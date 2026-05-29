@@ -41,6 +41,7 @@
 import { resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import BetterSqlite3 from 'better-sqlite3'
 
 // ---------------------------------------------------------------------------
@@ -372,6 +373,36 @@ async function main(): Promise<void> {
     ` skipped=${result.skipped}` +
     ` (noise=${counts.noise} parent_dupes=${counts.parent_brand_in_companies} exact_dupes=${counts.already_in_companies})`,
   )
+
+  // ---------------------------------------------------------------------------
+  // AUTO-FIRE: kick off enrichment for the just-inserted rows.
+  //
+  // Runs enrich-new-suppliers.ts --write immediately after merge so newly-added
+  // rows get website discovery + LLM capability extraction without any manual
+  // follow-up.  We pass --limit equal to the number just inserted so this run
+  // is scoped to the fresh batch (idempotent — already-enriched rows are skipped
+  // by the enricher anyway).
+  //
+  // Uses spawnSync (blocking) so the enrichment completes before this process
+  // exits.  On a large batch (800+) this will take several minutes — that is
+  // expected and intentional.
+  // ---------------------------------------------------------------------------
+  if (result.inserted > 0) {
+    const enricherPath = resolve(__dirname, 'enrich-new-suppliers.ts')
+    console.log()
+    console.log(`[merge-extracted-suppliers] Auto-firing enrichment for ${result.inserted} new rows…`)
+    const enrichResult = spawnSync(
+      'npx',
+      ['tsx', enricherPath, '--write', '--limit', String(result.inserted)],
+      { stdio: 'inherit', encoding: 'utf-8' },
+    )
+    if (enrichResult.status !== 0) {
+      console.error(`[merge-extracted-suppliers] WARNING: enrichment exited with code ${enrichResult.status}`)
+      console.error('  Run manually: npx tsx scripts/ingest/enrich-new-suppliers.ts --write --limit', result.inserted)
+    } else {
+      console.log('[merge-extracted-suppliers] Enrichment complete.')
+    }
+  }
 }
 
 main().catch(err => {
