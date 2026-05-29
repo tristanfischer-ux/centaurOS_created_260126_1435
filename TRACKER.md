@@ -7,6 +7,18 @@ _View styled: `~/.claude/scripts/show-md "/Users/tristanfischer/Developer/Centau
 ## Goal
 Recover BESS council quality toward ≥8 on a **deterministic, DB-grounded** document, and keep the engine universally sound (verified on VF). Driven by the principle: every fact comes **DB-first → search-on-miss → write-back → retrieve → grow**.
 
+## Active increment
+Engine deterministic-generation push to stable ≥8 council (Phase B single-source numbers + Phase C DB-pinned BoM); then re-validate the VF chain after the 2026-05-29 emitter rework (commit `ec954a39c`).
+
+## Missing-only recap (current — 2026-05-29, post-crash-recovery)
+_The engine-watchdog (`~/.claude/scripts/engine-watchdog.sh`) reads THIS section for the autonomous turn-start routing list. Keep these ❌ rows current; they are the live pending queue, NOT the stale `src/lib/pdf-engine-v2/TRACKER.md` (2026-05-07, Phase-P deferred)._
+
+| ID | Item | Status |
+|---|---|---|
+| ENG-8 | Deterministic-generation Phase B (single-source numbers) + Phase C (DB-pin 100% of BoM with provenance) → stable ≥8 BESS council | ❌ in progress |
+| VF-VALIDATE | Re-run VF chain through the 13-gate audit to validate the 40HC single-row / DX-HVAC-macro / external-skid emitter rework (commit `ec954a39c`); add a `dx_hvac_unit` macro-anchor regression invariant | ❌ pending chain run |
+| MODELS-TAIL | Finish the stale-model-id long tail: ~8 live-script refs (`enrich-state-with-suppliers`, `estimate-missing-prices`, `classify-pretraining-parts`, 2 audit scripts) + price-table GA keys (add-not-replace) + `claude-sonnet-4-7`→`4-6` bug | ❌ pending |
+
 ## Council trajectory (BESS)
 | Iter | Score | Note |
 |---|---|---|
