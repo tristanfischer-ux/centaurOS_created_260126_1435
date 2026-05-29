@@ -817,9 +817,14 @@ def camera_for_module(mod_centre, mod_dims, scene_bbox, camera_hint="three_quart
         return (cx + ux * horiz, cy + uy * horiz, cz + vert)
 
     if camera_hint == "front":
-        # Low elevation, camera on the module's outward face → the face fills
-        # the frame. ~20° elevation.
-        loc = _on_sphere(out, 20.0)
+        # 3/4-low angle: 40° azimuth off the outward normal toward the side
+        # axis + 22° elevation.  Provides the same "front face readable" quality
+        # as the pure front view but adds depth so the module's 3D form is
+        # legible (azimuth ≈40°, elevation ≈22°).  The previous straight-outward
+        # + 20° elevation rendered as a flat silhouette with no depth cue.
+        az = (out[0] * math.cos(math.radians(40)) + side[0] * math.sin(math.radians(40)),
+              out[1] * math.cos(math.radians(40)) + side[1] * math.sin(math.radians(40)))
+        loc = _on_sphere(az, 22.0)
         name = "front"
     elif camera_hint == "top_down":
         # High elevation looking down — roof / array / tray modules. Keep a
