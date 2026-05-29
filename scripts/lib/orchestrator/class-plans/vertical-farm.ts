@@ -410,7 +410,7 @@ const stepPestControl: ToolStep = {
         uvc_lamps_required: { value: out.lamps_required, unit: '', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: '4-log Botrytis', provenance: prov('lamps_required') as any },
         uvc_target_dose_mj_cm2: { value: out.target_dose_mJ_cm2, unit: 'mJ/cm²', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: null, provenance: prov('target_dose_mJ_cm2') as any },
         uvc_energy_kwh_cycle: { value: out.energy_kwh_per_cycle, unit: 'kWh', family: 'energy', basis: 'continuous', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'per sterilisation cycle', provenance: prov('energy_kwh_per_cycle') as any },
-        uvc_lockout_s: { value: out.eye_safety_lockout_time_s, unit: 's', family: 'time', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: 'ANSI Z535 occupancy interlock', provenance: prov('eye_safety_lockout_time_s') as any },
+        uvc_lockout_s: { value: out.eye_safety_lockout_time_s, unit: 's', family: 'time', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: 'ISO 3864 occupancy interlock', provenance: prov('eye_safety_lockout_time_s') as any },
       },
     }
   },

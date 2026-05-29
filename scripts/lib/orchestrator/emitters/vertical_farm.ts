@@ -1680,7 +1680,11 @@ function emitWorkerAccessSafety(p: VfParams) {
         cc('uvc_warning_label', 'UV-C warning label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.uvcLamps + 1)),
-          mod('regulatory', 'ANSI Z535.4 + ISO 7010'),
+          // ISO (not US ANSI Z535.4): ISO 3864-2 is the international product
+          // safety-label standard + ISO 7010 the symbols — accepted in UK, EU
+          // AND US, so it's jurisdiction-agnostic. ANSI Z535.4 failed gate-19 in
+          // the UK VF brief while every sibling label here already used EU/ISO.
+          mod('regulatory', 'ISO 3864-2 + ISO 7010'),
         ],
       ),
       word(
