@@ -119,6 +119,11 @@ const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   // was added to scripts/lib/engineering-contract.ts in the same change so the
   // max_plant_height_cm ceiling has an achieved headroom to audit against.
   total_growing_area_m2: { qtyKey: 'canopy_area_m2', label: 'Total growing area' },
+  // Brief-parser key-NAME non-determinism — same-unit growing-area synonyms.
+  growing_surface_area_m2: { qtyKey: 'canopy_area_m2', label: 'Total growing area' },
+  growing_area_m2: { qtyKey: 'canopy_area_m2', label: 'Total growing area' },
+  cultivation_area_m2: { qtyKey: 'canopy_area_m2', label: 'Total growing area' },
+  canopy_area_m2: { qtyKey: 'canopy_area_m2', label: 'Canopy area' },
   trolley_count: { qtyKey: 'trolley_count', label: 'Grow trolleys' },
   max_plant_height_cm: { qtyKey: 'tier_canopy_clearance_cm', label: 'Max plant height (tier clearance)' },
   // Brief parser non-determinism: same "~25 cm tall" brief parses as _cm one run,

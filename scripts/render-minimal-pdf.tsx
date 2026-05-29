@@ -4303,6 +4303,14 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
       // max_plant_height_cm → achieved tier_canopy_clearance_cm (FLOOR — each
       // tier's live headroom must clear the tallest plant the brief specifies).
       total_growing_area_m2:       { qtyKey: 'canopy_area_m2',            label: 'Total growing area',     unit: 'm²', tolerancePct: 5, kind: 'floor' },
+      // Brief-parser key-NAME non-determinism (distinct from unit-suffix variance
+      // above): iter-vf7 emitted growing_surface_area_m2 where iter-vf6 emitted
+      // total_growing_area_m2 — same "100 m² growing area" concept, different key.
+      // All same-unit (m²) growing-area synonyms resolve to the achieved canopy_area_m2.
+      growing_surface_area_m2:     { qtyKey: 'canopy_area_m2',            label: 'Total growing area',     unit: 'm²', tolerancePct: 5, kind: 'floor' },
+      growing_area_m2:             { qtyKey: 'canopy_area_m2',            label: 'Total growing area',     unit: 'm²', tolerancePct: 5, kind: 'floor' },
+      cultivation_area_m2:         { qtyKey: 'canopy_area_m2',            label: 'Total growing area',     unit: 'm²', tolerancePct: 5, kind: 'floor' },
+      canopy_area_m2:              { qtyKey: 'canopy_area_m2',            label: 'Canopy area',            unit: 'm²', tolerancePct: 5, kind: 'floor' },
       trolley_count:               { qtyKey: 'trolley_count',             label: 'Grow trolleys',          unit: '',   tolerancePct: 2, kind: 'exact' },
       max_plant_height_cm:         { qtyKey: 'tier_canopy_clearance_cm',  label: 'Max plant height (tier clearance)', unit: 'cm', tolerancePct: 5, kind: 'floor' },
       // The brief parser is non-deterministic on units: the same "~25 cm tall"
