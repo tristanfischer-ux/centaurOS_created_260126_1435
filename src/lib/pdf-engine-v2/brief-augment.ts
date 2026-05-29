@@ -310,34 +310,107 @@ function extractCropFromBriefText(briefText: string, productDescription: string)
 // product — not the cheapest commodity. Falls back to commodity midpoint when
 // premium is unavailable.
 //
-// For classes where output_unit != 'unit', we need a total quantity to
-// convert £/output_unit to £/product. We use a conservative "1 unit" fallback
-// (which is correct when output_unit IS 'unit') and log a note for reviewers.
+// For classes where output_unit != 'unit' (e.g. vertical_farm: £/m², BESS:
+// £/kWh), the per-unit-of-output midpoint MUST be multiplied by the design's
+// output quantity to produce a TOTAL ex-works ceiling comparable to the
+// achieved ex-works cost on the cover. Without the multiplication the
+// compliance check compares £2,450/m² against £140,488 total — a nonsensical
+// 57× breach on a correctly-priced VF.
+//
+// When the brief's target_performance.metrics[] carries the output quantity
+// (e.g. total_growing_area_m2 = 100 for a 100 m² VF), pass that value as
+// outputQuantity so inferCostCeiling can compute the TOTAL ceiling:
+//   £2,450/m² × 100 m² = £245,000 total ceiling.
+//
+// When outputQuantity is absent (brief has no scale metric), the per-unit-of-
+// output midpoint is stored with a rationale flagging the dependency — the
+// compliance renderer should handle this gracefully (e.g. show "per m²" with
+// a note rather than comparing against a total).
 
-function inferCostCeiling(productClass: string): { value: number; rationale: string } | null {
+function inferCostCeiling(
+  productClass: string,
+  outputQuantity?: number,
+): { value: number; perUnitMidpoint: number; outputUnit: string; rationale: string } | null {
   const band = MARKET_BANDS[productClass]
   if (!band) return null
 
   const { premium, commodity } = band.tiers
   const midPremium = Math.round((premium.low_gbp + premium.high_gbp) / 2)
   const midCommodity = Math.round((commodity.low_gbp + commodity.high_gbp) / 2)
-  const midpoint = midPremium > 0 ? midPremium : midCommodity
+  const perUnitMidpoint = midPremium > 0 ? midPremium : midCommodity
 
   if (band.output_unit === 'unit') {
     return {
-      value: midpoint,
-      rationale: `Class market-band midpoint (premium tier) for ${productClass}: £${midpoint.toLocaleString()} per unit. Source: ${band.source}`,
+      value: perUnitMidpoint,
+      perUnitMidpoint,
+      outputUnit: 'unit',
+      rationale: `Class market-band midpoint (premium tier) for ${productClass}: £${perUnitMidpoint.toLocaleString()} per unit. Source: ${band.source}`,
     }
   }
 
-  // For £/kWh, £/kW, £/m², etc. — we report the per-unit-of-output figure
-  // and note that the total cost ceiling depends on the design's scale.
-  // Return the per-output-unit midpoint for display in Section 1B; the
-  // engineering-contract builder will multiply by the design quantity.
-  return {
-    value: midpoint,
-    rationale: `Class market-band midpoint (premium tier) for ${productClass}: £${midpoint.toLocaleString()} per ${band.output_unit} — total ceiling depends on design scale. Source: ${band.source}`,
+  // For £/kWh, £/kW, £/m², £/L etc.: multiply by the design's output quantity
+  // so the stored value is a TOTAL ceiling comparable to the achieved ex-works
+  // cost. This makes "Achieved ex-works £140,488 vs ceiling £245,000" (PASS)
+  // rather than "vs ceiling £2,450" (false FAIL at 57×).
+  if (outputQuantity != null && outputQuantity > 0) {
+    const totalCeiling = Math.round(perUnitMidpoint * outputQuantity)
+    return {
+      value: totalCeiling,
+      perUnitMidpoint,
+      outputUnit: band.output_unit,
+      rationale: `Class market-band midpoint (premium tier) for ${productClass}: £${perUnitMidpoint.toLocaleString()} per ${band.output_unit} × ${outputQuantity} ${band.output_unit} (from brief target_performance) = £${totalCeiling.toLocaleString()} total ceiling. Source: ${band.source}`,
+    }
   }
+
+  // No output quantity available — store the per-unit-of-output midpoint and
+  // flag in the rationale. The compliance renderer must NOT compare this raw
+  // value against the total ex-works cost.
+  return {
+    value: perUnitMidpoint,
+    perUnitMidpoint,
+    outputUnit: band.output_unit,
+    rationale: `Class market-band midpoint (premium tier) for ${productClass}: £${perUnitMidpoint.toLocaleString()} per ${band.output_unit} — total ceiling unknown (no output quantity in brief). Compliance check should compare on a per-${band.output_unit} basis. Source: ${band.source}`,
+  }
+}
+
+// ─── Output-quantity extraction from brief target_performance ─────────────────
+//
+// Reads the brief's target_performance.metrics[] for a 'scale' category metric
+// whose key matches the class's typical output-quantity key (same vocabulary as
+// market-bands.ts readOutputQuantity / engineering-contract.ts shared_quantities).
+// Returns the numeric value, or null when absent.
+
+function extractOutputQuantityFromBrief(
+  brief: StructuredBriefJSON,
+  productClass: string,
+): number | null {
+  const metrics = brief.constraints.target_performance.metrics ?? []
+  // Per-class preferred key order (mirrors market-bands.ts readOutputQuantity).
+  const PREFERRED_KEYS: Record<string, string[]> = {
+    bess_utility_scale: ['usable_capacity_kwh', 'nameplate_capacity_kwh', 'nameplate_capacity_mwh'],
+    bess:              ['usable_capacity_kwh', 'nameplate_capacity_kwh', 'nameplate_capacity_mwh'],
+    energy_storage:    ['usable_capacity_kwh', 'nameplate_capacity_kwh', 'nameplate_capacity_mwh'],
+    haps:              ['wingspan_m'],
+    vertical_farm:     ['canopy_area_m2', 'growing_area_m2', 'total_growing_area_m2'],
+    ev_charger:        ['rated_power_kw', 'continuous_power_kw'],
+    heat_pump_residential: ['rated_thermal_output_kw', 'continuous_power_kw'],
+    bioreactor:        ['working_volume_l', 'volume_l'],
+    wind_turbine:      ['rated_power_kw', 'continuous_power_kw'],
+    h2_electrolyser:   ['rated_power_kw', 'continuous_power_kw'],
+    solar_inverter:    ['rated_power_kw', 'continuous_power_kw'],
+  }
+  // Try preferred keys first (exact or suffix match against key_metric).
+  const preferred = PREFERRED_KEYS[productClass] ?? []
+  for (const want of preferred) {
+    const m = metrics.find(
+      mm => mm.key_metric === want || mm.key_metric?.endsWith(want) || want.endsWith(mm.key_metric ?? ''),
+    )
+    if (m && m.value != null && Number.isFinite(m.value) && m.value > 0) return m.value
+  }
+  // Fallback: first 'scale' category metric with a positive value.
+  const scaleMetric = metrics.find(mm => mm.category === 'scale' && mm.value != null && Number.isFinite(mm.value) && mm.value > 0)
+  if (scaleMetric) return scaleMetric.value
+  return null
 }
 
 // ─── Main augmentation function ──────────────────────────────────────────────
@@ -400,9 +473,15 @@ export function augmentBrief(
   }
 
   // ── 1. unit_cost_ceiling ─────────────────────────────────────────────────
+  //
+  // For classes with output_unit != 'unit' (e.g. vertical_farm: £/m²),
+  // inferCostCeiling needs the design's output quantity so it can produce
+  // a TOTAL ceiling (£/m² × m²) comparable to the achieved ex-works cost.
+  // Extract the quantity from the brief's target_performance.metrics[] first.
+  const outputQtyForCeiling = extractOutputQuantityFromBrief(brief, productClass)
 
   if (c.unit_cost_ceiling.source !== 'user' || c.unit_cost_ceiling.value === null) {
-    const inferred = inferCostCeiling(productClass)
+    const inferred = inferCostCeiling(productClass, outputQtyForCeiling ?? undefined)
     if (inferred && (c.unit_cost_ceiling.value === null || c.unit_cost_ceiling.source === 'missing')) {
       const result = fillField(
         'unit_cost_ceiling',

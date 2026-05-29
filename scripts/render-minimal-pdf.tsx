@@ -189,6 +189,13 @@ function normalise_unicode(s: string): string {
     .replace(/≈/g, '~')
     // Greek micro sign µ (U+00B5) and mu (U+03BC) → ASCII u (closest match)
     .replace(/[µμ]/g, 'u')
+    // Greek small epsilon ε (U+03B5) — zero advance-width in Helvetica AFM;
+    // falls back to a low-9 quotation mark (U+201A ‚) which renders at the
+    // same X as the FOLLOWING text span, causing layout-overlap gate-11 fails.
+    // VF iter-vf3 audit: page 71 "µ-NTU Heat Exchanger" (ε-NTU), pages 69/74
+    // section headings. Map to "eps" so the glyph takes real advance width.
+    // Also map uppercase Ε (U+0395) for completeness.
+    .replace(/[εΕ]/g, 'eps')
     // Ohm sign Ω (U+03A9, U+2126) → ohm
     .replace(/[Ω]/g, 'ohm')
     // Greek capital delta Δ (U+0394) → "delta" or "D". Used throughout
@@ -3788,7 +3795,7 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
             <Text style={{ fontSize: 8.5, color: MUTED, letterSpacing: 0.4 }}>{f.label.toUpperCase()}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5 }}>{f.value}</Text>
+            <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5 }}>{normalise_unicode(f.value)}</Text>
           </View>
         </View>,
       )
@@ -3859,7 +3866,7 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 9, color: isMissing ? '#9a3412' : INK, fontFamily: isInferred ? 'Helvetica-Oblique' : 'Helvetica' }}>
-                {r.rendered}
+                {normalise_unicode(r.rendered)}
                 {isInferred ? <Text style={{ fontSize: 7.5, color: '#9a3412' }}>  · inferred by LLM</Text> : null}
                 {isMissing ? <Text style={{ fontSize: 7.5, color: '#9a3412' }}>  · not specified in brief</Text> : null}
               </Text>
@@ -6269,7 +6276,11 @@ function ModuleSection({
   for (const sm of (moduleSpec.sub_modules ?? [])) {
     const livePara = clean_prose(generateSubmoduleParagraph(sm as any))
     subModulesById.set(sm.id, {
-      name: sm.name_human || humanise(sm.id),
+      // normalise_unicode applied here so ε/µ/CO₂ in name_human go through
+      // the chokepoint before reaching the Helvetica-Bold heading at line ~6637.
+      // Without this, ε-NTU renders as '‚' (zero-advance low-9 quotation mark)
+      // which smears onto the following text span — gate-11 overlap finding.
+      name: normalise_unicode(sm.name_human || humanise(sm.id)),
       sentence: '',
       paragraph: livePara,
     })
@@ -7778,6 +7789,135 @@ function BillOfMaterialsPage({
       </Page>,
     )
   })
+
+  // ── Consumables (per cycle) and Supplied separately (external) segments ──
+  //
+  // These rows are excluded from the capital BoM grand total (they are not
+  // capital expenditure), so they are not in the main chunk list above.
+  // Render them as a dedicated continuation page when non-empty, so the
+  // buyer can plan ongoing procurement and logistics costs.
+  //
+  // Only shown when at least one segment has rows. Each segment has:
+  //   • a section header
+  //   • one row per item (name, qty, unit £, line total) in the same
+  //     column layout as the main BoM
+  //   • a segment total
+  const consumablesRows = bomTotals.consumablesRows ?? []
+  const consumablesTotal = bomTotals.consumablesTotal_gbp ?? 0
+  const externalRows = bomTotals.externalRows ?? []
+  const externalTotal = bomTotals.externalTotal_gbp ?? 0
+  const hasConsumables = consumablesRows.length > 0
+  const hasExternal = externalRows.length > 0
+
+  if (hasConsumables || hasExternal) {
+    const fmtGBPSeg = fmtGBP_shared
+    pages.push(
+      <Page key="bom-page-ancillary" size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Section 6 · Bill of Materials (ancillary)" project={project} />
+        <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 10 }}>
+          Bill of Materials — ancillary items
+        </Text>
+        <Text style={{ fontSize: 9, color: MUTED, fontStyle: 'italic', marginBottom: 12 }}>
+          These items are excluded from the capital raw-materials total above. Consumables are
+          replenished each production cycle. Externally-supplied sub-systems are sourced as complete
+          units outside this product's manufacturing scope.
+        </Text>
+
+        {/* ── Column header ── */}
+        {renderTableHead()}
+
+        {/* ── Consumables (per cycle) segment ── */}
+        {hasConsumables ? (
+          <>
+            <View wrap={false} style={{ marginTop: 8, marginBottom: 4, paddingVertical: 4, paddingHorizontal: 6, backgroundColor: '#f1f5f9', borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+                Consumables (per cycle)
+              </Text>
+              <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic' }}>
+                Not included in capital BoM — replenished each production cycle
+              </Text>
+            </View>
+            {consumablesRows.map((row, ri) => (
+              <View key={`cons-${ri}`} wrap={false} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.4, borderBottomColor: '#e2e8f0' }}>
+                <View style={{ flex: 4 }}>
+                  <Text style={{ fontSize: 9, color: INK }}>{title_case(row.word_name)}</Text>
+                </View>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK_SOFT }}>{row.quantity.toLocaleString('en-GB')}</Text>
+                </View>
+                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK_SOFT }}>{fmtGBPSeg(row.unit_price_gbp)}</Text>
+                </View>
+                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK, fontFamily: 'Helvetica-Bold' }}>{fmtGBPSeg(row.line_total_gbp)}</Text>
+                </View>
+                <View style={{ flex: 0.9 }} />
+              </View>
+            ))}
+            <View wrap={false} style={{ flexDirection: 'row', paddingTop: 4, paddingBottom: 6, marginBottom: 10, borderTopWidth: 0.8, borderTopColor: ACCENT_SOFT }}>
+              <View style={{ flex: 4 }}>
+                <Text style={{ fontSize: 9, color: MUTED, fontStyle: 'italic' }}>Consumables sub-total (per cycle)</Text>
+              </View>
+              <View style={{ flex: 1 }} />
+              <View style={{ flex: 1.5 }} />
+              <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT }}>{fmtGBP_subtotal(consumablesTotal)}</Text>
+              </View>
+              <View style={{ flex: 0.9 }} />
+            </View>
+          </>
+        ) : null}
+
+        {/* ── Supplied separately (external) segment ── */}
+        {hasExternal ? (
+          <>
+            <View wrap={false} style={{ marginTop: 8, marginBottom: 4, paddingVertical: 4, paddingHorizontal: 6, backgroundColor: '#f1f5f9', borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+                Supplied separately (external)
+              </Text>
+              <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic' }}>
+                Not included in capital BoM — externally-sourced, outside this product's manufacturing scope
+              </Text>
+            </View>
+            {externalRows.map((row, ri) => (
+              <View key={`ext-${ri}`} wrap={false} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.4, borderBottomColor: '#e2e8f0' }}>
+                <View style={{ flex: 0.8 }}>
+                  <Text style={{ fontSize: 8, color: INK_SOFT }}>{title_case(row.sub_module_name)}</Text>
+                </View>
+                <View style={{ flex: 3.2 }}>
+                  <Text style={{ fontSize: 9, color: INK }}>{title_case(row.word_name)}</Text>
+                </View>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK_SOFT }}>{row.quantity.toLocaleString('en-GB')}</Text>
+                </View>
+                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK_SOFT }}>{fmtGBPSeg(row.unit_price_gbp)}</Text>
+                </View>
+                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK, fontFamily: 'Helvetica-Bold' }}>{fmtGBPSeg(row.line_total_gbp)}</Text>
+                </View>
+                <View style={{ flex: 0.9 }} />
+              </View>
+            ))}
+            <View wrap={false} style={{ flexDirection: 'row', paddingTop: 4, paddingBottom: 6, marginBottom: 10, borderTopWidth: 0.8, borderTopColor: ACCENT_SOFT }}>
+              <View style={{ flex: 0.8 }} />
+              <View style={{ flex: 3.2 }}>
+                <Text style={{ fontSize: 9, color: MUTED, fontStyle: 'italic' }}>External sub-total</Text>
+              </View>
+              <View style={{ flex: 1 }} />
+              <View style={{ flex: 1.5 }} />
+              <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT }}>{fmtGBP_subtotal(externalTotal)}</Text>
+              </View>
+              <View style={{ flex: 0.9 }} />
+            </View>
+          </>
+        ) : null}
+
+        <PageFooter />
+      </Page>,
+    )
+  }
 
   return <>{pages}</>
 }
