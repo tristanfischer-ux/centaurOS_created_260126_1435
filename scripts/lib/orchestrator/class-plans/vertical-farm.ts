@@ -685,7 +685,7 @@ const stepFanCoil: ToolStep = {
 const stepRefrigCycle: ToolStep = {
   tool_id: 'refrigeration-cycle:cop',
   required: false,
-  feeds_into: [] as string[],
+  feeds_into: ['pandapower:grid-integration'] as string[],
   // Bug fix #13 (2026-05-22): the previous inputs (evap 5°C / cond 45°C /
   // isentropic 0.70) produced a 5.59 COP that overstated efficiency by ~85%
   // against the real ~3.0 COP for VF dehumidification reheat at UK design
@@ -828,7 +828,13 @@ const stepPandaPower: ToolStep = {
   input_from_contract: (c: any) => {
     // Total electrical demand: LED + HVAC chiller + dehumidifier + pumps + AHU fans + aux.
     const ledKw = c.quantities?.led_installed_power_kw?.value ?? 12
-    const hvacKw = c.quantities?.hvac_compressor_power_kw?.value ?? 7
+    // Prefer the CoolProp-derived compressor power from refrigeration-cycle:cop
+    // (more accurate Rankine-cycle result) over the HVAC step's approximation
+    // (chiller_capacity / estimated_COP). Falls back to hvac_compressor_power_kw
+    // when refrigeration-cycle has not yet run (standalone / first-pass).
+    const hvacKw = c.quantities?.chiller_compressor_power_kw?.value
+      ?? c.quantities?.hvac_compressor_power_kw?.value
+      ?? 7
     const dehumKw = c.quantities?.dehumidifier_electrical_kw?.value ?? 2
     const pumpKw = c.quantities?.irrigation_pump_motor_kw?.value ?? 0.75
     const ahuKw = c.quantities?.ahu_fan_power_kw?.value ?? 1.5
@@ -853,9 +859,13 @@ const stepPandaPower: ToolStep = {
       ena_g99_compliance: boolean
     }
     const prov = makeProv('pandapower:grid-integration', '3.4.0', 'BSD-3-Clause', 'github.com/e2nIEE/pandapower', 'library')
-    // Compute total electrical demand from inputs (we summed in input_from_contract)
+    // Compute total electrical demand from inputs (mirrors input_from_contract logic).
+    // Use chiller_compressor_power_kw from refrigeration-cycle:cop when available
+    // (coupling: refrigeration-cycle:cop → pandapower:grid-integration).
     const ledKw = c.quantities?.led_installed_power_kw?.value ?? 12
-    const hvacKw = c.quantities?.hvac_compressor_power_kw?.value ?? 7
+    const hvacKw = c.quantities?.chiller_compressor_power_kw?.value
+      ?? c.quantities?.hvac_compressor_power_kw?.value
+      ?? 7
     const dehumKw = c.quantities?.dehumidifier_electrical_kw?.value ?? 2
     const pumpKw = c.quantities?.irrigation_pump_motor_kw?.value ?? 0.75
     const ahuKw = c.quantities?.ahu_fan_power_kw?.value ?? 1.5
