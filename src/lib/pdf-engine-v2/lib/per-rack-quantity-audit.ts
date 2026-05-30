@@ -155,6 +155,16 @@ const PER_RACK_RE =
 /** Limiting-language guards — these indicate capacity limits, not multiplied totals. */
 const LIMITING_LANGUAGE_RE = /\b(max|maximum|up\s+to|at\s+most|no\s+more\s+than|at\s+least|minimum)\b/i
 
+/** Measurement-unit-CAPACITY guard (2026-05-30, BESS exit-26 false positive): a
+ *  noun phrase that STARTS with a measurement unit followed by "of" or end-of-
+ *  phrase is a per-denominator CAPACITY/RATING, not a count. "15 kW of cold-plate
+ *  capacity per rack" = 15 kW per rack (a rating), NOT "15 cold-plates per rack" —
+ *  it must not be multiplied by the rack count. The "(\s+of\b|\s*$)" constraint
+ *  keeps real counts like "15 kWh modules per rack" (unit immediately followed by
+ *  a noun, not "of") from being skipped. Universal across all classes. */
+const MEASUREMENT_UNIT_CAPACITY_RE =
+  /^(kwh?|mwh?|gwh?|wh|gw|kv|mv|kva|kvar|var|ah|ka|ma|hz|khz|mhz|ghz|mm|cm|km|kg|lpm|gpm|bar|kpa|mpa|pa|psi|nm|rpm|dba?|ppm|m2|m3|w|v|a|t|m|l)(\s+of\b|\s*$)/i
+
 // ── Fuzzy word matcher ────────────────────────────────────────────────────────
 
 /**
@@ -313,6 +323,11 @@ export function runPerRackQuantityAudit(
         // Guard: skip count <= 1 (1-per-X is a 1:1 mapping, not a multiplier bug)
         const countPerUnit = parseCount(countStr.trim())
         if (countPerUnit === null || countPerUnit <= 1) continue
+
+        // Guard: skip a MEASUREMENT-UNIT capacity ("15 kW of cold-plate capacity
+        // per rack" = a per-rack rating, not "15 items per rack"). See
+        // MEASUREMENT_UNIT_CAPACITY_RE. BESS exit-26 false positive 2026-05-30.
+        if (MEASUREMENT_UNIT_CAPACITY_RE.test(trimmedNoun)) continue
 
         // Guard: skip limiting language in the preceding 40 characters.
         const preceding = proseFields.slice(Math.max(0, match.index - 40), match.index)
