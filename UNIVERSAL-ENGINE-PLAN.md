@@ -66,12 +66,29 @@ Definition of done (per class, zero new code):
 - **Why now:** Tristan decided "full growing-DB + price from it." Self-contained, high-value (grounds cost universally), and a **clean working template** for the Lever-1 DB-grounding pattern (Lever 1 writ small).
 - **Effort:** medium. Migration + seed + DB-first read in `engineering-contract`/`audit-pdf-bom` + refresh job + invariant. **Executing now.**
 
-## Sequencing
-1. **Lever 5 (materials DB)** — now. Decided, self-contained, a working template for the DB-grounding pattern.
-2. **Lever 1 (DB-grounded class reference)** — the keystone; unblocks 3.
-3. **Lever 3 (universal emitter)** — consumes Lever 1.
-4. **Lever 2 (auto-planner)** — parallelisable with 1/3; biggest per-class reduction.
-5. **Lever 4 (universal contract)** — long tail, last.
+## ⚠️ AUDIT CORRECTION (2026-05-30, code-grounded — supersedes the lever ranking above)
+
+A full code audit (not memory, not the tracker) found the lever ranking above was **wrong on two of five** — the tracker's "class grounding is FROZEN baked TS" is **stale**. The accurate picture: the universal machinery is largely **BUILT BUT INERT**, and the real obstacle is **four parallel hardcoded class enumerations**, not missing infrastructure.
+
+| Lever | Real state (verified) |
+|---|---|
+| 1 — Class reference | **Built + read-wired**, BUT the DB-first read (`getClassReferenceGraphDBFirst`, chain:4063) feeds only a **soft K10 validator** (`validateConnectionsAgainstGraph`, non-fatal) — it never *generates* a design. `writebackDiscoveredNode/Edge` (class-reference-graph-db.ts:254/296) have **ZERO callers** → the "growing" half is dead code. |
+| 2 — Auto-planner | **Built** (`auto-planner.ts:87 composeToolGraph`, real Tarjan/Kahn) but has **ZERO runtime callers** AND **no tool declares I/O** (`output_keys` appears only in auto-planner.ts) → dormant + starved. The orchestrator uses `selectPlan()` (registry of 35) exclusively. |
+| 3 — Universal emitter | **Does not exist.** `assembler.ts:153` returns `{ok:false}` for any class without an exact hand-written emitter. The only lever with *zero* fallback. |
+| 4 — Universal contract | **Empty fallback.** Unknown class → `buildContract` returns null → empty contract (`{quantities:{}}`). `buildMinimalContract` exists but is a helper the stubs call, not a registry fallback. |
+| 5 — Materials DB | ✅ DONE this session. |
+
+**The four walls a new class must pass (in failure order):** ① `detectEnvelope` (envelope.ts:1876) → ② `selectPlan` (planner.ts) → ③ assembler (assembler.ts:153) → ④ contract archetype. **The envelope detector fails FIRST** → chain `exit 7`. So universality = defeat all four enumerations (+ then *populate grounding* via the now-dead writeback so the result is GOOD, not just non-crashing).
+
+## Corrected sequencing
+1. ✅ **Lever 5 (materials DB)** — done.
+2. ✅ **Wall ① — generic envelope fallback** (`envelope.ts`, commit cde61c6de) — done; registered classes unaffected.
+3. **Wall ② — generic plan fallback** (`planner.ts selectPlan` miss → minimal universal-tools plan; later, wire `composeToolGraph` once a tool-I/O manifest exists). _Next._
+4. **Wall ④ — contract fallback** (`engineering-contract.ts buildContract` miss → `buildMinimalContract` instead of empty). Small + safe.
+5. **Wall ③ — generic graph-driven emitter** (`assembler.ts` catch-all from class-ref graph + contract). The HARD one + only lever with no fallback; needs council validation → a focused, NOT-autonomous session.
+6. **Grounding-discovery** — wire the dead `writebackDiscoveredNode/Edge` + a tool-I/O manifest so an unseen class's graph + plan actually *populate* (the "grows" half), turning "runs" into "runs well".
+
+> ⚠️ Walls ②–③ touch core orchestration with real regression risk to the 35 registered classes, and wall ③ + grounding need council runs to validate quality. They are a focused session with the cost-monitor protocol, not an autonomous sprawl.
 
 Cross-cutting: keep every change behind the 30-gate floor + a regression invariant (per the "iter-N catches iter-(N+1)" rule). Never let a universalisation drop a class below its current council score — validate on BESS + VF + wind each step (the three I have warm states for).
 

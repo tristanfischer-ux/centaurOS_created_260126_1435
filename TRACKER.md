@@ -15,6 +15,8 @@ _The engine-watchdog (`~/.claude/scripts/engine-watchdog.sh`) reads THIS section
 
 | ID | Item | Status |
 |---|---|---|
+| UNIV-WALLS | **Universal class support (Tristan mandate 2026-05-30 "make all industrial products/classes").** Plan: `UNIVERSAL-ENGINE-PLAN.md`. A new class hits 4 hardcoded enumerations; envelope fails first. ✅ Wall 1 (generic envelope, cde61c6de). ❌ Wall 2 (generic plan / wire dormant composeToolGraph), Wall 4 (buildMinimalContract fallback), Wall 3 (generic graph-driven emitter — HARD, council-gated). Machinery is BUILT-BUT-INERT (drawer `forgeos_universal_class_machinery_built_but_inert`) — WIRE, don't rebuild | ❌ walls 2-4 open |
+| MATERIALS-DB | ✅ DONE 2026-05-30 (e9e39d179 + 7f80bf0d7) — `material_prices` growing-DB in forge-truth.db; getMaterialPrice DB-first + static fallback; B-8 grounds in DB; `deriveMacroMaterialRateGbpPerKg` price-from-it primitive (auto-derives wind blade £18.3/kg). Live feed = pluggable hook | ✅ done |
 | ENG-8 | Deterministic-generation Phase B (single-source numbers) + Phase C (DB-pin 100% of BoM with provenance) → stable ≥8 BESS council | ❌ in progress |
 | VF-VALIDATE | Re-run VF chain through the 13-gate audit to validate the 40HC single-row / DX-HVAC-macro / external-skid emitter rework (commit `ec954a39c`); add a `dx_hvac_unit` macro-anchor regression invariant | ❌ pending chain run |
 | MODELS-TAIL | Finish the stale-model-id long tail: ~8 live-script refs (`enrich-state-with-suppliers`, `estimate-missing-prices`, `classify-pretraining-parts`, 2 audit scripts) + price-table GA keys (add-not-replace) + `claude-sonnet-4-7`→`4-6` bug | ❌ pending |
