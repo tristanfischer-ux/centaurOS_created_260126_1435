@@ -33,6 +33,7 @@
 import { readFileSync, existsSync, writeFileSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join, basename } from 'node:path'
+import { checkMacroMaterialRate } from '../src/lib/pdf-engine-v2/lib/material-prices'
 
 interface Finding {
   severity: 'HIGH' | 'MED' | 'LOW' | 'INFO'
@@ -513,6 +514,26 @@ async function audit(outDir: string): Promise<{ findings: Finding[]; bom: BomExt
             `[£${band.low_gbp_per_unit}–£${band.high_gbp_per_unit}, typical £${band.typical_gbp_per_unit}].`,
         })
       }
+    }
+  }
+
+  // ── B-8 per-macro material-cost plausibility (2026-05-30, Tristan-asked) ──
+  // Grounds each MATERIAL-DOMINATED macro's £/kg rate in the real commodity
+  // price of the material it is mostly made of (lib/material-prices.ts). A rate
+  // >3× the manufactured-high band is an egregious magnitude error (the wind
+  // blade shipped at £180/kg when a GFRP-blade is ~£12-28/kg) and HARD-FAILS
+  // (exit 10) — the per-component complement to B-7's aggregate £/output band.
+  // Complex assemblies (nacelle, drivetrain, generator) are skipped — they
+  // legitimately exceed raw-material £/kg. Deterministic; universal across classes.
+  const macrosForMaterial = (state?.engineeringContract?.macro_assembly_prices ?? []) as Array<Record<string, unknown>>
+  for (const m of macrosForMaterial) {
+    const v = checkMacroMaterialRate(m as any)
+    if (v && v.severity !== 'OK') {
+      findings.push({
+        severity: v.severity,
+        check_id: 'B-8',
+        detail: `Material-cost ${v.severity === 'HIGH' ? 'IMPLAUSIBLE — likely a £/kg magnitude error' : 'outlier'}: ${v.detail}`,
+      })
     }
   }
 
