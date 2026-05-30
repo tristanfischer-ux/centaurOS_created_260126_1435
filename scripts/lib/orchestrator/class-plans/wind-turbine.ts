@@ -88,20 +88,42 @@ const stepWindpowerlib: ToolStep = {
   feeds_into: [] as string[],
   input_from_contract: (c: any) => ({
     rated_power_kw: c.quantities?.rated_power_kw?.value ?? 50,
-    cut_in_m_s: c.quantities?.cut_in_wind_speed_m_s?.value ?? 3,
-    rated_m_s: c.quantities?.rated_wind_speed_m_s?.value ?? 11.5,
-    cut_out_m_s: c.quantities?.cut_out_wind_speed_m_s?.value ?? 25,
+    // 2026-05-30 capacity-factor fix: the python tool defaults rotor_diameter_m=20
+    // and hub_height_m=50 when absent. For a 6 MW / 155 m machine the 20 m rotor
+    // (314 m² swept vs the real 18,869 m²) caps the synthetic power curve at
+    // ~1.35 MW, so the turbine "never reaches" its 6 MW rating and capacity factor
+    // collapses to ~9% (the "≥9%" Tristan flagged). Pass the real rotor + hub +
+    // site wind so AEP/CF are physical. ALSO fix the key NAMES: the tool reads
+    // cut_in_ms / rated_ms / cut_out_ms (no underscore before "ms") — the old
+    // cut_in_m_s keys silently no-op'd to tool defaults (3/12/25).
+    rotor_diameter_m: c.quantities?.rotor_diameter_m?.value ?? 18,
+    hub_height_m: c.quantities?.hub_height_m?.value ?? 24,
+    // mean_wind is already a HUB-HEIGHT figure (the site tool computes it at
+    // hub_height_m; a brief's "7 m/s mean site" for UK onshore is a hub-height
+    // mean — 10 m would be ~5-6 m/s). Set ref_height_m = hub_height so the tool
+    // does NOT shear it a second time (ref=10 → 120 m inflated 7 → 11.5 m/s and
+    // pushed CF to an offshore-like 59%; no-shear gives a physical ~35%).
+    mean_wind_speed_ms: c.quantities?.site_mean_wind_m_s?.value ?? 7.0,
+    ref_height_m: c.quantities?.hub_height_m?.value ?? 24,
+    weibull_k: c.quantities?.site_weibull_k?.value ?? 2.0,
+    cut_in_ms: c.quantities?.cut_in_wind_speed_m_s?.value ?? 3,
+    rated_ms: c.quantities?.rated_wind_speed_m_s?.value ?? 11.5,
+    cut_out_ms: c.quantities?.cut_out_wind_speed_m_s?.value ?? 25,
     cp_max: c.quantities?.rotor_cp_max?.value ?? 0.45,
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { annual_energy_kwh: number; capacity_factor_pct: number }
     const prov = (f: string) => ({ source: 'tool:wind-resource:iec61400' as const, tool_id: 'wind-resource:iec61400', tool_version: '0.2.2', tool_license: 'MIT' as const, tool_source_url: 'github.com/wind-python/windpowerlib', invocation_output_field: f, duration_ms: 0 })
+    // Condition label reflects the ACTUAL site mean wind fed to the tool, not a
+    // hardcoded "6 m/s" string (stale + misleading — the tool defaults to 7.0
+    // when site_mean_wind_m_s is absent).
+    const siteMeanWind = c.quantities?.site_mean_wind_m_s?.value ?? 7.0
     return {
       ...c,
       quantities: {
         ...c.quantities,
-        annual_energy_kwh: { value: out.annual_energy_kwh ?? 130000, unit: 'kWh', family: 'energy', basis: 'rated', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: '6 m/s site Weibull', provenance: prov('annual_energy_kwh') },
-        capacity_factor_pct: { value: out.capacity_factor_pct ?? 30, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'class III site', provenance: prov('capacity_factor_pct') },
+        annual_energy_kwh: { value: out.annual_energy_kwh ?? 130000, unit: 'kWh', family: 'energy', basis: 'rated', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: `${siteMeanWind.toFixed(1)} m/s site Weibull`, provenance: prov('annual_energy_kwh') },
+        capacity_factor_pct: { value: out.capacity_factor_pct ?? 30, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: `${siteMeanWind.toFixed(1)} m/s annual mean`, provenance: prov('capacity_factor_pct') },
       },
     }
   },

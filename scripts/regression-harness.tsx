@@ -218,6 +218,33 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL.energy_capacity_factor_reconciles ──────────────────────────
+  // When a state carries annual_energy_kwh + capacity_factor_pct + rated power,
+  // they MUST reconcile: CF% ≈ annual_energy_kwh / (rated_kw × 8760) × 100.
+  // Guards the 2026-05-30 wind bug: the wind-resource tool was fed a 20 m DEFAULT
+  // rotor (the class-plan payload omitted rotor_diameter_m + misnamed the cut-in/
+  // rated/cut-out keys), so it computed CF against a phantom ~1.35 MW curve —
+  // capacity_factor_pct=9.33% while annual_energy implied 2.1%. The two disagreed
+  // AND both were wrong. A correct run reconciles to within 15%. Fires only when
+  // all three fields are present (wind + any class emitting annual energy).
+  {
+    const q = state?.orchestratorContract?.quantities ?? {}
+    const cfPct = q?.capacity_factor_pct?.value
+    const aepKwh = q?.annual_energy_kwh?.value
+    const ratedKw = q?.rated_power_kw?.value
+    if (typeof cfPct === 'number' && cfPct > 0 && typeof aepKwh === 'number' && aepKwh > 0 && typeof ratedKw === 'number' && ratedKw > 0) {
+      const impliedCf = (aepKwh / (ratedKw * 8760)) * 100
+      const ratio = impliedCf / cfPct
+      assertions.push(assertEq(
+        'UNIVERSAL.energy_capacity_factor_reconciles',
+        `capacity_factor_pct (${cfPct.toFixed(1)}%) reconciles with annual_energy/(rated×8760) (${impliedCf.toFixed(1)}%)`,
+        ratio >= 0.85 && ratio <= 1.15,
+        (ok) => ok,
+        () => `capacity_factor_pct=${cfPct.toFixed(2)}% but annual_energy_kwh=${aepKwh.toFixed(0)} / (${ratedKw}×8760) implies ${impliedCf.toFixed(2)}% — a ${ratio.toFixed(2)}× mismatch. The wind-resource tool likely computed CF against a wrong rotor/rating; check rotor_diameter_m + hub_height_m are passed in the class-plan payload (scripts/lib/orchestrator/class-plans/wind-turbine.ts).`,
+      ))
+    }
+  }
+
   // ── UNIVERSAL.designs_within_premium_band_unless_flagged ─────────────────
   // For any state.json where the product_class is in MARKET_BANDS, assert
   // installed_asp_gbp / output_units is within ±10% of premium.high_gbp OR
