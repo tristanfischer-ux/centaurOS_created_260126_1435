@@ -28,6 +28,7 @@ import { getClassHazards, computeHazardRPN, type ClassHazard } from '../src/lib/
 import { resolvePriceBand, type PriceBand, type PriceBandVerdict } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { computeImprovementPlan } from '../src/lib/pdf-engine-v2/lib/auto-improve'
+import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { checkMacroMaterialRate } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import {
@@ -3201,6 +3202,60 @@ function formatPerfValue(v: unknown): string {
     }
   }
   return s
+}
+
+// Executive Summary page (2026-05-30) — a design-specific 3-paragraph narrative
+// (product / design outcome / next steps), the section the council scores against
+// the "not just a table" rubric. Synthesised deterministically from the brief
+// framing + the design's achieved headline + the compliance pass/fail tally +
+// the cost stack + the auto-improve levers (buildExecutiveSummary). Honest:
+// paragraph 2 names the breaches. Placed right after the cover.
+function ExecutiveSummaryPage({ state, project, bomTotals, costStack, priceReality }: { state: any; project: string; bomTotals: BomTotals | null; costStack?: CostStack | null; priceReality?: any }) {
+  const bop = state?.briefOverviewProse ?? {}
+  const pb = state?.parsedBrief ?? {}
+  const rows = _buildComplianceRows(state, bomTotals, costStack)
+  const pass = rows.filter((r) => r.status === 'pass').length
+  const fail = rows.filter((r) => r.status === 'fail').length
+  const failSummaries = rows
+    .filter((r) => r.status === 'fail')
+    .map((r) => `${r.constraint.toLowerCase()} ${r.designAchieved} vs ${r.briefTarget}${r.deltaText ? ` (${r.deltaText})` : ''}`)
+  const plan = computeImprovementPlan(_buildImprovementInput(state, bomTotals, costStack))
+  const ho = state?.keyMetrics?.headline_output
+  const headline = ho && typeof ho === 'object' && ho.value != null && ho.value !== ''
+    ? { label: String(ho.label ?? ''), value: ho.value, unit: String(ho.unit ?? '') }
+    : null
+  const exWorks = costStack && costStack.oem_transfer_price_gbp > 0 ? costStack.oem_transfer_price_gbp : (bomTotals?.grandTotal_gbp ?? null)
+  const perUnitVal = priceReality && typeof priceReality.metric_value === 'number' && priceReality.metric_value > 0 ? priceReality.metric_value : null
+  const perUnitName = priceReality?.natural_metric ? (String(priceReality.natural_metric).match(/£\s*\/\s*(\S+)/)?.[1] ?? null) : null
+  const costPerUnit = perUnitVal != null && perUnitName ? `£${Math.round(perUnitVal).toLocaleString('en-GB')}/${perUnitName}` : null
+  const pdName = String(pb?.product_description ?? '').trim().split(/(?<=[.])\s/)[0]
+  const classReadable = String(state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? 'product').replace(/_/g, ' ')
+  const article = /^[aeiou]/i.test(classReadable) ? 'an' : 'a'
+  const productName = (pdName && pdName.length <= 90 ? pdName : `${article} ${classReadable} system`).replace(/\.$/, '')
+  const summary = buildExecutiveSummary({
+    productName,
+    mission: String(bop.mission_statement ?? pb.mission_statement ?? ''),
+    targetCustomers: String(bop.target_customers ?? pb.target_customers ?? ''),
+    whyNow: String(bop.why_now ?? pb.why_now ?? ''),
+    headline,
+    compliancePass: pass, complianceFail: fail, complianceTotal: rows.length,
+    failSummaries,
+    exWorksCostGbp: exWorks,
+    costPerUnit,
+    improvementActions: plan.levers.map((l) => l.action),
+  })
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Executive Summary" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 10 }}>Executive summary</Text>
+      <Text style={{ fontSize: 11, color: INK, lineHeight: 1.6, marginBottom: 14 }}>{summary.product}</Text>
+      <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>Design outcome</Text>
+      <Text style={{ fontSize: 11, color: INK, lineHeight: 1.6, marginBottom: 14 }}>{summary.outcome}</Text>
+      <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>Recommendation &amp; next steps</Text>
+      <Text style={{ fontSize: 11, color: INK, lineHeight: 1.6 }}>{summary.next_steps}</Text>
+      <PageFooter />
+    </Page>
+  )
 }
 
 function PerformanceCardBody({ state }: { state: any }) {
@@ -10143,6 +10198,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           EngineeringQASummaryPage are removed — Tristan: "I don't think it
           adds much value". SystemLevelRisksPage moves to AFTER modules. */}
       {state.brief?.was_revised ? <BriefRevisionNoticePage state={state} project={project} /> : null}
+      <ExecutiveSummaryPage state={state} project={project} bomTotals={bomTotals} costStack={costStack} priceReality={priceReality} />
       <BriefPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       {/* Brief Provenance (universal — codified 2026-05-24): verbatim
           original brief + LLM-interpreted structured parse, side-by-side
