@@ -165,6 +165,12 @@ const LIMITING_LANGUAGE_RE = /\b(max|maximum|up\s+to|at\s+most|no\s+more\s+than|
 const MEASUREMENT_UNIT_CAPACITY_RE =
   /^(kwh?|mwh?|gwh?|wh|gw|kv|mv|kva|kvar|var|ah|ka|ma|hz|khz|mhz|ghz|mm|cm|km|kg|lpm|gpm|bar|kpa|mpa|pa|psi|nm|rpm|dba?|ppm|m2|m3|w|v|a|t|m|l)(\s+of\b|\s*$)/i
 
+/** Compound SLASH-RATE units — "6.2 L/min per rack", "2 m/s per X", "5 kg/h per X",
+ *  "320 W/m² per X" are per-denominator RATES, not counts. Matches a noun that
+ *  STARTS with a <unit>/<unit> token. (Real counts are "N cells per rack" — no
+ *  leading slash-unit.) BESS exit-26 false positive #2 (2026-05-30). */
+const RATE_UNIT_RE = /^[a-zµ°]+\d*\s*\/\s*[a-z]/i
+
 // ── Fuzzy word matcher ────────────────────────────────────────────────────────
 
 /**
@@ -324,10 +330,12 @@ export function runPerRackQuantityAudit(
         const countPerUnit = parseCount(countStr.trim())
         if (countPerUnit === null || countPerUnit <= 1) continue
 
-        // Guard: skip a MEASUREMENT-UNIT capacity ("15 kW of cold-plate capacity
-        // per rack" = a per-rack rating, not "15 items per rack"). See
-        // MEASUREMENT_UNIT_CAPACITY_RE. BESS exit-26 false positive 2026-05-30.
-        if (MEASUREMENT_UNIT_CAPACITY_RE.test(trimmedNoun)) continue
+        // Guard: skip a MEASUREMENT-UNIT capacity/RATE — "15 kW of cold-plate
+        // capacity per rack" (rating) or "6.2 L/min per rack" (flow rate) are
+        // per-rack measurements, NOT "N items per rack". Single units via
+        // MEASUREMENT_UNIT_CAPACITY_RE; compound slash-rate units (L/min, m/s,
+        // kg/h, kW/m²) via RATE_UNIT_RE. BESS exit-26 false positives 2026-05-30.
+        if (MEASUREMENT_UNIT_CAPACITY_RE.test(trimmedNoun) || RATE_UNIT_RE.test(trimmedNoun)) continue
 
         // Guard: skip limiting language in the preceding 40 characters.
         const preceding = proseFields.slice(Math.max(0, match.index - 40), match.index)
