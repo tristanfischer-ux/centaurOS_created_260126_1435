@@ -175,6 +175,29 @@ const CONSTRAINT_EXPECTED_FAMILY: Record<string, string> = {
   cycle_life_cycles: 'count',
 }
 
+/**
+ * Infer the physical family of a literal from the mod()/q() KEY that wraps it.
+ * The emitter wraps values as mod('list_price_gbp','300') / q(c,'dc_bus_voltage_v',800);
+ * the key tells you the value IS a price / a voltage — so it cannot be a stale
+ * mass/batch literal even though the bare number collides. Returns null when the
+ * key is unrecognised (fall through to unit-trailing discrimination). 2026-05-30.
+ */
+function familyFromValueKey(k: string): string | null {
+  const s = k.toLowerCase()
+  if (/price|_gbp|_usd|_eur|cost/.test(s)) return 'money'
+  if (/voltage|_kv\b|\bvolt|_v$/.test(s)) return 'voltage'
+  if (/mass|_kg\b|weight/.test(s)) return 'mass'
+  if (/current|_ka\b|_ma\b|\bamp|_a$/.test(s)) return 'current'
+  if (/power|_kw|_mw|_gw|watt|_w$/.test(s)) return 'power'
+  if (/energy|_kwh|_mwh|_gwh|_wh$/.test(s)) return 'energy'
+  if (/dimension|length|width|height|diameter|_mm$|_cm$|_m$/.test(s)) return 'length'
+  if (/temp|_degc|_degf/.test(s)) return 'temperature'
+  if (/count|\bqty|quantity|batch|cycles|_num$/.test(s)) return 'count'
+  if (/flow|_lpm|_cmh|_cms|_lph/.test(s)) return 'flow'
+  if (/_days$|_years$|_hours$|design_life/.test(s)) return 'time'
+  return null
+}
+
 // ── Line patterns to EXCLUDE from the scan ───────────────────────────────────
 
 /**
@@ -262,10 +285,13 @@ export function scanEmitterForBriefLiterals(
     const label = BRIEF_KEY_LABELS[key] ?? key
 
     for (let i = 0; i < lines.length; i++) {
-      const lineText = lines[i]
+      const rawLine = lines[i]
+      // Strip inline comments — a literal inside a `// ... £6,800` comment is not
+      // a rendered emitter value (2026-05-30 gate-25 false-positive fix).
+      const lineText = rawLine.replace(/\/\/.*$/, '').replace(/\/\*[\s\S]*?\*\//g, '')
 
-      // Skip excluded line types
-      if (EXCLUDED_LINE_PATTERNS.some((p) => p.test(lineText))) continue
+      // Skip excluded line types (test the RAW line so comment-only lines skip).
+      if (EXCLUDED_LINE_PATTERNS.some((p) => p.test(rawLine))) continue
 
       // Only scan lines that are inside mod() calls or template literals —
       // look for string context indicators
@@ -281,9 +307,21 @@ export function scanEmitterForBriefLiterals(
       const match = lineText.match(pattern)
       if (!match) continue
 
-      // Unit-family discrimination (gate-25 false-positive fix, 2026-05-30).
       const expectedFamily = CONSTRAINT_EXPECTED_FAMILY[key]
       const mIdx = match.index ?? lineText.indexOf(match[1])
+
+      // Value-key family (gate-25 false-positive fix, 2026-05-30): the mod()/q()
+      // KEY wrapping the literal tells us what the value IS (a price, a voltage).
+      // If that differs from the constraint's family it's a coincidental collision
+      // — e.g. mod('list_price_gbp','300') vs max_mass_kg=300,
+      // q(c,'dc_bus_voltage_v',800) vs batch_size=800.
+      if (expectedFamily) {
+        const keyMatch = lineText.slice(0, mIdx).match(/['"]([a-z_][a-z_0-9]{2,})['"]\s*,\s*['"]?\s*$/i)
+        const valFamily = keyMatch ? familyFromValueKey(keyMatch[1]) : null
+        if (valFamily && valFamily !== expectedFamily) continue
+      }
+
+      // Unit-family discrimination (trailing-unit check).
       const trailing = lineText.slice(mIdx + match[1].length).replace(/^[\s)\]}]+/, '')
       if (requireConstraintUnit) {
         // STRICT (narratives): require the constraint's OWN unit to follow the
