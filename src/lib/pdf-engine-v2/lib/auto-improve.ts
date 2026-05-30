@@ -16,6 +16,8 @@
  * Phase 3 runs the downrate/scale convergence loop (council-gated).
  */
 
+import { checkMacroMaterialRate, deriveMacroMaterialRateGbpPerKg } from './material-prices'
+
 export interface ImprovementMiss {
   /** Canonical metric key (or 'unit_cost' / 'max_mass'). */
   key: string
@@ -171,4 +173,63 @@ export function computeImprovementPlan(input: ImprovementInput): ImprovementPlan
         : `${misses.length} brief constraint(s) missed. ${levers.length} lever(s) identified; the lowest-risk is ${levers[0]?.id === 'L1_reprice' ? 'grounding over-priced parts in commodity rates (no design change)' : 'a measured downrate to fit the cost ceiling'}.`
 
   return { misses, levers, verdict, summary }
+}
+
+// ─── Phase 2 — lever L1: material re-price (the first MUTATION lever) ─────────
+export interface MacroLike {
+  word_name?: string
+  unit_price_gbp?: number
+  dimension_basis?: string
+  dimension_value?: number
+  total_gbp?: number
+  source_detail?: string
+  material?: string
+}
+
+export interface RepriceChange {
+  word_name: string
+  material: string
+  from_gbp_per_kg: number
+  to_gbp_per_kg: number
+  saving_gbp: number
+}
+
+export interface RepriceResult {
+  macros: MacroLike[]            // re-priced COPY (input is never mutated)
+  changes: RepriceChange[]
+  total_saving_gbp: number
+}
+
+/**
+ * AUTO-IMPROVE lever L1 (Phase 2) — re-price every material-dominated macro priced
+ * ABOVE its grounded commodity band down to the grounded mid rate
+ * (deriveMacroMaterialRateGbpPerKg). PURE: returns a re-priced copy + the changes;
+ * never mutates the input. Lowest-risk lever — it only corrects parts priced above
+ * market, so it can only make the BoM more honest (never raises a price, never
+ * touches an integrated assembly). total_gbp is rescaled by the same factor so the
+ * macro's line total stays consistent. Deterministic.
+ */
+export function applyMaterialRepriceLever(macros: MacroLike[]): RepriceResult {
+  const changes: RepriceChange[] = []
+  let totalSaving = 0
+  const out: MacroLike[] = (macros ?? []).map((m) => {
+    const verdict = checkMacroMaterialRate({
+      word_name: m?.word_name, unit_price_gbp: m?.unit_price_gbp,
+      dimension_basis: m?.dimension_basis, source_detail: m?.source_detail, material: m?.material,
+    })
+    if (!verdict || verdict.direction !== 'over') return { ...m }
+    const grounded = deriveMacroMaterialRateGbpPerKg(String(m?.word_name ?? ''), m?.source_detail)
+    if (!grounded || !(grounded.rate_gbp_per_kg > 0)) return { ...m }
+    const from = Number(m?.unit_price_gbp)
+    const to = grounded.rate_gbp_per_kg
+    if (!(to < from)) return { ...m } // only ever reduce
+    const factor = to / from
+    const oldTotal = Number(m?.total_gbp)
+    const newTotal = Number.isFinite(oldTotal) ? oldTotal * factor : oldTotal
+    const saving = Number.isFinite(oldTotal) ? oldTotal - newTotal : 0
+    totalSaving += saving
+    changes.push({ word_name: String(m?.word_name ?? ''), material: grounded.material, from_gbp_per_kg: from, to_gbp_per_kg: to, saving_gbp: saving })
+    return { ...m, unit_price_gbp: to, total_gbp: Number.isFinite(oldTotal) ? newTotal : m?.total_gbp }
+  })
+  return { macros: out, changes, total_saving_gbp: totalSaving }
 }
