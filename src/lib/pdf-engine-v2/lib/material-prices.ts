@@ -221,3 +221,37 @@ export function getMaterialPrice(material: string): MaterialPrice | null {
   if (fromDb) return fromDb
   return MATERIAL_PRICES[material] ?? null
 }
+
+/**
+ * Commodity-grounded finished £/kg for a MATERIAL-DOMINATED macro — the
+ * "price FROM it" primitive (Tristan-decided 2026-05-30). Infers the material,
+ * reads it DB-first, and returns raw × the GEOMETRIC-MEAN manufacturing
+ * multiplier (a balanced finished-rate point — avoids both the bargain-low and
+ * premium-high band edges). Returns null for integrated assemblies (not
+ * material-dominated) or unknown materials, so the caller keeps its explicit
+ * per-class rate / cascade price.
+ *
+ * This is what lets a NEW or universal-emitted class self-price its structural
+ * materials from commodity reality instead of a hand-coded per-class £/kg. (It
+ * derives the wind blade at ~£18/kg — exactly the value hand-fixed earlier this
+ * session — so the universal path reproduces the correct number for free.)
+ * Universal across product classes; the per-class archetype rate, when present,
+ * still wins (this is the grounding for macros that have NO explicit rate).
+ */
+export function deriveMacroMaterialRateGbpPerKg(
+  wordName: string,
+  sourceDetail?: string,
+): { rate_gbp_per_kg: number; material: string; band_low: number; band_high: number } | null {
+  if (!isMaterialDominated(wordName, sourceDetail)) return null
+  const material = inferMacroMaterial(wordName, sourceDetail)
+  if (!material) return null
+  const mp = getMaterialPrice(material)
+  if (!mp) return null
+  const midMult = Math.sqrt(mp.mfg_mult_low * mp.mfg_mult_high)
+  return {
+    rate_gbp_per_kg: mp.raw_gbp_per_kg * midMult,
+    material,
+    band_low: mp.raw_gbp_per_kg * mp.mfg_mult_low,
+    band_high: mp.raw_gbp_per_kg * mp.mfg_mult_high,
+  }
+}

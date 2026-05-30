@@ -77,9 +77,10 @@ Cross-cutting: keep every change behind the 30-gate floor + a regression invaria
 
 ## Autonomous execution log (this session)
 _Updated as I go; commits are the source of truth._
-- [in progress] Lever 5 — materials growing-DB end-to-end.
-- [queued] Lever 1 scaffold — `classReference()` DB read path + migration seeding the table from the 21 frozen graphs + DB-first-with-baked-fallback + invariant.
-- [queued] Re-validate BESS/VF/wind unaffected after each lever.
+- [✅ DONE] **Lever 5 — materials growing-DB.** `material_prices` table seeded in forge-truth.db (15 commodities); `getMaterialPrice()` DB-first read (proven via DB-only sentinel); B-8 gate grounds the commodity band in the DB; `seed-material-prices.ts` + `refresh-material-prices.ts` ingest jobs; `deriveMacroMaterialRateGbpPerKg()` "price-from-it" primitive (auto-derives the wind blade at £18.3/kg = the value hand-fixed earlier — the universal path reproduces it for free). Invariant `UNIVERSAL.material_db_first_never_drops_curated`. The primitive is ready to be consumed by the universal emitter (Lever 3). Live feed remains a pluggable hook (free-source default, paid upgrade later).
+- [NEXT / keystone] **Lever 1 — DB-grounded class reference.** Same pattern as Lever 5, applied to the 21 frozen `class-reference-graphs/*.ts`: seed a `class_reference` table in forge-truth.db from the baked graphs → `getClassReference()` DB-first with baked-TS fallback → web-on-miss for new classes → invariant (DB reference ⊇ baked for the 21 known classes). Larger; best as its own focused session — the materials work is the validated template.
+- [queued] Lever 3 (universal emitter, consumes Lever 1 + the price-from-it primitive), Lever 2 (auto-planner), Lever 4 (universal contract).
+- [ongoing] Re-validate BESS/VF/wind unaffected after each lever (warm states available).
 
 ## Open forks for Tristan (non-blocking; sensible defaults chosen)
 - **Materials live feed:** default = free sources (Trading Economics free tier / public LME spot) for the majors + dated table fallback. Upgrade to a paid feed (LME/Fastmarkets) later if accuracy demands — needs a key + budget.
