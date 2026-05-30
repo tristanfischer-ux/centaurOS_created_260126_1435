@@ -2522,6 +2522,7 @@ function CoverCostStackRow({
   isHeadline,
   isSubtotal,
   note,
+  perUnit,
 }: {
   label: string
   amount: number
@@ -2529,6 +2530,7 @@ function CoverCostStackRow({
   isHeadline: boolean
   isSubtotal: boolean
   note?: string
+  perUnit?: string
 }) {
   const labelColour = isHeadline ? '#ffffff' : isSubtotal ? '#ffffff' : '#bae6fd'
   const amountColour = isHeadline ? '#ffffff' : isSubtotal ? '#ffffff' : '#e0f2fe'
@@ -2553,6 +2555,9 @@ function CoverCostStackRow({
         <Text style={{ fontSize, fontFamily: family, color: amountColour }}>
           {fmtGBP_shared(amount)}
         </Text>
+        {perUnit ? (
+          <Text style={{ fontSize: fontSize - 2.5, fontFamily: 'Helvetica', color: '#7dd3fc' }}>{perUnit}</Text>
+        ) : null}
       </View>
     </View>
   )
@@ -2815,6 +2820,13 @@ function CoverPage({
               // but defensive coding keeps the cover honest if any future
               // class is calibrated with zero ratios.
               const r = costStack.ratios_applied
+              // Per-output-unit (£/kW, £/kWh, £/m²) at each cost-stack stage so the
+              // WHOLE-OBJECT price is explicit — not only the ex-works line the
+              // reference band compares (Tristan 2026-05-30: "are you looking at the
+              // whole object price per kW?"). Divisor = the band's output quantity.
+              const _ppu = priceReality && typeof priceReality.metric_input === 'number' && priceReality.metric_input > 0 ? priceReality.metric_input : null
+              const _ppuUnit = (String(priceReality?.natural_metric ?? priceReality?.metric_label ?? '')).match(/£\s*\/\s*([^\s(]+)/)?.[1] ?? 'unit'
+              const perU = (amt: number): string | undefined => _ppu ? `£${Math.round(amt / _ppu).toLocaleString()}/${_ppuUnit}` : undefined
               const allMarkupsZero =
                 r.assembly_labour_factor === 0 &&
                 r.factory_overhead_factor === 0 &&
@@ -2826,8 +2838,8 @@ function CoverPage({
                 // empty panel with em-dashes between subtotals.
                 return (
                   <>
-                    <CoverCostStackRow label="Raw materials BoM" amount={costStack.raw_materials_bom_gbp} pct={null} isHeadline={false} isSubtotal={false} />
-                    <CoverCostStackRow label="= Installed ASP" amount={costStack.installed_asp_gbp} pct={null} isHeadline={true} isSubtotal={false} />
+                    <CoverCostStackRow label="Raw materials BoM" amount={costStack.raw_materials_bom_gbp} pct={null} isHeadline={false} isSubtotal={false} perUnit={perU(costStack.raw_materials_bom_gbp)} />
+                    <CoverCostStackRow label="= Installed ASP" amount={costStack.installed_asp_gbp} pct={null} isHeadline={true} isSubtotal={false} perUnit={perU(costStack.installed_asp_gbp)} />
                     <Text style={{ fontSize: 7.5, color: '#bae6fd', marginTop: 4, fontStyle: 'italic' }}>
                       Cost stack collapsed — Raw BoM ≈ Installed ASP per {costStack.class_key} calibration (no markup applied).
                     </Text>
@@ -2836,7 +2848,7 @@ function CoverPage({
               }
               return (
                 <>
-                  <CoverCostStackRow label="Raw materials BoM" amount={costStack.raw_materials_bom_gbp} pct={null} isHeadline={false} isSubtotal={false} />
+                  <CoverCostStackRow label="Raw materials BoM" amount={costStack.raw_materials_bom_gbp} pct={null} isHeadline={false} isSubtotal={false} perUnit={perU(costStack.raw_materials_bom_gbp)} />
                   {r.assembly_labour_factor > 0 ? (
                     <CoverCostStackRow label="+ Assembly labour" amount={costStack.assembly_labour_gbp} pct={r.assembly_labour_factor * 100} isHeadline={false} isSubtotal={false} />
                   ) : null}
@@ -2847,7 +2859,7 @@ function CoverPage({
                   {r.manufacturer_margin_factor > 0 ? (
                     <CoverCostStackRow label="+ Manufacturer margin" amount={costStack.manufacturer_margin_gbp} pct={r.manufacturer_margin_factor * 100} isHeadline={false} isSubtotal={false} />
                   ) : null}
-                  <CoverCostStackRow label="= OEM transfer price" amount={costStack.oem_transfer_price_gbp} pct={null} isHeadline={false} isSubtotal={true} />
+                  <CoverCostStackRow label="= OEM transfer price" amount={costStack.oem_transfer_price_gbp} pct={null} isHeadline={false} isSubtotal={true} perUnit={perU(costStack.oem_transfer_price_gbp)} />
                   {r.channel_markup_factor > 0 ? (
                     <CoverCostStackRow label="+ Channel markup" amount={costStack.channel_markup_gbp} pct={r.channel_markup_factor * 100} isHeadline={false} isSubtotal={false} />
                   ) : (
@@ -2859,7 +2871,7 @@ function CoverPage({
                   ) : (
                     <CoverCostStackRow label="+ Installation" amount={0} pct={0} isHeadline={false} isSubtotal={false} note="no install service" />
                   )}
-                  <CoverCostStackRow label="= Installed ASP" amount={costStack.installed_asp_gbp} pct={null} isHeadline={true} isSubtotal={false} />
+                  <CoverCostStackRow label="= Installed ASP" amount={costStack.installed_asp_gbp} pct={null} isHeadline={true} isSubtotal={false} perUnit={perU(costStack.installed_asp_gbp)} />
                 </>
               )
             })()}
