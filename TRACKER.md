@@ -7,8 +7,11 @@ _View styled: `~/.claude/scripts/show-md "/Users/tristanfischer/Developer/Centau
 ## Goal
 Recover BESS council quality toward ≥8 on a **deterministic, DB-grounded** document, and keep the engine universally sound (verified on VF). Driven by the principle: every fact comes **DB-first → search-on-miss → write-back → retrieve → grow**.
 
-## Active increment
-Engine deterministic-generation push to stable ≥8 council (Phase B single-source numbers + Phase C DB-pinned BoM); then re-validate the VF chain after the 2026-05-29 emitter rework (commit `ec954a39c`).
+## Active increment (Tristan 3 decisions, 2026-05-30)
+1. **Hybrid quality**: get ONE class (BESS) to a reliable ≥8 council, make it the template, THEN go wide. (decision 1)
+2. **Materials growing-DB**: ✅ DONE + grounded in current prices (copper/aluminium were 36-45% stale). DB-first, 4-week refresh. Open: a hands-off monthly auto-feed needs a paid API or a fragile free scraper (CronCreate can't hold monthly — 7-day expiry); reliable free method = agent web-search re-ground when stale. (decision 2)
+3. **Auto-improve loop**: iterate a design toward its brief instead of accepting the miss. Spec: `AUTO-IMPROVE-SPEC.md`. Build = Phase 1 (structured trade-off) + Phase 2 (material-DB re-price lever), validated on BESS council, then Phase 3 convergence. Feeds decision 1. (decision 3)
+_(Prior: deterministic-generation Phase B/C → ≥8 BESS; folds into decision 1.)_
 
 ## Missing-only recap (current — 2026-05-29, post-crash-recovery)
 _The engine-watchdog (`~/.claude/scripts/engine-watchdog.sh`) reads THIS section for the autonomous turn-start routing list. Keep these ❌ rows current; they are the live pending queue, NOT the stale `src/lib/pdf-engine-v2/TRACKER.md` (2026-05-07, Phase-P deferred)._
