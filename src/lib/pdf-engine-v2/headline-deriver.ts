@@ -747,6 +747,35 @@ function deriveHapsHeadline(modules: ModuleSpec[], parsedBrief: any, briefText?:
   return out
 }
 
+function deriveWindHeadline(modules: ModuleSpec[], parsedBrief: any, briefText?: string | null): Record<string, any> {
+  // Wind headline = rated power × capacity factor × 8760 h = annual energy yield.
+  // Capacity factor comes from the BRIEF (UK onshore ~38-45%); never a derived
+  // low value — a 9% CF in the prose was a wrong derivation while the brief said 42%.
+  const ect = findModule(modules, 'energy_conversion_transduction') ?? findModule(modules, 'power_generation')
+  let ratedKw = pickFirstNumber(ect?.derived_parameters, ['rated_power_kw', 'rated_power_continuous_kw', 'continuous_power_kw', 'rated_ac_power_kw'])
+  const metrics: any[] = Array.isArray(parsedBrief?.constraints?.target_performance?.metrics) ? parsedBrief.constraints.target_performance.metrics : []
+  const findM = (k: string) => metrics.find((m) => String(m?.key_metric ?? '').includes(k))
+  if (ratedKw == null) {
+    const rp = findM('rated_power')
+    if (rp && typeof rp.value === 'number') ratedKw = /mw/i.test(String(rp.unit ?? '')) ? rp.value * 1000 : rp.value
+  }
+  const cfM = findM('capacity_factor')
+  const cfPct = cfM && typeof cfM.value === 'number' && cfM.value > 0 ? cfM.value : 38
+  const annualEnergyMwh = ratedKw != null ? Math.round((ratedKw * (cfPct / 100) * 8760) / 1000) : null
+
+  const out: Record<string, any> = {}
+  if (annualEnergyMwh != null && ratedKw != null) {
+    out.headline_output = metric('annual_energy_mwh', 'Annual energy yield', annualEnergyMwh, 'MWh/year',
+      `${(ratedKw / 1000).toFixed(1)} MW rated × ${cfPct}% capacity factor × 8760 h.`, 'derived_from_brief')
+  }
+  if (ratedKw != null) {
+    out.headline_constraint = metric('rated_power_kw', 'Rated electrical power', ratedKw, 'kW', 'Nameplate AC power.', 'derived_deterministic')
+  }
+  out.supporting_metrics = []
+  out.deployment_context = buildDeploymentContextDefault(parsedBrief, annualEnergyMwh != null ? annualEnergyMwh * 1000 : null, null, briefText)
+  return out
+}
+
 // ─── Registry ──────────────────────────────────────────────────────────────
 
 type Deriver = (modules: ModuleSpec[], parsedBrief: any, briefText?: string | null, orchestratorContract?: any) => Record<string, any>
@@ -762,6 +791,8 @@ const DERIVERS: Record<string, Deriver> = {
   bioreactor:        deriveBioreactorHeadline,
   auv:               deriveAuvHeadline,
   haps:              deriveHapsHeadline,
+  wind_turbine:      deriveWindHeadline,
+  wind:              deriveWindHeadline,
 }
 
 /**
