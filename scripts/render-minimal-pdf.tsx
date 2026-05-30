@@ -4205,6 +4205,16 @@ function _resolveAchievedUniversal(
   return best ? { value: best.value, unit: best.unit } : null
 }
 
+// Infer whether a brief metric is a CEILING ("lower is better" — design should be
+// ≤ target) or a FLOOR/target ("must meet or exceed" — design should be ≥ target),
+// from the metric key. Default = floor. Ceilings are the "lower is better" family:
+// cost, mass/weight, specific power, acoustic/noise/emission, anything *_max. Lets
+// the universal completeness rows assert PASS/FAIL instead of an evasive "—".
+const _CEILING_METRIC_RE = /cost|capex|\bprice\b|mass|weight|specific[_\s-]?power|acoust|noise|\bsound\b|emission|\bdba\b|\bnox\b|\bco2\b|leak|\bmax\b|max[_\s-]/i
+function _inferConstraintDirection(key: string): 'ceiling' | 'floor' {
+  return _CEILING_METRIC_RE.test(key) ? 'ceiling' : 'floor'
+}
+
 function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack?: CostStack | null): ComplianceRow[] {
   const constraints = state?.parsedBrief?.constraints
   if (!constraints || typeof constraints !== 'object') return []
@@ -4523,14 +4533,25 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
       const resolved = _resolveAchievedUniversal(quantities, km, unit)
       const fmtN = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(v >= 100 ? 0 : 2))
       const achievedDisplay = resolved ? `${fmtN(resolved.value)} ${resolved.unit}`.trim() : '—'
+      // Assert PASS/FAIL when we have an achieved value. Direction inferred from
+      // the metric key (default floor = "design must meet or exceed"; ceiling for
+      // cost/mass/specific-power/acoustic "lower is better" metrics). Within ±5%
+      // counts as met. No achieved value → 'unknown' ("—" — genuinely can't assess).
+      let status: ComplianceStatus = 'unknown'
+      let deltaText = ''
+      if (resolved) {
+        const within = _inferConstraintDirection(km) === 'ceiling'
+          ? resolved.value <= briefVal * 1.05
+          : resolved.value >= briefVal * 0.95
+        status = within ? 'pass' : 'fail'
+        deltaText = _formatDelta(briefVal, resolved.value, 'plain')
+      }
       rows.push({
         constraint: _humaniseMetricKey(km),
         briefTarget: `${briefVal} ${unit}`.trim(),
         designAchieved: achievedDisplay,
-        status: 'unknown',
-        // Info row — no pass/fail claim, so no delta: floor/ceiling direction is
-        // not universally inferable, and target + achieved speak for themselves.
-        deltaText: '',
+        status,
+        deltaText,
         tradeOffNarrative: null,
       })
     }
