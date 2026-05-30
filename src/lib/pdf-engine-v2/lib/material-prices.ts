@@ -21,6 +21,11 @@
  * parts/supplier growing-DB. This file is the deterministic v1 anchor.
  */
 
+import Database from 'better-sqlite3'
+import { homedir } from 'os'
+import { resolve } from 'path'
+import { existsSync } from 'fs'
+
 export interface MaterialPrice {
   /** Raw commodity / feedstock price, £/kg. */
   raw_gbp_per_kg: number
@@ -129,7 +134,7 @@ export function checkMacroMaterialRate(macro: {
   if (!isMaterialDominated(String(macro.word_name ?? ''), macro.source_detail)) return null
   const material = macro.material ?? inferMacroMaterial(String(macro.word_name ?? ''), macro.source_detail)
   if (!material) return null
-  const mp = MATERIAL_PRICES[material]
+  const mp = getMaterialPrice(material)
   if (!mp) return null
 
   const bandLow = mp.raw_gbp_per_kg * mp.mfg_mult_low
@@ -156,4 +161,63 @@ export function checkMacroMaterialRate(macro: {
     `£${bandLow.toFixed(1)}–£${bandHigh.toFixed(0)}/kg (raw £${mp.raw_gbp_per_kg}/kg × ${mp.mfg_mult_low}–${mp.mfg_mult_high} mfg mult) — ` +
     `${direction === 'within' ? 'within band' : `${factor.toFixed(1)}× ${direction} band`}. ${mp.source}.`
   return { word_name: String(macro.word_name ?? ''), material, rate_gbp_per_kg: rate, band_low: bandLow, band_high: bandHigh, factor, severity, direction, detail }
+}
+
+// ─── DB-first read — the materials GROWING-DB (Tristan-decided 2026-05-30) ────
+// Material costs are read DB-first from forge-truth.db `material_prices` (seeded
+// from the curated MATERIAL_PRICES above by scripts/ingest/seed-material-prices.ts,
+// web-refreshed over time by scripts/ingest/refresh-material-prices.ts), falling
+// back to the static table when the DB is absent or lacks the material. READONLY
+// per the CHAIN-AS-DB-CONSUMER principle — only scripts/ingest/* writes. The map
+// is loaded once and cached for the process. UNIVERSAL-ENGINE-PLAN.md Lever 5.
+let _dbMaterialCache: Map<string, MaterialPrice> | null | undefined  // undefined = not yet loaded; null = unavailable
+
+function loadDbMaterialPrices(): Map<string, MaterialPrice> | null {
+  if (_dbMaterialCache !== undefined) return _dbMaterialCache
+  try {
+    const dbPath = resolve(homedir(), '.forge-truth', 'forge-truth.db')
+    if (!existsSync(dbPath)) { _dbMaterialCache = null; return null }
+    const db = new Database(dbPath, { readonly: true })
+    let rows: Array<Record<string, unknown>> = []
+    try {
+      rows = db.prepare(
+        'SELECT material, raw_gbp_per_kg, mfg_mult_low, mfg_mult_high, source, updated FROM material_prices',
+      ).all() as Array<Record<string, unknown>>
+    } catch {
+      // table not present yet (seed not run) → static fallback
+      db.close()
+      _dbMaterialCache = null
+      return null
+    }
+    db.close()
+    if (!rows.length) { _dbMaterialCache = null; return null }
+    const m = new Map<string, MaterialPrice>()
+    for (const r of rows) {
+      m.set(String(r.material), {
+        raw_gbp_per_kg: Number(r.raw_gbp_per_kg),
+        mfg_mult_low: Number(r.mfg_mult_low),
+        mfg_mult_high: Number(r.mfg_mult_high),
+        source: String(r.source),
+        updated: String(r.updated),
+      })
+    }
+    _dbMaterialCache = m
+    return m
+  } catch {
+    _dbMaterialCache = null
+    return null
+  }
+}
+
+/**
+ * DB-first material price: the growing forge-truth.db `material_prices` table
+ * wins (it may carry web-refreshed rows), the curated static MATERIAL_PRICES is
+ * the deterministic fallback. This is the single read path the engine + the B-8
+ * gate use to ground material cost in reality. Returns null when the material is
+ * in neither source. Universal across product classes.
+ */
+export function getMaterialPrice(material: string): MaterialPrice | null {
+  const fromDb = loadDbMaterialPrices()?.get(material)
+  if (fromDb) return fromDb
+  return MATERIAL_PRICES[material] ?? null
 }

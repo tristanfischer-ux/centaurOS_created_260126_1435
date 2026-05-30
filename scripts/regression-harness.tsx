@@ -41,6 +41,7 @@ import { execFileSync } from 'child_process'
 import { resolve, dirname } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
+import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { buildContract } from './lib/engineering-contract'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
@@ -216,6 +217,23 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         () => `performanceCard product_class="${card?.product_class}" rowCount=${rowCount} for class="${productClass}" — expected a curated or 'brief-synthesised' card with ≥${Math.min(namedMetrics.length, 3)} rows, got the generic degrade. buildPerformanceCard is not surfacing the brief's ${namedMetrics.length} metrics[].`,
       ))
     }
+  }
+
+  // ── UNIVERSAL.material_db_first_never_drops_curated ──────────────────────
+  // The materials growing-DB (Lever 5): getMaterialPrice reads forge-truth.db
+  // material_prices DB-first, falling back to the static MATERIAL_PRICES. Assert
+  // the DB-first read NEVER loses a curated material (every static key resolves)
+  // — guards a broken seed/read from silently dropping a material's cost
+  // grounding, which would blind the B-8 commodity-rate gate.
+  {
+    const missing = Object.keys(MATERIAL_PRICES).filter((k) => getMaterialPrice(k) == null)
+    assertions.push(assertEq(
+      'UNIVERSAL.material_db_first_never_drops_curated',
+      `every curated material resolves via getMaterialPrice (DB-first + static fallback); ${Object.keys(MATERIAL_PRICES).length} materials`,
+      missing.length === 0,
+      (ok) => ok,
+      () => `getMaterialPrice returned null for: ${missing.join(', ')} — DB-first read or static fallback is broken; B-8 would lose commodity grounding for these.`,
+    ))
   }
 
   // ── UNIVERSAL.energy_capacity_factor_reconciles ──────────────────────────
