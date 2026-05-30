@@ -1871,15 +1871,45 @@ const DETECTORS: Record<string, ClassDetectors> = {
  *
  * Pure function. Same input → same output.
  */
+/**
+ * Permissive fallback envelope for an UNREGISTERED product class (2026-05-30
+ * universality, step 1 of 4 — UNIVERSAL-ENGINE-PLAN.md). Lets the pipeline
+ * ATTEMPT any industrial product instead of hard-exiting: a null envelope now
+ * means chain exit 7 (the LLM-generator fallback was removed 2026-05-23), so an
+ * unseen class was un-makeable. scale/form/application are 'generic'; voltage
+ * tier is inferred from the brief where stated, else 'low'. Registered classes
+ * NEVER reach this (their exact detectors run first); a registered-but-
+ * underspecified brief still returns null (a genuine "can't classify a KNOWN
+ * class" signal that must not be masked). NOTE: this only defeats the FIRST of
+ * four per-class enumerations — selectPlan, the assembler, and the contract
+ * archetype registry also need generic fallbacks before an unseen class renders.
+ */
+function genericEnvelope(constraints: ParsedConstraints): BriefEnvelope {
+  const rawClass = String(constraints.product_class ?? '')
+    .toLowerCase().trim().replace(/[\s_]+/g, '-') || 'generic'
+  const v = constraints.voltage_class_v
+  return {
+    class: rawClass,
+    scale_tier: 'generic',
+    voltage_tier: typeof v === 'number' && v > 0 ? classifyVoltage(v) : 'low',
+    form_factor: 'generic',
+    application: 'generic',
+    nameplate_kwh: undefined,
+    voltage_class_v: v,
+  }
+}
+
 export function detectEnvelope(constraints: ParsedConstraints): BriefEnvelope | null {
   const klass = normaliseClass(constraints.product_class)
-  if (!klass) return null
+  // UNIVERSAL fallback: an unregistered class (not in the classifier, or with no
+  // detector) gets a permissive generic envelope so the pipeline can attempt any
+  // industrial product. Registered classes are unaffected — their exact detectors
+  // run below.
+  if (!klass || !DETECTORS[klass]) return genericEnvelope(constraints)
 
   const detectors = DETECTORS[klass]
-  if (!detectors) return null // class registered in classifier but no detector
-
   const scaleTier = detectors.scaleTier(constraints)
-  if (!scaleTier) return null // brief constraints insufficient to classify
+  if (!scaleTier) return null // registered class but brief insufficient to classify (genuine signal — do not mask)
 
   const voltageTier = detectors.voltageTier(scaleTier, constraints)
   const formFactor = detectors.formFactor(scaleTier, constraints)
