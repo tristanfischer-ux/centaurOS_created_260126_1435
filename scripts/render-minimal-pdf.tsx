@@ -27,6 +27,8 @@ import { getClassStandards, mergeBriefAndClassStandards, type RegulatoryStandard
 import { getClassHazards, computeHazardRPN, type ClassHazard } from '../src/lib/pdf-engine-v2/class-hazards'
 import { resolvePriceBand, type PriceBand, type PriceBandVerdict } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
+import { computeImprovementPlan } from '../src/lib/pdf-engine-v2/lib/auto-improve'
+import { checkMacroMaterialRate } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import {
   MARKET_BANDS,
@@ -4215,6 +4217,50 @@ function _inferConstraintDirection(key: string): 'ceiling' | 'floor' {
   return _CEILING_METRIC_RE.test(key) ? 'ceiling' : 'floor'
 }
 
+// Assemble the AUTO-IMPROVE input (Phase 1) from the design state + cost stack —
+// reuses the gate-17 universal resolver so the miss vector matches the compliance
+// table exactly. Deterministic; no mutation.
+function _buildImprovementInput(state: any, bomTotals: BomTotals | null, costStack?: CostStack | null) {
+  const constraints = state?.parsedBrief?.constraints ?? {}
+  const quantities = state?.orchestratorContract?.quantities ?? {}
+  const briefMetrics: any[] = Array.isArray(constraints?.target_performance?.metrics) ? constraints.target_performance.metrics : []
+
+  const exWorks = costStack && costStack.oem_transfer_price_gbp > 0 ? costStack.oem_transfer_price_gbp
+    : costStack && costStack.installed_asp_gbp > 0 ? costStack.installed_asp_gbp
+    : (bomTotals?.grandTotal_gbp ?? null)
+  const ceiling = typeof constraints?.unit_cost_ceiling?.value === 'number' ? constraints.unit_cost_ceiling.value : null
+  const massCap = typeof constraints?.max_mass_kg?.value === 'number' ? constraints.max_mass_kg.value : null
+  const designMass = _qtyFromOrch(quantities, 'in_container_mass_kg')?.value
+    ?? _qtyFromOrch(quantities, 'total_system_mass_kg')?.value
+    ?? _qtyFromOrch(quantities, 'total_mass_kg')?.value ?? null
+
+  const scaleM = briefMetrics.find((m) => m?.category === 'scale' && typeof m?.value === 'number' && m?.key_metric)
+  const scaleMetric = scaleM
+    ? { key: String(scaleM.key_metric), label: _humaniseMetricKey(String(scaleM.key_metric)), value: scaleM.value as number, unit: String(scaleM.unit ?? '') }
+    : null
+
+  const performanceMisses: Array<{ key: string; label: string; brief: number; achieved: number; unit: string }> = []
+  for (const m of briefMetrics) {
+    const km = String(m?.key_metric ?? '')
+    if (!km || typeof m?.value !== 'number') continue
+    if (_inferConstraintDirection(km) !== 'floor') continue // only floors can fall "short"
+    const resolved = _resolveAchievedUniversal(quantities, km, String(m?.unit ?? ''))
+    if (!resolved || !(resolved.value >= 0)) continue
+    if (resolved.value < m.value * 0.95) {
+      performanceMisses.push({ key: km, label: _humaniseMetricKey(km), brief: m.value, achieved: resolved.value, unit: String(m?.unit ?? '') })
+    }
+  }
+
+  const macros: any[] = Array.isArray(state?.engineeringContract?.macro_assembly_prices) ? state.engineeringContract.macro_assembly_prices : []
+  let hasOverpricedMaterialMacro = false
+  for (const mac of macros) {
+    const v = checkMacroMaterialRate({ word_name: mac?.word_name, unit_price_gbp: mac?.unit_price_gbp, dimension_basis: mac?.dimension_basis, source_detail: mac?.source_detail })
+    if (v && v.direction === 'over') { hasOverpricedMaterialMacro = true; break }
+  }
+
+  return { exWorksCostGbp: exWorks, costCeilingGbp: ceiling, designMassKg: designMass, massCapKg: massCap, scaleMetric, performanceMisses, hasOverpricedMaterialMacro }
+}
+
 function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack?: CostStack | null): ComplianceRow[] {
   const constraints = state?.parsedBrief?.constraints
   if (!constraints || typeof constraints !== 'object') return []
@@ -5061,6 +5107,8 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
   const failedRows = rows.filter((r) => r.status === 'fail')
   const passedCount = rows.filter((r) => r.status === 'pass').length
   const decisionRationale = _generateDecisionRationale(rows)
+  // Auto-improve (Phase 1): the quantified levers that would close each miss.
+  const improvementPlan = computeImprovementPlan(_buildImprovementInput(state, bomTotals, costStack))
 
   // Fixed column ratios so the achieved-value column has room for "£1.34M"
   // and the brief-target column fits "£180k". Sum to 1.0.
@@ -5109,6 +5157,32 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
             : `Every brief constraint is met by the design as computed. No trade-off narrative is required.`}
         </Text>
       </View>
+
+      {/* Auto-improve (Phase 1): quantified levers to close each brief miss. */}
+      {improvementPlan.verdict !== 'within_brief' && improvementPlan.levers.length > 0 && (
+        <View
+          style={{ marginBottom: 14, padding: 10, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8' }}
+          minPresenceAhead={60}
+        >
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>
+            Auto-improve — adjustments to meet the brief
+          </Text>
+          <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 6 }}>
+            {improvementPlan.summary}
+          </Text>
+          {improvementPlan.levers.map((l, i) => (
+            <View key={`lever-${i}`} style={{ flexDirection: 'row', marginBottom: 4 }}>
+              <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#1d4ed8', width: 26 }}>
+                {l.id.split('_')[0]}
+              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4 }}>{l.action}</Text>
+                <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic', lineHeight: 1.4 }}>Trade-off: {l.trade_off}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Block 1: brief targets vs design achieved (table) */}
       <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 4, marginBottom: 6 }}>
