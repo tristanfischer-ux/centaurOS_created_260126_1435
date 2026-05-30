@@ -47,5 +47,12 @@ Apply to **BESS first** (furthest along, ~7.45 council). The hypothesis: a desig
 - The final "Design evolution" block must show every adjustment — auto-improvement is transparent, never hidden. (A design silently mutated to hit the brief would be a reproducible lie.)
 - Determinism preserved: same brief → same evolution path (levers are deterministic, ranked, threshold-driven).
 
-## First increment to build (next focused session)
-Phase 1 (structured trade-off) + Phase 2 (L1 material-DB re-price), validated on BESS council. Phase 3 after Phase 2 proves the harness + the objective converges.
+## Build status (2026-05-30)
+- ✅ **Phase 1 — DONE + rendered.** `computeImprovementPlan()` (lib/auto-improve.ts) computes the miss vector + ranked quantified levers + verdict; the renderer shows an "Auto-improve — design adjustments" block on the Brief Compliance page. Verified on wind (`infeasible_at_envelope`, L2 downrate to 2.3 MW / L4 scale-up). Commit 356f38153.
+- ✅ **Phase 2 lever L1 — DONE + verified (mechanism).** `applyMaterialRepriceLever()` (pure) re-prices over-priced material macros to grounded commodity rates; `applyAutoImproveToState()` applies it to a state (mutates `engineeringContract.macro_assembly_prices`, records `state.autoImproveLog`), and the renderer shows "Applied automatically — saved £X". Verified: a £180/kg steel macro → £2.3/kg, £8.89M saved, log rendered. Commits 36192e9e2 + (apply/render commit).
+- ✅ **Chain integration — DONE (wired safely as an enrichment subprocess).** `scripts/apply-auto-improve.tsx` reads state.json → `applyAutoImproveToState` → writes back; wired into `serial-design-chain-v2.tsx` right AFTER the cost-repair block (~line 4818, on `statePath`) — the SAME established enrichment-subprocess pattern as cost-repair + suppliers (each reads+writes statePath before render). So it runs after pricing settles + before render + before the post-render BoM cost gate. Default ON; `CHAIN_DISABLE_AUTO_IMPROVE=1` to skip. Verified via CLI (no-op on clean wind; applies on an injected over-priced macro). The earlier "don't wire blind" caveat was resolved by finding the subprocess pattern — no blind state-object guess was needed.
+- ❌ **Council validation on BESS** (decision 1 hybrid) — run a full BESS chain (now auto-improving) → council; confirm the auto-improved design scores ≥ baseline (ideally ≥8). Add the chain-level invariant `B-8 HIGH count == 0 after auto-improve`.
+- ❌ **Phase 3 (L2/L4 downrate/scale convergence)** — the design-changing loop, after BESS validation, with the convergence/rollback/transparency guards above (council-gated).
+
+## First increment for the next focused session
+1. Full BESS chain run (auto-improve now ON) → council; confirm ≥ baseline + B-8 HIGH == 0. 2. Then Phase 3 (downrate/scale convergence) with the guards above.

@@ -4816,6 +4816,29 @@ async function main() {
     console.error('[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)')
   }
 
+  // ── Auto-improve (Tristan decision 3, 2026-05-30): the engine FIXES its own
+  // design before render. Applies the SAFE L1 lever — re-price over-priced
+  // material macros to grounded commodity rates (apply-auto-improve.tsx →
+  // applyAutoImproveToState). Runs AFTER pricing is settled so it grounds the
+  // final macros, and BEFORE render so the rendered cost + the post-render BoM
+  // cost gate (gate 10 / B-7 / B-8) see the improvement. Idempotent + safe: L1
+  // only REDUCES material macros priced above their commodity band, so a clean
+  // design no-ops. Phase 3 (downrate/scale) is NOT applied here. Skip via
+  // CHAIN_DISABLE_AUTO_IMPROVE=1. Spec: AUTO-IMPROVE-SPEC.md.
+  if (process.env.CHAIN_DISABLE_AUTO_IMPROVE !== '1') {
+    const tAutoImprove = Date.now()
+    try {
+      execFileSync('npx', ['tsx', resolve(__dirname, 'apply-auto-improve.tsx'), statePath, '--write'], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+      })
+      logAction({ step: 'auto_improve', latency_ms: Date.now() - tAutoImprove, ok: true })
+    } catch (err) {
+      console.error(`[chain] auto-improve failed: ${(err as Error).message}; continuing without`)
+      logAction({ step: 'auto_improve', latency_ms: Date.now() - tAutoImprove, ok: false, error: String(err).slice(0, 200) })
+    }
+  }
+
   // ── Engine D (suppliers, 2026-05-19): spawn enrich-state-with-suppliers.tsx
   // to populate state.suppliers + state.suppliers_provenance. The renderer's
   // SuppliersPage (render-minimal-pdf.tsx:4049) reads state.suppliers and
