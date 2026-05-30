@@ -479,13 +479,102 @@ function normaliseClassSlug(raw: string): string {
   return lower.replace(/[_ ]/g, '-')
 }
 
+// Trailing unit-encoding tokens to strip from a canonical key_metric so the
+// label reads as a human noun phrase (the unit is shown in its own column).
+// Longest / multi-token units first so `_m_s` wins over `_m`, `_w_per_m2`
+// over `_m2`, etc. (regex alternation is `$`-anchored → suffix-only).
+const METRIC_KEY_UNIT_SUFFIX_RE =
+  /_(w_per_m2|kwh_per_m2|kw_per_m2|wh_per_m2|nm3_per_hr|kg_per_hr|kg_per_kg|m_per_s|m_s|kwh|mwh|gwh|mw|gw|kw|w|m2|m3|mm|cm|km|m|percent|pct|dba|db|kg|tonnes|tonne|lpm|kn|nm|rpm|hz|ppm|mpa|kpa|pa|bar|years|year|cycles|days|hrs|hr|h|c|k|v|a|t|l)$/i
+
+/** `rated_power_mw` → "Rated power", `cut_in_wind_speed_m_s` → "Cut in wind
+ *  speed", `specific_power_w_per_m2` → "Specific power". Strips one trailing
+ *  unit-encoding token then title-cases. Deterministic; no per-class table. */
+function humaniseMetricKey(key: string): string {
+  const raw = String(key ?? '').trim()
+  if (!raw) return ''
+  const base = raw.replace(METRIC_KEY_UNIT_SUFFIX_RE, '') || raw
+  const words = base.split(/[_\s]+/).filter(Boolean)
+  if (words.length === 0) return raw
+  return words.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ')
+}
+
+// category → spec-sheet section, in render order. Scale first (size/geometry),
+// then how it performs, how efficiently, durability limits, then cost targets.
+const SYNTH_SECTION_BY_CATEGORY: Array<[string, string]> = [
+  ['scale', 'Scale & geometry'],
+  ['performance', 'Performance'],
+  ['efficiency', 'Efficiency'],
+  ['durability', 'Durability & limits'],
+  ['cost', 'Cost targets'],
+]
+
+/**
+ * When a product class has NO curated PerformanceCardSchema, synthesise one
+ * from the brief's own `target_performance.metrics[]` so the spec sheet shows
+ * the rich brief targets (Rated power 6 MW, Rotor diameter 155 m, Capacity
+ * factor 42 %, …) instead of the degraded GENERIC single row "Performance
+ * target = <value>".
+ *
+ * Fully deterministic + universal: the brief PARSE already produces a
+ * canonical `key_metric` + `category` + `unit` + `value` per metric (post-P1-1
+ * schema); this just surfaces what's already there, with zero per-class code —
+ * every future unmapped class gets a full labelled card for free. Each row's
+ * value comes straight from the brief metric via a `compute` closure (the
+ * brief's STATED target; we have no reliable contract-key map for an unmapped
+ * class's achieved value, so we show the honest brief target).
+ *
+ * Codified 2026-05-30 after the wind dossier fell to GENERIC and rendered
+ * "Performance target 6.00" for a 6 MW turbine whose brief carried 10 fully
+ * specified metrics. Returns null when metrics[] is empty (caller falls back
+ * to GENERIC_SCHEMA, preserving the legacy single-row behaviour).
+ */
+function synthesiseSchemaFromBriefMetrics(state: any): PerformanceCardSchema | null {
+  const metrics: any[] = state?.parsedBrief?.constraints?.target_performance?.metrics
+  if (!Array.isArray(metrics) || metrics.length === 0) return null
+  const sections: PerformanceCardSchema['sections'] = []
+  for (const [category, sectionName] of SYNTH_SECTION_BY_CATEGORY) {
+    const inCat = metrics.filter(
+      m => m && m.category === category && typeof m.value === 'number' && typeof m.key_metric === 'string' && m.key_metric,
+    )
+    if (inCat.length === 0) continue
+    const specs: MetricSpec[] = inCat.map(m => {
+      const value = m.value as number
+      return {
+        id: String(m.key_metric),
+        label: humaniseMetricKey(String(m.key_metric)),
+        unit: String(m.unit ?? ''),
+        sources: [] as string[],     // value is the brief target itself, not a state path
+        compute: () => value,        // deterministic: the brief's stated target
+      }
+    })
+    sections.push({ name: sectionName, metrics: specs })
+  }
+  if (sections.length === 0) return null
+  // Universal cost ceiling (briefs always carry unit_cost_ceiling); mass cap
+  // only when the brief states one, so an absent constraint doesn't render "—".
+  const constraintSpecs: MetricSpec[] = [
+    { id: 'unit_cost_ceiling', label: 'Unit cost ceiling', unit: 'GBP', sources: ['parsedBrief.constraints.unit_cost_ceiling.value'] },
+  ]
+  if (typeof state?.parsedBrief?.constraints?.max_mass_kg?.value === 'number') {
+    constraintSpecs.push({ id: 'max_mass_kg', label: 'Mass ceiling', unit: 'kg', sources: ['parsedBrief.constraints.max_mass_kg.value'] })
+  }
+  sections.push({ name: 'Constraints', metrics: constraintSpecs })
+  return { product_class: 'brief-synthesised', sections }
+}
+
 export function buildPerformanceCard(state: any): PerformanceCard {
   const productClass =
     state?.moduleDecomposition?.product_class ??
     state?.parsedBrief?.product_class ??
     'generic'
   const slug = normaliseClassSlug(productClass)
-  const schema = PERFORMANCE_CARDS[slug] ?? PERFORMANCE_CARDS.generic
+  // Curated schema wins (BESS/VF/heat-pump/HAPS map to contract-derived achieved
+  // values). For an UNMAPPED class, synthesise a rich card from the brief's own
+  // metrics[] before falling back to the degraded generic single-row schema.
+  const schema =
+    PERFORMANCE_CARDS[slug] ??
+    synthesiseSchemaFromBriefMetrics(state) ??
+    PERFORMANCE_CARDS.generic
 
   const resolved: Record<string, ResolvedMetric> = {}
   const sections: PerformanceCard['sections'] = []

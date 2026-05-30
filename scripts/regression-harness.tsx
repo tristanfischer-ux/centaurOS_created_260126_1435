@@ -40,6 +40,7 @@ import { readFileSync, existsSync, statSync } from 'fs'
 import { execFileSync } from 'child_process'
 import { resolve, dirname } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
+import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { buildContract } from './lib/engineering-contract'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
@@ -185,6 +186,35 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
           () => `PDF did not contain "${expectedString}" (whitespace-normalised) — IndustryBandBlock returned null or the band was not resolved`,
         ))
       }
+    }
+  }
+
+  // ── UNIVERSAL.perf_card_not_degraded_when_brief_has_metrics ──────────────
+  // The brief PARSE emits a rich target_performance.metrics[] (canonical
+  // key_metric + category + value + unit). When a class has no curated
+  // PerformanceCardSchema, buildPerformanceCard MUST synthesise a labelled
+  // card from those metrics, NOT degrade to the generic single "Performance
+  // target = <value>" row. Guards the 2026-05-30 wind fix: a 6 MW turbine
+  // whose brief carried 10 metrics was rendering only "Performance target
+  // 6.00". Fires whenever the brief has ≥2 named metrics; passes for curated
+  // classes (card.product_class = the curated slug) and synthesised cards
+  // (product_class = 'brief-synthesised'); FAILS only on the degrade-to-generic.
+  {
+    const metrics = state?.parsedBrief?.constraints?.target_performance?.metrics
+    const namedMetrics = Array.isArray(metrics)
+      ? metrics.filter((m: any) => m && typeof m.value === 'number' && typeof m.key_metric === 'string' && m.key_metric)
+      : []
+    if (namedMetrics.length >= 2) {
+      let card: any = null
+      try { card = buildPerformanceCard(state) } catch { /* assertion below catches null */ }
+      const rowCount = card ? card.sections.reduce((n: number, s: any) => n + (s.metrics?.length ?? 0), 0) : 0
+      assertions.push(assertEq(
+        'UNIVERSAL.perf_card_not_degraded_when_brief_has_metrics',
+        `brief has ${namedMetrics.length} named metrics → performance card is not the degraded generic single-row schema`,
+        card?.product_class !== 'generic' && rowCount >= Math.min(namedMetrics.length, 3),
+        (ok) => ok,
+        () => `performanceCard product_class="${card?.product_class}" rowCount=${rowCount} for class="${productClass}" — expected a curated or 'brief-synthesised' card with ≥${Math.min(namedMetrics.length, 3)} rows, got the generic degrade. buildPerformanceCard is not surfacing the brief's ${namedMetrics.length} metrics[].`,
+      ))
     }
   }
 
