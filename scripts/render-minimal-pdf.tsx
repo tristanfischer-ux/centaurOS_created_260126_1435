@@ -5158,29 +5158,43 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
         </Text>
       </View>
 
-      {/* Auto-improve (Phase 1): quantified levers to close each brief miss. */}
-      {improvementPlan.verdict !== 'within_brief' && improvementPlan.levers.length > 0 && (
+      {/* Auto-improve: levers APPLIED (Phase 2) + remaining recommendations (Phase 1). */}
+      {(((state?.autoImproveLog?.applied?.length ?? 0) > 0) || (improvementPlan.verdict !== 'within_brief' && improvementPlan.levers.length > 0)) && (
         <View
           style={{ marginBottom: 14, padding: 10, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8' }}
           minPresenceAhead={60}
         >
           <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>
-            Auto-improve — adjustments to meet the brief
+            Auto-improve — design adjustments
           </Text>
-          <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 6 }}>
-            {improvementPlan.summary}
-          </Text>
-          {improvementPlan.levers.map((l, i) => (
-            <View key={`lever-${i}`} style={{ flexDirection: 'row', marginBottom: 4 }}>
-              <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#1d4ed8', width: 26 }}>
-                {l.id.split('_')[0]}
+          {((state?.autoImproveLog?.applied?.length ?? 0) > 0) && (
+            <View style={{ marginBottom: 6 }}>
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#15803d', marginBottom: 2 }}>
+                Applied automatically — saved £{Math.round(state.autoImproveLog.cost_saving_gbp).toLocaleString('en-GB')}
               </Text>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4 }}>{l.action}</Text>
-                <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic', lineHeight: 1.4 }}>Trade-off: {l.trade_off}</Text>
-              </View>
+              {(state.autoImproveLog.notes as string[]).map((n, i) => (
+                <Text key={`ai-note-${i}`} style={{ fontSize: 8, color: INK_SOFT, lineHeight: 1.4 }}>- {n}</Text>
+              ))}
             </View>
-          ))}
+          )}
+          {improvementPlan.verdict !== 'within_brief' && improvementPlan.levers.length > 0 && (
+            <View>
+              <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 6 }}>
+                {improvementPlan.summary}
+              </Text>
+              {improvementPlan.levers.map((l, i) => (
+                <View key={`lever-${i}`} style={{ flexDirection: 'row', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#1d4ed8', width: 26 }}>
+                    {l.id.split('_')[0]}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4 }}>{l.action}</Text>
+                    <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic', lineHeight: 1.4 }}>Trade-off: {l.trade_off}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       )}
 

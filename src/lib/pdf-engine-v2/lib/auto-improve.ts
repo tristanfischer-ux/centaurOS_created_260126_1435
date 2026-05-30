@@ -233,3 +233,43 @@ export function applyMaterialRepriceLever(macros: MacroLike[]): RepriceResult {
   })
   return { macros: out, changes, total_saving_gbp: totalSaving }
 }
+
+export interface AutoImproveOutcome {
+  applied: string[]                 // lever ids actually applied
+  reprice: RepriceResult | null
+  cost_saving_gbp: number
+  notes: string[]                   // human-readable record of each change (the "design evolution")
+}
+
+/**
+ * Apply the SAFE auto-improve levers (Phase 2) to a design state. Currently L1
+ * only — the material re-price, the lowest-risk lever that can only make the BoM
+ * more honest. MUTATES state.engineeringContract.macro_assembly_prices to the
+ * re-priced macros and records state.autoImproveLog (the transparent "design
+ * evolution"). Phase 3 (downrate/scale) is NOT applied here — it changes the
+ * design and needs council validation. Idempotent: re-running finds nothing left
+ * over-priced, so it no-ops. Returns the outcome.
+ */
+export function applyAutoImproveToState(state: any): AutoImproveOutcome {
+  const ec = state?.engineeringContract
+  const macros: MacroLike[] = Array.isArray(ec?.macro_assembly_prices) ? ec.macro_assembly_prices : []
+  const applied: string[] = []
+  const notes: string[] = []
+  let reprice: RepriceResult | null = null
+  if (macros.length > 0) {
+    reprice = applyMaterialRepriceLever(macros)
+    if (reprice.changes.length > 0) {
+      ec.macro_assembly_prices = reprice.macros
+      applied.push('L1_reprice')
+      for (const c of reprice.changes) {
+        notes.push(
+          `L1: re-priced ${c.word_name} £${c.from_gbp_per_kg.toFixed(0)}/kg -> £${c.to_gbp_per_kg.toFixed(1)}/kg ` +
+          `(${c.material} commodity rate), saving £${Math.round(c.saving_gbp).toLocaleString('en-GB')}`,
+        )
+      }
+    }
+  }
+  const outcome: AutoImproveOutcome = { applied, reprice, cost_saving_gbp: reprice?.total_saving_gbp ?? 0, notes }
+  if (state && typeof state === 'object') state.autoImproveLog = outcome
+  return outcome
+}
