@@ -3902,11 +3902,15 @@ registerArchetype('wind_turbine', (brief: any) => {
   const macro_assembly_prices: MacroAssemblyPrice[] = [
     {
       word_name: 'rotor_blade_assembly',
-      unit_price_gbp: 180,
+      // £18/kg GFRP-CFRP hybrid: a ~25 t 80 m blade ≈ £450-500k ex-works (Vestas
+      // EnVentus / GE Cypress disclosures). The prior £180/kg was a 10× magnitude
+      // error — it priced a single blade at ~£4.2M (vs the ~£500k reference in
+      // the comment above) and inflated the whole turbine BoM ~3x.
+      unit_price_gbp: 18,
       dimension_basis: 'kg_mass',
       dimension_value: totalBladeMassKg,
-      total_gbp: 180 * totalBladeMassKg,
-      source_detail: `£180/kg × ${totalBladeMassKg.toFixed(0)} kg total (${numBlades} blades × ${bladeMassKg.toFixed(0)} kg, GFRP/CFRP hybrid; Vestas EnVentus / GE Cypress disclosures)`,
+      total_gbp: 18 * totalBladeMassKg,
+      source_detail: `£18/kg × ${totalBladeMassKg.toFixed(0)} kg total (${numBlades} blades × ${bladeMassKg.toFixed(0)} kg ≈ £${Math.round(18 * bladeMassKg / 1000)}k/blade, GFRP/CFRP hybrid; Vestas EnVentus / GE Cypress disclosures)`,
     },
     {
       word_name: 'hub_assembly',
@@ -3926,11 +3930,13 @@ registerArchetype('wind_turbine', (brief: any) => {
     },
     {
       word_name: 'nacelle_enclosure_bedplate',
-      unit_price_gbp: 45,
+      // £20/kg: steel main frame + cast bedplate + GRP cover + yaw ring. The
+      // prior £45/kg was ~2x high (a 33 t nacelle structure at ~£660k, not £1.5M).
+      unit_price_gbp: 20,
       dimension_basis: 'kg_mass',
       dimension_value: nacelleMassKg,
-      total_gbp: 45 * nacelleMassKg,
-      source_detail: `£45/kg × ${nacelleMassKg.toFixed(0)} kg (steel main frame + GRP enclosure + yaw drive ring)`,
+      total_gbp: 20 * nacelleMassKg,
+      source_detail: `£20/kg × ${nacelleMassKg.toFixed(0)} kg (steel main frame + cast bedplate + GRP enclosure + yaw drive ring)`,
     },
     {
       word_name: 'tower_steel_sections',
