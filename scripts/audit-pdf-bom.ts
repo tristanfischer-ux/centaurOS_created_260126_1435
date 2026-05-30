@@ -477,7 +477,12 @@ async function audit(outDir: string): Promise<{ findings: Finding[]; bom: BomExt
       const overFactor = ratio / band.high_gbp_per_unit
       const underFactor = band.low_gbp_per_unit / ratio
       if (ratio > band.high_gbp_per_unit) {
-        const severity = overFactor > 2.0 ? 'HIGH' : 'MED'
+        // 2026-05-30 (Tristan): HIGH at >1.5x the ALREADY-PREMIUM high band, not
+        // >2.0x. The high band is the generous top of the industry range, so 1.5x
+        // beyond it is unambiguously inflated and must HARD-FAIL (exit 10), not sit
+        // as a MED warning an operator scans past. Wind shipped £3,233/kW (1.8x the
+        // £1,800/kW premium-high band) as a MED that went unread; this makes it HIGH.
+        const severity = overFactor > 1.5 ? 'HIGH' : 'MED'
         findings.push({
           severity,
           check_id: 'B-7',
