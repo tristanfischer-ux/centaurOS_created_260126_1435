@@ -273,3 +273,66 @@ export function applyAutoImproveToState(state: any): AutoImproveOutcome {
   if (state && typeof state === 'object') state.autoImproveLog = outcome
   return outcome
 }
+
+// ─── Phase 3 — convergence point (the design-changing loop's TARGET) ─────────
+export interface ConvergedPoint {
+  feasible: boolean
+  size_metric_key: string | null
+  size_metric_label: string | null
+  current_size: number | null
+  unit: string
+  cost_feasible_size: number | null        // largest size within the cost ceiling
+  performance_feasible_size: number | null // smallest size that clears every perf floor
+  converged_size: number | null            // the size to adopt (null when infeasible)
+  verdict: string
+  assumption: string
+}
+
+/**
+ * AUTO-IMPROVE Phase 3 — compute the single CONVERGED size that meets BOTH the
+ * cost ceiling AND every performance floor (or prove no such size exists). The
+ * size-driving metric (rated power / capacity / canopy area) scales cost up and
+ * performance up together; the feasible window is [size that hits the worst perf
+ * floor, size the cost ceiling allows]. If that window is non-empty → converge to
+ * its lower edge (smallest size that clears performance, within budget). If empty
+ * → infeasible: report the Pareto gap.
+ *
+ * ASSUMPTION (deliberately conservative + flagged): cost and the binding
+ * performance metric scale ~LINEARLY with the size metric. True for energy /
+ * capacity / yield / throughput classes (BESS, VF). NOT true for inverse
+ * couplings (wind capacity factor falls as specific power rises, so downrating
+ * helps BOTH) — for those the linear model still reaches the correct
+ * INFEASIBLE/feasible verdict here, but the convergence loop must NOT apply a
+ * naive scale; defer to the class physics. Pure + deterministic. Phase 3 APPLY
+ * (re-run the physics at converged_size) is the council-gated integration.
+ */
+export function computeConvergedDesignPoint(input: ImprovementInput): ConvergedPoint {
+  const sm = input.scaleMetric
+  const assumption =
+    'Assumes cost + performance scale ~linearly with the size metric (true for energy/capacity/yield classes; ' +
+    'inverse couplings like wind capacity-factor-vs-specific-power need class physics — the verdict holds, the naive scale does not).'
+  if (!sm || !(sm.value > 0)) {
+    return { feasible: false, size_metric_key: null, size_metric_label: null, current_size: null, unit: '', cost_feasible_size: null, performance_feasible_size: null, converged_size: null, verdict: 'No size-driving metric — cannot compute a convergence point.', assumption }
+  }
+  const current = sm.value
+  let costFeasible = current
+  if (input.exWorksCostGbp && input.exWorksCostGbp > 0 && input.costCeilingGbp && input.costCeilingGbp > 0) {
+    costFeasible = current * (input.costCeilingGbp / input.exWorksCostGbp)
+  }
+  let perfFeasible = current
+  for (const pm of input.performanceMisses ?? []) {
+    if (pm.brief > 0 && pm.achieved > 0 && pm.achieved < pm.brief) {
+      perfFeasible = Math.max(perfFeasible, current * (pm.brief / pm.achieved))
+    }
+  }
+  const feasible = costFeasible >= perfFeasible * 0.99
+  const converged = feasible ? perfFeasible : null
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2))
+  const verdict = feasible
+    ? `Feasible: at ~${fmt(converged as number)} ${sm.unit} ${sm.label.toLowerCase()} the design clears every performance floor AND stays within the cost ceiling.`
+    : `Infeasible at this envelope: the cost ceiling allows at most ~${fmt(costFeasible)} ${sm.unit} ${sm.label.toLowerCase()}, but performance needs at least ~${fmt(perfFeasible)} ${sm.unit} — a ${(perfFeasible / Math.max(costFeasible, 1e-9)).toFixed(1)}x gap. Closing it requires relaxing the cost ceiling or the performance target.`
+  return {
+    feasible, size_metric_key: sm.key, size_metric_label: sm.label, current_size: current, unit: sm.unit,
+    cost_feasible_size: costFeasible, performance_feasible_size: perfFeasible, converged_size: converged, verdict, assumption,
+  }
+}
