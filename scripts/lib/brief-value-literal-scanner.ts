@@ -138,6 +138,43 @@ const BRIEF_KEY_LABELS: Record<string, string> = {
   container_count: 'container count',
 }
 
+// ── Unit-family discrimination (gate-25 false-positive fix, 2026-05-30) ───────
+// A literal immediately followed by a unit from a DIFFERENT physical family than
+// the brief constraint is a COINCIDENTAL collision, not a stale brief literal —
+// e.g. "300 K" (radiator temperature) vs max_mass_kg=300, or "800 /h" (kLa rate)
+// vs batch_size=800. buildLiteralPattern's lookahead only checks the immediate
+// next char (a space), so it cannot tell "300 kg" from "300 K". When the trailing
+// unit belongs to a recognised family that ISN'T the constraint's family, skip.
+// Bare numbers and same-family units are kept (preserves the canonical
+// "28000 kg" stale-literal catch). Universal across all classes.
+const UNIT_FAMILY_TRAILING: Record<string, RegExp> = {
+  mass:          /^(kg|kgs|kilograms?|tonnes?|t|lbs?)\b/i,
+  energy:        /^(wh|kwh|mwh|gwh|kj|mj)\b/i,
+  power:         /^(w|kw|mw|gw|tw)(t|e|p|th|el)?\b/i,
+  voltage:       /^(v|kv|mv)\b/i,
+  current:       /^(a|ka|ma)\b/i,
+  temperature:   /^(K|°C|°F|degC|degF)\b/,   // case-sensitive: K = Kelvin, not kilo-
+  length:        /^(mm|cm|µm|nm|km|m)\b/i,
+  time:          /^(years?|yrs?|months?|days?|hrs?|hours?|seconds?)\b/i,
+  rate:          /^(\/h|\/hr|\/s|\/yr|hz|khz|mhz|rpm)\b/i,
+  money:         /^(£|\$|€|gbp|usd|eur)\b/i,
+  flow:          /^(lpm|gpm|cmh|cms|l\/|m³\/|m3\/)\b/i,
+  pressure:      /^(pa|kpa|mpa|bar|psi)\b/i,
+  concentration: /^(ppm|ppb|µmol|mg\/)\b/i,
+}
+const CONSTRAINT_EXPECTED_FAMILY: Record<string, string> = {
+  max_mass_kg: 'mass',
+  nameplate_capacity_mwh: 'energy',
+  usable_energy_mwh: 'energy',
+  dc_bus_voltage_v: 'voltage',
+  ac_grid_voltage_v: 'voltage',
+  unit_cost_ceiling_gbp: 'money',
+  design_life_years: 'time',
+  batch_size: 'count',
+  container_count: 'count',
+  cycle_life_cycles: 'count',
+}
+
 // ── Line patterns to EXCLUDE from the scan ───────────────────────────────────
 
 /**
@@ -203,6 +240,13 @@ export function scanEmitterForBriefLiterals(
   constraints: MinimalBriefConstraints,
   className: string,
   minValue = 100,
+  /** STRICT mode (used for tool-narratives.ts): only flag a literal that is
+   *  immediately followed by the constraint's OWN unit. Narrative prose is full
+   *  of physics example numbers (300 MWt, 800 /h kLa, 2-4 m) that coincidentally
+   *  equal brief values; strict mode flags only a genuine stale brief literal
+   *  (e.g. "28,000 kg") and skips the rest. Lenient mode (emitter) keeps bare
+   *  numbers and skips only clear cross-family unit conflicts. */
+  requireConstraintUnit = false,
 ): BriefValueLiteralScanResult {
   const lines = emitterSource.split('\n')
   const hits: LiteralHit[] = []
@@ -236,6 +280,29 @@ export function scanEmitterForBriefLiterals(
 
       const match = lineText.match(pattern)
       if (!match) continue
+
+      // Unit-family discrimination (gate-25 false-positive fix, 2026-05-30).
+      const expectedFamily = CONSTRAINT_EXPECTED_FAMILY[key]
+      const mIdx = match.index ?? lineText.indexOf(match[1])
+      const trailing = lineText.slice(mIdx + match[1].length).replace(/^[\s)\]}]+/, '')
+      if (requireConstraintUnit) {
+        // STRICT (narratives): require the constraint's OWN unit to follow the
+        // literal. Coincidental physics numbers (300 MWt, 800 /h, bare 800) are
+        // skipped; only a genuine stale brief literal ("28,000 kg") is flagged.
+        const expectedRe = expectedFamily ? UNIT_FAMILY_TRAILING[expectedFamily] : undefined
+        if (!expectedRe || !expectedRe.test(trailing)) continue
+      } else if (expectedFamily) {
+        // LENIENT (emitter): skip only a CLEAR cross-family unit conflict; keep
+        // bare numbers + same-family units (preserves the bare-literal catch).
+        let unitConflict = false
+        for (const fam in UNIT_FAMILY_TRAILING) {
+          if (fam !== expectedFamily && UNIT_FAMILY_TRAILING[fam].test(trailing)) {
+            unitConflict = true
+            break
+          }
+        }
+        if (unitConflict) continue
+      }
 
       hits.push({
         value,
@@ -351,7 +418,11 @@ export function scanMultipleFilesForBriefLiterals(
   for (const sourcePath of sourcePaths) {
     if (!fs.existsSync(sourcePath)) continue
     const source = fs.readFileSync(sourcePath, 'utf-8')
-    const result = scanEmitterForBriefLiterals(source, constraints, className, minValue)
+    // Narratives scanned in STRICT mode (require the constraint's own unit) —
+    // tool descriptions are dense with coincidental physics numbers; the emitter
+    // is scanned leniently (bare-literal catch).
+    const strictNarrative = /tool-narratives/.test(sourcePath)
+    const result = scanEmitterForBriefLiterals(source, constraints, className, minValue, strictNarrative)
     constraintsCheckedSeen = Math.max(constraintsCheckedSeen, result.constraints_checked)
     totalLinesScanned += result.lines_scanned
     for (const hit of result.hits) {
