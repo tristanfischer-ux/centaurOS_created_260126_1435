@@ -29,6 +29,7 @@ import { resolvePriceBand, type PriceBand, type PriceBandVerdict } from '../src/
 import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { computeImprovementPlan } from '../src/lib/pdf-engine-v2/lib/auto-improve'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
+import { buildSourcingStrategy } from '../src/lib/pdf-engine-v2/lib/sourcing-strategy'
 import { checkMacroMaterialRate } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import {
@@ -8345,6 +8346,12 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
   const suppliers: any[] = Array.isArray(state.suppliers) ? state.suppliers : []
   if (suppliers.length === 0) return null
 
+  // Sourcing strategy (2026-05-30): the lead-time / dual-source / MOQ narrative
+  // the council scores the section on — synthesised from the supplier archetypes.
+  const sourcingStrategy = buildSourcingStrategy(
+    suppliers.map((a) => ({ id: String(a?.archetype_id ?? ''), label: String(a?.archetype_label ?? ''), candidates: Array.isArray(a?.candidates) ? a.candidates.length : 0 })),
+  )
+
   const hasAnyCandidate = suppliers.some((s) => Array.isArray(s.candidates) && s.candidates.length > 0)
   if (!hasAnyCandidate) return null
 
@@ -8537,6 +8544,15 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
       <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
         Recommended companies for each delivery role — principal contractor and subcontractors. Up to 3 candidates per role. Each card carries the company identity, a concrete capability line, two or three reasons the company fits this brief, and a direct call to action.
       </Text>
+      {sourcingStrategy && (
+        <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8', borderRadius: 4 }} minPresenceAhead={80}>
+          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>Sourcing strategy</Text>
+          <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}>{sourcingStrategy.identification}</Text>
+          <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Lead time. </Text>{sourcingStrategy.lead_time}</Text>
+          <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Dual-source risk. </Text>{sourcingStrategy.dual_source}</Text>
+          <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Order strategy. </Text>{sourcingStrategy.moq}</Text>
+        </View>
+      )}
       <View
         style={{
           marginBottom: 14,
