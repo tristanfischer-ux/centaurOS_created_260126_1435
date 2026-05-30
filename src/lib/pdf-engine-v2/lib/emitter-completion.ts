@@ -124,6 +124,11 @@ export interface CompleteEmitterGapsOpts {
   /** Skip the DB write-back of generated parts. Default false. Tests pass true
    *  so a throwaway run does not mutate the production library. */
   skipWriteback?: boolean
+  /** Short summary of the overall product design (typically the brief's product
+   *  description) so the LLM-generate fallback picks parts CONSISTENT with the
+   *  design — e.g. no slip rings on a direct-drive PMSG, the right refrigerant,
+   *  the right voltage/power class. Default '' (no context). */
+  designContext?: string
   /** Optional sink for human-readable progress lines (defaults to console.error). */
   log?: (line: string) => void
   /** Override the LLM model for the generate fallback. Default Grok 4.3
@@ -337,6 +342,7 @@ async function generatePart(
   subModuleId: string,
   componentDescription: string,
   model: string,
+  designContext = '',
 ): Promise<GeneratedPart | null> {
   const sys =
     'You are a senior hardware design engineer compiling a concept-stage bill of materials. ' +
@@ -346,8 +352,16 @@ async function generatePart(
     'with keys: manufacturer (real company), part_number (a real catalogue part number IF you ' +
     'are confident it exists, else the empty string ""), name (short human name of the component), ' +
     'one_line (one-sentence description). If unsure of an exact part number, set part_number to "" — ' +
-    'do NOT invent a plausible-looking number.'
+    'do NOT invent a plausible-looking number. ' +
+    'The component MUST be PHYSICALLY CONSISTENT with the overall product design given below — ' +
+    'e.g. do not specify slip rings for a direct-drive permanent-magnet generator, do not pick an ' +
+    'R410A compressor for an R290 (propane) system, and match the stated voltage, power, and ' +
+    'capacity class. If the slot is physically inappropriate for the design, choose the nearest ' +
+    'component the design actually needs.'
   const user =
+    (designContext
+      ? `Overall product design (the component must be consistent with this):\n${designContext.slice(0, 600)}\n\n`
+      : '') +
     `Product class: ${className}\n` +
     `Module: ${moduleId}\n` +
     `Sub-assembly slot: ${subModuleId}\n` +
@@ -656,7 +670,7 @@ export async function completeEmitterGaps(
       let realMpnFromLlm = ''
 
       if (!opts.skipGenerate) {
-        const gen = await generatePart(className, gap.module_id, gap.sub_module_id, descriptor, model)
+        const gen = await generatePart(className, gap.module_id, gap.sub_module_id, descriptor, model, opts.designContext ?? '')
         if (gen) {
           manufacturer = gen.manufacturer
           humanName = gen.name || humanName

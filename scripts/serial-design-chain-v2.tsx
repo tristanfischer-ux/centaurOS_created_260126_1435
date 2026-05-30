@@ -3436,6 +3436,10 @@ async function main() {
       const completion = await completeEmitterGaps(
         design.modules ?? [],
         currentProductClass ?? 'unknown',
+        // Pass the brief's product description so generated parts are physically
+        // consistent with the design (no slip rings on a direct-drive PMSG, the
+        // right refrigerant, the right voltage/power class).
+        { designContext: String((parsedResult?.data as any)?.product_description ?? (parsedResult?.data as any)?.brief?.original_text ?? '') },
       )
       if (completion.filled.length > 0) {
         const dbN = completion.filled.filter((f) => f.source === 'db').length
