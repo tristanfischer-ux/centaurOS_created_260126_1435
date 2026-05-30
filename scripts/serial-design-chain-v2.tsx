@@ -75,6 +75,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
+import { completeEmitterGaps } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { snapshotEmitterIdentity, reassertEmitterIdentity, isLockedKind, type EmitterIdentitySnapshot } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { runSharedQuantityConsistencyAudit } from '../src/lib/pdf-engine-v2/lib/shared-quantity-consistency-audit'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
@@ -3411,6 +3412,57 @@ async function main() {
   // are now covered by deterministic-emitter.ts (commit accompanying this gate).
   {
     const tGate23 = Date.now()
+
+    // ── Emitter-completion growing-DB layer (2026-05-30, Tristan keystone) ──
+    //
+    // Universal "hand-complete on the fly + grow a DB" mechanism. BEFORE the
+    // gate-23 hard-exit, fill every gap sub_module with one MPN-bearing word:
+    //   DB-FIRST  → query pretraining_extracted_parts for a real catalogue part
+    //               whose component type matches the slot (high-precision, head-
+    //               noun rule — a wrong pin is worse than an honest generate).
+    //   ON MISS   → generate a real OEM + component via the engine's LLM caller
+    //               (grounded Flash-Lite → Grok 4.3 fallback), WRITE IT BACK to
+    //               pretraining_extracted_parts so the next run is a DB-first
+    //               hit ("good next time"), and inject an honest non-structured
+    //               part_number descriptor (gate-20-safe: never a fake MPN).
+    //
+    // This lets untuned classes (wind, bioreactor, EV charger, H2 electrolyser)
+    // clear gate-23 WITHOUT hand-authoring a per-class deterministic emitter,
+    // while the parts library compounds across projects (growing-DB principle).
+    // Gate-20 safety: DB-sourced parts are real (resolve library_only); LLM
+    // completions emit "specify exact MPN at detailed design" which gate-20
+    // skips as a commodity/non-structured descriptor. Honesty over fake MPNs.
+    try {
+      const completion = await completeEmitterGaps(
+        design.modules ?? [],
+        currentProductClass ?? 'unknown',
+      )
+      if (completion.filled.length > 0) {
+        const dbN = completion.filled.filter((f) => f.source === 'db').length
+        const genN = completion.filled.filter((f) => f.source === 'generated').length
+        console.error(
+          `[chain] emitter-completion: filled ${completion.filled.length} gap sub_module(s) ` +
+          `(${dbN} DB-first, ${genN} generated+written-back) before gate-23`,
+        )
+        logAction({
+          step: 'emitter_completion',
+          filled_count: completion.filled.length,
+          db_first: dbN,
+          generated: genN,
+          modules_mutated: completion.modulesMutated,
+          filled: completion.filled,
+          class_name: currentProductClass ?? 'unknown',
+          latency_ms: Date.now() - tGate23,
+        })
+      }
+    } catch (err) {
+      // Never let the completion layer crash the chain — gate-23 below still
+      // hard-exits on any remaining gap, so a completion failure degrades to
+      // the pre-existing behaviour (exit 23) rather than an unhandled throw.
+      console.error(`[chain] emitter-completion error (non-fatal): ${(err as Error).message}`)
+      logAction({ step: 'emitter_completion', error: (err as Error).message })
+    }
+
     const gate23Result = runEmitterCompletenessGate(
       design.modules ?? [],
       currentProductClass ?? 'unknown',
