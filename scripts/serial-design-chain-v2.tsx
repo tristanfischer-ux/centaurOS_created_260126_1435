@@ -981,11 +981,11 @@ That's the FIRST-DRAFT detail level — enough for procurement to identify the p
 === ADDITIONAL FIELD: brief_overview_prose ===
 
 Top-level JSON MUST include "brief_overview_prose" with sub-fields:
-  overview_and_context (2-3 paragraphs)
-  mission_statement (1 sentence; use brief's cost ceiling, deployment time, target market verbatim)
+  overview_and_context (2-3 paragraphs. Para 1: WHAT the product is + its headline ACHIEVED spec. Para 2: WHY this configuration, and the RESOLVED outcome — the achieved capacity/power/yield, the resulting unit cost, and the key engineering trade-off this design settled.)
+  mission_statement (1-2 sentences. State what the DESIGN DELIVERS, not what the brief requested. LEAD with the achieved headline metric and how it compares to the brief target (met / X% over / honest shortfall with the reason), then the resulting unit cost + simple payback or operating economics, then the headline compliance. Pull every number from modules[].derived_parameters. Do NOT merely restate the brief's target values — the reader sees those in the requirements table; the mission must show what the engineering RESOLVED TO. This is the section a buyer decides on, so lead with the result, not the request.)
   target_customers (2 sentences — name the SPECIFIC operator/buyer and their concrete procurement driver, and cite at least one real figure from this design (capacity, power, cost ceiling, or deployment time). BANNED phrases: "for the use case described in the brief", "mid-market", "defined performance and compliance requirements", "rather than research-pilot or hobbyist users". Do NOT write a sentence that would be equally true of any product in this class.)
   why_now (1 paragraph — give the SPECIFIC market, regulatory, or cost driver for THIS design, anchored to at least one concrete number or a named standard/scheme. State what changed and why it makes this design buyable now. BANNED generic openers: "Growing demand for", "premium, certified, rapidly deployable".)
-All numbers MUST match numbers in modules[].derived_parameters. Do not invent.
+All numbers MUST match numbers in modules[].derived_parameters AND be physically sane: sanity-check any ratio / efficiency / capacity-factor against real-world ranges for THIS product class before stating it — an absurd value (e.g. a 9% capacity factor for a utility wind turbine, an SCOP below 1, a battery round-trip efficiency above 100%) signals a derived_parameters error you must NOT propagate into the prose; flag it in design_decisions instead. Do not invent.
 
 === SUB-MODULE SPECIFICITY (HARD REQUIREMENT) ===
 
