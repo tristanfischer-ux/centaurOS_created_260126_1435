@@ -5415,15 +5415,18 @@ function ModuleConnectionMapPage({
     title: module_title(m),
   }))
 
-  // 460 keeps the SVG inside the usable column (595.28 - 128 = 467pt) so
-  // react-pdf's height calc is exact and the legend doesn't spill to its own
-  // near-empty page (page-bloat fix, 2026-05-29). H scaled to keep the ratio.
-  const W = 460
-  const H = 307
+  // Fix 4 (2026-05-30): legend rendered as side-panel on the SAME page as the
+  // SVG ring — diagram left (W=300pt), numbered legend right (W=155pt). This
+  // eliminates the near-empty legend-only continuation page that existed when
+  // module count was high enough to push the legend block to a new page via
+  // minPresenceAhead. A4 usable column = 467pt; diagram 300 + gap 12 + legend
+  // 155 = 467pt — fits exactly with no overflow.
+  const W = 300
+  const H = 200
   const cx = W / 2
   const cy = H / 2
-  const r = Math.min(W, H) / 2 - 32
-  const nodeR = 18
+  const r = Math.min(W, H) / 2 - 22
+  const nodeR = 15
 
   const positions = ordered.map((m, i) => {
     const angle = (i / ordered.length) * Math.PI * 2 - Math.PI / 2
@@ -5441,89 +5444,74 @@ function ModuleConnectionMapPage({
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
         Module Map
       </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 16 }}>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 12 }}>
         Figure 1. The {ordered.length} modules and how they connect.
       </Text>
 
       {/* Manual Review callout removed per Tristan fifth review. */}
 
-      <View style={{ alignItems: 'center', marginBottom: 16 }}>
-        <Svg width={W} height={H}>
-          {links.map((l, idx) => {
-            const a = posById.get(l.from_module)
-            const b = posById.get(l.to_module)
-            if (!a || !b) return null
-            return (
-              <Line
-                key={`link-${idx}`}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={RULE}
-                strokeWidth={0.8}
-              />
-            )
-          })}
-          {positions.map(p => (
-            <React.Fragment key={p.id}>
-              <Circle cx={p.x} cy={p.y} r={nodeR} fill={ACCENT} stroke={ACCENT_SOFT} strokeWidth={1.5} />
-              {/* react-pdf Svg <Text> renders with `fill` attribute, NOT style.color. */}
-              <Text
-                x={p.x}
-                y={p.y + 4}
-                fill="#ffffff"
-                style={{
-                  fontSize: 13,
-                  fontFamily: 'Helvetica-Bold',
-                  textAnchor: 'middle',
-                }}
-              >
-                {String(p.n)}
-              </Text>
-            </React.Fragment>
-          ))}
-        </Svg>
-      </View>
+      {/* Fix 4: diagram + legend side-by-side on one page */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        {/* Left: SVG ring diagram */}
+        <View style={{ width: W }}>
+          <Svg width={W} height={H}>
+            {links.map((l, idx) => {
+              const a = posById.get(l.from_module)
+              const b = posById.get(l.to_module)
+              if (!a || !b) return null
+              return (
+                <Line
+                  key={`link-${idx}`}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={RULE}
+                  strokeWidth={0.8}
+                />
+              )
+            })}
+            {positions.map(p => (
+              <React.Fragment key={p.id}>
+                <Circle cx={p.x} cy={p.y} r={nodeR} fill={ACCENT} stroke={ACCENT_SOFT} strokeWidth={1.5} />
+                {/* react-pdf Svg <Text> renders with `fill` attribute, NOT style.color. */}
+                <Text
+                  x={p.x}
+                  y={p.y + 4}
+                  fill="#ffffff"
+                  style={{
+                    fontSize: 11,
+                    fontFamily: 'Helvetica-Bold',
+                    textAnchor: 'middle',
+                  }}
+                >
+                  {String(p.n)}
+                </Text>
+              </React.Fragment>
+            ))}
+          </Svg>
+        </View>
 
-      {/*
-        Phase20 audit (2026-05-17): Module Map page produced an orphan
-        continuation page on bess/bioreactor/drone/ev-charger/haps/heatpump/
-        vertical-farm — react-pdf created a phantom wrap-page that the fixed
-        PageHeader/PageFooter then decorated with no body content. Wrap=false
-        on the legend prevents the SVG + legend block from forcing a wrap
-        boundary; the entire body fits inside the 716pt printable height for
-        all 10 current product classes (11 modules max).
-
-        Track N audit MAJOR 3 (2026-05-18): the "Module legend" heading was
-        rendered OUTSIDE the wrap=false block — so when the SVG + legend
-        couldn't fit on the same page, the heading orphaned at the foot of
-        the map page and the legend table got pushed to the next page. Wrap
-        the heading + table together in a single wrap=false block so they
-        always travel as one unit.
-      */}
-      {/* 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
-          minPresenceAhead — Module legend table grows with module count;
-          wrap=false caused page-overlap bug. 120pt keeps heading + first
-          rows together; if not enough space, push whole block to next page. */}
-      <View minPresenceAhead={120}>
-        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 8, marginBottom: 8 }}>
-          Module legend
-        </Text>
-        <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
-          {ordered.map(m => (
-            <View key={m.id} style={{
-              flexDirection: 'row',
-              paddingVertical: 5,
-              borderBottomWidth: 0.6,
-              borderBottomColor: RULE_SOFT,
-            }}>
-              <Text style={{ width: 30, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
-                {m.n}
-              </Text>
-              <Text style={{ flex: 1, fontSize: 10, color: INK_SOFT }}>{m.title}</Text>
-            </View>
-          ))}
+        {/* Right: numbered legend panel — fixed width, no page break possible */}
+        <View style={{ flex: 1, paddingLeft: 12, paddingTop: 4 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6, letterSpacing: 0.4 }}>
+            MODULE LEGEND
+          </Text>
+          <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
+            {ordered.map(m => (
+              <View key={m.id} style={{
+                flexDirection: 'row',
+                paddingVertical: 3,
+                borderBottomWidth: 0.4,
+                borderBottomColor: RULE_SOFT,
+              }}>
+                <Text style={{ width: 20, fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+                  {m.n}
+                </Text>
+                <Text style={{ flex: 1, fontSize: 8.5, color: INK_SOFT, lineHeight: 1.35 }}>{m.title}</Text>
+              </View>
+            ))}
+          </View>
         </View>
       </View>
 
@@ -8097,9 +8085,16 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
       // minPresenceAhead — supplier card is 4-6 inches tall with capability
       // one-liner + 3 fit_bullets + contact CTAs; wrap=false caused page-18
       // wind-turbine overlap bug. 200pt reserves enough space for safe fit.
+      //
+      // Fix 3 (2026-05-30): reduced minPresenceAhead 200→70. The 200pt
+      // reservation caused every supplier card that couldn't fit remaining
+      // page space to jump to a new page, leaving the archetype heading +
+      // "Suppliers (continued)" on a near-empty page. 70pt protects only the
+      // heading + company-name row; the card body flows naturally across the
+      // page boundary. react-pdf handles mid-card wrapping cleanly.
       <View
         key={`cand-${idx}`}
-        minPresenceAhead={200}
+        minPresenceAhead={70}
         style={{
           marginBottom: 10,
           padding: 12,
@@ -8196,85 +8191,100 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
     )
   }
 
-  // Chunk archetypes into pages — at most 2 archetypes per page to stay under
-  // the React-PDF translate-overflow threshold (each archetype has up to 3
-  // tall cards).
-  const ARCHETYPES_PER_PAGE = 2
-  const archetypeChunks: any[][] = []
-  for (let i = 0; i < suppliers.length; i += ARCHETYPES_PER_PAGE) {
-    archetypeChunks.push(suppliers.slice(i, i + ARCHETYPES_PER_PAGE))
+  // Fix 3 (2026-05-30): Blank "Suppliers (continued)" page guard.
+  //
+  // Root cause: explicit <Page> components per archetype chunk interact badly
+  // with react-pdf's auto-pagination. When chunk N's cards overflow the page,
+  // react-pdf auto-creates a continuation page. The explicit <Page> for chunk
+  // N+1 then renders AFTER that auto-page, and because the auto-page stole the
+  // slot, chunk N+1's page has the "Suppliers (continued)" heading and footer
+  // but no archetype content — a true blank page.
+  //
+  // Fix: single <Page> with all surviving archetypes flowing naturally. react-pdf
+  // paginates mid-content cleanly; the PageHeader + PageFooter auto-repeat via
+  // the fixed (header/footer registered on the <Page>). No explicit chunk loop,
+  // no blank pages from auto-pagination interference.
+  //
+  // Also: pre-filter archetypes whose every candidate is contactless (returned
+  // null by renderCandidateCard) so we don't emit archetype headings for empty
+  // sections.
+  function archetypeHasSurvivingCard(archetype: any): boolean {
+    if (!Array.isArray(archetype.candidates) || archetype.candidates.length === 0) {
+      // No candidates → "no candidates" text renders; archetype still shows up.
+      return true
+    }
+    return archetype.candidates.some((c: any) => {
+      const urlReconciles = c.website_url ? supplierUrlReconciles(String(c.name ?? ''), String(c.website_url)) : true
+      const websiteText = (c.website_url && urlReconciles)
+        ? String(c.website_url).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').slice(0, 60)
+        : ''
+      const rawEmail: string | null = c.contact_email || c.contact_email_derived || null
+      const emailReconciles = rawEmail ? supplierEmailReconciles(String(c.name ?? ''), rawEmail) : true
+      const emailToUse: string | null = (rawEmail && emailReconciles && urlReconciles) ? rawEmail : null
+      return !!(websiteText || emailToUse)
+    })
   }
 
-  const pages: React.ReactElement[] = []
-  archetypeChunks.forEach((chunk, pageIdx) => {
-    const isFirst = pageIdx === 0
-    pages.push(
-      <Page key={`sup-page-${pageIdx + 1}`} size="A4" style={PAGE_STYLE}>
-        <PageHeader
-          section={`Section 7 · Suppliers${archetypeChunks.length > 1 ? ` (page ${pageIdx + 1} of ${archetypeChunks.length})` : ''}`}
-          project={project}
-        />
-        {isFirst ? (
-          <>
-            <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-              Suppliers
-            </Text>
-            <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
-              Recommended companies for each delivery role — principal contractor and subcontractors. Up to 3 candidates per role. Each card carries the company identity, a concrete capability line, two or three reasons the company fits this brief, and a direct call to action.
-            </Text>
-            <View
-              style={{
-                marginBottom: 14,
-                padding: 10,
-                backgroundColor: '#fef3c7',
-                borderLeftWidth: 3,
-                borderLeftColor: '#c2410c',
-                borderRadius: 4,
-              }}
-            >
-              <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.45 }}>
-                Caveat — candidates are surfaced from a 28,000-company database plus a scored web fallback, then distilled into capability + fit bullets by a small language model. A human engineer should still validate fit, capacity, and certification before procurement.
-              </Text>
-            </View>
-          </>
-        ) : (
-          <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 10 }}>
-            Suppliers (continued)
-          </Text>
-        )}
-        {chunk.map((archetype: any, archIdx: number) => (
-          <View key={`arch-${pageIdx}-${archIdx}`} style={{ marginBottom: 16 }}>
-            <View style={{ marginBottom: 6, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
-              <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
-                {clean_prose(String(archetype.archetype_label ?? archetype.archetype_id ?? ''))}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.5, marginBottom: 10 }}>
-              {clean_prose(String(archetype.function_description ?? ''))}
-            </Text>
-            {Array.isArray(archetype.candidates) && archetype.candidates.length > 0 ? (
-              archetype.candidates.map((c: any, i: number) =>
-                renderCandidateCard(c, archIdx * 100 + i),
-              )
-            ) : (
-              <Text style={{ fontSize: 10, color: MUTED, fontStyle: 'italic' }}>
-                No candidates passed the relevance scorer for this role. Recommend a manual shortlist or expand the search keyword set.
-              </Text>
-            )}
-            {/* Phase19 audit 2026-05-17: archetype.notes is now provenance-only
-                telemetry ("X from forge-truth.db (N rejected); M added via
-                web-fallback.") that must NOT appear in the user-facing PDF.
-                Suppress it here; the same data is preserved in
-                state.suppliers_provenance for diagnostics. */}
-          </View>
-        ))}
-        {/* 2026-05-18 audit fix: footer on every chunk page. */}
-        <PageFooter />
-      </Page>,
-    )
-  })
+  const survivingSuppliers = suppliers.filter(archetypeHasSurvivingCard)
+  if (survivingSuppliers.length === 0) return null
 
-  return <>{pages}</>
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 7 · Suppliers" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Suppliers
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
+        Recommended companies for each delivery role — principal contractor and subcontractors. Up to 3 candidates per role. Each card carries the company identity, a concrete capability line, two or three reasons the company fits this brief, and a direct call to action.
+      </Text>
+      <View
+        style={{
+          marginBottom: 14,
+          padding: 10,
+          backgroundColor: '#fef3c7',
+          borderLeftWidth: 3,
+          borderLeftColor: '#c2410c',
+          borderRadius: 4,
+        }}
+      >
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.45 }}>
+          Caveat — candidates are surfaced from a 28,000-company database plus a scored web fallback, then distilled into capability + fit bullets by a small language model. A human engineer should still validate fit, capacity, and certification before procurement.
+        </Text>
+      </View>
+
+      {survivingSuppliers.map((archetype: any, archIdx: number) => (
+        // Each archetype heading travels with its function_description as a unit
+        // (minPresenceAhead=80pt) so the heading is never orphaned at the foot
+        // of a page without at least the description line following it.
+        <View key={`arch-${archIdx}`} style={{ marginBottom: 16 }} minPresenceAhead={80}>
+          <View style={{ marginBottom: 6, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
+            <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+              {clean_prose(String(archetype.archetype_label ?? archetype.archetype_id ?? ''))}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.5, marginBottom: 10 }}>
+            {clean_prose(String(archetype.function_description ?? ''))}
+          </Text>
+          {Array.isArray(archetype.candidates) && archetype.candidates.length > 0 ? (
+            archetype.candidates.map((c: any, i: number) =>
+              renderCandidateCard(c, archIdx * 100 + i),
+            )
+          ) : (
+            <Text style={{ fontSize: 10, color: MUTED, fontStyle: 'italic' }}>
+              No candidates passed the relevance scorer for this role. Recommend a manual shortlist or expand the search keyword set.
+            </Text>
+          )}
+          {/* Phase19 audit 2026-05-17: archetype.notes is now provenance-only
+              telemetry ("X from forge-truth.db (N rejected); M added via
+              web-fallback.") that must NOT appear in the user-facing PDF.
+              Suppress it here; the same data is preserved in
+              state.suppliers_provenance for diagnostics. */}
+        </View>
+      ))}
+      {/* 2026-05-18 audit fix: footer. */}
+      <PageFooter />
+    </Page>
+  )
 }
 
 
@@ -8620,15 +8630,22 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8 }}>
           Cost by module
         </Text>
-        {orderedMods.map((m, idx) => (
-          <View key={m.module} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
-            <Text style={{ width: 28, fontSize: 10, color: MUTED }}>{idx + 1}.</Text>
-            <Text style={{ flex: 1, fontSize: 10, color: INK }}>{m.display_name || m.label}</Text>
-            <Text style={{ fontSize: 10, color: INK, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>
-              £{m.subtotal_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </Text>
-          </View>
-        ))}
+        {orderedMods.map((m, idx) => {
+          // Fix 2 (2026-05-30): tail-orphan guard — the last two rows carry
+          // minPresenceAhead so they are pulled forward with the body rather
+          // than landing alone on a near-empty page. Earlier rows use wrap=false
+          // only (prevents mid-row page break without reserving excess space).
+          const isTail = idx >= orderedMods.length - 2
+          return (
+            <View key={m.module} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false} minPresenceAhead={isTail ? 40 : 0}>
+              <Text style={{ width: 28, fontSize: 10, color: MUTED }}>{idx + 1}.</Text>
+              <Text style={{ flex: 1, fontSize: 10, color: INK }}>{m.display_name || m.label}</Text>
+              <Text style={{ fontSize: 10, color: INK, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>
+                £{m.subtotal_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </Text>
+            </View>
+          )
+        })}
         <View style={{ flexDirection: 'row', paddingVertical: 7, marginTop: 4, borderTopWidth: 1, borderTopColor: ACCENT, alignItems: 'baseline' }} wrap={false}>
           <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT }}>Sum of modules</Text>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>
@@ -8645,10 +8662,16 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
           <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic', marginBottom: 8 }}>
             Per-component-class contribution to the grand total. Classifier source: Engine B (Phase 4 corpus lookup with Flash-Lite fallback).
           </Text>
-          {sortedClasses.map(([cls, amt]) => {
+          {sortedClasses.map(([cls, amt], idx) => {
             const pct = grandTotal > 0 ? (amt / grandTotal) * 100 : 0
+            // Fix 2 (2026-05-30): tail-orphan guard on class breakdown.
+            // Last 3 rows carry minPresenceAhead = 90pt (3 rows × 30pt each),
+            // so they travel together to the next page rather than being split
+            // into a lone 1-2 row orphan.
+            const tailPos = sortedClasses.length - 1 - idx // 0=last, 1=2nd-last, etc.
+            const minPA = tailPos === 0 ? 0 : tailPos <= 2 ? 90 : 0
             return (
-              <View key={cls} style={{ flexDirection: 'row', paddingVertical: 2, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
+              <View key={cls} style={{ flexDirection: 'row', paddingVertical: 2, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false} minPresenceAhead={minPA}>
                 <Text style={{ flex: 1, fontSize: 10, color: INK }}>{toTitleCaseEng(humanise(cls))}</Text>
                 <Text style={{ width: 100, fontSize: 10, color: INK, textAlign: 'right' }}>
                   £{amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -9544,14 +9567,18 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
 
       {page.tools.map((tool: any, ti: number) => {
         const claims: any[] = Array.isArray(tool.claims) ? tool.claims : []
-        // 2026-05-24 (Tristan flagged "why did you not include all 6 other claims?"):
-        // dropped the slice(0,12) cap — show ALL claims. Reserve enough vertical
-        // space to keep the card from page-breaking mid-claim by scaling
-        // minPresenceAhead with the claim count (12pt per claim row + 200pt for
-        // narrative + heading).
+        // Fix 1 (2026-05-30): replaced whole-card minPresenceAhead with a
+        // small heading+first-line guard (~65pt). The old formula
+        // (120 + claims.length*10) caused every card that couldn't fit in
+        // remaining space to jump to a fresh page, stranding 40-60% whitespace.
+        // With 65pt we only protect the heading row and one line of narrative;
+        // the rest of the card flows continuously — react-pdf page-breaks
+        // mid-card cleanly rather than skipping a full page.
+        // visibleClaims = claims intentionally kept — all claims shown per
+        // Tristan's 2026-05-24 explicit instruction "show ALL claims".
         const visibleClaims = claims
         const extraClaims: number = 0
-        const reserveHeight = 120 + claims.length * 10
+        const reserveHeight = 65
         return (
           <View
             key={tool.tool_id || `tool-${ti}`}

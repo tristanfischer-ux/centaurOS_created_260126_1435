@@ -11,7 +11,7 @@ Key constraints:
 - Heat output: 30 kW nominal at A7/W55 per EN 14825
 - Seasonal COP (SCOP): ≥ 3.5 at low-temperature application zone H3 (UK average)
 - Flow temperature: up to 65 °C for legacy radiator compatibility
-- Refrigerant charge: ≤ 500 g R290 to meet EN 378 restricted-charge outdoor installation rules
+- Refrigerant charge: sized per EN 378 for the rated capacity, charge-minimised R290 design with leak detection (outdoor/plant-room installation)
 - Operating ambient: -20 °C to +40 °C, with capacity maintained to -7 °C
 - Acoustic target: ≤ 52 dBA at 1 m outdoor-side sound pressure level, low-noise mode available for plant-room installation
 - Annual batch size: 500 units per year
