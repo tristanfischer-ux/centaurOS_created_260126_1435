@@ -4025,17 +4025,17 @@ async function main() {
       latency_ms: Date.now() - tGate30,
     })
     if (!gate30Result.passed) {
-      console.error(`\n[chain] === FATAL GATE 30 ===\n${gate30Result.message}`)
-      const g30State = {
-        projectId: 'chain-v2-' + Date.now(),
-        parsedBrief: parsedResult.data,
-        moduleDecomposition: design,
-        haltReason: `Gate 30 payload-rating-audit FAIL: ${gate30Result.message}`,
-        gate30Result,
-        savedAt: new Date().toISOString(),
-      }
-      writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g30State, null, 2))
-      process.exit(30)
+      // 2026-05-30 (Tristan decision 3 — "report + auto-improve, don't hard-fail"):
+      // a payload-rating breach is an HONEST design-vs-brief shortfall, already
+      // surfaced in the Brief Compliance "Max gross mass" PASS/FAIL row (exactly like
+      // the cost-ceiling breach, which renders + flags rather than hard-exiting). A
+      // hard-exit here produces NO dossier — worse than an honest one that shows the
+      // breach + the auto-improve recommendation (lighten / cut capacity / accept
+      // abnormal-load transport). So this is now NON-FATAL: flag + record + continue.
+      // (Wrongness gates — fictional parts, broken physics, layout smear — stay HARD;
+      // only this honest design-breach gate is downgraded.)
+      console.error(`[chain] gate-30 payload-rating: FLAGGED non-fatal (decision 3) — ${gate30Result.message}`)
+      ;(design as Record<string, unknown>).payloadRatingBreach = gate30Result
     }
   }
 
