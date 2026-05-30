@@ -40,11 +40,11 @@ export interface MaterialPrice {
 
 /** Curated raw-commodity reference, £/kg. Keep figures sourced + dated. */
 export const MATERIAL_PRICES: Record<string, MaterialPrice> = {
-  structural_steel:        { raw_gbp_per_kg: 0.75, mfg_mult_low: 2,   mfg_mult_high: 6,  source: 'Hot-rolled plate/section ~£700/t (UK Steel/LME 2024-25); fab = cut/weld/coat', updated: '2026-05-30' },
+  structural_steel:        { raw_gbp_per_kg: 0.65, mfg_mult_low: 2,   mfg_mult_high: 6,  source: 'UK hot-rolled coil ~£540-620/t (Tata Q2 2026, post-Port-Talbot import-dependent); structural sections ~£1.1-1.2/kg; fab = cut/weld/coat', updated: '2026-05-30' },
   stainless_steel:         { raw_gbp_per_kg: 2.6,  mfg_mult_low: 2,   mfg_mult_high: 6,  source: '304/316 ~£2.6/kg 2024-25', updated: '2026-05-30' },
   cast_iron:               { raw_gbp_per_kg: 1.2,  mfg_mult_low: 3,   mfg_mult_high: 9,  source: 'Ductile/nodular iron casting + machining (hubs, bedplates)', updated: '2026-05-30' },
-  copper:                  { raw_gbp_per_kg: 8.5,  mfg_mult_low: 1.3, mfg_mult_high: 3.5,source: 'LME copper ~£8-9/kg 2024-25; wire/busbar drawing', updated: '2026-05-30' },
-  aluminium:               { raw_gbp_per_kg: 2.3,  mfg_mult_low: 2,   mfg_mult_high: 6,  source: 'LME aluminium ~£2.3/kg 2024-25; extrusion/casting', updated: '2026-05-30' },
+  copper:                  { raw_gbp_per_kg: 10.5, mfg_mult_low: 1.3, mfg_mult_high: 3.5,source: 'LME copper ~$13,512/t May 2026 (+36% YoY) ÷ ~1.27 USD/GBP ≈ £10.6/kg; wire/busbar drawing', updated: '2026-05-30' },
+  aluminium:               { raw_gbp_per_kg: 2.9,  mfg_mult_low: 2,   mfg_mult_high: 6,  source: 'LME aluminium ~$3,681/t May 2026 (+45% YoY) ÷ ~1.27 USD/GBP ≈ £2.9/kg; extrusion/casting', updated: '2026-05-30' },
   concrete:                { raw_gbp_per_kg: 0.05, mfg_mult_low: 1.5, mfg_mult_high: 5,  source: 'Ready-mix ~£120/m³ ÷ 2400 kg/m³; + rebar/formwork/pour', updated: '2026-05-30' },
   gfrp:                    { raw_gbp_per_kg: 3.5,  mfg_mult_low: 3,   mfg_mult_high: 11, source: 'E-glass + epoxy/polyester ~£3-4/kg raw; layup/infusion is labour-heavy (blades, enclosures)', updated: '2026-05-30' },
   cfrp:                    { raw_gbp_per_kg: 22,   mfg_mult_low: 2.5, mfg_mult_high: 8,  source: 'Carbon fibre + epoxy prepreg ~£18-25/kg raw', updated: '2026-05-30' },

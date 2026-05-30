@@ -28,7 +28,9 @@ const DB_PATH = resolve(homedir(), '.forge-truth', 'forge-truth.db')
 const DRY = process.argv.includes('--dry')
 const FORCE = process.argv.includes('--force')
 const daysArg = process.argv.find(a => a.startsWith('--days='))
-const REFRESH_AFTER_DAYS = daysArg ? Number(daysArg.split('=')[1]) : 30
+// Tristan 2026-05-30: "look in DB first if the info is from the last 4 weeks; if
+// older than 4 weeks find a new number and update the DB" — 4 weeks = 28 days.
+const REFRESH_AFTER_DAYS = daysArg ? Number(daysArg.split('=')[1]) : 28
 
 interface MaterialRow {
   material: string
