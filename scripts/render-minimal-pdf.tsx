@@ -4115,6 +4115,96 @@ function _formatDelta(target: number, achieved: number, kind: 'cost' | 'mass' | 
  * Returns an empty array when the brief has no constraints (graceful
  * degradation — page then renders a placeholder).
  */
+// ── Universal brief-metric → compliance-row helpers (2026-05-30) ─────────────
+// Make the Brief Compliance table COMPLETE for any class: every brief metric
+// gets a row even when METRIC_MAP (the curated per-class achieved-value map)
+// doesn't know its key. Achieved value is resolved by matching a contract
+// quantity whose unit-stripped base key equals the brief metric's base key
+// (rated_power_mw <-> rated_power_kw), converting within the unit family. When
+// nothing matches, the row is informational (achieved "—") — VISIBLE, which is
+// what gate 17 requires. Tristan 2026-05-30: "use as much universal stuff as
+// possible"; the brief PARSE already carries every metric, so surface them all.
+const _METRIC_KEY_UNIT_SUFFIX_RE =
+  /_(w_per_m2|w_m2|kwh_per_m2|kwh_m2|kw_per_m2|kw_m2|wh_per_m2|nm3_per_hr|kg_per_hr|kg_per_kg|m_per_s|m_s|kwh|mwh|gwh|mw|gw|kw|w|m2|m3|mm|cm|km|m|percent|pct|dba|db|kg|tonnes|tonne|lpm|kn|nm|rpm|hz|ppm|mpa|kpa|pa|bar|years|year|cycles|days|hrs|hr|h|c|k|v|a|t|l)$/i
+
+function _stripMetricUnitSuffix(key: string): string {
+  const raw = String(key ?? '').trim()
+  return raw.replace(_METRIC_KEY_UNIT_SUFFIX_RE, '') || raw
+}
+
+function _humaniseMetricKey(key: string): string {
+  const base = _stripMetricUnitSuffix(key)
+  const words = base.split(/[_\s]+/).filter(Boolean)
+  if (words.length === 0) return String(key ?? '')
+  return words.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ')
+}
+
+const _METRIC_UNIT_FAMILIES: Record<string, Record<string, number>> = {
+  power:  { w: 1, kw: 1e3, mw: 1e6, gw: 1e9 },
+  energy: { wh: 1, kwh: 1e3, mwh: 1e6, gwh: 1e9 },
+  mass:   { g: 1, kg: 1e3, t: 1e6, tonne: 1e6, tonnes: 1e6 },
+  length: { mm: 1, cm: 10, m: 1e3, km: 1e6 },
+  area:   { cm2: 1, m2: 1e4, ha: 1e8 },
+}
+
+function _normUnitToken(u: string): string {
+  return String(u ?? '').toLowerCase().replace(/²/g, '2').replace(/³/g, '3').replace(/\s+/g, '').trim()
+}
+
+/** Convert within a unit family; null when units are in different families or
+ *  unknown (caller then shows the raw achieved value). Identity when equal. */
+function _convertMetricUnit(value: number, fromU: string, toU: string): number | null {
+  const f = _normUnitToken(fromU)
+  const t = _normUnitToken(toU)
+  if (f === t) return value            // identical units (includes both unit-less)
+  if (!f || !t) return null            // one side unit-less, the other carries a unit → not comparable (e.g. capacity_factor 0.32 [''] vs brief 42 ['%'])
+  for (const fam of Object.values(_METRIC_UNIT_FAMILIES)) {
+    if (f in fam && t in fam) return value * (fam[f] / fam[t])
+  }
+  return null
+}
+
+/** Resolve a brief metric's achieved value from contract quantities WITHOUT a
+ *  curated METRIC_MAP entry: exact key, else first quantity whose unit-stripped
+ *  base key matches, converting to the brief metric's unit. null when no
+ *  plausible match exists (caller renders an informational "—" row). */
+function _resolveAchievedUniversal(
+  quantities: Record<string, any>,
+  briefKey: string,
+  briefUnit: string,
+): { value: number; unit: string } | null {
+  if (!quantities || typeof quantities !== 'object') return null
+  const bUnit = _normUnitToken(briefUnit)
+  const base = _stripMetricUnitSuffix(briefKey)
+  // A contract key is a candidate when its unit-stripped base equals the brief
+  // metric's base, OR one is a trailing _-segment of the other
+  // (rotor_swept_area ⊇ swept_area). Anchored on full _-segments to avoid loose
+  // substring matches.
+  const baseMatches = (qk: string): boolean => {
+    if (qk === briefKey) return true
+    const qb = _stripMetricUnitSuffix(qk)
+    return qb === base || qb.endsWith('_' + base) || base.endsWith('_' + qb)
+  }
+  type Cand = { value: number; unit: string; exact: boolean; convertible: boolean }
+  const cands: Cand[] = []
+  for (const qk of Object.keys(quantities)) {
+    if (!baseMatches(qk)) continue
+    const q = quantities[qk]
+    if (!q || typeof q !== 'object' || typeof q.value !== 'number' || !Number.isFinite(q.value)) continue
+    const qUnit = String(q.unit ?? '')
+    const exact = _normUnitToken(qUnit) === bUnit
+    const conv = briefUnit ? _convertMetricUnit(q.value, qUnit || briefUnit, briefUnit) : q.value
+    cands.push({ value: conv != null ? conv : q.value, unit: briefUnit || qUnit, exact, convertible: conv != null })
+  }
+  if (cands.length === 0) return null
+  // Prefer an exact-unit match (capacity_factor_pct '%' beats capacity_factor
+  // ''), then a clean family conversion (rated_power_kw → MW). Reject base
+  // matches whose unit is incompatible — a raw mismatched number (0.32 against a
+  // 42 % target) is worse than an honest "—".
+  const best = cands.find(c => c.exact) ?? cands.find(c => c.convertible)
+  return best ? { value: best.value, unit: best.unit } : null
+}
+
 function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack?: CostStack | null): ComplianceRow[] {
   const constraints = state?.parsedBrief?.constraints
   if (!constraints || typeof constraints !== 'object') return []
@@ -4261,6 +4351,9 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
     // throughput, design life) are FLOORS. Voltages + frequencies are EXACT
     // (need to match design target precisely). No metric here is a ceiling
     // (mass + cost ceilings live in their dedicated rows above).
+    // Track which brief metric keys render a real (mapped) row below, so the
+    // universal completeness pass that follows only adds rows for the rest.
+    const _renderedMetricKeys = new Set<string>()
     type MetricKind = 'floor' | 'ceiling' | 'exact'
     const METRIC_MAP: Record<string, { qtyKey: string; label: string; unit: string; convert?: (v: number) => number; tolerancePct?: number; kind?: MetricKind }> = {
       // BESS-class energy/power (all FLOORS — brief states minimum/target performance)
@@ -4401,6 +4494,7 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
       const achievedDisplay = mapping.unit
         ? `${fmtAch(achievedConverted)} ${mapping.unit}`
         : `${fmtAch(achievedConverted)}`
+      _renderedMetricKeys.add(km)
       rows.push({
         constraint: mapping.label,
         briefTarget: briefDisplay,
@@ -4408,6 +4502,36 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
         status,
         deltaText: delta,
         tradeOffNarrative: narrative,
+      })
+    }
+
+    // ── Universal completeness pass (2026-05-30): emit a row for every brief
+    //    metric NOT already rendered above, so no constraint is silently absent
+    //    for an untuned class (gate 17). Informational status — target +
+    //    achieved shown WITHOUT a pass/fail claim, because floor/ceiling
+    //    direction isn't universally inferable, so we never assert a false
+    //    PASS/FAIL. Achieved resolved by unit-stripped base-key match against
+    //    the contract (rated_power_mw -> rated_power_kw), else "—". Universal:
+    //    works for any class whose brief carries metrics[], zero per-key code.
+    for (const m of briefMetrics) {
+      const km = String(m?.key_metric ?? '')
+      if (!km || _renderedMetricKeys.has(km)) continue
+      const briefVal = typeof m?.value === 'number' && Number.isFinite(m.value) ? m.value : null
+      if (briefVal == null) continue
+      _renderedMetricKeys.add(km)
+      const unit = String(m?.unit ?? '')
+      const resolved = _resolveAchievedUniversal(quantities, km, unit)
+      const fmtN = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(v >= 100 ? 0 : 2))
+      const achievedDisplay = resolved ? `${fmtN(resolved.value)} ${resolved.unit}`.trim() : '—'
+      rows.push({
+        constraint: _humaniseMetricKey(km),
+        briefTarget: `${briefVal} ${unit}`.trim(),
+        designAchieved: achievedDisplay,
+        status: 'unknown',
+        // Info row — no pass/fail claim, so no delta: floor/ceiling direction is
+        // not universally inferable, and target + achieved speak for themselves.
+        deltaText: '',
+        tradeOffNarrative: null,
       })
     }
   }

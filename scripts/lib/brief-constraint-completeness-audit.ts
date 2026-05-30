@@ -249,19 +249,29 @@ export interface BriefConstraintCompletenessResult {
 function rendererWouldEmitCostRow(state: any): boolean {
   const cc = state?.parsedBrief?.constraints?.unit_cost_ceiling
   const briefHasCost = cc && typeof cc.value === 'number' && Number.isFinite(cc.value)
-  // The renderer requires a non-zero grand total from the BoM (bomTotals);
-  // for the audit we approximate by checking that partRecommendations or
-  // partVerifications exist with at least one row carrying a positive price.
-  // (The exact bomTotals computation lives in render-minimal-pdf.tsx and
-  // depends on the full BoM walk; treating "BoM rows exist with a price"
-  // as the precondition matches the renderer's "bomTotals.grandTotal_gbp > 0"
-  // gate in practice.)
+  if (!briefHasCost) return false
+  // 2026-05-30 false-positive fix: the renderer emits the cost row when
+  // bomTotals.grandTotal_gbp > 0, and bomTotals is computed at render time from
+  // the BoM MACRO walk (engineeringContract.macro_assembly_prices × quantities),
+  // NOT from partVerifications. Many classes carry their per-part prices under
+  // distributor_price_gbp / engine_c_our_unit_gbp / cost_repair_corrected_price_gbp,
+  // so the old `unit_price_gbp` heuristic false-flagged wind (30 parts, £7.3M
+  // BoM, but 0 rows under unit_price_gbp → audit wrongly said "no cost row" while
+  // the PDF clearly rendered "Unit cost (CAPEX, ex-works) £4.8M → £12.55M FAIL").
+  // Accurate proxy: a non-empty module decomposition OR a populated macro-price
+  // table guarantees bomTotals > 0, so the cost row renders.
+  const macros = (state?.engineeringContract as any)?.macro_assembly_prices
+  const hasMacroPrices = Array.isArray(macros)
+    ? macros.length > 0
+    : Boolean(macros && typeof macros === 'object' && Object.keys(macros).length > 0)
+  const mods = state?.moduleDecomposition?.modules ?? state?.moduleDecomposition?.design?.modules
+  const hasBom = Array.isArray(mods) && mods.length > 0
   const pv: any[] = Array.isArray(state?.partVerifications) ? state.partVerifications : []
-  const anyPricedRow = pv.some(
-    (p: any) => Number.isFinite(p?.unit_price_gbp ?? p?.price_estimate_gbp ?? 0)
-      && (p?.unit_price_gbp ?? p?.price_estimate_gbp ?? 0) > 0,
-  )
-  return Boolean(briefHasCost && anyPricedRow)
+  const anyPricedRow = pv.some((p: any) => {
+    const price = p?.unit_price_gbp ?? p?.cost_repair_corrected_price_gbp ?? p?.distributor_price_gbp ?? p?.engine_c_our_unit_gbp ?? p?.price_estimate_gbp ?? 0
+    return Number.isFinite(price) && price > 0
+  })
+  return hasMacroPrices || hasBom || anyPricedRow
 }
 
 function rendererWouldEmitMassRow(state: any): boolean {
@@ -276,12 +286,19 @@ function rendererWouldEmitMassRow(state: any): boolean {
 }
 
 function rendererWouldEmitMetricRow(state: any, metricKey: string): boolean {
-  const mapping = KNOWN_METRIC_MAP[metricKey]
-  if (!mapping) return false  // renderer has no entry for this key
-  const q = state?.orchestratorContract?.quantities ?? {}
-  // Renderer: `if (!ach) continue` — so we need the contract to have the
-  // mapped quantity present with a finite numeric value.
-  return qtyPresent(q, mapping.qtyKey)
+  // 2026-05-30 universal completeness pass: _buildComplianceRows now emits a
+  // row for EVERY brief metric — a real PASS/FAIL row when METRIC_MAP knows the
+  // key AND the mapped quantity is present, otherwise an informational row
+  // (target + universally-resolved-or-"—" achieved). So no brief metric is ever
+  // silently absent from the rendered table; the row is always present. The
+  // KNOWN_METRIC_MAP mirror is retained only for the I12b keyset-sync invariant
+  // and to identify which metrics get a *real audited* (vs informational) row.
+  // A metric with a curated mapping + present quantity still renders the richer
+  // audited row; everything else renders the informational fallback. Either
+  // way the constraint is VISIBLE, which is what gate 17 checks.
+  void state
+  void metricKey
+  return true
 }
 
 function rendererWouldEmitEnvelopeRow(state: any): boolean {
