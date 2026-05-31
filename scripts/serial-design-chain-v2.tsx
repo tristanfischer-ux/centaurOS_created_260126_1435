@@ -76,7 +76,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { completeEmitterGaps } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
-import { snapshotEmitterIdentity, reassertEmitterIdentity, isLockedKind, type EmitterIdentitySnapshot } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
+import { snapshotEmitterIdentity, reassertEmitterIdentity, restoreStrippedPartNumbers, isLockedKind, type EmitterIdentitySnapshot } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { runSharedQuantityConsistencyAudit } from '../src/lib/pdf-engine-v2/lib/shared-quantity-consistency-audit'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
 import { runManufacturerAttributionAudit } from '../src/lib/pdf-engine-v2/lib/manufacturer-attribution-audit'
@@ -5420,13 +5420,16 @@ async function main() {
     //    placed in the MPN field — is an emitter schema fix, tracked separately in
     //    MPN-VALIDATION-ARCHITECTURE.md.)
     try {
-      const preRenderReassert = reassertEmitterIdentity(liveState?.moduleDecomposition?.modules ?? [], emitterIdentitySnapshot)
-      if (preRenderReassert.words_corrected > 0) {
-        console.error(`[chain] pre-render emitter-identity re-assert: restored ${preRenderReassert.words_corrected} word(s) a late stage had stripped (blanked part_numbers on real parts) — emitter is the part-identity authority`)
+      // part_number-ONLY restore (not a full identity reassert): heal a blanked
+      // SKU without touching numeric specs, so a late numeric correction is never
+      // reverted (which would cause a gate-18 cross-page conflict).
+      const skuRestore = restoreStrippedPartNumbers(liveState?.moduleDecomposition?.modules ?? [], emitterIdentitySnapshot)
+      if (skuRestore.restored > 0) {
+        console.error(`[chain] pre-render SKU restore: re-added ${skuRestore.restored} blanked part_number(s) a late stage stripped from real parts — emitter is the part-identity authority`)
       }
-      logAction({ step: 'emitter_identity_reassert_pre_render', words_corrected: preRenderReassert.words_corrected, words_matched: preRenderReassert.words_matched, words_missing: preRenderReassert.words_missing_post_mutation })
+      logAction({ step: 'emitter_identity_reassert_pre_render', words_corrected: skuRestore.restored, words_matched: skuRestore.words_checked, words_missing: 0 })
     } catch (err) {
-      console.error(`[chain] pre-render emitter-identity re-assert threw: ${(err as Error).message}; continuing`)
+      console.error(`[chain] pre-render SKU restore threw: ${(err as Error).message}; continuing`)
     }
 
     writeFileSync(statePath, JSON.stringify(liveState, null, 2))

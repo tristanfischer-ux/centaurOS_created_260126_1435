@@ -871,6 +871,16 @@ function buildFindings(clusters: Cluster[]): { findings: ConsistencyFinding[]; s
     //   continuous AND another's include peak — those are different
     //   quantities by definition (continuous power vs peak power).
     if (c.family === 'TEMP' && min < 0 && max > 0) severity = 'MED'
+    // - Any cluster whose qualifier set spans BOTH 'ac' and 'dc' is mixing two
+    //   genuinely-different quantities (AC continuous current != DC continuous
+    //   current; AC voltage != DC bus voltage). A single window like "AC
+    //   continuous current = 1,443 A, DC continuous current = 1,250 A" gives
+    //   EVERY number in it both 'ac' and 'dc' qualifiers, so the per-qualifier
+    //   ac/dc cluster-split can't fire and the two values wrongly cluster. That
+    //   is not a reader-irreconcilable contradiction — downgrade HIGH -> MED.
+    //   Added 2026-05-31 after a BESS run flagged 1443 A (AC) vs 1250 A (DC)
+    //   continuous current as a false-positive cross-page contradiction.
+    if (severity === 'HIGH' && c.qualifiers.includes('ac') && c.qualifiers.includes('dc')) severity = 'MED'
     if (c.family === 'POWER') {
       const perOccQuals = c.occurrences.map((o) => classifyTokens([...o.preTokens, ...o.postTokens]).qualifiers)
       const hasContinuous = perOccQuals.some((q) => q.includes('continuous'))

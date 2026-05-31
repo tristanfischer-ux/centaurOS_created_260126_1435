@@ -53,7 +53,7 @@ import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasib
 import { checkBriefAdherence } from './brief-adherence'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
-import { snapshotEmitterIdentity, reassertEmitterIdentity } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
+import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 
 interface Assertion {
   id: string
@@ -2217,20 +2217,25 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // relies on actually restores a stripped part_number, so a real part can never
   // ship with a blank SKU on a manufacturer.
   {
-    const emitterModules = [{ module: 'm', sub_modules: [{ id: 's', words: [{ id: 'w1', modifier_characters: [{ kind: 'manufacturer', value: 'CATL' }, { kind: 'part_number', value: 'LF280K' }] }] }] }]
+    const emitterModules = [{ module: 'm', sub_modules: [{ id: 's', words: [{ id: 'w1', modifier_characters: [{ kind: 'manufacturer', value: 'CATL' }, { kind: 'part_number', value: 'LF280K' }, { kind: 'rating_primary', value: '280 Ah' }] }] }] }]
     const snap = snapshotEmitterIdentity(emitterModules as never)
-    const stripped = JSON.parse(JSON.stringify(emitterModules)) as typeof emitterModules
-    stripped[0].sub_modules[0].words[0].modifier_characters = stripped[0].sub_modules[0].words[0].modifier_characters.filter((mc) => mc.kind !== 'part_number')
-    const strippedHadPn = stripped[0].sub_modules[0].words[0].modifier_characters.some((mc) => mc.kind === 'part_number')
-    reassertEmitterIdentity(stripped as never, snap)
-    const restoredPn = stripped[0].sub_modules[0].words[0].modifier_characters.find((mc) => mc.kind === 'part_number')?.value
-    const ok = strippedHadPn === false && restoredPn === 'LF280K'
+    // simulate the LATE stage: blank the part_number AND apply a legitimate numeric
+    // correction (rating 280 Ah -> 314 Ah). The narrow restore must heal the SKU
+    // but must NOT revert the corrected numeric (which would cause a gate-18 conflict).
+    const mutated = JSON.parse(JSON.stringify(emitterModules)) as typeof emitterModules
+    mutated[0].sub_modules[0].words[0].modifier_characters =
+      [{ kind: 'manufacturer', value: 'CATL' }, { kind: 'rating_primary', value: '314 Ah' }]
+    restoreStrippedPartNumbers(mutated as never, snap)
+    const mods = mutated[0].sub_modules[0].words[0].modifier_characters
+    const restoredPn = mods.find((mc) => mc.kind === 'part_number')?.value
+    const ratingKept = mods.find((mc) => mc.kind === 'rating_primary')?.value
+    const ok = restoredPn === 'LF280K' && ratingKept === '314 Ah'
     assertions.push(assertEq(
       'UNIVERSAL.reassert_restores_stripped_part_number',
-      'reassertEmitterIdentity restores a part_number a late stage stripped (a real part can never ship with a blank SKU on a manufacturer) — guards the 2026-05-31 pre-render reassert',
+      'restoreStrippedPartNumbers re-adds a blanked SKU (real part never ships blank) WITHOUT reverting a late numeric correction (rating stays 314 Ah, not 280 Ah) — guards the 2026-05-31 part_number-only pre-render restore',
       ok,
       (v: boolean) => v === true,
-      () => `strippedHadPn=${strippedHadPn} (want false), restoredPn=${restoredPn} (want LF280K)`,
+      () => `restoredPn=${restoredPn} (want LF280K), ratingKept=${ratingKept} (want 314 Ah — NOT reverted)`,
     ))
   }
 
