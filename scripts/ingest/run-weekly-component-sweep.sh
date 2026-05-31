@@ -41,6 +41,22 @@ KEYWORD_MAP_SCRIPT="${REPO_ROOT}/scripts/ingest/extract-keyword-map.ts"
 FORGE_TRUTH_DIR="${HOME}/.forge-truth"
 LOG_FILE="${FORGE_TRUTH_DIR}/ingest-weekly-$(date '+%Y-%m-%d').log"
 
+# ── Material commodity prices (growing-DB Lever 5) ──────────────────────────
+# Runs INDEPENDENTLY of distributor keys (it needs none) and BEFORE the guard so
+# a stale-price refresh still happens on a distributor-key-less host. Walks
+# material_prices and refreshes only rows staler than 28 days via the pluggable
+# live feed; no-ops safely (keeps the curated seed = deterministic fallback)
+# until a commodity-price feed is configured — see refresh-material-prices.ts
+# header (free Trading Economics tier covers steel/copper/aluminium/iron-ore).
+# A WEEKLY trigger with an internal 28-day staleness gate gives ~monthly refresh
+# without needing a monthly cron (which CronCreate can't hold). This is the
+# trigger the refresh script previously lacked (audit 2026-05-31: "never called").
+mkdir -p "${FORGE_TRUTH_DIR}"
+MAT_LOG="${FORGE_TRUTH_DIR}/material-refresh-$(date '+%Y-%m-%d').log"
+echo "[sweep] Refreshing stale material prices (>28d) — $(date)" | tee -a "${MAT_LOG}"
+( cd "${REPO_ROOT}" && npx tsx scripts/ingest/refresh-material-prices.ts ) 2>&1 | tee -a "${MAT_LOG}" \
+  || echo "[sweep] material refresh non-fatal failure (continuing)" | tee -a "${MAT_LOG}"
+
 # Guard: require distributor-apis.env to be sourced
 if [[ -z "${MOUSER_API_KEY:-}" && -z "${DIGIKEY_CLIENT_ID:-}" ]]; then
   echo "[sweep] ERROR: distributor API keys not set. Run: set -a; source ~/.claude/secrets/distributor-apis.env; set +a" >&2
