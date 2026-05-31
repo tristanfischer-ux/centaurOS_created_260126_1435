@@ -26,6 +26,7 @@ import { generateSubmoduleParagraph } from '../src/lib/pdf-engine-v2/radical/sen
 import { getClassStandards, mergeBriefAndClassStandards, type RegulatoryStandard } from '../src/lib/pdf-engine-v2/class-standards'
 import { getClassHazards, computeHazardRPN, type ClassHazard } from '../src/lib/pdf-engine-v2/class-hazards'
 import { resolvePriceBand, type PriceBand, type PriceBandVerdict } from '../src/lib/pdf-engine-v2/class-price-bands'
+import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasibility-gate'
 import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { computeImprovementPlan } from '../src/lib/pdf-engine-v2/lib/auto-improve'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
@@ -2996,8 +2997,14 @@ function CoverPage({
             const belowCeiling = pctDiff != null && pctDiff < 0
             const aboveCeiling = pctDiff != null && pctDiff > 0
             const onCeiling = pctDiff != null && pctDiff === 0
-            const labelColour = aboveCeiling ? '#9b1c1c' : belowCeiling ? '#065f46' : '#92400e'
-            const bgColour = aboveCeiling ? '#fee2e2' : belowCeiling ? '#d1fae5' : '#fef3c7'
+            // Brief-feasibility reframe (2026-05-31): when the brief's OWN cost
+            // ceiling is below the physical commodity floor (market-bands.ts), an
+            // over-ceiling result is the BRIEF being impossible, not the design
+            // failing — reframe blame + colour (amber, not red) accordingly.
+            const briefFeas = checkBriefFeasibility(state, String(state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? ''))
+            const infeasibleBrief = briefFeas.feasible === false && briefFeas.constraint === 'cost_ceiling'
+            const labelColour = aboveCeiling ? (infeasibleBrief ? '#92400e' : '#9b1c1c') : belowCeiling ? '#065f46' : '#92400e'
+            const bgColour = aboveCeiling ? (infeasibleBrief ? '#fef3c7' : '#fee2e2') : belowCeiling ? '#d1fae5' : '#fef3c7'
             return (
               <View style={{ marginTop: 8, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: labelColour }}>
                 <Text style={{ fontSize: 7.5, color: '#334155', letterSpacing: 1.0, marginBottom: 5 }}>
@@ -3021,7 +3028,9 @@ function CoverPage({
                         {belowCeiling
                           ? `${Math.abs(pctDiff)}% below ceiling (headroom ${fmt(briefCeiling! - achievedExWorks)})`
                           : aboveCeiling
-                            ? `${pctDiff}% above ceiling — cost reconciliation required`
+                            ? (infeasibleBrief
+                                ? `BRIEF CEILING INFEASIBLE — ${briefFeas.x_below_floor!.toFixed(1)}× below £${briefFeas.floor_per_unit_gbp}/${briefFeas.output_unit} floor`
+                                : `${pctDiff}% above ceiling — cost reconciliation required`)
                             : 'on ceiling'}
                       </Text>
                     </View>
@@ -3034,8 +3043,10 @@ function CoverPage({
                 ) : null}
                 {onCeiling || belowCeiling ? null : (
                   <Text style={{ fontSize: 7.5, color: '#475569', marginTop: 4, lineHeight: 1.4 }}>
-                    {`Achieved ex-works ${fmt(achievedExWorks)} exceeds the brief's stated ceiling ${fmt(briefCeiling!)}. ` +
-                     `See Brief Compliance table for trade-off narrative and lever options.`}
+                    {infeasibleBrief
+                      ? `The brief's ceiling ${fmt(briefCeiling!)} is physically infeasible: it implies £${Math.round(briefFeas.implied_per_unit_gbp!)}/${briefFeas.output_unit}, ${briefFeas.x_below_floor!.toFixed(1)}× below the £${briefFeas.floor_per_unit_gbp}/${briefFeas.output_unit} commodity floor (realistic floor ≈ ${fmt(briefFeas.realistic_floor_total_gbp!)}). This design's pricing is realistic; the brief's ceiling is not. See Brief Compliance.`
+                      : `Achieved ex-works ${fmt(achievedExWorks)} exceeds the brief's stated ceiling ${fmt(briefCeiling!)}. ` +
+                        `See Brief Compliance table for trade-off narrative and lever options.`}
                   </Text>
                 )}
               </View>

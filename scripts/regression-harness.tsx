@@ -49,6 +49,7 @@ import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lo
 import { homedir } from 'os'
 import Database from 'better-sqlite3'
 import { resolveClassGraphSlug } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
+import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasibility-gate'
 
 interface Assertion {
   id: string
@@ -2177,6 +2178,28 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         ))
       }
     }
+  }
+
+  // ── UNIVERSAL.brief_feasibility_gate_flags_impossible_briefs ──────────────
+  // Guards BF-1 (2026-05-31): a brief whose cost ceiling is below the physical
+  // commodity floor (market-bands.ts) must flag infeasible; an aggressive-but-
+  // possible one must NOT (respecting "aggressive targets are the work"). This
+  // is the root-cause fix for a brief-failing design scoring 9.28 — the engine
+  // must call out an impossible BRIEF rather than silently design to it.
+  {
+    const mk = (ceiling: number, val: number, unit: string) => ({ parsedBrief: { constraints: { unit_cost_ceiling: { value: ceiling }, target_performance: { value: val, unit } } } })
+    const impossible = checkBriefFeasibility(mk(180000, 3.5, 'MWh'), 'bess')   // £51/kWh — 4× below £215 floor
+    const feasible = checkBriefFeasibility(mk(900000, 3.5, 'MWh'), 'bess')      // £257/kWh — above floor
+    const aggressive = checkBriefFeasibility(mk(700000, 3.5, 'MWh'), 'bess')    // £200/kWh — within 15% margin, NOT flagged
+    const ok = impossible.feasible === false && impossible.constraint === 'cost_ceiling'
+      && feasible.feasible === true && aggressive.feasible === true
+    assertions.push(assertEq(
+      'UNIVERSAL.brief_feasibility_gate_flags_impossible_briefs',
+      'Brief-feasibility gate flags a sub-commodity-floor ceiling (£180k/3.5MWh = £51/kWh) infeasible, passes a feasible (£257/kWh) and an aggressive-but-possible (£200/kWh) one — BF-1 guard (2026-05-31)',
+      ok,
+      (v: boolean) => v === true,
+      () => `impossible.feasible=${impossible.feasible} (want false), feasible=${feasible.feasible} (want true), aggressive=${aggressive.feasible} (want true)`,
+    ))
   }
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
