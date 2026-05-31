@@ -594,10 +594,14 @@ def run(args):
         label = SLUG_LABEL[slug]
         print(f"\n[{label}] {pdf_path}")
 
-        # Convert to PNGs
+        # Convert to PNGs at the highest DPI whose total payload fits the model
+        # request-body limits. Fixed 150 DPI blew past 413 (Payload Too Large) on
+        # 84-page dossiers (12 MB); 4500 KB raw -> ~6 MB body, safe across Gemini /
+        # Opus / Qwen seats. Every page is still scored (no truncation). 2026-05-31.
         print(f"  Converting to PNGs...")
-        pngs = pdf_to_pngs(pdf_path)
-        print(f"  {len(pngs)} pages")
+        pngs, used_dpi = pdf_to_pngs_fit(pdf_path, target_raw_kb=4500)
+        _raw_kb = sum(p.stat().st_size for p in pngs) // 1024
+        print(f"  {len(pngs)} pages @ {used_dpi} DPI ({_raw_kb} KB raw)")
 
         if not pngs:
             print(f"  [SKIP] No pages extracted", file=sys.stderr)
