@@ -589,12 +589,3 @@ export function suggestEnvelope(
   fits.sort((a, b) => envelopeVolumeLiters(a) - envelopeVolumeLiters(b))
   return fits
 }
-
-/**
- * Convenience accessor for ad-hoc lookups by id. Returns `null` if the id
- * is not in the registry rather than throwing — callers can decide whether
- * a miss is a soft fall-back or a hard error.
- */
-export function getEnvelopeById(id: string): DeploymentEnvelope | null {
-  return DEPLOYMENT_ENVELOPES[id] ?? null
-}
