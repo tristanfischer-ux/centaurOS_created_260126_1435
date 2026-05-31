@@ -583,6 +583,17 @@ function extractOccurrences(pageText: string, page: number): NumericOccurrence[]
       const preChar = cleaned.slice(Math.max(0, matchStart - 12), matchStart)
       if (/\d+\/\s*$/.test(preChar)) continue
     }
+    // Skip the LOW end of a no-space product/spec RANGE ("250kW-1MW" — a supplier
+    // catalogue power range, not this design's value). The negative-skip above
+    // already drops the HIGH end ("-1MW"); this catches the FIRST value, which
+    // matches as a positive number and would otherwise cluster with a real design
+    // scalar. Added 2026-05-31 after BESS Nidec inverter range (250kW-1MW) clustered
+    // with 15 kW inverter dissipation. Only fires on `<unit>-<digit>` (a genuine
+    // range), so a real contradiction (never a hyphen-number) is unaffected.
+    {
+      const postChar = cleaned.slice(matchStart + m[0].length, matchStart + m[0].length + 6)
+      if (/^\s*[-–—]\s*\d/.test(postChar)) continue
+    }
     // Skip derate-table second values ("36 kW @ 35°C / 21.6 kW @ 50°C") —
     // these are the second ambient in a derate table, not a contradiction.
     // The pattern: <prev_num> <unit> @ <THIS_temp> appearing inside a
