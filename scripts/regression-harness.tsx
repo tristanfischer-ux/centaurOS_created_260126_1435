@@ -2282,6 +2282,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       'render-radical-from-snapshot',   // broken dev render helper (imported archived stages/7b-pdf-v3)
       'radical/composition',            // early-radical scaffolding superseded by structural-builder + sentence-generator
       'iter4-renderer-helpers',         // iter-3/4 radical renderer, replaced by render-minimal-pdf.tsx
+      'prompts-vendor-injection',       // dead vendor-catalog->prompt-injection wrapper (never wired; distributor-cascade-real is the live path)
     ]
     const root = resolve(__dirname, '..')
     let rgUsable = true
@@ -2289,8 +2290,11 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     for (const marker of PRUNED_IMPORT_MARKERS) {
       const escaped = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       try {
+        // Anchor at line-start (ESM import / export-from / multiline `} from`)
+        // so JSDoc example lines (` * import ... from 'x'`) cannot false-trip —
+        // only a REAL import statement counts as a resurrection.
         const out = execFileSync('rg', [
-          '-l', `(import|require|from)[^\\n]*${escaped}`,
+          '-l', `^\\s*(import\\b|export\\b|\\})[^\\n]*${escaped}`,
           '--glob=!_archive/**', '--glob=!**/worktrees/**', '--glob=!node_modules/**',
           '--glob=!**/*.md', '--glob=!**/*.jsonl', root,
         ], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] })

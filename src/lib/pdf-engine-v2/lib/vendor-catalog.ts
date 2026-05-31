@@ -5,30 +5,17 @@
  * for each product class so the Assembly Shortlist (S07) returns named suppliers
  * instead of LOW-confidence blanks. Target: lift S07 from 5.7 to 8+.
  *
- * ─── INTEGRATION TODO (after Phase 3a parallel sonnet completes) ───────────────
+ * ─── INTEGRATION STATUS (updated 2026-05-31 — ONE-UNIVERSAL-ENGINE consolidation) ─
  *
- * 1. PROMPT INJECTION — src/lib/pdf-engine-v2/stages/4-bom-cost-suppliers.ts
- *    Import `getVendorContext` from `prompts-vendor-injection.ts` (co-located with
- *    this file in lib/) and inject the result into BOM_GENERATION_SYSTEM for the
- *    current product class. The injection point is where the system prompt is
- *    assembled before the LLM call. Example:
- *
- *      const vendorCtx = getVendorContext(classification.productClass)
- *      const systemPrompt = BOM_GENERATION_SYSTEM + '\n\n' + vendorCtx
- *
- * 2. ASSEMBLY SHORTLIST RENDERER — src/lib/pdf-engine-v2/stages/7-pdf-v3.tsx
- *    The SupplierAppendix / Assembly Shortlist section should add two columns:
- *      - "Lead Time" reading from `regimeRouterResult.leadTimeWeeks` (integer, weeks)
- *      - "MOQ" reading from `regimeRouterResult.moqUnits` (integer, units)
- *    These fields are already requested in the BOM prompt after injection; the
- *    renderer just needs to render them. Suggested column widths: 80px / 60px.
- *    Add them after the "Supplier" column and before "Confidence".
- *
- * 3. MODULE DECOMPOSITION CONTEXT — src/lib/pdf-engine-v2/prompts.ts
- *    Add a reference to the catalog in MODULE_DECOMPOSITION_SYSTEM_PA so the
- *    decomposition stage names OEM subsystems that the BOM stage can later match
- *    against catalog entries. The `getVendorContext` function can be called at
- *    decompose time too (earlier in the pipeline = earlier grounding).
+ * The prompt-injection integration originally planned here was NEVER wired. Its
+ * wrapper (prompts-vendor-injection.ts, which exported getVendorContext /
+ * listSupportedClasses) was pruned in the consolidation as a dead parallel path,
+ * and the target stages it referenced (4-bom-cost-suppliers, 7-pdf-v3) are
+ * superseded by the orchestrator + render-minimal-pdf.tsx. The LIVE vendor-data
+ * path on the production chain is the registered `distributor-cascade-real`
+ * tool (DB-first via forge-truth.db). The curated VENDOR_CATALOG data below is
+ * retained (see GAP NOTES); any future re-wiring should go through the
+ * orchestrator tool registry, not a standalone prompt-injection wrapper.
  *
  * ─── GAP NOTES (honest, do not paper over with filler) ──────────────────────
  *

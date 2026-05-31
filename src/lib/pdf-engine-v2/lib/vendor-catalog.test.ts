@@ -6,7 +6,6 @@ import {
   getCatalogStats,
   type VendorCatalogEntry,
 } from './vendor-catalog'
-import { getVendorContext, listSupportedClasses } from './prompts-vendor-injection'
 
 // ─── Catalog structure integrity ──────────────────────────────────────────────
 
@@ -192,71 +191,5 @@ describe('gap notes', () => {
     const solarEntry = entries.find(e => e.partType === 'haps_solar_laminate')
     expect(solarEntry).toBeDefined()
     expect(solarEntry!.gapNote).toBeDefined()
-  })
-})
-
-// ─── Prompt injection ─────────────────────────────────────────────────────────
-
-describe('getVendorContext', () => {
-  it('returns non-empty string for energy_storage', () => {
-    const ctx = getVendorContext('energy_storage')
-    expect(ctx.length).toBeGreaterThan(100)
-    expect(ctx).toContain('VENDOR CATALOG')
-    expect(ctx).toContain('energy_storage')
-  })
-
-  it('includes real vendor names in output', () => {
-    const ctx = getVendorContext('energy_storage')
-    expect(ctx).toContain('CATL')
-    expect(ctx).toContain('Sungrow')
-    expect(ctx).toContain('Nuvation Energy')
-  })
-
-  it('includes lead time and MOQ in output', () => {
-    const ctx = getVendorContext('drone')
-    expect(ctx).toContain('wk lead')
-    expect(ctx).toContain('MOQ')
-  })
-
-  it('includes gap note for HAPS', () => {
-    const ctx = getVendorContext('haps')
-    expect(ctx).toContain('GAP')
-  })
-
-  it('returns empty string for unknown product class (no regression risk)', () => {
-    const ctx = getVendorContext('flux_capacitor')
-    expect(ctx).toBe('')
-  })
-
-  it('instructs LLM to never invent company names', () => {
-    const ctx = getVendorContext('bioreactor')
-    expect(ctx.toLowerCase()).toContain('never invent')
-  })
-
-  it('provides distributor fallback instruction', () => {
-    const ctx = getVendorContext('auv')
-    expect(ctx).toContain('RS Components')
-    expect(ctx).toContain('Farnell')
-  })
-})
-
-// ─── listSupportedClasses ─────────────────────────────────────────────────────
-
-describe('listSupportedClasses', () => {
-  it('returns all 10 expected product classes', () => {
-    const classes = listSupportedClasses()
-    const expected = [
-      'auv', 'bioreactor', 'drone', 'edge_ai_server', 'energy_storage',
-      'ev_charger', 'haps', 'thermal_system', 'vertical_farm', 'wearable_medical',
-    ]
-    for (const cls of expected) {
-      expect(classes).toContain(cls)
-    }
-  })
-
-  it('returns a sorted list', () => {
-    const classes = listSupportedClasses()
-    const sorted = [...classes].sort()
-    expect(classes).toEqual(sorted)
   })
 })
