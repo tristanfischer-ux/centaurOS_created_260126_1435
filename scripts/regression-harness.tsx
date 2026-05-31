@@ -2279,6 +2279,9 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       'tools/pandapower-stub',          // superseded by pandapower-real (register-all.ts:20)
       'tools/coolprop-stub',            // superseded by coolprop-real (register-all.ts:19)
       'tools/pybamm-stub',              // superseded by pybamm-real (register-all.ts:18); e2e test repointed to -real
+      'render-radical-from-snapshot',   // broken dev render helper (imported archived stages/7b-pdf-v3)
+      'radical/composition',            // early-radical scaffolding superseded by structural-builder + sentence-generator
+      'iter4-renderer-helpers',         // iter-3/4 radical renderer, replaced by render-minimal-pdf.tsx
     ]
     const root = resolve(__dirname, '..')
     let rgUsable = true
