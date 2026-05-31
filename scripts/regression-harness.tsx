@@ -53,6 +53,7 @@ import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasib
 import { checkBriefAdherence } from './brief-adherence'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
+import { snapshotEmitterIdentity, reassertEmitterIdentity } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 
 interface Assertion {
   id: string
@@ -2204,6 +2205,32 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `rating-phrase findings=${ratingFindings} (want 0), count-phrase findings=${countFindings} (want >=1)`,
+    ))
+  }
+
+  // ── UNIVERSAL.reassert_restores_stripped_part_number ─────────────────────
+  // Guards the 2026-05-31 pre-render emitter-identity reassert fix: a late stage
+  // (Stage 10.5 part-reality-check / R4 fact-check) strips emitter part_numbers
+  // AFTER the Phase-2 reassert, blanking REAL parts (~86% of an industrial BOM is
+  // real-but-not-on-electronics-distributors). The chain now reasserts emitter
+  // identity as the last mutation before render. This asserts the mechanism it
+  // relies on actually restores a stripped part_number, so a real part can never
+  // ship with a blank SKU on a manufacturer.
+  {
+    const emitterModules = [{ module: 'm', sub_modules: [{ id: 's', words: [{ id: 'w1', modifier_characters: [{ kind: 'manufacturer', value: 'CATL' }, { kind: 'part_number', value: 'LF280K' }] }] }] }]
+    const snap = snapshotEmitterIdentity(emitterModules as never)
+    const stripped = JSON.parse(JSON.stringify(emitterModules)) as typeof emitterModules
+    stripped[0].sub_modules[0].words[0].modifier_characters = stripped[0].sub_modules[0].words[0].modifier_characters.filter((mc) => mc.kind !== 'part_number')
+    const strippedHadPn = stripped[0].sub_modules[0].words[0].modifier_characters.some((mc) => mc.kind === 'part_number')
+    reassertEmitterIdentity(stripped as never, snap)
+    const restoredPn = stripped[0].sub_modules[0].words[0].modifier_characters.find((mc) => mc.kind === 'part_number')?.value
+    const ok = strippedHadPn === false && restoredPn === 'LF280K'
+    assertions.push(assertEq(
+      'UNIVERSAL.reassert_restores_stripped_part_number',
+      'reassertEmitterIdentity restores a part_number a late stage stripped (a real part can never ship with a blank SKU on a manufacturer) — guards the 2026-05-31 pre-render reassert',
+      ok,
+      (v: boolean) => v === true,
+      () => `strippedHadPn=${strippedHadPn} (want false), restoredPn=${restoredPn} (want LF280K)`,
     ))
   }
 

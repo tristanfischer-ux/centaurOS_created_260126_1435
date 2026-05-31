@@ -5405,6 +5405,30 @@ async function main() {
     // renderer can read it for the G1b badge).
     if (complianceGate) liveState.complianceGate = complianceGate
 
+    // ── Final emitter-identity re-assert (2026-05-31): the deterministic emitter
+    //    is the SOLE authority on part identity (architecture anchor A1). A LATE
+    //    stage (Stage 10.5 part-reality-check / R4 grounded fact-check) strips
+    //    "unverifiable" emitter part_numbers AFTER the Phase-2 reassert at :3669
+    //    (which logged words_corrected=0 — nothing was stripped yet at that point).
+    //    But ~86% of an industrial BOM is real-but-not-on-electronics-distributors
+    //    (CATL cells, RUD lifting points, Bender monitors), so that strip blanks
+    //    REAL parts — the dossier then ships a manufacturer with a BLANK SKU, which
+    //    is strictly worse than the emitter's best-guess MPN. Restore emitter
+    //    identity as the LAST mutation before render so no downstream stage can
+    //    ship a blank SKU on a real part. Idempotent + proven. Universal across all
+    //    35 classes. (The genuinely-fabricated residual — dimension/standard wrongly
+    //    placed in the MPN field — is an emitter schema fix, tracked separately in
+    //    MPN-VALIDATION-ARCHITECTURE.md.)
+    try {
+      const preRenderReassert = reassertEmitterIdentity(liveState?.moduleDecomposition?.modules ?? [], emitterIdentitySnapshot)
+      if (preRenderReassert.words_corrected > 0) {
+        console.error(`[chain] pre-render emitter-identity re-assert: restored ${preRenderReassert.words_corrected} word(s) a late stage had stripped (blanked part_numbers on real parts) — emitter is the part-identity authority`)
+      }
+      logAction({ step: 'emitter_identity_reassert_pre_render', words_corrected: preRenderReassert.words_corrected, words_matched: preRenderReassert.words_matched, words_missing: preRenderReassert.words_missing_post_mutation })
+    } catch (err) {
+      console.error(`[chain] pre-render emitter-identity re-assert threw: ${(err as Error).message}; continuing`)
+    }
+
     writeFileSync(statePath, JSON.stringify(liveState, null, 2))
     logAction({ step: 'recompute_summary_after_engines', ok: true, summary: liveState.partVerificationSummary })
   } catch (err) {
