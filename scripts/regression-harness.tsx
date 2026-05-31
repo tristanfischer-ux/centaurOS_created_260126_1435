@@ -2376,6 +2376,37 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL.no_untracked_orchestrator_tools ────────────────────────────
+  // Guards the 2026-05-31 reproducibility fix: register-all.ts imports 159
+  // orchestrator tools, but 147 of them (+ 221 companion python/ scripts) were
+  // never `git add`ed — a fresh clone had 12/159 tools and could not build the
+  // engine ("committed state != running state"). After committing them, this
+  // fails the build if ANY .ts/.py under scripts/lib/orchestrator/tools/ is
+  // untracked again — so the engine's tool layer can never silently drift out of
+  // version control. Uses git; skips gracefully where git/worktree is absent.
+  {
+    const root = resolve(__dirname, '..')
+    let gitUsable = true
+    let untracked: string[] = []
+    try {
+      const out = execFileSync('git', ['-C', root, 'ls-files', '--others', '--exclude-standard', 'scripts/lib/orchestrator/tools/'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] })
+      untracked = out.split('\n').map(s => s.trim()).filter(s => s.endsWith('.ts') || s.endsWith('.py'))
+    } catch {
+      gitUsable = false
+    }
+    if (!gitUsable) {
+      assertions.push({ id: 'UNIVERSAL.no_untracked_orchestrator_tools', description: 'untracked-tools guard (skipped — git unavailable)', passed: true, detail: 'git not available — skipped' })
+    } else {
+      assertions.push(assertEq(
+        'UNIVERSAL.no_untracked_orchestrator_tools',
+        'Every orchestrator tool (.ts wrapper + .py impl) under scripts/lib/orchestrator/tools/ is git-tracked — the engine must be reproducible from a clean clone (2026-05-31: 147 live-but-untracked tools committed)',
+        untracked.length,
+        (n: number) => n === 0,
+        () => `${untracked.length} untracked tool file(s): ${untracked.slice(0, 6).join(', ')}${untracked.length > 6 ? ' …' : ''}. register-all.ts imports these but git does not have them — a clone cannot build the engine. git add them (or delete if dead).`,
+      ))
+    }
+  }
+
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
 
