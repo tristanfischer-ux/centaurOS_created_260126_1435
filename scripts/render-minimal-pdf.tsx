@@ -639,6 +639,13 @@ type BomPartRow = {
   // overridden by the Engineering Contract's macro_assembly_prices
   // (size-aware pricing for items the per-unit class anchor under-prices).
   contract_override_reason?: string
+  // 2026-05-31 (wind gate-10 B-2 false-fail root cause): when an unmatched
+  // macro-assembly is given a synthetic module home by the net below, this
+  // carries the ORIGINAL-case macro word_name so the macro-claims.json builder
+  // can populate `macro_word_name` for it. Without this the audit's
+  // claimedMacroNames set held '' instead of the real macro name, so a macro
+  // whose cost DID land + reconcile was still flagged orphaned (exit 10).
+  macro_source_name?: string
   price_tier: 'actual' | 'estimate' | 'tbd'
   // Engine B (2026-05-18) — per-component-class attribution. Optional so
   // legacy state.json files without the engine_b_* fields still render.
@@ -1319,7 +1326,7 @@ function computeBomTotals(state: any): BomTotals | null {
     }
   }
   let unmatchedMacroTotal_gbp = 0
-  const unmatchedMacros: Array<{ name: string; total: number }> = []
+  const unmatchedMacros: Array<{ name: string; origName: string; total: number }> = []
   for (const { name, total_gbp: total } of dedupedMacros.values()) {
     const lowerName = name.toLowerCase()
     if (claimedMacroAssemblies.has(lowerName)) continue
@@ -1331,7 +1338,9 @@ function computeBomTotals(state: any): BomTotals | null {
     // £3.18M of cost. Strict match only via exact ID; the BESS pattern of
     // emitting word_id = `${macro_name}_word` is the supported mapping.
     const matched = wordNames.has(lowerName) || wordNames.has(`${lowerName}_word`)
-    if (!matched) unmatchedMacros.push({ name: lowerName, total: roundToPence(total) })
+    // origName carries the ORIGINAL-case contract word_name so the audit's
+    // exact-string `claimedMacroNames.has(m.word_name)` check can see this claim.
+    if (!matched) unmatchedMacros.push({ name: lowerName, origName: name, total: roundToPence(total) })
   }
   // 2026-05-28 (BESS L55 regression root-cause — DETERMINISM): an unmatched
   // macro-assembly price (e.g. liquid_cooling_loop £6,012 on a run where the
@@ -1391,6 +1400,7 @@ function computeBomTotals(state: any): BomTotals | null {
       price_tier: 'estimate',
       engine_b_component_class: 'system_assemblies',
       contract_override_reason: 'Engineering-contract macro-assembly aggregate — no discrete design word was emitted for it this run; shown here so the cost has a visible module home and the cover total reconciles with the module sub-totals.',
+      macro_source_name: um.origName,
     }
     homeSub.parts.push(syntheticRow)
     homeSub.subtotal_gbp = roundToPence(homeSub.subtotal_gbp + um.total)
@@ -10408,7 +10418,9 @@ async function main() {
               sub_module: sub.id,
               word_id: part.word_id,
               word_name: part.word_name,
-              macro_word_name: '', // will fill below by matching source_detail
+              // Net synthetic-home rows carry the macro name explicitly (2026-05-31);
+              // strict-matched rows fall through to the source_detail match below.
+              macro_word_name: part.macro_source_name ?? '',
               macro_total_gbp: part.line_total_gbp,
               unit_price_gbp: part.unit_price_gbp,
               line_total_gbp: part.line_total_gbp,
@@ -10424,6 +10436,7 @@ async function main() {
     // convenience. Bonus: total claimed money + count.
     const macros: Array<{ word_name: string; source_detail?: string; total_gbp: number }> = (state?.engineeringContract?.macro_assembly_prices ?? []) as any[]
     for (const c of macroClaims) {
+      if (c.macro_word_name) continue // net synthetic-home rows already set it
       const m = macros.find(mm => (mm.source_detail ?? '').slice(0, 60) === c.source_detail.slice(0, 60))
       if (m) c.macro_word_name = m.word_name
     }

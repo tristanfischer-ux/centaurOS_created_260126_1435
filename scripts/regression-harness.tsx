@@ -1256,6 +1256,40 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL: every engineering macro is recorded in macro-claims.json (2026-05-31) ──
+  //
+  // UNIVERSAL.every_engineering_macro_recorded_in_claims — if macro-claims.json is
+  // present alongside the snapshot, assert every engineering macro >£5k appears in
+  // the claims' macro_word_name set. Guards the 2026-05-31 wind gate-10 B-2
+  // FALSE-fail: the renderer's net DID give the £2.1M direct_drive_pmg_drivetrain
+  // macro a visible module home and the cost reconciled, but the synthetic home row
+  // never carried the macro name, so macro-claims.json recorded macro_word_name=''.
+  // audit-pdf-bom.ts:289 builds claimedMacroNames from macro_word_name and flags any
+  // engineering macro >£5k whose word_name is absent → HIGH B-2 → chain exit 10, even
+  // though the cost was in the BoM and reconciled. Fix: net synthetic rows carry
+  // macro_source_name (render-minimal-pdf.tsx) → the builder populates macro_word_name.
+  // A FAIL here means a macro home row stopped carrying its name again — a recording
+  // regression that hard-fails an otherwise-reconciling dossier.
+  {
+    const claimsPath = snapshotPath.replace(/state\.json$/, 'macro-claims.json')
+    if (existsSync(claimsPath)) {
+      try {
+        const claimsFile = JSON.parse(readFileSync(claimsPath, 'utf-8'))
+        const claims: any[] = Array.isArray(claimsFile?.claims) ? claimsFile.claims : []
+        const claimed = new Set<string>(claims.filter((c) => c?.macro_word_name).map((c) => String(c.macro_word_name)))
+        const macros: any[] = Array.isArray(state?.engineeringContract?.macro_assembly_prices) ? state.engineeringContract.macro_assembly_prices : []
+        const unrecorded = macros.filter((m) => Number(m?.total_gbp) > 5_000 && !claimed.has(String(m?.word_name)))
+        assertions.push(assertEq(
+          'UNIVERSAL.every_engineering_macro_recorded_in_claims',
+          `every engineering macro >£5k is recorded with its name in macro-claims.json (${macros.length} macros, ${claims.length} claims)`,
+          unrecorded.length,
+          (n) => n === 0,
+          (n) => `${n} engineering macro(s) >£5k missing a macro_word_name in macro-claims.json: ${unrecorded.slice(0, 5).map((m) => `${m.word_name} £${Math.round(Number(m.total_gbp)).toLocaleString()}`).join('; ')} — a synthetic-home row stopped carrying macro_source_name (render-minimal-pdf.tsx net), so audit-pdf-bom.ts B-2 will false-fail (exit 10) even though the cost reconciles.`,
+        ))
+      } catch { /* macro-claims.json unreadable — skip invariant */ }
+    }
+  }
+
   // ── UNIVERSAL: reviewer-merge never changes word.id (2026-05-27, L47 Fix B) ──
   //
   // UNIVERSAL.reviewer_merge_never_changes_word_id — reads actions.jsonl and
