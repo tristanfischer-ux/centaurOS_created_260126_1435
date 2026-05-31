@@ -101,7 +101,7 @@ import {
   getClassReferenceGraph,
   validateConnectionsAgainstGraph,
 } from '../src/lib/pdf-engine-v2/class-reference-graph'
-import { getClassReferenceGraphDBFirst } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
+import { getClassReferenceGraphDBFirst, writebackDiscoveredEdge } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
 import { runPhysicsLedger } from '../src/lib/pdf-engine-v2/stages/0.1-physics-ledger'
 import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-engine-v2/stages/3.5-compliance-gate'
 import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/lib/pdf-engine-v2/stages/1.8-brief-target-reconciliation'
@@ -4136,6 +4136,41 @@ async function main() {
       }
       ;(design as any).k10ShadowResult = shadowResult
       console.error(`[chain] K10 shadow: ${shadowResult.verdict} — matched=${shadowResult.matched_edges} missing=${shadowResult.missing_required.length} extra=${shadowResult.extra_emitted.length}`)
+
+      // 2026-05-31 (Tristan: "generate on the fly → add awareness to a DB → read
+      // it back next time"): wire the previously-DEAD writebackDiscoveredEdge so
+      // the class-reference graph GROWS from each run instead of re-deriving from
+      // the frozen 2026-05-18 baked snapshot. The emitted connections that did NOT
+      // match the baked graph (k10Result.extra) are discovered topology for this
+      // class — persist them (required:false, source=llm:discovery, lower
+      // confidence) so the next run's getClassReferenceGraphDBFirst reads them
+      // DB-first and the loop closes (fewer "extra" each run as the graph learns).
+      // SAFE: the class graph only feeds the SOFT non-fatal K10 validator, so a
+      // spurious discovered edge can never hard-break a run; dedup + the
+      // SKIP_LIBRARY_WRITEBACK kill-switch live inside the writeback fn. This
+      // function was built 2026-05-18 but had ZERO callers until now (the "growing
+      // DB" half of class-reference grounding was dead code).
+      try {
+        let k10Written = 0
+        for (const e of k10Result.extra) {
+          const fromC = String(e.from_module ?? '').trim()
+          const toC = String(e.to_module ?? '').trim()
+          if (!fromC || !toC || fromC === toC) continue // skip malformed / self-loops
+          writebackDiscoveredEdge(k10ProductClass, {
+            from_class: fromC,
+            to_class: toC,
+            mechanism: e.mechanism ? String(e.mechanism) : undefined,
+            protocol: (e as any).protocol ? String((e as any).protocol) : undefined,
+            required: false, // discovered, not mandatory — no K10 missing-required pressure
+            direction: 'mutual',
+            notes: 'discovered from chain run (emitted edge absent from baked graph)',
+          })
+          k10Written += 1
+        }
+        if (k10Written > 0) console.error(`[chain] K10 writeback: persisted ${k10Written} discovered edge(s) to grow the ${k10ProductClass} reference graph (was dead code until 2026-05-31)`)
+      } catch (wbErr) {
+        console.warn(`[chain] K10 discovered-edge writeback failed (non-fatal): ${(wbErr as Error).message}`)
+      }
       logAction({
         step: 'k10_shadow',
         verdict: shadowResult.verdict,
