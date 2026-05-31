@@ -34,6 +34,7 @@
  */
 
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs'
+import { recordScoringRun } from './lib/scoring-history.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { readdirSync } from 'fs'
@@ -866,6 +867,38 @@ async function main() {
             join(iterDir, `${brief.slug}.json`),
             JSON.stringify(stateSnapshot, null, 2),
           )
+
+          // Wire the previously-DEAD recordScoringRun (audit 2026-05-31): the RL
+          // loop is the one place TS code holds a FULL council result in hand
+          // (allSections === runCouncilScoring's result.data — scoreState merely
+          // extracts the primary section from it), so record each brief-run to the
+          // cross-run scoring dashboard. Non-fatal. NOTE: production go-wide scoring
+          // runs Python-side (score-radical-pdfs-multimodal.py → council-scores.jsonl);
+          // bridging THAT into this same dashboard is a separate task if Tristan
+          // wants unified go-wide + RL quality tracking.
+          try {
+            const secScores = (allSections as any[])
+              .map(s => ({ section: String(s.section), score: Number(s.score) }))
+              .filter(s => Number.isFinite(s.score) && s.score >= 0)
+            const cAvg = secScores.length > 0
+              ? secScores.reduce((a, s) => a + s.score, 0) / secScores.length
+              : null
+            recordScoringRun({
+              timestamp: new Date().toISOString(),
+              projectId: `rl-${stage}-${brief.slug}-iter${iter}`,
+              briefLabel: `RL:${stage}:${brief.slug}`,
+              compound: cAvg != null ? Math.round(cAvg * 10) : -1,
+              rubric: primary >= 0 ? Math.round(primary * 10) : -1,
+              councilAvg: cAvg,
+              councilScored: secScores.length,
+              councilFailed: (allSections as any[]).length - secScores.length,
+              sections: secScores,
+              formulaVersion: 'rl-loop',
+              status: primary >= 0 ? 'COMPLETED' : 'PIPELINE_ERROR',
+            })
+          } catch (recErr) {
+            console.warn(`  [${brief.slug}] scoring-history record failed (non-fatal): ${(recErr as Error).message}`)
+          }
 
           return { briefSlug: brief.slug, score: primary, reasons, allSections }
         }),
