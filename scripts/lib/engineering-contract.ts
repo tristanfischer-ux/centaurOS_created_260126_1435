@@ -599,17 +599,35 @@ registerArchetype('bess', (brief: any) => {
   const cellsPerRack = seriesCellsPerString  // 1P × 250S per rack
   const parallelStringsPerRack = 1
   const racksTheoretical = Math.ceil(nameplateKwhRequested / (cellsPerRack * cellEnergyKwh))
-  const rackCountMaxSingleContainer = 15
-  const rackCount = Math.min(racksTheoretical, rackCountMaxSingleContainer)
-  const cellCount = rackCount * cellsPerRack  // integer-clean: 15 × 250 = 3750
+  // Mass model (declared here so the rack ceiling can use it; reused by the
+  // in-container closure below — single source of truth).
+  const cellMassKg = 5.3
+  const briefMassCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 28_000)
+  // DERIVE the rack ceiling from the BRIEF'S mass budget — NOT a hardcoded 15.
+  // 2026-05-31 fix: `rackCountMaxSingleContainer = 15` was sized for the original
+  // 28 t cap and silently ignored the brief's actual mass allowance, so EVERY
+  // BESS capped at ~2.69 MWh usable regardless of the energy target (rack_count
+  // never scaled up even when the brief allowed more mass + asked for more
+  // energy). Now: max racks that fit the mass budget, where per-rack = cells +
+  // steel frame and fixed balance-of-system = container + PCS + BMS + cooling
+  // (the MV transformer is external pad-mount, not counted). These literals MUST
+  // stay in sync with the closure constants below (rackMassKgEach 200,
+  // containerTareKg 4000, pcsMassKg 1500, bmsCablingMassKg 500, coolingMassKg 1000).
+  const perRackMassKg = cellsPerRack * cellMassKg + 200
+  const fixedBosMassKg = 4_000 + 1_500 + 500 + 1_000
+  const rackCountMaxByMass = Math.max(1, Math.floor((briefMassCapKg - fixedBosMassKg) / perRackMassKg))
+  // Energy target drives the rack count UP (racksTheoretical), bounded by what
+  // the mass budget allows. For 3.5 MWh @ 38 t this resolves to 20 racks
+  // (3.58 MWh usable, 37.5 t); for the old 28 t cap it self-limits to a
+  // mass-feasible count rather than the old over-mass 15.
+  const rackCount = Math.min(racksTheoretical, rackCountMaxByMass)
+  const cellCount = rackCount * cellsPerRack  // integer-clean: e.g. 20 × 250 = 5000
   const parallelStringsTotal = parallelStringsPerRack * rackCount
   const stringVoltageNominalV = seriesCellsPerString * cellVoltageV  // 800 V
   const nameplateKwh = cellCount * cellEnergyKwh  // achieved, not requested
   const usableKwhAchieved = nameplateKwh * dodFraction
   const briefTargetFeasibility = usableKwhAchieved >= usableKwh * 0.99  // false at 3500/2688 target
-  const cellMassKg = 5.3
   const totalCellMassKg = cellCount * cellMassKg
-  const briefMassCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 28_000)
   // BESS L5 (2026-05-24, physics-critic L5 engineering_plausibility HIGH —
   // mass budget overrun): the previous closure only counted cells (capped at
   // 75% of mass cap as a heuristic) and ignored shell + racks + PCS + BMS +
@@ -728,7 +746,7 @@ registerArchetype('bess', (brief: any) => {
     // BESS L3 (2026-05-24, issue #2): integer-clean topology — emit the
     // authoritative values so the deterministic emitter consumes them via
     // q(contract, …) shadowing (drawer: q() helper is contract-wins).
-    rack_count: q(rackCount, '', 'dimensionless', 'rated', 'rack', 'calculator', { source_detail: `min(${racksTheoretical} theoretical, ${rackCountMaxSingleContainer} single-container mass cap)` }),
+    rack_count: q(rackCount, '', 'dimensionless', 'rated', 'rack', 'calculator', { source_detail: `min(${racksTheoretical} theoretical for energy target, ${rackCountMaxByMass} mass-budget cap @ ${briefMassCapKg} kg)` }),
     cells_per_rack: q(cellsPerRack, '', 'dimensionless', 'rated', 'rack', 'calculator', { source_detail: '1P × 250S = 800 V nominal exactly' }),
     series_cells_per_string: q(seriesCellsPerString, '', 'dimensionless', 'rated', 'rack', 'calculator', { source_detail: 'dc_bus_voltage_v / cell_voltage_v (IEC 61140 voltage-class)' }),
     parallel_strings_per_rack: q(parallelStringsPerRack, '', 'dimensionless', 'rated', 'rack', 'physics_constant'),

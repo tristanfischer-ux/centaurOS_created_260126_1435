@@ -2243,6 +2243,25 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // ── UNIVERSAL.bess_sizing_scales_to_energy_target ─────────────────────────
+  // Guards the 2026-05-31 fix: BESS rack_count must DERIVE from the brief's mass
+  // budget, not a hardcoded 15 — so a feasible brief (3.5 MWh @ 38 t) is actually
+  // met instead of silently under-delivering 2.69 MWh forever.
+  {
+    const c = buildContract('bess', { product_class: 'bess', product_description: 'containerised 3.5 MWh BESS, 1 MW PCS, LFP', constraints: { target_performance: { value: 3.5, unit: 'MWh' }, max_mass_kg: { value: 38000 }, unit_cost_ceiling: { value: 2000000 } } } as any) as any
+    const usable = c?.quantities?.usable_capacity_kwh?.value ?? 0
+    const massOk = (c?.quantities?.mass_feasibility?.value ?? 0) === 1
+    const targetOk = (c?.quantities?.brief_target_feasibility?.value ?? 0) === 1
+    const ok = usable >= 3500 && massOk && targetOk
+    assertions.push(assertEq(
+      'UNIVERSAL.bess_sizing_scales_to_energy_target',
+      'BESS sizes rack_count from the mass budget to MEET the energy target (3.5 MWh @ 38 t -> >=3500 kWh usable + mass-feasible) — was hardcoded-capped at 15 racks (2.69 MWh) until 2026-05-31',
+      ok,
+      (v: boolean) => v === true,
+      () => `usable=${usable} massOk=${massOk} targetOk=${targetOk}`,
+    ))
+  }
+
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
 
