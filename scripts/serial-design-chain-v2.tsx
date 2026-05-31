@@ -101,7 +101,7 @@ import {
   getClassReferenceGraph,
   validateConnectionsAgainstGraph,
 } from '../src/lib/pdf-engine-v2/class-reference-graph'
-import { getClassReferenceGraphDBFirst, writebackDiscoveredEdge } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
+import { getClassReferenceGraphDBFirst, writebackDiscoveredEdge, writebackDiscoveredNode } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
 import { runPhysicsLedger } from '../src/lib/pdf-engine-v2/stages/0.1-physics-ledger'
 import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-engine-v2/stages/3.5-compliance-gate'
 import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/lib/pdf-engine-v2/stages/1.8-brief-target-reconciliation'
@@ -4168,8 +4168,28 @@ async function main() {
           k10Written += 1
         }
         if (k10Written > 0) console.error(`[chain] K10 writeback: persisted ${k10Written} discovered edge(s) to grow the ${k10ProductClass} reference graph (was dead code until 2026-05-31)`)
+        // Companion NODE writeback (2026-05-31): writebackDiscoveredEdge was wired
+        // above but its twin writebackDiscoveredNode was left a zero-caller — the
+        // exact half-wiring pattern this loop is meant to close (audit 2026-05-31).
+        // Persist the discovered edges' endpoint classes as nodes too, so the node
+        // set grows in lockstep with the edge set (otherwise class_graph_edges
+        // accrues edges whose endpoint nodes are absent from class_graph_nodes).
+        // Dedup by class_id lives inside the writeback fn, so already-present nodes
+        // no-op safely.
+        const discoveredNodes = new Set<string>()
+        for (const e of k10Result.extra) {
+          for (const c of [String(e.from_module ?? '').trim(), String(e.to_module ?? '').trim()]) {
+            if (c) discoveredNodes.add(c)
+          }
+        }
+        let k10Nodes = 0
+        for (const class_id of discoveredNodes) {
+          writebackDiscoveredNode(k10ProductClass, { class_id, role: 'subsystem', required: false })
+          k10Nodes += 1
+        }
+        if (k10Nodes > 0) console.error(`[chain] K10 writeback: persisted ${k10Nodes} discovered node(s) to grow the ${k10ProductClass} reference graph`)
       } catch (wbErr) {
-        console.warn(`[chain] K10 discovered-edge writeback failed (non-fatal): ${(wbErr as Error).message}`)
+        console.warn(`[chain] K10 discovered-edge/node writeback failed (non-fatal): ${(wbErr as Error).message}`)
       }
       logAction({
         step: 'k10_shadow',
