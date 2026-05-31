@@ -5,7 +5,7 @@
  * Phase 1+2 end-to-end test for the universal engineering orchestrator.
  *
  * Loads:
- *   - PyBaMM stub tool (registers under 'pybamm:cell-sizing')
+ *   - PyBaMM real tool (registers under 'pybamm:cell-sizing')
  *   - BESS class plan (registers under 'bess:utility_containerised')
  * Calls orchestrateDesign() with a fake 3.5 MWh BESS brief.
  * Prints the full result: envelope, tool results, consistency, contract
@@ -18,7 +18,7 @@
  * Usage: npx tsx scripts/test-orchestrator-e2e.tsx
  */
 
-import './lib/orchestrator/tools/pybamm-stub'             // register the stub
+import './lib/orchestrator/tools/pybamm-real'             // register the real PyBaMM tool (stub pruned 2026-05-31 — drop-in, same id pybamm:cell-sizing)
 import './lib/orchestrator/class-plans/bess'              // register the BESS plan
 import { orchestrateDesign, renderToolsUsedPageAsText } from './lib/orchestrator/orchestrate'
 import { BESS_UTILITY_CONTAINERISED_PLAN } from './lib/orchestrator/class-plans/bess'

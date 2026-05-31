@@ -2275,6 +2275,10 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   {
     const PRUNED_IMPORT_MARKERS: string[] = [
       'registry-accumulation',          // legacy LLM-multi-emitter accumulation loop (deterministic emitter superseded it)
+      'tools/ngspice-stub',             // superseded by ngspice-real (register-all.ts:21)
+      'tools/pandapower-stub',          // superseded by pandapower-real (register-all.ts:20)
+      'tools/coolprop-stub',            // superseded by coolprop-real (register-all.ts:19)
+      'tools/pybamm-stub',              // superseded by pybamm-real (register-all.ts:18); e2e test repointed to -real
     ]
     const root = resolve(__dirname, '..')
     let rgUsable = true
