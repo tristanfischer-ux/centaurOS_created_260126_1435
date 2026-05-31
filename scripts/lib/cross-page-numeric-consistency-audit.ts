@@ -244,6 +244,11 @@ const STRONG_QUALIFIERS = new Set<string>([
   // alternative, not the as-built value ("rated power 350 kW"); they describe
   // different things and must not cluster. Added 2026-05-31 (ev-charger).
   'recommend', 'recommended', 'recommendation', 'downrate', 'downrated', 'tradeoff', 'trade-off',
+  // Mass-scope discriminators — empty vs laden/takeoff vs payload vs a single
+  // structural component are DIFFERENT masses; without these the audit clusters
+  // all the aircraft/vehicle masses together. Added 2026-05-31 (haps go-wide:
+  // 52.7 kg empty / 75 kg / 95 kg takeoff mashed into one "mass" contradiction).
+  'empty', 'laden', 'unladen', 'takeoff', 'mtom', 'mtow', 'tare', 'kerb', 'payload',
 ])
 
 /** WEAK qualifiers do NOT split clusters — "minimum target capacity" should
@@ -880,7 +885,23 @@ function buildFindings(clusters: Cluster[]): { findings: ConsistencyFinding[]; s
     //   is not a reader-irreconcilable contradiction — downgrade HIGH -> MED.
     //   Added 2026-05-31 after a BESS run flagged 1443 A (AC) vs 1250 A (DC)
     //   continuous current as a false-positive cross-page contradiction.
-    if (severity === 'HIGH' && c.qualifiers.includes('ac') && c.qualifiers.includes('dc')) severity = 'MED'
+    // Mutually-exclusive scope pairs (generalises the ac/dc guard): a cluster whose
+    // qualifier set contains BOTH sides describes two genuinely-different quantities
+    // mashed by a shared window ("AC continuous 1443 A, DC continuous 1250 A"; "350
+    // kW output … 650 kW input"; "52.7 kg empty … 95 kg takeoff"). Not a
+    // same-quantity cross-page contradiction → downgrade HIGH to MED. Added
+    // 2026-05-31 after the ev-charger (input/output power) + haps (empty/takeoff
+    // mass) go-wide false positives.
+    if (severity === 'HIGH') {
+      const EXCLUSIVE_PAIRS: ReadonlyArray<readonly [string, string]> = [
+        ['ac', 'dc'], ['input', 'output'], ['inlet', 'outlet'], ['supply', 'return'],
+        ['primary', 'secondary'], ['empty', 'takeoff'], ['empty', 'laden'],
+        ['empty', 'mtom'], ['empty', 'mtow'], ['empty', 'payload'], ['tare', 'laden'],
+      ]
+      for (const [a, b] of EXCLUSIVE_PAIRS) {
+        if (c.qualifiers.includes(a) && c.qualifiers.includes(b)) { severity = 'MED'; break }
+      }
+    }
     if (c.family === 'POWER') {
       const perOccQuals = c.occurrences.map((o) => classifyTokens([...o.preTokens, ...o.postTokens]).qualifiers)
       const hasContinuous = perOccQuals.some((q) => q.includes('continuous'))
