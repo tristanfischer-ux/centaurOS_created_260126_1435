@@ -55,6 +55,7 @@ import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
 import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
+import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
 
 interface Assertion {
   id: string
@@ -2263,6 +2264,39 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `restoredPn=${restoredPn} (want LF280K), ratingKept=${ratingKept} (want 314 Ah — NOT reverted)`,
+    ))
+  }
+
+  // ── UNIVERSAL.gate18_rounding_family_downgraded_not_high ──────────────────
+  // Guards the 2026-05-31 gate-18 rounding-precision fix: the same computed
+  // quantity printed at different decimal precisions (heatpump compressor power
+  // 4.646 / 4.65 / 4.6 kW) is ONE value, not a cross-page contradiction — it
+  // must downgrade HIGH → MED. The discriminator must NOT mask a real gap: the
+  // BESS L22 bug (2.69 MWh usable vs 3.5 MWh target, and the 3-way 3.5/2.69/3.36)
+  // must stay flagged. Asserts both directions so the guard can never widen into
+  // swallowing genuine contradictions.
+  {
+    const roundingFP = isRoundingFamily([
+      { rawValue: '4.65', canonicalValue: 4.65 },
+      { rawValue: '4.646', canonicalValue: 4.646 },
+      { rawValue: '4.6', canonicalValue: 4.6 },
+    ])
+    const realBugTwo = isRoundingFamily([
+      { rawValue: '2.69', canonicalValue: 2.69 },
+      { rawValue: '3.5', canonicalValue: 3.5 },
+    ])
+    const realBugThree = isRoundingFamily([
+      { rawValue: '3.5', canonicalValue: 3.5 },
+      { rawValue: '2.69', canonicalValue: 2.69 },
+      { rawValue: '3.36', canonicalValue: 3.36 },
+    ])
+    const ok = roundingFP === true && realBugTwo === false && realBugThree === false
+    assertions.push(assertEq(
+      'UNIVERSAL.gate18_rounding_family_downgraded_not_high',
+      'isRoundingFamily downgrades a same-value-different-precision cluster (4.6/4.646/4.65 kW → true) but keeps a real cross-page gap HIGH (2.69 vs 3.5 MWh → false; 3.5/2.69/3.36 → false) — guards the 2026-05-31 gate-18 rounding-precision false-positive fix',
+      ok,
+      (v: boolean) => v === true,
+      () => `roundingFP=${roundingFP} (want true), realBugTwo=${realBugTwo} (want false), realBugThree=${realBugThree} (want false)`,
     ))
   }
 

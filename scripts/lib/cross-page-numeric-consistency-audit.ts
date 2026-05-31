@@ -821,6 +821,42 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
   return [...clusters.values()]
 }
 
+/**
+ * A cluster is a "rounding family" when its distinct values are all consistent
+ * with one underlying quantity shown at different display precisions — i.e. each
+ * pair of values lies within the sum of their display half-steps. Example: a
+ * compressor power printed as "4.646 kW" (±0.0005), "4.65 kW" (±0.005), and
+ * "4.6 kW" (±0.05) on three pages is ONE value at three precisions, not three
+ * conflicting claims — every pairwise gap (≤0.05) sits inside the summed
+ * half-steps. The reader reconciles them trivially. A REAL contradiction does
+ * NOT: 2.69 MWh usable (±0.005) vs 3.5 MWh target (±0.05) has |Δ|=0.81, far
+ * outside the 0.055 tolerance, so it stays HIGH. Works in canonical units (the
+ * display step is scaled by canonicalValue/rawValue so kW-vs-W mixes are safe).
+ * Added 2026-05-31 after the heatpump go-wide false positive (4.6/4.646/4.65 kW).
+ */
+export function isRoundingFamily(occ: ReadonlyArray<{ rawValue: string | number; canonicalValue: number }>): boolean {
+  if (occ.length < 2) return false
+  const pts = occ.map((o) => {
+    const raw = String(o.rawValue)
+    const decMatch = raw.match(/\.(\d+)/)
+    const dp = decMatch ? decMatch[1].length : 0
+    const rawNum = parseFloat(raw.replace(/[^0-9.\-]/g, ''))
+    const scale = rawNum !== 0 && isFinite(rawNum) ? Math.abs(o.canonicalValue / rawNum) : 1
+    const step = Math.pow(10, -dp) * scale // one display ULP in canonical units
+    return { v: o.canonicalValue, half: step / 2 }
+  })
+  // Must have ≥2 genuinely-distinct values to be a "family" worth downgrading.
+  const distinctVals = new Set(pts.map((p) => Math.round(p.v * 1e6) / 1e6))
+  if (distinctVals.size < 2) return false
+  const EPS = 1e-9
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      if (Math.abs(pts[i].v - pts[j].v) > pts[i].half + pts[j].half + EPS) return false
+    }
+  }
+  return true
+}
+
 function buildFindings(clusters: Cluster[]): { findings: ConsistencyFinding[]; skippedSingletons: number } {
   const findings: ConsistencyFinding[] = []
   let skippedSingletons = 0
@@ -901,6 +937,14 @@ function buildFindings(clusters: Cluster[]): { findings: ConsistencyFinding[]; s
       for (const [a, b] of EXCLUSIVE_PAIRS) {
         if (c.qualifiers.includes(a) && c.qualifiers.includes(b)) { severity = 'MED'; break }
       }
+    }
+    // Rounding-precision family: distinct values that are all the SAME quantity
+    // shown at different decimal precisions (4.646 / 4.65 / 4.6 kW) are not a
+    // reader-irreconcilable contradiction. Downgrade HIGH → MED. Guarded so a
+    // genuine gap (2.69 vs 3.5 MWh) stays HIGH — see isRoundingFamily. Added
+    // 2026-05-31 after the heatpump go-wide false positive (compressor power).
+    if (severity === 'HIGH' && isRoundingFamily(deduped.map((o) => ({ rawValue: o.rawValue, canonicalValue: o.canonicalValue })))) {
+      severity = 'MED'
     }
     if (c.family === 'POWER') {
       const perOccQuals = c.occurrences.map((o) => classifyTokens([...o.preTokens, ...o.postTokens]).qualifiers)
