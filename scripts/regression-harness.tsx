@@ -52,6 +52,7 @@ import { resolveClassGraphSlug } from '../src/lib/pdf-engine-v2/lib/knowledge/cl
 import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasibility-gate'
 import { checkBriefAdherence } from './brief-adherence'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
+import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
 
 interface Assertion {
   id: string
@@ -2180,6 +2181,30 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         ))
       }
     }
+  }
+
+  // ── UNIVERSAL.per_rack_audit_skips_power_ratings_keeps_counts ─────────────
+  // Guards the 2026-05-31 gate-26 fix: a "N <power-unit> <noun> per X" prose
+  // phrase is a RATING of the noun, not a count of it ("20 kW cold-plate
+  // manifolds per rack" = one 20-kW manifold per rack, NOT 20 manifolds), so it
+  // must NOT produce a per-rack finding. But a genuine "N <noun> per X" count
+  // ("14 cold plates per rack" with the BoM under-emitting) MUST still fire. This
+  // asserts BOTH directions so the rating-unit guard can't silently over-skip.
+  {
+    const mk = (prose: string, wordId: string, qty: number) => ([{ module: 'm', sub_modules: [{ id: 's', english_sentence: prose, words: [{ id: wordId, modifier_characters: [{ kind: 'quantity', value: String(qty) }] }] }] }])
+    const Q = { rack_count: { value: 14 } }
+    // rating phrase → must be SKIPPED (0 findings)
+    const ratingFindings = runPerRackQuantityAudit(mk('Each contains 20 kW cold-plate manifolds per rack for cooling.', 'cold_plate_manifold_word', 14) as any, Q as any, 'energy_storage').findings?.length ?? 0
+    // genuine count under-emitted → must still FIRE (>=1 finding): 14 plates/rack × 14 racks = 196, BoM emits 14
+    const countFindings = runPerRackQuantityAudit(mk('The module uses 14 cold plates per rack across the system.', 'cold_plate_word', 14) as any, Q as any, 'energy_storage').findings?.length ?? 0
+    const ok = ratingFindings === 0 && countFindings >= 1
+    assertions.push(assertEq(
+      'UNIVERSAL.per_rack_audit_skips_power_ratings_keeps_counts',
+      'gate-26 skips a power-RATING phrase ("20 kW cold-plate manifolds per rack") yet still catches a genuine under-emitted count ("14 cold plates per rack") — guards the 2026-05-31 rating-unit false-positive fix without over-skipping',
+      ok,
+      (v: boolean) => v === true,
+      () => `rating-phrase findings=${ratingFindings} (want 0), count-phrase findings=${countFindings} (want >=1)`,
+    ))
   }
 
   // ── UNIVERSAL.no_inline_class_alias_maps_in_chain ─────────────────────────

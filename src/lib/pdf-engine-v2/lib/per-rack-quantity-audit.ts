@@ -171,6 +171,19 @@ const MEASUREMENT_UNIT_CAPACITY_RE =
  *  leading slash-unit.) BESS exit-26 false positive #2 (2026-05-30). */
 const RATE_UNIT_RE = /^[a-zµ°]+\d*\s*\/\s*[a-z]/i
 
+/** Power / voltage / current RATING-unit guard (2026-05-31, BESS exit-26 false
+ *  positive #3): a count number IMMEDIATELY followed by a power/electrical RATING
+ *  unit is the RATING of the noun that follows, not a count of it. "20 kW
+ *  cold-plate manifolds per rack" = manifolds RATED 20 kW (one per rack), NOT 20
+ *  manifolds per rack — it must not be multiplied by the rack count. Likewise
+ *  "400 V busbars per rack", "200 A fuses per rack", "1500 W heaters per rack".
+ *  Deliberately EXCLUDES energy-CAPACITY units (kWh/MWh/Wh/Ah), which the author
+ *  intentionally treats as real counts ("15 kWh modules per rack") and which stay
+ *  governed by MEASUREMENT_UNIT_CAPACITY_RE. The \b keeps it from matching nouns
+ *  that merely START with the unit letter (valve, watt-meter, amp-clamp → no
+ *  boundary after the leading letter). Universal across all classes. */
+const POWER_RATING_UNIT_RE = /^(kw|mw|gw|w|kva|mva|kvar|var|kv|mv|v|ka|ma|a|hp)\b/i
+
 // ── Fuzzy word matcher ────────────────────────────────────────────────────────
 
 /**
@@ -335,7 +348,7 @@ export function runPerRackQuantityAudit(
         // per-rack measurements, NOT "N items per rack". Single units via
         // MEASUREMENT_UNIT_CAPACITY_RE; compound slash-rate units (L/min, m/s,
         // kg/h, kW/m²) via RATE_UNIT_RE. BESS exit-26 false positives 2026-05-30.
-        if (MEASUREMENT_UNIT_CAPACITY_RE.test(trimmedNoun) || RATE_UNIT_RE.test(trimmedNoun)) continue
+        if (MEASUREMENT_UNIT_CAPACITY_RE.test(trimmedNoun) || RATE_UNIT_RE.test(trimmedNoun) || POWER_RATING_UNIT_RE.test(trimmedNoun)) continue
 
         // Guard: skip limiting language in the preceding 40 characters.
         const preceding = proseFields.slice(Math.max(0, match.index - 40), match.index)
