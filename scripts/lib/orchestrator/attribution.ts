@@ -654,11 +654,13 @@ export function generatePhysicsNarrative(
 ): PhysicsNarrative | null {
   if (!quantities || typeof quantities !== 'object') return null
 
-  // Select sentence set. Currently only VF; fallback for other classes returns
-  // null so the renderer skips the section rather than emitting nothing.
+  // VF gets the hand-curated causal prose below. EVERY OTHER class gets the
+  // UNIVERSAL data-driven narrative (2026-05-31) — walks each quantity's tool
+  // provenance so the section renders for all 35 classes, not just VF. This was
+  // VF-only ("the only class currently wired") until now.
   const classKey = (productClass ?? '').toLowerCase()
   const isVF = classKey.includes('vertical') || classKey.includes('farm')
-  if (!isVF) return null
+  if (!isVF) return generateUniversalPhysicsNarrative(quantities)
 
   const allSentences: string[] = []
   const toolsCited: string[] = []
@@ -692,6 +694,92 @@ export function generatePhysicsNarrative(
   return {
     heading: 'How the design was computed — the physics',
     sentences: allSentences,
+    groups,
+    tools_cited: toolsCited,
+  }
+}
+
+// ── Universal physics narrative (2026-05-31) ─────────────────────────────────
+// Class-agnostic "how the design was computed" — for every class that is NOT
+// hand-curated above. Reads each contract quantity's provenance.tool_id and
+// groups the computed quantities by the tool that produced them, so the section
+// renders for all 35 classes from the data the orchestrator already records.
+// No fabrication: only quantities that carry a real tool provenance + a finite
+// numeric value are included.
+
+const TOOL_DISPLAY_PREFIX: Record<string, string> = {
+  pybamm: 'PyBaMM', coolprop: 'CoolProp', ngspice: 'ngspice', pandapower: 'pandapower',
+  psychrolib: 'PsychroLib', fluids: 'Fluids', ht: 'Heat-Transfer', hvac: 'HVAC',
+  'arc-flash': 'Arc-Flash IEEE 1584', g99: 'G99 Compliance', 'protection-coordination': 'Protection Coordination',
+  thermal: 'Thermal', refrigeration: 'Refrigeration Cycle', 'plant-growth': 'Crop-Growth Model',
+  irrigation: 'Irrigation Sizing', dehumidification: 'Dehumidification', 'co2-enrichment': 'CO2 Enrichment',
+  'nutrient-solution': 'Nutrient Solution', 'led-par': 'LED PAR', sizing: 'Sizing',
+}
+const PHYS_ACRONYMS = new Set(['dc', 'ac', 'bms', 'pcs', 'soc', 'dod', 'hvac', 'led', 'co2', 'ppfd', 'emc', 'rpn', 'mppt', 'igbt', 'pv', 'ev', 'iso', 'ip', 'ntc', 'afe', 'iec', 'ul', 'nfpa', 'g99', 'pcc', 'cop', 'par', 'dli'])
+
+function titleCasePhys(s: string): string {
+  return s.split(/\s+/).map(w => (PHYS_ACRONYMS.has(w.toLowerCase()) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))).join(' ')
+}
+
+function toolDisplayName(toolId: string): string {
+  const [prefix, ...rest] = toolId.split(':')
+  const head = TOOL_DISPLAY_PREFIX[prefix] ?? titleCasePhys(prefix.replace(/[-_]+/g, ' '))
+  const tail = rest.join(' ').replace(/[-_]+/g, ' ').trim()
+  return tail ? `${head} (${titleCasePhys(tail)})` : head
+}
+
+function humanisePhysKey(key: string): string {
+  const noUnit = key.replace(/_(v|a|w|c|m|l|mm|m2|wh|kw|kwh|mwh|gwh|kg|kva|mva|hz|khz|mhz|kv|ka|ma|pct|gbp|cycles|years|days|barg|bar|kpa|mpa|lpm|rpm|kj_kgk|wh_kg|deg_c)$/i, '')
+  return noUnit.split('_').filter(Boolean).map(w => (PHYS_ACRONYMS.has(w.toLowerCase()) ? w.toUpperCase() : w)).join(' ').trim()
+}
+
+function formatPhysVal(value: number, unit: string): string {
+  const u = unit && unit.trim() ? ` ${unit.trim()}` : ''
+  const n = Math.abs(value) >= 100
+    ? Math.round(value).toLocaleString('en-GB')
+    : value.toLocaleString('en-GB', { maximumFractionDigits: 2 })
+  return `${n}${u}`
+}
+
+function generateUniversalPhysicsNarrative(quantities: Record<string, any>): PhysicsNarrative | null {
+  const byTool = new Map<string, { display: string; items: string[] }>()
+  const order: string[] = []
+
+  for (const [key, q] of Object.entries(quantities)) {
+    if (!q || typeof q !== 'object') continue
+    const toolId: unknown = (q as any).provenance?.tool_id
+    // Only real tool-computed quantities. Tool ids look like 'pybamm:cell-sizing';
+    // brief-/emitter-/contract-sourced values are excluded so this reflects the
+    // TOOLS' calculations, not restated inputs.
+    if (typeof toolId !== 'string' || !toolId.includes(':') || /^(brief|emitter|contract|user|derived)/i.test(toolId)) continue
+    const value: unknown = (q as any).value
+    if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) continue
+    const unit: string = typeof (q as any).unit === 'string' ? (q as any).unit : ''
+
+    if (!byTool.has(toolId)) { byTool.set(toolId, { display: toolDisplayName(toolId), items: [] }); order.push(toolId) }
+    byTool.get(toolId)!.items.push(`${humanisePhysKey(key)} = ${formatPhysVal(value, unit)}`)
+  }
+
+  if (byTool.size === 0) return null
+
+  const groups: PhysicsNarrativeGroup[] = []
+  const sentences: string[] = []
+  const toolsCited: string[] = []
+  for (const toolId of order) {
+    const t = byTool.get(toolId)!
+    if (t.items.length === 0) continue
+    const items = t.items.slice(0, 12) // cap overlong tool lists
+    const more = t.items.length > 12 ? `, and ${t.items.length - 12} more` : ''
+    const sentence = `${t.display} computed ${items.join(', ')}${more}.`
+    groups.push({ label: t.display, sentences: [sentence] })
+    sentences.push(sentence)
+    toolsCited.push(toolId)
+  }
+  if (sentences.length === 0) return null
+
+  return {
+    heading: 'How the design was computed — the physics',
+    sentences,
     groups,
     tools_cited: toolsCited,
   }

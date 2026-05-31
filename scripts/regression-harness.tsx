@@ -51,6 +51,7 @@ import Database from 'better-sqlite3'
 import { resolveClassGraphSlug } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
 import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasibility-gate'
 import { checkBriefAdherence } from './brief-adherence'
+import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 
 interface Assertion {
   id: string
@@ -2218,6 +2219,27 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `breaching: met=${breaching.all_hard_met} cap=${breaching.recommended_cap}; compliant: met=${compliant.all_hard_met} cap=${compliant.recommended_cap}`,
+    ))
+  }
+
+  // ── UNIVERSAL.physics_narrative_renders_for_all_classes ───────────────────
+  // Guards the 2026-05-31 fix: the "How the design was computed — the physics"
+  // section was VF-ONLY (generatePhysicsNarrative returned null for every other
+  // class). The universal data-driven path must now produce a tool-grounded
+  // narrative for any class whose contract quantities carry tool provenance.
+  {
+    const n = generatePhysicsNarrative({
+      cell_count: { value: 3750, unit: '', provenance: { tool_id: 'pybamm:cell-sizing' } },
+      dc_bus_voltage_v: { value: 800, unit: 'V', provenance: { tool_id: 'pybamm:cell-sizing' } },
+      thermal_rejection_min_kw: { value: 58.4, unit: 'kW', provenance: { tool_id: 'coolprop:refrigerant-properties' } },
+    }, 'bess')
+    const ok = n != null && n.sentences.length >= 1 && n.tools_cited.length >= 1
+    assertions.push(assertEq(
+      'UNIVERSAL.physics_narrative_renders_for_all_classes',
+      'generatePhysicsNarrative produces a tool-grounded narrative for a non-VF class (BESS) — was VF-only until 2026-05-31',
+      ok,
+      (v: boolean) => v === true,
+      () => `narrative=${n ? 'present' : 'NULL'} sentences=${n?.sentences.length ?? 0} tools=${n?.tools_cited.length ?? 0}`,
     ))
   }
 
