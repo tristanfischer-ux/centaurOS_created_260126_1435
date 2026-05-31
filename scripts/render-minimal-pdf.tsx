@@ -6408,7 +6408,16 @@ function SubModuleBomBlock({
         // £375000.00 reads as £375,000.00, ×3750 as ×3,750. Aligns with
         // sub-total formatting which already uses toLocaleString().
         const unitPriceCell = row.unit_price_gbp > 0
-          ? `~£${row.unit_price_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          // ≥£1M: drop the pence so the value fits the 62 pt UNIT column.
+          // £2,100,000.00 (~67 pt) overflows leftward and coalesces with the ×N
+          // QTY span into one PDF text run → gate-11 T-1 column-overflow (exposed
+          // on the wind direct_drive_pmg_drivetrain home row once gate-10 passed,
+          // 2026-05-31). Pence on a £M+ aggregate macro conveys no engineering
+          // information — same rationale as the L49 fmtGBP_subtotal council fix.
+          // Scoped to ≥£1M so sub-£1M unit prices (all of BESS) are unchanged.
+          ? (row.unit_price_gbp >= 1_000_000
+              ? `~£${Math.round(row.unit_price_gbp).toLocaleString('en-GB')}`
+              : `~£${row.unit_price_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
           : '—'
         const lineCell = row.line_total_gbp > 0
           ? `£${row.line_total_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
