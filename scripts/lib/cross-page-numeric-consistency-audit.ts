@@ -232,6 +232,18 @@ const STRONG_QUALIFIERS = new Set<string>([
   // 450 kWh / 2340 kWh alt-brief values clustering with 2690 kWh
   // design value and 3500 kWh brief target.
   'alternative', 'scenario', 'hypothetical',
+  // Power-conversion stage discriminators — a 350 kW AFE (active front-end
+  // rectifier) and a 30 kW LLC-resonant DC-DC converter are DIFFERENT power
+  // stages of the same charger, each with its own legitimate rating; the shared
+  // "power"/"module" anchor must not cluster them. Added 2026-05-31 after the
+  // ev-charger go-wide false-positive (350 kW AFE clustered with 30 kW DC-DC).
+  'afe', 'dc-dc', 'dcdc', 'ac-dc', 'acdc', 'llc', 'llc-resonant',
+  'rectifier', 'converter', 'pfc', 'boost', 'buck',
+  // Recommendation / trade-off role — an auto-improve recommendation ("downrate
+  // rated power to ~46.7 kW to meet the cost ceiling") is a suggested
+  // alternative, not the as-built value ("rated power 350 kW"); they describe
+  // different things and must not cluster. Added 2026-05-31 (ev-charger).
+  'recommend', 'recommended', 'recommendation', 'downrate', 'downrated', 'tradeoff', 'trade-off',
 ])
 
 /** WEAK qualifiers do NOT split clusters — "minimum target capacity" should
@@ -321,8 +333,18 @@ function classifyTokens(tokens: string[]): { qualifiers: string[]; head: string[
     if (STOPWORDS.has(t)) continue
     if (/^\d+([.,]\d+)?$/.test(t)) continue // numeric scrap
     if (t.length < 2) continue
+    // Check BOTH the raw token and its stem against the qualifier set, so a
+    // PLURAL discriminator ("power modules", "SiC rectifiers", "DC-DC
+    // converters") splits a cluster the same way its singular does. Without the
+    // stem check, "modules" fell through to head (stem→"module") and never
+    // split the 30 kW module from the 350 kW charger. Additive — raw matches
+    // still win, so existing splits are unchanged. Added 2026-05-31 (ev-charger).
     if (ROLE_QUALIFIERS.has(t)) {
       qualifiers.push(t)
+      continue
+    }
+    if (ROLE_QUALIFIERS.has(stem(t))) {
+      qualifiers.push(stem(t))
       continue
     }
     head.push(stem(t))
@@ -529,6 +551,13 @@ function extractOccurrences(pageText: string, page: number): NumericOccurrence[]
     const found = UNIT_TABLE.find((u) => u.test(unitToken))
     if (!found) continue
     const def = found.def
+    // Skip negative scalars for families where negativity is physically
+    // impossible (a "-40 kW" power, "-300 kg" mass, "-£5k" cost are always parse
+    // artefacts — most commonly the second half of a no-space range such as
+    // "30-40kW", where "-40kW" matches with the hyphen read as a minus sign and
+    // isPartOfRange's whitespace-hyphen pattern doesn't fire). TEMP legitimately
+    // goes negative (-40 °C), so it is exempt. Added 2026-05-31 (ev-charger).
+    if (numericValue < 0 && def.family !== 'TEMP') continue
     const canonicalValue = numericValue * def.toCanonical
     // Pre-context: 6 tokens before, post-context: 4 tokens after.
     const matchStart = m.index
@@ -814,6 +843,16 @@ function buildFindings(clusters: Cluster[]): { findings: ConsistencyFinding[]; s
     if (variancePct > 1) severity = 'HIGH'
     else if (variancePct > 0.1) severity = 'MED'
     if (!severity) continue
+    // gate 18 is the CROSS-PAGE consistency gate (CLAUDE.md: "two or more pages
+    // quoting different scalar values for the same engineering quantity"). A
+    // cluster whose occurrences all sit on ONE page is an in-passage illustrative
+    // comparison (e.g. "at 0.9 PF the current is 66.2 A ... even at a perfect
+    // 1.0 PF it is 59.6 A" — two scenarios in one sentence), not a cross-page
+    // contradiction the reader cannot reconcile. Downgrade single-page HIGH to
+    // MED. Added 2026-05-31 after the vertical-farm go-wide false-positive
+    // (power-factor scenario, both values on p.39).
+    const distinctPages = new Set(deduped.map((o) => o.page)).size
+    if (distinctPages < 2 && severity === 'HIGH') severity = 'MED'
     // Down-grade certain known-ambiguous families to MED:
     // - TEMP clusters where values span a sign change (-20 °C vs +50 °C)
     //   are very likely operating-range bounds, not contradictions.
