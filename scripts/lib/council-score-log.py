@@ -44,6 +44,7 @@ Rules:
 
 import json
 import os
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -83,6 +84,53 @@ def _validate(record: dict) -> None:
         )
 
 
+def _apply_brief_adherence_cap(record: dict) -> None:
+    """BF-2 (2026-05-31): deterministically CAP the council mean when the design
+    fails the brief's hard constraints.
+
+    The multimodal council rubric scores DOCUMENT quality and never penalises a
+    hard-constraint breach (BESS scored 9.28 at 7.7x over the cost ceiling + 23%
+    under energy). The council cannot be trusted to notice, so this does NOT ask
+    it to: it runs scripts/brief-adherence.ts on the sibling state.json, reads the
+    structured ACHIEVED values, and caps the logged mean so an unmet hard
+    requirement cannot be recorded as an 8+ 'pass'. Graceful no-op on ANY error —
+    score logging must never break because of the cap.
+    """
+    try:
+        pdf = record.get("pdf_path")
+        if not pdf:
+            return
+        state = Path(pdf).expanduser().resolve().parent / "state.json"
+        if not state.exists():
+            return
+        repo = Path(__file__).resolve().parents[2]  # scripts/lib/ -> repo root
+        adh = repo / "scripts" / "brief-adherence.ts"
+        if not adh.exists():
+            return
+        out = subprocess.run(
+            ["npx", "tsx", str(adh), str(state)],
+            cwd=str(repo), capture_output=True, text=True, timeout=120,
+        )
+        if out.returncode != 0 or not out.stdout.strip():
+            return
+        verdict = json.loads(out.stdout)
+        cap = verdict.get("recommended_cap")
+        record["brief_adherence"] = {
+            "all_hard_met": verdict.get("all_hard_met"),
+            "brief_infeasible": verdict.get("brief_infeasible"),
+            "recommended_cap": cap,
+            "breaches": verdict.get("breaches"),
+        }
+        if cap is not None and isinstance(record.get("mean"), (int, float)) and record["mean"] > cap:
+            record["raw_mean"] = record["mean"]
+            record["mean"] = cap
+            record["pass"] = bool(cap >= record.get("gate", 8.0))
+            note = (record.get("notes") or "").strip()
+            record["notes"] = (note + f" [BF-2 cap {cap}: {verdict.get('reason', '')}]").strip()
+    except Exception as e:  # noqa: BLE001 — never break logging
+        print(f"[council-score-log] brief-adherence cap skipped: {e}")
+
+
 def record_council_score(record: dict) -> None:
     """
     Append one JSON line to the canonical council-score log.
@@ -99,6 +147,9 @@ def record_council_score(record: dict) -> None:
     TypeError   if 'mean' is not numeric or 'pass' is not bool.
     """
     _validate(record)
+
+    # BF-2: cap the mean deterministically when the design fails the brief.
+    _apply_brief_adherence_cap(record)
 
     # Fill optional fields with defaults
     full = dict(OPTIONAL_KEYS_DEFAULTS)

@@ -5,9 +5,9 @@ We are designing a containerised 3.5 MWh Battery Energy Storage System, 1 MW PCS
 Target market: UK grid-scale frequency response and capacity market, plus C&I peak shaving. Factory-assembled and deployable within 5 working days of delivery to site.
 
 Key constraints:
-- Unit cost ceiling: £180,000 ex-works
-- Maximum gross mass: 28,000 kg (road-transportable without abnormal-load escort)
-- External envelope: 12,192 × 2,438 × 2,896 mm (standard 40-foot ISO)
+- Unit cost ceiling: £2,000,000 ex-works
+- Maximum gross mass: 38,000 kg (bespoke reinforced enclosure; heavy-haulage delivery, abnormal-load permit acceptable)
+- External envelope: 12,192 × 2,438 × 2,896 mm (40-foot form factor; bespoke reinforced enclosure, not ISO-668 payload-limited)
 - Usable energy: 3.5 MWh minimum at 25 °C, 80% depth of discharge, beginning of life
 - Power rating: 1 MW continuous, 1.25 MW peak for 15 minutes
 - Cell chemistry: LFP prismatic (CATL 280 Ah or equivalent)

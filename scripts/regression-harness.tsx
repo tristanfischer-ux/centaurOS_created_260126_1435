@@ -50,6 +50,7 @@ import { homedir } from 'os'
 import Database from 'better-sqlite3'
 import { resolveClassGraphSlug } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
 import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasibility-gate'
+import { checkBriefAdherence } from './brief-adherence'
 
 interface Assertion {
   id: string
@@ -2199,6 +2200,24 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `impossible.feasible=${impossible.feasible} (want false), feasible=${feasible.feasible} (want true), aggressive=${aggressive.feasible} (want true)`,
+    ))
+  }
+
+  // ── UNIVERSAL.brief_adherence_cap_fires_on_hard_breach ────────────────────
+  // Guards BF-2 (2026-05-31): a design that MISSES the brief's hard numeric
+  // constraints (energy floor / mass cap) must produce a score cap so an unmet
+  // requirement cannot be logged as 8+; a compliant design must produce NO cap.
+  {
+    const breaching = checkBriefAdherence({ parsedBrief: { constraints: { target_performance: { metrics: [{ key_metric: 'usable_energy_mwh', value: 3.5 }] }, max_mass_kg: { value: 28000 } } }, orchestratorContract: { quantities: { usable_capacity_kwh: { value: 2688 }, in_container_mass_kg: { value: 29875 } } } })
+    const compliant = checkBriefAdherence({ parsedBrief: { constraints: { target_performance: { metrics: [{ key_metric: 'usable_energy_mwh', value: 3.5 }] }, max_mass_kg: { value: 38000 } } }, orchestratorContract: { quantities: { usable_capacity_kwh: { value: 3550 }, in_container_mass_kg: { value: 36000 } } } })
+    const ok = breaching.all_hard_met === false && typeof breaching.recommended_cap === 'number'
+      && compliant.all_hard_met === true && compliant.recommended_cap === null
+    assertions.push(assertEq(
+      'UNIVERSAL.brief_adherence_cap_fires_on_hard_breach',
+      'Brief-adherence caps a design that misses hard constraints (energy 2688<3500, mass 29875>28000) and does NOT cap a compliant one — BF-2 guard (2026-05-31)',
+      ok,
+      (v: boolean) => v === true,
+      () => `breaching: met=${breaching.all_hard_met} cap=${breaching.recommended_cap}; compliant: met=${compliant.all_hard_met} cap=${compliant.recommended_cap}`,
     ))
   }
 
