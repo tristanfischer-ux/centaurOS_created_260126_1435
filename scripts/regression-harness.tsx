@@ -2262,6 +2262,51 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // ── UNIVERSAL.pruned_parallel_systems_stay_dead ───────────────────────────
+  // Guards the 2026-05-31 ONE-UNIVERSAL-ENGINE consolidation (Tristan): "we can
+  // only have one universal system ... prune anything which isn't a central
+  // universal system". Once a parallel/dead code path is pruned (zero
+  // production callers at prune time), NO live (non-archive, non-worktree)
+  // source file may import it again — re-introducing it is exactly how "two
+  // systems drift apart". Each marker is an import-path fragment removed during
+  // the consolidation; if a live importer reappears, this FAILS the build.
+  // Uses ripgrep; skips gracefully if rg is absent (CI). Extend PRUNED_IMPORT_
+  // MARKERS in the SAME commit that prunes a new path.
+  {
+    const PRUNED_IMPORT_MARKERS: string[] = [
+      'registry-accumulation',          // legacy LLM-multi-emitter accumulation loop (deterministic emitter superseded it)
+    ]
+    const root = resolve(__dirname, '..')
+    let rgUsable = true
+    const resurrected: string[] = []
+    for (const marker of PRUNED_IMPORT_MARKERS) {
+      const escaped = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      try {
+        const out = execFileSync('rg', [
+          '-l', `(import|require|from)[^\\n]*${escaped}`,
+          '--glob=!_archive/**', '--glob=!**/worktrees/**', '--glob=!node_modules/**',
+          '--glob=!**/*.md', '--glob=!**/*.jsonl', root,
+        ], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] })
+        const hits = out.split('\n').map(s => s.trim()).filter(Boolean)
+        if (hits.length) resurrected.push(`${marker} <- ${hits.map(h => h.replace(root + '/', '')).join(', ')}`)
+      } catch (err: any) {
+        if (err?.status === 1) continue   // rg exit 1 = no matches (the success case)
+        rgUsable = false                  // rg absent / errored → skip rather than false-fail
+      }
+    }
+    if (!rgUsable) {
+      assertions.push({ id: 'UNIVERSAL.pruned_parallel_systems_stay_dead', description: 'pruned-parallel-systems guard (skipped — ripgrep unavailable)', passed: true, detail: 'rg not available — skipped' })
+    } else {
+      assertions.push(assertEq(
+        'UNIVERSAL.pruned_parallel_systems_stay_dead',
+        'No live source file imports a pruned parallel/dead path (ONE-UNIVERSAL-ENGINE consolidation, 2026-05-31) — guards re-introduction of drift-prone duplicate systems',
+        resurrected.length,
+        (n: number) => n === 0,
+        () => `${resurrected.length} pruned path(s) resurrected: ${resurrected.join(' | ')}. These were removed as dead parallel systems with zero production callers; do NOT re-import them — extend the single canonical path instead.`,
+      ))
+    }
+  }
+
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
 
