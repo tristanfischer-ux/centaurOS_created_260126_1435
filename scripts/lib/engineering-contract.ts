@@ -3955,6 +3955,26 @@ registerArchetype('wind_turbine', (brief: any) => {
       source_detail: `£${foundationGbpPerKw}/kW × ${ratedKw} kW (${isOffshore ? 'monopile steel, 2000-4000 t per turbine, shallow water <50m' : 'reinforced concrete gravity pad, 600-800 m³, 1500 t rebar'})`,
     },
     {
+      // 2026-05-31 (wind go-wide gate-10 B-5): control_avionics rendered at £0.33
+      // because the controller/sensor words defaulted to ~£0.11 each and NO macro
+      // priced the control subsystem (every other wind subsystem has a macro). A
+      // utility turbine's control + condition-monitoring + SCADA + safety package
+      // (main controller e.g. Bachmann M1, safety PLC, vibration/drivetrain
+      // condition monitoring, met sensors, SCADA gateway, UPS + safety chain) is
+      // ~£12/kW for multi-MW machines — the pitch DRIVES sit in hub_assembly and
+      // converter control in the power converter, so this is the lighter ~1% slice,
+      // honestly NOT 2%. word_name strict-matches the turbine_controller completion
+      // word (semantic tokens turbine + control) so the macro lands in the
+      // control_avionics module and clears B-5's 0.5% floor. Recorded via the
+      // 2026-05-31 macro_source_name fix (commit ce40bd0a9).
+      word_name: 'turbine_control_system',
+      unit_price_gbp: 12,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: 12 * ratedKw,
+      source_detail: `£12/kW × ${ratedKw} kW (turbine controller + safety PLC + condition monitoring + met sensors + SCADA gateway + UPS; pitch drives in hub, converter control in power converter)`,
+    },
+    {
       // 2026-05-23 L22: renamed from power_converter_full_scale → generator_side_converter
       // to match the emitter's word_id (scripts/lib/orchestrator/emitters/
       // wind-turbine.ts emits generator_side_converter_word in converter_grid_tie
