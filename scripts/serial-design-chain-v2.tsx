@@ -4202,20 +4202,62 @@ async function main() {
         ok: true,
       })
     } else {
+      // No baked/DB graph for this class yet. Bootstrap one from THIS run's
+      // emitted connections so the class becomes DB-grounded next time
+      // ("generate on the fly → add to a DB → read it back", Tristan 2026-05-31).
+      // writebackDiscoveredEdge INSERT-OR-IGNOREs a class_reference_graphs row on
+      // first sighting (source=llm_bootstrap); every emitted edge is "discovered"
+      // (required:false) since there is no baseline to diff against. The seed is
+      // SOFT (feeds only the non-fatal K10 validator) so it can never break a run.
+      // NOTE: a genuinely-UNREGISTERED class never reaches here — it exits 7 at
+      // envelope detection long before K10 — so today this fires for the
+      // runnable-but-graphless subset (a plan + emitter exist but no graph yet).
+      // Next run, getClassReferenceGraphDBFirst reads the seeded graph DB-first
+      // and this branch is not taken again; the loop closes.
+      let k10Seeded = 0
+      try {
+        const seedNodes = new Set<string>()
+        for (const l of (design.cross_module_grammar_links ?? []) as any[]) {
+          const fromC = String(l.from_module ?? '').trim()
+          const toC = String(l.to_module ?? '').trim()
+          if (!fromC || !toC || fromC === toC) continue
+          writebackDiscoveredEdge(k10ProductClass, {
+            from_class: fromC,
+            to_class: toC,
+            mechanism: l.mechanism ? String(l.mechanism) : undefined,
+            protocol: l.protocol ? String(l.protocol) : undefined,
+            required: false,
+            direction: 'mutual',
+            notes: 'bootstrap seed — first sighting of this class, no baked graph',
+          })
+          seedNodes.add(fromC)
+          seedNodes.add(toC)
+          k10Seeded += 1
+        }
+        for (const class_id of seedNodes) {
+          writebackDiscoveredNode(k10ProductClass, { class_id, role: 'subsystem', required: false })
+        }
+      } catch (seedErr) {
+        console.warn(`[chain] K10 bootstrap-seed failed (non-fatal): ${(seedErr as Error).message}`)
+      }
       ;(design as any).k10ShadowResult = {
         class: '',
         product_class: k10ProductClass,
-        verdict: 'NO_GRAPH',
+        verdict: k10Seeded > 0 ? 'BOOTSTRAPPED' : 'NO_GRAPH',
         matched_edges: 0,
         missing_required: [],
         extra_emitted: [],
         protocol_mismatches: [],
         ts: new Date().toISOString(),
         mode: 'shadow' as const,
-        reason: `no K10 graph registered for product_class="${k10ProductClass}"`,
+        reason: k10Seeded > 0
+          ? `no baked K10 graph — seeded ${k10Seeded} edge(s) from this run (source=llm_bootstrap); next run reads it DB-first`
+          : `no K10 graph registered for product_class="${k10ProductClass}" and no emitted connections to seed`,
       }
-      console.error(`[chain] K10 shadow: NO_GRAPH for ${k10ProductClass} (add to class-reference-graphs/ to enable)`)
-      logAction({ step: 'k10_shadow', verdict: 'NO_GRAPH', product_class: k10ProductClass, latency_ms: Date.now() - tK10, ok: true })
+      console.error(k10Seeded > 0
+        ? `[chain] K10 shadow: NO_GRAPH for ${k10ProductClass} → BOOTSTRAPPED ${k10Seeded} edge(s) into a new class graph (grows DB-first next run)`
+        : `[chain] K10 shadow: NO_GRAPH for ${k10ProductClass} (no emitted connections to seed)`)
+      logAction({ step: 'k10_shadow', verdict: k10Seeded > 0 ? 'BOOTSTRAPPED' : 'NO_GRAPH', product_class: k10ProductClass, seeded: k10Seeded, latency_ms: Date.now() - tK10, ok: true })
     }
   } catch (err) {
     console.error(`[chain] K10 shadow threw: ${(err as Error).message}; continuing without`)
