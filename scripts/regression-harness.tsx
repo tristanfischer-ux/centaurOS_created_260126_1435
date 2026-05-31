@@ -46,6 +46,9 @@ import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v
 import { buildContract } from './lib/engineering-contract'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
 import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
+import { homedir } from 'os'
+import Database from 'better-sqlite3'
+import { resolveClassGraphSlug } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
 
 interface Assertion {
   id: string
@@ -2132,6 +2135,47 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         (n: number) => n === 0,
         (n: number) => `${n} HARD slot(s) not derivable for '${cls}': ${missingSlots.join(', ')}. Fix: add derivation for each missing slot in the '${cls}' archetype builder in scripts/lib/engineering-contract.ts. The lock gate (engineering-lock-gate.ts) will fire exit 22 until all HARD slots are filled.`,
       ))
+    }
+  }
+
+  // ── UNIVERSAL.class_graph_slugs_resolve_to_real_graph ─────────────────────
+  // Guards the 2026-05-31 K10 slug-drift regression. The chain emits engine
+  // product_class slugs (wind_turbine, h2_electrolyser, ev_charger) that the
+  // class-reference graph keys under DIFFERENT slugs (wind_turbine_small,
+  // hydrogen_electrolyser, dc_fast_ev_charger). When the alias map drifts, the
+  // class silently logs "NO_GRAPH" and its self-learning loop dies (and the
+  // writeback no-ops). Asserts every go-wide engine class resolves — via the
+  // single canonical resolveClassGraphSlug() — to a slug that EXISTS as a
+  // class_reference_graphs row. Snapshot-independent (like the lock-gate-slots
+  // block above); skips gracefully when forge-truth.db is absent (CI).
+  {
+    const GOWIDE_ENGINE_CLASSES = [
+      'wind_turbine', 'h2_electrolyser', 'ev_charger', 'vertical_farm',
+      'heat_pump', 'bess', 'vfd', 'auv', 'pv_module', 'fuel_cell',
+    ]
+    const graphDbPath = resolve(homedir(), '.forge-truth', 'forge-truth.db')
+    if (!existsSync(graphDbPath)) {
+      assertions.push({ id: 'UNIVERSAL.class_graph_slugs_resolve_to_real_graph', description: 'class-graph slug resolution (skipped — forge-truth.db absent)', passed: true, detail: 'DB absent (CI) — skipped' })
+    } else {
+      let known = new Set<string>()
+      let dbErr = ''
+      try {
+        const gdb = new Database(graphDbPath, { readonly: true })
+        known = new Set((gdb.prepare('SELECT product_class FROM class_reference_graphs').all() as Array<{ product_class: string }>).map(r => r.product_class))
+        gdb.close()
+      } catch (err) { dbErr = String(err) }
+      if (dbErr) {
+        assertions.push({ id: 'UNIVERSAL.class_graph_slugs_resolve_to_real_graph', description: 'read class_reference_graphs', passed: false, detail: `DB read failed: ${dbErr}` })
+      } else {
+        const unresolved = GOWIDE_ENGINE_CLASSES.filter(c => !known.has(resolveClassGraphSlug(c)))
+        assertions.push(assertEq(
+          'UNIVERSAL.class_graph_slugs_resolve_to_real_graph',
+          'Every go-wide engine class resolves (via resolveClassGraphSlug) to an existing class_reference_graphs row — guards the K10 NO_GRAPH / slug-drift regression (2026-05-31)',
+          unresolved.length,
+          (n: number) => n === 0,
+          () => `${unresolved.length} engine class(es) resolve to NO_GRAPH: ${unresolved.map(c => `${c}→${resolveClassGraphSlug(c)}`).join(', ')}. Fix: add the alias to CLASS_GRAPH_ALIASES in src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db.ts (NOT a local map copy), or add the graph row.`,
+        ))
+      }
     }
   }
 

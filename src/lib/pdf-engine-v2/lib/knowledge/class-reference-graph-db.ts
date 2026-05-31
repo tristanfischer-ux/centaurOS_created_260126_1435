@@ -56,6 +56,104 @@ const LLM_CONFIDENCE = 0.7
 const MAX_RETRY = 3
 const RETRY_DELAY_MS = 50
 
+// ── Class-graph slug resolution (single source of truth) ─────────────────────
+// The chain emits an ENGINE product_class (e.g. `wind_turbine`, `h2_electrolyser`,
+// `ev_charger`) that frequently differs from the GRAPH slug the row is keyed on
+// (`wind_turbine_small`, `hydrogen_electrolyser`, `dc_fast_ev_charger`).
+// Historically each caller carried its own drifted copy of this map (the chain's
+// inline K10 ALIASES, generate-class-registry's KNOWN_CLASS_SYNONYMS,
+// enrich-state's hyphenated variant) — so `wind_turbine`/`h2_electrolyser`
+// resolved in SOME callers and not others, and the K10 writeback wrote to the
+// UN-aliased slug (a silent no-op, so aliased classes never grew their graph).
+// This is the canonical resolver: every read AND every writeback in this module
+// goes through it, so a class can never read from one slug and write to another.
+// (2026-05-31 — fixes the wind/h2 "NO_GRAPH" + evcharger phantom-writeback bugs.)
+const CLASS_GRAPH_ALIASES: Readonly<Record<string, string>> = {
+  // BESS
+  bess: 'bess-utility-scale',
+  battery_energy_storage: 'bess-utility-scale',
+  battery_storage: 'bess-utility-scale',
+  energy_storage: 'bess-utility-scale',
+  utility_storage: 'bess-utility-scale',
+  residential_ess: 'bess-utility-scale',
+  // Wind — chain emits `wind_turbine`, graph row is `wind_turbine_small`
+  wind_turbine: 'wind_turbine_small',
+  small_wind: 'wind_turbine_small',
+  windmill: 'wind_turbine_small',
+  onshore_wind: 'wind_turbine_small',
+  offshore_wind: 'wind_turbine_small',
+  hawt: 'wind_turbine_small',
+  vawt: 'wind_turbine_small',
+  // Hydrogen — chain emits `h2_electrolyser`, graph row is `hydrogen_electrolyser`
+  h2_electrolyser: 'hydrogen_electrolyser',
+  h2_electrolyzer: 'hydrogen_electrolyser',
+  electrolyzer: 'hydrogen_electrolyser',
+  electrolyser: 'hydrogen_electrolyser',
+  // EV charging
+  ev_charger: 'dc_fast_ev_charger',
+  'ev-charger': 'dc_fast_ev_charger',
+  dc_charger: 'dc_fast_ev_charger',
+  // Heat pump
+  heat_pump: 'heat-pump-residential',
+  'heat-pump': 'heat-pump-residential',
+  heatpump: 'heat-pump-residential',
+  mini_split_heatpump: 'heat-pump-residential',
+  thermal_system: 'heat-pump-residential',
+  commercial_heatpump: 'heat-pump-commercial',
+  commercial_heat_pump: 'heat-pump-commercial',
+  industrial_heat_pump: 'heat-pump-commercial',
+  // PV
+  pv_module: 'pv_module_residential',
+  solar_module: 'pv_module_residential',
+  solar_panel: 'pv_module_residential',
+  pv_panel: 'pv_module_residential',
+  photovoltaic_module: 'pv_module_residential',
+  pv_inverter: 'pv_string_inverter',
+  solar_inverter: 'pv_string_inverter',
+  // Vehicle battery
+  vehicle_battery: 'vehicle_battery_pack',
+  traction_battery: 'vehicle_battery_pack',
+  traction_battery_pack: 'vehicle_battery_pack',
+  ev_battery: 'vehicle_battery_pack',
+  // VFD / motor drive
+  vfd: 'vfd-motor-drive',
+  motor_drive: 'vfd-motor-drive',
+  // AUV
+  auv: 'auv-subsea',
+  autonomous_underwater_vehicle: 'auv-subsea',
+  uuv: 'auv-subsea',
+  // Robotics / additive
+  robot_arm: 'industrial_robot_arm',
+  industrial_robot: 'industrial_robot_arm',
+  '3d_printer': 'industrial_3d_printer',
+  metal_3d_printer: 'industrial_3d_printer',
+  agv: 'automated_guided_vehicle_agv',
+  amr: 'autonomous_mobile_robot_amr',
+  // Misc
+  fuel_cell: 'fuel_cell_power_module',
+  drone: 'consumer_cinematography_drone',
+  'vertical-farm': 'vertical_farm',
+}
+
+/**
+ * Resolve an engine product_class slug to its canonical class-graph slug.
+ * Lower-cases + trims, returns the alias target if known, else the slug itself
+ * (so direct-match classes and genuinely-new classes pass through unchanged).
+ * Exported so non-DB callers (e.g. the chain K10 site) can resolve identically
+ * and never drift from this map again.
+ */
+export function resolveClassGraphSlug(raw: string): string {
+  const key = String(raw ?? '').trim().toLowerCase()
+  return CLASS_GRAPH_ALIASES[key] ?? key
+}
+
+function humaniseSlug(slug: string): string {
+  return slug
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim()
+}
+
 // ── Module-scoped DB handle ───────────────────────────────────────────────────
 
 let _db: Database.Database | null | undefined = undefined
@@ -67,6 +165,7 @@ let _stmtGetNodes: Database.Statement | null = null
 let _stmtGetEdges: Database.Statement | null = null
 let _stmtInsertNode: Database.Statement | null = null
 let _stmtInsertEdge: Database.Statement | null = null
+let _stmtBootstrapGraph: Database.Statement | null = null
 
 function getDb(): Database.Database | null {
   if (_db !== undefined) return _db
@@ -125,6 +224,16 @@ function getDb(): Database.Database | null {
          direction, electrical_json, mechanical_json, fluid_json,
          source_references_json, notes, confidence)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+
+    // Bootstrap a class_reference_graphs row for a never-seen class so the
+    // "growing DB" loop can start from the first run. INSERT OR IGNORE makes it
+    // concurrency-safe under parallel fire-and-forget writebacks (product_class
+    // is UNIQUE). schema_version is NOT NULL with no default, so set it here.
+    _stmtBootstrapGraph = db.prepare(`
+      INSERT OR IGNORE INTO class_reference_graphs
+        (product_class, display_name, source, schema_version, scope_notes)
+      VALUES (?, ?, 'llm_bootstrap', 'bootstrap-v1', ?)
     `)
 
     _db = db
@@ -225,6 +334,43 @@ async function retryWrite(fn: () => void, tag: string): Promise<void> {
   }
 }
 
+// ── Get-or-bootstrap a graph row for write-back ───────────────────────────────
+// Resolves the slug to its canonical graph slug, returns the existing row, or —
+// for a genuinely-new class never seen before — INSERT OR IGNOREs a bootstrap
+// row so the class starts growing its reference graph from the very first run
+// ("generate on the fly → add to a DB → read it back next time", Tristan
+// 2026-05-31). This is what lets a brand-new class become DB-grounded after one
+// sighting instead of re-deriving from scratch every time. Concurrency-safe:
+// parallel fire-and-forget writebacks for the same new class collapse onto one
+// row via the product_class UNIQUE constraint. Disabled by SKIP_GRAPH_BOOTSTRAP=1
+// (and by SKIP_LIBRARY_WRITEBACK=1 upstream, which short-circuits the writeback
+// entirely). The bootstrapped graph only feeds the SOFT non-fatal K10 validator,
+// so a slightly-imperfect first seed can never hard-break a run.
+function ensureGraphRowForWriteback(rawSlug: string): GraphRow | null {
+  if (!_stmtGetGraph) return null
+  const slug = resolveClassGraphSlug(rawSlug)
+  let row = _stmtGetGraph.get(slug) as GraphRow | undefined
+  if (row) return row // existing (possibly alias-resolved) class — grow it in place
+  if (process.env.SKIP_GRAPH_BOOTSTRAP === '1' || !_stmtBootstrapGraph) return null
+  try {
+    _stmtBootstrapGraph.run(
+      slug,
+      humaniseSlug(slug),
+      'auto-bootstrapped from chain discovery on first sighting of this class',
+    )
+    row = _stmtGetGraph.get(slug) as GraphRow | undefined
+    if (row) {
+      console.error(
+        `[class-reference-graph-db] bootstrapped new class graph class=${slug} source=llm_bootstrap (was unseen — now grows DB-first)`,
+      )
+    }
+    return row ?? null
+  } catch (err) {
+    console.warn(`[class-reference-graph-db] bootstrap insert failed for "${slug}": ${(err as Error).message}`)
+    return null
+  }
+}
+
 // ── Public: discovered edge/node write-back ───────────────────────────────────
 
 export interface DiscoveredNode {
@@ -263,8 +409,8 @@ export function writebackDiscoveredNode(
     if (!db || !_stmtGetGraph || !_stmtInsertNode) return
 
     try {
-      const graphRow = _stmtGetGraph.get(productClass) as GraphRow | undefined
-      if (!graphRow) return // class not in DB at all; nothing to attach to
+      const graphRow = ensureGraphRowForWriteback(productClass)
+      if (!graphRow) return // bootstrap disabled or insert failed; nothing to attach to
 
       // Guard: check if node already exists (coarse dedup by class_id)
       const existingCount = (db.prepare(
@@ -304,7 +450,7 @@ export function writebackDiscoveredEdge(
     if (!db || !_stmtGetGraph || !_stmtInsertEdge) return
 
     try {
-      const graphRow = _stmtGetGraph.get(productClass) as GraphRow | undefined
+      const graphRow = ensureGraphRowForWriteback(productClass)
       if (!graphRow) return
 
       // Guard: dedup by (from_class, to_class, protocol) — avoid duplicate edges
@@ -365,12 +511,20 @@ export async function getClassReferenceGraphDBFirst(
 ): Promise<ProductClassGraph | null> {
   const db = getDb()
 
-  // ── 1. DB-first ──────────────────────────────────────────────────────────
-  if (db && _stmtGetGraph && _stmtGetNodes && _stmtGetEdges) {
-    try {
-      const graphRow = _stmtGetGraph.get(productClass) as GraphRow | undefined
+  // Candidate slugs: the raw slug first (exact match always wins so the 24
+  // canonical rows + direct-match classes are untouched), then the alias-resolved
+  // graph slug. Dedup so a direct-match class (resolved === raw) is tried once.
+  const raw = String(productClass ?? '').trim().toLowerCase()
+  const resolved = resolveClassGraphSlug(raw)
+  const candidates = resolved === raw ? [raw] : [raw, resolved]
 
-      if (graphRow) {
+  // ── 1. DB-first (try each candidate) ──────────────────────────────────────
+  if (db && _stmtGetGraph && _stmtGetNodes && _stmtGetEdges) {
+    for (const slug of candidates) {
+      try {
+        const graphRow = _stmtGetGraph.get(slug) as GraphRow | undefined
+        if (!graphRow) continue
+
         const nodeRows = _stmtGetNodes.all(graphRow.id) as NodeRow[]
         const edgeRows = _stmtGetEdges.all(graphRow.id) as EdgeRow[]
 
@@ -384,22 +538,23 @@ export async function getClassReferenceGraphDBFirst(
 
         console.error(
           `[class-reference-graph-db] ${JSON.stringify({
-            product_class: productClass,
+            product_class: raw,
+            resolved_to: slug,
             hit: 'db',
             nodes: graph.nodes.length,
             edges: graph.edges.length,
           })}`,
         )
         return graph
+      } catch (err) {
+        console.warn(
+          `[class-reference-graph-db] DB lookup failed for "${slug}": ${(err as Error).message} — falling back to baked`,
+        )
       }
-    } catch (err) {
-      console.warn(
-        `[class-reference-graph-db] DB lookup failed for "${productClass}": ${(err as Error).message} — falling back to baked`,
-      )
     }
   }
 
-  // ── 2. Baked fallback ─────────────────────────────────────────────────────
+  // ── 2. Baked fallback (try each candidate) ────────────────────────────────
   try {
     await ensureGraphsRegistered()
   } catch (err) {
@@ -408,21 +563,24 @@ export async function getClassReferenceGraphDBFirst(
     )
   }
 
-  const baked = getClassReferenceGraph(productClass)
-  if (baked) {
-    console.error(
-      `[class-reference-graph-db] ${JSON.stringify({
-        product_class: productClass,
-        hit: 'baked',
-        nodes: baked.nodes.length,
-        edges: baked.edges.length,
-      })}`,
-    )
-    return baked
+  for (const slug of candidates) {
+    const baked = getClassReferenceGraph(slug)
+    if (baked) {
+      console.error(
+        `[class-reference-graph-db] ${JSON.stringify({
+          product_class: raw,
+          resolved_to: slug,
+          hit: 'baked',
+          nodes: baked.nodes.length,
+          edges: baked.edges.length,
+        })}`,
+      )
+      return baked
+    }
   }
 
   console.error(
-    `[class-reference-graph-db] ${JSON.stringify({ product_class: productClass, hit: 'miss' })}`,
+    `[class-reference-graph-db] ${JSON.stringify({ product_class: raw, hit: 'miss' })}`,
   )
   return null
 }
@@ -438,5 +596,6 @@ export function _resetForTests(): void {
   _stmtGetEdges = null
   _stmtInsertNode = null
   _stmtInsertEdge = null
+  _stmtBootstrapGraph = null
   _warnedMissing = false
 }
