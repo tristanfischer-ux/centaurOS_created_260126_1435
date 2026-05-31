@@ -13,6 +13,21 @@ Recover BESS council quality toward ≥8 on a **deterministic, DB-grounded** doc
 3. **Auto-improve loop**: iterate a design toward its brief instead of accepting the miss. Spec: `AUTO-IMPROVE-SPEC.md`. Build = Phase 1 (structured trade-off) + Phase 2 (material-DB re-price lever), validated on BESS council, then Phase 3 convergence. Feeds decision 1. (decision 3)
 _(Prior: deterministic-generation Phase B/C → ≥8 BESS; folds into decision 1.)_
 
+## 2026-05-31 — Self-learning loops + tool-automation session (Tristan-directed)
+Tristan: wire the self-learning loops (search→DB→reuse) + verify tool automation.
+**DONE (committed + proven):**
+- **New-class class-reference graph loop CLOSED** (82f2927e8 + cecd497e0): root cause of "why isn't the wind turbine learning" = K10 slug drift (chain emits `wind_turbine`/`h2_electrolyser`; graph keyed `wind_turbine_small`/`hydrogen_electrolyser`) + writeback aimed at the UN-aliased slug (silent no-op). Fixed at the choke point (`resolveClassGraphSlug` + bootstrap-on-miss); wind/h2/evcharger now read+grow their graph, new classes bootstrap from a run. Invariant `UNIVERSAL.class_graph_slugs_resolve_to_real_graph`.
+- **gate-18 systematic false positives killed** (ab5376d35): single-page PF, AFE-vs-dc-dc, `30-40kW`→`-40` negative-parse, downrate-recommendation. vf 1→0 HIGH; evcharger 4→1 (survivor is REAL: 300-vs-400 kg pedestal); BESS real mass contradiction preserved.
+- **recordScoringRun wired** (933a5ba27): RL loop feeds the scoring dashboard.
+- **material-price refresh triggered** (70ff6f0c5): weekly-sweep trigger + 28-day gate; live fetcher awaits a commodity-price key (flagged, not papered over).
+
+**INVESTIGATED → NOT BUILT (would be inert — verify-before-build):**
+- **Accumulation loop (Tristan's #1): OBSOLETE.** Needs ≥4/6 LLM-emitter consensus + a prompt to inject into; production uses the DETERMINISTIC emitter (LLM generator pruned 2026-05-23; `RADICAL_MULTI_EMITTER` unread by the chain; tables 0 rows). Intent ("don't re-derive modules") already met by determinism. Forward value (accumulate NEW-class modules) blocked on the generic emitter. **NEEDS TRISTAN DECISION.**
+- **iec-standards writeback-on-miss: DORMANT.** Only bess (1/35 plans) invokes the tool; bess never misses (67 rows + curated). Standards loop already wired via the lock-gate.
+
+**COUNCIL-GATED (not autonomous):**
+- **Schema-driven auto-planner (Tristan's #3) = UNIV-WALLS wall 2.** `composeToolGraph` + typed tool I/O. Per `forgeos_universal_class_machinery_built_but_inert`: needs a design council + focused session, NOT autonomous sprawl. Also the prerequisite for any forward accumulation value. **AWAITING council.**
+
 ## Missing-only recap (current — 2026-05-29, post-crash-recovery)
 _The engine-watchdog (`~/.claude/scripts/engine-watchdog.sh`) reads THIS section for the autonomous turn-start routing list. Keep these ❌ rows current; they are the live pending queue, NOT the stale `src/lib/pdf-engine-v2/TRACKER.md` (2026-05-07, Phase-P deferred)._
 
