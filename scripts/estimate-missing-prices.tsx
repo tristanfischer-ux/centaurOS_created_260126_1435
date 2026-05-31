@@ -763,7 +763,16 @@ function curveEstimateFor(
   productClassSlug?: string | null,
   keywordCtx?: { name?: string | null; manufacturer?: string | null; part_number?: string | null },
 ): { central: number; low: number; high: number; multiplier: number; reference: number; floored?: boolean; keyword_floor_note?: string; keyword_ceiling_note?: string; class_ceiling_clamped?: boolean; class_ceiling_note?: string; sanity_clamped?: boolean; sanity_note?: string } {
-  const c = COMPONENT_CURVES[cls]
+  // Defensive (2026-05-31): never let an unmapped/invalid component class crash
+  // the whole pricing engine. COMPONENT_CURVES covers all 24 ComponentClass
+  // values, but a stray runtime value (undefined / a future class added to the
+  // type but not the table) would otherwise throw "Cannot read 'curve'". Fall
+  // back to the median 'sensor' curve + warn so the BoM is still priced.
+  let c = COMPONENT_CURVES[cls]
+  if (!c) {
+    console.warn(`[estimate] curveEstimateFor: unmapped component class "${String(cls)}" — falling back to 'sensor' curve`)
+    c = COMPONENT_CURVES['sensor']
+  }
   // Engine B (2026-05-18 BESS investigation): the reference unit cost can be
   // overridden per (product_class, component_class) so industrial-heavy hosts
   // (e.g. utility BESS using 280 Ah LFP prismatics + £100k PCS oem_subsystems)
@@ -1201,8 +1210,15 @@ async function main() {
       })
       continue
     }
-    const cls = classByWordId.get(ctx.word_id)!
-    if (cls === 'unknown') {
+    const cls = classByWordId.get(ctx.word_id)
+    // 2026-05-31 (multi-class sweep): a part whose word_id never landed in
+    // classByWordId (classification partially failed — seen on auv / haps /
+    // ev-charger) yields `undefined`, not 'unknown'. The old `!` assertion +
+    // `=== 'unknown'` check let undefined slip through into curveEstimateFor ->
+    // COMPONENT_CURVES[undefined].curve -> TypeError that crashed ALL of Engine B
+    // (the whole BoM then shipped UNPRICED -> council BOM score 5.3). Treat an
+    // unclassified part as an unknown (handled by the unknowns path below).
+    if (!cls || cls === 'unknown') {
       unknowns.push(ctx)
       continue
     }
