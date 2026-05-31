@@ -54,6 +54,7 @@ import { checkBriefAdherence } from './brief-adherence'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
 import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
+import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
 
 interface Assertion {
   id: string
@@ -2205,6 +2206,32 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `rating-phrase findings=${ratingFindings} (want 0), count-phrase findings=${countFindings} (want >=1)`,
+    ))
+  }
+
+  // ── UNIVERSAL.gate25_skips_cross_unit_mod_literals ────────────────────────
+  // Guards the 2026-05-31 gate-25 fix: a value inside mod(key,'500','kbit/s') or
+  // mod(key,'500','A') carries its UNIT in the NEXT arg, not adjacent to the
+  // number. The scanner must read that next-arg unit so "500 kbit/s" (CAN data-
+  // rate) / "500 A" (current) are NOT matched to a unitless brief count like
+  // batch_size=500 (the heatpump exit-25 false positive) — while a genuine
+  // same-family stale literal ("28000 kg" vs max_mass_kg) MUST still be flagged.
+  {
+    const src = [
+      "mod('capacity', '500', 'kbit/s'),",
+      "mod('capacity', '500', 'A'),",
+      "mod('structural_floor_capacity', '28000', 'kg'),",
+    ].join('\n')
+    const r = scanEmitterForBriefLiterals(src, { batch_size: 500, max_mass_kg: 28000 } as never, 'test', 100)
+    const batchHits = r.hits.filter((h) => h.brief_key === 'batch_size').length
+    const massHits = r.hits.filter((h) => h.brief_key === 'max_mass_kg').length
+    const ok = batchHits === 0 && massHits >= 1
+    assertions.push(assertEq(
+      'UNIVERSAL.gate25_skips_cross_unit_mod_literals',
+      'gate-25 reads the mod() next-arg unit: "500 kbit/s"/"500 A" are NOT flagged as batch_size=500 (cross-family), but "28000 kg" IS flagged as max_mass_kg (same-family) — guards the 2026-05-31 unit-discrimination fix',
+      ok,
+      (v: boolean) => v === true,
+      () => `batch_size FPs=${batchHits} (want 0), max_mass_kg true-positive=${massHits} (want >=1)`,
     ))
   }
 

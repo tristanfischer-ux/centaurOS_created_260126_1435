@@ -157,6 +157,7 @@ const UNIT_FAMILY_TRAILING: Record<string, RegExp> = {
   length:        /^(mm|cm|µm|nm|km|m)\b/i,
   time:          /^(years?|yrs?|months?|days?|hrs?|hours?|seconds?)\b/i,
   rate:          /^(\/h|\/hr|\/s|\/yr|hz|khz|mhz|rpm)\b/i,
+  datarate:      /^(kbit\/s|mbit\/s|gbit\/s|kbps|mbps|gbps|bit\/s|bps|baud)\b/i,
   money:         /^(£|\$|€|gbp|usd|eur)\b/i,
   flow:          /^(lpm|gpm|cmh|cms|l\/|m³\/|m3\/)\b/i,
   pressure:      /^(pa|kpa|mpa|bar|psi)\b/i,
@@ -332,9 +333,16 @@ export function scanEmitterForBriefLiterals(
       } else if (expectedFamily) {
         // LENIENT (emitter): skip only a CLEAR cross-family unit conflict; keep
         // bare numbers + same-family units (preserves the bare-literal catch).
+        // The literal may be the VALUE arg of mod(key,'500','kbit/s') /
+        // q(c,key,'500','A') where the real UNIT is the NEXT quoted arg, not
+        // adjacent to the number — read it so "500 kbit/s" (CAN data-rate) or
+        // "500 A" (current) is not matched to a unitless brief count like
+        // batch_size=500. 2026-05-31 (heatpump exit-25 false positive).
+        const nextArgUnit = trailing.match(/^['"]?\s*,\s*['"]([^'"]+)['"]/)?.[1] ?? ''
+        const unitStr = nextArgUnit || trailing
         let unitConflict = false
         for (const fam in UNIT_FAMILY_TRAILING) {
-          if (fam !== expectedFamily && UNIT_FAMILY_TRAILING[fam].test(trailing)) {
+          if (fam !== expectedFamily && UNIT_FAMILY_TRAILING[fam].test(unitStr)) {
             unitConflict = true
             break
           }
