@@ -101,7 +101,7 @@ import {
   getClassReferenceGraph,
   validateConnectionsAgainstGraph,
 } from '../src/lib/pdf-engine-v2/class-reference-graph'
-import { getClassReferenceGraphDBFirst, writebackDiscoveredEdge, writebackDiscoveredNode } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
+import { getClassReferenceGraphDBFirst, writebackDiscoveredEdge, writebackDiscoveredNode, resolveClassGraphSlug } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
 import { runPhysicsLedger } from '../src/lib/pdf-engine-v2/stages/0.1-physics-ledger'
 import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-engine-v2/stages/3.5-compliance-gate'
 import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/lib/pdf-engine-v2/stages/1.8-brief-target-reconciliation'
@@ -4061,44 +4061,16 @@ async function main() {
     await ensureGraphsRegistered()
     const k10ProductClass = String(design.product_class ?? '').trim().toLowerCase()
     let graph = await getClassReferenceGraphDBFirst(k10ProductClass)
-    // Alias fallback — chain emits product_class from the Stage 0 classifier
-    // ("mini_split_heatpump") which may not exactly match the K10 registry
-    // slug ("heat_pump_residential"). Try a small alias map before giving up.
-    if (!graph) {
-      // K10 graphs use kebab-case slugs (`heat-pump-residential`, `vfd-motor-drive`,
-      // `bess-utility-scale`, `auv-subsea`). The chain's classifier emits
-      // snake_case (`mini_split_heatpump`, `heat_pump`). Bridge the two via an
-      // alias map. New product classes need entries here AND a K10 graph file
-      // in `src/lib/pdf-engine-v2/class-reference-graphs/`.
-      const ALIASES: Record<string, string> = {
-        mini_split_heatpump: 'heat-pump-residential',
-        heat_pump: 'heat-pump-residential',
-        'heat-pump': 'heat-pump-residential',
-        heatpump: 'heat-pump-residential',
-        thermal_system: 'heat-pump-residential',
-        commercial_heatpump: 'heat-pump-commercial',
-        'heat-pump-commercial': 'heat-pump-commercial',
-        battery_energy_storage: 'bess-utility-scale',
-        energy_storage: 'bess-utility-scale',
-        bess: 'bess-utility-scale',
-        residential_ess: 'bess-utility-scale',
-        ev_charger: 'dc_fast_ev_charger',
-        'ev-charger': 'dc_fast_ev_charger',
-        traction_battery_pack: 'vehicle_battery_pack',
-        vehicle_battery: 'vehicle_battery_pack',
-        vfd: 'vfd-motor-drive',
-        motor_drive: 'vfd-motor-drive',
-        auv: 'auv-subsea',
-        drone: 'consumer_cinematography_drone',
-        agv: 'automated_guided_vehicle_agv',
-        amr: 'autonomous_mobile_robot_amr',
-        // 2026-05-20 iter-9 Step 5: vertical-farm graph added — chain previously
-        // logged "NO_GRAPH for vertical_farm" because no K10 graph existed.
-        'vertical-farm': 'vertical_farm',
-      }
-      const aliased = ALIASES[k10ProductClass]
-      if (aliased) graph = await getClassReferenceGraphDBFirst(aliased)
-    }
+    // No inline alias map here. getClassReferenceGraphDBFirst() already resolves
+    // k10ProductClass through the SINGLE canonical resolveClassGraphSlug() /
+    // CLASS_GRAPH_ALIASES (class-reference-graph-db.ts), trying [raw, resolved]
+    // internally — so an `if (!graph)` inline retry can never succeed where the
+    // first call failed. A separate inline copy used to live here and had DRIFTED:
+    // it omitted wind_turbine/h2_electrolyser (their NO_GRAPH bug) while being a
+    // strict subset of the canonical map for every key it did hold. Removed
+    // 2026-05-31 in the ONE-UNIVERSAL-ENGINE consolidation. If a class logs
+    // NO_GRAPH, add its alias to CLASS_GRAPH_ALIASES (the one source of truth) and
+    // create its graph row — never re-introduce a local alias map in the chain.
     if (graph) {
       const emitted = (design.cross_module_grammar_links ?? []).map((l: any) => ({
         from_module: l.from_module,
@@ -5061,40 +5033,19 @@ async function main() {
       '',
     )
     if (productClass) {
-      // 2026-05-19 fix M4 (audit-found): K10 shadow uses an ALIASES map to
-      // bridge classifier slugs to canonical class-graph keys, but the
-      // envelope lookup had no such bridge — classes like
-      // `mini_split_heatpump`, `energy_storage`, `vfd` got null envelopes.
-      // Apply the same alias normalisation here. Keep both lookups: alias-
-      // normalised first, then raw classifier slug as fallback.
-      const ENVELOPE_ALIASES: Record<string, string> = {
-        mini_split_heatpump: 'heat-pump-residential',
-        heat_pump: 'heat-pump-residential',
-        'heat-pump': 'heat-pump-residential',
-        heatpump: 'heat-pump-residential',
-        thermal_system: 'heat-pump-residential',
-        commercial_heatpump: 'heat-pump-commercial',
-        'heat-pump-commercial': 'heat-pump-commercial',
-        battery_energy_storage: 'bess-utility-scale',
-        energy_storage: 'bess-utility-scale',
-        bess: 'bess-utility-scale',
-        residential_ess: 'bess-utility-scale',
-        ev_charger: 'dc_fast_ev_charger',
-        'ev-charger': 'dc_fast_ev_charger',
-        traction_battery_pack: 'vehicle_battery_pack',
-        vehicle_battery: 'vehicle_battery_pack',
-        vfd: 'vfd-motor-drive',
-        motor_drive: 'vfd-motor-drive',
-        auv: 'auv-subsea',
-        drone: 'consumer_cinematography_drone',
-        agv: 'automated_guided_vehicle_agv',
-        amr: 'autonomous_mobile_robot_amr',
-        // 2026-05-20 iter-9 Step 5: vertical-farm graph added — chain previously
-        // logged "NO_GRAPH for vertical_farm" because no K10 graph existed.
-        'vertical-farm': 'vertical_farm',
-      }
-      const aliased = ENVELOPE_ALIASES[productClass.toLowerCase()]
-      let envelope = (aliased ? defaultEnvelopeForClass(aliased) : null)
+      // 2026-05-19 fix M4 (audit-found): the envelope lookup needs the SAME
+      // classifier-slug -> canonical-slug bridge the K10 graph lookup uses, or
+      // classes like `mini_split_heatpump`, `energy_storage`, `vfd` get null
+      // envelopes. 2026-05-31 ONE-UNIVERSAL-ENGINE consolidation: this used to
+      // carry a byte-identical inline ENVELOPE_ALIASES copy of the chain's K10
+      // map — a second drifted duplicate (it too omitted wind_turbine/
+      // h2_electrolyser). Replaced with the single canonical resolveClassGraphSlug
+      // (a strict superset). Resolved slug first, raw classifier slug as fallback
+      // — defaultEnvelopeForClass already accepts the canonical graph slugs via
+      // its own CLASS_SLUG_TO_ENVELOPE_ID table.
+      const lower = productClass.toLowerCase()
+      const aliased = resolveClassGraphSlug(lower)
+      let envelope = (aliased !== lower ? defaultEnvelopeForClass(aliased) : null)
         ?? defaultEnvelopeForClass(productClass)
         ?? null
       // For container/cabinet/rack-categorised classes, prefer the size-aware

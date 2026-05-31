@@ -2182,6 +2182,39 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL.no_inline_class_alias_maps_in_chain ─────────────────────────
+  // Guards the 2026-05-31 consolidation: the production chain
+  // (serial-design-chain-v2.tsx) must resolve class slugs ONLY through the single
+  // canonical resolveClassGraphSlug / CLASS_GRAPH_ALIASES. Two byte-identical
+  // inline alias maps (K10 ALIASES + ENVELOPE_ALIASES) used to live in the chain
+  // and DRIFTED — both omitted wind_turbine/h2_electrolyser, causing their
+  // NO_GRAPH / null-envelope bug. Fails if any inline object-literal re-maps a
+  // class synonym to a canonical graph-slug target inside the chain file.
+  {
+    const chainPath = resolve(__dirname, 'serial-design-chain-v2.tsx')
+    if (!existsSync(chainPath)) {
+      assertions.push({ id: 'UNIVERSAL.no_inline_class_alias_maps_in_chain', description: 'chain alias-map guard (skipped — chain file absent)', passed: true, detail: 'serial-design-chain-v2.tsx absent — skipped' })
+    } else {
+      const src = readFileSync(chainPath, 'utf-8')
+      // The distinctive signature of a reintroduced drift copy is an object-literal
+      // value line mapping a class synonym to a canonical graph slug, e.g.
+      // `bess: 'bess-utility-scale'`. These target slugs appear as object VALUES
+      // nowhere legitimate in the chain — only the canonical map (in src/) should
+      // hold them. Prose mentions (in comments) don't match the `key: 'slug'` shape.
+      const TARGET_SLUGS = ['bess-utility-scale', 'heat-pump-residential', 'heat-pump-commercial', 'dc_fast_ev_charger', 'wind_turbine_small', 'hydrogen_electrolyser', 'vfd-motor-drive', 'auv-subsea', 'vehicle_battery_pack']
+      const offending = src.split('\n')
+        .map((line, i) => ({ line, n: i + 1 }))
+        .filter(({ line }) => /^\s*['"]?[a-z0-9_-]+['"]?\s*:\s*['"][a-z0-9_-]+['"]\s*,?\s*$/.test(line) && TARGET_SLUGS.some(t => line.includes(`'${t}'`) || line.includes(`"${t}"`)))
+      assertions.push(assertEq(
+        'UNIVERSAL.no_inline_class_alias_maps_in_chain',
+        'serial-design-chain-v2.tsx carries NO inline class->graph-slug alias map (resolves only via canonical resolveClassGraphSlug) — guards the 2026-05-31 drift-duplicate consolidation',
+        offending.length,
+        (n: number) => n === 0,
+        () => `${offending.length} inline alias line(s) reintroduced in the chain: ${offending.slice(0, 5).map(o => `L${o.n}:${o.line.trim()}`).join(' | ')}. Add the alias to CLASS_GRAPH_ALIASES (class-reference-graph-db.ts), NOT an inline map in the chain.`,
+      ))
+    }
+  }
+
   // ── UNIVERSAL.brief_feasibility_gate_flags_impossible_briefs ──────────────
   // Guards BF-1 (2026-05-31): a brief whose cost ceiling is below the physical
   // commodity floor (market-bands.ts) must flag infeasible; an aggressive-but-
