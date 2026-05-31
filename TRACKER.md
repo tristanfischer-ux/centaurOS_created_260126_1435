@@ -25,8 +25,14 @@ Tristan: wire the self-learning loops (search→DB→reuse) + verify tool automa
 - **Accumulation loop (Tristan's #1): OBSOLETE.** Needs ≥4/6 LLM-emitter consensus + a prompt to inject into; production uses the DETERMINISTIC emitter (LLM generator pruned 2026-05-23; `RADICAL_MULTI_EMITTER` unread by the chain; tables 0 rows). Intent ("don't re-derive modules") already met by determinism. Forward value (accumulate NEW-class modules) blocked on the generic emitter. **NEEDS TRISTAN DECISION.**
 - **iec-standards writeback-on-miss: DORMANT.** Only bess (1/35 plans) invokes the tool; bess never misses (67 rows + curated). Standards loop already wired via the lock-gate.
 
-**COUNCIL-GATED (not autonomous):**
-- **Schema-driven auto-planner (Tristan's #3) = UNIV-WALLS wall 2.** `composeToolGraph` + typed tool I/O. Per `forgeos_universal_class_machinery_built_but_inert`: needs a design council + focused session, NOT autonomous sprawl. Also the prerequisite for any forward accumulation value. **AWAITING council.**
+### ⭐ ACTIVE PRIORITY (Tristan 2026-05-31: robust-first, not shipping until robust) — UNIVERSAL-CLASS MILESTONE
+Wall-2 design council DONE (`plan_is_sound:false` → corrected plan in `UNIVERSAL-ENGINE-PLAN-wall2-council.md`, commit b0d91cd66). Verdict: wall-2 is plumbing; **wall-3 generic emitter is the value gate** (can a GENERIC dossier score 8+? — the one existential unknown the whole north-star hinges on). go-wide of the 35 registered classes does NOT invalidate (milestone is miss-path-scoped; registered classes byte-identical-protected). **Build order (the anti-forget queue — do NOT drop):**
+1. ❌ `tool-io-manifest.ts` (council increment-0; harvest output_keys from `output as {...}` type-literals + applicable_to allowlists + cost_basis; standalone, zero behaviour change; 2 unit tests)
+2. ❌ wall-4 quantity-DERIVATION in `buildContractForChain` miss-fallback (the real prerequisite; `buildMinimalContract:3322` is an input-taking stub)
+3. ❌ wall-2 `buildComposedPlan` (briefKeys from seeded contract; applicable_to filter; 1:1 copy + macro synthesis; `feeds_into:[]`+`validatePlan()`; (base_key,basis) matching) + wire `orchestrate.ts:95` additively + `shared_quantities` on contract type
+4. ❌ output-golden regression invariants (BESS+VF+wind deep-equality, NOT source-hash-pin)
+5. ❌ **wall-3 generic emitter — council-gated** — VALIDATE by running the BESS brief through the generic path vs the hand-written 9.28 golden ref. Only step that renders a new-class PDF / enables any 8+ claim.
+_Self-learning input already laid 2026-05-31: the class-reference graph loop wall-3 reads from now grows from runs._
 
 ## Missing-only recap (current — 2026-05-29, post-crash-recovery)
 _The engine-watchdog (`~/.claude/scripts/engine-watchdog.sh`) reads THIS section for the autonomous turn-start routing list. Keep these ❌ rows current; they are the live pending queue, NOT the stale `src/lib/pdf-engine-v2/TRACKER.md` (2026-05-07, Phase-P deferred)._
