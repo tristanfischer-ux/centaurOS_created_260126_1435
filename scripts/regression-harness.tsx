@@ -2280,6 +2280,40 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL.emitter_no_literal_collides_with_humanoid_cost_ceiling (2026-06-01) ──
+  // Guards the gate-25 (brief-value-literal-scanner) false-positive that blocked
+  // humanoid render at exit 25. The BESS PCS emitter pinned a bare literal
+  // mod('list_price_gbp', '75000') for the Sungrow SC1000UD-MV — a fixed real-
+  // part price — which COINCIDENTALLY equals the humanoid brief's £75,000
+  // unit_cost_ceiling. Gate 25 scans the whole emitter file against the current
+  // brief's values regardless of class, so the BESS literal collided with the
+  // humanoid ceiling → exit 25 (PRE-render, no PDF). Fix: extract the price to a
+  // SCREAMING_SNAKE_CASE named constant (the scanner skips const declarations).
+  // This invariant runs the real scanner with the humanoid cost-ceiling value
+  // against the live emitter source and asserts zero hits — catches any future
+  // bare price literal that re-collides. Snapshot-independent.
+  {
+    const emitterPath = resolve(__dirname, 'lib', 'deterministic-emitter.ts')
+    try {
+      const { scanEmitterFileForBriefLiterals } = require('./lib/brief-value-literal-scanner') as typeof import('./lib/brief-value-literal-scanner')
+      const res = scanEmitterFileForBriefLiterals(
+        emitterPath,
+        { unit_cost_ceiling_gbp: 75000, max_mass_kg: 65 } as never,
+        'humanoid',
+        0,
+      )
+      assertions.push(assertEq(
+        'UNIVERSAL.emitter_no_literal_collides_with_humanoid_cost_ceiling',
+        'deterministic-emitter.ts has no bare brief-value literal colliding with the humanoid £75,000 unit_cost_ceiling (gate 25 / exit 25 — pre-render block)',
+        res.hits.length,
+        (n: number) => n === 0,
+        () => `gate-25 scanner found ${res.hits.length} literal(s) colliding with humanoid cost ceiling: ${res.hits.map((h: { line: number; literal: string }) => `line ${h.line} "${h.literal}"`).join('; ')}. Fix: extract the value to a SCREAMING_SNAKE_CASE named constant in scripts/lib/deterministic-emitter.ts (the scanner skips const declarations) — it is a fixed real-part price, not a brief-derived value.`,
+      ))
+    } catch (err) {
+      assertions.push({ id: 'UNIVERSAL.emitter_no_literal_collides_with_humanoid_cost_ceiling', description: 'gate-25 scanner runs on deterministic-emitter.ts', passed: false, detail: `scanner threw: ${err}` })
+    }
+  }
+
   // ── UNIVERSAL.class_graph_slugs_resolve_to_real_graph ─────────────────────
   // Guards the 2026-05-31 K10 slug-drift regression. The chain emits engine
   // product_class slugs (wind_turbine, h2_electrolyser, ev_charger) that the

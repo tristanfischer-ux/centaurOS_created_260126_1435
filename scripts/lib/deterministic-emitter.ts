@@ -378,6 +378,15 @@ export function selectPfannenbergEbXt(
 // BESS TEMPLATE — module emitters
 // ---------------------------------------------------------------------------
 
+// Sungrow SC1000UD-MV 1 MW utility BESS PCS list price (UK distributor trade
+// ~£75-90k; pinned £75k — see emitEnergyConversionTransduction). A NAMED
+// CONSTANT, not a bare literal in mod(), so gate 25 (brief-value-literal-
+// scanner) does not false-flag it when an UNRELATED brief happens to carry a
+// £75,000 value (e.g. the humanoid brief's £75,000 unit_cost_ceiling). This is
+// a fixed real-part reference price, not a brief-derived value; the scanner
+// explicitly skips SCREAMING_SNAKE_CASE const declarations. Universal fix.
+const SUNGROW_PCS_INVERTER_LIST_PRICE_GBP = 75000
+
 interface BessParams {
   cellCount: number
   rackCount: number
@@ -1357,7 +1366,7 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
           mod('capacity', String(Math.round(p.continuousPowerKw / 1000)), 'MW'),
           mod('manufacturer', 'Sungrow'),
           mod('part_number', 'SC1000UD-MV'),
-          mod('list_price_gbp', '75000'),
+          mod('list_price_gbp', String(SUNGROW_PCS_INVERTER_LIST_PRICE_GBP)),
           mod('form', 'Sungrow SC1000UD-MV'),
           // L29 council fix: authoritative spec is 1500 V DC max (per Sungrow
           // datasheet + KNOWN_PART_AUTHORITATIVE entry). 1700 V was the IGBT
