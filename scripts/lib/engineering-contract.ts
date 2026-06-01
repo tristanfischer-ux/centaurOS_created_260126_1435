@@ -1144,7 +1144,16 @@ registerArchetype('haps', (brief: any) => {
   const wingAreaM2 = wingspanM * chordM
   const maxMassKg = Number(brief?.constraints?.max_mass_kg?.value ?? 95)
   const enduranceDays = extractRange(/(\d{2,3})\s*(?:to|-)?\s*(\d{2,3})?\s*day/i, 90)
-  const solarPeakKw = extractRange(/(\d\.\d|\d)\s*-?\s*(\d\.\d|\d)?\s*kW\s*(?:solar|peak|GaAs)/i, 3.0)
+  // Solar peak is a DESIGN OUTPUT computed from the array area, NOT a brief input.
+  // Was read from brief text with a 3.0 kW stub default — which made EVERY HAPS
+  // energy-balance closure false-fail (3 kW < the ~9 kW a 50 m wing needs to
+  // cruise + recharge), even though a 125 m² triple-junction GaAs array makes
+  // ~35 kW. peak = wing_area × cell-coverage × cell-efficiency × irradiance.
+  // 2026-06-01 fix (Tristan-flagged closure banner).
+  const solarCellEfficiency = 0.30 // triple-junction GaAs (Spectrolab XTJ ~30%)
+  const solarCoverageFraction = 0.85 // cells cover ~85% of wing planform (less LE/TE, control surfaces)
+  const stratosphericIrradianceKwM2 = 1.1 // ~20 km: low air mass, above cloud (solar constant 1.36, derated for incidence)
+  const solarPeakKw = wingAreaM2 * solarCoverageFraction * solarCellEfficiency * stratosphericIrradianceKwM2
   const batteryKwh = extractRange(/(\d{1,3})\s*-?\s*(\d{1,3})?\s*kWh/i, 16)
   const cruiseVMs = extractRange(/(\d{1,2})\s*-?\s*(\d{1,2})?\s*m\/s/i, 30)
   const altitudeM = extractRange(/(\d{1,2})\s*-?\s*(\d{1,2})?\s*km/i, 20) * 1000
@@ -1199,7 +1208,7 @@ registerArchetype('haps', (brief: any) => {
     battery_capacity_kwh: q(batteryKwh, 'kWh', 'energy', 'nameplate', 'system', 'brief'),
     battery_usable_kwh: q(batteryUsableKwh, 'kWh', 'energy', 'usable', 'system', 'calculator', { source_detail: 'battery × 0.80 DoD' }),
     battery_night_demand_kwh: q(batteryNightDemandKwh, 'kWh', 'energy', 'usable', 'system', 'calculator', { source_detail: `cruise_power × ${nightHours}h night` }),
-    solar_peak_kw: q(solarPeakKw, 'kW', 'power', 'peak', 'system', 'brief'),
+    solar_peak_kw: q(solarPeakKw, 'kW', 'power', 'peak', 'system', 'calculator', { source_detail: `wing_area ${wingAreaM2.toFixed(0)} m² × ${solarCoverageFraction} coverage × ${solarCellEfficiency} GaAs η × ${stratosphericIrradianceKwM2} kW/m²` }),
     solar_required_kw: q(solarRequiredKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: `cruise + battery recharge / ${sunlightHours}h sun` }),
     propulsion_each_w: q(propulsionEachW, 'W', 'power', 'continuous', 'system', 'brief'),
     composite_spar_mass_kg: q(sparMassKg, 'kg', 'mass', 'empty', 'system', 'calculator', { source_detail: `wing_area × ${sparArealKgM2} kg/m² areal density` }),

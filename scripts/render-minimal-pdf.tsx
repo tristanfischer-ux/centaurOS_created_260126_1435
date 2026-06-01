@@ -2684,27 +2684,35 @@ function CoverPage({
           const ec = state?.engineeringContract
           const failClosures = Array.isArray(ec?.closures) ? ec.closures.filter((c: any) => c?.status === 'fail') : []
           const warnClosures = Array.isArray(ec?.closures) ? ec.closures.filter((c: any) => c?.status === 'warn') : []
+          // Distinguish a genuine PHYSICS failure (design doesn't close — red) from
+          // a design that simply can't meet an over-aggressive BRIEF TARGET/cap
+          // (expected for a stretch brief — amber). 2026-06-01: replaced the solid
+          // dark-red slab with a slim left-bordered callout matching the dossier's
+          // other callouts (industry band, ex-works cost).
+          const isBriefTarget = (c: any) =>
+            /brief\s*(cap|target|ceiling)|vs\s*brief|exceeds?.*brief|\bceiling\b|unit[_\s]?cost|mass\s*cap|cost\s*cap/i
+              .test(`${String(c?.reason ?? '')} ${String(c?.invariant_id ?? '')}`)
           if (failClosures.length > 0) {
+            const anyPhysics = failClosures.some((c: any) => !isBriefTarget(c))
+            const accent = anyPhysics ? '#dc2626' : '#d97706'
+            const bg = anyPhysics ? '#fef2f2' : '#fffbeb'
+            const headColor = anyPhysics ? '#991b1b' : '#92400e'
+            const label = anyPhysics
+              ? `DESIGN DOES NOT CLOSE — ${failClosures.length} ${failClosures.length === 1 ? 'ITEM' : 'ITEMS'}`
+              : `BRIEF TARGET NOT MET — ${failClosures.length} ${failClosures.length === 1 ? 'ITEM' : 'ITEMS'}`
             return (
-              <View style={{
-                marginBottom: 14,
-                padding: 10,
-                backgroundColor: '#7f1d1d',
-                borderRadius: 4,
-                borderLeftWidth: 5,
-                borderLeftColor: '#fca5a5',
-              }}>
-                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#fee2e2', letterSpacing: 2, marginBottom: 4 }}>
-                  ENGINEERING CONTRACT — {failClosures.length} CLOSURE{failClosures.length === 1 ? '' : 'S'} FAILING
+              <View style={{ marginBottom: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: bg, borderLeftWidth: 3, borderLeftColor: accent, borderRadius: 2 }}>
+                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: headColor, letterSpacing: 1.5, marginBottom: 3 }}>
+                  {label}
                 </Text>
                 {failClosures.slice(0, 3).map((c: any, i: number) => (
-                  <Text key={i} style={{ fontSize: 9, color: '#fee2e2', lineHeight: 1.45, marginBottom: 3 }}>
-                    <Text style={{ fontFamily: 'Helvetica-Bold' }}>• {String(c.invariant_id ?? '').replace(/_/g, ' ')}:</Text>{' '}{String(c.reason ?? '')}
+                  <Text key={i} style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginBottom: 2 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold' }}>{String(c.invariant_id ?? '').replace(/_/g, ' ')}:</Text>{' '}{String(c.reason ?? '')}
                   </Text>
                 ))}
                 {failClosures.length > 3 ? (
-                  <Text style={{ fontSize: 9, color: '#fee2e2', fontStyle: 'italic' }}>
-                    + {failClosures.length - 3} more closure failure{failClosures.length - 3 === 1 ? '' : 's'} in the engineering appendix.
+                  <Text style={{ fontSize: 8, color: '#6b7280', fontStyle: 'italic' }}>
+                    + {failClosures.length - 3} more in the engineering appendix.
                   </Text>
                 ) : null}
               </View>
@@ -2712,13 +2720,13 @@ function CoverPage({
           }
           if (warnClosures.length > 0 && isBlocked) {
             return (
-              <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#78350f', borderRadius: 4, borderLeftWidth: 5, borderLeftColor: '#fcd34d' }}>
-                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#fef3c7', letterSpacing: 2, marginBottom: 4 }}>
-                  ENGINEERING CONTRACT — {warnClosures.length} CLOSURE WARNING{warnClosures.length === 1 ? '' : 'S'}
+              <View style={{ marginBottom: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#fffbeb', borderLeftWidth: 3, borderLeftColor: '#d97706', borderRadius: 2 }}>
+                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#92400e', letterSpacing: 1.5, marginBottom: 3 }}>
+                  DESIGN MARGINAL — {warnClosures.length} {warnClosures.length === 1 ? 'ITEM TO REVIEW' : 'ITEMS TO REVIEW'}
                 </Text>
                 {warnClosures.slice(0, 3).map((c: any, i: number) => (
-                  <Text key={i} style={{ fontSize: 9, color: '#fef3c7', lineHeight: 1.45, marginBottom: 3 }}>
-                    <Text style={{ fontFamily: 'Helvetica-Bold' }}>• {String(c.invariant_id ?? '').replace(/_/g, ' ')}:</Text>{' '}{String(c.reason ?? '')}
+                  <Text key={i} style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginBottom: 2 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold' }}>{String(c.invariant_id ?? '').replace(/_/g, ' ')}:</Text>{' '}{String(c.reason ?? '')}
                   </Text>
                 ))}
               </View>
@@ -2726,23 +2734,16 @@ function CoverPage({
           }
           if (isBlocked) {
             return (
-              <View style={{
-                marginBottom: 14,
-                padding: 10,
-                backgroundColor: '#7f1d1d',
-                borderRadius: 4,
-                borderLeftWidth: 5,
-                borderLeftColor: '#fca5a5',
-              }}>
-                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#fee2e2', letterSpacing: 2, marginBottom: 4 }}>
-                  DO NOT PROCURE — DESIGN BLOCKED
+              <View style={{ marginBottom: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#fef2f2', borderLeftWidth: 3, borderLeftColor: '#dc2626', borderRadius: 2 }}>
+                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#991b1b', letterSpacing: 1.5, marginBottom: 3 }}>
+                  CONCEPT SCAFFOLD — NOT PROCUREMENT-GRADE
                 </Text>
-                <Text style={{ fontSize: 9, color: '#fee2e2', lineHeight: 1.45 }}>
-                  Physics critic engineering plausibility{' '}
+                <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+                  Physics-critic engineering plausibility{' '}
                   {typeof plaus === 'number' ? `${plaus}/10` : 'below 3/10'}, brief-to-design fidelity{' '}
-                  {typeof fidel === 'number' ? `${fidel}/10` : 'below 3/10'}. First-cut engineering scaffold —
-                  contains first-principles violations and is NOT procurement-grade. Resolve high-severity findings
-                  in the physics appendix before sharing externally or quoting suppliers.
+                  {typeof fidel === 'number' ? `${fidel}/10` : 'below 3/10'}. First-cut scaffold — contains
+                  first-principles violations. Resolve the high-severity findings in the physics appendix before
+                  sharing externally or quoting suppliers.
                 </Text>
               </View>
             )

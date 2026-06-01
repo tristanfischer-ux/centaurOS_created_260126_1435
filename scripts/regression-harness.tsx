@@ -58,6 +58,7 @@ import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { classifyByRules } from './estimate-missing-prices'
+import { buildContract } from './lib/engineering-contract'
 
 interface Assertion {
   id: string
@@ -2266,6 +2267,28 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `restoredPn=${restoredPn} (want LF280K), ratingKept=${ratingKept} (want 314 Ah — NOT reverted)`,
+    ))
+  }
+
+  // ── UNIVERSAL.haps_solar_peak_computed_not_stubbed ────────────────────────
+  // Guards the 2026-06-01 closure fix: solar_peak_kw was read from brief text
+  // (extractRange, default 3.0 kW) → the energy-balance closure ALWAYS false-
+  // failed (3 kW < the ~9 kW a 50 m wing needs) and printed an ugly red "DESIGN
+  // DOES NOT CLOSE" banner, even though a 125 m² triple-junction array makes
+  // ~35 kW. Solar peak is now COMPUTED (wing_area × coverage × η × irradiance).
+  // Asserts it's a real computed value (not the 3.0 stub) and the closure passes.
+  {
+    const haps = buildContract('haps', { product_description: '50 m solar-electric HAPS, 90-day endurance, 16 kWh Li-S, GaAs solar', constraints: { max_mass_kg: { value: 95 } } } as never)
+    const sp = Number((haps?.quantities as never as Record<string, { value?: number }>)?.solar_peak_kw?.value ?? 0)
+    const sr = Number((haps?.quantities as never as Record<string, { value?: number }>)?.solar_required_kw?.value ?? 0)
+    const solarClosure = (haps?.closures ?? []).find((c: { invariant_id?: string }) => c.invariant_id === 'solar_balance_closure') as { status?: string } | undefined
+    const ok = sp > 20 && sp > sr && solarClosure?.status === 'pass'
+    assertions.push(assertEq(
+      'UNIVERSAL.haps_solar_peak_computed_not_stubbed',
+      'HAPS solar_peak_kw is COMPUTED from the array (>20 kW for a 50 m wing, was the 3.0 kW brief stub) and the solar_balance_closure now PASSES — guards the 2026-06-01 closure-banner fix',
+      ok,
+      (v: boolean) => v === true,
+      () => `solar_peak=${sp.toFixed(1)} solar_required=${sr.toFixed(2)} closure=${solarClosure?.status}`,
     ))
   }
 
