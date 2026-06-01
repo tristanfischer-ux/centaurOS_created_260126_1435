@@ -2313,6 +2313,37 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // ── UNIVERSAL.contract_outputs_computed_not_stubbed ───────────────────────
+  // Guards the 2026-06-01 P2 fixes to the "design output stubbed/inflated in the
+  // contract builder" bug family (drawer 14d63be0aa928f02): a design's own output
+  // (battery kWh, specific energy, mass) was read from brief-text/default and
+  // false-failed its closure. Now COMPUTED from geometry/chemistry. Asserts the 4
+  // fixed closures compute + pass for feasible briefs, AND heat-pump mass is no
+  // longer the 25 kg/kW inflation (12 kW → ~144 kg, was 300 kg).
+  {
+    const b = (slug: string, desc: string, mass?: number) => buildContract(slug, { product_description: desc, constraints: mass ? { max_mass_kg: { value: mass } } : {} } as never)
+    const st = (c: { closures?: { invariant_id?: string; status?: string }[] } | null, id: string) => (c?.closures ?? []).find((x) => x.invariant_id === id)?.status
+    const drone = b('drone', 'BVLOS octocopter inspection drone, 25 kg MTOW, 1.5 kg payload, 15 min flight', 25)
+    const auv = b('auv', '300 kg AUV, 1500 m depth, 12 h endurance at 3 knots, 0.5 m dia 3 m hull', 300)
+    const ssb = b('solid_state_battery', 'sulphide solid-state battery pack 75 kWh, 300 Wh/kg, 1000 cycles')
+    const cgm = b('cgm', '14-day continuous glucose monitor, BLE, SR416 coin cell')
+    const hp = b('heat_pump', '12 kW residential air-source heat pump, R290', 180)
+    const droneOk = st(drone, 'endurance_closure') === 'pass'
+    const auvOk = st(auv, 'endurance_closure') === 'pass' && st(auv, 'buoyancy_closure') === 'pass'
+    const ssbOk = st(ssb, 'specific_energy_pack_level_meets_brief') === 'pass'
+    const cgmOk = st(cgm, 'wear_duration_closure') === 'pass'
+    const hpMass = Number((hp?.quantities as never as Record<string, { value?: number }>)?.total_estimated_mass_kg?.value ?? 999)
+    const hpOk = hpMass > 50 && hpMass < 200 // 12 kW × 12 = 144 kg; the old 25 kg/kW gave 300
+    const ok = droneOk && auvOk && ssbOk && cgmOk && hpOk
+    assertions.push(assertEq(
+      'UNIVERSAL.contract_outputs_computed_not_stubbed',
+      'drone/auv endurance, ssb specific-energy, cgm wear-duration closures COMPUTE + pass for feasible briefs (were brief-stubbed false-fails), and heat-pump mass is ~12 kg/kW not the 25 kg/kW inflation — guards the 2026-06-01 P2 design-output-stub bug-family fix',
+      ok,
+      (v: boolean) => v === true,
+      () => `drone=${droneOk} auv=${auvOk} ssb=${ssbOk} cgm=${cgmOk} hpMass=${hpMass.toFixed(0)}kg(want 50-200)`,
+    ))
+  }
+
   // ── UNIVERSAL.haps_solar_peak_computed_not_stubbed ────────────────────────
   // Guards the 2026-06-01 closure fix: solar_peak_kw was read from brief text
   // (extractRange, default 3.0 kW) → the energy-balance closure ALWAYS false-
