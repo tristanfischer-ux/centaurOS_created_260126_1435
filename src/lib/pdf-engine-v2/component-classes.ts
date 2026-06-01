@@ -1640,6 +1640,45 @@ export const CATEGORY_KEYWORD_CEILINGS_GBP: CategoryKeywordCeiling[] = [
   // container is £1,500-£8,000. Hard cap £10,000.
   { pattern: /\b(container.?ac|rooftop.?ac|cabinet.?ac|enclosure.?ac|split.?ac)\b|\b(stulz|emerson.?precision|airedale)\b/i,
     ceiling_gbp: 10_000, note: 'container / cabinet AC unit — ceiling £10,000' },
+
+  // ── Process-instrument backstop ceilings (2026-06-01, Tristan cost-fingerprint) ─
+  // Distinct process instruments (a pH transmitter, a CO₂ mass-flow controller,
+  // a loop controller, a Mettler transmitter, an auto-sampler skid) all routed
+  // to `oem_subsystem` collapse onto the SINGLE class anchor (~£5,280) and emit
+  // an identical-price "fingerprint" — many unrelated parts at one price, the
+  // signature of mis-bucketing. These ceilings give each instrument TYPE its own
+  // realistic top-of-catalogue bound, so the curve path (and the renderer's
+  // estimate-tier self-correction) prices them apart instead of flat-pinning.
+  // Generous (top of the UK catalogue band) so a real sourced part is never
+  // clipped; ordered most-specific-first (MFC before the generic controller).
+  //
+  // Mass-flow controller / meter (Bronkhorst, Brooks) — top ~£3,000.
+  { pattern: /\bmass.?flow\b.{0,12}\b(controller|meter)\b|\bmfc\b|\b(bronkhorst|brooks\s*instrument)\b/i,
+    ceiling_gbp: 3000, note: 'mass-flow controller / meter — ceiling £3,000 (instrument anchor de-fingerprint)' },
+  // Process / loop / single-loop / PID / panel-mount controller (NOT a PLC, NOT
+  // an industrial PC, NOT a motor/charge controller) — top ~£2,500.
+  { pattern: /\b(process|loop|single-?loop|universal|panel-?mount|temperature|pid|setpoint)\b.{0,14}\bcontroller\b|\bcontroller\b.{0,10}\b(1\/4.?din|1\/8.?din|din.?rail)\b/i,
+    ceiling_gbp: 2500, note: 'process / loop controller — ceiling £2,500 (instrument anchor de-fingerprint)' },
+  // Process analyser (gas / liquid / dissolved-oxygen / pH / turbidity / optical)
+  // — genuinely expensive; top ~£8,000.
+  { pattern: /\b(gas|liquid|process|oxygen|co2|carbon.?dioxide|dissolved|do|ph|turbidity|optical|conductivity|tdl|ndir)\b.{0,16}\banaly[sz]er\b|\banaly[sz]er\b/i,
+    ceiling_gbp: 8000, note: 'process analyser — ceiling £8,000 (instrument anchor de-fingerprint)' },
+  // Coriolis / magnetic / vortex / ultrasonic flow meter — top ~£4,000.
+  { pattern: /\b(coriolis|magnetic|electromagnetic|electro-?mag|vortex|ultrasonic|turbine|thermal.?mass|mag)\b.{0,12}\bflow.?meter\b|\bflow.?meter\b/i,
+    ceiling_gbp: 4000, note: 'flow meter — ceiling £4,000 (instrument anchor de-fingerprint)' },
+  // Process transmitter (pressure / temperature / level / pH / conductivity /
+  // dissolved-O₂ / HART 2-wire — Mettler, Endress+Hauser, Rosemount) — top ~£1,800.
+  { pattern: /\btransmitter\b/i,
+    ceiling_gbp: 1800, note: 'process transmitter — ceiling £1,800 (instrument anchor de-fingerprint)' },
+  // Control / actuated / regulating / modulating valve (valve + actuator) — top ~£3,500.
+  { pattern: /\b(control|actuated|regulating|modulating|proportional|electric|pneumatic)\b.{0,12}\bvalve\b/i,
+    ceiling_gbp: 3500, note: 'control / actuated valve — ceiling £3,500 (instrument anchor de-fingerprint)' },
+  // Dosing / metering / peristaltic / diaphragm process pump — top ~£2,500.
+  { pattern: /\b(dosing|metering|peristaltic|diaphragm|gear|lobe)\b.{0,10}\bpump\b/i,
+    ceiling_gbp: 2500, note: 'dosing / metering pump — ceiling £2,500 (instrument anchor de-fingerprint)' },
+  // Load cell / weigh module / weighing sensor — top ~£1,500.
+  { pattern: /\b(load.?cell|weigh.?(module|cell|beam|sensor)|weighing.?(module|sensor|cell))\b/i,
+    ceiling_gbp: 1500, note: 'load cell / weigh module — ceiling £1,500 (instrument anchor de-fingerprint)' },
 ]
 
 /**

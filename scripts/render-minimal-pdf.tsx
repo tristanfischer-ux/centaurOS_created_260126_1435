@@ -40,7 +40,7 @@ import {
   type MarketBand,
   type BandPosition,
 } from '../src/lib/pdf-engine-v2/lib/market-bands'
-import { isConsumable, CLASS_PRICE_SANITY_BOUNDS } from '../src/lib/pdf-engine-v2/component-classes'
+import { isConsumable, CLASS_PRICE_SANITY_BOUNDS, keywordCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
 import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 
@@ -905,10 +905,15 @@ function computeBomTotals(state: any): BomTotals | null {
   const nreRows: BomTotals['nreRows'] = []
   // Capital lines collected for the cost self-assessment auditor (2026-06-01).
   const capitalLines: CostLine[] = []
+  // Render-time cost self-corrections (2026-06-01, Tristan "fix on the fly, don't
+  // flag"): estimate-tier lines re-priced down to their TYPE-realistic keyword
+  // ceiling, recorded for the actions log + a quiet methodology note (NOT a
+  // cover banner). Each entry breaks an identical-price fingerprint at source.
+  const costCorrections: Array<{ name: string; before: number; after: number; note: string }> = []
   // A non-recurring-engineering / certification line — a programme activity, not a
   // physical part (DO-178C / DAL-A / ARP 4761 / "certification" / "safety
   // assessment" / "qualification programme" / a certification-basis sub_module).
-  const NRE_RE = /\bDO-\d{3}|\bDAL[\s-]?[A-D]\b|\bARP\s?\d{3,}|\bcertificat(e|ion)\b|\bairworthiness\b|\bconformity\s+assessment\b|\bqualification\s+(test|programme|program|campaign)\b|\bsafety\s+assessment\b|\btype\s+(approval|certificat)|\bcompliance\s+(audit|assessment|documentation|programme)\b|\bdocumentation\s+(package|set|suite)\b/i
+  const NRE_RE = /\bDO-\d{3}|\bDAL[\s-]?[A-D]\b|\bARP\s?\d{3,}|\bcertificat(e|ion)\b|\bairworthiness\b|\bconformity\s+assessment\b|\bqualification\s+(test|programme|program|campaign)\b|\bsafety\s+assessment\b|\btype\s+(approval|certificat)|\bcompliance\s+(audit|assessment|documentation|programme)\b|\bdocumentation\s+(package|set|suite)\b|\b(data\s+)?historian\b|\b(scada|mes|software|firmware)\s+(licen|suite|platform|stack|package|subscription)\b|\bsoftware\s+(licen|defined\s+(?!radio))|\bdatabase\b/i
   const isNreLine = (name: string, subId: string): boolean =>
     NRE_RE.test(String(name)) || /(^|_)(regulatory_certification|type_certification|certification_basis|safety_assessment|compliance_doc|airworthiness)/i.test(String(subId))
 
@@ -1097,6 +1102,28 @@ function computeBomTotals(state: any): BomTotals | null {
             // ships a £4.17M line in the BoM with a £18 IGBT part
             // number — the Physics Critic correctly flags as nonsensical.
             macro_override_strip_corpus_partnum = true
+          }
+        }
+        // Render-time cost self-correction (2026-06-01, Tristan "fix on the fly,
+        // don't flag"): an ESTIMATE-tier line that inherited a high class anchor
+        // (the oem_subsystem ~£5,280 fingerprint — many distinct instruments at
+        // one price) is re-priced here to its TYPE-realistic keyword ceiling, so
+        // the dossier ships correct, differentiated costs instead of a "costs
+        // unreliable" banner. ACTUAL (distributor-sourced) prices and macro-
+        // contract overrides are never touched. Same CATEGORY_KEYWORD_CEILINGS
+        // table Engine B uses on the curve path — one source of truth.
+        if (tier === 'estimate' && contract_override_reason === null && unit_price_gbp > 0) {
+          const nm = String(w.name_human || v?.word_name || w.id || '')
+          const kwCeil = keywordCeilingGbp(
+            nm,
+            mfgMod ? String(mfgMod.value) : null,
+            pnMod ? String(pnMod.value) : null,
+          )
+          if (kwCeil && unit_price_gbp > kwCeil.ceiling_gbp) {
+            const before = unit_price_gbp
+            unit_price_gbp = roundToPence(kwCeil.ceiling_gbp)
+            line_total_gbp = roundToPence(unit_price_gbp * qty)
+            costCorrections.push({ name: nm, before, after: unit_price_gbp, note: kwCeil.note })
           }
         }
         const row: BomPartRow = {
@@ -1475,11 +1502,17 @@ function computeBomTotals(state: any): BomTotals | null {
     }
   }
 
-  // Cost self-assessment (2026-06-01, Tristan): the engine checks its OWN per-unit
-  // capital BoM for self-evidently-wrong costs (identical-price fingerprints,
-  // per-line type outliers, non-physical lines) — surfaced on the cover so absurd
-  // costs are flagged before the reader ever sees them, filling gate-21's blind
-  // spot (it skips lines with no live distributor price — the most-wrong ones).
+  // Cost self-correction + post-check (2026-06-01, Tristan "fix it, don't flag it").
+  // The engine no longer slaps a "costs unreliable" banner on the cover. Instead,
+  // estimate-tier lines that inherited a high class anchor were already RE-PRICED
+  // to their type-realistic keyword ceiling in the BoM loop above (costCorrections).
+  // auditCostSanity now runs as the POST-correction self-check: it should report
+  // 'clean'. Anything still flagged is logged for the engine's learning loop (so the
+  // keyword/NRE tables can be extended) — but it never reaches the reader's cover.
+  if (costCorrections.length > 0) {
+    console.log(`[render] cost self-correction: re-priced ${costCorrections.length} estimate-tier line(s) to type-realistic ceilings — ` +
+      costCorrections.slice(0, 8).map(c => `"${c.name.slice(0, 32)}" £${Math.round(c.before).toLocaleString()}→£${Math.round(c.after).toLocaleString()}`).join('; '))
+  }
   const classCeil: Record<string, number> = {}
   for (const [k, v] of Object.entries(CLASS_PRICE_SANITY_BOUNDS)) {
     const max = (v as { max_gbp?: number } | undefined)?.max_gbp
@@ -1487,7 +1520,10 @@ function computeBomTotals(state: any): BomTotals | null {
   }
   const costSanity = auditCostSanity(capitalLines, classCeil)
   if (costSanity.verdict !== 'clean') {
-    console.error(`[render] cost self-assessment: ${costSanity.verdict.toUpperCase()} — ${costSanity.findings.length} finding(s) on ${costSanity.lines_checked} capital lines`)
+    // Residual after self-correction — a gap in the keyword/NRE tables. Log it
+    // (the record the next iteration learns from); do NOT flag it on the cover.
+    console.error(`[render] cost self-check residual (post-correction): ${costSanity.verdict.toUpperCase()} — ${costSanity.findings.length} finding(s) on ${costSanity.lines_checked} capital lines: ` +
+      costSanity.findings.slice(0, 5).map(f => f.detail).join(' | '))
   }
 
   return {
@@ -1508,7 +1544,6 @@ function computeBomTotals(state: any): BomTotals | null {
     externalRows: externalRows && externalRows.length > 0 ? externalRows : undefined,
     nreTotal_gbp: nreTotal_gbp > 0 ? nreTotal_gbp : undefined,
     nreRows: nreRows && nreRows.length > 0 ? nreRows : undefined,
-    costSanity: costSanity.verdict !== 'clean' ? costSanity : undefined,
   }
 }
 
@@ -2830,24 +2865,12 @@ function CoverPage({
           }
           return null
         })()}
-        {/* Cost self-assessment (2026-06-01, Tristan): the engine flags its own
-            BoM lines it isn't confident about — before the reader sees the cost. */}
-        {(() => {
-          const cs = (bomTotals as any)?.costSanity
-          if (!cs || cs.verdict === 'clean' || !Array.isArray(cs.findings) || cs.findings.length === 0) return null
-          const fp = cs.findings.filter((f: any) => f.kind === 'identical_price_fingerprint').length
-          const hi = cs.findings.filter((f: any) => f.severity === 'HIGH').length
-          return (
-            <View style={{ marginBottom: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#fffbeb', borderLeftWidth: 3, borderLeftColor: '#d97706', borderRadius: 2 }}>
-              <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#92400e', letterSpacing: 1.5, marginBottom: 3 }}>
-                COST SELF-ASSESSMENT — {cs.findings.length} {cs.findings.length === 1 ? 'LINE' : 'LINES'} FLAGGED FOR REVIEW
-              </Text>
-              <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
-                The engine flagged {cs.findings.length} bill-of-materials cost{cs.findings.length === 1 ? '' : 's'} as potentially unreliable{fp > 0 ? ` (${fp} group${fp === 1 ? '' : 's'} of unrelated parts share an identical price — a sign of mis-classification)` : ''}{hi > 0 ? `; ${hi} need${hi === 1 ? 's' : ''} attention before quoting suppliers` : ''}. Treat the affected line prices as indicative — see the cost analysis for detail.
-              </Text>
-            </View>
-          )
-        })()}
+        {/* Cost self-correction (2026-06-01, Tristan "fix it, don't flag it"):
+            no cover banner. Estimate-tier instrument prices that inherited a high
+            class anchor are re-priced to type-realistic ceilings in the BoM loop
+            (renderBom → costCorrections), so the dossier simply ships correct,
+            differentiated costs. Residuals are logged for the engine's learning
+            loop, never shown to the reader. */}
         <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 2, marginBottom: 12 }}>
           FORGE ENGINEERING DESIGN DOSSIER · CONCEPT STAGE
         </Text>

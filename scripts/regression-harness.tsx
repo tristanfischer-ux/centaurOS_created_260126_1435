@@ -58,6 +58,7 @@ import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { classifyByRules } from './estimate-missing-prices'
+import { keywordCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
 import { applyPatches } from '../src/lib/pdf-engine-v2/radical/universal-repair'
 import { auditCostSanity } from './lib/cost-self-assessment'
 
@@ -1513,6 +1514,31 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         (n) => `${n} line(s) in deterministic-emitter.ts contain the literal ${maxMassKg} (brief.max_mass_kg). Fix: use String(p.briefMassCapKg) from contract.shared_quantities. Lines: ${literalHits.slice(0, 5).join(', ')}`,
       ))
     }
+  }
+
+  // UNIVERSAL.process_instruments_priced_apart (2026-06-01, Tristan cost-fingerprint)
+  // — the process-instrument keyword ceilings must give distinct instrument TYPES
+  // distinct realistic ceilings, so multiple instruments routed to the same
+  // oem_subsystem anchor cannot all flat-pin to one price (the £5,280 identical-
+  // price "fingerprint" the renderer used to FLAG; now it FIXES it by re-pricing
+  // estimate-tier lines to these ceilings). A FAIL means the
+  // CATEGORY_KEYWORD_CEILINGS_GBP instrument rows were removed/weakened and the
+  // fingerprint can reappear. Pure-function check (snapshot-independent).
+  {
+    const probe = [
+      'pH transmitter', 'CO2 mass flow controller', 'process loop controller',
+      'Coriolis flow meter', 'reactor load cell',
+    ]
+    const ceils = probe.map((n) => keywordCeilingGbp(n)?.ceiling_gbp ?? null)
+    const allMatched = ceils.every((c) => typeof c === 'number')
+    const distinct = new Set(ceils.filter((c): c is number => typeof c === 'number')).size
+    assertions.push(assertEq(
+      'UNIVERSAL.process_instruments_priced_apart',
+      'Process-instrument keyword ceilings differentiate instrument TYPES (cost-fingerprint fix 2026-06-01)',
+      allMatched && distinct >= 4 ? 1 : 0,
+      (v) => v === 1,
+      () => `Process-instrument ceilings regressed: ceilings=[${ceils.join(', ')}], distinct=${distinct} (need all 5 matched + >=4 distinct). The CATEGORY_KEYWORD_CEILINGS_GBP instrument rows (transmitter / mass-flow controller / process controller / flow meter / load cell) were removed or weakened — the £5,280 oem_subsystem identical-price fingerprint can reappear in BoMs.`,
+    ))
   }
 
   // ── UNIVERSAL: phase2 final state parses without truncation (2026-05-26, L38 class-killer D) ──
