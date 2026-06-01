@@ -59,6 +59,7 @@ import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { classifyByRules } from './estimate-missing-prices'
 import { applyPatches } from '../src/lib/pdf-engine-v2/radical/universal-repair'
+import { auditCostSanity } from './lib/cost-self-assessment'
 
 interface Assertion {
   id: string
@@ -2290,6 +2291,41 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `restoredPn=${restoredPn} (want LF280K), ratingKept=${ratingKept} (want 314 Ah — NOT reverted)`,
+    ))
+  }
+
+  // ── UNIVERSAL.cost_self_assessment_catches_absurdity ──────────────────────
+  // Guards the 2026-06-01 cost self-assessment auditor (Tristan: "the engine
+  // should catch wildly-out costs BEFORE the PDF"). It must catch the three
+  // signatures the existing reference-based gates skip: a non-physical line in
+  // the capital BoM (a £450k certification), an identical-price FINGERPRINT (many
+  // unrelated parts at one anchor = classifier mis-bucketing), and a per-line
+  // type outlier (a £5,000 part in a class whose ceiling is £600). And it must
+  // pass a clean BoM.
+  {
+    const ceil = { sensor: 600, electronic_connector: 50 }
+    const dirty = auditCostSanity([
+      { word_name: 'DO-178C DAL-A software certification', component_class: 'unknown', unit_price_gbp: 450000, quantity: 1 },
+      { word_name: 'auto-sampler skid', component_class: 'oem_subsystem', unit_price_gbp: 5280, quantity: 1 },
+      { word_name: 'CO2 MFC', component_class: 'oem_subsystem', unit_price_gbp: 5280, quantity: 1 },
+      { word_name: 'historian server', component_class: 'oem_subsystem', unit_price_gbp: 5280, quantity: 1 },
+      { word_name: 'over-priced thermistor', component_class: 'sensor', unit_price_gbp: 5400, quantity: 1 },
+    ], ceil)
+    const clean = auditCostSanity([
+      { word_name: 'NTC thermistor', component_class: 'sensor', unit_price_gbp: 12, quantity: 4 },
+      { word_name: 'busbar', component_class: 'electronic_connector', unit_price_gbp: 8, quantity: 20 },
+      { word_name: 'controller board', component_class: 'electronic_pcb', unit_price_gbp: 180, quantity: 1 },
+    ], ceil)
+    const caughtNonPhysical = dirty.findings.some((f) => f.kind === 'non_physical_in_capital')
+    const caughtFingerprint = dirty.findings.some((f) => f.kind === 'identical_price_fingerprint' && (f.count ?? 0) >= 3)
+    const caughtOutlier = dirty.findings.some((f) => f.kind === 'per_line_type_outlier')
+    const ok = caughtNonPhysical && caughtFingerprint && caughtOutlier && dirty.verdict === 'fail' && clean.verdict === 'clean'
+    assertions.push(assertEq(
+      'UNIVERSAL.cost_self_assessment_catches_absurdity',
+      'auditCostSanity catches a non-physical cert line in capital + an identical-price fingerprint + a per-line type outlier (verdict fail) and passes a clean BoM (verdict clean) — guards the 2026-06-01 cost self-assessment that fills gate-21\'s un-referenceable-line blind spot',
+      ok,
+      (v: boolean) => v === true,
+      () => `nonPhysical=${caughtNonPhysical} fingerprint=${caughtFingerprint} outlier=${caughtOutlier} dirty=${dirty.verdict} clean=${clean.verdict}`,
     ))
   }
 
