@@ -58,7 +58,7 @@ import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { classifyByRules } from './estimate-missing-prices'
-import { buildContract } from './lib/engineering-contract'
+import { applyPatches } from '../src/lib/pdf-engine-v2/radical/universal-repair'
 
 interface Assertion {
   id: string
@@ -2290,6 +2290,26 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `restoredPn=${restoredPn} (want LF280K), ratingKept=${ratingKept} (want 314 Ah — NOT reverted)`,
+    ))
+  }
+
+  // ── UNIVERSAL.applypatches_skips_corrupt_submodule_no_crash ───────────────
+  // Guards the 2026-06-01 wind-turbine exit-1 fix: a prose string that leaked
+  // into a sub_modules[] slot made the patch path-walker do `cursor['words']={}`
+  // on a string → "Cannot create property 'words' on string" → the WHOLE chain
+  // crashed (exit 1, no dossier). The walker now skips a walk-into-primitive
+  // instead of throwing. Asserts applyPatches does NOT throw on the corruption.
+  {
+    const corrupt = [{ module: 'm', sub_modules: ['The rotor blade assembly consists of three blades — leaked prose string.'] }]
+    const patches = [{ module: 'm', path: 'sub_modules[0].words[+]', new_value: { id: 'w', name_human: 'x' }, reason: 'test' }]
+    let threw = false
+    try { applyPatches(corrupt as never, [] as never, patches as never) } catch { threw = true }
+    assertions.push(assertEq(
+      'UNIVERSAL.applypatches_skips_corrupt_submodule_no_crash',
+      'applyPatches SKIPS a patch that walks into a prose-string sub_module slot instead of crashing the whole chain — guards the 2026-06-01 wind-turbine exit-1 "Cannot create property words on string" fix',
+      !threw,
+      (v: boolean) => v === true,
+      () => `threw=${threw} (want false — malformed patch must skip, not crash the chain)`,
     ))
   }
 

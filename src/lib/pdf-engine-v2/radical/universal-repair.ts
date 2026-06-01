@@ -667,6 +667,16 @@ export function applyPatches(
         if (!Array.isArray(cursor) || idx >= cursor.length) { ok = false; reasons.push(`skip out-of-range [${idx}]: ${p.module}.${p.path}`); break }
         cursor = cursor[idx]
       } else {
+        // Guard: cannot walk into a primitive. A prose string that leaked into a
+        // sub_module slot makes `cursor` a string, and `cursor['words'] = {}`
+        // throws "Cannot create property 'words' on string" — crashing the whole
+        // chain (wind-turbine exit 1, 2026-06-01). Skip the malformed patch
+        // instead. Universal: any class can hit a corrupted sub_module slot.
+        if (cursor === null || typeof cursor !== 'object') {
+          ok = false
+          reasons.push(`skip walk-into-${typeof cursor} at "${t.key}": ${p.module}.${p.path}`)
+          break
+        }
         if (cursor[t.key] === undefined) cursor[t.key] = {}
         cursor = cursor[t.key]
       }

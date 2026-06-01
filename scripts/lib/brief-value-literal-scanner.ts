@@ -305,6 +305,14 @@ export function scanEmitterForBriefLiterals(
 
       if (!isStringContext) continue
 
+      // Product-identifier mod() kinds wrap PRODUCT CODES, never physical brief
+      // values — a number inside one (Roxtec "S 150", "ABB 3.2") is a part code,
+      // not e.g. batch_size=150. Skip the whole line regardless of numeric
+      // coincidence. 2026-06-01 (solar-inverter "S 150" vs batch_size=150 false
+      // positive: a BESS-only Roxtec seal part-number flagged against an unrelated
+      // brief constraint that shared the value 150).
+      if (/\bmod\(\s*['"](?:part_number|manufacturer|mpn|sku|form|name_human|character_id)['"]/i.test(lineText)) continue
+
       const match = lineText.match(pattern)
       if (!match) continue
 
