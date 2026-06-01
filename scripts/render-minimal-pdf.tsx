@@ -731,6 +731,12 @@ type BomTotals = {
   // from grandTotal_gbp alone (capital items only).
   externalTotal_gbp?: number
   externalRows?: Array<{ sub_module_id: string; sub_module_name: string; word_name: string; quantity: number; unit_price_gbp: number; line_total_gbp: number }>
+  // NRE (2026-06-01): non-recurring engineering / certification — one-time
+  // programme cost, excluded from the per-unit capital total, shown + highlighted
+  // separately (a DO-178C DAL-A certification is real + valuable to surface, but
+  // it is NOT a per-unit raw material).
+  nreTotal_gbp?: number
+  nreRows?: Array<{ word_name: string; quantity: number; unit_price_gbp: number; line_total_gbp: number }>
 }
 
 function roundToPence(n: number): number {
@@ -886,6 +892,20 @@ function computeBomTotals(state: any): BomTotals | null {
   // U8 (2026-05-29): external sub-module lines excluded from capital total
   let externalTotal_gbp = 0
   const externalRows: BomTotals['externalRows'] = []
+  // NRE (2026-06-01, Tristan cost self-assessment): certification / standards /
+  // safety-assessment / documentation / software-licence lines are NON-RECURRING
+  // ENGINEERING — a one-time programme cost (a DO-178C DAL-A certification is ~£450k
+  // but it is NOT a per-unit raw material). Routing them OUT of the capital subtotal
+  // stops them flowing through the per-unit markup chain (×~3.6) and inflating the
+  // unit price absurdly (eVTOL BoM was 97% certification line-items).
+  let nreTotal_gbp = 0
+  const nreRows: BomTotals['nreRows'] = []
+  // A non-recurring-engineering / certification line — a programme activity, not a
+  // physical part (DO-178C / DAL-A / ARP 4761 / "certification" / "safety
+  // assessment" / "qualification programme" / a certification-basis sub_module).
+  const NRE_RE = /\bDO-\d{3}|\bDAL[\s-]?[A-D]\b|\bARP\s?\d{3,}|\bcertificat(e|ion)\b|\bairworthiness\b|\bconformity\s+assessment\b|\bqualification\s+(test|programme|program|campaign)\b|\bsafety\s+assessment\b|\btype\s+(approval|certificat)|\bcompliance\s+(audit|assessment|documentation|programme)\b|\bdocumentation\s+(package|set|suite)\b/i
+  const isNreLine = (name: string, subId: string): boolean =>
+    NRE_RE.test(String(name)) || /(^|_)(regulatory_certification|type_certification|certification_basis|safety_assessment|compliance_doc|airworthiness)/i.test(String(subId))
 
   for (const m of orderedModules as any[]) {
     const mod: BomMod = {
@@ -1222,6 +1242,18 @@ function computeBomTotals(state: any): BomTotals | null {
               unit_price_gbp: row.unit_price_gbp,
               line_total_gbp: row.line_total_gbp,
             })
+          } else if (isNreLine(String(row.word_name ?? ''), String(sm.id ?? ''))) {
+            // Non-recurring engineering / certification — a one-time programme cost,
+            // NOT a per-unit raw material. Route OUT of the capital subtotal (so it
+            // never flows through the per-unit markup chain) but RECORD it for the
+            // highlighted certification-cost line (Tristan 2026-06-01).
+            nreTotal_gbp = roundToPence(nreTotal_gbp + line_total_gbp)
+            nreRows!.push({
+              word_name: row.word_name,
+              quantity: row.quantity,
+              unit_price_gbp: row.unit_price_gbp,
+              line_total_gbp: row.line_total_gbp,
+            })
           } else {
             // Normal capital line
             sub.subtotal_gbp = roundToPence(sub.subtotal_gbp + line_total_gbp)
@@ -1448,6 +1480,8 @@ function computeBomTotals(state: any): BomTotals | null {
     // U8 (2026-05-29): external sub-module lines excluded from capital total
     externalTotal_gbp: externalTotal_gbp > 0 ? externalTotal_gbp : undefined,
     externalRows: externalRows && externalRows.length > 0 ? externalRows : undefined,
+    nreTotal_gbp: nreTotal_gbp > 0 ? nreTotal_gbp : undefined,
+    nreRows: nreRows && nreRows.length > 0 ? nreRows : undefined,
   }
 }
 
@@ -8193,10 +8227,13 @@ function BillOfMaterialsPage({
   const consumablesTotal = bomTotals.consumablesTotal_gbp ?? 0
   const externalRows = bomTotals.externalRows ?? []
   const externalTotal = bomTotals.externalTotal_gbp ?? 0
+  const nreRows = bomTotals.nreRows ?? []
+  const nreTotal = bomTotals.nreTotal_gbp ?? 0
   const hasConsumables = consumablesRows.length > 0
   const hasExternal = externalRows.length > 0
+  const hasNre = nreRows.length > 0
 
-  if (hasConsumables || hasExternal) {
+  if (hasConsumables || hasExternal || hasNre) {
     const fmtGBPSeg = fmtGBP_shared
     pages.push(
       <Page key="bom-page-ancillary" size="A4" style={PAGE_STYLE}>
@@ -8295,6 +8332,48 @@ function BillOfMaterialsPage({
               <View style={{ flex: 1.5 }} />
               <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
                 <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT }}>{fmtGBP_subtotal(externalTotal)}</Text>
+              </View>
+              <View style={{ flex: 0.9 }} />
+            </View>
+          </>
+        ) : null}
+
+        {/* ── Certification & non-recurring engineering — HIGHLIGHTED one-time programme cost ── */}
+        {hasNre ? (
+          <>
+            <View wrap={false} style={{ marginTop: 8, marginBottom: 4, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: '#fffbeb', borderLeftWidth: 3, borderLeftColor: '#d97706', borderRadius: 2 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#92400e' }}>
+                Certification & non-recurring engineering — one-time programme cost
+              </Text>
+              <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic' }}>
+                Excluded from the per-unit raw-materials BoM — a one-off programme investment (type certification, design-assurance, safety assessment), amortised over the production run, NOT a per-unit material.
+              </Text>
+            </View>
+            {nreRows.map((row, ri) => (
+              <View key={`nre-${ri}`} wrap={false} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.4, borderBottomColor: '#e2e8f0' }}>
+                <View style={{ flex: 4 }}>
+                  <Text style={{ fontSize: 9, color: INK }}>{title_case(row.word_name)}</Text>
+                </View>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK_SOFT }}>{row.quantity.toLocaleString('en-GB')}</Text>
+                </View>
+                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK_SOFT }}>{fmtGBPSeg(row.unit_price_gbp)}</Text>
+                </View>
+                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK, fontFamily: 'Helvetica-Bold' }}>{fmtGBPSeg(row.line_total_gbp)}</Text>
+                </View>
+                <View style={{ flex: 0.9 }} />
+              </View>
+            ))}
+            <View wrap={false} style={{ flexDirection: 'row', paddingTop: 4, paddingBottom: 6, marginBottom: 10, borderTopWidth: 0.8, borderTopColor: '#d97706' }}>
+              <View style={{ flex: 4 }}>
+                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#92400e' }}>Certification & NRE total (one-time)</Text>
+              </View>
+              <View style={{ flex: 1 }} />
+              <View style={{ flex: 1.5 }} />
+              <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#92400e' }}>{fmtGBP_subtotal(nreTotal)}</Text>
               </View>
               <View style={{ flex: 0.9 }} />
             </View>
