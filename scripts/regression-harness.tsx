@@ -2213,6 +2213,29 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // ── UNIVERSAL.per_rack_audit_ignores_citation_year ───────────────────────
+  // Guards the 2026-06-01 gate-26 fix: the "N <noun> per X" noun phrase is now
+  // bounded to ≤6 LETTER-only words, so a CITATION YEAR far from "per rack" can't
+  // be grabbed as the count. BESS exit-26 #4: "2013 LFP DFN simulation confirms
+  // 5000 cells equating to 20 racks with 250 series cells per rack" matched
+  // N=2013 × 20 racks = 40260 (vs BoM 5000) → false HIGH. The regex must now find
+  // the true "250 series cells per rack" → 250 × 20 = 5000 = BoM → no finding.
+  {
+    const mk = (prose: string, wordId: string, qty: number) => ([{ module: 'm', sub_modules: [{ id: 's', english_sentence: prose, words: [{ id: wordId, modifier_characters: [{ kind: 'quantity', value: String(qty) }] }] }] }])
+    const Q = { rack_count: { value: 20 } }
+    const yearProse = '2013 LFP DFN simulation confirms 5000 cells equating to 20 racks with 250 series cells per rack.'
+    // BoM emits 5000 = 250 series cells/rack × 20 racks → CORRECT → 0 findings.
+    const yearFindings = runPerRackQuantityAudit(mk(yearProse, 'series_cells_busbar_word', 5000) as never, Q as never, 'energy_storage').findings?.length ?? 0
+    const ok = yearFindings === 0
+    assertions.push(assertEq(
+      'UNIVERSAL.per_rack_audit_ignores_citation_year',
+      'gate-26 extracts "250 series cells per rack" (not the citation year 2013) so a correctly-emitted busbar qty (5000 = 250×20) produces NO finding — guards the 2026-06-01 year-span false-positive fix that blocked BESS',
+      ok,
+      (v: boolean) => v === true,
+      () => `year-prose findings=${yearFindings} (want 0 — regex must pick 250 not 2013/20)`,
+    ))
+  }
+
   // ── UNIVERSAL.gate25_skips_cross_unit_mod_literals ────────────────────────
   // Guards the 2026-05-31 gate-25 fix: a value inside mod(key,'500','kbit/s') or
   // mod(key,'500','A') carries its UNIT in the NEXT arg, not adjacent to the

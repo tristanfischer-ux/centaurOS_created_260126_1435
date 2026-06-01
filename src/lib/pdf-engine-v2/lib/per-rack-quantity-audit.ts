@@ -149,8 +149,15 @@ function parseCount(s: string): number | null {
  * Regex: "N <noun-phrase> per <denominator-phrase>"
  * Captures: [count-word, noun-phrase, denominator-word]
  */
+// Noun-phrase between N and "per" is BOUNDED to ≤6 words (was an unbounded
+// `[\w\s\-\/]+?` that spanned whole clauses). BESS exit-26 false positive #4
+// (2026-06-01): "2013 LFP DFN simulation confirms 5000 cells equating to 20 racks
+// with 250 series cells per rack" matched N=2013 (a CITATION YEAR) × 20 racks =
+// 40260 instead of the real "250 series cells per rack". A real "N <noun> per X"
+// count phrase is short (2-4 words); bounding to 6 stops the year-spanning match
+// so the regex finds the true "250 series cells per rack" instead.
 const PER_RACK_RE =
-  /((?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty))\s+([\w\s\-\/]+?)\s+per\s+(?:each\s+)?((?:\d+\s+)?[\w\s\-]+?)(?=[,;.!?]|$|\s{2,})/gi
+  /((?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty))\s+([a-zA-Z\-\/]+(?:\s+[a-zA-Z\-\/]+){0,5}?)\s+per\s+(?:each\s+)?((?:\d+\s+)?[\w\s\-]+?)(?=[,;.!?]|$|\s{2,})/gi
 
 /** Limiting-language guards — these indicate capacity limits, not multiplied totals. */
 const LIMITING_LANGUAGE_RE = /\b(max|maximum|up\s+to|at\s+most|no\s+more\s+than|at\s+least|minimum)\b/i
