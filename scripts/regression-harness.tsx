@@ -57,7 +57,7 @@ import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-q
 import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
-import { isCatalogueComponent, isBlankOrPlaceholderMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, tokenize as emitterTokenize, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { classifyByRules } from './estimate-missing-prices'
 import { keywordCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
 import { applyPatches } from '../src/lib/pdf-engine-v2/radical/universal-repair'
@@ -2675,6 +2675,93 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       (v: boolean) => v === true,
       () => `structOk=${structOk} catOk=${catOk} blankOk=${blankOk} realOk=${realOk}`,
     ))
+  }
+
+  // ── UNIVERSAL.db_matcher_never_mispins_bioreactor_instruments ─────────────
+  // Locks in the matcher PRECISION proven on 2026-06-01 (investigation of why the
+  // bioreactor BoM pins few catalogue prices). Root cause found: COVERAGE GAP —
+  // the real branded bioprocess instruments (Sartorius/Mettler/Hamilton/Bronkhorst
+  // pH/DO/PT100 probes + mass-flow controllers) EXIST as catalogue rows in
+  // forge-truth.db but carry unit_price_gbp = NULL, so no list_price_gbp pin can
+  // fire regardless of matcher recall. The matcher itself is already CORRECT and
+  // high-precision: it pins type-correct parts when they exist and otherwise falls
+  // through to generate — it does NOT mis-pin. A "loosen the matcher to raise
+  // recall" change (e.g. swapping the head-noun to the generic last token "probe")
+  // was empirically REJECTED because it surfaces a Fluke test-probe / fuse-test set
+  // for the pH/DO/PT100 slots — a precision regression with no price-pin gain.
+  //
+  // This invariant runs the EXACT production per-word path (dbFirstLookup →
+  // dbHitAcceptableForWord, same as fillBlankWordMpns) against the live DB and
+  // asserts ZERO wrong-type pins on the canonical bioreactor instrument slots:
+  //   • a mass-flow-CONTROLLER slot must NEVER pin a dissolved-oxygen SENSOR;
+  //   • a pH / DO / temperature PROBE slot must NEVER pin a generic test/fuse
+  //     probe, an op-amp, a motor driver, or a power supply.
+  // Any pin returned must be a type-correct instrument (sensor / flow / probe /
+  // transmitter / analyser family). If a future edit loosens the matcher and
+  // introduces such a mis-pin, this fails. Skips gracefully when forge-truth.db is
+  // absent (CI without the corpus) — same convention as the git/rg/pdftotext guards.
+  {
+    const dbPath = resolve(homedir(), '.forge-truth', 'forge-truth.db')
+    if (!existsSync(dbPath)) {
+      assertions.push({ id: 'UNIVERSAL.db_matcher_never_mispins_bioreactor_instruments', description: 'bioreactor-instrument mis-pin guard (skipped — forge-truth.db unavailable)', passed: true, detail: 'forge-truth.db not present — skipped' })
+    } else {
+      // Replicate the per-word call exactly: tokens = tokenize(subId) ∪ tokenize(name),
+      // headNoun = first distinguishing token of the name (production behaviour).
+      const perWordPin = (db: Database.Database, subId: string, name: string): DbPart | null => {
+        const tokens = new Set<string>([...emitterTokenize(subId), ...emitterTokenize(name)])
+        const headNoun = emitterTokenize(name)[0] ?? emitterTokenize(subId)[0] ?? null
+        const hit = dbFirstLookup(db, [...tokens], headNoun)
+        if (!hit) return null
+        return dbHitAcceptableForWord(hit, name) ? hit : null
+      }
+      // A wrong-TYPE pin is one whose part_name advertises a part family that is
+      // categorically not an inline process instrument: a generic test/fuse probe,
+      // an op-amp / amplifier IC, a motor / motion driver, or a bare power supply.
+      const WRONG_TYPE = /\b(test\s+prob|fuse\s+test|op[\s-]?amp|operational\s+amplifier|motor\W|motion\W|ignition|power\s+supplies|power\s+supply|din\s+rail\s+mount|heat\s+sink|variable\s+frequency)\b/i
+      // Canonical bioreactor instrument slots (sub_module_id :: word name), from the
+      // real run module-decomposition vocabulary.
+      const slots: Array<[string, string]> = [
+        ['gas_mixing_skid_fluid_flow', 'oxygen mass flow controller'],
+        ['gas_mixing_skid_fluid_flow', 'nitrogen mass flow controller'],
+        ['gas_mixing_skid_fluid_flow', 'carbon dioxide mass flow controller'],
+        ['inline_process_probes_chemical_sensing', 'inline pH probe'],
+        ['inline_process_probes_optical_sensing', 'optical dissolved oxygen probe'],
+        ['inline_process_probes_thermal_sensing', 'PT100 temperature probe'],
+      ]
+      let db: Database.Database | null = null
+      const mispins: string[] = []
+      try {
+        db = new Database(dbPath, { readonly: true })
+        db.pragma('busy_timeout = 2000')
+        for (const [subId, name] of slots) {
+          const pin = perWordPin(db, subId, name)
+          if (!pin) continue // generate-fallback / no pin — always precision-safe
+          const pn = String(pin.part_name ?? '')
+          // (a) a controller slot must not bind a dissolved-oxygen SENSOR
+          const isMfcSlot = /controller/i.test(name)
+          if (isMfcSlot && /dissolved\s+oxygen\s+sensor/i.test(pn)) {
+            mispins.push(`${name} → ${pin.manufacturer} ${pin.part_number} "${pn.slice(0, 50)}" (DO sensor pinned into an MFC slot)`)
+            continue
+          }
+          // (b) no instrument slot may bind a categorically wrong-type part
+          if (WRONG_TYPE.test(pn)) {
+            mispins.push(`${name} → ${pin.manufacturer} ${pin.part_number} "${pn.slice(0, 50)}" (wrong-type part)`)
+          }
+        }
+      } catch {
+        // DB open/query failure — degrade to skip rather than false-fail.
+        mispins.length = 0
+      } finally {
+        try { db?.close() } catch { /* no-op */ }
+      }
+      assertions.push(assertEq(
+        'UNIVERSAL.db_matcher_never_mispins_bioreactor_instruments',
+        'DB-first per-word matcher (dbFirstLookup + dbHitAcceptableForWord) pins ONLY type-correct instruments for bioreactor pH/DO/PT100 probe + O2/N2/CO2 mass-flow-controller slots — never a DO sensor in an MFC slot, never a test/fuse probe / op-amp / motor driver / power supply. Locks the 2026-06-01 precision verdict: bioreactor BoM under-pricing is a price-data COVERAGE GAP (NULL unit_price_gbp on real bioprocess instruments), NOT a matcher-recall problem; do NOT loosen the matcher to chase recall (it only mis-pins).',
+        mispins.length,
+        (n: number) => n === 0,
+        () => `${mispins.length} mis-pin(s): ${mispins.join(' | ')}. The matcher loosened and now binds a wrong-type part — revert; the under-pricing fix is ingesting prices for bioprocess instruments, not relaxing acceptance.`,
+      ))
+    }
   }
 
   // ── UNIVERSAL.no_inline_class_alias_maps_in_chain ─────────────────────────

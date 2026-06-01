@@ -198,7 +198,7 @@ export function isBlankOrPlaceholderMpn(pn: string | undefined | null): boolean 
 }
 
 // Strip a trailing "_word" / "_assembly" and split a snake/camel id into tokens.
-function tokenize(s: string | undefined | null): string[] {
+export function tokenize(s: string | undefined | null): string[] {
   if (!s) return []
   return String(s)
     .replace(/_word$/i, '')
@@ -228,7 +228,7 @@ const STOP_TOKENS = new Set<string>([
 // catalogue row (an M12 connector is not a main-shaft seal). We therefore
 // require a STRONG distinguishing-token overlap before accepting a DB hit.
 
-interface DbPart {
+export interface DbPart {
   part_name: string
   manufacturer: string
   part_number: string
@@ -307,7 +307,7 @@ const HEAVY_INDUSTRIAL_TOKENS = new Set<string>([
  * with-real-OEM is strictly better than a coincidental 2-token pin that would
  * fail the slot-mispin / Physics-Critic gates and read as nonsense.
  */
-function dbFirstLookup(
+export function dbFirstLookup(
   db: Database.Database | null,
   tokens: string[],
   headNoun: string | null,
@@ -387,7 +387,7 @@ function dbFirstLookup(
 //   3. the component TYPE (a head-noun token) must appear as a whole word in the
 //      candidate's name/class.
 // (Per-word dedup within a sub_module is enforced by the caller.)
-function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
+export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
   const mfr = dbHit.manufacturer.trim().toLowerCase()
   if (MAKER_VENDORS.has(mfr)) return false
   const toks = tokenize(name)
