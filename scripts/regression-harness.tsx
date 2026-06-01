@@ -2175,6 +2175,60 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL.contract_emits_renderer_mass_slot (2026-06-01, FIX 2) ────────
+  // Guards the gate-17 / exit-17 regression. The renderer's compliance-table
+  // mass row + brief-constraint-completeness-audit (gate 17) read the design's
+  // achieved mass ONLY from this fixed _qtyFromOrch fallback chain:
+  //   total_system_mass_kg → system_mass_with_external_kg → in_container_mass_kg
+  //   → total_mass_kg
+  // (render-minimal-pdf.tsx _buildComplianceRows + brief-constraint-completeness-
+  // audit.ts rendererWouldEmitMassRow). A class whose contract emits its mass
+  // under a DIFFERENT key (e.g. cnc_machine emitted bare `mass_kg`) silently
+  // drops the brief's max_mass_kg row from the compliance table → gate 17 HIGH
+  // → chain exit 17 (PDF rendered but rejected). This invariant asserts that
+  // for the in-scope classes that emit a mass quantity, at least one of the
+  // renderer-read keys is present. Same name-mismatch class as CLAUDE.md #13.
+  // NOTE (honest residual, 2026-06-01): the SAME mismatch also affects haps
+  // (total_estimated_mass_kg), drone (total_estimated_mass_kg), auv
+  // (hull_mass_kg+…), and wind_turbine (total_top_assembly_mass_kg) — PRE-
+  // EXISTING debt OUTSIDE this task's scope (this task fixes cnc/humanoid/dac);
+  // deliberately not listed here so the harness doesn't fail on unrelated
+  // classes. Close it universally by adding a total_system_mass_kg alias to each
+  // and extending MASS_CHECK_CLASSES.
+  {
+    const RENDERER_MASS_KEYS = ['total_system_mass_kg', 'system_mass_with_external_kg', 'in_container_mass_kg', 'total_mass_kg']
+    const MASS_KEY_RE = /(?:^|_)mass_kg$/i
+    const MASS_CHECK_CLASSES = ['cnc_machine', 'bess', 'e_bike']
+    const MINIMAL_MASS_BRIEF: Record<string, unknown> = {
+      product_description: '',
+      constraints: { target_performance: { value: 100, unit: 'kW' }, max_mass_kg: { value: 50000 } },
+    }
+    for (const cls of MASS_CHECK_CLASSES) {
+      let contract: ReturnType<typeof buildContract>
+      try {
+        contract = buildContract(cls, MINIMAL_MASS_BRIEF)
+      } catch (err) {
+        assertions.push({ id: `UNIVERSAL.contract_emits_renderer_mass_slot.${cls}`, description: `buildContract('${cls}') runs on minimal mass brief`, passed: false, detail: `threw: ${err}` })
+        continue
+      }
+      if (!contract) continue // unregistered class — not in scope
+      const qtyKeys = Object.keys(contract.quantities ?? {})
+      const emitsAnyMass = qtyKeys.some((k) => MASS_KEY_RE.test(k))
+      if (!emitsAnyMass) continue // class genuinely has no mass quantity — out of scope
+      const hasRendererKey = RENDERER_MASS_KEYS.some((k) => {
+        const qty = contract!.quantities[k] as unknown as { value?: number } | undefined
+        return qty != null && typeof qty === 'object' && typeof qty.value === 'number' && Number.isFinite(qty.value)
+      })
+      assertions.push(assertEq(
+        `UNIVERSAL.contract_emits_renderer_mass_slot.${cls}`,
+        `Class '${cls}': emits a renderer-read mass slot (one of ${RENDERER_MASS_KEYS.join('/')}) so the brief max_mass_kg row never silently drops (gate 17 / exit 17)`,
+        hasRendererKey,
+        (v: boolean) => v === true,
+        () => `'${cls}' emits a mass quantity (${qtyKeys.filter((k) => MASS_KEY_RE.test(k)).join(', ')}) but NONE of the renderer-read keys ${RENDERER_MASS_KEYS.join('/')}. Fix: add an alias quantity (e.g. total_system_mass_kg) in the '${cls}' archetype builder in scripts/lib/engineering-contract.ts. Without it the compliance table drops the mass row → gate 17 HIGH → chain exit 17.`,
+      ))
+    }
+  }
+
   // ── UNIVERSAL.class_graph_slugs_resolve_to_real_graph ─────────────────────
   // Guards the 2026-05-31 K10 slug-drift regression. The chain emits engine
   // product_class slugs (wind_turbine, h2_electrolyser, ev_charger) that the

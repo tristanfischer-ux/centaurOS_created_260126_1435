@@ -5321,6 +5321,16 @@ registerArchetype('cnc_machine', (brief: any) => {
     auxiliary_power_kw: q(auxiliaryPowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'hydraulics + coolant pumps + lubricator + chip conveyor' }),
     total_connected_power_kw: q(totalConnectedPowerKw, 'kW', 'power', 'peak', 'system', 'calculator', { source_detail: 'spindle + servos + auxiliaries' }),
     mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `${massPerM3} kg/m³ × envelope + ${1500 * axisCount} kg per-axis structure` }),
+    // Canonical total-mass alias read by the renderer's compliance-table mass
+    // row + gate 17 (brief-constraint-completeness-audit). The renderer's
+    // _qtyFromOrch mass fallback chain is total_system_mass_kg → system_mass_
+    // with_external_kg → in_container_mass_kg → total_mass_kg; the bare
+    // `mass_kg` key above is NOT in that chain, so without this alias the
+    // brief's max_mass_kg constraint silently dropped from the compliance
+    // table → gate 17 HIGH → chain exit 17. Same value as mass_kg (the CNC
+    // is a single monolithic machine — no external sub-assembly to add).
+    // See CLAUDE.md item #13 (HARD-slot name-mismatch class).
+    total_system_mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `total machine gross mass = ${massPerM3} kg/m³ × ${workEnvelopeM3.toFixed(3)} m³ envelope + ${1500 * axisCount} kg per-axis structure (mirrors mass_kg; renderer/gate-17 read this key)` }),
   }
 
   // Spindle current at 400 V three-phase
