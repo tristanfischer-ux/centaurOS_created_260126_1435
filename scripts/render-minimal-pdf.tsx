@@ -40,7 +40,8 @@ import {
   type MarketBand,
   type BandPosition,
 } from '../src/lib/pdf-engine-v2/lib/market-bands'
-import { isConsumable } from '../src/lib/pdf-engine-v2/component-classes'
+import { isConsumable, CLASS_PRICE_SANITY_BOUNDS } from '../src/lib/pdf-engine-v2/component-classes'
+import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
@@ -737,6 +738,8 @@ type BomTotals = {
   // it is NOT a per-unit raw material).
   nreTotal_gbp?: number
   nreRows?: Array<{ word_name: string; quantity: number; unit_price_gbp: number; line_total_gbp: number }>
+  // Cost self-assessment verdict (2026-06-01) — surfaced on the cover when not clean.
+  costSanity?: { verdict: string; findings: Array<{ severity: string; detail: string; kind: string }>; lines_checked: number }
 }
 
 function roundToPence(n: number): number {
@@ -900,6 +903,8 @@ function computeBomTotals(state: any): BomTotals | null {
   // unit price absurdly (eVTOL BoM was 97% certification line-items).
   let nreTotal_gbp = 0
   const nreRows: BomTotals['nreRows'] = []
+  // Capital lines collected for the cost self-assessment auditor (2026-06-01).
+  const capitalLines: CostLine[] = []
   // A non-recurring-engineering / certification line — a programme activity, not a
   // physical part (DO-178C / DAL-A / ARP 4761 / "certification" / "safety
   // assessment" / "qualification programme" / a certification-basis sub_module).
@@ -1257,6 +1262,12 @@ function computeBomTotals(state: any): BomTotals | null {
           } else {
             // Normal capital line
             sub.subtotal_gbp = roundToPence(sub.subtotal_gbp + line_total_gbp)
+            capitalLines.push({
+              word_name: String(row.word_name ?? ''),
+              component_class: row.engine_b_component_class ?? null,
+              unit_price_gbp: Number(row.unit_price_gbp ?? 0),
+              quantity: Number(row.quantity ?? 1) || 1,
+            })
           }
         }
         totalRows += 1
@@ -1464,6 +1475,21 @@ function computeBomTotals(state: any): BomTotals | null {
     }
   }
 
+  // Cost self-assessment (2026-06-01, Tristan): the engine checks its OWN per-unit
+  // capital BoM for self-evidently-wrong costs (identical-price fingerprints,
+  // per-line type outliers, non-physical lines) — surfaced on the cover so absurd
+  // costs are flagged before the reader ever sees them, filling gate-21's blind
+  // spot (it skips lines with no live distributor price — the most-wrong ones).
+  const classCeil: Record<string, number> = {}
+  for (const [k, v] of Object.entries(CLASS_PRICE_SANITY_BOUNDS)) {
+    const max = (v as { max_gbp?: number } | undefined)?.max_gbp
+    if (typeof max === 'number') classCeil[k] = max
+  }
+  const costSanity = auditCostSanity(capitalLines, classCeil)
+  if (costSanity.verdict !== 'clean') {
+    console.error(`[render] cost self-assessment: ${costSanity.verdict.toUpperCase()} — ${costSanity.findings.length} finding(s) on ${costSanity.lines_checked} capital lines`)
+  }
+
   return {
     allMods,
     grandTotal_gbp,
@@ -1482,6 +1508,7 @@ function computeBomTotals(state: any): BomTotals | null {
     externalRows: externalRows && externalRows.length > 0 ? externalRows : undefined,
     nreTotal_gbp: nreTotal_gbp > 0 ? nreTotal_gbp : undefined,
     nreRows: nreRows && nreRows.length > 0 ? nreRows : undefined,
+    costSanity: costSanity.verdict !== 'clean' ? costSanity : undefined,
   }
 }
 
@@ -2802,6 +2829,24 @@ function CoverPage({
             )
           }
           return null
+        })()}
+        {/* Cost self-assessment (2026-06-01, Tristan): the engine flags its own
+            BoM lines it isn't confident about — before the reader sees the cost. */}
+        {(() => {
+          const cs = (bomTotals as any)?.costSanity
+          if (!cs || cs.verdict === 'clean' || !Array.isArray(cs.findings) || cs.findings.length === 0) return null
+          const fp = cs.findings.filter((f: any) => f.kind === 'identical_price_fingerprint').length
+          const hi = cs.findings.filter((f: any) => f.severity === 'HIGH').length
+          return (
+            <View style={{ marginBottom: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#fffbeb', borderLeftWidth: 3, borderLeftColor: '#d97706', borderRadius: 2 }}>
+              <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#92400e', letterSpacing: 1.5, marginBottom: 3 }}>
+                COST SELF-ASSESSMENT — {cs.findings.length} {cs.findings.length === 1 ? 'LINE' : 'LINES'} FLAGGED FOR REVIEW
+              </Text>
+              <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+                The engine flagged {cs.findings.length} bill-of-materials cost{cs.findings.length === 1 ? '' : 's'} as potentially unreliable{fp > 0 ? ` (${fp} group${fp === 1 ? '' : 's'} of unrelated parts share an identical price — a sign of mis-classification)` : ''}{hi > 0 ? `; ${hi} need${hi === 1 ? 's' : ''} attention before quoting suppliers` : ''}. Treat the affected line prices as indicative — see the cost analysis for detail.
+              </Text>
+            </View>
+          )
         })()}
         <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 2, marginBottom: 12 }}>
           FORGE ENGINEERING DESIGN DOSSIER · CONCEPT STAGE
