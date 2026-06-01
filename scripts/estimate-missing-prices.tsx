@@ -322,6 +322,16 @@ const NAME_KEYWORD_RULES: RuleEntry[] = [
   // ── HVAC / chiller (NEVER oem_subsystem) ────────────────────────────────
   { pattern: /\b(liquid.chiller|chiller.unit|cooling.chiller|industrial.chiller)\b|\b(eb.xt|cc.series)\b.*\b(pfannenberg|stulz)\b/i, cls: 'oem_hvac_chiller' },
   { pattern: /\b(air.conditioning|air.handling|hvac|rooftop.ac|container.ac|cabinet.ac|split.ac)\b/i, cls: 'oem_hvac_chiller' },
+  // ── Aerospace / HAPS structural + comms (NEVER oem_subsystem — council 2026-06-01) ──
+  // These names fall through C4 to Flash-Lite, which mis-buckets them as
+  // oem_subsystem; with the haps oem_subsystem anchor at £80k they flat-pin at the
+  // £50k sanity-max (5 lines on the haps run). Route to their TRUE class. A genuine
+  // flight computer / avionics suite IS an oem_subsystem, so it is deliberately
+  // NOT listed here (council seat 3: routing it out would under-price a real £80k
+  // triplex FCC).
+  { pattern: /\b(wing.skin|solar.skin|array.skin|aeroshell|fairing|spar.cap|sandwich.panel|composite.skin|laminate.skin)\b|\bskin\b/i, cls: 'structural_polymer' },
+  { pattern: /\b(base.?station|ground.control.station|\bgcs\b|ground.station|rugged.console|control.console|operator.console)\b/i, cls: 'electronic_pcb' },
+  { pattern: /\b(ice.protection|anti.?icing|de.?icing|leading.edge.heater)\b/i, cls: 'thermal' },
   // ── Batteries / cells ───────────────────────────────────────────────────
   { pattern: /\b(li.?ion|lfp|nmc|lithium|prismatic.cell|pouch.cell|cylindrical.cell|18650|21700|280ah|100ah|304ah)\b/i, cls: 'battery_cell' },
   { pattern: /\b(lead.acid|agm|vrla|gel.battery|supercap|ultracap)\b/i, cls: 'battery_cell' },
@@ -388,7 +398,7 @@ const NAME_KEYWORD_RULES: RuleEntry[] = [
  * Invariant: smoke/detector/aspirating/chiller/hvac keywords NEVER return
  * `oem_subsystem` — they route to `oem_smoke_detection` or `oem_hvac_chiller`.
  */
-function classifyByRules(ctx: PartContext): ComponentClass | null {
+export function classifyByRules(ctx: PartContext): ComponentClass | null {
   // 1. MPN-prefix rules — most reliable signal
   if (ctx.manufacturer || ctx.part_number) {
     const mpnHay = [String(ctx.manufacturer ?? ''), String(ctx.part_number ?? '')].join(' ').trim()
@@ -1450,7 +1460,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('[estimate] fatal:', err)
-  process.exit(1)
-})
+// Only auto-run as a CLI; guarded so the module can be imported (e.g. by the
+// regression harness, which exercises classifyByRules) without executing main().
+if ((process.argv[1] ?? '').includes('estimate-missing-prices')) {
+  main().catch((err) => {
+    console.error('[estimate] fatal:', err)
+    process.exit(1)
+  })
+}

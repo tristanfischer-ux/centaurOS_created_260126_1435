@@ -57,6 +57,7 @@ import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/
 import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { classifyByRules } from './estimate-missing-prices'
 
 interface Assertion {
   id: string
@@ -2265,6 +2266,31 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `restoredPn=${restoredPn} (want LF280K), ratingKept=${ratingKept} (want 314 Ah — NOT reverted)`,
+    ))
+  }
+
+  // ── UNIVERSAL.pricing_classifier_routes_aerospace_off_oem_subsystem ───────
+  // Guards the 2026-06-01 Engine-B classifier fix: aerospace/HAPS structural +
+  // comms names were falling through C4 to Flash-Lite, which bucketed them
+  // `oem_subsystem` (haps anchor £80k → flat-pinned at the £50k sanity-max on 4
+  // lines). The cheap classifier fix (validated: haps BOM 7.33→8.00, 12/12
+  // sections ≥8) routes them to their TRUE class. CRITICALLY a genuine
+  // "flight computer triplex" must NOT be routed out (it IS a real ~£80k
+  // oem_subsystem — council seat 3) → classifyByRules returns null so Flash-Lite
+  // keeps it a subsystem.
+  {
+    const c = (name: string) => classifyByRules({ word_name: name } as never)
+    const skin = c('solar array skin') === 'structural_polymer'
+    const base = c('LTE-S basestation') === 'electronic_pcb'
+    const ice = c('leading edge ice protection') === 'thermal'
+    const fcc = c('flight computer triplex') == null // not routed by the new rules
+    const ok = skin && base && ice && fcc
+    assertions.push(assertEq(
+      'UNIVERSAL.pricing_classifier_routes_aerospace_off_oem_subsystem',
+      'Engine-B classifyByRules routes solar-array-skin→structural_polymer, basestation→electronic_pcb, ice-protection→thermal (off the £80k oem_subsystem anchor) but leaves "flight computer triplex" unrouted (genuine subsystem) — guards the 2026-06-01 price-fix that moved haps BOM 7.33→8.00',
+      ok,
+      (v: boolean) => v === true,
+      () => `skin=${skin} base=${base} ice=${ice} fcc_unrouted=${fcc}`,
     ))
   }
 
