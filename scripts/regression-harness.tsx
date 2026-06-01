@@ -56,6 +56,7 @@ import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-q
 import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
+import { isCatalogueComponent, isBlankOrPlaceholderMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 interface Assertion {
   id: string
@@ -2297,6 +2298,34 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `roundingFP=${roundingFP} (want true), realBugTwo=${realBugTwo} (want false), realBugThree=${realBugThree} (want false)`,
+    ))
+  }
+
+  // ── UNIVERSAL.discover_skips_material_words ───────────────────────────────
+  // Guards the 2026-06-01 discover-on-miss blank-word brander (fillBlankWordMpns).
+  // The coding-council BLOCKER: the catalogue-vs-structure filter must NOT try to
+  // pin a part number on a fabricated structure (wing_spar, gaas_solar_laminate,
+  // motor_pylon_mount, battery_pack_enclosure — all material £/kg costed) but MUST
+  // brand real catalogue parts (connector, sensor, flight computer, motor driver).
+  // Plus: isBlankOrPlaceholderMpn must treat empty/deferral as blank but NEVER a
+  // real structured MPN (so a genuine part number is never overwritten).
+  {
+    const structures = ['wing_spar', 'gaas_solar_laminate', 'motor_pylon_mount', 'battery_pack_enclosure']
+    const catalogue = ['connector', 'sensor', 'flight computer', 'motor driver']
+    const structOk = structures.every((s) => isCatalogueComponent(s) === false)
+    const catOk = catalogue.every((s) => isCatalogueComponent(s) === true)
+    // blank predicate: empty + deferral placeholders are blank; real MPNs are not.
+    const blankOk = isBlankOrPlaceholderMpn('') && isBlankOrPlaceholderMpn('TBD (detailed design)') &&
+      isBlankOrPlaceholderMpn('specify exact MPN at detailed design')
+    const realOk = !isBlankOrPlaceholderMpn('FIT1036') && !isBlankOrPlaceholderMpn('BD62012BFS-E2') &&
+      !isBlankOrPlaceholderMpn('LF280K')
+    const ok = structOk && catOk && blankOk && realOk
+    assertions.push(assertEq(
+      'UNIVERSAL.discover_skips_material_words',
+      'fillBlankWordMpns filter: SKIPS fabricated structures (wing_spar/laminate/pylon_mount/enclosure → no MPN, material-costed) but BRANDS catalogue parts (connector/sensor/flight-computer/motor-driver); isBlankOrPlaceholderMpn treats empty+deferral as blank but never a real MPN (FIT1036/BD62012BFS-E2/LF280K) — guards the 2026-06-01 coding-council BLOCKER fix',
+      ok,
+      (v: boolean) => v === true,
+      () => `structOk=${structOk} catOk=${catOk} blankOk=${blankOk} realOk=${realOk}`,
     ))
   }
 

@@ -144,7 +144,57 @@ export interface CompleteEmitterGapsOpts {
 // a gate-20 skip token ("specify"). This guarantees fictional-pn-audit treats
 // it as a commodity/unverifiable descriptor (LOW/MED, never HIGH / exit 20).
 function honestDescriptorMpn(): string {
-  return 'specify exact MPN at detailed design'
+  // Short + gate-20-safe (non-structured, contains 'TBD' commodity token so
+  // fictional-pn-audit skips it). The `form` modifier carries the full
+  // "manufacturer — confirm at detailed design" sentence; the part_number
+  // column only needs a terse deferral marker that does not spill the column.
+  return 'TBD (detailed design)'
+}
+
+// ── Catalogue-vs-structure discriminator (coding-council 2026-06-01) ──────────
+//
+// "Does this word represent a PURCHASED catalogue component (needs a real part
+// number) or a FABRICATED structure (costed by material £/kg, no part number)?"
+// The council rejected reusing material-prices.isMaterialDominated() — that is
+// an integrated-assembly COST signal, not a structure signal, and misfires
+// (passes `motor_pylon_mount` via "motor"; skips `flight computer`/`connector`).
+// This dedicated classifier scored 8/8 on the council's test-names.
+const STRUCTURAL_TOKENS =
+  /\b(spar|laminate|skin|panel|rib|bulkhead|frame|strut|mount|pylon|boom|keel|mast|shell|fairing|cowl|shroud|enclosure|chassis|housing|bracket|casing|ballast|foundation|tower|nacelle|hull|fuselage|airframe|structure|structural|monocoque|honeycomb|prepreg|layup|weldment)\b/i
+const CATALOGUE_TOKENS =
+  /\b(sensor|driver|controller|computer|processor|board|ic|chip|connector|cable|harness|antenna|transceiver|receiver|radio|motor|servo|actuator|esc|regulator|converter|inverter|relay|switch|fuse|capacitor|resistor|inductor|diode|transistor|mosfet|battery|cell|pump|valve|fan|gps|imu|gyro|accelerometer|magnetometer|altimeter|camera|lidar|sonar|encoder|amplifier|oscillator|led|display|gimbal|bearing|gearbox|coupling|compressor|chiller|heater|thermocouple|solenoid)\b/i
+
+/**
+ * True when a word is a purchased catalogue component worth attaching a part
+ * number to. False for fabricated structures (material-costed) and for words
+ * with no clear signal (conservative — never pin an MPN on something uncertain).
+ * Ambiguous compounds (catalogue + structural tokens both present, e.g.
+ * `motor_pylon_mount`, `battery_pack_enclosure`) are decided by the HEAD noun
+ * (last token): a structural head ⇒ structure.
+ */
+export function isCatalogueComponent(name: string): boolean {
+  const hay = String(name ?? '').toLowerCase()
+  const structural = STRUCTURAL_TOKENS.test(hay)
+  const catalogue = CATALOGUE_TOKENS.test(hay)
+  if (catalogue && !structural) return true
+  if (structural && !catalogue) return false
+  if (catalogue && structural) {
+    const lastTok = hay.trim().split(/[^a-z0-9]+/).filter(Boolean).pop() ?? ''
+    return !STRUCTURAL_TOKENS.test(lastTok)
+  }
+  return false
+}
+
+/**
+ * True when a word's part_number is absent or a deferral placeholder (so it
+ * renders as a generic/unbranded BoM line). Deliberately conservative: ONLY
+ * empty or explicit deferral text — never second-guesses a real-looking MPN, so
+ * a genuine catalogue part number (FIT1036, BD62012BFS-E2) is never overwritten.
+ */
+export function isBlankOrPlaceholderMpn(pn: string | undefined | null): boolean {
+  const s = String(pn ?? '').trim()
+  if (!s) return true
+  return /\b(specify|tbd|to\s+be\s+(confirmed|selected|determined|advised)|detailed\s+design|n\/?a|placeholder|unknown)\b/i.test(s)
 }
 
 // Strip a trailing "_word" / "_assembly" and split a snake/camel id into tokens.
@@ -318,6 +368,32 @@ function dbFirstLookup(
   // Acceptance: (head-noun hit AND ≥2 total hits) OR (≥3 total hits).
   const accept = (best.headHit && best.nameHits.size >= 2) || best.nameHits.size >= 3
   return accept ? best.row : null
+}
+
+// High-precision acceptance for a per-WORD DB pin (stricter than the
+// sub_module-gap path). The empirical haps test showed the loose token matcher
+// mis-pins (a TI op-amp as an "electronic speed controller"; a hobby DFRobot
+// servo on an aerospace control surface; one Abracon crystal on three different
+// battery parts). Three guards, council-derived:
+//   1. reject hobby/maker vendors (aerospace + industrial ≠ SparkFun/DFRobot);
+//   2. MOTION words (motor/servo/esc/drive/…) must resolve to a motion class —
+//      kills the op-amp-as-ESC (electronic_ic ≠ motor_actuator); SENSOR words
+//      must resolve to a sensor/optical class;
+//   3. the component TYPE (a head-noun token) must appear as a whole word in the
+//      candidate's name/class.
+// (Per-word dedup within a sub_module is enforced by the caller.)
+function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
+  const mfr = dbHit.manufacturer.trim().toLowerCase()
+  if (MAKER_VENDORS.has(mfr)) return false
+  const toks = tokenize(name)
+  const cls = (dbHit.component_class ?? '').toLowerCase()
+  const MOTION = new Set(['motor', 'servo', 'actuator', 'drive', 'esc', 'speed', 'propeller', 'propulsion', 'thruster'])
+  const SENSE = new Set(['sensor', 'imu', 'gyro', 'gyroscope', 'accelerometer', 'magnetometer', 'thermocouple', 'altimeter', 'encoder', 'pitot'])
+  if (toks.some((t) => MOTION.has(t)) && cls && !/motor_actuator|mechanical_assembly/.test(cls)) return false
+  if (toks.some((t) => SENSE.has(t)) && cls && !/sensor|optical/.test(cls)) return false
+  const hay = `${dbHit.part_name ?? ''} ${cls}`
+  const headTokens = toks.slice(-3)
+  return headTokens.length === 0 || headTokens.some((t) => hasWholeWord(hay, t))
 }
 
 // ── LLM generate fallback ────────────────────────────────────────────────────
@@ -689,7 +765,11 @@ export async function completeEmitterGaps(
       // descriptor; the real MPN (if any) lives in the DB row for future
       // dbFirstLookup to promote once an ingest job confirms it.
       const emittedMpn = honestDescriptorMpn()
-      const emittedMfr = manufacturer || 'OEM (to be selected)'
+      // Never emit the fictional "OEM (to be selected)" (council seat 3: reads as
+      // an unfinished template, worse than a category-typed supplier). The
+      // grounded LLM almost always returns a real OEM; on the rare empty, derive
+      // a category-typed placeholder from the slot's head noun.
+      const emittedMfr = manufacturer || `${(humanName.split(/\s+/)[0] || 'component').replace(/_/g, ' ')} supplier`
 
       const word = buildCompletionWord(
         gap.sub_module_id,
@@ -722,4 +802,173 @@ export async function completeEmitterGaps(
   log(`[emitter-completion] filled ${filled.length} gap(s): ${dbCount} DB-first, ${genCount} generated.`)
 
   return { filled, modulesMutated: mutated }
+}
+
+// ── fillBlankWordMpns — discover-on-miss for BLANK CATALOGUE WORDS ─────────────
+//
+// completeEmitterGaps (above) fills EMPTY sub_modules (gate-23 gaps) by INJECTING
+// one word. This sister function fills the orthogonal case the council flagged:
+// words that ALREADY EXIST inside populated sub_modules but carry no real
+// part_number — the generic/unbranded lines that drag the BoM score down
+// (haps: 76 of 82 words). It MUTATES the existing word's modifiers rather than
+// injecting a new line.
+//
+// Tristan's growing-DB flow, the in-chain + gate-20-safe portion:
+//   DB-first (cache-real ⇒ real structured MPN) → on miss generate (real OEM +
+//   honest deferred MPN) + write-back to grow the DB → take from DB next run.
+// The live web-VERIFY leg that promotes a generated MPN to a structured one
+// (Part B) is deferred per the council (gate-20 near-match poisoning risk).
+//
+// SAFETY (council-reviewed):
+//   • Only CATALOGUE words (isCatalogueComponent) — fabricated structures
+//     (wing_spar, laminate, pylon_mount, enclosure) are SKIPPED and left to
+//     material £/kg costing.
+//   • A structured MPN is emitted ONLY from a cache-real DB hit (dbFirstLookup),
+//     and is .trim()'d so gate-20's re-read of its own source row cannot miss on
+//     stray whitespace. A generate-on-miss never emits a structured MPN.
+//   • Never overwrites an existing real part_number (isBlankOrPlaceholderMpn is
+//     empty-or-deferral-only).
+
+function setWordMpn(
+  word: WordLike,
+  manufacturer: string,
+  partNumber: string,
+  source: 'db' | 'generated',
+): void {
+  const mods = Array.isArray(word.modifier_characters) ? word.modifier_characters : []
+  const kept = mods.filter((m) => m.kind !== 'part_number' && m.kind !== 'manufacturer')
+  kept.push(mod('manufacturer', manufacturer.trim()))
+  kept.push(mod('part_number', partNumber.trim()))
+  word.modifier_characters = kept
+  word.source_detail =
+    source === 'db'
+      ? 'Discover-on-miss: DB-first library match'
+      : 'Discover-on-miss: generated on the fly (MPN deferred to detailed design)'
+}
+
+export interface FillBlankWordsResult {
+  filled: FilledGap[]
+  modulesMutated: boolean
+  skipped_structural: number
+  candidates: number
+}
+
+export interface FillBlankWordsOpts extends CompleteEmitterGapsOpts {
+  /** Cap on the number of generate-on-miss LLM calls (cost guard). DB-first hits
+   *  are unlimited (no network). Default 40. */
+  maxGenerate?: number
+}
+
+/**
+ * Attach a real (or honestly-deferred) part number to every BLANK CATALOGUE word
+ * in `modules`. Mutates in place. Returns what was filled + how many structural
+ * words were (correctly) skipped.
+ *
+ * Run AFTER Phase 2 + the emitter-identity re-assert (so the reviewer has had
+ * its chance to fill words and nothing later reverts our writes), BEFORE render.
+ */
+export async function fillBlankWordMpns(
+  modules: DesignModuleLike[],
+  className: string,
+  opts: FillBlankWordsOpts = {},
+): Promise<FillBlankWordsResult> {
+  const log = opts.log ?? ((l: string) => console.error(l))
+  const model = opts.model ?? GROK_4_3
+  const dbPath = opts.dbPath ?? resolve(homedir(), '.forge-truth', 'forge-truth.db')
+  const maxGenerate = opts.maxGenerate ?? 40
+  const safeModules = Array.isArray(modules) ? modules : []
+
+  // Collect blank CATALOGUE-word candidates (skip structures + real-MPN words).
+  interface Candidate { module: DesignModuleLike; sub: SubModuleLike; word: WordLike; name: string; subId: string; moduleId: string }
+  const candidates: Candidate[] = []
+  let skippedStructural = 0
+  for (const m of safeModules) {
+    const moduleId = String(m?.module ?? 'unknown_module')
+    for (const sm of Array.isArray(m?.sub_modules) ? m.sub_modules! : []) {
+      const subId = String(sm?.id ?? 'unknown_sub_module')
+      for (const w of Array.isArray(sm?.words) ? sm.words! : []) {
+        const pn = (w.modifier_characters ?? []).find((mc) => mc.kind === 'part_number')?.value
+        if (!isBlankOrPlaceholderMpn(pn)) continue // already has a real MPN — leave it
+        const name = w.content_character?.name_human || w.name_human || w.content_character?.character_id || subId
+        if (!isCatalogueComponent(`${name} ${subId}`)) { skippedStructural++; continue }
+        candidates.push({ module: m, sub: sm, word: w, name, subId, moduleId })
+      }
+    }
+  }
+
+  if (candidates.length === 0) {
+    return { filled: [], modulesMutated: false, skipped_structural: skippedStructural, candidates: 0 }
+  }
+  log(
+    `[fill-blank-mpn] ${candidates.length} blank catalogue word(s) for class "${className}" ` +
+    `(${skippedStructural} structural skipped) — DB-first → generate → write-back`,
+  )
+
+  const db = openLibraryDb(dbPath)
+  const filled: FilledGap[] = []
+  let mutated = false
+  let generates = 0
+  // Never pin the SAME part to two words in one sub_module — a part that matches
+  // multiple slots is a generic over-match (an Abracon crystal "matching" busbar +
+  // sensor + harness on the shared token "battery"). Keyed by sub_module id.
+  const usedInSub = new Map<string, Set<string>>()
+
+  try {
+    for (const cand of candidates) {
+      const tokens = new Set<string>([...tokenize(cand.subId), ...tokenize(cand.name)])
+      for (const t of tokenize(cand.word.content_character?.character_id)) tokens.add(t)
+      const tokenList = [...tokens]
+      const headNoun = tokenize(cand.name)[0] ?? tokenize(cand.subId)[0] ?? null
+
+      // 1. DB-FIRST — cache-real structured MPN (gate-20-safe). Per-word matching
+      //    needs a TIGHTER precision bar than sub_module-gap matching (council
+      //    seat 1): a loose token overlap mis-pins (Abracon crystal → "battery
+      //    busbar"). Require the word's HEAD NOUN — the component TYPE, which in a
+      //    natural-language name is the LAST token (busbar/sensor/controller), not
+      //    the first — to appear as a whole word in the candidate, AND never reuse
+      //    a part within the sub_module.
+      const dbHit = dbFirstLookup(db, tokenList, headNoun)
+      if (dbHit) {
+        const typeOk = dbHitAcceptableForWord(dbHit, cand.name)
+        const key = `${dbHit.manufacturer}|${dbHit.part_number}`.toLowerCase()
+        let used = usedInSub.get(cand.subId)
+        if (!used) { used = new Set<string>(); usedInSub.set(cand.subId, used) }
+        if (typeOk && !used.has(key)) {
+          used.add(key)
+          setWordMpn(cand.word, dbHit.manufacturer, dbHit.part_number, 'db')
+          mutated = true
+          filled.push({ module_id: cand.moduleId, sub_module_id: cand.subId, source: 'db', manufacturer: dbHit.manufacturer, part_number: dbHit.part_number, name: cand.name })
+          log(`[fill-blank-mpn]   ✓ DB   ${cand.moduleId}::${cand.subId} (${cand.name}) → ${dbHit.manufacturer} ${dbHit.part_number}`)
+          continue
+        }
+        // type mismatch or duplicate → treat as a MISS (fall through to generate).
+      }
+
+      // 2. ON MISS → generate (real OEM + honest deferred MPN) + write-back to
+      //    grow the DB. Capped (cost guard); skippable for offline/test runs.
+      if (opts.skipGenerate || generates >= maxGenerate) continue
+      generates++
+      const gen = await generatePart(className, cand.moduleId, cand.subId, `${cand.name}; ${describeSubModule(cand.sub)}`, model, opts.designContext ?? '')
+      if (!gen || !gen.manufacturer) continue
+      if (!opts.skipWriteback) {
+        const wrote = writeBackGenerated(dbPath, gen, className, cand.moduleId, cand.subId)
+        if (wrote) log(`[fill-blank-mpn]      ↳ wrote back ${gen.manufacturer} to pretraining_extracted_parts`)
+      }
+      // gate-20 SAFETY: emit the honest non-structured descriptor, NOT gen's
+      // unverified MPN (it isn't in any distributor cache yet). The real MPN (if
+      // any) lives in the DB row for a future ingest job to promote.
+      setWordMpn(cand.word, gen.manufacturer, honestDescriptorMpn(), 'generated')
+      mutated = true
+      filled.push({ module_id: cand.moduleId, sub_module_id: cand.subId, source: 'generated', manufacturer: gen.manufacturer, part_number: honestDescriptorMpn(), name: cand.name })
+      log(`[fill-blank-mpn]   ✓ GEN  ${cand.moduleId}::${cand.subId} (${cand.name}) → ${gen.manufacturer} [MPN deferred${gen.part_number ? `; LLM suggested "${gen.part_number}" stored in DB` : ''}]`)
+    }
+  } finally {
+    try { db?.close() } catch { /* no-op */ }
+  }
+
+  const dbCount = filled.filter((f) => f.source === 'db').length
+  const genCount = filled.filter((f) => f.source === 'generated').length
+  log(`[fill-blank-mpn] filled ${filled.length}/${candidates.length} blank word(s): ${dbCount} DB-first (real MPN), ${genCount} generated (real OEM, MPN deferred); ${skippedStructural} structural skipped.`)
+
+  return { filled, modulesMutated: mutated, skipped_structural: skippedStructural, candidates: candidates.length }
 }

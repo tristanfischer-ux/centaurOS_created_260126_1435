@@ -75,7 +75,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
-import { completeEmitterGaps } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { completeEmitterGaps, fillBlankWordMpns } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { snapshotEmitterIdentity, reassertEmitterIdentity, restoreStrippedPartNumbers, isLockedKind, type EmitterIdentitySnapshot } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { runSharedQuantityConsistencyAudit } from '../src/lib/pdf-engine-v2/lib/shared-quantity-consistency-audit'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
@@ -3671,6 +3671,43 @@ async function main() {
       console.error(`[chain] emitter-identity re-assert: corrected ${reassert.words_corrected}/${reassert.words_matched} pinned words; ${reassert.words_missing_post_mutation} emitter word(s) missing post-mutation`)
     }
     logAction({ step: 'emitter_identity_reassert', pinned_words: reassert.pinned_words_in_snapshot, words_matched: reassert.words_matched, words_corrected: reassert.words_corrected, words_missing: reassert.words_missing_post_mutation, corrections: reassert.corrections })
+  }
+
+  // ── Discover-on-miss: brand BLANK CATALOGUE WORDS (2026-06-01, coding-council) ──
+  // Sister to emitter-completion (which fills EMPTY sub_modules): this brands the
+  // generic/unbranded WORDS inside populated sub_modules — the lines that drag the
+  // BoM score down (haps: 76 of 82 words blank). DB-first (cache-real ⇒ real
+  // structured MPN, gate-20-safe) → generate-on-miss (real OEM + honest deferred
+  // MPN) + write-back to grow the DB. Catalogue-only: fabricated structures are
+  // skipped (material £/kg costing). Runs AFTER the emitter-identity re-assert so
+  // nothing reverts our writes. Skip via CHAIN_SKIP_BLANK_MPN_FILL=1; DB-first
+  // only (no LLM) via CHAIN_BLANK_MPN_DB_ONLY=1.
+  if (process.env.CHAIN_SKIP_BLANK_MPN_FILL !== '1') {
+    try {
+      const tFill = Date.now()
+      const fill = await fillBlankWordMpns(
+        design.modules ?? [],
+        currentProductClass ?? 'unknown',
+        {
+          designContext: String((parsedResult?.data as any)?.product_description ?? (parsedResult?.data as any)?.brief?.original_text ?? ''),
+          // Default to the e2e-VERIFIED DB-first-only mode (zero added latency,
+          // gate-20-safe real MPNs). The generate-on-miss leg (real OEM + honest
+          // deferred MPN + DB write-back) is opt-in until its latency is measured.
+          skipGenerate: process.env.CHAIN_BLANK_MPN_GENERATE !== '1',
+        },
+      )
+      if (fill.filled.length > 0) {
+        const dbN = fill.filled.filter((f) => f.source === 'db').length
+        const genN = fill.filled.filter((f) => f.source === 'generated').length
+        console.error(
+          `[chain] fill-blank-mpn: branded ${fill.filled.length}/${fill.candidates} blank catalogue word(s) ` +
+          `(${dbN} DB-first real MPN, ${genN} generated real-OEM), ${fill.skipped_structural} structural skipped`,
+        )
+        logAction({ step: 'fill_blank_word_mpns', filled_count: fill.filled.length, db_first: dbN, generated: genN, skipped_structural: fill.skipped_structural, candidates: fill.candidates, modules_mutated: fill.modulesMutated, filled: fill.filled, class_name: currentProductClass ?? 'unknown', latency_ms: Date.now() - tFill })
+      }
+    } catch (err) {
+      console.error(`[chain] fill-blank-mpn skipped (non-fatal): ${(err as Error).message}`)
+    }
   }
 
   // ── Gate 24: Shared-Quantity Consistency Audit (exit 24, 2026-05-26, class-killer A) ──────────
