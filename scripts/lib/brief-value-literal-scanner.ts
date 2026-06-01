@@ -319,6 +319,16 @@ export function scanEmitterForBriefLiterals(
       const expectedFamily = CONSTRAINT_EXPECTED_FAMILY[key]
       const mIdx = match.index ?? lineText.indexOf(match[1])
 
+      // Arithmetic-constant skip (2026-06-01): a number immediately preceded by a
+      // multiply/divide operator is a SCALING / ROUNDING constant in a computation
+      // (×100 to make a percentage, /100)*100 to round to the nearest 100), NOT a
+      // hardcoded brief value. The farm batch_size=100 false-matched `* 100`
+      // (DoD→%), `/ 100) * 100` (round-to-nearest-100 A), and `(1 - 0.98) * 100`
+      // (loss→%) in BESS emitter arithmetic. A genuine stale brief literal is a
+      // mod()/q() value or an assignment, never a ×/÷ operand.
+      const beforeNum = lineText.slice(0, mIdx).replace(/\s+$/, '')
+      if (/[*/]$/.test(beforeNum)) continue
+
       // Value-key family (gate-25 false-positive fix, 2026-05-30): the mod()/q()
       // KEY wrapping the literal tells us what the value IS (a price, a voltage).
       // If that differs from the constraint's family it's a coincidental collision
