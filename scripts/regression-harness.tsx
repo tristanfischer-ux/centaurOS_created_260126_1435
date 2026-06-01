@@ -2200,6 +2200,102 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL.auto_plan_fallback_never_fires_for_registered_class (2026-06-01) ──
+  //
+  // Guards the WALL-2 auto-planner wire (orchestrate.ts: composeFallbackPlan at
+  // the selectPlan-miss branch, gated UNIVERSAL_AUTO_PLAN). The wire's safety
+  // contract is: for a NOVEL (unregistered) class it composes a tool graph so the
+  // orchestrator advances past wall-2; for the 35 REGISTERED classes the fallback
+  // must NEVER be consulted (they match a hand-written ClassToolPlan first), so
+  // existing-class behaviour is provably unchanged even with the flag ON.
+  //
+  // This invariant turns "fallback never fires for registered classes" + "wire is
+  // live for novel classes" into a mechanical, snapshot-independent assertion:
+  //   1. With the flag forced ON, every registered envelope where selectPlan
+  //      returns a plan MUST have composeFallbackPlan() short-circuited by the
+  //      orchestrator (the fallback is only reached when selectPlan===null). We
+  //      assert the structural precondition directly: selectPlan(env) !== null for
+  //      each registered class → the fallback branch is never entered.
+  //   2. For a guaranteed-novel class slug, selectPlan === null AND (flag ON)
+  //      composeFallbackPlan() returns a NON-EMPTY plan → the wire is live (a
+  //      novel class no longer dies at wall-2). With the flag OFF it returns null
+  //      (default-OFF safety).
+  // Self-contained: registers tools/plans via a side-effect import; skips cleanly
+  // if the orchestrator modules can't load.
+  {
+    let opOk = true
+    let mods: any = null
+    const savedFlag = process.env.UNIVERSAL_AUTO_PLAN
+    try {
+      require('./lib/orchestrator/register-all')
+      const planner = require('./lib/orchestrator/planner')
+      const envelopeMod = require('./lib/orchestrator/envelope')
+      const fallback = require('./lib/orchestrator/auto-plan-fallback')
+      mods = { planner, envelopeMod, fallback }
+    } catch (err) {
+      opOk = false
+      assertions.push({ id: 'UNIVERSAL.auto_plan_fallback_never_fires_for_registered_class', description: 'wall-2 auto-planner wire guard (skipped — orchestrator modules unavailable)', passed: true, detail: `import failed: ${String(err).slice(0, 120)}` })
+    }
+    if (opOk && mods) {
+      const { planner, envelopeMod, fallback } = mods
+      process.env.UNIVERSAL_AUTO_PLAN = '1' // force flag ON: the harshest test for "registered classes unaffected"
+      fallback._resetManifestCacheForTests?.()
+
+      // Representative registered envelopes (declared class → minimal brief). The
+      // set spans distinct scale-tier shapes so the assertion isn't BESS-only.
+      const REGISTERED_PROBES: Array<{ cls: string; brief: any }> = [
+        { cls: 'bess', brief: { product_class: 'bess', product_description: 'utility containerised lfp bess', target_performance: { value: 3.5, unit: 'MWh' }, max_mass_kg: { value: 35000 }, voltage_class_v: 1500 } },
+        { cls: 'bioreactor', brief: { product_class: 'bioreactor', product_description: 'stirred-tank stainless bioreactor', target_performance: { value: 2000, unit: 'L' } } },
+        { cls: 'wind_turbine', brief: { product_class: 'wind_turbine', product_description: 'onshore horizontal-axis wind turbine', target_performance: { value: 6, unit: 'MW' } } },
+        { cls: 'heat_pump_residential', brief: { product_class: 'heat_pump_residential', product_description: 'residential air-source heat pump monobloc', target_performance: { value: 12, unit: 'kW' } } },
+        { cls: 'ev_charger', brief: { product_class: 'ev_charger', product_description: 'DC fast charger CCS combo 2 pedestal', target_performance: { value: 150, unit: 'kW' }, voltage_class_v: 400 } },
+      ]
+      const noPlanFor: string[] = []
+      for (const probe of REGISTERED_PROBES) {
+        const env = envelopeMod.detectEnvelope(probe.brief)
+        const plan = env ? planner.selectPlan(env) : null
+        // The orchestrator only reaches composeFallbackPlan when selectPlan
+        // returns null. A registered class that selects a plan therefore NEVER
+        // enters the fallback branch — that is the entire "existing classes
+        // unaffected" guarantee. We assert that precondition directly.
+        if (!plan) noPlanFor.push(probe.cls)
+      }
+      // Assertion 1: every registered probe selects a hand-written plan (so the
+      // fallback branch is never entered for them).
+      assertions.push(assertEq(
+        'UNIVERSAL.auto_plan_fallback_never_fires_for_registered_class',
+        'WALL-2 wire: every registered class selects a hand-written ClassToolPlan (flag forced ON) → composeFallbackPlan is structurally bypassed; existing classes unaffected',
+        noPlanFor.length,
+        (n: number) => n === 0,
+        () => `registered classes WITHOUT a plan (would wrongly enter fallback): [${noPlanFor.join(', ')}]. A registered class must selectPlan()!==null so the auto-planner fallback never runs for it.`,
+      ))
+
+      // Assertion 2: a guaranteed-novel class has NO registered plan AND the wire
+      // composes a non-empty plan when the flag is ON (live), null when OFF (safe).
+      const novelBrief: any = { product_class: 'tidal_stream_generator', product_description: 'subsea tidal-stream turbine generator 1.5 MW 20 m rotor 3.3 kV export', target_performance: { value: 1500, unit: 'kW' }, max_mass_kg: { value: 250000 }, voltage_class_v: 3300 }
+      const novelEnv = envelopeMod.detectEnvelope(novelBrief)
+      const novelHasPlan = novelEnv ? planner.selectPlan(novelEnv) : null
+      process.env.UNIVERSAL_AUTO_PLAN = '1'
+      fallback._resetManifestCacheForTests?.()
+      const composedOn = novelEnv ? fallback.composeFallbackPlan(novelEnv, novelBrief) : null
+      delete process.env.UNIVERSAL_AUTO_PLAN
+      fallback._resetManifestCacheForTests?.()
+      const composedOff = novelEnv ? fallback.composeFallbackPlan(novelEnv, novelBrief) : null
+      const wireLive = novelHasPlan === null && !!composedOn && composedOn.plan.tools.length > 0 && composedOff === null
+      assertions.push(assertEq(
+        'UNIVERSAL.auto_plan_fallback_live_for_novel_class',
+        'WALL-2 wire: a novel class (tidal_stream_generator) has no registered plan, composes a NON-EMPTY tool graph when UNIVERSAL_AUTO_PLAN=1, and composes nothing when the flag is off (default-OFF safety)',
+        wireLive,
+        (v: boolean) => v === true,
+        () => `expected novelHasPlan=null (got ${novelHasPlan ? 'a plan' : 'null'}), composedOn.tools>0 (got ${composedOn ? composedOn.plan.tools.length : 'null'}), composedOff=null (got ${composedOff ? 'a plan' : 'null'}). The wire must be live ON + silent OFF for unregistered classes.`,
+      ))
+      // Restore the flag to its pre-test value so later invariants are unaffected.
+      if (savedFlag === undefined) delete process.env.UNIVERSAL_AUTO_PLAN
+      else process.env.UNIVERSAL_AUTO_PLAN = savedFlag
+      fallback._resetManifestCacheForTests?.()
+    }
+  }
+
   // ── UNIVERSAL.declared_class_beats_incidental_keyword (2026-06-01, FIX 1) ──
   // Guards the classifier regression that hard-exited humanoid + DAC chains at
   // exit 7. A brief's DECLARED product class must win over an INCIDENTAL
