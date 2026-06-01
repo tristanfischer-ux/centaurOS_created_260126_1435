@@ -166,6 +166,8 @@ SLUG_LABEL = {
     "rs-farm":       "Farm",
     "rs-haps":       "HAPS",
     "rs-heatpump":   "Heatpump",
+    "rs-wind-turbine":  "Wind-Turbine",
+    "rs-solar-inverter": "Solar-Inverter",
 }
 
 SCORING_PROMPT = """You are a senior hardware engineering consultant reviewing a ForgeOS AI-generated engineering design report (PDF).
