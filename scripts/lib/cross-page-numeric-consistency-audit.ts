@@ -287,6 +287,52 @@ const ACHIEVED_ROLE_TOKENS = new Set<string>([
   'design',
 ])
 
+// 2026-06-01 (gate-18 FIX 2b — cnc false-positive): a COST-CEILING LEVER /
+// RECOMMENDATION value is a "what-if you downrate/substitute to hit the cost
+// ceiling" suggestion, NOT a claim about the design. CNC L? cover prose
+// (recommendation list L1/L2/L3): "Downrate spindle power to ~17.1 kW to meet
+// the £280k ceiling" appears twice (p2 + p8) and clustered with the real
+// design value "Spindle power 22 kW" (8+ occurrences) → false HIGH 17.1 vs 22.
+// A recommendation lever is a different quantity-ROLE than the design value —
+// the same kind of split the file already makes for alternative-scenario
+// values (STRONG qualifiers alternative/scenario/hypothetical). These two
+// token sets identify the lever (downrate/derate/substitute/recommend) AND the
+// cost-ceiling target (meet/fit a ceiling/budget); BOTH must be present so a
+// bare "downrate" elsewhere doesn't over-split.
+const RECOMMENDATION_LEVER_TOKENS = new Set<string>([
+  'downrate', 'derate', 'substitut', 'substitute', 'recommend', 'recommended',
+  'recommends', 'lever', 'trade-off', 'tradeoff', 'reduce', 'downsize',
+])
+const COST_CEILING_TARGET_TOKENS = new Set<string>([
+  'ceil', 'ceiling', 'budget', 'meet', 'fit', 'cap', 'within',
+])
+
+// 2026-06-01 (gate-18 FIX 2a — cnc false-positive): MASS-SCOPE split. A
+// SYSTEM-TOTAL mass (the whole machine / shipment — "Mass: ≤ 8,500 kg
+// single-truck road transport") and a single-COMPONENT mass (one part —
+// "machine base ... ≥ 4,500 kg base mass") are PHYSICALLY DISTINCT quantities,
+// never a contradiction. Without a discriminator they share anchor=mass and
+// cluster → false HIGH (cnc: 8,500 system cap vs 4,500 cast-iron base, variance
+// 61.5%). This is the same kind of strong-qualifier split the file already
+// makes for nameplate≠usable and continuous≠peak. These token sets classify a
+// mass occurrence's SCOPE from its raw window. Matched against lowercased raw
+// pre/post tokens (NOT stemmed head) to avoid stemmer mangling (e.g. "shipping"
+// → "shipp"). gross/net/aggregate are also STRONG qualifiers already, so they
+// independently split too; scope adds the system-vs-component axis those miss.
+const MASS_SYSTEM_SCOPE_TOKENS = new Set<string>([
+  'gross', 'total', 'system', 'system-mass', 'overall', 'complete', 'entire',
+  'whole', 'assembled', 'payload', 'shipping', 'shipped', 'shipment',
+  'transport', 'transported', 'single-truck', 'truck', 'road', 'haul',
+  'gvw', 'gvm', 'curb', 'kerb', 'laden', 'in-container',
+])
+const MASS_COMPONENT_SCOPE_TOKENS = new Set<string>([
+  'base', 'casting', 'cast-iron', 'castiron', 'meehanite', 'column', 'bridge',
+  'frame', 'bracket', 'component', 'subassembly', 'sub-assembly', 'bedplate',
+  'saddle', 'ram', 'trunnion', 'cradle', 'plate', 'block', 'flange', 'rib',
+  'ribbing', 'casing', 'housing', 'rotor', 'stator', 'blade', 'hub', 'tower',
+  'foundation', 'enclosure', 'cabinet', 'module', 'rack', 'pack', 'cell',
+])
+
 /** Classify an occurrence's role from its local window tokens.
  *   achieved   = the design's delivered value ("Mission: deliver 2.69 MWh")
  *   req-floor  = a brief minimum / floor ("2.5 MWh minimum")
@@ -307,6 +353,19 @@ const ACHIEVED_ROLE_TOKENS = new Set<string>([
  * being a false positive. */
 function roleOf(feat: { head: string[]; qualifiers: string[] }): string {
   const toks = [...feat.head, ...feat.qualifiers]
+  // RECOMMENDATION dominates: a "downrate/substitute X to meet the cost ceiling"
+  // lever value is not a claim about the design. Requires BOTH a lever token AND
+  // a cost-ceiling target token so a bare "reduce" / "meet" elsewhere does not
+  // over-split. NOT-MASKING-REAL-FAILURES: two recommendation values that
+  // disagree still share role=recommendation → still cluster → still flag (the
+  // doc should not quote two different downrate targets for one lever); only a
+  // recommendation-vs-design pair stops being a false contradiction.
+  if (
+    toks.some((t) => RECOMMENDATION_LEVER_TOKENS.has(t)) &&
+    toks.some((t) => COST_CEILING_TARGET_TOKENS.has(t))
+  ) {
+    return 'recommendation'
+  }
   if (toks.some((t) => ACHIEVED_ROLE_TOKENS.has(t))) return 'achieved'
   if (toks.some((t) => REQUIREMENT_ROLE_TOKENS.has(t))) {
     const hasFloor = toks.some((t) => t === 'minimum' || t === 'floor')
@@ -734,6 +793,36 @@ function looksLikePartSpecific(occ: NumericOccurrence): boolean {
   return false
 }
 
+/** Classify a MASS occurrence's SCOPE from its raw window tokens:
+ *   'system'    = whole-machine / shipment mass ("gross mass", "single-truck
+ *                 road transport", "total system mass")
+ *   'component' = a single part's mass ("base mass", "cast-iron column",
+ *                 "rotor", "enclosure")
+ *   'neutral'   = no decisive signal, OR signals for BOTH (ambiguous → do not
+ *                 force a split).
+ *
+ * Reads RAW pre/post tokens (lowercased, punctuation-normalised the same way
+ * classifyTokens does) so the stemmer can't mangle multi-word/hyphenated tokens
+ * ("single-truck", "cast-iron", "shipping"→"shipp"). A system-total mass and a
+ * component mass are physically distinct quantities and must never cluster as a
+ * contradiction; a genuine same-scope mass contradiction (two system totals, or
+ * two values for the same component) still shares scope → still clusters → still
+ * flags. Only MASS uses this; other families are unaffected. */
+function massScopeOf(occ: NumericOccurrence): 'system' | 'component' | 'neutral' {
+  const toks = [...occ.preTokens, ...occ.postTokens]
+    .map((t) => t.toLowerCase().replace(/[^a-z0-9_-]/g, ''))
+    .filter(Boolean)
+  let hasSystem = false
+  let hasComponent = false
+  for (const t of toks) {
+    if (MASS_SYSTEM_SCOPE_TOKENS.has(t)) hasSystem = true
+    if (MASS_COMPONENT_SCOPE_TOKENS.has(t)) hasComponent = true
+  }
+  if (hasSystem && !hasComponent) return 'system'
+  if (hasComponent && !hasSystem) return 'component'
+  return 'neutral'
+}
+
 function featurize(occ: NumericOccurrence): OccurrenceFeatures {
   const pre = classifyTokens(occ.preTokens)
   const post = classifyTokens(occ.postTokens)
@@ -787,11 +876,16 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
     // neutral) splits the brief-spec value from the design-delivered value so
     // "2.5 MWh minimum" and "deliver 2.69 MWh" are not a false contradiction.
     const role = roleOf(feat)
+    // 2026-06-01 FIX 2a: MASS gets an extra SCOPE dimension (system-total vs
+    // single-component) so an 8,500 kg machine-mass cap never clusters with a
+    // 4,500 kg cast-iron base mass. Other families pass scope='' (no effect).
+    const scope = feat.family === 'MASS' ? massScopeOf(feat.occ) : ''
     let key: string
     if (feat.anchor) {
       // Anchor-based clustering: family + anchor + strong-qualifier-set + role
+      // (+ mass-scope for MASS).
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}`
+      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}|scope=${scope}`
     } else if (PART_SPECIFIC_FAMILIES.has(feat.family)) {
       // No fallback clustering for part-specific families. The audit would
       // be too noisy — every BoM line has a length/mass/voltage on a
