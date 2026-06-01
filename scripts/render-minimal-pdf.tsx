@@ -19,9 +19,10 @@
  */
 import React from 'react'
 import { Document, Page, Text, View, Svg, Line, Circle, Link, Image, pdf } from '@react-pdf/renderer'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, realpathSync } from 'fs'
 import { resolve, dirname, join } from 'path'
 import { execFileSync } from 'child_process'
+import { fileURLToPath } from 'url'
 import { generateSubmoduleParagraph } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { getClassStandards, mergeBriefAndClassStandards, type RegulatoryStandard } from '../src/lib/pdf-engine-v2/class-standards'
 import { getClassHazards, computeHazardRPN, type ClassHazard } from '../src/lib/pdf-engine-v2/class-hazards'
@@ -6330,6 +6331,34 @@ interface SubModuleNote {
  *  and render as garbled fallback glyphs like "t/u/v/w" for ⁴⁵⁶⁷). */
 const NOTE_MARK_STYLE = { fontSize: 6, fontFamily: 'Helvetica-Bold', color: ACCENT } as const
 
+/**
+ * Honest-pricing predicate (Tristan 2026-06-01, "the honesty lever").
+ *
+ * A BoM line gets the "indicative · RFQ" marker when its unit price is the best
+ * available ESTIMATE rather than a firm quote — i.e. a quote-only instrument or
+ * a build-to-order fabrication. We keep the NUMBER (it is the best estimate);
+ * only the PRESENTATION becomes honest, so a buyer treats the line as a
+ * request-for-quotation input rather than a live catalogue price.
+ *
+ * Single source of truth — used by BOTH BoM renderers (SubModuleBomBlock and
+ * renderPartRow) AND the regression invariant. The rule keys off the renderer's
+ * EXISTING tier/source fields (no new classifier):
+ *   • FIRM, no marker: price_tier === 'actual' — a real distributor / DB-sourced
+ *     catalogue price (incl. distributor_price_source === 'emitter_list_price'
+ *     pins like the EL-FLOW MFC £1,112), with NO macro override on the line.
+ *   • INDICATIVE · RFQ: price_tier === 'estimate' (class-anchor / Engine-B curve,
+ *     no real source) OR a macro / build-to-order line (contract_override_reason
+ *     set — a fabricated material×mass item like a vessel). The override check
+ *     comes FIRST: a line that started 'actual' but was re-priced by a macro
+ *     override is no longer a firm distributor price, so it reads as indicative.
+ *   • TBD: unit_price_gbp === 0 → no marker (already renders "TBD"/"—").
+ */
+export function isIndicativeRfqLine(row: Pick<BomPartRow, 'price_tier' | 'unit_price_gbp' | 'contract_override_reason'>): boolean {
+  if (!(typeof row.unit_price_gbp === 'number' && row.unit_price_gbp > 0)) return false
+  if (typeof row.contract_override_reason === 'string' && row.contract_override_reason.length > 0) return true
+  return row.price_tier === 'estimate'
+}
+
 /** Source-method short label for the BoM SRC column. */
 function srcLabelForRow(row: BomPartRow): string {
   const s = String(row.source_method ?? '').toLowerCase()
@@ -6558,6 +6587,14 @@ function SubModuleBomBlock({
         const src = srcLabelForRow(row)
         const ref = priceRealityRefForRow(row)
         const refColor = ref === '>2x' ? '#b91c1c' : ref === '<.5x' ? '#1d4ed8' : ref === 'OK' ? '#15803d' : MUTED
+        // Honest-pricing marker (Tristan 2026-06-01, "the honesty lever"):
+        // quote-only instruments + build-to-order fabrications keep their best-
+        // available NUMBER but read as a request-for-quotation input, not a
+        // firm catalogue price. Single source of truth (isIndicativeRfqLine):
+        // estimate-tier OR macro/contract-override lines get the marker; firm
+        // (actual-tier) distributor prices + TBD lines do NOT. The neutral
+        // legend beneath the table explains the marker.
+        const isIndicativeRfq = isIndicativeRfqLine(row)
         // 2026-05-23 P2-3: visually strikethrough excluded rows + tag them.
         // The math now reconciles for the reader: the row shows £96 but
         // strikethrough indicates it isn't in the sub-total.
@@ -6614,7 +6651,14 @@ function SubModuleBomBlock({
               )
             })()}
             <Text style={{ width: 24, fontSize: 9, color: INK, textAlign: 'right' }}>×{(row.quantity ?? 1).toLocaleString('en-GB')}</Text>
-            <Text style={{ width: 62, fontSize: 9, color: INK, textAlign: 'right' }}>{unitPriceCell}</Text>
+            <View style={{ width: 62, alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 9, color: INK, textAlign: 'right' }}>{unitPriceCell}</Text>
+              {/* Honest-pricing marker — small amber sub-line under the unit */}
+              {/* price on estimate-tier + build-to-order lines. NOT a banner. */}
+              {isIndicativeRfq ? (
+                <Text style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', color: '#92400e', textAlign: 'right' }}>indicative · RFQ</Text>
+              ) : null}
+            </View>
             <Text style={lineTextStyle}>{lineCell}</Text>
             <View style={{ width: 60, paddingLeft: 6, flexDirection: 'row', alignItems: 'baseline' }}>
               {isExcluded ? (
@@ -6646,7 +6690,7 @@ function SubModuleBomBlock({
           "corpus" term and describes the price-sanity check as comparing
           against typical prices for similar components. */}
       <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 4, lineHeight: 1.5, fontStyle: 'italic' }}>
-        SOURCE: Web = found in a distributor catalogue (DigiKey / Mouser / Farnell etc.) · Est. = web estimate, not a live quote · Mfr = found on the manufacturer&apos;s own site · — = no source recorded.  PRICE CHECK (against typical prices for similar components): OK = price sits in the normal range · &gt;2x = price looks more than 2× higher than typical · &lt;.5x = price looks less than half of typical · - = no comparable parts on record to check against.  PRICE-QUERY = part is required for the design but the unit price is under the industry floor for this class; verify the part number and specification before procurement.
+        SOURCE: Web = found in a distributor catalogue (DigiKey / Mouser / Farnell etc.) · Est. = web estimate, not a live quote · Mfr = found on the manufacturer&apos;s own site · — = no source recorded.  PRICE CHECK (against typical prices for similar components): OK = price sits in the normal range · &gt;2x = price looks more than 2× higher than typical · &lt;.5x = price looks less than half of typical · - = no comparable parts on record to check against.  PRICE-QUERY = part is required for the design but the unit price is under the industry floor for this class; verify the part number and specification before procurement.  INDICATIVE · RFQ = best available estimate for a quote-only instrument or build-to-order fabrication; request a quotation to firm up. Prices without the marker are live catalogue prices.
       </Text>
     </View>
   )
@@ -7904,6 +7948,11 @@ function BillOfMaterialsPage({
   const renderPartRow = (v: BomPartRow, keyHint: string) => {
     const priceTierColour = v.price_tier === 'actual' ? '#065f46' : v.price_tier === 'estimate' ? '#92400e' : '#6b7280'
     const priceTierLabel = v.price_tier === 'actual' ? '✓' : v.price_tier === 'estimate' ? '~' : '?'
+    // Honest-pricing marker (Tristan 2026-06-01, "the honesty lever"): see
+    // isIndicativeRfqLine (single source of truth). Estimate-tier + macro/
+    // build-to-order lines keep their best-available NUMBER but read as an
+    // RFQ input; firm actual-tier distributor prices + TBD lines stay clean.
+    const isIndicativeRfq = isIndicativeRfqLine(v)
     const sourceLabel =
       v.source_method === 'db-cache' ? 'Cache' :
       v.source_method === 'brave' ? 'Web' :
@@ -7962,6 +8011,16 @@ function BillOfMaterialsPage({
               {v.unit_price_gbp > 0 ? fmtGBP(v.unit_price_gbp) : 'TBD'}
             </Text>
           </View>
+          {/* Honest-pricing marker (Tristan 2026-06-01). Quote-only / build-to- */}
+          {/* order lines carry the best-available estimate as the NUMBER but */}
+          {/* must read as a request-for-quotation input, not a firm catalogue */}
+          {/* quote. Small amber sub-line under the price; firm (actual-tier) */}
+          {/* and TBD lines never show it. The neutral BoM footnote explains. */}
+          {isIndicativeRfq ? (
+            <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: '#92400e', letterSpacing: 0.2 }}>
+              indicative · RFQ
+            </Text>
+          ) : null}
         </View>
         <View style={{ flex: 1.2, alignItems: 'flex-end', paddingRight: 6 }}>
           <Text style={{ fontSize: 9.5, color: v.line_total_gbp > 0 ? INK : MUTED, fontFamily: v.line_total_gbp > 0 ? 'Helvetica-Bold' : undefined }}>
@@ -8121,6 +8180,11 @@ function BillOfMaterialsPage({
             {/* Manual Review callout removed per Tristan fifth review. */}
             <Text style={{ fontSize: 10, color: MUTED, marginBottom: 12 }}>
               Every part word in every sub-module is listed below. Price provenance: <Text style={{ color: '#065f46' }}>✓ ACTUAL</Text> = live distributor quote (DigiKey / Mouser / Farnell). <Text style={{ color: '#92400e' }}>~ ESTIMATE</Text> = price from web judgement, not a live quote. <Text style={{ color: '#6b7280' }}>? TBD</Text> = no price found yet; line total excluded from sub-totals. Click any part number to open its source page.{'\n'}
+              {/* Honest-pricing footnote (Tristan 2026-06-01, "the honesty lever"): */}
+              {/* line-level RFQ note — NOT a cover banner. Estimate-tier + build-to- */}
+              {/* order lines keep their best-available number but are flagged so a */}
+              {/* buyer treats them as a request-for-quotation input. */}
+              Lines marked <Text style={{ color: '#92400e', fontFamily: 'Helvetica-Bold' }}>indicative · RFQ</Text> carry the best available estimate and require a request-for-quotation to firm up (quote-only instruments and build-to-order fabrications); lines without the marker are live catalogue prices.{'\n'}
               Reference-anchor (Engine C): right-margin badge <Text style={{ color: '#065f46', fontFamily: 'Helvetica-Bold' }}>OK</Text> = unit price within 0.5x-2.0x of the Phase 4 corpus reference median for similar components, <Text style={{ color: '#9f1239', fontFamily: 'Helvetica-Bold' }}>&gt; 2x</Text> = over reference, <Text style={{ color: '#1e40af', fontFamily: 'Helvetica-Bold' }}>&lt; .5x</Text> = under reference, <Text style={{ color: '#9ca3af', fontFamily: 'Helvetica-Bold' }}>-</Text> = no priced reference in corpus (common for niche / bespoke parts).
             </Text>
             <View style={{ marginBottom: 14, padding: 14, backgroundColor: '#0c4a6e', borderRadius: 6 }}>
@@ -10649,7 +10713,27 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error('[render-minimal-pdf] FATAL:', err)
-  process.exit(1)
-})
+// Entrypoint guard (2026-06-01): only auto-run the CLI when this file is the
+// direct script entry. Without this, importing a helper from this module (e.g.
+// isIndicativeRfqLine into the regression harness) would execute main() on
+// import — reading process.argv[2] as a state path and crashing. The harness
+// renders via a SUBPROCESS (`npx tsx render-minimal-pdf.tsx …`), where this
+// file IS the entry, so the CLI still runs there.
+{
+  let isDirectEntry = true
+  try {
+    const thisFile = realpathSync(fileURLToPath(import.meta.url))
+    const entryArg = process.argv[1] ? realpathSync(process.argv[1]) : ''
+    isDirectEntry = entryArg === thisFile
+  } catch {
+    // If the comparison can't be made, fall back to running (preserves the
+    // prior always-run CLI behaviour for the direct-invocation case).
+    isDirectEntry = true
+  }
+  if (isDirectEntry) {
+    main().catch(err => {
+      console.error('[render-minimal-pdf] FATAL:', err)
+      process.exit(1)
+    })
+  }
+}

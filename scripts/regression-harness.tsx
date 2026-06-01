@@ -63,6 +63,7 @@ import { classifyByRules } from './estimate-missing-prices'
 import { keywordCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
 import { applyPatches } from '../src/lib/pdf-engine-v2/radical/universal-repair'
 import { auditCostSanity } from './lib/cost-self-assessment'
+import { isIndicativeRfqLine } from './render-minimal-pdf'
 
 interface Assertion {
   id: string
@@ -202,6 +203,84 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
           pdfText.replace(/\s+/g, '').includes(expectedString.replace(/\s+/g, '')),
           (found) => found,
           () => `PDF did not contain "${expectedString}" (whitespace-normalised) — IndustryBandBlock returned null or the band was not resolved`,
+        ))
+      }
+    }
+  }
+
+  // ── UNIVERSAL.indicative_rfq_marks_estimate_not_actual ───────────────────
+  // Honest-pricing lever (Tristan 2026-06-01): quote-only instruments and
+  // build-to-order fabrications must render their best-available NUMBER under
+  // an "indicative · RFQ" marker so a buyer treats them as a request-for-
+  // quotation input, NOT a firm catalogue price. FIRM lines (price_tier
+  // 'actual' — a real distributor/DB-sourced price, incl. emitter_list_price
+  // pins like the EL-FLOW MFC £1,112) must stay clean. Three guards:
+  //   (a) PREDICATE: isIndicativeRfqLine partitions the canonical tiers
+  //       correctly (actual→no, estimate→yes, macro-override→yes, tbd→no).
+  //   (b) PRESENCE: if the state has ≥1 estimate-tier line (or a macro
+  //       assembly price), the rendered PDF BoM contains the marker.
+  //   (c) NO-OVER-MARK: the marker count never exceeds the count of indicative
+  //       (estimate + macro) lines — i.e. firm actual lines are NOT marked.
+  {
+    // (a) Predicate sanity — pure logic, runs even when pdftotext is absent.
+    const predicateOk =
+      isIndicativeRfqLine({ price_tier: 'actual', unit_price_gbp: 1112.31, contract_override_reason: undefined }) === false &&
+      isIndicativeRfqLine({ price_tier: 'estimate', unit_price_gbp: 130, contract_override_reason: undefined }) === true &&
+      isIndicativeRfqLine({ price_tier: 'actual', unit_price_gbp: 50000, contract_override_reason: 'Contract macro-assembly (exact): vessel' }) === true &&
+      isIndicativeRfqLine({ price_tier: 'tbd', unit_price_gbp: 0, contract_override_reason: undefined }) === false
+    assertions.push(assertEq(
+      'UNIVERSAL.indicative_rfq_predicate',
+      'isIndicativeRfqLine: actual→firm, estimate→RFQ, macro-override→RFQ, tbd→firm',
+      predicateOk,
+      (ok) => ok,
+      () => `isIndicativeRfqLine misclassified a canonical tier — the renderer would mark firm distributor prices as indicative OR leave estimate/macro lines clean. Check the predicate in scripts/render-minimal-pdf.tsx.`,
+    ))
+
+    // (b)+(c) Render-side presence/no-over-mark, mirroring the renderer's tier
+    // computation: a partVerifications row is estimate-tier when it carries a
+    // numeric price_estimate_gbp and NO numeric distributor_price_gbp; it is
+    // actual-tier when distributor_price_gbp is numeric. Macro assembly prices
+    // (engineeringContract.macro_assembly_prices) and the synthetic macro
+    // aggregate rows also render the marker, so they count as indicative too.
+    const estimateLineCount = pv.filter((p: any) =>
+      typeof p?.price_estimate_gbp === 'number' && typeof p?.distributor_price_gbp !== 'number'
+    ).length
+    const macroPriceCount = Array.isArray(state?.engineeringContract?.macro_assembly_prices)
+      ? state.engineeringContract.macro_assembly_prices.filter((m: any) => Number(m?.total_gbp) > 0).length
+      : 0
+    const indicativeUpperBound = estimateLineCount + macroPriceCount
+    if (renderResult.ok && existsSync(renderResult.pdfPath) && indicativeUpperBound > 0) {
+      let pdfText = ''
+      try {
+        pdfText = execFileSync('pdftotext', [renderResult.pdfPath, '-'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
+      } catch {
+        // pdftotext not installed — skip the render-side half gracefully.
+      }
+      if (pdfText) {
+        // Marker is "indicative · RFQ"; pdftotext may split on the middle dot,
+        // so count whitespace-normalised occurrences of the joined token.
+        const norm = pdfText.replace(/\s+/g, ' ')
+        const markerCount = (norm.match(/indicative · RFQ/g) || []).length
+        // (b) presence: estimate/macro lines exist → at least one marker rendered.
+        assertions.push(assertEq(
+          'UNIVERSAL.indicative_rfq_marks_estimate_not_actual',
+          `${estimateLineCount} estimate + ${macroPriceCount} macro line(s) → rendered BoM carries the "indicative · RFQ" marker`,
+          markerCount >= 1,
+          (ok) => ok,
+          () => `state has ${indicativeUpperBound} indicative line(s) (${estimateLineCount} estimate + ${macroPriceCount} macro) but the rendered PDF has ${markerCount} "indicative · RFQ" markers — the honest-pricing marker is not rendering. Check renderPartRow / SubModuleBomBlock in render-minimal-pdf.tsx.`,
+        ))
+        // (c) no-over-mark: a marker per data row at most (≤2× headroom for the
+        // table appearing in both the per-sub-module view and any grouped view).
+        // Firm actual lines must NOT be marked, so the count cannot blow past
+        // the indicative upper bound. The ×2 allows the same row to render in
+        // two BoM presentations without tripping; a leak onto firm lines would
+        // push the count far above 2× the indicative count.
+        assertions.push(assertEq(
+          'UNIVERSAL.indicative_rfq_not_on_firm_lines',
+          `marker count (${markerCount}) ≤ 2× indicative line count (${indicativeUpperBound}) — firm actual-tier lines stay clean`,
+          markerCount <= indicativeUpperBound * 2,
+          (ok) => ok,
+          () => `rendered ${markerCount} "indicative · RFQ" markers but only ${indicativeUpperBound} indicative line(s) exist — the marker is leaking onto firm distributor-priced (actual-tier) lines, which must read as live catalogue prices.`,
         ))
       }
     }
