@@ -25,6 +25,7 @@
 
 import { detectEnvelope, validateEnvelope } from './envelope'
 import { selectPlan } from './planner'
+import { composeFallbackPlan } from './auto-plan-fallback'
 import { runToolPlan } from './executor'
 import { runConsistencyVerifier } from './verifier'
 import { finaliseContract } from './aggregator'
@@ -92,14 +93,30 @@ export async function orchestrateDesign(
   }
 
   // ── Step 2: Select tool plan ──────────────────────────────────────────
-  const plan = selectPlan(envelope)
+  let plan = selectPlan(envelope)
   if (!plan) {
-    const prefix = loud_failures ? '[LOUD] ' : ''
-    return failResult(
-      initialContract,
-      [`${prefix}no tool plan registered for envelope ${envelope.class}/${envelope.scale_tier} — class needs a ClassToolPlan in scripts/lib/orchestrator/class-plans/<class>.ts with envelope_predicate matching this envelope`],
-      fallback_on_failure,
-    )
+    // WALL-2 SAFE FALLBACK (2026-06-01): no hand-written ClassToolPlan matched.
+    // For a NOVEL (unregistered) class, try the schema-driven auto-planner —
+    // compose a tool graph from declared tool I/O instead of dying here.
+    // Gated behind UNIVERSAL_AUTO_PLAN=1 (default OFF) + scoped strictly to
+    // this selectPlan-MISS path, so all 35 registered classes (which match a
+    // plan above) are UNAFFECTED. Returns null when the flag is off or no
+    // graph composes → we keep the loud failure below verbatim.
+    const composed = composeFallbackPlan(envelope, parsedConstraints)
+    if (composed) {
+      console.error(
+        `[orchestrator] UNIVERSAL_AUTO_PLAN: no registered plan for ${envelope.class}/${envelope.scale_tier} — composed a ${composed.plan.tools.length}-tool fallback graph ` +
+        `(coupled_pairs=${composed.graph.coupled_pairs.length}, unmet_outputs=${composed.graph.unmet_outputs.length}). All steps non-fatal; proceeding past wall-2.`,
+      )
+      plan = composed.plan
+    } else {
+      const prefix = loud_failures ? '[LOUD] ' : ''
+      return failResult(
+        initialContract,
+        [`${prefix}no tool plan registered for envelope ${envelope.class}/${envelope.scale_tier} — class needs a ClassToolPlan in scripts/lib/orchestrator/class-plans/<class>.ts with envelope_predicate matching this envelope (or set UNIVERSAL_AUTO_PLAN=1 to compose one from tool I/O)`],
+        fallback_on_failure,
+      )
+    }
   }
 
   // Annotate the Contract envelope (if not already set)
