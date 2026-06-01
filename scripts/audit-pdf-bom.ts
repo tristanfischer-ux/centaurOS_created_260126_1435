@@ -215,7 +215,37 @@ function extractBomFromPdf(pdfPath: string): BomExtract {
         }
       }
       // Per-module headline lines like "9.   Rotor Blades   £12,521,772.25"
-      const mModuleHeader = line.match(/^\s*\d+\.\s+([A-Z][A-Za-z\s]+?)\s+£([\d,.]+)/)
+      // (the "Cost by module" summary table — CostByModulePage in
+      // render-minimal-pdf.tsx renders "N. <display_name> £<subtotal>").
+      //
+      // 2026-06-01 B-3 false-fail ROOT CAUSE + FIX: the label capture group
+      // was `[A-Z][A-Za-z\s]+?` — letters and spaces ONLY. A module whose
+      // display_name contains a DIGIT or punctuation (e.g. bioreactor's
+      // "Gas Supply O2 N2 Co2", a DAC "CO2 Capture", a humanoid "6-DoF Arm")
+      // failed to parse: the non-greedy group cannot consume the "2" in "O2",
+      // so the WHOLE line was skipped and that module's sub-total dropped out
+      // of the Σ-headers sum. The renderer is self-consistent BY CONSTRUCTION
+      // (cover == Σ ALL module subtotals — applyBatchEconomics sets
+      // grandTotal_gbp = Σ newMod.subtotal), so dropping ONE header produced a
+      // false gap equal to that module's subtotal — confirmed live: bioreactor
+      // cover £109,702.89 vs Σ-headers £109,112.62, gap £590.27 = exactly the
+      // un-parsed "Gas Supply O2 N2 Co2" subtotal → false HIGH, exit 10.
+      // The renderer DID render the header line; the audit's parser couldn't
+      // read it. Fix is here (the parser), NOT the renderer.
+      //
+      // Widen the label class to admit digits + the punctuation real
+      // display_names use (& / ( ) . , + -), still anchored on a leading
+      // capital and still requiring the `£` to immediately follow the label,
+      // which keeps the match constrained to the "N. Label £amount" summary-
+      // table shape (a footnote like "1. Plausible part-number format ..."
+      // has no trailing £amount and is not captured).
+      //
+      // NOT-MASKING-REAL-FAILURES proof: this only ADDS the previously-dropped
+      // module to Σ-headers. A GENUINELY orphaned macro (in grand-total but in
+      // NO module) still never appears as any "N. Label £amount" summary row,
+      // so Σ-headers stays short of cover and B-3 still fails — the fix
+      // removes a false gap without weakening the true-orphan check.
+      const mModuleHeader = line.match(/^\s*\d+\.\s+([A-Z][A-Za-z0-9\s&/().,+-]*?)\s+£([\d,.]+)/)
       if (mModuleHeader) {
         const moduleKey = mModuleHeader[1].toLowerCase().trim().replace(/\s+/g, '_')
         const amount = parsePoundAmount('£' + mModuleHeader[2])
