@@ -1996,6 +1996,13 @@ async function main() {
   // brief themselves. Accuracy over approval — never silently substitute the
   // user's input with a different product.
   const MAX_RELAX_FACTOR = 3
+  // Render-with-flag (Tristan 2026-06-01): a relax beyond MAX_RELAX_FACTOR no
+  // longer halts (exit 2). The chain now APPLIES the relax, renders the nearest-
+  // feasible design, and FLAGS the brief as infeasible prominently on the cover —
+  // a flagged dossier ("your £35k/350 kW target is infeasible; here is the design
+  // at the nearest-feasible value") beats no dossier. Only a TRULY-not-a-product
+  // brief (relax > RENDER_HARD_CAP) still refuses.
+  const RENDER_HARD_CAP = 100
   const apiKeyEarly = process.env.OPENROUTER_API_KEY ?? ''
 
   function parseRatio(raw: string): number | null {
@@ -2010,6 +2017,9 @@ async function main() {
   let currentParsed: any = parsedResultOriginal.data
   let currentProductClass = classificationOriginal.productClass
   const revisionHistory: any[] = []
+  // Set when a relax beyond MAX_RELAX_FACTOR is APPLIED → rendered on the cover as
+  // a prominent "brief target infeasible" flag (render-with-flag).
+  let briefInfeasibilityFlag: { constraint: string; original: string; revised: string; factor: string } | null = null
   let plausibility: BriefPlausibilityVerdict | null = null
   let briefIter = 0
 
@@ -2060,9 +2070,10 @@ async function main() {
     // rewrite-fail / re-parse-fail branches leave applied=false so the
     // renderer can distinguish proposed-but-not-applied from actually-applied.
     const factor = parseRelaxFactor(chosen.relax_factor)
-    const factorBlocked = factor != null && factor > MAX_RELAX_FACTOR
+    const factorBlocked = factor != null && factor > MAX_RELAX_FACTOR  // flag (render-with-flag)
+    const factorAbsurd = factor != null && factor > RENDER_HARD_CAP    // refuse (not a product)
     if (factorBlocked) {
-      console.error(`[chain] brief refinement iter ${briefIter}: chosen revision ${chosen.target_constraint} relax_factor ${factor}× exceeds MAX_RELAX_FACTOR=${MAX_RELAX_FACTOR}×; halting with revision logged for human review`)
+      console.error(`[chain] brief refinement iter ${briefIter}: ${chosen.target_constraint} relax ${factor}× exceeds MAX_RELAX_FACTOR=${MAX_RELAX_FACTOR}× — ${factorAbsurd ? `also exceeds RENDER_HARD_CAP=${RENDER_HARD_CAP}×, refusing` : 'applying + flagging brief infeasible on the cover (render-with-flag)'}`)
     }
 
     const entry: BriefRevisionEntry = {
@@ -2071,7 +2082,7 @@ async function main() {
       original_value: chosen.current_value,
       revised_value: chosen.proposed_value,
       relax_factor: chosen.relax_factor,
-      rationale: chosen.rationale + (factorBlocked ? ' [BLOCKED: exceeds 100× per-revision cap; surfaced for human review]' : ''),
+      rationale: chosen.rationale + (factorAbsurd ? ` [REFUSED: relax ${factor}× exceeds the ${RENDER_HARD_CAP}× hard cap — not a buildable product]` : factorBlocked ? ' [BRIEF INFEASIBLE: original target unreachable; relaxed beyond the normal cap and flagged on the cover]' : ''),
       contradictions_resolved: (chosen.resolves_contradiction_indexes ?? []).map((i: number) => plausibility?.contradictions[i]?.constraint ?? '?'),
       alternatives_considered: alternatives.map((a: any) => ({
         target_constraint: a.target_constraint,
@@ -2083,7 +2094,12 @@ async function main() {
     }
     revisionHistory.push(entry)
 
-    if (factorBlocked) break
+    // render-with-flag: a >MAX_RELAX_FACTOR relax is APPLIED (not halted) and
+    // flagged on the cover; only a >RENDER_HARD_CAP relax still refuses.
+    if (factorAbsurd) break
+    if (factorBlocked) {
+      briefInfeasibilityFlag = { constraint: chosen.target_constraint, original: String(chosen.current_value), revised: String(chosen.proposed_value), factor: String(chosen.relax_factor) }
+    }
 
     console.error(`[chain] brief refinement iter ${briefIter}: applying revision ${chosen.target_constraint}: ${chosen.current_value} → ${chosen.proposed_value} (${chosen.relax_factor}); ${alternatives.length} alternative${alternatives.length === 1 ? '' : 's'} surfaced for reader`)
 
@@ -2131,6 +2147,9 @@ async function main() {
     parsed_revised: anyApplied ? currentParsed : null,
     revision_history: revisionHistory,
     was_revised: wasRevised,
+    // render-with-flag: set when a relax beyond MAX_RELAX_FACTOR was APPLIED →
+    // the renderer shows a prominent "brief target infeasible" cover banner.
+    brief_infeasibility_flag: briefInfeasibilityFlag,
   }
   writeFileSync(resolve(outDir, '2-brief-block.json'), JSON.stringify(briefBlock, null, 2))
   logAction({ step: 'brief_block', was_revised: wasRevised, any_applied: anyApplied, applied_count: appliedCount, proposed_count: revisionHistory.length, iters_used: briefIter })
@@ -2153,7 +2172,10 @@ async function main() {
       const r = parseRatio(c.ratio)
       return r != null && r > 5.0
     })
-    if (!plausibility.possible && finalHard.length > 0) {
+    // render-with-flag: only REFUSE (exit 2) when no relax could be applied at all
+    // (LLM proposed nothing, or only a >RENDER_HARD_CAP absurd relax). If a relax
+    // WAS flagged + applied, render the nearest-feasible design with the cover flag.
+    if (!plausibility.possible && finalHard.length > 0 && !briefInfeasibilityFlag && !anyApplied) {
       console.error(`\n[chain] === FATAL === brief refinement loop exhausted ${MAX_BRIEF_ITERS} iter${MAX_BRIEF_ITERS === 1 ? '' : 's'} without convergence.`)
       for (const c of finalHard) console.error(`  ✗ ${c.constraint}: brief=${c.brief_value}, floor=${c.physical_floor}, ratio=${c.ratio}`)
       console.error(`\nFinal cumulative revisions:`)

@@ -2673,6 +2673,25 @@ function CoverPage({
     // from top.
     <Page size="A4" style={{ ...PAGE_STYLE, paddingHorizontal: 60 }}>
       <View style={{ marginBottom: 16 }}>
+        {/* Render-with-flag (2026-06-01): when the brief's target was physically
+            infeasible and got relaxed beyond the normal cap, lead with a prominent
+            "brief target infeasible" callout so the relaxed numbers below are never
+            mistaken for the brief's actual ask. */}
+        {(() => {
+          const flag = (state as any)?.brief?.brief_infeasibility_flag
+          if (!flag) return null
+          const c = String(flag.constraint ?? '').replace(/_/g, ' ')
+          return (
+            <View style={{ marginBottom: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#fffbeb', borderLeftWidth: 3, borderLeftColor: '#d97706', borderRadius: 2 }}>
+              <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#92400e', letterSpacing: 1.5, marginBottom: 3 }}>
+                BRIEF TARGET INFEASIBLE — RELAXED TO CLOSE THE DESIGN
+              </Text>
+              <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+                The brief&apos;s {c} target ({String(flag.original)}) is not physically achievable. This dossier shows the nearest-feasible design with {c} relaxed {String(flag.factor)} to {String(flag.revised)}. Reconsider the brief target — §1 has the full revision history + alternatives.
+              </Text>
+            </View>
+          )
+        })()}
         {/* Build #5: Engineering Contract closure-failure banner. Shows
             specific deterministic findings (mass closure, solar balance,
             etc.) instead of the generic Physics Critic "below 3/10" text.

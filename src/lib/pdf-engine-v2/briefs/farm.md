@@ -11,7 +11,7 @@ Key constraints:
 - Target yield: 12-15 kg leafy greens per week per unit at steady state
 - Crop types: lettuce, basil, rocket, pak choi, kale (no fruiting crops in v1)
 - Energy use: ≤ 2.5 kWh per kg of produce at steady state
-- Water use: ≤ 1.5 L per kg produce (closed-loop recirculating deep-water culture)
+- Water use: ≤ 4 L per kg produce (closed-loop recirculating deep-water culture)
 - Lighting: tunable-spectrum horticultural LED at 200-350 µmol·m⁻²·s⁻¹ PPFD per tier
 - Climate: 20-24 °C, 60-75% RH, 800-1,200 ppm CO₂ (dosed from cylinder)
 - Annual batch size: 100 units per year

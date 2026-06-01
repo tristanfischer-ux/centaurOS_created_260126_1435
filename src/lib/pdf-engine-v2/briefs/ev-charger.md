@@ -3,7 +3,7 @@
 We are developing a 350 kW ultra-rapid DC charger for the UK motorway and trunk-road network, delivered as a single CCS2-compatible pedestal with integrated transformer-isolation and dynamic load-sharing across two outlets. Target customers are UK Charge Point Operators (Gridserve, BP Pulse, Osprey, Instavolt, MFG) deploying at motorway service areas and forecourts under the Rapid Charging Fund and Project Rapid contracts.
 
 Key constraints:
-- Unit cost ceiling: £35,000 ex-works per pedestal (including transformer, dispenser, payment terminal; excluding civils, MV cabling, and Distribution Network Operator connection)
+- Unit cost ceiling: £180,000 ex-works per pedestal (including transformer, dispenser, payment terminal; excluding civils, MV cabling, and Distribution Network Operator connection)
 - Maximum delivered power per outlet: 350 kW (1,000 V DC @ 500 A) sustained for ≥ 20 minutes; second outlet load-shares dynamically when both engaged
 - Input: 400 V AC three-phase, 50 Hz, ≥ 500 A per phase per pedestal (650 kW peak input including conversion losses)
 - Power factor: ≥ 0.98 lagging at full output

@@ -8,10 +8,10 @@ Key constraints:
 - Unit cost ceiling: £750,000 ex-works (including vehicle, baseline payload, deck-handling cradle, charging dock; excluding launch-and-recovery-system gantry and support-vessel fit-out)
 - Maximum diving depth: 1,500 m (with 1.5× design margin to 2,250 m crush-pressure rating per DNV-GL-OS-E101)
 - Endurance: ≥ 24 hours at 3-knot cruise speed (≥ 72 nautical miles per mission)
-- Maximum mass: 300 kg dry (including baseline payload + 90 kWh battery pack)
+- Maximum mass: 300 kg dry (including baseline payload + 15 kWh battery pack)
 - Hull envelope: ≤ 3.0 m length × 0.7 m diameter (torpedo form factor) for a single-operator launch on a 2-tonne LARS
 - Cruise speed: 3.0 knots nominal, dash speed 5.0 knots for 30 minutes
-- Battery: 90 kWh lithium-iron-phosphate pressure-tolerant pack, hot-swappable on deck, ≥ 6-hour recharge between missions
+- Battery: 15 kWh lithium-iron-phosphate pressure-tolerant pack, hot-swappable on deck, ≥ 6-hour recharge between missions
 - Sensor payload power: ≥ 600 W continuous available to the payload bay
 - Positioning: USBL-aided dead-reckoning inertial navigation, with ≤ 0.1% of distance-travelled error after 24 hours
 - Operating temperature: -2 °C to +30 °C water; -10 °C to +40 °C deck
