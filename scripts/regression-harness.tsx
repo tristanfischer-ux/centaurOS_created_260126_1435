@@ -1542,6 +1542,30 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // UNIVERSAL.db_first_pins_catalogue_price (2026-06-01) — the self-learning
+  // price loop. pretraining_extracted_parts already carries a real unit_price_gbp
+  // on ~83% of MPN-bearing rows; the chain's MPN-fill MUST (a) SELECT it and
+  // (b) emit a list_price_gbp modifier, so a DB-first match pins the ingested
+  // catalogue price (Engine B pre-step bypasses the curve) instead of falling
+  // back to the component-class anchor (the £130-sensor-median-for-a-£1,112-MFC
+  // bug; verified live 2026-06-01 the EL-FLOW MFC went £130 → £1,112). Source-scan
+  // guard — a FAIL means someone dropped the price column or the modifier.
+  {
+    const ecPath = resolve(dirname(snapshotPath), '../../src/lib/pdf-engine-v2/lib/emitter-completion.ts')
+    if (existsSync(ecPath)) {
+      const txt = readFileSync(ecPath, 'utf-8')
+      const selectsPrice = /SELECT[^;]*\bunit_price_gbp\b[^;]*FROM\s+pretraining_extracted_parts/s.test(txt)
+      const emitsListPrice = /mod\(\s*['"]list_price_gbp['"]/.test(txt)
+      assertions.push(assertEq(
+        'UNIVERSAL.db_first_pins_catalogue_price',
+        'emitter-completion DB-first SELECTs unit_price_gbp AND emits a list_price_gbp modifier (self-learning price loop, 2026-06-01)',
+        selectsPrice && emitsListPrice ? 1 : 0,
+        (v) => v === 1,
+        () => `Self-learning price loop regressed: dbFirstLookup SELECTs unit_price_gbp=${selectsPrice}, buildCompletionWord emits list_price_gbp modifier=${emitsListPrice} (need BOTH). A DB-first part match would fall back to the component-class anchor (e.g. £130 sensor median for a £1,112 mass-flow controller) instead of the ingested catalogue price. Restore both in src/lib/pdf-engine-v2/lib/emitter-completion.ts.`,
+      ))
+    }
+  }
+
   // ── UNIVERSAL: phase2 final state parses without truncation (2026-05-26, L38 class-killer D) ──
   //
   // UNIVERSAL.phase2_final_state_parses_without_truncation — verifies that the

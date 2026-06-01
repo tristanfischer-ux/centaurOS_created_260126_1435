@@ -233,6 +233,11 @@ interface DbPart {
   manufacturer: string
   part_number: string
   component_class: string | null
+  // Self-learning price (2026-06-01): pretraining_extracted_parts already carries
+  // a real unit_price_gbp on ~83% of MPN-bearing rows. Pull it so a DB-first hit
+  // pins the catalogue price (via a list_price_gbp modifier) instead of falling
+  // back to the component-class anchor. Null when the ingested row had no price.
+  unit_price_gbp: number | null
 }
 
 function openLibraryDb(dbPath: string): Database.Database | null {
@@ -316,7 +321,7 @@ function dbFirstLookup(
   let stmt: Database.Statement
   try {
     stmt = db.prepare(`
-      SELECT part_name, manufacturer, part_number, component_class
+      SELECT part_name, manufacturer, part_number, component_class, unit_price_gbp
       FROM pretraining_extracted_parts
       WHERE manufacturer IS NOT NULL AND manufacturer != ''
         AND part_number IS NOT NULL AND length(part_number) >= 4
@@ -600,6 +605,7 @@ function buildCompletionWord(
   partNumber: string,
   humanName: string,
   source: 'db' | 'generated',
+  unitPriceGbp: number | null = null,
 ): WordLike {
   const baseId = subModuleId.replace(/_word$/i, '')
   const charId = `${baseId}_primary_component`
@@ -623,6 +629,15 @@ function buildCompletionWord(
       mod('manufacturer', manufacturer),
       mod('part_number', partNumber),
       mod('form', formNote),
+      // Self-learning price pin (2026-06-01): a DB-first match carries the
+      // ingested catalogue unit_price_gbp (present on ~83% of MPN-bearing rows).
+      // Emit it as a list_price_gbp modifier so Engine B's pre-step pins it
+      // (estimate-missing-prices.tsx ~L953) and BYPASSES the component-class
+      // anchor — the price the DB already knows instead of the £130 sensor median.
+      // DB hits only: a generated part has no trustworthy price (gate-20 safety).
+      ...(source === 'db' && typeof unitPriceGbp === 'number' && unitPriceGbp > 0
+        ? [mod('list_price_gbp', String(Math.round(unitPriceGbp * 100) / 100))]
+        : []),
     ],
     // Provenance badge (same convention as reviewer overrides) so the renderer
     // + audits can see this word was completed on the fly, not hand-authored.
@@ -724,6 +739,7 @@ export async function completeEmitterGaps(
           dbHit.part_number,
           dbHit.part_name?.slice(0, 80) || gap.sub_module_id.replace(/_/g, ' '),
           'db',
+          dbHit.unit_price_gbp,
         )
         ;(sub.words ??= []).push(word)
         mutated = true
