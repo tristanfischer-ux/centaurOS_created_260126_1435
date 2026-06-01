@@ -47,6 +47,7 @@ import { buildContract } from './lib/engineering-contract'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
 import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
+import { priceInBand, bandFor, looksLikeRealMpn } from './ingest/enrich-null-prices'
 import { homedir } from 'os'
 import Database from 'better-sqlite3'
 import { resolveClassGraphSlug } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
@@ -2858,6 +2859,63 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         () => `${mispins.length} mis-pin(s): ${mispins.join(' | ')}. The matcher loosened and now binds a wrong-type part — revert; the under-pricing fix is ingesting prices for bioprocess instruments, not relaxing acceptance.`,
       ))
     }
+  }
+
+  // ── UNIVERSAL.enrich_null_prices_only_writes_distributor_verified ─────────
+  // Locks the verify-leg property of the ingest-side price back-fill
+  // (scripts/ingest/enrich-null-prices.ts), built 2026-06-01 to populate
+  // pretraining_extracted_parts.unit_price_gbp on NULL-price rows so a DB-first
+  // match can fire its list_price_gbp pin instead of falling to the class anchor.
+  // The ABSOLUTE rule (council, drawer emitter-completion.ts 2026-06-01): a grown
+  // row's price must stay NULL until a verify-leg exists, because a wrong price in
+  // the SHARED forge-truth.db poisons EVERY future BoM (gate-20/21 fabrication
+  // risk). enrich-null-prices is that verify-leg: it writes ONLY a real
+  // distributor exact-MPN price, and ONLY when that price is inside a sane
+  // per-component-class band. This invariant exercises the script's exported
+  // guard functions directly (pure, no DB / no network — always runs):
+  //   • priceInBand REJECTS a £0 / negative / absurd-high hit (the band is the
+  //     last-line guard against a corrupt price-break or currency mix-up) and
+  //     ACCEPTS a real in-band catalogue price;
+  //   • looksLikeRealMpn REJECTS a free-text descriptor masquerading as a
+  //     part_number (so the job never "prices" a "316L stainless plate" row) and
+  //     ACCEPTS a genuine structured MPN.
+  // If a future edit loosens either guard — e.g. widens a band to admit a guess,
+  // or lets a descriptor through — this fails. It does NOT (cannot) assert that no
+  // LLM price is written, because the script has NO LLM/web writeback path at all
+  // by construction (distributor-only); these guards are the writeback gate.
+  {
+    // (a) BAND guard: zero / negative / absurd prices rejected; real ones accepted.
+    const rejectsZero = priceInBand(0, 'sensor') === false
+    const rejectsNegative = priceInBand(-5, 'electronic_connector') === false
+    const rejectsAbsurdHigh = priceInBand(5_000_000, 'electronic_passive') === false // £2k cap
+    const acceptsRealConnector = priceInBand(8.57, 'electronic_connector') === true   // real Phoenix Contact hit
+    const acceptsRealPlc = priceInBand(3474, 'electronic_pcb') === true               // real Siemens S7-1500 hit
+    // an unknown class falls back to DEFAULT_BAND [0.01, 200000] — still rejects 0.
+    const unknownClassStillRejectsZero = priceInBand(0, 'totally_unknown_class') === false
+    const unknownClassAcceptsReal = priceInBand(50, 'totally_unknown_class') === true
+    const [defLo] = bandFor('totally_unknown_class')
+    const defaultBandHasFloor = defLo > 0
+    // (b) MPN guard: descriptors rejected, structured MPNs accepted.
+    const rejectsDescriptorPhrase = looksLikeRealMpn('316L stainless plate') === false
+    const rejectsTbd = looksLikeRealMpn('TBD') === false
+    const rejectsBoltDescriptor = looksLikeRealMpn('M6 x 20 bolt') === false
+    const rejectsTooShort = looksLikeRealMpn('AB1') === false
+    const acceptsStructuredMpn = looksLikeRealMpn('BB-8848656') === true              // Sartorius pH probe
+    const acceptsAlnumMpn = looksLikeRealMpn('6ES7516-3FN02-0AB0') === true           // Siemens PLC
+    const acceptsConnectorMpn = looksLikeRealMpn('NC10MXX-14-B') === true             // Neutrik connector
+
+    const bandOk = rejectsZero && rejectsNegative && rejectsAbsurdHigh && acceptsRealConnector &&
+      acceptsRealPlc && unknownClassStillRejectsZero && unknownClassAcceptsReal && defaultBandHasFloor
+    const mpnOk = rejectsDescriptorPhrase && rejectsTbd && rejectsBoltDescriptor && rejectsTooShort &&
+      acceptsStructuredMpn && acceptsAlnumMpn && acceptsConnectorMpn
+    const ok = bandOk && mpnOk
+    assertions.push(assertEq(
+      'UNIVERSAL.enrich_null_prices_only_writes_distributor_verified',
+      'enrich-null-prices.ts (ingest price back-fill) writes ONLY a distributor-verified, in-band price — never an LLM/web guess, never a descriptor row, never a £0/absurd hit. priceInBand rejects 0/negative/absurd-high and accepts real catalogue prices (with a positive DEFAULT_BAND floor for unknown classes); looksLikeRealMpn rejects free-text descriptors (316L plate / TBD / "M6 x 20 bolt" / too-short) and accepts structured MPNs. This is the verify-leg that lets a grown DB row carry a price at all (council: NULL until distributor-verified — a wrong price in the shared forge-truth.db poisons every future BoM).',
+      ok,
+      (v: boolean) => v === true,
+      () => `bandOk=${bandOk} (rejectsZero=${rejectsZero} rejectsNeg=${rejectsNegative} rejectsAbsurd=${rejectsAbsurdHigh} acceptsConn=${acceptsRealConnector} acceptsPlc=${acceptsRealPlc} unknownRejects0=${unknownClassStillRejectsZero} unknownAcceptsReal=${unknownClassAcceptsReal} defFloor=${defaultBandHasFloor}); mpnOk=${mpnOk} (rejectsDescr=${rejectsDescriptorPhrase} rejectsTbd=${rejectsTbd} rejectsBolt=${rejectsBoltDescriptor} rejectsShort=${rejectsTooShort} acceptsBB=${acceptsStructuredMpn} acceptsSiemens=${acceptsAlnumMpn} acceptsNeutrik=${acceptsConnectorMpn}). A guard regressed — enrich-null-prices may now write a guessed/descriptor/out-of-band price into the shared DB. Revert in scripts/ingest/enrich-null-prices.ts.`,
+    ))
   }
 
   // ── UNIVERSAL.no_inline_class_alias_maps_in_chain ─────────────────────────
