@@ -10083,6 +10083,13 @@ registerArchetype('humanoid', (brief: any) => {
 
   const quantities: Record<string, Quantity> = {
     robot_mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    // Canonical total-mass alias the renderer's compliance-table mass row +
+    // gate 17 read (fallback chain total_system_mass_kg → system_mass_with_
+    // external_kg → in_container_mass_kg → total_mass_kg). The robot is a single
+    // self-contained system so total_system_mass_kg === robot_mass_kg. Without
+    // this alias the brief's body-mass cap (max_mass_kg) silently drops from the
+    // compliance table → gate 17 HIGH → chain exit 17. See CLAUDE.md item #13.
+    total_system_mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief', { source_detail: 'fully-equipped robot gross mass (= robot_mass_kg; renderer/gate-17 read this key)' }),
     height_m: q(heightM, 'm', 'length', 'rated', 'system', 'brief'),
     dof_count_total: q(dofCount, '', 'dimensionless', 'rated', 'system', 'brief'),
     dof_legs: q(dofLegs, '', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: '6 per leg × 2 = 12; hip3 + knee + ankle2' }),
@@ -10514,6 +10521,29 @@ registerArchetype('dac', (brief: any) => {
   // Cost per ton at scale — target. Brief override otherwise.
   const targetCostPerTonGbp = extractRangeFromDesc(desc, /£?(\d{2,4})\s*\/?\s*(?:t|ton|tonne)/i, 400)
 
+  // ── Total system mass (kg) ────────────────────────────────────────────────
+  // The renderer's compliance-table mass row + gate 17 read the design's
+  // achieved mass from total_system_mass_kg (→ system_mass_with_external_kg →
+  // in_container_mass_kg → total_mass_kg). The DAC brief states a module mass
+  // cap (max_mass_kg, e.g. ≤ 40,000 kg for a containerised 500 tCO₂/yr unit), so
+  // without a total-mass quantity the row silently drops → gate 17 HIGH → chain
+  // exit 17. Derive it bottom-up from the design's own quantities:
+  //   sorbent inventory (solid amine ~5% of capacity t/yr; liquid much less)
+  //   + ISO-frame structure + balance-of-plant (fans, vacuum pumps, heat-pump
+  //     regen train, CO₂ compressor + condenser, contactor structure, electrical).
+  // BoP + structure scale with the number of modular collector units; ISO-frame
+  // tare applies to containerised LT-DAC builds. Honour an explicit brief cap
+  // only as an upper sanity bound (a heavier design than the cap is a real
+  // finding the compliance row must surface — do NOT clamp to the cap).
+  const sorbentInventoryKg = sorbentInventoryT * 1000
+  const isContainerised = /iso\s*(?:frame|container)|40[\s-]?(?:foot|ft)|20[\s-]?(?:foot|ft)|containeris|skid/i.test(desc) || sorbentType !== 3
+  const isoFrameTareKg = isContainerised ? 3900 * Math.max(1, Math.ceil(numCollectorModules / 7)) : 0  // ~3.9 t per 40 ft HC frame
+  // Balance-of-plant + contactor structure mass per modular collector unit.
+  // Solid-amine collector cube ≈ 1.0 t; liquid cross-flow tower ≈ 40 t.
+  const bopPerModuleKg = sorbentType === 3 ? 40000 : 1000
+  const bopStructureKg = bopPerModuleKg * numCollectorModules
+  const dacTotalMassKg = Math.round(sorbentInventoryKg + isoFrameTareKg + bopStructureKg)
+
   const quantities: Record<string, Quantity> = {
     capture_capacity_tco2_per_year: q(captureTonsYr, 't/yr', 'flow_rate', 'rated', 'system', 'brief'),
     sorbent_class: q(sorbentType, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=solid amine on silica, 2=MOF metal-organic framework, 3=liquid KOH/NaOH (HT process), 4=zeolite' }),
@@ -10532,6 +10562,10 @@ registerArchetype('dac', (brief: any) => {
     contactor_face_velocity_ms: q(contactorFaceVelocityMs, 'm/s', 'velocity', 'rated', 'module', 'physics_constant', { source_detail: 'solid amine 1.5-3 / MOF 4-6 / liquid hydroxide cross-flow 1-2' }),
     contactor_face_area_m2: q(contactorFaceAreaM2, 'm²', 'area', 'aperture', 'system', 'calculator', { source_detail: 'annual_air_flow / (face_velocity × seconds_per_year × utilisation 0.85)' }),
     sorbent_inventory_tonnes: q(sorbentInventoryT, 't', 'mass', 'gross', 'module', 'calculator', { source_detail: 'Climeworks Orca 4 kt/yr → ~200 t amine inventory benchmark' }),
+    // Total module gross mass — read by the renderer compliance-table mass row +
+    // gate 17 (chain exit 17 if absent when brief states max_mass_kg). See
+    // CLAUDE.md item #13 (renderer mass-slot name chain).
+    total_system_mass_kg: q(dacTotalMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `sorbent ${Math.round(sorbentInventoryKg).toLocaleString()} kg + ISO-frame structure ${isoFrameTareKg.toLocaleString()} kg + balance-of-plant ${bopStructureKg.toLocaleString()} kg across ${numCollectorModules} collector module(s)` }),
     sorbent_lifetime_cycles: q(sorbentLifetimeCycles, '', 'dimensionless', 'lifetime', 'module', 'physics_constant'),
     sorbent_replacement_interval_years: q(sorbentReplacementYears, 'yr', 'time', 'cycle', 'module', 'calculator'),
     water_consumption_l_per_kg_co2: q(waterConsumptionLPerKgCo2, 'L/kg', 'flow_rate', 'rated', 'system', 'physics_constant', { source_detail: 'solid amine 1-3 / MOF 1-2 / liquid hydroxide 3-5 (make-up water for evaporative loss)' }),

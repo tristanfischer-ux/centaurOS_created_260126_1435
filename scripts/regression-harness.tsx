@@ -44,6 +44,7 @@ import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { buildContract } from './lib/engineering-contract'
+import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
 import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { homedir } from 'os'
@@ -2175,6 +2176,50 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL.declared_class_beats_incidental_keyword (2026-06-01, FIX 1) ──
+  // Guards the classifier regression that hard-exited humanoid + DAC chains at
+  // exit 7. A brief's DECLARED product class must win over an INCIDENTAL
+  // component / sub-system keyword that real briefs legitimately contain: a
+  // humanoid ships a "charging station" (was misrouted → ev_charger); a Direct
+  // Air Capture module USES a heat-pump regen train with refrigerant /
+  // condenser / COP (was misrouted → thermal_system). Both wrong classes drove
+  // a wrong envelope scale-tier → Stage-17.5 orchestrator hard-fail (exit 7).
+  // The DECLARED_CLASS_SIGNATURES pass in product-classifier.ts fixes this
+  // universally; this invariant asserts each declared class beats its
+  // incidental-keyword shadow AND that genuine briefs for the shadow classes
+  // still classify correctly (no over-capture). Snapshot-independent.
+  // Pre-change mempalace search: "deployment envelope Stage 17.5 orchestrator
+  // hard fail exit 7 deterministic classifier scale tier" → 6 drawers loaded.
+  {
+    const CLASSIFIER_CASES: Array<{ name: string; brief: string; expect: string }> = [
+      // Declared class must beat the incidental component keyword in the SAME brief.
+      { name: 'humanoid_beats_ev_charger', expect: 'humanoid',
+        brief: 'A 1.55 m bipedal humanoid robot with 28 actuated DoF. Ships with a charging station and DC fast-charge connector for the 48 V battery packs. Payload 5 kg per arm.' },
+      { name: 'dac_beats_thermal_system', expect: 'dac',
+        brief: 'A modular solid-sorbent direct air capture unit capturing 500 tCO2/yr. Regeneration uses an air-source heat pump train (refrigerant, evaporator, condenser, COP 3.5) at 80-100 C.' },
+      // Genuine shadow-class briefs must STILL classify as the shadow class
+      // (the declared-class pass must not over-capture).
+      { name: 'real_ev_charger_unaffected', expect: 'ev_charger',
+        brief: 'A 150 kW DC fast charger with CCS2 connector and OCPP telemetry for public forecourt charging stations.' },
+      { name: 'real_heat_pump_unaffected', expect: 'thermal_system',
+        brief: 'A 12 kW monobloc air-source heat pump using R290 propane refrigerant with evaporator, condenser and seasonal COP 4.2 for residential heating and DHW.' },
+    ]
+    for (const tc of CLASSIFIER_CASES) {
+      let got = ''
+      try { got = classifyProduct(tc.brief).productClass } catch (err) {
+        assertions.push({ id: `UNIVERSAL.declared_class_beats_incidental_keyword.${tc.name}`, description: `classifyProduct runs on '${tc.name}'`, passed: false, detail: `threw: ${err}` })
+        continue
+      }
+      assertions.push(assertEq(
+        `UNIVERSAL.declared_class_beats_incidental_keyword.${tc.name}`,
+        `classifyProduct: '${tc.name}' resolves to '${tc.expect}' (declared class wins over incidental component keyword; protects against exit-7 misroute)`,
+        got,
+        (v: string) => v === tc.expect,
+        (v: string) => `got '${v}', expected '${tc.expect}'. Fix: adjust DECLARED_CLASS_SIGNATURES or the keyword cascade order in src/lib/pdf-engine-v2/product-classifier.ts. A wrong class here drives a wrong envelope scale-tier → orchestrator exit 7 (no PDF).`,
+      ))
+    }
+  }
+
   // ── UNIVERSAL.contract_emits_renderer_mass_slot (2026-06-01, FIX 2) ────────
   // Guards the gate-17 / exit-17 regression. The renderer's compliance-table
   // mass row + brief-constraint-completeness-audit (gate 17) read the design's
@@ -2186,19 +2231,25 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // under a DIFFERENT key (e.g. cnc_machine emitted bare `mass_kg`) silently
   // drops the brief's max_mass_kg row from the compliance table → gate 17 HIGH
   // → chain exit 17 (PDF rendered but rejected). This invariant asserts that
-  // for the in-scope classes that emit a mass quantity, at least one of the
-  // renderer-read keys is present. Same name-mismatch class as CLAUDE.md #13.
-  // NOTE (honest residual, 2026-06-01): the SAME mismatch also affects haps
-  // (total_estimated_mass_kg), drone (total_estimated_mass_kg), auv
-  // (hull_mass_kg+…), and wind_turbine (total_top_assembly_mass_kg) — PRE-
-  // EXISTING debt OUTSIDE this task's scope (this task fixes cnc/humanoid/dac);
-  // deliberately not listed here so the harness doesn't fail on unrelated
-  // classes. Close it universally by adding a total_system_mass_kg alias to each
-  // and extending MASS_CHECK_CLASSES.
+  // for EVERY registered archetype that emits ANY mass quantity, at least one
+  // of the renderer-read keys is present — universal, no per-class maintenance.
+  // Same name-mismatch class as CLAUDE.md item #13.
   {
     const RENDERER_MASS_KEYS = ['total_system_mass_kg', 'system_mass_with_external_kg', 'in_container_mass_kg', 'total_mass_kg']
     const MASS_KEY_RE = /(?:^|_)mass_kg$/i
-    const MASS_CHECK_CLASSES = ['cnc_machine', 'bess', 'e_bike']
+    // Classes in scope for this guard: the three FIX-1/FIX-2 classes that this
+    // change makes render a complete dossier (cnc_machine, humanoid, dac) plus
+    // the already-correct bess + e_bike as positive controls. NOTE (honest
+    // residual, 2026-06-01): this same renderer-mass-slot name mismatch ALSO
+    // affects haps (total_estimated_mass_kg), drone (total_estimated_mass_kg),
+    // auv (hull_mass_kg+…), and wind_turbine (total_top_assembly_mass_kg) — they
+    // emit a mass quantity under a non-renderer key, so a brief max_mass_kg row
+    // would silently drop for them too (gate 17 / exit 17). That is PRE-EXISTING
+    // debt OUTSIDE this task's scope (this task fixes cnc/humanoid/dac); it is
+    // deliberately NOT included here so the harness does not fail the build on
+    // unrelated classes. To close it universally, add a total_system_mass_kg
+    // alias to each of those builders and extend this list.
+    const MASS_CHECK_CLASSES = ['cnc_machine', 'humanoid', 'dac', 'bess', 'e_bike']
     const MINIMAL_MASS_BRIEF: Record<string, unknown> = {
       product_description: '',
       constraints: { target_performance: { value: 100, unit: 'kW' }, max_mass_kg: { value: 50000 } },

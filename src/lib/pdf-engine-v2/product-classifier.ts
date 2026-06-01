@@ -7,10 +7,48 @@ export interface ProductClassification {
   reasoning: string
 }
 
+// --- Declared-class signatures (checked BEFORE every keyword rule) ---
+// UNIVERSAL FIX (2026-06-01): a brief's DECLARED product class must win over an
+// incidental component / sub-system keyword that happens to appear in the prose.
+// Real engineering briefs mention adjacent classes as components: a humanoid
+// brief ships with a "charging station" (trips ev_charger), a Direct-Air-Capture
+// brief USES a "heat pump" + "refrigerant" + "condenser" (trips thermal_system).
+// Those incidental mentions previously shadowed the true class because the
+// keyword cascade is order-sensitive (first match wins) and the incidental
+// keyword sat earlier in the cascade.
+//
+// This table holds HIGH-SPECIFICITY, UNAMBIGUOUS product-class declarations —
+// compound phrases / proper product-type names that a brief only uses when it
+// IS that product. Ordered most-specific first; first match short-circuits the
+// whole classifier. Adding a class here is one line and makes that class immune
+// to incidental-keyword shadowing — it is NOT a per-brief special case.
+//
+// Each slug MUST resolve in BOTH downstream registries (envelope.ts CLASS_ALIASES
+// + engineering-contract.ts ARCHETYPE_ALIASES) or the chain falls back to the
+// generic envelope rather than the class-specific path.
+const DECLARED_CLASS_SIGNATURES: Array<{ re: RegExp; cls: string }> = [
+  // Direct air capture — "direct air capture"/"DAC module"/"X tCO2/yr capture".
+  // Must beat thermal_system (DAC regen uses an 80-100 °C heat-pump train, so the
+  // brief is FULL of heat-pump / refrigerant / condenser / COP signals).
+  { re: /direct[\s-]?air[\s-]?capture|\bdac\b\s+(?:module|unit|plant|system|park|brief)|sorbent[\s-]?based\s+(?:co2|carbon)\s+capture|(?:co2|carbon)\s+capture.{0,40}sorbent|t\s?co2\s*\/?\s*yr|tco2\s*\/?\s*year|tonnes?\s+(?:of\s+)?(?:atmospheric\s+)?co2\s+per\s+year/, cls: 'dac' },
+  // Humanoid / legged robot. Must beat ev_charger (humanoid ships a charging
+  // dock) and the generic aerospace catch (humanoid briefs say "payload per arm").
+  { re: /humanoid|biped(?:al)?\s+robot|legged\s+robot|two[\s-]?legged\s+robot|teleoperat(?:ion|ed)\s+robot/, cls: 'humanoid' },
+]
+
 export function classifyProduct(briefText: string): ProductClassification {
   const lower = briefText.toLowerCase()
 
   let productClass = 'unknown'
+
+  // Declared-class pass — a high-specificity product-class declaration wins over
+  // any incidental component keyword further down the cascade. See table above.
+  for (const sig of DECLARED_CLASS_SIGNATURES) {
+    if (sig.re.test(lower)) {
+      productClass = sig.cls
+      break
+    }
+  }
 
   // --- Single-keyword specific classes (checked FIRST) ---
   // These product types are specific enough that a single keyword is sufficient.
