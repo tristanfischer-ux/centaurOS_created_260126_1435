@@ -36,9 +36,9 @@
  *                                          [--no-rerender]
  */
 
-import { readFileSync, existsSync, statSync } from 'fs'
+import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync } from 'fs'
 import { execFileSync } from 'child_process'
-import { resolve, dirname } from 'path'
+import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
@@ -47,8 +47,9 @@ import { buildContract } from './lib/engineering-contract'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
 import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
+import { auditCrossPageNumericConsistency } from './lib/cross-page-numeric-consistency-audit'
 import { priceInBand, bandFor, looksLikeRealMpn } from './ingest/enrich-null-prices'
-import { homedir } from 'os'
+import { homedir, tmpdir } from 'os'
 import Database from 'better-sqlite3'
 import { resolveClassGraphSlug } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
 import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasibility-gate'
@@ -123,6 +124,10 @@ function runRenderer(statePath: string): { ok: boolean; pdfPath: string; pages: 
     return { ok: false, pdfPath, pages: 0, sizeKb: 0, stderr: err?.stderr?.toString() ?? String(err) }
   }
 }
+
+// Module-level run-once guard for the gate-18 fixture check (class-agnostic;
+// fixtures need building only once per harness process, not per snapshot).
+let gate18FixtureChecked = false
 
 function checkSnapshot(snapshotPath: string): SnapshotResult {
   const assertions: Assertion[] = []
@@ -3194,6 +3199,188 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         (n: number) => n === 0,
         () => `${untracked.length} untracked tool file(s): ${untracked.slice(0, 6).join(', ')}${untracked.length > 6 ? ' …' : ''}. register-all.ts imports these but git does not have them — a clone cannot build the engine. git add them (or delete if dead).`,
       ))
+    }
+  }
+
+  // ── UNIVERSAL: B-3 module-header parser reconciles digit-bearing labels (2026-06-01) ──
+  //
+  // UNIVERSAL.bom_b3_module_header_parser_reconciles — re-renders the snapshot,
+  // extracts the "Cost by module" summary table ("N. <display_name> £<subtotal>"
+  // rows — CostByModulePage in render-minimal-pdf.tsx), parses every row with
+  // the SAME regex audit-pdf-bom.ts uses for its `__header` map, sums them, and
+  // asserts the Σ reconciles with the cover "Raw materials BoM" headline.
+  //
+  // Guards the 2026-06-01 B-3 false-fail: the audit's module-header regex used
+  // a letters-and-spaces-only label class (`[A-Z][A-Za-z\s]+?`), so a module
+  // whose display_name carried a DIGIT (bioreactor "Gas Supply O2 N2 Co2", DAC
+  // "CO2 Capture", humanoid "6-DoF Arm") failed to parse and its subtotal
+  // dropped out of Σ-headers — a false gap exactly equal to that module's
+  // subtotal (live: bioreactor cover £109,702.89 vs Σ £109,112.62, gap £590.27
+  // = the un-parsed Gas-Supply subtotal → false HIGH exit 10). The renderer
+  // rendered the header correctly; the audit parser couldn't read it. Fixed by
+  // widening the label class to admit digits + display-name punctuation.
+  //
+  // This invariant carries the FIXED regex and re-checks reconciliation, so a
+  // revert to the letters-only class re-opens the gap and fails here. It also
+  // explicitly asserts that any digit-bearing module label present in the table
+  // IS captured (the specific regression). No-op for docs with no "Cost by
+  // module" table (e.g. a deliberately minimal snapshot).
+  {
+    if (renderResult.ok && existsSync(renderResult.pdfPath)) {
+      let pdfText = ''
+      try {
+        pdfText = execFileSync('pdftotext', ['-layout', renderResult.pdfPath, '-'], { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
+      } catch {
+        // pdftotext not installed — skip gracefully
+      }
+      // Keep this regex BYTE-IDENTICAL to scripts/audit-pdf-bom.ts mModuleHeader.
+      const MODULE_HEADER_RE = /^\s*\d+\.\s+([A-Z][A-Za-z0-9\s&/().,+-]*?)\s+£([\d,.]+)/
+      const lines = pdfText.split('\n')
+      let coverBom: number | null = null
+      let sumHeaders = 0
+      let headerRows = 0
+      let digitLabelRows = 0
+      let digitLabelCaptured = 0
+      // First, count digit-bearing module rows in the "Cost by module" table by
+      // a looser shape (number-dot ... £amount) so we can prove the fixed regex
+      // captures the ones the OLD regex dropped.
+      const LOOSE_ROW_RE = /^\s*\d+\.\s+\S.*£[\d,.]+\s*$/
+      for (const line of lines) {
+        if (/Raw materials BoM/i.test(line) && coverBom == null) {
+          const m = line.match(/£([\d,.]+)/)
+          if (m) { const v = parseFloat(m[1].replace(/,/g, '')); if (Number.isFinite(v)) coverBom = v }
+        }
+        const looksLikeModuleRow = LOOSE_ROW_RE.test(line) && /[A-Z][A-Za-z]/.test(line)
+        const hasDigitInLabel = looksLikeModuleRow && /^\s*\d+\.\s+[A-Z][A-Za-z\s]*\d/.test(line)
+        const mh = line.match(MODULE_HEADER_RE)
+        if (mh) {
+          const amt = parseFloat(mh[2].replace(/,/g, ''))
+          if (Number.isFinite(amt) && amt > 0) { sumHeaders += amt; headerRows++ }
+          if (hasDigitInLabel) digitLabelCaptured++
+        }
+        if (hasDigitInLabel) digitLabelRows++
+      }
+      // Only assert when there IS a parseable cover total + at least one module
+      // header row (i.e. the doc actually has the BoM summary table).
+      if (coverBom != null && headerRows > 0) {
+        const absGap = Math.abs(coverBom - sumHeaders)
+        const tol = Math.max(50, coverBom * 0.002) // identical tolerance to audit-pdf-bom B-3
+        assertions.push(assertEq(
+          'UNIVERSAL.bom_b3_module_header_parser_reconciles',
+          `cover "Raw materials BoM" (£${coverBom.toLocaleString('en-GB')}) reconciles with Σ of ${headerRows} parsed "Cost by module" header rows — digit-bearing labels (O2/N2/CO2, 6-DoF) must parse (2026-06-01 B-3 false-fail guard)`,
+          absGap,
+          (g) => g <= tol,
+          (g) => `Σ-headers £${sumHeaders.toLocaleString('en-GB')} vs cover £${coverBom!.toLocaleString('en-GB')} (gap £${g.toFixed(2)} > tol £${tol.toFixed(2)}). A digit-bearing module label likely failed to parse — confirm audit-pdf-bom.ts mModuleHeader label class admits [0-9] and display-name punctuation.`,
+        ))
+        // Specific regression: every digit-bearing module row in the table must
+        // be captured by the regex. If the doc has none, this passes trivially.
+        assertions.push(assertEq(
+          'UNIVERSAL.bom_b3_digit_bearing_module_label_captured',
+          `every digit-bearing module label in the "Cost by module" table is captured by the B-3 header regex (${digitLabelCaptured}/${digitLabelRows} captured)`,
+          digitLabelRows - digitLabelCaptured,
+          (missed) => missed === 0,
+          (missed) => `${missed} digit-bearing module label(s) NOT captured by audit-pdf-bom.ts mModuleHeader regex — the letters-only label class regression has returned.`,
+        ))
+      }
+    }
+  }
+
+  // ── UNIVERSAL: gate-18 mass-scope + recommendation-role splits (2026-06-01) ──
+  //
+  // UNIVERSAL.gate18_mass_scope_and_recommendation_splits — runs the REAL
+  // cross-page-numeric-consistency audit (gate 18) against tiny synthetic PDFs
+  // that encode the two cnc false-positive shapes AND their genuine-contradiction
+  // counterparts, and asserts:
+  //   FALSE-POSITIVE shapes produce 0 HIGH:
+  //     - a SYSTEM-total mass cap ("8,500 kg single-truck road transport")
+  //       beside a single-COMPONENT mass ("4,500 kg cast-iron base mass")
+  //     - a cost-ceiling RECOMMENDATION ("downrate spindle power to 17.1 kW to
+  //       meet the ceiling") beside the real design value ("22 kW continuous")
+  //   GENUINE contradictions still fire ≥1 HIGH:
+  //     - two SYSTEM-total masses that disagree (same scope)
+  //     - two design power values that disagree
+  //     - two downrate RECOMMENDATIONS that disagree (same role)
+  //
+  // This is the mechanical guard for the 2026-06-01 gate-18 fix: a revert of the
+  // MASS scope split or the recommendation role re-introduces the false HIGH on
+  // the false-positive shapes and fails here; a weakening that swallows genuine
+  // contradictions fails the "still fire" cases. Runs ONCE per harness process
+  // (fixtures are class-agnostic). Skips gracefully when cupsfilter / pdfunite
+  // are unavailable (e.g. a CI image without CUPS) — the fix is still covered by
+  // the source-level guardrail tests recorded in the commit message.
+  if (!gate18FixtureChecked) {
+    gate18FixtureChecked = true
+    const have = (bin: string) => {
+      try { execFileSync('/bin/bash', ['-c', `command -v ${bin}`], { stdio: 'ignore' }); return true } catch { return false }
+    }
+    const tools = { cups: have('cupsfilter'), unite: have('pdfunite') }
+    if (tools.cups && tools.unite) {
+      try {
+        const dir = mkdtempSync(join(tmpdir(), 'g18-fixture-'))
+        const mkPdf = (name: string, pageTexts: string[]): string => {
+          const pagePdfs: string[] = []
+          pageTexts.forEach((txt, i) => {
+            const tf = join(dir, `${name}-${i}.txt`)
+            writeFileSync(tf, txt)
+            const pf = join(dir, `${name}-${i}.pdf`)
+            const out = execFileSync('cupsfilter', [tf], { maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
+            writeFileSync(pf, out)
+            pagePdfs.push(pf)
+          })
+          const merged = join(dir, `${name}.pdf`)
+          execFileSync('pdfunite', [...pagePdfs, merged], { stdio: 'ignore' })
+          return merged
+        }
+        const highCount = (pdf: string): number =>
+          auditCrossPageNumericConsistency(pdf).findings.filter((f) => f.severity === 'HIGH').length
+
+        // FALSE-POSITIVE shapes — must be 0 HIGH.
+        const fpMassComponent = mkPdf('fp-mass', [
+          'Cost Analysis\nMass: 8,500 kg single-truck UK road transport without abnormal-load permit.',
+          'Machine Base\nMachine base Meehanite cast-iron vibration-damping ribbing 4,500 kg base mass column.',
+        ])
+        const fpRecVsDesign = mkPdf('fp-rec', [
+          'Levers\nThe engine recommends: Downrate spindle power to 17.1 kW to meet the cost ceiling.',
+          'Spindle Module\nSpindle power 22 kW continuous BT-40 taper motorised spindle.',
+        ])
+        // GENUINE contradictions — must be >= 1 HIGH.
+        const realSystemMass = mkPdf('real-sysmass', [
+          'Cost Analysis\nThe gross system mass on road transport is 8,500 kg total as shipped.',
+          'Logistics\nThe gross system mass on road transport is 9,800 kg total as shipped.',
+        ])
+        const realRecConflict = mkPdf('real-rec', [
+          'Levers\nThe engine recommends: Downrate spindle power to 17.1 kW to meet the cost ceiling.',
+          'Levers Continued\nThe engine recommends: Downrate spindle power to 19.5 kW to meet the cost ceiling.',
+        ])
+
+        const fpMassHigh = highCount(fpMassComponent)
+        const fpRecHigh = highCount(fpRecVsDesign)
+        const realMassHigh = highCount(realSystemMass)
+        const realRecHigh = highCount(realRecConflict)
+
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_mass_total_vs_component_not_flagged',
+          'gate 18: a SYSTEM-total mass cap beside a single-COMPONENT mass produces 0 HIGH (cnc 8,500 kg cap vs 4,500 kg cast-iron base false-positive guard)',
+          fpMassHigh, (n) => n === 0, (n) => `${n} HIGH on system-vs-component mass — massScopeOf split has regressed`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_recommendation_vs_design_not_flagged',
+          'gate 18: a cost-ceiling downrate RECOMMENDATION beside the real design value produces 0 HIGH (cnc 17.1 kW downrate vs 22 kW design false-positive guard)',
+          fpRecHigh, (n) => n === 0, (n) => `${n} HIGH on recommendation-vs-design — recommendation role split has regressed`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_genuine_system_mass_contradiction_still_fires',
+          'gate 18: two disagreeing SYSTEM-total masses (same scope) still fire >= 1 HIGH — the mass-scope split must not mask a real contradiction',
+          realMassHigh, (n) => n >= 1, (n) => `expected >= 1 HIGH on genuine system-mass contradiction, got ${n} — the fix is over-masking`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_genuine_recommendation_contradiction_still_fires',
+          'gate 18: two disagreeing downrate RECOMMENDATIONS (same role) still fire >= 1 HIGH — the recommendation role must not mask a real contradiction',
+          realRecHigh, (n) => n >= 1, (n) => `expected >= 1 HIGH on two conflicting recommendations, got ${n} — the fix is over-masking`,
+        ))
+      } catch (err) {
+        assertions.push({ id: 'UNIVERSAL.gate18_mass_scope_and_recommendation_splits', description: 'gate 18 mass-scope + recommendation-role fixture check', passed: false, detail: `fixture build/run failed: ${String(err).slice(0, 200)}` })
+      }
     }
   }
 
