@@ -2307,7 +2307,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         'deterministic-emitter.ts has no bare brief-value literal colliding with the humanoid £75,000 unit_cost_ceiling (gate 25 / exit 25 — pre-render block)',
         res.hits.length,
         (n: number) => n === 0,
-        () => `gate-25 scanner found ${res.hits.length} literal(s) colliding with humanoid cost ceiling: ${res.hits.map((h: { line: number; literal: string }) => `line ${h.line} "${h.literal}"`).join('; ')}. Fix: extract the value to a SCREAMING_SNAKE_CASE named constant in scripts/lib/deterministic-emitter.ts (the scanner skips const declarations) — it is a fixed real-part price, not a brief-derived value.`,
+        () => `gate-25 scanner found ${res.hits.length} literal(s) colliding with humanoid cost ceiling: ${res.hits.map((h) => `line ${h.line_number} "${h.raw_match}"`).join('; ')}. Fix: extract the value to a SCREAMING_SNAKE_CASE named constant in scripts/lib/deterministic-emitter.ts (the scanner skips const declarations) — it is a fixed real-part price, not a brief-derived value.`,
       ))
     } catch (err) {
       assertions.push({ id: 'UNIVERSAL.emitter_no_literal_collides_with_humanoid_cost_ceiling', description: 'gate-25 scanner runs on deterministic-emitter.ts', passed: false, detail: `scanner threw: ${err}` })
