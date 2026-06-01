@@ -3384,6 +3384,37 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL: headline output is never blank for any class (2026-06-01) ──
+  //
+  // UNIVERSAL.headline_output_never_blank — deriveHeadlineFromModules must return
+  // a populated headline_output.value for EVERY class. Guards the DAC/h2/bioreactor
+  // blank-headline bug family: a class with no registered deriver (DAC,
+  // h2_electrolyser) rendered a bare "—" on the most prominent cell of page 1, and
+  // even a REGISTERED deriver (bioreactor) returned undefined when its class-
+  // specific fields were absent from the brief. Fixed by the universal brief-
+  // fallback + a registered-deriver backfill (headline-deriver.ts). A revert
+  // re-introduces the blank "—" and fails here.
+  try {
+    const h = deriveHeadlineFromModules(
+      state?.moduleDecomposition?.modules ?? [],
+      state?.parsedBrief,
+      productClass,
+      null,
+      state?.orchestratorContract,
+    )
+    const hv = h?.headline_output?.value
+    const blank = hv == null || String(hv).trim() === '' || String(hv).trim() === '—'
+    assertions.push(assertEq(
+      'UNIVERSAL.headline_output_never_blank',
+      `headline_output is populated for "${productClass}" — the cover OPERATIONAL HEADLINE must never render a bare "—" (universal brief-fallback + registered-deriver backfill, 2026-06-01)`,
+      blank ? '<blank>' : String(hv),
+      (v) => v !== '<blank>',
+      () => `headline_output.value is blank ("${String(hv)}") for class "${productClass}" — universal brief fallback failed to surface a metric; check parsedBrief.constraints.target_performance + deriveUniversalHeadlineFromBrief.`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.headline_output_never_blank', description: 'headline never blank', passed: false, detail: `deriveHeadlineFromModules threw: ${String(err).slice(0, 160)}` })
+  }
+
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
 

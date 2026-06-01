@@ -790,6 +790,80 @@ function deriveWindHeadline(modules: ModuleSpec[], parsedBrief: any, briefText?:
   return out
 }
 
+// ─── Universal fallback deriver (any / unknown class) ────────────────────────
+//
+// THE AIM: the engine must work on UNKNOWN / novel classes. A class with no
+// registered per-class deriver MUST still render a real headline — never a bare
+// "—" (the DAC + h2_electrolyser blank-headline bug, 2026-06-01). This surfaces
+// the brief's primary target_performance metric (the single "what it delivers"
+// number the brief states), its supporting metrics, and a binding constraint
+// (cost ceiling / mass cap) straight from parsedBrief — so DAC, h2_electrolyser,
+// humanoid, cnc, tidal and any future class get a populated, honest, brief-
+// faithful headline instead of a placeholder. A registered per-class deriver
+// (BESS, wind, …) still takes precedence and computes from design data.
+
+function prettyKey(k: string): string {
+  let s = String(k || '').trim()
+  // Strip a trailing unit-ish suffix that just duplicates the unit column.
+  s = s.replace(/_(kw|kwh|kg_per_hr|kwh_per_kg|kg|gbp|bar|percent|pct|m_s|mm|m2|m3|nm3|hr|hz|deg_c|c|v|a|l)$/i, '')
+  return s.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()).trim() || 'Headline output'
+}
+
+// Coerce a brief constraint that may be a bare number OR a { value, ... } object.
+function briefNum(v: any): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (v && typeof v === 'object' && typeof v.value === 'number' && Number.isFinite(v.value)) return v.value
+  return null
+}
+
+function deriveUniversalHeadlineFromBrief(modules: ModuleSpec[], parsedBrief: any, productClass: string, briefText?: string | null): Record<string, any> {
+  const out: Record<string, any> = {}
+  const c = parsedBrief?.constraints ?? {}
+  const tp = c.target_performance
+  const fmt = (v: any) => (typeof v === 'number' ? (Number.isInteger(v) ? v.toLocaleString('en-GB') : String(v)) : String(v ?? ''))
+
+  // Primary headline output: the brief's top-level target_performance metric.
+  let primaryKey: string | null = null
+  if (tp && tp.value != null && String(tp.value) !== '') {
+    primaryKey = String(tp.key_metric ?? '')
+    out.headline_output = metric(
+      'brief_headline_output',
+      prettyKey(tp.key_metric ?? 'Headline output'),
+      fmt(tp.value),
+      String(tp.unit ?? ''),
+      `Primary deliverable taken directly from the brief target (parsedBrief.constraints.target_performance). No per-class headline deriver yet for "${productClass}"; surfaced from the brief so the headline is never blank.`,
+      'derived_from_brief',
+    )
+  }
+
+  // Supporting metrics: the rest of target_performance.metrics[] (skip the dup).
+  const metricsArr: any[] = Array.isArray(tp?.metrics) ? tp.metrics : []
+  const supporting: any[] = []
+  for (const m of metricsArr) {
+    if (m?.value == null || String(m.value) === '') continue
+    if (primaryKey && String(m.key_metric ?? '') === primaryKey) continue
+    supporting.push(metric(String(m.key_metric ?? 'metric'), prettyKey(m.key_metric ?? 'Metric'), fmt(m.value), String(m.unit ?? ''), `Brief target metric (${String(m.category ?? 'spec')}).`, 'derived_from_brief'))
+    if (supporting.length >= 5) break
+  }
+  // target_performance absent but metrics[] present → promote the first metric.
+  if (!out.headline_output && supporting.length > 0) {
+    out.headline_output = supporting.shift()
+  }
+  out.supporting_metrics = supporting
+
+  // Binding constraint: cost ceiling preferred, else mass cap.
+  const costCeil = briefNum(c.unit_cost_ceiling) ?? briefNum(c.unit_cost_ceiling_gbp) ?? briefNum(c.cost_ceiling_gbp)
+  const massCap = briefNum(c.max_mass_kg) ?? briefNum(c.mass_ceiling_kg)
+  if (costCeil != null && costCeil > 0) {
+    out.headline_constraint = metric('unit_cost_ceiling_gbp', 'Unit cost ceiling', fmt(costCeil), 'GBP', 'Brief cost ceiling per unit.', 'derived_from_brief')
+  } else if (massCap != null && massCap > 0) {
+    out.headline_constraint = metric('max_mass_kg', 'Mass ceiling', fmt(massCap), 'kg', 'Brief maximum gross mass.', 'derived_from_brief')
+  }
+
+  out.deployment_context = buildDeploymentContextDefault(parsedBrief, null, null, briefText)
+  return out
+}
+
 // ─── Registry ──────────────────────────────────────────────────────────────
 
 type Deriver = (modules: ModuleSpec[], parsedBrief: any, briefText?: string | null, orchestratorContract?: any) => Record<string, any>
@@ -829,21 +903,36 @@ export function deriveHeadlineFromModules(modules: ModuleSpec[], parsedBrief: an
   const deriver = DERIVERS[productClass]
   if (deriver) {
     const out = deriver(modules, parsedBrief, briefText, orchestratorContract)
+    // Safety net: even a REGISTERED deriver can return an empty headline when
+    // its class-specific required fields are absent from the design (e.g. the
+    // bioreactor deriver needs a titer the brief never states → no headline).
+    // Backfill any missing top-line field from the universal brief fallback so
+    // the headline is never blank for ANY class. (2026-06-01 — DAC/h2/bioreactor
+    // blank-headline bug family.)
+    const ho = out.headline_output
+    const needsOutput = !ho || ho.value == null || String(ho.value).trim() === '' || String(ho.value).trim() === '—'
+    if (needsOutput || !out.headline_constraint || !(out.supporting_metrics?.length)) {
+      const uni = deriveUniversalHeadlineFromBrief(modules, parsedBrief, productClass, briefText)
+      if (needsOutput && uni.headline_output) out.headline_output = uni.headline_output
+      if (!out.headline_constraint && uni.headline_constraint) out.headline_constraint = uni.headline_constraint
+      if (!(out.supporting_metrics?.length) && uni.supporting_metrics?.length) out.supporting_metrics = uni.supporting_metrics
+      if (!out.deployment_context && uni.deployment_context) out.deployment_context = uni.deployment_context
+    }
     return {
       ...out,
-      generated_by: 'deterministic_deriver',
+      generated_by: needsOutput ? 'deterministic_deriver+brief_backfill' : 'deterministic_deriver',
       generated_at: new Date().toISOString(),
       product_class: productClass,
     }
   }
-  // No deriver — return empty headline with explicit note
+  // No per-class deriver — use the universal brief-derived fallback so the
+  // headline is NEVER a bare "—" (THE AIM: the engine must work on unknown /
+  // novel classes). Surfaces the brief's target_performance + supporting metrics
+  // + a binding constraint straight from parsedBrief.
+  const uni = deriveUniversalHeadlineFromBrief(modules, parsedBrief, productClass, briefText)
   return {
-    headline_output: metric('output', 'Headline output', '—', '', `No deterministic headline deriver registered for product class "${productClass}". Add a deriver in src/lib/pdf-engine-v2/headline-deriver.ts to compute headline metrics from the design data.`, 'unavailable'),
-    headline_constraint: undefined,
-    utilisation: undefined,
-    supporting_metrics: [],
-    deployment_context: null,
-    generated_by: 'no_deriver_for_class',
+    ...uni,
+    generated_by: 'universal_brief_fallback',
     generated_at: new Date().toISOString(),
     product_class: productClass,
   }
