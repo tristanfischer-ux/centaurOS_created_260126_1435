@@ -40,6 +40,7 @@ import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync } from '
 import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
+import { _buildComplianceRows, summariseComplianceRows } from './render-minimal-pdf'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
@@ -3413,6 +3414,31 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.headline_output_never_blank', description: 'headline never blank', passed: false, detail: `deriveHeadlineFromModules threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── UNIVERSAL: compliance banner never claims "All PASS" over unverified rows (2026-06-01) ──
+  //
+  // UNIVERSAL.compliance_banner_not_false_pass — the Brief Compliance headline must
+  // NEVER render the green "All N PASS" claim when a constraint row is a FAIL or
+  // could-not-be-verified ('unknown' → "—" achieved cell). The renderer banner and
+  // this gate share ONE source of truth (summariseComplianceRows), so a regression
+  // that re-folds unknown rows into "All PASS" fails here. Guards the self-check-
+  // returns-green-on-blank-cells lie found on every reviewed class (heatpump and
+  // bioreactor printed "All N PASS" directly above "—" core-metric cells).
+  try {
+    const cRows = _buildComplianceRows(state, null, null)
+    const v = summariseComplianceRows(cRows)
+    const claimsAllPass = /^All \d+ brief constraints PASS$/.test(v.headline)
+    const lying = (v.failCount + v.unknownCount > 0) && claimsAllPass
+    assertions.push(assertEq(
+      'UNIVERSAL.compliance_banner_not_false_pass',
+      `Brief Compliance banner is honest for "${productClass}" — "All N PASS" only with 0 fail + 0 unverified (${v.passCount}P/${v.failCount}F/${v.unknownCount}U of ${v.total})`,
+      lying,
+      (isLying) => isLying === false,
+      () => `banner "${v.headline}" claims all-pass while ${v.failCount} fail + ${v.unknownCount} unverified rows exist — the false-PASS-over-blank-cells lie has regressed.`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.compliance_banner_not_false_pass', description: 'compliance banner honesty', passed: true, detail: `skipped — _buildComplianceRows threw: ${String(err).slice(0, 120)}` })
   }
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }

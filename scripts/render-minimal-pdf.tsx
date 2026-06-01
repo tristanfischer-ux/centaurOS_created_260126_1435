@@ -4265,6 +4265,36 @@ interface ComplianceRow {
 }
 
 /**
+ * Single source of truth for the Brief Compliance headline verdict — used by the
+ * renderer's banner AND the regression harness, so the rendered claim and the
+ * gate can never diverge. A row whose achieved value could not be resolved is
+ * 'unknown' (rendered "—") — NOT a verified pass. The green "All N PASS" claim is
+ * honest ONLY when every row is a verified pass. (2026-06-01 false-PASS-banner
+ * fix: every reviewed class printed "All N PASS" over a table of "—" cells.)
+ */
+export interface ComplianceVerdict {
+  total: number
+  passCount: number
+  failCount: number
+  unknownCount: number
+  allVerifiedPass: boolean
+  headline: string
+}
+export function summariseComplianceRows(rows: { status: ComplianceStatus }[]): ComplianceVerdict {
+  const total = rows.length
+  const failCount = rows.filter((r) => r.status === 'fail').length
+  const unknownCount = rows.filter((r) => r.status === 'unknown').length
+  const passCount = rows.filter((r) => r.status === 'pass').length
+  const allVerifiedPass = total > 0 && failCount === 0 && unknownCount === 0
+  const headline = failCount > 0
+    ? `${failCount} of ${total} brief constraints FAIL${unknownCount > 0 ? ` · ${unknownCount} unverified` : ''}`
+    : unknownCount > 0
+      ? `${passCount} of ${total} brief constraints verified PASS · ${unknownCount} unverified`
+      : `All ${total} brief constraints PASS`
+  return { total, passCount, failCount, unknownCount, allVerifiedPass, headline }
+}
+
+/**
  * Pull the user-stated value out of a parsedBrief.constraints.target_performance.metrics
  * entry by key_metric. Returns null when the metric isn't present.
  */
@@ -4461,7 +4491,7 @@ function _buildImprovementInput(state: any, bomTotals: BomTotals | null, costSta
   return { exWorksCostGbp: exWorks, costCeilingGbp: ceiling, designMassKg: designMass, massCapKg: massCap, scaleMetric, performanceMisses, hasOverpricedMaterialMacro }
 }
 
-function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack?: CostStack | null): ComplianceRow[] {
+export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack?: CostStack | null): ComplianceRow[] {
   const constraints = state?.parsedBrief?.constraints
   if (!constraints || typeof constraints !== 'object') return []
 
@@ -5306,6 +5336,13 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
 
   const failedRows = rows.filter((r) => r.status === 'fail')
   const passedCount = rows.filter((r) => r.status === 'pass').length
+  // Rows whose achieved value could not be resolved are 'unknown' — they are NOT
+  // verified passes. The headline banner must NEVER fold them into "All PASS"
+  // (the self-check-returns-green-on-blank-cells bug, 2026-06-01: every reviewed
+  // class printed "All N PASS" directly above a table showing "—" for core
+  // metrics). A green "All N PASS" is honest ONLY when every row is a verified pass.
+  const unknownRows = rows.filter((r) => r.status === 'unknown')
+  const verdict = summariseComplianceRows(rows)
   const decisionRationale = _generateDecisionRationale(rows)
   // Auto-improve (Phase 1): the quantified levers that would close each miss.
   const improvementPlan = computeImprovementPlan(_buildImprovementInput(state, bomTotals, costStack))
@@ -5334,27 +5371,29 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
         engineering lever was pulled and which was relaxed.
       </Text>
 
-      {/* Headline summary — leads with PASS/FAIL count so the reader sees the
-          verdict before scanning the table. */}
+      {/* Headline summary — leads with the HONEST verdict. Green "All PASS" only
+          when every constraint is a VERIFIED pass; amber when some constraints
+          could not be verified (achieved value absent → "—") so the banner never
+          claims success over unresolved cells; red on any breach. */}
       <View
         style={{
           marginBottom: 14,
           padding: 10,
-          backgroundColor: failedRows.length > 0 ? '#fef2f2' : '#f0fdf4',
+          backgroundColor: failedRows.length > 0 ? '#fef2f2' : (unknownRows.length > 0 ? '#fffbeb' : '#f0fdf4'),
           borderLeftWidth: 3,
-          borderLeftColor: failedRows.length > 0 ? '#b91c1c' : '#15803d',
+          borderLeftColor: failedRows.length > 0 ? '#b91c1c' : (unknownRows.length > 0 ? '#b45309' : '#15803d'),
         }}
         minPresenceAhead={50}
       >
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>
-          {failedRows.length > 0
-            ? `${failedRows.length} of ${rows.length} brief constraints FAIL`
-            : `All ${rows.length} brief constraints PASS`}
+          {verdict.headline}
         </Text>
         <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5 }}>
           {failedRows.length > 0
-            ? `The design honours ${passedCount} of the brief's constraints but breaches ${failedRows.length}. Every breach is explained as a CAPEX / OPEX / output trade-off below; the reader should treat each as a deliberate design choice that requires acceptance or a brief revision before procurement.`
-            : `Every brief constraint is met by the design as computed. No trade-off narrative is required.`}
+            ? `The design honours ${passedCount} of the brief's constraints but breaches ${failedRows.length}${unknownRows.length > 0 ? ` and could not verify ${unknownRows.length}` : ''}. Every breach is explained as a CAPEX / OPEX / output trade-off below; treat each as a deliberate design choice requiring acceptance or a brief revision before procurement.`
+            : unknownRows.length > 0
+              ? `The design verifiably meets ${passedCount} of ${rows.length} brief constraints. ${unknownRows.length} could not be auto-verified — the design's achieved value was not computed into the engineering contract, so each is shown "—" and must be confirmed in the engineering narrative before procurement, NOT assumed to pass.`
+              : `Every brief constraint is met by the design as computed. No trade-off narrative is required.`}
         </Text>
       </View>
 
