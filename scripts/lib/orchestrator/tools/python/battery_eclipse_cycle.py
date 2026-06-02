@@ -47,8 +47,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -118,6 +122,79 @@ def compute(payload: dict) -> dict:
     capacity_required_wh = discharge_wh / (dod_max_pct / 100.0)
     oversize_factor = capacity_required_wh / cap_wh if cap_wh > 0 else 0.0
 
+    # --- Worked calculations ---
+    # cycles_available uses a power-law function — skipped.
+    discharge_r = round(discharge_wh, 3)
+    dod_r = round(dod_per_orbit_pct, 2)
+    period_r = round(orbital_period_min, 2)
+    cpd_r = round(cycles_per_day, 2)
+    cpy_r = round(cycles_per_year, 1)
+    tc_r = round(total_cycles, 0)
+    cap_req_r = round(capacity_required_wh, 2)
+    osf_r = round(oversize_factor, 3)
+
+    worked = [
+        worked_calc(
+            label="Energy discharged per eclipse pass",
+            formula="E_discharge = P_load x t_eclipse / 60",
+            values={"P_load": (load_w, "W"), "t_eclipse": (eclipse_min, "min")},
+            result=discharge_r, result_unit="Wh",
+            assumptions=["Constant load throughout eclipse"],
+        ),
+        worked_calc(
+            label="Depth of discharge per orbit",
+            formula="DoD = (E_discharge / cap_wh) x 100",
+            values={"E_discharge": (discharge_r, "Wh"), "cap_wh": (cap_wh, "Wh")},
+            result=dod_r, result_unit="%",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Orbital period",
+            formula="T_orbit = t_eclipse / (eclipse_frac / 100)",
+            values={"t_eclipse": (eclipse_min, "min"),
+                    "eclipse_frac": (eclipse_frac_pct, "%")},
+            result=period_r, result_unit="min",
+            assumptions=["eclipse_fraction relates eclipse time to full orbit period"],
+        ),
+        worked_calc(
+            label="Cycles per day",
+            formula="cycles_per_day = 1440 / T_orbit",
+            values={"T_orbit": (period_r, "min")},
+            result=cpd_r, result_unit="cycles/day",
+            assumptions=["1440 min/day; 1 eclipse per orbit for LEO"],
+        ),
+        worked_calc(
+            label="Cycles per year",
+            formula="cycles_per_year = cycles_per_day x 365.25",
+            values={"cycles_per_day": (cpd_r, "cycles/day")},
+            result=cpy_r, result_unit="cycles/year",
+            assumptions=["365.25 days/year"],
+        ),
+        worked_calc(
+            label="Total lifetime cycles",
+            formula="total_cycles = cycles_per_year x mission_yr",
+            values={"cycles_per_year": (cpy_r, "cycles/year"),
+                    "mission_yr": (mission_yr, "yr")},
+            result=tc_r, result_unit="cycles",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Required battery capacity (for allowed DoD)",
+            formula="cap_req = E_discharge / (dod_max / 100)",
+            values={"E_discharge": (discharge_r, "Wh"),
+                    "dod_max": (dod_max_pct, "%")},
+            result=cap_req_r, result_unit="Wh",
+            assumptions=["Rearranged from DoD = E_discharge / cap_req"],
+        ),
+        worked_calc(
+            label="Battery oversize factor",
+            formula="oversize = cap_req / cap_wh",
+            values={"cap_req": (cap_req_r, "Wh"), "cap_wh": (cap_wh, "Wh")},
+            result=osf_r, result_unit="",
+            assumptions=["Factor > 1 means battery must be enlarged"],
+        ),
+    ]
+
     return {
         "eclipse_fraction_pct": eclipse_frac_pct,
         "load_power_w_during_eclipse": load_w,
@@ -135,6 +212,7 @@ def compute(payload: dict) -> dict:
         "feasible_for_life": feasible,
         "capacity_required_wh": round(capacity_required_wh, 2),
         "battery_oversize_factor": round(oversize_factor, 3),
+        "worked": worked,
     }
 
 

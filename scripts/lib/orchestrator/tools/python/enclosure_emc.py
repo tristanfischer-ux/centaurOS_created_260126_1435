@@ -51,8 +51,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -186,19 +190,62 @@ def compute(payload: dict) -> dict:
     required_shielding_dB = source_dBuV - limit_dBuV + 6.0
     additional_shielding_needed_dB = max(0.0, required_shielding_dB - effective_shielding_dB)
 
+    # material_se_dB comes from log-freq interpolation (skip); pass as live symbol.
+    se_r = round(effective_shielding_dB, 2)
+    pred_r = round(predicted_emissions_dBuV, 2)
+    margin_r = round(compliance_margin_dB, 2)
+    req_r = round(required_shielding_dB, 2)
+
+    worked = [
+        worked_calc(
+            label="Predicted emissions at antenna",
+            formula="E_pred = E_source - SE",
+            values={
+                "E_source": (source_dBuV, "dBuV/m"),
+                "SE": (se_r, "dB"),
+            },
+            result=pred_r, result_unit="dBuV/m",
+            assumptions=[
+                "SE = max(explicit_shielding_dB, material_intrinsic_SE); "
+                "material SE from Ott table log-freq interpolation — not hand-checkable",
+            ],
+        ),
+        worked_calc(
+            label="Compliance margin",
+            formula="margin = limit - E_pred",
+            values={
+                "limit": (limit_dBuV, "dBuV/m"),
+                "E_pred": (pred_r, "dBuV/m"),
+            },
+            result=margin_r, result_unit="dB",
+            assumptions=["positive = passing; negative = failing"],
+        ),
+        worked_calc(
+            label="Required shielding (with 6 dB engineering margin)",
+            formula="SE_req = E_source - limit + 6",
+            values={
+                "E_source": (source_dBuV, "dBuV/m"),
+                "limit": (limit_dBuV, "dBuV/m"),
+            },
+            result=req_r, result_unit="dB",
+            assumptions=["6 dB engineering margin per standard practice"],
+        ),
+    ]
+
     return {
         "enclosure_material": material,
         "frequency_mhz": freq_mhz,
         "source_dBuV_m_at_3m": source_dBuV,
         "material_intrinsic_shielding_dB": round(material_se_dB, 2),
-        "applied_shielding_dB": round(effective_shielding_dB, 2),
-        "predicted_emissions_dBuV_m": round(predicted_emissions_dBuV, 2),
+        "applied_shielding_dB": se_r,
+        "predicted_emissions_dBuV_m": pred_r,
         "target_standard": target_standard,
         "limit_dBuV_m": limit_dBuV,
-        "compliance_margin_dB": round(compliance_margin_dB, 2),
+        "compliance_margin_dB": margin_r,
         "compliance_pass": compliance_pass,
-        "required_shielding_dB_with_6dB_margin": round(required_shielding_dB, 2),
+        "required_shielding_dB_with_6dB_margin": req_r,
         "additional_shielding_needed_dB": round(additional_shielding_needed_dB, 2),
+        "worked": worked,
         "_meta": {
             "model": "Source - shielding effectiveness vs CISPR-22/FCC/EN-55032 radiated emission limits at 3m",
             "references": [

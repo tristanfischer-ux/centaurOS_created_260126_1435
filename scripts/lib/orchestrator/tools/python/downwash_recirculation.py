@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "downwash_recirculation (custom)",
@@ -98,6 +102,27 @@ def compute(payload: dict) -> dict:
     HIGE_to_HOGE_thrust_ratio = gef
     HIGE_to_HOGE_power_ratio = 1.0 / gef  # less power needed in GE
 
+    # Worked calculations for the PDF appendix.
+    # v_i = sqrt(DL / (2*rho)) is transcendental (sqrt), so v_i is passed as a live
+    # input symbol to the induced-power step.
+    # gef is piecewise/clamped (two branches + min/max) — skipped.
+    # rec_loss_pct is a piecewise empirical curve — skipped.
+    v_i_r = round(v_i, 2)
+    ipd_r = round(induced_power_per_disk_w_m2 / 1000.0, 3)
+    worked = [
+        worked_calc(
+            label="Induced power per unit disk area",
+            formula="P_induced_kw_m2 = DL x v_i / 1000",
+            values={"DL": (DL, "N/m^2"), "v_i": (v_i_r, "m/s")},
+            result=ipd_r,
+            result_unit="kW/m^2",
+            assumptions=[
+                "momentum theory: power per disk = thrust x induced velocity",
+                "v_i = sqrt(DL / (2 x rho_SL)) at rho_SL = 1.225 kg/m^3 (transcendental, not shown)",
+            ],
+        ),
+    ]
+
     return {
         "rotor_disk_loading_n_m2": DL,
         "induced_velocity_ms": round(v_i, 2),
@@ -111,6 +136,7 @@ def compute(payload: dict) -> dict:
         "num_rotors": n_rotors,
         "altitude_agl_m": z_agl,
         "recommended_min_spacing_d": 1.5,
+        "worked": worked,
     }
 
 

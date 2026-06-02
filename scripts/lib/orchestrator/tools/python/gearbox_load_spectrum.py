@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -99,6 +103,91 @@ def compute(payload: dict) -> dict:
     gear_ratio_total = 100.0
     hss_cycles = rotor_cycles * gear_ratio_total
 
+    # Worked calculations — each step chains off the prior rounded value.
+    ti_r = round(ti, 4)
+    sigma_v_r = round(sigma_v, 4)
+    op_hours_r = round(op_hours, 1)
+    rotor_cycles_r = round(rotor_cycles, 0)
+    overshoot_r = round(overshoot, 4)
+    T_peak_r = round(T_peak, 1)
+    sigma_T_r = round(sigma_T, 2)
+    damage_eq_r = round(damage_eq, 4)
+    worked = [
+        worked_calc(
+            label="Turbulence intensity (fraction)",
+            formula="TI = TI_pct / 100",
+            values={"TI_pct": (ti_pct, "%")},
+            result=ti_r, result_unit="",
+            assumptions=["Input turbulence intensity converted from percent to fraction"],
+        ),
+        worked_calc(
+            label="Wind speed standard deviation",
+            formula="sigma_v = TI x v_mean",
+            values={"TI": (ti_r, ""), "v_mean": (v_mean, "m/s")},
+            result=sigma_v_r, result_unit="m/s",
+            assumptions=["sigma_v = turbulence intensity x mean wind speed"],
+        ),
+        worked_calc(
+            label="Operating hours over design life",
+            formula="op_hours = lifetime_y x 8760 x avail_pct / 100",
+            values={
+                "lifetime_y": (lifetime_y, "yr"),
+                "avail_pct": (avail_pct, "%"),
+            },
+            result=op_hours_r, result_unit="h",
+            assumptions=["8760 h/yr; availability factor applied"],
+        ),
+        worked_calc(
+            label="Rotor cycles per lifetime",
+            formula="rotor_cycles = op_hours x 60 x n_rotor_rpm",
+            values={
+                "op_hours": (op_hours_r, "h"),
+                "n_rotor_rpm": (n_rotor_rpm, "rpm"),
+            },
+            result=rotor_cycles_r, result_unit="rev",
+            assumptions=["x 60 converts hours to minutes; each revolution = 1 rotor cycle"],
+        ),
+        worked_calc(
+            label="Torque overshoot factor (3-sigma gust, IEC 61400-1)",
+            formula="overshoot = 1 + 2.5 x sigma_v / v_mean",
+            values={"sigma_v": (sigma_v_r, "m/s"), "v_mean": (v_mean, "m/s")},
+            result=overshoot_r, result_unit="",
+            assumptions=["IEC 61400-1 Class I-III extreme gust factor; 2.5 = 3σ / (3σ - 2σ) scale"],
+        ),
+        worked_calc(
+            label="Peak gearbox torque",
+            formula="T_peak = T_rated x overshoot",
+            values={"T_rated": (T_rated, "Nm"), "overshoot": (overshoot_r, "")},
+            result=T_peak_r, result_unit="Nm",
+            assumptions=["Peak torque estimated from rated torque scaled by gust overshoot factor"],
+        ),
+        worked_calc(
+            label="Torque standard deviation (operational turbulence)",
+            formula="sigma_T = T_rated x sigma_v / v_mean",
+            values={
+                "T_rated": (T_rated, "Nm"),
+                "sigma_v": (sigma_v_r, "m/s"),
+                "v_mean": (v_mean, "m/s"),
+            },
+            result=sigma_T_r, result_unit="Nm",
+            assumptions=["Narrow operating range approximation; sigma_T proportional to wind sigma_v"],
+        ),
+        worked_calc(
+            label="Miner damage equivalent (Gaussian approximation, m=10)",
+            formula="D_eq = 1 + 0.5 x m x (m - 1) x (sigma_T / T_rated) ^ 2",
+            values={
+                "m": (m, ""),
+                "sigma_T": (sigma_T_r, "Nm"),
+                "T_rated": (T_rated, "Nm"),
+            },
+            result=damage_eq_r, result_unit="",
+            assumptions=[
+                "Miner linear damage rule; m=10 Woehler exponent for steel gears (DIN 743 / ISO 6336)",
+                "Second-order Gaussian moment approximation: E[(T/T_R)^m] ~ 1 + C(m,2)(sigma_T/T_R)^2",
+            ],
+        ),
+    ]
+
     return {
         "load_cycles_per_lifetime": round(rotor_cycles, 0),
         "hss_bearing_cycles_per_lifetime": round(hss_cycles, 0),
@@ -116,6 +205,7 @@ def compute(payload: dict) -> dict:
             "S"
         ),
         "miner_exponent_m": m,
+        "worked": worked,
     }
 
 

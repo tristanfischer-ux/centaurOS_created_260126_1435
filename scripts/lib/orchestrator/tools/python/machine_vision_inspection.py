@@ -41,8 +41,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -172,28 +176,81 @@ def compute(payload: dict) -> dict:
     if pixels_per_defect < 1:
         false_alarm_rate = max(false_alarm_rate, 0.1)  # sub-pixel defects: many false alarms
 
+    # Rounded display values that chain through the worked calculations.
+    pixel_size_r = round(pixel_size_at_target_mm, 4)
+    pixels_per_defect_r = round(pixels_per_defect, 2)
+    gflops_r = round(gflops_per_image, 3)
+    tops_req_r = round(tops_required, 2)
+    tops_eff_r = round(tops_effective, 2)
+
+    # Worked calculations (hand-checkable closed-form steps only).
+    # fov_diameter uses tan(fov/2) — SKIP.
+    # n_pixels_per_side uses sqrt — SKIP.
+    # pixel_size = fov_diameter / n_pixels is quotient of two SKIP quantities;
+    #   pass it as a live input symbol for pixels_per_defect.
+    # irr_w_m2 uses tan (directional) or a lookup (solar) — SKIP.
+    # photons/electrons use omega_sr (derived) — SKIP.
+    # snr uses sqrt — SKIP.
+    worked = [
+        worked_calc(
+            label="Pixels per defect (defect coverage)",
+            formula="pixels_per_defect = (defect_mm / pixel_size_mm)^2",
+            values={
+                "defect_mm": (defect_mm, "mm"),
+                "pixel_size_mm": (pixel_size_r, "mm"),
+            },
+            result=pixels_per_defect_r, result_unit="pixels",
+            assumptions=[
+                "pixel_size_mm is ground-projected pixel pitch: 2*d*tan(FoV/2) / sqrt(N_px)",
+                "square defect assumption for pixel count",
+            ],
+        ),
+        worked_calc(
+            label="CNN compute requirement per image",
+            formula="GFLOPs_per_image = 20 x (cam_mp / 12)",
+            values={"cam_mp": (cam_mp, "MP")},
+            result=gflops_r, result_unit="GFLOPs/image",
+            assumptions=["20 GFLOPs baseline for ResNet-50-class detector at 12 MP; linear scaling"],
+        ),
+        worked_calc(
+            label="Required compute throughput",
+            formula="TOPS_req = GFLOPs_per_image x fps / 1000",
+            values={"GFLOPs_per_image": (gflops_r, "GFLOPs/image"), "fps": (fps, "fps")},
+            result=tops_req_r, result_unit="TOPS",
+            assumptions=["GFLOPs/image x frames/s / 1000 = TOPS (INT8 approximate)"],
+        ),
+        worked_calc(
+            label="Effective accelerator throughput (with utilisation factor)",
+            formula="TOPS_eff = TOPS_peak x utilisation",
+            values={"TOPS_peak": (tops_available, "TOPS"), "utilisation": (0.15, "")},
+            result=tops_eff_r, result_unit="TOPS",
+            assumptions=["0.15 utilisation factor from MLPerf real-world inference benchmarks"],
+        ),
+    ]
+
     return {
         "target_distance_m": distance_m,
         "illumination": illumination,
         "camera_resolution_mp": cam_mp,
         "field_of_view_deg": fov_deg,
         "fov_diameter_at_target_m": round(fov_diameter_m, 3),
-        "pixel_size_at_target_mm": round(pixel_size_at_target_mm, 4),
+        "pixel_size_at_target_mm": pixel_size_r,
         "defect_detection_target_mm": defect_mm,
-        "pixels_per_defect": round(pixels_per_defect, 2),
+        "pixels_per_defect": pixels_per_defect_r,
         "frame_rate_fps": fps,
         "exposure_time_ms": exposure_ms,
         "irradiance_at_target_w_m2": round(irr_w_m2, 2),
         "photons_per_pixel": round(photons_per_pixel, 1),
         "electrons_per_pixel": round(n_electrons, 1),
         "signal_to_noise": round(snr, 2),
-        "required_compute_TOPS": round(tops_required, 2),
+        "required_compute_TOPS": tops_req_r,
         "compute_accelerator": accel,
         "tops_available_peak": tops_available,
-        "tops_effective_with_utilisation": round(tops_effective, 2),
+        "tops_effective_with_utilisation": tops_eff_r,
         "compute_sufficient": tops_required <= tops_effective,
         "detection_probability": round(pod, 4),
         "false_alarm_rate": round(false_alarm_rate, 5),
+        "worked": worked,
     }
 
 

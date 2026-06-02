@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "regeneration_energy (custom)",
@@ -120,6 +124,116 @@ def compute(payload: dict) -> dict:
     time_to_heat_s = (mass_sorbent_kg * p["c_p_kj_kg_k"] * dT) / (P_heat_kw_per_t_sorbent * mass_sorbent_kg / 1000)
     regen_time_min = time_to_heat_s / 60
 
+    # --- Worked calculations ---
+    moles_r = round(moles_co2_per_ton, 1)
+    h_des_r = round(h_desorption_gj_ton, 2)
+    mass_sorb_r = round(mass_sorbent_kg, 0)
+    dT_r = round(dT, 1)
+    h_sens_kj_r = round(h_sensible_kj, 1)
+    h_sens_gj_r = round(h_sensible_gj_ton, 2)
+    # steam_kg_per_ton is only computed for amine/mof/carbonate; guard:
+    if "amine" in sorbent or "mof" in sorbent or sorbent == "carbonate_slurry":
+        steam_kg_r = round(steam_kg_per_ton, 2)
+        h_steam_r = round(h_steam_gj_ton, 2)
+    else:
+        steam_kg_r = 0.0
+        h_steam_r = 0.0
+    total_gj_r = round(total_gj_ton, 2)
+    useful_r = round(useful_energy_gj_ton, 2)
+    kwh_r = round(energy_kwh_per_ton, 0)
+
+    worked = [
+        worked_calc(
+            label="Moles of CO2 per tonne captured",
+            formula="n_co2 = 1e6 / M_co2",
+            values={
+                "M_co2": (44.0, "g/mol"),
+            },
+            result=moles_r,
+            result_unit="mol/tonne",
+            assumptions=["1 tonne CO2 = 1e6 g; molar mass CO2 = 44 g/mol"],
+        ),
+        worked_calc(
+            label="Desorption enthalpy per tonne CO2",
+            formula="H_des = dh_mol x n_co2 / 1e6",
+            values={
+                "dh_mol": (p["dh_desorption_kj_mol"], "kJ/mol"),
+                "n_co2": (moles_r, "mol/tonne"),
+            },
+            result=h_des_r,
+            result_unit="GJ/tonne",
+            assumptions=[f"dh_mol = {p['dh_desorption_kj_mol']} kJ/mol for {sorbent} (Sanz-Perez 2016)"],
+        ),
+        worked_calc(
+            label="Sorbent mass per tonne CO2 captured",
+            formula="m_sorbent = 1000 / cap",
+            values={
+                "cap": (cap_g_g, "g_CO2/g_sorbent"),
+            },
+            result=mass_sorb_r,
+            result_unit="kg_sorbent/tonne_CO2",
+            assumptions=["1000 kg CO2 per tonne; cap = grams CO2 per gram sorbent"],
+        ),
+        worked_calc(
+            label="Sensible heat to warm sorbent",
+            formula="H_sens_kJ = m_sorbent x c_p x dT",
+            values={
+                "m_sorbent": (mass_sorb_r, "kg"),
+                "c_p": (p["c_p_kj_kg_k"], "kJ/kg/K"),
+                "dT": (dT_r, "K"),
+            },
+            result=h_sens_kj_r,
+            result_unit="kJ",
+            assumptions=[f"dT = T_regen - T_amb = {T_regen_c} - {T_amb_c} = {dT_r} K"],
+        ),
+        worked_calc(
+            label="Sensible heat in GJ per tonne CO2",
+            formula="H_sens_GJ = H_sens_kJ / 1e6",
+            values={
+                "H_sens_kJ": (h_sens_kj_r, "kJ"),
+            },
+            result=h_sens_gj_r,
+            result_unit="GJ/tonne",
+            assumptions=["unit conversion only: 1 GJ = 1e6 kJ"],
+        ),
+        worked_calc(
+            label="Total thermal energy demand (no heat recovery)",
+            formula="H_total = H_des + H_sens + H_steam",
+            values={
+                "H_des": (h_des_r, "GJ/tonne"),
+                "H_sens": (h_sens_gj_r, "GJ/tonne"),
+                "H_steam": (h_steam_r, "GJ/tonne"),
+            },
+            result=total_gj_r,
+            result_unit="GJ/tonne",
+            assumptions=["H_steam = steam_kg x 2257 kJ/kg / 1e6; steam latent heat 2257 kJ/kg"],
+        ),
+        worked_calc(
+            label="Useful energy after heat-source adjustment",
+            formula="H_useful = H_total x source_factor",
+            values={
+                "H_total": (total_gj_r, "GJ/tonne"),
+                "source_factor": (round(useful_r / total_gj_r if total_gj_r > 0 else 1.0, 3), ""),
+            },
+            result=useful_r,
+            result_unit="GJ/tonne",
+            assumptions=[
+                "low_grade_waste: 0.4 (40% from grid, 60% from free waste heat); "
+                "heat_pump: 1/COP=1/3.5=0.286; electric_resistance: 1.0",
+            ],
+        ),
+        worked_calc(
+            label="Regeneration energy in kWh per tonne CO2",
+            formula="E_kwh = H_useful x 277.78",
+            values={
+                "H_useful": (useful_r, "GJ/tonne"),
+            },
+            result=kwh_r,
+            result_unit="kWh/tonne",
+            assumptions=["1 GJ = 277.78 kWh"],
+        ),
+    ]
+
     return {
         "sorbent_type": sorbent,
         "capture_capacity_g_co2_g_sorbent": cap_g_g,
@@ -136,6 +250,7 @@ def compute(payload: dict) -> dict:
         "mass_sorbent_kg_per_ton_co2": round(mass_sorbent_kg, 0),
         "dh_desorption_kj_mol": p["dh_desorption_kj_mol"],
         "dt_kelvin": dT,
+        "worked": worked,
     }
 
 

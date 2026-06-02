@@ -26,8 +26,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -136,6 +140,89 @@ def compute(payload: dict) -> dict:
     }.get(crop, 15)
     benchmark_market = energy_intensity <= benchmark_kwh_kg
 
+    # Rounded intermediates for chained worked calculations.
+    annual_rev_r = round(annual_gross_yr_t, 2)
+    gross_margin_r = round(gross_margin_yr1, 2)
+    energy_int_r = round(energy_intensity, 2)
+    cost_per_kg_r = round(cost_per_kg_yr1, 4)
+    cap_amort_r = round(capex_amortised_per_kg, 4)
+    all_in_cost_r = round(all_in_cost_per_kg, 4)
+    all_in_margin_r = round(market_price - all_in_cost_per_kg, 4)
+
+    worked = [
+        worked_calc(
+            label="Annual gross revenue (year 1)",
+            formula="annual_revenue = annual_yield_kg x market_price",
+            values={
+                "annual_yield_kg": (annual_yield_kg, "kg/yr"),
+                "market_price": (market_price, "GBP/kg"),
+            },
+            result=annual_rev_r, result_unit="GBP/yr",
+            assumptions=["year 1 price; subsequent years inflated at price_inflation_pct per annum"],
+        ),
+        worked_calc(
+            label="Gross margin year 1",
+            formula="gross_margin = (annual_revenue - opex_per_yr) / annual_revenue x 100",
+            values={
+                "annual_revenue": (annual_rev_r, "GBP/yr"),
+                "opex_per_yr": (opex_per_yr, "GBP/yr"),
+            },
+            result=gross_margin_r, result_unit="%",
+            assumptions=["gross margin before tax and depreciation; year-1 only"],
+        ),
+        worked_calc(
+            label="Energy intensity",
+            formula="energy_intensity = annual_energy_kwh / annual_yield_kg",
+            values={
+                "annual_energy_kwh": (annual_energy_kwh, "kWh/yr"),
+                "annual_yield_kg": (annual_yield_kg, "kg/yr"),
+            },
+            result=energy_int_r, result_unit="kWh/kg",
+            assumptions=["total site energy divided by total harvested yield; no allocation between crops"],
+        ),
+        worked_calc(
+            label="Operating cost per kg",
+            formula="cost_per_kg = opex_per_yr / annual_yield_kg",
+            values={
+                "opex_per_yr": (opex_per_yr, "GBP/yr"),
+                "annual_yield_kg": (annual_yield_kg, "kg/yr"),
+            },
+            result=cost_per_kg_r, result_unit="GBP/kg",
+            assumptions=["year-1 opex only; subsequent years inflated"],
+        ),
+        worked_calc(
+            label="Amortised capital cost per kg",
+            formula="cap_amort = capex_gbp / (annual_yield_kg x project_years)",
+            values={
+                "capex_gbp": (capex_gbp, "GBP"),
+                "annual_yield_kg": (annual_yield_kg, "kg/yr"),
+                "project_years": (project_years, "yr"),
+            },
+            result=cap_amort_r, result_unit="GBP/kg",
+            assumptions=["straight-line amortisation over project life; matches straight-line depreciation assumption"],
+        ),
+        worked_calc(
+            label="All-in cost per kg (opex + amortised capex)",
+            formula="all_in_cost = cost_per_kg + cap_amort",
+            values={
+                "cost_per_kg": (cost_per_kg_r, "GBP/kg"),
+                "cap_amort": (cap_amort_r, "GBP/kg"),
+            },
+            result=all_in_cost_r, result_unit="GBP/kg",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="All-in margin per kg",
+            formula="all_in_margin = market_price - all_in_cost",
+            values={
+                "market_price": (market_price, "GBP/kg"),
+                "all_in_cost": (all_in_cost_r, "GBP/kg"),
+            },
+            result=all_in_margin_r, result_unit="GBP/kg",
+            assumptions=["positive = profitable at year-1 volume and price"],
+        ),
+    ]
+
     return {
         "npv_gbp": round(npv),
         "irr_pct": round(irr * 100.0, 2) if irr is not None else None,
@@ -151,6 +238,7 @@ def compute(payload: dict) -> dict:
         "cost_per_kg_opex_only_gbp": round(cost_per_kg_yr1, 2),
         "all_in_cost_per_kg_gbp": round(all_in_cost_per_kg, 2),
         "all_in_margin_per_kg_gbp": round(market_price - all_in_cost_per_kg, 2),
+        "worked": worked,
         "capex_gbp": capex_gbp,
         "project_life_years": project_years,
         "discount_rate_pct": discount_rate * 100.0,

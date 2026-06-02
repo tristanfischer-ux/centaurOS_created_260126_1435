@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -167,6 +171,77 @@ def compute(payload: dict) -> dict:
 
     # Convert to dB sigma zero (typically -20 to -25 dB for civil SAR)
 
+    # Worked calculations.  Most intermediate quantities involve sqrt, tan,
+    # cos, log (transcendental) — those are passed as rounded opaque inputs.
+    # The arithmetic-only steps are: wavelength, duty cycle, average power,
+    # azimuth resolution, and swath width.
+    lambda_r = round(lambda_m, 4)
+    duty_r = round(duty_cycle, 4)
+    p_avg_r = round(p_avg_w, 1)
+    dAz_r = round(dAz_m, 2)
+    Delta_R_r = round(Delta_R_max_m, 1)
+    swath_r = round(swath_width_km, 1)
+    L_az_r = round(L_az_m, 2)
+
+    worked = [
+        worked_calc(
+            label="Radar wavelength",
+            formula="lambda = C / (f_ghz x 1e9)",
+            values={
+                "C": (C_LIGHT, "m/s"),
+                "f_ghz": (freq_ghz, "GHz"),
+            },
+            result=lambda_r, result_unit="m",
+            assumptions=["Speed of light C = 2.998e8 m/s"],
+        ),
+        worked_calc(
+            label="Transmit duty cycle",
+            formula="duty = tau_p_us x 1e-6 x PRF",
+            values={
+                "tau_p_us": (pulse_us, "us"),
+                "PRF": (prf_hz, "Hz"),
+            },
+            result=duty_r, result_unit="",
+            assumptions=["Duty cycle = pulse duration x pulse repetition frequency"],
+        ),
+        worked_calc(
+            label="Average transmit power",
+            formula="P_avg = P_peak_kw x 1000 x duty",
+            values={
+                "P_peak_kw": (peak_power_kw, "kW"),
+                "duty": (duty_r, ""),
+            },
+            result=p_avg_r, result_unit="W",
+            assumptions=["P_avg = P_peak x duty cycle (IEEE 686 radar definitions)"],
+        ),
+        worked_calc(
+            label="Azimuth resolution",
+            formula="dAz = L_az / 2",
+            values={
+                "L_az": (L_az_r, "m"),
+            },
+            result=dAz_r, result_unit="m",
+            assumptions=[
+                f"L_az = {L_az_r} m from min-antenna-area constraint A_min "
+                "(Tomiyasu 1978, transcendental — involves sqrt, tan, v_orbital); "
+                "full-aperture SAR: azimuth resolution = L_antenna / 2",
+            ],
+        ),
+        worked_calc(
+            label="Maximum swath width",
+            formula="swath_km = Delta_R_max / sin_inc / 1000",
+            values={
+                "Delta_R_max": (Delta_R_r, "m"),
+                "sin_inc": (round(math.sin(incidence_rad), 4), ""),
+            },
+            result=swath_r, result_unit="km",
+            assumptions=[
+                f"Delta_R_max = C / (2 x PRF) = {C_LIGHT:.3g} / (2 x {prf_hz}) = {Delta_R_r} m "
+                f"(PRF-limited range extent); sin_inc = sin({incidence_deg} deg) — transcendental, pre-computed",
+            ],
+        ),
+    ]
+
     return {
         "frequency_ghz": freq_ghz,
         "wavelength_m": round(lambda_m, 4),
@@ -192,6 +267,7 @@ def compute(payload: dict) -> dict:
         "NESZ_dB": round(nesz_db, 2),
         "polarization": polarization,
         "valid_prf": prf_hz > prf_min_hz,
+        "worked": worked,
     }
 
 

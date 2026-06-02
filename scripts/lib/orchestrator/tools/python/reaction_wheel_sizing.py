@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -135,6 +139,112 @@ def compute(payload: dict) -> dict:
     else:
         desat_recommended = "gravity_gradient"
 
+    # --- Worked calculations ---
+    # Round intermediates and chain each step off the prior rounded value so a
+    # reviewer can follow the arithmetic by hand.
+    alpha_r = round(alpha_rad_s2, 6)
+    torque_axis_r = round(torque_axis_nm, 5)
+    # torque_required_axis_nm uses max() — pass live value as a symbol input to
+    # the per-wheel step; no closed-form for the max() itself.
+    torque_req_r = round(torque_required_axis_nm, 5)
+    torque_wheel_r = round(torque_per_wheel_nm, 5)
+    h_slew_r = round(h_slew_axis_nms, 4)
+    h_dist_r = round(h_dist_nms, 4)
+    # h_required_axis_nms uses max() + scale factor — not a simple closed-form.
+    # Pass live value as symbol input for per-wheel step.
+    h_req_r = round(h_required_axis_nms, 4)
+    h_wheel_r = round(h_per_wheel_nms, 4)
+    proj = round(geom["projection_factor"], 3)
+    wheel_mass_total_r = round(wheel_mass_total_kg, 3)
+    wheel_mass_each_r = round(wheel_mass_each_kg, 3)
+
+    worked = [
+        worked_calc(
+            label="Angular acceleration (slew rate ramp)",
+            formula="alpha = slew_rate_rad_s / t_accel",
+            values={
+                "slew_rate_rad_s": (round(slew_rate_rad_s, 6), "rad/s"),
+                "t_accel": (t_accel_s, "s"),
+            },
+            result=alpha_r,
+            result_unit="rad/s^2",
+            assumptions=["assumes 30 s acceleration time to reach max slew rate (typical RWA sizing convention)"],
+        ),
+        worked_calc(
+            label="Per-axis slew torque",
+            formula="T_axis = I x alpha",
+            values={
+                "I": (inertia_kgm2, "kg.m^2"),
+                "alpha": (alpha_r, "rad/s^2"),
+            },
+            result=torque_axis_r,
+            result_unit="N.m",
+            assumptions=["single-axis torque demand; disturbance margin applied separately"],
+        ),
+        worked_calc(
+            label="Per-wheel torque demand",
+            formula="T_wheel = T_req_axis / proj_factor",
+            values={
+                "T_req_axis": (torque_req_r, "N.m"),
+                "proj_factor": (proj, ""),
+            },
+            result=torque_wheel_r,
+            result_unit="N.m",
+            assumptions=[
+                f"projection factor {proj} for {wheel_geom} geometry (fraction of wheel spin axis aligned with control axis)",
+                "T_req_axis = max(T_axis, 10 x disturbance) already applied",
+            ],
+        ),
+        worked_calc(
+            label="Momentum to stop max-rate slew (per axis)",
+            formula="H_slew = I x omega_max",
+            values={
+                "I": (inertia_kgm2, "kg.m^2"),
+                "omega_max": (round(slew_rate_rad_s, 6), "rad/s"),
+            },
+            result=h_slew_r,
+            result_unit="N.m.s",
+            assumptions=["momentum required to bring satellite from max slew rate to rest in one axis"],
+        ),
+        worked_calc(
+            label="Momentum to absorb disturbance over desat interval",
+            formula="H_dist = T_dist x t_desat",
+            values={
+                "T_dist": (disturbance_nm, "N.m"),
+                "t_desat": (desat_interval_s, "s"),
+            },
+            result=h_dist_r,
+            result_unit="N.m.s",
+            assumptions=[f"desaturation interval = {desat_interval_s} s (6 h typical orbit)"],
+        ),
+        worked_calc(
+            label="Per-wheel momentum capacity",
+            formula="H_wheel = H_req_axis / proj_factor",
+            values={
+                "H_req_axis": (h_req_r, "N.m.s"),
+                "proj_factor": (proj, ""),
+            },
+            result=h_wheel_r,
+            result_unit="N.m.s",
+            assumptions=[
+                "H_req_axis = 1.5 x max(H_slew, H_dist) already applied (1.5x margin)",
+            ],
+        ),
+        worked_calc(
+            label="Total reaction wheel assembly mass",
+            formula="m_total = m_each x N_wheels",
+            values={
+                "m_each": (wheel_mass_each_r, "kg"),
+                "N_wheels": (geom["count"], ""),
+            },
+            result=wheel_mass_total_r,
+            result_unit="kg",
+            assumptions=[
+                "m_each derived from Honeywell HR-Series empirical scaling: m = 1.7 x H^0.6 (power-law fit, not closed-form arithmetic — shown here as chained input)",
+            ],
+        ),
+    ]
+
     return {
         "satellite_inertia_kgm2": inertia_kgm2,
         "max_slew_rate_deg_s": slew_rate_deg_s,
@@ -152,6 +262,7 @@ def compute(payload: dict) -> dict:
         "desat_method_recommended": desat_recommended,
         "wheel_mass_each_kg": round(wheel_mass_each_kg, 3),
         "wheel_mass_kg": round(wheel_mass_total_kg, 3),
+        "worked": worked,
     }
 
 

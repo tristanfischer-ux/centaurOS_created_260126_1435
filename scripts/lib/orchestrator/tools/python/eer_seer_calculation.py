@@ -29,8 +29,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -113,9 +117,57 @@ def compute(payload: dict) -> dict:
     else:
         es_class = "Below code"
 
+    # Worked calculations for the PDF appendix.
+    # The SEER computation is a weighted loop across temperature bins — branchy, skipped.
+    # seer2 has two paths (ducted/ductless); the ducted case is shown as the general formula
+    # with a note about ductless being unity.
+    eer_r = round(eer, 2)
+    cop_r = round(eer / 3.412, 2)
+    seer_r = round(seer, 2)
+    seer2_r = round(seer2, 2)
+    cool_kw_r = round(rated_btuh / 3412.142, 2)
+    seer2_factor = 0.95 if is_ducted else 1.0
+    worked = [
+        worked_calc(
+            label="EER at rated conditions",
+            formula="EER = rated_btuh / rated_w",
+            values={"rated_btuh": (rated_btuh, "BTU/h"), "rated_w": (rated_w, "W")},
+            result=eer_r,
+            result_unit="BTU/h/W",
+            assumptions=["AHRI 210/240 standard conditions: 95 degF outdoor / 80 degF indoor"],
+        ),
+        worked_calc(
+            label="COP from EER",
+            formula="COP = EER / 3.412",
+            values={"EER": (eer_r, "BTU/h/W")},
+            result=cop_r,
+            result_unit="",
+            assumptions=["1 kWh = 3412.142 BTU; COP = thermal / electrical (dimensionless ratio)"],
+        ),
+        worked_calc(
+            label="Rated cooling capacity in kW",
+            formula="cool_kw = rated_btuh / 3412.142",
+            values={"rated_btuh": (rated_btuh, "BTU/h")},
+            result=cool_kw_r,
+            result_unit="kW",
+        ),
+        worked_calc(
+            label="SEER2 adjustment",
+            formula="SEER2 = SEER x seer2_factor",
+            values={"SEER": (seer_r, "BTU/h/W"), "seer2_factor": (seer2_factor, "")},
+            result=seer2_r,
+            result_unit="BTU/h/W",
+            assumptions=[
+                "seer2_factor = 0.95 for ducted (DOE 10 CFR 430 Appendix M higher static pressure test)",
+                "seer2_factor = 1.0 for ductless mini-splits",
+                "SEER itself is weighted-bin integral across climate region IV (DOE Table 6); shown as input",
+            ],
+        ),
+    ]
+
     return {
         "rated_cooling_btuh": rated_btuh,
-        "rated_cooling_kw": round(rated_btuh / 3412.142, 2),
+        "rated_cooling_kw": cool_kw_r,
         "rated_power_w": rated_w,
         "eer_btuh_per_w": round(eer, 2),
         "cop_at_eer": round(eer / 3.412, 2),
@@ -127,6 +179,7 @@ def compute(payload: dict) -> dict:
         "meets_most_efficient": (seer2 >= es_most_efficient_seer2),
         "part_load_eer_used": pl_eer,
         "weights_per_load": weights,
+        "worked": worked,
         "notes": (
             "EER per AHRI 210/240 at 95°F outdoor. SEER weighted across "
             "DOE Climate IV climate (Atlanta GA basis). SEER2 = SEER × 0.95 for "

@@ -48,8 +48,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -134,20 +138,113 @@ def compute(payload: dict) -> dict:
     max_accel_m_s2 = f_avail_for_accel / max(1e-3, moving_mass_kg)
     max_accel_mm_s2 = max_accel_m_s2 * 1000.0
 
+    # Worked calculations for the PDF appendix.
+    # available_torque_ncm comes from table interpolation — SKIP, pass as live value.
+    # max_accel derives from available_torque after friction subtraction — pass live.
+    travel_r = round(travel_per_rev_mm, 3)
+    full_steps_r = round(full_steps_per_rev, 1)
+    steps_per_mm_r = round(steps_per_mm, 4)
+    max_step_freq_r = round(max_step_freq_hz, 1)
+    r_pulley_mm_r = round(r_pulley_mm, 3)
+    f_accel_r = round(f_accel_n, 3)
+    f_friction_r = round(f_friction_n, 3)
+    f_total_r = round(f_total_n, 3)
+    torque_req_r = round(torque_required_ncm, 3)
+    worked = [
+        worked_calc(
+            label="Belt travel per motor revolution",
+            formula="travel_per_rev = teeth x pitch_mm",
+            values={
+                "teeth": (teeth, "teeth"),
+                "pitch_mm": (pitch_mm, "mm"),
+            },
+            result=travel_r, result_unit="mm/rev",
+        ),
+        worked_calc(
+            label="Steps per mm",
+            formula="steps_per_mm = (full_steps_per_rev x microstep) / travel_per_rev",
+            values={
+                "full_steps_per_rev": (full_steps_r, "steps/rev"),
+                "microstep": (microstep, ""),
+                "travel_per_rev": (travel_r, "mm/rev"),
+            },
+            result=steps_per_mm_r, result_unit="steps/mm",
+            assumptions=["full_steps_per_rev = 360 / step_angle_deg"],
+        ),
+        worked_calc(
+            label="Maximum step frequency at target print speed",
+            formula="max_step_freq = steps_per_mm x target_speed",
+            values={
+                "steps_per_mm": (steps_per_mm_r, "steps/mm"),
+                "target_speed": (target_speed, "mm/s"),
+            },
+            result=max_step_freq_r, result_unit="Hz",
+        ),
+        worked_calc(
+            label="Pulley pitch radius",
+            formula="r_pulley_mm = travel_per_rev / (2 x pi)",
+            values={"travel_per_rev": (travel_r, "mm/rev")},
+            result=r_pulley_mm_r, result_unit="mm",
+            assumptions=[f"2 x pi = {round(2*math.pi, 6)}"],
+        ),
+        worked_calc(
+            label="Acceleration force on moving mass",
+            formula="F_accel = moving_mass x target_accel_m_s2",
+            values={
+                "moving_mass": (moving_mass_kg, "kg"),
+                "target_accel_m_s2": (round(a_m_s2, 4), "m/s^2"),
+            },
+            result=f_accel_r, result_unit="N",
+            assumptions=["target_accel_m_s2 = target_accel_mm_s2 / 1000"],
+        ),
+        worked_calc(
+            label="Friction force",
+            formula="F_friction = friction_coeff x moving_mass x g",
+            values={
+                "friction_coeff": (friction_coeff, ""),
+                "moving_mass": (moving_mass_kg, "kg"),
+                "g": (9.80665, "m/s^2"),
+            },
+            result=f_friction_r, result_unit="N",
+        ),
+        worked_calc(
+            label="Total belt force required",
+            formula="F_total = F_accel + F_friction",
+            values={
+                "F_accel": (f_accel_r, "N"),
+                "F_friction": (f_friction_r, "N"),
+            },
+            result=f_total_r, result_unit="N",
+        ),
+        worked_calc(
+            label="Required motor torque (N.cm)",
+            formula="T_req = ((F_total x r_pulley_mm) / eta_belt) / 10",
+            values={
+                "F_total": (f_total_r, "N"),
+                "r_pulley_mm": (r_pulley_mm_r, "mm"),
+                "eta_belt": (eta_belt, ""),
+            },
+            result=torque_req_r, result_unit="N.cm",
+            assumptions=[
+                "r_pulley_mm / 1000 converts mm to m; / 10 = / 1000 x 100 gives N.cm; eta_belt = 0.90",
+            ],
+        ),
+    ]
+
     return {
-        "steps_per_mm": round(steps_per_mm, 4),
+        "steps_per_mm": steps_per_mm_r,
         "max_accel_mm_s2": round(max_accel_mm_s2, 1),
-        "motor_torque_required_ncm": round(torque_required_ncm, 3),
+        "motor_torque_required_ncm": torque_req_r,
         "motor_torque_available_at_speed_ncm": round(available_torque_ncm, 3),
         "torque_margin_pct": round(100.0 * (available_torque_ncm - torque_required_ncm) / max(0.01, available_torque_ncm), 1),
-        "max_step_freq_hz": round(max_step_freq_hz, 1),
-        "pulley_radius_mm": round(r_pulley_mm, 3),
-        "travel_per_rev_mm": round(travel_per_rev_mm, 3),
-        "full_steps_per_rev": round(full_steps_per_rev, 1),
+        "max_step_freq_hz": max_step_freq_r,
+        "pulley_radius_mm": r_pulley_mm_r,
+        "travel_per_rev_mm": travel_r,
+        "full_steps_per_rev": full_steps_r,
         "microstepping": microstep,
-        "force_required_n": round(f_total_n, 3),
-        "force_acceleration_n": round(f_accel_n, 3),
-        "force_friction_n": round(f_friction_n, 3),
+        "force_required_n": f_total_r,
+        "force_acceleration_n": f_accel_r,
+        "force_friction_n": f_friction_r,
         "axis_length_mm": axis_length,
         "moving_mass_kg": moving_mass_kg,
         "belt_pitch_mm": pitch_mm,
@@ -155,6 +252,7 @@ def compute(payload: dict) -> dict:
         "step_angle_deg": step_angle,
         "target_print_speed_mm_s": target_speed,
         "feasible": available_torque_ncm > torque_required_ncm,
+        "worked": worked,
     }
 
 

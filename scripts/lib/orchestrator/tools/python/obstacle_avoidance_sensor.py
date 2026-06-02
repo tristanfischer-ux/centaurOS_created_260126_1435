@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -135,6 +139,47 @@ def compute(payload: dict) -> dict:
     # Recommend sensor count for 360° coverage with this single-sensor FOV
     sensors_for_360 = math.ceil(360 / max(1, fov_deg))
 
+    # Worked calculations.
+    # total_latency and braking_distance are pure arithmetic — convert.
+    # safety_margin = max_range / braking_distance — convert.
+    # blind_spot calculations involve cos/radians (transcendental) — skip;
+    # pass blind_fraction as a live symbol for blind_spot_vol.
+    total_latency_r = round(total_latency_ms, 1)
+    total_latency_s_r = round(total_latency_s, 4)
+    braking_r = round(braking_distance_m, 2)
+    safety_r = round(safety_margin, 2)
+    worked = [
+        worked_calc(
+            label="Total sensor-to-control latency",
+            formula="latency_ms = sensor_latency + 3 x 1000 / rate_hz + control_latency",
+            values={
+                "sensor_latency": (sensor["latency_ms"], "ms"),
+                "rate_hz": (rate_hz, "Hz"),
+                "control_latency": (control_latency_ms, "ms"),
+            },
+            result=total_latency_r, result_unit="ms",
+            assumptions=["3 frame pipeline delay; control loop 50 ms (SAE AS6968 §6.2)"],
+        ),
+        worked_calc(
+            label="Braking distance at maximum speed",
+            formula="s = v^2 / (2 x a) + v x latency_s",
+            values={
+                "v": (v, "m/s"),
+                "a": (deceleration_ms2, "m/s2"),
+                "latency_s": (total_latency_s_r, "s"),
+            },
+            result=braking_r, result_unit="m",
+            assumptions=["ISO 21629 stopping envelope: kinematic braking + latency reaction distance"],
+        ),
+        worked_calc(
+            label="Safety margin ratio (range to braking distance)",
+            formula="margin = max_range / braking_distance",
+            values={"max_range": (max_range_m, "m"), "braking_distance": (braking_r, "m")},
+            result=safety_r, result_unit="",
+            assumptions=[">1.5 required for 50% safety buffer (SAE AS6968)"],
+        ),
+    ]
+
     return {
         "sensor_type": sensor_type,
         "max_range_m": max_range_m,
@@ -170,6 +215,7 @@ def compute(payload: dict) -> dict:
             f"at 5-8 m/s² typical. {sensor_type.upper()} weather capability: "
             f"{'OK rain/fog' if sensor['works_in_fog_rain'] else 'degrades in low visibility'}."
         ),
+        "worked": worked,
     }
 
 

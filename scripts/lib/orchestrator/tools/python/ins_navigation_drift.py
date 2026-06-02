@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -144,6 +148,73 @@ def compute(payload: dict) -> dict:
     if not recs:
         recs.append("Navigation accuracy adequate for mission duration.")
 
+    # Worked calculations — each step chains from prior rounded value.
+    # bias_rad_s conversion uses math.radians() (transcendental) so we pass its
+    # live computed value as an input symbol to the downstream hand-verifiable steps.
+    bias_rad_s_r = round(bias_rad_s, 10)
+    pos_drift_r = round(position_drift_m_per_hr, 2)
+    dvl_vel_r = round(dvl_vel_err_ms, 4)
+    pos_aided_r = round(position_drift_m_per_hr_aided, 2)
+    total_pos_r = round(total_position_drift_m, 1)
+    total_att_r = round(total_attitude_drift_deg, 2)
+    worked_steps = [
+        worked_calc(
+            label="Open-loop INS position drift per hour (inertial only)",
+            formula="pos_drift_per_hr = (1/3) x bias_rad_s x g x t_s^2",
+            values={
+                "bias_rad_s": (bias_rad_s_r, "rad/s"),
+                "g": (g, "m/s2"),
+                "t_s": (t_s, "s"),
+            },
+            result=pos_drift_r, result_unit="m/hr",
+            assumptions=[
+                "Second-order INS error growth: x_err ~ (1/3) bias_rad_s x g x t^2 (Titterton & Weston 2004)",
+                f"bias_rad_s = radians({bias_deg_hr} deg/hr) / 3600 = {bias_rad_s_r:.4g} rad/s",
+                "t_s = 3600 s (one hour)",
+            ],
+        ),
+        worked_calc(
+            label="DVL velocity error",
+            formula="dvl_vel_err = (dvl_accuracy_pct / 100) x average_speed",
+            values={
+                "dvl_accuracy_pct": (dvl_accuracy_pct, "%"),
+                "average_speed": (average_speed_ms, "m/s"),
+            },
+            result=dvl_vel_r, result_unit="m/s",
+            assumptions=[f"DVL accuracy {dvl_accuracy_pct}% of vehicle speed; from input"],
+        ),
+    ]
+    if dvl_present:
+        worked_steps.append(worked_calc(
+            label="DVL-aided position drift per hour",
+            formula="pos_drift_aided = dvl_vel_err x 3600",
+            values={
+                "dvl_vel_err": (dvl_vel_r, "m/s"),
+            },
+            result=pos_aided_r, result_unit="m/hr",
+            assumptions=["DVL bounds velocity error; drift grows linearly in time (not t^2) when DVL active"],
+        ))
+    worked_steps.append(worked_calc(
+        label="Total position drift over mission",
+        formula="total_pos_drift = pos_drift_per_hr x mission_hours",
+        values={
+            "pos_drift_per_hr": (pos_aided_r, "m/hr"),
+            "mission_hours": (mission_hours, "hr"),
+        },
+        result=total_pos_r, result_unit="m",
+        assumptions=[],
+    ))
+    worked_steps.append(worked_calc(
+        label="Total attitude drift over mission",
+        formula="total_att_drift = bias_deg_hr x mission_hours",
+        values={
+            "bias_deg_hr": (bias_deg_hr, "deg/hr"),
+            "mission_hours": (mission_hours, "hr"),
+        },
+        result=total_att_r, result_unit="deg",
+        assumptions=["Attitude drift = gyro bias x time (first-order)"],
+    ))
+
     return {
         "gyro_grade": gyro_grade,
         "gyro_bias_deg_hr": bias_deg_hr,
@@ -166,6 +237,7 @@ def compute(payload: dict) -> dict:
         "dvl_cost_gbp": dvl_cost,
         "total_navigation_cost_gbp": total_nav_cost,
         "recommendations": recs,
+        "worked": worked_steps,
         "notes": (
             "Open-loop INS position drift = (1/3) × bias × g × t². "
             "DVL bounds velocity error to ~0.2% of speed = drastically lower drift. "

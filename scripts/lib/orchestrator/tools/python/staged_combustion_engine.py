@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -139,6 +143,111 @@ def compute(payload: dict) -> dict:
     # Cycle efficiency (percentage)
     cycle_eff_pct = c["efficiency"] * 100.0
 
+    # Worked calculations — each step chains off the prior rounded value so a
+    # reviewer can follow the arithmetic without the source code.
+    p_c_pa_r = round(p_c_pa, 0)
+    A_t_m2_r = round(A_t_m2, 6)
+    m_dot_r = round(m_dot_total_kg_s, 3)
+    p_pump_r = round(p_pump_out_bar, 1)
+    m_dot_ox_r = round(m_dot_ox, 3)
+    m_dot_fuel_r = round(m_dot_fuel, 3)
+    dp_pa_r = round(dp_pa, 0)
+    w_ox_r = round(w_pump_ox_w, 1)
+    w_fuel_r = round(w_pump_fuel_w, 1)
+    isp_vac_r = round(isp_vac_s, 1)
+    thrust_r = round(thrust_vac_n, 0)
+    worked = [
+        worked_calc(
+            label="Chamber pressure (Pa)",
+            formula="p_c_pa = p_c_bar x 1e5",
+            values={"p_c_bar": (p_c_bar, "bar")},
+            result=p_c_pa_r, result_unit="Pa",
+            assumptions=["1 bar = 1e5 Pa"],
+        ),
+        worked_calc(
+            label="Throat area (m^2)",
+            formula="A_t_m2 = A_t_cm2 / 1e4",
+            values={"A_t_cm2": (A_t_cm2, "cm^2")},
+            result=A_t_m2_r, result_unit="m^2",
+            assumptions=["1 cm^2 = 1e-4 m^2"],
+        ),
+        worked_calc(
+            label="Total mass flow rate",
+            formula="m_dot = p_c_pa x A_t_m2 / c_star",
+            values={"p_c_pa": (p_c_pa_r, "Pa"), "A_t_m2": (A_t_m2_r, "m^2"),
+                    "c_star": (p["c_star"], "m/s")},
+            result=m_dot_r, result_unit="kg/s",
+            assumptions=["Steady-state rocket nozzle continuity; Sutton & Biblarz §3"],
+        ),
+        worked_calc(
+            label="Pump outlet pressure",
+            formula="p_pump_out = p_c_bar x pump_pressure_ratio",
+            values={"p_c_bar": (p_c_bar, "bar"),
+                    "pump_pressure_ratio": (c["pump_pressure_ratio"], "")},
+            result=p_pump_r, result_unit="bar",
+            assumptions=[f"Pump pressure ratio for {cycle} cycle from CYCLE_EFFICIENCY table"],
+        ),
+        worked_calc(
+            label="Oxidiser mass flow",
+            formula="m_dot_ox = m_dot x of_opt / (1 + of_opt)",
+            values={"m_dot": (m_dot_r, "kg/s"), "of_opt": (p["of_opt"], "")},
+            result=m_dot_ox_r, result_unit="kg/s",
+            assumptions=[f"Optimal O/F ratio {p['of_opt']} for {propellants}"],
+        ),
+        worked_calc(
+            label="Fuel mass flow",
+            formula="m_dot_fuel = m_dot / (1 + of_opt)",
+            values={"m_dot": (m_dot_r, "kg/s"), "of_opt": (p["of_opt"], "")},
+            result=m_dot_fuel_r, result_unit="kg/s",
+            assumptions=[f"Optimal O/F ratio {p['of_opt']} for {propellants}"],
+        ),
+        worked_calc(
+            label="Differential pump pressure",
+            formula="dp_pa = (p_pump_out - 5) x 1e5",
+            values={"p_pump_out": (p_pump_r, "bar")},
+            result=dp_pa_r, result_unit="Pa",
+            assumptions=["Tank inlet pressure assumed 5 bar"],
+        ),
+        worked_calc(
+            label="Oxidiser pump power",
+            formula="w_pump_ox = m_dot_ox x dp_pa / (density_LOX x 0.75)",
+            values={"m_dot_ox": (m_dot_ox_r, "kg/s"), "dp_pa": (dp_pa_r, "Pa"),
+                    "density_LOX": (p["density_LOX"], "kg/m^3")},
+            result=w_ox_r, result_unit="W",
+            assumptions=["Pump isentropic efficiency 0.75 (Sutton Table 6-2)"],
+        ),
+        worked_calc(
+            label="Fuel pump power",
+            formula="w_pump_fuel = m_dot_fuel x dp_pa / (density_fuel x 0.75)",
+            values={"m_dot_fuel": (m_dot_fuel_r, "kg/s"), "dp_pa": (dp_pa_r, "Pa"),
+                    "density_fuel": (p["density_fuel"], "kg/m^3")},
+            result=w_fuel_r, result_unit="W",
+            assumptions=["Pump isentropic efficiency 0.75"],
+        ),
+        worked_calc(
+            label="Total pump power",
+            formula="total_pump_power_kw = (w_pump_ox + w_pump_fuel) / 1000",
+            values={"w_pump_ox": (w_ox_r, "W"), "w_pump_fuel": (w_fuel_r, "W")},
+            result=round(total_pump_power_kw, 1), result_unit="kW",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Vacuum thrust",
+            formula="thrust_vac = m_dot x isp_vac x g_0",
+            values={"m_dot": (m_dot_r, "kg/s"), "isp_vac": (isp_vac_r, "s"),
+                    "g_0": (G_0, "m/s^2")},
+            result=thrust_r, result_unit="N",
+            assumptions=["isp_vac already accounts for cycle efficiency and expansion ratio scaling"],
+        ),
+        worked_calc(
+            label="Cycle efficiency",
+            formula="cycle_eff_pct = efficiency x 100",
+            values={"efficiency": (c["efficiency"], "")},
+            result=round(cycle_eff_pct, 1), result_unit="%",
+            assumptions=[f"Cycle efficiency for {cycle} from CYCLE_EFFICIENCY table (Sutton 2017)"],
+        ),
+    ]
+
     return {
         "power_cycle": cycle,
         "propellants": propellants,
@@ -157,6 +266,7 @@ def compute(payload: dict) -> dict:
         "cycle_efficiency_pct": round(cycle_eff_pct, 1),
         "total_pump_power_kw": round(total_pump_power_kw, 1),
         "characteristic_velocity_c_star": p["c_star"],
+        "worked": worked,
     }
 
 

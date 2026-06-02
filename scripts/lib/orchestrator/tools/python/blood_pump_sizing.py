@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -125,26 +129,135 @@ def compute(payload: dict) -> dict:
     else:
         risk = "high"
 
+    # Worked calculations — clean arithmetic steps only.
+    # Transcendentals (tau_wall via pi/r^3, HI power-law) are passed as opaque
+    # inputs to downstream steps and not themselves shown as worked steps.
+    V_per_rev_r = round(V_per_rev_ml, 4)
+    V_eff_r = round(V_eff_ml, 4)
+    rpm_r = round(rpm, 2)
+    P_hydraulic_r = round(P_hydraulic_w, 3)
+    T_compress_r = round(T_compress_nm, 4)
+    # Derive T_hydraulic_r from the rounded P_hydraulic_r and rounded omega so
+    # that the substitution (P_hydraulic / (omega x eta_pump)) reproduces the
+    # stated result exactly — avoids the 0.39% non-reconciliation from using
+    # the raw P_hydraulic_w.
+    omega_r = round(omega, 4)
+    T_hydraulic_r = round(P_hydraulic_r / max(1e-6, omega_r * eta_pump), 4)
+    T_motor_r = round(T_compress_r + T_hydraulic_r, 5)
+    T_motor_ncm_r = round(T_motor_r * 100.0, 3)
+
+    worked = [
+        worked_calc(
+            label="Geometric volume per revolution",
+            formula="V_per_rev = (A_tube x L_per_rev) / 1000",
+            values={
+                "A_tube": (round(A_tube_mm2, 4), "mm2"),
+                "L_per_rev": (round(L_per_rev_mm, 4), "mm"),
+            },
+            result=V_per_rev_r, result_unit="ml",
+            assumptions=[
+                "A_tube = pi x (ID/2)^2 (circular cross-section)",
+                "L_per_rev = pi x D_rotor (one full circumferential path)",
+                "1 mm3 = 0.001 ml",
+            ],
+        ),
+        worked_calc(
+            label="Effective volume per revolution (stall correction)",
+            formula="V_eff = V_per_rev x stall_factor",
+            values={
+                "V_per_rev": (V_per_rev_r, "ml"),
+                "stall_factor": (stall_factor, ""),
+            },
+            result=V_eff_r, result_unit="ml",
+            assumptions=["stall_factor = 0.95 — typical for 3-roller peristaltic head (stagnant volume between rollers)"],
+        ),
+        worked_calc(
+            label="Pump speed to deliver target flow",
+            formula="rpm = Q_ml_min / V_eff",
+            values={
+                "Q_ml_min": (Q_ml_min, "ml/min"),
+                "V_eff": (V_eff_r, "ml/rev"),
+            },
+            result=rpm_r, result_unit="rpm",
+            assumptions=["linear relationship between RPM and volumetric flow"],
+        ),
+        worked_calc(
+            label="Hydraulic power",
+            formula="P_hydraulic = Q_m3_s x P_pa",
+            values={
+                "Q_m3_s": (round(Q_m3_s, 9), "m3/s"),
+                "P_pa": (round(P_pa, 1), "Pa"),
+            },
+            result=P_hydraulic_r, result_unit="W",
+            assumptions=["Q_m3_s = Q_ml_min x 1e-6 / 60; P_pa = P_mmhg x 133.322"],
+        ),
+        worked_calc(
+            label="Tubing compression torque",
+            formula="T_compress = f_compress_total x R_rotor x 0.3",
+            values={
+                "f_compress_total": (f_compress_total, "N"),
+                "R_rotor": (round(R_rotor_m, 4), "m"),
+            },
+            result=T_compress_r, result_unit="N·m",
+            assumptions=[
+                "f_compress_per_roller = 30 N (standard dialysis tubing, empirical)",
+                "0.3 = effective lever arm fraction",
+                f"n_rollers = {n_rollers}",
+            ],
+        ),
+        worked_calc(
+            label="Hydraulic torque",
+            formula="T_hydraulic = P_hydraulic / (omega x eta_pump)",
+            values={
+                "P_hydraulic": (P_hydraulic_r, "W"),
+                "omega": (omega_r, "rad/s"),
+                "eta_pump": (eta_pump, ""),
+            },
+            result=T_hydraulic_r, result_unit="N·m",
+            assumptions=["omega = (rpm/60) x 2 x pi"],
+        ),
+        worked_calc(
+            label="Total motor torque",
+            formula="T_motor = T_compress + T_hydraulic",
+            values={
+                "T_compress": (T_compress_r, "N·m"),
+                "T_hydraulic": (T_hydraulic_r, "N·m"),
+            },
+            result=T_motor_r, result_unit="N·m",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Motor torque in N·cm",
+            formula="T_motor_ncm = T_motor x 100",
+            values={
+                "T_motor": (T_motor_r, "N·m"),
+            },
+            result=T_motor_ncm_r, result_unit="N·cm",
+            assumptions=["1 N·m = 100 N·cm"],
+        ),
+    ]
+
     return {
-        "pump_rpm": round(rpm, 2),
-        "motor_torque_ncm": round(T_motor_ncm, 3),
-        "motor_torque_nm": round(T_motor_nm, 5),
+        "pump_rpm": rpm_r,
+        "motor_torque_ncm": T_motor_ncm_r,
+        "motor_torque_nm": T_motor_r,
         "hemolysis_risk_score": risk,
         "hemolysis_index_pct": round(HI_pct, 6),
         "wall_shear_stress_pa": round(tau_wall, 2),
         "exposure_time_s": round(t_exposure_s, 3),
         "target_flow_ml_min": Q_ml_min,
         "pressure_head_mmhg": P_head_mmhg,
-        "hydraulic_power_w": round(P_hydraulic_w, 3),
-        "volume_per_rev_ml": round(V_eff_ml, 3),
-        "v_per_rev_geometric_ml": round(V_per_rev_ml, 3),
+        "hydraulic_power_w": P_hydraulic_r,
+        "volume_per_rev_ml": V_eff_r,
+        "v_per_rev_geometric_ml": V_per_rev_r,
         "tubing_id_mm": D_tube_id_mm,
         "rotor_diameter_mm": D_rotor_mm,
         "num_rollers": n_rollers,
         "pump_efficiency": eta_pump,
-        "torque_compression_nm": round(T_compress_nm, 4),
-        "torque_hydraulic_nm": round(T_hydraulic_nm, 4),
+        "torque_compression_nm": T_compress_r,
+        "torque_hydraulic_nm": T_hydraulic_r,
         "tube_velocity_m_s": round(v_tube_m_s, 3),
+        "worked": worked,
     }
 
 

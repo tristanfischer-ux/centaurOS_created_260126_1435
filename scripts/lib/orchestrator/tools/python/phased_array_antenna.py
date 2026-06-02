@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -142,6 +146,78 @@ def compute(payload: dict) -> dict:
     required_per_element_w = required_total_tx_w / n_elements_actual
     required_per_element_dbm = 10.0 * math.log10(required_per_element_w * 1000.0)
 
+    # Worked calculations — closed-form arithmetic steps.
+    # g_array_db and scan_loss_db involve log10/cos — passed as rounded inputs
+    # where needed for downstream steps.
+    lambda_r = round(lambda_m, 6)
+    d_spacing_r = round(d_spacing_m, 6)
+    array_size_r = round((n_per_side - 1) * d_spacing_r, 4)  # chain off rounded spacing
+    theta_3db_r = round(theta_3db_deg, 4)
+    g_array_r = round(g_array_db, 3)
+    required_tx_r = round(required_total_tx_w, 3)
+    per_elem_w_r = round(required_per_element_w, 5)
+
+    worked = [
+        worked_calc(
+            label="Free-space wavelength",
+            formula="lambda_m = 0.2998 / freq_ghz",
+            values={"freq_ghz": (freq_ghz, "GHz")},
+            result=lambda_r, result_unit="m",
+            assumptions=["Speed of light c = 0.2998 GHz*m (= 2.998e8 m/s expressed in GHz-metre units)"],
+        ),
+        worked_calc(
+            label="Element spacing in metres",
+            formula="d_spacing_m = spacing_lambda x lambda_m",
+            values={"spacing_lambda": (spacing_lambda, "lambda"), "lambda_m": (lambda_r, "m")},
+            result=d_spacing_r, result_unit="m",
+            assumptions=["d = (spacing in wavelengths) x lambda; default 0.5 lambda avoids grating lobes at boresight"],
+        ),
+        worked_calc(
+            label="Array aperture size",
+            formula="array_size_m = (n_per_side - 1) x d_spacing_m",
+            values={"n_per_side": (n_per_side, ""), "d_spacing_m": (d_spacing_r, "m")},
+            result=array_size_r, result_unit="m",
+            assumptions=["Edge-to-edge aperture from first to last element (N-1 inter-element gaps)"],
+        ),
+        worked_calc(
+            label="3 dB beamwidth at boresight",
+            formula="theta_3dB = bw_factor x lambda_m / array_size_m x (180 / pi)",
+            values={
+                "bw_factor": (t["bw_factor"], ""),
+                "lambda_m": (lambda_r, "m"),
+                "array_size_m": (array_size_r, "m"),
+            },
+            result=theta_3db_r, result_unit="deg",
+            assumptions=[
+                f"Taper: {taper} — BW factor = {t['bw_factor']} (Mailloux 2018 Table 2.1)",
+                "Radians converted to degrees; formula gives half-power beamwidth",
+            ],
+        ),
+        worked_calc(
+            label="Required total transmit power to meet EIRP target",
+            formula="P_tx_total_w = 10 ^ ((target_eirp_dbw - g_array_db) / 10)",
+            values={
+                "target_eirp_dbw": (target_eirp_dbw, "dBW"),
+                "g_array_db": (g_array_r, "dBi"),
+            },
+            result=required_tx_r, result_unit="W",
+            assumptions=[
+                "EIRP = P_tx + G_array (in dB); rearranged for P_tx",
+                "g_array_db includes element gain, element efficiency, and taper efficiency",
+            ],
+        ),
+        worked_calc(
+            label="Required transmit power per element",
+            formula="P_elem_w = P_tx_total_w / n_elements",
+            values={
+                "P_tx_total_w": (required_tx_r, "W"),
+                "n_elements": (n_elements_actual, ""),
+            },
+            result=per_elem_w_r, result_unit="W",
+            assumptions=["Equal power split to all active T/R modules (no amplitude taper on transmit path in this model)"],
+        ),
+    ]
+
     return {
         "frequency_ghz": freq_ghz,
         "wavelength_m": round(lambda_m, 4),
@@ -166,6 +242,7 @@ def compute(payload: dict) -> dict:
         "EIRP_dbw": target_eirp_dbw,
         "element_efficiency_pct": element_eff_pct,
         "taper_efficiency": t["efficiency"],
+        "worked": worked,
     }
 
 

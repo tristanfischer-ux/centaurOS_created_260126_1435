@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -135,6 +139,59 @@ def compute(payload: dict) -> dict:
     else:
         v_string = 100.0
 
+    # Worked calculations.
+    # cos_loss uses math.cos() — skip it as an input symbol to the next steps.
+    # eta_distribution is a weighted average of two terms — clean arithmetic.
+    # area_m2 denominator and BOL peak are both clean products.
+    cos_loss_r = round(cos_loss, 4)
+    eta_dist_r = round(eta_distribution, 4)
+    denom_r = round(denominator, 4)
+    area_r = round(area_m2, 4)
+    p_bol_r = round(p_bol_peak_w, 2)
+    worked = [
+        worked_calc(
+            label="Effective distribution efficiency",
+            formula="eta_dist = sun_frac x eta_direct + eclipse_frac x eta_battery",
+            values={"sun_frac": (round(sun_frac, 4), ""),
+                    "eta_direct": (eta_direct, ""),
+                    "eclipse_frac": (round(eclipse_frac, 4), ""),
+                    "eta_battery": (eta_through_battery, "")},
+            result=eta_dist_r, result_unit="",
+            assumptions=["eta_direct = 0.95 (direct-bus path)",
+                         "eta_battery = 0.80 (90% charge x 90% discharge through battery)"],
+        ),
+        worked_calc(
+            label="Array-sizing denominator",
+            formula="denom = G x eta_cell x packing x (1 - eol_deg) x cos_loss x eta_dist",
+            values={"G": (op["solar_flux_w_m2"], "W/m^2"),
+                    "eta_cell": (round(eta_cell, 4), ""),
+                    "packing": (round(packing, 4), ""),
+                    "eol_deg": (round(eol_deg, 4), ""),
+                    "cos_loss": (cos_loss_r, ""),
+                    "eta_dist": (eta_dist_r, "")},
+            result=denom_r, result_unit="W/m^2",
+            assumptions=["cos_loss = cos(sun_pointing_accuracy_deg)"],
+        ),
+        worked_calc(
+            label="Required array area",
+            formula="area = P_required / denom",
+            values={"P_required": (p_required_w, "W"),
+                    "denom": (denom_r, "W/m^2")},
+            result=area_r, result_unit="m^2",
+            assumptions=["SMAD eq. 11-1; denom encodes EOL degradation + eclipse fraction + cosine loss"],
+        ),
+        worked_calc(
+            label="BOL peak power",
+            formula="P_BOL = area x G x eta_cell x packing",
+            values={"area": (area_r, "m^2"),
+                    "G": (op["solar_flux_w_m2"], "W/m^2"),
+                    "eta_cell": (round(eta_cell, 4), ""),
+                    "packing": (round(packing, 4), "")},
+            result=p_bol_r, result_unit="W",
+            assumptions=["no degradation, full sun, boresight normal to sun"],
+        ),
+    ]
+
     return {
         "required_orbital_avg_power_w": p_required_w,
         "orbit": orbit,
@@ -154,6 +211,7 @@ def compute(payload: dict) -> dict:
         "specific_power_w_per_kg": round(spec_power_w_per_kg, 1),
         "cell_count_estimate": cell_count,
         "string_voltage_v_recommended": v_string,
+        "worked": worked,
     }
 
 

@@ -41,8 +41,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -150,6 +154,67 @@ def compute(payload: dict) -> dict:
     # Recommended design g-factor
     g_factor_design = n_total * 1.5  # FAA factor 1.5 limit-to-ultimate
 
+    # Worked calculations.
+    # ISA density uses exp + piecewise branches → skipped; rho passed as live input.
+    # sigma_w uses piecewise altitude branches + lat exp model → skipped;
+    # sigma_w passed as live input to peak_gust_ms.
+    # far_25_gust is piecewise/branchy → skipped; passed as live input to design_gust.
+    # design_gust uses max() (piecewise) → skipped; passed as live input to delta_n.
+    sigma_w_r = round(sigma_w, 3)
+    peak_gust_r = round(peak_gust_ms, 2)
+    rho_r = round(rho, 4)
+    design_gust_r = round(design_gust, 2)
+    delta_n_r = round(delta_n, 3)
+    # Use 3 decimal places so n_total_r x 1.5 chains to g_factor_r correctly.
+    n_total_r = round(1.0 + delta_n_r, 3)
+    g_factor_r = round(n_total_r * 1.5, 2)
+    worked = [
+        worked_calc(
+            label="Peak statistical gust velocity",
+            formula="peak_gust = sigma_w x peak_sigma",
+            values={
+                "sigma_w": (sigma_w_r, "m/s"),
+                "peak_sigma": (peak_sigma, ""),
+            },
+            result=peak_gust_r, result_unit="m/s",
+            assumptions=[
+                "sigma_w computed from altitude/latitude/season model (piecewise, not shown)",
+                f"peak_sigma = {peak_sigma} for mission duration {mission_duration_hours} h (Hoblit 1988 Table)",
+            ],
+        ),
+        worked_calc(
+            label="Gust load increment (delta n)",
+            formula="delta_n = rho x V x CL_alpha x U_ds / (2 x W_S)",
+            values={
+                "rho": (rho_r, "kg/m^3"),
+                "V": (airspeed_m_s, "m/s"),
+                "CL_alpha": (cl_alpha, "1/rad"),
+                "U_ds": (design_gust_r, "m/s"),
+                "W_S": (wing_loading_pa, "Pa"),
+            },
+            result=delta_n_r, result_unit="g",
+            assumptions=[
+                "FAR 25.341(a) discrete gust equation",
+                "U_ds = max(statistical peak, FAR 25 reference) — max() not shown",
+                "W/S = wing loading in Pa (N/m^2)",
+            ],
+        ),
+        worked_calc(
+            label="Total gust load factor",
+            formula="n_total = 1 + delta_n",
+            values={"delta_n": (delta_n_r, "g")},
+            result=n_total_r, result_unit="g",
+            assumptions=["1g cruise + gust increment"],
+        ),
+        worked_calc(
+            label="Design g-factor (limit-to-ultimate, FAA 1.5x)",
+            formula="g_design = n_total x 1.5",
+            values={"n_total": (n_total_r, "g")},
+            result=g_factor_r, result_unit="g",
+            assumptions=["FAA/FAR ultimate load = 1.5 x limit load"],
+        ),
+    ]
+
     return {
         "altitude_km": altitude_km,
         "altitude_m": altitude_m,
@@ -173,6 +238,7 @@ def compute(payload: dict) -> dict:
         "control_surface_load_n": round(f_ctrl, 1),
         "airspeed_ms": airspeed_m_s,
         "mission_duration_hours": mission_duration_hours,
+        "worked": worked,
         "notes": (
             "Stratospheric turbulence per NCAR-TN-468 (Sharman 2014). "
             "Mid-latitude jet stream (50-60°) doubles σ_w; polar/equatorial 0.7×. "

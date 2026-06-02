@@ -40,8 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -137,6 +141,40 @@ def compute(payload: dict) -> dict:
     # Quantum fraction (how much of the entropy is truly quantum vs classical)
     quantum_fraction = src["quantum_fraction"]
 
+    # Worked calculations.
+    # h_min_quantum = log2(sqrt(snr_lin-1)) is transcendental — SKIPPED.
+    # h_min_per_sample (clamped result) and fs_effective are passed as live
+    # input symbols to the two clean arithmetic steps below.
+    h_min_r = round(h_min_per_sample, 3)
+    fs_eff_r = round(fs_effective_gsps, 3)
+    raw_r = round(raw_entropy_gbps, 3)
+    cert_r = round(certified_entropy_gbps, 3)
+    worked = [
+        # 'Effective sampling rate' uses min() which is a non-arithmetic function;
+        # entry removed per worked_calc rules — pass the live capped value as an input
+        # to the next step instead.  Nyquist cap: fs_eff = min(fs_gsps, 2 x bw_ghz).
+        worked_calc(
+            label="Raw entropy rate",
+            formula="raw_entropy = h_min x fs_eff",
+            values={
+                "h_min": (h_min_r, "bits/sample"),
+                "fs_eff": (fs_eff_r, "Gsps"),
+            },
+            result=raw_r, result_unit="Gbps",
+            assumptions=["h_min derived from SNR via log2(sqrt(SNR_linear - 1)) — clamped to ADC bit depth and source maximum"],
+        ),
+        worked_calc(
+            label="Certified entropy rate after post-processing",
+            formula="cert_entropy = raw_entropy x extractor_eff",
+            values={
+                "raw_entropy": (raw_r, "Gbps"),
+                "extractor_eff": (extractor_eff, ""),
+            },
+            result=cert_r, result_unit="Gbps",
+            assumptions=[f"extractor efficiency {extractor_eff} for {post_proc} (Herrero-Collantes & Garcia-Escartin 2017 Table I)"],
+        ),
+    ]
+
     return {
         "source_type": source,
         "detector_bandwidth_ghz": bw_ghz,
@@ -153,6 +191,7 @@ def compute(payload: dict) -> dict:
         "quantum_fraction": quantum_fraction,
         "nist_sp_800_22_pass_probability": round(nist_pass_prob, 3),
         "max_bits_per_sample_source_limited": src["bits_per_sample_max"],
+        "worked": worked,
     }
 
 

@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -103,6 +107,58 @@ def compute(payload: dict) -> dict:
     # Total inverter input power harvest
     p_harvest_w = P_mp * mppt_eta
 
+    # Worked calculations — V_oc_op is the result of two transcendental
+    # corrections (temperature + log-irradiance) so it is SKIPPED and passed
+    # as a live input symbol into the downstream clean steps.
+    I_sc_op_r = round(I_sc_op, 3)
+    V_oc_op_r = round(V_oc_op, 2)
+    V_mp_r = round(V_mp, 2)
+    I_mp_r = round(I_mp, 3)
+    P_mp_r = round(P_mp, 2)
+    worked = [
+        worked_calc(
+            label="Short-circuit current at operating conditions",
+            formula="I_sc_op = I_sc_stc x (G / G_stc) x (1 + alpha_I x dT)",
+            values={
+                "I_sc_stc": (I_sc_stc, "A"),
+                "G": (G, "W/m2"),
+                "G_stc": (G_STC, "W/m2"),
+                "alpha_I": (TEMP_COEFF_I_SC, "/K"),
+                "dT": (delta_T, "K"),
+            },
+            result=I_sc_op_r, result_unit="A",
+            assumptions=["TEMP_COEFF_I_SC = +0.05 %/K for mono-Si (IEC 60904-3)"],
+        ),
+        worked_calc(
+            label="Maximum-power-point voltage",
+            formula="V_mp = v_mp_ratio x V_oc_op",
+            values={"v_mp_ratio": (v_mp_ratio, ""), "V_oc_op": (V_oc_op_r, "V")},
+            result=V_mp_r, result_unit="V",
+            assumptions=["V_oc_op already corrected for temperature + log-irradiance (Sandia PV model)"],
+        ),
+        worked_calc(
+            label="Maximum-power-point current",
+            formula="I_mp = i_mp_ratio x I_sc_op",
+            values={"i_mp_ratio": (i_mp_ratio, ""), "I_sc_op": (I_sc_op_r, "A")},
+            result=I_mp_r, result_unit="A",
+            assumptions=["i_mp_ratio typical 0.92-0.95 at STC (Sandia PV model)"],
+        ),
+        worked_calc(
+            label="Maximum-power-point power",
+            formula="P_mp = V_mp x I_mp",
+            values={"V_mp": (V_mp_r, "V"), "I_mp": (I_mp_r, "A")},
+            result=P_mp_r, result_unit="W",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Harvested power after MPPT tracking loss",
+            formula="P_harvest = P_mp x mppt_eta",
+            values={"P_mp": (P_mp_r, "W"), "mppt_eta": (mppt_eta, "")},
+            result=round(p_harvest_w, 2), result_unit="W",
+            assumptions=["Perturb-and-observe tracker efficiency 99.2% at steady irradiance (Schmid/SolarEdge)"],
+        ),
+    ]
+
     return {
         "mpp_voltage_v": round(V_mp, 2),
         "mpp_current_a": round(I_mp, 3),
@@ -116,6 +172,7 @@ def compute(payload: dict) -> dict:
         "irradiance_w_m2": G,
         "temp_derate_factor": round(1.0 + TEMP_COEFF_P_MAX * delta_T, 4),
         "irradiance_factor": round(G / G_STC, 3),
+        "worked": worked,
     }
 
 

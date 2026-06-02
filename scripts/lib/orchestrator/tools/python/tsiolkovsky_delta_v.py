@@ -41,8 +41,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -93,6 +97,36 @@ def compute(payload: dict) -> dict:
 
     prop_mass_fraction = prop_mass_kg / m_initial
 
+    # Worked calculations.
+    # delta_v uses ln(mass_ratio) — transcendental, SKIP; pass the live result as
+    # a note only.  The three clean steps below are fully hand-verifiable.
+    ve_r = round(ve_ms, 2)
+    mr_r = round(mass_ratio, 5)
+    pmf_r = round(prop_mass_fraction, 5)
+    worked = [
+        worked_calc(
+            label="Effective exhaust velocity",
+            formula="v_e = isp_s x g0",
+            values={"isp_s": (isp_s, "s"), "g0": (g0, "m/s^2")},
+            result=ve_r, result_unit="m/s",
+            assumptions=["v_e = Isp x g0 by definition (Sutton & Biblarz §2.4)"],
+        ),
+        worked_calc(
+            label="Mass ratio",
+            formula="mass_ratio = m_initial / m_final",
+            values={"m_initial": (m_initial, "kg"), "m_final": (m_final, "kg")},
+            result=mr_r, result_unit="",
+            assumptions=["m_initial = dry_mass + propellant_mass"],
+        ),
+        worked_calc(
+            label="Propellant mass fraction",
+            formula="pmf = prop_mass_kg / m_initial",
+            values={"prop_mass_kg": (prop_mass_kg, "kg"), "m_initial": (m_initial, "kg")},
+            result=pmf_r, result_unit="",
+            assumptions=["Fraction of initial mass that is propellant"],
+        ),
+    ]
+
     return {
         "dry_mass_kg": dry_mass_kg,
         "propellant_mass_kg": prop_mass_kg,
@@ -104,6 +138,7 @@ def compute(payload: dict) -> dict:
         "mass_ratio": round(mass_ratio, 5),
         "propellant_mass_fraction": round(prop_mass_fraction, 5),
         "delta_v_ms": round(delta_v_ms, 2),
+        "worked": worked,
     }
 
 

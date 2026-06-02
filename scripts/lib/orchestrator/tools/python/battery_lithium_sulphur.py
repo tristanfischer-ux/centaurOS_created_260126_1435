@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -125,6 +129,110 @@ def compute(payload: dict) -> dict:
     cost_per_kwh_gbp = 350
     pack_cost_gbp = target_energy_kwh * cost_per_kwh_gbp
 
+    # --- Worked calculations ---
+    # cell_count_for_energy uses math.ceil — SKIP direct formula.
+    # cells_series uses math.ceil — pass as live input.
+    # soh_at_target_cycles uses N^0.85 power law — SKIP.
+    cell_e_r = round(cell_energy_wh, 1)
+    cell_mass_r = round(cell_mass_kg, 5)
+    # Use 2 d.p. so the mass-advantage substitution (m_lfp - m_pack) / m_lfp x 100
+    # reproduces the stated result; 1 d.p. causes a boundary-crossing error.
+    pack_mass_r = round(pack_mass_kg, 2)
+    pack_v_r = round(actual_pack_voltage, 1)
+    pack_kwh_r = round(actual_pack_energy_kwh, 2)
+    pack_spec_r = round(pack_specific_energy, 1)
+    lfp_mass_r = round(alternative_lfp_mass, 1)
+    nmc_mass_r = round(alternative_nmc_mass, 1)
+    # Derive advantage from the same rounded pack_mass_r used in the substitution.
+    adv_lfp_r = round((lfp_mass_r - pack_mass_r) / lfp_mass_r * 100, 1)
+    adv_nmc_r = round((nmc_mass_r - pack_mass_r) / nmc_mass_r * 100, 1)
+    cost_r = round(pack_cost_gbp)
+
+    worked = [
+        worked_calc(
+            label="Cell energy",
+            formula="E_cell = V_cell x cap_ah",
+            values={"V_cell": (cell_voltage, "V"), "cap_ah": (cell_capacity_ah, "Ah")},
+            result=cell_e_r, result_unit="Wh",
+            assumptions=["Nominal voltage plateau ~2.1 V for Li-S"],
+        ),
+        worked_calc(
+            label="Cell mass",
+            formula="m_cell = E_cell / spec_energy",
+            values={"E_cell": (cell_e_r, "Wh"),
+                    "spec_energy": (CELL_PARAMS["specific_energy_wh_kg"], "Wh/kg")},
+            result=cell_mass_r, result_unit="kg",
+            assumptions=["Cell-level specific energy 400 Wh/kg (Li-S 2025-26 production)"],
+        ),
+        worked_calc(
+            label="Pack mass (with overhead)",
+            formula="m_pack = n_cells x m_cell x overhead",
+            values={"n_cells": (cell_count_for_energy, ""),
+                    "m_cell": (cell_mass_r, "kg"),
+                    "overhead": (pack_overhead_factor, "")},
+            result=pack_mass_r, result_unit="kg",
+            assumptions=["12% overhead for case, BMS, wiring"],
+        ),
+        worked_calc(
+            label="Actual pack voltage",
+            formula="V_pack = cells_series x V_cell",
+            values={"cells_series": (cells_series, ""), "V_cell": (cell_voltage, "V")},
+            result=pack_v_r, result_unit="V",
+            assumptions=["cells_series = ceil(target_pack_v / cell_voltage)"],
+        ),
+        worked_calc(
+            label="Actual pack energy",
+            formula="E_pack = V_pack x cap_ah_parallel / 1000",
+            values={"V_pack": (pack_v_r, "V"),
+                    "cap_ah_parallel": (actual_pack_capacity_ah, "Ah")},
+            result=pack_kwh_r, result_unit="kWh",
+            assumptions=["cap_ah_parallel = cells_parallel x cell_capacity_ah"],
+        ),
+        worked_calc(
+            label="Pack specific energy",
+            formula="E_spec = (E_pack x 1000) / m_pack",
+            values={"E_pack": (pack_kwh_r, "kWh"), "m_pack": (pack_mass_r, "kg")},
+            result=pack_spec_r, result_unit="Wh/kg",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Equivalent LFP pack mass",
+            formula="m_lfp = target_kwh x 1000 / 170",
+            values={"target_kwh": (target_energy_kwh, "kWh")},
+            result=lfp_mass_r, result_unit="kg",
+            assumptions=["LFP specific energy 170 Wh/kg cell-level"],
+        ),
+        worked_calc(
+            label="Equivalent NMC pack mass",
+            formula="m_nmc = target_kwh x 1000 / 260",
+            values={"target_kwh": (target_energy_kwh, "kWh")},
+            result=nmc_mass_r, result_unit="kg",
+            assumptions=["NMC specific energy 260 Wh/kg cell-level"],
+        ),
+        worked_calc(
+            label="Mass advantage vs LFP",
+            formula="adv_lfp = (m_lfp - m_pack) / m_lfp x 100",
+            values={"m_lfp": (lfp_mass_r, "kg"), "m_pack": (pack_mass_r, "kg")},
+            result=adv_lfp_r, result_unit="%",
+            assumptions=["Positive = Li-S is lighter"],
+        ),
+        worked_calc(
+            label="Mass advantage vs NMC",
+            formula="adv_nmc = (m_nmc - m_pack) / m_nmc x 100",
+            values={"m_nmc": (nmc_mass_r, "kg"), "m_pack": (pack_mass_r, "kg")},
+            result=adv_nmc_r, result_unit="%",
+            assumptions=["Positive = Li-S is lighter"],
+        ),
+        worked_calc(
+            label="Pack cost estimate",
+            formula="cost = target_kwh x cost_per_kwh",
+            values={"target_kwh": (target_energy_kwh, "kWh"),
+                    "cost_per_kwh": (cost_per_kwh_gbp, "GBP/kWh")},
+            result=cost_r, result_unit="GBP",
+            assumptions=["Li-S ~GBP 350/kWh (2025 estimate; 2-3x LFP premium)"],
+        ),
+    ]
+
     return {
         "target_energy_kwh": target_energy_kwh,
         "cell_voltage_v": cell_voltage,
@@ -156,6 +264,7 @@ def compute(payload: dict) -> dict:
         "self_discharge_pct_month": CELL_PARAMS["self_discharge_pct_month"],
         "max_c_rate_discharge": CELL_PARAMS["max_c_rate_discharge"],
         "warning_low_cycle_life": (target_lifetime_cycles > 500),
+        "worked": worked,
         "notes": (
             "LiS specific energy 2-3× higher than LFP/NMC at cell level; ideal for "
             "HAPS where mass matters more than cycle life. Polysulfide shuttle limits "

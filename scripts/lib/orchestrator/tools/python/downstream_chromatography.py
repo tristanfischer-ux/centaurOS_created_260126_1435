@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -184,6 +188,104 @@ def compute(payload: dict) -> dict:
     buffer_cost_per_l_gbp = 1.50
     total_buffer_cost = total_eluent_volume_l * buffer_cost_per_l_gbp
 
+    # Worked calculations for the PDF appendix.
+    # SEC column sizing is feedstock-volume-based (not bind-and-elute); for SEC the
+    # column_volume_l formula differs and is shown with a note.
+    # cycles is the ceiling of a division — branchy, passed as live input to downstream
+    # cost steps.
+    col_vol_l_r = round(column_volume_l, 3)
+    col_area_r = round(column_area_cm2, 2)
+    col_vol_ml_r = round(column_volume_ml, 1)
+    # Use 2dp so that col_vol_ml_r / col_area_r evaluates to a value within 0.5% of col_h_r.
+    # 1dp (e.g. 0.6 for an actual 0.6496 cm) is 8% away from the substitution result — the
+    # reviewer cannot verify 100/153.94 = 0.6 by hand.  At 2dp the gap is <0.1%.
+    col_h_r = round(column_height_cm, 2)
+    eluent_r = round(eluent_volume_per_cycle_l, 1)
+    total_eluent_r = round(total_eluent_volume_l, 1)
+    resin_cost_r = round(resin_cost_gbp, 0)
+    cost_per_cycle_r = round(cost_per_cycle_gbp, 0)
+    worked: list = []
+    if not is_sec:
+        worked.append(worked_calc(
+            label="Column volume required (bind-and-elute)",
+            formula="col_vol_l = (target_g x 1000) / dbc / 1000",
+            values={
+                "target_g": (target_protein_mass_g, "g"),
+                "dbc": (dbc, "mg/mL"),
+            },
+            result=col_vol_l_r,
+            result_unit="L",
+            assumptions=["full mass bound in single pass; DBC = dynamic binding capacity"],
+        ))
+    else:
+        worked.append(worked_calc(
+            label="Column volume required (SEC — feedstock fraction rule)",
+            formula="col_vol_l = feedstock_volume_l / 0.05",
+            values={"feedstock_volume_l": (feedstock_volume_l, "L")},
+            result=col_vol_l_r,
+            result_unit="L",
+            assumptions=["load volume <= 5% of column volume for size-exclusion chromatography"],
+        ))
+    worked += [
+        worked_calc(
+            label="Column cross-sectional area",
+            formula="col_area = pi x (diameter / 2)^2",
+            values={"diameter": (column_diameter_cm, "cm")},
+            result=col_area_r,
+            result_unit="cm^2",
+        ),
+        worked_calc(
+            label="Column volume in mL",
+            formula="col_vol_ml = col_vol_l x 1000",
+            values={"col_vol_l": (col_vol_l_r, "L")},
+            result=col_vol_ml_r,
+            result_unit="mL",
+        ),
+        worked_calc(
+            label="Column bed height",
+            formula="col_height = col_vol_ml / col_area",
+            values={"col_vol_ml": (col_vol_ml_r, "mL"), "col_area": (col_area_r, "cm^2")},
+            result=col_h_r,
+            result_unit="cm",
+        ),
+        worked_calc(
+            label="Eluent volume per cycle",
+            formula="eluent_per_cycle = col_vol_l x 3",
+            values={"col_vol_l": (col_vol_l_r, "L")},
+            result=eluent_r,
+            result_unit="L",
+            assumptions=["3 column volumes: elution + re-equilibration (Carta & Jungbauer 2020)"],
+        ),
+        worked_calc(
+            label="Total eluent volume",
+            formula="total_eluent = eluent_per_cycle x cycles",
+            values={"eluent_per_cycle": (eluent_r, "L"), "cycles": (cycles, "")},
+            result=total_eluent_r,
+            result_unit="L",
+        ),
+        worked_calc(
+            label="Resin cost",
+            formula="resin_cost = col_vol_l x cost_per_l",
+            values={
+                "col_vol_l": (col_vol_l_r, "L"),
+                "cost_per_l": (props["cost_gbp_per_l"], "GBP/L"),
+            },
+            result=resin_cost_r,
+            result_unit="GBP",
+        ),
+        worked_calc(
+            label="Resin cost per cycle",
+            formula="cost_per_cycle = resin_cost / resin_lifetime_cycles",
+            values={
+                "resin_cost": (resin_cost_r, "GBP"),
+                "resin_lifetime_cycles": (props["cycles_typical"], ""),
+            },
+            result=cost_per_cycle_r,
+            result_unit="GBP",
+            assumptions=["resin amortised over typical cycle lifetime"],
+        ),
+    ]
+
     return {
         "feedstock_volume_l": feedstock_volume_l,
         "target_protein_mass_g": target_protein_mass_g,
@@ -192,7 +294,7 @@ def compute(payload: dict) -> dict:
         "column_volume_l": round(column_volume_l, 3),
         "column_volume_ml": round(column_volume_ml, 1),
         "column_diameter_cm": column_diameter_cm,
-        "column_bed_height_cm": round(bed_height_cm, 1),
+        "column_bed_height_cm": col_h_r,
         "cycle_count": cycles,
         "yield_pct_per_cycle": yield_pct,
         "yield_pct_overall": round(final_yield_pct, 1),
@@ -207,6 +309,7 @@ def compute(payload: dict) -> dict:
         "cost_per_cycle_gbp": round(cost_per_cycle_gbp, 0),
         "total_buffer_cost_gbp": round(total_buffer_cost, 0),
         "total_run_cost_gbp": round(resin_cost_gbp + total_buffer_cost, 0),
+        "worked": worked,
         "notes": (
             "Per Carta & Jungbauer (2020) Protein Chromatography. "
             "DBC = dynamic binding capacity (typically 70-80% of static capacity). "

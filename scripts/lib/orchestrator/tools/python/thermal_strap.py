@@ -50,8 +50,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -117,11 +121,83 @@ def compute(payload: dict) -> dict:
 
     # Flexibility — penalise tight bend radius (rule of thumb: r_bend/d > 5 for graphite)
     # Cross-section "equivalent diameter": d = sqrt(4A/π)
-    import math
+    import math  # noqa: PLC0415 (local import preserved as-is)
     d_eq_mm = math.sqrt(4.0 * area_mm2 / math.pi)
     r_over_d = r_bend_mm / max(0.1, d_eq_mm)
     flex_penalty = max(0.0, 1.0 - (5.0 - min(5.0, r_over_d)) * 0.2)
     flex_score = max(1, min(10, round(mat["flex_base"] * flex_penalty + (1 - flex_penalty) * 1)))
+
+    # Worked calculations.
+    # d_eq_mm uses sqrt (transcendental) — SKIP; flex_score is piecewise/clamped — SKIP.
+    # All conduction steps below are clean closed-form arithmetic.
+    length_m_r = round(length_m, 4)
+    area_m2_r = round(area_m2, 8)
+    r_strap_r = round(r_strap, 5)
+    r_contact_r = round(r_contact_end, 5)
+    r_total_r = round(r_total, 5)
+    g_eff_r = round(g_eff, 3)
+    vol_r = round(volume_m3, 10)
+    worked = [
+        worked_calc(
+            label="Strap length (m)",
+            formula="length_m = length_mm / 1000",
+            values={"length_mm": (length_mm, "mm")},
+            result=length_m_r, result_unit="m",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Cross-section area (m^2)",
+            formula="area_m2 = area_mm2 / 1e6",
+            values={"area_mm2": (area_mm2, "mm^2")},
+            result=area_m2_r, result_unit="m^2",
+            assumptions=["1 mm^2 = 1e-6 m^2"],
+        ),
+        worked_calc(
+            label="Bulk strap thermal resistance",
+            formula="r_strap = length_m / (k_w_mk x area_m2)",
+            values={"length_m": (length_m_r, "m"), "k_w_mk": (mat["k_w_mk"], "W/m/K"),
+                    "area_m2": (area_m2_r, "m^2")},
+            result=r_strap_r, result_unit="K/W",
+            assumptions=[f"Thermal conductivity {mat['k_w_mk']} W/m/K for {material} "
+                         f"(Gilmore Spacecraft Thermal Control Handbook, Table 8.1)"],
+        ),
+        worked_calc(
+            label="Contact thermal resistance (one end)",
+            formula="r_contact = 1 / (h_contact x area_m2)",
+            values={"h_contact": (h_contact, "W/m^2/K"), "area_m2": (area_m2_r, "m^2")},
+            result=r_contact_r, result_unit="K/W",
+            assumptions=[f"Contact conductance {h_contact} W/m^2/K for {attach} "
+                         f"attachment (Gilmore Table 8.1)"],
+        ),
+        worked_calc(
+            label="Total thermal resistance (strap + 2 contacts)",
+            formula="r_total = r_strap + 2 x r_contact",
+            values={"r_strap": (r_strap_r, "K/W"), "r_contact": (r_contact_r, "K/W")},
+            result=r_total_r, result_unit="K/W",
+            assumptions=["Two contact interfaces (source end + sink end)"],
+        ),
+        worked_calc(
+            label="Effective thermal conductance",
+            formula="g_eff = 1 / r_total",
+            values={"r_total": (r_total_r, "K/W")},
+            result=g_eff_r, result_unit="W/K",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Strap volume",
+            formula="volume_m3 = area_m2 x length_m",
+            values={"area_m2": (area_m2_r, "m^2"), "length_m": (length_m_r, "m")},
+            result=vol_r, result_unit="m^3",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Strap mass",
+            formula="mass_g = rho_kgm3 x volume_m3 x 1000",
+            values={"rho_kgm3": (mat["rho_kgm3"], "kg/m^3"), "volume_m3": (vol_r, "m^3")},
+            result=round(mass_g, 3), result_unit="g",
+            assumptions=[f"Density {mat['rho_kgm3']} kg/m^3 for {material}"],
+        ),
+    ]
 
     return {
         "material": material,
@@ -140,6 +216,7 @@ def compute(payload: dict) -> dict:
         "flexibility_score": flex_score,
         "equivalent_diameter_mm": round(d_eq_mm, 3),
         "bend_radius_to_diameter_ratio": round(r_over_d, 3),
+        "worked": worked,
     }
 
 

@@ -34,8 +34,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -125,6 +129,81 @@ def compute(payload: dict) -> dict:
     total_mass_g = sensor_mass_g + 50.0
     total_mass_kg = total_mass_g / 1000.0
 
+    # Worked calculations.
+    # r_min_m uses a cube-root (transcendental) — skip; pass d_min_detectable_um as input.
+    # flux power-law uses (1/d)^2.5 — skip; pass flux_per_m2_yr as input.
+    # flux_uncertainty uses sqrt — skip.
+    area_m2_r = round(area_m2, 6)
+    d_min_det_r = round(d_min_detectable_um, 2)
+    flux_r = round(flux_per_m2_yr, 1)
+    eff_r = round(detect_eff_pct, 1)
+    impacts_r = round(impacts_per_year, 3)
+    pvdf_r = round(pvdf_density_g_cm2, 4)
+    sensor_mass_r = round(sensor_mass_g, 2)
+    total_mass_kg_r = round(total_mass_kg, 3)
+    # Use the raw m_min_kg (not rounded to 6dp which collapses tiny values to 0)
+    # so that the substitution string is arithmetically sound.
+    worked = [
+        worked_calc(
+            label="Minimum detectable particle mass",
+            formula="m_min = 2 x E_threshold / v_impact^2",
+            values={
+                "E_threshold": (threshold_energy_j, "J"),
+                "v_impact": (v_m_s, "m/s"),
+            },
+            result=m_min_kg, result_unit="kg",
+            assumptions=[
+                "E_threshold = 10 nJ typical PVDF/PZT acoustic detection threshold",
+                "v_impact in m/s; kinetic energy KE = 0.5 m v^2 rearranged",
+            ],
+        ),
+        worked_calc(
+            label="Detector area in m2",
+            formula="A_m2 = A_cm2 / 10000",
+            values={"A_cm2": (area_cm2, "cm2")},
+            result=area_m2_r, result_unit="m2",
+            assumptions=["unit conversion: 1 m2 = 10,000 cm2"],
+        ),
+        worked_calc(
+            label="Annual impacts on detector",
+            formula="impacts = flux x A_m2 x detect_eff / 100",
+            values={
+                "flux": (flux_r, "impacts/m2/yr"),
+                "A_m2": (area_m2_r, "m2"),
+                "detect_eff": (eff_r, "%"),
+            },
+            result=impacts_r, result_unit="impacts/yr",
+            assumptions=[
+                f"flux = ESA MASTER-8 power-law evaluated at d_min = {d_min_det_r} um (transcendental — not shown)",
+                "detect_eff fraction of particle-size range that is actually detectable",
+            ],
+        ),
+        worked_calc(
+            label="PVDF film areal mass density",
+            formula="rho_areal = sensor_thickness_um / 10 x 0.001",
+            values={"sensor_thickness_um": (sensor_thickness_um, "um")},
+            result=pvdf_r, result_unit="g/cm2",
+            assumptions=["1 mg/cm2 per 10 um PVDF thickness (manufacturer spec)"],
+        ),
+        worked_calc(
+            label="Sensor film mass",
+            formula="m_sensor = rho_areal x A_cm2",
+            values={
+                "rho_areal": (pvdf_r, "g/cm2"),
+                "A_cm2": (area_cm2, "cm2"),
+            },
+            result=sensor_mass_r, result_unit="g",
+            assumptions=["film only; electronics and housing added separately"],
+        ),
+        worked_calc(
+            label="Total detector mass",
+            formula="m_total = (m_sensor + 50) / 1000",
+            values={"m_sensor": (sensor_mass_r, "g")},
+            result=total_mass_kg_r, result_unit="kg",
+            assumptions=["50 g fixed allowance for electronics and housing (nanosensor typical)"],
+        ),
+    ]
+
     return {
         "detection_area_cm2": area_cm2,
         "particle_size_range_um": size_range,
@@ -132,14 +211,15 @@ def compute(payload: dict) -> dict:
         "sensor_type": sensor_type,
         "sensor_thickness_um": sensor_thickness_um,
         "detection_threshold_energy_J": threshold_energy_j,
-        "min_detectable_particle_um": round(d_min_detectable_um, 2),
+        "min_detectable_particle_um": d_min_det_r,
         "max_detectable_particle_um": round(d_max_detectable_um, 0),
-        "detection_efficiency_pct": round(detect_eff_pct, 1),
-        "impacts_per_year": round(impacts_per_year, 3),
+        "detection_efficiency_pct": eff_r,
+        "impacts_per_year": impacts_r,
         "particle_flux_measurement_uncertainty_pct": round(flux_uncertainty_pct, 1),
-        "flux_per_m2_yr_above_min": round(flux_per_m2_yr, 1),
-        "sensor_mass_g": round(sensor_mass_g, 2),
-        "mass_kg": round(total_mass_kg, 3),
+        "flux_per_m2_yr_above_min": flux_r,
+        "sensor_mass_g": sensor_mass_r,
+        "mass_kg": total_mass_kg_r,
+        "worked": worked,
     }
 
 

@@ -33,8 +33,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -148,6 +152,79 @@ def compute(payload: dict) -> dict:
         + 12000  # pretreatment skid
     )
 
+    # Rounded intermediates for chained worked calculations.
+    q_permeate_r = round(q_permeate_lph, 1)
+    q_feed_r = round(q_feed_lph, 1)
+    q_reject_r = round(q_reject_lph, 1)
+    mem_area_r = round(membrane_area_m2, 2)
+    q_feed_m3h_r = round(q_feed_lph / 1000.0, 4)
+    hyd_power_r = round(hydraulic_power_kw, 4)
+    energy_r = round(energy_kwh_per_m3, 3)
+
+    worked = [
+        worked_calc(
+            label="Permeate flow rate",
+            formula="q_permeate = daily_demand / op_hours",
+            values={
+                "daily_demand": (daily_demand_l, "L/day"),
+                "op_hours": (operating_hours_per_day, "h/day"),
+            },
+            result=q_permeate_r, result_unit="L/h",
+            assumptions=["system operates at constant flow rate during operating hours"],
+        ),
+        worked_calc(
+            label="Feed flow rate (accounting for recovery losses)",
+            formula="q_feed = q_permeate / recovery",
+            values={
+                "q_permeate": (q_permeate_r, "L/h"),
+                "recovery": (recovery_target, ""),
+            },
+            result=q_feed_r, result_unit="L/h",
+            assumptions=[f"recovery target {round(recovery_target*100, 1)}% per input"],
+        ),
+        worked_calc(
+            label="Reject (concentrate) flow rate",
+            formula="q_reject = q_feed - q_permeate",
+            values={
+                "q_feed": (q_feed_r, "L/h"),
+                "q_permeate": (q_permeate_r, "L/h"),
+            },
+            result=q_reject_r, result_unit="L/h",
+            assumptions=["mass balance: feed = permeate + reject"],
+        ),
+        worked_calc(
+            label="Required membrane area",
+            formula="mem_area = q_permeate / flux_lmh",
+            values={
+                "q_permeate": (q_permeate_r, "L/h"),
+                "flux_lmh": (flux_lmh, "L/m2/h"),
+            },
+            result=mem_area_r, result_unit="m2",
+            assumptions=[f"flux {flux_lmh} L/m2/h for {mem} membrane (DOW FILMTEC technical manual)"],
+        ),
+        worked_calc(
+            label="Hydraulic pump power",
+            formula="hyd_power = (p_op x q_feed_m3h / 36) / pump_eff",
+            values={
+                "p_op": (p_op_bar, "bar"),
+                "q_feed_m3h": (q_feed_m3h_r, "m3/h"),
+                "pump_eff": (pump_efficiency, ""),
+            },
+            result=hyd_power_r, result_unit="kW",
+            assumptions=["1 bar x 1 m3/h / 36 = 0.02778 kW hydraulic (unit conversion)"],
+        ),
+        worked_calc(
+            label="Specific energy consumption",
+            formula="energy = hyd_power / (q_permeate / 1000)",
+            values={
+                "hyd_power": (hyd_power_r, "kW"),
+                "q_permeate": (q_permeate_r, "L/h"),
+            },
+            result=energy_r, result_unit="kWh/m3",
+            assumptions=["q_permeate converted L/h to m3/h by dividing 1000"],
+        ),
+    ]
+
     return {
         "membrane_type": mem,
         "flux_lmh": flux_lmh,
@@ -171,6 +248,7 @@ def compute(payload: dict) -> dict:
         "pretreatment_required": pretreatment_needed,
         "estimated_capex_gbp": round(capex_gbp),
         "estimated_membrane_replacement_yr": 3,
+        "worked": worked,
         "notes": (
             f"Per DOW FILMTEC Technical Manual. {mem} flux {flux_lmh} LMH, "
             f"{rejection_pct}% rejection. Recovery {recovery_target*100:.0f}% balanced "

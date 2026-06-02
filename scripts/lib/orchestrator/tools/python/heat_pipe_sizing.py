@@ -51,8 +51,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -192,6 +196,67 @@ def compute(payload: dict) -> dict:
     # How many pipes if single pipe over-stretched
     recommended_count = max(1, math.ceil(q / max(1e-6, q_max_w_corrected)))
 
+    # Worked calculations — closed-form steps only; sqrt-diameter and table
+    # lookups are skipped because they are not hand-verifiable arithmetic.
+    q_per_aw_r = round(q_per_aw, 4)
+    cap_head_pa_r = round(cap_head_pa, 2)
+    pressure_drop_pa_r = round(pressure_drop_pa, 2)
+    mass_per_m_r = round(mass_per_m_kg, 4)
+    worked = [
+        worked_calc(
+            label="Capillary limit per unit wick area",
+            formula="q_per_aw = (2 x sigma x rho_l x hfg x K) / (r_eff x mu_l x L_eff)",
+            values={
+                "sigma": (fluid["surface_tension"], "N/m"),
+                "rho_l": (fluid["liquid_density"], "kg/m3"),
+                "hfg": (fluid["latent_heat"], "J/kg"),
+                "K": (K, "m2"),
+                "r_eff": (r_eff_m, "m"),
+                "mu_l": (fluid["viscosity"], "Pa.s"),
+                "L_eff": (l_eff, "m"),
+            },
+            result=q_per_aw_r, result_unit="W/m2",
+            assumptions=[
+                "Capillary limit formula per Chi (1976); wick permeability K and r_eff from pipe-type table",
+                f"fluid: {fluid_name}, pipe type: {pipe_type}",
+            ],
+        ),
+        worked_calc(
+            label="Capillary pressure head",
+            formula="cap_head_pa = 2 x sigma / r_eff",
+            values={
+                "sigma": (fluid["surface_tension"], "N/m"),
+                "r_eff": (r_eff_m, "m"),
+            },
+            result=cap_head_pa_r, result_unit="Pa",
+            assumptions=["Young-Laplace equation for cylindrical pore; contact angle theta assumed 0 (cos theta = 1)"],
+        ),
+        worked_calc(
+            label="Liquid pressure drop",
+            formula="delta_P = (Q x mu_l x L_eff) / (rho_l x hfg x K x A_w_avail)",
+            values={
+                "Q": (q, "W"),
+                "mu_l": (fluid["viscosity"], "Pa.s"),
+                "L_eff": (l_eff, "m"),
+                "rho_l": (fluid["liquid_density"], "kg/m3"),
+                "hfg": (fluid["latent_heat"], "J/kg"),
+                "K": (K, "m2"),
+                "A_w_avail": (round(a_w_avail, 8), "m2"),
+            },
+            result=pressure_drop_pa_r, result_unit="Pa",
+            assumptions=["A_w_avail computed from recommended stock diameter; 30% wick fill assumed"],
+        ),
+        worked_calc(
+            label="Mass per metre of heat pipe",
+            formula="mass_per_m = 0.06 x (d_mm / 8.0)",
+            values={
+                "d_mm": (d_recommended_mm, "mm"),
+            },
+            result=mass_per_m_r, result_unit="kg/m",
+            assumptions=["0.06 kg/m reference for 8 mm aluminium heat pipe (Brennan & Kroliczek 1979); linear diameter scaling"],
+        ),
+    ]
+
     return {
         "heat_load_w": q,
         "pipe_length_m": length_m,
@@ -217,6 +282,7 @@ def compute(payload: dict) -> dict:
         "mass_total_kg": round(mass_per_m_kg * length_m * recommended_count, 4),
         "recommended_count": recommended_count,
         "merit_number_w_m2": fluid["merit_number"],
+        "worked": worked,
     }
 
 

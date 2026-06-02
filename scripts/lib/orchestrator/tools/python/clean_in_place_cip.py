@@ -40,8 +40,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -167,6 +171,89 @@ def compute(payload: dict) -> dict:
     chemical_disposal_gbp = (naoh_50_l + hno3_30_l) * 0.50   # £500/m³ neutralisation
     total_cost_gbp = water_cost_gbp + naoh_cost_gbp + hno3_cost_gbp + energy_cost_gbp + chemical_disposal_gbp
 
+    # Worked calculations — reviewer-verifiable arithmetic steps.
+    # cycle_time_min is a sum of lookup-table values (not re-shown).
+    delta_t_r           = round(delta_t, 1)
+    energy_kj_r         = round(energy_kj, 1)
+    energy_kwh_heat_r   = round(energy_kwh_heating, 2)
+    energy_kwh_pump_r   = round(energy_kwh_pumping, 2)
+    total_energy_r      = round(total_energy_kwh, 2)
+    naoh_r              = round(naoh_50_l, 2)
+    hno3_r              = round(hno3_30_l, 2)
+    water_cost_r        = round(water_cost_gbp, 2)
+    naoh_cost_r         = round(naoh_cost_gbp, 2)
+    hno3_cost_r         = round(hno3_cost_gbp, 2)
+    energy_cost_r       = round(energy_cost_gbp, 2)
+    disposal_cost_r     = round(chemical_disposal_gbp, 2)
+    total_cost_r        = round(total_cost_gbp, 2)
+
+    worked = [
+        worked_calc(
+            label="Heating energy (alkaline + acid washes)",
+            formula="energy_kj = cycle_volume_to_heat_l x 4.184 x delta_t",
+            values={
+                "cycle_volume_to_heat_l": (cycle_volume_to_heat_l, "L"),
+                "delta_t":               (delta_t_r, "K"),
+            },
+            result=energy_kj_r, result_unit="kJ",
+            assumptions=[
+                "Specific heat of water = 4.184 kJ/(kg·K); density 1 kg/L.",
+                "delta_t = cleaning_temp_c - 20 (ambient 20 °C).",
+                "Two vessel-volumes heated (alkaline wash + acid wash).",
+            ],
+        ),
+        worked_calc(
+            label="Heating energy converted to kWh",
+            formula="energy_kwh_heating = energy_kj / 3600",
+            values={"energy_kj": (energy_kj_r, "kJ")},
+            result=energy_kwh_heat_r, result_unit="kWh",
+            assumptions=["1 kWh = 3600 kJ."],
+        ),
+        worked_calc(
+            label="Pumping energy",
+            formula="energy_kwh_pumping = vessel_volume_l x 0.005",
+            values={"vessel_volume_l": (volume_l, "L")},
+            result=energy_kwh_pump_r, result_unit="kWh",
+            assumptions=["~5 Wh/L pumping energy (ASME BPE industry typical for CIP skids)."],
+        ),
+        worked_calc(
+            label="NaOH 50% concentrate required",
+            formula="naoh_50_l = alkali_cycle_volume x (alkali_strength_pct / 50)",
+            values={
+                "alkali_cycle_volume":   (alkali_cycle_volume, "L"),
+                "alkali_strength_pct":   (durations["alkali_strength_pct"], "%"),
+            },
+            result=naoh_r, result_unit="L",
+            assumptions=["Alkali cycle volume = 2 x vessel volume (recirculation loop per ASME BPE)."],
+        ),
+        worked_calc(
+            label="HNO3 30% concentrate required",
+            formula="hno3_30_l = acid_cycle_volume x (acid_strength_pct / 30)",
+            values={
+                "acid_cycle_volume": (acid_cycle_volume, "L"),
+                "acid_strength_pct": (durations["acid_strength_pct"], "%"),
+            },
+            result=hno3_r, result_unit="L",
+            assumptions=["Acid cycle volume = 1.5 x vessel volume (single-pass with recirculation per ASME BPE)."],
+        ),
+        worked_calc(
+            label="Total cost per CIP cycle",
+            formula="total_cost = water_cost + naoh_cost + hno3_cost + energy_cost + disposal_cost",
+            values={
+                "water_cost":    (water_cost_r,    "GBP"),
+                "naoh_cost":     (naoh_cost_r,     "GBP"),
+                "hno3_cost":     (hno3_cost_r,     "GBP"),
+                "energy_cost":   (energy_cost_r,   "GBP"),
+                "disposal_cost": (disposal_cost_r, "GBP"),
+            },
+            result=total_cost_r, result_unit="GBP",
+            assumptions=[
+                "Water £2/m3, NaOH 50% £300/m3, HNO3 30% £350/m3, electricity £0.15/kWh.",
+                "Effluent neutralisation £500/m3 of chemical concentrate.",
+            ],
+        ),
+    ]
+
     # Effluent treatment requirements
     effluent_volume = total_water_l
     effluent_ph = "Acidic (HNO3) → neutralise to pH 6-9 before discharge"
@@ -208,6 +295,7 @@ def compute(payload: dict) -> dict:
             "Hot caustic removes proteins/cells; hot acid removes mineral scale. "
             "Effluent neutralisation mandatory before discharge."
         ),
+        "worked": worked,
     }
 
 

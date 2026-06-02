@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -116,6 +120,41 @@ def compute(payload: dict) -> dict:
     # Sound output (regulatory IEC 60601-1-2 typical < 50 dBA)
     sound_dba = 35.0 if valve_type == "water_column" else 45.0
 
+    # Worked calculations — hand-checkable arithmetic steps.
+    # The Cv formula itself uses sqrt(dp_bar x p1_bar) which is transcendental
+    # for the reviewer; pass the live Cv value as input for the Kv conversion step.
+    dp_pa_r = round(dp_pa, 3)
+    q_m3_h_r = round(q_m3_h_stp, 5)
+    cv_r = round(cv, 4)
+    kv_r = round(kv, 4)
+
+    worked = [
+        worked_calc(
+            label="Pressure drop in Pa",
+            formula="dp_pa = dp_cmh2o x 98.0665",
+            values={"dp_cmh2o": (dp_cmh2o, "cmH2O")},
+            result=dp_pa_r, result_unit="Pa",
+            assumptions=["1 cmH2O = 98.0665 Pa (ISO 80601-2-12 standard conversion)"],
+        ),
+        worked_calc(
+            label="Peak flow in m^3/h (STP)",
+            formula="q_m3_h = flow_l_min / 1000 / 60 x 3600",
+            values={"flow_l_min": (flow_max_l_min, "L/min")},
+            result=q_m3_h_r, result_unit="m^3/h",
+            assumptions=["Convert L/min to m^3/s (/ 1000 / 60) then to m^3/h (x 3600)"],
+        ),
+        worked_calc(
+            label="Valve flow coefficient Kv from Cv",
+            formula="Kv = Cv x 0.865",
+            values={"Cv": (cv_r, "")},
+            result=kv_r, result_unit="",
+            assumptions=[
+                "ISA S75.01 / IEC 60534: Kv [m^3/h/bar^0.5] = Cv [US gpm/psi^0.5] x 0.865",
+                "Cv computed from ISA subcritical gas formula using sqrt(dp_bar x p1_bar) — not reproduced here",
+            ],
+        ),
+    ]
+
     return {
         "valve_cv_required": round(cv, 4),
         "valve_kv_required": round(kv, 4),
@@ -133,6 +172,7 @@ def compute(payload: dict) -> dict:
             and safety_p_cmh2o <= 80.0
             and relief_response_ms <= 200.0
         ),
+        "worked": worked,
     }
 
 

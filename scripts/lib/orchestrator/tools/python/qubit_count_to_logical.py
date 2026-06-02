@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "qubit_count_to_logical (custom)",
@@ -118,6 +122,54 @@ def compute(payload: dict) -> dict:
     else:
         actual_pL = p_phys * d  # above threshold; bigger d worsens
 
+    # Worked calculations — clean arithmetic only.
+    # d_required is derived from log/ceiling (transcendental) so is SKIPPED;
+    # the code_distance_used (d) is passed as input to the downstream steps.
+    # The formula for phys_per_logical differs by code_type — mirror the branch.
+    if code_type in ("bb_72_12_6", "bb", "bicycle"):
+        # d is always >= 3, so d^2 >= 9 > 6; the max(6, ...) floor never binds.
+        _ppl_formula = "phys_per_logical = d^2"
+        _ppl_values = {"d": (d, "")}
+        _ppl_assumptions = [
+            "IBM BB [[72,12,6]] code: ~d^2 physical qubits per logical (floor 6, never binding for d >= 3)",
+            "d must be odd for standard syndrome extraction",
+        ]
+    elif code_type == "colour":
+        _ppl_formula = "phys_per_logical = (3 x d^2 - 1) / 2"
+        _ppl_values = {"d": (d, "")}
+        _ppl_assumptions = [
+            "triangular colour code: (3d^2 - 1) / 2 physical qubits per logical qubit",
+            "integer division; d must be odd",
+        ]
+    else:
+        # surface code (default)
+        _ppl_formula = "phys_per_logical = 2 x d^2 - 1"
+        _ppl_values = {"d": (d, "")}
+        _ppl_assumptions = [
+            "rotated surface code: d^2 data qubits + (d^2 - 1) ancilla qubits",
+            "d must be odd for standard syndrome extraction",
+        ]
+    worked = [
+        worked_calc(
+            label="Physical qubits per logical qubit (surface code)",
+            formula=_ppl_formula,
+            values=_ppl_values,
+            result=phys_per_logical, result_unit="physical qubits",
+            assumptions=_ppl_assumptions,
+        ),
+        worked_calc(
+            label="Number of logical qubits from physical budget",
+            formula="logical_count = n_phys / phys_per_logical",
+            values={
+                "n_phys": (n_phys, "physical qubits"),
+                "phys_per_logical": (phys_per_logical, "physical/logical"),
+            },
+            result=round(n_phys / phys_per_logical, 4),
+            result_unit="logical qubits (floor to integer gives final count)",
+            assumptions=["integer division — remainder physical qubits cannot form a complete logical qubit"],
+        ),
+    ]
+
     return {
         "physical_qubit_count": n_phys,
         "physical_error_rate": p_phys,
@@ -133,6 +185,7 @@ def compute(payload: dict) -> dict:
         "actual_logical_error_rate": float(f"{actual_pL:.3e}"),
         "suppression_per_distance_increase_log10": round(suppression_per_d, 2),
         "threshold_pct": round(p_th * 100.0, 3),
+        "worked": worked,
     }
 
 

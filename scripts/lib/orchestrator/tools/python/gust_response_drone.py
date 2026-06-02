@@ -34,8 +34,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -106,6 +110,71 @@ def compute(payload: dict) -> dict:
     else:
         v_critical = 999
 
+    # Worked calculations — attitude_excursion uses atan() (transcendental) → skipped.
+    W_r = round(W, 2)
+    wing_loading_r = round(wing_loading_pa, 1)
+    delta_n_r = round(delta_n, 2)
+    n_total_r = round(n_total, 2)
+    # Use 2 dp for v_crit so the substitution evaluates within 0.5% of the stated result;
+    # rounding to 1 dp (e.g. 3.3) would require the expression to evaluate to 3.3 exactly,
+    # which it cannot when the inputs are displayed to fewer significant figures.
+    v_crit_r = round(v_critical, 2)
+    worked = [
+        worked_calc(
+            label="Drone weight",
+            formula="W = m x g",
+            values={"m": (drone_mass_kg, "kg"), "g": (9.81, "m/s^2")},
+            result=W_r, result_unit="N",
+            assumptions=["g = 9.81 m/s^2 (standard gravity at sea level)"],
+        ),
+        worked_calc(
+            label="Wing loading",
+            formula="W_S = W / wing_area",
+            values={"W": (W_r, "N"), "wing_area": (wing_area_m2, "m^2")},
+            result=wing_loading_r, result_unit="Pa",
+            assumptions=["Wing area includes rotor disc area for multirotor"],
+        ),
+        worked_calc(
+            label="Gust load increment (delta n)",
+            formula="delta_n = rho x V x CL_alpha x U_gust / (2 x W_S)",
+            values={
+                "rho": (rho, "kg/m^3"),
+                "V": (airspeed_m_s, "m/s"),
+                "CL_alpha": (cl_alpha_per_rad, "1/rad"),
+                "U_gust": (gust_speed_m_s, "m/s"),
+                "W_S": (wing_loading_r, "Pa"),
+            },
+            result=delta_n_r, result_unit="g",
+            assumptions=[
+                "FAR 23.341 discrete gust equation",
+                "rho = 1.225 kg/m^3 (ISA sea level)",
+            ],
+        ),
+        worked_calc(
+            label="Total gust load factor",
+            formula="n_total = 1 + delta_n",
+            values={"delta_n": (delta_n_r, "g")},
+            result=n_total_r, result_unit="g",
+            assumptions=["1g cruise load + gust increment"],
+        ),
+        worked_calc(
+            label="Critical airspeed (g-limit onset)",
+            formula="V_crit = 2 x W_S x (g_lim - 1) / (rho x CL_alpha x U_gust)",
+            values={
+                "W_S": (wing_loading_r, "Pa"),
+                "g_lim": (g_limit_max, "g"),
+                "rho": (rho, "kg/m^3"),
+                "CL_alpha": (cl_alpha_per_rad, "1/rad"),
+                "U_gust": (gust_speed_m_s, "m/s"),
+            },
+            result=v_crit_r, result_unit="m/s",
+            assumptions=[
+                "Solve delta_n equation for V when n_total = g_limit_max",
+                "g_lim = 3.8g per ASTM F3322 Light Sport Aircraft limit",
+            ],
+        ),
+    ]
+
     return {
         "drone_mass_kg": drone_mass_kg,
         "wing_area_m2": wing_area_m2,
@@ -122,13 +191,14 @@ def compute(payload: dict) -> dict:
         "within_g_limits": within_limits,
         "g_limit_max_astm_f3322": g_limit_max,
         "g_limit_min_astm_f3322": g_limit_min,
-        "critical_airspeed_ms_for_g_limit": round(v_critical, 1),
+        "critical_airspeed_ms_for_g_limit": v_crit_r,
         "notes": (
             "Per FAR 23.341 / ASTM F3322-22. Multirotor recovery 2-3× faster than "
             "fixed-wing due to direct attitude control via differential thrust. "
             "Above critical airspeed, gust will exceed g-limit - reduce throttle. "
             "For ag/inspection drones, target 30% margin (peak ≤ 2.5g for typical 10 m/s gust)."
         ),
+        "worked": worked,
     }
 
 

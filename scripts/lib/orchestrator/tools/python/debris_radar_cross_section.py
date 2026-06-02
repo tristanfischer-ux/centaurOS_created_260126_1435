@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -177,21 +181,94 @@ def compute(payload: dict) -> dict:
     else:
         p_required_kw = float("inf")
 
+    # Worked calculations.
+    # Rayleigh sigma uses (ka)^4 — skip. Mie sigma uses sin — skip.
+    # Optical sigma = pi * a^2 is clean; shape and material multiplications are clean.
+    # Detection range involves r^(1/4) — skip. Threshold power involves r^4 — skip
+    # (both are round-trips of the same radar range equation, not simple closed forms).
+    lambda_r = round(lambda_m, 4)
+    a_r = round(a_m, 6)
+    ka_r = round(ka, 3)
+    mat_f = MATERIAL_FACTORS[material]
+    sigma_r = round(sigma_m2, 8)
+    rcs_dbsm_r = round(rcs_dbsm, 2)
+
+    worked: list[dict] = [
+        worked_calc(
+            label="Radar wavelength",
+            formula="lambda = c / f_ghz",
+            values={
+                "c": (0.2998, "GHz-m"),
+                "f_ghz": (freq_ghz, "GHz"),
+            },
+            result=lambda_r, result_unit="m",
+            assumptions=["c = 0.2998 GHz-m (speed of light 2.998e8 m/s scaled for GHz input)"],
+        ),
+        worked_calc(
+            label="Particle radius",
+            formula="a = d_mm / 2000",
+            values={"d_mm": (d_mm, "mm")},
+            result=a_r, result_unit="m",
+            assumptions=["divide by 1000 for mm-to-m, divide by 2 for diameter-to-radius"],
+        ),
+    ]
+
+    if regime == "Optical":
+        shape_f = SHAPE_OPTICAL_RCS_FACTOR[shape]
+        # Keep sigma_pec_r at full precision so the 'pi x a^2 x shape_factor'
+        # substitution evaluates to the same value.
+        sigma_pec_r = math.pi * a_r ** 2 * shape_f
+        # For the material step, the substitution replaces sigma_pec with its
+        # _fmt display value (4 dp / 4 sig-fig truncated), so the stated result
+        # must equal _fmt(sigma_pec_r) × mat_f to be self-consistent.
+        sigma_mat_r = float(f"{sigma_pec_r:,.4f}".rstrip("0").rstrip(".") or "0") * mat_f
+        worked += [
+            worked_calc(
+                label="Optical-regime RCS (perfect conductor, shape-adjusted)",
+                formula="sigma_pec = pi x a^2 x shape_factor",
+                values={
+                    "a": (a_r, "m"),
+                    "shape_factor": (shape_f, ""),
+                },
+                result=sigma_pec_r, result_unit="m2",
+                assumptions=[
+                    f"optical regime (ka = {ka_r} > 5); sphere baseline sigma = pi a^2",
+                    f"shape factor {shape_f} for {shape} (Knott 2004 Table 4.2)",
+                ],
+            ),
+            worked_calc(
+                label="Material-corrected RCS",
+                formula="sigma = sigma_pec x mat_factor",
+                values={
+                    "sigma_pec": (sigma_pec_r, "m2"),
+                    "mat_factor": (mat_f, ""),
+                },
+                result=sigma_mat_r, result_unit="m2",
+                assumptions=[f"material factor {mat_f} for {material} relative to PEC (Knott 2004 §4.2)"],
+            ),
+            # RCS_dBsm = 10 * log10(sigma) is omitted: log10 is a transcendental
+            # function that a reviewer cannot re-evaluate with + - x / ^ by hand.
+            # The sigma value (m²) above is the hand-verifiable result; the dBsm
+            # conversion is read off a calculator / log table and stated in the
+            # output field only.
+        ]
+
     return {
         "debris_diameter_mm": d_mm,
         "material": material,
         "shape": shape,
         "radar_frequency_ghz": freq_ghz,
-        "wavelength_m": round(lambda_m, 4),
-        "size_parameter_ka": round(ka, 3),
+        "wavelength_m": lambda_r,
+        "size_parameter_ka": ka_r,
         "scattering_regime": regime,
         "rcs_m2": sigma_m2,
-        "rcs_dbsm": round(rcs_dbsm, 2),
-        "material_factor": MATERIAL_FACTORS[material],
+        "rcs_dbsm": rcs_dbsm_r,
+        "material_factor": mat_f,
         "polarization": pol,
         "detection_range_km_for_p1_radar": round(detection_range_km, 0),
         "p1_radar_assumed_kw": p_t_w / 1000,
         "threshold_radar_power_at_1000km_kw": round(p_required_kw, 1) if p_required_kw != float("inf") else None,
+        "worked": worked,
     }
 
 

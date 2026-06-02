@@ -36,8 +36,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -172,6 +176,45 @@ def compute(payload: dict) -> dict:
         monthly_cost_usd = 0.0
         over_cap = False
 
+    # Worked calculations — all steps are pure arithmetic, no transcendentals.
+    bytes_per_sec_r = round(bytes_per_sec, 2)
+    raw_mbps_r = round(raw_mbps, 4)
+    required_mbps_r = round(required_mbps, 4)
+    gb_per_month_r = round(gb_per_month, 2)
+    worked = [
+        worked_calc(
+            label="Raw data rate (bytes/s)",
+            formula="bytes_per_sec = inferences_per_sec x output_kbytes x 1000",
+            values={
+                "inferences_per_sec": (inferences_per_sec, "inf/s"),
+                "output_kbytes": (output_kbytes, "kB"),
+            },
+            result=bytes_per_sec_r, result_unit="B/s",
+            assumptions=["× 1000 converts kB to B"],
+        ),
+        worked_calc(
+            label="Raw bandwidth requirement",
+            formula="raw_mbps = bytes_per_sec x 8 / 1000000",
+            values={"bytes_per_sec": (bytes_per_sec_r, "B/s")},
+            result=raw_mbps_r, result_unit="Mbps",
+            assumptions=["× 8 bits/byte; ÷ 1 000 000 bits/Mbit"],
+        ),
+        worked_calc(
+            label="Required bandwidth with protocol overhead",
+            formula="required_mbps = raw_mbps x redundancy",
+            values={"raw_mbps": (raw_mbps_r, "Mbps"), "redundancy": (redundancy, "")},
+            result=required_mbps_r, result_unit="Mbps",
+            assumptions=["redundancy factor covers protocol overhead and retransmissions"],
+        ),
+        worked_calc(
+            label="Monthly data volume",
+            formula="gb_per_month = bytes_per_sec x redundancy x 30 x 24 x 3600 / 1000000000",
+            values={"bytes_per_sec": (bytes_per_sec_r, "B/s"), "redundancy": (redundancy, "")},
+            result=gb_per_month_r, result_unit="GB/month",
+            assumptions=["30 days/month; ÷ 1e9 converts bytes to GB"],
+        ),
+    ]
+
     return {
         "inferences_per_sec": inferences_per_sec,
         "output_kbytes_per_inference": output_kbytes,
@@ -196,6 +239,7 @@ def compute(payload: dict) -> dict:
                 "LoRaWAN RP002-1.0.3",
             ],
         },
+        "worked": worked,
     }
 
 

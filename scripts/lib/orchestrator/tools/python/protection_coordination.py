@@ -56,8 +56,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -254,10 +258,44 @@ def compute(payload: dict) -> dict:
             "ok": bool(pair_ok),
         })
 
+    # Worked calculations.
+    # AC fault currents come from pandapower (IEC 60909 power-flow solver) —
+    # those are black-box outputs; no worked_calc emitted for them.
+    # TCC model functions are piecewise / inverse-power — skipped.
+    # DC bus prospective fault current is simple Ohm's law and IS hand-checkable.
+    r_total_ohm = round(pack_resistance_ohm + bus_resistance_ohm, 6)
+    dc_ka_r = round(dc_ka, 3)
+
+    worked = [
+        worked_calc(
+            label="DC bus total fault resistance",
+            formula="r_total = r_pack + r_bus",
+            values={
+                "r_pack": (pack_resistance_ohm, "ohm"),
+                "r_bus": (bus_resistance_ohm, "ohm"),
+            },
+            result=r_total_ohm, result_unit="ohm",
+            assumptions=["resistance-limited DC battery fault; not an IEC 60909 AC fault"],
+        ),
+        worked_calc(
+            label="DC bus prospective fault current",
+            formula="dc_ka = v_bus / r_total / 1000",
+            values={
+                "v_bus": (dc_bus_voltage_v, "V"),
+                "r_total": (r_total_ohm, "ohm"),
+            },
+            result=dc_ka_r, result_unit="kA",
+            assumptions=[
+                "prospective (bolted) fault current — worst case, no arc voltage",
+                "divides by 1000 to convert A to kA",
+            ],
+        ),
+    ]
+
     return {
         "pcc_fault_ka": round(ac["pcc_fault_ka"], 3),
         "lv_fault_ka": round(ac["lv_fault_ka"], 3),
-        "dc_bus_fault_ka": round(dc_ka, 3),
+        "dc_bus_fault_ka": dc_ka_r,
         "selectivity_ok": bool(selectivity_ok),
         "coordination_pairs": out_pairs,
         "inputs": {
@@ -277,6 +315,7 @@ def compute(payload: dict) -> dict:
             "the upstream device trips, by the required margin. Fuse curve = "
             "IEC 60269; ACB trip = IEC 60255 L/S/I."
         ),
+        "worked": worked,
     }
 
 

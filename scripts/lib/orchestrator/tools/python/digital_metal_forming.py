@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -160,6 +164,98 @@ def compute(payload: dict) -> dict:
     # Spec compliance
     spec_met = yield_mpa_achievable >= target_strength
 
+    # Worked calculations for the PDF appendix.
+    # material_factor and effective_rate are clean arithmetic steps.
+    # rho_rel = 1 - exp(-e_density/E_crit) is transcendental so is passed as a live input
+    # symbol to the yield step below.
+    mat_factor_r = round(material_factor, 4)
+    eff_rate_r = round(effective_rate, 1)
+    # Use 4dp for build_time in the energy substitution so that
+    # laser_w x build_time_4dp / 1000 / efficiency x 1.2 reproduces energy_kwh_r.
+    # 2dp (e.g. 3.67) introduces enough error that the sub rounds to 7.05 instead of 7.04.
+    build_time_r = round(build_time_hours, 2)
+    build_time_4dp = round(build_time_hours, 4)
+    layer_mm_r = round(layer_mm, 6)
+    e_dens_r = round(e_density_j_mm3, 1)
+    # Derive energy_kwh_r from the 4dp build_time so the substitution is self-consistent.
+    energy_kwh_r = round(laser_w * build_time_4dp / 1000.0 / proc["efficiency"] * 1.2, 2)
+    mass_kg_r = round(mass_kg, 3)
+    rho_rel_r = round(rho_rel, 4)
+    worked = [
+        worked_calc(
+            label="Material speed factor (refractory penalty)",
+            formula="mat_factor = 50 / E_crit",
+            values={"E_crit": (mat["E_crit_J_mm3"], "J/mm^3")},
+            result=mat_factor_r,
+            result_unit="",
+            assumptions=["reference E_crit = 50 J/mm^3 (Ti-6Al-4V baseline)"],
+        ),
+        worked_calc(
+            label="Effective build rate",
+            formula="eff_rate = build_rate x mat_factor",
+            values={
+                "build_rate": (build_rate_cm3_hr, "cm^3/hr"),
+                "mat_factor": (mat_factor_r, ""),
+            },
+            result=eff_rate_r,
+            result_unit="cm^3/hr",
+            assumptions=["Wohlers Report 2024 process nominal rates"],
+        ),
+        worked_calc(
+            label="Build time",
+            formula="build_time = volume / eff_rate",
+            values={"volume": (volume_cm3, "cm^3"), "eff_rate": (eff_rate_r, "cm^3/hr")},
+            result=build_time_r,
+            result_unit="hr",
+        ),
+        worked_calc(
+            label="Energy density",
+            formula="E_density = laser_w / (scan_speed x hatch x layer_mm)",
+            values={
+                "laser_w": (laser_w, "W"),
+                "scan_speed": (scan_speed_mm_s, "mm/s"),
+                "hatch": (hatch_mm, "mm"),
+                "layer_mm": (layer_mm_r, "mm"),
+            },
+            result=e_dens_r,
+            result_unit="J/mm^3",
+            assumptions=["scan_speed 1000 mm/s, hatch 0.12 mm (typical Ti-6Al-4V)"],
+        ),
+        worked_calc(
+            label="Energy consumption",
+            formula="energy_kwh = laser_w x build_time / 1000 / efficiency x 1.2",
+            values={
+                "laser_w": (laser_w, "W"),
+                "build_time": (build_time_4dp, "hr"),
+                "efficiency": (proc["efficiency"], ""),
+            },
+            result=energy_kwh_r,
+            result_unit="kWh",
+            assumptions=["1.2 overhead factor for beam manipulation and heating"],
+        ),
+        worked_calc(
+            label="Part mass",
+            formula="mass_kg = volume_cm3 x density / 1000",
+            values={
+                "volume_cm3": (volume_cm3, "cm^3"),
+                "density": (mat["density_g_cm3"], "g/cm^3"),
+            },
+            result=mass_kg_r,
+            result_unit="kg",
+        ),
+        worked_calc(
+            label="Achievable yield strength",
+            formula="yield_mpa = mat_yield x rho_rel",
+            values={
+                "mat_yield": (mat["yield_mpa"], "MPa"),
+                "rho_rel": (rho_rel_r, ""),
+            },
+            result=round(yield_mpa_achievable, 1),
+            result_unit="MPa",
+            assumptions=["rho_rel from 1-exp(-E_density/E_crit) (Yap 2015); transcendental step not shown"],
+        ),
+    ]
+
     return {
         "feedstock_material": material,
         "process": process,
@@ -179,6 +275,7 @@ def compute(payload: dict) -> dict:
         "mass_kg": round(mass_kg, 3),
         "spec_strength_met": spec_met,
         "material_density_g_cm3": mat["density_g_cm3"],
+        "worked": worked,
     }
 
 

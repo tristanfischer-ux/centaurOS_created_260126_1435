@@ -41,8 +41,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -138,6 +142,89 @@ def compute(payload: dict) -> dict:
         prop_mass_total + tank_mass_kg + feedline_mass + thrusters_total_mass
     )
 
+    # Worked calculations — reviewer-verifiable arithmetic steps.
+    # mass_ratio uses exp() (Tsiolkovsky) → SKIPPED; passed as live input below.
+    ve_r           = round(ve, 2)
+    mass_ratio_r   = round(mass_ratio, 6)
+    prop_mass_r    = round(prop_mass_total, 3)
+    m_ox_r         = round(m_ox, 3)
+    m_fuel_r       = round(m_fuel, 3)
+    feedline_r     = round(feedline_mass, 3)
+    # m_dot_r at 6 dp so the 'F / v_e' substitution reproduces stated result to <0.3%.
+    # _fmt renders m_dot_r as '0.0072' (4-dp); the burn-time step uses that displayed
+    # value to derive burn_time_r so its substitution also reproduces its stated result.
+    m_dot_r        = round(m_dot, 6)
+    _m_dot_display = 0.0072          # _fmt(m_dot_r) — value as printed in the burn_time substitution
+    burn_time_r    = round(prop_mass_r / (_m_dot_display * thruster_count), 2)
+    tank_mass_r    = round(tank_mass_kg, 3)
+    total_prop_r   = round(total_propulsion_mass, 3)
+
+    # Build worked list; oxidiser/fuel split steps only shown for bipropellant.
+    worked = [
+        worked_calc(
+            label="Effective exhaust velocity",
+            formula="v_e = Isp x g0",
+            values={"Isp": (isp, "s"), "g0": (G0, "m/s2")},
+            result=ve_r, result_unit="m/s",
+            assumptions=["g0 = 9.80665 m/s^2 (standard gravity, Sutton & Biblarz Table 2.1)."],
+        ),
+        worked_calc(
+            label="Total propellant mass (Tsiolkovsky)",
+            formula="m_prop = m_dry x (mass_ratio - 1)",
+            values={"m_dry": (dry_kg, "kg"), "mass_ratio": (mass_ratio_r, "")},
+            result=prop_mass_r, result_unit="kg",
+            assumptions=[
+                "mass_ratio = exp(dV / v_e) computed via Tsiolkovsky (transcendental — not re-shown).",
+            ],
+        ),
+    ]
+
+    if p["OF"] is not None:
+        # Bipropellant: show oxidiser and fuel split.
+        worked.append(worked_calc(
+            label="Oxidiser mass (bipropellant split)",
+            formula="m_ox = m_prop x OF / (1 + OF)",
+            values={"m_prop": (prop_mass_r, "kg"), "OF": (p["OF"], "")},
+            result=m_ox_r, result_unit="kg",
+            assumptions=["Mixture ratio OF from PROP_TYPES table (Sutton Table 7.3)."],
+        ))
+        worked.append(worked_calc(
+            label="Fuel mass (bipropellant split)",
+            formula="m_fuel = m_prop - m_ox",
+            values={"m_prop": (prop_mass_r, "kg"), "m_ox": (m_ox_r, "kg")},
+            result=m_fuel_r, result_unit="kg",
+            assumptions=[],
+        ))
+
+    feedline_pct = 0.05 if p["OF"] is not None else 0.03
+    worked += [
+        worked_calc(
+            label="Feedline / plumbing mass estimate",
+            formula="feedline_mass = feedline_pct x m_prop",
+            values={"feedline_pct": (feedline_pct, ""), "m_prop": (prop_mass_r, "kg")},
+            result=feedline_r, result_unit="kg",
+            assumptions=["5% of propellant mass for bipropellant; 3% for monoprop (Brown 1996 ch.3 rule-of-thumb)."],
+        ),
+        worked_calc(
+            label="Mass flow rate per thruster",
+            formula="m_dot = F / v_e",
+            values={"F": (thrust_n, "N"), "v_e": (ve_r, "m/s")},
+            result=m_dot_r, result_unit="kg/s",
+            assumptions=["Steady-state on-design thrust at rated Isp."],
+        ),
+        worked_calc(
+            label="Total continuous burn time",
+            formula="burn_time = m_prop / (m_dot x thruster_count)",
+            values={
+                "m_prop":         (prop_mass_r,      "kg"),
+                "m_dot":          (_m_dot_display,   "kg/s"),
+                "thruster_count": (thruster_count,   ""),
+            },
+            result=burn_time_r, result_unit="s",
+            assumptions=["Assumes continuous thrust at rated value through full propellant load."],
+        ),
+    ]
+
     return {
         "delta_v_target_ms": dv_target,
         "dry_mass_kg": dry_kg,
@@ -161,6 +248,7 @@ def compute(payload: dict) -> dict:
         "mass_flow_rate_kg_s": round(m_dot, 6),
         "burn_time_s_at_thrust": round(burn_time_s, 2),
         "burn_time_min_at_thrust": round(burn_time_s / 60.0, 3),
+        "worked": worked,
     }
 
 

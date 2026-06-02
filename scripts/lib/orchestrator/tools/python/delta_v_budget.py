@@ -51,8 +51,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -146,6 +150,42 @@ def compute(payload: dict) -> dict:
     mass_ratio = math.exp(total_dv_with_margin / ve)
     propellant_mass_kg = dry_kg * (mass_ratio - 1.0)
 
+    # Worked calculations for the PDF appendix.
+    # total_dv is the sum of piecewise-classified manoeuvre values (branchy, no closed form)
+    # so it is passed as a live input symbol rather than re-derived step-by-step.
+    total_dv_r = round(total_dv, 2)
+    total_dv_with_margin_r = round(total_dv_with_margin, 2)
+    ve_r = round(ve, 2)
+    mass_ratio_r = round(mass_ratio, 5)
+    worked = [
+        worked_calc(
+            label="Margin-adjusted total delta-V",
+            formula="dv_margin = total_dv x (1 + margin_pct / 100)",
+            values={"total_dv": (total_dv_r, "m/s"), "margin_pct": (margin_pct, "%")},
+            result=total_dv_with_margin_r,
+            result_unit="m/s",
+            assumptions=["10% margin per ESA standard practice"],
+        ),
+        worked_calc(
+            label="Effective exhaust velocity",
+            formula="ve = Isp x G0",
+            values={"Isp": (isp_s, "s"), "G0": (G0, "m/s^2")},
+            result=ve_r,
+            result_unit="m/s",
+            assumptions=["G0 = 9.80665 m/s^2 (standard gravity)"],
+        ),
+        worked_calc(
+            label="Propellant mass (Tsiolkovsky)",
+            formula="m_prop = dry_kg x (mass_ratio - 1)",
+            values={"dry_kg": (dry_kg, "kg"), "mass_ratio": (mass_ratio_r, "")},
+            # Derive result from the same rounded mass_ratio_r so the substitution
+            # dry_kg x (mass_ratio_r - 1) evaluates to this exact value.
+            result=round(dry_kg * (mass_ratio_r - 1.0), 3),
+            result_unit="kg",
+            assumptions=["mass_ratio = exp(dv_margin / ve); transcendental step shown separately"],
+        ),
+    ]
+
     return {
         "launch_vehicle": lv,
         "orbit_target": orbit_target,
@@ -158,12 +198,14 @@ def compute(payload: dict) -> dict:
         "stationkeeping_delta_v_ms_per_year": round(stationkeeping_per_year, 3),
         "deorbit_delta_v_ms": round(deorbit, 2),
         "other_delta_v_ms": round(other, 2),
-        "total_delta_v_ms": round(total_dv, 2),
+        "total_delta_v_ms": total_dv_r,
         "margin_pct": margin_pct,
-        "total_delta_v_with_margin_ms": round(total_dv_with_margin, 2),
-        "mass_ratio": round(mass_ratio, 5),
+        "total_delta_v_with_margin_ms": total_dv_with_margin_r,
+        "exhaust_velocity_ms": ve_r,
+        "mass_ratio": mass_ratio_r,
         "total_propellant_mass_kg": round(propellant_mass_kg, 3),
         "n_maneuvers": len(maneuvers),
+        "worked": worked,
     }
 
 

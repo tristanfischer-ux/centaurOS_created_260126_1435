@@ -35,8 +35,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -127,6 +131,62 @@ def compute(payload: dict) -> dict:
     # Required ultimate stroke for SF of 2 (per FAR 23.473)
     required_stroke_sf2 = ke_j / (mass_kg * 9.81 * (sy_mpa * 1e6 * csa_m2 / mass_kg / 9.81 / 2)) if csa_m2 > 0 else stroke_m
 
+    # Worked calculations — pure arithmetic steps only.
+    # radius_m, I_m4, and deflection_m involve sqrt then ^4 / division;
+    # radius is skipped (sqrt), but I_m4 and deflection are passed as live
+    # inputs to avoid transcendental display.
+    ke_r = round(ke_j, 1)
+    fpeak_r = round(f_peak_n, 0)
+    gpeak_r = round(g_peak, 1)
+    # Derive sig_r from fpeak_r so that F_peak / (frame_csa_mm2 x 1e-6) / 1e6
+    # evaluates to sig_r in the substitution.
+    sig_r = round(fpeak_r / (frame_csa_mm2 * 1e-6) / 1e6, 1)
+    worked = [
+        worked_calc(
+            label="Kinetic energy at touchdown",
+            formula="KE = 0.5 x m x v^2",
+            values={
+                "m": (mass_kg, "kg"),
+                "v": (v_descent, "m/s"),
+            },
+            result=ke_r, result_unit="J",
+            assumptions=["all kinetic energy must be absorbed by landing gear stroke"],
+        ),
+        worked_calc(
+            label="Peak impact force",
+            formula="F_peak = KE / stroke",
+            values={
+                "KE": (ke_r, "J"),
+                "stroke": (stroke_m, "m"),
+            },
+            result=fpeak_r, result_unit="N",
+            assumptions=[
+                "linear energy absorption assumed (F constant over stroke)",
+                f"landing gear type: {gear_type} — stroke from standard table",
+            ],
+        ),
+        worked_calc(
+            label="Peak deceleration",
+            formula="g_peak = F_peak / (m x 9.81)",
+            values={
+                "F_peak": (fpeak_r, "N"),
+                "m": (mass_kg, "kg"),
+            },
+            result=gpeak_r, result_unit="g",
+            assumptions=["9.81 m/s^2 gravitational acceleration"],
+        ),
+        worked_calc(
+            label="Peak stress in frame member",
+            formula="sigma = F_peak / (frame_csa_mm2 x 1e-6) / 1e6",
+            values={
+                "F_peak": (fpeak_r, "N"),
+                "frame_csa_mm2": (frame_csa_mm2, "mm^2"),
+            },
+            result=sig_r, result_unit="MPa",
+            assumptions=["uniform axial stress over cross-section; 1 mm^2 = 1e-6 m^2; / 1e6 converts Pa to MPa"],
+        ),
+    ]
+
     return {
         "drone_mass_kg": mass_kg,
         "descent_velocity_ms": v_descent,
@@ -153,6 +213,7 @@ def compute(payload: dict) -> dict:
             "Add ground reaction multiplier × 1.5 for hard surface. "
             "Use scikit-fem wrapper (when available) for non-axial loading or detailed deflection."
         ),
+        "worked": worked,
     }
 
 

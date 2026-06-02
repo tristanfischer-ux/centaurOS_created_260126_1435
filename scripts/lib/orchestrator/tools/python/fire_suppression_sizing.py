@@ -45,8 +45,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -173,27 +177,94 @@ def compute(payload: dict) -> dict:
     sufficient = mass_kg_with_sf >= (volume_m3 / s) * (props["design_c_pct_lithium_ion"] /
                                                         (100.0 - props["design_c_pct_lithium_ion"]))
 
+    mass_r = round(mass_kg, 1)
+    mass_sf_r = round(mass_kg_with_sf, 1)
+    agent_cost_r = round(agent_cost_gbp)
+    cyl_hw_r = round(cylinder_hw_gbp)
+    pipe_r = round(pipe_nozzle_gbp)
+    total_r = round(total_install_gbp)
+
+    worked = [
+        worked_calc(
+            label="Agent mass (NFPA 2001 Eq. 4.4.2.1.1)",
+            formula="W = (V / s) x (C / (100 - C))",
+            values={
+                "V": (volume_m3, "m3"),
+                "s": (s, "m3/kg"),
+                "C": (design_c_pct, "%"),
+            },
+            result=mass_r, result_unit="kg",
+            assumptions=[
+                "s = specific volume of superheated agent at 20 C (NFPA 2001 Table C.1)",
+            ],
+        ),
+        worked_calc(
+            label="Agent mass with 10% safety factor",
+            formula="W_sf = W x 1.10",
+            values={"W": (mass_r, "kg")},
+            result=mass_sf_r, result_unit="kg",
+            assumptions=["10% safety factor per NFPA 2001 4.4.2.2"],
+        ),
+        worked_calc(
+            label="Agent material cost",
+            formula="cost_agent = m_charge x cost_per_kg",
+            values={
+                "m_charge": (actual_charge_kg, "kg"),
+                "cost_per_kg": (props["cost_gbp_per_kg"], "GBP/kg"),
+            },
+            result=agent_cost_r, result_unit="GBP",
+            assumptions=["actual_charge = cylinder_count x cylinder_size_kg"],
+        ),
+        worked_calc(
+            label="Cylinder hardware cost",
+            formula="cost_cyl = N_cyl x 2500",
+            values={"N_cyl": (cylinder_count, "")},
+            result=cyl_hw_r, result_unit="GBP",
+            assumptions=["GBP 2500 per cylinder incl. valve, manifold, brackets"],
+        ),
+        worked_calc(
+            label="Pipe and nozzle cost",
+            formula="cost_pipe = V x 12",
+            values={"V": (volume_m3, "m3")},
+            result=pipe_r, result_unit="GBP",
+            assumptions=["GBP 12/m3 for distribution piping (rough installed estimate)"],
+        ),
+        worked_calc(
+            label="Total installed cost",
+            formula="total = cost_agent + cost_cyl + cost_pipe + cost_detection",
+            values={
+                "cost_agent": (agent_cost_r, "GBP"),
+                "cost_cyl": (cyl_hw_r, "GBP"),
+                "cost_pipe": (pipe_r, "GBP"),
+                "cost_detection": (round(detection_gbp), "GBP"),
+            },
+            result=total_r, result_unit="GBP",
+            assumptions=["detection = GBP 8000 fixed (smoke/heat panel + AHJ acceptance)"],
+        ),
+    ]
+
     return {
         "agent": agent,
         "agent_name": props["name"],
         "volume_m3": volume_m3,
         "design_concentration_pct": design_c_pct,
-        "agent_mass_kg": round(mass_kg, 1),
-        "agent_mass_kg_with_safety_factor": round(mass_kg_with_sf, 1),
+        "agent_mass_kg": mass_r,
+        "agent_mass_kg_with_safety_factor": mass_sf_r,
         "discharge_time_s": props["discharge_time_max_s"],
         "total_cylinder_count": cylinder_count,
         "cylinder_size_kg": cyl_typ,
         "actual_charge_kg": actual_charge_kg,
         "retention_time_minutes": retention_minutes,
-        "agent_cost_gbp": round(agent_cost_gbp),
-        "cylinder_hardware_gbp": round(cylinder_hw_gbp),
-        "pipe_nozzle_gbp": round(pipe_nozzle_gbp),
+        "agent_cost_gbp": agent_cost_r,
+        "cylinder_hardware_gbp": cyl_hw_r,
+        "pipe_nozzle_gbp": pipe_r,
         "detection_panel_gbp": round(detection_gbp),
-        "total_installed_cost_gbp": round(total_install_gbp),
+        "total_installed_cost_gbp": total_r,
         "is_lithium_ion_design": is_lithium_design,
         "sufficient_for_lithium_ion": sufficient,
         "gwp": props["gwp"],
         "odp": props["odp"],
+        "worked": worked,
         "notes": (
             f"Mass per NFPA 2001 Eq. 4.4.2.1.1, 10% safety factor. "
             f"For Li-ion suppression, UL EX1741 requires {props['design_c_pct_lithium_ion']}% "

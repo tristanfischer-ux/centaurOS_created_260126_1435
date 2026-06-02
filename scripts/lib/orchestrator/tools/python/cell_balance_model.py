@@ -27,8 +27,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -142,6 +146,93 @@ def compute(payload: dict) -> dict:
     # Pack cost
     pack_balancing_hardware_cost_gbp = cell_count * props["cost_gbp_per_cell"]
 
+    # Worked calculations — cells_balancing_per_cycle uses int() truncation (pass as
+    # an opaque input); t_balance uses a branch (pass as opaque input).
+    # All remaining steps are simple closed-form arithmetic.
+    delta_soc_r = round(delta_soc, 4)
+    charge_r = round(charge_to_balance_ah, 2)
+    energy_move_r = round(energy_to_move_wh, 2)
+    energy_lost_cell_r = round(energy_lost_per_cycle_wh, 1)
+    energy_lost_pack_r = round(energy_lost_pack_wh, 1)
+    energy_lost_kwh_r = round(energy_lost_pack_kwh, 3)
+    hw_cost_r = round(pack_balancing_hardware_cost_gbp, 2)
+    t_balance_r = round(t_balance_hours_per_cell, 2)
+
+    worked = [
+        worked_calc(
+            label="SoC imbalance as fraction",
+            formula="delta_soc = initial_imbalance_pct / 100",
+            values={"initial_imbalance_pct": (initial_imbalance_pct, "%")},
+            result=delta_soc_r, result_unit="fraction",
+            assumptions=["SoC spread between most-charged and least-charged cell"],
+        ),
+        worked_calc(
+            label="Charge to balance per cell",
+            formula="charge_to_balance = delta_soc x cell_capacity_ah",
+            values={
+                "delta_soc": (delta_soc_r, ""),
+                "cell_capacity_ah": (cell_capacity_ah, "Ah"),
+            },
+            result=charge_r, result_unit="Ah",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Energy to move per cell",
+            formula="energy_to_move = charge_to_balance x cell_voltage",
+            values={
+                "charge_to_balance": (charge_r, "Ah"),
+                "cell_voltage": (cell_voltage, "V"),
+            },
+            result=energy_move_r, result_unit="Wh",
+            assumptions=[f"cell chemistry: {chemistry}, nominal voltage {cell_voltage} V"],
+        ),
+        worked_calc(
+            label="Energy lost per balancing cycle (per cell)",
+            formula="energy_lost_cell = energy_to_move x (1 - eta)"
+                    if bal_type != "passive_shunt"
+                    else "energy_lost_cell = energy_to_move x 1",
+            values={
+                "energy_to_move": (energy_move_r, "Wh"),
+                **({"eta": (props["efficiency"], "")} if bal_type != "passive_shunt" else {}),
+            },
+            result=energy_lost_cell_r, result_unit="Wh",
+            assumptions=[
+                f"balancing type: {bal_type}",
+                f"efficiency eta = {props['efficiency']} (passive = 0, all energy dissipated)",
+            ],
+        ),
+        worked_calc(
+            label="Pack energy lost per cycle (10% of cells balancing)",
+            formula="energy_lost_pack = energy_lost_cell x cells_balancing",
+            values={
+                "energy_lost_cell": (energy_lost_cell_r, "Wh"),
+                "cells_balancing": (cells_balancing_per_cycle, ""),
+            },
+            result=energy_lost_pack_r, result_unit="Wh",
+            assumptions=[
+                "cells_balancing = max(1, int(cell_count x 0.10))",
+                "only ~10% of cells typically require full balancing per cycle",
+            ],
+        ),
+        worked_calc(
+            label="Pack energy lost per cycle in kWh",
+            formula="energy_lost_kwh = energy_lost_pack / 1000",
+            values={"energy_lost_pack": (energy_lost_pack_r, "Wh")},
+            result=energy_lost_kwh_r, result_unit="kWh",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Balancing hardware cost for full pack",
+            formula="hw_cost = cell_count x cost_per_cell",
+            values={
+                "cell_count": (cell_count, ""),
+                "cost_per_cell": (props["cost_gbp_per_cell"], "GBP"),
+            },
+            result=hw_cost_r, result_unit="GBP",
+            assumptions=[f"balancing type: {bal_type}; cost per cell from industry survey"],
+        ),
+    ]
+
     return {
         "cell_count": cell_count,
         "cell_capacity_ah": cell_capacity_ah,
@@ -168,6 +259,7 @@ def compute(payload: dict) -> dict:
             f"capacity drift per month. Passive sufficient for slow-cycling; "
             f"active mandatory for high-C-rate or asymmetric cycling."
         ),
+        "worked": worked,
     }
 
 

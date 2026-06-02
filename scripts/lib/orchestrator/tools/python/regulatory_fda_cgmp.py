@@ -40,8 +40,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -225,6 +229,66 @@ def compute(payload: dict) -> dict:
     # Total cost estimate
     total_cost = ind_cost + bla_cost + audit_cost
 
+    # --- Worked calculations ---
+    ind_base_r = reqs["ind_filing_cost_gbp"]
+    bla_base_r = reqs["bla_filing_cost_gbp"]
+    audit_base_r = reqs["audit_cost_gbp"]
+    ind_r = round(ind_cost)
+    bla_r = round(bla_cost)
+    audit_r = round(audit_cost)
+    total_r = round(total_cost)
+
+    worked = [
+        worked_calc(
+            label="IND filing cost after market uplift",
+            formula="ind_cost = ind_base x uplift",
+            values={
+                "ind_base": (ind_base_r, "GBP"),
+                "uplift": (uplift, ""),
+            },
+            result=ind_r,
+            result_unit="GBP",
+            assumptions=[
+                f"IND base for {product_type} from FDA PDUFA-VII fee schedule",
+                f"market uplift {uplift} for {market} ({market_info['regulator']})",
+            ],
+        ),
+        worked_calc(
+            label="BLA/NDA filing cost after market uplift",
+            formula="bla_cost = bla_base x uplift",
+            values={
+                "bla_base": (bla_base_r, "GBP"),
+                "uplift": (uplift, ""),
+            },
+            result=bla_r,
+            result_unit="GBP",
+            assumptions=[f"BLA base for {product_type} (pathway: {reqs['fda_pathway']})"],
+        ),
+        worked_calc(
+            label="Audit / inspection cost after market uplift",
+            formula="audit_cost = audit_base x uplift",
+            values={
+                "audit_base": (audit_base_r, "GBP"),
+                "uplift": (uplift, ""),
+            },
+            result=audit_r,
+            result_unit="GBP",
+            assumptions=["audit cost = pre-approval inspection + site audit preparation"],
+        ),
+        worked_calc(
+            label="Total regulatory cost",
+            formula="total = ind_cost + bla_cost + audit_cost",
+            values={
+                "ind_cost": (ind_r, "GBP"),
+                "bla_cost": (bla_r, "GBP"),
+                "audit_cost": (audit_r, "GBP"),
+            },
+            result=total_r,
+            result_unit="GBP",
+            assumptions=["excludes clinical trial costs (Phase 1/2/3 separately £20-200M)"],
+        ),
+    ]
+
     return {
         "product_type": product_type,
         "market": market,
@@ -243,6 +307,7 @@ def compute(payload: dict) -> dict:
         "bla_filing_cost_gbp": round(bla_cost),
         "total_regulatory_cost_gbp": round(total_cost),
         "uplift_factor_market": uplift,
+        "worked": worked,
         "notes": (
             "Per 21 CFR 211 (US), EU GMP Vol 4 (EU). Costs are filing fees + "
             "documentation prep + audit. Excludes clinical trial costs "

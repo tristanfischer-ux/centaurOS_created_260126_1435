@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -151,6 +155,83 @@ def compute(payload: dict) -> dict:
     # Number of edge emitters / coupling sites
     edge_emitter_count = max(2, facet_count)
 
+    # Worked calculations — clean arithmetic steps only.
+    # Murphy yield involves exp() so is SKIPPED; its result is passed as an input
+    # symbol to the cost step that chains from it.
+    wafer_cost_r = round(wafer_cost_with_material, 2)
+    cost_silicon_r = round(cost_per_chip_silicon, 2)
+    cost_total_r = round(cost_per_chip_total, 2)
+    total_facet_r = round(total_facet_loss_db, 2)
+    thermal_r = round(thermal_dissipation_w, 3)
+    worked = [
+        worked_calc(
+            label="Wafer cost adjusted for material factor",
+            formula="wafer_cost_adj = wafer_cost_gbp x mat_cost_factor",
+            values={
+                "wafer_cost_gbp": (wafer_cost_gbp, "GBP"),
+                "mat_cost_factor": (mat["wafer_cost_factor"], ""),
+            },
+            result=wafer_cost_r, result_unit="GBP",
+            assumptions=[f"material cost factor for {material} from foundry PDK data"],
+        ),
+        worked_calc(
+            label="Wafer cost apportioned per yielded chip",
+            formula="cost_silicon = wafer_cost_adj / yielded_chips",
+            values={
+                "wafer_cost_adj": (wafer_cost_r, "GBP"),
+                "yielded_chips": (yielded_chips, "chips"),
+            },
+            result=cost_silicon_r, result_unit="GBP",
+            assumptions=["yielded_chips derived from Murphy compound-yield formula (transcendental — not expanded here)"],
+        ),
+        worked_calc(
+            label="Total cost per chip including packaging",
+            formula="cost_total = cost_silicon + packaging_cost",
+            values={
+                "cost_silicon": (cost_silicon_r, "GBP"),
+                "packaging_cost": (PACKAGING_COST_GBP, "GBP"),
+            },
+            result=cost_total_r, result_unit="GBP",
+            assumptions=["packaging = fibre attach + wirebond + hermetic seal (industry estimate)"],
+        ),
+        worked_calc(
+            label="Total optical loss across all fibre facets",
+            formula="total_facet_loss = loss_per_facet x facet_count",
+            values={
+                "loss_per_facet": (loss_per_facet_db, "dB"),
+                "facet_count": (facet_count, ""),
+            },
+            result=total_facet_r, result_unit="dB",
+            assumptions=[f"loss_per_facet = {loss_per_facet_db} dB for {material} (foundry PDK, e.g. imec SiPhoton 2023)"],
+        ),
+        # For materials with on-chip lasers the formula must include the laser
+        # power term so the substitution reproduces thermal_r exactly.
+        worked_calc(
+            label="Chip thermal dissipation from active components",
+            **({
+                "formula": "thermal_w = num_components x power_per_component_mw / 1000 + laser_power_w",
+                "values": {
+                    "num_components": (num_components, ""),
+                    "power_per_component_mw": (POWER_PER_COMPONENT_MW, "mW"),
+                    "laser_power_w": (round(laser_power_w, 3), "W"),
+                },
+                "assumptions": [
+                    "5 mW per phase-shifter heater (typical photonic integrated circuit)",
+                    f"laser_power_w = 0.5 x (num_components / 100) for {material} "
+                    "(hybrid laser sources: ~0.5 W per chip per 100 components)",
+                ],
+            } if material in ("InP", "GaAs", "SOI") else {
+                "formula": "thermal_w = num_components x power_per_component_mw / 1000",
+                "values": {
+                    "num_components": (num_components, ""),
+                    "power_per_component_mw": (POWER_PER_COMPONENT_MW, "mW"),
+                },
+                "assumptions": ["5 mW per phase-shifter heater (typical photonic integrated circuit)"],
+            }),
+            result=thermal_r, result_unit="W",
+        ),
+    ]
+
     return {
         "chip_size_mm2": chip_mm2,
         "num_components": num_components,
@@ -173,6 +254,7 @@ def compute(payload: dict) -> dict:
         "component_density_per_mm2": round(component_density_per_mm2, 2),
         "edge_emitter_count": edge_emitter_count,
         "defect_density_per_cm2": mat["defect_density_per_cm2"],
+        "worked": worked,
     }
 
 

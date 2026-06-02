@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "calibration_imperfection (custom)",
@@ -101,6 +105,30 @@ def compute(payload: dict) -> dict:
     # Half-power beam-width broadening from errors
     hpbw_broaden_pct = (1 + sigma_total_sq) * 100 - 100
 
+    # Worked calculation — only the gain_loss step is a simple closed-form multiply.
+    # sigma_phase_rad = radians(deg) and sigma_gain_linear = 10^(x/20)-1 are
+    # transcendental; sll_rise and pointing_error contain log10/sqrt — all skipped.
+    # We pass the live sigma_total_sq as an opaque input symbol so the gain_loss
+    # step is hand-checkable without needing to re-derive it.
+    sigma_total_sq_r = round(sigma_total_sq, 6)
+    gain_loss_r = round(gain_loss_db, 3)
+    worked = [
+        worked_calc(
+            label="Gain loss from combined phase + gain errors",
+            formula="gain_loss = 4.343 x sigma_total_sq",
+            values={"sigma_total_sq": (sigma_total_sq_r, "rad2 (combined error variance)")},
+            result=gain_loss_r, result_unit="dB",
+            assumptions=[
+                "Mailloux (2005) eq. 7.4-1: delta_G = -4.343 x sigma^2 dB",
+                f"sigma_phase_rad = {round(sigma_phase_rad, 4)} rad "
+                f"(converted from {phase_err_deg_rms} deg rms)",
+                f"sigma_gain_linear = {round(sigma_gain_linear, 4)} "
+                f"(10^(gain_err_db/20) - 1 for {gain_err_db_rms} dB rms)",
+                "sigma_total_sq = sigma_phase_rad^2 + sigma_gain_linear^2 (uncorrelated errors)",
+            ],
+        ),
+    ]
+
     return {
         "phase_error_deg_rms": phase_err_deg_rms,
         "gain_error_db_rms": gain_err_db_rms,
@@ -109,13 +137,14 @@ def compute(payload: dict) -> dict:
         "sidelobe_level_db": round(sll_final_db, 1),
         "sidelobe_level_ideal_db": round(sll_ideal_db, 1),
         "sidelobe_rise_db": round(sll_rise_db - sll_ideal_db, 1) if sll_rise_db > sll_ideal_db else 0.0,
-        "gain_loss_db": round(gain_loss_db, 3),
+        "gain_loss_db": gain_loss_r,
         "pointing_error_arcmin": round(sigma_theta_arcmin, 2),
         "hpbw_broadening_pct": round(hpbw_broaden_pct, 2),
         "phase_error_rms_rad": round(sigma_phase_rad, 4),
         "gain_error_rms_linear": round(sigma_gain_linear, 4),
         "calibration_yield_pct": round(yield_pct, 1),
         "meets_n_30db_SLL": sll_final_db <= -30,
+        "worked": worked,
     }
 
 

@@ -41,8 +41,12 @@ Ind. Eng. Chem. Process Des. Dev., 18(3), 357-364.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -122,6 +126,79 @@ def compute(payload: dict) -> dict:
     # mmol O2 / L / hr: kg/m³/hr × 1000 g/kg / 32 g/mol × 1000 mmol/mol / 1000 L/m³
     otr_mmol_l_hr = otr_kg_m3_hr * 1000.0 / 32.0
 
+    # Worked calculations — closed-form steps only.
+    # kLa = a*(P/V)^b*Ug^c involves fractional power (^0.4, ^0.5) — transcendental, skipped.
+    # Pass the live kla_per_s as an input symbol to the hand-verifiable downstream steps.
+    kla_s_r = round(kla_per_s, 5)
+    kla_hr_r = round(kla_per_hour, 2)
+    c_l_r = round(c_l, 6)
+    df_r = round(driving_force, 6)
+    otr_s_r = round(otr_kg_m3_s, 8)
+    otr_hr_r = round(otr_kg_m3_hr, 4)
+    otr_mmol_r = round(otr_mmol_l_hr, 2)
+    worked = [
+        worked_calc(
+            label="kLa in per-hour (from per-second)",
+            formula="kla_per_hour = kla_per_s x 3600",
+            values={
+                "kla_per_s": (kla_s_r, "1/s"),
+            },
+            result=kla_hr_r, result_unit="1/hr",
+            assumptions=[
+                "kLa_per_s from Van 't Riet correlation (fractional power — not hand-verifiable); treated as input",
+                f"Correlation: a={corr['a']}, b={corr['b']}, c={corr['c']}; impeller scaling = {scaling}",
+            ],
+        ),
+        worked_calc(
+            label="Current dissolved-oxygen concentration",
+            formula="c_l = (do_pct / 100) x c_star",
+            values={
+                "do_pct": (do_current_pct, "%"),
+                "c_star": (c_star, "kg/m3"),
+            },
+            result=c_l_r, result_unit="kg/m3",
+            assumptions=["c_star = 0.0080 kg/m^3 (DO saturation at 25 degC, 1 atm, pure water)"],
+        ),
+        worked_calc(
+            label="Driving force for oxygen transfer",
+            formula="driving_force = c_star - c_l",
+            values={
+                "c_star": (c_star, "kg/m3"),
+                "c_l": (c_l_r, "kg/m3"),
+            },
+            result=df_r, result_unit="kg/m3",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Oxygen transfer rate (OTR) per second",
+            formula="otr_kg_m3_s = kla_per_s x driving_force",
+            values={
+                "kla_per_s": (kla_s_r, "1/s"),
+                "driving_force": (df_r, "kg/m3"),
+            },
+            result=otr_s_r, result_unit="kg/m3/s",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="OTR per hour",
+            formula="otr_kg_m3_hr = otr_kg_m3_s x 3600",
+            values={
+                "otr_kg_m3_s": (otr_s_r, "kg/m3/s"),
+            },
+            result=otr_hr_r, result_unit="kg/m3/hr",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="OTR in mmol O2 per litre per hour",
+            formula="otr_mmol_l_hr = otr_kg_m3_hr x 1000 / 32",
+            values={
+                "otr_kg_m3_hr": (otr_hr_r, "kg/m3/hr"),
+            },
+            result=otr_mmol_r, result_unit="mmol/L/hr",
+            assumptions=["Molar mass O2 = 32 g/mol; 1 kg/m^3/hr = 1 g/L/hr; factor 1000/32 converts g/L/hr to mmol/L/hr"],
+        ),
+    ]
+
     return {
         "power_volumetric_w_m3": p_over_v,
         "superficial_velocity_m_s": u_g,
@@ -138,6 +215,7 @@ def compute(payload: dict) -> dict:
         "otr_kg_m3_hr": round(otr_kg_m3_hr, 4),
         "otr_mmol_l_hr": round(otr_mmol_l_hr, 2),
         "_correlation_used": correlation_name,
+        "worked": worked,
     }
 
 

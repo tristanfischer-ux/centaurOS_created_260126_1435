@@ -55,8 +55,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "astropy + Vallado Lambert (hapsira target)",
@@ -239,6 +243,50 @@ def compute(payload: dict) -> dict:
     else:
         approach = "v_bar_hohmann_below"
 
+    # Worked calculations.
+    # Hohmann burns use sqrt(mu/r) (transcendental) — skipped; dv1_h, dv2_h
+    # passed as live inputs.  Plane change uses sin() — skipped; dv_plane passed
+    # as live input.  Tsiolkovsky uses exp() — skipped entirely.
+    # dv values are converted to m/s before passing so _fmt retains enough
+    # significant figures (km/s values like 0.0055 get truncated to 0.0055 by
+    # :.4f, losing two significant figures).
+    r1_r = round(r1, 3)
+    r2_r = round(r2, 3)
+    dv_coplanar_ms_r = round(dv_total_coplanar * 1000, 3)
+    dv_plane_ms_r = round(dv_plane * 1000, 3)
+    dv_phasing_ms_r = round(dv_phasing, 3)
+    dv_total_r = round(dv_total_with_phasing, 3)
+    worked = [
+        worked_calc(
+            label="Chaser orbital radius",
+            formula="r1 = R_body + alt_chaser",
+            values={"R_body": (R, "km"), "alt_chaser": (alt_c, "km")},
+            result=r1_r, result_unit="km",
+            assumptions=["R_body = equatorial radius of central body (astropy CODATA 2018)"],
+        ),
+        worked_calc(
+            label="Target orbital radius",
+            formula="r2 = R_body + alt_target",
+            values={"R_body": (R, "km"), "alt_target": (alt_t, "km")},
+            result=r2_r, result_unit="km",
+            assumptions=["Same central body as chaser"],
+        ),
+        worked_calc(
+            label="Total delta-V (coplanar + plane change + phasing, m/s)",
+            formula="dv_total = dv_coplanar_ms + dv_plane_ms + dv_phasing",
+            values={
+                "dv_coplanar_ms": (dv_coplanar_ms_r, "m/s"),
+                "dv_plane_ms": (dv_plane_ms_r, "m/s"),
+                "dv_phasing": (dv_phasing_ms_r, "m/s"),
+            },
+            result=dv_total_r, result_unit="m/s",
+            assumptions=[
+                "dv_coplanar from Hohmann/Lambert (sqrt expressions not shown); pre-converted to m/s",
+                "dv_plane from plane-change burn at apogee (sin expression not shown); pre-converted to m/s",
+            ],
+        ),
+    ]
+
     out: dict = {
         "central_body": body,
         "chaser_altitude_km": alt_c,
@@ -265,6 +313,7 @@ def compute(payload: dict) -> dict:
         "plume_impingement_minimum_distance_m": plume_dist,
         "approach_strategy": approach,
         "hohmann_baseline_dv_ms": round(1000 * (dv1_h + dv2_h), 3),
+        "worked": worked,
     }
     return out
 

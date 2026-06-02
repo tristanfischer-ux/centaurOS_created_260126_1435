@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -169,6 +173,54 @@ def compute(payload: dict) -> dict:
     g = 9.80665 * (6371.0 / (6371.0 + alt_km)) ** 2
     H_m = (R_gas * T_k) / (M_mean * g)
 
+    # Worked calculations.
+    # rho and T_k come from a table lookup + log-linear interpolation
+    # (transcendental) — skip; pass as live symbols.
+    # g = g0 × (R_e / (R_e + h))^2 — pure arithmetic, convert.
+    # p = rho × R_gas × T / M — pure arithmetic once rho and T live, convert.
+    # H = R_gas × T / (M × g) — pure arithmetic, convert.
+    rho_r = float(f"{rho:.4e}")
+    T_k_r = round(T_k, 1)
+    g_r = round(g, 4)
+    p_r = float(f"{p_pa:.4e}")
+    H_m_r = round(H_m, 1)
+    worked = [
+        worked_calc(
+            label="Local gravitational acceleration",
+            formula="g = 9.80665 x (6371 / (6371 + alt_km))^2",
+            values={"alt_km": (alt_km, "km")},
+            result=g_r, result_unit="m/s2",
+            assumptions=["g0 = 9.80665 m/s2; Earth radius 6371 km (spherical)"],
+        ),
+        worked_calc(
+            label="Atmospheric pressure (ideal gas)",
+            formula="p = rho x R_gas x T / M_mean",
+            values={
+                "rho": (rho_r, "kg/m3"),
+                "R_gas": (R_gas, "J/(mol·K)"),
+                "T": (T_k_r, "K"),
+                "M_mean": (M_mean, "kg/mol"),
+            },
+            result=p_r, result_unit="Pa",
+            assumptions=[
+                "rho and T from NRLMSISE-00 table (log-linear interpolation)",
+                f"M_mean = {M_mean} kg/mol for altitude band (molecular composition model)",
+            ],
+        ),
+        worked_calc(
+            label="Atmospheric scale height",
+            formula="H = R_gas x T / (M_mean x g)",
+            values={
+                "R_gas": (R_gas, "J/(mol·K)"),
+                "T": (T_k_r, "K"),
+                "M_mean": (M_mean, "kg/mol"),
+                "g": (g_r, "m/s2"),
+            },
+            result=H_m_r, result_unit="m",
+            assumptions=["barometric scale height; constant over thin layer"],
+        ),
+    ]
+
     return {
         "altitude_km": alt_km,
         "density_kg_m3": float(f"{rho:.4e}"),
@@ -182,6 +234,7 @@ def compute(payload: dict) -> dict:
         "latitude_deg": latitude,
         "local_solar_time_h": lst_h,
         "note": "NRLMSISE-00 mean values, ±50% diurnal variation, ±10× solar cycle",
+        "worked": worked,
     }
 
 

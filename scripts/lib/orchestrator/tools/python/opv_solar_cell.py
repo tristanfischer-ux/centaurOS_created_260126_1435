@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -124,6 +128,70 @@ def compute(payload: dict) -> dict:
     # Power after mission years
     power_after_mission = p_bol_w * ((1 - annual_degradation) ** mission_yr)
 
+    # Worked calculations — clean closed-form arithmetic steps only.
+    # temp_factor uses max() clamp so is skipped; pass its live value as an input.
+    # t_50_years uses log() so is skipped.
+    temp_factor_r = round(temp_factor, 3)
+    p_bol_r = round(p_bol_w, 2)
+    p_eol_r = round(p_eol_w, 2)
+    mass_r = round(mass_kg, 3)
+    pam_r = round(power_after_mission, 2)
+    worked = [
+        worked_calc(
+            label="Beginning-of-life (BOL) power output",
+            formula="p_bol_w = irradiance_w_m2 x cell_area_m2 x (cell_eff_pct / 100) x temp_factor",
+            values={
+                "irradiance_w_m2": (irradiance_w_m2, "W/m2"),
+                "cell_area_m2": (cell_area_m2, "m2"),
+                "cell_eff_pct": (cell_eff_pct, "%"),
+                "temp_factor": (temp_factor_r, ""),
+            },
+            result=p_bol_r, result_unit="W",
+            assumptions=["temp_factor = 1 + (-0.005/K) x (T_op - 25 C); clamped >= 0.3 (OPV datasheet)"],
+        ),
+        worked_calc(
+            label="End-of-life (EOL) power output",
+            formula="p_eol_w = p_bol_w x eol_factor",
+            values={
+                "p_bol_w": (p_bol_r, "W"),
+                "eol_factor": (eol_factor, ""),
+            },
+            result=p_eol_r, result_unit="W",
+            assumptions=["EOL factor supplied by user; covers radiation + UV degradation over mission"],
+        ),
+        worked_calc(
+            label="Cell mass",
+            formula="mass_kg = cell_area_m2 x mass_density_g_m2 / 1000",
+            values={
+                "cell_area_m2": (cell_area_m2, "m2"),
+                "mass_density_g_m2": (mass_density_g_m2, "g/m2"),
+            },
+            result=mass_r, result_unit="kg",
+            assumptions=["OPV flexible substrate; Heliatek HeliaFilm: 500 g/m2; default 300 g/m2"],
+        ),
+        worked_calc(
+            label="Specific power",
+            formula="specific_power_w_kg = p_bol_w / mass_kg",
+            values={
+                "p_bol_w": (p_bol_r, "W"),
+                "mass_kg": (mass_r, "kg"),
+            },
+            result=round(specific_power_w_kg, 1), result_unit="W/kg",
+            assumptions=["BOL power; mass includes substrate only (not structure or wiring)"],
+        ),
+        worked_calc(
+            label="Power remaining after mission duration",
+            formula="power_after_mission = p_bol_w x (1 - annual_degradation) ^ mission_yr",
+            values={
+                "p_bol_w": (p_bol_r, "W"),
+                "annual_degradation": (annual_degradation, ""),
+                "mission_yr": (mission_yr, "yr"),
+            },
+            result=pam_r, result_unit="W",
+            assumptions=[f"annual degradation {annual_degradation*100:.0f}%/yr for {radiation_environment} (Cardinaletti et al. 2018)"],
+        ),
+    ]
+
     return {
         "irradiance_w_m2": irradiance_w_m2,
         "cell_area_m2": cell_area_m2,
@@ -143,6 +211,7 @@ def compute(payload: dict) -> dict:
         "radiation_environment": radiation_environment,
         "annual_degradation_rate": annual_degradation,
         "degradation_lifetime_years": round(t_50_years, 1) if t_50_years != float("inf") else None,
+        "worked": worked,
     }
 
 

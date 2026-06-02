@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "rotor_tilt_transition (custom)",
@@ -108,23 +112,79 @@ def compute(payload: dict) -> dict:
     # Failure mode
     feasible = thrust_required_n <= installed_thrust_n and V >= v_stall
 
+    # Worked calculations.  Steps involving cos/sin/sqrt (tilt resolution,
+    # momentum theory power) are transcendental — pass their rounded values
+    # as opaque inputs; weight and wing-lift arithmetic are clean.
+    weight_r = round(weight_n, 1)
+    wing_lift_r = round(wing_lift_n, 1)
+    wing_lift_eff_r = round(wing_lift_eff, 1)
+    thrust_r = round(thrust_required_n, 1)
+    p_per_rotor_kw_r = round(power_per_rotor_w / 1000.0, 2)
+    total_power_r = round(total_power_kw, 2)
+    cl_op_r = round(cl_op, 4)
+
+    worked = [
+        worked_calc(
+            label="Aircraft weight",
+            formula="W = mass x G",
+            values={
+                "mass": (mass, "kg"),
+                "G": (G, "m/s^2"),
+            },
+            result=weight_r, result_unit="N",
+            assumptions=["Standard gravity G = 9.81 m/s^2"],
+        ),
+        worked_calc(
+            label="Wing aerodynamic lift",
+            formula="L_wing = 0.5 x rho x V^2 x S_wing x CL_op",
+            values={
+                "rho": (RHO_SL, "kg/m^3"),
+                "V": (V, "m/s"),
+                "S_wing": (S_wing, "m^2"),
+                "CL_op": (cl_op_r, ""),
+            },
+            result=wing_lift_r, result_unit="N",
+            assumptions=[
+                f"CL_op = 0.6 x CL_max = 0.6 x {cl_max} = {cl_op_r} (stall margin); "
+                "rho = 1.225 kg/m^3 ISA sea level",
+            ],
+        ),
+        worked_calc(
+            label="Total transition power",
+            formula="P_total = P_per_rotor_kW x num_rotors / eta_hover",
+            values={
+                "P_per_rotor_kW": (p_per_rotor_kw_r, "kW"),
+                "num_rotors": (num_rotors, ""),
+                "eta_hover": (0.75, ""),
+            },
+            result=total_power_r, result_unit="kW",
+            assumptions=[
+                f"P_per_rotor_kW = {p_per_rotor_kw_r} kW from momentum theory T^1.5/sqrt(2*rho*A_disk) "
+                "(transcendental, pre-computed); "
+                "hover efficiency 0.75 typical for tilted-rotor transition; "
+                "P_per_rotor_kW already in kW so no /1000 factor needed",
+            ],
+        ),
+    ]
+
     return {
         "forward_speed_ms": V,
         "tilt_angle_deg": tilt_deg,
-        "weight_n": round(weight_n, 1),
+        "weight_n": weight_r,
         "lift_force_n": round(wing_lift_eff + thrust_required_n * cos_t, 1),
-        "thrust_required_n": round(thrust_required_n, 1),
+        "thrust_required_n": thrust_r,
         "forward_thrust_n": round(forward_thrust_n, 1),
-        "wing_lift_n": round(wing_lift_n, 1),
-        "wing_lift_effective_n": round(wing_lift_eff, 1),
+        "wing_lift_n": wing_lift_r,
+        "wing_lift_effective_n": wing_lift_eff_r,
         "rotor_lift_n": round(thrust_required_n * cos_t, 1),
-        "power_per_rotor_kw": round(power_per_rotor_w / 1000.0, 2),
-        "total_power_kw": round(total_power_kw, 2),
+        "power_per_rotor_kw": p_per_rotor_kw_r,
+        "total_power_kw": total_power_r,
         "transition_corridor_stall_speed_ms": round(v_stall, 2),
         "transition_corridor_50pct_lift_ms": round(v_50, 2),
         "thrust_margin_pct": round(margin * 100.0, 1),
         "feasible_at_this_state": feasible,
         "thrust_to_weight_at_transition": round(thrust_required_n / weight_n, 3),
+        "worked": worked,
     }
 
 

@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -102,6 +106,84 @@ def compute(payload: dict) -> dict:
     # Motor RPM at top speed
     motor_rpm_at_top = no_load_rpm * 0.80
 
+    # Worked calculations — all steps are plain arithmetic, chain-rounded.
+    no_load_rpm_r = round(no_load_rpm, 1)
+    gear_ratio_r = round(gear_ratio, 4)
+    wheel_rpm_r = round(wheel_rpm_max, 1)
+    circ_r = round(wheel_circ_m, 4)
+    top_speed_r = round(top_speed_kmh, 2)
+    realistic_r = round(realistic_speed_kmh, 2)
+    t_wheel_r = round(t_wheel_nm, 3)
+    f_thrust_r = round(f_thrust_n, 2)
+    worked = [
+        worked_calc(
+            label="No-load motor RPM",
+            formula="RPM_nl = Kv x V_batt",
+            values={"Kv": (kv, "rpm/V"), "V_batt": (v_batt, "V")},
+            result=no_load_rpm_r, result_unit="rpm",
+            assumptions=["No-load speed; Kv = speed constant from motor datasheet"],
+        ),
+        worked_calc(
+            label="Gear ratio (motor:wheel)",
+            formula="GR = teeth_wheel / teeth_motor",
+            values={"teeth_wheel": (teeth_wheel, ""), "teeth_motor": (teeth_motor, "")},
+            result=gear_ratio_r, result_unit="",
+            assumptions=["Belt/chain transmission; teeth counts from sprocket spec"],
+        ),
+        worked_calc(
+            label="Wheel RPM at no-load",
+            formula="RPM_wheel = RPM_nl / GR",
+            values={"RPM_nl": (no_load_rpm_r, "rpm"), "GR": (gear_ratio_r, "")},
+            result=wheel_rpm_r, result_unit="rpm",
+            assumptions=["No slippage assumed"],
+        ),
+        worked_calc(
+            label="Wheel circumference",
+            formula="C_wheel = pi x D_wheel",
+            values={"D_wheel": (round(wheel_d_mm * 1e-3, 4), "m")},
+            result=circ_r, result_unit="m",
+            assumptions=["D_wheel in metres = wheel_diameter_mm / 1000"],
+        ),
+        worked_calc(
+            label="Top speed (no-load)",
+            formula="V_top = RPM_wheel x C_wheel x 60 / 1000",
+            values={
+                "RPM_wheel": (wheel_rpm_r, "rpm"),
+                "C_wheel": (circ_r, "m"),
+            },
+            result=top_speed_r, result_unit="km/h",
+            assumptions=["x 60 converts rev/min to rev/hour; / 1000 converts m to km"],
+        ),
+        worked_calc(
+            label="Realistic top speed (80% load derating)",
+            formula="V_real = V_top x 0.80",
+            values={"V_top": (top_speed_r, "km/h")},
+            result=realistic_r, result_unit="km/h",
+            assumptions=["Motor RPM drops ~20% under load (back-EMF + resistance)"],
+        ),
+        worked_calc(
+            label="Torque at wheel (after gearing)",
+            formula="T_wheel = T_motor x GR x eta_drive",
+            values={
+                "T_motor": (t_motor_nm, "Nm"),
+                "GR": (gear_ratio_r, ""),
+                "eta_drive": (drive_eta, ""),
+            },
+            result=t_wheel_r, result_unit="Nm",
+            assumptions=["eta_drive = drive_efficiency (belt/chain loss factor)"],
+        ),
+        worked_calc(
+            label="Wheel thrust force",
+            formula="F_thrust = T_wheel / r_wheel",
+            values={
+                "T_wheel": (t_wheel_r, "Nm"),
+                "r_wheel": (round(wheel_d_mm * 1e-3 / 2.0, 4), "m"),
+            },
+            result=f_thrust_r, result_unit="N",
+            assumptions=["r_wheel = wheel_diameter_mm / 2000"],
+        ),
+    ]
+
     return {
         "max_speed_kmh": round(realistic_speed_kmh, 2),
         "max_speed_kmh_no_load": round(top_speed_kmh, 2),
@@ -119,6 +201,7 @@ def compute(payload: dict) -> dict:
         "drive_efficiency": drive_eta,
         "pulley_teeth_motor": teeth_motor,
         "pulley_teeth_wheel": teeth_wheel,
+        "worked": worked,
     }
 
 

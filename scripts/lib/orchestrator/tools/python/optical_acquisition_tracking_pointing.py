@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "optical_acquisition_tracking_pointing (custom)",
@@ -110,6 +114,76 @@ def compute(payload: dict) -> dict:
     dwell_s = 0.001  # 1 ms per cell
     acquisition_time_s = cells * dwell_s
 
+    # Worked calculations — clean closed-form arithmetic steps only.
+    # ATP_bandwidth_hz uses max() so is skipped.
+    # disturbance_rejection_db uses log10 so is skipped.
+    # acquisition_time_s involves a squared ratio chained from div_half_angle_arcsec.
+    div_rad_r = round(div_half_angle_rad, 9)
+    div_arcsec_r = round(div_half_angle_arcsec, 3)
+    spot_r = round(spot_radius_m, 4)
+    req_jitter_r = round(required_jitter_arcsec, 3)
+    pt_loss_r = round(pointing_loss_db, 2)
+    worked = [
+        worked_calc(
+            label="Diffraction-limited beam half-angle divergence",
+            formula="div_half_angle_rad = wavelength_m / D_tx_m",
+            values={
+                "wavelength_m": (round(wavelength_m, 12), "m"),
+                "D_tx_m": (D_tx_m, "m"),
+            },
+            result=div_rad_r, result_unit="rad",
+            assumptions=["symmetric system: D_tx = D_rx; diffraction limit (Andrews & Phillips 2005)"],
+        ),
+        worked_calc(
+            label="Beam divergence in arcseconds",
+            formula="div_half_angle_arcsec = div_half_angle_rad x ARCSEC_PER_RAD",
+            values={
+                "div_half_angle_rad": (div_rad_r, "rad"),
+                "ARCSEC_PER_RAD": (ARCSEC_PER_RAD, "arcsec/rad"),
+            },
+            result=div_arcsec_r, result_unit="arcsec",
+            assumptions=["1 rad = 206265 arcsec (exact)"],
+        ),
+        worked_calc(
+            label="Beam spot radius at receiver",
+            formula="spot_radius_m = div_half_angle_rad x range_km x 1000",
+            values={
+                "div_half_angle_rad": (div_rad_r, "rad"),
+                "range_km": (range_km, "km"),
+            },
+            result=spot_r, result_unit="m",
+            assumptions=["far-field planar approximation; no atmospheric effects"],
+        ),
+        worked_calc(
+            label="Required pointing accuracy (< theta / 3 for <= 0.5 dB loss)",
+            formula="required_jitter_arcsec = div_half_angle_arcsec / 3",
+            values={
+                "div_half_angle_arcsec": (div_arcsec_r, "arcsec"),
+            },
+            result=req_jitter_r, result_unit="arcsec",
+            assumptions=["jitter < theta/3 criterion: < 0.5 dB pointing loss (Kaymak et al. 2018)"],
+        ),
+        worked_calc(
+            label="Gaussian beam pointing loss",
+            formula="pointing_loss_db = 4.343 x (jitter_arcsec / div_half_angle_arcsec) ^ 2",
+            values={
+                "jitter_arcsec": (jitter_arcsec, "arcsec"),
+                "div_half_angle_arcsec": (div_arcsec_r, "arcsec"),
+            },
+            result=pt_loss_r, result_unit="dB",
+            assumptions=["4.343 = 10/ln(10); Gaussian-beam pointing-loss formula"],
+        ),
+        worked_calc(
+            label="Available fade margin",
+            formula="fade_margin_db = 12 - pointing_loss_db",
+            values={
+                "pointing_loss_db": (pt_loss_r, "dB"),
+            },
+            result=round(fade_margin_db, 2), result_unit="dB",
+            assumptions=["12 dB budget: 6 dB scintillation + 3 dB pointing + 3 dB other (industry rule)"],
+        ),
+    ]
+
     return {
         "tx_jitter_arcsec_rms": jitter_arcsec,
         "rx_aperture_mm": D_rx_mm,
@@ -130,6 +204,7 @@ def compute(payload: dict) -> dict:
         "acquisition_time_s": round(acquisition_time_s, 2),
         "pointing_adequate": jitter_arcsec <= required_jitter_arcsec,
         "fade_margin_positive": fade_margin_db > 0,
+        "worked": worked,
     }
 
 

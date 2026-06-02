@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -173,6 +177,54 @@ def compute(payload: dict) -> dict:
     earth_circ_at_lat_km = 40075.0
     daily_revisit_rate = (swath_km * 15.0) / earth_circ_at_lat_km  # fraction of Earth covered
 
+    # Rounded display values that chain through the worked calculations.
+    signal_photons_r = round(signal_photons, 1)
+    n_electrons_r = round(n_electrons, 1)
+    daily_revisit_r = round(daily_revisit_rate, 4)
+
+    # Worked calculations (hand-checkable closed-form steps only).
+    # air_mass uses 1/cos — trig (but result is simple ratio; still SKIP as trig input).
+    # transmittance_atm uses exp — SKIP.
+    # radiance_at_surface = (solar/pi)*albedo*cos(sza) — trig/pi — SKIP;
+    #   pass radiance_at_aperture as live input to signal_w.
+    # snr uses sqrt — SKIP.
+    # detection_threshold uses log — SKIP.
+    # signal_w passes into signal_photons: that step is fully closed-form.
+    worked = [
+        worked_calc(
+            label="Signal photons per pixel per integration",
+            formula="photons = signal_w x t_int / E_photon",
+            values={
+                "signal_w": (signal_w, "W"),
+                "t_int": (integration_ms * 1e-3, "s"),
+                "E_photon": (photon_energy_j, "J"),
+            },
+            result=signal_photons_r, result_unit="photons",
+            assumptions=[
+                "signal_w = L_aperture x A_aperture x omega_pixel x delta_lambda",
+                "photon energy hc/lambda at selected wavelength",
+            ],
+        ),
+        worked_calc(
+            label="Signal electrons per pixel",
+            formula="N_e = photons x QE",
+            values={"photons": (signal_photons_r, "photons"), "QE": (0.6, "")},
+            result=n_electrons_r, result_unit="electrons",
+            assumptions=["detector quantum efficiency QE = 0.60 (typical InGaAs SWIR)"],
+        ),
+        worked_calc(
+            label="Daily revisit rate (fraction of Earth covered)",
+            formula="revisit = swath_km x orbits_per_day / earth_circ_km",
+            values={
+                "swath_km": (float(payload.get("swath_km", 30.0)), "km"),
+                "orbits_per_day": (15.0, "orbits/day"),
+                "earth_circ_km": (40075.0, "km"),
+            },
+            result=daily_revisit_r, result_unit="fraction",
+            assumptions=["15 orbits/day at 500 km altitude; equatorial Earth circumference 40,075 km"],
+        ),
+    ]
+
     return {
         "wavelength_band_nm": wavelength_nm,
         "band_used": band_key,
@@ -186,13 +238,14 @@ def compute(payload: dict) -> dict:
         "atmospheric_transmittance": round(transmittance_atm, 4),
         "absorption_coeff_per_ppm_m": abs_coeff,
         "radiance_at_aperture_w_m2_sr_um": round(radiance_at_aperture_um, 5),
-        "signal_photons_per_pixel": round(signal_photons, 1),
-        "signal_electrons": round(n_electrons, 1),
+        "signal_photons_per_pixel": signal_photons_r,
+        "signal_electrons": n_electrons_r,
         "expected_snr": round(snr, 1),
         "detection_threshold_ppm_m": round(detection_threshold_ppm_m, 1),
         "false_positive_rate_per_pixel": false_positive_rate,
         "false_positive_rate_after_spatial_filter": false_positive_rate_after_spatial,
-        "daily_revisit_rate_fraction_earth": round(daily_revisit_rate, 4),
+        "daily_revisit_rate_fraction_earth": daily_revisit_r,
+        "worked": worked,
     }
 
 

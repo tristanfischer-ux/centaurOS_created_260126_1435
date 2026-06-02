@@ -35,8 +35,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -132,23 +136,91 @@ def compute(payload: dict) -> dict:
         # Larger arrays have more redundancy → effective lifetime longer
         lifetime_hours = 5000.0
 
+    # v_exhaust uses sqrt (transcendental) — pass live value as input symbol.
+    m_dot_per_emitter_ng_r = round(m_dot_per_emitter_kg_s * 1e12, 6)
+    m_dot_total_ug_r = round(m_dot_total_kg_s * 1e9, 4)
+    v_ex_km_r = round(v_exhaust_m_s / 1000.0, 1)
+    thrust_un_r = round(thrust_un, 2)
+    isp_r = round(isp_s, 0)
+    power_r = round(power_w, 3)
+    i_total_ua_r = round(i_total_a * 1e6, 4)
+
+    worked = [
+        worked_calc(
+            label="Mass flow per emitter",
+            formula="m_dot_e = flow_pL_s x 1e-15 x rho_kg_m3 x 1e12",
+            values={
+                "flow_pL_s": (flow_rate_pl_s, "pL/s"),
+                "rho_kg_m3": (1300.0, "kg/m3"),
+            },
+            result=m_dot_per_emitter_ng_r, result_unit="ng/s",
+            assumptions=["1 pL = 1e-15 m3; ionic liquid density 1300 kg/m3; x 1e12 converts kg/s to ng/s"],
+        ),
+        worked_calc(
+            label="Total mass flow (all emitters)",
+            formula="m_dot_tot = m_dot_e x N_emitters / 1000",
+            values={
+                "m_dot_e": (m_dot_per_emitter_ng_r, "ng/s"),
+                "N_emitters": (emitter_count, ""),
+            },
+            result=m_dot_total_ug_r, result_unit="ug/s",
+            assumptions=["m_dot_e in ng/s; / 1000 converts ng/s to ug/s"],
+        ),
+        worked_calc(
+            label="Total thruster thrust",
+            formula="F = eta x m_dot_total x v_exhaust x 1e6",
+            values={
+                "eta": (eta_thrust, ""),
+                "m_dot_total": (round(m_dot_total_kg_s, 15), "kg/s"),
+                "v_exhaust": (v_ex_km_r * 1000.0, "m/s"),
+            },
+            result=thrust_un_r, result_unit="uN",
+            assumptions=[
+                "eta = 0.85 typical ESI efficiency; v_exhaust from sqrt(2qV/m) transcendental — passed as live value",
+                "x 1e6 converts N to uN",
+            ],
+        ),
+        worked_calc(
+            label="Specific impulse (Isp)",
+            formula="Isp = F / (m_dot_total x g0)",
+            values={
+                "F": (round(thrust_n, 9), "N"),
+                "m_dot_total": (round(m_dot_total_kg_s, 15), "kg/s"),
+                "g0": (G_0, "m/s2"),
+            },
+            result=isp_r, result_unit="s",
+            assumptions=["g0 = 9.80665 m/s2 (standard gravity)"],
+        ),
+        worked_calc(
+            label="Thruster electrical power",
+            formula="P = I_total x V",
+            values={
+                "I_total": (round(i_total_a, 9), "A"),
+                "V": (voltage_v, "V"),
+            },
+            result=power_r, result_unit="W",
+            assumptions=["purely ohmic dissipation at beam extraction voltage"],
+        ),
+    ]
+
     return {
         "emitter_count": emitter_count,
         "voltage_kv": voltage_kv,
         "ionic_liquid_type": ionic_liquid,
         "ion_mass_amu": il["mass_amu"],
         "flow_rate_pl_s": flow_rate_pl_s,
-        "mass_flow_per_emitter_ng_s": m_dot_per_emitter_kg_s * 1e12,
-        "total_mass_flow_ug_s": m_dot_total_kg_s * 1e9,
-        "current_per_emitter_nA": i_per_emitter_a * 1e9,
-        "total_current_uA": i_total_a * 1e6,
-        "exhaust_velocity_km_s": round(v_exhaust_m_s / 1000.0, 1),
-        "thrust_un": round(thrust_un, 2),
-        "thrust_uN_per_emitter": round(thrust_un / emitter_count, 3),
-        "isp_s": round(isp_s, 0),
-        "power_w": round(power_w, 3),
+        "mass_flow_per_emitter_ng_s": m_dot_per_emitter_ng_r,
+        "total_mass_flow_ug_s": m_dot_total_ug_r,
+        "current_per_emitter_nA": round(i_per_emitter_a * 1e9, 4),
+        "total_current_uA": i_total_ua_r,
+        "exhaust_velocity_km_s": v_ex_km_r,
+        "thrust_un": thrust_un_r,
+        "thrust_uN_per_emitter": round(thrust_un_r / emitter_count, 3),
+        "isp_s": isp_r,
+        "power_w": power_r,
         "lifetime_hours": lifetime_hours,
         "thrust_efficiency_pct": round(eta_thrust * 100.0, 1),
+        "worked": worked,
     }
 
 

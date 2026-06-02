@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -129,6 +133,76 @@ def compute(payload: dict) -> dict:
     v_tank = (math.pi / 4.0) * (tank_d_m ** 2) * tank_d_m
     pv_w_m3 = power_w / max(1e-6, v_tank)
 
+    # Worked calculations — pure arithmetic steps only.
+    # Power number n_power is a table lookup or piecewise interpolation
+    # (not hand-checkable), so it is passed as a live input to the
+    # ungassed-power step.  The gassed correction uses min/max clamping, skipped.
+    n_per_s_r = round(n_per_s, 4)
+    tip_r = round(tip_speed_m_s, 3)
+    re_r = round(re_imp, 1)
+    np_r = round(n_power, 3)
+    pu_r = round(power_w_ungassed, 2)
+    # Use the actual power applied (gassed or ungassed) so the volumetric
+    # power substitution reproduces the stated result for both branches.
+    pw_r = round(power_w, 2)
+    v_tank_r = round(v_tank, 4)
+    pv_r = round(pw_r / max(1e-6, v_tank), 2)
+    worked = [
+        worked_calc(
+            label="Impeller rotational speed",
+            formula="N = rpm / 60",
+            values={"rpm": (rpm, "rpm")},
+            result=n_per_s_r, result_unit="rev/s",
+            assumptions=["converts rpm to revolutions per second for SI power formula"],
+        ),
+        worked_calc(
+            label="Impeller tip speed",
+            formula="v_tip = pi x D x N",
+            values={"D": (d_imp_m, "m"), "N": (n_per_s_r, "rev/s")},
+            result=tip_r, result_unit="m/s",
+            assumptions=["circumferential tip velocity; indicator of shear stress on cells"],
+        ),
+        worked_calc(
+            label="Impeller Reynolds number",
+            formula="Re = rho x N x D^2 / mu",
+            values={
+                "rho": (rho, "kg/m^3"),
+                "N": (n_per_s_r, "rev/s"),
+                "D": (d_imp_m, "m"),
+                "mu": (viscosity, "Pa.s"),
+            },
+            result=re_r, result_unit="",
+            assumptions=["Re > 10000 = fully turbulent; Re < 10 = laminar (Doran Ch.8)"],
+        ),
+        worked_calc(
+            label="Ungassed agitation power",
+            formula="P_ug = Np x rho x N^3 x D^5",
+            values={
+                "Np": (np_r, ""),
+                "rho": (rho, "kg/m^3"),
+                "N": (n_per_s_r, "rev/s"),
+                "D": (d_imp_m, "m"),
+            },
+            result=pu_r, result_unit="W",
+            assumptions=[
+                "Np from Bates-Fondy-Corpstein turbulent power numbers; piecewise for transitional Re",
+                "single impeller, baffled tank, D/T ~ 1/3",
+            ],
+        ),
+        worked_calc(
+            label="Volumetric power input",
+            formula="P_V = P_w / V_tank",
+            # P_w is gassed power when gassed=True, ungassed otherwise — mirrors
+            # the same branch the code takes when computing pv_w_m3.
+            values={"P_w": (pw_r, "W"), "V_tank": (v_tank_r, "m^3")},
+            result=pv_r, result_unit="W/m^3",
+            assumptions=[
+                "cylindrical tank assumed H = T; V_tank = pi/4 x T^3",
+                "P_w = gassed power when gassed=True (Michel & Miller correction applied upstream)",
+            ],
+        ),
+    ]
+
     return {
         "impeller_diameter_m": d_imp_m,
         "rpm": rpm,
@@ -146,6 +220,7 @@ def compute(payload: dict) -> dict:
         "power_w": round(power_w, 2),
         "power_volumetric_w_m3": round(pv_w_m3, 2),
         "tank_volume_m3_assumed": round(v_tank, 4),
+        "worked": worked,
     }
 
 

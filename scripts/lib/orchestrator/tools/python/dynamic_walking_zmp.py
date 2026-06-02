@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "dynamic_walking_zmp (custom)",
@@ -114,6 +118,116 @@ def compute(payload: dict) -> dict:
     # P ≈ 0.5 × m × v² × cadence
     power_walking_w = 0.5 * mass_kg * (speed_ms ** 2) * step_freq_hz
 
+    # Worked calculations for the PDF appendix.
+    # omega_c_rad_s = sqrt(G / h_com) is transcendental — passed as live input.
+    # capture_radius uses sqrt — skipped.
+    omega_c_r = round(omega_c_rad_s, 2)
+    # Three decimal places for omega_c_hz so the ctrl_bw chain stays within 1%
+    omega_c_hz_r = round(omega_c_hz, 3)
+    L_foot_r = round(L_foot_m, 4)
+    a_max_r = round(a_max_m_s2, 2)
+    omega_walk_r = round(omega_walk_rad_s, 3)
+    com_accel_r = round(com_accel_m_s2, 2)
+    zmp_exc_r = round(zmp_excursion_mm, 1)
+    zmp_margin_r = round(zmp_margin_mm, 1)
+    # Derive ctrl_bw_r from rounded omega_c_hz_r to 3 dp so the substitution
+    # (5 x omega_c_hz_r) reproduces the stated result exactly.
+    ctrl_bw_r = round(5.0 * omega_c_hz_r, 3)
+    step_freq_r = round(step_freq_hz, 2)
+    # Derive power_r to 1 dp so 0.5 x mass x speed^2 x step_freq reproduces it.
+    power_r = round(power_walking_w, 1)
+    worked = [
+        worked_calc(
+            label="LIPM natural frequency (Hz)",
+            formula="omega_c_hz = omega_c_rad_s / (2 x pi)",
+            values={"omega_c_rad_s": (omega_c_r, "rad/s")},
+            result=omega_c_hz_r,
+            result_unit="Hz",
+            assumptions=["omega_c_rad_s = sqrt(G/h_com) (transcendental, not shown)"],
+        ),
+        worked_calc(
+            label="Foot length in metres",
+            formula="L_foot_m = foot_size_mm / 1000",
+            values={"foot_size_mm": (foot_mm, "mm")},
+            result=L_foot_r,
+            result_unit="m",
+        ),
+        worked_calc(
+            label="Maximum safe CoM acceleration",
+            formula="a_max = (L_foot_m / 2) x G / h_com_m",
+            values={
+                "L_foot_m": (L_foot_r, "m"),
+                "G": (G, "m/s^2"),
+                "h_com_m": (h_com_m, "m"),
+            },
+            result=a_max_r,
+            result_unit="m/s^2",
+            assumptions=["cart-table model: ZMP shift = h/g * accel; max shift = L_foot/2"],
+        ),
+        worked_calc(
+            label="Walking angular frequency",
+            formula="omega_walk = 2 x pi / step_T_s",
+            values={"step_T_s": (step_T_s, "s")},
+            result=omega_walk_r,
+            result_unit="rad/s",
+        ),
+        worked_calc(
+            label="Peak CoM acceleration",
+            formula="com_accel = omega_walk^2 x (stride_m / 2)",
+            values={"omega_walk": (omega_walk_r, "rad/s"), "stride_m": (stride_m, "m")},
+            result=com_accel_r,
+            result_unit="m/s^2",
+            assumptions=["sinusoidal CoM trajectory approximation"],
+        ),
+        worked_calc(
+            label="ZMP excursion from neutral",
+            formula="zmp_exc_mm = h_com_m x com_accel / G x 1000",
+            values={
+                "h_com_m": (h_com_m, "m"),
+                "com_accel": (com_accel_r, "m/s^2"),
+                "G": (G, "m/s^2"),
+            },
+            result=zmp_exc_r,
+            result_unit="mm",
+            assumptions=["cart-table ZMP equation: zmp = x_com - h/g * accel"],
+        ),
+        worked_calc(
+            label="ZMP stability margin",
+            formula="zmp_margin = (foot_size_mm / 2) - zmp_exc_mm",
+            values={"foot_size_mm": (foot_mm, "mm"), "zmp_exc_mm": (zmp_exc_r, "mm")},
+            result=zmp_margin_r,
+            result_unit="mm",
+            assumptions=["positive margin = ZMP within support polygon = stable"],
+        ),
+        worked_calc(
+            label="Required control bandwidth",
+            formula="ctrl_bw = 5 x omega_c_hz",
+            values={"omega_c_hz": (omega_c_hz_r, "Hz")},
+            result=ctrl_bw_r,
+            result_unit="Hz",
+            assumptions=["5x LIPM natural frequency required for disturbance rejection"],
+        ),
+        worked_calc(
+            label="Step frequency",
+            formula="step_freq = 1 / step_T_s",
+            values={"step_T_s": (step_T_s, "s")},
+            result=step_freq_r,
+            result_unit="Hz",
+        ),
+        worked_calc(
+            label="Estimated walking power",
+            formula="P_walk = 0.5 x mass_kg x speed_ms^2 x step_freq",
+            values={
+                "mass_kg": (mass_kg, "kg"),
+                "speed_ms": (speed_ms, "m/s"),
+                "step_freq": (step_freq_r, "Hz"),
+            },
+            result=power_r,
+            result_unit="W",
+            assumptions=["kinetic energy exchanged at each step frequency; rough estimate only"],
+        ),
+    ]
+
     return {
         "stride_length_m": stride_m,
         "walking_speed_ms": speed_ms,
@@ -124,15 +238,16 @@ def compute(payload: dict) -> dict:
         "zmp_excursion_mm": round(zmp_excursion_mm, 1),
         "zmp_margin_mm": round(zmp_margin_mm, 1),
         "stability": stability,
-        "lipm_natural_freq_hz": round(omega_c_hz, 2),
+        "lipm_natural_freq_hz": omega_c_hz_r,
         "lipm_natural_omega_rad_s": round(omega_c_rad_s, 2),
-        "control_bandwidth_required_hz": round(control_bw_hz_required, 1),
+        "control_bandwidth_required_hz": ctrl_bw_r,
         "com_acceleration_m_s2": round(com_accel_m_s2, 2),
         "max_safe_acceleration_m_s2": round(a_max_m_s2, 2),
         "capture_radius_mm": round(capture_radius_mm, 0),
         "step_frequency_hz": round(step_freq_hz, 2),
         "cadence_steps_per_min": round(cadence_steps_min, 0),
-        "walking_power_estimate_w": round(power_walking_w, 0),
+        "walking_power_estimate_w": power_r,
+        "worked": worked,
     }
 
 

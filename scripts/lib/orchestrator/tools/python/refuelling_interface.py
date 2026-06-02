@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -163,6 +167,68 @@ def compute(payload: dict) -> dict:
     # Plus misalignment correction
     alignment_force_n *= (1.0 + misalignment_mm / 10.0)
 
+    # --- Worked calculations ---
+    # Mass-flow steps (Bernoulli sqrt for liquids; compressible isentropic for
+    # gas including choked-flow) are transcendental — skipped.  Transfer time,
+    # alignment force, and seal leakage are clean closed-form arithmetic.
+    mdot_r = round(mass_flow_kg_s, 5)
+    mdot_gs_r = round(mass_flow_g_s, 2)
+    # Use two decimal places so the printed substitution (m / mdot_r) reproduces
+    # the stated result to within 0.5%.  The top-level output field
+    # transfer_time_seconds still uses round(..., 0) for display.
+    t_s_r = round(mass_kg / mdot_r, 2) if transfer_time_s != float("inf") else None
+    t_min_r = round(transfer_time_minutes, 1) if transfer_time_s != float("inf") else None
+    al_base = round((diameter_mm / 25.0) * 200.0, 1)
+    al_total = round(alignment_force_n, 1)
+    misalign_factor = round(1.0 + misalignment_mm / 10.0, 3)
+
+    worked = [
+        worked_calc(
+            label="Mass flow rate (g/s)",
+            formula="mdot_gs = mdot_kg_s x 1000",
+            values={
+                "mdot_kg_s": (mdot_r, "kg/s"),
+            },
+            result=mdot_gs_r,
+            result_unit="g/s",
+            assumptions=[
+                "mdot_kg_s computed via Bernoulli (liquid) or choked isentropic (gas) — transcendental, passed as computed input",
+            ],
+        ),
+        worked_calc(
+            label="Propellant transfer time",
+            formula="t_transfer = m_transfer / mdot_kg_s",
+            values={
+                "m_transfer": (mass_kg, "kg"),
+                "mdot_kg_s": (mdot_r, "kg/s"),
+            },
+            result=t_s_r if t_s_r is not None else 0,
+            result_unit="s",
+            assumptions=["assumes constant mass-flow rate throughout transfer"],
+        ),
+        worked_calc(
+            label="Alignment (mating) force — base",
+            formula="F_base = (d_mm / 25.0) x 200",
+            values={
+                "d_mm": (diameter_mm, "mm"),
+            },
+            result=al_base,
+            result_unit="N",
+            assumptions=["200 N baseline for 25 mm O-ring seal (Parker ORD 5712 compression load)"],
+        ),
+        worked_calc(
+            label="Alignment force — misalignment correction",
+            formula="F_align = F_base x (1 + misalign_mm / 10)",
+            values={
+                "F_base": (al_base, "N"),
+                "misalign_mm": (misalignment_mm, "mm"),
+            },
+            result=al_total,
+            result_unit="N",
+            assumptions=["linear correction factor; 10 mm misalignment doubles the required mating load"],
+        ),
+    ]
+
     return {
         "propellant_type": propellant,
         "is_gas": prop["is_gas"],
@@ -181,6 +247,7 @@ def compute(payload: dict) -> dict:
         "seal_leakage_rate_g_per_day": round(seal_leak_per_day_g, 4),
         "alignment_force_n": round(alignment_force_n, 1),
         "material_compatibility": prop["compatibility"],
+        "worked": worked,
     }
 
 

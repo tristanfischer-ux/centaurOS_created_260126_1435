@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -137,6 +141,109 @@ def compute(payload: dict) -> dict:
         eta = ideal_power / max(1e-9, power_w)
     eta = max(0.0, min(1.0, eta))
 
+    # Worked calculations — only the closed-form steps that are hand-checkable.
+    # Wave drag factor, CT/CP degradation, and efficiency are piecewise / use
+    # exp() — skipped per rules. Pass their live values as input symbols into
+    # the thrust and power steps.
+    n_per_s_r = round(n_per_s, 4)
+    omega_r = round(omega, 4)
+    tip_speed_r = round(tip_speed, 1)
+    mach_tip_r = round(tip_mach, 3)
+    J_r = round(J, 3)
+    thrust_r = round(thrust_n, 2)
+    power_r = round(power_w, 1)
+    torque_r = round(torque_nm, 3)
+
+    worked = [
+        worked_calc(
+            label="Rotational speed (rev/s)",
+            formula="n_per_s = rpm / 60",
+            values={"rpm": (rpm, "rev/min")},
+            result=n_per_s_r, result_unit="rev/s",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Angular velocity",
+            formula="omega = 2 x pi x n_per_s",
+            values={"n_per_s": (n_per_s_r, "rev/s")},
+            result=omega_r, result_unit="rad/s",
+            assumptions=["pi = 3.141593"],
+        ),
+        worked_calc(
+            label="Blade tip speed",
+            formula="tip_speed = omega x radius",
+            values={
+                "omega": (omega_r, "rad/s"),
+                "radius": (round(diameter_m / 2.0, 4), "m"),
+            },
+            result=tip_speed_r, result_unit="m/s",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Tip Mach number",
+            formula="mach_tip = tip_speed / a_sound",
+            values={
+                "tip_speed": (tip_speed_r, "m/s"),
+                "a_sound": (a_sound, "m/s"),
+            },
+            result=mach_tip_r, result_unit="",
+            assumptions=["a_sound = 295 m/s at ~216 K (20 km HAPS altitude)" if air_density < 0.5 else "a_sound = 343 m/s at sea level"],
+        ),
+        worked_calc(
+            label="Advance ratio J",
+            formula="J = airspeed / (n_per_s x diameter)",
+            values={
+                "airspeed": (airspeed_m_s, "m/s"),
+                "n_per_s": (n_per_s_r, "rev/s"),
+                "diameter": (diameter_m, "m"),
+            },
+            result=J_r, result_unit="",
+            assumptions=["standard propeller advance ratio definition"],
+        ),
+        # CT and CP are piecewise/empirical — pass as live inputs to thrust/power.
+        worked_calc(
+            label="Thrust (dimensional analysis from thrust coefficient)",
+            formula="thrust = ct x rho x n_per_s^2 x diameter^4 x blade_factor",
+            values={
+                "ct": (round(ct, 4), ""),
+                "rho": (air_density, "kg/m3"),
+                "n_per_s": (n_per_s_r, "rev/s"),
+                "diameter": (diameter_m, "m"),
+                "blade_factor": (round(blade_factor, 3), ""),
+            },
+            result=thrust_r, result_unit="N",
+            assumptions=[
+                "ct is low-Re-degraded thrust coefficient (includes CL_max factor, advance-ratio correction)",
+                "blade_factor accounts for multi-blade solidity",
+            ],
+        ),
+        worked_calc(
+            label="Shaft power (dimensional analysis from power coefficient)",
+            formula="power = cp x rho x n_per_s^3 x diameter^5 x blade_factor_pow",
+            values={
+                "cp": (round(cp, 4), ""),
+                "rho": (air_density, "kg/m3"),
+                "n_per_s": (n_per_s_r, "rev/s"),
+                "diameter": (diameter_m, "m"),
+                "blade_factor_pow": (round(blade_factor_pow, 3), ""),
+            },
+            result=power_r, result_unit="W",
+            assumptions=[
+                "cp is low-Re-penalised power coefficient (includes wave drag factor)",
+            ],
+        ),
+        worked_calc(
+            label="Shaft torque",
+            formula="torque = power / omega",
+            values={
+                "power": (power_r, "W"),
+                "omega": (omega_r, "rad/s"),
+            },
+            result=torque_r, result_unit="N.m",
+            assumptions=[],
+        ),
+    ]
+
     return {
         "diameter_m": diameter_m,
         "pitch_m": pitch_m,
@@ -172,6 +279,7 @@ def compute(payload: dict) -> dict:
             "wave drag rises rapidly. For HAPS 20 km cruise, target "
             "Mach_tip < 0.7 by enlarging diameter or reducing rpm."
         ),
+        "worked": worked,
     }
 
 

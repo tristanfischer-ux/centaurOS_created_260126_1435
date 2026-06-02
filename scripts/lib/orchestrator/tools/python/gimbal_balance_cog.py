@@ -34,8 +34,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -114,6 +118,85 @@ def compute(payload: dict) -> dict:
     balance_ok_z = abs(cog_z) < 5   # vertical offset can be slightly larger
     balance_ok = balance_ok_x and balance_ok_y and balance_ok_z
 
+    # Worked calculations.
+    # torque_yaw_nm uses sqrt(x^2+y^2) (transcendental) — skipped; passed as live
+    # input to motor_torque_required_ncm via torque_required_ncm.
+    pl_mass_kg_r = round(pl_mass_kg, 4)
+    cog_z_m_r = round(cog_z_m, 4)
+    torque_roll_r = round(torque_roll_nm, 4)
+    torque_dyn_r = round(torque_roll_dyn, 4)   # roll == pitch by construction
+    # Use 4 decimal places so that torque_ncm_r * 1.5 chains to motor_ncm_r correctly.
+    torque_ncm_r = round(torque_required_ncm, 4)
+    motor_ncm_r = round(torque_ncm_r * 1.5, 2)
+    total_mass_r = round(total_gimbal_mass_g, 1)
+    worked = [
+        worked_calc(
+            label="Payload mass (kg)",
+            formula="m_pl = pl_mass_g / 1000",
+            values={"pl_mass_g": (pl_mass_g, "g")},
+            result=pl_mass_kg_r, result_unit="kg",
+            assumptions=["Convert grams to kilograms"],
+        ),
+        worked_calc(
+            label="Camera CoG vertical offset from mount",
+            formula="cog_z_m = (mz - pl_z x 0.3) / 1000",
+            values={"mz": (mz, "mm"), "pl_z": (pl_z, "mm")},
+            result=cog_z_m_r, result_unit="m",
+            assumptions=["Camera body extends 30% of its Z dimension below the mount point"],
+        ),
+        worked_calc(
+            label="Static roll/pitch gimbal torque",
+            formula="T_static = m_pl x g x |cog_z_m|",
+            values={
+                "m_pl": (pl_mass_kg_r, "kg"),
+                "g": (9.81, "m/s^2"),
+                "|cog_z_m|": (abs(cog_z_m_r), "m"),
+            },
+            result=torque_roll_r, result_unit="Nm",
+            assumptions=[
+                "Worst-case axis torque when CoG is offset from rotational axis",
+                "Roll and pitch torques are equal by symmetry for this geometry",
+            ],
+        ),
+        worked_calc(
+            label="Dynamic torque (3g manoeuvre factor)",
+            formula="T_dyn = T_static x dynamic_factor",
+            values={"T_static": (torque_roll_r, "Nm"), "dynamic_factor": (dynamic_factor, "")},
+            result=torque_dyn_r, result_unit="Nm",
+            assumptions=["3g dynamic factor for aggressive flight manoeuvres (cinema = 1.5g)"],
+        ),
+        worked_calc(
+            label="Required motor torque (peak dynamic, in Ncm)",
+            formula="T_req_ncm = T_dyn x 100",
+            values={"T_dyn": (torque_dyn_r, "Nm")},
+            result=torque_ncm_r, result_unit="Ncm",
+            assumptions=[
+                "x100 converts Nm to Ncm",
+                "Yaw torque uses sqrt of CoG radial offset (not shown — transcendental); "
+                "roll/pitch torques govern this geometry because CoG is on-axis laterally",
+            ],
+        ),
+        worked_calc(
+            label="Specified gimbal motor torque (1.5x safety factor)",
+            formula="T_motor = T_req_ncm x 1.5",
+            values={"T_req_ncm": (torque_ncm_r, "Ncm")},
+            result=motor_ncm_r, result_unit="Ncm",
+            assumptions=["1.5x safety factor for motor torque spec (DJI Ronin / BaseCam EVO sizing rule)"],
+        ),
+        worked_calc(
+            label="Total gimbal assembly mass",
+            formula="m_total = pl_mass_g + gimbal_stages x (motor_mass_g + frame_per_stage_g)",
+            values={
+                "pl_mass_g": (pl_mass_g, "g"),
+                "gimbal_stages": (gimbal_stages, ""),
+                "motor_mass_g": (motor_mass_g, "g"),
+                "frame_per_stage_g": (frame_per_stage_g, "g"),
+            },
+            result=total_mass_r, result_unit="g",
+            assumptions=["30 g per axis motor + 20 g per stage frame (brushless gimbal motors, typical)"],
+        ),
+    ]
+
     return {
         "payload_mass_g": pl_mass_g,
         "payload_dimensions_mm": dims,
@@ -144,6 +227,7 @@ def compute(payload: dict) -> dict:
             "Dynamic factor 3g for aggressive manoeuvres (cinema = 1.5g). "
             "Counterweight tab balance is fastest tuning method."
         ),
+        "worked": worked,
     }
 
 

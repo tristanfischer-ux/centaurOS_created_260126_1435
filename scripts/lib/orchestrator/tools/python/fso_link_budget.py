@@ -51,8 +51,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -196,6 +200,56 @@ def compute(payload: dict) -> dict:
     # Far-field (Rayleigh) distance: 2 D^2 / lambda
     far_field_m = 2.0 * (tx_aperture_m ** 2) / wavelength_m
 
+    # Worked calculations — only clean arithmetic steps are shown.
+    # G_tx, G_rx, and FSPL all require log10() which a reviewer cannot
+    # verify with +/-x/^ alone — those three entries are omitted per
+    # worked_calc design rules (transcendental function = skip).
+    # Pointing loss uses exp() — also omitted; passed as a live input to
+    # the dB budget sum below.
+    g_tx_r = round(g_tx_db, 2)
+    g_rx_r = round(g_rx_db, 2)
+    fspl_r = round(fspl_db, 2)
+    rx_dbw_r = round(rx_power_dbw, 2)
+    rx_dbm_r = round(rx_power_dbm, 2)
+    ff_r = round(far_field_m, 1)
+    worked = [
+        worked_calc(
+            label="Received power (dB budget)",
+            formula="P_rx_dBW = P_tx_dBW + G_tx_dB + G_rx_dB - FSPL_dB - L_atm_dB - L_point_dB",
+            values={
+                "P_tx_dBW": (round(tx_power_dbw, 2), "dBW"),
+                "G_tx_dB": (g_tx_r, "dB"),
+                "G_rx_dB": (g_rx_r, "dB"),
+                "FSPL_dB": (fspl_r, "dB"),
+                "L_atm_dB": (atm_loss_db, "dB"),
+                "L_point_dB": (round(pointing_loss_db, 3), "dB"),
+            },
+            result=rx_dbw_r, result_unit="dBW",
+            assumptions=[
+                "Friis link equation in dB domain",
+                "G_tx, G_rx, FSPL computed via log10 (not hand-verifiable; passed as live inputs)",
+                "L_point_dB from Gaussian beam pointing-error model (exp — not shown)",
+            ],
+        ),
+        worked_calc(
+            label="Received power in dBm",
+            formula="P_rx_dBm = P_rx_dBW + 30",
+            values={"P_rx_dBW": (rx_dbw_r, "dBW")},
+            result=rx_dbm_r, result_unit="dBm",
+            assumptions=["1 W = 30 dBm"],
+        ),
+        worked_calc(
+            label="Far-field (Rayleigh) distance",
+            formula="R_ff = 2 x D_tx ^ 2 / lambda",
+            values={
+                "D_tx": (tx_aperture_m, "m"),
+                "lambda": (wavelength_m, "m"),
+            },
+            result=ff_r, result_unit="m",
+            assumptions=["Rayleigh range; near-field / far-field boundary"],
+        ),
+    ]
+
     return {
         "tx_power_w": tx_power_w,
         "wavelength_nm": float(payload.get("wavelength_nm", 1550.0)),
@@ -219,6 +273,7 @@ def compute(payload: dict) -> dict:
         "far_field_distance_m": round(far_field_m, 1),
         "detector_type": detector,
         "noise_equivalent_power_w_sqrthz": nep,
+        "worked": worked,
     }
 
 

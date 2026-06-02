@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -147,6 +151,100 @@ def compute(payload: dict) -> dict:
     else:
         eps_eff_total = eps_eff_rad
 
+    # Worked calculations for the PDF appendix.
+    # q_cond uses max() branch — SKIP; passed as live input to the ideal sum.
+    eps_eff_rad_r = round(eps_eff_rad, 5)
+    # eps_eff_rad_e3: emissivity scaled by 1000 so _fmt displays it with enough sig figs.
+    # round(eps_eff_rad*1000, 3) keeps 3 significant decimal digits (e.g. 1.019) and
+    # avoids the 4-decimal-place truncation that _fmt applies to values > 1e-3.
+    eps_eff_rad_e3 = round(eps_eff_rad * 1000, 3)
+    sigma_term = round(SIGMA * (t_hot**4 - t_cold**4), 6)
+    q_rad_r = round(q_rad, 4)
+    q_cond_r = round(q_cond, 4)
+    q_ideal_r = round(q_ideal, 4)
+    q_actual_r = round(q_actual, 4)
+    mass_film_r = round(mass_film_g_m2, 2)
+    mass_spacer_r = round(mass_spacer_g_m2, 2)
+    mass_total_r = round(mass_total_g_m2, 2)
+    k_eq_r = round(k_eq, 7)
+    worked = [
+        worked_calc(
+            label="MLI effective emissivity (radiation only)",
+            formula="eps_eff_rad = eps_film / (2 x n - (n - 1) x eps_film)",
+            values={
+                "eps_film": (eps_film, ""),
+                "n": (n, "layers"),
+            },
+            result=eps_eff_rad_r, result_unit="",
+            assumptions=["Cunnington-Tien series-resistance formula; N identical shields"],
+        ),
+        worked_calc(
+            label="Radiation heat flux (Stefan-Boltzmann)",
+            formula="q_rad = (eps_eff_rad_e3 x 1e-3) x sigma_x_dT4",
+            values={
+                "eps_eff_rad_e3": (eps_eff_rad_e3, ""),
+                "sigma_x_dT4": (sigma_term, "W/m^2"),
+            },
+            result=q_rad_r, result_unit="W/m^2",
+            assumptions=[
+                "eps_eff_rad_e3 = eps_eff_rad x 1000 (scaled so display shows 3 sig figs)",
+                f"sigma_x_dT4 = sigma x (T_hot^4 - T_cold^4) = {sigma_term} W/m^2 "
+                f"for T_hot={t_hot} K, T_cold={t_cold} K",
+                f"Stefan-Boltzmann sigma = {SIGMA:.4e} W/m^2/K^4",
+            ],
+        ),
+        worked_calc(
+            label="Total ideal heat leak (radiation + conduction)",
+            formula="q_ideal = q_rad + q_cond",
+            values={
+                "q_rad": (q_rad_r, "W/m^2"),
+                "q_cond": (q_cond_r, "W/m^2"),
+            },
+            result=q_ideal_r, result_unit="W/m^2",
+            assumptions=["q_cond from spacer conductance model (Bapat 1990); not independently hand-checkable"],
+        ),
+        worked_calc(
+            label="Actual heat leak including penetration / edge penalty",
+            formula="q_actual = q_ideal x (1 + edge_penalty)",
+            values={
+                "q_ideal": (q_ideal_r, "W/m^2"),
+                "edge_penalty": (edge_penalty, ""),
+            },
+            result=q_actual_r, result_unit="W/m^2",
+            assumptions=[f"edge_penalty = {round(edge_penalty*100,1)}% for treatment '{edge}'"],
+        ),
+        worked_calc(
+            label="Film layer mass",
+            formula="mass_film = n x mass_g_m2_per_layer",
+            values={
+                "n": (n, "layers"),
+                "mass_g_m2_per_layer": (layer["mass_g_m2"], "g/m^2"),
+            },
+            result=mass_film_r, result_unit="g/m^2",
+        ),
+        worked_calc(
+            label="Spacer mass",
+            formula="mass_spacer = (n - 1) x mass_g_m2_per_spacer",
+            values={
+                "n": (n, "layers"),
+                "mass_g_m2_per_spacer": (sp["mass_g_m2_per_layer"], "g/m^2"),
+            },
+            result=mass_spacer_r, result_unit="g/m^2",
+            assumptions=["n-1 spacer layers between n film layers"],
+        ),
+        worked_calc(
+            label="Equivalent thermal conductivity",
+            formula="k_eq = q_actual x blanket_thickness / delta_T",
+            values={
+                "q_actual": (q_actual_r, "W/m^2"),
+                "blanket_thickness": (blanket_thickness_m, "m"),
+                "delta_T": (delta_t, "K"),
+            },
+            result=k_eq_r, result_unit="W/m/K",
+            assumptions=["blanket thickness assumed 25 mm (typical MLI blanket)"],
+        ),
+    ]
+
     return {
         "num_layers": n,
         "layer_material": layer_mat,
@@ -155,18 +253,19 @@ def compute(payload: dict) -> dict:
         "temperature_hot_k": t_hot,
         "temperature_cold_k": t_cold,
         "film_emissivity_per_side": eps_film,
-        "effective_emissivity_radiation_only": round(eps_eff_rad, 5),
+        "effective_emissivity_radiation_only": eps_eff_rad_r,
         "effective_emissivity": round(eps_eff_total, 5),
-        "heat_leak_radiation_w_m2": round(q_rad, 4),
-        "heat_leak_conduction_w_m2": round(q_cond, 4),
-        "heat_leak_ideal_w_m2": round(q_ideal, 4),
-        "heat_leak_w_m2": round(q_actual, 4),
+        "heat_leak_radiation_w_m2": q_rad_r,
+        "heat_leak_conduction_w_m2": q_cond_r,
+        "heat_leak_ideal_w_m2": q_ideal_r,
+        "heat_leak_w_m2": q_actual_r,
         "penetration_penalty_pct": round(edge_penalty * 100.0, 2),
-        "equivalent_thermal_conductivity_w_mk": round(k_eq, 7),
-        "mass_film_g_m2": round(mass_film_g_m2, 2),
-        "mass_spacer_g_m2": round(mass_spacer_g_m2, 2),
-        "mass_g_m2": round(mass_total_g_m2, 2),
-        "mass_kg_m2": round(mass_total_g_m2 / 1000.0, 4),
+        "equivalent_thermal_conductivity_w_mk": k_eq_r,
+        "mass_film_g_m2": mass_film_r,
+        "mass_spacer_g_m2": mass_spacer_r,
+        "mass_g_m2": mass_total_r,
+        "mass_kg_m2": round(mass_total_r / 1000.0, 4),
+        "worked": worked,
     }
 
 

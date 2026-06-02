@@ -41,8 +41,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -163,6 +167,78 @@ def compute(payload: dict) -> dict:
     over_temp = hot_k > te["max_temp_k"]
     under_temp = cold_k < te["min_temp_k"]
 
+    # Worked calculations.  Decay factor involves exp() (transcendental) so
+    # p_thermal_eol_w is passed as an opaque input to the electrical steps.
+    p_bol_r = round(p_thermal_bol_w, 1)
+    p_eol_r = round(p_thermal_eol_w, 1)
+    decay_r = round(decay_factor, 4)
+    eta_carnot_r = round(eta_carnot, 4)
+    eta_real_r = round(eta_real, 4)
+    delta_t_r = round(delta_t, 0)
+
+    worked = [
+        worked_calc(
+            label="Thermal power at BOL",
+            formula="P_thermal_BOL = m_fuel x power_density",
+            values={
+                "m_fuel": (fuel_mass_g, "g"),
+                "power_density": (f["power_density_w_g"], "W/g"),
+            },
+            result=p_bol_r, result_unit="W",
+            assumptions=[
+                f"Specific thermal power {f['power_density_w_g']} W/g for {fuel} "
+                f"(half-life {f['half_life_yr']} yr); CRC Handbook 95th ed. + Bennett 2006 AIAA 2006-4191",
+            ],
+        ),
+        worked_calc(
+            label="Carnot efficiency limit",
+            formula="eta_carnot = (T_hot - T_cold) / T_hot",
+            values={
+                "T_hot": (hot_k, "K"),
+                "T_cold": (cold_k, "K"),
+            },
+            result=eta_carnot_r, result_unit="",
+            assumptions=["Second-law maximum; real TE operates at ~40-50% of Carnot (Rowe 2006)"],
+        ),
+        worked_calc(
+            label="TE module real efficiency",
+            formula="eta_real = eta_ref x (delta_T / delta_T_ref)",
+            values={
+                "eta_ref": (te.get("eta_at_dT_700", te.get("eta_at_dT_500", 0.07)), ""),
+                "delta_T": (delta_t_r, "K"),
+                "delta_T_ref": (700.0 if te_module in ("SiGe", "skutterudite") else 500.0, "K"),
+            },
+            result=eta_real_r, result_unit="",
+            assumptions=[
+                f"{te_module} reference efficiency from Rowe 'Thermoelectrics Handbook' 2006; "
+                "bounded to 0.5 x eta_carnot",
+            ],
+        ),
+        worked_calc(
+            label="Electrical power at BOL",
+            formula="P_elec_BOL = P_thermal_BOL x eta_real",
+            values={
+                "P_thermal_BOL": (p_bol_r, "W"),
+                "eta_real": (eta_real_r, ""),
+            },
+            result=round(p_elec_bol_w, 2), result_unit="W",
+            assumptions=["eta_real already bounded to Carnot limit above"],
+        ),
+        worked_calc(
+            label="Electrical power at EOL",
+            formula="P_elec_EOL = P_thermal_EOL x eta_real",
+            values={
+                "P_thermal_EOL": (p_eol_r, "W"),
+                "eta_real": (eta_real_r, ""),
+            },
+            result=round(p_elec_eol_w, 2), result_unit="W",
+            assumptions=[
+                f"P_thermal_EOL = {p_bol_r} x decay_factor {decay_r} "
+                f"(exp(-ln2 x {mission_yr} yr / {f['half_life_yr']} yr) — transcendental, pre-computed)",
+            ],
+        ),
+    ]
+
     return {
         "fuel": fuel,
         "fuel_mass_g": fuel_mass_g,
@@ -171,12 +247,12 @@ def compute(payload: dict) -> dict:
         "thermoelectric_module": te_module,
         "hot_end_temp_k": hot_k,
         "cold_end_temp_k": cold_k,
-        "delta_t_k": round(delta_t, 0),
+        "delta_t_k": delta_t_r,
         "mission_duration_years": mission_yr,
-        "thermal_power_bol_w": round(p_thermal_bol_w, 1),
-        "thermal_power_eol_w": round(p_thermal_eol_w, 1),
-        "thermal_power_w": round(p_thermal_eol_w, 1),
-        "fuel_decay_factor": round(decay_factor, 4),
+        "thermal_power_bol_w": p_bol_r,
+        "thermal_power_eol_w": p_eol_r,
+        "thermal_power_w": p_eol_r,
+        "fuel_decay_factor": decay_r,
         "carnot_efficiency_pct": round(eta_carnot * 100.0, 1),
         "thermoelectric_efficiency_pct": round(eta_real * 100.0, 2),
         "fraction_of_carnot": round(eta_real / max(eta_carnot, 0.001) * 100.0, 1),
@@ -186,6 +262,7 @@ def compute(payload: dict) -> dict:
         "mass_kg": round(rtg_total_mass_kg, 2),
         "over_max_te_temp": over_temp,
         "under_min_te_temp": under_temp,
+        "worked": worked,
     }
 
 

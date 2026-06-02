@@ -49,8 +49,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -153,6 +157,87 @@ def compute(payload: dict) -> dict:
     # Add 50% margin for transients
     h_wheel_with_margin = h_wheel_nms * 1.5
 
+    # --- Worked calculations (hand-checkable steps only) ---
+    # Quantities derived from transcendental functions (sqrt, log, exp) or
+    # table lookups (atmosphere_density_leo) are passed as rounded live values
+    # rather than expanded, following the led_par pattern.
+    r_m_r = round(r_m, 0)
+    v_orbital_r = round(v_orbital, 1)
+    T_orbit_s_r = round(T_orbit_s, 1)
+    rho_r = float(f"{rho:.4e}")
+    q_dyn_r = float(f"{q_dyn:.4e}")
+
+    T_gg_r = float(f"{T_gg:.4e}")
+    T_aero_r = float(f"{T_aero:.4e}")
+    p_solar_r = float(f"{p_solar:.4e}")
+    T_solar_r = float(f"{T_solar:.4e}")
+    T_total_r = float(f"{T_total:.4e}")
+    h_wheel_r = float(f"{h_wheel_nms:.4e}")
+    h_margin_r = float(f"{h_wheel_with_margin:.4e}")
+
+    worked = [
+        worked_calc(
+            label="Orbital radius",
+            formula="r = R_earth + alt_km x 1000",
+            values={"R_earth": (R_EARTH_M, "m"), "alt_km": (alt_km, "km")},
+            result=r_m_r, result_unit="m",
+            assumptions=["Earth mean radius 6,371 km"],
+        ),
+        worked_calc(
+            label="Gravity-gradient disturbance torque (max)",
+            formula="T_gg = (3 x mu / r^3) x I_max_diff",
+            values={"mu": (MU_EARTH, "m3/s2"), "r": (r_m_r, "m"),
+                    "I_max_diff": (I_max_diff, "kg m2")},
+            result=T_gg_r, result_unit="N m",
+            assumptions=["Max disturbance at 45 deg tilt (sin 2theta = 1)"],
+        ),
+        worked_calc(
+            label="Aerodynamic disturbance torque",
+            formula="T_aero = q_dyn x Cd x A_vel x cg_offset",
+            values={"q_dyn": (q_dyn_r, "Pa"), "Cd": (cd_aero, ""),
+                    "A_vel": (A_vel, "m2"), "cg_offset": (cg_offset, "m")},
+            result=T_aero_r, result_unit="N m",
+            assumptions=["q_dyn = 0.5 x rho x v^2 from NRLMSISE-00 table lookup"],
+        ),
+        worked_calc(
+            label="Solar radiation pressure",
+            formula="p_solar = SOLAR_FLUX / c",
+            values={"SOLAR_FLUX": (SOLAR_FLUX_W_M2, "W/m2"), "c": (C_LIGHT, "m/s")},
+            result=p_solar_r, result_unit="Pa",
+            assumptions=["Solar constant 1361 W/m2"],
+        ),
+        worked_calc(
+            label="Solar radiation pressure torque",
+            formula="T_solar = p_solar x (1 + reflectivity) x A_sun x cg_offset",
+            values={"p_solar": (p_solar_r, "Pa"), "reflectivity": (reflectivity, ""),
+                    "A_sun": (A_sun, "m2"), "cg_offset": (cg_offset, "m")},
+            result=T_solar_r, result_unit="N m",
+            assumptions=["Worst-case orientation: sun normal to A_sun face"],
+        ),
+        worked_calc(
+            label="Total disturbance torque (worst-case sum)",
+            formula="T_total = T_gg + T_aero + T_solar",
+            values={"T_gg": (T_gg_r, "N m"), "T_aero": (T_aero_r, "N m"),
+                    "T_solar": (T_solar_r, "N m")},
+            result=T_total_r, result_unit="N m",
+            assumptions=["Torques add worst-case (not root-sum-square)"],
+        ),
+        worked_calc(
+            label="Reaction wheel angular momentum (one orbit)",
+            formula="h_wheel = T_total x T_orbit / 4",
+            values={"T_total": (T_total_r, "N m"), "T_orbit": (T_orbit_s_r, "s")},
+            result=h_wheel_r, result_unit="N m s",
+            assumptions=["Wertz Ch 18 conservative estimate; divides by 4 for sinusoidal averaging"],
+        ),
+        worked_calc(
+            label="Reaction wheel angular momentum (with 50% margin)",
+            formula="h_margin = h_wheel x 1.5",
+            values={"h_wheel": (h_wheel_r, "N m s")},
+            result=h_margin_r, result_unit="N m s",
+            assumptions=["50% transient margin per Wertz Ch 18 recommendation"],
+        ),
+    ]
+
     return {
         "gravity_gradient_torque_nm": float(f"{T_gg:.4e}"),
         "aero_torque_nm": float(f"{T_aero:.4e}"),
@@ -172,6 +257,7 @@ def compute(payload: dict) -> dict:
         "solar_reflectivity": reflectivity,
         "drag_coefficient": cd_aero,
         "solar_radiation_pressure_pa": float(f"{p_solar:.4e}"),
+        "worked": worked,
     }
 
 

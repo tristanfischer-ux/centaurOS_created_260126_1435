@@ -35,8 +35,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -138,6 +142,74 @@ def compute(payload: dict) -> dict:
     defrost_minutes_per_yr = defrost_frequency_per_hour * defrost_duration * annual_frost_hours
     defrost_kwh_per_yr = defrost_minutes_per_yr / 60.0 * unit_capacity_kw * (energy_penalty_pct / 100.0)
 
+    # Worked calculations.
+    # Humidity ratios use Magnus equation (exp) — skip; pass delta_w as known input.
+    # energy_penalty_pct has conditional multipliers (branchy) — skip; pass as known input.
+    # defrost_minutes_per_yr chain is fully arithmetic once inputs are known.
+    delta_w_r = round(delta_w, 5)
+    # Derive frost_g_r from the same rounded delta_w_r used in the substitution so
+    # K_frost x delta_w_r x m_dot_air x 1000 x 60 evaluates to this exact value.
+    frost_g_r = round(K_frost * delta_w_r * m_dot_air * 1000 * 60, 3)
+    frost_thresh_r = round(frost_threshold_g, 0)
+    defrost_int_r = round(defrost_interval_minutes, 0)
+    ep_r = round(energy_penalty_pct, 1)
+    annual_mins_r = round(defrost_minutes_per_yr, 0)
+    annual_kwh_r = round(defrost_kwh_per_yr, 1)
+
+    worked: list[dict] = []
+    if is_frost_zone:
+        worked += [
+            worked_calc(
+                label="Frost mass deposition rate",
+                formula="m_frost = K_frost x delta_W x m_dot_air x 1000 x 60",
+                values={
+                    "K_frost": (K_frost, ""),
+                    "delta_W": (delta_w_r, "kg/kg"),
+                    "m_dot_air": (m_dot_air, "kg/s"),
+                },
+                result=frost_g_r, result_unit="g/min",
+                assumptions=[
+                    "K_frost = 0.6 deposition coefficient (Lee & Ro 2010)",
+                    "m_dot_air = 0.3 kg/s nominal air flow for 8 kW outdoor unit",
+                    "delta_W = W_air - W_sat(T_coil) via Magnus equation — not shown",
+                    "multiply by 1000 (kg to g) and 60 (per second to per minute)",
+                ],
+            ),
+            worked_calc(
+                label="Frost mass threshold before defrost triggers",
+                formula="m_thresh = 250 x capacity_kw",
+                values={"capacity_kw": (unit_capacity_kw, "kW")},
+                result=frost_thresh_r, result_unit="g",
+                assumptions=["250 g per kW rated heating capacity (AHRI 210/240 empirical threshold)"],
+            ),
+            worked_calc(
+                label="Defrost interval between cycles",
+                formula="t_defrost = m_thresh / m_frost",
+                values={
+                    "m_thresh": (frost_thresh_r, "g"),
+                    "m_frost": (frost_g_r, "g/min"),
+                },
+                result=defrost_int_r, result_unit="min",
+                assumptions=["frost accumulation assumed linear at steady m_frost rate"],
+            ),
+            worked_calc(
+                label="Annual defrost energy penalty",
+                formula="E_defrost = (freq x t_dur x frost_hr / 60) x capacity x ep / 100",
+                values={
+                    "freq": (round(defrost_frequency_per_hour, 4), "cycles/hr"),
+                    "t_dur": (defrost_duration, "min"),
+                    "frost_hr": (annual_frost_hours, "hr"),
+                    "capacity": (unit_capacity_kw, "kW"),
+                    "ep": (ep_r, "%"),
+                },
+                result=annual_kwh_r, result_unit="kWh/yr",
+                assumptions=[
+                    f"annual frost hours {annual_frost_hours} hr/yr (typical UK climate)",
+                    f"energy penalty {ep_r}% for {method} (includes cold-weather multipliers if T_amb < -5°C)",
+                ],
+            ),
+        ]
+
     return {
         "ambient_temp_c": T_amb,
         "rh_pct": rh,
@@ -146,18 +218,18 @@ def compute(payload: dict) -> dict:
         "defrost_method": method,
         "humidity_ratio_air_kg_kg": round(W_air, 5),
         "humidity_ratio_coil_sat_kg_kg": round(W_sat_coil, 5),
-        "delta_humidity_ratio_kg_kg": round(delta_w, 5),
-        "frost_mass_flow_g_per_min": round(frost_g_per_min, 3),
-        "defrost_threshold_g": round(frost_threshold_g, 0),
-        "defrost_interval_minutes": round(defrost_interval_minutes, 0),
+        "delta_humidity_ratio_kg_kg": delta_w_r,
+        "frost_mass_flow_g_per_min": frost_g_r,
+        "defrost_threshold_g": frost_thresh_r,
+        "defrost_interval_minutes": defrost_int_r,
         "defrost_frequency_per_hour": round(defrost_frequency_per_hour, 2),
         "defrost_duration_minutes": defrost_duration,
-        "energy_penalty_pct": round(energy_penalty_pct, 1),
+        "energy_penalty_pct": ep_r,
         "hot_water_capacity_lost_pct": capacity_lost_pct,
         "hot_water_capacity_lost_l": round(hot_water_capacity_lost_l, 1),
         "annual_frost_hours_estimated": annual_frost_hours,
-        "annual_defrost_minutes": round(defrost_minutes_per_yr, 0),
-        "annual_defrost_kwh_penalty": round(defrost_kwh_per_yr, 1),
+        "annual_defrost_minutes": annual_mins_r,
+        "annual_defrost_kwh_penalty": annual_kwh_r,
         "rated_heating_capacity_kw": unit_capacity_kw,
         "notes": (
             "Frost rate per Lee & Ro (2010); defrost intervals AHRI 210/240. "
@@ -165,6 +237,7 @@ def compute(payload: dict) -> dict:
             "loss; electric eliminates capacity loss but adds OPEX. "
             "Demand-defrost (pressure-sensor triggered) reduces unnecessary cycles vs timer."
         ),
+        "worked": worked,
     }
 
 

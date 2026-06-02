@@ -33,8 +33,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "dilution_fridge_cooling_power (custom)",
@@ -90,6 +94,56 @@ def compute(payload: dict) -> dict:
     # 1K still pot: ~30 mW @ 800 mK
     # 100 mK plate: ~ Q_at_100mK
     # 20 mK base: Q_at_base
+
+    # Worked calculations for the PDF appendix.
+    # The Kapitza derate branch (piecewise/clamped) is skipped — instead we show the
+    # ideal Pobell value and state the derate factor in assumptions so the reviewer can
+    # apply it by hand.  Q_at_base is already derated; for the worked calc we show the
+    # ideal pre-derate value (which is what the formula actually evaluates to).
+    n_3_mol_s_r = round(n_3_mol_s, 9)
+    Q_100mK_r = round(Q_at_100mK, 1)
+    # cooling_power_w() is the ideal Pobell formula; the result before the in-place
+    # Kapitza multiplication.  We recompute it here to get the pre-derate ideal value
+    # that the worked formula actually evaluates to.
+    Q_base_ideal_uw = round(84.0 * n_3_mol_s * (T_base_k ** 2) * 1e6, 2)
+    Q_base_r = round(Q_at_base, 2)
+    T_100mK_k = 0.100
+    worked = [
+        worked_calc(
+            label="3He molar flow rate",
+            formula="n_3_mol_s = n_3_umol_s x 1e-6",
+            values={"n_3_umol_s": (n_3_umol_s, "umol/s")},
+            result=n_3_mol_s_r,
+            result_unit="mol/s",
+            assumptions=["1 umol = 1e-6 mol"],
+        ),
+        worked_calc(
+            label="Ideal dilution cooling power at 100 mK",
+            formula="Q_100mK_uw = 84 x n_3_mol_s x T_100mK^2 x 1e6",
+            values={
+                "n_3_mol_s": (n_3_mol_s_r, "mol/s"),
+                "T_100mK": (T_100mK_k, "K"),
+            },
+            result=Q_100mK_r,
+            result_unit="uW",
+            assumptions=["Pobell Eq. 7.45: Q_dot = 84 n_3 T^2 [W]; factor 1e6 converts W to uW"],
+        ),
+        worked_calc(
+            label="Ideal dilution cooling power at base temperature (pre-Kapitza)",
+            formula="Q_base_ideal_uw = 84 x n_3_mol_s x T_base_k^2 x 1e6",
+            values={
+                "n_3_mol_s": (n_3_mol_s_r, "mol/s"),
+                "T_base_k": (T_base_k, "K"),
+            },
+            result=Q_base_ideal_uw,
+            result_unit="uW",
+            assumptions=[
+                "Pobell Eq. 7.45 ideal (pre-Kapitza); actual output in cooling_power_uw_at_base applies "
+                f"kapitza_derate = {round(kapitza_derate, 3)} (piecewise function, not shown here)",
+            ],
+        ),
+    ]
+
     return {
         "target_base_temp_mk": T_base_mk,
         "helium_3_flow_umol_s": n_3_umol_s,
@@ -103,7 +157,8 @@ def compute(payload: dict) -> dict:
         "he4_equivalent_capacity_l": round(he4_capacity_l, 1),
         "ideal_at_100mK_uw": round(Q_at_100mK, 1),
         "achievable_base_temp_mk_at_zero_load": round(T_base_mk, 1),
-        "max_heat_load_at_base_uw": round(Q_at_base, 2),
+        "max_heat_load_at_base_uw": Q_base_r,
+        "worked": worked,
     }
 
 

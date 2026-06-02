@@ -35,8 +35,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -86,7 +90,8 @@ def compute(payload: dict) -> dict:
     cf = 1.5 if v <= 600 else 1.0
 
     # Estimate arcing current (~85% of bolted fault for LV, 95% for MV)
-    i_arc_ka = i_fault_ka * (0.85 if vc == "lv" else 0.95)
+    i_arc_factor = 0.85 if vc == "lv" else 0.95
+    i_arc_ka = i_fault_ka * i_arc_factor
     # Simplified IEEE 1584: log10(En) = K1 + K2 + 1.081*log10(I_arc) + 0.0011*G
     k1, k2 = K_TABLE.get(vc, K_TABLE["lv"])
     log_en = k1 + k2 + 1.081 * math.log10(max(0.1, i_arc_ka)) + 0.0011 * gap_mm
@@ -99,6 +104,27 @@ def compute(payload: dict) -> dict:
 
     # Arc flash boundary
     afb_mm = ((4.184 * cf * en * (clearing_s / 0.2)) / 1.2) ** (1.0 / x) * 610.0
+
+    # Worked calculations.
+    # log_en uses log10 (transcendental) — skipped.
+    # e_cal_cm2 uses (610/D)^x with non-integer x — skipped.
+    # Only the arcing-current estimate is a plain multiplication.
+    i_arc_r = round(i_arc_ka, 2)
+    worked = [
+        worked_calc(
+            label="Estimated arcing current",
+            formula="I_arc = I_bf x arc_factor",
+            values={
+                "I_bf": (i_fault_ka, "kA"),
+                "arc_factor": (i_arc_factor, ""),
+            },
+            result=i_arc_r, result_unit="kA",
+            assumptions=[
+                "arc_factor = 0.85 for LV (<= 1 kV); 0.95 for MV (IEEE 1584-2018 simplified)",
+                "bolted-fault-to-arcing-current ratio from empirical correlation",
+            ],
+        ),
+    ]
 
     # PPE category
     if e_cal_cm2 < 1.2:
@@ -142,6 +168,7 @@ def compute(payload: dict) -> dict:
             "Faster breaker clearing time (e.g. arc-fault breaker 50ms) "
             "dramatically reduces energy. PPE Cat 4+ = consider remote racking."
         ),
+        "worked": worked,
     }
 
 

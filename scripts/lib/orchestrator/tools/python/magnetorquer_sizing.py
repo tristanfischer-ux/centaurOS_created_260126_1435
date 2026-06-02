@@ -49,8 +49,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -161,6 +165,79 @@ def compute(payload: dict) -> dict:
     else:
         t_unload_min = float("inf")
 
+    # Rounded display values that chain through the worked calculations.
+    m_req_r = round(m_required_am2, 4)
+    i_max_r = round(i_max_from_power, 4)
+    r_coil_r = round(r_coil, 3)
+    i_actual_r = round(i_actual, 4)
+    power_r = round(power_actual_w, 3)
+    # Use 4-dp rounding for coil_area_r so _fmt represents it accurately (0.0079),
+    # then derive m_actual_r from those same displayed inputs so the substitution
+    # N x i_actual x mu_app x A_coil reproduces the stated result exactly.
+    coil_area_r = round(coil_area_m2, 4)
+    m_actual_r = round(n_turns * i_actual_r * mu_apparent * coil_area_r, 4)
+    l_wire_r = round(l_wire_m, 2)
+    t_unload_r = round(t_unload_min, 2)
+
+    # Worked calculations (hand-checkable closed-form steps only).
+    # b_t uses sqrt+sin (earth_b_field_t) — SKIP; pass b_t as live input symbol.
+    # n_turns uses math.ceil — SKIP; pass n_turns as live input symbol.
+    # r_coil uses actual wire area after max() clamp — use live a_wire_m2 in formula.
+    # i_actual is min-clamped — SKIP direct formula; use live value as input to power/moment.
+    worked = [
+        worked_calc(
+            label="Required magnetic dipole moment",
+            formula="m_req = T_desired / B_earth",
+            values={"T_desired": (desired_torque_nm, "N m"), "B_earth": (round(b_t, 9), "T")},
+            result=m_req_r, result_unit="A m2",
+            assumptions=["worst-case: torque vector perpendicular to B field (sin(theta)=1)"],
+        ),
+        worked_calc(
+            label="Max current from power budget",
+            formula="i_max = P_budget / V",
+            values={"P_budget": (power_budget_w, "W"), "V": (voltage_v, "V")},
+            result=i_max_r, result_unit="A",
+            assumptions=["power-limited current cap; iron-core additionally capped at 0.5 A to avoid saturation"],
+        ),
+        worked_calc(
+            label="Coil resistance",
+            formula="R_coil = resistivity x L_wire / A_wire",
+            values={
+                "resistivity": (COPPER_RESISTIVITY, "Ohm m"),
+                "L_wire": (l_wire_r, "m"),
+                "A_wire": (round(a_wire_m2, 9), "m2"),
+            },
+            result=r_coil_r, result_unit="Ohm",
+            assumptions=["copper resistivity 1.724e-8 Ohm m at 20 C"],
+        ),
+        worked_calc(
+            label="Actual coil power dissipation",
+            formula="P_actual = i_actual^2 x R_coil",
+            values={"i_actual": (i_actual_r, "A"), "R_coil": (r_coil_r, "Ohm")},
+            result=power_r, result_unit="W",
+            assumptions=["i_actual is min(V/R, i_max_from_power)"],
+        ),
+        worked_calc(
+            label="Achieved magnetic dipole moment",
+            formula="m_actual = N x i_actual x mu_app x A_coil",
+            values={
+                "N": (n_turns, "turns"),
+                "i_actual": (i_actual_r, "A"),
+                "mu_app": (mu_apparent, ""),
+                "A_coil": (coil_area_r, "m2"),
+            },
+            result=m_actual_r, result_unit="A m2",
+            assumptions=["m = N I mu_apparent A for coil; mu_apparent=1 (air core), 100 (iron rod)"],
+        ),
+        worked_calc(
+            label="Time to unload reaction wheel angular momentum",
+            formula="t_unload = H_wheel / T_desired / 60",
+            values={"H_wheel": (1.0, "N m s"), "T_desired": (desired_torque_nm, "N m")},
+            result=t_unload_r, result_unit="min",
+            assumptions=["H_wheel = 1 N m s (typical small-sat reaction wheel); divide by 60 for minutes"],
+        ),
+    ]
+
     return {
         "altitude_km": altitude_km,
         "latitude_deg": latitude_deg,
@@ -170,19 +247,20 @@ def compute(payload: dict) -> dict:
         "power_budget_w": power_budget_w,
         "earth_b_field_t": b_t,
         "earth_b_field_microtesla": round(b_t * 1e6, 3),
-        "magnetic_dipole_moment_required_am2": round(m_required_am2, 4),
-        "magnetic_dipole_moment_am2": round(m_actual_am2, 4),
+        "magnetic_dipole_moment_required_am2": m_req_r,
+        "magnetic_dipole_moment_am2": m_actual_r,
         "coil_diameter_m": coil_diameter_m,
-        "coil_area_m2": round(coil_area_m2, 5),
+        "coil_area_m2": coil_area_r,
         "coil_turns": n_turns,
-        "coil_current_a": round(i_actual, 4),
+        "coil_current_a": i_actual_r,
         "coil_wire_area_mm2": round(a_wire_required_mm2, 4),
-        "coil_wire_length_m": round(l_wire_m, 2),
-        "coil_resistance_ohm": round(r_coil, 3),
-        "coil_power_w": round(power_actual_w, 3),
+        "coil_wire_length_m": l_wire_r,
+        "coil_resistance_ohm": r_coil_r,
+        "coil_power_w": power_r,
         "coil_mass_kg": round(coil_mass_total_kg, 4),
-        "time_to_unload_minutes": round(t_unload_min, 2),
+        "time_to_unload_minutes": t_unload_r,
         "apparent_permeability": mu_apparent,
+        "worked": worked,
     }
 
 

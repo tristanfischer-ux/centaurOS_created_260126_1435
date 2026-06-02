@@ -44,8 +44,12 @@ License: MIT.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -116,6 +120,46 @@ def compute(payload: dict) -> dict:
     # Cap at material limit
     t_max = T_MAX_BEARING[bearing_type]
 
+    # Worked calculations.
+    # speed_factor uses sqrt() — skip; pass as live input to next steps.
+    # p_loss_kw, m_dot_kg_s, and oil_lpm are clean products/ratios.
+    speed_r = round(speed_factor, 3)
+    p_loss_r = round(p_loss_kw, 4)
+    m_dot_r = round(m_dot_kg_s, 4)
+    oil_lpm_r = round(oil_lpm, 2)
+    worked = [
+        worked_calc(
+            label="Bearing heat dissipation",
+            formula="P_loss = P_spindle x loss_frac x speed_factor x duty",
+            values={"P_spindle": (p_spindle_kw, "kW"),
+                    "loss_frac": (loss_frac, ""),
+                    "speed_factor": (speed_r, ""),
+                    "duty": (duty, "")},
+            result=p_loss_r, result_unit="kW",
+            assumptions=["loss_frac from bearing type lookup (SKF catalogue)",
+                         "speed_factor = (RPM/12000)^0.5 (reference speed 12,000 rpm)"],
+        ),
+        worked_calc(
+            label="Cooling oil mass flow rate",
+            formula="m_dot = P_loss x 1000 / (Cp x 1000 x dT)",
+            values={"P_loss": (p_loss_r, "kW"),
+                    "Cp": (OIL_CP_KJ_KG_K, "kJ/(kg*K)"),
+                    "dT": (OIL_DELTA_T_K, "K")},
+            result=m_dot_r, result_unit="kg/s",
+            assumptions=["Cp = 2.0 kJ/(kg*K) for ISO VG 32 synthetic spindle oil",
+                         "dT = 8 K oil inlet-to-outlet temperature rise"],
+        ),
+        worked_calc(
+            label="Cooling oil volumetric flow rate",
+            formula="oil_lpm = m_dot / rho x 1000 x 60",
+            values={"m_dot": (m_dot_r, "kg/s"),
+                    "rho": (OIL_RHO_KG_M3, "kg/m^3")},
+            result=oil_lpm_r, result_unit="L/min",
+            assumptions=["rho = 870 kg/m^3 for ISO VG 32 synthetic oil",
+                         "multiply by 1000 (m^3 to L) and 60 (s to min)"],
+        ),
+    ]
+
     return {
         "heat_dissipation_kw": round(p_loss_kw, 4),
         "bearing_temp_c": round(min(t_max, t_bearing_c), 2),
@@ -131,6 +175,7 @@ def compute(payload: dict) -> dict:
         "bearing_type": bearing_type,
         "feasible_with_chiller_5kw": p_loss_kw < 5.0,
         "ambient_c": t_amb,
+        "worked": worked,
     }
 
 

@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "OpenCV",
@@ -201,6 +205,45 @@ def compute(payload: dict) -> dict:
     fps_map = {"canny": 30, "template_match": 15, "optical_flow": 25, "yolo": 30, "sift": 8}
     throughput = fps_map.get(algorithm, 15)
 
+    # Worked calculations — clean optics steps only.
+    # px_pitch_mm uses sqrt so is skipped; photons_per_px and snr use sqrt/clamp so skipped.
+    # Pass their live computed values as inputs to the clean steps that follow.
+    ifov_rad_r = round(ifov_rad, 8)
+    defect_ang_r = round(defect_angular_rad, 8)
+    defect_px_r = round(defect_pixel_size, 2)
+    worked = [
+        worked_calc(
+            label="Instantaneous field of view (IFOV) per pixel",
+            formula="ifov_rad = px_pitch_mm / f_mm",
+            values={
+                "px_pitch_mm": (round(px_pitch_mm, 5), "mm"),
+                "f_mm": (f_mm, "mm"),
+            },
+            result=ifov_rad_r, result_unit="rad/px",
+            assumptions=["pixel pitch derived from sensor diagonal / sqrt(Mpix) x sqrt(2)"],
+        ),
+        worked_calc(
+            label="Defect angular subtense at target distance",
+            formula="defect_angular_rad = (defect_mm / 1000) / dist_m",
+            values={
+                "defect_mm": (defect_mm, "mm"),
+                "dist_m": (dist_m, "m"),
+            },
+            result=defect_ang_r, result_unit="rad",
+            assumptions=["small-angle approximation; target perpendicular to bore-sight"],
+        ),
+        worked_calc(
+            label="Defect apparent size in pixels",
+            formula="defect_pixel_size = defect_angular_rad / ifov_rad",
+            values={
+                "defect_angular_rad": (defect_ang_r, "rad"),
+                "ifov_rad": (ifov_rad_r, "rad/px"),
+            },
+            result=defect_px_r, result_unit="px",
+            assumptions=["uniform pixel pitch; diffraction MTF not included"],
+        ),
+    ]
+
     out: dict = {
         "image_size_mp": img_mp,
         "target_distance_m": dist_m,
@@ -214,6 +257,7 @@ def compute(payload: dict) -> dict:
         "ifov_microrad": round(ifov_urad, 2),
         "pixel_pitch_um": round(px_pitch_mm * 1000, 3),
         "photons_per_pixel": round(photons_per_px, 0),
+        "worked": worked,
     }
     return out
 

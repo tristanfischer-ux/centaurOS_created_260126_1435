@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "coherent_optical_receiver (custom)",
@@ -129,6 +133,53 @@ def compute(payload: dict) -> dict:
     after_fec_ber = 1e-12 if ber < fec_threshold_ber else ber
     fec_helps = ber < fec_threshold_ber
 
+    # Worked calculations — reviewer-verifiable arithmetic steps.
+    # BER formulas use erfc/exp (transcendental) → SKIPPED.
+    # log10 for SNR dB → SKIPPED.
+    wavelength_m_r  = wavelength_m
+    freq_r          = round(freq_hz, 4)
+    photon_e_r      = photon_energy_j  # keep full float (very small)
+    rate_bps_r      = rate_bps
+    P_quantum_r     = float(f"{P_quantum_w:.3e}")
+    P_sens_r        = float(f"{P_sens_w:.3e}")
+
+    worked = [
+        worked_calc(
+            label="Optical frequency from wavelength",
+            formula="freq_hz = C_LIGHT / wavelength_m",
+            values={
+                "C_LIGHT":      (3e8,            "m/s"),
+                "wavelength_m": (wavelength_m_r, "m"),
+            },
+            result=freq_r, result_unit="Hz",
+            assumptions=["Speed of light c = 3e8 m/s (vacuum approximation)."],
+        ),
+        worked_calc(
+            label="Signal power at quantum limit",
+            formula="P_quantum = N_photons x photon_energy_j x rate_bps",
+            values={
+                "N_photons":       (N_photons,    "photons/bit"),
+                "photon_energy_j": (photon_e_r,   "J"),
+                "rate_bps":        (rate_bps_r,   "bit/s"),
+            },
+            result=P_quantum_r, result_unit="W",
+            assumptions=["Assumes one photon per bit energy × bit rate gives average optical power."],
+        ),
+        worked_calc(
+            label="Receiver sensitivity power at BER 1e-9",
+            formula="P_sens = n_for_1e_9 x photon_energy_j x rate_bps",
+            values={
+                "n_for_1e_9":      (n_for_1e_9,  "photons/bit"),
+                "photon_energy_j": (photon_e_r,  "J"),
+                "rate_bps":        (rate_bps_r,  "bit/s"),
+            },
+            result=P_sens_r, result_unit="W",
+            assumptions=[
+                f"n_for_1e_9 = {n_for_1e_9} for {mod} (shot-noise-limited coherent detection threshold, Agrawal 4th ed.).",
+            ],
+        ),
+    ]
+
     return {
         "signal_photons_per_bit": N_photons,
         "modulation": mod,
@@ -147,6 +198,7 @@ def compute(payload: dict) -> dict:
         "symbol_rate_gsym_s": round(symbol_rate_gsym_s, 2),
         "quantum_power_at_input_dbm": round(P_quantum_dbm, 2),
         "photon_energy_j": photon_energy_j,
+        "worked": worked,
     }
 
 

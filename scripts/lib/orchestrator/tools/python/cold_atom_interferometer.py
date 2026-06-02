@@ -45,8 +45,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -152,6 +156,61 @@ def compute(payload: dict) -> dict:
     # phi_max = pi → a_max = pi / (k_eff * T^2)
     a_dynamic_range_g = math.pi / (k_eff * T_s ** 2) / G_STANDARD
 
+    # Worked calculations — reviewer-verifiable arithmetic steps.
+    # k_laser = 2*pi/lambda (transcendental) → SKIPPED; passed as live input.
+    # sigma_phi_per_shot = 1/(C*sqrt(N)) uses sqrt (transcendental) → SKIPPED; passed as live.
+    # v_thermal uses sqrt (transcendental) → SKIPPED.
+    k_eff_r              = round(k_eff, 1)
+    k_laser_r            = round(k_laser, 1)
+    sigma_phi_r          = round(sigma_phi_per_shot, 8)
+    sigma_a_r            = sigma_a_per_shot
+    T_s_r                = T_s
+    sigma_a_sqrthz_r     = sigma_a_per_sqrthz
+    sens_g_r             = sensitivity_g_per_sqrthz
+    sens_ug_r            = round(sensitivity_micro_g_per_sqrthz, 4)
+
+    worked = [
+        worked_calc(
+            label="Effective two-photon wave-vector",
+            formula="k_eff = 2 x k_laser",
+            values={"k_laser": (k_laser_r, "rad/m")},
+            result=k_eff_r, result_unit="rad/m",
+            assumptions=[
+                "Two-photon Raman process: k_eff = 2*k_laser (Kasevich & Chu 1991).",
+                "k_laser = 2*pi/lambda (transcendental — not re-shown).",
+            ],
+        ),
+        worked_calc(
+            label="Per-shot acceleration sensitivity",
+            formula="sigma_a = sigma_phi_per_shot / (k_eff x T_s^2)",
+            values={
+                "sigma_phi_per_shot": (sigma_phi_r, "rad"),
+                "k_eff":              (k_eff_r,     "rad/m"),
+                "T_s":                (T_s_r,       "s"),
+            },
+            result=float(f"{sigma_a_r:.4e}"), result_unit="m/s2",
+            assumptions=[
+                "sigma_phi = 1/(C*sqrt(N)) (shot-noise limit; transcendental — not re-shown).",
+                "Phase sensitivity formula Delta_phi = k_eff a T^2 (Kasevich & Chu 1991).",
+            ],
+        ),
+        worked_calc(
+            label="Sensitivity in micro-g per root-Hz",
+            formula="sens_ug = sigma_a_per_sqrthz / G_STANDARD x 1e6",
+            values={
+                "sigma_a_per_sqrthz": (float(f"{sigma_a_per_sqrthz:.4e}"), "m/s2 / sqrt(Hz)"),
+                "G_STANDARD":          (G_STANDARD,                          "m/s2"),
+            },
+            # Use the pre-rounded value so the substitution arithmetic reproduces the result.
+            # The output field sensitivity_micro_g_per_sqrthz is rounded separately.
+            result=sensitivity_micro_g_per_sqrthz, result_unit="ug/sqrt(Hz)",
+            assumptions=[
+                "sigma_a_per_sqrthz = sigma_a / sqrt(rate_hz) (transcendental — not re-shown).",
+                "1e6 converts g to micro-g.",
+            ],
+        ),
+    ]
+
     return {
         "atom_species": species,
         "atom_name": atom["name"],
@@ -174,6 +233,7 @@ def compute(payload: dict) -> dict:
         "size_volume_l": round(volume_l, 1),
         "signal_to_noise": round(snr, 1),
         "dynamic_range_g": round(a_dynamic_range_g, 4),
+        "worked": worked,
     }
 
 

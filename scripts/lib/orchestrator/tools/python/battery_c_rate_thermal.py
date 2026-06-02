@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -141,6 +145,64 @@ def compute(payload: dict) -> dict:
     else:
         recommended_max_c = 1.0
 
+    # --- Worked calculations ---
+    # cell_mass_kg and h_cooling are branchy lookups — passed as live inputs.
+    # actual_dt involves exp() — skipped.
+    current_r = round(current_a, 1)
+    r_ohm_r = round(r_ohm, 6)
+    q_res_r = round(q_resistive, 2)
+    q_pol_r = round(q_polarisation, 2)
+    q_tot_r = round(q_total_w, 2)
+    steady_dt_r = round(steady_dt_K, 1)
+    tau_r = round(tau_s, 1)
+
+    worked = [
+        worked_calc(
+            label="Discharge current",
+            formula="I = C_rate x capacity_Ah",
+            values={"C_rate": (c_rate, ""), "capacity_Ah": (cell_capacity_ah, "Ah")},
+            result=current_r, result_unit="A",
+            assumptions=["C-rate is multiple of capacity; 30C x 1.5 Ah = 45 A"],
+        ),
+        worked_calc(
+            label="Resistive heat generation",
+            formula="Q_resistive = I^2 x R",
+            values={"I": (current_r, "A"), "R": (r_ohm_r, "ohm")},
+            result=q_res_r, result_unit="W",
+            assumptions=["R_internal in ohm = cell_internal_resistance_mohm / 1000"],
+        ),
+        worked_calc(
+            label="Polarisation heat generation (10% penalty)",
+            formula="Q_pol = Q_resistive x 0.10",
+            values={"Q_resistive": (q_res_r, "W")},
+            result=q_pol_r, result_unit="W",
+            assumptions=["Empirical 10% overpotential penalty at high C-rate"],
+        ),
+        worked_calc(
+            label="Total heat generated per cell",
+            formula="Q_total = Q_resistive + Q_pol",
+            values={"Q_resistive": (q_res_r, "W"), "Q_pol": (q_pol_r, "W")},
+            result=q_tot_r, result_unit="W",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Steady-state temperature rise",
+            formula="dT_ss = Q_total / (h x A_surface)",
+            values={"Q_total": (q_tot_r, "W"), "h": (h_cooling, "W/m2K"),
+                    "A_surface": (cell_surface_m2, "m2")},
+            result=steady_dt_r, result_unit="K",
+            assumptions=["h from cooling mode lookup; A_surface from cell capacity band"],
+        ),
+        worked_calc(
+            label="Thermal time constant",
+            formula="tau = (m x c_p) / (h x A_surface)",
+            values={"m": (cell_mass_kg, "kg"), "c_p": (cp_battery, "J/kgK"),
+                    "h": (h_cooling, "W/m2K"), "A_surface": (cell_surface_m2, "m2")},
+            result=tau_r, result_unit="s",
+            assumptions=["Lumped-capacitance model; c_p = 1100 J/(kg K) for Li-ion"],
+        ),
+    ]
+
     return {
         "cell_capacity_ah": cell_capacity_ah,
         "c_rate": c_rate,
@@ -166,6 +228,7 @@ def compute(payload: dict) -> dict:
         "max_c_rate_within_cooling": recommended_max_c >= c_rate,
         "thermal_runaway_temp_c": 130,
         "vent_threshold_c": 90,
+        "worked": worked,
         "notes": (
             "Heat = I²R + polarisation losses. Transient temp uses lumped capacity. "
             "Capacity loss accelerates above 45°C; thermal runaway above 130°C "

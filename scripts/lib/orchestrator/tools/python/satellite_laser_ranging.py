@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -162,6 +166,56 @@ def compute(payload: dict) -> dict:
     snr_lin = n_return / max(math.sqrt(background_photons_per_pulse + n_return), 1)
     snr_db = 10.0 * math.log10(max(snr_lin, 1e-3))
 
+    # Worked calculations — only clean arithmetic steps shown.
+    # Steps involving pi^4, sqrt, or log are passed as live inputs to the
+    # next clean step rather than emitted as worked_calc entries.
+    e_pulse_j_r = round(e_pulse_j, 6)
+    n_tx_r = round(n_tx_photons, 0)
+    A_tel_r = round(A_tel_m2, 4)
+    eta_total_r = round(eta_total, 5)
+    n_return_r = round(n_return, 6)
+    worked = [
+        worked_calc(
+            label="Pulse energy conversion (mJ to J)",
+            formula="E_pulse_j = E_pulse_mj x 1e-3",
+            values={"E_pulse_mj": (e_pulse_mj, "mJ")},
+            result=e_pulse_j_r, result_unit="J",
+            assumptions=["1 mJ = 1e-3 J"],
+        ),
+        worked_calc(
+            label="Transmit photons per pulse",
+            formula="N_tx = E_pulse_j / photon_energy_j",
+            values={"E_pulse_j": (e_pulse_j_r, "J"),
+                    "photon_energy_j": (round(photon_energy_j, 30), "J")},
+            result=round(n_tx_photons, 4), result_unit="photons",
+            assumptions=["photon_energy_j = h * c / wavelength_m (Planck)"],
+        ),
+        worked_calc(
+            label="Combined link efficiency",
+            formula="eta_total = tx_eff x rx_eff x detector_qe x atm_two_way",
+            values={"tx_eff": (tx_eff, ""),
+                    "rx_eff": (rx_eff, ""),
+                    "detector_qe": (detector_qe, ""),
+                    "atm_two_way": (round(atm_two_way, 4), "")},
+            result=eta_total_r, result_unit="",
+            assumptions=["atm_two_way = 10^(-atm_loss_one_way_db/10) ^ 2"],
+        ),
+        worked_calc(
+            label="Returned photons per pulse",
+            formula="N_return = N_tx x eta_total x sigma_cube x A_tel / (spot_area x 4 x pi x R^2)",
+            values={"N_tx": (round(n_tx_photons, 4), "photons"),
+                    "eta_total": (eta_total_r, ""),
+                    "sigma_cube": (round(sigma_cube_m2, 6), "m^2"),
+                    "A_tel": (A_tel_r, "m^2"),
+                    "spot_area": (round(spot_area_m2, 4), "m^2"),
+                    "R": (R_m, "m")},
+            result=n_return_r, result_unit="photons",
+            assumptions=["sigma_cube = pi^4 * D^4 / (4 * lambda^2) per Degnan 1993",
+                         "spot_area = pi * (2R * tx_div_rad / 2)^2",
+                         "4 x pi x R^2 = far-field sphere solid angle denominator"],
+        ),
+    ]
+
     return {
         "target_satellite_altitude_km": alt_km,
         "wavelength_nm": wavelength_nm,
@@ -180,6 +234,7 @@ def compute(payload: dict) -> dict:
         "max_range_km": round(r_max_km, 0),
         "link_signal_to_noise_db": round(snr_db, 1),
         "background_photons_per_pulse_assumed": background_photons_per_pulse,
+        "worked": worked,
     }
 
 

@@ -45,8 +45,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -119,6 +123,51 @@ def compute(payload: dict) -> dict:
     feasibility = "OK" if link_margin_db >= 10.0 else (
         "MARGINAL" if link_margin_db >= 0.0 else "INFEASIBLE")
 
+    # Rounded intermediates for chained worked calculations.
+    fspl_r = round(fspl_db, 2)
+    body_r = round(body_loss_db, 2)
+    total_path_r = round(total_path_loss_db, 2)
+    rx_power_r = round(rx_power_dbm, 2)
+    link_margin_r = round(link_margin_db, 2)
+
+    worked = [
+        worked_calc(
+            label="Total path loss (free space + body absorption)",
+            formula="total_path_loss = fspl_db + body_loss_db",
+            values={
+                "fspl_db": (fspl_r, "dB"),
+                "body_loss_db": (body_r, "dB"),
+            },
+            result=total_path_r, result_unit="dB",
+            assumptions=[
+                "fspl_db = 20 log10(4 pi d / lambda) — log step not hand-checkable, treated as input here",
+                f"body_loss_db = {body_r} dB for {'on-body' if body_absorb else 'off-body'} at {freq_ghz} GHz (Hall & Hao 2012)",
+            ],
+        ),
+        worked_calc(
+            label="Received power at receiver antenna",
+            formula="rx_power = tx_power + gain_tx + gain_rx - total_path_loss",
+            values={
+                "tx_power": (tx_power_dbm, "dBm"),
+                "gain_tx": (gain_tx, "dBi"),
+                "gain_rx": (gain_rx, "dBi"),
+                "total_path_loss": (total_path_r, "dB"),
+            },
+            result=rx_power_r, result_unit="dBm",
+            assumptions=["Friis equation in dB form; gains in dBi relative to isotropic"],
+        ),
+        worked_calc(
+            label="Link margin",
+            formula="link_margin = rx_power - rx_sensitivity",
+            values={
+                "rx_power": (rx_power_r, "dBm"),
+                "rx_sensitivity": (rx_sens_dbm, "dBm"),
+            },
+            result=link_margin_r, result_unit="dB",
+            assumptions=["positive margin means received power exceeds receiver noise floor"],
+        ),
+    ]
+
     return {
         "tx_power_dbm": tx_power_dbm,
         "frequency_ghz": freq_ghz,
@@ -132,6 +181,7 @@ def compute(payload: dict) -> dict:
         "link_margin_db": round(link_margin_db, 2),
         "max_range_m": round(max_range_m, 2),
         "feasibility": feasibility,
+        "worked": worked,
         "_meta": {
             "model": "Friis free-space + body-absorption (Hall & Hao 2012, IEEE 802.15.6)",
         },

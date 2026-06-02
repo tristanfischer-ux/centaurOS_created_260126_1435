@@ -35,8 +35,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -123,6 +127,32 @@ def compute(payload: dict) -> dict:
     heat_rejection_min_w_m2 = eps_low * sigma_sb * (avg_t ** 4)
     heat_modulation_ratio = heat_rejection_max_w_m2 / heat_rejection_min_w_m2
 
+    # Worked calculations.
+    # Switching time uses Arrhenius exp() — skip.
+    # Stefan-Boltzmann uses T^4 — skip (transcendental to verify by hand).
+    # Power to maintain state is a clean product of named inputs.
+    leakage_total_a_r = round(leakage_total_a, 8)
+    power_mw_r = round(power_mw, 4)
+    worked = [
+        worked_calc(
+            label="Total leakage current",
+            formula="I_leak = leakage_A_cm2 x area_cm2",
+            values={"leakage_A_cm2": (leakage_a_cm2, "A/cm^2"),
+                    "area_cm2": (area_cm2, "cm^2")},
+            result=leakage_total_a_r, result_unit="A",
+            assumptions=["steady-state leakage density 1 uA/cm^2 (Salihoglu 2018)"],
+        ),
+        worked_calc(
+            label="Power to maintain switched state",
+            formula="P_hold = I_leak x V x 1000",
+            values={"I_leak": (leakage_total_a_r, "A"),
+                    "V": (voltage_v, "V")},
+            result=power_mw_r, result_unit="mW",
+            assumptions=["factor 1000 converts W to mW",
+                         "leakage-current model from Salihoglu 2018"],
+        ),
+    ]
+
     return {
         "temperature_range_k": temp_range,
         "switching_voltage_v": voltage_v,
@@ -136,6 +166,7 @@ def compute(payload: dict) -> dict:
         "heat_rejection_max_w_m2": round(heat_rejection_max_w_m2, 1),
         "heat_rejection_min_w_m2": round(heat_rejection_min_w_m2, 1),
         "heat_modulation_ratio": round(heat_modulation_ratio, 2),
+        "worked": worked,
     }
 
 

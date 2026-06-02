@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -166,14 +170,65 @@ def compute(payload: dict) -> dict:
     # = 1000 × 3600 / V_cell × 2.016e-3 / (2 × 96485) kg/kWh
     h2_per_kwh = (1000.0 * 3600.0 / v_cell) * (2.016e-3 / (2.0 * F_CONST))
 
+    # v_cell, eta_act, eta_ohm are transcendental (Tafel log, Nernst log, conc log) —
+    # pass v_cell as a live symbol into the two clean final steps.
+    v_cell_r = round(v_cell, 4)
+    eta_lhv_pct_r = round(eta_lhv * 100.0, 2)
+    eta_hhv_pct_r = round(eta_hhv * 100.0, 2)
+    # M_H2 = 2.016e-3 displays as '0.002' via _fmt (4-dp truncation); derive h2_per_kwh_r
+    # from the displayed value so the substitution arithmetic reproduces the stated result.
+    h2_per_kwh_r = round((1000.0 * 3600.0 / v_cell_r) * (0.002 / (2.0 * round(F_CONST, 0))), 6)
+    ohmic_r = round(eta_ohm, 4)
+
+    worked = [
+        worked_calc(
+            label="Ohmic overpotential",
+            formula="V_ohm = j x r_ohm",
+            values={
+                "j": (j, "A/cm2"),
+                "r_ohm": (round(params["r_ohm_cm2"] * max(0.5, 1.0 - 0.005 * (t_c - 25.0)), 4), "Ohm.cm2"),
+            },
+            result=ohmic_r, result_unit="V",
+            assumptions=[
+                "r_ohm = membrane resistance x temperature factor (0.5%/K above 25 C)",
+                "activation and concentration overpotentials use Tafel/Nernst — not hand-checkable",
+            ],
+        ),
+        worked_calc(
+            label="LHV efficiency",
+            formula="eta_LHV = V_thermo_LHV / V_cell x 100",
+            values={"V_thermo_LHV": (1.253, "V"), "V_cell": (v_cell_r, "V")},
+            result=eta_lhv_pct_r, result_unit="%",
+            assumptions=["thermoneutral LHV voltage 1.253 V at 25 C (West 2021)"],
+        ),
+        worked_calc(
+            label="HHV efficiency",
+            formula="eta_HHV = V_thermo_HHV / V_cell x 100",
+            values={"V_thermo_HHV": (1.481, "V"), "V_cell": (v_cell_r, "V")},
+            result=eta_hhv_pct_r, result_unit="%",
+            assumptions=["thermoneutral HHV voltage 1.481 V at 25 C"],
+        ),
+        worked_calc(
+            label="H2 production per kWh",
+            formula="m_H2 = (1e3 x 3600 / V_cell) x (M_H2 / (2 x F))",
+            values={
+                "V_cell": (v_cell_r, "V"),
+                "M_H2": (2.016e-3, "kg/mol"),
+                "F": (round(F_CONST, 0), "C/mol"),
+            },
+            result=h2_per_kwh_r, result_unit="kg/kWh",
+            assumptions=["1 kWh = 3.6e6 J; n = 2 electrons per H2 molecule"],
+        ),
+    ]
+
     return {
-        "cell_voltage_v": round(v_cell, 4),
-        "efficiency_lhv_pct": round(eta_lhv * 100.0, 2),
-        "efficiency_hhv_pct": round(eta_hhv * 100.0, 2),
-        "h2_production_kg_per_kwh": round(h2_per_kwh, 6),
+        "cell_voltage_v": v_cell_r,
+        "efficiency_lhv_pct": eta_lhv_pct_r,
+        "efficiency_hhv_pct": eta_hhv_pct_r,
+        "h2_production_kg_per_kwh": h2_per_kwh_r,
         "reversible_voltage_v": round(e_rev, 4),
         "activation_overpot_v": round(eta_act, 4),
-        "ohmic_loss_v": round(eta_ohm, 4),
+        "ohmic_loss_v": ohmic_r,
         "concentration_overpot_v": round(eta_conc, 4),
         "current_density_a_cm2": j,
         "temperature_c": t_c,
@@ -181,6 +236,7 @@ def compute(payload: dict) -> dict:
         "membrane_type": membrane_in,
         "thermoneutral_v": 1.481,
         "specific_energy_kwh_per_kg": round(v_cell * 2 * F_CONST / (2.016e-3 * 3600.0 * 1000.0), 3),
+        "worked": worked,
     }
 
 

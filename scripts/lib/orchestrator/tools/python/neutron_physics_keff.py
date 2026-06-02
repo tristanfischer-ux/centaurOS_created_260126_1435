@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "neutron_physics_keff (custom)",
@@ -160,6 +164,94 @@ def compute(payload: dict) -> dict:
     # Effective delayed neutron fraction
     beta_eff = 0.0065 * (1 - 0.05 * (rho_fuel - 10.4) / 10.4)
 
+    # Worked calculations.
+    # eps, p, f are table lookups (branchy) — skip; pass as live symbols.
+    # B_squared uses pi (well-known constant) and is hand-checkable — convert.
+    # k_eff reflector boost is conditional (branchy) — skip; pass final k_eff live.
+    # k_eff_bare = leakage step only (before reflector); reflector step adds a clean
+    # multiply so can show as a separate step when reflector=True.
+    k_eff_bare = k_inf / (1.0 + M_squared_m2 * B_squared)
+    sigma_a_avg_r = round(sigma_a_avg, 4)
+    sigma_f_avg_r = round(sigma_f_avg, 4)
+    eta_r = round(eta, 3)
+    k_inf_r = round(k_inf, 4)
+    B_sq_r = round(B_squared, 4)
+    M_sq_r = round(M_squared_m2, 6)
+    k_eff_bare_r = round(k_eff_bare, 4)
+    k_eff_r = round(k_eff, 4)
+    beta_r = round(beta_eff, 4)
+    worked = [
+        worked_calc(
+            label="Fuel macroscopic absorption cross-section (weighted average)",
+            formula="sigma_a_avg = f_U235 x sigma_a_U235 + (1 - f_U235) x sigma_a_U238",
+            values={
+                "f_U235": (f_U235, ""),
+                "sigma_a_U235": (sigma_a_U235, "barn"),
+                "sigma_a_U238": (sigma_a_U238, "barn"),
+            },
+            result=sigma_a_avg_r, result_unit="barn",
+            assumptions=["thermal cross-sections: U-235 681 b, U-238 2.7 b (Lamarsh & Baratta Table 3-1)"],
+        ),
+        worked_calc(
+            label="Reproduction factor eta",
+            formula="eta = nu x sigma_f_avg / sigma_a_avg",
+            values={
+                "nu": (nu_per_fission, "n/fission"),
+                "sigma_f_avg": (sigma_f_avg_r, "barn"),
+                "sigma_a_avg": (sigma_a_avg_r, "barn"),
+            },
+            result=eta_r, result_unit="",
+            assumptions=["nu = 2.42 for thermal U-235 fission (ENDF/B-VIII.0)"],
+        ),
+        worked_calc(
+            label="Infinite multiplication factor (four-factor formula)",
+            formula="k_inf = eta x eps x p x f",
+            values={
+                "eta": (eta_r, ""),
+                "eps": (eps, ""),
+                "p": (p, ""),
+                "f": (f, ""),
+            },
+            result=k_inf_r, result_unit="",
+            assumptions=[
+                f"eps = {eps} (fast fission factor for {moderator} moderator)",
+                f"p = {p} (resonance escape for {moderator})",
+                f"f = {f} (thermal utilisation for {moderator})",
+            ],
+        ),
+        worked_calc(
+            label="Geometric buckling for finite cylinder",
+            formula="B_sq = (3.14159 / H_eff)^2 + (2.405 / R_eff)^2",
+            values={"H_eff": (round(H_eff, 3), "m"), "R_eff": (round(R_eff, 3), "m")},
+            result=B_sq_r, result_unit="m^-2",
+            assumptions=["2.405 = first root of J0 Bessel function (cylindrical geometry)"],
+        ),
+        worked_calc(
+            label="Bare-core effective multiplication factor (finite-core leakage)",
+            formula="k_eff_bare = k_inf / (1 + M_sq x B_sq)",
+            values={"k_inf": (k_inf_r, ""), "M_sq": (M_sq_r, "m2"), "B_sq": (B_sq_r, "m^-2")},
+            result=k_eff_bare_r, result_unit="",
+            assumptions=[f"M^2 = {M_sq_r} m2 migration area for {moderator} (Lamarsh §5.3)"],
+        ),
+        *(
+            [worked_calc(
+                label="k_eff with reflector saving",
+                formula="k_eff = k_eff_bare x 1.04",
+                values={"k_eff_bare": (k_eff_bare_r, "")},
+                result=k_eff_r, result_unit="",
+                assumptions=["1.04× reflector saving factor for water reflector (Glasstone & Sesonske §4.8)"],
+            )]
+            if reflector else []
+        ),
+        worked_calc(
+            label="Effective delayed neutron fraction",
+            formula="beta_eff = 0.0065 x (1 - 0.05 x (rho_fuel - 10.4) / 10.4)",
+            values={"rho_fuel": (rho_fuel, "g/cm3")},
+            result=beta_r, result_unit="",
+            assumptions=["0.0065 = reference beta_eff for U-235 at nominal density 10.4 g/cm3"],
+        ),
+    ]
+
     return {
         "fuel_enrichment_pct": enrichment_pct,
         "moderator_type": moderator,
@@ -183,6 +275,7 @@ def compute(payload: dict) -> dict:
         "core_volume_m3": fuel_vol_m3,
         "core_geometry": "cylindrical",
         "reflector_present": reflector,
+        "worked": worked,
     }
 
 

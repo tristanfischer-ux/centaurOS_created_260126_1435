@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -184,6 +188,84 @@ def compute(payload: dict) -> dict:
     g_0 = 9.80665
     isp_calc = thrust_n / (m_dot_total * g_0)
 
+    # Worked calculations — closed-form arithmetic steps only.
+    # isp_factor (parabolic clamped), cf_ideal (sqrt of multi-term), A_port (pi*r^2)
+    # and A_fuel (difference of two pi*r^2) are skipped — not simple hand-check chains.
+    m_dot_total_r = round(m_dot_total, 4)
+    m_dot_fuel_r = round(m_dot_fuel, 4)
+    m_dot_ox_r = round(m_dot_ox, 4)
+    fuel_mass_r = round(fuel_mass_kg, 3)
+    thrust_r = round(thrust_n, 1)
+    burn_time_r = round(burn_time_s, 1)
+    oxidizer_mass_r = round(oxidizer_mass_kg, 2)
+    worked = [
+        worked_calc(
+            label="Total propellant mass flow (fuel + oxidiser)",
+            formula="m_dot_total = (fuel_mass / burn_time_target) x (1 + OF)",
+            values={
+                "fuel_mass": (round(fuel_mass_kg, 3), "kg"),
+                "burn_time_target": (burn_time_target, "s"),
+                "OF": (of_ratio, ""),
+            },
+            result=m_dot_total_r, result_unit="kg/s",
+            assumptions=["fuel_mass from grain geometry (density x annular volume); burn time from input"],
+        ),
+        worked_calc(
+            label="Fuel mass flow",
+            formula="m_dot_fuel = m_dot_total / (1 + OF)",
+            values={
+                "m_dot_total": (m_dot_total_r, "kg/s"),
+                "OF": (of_ratio, ""),
+            },
+            result=m_dot_fuel_r, result_unit="kg/s",
+            assumptions=["O/F ratio splits total flow by mass; OF from input"],
+        ),
+        worked_calc(
+            label="Oxidiser mass flow",
+            formula="m_dot_ox = m_dot_fuel x OF",
+            values={
+                "m_dot_fuel": (m_dot_fuel_r, "kg/s"),
+                "OF": (of_ratio, ""),
+            },
+            result=m_dot_ox_r, result_unit="kg/s",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Thrust",
+            formula="F = cf_eff x p_c_pa x A_t",
+            values={
+                "cf_eff": (round(cf_eff, 4), ""),
+                "p_c_pa": (round(p_c_pa, 0), "Pa"),
+                "A_t": (round(A_t, 6), "m2"),
+            },
+            result=thrust_r, result_unit="N",
+            assumptions=[
+                "cf_eff = cf_ideal x 0.96 nozzle efficiency; cf_ideal from Sutton eq.3-30 (not hand-verified — complex)",
+                f"A_t from m_dot_total x c_star / p_c; c_star = {c_star} m/s (Sutton Table 15-2 for {fuel}/{oxidizer})",
+            ],
+        ),
+        worked_calc(
+            label="Burn time",
+            formula="burn_time = fuel_mass / m_dot_fuel",
+            values={
+                "fuel_mass": (fuel_mass_r, "kg"),
+                "m_dot_fuel": (m_dot_fuel_r, "kg/s"),
+            },
+            result=burn_time_r, result_unit="s",
+            assumptions=["Grain burns until all fuel consumed at constant regression rate"],
+        ),
+        worked_calc(
+            label="Oxidiser mass consumed",
+            formula="ox_mass = m_dot_ox x burn_time",
+            values={
+                "m_dot_ox": (m_dot_ox_r, "kg/s"),
+                "burn_time": (burn_time_r, "s"),
+            },
+            result=oxidizer_mass_r, result_unit="kg",
+            assumptions=[],
+        ),
+    ]
+
     return {
         "fuel": fuel,
         "oxidizer": oxidizer,
@@ -209,6 +291,7 @@ def compute(payload: dict) -> dict:
         "characteristic_velocity_c_star": c_star,
         "oxidiser_mass_flux_g_ox_kg_m2_s": round(g_ox, 1),
         "m_dot_total_kg_s": round(m_dot_total, 3),
+        "worked": worked,
     }
 
 

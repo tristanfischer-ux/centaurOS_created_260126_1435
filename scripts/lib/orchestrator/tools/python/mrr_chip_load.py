@@ -51,8 +51,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -161,6 +165,62 @@ def compute(payload: dict) -> dict:
     else:
         T_life_min = 0.0
 
+    # Worked calculations.
+    # rpm uses pi — transcendental; pass as live symbol.
+    # feed_rate = rpm × Z × f_z is clean given live rpm.
+    # mrr = a_p × a_e × feed_rate / 1000 is clean.
+    # Chip thickness h_m uses sin for partial engagement (transcendental);
+    # pass h_m and A_chip as live symbols for F_c and T steps.
+    # Spindle power uses pi via omega — skip; pass P_spindle_kw as live value.
+    # Taylor tool life uses fractional exponent — transcendental; skip.
+    rpm_r = round(rpm, 1)
+    feed_rate_r = round(feed_rate_mm_min, 1)
+    mrr_r = round(mrr_cm3_min, 3)
+    A_chip_r = round(A_chip_mm2, 4)
+    F_c_n_r = round(F_c_n, 1)
+    F_c_total_r = round(F_c_total_n, 1)
+    T_spindle_r = round(T_spindle_nm, 4)
+    worked = [
+        worked_calc(
+            label="Table feed rate",
+            formula="feed_rate = rpm x Z x f_z",
+            values={"rpm": (rpm_r, "rev/min"), "Z": (Z, ""), "f_z": (f_z_mm, "mm")},
+            result=feed_rate_r, result_unit="mm/min",
+            assumptions=["rpm already corrected for pi×D (transcendental — passed as live value)"],
+        ),
+        worked_calc(
+            label="Material removal rate",
+            formula="MRR = a_p x a_e x feed_rate / 1000",
+            values={"a_p": (a_p, "mm"), "a_e": (a_e, "mm"), "feed_rate": (feed_rate_r, "mm/min")},
+            result=mrr_r, result_unit="cm3/min",
+            assumptions=["÷ 1000 converts mm3/min to cm3/min"],
+        ),
+        worked_calc(
+            label="Cutting force per tooth",
+            formula="F_c = K_s x A_chip",
+            values={"K_s": (K_s, "N/mm2"), "A_chip": (A_chip_r, "mm2")},
+            result=F_c_n_r, result_unit="N",
+            assumptions=[
+                f"K_s = {K_s} N/mm2 for {material} (Sandvik Coromant handbook)",
+                "A_chip = a_p × h_m where h_m from engagement geometry (passed as live value)",
+            ],
+        ),
+        worked_calc(
+            label="Total cutting force (all teeth in cut)",
+            formula="F_c_total = F_c x teeth_in_cut",
+            values={"F_c": (F_c_n_r, "N"), "teeth_in_cut": (teeth_in_cut, "")},
+            result=F_c_total_r, result_unit="N",
+            assumptions=[f"teeth_in_cut = {teeth_in_cut} (engagement fraction {round(eng_frac,3)})"],
+        ),
+        worked_calc(
+            label="Spindle torque",
+            formula="T_spindle = F_c_total x (D_mm / 2) / 1000",
+            values={"F_c_total": (F_c_total_r, "N"), "D_mm": (D_mm, "mm")},
+            result=T_spindle_r, result_unit="N·m",
+            assumptions=["÷ 1000 converts mm to m for SI torque"],
+        ),
+    ]
+
     return {
         "mrr_cm3_min": round(mrr_cm3_min, 3),
         "cutting_force_n": round(F_c_total_n, 1),
@@ -184,6 +244,7 @@ def compute(payload: dict) -> dict:
         "radial_depth_mm": a_e,
         "taylor_n": n,
         "taylor_c": C,
+        "worked": worked,
     }
 
 

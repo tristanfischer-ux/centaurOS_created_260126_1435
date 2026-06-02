@@ -55,8 +55,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -148,24 +152,101 @@ def compute(payload: dict) -> dict:
     else:
         peak_load = sine_resp_g + 3.0 * grms_resp
 
+    # Rounded display values that chain through the worked calculations.
+    q_r = round(q, 3)
+    sine_resp_r = round(sine_resp_g, 3)
+    grms_resp_r = round(grms_resp, 3)
+    fatigue_qual_r = round(fatigue_cycles, 0)
+    fatigue_launch_r = round(fatigue_cycles_launch, 0)
+
+    # Worked calculations (hand-checkable, closed-form steps only).
+    # derate_factor, grms_input, grms_resp use log10/sqrt — SKIP those.
+    worked = [
+        worked_calc(
+            label="Amplification factor Q",
+            formula="Q = 1 / (2 x damping)",
+            values={"damping": (damping, "")},
+            result=q_r, result_unit="",
+            assumptions=["single-DoF resonance amplification (Wijker 2004 §4)"],
+        ),
+        worked_calc(
+            label="Sine peak response acceleration",
+            formula="sine_resp = Q x sine_input",
+            values={"Q": (q_r, ""), "sine_input": (sine_input_g, "g")},
+            result=sine_resp_r, result_unit="g",
+            assumptions=["sine sweep through resonance; worst-case alignment"],
+        ),
+        worked_calc(
+            label="Fatigue cycles — qualification test",
+            formula="N_qual = f_n x t_test",
+            values={"f_n": (fn_hz, "Hz"), "t_test": (RANDOM_TEST_DURATION_S, "s")},
+            result=fatigue_qual_r, result_unit="cycles",
+            assumptions=["60 s random vibration qualification test per axis (NASA-GEVS)"],
+        ),
+        worked_calc(
+            label="Fatigue cycles — launch phase",
+            formula="N_launch = f_n x t_launch",
+            values={"f_n": (fn_hz, "Hz"), "t_launch": (500.0, "s")},
+            result=fatigue_launch_r, result_unit="cycles",
+            assumptions=["typical 500 s powered ascent"],
+        ),
+        worked_calc(
+            label="Fatigue cycles — lifetime (qualification + launch)",
+            formula="N_total = N_qual + N_launch",
+            values={"N_qual": (fatigue_qual_r, "cycles"), "N_launch": (fatigue_launch_r, "cycles")},
+            result=round(fatigue_cycles_lifetime, 0), result_unit="cycles",
+            assumptions=["sum of qualification and launch fatigue"],
+        ),
+        # Branch-mirror: longitudinal axis adds QSL quasi-static term (CRITIC-high 2026-06-02)
+        *(
+            [worked_calc(
+                label="Peak combined load factor (longitudinal axis)",
+                formula="peak_load = qsl_long + sine_resp + 3 x grms_resp",
+                values={
+                    "qsl_long": (qsl_long, "g"),
+                    "sine_resp": (sine_resp_r, "g"),
+                    "grms_resp": (grms_resp_r, "g"),
+                },
+                result=round(peak_load, 3), result_unit="g",
+                assumptions=[
+                    "3-sigma random response + sine peak + quasi-static longitudinal (conservative combination)",
+                    "longitudinal axis: QSL term added (Wijker 2004 §6)",
+                ],
+            )]
+            if axis == "longitudinal"
+            else
+            [worked_calc(
+                label="Peak combined load factor (lateral axis)",
+                formula="peak_load = sine_resp + 3 x grms_resp",
+                values={"sine_resp": (sine_resp_r, "g"), "grms_resp": (grms_resp_r, "g")},
+                result=round(peak_load, 3), result_unit="g",
+                assumptions=[
+                    "3-sigma random response added linearly to sine peak (conservative combination)",
+                    "lateral axis: QSL longitudinal not included",
+                ],
+            )]
+        ),
+    ]
+
     return {
         "launch_vehicle": lv,
         "payload_mass_kg": mass_kg,
         "first_natural_frequency_hz": fn_hz,
         "damping_ratio": damping,
         "axis": axis,
-        "amplification_factor_Q": round(q, 3),
+        "amplification_factor_Q": q_r,
         "mass_derate_factor": round(derate_factor, 4),
         "psd_input_g2_hz": round(psd_at_fn, 5),
         "random_grms_input": round(grms_input, 3),
-        "random_grms_response": round(grms_resp, 3),
+        "random_grms_response": grms_resp_r,
         "sine_peak_g_input": sine_input_g,
-        "sine_peak_g_response": round(sine_resp_g, 3),
-        "fatigue_cycles_qualification": round(fatigue_cycles, 0),
-        "fatigue_cycles_launch": round(fatigue_cycles_launch, 0),
+        "sine_peak_g_response": sine_resp_r,
+        "fatigue_cycles_qualification": fatigue_qual_r,
+        "fatigue_cycles_launch": fatigue_launch_r,
         "fatigue_cycles_lifetime": round(fatigue_cycles_lifetime, 0),
         "quasi_static_long_g": qsl_long,
         "peak_load_factor": round(peak_load, 3),
+        "worked": worked,
     }
 
 

@@ -41,8 +41,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -147,6 +151,37 @@ def compute(payload: dict) -> dict:
     layup_rate_kg_hr = 3.0  # RTS typical
     layup_time_hours = (laminate_mass_per_m2_g / 1000.0) / layup_rate_kg_hr
 
+    # Worked calculations — reviewer-verifiable arithmetic steps.
+    # r_min_no_defect_mm uses sin (transcendental) → SKIPPED.
+    # actual_shear_deg uses asin (transcendental) → SKIPPED.
+    # defects_per_meter is branchy (if/else on radius vs threshold) → SKIPPED.
+    # structural_efficiency_factor is piecewise → SKIPPED.
+    lam_mass_r   = round(laminate_mass_per_m2_g, 0)
+    layup_time_r = round(layup_time_hours, 2)
+
+    worked = [
+        worked_calc(
+            label="Laminate areal mass",
+            formula="lam_mass_g_m2 = density_g_cm3 x 1000 x 0.25 x layer_count",
+            values={
+                "density_g_cm3": (mat["density_g_cm3"], "g/cm3"),
+                "layer_count":   (layer_count,          ""),
+            },
+            result=lam_mass_r, result_unit="g/m2",
+            assumptions=["0.25 mm nominal ply thickness per layer (standard pre-preg)."],
+        ),
+        worked_calc(
+            label="Layup time per square metre (RTS rate)",
+            formula="layup_time = (lam_mass_g_m2 / 1000) / layup_rate_kg_hr",
+            values={
+                "lam_mass_g_m2":   (lam_mass_r, "g/m2"),
+                "layup_rate_kg_hr": (3.0,        "kg/hr"),
+            },
+            result=layup_time_r, result_unit="hr/m2",
+            assumptions=["RTS (Rapid Tow Shearing) rate 3 kg/hr (Kim, Potter & Weaver 2012)."],
+        ),
+    ]
+
     return {
         "tow_width_mm": tow_width_mm,
         "steering_radius_mm": steering_radius_mm,
@@ -163,6 +198,7 @@ def compute(payload: dict) -> dict:
         "mass_savings_vs_quasi_iso_pct": round(mass_savings_pct, 1),
         "layup_time_hours_per_m2": round(layup_time_hours, 2),
         "laminate_areal_mass_g_m2": round(laminate_mass_per_m2_g, 0),
+        "worked": worked,
     }
 
 

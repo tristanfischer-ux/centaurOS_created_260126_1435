@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "beamforming_codebook (custom)",
@@ -117,6 +121,47 @@ def compute(payload: dict) -> dict:
     # Codebook training overhead (bits)
     codebook_bits = math.ceil(math.log2(max(2, codebook_size)))
 
+    # --- Worked calculations ---
+    # codebook_size is branchy — SKIP.
+    # proj_factor = cos(scan_rad) — trig: SKIP.
+    # scan_loss_db = -20 log10(proj_factor) — log: SKIP.
+    # array_gain_db = 10 log10(M) — log: SKIP.
+    # hpbw_deg / proj_factor is division but proj_factor is trig result — pass as input.
+    wavelength_r = round(wavelength_m * 1000, 2)  # mm
+    d_r = round(d_m * 1000, 2)  # mm
+    hpbw_r = round(hpbw_deg, 2)
+
+    # Pass lambda and d at 4 dp so _fmt represents them accurately; derive hpbw_r
+    # from those same 4-dp values so the printed substitution reproduces the result.
+    lam_4dp = round(wavelength_m, 4)
+    d_4dp = round(d_m, 4)
+    hpbw_r_rad = round(0.886 * lam_4dp / (M * d_4dp), 6)
+
+    worked = [
+        worked_calc(
+            label="Signal wavelength",
+            formula="lambda = c / f",
+            values={"c": (C_LIGHT, "m/s"), "f": (f_ghz * 1e9, "Hz")},
+            result=round(wavelength_m, 6), result_unit="m",
+            assumptions=["Speed of light 3e8 m/s"],
+        ),
+        worked_calc(
+            label="Half-wavelength element spacing",
+            formula="d = lambda / 2",
+            values={"lambda": (round(wavelength_m, 6), "m")},
+            result=round(d_m, 6), result_unit="m",
+            assumptions=["Standard half-wavelength ULA spacing"],
+        ),
+        worked_calc(
+            label="HPBW at broadside (ULA)",
+            formula="HPBW = 0.886 x lambda / (M x d)",
+            values={"lambda": (lam_4dp, "m"), "M": (M, "elements"),
+                    "d": (d_4dp, "m")},
+            result=hpbw_r_rad, result_unit="rad",
+            assumptions=["Balanis 3rd ed. ULA HPBW formula; 0.886 = 2 arcsin(0.443)"],
+        ),
+    ]
+
     return {
         "num_elements": M,
         "num_RF_chains": N_RF,
@@ -135,6 +180,7 @@ def compute(payload: dict) -> dict:
         "hpbw_at_scan_deg": round(hpbw_at_scan_deg, 2),
         "element_spacing_mm": round(d_m * 1000, 2),
         "n_independent_beams": n_beams_independent,
+        "worked": worked,
     }
 
 

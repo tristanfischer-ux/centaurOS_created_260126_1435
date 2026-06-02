@@ -40,8 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "QuTiP (Quantum Toolbox in Python)",
@@ -145,6 +149,42 @@ def compute(payload: dict) -> dict:
     purity = float((rho_final * rho_final).tr().real)
     p1 = float(qt.expect(qt.basis(2, 1).proj(), rho_final))
 
+    # Worked calculations.
+    # Gate fidelity (fid) comes from QuTiP mesolve() — library black-box, SKIPPED.
+    # The small-error analytic estimates for T1 and T_phi contributions are
+    # clean arithmetic and shown here.
+    tg_us = round(tg * 1e6, 4)  # convert gate_ns to microseconds for display
+    err_T1_r = float(f"{err_T1:.3e}")
+    err_Tphi_r = float(f"{err_Tphi:.3e}")
+    worked = [
+        worked_calc(
+            label="T1-limited gate error estimate (small-error, analytical)",
+            formula="err_T1 = tg / (3 x T1)",
+            values={
+                "tg": (tg_us, "us"),
+                "T1": (T1_us, "us"),
+            },
+            result=err_T1_r, result_unit="",
+            assumptions=[
+                "Small-error limit from Krantz 2019 (Applied Physics Reviews) eq. 5.16",
+                "Valid when tg << T1",
+            ],
+        ),
+        worked_calc(
+            label="Pure-dephasing gate error estimate (small-error, analytical)",
+            formula="err_Tphi = tg / (2 x T2)",
+            values={
+                "tg": (tg_us, "us"),
+                "T2": (T2_us, "us"),
+            },
+            result=err_Tphi_r, result_unit="",
+            assumptions=[
+                "Small-error limit; T2 here is the effective dephasing time",
+                "Valid when tg << T2",
+            ],
+        ),
+    ]
+
     out: dict = {
         "qubit_type": qtype,
         "T1_us": T1_us,
@@ -159,6 +199,7 @@ def compute(payload: dict) -> dict:
         "T1_dominated_error_est": float(f"{err_T1:.3e}"),
         "Tphi_dominated_error_est": float(f"{err_Tphi:.3e}"),
         "drive_rabi_rate_hz": round(Omega / (2 * math.pi), 2),
+        "worked": worked,
     }
     return out
 

@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -140,6 +144,101 @@ def compute(payload: dict) -> dict:
     install_gbp = lamps_required * 200
     total_capex = lamp_cost_gbp + fixture_cost_gbp + control_panel_gbp + install_gbp
 
+    # Worked calculations — closed-form arithmetic steps only.
+    # irradiance_mw_cm2 uses distance^1.5 (non-integer exponent) — passed as a
+    # rounded input to the dose-per-lamp step.
+    d_log10 = path_info["D_log10_mJ_cm2"]
+    target_dose_r = round(target_dose_mJ_cm2, 1)
+    target_dose_j_r = round(target_dose_j_m2, 1)
+    lamp_output_r = round(lamp_output_w, 2)
+    irradiance_r = round(irradiance_mw_cm2, 4)
+    dose_per_lamp_r = round(irradiance_r * exposure_time_s, 2)
+    floor_area_r = round(floor_area_m2, 1)
+    actual_dose_r = round(actual_dose_mJ_cm2, 1)
+    energy_r = round(energy_kwh_per_cycle, 4)
+    lockout_r = round(eye_safety_lockout_s, 1)
+
+    worked = [
+        worked_calc(
+            label="Target UV-C dose for specified log reduction",
+            formula="target_dose = D_log10 x target_log_reduction",
+            values={
+                "D_log10": (d_log10, "mJ/cm^2 per log10"),
+                "target_log_reduction": (target_log_reduction, ""),
+            },
+            result=target_dose_r, result_unit="mJ/cm^2",
+            assumptions=[
+                f"D_log10 = {d_log10} mJ/cm^2 per decade for {contaminant} (IUVA 2021 / USDA 2017)",
+                "First-order inactivation kinetics: log10(N0/N) = D / D_log10",
+            ],
+        ),
+        worked_calc(
+            label="Target dose in J/m^2",
+            formula="target_dose_j_m2 = target_dose_mJ_cm2 x 10",
+            values={"target_dose_mJ_cm2": (target_dose_r, "mJ/cm^2")},
+            result=target_dose_j_r, result_unit="J/m^2",
+            assumptions=["1 mJ/cm^2 = 10 J/m^2 (unit conversion: 1e-3 J / 1e-4 m^2 = 10)"],
+        ),
+        worked_calc(
+            label="UV-C output power per lamp",
+            formula="lamp_output_w = lamp_uvc_w x uv_efficiency",
+            values={"lamp_uvc_w": (lamp_uvc_w, "W"), "uv_efficiency": (uv_efficiency, "")},
+            result=lamp_output_r, result_unit="W",
+            assumptions=["Low-pressure mercury lamp UV-C efficiency 32% of input power at 254 nm"],
+        ),
+        worked_calc(
+            label="UV-C dose delivered per lamp over exposure time",
+            formula="dose_per_lamp = irradiance_mw_cm2 x exposure_time_s",
+            values={
+                "irradiance_mw_cm2": (irradiance_r, "mW/cm^2"),
+                "exposure_time_s": (exposure_time_s, "s"),
+            },
+            result=dose_per_lamp_r, result_unit="mJ/cm^2",
+            assumptions=[
+                "irradiance at target distance computed from inverse-square-law (distance^1.5 for tube source) — passed as live input",
+                "Dose = irradiance x time (constant irradiance over exposure period)",
+            ],
+        ),
+        worked_calc(
+            label="Floor area from room volume",
+            formula="floor_area_m2 = room_volume_m3 / 3.0",
+            values={"room_volume_m3": (room_volume_m3, "m^3")},
+            result=floor_area_r, result_unit="m^2",
+            assumptions=["Assumed ceiling height 3 m (standard grow room)"],
+        ),
+        worked_calc(
+            label="Actual delivered dose (all lamps)",
+            formula="actual_dose = lamps_required x dose_per_lamp",
+            values={
+                "lamps_required": (lamps_required, ""),
+                "dose_per_lamp": (dose_per_lamp_r, "mJ/cm^2"),
+            },
+            result=actual_dose_r, result_unit="mJ/cm^2",
+            assumptions=["lamps_required = max(dose-driven count, coverage-driven count) — ceiling taken before this step"],
+        ),
+        worked_calc(
+            label="Energy consumption per treatment cycle",
+            formula="energy_kwh = lamps_required x lamp_uvc_w / 1000 x exposure_time_s / 3600",
+            values={
+                "lamps_required": (lamps_required, ""),
+                "lamp_uvc_w": (lamp_uvc_w, "W"),
+                "exposure_time_s": (exposure_time_s, "s"),
+            },
+            result=energy_r, result_unit="kWh",
+            assumptions=["Input wattage (not UV-C output) used for energy accounting"],
+        ),
+        worked_calc(
+            label="Eye-safety lockout duration",
+            formula="lockout_s = exposure_time_s x 1.2 + 30",
+            values={"exposure_time_s": (exposure_time_s, "s")},
+            result=lockout_r, result_unit="s",
+            assumptions=[
+                "1.2 x exposure = safety margin for lamp cool-down + personnel re-entry",
+                "+30 s fixed clearance per ANSI/IES RP-27.3-2017",
+            ],
+        ),
+    ]
+
     return {
         "contaminant_type": contaminant,
         "pathogen_class": path_info["type"],
@@ -174,6 +273,7 @@ def compute(payload: dict) -> dict:
             f"log10 reduction. UV-C is HAZARDOUS - mandatory occupancy lockout. "
             f"For confluent infestation use higher target_log_reduction (5-6)."
         ),
+        "worked": worked,
     }
 
 

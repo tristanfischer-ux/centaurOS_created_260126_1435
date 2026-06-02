@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -160,6 +164,74 @@ def compute(payload: dict) -> dict:
     # Effective focal length (same as f, but with telephoto multiplier)
     effective_focal_length_m = focal_length_m
 
+    stowed_r = round(stowed_length_mm, 1)
+    f_num_r = round(f_number, 2)
+    f_prim_r = round(f_primary_number, 2)
+    ps_arcsec_mm_r = round(plate_scale_arcsec_per_mm, 4)
+    # Round to 4 dp so ps_mm / 1000 evaluates within 0.5% of the stated result.
+    ps_arcsec_um_r = round(plate_scale_arcsec_per_um, 4)
+    airy_r = round(airy_disk_first_zero_arcsec, 3)
+
+    worked = [
+        worked_calc(
+            label="Stowed (physical) tube length",
+            formula="L_stow = f / telephoto_ratio x 1000",
+            values={"f": (focal_length_m, "m"), "telephoto_ratio": (telephoto, "")},
+            result=stowed_r, result_unit="mm",
+            assumptions=[
+                f"telephoto ratio for {config} from Korsch (1991) Table 5.1; x 1000 converts m to mm",
+            ],
+        ),
+        worked_calc(
+            label="System f-number",
+            formula="f_num = f / D",
+            values={"f": (focal_length_m, "m"), "D": (aperture_m, "m")},
+            result=f_num_r, result_unit="",
+            assumptions=["D = aperture_mm / 1000"],
+        ),
+        worked_calc(
+            label="Primary mirror focal length",
+            formula="f_prim = R_primary / 2",
+            values={"R_primary": (R_primary, "m")},
+            result=round(f_primary_m, 4), result_unit="m",
+            assumptions=["f = R / 2 for spherical mirror (paraxial)"],
+        ),
+        worked_calc(
+            label="Primary mirror f-number",
+            formula="f_num_prim = f_prim / D",
+            values={"f_prim": (round(f_primary_m, 4), "m"), "D": (aperture_m, "m")},
+            result=f_prim_r, result_unit="",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Plate scale",
+            formula="ps_mm = 206265 / (f x 1000)",
+            values={"f": (focal_length_m, "m")},
+            result=ps_arcsec_mm_r, result_unit="arcsec/mm",
+            assumptions=["206265 arcsec per radian; f in mm = f_m x 1000"],
+        ),
+        worked_calc(
+            label="Plate scale per micron",
+            formula="ps_um = ps_mm / 1000",
+            values={"ps_mm": (ps_arcsec_mm_r, "arcsec/mm")},
+            result=ps_arcsec_um_r, result_unit="arcsec/um",
+            assumptions=["1 mm = 1000 um"],
+        ),
+        worked_calc(
+            label="Airy disk first zero (angular resolution)",
+            formula="theta_arcsec = 1.22 x lambda_m / D_m x 206265",
+            values={
+                "lambda_m": (round(lambda_m, 11), "m"),
+                "D_m": (aperture_m, "m"),
+            },
+            result=airy_r, result_unit="arcsec",
+            assumptions=[
+                "lambda_m = wavelength_nm x 1e-9; D_m = aperture_mm / 1000; "
+                "x 206265 converts radians to arcseconds",
+            ],
+        ),
+    ]
+
     return {
         "aperture_mm": aperture_mm,
         "num_fold_mirrors": num_fold,
@@ -169,11 +241,11 @@ def compute(payload: dict) -> dict:
         "physical_focal_length_m": focal_length_m,
         "effective_focal_length_m": effective_focal_length_m,
         "telephoto_ratio": telephoto,
-        "stowed_length_mm": round(stowed_length_mm, 1),
-        "f_number_system": round(f_number, 2),
-        "primary_mirror_f_number": round(f_primary_number, 2),
-        "plate_scale_arcsec_per_um": round(plate_scale_arcsec_per_um, 3),
-        "airy_disk_first_zero_arcsec": round(airy_disk_first_zero_arcsec, 3),
+        "stowed_length_mm": stowed_r,
+        "f_number_system": f_num_r,
+        "primary_mirror_f_number": f_prim_r,
+        "plate_scale_arcsec_per_um": ps_arcsec_um_r,  # 4 dp: self-consistent with ps_mm / 1000
+        "airy_disk_first_zero_arcsec": airy_r,
         "nu_cutoff_cycles_per_mm": round(nu_cutoff_cycles_per_mm, 2),
         "nyquist_cycles_per_mm": round(nyquist_cycles_per_mm, 2),
         "MTF_at_nyquist": round(mtf_at_nyquist, 3),
@@ -181,6 +253,7 @@ def compute(payload: dict) -> dict:
         "mass_primary_kg": round(mass_primary, 2),
         "mass_total_kg": round(mass_total_kg, 1),
         "num_mirrors_config": NUM_MIRRORS.get(config, 2),
+        "worked": worked,
     }
 
 

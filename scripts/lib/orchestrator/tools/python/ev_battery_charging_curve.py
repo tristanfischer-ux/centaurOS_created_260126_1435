@@ -47,8 +47,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -216,6 +220,25 @@ def compute(payload: dict) -> dict:
     avg_power_kw = energy_delivered_kwh / total_time_hours if total_time_hours > 0 else 0.0
     peak_c_rate = peak_power_kw / battery_kwh
 
+    peak_c_rate_r = round(peak_c_rate, 3)
+    peak_power_r = round(peak_power_kw, 2)
+
+    worked = [
+        worked_calc(
+            label="Peak C-rate",
+            formula="C_rate = P_peak / E_pack",
+            values={
+                "P_peak": (peak_power_r, "kW"),
+                "E_pack": (battery_kwh, "kWh"),
+            },
+            result=peak_c_rate_r, result_unit="C",
+            assumptions=[
+                "peak_power from SOC-step loop (piecewise empirical taper x temperature derate — not hand-checkable)",
+                "C-rate = kW / kWh = h^-1",
+            ],
+        ),
+    ]
+
     return {
         "battery_kwh": battery_kwh,
         "soc_start_pct": soc_start,
@@ -224,16 +247,17 @@ def compute(payload: dict) -> dict:
         "battery_temp_c": temp_c,
         "temperature_derate_factor": round(temp_factor, 3),
         "max_power_kw_input": max_power_kw,
-        "peak_power_kw_achieved": round(peak_power_kw, 2),
+        "peak_power_kw_achieved": peak_power_r,
         "average_power_kw": round(avg_power_kw, 2),
-        "peak_c_rate": round(peak_c_rate, 3),
+        "peak_c_rate": peak_c_rate_r,
         "total_charge_time_minutes": round(total_time_minutes, 1),
         "total_charge_time_hours": round(total_time_hours, 3),
         "energy_delivered_kwh": round(energy_delivered_kwh, 2),
         # Trimmed for transport efficiency — every 5th SOC sample
         "actual_max_power_per_soc_kw": power_curve[::5] if len(power_curve) > 30 else power_curve,
+        "worked": worked,
         "_meta": {
-            "model": "Empirical CCS taper curve per chemistry × temperature derating",
+            "model": "Empirical CCS taper curve per chemistry x temperature derating",
             "references": [
                 "Argonne National Lab Fast Charging EV test data",
                 "Idaho National Lab BatteryPlus",

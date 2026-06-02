@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -166,14 +170,88 @@ def compute(payload: dict) -> dict:
     else:
         cooling_fan_cfm = 5.0  # baseline
 
+    delta_t_r = round(delta_t, 2)
+    p_melt_r = round(p_melt_w, 3)
+    q_loss_r = round(q_loss, 3)
+    p_req_r = round(p_required, 3)
+    ua_loop_r = round(ua_loop, 4)
+    ua_total_r = round(ua_total, 4)
+    m_cp_r = round(m_cp, 4)
+    tau_r = round(temp_lag_s, 3)
+
+    worked = [
+        worked_calc(
+            label="Temperature rise from ambient to set point",
+            formula="delta_T = T_set - T_ambient",
+            values={"T_set": (t_set, "C"), "T_ambient": (t_ambient, "C")},
+            result=delta_t_r, result_unit="K",
+            assumptions=["filament enters at ambient temperature"],
+        ),
+        worked_calc(
+            label="Power to melt incoming filament",
+            formula="P_melt = m_dot x cp x delta_T",
+            values={
+                "m_dot": (m_dot_g_s, "g/s"),
+                "cp": (cp_filament, "J/g.K"),
+                "delta_T": (delta_t_r, "K"),
+            },
+            result=p_melt_r, result_unit="W",
+            assumptions=["cp from material TDS; room-temperature average"],
+        ),
+        worked_calc(
+            label="Ambient heat loss from heater block",
+            formula="Q_loss = UA_block x delta_T",
+            values={
+                "UA_block": (UA_BLOCK_W_K, "W/K"),
+                "delta_T": (delta_t_r, "K"),
+            },
+            result=q_loss_r, result_unit="W",
+            assumptions=["UA_block = 0.15 W/K (E3D V6 with silicone sock)"],
+        ),
+        worked_calc(
+            label="Total heater power required",
+            formula="P_req = P_melt + Q_loss",
+            values={"P_melt": (p_melt_r, "W"), "Q_loss": (q_loss_r, "W")},
+            result=p_req_r, result_unit="W",
+            assumptions=["if P_req > P_heater, steady-state temp falls below set point"],
+        ),
+        worked_calc(
+            label="PID effective UA (loop contribution)",
+            formula="UA_loop = kP x P_heater",
+            values={"kP": (0.05, "1/K"), "P_heater": (p_heater, "W")},
+            result=ua_loop_r, result_unit="W/K",
+            assumptions=["typical PID kP = 0.05 per K of error for 40 W heater"],
+        ),
+        worked_calc(
+            label="Total effective UA",
+            formula="UA_total = UA_loop + UA_block",
+            values={"UA_loop": (ua_loop_r, "W/K"), "UA_block": (UA_BLOCK_W_K, "W/K")},
+            result=ua_total_r, result_unit="W/K",
+            assumptions=["ambient + PID-driven UA combined"],
+        ),
+        worked_calc(
+            label="Thermal time constant (temp lag)",
+            formula="tau = m_cp / UA_total",
+            values={
+                "m_cp": (m_cp_r, "J/K"),
+                "UA_total": (ua_total_r, "W/K"),
+            },
+            result=tau_r, result_unit="s",
+            assumptions=[
+                "m_cp = M_BLOCK_G x CP_BLOCK = 8.0 g x 0.45 J/g.K",
+                "tau = 1 time constant for 63% step response",
+            ],
+        ),
+    ]
+
     return {
         "steady_state_temp_c": round(t_steady, 2),
-        "temp_lag_s": round(temp_lag_s, 3),
+        "temp_lag_s": tau_r,
         "melt_zone_length_mm": round(L_melt_mm, 3),
         "cooling_fan_required_cfm": round(cooling_fan_cfm, 2),
-        "p_melt_required_w": round(p_melt_w, 3),
-        "p_ambient_loss_w": round(q_loss, 3),
-        "p_required_total_w": round(p_required, 3),
+        "p_melt_required_w": p_melt_r,
+        "p_ambient_loss_w": q_loss_r,
+        "p_required_total_w": p_req_r,
         "heater_capacity_w": p_heater,
         "heater_utilisation_pct": round(min(100.0, 100.0 * p_required / p_heater), 1),
         "axial_melt_velocity_m_s": round(v_axial_m_s, 5),
@@ -186,6 +264,7 @@ def compute(payload: dict) -> dict:
         "material_t_glass_c": t_glass,
         "material_cp_jgk": cp_filament,
         "material_k_thermal_wm_k": k_thermal,
+        "worked": worked,
     }
 
 

@@ -56,8 +56,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -155,6 +159,134 @@ def compute(payload: dict) -> dict:
     total_dry_mass_kg = tank_mass_kg + feedline_mass_kg
     mass_fraction = mass_kg / (mass_kg + total_dry_mass_kg) * 100.0
 
+    # Worked calculations — chained off rounded intermediates.
+    # Tank radius (cube root) is transcendental — skip that step.
+    # Pass the live r_m as an input symbol to the wall-thickness step.
+    # Record the pre-clamp thickness for the worked_calc so the formula
+    # p_pa x r_mm x sf / (2 x sigma_y_pa) is self-consistent; the minimum-
+    # gauge override (max 1.0 mm) is documented in assumptions.
+    t_mm_pre_clamp_r = round((p_pa * r_m * sf) / (2.0 * sigma_y_pa) * 1000.0, 3)
+    v_prop_l_r = round(v_prop_m3 * 1000.0, 3)
+    v_tank_l_r = round(v_tank_l, 3)
+    r_mm_r = round(r_m * 1000.0, 2)
+    t_mm_r = round(t_mm, 3)
+    surf_area_m2_r = round(surf_area_m2, 6)
+    shell_vol_m3_r = round(shell_vol_m3, 6)
+    tank_shell_mass_r = round(tank_shell_mass_kg, 3)
+    furniture_mass_r = round(tank_furniture_kg, 3)
+    tank_mass_r = round(tank_mass_kg, 3)
+    feedline_mass_r = round(feedline_mass_kg, 3)
+    total_dry_mass_r = round(total_dry_mass_kg, 3)
+
+    worked = [
+        worked_calc(
+            label="Propellant volume",
+            formula="v_prop_l = prop_mass_kg / rho x 1000",
+            values={
+                "prop_mass_kg": (mass_kg, "kg"),
+                "rho": (rho, "kg/m3"),
+            },
+            result=v_prop_l_r, result_unit="L",
+            assumptions=[f"propellant {prop}; density at storage conditions"],
+        ),
+        worked_calc(
+            label="Tank volume (with ullage)",
+            formula="v_tank_l = v_prop_l x (1 + ullage_pct / 100)",
+            values={
+                "v_prop_l": (v_prop_l_r, "L"),
+                "ullage_pct": (ullage_pct, "%"),
+            },
+            result=v_tank_l_r, result_unit="L",
+            assumptions=[f"feed type {feed}; ullage fraction from ASME/Sutton practice"],
+        ),
+        # Tank radius from cube root is transcendental — pass r_mm as a live
+        # input symbol into the next step.
+        # Formula gives pre-clamp thickness; minimum-gauge override (1.0 mm) is noted
+        # in assumptions so the reviewer understands the final wall thickness may differ.
+        worked_calc(
+            label="Spherical wall thickness (hoop stress)",
+            formula="t_mm = p_pa x r_mm x sf / (2 x sigma_y_pa)",
+            values={
+                "p_pa": (round(p_pa, 0), "Pa"),
+                "r_mm": (r_mm_r, "mm"),
+                "sf": (sf, ""),
+                "sigma_y_pa": (round(sigma_y_pa, 0), "Pa"),
+            },
+            result=t_mm_pre_clamp_r, result_unit="mm",
+            assumptions=[
+                "spherical pressure vessel hoop stress: sigma = p*r/(2*t) => t = p*r*sf/(2*sigma_y)",
+                "r_mm in mm, sigma_y_pa in Pa: Pa*mm/Pa = mm (units self-consistent)",
+                f"minimum gauge 1.0 mm may override this value; final t_mm = {t_mm_r} mm",
+            ],
+        ),
+        worked_calc(
+            label="Spherical shell surface area",
+            formula="surf_area = 4 x pi x (r_mm / 1000)^2",
+            values={
+                "r_mm": (r_mm_r, "mm"),
+            },
+            result=surf_area_m2_r, result_unit="m2",
+            assumptions=["r_mm converted to metres; pi = 3.141593"],
+        ),
+        worked_calc(
+            label="Shell volume (thin wall: area x thickness)",
+            formula="shell_vol_m3 = surf_area_m2 x t_m",
+            values={
+                "surf_area_m2": (surf_area_m2_r, "m2"),
+                "t_m": (round(t_m, 6), "m"),
+            },
+            result=shell_vol_m3_r, result_unit="m3",
+            assumptions=["thin-wall approximation; t_m = t_mm / 1000"],
+        ),
+        worked_calc(
+            label="Tank shell mass",
+            formula="tank_shell_mass = shell_vol_m3 x density",
+            values={
+                "shell_vol_m3": (shell_vol_m3_r, "m3"),
+                "density": (mat["density_kgm3"], "kg/m3"),
+            },
+            result=tank_shell_mass_r, result_unit="kg",
+            assumptions=[f"material {material}"],
+        ),
+        worked_calc(
+            label="Tank furniture mass (mountings, valves, fittings)",
+            formula="furniture_mass = 0.25 x tank_shell_mass",
+            values={"tank_shell_mass": (tank_shell_mass_r, "kg")},
+            result=furniture_mass_r, result_unit="kg",
+            assumptions=["25% of shell mass from Sutton & Biblarz ch.5 propellant systems"],
+        ),
+        worked_calc(
+            label="Total tank mass (shell + furniture)",
+            formula="tank_mass = tank_shell_mass + furniture_mass",
+            values={
+                "tank_shell_mass": (tank_shell_mass_r, "kg"),
+                "furniture_mass": (furniture_mass_r, "kg"),
+            },
+            result=tank_mass_r, result_unit="kg",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Total dry mass (tank + feedlines/valves)",
+            formula="total_dry_mass = tank_mass + feedline_mass",
+            values={
+                "tank_mass": (tank_mass_r, "kg"),
+                "feedline_mass": (feedline_mass_r, "kg"),
+            },
+            result=total_dry_mass_r, result_unit="kg",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Propellant mass fraction",
+            formula="mass_fraction = prop_mass / (prop_mass + total_dry_mass) x 100",
+            values={
+                "prop_mass": (mass_kg, "kg"),
+                "total_dry_mass": (total_dry_mass_r, "kg"),
+            },
+            result=round(mass_fraction, 2), result_unit="%",
+            assumptions=[],
+        ),
+    ]
+
     return {
         "propellant_type": prop,
         "propellant_mass_kg": mass_kg,
@@ -176,6 +308,7 @@ def compute(payload: dict) -> dict:
         "feedline_mass_kg": round(feedline_mass_kg, 3),
         "total_dry_mass_kg": round(total_dry_mass_kg, 3),
         "mass_fraction_pct": round(mass_fraction, 2),
+        "worked": worked,
     }
 
 

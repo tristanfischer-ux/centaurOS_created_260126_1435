@@ -66,8 +66,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -295,6 +299,48 @@ def compute(payload: dict) -> dict:
     co2_per_unit_g = co2_intensity * (prod_kg / 1000.0) * distance_km
     co2_per_unit_kg = co2_per_unit_g / 1000.0
 
+    # Worked calculations — table lookups (fit check, transit days, customs days)
+    # are piecewise/branchy, SKIP.  Cost and CO2 are clean closed-form arithmetic.
+    cost_r = round(total_cost_gbp)
+    co2_g_r = round(co2_per_unit_g, 1)
+    worked = [
+        worked_calc(
+            label="Total shipping cost (GBP)",
+            formula="cost_gbp = base_cost_usd x containers_needed x USD_GBP",
+            values={"base_cost_usd": (base_cost, "USD"),
+                    "containers_needed": (containers_needed, ""),
+                    "USD_GBP": (USD_GBP, "")},
+            result=cost_r, result_unit="GBP",
+            assumptions=["base_cost_usd from SHIPPING_COST table (2026 spot rates, "
+                         "Drewry/Freightos); USD_GBP = 0.78"],
+        ),
+        worked_calc(
+            label="Shipping cost per unit",
+            formula="cost_per_unit = cost_gbp / qty",
+            values={"cost_gbp": (cost_r, "GBP"), "qty": (qty, "")},
+            result=round(total_cost_gbp / max(1, qty)), result_unit="GBP/unit",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="CO2 per unit (grams)",
+            formula="co2_g = co2_intensity x (prod_kg / 1000) x distance_km",
+            values={"co2_intensity": (co2_intensity, "g_CO2/t-km"),
+                    "prod_kg": (prod_kg, "kg"),
+                    "distance_km": (distance_km, "km")},
+            result=co2_g_r, result_unit="g CO2",
+            assumptions=[f"CO2 intensity {co2_intensity} g/t-km for {mode} "
+                         f"(IMO MEPC.337(76) / IEA Transport 2024); "
+                         f"distance {distance_km} km from DISTANCE_KM table"],
+        ),
+        worked_calc(
+            label="CO2 per unit (kg)",
+            formula="co2_kg = co2_g / 1000",
+            values={"co2_g": (co2_g_r, "g")},
+            result=round(co2_per_unit_kg, 1), result_unit="kg CO2",
+            assumptions=[],
+        ),
+    ]
+
     return {
         "mode": mode,
         "mode_label": container["label"],
@@ -317,6 +363,7 @@ def compute(payload: dict) -> dict:
         "co2_intensity_g_per_tkm": co2_intensity,
         "origin_country": origin,
         "destination_country": dest,
+        "worked": worked,
         "notes": (
             "Costs are 2026 spot averages (Drewry/Freightos). Sea routes vary "
             "±40% with bunker. Customs assumes standard HS classification - "

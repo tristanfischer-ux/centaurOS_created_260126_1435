@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -104,6 +108,10 @@ def compute(payload: dict) -> dict:
     dv_final_capture = 0.05
     dv_avoidance_margin = 0.20  # collision avoidance reserve
     dv_total_ms = (dv_stop + dv_hold_keep_in_box + dv_final_capture + dv_avoidance_margin) * 1.5
+    # Capture the pre-tumble-multiplier budget for the worked_calc — the formula is
+    # explicitly labelled 'before tumble multiplier' and the assumptions note the
+    # conditional factor; using the pre-multiplier value keeps the substitution honest.
+    dv_base_ms = dv_total_ms
 
     # Approach time
     if v_approach > 0:
@@ -159,6 +167,71 @@ def compute(payload: dict) -> dict:
     # CW formation period (along R-bar)
     n_periods_in_capture = approach_time_s / n_orbit_period_s
 
+    # Worked calculations — only closed-form steps.
+    # n_rad_s uses sqrt (transcendental) — pass as live input.
+    # Tsiolkovsky uses exp() — skip.
+    # Plume risk and capture difficulty are piecewise — skip.
+    # Use pre-tumble-multiplier budget so the formula is always self-consistent
+    # (the tumble multiplier branch is documented in the assumptions).
+    dv_base_r = round(dv_base_ms, 3)
+    dv_total_r = round(dv_total_ms, 3)
+    approach_time_s_r = round(approach_time_s, 1)
+    approach_time_min_r = round(approach_time_minutes, 1)
+    time_to_capture_r = round(time_to_capture_minutes, 1)
+
+    worked = [
+        worked_calc(
+            label="Delta-V budget (before tumble multiplier)",
+            formula="dv_base = (dv_stop + dv_hold + dv_capture + dv_avoidance) x 1.5",
+            values={
+                "dv_stop": (v_approach, "m/s"),
+                "dv_hold": (dv_hold_keep_in_box, "m/s"),
+                "dv_capture": (dv_final_capture, "m/s"),
+                "dv_avoidance": (dv_avoidance_margin, "m/s"),
+            },
+            result=dv_base_r, result_unit="m/s",
+            assumptions=[
+                "1.5x safety margin on manoeuvre budget",
+                "dv_stop = approach speed (decelerate to hold point)",
+                "dv_hold = 0.02 m/s box-keeping delta-V",
+                "dv_capture = 0.05 m/s final docking impulse",
+                "dv_avoidance = 0.20 m/s collision avoidance reserve",
+                "additional multiplier x1.2 (tumble 5-10 deg/s) or x1.5 (>10 deg/s) applied after this step",
+            ],
+        ),
+        worked_calc(
+            label="Approach time",
+            formula="approach_time_s = separation / v_approach",
+            values={
+                "separation": (sep_m, "m"),
+                "v_approach": (v_approach, "m/s"),
+            },
+            result=approach_time_s_r, result_unit="s",
+            assumptions=["constant approach speed assumed"],
+        ),
+        worked_calc(
+            label="Approach time (minutes)",
+            formula="approach_time_min = approach_time_s / 60",
+            values={"approach_time_s": (approach_time_s_r, "s")},
+            result=approach_time_min_r, result_unit="min",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Total time to capture",
+            formula="time_to_capture = approach_time_min + hold_time + final_closure",
+            values={
+                "approach_time_min": (approach_time_min_r, "min"),
+                "hold_time": (hold_time_min, "min"),
+                "final_closure": (final_closure_min, "min"),
+            },
+            result=time_to_capture_r, result_unit="min",
+            assumptions=[
+                "hold_time = 5 min station-keeping check at hold point",
+                "final_closure = 10 min last-metre approach and capture",
+            ],
+        ),
+    ]
+
     return {
         "chaser_mass_kg": m_chaser,
         "target_mass_kg": m_target,
@@ -178,6 +251,7 @@ def compute(payload: dict) -> dict:
         "plume_impingement_risk_score": plume_risk,
         "capture_difficulty": capture_difficulty,
         "n_orbits_during_capture": round(n_periods_in_capture, 2),
+        "worked": worked,
     }
 
 

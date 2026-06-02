@@ -45,8 +45,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -194,6 +198,95 @@ def compute(payload: dict) -> dict:
     else:
         downrange_km = 0.0
 
+    # --- Worked calculations ---
+    # The heat-flux steps (Sutton-Graves sqrt, Allen-Eggers exp/log, sin,
+    # radiative equilibrium ^0.25) are transcendental — they are not shown
+    # as simple hand-checkable arithmetic and are SKIPPED per the worked-calc
+    # rules.  The following steps are clean closed-form arithmetic and ARE shown.
+
+    q_peak_pa_r = round(q_peak_pa, 0)
+    a_ref_r = round(a_ref_m2, 4)
+    heatshield_r = round(heatshield_area_m2, 2)
+    total_heat_r = round(total_heat_MJ_m2, 1)
+    recession_r = round(tps_recession_kg_m2, 2)
+    tps_total_r = round(tps_total_kg_m2, 2)
+    tps_mass_r = round(tps_mass_kg, 1)
+    v_peak_r = round(v_peak, 1)
+    rho_peak_r = round(rho_at_peak, 5)
+
+    worked = [
+        worked_calc(
+            label="Peak dynamic pressure",
+            formula="q_peak = 0.5 x rho_peak x v_peak^2",
+            values={
+                "rho_peak": (rho_peak_r, "kg/m^3"),
+                "v_peak": (v_peak_r, "m/s"),
+            },
+            result=q_peak_pa_r,
+            result_unit="Pa",
+            assumptions=[
+                "rho_peak = rho_0 x exp(-h_peak / H_scale): transcendental, passed as computed input",
+                "v_peak = v_e x exp(-0.5) (Allen-Eggers peak-deceleration velocity): transcendental, passed as computed input",
+            ],
+        ),
+        worked_calc(
+            label="Reference area (from ballistic coefficient)",
+            formula="A_ref = mass / BC",
+            values={
+                "mass": (mass_kg, "kg"),
+                "BC": (bc_kg_m2, "kg/m^2"),
+            },
+            result=a_ref_r,
+            result_unit="m^2",
+            assumptions=["ballistic coefficient BC = mass / (C_D x A_ref); rearranged for A_ref"],
+        ),
+        worked_calc(
+            label="Heat-shield area",
+            formula="A_shield = A_ref x 1.5",
+            values={
+                "A_ref": (a_ref_r, "m^2"),
+            },
+            result=heatshield_r,
+            result_unit="m^2",
+            assumptions=["forebody area assumed 1.5 x reference area (standard blunt-body approximation)"],
+        ),
+        worked_calc(
+            label="TPS recession mass per unit area",
+            formula="m_recession = loss_rate x Q_total_MJ",
+            values={
+                "loss_rate": (t["mass_loss_kg_m2_MJ"], "kg/m^2/MJ"),
+                "Q_total_MJ": (total_heat_r, "MJ/m^2"),
+            },
+            result=recession_r,
+            result_unit="kg/m^2",
+            assumptions=[
+                f"loss rate {t['mass_loss_kg_m2_MJ']} kg/m^2/MJ from {tps_mat} ablator datasheet",
+                "total heat load Q = (4/3) x q_peak x t_peak; peak flux is Sutton-Graves (transcendental), passed as computed input",
+            ],
+        ),
+        worked_calc(
+            label="Total TPS areal density",
+            formula="m_TPS_per_m2 = m_recession x (1 + 5.0) + 1.0",
+            values={
+                "m_recession": (recession_r, "kg/m^2"),
+            },
+            result=tps_total_r,
+            result_unit="kg/m^2",
+            assumptions=["insulation = 5 x recession mass (time-margin factor); minimum 1 kg/m^2 added"],
+        ),
+        worked_calc(
+            label="Total TPS mass",
+            formula="m_TPS = m_TPS_per_m2 x A_shield",
+            values={
+                "m_TPS_per_m2": (tps_total_r, "kg/m^2"),
+                "A_shield": (heatshield_r, "m^2"),
+            },
+            result=tps_mass_r,
+            result_unit="kg",
+            assumptions=["uniform areal density over entire forebody heat shield"],
+        ),
+    ]
+
     return {
         "entry_velocity_m_s": v_e,
         "entry_angle_deg": gamma_deg,
@@ -219,6 +312,7 @@ def compute(payload: dict) -> dict:
         "tps_max_capable_flux_w_m2": t["max_q_w_m2"],
         "TPS_material_capable": tps_ok,
         "downrange_distance_km": round(downrange_km, 0),
+        "worked": worked,
     }
 
 

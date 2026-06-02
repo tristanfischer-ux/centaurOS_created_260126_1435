@@ -46,8 +46,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "QuTiP (cold-atom interferometry adaptation)",
@@ -147,6 +151,48 @@ def compute(payload: dict) -> dict:
     # Allan deviation at 1s: scales as sigma_sqrtHz / sqrt(1s)
     allan_1s_g = sigma_g_sqrtHz  # for tau=1s the white-noise ADEV equals sqrt(Hz) sensitivity
 
+    # Worked calculations.
+    # sigma_phi = 1/(C * sqrt(N)) involves sqrt(N) — transcendental, SKIPPED;
+    # sigma_a_sqrtHz involves sqrt(cycle_s) — transcendental, SKIPPED.
+    # QuTiP population (p_g_predicted) is from library matrix exponentiation — SKIPPED.
+    # Two clean arithmetic steps are shown:
+    # k_eff = 4*pi / lambda (k_eff involves pi, which a reviewer can verify)
+    # scale_factor = 1 / (k_eff * T^2) — straightforward division.
+    k_eff_r = float(f"{k_eff:.3e}")
+    scale_factor_r = float(f"{scale_factor:.3e}")
+    sigma_phi_r = float(f"{sigma_phi:.3e}")
+    sigma_a_r = float(f"{sigma_a:.3e}")
+
+    worked = [
+        worked_calc(
+            label="Effective two-photon Raman wave-vector",
+            formula="k_eff = 4 x pi / lambda",
+            values={"lambda": (wavelength, "m")},
+            result=k_eff_r, result_unit="m^-1",
+            assumptions=["counter-propagating Raman beams; effective wave-vector = 2 x single-photon k"],
+        ),
+        worked_calc(
+            label="Acceleration scale factor (radian per m/s2)",
+            formula="scale_factor = 1 / (k_eff x T^2)",
+            values={
+                "k_eff": (k_eff_r, "m^-1"),
+                "T": (T, "s"),
+            },
+            result=scale_factor_r, result_unit="m/s2/rad",
+            assumptions=["Mach-Zehnder phase shift: phi = k_eff x a x T^2"],
+        ),
+        worked_calc(
+            label="Single-shot acceleration uncertainty",
+            formula="sigma_a = sigma_phi x scale_factor",
+            values={
+                "sigma_phi": (sigma_phi_r, "rad"),
+                "scale_factor": (scale_factor_r, "m/s2/rad"),
+            },
+            result=sigma_a_r, result_unit="m/s2",
+            assumptions=["sigma_phi = 1/(C x sqrt(N)) — shot-noise limit (sqrt(N) is transcendental, result passed as input)"],
+        ),
+    ]
+
     out: dict = {
         "atom_species": species,
         "wavelength_nm": ATOM_TRANSITIONS[species]["lambda_nm"],
@@ -161,6 +207,7 @@ def compute(payload: dict) -> dict:
         "allan_deviation_at_1s": float(f"{allan_1s_g:.3e}"),
         "qutip_pi_2_midfringe_pop": round(p_g_predicted, 4),
         "shot_noise_limited": True,
+        "worked": worked,
     }
     return out
 

@@ -41,8 +41,12 @@ License: MIT.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -98,6 +102,7 @@ def compute(payload: dict) -> dict:
 
     # Usable energy after DoD limit
     usable_kwh = cap_kwh * (dod_pct / 100.0)
+    usable_kwh_pre_storage = usable_kwh  # capture before storage-loss deduction
 
     # Self-discharge over storage (linear approximation)
     self_disch_pct_month = SELF_DISCHARGE_PCT_PER_MONTH.get(chemistry, 3.0)
@@ -121,20 +126,98 @@ def compute(payload: dict) -> dict:
     # Effective load drawing from battery accounting for inverter loss
     effective_load_dc_kw = load_kw / eta_inv
 
+    # Worked calculations.  Peukert factor involves (1/C_rate)^(k-1) (power
+    # law — transcendental for non-integer k); pass the rounded result as an
+    # opaque input to the runtime step, which is then clean arithmetic.
+    # usable_pre_r is the capacity after DoD only (before any storage loss);
+    # usable_r is after storage loss (the value that feeds the Peukert step).
+    usable_pre_r = round(usable_kwh_pre_storage, 4)
+    usable_r = round(usable_kwh, 4)
+    storage_loss_frac_r = round(storage_loss_frac, 4)
+    usable_p_r = round(usable_kwh_peukert, 4)
+    eta_inv_r = round(eta_inv, 4)
+    peukert_r = round(peukert_factor, 4)
+    runtime_h_r = round(runtime_h, 3)
+
+    worked = [
+        worked_calc(
+            label="Usable energy after depth-of-discharge limit",
+            formula="usable_kwh = cap_kwh x (dod_pct / 100)",
+            values={
+                "cap_kwh": (cap_kwh, "kWh"),
+                "dod_pct": (dod_pct, "%"),
+            },
+            result=usable_pre_r, result_unit="kWh",
+            assumptions=[f"DoD limit {dod_pct}%; battery chemistry {chemistry}"],
+        ),
+        # Storage-loss step only emitted when storage_days > 0 so the
+        # substitution is always clean arithmetic that reproduces usable_r.
+        *([worked_calc(
+            label="Usable energy after self-discharge during storage",
+            formula="usable_after_storage = usable_kwh x (1 - storage_loss_frac)",
+            values={
+                "usable_kwh": (usable_pre_r, "kWh"),
+                "storage_loss_frac": (storage_loss_frac_r, ""),
+            },
+            result=usable_r, result_unit="kWh",
+            assumptions=[
+                f"storage_loss_frac = (self_discharge_pct_month / 100) x (storage_days / 30) "
+                f"= ({self_disch_pct_month} / 100) x ({storage_days} / 30) = {storage_loss_frac_r}",
+                "linear self-discharge approximation (IEEE 1184-2006)",
+            ],
+        )] if storage_days > 0 else []),
+        worked_calc(
+            label="Effective battery capacity after Peukert correction",
+            formula="usable_peukert = usable_kwh x peukert_factor",
+            values={
+                "usable_kwh": (usable_r, "kWh"),
+                "peukert_factor": (peukert_r, ""),
+            },
+            result=usable_p_r, result_unit="kWh",
+            assumptions=[
+                f"Peukert factor = (1/C_rate)^(k-1) = (1/{round(c_rate, 4)})^({round(k, 4)}-1) "
+                f"(power-law, pre-computed); k={round(k, 4)} for {chemistry} (IEEE 1184-2006)",
+                f"C-rate = {round(c_rate, 4)} (load_kw / cap_kwh)",
+            ],
+        ),
+        worked_calc(
+            label="Battery runtime",
+            formula="runtime_h = (usable_peukert x eta_inv) / load_kw",
+            values={
+                "usable_peukert": (usable_p_r, "kWh"),
+                "eta_inv": (eta_inv_r, ""),
+                "load_kw": (load_kw, "kW"),
+            },
+            result=runtime_h_r, result_unit="h",
+            assumptions=[f"Inverter efficiency {eta_inv_pct}% (online double-conversion UPS)"],
+        ),
+        worked_calc(
+            label="Effective DC load (battery draw)",
+            formula="load_dc = load_kw / eta_inv",
+            values={
+                "load_kw": (load_kw, "kW"),
+                "eta_inv": (eta_inv_r, ""),
+            },
+            result=round(effective_load_dc_kw, 3), result_unit="kW",
+            assumptions=["Accounts for inverter losses between battery and AC load"],
+        ),
+    ]
+
     return {
         "runtime_minutes": round(runtime_min, 1),
-        "runtime_hours": round(runtime_h, 3),
-        "usable_capacity_kwh": round(usable_kwh, 4),
-        "usable_capacity_after_peukert_kwh": round(usable_kwh_peukert, 4),
+        "runtime_hours": runtime_h_r,
+        "usable_capacity_kwh": usable_r,
+        "usable_capacity_after_peukert_kwh": usable_p_r,
         "effective_load_kw": round(effective_load_dc_kw, 3),
         "c_rate": round(c_rate, 4),
         "peukert_exponent": round(k, 4),
-        "peukert_factor": round(peukert_factor, 4),
+        "peukert_factor": peukert_r,
         "battery_chemistry": chemistry,
         "inverter_efficiency_pct": eta_inv_pct,
         "dod_max_pct": dod_pct,
         "battery_nominal_kwh": cap_kwh,
         "storage_days_since_charge": storage_days,
+        "worked": worked,
     }
 
 

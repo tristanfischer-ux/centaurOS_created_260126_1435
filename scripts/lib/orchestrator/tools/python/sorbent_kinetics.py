@@ -41,8 +41,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "sorbent_kinetics (custom)",
@@ -83,9 +87,10 @@ def compute(payload: dict) -> dict:
     # CO2 partial pressure: ambient ≈ 0.04 bar at 420 ppm and 1 atm
     p_co2_bar = co2_ppm / 1e6 * 1.01325
 
-    # Langmuir b: typical 100-500 bar⁻¹ for amine sorbents → 95% capacity at 0.04 bar
+    # Langmuir b: typical 100-500 bar^-1 for amine sorbents -> 95% capacity at 0.04 bar
     b_bar_inv = 200.0
-    q_eq_mmol_g = q_max_mmol_g * b_bar_inv * p_co2_bar / (1 + b_bar_inv * p_co2_bar)
+    q_eq_base_mmol_g = q_max_mmol_g * b_bar_inv * p_co2_bar / (1 + b_bar_inv * p_co2_bar)
+    q_eq_mmol_g = q_eq_base_mmol_g  # will be mutated by humidity/temperature below
 
     # Humidity boost (amines): RH 50-60% optimum, gain ~30%
     if sorbent == "amine_silica" or sorbent == "mof":
@@ -124,7 +129,58 @@ def compute(payload: dict) -> dict:
     # simpler: per mol CO2 = energy_kj_mol; per kg CO2 = energy_kj_mol / 0.044
     energy_kj_per_kg_co2 = energy_kj_mol / 0.044
     energy_gj_per_ton_co2 = energy_kj_per_kg_co2 / 1000.0  # GJ/ton
-    energy_kwh_per_ton_co2 = energy_gj_per_ton_co2 * 277.78  # convert GJ→kWh
+    energy_kwh_per_ton_co2 = energy_gj_per_ton_co2 * 277.78  # convert GJ->kWh
+
+    # Worked calculations.
+    # Humidity and temperature factors use exp() — skip those adjustments.
+    # LDF capture at time t uses exp(-k*t) — skip.
+    # Breakthrough time uses log() — skip.
+    # CO2 partial pressure, Langmuir equilibrium, energy conversions are clean arithmetic.
+    p_co2_r = round(p_co2_bar, 6)
+    q_eq_r = round(q_eq_mmol_g, 3)
+    energy_kj_kg_r = round(energy_kj_per_kg_co2, 1)
+    # 3 dp (1.818) gives E_kwh substitution 1.818 x 277.78 = 505.00 — agrees with result
+    energy_gj_t_r = round(energy_gj_per_ton_co2, 3)
+    worked = [
+        worked_calc(
+            label="CO2 partial pressure",
+            formula="p_co2 = co2_ppm / 1e6 x 1.01325",
+            values={"co2_ppm": (co2_ppm, "ppm")},
+            result=p_co2_r, result_unit="bar",
+            assumptions=["ambient pressure 1.01325 bar; 1 ppm = 1e-6 volume fraction"],
+        ),
+        worked_calc(
+            label="Langmuir equilibrium capacity (base, before humidity boost)",
+            formula="q_eq_base = q_max x b x p_co2 / (1 + b x p_co2)",
+            values={"q_max": (q_max_mmol_g, "mmol/g"),
+                    "b": (b_bar_inv, "bar^-1"),
+                    "p_co2": (p_co2_r, "bar")},
+            result=round(q_eq_base_mmol_g, 3), result_unit="mmol/g",
+            assumptions=["Langmuir isotherm; b = 200 bar^-1 (amine sorbent literature)",
+                         "humidity boost (exp factor) and temperature correction applied afterwards"],
+        ),
+        worked_calc(
+            label="Regeneration energy per kg CO2",
+            formula="E_kg = energy_kj_mol / 0.044",
+            values={"energy_kj_mol": (energy_kj_mol, "kJ/mol")},
+            result=energy_kj_kg_r, result_unit="kJ/kg",
+            assumptions=["molar mass CO2 = 44 g/mol = 0.044 kg/mol"],
+        ),
+        worked_calc(
+            label="Regeneration energy per tonne CO2 (GJ)",
+            formula="E_gj = E_kg / 1000",
+            values={"E_kg": (energy_kj_kg_r, "kJ/kg")},
+            result=energy_gj_t_r, result_unit="GJ/t",
+            assumptions=["1 tonne = 1000 kg; 1 GJ = 1000 kJ"],
+        ),
+        worked_calc(
+            label="Regeneration energy per tonne CO2 (kWh)",
+            formula="E_kwh = E_gj x 277.78",
+            values={"E_gj": (energy_gj_t_r, "GJ/t")},
+            result=round(energy_kwh_per_ton_co2, 0), result_unit="kWh/t",
+            assumptions=["1 GJ = 277.78 kWh"],
+        ),
+    ]
 
     return {
         "sorbent": sorbent,
@@ -146,6 +202,7 @@ def compute(payload: dict) -> dict:
         "energy_gj_per_ton_co2": round(energy_gj_per_ton_co2, 2),
         "energy_kwh_per_ton_co2": round(energy_kwh_per_ton_co2, 0),
         "cycle_time_s": cycle_time_s,
+        "worked": worked,
     }
 
 

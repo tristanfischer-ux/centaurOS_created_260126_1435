@@ -47,8 +47,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -184,6 +188,123 @@ def compute(payload: dict) -> dict:
     p_elec_w = v_op * i_op_a
     wpe_pct = (p_out_w / max(p_elec_w, 1e-9)) * 100.0
 
+    # Worked calculations — hand-checkable closed-form steps only.
+    # Steps involving log/sqrt (alpha_m, photon_energy_v, device_side_mm)
+    # are SKIPPED and their live values passed as inputs to downstream steps.
+    area_cm2_r = round(area_cm2, 4)
+    g_th_r = round(g_th_cm_1, 4)       # involves log — passed as input
+    j_th_per_qw_r = round(j_th_per_qw, 4)
+    j_th_total_r = round(j_th_total_a_cm2, 4)
+    i_th_r = round(i_th_a, 4)
+    i_op_r = round(i_op_a, 4)
+    p_out_r = round(p_out_w, 4)
+    fwhm_r = round(fwhm_mrad, 4)
+    e2_r = round(e2_mrad, 4)
+    p_elec_r = round(p_elec_w, 4)
+    wpe_r = round(wpe_pct, 2)
+    n_eff = material["n_eff"]
+
+    worked = [
+        worked_calc(
+            label="Bragg wavelength check",
+            formula="lambda_bragg = a_nm x n_eff",
+            values={"a_nm": (a_nm, "nm"), "n_eff": (n_eff, "")},
+            result=round(bragg_wavelength_nm, 2), result_unit="nm",
+            assumptions=[
+                "Gamma-point lasing condition: band-edge wavelength = lattice constant x effective refractive index",
+                f"n_eff = {n_eff} for {mat_name} (Adachi 1994)",
+            ],
+        ),
+        worked_calc(
+            label="Device active area (cm^2)",
+            formula="area_cm2 = area_mm2 x 0.01",
+            values={"area_mm2": (area_mm2, "mm^2")},
+            result=area_cm2_r, result_unit="cm^2",
+            assumptions=["1 mm^2 = 0.01 cm^2"],
+        ),
+        worked_calc(
+            label="Threshold current density per QW",
+            formula="j_th_qw = j_tr + g_th / g_coeff",
+            values={
+                "j_tr": (j_tr, "A/cm^2"),
+                "g_th": (g_th_r, "cm^-1"),
+                "g_coeff": (g_per_a_cm, "cm/A"),
+            },
+            result=j_th_per_qw_r, result_unit="A/cm^2",
+            assumptions=[
+                "Linear gain approximation: g = g_coeff x (J - j_tr)",
+                f"g_th (internal + mirror loss) passed from prior log-based step: {g_th_r} cm^-1",
+            ],
+        ),
+        worked_calc(
+            label="Total threshold current density",
+            formula="j_th_total = j_th_qw x num_qw",
+            values={"j_th_qw": (j_th_per_qw_r, "A/cm^2"), "num_qw": (num_qw, "")},
+            result=j_th_total_r, result_unit="A/cm^2",
+            assumptions=["Each QW contributes equally; gains sum linearly (low-injection approx)"],
+        ),
+        worked_calc(
+            label="Threshold current",
+            formula="I_th = j_th_total x area_cm2",
+            values={"j_th_total": (j_th_total_r, "A/cm^2"), "area_cm2": (area_cm2_r, "cm^2")},
+            result=i_th_r, result_unit="A",
+            assumptions=["Uniform current injection across device area"],
+        ),
+        worked_calc(
+            label="Operating current",
+            formula="I_op = j_op_kA x 1000 x area_cm2",
+            values={"j_op_kA": (j_op_kA_cm2, "kA/cm^2"), "area_cm2": (area_cm2_r, "cm^2")},
+            result=i_op_r, result_unit="A",
+            assumptions=["j_op_kA x 1000 converts kA/cm^2 to A/cm^2"],
+        ),
+        # Skip 'Output optical power' worked_calc when I_op <= I_th:
+        # the formula eta_d x (I_op - I_th) evaluates to a negative number while the
+        # actual result is clamped to zero — a substitution that is negative but states
+        # 0 W fails the arithmetic check.  Above-threshold operation is handled correctly
+        # by the formula; below-threshold is a trivial clamp, not a formula to verify.
+        *([worked_calc(
+            label="Output optical power",
+            formula="P_out = eta_d x (I_op - I_th)",
+            values={
+                "eta_d": (round(eta_d_w_per_a, 4), "W/A"),
+                "I_op": (i_op_r, "A"),
+                "I_th": (i_th_r, "A"),
+            },
+            result=p_out_r, result_unit="W",
+            assumptions=["Applies only when I_op > I_th (above-threshold); slope efficiency eta_d passed from Tafel-based step"],
+        )] if i_op_a > i_th_a else []),
+        worked_calc(
+            label="Beam divergence FWHM",
+            formula="theta_FWHM = 1.03 x lambda_nm x 1e-6 / device_side_mm x 1000",
+            values={
+                "lambda_nm": (wavelength_nm, "nm"),
+                "device_side_mm": (round(device_side_mm, 4), "mm"),
+            },
+            result=fwhm_r, result_unit="mrad",
+            assumptions=[
+                "Fraunhofer diffraction from square aperture: 1.03 x lambda / D",
+                "1e-6 converts nm/mm to dimensionless radians; x 1000 converts rad to mrad",
+            ],
+        ),
+        worked_calc(
+            label="Beam divergence 1/e^2 (Gaussian-equivalent)",
+            formula="theta_e2 = theta_FWHM x 1.78",
+            values={"theta_FWHM": (fwhm_r, "mrad")},
+            result=e2_r, result_unit="mrad",
+            assumptions=["Gaussian-to-FWHM conversion factor 1.78 (1/e^2 width = 1.699 x FWHM; use 1.78 industry convention)"],
+        ),
+        worked_calc(
+            label="Wall-plug efficiency",
+            formula="WPE = P_out / P_elec x 100",
+            values={"P_out": (p_out_r, "W"), "P_elec": (p_elec_r, "W")},
+            result=wpe_r, result_unit="%",
+            assumptions=[
+                "P_elec = V_op x I_op where V_op = photon_energy_V + 0.5 V series resistance",
+                f"P_elec = {p_elec_r} W (from prior step involving photon-energy conversion)",
+            ],
+        ),
+    ]
+
     return {
         "target_wavelength_nm": wavelength_nm,
         "lattice_constant_nm_input": a_nm,
@@ -206,6 +327,7 @@ def compute(payload: dict) -> dict:
         "mirror_loss_cm_1": round(alpha_m_cm_1, 4),
         "threshold_gain_cm_1": round(g_th_cm_1, 2),
         "target_power_w_input": target_power_w,
+        "worked": worked,
     }
 
 

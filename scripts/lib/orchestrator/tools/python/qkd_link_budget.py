@@ -46,8 +46,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -206,6 +210,44 @@ def compute(payload: dict) -> dict:
         # 10 dB ~ 100 km (LEO satellite), 30 dB ~ 1000 km
         max_distance_km = 10.0 ** ((max_loss_db - 20.0) / 20.0) * 100.0
 
+    # Worked calculations.
+    # Most intermediates involve exp() or log() — SKIPPED.
+    # Two clean arithmetic steps are shown: sifted key rate and max distance.
+    sifted_r = round(sifted_rate_bps, 1)
+    secret_r = round(secret_rate_bps, 2)
+    max_dist_r = round(max_distance_km, 1)
+    max_loss_r = round(max_loss_db, 2)
+
+    worked = []
+
+    # Sifted key rate: clean multiplication of a protocol sifting factor,
+    # Q_mu (detection probability per pulse), and source rate.
+    # Q_mu = 1 - exp(-mu*eta) + Y_0 is transcendental — pass as live input.
+    sifted_per_pulse_r = round(sifted_per_pulse, 8) if protocol != "CV-QKD" else round(sifted_per_pulse, 8)
+    worked.append(worked_calc(
+        label="Sifted key rate",
+        formula="sifted_rate = sifted_per_pulse x source_rate_hz",
+        values={
+            "sifted_per_pulse": (sifted_per_pulse_r, "bits/pulse"),
+            "source_rate_hz": (source_rate_hz, "Hz"),
+        },
+        result=sifted_r, result_unit="bps",
+        assumptions=["sifted_per_pulse = sifting_factor x Q_mu (detection probability includes dark counts and channel loss)"],
+    ))
+
+    if medium == "fibre" and max_loss_db > 0:
+        fibre_atten = 0.18
+        worked.append(worked_calc(
+            label="Maximum operating distance in fibre",
+            formula="max_dist = max_loss / fibre_atten",
+            values={
+                "max_loss": (max_loss_r, "dB"),
+                "fibre_atten": (fibre_atten, "dB/km"),
+            },
+            result=max_dist_r, result_unit="km",
+            assumptions=["SMF-28 fibre attenuation 0.18 dB/km at 1550 nm (Corning datasheet)"],
+        ))
+
     return {
         "protocol": protocol,
         "source_rate_mhz": float(payload.get("source_rate_mhz", 1000.0)),
@@ -224,6 +266,7 @@ def compute(payload: dict) -> dict:
         "above_min_qber_threshold": qber_pct >= proto["min_qber_pct"],
         "min_qber_threshold_pct": proto["min_qber_pct"],
         "fibre_or_freespace": medium,
+        "worked": worked,
     }
 
 

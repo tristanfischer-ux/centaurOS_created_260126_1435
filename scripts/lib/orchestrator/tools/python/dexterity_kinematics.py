@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "dexterity_kinematics (custom)",
@@ -108,6 +112,66 @@ def compute(payload: dict) -> dict:
     encoder_count = actuator_count
     tactile_count = n_fingers * 3
 
+    # Worked calculations for the PDF appendix.
+    # total_dof depends on the thumb_opp branch (not a simple closed-form for all cases)
+    # so it is passed as a live input symbol rather than shown as a derived step.
+    # dexterity_d uses min() clamping → also passed as input to downstream steps.
+    L_lever_m_r = round(L_lever_m, 5)
+    F_per_finger_r = round(F_per_finger_n, 1)
+    # Use 4dp for tau_r so that actuator_count x tau_r evaluates to the same total_torque_r.
+    # 3dp causes a floating-point artefact (0.23750...2 rounds to 0.238 not 0.237) that makes
+    # 21 x 0.238 = 4.998 round to 5.00, disagreeing with the actual result 4.99.
+    tau_r = round(tau_per_joint_nm, 4)
+    # Derive total_torque_r from the same tau_r so the substitution is self-consistent.
+    total_torque_r = round(actuator_count * tau_r, 2)
+    workspace_r = round(workspace_mm3, 0)
+    worked = [
+        worked_calc(
+            label="Lever arm (average joint-to-fingertip distance)",
+            formula="L_lever_m = (L_finger_mm / 1000) / 2",
+            values={"L_finger_mm": (L_finger_mm, "mm")},
+            result=L_lever_m_r,
+            result_unit="m",
+            assumptions=["average moment arm = half the total finger length"],
+        ),
+        worked_calc(
+            label="Force per opposing finger",
+            formula="F_per_finger = F_grip / n_opposing",
+            values={"F_grip": (F_grip_n, "N"), "n_opposing": (n_opposing, "")},
+            result=F_per_finger_r,
+            result_unit="N",
+            assumptions=["grip load shared equally across opposing fingers"],
+        ),
+        worked_calc(
+            label="Torque per joint",
+            formula="tau = F_per_finger x L_lever_m / (dof_per_finger - 1)",
+            values={
+                "F_per_finger": (F_per_finger_r, "N"),
+                "L_lever_m": (L_lever_m_r, "m"),
+                "dof_per_finger": (dof_per_finger, ""),
+            },
+            result=tau_r,
+            result_unit="N.m",
+            assumptions=["torque distributed equally across active joints per finger"],
+        ),
+        worked_calc(
+            label="Total motor torque (all actuators)",
+            formula="total_torque = actuator_count x tau",
+            values={"actuator_count": (actuator_count, ""), "tau": (tau_r, "N.m")},
+            result=total_torque_r,
+            result_unit="N.m",
+            assumptions=["one actuator per active degree of freedom (full actuation)"],
+        ),
+        worked_calc(
+            label="Workspace volume estimate",
+            formula="workspace = L_finger_mm^3 x 1.5 x n_fingers",
+            values={"L_finger_mm": (L_finger_mm, "mm"), "n_fingers": (n_fingers, "")},
+            result=workspace_r,
+            result_unit="mm^3",
+            assumptions=["rough spherical-sector envelope; factor 1.5 from Salisbury (1985)"],
+        ),
+    ]
+
     return {
         "finger_count": n_fingers,
         "dof_per_finger": dof_per_finger,
@@ -116,12 +180,12 @@ def compute(payload: dict) -> dict:
         "actuator_count": actuator_count,
         "underactuated_count": underactuated_count,
         "total_dof": total_dof,
-        "total_motor_torque_nm": round(total_torque_nm, 2),
-        "torque_per_joint_nm": round(tau_per_joint_nm, 3),
+        "total_motor_torque_nm": total_torque_r,
+        "torque_per_joint_nm": tau_r,
         "dexterity_index": round(dexterity_d, 2),
-        "workspace_mm3": round(workspace_mm3, 0),
+        "workspace_mm3": workspace_r,
         "pinch_span_mm": round(pinch_span_mm, 0),
-        "force_per_finger_n": round(F_per_finger_n, 1),
+        "force_per_finger_n": F_per_finger_r,
         "n_opposing_fingers": n_opposing,
         "power_per_finger_w": round(power_per_finger_w, 2),
         "total_hand_power_w": round(total_hand_power_w, 1),
@@ -130,6 +194,7 @@ def compute(payload: dict) -> dict:
         "finger_length_mm": L_finger_mm,
         "max_grasp_force_n": round(F_grip_n, 1),
         "anthropomorphic": dexterity_d >= 0.8 and thumb_opp,
+        "worked": worked,
     }
 
 

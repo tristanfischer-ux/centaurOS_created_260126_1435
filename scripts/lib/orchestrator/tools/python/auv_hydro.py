@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -120,6 +124,42 @@ def compute(payload: dict) -> dict:
     )
     buoyancy_n = rho_water * G * body_volume
 
+    # --- Worked calculations ---
+    # rho_water is from python-seawater library (or linear fallback), so it is
+    # passed as a rounded live value.  frontal_area is branchy (hull_form),
+    # so drag_force_n is also skipped as a direct formula — instead drag_power_w
+    # chains off the live drag_force_n value.
+    rho_r = round(rho_water, 3)
+    p_hydro_r = round(p_hydrostatic, 1)
+    drag_n_r = round(drag_force_n, 3)
+    reynolds_r = round(reynolds, 0)
+
+    worked = [
+        worked_calc(
+            label="Hydrostatic pressure",
+            formula="p_hydro = rho_water x G x depth",
+            values={"rho_water": (rho_r, "kg/m3"), "G": (G, "m/s2"),
+                    "depth": (depth_m, "m")},
+            result=p_hydro_r, result_unit="Pa",
+            assumptions=["rho_water from UNESCO EOS-80 (python-seawater) or linear fallback"],
+        ),
+        worked_calc(
+            label="Drag power",
+            formula="P_drag = F_drag x velocity",
+            values={"F_drag": (drag_n_r, "N"), "velocity": (velocity_m_s, "m/s")},
+            result=round(drag_power_w, 3), result_unit="W",
+            assumptions=["F_drag includes hull-form-dependent frontal area"],
+        ),
+        worked_calc(
+            label="Reynolds number",
+            formula="Re = velocity x length / nu",
+            values={"velocity": (velocity_m_s, "m/s"), "length": (length_m, "m"),
+                    "nu": (nu_kinematic, "m2/s")},
+            result=reynolds_r, result_unit="",
+            assumptions=["nu = 1.5e-6 m2/s for cold deep seawater (~4 deg C)"],
+        ),
+    ]
+
     return {
         "depth_m": depth_m,
         "velocity_m_s": velocity_m_s,
@@ -141,6 +181,7 @@ def compute(payload: dict) -> dict:
         "buoyancy_n": round(buoyancy_n, 3),
         "reynolds_number": round(reynolds, 0),
         "c_d": c_d,
+        "worked": worked,
         "_meta": {"seawater_lib_used": seawater_lib_ok},
     }
 

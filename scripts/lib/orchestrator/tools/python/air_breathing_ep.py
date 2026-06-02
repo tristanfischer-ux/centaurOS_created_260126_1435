@@ -39,9 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "air_breathing_ep (custom)",
@@ -154,6 +157,83 @@ def compute(payload: dict) -> dict:
     else:
         drag_compensation = float("inf")
 
+    # Worked calculations — pure arithmetic steps only.
+    # v_orbital uses sqrt(GM/R) (transcendental), so it is passed as a live
+    # input.  thrust_power_limited uses sqrt() and is skipped.
+    # thrust_n = min(...) is piecewise and skipped; thrust_propellant_limited
+    # is the clean step to show.
+    rho_r = float(f"{rho_kg_m3:.3e}")
+    v_orb_r = round(v_orbital_m_s, 1)
+    drag_r = round(drag_force_n, 6)
+    A_in_r = round(A_intake_m2, 3)
+    # Derive mdot_in_r from the same rounded inputs so the substitution
+    # (rho_r x v_orb_r x A_in_r) evaluates to the stated result.
+    mdot_in_r = rho_r * v_orb_r * A_in_r
+    # Derive mdot_eff_r from mdot_in_r so the next step is also self-consistent.
+    mdot_eff_r = mdot_in_r * eta_ion
+    v_ex_r = round(v_exhaust_m_s, 1)
+    # Derive thrust_prop_r from mdot_eff_r x v_ex_r so the substitution
+    # reproduces the stated result exactly.
+    thrust_prop_r = round(mdot_eff_r * v_ex_r, 6)
+    worked = [
+        worked_calc(
+            label="Satellite drag force",
+            formula="F_drag = 0.5 x rho x v_orb^2 x Cd x A_cross",
+            values={
+                "rho": (rho_r, "kg/m^3"),
+                "v_orb": (v_orb_r, "m/s"),
+                "Cd": (Cd, ""),
+                "A_cross": (A_cross, "m^2"),
+            },
+            result=drag_r, result_unit="N",
+            assumptions=[
+                "Cd = 2.2 (flat-plate VLEO free-molecular regime; Pekker & Keidar 2012)",
+                "v_orbital from sqrt(GM/R_sat) — not hand-checkable; passed as live input",
+            ],
+        ),
+        worked_calc(
+            label="Intake collection area",
+            formula="A_intake = A_cross x eta_intake",
+            values={
+                "A_cross": (A_cross, "m^2"),
+                "eta_intake": (eta_intake, ""),
+            },
+            result=A_in_r, result_unit="m^2",
+            assumptions=["intake efficiency = fraction of cross-section that captures atmospheric flux"],
+        ),
+        worked_calc(
+            label="Atmospheric propellant mass collection rate",
+            formula="m_dot_in = rho x v_orb x A_intake",
+            values={
+                "rho": (rho_r, "kg/m^3"),
+                "v_orb": (v_orb_r, "m/s"),
+                "A_intake": (A_in_r, "m^2"),
+            },
+            result=mdot_in_r, result_unit="kg/s",
+            assumptions=["ram-flux collection; no magnetic scooping correction"],
+        ),
+        worked_calc(
+            label="Effective ionised propellant flow",
+            formula="m_dot_eff = m_dot_in_kg_s x eta_ion",
+            values={
+                "m_dot_in_kg_s": (mdot_in_r, "kg/s"),
+                "eta_ion": (eta_ion, ""),
+            },
+            result=mdot_eff_r, result_unit="kg/s",
+            assumptions=["ionization efficiency = fraction of collected gas successfully ionized and accelerated"],
+        ),
+        worked_calc(
+            label="Propellant-limited thrust",
+            formula="F_prop = m_dot_eff_kg_s x v_exhaust",
+            values={
+                "m_dot_eff_kg_s": (mdot_eff_r, "kg/s"),
+                "v_exhaust": (v_ex_r, "m/s"),
+            },
+            result=thrust_prop_r, result_unit="N",
+            assumptions=["v_exhaust = Isp x g_0; lower bound on achievable thrust"],
+        ),
+    ]
+
     return {
         "altitude_km": alt_km,
         "atmospheric_density_kg_m3": rho_kg_m3,
@@ -174,6 +254,7 @@ def compute(payload: dict) -> dict:
         "target_isp_s": isp_target_s,
         "drag_compensation_margin": round(drag_compensation, 3) if drag_compensation != float("inf") else None,
         "drag_compensated": drag_compensation >= 1.0,
+        "worked": worked,
     }
 
 

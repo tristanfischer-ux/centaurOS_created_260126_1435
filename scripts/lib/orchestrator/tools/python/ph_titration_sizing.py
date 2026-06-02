@@ -34,8 +34,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -106,6 +110,72 @@ def compute(payload: dict) -> dict:
     base_l_per_24h = base_dose_mol_per_h * 24 / base_concentration_m if needs_base else 0
     acid_l_per_24h = (initial_dose_ml + acid_dose_ml_per_min * 1440) / 1000 if needs_acid else 0
 
+    # Worked calculations — closed-form steps that run regardless of acid/base branch.
+    # Branch-dependent dosing rates are SKIPPED (piecewise logic).
+    mol_h_r = round(mol_h_needed, 4)
+    initial_dose_ml_r = round(initial_dose_ml, 3)
+    co2_mol_r = round(co2_mol_per_h, 4)
+    h_plus_r = round(h_plus_mol_per_h, 4)
+    ph_swing_r = round(ph_swing_per_minute_uncontrolled, 5)
+
+    worked = [
+        worked_calc(
+            label="Moles of H+ needed for initial bolus",
+            formula="mol_H = (buffer_cap / 1000) x delta_pH x volume_l",
+            values={
+                "buffer_cap": (buffer_capacity_meq_per_l, "meq/L"),
+                "delta_pH": (round(delta_ph, 3), ""),
+                "volume_l": (volume_l, "L"),
+            },
+            result=mol_h_r, result_unit="mol",
+            assumptions=[
+                "buffer_cap in meq/L; divide by 1000 to convert meq to eq (= mol H+ for monoprotic)",
+                "Linear buffer approximation valid for pH swing <= 1 unit",
+            ],
+        ),
+        worked_calc(
+            label="Initial bolus volume of acid/base",
+            formula="initial_dose_ml = mol_H / acid_conc x 1000",
+            values={
+                "mol_H": (mol_h_r, "mol"),
+                "acid_conc": (acid_concentration_m, "mol/L"),
+            },
+            result=initial_dose_ml_r, result_unit="mL",
+            assumptions=["Volume = moles / concentration; x 1000 converts L to mL"],
+        ),
+        worked_calc(
+            label="CO2 production rate in moles per hour",
+            formula="co2_mol_h = co2_g_h / 44",
+            values={"co2_g_h": (co2_production_g_h, "g/h")},
+            result=co2_mol_r, result_unit="mol/h",
+            assumptions=["Molar mass of CO2 = 44 g/mol"],
+        ),
+        worked_calc(
+            label="H+ generation rate from CO2 dissolution",
+            formula="H_plus_mol_h = co2_mol_h x 0.30",
+            values={"co2_mol_h": (co2_mol_r, "mol/h")},
+            result=h_plus_r, result_unit="mol/h",
+            assumptions=[
+                "~30% of dissolved CO2 forms H+ in bicarbonate-buffered medium at physiological pH",
+                "CO2 + H2O -> HCO3- + H+ partial dissociation (Doran 2013, ch.8)",
+            ],
+        ),
+        worked_calc(
+            label="Uncontrolled pH swing per minute",
+            formula="dpH_per_min = (H_plus_mol_h / 60 x 1000) / (buffer_cap x volume_l)",
+            values={
+                "H_plus_mol_h": (h_plus_r, "mol/h"),
+                "buffer_cap": (buffer_capacity_meq_per_l, "meq/L"),
+                "volume_l": (volume_l, "L"),
+            },
+            result=ph_swing_r, result_unit="pH/min",
+            assumptions=[
+                "H+ rate x 1000 converts mol to mmol (= meq for monoprotic acid)",
+                "Divide by (buffer_cap x volume_l) to get pH units/min from meq/min",
+            ],
+        ),
+    ]
+
     return {
         "starting_ph": start_ph,
         "target_ph": target_ph,
@@ -135,6 +205,7 @@ def compute(payload: dict) -> dict:
             "Initial bolus to set-point + continuous compensation for organism acid production. "
             "Use phosphoric acid (also provides P) or KH2PO4 buffer to reduce titrant volume."
         ),
+        "worked": worked,
     }
 
 

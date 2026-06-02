@@ -40,8 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -170,6 +174,117 @@ def compute(payload: dict) -> dict:
     # Cooling time in hours
     solidification_time_hours = cooling_time_s / 3600.0
 
+    # Rounded display values that chain through the worked calculations.
+    mass_g_r = round(mass_g, 2)
+    total_enthalpy_r = round(total_enthalpy_j, 1)
+    sensible_r = round(sensible_heat_j, 1)
+    total_heat_r = round(total_heat_j, 1)
+    cooling_time_r = round(cooling_time_s, 2)
+    cooling_power_r = round(cooling_power_w, 1)
+    solidification_hr_r = round(solidification_time_hours, 4)
+    yield_mpa_r = round(yield_mpa, 1)
+    uts_mpa_r = round(uts_mpa, 1)
+
+    # Worked calculations (hand-checkable closed-form steps only).
+    # ug_factor and baseline_yield are piecewise/lookup — SKIP; pass as live input symbols.
+    # fatigue_cycles product includes float multiplication of large int; show it.
+    worked = [
+        worked_calc(
+            label="Alloy mass from volume",
+            formula="mass = volume x density",
+            values={
+                "volume": (volume_cm3, "cm3"),
+                "density": (a["density_g_cm3"], "g/cm3"),
+            },
+            result=mass_g_r, result_unit="g",
+            assumptions=[f"alloy density for {alloy} from ASM Handbook Vol.3 / Pollock & Tin (2006)"],
+        ),
+        worked_calc(
+            label="Latent heat to remove (fusion enthalpy)",
+            formula="H_fusion_total = mass x H_fusion",
+            values={
+                "mass": (mass_g_r, "g"),
+                "H_fusion": (a["H_fusion_J_g"], "J/g"),
+            },
+            result=total_enthalpy_r, result_unit="J",
+            assumptions=[f"H_fusion for {alloy} from ASM Handbook Vol.3"],
+        ),
+        worked_calc(
+            label="Sensible heat (cooling 200 K below liquidus)",
+            formula="Q_sensible = mass x cp x delta_T",
+            values={
+                "mass": (mass_g_r, "g"),
+                "cp": (cp_j_g_k, "J/(g K)"),
+                "delta_T": (temp_drop_k, "K"),
+            },
+            result=sensible_r, result_unit="J",
+            assumptions=["cp = 0.5 J/(g K) average for superalloy; 200 K below liquidus"],
+        ),
+        worked_calc(
+            label="Total heat to remove (latent + sensible)",
+            formula="Q_total = H_fusion_total + Q_sensible",
+            values={
+                "H_fusion_total": (total_enthalpy_r, "J"),
+                "Q_sensible": (sensible_r, "J"),
+            },
+            result=total_heat_r, result_unit="J",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Solidification time from cooling rate",
+            formula="t_cool = delta_T / cooling_rate",
+            values={
+                "delta_T": (temp_drop_k, "K"),
+                "cooling_rate": (cooling_rate_k_s, "K/s"),
+            },
+            result=cooling_time_r, result_unit="s",
+            assumptions=["linear cooling rate; 200 K thermal window below liquidus"],
+        ),
+        worked_calc(
+            label="Required cooling power",
+            formula="P_cool = Q_total / t_cool",
+            values={
+                "Q_total": (total_heat_r, "J"),
+                "t_cool": (cooling_time_r, "s"),
+            },
+            result=cooling_power_r, result_unit="W",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Solidification time in hours",
+            formula="t_hr = t_cool / 3600",
+            values={"t_cool": (cooling_time_r, "s")},
+            result=solidification_hr_r, result_unit="hr",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Yield strength with orientation and microgravity factors",
+            formula="yield_mpa = yield_base x yield_orient_f x ug_factor",
+            values={
+                "yield_base": (a["yield_mpa"], "MPa"),
+                "yield_orient_f": (o["yield_factor"], ""),
+                "ug_factor": (ug_factor, ""),
+            },
+            result=yield_mpa_r, result_unit="MPa",
+            assumptions=[
+                f"baseline for {alloy}; orientation factor for {orientation}; ug_factor from g-level",
+            ],
+        ),
+        worked_calc(
+            label="Ultimate tensile strength with orientation and microgravity factors",
+            formula="uts_mpa = uts_base x uts_orient_f x ug_factor",
+            values={
+                "uts_base": (a["uts_mpa"], "MPa"),
+                "uts_orient_f": (o["uts_factor"], ""),
+                "ug_factor": (ug_factor, ""),
+            },
+            result=uts_mpa_r, result_unit="MPa",
+            assumptions=[
+                f"baseline for {alloy}; orientation factor for {orientation}; ug_factor from g-level",
+            ],
+        ),
+    ]
+
     return {
         "alloy": alloy,
         "volume_cm3": volume_cm3,
@@ -179,17 +294,18 @@ def compute(payload: dict) -> dict:
         "container_material": container,
         "mass_kg": round(mass_g / 1000.0, 3),
         "total_heat_to_remove_kj": round(total_heat_j / 1000.0, 1),
-        "cooling_power_w": round(cooling_power_w, 1),
-        "solidification_time_hours": round(solidification_time_hours, 3),
+        "cooling_power_w": cooling_power_r,
+        "solidification_time_hours": solidification_hr_r,
         "microgravity_benefit_factor": ug_factor,
         "yield_pct": round(yield_pct, 1),
         "mechanical_properties": {
-            "yield_mpa": round(yield_mpa, 1),
-            "uts_mpa": round(uts_mpa, 1),
+            "yield_mpa": yield_mpa_r,
+            "uts_mpa": uts_mpa_r,
             "fatigue_life_cycles": int(fatigue_cycles),
         },
         "microstructure_score": score,
         "baseline_yield_pct_on_ground": round(baseline_yield * 100.0, 1),
+        "worked": worked,
     }
 
 

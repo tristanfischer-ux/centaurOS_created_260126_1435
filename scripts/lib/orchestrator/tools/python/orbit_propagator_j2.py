@@ -60,8 +60,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "astropy + sgp4",
@@ -220,6 +224,30 @@ def compute(payload: dict) -> dict:
     n_orbits_propagated = prop_time_days * 86400.0 / period_s
     true_anomaly_propagated_deg = (nu_deg + n_orbits_propagated * 360.0) % 360.0
 
+    # Worked calculations — only clean arithmetic propagation steps.
+    # period_s uses sqrt, eclipse_frac uses asin, omega_dot_rads uses cos:
+    # all transcendental — skipped; their live values are passed as inputs.
+    raan_prop_r = round(raan_propagated_deg, 4)
+    argp_prop_r = round(arg_perigee_propagated_deg, 4)
+    omega_dot_r = round(omega_dot_deg_per_day, 4)
+    argp_dot_r = round(arg_perigee_dot_deg_per_day, 4)
+    n_orbits_r = round(n_orbits_propagated, 3)
+    # Propagated RAAN and argument-of-perigee both use mod 360 — a non-arithmetic
+    # function that a hand-checker cannot evaluate with + - x / ^ alone.
+    # These entries are omitted per the worked_calc arithmetic-only rule (2026-06-02).
+    worked = [
+        worked_calc(
+            label="Number of orbits completed in propagation window",
+            formula="n_orbits_propagated = prop_time_days x 86400 / period_s",
+            values={
+                "prop_time_days": (prop_time_days, "days"),
+                "period_s": (round(period_s, 3), "s"),
+            },
+            result=n_orbits_r, result_unit="rev",
+            assumptions=["Kepler period; period_s computed from sqrt(a^3/mu) (transcendental)"],
+        ),
+    ]
+
     out = {
         "central_body": central_body,
         "mu_km3s2": round(mu, 6),
@@ -252,6 +280,7 @@ def compute(payload: dict) -> dict:
         "arg_perigee_propagated_deg": round(arg_perigee_propagated_deg, 4),
         "true_anomaly_propagated_deg": round(true_anomaly_propagated_deg, 4),
         "_provenance": PROVENANCE,
+        "worked": worked,
     }
 
     # If TLE is supplied, run SGP4 alongside

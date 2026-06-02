@@ -40,9 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "aerospike_engine (custom)",
@@ -195,6 +198,71 @@ def compute(payload: dict) -> dict:
     bell_length_m = 1.5 * math.sqrt(A_exit_m2)
     aerospike_length_m = bell_length_m * 0.4
 
+    # Worked calculations — pure arithmetic steps only.
+    # thrust_coefficient is computed via a 100-step Newton iteration (not hand-
+    # checkable), so cf_aero at sea level is passed as a live input to the
+    # Isp step.  bell_length uses sqrt(A_exit), so it is skipped; aerospike
+    # length chains off the rounded bell length.
+    throat_r_mm = throat_d_mm / 2.0
+    At_cm2_r = round(A_t_m2 * 1e4, 2)
+    mdot_r = round(m_dot_kg_s, 3)
+    bell_r = round(bell_length_m, 2)
+    # Derive aero_r from bell_r at 3 dp so the substitution (bell_r x 0.4) reproduces
+    # the stated result exactly (e.g. 1.99 x 0.4 = 0.796).
+    aero_r = round(bell_r * 0.4, 3)
+    isp_sl = isp_at_alt.get("0km", 0.0)
+    thrust_sl = thrust_at_alt.get("0km", 0.0)
+    # Reconstruct cf_aero_sl from stored thrust: F = cf * Pc * At * 0.95
+    cf_aero_sl_r = round(thrust_sl / (p_c_pa * A_t_m2 * 0.95), 3) if (p_c_pa * A_t_m2) > 0 else 0.0
+
+    worked = [
+        worked_calc(
+            label="Throat area",
+            formula="A_t = pi x (throat_r_mm / 1000)^2 x 10000",
+            values={
+                "throat_r_mm": (throat_r_mm, "mm"),
+            },
+            result=At_cm2_r, result_unit="cm^2",
+            assumptions=["circular throat; radius = throat_diameter_mm / 2; x 10000 converts m^2 to cm^2"],
+        ),
+        worked_calc(
+            label="Throat mass flow",
+            formula="m_dot = p_c_pa x A_t_m2 / c_star",
+            values={
+                "p_c_pa": (p_c_pa, "Pa"),
+                "A_t_m2": (round(A_t_m2, 6), "m^2"),
+                "c_star": (p["c_star"], "m/s"),
+            },
+            result=mdot_r, result_unit="kg/s",
+            assumptions=["choked throat; c* from Sutton Table 5-1 for " + fuel],
+        ),
+        worked_calc(
+            label="Sea-level aerospike Isp",
+            formula="Isp_sl = (cf_aero_sl x p_c_pa x A_t_m2 x 0.95) / (m_dot x G_0)",
+            values={
+                "cf_aero_sl": (cf_aero_sl_r, ""),
+                "p_c_pa": (p_c_pa, "Pa"),
+                "A_t_m2": (round(A_t_m2, 6), "m^2"),
+                "m_dot": (mdot_r, "kg/s"),
+                "G_0": (G_0, "m/s^2"),
+            },
+            result=isp_sl, result_unit="s",
+            assumptions=[
+                "0.95 = aerospike nozzle efficiency vs ideal (Rocketdyne X-33 data)",
+                "cf_aero from ideal altitude-matched expansion (Pe = Pa); not hand-checkable",
+            ],
+        ),
+        worked_calc(
+            label="Aerospike plug length",
+            formula="L_aero = L_bell x 0.4",
+            values={
+                "L_bell": (bell_r, "m"),
+            },
+            result=aero_r, result_unit="m",
+            assumptions=["aerospike ~ 40% of equivalent bell nozzle length (Rocketdyne X-33)"],
+        ),
+    ]
+
     return {
         "chamber_pressure_bar": p_c_bar,
         "expansion_ratio": expansion_ratio,
@@ -212,6 +280,7 @@ def compute(payload: dict) -> dict:
         "bell_nozzle_length_m_equivalent": round(bell_length_m, 2),
         "aerospike_length_m": round(aerospike_length_m, 2),
         "nozzle_length_m": round(aerospike_length_m, 2),
+        "worked": worked,
     }
 
 

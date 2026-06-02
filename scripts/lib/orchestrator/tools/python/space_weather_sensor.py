@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -160,6 +164,44 @@ def compute(payload: dict) -> dict:
     # Trapped proton dose contribution
     proton_flux = PROTON_FLUX_PER_YEAR[lat_band]
 
+    # Worked calculations.
+    # shield_factor uses fractional power (0.4) — skip; pass as live input.
+    # expected_tid_krad and SEU_per_day are clean products of named inputs.
+    tid_rate_r = round(tid_per_year, 2)
+    shield_r = round(shield_factor, 3)
+    expected_tid_r = round(expected_tid_krad, 1)
+    # 6 dp gives 0.000274 — substitution evaluates to 0.00027397 (0.011% off, within threshold)
+    seu_r = round(seu_per_day, 6)
+    worked = [
+        worked_calc(
+            label="Annual TID at design shield thickness",
+            formula="tid_rate = base_tid_rate x shield_factor",
+            values={"base_tid_rate": (base_tid_rate, "krad/yr"),
+                    "shield_factor": (shield_r, "")},
+            result=tid_rate_r, result_unit="krad/yr",
+            assumptions=[f"base_tid_rate for {lat_band} at 5 mm Al from SPENVIS/ECSS-E-ST-10-04C",
+                         "shield_factor = (5mm / shield_mm)^0.4 (empirical scaling)"],
+        ),
+        worked_calc(
+            label="Mission total TID",
+            formula="TID = tid_rate x mission_years",
+            values={"tid_rate": (tid_rate_r, "krad/yr"),
+                    "mission_years": (mission_years, "yr")},
+            result=expected_tid_r, result_unit="krad",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="SEU rate per day",
+            formula="SEU_day = hi_rate / 365 x sigma_sat x bits_per_chip",
+            values={"hi_rate": (hi_rate, "ions/yr"),
+                    "sigma_sat": (sigma_sat, "cm^2/bit"),
+                    "bits_per_chip": (bits_per_chip, "bits")},
+            result=seu_r, result_unit="SEU/day",
+            assumptions=["sigma_sat = 1e-14 cm^2/bit (JEDEC JESD89A, 130nm SRAM)",
+                         "bits_per_chip = 1e6 (1 Mbit nominal)"],
+        ),
+    ]
+
     # Mission-averaged radiation hazard score (1-10)
     if expected_tid_krad > 50:
         hazard = 10
@@ -184,11 +226,12 @@ def compute(payload: dict) -> dict:
         "shielding_factor": round(shield_factor, 3),
         "trapped_proton_flux_per_year": proton_flux,
         "heavy_ion_rate_per_year": hi_rate,
-        "SEU_per_day": round(seu_per_day, 4),
+        "SEU_per_day": seu_r,
         "detector_size_l": round(detector_size_l, 3),
         "detector_mass_kg": round(detector_mass_kg, 2),
         "power_w": round(detector_power_w, 2),
         "radiation_hazard_score_1_10": hazard,
+        "worked": worked,
     }
 
 

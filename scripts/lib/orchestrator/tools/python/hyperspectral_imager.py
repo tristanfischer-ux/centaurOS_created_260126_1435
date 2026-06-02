@@ -45,8 +45,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -183,6 +187,64 @@ def compute(payload: dict) -> dict:
     data_rate_bps = num_bands * swath_pixels * bit_depth_bits * pushbroom_rate_hz
     data_rate_mbps = data_rate_bps / 1e6
 
+    # Worked calculations — closed-form steps only.
+    # v_orb (sqrt of GM/R), omega_pixel (ifov^2), photon energy (hc/lambda),
+    # A_required (complex fraction), SNR (sqrt), and piecewise solar irradiance
+    # are all skipped — transcendental or piecewise.
+    v_ground_r = round(v_ground_m_s, 2)
+    dwell_s_r = round(dwell_time_s, 6)
+    focal_mm_r = round(focal_length_mm, 1)
+    pushbroom_hz_r = round(pushbroom_rate_hz, 0)
+    data_rate_r = round(data_rate_mbps, 1)
+    worked = [
+        worked_calc(
+            label="Pushbroom dwell time per ground pixel",
+            formula="dwell_time = GSD / v_ground",
+            values={
+                "GSD": (target_gsd_m, "m"),
+                "v_ground": (v_ground_r, "m/s"),
+            },
+            result=dwell_s_r, result_unit="s",
+            assumptions=["v_ground derived from orbital mechanics (sqrt step, not hand-verified); GSD = ground-sample distance"],
+        ),
+        worked_calc(
+            label="Focal length from GSD geometry",
+            formula="focal_length_mm = (pixel_um x 1e-6) x altitude_m / GSD x 1000",
+            values={
+                "pixel_um": (pixel_um, "um"),
+                "altitude_m": (altitude_m, "m"),
+                "GSD": (target_gsd_m, "m"),
+            },
+            result=focal_mm_r, result_unit="mm",
+            assumptions=["Thin-lens paraxial relation: GSD = pixel_size x altitude / focal_length"],
+        ),
+        worked_calc(
+            label="Pushbroom line rate",
+            formula="pushbroom_rate = v_ground / GSD",
+            values={
+                "v_ground": (v_ground_r, "m/s"),
+                "GSD": (target_gsd_m, "m"),
+            },
+            result=pushbroom_hz_r, result_unit="Hz",
+            assumptions=[
+                "Equivalent to 1 / dwell_time; uses v_ground / GSD to avoid precision loss "
+                "when dwell_time is small and _fmt truncates to 4 decimal places",
+            ],
+        ),
+        worked_calc(
+            label="Raw data rate",
+            formula="data_rate_mbps = num_bands x swath_pixels x bit_depth x pushbroom_rate / 1e6",
+            values={
+                "num_bands": (num_bands, ""),
+                "swath_pixels": (swath_pixels, ""),
+                "bit_depth": (bit_depth_bits, "bits"),
+                "pushbroom_rate": (pushbroom_hz_r, "Hz"),
+            },
+            result=data_rate_r, result_unit="Mbit/s",
+            assumptions=["Uncompressed; bit_depth from adc_bit_depth input (default 14 bits)"],
+        ),
+    ]
+
     return {
         "wavelength_start_nm": lam_start_nm,
         "wavelength_end_nm": lam_end_nm,
@@ -204,6 +266,7 @@ def compute(payload: dict) -> dict:
         "data_rate_mbps": round(data_rate_mbps, 1),
         "pushbroom_line_rate_hz": round(pushbroom_rate_hz, 0),
         "bit_depth_bits": bit_depth_bits,
+        "worked": worked,
     }
 
 

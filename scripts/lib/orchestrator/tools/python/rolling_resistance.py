@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -115,14 +119,75 @@ def compute(payload: dict) -> dict:
     # Velocity in km/h
     v_kmh = v_ms * 3.6
 
+    # Worked calculations — each step uses rounded live values so the
+    # substitution string matches by construction (drift-safe).
+    crr_r = round(crr, 5)
+    F_rr_r = round(F_rr, 3)
+    F_aero_r = round(F_aero, 3)
+    F_grad_r = round(F_grad, 3)
+    F_total_r = round(F_total, 3)
+    p_wheel_r = round(p_wheel_w, 2)
+
+    worked = [
+        worked_calc(
+            label="Rolling resistance force",
+            formula="F_rr = crr x m x g",
+            values={
+                "crr": (crr_r, ""),
+                "m": (m_kg, "kg"),
+                "g": (g, "m/s^2"),
+            },
+            result=F_rr_r, result_unit="N",
+            assumptions=[
+                f"Crr corrected for tyre pressure: {tire_type} base Crr {crr_base} "
+                f"scaled by (4 bar / {p_tire_bar} bar)^0.5 (Pearson 2007 fit)",
+            ],
+        ),
+        worked_calc(
+            label="Aerodynamic drag force",
+            formula="F_aero = 0.5 x rho x CdA x v^2",
+            values={
+                "rho": (rho, "kg/m^3"),
+                "CdA": (cda, "m^2"),
+                "v": (v_ms, "m/s"),
+            },
+            result=F_aero_r, result_unit="N",
+            assumptions=[
+                f"CdA = {cda} m^2 for rider position '{rider_pos}' (Wilson Bicycling Science tables)",
+            ],
+        ),
+        worked_calc(
+            label="Total wheel power",
+            formula="P_wheel = (F_rr + F_aero + F_grad) x v",
+            values={
+                "F_rr": (F_rr_r, "N"),
+                "F_aero": (F_aero_r, "N"),
+                "F_grad": (F_grad_r, "N"),
+                "v": (v_ms, "m/s"),
+            },
+            result=p_wheel_r, result_unit="W",
+            assumptions=["F_grad computed via arctan + sin (transcendental); passed as input here"],
+        ),
+        worked_calc(
+            label="Battery / motor input power",
+            formula="P_battery = P_wheel / eta_drive",
+            values={
+                "P_wheel": (p_wheel_r, "W"),
+                "eta_drive": (drive_eta, ""),
+            },
+            result=round(p_battery_w, 2), result_unit="W",
+            assumptions=[f"Drive-train efficiency {drive_eta} (motor + controller + chain)"],
+        ),
+    ]
+
     return {
-        "rolling_drag_n": round(F_rr, 3),
-        "aero_drag_n": round(F_aero, 3),
-        "gradient_drag_n": round(F_grad, 3),
-        "total_drag_n": round(F_total, 3),
-        "total_power_required_w": round(p_wheel_w, 2),
+        "rolling_drag_n": F_rr_r,
+        "aero_drag_n": F_aero_r,
+        "gradient_drag_n": F_grad_r,
+        "total_drag_n": F_total_r,
+        "total_power_required_w": p_wheel_r,
         "battery_power_required_w": round(p_battery_w, 2),
-        "crr_used": round(crr, 5),
+        "crr_used": crr_r,
         "crr_base": crr_base,
         "cda_m2": cda,
         "velocity_kmh": round(v_kmh, 2),
@@ -135,6 +200,7 @@ def compute(payload: dict) -> dict:
         "air_density_kg_m3": rho,
         "drive_efficiency": drive_eta,
         "wheel_diameter_inch": wheel_d_in,
+        "worked": worked,
     }
 
 

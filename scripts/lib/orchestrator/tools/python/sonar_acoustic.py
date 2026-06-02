@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -151,6 +155,34 @@ def compute(payload: dict) -> dict:
     # Wavelength
     wavelength_m = c / (freq_khz * 1000.0)
 
+    # Worked calculations.
+    # mackenzie_sound_speed and francois_garrison_attenuation are multi-term
+    # polynomial + exponential formulae — not hand-checkable in one line; skip.
+    # spreading_loss = 20*log10(r) — transcendental; pass as live input.
+    # absorption_loss and path_loss are clean products/sums of named inputs.
+    alpha_r = round(alpha_db_km, 4)
+    spread_r = round(spreading_loss_db, 3)
+    abs_r = round(absorption_loss_db, 3)
+    worked = [
+        worked_calc(
+            label="Absorption loss",
+            formula="abs_loss = alpha x distance_km",
+            values={"alpha": (alpha_r, "dB/km"),
+                    "distance_km": (distance_km, "km")},
+            result=abs_r, result_unit="dB",
+            assumptions=["alpha from Francois-Garrison (1982) equation at given T/S/depth/pH"],
+        ),
+        worked_calc(
+            label="Total path loss",
+            formula="path_loss = spreading_loss + abs_loss",
+            values={"spreading_loss": (spread_r, "dB"),
+                    "abs_loss": (abs_r, "dB")},
+            result=round(path_loss_db, 3), result_unit="dB",
+            assumptions=["spreading_loss = 20*log10(distance_m) — spherical spreading",
+                         "per Urick 'Principles of Underwater Sound' 3rd ed."],
+        ),
+    ]
+
     return {
         "frequency_khz": freq_khz,
         "distance_km": distance_km,
@@ -164,6 +196,7 @@ def compute(payload: dict) -> dict:
         "spreading_loss_db": round(spreading_loss_db, 3),
         "absorption_loss_db": round(absorption_loss_db, 3),
         "path_loss_db": round(path_loss_db, 3),
+        "worked": worked,
     }
 
 

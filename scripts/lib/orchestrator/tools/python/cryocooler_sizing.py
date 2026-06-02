@@ -47,8 +47,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -137,19 +141,88 @@ def compute(payload: dict) -> dict:
     # Microphonic vibration disturbance (relevant for IR imagers)
     vib_n = prop["vib_n_per_w_input"] * p_input_w
 
+    # Worked calculations.
+    # derate is exp(log(...)) — transcendental; eta_carnot is passed as a live
+    # intermediate value rather than re-derived, making subsequent steps checkable.
+    cop_carnot_r = round(cop_carnot, 4)
+    eta_carnot_r = round(eta_carnot, 4)
+    cop_actual_r = round(cop_actual, 4)
+    p_input_r = round(p_input_w, 3)
+    mass_r = round(mass_kg, 3)
+    vib_r = round(vib_n, 5)
+    worked = [
+        worked_calc(
+            label="Carnot coefficient of performance (COP)",
+            formula="COP_Carnot = T_cold / (T_hot - T_cold)",
+            values={
+                "T_cold": (t_cold, "K"),
+                "T_hot": (t_hot, "K"),
+            },
+            result=cop_carnot_r, result_unit="",
+            assumptions=["ideal reversible (Carnot) cycle upper bound"],
+        ),
+        worked_calc(
+            label="Actual COP (derated from Carnot)",
+            formula="COP_actual = COP_Carnot x eta_carnot",
+            values={
+                "COP_Carnot": (cop_carnot_r, ""),
+                "eta_carnot": (eta_carnot_r, ""),
+            },
+            result=cop_actual_r, result_unit="",
+            assumptions=[
+                f"eta_carnot from smooth log-derate of {prop['carnot_eff_at_80K']} (Carnot fraction at 80 K for {cooler_type}); "
+                "derate = exp(-|ln(T_cold/sweet_spot)| x 0.5) — transcendental, not shown separately",
+            ],
+        ),
+        worked_calc(
+            label="Input electrical power required",
+            formula="P_in = Q_load / COP_actual",
+            values={
+                "Q_load": (q_load, "W"),
+                "COP_actual": (cop_actual_r, ""),
+            },
+            result=p_input_r, result_unit="W",
+            assumptions=["steady-state; no transient start-up penalty"],
+        ),
+        worked_calc(
+            label="Cryocooler mass (Ladner 2010 scaling)",
+            formula="m = mass_per_W_input x P_in",
+            values={
+                "mass_per_W_input": (prop["mass_kg_per_W_input"], "kg/W"),
+                "P_in": (p_input_r, "W"),
+            },
+            result=mass_r, result_unit="kg",
+            assumptions=[
+                f"mass scaling coefficient {prop['mass_kg_per_W_input']} kg/W for {cooler_type} (Ladner 2010)",
+                "minimum 0.5 kg floor for small loads — applied after this step if necessary",
+            ],
+        ),
+        worked_calc(
+            label="Microphonic vibration force",
+            formula="F_vib = vib_per_W x P_in",
+            values={
+                "vib_per_W": (prop["vib_n_per_w_input"], "N/W"),
+                "P_in": (p_input_r, "W"),
+            },
+            result=vib_r, result_unit="N",
+            assumptions=[f"vibration coefficient {prop['vib_n_per_w_input']} N/W for {cooler_type}; relevant for IR imager pointing stability"],
+        ),
+    ]
+
     return {
         "target_temp_k": t_cold,
         "cooling_load_w": q_load,
         "sink_temp_k": t_hot,
         "cooler_type": cooler_type,
         "in_temperature_range": in_range,
-        "cop_carnot_max": round(cop_carnot, 4),
-        "carnot_efficiency_at_op": round(eta_carnot, 4),
-        "cop_actual": round(cop_actual, 4),
+        "cop_carnot_max": cop_carnot_r,
+        "carnot_efficiency_at_op": eta_carnot_r,
+        "cop_actual": cop_actual_r,
         "efficiency_pct_carnot": round(eta_carnot * 100.0, 2),
-        "input_power_w": round(p_input_w, 3),
-        "mass_kg": round(mass_kg, 3),
-        "microphonic_vibration_n": round(vib_n, 5),
+        "input_power_w": p_input_r,
+        "mass_kg": mass_r,
+        "microphonic_vibration_n": vib_r,
+        "worked": worked,
     }
 
 

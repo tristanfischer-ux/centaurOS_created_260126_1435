@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -141,6 +145,147 @@ def compute(payload: dict) -> dict:
 
     passes = (safety_factor >= sf_required) and (buckling_sf >= sf_required)
 
+    # Worked calculations — chained off rounded intermediates so a reviewer
+    # can verify each step by hand without the source code.
+    p_ext_mpa_r = round(p_ext_mpa, 4)
+    if thin_wall:
+        sigma_hoop_r = round(sigma_hoop_mpa, 3)
+        hoop_formula = "sigma_hoop = p_ext x r_outer / t"
+        hoop_values = {
+            "p_ext": (p_ext_mpa_r, "MPa"),
+            "r_outer": (r_outer_mm, "mm"),
+            "t": (wall_t_mm, "mm"),
+        }
+        hoop_note = "thin-wall formula (t < r/10)"
+    else:
+        sigma_hoop_r = round(sigma_hoop_mpa, 3)
+        hoop_formula = "sigma_hoop = 2 x p_ext x r_outer^2 / (r_outer^2 - r_inner^2)"
+        hoop_values = {
+            "p_ext": (p_ext_mpa_r, "MPa"),
+            "r_outer": (round(r_outer_mm, 2), "mm"),
+            "r_inner": (round(r_inner_mm, 2), "mm"),
+        }
+        hoop_note = "Lame thick-wall formula (external pressure only)"
+    sigma_long_r = round(sigma_long_mpa, 3)
+    p_cr_mpa_r = round(p_cr_mpa, 4)
+    safety_factor_r = round(safety_factor, 3)
+    buckling_sf_r = round(buckling_sf, 3)
+    vol_m3_r = round(vol_m3, 6)
+    mass_kg_r = round(mass_kg, 3)
+    end_cap_area_mm2_r = round(end_cap_area_mm2, 2)
+    end_cap_vol_mm3_r = round(end_cap_vol_mm3, 2)
+    end_cap_mass_kg_r = round(end_cap_mass_kg, 3)
+
+    worked = [
+        worked_calc(
+            label="External hydrostatic pressure",
+            formula="p_ext = rho_water x G x depth / 1e6",
+            values={
+                "rho_water": (1025.0, "kg/m3"),
+                "G": (9.80665, "m/s2"),
+                "depth": (depth_m, "m"),
+            },
+            result=p_ext_mpa_r, result_unit="MPa",
+            assumptions=["seawater density 1025 kg/m3", "gauge pressure (atmospheric inside)", "divide by 1e6 converts Pa to MPa"],
+        ),
+        worked_calc(
+            label="Hoop stress",
+            formula=hoop_formula,
+            values=hoop_values,
+            result=sigma_hoop_r, result_unit="MPa",
+            assumptions=[hoop_note],
+        ),
+        worked_calc(
+            label="Longitudinal stress (closed-end)",
+            formula="sigma_long = p_ext x r_outer / (2 x t)",
+            values={
+                "p_ext": (p_ext_mpa_r, "MPa"),
+                "r_outer": (r_outer_mm, "mm"),
+                "t": (wall_t_mm, "mm"),
+            },
+            result=sigma_long_r, result_unit="MPa",
+            assumptions=["closed end-cap assumption; sigma_long = sigma_hoop / 2 for thin wall"],
+        ),
+        worked_calc(
+            label="Yield safety factor (hoop-governing)",
+            formula="SF_yield = yield_mpa / sigma_hoop",
+            values={
+                "yield_mpa": (mat["yield_mpa"], "MPa"),
+                "sigma_hoop": (sigma_hoop_r, "MPa"),
+            },
+            result=safety_factor_r, result_unit="",
+            assumptions=[f"material {material}; yield from datasheet/standard"],
+        ),
+        worked_calc(
+            label="Critical external-pressure buckling (Bresse / Bryan)",
+            formula="p_cr = 2 x E_gpa x 1000 x (t / diameter)^3 / (1 - nu^2)",
+            values={
+                "E_gpa": (mat["E_gpa"], "GPa"),
+                "t": (wall_t_mm, "mm"),
+                "diameter": (diameter_mm, "mm"),
+                "nu": (0.3, ""),
+            },
+            result=p_cr_mpa_r, result_unit="MPa",
+            assumptions=[
+                "nu = 0.3 (Poisson's ratio, typical metal)",
+                "simplified Bresse formula valid for L > D",
+                "factor 1000 converts E from GPa to MPa; mm/mm ratio cancels units",
+            ],
+        ),
+        worked_calc(
+            label="Buckling safety factor",
+            formula="SF_buckling = p_cr / p_ext",
+            values={
+                "p_cr": (p_cr_mpa_r, "MPa"),
+                "p_ext": (p_ext_mpa_r, "MPa"),
+            },
+            result=buckling_sf_r, result_unit="",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Cylinder wall volume",
+            formula="vol_m3 = pi x (r_outer^2 - r_inner^2) x length_mm / 1e9",
+            values={
+                "r_outer": (r_outer_mm, "mm"),
+                "r_inner": (round(r_inner_mm, 2), "mm"),
+                "length_mm": (length_mm, "mm"),
+            },
+            result=vol_m3_r, result_unit="m3",
+            assumptions=["cylindrical shell only; end caps computed separately", "1e9 converts mm3 to m3"],
+        ),
+        worked_calc(
+            label="Cylinder wall mass",
+            formula="mass_kg = vol_m3 x density",
+            values={
+                "vol_m3": (vol_m3_r, "m3"),
+                "density": (mat["density"], "kg/m3"),
+            },
+            result=mass_kg_r, result_unit="kg",
+            assumptions=[f"material {material}"],
+        ),
+        worked_calc(
+            label="End-cap mass (both flat-plate approximation)",
+            formula="end_cap_mass = 2 x pi x r_outer^2 x t x density / 1e9",
+            values={
+                "r_outer": (r_outer_mm, "mm"),
+                "t": (wall_t_mm, "mm"),
+                "density": (mat["density"], "kg/m3"),
+            },
+            result=end_cap_mass_kg_r, result_unit="kg",
+            assumptions=["flat-plate end-cap approximation; 2 caps", "1e9 converts mm3 to m3"],
+        ),
+        worked_calc(
+            label="Total vessel mass",
+            formula="total_mass = mass_cylinder + mass_end_caps",
+            values={
+                "mass_cylinder": (mass_kg_r, "kg"),
+                "mass_end_caps": (end_cap_mass_kg_r, "kg"),
+            },
+            result=round(total_mass_kg, 3), result_unit="kg",
+            assumptions=[],
+        ),
+    ]
+
     return {
         "depth_m": depth_m,
         "diameter_mm": diameter_mm,
@@ -163,6 +308,7 @@ def compute(payload: dict) -> dict:
         "mass_kg": round(total_mass_kg, 3),
         "safety_factor_required": sf_required,
         "passes": passes,
+        "worked": worked,
     }
 
 

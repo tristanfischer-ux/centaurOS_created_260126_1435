@@ -50,8 +50,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -165,6 +169,84 @@ def compute(payload: dict) -> dict:
     cgm_lifespan_days = 14.0
     cgm_headroom_pct = ((life_days - cgm_lifespan_days) / cgm_lifespan_days) * 100.0
 
+    # Rounded intermediates for chained worked calculations.
+    eff_cap_r = round(effective_capacity_mAh, 3)
+    avg_tx_r = round(avg_tx_uA, 4)
+    total_avg_r = round(total_avg_uA, 4)
+    self_dis_r = round(self_discharge_uA, 4)
+    total_drain_r = round(total_drain_uA, 4)
+    capacity_uAh_r = round(capacity_uAh, 2)
+    life_hours_r = round(life_hours, 2)
+    life_days_r = round(life_days, 2)
+
+    worked = [
+        worked_calc(
+            label="Average TX current contribution",
+            formula="avg_tx_uA = tx_burst_mA x 1000 x duty_fraction",
+            values={
+                "tx_burst_mA": (tx_burst_mA, "mA"),
+                "duty_fraction": (duty_fraction, ""),
+            },
+            result=avg_tx_r, result_unit="uA",
+            assumptions=["duty_fraction = transmit_duty_pct / 100; burst current time-averaged over full cycle"],
+        ),
+        worked_calc(
+            label="Total average current (all consumers)",
+            formula="total_avg_uA = sensor_uA + mcu_sleep_uA + avg_tx_uA",
+            values={
+                "sensor_uA": (sensor_uA, "uA"),
+                "mcu_sleep_uA": (mcu_sleep_uA, "uA"),
+                "avg_tx_uA": (avg_tx_r, "uA"),
+            },
+            result=total_avg_r, result_unit="uA",
+            assumptions=["three independent current sources summed linearly"],
+        ),
+        worked_calc(
+            label="Self-discharge equivalent current",
+            formula="self_dis_uA = (eff_cap_mAh x 1000 x self_dis_pct_month / 100) / 730",
+            values={
+                "eff_cap_mAh": (eff_cap_r, "mAh"),
+                "self_dis_pct_month": (bp["self_discharge_pct_per_month"], "%/month"),
+            },
+            result=self_dis_r, result_unit="uA",
+            assumptions=["730 h per month; self-discharge modelled as constant equivalent current drain"],
+        ),
+        worked_calc(
+            label="Total drain current (active + self-discharge)",
+            formula="total_drain_uA = total_avg_uA + self_dis_uA",
+            values={
+                "total_avg_uA": (total_avg_r, "uA"),
+                "self_dis_uA": (self_dis_r, "uA"),
+            },
+            result=total_drain_r, result_unit="uA",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Effective battery capacity in uAh",
+            formula="capacity_uAh = eff_cap_mAh x 1000",
+            values={"eff_cap_mAh": (eff_cap_r, "mAh")},
+            result=capacity_uAh_r, result_unit="uAh",
+            assumptions=["1 mAh = 1000 uAh"],
+        ),
+        worked_calc(
+            label="Battery life in hours",
+            formula="life_hours = capacity_uAh / total_drain_uA",
+            values={
+                "capacity_uAh": (capacity_uAh_r, "uAh"),
+                "total_drain_uA": (total_drain_r, "uA"),
+            },
+            result=life_hours_r, result_unit="h",
+            assumptions=["constant-drain approximation (Peukert effect negligible at uA range)"],
+        ),
+        worked_calc(
+            label="Battery life in days",
+            formula="life_days = life_hours / 24",
+            values={"life_hours": (life_hours_r, "h")},
+            result=life_days_r, result_unit="days",
+            assumptions=[],
+        ),
+    ]
+
     return {
         "battery_type": battery_type,
         "battery_voltage_v": bp["voltage_v"],
@@ -191,6 +273,7 @@ def compute(payload: dict) -> dict:
             "TIGHT" if life_days > cgm_lifespan_days else
             "INFEASIBLE"
         ),
+        "worked": worked,
         "_meta": {
             "model": "Coin-cell low-drain capacity model + duty-cycled BLE TX",
             "references": [

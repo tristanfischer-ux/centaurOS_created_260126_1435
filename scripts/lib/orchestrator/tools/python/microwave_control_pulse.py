@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "microwave_control_pulse (custom)",
@@ -104,23 +108,81 @@ def compute(payload: dict) -> dict:
     gate_fidelity = max(0.0, 1.0 - leakage - decoherence - calibration_error)
     gate_error = 1.0 - gate_fidelity
 
+    # Worked calculations for the PDF appendix.
+    # Leakage probability is piecewise on shape — not hand-checkable; passed as live input.
+    # Rotation angle chains through Rabi rate (arithmetic unit conversion), pulse duration,
+    # then decoherence and gate fidelity are clean arithmetic.
+    omega_rabi_mhz_r = round(omega_rabi_mhz, 2)
+    # omega_rabi_rad_s = omega_rabi_mhz x 2pi x 1e6 — used as input to rotation
+    omega_rabi_rad_s_r = round(omega_rabi_rad_s, 2)
+    pulse_s_r = round(pulse_s, 12)
+    rotation_rad_r = round(rotation_rad, 4)
+    decoherence_r = round(decoherence, 7)
+    leakage_r = round(leakage, 6)
+    gate_fidelity_r = round(gate_fidelity, 6)
+    worked = [
+        worked_calc(
+            label="Rabi rate from pulse amplitude",
+            formula="omega_rabi_mhz = rabi_mhz_per_v x pulse_amp_v",
+            values={
+                "rabi_mhz_per_v": (rabi_mhz_per_v, "MHz/V"),
+                "pulse_amp_v": (pulse_amp_v, "V"),
+            },
+            result=omega_rabi_mhz_r, result_unit="MHz",
+            assumptions=["coupling constant 100 MHz/V (industry-typical for 50-ohm drive line)"],
+        ),
+        worked_calc(
+            label="Rotation angle",
+            formula="theta = omega_rabi_rad_s x pulse_s",
+            values={
+                "omega_rabi_rad_s": (omega_rabi_rad_s_r, "rad/s"),
+                "pulse_s": (pulse_s_r, "s"),
+            },
+            result=rotation_rad_r, result_unit="rad",
+            assumptions=["omega_rabi_rad_s = omega_rabi_mhz x 2 x pi x 1e6"],
+        ),
+        worked_calc(
+            label="Decoherence loss (T1+T2 limited)",
+            formula="decoherence = pulse_us / (3 x T2_us) + pulse_us / (3 x T1_us)",
+            values={
+                "pulse_us": (round(pulse_ns / 1000.0, 6), "us"),
+                "T2_us": (T2_us, "us"),
+                "T1_us": (T1_us, "us"),
+            },
+            result=decoherence_r, result_unit="",
+            assumptions=["T1 = 100 us, T2 = 50 us typical superconducting qubit"],
+        ),
+        worked_calc(
+            label="Gate fidelity",
+            formula="gate_fidelity = 1 - leakage - decoherence - calibration_error",
+            values={
+                "leakage": (leakage_r, ""),
+                "decoherence": (decoherence_r, ""),
+                "calibration_error": (calibration_error, ""),
+            },
+            result=gate_fidelity_r, result_unit="",
+            assumptions=["leakage computed from DRAG suppression formula (piecewise, not hand-verified here)"],
+        ),
+    ]
+
     return {
         "qubit_frequency_ghz": f_qubit_ghz,
         "anharmonicity_mhz": anharm_mhz,
         "pulse_amplitude_v": pulse_amp_v,
         "pulse_duration_ns": pulse_ns,
         "pulse_shape": shape,
-        "rabi_rate_mhz": round(omega_rabi_mhz, 2),
-        "rotation_angle_rad": round(rotation_rad, 4),
+        "rabi_rate_mhz": omega_rabi_mhz_r,
+        "rotation_angle_rad": rotation_rad_r,
         "rotation_angle_pi_units": round(rotation_normalised_pi, 3),
         "leakage_pct": round(leakage * 100.0, 5),
         "leakage_no_correction": round(leakage_no_correction, 5),
-        "gate_fidelity": round(gate_fidelity, 6),
+        "gate_fidelity": gate_fidelity_r,
         "gate_error": round(gate_error, 6),
         "decoherence_loss_pct": round(decoherence * 100.0, 4),
         "calibration_error_pct": round(calibration_error * 100.0, 4),
         "single_qubit_gate_error_target_1e_4": gate_error < 1e-3,
         "supports_fault_tolerance_threshold_1e_2": gate_error < 1e-2,
+        "worked": worked,
     }
 
 

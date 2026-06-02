@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -218,6 +222,85 @@ def compute(payload: dict) -> dict:
     # Memory feasibility check
     memory_ok = memory_used_mb < (spec["memory_gb"] * 1024 * 0.8)  # 80% of total
 
+    # Worked calculations — all steps here are simple closed-form arithmetic.
+    gops_r = round(gops_per_inference, 3)
+    eff_tops_r = round(effective_tops, 3)
+    gops_s_r = round(gops_per_sec, 3)
+    inf_s_r = round(inferences_per_sec, 1)
+    weights_mb_r = round(model_weights_mb, 2)
+    mem_r = round(memory_used_mb, 2)
+    power_r = round(power_w, 2)
+    worked = [
+        worked_calc(
+            label="Giga-operations per inference",
+            formula="gops_per_inference = 2 x macs_G",
+            values={
+                "macs_G": (macs_G, "GMACs"),
+            },
+            result=gops_r, result_unit="GOps",
+            assumptions=["Each MAC = 1 multiply + 1 add = 2 operations"],
+        ),
+        worked_calc(
+            label="Effective TOPS (sustained)",
+            formula="effective_tops = peak_tops x utilisation",
+            values={
+                "peak_tops": (peak_tops, "TOPS"),
+                "utilisation": (spec["utilisation_typical"], ""),
+            },
+            result=eff_tops_r, result_unit="TOPS",
+            assumptions=[f"utilisation from MLPerf Edge real-world measurements for {accelerator}; quantisation: {quantization}"],
+        ),
+        worked_calc(
+            label="Effective GOps per second",
+            formula="gops_per_sec = effective_tops x 1000",
+            values={
+                "effective_tops": (eff_tops_r, "TOPS"),
+            },
+            result=gops_s_r, result_unit="GOps/s",
+            assumptions=["1 TOPS = 1000 GOps/s"],
+        ),
+        worked_calc(
+            label="Inferences per second",
+            formula="inferences_per_sec = gops_per_sec / gops_per_inference",
+            values={
+                "gops_per_sec": (gops_s_r, "GOps/s"),
+                "gops_per_inference": (gops_r, "GOps"),
+            },
+            result=inf_s_r, result_unit="inf/s",
+            assumptions=["batch_size = 1 (no batching factor applied)"],
+        ),
+        worked_calc(
+            label="Model weight memory",
+            formula="model_weights_mb = model_params_M x 1e6 x bytes_per_weight / 1e6",
+            values={
+                "model_params_M": (model_params_M, "M"),
+                "bytes_per_weight": (quant["bytes_per_weight"], "bytes"),
+            },
+            result=weights_mb_r, result_unit="MB",
+            assumptions=[f"bytes per weight for {quantization}: {quant['bytes_per_weight']}"],
+        ),
+        worked_calc(
+            label="Total memory (weights + activations)",
+            formula="memory_used_mb = model_weights_mb + model_weights_mb x 2 x batch_size",
+            values={
+                "model_weights_mb": (weights_mb_r, "MB"),
+                "batch_size": (batch_size, ""),
+            },
+            result=mem_r, result_unit="MB",
+            assumptions=["Activation overhead approximated as 2x weights x batch_size"],
+        ),
+        worked_calc(
+            label="Typical power draw",
+            formula="power_w = power_w_typ x (0.3 + 0.7 x utilisation)",
+            values={
+                "power_w_typ": (spec["power_w_typ"], "W"),
+                "utilisation": (spec["utilisation_typical"], ""),
+            },
+            result=power_r, result_unit="W",
+            assumptions=[f"30% static + 70% dynamic fraction of peak power; typical power for {accelerator} from datasheet"],
+        ),
+    ]
+
     return {
         "model_params_M": model_params_M,
         "model_macs_G_estimated": round(macs_G, 3),
@@ -235,6 +318,7 @@ def compute(payload: dict) -> dict:
         "power_w": round(power_w, 2),
         "inferences_per_joule": round(inferences_per_joule, 2),
         "batch_size": batch_size,
+        "worked": worked,
         "_meta": {
             "model": "Peak-TOPS × utilisation / GOps-per-inference",
             "references": [

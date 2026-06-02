@@ -40,8 +40,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -134,6 +138,68 @@ def compute(payload: dict) -> dict:
     # Anode mass required
     anode_mass_kg = total_charge_ah / effective_capacity
 
+    # Worked calculations — built from the same live variables above.
+    # Anode count selection and replacement interval are branchy — skipped.
+    total_current_a_r = round(total_current_a, 3)
+    service_hours_r = round(service_hours, 0)
+    total_charge_ah_r = round(total_charge_ah, 0)
+    effective_capacity_r = round(effective_capacity, 0)
+    # Derive anode_mass_kg_r from the same rounded inputs shown in the substitution so
+    # that Q_total_r / C_eff_r reproduces the stated result exactly.
+    anode_mass_kg_r = round(total_charge_ah_r / effective_capacity_r, 4)
+    worked = [
+        worked_calc(
+            label="Total protection current",
+            formula="I_total = i_density x A_hull / 1000",
+            values={
+                "i_density": (current_density_ma_m2, "mA/m2"),
+                "A_hull": (hull_area_m2, "m2"),
+            },
+            result=total_current_a_r, result_unit="A",
+            assumptions=[
+                f"current density from DNV-RP-B401 Table A-4 for {hull_material} in {env} environment",
+                "divide by 1000 converts mA to A",
+            ],
+        ),
+        worked_calc(
+            label="Service hours for mission life",
+            formula="t_service = life_years x 8760",
+            values={"life_years": (mission_life_years, "yr")},
+            result=service_hours_r, result_unit="hr",
+            assumptions=["8760 hr/yr (365 days x 24 h)"],
+        ),
+        worked_calc(
+            label="Total charge required",
+            formula="Q_total = I_total x t_service",
+            values={
+                "I_total": (total_current_a_r, "A"),
+                "t_service": (service_hours_r, "hr"),
+            },
+            result=total_charge_ah_r, result_unit="A-hr",
+            assumptions=["constant current draw over full service life"],
+        ),
+        worked_calc(
+            label="Effective anode capacity",
+            formula="C_eff = C_rated x efficiency",
+            values={
+                "C_rated": (anode_props["capacity_ahkg"], "A-hr/kg"),
+                "efficiency": (ANODE_EFFICIENCY[anode_material], ""),
+            },
+            result=effective_capacity_r, result_unit="A-hr/kg",
+            assumptions=[f"anode material {anode_material}; efficiency accounts for self-corrosion losses"],
+        ),
+        worked_calc(
+            label="Anode mass required",
+            formula="m_anode = Q_total / C_eff",
+            values={
+                "Q_total": (total_charge_ah_r, "A-hr"),
+                "C_eff": (effective_capacity_r, "A-hr/kg"),
+            },
+            result=anode_mass_kg_r, result_unit="kg",
+            assumptions=["Faraday-law equivalent; anode count and size selected from standard sizes (branchy — not shown)"],
+        ),
+    ]
+
     # Typical anode sizes: 5, 10, 15, 25 kg
     standard_sizes = [2, 5, 10, 15, 25, 40, 60]
     # Pick smallest size that gives whole multiples
@@ -167,14 +233,14 @@ def compute(payload: dict) -> dict:
         "salinity_ppt": salinity,
         "water_temp_c": water_temp,
         "current_density_ma_m2": current_density_ma_m2,
-        "total_current_required_a": round(total_current_a, 3),
-        "total_charge_required_ah": round(total_charge_ah, 0),
+        "total_current_required_a": total_current_a_r,
+        "total_charge_required_ah": total_charge_ah_r,
         "anode_material": anode_material,
         "anode_alloy": anode_props["alloy"],
         "anode_capacity_ahkg": anode_props["capacity_ahkg"],
         "anode_efficiency": ANODE_EFFICIENCY[anode_material],
-        "anode_effective_capacity_ahkg": round(effective_capacity, 0),
-        "anode_mass_kg_calculated": round(anode_mass_kg, 1),
+        "anode_effective_capacity_ahkg": effective_capacity_r,
+        "anode_mass_kg_calculated": anode_mass_kg_r,
         "anode_count": anode_count,
         "anode_size_kg_each": anode_size,
         "anode_mass_kg_actual_installed": actual_mass_kg,
@@ -191,6 +257,7 @@ def compute(payload: dict) -> dict:
             "Mg over-protects steel - can cause hydrogen embrittlement. "
             "Replace at 80% consumption to maintain protection margin."
         ),
+        "worked": worked,
     }
 
 

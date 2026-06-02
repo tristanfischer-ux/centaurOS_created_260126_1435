@@ -40,8 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -167,6 +171,46 @@ def compute(payload: dict) -> dict:
     battery_life_h = bat_mah / avg_current_ma
     battery_life_years = battery_life_h / 8760.0
 
+    # Worked calculations.
+    # FSPL, CNO, EbNo all involve log10 (transcendental) — skip.
+    # Doppler uses sqrt (transcendental) — skip.
+    # Battery life duty-cycle average current is pure arithmetic — convert.
+    # Round to 4 dp so _fmt displays the same digits used in the substitution,
+    # then chain each subsequent step off the prior rounded value (drift-safe).
+    avg_current_r = round(avg_current_ma, 4)
+    battery_life_h_r = round(bat_mah / avg_current_r, 1)
+    worked = [
+        worked_calc(
+            label="Average terminal current draw",
+            formula="I_avg = I_tx x duty + I_idle x (1 - duty)",
+            values={
+                "I_tx": (tx_current_ma, "mA"),
+                "duty": (duty_cycle, ""),
+                "I_idle": (idle_current_ma, "mA"),
+            },
+            result=avg_current_r, result_unit="mA",
+            assumptions=[
+                "duty = 2 s TX per 3600 s hour",
+                "I_tx = 25 mA (NB-IoT typical uplink at 20 dBm EIRP)",
+                "I_idle = 0.030 mA (PSM deep sleep, 3GPP TS 23.682)",
+            ],
+        ),
+        worked_calc(
+            label="Battery life",
+            formula="t_battery = bat_mah / I_avg",
+            values={"bat_mah": (bat_mah, "mAh"), "I_avg": (avg_current_r, "mA")},
+            result=battery_life_h_r, result_unit="h",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Battery life in years",
+            formula="t_years = t_battery / 8760",
+            values={"t_battery": (battery_life_h_r, "h")},
+            result=round(battery_life_h_r / 8760.0, 2), result_unit="years",
+            assumptions=["8760 h/year"],
+        ),
+    ]
+
     return {
         "user_terminal_eirp_dbm": eirp_dbm,
         "satellite_g_t_db_k": g_t_db_k,
@@ -186,6 +230,7 @@ def compute(payload: dict) -> dict:
         "coverage_km2_per_sat": round(coverage_km2, 0),
         "user_terminal_battery_life_years": round(battery_life_years, 2),
         "v_orbital_km_s": round(v_orbital_m_s / 1000.0, 3),
+        "worked": worked,
     }
 
 

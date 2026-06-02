@@ -35,8 +35,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -140,6 +144,100 @@ def compute(payload: dict) -> dict:
         battery_life_days = float("inf")
     battery_life_years = battery_life_days / 365.25
 
+    # Worked calculations — closed-form dB arithmetic and battery life steps.
+    # FSPL (20*log10 of range and frequency) and Eb/N0 (10*log10 of data rate)
+    # are transcendental — skipped. Pass their live values as inputs to downstream steps.
+    eirp_dbm_r = round(eirp_dbm, 2)
+    eirp_dbw_r = round(eirp_dbw, 2)
+    cn0_r = round(cn0_dbhz, 2)
+    ebno_r = round(ebno_db, 2)
+    margin_r = round(link_margin_db, 2)
+    msg_e_r = round(msg_energy_mah, 3)
+    daily_c_r = round(daily_consumption_mah, 4)
+    worked = [
+        worked_calc(
+            label="Device EIRP (Effective Isotropic Radiated Power)",
+            formula="eirp_dbm = tx_dbm + ant_gain_dbi",
+            values={
+                "tx_dbm": (tx_dbm, "dBm"),
+                "ant_gain_dbi": (ant_gain_dbi, "dBi"),
+            },
+            result=eirp_dbm_r, result_unit="dBm",
+            assumptions=["dB addition; antenna gain referenced to isotropic"],
+        ),
+        worked_calc(
+            label="EIRP in dBW",
+            formula="eirp_dbw = eirp_dbm - 30",
+            values={
+                "eirp_dbm": (eirp_dbm_r, "dBm"),
+            },
+            result=eirp_dbw_r, result_unit="dBW",
+            assumptions=["0 dBW = 30 dBm"],
+        ),
+        worked_calc(
+            label="Carrier-to-noise-density ratio (C/N0)",
+            formula="cn0_dbhz = eirp_dbw - fspl_db - atm_loss_db + sat_g_t_db_k + 228.6",
+            values={
+                "eirp_dbw": (eirp_dbw_r, "dBW"),
+                "fspl_db": (round(fspl_db, 2), "dB"),
+                "atm_loss_db": (atm_loss_db, "dB"),
+                "sat_g_t_db_k": (sat_g_t_db_k, "dB/K"),
+            },
+            result=cn0_r, result_unit="dBHz",
+            assumptions=[
+                "Friis link equation; 228.6 dBW/K/Hz = Boltzmann constant in dB",
+                "fspl_db = 92.45 + 20*log10(range_km) + 20*log10(freq_GHz) — not hand-verifiable (log10)",
+            ],
+        ),
+        worked_calc(
+            label="Link margin",
+            formula="link_margin_db = ebno_db - required_ebno_db",
+            values={
+                "ebno_db": (ebno_r, "dB"),
+                "required_ebno_db": (required_ebno_db, "dB"),
+            },
+            result=margin_r, result_unit="dB",
+            assumptions=[
+                "required_ebno_db = 8.0 dB for BPSK/GMSK at BER 1e-5 with FEC (Sklar 2001)",
+                "ebno_db = cn0_dbhz - 10*log10(data_rate_bps) — not hand-verifiable (log10); treated as input",
+            ],
+        ),
+        worked_calc(
+            label="Energy per message",
+            formula="msg_energy_mah = (tx_current x tx_time_per_msg) / 3600 x 1000",
+            values={
+                "tx_current": (tx_current_a, "A"),
+                "tx_time_per_msg": (tx_time_per_msg_s, "s"),
+            },
+            result=msg_e_r, result_unit="mAh",
+            assumptions=["tx_current = 500 mA during transmission; tx_time = 2 s per message"],
+        ),
+        worked_calc(
+            label="Daily battery consumption",
+            formula="daily_consumption_mah = daily_messages x msg_energy_mah + idle_current_a x 24 x 1000",
+            values={
+                "daily_messages": (int(daily_messages), ""),
+                "msg_energy_mah": (msg_e_r, "mAh"),
+                "idle_current_a": (idle_current_a, "A"),
+            },
+            result=daily_c_r, result_unit="mAh/day",
+            assumptions=["idle_current = 50 uA = 0.00005 A; 24 hours/day"],
+        ),
+    ]
+    if daily_consumption_mah > 0 and battery_life_years != float("inf"):
+        battery_life_years_r = round(battery_life_years, 1)
+        battery_life_days_r = round(battery_life_days, 1)
+        worked.append(worked_calc(
+            label="Battery life",
+            formula="battery_life_years = (battery_mah / daily_consumption_mah) / 365.25",
+            values={
+                "battery_mah": (battery_mah, "mAh"),
+                "daily_consumption_mah": (daily_c_r, "mAh/day"),
+            },
+            result=battery_life_years_r, result_unit="years",
+            assumptions=["365.25 days/year"],
+        ))
+
     return {
         "device_tx_power_dbm": tx_dbm,
         "antenna_gain_dbi": ant_gain_dbi,
@@ -160,6 +258,7 @@ def compute(payload: dict) -> dict:
         "daily_consumption_mah": round(daily_consumption_mah, 4),
         "battery_life_years": round(battery_life_years, 1) if battery_life_years != float("inf") else None,
         "data_rate_bps": data_rate_bps,
+        "worked": worked,
     }
 
 

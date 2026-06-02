@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -141,6 +145,95 @@ def compute(payload: dict) -> dict:
         ideal_power = thrust_n * math.sqrt(max(0, thrust_n) / max(1e-9, (2.0 * rho * disc_area_m2)))
         eta = ideal_power / max(1e-9, power_w)
 
+    # --- Worked calculations ---
+    # rho from ISA formula (piecewise + exp) — pass as live input.
+    # blade_factor from dict lookup — pass as live input.
+    # ct, cp depend on branchy de-rating (J > 0 path) — pass ct, cp as live inputs.
+    # torque = power / omega is clean, chain off live values.
+    diam_r = round(diameter_m, 4)
+    n_r = round(n_per_s, 4)
+    omega_r = round(omega, 3)
+    tip_r = round(tip_speed_m_s, 2)
+    pod_r = round(p_over_d, 3)
+    J_r = round(J, 4)
+    ct_r = round(ct, 4)
+    cp_r = round(cp, 4)
+    rho_r = round(rho, 4)
+    thrust_r = round(thrust_n, 3)
+    power_r = round(power_w, 2)
+    torque_r = round(torque_nm, 4)
+
+    worked = [
+        worked_calc(
+            label="Diameter conversion",
+            formula="D_m = D_inch x INCH_M",
+            values={"D_inch": (diameter_inch, "in"), "INCH_M": (INCH_M, "m/in")},
+            result=diam_r, result_unit="m",
+            assumptions=["1 inch = 0.0254 m"],
+        ),
+        worked_calc(
+            label="Rotation rate",
+            formula="n = rpm / 60",
+            values={"rpm": (rpm, "rpm")},
+            result=n_r, result_unit="rev/s",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Angular velocity",
+            formula="omega = 2 x pi x n",
+            values={"n": (n_r, "rev/s")},
+            result=omega_r, result_unit="rad/s",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Blade tip speed",
+            formula="v_tip = omega x (D_m / 2)",
+            values={"omega": (omega_r, "rad/s"), "D_m": (diam_r, "m")},
+            result=tip_r, result_unit="m/s",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Pitch-to-diameter ratio",
+            formula="p_over_d = pitch_inch / D_inch",
+            values={"pitch_inch": (pitch_inch, "in"), "D_inch": (diameter_inch, "in")},
+            result=pod_r, result_unit="",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Advance ratio",
+            formula="J = v_air / (n x D_m)",
+            values={"v_air": (airspeed_m_s, "m/s"), "n": (n_r, "rev/s"),
+                    "D_m": (diam_r, "m")},
+            result=J_r, result_unit="",
+            assumptions=["J = 0 in hover"],
+        ),
+        worked_calc(
+            label="Thrust (from thrust coefficient)",
+            formula="T = Ct x rho x n^2 x D^4 x blade_factor",
+            values={"Ct": (ct_r, ""), "rho": (rho_r, "kg/m3"),
+                    "n": (n_r, "rev/s"), "D": (diam_r, "m"),
+                    "blade_factor": (blade_factor, "")},
+            result=thrust_r, result_unit="N",
+            assumptions=["Ct from UIUC empirical fit + J de-rating; blade_factor from lookup"],
+        ),
+        worked_calc(
+            label="Power (from power coefficient)",
+            formula="P = Cp x rho x n^3 x D^5 x blade_factor_power",
+            values={"Cp": (cp_r, ""), "rho": (rho_r, "kg/m3"),
+                    "n": (n_r, "rev/s"), "D": (diam_r, "m"),
+                    "blade_factor_power": (blade_factor_power, "")},
+            result=power_r, result_unit="W",
+            assumptions=["Cp from UIUC empirical fit; blade_factor_power from lookup"],
+        ),
+        worked_calc(
+            label="Shaft torque",
+            formula="Q = P / omega",
+            values={"P": (power_r, "W"), "omega": (omega_r, "rad/s")},
+            result=torque_r, result_unit="N m",
+            assumptions=[],
+        ),
+    ]
+
     return {
         "diameter_inch": diameter_inch,
         "pitch_inch": pitch_inch,
@@ -162,6 +255,7 @@ def compute(payload: dict) -> dict:
         "cp": round(cp, 4),
         "efficiency": round(max(0.0, min(1.0, eta)), 3),
         "disc_area_m2": round(disc_area_m2, 5),
+        "worked": worked,
     }
 
 

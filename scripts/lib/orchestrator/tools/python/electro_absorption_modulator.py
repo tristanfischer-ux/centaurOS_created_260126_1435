@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -152,6 +156,89 @@ def compute(payload: dict) -> dict:
     f_design_ghz = float(payload.get("design_data_rate_ghz", min(f_3db_ghz, 50.0)))
     drive_power_mw = 0.5 * C_junction_f * (total_voltage ** 2) * f_design_ghz * 1e9 * 1000.0
 
+    # Rounded intermediates for chained display.
+    field_r = round(field_kv_per_cm, 2)
+    delta_alpha_r = round(delta_alpha_cm_1, 1)
+    L_cm_r = round(L_cm, 6)
+    er_r = round(extinction_ratio_db, 2)
+    il_r = round(insertion_loss_db, 2)
+    C_pf_r = round(C_junction_pf, 3)
+    R_total_r = round(R_total, 1)
+    bw_r = round(f_3db_ghz, 2)
+
+    worked = [
+        worked_calc(
+            label="Electric field across active region",
+            formula="E_field = V_total / (t_nm x 1e-9) x 1e-5",
+            values={
+                "V_total": (round(total_voltage, 3), "V"),
+                "t_nm": (thickness_nm, "nm"),
+            },
+            result=field_r, result_unit="kV/cm",
+            assumptions=[
+                "total_voltage = |v_applied + v_bias|",
+                "1e-9 converts nm to m; 1e-5 converts V/m to kV/cm",
+            ],
+        ),
+        worked_calc(
+            label="QCSE absorption shift",
+            formula="d_alpha = alpha_qcse x E_field",
+            values={
+                "alpha_qcse": (mat["alpha_qcse_per_field"], "cm^-1 per kV/cm"),
+                "E_field": (field_r, "kV/cm"),
+            },
+            result=delta_alpha_r, result_unit="cm^-1",
+            assumptions=["quantum-confined Stark effect linear approximation (Wood 1988)"],
+        ),
+        worked_calc(
+            label="Extinction ratio",
+            formula="ER_dB = 4.343 x Gamma x d_alpha x L_cm",
+            values={
+                "Gamma": (confinement, ""),
+                "d_alpha": (delta_alpha_r, "cm^-1"),
+                "L_cm": (L_cm_r, "cm"),
+            },
+            result=er_r, result_unit="dB",
+            assumptions=[
+                "4.343 = 10/ln(10); L_cm = modulator_length_um x 1e-4",
+            ],
+        ),
+        worked_calc(
+            label="Intrinsic insertion loss (residual absorption)",
+            formula="IL_dB = 4.343 x Gamma x loss_cm x L_cm",
+            values={
+                "Gamma": (confinement, ""),
+                "loss_cm": (mat["residual_loss_cm_1"], "cm^-1"),
+                "L_cm": (L_cm_r, "cm"),
+            },
+            result=il_r, result_unit="dB",
+            assumptions=["residual absorption in OFF state; excludes facet coupling loss"],
+        ),
+        worked_calc(
+            label="Junction capacitance",
+            formula="C_j = eps0 x eps_r x w_m x L_m / t_m x 1e12",
+            values={
+                "eps0": (8.854e-12, "F/m"),
+                "eps_r": (mat["eps_r"], ""),
+                "w_m": (round(width_m, 9), "m"),
+                "L_m": (round(length_m, 9), "m"),
+                "t_m": (round(thickness_m, 12), "m"),
+            },
+            result=C_pf_r, result_unit="pF",
+            assumptions=["parallel-plate capacitor approximation; x 1e12 converts F to pF"],
+        ),
+        worked_calc(
+            label="3-dB modulation bandwidth",
+            formula="BW = 1 / (2 x pi x R_total x C_j_F) / 1e9",
+            values={
+                "R_total": (R_total_r, "Ohm"),
+                "C_j_F": (round(C_junction_f, 15), "F"),
+            },
+            result=bw_r, result_unit="GHz",
+            assumptions=["R_total = 50 Ohm load + contact_resistance; / 1e9 converts Hz to GHz"],
+        ),
+    ]
+
     return {
         "wavelength_nm": wavelength_nm,
         "modulator_length_um": length_um,
@@ -159,18 +246,19 @@ def compute(payload: dict) -> dict:
         "applied_voltage_v": v_applied,
         "bias_voltage_v": v_bias,
         "total_voltage_v": round(total_voltage, 3),
-        "field_kv_per_cm": round(field_kv_per_cm, 2),
-        "absorption_shift_cm_1": round(delta_alpha_cm_1, 1),
-        "extinction_ratio_db": round(extinction_ratio_db, 2),
-        "insertion_loss_db": round(insertion_loss_db, 2),
+        "field_kv_per_cm": field_r,
+        "absorption_shift_cm_1": delta_alpha_r,
+        "extinction_ratio_db": er_r,
+        "insertion_loss_db": il_r,
         "facet_coupling_loss_db": facet_coupling_loss_db,
         "total_insertion_loss_db": round(total_insertion_loss_db, 2),
-        "junction_capacitance_pf": round(C_junction_pf, 3),
-        "three_db_bandwidth_ghz": round(f_3db_ghz, 2),
+        "junction_capacitance_pf": C_pf_r,
+        "three_db_bandwidth_ghz": bw_r,
         "v_pi_v": round(v_pi_v, 3),
         "chirp_parameter_alpha": chirp_alpha,
         "drive_power_mw_at_design": round(drive_power_mw, 2),
         "confinement_factor": confinement,
+        "worked": worked,
     }
 
 

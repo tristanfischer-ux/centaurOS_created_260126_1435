@@ -46,8 +46,12 @@ License: MIT.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -121,19 +125,105 @@ def compute(payload: dict) -> dict:
     # Auto-PEEP risk: if T_e < 3 × tau, exhalation incomplete
     auto_peep_risk = T_e_s < 3.0 * tau_s
 
+    T_cycle_r = round(T_cycle_s, 4)
+    T_i_r = round(T_i_s, 4)
+    V_dot_r = round(V_dot_l_s, 4)
+    insp_flow_r = round(insp_flow_l_min, 2)
+    P_el_r = round(P_elastic, 2)
+    P_res_r = round(P_resistive, 2)
+    P_peak_r = round(P_peak, 2)
+    P_plat_r = round(P_plateau, 2)
+    P_mean_r = round(P_mean, 2)
+    tau_r = round(tau_s, 4)
+
+    worked = [
+        worked_calc(
+            label="Breath cycle time",
+            formula="T_cycle = 60 / RR",
+            values={"RR": (rr_bpm, "breaths/min")},
+            result=T_cycle_r, result_unit="s",
+            assumptions=["RR = respiratory rate in breaths per minute"],
+        ),
+        worked_calc(
+            label="Inspiratory time",
+            formula="T_i = T_cycle x (IE / (1 + IE))",
+            values={"T_cycle": (T_cycle_r, "s"), "IE": (ie_ratio, "")},
+            result=T_i_r, result_unit="s",
+            assumptions=["IE = I:E ratio; I:E = 1:2 gives IE = 0.5"],
+        ),
+        worked_calc(
+            label="Inspiratory flow rate",
+            formula="V_dot = V_t_L / T_i",
+            values={"V_t_L": (round(V_t_l, 4), "L"), "T_i": (T_i_r, "s")},
+            result=V_dot_r, result_unit="L/s",
+            assumptions=["constant-flow volume-control; V_t_L = V_t_ml / 1000"],
+        ),
+        worked_calc(
+            label="Elastic pressure (lung recoil)",
+            formula="P_el = V_t_ml / C",
+            values={"V_t_ml": (V_t_ml, "mL"), "C": (C_ml_cmh2o, "mL/cmH2O")},
+            result=P_el_r, result_unit="cmH2O",
+            assumptions=["compliance C = delta_V / delta_P"],
+        ),
+        worked_calc(
+            label="Resistive pressure",
+            formula="P_res = V_dot x R",
+            values={"V_dot": (V_dot_r, "L/s"), "R": (R_cmh2o_l_s, "cmH2O.s/L")},
+            result=P_res_r, result_unit="cmH2O",
+            assumptions=["R already in cmH2O per L/s"],
+        ),
+        worked_calc(
+            label="Peak inspiratory pressure (PIP)",
+            formula="PIP = PEEP + P_el + P_res",
+            values={
+                "PEEP": (peep_cmh2o, "cmH2O"),
+                "P_el": (P_el_r, "cmH2O"),
+                "P_res": (P_res_r, "cmH2O"),
+            },
+            result=P_peak_r, result_unit="cmH2O",
+            assumptions=["constant-flow VC waveform; decelerating/PC waveforms reduce P_res contribution"],
+        ),
+        worked_calc(
+            label="Plateau pressure (end-inspiratory hold)",
+            formula="P_plat = PEEP + P_el",
+            values={"PEEP": (peep_cmh2o, "cmH2O"), "P_el": (P_el_r, "cmH2O")},
+            result=P_plat_r, result_unit="cmH2O",
+            assumptions=["resistive component = 0 at zero flow (inspiratory pause)"],
+        ),
+        worked_calc(
+            label="Mean airway pressure",
+            formula="P_mean = PEEP + (P_plat - PEEP) x (T_i / T_cycle)",
+            values={
+                "PEEP": (peep_cmh2o, "cmH2O"),
+                "P_plat": (P_plat_r, "cmH2O"),
+                "T_i": (T_i_r, "s"),
+                "T_cycle": (T_cycle_r, "s"),
+            },
+            result=P_mean_r, result_unit="cmH2O",
+            assumptions=["trapezoidal area approximation under P-time curve"],
+        ),
+        worked_calc(
+            label="RC time constant (expiratory)",
+            formula="tau = R x C / 1000",
+            values={"R": (R_cmh2o_l_s, "cmH2O.s/L"), "C": (C_ml_cmh2o, "mL/cmH2O")},
+            result=tau_r, result_unit="s",
+            assumptions=["R x C = cmH2O.s/L x mL/cmH2O = mL.s/L = ms; /1000 to convert to s"],
+        ),
+    ]
+
     return {
-        "peak_pressure_cmh2o": round(P_peak, 2),
-        "mean_airway_pressure_cmh2o": round(P_mean, 2),
-        "plateau_pressure_cmh2o": round(P_plateau, 2),
-        "inspiratory_flow_l_min": round(insp_flow_l_min, 2),
+        "peak_pressure_cmh2o": P_peak_r,
+        "mean_airway_pressure_cmh2o": P_mean_r,
+        "plateau_pressure_cmh2o": P_plat_r,
+        "inspiratory_flow_l_min": insp_flow_r,
         "inspiratory_time_ms": round(T_i_s * 1000.0, 1),
         "expiratory_time_ms": round(T_e_s * 1000.0, 1),
         "cycle_time_ms": round(T_cycle_s * 1000.0, 1),
         "ie_ratio_io_e": round(ie_ratio, 3),
-        "p_elastic_cmh2o": round(P_elastic, 2),
-        "p_resistive_cmh2o": round(P_resistive, 2),
+        "p_elastic_cmh2o": P_el_r,
+        "p_resistive_cmh2o": P_res_r,
         "minute_ventilation_l_min": round(V_min_l_min, 2),
-        "rc_time_constant_s": round(tau_s, 4),
+        "rc_time_constant_s": tau_r,
         "auto_peep_risk": auto_peep_risk,
         "tidal_volume_ml": V_t_ml,
         "peep_cmh2o": peep_cmh2o,
@@ -143,6 +233,7 @@ def compute(payload: dict) -> dict:
         "waveform": waveform,
         "lung_protective_pp_lt_30": P_plateau < 30.0,
         "lung_protective_dp_lt_15": (P_plateau - peep_cmh2o) < 15.0,
+        "worked": worked,
     }
 
 

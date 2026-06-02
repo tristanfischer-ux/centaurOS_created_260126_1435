@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -152,6 +156,95 @@ def compute(payload: dict) -> dict:
     max_msgs_per_sec = max_traffic_bps / avg_msg_bits
     max_vessels_per_sat = int(max_msgs_per_sec / max(msgs_per_sec_per_vessel, 1e-6))
 
+    # Rounded intermediates for chained worked calculations.
+    total_raw_rate_r = round(total_raw_rate_kbps, 2)
+    vessels_r = round(vessels_in_footprint, 1)
+    # Combine messages/sec into offered_bps in one step to avoid display-rounding
+    # error: msgs_per_sec = 4/3600 = 0.001111 but _fmt shows "0.0011" (4 decimal
+    # places), which would make the chained product appear ~1% off.
+    offered_bps_r = round(offered_bps, 0)
+    G_r = round(G, 4)
+    max_traffic_bps_r = round(max_traffic_bps, 0)
+    max_msgs_r = round(max_msgs_per_sec, 4)
+    msgs_per_sec_r = round(msgs_per_sec_per_vessel, 6)
+
+    worked = [
+        worked_calc(
+            label="Total raw channel data rate",
+            formula="rate_total = base_rate x num_channels",
+            values={
+                "base_rate": (base_rate_kbps, "kbps"),
+                "num_channels": (num_channels, ""),
+            },
+            result=total_raw_rate_r, result_unit="kbps",
+            assumptions=[f"VDES {modulation} modulation rate per ITU-R M.2092-1; {num_channels} channels in {band}"],
+        ),
+        worked_calc(
+            label="Vessels in satellite footprint",
+            formula="vessels = density x coverage_km2",
+            values={
+                "density": (density, "vessels/km2"),
+                "coverage_km2": (round(coverage_km2, 0), "km2"),
+            },
+            result=round(vessels_in_footprint, 1), result_unit="vessels",
+            assumptions=["coverage_km2 derived from elevation mask + Earth geometry (asin step, not hand-checkable)"],
+        ),
+        worked_calc(
+            label="Offered bit-load from all vessels",
+            formula="offered_bps = vessels x (msg_per_hr / 3600) x avg_msg_bits",
+            values={
+                "vessels": (vessels_r, ""),
+                "msg_per_hr": (msg_per_hr, "msg/hr/vessel"),
+                "avg_msg_bits": (avg_msg_bits, "bits"),
+            },
+            result=offered_bps_r, result_unit="bps",
+            assumptions=[
+                "avg_msg_bits = 50 bytes x 8 = 400 bits (ITU-R M.2092-1 typical VDES message)",
+                "msg/hr divided by 3600 gives msg/s; combined into one step to preserve chaining accuracy",
+            ],
+        ),
+        worked_calc(
+            label="Channel utilisation (traffic load G)",
+            formula="G = offered_bps / (rate_total x 1000)",
+            values={
+                "offered_bps": (offered_bps_r, "bps"),
+                "rate_total": (total_raw_rate_r, "kbps"),
+            },
+            result=G_r, result_unit="",
+            assumptions=["rate_total converted to bps by x1000"],
+        ),
+        worked_calc(
+            label="Max allowed traffic for spec compliance (G < 0.1)",
+            formula="max_traffic_bps = max_g x rate_total x 1000",
+            values={
+                "max_g": (max_g_for_spec, ""),
+                "rate_total": (total_raw_rate_r, "kbps"),
+            },
+            result=max_traffic_bps_r, result_unit="bps",
+            assumptions=["max_g = 0.1 ensures collision rate < 10% (slotted Aloha spec threshold)"],
+        ),
+        worked_calc(
+            label="Max messages per second at spec limit",
+            formula="max_msgs = max_traffic_bps / avg_msg_bits",
+            values={
+                "max_traffic_bps": (max_traffic_bps_r, "bps"),
+                "avg_msg_bits": (avg_msg_bits, "bits"),
+            },
+            result=max_msgs_r, result_unit="msg/s",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Maximum vessels per satellite (spec-compliant)",
+            formula="max_vessels = max_msgs x 3600 / msg_per_hr",
+            values={
+                "max_msgs": (max_msgs_r, "msg/s"),
+                "msg_per_hr": (msg_per_hr, "msg/hr/vessel"),
+            },
+            result=max_vessels_per_sat, result_unit="vessels",
+            assumptions=["integer floor; 3600 converts msg/s back to hr; vessels transmit at the average message rate"],
+        ),
+    ]
+
     return {
         "vessel_density_per_km2": density,
         "message_rate_per_vessel_per_hour": msg_per_hr,
@@ -170,6 +263,7 @@ def compute(payload: dict) -> dict:
         "collision_rate_pct": round(collision_rate_pct, 1),
         "max_vessels_per_satellite": max_vessels_per_sat,
         "contact_duration_minutes": round(contact_minutes, 1),
+        "worked": worked,
     }
 
 

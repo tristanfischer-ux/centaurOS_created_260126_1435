@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "membrane_humidification (custom)",
@@ -119,17 +123,69 @@ def compute(payload: dict) -> dict:
 
     flooding_risk = water_gen_mol_s_cm2 * A_cell_cm2 > water_carry_capacity_mol_s
 
+    # Rounded display values that chain through the worked calculations.
+    lambda_r = round(lambda_val, 2)
+    sigma_r = round(sigma_s_cm, 5)
+    R_ohm_r = round(R_ohm_cm2, 4)
+    n_drag_r = round(n_drag, 2)
+    water_mol_r = float(f"{water_gen_mol_s_cm2:.3e}")
+    water_g_r = round(water_gen_g_s, 4)
+
+    # Worked calculations (hand-checkable closed-form steps only).
+    # lambda_from_aw uses a cubic polynomial — SKIP; pass lambda as live input.
+    # sigma uses exp — SKIP; pass sigma as live input.
+    # P_sat uses exp — SKIP.
+    worked = [
+        worked_calc(
+            label="Membrane ohmic resistance per unit area",
+            formula="R_ohm = t_cm / sigma",
+            values={
+                "t_cm": (round(t_membrane_um * 1e-4, 6), "cm"),
+                "sigma": (sigma_r, "S/cm"),
+            },
+            result=R_ohm_r, result_unit="Ohm cm2",
+            assumptions=[
+                "sigma from Springer-Rowland correlation at current lambda and temperature",
+                "t_cm = membrane thickness in cm (= um x 1e-4)",
+            ],
+        ),
+        worked_calc(
+            label="Water generation rate per unit area",
+            formula="water_mol = i / (2 x F)",
+            values={"i": (i_a_cm2, "A/cm2"), "F": (F, "C/mol")},
+            result=water_mol_r, result_unit="mol/(s cm2)",
+            assumptions=["2 moles electrons per mole water (cathode half-reaction: 1/2 O2 + 2H+ + 2e- -> H2O)"],
+        ),
+        worked_calc(
+            label="Water generation rate over 100 cm2 cell (in g/s)",
+            formula="water_g = water_mol x A_cell x 18",
+            values={
+                "water_mol": (water_mol_r, "mol/(s cm2)"),
+                "A_cell": (A_cell_cm2, "cm2"),
+            },
+            result=water_g_r, result_unit="g/s",
+            assumptions=["M_H2O = 18 g/mol; A_cell = 100 cm2 (typical lab cell)"],
+        ),
+        worked_calc(
+            label="Electro-osmotic drag coefficient",
+            formula="n_drag = 2.5 x lambda / 22",
+            values={"lambda": (lambda_r, "mol H2O / mol SO3H")},
+            result=n_drag_r, result_unit="mol H2O / mol H+",
+            assumptions=["Springer (1991): n_drag scales linearly with lambda; max 2.5 at lambda=22 (liquid-equilibrated)"],
+        ),
+    ]
+
     return {
         "dry_air_flow_lpm": Q_air_lpm,
         "current_a_per_cm2": i_a_cm2,
         "temperature_c": T_c,
         "relative_humidity_in_pct": rh_in_pct,
-        "water_content_lambda": round(lambda_val, 2),
-        "ionic_conductivity_s_cm": round(sigma_s_cm, 5),
-        "ohmic_resistance_ohm_cm2": round(R_ohm_cm2, 4),
-        "water_generation_rate_g_s": round(water_gen_g_s, 4),
-        "water_generation_rate_mol_s_cm2": float(f"{water_gen_mol_s_cm2:.3e}"),
-        "membrane_drag_coefficient": round(n_drag, 2),
+        "water_content_lambda": lambda_r,
+        "ionic_conductivity_s_cm": sigma_r,
+        "ohmic_resistance_ohm_cm2": R_ohm_r,
+        "water_generation_rate_g_s": water_g_r,
+        "water_generation_rate_mol_s_cm2": water_mol_r,
+        "membrane_drag_coefficient": n_drag_r,
         "stoich_air_flow_lpm_at_2x": round(Air_lpm_actual, 1),
         "water_carry_capacity_mol_s": float(f"{water_carry_capacity_mol_s:.3e}"),
         "flooding_risk": flooding_risk,
@@ -137,6 +193,7 @@ def compute(payload: dict) -> dict:
         "p_water_inlet_kpa": round(P_in_kpa, 2),
         "membrane_thickness_um": t_membrane_um,
         "operating_window_ok": lambda_val >= 8.0 and not flooding_risk,
+        "worked": worked,
     }
 
 

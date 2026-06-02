@@ -34,8 +34,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -143,6 +147,47 @@ def compute(payload: dict) -> dict:
             year_at_target = yr
             break
 
+    # Rounded intermediates for chained worked calculations.
+    total_cycles_r = round(total_cycles, 0)
+    repl_cost_r = round(repl_cost_per_unit_gbp, 2)
+    expected_warranty_cost_r = round(expected_warranty_cost, 0)
+
+    # Partial worked calculations: only plain arithmetic steps are shown.
+    # Calendar fade and cycle fade involve Arrhenius exp() and N^beta power
+    # terms — those are transcendental and are omitted per reviewer convention.
+    worked = [
+        worked_calc(
+            label="Total cycles over warranty period",
+            formula="total_cycles = cycle_per_yr x warranty_yrs",
+            values={
+                "cycle_per_yr": (cycle_per_yr, "cycles/yr"),
+                "warranty_yrs": (warranty_yrs, "yr"),
+            },
+            result=int(total_cycles_r), result_unit="cycles",
+            assumptions=["constant cycle rate over warranty; no degradation-driven rate change"],
+        ),
+        worked_calc(
+            label="Battery replacement cost (50% of unit cost)",
+            formula="repl_cost = unit_cost_gbp x 0.5",
+            values={"unit_cost_gbp": (unit_cost_gbp, "GBP")},
+            result=repl_cost_r, result_unit="GBP",
+            assumptions=["replacement at 50% of new unit cost (industry standard for battery module swap)"],
+        ),
+        worked_calc(
+            label="Expected warranty cost per unit",
+            formula="expected_cost = (repl_prob_pct / 100) x repl_cost",
+            values={
+                "repl_prob_pct": (repl_prob_pct, "%"),
+                "repl_cost": (repl_cost_r, "GBP"),
+            },
+            result=int(expected_warranty_cost_r), result_unit="GBP",
+            assumptions=[
+                "repl_prob_pct is piecewise (branchy) based on predicted vs target SoH — see full fade model for detail",
+                "calendar + cycle fade use Arrhenius / power-law — not hand-checkable; SoH reported separately",
+            ],
+        ),
+    ]
+
     return {
         "cell_chemistry": chemistry,
         "warranty_years": warranty_yrs,
@@ -166,6 +211,7 @@ def compute(payload: dict) -> dict:
         "arrhenius_factor_at_op_temp": fade_eow["arrhenius_factor"],
         "dod_stress_factor": fade_eow["dod_factor"],
         "c_rate_stress_factor": fade_eow["c_rate_factor"],
+        "worked": worked,
         "notes": (
             f"Combined calendar + cycle fade per Schmalstieg/Naumann. "
             f"Calendar fade ∝ t^0.55-0.6 with Arrhenius temp dependence. "

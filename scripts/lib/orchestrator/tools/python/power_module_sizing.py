@@ -57,8 +57,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -164,6 +168,64 @@ def compute(payload: dict) -> dict:
     mass_per_module_kg = 18.0
     total_module_mass_kg = mass_per_module_kg * n_total
 
+    # Worked calculations — closed-form arithmetic steps only.
+    # n_required uses ceil() — skipped; passed as rounded input.
+    # Efficiency is from piecewise-interpolated curve — skipped.
+    rated_output_r = round(rated_output_kw, 1)
+    avg_kw_r = round(avg_kw_drawn, 2)
+    annual_kwh_r = round(annual_kwh_delivered, 0)
+    capex_low_r = round(capex_low, 0)
+    capex_high_r = round(capex_high, 0)
+    mass_r = round(total_module_mass_kg, 1)
+
+    worked = [
+        worked_calc(
+            label="Rated output power of installed modules",
+            formula="rated_output_kw = n_total x module_unit_kw",
+            values={"n_total": (n_total, ""), "module_unit_kw": (module_unit_kw, "kW")},
+            result=rated_output_r, result_unit="kW",
+            assumptions=[
+                f"n_total = n_required + redundancy_add = {n_required} + {redundancy_add} = {n_total}",
+                "n_required = ceil(total_power / module_unit_kw) — ceiling applied before this step",
+            ],
+        ),
+        worked_calc(
+            label="Average power drawn at stated load factor",
+            formula="avg_kw = total_power_kw x load_factor",
+            values={"total_power_kw": (total_power_kw, "kW"), "load_factor": (load_factor, "")},
+            result=avg_kw_r, result_unit="kW",
+            assumptions=["load_factor is the average utilisation fraction of rated power"],
+        ),
+        worked_calc(
+            label="Annual energy delivered (rough estimate)",
+            formula="annual_kwh = avg_kw x 6 x 365",
+            values={"avg_kw": (avg_kw_r, "kW")},
+            result=annual_kwh_r, result_unit="kWh/year",
+            assumptions=["6 hours/day average utilisation at charge-site (CharIN 2022 CSO model)"],
+        ),
+        worked_calc(
+            label="Capital expenditure range — lower bound",
+            formula="capex_low = rated_output_kw x 50",
+            values={"rated_output_kw": (rated_output_r, "kW")},
+            result=capex_low_r, result_unit="USD",
+            assumptions=["USD 50/kW installed cost — low end of CharIN 2022 modular DC charger cost range"],
+        ),
+        worked_calc(
+            label="Capital expenditure range — upper bound",
+            formula="capex_high = rated_output_kw x 200",
+            values={"rated_output_kw": (rated_output_r, "kW")},
+            result=capex_high_r, result_unit="USD",
+            assumptions=["USD 200/kW installed cost — high end of CharIN 2022 modular DC charger cost range"],
+        ),
+        worked_calc(
+            label="Total module mass",
+            formula="mass_kg = 18 x n_total",
+            values={"n_total": (n_total, "")},
+            result=mass_r, result_unit="kg",
+            assumptions=["18 kg per module — typical SiC-based 25 kW modular DC charger unit (Phoenix Contact / ABB Terra datasheets)"],
+        ),
+    ]
+
     return {
         "total_power_kw_requested": total_power_kw,
         "module_unit_kw": module_unit_kw,
@@ -191,6 +253,7 @@ def compute(payload: dict) -> dict:
                 "Heliox modular DC charger tech brief",
             ],
         },
+        "worked": worked,
     }
 
 

@@ -53,8 +53,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -212,6 +216,22 @@ def compute(payload: dict) -> dict:
     if not plug_supported_by_protocol:
         issues.append(f"Plug '{plug_type}' not supported by protocol '{protocol_version}'")
 
+    # Worked calculation — only requested_kw is a simple hand-checkable formula.
+    # max_power_supported_kw = min(plug_kw, protocol_kw, requested_kw) is a clamp — skip.
+    requested_kw_r = round(requested_kw, 2)
+    worked = [
+        worked_calc(
+            label="Requested DC charging power",
+            formula="requested_kw = (max_voltage_v x max_current_a) / 1000",
+            values={
+                "max_voltage_v": (max_voltage_v, "V"),
+                "max_current_a": (max_current_a, "A"),
+            },
+            result=requested_kw_r, result_unit="kW",
+            assumptions=["DC power = V x I; divide by 1000 to convert W to kW"],
+        ),
+    ]
+
     return {
         "compliance_pass": compliance_pass,
         "plug_type": plug_type,
@@ -224,13 +244,14 @@ def compute(payload: dict) -> dict:
         "protocol_description": proto["description"],
         "requested_voltage_v": max_voltage_v,
         "requested_current_a": max_current_a,
-        "requested_kw": round(requested_kw, 2),
+        "requested_kw": requested_kw_r,
         "max_power_supported_kw": round(max_power_supported_kw, 2),
         "V2G_capable": proto["v2g"],
         "PnC_supported": proto["pnc"],
         "bidirectional_supported": proto["bidirectional"],
         "tls_certificate_auth": proto["tls_certificate_auth"],
         "issues": issues,
+        "worked": worked,
         "_meta": {
             "model": "ISO 15118-2/-20 + IEC 61851-23 + CHAdeMO Association lookup",
             "references": [

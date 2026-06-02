@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -147,6 +151,53 @@ def compute(payload: dict) -> dict:
     volume_cm3 = math.pi * (diameter_mm / 20.0) ** 2 * (boule_length_mm / 10.0)
     mass_kg = volume_cm3 * mat["density_g_cm3"] / 1000.0
 
+    # Worked calculations for the PDF appendix.
+    # Defect density and purity are piecewise/branchy — not checkable by hand; omitted.
+    # Growth time, volume, and mass are simple arithmetic chains.
+    growth_time_hr_r = round(growth_time_hr, 2)
+    volume_cm3_r = round(volume_cm3, 2)
+    # r_cm = diameter_mm / 20 (mm → cm, then radius = d/2)
+    r_cm = round(diameter_mm / 20.0, 4)
+    len_cm = round(boule_length_mm / 10.0, 4)
+    density = mat["density_g_cm3"]
+    mass_kg_r = round(mass_kg, 3)
+    worked = [
+        worked_calc(
+            label="Boule growth time",
+            formula="t_growth = boule_length / growth_rate",
+            values={
+                "boule_length": (boule_length_mm, "mm"),
+                "growth_rate": (growth_rate_mm_hr, "mm/hr"),
+            },
+            result=growth_time_hr_r, result_unit="hr",
+            assumptions=["constant growth rate; no nucleation delay modelled"],
+        ),
+        worked_calc(
+            label="Boule volume (cylinder)",
+            formula="V = pi x r_cm^2 x len_cm",
+            values={
+                "r_cm": (r_cm, "cm"),
+                "len_cm": (len_cm, "cm"),
+            },
+            result=volume_cm3_r, result_unit="cm^3",
+            assumptions=[
+                "r_cm = boule_diameter_mm / 20 (half-diameter in cm)",
+                "len_cm = target_boule_length_mm / 10",
+                f"pi = {round(math.pi, 6)}",
+            ],
+        ),
+        worked_calc(
+            label="Boule mass",
+            formula="m = V x density / 1000",
+            values={
+                "V": (volume_cm3_r, "cm^3"),
+                "density": (density, "g/cm^3"),
+            },
+            result=mass_kg_r, result_unit="kg",
+            assumptions=["/ 1000 converts g to kg"],
+        ),
+    ]
+
     return {
         "material": material,
         "growth_method": method,
@@ -159,12 +210,13 @@ def compute(payload: dict) -> dict:
         "baseline_defects_per_cm2_1G": mat["baseline_defects_per_cm2"],
         "improvement_factor_vs_1G": round(mat["baseline_defects_per_cm2"] / max(defect_density, 1.0), 1),
         "grain_purity_pct": round(purity_pct, 4),
-        "growth_time_hours": round(growth_time_hr, 2),
-        "volume_cm3": round(volume_cm3, 2),
-        "mass_kg": round(mass_kg, 3),
+        "growth_time_hours": growth_time_hr_r,
+        "volume_cm3": volume_cm3_r,
+        "mass_kg": mass_kg_r,
         "feasible_for_method_diameter": feasible,
         "method_max_diameter_mm": meth["max_diameter_mm"],
         "thermal_gradient_k_cm": meth["thermal_gradient_k_cm"],
+        "worked": worked,
     }
 
 

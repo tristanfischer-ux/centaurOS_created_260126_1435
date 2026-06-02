@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -126,6 +130,61 @@ def compute(payload: dict) -> dict:
     # Productivity (g biomass produced per L per hour)
     productivity_g_l_h = (final_biomass - initial_biomass) / max(0.1, time_to_target_h)
 
+    # Worked calculations for the PDF appendix.
+    # time_to_target uses ln() — transcendental, SKIP.
+    # doubling_time uses ln(2) — transcendental, SKIP.
+    # substrate_consumed, q_s_max, peak_uptake, final_biomass_kg are arithmetic.
+    substrate_consumed_r = round(substrate_consumed_g_l, 2)
+    q_s_max_r = round(q_s_max, 3)
+    peak_uptake_r = round(peak_uptake_g_per_h, 1)
+    final_biomass_r = round(final_biomass, 2)
+    final_biomass_kg_r = round(final_biomass_kg, 2)
+    worked = [
+        worked_calc(
+            label="Substrate consumed to reach target biomass",
+            formula="S_consumed = (X_target - X0) / Y_xs",
+            values={
+                "X_target": (target_biomass, "g/L"),
+                "X0": (initial_biomass, "g/L"),
+                "Y_xs": (yxs, "g_biomass/g_substrate"),
+            },
+            result=substrate_consumed_r, result_unit="g/L",
+            assumptions=["Y_xs = biomass yield coefficient; assumes no substrate maintenance"],
+        ),
+        worked_calc(
+            label="Maximum specific substrate uptake rate",
+            formula="q_s_max = mu_max / Y_xs",
+            values={
+                "mu_max": (mu_max, "/h"),
+                "Y_xs": (yxs, "g_biomass/g_substrate"),
+            },
+            result=q_s_max_r, result_unit="g_substrate/g_cells/h",
+            assumptions=["at mu = mu_max (no substrate limitation)"],
+        ),
+        worked_calc(
+            label="Peak substrate uptake rate (whole bioreactor)",
+            formula="q_s_peak = q_s_max x max_biomass x working_volume",
+            values={
+                "q_s_max": (q_s_max_r, "g_s/g_x/h"),
+                "max_biomass": (round(max_biomass, 2), "g/L"),
+                "working_volume": (working_volume_l, "L"),
+            },
+            result=peak_uptake_r, result_unit="g/h",
+        ),
+        worked_calc(
+            label="Final biomass (mass balance: all substrate consumed)",
+            formula="X_final_kg = (X0 + S_init x Y_xs) x V / 1000",
+            values={
+                "X0": (initial_biomass, "g/L"),
+                "S_init": (initial_substrate, "g/L"),
+                "Y_xs": (yxs, ""),
+                "V": (working_volume_l, "L"),
+            },
+            result=final_biomass_kg_r, result_unit="kg",
+            assumptions=["/ 1000 converts g to kg"],
+        ),
+    ]
+
     return {
         "substrate": substrate,
         "substrate_name": defaults["name"],
@@ -140,17 +199,18 @@ def compute(payload: dict) -> dict:
         "time_to_target_biomass_h": round(time_to_target_h, 2),
         "target_achievable": target_achievable,
         "substrate_limited": substrate_limited,
-        "biomass_final_g_l": round(final_biomass, 2),
-        "biomass_final_kg_total": round(final_biomass_kg, 2),
-        "substrate_consumed_g_l": round(substrate_consumed_g_l, 2),
-        "substrate_consumed_g_total": round(substrate_consumed_g_l * working_volume_l, 0),
-        "peak_substrate_uptake_g_h": round(peak_uptake_g_per_h, 1),
-        "specific_substrate_uptake_q_s_max_g_g_h": round(q_s_max, 3),
+        "biomass_final_g_l": final_biomass_r,
+        "biomass_final_kg_total": final_biomass_kg_r,
+        "substrate_consumed_g_l": substrate_consumed_r,
+        "substrate_consumed_g_total": round(substrate_consumed_r * working_volume_l, 0),
+        "peak_substrate_uptake_g_h": peak_uptake_r,
+        "specific_substrate_uptake_q_s_max_g_g_h": q_s_max_r,
         "productivity_g_l_h": round(productivity_g_l_h, 3),
+        "worked": worked,
         "notes": (
-            "Monod kinetics per Doran (2013) Ch.13. μ_max applies above K_s. "
-            "For fed-batch, substrate kept low to control μ (avoid Crabtree/Warburg "
-            "effects). For continuous chemostat, set dilution rate D < μ_max."
+            "Monod kinetics per Doran (2013) Ch.13. mu_max applies above K_s. "
+            "For fed-batch, substrate kept low to control mu (avoid Crabtree/Warburg "
+            "effects). For continuous chemostat, set dilution rate D < mu_max."
         ),
     }
 

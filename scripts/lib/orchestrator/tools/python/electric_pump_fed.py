@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -125,6 +129,106 @@ def compute(payload: dict) -> dict:
     else:
         isp_gain_pump_s = 0.0
 
+    # Rounded intermediates for display; each step chains off the prior rounded value.
+    dp_bar_r = round(dp_bar, 2)
+    p_hyd_kw_r = round(p_hydraulic_w / 1000.0, 2)
+    p_shaft_kw_r = round(p_pump_shaft_w / 1000.0, 2)
+    pump_power_kw_r = round(pump_power_kw, 2)
+    energy_kwh_r = round(energy_required_kwh, 2)
+    battery_mass_r = round(battery_mass_kg, 1)
+    motor_mass_r = round(motor_mass_kg, 2)
+    pump_mass_r = round(pump_mass_kg, 2)
+    inverter_mass_r = round(inverter_mass_kg, 2)
+    total_dry_r = round(total_dry_mass_kg, 1)
+
+    worked = [
+        worked_calc(
+            label="Pump pressure rise",
+            formula="dp_bar = p_c_bar x 1.3 - tank_p_bar",
+            values={"p_c_bar": (p_c_bar, "bar"), "tank_p_bar": (tank_pressure_bar, "bar")},
+            result=dp_bar_r, result_unit="bar",
+            assumptions=["30% headroom above chamber pressure; 5 bar residual tank pressure"],
+        ),
+        worked_calc(
+            label="Hydraulic pump power",
+            formula="P_hyd = m_dot x dp_pa / rho / 1000",
+            values={
+                "m_dot": (m_dot_kg_s, "kg/s"),
+                "dp_pa": (round(dp_bar_r * 1e5, 0), "Pa"),
+                "rho": (propellant_density_kg_m3, "kg/m3"),
+            },
+            result=p_hyd_kw_r, result_unit="kW",
+            assumptions=["dp_pa = dp_bar x 1e5; / 1000 converts W to kW"],
+        ),
+        worked_calc(
+            label="Pump shaft power",
+            formula="P_shaft = P_hyd / pump_eff",
+            values={"P_hyd": (p_hyd_kw_r, "kW"), "pump_eff": (pump_efficiency, "")},
+            result=p_shaft_kw_r, result_unit="kW",
+            assumptions=["pump isentropic efficiency"],
+        ),
+        worked_calc(
+            label="Motor electrical power (pump power)",
+            formula="P_motor = P_shaft / motor_eff",
+            values={"P_shaft": (p_shaft_kw_r, "kW"), "motor_eff": (motor_eff, "")},
+            result=pump_power_kw_r, result_unit="kW",
+            assumptions=["motor efficiency from input"],
+        ),
+        worked_calc(
+            label="Battery energy required",
+            formula="E_kwh = P_motor x burn_time / 3600",
+            values={"P_motor": (pump_power_kw_r, "kW"), "burn_time": (burn_time_s, "s")},
+            result=energy_kwh_r, result_unit="kWh",
+            assumptions=["P_motor is in kW; P[kW] x t[s] / 3600 = energy in kWh"],
+        ),
+        worked_calc(
+            label="Battery mass",
+            formula="m_batt = E_kwh x 1000 / E_density",
+            values={
+                "E_kwh": (energy_kwh_r, "kWh"),
+                "E_density": (battery_energy_density_wh_kg, "Wh/kg"),
+            },
+            result=battery_mass_r, result_unit="kg",
+            assumptions=["150 Wh/kg sustained high-C-rate LiPo (Rocket Lab Electron)"],
+        ),
+        worked_calc(
+            label="Motor mass",
+            formula="m_motor = P_motor / P_density",
+            values={
+                "P_motor": (pump_power_kw_r, "kW"),
+                "P_density": (motor_power_density_kw_kg, "kW/kg"),
+            },
+            result=motor_mass_r, result_unit="kg",
+            assumptions=["3 kW/kg PMSM aerospace motor (Rutherford-class)"],
+        ),
+        worked_calc(
+            label="Pump mass",
+            formula="m_pump = m_motor x 0.3",
+            values={"m_motor": (motor_mass_r, "kg")},
+            result=pump_mass_r, result_unit="kg",
+            assumptions=["pump body ~30% of motor mass (industry rule of thumb)"],
+        ),
+        worked_calc(
+            label="Inverter mass",
+            formula="m_inv = P_motor x 0.05",
+            values={"P_motor": (pump_power_kw_r, "kW")},
+            result=inverter_mass_r, result_unit="kg",
+            assumptions=["0.05 kg/kW for compact aerospace inverter"],
+        ),
+        worked_calc(
+            label="Total propulsion dry mass",
+            formula="m_dry = m_batt + m_motor + m_pump + m_inv",
+            values={
+                "m_batt": (battery_mass_r, "kg"),
+                "m_motor": (motor_mass_r, "kg"),
+                "m_pump": (pump_mass_r, "kg"),
+                "m_inv": (inverter_mass_r, "kg"),
+            },
+            result=total_dry_r, result_unit="kg",
+            assumptions=["sum of battery, motor, pump and inverter dry masses"],
+        ),
+    ]
+
     return {
         "chamber_pressure_bar": p_c_bar,
         "propellant_mass_flow_kg_s": m_dot_kg_s,
@@ -132,19 +236,20 @@ def compute(payload: dict) -> dict:
         "motor_efficiency": motor_eff,
         "burn_time_s": burn_time_s,
         "pump_efficiency": pump_efficiency,
-        "pressure_drop_bar": dp_bar,
-        "hydraulic_power_kw": round(p_hydraulic_w / 1000.0, 2),
-        "pump_shaft_power_kw": round(p_pump_shaft_w / 1000.0, 2),
-        "pump_power_kw": round(pump_power_kw, 2),
-        "energy_required_kwh": round(energy_required_kwh, 2),
-        "battery_mass_kg": round(battery_mass_kg, 1),
-        "motor_mass_kg": round(motor_mass_kg, 2),
-        "pump_mass_kg": round(pump_mass_kg, 2),
-        "inverter_mass_kg": round(inverter_mass_kg, 2),
-        "total_propulsion_dry_mass_kg": round(total_dry_mass_kg, 1),
+        "pressure_drop_bar": dp_bar_r,
+        "hydraulic_power_kw": p_hyd_kw_r,
+        "pump_shaft_power_kw": p_shaft_kw_r,
+        "pump_power_kw": pump_power_kw_r,
+        "energy_required_kwh": energy_kwh_r,
+        "battery_mass_kg": battery_mass_r,
+        "motor_mass_kg": motor_mass_r,
+        "pump_mass_kg": pump_mass_r,
+        "inverter_mass_kg": inverter_mass_r,
+        "total_propulsion_dry_mass_kg": total_dry_r,
         "isp_vs_pressure_fed_delta_s": round(isp_gain_pump_s, 1),
         "battery_energy_density_wh_kg": battery_energy_density_wh_kg,
         "motor_power_density_kw_kg": motor_power_density_kw_kg,
+        "worked": worked,
     }
 
 

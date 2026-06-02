@@ -3482,7 +3482,10 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   try {
     // tiny safe arithmetic evaluator (no eval/Function — eslint-clean): + - * / ( )
     const evalArith = (raw: string): number | null => {
-      const toks = raw.replace(/,/g, '').replace(/x/gi, '*').match(/\d+\.?\d*(?:[eE][+-]?\d+)?|[+\-*/()^]/g)
+      // 'pi' is a literal constant in many physics formulas (aerospike throat area, antenna gains,
+      // cold-atom k_eff); substitute it numerically BEFORE tokenising, else the evaluator can't parse
+      // the substitution and silently skips it (a wrong pi-formula would ship unverified). 2026-06-02.
+      const toks = raw.replace(/,/g, '').replace(/\bpi\b/gi, String(Math.PI)).replace(/x/gi, '*').match(/\d+\.?\d*(?:[eE][+-]?\d+)?|[+\-*/()^]/g)
       if (!toks) return null
       let i = 0
       const peek = () => toks[i]

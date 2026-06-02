@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -128,6 +132,65 @@ def compute(payload: dict) -> dict:
     # (max efficient propulsion angle for orbit-raising)
     optimal_cone_angle_deg = 35.26
 
+    # Worked calculations — all steps are clean arithmetic products/ratios.
+    S_r = round(S, 2)
+    sail_mass_r = round(sail_mass_kg, 3)
+    total_mass_r = round(total_mass_kg, 2)
+    thrust_r = round(thrust_n, 6)
+    accel_r = round(accel_m_s2, 9)
+    worked = [
+        worked_calc(
+            label="Solar flux at target distance",
+            formula="S = S_1au / distance_au^2",
+            values={"S_1au": (SOLAR_CONSTANT_W_M2, "W/m^2"),
+                    "distance_au": (distance_au, "AU")},
+            result=S_r, result_unit="W/m^2",
+            assumptions=["inverse-square law; S_1au = 1360.8 W/m^2 (Kopp & Lean 2011)"],
+        ),
+        worked_calc(
+            label="Sail mass",
+            formula="m_sail = sail_area x sail_density / 1000",
+            values={"sail_area": (sail_area_m2, "m^2"),
+                    "sail_density": (sail_density_g_m2, "g/m^2")},
+            result=sail_mass_r, result_unit="kg",
+            assumptions=["divide by 1000 converts g to kg"],
+        ),
+        worked_calc(
+            label="Total spacecraft mass",
+            formula="m_total = m_sail + m_sc",
+            values={"m_sail": (sail_mass_r, "kg"),
+                    "m_sc": (spacecraft_mass_kg, "kg")},
+            result=total_mass_r, result_unit="kg",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Solar radiation pressure thrust",
+            formula="F = (1 + reflectivity) x S x sail_area / c",
+            values={"reflectivity": (reflectivity, ""),
+                    "S": (S_r, "W/m^2"),
+                    "sail_area": (sail_area_m2, "m^2"),
+                    "c": (C_LIGHT, "m/s")},
+            result=thrust_r, result_unit="N",
+            assumptions=["McInnes 1999: F = (1+rho)*S*A/c for specular reflection at normal incidence"],
+        ),
+        worked_calc(
+            label="Acceleration",
+            formula="a = F / m_total",
+            values={"F": (thrust_r, "N"),
+                    "m_total": (total_mass_r, "kg")},
+            result=round(accel_m_s2, 9), result_unit="m/s^2",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Delta-V per year (continuous thrust)",
+            formula="dv_yr = a x seconds_per_year",
+            values={"a": (round(accel_m_s2, 9), "m/s^2"),
+                    "seconds_per_year": (round(seconds_per_year, 0), "s")},
+            result=round(delta_v_per_year_ms, 1), result_unit="m/s",
+            assumptions=["365.25 days x 86400 s/day = 31,557,600 s/yr"],
+        ),
+    ]
+
     return {
         "sail_area_m2": sail_area_m2,
         "sail_density_g_m2": sail_density_g_m2,
@@ -146,6 +209,7 @@ def compute(payload: dict) -> dict:
         "delta_v_per_year_ms": round(delta_v_per_year_ms, 1),
         "lightness_number_beta": round(lightness_number_beta, 5),
         "optimal_cone_angle_deg": optimal_cone_angle_deg,
+        "worked": worked,
     }
 
 

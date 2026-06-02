@@ -49,8 +49,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -137,6 +141,100 @@ def compute(payload: dict) -> dict:
         prop_mass + tank_mass + ppu_mass + mass_thruster * n_thrusters
     )
 
+    # Worked calculations for the PDF appendix.
+    # n_thrusters uses int() + max() (branchy) — passed as live input.
+    # mass_ratio = exp(dv/ve) is transcendental — passed as live input.
+    # tank_mass path branches on propellant type — shown for Xe path.
+    ve_r = round(ve, 2)
+    mass_ratio_r = round(mass_ratio, 5)
+    prop_mass_r = round(prop_mass, 3)
+    total_thrust_r = round(total_thrust_n, 4)
+    m_dot_r = m_dot  # small number, keep full precision for chain
+    burn_time_r = round(burn_time_s, 1)
+    burn_days_r = round(burn_time_days, 3)
+    tank_mass_r = round(tank_mass, 3)
+    ppu_mass_r = round(ppu_mass, 3)
+    total_prop_r = round(total_prop_system_mass, 3)
+    worked = [
+        worked_calc(
+            label="Effective exhaust velocity",
+            formula="ve = Isp x G0",
+            values={"Isp": (isp, "s"), "G0": (G0, "m/s^2")},
+            result=ve_r,
+            result_unit="m/s",
+            assumptions=["G0 = 9.80665 m/s^2 (standard gravity)"],
+        ),
+        worked_calc(
+            label="Propellant mass (Tsiolkovsky)",
+            formula="m_prop = dry_kg x (mass_ratio - 1)",
+            values={"dry_kg": (dry_kg, "kg"), "mass_ratio": (mass_ratio_r, "")},
+            result=prop_mass_r,
+            result_unit="kg",
+            assumptions=["mass_ratio = exp(dv / ve); transcendental step not shown"],
+        ),
+        worked_calc(
+            label="Total thrust (all thrusters)",
+            formula="F_total = thrust_mn x 0.001 x n_thrusters",
+            values={
+                "thrust_mn": (f_mn, "mN"),
+                "n_thrusters": (n_thrusters, ""),
+            },
+            result=total_thrust_r,
+            result_unit="N",
+            assumptions=["n_thrusters = floor(P_bus x eta_PPU / P_rated); at least 1"],
+        ),
+        worked_calc(
+            label="Propellant mass flow rate",
+            formula="m_dot = F_total / ve",
+            values={"F_total": (total_thrust_r, "N"), "ve": (ve_r, "m/s")},
+            result=round(m_dot_r, 8),
+            result_unit="kg/s",
+        ),
+        worked_calc(
+            label="Burn time",
+            formula="burn_time_s = m_prop / m_dot",
+            values={"m_prop": (prop_mass_r, "kg"), "m_dot": (round(m_dot_r, 8), "kg/s")},
+            result=burn_time_r,
+            result_unit="s",
+        ),
+        worked_calc(
+            label="Burn time in days",
+            formula="burn_days = burn_time_s / 86400",
+            values={"burn_time_s": (burn_time_r, "s")},
+            result=burn_days_r,
+            result_unit="days",
+        ),
+        worked_calc(
+            label="Xenon tank mass (10% of propellant)",
+            formula="tank_mass = 0.10 x m_prop",
+            values={"m_prop": (prop_mass_r, "kg")},
+            result=tank_mass_r,
+            result_unit="kg",
+            assumptions=["Xe CFRP overwrap tank at 150 bar; ~10% of propellant mass (Goebel & Katz 2008)"],
+        ),
+        worked_calc(
+            label="PPU mass",
+            formula="ppu_mass = 3.0 x (P_bus / 1000)",
+            values={"P_bus": (available_power_w, "W")},
+            result=ppu_mass_r,
+            result_unit="kg",
+            assumptions=["3 kg/kW specific PPU mass (Goebel & Katz 2008 typical)"],
+        ),
+        worked_calc(
+            label="Total propulsion system mass",
+            formula="m_total = m_prop + tank_mass + ppu_mass + thruster_mass x n_thrusters",
+            values={
+                "m_prop": (prop_mass_r, "kg"),
+                "tank_mass": (tank_mass_r, "kg"),
+                "ppu_mass": (ppu_mass_r, "kg"),
+                "thruster_mass": (mass_thruster, "kg"),
+                "n_thrusters": (n_thrusters, ""),
+            },
+            result=total_prop_r,
+            result_unit="kg",
+        ),
+    ]
+
     return {
         "delta_v_target_ms": dv_target,
         "dry_mass_kg": dry_kg,
@@ -158,7 +256,8 @@ def compute(payload: dict) -> dict:
         "tank_mass_kg": round(tank_mass, 3),
         "PPU_mass_kg": round(ppu_mass, 3),
         "thruster_unit_mass_kg": mass_thruster,
-        "total_propulsion_mass_kg": round(total_prop_system_mass, 3),
+        "total_propulsion_mass_kg": total_prop_r,
+        "worked": worked,
     }
 
 

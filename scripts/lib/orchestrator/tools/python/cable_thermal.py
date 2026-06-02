@@ -56,8 +56,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -221,6 +225,127 @@ def compute(payload: dict) -> dict:
     if cooling == "liquid_cooled":
         cable_outer_dia_mm *= 1.5  # coolant channels add bulk
 
+    # Worked calculations — post CSA-selection arithmetic only.
+    # CSA selection is a table-lookup with ambient-derating branch (skip).
+    # Round alpha to 4 dp before use in the worked entry so _fmt(alpha) and
+    # the stated result both reflect the same rounded value (0.00393 :.4f = 0.0039
+    # which would silently drop the '3' — using round(alpha, 4) = 0.0039 makes
+    # the substitution self-consistent).
+    alpha_r = round(alpha, 4)
+    rho_op_display = rho_20 * (1.0 + alpha_r * (operating_temp_c - 20.0))
+    rho_op_r = float(f"{rho_op_display:.4g}")
+    # Round-trip length used in resistance calculation
+    total_len_r = round(total_length_m, 1)
+    # resistance_ohm is ~1e-3 to ~1e-2 ohm; keep 4 significant figures so
+    # the displayed substitution string verifies correctly for the reviewer
+    resistance_r = float(f"{resistance_ohm:.4g}")
+    ohmic_r = round(ohmic_loss_w, 1)
+    loss_per_m_r = round(loss_per_meter_w_m, 2)
+    v_drop_r = round(voltage_drop_v, 3)
+    temp_rise_r = round(cable_temp_rise_c, 2)
+    cable_mass_r = round(cable_mass_kg, 2)
+    liquid_lpm_r = round(liquid_cooling_lpm, 3) if cooling == "liquid_cooled" else 0.0
+
+    worked = [
+        worked_calc(
+            label="Conductor resistivity at operating temperature",
+            formula="rho_op = rho_20 x (1 + alpha x (T_op - 20))",
+            values={
+                "rho_20": (rho_20, "ohm.m"),
+                "alpha": (alpha_r, "/degC"),
+                "T_op": (operating_temp_c, "degC"),
+            },
+            result=rho_op_r, result_unit="ohm.m",
+            assumptions=[
+                f"conductor material: {conductor}",
+                "assumed operating temperature 70 degC (typical mid-load for EV cable)",
+            ],
+        ),
+        worked_calc(
+            label="Round-trip cable resistance",
+            formula="resistance_mohm = rho_op x total_length / csa x 1000",
+            values={
+                "rho_op": (rho_op_r, "ohm.m"),
+                "total_length": (total_len_r, "m"),
+                "csa": (csa_m2, "m2"),
+            },
+            result=round(resistance_ohm * 1000, 4), result_unit="mohm",
+            assumptions=["total_length = 2 x cable_length (DC+ and DC- conductors); result in mohm for display precision"],
+        ),
+        worked_calc(
+            label="Joule (ohmic) loss",
+            formula="ohmic_loss = I^2 x resistance_mohm / 1000",
+            values={
+                "I": (current_a, "A"),
+                "resistance_mohm": (round(resistance_ohm * 1000, 4), "mohm"),
+            },
+            result=ohmic_r, result_unit="W",
+            assumptions=["I^2 x R Joule heating; resistance expressed in mohm for display precision"],
+        ),
+        worked_calc(
+            label="Ohmic loss per metre",
+            formula="loss_per_m = ohmic_loss / cable_length",
+            values={
+                "ohmic_loss": (ohmic_r, "W"),
+                "cable_length": (cable_length_m, "m"),
+            },
+            result=loss_per_m_r, result_unit="W/m",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Voltage drop (round-trip)",
+            formula="v_drop = I x resistance_mohm / 1000",
+            values={
+                "I": (current_a, "A"),
+                "resistance_mohm": (round(resistance_ohm * 1000, 4), "mohm"),
+            },
+            result=v_drop_r, result_unit="V",
+            assumptions=["full round-trip resistance already included; expressed in mohm for display precision"],
+        ),
+        worked_calc(
+            label="Cable surface temperature rise",
+            formula="temp_rise = R_thermal x loss_per_m",
+            values={
+                "R_thermal": (thermal_resistance_k_w_m, "K.m/W"),
+                "loss_per_m": (loss_per_m_r, "W/m"),
+            },
+            result=temp_rise_r, result_unit="degC",
+            assumptions=[
+                f"cooling = {cooling}",
+                "R_thermal_passive = 1.5 K.m/W; R_thermal_liquid = 0.2 K.m/W (IEC 62893 typical)",
+            ],
+        ),
+        worked_calc(
+            label="Cable mass",
+            formula="cable_mass = mass_per_m x cable_length",
+            values={
+                "mass_per_m": (mass_per_m, "kg/m"),
+                "cable_length": (cable_length_m, "m"),
+            },
+            result=cable_mass_r, result_unit="kg",
+            assumptions=[f"mass per metre from IEC 60364-5-52 table for {csa_mm2} mm2 Cu"],
+        ),
+    ]
+
+    if cooling == "liquid_cooled":
+        coolant_dT_k = 10.0
+        coolant_cp_local = 4186.0
+        worked.append(worked_calc(
+            label="Liquid coolant flow rate",
+            formula="lpm = (ohmic_loss / (coolant_cp x dT)) x 60",
+            values={
+                "ohmic_loss": (ohmic_r, "W"),
+                "coolant_cp": (coolant_cp_local, "J/kg.K"),
+                "dT": (coolant_dT_k, "K"),
+            },
+            result=liquid_lpm_r, result_unit="L/min",
+            assumptions=[
+                "coolant = water (cp = 4186 J/kg/K)",
+                "acceptable coolant temperature rise = 10 K",
+                "water density = 1 kg/L",
+            ],
+        ))
+
     return {
         "continuous_current_a": current_a,
         "cable_length_m": cable_length_m,
@@ -242,6 +367,7 @@ def compute(payload: dict) -> dict:
         "cable_mass_kg": round(cable_mass_kg, 2),
         "operating_temp_c_assumed": operating_temp_c,
         "feasibility": "OK" if surface_ok else "REQUIRES_LIQUID_COOLING",
+        "worked": worked,
         "_meta": {
             "model": "IEC 62893 cable sizing + Joule heating + thermal resistance to ambient",
             "references": [

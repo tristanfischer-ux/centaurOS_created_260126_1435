@@ -41,8 +41,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -171,6 +175,49 @@ def compute(payload: dict) -> dict:
     # Daily contact time (sum across passes)
     daily_contact_min = passes_per_day * avg_pass_duration_s / 60.0
 
+    # Worked calculations.
+    # Orbital period, orbital velocity, geocentric half-angle all involve
+    # sqrt() or asin() — transcendental, SKIPPED.
+    # Pass their live computed values as input symbols to the clean arithmetic
+    # steps: key bits per pass, weather-adjusted bits, and network throughput.
+    avg_dur_r = round(avg_pass_duration_s, 1)
+    passes_r = round(passes_per_day, 2)
+    key_no_weather_r = int(round(key_bits_per_pass))
+    key_weather_r = int(round(effective_key_bits_per_pass))
+    throughput_r = round(network_throughput_bps_avg, 2)
+
+    worked = [
+        worked_calc(
+            label="Key bits per pass (before weather loss)",
+            formula="key_no_weather = skr_bps x avg_pass_duration_s",
+            values={
+                "skr_bps": (skr_bps, "bps"),
+                "avg_pass_duration_s": (avg_dur_r, "s"),
+            },
+            result=key_no_weather_r, result_unit="bits",
+            assumptions=["avg_pass_duration_s = 0.5 x max_contact_s (half-max pass model)"],
+        ),
+        worked_calc(
+            label="Weather-adjusted key bits per pass",
+            formula="key_weather = key_no_weather x (weather_pct / 100)",
+            values={
+                "key_no_weather": (key_no_weather_r, "bits"),
+                "weather_pct": (weather_pct, "%"),
+            },
+            result=key_weather_r, result_unit="bits",
+        ),
+        worked_calc(
+            label="Average network throughput",
+            formula="throughput = key_weather x passes_per_day / 86400",
+            values={
+                "key_weather": (key_weather_r, "bits"),
+                "passes_per_day": (passes_r, "passes/day"),
+            },
+            result=throughput_r, result_unit="bps",
+            assumptions=["86400 s/day; passes_per_day from orbital geometry (asin-based — not expanded here)"],
+        ),
+    ]
+
     return {
         "satellite_altitude_km": alt_km,
         "ground_station_lat_deg": lat_deg,
@@ -190,6 +237,7 @@ def compute(payload: dict) -> dict:
         "network_throughput_bps_avg": round(network_throughput_bps_avg, 2),
         "daily_uplink_minutes": round(daily_contact_min, 1),
         "geocentric_half_angle_deg": round(math.degrees(geocentric_half_angle_rad), 2),
+        "worked": worked,
     }
 
 

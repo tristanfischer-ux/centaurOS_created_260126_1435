@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -128,27 +132,91 @@ def compute(payload: dict) -> dict:
     weight_n = payload_kg * 9.80665
     twr = max_total_thrust_n / max(1e-6, weight_n)
 
+    # Worked calculations for the PDF appendix.
+    # estimate_prop_thrust uses blade-count lookup table — SKIP for thrust/power.
+    # hover_rpm uses sqrt — transcendental — SKIP; pass as live input.
+    # v_back, hover_throttle_pct, and twr chain cleanly off live values.
+    no_load_rpm_r = round(no_load_rpm, 1)
+    req_thrust_r = round(required_thrust_per_motor_n, 3)
+    hover_rpm_r = round(hover_rpm, 1)
+    v_back_r = round(v_back, 3)
+    hover_throttle_r = round(hover_throttle_pct, 1)
+    max_total_thrust_r = round(max_total_thrust_n, 3)
+    weight_n_r = round(weight_n, 3)
+    twr_r = round(twr, 3)
+    worked = [
+        worked_calc(
+            label="No-load motor RPM at battery voltage",
+            formula="RPM_no_load = motor_kv x battery_voltage",
+            values={
+                "motor_kv": (motor_kv, "RPM/V"),
+                "battery_voltage": (battery_voltage, "V"),
+            },
+            result=no_load_rpm_r, result_unit="RPM",
+        ),
+        worked_calc(
+            label="Required hover thrust per motor",
+            formula="T_req = (payload_kg x g) / num_motors",
+            values={
+                "payload_kg": (payload_kg, "kg"),
+                "g": (9.80665, "m/s^2"),
+                "num_motors": (num_motors, ""),
+            },
+            result=req_thrust_r, result_unit="N",
+        ),
+        worked_calc(
+            label="Back-EMF voltage at hover RPM",
+            formula="V_back = hover_rpm / motor_kv",
+            values={
+                "hover_rpm": (hover_rpm_r, "RPM"),
+                "motor_kv": (motor_kv, "RPM/V"),
+            },
+            result=v_back_r, result_unit="V",
+            assumptions=["hover_rpm derived from thrust-RPM^2 scaling (sqrt step, not shown)"],
+        ),
+        worked_calc(
+            label="Hover throttle percentage",
+            formula="throttle_pct = (V_back / battery_voltage) x 100",
+            values={
+                "V_back": (v_back_r, "V"),
+                "battery_voltage": (battery_voltage, "V"),
+            },
+            result=hover_throttle_r, result_unit="%",
+        ),
+        worked_calc(
+            label="Thrust-to-weight ratio at max throttle",
+            formula="TWR = max_total_thrust / weight",
+            values={
+                "max_total_thrust": (max_total_thrust_r, "N"),
+                "weight": (weight_n_r, "N"),
+            },
+            result=twr_r, result_unit="",
+            assumptions=["weight = payload_kg x 9.80665"],
+        ),
+    ]
+
     return {
         "motor_kv": motor_kv,
         "battery_voltage": battery_voltage,
-        "no_load_rpm": round(no_load_rpm, 1),
+        "no_load_rpm": no_load_rpm_r,
         "prop_diameter_inch": prop_diameter_inch,
         "prop_pitch_inch": prop_pitch_inch,
         "num_blades": num_blades,
         "num_motors": num_motors,
         "payload_kg": payload_kg,
-        "required_thrust_per_motor_n": round(required_thrust_per_motor_n, 3),
+        "required_thrust_per_motor_n": req_thrust_r,
         "max_thrust_per_motor_n": round(max_thrust_per_motor, 3),
-        "max_total_thrust_n": round(max_total_thrust_n, 3),
+        "max_total_thrust_n": max_total_thrust_r,
         "max_power_per_motor_w": round(max_power_per_motor, 2),
-        "hover_rpm": round(hover_rpm, 1),
+        "hover_rpm": hover_rpm_r,
         "hover_thrust_per_motor_n": round(hover_thrust_per_motor, 3),
         "hover_power_per_motor_w": round(hover_power_per_motor, 2),
-        "hover_throttle_pct": round(hover_throttle_pct, 1),
+        "hover_throttle_pct": hover_throttle_r,
         "hover_current_per_motor_a": round(hover_current_per_motor_a, 2),
         "hover_total_current_a": round(hover_current_per_motor_a * num_motors, 2),
         "hover_total_power_w": round(hover_power_per_motor * num_motors, 2),
-        "thrust_to_weight_ratio": round(twr, 3),
+        "thrust_to_weight_ratio": twr_r,
+        "worked": worked,
     }
 
 

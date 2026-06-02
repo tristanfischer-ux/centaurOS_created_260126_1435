@@ -39,8 +39,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -138,6 +142,34 @@ def compute(payload: dict) -> dict:
     # EU formula: η_s = SCOP/2.5 × 100% - corrections (5% for control, 5% for power)
     eta_s = scop / 2.5 * 100.0 - 6.0   # typical aux losses
 
+    # Worked calculations — COP interpolation across bins is piecewise (skip);
+    # the final SCOP ratio and ErP seasonal efficiency formula are clean arithmetic.
+    scop_r = round(scop, 2)
+    total_heat_r = round(total_heat_kwh, 1)
+    total_elec_r = round(total_elec_kwh, 1)
+    worked = [
+        worked_calc(
+            label="Seasonal COP (SCOP)",
+            formula="SCOP = total_heat / total_elec",
+            values={"total_heat": (total_heat_r, "capacity-h"),
+                    "total_elec": (total_elec_r, "capacity-h")},
+            result=scop_r, result_unit="",
+            assumptions=[
+                "total_heat = sum(demand_fraction_bin x bin_hours) over climate bins",
+                "total_elec = sum(heat_bin / COP_bin); COP interpolated linearly between -7/+2/+7/+12 degC test points",
+                f"climate zone: {climate}",
+            ],
+        ),
+        worked_calc(
+            label="Seasonal efficiency (eta_s) for ErP label",
+            formula="eta_s = SCOP / 2.5 x 100 - 6",
+            values={"SCOP": (scop_r, "")},
+            result=round(eta_s, 1), result_unit="%",
+            assumptions=["EU Regulation 813/2013: divides by primary-energy factor 2.5",
+                         "minus 6% for typical auxiliary-loss corrections"],
+        ),
+    ]
+
     if eta_s >= 175:
         eu_label = "A+++"
     elif eta_s >= 150:
@@ -158,6 +190,7 @@ def compute(payload: dict) -> dict:
     scop_warm = scop * 1.15   # rough estimate for warm
 
     return {
+        "worked": worked,
         "climate_zone": climate,
         "scop_average": round(scop, 2),
         "scop_cold_estimate": round(scop_cold, 2),

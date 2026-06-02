@@ -49,8 +49,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -124,6 +128,89 @@ def compute(payload: dict) -> dict:
     q_rad_per_m2 = eps * SIGMA_SB * (T_design_k ** 4 - T_SPACE_K ** 4)
     A_rad_required = Q_int / max(1e-3, q_rad_per_m2)
 
+    # Worked calculations — clean arithmetic steps only.
+    # view_factor_earth uses sqrt so is skipped; T_sun_k uses ^0.25 so is skipped.
+    # A_rad_required uses T^4 so is skipped.
+    # Pass live view_factor_earth as an input symbol to Q_albedo and Q_earth_ir.
+    vf_r = round(view_factor_earth, 4)
+    q_sol_r = round(Q_solar, 2)
+    q_alb_r = round(Q_albedo, 2)
+    q_eir_r = round(Q_earth_ir, 2)
+    q_sun_r = round(Q_in_sun, 2)
+    q_ecl_r = round(Q_in_ecl, 2)
+    t_avg_r = round(T_avg_c, 2)
+    worked = [
+        worked_calc(
+            label="Solar heat load on sun-facing face",
+            formula="Q_solar = alpha x A_sun x Q_SUN_W_M2",
+            values={
+                "alpha": (alpha, ""),
+                "A_sun": (A_sun, "m2"),
+                "Q_SUN_W_M2": (Q_SUN_W_M2, "W/m2"),
+            },
+            result=q_sol_r, result_unit="W",
+            assumptions=["Q_SUN = 1361 W/m2 at 1 AU (solar constant)"],
+        ),
+        worked_calc(
+            label="Albedo heat load",
+            formula="Q_albedo = alpha x A_earth x Q_SUN_W_M2 x albedo x view_factor_earth",
+            values={
+                "alpha": (alpha, ""),
+                "A_earth": (A_sun, "m2"),
+                "Q_SUN_W_M2": (Q_SUN_W_M2, "W/m2"),
+                "albedo": (albedo, ""),
+                "view_factor_earth": (vf_r, ""),
+            },
+            result=q_alb_r, result_unit="W",
+            assumptions=["view_factor_earth from sphere-shadow geometry (transcendental); Earth albedo 0.25-0.35 LEO"],
+        ),
+        worked_calc(
+            label="Earth IR heat load",
+            formula="Q_earth_ir = eps x A_earth x earth_ir x view_factor_earth",
+            values={
+                "eps": (eps, ""),
+                "A_earth": (A_sun, "m2"),
+                "earth_ir": (earth_ir, "W/m2"),
+                "view_factor_earth": (vf_r, ""),
+            },
+            result=q_eir_r, result_unit="W",
+            assumptions=["earth_ir = 237 W/m2 (NASA CERES average outgoing longwave)"],
+        ),
+        worked_calc(
+            label="Total heat input in sunlight",
+            formula="Q_in_sun = Q_solar + Q_albedo + Q_earth_ir + Q_int",
+            values={
+                "Q_solar": (q_sol_r, "W"),
+                "Q_albedo": (q_alb_r, "W"),
+                "Q_earth_ir": (q_eir_r, "W"),
+                "Q_int": (Q_int, "W"),
+            },
+            result=q_sun_r, result_unit="W",
+            assumptions=["steady-state; no conduction losses modelled"],
+        ),
+        worked_calc(
+            label="Total heat input in eclipse",
+            formula="Q_in_ecl = Q_earth_ir + Q_int",
+            values={
+                "Q_earth_ir": (q_eir_r, "W"),
+                "Q_int": (Q_int, "W"),
+            },
+            result=q_ecl_r, result_unit="W",
+            assumptions=["no solar or albedo input during eclipse"],
+        ),
+        worked_calc(
+            label="Orbit-averaged temperature",
+            formula="T_avg_c = (1 - f_ecl) x T_sun_c + f_ecl x T_ecl_c",
+            values={
+                "f_ecl": (round(f_ecl, 4), ""),
+                "T_sun_c": (round(T_sun_c, 2), "degC"),
+                "T_ecl_c": (round(T_ecl_c, 2), "degC"),
+            },
+            result=t_avg_r, result_unit="degC",
+            assumptions=["linear duty-cycle weighting; T_sun_c and T_ecl_c from Stefan-Boltzmann (transcendental)"],
+        ),
+    ]
+
     return {
         "equilibrium_temp_c_sun": round(T_sun_c, 2),
         "equilibrium_temp_c_eclipse": round(T_ecl_c, 2),
@@ -147,6 +234,7 @@ def compute(payload: dict) -> dict:
         "alpha_over_epsilon": round(alpha / max(1e-3, eps), 4),
         "eclipse_fraction_pct": eclipse_pct,
         "radiator_setpoint_c": T_RADIATOR_DESIGN_C,
+        "worked": worked,
     }
 
 

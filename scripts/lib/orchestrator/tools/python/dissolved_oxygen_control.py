@@ -42,8 +42,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -138,6 +142,54 @@ def compute(payload: dict) -> dict:
     # Oxygen enrichment requirement
     o2_supplementation_needed = kla_required > 800
 
+    # Worked calculations for the PDF appendix.
+    # c_sat_air_mgl comes from a piecewise temperature table, so it is passed
+    # as a live input symbol rather than re-derived.
+    # vvm_target and rpm_required are piecewise/branchy — skipped.
+    c_sat_r = round(c_sat_air_mgl, 2)
+    c_sat_mmol_r = round(c_sat_air_mmol_l, 3)
+    do_sp_r = round(do_setpoint_mmol_l, 3)
+    drv_r = round(driving_force, 3)
+    kla_req_r = round(kla_required, 1)
+    worked = [
+        worked_calc(
+            label="O2 saturation in mmol/L",
+            formula="c_sat_mmol = c_sat_mgl / 32",
+            values={"c_sat_mgl": (c_sat_r, "mg/L")},
+            result=c_sat_mmol_r,
+            result_unit="mmol/L",
+            assumptions=["O2 molar mass 32 g/mol; c_sat_mgl from Henry temperature table"],
+        ),
+        worked_calc(
+            label="DO at setpoint",
+            formula="do_sp = c_sat_mmol x (do_setpoint_pct / 100)",
+            values={
+                "c_sat_mmol": (c_sat_mmol_r, "mmol/L"),
+                "do_setpoint_pct": (do_setpoint_pct, "%"),
+            },
+            result=do_sp_r,
+            result_unit="mmol/L",
+        ),
+        worked_calc(
+            label="Driving force (saturation deficit)",
+            formula="driving_force = c_sat_mmol - do_sp",
+            values={"c_sat_mmol": (c_sat_mmol_r, "mmol/L"), "do_sp": (do_sp_r, "mmol/L")},
+            result=drv_r,
+            result_unit="mmol/L",
+        ),
+        worked_calc(
+            label="Required kLa",
+            formula="kLa_req = OUR / driving_force",
+            values={
+                "OUR": (our_mmol_l_h, "mmol/L/h"),
+                "driving_force": (drv_r, "mmol/L"),
+            },
+            result=kla_req_r,
+            result_unit="1/h",
+            assumptions=["steady-state DO balance: OTR = kLa x (C* - C_L) = OUR"],
+        ),
+    ]
+
     return {
         "working_volume_l": volume_l,
         "kla_per_hour_available": kla_per_hour,
@@ -160,6 +212,7 @@ def compute(payload: dict) -> dict:
         "organism": organism,
         "temperature_c": temp_c,
         "pressure_atm": pressure_atm,
+        "worked": worked,
         "notes": (
             "Cascade: DO controller → airflow (primary) → agitation (secondary) → "
             "O2 supplementation (last resort). VVM typical 0.5-1.5 for stirred tank. "

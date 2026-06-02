@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -142,6 +146,71 @@ def compute(payload: dict) -> dict:
     p_per_cmg_w = h_per_cmg_nms * 5.0  # 5 W/Nms typical for high-speed flywheels
     total_power_w = p_per_cmg_w * n_cmgs
 
+    # Worked calculations — reviewer-verifiable steps.
+    # omega_rotor_rad_s uses 2*pi (transcendental) → SKIPPED; passed as live input.
+    # omega_gimbal_rad_s uses math.radians (transcendental) → SKIPPED; passed as live input.
+    # config_factor_torque and singularity_free_factor are piecewise lookup → SKIPPED.
+    omega_r_r        = round(omega_rotor_rad_s, 1)
+    omega_g_r        = round(omega_gimbal_rad_s, 6)
+    h_per_r          = round(h_per_cmg_nms, 3)
+    torque_per_r     = round(torque_per_cmg_nm, 4)
+    total_torque_r   = round(total_torque_nm, 3)
+    eff_torque_r     = round(effective_torque_nm, 3)
+    total_mom_r      = round(total_momentum_nms, 2)
+
+    worked = [
+        worked_calc(
+            label="Stored angular momentum per CMG",
+            formula="h_per_cmg = I_rotor x omega_rotor_rad_s",
+            values={
+                "I_rotor":          (I_rotor,   "kg m2"),
+                "omega_rotor_rad_s": (omega_r_r, "rad/s"),
+            },
+            result=h_per_r, result_unit="N m s",
+            assumptions=["omega_rotor_rad_s = rpm x 2pi / 60 (transcendental — not re-shown)."],
+        ),
+        worked_calc(
+            label="Output torque per CMG",
+            formula="torque_per_cmg = h_per_cmg x omega_gimbal_rad_s",
+            values={
+                "h_per_cmg":         (h_per_r,   "N m s"),
+                "omega_gimbal_rad_s": (omega_g_r, "rad/s"),
+            },
+            result=torque_per_r, result_unit="N m",
+            assumptions=["Cross-product magnitude = H * gimbal_rate (Wertz 1978 ch.7)."],
+        ),
+        worked_calc(
+            label="Peak torque (configuration factor applied)",
+            formula="total_torque = torque_per_cmg x config_factor_torque",
+            values={
+                "torque_per_cmg":    (torque_per_r,       "N m"),
+                "config_factor_torque": (config_factor_torque, ""),
+            },
+            result=total_torque_r, result_unit="N m",
+            assumptions=["config_factor_torque = 2.0 for 4-CMG pyramid (Sidi 1997 §7.5)."],
+        ),
+        worked_calc(
+            label="Effective (singularity-free workspace) torque",
+            formula="eff_torque = total_torque x singularity_free_factor",
+            values={
+                "total_torque":          (total_torque_r,         "N m"),
+                "singularity_free_factor": (singularity_free_factor, ""),
+            },
+            result=eff_torque_r, result_unit="N m",
+            assumptions=["Singularity-free workspace 70% for pyramid 4-CMG (Sidi 1997 §7.6)."],
+        ),
+        worked_calc(
+            label="Total stored momentum (cluster)",
+            formula="total_momentum = h_per_cmg x config_factor_momentum",
+            values={
+                "h_per_cmg":            (h_per_r,               "N m s"),
+                "config_factor_momentum": (config_factor_momentum, ""),
+            },
+            result=total_mom_r, result_unit="N m s",
+            assumptions=["config_factor_momentum = n_CMGs for additive momentum (parallel spin axes)."],
+        ),
+    ]
+
     return {
         "rotor_inertia_kgm2": I_rotor,
         "rotor_speed_rpm": omega_rotor_rpm,
@@ -162,6 +231,7 @@ def compute(payload: dict) -> dict:
         "slew_90deg_seconds": round(slew_90_s, 2) if slew_90_s != float("inf") else None,
         "saturation_angle_deg": saturation_angle_deg,
         "total_power_w": round(total_power_w, 1),
+        "worked": worked,
     }
 
 

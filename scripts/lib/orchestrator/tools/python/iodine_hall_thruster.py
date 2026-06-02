@@ -35,8 +35,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -125,6 +129,96 @@ def compute(payload: dict) -> dict:
     # Discharge current (m_dot expressed as ion current)
     i_d_a = m_dot_kg_s * Q_ELEMENTARY / m_ion_kg
 
+    # Worked calculations — closed-form steps only.
+    # v_exhaust = sqrt(2qV/m) is transcendental — pass its live rounded value as input.
+    # Round to 2 dp so both thrust and p_jet substitutions reproduce the stated result;
+    # round-to-0dp (21357) causes thrust to evaluate to 0.010678 instead of 0.010679
+    # and p_jet to 114.0304 instead of 114.0326 (both outside the 0.5% tolerance).
+    v_ex_r = round(v_exhaust_m_s, 2)
+    m_dot_r = round(m_dot_kg_s, 8)
+    thrust_n_r = round(thrust_n, 6)
+    thrust_mn_r = round(thrust_mn, 4)
+    isp_r = round(isp_s, 0)
+    storage_r = round(storage_advantage, 2)
+    p_jet_r = round(p_jet_w, 4)
+    eff_r = round(eff_pct, 1)
+    worked = [
+        worked_calc(
+            label="Mass flow in kg/s",
+            formula="m_dot_kg_s = m_dot_mg_s x 1e-6",
+            values={
+                "m_dot_mg_s": (m_dot_mg_s, "mg/s"),
+            },
+            result=m_dot_r, result_unit="kg/s",
+            assumptions=["Unit conversion from mg/s to kg/s"],
+        ),
+        worked_calc(
+            label="Effective thrust",
+            formula="thrust_n = eta_thrust x m_dot_kg_s x v_exhaust",
+            values={
+                "eta_thrust": (eta_thrust, ""),
+                "m_dot_kg_s": (m_dot_r, "kg/s"),
+                "v_exhaust": (v_ex_r, "m/s"),
+            },
+            result=thrust_n_r, result_unit="N",
+            assumptions=[
+                f"v_exhaust = sqrt(2 q V / m_ion) — not hand-verifiable (sqrt); treated as input here",
+                f"eta_thrust = {eta_thrust} for {propellant} (ThrustMe / Goebel & Katz 2008 measured efficiency)",
+            ],
+        ),
+        worked_calc(
+            label="Thrust in milli-Newtons",
+            formula="thrust_mn = thrust_n x 1000",
+            values={
+                "thrust_n": (thrust_n_r, "N"),
+            },
+            result=thrust_mn_r, result_unit="mN",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Specific impulse (Isp)",
+            formula="isp_s = thrust_n / (m_dot_kg_s x G_0)",
+            values={
+                "thrust_n": (thrust_n_r, "N"),
+                "m_dot_kg_s": (m_dot_r, "kg/s"),
+                "G_0": (G_0, "m/s2"),
+            },
+            result=isp_r, result_unit="s",
+            assumptions=["Standard gravity G_0 = 9.80665 m/s^2 (BIPM)"],
+        ),
+        worked_calc(
+            label="Propellant storage density advantage vs Xenon",
+            formula="storage_advantage = density_I / density_Xe",
+            values={
+                "density_I": (p["storage_g_cm3"], "g/cm3"),
+                "density_Xe": (p_xe["storage_g_cm3"], "g/cm3"),
+            },
+            result=storage_r, result_unit="",
+            assumptions=["Iodine solid 4.93 g/cm^3 (CRC Handbook); Xe gas at 200 bar 1.60 g/cm^3"],
+        ),
+        worked_calc(
+            label="Jet (kinetic) power",
+            formula="p_jet_w = 0.5 x m_dot_kg_s x v_exhaust^2 x eta_thrust",
+            values={
+                "m_dot_kg_s": (m_dot_r, "kg/s"),
+                "v_exhaust": (v_ex_r, "m/s"),
+                "eta_thrust": (eta_thrust, ""),
+            },
+            result=p_jet_r, result_unit="W",
+            assumptions=["Kinetic power from exhaust beam; efficiency factor applied"],
+        ),
+        worked_calc(
+            label="Overall thruster efficiency",
+            formula="eff_pct = (p_jet / power_in) x 100",
+            values={
+                "p_jet": (p_jet_r, "W"),
+                "power_in": (power_w, "W"),
+            },
+            result=eff_r, result_unit="%",
+            assumptions=[],
+        ),
+    ]
+
     return {
         "propellant": propellant,
         "ion_mass_amu": p["mass_amu"],
@@ -142,6 +236,7 @@ def compute(payload: dict) -> dict:
         "storage_density_g_cm3": p["storage_g_cm3"],
         "propellant_storage_density_advantage_vs_Xe": round(storage_advantage, 2),
         "propellant_form": p["form"],
+        "worked": worked,
     }
 
 

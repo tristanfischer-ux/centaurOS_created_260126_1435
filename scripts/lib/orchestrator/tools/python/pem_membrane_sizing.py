@@ -40,8 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -98,6 +102,89 @@ def compute(payload: dict) -> dict:
     water_kg_day = target_h2_kg_day * 9.0  # stoichiometric
     water_total_kg_day = water_kg_day * 1.5  # +50% for cooling/humid
 
+    # Worked calculations — all steps are closed-form arithmetic.
+    # rate_kg_s_cm2 involves Faraday constants and is passed as a rounded input.
+    # Display the rate in micro-kg/day/cm² (multiply by 1e6) so that _fmt shows
+    # four meaningful decimal digits rather than rounding 0.001769 -> 0.0018,
+    # which would make the substitution 1000/0.0018 = 555,555 instead of 565,237.
+    rate_day_r = round(rate_kg_day_cm2, 6)
+    rate_day_u_r = round(rate_kg_day_cm2 * 1e6, 4)   # same value in ug/day/cm²
+    total_area_cm2_r = round(total_area_cm2, 1)
+    total_area_m2_r = round(total_area_m2, 2)
+    current_per_cell_r = round(current_per_cell_a, 1)
+    power_per_cell_r = round(power_per_cell_w, 1)
+    total_power_kw_r = round(total_power_w / 1000.0, 2)
+    water_kg_day_r = round(water_kg_day, 1)
+    water_total_r = round(water_total_kg_day, 1)
+
+    worked = [
+        worked_calc(
+            label="H2 production rate per cm^2 per day",
+            formula="rate_kg_day_cm2 = rate_kg_s_cm2 x 86400",
+            values={"rate_kg_s_cm2": (round(rate_kg_s_cm2, 10), "kg/s/cm^2")},
+            result=rate_day_r, result_unit="kg/day/cm^2",
+            assumptions=[
+                "rate_kg_s_cm2 = j x eta_F x M_H2 / (2 x F) — Faraday's law; 86400 s/day",
+                f"j = {j_a_cm2} A/cm^2, eta_F = {eta_F}, M_H2 = {M_H2} kg/mol, F = {F_CONST} C/mol",
+            ],
+        ),
+        worked_calc(
+            label="Total required active area",
+            formula="total_area_cm2 = target_h2_kg_day x 1e6 / rate_ukg_day_cm2",
+            values={
+                "target_h2_kg_day": (target_h2_kg_day, "kg/day"),
+                "rate_ukg_day_cm2": (rate_day_u_r, "ug/day/cm^2"),
+            },
+            result=total_area_cm2_r, result_unit="cm^2",
+            assumptions=[
+                "Linear scaling: area = production target / unit-area rate",
+                "rate expressed in micro-kg/day/cm^2 (x 1e6) to preserve display precision",
+            ],
+        ),
+        worked_calc(
+            label="Total active area in m^2",
+            formula="total_area_m2 = total_area_cm2 / 10000",
+            values={"total_area_cm2": (total_area_cm2_r, "cm^2")},
+            result=total_area_m2_r, result_unit="m^2",
+            assumptions=["1 m^2 = 10,000 cm^2"],
+        ),
+        worked_calc(
+            label="Current per cell",
+            formula="I_cell = j x A_per_cell",
+            values={"j": (j_a_cm2, "A/cm^2"), "A_per_cell": (a_per_cell_cm2, "cm^2")},
+            result=current_per_cell_r, result_unit="A",
+            assumptions=["All cells operate at the same current density"],
+        ),
+        worked_calc(
+            label="Power per cell",
+            formula="P_cell = I_cell x V_cell",
+            values={"I_cell": (current_per_cell_r, "A"), "V_cell": (v_cell, "V")},
+            result=power_per_cell_r, result_unit="W",
+            assumptions=["V_cell is the per-cell operating voltage (includes overpotentials)"],
+        ),
+        worked_calc(
+            label="Total stack power",
+            formula="P_total_kw = P_cell x cell_count / 1000",
+            values={"P_cell": (power_per_cell_r, "W"), "cell_count": (cell_count, "")},
+            result=total_power_kw_r, result_unit="kW",
+            assumptions=["cell_count = ceil(total_area_cm2 / area_per_cell) — ceiling applied before this step"],
+        ),
+        worked_calc(
+            label="Stoichiometric water consumption",
+            formula="water_kg_day = target_h2_kg_day x 9",
+            values={"target_h2_kg_day": (target_h2_kg_day, "kg/day")},
+            result=water_kg_day_r, result_unit="kg/day",
+            assumptions=["9 kg H2O per kg H2 (stoichiometric: 2H2O -> 2H2 + O2; M_H2O/M_H2 = 18/2 = 9)"],
+        ),
+        worked_calc(
+            label="Total water requirement (incl. cooling + humidification)",
+            formula="water_total = water_stoich x 1.5",
+            values={"water_stoich": (water_kg_day_r, "kg/day")},
+            result=water_total_r, result_unit="kg/day",
+            assumptions=["+50% for cooling water and membrane humidification (Bessarabov 2016 design factor)"],
+        ),
+    ]
+
     return {
         "active_area_m2": round(total_area_m2, 2),
         "active_area_cm2": round(total_area_cm2, 1),
@@ -117,6 +204,7 @@ def compute(payload: dict) -> dict:
         "water_stoich_kg_day": round(water_kg_day, 1),
         "water_total_kg_day": round(water_total_kg_day, 1),
         "faradaic_efficiency": eta_F,
+        "worked": worked,
     }
 
 

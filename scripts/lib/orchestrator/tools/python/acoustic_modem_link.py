@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -116,6 +120,7 @@ def compute(payload: dict) -> dict:
 
     # SNR
     snr_db = source_level_db - tl_db - nl_db + directivity_index_db - detection_threshold_db
+    snr_db_r = round(snr_db, 1)
 
     # Data rate vs modulation
     if modulation in ("FSK",):
@@ -156,6 +161,47 @@ def compute(payload: dict) -> dict:
     # Link viability
     link_works = snr_db > 5 and data_rate_bps > 0
 
+    # Worked calculations (only the two purely arithmetic steps are shown;
+    # sound speed and absorption use Mackenzie/Francois-Garrison transcendental
+    # polynomials that cannot be verified by hand, so they are passed as live
+    # inputs to the chain-able steps below).
+    tl_db_r = round(tl_db, 1)
+    nl_db_r = round(nl_db, 1)
+    c_ms_r = round(c_ms, 1)
+    prop_delay_r = round(propagation_delay_ms, 1)
+    # Compute snr_db_r from the same rounded intermediates used in the
+    # substitution so that the printed arithmetic reproduces the stated result.
+    snr_db_r = round(source_level_db - tl_db_r - nl_db_r + directivity_index_db - detection_threshold_db, 1)
+    worked = [
+        worked_calc(
+            label="Signal-to-noise ratio (sonar equation)",
+            formula="SNR = SL - TL - NL + DI - DT",
+            values={
+                "SL": (source_level_db, "dB re 1 uPa"),
+                "TL": (tl_db_r, "dB"),
+                "NL": (nl_db_r, "dB"),
+                "DI": (directivity_index_db, "dB"),
+                "DT": (detection_threshold_db, "dB"),
+            },
+            result=snr_db_r, result_unit="dB",
+            assumptions=[
+                "TL = 20 log10(r) + alpha x r (Urick 1983 spherical + absorption)",
+                "NL = noise_spectral_level + 10 log10(bandwidth)",
+                "sound speed and absorption from Mackenzie / Francois-Garrison (not hand-checkable)",
+            ],
+        ),
+        worked_calc(
+            label="One-way propagation delay",
+            formula="t_prop = distance_m / c x 1000",
+            values={
+                "distance_m": (distance_m, "m"),
+                "c": (c_ms_r, "m/s"),
+            },
+            result=prop_delay_r, result_unit="ms",
+            assumptions=["one-way delay; x 1000 converts s to ms; multiply by 2 for round-trip"],
+        ),
+    ]
+
     return {
         "frequency_khz": f_khz,
         "distance_km": distance_km,
@@ -167,7 +213,7 @@ def compute(payload: dict) -> dict:
         "transmission_loss_db": round(tl_db, 1),
         "source_level_db": source_level_db,
         "noise_level_total_db": round(nl_db, 1),
-        "snr_db": round(snr_db, 1),
+        "snr_db": snr_db_r,
         "modulation": modulation,
         "data_rate_bps": round(data_rate_bps, 0),
         "ber_estimate": ber_estimate,
@@ -183,6 +229,7 @@ def compute(payload: dict) -> dict:
             "High frequencies (>100 kHz) attenuate rapidly (>10 dB/km @ 100 kHz). "
             "Multipath in shallow water reduces practical rates 2-4× vs free field."
         ),
+        "worked": worked,
     }
 
 

@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "magnetic_shielding (custom)",
@@ -110,17 +114,53 @@ def compute(payload: dict) -> dict:
     B_external_T = B_ext_g * 1e-4
     saturated = B_external_T > 0.5  # working margin
 
+    # Rounded display values that chain through the worked calculations.
+    s_actual_r = round(s_actual, 1)
+    B_int_g_r = round(B_internal_gauss, 6)
+    B_ext_uT_r = round(B_ext_g * 100, 2)
+
+    # Worked calculations (hand-checkable closed-form steps only).
+    # target_atten_factor uses 10^ — SKIP.
+    # s_per_layer uses power (1/n) — SKIP.
+    # actual_atten_db uses log10 — SKIP.
+    # s_total_inf uses power n_layers — SKIP (n could be >1).
+    # Mass involves a loop — SKIP.
+    # Remaining clean steps: unit conversion (G→µT), internal field = B_ext / S.
+    worked = [
+        worked_calc(
+            label="External field unit conversion (Gauss to microtesla)",
+            formula="B_ext_uT = B_ext_G x 100",
+            values={"B_ext_G": (B_ext_g, "G")},
+            result=B_ext_uT_r, result_unit="uT",
+            assumptions=["1 Gauss = 100 microtesla (SI conversion)"],
+        ),
+        worked_calc(
+            label="Internal field after shielding",
+            formula="B_int = B_ext_G / S_actual",
+            values={"B_ext_G": (B_ext_g, "G"), "S_actual": (s_actual_r, "")},
+            result=B_int_g_r, result_unit="G",
+            assumptions=["S_actual is the multi-layer shielding factor with open-end correction"],
+        ),
+        worked_calc(
+            label="Internal field in nanotesla",
+            formula="B_int_nT = B_int_G x 1e5",
+            values={"B_int_G": (B_int_g_r, "G")},
+            result=round(B_internal_nT, 2), result_unit="nT",
+            assumptions=["1 Gauss = 1e5 nT (SI conversion)"],
+        ),
+    ]
+
     return {
         "external_field_gauss": B_ext_g,
-        "external_field_uT": round(B_ext_g * 100, 2),
+        "external_field_uT": B_ext_uT_r,
         "target_attenuation_db": target_atten_db,
         "shield_layers": n_layers,
         "mu_metal_thickness_mm": t_recommended_mm,
         "mu_metal_thickness_required_mm": round(t_per_layer_mm, 3),
         "mass_kg": round(total_mass_kg, 2),
-        "shielding_factor": round(s_actual, 1),
+        "shielding_factor": s_actual_r,
         "actual_attenuation_db": round(actual_atten_db, 1),
-        "internal_field_gauss": round(B_internal_gauss, 6),
+        "internal_field_gauss": B_int_g_r,
         "internal_field_nT": round(B_internal_nT, 2),
         "open_end_loss_factor": round(end_factor, 3),
         "saturated": saturated,
@@ -128,6 +168,7 @@ def compute(payload: dict) -> dict:
         "shield_diameter_m": D_m,
         "shield_length_m": L_m,
         "meets_target": actual_atten_db >= target_atten_db,
+        "worked": worked,
     }
 
 

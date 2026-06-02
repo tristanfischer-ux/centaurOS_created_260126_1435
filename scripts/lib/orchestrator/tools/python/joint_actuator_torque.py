@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "joint_actuator_torque (custom)",
@@ -103,6 +107,83 @@ def compute(payload: dict) -> dict:
     # Cost estimate: £80/Nm for high-quality QDD actuator
     cost_gbp = 80 * tau_total_nm
 
+    # Worked calculations — all steps are straightforward closed-form arithmetic.
+    tau_s_r = round(tau_static_nm, 2)
+    tau_d_r = round(tau_dynamic_nm, 2)
+    tau_t_r = round(tau_total_nm, 1)
+    # Derive motor_tau_r from tau_t_r (the rounded value shown in the prior step) so
+    # that tau_total / (gear_ratio x gear_eff) reproduces the stated result exactly.
+    motor_tau_r = round(tau_t_r / (gear_ratio * gear_efficiency), 3)
+    # Derive i_peak_r from motor_tau_r so motor_torque / Kt reproduces stated result.
+    i_peak_r = round(motor_tau_r / Kt, 2)
+    p_peak_r = round(peak_power_w, 0)
+    worked = [
+        worked_calc(
+            label="Static joint torque",
+            formula="tau_static = m_payload x G x L",
+            values={
+                "m_payload": (m_payload, "kg"),
+                "G": (G, "m/s2"),
+                "L": (L, "m"),
+            },
+            result=tau_s_r, result_unit="N.m",
+            assumptions=["Worst-case static gravity load at full lever extension"],
+        ),
+        worked_calc(
+            label="Dynamic joint torque",
+            formula="tau_dynamic = m_payload x a x L",
+            values={
+                "m_payload": (m_payload, "kg"),
+                "a": (a, "m/s2"),
+                "L": (L, "m"),
+            },
+            result=tau_d_r, result_unit="N.m",
+            assumptions=["Dynamic inertial load from acceleration; simultaneous with gravity"],
+        ),
+        worked_calc(
+            label="Total joint torque (with safety factor)",
+            formula="tau_total = (tau_static + tau_dynamic) x joint_sf",
+            values={
+                "tau_static": (tau_s_r, "N.m"),
+                "tau_dynamic": (tau_d_r, "N.m"),
+                "joint_sf": (joint_sf, ""),
+            },
+            result=tau_t_r, result_unit="N.m",
+            assumptions=[f"Safety factor {joint_sf} for {joint} joint (Boston Dynamics Atlas sizing practice)"],
+        ),
+        worked_calc(
+            label="Required motor torque (before gearbox)",
+            formula="motor_torque = tau_total / (gear_ratio x gear_eff)",
+            values={
+                "tau_total": (tau_t_r, "N.m"),
+                "gear_ratio": (gear_ratio, ""),
+                "gear_eff": (gear_efficiency, ""),
+            },
+            result=motor_tau_r, result_unit="N.m",
+            assumptions=["gear_eff = 0.85 typical for harmonic/planetary gearbox (Wensing et al. 2017)"],
+        ),
+        worked_calc(
+            label="Peak motor current",
+            formula="peak_current = motor_torque / Kt",
+            values={
+                "motor_torque": (motor_tau_r, "N.m"),
+                "Kt": (Kt, "N.m/A"),
+            },
+            result=i_peak_r, result_unit="A",
+            assumptions=["Kt = 0.10 N.m/A typical small-frame BLDC (0.05-0.15 N.m/A range)"],
+        ),
+        worked_calc(
+            label="Peak joint power",
+            formula="peak_power = tau_total x omega",
+            values={
+                "tau_total": (tau_t_r, "N.m"),
+                "omega": (omega_rad_s, "rad/s"),
+            },
+            result=p_peak_r, result_unit="W",
+            assumptions=["omega = 8 rad/s mid-range typical joint angular velocity (5-15 rad/s)"],
+        ),
+    ]
+
     return {
         "joint_type": joint,
         "lever_arm_m": L,
@@ -122,6 +203,7 @@ def compute(payload: dict) -> dict:
         "heat_dissipation_w": round(heat_w, 1),
         "estimated_cost_gbp": round(cost_gbp, 0),
         "motor_constant_kt_nm_a": Kt,
+        "worked": worked,
     }
 
 

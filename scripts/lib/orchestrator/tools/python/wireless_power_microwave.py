@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -118,6 +122,93 @@ def compute(payload: dict) -> dict:
     if freq_ghz > 10:
         atm_loss_db = freq_ghz * 0.05  # higher loss at Ka, Q bands
 
+    # Rounded intermediates for chained worked calculations.
+    lambda_r = round(lambda_m, 6)
+    d_tx_m_r = round(d_tx_m, 2)
+    range_m_r = round(range_m, 0)
+    theta_r = round(theta_half_rad, 8)
+    d_rx_m_r = round(d_rx_m, 2)
+    tau_r = round(tau, 6)
+    eta_r = round(eta_goubau, 6)
+    a_rx_r = round(a_rx_m2, 2)
+    p_density_r = round(power_density_avg, 4)
+    recv_power_mw_r = round(receivable_power_mw, 4)
+
+    worked = [
+        worked_calc(
+            label="Signal wavelength",
+            formula="lambda = 0.2998 / freq_ghz",
+            values={"freq_ghz": (freq_ghz, "GHz")},
+            result=lambda_r, result_unit="m",
+            assumptions=["0.2998 m/ns = speed of light / 1e9; freq in GHz"],
+        ),
+        worked_calc(
+            label="Transmit aperture diameter in metres",
+            formula="d_tx_m = d_tx_km x 1000",
+            values={"d_tx_km": (d_tx_km, "km")},
+            result=d_tx_m_r, result_unit="m",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Beam half-angle (diffraction limit)",
+            formula="theta = lambda / d_tx_m",
+            values={
+                "lambda": (lambda_r, "m"),
+                "d_tx_m": (d_tx_m_r, "m"),
+            },
+            result=theta_r, result_unit="rad",
+            assumptions=["far-field diffraction: half-angle = lambda / aperture diameter"],
+        ),
+        worked_calc(
+            label="Minimum rectenna diameter (geometric beam spread)",
+            formula="d_rx_m = 2 x theta x range_m + d_tx_m",
+            values={
+                "theta": (theta_r, "rad"),
+                "range_m": (range_m_r, "m"),
+                "d_tx_m": (d_tx_m_r, "m"),
+            },
+            result=d_rx_m_r, result_unit="m",
+            assumptions=["geometric spot size: beam spreads 2*theta*R, plus transmit aperture"],
+        ),
+        worked_calc(
+            label="Goubau coupling parameter tau",
+            formula="tau = pi x d_tx_m x d_rx_m / (4 x lambda x range_m)",
+            values={
+                "d_tx_m": (d_tx_m_r, "m"),
+                "d_rx_m": (d_rx_m_r, "m"),
+                "lambda": (lambda_r, "m"),
+                "range_m": (range_m_r, "m"),
+            },
+            result=tau_r, result_unit="",
+            assumptions=["Goubau-Schwering (1961) beam-waveguide coupling parameter; pi/4 prefactor"],
+        ),
+        worked_calc(
+            label="Average power density at rectenna",
+            formula="p_density = (p_tx_mw x 1e6 x eta) / a_rx",
+            values={
+                "p_tx_mw": (p_tx_mw, "MW"),
+                "eta": (eta_r, ""),
+                "a_rx": (a_rx_r, "m2"),
+            },
+            result=p_density_r, result_unit="W/m2",
+            assumptions=[
+                "p_tx_mw x 1e6 converts MW to W; eta = 1 - exp(-tau^2) (transcendental, not hand-checkable)",
+                "a_rx = pi x (d_rx/2)^2",
+            ],
+        ),
+        worked_calc(
+            label="Receivable power after rectenna efficiency",
+            formula="recv_power_mw = p_tx_mw x 1e6 x eta x (rectenna_eff_pct / 100) / 1e6",
+            values={
+                "p_tx_mw": (p_tx_mw, "MW"),
+                "eta": (eta_r, ""),
+                "rectenna_eff_pct": (rectenna_eff_pct, "%"),
+            },
+            result=recv_power_mw_r, result_unit="MW",
+            assumptions=["result in MW (same units as transmit power); eta from Goubau formula"],
+        ),
+    ]
+
     return {
         "transmit_power_mw": p_tx_mw,
         "frequency_ghz": freq_ghz,
@@ -138,6 +229,7 @@ def compute(payload: dict) -> dict:
         "receivable_power_mw": round(receivable_power_mw, 1),
         "iso_safe_density_limit_w_m2": 100.0,  # ICNIRP 1998
         "exceeds_iso_safe_limit": power_density_peak > 100.0,
+        "worked": worked,
     }
 
 

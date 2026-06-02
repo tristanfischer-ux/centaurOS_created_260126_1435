@@ -32,8 +32,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "helium_circulation (custom)",
@@ -83,6 +87,66 @@ def compute(payload: dict) -> dict:
     leak_mbar_l_year = leak_total_mbar_l_s * 3.15e7
     inventory_loss_pct_year = (leak_mbar_l_year / max(0.01, inventory_l_STP * 1013)) * 100
 
+    # Worked calculations — each step chains from the prior rounded value.
+    n3_in_mc_r = round(n3_in_mc_mol, 6)
+    total_inv_r = round(total_inventory_mol, 4)
+    # Derive inv_stp_r from the same rounded total_inv_r shown in the substitution so
+    # that total_inventory_r x 22.4 reproduces the stated result exactly.
+    inv_stp_r = round(total_inv_r * 22.4, 4)
+    throughput_r = round(throughput_mbar_l_s, 1)
+    mass_flow_r = round(mass_flow_mol_s, 6)
+    worked = [
+        worked_calc(
+            label="3He in mixing chamber (steady state)",
+            formula="n3_in_mc = n3_dot x tau_residence",
+            values={
+                "n3_dot": (n3_mol_s, "mol/s"),
+                "tau_residence": (tau_residence, "s"),
+            },
+            result=n3_in_mc_r, result_unit="mol",
+            assumptions=["Residence time tau = 1.5 s (typical high-cooling dilution fridge, Pobell §7.5)"],
+        ),
+        worked_calc(
+            label="Total 3He inventory in circulation loop",
+            formula="total_inventory = n3_in_mc x 10",
+            values={
+                "n3_in_mc": (n3_in_mc_r, "mol"),
+            },
+            result=total_inv_r, result_unit="mol",
+            assumptions=["10x loop factor accounts for concentrated + dilute streams, condenser, still, lines, traps (Pobell §7.6)"],
+        ),
+        worked_calc(
+            label="Inventory volume at STP",
+            formula="inventory_STP = total_inventory x 22.4",
+            values={
+                "total_inventory": (total_inv_r, "mol"),
+            },
+            result=inv_stp_r, result_unit="L",
+            assumptions=["Molar volume at STP = 22.4 L/mol (ideal gas, 273 K, 1 atm)"],
+        ),
+        worked_calc(
+            label="Gas-handling system throughput",
+            formula="throughput = p_GHS x S_pump",
+            values={
+                "p_GHS": (p_GHS_mbar, "mbar"),
+                "S_pump": (S_pump_l_s, "L/s"),
+            },
+            result=throughput_r, result_unit="mbar.L/s",
+            assumptions=["p_GHS = 300 mbar typical regulated pressure; pump speed from input"],
+        ),
+        worked_calc(
+            label="Mass flow from pump throughput at room temperature",
+            formula="mass_flow = throughput / (R_gas x T)",
+            values={
+                "throughput": (throughput_r, "mbar.L/s"),
+                "R_gas": (83.14, "mbar.L/mol/K"),
+                "T": (300.0, "K"),
+            },
+            result=mass_flow_r, result_unit="mol/s",
+            assumptions=["Ideal gas; R = 83.14 mbar.L/mol/K; room temperature T = 300 K"],
+        ),
+    ]
+
     return {
         "dilution_rate_mol_s": n3_mol_s,
         "dilution_rate_umol_s": round(n3_mol_s * 1e6, 1),
@@ -99,6 +163,7 @@ def compute(payload: dict) -> dict:
         "vacuum_chamber_volume_l": V_chamber_l,
         "pumping_speed_l_s": S_pump_l_s,
         "3He_cost_estimate_gbp": round(inventory_l_STP * 25000, 0),  # ~£25k/L 3He (2024 prices)
+        "worked": worked,
     }
 
 

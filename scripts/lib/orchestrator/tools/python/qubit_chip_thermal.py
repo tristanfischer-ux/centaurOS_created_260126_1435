@@ -40,8 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "qubit_chip_thermal (custom)",
@@ -120,6 +124,65 @@ def compute(payload: dict) -> dict:
 
     cooling_margin_pct = ((cooling_power_uw_at_T - total_uw) / cooling_power_uw_at_T) * 100.0
 
+    # Worked calculations.
+    # p_in_w and p_base_per_line_w involve 10^(x) (transcendental) — SKIPPED;
+    # per_line_uw (the combined per-line heat load) is passed as a live input
+    # symbol to the signal-total step which chains cleanly from it.
+    per_line_uw_r = round(per_line_uw, 4)
+    static_total_r = round(static_total_uw, 2)
+    total_signal_r = round(total_signal_uw, 2)
+    total_r = round(total_uw, 2)
+    cooling_r = round(cooling_power_uw_at_T, 1)
+    worked = [
+        worked_calc(
+            label="Static conduction heat load from coax cables",
+            formula="static_total = static_uw_per_line x n_signals",
+            values={
+                "static_uw_per_line": (static_uw_per_line, "uW"),
+                "n_signals": (n_signals, ""),
+            },
+            result=static_total_r, result_unit="uW",
+            assumptions=["0.1 uW/line for stainless-steel coax at base plate (Krinner 2019 Table 1)"],
+        ),
+        worked_calc(
+            label="Microwave signal heat load at base plate",
+            formula="signal_total = per_line_uw x n_signals",
+            values={
+                "per_line_uw": (per_line_uw_r, "uW"),
+                "n_signals": (n_signals, ""),
+            },
+            result=total_signal_r, result_unit="uW",
+            assumptions=["per_line_uw includes attenuated input power plus last-stage attenuator dissipation (dBm conversion — not expanded here)"],
+        ),
+        worked_calc(
+            label="Total heat load at base plate",
+            formula="total = signal_total + static_total",
+            values={
+                "signal_total": (total_signal_r, "uW"),
+                "static_total": (static_total_r, "uW"),
+            },
+            result=total_r, result_unit="uW",
+        ),
+        worked_calc(
+            label="Cooling power available at base plate temperature",
+            formula="cooling_power = 30 x (T_base_mk / 20)^2",
+            values={"T_base_mk": (T_base_mk, "mK")},
+            result=cooling_r, result_unit="uW",
+            assumptions=[
+                "Bluefors LD-400: 30 uW at 20 mK base; scales as T^2 (Bluefors curve fit)",
+            ],
+        ),
+        worked_calc(
+            label="Cooling margin",
+            formula="margin_pct = (cooling_power - total) / cooling_power x 100",
+            values={
+                "cooling_power": (cooling_r, "uW"),
+                "total": (total_r, "uW"),
+            },
+            result=round(cooling_margin_pct, 1), result_unit="%",
+        ),
+    ]
+
     return {
         "qubit_count": n_qubits,
         "microwave_signal_count": n_signals,
@@ -134,6 +197,7 @@ def compute(payload: dict) -> dict:
         "T1_degradation_factor": round(T1_degradation, 2),
         "max_supportable_qubits_at_this_temp": max_qubits_at_temp,
         "thermal_envelope_ok": total_uw < cooling_power_uw_at_T,
+        "worked": worked,
     }
 
 

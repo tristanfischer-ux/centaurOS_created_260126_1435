@@ -34,9 +34,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -116,6 +119,45 @@ def compute(payload: dict) -> dict:
     safe_flutter = flutter_speed_ms >= safety_factor_target * airspeed_m_s
     safe_divergence = divergence_speed_ms >= safety_factor_target * airspeed_m_s
 
+    # Worked calculations — only the two pure arithmetic steps.
+    # omega_h and omega_alpha are raised to fractional powers (0.5 of a
+    # (1.875/L)^4 product) so they cannot be hand-verified; pass their
+    # rounded live values as inputs to the steps that chain off them.
+    mu_r = round(mu, 2)
+    q_d_r = round(q_d, 1)
+    worked = [
+        worked_calc(
+            label="Mass ratio (mu)",
+            formula="mu = m_per_m / (pi x rho x b^2)",
+            values={
+                "m_per_m": (m_per_m_kg, "kg/m"),
+                "rho": (density, "kg/m^3"),
+                "b": (half_chord, "m"),
+            },
+            result=mu_r, result_unit="",
+            assumptions=[
+                "b = half-chord = chord / 2",
+                "per-unit-span mass ratio (Theodorsen 2-DoF formulation)",
+            ],
+        ),
+        worked_calc(
+            label="Divergence dynamic pressure",
+            formula="q_D = GJ / (chord^2 x e x CL_alpha x half_span^2)",
+            values={
+                "GJ": (gj, "N.m^2"),
+                "chord": (chord_m, "m"),
+                "e": (e_eccentricity, "m"),
+                "CL_alpha": (cl_alpha, "1/rad"),
+                "half_span": (half_span, "m"),
+            },
+            result=q_d_r, result_unit="Pa",
+            assumptions=[
+                "steady (non-oscillatory) divergence; torsional stiffness GJ dominates",
+                "CL_alpha per radian (thin-wing theory default 2*pi ~ 6.28)",
+            ],
+        ),
+    ]
+
     # Recommendations
     recs: list[str] = []
     if not safe_flutter:
@@ -164,6 +206,7 @@ def compute(payload: dict) -> dict:
             "U_F drops 30-50% vs sea-level operation of same structure. Coupled "
             "GVT (ground vibration test) + flight flutter test mandatory for cert."
         ),
+        "worked": worked,
     }
 
 

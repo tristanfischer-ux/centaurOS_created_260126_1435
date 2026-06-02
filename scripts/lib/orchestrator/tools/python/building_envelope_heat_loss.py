@@ -38,8 +38,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -120,6 +124,163 @@ def compute(payload: dict) -> dict:
     # NZEB check: heat demand ≤ 50 kWh/m²/yr
     is_nzeb = annual_kwh_per_m2 <= 50
 
+    # Worked calculations — rounded intermediates chained in order.
+    # Heat pump sizing uses a next()-over-list (table lookup) so that step is skipped.
+    q_wall_r = round(q_wall, 0)
+    q_window_r = round(q_window, 0)
+    q_roof_r = round(q_roof, 0)
+    q_floor_r = round(q_floor, 0)
+    q_door_r = round(q_door, 0)
+    q_fabric_r = round(q_fabric, 0)
+    q_vent_r = round(q_vent, 0)
+    q_bridges_r = round(q_bridges, 0)
+    q_total_w_r = round(q_total_w, 0)
+    q_total_kw_r = round(q_total_kw, 2)
+    htc_r = round(htc_w_k, 1)
+    annual_r = round(annual_heating_kwh, 0)
+    hp_size_r = round(hp_size_kw, 2)
+
+    worked = [
+        worked_calc(
+            label="Wall fabric heat loss",
+            formula="q_wall = wall_u x wall_area x delta_t",
+            values={
+                "wall_u": (wall_u_value, "W/m2K"),
+                "wall_area": (wall_area_m2, "m2"),
+                "delta_t": (delta_t, "K"),
+            },
+            result=q_wall_r, result_unit="W",
+            assumptions=["BS EN 12831 steady-state fabric transmission"],
+        ),
+        worked_calc(
+            label="Window fabric heat loss",
+            formula="q_window = window_u x window_area x delta_t",
+            values={
+                "window_u": (window_u_value, "W/m2K"),
+                "window_area": (window_area_m2, "m2"),
+                "delta_t": (delta_t, "K"),
+            },
+            result=q_window_r, result_unit="W",
+            assumptions=["double-glazed argon-filled by default"],
+        ),
+        worked_calc(
+            label="Roof fabric heat loss",
+            formula="q_roof = roof_u x roof_area x delta_t",
+            values={
+                "roof_u": (roof_u_value, "W/m2K"),
+                "roof_area": (roof_area_m2, "m2"),
+                "delta_t": (delta_t, "K"),
+            },
+            result=q_roof_r, result_unit="W",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Floor fabric heat loss",
+            formula="q_floor = floor_u x floor_area x delta_t",
+            values={
+                "floor_u": (floor_u_value, "W/m2K"),
+                "floor_area": (floor_area_m2, "m2"),
+                "delta_t": (delta_t, "K"),
+            },
+            result=q_floor_r, result_unit="W",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Door fabric heat loss",
+            formula="q_door = door_u x door_area x delta_t",
+            values={
+                "door_u": (door_u_value, "W/m2K"),
+                "door_area": (door_area_m2, "m2"),
+                "delta_t": (delta_t, "K"),
+            },
+            result=q_door_r, result_unit="W",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Total fabric heat loss",
+            formula="q_fabric = q_wall + q_window + q_roof + q_floor + q_door",
+            values={
+                "q_wall": (q_wall_r, "W"),
+                "q_window": (q_window_r, "W"),
+                "q_roof": (q_roof_r, "W"),
+                "q_floor": (q_floor_r, "W"),
+                "q_door": (q_door_r, "W"),
+            },
+            result=q_fabric_r, result_unit="W",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Ventilation / infiltration heat loss",
+            formula="q_vent = 0.34 x building_volume x infiltration_ach x delta_t",
+            values={
+                "building_volume": (building_volume_m3, "m3"),
+                "infiltration_ach": (infiltration_ach, "h^-1"),
+                "delta_t": (delta_t, "K"),
+            },
+            result=q_vent_r, result_unit="W",
+            assumptions=["0.34 = air volumetric heat capacity (W·h / m3·K) per BS EN 12831"],
+        ),
+        worked_calc(
+            label="Thermal bridge uplift",
+            formula="q_bridges = q_fabric x (thermal_bridge_factor_pct / 100)",
+            values={
+                "q_fabric": (q_fabric_r, "W"),
+                "thermal_bridge_factor_pct": (thermal_bridge_factor_pct, "%"),
+            },
+            result=q_bridges_r, result_unit="W",
+            assumptions=["% uplift on fabric losses per Part L 2021 / CIBSE Guide A"],
+        ),
+        worked_calc(
+            label="Total design heat loss",
+            formula="q_total = q_fabric + q_vent + q_bridges",
+            values={
+                "q_fabric": (q_fabric_r, "W"),
+                "q_vent": (q_vent_r, "W"),
+                "q_bridges": (q_bridges_r, "W"),
+            },
+            result=q_total_w_r, result_unit="W",
+            assumptions=["BS EN 12831-1:2017 design heat load"],
+        ),
+        worked_calc(
+            label="Design heat loss in kW",
+            formula="q_total_kw = q_total / 1000",
+            values={"q_total": (q_total_w_r, "W")},
+            result=q_total_kw_r, result_unit="kW",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Specific heat transfer coefficient (HTC)",
+            formula="htc = q_total / delta_t",
+            values={
+                "q_total": (q_total_w_r, "W"),
+                "delta_t": (delta_t, "K"),
+            },
+            result=htc_r, result_unit="W/K",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Annual heating demand (degree-day method)",
+            formula="annual_kwh = (q_total_kw x hdd_uk_base x 24) / delta_t",
+            values={
+                "q_total_kw": (q_total_kw_r, "kW"),
+                "hdd_uk_base": (2200, "K·day"),
+                "delta_t": (delta_t, "K"),
+            },
+            result=annual_r, result_unit="kWh",
+            assumptions=["UK average HDD15.5 = 2200; method per CIBSE Guide A §2.8"],
+        ),
+        worked_calc(
+            label="Heat pump minimum nominal size (pre-rounding)",
+            formula="hp_size = q_total_kw x 1.10",
+            values={"q_total_kw": (q_total_kw_r, "kW")},
+            result=hp_size_r, result_unit="kW",
+            assumptions=[
+                "10% safety factor for defrost cycle capacity loss (MIS 3005)",
+                "Final selection rounds up to nearest standard size in kW list",
+            ],
+        ),
+    ]
+
     return {
         "design_heat_loss_kw": round(q_total_kw, 2),
         "design_heat_loss_w": round(q_total_w, 0),
@@ -159,6 +320,7 @@ def compute(payload: dict) -> dict:
             "Heat pump sized at design temp + 10% for defrost/safety. "
             "Annual demand via UK HDD15.5 = 2200 method."
         ),
+        "worked": worked,
     }
 
 

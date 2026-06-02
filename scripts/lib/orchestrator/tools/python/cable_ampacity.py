@@ -27,8 +27,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -173,18 +177,98 @@ def compute(payload: dict) -> dict:
     cond_mass_per_m_kg = (selected_csa / 1e6) * density  # mm² to m² (1e6), × density
     cable_mass_per_m_kg = cond_mass_per_m_kg * 1.25
 
+    # Worked calculations — post CSA-selection arithmetic only.
+    # CSA selection itself is a table-lookup loop (skip).
+    # Ambient derating is interpolated from a table (skip as input symbol).
+    res_r = round(resistance_ohm_km, 4)
+    v_drop_r = round(v_drop, 2)
+    v_drop_pct_r = round(v_drop_pct, 3)
+    mass_per_m_r = round(cable_mass_per_m_kg, 3)
+    total_mass_r = round(cable_mass_per_m_kg * length_m, 2)
+
+    worked = [
+        worked_calc(
+            label="Cable resistance per km",
+            formula="R_per_km = (rho x 1000) / csa",
+            values={
+                "rho": (rho, "ohm.mm2/m"),
+                "csa": (selected_csa, "mm2"),
+            },
+            result=res_r, result_unit="ohm/km",
+            assumptions=[
+                f"rho at 20 degC for {'aluminium' if is_aluminium else 'copper'}",
+                "IEC 60228 conductor resistivity",
+            ],
+        ),
+        worked_calc(
+            label="Voltage drop",
+            formula="v_drop = I x length_m x R_per_km x multiplier / 1000",
+            values={
+                "I": (current_a, "A"),
+                "length_m": (length_m, "m"),
+                "R_per_km": (res_r, "ohm/km"),
+                "multiplier": (multiplier, ""),
+            },
+            result=v_drop_r, result_unit="V",
+            assumptions=[
+                "multiplier = 2.0 for DC (return path); 1.732 for 3-phase AC",
+                f"circuit is {'DC' if is_dc else 'AC'} (voltage_v = {voltage_v} V)",
+            ],
+        ),
+        worked_calc(
+            label="Voltage drop percentage",
+            formula="v_drop_pct = (v_drop / voltage_v) x 100",
+            values={
+                "v_drop": (v_drop_r, "V"),
+                "voltage_v": (voltage_v, "V"),
+            },
+            result=v_drop_pct_r, result_unit="%",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Conductor mass per metre",
+            formula="cond_mass_per_m = (csa / 1e6) x density",
+            values={
+                "csa": (selected_csa, "mm2"),
+                "density": (density, "kg/m3"),
+            },
+            result=round(cond_mass_per_m_kg, 4), result_unit="kg/m",
+            assumptions=[
+                f"density = {density} kg/m3 ({'Al' if is_aluminium else 'Cu'})",
+                "1 mm2 = 1e-6 m2",
+            ],
+        ),
+        worked_calc(
+            label="Cable (with insulation) mass per metre",
+            formula="cable_mass_per_m = cond_mass_per_m x 1.25",
+            values={"cond_mass_per_m": (round(cond_mass_per_m_kg, 4), "kg/m")},
+            result=mass_per_m_r, result_unit="kg/m",
+            assumptions=["1.25 factor covers insulation, armour, and sheath (~25% extra)"],
+        ),
+        worked_calc(
+            label="Total cable mass",
+            formula="total_mass = cable_mass_per_m x length_m",
+            values={
+                "cable_mass_per_m": (mass_per_m_r, "kg/m"),
+                "length_m": (length_m, "m"),
+            },
+            result=total_mass_r, result_unit="kg",
+            assumptions=[],
+        ),
+    ]
+
     return {
         "csa_mm2": selected_csa,
-        "voltage_drop_v": round(v_drop, 2),
-        "voltage_drop_pct": round(v_drop_pct, 3),
+        "voltage_drop_v": v_drop_r,
+        "voltage_drop_pct": v_drop_pct_r,
         "rated_ampacity_a_after_derating": round(rated_amps, 1),
         "temperature_derating_factor": round(temp_factor, 3),
         "material": material,
         "installation_method": installation,
-        "resistance_ohm_per_km": round(resistance_ohm_km, 4),
+        "resistance_ohm_per_km": res_r,
         "length_m": length_m,
-        "mass_kg_per_m": round(cable_mass_per_m_kg, 3),
-        "total_mass_kg": round(cable_mass_per_m_kg * length_m, 2),
+        "mass_kg_per_m": mass_per_m_r,
+        "total_mass_kg": total_mass_r,
         "upgraded_for_voltage_drop": upgrade_for_vdrop,
         "is_dc_circuit": is_dc,
         "ampacity_table_used": installation,
@@ -193,6 +277,7 @@ def compute(payload: dict) -> dict:
             "Voltage drop ≤ "
             f"{voltage_drop_max_pct}% of {voltage_v} V."
         ),
+        "worked": worked,
     }
 
 

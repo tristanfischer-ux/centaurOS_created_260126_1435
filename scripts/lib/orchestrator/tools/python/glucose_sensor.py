@@ -41,8 +41,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -181,6 +185,67 @@ def compute(payload: dict) -> dict:
     # Linear range in clinical units (within 10% of linearity)
     linear_range_max_mg_dl = params["km_mM"] * 0.5 * 180.156 / 10.0
 
+    # Worked calculations.
+    # bias_factor and temp_factor use min/max clamps and 2^x (transcendental) —
+    # skipped; their live values are passed as inputs to the current step.
+    # rate_mol_per_s involves these skipped factors; also skipped as a whole.
+    # current_a = n × F × rate is clean given rate, but rate is not directly
+    # hand-checkable, so the total current is also skipped (passed as live value).
+    glucose_mM_r = round(glucose_mM, 3)
+    drift_r = round(drift_at_day_n_pct, 2)
+    sat_mM_r = round(saturation_glucose_mM, 1)
+    sat_mgdl_r = round(saturation_glucose_mg_dl, 1)
+    lin_mgdl_r = round(linear_range_max_mg_dl, 1)
+    worked = [
+        worked_calc(
+            label="Glucose concentration (mM)",
+            formula="glucose_mM = glucose_mg_dl x 10 / 180.156",
+            values={"glucose_mg_dl": (glucose_mg_dl, "mg/dL")},
+            result=glucose_mM_r, result_unit="mM",
+            assumptions=[
+                "Glucose molar mass = 180.156 g/mol",
+                "mg/dL × 10 converts to mg/L; /180.156 converts mg/L to mmol/L",
+            ],
+        ),
+        worked_calc(
+            label="Cumulative sensor drift at day N",
+            formula="drift_at_N = drift_pct_per_day x operating_days",
+            values={
+                "drift_pct_per_day": (drift_pct_per_day, "%/day"),
+                "operating_days": (operating_days, "days"),
+            },
+            result=drift_r, result_unit="%",
+            assumptions=[
+                "Linear drift approximation over CGM sensor lifespan",
+                f"drift_pct_per_day = {drift_pct_per_day} for {enzyme} (Cengiz & Tamborlane, Diab Tech 2009)",
+            ],
+        ),
+        worked_calc(
+            label="Sensor saturation glucose concentration (mM)",
+            formula="sat_mM = Km x 5",
+            values={"Km": (params["km_mM"], "mM")},
+            result=sat_mM_r, result_unit="mM",
+            assumptions=[
+                "Michaelis-Menten: at [S] = 5 Km the rate is 83% of V_max (non-linear response)",
+                f"Km = {params['km_mM']} mM for {enzyme} (Heller 2008; Yoo 2010)",
+            ],
+        ),
+        worked_calc(
+            label="Sensor saturation glucose concentration (mg/dL)",
+            formula="sat_mg_dl = sat_mM x 180.156 / 10",
+            values={"sat_mM": (sat_mM_r, "mM")},
+            result=sat_mgdl_r, result_unit="mg/dL",
+            assumptions=["Inverse of mM→mg/dL conversion; /10 converts mg/L to mg/dL"],
+        ),
+        worked_calc(
+            label="Linear response range upper limit (mg/dL)",
+            formula="lin_max_mg_dl = Km x 0.5 x 180.156 / 10",
+            values={"Km": (params["km_mM"], "mM")},
+            result=lin_mgdl_r, result_unit="mg/dL",
+            assumptions=["At [S] = 0.5 Km the rate is within ~10% of linear; clinical linear range upper limit"],
+        ),
+    ]
+
     return {
         "glucose_mg_dl_input": glucose_mg_dl,
         "glucose_mM": round(glucose_mM, 3),
@@ -199,6 +264,7 @@ def compute(payload: dict) -> dict:
         "temperature_factor": round(temp_factor, 3),
         "km_mM": params["km_mM"],
         "electrode_area_mm2": electrode_area_mm2,
+        "worked": worked,
         "_meta": {
             "model": "Michaelis-Menten amperometric biosensor",
             "references": [

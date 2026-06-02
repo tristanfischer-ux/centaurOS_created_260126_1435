@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -144,6 +148,66 @@ def compute(payload: dict) -> dict:
     # Mass flow rate at thrust
     m_dot_per = thrust_per / (isp * G0)
 
+    # Worked calculations — reviewer-verifiable arithmetic steps.
+    # tank_count uses math.ceil (branchy) → SKIPPED.
+    prop_mass_r    = round(prop_mass_kg, 4)
+    m_max_r        = round(m_max_per_tank_kg, 4)
+    m_dot_r        = round(m_dot_per, 7)
+    R_spec_r       = round(R_specific, 2)
+
+    # Tank capacity worked step differs by storage form (two clean arithmetic paths).
+    if prop["storage_form"] == "compressed":
+        tank_cap_wc = worked_calc(
+            label="Maximum propellant per tank (ideal gas, compressed)",
+            formula="m_max = (p_tank_pa x v_tank_m3) / (R_specific x T_K)",
+            values={
+                "p_tank_pa":  (p_tank_bar * 1e5, "Pa"),
+                "v_tank_m3":  (v_tank_l * 1e-3,  "m3"),
+                "R_specific": (R_spec_r,           "J/(kg K)"),
+                "T_K":        (T_K,                "K"),
+            },
+            result=m_max_r, result_unit="kg",
+            assumptions=["Ideal gas law PV = mRT. R_specific = R_universal / M_molar."],
+        )
+    else:
+        v_liq_m3 = v_tank_l * 1e-3 * 0.95
+        tank_cap_wc = worked_calc(
+            label="Maximum propellant per tank (liquefied, density method)",
+            formula="m_max = rho_storage x v_liq_m3",
+            values={
+                "rho_storage": (prop["rho_storage_kgm3"], "kg/m3"),
+                "v_liq_m3":    (round(v_liq_m3, 5),       "m3"),
+            },
+            result=m_max_r, result_unit="kg",
+            assumptions=["95% liquid fill fraction at room temperature; density from PROPELLANTS table."],
+        )
+
+    worked = [
+        worked_calc(
+            label="Propellant mass from total impulse",
+            formula="m_prop = I_total / (Isp x g0)",
+            values={
+                "I_total": (total_impulse_ns, "N s"),
+                "Isp":     (isp,             "s"),
+                "g0":      (G0,              "m/s2"),
+            },
+            result=prop_mass_r, result_unit="kg",
+            assumptions=["Tsiolkovsky impulse equation: I = m * Isp * g0 → m = I/(Isp*g0)."],
+        ),
+        tank_cap_wc,
+        worked_calc(
+            label="Mass flow rate per thruster",
+            formula="m_dot = F / (Isp x g0)",
+            values={
+                "F":   (thrust_per, "N"),
+                "Isp": (isp,        "s"),
+                "g0":  (G0,         "m/s2"),
+            },
+            result=m_dot_r, result_unit="kg/s",
+            assumptions=["Steady-state on-design thrust, rated Isp."],
+        ),
+    ]
+
     return {
         "total_impulse_required_ns": total_impulse_ns,
         "propellant": propellant,
@@ -164,6 +228,7 @@ def compute(payload: dict) -> dict:
         "total_system_mass_kg": round(total_system_mass, 3),
         "lifetime_impulses": lifetime_impulses,
         "mass_flow_rate_kg_s_per_thruster": round(m_dot_per, 7),
+        "worked": worked,
     }
 
 

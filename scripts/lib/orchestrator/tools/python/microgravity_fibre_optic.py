@@ -40,8 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -142,13 +146,52 @@ def compute(payload: dict) -> dict:
     if material == "ZBLAN" or material == "fluoride":
         diameter_tolerance_um = 2.0  # less mature
 
+    # Rounded display values that chain through the worked calculations.
+    draw_ratio_r = round(draw_ratio, 1)
+    feed_rate_r = round(preform_feed_rate_m_s * 60 * 1000.0, 4)
+    draw_length_r = round(draw_length_km_hr, 4)
+
+    # Worked calculations (hand-checkable closed-form steps only).
+    # attenuation_db_km is a piecewise table lookup — SKIP.
+    # tensile uses a branchy expression — SKIP.
+    # yield_pct uses piecewise multiplier then min() — SKIP.
+    worked = [
+        worked_calc(
+            label="Draw ratio (area reduction, preform to fibre)",
+            formula="draw_ratio = (D_preform_um / D_fibre_um)^2",
+            values={
+                "D_preform_um": (preform_diameter_mm * 1000.0, "um"),
+                "D_fibre_um": (target_diameter_um, "um"),
+            },
+            result=draw_ratio_r, result_unit="",
+            assumptions=["mass conservation: A_preform * V_preform = A_fibre * V_fibre; areas scale as diameter^2"],
+        ),
+        worked_calc(
+            label="Preform feed rate (mass conservation)",
+            formula="feed_rate = draw_speed / draw_ratio",
+            values={
+                "draw_speed": (draw_speed_m_s * 60 * 1000.0, "mm/min"),
+                "draw_ratio": (draw_ratio_r, ""),
+            },
+            result=feed_rate_r, result_unit="mm/min",
+            assumptions=["volume conservation; draw_speed converted to mm/min"],
+        ),
+        worked_calc(
+            label="Fibre length drawn per hour",
+            formula="draw_km_hr = draw_speed x 3600 / 1000",
+            values={"draw_speed": (draw_speed_m_s, "m/s")},
+            result=draw_length_r, result_unit="km/hr",
+            assumptions=["3600 s/hr; 1000 m/km"],
+        ),
+    ]
+
     return {
         "preform_material": material,
         "draw_speed_m_s": draw_speed_m_s,
         "target_diameter_um": target_diameter_um,
         "preform_diameter_mm": preform_diameter_mm,
-        "draw_ratio": round(draw_ratio, 1),
-        "preform_feed_rate_mm_per_min": round(preform_feed_rate_m_s * 60 * 1000.0, 4),
+        "draw_ratio": draw_ratio_r,
+        "preform_feed_rate_mm_per_min": feed_rate_r,
         "furnace_temperature_c": furnace_c,
         "atmosphere": atmosphere,
         "g_level": g_level,
@@ -157,8 +200,9 @@ def compute(payload: dict) -> dict:
         "improvement_factor_vs_1G": round(m["atten_1G_db_km"] / max(attenuation_db_km, 0.001), 1),
         "tensile_strength_mpa": round(tensile_mpa, 1),
         "yield_pct": round(yield_pct, 1),
-        "draw_length_per_hour_km": round(draw_length_km_hr, 4),
+        "draw_length_per_hour_km": draw_length_r,
         "diameter_tolerance_um": diameter_tolerance_um,
+        "worked": worked,
     }
 
 

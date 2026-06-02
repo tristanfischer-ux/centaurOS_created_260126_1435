@@ -48,8 +48,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -144,6 +148,50 @@ def compute(payload: dict) -> dict:
     else:
         eKt_V = Kt_V
 
+    # Worked calculations — clean arithmetic steps only.
+    # K_urea/K_creat/K_solute use clearance_michaels() which contains exp() — skipped.
+    # URR_pct uses exp() — skipped. Pass clearance values as live inputs.
+    k_urea_r = round(K_urea, 2)
+    kt_v_r = round(Kt_V, 3)
+    ekt_v_r = round(eKt_V, 3)
+    eta_r = round(eta_dialyser, 3)
+    worked = [
+        worked_calc(
+            label="Kt/V dialysis dose per session",
+            formula="Kt_V = (K_urea x t_min) / V_ml",
+            values={
+                "K_urea": (k_urea_r, "ml/min"),
+                "t_min": (t_min, "min"),
+                "V_ml": (V_l * 1000.0, "ml"),
+            },
+            result=kt_v_r, result_unit="",
+            assumptions=["single-pool urea model (Daugirdas 2014); V = patient total body water x 1000"],
+        ),
+        worked_calc(
+            label="Equilibrated Kt/V (eKt/V)",
+            formula="eKt_V = Kt_V - 0.6 x Kt_V / t_hr + 0.03",
+            values={
+                "Kt_V": (kt_v_r, ""),
+                "t_hr": (round(t_min / 60.0, 3), "h"),
+            },
+            result=ekt_v_r, result_unit="",
+            assumptions=["Daugirdas eKt/V correction for post-dialysis rebound (Daugirdas 2014 Ch 3)"],
+        ),
+        worked_calc(
+            label="Dialyser efficiency",
+            formula="eta_dialyser = K_urea / min_Q",
+            values={
+                "K_urea": (k_urea_r, "ml/min"),
+                "min_Q": (min(Q_b, Q_d), "ml/min"),
+            },
+            result=eta_r, result_unit="",
+            assumptions=[
+                "min_Q = min(blood_flow, dialysate_flow) — limiting flow rate",
+                "efficiency capped by limiting flow (blood or dialysate)",
+            ],
+        ),
+    ]
+
     return {
         "urea_clearance_ml_min": round(K_urea, 2),
         "creatinine_clearance_ml_min": round(K_creat, 2),
@@ -162,6 +210,7 @@ def compute(payload: dict) -> dict:
         "dialyser_efficiency": round(eta_dialyser, 3),
         "kdoqi_adequate_kt_v_ge_1_4": Kt_V >= 1.4,
         "urea_KoA_total_ml_min": round(KoA_urea * A_m2, 1),
+        "worked": worked,
     }
 
 

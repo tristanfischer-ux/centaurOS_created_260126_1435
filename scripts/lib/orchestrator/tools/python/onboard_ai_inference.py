@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -159,6 +163,80 @@ def compute(payload: dict) -> dict:
     # Throughput target met?
     target_met = throughput_fps >= target_fps
 
+    # Worked calculations — only clean closed-form arithmetic steps are shown.
+    # scale_factor, effective_tops, throughput_fps chain off each other.
+    # util_ratio uses min() so is skipped; power uses util_ratio so is skipped.
+    scale_factor_r = round(scale_factor, 4)
+    gops_r = round(gops_per_inference, 1)
+    eff_tops_r = round(effective_tops, 4)
+    # Use 4dp so the substituted arithmetic (eff_tops_r * 1000 / gops_r) reproduces the stated result.
+    # round(throughput_fps, 2) can mask a factor-1000 gap when the true value is ~0.009 (rounds to 0.01).
+    thr_r = round(throughput_fps, 4)
+    model_mb_r = round(model_mb, 1)
+    worked = [
+        worked_calc(
+            label="Resolution scale factor (image vs 224x224 baseline)",
+            formula="scale_factor = (img_mp x input_channels) / (base_resolution_mp x 3)",
+            values={
+                "img_mp": (img_mp, "Mpix"),
+                "input_channels": (input_channels, "ch"),
+                "base_resolution_mp": (round(base_resolution_mp, 5), "Mpix"),
+            },
+            result=scale_factor_r, result_unit="",
+            assumptions=["baseline CNN input 224x224 px (3 channels); COCO reference — Lin et al. 2015"],
+        ),
+        worked_calc(
+            label="GOps per inference",
+            formula="gops_per_inference = 2 x model_M_params x 1000 x scale_factor / 1000",
+            values={
+                "model_M_params": (model_M_params, "M"),
+                "scale_factor": (scale_factor_r, ""),
+            },
+            result=gops_r, result_unit="GOps",
+            assumptions=["2x multiply-accumulate per parameter; image-resolution scaling only"],
+        ),
+        worked_calc(
+            label="Effective (practical) TOPS",
+            formula="effective_tops = peak_tops x utilisation",
+            values={
+                "peak_tops": (peak_tops, "TOPS"),
+                "utilisation": (utilisation, ""),
+            },
+            result=eff_tops_r, result_unit="TOPS",
+            assumptions=["15% real-world utilisation from MLPerf Inference Edge v3.0"],
+        ),
+        worked_calc(
+            label="Accelerator throughput",
+            formula="throughput_fps = (effective_tops x 1000) / gops_per_inference",
+            values={
+                "effective_tops": (eff_tops_r, "TOPS"),
+                "gops_per_inference": (gops_r, "GOps"),
+            },
+            result=thr_r, result_unit="FPS",
+            assumptions=["1 TOPS = 1000 GOps/s"],
+        ),
+        worked_calc(
+            label="Model memory footprint",
+            formula="model_mb = model_M_params x 1000000 x bytes_per_p / 1000000",
+            values={
+                "model_M_params": (model_M_params, "M"),
+                "bytes_per_p": (bytes_per_p, "B/param"),
+            },
+            result=model_mb_r, result_unit="MB",
+            assumptions=[f"quantization {quantization}; bytes/param from Han et al. (2016)"],
+        ),
+        worked_calc(
+            label="Total memory (model + activations)",
+            formula="memory_mb_total = model_mb + activation_mb",
+            values={
+                "model_mb": (model_mb_r, "MB"),
+                "activation_mb": (round(activation_mb, 1), "MB"),
+            },
+            result=round(total_memory_mb, 1), result_unit="MB",
+            assumptions=["activation memory ~ 2x model size (conservative estimate)"],
+        ),
+    ]
+
     return {
         "accelerator": accel,
         "model_size_M_params": model_M_params,
@@ -168,7 +246,7 @@ def compute(payload: dict) -> dict:
         "quantization": quantization,
         "peak_tops_at_quantization": round(peak_tops, 2),
         "gops_per_inference": round(gops_per_inference, 1),
-        "throughput_fps": round(throughput_fps, 2),
+        "throughput_fps": thr_r,
         "target_met": target_met,
         "latency_ms_per_inference": round(latency_ms, 1),
         "power_w": round(p_w, 2),
@@ -181,6 +259,7 @@ def compute(payload: dict) -> dict:
         "utilisation_factor_used": utilisation,
         "rad_tolerance_krad": a["rad_tolerance_krad"],
         "accelerator_cost_usd": a["cost_usd"],
+        "worked": worked,
     }
 
 

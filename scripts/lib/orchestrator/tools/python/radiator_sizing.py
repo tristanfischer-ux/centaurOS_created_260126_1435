@@ -41,8 +41,12 @@ Reference:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -114,6 +118,69 @@ def compute(payload: dict) -> dict:
     else:
         effective_eps = epsilon
 
+    # Worked calculations — all clean closed-form arithmetic, checkable by hand.
+    # Each step chains off the prior rounded value.
+    q_ir_r = round(q_ir_per_m2, 2)
+    sol_r = round(solar_load_per_m2, 2)
+    q_net_r = round(q_net_per_m2, 2)
+    q_design_r = round(q_design, 2)
+    area_r = round(area_m2, 4)
+    worked = [
+        worked_calc(
+            label="IR rejection capability per m2",
+            formula="q_ir = epsilon x SIGMA x F x (T_rad^4 - T_sink^4)",
+            values={
+                "epsilon": (epsilon, ""),
+                "SIGMA": (SIGMA, "W/m2/K4"),
+                "F": (view_factor, ""),
+                "T_rad": (t_rad, "K"),
+                "T_sink": (t_sink, "K"),
+            },
+            result=q_ir_r, result_unit="W/m2",
+            assumptions=[
+                "Stefan-Boltzmann constant sigma = 5.670374419e-8 W/m2/K4",
+                "T_rad^4 and T_sink^4 in Kelvin",
+            ],
+        ),
+        worked_calc(
+            label="Solar load absorbed per m2",
+            formula="q_sol = alpha x G_solar x sol_factor",
+            values={
+                "alpha": (alpha, ""),
+                "G_solar": (G_SOLAR, "W/m2"),
+                "sol_factor": (sol_factor, ""),
+            },
+            result=sol_r, result_unit="W/m2",
+            assumptions=["G_solar = 1361 W/m2 at 1 AU (solar constant)"],
+        ),
+        worked_calc(
+            label="Net rejection capability per m2",
+            formula="q_net = q_ir - q_sol",
+            values={"q_ir": (q_ir_r, "W/m2"), "q_sol": (sol_r, "W/m2")},
+            result=q_net_r, result_unit="W/m2",
+        ),
+        worked_calc(
+            label="Design heat load with safety margin",
+            formula="q_design = q x (1 + margin)",
+            values={"q": (q, "W"), "margin": (margin, "")},
+            result=q_design_r, result_unit="W",
+            assumptions=[f"safety margin = {margin * 100:.0f}%"],
+        ),
+        worked_calc(
+            label="Required radiator area",
+            formula="area = q_design / q_net",
+            values={"q_design": (q_design_r, "W"), "q_net": (q_net_r, "W/m2")},
+            result=area_r, result_unit="m2",
+        ),
+        worked_calc(
+            label="Radiator mass (aluminium honeycomb)",
+            formula="mass = 1.5 x area",
+            values={"area": (area_r, "m2")},
+            result=round(radiator_mass_kg, 3), result_unit="kg",
+            assumptions=["1.5 kg/m2 specific mass for Al honeycomb (Gilmore 2002 Table 4.1)"],
+        ),
+    ]
+
     return {
         "dissipation_w": q,
         "sink_temp_k": t_sink,
@@ -131,6 +198,7 @@ def compute(payload: dict) -> dict:
         "deployable_required": deployable_required,
         "effective_emissivity": round(effective_eps, 4),
         "alpha_over_epsilon": round(alpha / max(1e-6, epsilon), 3),
+        "worked": worked,
     }
 
 

@@ -33,8 +33,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Map orchestrator chemistry codes to PyBaMM parameter sets.
 PARAMETER_SETS = {
@@ -469,6 +473,109 @@ def compute(payload: dict) -> dict:
     # Recompute total based on rounded-up per-rack
     cold_plate_total_capacity_kw = round(cold_plate_per_rack_min_capacity_kw * rack_count, 2)
 
+    # Worked calculations — deterministic arithmetic only.
+    # Cell count uses ceil() — pass cell_count_rounded as a live input symbol.
+    # DFN voltage profile comes from PyBaMM (library) — no worked_calc.
+    # pack topology from derive_pack_topology iterates (branchy) — pass results as inputs.
+    # Thermal: I^2 R and system overhead multiplier are clean once r_ohm and current are known.
+    target_kwh = float(payload.get("target_energy_kwh", 3500))
+    dod = float(payload.get("dod_fraction", 0.80))
+    cell_ah_w = float(payload.get("cell_capacity_ah", 280))
+    cell_v_w = float(payload.get("cell_voltage_v", 3.2))
+    nameplate_r = round(cell_count_rounded * cell_ah_w * cell_v_w / 1000.0, 1)
+    total_bus_current_r = round(total_bus_current_a, 1)
+    per_cell_current_r = round(per_cell_current_a, 1)
+    r_ohm_r = round(r_ohm, 6)
+    per_cell_thermal_r = round(per_cell_thermal_w, 4)
+    system_thermal_r = system_thermal_dissipation_kw
+    cold_plate_total_r = cold_plate_total_capacity_kw
+    total_cell_mass_r = total_cell_mass_kg
+
+    worked = [
+        worked_calc(
+            label="Nameplate capacity (at rounded integer cell count)",
+            formula="nameplate_kwh = cell_count x cell_ah x cell_v / 1000",
+            values={
+                "cell_count": (cell_count_rounded, "cells"),
+                "cell_ah": (cell_ah_w, "Ah"),
+                "cell_v": (cell_v_w, "V"),
+            },
+            result=nameplate_r, result_unit="kWh",
+            assumptions=["cell_count_rounded from topology solver (integer-clean)"],
+        ),
+        worked_calc(
+            label="Total DC bus current at rated power",
+            formula="bus_current = rated_power_kw x 1000 / dc_bus_voltage",
+            values={
+                "rated_power_kw": (rated_power_kw, "kW"),
+                "dc_bus_voltage": (dc_bus_voltage_v, "V"),
+            },
+            result=total_bus_current_r, result_unit="A",
+            assumptions=["P = V x I; bus_current is the total current across all parallel strings"],
+        ),
+        worked_calc(
+            label="Per-cell current (series-parallel topology)",
+            formula="per_cell_current = bus_current / parallel_strings_total",
+            values={
+                "bus_current": (total_bus_current_r, "A"),
+                "parallel_strings_total": (parallel_strings_total, ""),
+            },
+            result=per_cell_current_r, result_unit="A",
+            assumptions=["current splits equally across parallel strings"],
+        ),
+        worked_calc(
+            label="Per-cell thermal dissipation (I^2 R)",
+            formula="per_cell_thermal_w = per_cell_current^2 x r_ohm",
+            values={
+                "per_cell_current": (per_cell_current_r, "A"),
+                "r_ohm": (r_ohm_r, "ohm"),
+            },
+            result=per_cell_thermal_r, result_unit="W",
+            assumptions=[f"r_ohm clamped to min {r_ohm_r} ohm (datasheet floor; PyBaMM DFN transient under-estimates)"],
+        ),
+        worked_calc(
+            label="System thermal dissipation (all cells + overhead)",
+            formula="system_thermal_kw = cell_count x per_cell_thermal_w x 1.5 / 1000",
+            values={
+                "cell_count": (cell_count_rounded, "cells"),
+                "per_cell_thermal_w": (per_cell_thermal_r, "W"),
+            },
+            result=system_thermal_r, result_unit="kW",
+            assumptions=[
+                "1.5x overhead for busbars, tabs, wiring, contactors",
+                "divide by 1000 to convert W to kW",
+            ],
+        ),
+        # BMS slave board count uses ceil() which is a non-arithmetic function;
+        # a reviewer cannot verify it with + - x / ^ alone — entry removed per
+        # worked_calc rules (transcendental / branchy functions must be skipped).
+        # The formula and result are: ceil(cells_per_rack / 18) x rack_count = bms_slave_count.
+        # bms_slave_count is still returned in the tool output for downstream consumers.
+        worked_calc(
+            label="Total cell mass",
+            formula="total_cell_mass_kg = cell_count x cell_mass_kg",
+            values={
+                "cell_count": (cell_count_rounded, "cells"),
+                "cell_mass_kg": (cell_mass_kg, "kg"),
+            },
+            result=round(total_cell_mass_r, 1), result_unit="kg",
+            assumptions=[f"cell_mass_kg from {chemistry.upper()} 280Ah prismatic class datasheets"],
+        ),
+        worked_calc(
+            label="Cold plate total capacity (with 1.25 safety factor)",
+            formula="cold_plate_total_kw = cold_plate_per_rack_kw x rack_count",
+            values={
+                "cold_plate_per_rack_kw": (cold_plate_per_rack_min_capacity_kw, "kW"),
+                "rack_count": (rack_count, "racks"),
+            },
+            result=cold_plate_total_r, result_unit="kW",
+            assumptions=[
+                "cold_plate_per_rack rounded up to nearest standard commercial rating",
+                "1.25 safety factor applied before rounding",
+            ],
+        ),
+    ]
+
     return {
         "cell_count": cell_count_rounded,           # USE THIS (integer-clean) value in design
         "cell_count_raw_physics": cell_count,        # original physics-derived (with EoL margin)
@@ -512,6 +619,7 @@ def compute(payload: dict) -> dict:
         },
         # Build #19d: provenance block — surfaces in the report's Tools-Used page
         "_provenance": PROVENANCE,
+        "worked": worked,
     }
 
 

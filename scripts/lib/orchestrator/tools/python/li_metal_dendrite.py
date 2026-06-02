@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "li_metal_dendrite (custom)",
@@ -111,22 +115,97 @@ def compute(payload: dict) -> dict:
     else:
         window = "hazard"
 
+    # Rounded display values that chain through the worked calculations.
+    mn_thresh_r = round(monroe_newman_threshold, 2)
+    mod_f_r = round(modulus_factor, 2)
+    pres_f_r = round(pressure_factor, 2)
+    temp_f_r = round(temp_factor, 2)
+    i_crit_r = round(i_crit_ma_cm2, 3)
+    cap_r = round(cap_per_area_mAh_cm2, 2)
+
+    # Worked calculations (hand-checkable, closed-form steps only).
+    # lambda_from_aw uses a cubic polynomial — SKIP.
+    # sigma uses exp — SKIP.
+    # sand_time denominator uses max() — SKIP.
+    # growth_rate is piecewise — SKIP.
+    worked = [
+        worked_calc(
+            label="Monroe-Newman threshold (min separator shear modulus)",
+            formula="MN_thresh = 2 x G_Li",
+            values={"G_Li": (LI_SHEAR_MODULUS_GPA, "GPa")},
+            result=mn_thresh_r, result_unit="GPa",
+            assumptions=["Monroe & Newman (2005): separator must exceed 2 x Li shear modulus"],
+        ),
+        worked_calc(
+            label="Modulus factor (relative to 8 GPa baseline)",
+            formula="mod_factor = G_sep / 8",
+            values={"G_sep": (G_sep_gpa, "GPa")},
+            result=mod_f_r, result_unit="",
+            assumptions=["normalised to 8 GPa (Monroe-Newman minimum for polymer electrolytes)"],
+        ),
+        worked_calc(
+            label="Pressure factor",
+            formula="pres_factor = 1 + 0.5 x (stack_p - 1)",
+            values={"stack_p": (stack_p_mpa, "MPa")},
+            result=pres_f_r, result_unit="",
+            assumptions=["empirical fit from Porz et al. (2017)"],
+        ),
+        worked_calc(
+            label="Temperature factor",
+            formula="temp_factor = 1 + 0.03 x (T - 25)",
+            values={"T": (T_c, "C")},
+            result=temp_f_r, result_unit="",
+            assumptions=["empirical linear Arrhenius proxy over practical temperature range"],
+        ),
+        worked_calc(
+            label="Critical current density",
+            formula="i_crit = base_crit x mod_factor x pres_factor x temp_factor",
+            values={
+                "base_crit": (0.5, "mA/cm2"),
+                "mod_factor": (mod_f_r, ""),
+                "pres_factor": (pres_f_r, ""),
+                "temp_factor": (temp_f_r, ""),
+            },
+            result=i_crit_r, result_unit="mA/cm2",
+            assumptions=["base 0.5 mA/cm2 at G=8 GPa, p=1 MPa, T=25 C (Porz et al. 2017 LLZO fit)"],
+        ),
+        worked_calc(
+            label="Li anode capacity per unit area",
+            formula="cap = (Li_thick x 1e-4) x Li_density x Li_sp_cap",
+            values={
+                "Li_thick": (Li_thick_um, "um"),
+                "Li_density": (Li_density_g_cm3, "g/cm3"),
+                "Li_sp_cap": (Li_specific_capacity_mAh_g, "mAh/g"),
+            },
+            result=cap_r, result_unit="mAh/cm2",
+            assumptions=["Li-metal theoretical capacity 3860 mAh/g; density 0.534 g/cm3"],
+        ),
+        worked_calc(
+            label="Sand's time (time to Li depletion at this current)",
+            formula="sand_time = cap / J",
+            values={"cap": (cap_r, "mAh/cm2"), "J": (J_ma_cm2, "mA/cm2")},
+            result=round(sand_time_hr, 1), result_unit="hr",
+            assumptions=["Sand's time approximation: linear Li consumption at constant current"],
+        ),
+    ]
+
     return {
         "current_density_ma_cm2": J_ma_cm2,
-        "critical_current_density_ma_cm2": round(i_crit_ma_cm2, 3),
+        "critical_current_density_ma_cm2": i_crit_r,
         "dendrite_growth_rate_um_per_hr": round(growth_rate_um_hr, 2),
         "time_to_short_circuit_hr": round(time_to_short_hr, 1) if time_to_short_hr < 999999 else None,
         "safe_operating_window": window,
-        "monroe_newman_threshold_gpa": monroe_newman_threshold,
+        "monroe_newman_threshold_gpa": mn_thresh_r,
         "monroe_newman_pass": mn_pass,
         "sand_time_hr": round(sand_time_hr, 1),
-        "li_capacity_per_area_mAh_cm2": round(cap_per_area_mAh_cm2, 2),
+        "li_capacity_per_area_mAh_cm2": cap_r,
         "separator_modulus_gpa": G_sep_gpa,
         "stack_pressure_mpa": stack_p_mpa,
         "temperature_c": T_c,
-        "modulus_factor": round(modulus_factor, 2),
-        "pressure_factor": round(pressure_factor, 2),
-        "temperature_factor": round(temp_factor, 2),
+        "modulus_factor": mod_f_r,
+        "pressure_factor": pres_f_r,
+        "temperature_factor": temp_f_r,
+        "worked": worked,
     }
 
 

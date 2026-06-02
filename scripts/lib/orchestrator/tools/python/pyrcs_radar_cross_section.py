@@ -53,8 +53,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 C_LIGHT = 2.99792458e8   # m/s
 
@@ -218,6 +222,67 @@ def compute(payload: dict) -> dict:
             r_i = rcs
         response[f"{fg}_GHz"] = round(10 * math.log10(r_i) if r_i > 0 else -1e6, 2)
 
+    # Worked calculations — only the closed-form optical-regime steps are shown;
+    # Mie (sqrt-blend), Rayleigh (k^4 a^6 is arithmetic but regime is
+    # piecewise/branchy), cone (tan^4 is transcendental) are SKIPPED.
+    # Pass live computed values (rcs, lam, ka) as inputs to the dBsm step.
+    lam_r = round(lam, 5)
+    ka_r = round(ka, 3)
+    rcs_r = float(f"{rcs:.4g}")
+    rcs_dbsm_r = round(rcs_dbsm, 3)
+
+    worked = []
+
+    # Wavelength: clean arithmetic
+    worked.append(worked_calc(
+        label="Radar wavelength",
+        formula="lam = C / f",
+        values={"C": (2.998e8, "m/s"), "f": (f_hz, "Hz")},
+        result=lam_r, result_unit="m",
+        assumptions=["speed of light C = 2.998e8 m/s in vacuo"],
+    ))
+
+    # Optical-regime sphere: sigma = pi * a^2 — clean arithmetic
+    if geom == "sphere" and regime == "optical":
+        a = size / 2.0
+        a_r = round(a, 4)
+        worked.append(worked_calc(
+            label="Sphere RCS (optical regime, ka >> 1)",
+            formula="rcs = pi x a^2 x material_R",
+            values={
+                "a": (a_r, "m"),
+                "material_R": (material_R, ""),
+            },
+            result=rcs_r, result_unit="m2",
+            assumptions=["optical limit valid for ka >> 1; ka = " + str(ka_r)],
+        ))
+
+    # Flat-plate optical-regime: sigma = 4*pi*A^2/lam^2 — clean arithmetic
+    elif geom in ("plate", "cube") and regime == "optical":
+        if geom == "plate":
+            W = float(payload.get("width_m", size))
+        else:
+            W = size
+        A = size * W
+        A_r = round(A, 4)
+        worked.append(worked_calc(
+            label="Flat-plate RCS broadside (optical regime)",
+            formula="rcs = 4 x pi x A^2 / lam^2 x material_R",
+            values={
+                "A": (A_r, "m2"),
+                "lam": (lam_r, "m"),
+                "material_R": (material_R, ""),
+            },
+            result=rcs_r, result_unit="m2",
+            assumptions=["normal incidence; optical limit valid for ka >> 1"],
+        ))
+
+    # RCS in dBsm requires log10 which is a transcendental function; a reviewer
+    # cannot re-evaluate it with + - x / ^ alone — entry omitted per worked_calc
+    # rules.  The rcs_dbsm value is still returned in the tool output.
+    # Verification note: rcs_dbsm = 10 * log10(rcs_m2) — use a calculator with
+    # rcs_m2 = {rcs_r} m^2.
+
     out: dict = {
         "object_geometry": geom,
         "characteristic_size_m": size,
@@ -225,13 +290,14 @@ def compute(payload: dict) -> dict:
         "polarisation": polarisation,
         "aspect_angle_deg": aspect_deg,
         "material": material,
-        "wavelength_m": round(lam, 5),
-        "ka_parameter": round(ka, 3),
+        "wavelength_m": lam_r,
+        "ka_parameter": ka_r,
         "regime": regime,
-        "rcs_m2": float(f"{rcs:.4g}"),
-        "rcs_dbsm": round(rcs_dbsm, 3),
+        "rcs_m2": rcs_r,
+        "rcs_dbsm": rcs_dbsm_r,
         "monostatic_rcs_function": "closed-form per geometry per Knott 2004 Tables 14.1-14.4",
         "frequency_response_dbsm": response,
+        "worked": worked,
     }
     return out
 

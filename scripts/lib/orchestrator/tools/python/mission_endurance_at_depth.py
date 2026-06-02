@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -128,22 +132,110 @@ def compute(payload: dict) -> dict:
     # Energy density at vehicle level
     vehicle_energy_density_wh_per_l = energy_wh / vehicle_volume_l
 
+    # Worked calculations for the PDF appendix.
+    # Hoop-stress wall thickness has a max() clamp — SKIP.
+    # Housing surface area + mass involve pi — SKIP.
+    pressure_bar_r = round(pressure_bar, 1)
+    drag_force_r = round(drag_force, 1)
+    propulsion_w_r = round(propulsion_w, 1)
+    total_power_w_r = round(total_power_w, 1)
+    energy_wh_r = round(energy_wh, 0)
+    energy_kwh_r = round(energy_kwh, 2)
+    battery_cap_kwh_r = round(battery_capacity_required_kwh, 2)
+    cell_mass_r = round(cell_mass, 1)
+    pack_mass_r = round(pack_mass, 1)
+    worked = [
+        worked_calc(
+            label="Hydrostatic pressure at depth",
+            formula="P_bar = depth_m / 10 + 1",
+            values={"depth_m": (depth_m, "m")},
+            result=pressure_bar_r, result_unit="bar",
+            assumptions=["1 bar per 10 m seawater + 1 bar atmospheric"],
+        ),
+        worked_calc(
+            label="Drag force on hull",
+            formula="F_drag = 0.5 x rho x Cd x A x V^2",
+            values={
+                "rho": (rho_seawater, "kg/m^3"),
+                "Cd": (drag_coeff_cd, ""),
+                "A": (frontal_area_m2, "m^2"),
+                "V": (cruise_speed_ms, "m/s"),
+            },
+            result=drag_force_r, result_unit="N",
+            assumptions=["seawater density 1025 kg/m^3"],
+        ),
+        worked_calc(
+            label="Propulsion power",
+            formula="P_prop = F_drag x V / eta_prop",
+            values={
+                "F_drag": (drag_force_r, "N"),
+                "V": (cruise_speed_ms, "m/s"),
+                "eta_prop": (eta_prop, ""),
+            },
+            result=propulsion_w_r, result_unit="W",
+            assumptions=["propeller efficiency eta_prop = 0.55 (AUV typical)"],
+        ),
+        worked_calc(
+            label="Total hotel + payload + propulsion power",
+            formula="P_total = P_prop + P_payload + P_hotel",
+            values={
+                "P_prop": (propulsion_w_r, "W"),
+                "P_payload": (payload_w, "W"),
+                "P_hotel": (hotel_w, "W"),
+            },
+            result=total_power_w_r, result_unit="W",
+        ),
+        worked_calc(
+            label="Mission energy required",
+            formula="E_wh = P_total x mission_hours",
+            values={
+                "P_total": (total_power_w_r, "W"),
+                "mission_hours": (mission_hours, "h"),
+            },
+            result=energy_wh_r, result_unit="Wh",
+        ),
+        worked_calc(
+            label="Battery capacity required (accounting for usable SoC)",
+            formula="E_cap = E_kwh / usable_soc",
+            values={
+                "E_kwh": (energy_kwh_r, "kWh"),
+                "usable_soc": (usable_soc, ""),
+            },
+            result=battery_cap_kwh_r, result_unit="kWh",
+            assumptions=["usable SoC = 0.80 (LFP safety margin)"],
+        ),
+        worked_calc(
+            label="Battery cell mass (LFP 150 Wh/kg cell-level)",
+            formula="m_cell = E_cap x 1000 / 150",
+            values={"E_cap": (battery_cap_kwh_r, "kWh")},
+            result=cell_mass_r, result_unit="kg",
+            assumptions=["LFP cell energy density 150 Wh/kg"],
+        ),
+        worked_calc(
+            label="Battery pack mass (15% overhead for packaging)",
+            formula="m_pack = m_cell x 1.15",
+            values={"m_cell": (cell_mass_r, "kg")},
+            result=pack_mass_r, result_unit="kg",
+            assumptions=["pack overhead factor 1.15"],
+        ),
+    ]
+
     return {
         "depth_rating_m": depth_m,
-        "pressure_bar": round(pressure_bar, 1),
+        "pressure_bar": pressure_bar_r,
         "pressure_pa": round(pressure_pa, 0),
         "mission_duration_hours": mission_hours,
         "cruise_speed_ms": cruise_speed_ms,
-        "drag_force_n": round(drag_force, 1),
-        "propulsion_power_w": round(propulsion_w, 1),
+        "drag_force_n": drag_force_r,
+        "propulsion_power_w": propulsion_w_r,
         "payload_power_w": payload_w,
         "hotel_power_w": hotel_w,
-        "total_power_w": round(total_power_w, 1),
-        "energy_required_wh": round(energy_wh, 0),
-        "energy_required_kwh": round(energy_kwh, 2),
-        "battery_capacity_required_kwh": round(battery_capacity_required_kwh, 2),
-        "battery_cell_mass_kg": round(cell_mass, 1),
-        "battery_pack_mass_kg": round(pack_mass, 1),
+        "total_power_w": total_power_w_r,
+        "energy_required_wh": energy_wh_r,
+        "energy_required_kwh": energy_kwh_r,
+        "battery_capacity_required_kwh": battery_cap_kwh_r,
+        "battery_cell_mass_kg": cell_mass_r,
+        "battery_pack_mass_kg": pack_mass_r,
         "battery_pack_volume_l": round(pack_volume_l, 1),
         "pressure_housing_material": housing_material,
         "pressure_housing_thickness_mm": round(t_mm, 1),
@@ -153,6 +245,7 @@ def compute(payload: dict) -> dict:
         "neutral_buoyancy_check": bool(neutral),
         "surplus_payload_capacity_kg": round(surplus_capacity_kg, 1),
         "vehicle_energy_density_wh_per_l": round(vehicle_energy_density_wh_per_l, 1),
+        "worked": worked,
         "notes": (
             "Pressure housing per ASME BPVC + Roark Ch.10. Energy density at "
             "vehicle level (Wh/L) is the critical AUV metric. Pressure-tolerant "

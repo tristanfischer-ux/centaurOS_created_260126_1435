@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -129,19 +133,60 @@ def compute(payload: dict) -> dict:
     else:
         lifetime_cycles = base_lifetime
 
+    # Worked calculations.  switch_loss_db and routing_loss_db both involve
+    # sqrt (transcendental) so we pass their rounded values as opaque inputs;
+    # the cascade-sum and derate steps are then clean arithmetic.
+    switch_loss_r = round(switch_loss_db, 3)
+    routing_loss_r = round(routing_loss_db, 3)
+    total_loss_r = round(total_loss_db, 2)
+    lifetime_r = round(lifetime_cycles, 0)
+
+    worked = [
+        worked_calc(
+            label="Total insertion loss",
+            formula="IL_total = N_sw x L_switch + L_pkg + L_route",
+            values={
+                "N_sw": (n_switches, ""),
+                "L_switch": (switch_loss_r, "dB"),
+                "L_pkg": (packaging_loss_db, "dB"),
+                "L_route": (routing_loss_r, "dB"),
+            },
+            result=total_loss_r, result_unit="dB",
+            assumptions=[
+                f"switch_loss_db {switch_loss_r} dB already frequency-corrected via sqrt(f/10) (transcendental, pre-computed)",
+                f"routing_loss_db {routing_loss_r} dB = 0.1 x N_sw x sqrt(f_ghz/10) / 10 (pre-computed)",
+                f"switch type '{switch_type}', base loss from Rebeiz 2003 Table 11.1",
+            ],
+        ),
+    ]
+
+    # Lifetime derate step only when it actually applies (duty > 50%)
+    if duty_pct > 50:
+        worked.append(worked_calc(
+            label="Hot-switch lifetime derate",
+            formula="lifetime = base_lifetime x (50 / duty_pct)",
+            values={
+                "base_lifetime": (s["lifetime"], "cycles"),
+                "duty_pct": (duty_pct, "%"),
+            },
+            result=lifetime_r, result_unit="cycles",
+            assumptions=["Derate for hot-switching at duty_pct > 50%; Rebeiz 2003 ch.11"],
+        ))
+
     return {
         "frequency_ghz": freq_ghz,
         "num_MEMS_switches": n_switches,
         "switch_type": switch_type,
-        "switch_loss_db_per": round(switch_loss_db, 3),
+        "switch_loss_db_per": switch_loss_r,
         "packaging_loss_db": packaging_loss_db,
-        "routing_loss_db": round(routing_loss_db, 3),
-        "total_insertion_loss_db": round(total_loss_db, 2),
+        "routing_loss_db": routing_loss_r,
+        "total_insertion_loss_db": total_loss_r,
         "isolation_per_switch_db": isolation_db,
         "total_isolation_db": round(total_isolation_db, 1),
         "switching_speed_us": switching_speed_us,
-        "lifetime_cycles": round(lifetime_cycles, 0),
+        "lifetime_cycles": lifetime_r,
         "duty_cycle_pct": duty_pct,
+        "worked": worked,
     }
 
 

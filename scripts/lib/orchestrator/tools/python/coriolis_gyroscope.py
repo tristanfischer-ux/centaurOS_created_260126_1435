@@ -35,8 +35,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -124,6 +128,30 @@ def compute(payload: dict) -> dict:
     else:
         sf_stability_ppm = 100
 
+    # Bandwidth is a clean closed-form: BW = 0.5 * f_d / Q (no transcendentals).
+    # ARW, bias_stability and scale_factor_stability are either sqrt-of-compound,
+    # conditional, or a dict lookup — all skipped.
+    # Round to 5 dp so the worked entry and the output field are consistent.
+    # (round(0.005, 2) = 0.01 due to float representation — different from round(0.005, 5) = 0.005;
+    # using 5 dp for both avoids that 2x contradiction for a PDF reviewer.)
+    bw_raw = bandwidth_hz  # pre-rounding
+    bw_r = round(bandwidth_hz, 5)
+    worked = [
+        worked_calc(
+            label="Closed-loop bandwidth of resonator",
+            formula="BW = 0.5 x f_drive_hz / Q_factor",
+            values={
+                "f_drive_hz": (drive_freq_khz * 1000, "Hz"),
+                "Q_factor": (q_factor, ""),
+            },
+            result=round(bw_raw, 5), result_unit="Hz",
+            assumptions=[
+                "closed-loop readout electronics bandwidth; capped at 1000 Hz by ADC",
+                "factor 0.5 from Lynch (1998) half-bandwidth approximation",
+            ],
+        ),
+    ]
+
     return {
         "resonator_type": resonator,
         "drive_frequency_khz": drive_freq_khz,
@@ -132,8 +160,9 @@ def compute(payload: dict) -> dict:
         "ARW_deg_sqrthr": round(arw_deg_sqrthr, 5),
         "bias_stability_deg_hr": round(bias_stability_deg_hr, 4),
         "scale_factor_stability_ppm": sf_stability_ppm,
-        "bandwidth_hz": round(bandwidth_hz, 2),
+        "bandwidth_hz": bw_r,
         "performance_grade": _classify_grade(bias_stability_deg_hr),
+        "worked": worked,
     }
 
 

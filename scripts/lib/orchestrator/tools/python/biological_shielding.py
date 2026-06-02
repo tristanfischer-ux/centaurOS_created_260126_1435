@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "biological_shielding (custom)",
@@ -127,6 +131,74 @@ def compute(payload: dict) -> dict:
     }.get(material, 250)
     cost_gbp = V_total_m3 * cost_gbp_per_m3
 
+    # --- Worked calculations ---
+    # x_required_m = TVL * log10(atten) — log: SKIP.
+    # x_recommended_m is ceil() of x_required — pass as live input.
+    # actual_attenuation = 10^(x/TVL) — transcendental: pass as live input.
+    unshielded_1m_r = round(unshielded_dose_at_1m_sv_h, 1)
+    dose_dist_r = round(dose_at_distance_usv_h_unshielded, 0)
+    r_outer_r = round(r_outer_m, 3)
+    V_cyl_r = round(V_cyl_m3, 3)
+    V_end_r = round(V_endcap_m3, 3)
+    # Use 3 d.p. so the mass substitution (V_tot_r x rho) evaluates within 1% of
+    # the stated result.  round(124.878, 1) = 124.9; 124.9 x 2350 = 293,515
+    # but round(124.878, 3) = 124.878; 124.878 x 2350 = 293,463 — matches.
+    V_tot_r = round(V_total_m3, 3)
+    mass_kg_r = round(mass_kg, 0)
+
+    worked = [
+        worked_calc(
+            label="Unshielded dose rate at 1 m (empirical scaling)",
+            formula="D_1m = 10 x (P_mwt / 1000)",
+            values={"P_mwt": (P_mwt, "MWth")},
+            result=unshielded_1m_r, result_unit="Sv/h",
+            assumptions=["Empirical: 1 GWth unshielded core ~ 10 Sv/h at 1 m"],
+        ),
+        worked_calc(
+            label="Unshielded dose rate at working distance",
+            formula="D_dist = D_1m x 1e6 / distance^2",
+            values={"D_1m": (unshielded_1m_r, "Sv/h"), "distance": (distance_m, "m")},
+            result=dose_dist_r, result_unit="uSv/h",
+            assumptions=["Inverse-square law; x 1e6 converts Sv/h to uSv/h"],
+        ),
+        worked_calc(
+            label="Shield outer radius",
+            formula="r_outer = r_inner + x_shield",
+            values={"r_inner": (r_inner_m, "m"), "x_shield": (x_recommended_m, "m")},
+            result=r_outer_r, result_unit="m",
+            assumptions=["r_inner = 1 m from core surface (typical)"],
+        ),
+        worked_calc(
+            label="Cylindrical shell volume",
+            formula="V_cyl = pi x (r_outer^2 - r_inner^2) x H",
+            values={"r_outer": (r_outer_r, "m"), "r_inner": (r_inner_m, "m"),
+                    "H": (H_m, "m")},
+            result=V_cyl_r, result_unit="m3",
+            assumptions=["H = 4 m typical core height"],
+        ),
+        worked_calc(
+            label="Endcap volume (top + bottom)",
+            formula="V_endcap = 2 x pi x r_outer^2 x x_shield",
+            values={"r_outer": (r_outer_r, "m"), "x_shield": (x_recommended_m, "m")},
+            result=V_end_r, result_unit="m3",
+            assumptions=["Flat circular endcaps of shield thickness"],
+        ),
+        worked_calc(
+            label="Total shield volume",
+            formula="V_total = V_cyl + V_endcap",
+            values={"V_cyl": (V_cyl_r, "m3"), "V_endcap": (V_end_r, "m3")},
+            result=V_tot_r, result_unit="m3",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Shield mass",
+            formula="m_shield = V_total x rho",
+            values={"V_total": (V_tot_r, "m3"), "rho": (rho_kg_m3, "kg/m3")},
+            result=mass_kg_r, result_unit="kg",
+            assumptions=[f"Material density: {material} {rho_kg_m3} kg/m3"],
+        ),
+    ]
+
     return {
         "reactor_power_mwt": P_mwt,
         "target_dose_usv_h": target_dose_usv_h,
@@ -147,8 +219,9 @@ def compute(payload: dict) -> dict:
         "meets_target": actual_dose_usv_h <= target_dose_usv_h,
         "shield_cost_gbp": round(cost_gbp, 0),
         "shield_density_kg_m3": rho_kg_m3,
-        "icrp_103_public_limit_usv_h": 1.0,  # 1 mSv/yr ÷ 1000 hr ≈ 1 µSv/h
+        "icrp_103_public_limit_usv_h": 1.0,  # 1 mSv/yr / 1000 hr approx 1 uSv/h
         "icrp_103_occupational_limit_usv_h": 10.0,
+        "worked": worked,
     }
 
 

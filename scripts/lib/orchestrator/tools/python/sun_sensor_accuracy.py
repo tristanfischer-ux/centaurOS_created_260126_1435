@@ -33,8 +33,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -105,6 +109,30 @@ def compute(payload: dict) -> dict:
     mass_g = s["mass_g"]
     power_w = s["power_w"]
 
+    # Worked calculations.
+    # adc_resolution_deg = FOV / 2^bits is only valid for digital/fine/QUAD/APS.
+    # total_accuracy_deg uses sqrt-of-sum-of-squares (SKIP: transcendental) — pass
+    # the live computed value as a symbol for the arcsec conversion step.
+    total_acc_r = round(total_accuracy_deg, 5)
+    worked = []
+    if sensor_type in ("digital", "fine", "QUAD", "APS"):
+        adc_r = round(fov_deg / (2 ** bits), 6)
+        worked.append(worked_calc(
+            label="ADC angular resolution",
+            formula="adc_res_deg = FOV_deg / 2^bits",
+            values={"FOV_deg": (fov_deg, "deg"), "bits": (bits, "")},
+            result=adc_r, result_unit="deg",
+            assumptions=["Digital sun sensor: one LSB spans FOV / 2^bits"],
+        ))
+    worked.append(worked_calc(
+        label="Accuracy in arcseconds",
+        formula="accuracy_arcsec = total_accuracy_deg x 3600",
+        values={"total_accuracy_deg": (total_acc_r, "deg")},
+        result=round(accuracy_arcsec, 1), result_unit="arcsec",
+        assumptions=["1 degree = 3600 arcseconds; total_accuracy_deg is RSS of ADC "
+                     "resolution and systematic error (sqrt step not shown — transcendental)"],
+    ))
+
     return {
         "sensor_type": sensor_type,
         "FOV_deg": fov_deg,
@@ -116,6 +144,7 @@ def compute(payload: dict) -> dict:
         "update_rate_hz": update_rate_hz,
         "mass_g": mass_g,
         "power_w": power_w,
+        "worked": worked,
     }
 
 

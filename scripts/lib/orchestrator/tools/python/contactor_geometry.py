@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "contactor_geometry (custom)",
@@ -108,6 +112,69 @@ def compute(payload: dict) -> dict:
     # Footprint = width × bed depth + 50% access aisles
     footprint_m2 = contactor_width_m * bed_depth_m * 1.5
 
+    # Worked calculations — reviewer-verifiable arithmetic steps.
+    co2_r       = float(f"{co2_kg_m3_air:.3e}")
+    target_hr_r = round(target_kg_hr, 2)
+    V_dot_r     = round(V_dot_m3_s, 2)
+    A_r         = round(A_frontal_m2, 1)
+    dp_total_r  = round(dp_total_pa, 1)
+    dp_pack_r   = round(dp_packing_pa, 1)
+    P_fan_r     = round(P_fan_kw, 2)
+
+    worked = [
+        worked_calc(
+            label="CO2 mass concentration in ambient air",
+            formula="co2_kg_m3 = co2_ppm x 1e-6 x RHO_AIR x M_CO2 / M_AIR",
+            values={
+                "co2_ppm":  (co2_ppm,  "ppm"),
+                "RHO_AIR":  (RHO_AIR,  "kg/m3"),
+                "M_CO2":    (M_CO2,    "kg/mol"),
+                "M_AIR":    (M_AIR,    "kg/mol"),
+            },
+            result=co2_r, result_unit="kg CO2/m3 air",
+            assumptions=["RHO_AIR = 1.225 kg/m3 at STP; M_CO2 = 0.044 kg/mol; M_AIR = 0.029 kg/mol."],
+        ),
+        worked_calc(
+            label="Required air volume flow rate",
+            formula="V_dot = target_kg_hr / (3600 x co2_kg_m3 x eta_removal)",
+            values={
+                "target_kg_hr":  (target_hr_r, "kg/hr"),
+                "co2_kg_m3":     (co2_r,       "kg/m3"),
+                "eta_removal":   (eta_removal,  ""),
+            },
+            result=V_dot_r, result_unit="m3/s",
+            assumptions=["eta_removal = 0.5 (50% single-pass removal, typical amine TSA; Keith et al. 2018)."],
+        ),
+        worked_calc(
+            label="Contactor frontal area",
+            formula="A_frontal = V_dot / v_ms",
+            values={
+                "V_dot": (V_dot_r, "m3/s"),
+                "v_ms":  (v_ms,    "m/s"),
+            },
+            result=A_r, result_unit="m2",
+            assumptions=["Uniform face velocity across contactor frontal plane."],
+        ),
+        worked_calc(
+            label="Packing pressure drop",
+            formula="dp_packing = 100 x bed_depth_m",
+            values={"bed_depth_m": (round(bed_depth_m, 2), "m")},
+            result=dp_pack_r, result_unit="Pa",
+            assumptions=["100 Pa/m pressure drop for low-pressure-drop amine monolith packing (industry typical)."],
+        ),
+        worked_calc(
+            label="Fan power",
+            formula="P_fan_kw = V_dot x dp_total / eta_fan / 1000",
+            values={
+                "V_dot":    (V_dot_r,   "m3/s"),
+                "dp_total": (dp_total_r, "Pa"),
+                "eta_fan":  (eta_fan,   ""),
+            },
+            result=P_fan_r, result_unit="kW",
+            assumptions=["eta_fan = 0.65 (axial fan efficiency, industry standard); /1000 converts W to kW."],
+        ),
+    ]
+
     # Air flow rate in standard units
     V_dot_m3_hr = V_dot_m3_s * 3600
     V_dot_cfm = V_dot_m3_s * 2118.88
@@ -137,6 +204,7 @@ def compute(payload: dict) -> dict:
         "pressure_drop_packing_pa": round(dp_packing_pa, 1),
         "fan_energy_kwh_per_ton_co2": round(fan_kwh_per_ton_co2, 0),
         "fan_energy_mwh_per_year": round(fan_kwh_per_year / 1000, 1),
+        "worked": worked,
     }
 
 

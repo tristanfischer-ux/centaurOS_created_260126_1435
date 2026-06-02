@@ -40,8 +40,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -152,6 +156,101 @@ def compute(payload: dict) -> dict:
     total_system_mass_kg = mass_kg + container_mass_kg
     mass_efficiency = total_latent_kj / max(0.001, total_system_mass_kg)
 
+    # Worked calculations — all steps here are clean closed-form arithmetic.
+    mass_kg_r = round(mass_kg, 3)
+    total_kj_r = round(total_latent_kj, 3)
+    event_kj_r = round(energy_event_kj, 3)
+    resp_r = round(response_time_s, 3)
+    solid_r = round(solid_time_s, 2)
+    cont_mass_r = round(container_mass_kg, 4)
+    sys_mass_r = round(total_system_mass_kg, 4)
+    eff_r = round(mass_efficiency, 3)
+    worked = [
+        worked_calc(
+            label="PCM mass",
+            formula="mass_kg = pcm_mass_g / 1000",
+            values={
+                "pcm_mass_g": (mass_g, "g"),
+            },
+            result=mass_kg_r, result_unit="kg",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Total latent energy storage capacity",
+            formula="total_latent_kj = mass_kg x latent_kj_kg",
+            values={
+                "mass_kg": (mass_kg_r, "kg"),
+                "latent_kj_kg": (pcm["latent_kj_kg"], "kJ/kg"),
+            },
+            result=total_kj_r, result_unit="kJ",
+            assumptions=[f"{pcm_name} latent heat from ASHRAE Handbook of Fundamentals Ch.33"],
+        ),
+        worked_calc(
+            label="Energy delivered during peak absorption event",
+            formula="energy_event_kj = q_target_w x duration_s / 1000",
+            values={
+                "q_target_w": (q_target_w, "W"),
+                "duration_s": (duration_min * 60.0, "s"),
+            },
+            result=event_kj_r, result_unit="kJ",
+            assumptions=["constant power during peak; duration_s = peak_duration_minutes x 60"],
+        ),
+        worked_calc(
+            label="Response time to reach melt point (sensible heating)",
+            formula="response_time_s = (mass_kg x cp_solid x 5) x 1000 / q_target_w",
+            values={
+                "mass_kg": (mass_kg_r, "kg"),
+                "cp_solid": (pcm["cp_solid"], "kJ/kg/K"),
+                "q_target_w": (q_target_w, "W"),
+            },
+            result=resp_r, result_unit="s",
+            assumptions=["PCM starts 5 K below melt (trigger threshold); x1000 converts kJ to J"],
+        ),
+        worked_calc(
+            label="Solidification time (1-D Stefan slab approximation)",
+            formula="solid_time_s = (rho x latent_kj_kg x 1000 x L_char_m ^ 2) / (2 x k_eff x dt_freeze_k)",
+            values={
+                "rho": (pcm["rho_kgm3"], "kg/m3"),
+                "latent_kj_kg": (pcm["latent_kj_kg"], "kJ/kg"),
+                "L_char_m": (L_char_m, "m"),
+                "k_eff": (round(k_eff, 4), "W/m/K"),
+                "dt_freeze_k": (dt_freeze_k, "K"),
+            },
+            result=solid_r, result_unit="s",
+            assumptions=["10 mm characteristic slab thickness; 10 K sub-cool; k_eff = k_pcm x container_k_boost"],
+        ),
+        worked_calc(
+            label="Container mass",
+            formula="container_mass_kg = mass_kg x mass_overhead_pct / 100",
+            values={
+                "mass_kg": (mass_kg_r, "kg"),
+                "mass_overhead_pct": (cont["mass_overhead_pct"], "%"),
+            },
+            result=cont_mass_r, result_unit="kg",
+            assumptions=[f"container type: {container}"],
+        ),
+        worked_calc(
+            label="Total system mass (PCM + container)",
+            formula="total_system_mass_kg = mass_kg + container_mass_kg",
+            values={
+                "mass_kg": (mass_kg_r, "kg"),
+                "container_mass_kg": (cont_mass_r, "kg"),
+            },
+            result=sys_mass_r, result_unit="kg",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Mass-specific energy storage efficiency",
+            formula="mass_efficiency_kj_per_kg = total_latent_kj / total_system_mass_kg",
+            values={
+                "total_latent_kj": (total_kj_r, "kJ"),
+                "total_system_mass_kg": (sys_mass_r, "kg"),
+            },
+            result=eff_r, result_unit="kJ/kg",
+            assumptions=["includes container overhead; latent energy only (not sensible)"],
+        ),
+    ]
+
     return {
         "pcm_material": pcm_name,
         "pcm_mass_g": mass_g,
@@ -173,6 +272,7 @@ def compute(payload: dict) -> dict:
         "container_mass_kg": round(container_mass_kg, 4),
         "total_system_mass_kg": round(total_system_mass_kg, 4),
         "mass_efficiency_kj_per_kg": round(mass_efficiency, 3),
+        "worked": worked,
     }
 
 

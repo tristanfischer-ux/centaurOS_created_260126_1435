@@ -52,8 +52,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -167,6 +171,55 @@ def compute(payload: dict) -> dict:
         ebno_at_bw_db = -float("inf")
     link_margin_db = ebno_at_bw_db - required_ebno_db
 
+    # Rounded display values that chain through the worked calculations.
+    eirp_r = round(eirp_dbw, 3)
+    rx_power_r = round(rx_power_dbw, 3)
+    link_margin_r = round(link_margin_db, 3) if link_margin_db != -float("inf") else None
+
+    # Worked calculations (hand-checkable dB arithmetic only).
+    # tx_power_dbw uses log10 — SKIP.
+    # fspl_db uses log10 — SKIP.
+    # cn0 uses log10(T_sys) — SKIP.
+    # data_rate_power_limited uses 10^x — SKIP.
+    worked = [
+        worked_calc(
+            label="Effective isotropic radiated power (EIRP)",
+            formula="EIRP = tx_dbw + G_tx - L_tx_point",
+            values={
+                "tx_dbw": (round(tx_power_dbw, 3), "dBW"),
+                "G_tx": (tx_gain_dbi, "dBi"),
+                "L_tx_point": (tx_point_loss_db, "dB"),
+            },
+            result=eirp_r, result_unit="dBW",
+            assumptions=["EIRP = transmitter power + antenna gain − pointing loss"],
+        ),
+        worked_calc(
+            label="Received power at antenna port",
+            formula="P_rx = EIRP - FSPL - L_atm - L_pol - L_rx_point + G_rx",
+            values={
+                "EIRP": (eirp_r, "dBW"),
+                "FSPL": (round(fspl_db, 3), "dB"),
+                "L_atm": (l_atm_db, "dB"),
+                "L_pol": (l_pol_db, "dB"),
+                "L_rx_point": (rx_point_loss_db, "dB"),
+                "G_rx": (rx_gain_dbi, "dBi"),
+            },
+            result=rx_power_r, result_unit="dBW",
+            assumptions=["Friis free-space transmission equation; atmospheric + polarisation losses"],
+        ),
+        worked_calc(
+            label="Link margin at design bandwidth",
+            formula="margin = Eb_N0_at_bw - required_EbN0",
+            values={
+                "Eb_N0_at_bw": (round(ebno_at_bw_db, 3) if ebno_at_bw_db != -float("inf") else 0.0, "dB"),
+                "required_EbN0": (required_ebno_db, "dB"),
+            },
+            result=link_margin_r if link_margin_r is not None else 0.0,
+            result_unit="dB",
+            assumptions=["positive margin = link closes at design data rate"],
+        ),
+    ]
+
     return {
         "tx_power_w": tx_power_w,
         "tx_power_dbw": round(tx_power_dbw, 3),
@@ -191,10 +244,11 @@ def compute(payload: dict) -> dict:
         "implementation_loss_db": impl_loss_db,
         "ebno_db": round(ebno_db, 3) if ebno_db != -float("inf") else None,
         "ebno_at_design_bw_db": round(ebno_at_bw_db, 3) if ebno_at_bw_db != -float("inf") else None,
-        "link_margin_db": round(link_margin_db, 3) if link_margin_db != -float("inf") else None,
+        "link_margin_db": link_margin_r,
         "data_rate_bps_supported": int(round(data_rate_bps)),
         "data_rate_bps_bandwidth_limited": int(round(data_rate_bps_bandwidth_limited)),
         "data_rate_bps_power_limited": int(round(data_rate_power_limited)),
+        "worked": worked,
     }
 
 

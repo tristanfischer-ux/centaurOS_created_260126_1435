@@ -53,8 +53,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "Radioisotope decay (textbook + NIST data)",
@@ -158,6 +162,83 @@ def compute(payload: dict) -> dict:
     # Fuel volume
     fuel_vol_cm3 = fuel_g / data["fuel_form_density_g_cm3"]
 
+    # Worked calculations — closed-form steps only.
+    # Decay constant uses ln(2) — pass T_half and note the ln(2) constant.
+    # EOL thermal power uses exp() — transcendental, skip; pass P_eol as live input.
+    # TE EOL efficiency degradation is a linear multiplication — convertible.
+    P0_thermal_r = round(P0_thermal, 1)
+    P0_thermal_net_r = round(P0_thermal_net, 1)
+    P0_electrical_r = round(P0_electrical, 2)
+    te_eff_eol_r = round(te_eff_eol, 4)
+    P_eol_thermal_r = round(P_eol_thermal, 1)
+    P_eol_electrical_r = round(P_eol_electrical, 2)
+    fuel_vol_r = round(fuel_vol_cm3, 2)
+
+    worked = [
+        worked_calc(
+            label="Initial gross thermal power",
+            formula="P0_thermal = specific_power x fuel_g",
+            values={
+                "specific_power": (data["specific_power_w_per_g"], "W/g"),
+                "fuel_g": (fuel_g, "g"),
+            },
+            result=P0_thermal_r, result_unit="W",
+            assumptions=[f"specific power for {iso} from GPHS-RTG/MMRTG flight data (NNDC ENSDF 2024)"],
+        ),
+        worked_calc(
+            label="Net initial thermal power (after encapsulation losses)",
+            formula="P0_thermal_net = P0_thermal x (1 - encap_loss_pct / 100)",
+            values={
+                "P0_thermal": (P0_thermal_r, "W"),
+                "encap_loss_pct": (encap_loss_pct, "%"),
+            },
+            result=P0_thermal_net_r, result_unit="W",
+            assumptions=["encapsulation loss accounts for housing conduction, radiation losses"],
+        ),
+        # EOL thermal uses exp(-lambda*t) — transcendental; pass P_eol as live input.
+        worked_calc(
+            label="Thermoelectric efficiency at end-of-life",
+            formula="te_eff_eol = te_eff x (1 - te_deg_per_yr x mission_yr)",
+            values={
+                "te_eff": (te_eff, ""),
+                "te_deg_per_yr": (0.006, "1/yr"),
+                "mission_yr": (mission_yr, "yr"),
+            },
+            result=te_eff_eol_r, result_unit="",
+            assumptions=["SiGe RTG thermoelectric degradation ~0.6%/yr (NASA MMRTG flight data)"],
+        ),
+        worked_calc(
+            label="Electrical power at beginning-of-life",
+            formula="P0_electrical = P0_thermal_net x te_eff",
+            values={
+                "P0_thermal_net": (P0_thermal_net_r, "W"),
+                "te_eff": (te_eff, ""),
+            },
+            result=P0_electrical_r, result_unit="W",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Electrical power at end-of-life",
+            formula="P_eol_electrical = P_eol_thermal x te_eff_eol",
+            values={
+                "P_eol_thermal": (P_eol_thermal_r, "W"),
+                "te_eff_eol": (te_eff_eol_r, ""),
+            },
+            result=P_eol_electrical_r, result_unit="W",
+            assumptions=["P_eol_thermal from exponential decay law (exp term not shown — transcendental)"],
+        ),
+        worked_calc(
+            label="Fuel volume",
+            formula="fuel_vol_cm3 = fuel_g / fuel_density",
+            values={
+                "fuel_g": (fuel_g, "g"),
+                "fuel_density": (data["fuel_form_density_g_cm3"], "g/cm3"),
+            },
+            result=fuel_vol_r, result_unit="cm3",
+            assumptions=[f"{iso} fuel-form density {data['fuel_form_density_g_cm3']} g/cm3 (PuO2 / AmO2 / SrTiO3 / Po-metal / CmO2 per isotope)"],
+        ),
+    ]
+
     out: dict = {
         "isotope": iso,
         "fuel_mass_g": fuel_g,
@@ -178,6 +259,7 @@ def compute(payload: dict) -> dict:
         "primary_decay_mode": data["primary_decay"],
         "alpha_q_mev": data["q_mev"],
         "power_fade_pct_over_mission": round((1 - P_eol_thermal / P0_thermal_net) * 100, 2),
+        "worked": worked,
     }
     return out
 

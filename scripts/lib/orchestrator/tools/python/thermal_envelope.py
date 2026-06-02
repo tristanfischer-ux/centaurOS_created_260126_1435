@@ -43,8 +43,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -193,6 +197,79 @@ def compute(payload: dict) -> dict:
     # Cost / complexity ranking
     complexity_score = {"none": 1, "passive_finned": 2, "active_fan": 3, "liquid": 5}[heatsink_type]
 
+    # Worked calculations.
+    # enclosure_rise_k uses (tdp_w/10)^0.6 — fractional exponent, SKIP; pass the
+    # live result as a symbol into the downstream steps.
+    # r_sa for active_fan is a direct table lookup; for passive it is
+    # r_sa_natural / ventilation_factor (clean).  Pass the live r_sa value as a
+    # symbol in all cases so every subsequent step is verifiable.
+    int_amb_r = round(internal_ambient_c, 2)
+    r_sa_r = round(r_sa, 3)
+    r_total_r = round(r_total, 3)
+    temp_rise_r = round(temp_rise_k, 2)
+    junc_r = round(junction_temp_c, 2)
+    case_r = round(case_temp_c, 2)
+    sink_r = round(sink_temp_c, 2)
+    worked = []
+    if not hs["needs_fan"]:
+        # r_sa = r_sa_natural / ventilation_factor — clean division
+        worked.append(worked_calc(
+            label="Effective sink-to-ambient resistance (passive)",
+            formula="r_sa = r_sa_natural / ventilation_factor",
+            values={"r_sa_natural": (hs["r_sa_natural_k_w"], "K/W"),
+                    "ventilation_factor": (enc["ventilation_factor"], "")},
+            result=r_sa_r, result_unit="K/W",
+            assumptions=["Sealed/restricted enclosures reduce natural convection; "
+                         "ventilation_factor from ENCLOSURE_SPECS table"],
+        ))
+    worked += [
+        worked_calc(
+            label="Total thermal resistance",
+            formula="r_total = r_jc + r_cs + r_sa",
+            values={"r_jc": (r_jc, "K/W"), "r_cs": (r_cs, "K/W"), "r_sa": (r_sa_r, "K/W")},
+            result=r_total_r, result_unit="K/W",
+            assumptions=["Series resistance ladder: junction-to-case + case-to-sink + sink-to-ambient"],
+        ),
+        worked_calc(
+            label="Temperature rise across thermal resistance",
+            formula="temp_rise = tdp_w x r_total",
+            values={"tdp_w": (tdp_w, "W"), "r_total": (r_total_r, "K/W")},
+            result=temp_rise_r, result_unit="K",
+            assumptions=["Fourier conduction: Q = Delta_T / R  =>  Delta_T = Q x R"],
+        ),
+        worked_calc(
+            label="Junction temperature",
+            formula="T_j = T_internal_amb + temp_rise",
+            values={"T_internal_amb": (int_amb_r, "degC"), "temp_rise": (temp_rise_r, "K")},
+            result=junc_r, result_unit="degC",
+            assumptions=["T_internal_amb includes enclosure ambient rise "
+                         "(computed via (tdp/10)^0.6 scaling — not shown, transcendental)"],
+        ),
+        worked_calc(
+            label="Case temperature",
+            formula="T_case = T_internal_amb + tdp_w x (r_cs + r_sa)",
+            values={"T_internal_amb": (int_amb_r, "degC"), "tdp_w": (tdp_w, "W"),
+                    "r_cs": (r_cs, "K/W"), "r_sa": (r_sa_r, "K/W")},
+            result=case_r, result_unit="degC",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Heatsink surface temperature",
+            formula="T_sink = T_internal_amb + tdp_w x r_sa",
+            values={"T_internal_amb": (int_amb_r, "degC"), "tdp_w": (tdp_w, "W"),
+                    "r_sa": (r_sa_r, "K/W")},
+            result=sink_r, result_unit="degC",
+            assumptions=[],
+        ),
+        worked_calc(
+            label="Junction temperature margin",
+            formula="T_margin = T_j_max - T_j",
+            values={"T_j_max": (max_junction_c, "degC"), "T_j": (junc_r, "degC")},
+            result=round(junction_margin_c, 2), result_unit="K",
+            assumptions=["Positive margin = headroom before Tj_max"],
+        ),
+    ]
+
     return {
         "tdp_w": tdp_w,
         "ambient_c_outside": ambient_c,
@@ -213,6 +290,7 @@ def compute(payload: dict) -> dict:
         "required_airflow_cfm": round(required_airflow_cfm, 2),
         "heatsink_complexity_score": complexity_score,
         "feasibility": "OK" if throttle_risk in ("safe", "marginal") else "NEEDS_UPGRADE",
+        "worked": worked,
         "_meta": {
             "model": "Series thermal resistance (R_jc + R_cs + R_sa) + enclosure ambient rise",
             "references": [

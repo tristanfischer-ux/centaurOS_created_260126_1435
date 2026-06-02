@@ -43,8 +43,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -140,6 +144,51 @@ def compute(payload: dict) -> dict:
     cad_pit_cost = 2000                      # inspection pits + connection plates
     total_install = rod_cost + bonding_cost + air_term_cost + cad_pit_cost
 
+    # Worked calculations.
+    # R_single uses ln() (Dwight formula, transcendental) — skipped; passed as
+    # live input to R_combined which is then clean arithmetic.
+    R_single_r = round(R_single, 2)
+    R_combined_r = round(R_combined, 2)
+    perimeter_r = round(perimeter, 1)
+    step_r = round(step_voltage_at_1m_kv, 2)
+    worked = [
+        worked_calc(
+            label="Combined earth resistance (N rods, mutual coupling)",
+            formula="R_combined = (R_single / N) x (1 + K / N)",
+            values={
+                "R_single": (R_single_r, "ohm"),
+                "N": (rod_count, ""),
+                "K": (0.6, ""),
+            },
+            result=R_combined_r, result_unit="ohm",
+            assumptions=[
+                "R_single computed by Dwight formula (BS 7430 Annex B); contains ln() — not shown",
+                "K = 0.6 mutual coupling factor (rods spaced > 2 x rod length)",
+            ],
+        ),
+        worked_calc(
+            label="Container perimeter (for down-conductor count)",
+            formula="perimeter = 2 x (L + W)",
+            values={"L": (L_container, "m"), "W": (W_container, "m")},
+            result=perimeter_r, result_unit="m",
+            assumptions=["Rectangular container footprint"],
+        ),
+        worked_calc(
+            label="Step voltage at 1 m (peak lightning current)",
+            formula="V_step_kV = rho x I_peak_kA / (2 x pi x 1) / 1000",
+            values={
+                "rho": (rho, "ohm.m"),
+                "I_peak_kA": (peak_current_ka, "kA"),
+            },
+            result=step_r, result_unit="kV",
+            assumptions=[
+                "Simplified step-potential formula at 1 m from earth electrode",
+                "IEC 62305-3 Table 7 peak current for the selected LPL",
+                "rho [ohm.m] x I_kA treated as V; / 1000 converts to kV",
+            ],
+        ),
+    ]
+
     return {
         "ground_resistance_ohm": round(R_combined, 2),
         "single_rod_resistance_ohm": round(R_single, 2),
@@ -163,6 +212,7 @@ def compute(payload: dict) -> dict:
         "rod_diameter_mm": rod_diameter_mm,
         "estimated_installed_cost_gbp": round(total_install),
         "compliance_iec_62305": (R_combined <= 10.0),
+        "worked": worked,
         "notes": (
             "Earth resistance per Dwight formula (BS 7430 Annex B). "
             "Multi-rod uses 0.6 mutual coupling factor (rods spaced > 2L). "

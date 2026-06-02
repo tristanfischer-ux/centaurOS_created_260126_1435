@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -145,24 +149,98 @@ def compute(payload: dict) -> dict:
     feasible = (control_bw_hz_achievable >= control_bw_hz_required and
                 capture_window_s > 0.5)  # need at least 0.5 s window
 
+    # Worked calculations — transcendental intermediates (radians, sqrt)
+    # are passed as opaque inputs; only the clean arithmetic steps are shown.
+    capture_window_r = round(capture_window_s, 2) if capture_window_s != float("inf") else None
+    m_payload_r = round(m_payload_kg, 1)
+    tau_i_r = round(tau_base_inertia, 1)
+    tau_f_r = round(tau_friction_total, 2)
+    tau_d_r = round(tau_dynamics, 2)
+    tau_total_r = round(tau_total, 1)
+
+    worked = []
+
+    if capture_window_r is not None:
+        worked.append(worked_calc(
+            label="Capture window",
+            formula="t_capture = (align_mm / 1000) / v_rel",
+            values={
+                "align_mm": (alignment_mm, "mm"),
+                "v_rel": (v_rel, "m/s"),
+            },
+            result=capture_window_r, result_unit="s",
+            assumptions=[
+                f"Alignment tolerance for '{target}' interface from Nokin 2010 ATV CAM data",
+            ],
+        ))
+
+    worked.append(worked_calc(
+        label="Estimated payload mass (from inertia)",
+        formula="m_payload = 2 x I_payload / reach^2",
+        values={
+            "I_payload": (payload_inertia, "kg.m^2"),
+            "reach": (reach_m, "m"),
+        },
+        result=m_payload_r, result_unit="kg",
+        assumptions=["Thin-rod approximation: I = m*L^2/2 => m = 2*I/L^2"],
+    ))
+
+    worked.append(worked_calc(
+        label="Arm structural mass",
+        formula="m_arm = dof x mass_per_dof",
+        values={
+            "dof": (dof, ""),
+            "mass_per_dof": (ARM_MASS_PER_DOF_KG, "kg/DOF"),
+        },
+        result=round(arm_mass_kg, 1), result_unit="kg",
+        assumptions=["30 kg/DOF from Canadarm2 + ERA + JEMRMS public data (Flores-Abad 2014)"],
+    ))
+
+    worked.append(worked_calc(
+        label="Total base-joint torque",
+        formula="tau_total = tau_inertia + tau_friction + tau_dynamics",
+        values={
+            "tau_inertia": (tau_i_r, "N.m"),
+            "tau_friction": (tau_f_r, "N.m"),
+            "tau_dynamics": (tau_d_r, "N.m"),
+        },
+        result=tau_total_r, result_unit="N.m",
+        assumptions=[
+            "tau_inertia = I_payload x alpha (alpha from omega_max / capture_window — transcendental, passed as input)",
+            "tau_friction = friction_per_joint x dof",
+            "tau_dynamics = m_payload x reach x omega_max^2 (centripetal)",
+        ],
+    ))
+
+    worked.append(worked_calc(
+        label="Required motor torque (with safety factor)",
+        formula="tau_motor = tau_total x 1.5",
+        values={
+            "tau_total": (tau_total_r, "N.m"),
+        },
+        result=round(required_motor_torque_nm, 1), result_unit="N.m",
+        assumptions=["1.5x safety factor for contact dynamics at capture (Yoshida & Wilcox 2008)"],
+    ))
+
     return {
         "arm_reach_m": reach_m,
         "arm_dof": dof,
         "payload_inertia_kgm2": payload_inertia,
-        "estimated_payload_mass_kg": round(m_payload_kg, 1),
+        "estimated_payload_mass_kg": m_payload_r,
         "target_grapple_point_type": target,
         "alignment_tolerance_mm": alignment_mm,
         "target_velocity_at_grapple_m_s": v_rel,
-        "capture_window_seconds": round(capture_window_s, 2) if capture_window_s != float("inf") else None,
+        "capture_window_seconds": capture_window_r,
         "required_motor_torque_nm": round(required_motor_torque_nm, 1),
-        "tau_inertial_component_nm": round(tau_base_inertia, 1),
-        "tau_friction_component_nm": round(tau_friction_total, 2),
-        "tau_dynamics_component_nm": round(tau_dynamics, 2),
+        "tau_inertial_component_nm": tau_i_r,
+        "tau_friction_component_nm": tau_f_r,
+        "tau_dynamics_component_nm": tau_d_r,
         "arm_mass_kg": round(arm_mass_kg, 1),
         "max_joint_speed_deg_s": max_joint_speed_deg_s,
         "control_bandwidth_hz_required": round(control_bw_hz_required, 1),
         "control_bandwidth_hz_achievable": round(control_bw_hz_achievable, 1),
         "feasible": feasible,
+        "worked": worked,
     }
 
 

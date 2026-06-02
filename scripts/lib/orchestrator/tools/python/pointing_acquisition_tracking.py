@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -167,6 +171,99 @@ def compute(payload: dict) -> dict:
     # Lateral miss on receiver due to pointing error
     lateral_miss_m = target_arcsec * (math.pi / 180.0) / 3600.0 * link_km * 1000.0
 
+    # Worked calculations — closed-form arithmetic steps only.
+    # required_bw_hz involves sqrt(ratio^2 - 1) — transcendental, skipped.
+    # residual_jitter involves sqrt(1 + ...) — skipped; passed as rounded input.
+    beam_div_arcsec_r = round(beam_div_arcsec, 3)
+    fine_fov_r = round(fine_fov_arcsec, 3)
+    coarse_handoff_r = round(coarse_handoff_arcsec, 3)
+    fine_steer_arcsec_r = round(fine_steering_arcsec, 4)
+    fine_steer_urad_r = round(fine_steering_urad, 4)
+    lateral_miss_r = round(lateral_miss_m, 3)
+    step_r = round(step_arcsec, 3)
+    n_steps_r = round(n_steps, 1)
+    acq_time_r = round(acquisition_time_s, 3)
+
+    # arc-second to radian conversion constant
+    ARCSEC_TO_RAD = math.pi / 180.0 / 3600.0
+
+    worked = [
+        worked_calc(
+            label="Beam divergence converted to arcseconds",
+            formula="beam_div_arcsec = beam_div_mrad x 1e-3 x (180 / pi) x 3600",
+            values={"beam_div_mrad": (beam_div_mrad, "mrad")},
+            result=beam_div_arcsec_r, result_unit="arcsec",
+            assumptions=["1 mrad = 1e-3 rad; 1 rad = (180/pi) deg = 206,265 arcsec"],
+        ),
+        worked_calc(
+            label="Fine-sensor field of view (must cover residual after coarse acquisition)",
+            formula="fine_FOV = 4 x beam_div_arcsec",
+            values={"beam_div_arcsec": (beam_div_arcsec_r, "arcsec")},
+            result=fine_fov_r, result_unit="arcsec",
+            assumptions=[
+                "Fine sensor FOV = 4 x beam divergence (rule of thumb: Chen & Gardner 1989)",
+                "Minimum 10 arcsec floor applied if result is smaller",
+            ],
+        ),
+        worked_calc(
+            label="Coarse-to-fine handoff threshold",
+            formula="coarse_handoff = fine_FOV / 4",
+            values={"fine_FOV": (fine_fov_r, "arcsec")},
+            result=coarse_handoff_r, result_unit="arcsec",
+            assumptions=["Handoff at quarter of fine-sensor FOV to ensure overlap margin"],
+        ),
+        worked_calc(
+            label="Required fine-steering resolution",
+            formula="fine_steer_arcsec = target_arcsec / 4",
+            values={"target_arcsec": (target_arcsec, "arcsec")},
+            result=fine_steer_arcsec_r, result_unit="arcsec",
+            assumptions=["Fine-steering resolution <= target/2; factor 4 gives comfortable margin"],
+        ),
+        worked_calc(
+            label="Fine-steering resolution in microradians",
+            formula="fine_steer_urad = fine_steer_arcsec x (pi / 180 / 3600) x 1e6",
+            values={"fine_steer_arcsec": (fine_steer_arcsec_r, "arcsec")},
+            result=fine_steer_urad_r, result_unit="urad",
+            assumptions=["arcsec x pi/180/3600 converts to radians; x 1e6 converts to microradians"],
+        ),
+        worked_calc(
+            label="Number of acquisition spiral steps",
+            formula="n_steps = (acq_unc_arcsec / step_arcsec) ^ 2",
+            values={
+                "acq_unc_arcsec": (acq_unc_arcsec, "arcsec"),
+                "step_arcsec": (step_r, "arcsec"),
+            },
+            result=n_steps_r, result_unit="steps",
+            assumptions=[
+                "Archimedean spiral: area_unc / area_step = (sigma_unc/step)^2",
+                f"step_arcsec = fine_FOV / 4 = {step_r} arcsec",
+            ],
+        ),
+        worked_calc(
+            label="Acquisition time",
+            formula="t_acq = n_steps x scan_dwell_s",
+            values={
+                "n_steps": (n_steps_r, ""),
+                "scan_dwell_s": (round(scan_dwell_time_s, 6), "s"),
+            },
+            result=acq_time_r, result_unit="s",
+            assumptions=[f"scan_dwell_s = 5 / sensor_rate_hz = 5 / {sensor_rate_hz} s (5 samples per dwell position)"],
+        ),
+        worked_calc(
+            label="Lateral miss distance at receiver",
+            formula="lateral_miss_m = target_arcsec x (pi / 180 / 3600) x link_km x 1000",
+            values={
+                "target_arcsec": (target_arcsec, "arcsec"),
+                "link_km": (link_km, "km"),
+            },
+            result=lateral_miss_r, result_unit="m",
+            assumptions=[
+                "Small-angle approximation: miss = angle_rad x range",
+                "arcsec x pi/180/3600 = angle in radians; x link_km x 1000 converts km to m",
+            ],
+        ),
+    ]
+
     return {
         "target_pointing_arcsec_rms": target_arcsec,
         "satellite_jitter_arcsec_rms": jitter_arcsec,
@@ -190,6 +287,7 @@ def compute(payload: dict) -> dict:
         "pointing_budget_met": pointing_margin_arcsec >= 0,
         "lateral_miss_distance_m": round(lateral_miss_m, 2),
         "disturbance_peak_hz": f_dist_hz,
+        "worked": worked,
     }
 
 

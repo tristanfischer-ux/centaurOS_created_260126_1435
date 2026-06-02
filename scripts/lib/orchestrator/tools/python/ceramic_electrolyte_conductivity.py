@@ -38,8 +38,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "ceramic_electrolyte_conductivity (custom)",
@@ -103,6 +107,53 @@ def compute(payload: dict) -> dict:
     thickness_cm = thickness_um * 1e-4
     ASR_ohm_cm2 = thickness_cm / max(1e-30, sigma_eff)
 
+    # Worked calculations — reviewer-verifiable steps only.
+    # sigma_bulk and sigma_gb each use exp() (Arrhenius) so they are SKIPPED;
+    # their live values are passed as input symbols to subsequent clean steps.
+    sigma_bulk_r = float(f"{sigma_bulk:.3e}")
+    sigma_gb_r   = float(f"{sigma_gb:.3e}")
+    Ea_apparent_r = round(Ea_apparent, 3)
+    ASR_r = round(ASR_ohm_cm2, 2)
+    sigma_eff_r = float(f"{sigma_eff:.3e}")
+
+    worked = [
+        worked_calc(
+            label="Effective ionic conductivity (series grain-boundary mix)",
+            formula="sigma_eff = 1 / ((1 - f_gb) / sigma_bulk + f_gb / sigma_gb)",
+            values={
+                "f_gb":       (f_gb,       ""),
+                "sigma_bulk": (sigma_bulk_r, "S/cm"),
+                "sigma_gb":   (sigma_gb_r,  "S/cm"),
+            },
+            result=sigma_eff_r, result_unit="S/cm",
+            assumptions=[
+                "Series grain-boundary mixing (Knauth 2009 §3.2): bulk and GB in series proportion.",
+                "sigma_bulk and sigma_gb computed via Arrhenius (transcendental — not re-shown here).",
+            ],
+        ),
+        worked_calc(
+            label="Apparent (weighted) activation energy",
+            formula="Ea_apparent = Ea_bulk x (1 - f_gb) + Ea_gb x f_gb",
+            values={
+                "Ea_bulk": (Ea_bulk, "eV"),
+                "Ea_gb":   (Ea_gb,  "eV"),
+                "f_gb":    (f_gb,   ""),
+            },
+            result=Ea_apparent_r, result_unit="eV",
+            assumptions=["Linear weighted average of bulk and grain-boundary activation energies."],
+        ),
+        worked_calc(
+            label="Area-specific resistance (ASR) at 100 um thickness",
+            formula="ASR = thickness_cm / sigma_eff",
+            values={
+                "thickness_cm": (thickness_cm, "cm"),
+                "sigma_eff":    (sigma_eff_r,  "S/cm"),
+            },
+            result=ASR_r, result_unit="ohm_cm2",
+            assumptions=["Thickness = 100 um = 1e-4 cm (typical solid-electrolyte film)."],
+        ),
+    ]
+
     return {
         "material": material,
         "temperature_c": T_c,
@@ -117,6 +168,7 @@ def compute(payload: dict) -> dict:
         "ASR_at_100um_ohm_cm2": round(ASR_ohm_cm2, 2),
         "conductivity_pre_exponent_bulk_s_cm": sigma0_bulk,
         "competitive_with_liquid_electrolyte": sigma_eff > 1e-3,
+        "worked": worked,
     }
 
 

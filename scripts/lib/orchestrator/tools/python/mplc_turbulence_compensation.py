@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -176,22 +180,79 @@ def compute(payload: dict) -> dict:
         # Solve asymptotic: 0.2944 * N^(-0.866) = target -> N = (0.2944/target)^(1/0.866)
         n_required = int(round((0.2944 / target_coeff) ** (1.0 / 0.866))) if target_coeff > 0 else 1000
 
+    # Worked calculations for the PDF appendix.
+    # strehl values use exp() — transcendental — SKIP; passed as live inputs.
+    # fade_reduction_db uses log10 — transcendental — SKIP; passed as live input.
+    # Noll variance steps and net_gain_db are arithmetic and CONVERT.
+    sigma_uncorr_r = round(sigma_phi2_uncorr, 4)
+    sigma_corr_r = round(sigma_phi2_corr, 5)
+    c_uncorr_r = round(c_uncorr, 4)
+    c_resid_r = round(c_resid, 5)
+    d_r53 = round(d_over_r0 ** (5.0 / 3.0), 4)
+    fade_db_r = round(fade_reduction_db, 2)
+    net_gain_r = round(net_gain_db, 2)
+    strehl_uncorr_r = round(strehl_uncorr, 4)
+    strehl_corr_r = round(strehl_corr, 4)
+    worked = [
+        worked_calc(
+            label="Uncorrected wavefront variance (Noll 1976)",
+            formula="sigma_phi2_uncorr = c_uncorr x D_r53",
+            values={
+                "c_uncorr": (c_uncorr_r, ""),
+                "D_r53": (d_r53, ""),
+            },
+            result=sigma_uncorr_r, result_unit="rad^2",
+            assumptions=[
+                f"c_uncorr = Noll coefficient for 1-mode (piston only) = {c_uncorr_r}",
+                f"D_r53 = (D/r0)^(5/3) = {d_r53} for D/r0 = {d_over_r0} (precomputed)",
+            ],
+        ),
+        worked_calc(
+            label="Residual wavefront variance after N-mode MPLC correction",
+            formula="sigma_phi2_corr = c_resid x D_r53",
+            values={
+                "c_resid": (c_resid_r, ""),
+                "D_r53": (d_r53, ""),
+            },
+            result=sigma_corr_r, result_unit="rad^2",
+            assumptions=[
+                f"c_resid = Noll residual coefficient for {num_modes} modes = {c_resid_r}",
+                f"D_r53 = (D/r0)^(5/3) = {d_r53} (same as uncorrected)",
+            ],
+        ),
+        worked_calc(
+            label="Net link improvement after subtracting MPLC insertion loss",
+            formula="net_gain_db = fade_reduction_db - MPLC_insertion_loss_db",
+            values={
+                "fade_reduction_db": (fade_db_r, "dB"),
+                "MPLC_insertion_loss_db": (MPLC_INSERTION_LOSS_DB, "dB"),
+            },
+            result=net_gain_r, result_unit="dB",
+            assumptions=[
+                "fade_reduction_db = 10 x log10(strehl_corr / strehl_uncorr) (transcendental, not shown)",
+                f"strehl_uncorr = exp(-sigma_phi2_uncorr) = {strehl_uncorr_r}",
+                f"strehl_corr = exp(-sigma_phi2_corr) = {strehl_corr_r}",
+            ],
+        ),
+    ]
+
     return {
         "D_over_r0": d_over_r0,
         "num_modes": num_modes,
         "wavelength_nm": wavelength_nm,
         "aperture_mm": aperture_mm,
         "elevation_angle_deg": elevation_deg,
-        "wavefront_variance_uncorrected_rad2": round(sigma_phi2_uncorr, 4),
-        "wavefront_variance_corrected_rad2": round(sigma_phi2_corr, 5),
-        "strehl_ratio_uncorrected": round(strehl_uncorr, 4),
-        "strehl_ratio_corrected": round(strehl_corr, 4),
-        "fade_reduction_db": round(fade_reduction_db, 2),
+        "wavefront_variance_uncorrected_rad2": sigma_uncorr_r,
+        "wavefront_variance_corrected_rad2": sigma_corr_r,
+        "strehl_ratio_uncorrected": strehl_uncorr_r,
+        "strehl_ratio_corrected": strehl_corr_r,
+        "fade_reduction_db": fade_db_r,
         "mplc_insertion_loss_db": MPLC_INSERTION_LOSS_DB,
-        "net_link_improvement_db": round(net_gain_db, 2),
+        "net_link_improvement_db": net_gain_r,
         "coupling_efficiency_to_smf": round(coupling_efficiency, 4),
         "modes_required_for_strehl_0p8": n_required,
-        "noll_residual_coeff_used": round(c_resid, 5),
+        "noll_residual_coeff_used": c_resid_r,
+        "worked": worked,
     }
 
 
