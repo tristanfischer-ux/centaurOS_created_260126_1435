@@ -178,23 +178,39 @@ export function buildAuditDigest(state: any, productClass: string): AuditDigest 
       price: coalescePrice(p),
     }))
     const withPrice = priced.filter(p => p.price != null)
+    // Big-ticket items are priced by dimension-based MACROS in the renderer (vessel
+    // £50k, etc.) and that override is NOT written back to partVerifications — those
+    // keep the PRE-MACRO Engine-B estimate (often £0). So a £0 here is usually a
+    // pre-macro placeholder for an item the rendered PDF actually prices via a macro.
+    // Surface the macros so the judge sees the £50k vessel, not a phantom £0. (Bug
+    // found 2026-06-02: the audit reported bioreactor £47.9k when the PDF renders £199k.)
+    const macros: any[] = Array.isArray(state?.engineeringContract?.macro_assembly_prices) ? state.engineeringContract.macro_assembly_prices : []
+    const macroTotal = macros.reduce((a, m) => a + (num(m?.total_gbp) ?? 0), 0)
+    const sigToks = (s: string) => new Set(String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(' ').filter(t => t.length >= 4))
+    const macroTokSets = macros.map(m => sigToks(m?.word_name ?? ''))
+    const macroCovered = (name: string) => { const nt = sigToks(name); return macroTokSets.some(ms => [...ms].some(t => nt.has(t))) }
     const zeros = withPrice.filter(p => (p.price as number) <= 0)
+    const realZeros = zeros.filter(p => !macroCovered(p.name))  // £0 lines NOT explained by a macro
     const sorted = [...withPrice].sort((a, b) => (a.price as number) - (b.price as number))
-    if (total == null || total <= 0) hard.push('BOM_TOTAL_ZERO')
-    if (zeros.length > 0) hard.push(`BOM_ZERO_PRICE_LINES_${zeros.length}`)
+    const effTotal = Math.max(num(total) ?? 0, macroTotal)
+    if (effTotal <= 0) hard.push('BOM_TOTAL_ZERO')
+    if (realZeros.length > 0) hard.push(`BOM_ZERO_PRICE_LINES_${realZeros.length}`)
     const line = (p: any) => `${truncate(p.name, 48)}${p.mfr ? ` [${truncate(p.mfr, 24)} ${truncate(p.mpn, 24)}]` : ''} = ${gbp(p.price)}`
     // per-module unit-price rollup (rough — qty-weighted total lives in cost_reality)
     const byMod: Record<string, number> = {}
     for (const p of withPrice) byMod[p.module] = (byMod[p.module] ?? 0) + (p.price as number)
     const modRoll = Object.entries(byMod).sort((a, b) => b[1] - a[1]).slice(0, 12)
       .map(([m, s]) => `  ${truncate(m, 32)}: ${gbp(s)}`).join('\n')
+    const macroList = [...macros].sort((a, b) => (num(b?.total_gbp) ?? 0) - (num(a?.total_gbp) ?? 0)).slice(0, 8)
+      .map((m: any) => `  ${truncate(m?.word_name ?? '?', 34)} = ${gbp(num(m?.total_gbp))}${m?.source_detail ? `  (${truncate(m.source_detail, 48)})` : ''}`).join('\n')
     const text =
-      `BoM total (cover): ${gbp(total)} for this ${productClass}.  priced lines ${cr?.priced_lines ?? withPrice.length}, unpriced ${cr?.unpriced_lines ?? (pv.length - withPrice.length)}.\n` +
-      (zeros.length ? `£0 LINES (${zeros.length}): ${zeros.slice(0, 10).map((p: any) => truncate(p.name, 40)).join('; ')}\n` : '') +
-      `Dearest lines:\n${sorted.slice(-6).reverse().map((p: any) => '  ' + line(p)).join('\n')}\n` +
-      `Cheapest lines:\n${sorted.slice(0, 6).map((p: any) => '  ' + line(p)).join('\n')}\n` +
+      `BoM total (chain estimate): ${gbp(total)} for this ${productClass}.  priced lines ${cr?.priced_lines ?? withPrice.length}, unpriced ${cr?.unpriced_lines ?? (pv.length - withPrice.length)}.\n` +
+      (macros.length ? `BIG-TICKET ASSEMBLIES priced by dimension-based MACROS (authoritative for large items; total ${gbp(macroTotal)}):\n${macroList}\nNOTE: per-line prices below are PRE-MACRO component estimates — a line whose name matches a macro above renders at the macro price, so a £0/tiny price on a vessel/skid/motor below is a pre-macro placeholder, NOT the shipped price.\n` : '') +
+      (realZeros.length ? `£0 LINES not covered by any macro (${realZeros.length}): ${realZeros.slice(0, 10).map((p: any) => truncate(p.name, 40)).join('; ')}\n` : '') +
+      `Dearest component lines:\n${sorted.slice(-6).reverse().map((p: any) => '  ' + line(p)).join('\n')}\n` +
+      `Cheapest component lines:\n${sorted.slice(0, 6).map((p: any) => '  ' + line(p)).join('\n')}\n` +
       `Module unit-price rollup:\n${modRoll || '  (none)'}\n` +
-      `Judge: is the total plausible for a ${productClass} of this brief's scale? Is any expensive physical item priced at £0? Does any part belong to a DIFFERENT product class?`
+      `This BoM is computed PRE-RENDER: the SHIPPED total is HIGHER (the renderer applies macro qty-weighting + final pricing not reflected in the chain estimate above). So judge BoM COMPLETENESS, per-line sanity, genuinely-unpriced (£0, non-macro) items, and WRONG-CLASS parts — but do NOT hard-penalise the absolute magnitude of this pre-render estimate. Price macro-covered big items at their macro price, NOT the pre-macro £0. Does any part belong to a DIFFERENT product class?`
     sections.push({ name: 'bill_of_materials', label: 'Bill of materials + costs', text, hardSignals: hard })
   }
 
