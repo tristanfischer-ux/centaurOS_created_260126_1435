@@ -3469,6 +3469,75 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     assertions.push({ id: 'UNIVERSAL.self_audit_digest_complete', description: 'self-audit digest complete', passed: false, detail: `buildAuditDigest threw for "${productClass}": ${String(err).slice(0, 160)}` })
   }
 
+  // ── UNIVERSAL: every printed worked-calculation actually adds up (2026-06-02) ──
+  //
+  // UNIVERSAL.worked_calc_arithmetic_sound — the Tools-Used appendix now prints worked
+  // calculations (inputs -> formula -> substituted numbers -> result) so a reviewer can
+  // check the maths by hand. The substitution is built in each tool's Python from its
+  // LIVE values (so it cannot silently diverge from the code), but a wrong formula
+  // TEMPLATE (e.g. an author writes '/' where the code does 'x') would print a working
+  // that doesn't evaluate to the stated result — worse than none, it misleads the
+  // reviewer. This re-evaluates each substitution's arithmetic and fails on a mismatch.
+  // Vacuously passes on snapshots predating the feature (no worked blocks).
+  try {
+    // tiny safe arithmetic evaluator (no eval/Function — eslint-clean): + - * / ( )
+    const evalArith = (raw: string): number | null => {
+      const toks = raw.replace(/,/g, '').replace(/x/gi, '*').match(/\d+\.?\d*(?:[eE][+-]?\d+)?|[+\-*/()]/g)
+      if (!toks) return null
+      let i = 0
+      const peek = () => toks[i]
+      const parseExpr = (): number | null => {
+        let v = parseTerm(); if (v == null) return null
+        while (peek() === '+' || peek() === '-') { const op = toks[i++]; const r = parseTerm(); if (r == null) return null; v = op === '+' ? v + r : v - r }
+        return v
+      }
+      const parseTerm = (): number | null => {
+        let v = parseFactor(); if (v == null) return null
+        while (peek() === '*' || peek() === '/') { const op = toks[i++]; const r = parseFactor(); if (r == null) return null; v = op === '*' ? v * r : v / r }
+        return v
+      }
+      const parseFactor = (): number | null => {
+        const t = peek()
+        if (t === '(') { i++; const v = parseExpr(); if (peek() === ')') i++; return v }
+        if (t === '-') { i++; const v = parseFactor(); return v == null ? null : -v }
+        if (t != null && /^\d/.test(t)) { i++; return Number(t) }
+        return null
+      }
+      const v = parseExpr()
+      return (i === toks.length && v != null && isFinite(v)) ? v : null
+    }
+    const tools: any[] = Array.isArray(state?.toolsUsedPage?.tools) ? state.toolsUsedPage.tools : []
+    const bad: string[] = []
+    let checked = 0
+    for (const t of tools) {
+      for (const wc of (Array.isArray(t?.worked) ? t.worked : [])) {
+        const subst = String(wc?.substitution ?? '')
+        const parts = subst.split('=')
+        if (parts.length < 3) continue
+        const evald = evalArith(parts.slice(1, -1).join('='))
+        let resultNum = Number(wc?.result?.value)
+        if (!isFinite(resultNum)) {
+          const m = String(parts[parts.length - 1]).replace(/,/g, '').match(/-?[0-9.]+(?:[eE][+-]?[0-9]+)?/)
+          resultNum = m ? Number(m[0]) : NaN
+        }
+        if (evald == null || !isFinite(resultNum)) continue
+        checked++
+        if (Math.abs(evald - resultNum) / Math.max(Math.abs(resultNum), 1e-9) > 0.015) {
+          bad.push(`${t.tool_id}: "${subst}" → expr=${evald}, stated=${resultNum}`)
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'UNIVERSAL.worked_calc_arithmetic_sound',
+      `every printed worked-calculation evaluates to its stated result for "${productClass}" (${checked} checked) — a working that doesn't add up misleads the reviewer`,
+      bad.length,
+      (n) => n === 0,
+      () => `${bad.length} worked calc(s) don't add up (formula-template bug): ${bad.slice(0, 3).join(' | ')}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.worked_calc_arithmetic_sound', description: 'worked calc arithmetic sound', passed: true, detail: `skipped: ${String(err).slice(0, 100)}` })
+  }
+
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
 

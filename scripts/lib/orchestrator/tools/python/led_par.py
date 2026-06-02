@@ -36,8 +36,12 @@ Use: vertical-farm lighting design + DLI matching to crop needs.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -110,6 +114,43 @@ def compute(payload: dict) -> dict:
     # So for 1 μmol/s at 555 nm = 0.216 mW = 2.16e-4 W. Scale by lambda/555 for other wavelengths.
     par_watts = ppf_umol_s * (peak_lambda_nm / 555.0) * 2.16e-4
 
+    # Worked calculations for the PDF appendix — inputs -> formula -> substituted
+    # numbers -> result, built from the SAME live values computed above (drift-safe).
+    # Each step chains off the prior step's displayed value so a reviewer can follow it.
+    led_input_w_r = round(led_input_w, 2)
+    ppf_r = round(ppf_umol_s, 2)
+    ppfd_r = round(ppfd_umol_m2_s, 2)
+    worked = [
+        worked_calc(
+            label="Driver-adjusted LED power",
+            formula="P_led = P_in x driver_eff",
+            values={"P_in": (input_watts, "W"), "driver_eff": (driver_eff, "")},
+            result=led_input_w_r, result_unit="W",
+            assumptions=["driver / power-supply efficiency from fixture datasheet"],
+        ),
+        worked_calc(
+            label="Photosynthetic photon flux (PPF)",
+            formula="PPF = P_led x efficacy",
+            values={"P_led": (led_input_w_r, "W"), "efficacy": (efficacy, "umol/J")},
+            result=ppf_r, result_unit="umol/s",
+            assumptions=[f"wall-plug efficacy {efficacy} umol/J for {led_type} (horticultural LED datasheets; Kusuma et al. 2020)"],
+        ),
+        worked_calc(
+            label="Photosynthetic photon flux density (PPFD)",
+            formula="PPFD = PPF / area",
+            values={"PPF": (ppf_r, "umol/s"), "area": (growing_area_m2, "m2")},
+            result=ppfd_r, result_unit="umol/m2/s",
+            assumptions=["uniform canopy distribution", "no fixture/optical losses"],
+        ),
+        worked_calc(
+            label="Daily light integral (DLI)",
+            formula="DLI = PPFD x photoperiod x 0.0036",
+            values={"PPFD": (ppfd_r, "umol/m2/s"), "photoperiod": (photoperiod_hours, "h")},
+            result=round(dli_mol_m2_day, 3), result_unit="mol/m2/day",
+            assumptions=["0.0036 = 3600 s/h x 1e-6 mol/umol"],
+        ),
+    ]
+
     return {
         "led_type": led_type,
         "input_watts": input_watts,
@@ -117,12 +158,13 @@ def compute(payload: dict) -> dict:
         "growing_area_m2": growing_area_m2,
         "driver_efficiency": driver_eff,
         "wall_plug_efficacy_umol_per_j": efficacy,
-        "led_input_w_after_driver": round(led_input_w, 2),
-        "ppf_umol_s": round(ppf_umol_s, 2),
-        "ppfd_umol_m2_s": round(ppfd_umol_m2_s, 2),
+        "led_input_w_after_driver": led_input_w_r,
+        "ppf_umol_s": ppf_r,
+        "ppfd_umol_m2_s": ppfd_r,
         "dli_mol_m2_day": round(dli_mol_m2_day, 3),
         "par_watts": round(par_watts, 3),
         "peak_wavelength_nm": peak_lambda_nm,
+        "worked": worked,
     }
 
 

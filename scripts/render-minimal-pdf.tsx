@@ -10272,6 +10272,34 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
               </Text>
             ) : null}
 
+            {/* Worked calculation (2026-06-02): inputs -> formula -> substituted
+                numbers -> result, so a reviewer can check the maths by hand without
+                the source code. The substitution is built in the tool's own compute()
+                from its live values (drift-safe). Universal: shows for any tool whose
+                Python emitted a `worked` block; stubs emit none, so nothing fake shows. */}
+            {Array.isArray(tool.worked) && tool.worked.length > 0 ? (
+              <View style={{ marginTop: 4, marginBottom: 6, padding: 8, backgroundColor: '#ffffff', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
+                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
+                  Worked calculation — every number below is checkable by hand:
+                </Text>
+                {tool.worked.map((wc: any, wi: number) => (
+                  <View key={wi} style={{ marginBottom: 5 }}>
+                    <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{normalise_unicode(String(wc.label ?? ''))}</Text>
+                    </Text>
+                    <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK, lineHeight: 1.5, marginLeft: 6 }}>
+                      {normalise_unicode(String(wc.substitution ?? ''))}
+                    </Text>
+                    {Array.isArray(wc.assumptions) && wc.assumptions.length > 0 ? (
+                      <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.45, marginLeft: 6 }}>
+                        {normalise_unicode('assumes: ' + wc.assumptions.join('; '))}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
             {tool.tool_source_url ? (
               <Text style={{ fontSize: 9, color: MUTED, marginBottom: 6 }}>
                 <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Source: </Text>

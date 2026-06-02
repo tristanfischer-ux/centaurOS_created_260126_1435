@@ -143,9 +143,19 @@ async function runStep(
   if (!result.ok) return { ok: false, contract: null, warnings: result.warnings, error: result.error }
 
   const updated = step.contract_update(contract, result.output)
-  const newContract = {
+  const newContract: ContractInProgress = {
     ...updated,
     _tools_run: [...updated._tools_run.filter(t => t !== step.tool_id), step.tool_id],
+  }
+  // Capture the tool's worked calculations (inputs -> formula -> substituted numbers
+  // -> result) so the Tools-Used appendix can show the maths a reviewer can check by
+  // hand. UNIVERSAL: any tool whose Python emits a `worked` list is covered with zero
+  // per-class code; tools that emit none (incl. stubs) simply contribute nothing —
+  // we never show a fabricated working. Keyed by tool_id, persisted on the contract.
+  const workedOut = (result.output as { worked?: unknown })?.worked
+  if (Array.isArray(workedOut) && workedOut.length > 0) {
+    const wc = ((newContract as any).worked_calculations ??= {})
+    wc[step.tool_id] = workedOut
   }
   return { ok: true, contract: newContract, warnings: result.warnings }
 }

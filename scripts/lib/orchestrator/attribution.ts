@@ -231,8 +231,13 @@ export function buildToolsUsedPage(
     const { listTools } = require('./registry') as typeof import('./registry')
     for (const [tid, tool] of listTools()) registryNames.set(tid, tool.name)
   } catch { /* registry not available — fall back to humanised ids below */ }
+  // Attach each tool's worked calculations (captured on the contract by the executor)
+  // so the renderer can show the maths. Universal: any tool whose Python emitted a
+  // `worked` list is covered; tools without one get an empty array (no block shown).
+  const allWorked: Record<string, any[]> = (contract as any).worked_calculations ?? {}
   for (const entry of byTool.values()) {
     if (!entry.tool_name) entry.tool_name = registryNames.get(entry.tool_id) || humaniseToolId(entry.tool_id)
+    ;(entry as any).worked = Array.isArray(allWorked[entry.tool_id]) ? allWorked[entry.tool_id] : []
   }
 
   // Build #18m: list tools that are AVAILABLE in the registry but did
