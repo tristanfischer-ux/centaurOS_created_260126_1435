@@ -269,7 +269,10 @@ The bar is 8/10 on EVERY section — that is the FLOOR, not the average. You are
   • a compliance / status claim asserted over an unverified or failing cell;
   • prose that is generic boilerplate rather than grounded in THIS brief.
 
-HONESTY DISTINCTION (decides blocking vs non-blocking): a brief target that is MISSED but OPENLY stated and documented as a deliberate trade-off (e.g. "accepts a 23% shortfall vs the 3.5 MWh target as a mass-constrained trade-off") is a real WEAKNESS — score that section <=6 — but it is NOT ship-blocking, because the reader is not deceived. The SAME miss becomes ship-blocking (blocking=true) when a headline, banner, or compliance row CLAIMS the target is met while the design does not meet it. Deception blocks; disclosed limitation does not.
+HONESTY DISTINCTION (decides blocking vs non-blocking — apply it strictly): the question for blocking is "is the reader DECEIVED?", not "is there a gap?".
+  - A brief target MISSED but OPENLY stated as a deliberate trade-off ("accepts a 23% shortfall vs the 3.5 MWh target as a mass-constrained trade-off") is a WEAKNESS (score <=6) but NOT ship-blocking — the reader is not deceived.
+  - An UNVERIFIED constraint rendered HONESTLY as "—" / "unverified", where the banner DISCLOSES the unverified count ("12 of 13 verified · 1 unverified"), is an INCOMPLETENESS weakness, NOT ship-blocking. Score by how many: a few "—" among many verified → 5-6; many "—" → 3-4. blocking=false either way, because nothing is claimed falsely.
+  - It becomes ship-blocking (blocking=true) ONLY when a headline, banner, or compliance row ASSERTS pass / "met" / "All N PASS" over a cell that is actually "—" or failing — i.e. a positive false claim. Deception blocks; an honestly-labelled gap or "—" does not.
 
 Score honestly from your own engineering world knowledge — you judge UNKNOWN product classes with no lookup table. The pre-computed HARD-SIGNAL tags in the digest are deterministic facts you must treat as true. Reward a section that is genuinely complete, specific, and plausible with 8-10.
 
