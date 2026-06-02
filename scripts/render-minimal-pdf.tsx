@@ -9490,6 +9490,65 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
         </View>
       ) : null}
 
+      {/* task #37 (2026-06-02): U2 consumables + U8 external + NRE summary roll-ups.
+          These were stranded in the dead BillOfMaterialsPage (drawer
+          forgeos_gotchas_49fa725ced010bc2) — the cost EXCLUSION worked but the
+          itemised summary never rendered. Now LIVE here. Pure display (these totals
+          are already out of grandTotal), so the capital figure is unchanged. */}
+      {Array.isArray(bomTotals.consumablesRows) && bomTotals.consumablesRows.length > 0 ? (
+        <View style={{ marginTop: 14, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4 }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>Consumables (per production cycle)</Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic', marginBottom: 8 }}>Replenished each cycle — excluded from the capital total above, not a one-time build cost.</Text>
+          {bomTotals.consumablesRows.map((r, i) => (
+            <View key={`cons-${i}`} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
+              <Text style={{ flex: 1, fontSize: 10, color: INK }}>{toTitleCaseEng(r.word_name)}</Text>
+              <Text style={{ width: 44, fontSize: 9, color: MUTED, textAlign: 'right' }}>×{r.quantity.toLocaleString('en-GB')}</Text>
+              <Text style={{ width: 96, fontSize: 10, color: INK, textAlign: 'right' }}>£{r.line_total_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', paddingTop: 5, marginTop: 2, borderTopWidth: 0.8, borderTopColor: ACCENT_SOFT, alignItems: 'baseline' }} wrap={false}>
+            <Text style={{ flex: 1, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: ACCENT }}>Consumables sub-total (per cycle)</Text>
+            <Text style={{ width: 96, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>£{(bomTotals.consumablesTotal_gbp ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {Array.isArray(bomTotals.externalRows) && bomTotals.externalRows.length > 0 ? (
+        <View style={{ marginTop: 12, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4 }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>Supplied separately (external scope)</Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic', marginBottom: 8 }}>Sourced as complete units outside this product&apos;s manufacturing scope — excluded from the capital total above.</Text>
+          {bomTotals.externalRows.map((r, i) => (
+            <View key={`ext-${i}`} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
+              <Text style={{ flex: 1, fontSize: 10, color: INK }}>{toTitleCaseEng(r.word_name)}</Text>
+              <Text style={{ width: 44, fontSize: 9, color: MUTED, textAlign: 'right' }}>×{r.quantity.toLocaleString('en-GB')}</Text>
+              <Text style={{ width: 96, fontSize: 10, color: INK, textAlign: 'right' }}>£{r.line_total_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', paddingTop: 5, marginTop: 2, borderTopWidth: 0.8, borderTopColor: ACCENT_SOFT, alignItems: 'baseline' }} wrap={false}>
+            <Text style={{ flex: 1, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: ACCENT }}>External sub-total</Text>
+            <Text style={{ width: 96, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>£{(bomTotals.externalTotal_gbp ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {Array.isArray(bomTotals.nreRows) && bomTotals.nreRows.length > 0 ? (
+        <View style={{ marginTop: 12, padding: 10, backgroundColor: '#fffbeb', borderLeftWidth: 3, borderLeftColor: '#d97706', borderRadius: 4 }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#92400e', marginBottom: 2 }}>Certification &amp; non-recurring engineering (one-time)</Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic', marginBottom: 8 }}>A one-off programme investment (type certification, design assurance, safety assessment), amortised over the production run — NOT a per-unit material; excluded from the capital total above.</Text>
+          {bomTotals.nreRows.map((r, i) => (
+            <View key={`nre-${i}`} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
+              <Text style={{ flex: 1, fontSize: 10, color: INK }}>{toTitleCaseEng(r.word_name)}</Text>
+              <Text style={{ width: 44, fontSize: 9, color: MUTED, textAlign: 'right' }}>×{r.quantity.toLocaleString('en-GB')}</Text>
+              <Text style={{ width: 96, fontSize: 10, color: INK, textAlign: 'right' }}>£{r.line_total_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', paddingTop: 5, marginTop: 2, borderTopWidth: 0.8, borderTopColor: '#d97706', alignItems: 'baseline' }} wrap={false}>
+            <Text style={{ flex: 1, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: '#92400e' }}>Certification &amp; NRE total (one-time)</Text>
+            <Text style={{ width: 96, fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#92400e', textAlign: 'right' }}>£{(bomTotals.nreTotal_gbp ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+          </View>
+        </View>
+      ) : null}
+
       <PageFooter />
     </Page>
   )
