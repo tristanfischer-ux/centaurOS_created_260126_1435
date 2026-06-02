@@ -8557,15 +8557,11 @@ function BillOfMaterialsPage({
   const externalTotal = bomTotals.externalTotal_gbp ?? 0
   const nreRows = bomTotals.nreRows ?? []
   const nreTotal = bomTotals.nreTotal_gbp ?? 0
-  // P3 (2026-06-02): concept-stage / not-yet-costed modules (exotic big-ticket gaps).
-  const indicativeModules = bomTotals.indicativeModules ?? []
-  const indicativeFloorTotal = indicativeModules.reduce((s, im) => s + (im.indicative_floor_gbp ?? 0), 0)
   const hasConsumables = consumablesRows.length > 0
   const hasExternal = externalRows.length > 0
   const hasNre = nreRows.length > 0
-  const hasIndicative = indicativeModules.length > 0
 
-  if (hasConsumables || hasExternal || hasNre || hasIndicative) {
+  if (hasConsumables || hasExternal || hasNre) {
     const fmtGBPSeg = fmtGBP_shared
     pages.push(
       <Page key="bom-page-ancillary" size="A4" style={PAGE_STYLE}>
@@ -8709,51 +8705,6 @@ function BillOfMaterialsPage({
               </View>
               <View style={{ flex: 0.9 }} />
             </View>
-          </>
-        ) : null}
-
-        {/* ── P3 (2026-06-02, council Option C): Indicative / concept-stage subsystems ── */}
-        {hasIndicative ? (
-          <>
-            <View wrap={false} style={{ marginTop: 8, marginBottom: 4, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: '#f8fafc', borderLeftWidth: 3, borderLeftColor: '#64748b', borderRadius: 2 }}>
-              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#334155' }}>
-                Indicative — concept-stage subsystems (not yet costed)
-              </Text>
-              <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic' }}>
-                Excluded from the capital BoM total above. These subsystems are sized but not yet priced to a
-                quotation at concept stage. Where a dominant structural material is identifiable, an indicative
-                material-cost lower bound (commodity £/kg × estimated mass) is shown — NOT a quotation; the delivered
-                cost is higher once fabrication, integration and certification are added.
-              </Text>
-            </View>
-            {indicativeModules.map((im, ri) => (
-              <View key={`ind-${ri}`} wrap={false} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.4, borderBottomColor: '#e2e8f0' }}>
-                <View style={{ flex: 2.2 }}>
-                  <Text style={{ fontSize: 9, color: INK }}>{title_case(im.label)}</Text>
-                </View>
-                <View style={{ flex: 3 }}>
-                  <Text style={{ fontSize: 8, color: MUTED }}>{im.basis}</Text>
-                </View>
-                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 9, color: im.indicative_floor_gbp != null ? INK : MUTED, fontFamily: im.indicative_floor_gbp != null ? 'Helvetica-Bold' : 'Helvetica', fontStyle: im.indicative_floor_gbp != null ? 'normal' : 'italic' }}>
-                    {im.indicative_floor_gbp != null ? `≥ ${fmtGBPSeg(im.indicative_floor_gbp)}` : 'TBD'}
-                  </Text>
-                </View>
-                <View style={{ flex: 0.9 }} />
-              </View>
-            ))}
-            {indicativeFloorTotal > 0 ? (
-              <View wrap={false} style={{ flexDirection: 'row', paddingTop: 4, paddingBottom: 6, marginBottom: 10, borderTopWidth: 0.8, borderTopColor: '#64748b' }}>
-                <View style={{ flex: 2.2 }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#334155' }}>Indicative material-floor sub-total (lower bound)</Text>
-                </View>
-                <View style={{ flex: 3 }} />
-                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#334155' }}>{'≥ '}{fmtGBP_subtotal(indicativeFloorTotal)}</Text>
-                </View>
-                <View style={{ flex: 0.9 }} />
-              </View>
-            ) : null}
           </>
         ) : null}
 
@@ -9475,6 +9426,38 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
           </Text>
         </View>
       </View>
+
+      {/* P3 (2026-06-02, council Option C): honest disclosure of any module that
+          priced to £0 above (exotic / unseen class whose big-ticket item has no
+          hand-authored macro + a parts-cascade miss) — concept-stage, not "free".
+          Indicative material-cost floor shown only where a defensible mass exists
+          (never fabricated). Excluded from the capital total. Data: computeBomTotals. */}
+      {Array.isArray(bomTotals.indicativeModules) && bomTotals.indicativeModules.length > 0 ? (
+        <View style={{ marginBottom: 18, padding: 10, backgroundColor: '#f8fafc', borderLeftWidth: 3, borderLeftColor: '#64748b', borderRadius: 4 }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#334155', marginBottom: 3 }}>
+            Indicative — concept-stage subsystems (not yet costed)
+          </Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic', marginBottom: 8, lineHeight: 1.5 }}>
+            The subsystem(s) below show £0 above because their primary items are bespoke fabrications with no catalogue
+            match at concept stage — they are not free. Where a dominant structural material is identifiable, an
+            indicative material-cost lower bound (commodity £/kg × estimated mass) is given; it is NOT a quotation and
+            is excluded from the capital total — the delivered cost is higher once fabrication, integration and
+            certification are added.
+          </Text>
+          {bomTotals.indicativeModules.map((im, idx) => (
+            <View key={im.module} style={{ flexDirection: 'row', paddingVertical: 4, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false} minPresenceAhead={idx >= bomTotals.indicativeModules!.length - 2 ? 40 : 0}>
+              <Text style={{ width: 28, fontSize: 9, color: MUTED }}>{idx + 1}.</Text>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={{ fontSize: 10, color: INK }}>{im.label}</Text>
+                <Text style={{ fontSize: 8, color: MUTED }}>{im.basis}</Text>
+              </View>
+              <Text style={{ width: 92, fontSize: 10, color: im.indicative_floor_gbp != null ? INK : MUTED, fontFamily: im.indicative_floor_gbp != null ? 'Helvetica-Bold' : 'Helvetica', textAlign: 'right' }}>
+                {im.indicative_floor_gbp != null ? `≥ £${im.indicative_floor_gbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : 'TBD'}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {sortedClasses.length > 0 ? (
         <View style={{ padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4 }}>
