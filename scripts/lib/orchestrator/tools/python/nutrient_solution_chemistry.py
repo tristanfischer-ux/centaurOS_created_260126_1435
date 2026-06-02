@@ -37,8 +37,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -177,6 +181,38 @@ def compute(payload: dict) -> dict:
     # Total mineral mass for reservoir
     total_mineral_g = sum(salts_needed.values()) * res_volume_l / 1000.0  # convert mg/L to g
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # above (drift-safe). Two representative macro-salt dosings are shown (each
+    # salt mass = target ppm / nutrient mass-fraction). SKIPPED:
+    # total_mineral_mass (a variable-length sum over all 12 salts, not a
+    # fixed-input arithmetic expression).
+    ca_frac = SALTS["Ca(NO3)2_4H2O"]["Ca_frac"]
+    p_frac = SALTS["KH2PO4"]["P_frac"]
+    worked = [
+        worked_calc(
+            label="Calcium nitrate dosing (provides Ca)",
+            formula="salt_mass = Ca_target / Ca_fraction",
+            values={"Ca_target": (recipe["Ca"], "mg/L"), "Ca_fraction": (round(ca_frac, 4), "")},
+            result=round(salts_needed["Ca(NO3)2_4H2O"], 2), result_unit="mg/L",
+            assumptions=[f"Ca mass-fraction of Ca(NO3)2.4H2O = {round(ca_frac, 4)} (40.08 / 236.15 g/mol)"],
+        ),
+        worked_calc(
+            label="Monopotassium phosphate dosing (provides P)",
+            formula="salt_mass = P_target / P_fraction",
+            values={"P_target": (recipe["P"], "mg/L"), "P_fraction": (round(p_frac, 4), "")},
+            result=round(salts_needed["KH2PO4"], 2), result_unit="mg/L",
+            assumptions=[f"P mass-fraction of KH2PO4 = {round(p_frac, 4)} (30.97 / 136.09 g/mol)"],
+        ),
+        worked_calc(
+            label="Stock dosing rate",
+            formula="dosing_rate = (reservoir_volume x dose_rate) / 60",
+            values={"reservoir_volume": (res_volume_l, "L"),
+                    "dose_rate": (dose_rate_ml_per_l_solution, "mL/L")},
+            result=round(res_volume_l * dose_rate_ml_per_l_solution / 60.0, 2), result_unit="mL/min",
+            assumptions=["100x concentrated stock dosed over the reservoir fill"],
+        ),
+    ]
+
     return {
         "target_crop": crop,
         "target_ec_ms_cm": target_ec,
@@ -209,6 +245,7 @@ def compute(payload: dict) -> dict:
             "EC drops 0.3-0.5 mS/cm/day in active crop; replenish on EC sag. "
             "Verify with hand-held EC/pH meter 2x daily; calibrate weekly."
         ),
+        "worked": worked,
     }
 
 

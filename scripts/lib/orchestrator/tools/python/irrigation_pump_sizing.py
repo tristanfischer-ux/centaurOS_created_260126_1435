@@ -36,8 +36,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -128,6 +132,66 @@ def compute(payload: dict) -> dict:
     # CAPEX rough
     pump_cost_gbp = recommended_motor_kw * 200 + 800  # crude per-kW + base
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # above (drift-safe), chained so each line follows from the previous.
+    # SKIPPED: friction_head (Hazen-Williams power law H = 10.67 L Q^1.852 /
+    # (C^1.852 D^4.871) — fractional-exponent term, not a +-*/ expression the
+    # reviewer's checker can re-evaluate; its numeric value is folded into
+    # pump_head_m below as a live input). recommended_motor_kw (table lookup —
+    # next standard frame size up).
+    h_total_r = round(h_total_m, 2)
+    p_hyd_r = round(p_hydraulic_w, 1)
+    p_shaft_r = round(p_shaft_w, 1)
+    worked = [
+        worked_calc(
+            label="Total system flow",
+            formula="flow_lpm = (n_emitters x flow_per_emitter) / 60",
+            values={"n_emitters": (n_emitters, ""),
+                    "flow_per_emitter": (flow_per_emitter_lph, "L/h")},
+            result=round(total_flow_lpm, 2), result_unit="L/min",
+        ),
+        worked_calc(
+            label="Total pump head",
+            formula="head = static_head + friction_head + emitter_head",
+            values={"static_head": (static_head_m, "m"),
+                    "friction_head": (round(h_friction, 2), "m"),
+                    "emitter_head": (round(h_emitter, 2), "m")},
+            result=h_total_r, result_unit="m",
+            assumptions=["friction_head from Hazen-Williams (C=150 PVC)",
+                         "emitter_head = emitter pressure x 0.102 m/kPa"],
+        ),
+        worked_calc(
+            label="Pump hydraulic power",
+            formula="P_hyd = 1000 x 9.81 x (Q_m3h / 3600) x head",
+            values={"Q_m3h": (round(total_flow_m3_h, 4), "m3/h"), "head": (h_total_r, "m")},
+            result=p_hyd_r, result_unit="W",
+            assumptions=["P = rho x g x Q x H, water rho 1000 kg/m3, g 9.81 m/s2",
+                         "Q_m3h / 3600 converts m3/h to m3/s"],
+        ),
+        worked_calc(
+            label="Pump shaft power",
+            formula="P_shaft = P_hyd / pump_eff",
+            values={"P_hyd": (p_hyd_r, "W"), "pump_eff": (pump_eff, "")},
+            result=p_shaft_r, result_unit="W",
+            assumptions=[f"{system_type} pump efficiency {pump_eff} at duty point"],
+        ),
+        worked_calc(
+            label="Motor input power",
+            formula="P_motor = P_shaft / motor_eff",
+            values={"P_shaft": (p_shaft_r, "W"), "motor_eff": (motor_eff, "")},
+            result=round(p_motor_w, 1), result_unit="W",
+        ),
+        worked_calc(
+            label="Pipe velocity",
+            formula="velocity = (Q_m3h / 3600) / (pipe_area_mm2 / 1000000)",
+            values={"Q_m3h": (round(total_flow_m3_h, 4), "m3/h"),
+                    "pipe_area_mm2": (round(pipe_area_m2 * 1e6, 1), "mm2")},
+            result=round(velocity_m_s, 3), result_unit="m/s",
+            assumptions=["keep < 2.5 m/s to avoid erosion / water hammer",
+                         "Q_m3h / 3600 converts m3/h to m3/s; pipe_area / 1e6 converts mm2 to m2"],
+        ),
+    ]
+
     return {
         "system_type": system_type,
         "total_emitters": n_emitters,
@@ -159,6 +223,7 @@ def compute(payload: dict) -> dict:
             "diaphragm pumps; drip/NFT centrifugal 1-2 bar. "
             "Verify duty point on pump curve at intersect with system curve."
         ),
+        "worked": worked,
     }
 
 

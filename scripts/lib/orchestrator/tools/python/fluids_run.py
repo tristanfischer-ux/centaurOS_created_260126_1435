@@ -60,8 +60,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 PROVENANCE = {
     "tool_name": "fluids",
@@ -262,6 +266,66 @@ def compute(payload: dict) -> dict:
     # Recommendations
     rec = recommend_pipe_class(v, dp_total, fluid_name, D_mm)
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # above (drift-safe), chained so each line follows from the previous.
+    # SKIPPED: friction_factor f (Colebrook-White implicit / regime-switched
+    # laminar 64/Re — transcendental, not a +-*/ expression); its computed value
+    # is used as a live input to the straight-pipe pressure-drop line below.
+    def _sig4(x: float) -> float:
+        # Round to ~4 significant figures so small (sub-1-Pa) and large pressure
+        # values both keep enough precision for the printed substitution to
+        # re-evaluate to the displayed result (the renderer shows the same value).
+        if x == 0:
+            return 0.0
+        from math import floor, log10
+        d = 3 - int(floor(log10(abs(x))))
+        return round(x, max(1, d))
+
+    v_r = round(v, 4)
+    dp_straight_r = _sig4(dp_straight)
+    dp_grav_r = round(dp_gravity, 1)
+    dp_fittings_r = _sig4(dp_fittings)
+    worked = [
+        worked_calc(
+            label="Flow velocity",
+            formula="velocity = Q / (pipe_area_mm2 / 1000000)",
+            values={"Q": (Q, "m3/s"), "pipe_area_mm2": (round(A * 1e6, 1), "mm2")},
+            result=v_r, result_unit="m/s",
+            assumptions=["pipe_area = pi x (D/2)^2 for internal diameter D; /1e6 converts mm2 to m2"],
+        ),
+        worked_calc(
+            label="Reynolds number",
+            formula="Re = rho x velocity x D / mu",
+            values={"rho": (round(rho, 3), "kg/m3"), "velocity": (v_r, "m/s"),
+                    "D": (round(D, 4), "m"), "mu": (mu, "Pa.s")},
+            result=round(Re, 1), result_unit="",
+        ),
+        worked_calc(
+            label="Straight-pipe pressure drop",
+            formula="dp_straight = f x (L / D) x 0.5 x rho x velocity x velocity",
+            values={"f": (round(f, 5), ""), "L": (L, "m"), "D": (round(D, 4), "m"),
+                    "rho": (round(rho, 3), "kg/m3"), "velocity": (v_r, "m/s")},
+            result=dp_straight_r, result_unit="Pa",
+            assumptions=["Darcy-Weisbach; velocity x velocity = velocity squared"],
+        ),
+        worked_calc(
+            label="Gravity (elevation) head",
+            formula="dp_gravity = rho x g x elevation_change",
+            values={"rho": (round(rho, 3), "kg/m3"), "g": (round(g, 5), "m/s2"),
+                    "elevation_change": (elev_m, "m")},
+            result=dp_grav_r, result_unit="Pa",
+        ),
+        worked_calc(
+            label="Total pressure drop",
+            formula="dp_total = dp_straight + dp_fittings + dp_gravity",
+            values={"dp_straight": (dp_straight_r, "Pa"),
+                    "dp_fittings": (dp_fittings_r, "Pa"),
+                    "dp_gravity": (dp_grav_r, "Pa")},
+            result=_sig4(dp_total), result_unit="Pa",
+            assumptions=["dp_fittings = sum of fitting K-values x 0.5 x rho x velocity^2 (3-K method)"],
+        ),
+    ]
+
     return {
         "pressure_drop_pa": round(dp_total, 1),
         "pressure_drop_kpa": round(dp_total / 1000.0, 3),
@@ -284,6 +348,7 @@ def compute(payload: dict) -> dict:
         "length_m": L,
         "roughness_mm": eps_mm,
         "relative_roughness_eD": round(eps / D, 6),
+        "worked": worked,
         **rec,
         "_provenance": PROVENANCE,
     }

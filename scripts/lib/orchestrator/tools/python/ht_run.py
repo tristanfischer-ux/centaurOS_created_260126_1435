@@ -48,8 +48,12 @@ Paper:   Bell, Caleb (2016-2024), "ht: Heat transfer component of
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 PROVENANCE = {
     "tool_name": "ht",
@@ -142,11 +146,25 @@ def compute(payload: dict) -> dict:
         "n_shell_tube": n_shell_tube,
     }
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # (drift-safe), chained off the library-computed effectiveness.
+    # SKIPPED: effectiveness itself (comes from ht.effectiveness_from_NTU — an
+    # NTU-correlation, transcendental / config-dependent, not a +-*/ expression);
+    # its value is used as a live input to the heat-transfer line below.
+    eff_r = round(eff, 4)
+    worked: list = []
+
     # Heat-duty + outlet temperatures if c_min_kw_k is provided
     if "c_min_kw_k" in payload:
         c_min = float(payload["c_min_kw_k"])
         out["c_min_kw_k"] = c_min
         out["ua_kw_k"] = round(ntu * c_min, 4)
+        worked.append(worked_calc(
+            label="Conductance UA",
+            formula="UA = ntu x c_min",
+            values={"ntu": (ntu, ""), "c_min": (c_min, "kW/K")},
+            result=round(ntu * c_min, 4), result_unit="kW/K",
+        ))
         if "t_hot_in_c" in payload and "t_cold_in_c" in payload:
             t_h_in = float(payload["t_hot_in_c"])
             t_c_in = float(payload["t_cold_in_c"])
@@ -161,6 +179,36 @@ def compute(payload: dict) -> dict:
             # Assume hot fluid is the C_min side (typical chiller/HVAC case)
             out["t_hot_out_c"] = round(t_h_in - q / c_min, 3)
             out["t_cold_out_c"] = round(t_c_in + (q / c_max if c_ratio > 0 else 0), 3)
+            q_max_r = round(q_max, 3)
+            q_r = round(q, 3)
+            worked.append(worked_calc(
+                label="Maximum heat duty",
+                formula="q_max = c_min x (t_hot_in - t_cold_in)",
+                values={"c_min": (c_min, "kW/K"), "t_hot_in": (t_h_in, "C"),
+                        "t_cold_in": (t_c_in, "C")},
+                result=q_max_r, result_unit="kW",
+            ))
+            worked.append(worked_calc(
+                label="Actual heat transfer",
+                formula="q = effectiveness x q_max",
+                values={"effectiveness": (eff_r, ""), "q_max": (q_max_r, "kW")},
+                result=q_r, result_unit="kW",
+            ))
+            worked.append(worked_calc(
+                label="Hot-side outlet temperature",
+                formula="t_hot_out = t_hot_in - q / c_min",
+                values={"t_hot_in": (t_h_in, "C"), "q": (q_r, "kW"), "c_min": (c_min, "kW/K")},
+                result=round(t_h_in - q / c_min, 3), result_unit="C",
+                assumptions=["hot fluid taken as the C_min side (typical chiller/HVAC case)"],
+            ))
+            if c_ratio > 0:
+                worked.append(worked_calc(
+                    label="Cold-side outlet temperature",
+                    formula="t_cold_out = t_cold_in + q / c_max",
+                    values={"t_cold_in": (t_c_in, "C"), "q": (q_r, "kW"),
+                            "c_max": (round(c_max, 4), "kW/K")},
+                    result=round(t_c_in + q / c_max, 3), result_unit="C",
+                ))
             # UA required to deliver q given LMTD
             # (Approximate via LMTD for cross-check)
             dt1 = t_h_in - out["t_cold_out_c"]
@@ -174,6 +222,7 @@ def compute(payload: dict) -> dict:
                 out["lmtd_k"] = round(dt1, 3)
                 out["ua_required_w_k"] = round((q * 1000.0) / max(0.01, dt1), 1)
 
+    out["worked"] = worked
     out["_provenance"] = PROVENANCE
     return out
 

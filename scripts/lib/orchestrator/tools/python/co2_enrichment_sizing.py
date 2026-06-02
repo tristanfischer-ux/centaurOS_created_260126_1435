@@ -41,8 +41,12 @@ References:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -140,6 +144,54 @@ def compute(payload: dict) -> dict:
     peak_demand_g_h = uptake_g_m2_h * growing_area_m2 * lai_factor + co2_loss_g_per_h
     injection_points = max(1, int(growing_area_m2 / 100))   # 1 per 100m² grow
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # above (drift-safe), chained so each line follows from the previous.
+    # SKIPPED: lai_factor (min(1.5, LAI/4) clamp — its value is already folded
+    # into the live uptake_g_m2_h used below); supply-method + tank-size
+    # selection (annual-volume threshold + standard-size table lookup).
+    uptake_r = round(uptake_g_m2_h, 2)
+    plant_uptake_r = round(daily_plant_uptake_kg, 2)
+    loss_r = round(co2_loss_g_per_h, 1)
+    infil_r = round(daily_infiltration_kg, 2)
+    worked = [
+        worked_calc(
+            label="Room volume",
+            formula="volume = area x room_height",
+            values={"area": (growing_area_m2, "m2"), "room_height": (room_height_m, "m")},
+            result=round(room_volume_m3, 2), result_unit="m3",
+        ),
+        worked_calc(
+            label="Daily plant CO2 uptake",
+            formula="plant_uptake = (uptake_rate x area x photoperiod) / 1000",
+            values={"uptake_rate": (uptake_r, "g/m2/h"), "area": (growing_area_m2, "m2"),
+                    "photoperiod": (photoperiod_hours, "h")},
+            result=plant_uptake_r, result_unit="kg/day",
+            assumptions=["uptake only during photoperiod", "/1000 converts g to kg"],
+        ),
+        worked_calc(
+            label="Infiltration loss rate",
+            formula="co2_loss = volume x ach x delta_c x 0.00183",
+            values={"volume": (round(room_volume_m3, 2), "m3"), "ach": (ach, "1/h"),
+                    "delta_c": (delta_c_ppm, "ppm")},
+            result=loss_r, result_unit="g/h",
+            assumptions=["1 ppm CO2 = 1.83 mg/m3 at 20 C, 1 atm"],
+        ),
+        worked_calc(
+            label="Daily infiltration loss",
+            formula="daily_infiltration = (co2_loss x 24) / 1000",
+            values={"co2_loss": (loss_r, "g/h")},
+            result=infil_r, result_unit="kg/day",
+            assumptions=["24 h/day leak (enrichment maintained continuously)"],
+        ),
+        worked_calc(
+            label="Total daily CO2 consumption",
+            formula="consumption = plant_uptake + daily_infiltration",
+            values={"plant_uptake": (plant_uptake_r, "kg/day"),
+                    "daily_infiltration": (infil_r, "kg/day")},
+            result=round(daily_consumption_kg, 2), result_unit="kg/day",
+        ),
+    ]
+
     return {
         "growing_area_m2": growing_area_m2,
         "target_co2_ppm": target_ppm,
@@ -170,6 +222,7 @@ def compute(payload: dict) -> dict:
             "<500 kg/yr cylinders, 500-5000 kg/yr cylinders or mini-bulk, >5000 kg/yr bulk. "
             "CHP flue gas is free if cleaned to <50 ppm NOx + <50 ppm CO."
         ),
+        "worked": worked,
     }
 
 

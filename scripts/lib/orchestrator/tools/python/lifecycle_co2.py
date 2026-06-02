@@ -46,8 +46,12 @@ Output:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -212,6 +216,52 @@ def compute(payload: dict) -> dict:
     # IS CSRD-eligible reporting; bool flag = true if reported.
     compliance_csrd = (total_lifecycle_co2_kg > 0 and total_mass_kg > 0)
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # above (drift-safe). SKIPPED: embodied_co2_kg itself (a variable-length
+    # sum over the BoM material table, not a fixed-input arithmetic expression);
+    # its computed total is used as a live input symbol below.
+    embodied_r = round(embodied_co2_kg, 1)
+    op_r = round(operational_co2_kg, 1)
+    eol_r = round(eol_co2_kg, 1)
+    total_r = round(total_lifecycle_co2_kg, 1)
+    worked = [
+        worked_calc(
+            label="Operational CO2",
+            formula="operational = annual_kwh x service_life x grid_intensity",
+            values={"annual_kwh": (op_kwh_per_yr, "kWh/yr"),
+                    "service_life": (life_years, "yr"),
+                    "grid_intensity": (grid_intensity, "kgCO2/kWh")},
+            result=op_r, result_unit="kgCO2",
+        ),
+        worked_calc(
+            label="End-of-life CO2 (credit/burden)",
+            formula="eol = embodied x (eol_retention - 1)",
+            values={"embodied": (embodied_r, "kgCO2"),
+                    "eol_retention": (eol_factor, "")},
+            result=eol_r, result_unit="kgCO2",
+            assumptions=[f"{eol} retention factor {eol_factor} (negative result = avoided-primary credit)"],
+        ),
+        worked_calc(
+            label="Total lifecycle CO2",
+            formula="total = embodied + operational + eol",
+            values={"embodied": (embodied_r, "kgCO2"), "operational": (op_r, "kgCO2"),
+                    "eol": (eol_r, "kgCO2")},
+            result=total_r, result_unit="kgCO2",
+        ),
+        worked_calc(
+            label="CO2 per year",
+            formula="co2_per_year = total / service_life",
+            values={"total": (total_r, "kgCO2"), "service_life": (life_years, "yr")},
+            result=round(co2_per_year, 1), result_unit="kgCO2/yr",
+        ),
+        worked_calc(
+            label="CO2 per kg of product",
+            formula="co2_per_kg = total / total_mass",
+            values={"total": (total_r, "kgCO2"), "total_mass": (round(total_mass_kg, 1), "kg")},
+            result=round(co2_per_kg_product, 2), result_unit="kgCO2/kg",
+        ),
+    ]
+
     return {
         "total_mass_kg": round(total_mass_kg, 1),
         "embodied_co2_kg": round(embodied_co2_kg, 1),
@@ -231,6 +281,7 @@ def compute(payload: dict) -> dict:
             "Ecoinvent 3.10. Regional multipliers reflect grid electricity carbon "
             "intensity. EoL credit/penalty applied per ISO 14040 cradle-to-grave."
         ),
+        "worked": worked,
     }
 
 

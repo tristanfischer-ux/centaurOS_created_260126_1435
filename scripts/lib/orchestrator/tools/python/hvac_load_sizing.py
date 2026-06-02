@@ -51,8 +51,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -169,6 +173,84 @@ def compute(payload: dict) -> dict:
     W_indoor = humidity_ratio(indoor_db_c, indoor_rh_pct)
     W_outdoor = humidity_ratio(outdoor_db_c, outdoor_rh_pct)
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # above (drift-safe), chained so each line follows from the previous.
+    # SKIPPED (transcendental / clamped, no clean substitution): humidity_ratio
+    # (Magnus-Tetens exp), coil-area LMTD values (fixed empirical constants, not
+    # an arithmetic function of the inputs).
+    chiller_r = round(chiller_capacity_kw, 3)
+    carnot_r = round(carnot_cop, 3)
+    cop_r = round(expected_cop, 3)
+    comp_r = round(compressor_power_kw, 3)
+    cond_r = round(condenser_duty_kw, 3)
+    worked = [
+        worked_calc(
+            label="Total cooling load",
+            formula="Q_total = Q_sens + Q_lat",
+            values={"Q_sens": (round(Q_sens_kw, 3), "kW"), "Q_lat": (round(Q_lat_kw, 3), "kW")},
+            result=round(Q_total_kw, 3), result_unit="kW",
+        ),
+        worked_calc(
+            label="Chiller capacity (with safety factor)",
+            formula="chiller = Q_total x safety_factor",
+            values={"Q_total": (round(Q_total_kw, 3), "kW"), "safety_factor": (safety_factor, "")},
+            result=chiller_r, result_unit="kW",
+            assumptions=["safety factor covers duct gain + coil fouling"],
+        ),
+        worked_calc(
+            label="Carnot COP ceiling",
+            formula="carnot_cop = T_evap / (T_cond - T_evap)",
+            values={"T_evap": (round(t_evap_k, 2), "K"), "T_cond": (round(t_cond_k, 2), "K")},
+            result=carnot_r, result_unit="",
+            assumptions=["12 K approach on both evaporator and condenser"],
+        ),
+        worked_calc(
+            label="Expected (real) COP",
+            formula="cop = carnot_cop x eta_relative",
+            values={"carnot_cop": (carnot_r, ""), "eta_relative": (eta_relative, "")},
+            result=cop_r, result_unit="",
+            assumptions=[f"{round(eta_relative * 100)}% of Carnot — typical vapour-compression cycle"],
+        ),
+        worked_calc(
+            label="Compressor power",
+            formula="P_comp = chiller / cop",
+            values={"chiller": (chiller_r, "kW"), "cop": (cop_r, "")},
+            result=comp_r, result_unit="kW",
+        ),
+        worked_calc(
+            label="Condenser duty (energy balance)",
+            formula="cond_duty = chiller + P_comp",
+            values={"chiller": (chiller_r, "kW"), "P_comp": (comp_r, "kW")},
+            result=cond_r, result_unit="kW",
+        ),
+        worked_calc(
+            label="Evaporator coil area",
+            formula="A_evap = (chiller x 1000) / (U_evap x LMTD_evap)",
+            values={"chiller": (chiller_r, "kW"), "U_evap": (U_EVAP_FINNED, "W/m2/K"),
+                    "LMTD_evap": (round(lmtd_evap_k, 2), "K")},
+            result=round(A_evap_m2, 3), result_unit="m2",
+            assumptions=["air-side-limited finned-tube U (ASHRAE 2017 Ch 22)"],
+        ),
+        worked_calc(
+            label="Condenser coil area",
+            formula="A_cond = (cond_duty x 1000) / (U_cond x LMTD_cond)",
+            values={"cond_duty": (cond_r, "kW"), "U_cond": (U_COND_FINNED, "W/m2/K"),
+                    "LMTD_cond": (round(lmtd_cond_k, 2), "K")},
+            result=round(A_cond_m2, 3), result_unit="m2",
+        ),
+    ]
+    # Airflow line only when the tool COMPUTED it (sensible side); skip when the
+    # caller supplied an airflow override or the pure-latent placeholder fired.
+    if airflow_cms_input is None and Q_sens_kw > 0 and supply_air_dt_k > 0:
+        worked.insert(2, worked_calc(
+            label="Supply airflow",
+            formula="airflow = (Q_sens x 1000) / (rho x Cp x 1000 x dT)",
+            values={"Q_sens": (round(Q_sens_kw, 3), "kW"), "rho": (RHO_AIR, "kg/m3"),
+                    "Cp": (CP_AIR_DRY, "kJ/kg/K"), "dT": (supply_air_dt_k, "K")},
+            result=round(airflow_cms, 4), result_unit="m3/s",
+            assumptions=["sensible-only sizing with dry-air Cp"],
+        ))
+
     return {
         "total_load_kw": round(Q_total_kw, 3),
         "sensible_load_kw": round(Q_sens_kw, 3),
@@ -191,6 +273,7 @@ def compute(payload: dict) -> dict:
         "humidity_ratio_outdoor_kg_kg": round(W_outdoor, 6),
         "carnot_cop_ceiling": round(carnot_cop, 3),
         "carnot_efficiency_pct": round(eta_relative * 100.0, 1),
+        "worked": worked,
     }
 
 

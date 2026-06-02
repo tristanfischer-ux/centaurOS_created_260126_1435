@@ -42,8 +42,12 @@ License: MIT.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -141,6 +145,45 @@ def compute(payload: dict) -> dict:
     v_filter = FILTER_FACE_VELOCITY[filter_class]
     A_filter = Q_air_cms / v_filter
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # above (drift-safe). SKIPPED: coil_rows (int(round(...)) — the integer
+    # rounding means a re-evaluated continuous expression would not match the
+    # printed integer; its value feeds the total static-pressure line as a live
+    # input via dp_coil).
+    dp_coil_r = round(dp_coil, 1)
+    dp_total_r = round(dp_total, 1)
+    worked = [
+        worked_calc(
+            label="Coil face area",
+            formula="A_face = airflow / face_velocity",
+            values={"airflow": (Q_air_cms, "m3/s"), "face_velocity": (round(v_face, 2), "m/s")},
+            result=round(A_face, 3), result_unit="m2",
+        ),
+        worked_calc(
+            label="Total static pressure",
+            formula="dp_total = external + dp_coil + dp_filter + dp_extras",
+            values={"external": (round(p_ext_pa, 1), "Pa"), "dp_coil": (dp_coil_r, "Pa"),
+                    "dp_filter": (round(dp_filter, 1), "Pa"), "dp_extras": (dp_extras, "Pa")},
+            result=dp_total_r, result_unit="Pa",
+            assumptions=["coil + filter drops per ASHRAE 2017 Ch 22 / EN 779; dp_extras = dampers + diffusers"],
+        ),
+        worked_calc(
+            label="Fan shaft power",
+            formula="fan_power = (airflow x dp_total) / (fan_eff x 1000)",
+            values={"airflow": (Q_air_cms, "m3/s"), "dp_total": (dp_total_r, "Pa"),
+                    "fan_eff": (eta_fan, "")},
+            result=round(fan_power_kw, 3), result_unit="kW",
+            assumptions=["centrifugal AHU fan + motor + belt efficiency"],
+        ),
+        worked_calc(
+            label="Filter face area",
+            formula="A_filter = airflow / filter_face_velocity",
+            values={"airflow": (Q_air_cms, "m3/s"), "filter_face_velocity": (v_filter, "m/s")},
+            result=round(A_filter, 3), result_unit="m2",
+            assumptions=[f"{filter_class} face velocity {v_filter} m/s (EN 779)"],
+        ),
+    ]
+
     return {
         "airflow_cms": Q_air_cms,
         "coil_face_area_m2": round(A_face, 3),
@@ -160,6 +203,7 @@ def compute(payload: dict) -> dict:
         "coil_u_w_m2_k": round(U, 1),
         "coil_type": coil_type,
         "coil_load_kw": coil_load_kw,
+        "worked": worked,
     }
 
 

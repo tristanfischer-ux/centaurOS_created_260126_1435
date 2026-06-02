@@ -48,8 +48,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -126,6 +130,40 @@ def compute(payload: dict) -> dict:
     # Approx 0.4 × latent for typical 5°C coil + back to indoor target
     reheat_kw = chiller_latent_kw * 0.4 if dehum_type == "refrigeration" else 0.0
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # above (drift-safe). SKIPPED: humidity ratios W_indoor / W_outdoor / W_supply
+    # (Magnus-Tetens saturation, transcendental exp — not a +-*/ expression); the
+    # resulting delta_W value is used as a live input to the airflow line below.
+    chiller_latent_r = round(chiller_latent_kw, 3)
+    worked = [
+        worked_calc(
+            label="Moisture removal capacity",
+            formula="capacity = moisture x 24",
+            values={"moisture": (round(moisture_kg_h, 3), "kg/h")},
+            result=round(capacity_l_day, 1), result_unit="L/day",
+            assumptions=["1 kg water = 1 L"],
+        ),
+        worked_calc(
+            label="Refrigeration latent load",
+            formula="Q_latent = (moisture / 3600) x h_fg",
+            values={"moisture": (round(moisture_kg_h, 3), "kg/h"), "h_fg": (H_FG_WATER, "kJ/kg")},
+            result=chiller_latent_r, result_unit="kW",
+            assumptions=["h_fg = latent heat of vaporisation at 20 C"],
+        ),
+    ]
+    if delta_W > 0:
+        # Express delta_W in g/kg (x1000) so the small divisor prints with full
+        # precision; airflow = moisture/3600/delta_W/rho = moisture/(3.6 x dW_g x rho).
+        delta_w_g_kg = delta_W * 1000.0
+        worked.append(worked_calc(
+            label="Minimum process airflow",
+            formula="airflow = moisture / (3.6 x delta_W_g_kg x rho_air)",
+            values={"moisture": (round(moisture_kg_h, 3), "kg/h"),
+                    "delta_W_g_kg": (round(delta_w_g_kg, 3), "g/kg"), "rho_air": (RHO_AIR, "kg/m3")},
+            result=round(airflow_min_cms, 4), result_unit="m3/s",
+            assumptions=["supply air saturated at 5 C coil", "delta_W_g_kg = (W_indoor - W_supply) x 1000"],
+        ))
+
     result = {
         "moisture_removal_required_kg_h": round(moisture_kg_h, 3),
         "dehumidifier_capacity_l_day": round(capacity_l_day, 1),
@@ -154,6 +192,7 @@ def compute(payload: dict) -> dict:
             (regen_kw if regen_kw else 0.0) / 0.95 + chiller_latent_kw * 0.10, 3
         )
 
+    result["worked"] = worked
     return result
 
 

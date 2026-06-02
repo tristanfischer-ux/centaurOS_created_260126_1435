@@ -35,8 +35,12 @@ Crop parameters from:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -167,6 +171,64 @@ def compute(payload: dict) -> dict:
     transpiration_l_total = total_yield_kg * params["transpiration_l_per_kg"]
     transpiration_l_per_day = transpiration_l_total / cycle_days
 
+    # Worked calculations for the PDF appendix — built from the SAME live values
+    # computed above (drift-safe), chained so a reviewer can follow the thread.
+    # SKIPPED (piecewise / clamped, no clean closed form): growth_rate_factor
+    # (4-branch ramp + saturation cap), co2_factor (min/max-clamped),
+    # temp_factor (bell-curve with regime switch at +/-5 K).
+    gf_r = round(growth_factor, 3)
+    co2_r = round(co2_factor, 3)
+    temp_r = round(temp_factor, 3)
+    combined_r = round(combined_factor, 3)
+    yield_cycle_r = round(yield_per_m2_cycle, 3)
+    cycles_yr_r = round(cycles_per_year, 2)
+    base_yield = params["yield_kg_per_m2_per_cycle"]
+    worked = [
+        worked_calc(
+            label="Combined growth multiplier",
+            formula="combined = growth_factor x co2_factor x temp_factor",
+            values={"growth_factor": (gf_r, ""), "co2_factor": (co2_r, ""),
+                    "temp_factor": (temp_r, "")},
+            result=combined_r, result_unit="",
+            assumptions=["growth/CO2/temperature factors each clamped to their regime; product gives the overall yield derating"],
+        ),
+        worked_calc(
+            label="Yield per cycle",
+            formula="yield_cycle = base_yield x combined",
+            values={"base_yield": (base_yield, "kg/m2"), "combined": (combined_r, "")},
+            result=yield_cycle_r, result_unit="kg/m2",
+            assumptions=[f"base CEA yield {base_yield} kg/m2/cycle for {crop} at target DLI (Kozai 2015; USDA ARS)"],
+        ),
+        worked_calc(
+            label="Cycles per year",
+            formula="cycles_per_year = 365 / cycle_days",
+            values={"cycle_days": (cycle_days, "day")},
+            result=cycles_yr_r, result_unit="",
+            assumptions=["continuous succession cropping, no changeover downtime"],
+        ),
+        worked_calc(
+            label="Annual yield per m2",
+            formula="annual_yield = yield_cycle x cycles_per_year",
+            values={"yield_cycle": (yield_cycle_r, "kg/m2"), "cycles_per_year": (cycles_yr_r, "")},
+            result=round(annual_yield_per_m2, 3), result_unit="kg/m2/yr",
+        ),
+        worked_calc(
+            label="Total yield per cycle",
+            formula="total_yield = yield_cycle x area",
+            values={"yield_cycle": (yield_cycle_r, "kg/m2"), "area": (growing_area, "m2")},
+            result=round(total_yield_kg, 2), result_unit="kg",
+        ),
+        worked_calc(
+            label="Transpiration per day",
+            formula="transpiration_day = (total_yield x transp_per_kg) / cycle_days",
+            values={"total_yield": (round(total_yield_kg, 2), "kg"),
+                    "transp_per_kg": (params["transpiration_l_per_kg"], "L/kg"),
+                    "cycle_days": (cycle_days, "day")},
+            result=round(transpiration_l_per_day, 2), result_unit="L/day",
+            assumptions=[f"{params['transpiration_l_per_kg']} L transpired per kg fresh weight (closed-canopy Penman-Monteith)"],
+        ),
+    ]
+
     return {
         "crop": crop,
         "dli_provided_mol_m2_day": dli_provided,
@@ -185,6 +247,7 @@ def compute(payload: dict) -> dict:
         "transpiration_l_per_day": round(transpiration_l_per_day, 2),
         "transpiration_l_per_cycle": round(transpiration_l_total, 2),
         "transpiration_l_per_kg_yield": params["transpiration_l_per_kg"],
+        "worked": worked,
     }
 
 

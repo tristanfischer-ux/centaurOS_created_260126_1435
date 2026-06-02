@@ -3482,7 +3482,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   try {
     // tiny safe arithmetic evaluator (no eval/Function — eslint-clean): + - * / ( )
     const evalArith = (raw: string): number | null => {
-      const toks = raw.replace(/,/g, '').replace(/x/gi, '*').match(/\d+\.?\d*(?:[eE][+-]?\d+)?|[+\-*/()]/g)
+      const toks = raw.replace(/,/g, '').replace(/x/gi, '*').match(/\d+\.?\d*(?:[eE][+-]?\d+)?|[+\-*/()^]/g)
       if (!toks) return null
       let i = 0
       const peek = () => toks[i]
@@ -3492,9 +3492,14 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         return v
       }
       const parseTerm = (): number | null => {
-        let v = parseFactor(); if (v == null) return null
-        while (peek() === '*' || peek() === '/') { const op = toks[i++]; const r = parseFactor(); if (r == null) return null; v = op === '*' ? v * r : v / r }
+        let v = parsePower(); if (v == null) return null
+        while (peek() === '*' || peek() === '/') { const op = toks[i++]; const r = parsePower(); if (r == null) return null; v = op === '*' ? v * r : v / r }
         return v
+      }
+      const parsePower = (): number | null => {  // right-assoc ^ (display power-law notation), binds tighter than * /
+        const b = parseFactor(); if (b == null) return null
+        if (peek() === '^') { i++; const e = parsePower(); if (e == null) return null; return Math.pow(b, e) }
+        return b
       }
       const parseFactor = (): number | null => {
         const t = peek()
