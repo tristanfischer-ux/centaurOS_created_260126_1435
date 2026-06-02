@@ -41,7 +41,7 @@ import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { _buildComplianceRows, summariseComplianceRows } from './render-minimal-pdf'
-import { buildAuditDigest } from './lib/semantic-self-audit'
+import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
@@ -3541,6 +3541,45 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.worked_calc_arithmetic_sound', description: 'worked calc arithmetic sound', passed: true, detail: `skipped: ${String(err).slice(0, 100)}` })
+  }
+
+  // ── UNIVERSAL: self-audit enforcing blocks deception, never a disclosed gap (2026-06-02) ──
+  //
+  // UNIVERSAL.self_audit_enforcement_blocks_deception — evaluateSelfAuditEnforcement() is the PURE
+  // decision the chain's enforcing mode (PDF_ENGINE_SELF_AUDIT_ENFORCING) calls to hard-exit on a
+  // DECEPTIVE/broken dossier. A K10-style enforce ladder is only safe if that decision is exactly
+  // right: a positive false claim or broken core (blank headline / false-PASS banner / £0 BoM) MUST
+  // block; an honestly-disclosed brief miss, an honest "—", a rendered FAIL row, or a merely-low
+  // score MUST NOT (gate-severity: WRONGNESS hard-exits, a disclosed DESIGN-BREACH flags+renders).
+  // Asserts BOTH directions on synthetic verdicts — pure logic, independent of the snapshot.
+  try {
+    const mk = (hard: string[], blocking: string[], ok: boolean, min: number) =>
+      ({ hard_signals: hard, blocking_defects: blocking, ok, min_score: min } as any)
+    const det = (sa: any) => evaluateSelfAuditEnforcement(sa, 'deterministic')
+    const jud = (sa: any) => evaluateSelfAuditEnforcement(sa, 'judge')
+    const off = (sa: any) => evaluateSelfAuditEnforcement(sa, 'off')
+    const checks: Array<[string, boolean]> = [
+      ['falsePass blocks (det)',         det(mk(['COMPLIANCE_FALSE_PASS'], [], true, 4)).shouldExit === true],
+      ['blankHeadline blocks (det)',     det(mk(['HEADLINE_BLANK'], [], true, 2)).shouldExit === true],
+      ['zeroBom blocks (det)',           det(mk(['BOM_TOTAL_ZERO'], [], true, 3)).shouldExit === true],
+      ['exit code is 31',                det(mk(['HEADLINE_BLANK'], [], true, 2)).exitCode === 31],
+      ['disclosed unverified NOT block', det(mk(['COMPLIANCE_UNVERIFIED_3_OF_13'], [], true, 5)).shouldExit === false],
+      ['rendered FAIL NOT block',        det(mk(['COMPLIANCE_FAIL_1'], [], true, 5)).shouldExit === false],
+      ['low score alone NOT block',      det(mk([], [], true, 2)).shouldExit === false],
+      ['judge-blocking NOT block (det)', det(mk([], ['[bom] absurd'], true, 4)).shouldExit === false],
+      ['judge-blocking blocks (judge)',  jud(mk([], ['[bom] absurd'], true, 4)).shouldExit === true],
+      ['off never blocks',               off(mk(['COMPLIANCE_FALSE_PASS', 'HEADLINE_BLANK'], ['x'], true, 0)).shouldExit === false],
+    ]
+    const failed = checks.filter(([, ok]) => !ok).map(([n]) => n)
+    assertions.push(assertEq(
+      'UNIVERSAL.self_audit_enforcement_blocks_deception',
+      `self-audit enforcing blocks deception/broken-core (false-PASS · blank headline · £0 BoM) and NEVER a disclosed gap / rendered FAIL / low score (10 cases)`,
+      failed.length,
+      (n) => n === 0,
+      () => `enforcement decision wrong on: ${failed.join('; ')}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.self_audit_enforcement_blocks_deception', description: 'self-audit enforcement decision', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }

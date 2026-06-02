@@ -372,3 +372,65 @@ export async function runSemanticSelfAudit(
     min_score, mean_score, blocking_defects,
   }
 }
+
+// ───────────────────────── enforcing ladder (K10-style: shadow → enforce) ─────────────────────────
+//
+// The shadow stage records state.selfAudit every run. ENFORCING mode (env-flagged, like the K10
+// PDF_ENGINE_K10_ENFORCING gate) turns a DECEPTION into a hard chain exit so a deceptive/broken
+// dossier never ships. The trigger is NOT min_score<8 — an honestly-disclosed brief miss or an
+// honest "—" is a weakness, not a deception, and must still render (gate-severity philosophy:
+// WRONGNESS hard-exits, a disclosed DESIGN-BREACH flags+renders). Only a positive false claim or a
+// broken core (blank headline, false-PASS banner, £0 BoM total) blocks.
+//
+// Tiers (graded for LLM-flake safety — the judge is the non-deterministic grok-4.3):
+//   'off'           — shadow only (default): never exits.
+//   'deterministic' — exits ONLY on a deterministic deception/broken hard-signal (computed in
+//                     buildAuditDigest WITHOUT the LLM, so zero judge-flake risk). Safe enforce default.
+//   'judge'         — ALSO exits on the LLM judge's blocking_defects (requires sa.ok). Stricter;
+//                     opt-in once shadow telemetry shows the judge is reliable for a class.
+
+export type SelfAuditEnforceMode = 'off' | 'deterministic' | 'judge'
+
+/** Fatal chain exit code for an enforced self-audit block (next free after 30; see CLAUDE.md table).
+ *  Module-local: consumers read decision.exitCode, nothing imports the constant. */
+const SELF_AUDIT_EXIT_CODE = 31
+
+/** Deterministic signals that mean the dossier is DECEPTIVE or BROKEN AT THE CORE — pure facts from
+ *  buildAuditDigest, no LLM. A blank page-1 headline, a banner claiming pass over a failing/unverified
+ *  cell, or a £0 bill of materials. NOT included: COMPLIANCE_FAIL_n (an honest, rendered FAIL row is a
+ *  disclosed design-breach, not a deception) or COMPLIANCE_UNVERIFIED_n (an honest "—" weakness). */
+const DETERMINISTIC_BLOCK_SIGNALS = ['HEADLINE_BLANK', 'COMPLIANCE_FALSE_PASS', 'BOM_TOTAL_ZERO']
+
+export interface SelfAuditEnforcementDecision {
+  shouldExit: boolean
+  exitCode: number          // SELF_AUDIT_EXIT_CODE when shouldExit, else 0
+  mode: SelfAuditEnforceMode
+  reasons: string[]         // the deception/broken signals that triggered the block (empty if none)
+}
+
+/**
+ * PURE + deterministic given (sa, mode): decide whether enforcing mode must hard-exit the chain.
+ * Deception/broken-core blocks; a disclosed gap, an honest "—", a rendered FAIL row, or a low score
+ * never blocks. Harness-tested (UNIVERSAL.self_audit_enforcement_blocks_deception).
+ */
+export function evaluateSelfAuditEnforcement(sa: SelfAuditResult, mode: SelfAuditEnforceMode): SelfAuditEnforcementDecision {
+  if (mode === 'off') return { shouldExit: false, exitCode: 0, mode, reasons: [] }
+  const reasons: string[] = []
+  for (const h of (sa?.hard_signals ?? [])) {
+    if (DETERMINISTIC_BLOCK_SIGNALS.some((d) => String(h).startsWith(d))) reasons.push(`deterministic:${h}`)
+  }
+  if (mode === 'judge' && sa?.ok && Array.isArray(sa.blocking_defects)) {
+    for (const d of sa.blocking_defects) reasons.push(`judge-blocking:${d}`)
+  }
+  const shouldExit = reasons.length > 0
+  return { shouldExit, exitCode: shouldExit ? SELF_AUDIT_EXIT_CODE : 0, mode, reasons }
+}
+
+/** Map PDF_ENGINE_SELF_AUDIT_ENFORCING to a mode. unset/0/false/shadow/off/no → off; judge/strict/all →
+ *  judge; anything else truthy (1/true/deterministic/enforce) → deterministic (the safe enforce default). */
+export function selfAuditEnforceModeFromEnv(v: string | undefined): SelfAuditEnforceMode {
+  const s = String(v ?? '').trim().toLowerCase()
+  if (s === '' || s === '0' || s === 'false' || s === 'shadow' || s === 'off' || s === 'no') return 'off'
+  if (s === 'judge' || s === 'strict' || s === 'all') return 'judge'
+  return 'deterministic'
+}

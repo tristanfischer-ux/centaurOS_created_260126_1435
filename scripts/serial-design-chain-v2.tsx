@@ -46,7 +46,7 @@ import { LLM_CONFIG } from '../src/lib/pdf-engine-v2/llm-config'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
-import { runSemanticSelfAudit, type LlmCaller } from './lib/semantic-self-audit'
+import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
 // The orchestrator's assembler.ts lazy-loads emitBessDesign internally via
 // `await import('../deterministic-emitter')` at assembler.ts:130 — that path
@@ -5507,9 +5507,11 @@ async function main() {
   //    part, a claim made over a blank cell). This renders a per-section digest of the
   //    FINAL pre-render state and asks a non-Anthropic reasoner to score every section
   //    against the ≥8 floor + enumerate every defect — universal, works on unknown
-  //    classes from world knowledge where no curated gate can. SHADOW (mirrors the K10
-  //    ladder): records state.selfAudit + actions.jsonl, NEVER blocks; enforcing mode
-  //    is a later env-flagged step once shadow telemetry calibrates the threshold.
+  //    classes from world knowledge where no curated gate can. SHADOW by default (mirrors
+  //    the K10 ladder): records state.selfAudit + actions.jsonl, NEVER blocks. ENFORCING is
+  //    opt-in via PDF_ENGINE_SELF_AUDIT_ENFORCING (deterministic|judge): a DECEPTION / broken
+  //    core (blank headline · false-PASS banner · £0 BoM) hard-exits 31; a disclosed gap or
+  //    low score never blocks (gate-severity: WRONGNESS exits, disclosed breach flags+renders).
   //    Self-contained re-read of the final state (written above at the recompute block);
   //    nothing rewrites statePath before render, so selfAudit persists. Kill: CHAIN_SKIP_SELF_AUDIT=1.
   if (!process.env.CHAIN_SKIP_SELF_AUDIT) {
@@ -5533,6 +5535,22 @@ async function main() {
       } else {
         console.error(`[chain] self-audit (shadow) did not score: ${sa.error} (hard-signals: ${sa.hard_signals.join(', ') || 'none'})`)
         logAction({ step: 'self_audit_shadow', ok: false, error: sa.error, hard_signals: sa.hard_signals, latency_ms: Date.now() - tSA })
+      }
+      // ENFORCING (opt-in via PDF_ENGINE_SELF_AUDIT_ENFORCING): a deception/broken-core signal
+      // hard-exits so it never ships. Deterministic signals need no LLM (zero judge-flake); the
+      // 'judge' tier also honours the LLM blocking_defects. A disclosed miss / low score never
+      // blocks. State is already persisted above, so the audit is recorded even when we exit here.
+      const enforceMode = selfAuditEnforceModeFromEnv(process.env.PDF_ENGINE_SELF_AUDIT_ENFORCING)
+      if (enforceMode !== 'off') {
+        const decision = evaluateSelfAuditEnforcement(sa, enforceMode)
+        if (decision.shouldExit) {
+          console.error(`[chain] self-audit ENFORCING (${enforceMode}): BLOCKING — dossier deceptive/broken at the core (${decision.reasons.length} signal(s)):`)
+          for (const r of decision.reasons.slice(0, 8)) console.error(`  ✗ ${r}`)
+          logAction({ step: 'self_audit_enforce', ok: false, mode: enforceMode, exit_code: decision.exitCode, reasons: decision.reasons, latency_ms: Date.now() - tSA })
+          process.exit(decision.exitCode)
+        }
+        console.error(`[chain] self-audit enforcing (${enforceMode}): no deception/broken-core signal — ship allowed (floor ${sa.min_score ?? 'n/a'}/10).`)
+        logAction({ step: 'self_audit_enforce', ok: true, mode: enforceMode, floor: sa.min_score })
       }
     } catch (err) {
       console.error(`[chain] self-audit (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
