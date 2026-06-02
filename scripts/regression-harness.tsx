@@ -40,7 +40,7 @@ import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync } from '
 import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
-import { _buildComplianceRows, summariseComplianceRows } from './render-minimal-pdf'
+import { _buildComplianceRows, summariseComplianceRows, computeBomTotals } from './render-minimal-pdf'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
@@ -3585,6 +3585,77 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.self_audit_enforcement_blocks_deception', description: 'self-audit enforcement decision', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── P3: uncostable-module disclosure — XOR + byte-identical + no fabricated mass (2026-06-02) ──
+  //
+  // UNIVERSAL.uncostable_module_disclosed_not_silent_zero — computeBomTotals() is the renderer's
+  // BoM roll-up. Council Option C (grok-4.3 + gemini-3.1-pro + deepseek-v4-pro, UNANIMOUS): a
+  // top-level module that priced to ~£0 with NO macro claimed (an exotic / unseen class whose
+  // big-ticket item has no hand-authored macro) MUST be disclosed as a concept-stage subsystem,
+  // never shipped as a silent £0 (which reads as "free" — a BoM-quality defect). Three guarantees,
+  // all asserted on synthetic states (pure, snapshot-independent):
+  //   (1) XOR — only £0+no-macro CAPITAL modules are disclosed; a priced module never is; a module
+  //       whose only line is NRE/cert (zero capital lines) is never disclosed.
+  //   (2) BYTE-IDENTICAL — disclosed modules are already £0, so grandTotal is unchanged (supported
+  //       classes BESS/VF are wholly priced → untouched). Proof: a mixed state's grandTotal equals
+  //       the priced module's subtotal alone.
+  //   (3) NO FABRICATED MASS — an indicative material-cost floor appears ONLY when a defensible
+  //       per-module mass exists (derived_parameters *_mass_kg); absent mass → floor is null (honest
+  //       disclosure, no invented number — the council's own flagged failure mode).
+  try {
+    const matMod = (v: string) => ({ kind: 'material', value: v })
+    const word = (id: string, name: string, mods: any[] = []) => ({ id, name_human: name, modifier_characters: mods })
+    const moduleOf = (module: string, words: any[], derived_parameters?: any) => ({
+      module, display_name: module, derived_parameters,
+      sub_modules: [{ id: `${module}_sm`, name_human: module, words }],
+    })
+    const synthState = {
+      partVerifications: [{ word_id: 'frame_word', distributor_price_gbp: 1000 }],
+      engineeringContract: { macro_assembly_prices: [] },
+      moduleDecomposition: {
+        modules: [
+          // (a) £0, no macro, has material → disclosed; no mass → floor null
+          moduleOf('uncostable_vessel', [
+            word('vessel_word', '316L stainless reactor vessel', [matMod('SS316 stainless steel')]),
+            word('skirt_word', 'vessel support skirt', [matMod('S355 structural steel')]),
+          ]),
+          // (b) priced → NOT disclosed; sole contributor to grandTotal
+          moduleOf('priced_frame', [word('frame_word', 'main frame')]),
+          // (c) £0, no macro, defensible per-module mass → floor = rate × mass
+          moduleOf('massed_vessel', [
+            word('mv_word', '316L stainless vessel', [matMod('SS316 stainless steel')]),
+          ], { vessel_mass_kg: 250 }),
+          // (d) £0 but the only line is NRE/cert → zero capital lines → NOT disclosed
+          moduleOf('cert_only', [word('cert_word', 'type certification programme')]),
+        ],
+      },
+    }
+    const bt = computeBomTotals(synthState)
+    const ind = bt?.indicativeModules ?? []
+    const byMod = (id: string) => ind.find((im) => im.module === id)
+    const mv = byMod('massed_vessel')
+    const checks: Array<[string, boolean]> = [
+      ['uncostable disclosed',            !!byMod('uncostable_vessel')],
+      ['uncostable material named',       byMod('uncostable_vessel')?.dominant_material != null],
+      ['uncostable floor null (no mass)', byMod('uncostable_vessel')?.indicative_floor_gbp == null],
+      ['priced NOT disclosed (XOR)',      !byMod('priced_frame')],
+      ['grandTotal byte-identical',       bt?.grandTotal_gbp === 1000],
+      ['massed mass = 250',               mv?.module_mass_kg === 250],
+      ['massed floor computed > 0',       (mv?.indicative_floor_gbp ?? 0) > 0],
+      ['massed floor == rate × mass',     !!mv && mv.indicative_floor_gbp != null && mv.material_rate_gbp_per_kg != null && Math.abs(mv.indicative_floor_gbp - Math.round(mv.module_mass_kg! * mv.material_rate_gbp_per_kg * 100) / 100) < 0.01],
+      ['NRE-only NOT disclosed',          !byMod('cert_only')],
+    ]
+    const failed = checks.filter(([, ok]) => !ok).map(([n]) => n)
+    assertions.push(assertEq(
+      'UNIVERSAL.uncostable_module_disclosed_not_silent_zero',
+      `£0+no-macro modules disclosed (concept-stage), not silent £0; priced modules untouched (XOR + grandTotal byte-identical); indicative floor only with a defensible mass (9 cases)`,
+      failed.length,
+      (n) => n === 0,
+      () => `P3 disclosure wrong on: ${failed.join('; ')} | indicativeModules=${JSON.stringify(ind)}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.uncostable_module_disclosed_not_silent_zero', description: 'P3 uncostable-module disclosure', passed: false, detail: `threw: ${String(err).slice(0, 180)}` })
   }
 
   // ── U2: consumable rows excluded from capital grand total (2026-05-29) ──────

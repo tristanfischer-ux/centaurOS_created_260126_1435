@@ -32,7 +32,7 @@ import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/p
 import { computeImprovementPlan } from '../src/lib/pdf-engine-v2/lib/auto-improve'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { buildSourcingStrategy } from '../src/lib/pdf-engine-v2/lib/sourcing-strategy'
-import { checkMacroMaterialRate } from '../src/lib/pdf-engine-v2/lib/material-prices'
+import { checkMacroMaterialRate, inferMacroMaterial, getMaterialPrice } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import {
   MARKET_BANDS,
@@ -739,6 +739,30 @@ type BomTotals = {
   // it is NOT a per-unit raw material).
   nreTotal_gbp?: number
   nreRows?: Array<{ word_name: string; quantity: number; unit_price_gbp: number; line_total_gbp: number }>
+  // P3 (2026-06-02, council Option C — grok-4.3 + gemini-3.1-pro + deepseek-v4-pro
+  // UNANIMOUS): top-level modules that priced to ~£0 with NO macro claimed. These
+  // are exotic / unseen classes whose big-ticket items have no hand-authored macro
+  // in engineering-contract.ts (macros are per-class hand-authored), so the parts
+  // cascade finds nothing and the module collapses to £0. Rather than ship a silent
+  // £0 (reads as "free" — a BoM-quality defect), disclose the subsystem honestly as
+  // concept-stage / not-yet-costed, naming its dominant structural material. An
+  // INDICATIVE material-cost lower bound (commodity £/kg × module mass) is shown
+  // ONLY where a defensible module mass exists — never fabricated (the council's own
+  // flagged failure mode: "unreliable physics mass → arbitrary floor"). XOR guard
+  // (Gemini): fires ONLY on a module with zero real cost, so it can never
+  // double-count an already-priced module. Because the module is already £0, routing
+  // it here leaves grandTotal_gbp byte-identical → supported classes (BESS/VF, all
+  // priced) are untouched by construction. Excluded from the capital total + cost
+  // stack; never persisted to the part DB.
+  indicativeModules?: Array<{
+    module: string
+    label: string
+    dominant_material: string | null
+    module_mass_kg: number | null
+    material_rate_gbp_per_kg: number | null
+    indicative_floor_gbp: number | null
+    basis: string
+  }>
   // Cost self-assessment verdict (2026-06-01) — surfaced on the cover when not clean.
   costSanity?: { verdict: string; findings: Array<{ severity: string; detail: string; kind: string }>; lines_checked: number }
 }
@@ -856,7 +880,35 @@ class RenderEngineBClassifier {
 
 const _renderEngineBClassifier = new RenderEngineBClassifier()
 
-function computeBomTotals(state: any): BomTotals | null {
+/**
+ * P3 (2026-06-02, council Option C): a DEFENSIBLE per-module mass for the
+ * indicative material-cost floor — or null. NEVER fabricated (the council's own
+ * flagged failure mode is "unreliable physics mass → arbitrary floor"). v1 reads
+ * ONLY a genuine per-module `*_mass_kg` from the module's own derived_parameters
+ * (excluding system-level / envelope / brief-cap aggregates), so the floor
+ * activates exactly when real per-module mass coverage exists and stays silent
+ * (→ honest concept-stage disclosure) otherwise. This is the forward hook for the
+ * universal per-module-mass plumbing (the BoM-data long pole, [[forgeos_the_aim]]):
+ * as modules gain a real module_mass_kg, their indicative floor lights up for free,
+ * with no change here.
+ */
+function deriveDefensibleModuleMassKg(moduleNode: any): number | null {
+  const dp = moduleNode?.derived_parameters
+  if (!dp || typeof dp !== 'object') return null
+  // Exclude system / envelope / brief-cap aggregates — only a true per-module mass.
+  const EXCLUDE = /(system|brief|cap|envelope|payload|budget|breach|gross|container)/i
+  let best: number | null = null
+  for (const [k, raw] of Object.entries(dp)) {
+    if (!/_mass_kg$/i.test(k)) continue
+    if (EXCLUDE.test(k)) continue
+    const v = typeof raw === 'number' ? raw : Number(raw)
+    if (!Number.isFinite(v) || v <= 0) continue
+    if (best == null || v > best) best = v
+  }
+  return best
+}
+
+export function computeBomTotals(state: any): BomTotals | null {
   const verifications: any[] = Array.isArray(state.partVerifications) ? state.partVerifications : []
   const verifByWordId = new Map<string, any>()
   for (const v of verifications) {
@@ -904,6 +956,11 @@ function computeBomTotals(state: any): BomTotals | null {
   // unit price absurdly (eVTOL BoM was 97% certification line-items).
   let nreTotal_gbp = 0
   const nreRows: BomTotals['nreRows'] = []
+  // P3 (2026-06-02, council Option C): top-level modules that priced to ~£0 with
+  // no macro claimed — disclosed honestly as concept-stage / not-yet-costed rather
+  // than shipped as a silent £0. Populated at each module's close (see ~module
+  // loop tail). Never affects grandTotal (the modules are already £0).
+  const indicativeModules: NonNullable<BomTotals['indicativeModules']> = []
   // Capital lines collected for the cost self-assessment auditor (2026-06-01).
   const capitalLines: CostLine[] = []
   // Render-time cost self-corrections (2026-06-01, Tristan "fix on the fly, don't
@@ -926,6 +983,17 @@ function computeBomTotals(state: any): BomTotals | null {
       subs: [],
       subtotal_gbp: 0,
     }
+    // P3 (2026-06-02): per-module signals for the indicative / uncostable-module
+    // disclosure (council Option C). moduleClaimedMacro = did any word in this
+    // module receive an engineering-contract macro override; moduleCapitalLines =
+    // how many words routed to the CAPITAL subtotal (vs consumables/external/NRE —
+    // a module whose lines all went to those is NOT uncostable, its costs live
+    // elsewhere); moduleMatWords = capital words' (name, explicit material) for
+    // dominant-material inference. A module ending with capital lines but a ~£0
+    // subtotal and no macro is an exotic big-ticket gap → disclosed, not a silent £0.
+    let moduleClaimedMacro = false
+    let moduleCapitalLines = 0
+    const moduleMatWords: Array<{ name: string; material: string | null }> = []
     for (const sm of m.sub_modules ?? []) {
       const sub: BomSub = { id: sm.id, name: sm.name_human || humanise(sm.id), parts: [], subtotal_gbp: 0 }
       for (const w of sm.words ?? []) {
@@ -1078,6 +1146,9 @@ function computeBomTotals(state: any): BomTotals | null {
             contract_override_reason = `Contract macro-assembly (${bestScore >= 1 ? 'exact' : `${Math.round(bestScore * 100)}% token match`}): ${bestMatch.source_detail}`
             // Claim this macro so subsequent matching words don't double-count.
             claimedMacroAssemblies.add(bestMatch.word_name)
+            // P3: this module has a real macro price → it is NOT an uncostable £0
+            // module, so the indicative-disclosure XOR guard must not fire for it.
+            moduleClaimedMacro = true
             // 2026-05-23 (L23 post-mortem): when a macro override applies,
             // CLEAR cost_repair_excluded_from_subtotal. Cost-repair earlier
             // flagged this row as "way under corpus median" and excluded
@@ -1296,6 +1367,15 @@ function computeBomTotals(state: any): BomTotals | null {
               unit_price_gbp: Number(row.unit_price_gbp ?? 0),
               quantity: Number(row.quantity ?? 1) || 1,
             })
+            // P3: track capital lines + their declared material for the
+            // uncostable-module disclosure. A module whose capital lines sum to
+            // ~£0 with no macro claimed is an exotic big-ticket gap.
+            moduleCapitalLines++
+            const matMod = mods.find((mc: any) => mc.kind === 'material')
+            moduleMatWords.push({
+              name: String(row.word_name ?? w.id ?? ''),
+              material: matMod ? String(matMod.value) : null,
+            })
           }
         }
         totalRows += 1
@@ -1311,6 +1391,82 @@ function computeBomTotals(state: any): BomTotals | null {
     if (mod.subs.length > 0) {
       allMods.push(mod)
       grandTotal_gbp = roundToPence(grandTotal_gbp + mod.subtotal_gbp)
+    }
+
+    // ── P3 (2026-06-02, council Option C): uncostable-module disclosure ───────
+    // A top-level module that ended with CAPITAL lines but a ~£0 subtotal and NO
+    // macro claimed is an exotic / unseen-class big-ticket gap (no hand-authored
+    // macro in engineering-contract.ts + a parts-cascade miss). Disclose it
+    // HONESTLY as a concept-stage subsystem naming its dominant material — never a
+    // silent £0 (which reads as "free"). XOR guard (council, Gemini): only
+    // £0 + no-macro modules qualify, so this can never touch an already-priced
+    // module, and grandTotal is unchanged (the module is already £0) → supported
+    // classes (BESS/VF, all priced) stay BYTE-IDENTICAL.
+    const UNCOSTABLE_EPS_GBP = 1
+    if (moduleCapitalLines > 0 && !moduleClaimedMacro && mod.subtotal_gbp < UNCOSTABLE_EPS_GBP) {
+      // Dominant material: most-frequent canonical material across the module's
+      // capital words — preferring an EXPLICIT `material` modifier, falling back to
+      // keyword inference over the word name. canonical = a MATERIAL_PRICES key
+      // (drives the £/kg rate); display = the human string the emitter pinned.
+      const matCount = new Map<string, number>()
+      const displayByCanon = new Map<string, string>()
+      for (const mw of moduleMatWords) {
+        const canon = (mw.material ? inferMacroMaterial(mw.material) : null) ?? inferMacroMaterial(mw.name)
+        if (!canon) continue
+        matCount.set(canon, (matCount.get(canon) ?? 0) + 1)
+        if (mw.material && !displayByCanon.has(canon)) displayByCanon.set(canon, mw.material)
+      }
+      let canonical: string | null = null
+      let bestCount = 0
+      for (const [k, c] of [...matCount.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        if (c > bestCount) { bestCount = c; canonical = k }
+      }
+      const dominant_material = canonical ? (displayByCanon.get(canonical) ?? humanise(canonical)) : null
+      // DEFENSIBLE mass only — null for almost every exotic module today (→ honest
+      // disclosure, no fabricated number).
+      const module_mass_kg = deriveDefensibleModuleMassKg(m)
+      const mp = canonical ? getMaterialPrice(canonical) : null
+      const material_rate_gbp_per_kg = mp
+        ? Math.round(mp.raw_gbp_per_kg * Math.sqrt(mp.mfg_mult_low * mp.mfg_mult_high) * 100) / 100
+        : null
+      const indicative_floor_gbp = (module_mass_kg && material_rate_gbp_per_kg)
+        ? roundToPence(module_mass_kg * material_rate_gbp_per_kg)
+        : null
+      const basis = indicative_floor_gbp != null
+        ? `Indicative material-cost lower bound: ${module_mass_kg!.toLocaleString('en-GB')} kg ${dominant_material} × £${material_rate_gbp_per_kg!.toLocaleString('en-GB')}/kg finished. Excludes fabrication, integration & certification — delivered cost is higher.`
+        : (dominant_material
+            ? `Concept-stage subsystem — dominant material ${dominant_material}${material_rate_gbp_per_kg ? ` (~£${material_rate_gbp_per_kg.toLocaleString('en-GB')}/kg finished)` : ''}; mass + detailed cost resolved at detailed-design stage.`
+            : `Concept-stage subsystem — costed at detailed-design stage.`)
+      indicativeModules.push({
+        module: mod.module,
+        label: mod.display_name ?? mod.label,
+        dominant_material,
+        module_mass_kg,
+        material_rate_gbp_per_kg,
+        indicative_floor_gbp,
+        basis,
+      })
+      // Orphaning guard — do NOT mask a real macro bug (cf. bioreactor task #34):
+      // if an UNCLAIMED macro's semantic tokens overlap a word in THIS module, the
+      // £0 is likely a macro-MATCH failure, not a genuine coverage gap. Surface it
+      // to the actions log rather than papering over it with the disclosure.
+      const allMacros: any[] = [
+        ...((state?.engineeringContract?.macro_assembly_prices ?? []) as any[]),
+        ...((state?.orchestratorContract?.macro_assembly_prices ?? []) as any[]),
+      ]
+      for (const m2 of allMacros) {
+        const wn = String(m2?.word_name ?? '')
+        if (!wn || claimedMacroAssemblies.has(wn)) continue
+        const toks = wn.toLowerCase().split('_').filter((t: string) => t.length >= 4)
+        if (toks.length === 0) continue
+        const hit = moduleMatWords.some((mw) => {
+          const cand = String(mw.name).toLowerCase().replace(/[-\s]+/g, '_')
+          return toks.every((t: string) => cand.includes(t))
+        })
+        if (hit) {
+          console.error(`[render-minimal-pdf] P3 orphaning suspicion: module '${mod.module}' priced £0 but unclaimed macro '${wn}' (£${Number(m2?.total_gbp ?? 0).toLocaleString('en-GB')}) token-overlaps a module word — possible macro-match failure, not a coverage gap (cf. task #34).`)
+        }
+      }
     }
   }
 
@@ -1545,6 +1701,7 @@ function computeBomTotals(state: any): BomTotals | null {
     externalRows: externalRows && externalRows.length > 0 ? externalRows : undefined,
     nreTotal_gbp: nreTotal_gbp > 0 ? nreTotal_gbp : undefined,
     nreRows: nreRows && nreRows.length > 0 ? nreRows : undefined,
+    indicativeModules: indicativeModules.length > 0 ? indicativeModules : undefined,
   }
 }
 
@@ -8400,11 +8557,15 @@ function BillOfMaterialsPage({
   const externalTotal = bomTotals.externalTotal_gbp ?? 0
   const nreRows = bomTotals.nreRows ?? []
   const nreTotal = bomTotals.nreTotal_gbp ?? 0
+  // P3 (2026-06-02): concept-stage / not-yet-costed modules (exotic big-ticket gaps).
+  const indicativeModules = bomTotals.indicativeModules ?? []
+  const indicativeFloorTotal = indicativeModules.reduce((s, im) => s + (im.indicative_floor_gbp ?? 0), 0)
   const hasConsumables = consumablesRows.length > 0
   const hasExternal = externalRows.length > 0
   const hasNre = nreRows.length > 0
+  const hasIndicative = indicativeModules.length > 0
 
-  if (hasConsumables || hasExternal || hasNre) {
+  if (hasConsumables || hasExternal || hasNre || hasIndicative) {
     const fmtGBPSeg = fmtGBP_shared
     pages.push(
       <Page key="bom-page-ancillary" size="A4" style={PAGE_STYLE}>
@@ -8548,6 +8709,51 @@ function BillOfMaterialsPage({
               </View>
               <View style={{ flex: 0.9 }} />
             </View>
+          </>
+        ) : null}
+
+        {/* ── P3 (2026-06-02, council Option C): Indicative / concept-stage subsystems ── */}
+        {hasIndicative ? (
+          <>
+            <View wrap={false} style={{ marginTop: 8, marginBottom: 4, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: '#f8fafc', borderLeftWidth: 3, borderLeftColor: '#64748b', borderRadius: 2 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#334155' }}>
+                Indicative — concept-stage subsystems (not yet costed)
+              </Text>
+              <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic' }}>
+                Excluded from the capital BoM total above. These subsystems are sized but not yet priced to a
+                quotation at concept stage. Where a dominant structural material is identifiable, an indicative
+                material-cost lower bound (commodity £/kg × estimated mass) is shown — NOT a quotation; the delivered
+                cost is higher once fabrication, integration and certification are added.
+              </Text>
+            </View>
+            {indicativeModules.map((im, ri) => (
+              <View key={`ind-${ri}`} wrap={false} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.4, borderBottomColor: '#e2e8f0' }}>
+                <View style={{ flex: 2.2 }}>
+                  <Text style={{ fontSize: 9, color: INK }}>{title_case(im.label)}</Text>
+                </View>
+                <View style={{ flex: 3 }}>
+                  <Text style={{ fontSize: 8, color: MUTED }}>{im.basis}</Text>
+                </View>
+                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: im.indicative_floor_gbp != null ? INK : MUTED, fontFamily: im.indicative_floor_gbp != null ? 'Helvetica-Bold' : 'Helvetica', fontStyle: im.indicative_floor_gbp != null ? 'normal' : 'italic' }}>
+                    {im.indicative_floor_gbp != null ? `≥ ${fmtGBPSeg(im.indicative_floor_gbp)}` : 'TBD'}
+                  </Text>
+                </View>
+                <View style={{ flex: 0.9 }} />
+              </View>
+            ))}
+            {indicativeFloorTotal > 0 ? (
+              <View wrap={false} style={{ flexDirection: 'row', paddingTop: 4, paddingBottom: 6, marginBottom: 10, borderTopWidth: 0.8, borderTopColor: '#64748b' }}>
+                <View style={{ flex: 2.2 }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#334155' }}>Indicative material-floor sub-total (lower bound)</Text>
+                </View>
+                <View style={{ flex: 3 }} />
+                <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#334155' }}>{'≥ '}{fmtGBP_subtotal(indicativeFloorTotal)}</Text>
+                </View>
+                <View style={{ flex: 0.9 }} />
+              </View>
+            ) : null}
           </>
         ) : null}
 
