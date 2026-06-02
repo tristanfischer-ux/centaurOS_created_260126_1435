@@ -41,6 +41,7 @@ import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { _buildComplianceRows, summariseComplianceRows } from './render-minimal-pdf'
+import { buildAuditDigest } from './lib/semantic-self-audit'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
@@ -3439,6 +3440,33 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.compliance_banner_not_false_pass', description: 'compliance banner honesty', passed: true, detail: `skipped — _buildComplianceRows threw: ${String(err).slice(0, 120)}` })
+  }
+
+  // ── UNIVERSAL: the semantic self-audit digest is complete + crash-free for any class (2026-06-02) ──
+  //
+  // UNIVERSAL.self_audit_digest_complete — buildAuditDigest() is the PURE half of the
+  // semantic self-audit stage (the universal LLM-judge complement to the 30 deterministic
+  // gates). It must extract all six canonical dossier sections from ANY snapshot, never
+  // throw on a missing/oddly-shaped section, and carry the deterministic hard-signal layer.
+  // A regression that drops a section (so the judge never scores it) or throws on a sparse
+  // state (so shadow-mode silently records nothing) fails here. The LLM judgment itself is
+  // non-deterministic and not harness-tested; this guards the input contract it depends on.
+  try {
+    const EXPECTED = ['headline', 'brief_compliance', 'bill_of_materials', 'performance_card', 'design_narrative', 'physics_fidelity']
+    const dg = buildAuditDigest(state, productClass)
+    const names = (dg?.sections ?? []).map((s: any) => s.name)
+    const missing = EXPECTED.filter((e) => !names.includes(e))
+    const anyEmptyText = (dg?.sections ?? []).some((s: any) => !s.text || String(s.text).trim() === '')
+    const ok = missing.length === 0 && Array.isArray(dg?.sections) && !anyEmptyText && Array.isArray(dg.sections.flatMap((s: any) => s.hardSignals))
+    assertions.push(assertEq(
+      'UNIVERSAL.self_audit_digest_complete',
+      `semantic self-audit digest has all 6 scored sections for "${productClass}" + non-empty text + deterministic hard-signals (universal self-correction input contract, 2026-06-02)`,
+      ok ? 'complete' : `missing=[${missing.join(',')}]${anyEmptyText ? ' +empty-text' : ''}`,
+      (v) => v === 'complete',
+      (v) => `buildAuditDigest is incomplete for "${productClass}": ${v} — the self-audit would score fewer than 6 sections or record nothing in shadow mode.`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.self_audit_digest_complete', description: 'self-audit digest complete', passed: false, detail: `buildAuditDigest threw for "${productClass}": ${String(err).slice(0, 160)}` })
   }
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }

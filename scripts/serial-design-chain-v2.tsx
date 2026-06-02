@@ -46,6 +46,7 @@ import { LLM_CONFIG } from '../src/lib/pdf-engine-v2/llm-config'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
+import { runSemanticSelfAudit, type LlmCaller } from './lib/semantic-self-audit'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
 // The orchestrator's assembler.ts lazy-loads emitBessDesign internally via
 // `await import('../deterministic-emitter')` at assembler.ts:130 — that path
@@ -5496,6 +5497,47 @@ async function main() {
   } catch (err) {
     console.error(`[chain] failed to re-stamp partVerificationSummary + G2 + G3 after Engine B/C: ${(err as Error).message}; continuing`)
     logAction({ step: 'recompute_summary_after_engines', ok: false, error: String(err).slice(0, 200) })
+  }
+
+  // ── Semantic self-audit (SHADOW, 2026-06-02): the universal LLM-judge complement
+  //    to the 30 deterministic gates. Tristan: "they're all supposed to be self-
+  //    correcting, and that part clearly has failed." The curated gates are BESS-
+  //    derived scar-tissue — they catch SPECIFIC failures but miss the generic defects
+  //    a human spots at a glance (blank headline, £0 vessel, absurd unit, wrong-class
+  //    part, a claim made over a blank cell). This renders a per-section digest of the
+  //    FINAL pre-render state and asks a non-Anthropic reasoner to score every section
+  //    against the ≥8 floor + enumerate every defect — universal, works on unknown
+  //    classes from world knowledge where no curated gate can. SHADOW (mirrors the K10
+  //    ladder): records state.selfAudit + actions.jsonl, NEVER blocks; enforcing mode
+  //    is a later env-flagged step once shadow telemetry calibrates the threshold.
+  //    Self-contained re-read of the final state (written above at the recompute block);
+  //    nothing rewrites statePath before render, so selfAudit persists. Kill: CHAIN_SKIP_SELF_AUDIT=1.
+  if (!process.env.CHAIN_SKIP_SELF_AUDIT) {
+    const tSA = Date.now()
+    try {
+      const auditState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const auditClass = String(
+        auditState?.keyMetrics?.product_class ?? auditState?.parsedBrief?.constraints?.product_class
+        ?? auditState?.complianceGate?.product_class ?? 'unknown',
+      ).trim().toLowerCase()
+      // bound the judge call so a slow/hung audit can never stall the chain (shadow is best-effort)
+      const auditCaller: LlmCaller = (o) => callLlm({ model: o.model, system: o.system, user: o.user, maxTokens: o.maxTokens, temperature: o.temperature, timeoutMs: 120_000 })
+      const sa = await runSemanticSelfAudit(auditState, { productClass: auditClass, callLlm: auditCaller, mode: 'shadow' })
+      auditState.selfAudit = sa
+      writeFileSync(statePath, JSON.stringify(auditState, null, 2))
+      if (sa.ok) {
+        const belowBar = sa.sections.filter((s) => s.score < 8).map((s) => `${s.name}=${s.score}`)
+        console.error(`[chain] self-audit (shadow): floor ${sa.min_score}/10 · mean ${sa.mean_score}/10 · ${sa.blocking_defects.length} blocking · below-8: ${belowBar.join(', ') || 'none'}`)
+        for (const d of sa.blocking_defects.slice(0, 6)) console.error(`  ✗ ${d}`)
+        logAction({ step: 'self_audit_shadow', ok: true, min_score: sa.min_score, mean_score: sa.mean_score, blocking: sa.blocking_defects.length, below_bar: belowBar, hard_signals: sa.hard_signals, model: sa.model, latency_ms: Date.now() - tSA })
+      } else {
+        console.error(`[chain] self-audit (shadow) did not score: ${sa.error} (hard-signals: ${sa.hard_signals.join(', ') || 'none'})`)
+        logAction({ step: 'self_audit_shadow', ok: false, error: sa.error, hard_signals: sa.hard_signals, latency_ms: Date.now() - tSA })
+      }
+    } catch (err) {
+      console.error(`[chain] self-audit (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
+      logAction({ step: 'self_audit_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tSA })
+    }
   }
 
   // ── Engineering Tools Flow — Mermaid diagram (2026-05-24, replaces the
