@@ -42,8 +42,8 @@ describe('spec-extraction', () => {
       expect(specs.dod).toBeCloseTo(0.8, 3)
     })
 
-    it('extracts 28,000 kg gross mass limit', () => {
-      expect(specs.massKg).toBe(28000)
+    it('extracts 38,000 kg gross mass limit', () => {
+      expect(specs.massKg).toBe(38000)
     })
 
     it('extracts 12,192 × 2,438 × 2,896 mm envelope', () => {

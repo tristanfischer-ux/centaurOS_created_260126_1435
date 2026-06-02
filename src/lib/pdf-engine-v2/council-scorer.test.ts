@@ -180,12 +180,12 @@ describe('F8: Per-judge score breakdown (council-scorer)', () => {
     const state = makeState()
     await runCouncilScoring(state)
 
-    // B2 (2026-05-08): MiMo replaced by GPT-5.4.
+    // B2 (2026-05-08): MiMo replaced by GPT-5.4. Model sweep (c7fe256d7): GPT-5.4 → GPT-5.5 (current GA).
     // Iter-09 (2026-05-13): Mistral Large replaced by Gemini Flash-Lite (HTTP 400 unreliability).
-    // Current 3-judge rotation: Grok 4.3 + GPT-5.4 + Gemini 3.1 Flash-Lite (engine-lineage excluded per SCORE-F9).
+    // Current 3-judge rotation: Grok 4.3 + GPT-5.5 + Gemini 3.1 Flash-Lite (engine-lineage excluded per SCORE-F9).
     const uniqueModels = [...new Set(modelsSeen)]
     expect(uniqueModels).toContain('x-ai/grok-4.3')
-    expect(uniqueModels).toContain('openai/gpt-5.4')
+    expect(uniqueModels).toContain('openai/gpt-5.5')
     expect(uniqueModels).toContain('google/gemini-3.1-flash-lite')
   })
 
