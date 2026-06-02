@@ -58,16 +58,22 @@ export interface ComposedToolGraph {
   unsatisfied_inputs: Array<{ tool_id: string; missing: string[] }>
 }
 
-/** Loose key match — the same rule the tools-flow diagram's consumersOf uses:
- *  exact (case-insensitive), or ≥8-char substring containment (so
- *  `cell_count` does NOT match `total_cell_mass_kg`, but `led_heat_load_kw`
- *  matches `led_heat_kw`). Conservative to avoid spurious edges. */
+/** Key match for auto-planner edge derivation. Exact (case-insensitive), OR the shorter key is a
+ *  full _-token-boundary suffix/prefix of the longer with ≥3 tokens — so `compressor_power_kw`
+ *  matches `chiller_compressor_power_kw` (qualifier prefix), but a generic 2-token unit like
+ *  `power_kw`/`mass_kg`, or two unrelated keys sharing a mid-string substring, do NOT.
+ *  TIGHTENED 2026-06-02 from ">=8-char substring containment", which over-coupled the
+ *  backward-chain ACROSS DOMAINS (a 5-output brief pulled in 22 tools across 6 sectors because
+ *  generic keys substring-matched unrelated tools). Under-connection (an input reported
+ *  unsatisfied → brief-supplied/unmet) is the safe failure mode vs over-selecting irrelevant
+ *  physics. Auto-planner-internal only — NOT the production tools-flow diagram. */
 function keysMatch(a: string, b: string): boolean {
   const x = a.toLowerCase()
   const y = b.toLowerCase()
   if (x === y) return true
-  const minLen = Math.min(x.length, y.length)
-  return minLen >= 8 && (x.includes(y) || y.includes(x))
+  const [shortK, longK] = x.length <= y.length ? [x, y] : [y, x]
+  if (shortK.split('_').length < 3) return false  // generic 2-token / single-token keys: exact only
+  return longK.endsWith('_' + shortK) || longK.startsWith(shortK + '_')
 }
 
 function produces(schema: ToolIOSchema, key: string): boolean {
