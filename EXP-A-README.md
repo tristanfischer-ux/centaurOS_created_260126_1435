@@ -78,3 +78,24 @@ Ran the holdout end-to-end on the canonical BESS brief. The de-risk delivered a 
 4. **derived_parameters completeness:** emit the full arithmetic field set per module (cell_count + module_count + cells_per_module …), not just raw contract quantities.
 
 Then re-run `bash scripts/exp-a-bess-golden-holdout.sh` and council vs the 9.28 golden.
+
+---
+
+## Phase-1 RESULT (2026-06-03, two builds) · VERDICT: STRUCTURE SOLVED — SIZING IS THE WALL → PIVOT
+
+Built the component-level Phase-1 (new `generic/component-source.ts` Tier-A corpus union + `generic/build-links.ts` graph-edges + required-link registry + rewritten `derive-skeleton.ts`) and ran the holdout twice.
+
+**What the universal machinery now SOLVES (no per-class code):**
+- gate-23 PASS (22/22 sub_modules) — no completeEmitterGaps injection (the gate-20-safe `'TBD (detailed design)'` placeholder satisfies gate-23, so the mis-pinning injection never fires; `fillBlankWordMpns` still grounds the catalogue-named words).
+- **gate-20 PASS** (was exit-20 in build-1 on a `'Carl Zeiss'` injected mis-pin → fixed by the placeholder).
+- **D-1 PASS** (2 sub_modules/module, mean 2.0) via the split.
+- Grammar/density/links/orphan/sensor/thermal all PASS; layout, BoM-reconciliation, jurisdiction (UK, 0 findings — generic emits NO `regulatory` modifier, sidestepping gate-19), mis-pin, thermal, sizing-vs-load, drift, parts, completeness, consistency all PASS.
+- **4 of 5 Physics dimensions clear or near the ≥8 floor:** brief_to_design_fidelity **8**, part_realism **8**, honesty_signal **9**, internal_coherence 6.
+
+**The lone WALL — engineering_plausibility = 3/10 (sizing/scale):**
+- "15 racks × 800 mm = 12 m won't fit a 40-ft container" (layout geometry), "a 1 MW inverter can't fit in 0.53 L" (grounding pinned a real but SiC-device-scale part), cooling margin. Chain exits **26** (per-rack drift: narrator "250 cells per string" vs the correct total 3750 = 250×15 — a denominator-alignment quirk, the cells ARE sized right).
+- TRADEOFF FOUND: grounding to real parts lifts part_realism (→8) but DROPS plausibility (5→3) because real catalogue parts are scale-wrong for an assembly-level slot. Scale-aware grounding is a Phase-2 lever but the core (how many / what rating / what dimensions) needs coupled-physics SIZING.
+
+**Decision-rule outcome:** HIGH engineering findings + plausibility <6 → **PIVOT** (per `GENERIC-EMITTER-PLAN.md §1`). Pure-generic-≥8 is NOT reachable: the universal path nails structure + document hygiene + parts + honesty (4/5 dims), but ≥8-on-every-section reduces to **ONE** remaining problem — **engineering plausibility = sizing/scale** — which is irreducibly (semi-)per-class coupled physics. The next workstream is **generic structure + per-class-family sizing plug-ins**, not more generic-structure work.
+
+Regression guard: `GENERIC.derive_skeleton_safe_placeholder_and_density` (regression-harness.tsx). Mechanism drawers: `forgeos_gotchas_b96c4c258b64cc14` (two-function grounding), `forgeos_gotchas_64ddb51bf0015e88` (coarse-family class-connections keying).

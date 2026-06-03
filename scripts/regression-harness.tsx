@@ -1382,6 +1382,40 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── GENERIC.derive_skeleton_safe_placeholder_and_density (2026-06-03, wall-3 Phase-1) ──
+  //
+  // The wall-3 generic emitter's component words must (a) carry ONLY a gate-20-safe
+  // PLACEHOLDER part_number ('TBD (detailed design)'), never a real or invented
+  // structured MPN — real MPNs come DOWNSTREAM from fillBlankWordMpns; emitting one
+  // here risks gate-20 (fictional-PN, exit 20) AND re-enables the completeEmitterGaps
+  // mis-pin injection (the Phase-1 "Carl Zeiss on an inverter" HIGH + the component
+  // duplication the physics critic flagged); AND (b) keep MAX_COMPONENTS ≥ 2×MIN_WORDS
+  // so every module splits into ≥2 sub_modules of ≥5 words (audit-pdf-run D-1 mean
+  // ≥2.0/module AND the grammar density floor). Snapshot-independent source scan.
+  // Drawer forgeos_gotchas_b96c4c258b64cc14.
+  {
+    const dsPath = resolve(process.cwd(), 'scripts/lib/orchestrator/generic/derive-skeleton.ts')
+    if (existsSync(dsPath)) {
+      const src = readFileSync(dsPath, 'utf-8')
+      const placeholderRe = /\b(tbd|specify|detailed\s+design|to\s+be\s+(confirmed|selected|determined)|placeholder)\b/i
+      const badPns: string[] = []
+      const pnRe = /mod\(\s*['"]part_number['"]\s*,\s*['"]([^'"]*)['"]/g
+      let pm: RegExpExecArray | null
+      while ((pm = pnRe.exec(src)) !== null) {
+        if (!placeholderRe.test(pm[1])) badPns.push(pm[1])
+      }
+      const minWords = Number(src.match(/const\s+MIN_WORDS\s*=\s*(\d+)/)?.[1] ?? 0)
+      const maxComponents = Number(src.match(/const\s+MAX_COMPONENTS\s*=\s*(\d+)/)?.[1] ?? 0)
+      assertions.push(assertEq(
+        'GENERIC.derive_skeleton_safe_placeholder_and_density',
+        'generic derive-skeleton emits ONLY a gate-20-safe placeholder part_number (never a structured MPN — grounding is downstream) and MAX_COMPONENTS≥2×MIN_WORDS≥10 so every module splits into ≥2 sub_modules of ≥5 words (D-1 + density). wall-3 Phase-1, 2026-06-03',
+        { badPns, minWords, maxComponents },
+        (v) => v.badPns.length === 0 && v.minWords >= 5 && v.maxComponents >= 2 * v.minWords,
+        (v) => `derive-skeleton regressed:${v.badPns.length ? ` componentWord emits a non-placeholder part_number ${JSON.stringify(v.badPns.slice(0, 3))} (gate-20 risk + re-enables completeEmitterGaps mis-pin injection);` : ''}${v.minWords < 5 ? ` MIN_WORDS=${v.minWords}<5;` : ''}${v.maxComponents < 2 * v.minWords ? ` MAX_COMPONENTS=${v.maxComponents}<2×MIN_WORDS (modules cannot split into ≥2 sub_modules → D-1 fail);` : ''}`,
+      ))
+    }
+  }
+
   // ── UNIVERSAL: every engineering macro is recorded in macro-claims.json (2026-05-31) ──
   //
   // UNIVERSAL.every_engineering_macro_recorded_in_claims — if macro-claims.json is
