@@ -612,6 +612,25 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
         // The A2 word-stripping (which left an empty sub_module → gate-23 halt) is
         // superseded by this hard block. Reviewers are prose-only; if the emitter
         // is genuinely missing a sub_module, add it to deterministic-emitter.ts.
+        //
+        // EXPERIMENT B (2026-06-03, Tristan): the hard lockout blocked reviewers from
+        // FIXING brief-fidelity violations — the bioreactor Physics Critic's
+        // single_use_bag_interface + magnetic_coupling_drive adds were REJECTED here,
+        // baking the brief contradiction (multi-use stainless, direct-drive). With
+        // ALLOW_FIDELITY_STRUCTURE_EDITS=1 we APPLY the add (this runs at ~1924, BEFORE
+        // completeEmitterGaps + gate-23, so any MPN gap in the new sub_module is filled
+        // downstream and gate-23 still passes). Determinism caveat acknowledged: a
+        // permanent version would constrain adds to Physics-Critic-flagged violations +
+        // re-assert determinism; this flag is the fidelity-vs-lockout measurement.
+        if (process.env.ALLOW_FIDELITY_STRUCTURE_EDITS === '1' && p.module && p.sub_module?.id) {
+          const m = design.modules.find((x: any) => x.module === p.module)
+          if (!m) { skipped++; reasons.push(`skip add_sub_module: module "${p.module}" not found`); continue }
+          if (!Array.isArray(m.sub_modules)) m.sub_modules = []
+          if (m.sub_modules.some((s: any) => s.id === p.sub_module.id)) { skipped++; reasons.push(`skip add_sub_module: ${p.module}.${p.sub_module.id} already exists`); continue }
+          m.sub_modules.push(p.sub_module)
+          applied++; reasons.push(`+sub_module ${p.module}.${p.sub_module.id} (Exp-B fidelity structure edit — lockout relaxed)`)
+          continue
+        }
         skipped++
         reasons.push(`REJECT [structure-locked] add_sub_module ${p.module}.${p.sub_module?.id}: design structure is emitter-owned; reviewers may not add sub_modules`)
         continue
