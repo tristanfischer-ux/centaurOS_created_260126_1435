@@ -1007,6 +1007,17 @@ async function main() {
         if (existing) {
           existing.distributor_price_gbp = listPrice
           existing.distributor_price_source = 'emitter_list_price'
+          // 2026-06-03 co2_mineralisation cost-undercount fix: ALSO populate
+          // price_estimate_gbp so EVERY downstream reader sees the pinned
+          // catalogue price, not just the ones that consult the distributor
+          // field first. The cover cost-stack + cost_reality gate read
+          // distributor_price_gbp → price_estimate_gbp; but the per-line price
+          // plausibility gate (gate 21) reads cost_repair_corrected_price_gbp
+          // ?? price_estimate_gbp ?? unit_price_gbp and never looks at
+          // distributor_price_gbp — so a distributor-only pin was invisible to
+          // it. Setting both keeps one authoritative number across all readers.
+          existing.price_estimate_gbp = listPrice
+          existing.price_estimate_source = 'emitter_list_price'
         } else {
           const mfgMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'manufacturer')
           const pnMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'part_number')
@@ -1022,6 +1033,10 @@ async function main() {
             confidence: 'high',
             distributor_price_gbp: listPrice,
             distributor_price_source: 'emitter_list_price',
+            // See note above: mirror onto price_estimate_gbp for universal
+            // reader coverage (gate 21 et al. don't read distributor_price_gbp).
+            price_estimate_gbp: listPrice,
+            price_estimate_source: 'emitter_list_price',
           }
           state.partVerifications.push(newRow)
           verifByCompoundId.set(key, newRow)
@@ -1068,6 +1083,22 @@ async function main() {
   console.log(`[estimate] ${targets.length} parts need price estimates`)
   if (targets.length === 0) {
     console.log('[estimate] nothing to do')
+    // CRITICAL (2026-06-03 co2_mineralisation cost-undercount fix): the
+    // emitter list_price_gbp pin pre-step above (lines ~997-1035) mutates
+    // state.partVerifications (96 existing rows + 14 new rows for this run).
+    // Those pins are a real side effect that the downstream cost-reality gate
+    // and renderer MUST see. When EVERY word already carries a price (every
+    // BoM word has a list_price_gbp modifier → targets.length === 0), the old
+    // code returned here WITHOUT reaching the writeFileSync at the foot of
+    // main(), so all 110 pins were silently dropped and cost_reality counted
+    // only the handful of pre-existing distributor quotes (£21,923 of £690,491
+    // for co2_mineralisation). Persist the pinned state before returning.
+    if (write && listPricePinned > 0) {
+      writeFileSync(statePath, JSON.stringify(state, null, 2))
+      console.log(`[estimate] persisted ${listPricePinned} emitter list_price pins → ${statePath}`)
+    } else if (!write) {
+      console.log('[estimate] dry run; pass --write to persist any emitter list_price pins')
+    }
     return
   }
 

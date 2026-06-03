@@ -1711,6 +1711,66 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL.emitter_list_price_flows_to_cost_total (2026-06-03, co2_mineralisation
+  //    cost-undercount fix) ───────────────────────────────────────────────────
+  // When N BoM words carry an emitter `list_price_gbp` modifier, ALL N of those
+  // catalogue-pinned prices MUST flow into the cost roll-up — the BoM grand total
+  // (cost_reality.bom_total_gbp) must be at least the sum of those unit prices
+  // (× quantity), and priced_lines must cover at least those N words. The bug
+  // this guards: estimate-missing-prices.tsx pinned 110 list_price modifiers
+  // (£690,491) but returned early — BEFORE its writeFileSync — whenever EVERY
+  // word already had a price (targets.length === 0), so all 110 pins were
+  // dropped from the persisted state and cost_reality counted only the 9
+  // pre-existing distributor quotes (£21,923). Adding priced parts REDUCED the
+  // counted total — a regression a subset-undercount check would miss. This
+  // invariant asserts the FULL set flows through. Universal across any class with
+  // emitter list_price_gbp modifiers. Guard: only runs when ≥1 list_price word is
+  // present AND cost_reality.bom_total_gbp is recorded (else the stage was
+  // skipped — not a regression).
+  {
+    let listPriceWordCount = 0
+    let listPriceUnitSumGbp = 0      // Σ unit list_price (qty=1)
+    let listPriceQtySumGbp = 0       // Σ unit list_price × quantity
+    for (const m of (state?.moduleDecomposition?.modules ?? [])) {
+      for (const sm of (m.sub_modules ?? [])) {
+        for (const w of (sm.words ?? [])) {
+          const lp = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'list_price_gbp')
+          if (!lp) continue
+          const price = parseFloat(String(lp.value))
+          if (!Number.isFinite(price) || price <= 0) continue
+          let qty = 1
+          const qmod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'quantity')
+          if (qmod) {
+            const n = parseInt(String(qmod.value).replace(/[×x,\s]/g, ''), 10)
+            if (Number.isFinite(n) && n > 0) qty = n
+          }
+          listPriceWordCount += 1
+          listPriceUnitSumGbp += price
+          listPriceQtySumGbp += price * qty
+        }
+      }
+    }
+    const bomTotal = Number(state?.cost_reality?.bom_total_gbp)
+    const pricedLines = Number(state?.cost_reality?.priced_lines)
+    if (listPriceWordCount > 0 && Number.isFinite(bomTotal) && bomTotal > 0) {
+      // The grand total must reflect the FULL set of pinned prices. We compare
+      // against the qty=1 unit sum with a 1% floor tolerance (the cost loop
+      // multiplies by qty, so the real total is ≥ the unit sum); a dropped-pin
+      // regression collapses bomTotal far below this. priced_lines must also
+      // cover at least the list_price words.
+      const floor = listPriceUnitSumGbp * 0.99
+      const totalCoversPins = bomTotal >= floor
+      const linesCoverPins = !Number.isFinite(pricedLines) || pricedLines >= listPriceWordCount
+      assertions.push(assertEq(
+        'UNIVERSAL.emitter_list_price_flows_to_cost_total',
+        `${listPriceWordCount} emitter list_price_gbp word(s) (Σ unit £${Math.round(listPriceUnitSumGbp).toLocaleString()}, Σ×qty £${Math.round(listPriceQtySumGbp).toLocaleString()}) all flow into cost_reality.bom_total_gbp`,
+        totalCoversPins && linesCoverPins ? 1 : 0,
+        (v) => v === 1,
+        () => `Emitter list_price pins are NOT reaching the cost total: ${listPriceWordCount} words carry list_price_gbp summing £${Math.round(listPriceUnitSumGbp).toLocaleString()} (unit), but cost_reality.bom_total_gbp=£${Math.round(bomTotal).toLocaleString()} (need ≥ £${Math.round(floor).toLocaleString()}) and priced_lines=${Number.isFinite(pricedLines) ? pricedLines : 'n/a'} (need ≥ ${listPriceWordCount}). Likely cause: estimate-missing-prices.tsx dropped the list_price pins before writeFileSync (the targets.length===0 early-return path) OR a downstream stage clobbered partVerifications. The cover "Raw materials BoM" + cost-sanity gate will undercount.`,
+      ))
+    }
+  }
+
   // ── UNIVERSAL: phase2 final state parses without truncation (2026-05-26, L38 class-killer D) ──
   //
   // UNIVERSAL.phase2_final_state_parses_without_truncation — verifies that the

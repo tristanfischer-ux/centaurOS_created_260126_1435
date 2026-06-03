@@ -115,7 +115,15 @@ function clip(s: string, n: number): string {
 
 function buildCostVerdict(state: any): string {
   const cr = state?.cost_reality ?? {}
-  const total = num(cr.bom_total_gbp)
+  // Cost SINGLE-SOURCE-OF-TRUTH (2026-06-03): the ex-works figure the cover
+  // prints is costStack.oem_transfer_price_gbp (raw materials + labour +
+  // overhead + manufacturer margin), NOT the raw materials BoM total. Prefer
+  // it so the feasibility narrative, the cover cost-stack, and the gate-32
+  // cost-sanity audit all quote ONE ex-works number. Fall back to the raw
+  // cost_reality.bom_total_gbp only when the cost stack was not persisted
+  // (older state files / classes where the stack could not be resolved).
+  const exWorks = num(state?.costStack?.oem_transfer_price_gbp)
+  const total = exWorks ?? num(cr.bom_total_gbp)
   const verdict = String(cr.verdict ?? '').toLowerCase()
   const ceiling = num(state?.parsedBrief?.constraints?.unit_cost_ceiling?.value)
   if (total == null) {

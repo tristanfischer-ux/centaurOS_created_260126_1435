@@ -5633,6 +5633,25 @@ async function main() {
         order_of_magnitude: Math.round(orderOfMag * 10) / 10,
         verdict: cost_reality_verdict,
       }
+      // ── Cost SINGLE-SOURCE-OF-TRUTH (2026-06-03): persist the ex-works cost
+      // stack onto state.costStack so feasibility-assessment.ts and
+      // independent-cost-sanity-audit.ts (gate 32) read the SAME ex-works
+      // figure the cover prints, instead of falling back to the raw
+      // cost_reality.bom_total_gbp (raw materials only, no labour/overhead/
+      // margin). Previously costStack was render-only (computed inside
+      // render-minimal-pdf.tsx and never written back), so the chain-side
+      // consumers diverged from the cover. Uses the SAME resolveCostStack +
+      // computeCostStack the cover and the G2 band check use, so all three
+      // surfaces are byte-consistent. Universal across all classes.
+      if (bomTotalGbp > 0) {
+        try {
+          const { ratios: csRatios, class_key: csClassKey } = resolveCostStack(liveState)
+          liveState.costStack = computeCostStack(bomTotalGbp, csRatios, csClassKey)
+          console.error(`[chain] costStack persisted: ex-works £${Math.round(liveState.costStack.oem_transfer_price_gbp)} (raw materials £${Math.round(liveState.costStack.raw_materials_bom_gbp)}, class ${csClassKey})`)
+        } catch (csErr) {
+          console.error(`[chain] costStack persist threw: ${(csErr as Error).message}; continuing without`)
+        }
+      }
       console.error(`[chain] G2 cost-reality: ${cost_reality_verdict.toUpperCase()} — BoM £${Math.round(bomTotalGbp)} across ${bomPricedLines} priced lines (${bomUnpricedLines} unpriced)`)
       logAction({ step: 'cost_reality_gate', verdict: cost_reality_verdict, bom_total_gbp: Math.round(bomTotalGbp), priced_lines: bomPricedLines, latency_ms: Date.now() - tCostReality, ok: true })
     } catch (err) {
