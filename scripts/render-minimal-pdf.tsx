@@ -10433,6 +10433,51 @@ function readToolsUsedPage(state: any): any | null {
   return null
 }
 
+// Investor-fit appendix (2026-06-03) — the Fractional Forge lead-gen section.
+// Reads state.investorSection (set by enrich-state-with-investors.tsx); returns
+// null when absent so dossiers without the enrichment render unchanged.
+function InvestorPage({ state, project }: { state: any; project: string }) {
+  const sec = state?.investorSection
+  if (!sec || !Array.isArray(sec.picks) || sec.picks.length === 0) return null
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Appendix · Potential Investors" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Potential Investors
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 16, lineHeight: 1.55 }}>
+        {String(sec.one_liner ?? '')} — these firms have a thesis that fits. We have named the firm; the specific partner to approach is available through Fractional Forge.
+      </Text>
+      {sec.picks.map((p: any, i: number) => (
+        <View key={`inv-${i}`} style={{ marginBottom: 12, padding: 12, borderWidth: 1, borderColor: '#e3e8f0', borderRadius: 5 }} wrap={false}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+            <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: INK }}>
+              {String(p.firm ?? '')} <Text style={{ fontFamily: 'Helvetica', fontSize: 9, color: MUTED }}>· partner withheld</Text>
+            </Text>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: ACCENT }}>Thesis fit: {String(p.fit ?? 'good')}</Text>
+          </View>
+          {([['Why them', p.why_them], ['Why you', p.why_you], ['How to pitch', p.how_to_pitch]] as Array<[string, string]>).map(([lab, val], j) => (
+            <View key={`inv-${i}-${j}`} style={{ flexDirection: 'row', marginBottom: 4 }}>
+              <Text style={{ width: 78, fontSize: 8, fontFamily: 'Helvetica-Bold', color: ACCENT }}>{lab}</Text>
+              <Text style={{ flex: 1, fontSize: 9.5, color: '#28313f', lineHeight: 1.45 }}>{String(val ?? '')}</Text>
+            </View>
+          ))}
+        </View>
+      ))}
+      <View style={{ marginTop: 14, padding: 14, borderWidth: 1, borderColor: '#cfe6e0', backgroundColor: '#f3faf8', borderRadius: 6 }} wrap={false}>
+        <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 4 }}>Want the named partners and the full match list?</Text>
+        <Text style={{ fontSize: 9.5, color: '#2c3a44', lineHeight: 1.5, marginBottom: 8 }}>
+          This dossier shows five of your strongest-fit firms (matched live from {String(sec.candidate_count ?? '')} candidates in Fractional Forge&apos;s investor intelligence). The specific partner to approach at each — plus the wider matched set, warm-intro paths and live fund status — are at Fractional Forge.
+        </Text>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT }}>fractionalforge.com →</Text>
+      </View>
+      <Text style={{ marginTop: 12, fontSize: 7.5, color: MUTED, lineHeight: 1.4 }}>
+        Investor matches are generated from your brief against Fractional Forge&apos;s investor database and are indicative signals, not investment advice or any endorsement by the named firms. Individuals are withheld by design.
+      </Text>
+    </Page>
+  )
+}
+
 function ToolsUsedPage({ state, project }: { state: any; project: string }) {
   const page = readToolsUsedPage(state)
   if (!page) return null
@@ -10915,6 +10960,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           (returns null) when the orchestrator phase didn't run OR no
           tools contributed claims — preserves legacy chain output. */}
       <ToolsUsedPage state={state} project={project} />
+      <InvestorPage state={state} project={project} />
     </Document>
   )
 }

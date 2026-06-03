@@ -5828,6 +5828,24 @@ async function main() {
     logAction({ step: 'tools_flow_mermaid', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // ── Investor-fit section (2026-06-03): the Fractional Forge lead-gen appendix.
+  // Matches the brief against the Forge Capital investor DB + writes the 5-investor
+  // section onto state.investorSection for the renderer's InvestorPage. Fail-soft
+  // (the enrichment + the page both no-op on any miss). Skip via INVESTOR_SECTION=0.
+  if (process.env.INVESTOR_SECTION !== '0') {
+    const tInv = Date.now()
+    try {
+      execFileSync('npx', ['tsx', resolve(__dirname, 'enrich-state-with-investors.tsx'), statePath, '--write'], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+      })
+      logAction({ step: 'investor_section', latency_ms: Date.now() - tInv, ok: true })
+    } catch (err) {
+      console.error(`[chain] investor-section enrichment failed (non-fatal): ${(err as Error).message.slice(0, 120)}`)
+      logAction({ step: 'investor_section', latency_ms: Date.now() - tInv, ok: false, error: String(err).slice(0, 200) })
+    }
+  }
+
   const pdfPath = resolve(outDir, 'chain-v2.pdf')
   // 2026-05-19 fix C2: pass RENDER_NO_OPEN=1 to renderer in worker context so
   // the renderer doesn't try to open Preview (LaunchAgent has no GUI session).
