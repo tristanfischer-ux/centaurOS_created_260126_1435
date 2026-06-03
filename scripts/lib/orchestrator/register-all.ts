@@ -360,6 +360,7 @@ import './emitters/edge-ai'
 import './emitters/humanoid'
 import './emitters/smr'
 import './emitters/dac'
+import './emitters/co2-mineralisation' // 2026-06-03 CO2 capture + mineral-carbonation plant (MEA→gypsum→CaCO3+K2SO4)
 import './emitters/solid-state-battery'
 // 2026-05-22 HVAC + medical BESS-quality batch (Build #20b):
 // heat_pump_residential / dialysis_machine / ventilator / cgm

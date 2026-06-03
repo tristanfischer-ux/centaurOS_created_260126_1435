@@ -27,6 +27,12 @@ export interface ProductClassification {
 // + engineering-contract.ts ARCHETYPE_ALIASES) or the chain falls back to the
 // generic envelope rather than the class-specific path.
 const DECLARED_CLASS_SIGNATURES: Array<{ re: RegExp; cls: string }> = [
+  // CO2 capture + MINERAL CARBONATION plant (2026-06-03): MEA flue-gas capture →
+  // gypsum → CaCO3 + K2SO4, with MEA recovery. Must beat the 'dac' rule below (this
+  // is SOLVENT capture + mineralisation to PRODUCTS, not sorbent air capture) and
+  // the generic vehicle/other catches ("trailer", "skid"). Routes to the
+  // co2_mineralisation emitter + envelope detector.
+  { re: /mineral[\s-]?carbon(?:at|is)|capture\s+and\s+mineralis|mineralis\w*\s+(?:the\s+)?(?:captured\s+)?(?:co2|carbon)|(?:co2|carbon).{0,40}gypsum|gypsum.{0,40}(?:co2|carbon|calcium\s*carbonate|caco3)/, cls: 'co2_mineralisation' },
   // Direct air capture — "direct air capture"/"DAC module"/"X tCO2/yr capture".
   // Must beat thermal_system (DAC regen uses an 80-100 °C heat-pump train, so the
   // brief is FULL of heat-pump / refrigerant / condenser / COP signals).

@@ -222,6 +222,10 @@ const CLASS_ALIASES: Record<string, string> = {
   general_purpose_humanoid: 'humanoid',
   // DAC
   dac: 'dac',
+  co2_mineralisation: 'co2_mineralisation',
+  co2_mineralization: 'co2_mineralisation',
+  mineral_carbonation: 'co2_mineralisation',
+  carbon_mineralisation: 'co2_mineralisation',
   direct_air_capture: 'dac',
   atmospheric_co2_capture: 'dac',
   co2_air_capture: 'dac',
@@ -1637,6 +1641,21 @@ interface ClassDetectors {
   nameplateKwh?: (c: ParsedConstraints) => number | undefined
 }
 
+// CO2 capture + mineral-carbonation plant (2026-06-03). Sized by t CO2/day;
+// always returns a tier so the envelope resolves (the emitter sizes from contract
+// quantities with fallbacks). Skid-mounted, low-voltage chemical plant.
+function co2MinScaleTier(c: ParsedConstraints): string | null {
+  const desc = String(c.product_description ?? '').toLowerCase()
+  const m = desc.match(/(\d+(?:\.\d+)?)\s*t(?:onne)?s?\s*(?:of\s+)?co2\s*\/?\s*(?:per\s+)?day/)
+  const tpd = m ? parseFloat(m[1]) : 1
+  if (tpd <= 5) return 'pilot'
+  if (tpd <= 100) return 'demonstration'
+  return 'commercial'
+}
+function co2MinVoltageTier(_: string | null, _c: ParsedConstraints): VoltageTier { return 'low' }
+function co2MinFormFactor(_: string | null, _c: ParsedConstraints): string { return 'skid_mounted' }
+function co2MinApplication(_: string | null, _c: ParsedConstraints): string { return 'carbon_mineralisation' }
+
 const DETECTORS: Record<string, ClassDetectors> = {
   bess: {
     scaleTier: bessScaleTier,
@@ -1856,6 +1875,12 @@ const DETECTORS: Record<string, ClassDetectors> = {
     voltageTier: dacVoltageTier,
     formFactor: dacFormFactor,
     application: dacApplication,
+  },
+  co2_mineralisation: {
+    scaleTier: co2MinScaleTier,
+    voltageTier: co2MinVoltageTier,
+    formFactor: co2MinFormFactor,
+    application: co2MinApplication,
   },
 }
 
