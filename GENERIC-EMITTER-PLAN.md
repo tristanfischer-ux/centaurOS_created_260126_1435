@@ -129,3 +129,28 @@ Reuses: the assembler registry + `finalise()`, `getClassReferenceGraphDBFirst`, 
 - **Generic ≥6-honest universally, gate-passing, real-part, honestly-costed, near-term: YES** (moderate-high confidence). The components exist and partly shipped in the bioreactor run; the gap is (i) relaxing the structure-lockout and (ii) wiring the auto-promotion flywheel.
 
 **Sequence:** Experiment B (lockout, hours) → Experiment A (BESS-golden, 1 day) → if hybrid: Phase 0 → Q → 1 → 2 → 3 → 4. Pure-generic-≥8 stays the north star; ≥6-honest is the next build.
+
+---
+
+## 10. The strongest path — the LLM authors the *sizing code*, iterated against the oracle (Tristan, 2026-06-03)
+
+The council (and my §9 verdict) under-rated one option, and Tristan is right to correct it. The argument against ≥8-generic was: "the 9.28 is 4,710 lines of coupled-physics code that doesn't live in a growable DB, and an LLM can't originate it." **But that code was written by an LLM in the first place.** So the constraint isn't "an LLM can't author sizing physics" — it demonstrably can; it's "an LLM can't do it reliably *one-shot*." Those are different, and the second is solvable by the same mechanism that produced the BESS emitter: **iteration against an oracle.**
+
+**The reframe — emit *code*, not a *design*.** The generic emitter's LLM layer should not produce the design directly (non-deterministic, silently-wrong, exactly why the LLM-Generator was deleted). It should produce a **bespoke per-class sizing module** — code — that is then:
+- **deterministic** (run N times → identical output; passes the determinism test the structure-lockout was protecting),
+- **testable** (run it → score against the 30 gates + council + the universal self-audit),
+- **inspectable** (a human/LLM can read the formula; wrong physics is visible, not buried in a one-shot design),
+- **iterable** (gate/audit failures feed back → the LLM fixes the code → re-run → converge),
+- **cacheable/promotable** (write once per class → the §5 flywheel; the second instance is free).
+
+This is **literally how the BESS emitter reached 9.28** — Claude wrote sizing code, ran it through gates and councils, saw the failures, fixed the code, over many sessions. The proposal is to **close that loop and automate it**: the chain's iteration loops, council scoring, and gate feedback already exist. So the "LLM physics-refinement" layer in §3/§7 is upgraded from *"refine the design"* (capped ~≥6) to *"author + iterate a sizing module against the oracle"* (ceiling = whatever the loop converges to, potentially ≥8).
+
+**What this changes in the verdict.** The blocker for ≥8-generic is **not** "LLMs can't write the physics" — they can. It's **convergence**: does the automated write-code → score → fix loop converge as well as the human-in-the-loop version did, and is the **oracle strong enough** to catch wrong physics on a *novel* class (where the BESS-shaped gates have blind spots)? That makes two things load-bearing, and both are already in this plan:
+1. **The universal physics self-audit (§6)** is no longer just a safety backstop — it becomes the **convergence signal** the code-gen loop optimises against. A gate that only knows BESS failure modes can't guide an unseen class to correctness; an LLM-judge asking "does this design's physics close?" can. *Strengthening the oracle is the highest-leverage investment.*
+2. **The flywheel (§5)** is what makes the per-class code-gen cost (many LLM calls + executions to converge) a **one-time** cost — pay once on first sight, cache the converged module, never again.
+
+**Honest caveats (named, not hidden):** (a) convergence is genuinely unproven for an *arbitrary* class — the loop could plateau below 8 or oscillate; (b) executing LLM-authored code needs the same sandbox discipline the existing tool venv already provides; (c) a converged module that passes a weak oracle is *confidently wrong* — so the oracle quality is the ceiling on trust (this is seat-3's risk, now the central design problem rather than a footnote).
+
+**The de-risk experiment (§1-A) should now test exactly this.** Reframe it: hold out the BESS emitter, have the engine **generate a bespoke BESS sizing module from the brief + tool graph and iterate it against the gates + council + self-audit**, and measure whether it converges toward 9.28. That is the decisive test of the thesis — not "can generic structure + a one-shot refinement reach 8" (it can't), but "can the *write-code-and-iterate* loop reach 8 on the one class where we have ground truth." If it converges on BESS, ≥8-generic is real and the whole north star is reachable; if it plateaus, we learn the oracle is the gap and invest there. Either outcome is decisive, and it costs ~1 session.
+
+**Revised one-line recommendation:** build the generic emitter as **structure (DB-first) + an LLM that authors-and-iterates a per-class sizing module against a *universal physics oracle* + the flywheel that caches the converged module** — and run the BESS-golden de-risk on *that* loop. ≥6-honest is the floor it ships at from day one; ≥8 is what the loop converges to where the oracle is strong enough — and that, not hand-written code, is how "any industrial product" actually scales.
