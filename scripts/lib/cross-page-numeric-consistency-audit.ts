@@ -508,6 +508,86 @@ interface NumericOccurrence {
   contextWindow: string // ~30 chars before + 10 after
   preTokens: string[] // 6 tokens before
   postTokens: string[] // 4 tokens after
+  /** When the number is the RHS of a tool-output assignment
+   * "<field_name> = <value>" (e.g. "absorber shell mass = 1,274 kg"), this is
+   * the normalised field name immediately preceding the "=" (e.g.
+   * "absorbershellmass"). null when the occurrence is free prose, not an
+   * assignment. Used to anchor distinct tool-output fields into distinct
+   * clusters so a run-on "name = a, name = b, name = c" sentence does not
+   * collapse every value into one false contradiction. Added 2026-06-03. */
+  fieldKey: string | null
+}
+
+/** Extract the FIELD NAME from a tool-output assignment "<field> = <number>".
+ *
+ * Tool-computation prose packs many DISTINCT engineering quantities into one
+ * run-on sentence: "computed absorber shell mass = 1,274 kg, stripper shell
+ * mass = 940 kg, reactor shell mass = 905 kg". Every value shares the generic
+ * family anchor "mass", so without a per-field discriminator they collapse
+ * into a single cluster and fire a false contradiction (the co2-mineralisation
+ * gate-18 case, 2026-06-03). The SPECIFIC field name sits immediately before
+ * the "=". We take the run of name words between the preceding delimiter
+ * (comma / semicolon / period / bullet / open-paren / colon) and the "=",
+ * then normalise: lowercase, strip a trailing unit-suffix token from snake_case
+ * identifiers (cp_anode_mass_KG → cp_anode_mass), drop non-alphanumerics. The
+ * result keys the cluster, so each distinct field is its own cluster.
+ *
+ * Returns null when `preText` does not end in an assignment (`... = ` directly
+ * before the number) — i.e. ordinary prose ("deliver 2.69 MWh of usable
+ * energy") is untouched, preserving the L22 BESS cover-vs-mission detection.
+ *
+ * UNIVERSAL: every tool-rich class (BESS, wind, ev-charger, co2, …) emits this
+ * "<field> = <value>" pattern from its orchestrator tool outputs; the fix needs
+ * no per-class table. */
+const ASSIGNMENT_FIELD_STOPWORDS = new Set<string>([
+  'computed', 'compute', 'computes', 'confirms', 'confirm', 'confirmed',
+  'this', 'the', 'a', 'an', 'of', 'for', 'is', 'are', 'design', 'check',
+  'assumes', 'assume', 'where', 'with', 'and', 'gives', 'yields', 'at',
+])
+// A trailing snake_case unit suffix (…_kg, …_kw, …_a, …_t, …_mm, …_v, …_mpa,
+// …_m, …_kwh, …_mwh, …_pct, …_y, …_yr, …_c) is a UNIT annotation on the field
+// name, not part of the field IDENTITY. "cp_anode_mass_kg" and the prose form
+// "cp anode mass" must map to the SAME field key so a snake_case spec-dump line
+// and a sentence form of the same quantity still cluster (and a genuine
+// contradiction between them still fires).
+const FIELD_UNIT_SUFFIX = /_(?:kg|t|kw|mw|gw|w|kwh|mwh|gwh|wh|a|ma|ka|v|kv|mv|mm|cm|km|m|mpa|kpa|pa|bar|psi|hz|khz|mhz|ghz|c|pct|percent|y|yr|yrs|years|m2|m3|lpm|nm)$/
+function extractAssignmentFieldKey(preText: string): string | null {
+  // Require the text to end with "= " (optionally with whitespace/newlines)
+  // directly before where the number begins.
+  if (!/=\s*$/.test(preText)) return null
+  // Drop the trailing "= " then take everything after the last hard delimiter.
+  const beforeEq = preText.replace(/=\s*$/, '')
+  // Split on delimiters that separate one "field = value" clause from the next:
+  // comma, semicolon, bullet/middot, pipe, colon, open/close paren, and a
+  // sentence period. Take the LAST segment — the field name for THIS value.
+  const seg = beforeEq.split(/[,;:•·|()•·]|\.\s/).pop() ?? ''
+  const allTokens = seg
+    .replace(PRE_CONTEXT_NOISE, ' ')
+    .split(/[\s]+/)
+    .map((t) => t.toLowerCase().replace(/[^a-z0-9_]/g, ''))
+    .filter(Boolean)
+    .filter((t) => !ASSIGNMENT_FIELD_STOPWORDS.has(t))
+  // A field name is the SHORT noun phrase immediately before "=" (1-4 words:
+  // "absorber shell mass", "cp protection current", "mea pump motor"). When the
+  // assignment is the FIRST clause in a sentence there is no preceding
+  // delimiter, so `seg` also captures the sentence/section prefix ("Mass
+  // Aggregator Envelope Check computed total plant mass"). Keep only the LAST 4
+  // tokens so the prefix (page title, restated/continued markers) cannot
+  // pollute the key and split two occurrences of the SAME field across pages —
+  // that pollution is what hid a genuine same-field contradiction before. Snake
+  // identifiers are a single token and unaffected by the cap.
+  const tokens = allTokens.slice(-4)
+  if (tokens.length === 0) return null
+  // Normalise each token: strip a trailing snake_case unit suffix so
+  // "cp_anode_mass_kg" === "cp anode mass". Then concatenate the alphanumerics.
+  const norm = tokens
+    .map((t) => t.replace(FIELD_UNIT_SUFFIX, ''))
+    .join('')
+    .replace(/[^a-z0-9]/g, '')
+  // Guard: a 1-char remnant (e.g. a lone "t" from "CO2 t =") is not a usable
+  // field identity — fall back to null so the occurrence clusters normally.
+  if (norm.length < 3) return null
+  return norm
 }
 
 /** Run pdftotext page-by-page; returns Map<pageNumber, text>. */
@@ -671,6 +751,23 @@ function extractOccurrences(pageText: string, page: number): NumericOccurrence[]
         if (def.family === 'TEMP') continue
       }
     }
+    // CHARGE-vs-CURRENT dimension guard (2026-06-03, gate-18 co2 false-positive
+    // case 2). pdftotext extracts "39,420 A-hr" as the number "39,420" + unit
+    // "A" (the unit regex stops at the hyphen). An ampere-HOUR is a CHARGE
+    // (current × time), a different physical dimension from an ampere (CURRENT);
+    // "39,420 A-hr" must NOT cluster with "0.225 A". The matched-unit token is
+    // CURRENT (A / mA / kA) but the immediately-following characters spell out
+    // "-hr" / "·hr" / "h" (ampere-hours) or "-hr/kg" (specific charge capacity).
+    // Skip the occurrence entirely — it is not a current claim. Mirrors the
+    // kWh-vs-kW family separation the UNIT_TABLE already encodes (ENERGY ≠ POWER)
+    // for the case where the "h" is severed from "A" by a hyphen. Universal:
+    // any tool-output that prints a charge (anode sizing, battery Ah ratings)
+    // benefits. A real current contradiction (two bare-A values) is unaffected
+    // because bare amperes are never followed by an "h".
+    if (def.family === 'CURRENT') {
+      const postChargeChar = cleaned.slice(matchStart + m[0].length, matchStart + m[0].length + 5)
+      if (/^\s*[-·.]?\s*h(?:r|our|\b)/i.test(postChargeChar)) continue
+    }
     const preText = cleaned.slice(Math.max(0, matchStart - 150), matchStart)
     const postText = cleaned.slice(matchStart + m[0].length, matchStart + m[0].length + 80)
     const preTokensRaw = preText
@@ -684,6 +781,8 @@ function extractOccurrences(pageText: string, page: number): NumericOccurrence[]
     const preTokens = preTokensRaw.slice(-6) // last 6 tokens preceding the number
     const postTokens = postTokensRaw.slice(0, 4) // first 4 tokens after the unit
     const contextWindow = `${preText.slice(-60)}[${m[0]}]${postText.slice(0, 40)}`.replace(/\s+/g, ' ').trim()
+    // Field-anchored cluster key for tool-output assignments "<field> = <N>".
+    const fieldKey = extractAssignmentFieldKey(preText)
     occurrences.push({
       page,
       rawValue: rawValueStr,
@@ -695,6 +794,7 @@ function extractOccurrences(pageText: string, page: number): NumericOccurrence[]
       contextWindow,
       preTokens,
       postTokens,
+      fieldKey,
     })
   }
   return occurrences
@@ -790,6 +890,28 @@ function looksLikePartSpecific(occ: NumericOccurrence): boolean {
   if (/\b\d+[A-Z]{2,}\b/.test(combined)) return true
   // Brand-name + part-form prefix common in BoM cards.
   if (/\bpart\b/i.test(combined)) return true
+  // PACKAGED-UNIT / PER-UNIT measurement: a value that is the size of one
+  // packaged/repeated unit — "249 × 25 kg bags/day", "3 × 18 kg sacks", "12 kg
+  // per cartridge" — is a per-part measurement, not a system-level scalar. It
+  // must not cluster with a system total (the co2 case: "25 kg bags" vs the
+  // 18,779 kg plant mass). Two signals, EITHER fires:
+  //   (a) a count-multiplier immediately precedes the number ("249 ×", "3 x")
+  //   (b) a packaged/per-unit noun immediately follows ("bags", "sacks",
+  //       "cartridges", "each", "per <noun>"). Added 2026-06-03.
+  const post = occ.postTokens.map((t) => t.toLowerCase().replace(/[^a-z]/g, '')).filter(Boolean)
+  const PACKAGE_NOUNS = new Set<string>([
+    'bag', 'bags', 'sack', 'sacks', 'cartridge', 'cartridges', 'drum', 'drums',
+    'canister', 'canisters', 'cylinder', 'cylinders', 'bottle', 'bottles',
+    'pallet', 'pallets', 'each', 'apiece', 'unit', 'units', 'piece', 'pieces',
+  ])
+  if (post.length > 0 && PACKAGE_NOUNS.has(post[0])) return true
+  if (post.length > 0 && post[0] === 'per') return true
+  const lastPre = occ.preTokens.length ? occ.preTokens[occ.preTokens.length - 1] : ''
+  if (/^[×x*]$/i.test(lastPre)) return true
+  // pdftotext often renders "249 × 25" with the multiplier glued or as a bare
+  // "×" token swallowed by PRE_CONTEXT_NOISE — also catch a count-then-multiplier
+  // in the raw pre window ("249 ×" / "249 x" within the last ~12 chars).
+  if (/\d+\s*[×x*]\s*$/i.test(occ.contextWindow.replace(/\[.*$/, ''))) return true
   return false
 }
 
@@ -880,18 +1002,39 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
     // single-component) so an 8,500 kg machine-mass cap never clusters with a
     // 4,500 kg cast-iron base mass. Other families pass scope='' (no effect).
     const scope = feat.family === 'MASS' ? massScopeOf(feat.occ) : ''
+    // 2026-06-03 FIELD-ANCHORED clustering (co2-mineralisation gate-18 fix). When
+    // the number is the RHS of a tool-output assignment "<field_name> = <value>",
+    // the SPECIFIC field preceding the "=" (absorber_shell_mass,
+    // stripper_shell_mass, cp_anode_mass, …) is the true identity of the
+    // quantity — NOT the generic family anchor ("mass"), which every field in a
+    // run-on "name = a, name = b, name = c" sentence shares. Fold the field key
+    // into the cluster key so distinct fields form DISTINCT clusters and a dense
+    // tool-output sentence stops collapsing six quantities into one false
+    // contradiction. Free-prose occurrences carry fieldKey=null → field='' →
+    // existing behaviour is byte-for-byte unchanged (the L22 BESS prose-vs-prose
+    // contradiction, which has no "=", is fully preserved). A genuine SAME-field
+    // contradiction (the same field assigned two different values across pages)
+    // still shares one field key → still clusters → still fires HIGH.
+    const field = occ.fieldKey ? `|field=${occ.fieldKey}` : ''
     let key: string
     if (feat.anchor) {
       // Anchor-based clustering: family + anchor + strong-qualifier-set + role
-      // (+ mass-scope for MASS).
+      // (+ mass-scope for MASS) (+ field for tool-output assignments).
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}|scope=${scope}`
+      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}|scope=${scope}${field}`
     } else if (PART_SPECIFIC_FAMILIES.has(feat.family)) {
-      // No fallback clustering for part-specific families. The audit would
-      // be too noisy — every BoM line has a length/mass/voltage on a
-      // specific component, and the engine's variation across parts is by
-      // design, not a contradiction.
-      continue
+      // No fallback clustering for part-specific families UNLESS the occurrence
+      // is a tool-output assignment with an explicit field name. A bare
+      // per-part length/mass/voltage stays excluded (every BoM line has one and
+      // the variation is by design), but a "<field> = <value>" assignment names
+      // a SYSTEM quantity (total plant mass, cp anode mass) whose cross-page
+      // agreement IS worth checking — keyed on the field so distinct fields
+      // never collide. Added 2026-06-03 (co2-mineralisation): without this the
+      // p12 "cp anode mass = 20 kg" / "total plant mass = 18,779 kg" assignments
+      // were dropped from MASS clustering and could not be checked at all.
+      if (!occ.fieldKey) continue
+      const qualSorted = [...strongQuals].sort().join('+')
+      key = `${feat.family}|qual=${qualSorted}|role=${role}|scope=${scope}${field}`
     } else {
       // Fallback for non-part-specific families: family + head +
       // strong-qualifier-set. Stricter — requires EXACT head-token match.
@@ -899,7 +1042,7 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
       // (e.g. table rows that quote the same spec twice).
       const headSorted = [...feat.head].sort().join('+')
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|head=${headSorted}|qual=${qualSorted}|role=${role}`
+      key = `${feat.family}|head=${headSorted}|qual=${qualSorted}|role=${role}${field}`
     }
     let c = clusters.get(key)
     if (!c) {

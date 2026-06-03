@@ -26,12 +26,13 @@ import { fileURLToPath } from 'url'
 import { generateSubmoduleParagraph } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { getClassStandards, mergeBriefAndClassStandards, type RegulatoryStandard } from '../src/lib/pdf-engine-v2/class-standards'
 import { getClassHazards, computeHazardRPN, type ClassHazard } from '../src/lib/pdf-engine-v2/class-hazards'
+import { buildFeasibilityAssessment } from '../src/lib/pdf-engine-v2/lib/feasibility-assessment'
 import { resolvePriceBand, type PriceBand, type PriceBandVerdict } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasibility-gate'
 import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { computeImprovementPlan } from '../src/lib/pdf-engine-v2/lib/auto-improve'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
-import { buildSourcingStrategy } from '../src/lib/pdf-engine-v2/lib/sourcing-strategy'
+import { buildSourcingStrategyFromState, deriveSourcingArchetypesFromState, countPinnedManufacturers } from '../src/lib/pdf-engine-v2/lib/sourcing-strategy'
 import { checkMacroMaterialRate, inferMacroMaterial, getMaterialPrice } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import {
@@ -7563,8 +7564,21 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
   const productClass = String(state.moduleDecomposition?.product_class ?? '')
   if (!productClass) return null
   const classBlock = getClassHazards(productClass)
-  if (classBlock.hazards.length === 0 && systemRisks.length === 0) return null
+  // Technical-feasibility assessment (2026-06-03): cost verdict + proven
+  // engineering margins (from the orchestrator tool outputs) + top technical
+  // risks with severity + regulatory / manufacturing flags. This is the
+  // design-specific content the council scores `feasibility_notes` on — the
+  // class-hazard register below is generic to the class, so without this block
+  // the section read as boilerplate (CO₂ scored 7.5). Universal across classes.
+  const feas = buildFeasibilityAssessment(state)
+  if (classBlock.hazards.length === 0 && systemRisks.length === 0 && !feas.has_content) return null
   const sorted = [...classBlock.hazards].sort((a, b) => computeHazardRPN(b) - computeHazardRPN(a))
+
+  const SEV_STYLE: Record<string, { bg: string; bar: string; fg: string; tag: string }> = {
+    high: { bg: '#ffe4e6', bar: '#b91c1c', fg: '#7f1d1d', tag: 'HIGH' },
+    med: { bg: '#fef3c7', bar: '#c2410c', fg: '#92400e', tag: 'MEDIUM' },
+    low: { bg: '#f1f5f9', bar: '#64748b', fg: '#334155', tag: 'LOW' },
+  }
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
@@ -7572,8 +7586,91 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
         Risk & Integration Analysis
       </Text>
+
+      {/* (0) Technical-feasibility assessment — design-specific verdict. */}
+      {feas.has_content ? (
+        <View style={{ marginBottom: 18 }}>
+          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8, letterSpacing: 0.6 }}>
+            TECHNICAL FEASIBILITY
+          </Text>
+          {/* Cost verdict */}
+          <View style={{ marginBottom: 10, padding: 10, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8', borderRadius: 4 }}>
+            <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold' }}>Cost verdict. </Text>{clean_prose(feas.cost_verdict)}
+            </Text>
+          </View>
+          {/* What is proven — calculated engineering margins */}
+          <Text style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.55, marginBottom: 8 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What is proven. </Text>{clean_prose(feas.proven_summary)}
+          </Text>
+          {feas.proven_margins.length > 0 ? (
+            <View style={{ marginBottom: 12, padding: 8, backgroundColor: '#f7f8fa', borderRadius: 4 }}>
+              {feas.proven_margins.map((m, mi) => (
+                <View key={`pm-${mi}`} style={{ flexDirection: 'row', paddingTop: 2, paddingBottom: 2, borderBottomWidth: mi === feas.proven_margins.length - 1 ? 0 : 0.4, borderBottomColor: RULE_SOFT }}>
+                  <Text style={{ flex: 1, fontSize: 9, color: INK_SOFT }}>{clean_prose(m.label)}</Text>
+                  <Text style={{ width: 110, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>{clean_prose(m.value)}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {/* Top technical risks with severity + mitigation */}
+          {feas.risks.length > 0 ? (
+            <>
+              <Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+                Top technical risks (this design)
+              </Text>
+              {feas.risks.map((r, ri) => {
+                const st = SEV_STYLE[r.severity] ?? SEV_STYLE.low
+                return (
+                  <View key={`fr-${ri}`} minPresenceAhead={90} style={{ marginBottom: 8, padding: 10, backgroundColor: st.bg, borderLeftWidth: 4, borderLeftColor: st.bar, borderRadius: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 3 }}>
+                      <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: st.bar, letterSpacing: 0.8, marginRight: 6 }}>{st.tag}</Text>
+                      <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: st.fg }}>{clean_prose(r.title.length > 110 ? r.title.slice(0, 109).trimEnd() + '…' : r.title)}</Text>
+                    </View>
+                    <Text style={{ fontSize: 9, color: '#475569', lineHeight: 1.5, marginBottom: r.mitigation ? 3 : 0 }}>{clean_prose(r.detail)}</Text>
+                    {r.mitigation ? (
+                      <Text style={{ fontSize: 9, color: '#475569', lineHeight: 1.5 }}>
+                        <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Mitigation: </Text>{clean_prose(r.mitigation)}
+                      </Text>
+                    ) : null}
+                  </View>
+                )
+              })}
+            </>
+          ) : null}
+          {/* Regulatory + manufacturing flags */}
+          {(feas.regulatory_flags.length > 0 || feas.manufacturing_flags.length > 0) ? (
+            <View style={{ flexDirection: 'row', marginTop: 4 }}>
+              {feas.regulatory_flags.length > 0 ? (
+                <View style={{ flex: 1, marginRight: feas.manufacturing_flags.length > 0 ? 8 : 0 }}>
+                  <Text style={{ fontSize: 8, color: MUTED, letterSpacing: 0.6, marginBottom: 3 }}>REGULATORY FLAGS</Text>
+                  {feas.regulatory_flags.map((f, fi) => (
+                    <View key={`rf-${fi}`} style={{ flexDirection: 'row', marginBottom: 2 }}>
+                      <Text style={{ fontSize: 9, color: INK_SOFT, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 9, color: INK_SOFT, lineHeight: 1.4 }}>{clean_prose(f)}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              {feas.manufacturing_flags.length > 0 ? (
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 8, color: MUTED, letterSpacing: 0.6, marginBottom: 3 }}>MANUFACTURING FLAGS</Text>
+                  {feas.manufacturing_flags.map((f, fi) => (
+                    <View key={`mf-${fi}`} style={{ flexDirection: 'row', marginBottom: 2 }}>
+                      <Text style={{ fontSize: 9, color: INK_SOFT, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 9, color: INK_SOFT, lineHeight: 1.4 }}>{clean_prose(f)}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
       <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14, lineHeight: 1.55 }}>
-        Two views in one section: (1) cumulative cross-cutting issues that span more than one module — checked together because no single module's review would catch them; and (2) class-level pre-mitigation hazards a {classBlock.display_name.toLowerCase()} design must address, rated on three 1-5 scales whose product gives a single risk priority.
+        {feas.has_content
+          ? `Three views in one section: a technical-feasibility assessment of THIS design (cost verdict, the engineering the analysis tools have proven, and the top technical risks); cross-cutting issues that span more than one module; and the class-level pre-mitigation hazards a ${classBlock.display_name.toLowerCase()} design must address, rated on three 1-5 scales whose product gives a single risk priority.`
+          : `Two views in one section: (1) cumulative cross-cutting issues that span more than one module — checked together because no single module's review would catch them; and (2) class-level pre-mitigation hazards a ${classBlock.display_name.toLowerCase()} design must address, rated on three 1-5 scales whose product gives a single risk priority.`}
       </Text>
 
       {/* (1) Cross-cutting system-level findings */}
@@ -7600,42 +7697,47 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
         </View>
       ) : null}
 
-      {/* (2) Class-level Failure-Mode register */}
+      {/* (2) Class-level Failure-Mode register — only when the class has a
+          registered hazard set. Guarded as one unit (heading + legend +
+          summary + table header) so a class with feasibility content but no
+          class hazards doesn't render an empty register. */}
       {classBlock.hazards.length > 0 ? (
-        <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8, letterSpacing: 0.6 }}>
-          CLASS-LEVEL FAILURE-MODE REGISTER
-        </Text>
-      ) : null}
-      {/* Manual Review callout removed per Tristan fifth review. */}
-      <View style={{ marginBottom: 12, padding: 8, backgroundColor: '#f7f8fa', borderRadius: 3 }}>
-        <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55, marginBottom: 2 }}>
-          <Text style={{ fontFamily: 'Helvetica-Bold' }}>Severity</Text> — how bad the outcome is if the hazard occurs (1 = inconvenience, 5 = injury / fire / total loss).
-        </Text>
-        <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55, marginBottom: 2 }}>
-          <Text style={{ fontFamily: 'Helvetica-Bold' }}>Likelihood</Text> — how often it tends to happen in fielded systems before mitigation (1 = very rare, 5 = frequent).
-        </Text>
-        <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55, marginBottom: 2 }}>
-          <Text style={{ fontFamily: 'Helvetica-Bold' }}>Detectability</Text> — how hard it is to spot before it causes harm (1 = obvious / instrumented, 5 = silent failure).
-        </Text>
-        <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55 }}>
-          <Text style={{ fontFamily: 'Helvetica-Bold' }}>Risk priority</Text> — severity × likelihood × detectability. The single number used to rank hazards.
-        </Text>
-      </View>
-      <Text style={{ fontSize: 10, color: INK_SOFT, marginBottom: 18, lineHeight: 1.55 }}>
-        {clean_prose(classBlock.hazard_summary)}
-      </Text>
+        <>
+          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8, letterSpacing: 0.6 }}>
+            CLASS-LEVEL FAILURE-MODE REGISTER
+          </Text>
+          {/* Manual Review callout removed per Tristan fifth review. */}
+          <View style={{ marginBottom: 12, padding: 8, backgroundColor: '#f7f8fa', borderRadius: 3 }}>
+            <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55, marginBottom: 2 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold' }}>Severity</Text> — how bad the outcome is if the hazard occurs (1 = inconvenience, 5 = injury / fire / total loss).
+            </Text>
+            <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55, marginBottom: 2 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold' }}>Likelihood</Text> — how often it tends to happen in fielded systems before mitigation (1 = very rare, 5 = frequent).
+            </Text>
+            <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55, marginBottom: 2 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold' }}>Detectability</Text> — how hard it is to spot before it causes harm (1 = obvious / instrumented, 5 = silent failure).
+            </Text>
+            <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold' }}>Risk priority</Text> — severity × likelihood × detectability. The single number used to rank hazards.
+            </Text>
+          </View>
+          <Text style={{ fontSize: 10, color: INK_SOFT, marginBottom: 18, lineHeight: 1.55 }}>
+            {clean_prose(classBlock.hazard_summary)}
+          </Text>
 
-      {/* Header row — ITER-10.5 fifth review (Tristan 2026-05-20):
-          shorter column headers so they don't wrap. Full names spelled
-          out in the legend above. */}
-      <View style={{ flexDirection: 'row', borderBottomWidth: 0.8, borderBottomColor: INK, paddingBottom: 4, marginBottom: 4 }}>
-        <Text style={{ width: 50,  fontSize: 8, color: MUTED, letterSpacing: 0.6 }}>CODE</Text>
-        <Text style={{ flex: 3,    fontSize: 8, color: MUTED, letterSpacing: 0.6 }}>HAZARD</Text>
-        <Text style={{ width: 34,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>SEV</Text>
-        <Text style={{ width: 34,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LIK</Text>
-        <Text style={{ width: 34,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>DET</Text>
-        <Text style={{ width: 40,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>RP</Text>
-      </View>
+          {/* Header row — ITER-10.5 fifth review (Tristan 2026-05-20):
+              shorter column headers so they don't wrap. Full names spelled
+              out in the legend above. */}
+          <View style={{ flexDirection: 'row', borderBottomWidth: 0.8, borderBottomColor: INK, paddingBottom: 4, marginBottom: 4 }}>
+            <Text style={{ width: 50,  fontSize: 8, color: MUTED, letterSpacing: 0.6 }}>CODE</Text>
+            <Text style={{ flex: 3,    fontSize: 8, color: MUTED, letterSpacing: 0.6 }}>HAZARD</Text>
+            <Text style={{ width: 34,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>SEV</Text>
+            <Text style={{ width: 34,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LIK</Text>
+            <Text style={{ width: 34,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>DET</Text>
+            <Text style={{ width: 40,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>RP</Text>
+          </View>
+        </>
+      ) : null}
 
       {sorted.map((h: ClassHazard, idx) => {
         const rpn = computeHazardRPN(h)
@@ -7668,11 +7770,13 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
         )
       })}
 
-      <View style={{ marginTop: 16, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT }}>
-        <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>
-          Mitigation cost and post-mitigation residual risk are withheld from this report until the Bill of Materials and an assumptions ledger exist. The hazards above are CLASS-LEVEL pre-mitigation; design-specific FMEA (effects of chosen cell chemistry, refrigerant, sensor architecture etc.) will be derived against these once the BoM is grounded.
-        </Text>
-      </View>
+      {classBlock.hazards.length > 0 ? (
+        <View style={{ marginTop: 16, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT }}>
+          <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>
+            Mitigation cost and post-mitigation residual risk are withheld from this report until the Bill of Materials and an assumptions ledger exist. The hazards above are CLASS-LEVEL pre-mitigation; design-specific FMEA (effects of chosen cell chemistry, refrigerant, sensor architecture etc.) will be derived against these once the BoM is grounded.
+          </Text>
+        </View>
+      ) : null}
 
       <PageFooter />
     </Page>
@@ -8860,16 +8964,28 @@ function supplierUrlReconciles(name: string, websiteUrl: string): boolean {
 
 function SuppliersPage({ state, project }: { state: any; project: string }) {
   const suppliers: any[] = Array.isArray(state.suppliers) ? state.suppliers : []
-  if (suppliers.length === 0) return null
 
-  // Sourcing strategy (2026-05-30): the lead-time / dual-source / MOQ narrative
-  // the council scores the section on — synthesised from the supplier archetypes.
-  const sourcingStrategy = buildSourcingStrategy(
+  // Sourcing strategy (2026-05-30; BoM fallback 2026-06-03): the lead-time /
+  // dual-source / MOQ narrative the council scores `sourcing_strategy` on.
+  // Synthesised from the discovered supplier archetypes when the discovery stage
+  // ran, ELSE from the manufacturers the BoM already pins (Grundfos pumps, Alfa
+  // Laval exchangers, GEA dryers, …). The BoM fallback is universal — any class
+  // whose design names real manufacturers gets a substantive strategy even when
+  // `state.suppliers` is empty (CO₂ scored 5.0 on a blank section for exactly
+  // this reason).
+  const sourcingStrategy = buildSourcingStrategyFromState(
+    state,
     suppliers.map((a) => ({ id: String(a?.archetype_id ?? ''), label: String(a?.archetype_label ?? ''), candidates: Array.isArray(a?.candidates) ? a.candidates.length : 0 })),
   )
 
   const hasAnyCandidate = suppliers.some((s) => Array.isArray(s.candidates) && s.candidates.length > 0)
-  if (!hasAnyCandidate) return null
+  // BoM-derived sourcing roles (manufacturer → delivery-role table) rendered
+  // when no discovered candidate cards survived but the BoM names manufacturers.
+  const bomRoles = hasAnyCandidate ? [] : deriveSourcingArchetypesFromState(state)
+  const bomManufacturerCount = hasAnyCandidate ? 0 : countPinnedManufacturers(state)
+  // Render the page when EITHER discovered candidates exist OR we have a sourcing
+  // strategy from the BoM. Only bail when there is genuinely nothing to source.
+  if (!hasAnyCandidate && !sourcingStrategy && bomRoles.length === 0) return null
 
   const renderCandidateCard = (c: any, idx: number) => {
     // ITER-10.5 (Tristan 2026-05-20 fifth review): suppliers with no
@@ -9049,7 +9165,59 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
   }
 
   const survivingSuppliers = suppliers.filter(archetypeHasSurvivingCard)
-  if (survivingSuppliers.length === 0) return null
+
+  // BoM-FALLBACK page (2026-06-03): no discovered candidate cards, but the BoM
+  // pins real manufacturers → render the sourcing strategy + a manufacturer →
+  // delivery-role table so the section is substantive (lead-times, dual-source,
+  // MOQ) instead of absent. Universal across classes.
+  if (survivingSuppliers.length === 0) {
+    if (!sourcingStrategy && bomRoles.length === 0) return null
+    return (
+      <Page size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Section 7 · Sourcing strategy" project={project} />
+        <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+          Sourcing strategy
+        </Text>
+        <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14, lineHeight: 1.5 }}>
+          {bomManufacturerCount > 0
+            ? `Each major component in the bill of materials is specified against a named manufacturer — ${bomManufacturerCount} distinct manufacturers across ${bomRoles.length} delivery roles. The procurement strategy below is built from those pinned manufacturers: lead-time bands, single-source risk and order strategy by role. A buyer should issue a request-for-quote to each named manufacturer plus at least one equivalent second source before committing the bill of materials.`
+            : 'Procurement strategy by delivery role — lead-time bands, single-source risk and order strategy.'}
+        </Text>
+        {sourcingStrategy && (
+          <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8', borderRadius: 4 }} minPresenceAhead={80}>
+            <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>Strategy summary</Text>
+            <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}>{sourcingStrategy.identification}</Text>
+            <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Lead time. </Text>{sourcingStrategy.lead_time}</Text>
+            <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Dual-source risk. </Text>{sourcingStrategy.dual_source}</Text>
+            <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Order strategy. </Text>{sourcingStrategy.moq}</Text>
+          </View>
+        )}
+        {bomRoles.length > 0 && (
+          <>
+            <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8, letterSpacing: 0.6 }}>
+              DELIVERY ROLES &amp; NAMED MANUFACTURERS
+            </Text>
+            <View style={{ flexDirection: 'row', borderBottomWidth: 0.8, borderBottomColor: INK, paddingBottom: 4, marginBottom: 4 }}>
+              <Text style={{ flex: 3, fontSize: 8, color: MUTED, letterSpacing: 0.6 }}>DELIVERY ROLE</Text>
+              <Text style={{ width: 70, fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>MANUFACTURERS</Text>
+            </View>
+            {bomRoles.map((r, ri) => (
+              <View key={`bomrole-${ri}`} wrap={false} style={{ flexDirection: 'row', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT }}>
+                <Text style={{ flex: 3, fontSize: 9.5, color: INK, lineHeight: 1.4 }}>{clean_prose(String(r.label))}</Text>
+                <Text style={{ width: 70, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>{r.candidates}</Text>
+              </View>
+            ))}
+            <View style={{ marginTop: 14, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT }}>
+              <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55 }}>
+                Manufacturers are taken from the verified bill of materials, not a supplier-discovery search. Named companies indicate the product platform the design specifies; for each role a buyer should confirm current lead-time, obtain a firm quotation, and qualify at least one equivalent second source before committing the order.
+              </Text>
+            </View>
+          </>
+        )}
+        <PageFooter />
+      </Page>
+    )
+  }
 
   return (
     <Page size="A4" style={PAGE_STYLE}>

@@ -47,6 +47,7 @@ import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
+import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
 // The orchestrator's assembler.ts lazy-loads emitBessDesign internally via
 // `await import('../deterministic-emitter')` at assembler.ts:130 — that path
@@ -5764,6 +5765,56 @@ async function main() {
     } catch (err) {
       console.error(`[chain] self-audit (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
       logAction({ step: 'self_audit_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tSA })
+    }
+  }
+
+  // ── Independent cost-sanity gate (B4, SHADOW by default, 2026-06-03): the single
+  //    highest-value universal check from the CO₂-mineralisation post-mortem
+  //    (docs/autonomous-archetype-self-interrogation.md). Computes the dossier's
+  //    headline £/output-unit from STATE and compares it against an industry band
+  //    keyed by OUTPUT FAMILY (power → £/kW, energy → £/kWh, throughput → £/(unit·yr),
+  //    …) — universal across unseen archetypes, where the per-class B-7 band (keyed
+  //    by class slug) silently skips. Prefers a tighter per-class band when the class
+  //    is recognised. Would have caught BOTH real misses: the CO₂ dossier's original
+  //    £55k ≈ £150/(t·yr) (~15× too LOW) and a wind turbine at £3,233/kW (~2.2× too HIGH).
+  //    SHADOW by default: records state.costSanity + logs the verdict + NEVER exits.
+  //    ENFORCING is opt-in via COST_SANITY_ENFORCING (off→shadow); a HIGH verdict then
+  //    hard-exits 32 (a MED flags + renders, per the gate-severity philosophy). Pure +
+  //    deterministic (no LLM); self-contained re-read of the final state. Kill:
+  //    CHAIN_SKIP_COST_SANITY=1.
+  if (!process.env.CHAIN_SKIP_COST_SANITY) {
+    const tCS = Date.now()
+    try {
+      const csState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const cs = computeCostSanity(csState)
+      csState.costSanity = cs
+      writeFileSync(statePath, JSON.stringify(csState, null, 2))
+      const tag = cs.verdict.toUpperCase()
+      console.error(`[chain] cost-sanity (shadow): ${tag} — ${cs.message}`)
+      logAction({
+        step: 'cost_sanity_shadow', ok: true, verdict: cs.verdict,
+        cost_per_output_unit: cs.cost_per_output_unit, headline_cost_gbp: cs.headline_cost_gbp,
+        headline_cost_source: cs.headline_cost_source, output_family: cs.output_family,
+        band: cs.band, band_basis: cs.band_basis, ratio_to_nearest_edge: cs.ratio_to_nearest_edge,
+        direction: cs.direction, latency_ms: Date.now() - tCS,
+      })
+      // ENFORCING (opt-in via COST_SANITY_ENFORCING): a HIGH magnitude error hard-exits
+      // so it never ships. Default is OFF (shadow) so an in-flight re-run is never blocked.
+      // State is already persisted above, so the verdict is recorded even when we exit here.
+      const csMode = costSanityEnforceModeFromEnv(process.env.COST_SANITY_ENFORCING)
+      if (csMode === 'on') {
+        const decision = evaluateCostSanityEnforcement(cs, csMode)
+        if (decision.shouldExit) {
+          console.error(`[chain] cost-sanity ENFORCING: BLOCKING (exit ${decision.exitCode}) — ${decision.reason}`)
+          logAction({ step: 'cost_sanity_enforce', ok: false, exit_code: decision.exitCode, verdict: cs.verdict, reason: decision.reason, latency_ms: Date.now() - tCS })
+          process.exit(decision.exitCode)
+        }
+        console.error(`[chain] cost-sanity enforcing: no HIGH magnitude error — ship allowed (verdict ${cs.verdict}).`)
+        logAction({ step: 'cost_sanity_enforce', ok: true, verdict: cs.verdict })
+      }
+    } catch (err) {
+      console.error(`[chain] cost-sanity (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
+      logAction({ step: 'cost_sanity_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tCS })
     }
   }
 

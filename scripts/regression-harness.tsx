@@ -3670,6 +3670,65 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
           'gate 18: two disagreeing downrate RECOMMENDATIONS (same role) still fire >= 1 HIGH — the recommendation role must not mask a real contradiction',
           realRecHigh, (n) => n >= 1, (n) => `expected >= 1 HIGH on two conflicting recommendations, got ${n} — the fix is over-masking`,
         ))
+
+        // ── gate-18 FIELD-ANCHORED clustering (2026-06-03 co2-mineralisation) ──
+        // A tool-output sentence packs many DISTINCT quantities into one run-on
+        // "<field_name> = <value>, <field_name> = <value>, …" clause. Every value
+        // shares the generic family anchor ("mass"), so without per-field
+        // anchoring they collapse into ONE cluster and fire a false contradiction
+        // (co2: absorber/stripper/reactor/anode/fire-agent shell masses → one
+        // false 616% HIGH). The fix keys the cluster on the SPECIFIC field name
+        // before the "=". These three fixtures lock the behaviour both ways.
+        //
+        // FALSE-POSITIVE shapes — must be 0 HIGH:
+        const fpFieldAnchored = mkPdf('fp-field', [
+          'Pressure Vessel Design\nPressure Vessel Design computed absorber shell mass = 1,274 kg, stripper shell mass = 940 kg, reactor shell mass = 905 kg, cp anode mass = 20 kg.',
+          'Fire And Lifecycle\nFire Suppression computed fire agent mass = 103 kg, plant embodied CO2 t = 30.6 t.',
+        ])
+        // an ampere-HOUR charge ("39,420 A-hr") must NOT cluster with an
+        // ampere current ("0.225 A") — different physical dimension:
+        const fpChargeVsCurrent = mkPdf('fp-charge', [
+          'Anode Sizing\nCorrosion analysis computed cp protection current = 0.225 A for the hull.',
+          'Charge Budget\nThe service charge Q_total = 0.225 x 175,200 = 39,420 A-hr over the design life.',
+        ])
+        // a packaged per-unit bag size ("25 kg bags/day") must NOT cluster with
+        // the system plant mass ("18,779 kg"):
+        const fpBagVsPlant = mkPdf('fp-bag', [
+          'Mass Aggregator\nEnvelope Check computed total plant mass = 18,779 kg overall as assembled.',
+          'Maintenance Serviceability\nMaintenance serviceability bagging line fills 249 x 25 kg bags/day of CaCO3.',
+        ])
+        // GENUINE same-field contradiction — must still fire >= 1 HIGH (the same
+        // tool field assigned two different values across two pages):
+        const realFieldConflict = mkPdf('real-field', [
+          'Mass Aggregator\nEnvelope Check computed total plant mass = 18,779 kg overall as assembled.',
+          'Mass Aggregator Restated\nEnvelope Check computed total plant mass = 25,000 kg overall as assembled.',
+        ])
+
+        const fpFieldHigh = highCount(fpFieldAnchored)
+        const fpChargeHigh = highCount(fpChargeVsCurrent)
+        const fpBagHigh = highCount(fpBagVsPlant)
+        const realFieldHigh = highCount(realFieldConflict)
+
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_field_anchored_clustering',
+          'gate 18: distinct tool-output fields ("absorber shell mass = a, stripper shell mass = b, …") in ONE run-on sentence form DISTINCT clusters → 0 HIGH (co2-mineralisation false-positive guard); the field-name-before-"=" anchor must separate them',
+          fpFieldHigh, (n) => n === 0, (n) => `${n} HIGH on a multi-field tool-output sentence — field-anchored clustering has regressed (distinct fields are collapsing into one cluster)`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_ampere_hour_not_clustered_with_ampere',
+          'gate 18: an ampere-HOUR charge value ("39,420 A-hr") is NOT clustered with an ampere current ("0.225 A") — different physical dimension, 0 HIGH (co2 charge-vs-current guard)',
+          fpChargeHigh, (n) => n === 0, (n) => `${n} HIGH on A-hr vs A — the charge/current dimension guard has regressed`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_packaged_unit_not_clustered_with_system_total',
+          'gate 18: a packaged per-unit size ("249 x 25 kg bags/day") is NOT clustered with the system plant mass ("18,779 kg"), 0 HIGH (co2 bag-vs-plant per-part guard)',
+          fpBagHigh, (n) => n === 0, (n) => `${n} HIGH on bag-size vs plant-mass — the packaged-unit per-part guard has regressed`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_genuine_same_field_contradiction_still_fires',
+          'gate 18: the SAME tool field assigned two different values across pages ("total plant mass = 18,779 kg" vs "= 25,000 kg") still fires >= 1 HIGH — field-anchoring must not mask a real same-field contradiction',
+          realFieldHigh, (n) => n >= 1, (n) => `expected >= 1 HIGH on a genuine same-field cross-page contradiction, got ${n} — the field-anchored fix is over-masking`,
+        ))
       } catch (err) {
         assertions.push({ id: 'UNIVERSAL.gate18_mass_scope_and_recommendation_splits', description: 'gate 18 mass-scope + recommendation-role fixture check', passed: false, detail: `fixture build/run failed: ${String(err).slice(0, 200)}` })
       }
