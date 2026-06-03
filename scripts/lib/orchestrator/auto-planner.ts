@@ -99,33 +99,78 @@ export function composeToolGraph(
   const byId = new Map(registry.map((s) => [s.tool_id, s]))
   // Deterministic producer search order: registry order (caller sorts once).
   const briefProvides = (key: string) => briefKeys.some((b) => keysMatch(b, key))
+  const producesRequired = (schema: ToolIOSchema) =>
+    schema.output_keys.some((o) => requiredOutputs.some((r) => keysMatch(o, r)))
 
   // ── 1. Backward-chain tool selection ──────────────────────────────────
   // To satisfy a needed quantity: if the brief supplies it or a selected tool
   // already produces it, done; else select the first applicable producer and
   // enqueue ITS inputs as new needs. Recurse to a fixed point.
-  const selected = new Set<string>()
-  const unmet: string[] = []
-  const seenNeed = new Set<string>()
-  const queue = [...requiredOutputs]
-  while (queue.length > 0) {
-    const need = queue.shift() as string
-    const nk = need.toLowerCase()
-    if (seenNeed.has(nk)) continue
-    seenNeed.add(nk)
-    if (briefProvides(need)) continue
-    let coveredBySelected = false
-    for (const id of selected) {
-      if (produces(byId.get(id) as ToolIOSchema, need)) { coveredBySelected = true; break }
+  //
+  // `banned` lets a later prune pass RE-CHAIN with a dead-weight producer
+  // forbidden, so a legitimate ALTERNATE producer of the same key is found.
+  // (A cross-domain outlier that sorts first can DISPLACE the right producer:
+  //  it suffix-matches a needed intermediate and `registry.find` picks it, so
+  //  the legit producer is never selected. Banning it and re-chaining repairs
+  //  that — see the prune loop below.) Pure + deterministic: no clocks/RNG.
+  const backwardChain = (banned: ReadonlySet<string>): { selected: Set<string>; unmet: string[] } => {
+    const selected = new Set<string>()
+    const unmet: string[] = []
+    const seenNeed = new Set<string>()
+    const queue = [...requiredOutputs]
+    while (queue.length > 0) {
+      const need = queue.shift() as string
+      const nk = need.toLowerCase()
+      if (seenNeed.has(nk)) continue
+      seenNeed.add(nk)
+      if (briefProvides(need)) continue
+      let coveredBySelected = false
+      for (const id of selected) {
+        if (produces(byId.get(id) as ToolIOSchema, need)) { coveredBySelected = true; break }
+      }
+      if (coveredBySelected) continue
+      const producer = registry.find(
+        (s) => !banned.has(s.tool_id) && produces(s, need) && (!s.applicable || s.applicable(envelopeClass)),
+      )
+      if (!producer) { unmet.push(need); continue }
+      selected.add(producer.tool_id)
+      for (const inp of producer.input_keys) queue.push(inp)
     }
-    if (coveredBySelected) continue
-    const producer = registry.find(
-      (s) => produces(s, need) && (!s.applicable || s.applicable(envelopeClass)),
-    )
-    if (!producer) { unmet.push(need); continue }
-    selected.add(producer.tool_id)
-    for (const inp of producer.input_keys) queue.push(inp)
+    return { selected, unmet }
   }
+
+  // ── 1b. UNSATISFIABLE-INPUT (cross-domain dead-weight) PRUNE ───────────
+  // After selection, DROP any selected tool that BOTH (i) produces NO required
+  // output AND (ii) has its inputs ENTIRELY unsatisfiable (not brief-supplied
+  // and not produced by another selected tool). Such a tool was pulled in only
+  // because its output loosely key-matched an intermediate — it can never run
+  // (no input source) and feeds nothing the design actually needs. Pruning it
+  // and RE-CHAINING (with it banned) lets a legit alternate producer fill the
+  // intermediate it was displacing, so unmet/unsatisfied diagnostics stay true.
+  // Bounded by registry size (each pass bans ≥1 tool); deterministic order.
+  const banned = new Set<string>()
+  let chain = backwardChain(banned)
+  let selected = chain.selected
+  for (let pass = 0; pass < registry.length; pass++) {
+    const cur = [...selected]
+    const deadWeight = cur
+      .filter((id) => {
+        const S = byId.get(id) as ToolIOSchema
+        if (producesRequired(S)) return false               // (i) keep anything producing a REQUIRED output
+        if (S.input_keys.length === 0) return false          // a source-less producer with no inputs is not "unsatisfiable" — keep
+        const everyInputUnsatisfiable = S.input_keys.every((ik) => {
+          if (briefProvides(ik)) return false
+          return !cur.some((o) => o !== id && produces(byId.get(o) as ToolIOSchema, ik))
+        })
+        return everyInputUnsatisfiable                       // (ii) ALL inputs unsatisfiable → dead weight
+      })
+      .sort()
+    if (deadWeight.length === 0) break
+    for (const id of deadWeight) banned.add(id)
+    chain = backwardChain(banned)
+    selected = chain.selected
+  }
+  const unmet = chain.unmet // honest gaps for the FINAL (post-prune, re-chained) selection
 
   const sel = [...selected].sort() // deterministic node order
 

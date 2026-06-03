@@ -42,6 +42,7 @@ import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode } from './render-minimal-pdf'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
+import { composeToolGraph } from './lib/orchestrator/auto-planner'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
@@ -2373,6 +2374,63 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       else process.env.UNIVERSAL_AUTO_PLAN = savedFlag
       fallback._resetManifestCacheForTests?.()
     }
+  }
+
+  // ── task #14: auto-planner cross-domain over-selection prune (2026-06-03) ───
+  //
+  // UNIVERSAL.auto_planner_prunes_cross_domain_deadweight — composeToolGraph
+  // backward-chains and picks the FIRST producer of each need; a cross-domain
+  // outlier that sorts first + suffix-matches a needed INTERMEDIATE key DISPLACES
+  // the legit producer and drags its own unsatisfiable inputs in as phantom unmet.
+  // The unsatisfiable-input prune must DROP such a tool (produces no required
+  // output + ALL inputs unsatisfiable) and re-chain so the displaced legit producer
+  // is restored — AND must KEEP any tool that produces a required output even when
+  // an input is unsatisfiable (honest coverage gap, reported not dropped). Pure
+  // function, no flag, both directions.
+  try {
+    const reqd = ['total_system_mass_kg', 'cost_estimate_gbp']
+    const brief = ['rated_power_kw']
+    const reg = [
+      { tool_id: 'aaa-hydraulic-press', domain: 'process',
+        input_keys: ['hydraulic_fluid_pressure_bar', 'press_tonnage_rating_t'],
+        output_keys: ['ram_enclosure_assembly_mass_kg'] },
+      { tool_id: 'converter-sizer', domain: 'power_electronics',
+        input_keys: ['rated_power_kw'], output_keys: ['converter_module_mass_kg'] },
+      { tool_id: 'cost-stack', domain: 'parts_catalog',
+        input_keys: ['converter_module_mass_kg', 'enclosure_assembly_mass_kg'], output_keys: ['cost_estimate_gbp'] },
+      { tool_id: 'enclosure-sizer', domain: 'mechanical',
+        input_keys: ['rated_power_kw'], output_keys: ['enclosure_assembly_mass_kg'] },
+      { tool_id: 'mass-aggregator', domain: 'mechanical',
+        input_keys: ['enclosure_assembly_mass_kg', 'converter_module_mass_kg'], output_keys: ['total_system_mass_kg'] },
+    ].sort((a, b) => a.tool_id.localeCompare(b.tool_id))
+    const g = composeToolGraph(reqd, reg, brief, 'electrical_widget')
+    const legit = ['converter-sizer', 'cost-stack', 'enclosure-sizer', 'mass-aggregator']
+    const prunedOk = !g.order.includes('aaa-hydraulic-press')
+      && legit.every((t) => g.order.includes(t))
+      && g.unmet_outputs.length === 0 && g.unsatisfied_inputs.length === 0
+    assertions.push(assertEq(
+      'UNIVERSAL.auto_planner_prunes_cross_domain_deadweight',
+      'composeToolGraph prunes a cross-domain dead-weight producer (no required output + all-unsatisfiable inputs) AND keeps/restores the legit chain it displaced',
+      prunedOk,
+      (v) => v === true,
+      () => `order=[${g.order.join(', ')}] unmet=[${g.unmet_outputs.join(', ')}] unsat=${JSON.stringify(g.unsatisfied_inputs)}; expected outlier dropped, 4 legit tools present, no unmet/unsat`,
+    ))
+    // Keep-direction guard: a required-output producer with an unsatisfiable input
+    // must NOT be pruned (honest coverage gap, reported in unsatisfied_inputs).
+    const gk = composeToolGraph(['total_system_mass_kg'],
+      [{ tool_id: 'mass-agg', domain: 'mechanical', input_keys: ['unobtainium_density_kgm3'], output_keys: ['total_system_mass_kg'] }],
+      [], 'widget')
+    const keptOk = gk.order.includes('mass-agg')
+      && gk.unsatisfied_inputs.some((u) => u.tool_id === 'mass-agg' && u.missing.includes('unobtainium_density_kgm3'))
+    assertions.push(assertEq(
+      'UNIVERSAL.auto_planner_keeps_required_producer_with_unmet_input',
+      'composeToolGraph keeps a tool that produces a REQUIRED output even when an input is unsatisfiable, and reports the gap rather than dropping the tool',
+      keptOk,
+      (v) => v === true,
+      () => `order=[${gk.order.join(', ')}] unsat=${JSON.stringify(gk.unsatisfied_inputs)}; expected mass-agg kept + its missing input reported`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.auto_planner_prunes_cross_domain_deadweight', description: 'auto-planner over-selection prune', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   // ── UNIVERSAL.declared_class_beats_incidental_keyword (2026-06-01, FIX 1) ──

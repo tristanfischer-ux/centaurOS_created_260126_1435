@@ -100,8 +100,13 @@ export function loadToolIORegistry(): ToolIOSchema[] {
   for (const [tool_id, io] of Object.entries(raw)) {
     const output_keys = io.output_keys ?? []
     if (output_keys.length === 0) continue          // no declared outputs → can't be a producer
-    if (!getTool(tool_id)) continue                 // not registered → executor couldn't run it
-    schemas.push({ tool_id, input_keys: io.input_keys ?? [], output_keys })
+    const tool = getTool(tool_id)
+    if (!tool) continue                             // not registered → executor couldn't run it
+    // Carry the live registry's engineering domain onto the schema so the
+    // auto-planner can use it for diagnostics + deterministic domain-aware
+    // tie-breaks. (Previously dropped — the schema's optional `domain` was
+    // always undefined even though every registered Tool declares one.)
+    schemas.push({ tool_id, input_keys: io.input_keys ?? [], output_keys, domain: tool.domain })
   }
   // Deterministic order (composeToolGraph picks the FIRST applicable producer).
   schemas.sort((a, b) => a.tool_id.localeCompare(b.tool_id))
