@@ -138,8 +138,19 @@ export function classifyProduct(briefText: string): ProductClassification {
     // tiltrotor / UAM / urban air mobility / vertical take-off references.
     if (lower.match(/\bevtol\b|tilt[- ]?rotor|urban air mobility|\buam\b/)) {
       productClass = 'evtol'
-    } else if (lower.match(/satellite|cubesat|orbit|payload|launch/)) {
-      productClass = 'aerospace'
+    } else if (lower.match(/satellite|cubesat|orbit|payload|launch|spacecraft|\bleo\b/)) {
+      // 2026-06-03 (wall-1 satellite routing): the coarse 'aerospace' class had
+      // NO registered emitter/detector → satellite briefs hit exit 7 even though
+      // the satellite emitters (satellite_smallsat/cubesat/geo_comsat/
+      // interplanetary) are registered + BESS-quality + have envelope detectors.
+      // Route to the actual sub-class so the registered emitter fires. Sub-type
+      // by keyword; default to smallsat (50-500 kg ESPA-class). Note: the HAPS
+      // branch above already claimed "high-altitude pseudo-satellite", so a true
+      // free-flyer reaches here.
+      if (lower.match(/cubesat|\b[1369]u\b|pocketqube/)) productClass = 'satellite_cubesat'
+      else if (lower.match(/interplanetary|deep[- ]?space|cislunar|\blunar\b|\bmars\b|flyby/)) productClass = 'satellite_interplanetary'
+      else if (lower.match(/geostationary|\bgeo\b|comsat|communications satellite|broadcast satellite/)) productClass = 'satellite_geo_comsat'
+      else productClass = 'satellite_smallsat'
     } else if (lower.match(/\bcnc\b|machining cent(?:re|er)|\b5[- ]?axis\b|\bvmc\b|vertical machining/)) {
       // 2026-05-23 (CNC chain audit): CNC briefs often mention "robot
       // integration" as an EXCLUDED component, which would trip the generic
