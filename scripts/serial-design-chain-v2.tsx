@@ -82,6 +82,7 @@ import { runSharedQuantityConsistencyAudit } from '../src/lib/pdf-engine-v2/lib/
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
 import { runManufacturerAttributionAudit } from '../src/lib/pdf-engine-v2/lib/manufacturer-attribution-audit'
 import { scanMultipleFilesForBriefLiterals } from './lib/brief-value-literal-scanner'
+import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { runStateParseGuard } from '../src/lib/pdf-engine-v2/lib/state-parse-guard'
 import { runSubModuleDomainGuard } from '../src/lib/pdf-engine-v2/lib/submodule-domain-guard'
 import { runPayloadRatingAudit } from '../src/lib/pdf-engine-v2/lib/payload-rating-audit'
@@ -4812,6 +4813,50 @@ async function main() {
     // Per 6/6 council unanimous verdict (commit 6dc4face1).
     engineeringContract,
     savedAt: new Date().toISOString(),
+  }
+  // ── Universal per-module mass attribution (task #38, 2026-06-03).
+  // CONSUME + ATTRIBUTE only (never compute/fabricate a mass). Runs AFTER the
+  // orchestrator contract + moduleDecomposition.modules are final and BEFORE
+  // render (so the P3 BoM indicative floor + gate-17 mass-cap row + performance
+  // card all see any writes). Scans orchestratorContract.quantities for
+  // STRUCTURAL masses (family='mass', *_mass_kg, non-process token, value>0),
+  // pins each to its owning module via a tight token match
+  // (module_mass_kg, written only where absent), and emits total_system_mass_kg
+  // ONLY when coverage reaches ceil(60%) of capital modules — else gate-17 keeps
+  // its honest "unverified —" path. NO-OP for classes with full mass coverage
+  // (BESS already carry total_system_mass_kg → no module write, no total emit).
+  // Mutates state.moduleDecomposition.modules + state.orchestratorContract
+  // .quantities in place. Gate-safe: module_mass_kg is the same shape as the
+  // bioreactor's pre-existing vessel_mass_kg; total_system_mass_kg is skipped by
+  // gate-12 (count-suffixed keys only) and is a new quantity, not a contradiction.
+  try {
+    const massAttr = runMassAttributionStage(
+      (state.moduleDecomposition?.modules ?? []) as any[],
+      ((state.orchestratorContract as Record<string, any> | null)?.quantities ?? null),
+    )
+    console.error(
+      `[chain] mass-attribution: ${massAttr.structural_masses_found} structural mass quantit${massAttr.structural_masses_found === 1 ? 'y' : 'ies'} found, ` +
+      `${massAttr.attributions.filter((a) => a.wrote_module_key).length} module_mass_kg written ` +
+      `(${massAttr.attributions.map((a) => `${a.quantity_key}→${a.module_id}`).join(', ') || 'none'}); ` +
+      `coverage ${massAttr.modules_with_mass}/${massAttr.capital_modules} capital (threshold ${massAttr.coverage_threshold}); ` +
+      `total_system_mass_kg ${massAttr.total_emitted ? `EMITTED=${massAttr.total_system_mass_kg}` : 'NOT emitted'} — ${massAttr.total_reason}`,
+    )
+    logAction({
+      step: 'mass_attribution',
+      structural_masses_found: massAttr.structural_masses_found,
+      module_masses_written: massAttr.attributions.filter((a) => a.wrote_module_key).length,
+      unattributed: massAttr.unattributed_keys.length,
+      capital_modules: massAttr.capital_modules,
+      modules_with_mass: massAttr.modules_with_mass,
+      coverage_threshold: massAttr.coverage_threshold,
+      total_emitted: massAttr.total_emitted,
+      total_system_mass_kg: massAttr.total_system_mass_kg,
+      no_op: massAttr.no_op,
+      reason: massAttr.total_reason,
+    })
+  } catch (err) {
+    console.error(`[chain] mass-attribution stage failed (non-fatal): ${(err as Error).message}`)
+    logAction({ step: 'mass_attribution', ok: false, error: String(err).slice(0, 200) })
   }
   // 2026-05-20 iter-8: build per-class performance card AFTER the rest of
   // state is populated. The card resolves canopy area, LED power, cooling,

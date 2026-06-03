@@ -43,6 +43,7 @@ import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-der
 import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode } from './render-minimal-pdf'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
+import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
@@ -2431,6 +2432,49 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.auto_planner_prunes_cross_domain_deadweight', description: 'auto-planner over-selection prune', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── task #38: mass-attribution stage — structural-only, never fabricate (2026-06-03) ──
+  //
+  // UNIVERSAL.mass_attribution_structural_only — runMassAttributionStage must
+  // (1) attribute a STRUCTURAL mass to its owning module + write module_mass_kg where
+  // absent, (2) NEVER attribute a PROCESS mass (substrate/product/biomass — even one
+  // mis-tagged family='mass'), (3) NEVER emit total_system_mass_kg below ceil(60%)
+  // capital-module coverage (an incomplete sum understates true mass + would mislead
+  // gate-17's PASS/FAIL), and (4) emit it at >=60% coverage. The "compute a missing
+  // mass" treadmill is out of scope — this is the honest consume+attribute half.
+  // Pure synthetic, all four directions.
+  try {
+    // (1) structural mass attributed + written where absent
+    const m1: any[] = [{ module: 'stainless_vessel', derived_parameters: {}, sub_modules: [{ id: 'vessel_body', name_human: 'vessel body' }] }]
+    const q1: any = { vessel_mass_kg: { value: 1000, unit: 'kg', family: 'mass' } }
+    const r1 = runMassAttributionStage(m1, q1)
+    // (2) process masses never attributed/totalled (even mis-tagged family='mass')
+    const m2: any[] = [{ module: 'fermentation_train', derived_parameters: {}, sub_modules: [{ id: 'substrate_feed', name_human: 'substrate feed' }] }]
+    const q2: any = { substrate_mass_kg: { value: 100, family: 'mass' }, product_mass_kg: { value: 46, family: 'mass' }, biomass_final_mass_kg: { value: 0.8, family: 'mass' } }
+    const r2 = runMassAttributionStage(m2, q2)
+    // (3) no total below ceil(60%) coverage (1 of 4 capital modules)
+    const m3: any[] = ['main_vessel', 'pump_skid', 'piping_manifold', 'instrument_rack'].map((mm) => ({ module: mm, derived_parameters: {}, sub_modules: [] }))
+    const q3: any = { vessel_mass_kg: { value: 1000, family: 'mass' } }
+    const r3 = runMassAttributionStage(m3, q3)
+    // (4) total IS emitted at >=60% coverage (2 of 3)
+    const m4: any[] = ['chassis_frame', 'gearbox_housing', 'cover_panel'].map((mm) => ({ module: mm, derived_parameters: {}, sub_modules: [] }))
+    const q4: any = { chassis_mass_kg: { value: 500, family: 'mass' }, gearbox_mass_kg: { value: 300, family: 'mass' } }
+    const r4 = runMassAttributionStage(m4, q4)
+    const ok =
+      r1.attributions[0]?.module_id === 'stainless_vessel' && m1[0].derived_parameters.module_mass_kg === 1000 &&
+      r2.structural_masses_found === 0 && r2.total_emitted === false && m2[0].derived_parameters.module_mass_kg === undefined &&
+      r3.total_emitted === false && q3.total_system_mass_kg === undefined &&
+      r4.total_emitted === true && q4.total_system_mass_kg?.value === 800
+    assertions.push(assertEq(
+      'UNIVERSAL.mass_attribution_structural_only',
+      'mass-attribution: structural mass attributed + written; process mass never attributed/totalled; no total below ceil(60%) coverage; total emitted at >=60% — never fabricates',
+      ok,
+      (v) => v === true,
+      () => `mass-attribution wrong: r1.mod=${r1.attributions[0]?.module_id}/m1.mass=${m1[0].derived_parameters.module_mass_kg}; r2.found=${r2.structural_masses_found}/total=${r2.total_emitted}; r3.total=${r3.total_emitted}; r4.total=${r4.total_emitted}/q4=${q4.total_system_mass_kg?.value}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.mass_attribution_structural_only', description: 'mass-attribution stage', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   // ── UNIVERSAL.declared_class_beats_incidental_keyword (2026-06-01, FIX 1) ──

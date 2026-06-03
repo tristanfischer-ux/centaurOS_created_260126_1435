@@ -896,7 +896,10 @@ function deriveDefensibleModuleMassKg(moduleNode: any): number | null {
   const dp = moduleNode?.derived_parameters
   if (!dp || typeof dp !== 'object') return null
   // Exclude system / envelope / brief-cap aggregates — only a true per-module mass.
-  const EXCLUDE = /(system|brief|cap|envelope|payload|budget|breach|gross|container)/i
+  // `max` added 2026-06-03 (task #38): a module can carry both the brief cap
+  // `max_mass_kg` AND a real structural `module_mass_kg`; without excluding the cap
+  // the floor would pick the larger (cap) value and over-state the indicative floor.
+  const EXCLUDE = /(system|brief|cap|envelope|payload|budget|breach|gross|container|max)/i
   let best: number | null = null
   for (const [k, raw] of Object.entries(dp)) {
     if (!/_mass_kg$/i.test(k)) continue
