@@ -1353,6 +1353,35 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── BIOREACTOR.emitter_regulatory_citations_uk_accepted (2026-06-03, #41 exit-19) ──
+  //
+  // The bioreactor emitter targets UK/EU briefs (EN 1672-2 / PED 2014/68/EU /
+  // ISO 13408-2). It must NOT cite US ASME/ASTM standard families in its
+  // regulatory modifiers — gate-19 (jurisdictional-standards-audit) hard-FAILs
+  // the chain (exit 19) on any ASME/ASTM citation for that jurisdiction. This
+  // static source-scan catches a re-introduction at HARNESS time, before any
+  // chain run (gate-19 remains the runtime backstop). Source-independent of the
+  // snapshot; cheap. Root fix: commit for #41, 2026-06-03.
+  {
+    const bioPath = resolve(process.cwd(), 'scripts/lib/orchestrator/emitters/bioreactor.ts')
+    if (existsSync(bioPath)) {
+      const src = readFileSync(bioPath, 'utf-8')
+      const offending: string[] = []
+      const regRe = /mod\(\s*['"]regulatory['"]\s*,\s*['"]([^'"]*)['"]/g
+      let mm: RegExpExecArray | null
+      while ((mm = regRe.exec(src)) !== null) {
+        if (/\bASME\b|\bASTM\b/.test(mm[1])) offending.push(mm[1])
+      }
+      assertions.push(assertEq(
+        'BIOREACTOR.emitter_regulatory_citations_uk_accepted',
+        'bioreactor.ts regulatory modifiers cite no US ASME/ASTM families (gate-19 / exit-19 guard, #41 2026-06-03)',
+        offending.length,
+        (n) => n === 0,
+        () => `bioreactor.ts re-introduced ${offending.length} ASME/ASTM regulatory citation(s): ${offending.slice(0, 5).join(', ')} — exit-19 on UK/EU briefs. Map to EN 1672-2 / PED 2014/68/EU / ISO 13408-2.`,
+      ))
+    }
+  }
+
   // ── UNIVERSAL: every engineering macro is recorded in macro-claims.json (2026-05-31) ──
   //
   // UNIVERSAL.every_engineering_macro_recorded_in_claims — if macro-claims.json is

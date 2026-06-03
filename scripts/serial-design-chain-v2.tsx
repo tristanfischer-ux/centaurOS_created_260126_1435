@@ -590,10 +590,54 @@ function validateProseContent(text: string | undefined | null): ContentValidatio
   return { ok: true }
 }
 
-function applyReviewerPatches(design: any, patches: any[]): { applied: number; skipped: number; reasons: string[] } {
+/**
+ * Derive the set of (module, sub_module_id) location keys that the Physics
+ * Critic flagged as brief_to_design_fidelity violations. Used by
+ * applyReviewerPatches to gate structural adds: a reviewer add_sub_module is
+ * only permitted when the Critic explicitly flagged a brief-fidelity issue
+ * whose `where` path references the target module OR when the Critic flagged
+ * a fidelity issue with HIGH/MED severity on that module (the sub_module.id
+ * in the patch need not appear verbatim in `where` — a module-level match
+ * is sufficient because the Critic's `where` is written as
+ * "<module>/<sub_module>/<word>" and a new sub_module addresses a module-level
+ * brief gap).
+ *
+ * Returns a Set of module ids that have ≥1 brief_to_design_fidelity issue.
+ * An empty set means the Critic found no fidelity violations → no structural
+ * adds are permitted (the default-safe deterministic path).
+ *
+ * Determinism note: given the same state the Physics Critic is called with
+ * temperature=0 + fixed model (FLASH_3_5), so the same state always yields
+ * the same flagged modules → the same add_sub_module decisions.
+ */
+function deriveFidelityFlaggedModules(critique: any): Set<string> {
+  const flagged = new Set<string>()
+  if (!critique || !Array.isArray(critique.issues)) return flagged
+  for (const issue of critique.issues) {
+    if (issue?.dimension !== 'brief_to_design_fidelity') continue
+    if (issue?.severity !== 'high' && issue?.severity !== 'med') continue
+    const where = String(issue?.where ?? '')
+    if (!where) continue
+    // `where` is typically "<module>/<sub_module>/<word>" or just "<module>".
+    // Extract the first path segment as the module id.
+    const moduleId = where.split('/')[0].trim()
+    if (moduleId) flagged.add(moduleId)
+  }
+  return flagged
+}
+
+function applyReviewerPatches(
+  design: any,
+  patches: any[],
+  /** Set of module ids the Physics Critic flagged as brief_to_design_fidelity
+   *  violations. An add_sub_module targeting one of these modules is permitted
+   *  (constrained fidelity relaxation). An empty set means no adds permitted. */
+  fidelityFlaggedModules: Set<string> = new Set(),
+): { applied: number; skipped: number; reasons: string[]; structuralAdds: Array<{ module: string; sub_module: any }> } {
   let applied = 0
   let skipped = 0
   const reasons: string[] = []
+  const structuralAdds: Array<{ module: string; sub_module: any }> = []
   if (!Array.isArray(design.modules)) design.modules = []
   if (!Array.isArray(design.cross_module_grammar_links)) design.cross_module_grammar_links = []
 
@@ -601,38 +645,64 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
     try {
       const op = p.op
       if (op === 'add_sub_module') {
-        // 2026-05-28 deterministic-generation (anchor A1 — STRUCTURE determinism):
-        // reviewers may NOT add sub_modules. The design STRUCTURE is owned solely
-        // by the deterministic emitter. Reviewer-added sub_modules were the
-        // run-to-run structure-variance + gate-23 whack-a-mole source: iter-61 had
-        // 2 empty reviewer sub_modules (watchdog_timer, emergency_stop_chain), and
-        // iter-62 had 4 entirely DIFFERENT ones (cell_voltage_wire_upgrade,
-        // coolant_return_manifold, coolant_heater, gas_vent_interlock) — proof the
-        // additions are non-deterministic and would defeat the determinism test.
-        // The A2 word-stripping (which left an empty sub_module → gate-23 halt) is
-        // superseded by this hard block. Reviewers are prose-only; if the emitter
-        // is genuinely missing a sub_module, add it to deterministic-emitter.ts.
+        // ── STRUCTURE-LOCK POLICY (2026-05-28 / 2026-06-03) ─────────────────
         //
-        // EXPERIMENT B (2026-06-03, Tristan): the hard lockout blocked reviewers from
-        // FIXING brief-fidelity violations — the bioreactor Physics Critic's
-        // single_use_bag_interface + magnetic_coupling_drive adds were REJECTED here,
-        // baking the brief contradiction (multi-use stainless, direct-drive). With
-        // ALLOW_FIDELITY_STRUCTURE_EDITS=1 we APPLY the add (this runs at ~1924, BEFORE
-        // completeEmitterGaps + gate-23, so any MPN gap in the new sub_module is filled
-        // downstream and gate-23 still passes). Determinism caveat acknowledged: a
-        // permanent version would constrain adds to Physics-Critic-flagged violations +
-        // re-assert determinism; this flag is the fidelity-vs-lockout measurement.
-        if (process.env.ALLOW_FIDELITY_STRUCTURE_EDITS === '1' && p.module && p.sub_module?.id) {
-          const m = design.modules.find((x: any) => x.module === p.module)
-          if (!m) { skipped++; reasons.push(`skip add_sub_module: module "${p.module}" not found`); continue }
-          if (!Array.isArray(m.sub_modules)) m.sub_modules = []
-          if (m.sub_modules.some((s: any) => s.id === p.sub_module.id)) { skipped++; reasons.push(`skip add_sub_module: ${p.module}.${p.sub_module.id} already exists`); continue }
-          m.sub_modules.push(p.sub_module)
-          applied++; reasons.push(`+sub_module ${p.module}.${p.sub_module.id} (Exp-B fidelity structure edit — lockout relaxed)`)
-          continue
+        // Anchor A1: the deterministic emitter SOLELY owns design structure.
+        // Reviewer-added sub_modules were the run-to-run variance + gate-23
+        // whack-a-mole source (iter-61 had 2 empty sub_modules; iter-62 had 4
+        // DIFFERENT ones — proof of non-determinism). Default: REJECT all adds.
+        //
+        // PERMANENT CONSTRAINED RELAXATION (2026-06-03, task #41 fix):
+        // Experiment B showed that the hard lockout blocked reviewers from
+        // fixing GENUINE brief-fidelity violations (bioreactor Physics Critic
+        // flagged single_use_bag_interface + magnetic_coupling_drive as HIGH
+        // brief_to_design_fidelity issues, but add_sub_module was REJECTED here,
+        // baking the wrong architecture — multi-use 316L stainless + direct-drive
+        // instead of the brief's single-use bag + magnetic coupling).
+        //
+        // Safe default (NO env flag needed): an add_sub_module is PERMITTED when:
+        //   (a) The patch targets a module the Physics Critic flagged as a
+        //       brief_to_design_fidelity violation (HIGH or MED severity), AND
+        //   (b) The patch carries a valid sub_module.id.
+        //
+        // This is DETERMINISTIC because the Critic runs at temperature=0 with a
+        // fixed model; the same state always yields the same flagged modules.
+        // The LLM reviewer's choice of sub_module.id and content is still
+        // non-deterministic, but the permission decision (gate) is deterministic,
+        // which is what the original lockout was trying to enforce.
+        //
+        // ALLOW_FIDELITY_STRUCTURE_EDITS=1 remains as an escape hatch that
+        // widens the gate to ANY add_sub_module regardless of Critic flags —
+        // useful for debugging / manual override. Do NOT leave it on in production
+        // because it reintroduces the run-to-run structural variance problem.
+        //
+        // "If the emitter is genuinely missing a sub_module, add it to
+        //  deterministic-emitter.ts" — this still applies for NEW archetypes;
+        //  the relaxation here is for the case where the BRIEF requires something
+        //  the emitter got architecturally wrong (wrong technology class, wrong
+        //  design pattern). That is a brief-fidelity violation, not a missing word.
+        if (p.module && p.sub_module?.id) {
+          // Check: is this a Critic-flagged fidelity violation for this module?
+          const isFidelityFlagged = fidelityFlaggedModules.has(String(p.module))
+          // Check: is the broad escape hatch set?
+          const broadOverride = process.env.ALLOW_FIDELITY_STRUCTURE_EDITS === '1'
+
+          if (isFidelityFlagged || broadOverride) {
+            const m = design.modules.find((x: any) => x.module === p.module)
+            if (!m) { skipped++; reasons.push(`skip add_sub_module: module "${p.module}" not found`); continue }
+            if (!Array.isArray(m.sub_modules)) m.sub_modules = []
+            if (m.sub_modules.some((s: any) => s.id === p.sub_module.id)) { skipped++; reasons.push(`skip add_sub_module: ${p.module}.${p.sub_module.id} already exists`); continue }
+            m.sub_modules.push(p.sub_module)
+            structuralAdds.push({ module: String(p.module), sub_module: p.sub_module })
+            const gateReason = isFidelityFlagged
+              ? `Critic brief_fidelity flag on module "${p.module}"`
+              : `ALLOW_FIDELITY_STRUCTURE_EDITS=1 broad override`
+            applied++; reasons.push(`+sub_module ${p.module}.${p.sub_module.id} (fidelity structural add — ${gateReason})`)
+            continue
+          }
         }
         skipped++
-        reasons.push(`REJECT [structure-locked] add_sub_module ${p.module}.${p.sub_module?.id}: design structure is emitter-owned; reviewers may not add sub_modules`)
+        reasons.push(`REJECT [structure-locked] add_sub_module ${p.module}.${p.sub_module?.id}: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "${p.module}" (${fidelityFlaggedModules.size} flagged module(s): ${[...fidelityFlaggedModules].join(', ') || 'none'})`)
         continue
       } else if (op === 'add_grammar_link') {
         const m = design.modules.find((x: any) => x.module === p.module)
@@ -829,7 +899,7 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
       skipped++; reasons.push(`skip exception: ${String(err)}`)
     }
   }
-  return { applied, skipped, reasons }
+  return { applied, skipped, reasons, structuralAdds }
 }
 
 function setByPath(obj: any, path: string, value: any): void {
@@ -1849,6 +1919,16 @@ async function runReviewerStep(opts: {
   // source_detail = "Library override: ..."). Empty string when the
   // helper found no classifiable words or the DB was unavailable.
   libraryCandidatesBlock?: string
+  // Task #41 (2026-06-03): set of module ids the Physics Critic flagged as
+  // brief_to_design_fidelity violations. Passed to applyReviewerPatches to
+  // gate structural add_sub_module operations. When absent / empty, no adds
+  // are permitted (the default-safe deterministic behaviour).
+  fidelityFlaggedModules?: Set<string>
+  // Task #41 (2026-06-03): the emitter identity snapshot from the outer scope.
+  // When provided, this reviewer step will extend it with the words of any
+  // fidelity-approved sub_module adds so subsequent Phase-2 reassert calls
+  // can lock those words in the same way as emitter-owned words.
+  emitterIdentitySnapshot?: EmitterIdentitySnapshot
 }): Promise<any> {
   const system = REVIEWER_TEMPLATE + (opts.systemAppend ?? '')
   const densityTargets = computeDensityTargets(opts.currentDesign)
@@ -1940,8 +2020,45 @@ Return the corrected JSON.`
 
   // Deep-clone design and apply patches in-place
   const parsed = JSON.parse(JSON.stringify(opts.currentDesign))
-  const applyResult = applyReviewerPatches(parsed, patches)
+  const applyResult = applyReviewerPatches(parsed, patches, opts.fidelityFlaggedModules ?? new Set())
   console.error(`[chain] ${opts.label} applied ${applyResult.applied} / ${patches.length} patches (skipped ${applyResult.skipped})`)
+  if (applyResult.structuralAdds.length > 0) {
+    console.error(`[chain] ${opts.label} fidelity structural adds: ${applyResult.structuralAdds.map((a) => `${a.module}.${a.sub_module?.id}`).join(', ')}`)
+    // Task #41 (2026-06-03): extend the emitter identity snapshot with the words
+    // of fidelity-approved structural adds. This ensures that Phase-2's
+    // reassertEmitterIdentity() treats these words the same as emitter-owned words —
+    // i.e. their locked modifiers (manufacturer / part_number / capacity / etc.)
+    // cannot be mutated by Phase-2 repair LLMs between iterations.
+    //
+    // Why this is correct: the Physics Critic runs at temperature=0 with a fixed
+    // model, so the same state always yields the same fidelity flags → the same
+    // structural add decisions. The CONTENT of the new sub_module still varies per
+    // LLM call, but we snapshot it immediately after the add — subsequent iterations
+    // will see the same words and re-assert them. The snapshot is per-run, not
+    // cross-run, so there is no cross-run non-determinism introduced here.
+    if (opts.emitterIdentitySnapshot) {
+      const snap = snapshotEmitterIdentity(parsed.modules ?? [])
+      // Merge only the entries that correspond to the newly-added sub_modules.
+      const addedSubIds = new Set(applyResult.structuralAdds.map((a) => String(a.sub_module?.id ?? '')))
+      for (const entry of snap.entries) {
+        if (!addedSubIds.has(entry.subId)) continue
+        // Add to the snapshot's maps so future reassert calls can find these words.
+        opts.emitterIdentitySnapshot.entries.push(entry)
+        ;(opts.emitterIdentitySnapshot as any).pinnedWordCount++
+        const wk = `${entry.moduleId} ${entry.subId} ${entry.wordId}`
+        if (entry.wordId && !opts.emitterIdentitySnapshot.byWordKey.has(wk)) {
+          opts.emitterIdentitySnapshot.byWordKey.set(wk, entry)
+        }
+        if (entry.characterId) {
+          const ck = `${entry.moduleId} ${entry.subId} ${entry.characterId}`
+          if (!opts.emitterIdentitySnapshot.byCharKey.has(ck)) {
+            opts.emitterIdentitySnapshot.byCharKey.set(ck, entry)
+          }
+        }
+      }
+      console.error(`[chain] ${opts.label} snapshot extended: +${addedSubIds.size} sub_module(s) → ${opts.emitterIdentitySnapshot.pinnedWordCount} total pinned words`)
+    }
+  }
   for (const r of applyResult.reasons.slice(0, 8)) console.error(`    ${r}`)
 
   const afterCheck = summarise(parsed.modules ?? [])
@@ -3079,6 +3196,15 @@ async function main() {
   // — option kept as a no-op stub for backwards compat). Leaving it on R4 made
   // readers think the reviewer was web-grounded when it wasn't. Removed.
   // Real grounding requires the GEMINI_API_KEY escape valve (not yet wired).
+  // Task #41 (2026-06-03): derive fidelity-flagged modules from the Physics
+  // Critic result. This set is passed to R4 + R4.5 so add_sub_module patches
+  // are only permitted when the Critic has flagged a brief_fidelity violation
+  // on the target module. Both R4 and R4.5 receive the snapshot reference so
+  // they can extend it with any fidelity-approved structural adds.
+  const r4FidelityFlags = deriveFidelityFlaggedModules(critique)
+  if (r4FidelityFlags.size > 0) {
+    console.error(`[chain] task-41 fidelity gates: Critic flagged ${r4FidelityFlags.size} module(s) for brief_fidelity structural adds: ${[...r4FidelityFlags].join(', ')}`)
+  }
   const r4 = await runReviewerStep({
     label: 'STEP 8: R4 Flash-Lite review',  // LM-only, not grounded
     model: FLASH_LITE,
@@ -3090,6 +3216,8 @@ async function main() {
     keyMetrics,
     toolOutputsBlock,
     libraryCandidatesBlock,
+    fidelityFlaggedModules: r4FidelityFlags,
+    emitterIdentitySnapshot,
   })
   design = r4.design
   writeFileSync(resolve(outDir, '8-r4-flashlite.json'), JSON.stringify(design, null, 2))
@@ -3158,6 +3286,11 @@ async function main() {
           keyMetrics,
           toolOutputsBlock,
           libraryCandidatesBlock,
+          // Task #41 (2026-06-03): carry fidelity flags + snapshot through to R4.5
+          // so the specialist can also add brief-fidelity sub_modules if the Critic
+          // flagged the module AND so any adds extend the snapshot.
+          fidelityFlaggedModules: r4FidelityFlags,
+          emitterIdentitySnapshot,
         })
         design = r45.design
         writeFileSync(resolve(outDir, '8-5-specialist.json'), JSON.stringify(design, null, 2))
