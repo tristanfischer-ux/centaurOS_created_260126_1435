@@ -4771,6 +4771,23 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
         deltaText: delta,
         tradeOffNarrative: narrative,
       })
+    } else {
+      // 2026-06-03 (task #39/#38, gate-17): no achieved system-mass quantity was
+      // computed for this class (the per-module mass-coverage gap — e.g. bioreactor
+      // emits vessel_mass_kg but no total_system_mass_kg). Render the HARD mass
+      // constraint as UNVERIFIED ("—") rather than silently dropping it. Gate-17's
+      // intent is that a brief constraint must be VISIBLE (the reader sees it wasn't
+      // verified), never absent; the amber "could not verify" banner already handles
+      // 'unknown' rows. NEVER fabricate an achieved mass. Universal + monotonic:
+      // classes that DO compute a mass take the branch above and are unaffected.
+      rows.push({
+        constraint: 'Max gross mass',
+        briefTarget: `${target.toLocaleString('en-GB')} kg`,
+        designAchieved: '—',
+        status: 'unknown',
+        deltaText: '',
+        tradeOffNarrative: null,
+      })
     }
   }
 

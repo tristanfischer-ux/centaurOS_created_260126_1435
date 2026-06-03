@@ -278,11 +278,15 @@ function rendererWouldEmitMassRow(state: any): boolean {
   const cap = state?.parsedBrief?.constraints?.max_mass_kg
   const briefHasMass = cap && typeof cap.value === 'number' && Number.isFinite(cap.value)
   if (!briefHasMass) return false
-  const q = state?.orchestratorContract?.quantities ?? {}
-  // Renderer reads totalMass via _qtyFromOrch fallback chain (renderer line 3594):
-  //   total_system_mass_kg -> system_mass_with_external_kg -> in_container_mass_kg -> total_mass_kg
-  return ['total_system_mass_kg', 'system_mass_with_external_kg', 'in_container_mass_kg', 'total_mass_kg']
-    .some((k) => qtyPresent(q, k))
+  // 2026-06-03 (task #39/#38, gate-17): the renderer now ALWAYS emits the Max-gross-mass
+  // row when the brief states a mass cap — a verified PASS/FAIL when a system-mass quantity
+  // is present (total_system_mass_kg / in_container_mass_kg / ...), ELSE an honest UNVERIFIED
+  // "—" row (never a fabricated mass; see render-minimal-pdf.tsx _buildComplianceRows mass
+  // else-branch). So the HARD constraint is never SILENTLY ABSENT once the brief states it —
+  // which is exactly what gate-17 guards. The design-mass-not-computed case (the per-module
+  // mass-coverage gap, task #38) is now disclosed IN the dossier as an "unverified" row +
+  // amber banner, not hidden by a dropped row.
+  return true
 }
 
 function rendererWouldEmitMetricRow(state: any, metricKey: string): boolean {

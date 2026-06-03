@@ -3706,6 +3706,32 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     assertions.push({ id: 'UNIVERSAL.normalise_unicode_strips_gate11_glyphs', description: 'gate-11 glyph sanitiser', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
+  // ── task #39/#38: HARD mass constraint never silently dropped (2026-06-03) ───
+  //
+  // UNIVERSAL.mass_constraint_row_present_when_brief_states_cap — when the brief
+  // states a max_mass_kg, the rendered Brief Compliance table MUST include a
+  // 'Max gross mass' row (a verified PASS/FAIL when a system-mass quantity exists,
+  // else an honest unverified "—" row), NEVER silently absent — that absence is
+  // exactly what gate-17 (exit 17) hard-fails on (bioreactor had no
+  // total_system_mass_kg). Guards the renderer mass else-branch + the audit shadow.
+  // Snapshot-based (real state); fires non-vacuously on any class whose brief caps mass.
+  try {
+    const massCap = state?.parsedBrief?.constraints?.max_mass_kg
+    if (massCap && typeof massCap.value === 'number' && Number.isFinite(massCap.value)) {
+      const cRows = _buildComplianceRows(state, null)
+      const hasMassRow = Array.isArray(cRows) && cRows.some((r: any) => r?.constraint === 'Max gross mass')
+      assertions.push(assertEq(
+        'UNIVERSAL.mass_constraint_row_present_when_brief_states_cap',
+        'gate-17: brief states a mass cap → compliance table renders a Max-gross-mass row (verified or unverified "—"), never silently dropped',
+        hasMassRow,
+        (v) => v === true,
+        () => `brief has max_mass_kg=${massCap.value} but _buildComplianceRows emitted no 'Max gross mass' row — gate-17 (exit 17) would hard-fail. Check the mass else-branch in render-minimal-pdf.tsx _buildComplianceRows.`,
+      ))
+    }
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.mass_constraint_row_present_when_brief_states_cap', description: 'gate-17 mass-row present', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
   // ── U2: consumable rows excluded from capital grand total (2026-05-29) ──────
   //
   // UNIVERSAL.consumable_rows_excluded_from_capital_total — when a state has
