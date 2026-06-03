@@ -112,11 +112,54 @@ if _missing_keys:
     )
     sys.exit(1)
 
-# Maximum PDF pages sent per scoring call. The corpus today is 17–22 pages
-# per PDF; this hard cap protects against a future PDF being silently
-# enormous and blowing the multimodal request budget. Per-judge image limits
-# (Anthropic Opus 4.7 = 100 images/msg, OpenRouter ≈10 MB body) are still the
-# physical ceiling — this is a softer safety net.
+# ─── Per-SECTION scoring (root fix for HTTP 400 on large dossiers) ───────────
+# THE OLD FAILURE: every model was sent the WHOLE PDF in one request. On the
+# 91-page co2_mineralisation dossier (22.7 MB / ~90 page-images) that blew past
+# the OpenRouter ≈10 MB body limit and the Anthropic per-request image ceiling,
+# so Claude + Qwen both returned `HTTP 400 Bad Request` and ONLY Gemini scored —
+# a single un-calibrated judge that returned a meaningless uniform 10.00 while
+# the chain itself hard-exited a gate and the Physics Critic flagged 3 HIGH.
+#
+# THE FIX: score each of the 12 council SECTIONS from ONLY its relevant page
+# images (mapped from the PDF's own section headers — see build_section_page_map),
+# capped at MAX_IMAGES_PER_SECTION. Each request now carries a handful of images
+# regardless of how long the dossier is, so it stays far under every seat's
+# payload limit. 12 sections × 3 models = small, reliable calls instead of one
+# enormous one.
+#
+# MAX_IMAGES_PER_SECTION: hard cap on images attached to ONE (model, section)
+# request. ~8 keeps any single request well under ~10 MB even at 150–200 DPI.
+# When a section spans more pages than this, we SAMPLE evenly (always keeping the
+# first + last page so the section header and any sub-total/summary are seen).
+MAX_IMAGES_PER_SECTION = 8
+
+# Whole-document sampling for the two "holistic" sections (grammar_language and
+# visual_layout) that are not tied to one header — sample this many pages spread
+# across the entire dossier so the judge still sees representative typography /
+# language across the whole document without receiving every page.
+MAX_IMAGES_HOLISTIC = 8
+
+# Per-section image legibility. Because a section subset is small (≤ ~8 pages),
+# payload is no longer the binding constraint, so we can afford a HIGHER base DPI
+# than the old whole-doc-in-one-call path (which had to step down to ~60 DPI on
+# long dossiers and rendered unreadable pages). 150 DPI is comfortably legible
+# for the BoM / cost tables that matter most. PER_SECTION_RAW_KB_CAP is a safety
+# net: if a specific subset somehow exceeds it we down-convert just that subset.
+SECTION_RENDER_DPI = 150
+PER_SECTION_RAW_KB_CAP = 6500  # ~8.7 MB base64 body — under the ~10 MB seat limit
+
+# Resilience: transient-error retry policy for model calls.
+MAX_RETRIES = 3            # total attempts per (model, section) request
+RETRY_BACKOFF_BASE_S = 4   # exponential: 4s, 8s, 16s ...
+
+# A section is only trustworthy as a CALIBRATED result if ≥2 models scored it.
+# A lone surviving model (the exact 91-page failure mode) must NOT be reported as
+# a calibrated pass — calibrate_section returns its value but flags low-confidence,
+# and the overall pass is forced False if any HARD section is single-model.
+MIN_MODELS_FOR_CONFIDENT_SECTION = 2
+
+# Legacy whole-PDF page cap (kept only for the obsolete build_messages helpers,
+# which are no longer on the scoring path).
 MAX_PAGES_PER_CALL = 120
 
 MODELS = [
@@ -278,7 +321,278 @@ def encode_image(path: Path) -> str:
     return base64.standard_b64encode(path.read_bytes()).decode("utf-8")
 
 
+# ─── Section → page mapping (root fix) ──────────────────────────────────────
+# We send each council section ONLY its relevant page images. ForgeOS dossiers
+# print a consistent running section header on every page ("SECTION 1 · BRIEF &
+# REQUIREMENTS", "SECTION 2 · MODULE 4", "SECTION 3 · RISK & INTEGRATION
+# ANALYSIS", "SECTION 7 · SOURCING STRATEGY", "SECTION · TOOLS USED IN THIS
+# REPORT", "APPENDIX · ...", "EXECUTIVE SUMMARY", ...). We read those headers via
+# pdftotext and bucket each PHYSICAL page (1-indexed) into one or more of the 12
+# COUNCIL sections. This is class-AGNOSTIC: every archetype shares the header
+# scheme, so the mapping works on an unseen dossier with no per-class wiring.
+
+# Each council section maps to a set of header SIGNATURES (substring match on the
+# de-spaced, upper-cased page header). A page may feed more than one section
+# (e.g. a "COST BY MODULE" page feeds both `bom` and `cost_analysis`).
+_HEADER_SIGNATURES: dict[str, list[str]] = {
+    "executive_summary":  ["EXECUTIVESUMMARY"],
+    "brief_requirements": ["BRIEF&REQUIREMENTS", "BRIEFPROVENANCE",
+                           "BRIEFCOMPLIANCE", "PHYSICSNARRATIVE",
+                           "SYSTEMOVERVIEW", "DESIGNTRADE-OFFS"],
+    "design_modules":     ["·MODULES", "·MODULE", "ENGINEERINGTOOLSFLOW"],
+    "bom":                ["COSTBYMODULE"],
+    "cost_analysis":      ["COSTBYMODULE", "BRIEFCOMPLIANCE"],
+    "sourcing_strategy":  ["SOURCINGSTRATEGY"],
+    "feasibility_notes":  ["RISK&INTEGRATION", "RISKANALYSIS",
+                           "REGULATORY&COMPLIANCE", "REGULATORY&"],
+    "sources_references": ["TOOLSUSEDINTHISREPORT", "TOOLSUSED", "REFERENCES",
+                           "POTENTIALINVESTORS", "APPENDIX·POTENTIAL"],
+    "appendix_technical": ["TOOLSUSEDINTHISREPORT", "TOOLSUSED", "APPENDIX",
+                           "PHYSICSNARRATIVE", "ENGINEERINGTOOLSFLOW"],
+}
+# Sections deliberately NOT in the table above:
+#   cover           -> always physical page 1 (the title page has no SECTION header)
+#   grammar_language, visual_layout -> HOLISTIC, sampled across the whole doc.
+
+# Sections whose absence (single-model or no-model) is a genuine PASS-blocker.
+# These are the content sections a reader relies on; a uniform-10 from one model
+# on these is exactly the false-PASS this fix exists to prevent.
+HARD_SECTIONS = {
+    "executive_summary", "brief_requirements", "design_modules",
+    "bom", "cost_analysis", "sourcing_strategy", "feasibility_notes",
+}
+
+
+def _despace_upper(s: str) -> str:
+    """Normalise a page header for signature matching: strip ALL whitespace and
+    upper-case, so the renderer's letter-spaced 'S E C T I O N 2' and the plain
+    'SECTION 2' both collapse to 'SECTION2'."""
+    return "".join(s.split()).upper()
+
+
+def build_section_page_map(pdf_path: Path, num_pages: int) -> dict[str, list[int]]:
+    """Return {council_section: [1-indexed physical page numbers]} by reading the
+    PDF's own running section headers via pdftotext.
+
+    Robust by construction:
+      * cover           -> [1] always.
+      * holistic sections (grammar_language, visual_layout) -> an evenly-spread
+        sample across ALL pages (set later in select_section_pages), so they are
+        NOT keyed here.
+      * every other section -> pages whose header matches a signature.
+      * any section that ends up empty (header scheme changed / unusual dossier)
+        falls back to a sensible default so a model is still asked about it.
+    """
+    # Extract page text. pdftotext writes form-feed (\f) between pages.
+    txt = ""
+    try:
+        tmp = Path(tempfile.mktemp(suffix=".txt"))
+        subprocess.run(
+            ["pdftotext", "-layout", str(pdf_path), str(tmp)],
+            capture_output=True, text=True,
+        )
+        if tmp.exists():
+            txt = tmp.read_text(encoding="utf-8", errors="replace")
+            tmp.unlink()
+    except Exception as e:
+        print(f"  [WARN] pdftotext failed for section map: {e}", file=sys.stderr)
+
+    page_texts = txt.split("\f") if txt else []
+    # The header is in the first few lines of each page; use the de-spaced first
+    # ~6 lines as the matchable header blob.
+    page_headers: list[str] = []
+    for pg in page_texts:
+        lines = [l for l in pg.splitlines() if l.strip()]
+        page_headers.append(_despace_upper(" ".join(lines[:6])))
+
+    mapping: dict[str, list[int]] = {s: [] for s in SECTIONS}
+    mapping["cover"] = [1]
+
+    for idx, header in enumerate(page_headers, start=1):
+        if idx > num_pages:
+            break
+        for section, sigs in _HEADER_SIGNATURES.items():
+            if any(sig in header for sig in sigs):
+                if idx not in mapping[section]:
+                    mapping[section].append(idx)
+
+    # ── Fallbacks so NO content section is silently empty ────────────────────
+    # If the header parse found nothing for a section (unusual dossier / header
+    # scheme drift), fall back to a positional guess rather than asking the model
+    # to score a section it never saw.
+    if num_pages >= 2 and not mapping["executive_summary"]:
+        mapping["executive_summary"] = [2]
+    if not mapping["brief_requirements"]:
+        mapping["brief_requirements"] = [p for p in range(3, min(8, num_pages) + 1)]
+    if not mapping["design_modules"]:
+        # middle of the document is almost always the modules body
+        lo = max(1, num_pages // 4)
+        hi = max(lo, (num_pages * 3) // 4)
+        mapping["design_modules"] = list(range(lo, hi + 1))
+    if not mapping["bom"]:
+        mapping["bom"] = mapping["cost_analysis"] or mapping["design_modules"][:4] or [min(18, num_pages)]
+    if not mapping["cost_analysis"]:
+        mapping["cost_analysis"] = mapping["bom"]
+    if not mapping["sourcing_strategy"]:
+        mapping["sourcing_strategy"] = [max(1, num_pages - 3)]
+    if not mapping["feasibility_notes"]:
+        mapping["feasibility_notes"] = [max(1, num_pages - 5)]
+    if not mapping["sources_references"]:
+        mapping["sources_references"] = [num_pages]
+    if not mapping["appendix_technical"]:
+        mapping["appendix_technical"] = [num_pages]
+
+    return mapping
+
+
+def _sample_pages(pages: list[int], cap: int) -> list[int]:
+    """Down-sample a sorted page list to at most `cap` entries, ALWAYS keeping the
+    first and last page (section header + any closing sub-total/summary) and
+    spreading the rest evenly across the span."""
+    pages = sorted(set(pages))
+    if len(pages) <= cap:
+        return pages
+    if cap <= 1:
+        return [pages[0]]
+    if cap == 2:
+        return [pages[0], pages[-1]]
+    # keep first + last, evenly sample the interior for the remaining slots
+    interior = pages[1:-1]
+    want = cap - 2
+    step = len(interior) / want
+    picked = [interior[int(i * step)] for i in range(want)]
+    return sorted(set([pages[0]] + picked + [pages[-1]]))
+
+
+def select_section_pages(
+    section: str,
+    section_map: dict[str, list[int]],
+    num_pages: int,
+) -> list[int]:
+    """Return the capped, 1-indexed page list to send for one council section."""
+    # Holistic sections: spread a sample across the WHOLE document.
+    if section in ("grammar_language", "visual_layout"):
+        if num_pages <= MAX_IMAGES_HOLISTIC:
+            return list(range(1, num_pages + 1))
+        step = num_pages / MAX_IMAGES_HOLISTIC
+        return sorted(set(
+            min(num_pages, max(1, int(i * step) + 1))
+            for i in range(MAX_IMAGES_HOLISTIC)
+        ))
+
+    pages = [p for p in section_map.get(section, []) if 1 <= p <= num_pages]
+    if not pages:
+        # last-ditch: cover page so the model at least returns a (low) score
+        return [1]
+    return _sample_pages(pages, MAX_IMAGES_PER_SECTION)
+
+
+def render_section_pngs(
+    all_pngs: list[Path],
+    page_numbers: list[int],
+    pdf_path: Path,
+) -> list[Path]:
+    """Map 1-indexed physical page numbers to already-rendered PNG paths.
+
+    `all_pngs` is the whole document rendered ONCE at SECTION_RENDER_DPI (pages are
+    named page-0001.png, page-0002.png, ...). Subsets are small, so we do not need
+    per-section re-rendering for size; if a particular subset still exceeds
+    PER_SECTION_RAW_KB_CAP we down-convert just those pages to keep the body legal.
+    """
+    selected = [all_pngs[p - 1] for p in page_numbers if 1 <= p <= len(all_pngs)]
+    if not selected:
+        return []
+    raw_kb = sum(p.stat().st_size for p in selected) // 1024
+    if raw_kb <= PER_SECTION_RAW_KB_CAP:
+        return selected
+    # Rare: a few very heavy pages. Re-render just this subset at a lower DPI.
+    import math
+    scale = math.sqrt(PER_SECTION_RAW_KB_CAP / max(raw_kb, 1))
+    lo_dpi = max(60, int(SECTION_RENDER_DPI * scale))
+    sub_dir = pdf_path.parent / f"_council_pngs_sub_{pdf_path.stem}"
+    import shutil
+    if sub_dir.exists():
+        shutil.rmtree(sub_dir)
+    sub_dir.mkdir(exist_ok=True)
+    out: list[Path] = []
+    for p in page_numbers:
+        prefix = str(sub_dir / f"p{p}")
+        subprocess.run(
+            ["pdftoppm", "-r", str(lo_dpi), "-png", "-f", str(p), "-l", str(p),
+             str(pdf_path), prefix],
+            capture_output=True, text=True,
+        )
+        hits = sorted(sub_dir.glob(f"p{p}-*.png"))
+        if hits:
+            out.append(hits[0])
+    return out or selected
+
+
 # ─── API calls ────────────────────────────────────────────────────────────
+
+class PayloadTooLargeError(Exception):
+    """Raised when a request is rejected as too large (HTTP 400/413). NOT retried
+    — backing off won't help; the caller must send fewer images. With the
+    per-section fix this should never fire, but we surface it distinctly so a
+    regression (a section subset still too big) is obvious in the logs."""
+
+
+def _http_post_with_retries(req_factory, who: str) -> "urllib.response.addinfourl":
+    """POST with exponential backoff on TRANSIENT failures (429, 5xx, timeouts,
+    connection resets). HTTP 400/413 (payload) is raised as PayloadTooLargeError
+    immediately — retrying a too-large body is pointless. `req_factory` is a
+    zero-arg callable returning a fresh urllib Request (a Request can't be reused
+    after a failed send)."""
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            return urllib.request.urlopen(req_factory(), timeout=180)
+        except urllib.error.HTTPError as e:
+            code = e.code
+            if code in (400, 413):
+                # Read a snippet of the error body for diagnosis, then give up
+                # (neither a too-large body nor a malformed/billing 400 is helped
+                # by retrying). Distinguish a genuine SIZE rejection (the original
+                # 91-page failure) from other 400s (billing, auth, bad request) so
+                # the log is accurate and a real size regression stays obvious.
+                try:
+                    detail = e.read().decode("utf-8", "replace")[:300]
+                except Exception:
+                    detail = ""
+                low = detail.lower()
+                size_signal = code == 413 or any(
+                    k in low for k in (
+                        "too large", "payload", "request entity",
+                        "maximum", "image", "too many", "tokens", "exceed",
+                    )
+                )
+                if size_signal:
+                    raise PayloadTooLargeError(
+                        f"HTTP {code} (payload/size) from {who}: {detail}"
+                    ) from e
+                raise RuntimeError(f"HTTP {code} from {who}: {detail}") from e
+            if code == 429 or 500 <= code < 600:
+                last_exc = e
+                if attempt < MAX_RETRIES:
+                    wait = RETRY_BACKOFF_BASE_S * (2 ** (attempt - 1))
+                    print(f"      [retry {attempt}/{MAX_RETRIES}] {who} HTTP {code}; "
+                          f"backing off {wait}s", file=sys.stderr)
+                    time.sleep(wait)
+                    continue
+            raise  # other 4xx (401/403/404) — not transient
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            last_exc = e
+            if attempt < MAX_RETRIES:
+                wait = RETRY_BACKOFF_BASE_S * (2 ** (attempt - 1))
+                print(f"      [retry {attempt}/{MAX_RETRIES}] {who} {type(e).__name__}; "
+                      f"backing off {wait}s", file=sys.stderr)
+                time.sleep(wait)
+                continue
+            raise
+    if last_exc:
+        raise last_exc
+    raise RuntimeError(f"{who}: exhausted retries with no exception captured")
+
 
 def call_openrouter(model: str, messages: list[dict], max_tokens: int = 4096) -> str:
     payload = json.dumps({
@@ -287,17 +601,20 @@ def call_openrouter(model: str, messages: list[dict], max_tokens: int = 4096) ->
         "max_tokens": max_tokens,
         "temperature": 0.1,
     }).encode("utf-8")
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://forgeos.fractionalforge.com",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=180) as resp:
+
+    def _make_req():
+        return urllib.request.Request(
+            "https://openrouter.ai/api/v1/chat/completions",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://forgeos.fractionalforge.com",
+            },
+            method="POST",
+        )
+
+    with _http_post_with_retries(_make_req, f"OpenRouter[{model}]") as resp:
         body_bytes = resp.read().decode("utf-8").strip()
         # OpenRouter sometimes prepends whitespace before the JSON object
         start = body_bytes.find("{")
@@ -312,17 +629,20 @@ def call_anthropic(model: str, messages: list[dict], max_tokens: int = 4096) -> 
         "messages": messages,
         "max_tokens": max_tokens,
     }).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers={
-            "x-api-key": ANTHROPIC_KEY,
-            "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=180) as resp:
+
+    def _make_req():
+        return urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload,
+            headers={
+                "x-api-key": ANTHROPIC_KEY,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+    with _http_post_with_retries(_make_req, f"Anthropic[{model}]") as resp:
         body = json.loads(resp.read())
     return body["content"][0]["text"]
 
@@ -369,6 +689,208 @@ def build_messages_anthropic(pngs: list[Path], slug: str) -> list[dict]:
     return [{"role": "user", "content": content}]
 
 
+# ─── Per-section scoring (root fix) ─────────────────────────────────────────
+
+# Per-section criterion text, lifted from SCORING_PROMPT so each focused request
+# carries the SAME rubric the whole-doc prompt used.
+_SECTION_CRITERIA: dict[str, str] = {
+    "cover": "professional appearance, product name, class, cost ceiling, page count, any visual element",
+    "executive_summary": "3-paragraph narrative (product description / design outcome / next steps), not just a table",
+    "brief_requirements": "quantified performance targets, regulatory standards, measurable KPIs",
+    "design_modules": "subsystem list with functional descriptions, domain-correct subsystems for this product class",
+    "bom": "complete BOM with parts, quantities, unit costs, suppliers, MPNs (not TBD), grade quality",
+    "cost_analysis": "total unit cost vs ceiling, cost breakdown by module, credibility of estimates",
+    "sourcing_strategy": "supplier identification, lead times, dual-source risk, MOQ discussion",
+    "feasibility_notes": "cost verdict, top 3 technical risks with severity, regulatory flags, manufacturing flags",
+    "grammar_language": "engineering terminology correctness, no hallucinated subsystems, DRC/grammar pass status",
+    "sources_references": "cited sources, search results referenced, credibility",
+    "appendix_technical": "any supporting technical data, calculations, datasheets",
+    "visual_layout": "overall PDF layout quality, typography, table formatting, BOM legend clarity",
+}
+
+SECTION_SCORING_PROMPT = """You are a senior hardware engineering consultant reviewing ONE section of a ForgeOS AI-generated engineering design report (PDF).
+
+You are shown ONLY the page images relevant to this section: **{section_name}**.
+
+Score this section out of 10, where:
+- 10 = publication-quality, completely fills the section's purpose for a hardware team
+- 8  = clearly present, specific, actionable, minimal gaps
+- 6  = present but thin, generic, or missing important sub-content
+- 4  = partially present but significant gaps or errors
+- 2  = token effort, mostly placeholder or wrong
+- 0  = completely absent (these pages do not contain this section) or so wrong it is misleading
+
+Criterion for "{section_name}": {criterion}
+
+CRITICAL: Do NOT default to 10. Reserve 9–10 for genuinely publication-grade content. If the BoM has TBD/placeholder parts, if costs look implausible, if a risk/feasibility section lacks severities, if subsystems look wrong for the product class, or if the pages are mostly boilerplate, score accordingly (≤6). Judge ONLY what is visible on the pages shown.
+
+Return ONLY a JSON object (no code fences, no backticks). Put "score" FIRST and keep "notes" to at most 12 words so the JSON is never truncated:
+{{"score": <int 0-10 or null>, "notes": "<≤12-word justification>"}}
+"""
+
+
+def build_section_messages_openrouter(pngs: list[Path], section: str, slug: str) -> list[dict]:
+    prompt = SECTION_SCORING_PROMPT.format(
+        section_name=build_section_label(section),
+        criterion=_SECTION_CRITERIA.get(section, section),
+    )
+    content: list[dict] = [{
+        "type": "text",
+        "text": f"PDF: {slug}  ·  Section under review: {section}\n\n{prompt}\n\nRelevant pages follow:",
+    }]
+    for png in pngs:
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{encode_image(png)}"},
+        })
+    return [{"role": "user", "content": content}]
+
+
+def build_section_messages_anthropic(pngs: list[Path], section: str, slug: str) -> list[dict]:
+    prompt = SECTION_SCORING_PROMPT.format(
+        section_name=build_section_label(section),
+        criterion=_SECTION_CRITERIA.get(section, section),
+    )
+    content: list[dict] = [{
+        "type": "text",
+        "text": f"PDF: {slug}  ·  Section under review: {section}\n\n{prompt}\n\nRelevant pages follow:",
+    }]
+    for png in pngs:
+        content.append({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": encode_image(png),
+            },
+        })
+    return [{"role": "user", "content": content}]
+
+
+def parse_single_score(raw: str) -> Optional[int]:
+    """Extract a single integer `score` from a per-section model response.
+
+    Tolerant of TRUNCATED JSON: when max_tokens cuts the response off mid-`notes`
+    string the object never closes, so json.loads fails — but the score we need is
+    the FIRST key and is fully present (`{"score": 8, "notes": "The cover...`).
+    We therefore try a strict parse first, then fall back to a regex that pulls the
+    leading integer `score` out of the partial object. Without this fallback every
+    Gemini section read returned None and the whole judge was wrongly dropped."""
+    # Quiet strict parse first (don't route through parse_scores, which logs a
+    # WARN on every truncated object — that would spam 12× per model).
+    import re
+    text = raw.strip()
+    if text.startswith("```"):
+        nl = text.find("\n")
+        if nl != -1:
+            text = text[nl + 1:]
+        if text.endswith("```"):
+            text = text[: text.rfind("```")].rstrip()
+    start = text.find("{")
+    if start != -1:
+        try:
+            obj, _ = json.JSONDecoder().raw_decode(text, start)
+            if isinstance(obj, dict):
+                val = obj.get("score")
+                if isinstance(val, bool):
+                    val = None
+                elif isinstance(val, int):
+                    return val
+                elif isinstance(val, float) and val.is_integer():
+                    return int(val)
+        except json.JSONDecodeError:
+            pass
+    # Fallback: regex the score out of a truncated / non-standard object.
+    mt = re.search(r'"score"\s*:\s*(null|-?\d+(?:\.\d+)?)', raw)
+    if mt:
+        tok = mt.group(1)
+        if tok == "null":
+            return None
+        try:
+            f = float(tok)
+            if f.is_integer():
+                return int(f)
+        except ValueError:
+            pass
+    return None
+
+
+def score_section_with_model(
+    model_cfg: dict,
+    section: str,
+    section_pngs: list[Path],
+    slug: str,
+) -> Optional[int]:
+    """Score ONE section with ONE model from ONLY that section's page images.
+    Returns the int score, or None on failure (after retries) — recorded as
+    MISSING so a single surviving model can never stand as the calibrated result.
+    """
+    provider = model_cfg["provider"]
+    model = model_cfg["model"]
+    if not section_pngs:
+        return None
+    try:
+        if provider == "anthropic":
+            messages = build_section_messages_anthropic(section_pngs, section, slug)
+            raw = call_anthropic(model, messages, max_tokens=700)
+        else:
+            messages = build_section_messages_openrouter(section_pngs, section, slug)
+            raw = call_openrouter(model, messages, max_tokens=700)
+        return parse_single_score(raw)
+    except PayloadTooLargeError as e:
+        # Should not happen with ≤8 images; surface loudly if it does.
+        print(f"      ! {model_cfg['label']} / {section}: {e}", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"      ! {model_cfg['label']} / {section} ERROR: {e}", file=sys.stderr)
+        return None
+
+
+def score_pdf_per_section(
+    pdf_path: Path,
+    all_pngs: list[Path],
+    slug: str,
+) -> dict[str, dict[str, Optional[int]]]:
+    """ROOT-FIX scoring path. For each model × each of the 12 sections, send ONLY
+    that section's page subset and collect the score. Returns
+    {section: {model_id: score_or_None}} — the same structure the markdown and
+    calibration code already consume.
+
+    Image subsets are cached per (page-tuple) so identical page sets (e.g. bom and
+    cost_analysis both reading the COST BY MODULE pages) don't double-encode.
+    """
+    num_pages = len(all_pngs)
+    section_map = build_section_page_map(pdf_path, num_pages)
+
+    # Pre-compute the page subset + PNG list per section (with the small payload
+    # safety re-render baked in by render_section_pngs).
+    section_pngs: dict[str, list[Path]] = {}
+    for section in SECTIONS:
+        pages = select_section_pages(section, section_map, num_pages)
+        section_pngs[section] = render_section_pngs(all_pngs, pages, pdf_path)
+        print(f"    · {section:<20} pages {pages}")
+
+    results: dict[str, dict[str, Optional[int]]] = {s: {} for s in SECTIONS}
+    for model_cfg in MODELS:
+        mid = model_cfg["id"]
+        label = model_cfg["label"]
+        print(f"    → {label} (per-section)...", flush=True)
+        ok = 0
+        fail = 0
+        for section in SECTIONS:
+            score = score_section_with_model(model_cfg, section, section_pngs[section], slug)
+            results[section][mid] = score
+            if score is None:
+                fail += 1
+            else:
+                ok += 1
+        status = f"OK ({ok}/{len(SECTIONS)} sections)"
+        if fail:
+            status += f", {fail} missing"
+        print(f"      {label}: {status}")
+    return results
+
+
 def parse_scores(raw: str) -> dict:
     """Extract JSON scores from LLM response."""
     # Strip code fences
@@ -405,7 +927,12 @@ def parse_scores(raw: str) -> dict:
 
 
 def score_pdf_with_model(model_cfg: dict, pngs: list[Path], slug: str) -> dict:
-    """Score a PDF with one model. Returns dict of section → score."""
+    """DEPRECATED whole-PDF scoring path — sent every page in ONE request, which
+    HTTP-400'd on large dossiers (the 91-page failure this module was fixed for).
+    Replaced by score_pdf_per_section() / score_section_with_model(). Retained only
+    so any external importer doesn't break; NOT on the active scoring path.
+
+    Score a PDF with one model. Returns dict of section → score."""
     provider = model_cfg["provider"]
     model    = model_cfg["model"]
     label    = model_cfg["label"]
@@ -457,6 +984,22 @@ def calibrate_section(scores_by_model: dict[str, Optional[int]]) -> Optional[flo
         remaining = sorted_vals
 
     return sum(remaining) / len(remaining)
+
+
+def section_model_count(scores_by_model: dict[str, Optional[int]]) -> int:
+    """How many models returned an integer score for this section."""
+    return sum(1 for s in scores_by_model.values() if isinstance(s, int))
+
+
+def section_is_confident(scores_by_model: dict[str, Optional[int]]) -> bool:
+    """A section is CALIBRATED-confident only if ≥2 models scored it.
+
+    This is the guard that stops the 91-page failure mode: when Claude + Qwen both
+    HTTP-400'd, Gemini's lone uniform-10 was reported as a calibrated PASS. With
+    the per-section fix that should not recur, but if a single model still fails a
+    section we treat that section as low-confidence rather than trusting one judge.
+    """
+    return section_model_count(scores_by_model) >= MIN_MODELS_FOR_CONFIDENT_SECTION
 
 
 # ─── Markdown output ──────────────────────────────────────────────────────
@@ -596,28 +1139,19 @@ def run(args):
         label = SLUG_LABEL[slug]
         print(f"\n[{label}] {pdf_path}")
 
-        # Convert to PNGs at the highest DPI whose total payload fits the model
-        # request-body limits. Fixed 150 DPI blew past 413 (Payload Too Large) on
-        # 84-page dossiers (12 MB); 4500 KB raw -> ~6 MB body, safe across Gemini /
-        # Opus / Qwen seats. Every page is still scored (no truncation). 2026-05-31.
-        print(f"  Converting to PNGs...")
-        pngs, used_dpi = pdf_to_pngs_fit(pdf_path, target_raw_kb=4500)
-        _raw_kb = sum(p.stat().st_size for p in pngs) // 1024
-        print(f"  {len(pngs)} pages @ {used_dpi} DPI ({_raw_kb} KB raw)")
+        # Render the whole document ONCE at a legible fixed DPI, then score each
+        # council section from ONLY its relevant page subset (per-section fix). The
+        # old whole-doc-in-one-request path HTTP-400'd on 88-91 page dossiers; this
+        # keeps every request tiny regardless of length while preserving legibility.
+        print(f"  Converting to PNGs @ {SECTION_RENDER_DPI} DPI (per-section scoring)...")
+        pngs = pdf_to_pngs(pdf_path, dpi=SECTION_RENDER_DPI)
+        print(f"  {len(pngs)} pages rendered")
 
         if not pngs:
             print(f"  [SKIP] No pages extracted", file=sys.stderr)
             continue
 
-        slug_results: dict[str, dict[str, Optional[int]]] = {s: {} for s in SECTIONS}
-
-        for model_cfg in MODELS:
-            mid = model_cfg["id"]
-            model_scores = score_pdf_with_model(model_cfg, pngs, slug)
-            for section in SECTIONS:
-                val = model_scores.get(section)
-                slug_results[section][mid] = val if isinstance(val, int) else None
-
+        slug_results = score_pdf_per_section(pdf_path, pngs, slug)
         all_results[slug] = slug_results
 
         # ── Permanent score log ──────────────────────────────────────────
@@ -626,12 +1160,16 @@ def run(args):
         # average logic used later in the markdown report.
         if _record_council_score is not None:
             section_means: list[float] = []
+            low_confidence_sections: list[str] = []
             for section in SECTIONS:
                 by_model = slug_results.get(section, {})
                 m = calibrate_section(by_model)
                 if m is not None:
                     section_means.append(m)
+                if not section_is_confident(by_model):
+                    low_confidence_sections.append(section)
             pdf_mean = sum(section_means) / len(section_means) if section_means else 0.0
+            hard_low_conf = [s for s in low_confidence_sections if s in HARD_SECTIONS]
 
             # Seat scores: mean of calibrated sections per model
             seat_scores: dict[str, float] = {}
@@ -661,6 +1199,12 @@ def run(args):
             run_tag = getattr(args, "run_tag", None) or ""
             product_class = getattr(args, "product_class", None) or slug
 
+            confidence_ok = not hard_low_conf
+            note = ""
+            if hard_low_conf:
+                note = (f"LOW-CONFIDENCE: {len(hard_low_conf)} HARD section(s) scored by "
+                        f"<{MIN_MODELS_FOR_CONFIDENT_SECTION} models — manual review "
+                        f"required: {', '.join(hard_low_conf)}")
             _record_council_score({
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "product_class": product_class,
@@ -670,11 +1214,17 @@ def run(args):
                 "seats": seat_scores,
                 "mean": round(pdf_mean, 4),
                 "gate": 8.0,
-                "pass": pdf_mean >= 8.0,
-                "notes": "",
+                "pass": (pdf_mean >= 8.0) and confidence_ok,
+                "notes": note,
                 "backfilled": False,
+                "confidence_ok": confidence_ok,
+                "low_confidence_sections": low_confidence_sections,
+                "section_model_counts": {
+                    s: section_model_count(slug_results.get(s, {})) for s in SECTIONS
+                },
             })
-            print(f"  [log] Recorded {slug} mean={pdf_mean:.2f} → council-scores.jsonl")
+            conf_flag = "" if confidence_ok else f"  ⚠ {len(hard_low_conf)} HARD low-conf"
+            print(f"  [log] Recorded {slug} mean={pdf_mean:.2f}{conf_flag} → council-scores.jsonl")
 
         time.sleep(1)  # Brief pause between PDFs
 
@@ -865,13 +1415,15 @@ def run_single_pdf(args) -> None:
     print(f"[single-PDF] Scoring: {pdf_path}")
     print(f"  product_class={product_class}  run_tag={run_tag}")
 
-    # Convert to PNGs at the highest DPI whose total body fits the multimodal
-    # request limit, so the WHOLE doc is scored rather than truncating to the
-    # first MAX_PAGES_PER_CALL pages (which would penalise unseen BoM / cost /
-    # appendix sections).
-    print("  Converting to PNGs (auto-fit DPI)...")
-    pngs, dpi_used = pdf_to_pngs_fit(pdf_path)
-    print(f"  {len(pngs)} pages @ {dpi_used} DPI")
+    # Render the WHOLE document ONCE at a legible fixed DPI. We no longer shrink
+    # to fit the whole doc into a single request (that path produced ~60 DPI
+    # unreadable pages on long dossiers and STILL HTTP-400'd at 91 pages because
+    # ~90 images blew the body limit). Instead each council section is scored from
+    # only its own ≤8-page subset (build_section_page_map), so payload is never the
+    # constraint and we can keep full legibility.
+    print(f"  Converting to PNGs @ {SECTION_RENDER_DPI} DPI (per-section scoring)...")
+    pngs = pdf_to_pngs(pdf_path, dpi=SECTION_RENDER_DPI)
+    print(f"  {len(pngs)} pages rendered")
     if not pngs:
         print("ERROR: No pages extracted.", file=sys.stderr)
         sys.exit(1)
@@ -879,31 +1431,57 @@ def run_single_pdf(args) -> None:
     # Use pdf stem as the label identifier for prompts
     label = pdf_path.stem  # e.g. "radical" or whatever the file is named
 
-    slug_results: dict[str, dict[str, Optional[int]]] = {s: {} for s in SECTIONS}
-    for model_cfg in MODELS:
-        mid = model_cfg["id"]
-        model_scores = score_pdf_with_model(model_cfg, pngs, label)
-        for section in SECTIONS:
-            val = model_scores.get(section)
-            slug_results[section][mid] = val if isinstance(val, int) else None
+    # ROOT FIX: per-section scoring — each (model, section) request carries ONLY
+    # that section's relevant pages, so no request exceeds the payload limit
+    # regardless of dossier length.
+    slug_results = score_pdf_per_section(pdf_path, pngs, label)
 
-    # Compute section means and overall mean
+    # Compute section means + confidence. A section needs ≥2 models to be a
+    # CALIBRATED result; a HARD section with <2 models forces overall FAIL so a
+    # lone surviving model's uniform-10 can never be reported as a pass.
     section_means: list[float] = []
-    print("\n  Section scores (calibrated):")
+    low_confidence_sections: list[str] = []
+    print("\n  Section scores (calibrated, [n] = models that scored it):")
     for section in SECTIONS:
         by_model = slug_results.get(section, {})
         m = calibrate_section(by_model)
+        n = section_model_count(by_model)
+        confident = section_is_confident(by_model)
+        if not confident:
+            low_confidence_sections.append(section)
         if m is not None:
             section_means.append(m)
             flag = " ✅" if m >= 8.0 else ""
-            print(f"    {section:<30} {m:.2f}{flag}")
+            conf = "" if confident else "  ⚠ LOW-CONF (needs manual)"
+            print(f"    {section:<30} {m:.2f} [{n}]{flag}{conf}")
         else:
-            print(f"    {section:<30} —")
+            print(f"    {section:<30} —   [0]  ⚠ MISSING (no model scored)")
 
     pdf_mean = sum(section_means) / len(section_means) if section_means else 0.0
-    passed = pdf_mean >= 8.0
+
+    # Pass requires the gate AND that no HARD content section is low-confidence.
+    hard_low_conf = [s for s in low_confidence_sections if s in HARD_SECTIONS]
+    confidence_ok = not hard_low_conf
+    passed = (pdf_mean >= 8.0) and confidence_ok
+
+    # Guard against the exact regression this fix targets: a uniform result from a
+    # single surviving model. If every scored section has the identical value and
+    # ≥half the sections are single-model, that is the degraded-to-one-judge
+    # signature — never a pass.
+    scored_vals = [calibrate_section(slug_results[s]) for s in SECTIONS]
+    scored_vals = [v for v in scored_vals if v is not None]
+    uniform = len(set(scored_vals)) == 1 and len(scored_vals) >= 2
+    single_model_heavy = len(hard_low_conf) >= 1
+    if uniform and single_model_heavy:
+        passed = False
+        confidence_ok = False
 
     print(f"\n  Overall mean: {pdf_mean:.2f}/10  gate=8.0  {'PASS ✅' if passed else 'FAIL ❌'}")
+    if hard_low_conf:
+        print(f"  ⚠ FAIL reason: {len(hard_low_conf)} HARD section(s) scored by <2 models "
+              f"(needs manual review): {', '.join(hard_low_conf)}", file=sys.stderr)
+    if low_confidence_sections:
+        print(f"  Low-confidence sections (<2 models): {', '.join(low_confidence_sections)}")
 
     # Seat scores: mean of calibrated section scores per model
     seat_scores: dict[str, float] = {}
@@ -933,6 +1511,11 @@ def run_single_pdf(args) -> None:
     # Record permanently
     _log_path = Path("~/Downloads/engine-evidence/council-scores.jsonl").expanduser()
     if _record_council_score is not None:
+        note = ""
+        if hard_low_conf:
+            note = (f"LOW-CONFIDENCE: {len(hard_low_conf)} HARD section(s) scored by "
+                    f"<{MIN_MODELS_FOR_CONFIDENT_SECTION} models — manual review "
+                    f"required: {', '.join(hard_low_conf)}")
         _record_council_score({
             "ts": datetime.now(timezone.utc).isoformat(),
             "product_class": product_class,
@@ -943,8 +1526,14 @@ def run_single_pdf(args) -> None:
             "mean": round(pdf_mean, 4),
             "gate": 8.0,
             "pass": passed,
-            "notes": "",
+            "notes": note,
             "backfilled": False,
+            # Confidence metadata so a degraded run is never silently a "pass".
+            "confidence_ok": confidence_ok,
+            "low_confidence_sections": low_confidence_sections,
+            "section_model_counts": {
+                s: section_model_count(slug_results.get(s, {})) for s in SECTIONS
+            },
         })
         print(f"  [log] Recorded → {_log_path}")
     else:
@@ -961,8 +1550,8 @@ def run_single_pdf(args) -> None:
             f"**product_class:** `{product_class}`  ",
             f"**commit:** `{sha or 'unknown'}`",
             "",
-            "| Section | Gemini | Claude | Qwen | **Mean** |",
-            "|---|---|---|---|---|",
+            "| Section | Gemini | Claude | Qwen | n | **Mean** | Confidence |",
+            "|---|---|---|---|---|---|---|",
         ]
         for section in SECTIONS:
             by_model = slug_results.get(section, {})
@@ -970,16 +1559,26 @@ def run_single_pdf(args) -> None:
             c = by_model.get("claude")
             q = by_model.get("qwen")
             m = calibrate_section(by_model)
+            n = section_model_count(by_model)
             g_s = str(g) if g is not None else "—"
             c_s = str(c) if c is not None else "—"
             q_s = str(q) if q is not None else "—"
             m_s = f"**{m:.2f}**{'  ✅' if m is not None and m >= 8 else ''}" if m is not None else "**—**"
-            md_lines.append(f"| {build_section_label(section)} | {g_s} | {c_s} | {q_s} | {m_s} |")
+            conf = "OK" if section_is_confident(by_model) else "⚠ low (manual)"
+            md_lines.append(f"| {build_section_label(section)} | {g_s} | {c_s} | {q_s} | {n} | {m_s} | {conf} |")
         md_lines += [
             "",
             f"**Overall mean: {pdf_mean:.2f}/10** — {'PASS ✅' if passed else 'FAIL ❌'}",
+        ]
+        if hard_low_conf:
+            md_lines.append(
+                f"\n> ⚠ **Not a clean pass**: {len(hard_low_conf)} HARD section(s) "
+                f"scored by fewer than {MIN_MODELS_FOR_CONFIDENT_SECTION} models "
+                f"({', '.join(hard_low_conf)}) — manual review required."
+            )
+        md_lines += [
             "",
-            "_Generated by `scripts/score-radical-pdfs-multimodal.py --pdf`_",
+            "_Generated by `scripts/score-radical-pdfs-multimodal.py --pdf` (per-section scoring)_",
         ]
         output_path.write_text("\n".join(md_lines))
         print(f"  Report written to {output_path}")
