@@ -52,8 +52,12 @@ Sources:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "CoolProp + thermo cross-check",
@@ -202,6 +206,43 @@ def compute(payload: dict) -> dict:
         except Exception:
             pass
 
+    # Worked calculations (2026-06-03): the closed-form derived quantities a
+    # reviewer can check by hand from the CoolProp enthalpies. The state-point
+    # enthalpies (h1..h4) come from CoolProp's Helmholtz EoS and are stated as
+    # assumptions; everything below is a hand-checkable ratio/product of them.
+    q_evap_kj = q_evap / 1000.0
+    w_comp_kj = w_comp / 1000.0
+    worked = [
+        worked_calc(
+            label="Cooling coefficient of performance",
+            formula="cop_cooling = q_evap / w_comp",
+            values={"q_evap": (round(q_evap_kj, 3), "kJ/kg"), "w_comp": (round(w_comp_kj, 3), "kJ/kg")},
+            result=round(cop_cooling, 3), result_unit="",
+            assumptions=["q_evap = h1 - h4 (evaporator duty), w_comp = h2 - h1 (compressor work); enthalpies from CoolProp Helmholtz EoS"],
+        ),
+        worked_calc(
+            label="Refrigerant mass flow",
+            formula="mass_flow = cooling_load / q_evap",
+            values={"cooling_load": (cooling_load_kw, "kW"), "q_evap": (round(q_evap_kj, 3), "kJ/kg")},
+            result=round(mass_flow_kg_s, 5), result_unit="kg/s",
+            assumptions=["sized to deliver the brief cooling load at the cycle's evaporator duty"],
+        ),
+        worked_calc(
+            label="Compressor electrical power",
+            formula="compressor_power = mass_flow x w_comp",
+            values={"mass_flow": (round(mass_flow_kg_s, 5), "kg/s"), "w_comp": (round(w_comp_kj, 3), "kJ/kg")},
+            result=round(compressor_power_kw, 3), result_unit="kW",
+            assumptions=["w_comp already includes the isentropic-efficiency penalty (eta_is)"],
+        ),
+        worked_calc(
+            label="Pressure ratio",
+            formula="pressure_ratio = p_cond / p_evap",
+            values={"p_cond": (round(p_cond / 1e5, 3), "bar"), "p_evap": (round(p_evap / 1e5, 3), "bar")},
+            result=round(p_cond / p_evap, 3), result_unit="",
+            assumptions=["saturation pressures at the condenser/evaporator temperatures (CoolProp)"],
+        ),
+    ]
+
     return {
         "refrigerant": fluid,
         "evap_temp_c": t_evap_c,
@@ -232,6 +273,7 @@ def compute(payload: dict) -> dict:
             "evap_state": thermo_check_evap,
             "cond_state": thermo_check_cond,
         },
+        "worked": worked,
         "_provenance": PROVENANCE,
     }
 

@@ -27,6 +27,12 @@ import json, subprocess, re, math, os, glob, sys
 
 DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib', 'orchestrator', 'tools', 'python')
 THRESH = float(os.environ.get('THRESH', '1.0'))
+# Run tools with the SAME interpreter the chain uses (.venv has CoolProp / qutip /
+# pandapower / ngspice). With bare system python3 the venv-dependent tools fail their
+# library import → emit no worked block → land in the "no worked output" blind spot
+# (refrigeration_cycle, coolprop_run, qutip_*, fluids_run, ht_run). 2026-06-03.
+_VENV_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.venv', 'bin', 'python3')
+PYTHON = _VENV_PY if os.path.exists(_VENV_PY) else 'python3'
 
 args = list(sys.argv[1:])
 if args:
@@ -116,7 +122,7 @@ fails, syms, noout = [], [], []
 checked = 0
 for t in TOOLS:
     try:
-        p = subprocess.run(['python3', t], input='{}', capture_output=True, text=True, timeout=30, cwd=DIR)
+        p = subprocess.run([PYTHON, t], input='{}', capture_output=True, text=True, timeout=30, cwd=DIR)
         out = json.loads(p.stdout)
     except Exception:
         noout.append(t + ' (run/parse error on {})'); continue

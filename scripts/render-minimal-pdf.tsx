@@ -10560,6 +10560,16 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
                     <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
                       <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{normalise_unicode(String(wc.label ?? ''))}</Text>
                     </Text>
+                    {/* 2026-06-03 (Tristan): show the SYMBOLIC formula above the substituted
+                        numbers — without it the reader sees "(10 - 0.1) / 0.4 = 24.75" and
+                        cannot tell what the numbers represent. formula = "LHS = <expr in symbols>";
+                        substitution = "LHS = <numbers> = result". Together they read as a
+                        standard worked example (formula line, then substituted line). */}
+                    {wc.formula ? (
+                      <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK_SOFT, lineHeight: 1.5, marginLeft: 6 }}>
+                        {normalise_unicode(String(wc.formula))}
+                      </Text>
+                    ) : null}
                     <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK, lineHeight: 1.5, marginLeft: 6 }}>
                       {normalise_unicode(String(wc.substitution ?? ''))}
                     </Text>
