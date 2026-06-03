@@ -113,9 +113,19 @@ export async function assembleDesign(
   const finalise = (design: DesignJSON): DesignJSON =>
     applyBriefScopeFilter(splitDenseSubModulesByRadical(design), brief, envelope)
 
+  // ── 0. Holdout (Experiment A — GENERIC-EMITTER-PLAN.md §1) ──
+  // EXP_A_HOLDOUT_CLASS=bess forces a KNOWN class down the GENERIC miss-fallback
+  // (§4) by hiding its registered + legacy emitters, so the generic output can
+  // be councilled against the hand-built golden. Comma-separated; empty = normal.
+  const heldOut = (process.env.EXP_A_HOLDOUT_CLASS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .includes(envelope.class)
+
   // ── 1. Try exact class/scale_tier match in registry ──
   const exactKey = `${envelope.class}/${envelope.scale_tier ?? 'default'}`
-  const exactFn = EMITTER_REGISTRY[exactKey]
+  const exactFn = heldOut ? undefined : EMITTER_REGISTRY[exactKey]
   if (exactFn) {
     try {
       const design = exactFn(contract, brief, envelope)
@@ -126,7 +136,7 @@ export async function assembleDesign(
   }
 
   // ── 2. Try class-alone match in registry ──
-  const classFn = EMITTER_REGISTRY[envelope.class]
+  const classFn = heldOut ? undefined : EMITTER_REGISTRY[envelope.class]
   if (classFn) {
     try {
       const design = classFn(contract, brief, envelope)
@@ -137,7 +147,7 @@ export async function assembleDesign(
   }
 
   // ── 3. Legacy BESS path (lazy-import for the 1424-line file) ──
-  if (envelope.class === 'bess' && envelope.scale_tier === 'utility_containerised') {
+  if (!heldOut && envelope.class === 'bess' && envelope.scale_tier === 'utility_containerised') {
     try {
       const { emitBessDesign, canEmitBess } = await import('../deterministic-emitter')
       if (!canEmitBess(contract as any)) {
@@ -150,7 +160,21 @@ export async function assembleDesign(
     }
   }
 
-  // ── 4. No emitter registered → chain falls back to LLM Generator ──
+  // ── 4. Generic emitter (wall-3 miss-fallback) — GENERIC-EMITTER-PLAN.md §3 ──
+  // Flag-gated (UNIVERSAL_GENERIC_EMITTER=1) so the 35 registered classes never
+  // reach it. The single path that renders an UNSEEN class (or an Exp-A holdout):
+  // structure from the class-reference graph + downstream gap-filler parts.
+  if (process.env.UNIVERSAL_GENERIC_EMITTER === '1' || process.env.UNIVERSAL_GENERIC_EMITTER === 'true') {
+    try {
+      const { emitGenericDesign } = await import('./generic/generic-emitter')
+      const design = await emitGenericDesign(contract, brief, envelope)
+      return { ok: true, design: finalise(design) }
+    } catch (err) {
+      return { ok: false, design: null, error: `generic emitter threw: ${(err as Error).message}` }
+    }
+  }
+
+  // ── 5. No emitter registered → chain falls back to LLM Generator ──
   return {
     ok: false,
     design: null,
