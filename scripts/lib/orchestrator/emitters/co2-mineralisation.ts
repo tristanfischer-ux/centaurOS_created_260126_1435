@@ -99,7 +99,10 @@ interface Co2MinParams {
   distillColDiaM: number
   dryerHeatKw: number
   steamKgH: number
+  boilerSteamKgH: number
+  boilerElectricalKw: number
   electricalKw: number
+  transformerKva: number
   bagKg: number
   bagsPerDay: number
 }
@@ -112,6 +115,42 @@ function deriveParams(c: ContractInProgress): Co2MinParams {
   const gypsum = tpd * (172 / 44)
   const koh = tpd * (112 / 44)
   const bagKg = 25
+  const dryerHeatKw = q(c, 'dryer_heat_duty_kw', 75)
+  const reboilerSteamKgH = q(c, 'reboiler_steam_kg_h', 180)
+
+  // ── Steam-boiler sizing (gate-4 Physics-Critic fix, 2026-06-04) ──
+  // The boiler must supply the SUM of every steam consumer, not just the
+  // distillation reboiler. Sized from the tool-computed reboiler duty plus the
+  // crystalliser circulation-heater duty plus the MEA stripper reboil-pot duty.
+  // LP steam (~3 bar g) latent heat ≈ 2150 kJ/kg ⇒ kg/h = kW × 3600 / 2150.
+  const reboilerDutyKw = q(c, 'reboiler_duty_kw', 91)              // tool:ht:ntu-heat-exchanger
+  const crystalliserHeaterKw = q(c, 'crystalliser_heater_duty_kw', 90)
+  const stripperPotKw = q(c, 'mea_stripper_pot_duty_kw', 30)
+  const steamThermalKw = reboilerDutyKw + crystalliserHeaterKw + stripperPotKw
+  const STEAM_LATENT_KJ_KG = 2150
+  const totalSteamKgH = (steamThermalKw * 3600) / STEAM_LATENT_KJ_KG
+  // +15 % engineering margin, rounded up to the next 50 kg/h boiler frame size.
+  const boilerSteamKgH = q(c, 'boiler_steam_capacity_kg_h',
+    Math.ceil((totalSteamKgH * 1.15) / 50) * 50)
+  const boilerElectricalKw = Math.round(steamThermalKw / 0.98)     // electric element input
+
+  // ── Plant electrical-load + transformer sizing (gate Physics-Critic fix) ──
+  // The connected active load is dominated by the electric steam boiler
+  // (~boilerElectricalKw), the two hot-air duct heaters (2 × dryerHeatKw), the
+  // shrink-wrap tunnel heater (~24 kW) and ~87 kW of motors/aux. A 160 kVA
+  // transformer cannot supply this — size it from the real connected load.
+  const ductHeaterKw = 2 * dryerHeatKw            // 2 × Kanthal hot-air duct heaters
+  const shrinkTunnelKw = 24                        // bagging shrink-wrap tunnel
+  const motorAuxKw = 87                            // pumps, agitators, blowers, centrifuge, bagging, control/aux
+  const connectedKw = boilerElectricalKw + ductHeaterKw + shrinkTunnelKw + motorAuxKw
+  const electricalKw = q(c, 'electrical_load_kw', Math.round(connectedKw))
+  // Coincident demand (×0.9 diversity) at pf 0.9 ⇒ kVA, then ×1.25 margin,
+  // rounded up to the next standard IEC cast-resin rating.
+  const STD_KVA = [160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600]
+  const requiredKva = (electricalKw * 0.9 / 0.9) * 1.25
+  const transformerKva = q(c, 'transformer_rating_kva',
+    STD_KVA.find((r) => r >= requiredKva) ?? 1600)
+
   return {
     captureTpd: tpd,
     captureKgH: kgH,
@@ -127,9 +166,12 @@ function deriveParams(c: ContractInProgress): Co2MinParams {
     reactorVolumeM3: q(c, 'carbonation_reactor_volume_m3', 4),
     filterAreaM2: q(c, 'filter_area_m2', 3),
     distillColDiaM: q(c, 'distillation_column_diameter_m', 0.3),
-    dryerHeatKw: q(c, 'dryer_heat_duty_kw', 75),
-    steamKgH: q(c, 'reboiler_steam_kg_h', 180),
-    electricalKw: q(c, 'electrical_load_kw', 90),
+    dryerHeatKw,
+    steamKgH: reboilerSteamKgH,
+    boilerSteamKgH,
+    boilerElectricalKw,
+    electricalKw,
+    transformerKva,
     bagKg,
     bagsPerDay: Math.round(((caco3 + k2so4) * 1000) / bagKg),
   }
@@ -141,13 +183,13 @@ function emitAbsorptionCapture(p: Co2MinParams): DesignModule {
     `${p.captureKgH.toFixed(0)} kg/h CO2 absorbed into ${p.meaWtPct.toFixed(0)} wt% aqueous MEA circulating at ${p.meaCircM3H.toFixed(1)} m³/h through a ${p.absorberDiaM.toFixed(1)} m × ${p.absorberHeightM.toFixed(0)} m packed column`, [
     word('packed_absorber_column_word', 'packed absorber column',
       cc('packed_absorber_column', 'packed absorber column', 'mass_fluid_transport_process', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'random-packed counter-current column'),
+      [mod('quantity', '×1'), mod('form', 'random-packed counter-current column, flanged segments for field erection'),
        mod('dimension', `${p.absorberDiaM.toFixed(1)} m dia × ${p.absorberHeightM.toFixed(0)} m`), mod('manufacturer', 'Sulzer'),
-       mod('part_number', 'fabricated 316L packed column — bespoke vessel'), mod('list_price_gbp', '18000'), mod('regulatory', 'PED 2014/68/EU')]),
+       mod('part_number', 'fabricated 316L packed column — bespoke vessel'), mod('list_price_gbp', '26000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('structured_packing_word', 'structured packing',
       cc('structured_packing', 'structured packing', 'mass_fluid_transport_process', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'Mellapak 250.Y'), mod('manufacturer', 'Sulzer'), mod('dimension', `${(p.absorberDiaM * p.absorberDiaM * 0.785 * p.absorberHeightM).toFixed(1)} m³ bed`),
-       mod('part_number', 'MELLAPAK 250.Y'), mod('list_price_gbp', '6500')]),
+       mod('part_number', 'MELLAPAK 250.Y'), mod('list_price_gbp', '5800')]),
     word('mea_circulation_pump_word', 'MEA circulation pump',
       cc('mea_circulation_pump', 'MEA circulation pump', 'mass_fluid_transport_process', 'stainless_steel'),
       [mod('quantity', '×2'), mod('form', 'centrifugal, 1 duty + 1 standby'), mod('capacity', String(p.meaCircM3H.toFixed(1)), 'm³/h'), mod('manufacturer', 'Grundfos'),
@@ -155,11 +197,11 @@ function emitAbsorptionCapture(p: Co2MinParams): DesignModule {
     word('rich_lean_mea_exchanger_word', 'rich/lean MEA exchanger',
       cc('rich_lean_mea_exchanger', 'rich/lean MEA plate exchanger', 'thermal_transfer_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'gasketed plate cross-exchanger'), mod('manufacturer', 'Alfa Laval'),
-       mod('part_number', 'M10-BFG'), mod('list_price_gbp', '9000')]),
+       mod('part_number', 'M10-BFG'), mod('list_price_gbp', '8800')]),
     word('lean_amine_cooler_word', 'lean-amine cooler',
       cc('lean_amine_cooler', 'lean-amine trim cooler', 'thermal_transfer_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'gasketed plate cooler, cooling-water served'), mod('capacity', '120', 'kW'), mod('manufacturer', 'Alfa Laval'),
-       mod('part_number', 'M6-FG'), mod('list_price_gbp', '6500')]),
+       mod('part_number', 'M6-FG'), mod('list_price_gbp', '6200')]),
     word('rich_amine_trim_cooler_word', 'rich-amine inlet cooler',
       cc('rich_amine_trim_cooler', 'rich-amine inlet trim cooler', 'thermal_transfer_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'brazed-plate cooler'), mod('capacity', '40', 'kW'), mod('manufacturer', 'Alfa Laval'),
@@ -190,7 +232,7 @@ function emitCarbonationReactor(p: Co2MinParams): DesignModule {
     word('stirred_carbonation_reactor_word', 'stirred carbonation reactor',
       cc('stirred_carbonation_reactor', 'stirred carbonation reactor', 'chemical_reaction_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'baffled stirred-tank reactor, jacketed'), mod('dimension', String(p.reactorVolumeM3.toFixed(0)), 'm³'), mod('manufacturer', 'De Dietrich'),
-       mod('part_number', 'fabricated jacketed 316L stirred-tank reactor — bespoke vessel'), mod('list_price_gbp', '22000'), mod('regulatory', 'PED 2014/68/EU')]),
+       mod('part_number', 'fabricated jacketed 316L stirred-tank reactor — bespoke vessel'), mod('list_price_gbp', '24000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('carbonation_maturation_vessel_word', 'carbonation maturation vessel',
       cc('carbonation_maturation_vessel', 'CaCO3 maturation/digestion vessel', 'chemical_reaction_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'gently-stirred residence vessel for crystal growth'), mod('dimension', String((p.reactorVolumeM3 * 0.75).toFixed(1)), 'm³'),
@@ -222,7 +264,7 @@ function emitCarbonationReactor(p: Co2MinParams): DesignModule {
     word('gypsum_feed_hopper_word', 'gypsum feed hopper + screw',
       cc('gypsum_feed_hopper', 'gypsum feed hopper and metering screw', 'mass_fluid_transport_process', 'steel'),
       [mod('quantity', '×1'), mod('form', 'loss-in-weight screw feeder'), mod('capacity', String((p.gypsumTpd * 1000 / 24).toFixed(0)), 'kg/h'), mod('manufacturer', 'Schenck Process'),
-       mod('part_number', 'MULTICOR'), mod('list_price_gbp', '9500')]),
+       mod('part_number', 'MULTICOR'), mod('list_price_gbp', '9800')]),
     word('slurry_transfer_pump_word', 'CaCO3 slurry transfer pump',
       cc('slurry_transfer_pump', 'CaCO3 slurry transfer pump', 'mass_fluid_transport_process', 'stainless_steel'),
       [mod('quantity', '×2'), mod('form', 'progressive-cavity, abrasion-rated'), mod('manufacturer', 'SEEPEX'),
@@ -251,6 +293,13 @@ function emitCarbonationReactor(p: Co2MinParams): DesignModule {
       cc('reactor_temp_probe', 'reactor Pt100 temperature sensor', 'chemical_sensing_function', 'stainless_steel'),
       [mod('quantity', '×2'), mod('form', 'Memosens Pt100 with thermowell'), mod('manufacturer', 'Endress+Hauser'),
        mod('part_number', 'iTHERM TM411'), mod('list_price_gbp', '1100')]),
+    // Real IP66 instrument junction box (gate-21/gate-20 fix, 2026-06-04): a
+    // genuine Spelsberg Abox enclosure, NOT a rotary position sensor. Emitter
+    // owns this MPN so Phase 2 cannot invent a wrong part for the slot.
+    word('junction_box_word', 'instrument junction box',
+      cc('junction_box', 'field instrument junction box', 'chemical_sensing_function', 'polymer_thermoplastic'),
+      [mod('quantity', '×4'), mod('form', 'IP66 field junction box for instrument wiring'), mod('dimension', '152 × 152 × 80 mm'), mod('manufacturer', 'Spelsberg'),
+       mod('part_number', '81040001'), mod('list_price_gbp', '40'), mod('regulatory', 'BS EN 62208')]),
   ])
   return { module: 'energy_conversion_transduction', display_name: 'Gypsum Carbonation Reactor',
     module_brief: `Jacketed stirred carbonation reactor mineralises captured CO2 with gypsum to ${p.caco3Tpd.toFixed(1)} t/day CaCO3; pH/ORP-controlled, agitated, slurry pumped to filtration.`,
@@ -356,7 +405,7 @@ function emitK2so4Recovery(p: Co2MinParams): DesignModule {
     word('crystalliser_vacuum_condenser_word', 'crystalliser vacuum condenser',
       cc('crystalliser_vacuum_condenser', 'crystalliser vacuum/MEA-vapour condenser', 'thermal_transfer_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'shell-and-tube vacuum condenser with vapour ejector'), mod('capacity', '60', 'kW'), mod('manufacturer', 'GEA'),
-       mod('part_number', 'shell-and-tube vacuum condenser — packaged'), mod('list_price_gbp', '9500')]),
+       mod('part_number', 'shell-and-tube vacuum condenser — packaged'), mod('list_price_gbp', '9200')]),
   ])
   return { module: 'energy_conversion_transduction', display_name: 'K2SO4 Recovery & Crystallisation',
     module_brief: `KOH converts the sulfate filtrate to fertiliser-grade K2SO4 and regenerates free MEA; K2SO4 is centrifuged, recrystallised MEA-free and hot-air dried.`,
@@ -371,11 +420,11 @@ function emitMeaRecovery(p: Co2MinParams): DesignModule {
     word('mea_distillation_column_word', 'MEA distillation column',
       cc('mea_distillation_column', 'MEA wash-water distillation column', 'mass_fluid_transport_process', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'packed stripping column'), mod('dimension', `${p.distillColDiaM.toFixed(1)} m dia`), mod('manufacturer', 'Koch-Glitsch'),
-       mod('part_number', 'fabricated 316L packed stripping column — bespoke vessel'), mod('list_price_gbp', '22000'), mod('regulatory', 'PED 2014/68/EU')]),
+       mod('part_number', 'fabricated 316L packed stripping column — bespoke vessel'), mod('list_price_gbp', '20000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('reboiler_word', 'distillation reboiler',
       cc('reboiler', 'thermosiphon reboiler', 'thermal_transfer_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'shell-and-tube thermosiphon'), mod('capacity', String(p.steamKgH.toFixed(0)), 'kg/h steam'), mod('manufacturer', 'Alfa Laval'),
-       mod('part_number', 'CB60 (brazed-plate reboiler)'), mod('list_price_gbp', '9500')]),
+       mod('part_number', 'CB60 (brazed-plate reboiler)'), mod('list_price_gbp', '8900')]),
     word('overhead_condenser_word', 'overhead condenser',
       cc('overhead_condenser', 'overhead condenser', 'thermal_transfer_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'plate condenser'), mod('manufacturer', 'Alfa Laval'),
@@ -410,11 +459,11 @@ function emitMeaRecovery(p: Co2MinParams): DesignModule {
 // 6. Thermal utilities ------------------------------------------------------------
 function emitThermalUtilities(p: Co2MinParams): DesignModule {
   const sub = makeSub('thermal_utilities', 'thermal utilities', 'supplies',
-    `steam generation for the reboiler and hot air for two drying stages plus cooling water`, [
+    `a ${p.boilerSteamKgH.toFixed(0)} kg/h packaged electric steam boiler serving the distillation reboiler, the K2SO4 crystalliser heater and the MEA stripping pot, plus hot air for two drying stages and closed-loop cooling water`, [
     word('steam_generator_word', 'electric steam generator',
       cc('steam_generator', 'electric steam generator', 'thermal_transfer_function', 'steel'),
-      [mod('quantity', '×1'), mod('form', 'packaged electric steam boiler'), mod('capacity', String(p.steamKgH.toFixed(0)), 'kg/h'), mod('manufacturer', 'Cochran'),
-       mod('part_number', 'packaged electric steam boiler — bespoke package'), mod('list_price_gbp', '18000'), mod('regulatory', 'PED 2014/68/EU')]),
+      [mod('quantity', '×1'), mod('form', `packaged electric steam boiler, ${p.boilerElectricalKw} kW element`), mod('capacity', String(p.boilerSteamKgH.toFixed(0)), 'kg/h'), mod('manufacturer', 'Cochran'),
+       mod('part_number', 'packaged electric steam boiler — bespoke package'), mod('list_price_gbp', '52000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('hot_air_heater_word', 'hot-air process heater',
       cc('hot_air_heater', 'electric hot-air process heater', 'thermal_transfer_function', 'steel'),
       [mod('quantity', '×2'), mod('form', 'finned electric duct heater'), mod('capacity', String(p.dryerHeatKw.toFixed(0)), 'kW each'), mod('manufacturer', 'Kanthal'),
@@ -422,15 +471,15 @@ function emitThermalUtilities(p: Co2MinParams): DesignModule {
     word('cooling_water_skid_word', 'cooling-water skid',
       cc('cooling_water_skid', 'closed-loop cooling-water skid', 'thermal_transfer_function', 'steel'),
       [mod('quantity', '×1'), mod('form', 'dry-cooler + circulation pump'), mod('manufacturer', 'Pfannenberg'),
-       mod('part_number', 'closed-loop cooling-water skid — packaged'), mod('list_price_gbp', '9000')]),
+       mod('part_number', 'closed-loop cooling-water skid — packaged'), mod('list_price_gbp', '9400')]),
     word('condensate_flash_vessel_word', 'condensate + feedwater vessel',
       cc('condensate_flash_vessel', 'condensate flash and boiler feedwater vessel', 'thermal_transfer_function', 'steel'),
       [mod('quantity', '×1'), mod('form', 'condensate flash receiver + feedwater de-aerator pot'), mod('dimension', '0.5 m³'),
        mod('part_number', 'fabricated condensate/feedwater vessel — bespoke vessel'), mod('list_price_gbp', '4600'), mod('regulatory', 'PED 2014/68/EU')]),
   ])
   return { module: 'environmental_interface', display_name: 'Thermal Utilities',
-    module_brief: `Packaged electric steam + hot-air + cooling-water utilities serve the reboiler, the two dryers and process cooling.`,
-    overview_paragraph_en: '', derived_parameters: { reboiler_steam_kg_h: p.steamKgH, dryer_heat_kw: p.dryerHeatKw },
+    module_brief: `A ${p.boilerSteamKgH.toFixed(0)} kg/h packaged electric steam boiler plus hot-air and cooling-water utilities serve the distillation reboiler, the crystalliser heater, the MEA stripping pot, the two dryers and process cooling.`,
+    overview_paragraph_en: '', derived_parameters: { reboiler_steam_kg_h: p.steamKgH, boiler_steam_capacity_kg_h: p.boilerSteamKgH, boiler_electrical_kw: p.boilerElectricalKw, dryer_heat_kw: p.dryerHeatKw },
     allowed_radicals: ['thermal_transfer_function', 'steel'], applicability_confidence: 'high', sub_modules: [sub] }
 }
 
@@ -554,8 +603,8 @@ function emitElectrical(p: Co2MinParams): DesignModule {
        mod('part_number', 'FPNO-21'), mod('list_price_gbp', '210')]),
     word('transformer_word', 'distribution transformer',
       cc('distribution_transformer', 'distribution transformer', 'electromagnetic_actuator_function', 'copper'),
-      [mod('quantity', '×1'), mod('form', 'cast-resin'), mod('capacity', '160', 'kVA'), mod('manufacturer', 'Schneider Electric'),
-       mod('part_number', 'Trihal 160 kVA cast-resin transformer'), mod('list_price_gbp', '13000')]),
+      [mod('quantity', '×1'), mod('form', 'cast-resin'), mod('capacity', String(p.transformerKva), 'kVA'), mod('manufacturer', 'Schneider Electric'),
+       mod('part_number', `Trihal ${p.transformerKva} kVA cast-resin transformer`), mod('list_price_gbp', '32000')]),
     word('contactors_word', 'motor contactors',
       cc('contactors', 'MCC motor contactors', 'electromagnetic_actuator_function', 'polymer_thermoplastic'),
       [mod('quantity', '×14'), mod('form', '3-pole AC-3 block contactor'), mod('manufacturer', 'ABB'),
@@ -578,15 +627,19 @@ function emitElectrical(p: Co2MinParams): DesignModule {
 // 10. Structure / containment / skid ----------------------------------------------
 function emitStructure(_p: Co2MinParams): DesignModule {
   const sub = makeSub('skid_structure', 'skid structure + containment', 'supports',
-    `a transportable galvanised-steel skid carrying the vessels, columns and tanks with chemical bunding`, [
+    `a transportable galvanised-steel skid (within the 2.59 m road-transport height envelope) carrying the reactors, exchangers, pumps and tanks with chemical bunding; the tall packed columns (absorber, MEA stripper, distillation) ship as flanged segments and are field-erected on a plinth beside the skid`, [
     word('process_skid_frame_word', 'process skid frame',
       cc('process_skid_frame', 'galvanised process skid frame', 'mechanical_load_bearing_function', 'steel'),
-      [mod('quantity', '×1'), mod('form', 'welded galvanised frame, ISO-corner transportable'), mod('dimension', '12 m × 2.4 m'),
-       mod('part_number', 'welded galvanised structural-steel skid frame — fabricated'), mod('list_price_gbp', '18000')]),
+      [mod('quantity', '×1'), mod('form', 'welded galvanised frame, ISO-corner transportable, ≤2.59 m transport height'), mod('dimension', '12 m × 2.4 m × 2.59 m'),
+       mod('part_number', 'welded galvanised structural-steel skid frame — fabricated'), mod('list_price_gbp', '15000')]),
+    word('column_plinth_word', 'field-erection column plinth',
+      cc('column_plinth', 'field-erected column support plinth', 'mechanical_load_bearing_function', 'steel'),
+      [mod('quantity', '×1'), mod('form', 'reinforced plinth + bolted column support frame for the field-erected packed columns beside the skid'),
+       mod('part_number', 'reinforced column support plinth and frame — fabricated'), mod('list_price_gbp', '7500')]),
     word('chemical_bund_word', 'chemical bund',
       cc('chemical_bund', 'MEA/KOH chemical bund', 'mechanical_load_bearing_function', 'polymer_thermoplastic'),
       [mod('quantity', '×1'), mod('form', '110% bunded containment'),
-       mod('part_number', 'GRP 110% bunded containment tray — fabricated'), mod('list_price_gbp', '6500'), mod('regulatory', 'DSEAR')]),
+       mod('part_number', 'GRP 110% bunded containment tray — fabricated'), mod('list_price_gbp', '7000'), mod('regulatory', 'DSEAR')]),
     word('vessel_supports_word', 'vessel supports + saddles',
       cc('vessel_supports', 'vessel supports and saddles', 'mechanical_load_bearing_function', 'steel'),
       [mod('quantity', '×8'), mod('form', 'bolted saddles'),
@@ -597,8 +650,8 @@ function emitStructure(_p: Co2MinParams): DesignModule {
        mod('part_number', 'GRP grating access platform and ladders — fabricated'), mod('list_price_gbp', '8500'), mod('regulatory', 'BS EN ISO 14122')]),
   ])
   return { module: 'structure_containment', display_name: 'Skid Structure & Containment',
-    module_brief: `A transportable skid with 110% chemical bunding carries the full plant for road transport and drop-in installation.`,
-    overview_paragraph_en: '', derived_parameters: { skid_length_m: 12 },
+    module_brief: `A transportable skid (within the 2.59 m road-transport height envelope) with 110% chemical bunding carries the reactors, exchangers, pumps and tanks; the tall packed columns ship as flanged segments and are field-erected on a plinth beside the skid, so the 2.59 m envelope governs the transportable modules, not the erected ~6 m column height.`,
+    overview_paragraph_en: '', derived_parameters: { skid_length_m: 12, skid_transport_height_m: 2.59 },
     allowed_radicals: ['mechanical_load_bearing_function', 'steel', 'polymer_thermoplastic'], applicability_confidence: 'high', sub_modules: [sub] }
 }
 
@@ -641,7 +694,7 @@ function emitSafety(_p: Co2MinParams): DesignModule {
     word('emergency_stop_word', 'emergency shutdown system',
       cc('emergency_stop', 'emergency shutdown system', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
       [mod('quantity', '×1'), mod('form', 'SIL-2 ESD chain controller'), mod('manufacturer', 'Siemens'),
-       mod('part_number', '3SK1112-1BB40'), mod('list_price_gbp', '11000'), mod('regulatory', 'BS EN 61511')]),
+       mod('part_number', '3SK1112-1BB40'), mod('list_price_gbp', '200'), mod('regulatory', 'BS EN 61511')]),
     word('safety_relay_word', 'safety relays',
       cc('safety_relay', 'modular safety relays', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
       [mod('quantity', '×8'), mod('form', 'SIRIUS 3SK modular safety relay'), mod('manufacturer', 'Siemens'),
@@ -692,7 +745,7 @@ function emitBagging(p: Co2MinParams): DesignModule {
     word('palletiser_word', 'pallet wrapper',
       cc('palletiser', 'semi-automatic pallet wrapper', 'mass_fluid_transport_process', 'steel'),
       [mod('quantity', '×1'), mod('form', 'turntable stretch-wrapper'), mod('manufacturer', 'Robopac'),
-       mod('part_number', 'Rotoplat 308'), mod('list_price_gbp', '6500')]),
+       mod('part_number', 'Rotoplat 308'), mod('list_price_gbp', '6800')]),
     word('bag_conveyor_word', 'bag take-away conveyor',
       cc('bag_conveyor', 'filled-bag take-away conveyor', 'mass_fluid_transport_process', 'steel'),
       [mod('quantity', '×1'), mod('form', 'flat-belt conveyor from bagger to palletiser'), mod('manufacturer', 'Interroll'),
@@ -722,7 +775,7 @@ function emitCrossModuleGrammarLinks(p: Co2MinParams) {
     { from_module: 'safety_protection', to_module: 'control_compute_communication',
       mechanism: 'data' as const, type: 'directional' as const, detail: 'gas detection + ESD chain trip the PLC' },
     { from_module: 'structure_containment', to_module: 'energy_conversion_transduction',
-      mechanism: 'mechanical' as const, type: 'directional' as const, detail: 'reactors + columns saddle-mounted on the bunded skid' },
+      mechanism: 'mechanical' as const, type: 'directional' as const, detail: 'reactors + exchangers saddle-mounted on the bunded skid (≤2.59 m); tall packed columns field-erected on an adjacent plinth' },
   ]
 }
 
