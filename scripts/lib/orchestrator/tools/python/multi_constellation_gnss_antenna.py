@@ -32,8 +32,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -137,6 +141,27 @@ def compute(payload: dict) -> dict:
     # AR = 3 dB → ~83% RHCP
     polarisation_purity_pct = 100.0 * (1.0 / (1.0 + ((ar_lin - 1.0) / (ar_lin + 1.0)) ** 2))
 
+    # Worked calculations (2026-06-03): the per-band gain is a log-domain figure
+    # (skipped), but the physical aperture area and the polarisation-purity fraction
+    # are closed-form and hand-checkable. ar_lin = 10^(AR_dB/20) is surfaced as an
+    # input so the purity arithmetic re-checks without a log.
+    worked = [
+        worked_calc(
+            label="Antenna aperture area",
+            formula="aperture_area = pi x (diameter / 2)^2",
+            values={"diameter": (round(d_m, 4), "m")},
+            result=round(A_m2, 6), result_unit="m2",
+            assumptions=["circular aperture of the stated physical diameter"],
+        ),
+        worked_calc(
+            label="Polarisation purity (RHCP fraction)",
+            formula="polarisation_purity = 100 x (1 / (1 + ((ar_lin - 1) / (ar_lin + 1))^2))",
+            values={"ar_lin": (round(ar_lin, 5), "")},
+            result=round(polarisation_purity_pct, 1), result_unit="%",
+            assumptions=[f"ar_lin = 10^(axial_ratio_dB/20) = 10^({axial_ratio_db}/20); AR=0 dB -> 100% pure RHCP"],
+        ),
+    ]
+
     return {
         "frequencies_supported": list(freqs_supported),
         "antenna_diameter_mm": antenna_diameter_mm,
@@ -148,6 +173,7 @@ def compute(payload: dict) -> dict:
         "multipath_rejection_db": round(multipath_rejection_db, 1),
         "polarisation_purity_pct": round(polarisation_purity_pct, 1),
         "num_bands_supported": len(gain_per_band),
+        "worked": worked,
     }
 
 

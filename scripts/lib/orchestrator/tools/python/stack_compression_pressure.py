@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "stack_compression_pressure (custom)",
@@ -127,6 +131,45 @@ def compute(payload: dict) -> dict:
     # Stress check
     margin_pct = (sigma_yield_mpa - actual_stress_mpa) / sigma_yield_mpa * 100
 
+    # Worked calculations (2026-06-03): the clamp force balance and tie-rod stress
+    # are pure closed-form (F = P*A, stress = F/A) — fully hand-checkable. Pressure
+    # is in MPa and area in mm2 so that MPa*mm2 = N directly (and MPa = N/mm2).
+    A_cell_mm2 = A_cell_cm2 * 100.0  # cm2 -> mm2
+    worked = [
+        worked_calc(
+            label="Stack clamp force",
+            formula="clamp_force = target_pressure x cell_area",
+            values={"target_pressure": (P_target_mpa, "MPa"),
+                    "cell_area": (round(A_cell_mm2, 2), "mm2")},
+            result=round(F_clamp_n, 0), result_unit="N",
+            assumptions=["F = P * A across the cell footprint (MPa * mm2 = N)"],
+        ),
+        worked_calc(
+            label="Force per tie rod",
+            formula="force_per_rod = clamp_force / tie_rod_count",
+            values={"clamp_force": (round(F_clamp_n, 0), "N"),
+                    "tie_rod_count": (n_tie_rods, "")},
+            result=round(F_per_rod_n, 0), result_unit="N",
+            assumptions=[f"{n_tie_rods} tie rods at the corners share the clamp load equally in tension"],
+        ),
+        worked_calc(
+            label="Tie-rod tensile stress",
+            formula="frame_stress = force_per_rod / rod_area",
+            values={"force_per_rod": (round(F_per_rod_n, 0), "N"),
+                    "rod_area": (selected_area_mm2, "mm2")},
+            result=round(actual_stress_mpa, 2), result_unit="MPa",
+            assumptions=[f"selected {selected_bolt} thread (stress area {selected_area_mm2} mm2); N/mm2 = MPa"],
+        ),
+        worked_calc(
+            label="Yield stress margin",
+            formula="stress_margin = (yield_strength - frame_stress) / yield_strength x 100",
+            values={"yield_strength": (sigma_yield_mpa, "MPa"),
+                    "frame_stress": (round(actual_stress_mpa, 2), "MPa")},
+            result=round(margin_pct, 1), result_unit="%",
+            assumptions=[f"{frame_mat} yield strength {sigma_yield_mpa} MPa (design safety factor {SF})"],
+        ),
+    ]
+
     return {
         "cell_area_cm2": A_cell_cm2,
         "stack_count": N_cells,
@@ -146,6 +189,7 @@ def compute(payload: dict) -> dict:
         "frame_mass_kg": round(frame_mass_kg, 2),
         "stack_height_mm": round(stack_height_m * 1000, 1),
         "safety_factor_design": SF,
+        "worked": worked,
     }
 
 

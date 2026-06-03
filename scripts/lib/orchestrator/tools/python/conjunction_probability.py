@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -173,6 +177,29 @@ def compute(payload: dict) -> dict:
     else:
         severity = "green"
 
+    # Worked calculations (2026-06-03): the Foster 1992 collision-probability
+    # integral over the encounter plane is numerical (not hand-checkable), but the
+    # two geometric drivers that feed it — the closest-approach miss distance and
+    # the relative velocity — are plain Euclidean norms a reviewer can re-check.
+    dx_m, dy_m, dz_m = r_rel_m[0], r_rel_m[1], r_rel_m[2]
+    dvx, dvy, dvz = vel2[0] - vel1[0], vel2[1] - vel1[1], vel2[2] - vel1[2]
+    worked = [
+        worked_calc(
+            label="Miss distance at closest approach",
+            formula="miss_distance = (dx^2 + dy^2 + dz^2)^0.5",
+            values={"dx": (round(dx_m, 3), "m"), "dy": (round(dy_m, 3), "m"), "dz": (round(dz_m, 3), "m")},
+            result=round(miss_distance_m, 2), result_unit="m",
+            assumptions=["relative position vector (object 2 - object 1) at the time of closest approach, converted km -> m"],
+        ),
+        worked_calc(
+            label="Relative velocity",
+            formula="rel_velocity = (dvx^2 + dvy^2 + dvz^2)^0.5",
+            values={"dvx": (round(dvx, 4), "km/s"), "dvy": (round(dvy, 4), "km/s"), "dvz": (round(dvz, 4), "km/s")},
+            result=round(rel_speed_km_s, 3), result_unit="km/s",
+            assumptions=["relative velocity vector (object 2 - object 1) magnitude"],
+        ),
+    ]
+
     return {
         "position_1_km": pos1,
         "position_2_km": pos2,
@@ -186,6 +213,7 @@ def compute(payload: dict) -> dict:
         "log10_probability": round(math.log10(max(p_c, 1e-30)), 2),
         "conjunction_severity": severity,
         "time_of_closest_approach_minutes": tca_min,
+        "worked": worked,
     }
 
 

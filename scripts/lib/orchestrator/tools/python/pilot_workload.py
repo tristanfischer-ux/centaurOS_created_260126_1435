@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "pilot_workload (custom)",
@@ -135,6 +139,22 @@ def compute(payload: dict) -> dict:
 
     mil_pass = ch_rating <= 3 and force_n <= 35 and omega_BW >= 2.0 and stab_margin_db >= 6.0
 
+    # Worked calculation (2026-06-03): the Cooper-Harper rating is a penalty-band
+    # heuristic (if/elif accumulation then ceil) — not a closed-form expression, so
+    # it is not given a worked line. The one closed-form physical quantity is the
+    # response bandwidth derived from the control response time.
+    response_time_eff = max(50.0, response_ms)
+    worked = [
+        worked_calc(
+            label="Response bandwidth",
+            formula="bandwidth = 1000 / response_time x (pi / 2)",
+            values={"response_time": (response_time_eff, "ms")},
+            result=round(omega_BW, 2), result_unit="rad/s",
+            assumptions=["first-order response: omega_BW ~ (1/tau) * pi/2 with tau the control response time",
+                         "response time floored at 50 ms"],
+        ),
+    ]
+
     return {
         "cooper_harper_rating": ch_rating,
         "MIL-STD-1797_pass": mil_pass,
@@ -149,6 +169,7 @@ def compute(payload: dict) -> dict:
         "autonomy_level": autonomy,
         "ratings_notes": notes,
         "pilot_workload": "low" if ch_rating <= 3 else "medium" if ch_rating <= 6 else "high",
+        "worked": worked,
     }
 
 

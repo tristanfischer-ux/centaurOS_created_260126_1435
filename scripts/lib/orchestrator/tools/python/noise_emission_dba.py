@@ -39,8 +39,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -139,6 +143,34 @@ def compute(payload: dict) -> dict:
     if not recs:
         recs.append("Acoustic emissions within typical limits.")
 
+    # Worked calculations (2026-06-03): the source combination L_w_total is a
+    # log-domain energy sum (not hand-checkable without logs), but the sound-
+    # pressure decay from L_w to L_p is a clean closed-form subtraction once the
+    # geometric spreading term 20*log10(r) is evaluated. We surface that term as
+    # an input so the reviewer can re-check the dB arithmetic by hand.
+    lw_total_r = round(lw_total, 1)
+    dist_atten_db = round(20 * math.log10(max(1, distance_m)), 2)
+    worked = [
+        worked_calc(
+            label="Sound pressure at 1 m",
+            formula="lp_at_1m = lw_total - 8 + mounting_correction",
+            values={"lw_total": (lw_total_r, "dB(A)"),
+                    "mounting_correction": (mounting_correction, "dB")},
+            result=round(lp_at_1m, 1), result_unit="dB(A)",
+            assumptions=["free-field hemispherical radiation: L_p = L_w - 10*log10(2*pi*r^2), which at r=1 m gives -8 dB plus the mounting reflection term"],
+        ),
+        worked_calc(
+            label="Sound pressure at distance",
+            formula="lp_at_distance = lw_total - dist_atten - 8 + mounting_correction",
+            values={"lw_total": (lw_total_r, "dB(A)"),
+                    "dist_atten": (dist_atten_db, "dB"),
+                    "mounting_correction": (mounting_correction, "dB")},
+            result=round(lp_at_distance, 1), result_unit="dB(A)",
+            assumptions=[f"geometric spreading dist_atten = 20*log10(r) with r = {distance_m} m",
+                         "free-field with ground/wall reflection per BS EN 12102-1"],
+        ),
+    ]
+
     return {
         "compressor_kw": compressor_kw,
         "compressor_type": compressor_type,
@@ -157,6 +189,7 @@ def compute(payload: dict) -> dict:
         "compliance_uk_pdr_42db": pdr_42db_pass,
         "compliance_eu_ecodesign_2024": eco_design_pass,
         "eu_ecodesign_limit_db": eco_limit,
+        "worked": worked,
         "recommendations": recs,
         "notes": (
             "Lw per BS EN 12102-1:2022. Lp at distance assumes free-field with "

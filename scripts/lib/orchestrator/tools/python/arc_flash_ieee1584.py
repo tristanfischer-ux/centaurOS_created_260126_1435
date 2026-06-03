@@ -40,8 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # ──────────────────────────────────────────────────────────────────────────
 # IEEE 1584-2018 coefficient tables (verbatim from the standard).
@@ -340,6 +344,23 @@ def compute(payload: dict) -> dict:
     e_cal = governing["incident_energy_cal_cm2"]
     ppe, ppe_desc = _ppe_category(e_cal)
 
+    # Worked calculation (2026-06-03): the IEEE 1584-2018 incident energy itself
+    # comes from the empirical log10 polynomial (Tables 3-5, not hand-checkable),
+    # but the headline cal/cm2 figure the PPE table keys off is a clean closed-form
+    # unit conversion of the model's J/cm2 output.
+    e_j_round = round(governing["incident_energy_j_cm2"], 3)
+    worked = [
+        worked_calc(
+            label="Incident energy (J/cm2 -> cal/cm2)",
+            formula="incident_energy_cal = incident_energy_j x cal_per_j",
+            values={"incident_energy_j": (e_j_round, "J/cm2"),
+                    "cal_per_j": (round(CAL_PER_J, 6), "cal/J")},
+            result=round(e_cal, 3), result_unit="cal/cm2",
+            assumptions=["J/cm2 from the IEEE 1584-2018 empirical model (governing of full/reduced arcing-current cases)",
+                         "1 cal = 4.184 J, so cal_per_j = 1/4.184"],
+        ),
+    ]
+
     return {
         "incident_energy_cal_cm2": round(e_cal, 3),
         "incident_energy_j_cm2": round(governing["incident_energy_j_cm2"], 3),
@@ -357,6 +378,7 @@ def compute(payload: dict) -> dict:
         "governing_case": governing_case,
         "full_case_cal_cm2": round(res_full["incident_energy_cal_cm2"], 3),
         "reduced_case_cal_cm2": round(res_reduced["incident_energy_cal_cm2"], 3),
+        "worked": worked,
         "model": "IEEE 1584-2018",
         "notes": (
             "Incident energy at the stated working distance and arc duration. "

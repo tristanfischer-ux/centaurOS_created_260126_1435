@@ -44,8 +44,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -193,6 +197,29 @@ def compute(payload: dict) -> dict:
     # Motional decoherence: 1/n_heating gives quanta-coherence time
     motional_decoherence_s = 1.0 / max(heating_rate, 0.01)
 
+    # Worked calculations (2026-06-03): the Rabi frequency, T2 and gate fidelity
+    # involve saturation intensity, Zeeman sensitivity and clamped infidelity sums
+    # (not single-line closed forms). The two clean, hand-checkable derived outputs
+    # are the motional-coherence time (inverse heating rate) and the single-qubit
+    # pi-pulse duration (pi / Rabi frequency).
+    worked = [
+        worked_calc(
+            label="Motional decoherence time",
+            formula="motional_decoherence = 1 / heating_rate",
+            values={"heating_rate": (heating_rate, "quanta/s")},
+            result=round(motional_decoherence_s, 4), result_unit="s",
+            assumptions=["time to absorb one motional quantum at the anomalous heating rate"],
+        ),
+        worked_calc(
+            label="Single-qubit pi-pulse time",
+            formula="pi_pulse = pi / rabi_frequency x 1000",
+            values={"rabi_frequency": (round(omega_rabi_khz, 2), "kHz")},
+            result=round(t_pi_us, 3), result_unit="us",
+            assumptions=["t_pi = pi / Omega; Rabi frequency in kHz, x1000 gives microseconds",
+                         "Rabi frequency capped at the resolved-sideband limit (trap_frequency/2)"],
+        ),
+    ]
+
     return {
         "ion_species": species,
         "ion_mass_amu": ion["mass_amu"],
@@ -214,6 +241,7 @@ def compute(payload: dict) -> dict:
         "trap_geometry": geometry,
         "qubits_per_chip": qubits_per_chip,
         "doppler_cooling_limit_mK": ion["doppler_temp_mK"],
+        "worked": worked,
     }
 
 

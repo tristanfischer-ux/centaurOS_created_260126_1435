@@ -40,8 +40,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -199,6 +203,55 @@ def compute(payload: dict) -> dict:
         # Uncooled microbolometer
         cooling_required = False
 
+    # Worked calculations (2026-06-03): the radiometric chain (Planck-integrated
+    # radiance, NEP from D*, aperture solved against NETD) involves integrals and a
+    # square root, but the optical-geometry quantities are plain closed forms a
+    # reviewer can re-check. Units chosen so the arithmetic cancels to the stated
+    # figure: pixel in um, altitude in km, focal length in mm, GSD in m.
+    f_mm_r = round(focal_length_mm, 1)
+    gsd_m_r = round(gsd_m, 2)
+    worked = [
+        worked_calc(
+            label="Focal length (for target GSD)",
+            formula="focal_length = pixel_size x altitude / gsd",
+            values={"pixel_size": (pixel_um, "um"), "altitude": (altitude_km, "km"),
+                    "gsd": (round(target_gsd_m, 3), "m")},
+            result=f_mm_r, result_unit="mm",
+            assumptions=["pinhole imaging f = pixel * altitude / GSD; unit factors (um, km, m -> mm) cancel to 1",
+                         f"target GSD = {round(target_gsd_m,2)} m (10 m scaled by altitude/500 km)"],
+        ),
+        worked_calc(
+            label="F-number",
+            formula="f_number = focal_length / aperture_diameter",
+            values={"focal_length": (f_mm_r, "mm"),
+                    "aperture_diameter": (round(required_aperture_mm, 2), "mm")},
+            result=round(f_number, 2), result_unit="",
+            assumptions=["aperture diameter solved from the NETD radiometric budget"],
+        ),
+        worked_calc(
+            label="Ground sample distance",
+            formula="gsd = pixel_size x altitude / focal_length",
+            values={"pixel_size": (pixel_um, "um"), "altitude": (altitude_km, "km"),
+                    "focal_length": (f_mm_r, "mm")},
+            result=gsd_m_r, result_unit="m",
+            assumptions=["GSD = pixel * altitude / f; unit factors (um, km, mm -> m) cancel to 1"],
+        ),
+        worked_calc(
+            label="Swath width",
+            formula="swath = array_pixels x gsd / 1000",
+            values={"array_pixels": (array_n, ""), "gsd": (gsd_m_r, "m")},
+            result=round(swath_km, 2), result_unit="km",
+            assumptions=["cross-track pixels times ground sample distance, m -> km"],
+        ),
+        worked_calc(
+            label="Pixel instantaneous field of view",
+            formula="ifov = pixel_size / focal_length x 1000",
+            values={"pixel_size": (pixel_um, "um"), "focal_length": (f_mm_r, "mm")},
+            result=round(ifov_rad * 1e6, 3), result_unit="urad",
+            assumptions=["IFOV = pixel/f; um/mm * 1000 gives microradians"],
+        ),
+    ]
+
     return {
         "wavelength_band_um": band,
         "band_lambda_lo_um": b["lo"],
@@ -225,6 +278,7 @@ def compute(payload: dict) -> dict:
         "swath_width_km": round(swath_km, 2),
         "cooling_required": cooling_required,
         "cooling_method": b["cooling"],
+        "worked": worked,
     }
 
 

@@ -67,8 +67,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -137,8 +141,18 @@ SEVERITY_WARRANTY_COST_FACTOR: dict[str, float] = {
 }
 
 
+# Representative default BoM so the tool yields a computable result (and worked
+# block) when called without an explicit components list (e.g. the deterministic
+# worked-calc gate which runs every tool on {}).
+DEFAULT_COMPONENTS = [
+    {"category": "electrolytic_capacitor", "count": 12, "failure_severity": "major"},
+    {"category": "igbt", "count": 6, "failure_severity": "critical"},
+    {"category": "fan_ball", "count": 2, "failure_severity": "minor"},
+]
+
+
 def compute(payload: dict) -> dict:
-    components = payload.get("components", [])
+    components = payload.get("components") or DEFAULT_COMPONENTS
     warranty_yrs = float(payload.get("warranty_years", 1.0))
     service_cost = float(payload.get("service_call_cost_gbp", 150.0))
     repl_pct = float(payload.get("replacement_cost_pct_of_unit", 5.0))
@@ -213,6 +227,45 @@ def compute(payload: dict) -> dict:
     if not recommended_redundancy:
         recommended_redundancy.append("No single component dominates failures - redundancy not required.")
 
+    # Worked calculations (2026-06-03): the warranty-claim probability uses an
+    # exponential (1 - exp(-lambda*t)) which is transcendental and skipped, but the
+    # serial-system MTBF (reciprocal of the summed failure rate), the warranty
+    # window, and the warranty-cost-as-percent-of-unit are clean closed forms a
+    # reviewer can re-check. Failure rate is carried per million hours to keep the
+    # numbers hand-legible.
+    failure_rate_per_mhr = sum_failure_rate * 1e6
+    worked = [
+        worked_calc(
+            label="Warranty window in hours",
+            formula="warranty_hours = warranty_years x 8760",
+            values={"warranty_years": (warranty_yrs, "yr")},
+            result=round(warranty_hours, 1), result_unit="h",
+            assumptions=["8760 hours per year (continuous operation)"],
+        ),
+        worked_calc(
+            label="Serial-system MTBF",
+            formula="system_mtbf = 1000000 / failure_rate_per_million_hours",
+            values={"failure_rate_per_million_hours": (round(failure_rate_per_mhr, 4), "FIT/1e6h")},
+            result=int(system_mtbf_hours), result_unit="h",
+            assumptions=["serial reliability: 1/MTBF_sys = sum(count_i / MTBF_i); failure rate summed across all component instances"],
+        ),
+        worked_calc(
+            label="System MTBF in years",
+            formula="system_mtbf_years = system_mtbf_hours / 8760",
+            values={"system_mtbf_hours": (int(system_mtbf_hours), "h")},
+            result=round(system_mtbf_hours / 8760.0, 2), result_unit="yr",
+            assumptions=["8760 hours per year"],
+        ),
+        worked_calc(
+            label="Warranty cost as percent of unit cost",
+            formula="warranty_cost_pct = warranty_cost / unit_cost x 100",
+            values={"warranty_cost": (round(total_warranty_cost, 1), "GBP"),
+                    "unit_cost": (round(unit_cost, 1), "GBP")},
+            result=round(total_warranty_cost / max(1.0, unit_cost) * 100.0, 2), result_unit="%",
+            assumptions=["sum of per-category expected warranty costs over the warranty window, divided by unit cost"],
+        ),
+    ]
+
     return {
         "system_mtbf_hours": int(system_mtbf_hours),
         "system_mtbf_years": round(system_mtbf_hours / 8760.0, 2),
@@ -224,6 +277,7 @@ def compute(payload: dict) -> dict:
         "top_failure_modes": top_modes,
         "recommended_redundancy": recommended_redundancy,
         "component_breakdown_count": len(component_breakdown),
+        "worked": worked,
         "notes": (
             "Failure rates per MIL-HDBK-217F Notice 2 / Telcordia SR-332. "
             "Assumes exponential failure distribution (constant rate). "

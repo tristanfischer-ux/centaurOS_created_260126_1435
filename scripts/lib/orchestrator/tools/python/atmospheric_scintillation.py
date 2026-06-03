@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 
 PROVENANCE = {
@@ -211,6 +215,36 @@ def compute(payload: dict) -> dict:
     # D/r0 ratio (turbulence strength relative to aperture)
     d_over_r0 = aperture_m / max(r0_m, 1e-9)
 
+    # Worked calculations (2026-06-03): the Rytov variance, r0 and isoplanatic angle
+    # rest on a numerical Cn^2 slant-path integral (not a single closed form), but
+    # three downstream quantities are hand-checkable: the aperture-averaging factor
+    # (with its dimensionless argument surfaced), the aperture-averaged scintillation
+    # index (a product), and the D/r0 turbulence-to-aperture ratio.
+    worked = [
+        worked_calc(
+            label="Aperture-averaging factor",
+            formula="aperture_factor = (1 + 1.07 x arg^(7/6))^(-7/6)",
+            values={"arg": (round(arg, 6), "")},
+            result=round(A, 4), result_unit="",
+            assumptions=["Andrews (2005) eq. 9.27; arg = k * D^2 / (4 * L) where k = 2*pi/lambda, D = aperture, L = path length"],
+        ),
+        worked_calc(
+            label="Aperture-averaged scintillation index",
+            formula="scint_aperture_avg = scintillation_index x aperture_factor",
+            values={"scintillation_index": (round(sigma_I2, 5), ""),
+                    "aperture_factor": (round(A, 4), "")},
+            result=round(sigma_I2_eff, 5), result_unit="",
+            assumptions=["point-aperture scintillation index reduced by the aperture-averaging factor"],
+        ),
+        worked_calc(
+            label="Aperture-to-coherence ratio D/r0",
+            formula="d_over_r0 = aperture / r0",
+            values={"aperture": (round(aperture_m, 5), "m"), "r0": (round(r0_m, 5), "m")},
+            result=round(d_over_r0, 2), result_unit="",
+            assumptions=["aperture diameter divided by the Fried coherence length r0 (r0 = coherence_length_r0_cm / 100)"],
+        ),
+    ]
+
     return {
         "elevation_angle_deg": elevation_deg,
         "zenith_angle_deg": round(zenith_deg, 2),
@@ -226,6 +260,7 @@ def compute(payload: dict) -> dict:
         "isoplanatic_angle_urad": round(theta_0_urad, 2) if theta_0_urad != float("inf") else None,
         "D_over_r0": round(d_over_r0, 2),
         "turbulence_strength": "weak" if sigma_R2 < 0.3 else ("moderate" if sigma_R2 < 1.0 else "strong"),
+        "worked": worked,
     }
 
 

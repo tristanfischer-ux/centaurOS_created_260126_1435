@@ -42,8 +42,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "Spectral Python (SPy)",
@@ -190,6 +194,30 @@ def compute(payload: dict) -> dict:
     min_idx = int(np.argmin(snr_vals))
     max_idx = int(np.argmax(snr_vals))
 
+    # Worked calculations (2026-06-03): per-band SNR and atmospheric transmission
+    # are numerical (Planck radiance, SPy band-resampler convolution, exp(-tau)
+    # Beer-Lambert), so they are not hand-checkable single lines. The band-plan
+    # geometry IS closed-form: the inter-band spacing, and (when bands actually
+    # overlap) the spectral overlap fraction.
+    worked = [
+        worked_calc(
+            label="Inter-band spacing",
+            formula="band_step = (wavelength_end - wavelength_start) / (num_bands - 1)",
+            values={"wavelength_end": (wl_end, "nm"), "wavelength_start": (wl_start, "nm"),
+                    "num_bands": (n_bands, "")},
+            result=round(band_step, 2), result_unit="nm",
+            assumptions=["evenly spaced band centres across the spectral range"],
+        ),
+    ]
+    if fwhm_nm > band_step:
+        worked.append(worked_calc(
+            label="Spectral band overlap",
+            formula="band_overlap = (fwhm - band_step) / fwhm x 100",
+            values={"fwhm": (fwhm_nm, "nm"), "band_step": (round(band_step, 2), "nm")},
+            result=round(overlap_pct, 1), result_unit="%",
+            assumptions=["fraction of each band's FWHM that overlaps its neighbour (only when FWHM exceeds the band step)"],
+        ))
+
     out: dict = {
         "wavelength_start_nm": wl_start,
         "wavelength_end_nm": wl_end,
@@ -197,6 +225,7 @@ def compute(payload: dict) -> dict:
         "spectral_resolution_nm_fwhm": fwhm_nm,
         "band_step_nm": round(band_step, 2),
         "band_overlap_pct": round(overlap_pct, 1),
+        "worked": worked,
         "snr_per_band": snr_per_band,
         "atmospheric_transmission_per_band": tau_per_band,
         "min_snr_band_nm": int(coarse_wl[min_idx]),

@@ -60,8 +60,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
     "tool_name": "windpowerlib",
@@ -228,6 +232,47 @@ def compute(payload: dict) -> dict:
         availability_pct=availability_pct,
     )
     annual_energy_kwh = energy_w * 8760.0 / 1000.0  # E[P] * 8760
+    average_power_kw = energy_w / 1000.0
+
+    # Worked calculations (2026-06-03): the annual-energy figure is a numerical
+    # Weibull x power-curve integral (windpowerlib / synthetic curve), but the
+    # site-physics quantities feeding it are closed-form and hand-checkable: the
+    # power-law wind shear to hub height, the swept rotor area, the Weibull scale
+    # parameter, and the capacity factor as average/rated power.
+    gamma_factor = gamma(1.0 + 1.0 / k)
+    v_hub_r = round(v_mean_hub, 3)
+    worked = [
+        worked_calc(
+            label="Hub-height wind speed (power-law shear)",
+            formula="hub_wind_speed = ref_wind_speed x (hub_height / ref_height)^alpha",
+            values={"ref_wind_speed": (v_mean_ref, "m/s"), "hub_height": (h_hub, "m"),
+                    "ref_height": (h_ref, "m"), "alpha": (alpha, "")},
+            result=v_hub_r, result_unit="m/s",
+            assumptions=[f"IEC 61400-1 power-law shear, exponent alpha = {alpha} for roughness class {rough_class}"],
+        ),
+        worked_calc(
+            label="Rotor swept area",
+            formula="rotor_area = pi x (rotor_diameter / 2)^2",
+            values={"rotor_diameter": (D_rotor, "m")},
+            result=round(rotor_area, 2), result_unit="m2",
+            assumptions=["circular swept disc of the rotor diameter"],
+        ),
+        worked_calc(
+            label="Weibull scale parameter c",
+            formula="weibull_c = hub_wind_speed / gamma_factor",
+            values={"hub_wind_speed": (v_hub_r, "m/s"), "gamma_factor": (round(gamma_factor, 5), "")},
+            result=round(c, 3), result_unit="m/s",
+            assumptions=[f"c = mean_speed / Gamma(1 + 1/k) with shape k = {k}; gamma_factor = Gamma(1 + 1/{k})"],
+        ),
+        worked_calc(
+            label="Capacity factor",
+            formula="capacity_factor = average_power / rated_power x 100",
+            values={"average_power": (round(average_power_kw, 2), "kW"),
+                    "rated_power": (round(rated_power_kw, 2), "kW")},
+            result=round(cap_factor_pct, 2), result_unit="%",
+            assumptions=["mean electrical power over the Weibull distribution divided by nameplate, after wake + availability losses"],
+        ),
+    ]
 
     return {
         "annual_energy_kwh": round(annual_energy_kwh, 1),
@@ -244,7 +289,8 @@ def compute(payload: dict) -> dict:
         "cut_out_ms": cut_out,
         "rated_ms": rated_ms,
         "rated_power_kw": rated_power_kw,
-        "average_power_kw": round(energy_w / 1000.0, 2),
+        "average_power_kw": round(average_power_kw, 2),
+        "worked": worked,
         "wake_loss_pct_applied": wake_loss_pct,
         "availability_pct_applied": availability_pct,
         "power_curve_source": curve_source,

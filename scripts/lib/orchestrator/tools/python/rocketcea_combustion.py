@@ -38,9 +38,34 @@ License: Apache-2.0. Source: github.com/sonofeft/RocketCEA
 """
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _worked import worked_calc  # noqa: E402
+
+
+@contextlib.contextmanager
+def _suppress_stdout_fd():
+    """RocketCEA prints 'USER_HOME_DIR=...' to stdout at import/CEA time, which
+    corrupts our JSON-on-stdout contract (and made the worked-calc gate unable to
+    parse this tool). Redirect OS-level fd 1 to /dev/null for the duration, so even
+    C-level prints from the CEA Fortran core are swallowed. Restored on exit."""
+    saved_fd = os.dup(1)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        sys.stdout.flush()
+        os.dup2(devnull, 1)
+        yield
+    finally:
+        sys.stdout.flush()
+        os.dup2(saved_fd, 1)
+        os.close(devnull)
+        os.close(saved_fd)
+
 
 # Build #19d (2026-05-22): provenance metadata.
 PROVENANCE = {
@@ -141,6 +166,37 @@ def compute(payload: dict) -> dict:
     except Exception:
         exhaust_summary = None
 
+    # Worked calculations (2026-06-03): the thermochemistry (Isp, chamber/exit
+    # temperatures, c*, gamma) is produced by NASA CEA's Gibbs-minimisation solver
+    # and has no closed-form expression — those are NOT given worked lines. The
+    # hand-checkable closed forms are the unit conversions applied to the solver's
+    # raw output: chamber pressure bar -> psi, c* ft/s -> m/s, and chamber
+    # temperature Rankine -> Kelvin.
+    worked = [
+        worked_calc(
+            label="Chamber pressure (bar -> psi)",
+            formula="chamber_pressure_psi = chamber_pressure_bar x psi_per_bar",
+            values={"chamber_pressure_bar": (pc_bar, "bar"),
+                    "psi_per_bar": (PSI_PER_BAR, "psi/bar")},
+            result=round(pc_psi, 2), result_unit="psi",
+            assumptions=["exact conversion 1 bar = 14.5037738 psi (CEA takes chamber pressure in psia)"],
+        ),
+        worked_calc(
+            label="Characteristic velocity (ft/s -> m/s)",
+            formula="c_star_m_s = c_star_ft_s x 0.3048",
+            values={"c_star_ft_s": (round(cstar_ft_s, 2), "ft/s")},
+            result=round(cstar_m_s, 1), result_unit="m/s",
+            assumptions=["c* from NASA CEA (returned in ft/s); 1 ft = 0.3048 m exactly"],
+        ),
+        worked_calc(
+            label="Chamber temperature (Rankine -> Kelvin)",
+            formula="chamber_temp_k = chamber_temp_rankine / 1.8",
+            values={"chamber_temp_rankine": (round(float(temps[0]), 1), "R")},
+            result=round(chamber_temp_k, 1), result_unit="K",
+            assumptions=["chamber temperature from NASA CEA (returned in Rankine); K = R / 1.8"],
+        ),
+    ]
+
     out: dict = {
         "oxidiser": ox,
         "fuel": fu,
@@ -157,6 +213,7 @@ def compute(payload: dict) -> dict:
         "exhaust_mol_weight_g_mol": round(mw, 3) if mw is not None else None,
         "specific_heat_ratio_gamma": round(gam, 4) if gam is not None else None,
         "exhaust_major_species": exhaust_summary,
+        "worked": worked,
     }
     return out
 
@@ -170,7 +227,10 @@ def main() -> int:
         return 2
 
     try:
-        result = compute(payload)
+        # Silence RocketCEA's library-level prints (e.g. USER_HOME_DIR=...) so they
+        # don't corrupt the JSON-only stdout contract.
+        with _suppress_stdout_fd():
+            result = compute(payload)
     except Exception as exc:
         import traceback
         json.dump({
