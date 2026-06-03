@@ -48,3 +48,33 @@ This sets `EXP_A_HOLDOUT_CLASS=bess` + `UNIVERSAL_GENERIC_EMITTER=1` and runs th
 | `scripts/test-generic-skeleton.tsx` | self-verifying smoke + invariant test (no chain/LLM/network) |
 
 _North star stays pure-generic ≥8 (high-confidence NOT near-term); the next build after a GO/HYBRID is `GENERIC-EMITTER-PLAN.md §7` Phase 0 → Q → 1 → 2 → 3 → 4._
+
+---
+
+## Experiment A — RESULT (2026-06-03 live run) · VERDICT: HYBRID — build Phase-1 (rough graph-only is too thin)
+
+Ran the holdout end-to-end on the canonical BESS brief. The de-risk delivered a **measured verdict**.
+
+**What worked:**
+- Holdout + generic path engaged cleanly — `bess` fell through to assembler §4, `emitGenericDesign` produced 11 modules from the `bess-utility-scale` graph (`hit:db`); the chain ran end-to-end through Phase-2 and every structural gate.
+- **gate-23 PASS** (12/12 sub_modules) — structure is complete.
+- Partial real-part grounding worked (an ABB PCS inverter grounded downstream).
+- **#41 verified live** — the Physics Critic flagged `brief_to_design_fidelity @ environmental_interface`; the constrained relaxation PERMITTED the reviewer's `add_sub_module environmental_interface__chiller` (module was fidelity-flagged) and the snapshot extended (+1). Risk-#1 (Critic `where`-field → module match) RESOLVED.
+
+**Why it is NOT yet a councillable dossier (the measured gap):** a pure graph-node skeleton is structurally complete but far too THIN. The grammar/density gate flagged comprehensively — and Phase-2 could NOT repair it (Phase-2 is architecturally barred from adding MPN-bearing words/structure, so it looped without converging):
+- `sub_module_word_density`: 12 sub_modules at **1 word** (need 5-7 for a real BoM).
+- `word_modifier_richness`: 11 words at **2 mods** (need qty+manufacturer+part_number+rating = 4).
+- `cross_module_required_links`: **10 required BESS links MISSING** (`cross_module_grammar_links` emitted empty).
+- `no_orphan_sub_modules` / `thermal_path_closes` / `sensor_has_receiver`: all consequences of the empty links.
+- `module_cell_count` incomplete (cell_count without module_count / cells_per_module).
+- Plausibility misses on coupled geometry (PCS depth vs container width; rack row vs container length) — the "no bespoke sizing" gap, as expected.
+
+**Decision-rule outcome:** rough-generic can't clear the BoM floor → confirms **HYBRID, not pure-generic-≥8**. The generic emitter needs **component-level** structure, not module-level. (This is a *successful* de-risk: it converted the existential unknown into a precise build spec, cheaply, without committing to the multi-session build first.)
+
+### Phase-1 build spec (measured from the live run — execute next)
+1. **edges→links (cheap, high-impact):** populate `cross_module_grammar_links` from `graph.edges` (each `ConnectionEdge` carries `from_class`/`to_class`/`mechanism`). Clears cross_module_required_links + no_orphan + thermal_path + sensor_has_receiver in one move — the gate literally enumerates the required links and they are all already in the graph. Done in `generic-emitter.ts` (DesignJSON-level field).
+2. **Tier-A component density (the big lift):** per module, emit 5-7 component words by unioning the nearest `pretraining_products.modules_json` trees (§3 Tier A) instead of one placeholder per node — feeds word density AND gives the gap-filler specific component names to ground.
+3. **word richness + true-gap parts:** emit each word with qty + a contract-derived rating, and WITHOUT a `part_number` modifier (a *true* gate-23 gap) so `completeEmitterGaps`/`fillBlankWordMpns` supplies real manufacturer+MPN — avoid the dead-zone `'specify at detailed design'` placeholder that blocks grounding.
+4. **derived_parameters completeness:** emit the full arithmetic field set per module (cell_count + module_count + cells_per_module …), not just raw contract quantities.
+
+Then re-run `bash scripts/exp-a-bess-golden-holdout.sh` and council vs the 9.28 golden.
