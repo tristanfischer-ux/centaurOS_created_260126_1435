@@ -37,6 +37,9 @@ import {
   persistArchetypeWebCandidates,
   queryArchetypeTaggedCandidates,
 } from './supplier-enrichment/persist-web-fallback'
+// VF slot-backfill (task #18): pure backfill-selection logic extracted so it
+// can be unit-tested independently of the I/O-heavy enrichment loop.
+import { pickBackfillCandidates, extractApex } from '../src/lib/pdf-engine-v2/lib/supplier-slot-backfill'
 
 const FORGE_TRUTH_DB = '/Users/tristanfischer/.forge-truth/forge-truth.db'
 const CANDIDATES_PER_ARCHETYPE = 3
@@ -2083,6 +2086,13 @@ interface SupplierArchetypeOutput {
    * search.
    */
   candidate_shortfall?: boolean
+  /**
+   * VF slot-backfill (task #18): DB candidates that passed LLM scoring but
+   * were not selected in the initial top-N pick. Used exclusively as a
+   * backfill pool when cross-archetype dedup drops a slot. Stripped from the
+   * output before state.json write so it never reaches the PDF renderer.
+   */
+  _retainedPool?: SupplierCandidate[]
 }
 
 /**
@@ -2301,10 +2311,14 @@ async function enrichSuppliers(state: any): Promise<SupplierArchetypeOutput[]> {
     }
 
     // Filter to fit + score >= MIN_LLM_SCORE; sort by score desc; take top N
-    const accepted = scored
+    const passingScored = scored
       .filter((s) => s.score === null || (s.score.fit_or_reject === 'fit' && s.score.score >= MIN_LLM_SCORE))
       .sort((a, b) => (b.score?.score ?? 0) - (a.score?.score ?? 0))
-      .slice(0, CANDIDATES_PER_ARCHETYPE)
+    const accepted = passingScored.slice(0, CANDIDATES_PER_ARCHETYPE)
+    // VF slot-backfill (task #18): candidates beyond the top-N that still passed
+    // scoring. Stored as the retained pool — used to fill slots when cross-archetype
+    // dedup later drops a selected candidate from this archetype.
+    const retainedPool = passingScored.slice(CANDIDATES_PER_ARCHETYPE).map((s) => rowToCandidate(s.row, s.score))
 
     for (const a of accepted) {
       globalExclude.add(a.row.id)
@@ -2404,6 +2418,9 @@ async function enrichSuppliers(state: any): Promise<SupplierArchetypeOutput[]> {
       brief,
       candidates,
       notes: note,
+      // VF slot-backfill (task #18): persist the retained pool so cross-archetype
+      // dedup can draw from it. Stripped before state.json write (see below).
+      _retainedPool: retainedPool,
     })
   }
 
@@ -2491,6 +2508,55 @@ async function enrichSuppliers(state: any): Promise<SupplierArchetypeOutput[]> {
       outputs[i].candidates = filtered
     }
     console.log(`  [cross-archetype dedup] removed ${crossDedupDrops} duplicate candidate slot(s)`)
+
+    // VF slot-backfill (task #18): for each archetype that lost a slot due to
+    // cross-dedup, draw the next-best candidate from the retained pool via the
+    // pure pickBackfillCandidates helper (unit-tested in
+    // src/lib/pdf-engine-v2/lib/supplier-slot-backfill.test.ts).
+    let backfillAdded = 0
+    for (let i = 0; i < outputs.length; i++) {
+      const out = outputs[i]
+      const needed = CANDIDATES_PER_ARCHETYPE - out.candidates.length
+      if (needed <= 0) continue
+      const pool = out._retainedPool ?? []
+      if (pool.length === 0) continue
+
+      // Build the set of apex domains already committed to THIS archetype's slot.
+      const committedApexes = new Set<string>()
+      for (const c of out.candidates) {
+        const a = extractApex(c.website_url)
+        if (a) committedApexes.add(a)
+      }
+
+      // Build the set of apex domains committed to ALL OTHER archetypes so the
+      // cross-archetype dedup invariant is preserved in the backfill candidates.
+      const otherApexes = new Set<string>()
+      for (let k = 0; k < outputs.length; k++) {
+        if (k === i) continue
+        for (const c of outputs[k].candidates) {
+          const a = extractApex(c.website_url)
+          if (a) otherApexes.add(a)
+        }
+      }
+
+      const backfilled = pickBackfillCandidates(pool, committedApexes, otherApexes, needed)
+      for (const candidate of backfilled) {
+        out.candidates.push(candidate)
+        backfillAdded += 1
+        console.log(
+          `  [slot-backfill] archetype "${out.archetype_id}" slot restored: ${candidate.name} (score ${candidate.llm_score ?? 'n/a'}) from retained pool`,
+        )
+      }
+    }
+    if (backfillAdded > 0) {
+      console.log(`  [slot-backfill] restored ${backfillAdded} slot(s) from retained pools`)
+    }
+  }
+
+  // Strip the internal retained pool before outputs leave this function —
+  // it must never reach state.json or the PDF renderer.
+  for (const out of outputs) {
+    delete out._retainedPool
   }
 
   // 2026-05-18 PM re-audit fix #5: any archetype that finishes below
