@@ -52,6 +52,7 @@ import { buildContract } from './lib/engineering-contract'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
 import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
+import { CLASS_HAZARDS, getClassHazards } from '../src/lib/pdf-engine-v2/class-hazards'
 import { auditCrossPageNumericConsistency } from './lib/cross-page-numeric-consistency-audit'
 import { priceInBand, bandFor, looksLikeRealMpn } from './ingest/enrich-null-prices'
 import { homedir, tmpdir } from 'os'
@@ -2342,6 +2343,36 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         (n: number) => `${n} HARD slot(s) not derivable for '${cls}': ${missingSlots.join(', ')}. Fix: add derivation for each missing slot in the '${cls}' archetype builder in scripts/lib/engineering-contract.ts. The lock gate (engineering-lock-gate.ts) will fire exit 22 until all HARD slots are filled.`,
       ))
     }
+  }
+
+  // ── UNIVERSAL.fully_wired_class_has_risk_hazards (2026-06-03) ──
+  //
+  // The standalone §Risk page (render-minimal-pdf.tsx RiskPage) returns null when
+  // getClassHazards(product_class).hazards is empty AND there are no system risks.
+  // A newly-wired class (classifier + envelope + emitter + class-plan) therefore
+  // silently DROPS its entire Risk & Integration section unless a class-hazards
+  // entry is ALSO added — the 6th wiring layer a new class needs. co2_mineralisation
+  // hit exactly this (2026-06-03): all five other layers were in place but the Risk
+  // page rendered blank until a CLASS_HAZARDS entry was added (verified via re-render:
+  // "Risk & Integration" 0→1). This invariant guards the gap.
+  {
+    for (const cls of Object.keys(CLASS_HAZARDS)) {
+      const block = getClassHazards(cls)
+      assertions.push(assertEq(
+        `UNIVERSAL.fully_wired_class_has_risk_hazards.${cls}`,
+        `Class '${cls}': getClassHazards resolves to >=1 class-level hazard so the §Risk page renders`,
+        block.hazards.length,
+        (n: number) => n > 0,
+        (n: number) => `getClassHazards('${cls}').hazards is empty (${n}) — the §Risk page renders blank for this class. Fix: add/repair the ClassHazards entry in src/lib/pdf-engine-v2/class-hazards.ts.`,
+      ))
+    }
+    assertions.push(assertEq(
+      'UNIVERSAL.fully_wired_class_has_risk_hazards.co2_mineralisation_present',
+      'co2_mineralisation is registered in CLASS_HAZARDS (the Risk-page wiring layer alongside classifier + envelope + emitter + class-plan)',
+      CLASS_HAZARDS['co2_mineralisation'] ? 1 : 0,
+      (n: number) => n === 1,
+      () => 'co2_mineralisation missing from CLASS_HAZARDS — its §Risk page will null. Add the entry in src/lib/pdf-engine-v2/class-hazards.ts.',
+    ))
   }
 
   // ── UNIVERSAL.auto_plan_fallback_never_fires_for_registered_class (2026-06-01) ──

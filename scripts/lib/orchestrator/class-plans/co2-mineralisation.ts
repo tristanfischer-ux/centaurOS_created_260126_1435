@@ -56,7 +56,9 @@ const num = (o: any, ...keys: string[]): number | undefined => {
 const stepCantera: ToolStep = {
   tool_id: 'cantera:reaction-equilibrium',
   required: false,
-  feeds_into: [] as string[],
+  // Reaction equilibrium (capture efficiency + carbonation conversion) sets the
+  // reactor duty + heat load, so it feeds the vessel design + heat-exchanger.
+  feeds_into: ['pressure-vessel:design', 'ht:heat-exchanger'] as string[],
   input_from_contract: () => ({ reaction: 'amine_co2_carbamate' as const, temperature_k: 333, pressure_pa: 101_325 }),
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('cantera:reaction-equilibrium', '3.2.0', 'BSD-3-Clause', 'cantera.org')
@@ -71,7 +73,7 @@ const stepCantera: ToolStep = {
 const stepFluids: ToolStep = {
   tool_id: 'fluids:pipe-sizing',
   required: false,
-  feeds_into: [] as string[],
+  feeds_into: ['mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => ({ flow_m3_h: q(c, 'mea_circulation_m3_h', 3), fluid: 'water_glycol' as const, target_velocity_m_s: 1.5 }),
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('fluids:pipe-sizing', '2.0.0', 'MIT', 'github.com/CalebBell/fluids')
@@ -85,7 +87,7 @@ const stepFluids: ToolStep = {
 const stepHt: ToolStep = {
   tool_id: 'ht:heat-exchanger',
   required: false,
-  feeds_into: [] as string[],
+  feeds_into: ['fluids:pipe-sizing'] as string[],
   input_from_contract: (c: ContractInProgress) => ({ duty_kw: q(c, 'dryer_heat_duty_kw', 75), hot_in_c: 130, cold_in_c: 25, type: 'plate' as const }),
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('ht:heat-exchanger', '1.0.20', 'MIT', 'github.com/CalebBell/ht')
@@ -99,7 +101,7 @@ const stepHt: ToolStep = {
 const stepPressureVessel: ToolStep = {
   tool_id: 'pressure-vessel:design',
   required: false,
-  feeds_into: [] as string[],
+  feeds_into: ['mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => ({ design_pressure_mpa: 0.6, design_temperature_c: 120, diameter_m: 1.6, length_m: 2.0, material: 'SA-240_316L', code: 'ASME_VIII' as const, target_lifetime_a: 20, capacity_kg: q(c, 'carbonation_reactor_volume_m3', 4) * 1000 }),
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('pressure-vessel:design', '1.0.0', 'MIT', 'internal://forgeos/orchestrator/pv')
