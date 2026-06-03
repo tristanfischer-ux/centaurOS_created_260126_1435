@@ -21,7 +21,7 @@ Key constraints:
 - Feedstocks: gypsum (approximately 3.1 t/day), potassium hydroxide (approximately 2.6 t/day), process water
 - Product purity: potassium sulfate to fertiliser grade (low chloride, MEA-free); calcium carbonate to industrial filler grade
 - Utilities: low-pressure steam for the distillation reboiler, hot air for two drying stages, cooling water, electricity, instrument air
-- Unit cost ceiling: £1,300,000 ex-works for the skid-mounted plant
+- Unit cost ceiling: £1,900,000 ex-works for the modular plant (realistic budget for a 1 tonne/day amine-capture + mineralisation pilot; tall packed columns are shipped as flanged segments and field-erected on a plinth beside the transportable skid modules)
 - Operating temperature: ambient to 120 °C across reaction, drying and distillation; atmospheric to low-pressure operation
 - Footprint: containerised / skid-mounted for transport on a standard trailer
 - Annual production volume: 6 plants per year
