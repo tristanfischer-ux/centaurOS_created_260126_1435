@@ -41,6 +41,7 @@ import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { _buildComplianceRows, summariseComplianceRows, computeBomTotals } from './render-minimal-pdf'
+import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
@@ -1266,35 +1267,24 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // where Phase 2 LLM invents real-but-uncurated MPNs that the B1 allowlist
   // rejects, causing Phase 2 stall.
   {
-    // Inline the gate logic here (no import needed — regression-harness runs
-    // as a standalone script). Mirrors emitter-completeness-gate.ts exactly.
-    const snapshotModules: any[] = modules
+    // Call the REAL gate (single source of truth — no inline mirror to drift),
+    // passing the snapshot's macro_assembly_prices word_names so the macro-anchor
+    // exemption (task #34, 2026-06-03) is honoured EXACTLY: a future run that
+    // (correctly) no longer injects a branded duplicate for a macro-anchored
+    // sub_module must NOT false-fail here just because that sub_module's priced
+    // word carries no part_number.
     const snapshotClass = String(productClass ?? 'unknown')
-    const incompleteSMs: Array<{ module_id: string; sub_module_id: string }> = []
-    for (const m of snapshotModules) {
-      const moduleId = String(m?.module ?? 'unknown_module')
-      const subs = Array.isArray(m?.sub_modules) ? m.sub_modules : []
-      for (const sm of subs) {
-        const subModuleId = String(sm?.id ?? 'unknown_sub_module')
-        const words = Array.isArray(sm?.words) ? sm.words : []
-        const mpnWordCount = words.filter((w: any) => {
-          const mods = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
-          return mods.some((mc: any) => {
-            const kind = String(mc?.kind ?? '').toLowerCase().replace(/[\s_-]/g, '')
-            return kind === 'partnumber' || kind === 'part_number' || kind === 'pn'
-          })
-        }).length
-        if (mpnWordCount === 0) {
-          incompleteSMs.push({ module_id: moduleId, sub_module_id: subModuleId })
-        }
-      }
-    }
+    const macroNames = new Set<string>(
+      ((state?.engineeringContract?.macro_assembly_prices ?? []) as any[]).map((m) => String(m?.word_name ?? '')),
+    )
+    const g23 = runEmitterCompletenessGate(modules as any, snapshotClass, macroNames)
+    const incompleteSMs = g23.incomplete_sub_modules
     assertions.push(assertEq(
       'UNIVERSAL.emitter_completeness_gate_passes',
-      'Gate 23 emitter completeness: every sub_module in the design has ≥1 deterministic-emitter word with a part_number modifier (architectural invariant 2026-05-26)',
+      'Gate 23 emitter completeness: every sub_module has ≥1 part_number word OR a macro-anchored word (architectural invariant 2026-05-26; macro-anchor exemption 2026-06-03 task #34)',
       incompleteSMs.length,
       (n) => n === 0,
-      (n) => `${n} sub_module(s) have zero MPN-bearing words: ${incompleteSMs.slice(0, 8).map(s => `${s.module_id}::${s.sub_module_id}`).join('; ')} — fix is in scripts/lib/deterministic-emitter.ts (or per-class emitter), NOT in Phase 2. See emitter-completeness-gate.ts for the architectural contract.`,
+      (n) => `${n} sub_module(s) have zero MPN-bearing words AND no macro anchor: ${incompleteSMs.slice(0, 8).map(s => `${s.module_id}::${s.sub_module_id}`).join('; ')} — fix is in scripts/lib/deterministic-emitter.ts (or per-class emitter), NOT in Phase 2. See emitter-completeness-gate.ts.`,
     ))
   }
 
@@ -3656,6 +3646,39 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.uncostable_module_disclosed_not_silent_zero', description: 'P3 uncostable-module disclosure', passed: false, detail: `threw: ${String(err).slice(0, 180)}` })
+  }
+
+  // ── task #34: gate-23 macro-anchor exemption (2026-06-03, council root fix) ──
+  //
+  // UNIVERSAL.gate23_macro_anchor_exempts_priced_word_not_real_gap — a sub_module
+  // whose word is anchored to a dimension-based macro (the macro IS its priced
+  // part, no MPN by design) must PASS gate-23, so completeEmitterGaps() does not
+  // inject a branded duplicate that the renderer then orphans at £0 (the bioreactor
+  // bug). But a REAL gap (no MPN, no macro anchor) must STILL be caught, and an
+  // empty macro set must be byte-identical to the prior behaviour. Pure synthetic,
+  // both directions, snapshot-independent.
+  try {
+    const smk = (id: string, words: any[]) => ({ id, words })
+    const mods = [{ module: 'm', sub_modules: [
+      smk('vessel',  [{ id: 'stainless_316l_vessel_word', content_character: { character_id: 'stainless_316l_vessel' }, modifier_characters: [] }]),
+      smk('realgap', [{ id: 'foo_word', modifier_characters: [] }]),
+      smk('mpnok',   [{ id: 'bar_word', modifier_characters: [{ kind: 'part_number', value: 'LF280K' }] }]),
+    ] }]
+    const macros = new Set(['stainless_316l_vessel'])
+    const without = runEmitterCompletenessGate(mods as any, 'bioreactor').incomplete_sub_modules.map((s) => s.sub_module_id).sort()
+    const withM = runEmitterCompletenessGate(mods as any, 'bioreactor', macros).incomplete_sub_modules.map((s) => s.sub_module_id).sort()
+    const ok =
+      JSON.stringify(without) === JSON.stringify(['realgap', 'vessel']) &&  // empty set = prior behaviour
+      JSON.stringify(withM) === JSON.stringify(['realgap'])                 // macro exempts vessel; real gap still caught
+    assertions.push(assertEq(
+      'UNIVERSAL.gate23_macro_anchor_exempts_priced_word_not_real_gap',
+      'gate-23: a macro-anchored sub_module is not a gap (no branded-duplicate injection, task #34); a real gap is still caught; empty macro set = prior behaviour',
+      ok,
+      (v) => v === true,
+      () => `gate-23 macro-anchor exemption wrong: without=${JSON.stringify(without)} (expect ["realgap","vessel"]); with=${JSON.stringify(withM)} (expect ["realgap"])`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.gate23_macro_anchor_exempts_priced_word_not_real_gap', description: 'gate-23 macro-anchor exemption', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   // ── U2: consumable rows excluded from capital grand total (2026-05-29) ──────

@@ -3455,6 +3455,14 @@ async function main() {
     // Gate-20 safety: DB-sourced parts are real (resolve library_only); LLM
     // completions emit "specify exact MPN at detailed design" which gate-20
     // skips as a commodity/non-structured descriptor. Honesty over fake MPNs.
+    // task #34 (2026-06-03, council root fix): a sub_module whose word is anchored
+    // to a dimension-based macro (no MPN by design) is NOT a gate-23 gap — the macro
+    // IS its priced part. Passing the macro word_names exempts those sub_modules, so
+    // completeEmitterGaps() no longer injects a branded duplicate that the renderer
+    // then orphans at £0. Empty for classes/contracts with no macros → no change.
+    const macroWordNamesForGate23 = new Set<string>(
+      (engineeringContract?.macro_assembly_prices ?? []).map((m) => String(m.word_name)),
+    )
     try {
       const completion = await completeEmitterGaps(
         design.modules ?? [],
@@ -3462,7 +3470,10 @@ async function main() {
         // Pass the brief's product description so generated parts are physically
         // consistent with the design (no slip rings on a direct-drive PMSG, the
         // right refrigerant, the right voltage/power class).
-        { designContext: String((parsedResult?.data as any)?.product_description ?? (parsedResult?.data as any)?.brief?.original_text ?? '') },
+        {
+          designContext: String((parsedResult?.data as any)?.product_description ?? (parsedResult?.data as any)?.brief?.original_text ?? ''),
+          macroWordNames: macroWordNamesForGate23,
+        },
       )
       if (completion.filled.length > 0) {
         const dbN = completion.filled.filter((f) => f.source === 'db').length
@@ -3493,6 +3504,7 @@ async function main() {
     const gate23Result = runEmitterCompletenessGate(
       design.modules ?? [],
       currentProductClass ?? 'unknown',
+      macroWordNamesForGate23,
     )
     console.error(
       `[chain] gate-23 emitter-completeness: ${gate23Result.passed ? 'PASS' : 'FAIL'} — ` +

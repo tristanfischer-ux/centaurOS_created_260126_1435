@@ -47,12 +47,51 @@
 
 interface WordLike {
   id?: string
+  name_human?: string
+  content_character?: { character_id?: string }
   modifier_characters?: Array<{ kind?: string; value?: string }>
 }
 
 interface SubModuleLike {
   id?: string
   words?: WordLike[]
+}
+
+/** Normalise a word-identifying string into the macro_assembly_prices.word_name
+ *  space: lowercase, separators → `_`, drop a trailing `_word`. */
+function normaliseToMacroKey(s: string | undefined): string {
+  return String(s ?? '').toLowerCase().replace(/[\s-]+/g, '_').replace(/_word$/, '')
+}
+
+/**
+ * True if any word in the sub_module is a MACRO-ANCHORED part — i.e. its
+ * content_character.character_id / id / name_human reduces (exactly) to a
+ * macro_assembly_prices word_name. Such a word IS the priced part for its slot
+ * (dimension-based macro pricing carries no MPN), so the sub_module is NOT a
+ * gap even with zero part_number words.
+ *
+ * Root cause this closes (bioreactor task #34, council-found 2026-06-03): the
+ * macro-carrier word (e.g. `stainless_316l_vessel_word`, ccid
+ * `stainless_316l_vessel` == the £50k macro's word_name) has no part_number, so
+ * gate-23 wrongly flagged its sub_module as a gap, completeEmitterGaps() injected
+ * a SECOND branded word (Sartorius "BIOSTAT STR 200L") for the same physical
+ * vessel, and the renderer's exact-match landed the macro on the generic word and
+ * orphaned the branded duplicate at £0. Exempting macro-anchored sub_modules
+ * stops the spurious injection at the root. Conservative EXACT match (not token
+ * match) → never over-exempts a real gap. `normMacroNames` is pre-normalised.
+ */
+function subModuleHasMacroAnchorWord(sm: SubModuleLike, normMacroNames: Set<string>): boolean {
+  if (normMacroNames.size === 0) return false
+  const words = Array.isArray(sm?.words) ? sm.words : []
+  for (const w of words) {
+    const keys = [
+      normaliseToMacroKey(w?.content_character?.character_id),
+      normaliseToMacroKey(w?.id),
+      normaliseToMacroKey(w?.name_human),
+    ]
+    if (keys.some((k) => k.length > 0 && normMacroNames.has(k))) return true
+  }
+  return false
 }
 
 interface DesignModuleLike {
@@ -98,12 +137,18 @@ export interface EmitterCompletenessGateResult {
 export function runEmitterCompletenessGate(
   modules: DesignModuleLike[],
   className: string,
+  /** macro_assembly_prices word_names (raw; normalised internally). A sub_module
+   *  with a macro-anchored word is NOT a gap (the macro IS its priced part).
+   *  Defaults to empty → byte-identical to the prior behaviour for any caller
+   *  that doesn't pass it. */
+  macroWordNames: Set<string> = new Set(),
 ): EmitterCompletenessGateResult {
   const incompleteSubModules: IncompleteSubModule[] = []
   let totalChecked = 0
   let passing = 0
 
   const safeMods = Array.isArray(modules) ? modules : []
+  const normMacroNames = new Set([...macroWordNames].map(normaliseToMacroKey))
 
   for (const m of safeMods) {
     const moduleId = String(m?.module ?? 'unknown_module')
@@ -122,7 +167,10 @@ export function runEmitterCompletenessGate(
         })
       }).length
 
-      if (mpnWordCount === 0) {
+      // A sub_module is COMPLETE if it has an MPN-bearing word OR a macro-anchored
+      // word (the macro IS its priced part — no MPN by design). The macro-anchor
+      // exemption stops the spurious branded-duplicate injection (task #34).
+      if (mpnWordCount === 0 && !subModuleHasMacroAnchorWord(sm, normMacroNames)) {
         incompleteSubModules.push({
           module_id: moduleId,
           sub_module_id: subModuleId,

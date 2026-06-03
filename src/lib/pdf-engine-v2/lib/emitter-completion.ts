@@ -136,6 +136,10 @@ export interface CompleteEmitterGapsOpts {
   model?: string
   /** Path to forge-truth.db. Default ~/.forge-truth/forge-truth.db. */
   dbPath?: string
+  /** macro_assembly_prices word_names — a sub_module whose word is macro-anchored
+   *  is NOT a gap (the macro IS its priced part), so no branded duplicate is
+   *  injected for it (task #34). Default empty → prior behaviour. */
+  macroWordNames?: Set<string>
 }
 
 // ── Honest-descriptor MPN for unverified LLM completions ─────────────────────
@@ -686,8 +690,9 @@ export async function completeEmitterGaps(
   const dbPath = opts.dbPath ?? resolve(homedir(), '.forge-truth', 'forge-truth.db')
   const safeModules = Array.isArray(modules) ? modules : []
 
-  // 1. Find the gaps using the SAME gate the chain runs.
-  const gate = runEmitterCompletenessGate(safeModules as any, className)
+  // 1. Find the gaps using the SAME gate the chain runs (macro-anchored
+  //    sub_modules are NOT gaps → no branded-duplicate injection, task #34).
+  const gate = runEmitterCompletenessGate(safeModules as any, className, opts.macroWordNames ?? new Set())
   if (gate.passed || gate.incomplete_sub_modules.length === 0) {
     return { filled: [], modulesMutated: false }
   }
