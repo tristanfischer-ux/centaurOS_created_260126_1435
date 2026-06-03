@@ -2359,13 +2359,13 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       process.env.UNIVERSAL_AUTO_PLAN = '1'
       fallback._resetManifestCacheForTests?.()
       const composedOn = novelEnv ? fallback.composeFallbackPlan(novelEnv, novelBrief) : null
-      delete process.env.UNIVERSAL_AUTO_PLAN
+      process.env.UNIVERSAL_AUTO_PLAN = '0' // explicit-disable escape hatch (default is now ON, flipped 2026-06-03)
       fallback._resetManifestCacheForTests?.()
       const composedOff = novelEnv ? fallback.composeFallbackPlan(novelEnv, novelBrief) : null
       const wireLive = novelHasPlan === null && !!composedOn && composedOn.plan.tools.length > 0 && composedOff === null
       assertions.push(assertEq(
         'UNIVERSAL.auto_plan_fallback_live_for_novel_class',
-        'WALL-2 wire: a novel class (tidal_stream_generator) has no registered plan, composes a NON-EMPTY tool graph when UNIVERSAL_AUTO_PLAN=1, and composes nothing when the flag is off (default-OFF safety)',
+        'WALL-2 wire: a novel class (tidal_stream_generator) has no registered plan, composes a NON-EMPTY tool graph by DEFAULT (flag flipped ON 2026-06-03), and composes nothing when explicitly disabled (UNIVERSAL_AUTO_PLAN=0)',
         wireLive,
         (v: boolean) => v === true,
         () => `expected novelHasPlan=null (got ${novelHasPlan ? 'a plan' : 'null'}), composedOn.tools>0 (got ${composedOn ? composedOn.plan.tools.length : 'null'}), composedOff=null (got ${composedOff ? 'a plan' : 'null'}). The wire must be live ON + silent OFF for unregistered classes.`,

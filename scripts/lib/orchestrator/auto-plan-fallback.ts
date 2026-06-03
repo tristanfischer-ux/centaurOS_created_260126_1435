@@ -47,10 +47,18 @@ import type {
   ToolStep,
 } from './types'
 
-/** Env flag — default OFF. Set UNIVERSAL_AUTO_PLAN=1 to activate the wall-2
- *  fallback for unregistered classes. */
+/** Env flag — default ON (flipped 2026-06-03, Tristan-authorised). The wall-2
+ *  fallback affects ONLY unregistered/novel classes — all ~35 registered classes
+ *  match a hand-written ClassToolPlan first, so they bypass it entirely — and every
+ *  composed ToolStep is `required:false` (non-fatal), so it can neither alter nor
+ *  halt any existing class. A novel class now composes-and-advances past wall-2
+ *  instead of hard-failing; it still won't render a finished dossier until the
+ *  generic emitter (wall-3) lands, but "fails later with a composed plan" beats
+ *  "fails immediately". The over-selection prune (same commit family) makes the
+ *  composed plan cleaner than when this defaulted off. Escape hatch: set
+ *  UNIVERSAL_AUTO_PLAN=0 to disable. */
 export function autoPlanEnabled(): boolean {
-  return process.env.UNIVERSAL_AUTO_PLAN === '1'
+  return process.env.UNIVERSAL_AUTO_PLAN !== '0'
 }
 
 /**
