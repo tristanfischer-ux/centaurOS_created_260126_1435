@@ -162,7 +162,7 @@ function apply_engineering_fixups(s: string): string {
  * render — arrows, smart quotes, em-dashes, fraction slashes — to ASCII
  * equivalents. Without this they render as a placeholder box / apostrophe.
  */
-function normalise_unicode(s: string): string {
+export function normalise_unicode(s: string): string {
   return s
     .replace(/[→➜⟶]/g, ' to ')
     .replace(/[←⟵]/g, ' from ')
@@ -5641,13 +5641,18 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
             }}
           >
             <View style={{ flex: COL_CONSTRAINT, paddingRight: 6 }}>
-              <Text style={{ fontSize: 9, color: INK, fontFamily: 'Helvetica-Bold' }}>{row.constraint}</Text>
+              {/* normalise_unicode: brief constraint labels routinely carry ≤ ≥ µ
+                  (e.g. "Surface finish Ra ≤ 0.4 µm") — Helvetica has no glyph for
+                  ≤/≥, so the .notdef substitution renders at the wrong advance width
+                  and the following value overlaps it, tripping gate-11 (exit 11).
+                  Universal across classes; the other 16 prose sites already do this. */}
+              <Text style={{ fontSize: 9, color: INK, fontFamily: 'Helvetica-Bold' }}>{normalise_unicode(String(row.constraint ?? ''))}</Text>
             </View>
             <View style={{ flex: COL_TARGET, paddingRight: 6 }}>
-              <Text style={{ fontSize: 9, color: INK_SOFT }}>{row.briefTarget}</Text>
+              <Text style={{ fontSize: 9, color: INK_SOFT }}>{normalise_unicode(String(row.briefTarget ?? ''))}</Text>
             </View>
             <View style={{ flex: COL_ACHIEVED, paddingRight: 6 }}>
-              <Text style={{ fontSize: 9, color: rowTextColour, fontFamily: isFail ? 'Helvetica-Bold' : 'Helvetica' }}>{row.designAchieved}</Text>
+              <Text style={{ fontSize: 9, color: rowTextColour, fontFamily: isFail ? 'Helvetica-Bold' : 'Helvetica' }}>{normalise_unicode(String(row.designAchieved ?? ''))}</Text>
             </View>
             <View style={{ flex: COL_STATUS, paddingRight: 6 }}>
               <View style={{ backgroundColor: pillBg, paddingVertical: 2, paddingHorizontal: 5, borderRadius: 3, alignSelf: 'flex-start' }}>
@@ -5655,7 +5660,7 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
               </View>
             </View>
             <View style={{ flex: COL_DELTA }}>
-              <Text style={{ fontSize: 9, color: isFail ? '#b91c1c' : INK_SOFT, fontFamily: isFail ? 'Helvetica-Bold' : 'Helvetica' }}>{row.deltaText}</Text>
+              <Text style={{ fontSize: 9, color: isFail ? '#b91c1c' : INK_SOFT, fontFamily: isFail ? 'Helvetica-Bold' : 'Helvetica' }}>{normalise_unicode(String(row.deltaText ?? ''))}</Text>
             </View>
           </View>
         )

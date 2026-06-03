@@ -40,7 +40,7 @@ import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync } from '
 import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
-import { _buildComplianceRows, summariseComplianceRows, computeBomTotals } from './render-minimal-pdf'
+import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode } from './render-minimal-pdf'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
@@ -3679,6 +3679,31 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.gate23_macro_anchor_exempts_priced_word_not_real_gap', description: 'gate-23 macro-anchor exemption', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── task #39: gate-11 glyph sanitiser (2026-06-03) ──────────────────────────
+  //
+  // UNIVERSAL.normalise_unicode_strips_gate11_glyphs — Helvetica (react-pdf's
+  // default font) has NO glyph for ≤ ≥ µ ε ⊗ ⊙ ⊕ ≈ or Unicode sub/superscripts;
+  // their .notdef substitution renders at the wrong advance width, so the NEXT
+  // text span overlaps it and gate-11 (layout-overlap audit, exit 11) fails. The
+  // bioreactor tripped on a brief constraint "Surface finish Ra ≤ 0.4 µm" because
+  // the compliance table was the one render path NOT calling normalise_unicode()
+  // (fixed by wrapping its 4 cells). This guards the SANITISER PRIMITIVE: if a
+  // future edit weakens it, iter-N catches it before the next layout-audit fail.
+  // Pure, snapshot-independent.
+  try {
+    const out = normalise_unicode('Surface finish Ra ≤ 0.4 µm; flow ≥ 8 hr⁻¹; ε-NTU; a⊗b; CO₂')
+    const residual = /[≤≥µμε⊗⊙⊕≈₀-₉⁰-⁹⁻]/.test(out)
+    assertions.push(assertEq(
+      'UNIVERSAL.normalise_unicode_strips_gate11_glyphs',
+      'normalise_unicode maps every gate-11-tripping glyph (≤ ≥ µ ε ⊗ ⊙ ⊕ ≈ sub/superscripts) to an ASCII advance-width-safe equivalent — render must not ship a .notdef smear',
+      residual,
+      (r) => r === false,
+      () => `normalise_unicode left a gate-11-tripping glyph in "${out}" — Helvetica has no glyph for it, so it .notdef-smears and trips the layout-overlap audit (exit 11). Restore the replace() in render-minimal-pdf.tsx normalise_unicode.`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.normalise_unicode_strips_gate11_glyphs', description: 'gate-11 glyph sanitiser', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   // ── U2: consumable rows excluded from capital grand total (2026-05-29) ──────
