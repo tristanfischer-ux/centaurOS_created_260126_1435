@@ -26,7 +26,7 @@ export const pressureVesselTool: Tool<any, any> = {
   source_url: 'internal://forgeos/structural',
   domain: 'mechanical',
   pinned_environment: { python: '3.14.4' },
-  applicable_to(envelope) { return ['auv', 'bess', 'wind_turbine', 'h2_electrolyser', '3d_printer_fdm', 'cnc_machine', 'satellite_smallsat', 'satellite_cubesat', 'satellite_geo_comsat', 'ventilator'].includes(envelope.class) },
+  applicable_to(envelope) { return ['auv', 'bess', 'wind_turbine', 'h2_electrolyser', '3d_printer_fdm', 'cnc_machine', 'satellite_smallsat', 'satellite_cubesat', 'satellite_geo_comsat', 'ventilator', 'co2_mineralisation'].includes(envelope.class) },
   async invoke(input: any): Promise<ToolResult<any>> {
     const t0 = Date.now()
     const payload = JSON.stringify(input)

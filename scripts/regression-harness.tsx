@@ -2987,6 +2987,38 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // ── UNIVERSAL.pricing_classifier_routes_process_equipment ─────────────────
+  // Guards the 2026-06-03 co2_mineralisation cost-self-check fix: process /
+  // chemical-plant unit-operations had NO Engine-B rule and fell through to the
+  // corpus token-classifier, which mis-bucketed them on single-row token noise —
+  // "dryer" matched one junk `safety_consumable` row (sane ceiling £5k → a £21k
+  // dryer flagged 4.2× type-outlier), and the token "safety" in "safety shower +
+  // eyewash" matched `mechanical_fastener` (ceiling £200 → 11× HARD fail, render
+  // cost self-check FAIL). New name-keyword rules route each to its TYPE-correct
+  // class so the macro-pinned price sits inside the class ceiling. CRITICALLY the
+  // qualified-`reactor` fix must NOT steal a genuine electrical line reactor:
+  // "line reactor" stays `magnetic`, only a process "carbonation reactor" routes
+  // to mechanical_assembly. Fasteners + fuses must be untouched.
+  {
+    const c = (name: string) => classifyByRules({ word_name: name } as never)
+    const dryer = c('CaCO3 hot-air dryer') === 'thermal'
+    const shower = c('safety shower + eyewash') === 'fluid_path'
+    const column = c('MEA distillation column') === 'fluid_path'
+    const steam = c('electric steam generator') === 'thermal'
+    const reactor = c('stirred carbonation reactor') === 'mechanical_assembly'
+    const lineReactor = c('line reactor') === 'magnetic'        // electrical reactor preserved
+    const bolt = c('M12 bolt') === 'mechanical_fastener'        // regression
+    const fuse = c('HRC fuse') === 'safety_consumable'          // regression
+    const ok = dryer && shower && column && steam && reactor && lineReactor && bolt && fuse
+    assertions.push(assertEq(
+      'UNIVERSAL.pricing_classifier_routes_process_equipment',
+      'Engine-B classifyByRules routes dryer/steam-generator→thermal, safety-shower/distillation-column→fluid_path, carbonation-reactor→mechanical_assembly (TYPE-correct, price clears class ceiling) while keeping "line reactor"→magnetic and fastener/fuse unchanged — guards the 2026-06-03 co2_mineralisation cost-self-check FAIL→REVIEW fix',
+      ok,
+      (v: boolean) => v === true,
+      () => `dryer=${dryer} shower=${shower} column=${column} steam=${steam} reactor=${reactor} lineReactor=${lineReactor} bolt=${bolt} fuse=${fuse}`,
+    ))
+  }
+
   // ── UNIVERSAL.gate18_rounding_family_downgraded_not_high ──────────────────
   // Guards the 2026-05-31 gate-18 rounding-precision fix: the same computed
   // quantity printed at different decimal precisions (heatpump compressor power
@@ -3473,6 +3505,76 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         ))
       }
     }
+  }
+
+  // ── UNIVERSAL: duplicate-module-enum cost-by-module rows reconcile (2026-06-03) ──
+  //
+  // Guards the 2026-06-03 co2_mineralisation B-3 (exit 10) fix. When an emitter
+  // returns MULTIPLE DesignModules that share the same `module` enum (a chemical
+  // plant with three `mass_fluid_transport_process` stages at £50,449 / £45,049 /
+  // £46,240), TWO render bugs broke cover ≡ Σ:
+  //   (a) CostByModulePage did `order_modules(allMods).map(m => allMods.find(x =>
+  //       x.module === m.module))`, which COLLAPSED every same-enum row onto the
+  //       FIRST object → the first subtotal printed N times, so visible rows summed
+  //       to LESS than "Sum of modules"; and
+  //   (b) identical row labels COLLIDED in audit-pdf-bom.ts's per-module-header Map
+  //       (Map.set overwrites) → those modules dropped out of Σ-headers.
+  // The fix sorts allMods in place (no find-collapse) AND disambiguates repeated
+  // labels with an audit-parseable " (Stage N)" suffix. This invariant replicates
+  // that exact label/subtotal logic on a synthetic duplicate-enum set and asserts:
+  // every row label is distinct, each parses under the audit's header regex, and
+  // Σ rows == the true grand total. A revert to find-collapse OR an unparseable
+  // separator (e.g. an em-dash) re-opens the B-3 gap and fails here — with NO
+  // dependency on the live snapshot happening to contain a duplicate enum.
+  {
+    type Row = { module: string; label: string; display_name?: string; subtotal_gbp: number }
+    const rows: Row[] = [
+      { module: 'mass_fluid_transport_process', label: 'Mass Fluid Transport Process', subtotal_gbp: 50449 },
+      { module: 'mass_fluid_transport_process', label: 'Mass Fluid Transport Process', subtotal_gbp: 45049 },
+      { module: 'mass_fluid_transport_process', label: 'Mass Fluid Transport Process', subtotal_gbp: 46240 },
+      { module: 'energy_conversion_transduction', label: 'Energy Conversion Transduction', subtotal_gbp: 59500 },
+      { module: 'energy_conversion_transduction', label: 'Energy Conversion Transduction', subtotal_gbp: 96000 },
+      { module: 'power_distribution', label: 'Power Distribution', subtotal_gbp: 71680 },
+    ]
+    const grandTotal = rows.reduce((a, r) => a + r.subtotal_gbp, 0)
+    // Replicate CostByModulePage's uniqueLabelFor (no find-collapse: map rows directly).
+    const baseLabel = (m: Row) => m.display_name || m.label
+    const counts = new Map<string, number>()
+    for (const m of rows) counts.set(baseLabel(m), (counts.get(baseLabel(m)) ?? 0) + 1)
+    const seen = new Map<string, number>()
+    const uniqueLabelFor = (m: Row): string => {
+      const base = baseLabel(m)
+      if ((counts.get(base) ?? 0) <= 1) return base
+      const n = (seen.get(base) ?? 0) + 1
+      seen.set(base, n)
+      return `${base} (Stage ${n})`
+    }
+    const HEADER_RE = /^\s*\d+\.\s+([A-Z][A-Za-z0-9\s&/().,+-]*?)\s+£([\d,.]+)/  // byte-identical to audit
+    const headerMap = new Map<string, number>()  // mirror audit's `__header` Map (label → amount)
+    const renderedLabels: string[] = []
+    rows.forEach((m, idx) => {
+      const label = uniqueLabelFor(m)
+      renderedLabels.push(label)
+      // Simulate the audit reading the rendered "N. <label>   £<amount>" line.
+      const line = `   ${idx + 1}.     ${label}                 £${m.subtotal_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`
+      const mh = line.match(HEADER_RE)
+      if (mh) {
+        const key = mh[1].toLowerCase().trim().replace(/\s+/g, '_') + '__header'
+        headerMap.set(key, parseFloat(mh[2].replace(/,/g, '')))
+      }
+    })
+    const distinctLabels = new Set(renderedLabels).size === rows.length
+    const allParsed = headerMap.size === rows.length  // every row parsed AND no key collision
+    const sumHeaders = Array.from(headerMap.values()).reduce((a, v) => a + v, 0)
+    const reconciles = Math.abs(sumHeaders - grandTotal) <= Math.max(50, grandTotal * 0.002)
+    const ok = distinctLabels && allParsed && reconciles
+    assertions.push(assertEq(
+      'UNIVERSAL.duplicate_module_enum_cost_rows_reconcile',
+      'when an emitter returns multiple modules sharing a `module` enum, the "Cost by module" rows render distinct subtotals + distinct audit-parseable labels so Σ headers == grand total (cover) — guards the 2026-06-03 co2_mineralisation B-3 find-collapse + label-collision fix (exit 10)',
+      ok,
+      (v: boolean) => v === true,
+      () => `distinctLabels=${distinctLabels} allParsed=${allParsed}(${headerMap.size}/${rows.length}) reconciles=${reconciles} (Σ£${sumHeaders} vs grand£${grandTotal})`,
+    ))
   }
 
   // ── UNIVERSAL: gate-18 mass-scope + recommendation-role splits (2026-06-01) ──

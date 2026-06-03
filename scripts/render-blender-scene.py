@@ -83,6 +83,12 @@ CLASS_TO_TEMPLATE: dict[str, str] = {
     "hydrogen_electrolyser": "hydrogen-electrolyser-9shot.py",
     "hydrogen-electrolyser": "hydrogen-electrolyser-9shot.py",
     "h2_electrolyser": "hydrogen-electrolyser-9shot.py",
+    # CO2 capture + mineralisation process skid (added 2026-06-03). Bespoke
+    # template models the absorber/stripper columns + carbonation reactor +
+    # filter/centrifuge + dryer + crystalliser + MEA tanks + skid frame.
+    "co2_mineralisation": "co2-mineralisation-9shot.py",
+    "co2-mineralisation": "co2-mineralisation-9shot.py",
+    "mineralisation": "co2-mineralisation-9shot.py",
     # Phase 3 industrial + other (bootstrapped via GPT-5.5, 2026-05-24)
     "industrial_inspection_drone": "industrial-inspection-drone-9shot.py",
     "industrial-inspection-drone": "industrial-inspection-drone-9shot.py",

@@ -355,7 +355,39 @@ const NAME_KEYWORD_RULES: RuleEntry[] = [
   { pattern: /\b(circulator.pump|dosing.pump|glycol.pump|coolant.pump|coolant.circulation|coolant.loop)\b/i, cls: 'mechanical_assembly' },
   // ── Transformers / magnetics ──────────────────────────────────────────────
   { pattern: /\b(step.up.transformer|step.down.transformer|isolation.transformer|distribution.transformer|dry.type.transformer|cast.resin.transformer)\b/i, cls: 'magnetic' },
-  { pattern: /\b(emi.filter|line.filter|common.mode.choke|differential.mode.choke|dc.choke|ac.choke|reactor)\b/i, cls: 'magnetic' },
+  // 2026-06-03: qualified the bare `reactor` token → it was swallowing PROCESS /
+  // nuclear reactors ("carbonation reactor", "reactor pressure vessel") as
+  // `magnetic`. An electrical reactor is always qualified (line / smoothing / AC /
+  // DC / series / shunt / current-limiting); bare "reactor" now falls through to
+  // the process-equipment rules above. Universal correctness fix.
+  { pattern: /\b(emi.filter|line.filter|common.mode.choke|differential.mode.choke|dc.choke|ac.choke|(line|smoothing|series|shunt|current.?limiting|ac|dc).?reactor)\b/i, cls: 'magnetic' },
+  // ── Process equipment — chemical / process plant (2026-06-03, co2_mineralisation) ──
+  // Process unit-operations (dryers, reboilers, condensers, columns, reactors,
+  // crystallisers, safety showers, bunds) have no rules below and fall through to
+  // the corpus token-classifier, which mis-buckets them on noise: "dryer" matched a
+  // single junk corpus row classed `safety_consumable` (sane ceiling £5k) and the
+  // token "safety" in "safety shower + eyewash" matched `mechanical_fastener`
+  // (ceiling £200) → 11× type-outlier, render cost self-check FAIL. These ADDITIVE
+  // rules route each to its TYPE-correct class so the price (real macro-pinned
+  // £2.2k–£22k) sits inside the class ceiling. Specific-before-generic; only fires
+  // on parts that previously had NO rule, so other product classes are unaffected.
+  // Heat-transfer process equipment → thermal (ceiling £15k):
+  { pattern: /\b(reboiler|condenser|evaporator|recuperator|economiser|economizer|desuperheater)\b/i, cls: 'thermal' },
+  { pattern: /\b(dryer|drier|fluid.?bed.?dry|fluidised.?bed|fluidized.?bed|spray.?dry|rotary.?dry|flash.?dry|vibro.?fluidiser)\b/i, cls: 'thermal' },
+  { pattern: /\b(steam.?generator|steam.?boiler|process.?boiler|electric.?boiler|hot.?air.?heater|duct.?heater|process.?heater|air.?heater|immersion.?heater)\b/i, cls: 'thermal' },
+  { pattern: /\b(cooling.?water.?skid|dry.?cooler|cooling.?tower|chilled.?water.?skid|cooling.?skid)\b/i, cls: 'thermal' },
+  // Mass-transfer columns + wetted safety / containment equipment → fluid_path (ceiling £10k):
+  { pattern: /\b(absorber|absorption.?column|stripper|stripping.?column|distillation.?column|packed.?column|scrubber|packed.?tower|wash.?column|rectif\w+.?column)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(structured.?packing|random.?packing|mellapak|raschig|pall.?ring|packing.?bed|column.?packing)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(safety.?shower|emergency.?shower|eyewash|eye.?wash|deluge.?shower|drench.?shower)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(bund|bunded.?tray|containment.?tray|spill.?tray|drip.?tray|bunding)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(storage.?tank|buffer.?tank|day.?tank|process.?tank|mixing.?tank|surge.?tank|reclaim.?tank|wash.?water.?tank|atmospheric.?tank)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(belt.?filter|vacuum.?filter|filter.?press|leaf.?filter|drum.?filter|nutsche|wash.?manifold|spray.?manifold)\b/i, cls: 'fluid_path' },
+  // Rotating / agitated process assemblies → mechanical_assembly (ceiling £20k):
+  { pattern: /\b(stirred.?reactor|carbonation.?reactor|reaction.?vessel|agitated.?vessel|jacketed.?vessel|stirred.?tank|crystalliser|crystallizer|recrystalliser|recrystallizer)\b/i, cls: 'mechanical_assembly' },
+  { pattern: /\b(agitator|impeller.?drive|mixer.?drive|top.?entry.?agitator|side.?entry.?agitator)\b/i, cls: 'mechanical_assembly' },
+  { pattern: /\b(centrifuge|pusher.?centrifuge|decanter.?centrifuge|screw.?feeder|metering.?screw|loss.?in.?weight.?feeder|dosing.?feeder|hopper)\b/i, cls: 'mechanical_assembly' },
+  { pattern: /\b(bagging.?machine|open.?mouth.?bagger|bagger|palletiser|palletizer|pallet.?wrapper|stretch.?wrapper|heat.?sealer|band.?sealer)\b/i, cls: 'mechanical_assembly' },
   // ── Thermal management ────────────────────────────────────────────────────
   { pattern: /\b(cold.plate|liquid.cooling.plate|heatsink|heat.sink|heat.exchanger|plate.heat.exchanger|bphe|thermal.interface|tim.pad|tim.sheet)\b/i, cls: 'thermal' },
   { pattern: /\b(cooling.fan|condenser.fan|evaporator.fan|axial.fan|blower)\b/i, cls: 'thermal' },

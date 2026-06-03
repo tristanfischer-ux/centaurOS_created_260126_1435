@@ -42,6 +42,7 @@ import {
   type BandPosition,
 } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { isConsumable, CLASS_PRICE_SANITY_BOUNDS, keywordCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
+import { classifyByRules } from './estimate-missing-prices'
 import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 
@@ -1250,14 +1251,30 @@ export function computeBomTotals(state: any): BomTotals | null {
           // Engine B (2026-05-18) attribution — present when the part was
           // priced via the volume curve in `estimate-missing-prices.tsx`.
           // P6 fix (2026-05-18): when the verification row lacks the field
-          // (older state files predating Engine B), fall back to a render-time
-          // corpus lookup on the part name. The corpus has component_class on
-          // 22k+ records; the lookup is sub-millisecond and free. If no match,
-          // stays undefined and the per-class aggregate falls back to
-          // 'unclassified' as before.
+          // (older state files predating Engine B, OR macro-priced parts that
+          // skip Engine-B classification), fall back at render time.
+          //
+          // 2026-06-03 (co2_mineralisation cost self-check FIX): try the
+          // DETERMINISTIC rule classifier (classifyByRules — name + MPN keyword
+          // table) FIRST, then the corpus token-match. The corpus fallback alone
+          // mis-bucketed process equipment on single-row token noise ("dryer" →
+          // one junk `safety_consumable` row; the token "safety" in "safety
+          // shower" → `mechanical_fastener`), producing absurd type-outlier
+          // findings in the cost self-check. classifyByRules is authoritative for
+          // recognised part types and returns null otherwise, so the corpus
+          // fallback (and finally 'unclassified') is preserved unchanged for
+          // everything the rules don't match. Additive + universal.
           engine_b_component_class: typeof v?.engine_b_component_class === 'string'
             ? v.engine_b_component_class
-            : (_renderEngineBClassifier.lookup(
+            : (classifyByRules({
+                word_id: String(w.id ?? ''),
+                word_name: String(w.name_human || v?.word_name || w.id || ''),
+                module: '', sub_module_id: '',
+                manufacturer: mfgMod ? String(mfgMod.value) : (v?.manufacturer ?? null),
+                part_number: pnMod ? String(pnMod.value) : (v?.part_number ?? null),
+                description: null, quantity: qty,
+              })
+              ?? _renderEngineBClassifier.lookup(
                 String(w.name_human || v?.word_name || w.id || '')
               ) ?? undefined),
           engine_b_curve_multiplier: typeof v?.engine_b_curve_multiplier === 'number'
@@ -6041,7 +6058,7 @@ function SystemOverviewPage({ state, project }: { state: any; project: string })
       <View style={{ padding: 10, backgroundColor: '#f7faff', borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
         {moduleMapRows.map((r, i) => (
           <View
-            key={`mod-row-${r.id}`}
+            key={`mod-row-${r.id}-${i}`}
             style={{ flexDirection: 'row', marginBottom: i === moduleMapRows.length - 1 ? 0 : 6 }}
           >
             <View style={{ width: 150, paddingRight: 8 }}>
@@ -6137,8 +6154,8 @@ function ModuleConnectionMapPage({
                 />
               )
             })}
-            {positions.map(p => (
-              <React.Fragment key={p.id}>
+            {positions.map((p, pIdx) => (
+              <React.Fragment key={`${p.id}-${pIdx}`}>
                 <Circle cx={p.x} cy={p.y} r={nodeR} fill={ACCENT} stroke={ACCENT_SOFT} strokeWidth={1.5} />
                 {/* react-pdf Svg <Text> renders with `fill` attribute, NOT style.color. */}
                 <Text
@@ -6165,7 +6182,7 @@ function ModuleConnectionMapPage({
           </Text>
           <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
             {ordered.map(m => (
-              <View key={m.id} style={{
+              <View key={`legend-${m.id}-${m.n}`} style={{
                 flexDirection: 'row',
                 paddingVertical: 3,
                 borderBottomWidth: 0.4,
@@ -8463,13 +8480,30 @@ function BillOfMaterialsPage({
             ) : null}
             <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4 }}>
               <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>Cost by module</Text>
-              {allMods.map((mod, mi) => (
+              {(() => {
+                // Mirror CostByModulePage's distinct-label handling so this
+                // secondary table never shows duplicate rows when an emitter
+                // reuses a module enum (prefer display_name; disambiguate
+                // repeats with an audit-parseable "(Stage N)" suffix).
+                const labelOf = (mod: any) => title_case(mod.display_name || mod.label)
+                const counts = new Map<string, number>()
+                for (const mod of allMods) counts.set(labelOf(mod), (counts.get(labelOf(mod)) ?? 0) + 1)
+                const seen = new Map<string, number>()
+                const uniq = (mod: any): string => {
+                  const base = labelOf(mod)
+                  if ((counts.get(base) ?? 0) <= 1) return base
+                  const n = (seen.get(base) ?? 0) + 1
+                  seen.set(base, n)
+                  return `${base} (Stage ${n})`
+                }
+                return allMods.map((mod, mi) => (
                 <View key={`grand-row-${mi}`} style={{ flexDirection: 'row', paddingVertical: 2 }}>
                   <View style={{ width: 22 }}><Text style={{ fontSize: 9, color: ACCENT, fontFamily: 'Helvetica-Bold' }}>{mi + 1}.</Text></View>
-                  <View style={{ flex: 1 }}><Text style={{ fontSize: 9.5, color: INK_SOFT }}>{title_case(mod.label)}</Text></View>
+                  <View style={{ flex: 1 }}><Text style={{ fontSize: 9.5, color: INK_SOFT }}>{uniq(mod)}</Text></View>
                   <View style={{ width: 90, alignItems: 'flex-end' }}><Text style={{ fontSize: 9.5, color: INK, fontFamily: 'Helvetica-Bold' }}>{fmtGBP(mod.subtotal_gbp)}</Text></View>
                 </View>
-              ))}
+                ))
+              })()}
               <View style={{ flexDirection: 'row', paddingTop: 6, marginTop: 4, borderTopWidth: 0.6, borderTopColor: '#cbd5e1' }}>
                 <View style={{ width: 22 }} />
                 <View style={{ flex: 1 }}><Text style={{ fontSize: 9.5, color: ACCENT, fontFamily: 'Helvetica-Bold' }}>Sum of modules</Text></View>
@@ -9406,9 +9440,17 @@ function resolveHeroImages(state: any): { cover: string | null; exploded: string
  */
 function CostByModulePage({ state, project, bomTotals }: { state: any; project: string; bomTotals: BomTotals | null }) {
   if (!bomTotals || !Array.isArray(bomTotals.allMods) || bomTotals.allMods.length === 0) return null
-  const orderedMods = order_modules(bomTotals.allMods as Array<{ module: string; display_name?: string }>)
-    .map(m => bomTotals.allMods.find(x => x.module === m.module))
-    .filter((m): m is BomMod => m != null)
+  // B-3 fix (2026-06-03): order_modules sorts the BomMod[] in place and returns
+  // the SAME objects — keep them. The previous `.map(m => allMods.find(x =>
+  // x.module === m.module))` collapsed every module sharing a `module` enum onto
+  // the FIRST such object: a chemical plant with three `mass_fluid_transport_process`
+  // stages (£50,449 / £45,049 / £46,240) rendered the first subtotal THREE times,
+  // so the visible "Cost by module" rows summed to LESS than the true "Sum of
+  // modules" grand total, and the BoM audit (audit-pdf-bom.ts B-3) read the
+  // collapsed rows → cover ≢ Σ module sub-totals → false HIGH, exit 10. Sorting
+  // allMods directly preserves every distinct module's real subtotal. Universal
+  // across all classes whose emitter reuses a module enum (DAC, etc.).
+  const orderedMods = order_modules(bomTotals.allMods as BomMod[])
   const grandTotal = bomTotals.grandTotal_gbp
   const byClass = bomTotals.engine_b_by_class ?? {}
   const sortedClasses = Object.entries(byClass)
@@ -9428,22 +9470,51 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8 }}>
           Cost by module
         </Text>
-        {orderedMods.map((m, idx) => {
+        {(() => {
+          // B-3 fix (2026-06-03): when an emitter returns MULTIPLE modules with
+          // the SAME `module` enum AND no distinct display_name (older states,
+          // or any class whose emitter reuses an enum), every row renders the
+          // identical label. The BoM audit (audit-pdf-bom.ts) keys its
+          // per-module-header Map off that label, so identical labels COLLIDE
+          // (Map.set overwrites) and those modules' sub-totals drop out of Σ →
+          // cover ≢ Σ → false HIGH, exit 10. Disambiguate repeated labels here
+          // with the module's own first sub-module name (meaningful), falling
+          // back to an index — so every rendered row label is unique and the
+          // audit Map never collides. Distinct emitter display_names (preferred,
+          // set on re-emit) make this a no-op. Universal across all classes.
+          const baseLabel = (m: BomMod) => m.display_name || m.label
+          const labelCounts = new Map<string, number>()
+          for (const m of orderedMods) labelCounts.set(baseLabel(m), (labelCounts.get(baseLabel(m)) ?? 0) + 1)
+          const seen = new Map<string, number>()
+          const uniqueLabelFor = (m: BomMod): string => {
+            const base = baseLabel(m)
+            if ((labelCounts.get(base) ?? 0) <= 1) return base
+            const n = (seen.get(base) ?? 0) + 1
+            seen.set(base, n)
+            // Disambiguate with a parenthetical " (Stage N)" — parentheses + digits
+            // are inside the BoM audit's module-header label char class so the row
+            // still parses (an em-dash + free-text suffix would NOT, dropping the
+            // row from the audit's Σ). Distinct emitter display_names make this
+            // branch unreachable on a fresh re-emit.
+            return `${base} (Stage ${n})`
+          }
+          return orderedMods.map((m, idx) => {
           // Fix 2 (2026-05-30): tail-orphan guard — the last two rows carry
           // minPresenceAhead so they are pulled forward with the body rather
           // than landing alone on a near-empty page. Earlier rows use wrap=false
           // only (prevents mid-row page break without reserving excess space).
           const isTail = idx >= orderedMods.length - 2
           return (
-            <View key={m.module} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false} minPresenceAhead={isTail ? 40 : 0}>
+            <View key={`${m.module}-${idx}`} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false} minPresenceAhead={isTail ? 40 : 0}>
               <Text style={{ width: 28, fontSize: 10, color: MUTED }}>{idx + 1}.</Text>
-              <Text style={{ flex: 1, fontSize: 10, color: INK }}>{m.display_name || m.label}</Text>
+              <Text style={{ flex: 1, fontSize: 10, color: INK }}>{uniqueLabelFor(m)}</Text>
               <Text style={{ fontSize: 10, color: INK, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>
                 £{m.subtotal_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Text>
             </View>
           )
-        })}
+          })
+        })()}
         <View style={{ flexDirection: 'row', paddingVertical: 7, marginTop: 4, borderTopWidth: 1, borderTopColor: ACCENT, alignItems: 'baseline' }} wrap={false}>
           <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT }}>Sum of modules</Text>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>
@@ -10927,7 +10998,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
       <CostByModulePage state={state} project={project} bomTotals={bomTotals} />
       {modules.map((m: any, idx: number) => (
         <ModuleSection
-          key={m.module}
+          key={`${m.module}-${idx}`}
           index={idx + 1}
           moduleSpec={m}
           nl={byModule[m.module]}

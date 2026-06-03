@@ -41,6 +41,17 @@ export interface DesignJSON {
 
 export interface DesignModule {
   module: string
+  // Optional human-facing label for the "Cost by module" table + section
+  // headers. When an emitter returns MULTIPLE DesignModules that share the same
+  // `module` enum (e.g. a chemical plant with three `mass_fluid_transport_process`
+  // stages), each MUST carry a DISTINCT display_name — otherwise the renderer
+  // prints indistinguishable rows AND the BoM audit's per-module-header Map
+  // collides (Map.set overwrites the same key), dropping those modules'
+  // sub-totals from Σ and false-failing B-3 (cover ≢ Σ module sub-totals,
+  // exit 10). The Stage 1.7 LLM path already populates this on state; a
+  // deterministic emitter that reuses a module enum should set it too. The
+  // renderer falls back to humanise(module) when absent.
+  display_name?: string
   module_brief: string
   overview_paragraph_en: string
   derived_parameters: Record<string, number | string>
