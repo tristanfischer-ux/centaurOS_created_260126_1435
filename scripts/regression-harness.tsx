@@ -75,6 +75,7 @@ import { OPTIONAL_MODULES } from './lib/orchestrator/brief-scope-filter'
 import { buildToolsUsedPage } from './lib/orchestrator/attribution'
 import { auditCostSanity } from './lib/cost-self-assessment'
 import { isIndicativeRfqLine } from './render-minimal-pdf'
+import { resolveCostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 
 interface Assertion {
   id: string
@@ -221,6 +222,36 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         ))
       }
     }
+  }
+
+  // ── UNIVERSAL.cost_stack_bespoke_plant_is_direct_epc ─────────────────────
+  // Bespoke engineered-to-order plants (CO2 capture/mineralisation, DAC, H2
+  // electrolyser, fluid processing, SMR) sell DIRECT under an EPC contract — NO
+  // distributor channel — so the cost stack must NOT apply the consumer "channel
+  // list price" markup. co2_mineralisation previously had no COST_STACK entry and
+  // fell to DEFAULT (channel 0.25): the root cause of the "+ Channel markup 25%"
+  // line on the CO2 dossier (Tristan 2026-06-04). Guards: (a) co2 → channel 0;
+  // (b) the universal plant-slug heuristic routes an UNMAPPED plant class to
+  // channel 0 (class_key bespoke_plant_default) BEFORE DEFAULT; (c) an unmapped
+  // CONSUMER class still lands on DEFAULT with a NON-zero channel markup — the
+  // heuristic must not over-capture.
+  {
+    const co2cs = resolveCostStack({ keyMetrics: { product_class: 'co2_mineralisation' } })
+    const unmappedPlant = resolveCostStack({ keyMetrics: { product_class: 'biogas_plant' } })
+    const consumerGadget = resolveCostStack({ keyMetrics: { product_class: 'wireless_earbuds_generic' } })
+    const costStackOk =
+      co2cs.ratios.channel_markup_factor === 0 &&
+      unmappedPlant.ratios.channel_markup_factor === 0 &&
+      unmappedPlant.class_key === 'bespoke_plant_default' &&
+      consumerGadget.class_key === 'DEFAULT' &&
+      consumerGadget.ratios.channel_markup_factor > 0
+    assertions.push(assertEq(
+      'UNIVERSAL.cost_stack_bespoke_plant_is_direct_epc',
+      'resolveCostStack: co2 + unmapped plant → channel 0 (direct EPC); unmapped consumer → DEFAULT (channel > 0)',
+      costStackOk,
+      (ok) => ok,
+      () => `cost stack mis-resolved: co2 channel=${co2cs.ratios.channel_markup_factor} (want 0); unmappedPlant=${unmappedPlant.class_key}/${unmappedPlant.ratios.channel_markup_factor} (want bespoke_plant_default/0); consumer=${consumerGadget.class_key}/${consumerGadget.ratios.channel_markup_factor} (want DEFAULT/>0). A bespoke plant getting a channel markup is the CO2 "Channel list price" bug.`,
+    ))
   }
 
   // ── UNIVERSAL.indicative_rfq_marks_estimate_not_actual ───────────────────

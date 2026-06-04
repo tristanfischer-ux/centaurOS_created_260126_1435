@@ -132,6 +132,27 @@ const ARCH_INDUSTRIAL_HEAVY_EPC: CostStackRatios = {
   notes: 'Industrial-heavy EPC archetype (direct, civils + install).',
 }
 
+const ARCH_BESPOKE_ENGINEERED_PLANT: CostStackRatios = {
+  // Bespoke, engineered-to-order PROCESS / CHEMICAL / POWER plant sold DIRECT to
+  // the operator under an EPC (engineer-procure-construct) contract — CO2
+  // mineralisation/capture, direct-air-capture, hydrogen electrolyser plant,
+  // small modular reactor, fluid-processing/desalination skid-trains. These are
+  // first-of-a-kind, low-volume (1-handful/yr), integrated on site. There is NO
+  // distributor/dealer channel, so channel markup is 0 (the consumer-product
+  // "channel list price" step does not exist for a direct EPC sale). The margin
+  // is the integrator/EPC margin on COGS; installation captures civils + field
+  // erection + piping + commissioning, which dominate a process-plant CAPEX.
+  // Stack reads: raw materials -> assembly labour -> engineering/overhead ->
+  // factory COGS -> EPC margin -> (channel = 0, direct) -> civils/erection/
+  // commissioning -> installed (CAPEX) price.
+  assembly_labour_factor: 0.25,   // industrial-heavy, hand-built fabrication + integration
+  factory_overhead_factor: 0.18,  // industrial/regulated facility overhead
+  manufacturer_margin_factor: 0.13, // integrator/EPC margin on COGS (thin vs consumer)
+  channel_markup_factor: 0,       // direct EPC/B2B sale — no distributor channel
+  installation_cost_factor: 0.55, // civils + field erection + piping + commissioning
+  notes: 'Bespoke engineered-to-order plant archetype (direct EPC/B2B — process/chemical/power plant, NO distributor channel, civils + field erection + commissioning).',
+}
+
 const ARCH_BESPOKE_LOW_VOLUME: CostStackRatios = {
   // HAPS, AUV, custom robotics. Hand-built, low channel markup, light install.
   assembly_labour_factor: 0.25,
@@ -415,6 +436,19 @@ export const COST_STACK: Record<string, CostStackRatios> = {
     notes: 'Industrial chiller — calibrated 2026-05-18. Pipework + refrigerant + commissioning install. W3 already 1.0. Multiplier 1.519× lifts £275 to £418/kW (mid-band £320-520). Note: old raw band already included installer margin so ratios are modest.',
   },
 
+  // ===== Bespoke engineered-to-order PLANT classes (direct EPC, no channel) =====
+  // Process / chemical / power plants sold direct under an EPC contract. These
+  // were previously falling through resolveCostStack to DEFAULT (= mid-volume
+  // professional, 25% channel markup) — wrong for a first-of-a-kind plant with
+  // no distributor channel. Mapped to ARCH_BESPOKE_ENGINEERED_PLANT so the cost
+  // stack drops the "Channel list price" step (channel = 0, direct) and carries
+  // civils + field erection + commissioning as the install layer.
+  co2_mineralisation: { ...ARCH_BESPOKE_ENGINEERED_PLANT, notes: 'CO2 capture + mineralisation plant — bespoke engineered-to-order, direct EPC sale (no distributor channel). Civils + field erection + commissioning install. Calibrate against Phase 4 corpus pilot-plant CAPEX once Engine C lands.' },
+  dac: { ...ARCH_BESPOKE_ENGINEERED_PLANT, notes: 'Direct-air-capture plant — bespoke engineered-to-order, direct EPC sale (no distributor channel).' },
+  smr: { ...ARCH_BESPOKE_ENGINEERED_PLANT, manufacturer_margin_factor: 0.15, installation_cost_factor: 0.70, notes: 'Small modular reactor — bespoke engineered-to-order power plant, direct EPC sale (no distributor channel). Civils + nuclear-grade field erection + commissioning dominate CAPEX.' },
+  h2_electrolyser: { ...ARCH_BESPOKE_ENGINEERED_PLANT, manufacturer_margin_factor: 0.15, notes: 'Hydrogen electrolyser plant — bespoke engineered-to-order, direct EPC sale (no distributor channel). Mirrors hydrogen_electrolyser canonical; EPC + commissioning.' },
+  fluid_processing: { ...ARCH_BESPOKE_ENGINEERED_PLANT, installation_cost_factor: 0.50, notes: 'Fluid-processing / desalination plant skid-train — bespoke engineered-to-order, direct EPC sale (no distributor channel). Pipework + field erection + commissioning install.' },
+
   // ===== Additional class taxonomy (archetype-mapped starter ratios) =====
   // Energy + storage
   bess_residential: { ...ARCH_MID_VOLUME_PROFESSIONAL, installation_cost_factor: 0.40, notes: 'Residential BESS — mid-volume, distributor + installer.' },
@@ -639,6 +673,26 @@ export type CostStack = {
 // Resolve the cost-stack ratios for a given pipeline state. Matches the
 // resolvePriceBand pattern: tries product_class first, then slugHint, then
 // the projectId prefix, then DEFAULT.
+// Archetype heuristic for classes that have no explicit COST_STACK entry. Maps
+// an unrecognised class slug to a sensible ARCHETYPE rather than the neutral
+// mid-volume-professional DEFAULT. Currently catches the bespoke
+// engineered-to-order PLANT family (process / chemical / power plants sold
+// direct under an EPC contract — they have NO distributor channel, so DEFAULT's
+// 25% channel markup is wrong). This keeps the fix universal: a brand-new plant
+// class (e.g. `biogas_plant`, `ammonia_plant`, `desalination_plant`) gets the
+// EPC stack automatically without needing its own COST_STACK key.
+function archetypeForUnknownClass(slug: string | undefined): { ratios: CostStackRatios; class_key: string } | null {
+  if (!slug) return null
+  const s = slug.toLowerCase()
+  // Bespoke engineered-to-order plant: a process/chemical/power PLANT, capture /
+  // electrolyser / reactor / desalination / mineralisation, sold direct EPC.
+  const looksLikePlant =
+    /(?:^|_)(?:plant|reactor|electroly[sz]er|capture|mineralis|mineraliz|desalinat|smr|dac|carbonat|gasif|pyroly|digest|biogas|ammonia|methanol|refiner)/.test(s) ||
+    /(?:capture|electroly[sz]er|mineralis|mineraliz|desalinat|carbonat|gasif|pyroly|refiner)/.test(s)
+  if (looksLikePlant) return { ratios: ARCH_BESPOKE_ENGINEERED_PLANT, class_key: 'bespoke_plant_default' }
+  return null
+}
+
 export function resolveCostStack(state: any, slugHint?: string): { ratios: CostStackRatios; class_key: string } {
   const productClass: string | undefined = state?.keyMetrics?.product_class || state?.moduleDecomposition?.product_class || state?.parsedBrief?.product_class
   if (productClass && COST_STACK[productClass]) return { ratios: COST_STACK[productClass], class_key: productClass }
@@ -646,6 +700,11 @@ export function resolveCostStack(state: any, slugHint?: string): { ratios: CostS
   const projectId: string = state?.projectId || ''
   const prefix = projectId.split('-')[0]?.toLowerCase()
   if (prefix && COST_STACK[prefix]) return { ratios: COST_STACK[prefix], class_key: prefix }
+  // Before the neutral DEFAULT, try an archetype heuristic on the class name so
+  // unmapped bespoke PLANTS land on the EPC stack (no distributor channel)
+  // rather than the consumer-product mid-volume-professional DEFAULT.
+  const archetype = archetypeForUnknownClass(productClass) || archetypeForUnknownClass(slugHint)
+  if (archetype) return archetype
   return { ratios: COST_STACK.DEFAULT, class_key: 'DEFAULT' }
 }
 
