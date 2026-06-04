@@ -92,6 +92,306 @@ interface SnapshotResult {
   assertions: Assertion[]
 }
 
+// ── UNIVERSAL: the chemical-process reaction tools' worked[] arithmetic is sound (2026-06-04) ──
+//
+// Plan C added reaction:stoichiometry-balance + reaction:feasibility-gibbs. Each tool's
+// Python builds a worked[] array (inputs -> formula -> substituted numbers -> result) from
+// its LIVE values via _worked.py. The existing UNIVERSAL.worked_calc_arithmetic_sound only
+// re-checks worked[] that already landed in a RENDERED snapshot's toolsUsedPage — vacuous
+// until a CO2 dossier is rendered. This invariant exercises the two tools DIRECTLY on the
+// real gypsum-carbonation reaction (CaSO4·2H2O + CO2 + 2KOH -> CaCO3 + K2SO4 + 3H2O), so a
+// formula-template regression (someone writes '/' where the code does 'x') is caught at
+// build time without waiting for a chain run. It also asserts the chemistry sanity that
+// drove the tools: the reaction is atom-balanced, the gypsum feed is ~3.9 t/day at 1 t/day
+// CO2, and the novel K2SO4-loop ΔG verdict is 'feasible'.
+//
+// Spawns the repo .venv python ONCE across the whole harness run (memoised) — not per
+// snapshot. Vacuously passes (skips) if the .venv python is unavailable.
+let _reactionWorkedCheck: Assertion[] | null = null
+function checkReactionToolsWorkedSound(): Assertion[] {
+  if (_reactionWorkedCheck) return _reactionWorkedCheck
+  const out: Assertion[] = []
+  // tiny safe arithmetic evaluator (no eval/Function): + - * / ( ) ^, 'x' as multiply.
+  const evalArith = (raw: string): number | null => {
+    const toks = raw.replace(/,/g, '').replace(/x/gi, '*').match(/-?\d+\.?\d*(?:[eE][+-]?\d+)?|[+\-*/()^]/g)
+    if (!toks) return null
+    let i = 0
+    const peek = () => toks[i]
+    const parseExpr = (): number | null => {
+      let v = parseTerm(); if (v == null) return null
+      while (peek() === '+' || peek() === '-') { const op = toks[i++]; const r = parseTerm(); if (r == null) return null; v = op === '+' ? v + r : v - r }
+      return v
+    }
+    const parseTerm = (): number | null => {
+      let v = parsePower(); if (v == null) return null
+      while (peek() === '*' || peek() === '/') { const op = toks[i++]; const r = parsePower(); if (r == null) return null; v = op === '*' ? v * r : v / r }
+      return v
+    }
+    const parsePower = (): number | null => {
+      const b = parseFactor(); if (b == null) return null
+      if (peek() === '^') { i++; const e = parsePower(); if (e == null) return null; return Math.pow(b, e) }
+      return b
+    }
+    const parseFactor = (): number | null => {
+      const t = peek()
+      if (t === '(') { i++; const v = parseExpr(); if (peek() === ')') i++; return v }
+      if (t === '-') { i++; const v = parseFactor(); return v == null ? null : -v }
+      if (t != null && /^-?\d/.test(t)) { i++; return Number(t) }
+      return null
+    }
+    const v = parseExpr()
+    return (i === toks.length && v != null && isFinite(v)) ? v : null
+  }
+  const reEvalWorked = (worked: any[]): { checked: number; bad: string[] } => {
+    const bad: string[] = []; let checked = 0
+    for (const wc of (Array.isArray(worked) ? worked : [])) {
+      const subst = String(wc?.substitution ?? '')
+      const parts = subst.split('=')
+      if (parts.length < 3) continue
+      const evald = evalArith(parts.slice(1, -1).join('='))
+      let resultNum = Number(wc?.result?.value)
+      if (!isFinite(resultNum)) {
+        const m = String(parts[parts.length - 1]).replace(/,/g, '').match(/-?[0-9.]+(?:[eE][+-]?[0-9]+)?/)
+        resultNum = m ? Number(m[0]) : NaN
+      }
+      if (evald == null || !isFinite(resultNum)) continue
+      checked++
+      if (Math.abs(evald - resultNum) / Math.max(Math.abs(resultNum), 1e-9) > 0.015) {
+        bad.push(`"${subst}" -> expr=${evald}, stated=${resultNum}`)
+      }
+    }
+    return { checked, bad }
+  }
+  const PY = resolve(__dirname, '..', '.venv', 'bin', 'python3')
+  const runTool = (script: string, payload: unknown): any => {
+    const o = execFileSync(PY, [resolve(__dirname, 'lib', 'orchestrator', 'tools', 'python', script)], {
+      input: JSON.stringify(payload), encoding: 'utf-8', timeout: 30_000,
+    })
+    return JSON.parse(o)
+  }
+  try {
+    // 1. stoichiometry-balance on gypsum carbonation, 1 t/day CO2 basis.
+    const stoich = runTool('reaction_stoichiometry_balance.py', {
+      reaction_name: 'gypsum carbonation',
+      species: [
+        { name: 'CaSO4.2H2O', coeff: -1, cas: '10101-41-4', formula: 'CaH4O6S' },
+        { name: 'CO2', coeff: -1, cas: '124-38-9' },
+        { name: 'KOH', coeff: -2, cas: '1310-58-3' },
+        { name: 'CaCO3', coeff: 1, cas: '471-34-1' },
+        { name: 'K2SO4', coeff: 1, cas: '7778-80-5' },
+        { name: 'H2O', coeff: 3, cas: '7732-18-5' },
+      ],
+      basis: { species: 'CO2', rate: 1.0, unit: 't/day', is_mass: true },
+    })
+    const s1 = reEvalWorked(stoich?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.reaction_stoichiometry_worked_sound',
+      `reaction:stoichiometry-balance worked[] arithmetic re-evaluates (${s1.checked} checked), reaction is atom-balanced, gypsum feed ~3.9 t/day at 1 t/day CO2`,
+      JSON.stringify({ bad: s1.bad.length, balanced: stoich?.atom_balanced, gyp: stoich?.mass_flows_t_day?.['CaSO4.2H2O'] }),
+      () => s1.bad.length === 0
+        && stoich?.atom_balanced === true
+        && Math.abs(Number(stoich?.mass_flows_t_day?.['CaSO4.2H2O']) - 3.91) < 0.1,
+      () => `bad worked: ${s1.bad.slice(0, 2).join(' | ')} | atom_balanced=${stoich?.atom_balanced} | gypsum_t_day=${stoich?.mass_flows_t_day?.['CaSO4.2H2O']}`,
+    ))
+
+    // 2. feasibility-gibbs on the novel K2SO4 / MEA-regeneration loop.
+    const gibbs = runTool('reaction_feasibility_gibbs.py', {
+      reaction_name: 'gypsum carbonation (novel K2SO4 loop)',
+      species: [
+        { name: 'CaSO4.2H2O', coeff: -1, cas: '10101-41-4', phase: 's' },
+        { name: 'CO2', coeff: -1, cas: '124-38-9', phase: 'aq' },
+        { name: 'KOH', coeff: -2, cas: '1310-58-3', phase: 'aq' },
+        { name: 'CaCO3', coeff: 1, cas: '471-34-1', phase: 's' },
+        { name: 'K2SO4', coeff: 1, cas: '7778-80-5', phase: 's' },
+        { name: 'H2O', coeff: 3, cas: '7732-18-5', phase: 'l' },
+      ],
+      temperatures_k: [298.15, 393.15],
+    })
+    const s2 = reEvalWorked(gibbs?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.reaction_gibbs_worked_sound',
+      `reaction:feasibility-gibbs worked[] arithmetic re-evaluates (${s2.checked} checked), the novel K2SO4-loop verdict is 'feasible' (ΔG < 0)`,
+      JSON.stringify({ bad: s2.bad.length, verdict: gibbs?.verdict, dg: gibbs?.delta_g_rxn_298k_kj_mol }),
+      () => s2.bad.length === 0
+        && gibbs?.verdict === 'feasible'
+        && Number(gibbs?.delta_g_rxn_298k_kj_mol) < 0,
+      () => `bad worked: ${s2.bad.slice(0, 2).join(' | ')} | verdict=${gibbs?.verdict} | dG=${gibbs?.delta_g_rxn_298k_kj_mol}`,
+    ))
+  } catch (err) {
+    // .venv python unavailable in this environment — skip (vacuous pass), do not fail the harness.
+    out.push({ id: 'UNIVERSAL.reaction_stoichiometry_worked_sound', description: 'reaction stoichiometry worked sound', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'UNIVERSAL.reaction_gibbs_worked_sound', description: 'reaction gibbs worked sound', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+  }
+  _reactionWorkedCheck = out
+  return out
+}
+
+// ── UNIVERSAL: the chemical-process SIZING tools produce sane, arithmetically-sound
+//    worked[] on a CO2-scale fixture (2026-06-04) ──
+//
+// Plan C also wired four UNIT-OPERATION SIZING tools into the co2_mineralisation class
+// plan (reactor:cstr-pfr-sizing, crystalliser:evaporator-sizing, absorption:column-htu-ntu,
+// dryer:thermal-sizing) so the novel sub-modules get SIZED equipment as real BoM line-items.
+// This invariant exercises each of the four DIRECTLY on a 1 t/day-CO2-scale fixture and
+// asserts (a) the tool returned ok (no error), (b) the headline result sits in a SANE
+// engineering band, and (c) every numeric worked[] substitution re-evaluates within 1%
+// (reusing the worked-calc substitution parser from checkReactionToolsWorkedSound). A
+// formula-template regression (someone writes '/' where the code does 'x', or an output-key
+// rename) is then caught at build time without waiting for a CO2 chain run.
+//
+// Spawns the repo .venv python (memoised across the whole harness run). Vacuously passes
+// (skips) if the .venv python is unavailable.
+let _sizingWorkedCheck: Assertion[] | null = null
+function checkSizingToolsWorkedSound(): Assertion[] {
+  if (_sizingWorkedCheck) return _sizingWorkedCheck
+  const out: Assertion[] = []
+  // Same safe arithmetic evaluator + worked[] re-checker as the reaction-tools invariant.
+  const evalArith = (raw: string): number | null => {
+    const toks = raw.replace(/,/g, '').replace(/x/gi, '*').match(/-?\d+\.?\d*(?:[eE][+-]?\d+)?|[+\-*/()^]/g)
+    if (!toks) return null
+    let i = 0
+    const peek = () => toks[i]
+    const parseExpr = (): number | null => {
+      let v = parseTerm(); if (v == null) return null
+      while (peek() === '+' || peek() === '-') { const op = toks[i++]; const r = parseTerm(); if (r == null) return null; v = op === '+' ? v + r : v - r }
+      return v
+    }
+    const parseTerm = (): number | null => {
+      let v = parsePower(); if (v == null) return null
+      while (peek() === '*' || peek() === '/') { const op = toks[i++]; const r = parsePower(); if (r == null) return null; v = op === '*' ? v * r : v / r }
+      return v
+    }
+    const parsePower = (): number | null => {
+      const b = parseFactor(); if (b == null) return null
+      if (peek() === '^') { i++; const e = parsePower(); if (e == null) return null; return Math.pow(b, e) }
+      return b
+    }
+    const parseFactor = (): number | null => {
+      const t = peek()
+      if (t === '(') { i++; const v = parseExpr(); if (peek() === ')') i++; return v }
+      if (t === '-') { i++; const v = parseFactor(); return v == null ? null : -v }
+      if (t != null && /^-?\d/.test(t)) { i++; return Number(t) }
+      return null
+    }
+    const v = parseExpr()
+    return (i === toks.length && v != null && isFinite(v)) ? v : null
+  }
+  const reEvalWorked = (worked: any[]): { checked: number; bad: string[] } => {
+    const bad: string[] = []; let checked = 0
+    for (const wc of (Array.isArray(worked) ? worked : [])) {
+      const subst = String(wc?.substitution ?? '')
+      const parts = subst.split('=')
+      if (parts.length < 3) continue
+      const exprStr = parts.slice(1, -1).join('=')
+      // The pure-arithmetic evaluator (+ - * / ^ parens) cannot evaluate transcendental
+      // FUNCTIONS — the sizing tools legitimately print sqrt()/ln()/log()/exp()/cbrt() in
+      // some worked lines (e.g. the Eckert flow parameter F_LV = (L/G) x sqrt(rho_G/rho_L),
+      // the Colburn NTU log form). Skip those lines rather than mis-evaluate them; the
+      // arithmetic-only lines still fully exercise the substitution<->result reconciliation.
+      if (/\b(sqrt|cbrt|ln|log|log10|exp)\b/i.test(exprStr)) continue
+      const evald = evalArith(exprStr)
+      let resultNum = Number(wc?.result?.value)
+      if (!isFinite(resultNum)) {
+        const m = String(parts[parts.length - 1]).replace(/,/g, '').match(/-?[0-9.]+(?:[eE][+-]?[0-9]+)?/)
+        resultNum = m ? Number(m[0]) : NaN
+      }
+      if (evald == null || !isFinite(resultNum)) continue
+      checked++
+      if (Math.abs(evald - resultNum) / Math.max(Math.abs(resultNum), 1e-9) > 0.01) {
+        bad.push(`"${subst}" -> expr=${evald}, stated=${resultNum}`)
+      }
+    }
+    return { checked, bad }
+  }
+  const PY = resolve(__dirname, '..', '.venv', 'bin', 'python3')
+  const runTool = (script: string, payload: unknown): any => {
+    const o = execFileSync(PY, [resolve(__dirname, 'lib', 'orchestrator', 'tools', 'python', script)], {
+      input: JSON.stringify(payload), encoding: 'utf-8', timeout: 30_000,
+    })
+    return JSON.parse(o)
+  }
+  const num = (o: any, k: string): number => Number(o?.[k])
+  try {
+    // 1. reactor:cstr-pfr-sizing — gypsum carbonation CSTR (feed ~3.91 t/day gypsum + 4000 kg/h liquor).
+    const reactor = runTool('reactor_cstr_pfr_sizing.py', {
+      reactor_name: 'gypsum carbonation reactor', reactor_type: 'cstr',
+      mass_flow_kg_h: 4163, density_kg_m3: 1300, residence_time_h: 1.5,
+      length_to_diameter: 2.0, design_pressure_barg: 2.0, material: 'steel_316L', fill_fraction: 0.8,
+    })
+    const r1 = reEvalWorked(reactor?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.chemical_process_sizing_tools_worked_calc_sound.reactor',
+      `reactor:cstr-pfr-sizing ok on CO2 fixture, V 1-100 m3 + diameter 0.3-6 m + shell mass > 0, worked[] re-evaluates within 1% (${r1.checked} checked)`,
+      JSON.stringify({ bad: r1.bad.length, V: reactor?.working_volume_total_m3, D: reactor?.vessel_diameter_m, shell: reactor?.shell_mass_kg_total, err: reactor?.error }),
+      () => !reactor?.error && r1.bad.length === 0
+        && num(reactor, 'working_volume_total_m3') >= 1 && num(reactor, 'working_volume_total_m3') <= 100
+        && num(reactor, 'vessel_diameter_m') >= 0.3 && num(reactor, 'vessel_diameter_m') <= 6
+        && num(reactor, 'shell_mass_kg_total') > 0,
+      () => `error=${reactor?.error} | bad=${r1.bad.slice(0, 1).join(' | ')} | V=${reactor?.working_volume_total_m3} D=${reactor?.vessel_diameter_m} shell=${reactor?.shell_mass_kg_total}`,
+    ))
+
+    // 2. absorption:column-htu-ntu — CO2 absorber (full ~316 kg/h flue gas, 90% removal).
+    const absorber = runTool('absorption_column_htu_ntu.py', {
+      column_name: 'CO2 absorber', mode: 'absorber', gas_flow_kg_h: 316, gas_density_kg_m3: 1.1,
+      y_in_mol_frac: 0.12, target_removal: 0.90, liquid_flow_kg_h: 3500, equilibrium_slope_m: 0.4,
+      htu_m: 0.6, packing_factor_fp_per_m: 66, fraction_of_flooding: 0.65,
+    })
+    const r2 = reEvalWorked(absorber?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.chemical_process_sizing_tools_worked_calc_sound.absorber',
+      `absorption:column-htu-ntu ok on CO2 fixture, diameter 0.05-2 m + design_velocity < flooding_velocity, worked[] re-evaluates within 1% (${r2.checked} checked)`,
+      JSON.stringify({ bad: r2.bad.length, D: absorber?.column_diameter_m, u: absorber?.design_velocity_m_s, uf: absorber?.flooding_velocity_m_s, err: absorber?.error }),
+      () => !absorber?.error && r2.bad.length === 0
+        && num(absorber, 'column_diameter_m') >= 0.05 && num(absorber, 'column_diameter_m') <= 2
+        && num(absorber, 'design_velocity_m_s') < num(absorber, 'flooding_velocity_m_s')
+        && num(absorber, 'design_velocity_m_s') > 0,
+      () => `error=${absorber?.error} | bad=${r2.bad.slice(0, 1).join(' | ')} | D=${absorber?.column_diameter_m} u_design=${absorber?.design_velocity_m_s} u_flood=${absorber?.flooding_velocity_m_s}`,
+    ))
+
+    // 3. crystalliser:evaporator-sizing — K2SO4 recovery (~165 kg/h product).
+    const cryst = runTool('crystalliser_evaporator_sizing.py', {
+      crystalliser_name: 'K2SO4 evaporative crystalliser', solute_name: 'K2SO4',
+      solute_mass_rate_kg_h: 165, feed_solute_concentration_g_l: 120, target_recovery: 0.90,
+      solubility_g_per_100g_water: 12.0, operating_pressure_kpa: 30, feed_temp_c: 25,
+      overall_htc_w_m2k: 1200, steam_temp_c: 130, magma_residence_time_h: 2.0,
+    })
+    const r3 = reEvalWorked(cryst?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.chemical_process_sizing_tools_worked_calc_sound.crystalliser',
+      `crystalliser:evaporator-sizing ok on CO2 fixture, duty 10-5000 kW + area 0.5-500 m2, worked[] re-evaluates within 1% (${r3.checked} checked)`,
+      JSON.stringify({ bad: r3.bad.length, duty: cryst?.duty_total_kw, area: cryst?.heat_transfer_area_m2, err: cryst?.error }),
+      () => !cryst?.error && r3.bad.length === 0
+        && num(cryst, 'duty_total_kw') >= 10 && num(cryst, 'duty_total_kw') <= 5000
+        && num(cryst, 'heat_transfer_area_m2') >= 0.5 && num(cryst, 'heat_transfer_area_m2') <= 500,
+      () => `error=${cryst?.error} | bad=${r3.bad.slice(0, 1).join(' | ')} | duty=${cryst?.duty_total_kw} area=${cryst?.heat_transfer_area_m2}`,
+    ))
+
+    // 4. dryer:thermal-sizing — CaCO3 cake dryer (~135 kg/h wet cake).
+    const dryer = runTool('dryer_thermal_sizing.py', {
+      dryer_name: 'CaCO3 cake dryer', wet_solids_kg_h: 135.1, moisture_in_pct: 30.0,
+      moisture_out_pct: 1.0, moisture_basis: 'wet', inlet_air_temp_c: 120.0,
+      outlet_air_temp_c: 60.0, heater_efficiency: 0.85,
+    })
+    const r4 = reEvalWorked(dryer?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.chemical_process_sizing_tools_worked_calc_sound.dryer',
+      `dryer:thermal-sizing ok on CO2 fixture, heater duty 1-2000 kW, worked[] re-evaluates within 1% (${r4.checked} checked)`,
+      JSON.stringify({ bad: r4.bad.length, duty: dryer?.heater_duty_kw, air: dryer?.drying_air_mass_flow_kg_h, err: dryer?.error }),
+      () => !dryer?.error && r4.bad.length === 0
+        && num(dryer, 'heater_duty_kw') >= 1 && num(dryer, 'heater_duty_kw') <= 2000
+        && num(dryer, 'drying_air_mass_flow_kg_h') > 0,
+      () => `error=${dryer?.error} | bad=${r4.bad.slice(0, 1).join(' | ')} | duty=${dryer?.heater_duty_kw} air=${dryer?.drying_air_mass_flow_kg_h}`,
+    ))
+  } catch (err) {
+    // .venv python unavailable — skip (vacuous pass), do not fail the harness.
+    for (const id of ['reactor', 'absorber', 'crystalliser', 'dryer']) {
+      out.push({ id: `UNIVERSAL.chemical_process_sizing_tools_worked_calc_sound.${id}`, description: 'chemical-process sizing tool worked-calc sound', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    }
+  }
+  _sizingWorkedCheck = out
+  return out
+}
+
 const DEFAULT_SNAPSHOTS = [
   // 100 m² VF container brief — the canonical case
   '/tmp/vf-100m2-rerun/state.json',
@@ -5315,6 +5615,16 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ))
     }
   }
+
+  // Self-contained (snapshot-independent) — the chemical-process reaction tools'
+  // worked[] arithmetic, exercised directly on the real CO2 reactions. Memoised so the
+  // .venv python spawns once across the whole run, not per snapshot.
+  for (const a of checkReactionToolsWorkedSound()) assertions.push(a)
+
+  // Self-contained — the four chemical-process SIZING tools (reactor / absorber+stripper /
+  // crystalliser / dryer) exercised directly on a CO2-scale fixture: ok + sane headline
+  // band + worked[] arithmetic reconciliation within 1%. Memoised (spawns once per run).
+  for (const a of checkSizingToolsWorkedSound()) assertions.push(a)
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }

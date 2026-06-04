@@ -21,6 +21,14 @@ import './tools/pandapower-real'     // Build #18g  pandapower 3.4.0
 import './tools/ngspice-real'        // Build #18h  ngspice 46 direct CLI
 import './tools/opendss-real'        // Build #18i  OpenDSS 0.9.4
 import './tools/cantera-real'        // Build #18j  Cantera 3.2.0
+import './tools/reaction-stoichiometry-balance' // 2026-06-04 Plan C: first-principles mass balance (chemicals 1.5 MW)
+import './tools/reaction-feasibility-gibbs'      // 2026-06-04 Plan C: ΔG/K feasibility (chemicals 1.5 + cited literature)
+// 2026-06-04 Plan C — chemical-process UNIT-OPERATION SIZING tools (produce SIZED
+// equipment = BoM line items for the CO2 novel sub-modules + the process-plant family):
+import './tools/reactor-cstr-pfr-sizing'         // reactor:cstr-pfr-sizing — V=Q·τ + vessel + shell (Levenspiel + Sinnott + ASME VIII)
+import './tools/crystalliser-evaporator-sizing'  // crystalliser:evaporator-sizing — duty + U·A·ΔT area + magma vessel (CoolProp h_fg + Perry)
+import './tools/absorption-column-htu-ntu'       // absorption:column-htu-ntu — H=HTU·NTU (Colburn) + flooding diameter (Eckert GPDC)
+import './tools/dryer-thermal-sizing'            // dryer:thermal-sizing — evap load + air flow (humidity pick-up) + heater duty (psychrolib)
 // 2026-05-25: octopart-stub replaced by distributor-cascade-real which calls
 // findSkuForPart (Mouser + Digi-Key + Farnell + LCSC + Nexar in parallel).
 // Same tool ID 'octopart:parts-lookup' preserved so TOOL_INPUT_HINTS + mermaid
