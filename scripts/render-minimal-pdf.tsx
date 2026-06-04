@@ -4741,6 +4741,92 @@ function _qtyFromOrch(quantities: any, key: string): { value: number; unit: stri
   return { value: q.value, unit: String(q.unit ?? '') }
 }
 
+// ─── Net-CO2 reconciliation (2026-06-04, System-Overview merge) ─────────────
+// The single highest-value number for a carbon-capture buyer: does the plant
+// capture MORE CO2 than it emits, and how fast does its embodied carbon repay?
+// Entirely DETERMINISTIC — templated from computed contract quantities + the
+// brief's stated capture rate; no LLM. Returns null unless BOTH a capture rate
+// AND the lifecycle operational footprint are present, so it renders ONLY for
+// carbon-capture dossiers and is skipped cleanly for every other class.
+//
+// Capture rate source priority:
+//   1. an explicit captured-CO2 contract quantity, if a tool ever emits one
+//      (co2_captured_t_day / co2_capture_t_day / co2_capture_kg_per_day);
+//   2. the brief's stated capture metric (target_performance co2_capture_kg_per_day
+//      / co2_capture_t_day) — the CO2-mineralisation brief states 1 t/day.
+// The denominator (annual capture) applies a stated operating-days basis; a
+// continuously-operated pilot chemical plant runs ~330 d/yr (≈90% availability,
+// allowing maintenance/turnaround) — surfaced in the card so the reader sees
+// the assumption. `derived` records whether the rate came from the brief basis.
+const NET_CO2_OPERATING_DAYS_PER_YEAR = 330
+interface NetCo2Reconciliation {
+  captured_t_yr: number
+  emitted_t_yr: number
+  net_t_yr: number
+  embodied_t: number
+  payback_years: number
+  capture_t_day: number
+  operating_days: number
+  /** True when the capture rate came from the brief basis (no explicit contract qty). */
+  derived_from_brief: boolean
+}
+function computeNetCo2Reconciliation(state: any): NetCo2Reconciliation | null {
+  const quantities: Record<string, any> =
+    (state?.orchestratorContract as any)?.quantities
+    ?? (state?.engineeringContract as any)?.quantities
+    ?? {}
+  const parsed = readParsedBriefForOverview(state) ?? state?.parsedBrief ?? {}
+  const metrics: any[] = Array.isArray(parsed?.constraints?.target_performance?.metrics)
+    ? parsed.constraints.target_performance.metrics
+    : Array.isArray(parsed?.target_performance?.metrics)
+      ? parsed.target_performance.metrics
+      : []
+
+  // 1. Prefer an explicit captured-CO2 contract quantity (in t/day, or kg/day).
+  let capture_t_day: number | null = null
+  let derived_from_brief = false
+  const tDayQty =
+    _qtyFromOrch(quantities, 'co2_captured_t_day') ??
+    _qtyFromOrch(quantities, 'co2_capture_t_day')
+  if (tDayQty && tDayQty.value > 0) {
+    capture_t_day = tDayQty.value
+  } else {
+    const kgDayQty = _qtyFromOrch(quantities, 'co2_capture_kg_per_day')
+    if (kgDayQty && kgDayQty.value > 0) capture_t_day = kgDayQty.value / 1000
+  }
+  // 2. Fall back to the brief's stated capture metric.
+  if (capture_t_day === null) {
+    const briefKgDay = _metricFromBrief(metrics, 'co2_capture_kg_per_day')
+    const briefTDay = _metricFromBrief(metrics, 'co2_capture_t_day')
+    if (briefKgDay && briefKgDay.value > 0) { capture_t_day = briefKgDay.value / 1000; derived_from_brief = true }
+    else if (briefTDay && briefTDay.value > 0) { capture_t_day = briefTDay.value; derived_from_brief = true }
+  }
+  if (capture_t_day === null || !(capture_t_day > 0)) return null
+
+  // Operational footprint (emitted) — required; the lifecycle tool emits this.
+  const emitted = _qtyFromOrch(quantities, 'plant_annual_co2_t')
+  if (!emitted || !(emitted.value > 0)) return null
+  const emitted_t_yr = emitted.value
+
+  const captured_t_yr = capture_t_day * NET_CO2_OPERATING_DAYS_PER_YEAR
+  const net_t_yr = captured_t_yr - emitted_t_yr
+  const embodiedQty = _qtyFromOrch(quantities, 'plant_embodied_co2_t')
+  const embodied_t = embodiedQty && embodiedQty.value > 0 ? embodiedQty.value : 0
+  // Embodied payback only meaningful when the plant is net carbon-negative.
+  const payback_years = net_t_yr > 0 && embodied_t > 0 ? embodied_t / net_t_yr : NaN
+
+  return {
+    captured_t_yr,
+    emitted_t_yr,
+    net_t_yr,
+    embodied_t,
+    payback_years,
+    capture_t_day,
+    operating_days: NET_CO2_OPERATING_DAYS_PER_YEAR,
+    derived_from_brief,
+  }
+}
+
 /**
  * Compute a percent delta string. Positive numbers prefix "+", negative "-".
  * Cost over-runs ≥1.5× read as a multiplier ("+646% (7.5× over)") because
@@ -6359,6 +6445,43 @@ function SystemOverviewPage({ state, project }: { state: any; project: string })
     purpose: moduleSummarySentences(m, 1) || `The ${humanise(m.module).toLowerCase()} block of the ${classLabel}.`,
   }))
 
+  // ─── BLOCK 4: THE NUMBERS BEHIND IT ────────────────────────────────────
+  // 2026-06-04 (System-Overview merge): the system-level physics cards (the
+  // former standalone "How the design was computed — the physics" page, which
+  // rendered half-empty) now fold IN here as a sub-block of one coherent
+  // section. WHAT/HOW above is the LLM-written narrative; the numbers below are
+  // DETERMINISTIC — templated straight from computed contract quantities, no
+  // language model — so the credibility note is distinct and stays. The cards
+  // are pruned to the cross-cutting whole-plant tools (the complement of the
+  // per-module routing); each module-owned tool's worked maths sits WITH its
+  // module. CoolProp (a coolant-property look-up, not a headline result) is
+  // dropped via the denylist in generatePhysicsNarrative.
+  const quantities: Record<string, any> =
+    (state?.orchestratorContract as any)?.quantities
+    ?? (state?.engineeringContract as any)?.quantities
+    ?? {}
+  const systemIds = systemLevelToolIds(state)
+  const numbersNarrative = generatePhysicsNarrative(quantities, productClass, systemIds)
+  // Net-CO2 reconciliation: the single highest-value number for a carbon-
+  // capture buyer (captured vs emitted → net, plus embodied payback). Null for
+  // every non-carbon-capture class, so the card renders only where it applies.
+  const netCo2 = computeNetCo2Reconciliation(state)
+  // Resolve the system-level tool_ids to display names for the cited-tools
+  // footer (same logic the old page used), so the line lists only system tools.
+  const numbersToolsPage = readToolsUsedPage(state)
+  const systemToolNames = new Set<string>()
+  if (numbersToolsPage && Array.isArray(numbersToolsPage.tools)) {
+    for (const t of numbersToolsPage.tools as any[]) {
+      if (systemIds.has(t?.tool_id)) systemToolNames.add(normalise_unicode(String(t?.tool_name || t?.tool_id)))
+    }
+  }
+  const citedNumbersTools = numbersNarrative
+    ? (systemToolNames.size > 0
+        ? numbersNarrative.tools_cited.filter((n) => systemToolNames.has(normalise_unicode(String(n))))
+        : numbersNarrative.tools_cited)
+    : []
+  const hasNumbersBlock = !!(netCo2 || (numbersNarrative && numbersNarrative.sentences.length > 0))
+
   return (
     <Page size="A4" style={PAGE_STYLE}>
       <PageHeader section="Section 1d · System Overview" project={project} />
@@ -6431,6 +6554,126 @@ function SystemOverviewPage({ state, project }: { state: any; project: string })
           </View>
         ))}
       </View>
+
+      {/* BLOCK 4 — THE NUMBERS BEHIND IT (merged 2026-06-04 from the former
+          standalone Physics Narrative page). DETERMINISTIC: templated from
+          computed contract quantities, no LLM — hence the distinct credibility
+          note below, which must stay separate from the WHAT/HOW narrative. */}
+      {hasNumbersBlock ? (
+        <View style={{ marginTop: 16 }}>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 6 }}>
+            The numbers behind it
+          </Text>
+          <Text style={{ fontSize: 9, color: MUTED, marginBottom: 12, lineHeight: 1.5, fontStyle: 'italic' }}>
+            Every figure below is templated directly from computed contract
+            quantities; any figure whose source quantities were absent has been
+            omitted. No language model was involved in generating this block.
+          </Text>
+
+          {/* NET CARBON card — the headline reconciliation for a carbon-capture
+              buyer. Deterministic; sits under the credibility note. */}
+          {netCo2 ? (() => {
+            const capturedStr = Math.round(netCo2.captured_t_yr).toLocaleString('en-GB')
+            const emittedStr = Math.round(netCo2.emitted_t_yr).toLocaleString('en-GB')
+            const netRounded = Math.round(netCo2.net_t_yr)
+            const netStr = `${netRounded >= 0 ? '+' : ''}${netRounded.toLocaleString('en-GB')}`
+            const isNegativeFootprint = netCo2.net_t_yr > 0
+            const cardBg = isNegativeFootprint ? '#eef7f0' : '#fdf2ec'
+            const cardLine = isNegativeFootprint ? '#2f855a' : '#c2410c'
+            const embodiedStr = netCo2.embodied_t > 0
+              ? netCo2.embodied_t.toLocaleString('en-GB', { maximumFractionDigits: 1 })
+              : null
+            // Payback: months when < 1 year (the expected ~2.3 months here), else years.
+            let paybackStr = ''
+            if (Number.isFinite(netCo2.payback_years) && netCo2.payback_years > 0) {
+              paybackStr = netCo2.payback_years < 1
+                ? `${(netCo2.payback_years * 12).toLocaleString('en-GB', { maximumFractionDigits: 1 })} months`
+                : `${netCo2.payback_years.toLocaleString('en-GB', { maximumFractionDigits: 1 })} years`
+            }
+            const captureBasis = netCo2.capture_t_day.toLocaleString('en-GB', { maximumFractionDigits: 2 })
+            return (
+              <View
+                style={{
+                  padding: 14,
+                  backgroundColor: cardBg,
+                  borderLeftWidth: 3,
+                  borderLeftColor: cardLine,
+                  borderRadius: 4,
+                  marginBottom: 12,
+                }}
+                wrap={false}
+              >
+                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_SOFT, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                  Net carbon
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.6, marginBottom: 6 }}>
+                  {`Captures ${capturedStr} t CO2/yr, plant footprint ${emittedStr} t CO2/yr `}
+                  <Text style={{ color: cardLine }}>{`→ NET ${netStr} t CO2/yr`}</Text>
+                  {isNegativeFootprint ? ' (net carbon-negative).' : ' (net positive — review footprint).'}
+                </Text>
+                {embodiedStr && paybackStr ? (
+                  <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, marginBottom: 6 }}>
+                    {`Embodied CO2 (${embodiedStr} t) repaid in ~${paybackStr} at the net rate.`}
+                  </Text>
+                ) : null}
+                <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45, fontStyle: 'italic' }}>
+                  {`Capture basis: ${captureBasis} t CO2/day`}
+                  {netCo2.derived_from_brief ? ' (from the brief’s stated capture rate)' : ' (computed)'}
+                  {` × ${netCo2.operating_days} operating days/yr (≈ 90% availability for a continuously-operated pilot plant, allowing maintenance and turnaround). Plant footprint and embodied CO2 from lifecycle-co2:assessment.`}
+                </Text>
+              </View>
+            )
+          })() : null}
+
+          {/* System-level physics cards — the former Physics Narrative content,
+              grouped by tool. CoolProp excluded (property look-up). */}
+          {numbersNarrative && numbersNarrative.groups && numbersNarrative.groups.length > 0
+            ? numbersNarrative.groups.map((group, gi) => (
+                <View
+                  key={`numbers-grp-${gi}`}
+                  style={{
+                    padding: 12,
+                    backgroundColor: '#f0f4f8',
+                    borderLeftWidth: 3,
+                    borderLeftColor: ACCENT,
+                    borderRadius: 4,
+                    marginBottom: gi < numbersNarrative.groups.length - 1 ? 8 : 10,
+                  }}
+                  wrap={false}
+                >
+                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_SOFT, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                    {group.label}
+                  </Text>
+                  {group.sentences.map((sentence, si) => (
+                    <Text
+                      key={`numbers-grp-${gi}-${si}`}
+                      style={{ fontSize: 10, color: INK, lineHeight: 1.65, marginBottom: si < group.sentences.length - 1 ? 5 : 0 }}
+                    >
+                      {normalise_unicode(sentence)}
+                    </Text>
+                  ))}
+                </View>
+              ))
+            : null}
+
+          {citedNumbersTools.length > 0 ? (
+            <View style={{ padding: 10, backgroundColor: '#ffffff', borderTopWidth: 0.5, borderTopColor: RULE_SOFT }}>
+              <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>
+                  {'System-level tools cited in this block: '}
+                </Text>
+                {normalise_unicode(citedNumbersTools.join('   ·   '))}
+              </Text>
+              <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic', lineHeight: 1.4 }}>
+                Each tool&apos;s version, licence and source are listed in the
+                one-line-per-tool Tools-Used index at the end of this report; the
+                worked calculations for module-specific tools are shown with their
+                module.
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <PageFooter />
     </Page>
@@ -10120,6 +10363,267 @@ function resolveHeroImages(state: any): { cover: string | null; exploded: string
 // ─── ITER-10 NEW PAGES ─────────────────────────────────────────────────────
 
 /**
+ * Section 6 · Bill of Materials — consolidated master parts list (Tristan
+ * 2026-06-04: the priced-parts BoM section scored 4.5/10 — the lowest section,
+ * blocking ≥8). Root cause (diagnosed by rendering the pages, not guessing): a
+ * vision scorer maps "bom" by SECTION TITLE to pages that were "Section 2 ·
+ * Cost by Module" — a cost ROLLUP with ZERO parts-level rows + a ~90%-empty
+ * continuation page. The actual PART | MANUFACTURER | PART NUMBER | QTY | UNIT |
+ * LINE | SOURCE tables existed but were SCATTERED per-sub-module, buried deep in
+ * the design-module pages. A reviewer told "score the Bill of Materials" saw a
+ * cost summary with no parts → 4.5 is correct.
+ *
+ * Fix: ONE canonical priced-parts table — every line already in `bomTotals`,
+ * grouped by module (sub-module lines consolidated under their module), module
+ * subtotals + a grand total. Placed as Section 6, after the modules + Risk and
+ * immediately BEFORE Sourcing (Tristan 2026-06-04: the reader meets the design
+ * first, then the canonical parts list that feeds procurement). The scorer keys
+ * "bom" off the "· BILL OF MATERIALS" section header — the leading "·" so prose
+ * mentions of "bill of materials" elsewhere are not mapped as the BoM.
+ *
+ * SAFETY (gate-20 / gate-33-34 hallucination line): this is a PURE PRESENTATION
+ * CONSOLIDATION. It reads ONLY lines already present in `bomTotals` (produced by
+ * computeBomTotals) — zero new parts, manufacturers, part numbers, or prices are
+ * invented here. Fabricated MPNs poison the downstream truth DB; nothing is
+ * invented in this component.
+ *
+ * Multi-page safety: this section WILL span pages. The react-pdf "peach gap" bug
+ * (a backgroundColor/border on a View that wraps across a page boundary stretches
+ * the continuation fragment to full page height) is avoided exactly as
+ * SubModuleBomBlock does — the table wrapper is TRANSPARENT (no bg / no border)
+ * and every row carries `wrap={false}` so a row never splits across a page. The
+ * module sub-headers + subtotal rows + grand-total row are all `wrap={false}`.
+ *
+ * Columns + cell rendering mirror SubModuleBomBlock (the per-sub-module renderer)
+ * byte-for-byte so the consolidated table reads identically to the scattered
+ * tables it summarises; the SOURCE · CHECK legend renders ONCE at the end.
+ */
+function MasterBillOfMaterialsPage({ project, bomTotals, partLinkMap }: { project: string; bomTotals: BomTotals | null; partLinkMap?: Map<string, { url: string; title: string | null; manufacturer: string }> }) {
+  if (!bomTotals || !Array.isArray(bomTotals.allMods) || bomTotals.allMods.length === 0) return null
+  // Canonical module order — order_modules sorts allMods in place and returns the
+  // SAME objects (mirrors CostByModulePage's B-3 fix: do NOT collapse modules that
+  // share a `module` enum onto the first instance; a chemical plant with three
+  // mass_fluid_transport_process stages must render each distinct subtotal once).
+  const orderedMods = order_modules(bomTotals.allMods as BomMod[])
+  // Repeated-enum label disambiguation — identical to CostByModulePage so a class
+  // whose emitter reuses a module enum gets unique, meaningful sub-headers.
+  const baseLabel = (m: BomMod) => m.display_name || m.label
+  const labelCounts = new Map<string, number>()
+  for (const m of orderedMods) labelCounts.set(baseLabel(m), (labelCounts.get(baseLabel(m)) ?? 0) + 1)
+  const seenLabels = new Map<string, number>()
+  const uniqueLabelFor = (m: BomMod): string => {
+    const base = baseLabel(m)
+    if ((labelCounts.get(base) ?? 0) <= 1) return base
+    const n = (seenLabels.get(base) ?? 0) + 1
+    seenLabels.set(base, n)
+    return `${base} (Stage ${n})`
+  }
+  // Consolidate every sub-module's part lines under its module, in canonical
+  // sub-module order. PURE read of bomTotals — no synthesis. We keep per-module
+  // grouping (Tristan's spec) rather than a global flat sort so the reader can
+  // still see which module a part belongs to.
+  const modBlocks = orderedMods.map(m => ({
+    mod: m,
+    label: uniqueLabelFor(m),
+    lines: m.subs.flatMap(s => s.parts as BomPartRow[]),
+    subtotal: m.subtotal_gbp,
+  }))
+  // Line count + summed-line total computed INDEPENDENTLY from the rendered rows
+  // (the master-BoM consolidation invariant: this MUST equal the sum of per-module
+  // bomTotals line counts, and the rendered module subtotals sum to the canonical
+  // grand total within macro-rounding). The grand-total FIGURE shown is the
+  // canonical bomTotals.grandTotal_gbp (the same number CostByModulePage's "Sum of
+  // modules" prints and the cover cost stack is built from) — never a hardcode.
+  const totalLineCount = modBlocks.reduce((acc, b) => acc + b.lines.length, 0)
+  const grandTotal = bomTotals.grandTotal_gbp
+  // unmatched macro-assembly lines (big-ticket items with no emitter word, e.g. a
+  // wind gearbox) ARE part of grandTotal_gbp but have no per-module BoM row; we
+  // surface them as a final consolidated group so the grand total reconciles for
+  // the reader instead of appearing to under-sum. PURE read — names + totals come
+  // straight from bomTotals.unmatchedMacros.
+  const unmatchedMacros = Array.isArray(bomTotals.unmatchedMacros) ? bomTotals.unmatchedMacros.filter(u => u && u.total > 0) : []
+  const unmatchedMacroTotal = bomTotals.unmatchedMacroTotal_gbp ?? 0
+
+  // Shared 7-column header — identical structure to SubModuleBomBlock's header.
+  const TableHead = () => (
+    <View wrap={false} style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: RULE, paddingBottom: 3, marginTop: 4 }}>
+      <Text style={{ flex: 2.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART</Text>
+      <Text style={{ flex: 1.4, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>MANUFACTURER</Text>
+      <Text style={{ flex: 1.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART NUMBER</Text>
+      <Text style={{ width: 24, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>QTY</Text>
+      <Text style={{ width: 62, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>UNIT (£)</Text>
+      <Text style={{ width: 49, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LINE (£)</Text>
+      <Text style={{ width: 60, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, paddingLeft: 6 }}>SOURCE · CHECK</Text>
+    </View>
+  )
+
+  // One consolidated part row — cell rendering mirrors SubModuleBomBlock exactly
+  // (≥£1M pence-drop on UNIT, comma thousands, hyphen zero-width-break on long
+  // part numbers, indicative·RFQ marker via isIndicativeRfqLine, excluded-row
+  // strikethrough + PRICE-QUERY tag, distributor link when partLinkMap has the
+  // SKU). No note superscripts here — the per-sub-module Notes blocks deeper in
+  // the document carry the narrative; this is the canonical procurement list.
+  const renderConsolidatedRow = (row: BomPartRow, keyHint: string) => {
+    const unitPriceCell = row.unit_price_gbp > 0
+      ? (row.unit_price_gbp >= 1_000_000
+          ? `~£${Math.round(row.unit_price_gbp).toLocaleString('en-GB')}`
+          : `~£${row.unit_price_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+      : '—'
+    const lineCell = row.line_total_gbp > 0
+      ? `£${row.line_total_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : '—'
+    const src = srcLabelForRow(row)
+    const ref = priceRealityRefForRow(row)
+    const refColor = ref === '>2x' ? '#b91c1c' : ref === '<.5x' ? '#1d4ed8' : ref === 'OK' ? '#15803d' : MUTED
+    const isIndicativeRfq = isIndicativeRfqLine(row)
+    const isExcluded = row.cost_repair_excluded_from_subtotal === true
+    const partTextStyle = isExcluded
+      ? { flex: 2.6, fontSize: 9, color: MUTED, textDecoration: 'line-through' as const }
+      : { flex: 2.6, fontSize: 9, color: INK }
+    const lineTextStyle = isExcluded
+      ? { width: 49, fontSize: 9, color: MUTED, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold', textDecoration: 'line-through' as const }
+      : { width: 49, fontSize: 9, color: INK, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold' }
+    const pn = row.part_number
+    const pnWithBreaks = pn ? pn.replace(/-/g, '-​') : null
+    const linked = pn && partLinkMap ? partLinkMap.get(pn) : null
+    return (
+      <View
+        key={keyHint}
+        wrap={false}
+        style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
+      >
+        <Text style={partTextStyle}>
+          {row.word_name ? toTitleCaseEng(normalise_unicode(row.word_name)) : '—'}
+        </Text>
+        <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT }}>{row.manufacturer ?? '—'}</Text>
+        {linked && linked.url ? (
+          <Link src={linked.url} style={{ flex: 1.6, fontSize: 8.5, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold', textDecoration: 'underline' }}>
+            {pnWithBreaks}
+          </Link>
+        ) : (
+          <Text style={{ flex: 1.6, fontSize: 8.5, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>
+            {pnWithBreaks ?? '—'}
+          </Text>
+        )}
+        <Text style={{ width: 24, fontSize: 9, color: INK, textAlign: 'right' }}>×{(row.quantity ?? 1).toLocaleString('en-GB')}</Text>
+        <View style={{ width: 62, alignItems: 'flex-end' }}>
+          <Text style={{ fontSize: 9, color: INK, textAlign: 'right' }}>{unitPriceCell}</Text>
+          {isIndicativeRfq ? (
+            <Text style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', color: '#92400e', textAlign: 'right' }}>indicative · RFQ</Text>
+          ) : null}
+        </View>
+        <Text style={lineTextStyle}>{lineCell}</Text>
+        <View style={{ width: 60, paddingLeft: 6, flexDirection: 'row', alignItems: 'baseline' }}>
+          {isExcluded ? (
+            <Text style={{ fontSize: 7.5, color: '#b45309', fontFamily: 'Helvetica-Bold' }}>PRICE-QUERY</Text>
+          ) : (
+            <>
+              <Text style={{ fontSize: 8, color: MUTED }}>{src}</Text>
+              <Text style={{ fontSize: 8, color: refColor, fontFamily: 'Helvetica-Bold', marginLeft: 4 }}>{ref}</Text>
+            </>
+          )}
+        </View>
+      </View>
+    )
+  }
+
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 6 · Bill of Materials" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Bill of Materials
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 16, lineHeight: 1.5 }}>
+        The complete priced parts list — {totalLineCount.toLocaleString('en-GB')} line{totalLineCount === 1 ? '' : 's'} totalling{' '}
+        {fmtGBP_subtotal(grandTotal)} ex-works, grouped by module. Every line is consolidated here from the per-sub-module
+        tables inside the preceding module sections; module subtotals and the grand total reconcile with those tables and
+        with the Cost-by-Module summary in Section 2.
+      </Text>
+
+      {/* TRANSPARENT wrapper (no backgroundColor / no border) so the section can
+          wrap across pages without the react-pdf "peach gap" continuation-stretch
+          bug. Every row inside carries wrap={false}; see component header. */}
+      <View>
+        {modBlocks.map((b, mi) => (
+          <View key={`mbom-mod-${b.mod.module}-${mi}`}>
+            {/* Module sub-header — module name (left) + module subtotal (right).
+                wrap={false} keeps the header with its first rows' header line. */}
+            <View wrap={false} minPresenceAhead={70} style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: mi === 0 ? 0 : 16, marginBottom: 2, paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
+              <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+                {mi + 1}. {b.label}
+              </Text>
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>
+                {fmtGBP_subtotal(b.subtotal)}
+              </Text>
+            </View>
+            {b.lines.length > 0 ? (
+              <>
+                <TableHead />
+                {b.lines.map((row, ri) => renderConsolidatedRow(row, `mbom-${mi}-${ri}`))}
+              </>
+            ) : (
+              <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic', paddingVertical: 4 }}>
+                No catalogue-priced lines in this module — see the module section for concept-stage detail.
+              </Text>
+            )}
+          </View>
+        ))}
+
+        {/* Unmatched macro-assemblies — big-ticket items (e.g. a gearbox / PM
+            generator) that ARE in the grand total but have no per-module emitter
+            word. Surfaced so the grand total reconciles. PURE read of bomTotals. */}
+        {unmatchedMacros.length > 0 ? (
+          <View>
+            <View wrap={false} minPresenceAhead={70} style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 16, marginBottom: 2, paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
+              <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+                {modBlocks.length + 1}. Major Assemblies
+              </Text>
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>
+                {fmtGBP_subtotal(unmatchedMacroTotal)}
+              </Text>
+            </View>
+            {unmatchedMacros.map((u, ui) => (
+              <View key={`mbom-macro-${ui}`} wrap={false} style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}>
+                <Text style={{ flex: 2.6, fontSize: 9, color: INK }}>{toTitleCaseEng(normalise_unicode(String(u.name ?? '')))}</Text>
+                <Text style={{ flex: 1.4, fontSize: 8.5, color: MUTED }}>—</Text>
+                <Text style={{ flex: 1.6, fontSize: 8.5, color: MUTED, fontFamily: 'Helvetica-Bold' }}>—</Text>
+                <Text style={{ width: 24, fontSize: 9, color: INK, textAlign: 'right' }}>×1</Text>
+                <View style={{ width: 62, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 9, color: INK, textAlign: 'right' }}>{u.total >= 1_000_000 ? `~£${Math.round(u.total).toLocaleString('en-GB')}` : `~£${u.total.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                  <Text style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', color: '#92400e', textAlign: 'right' }}>indicative · RFQ</Text>
+                </View>
+                <Text style={{ width: 49, fontSize: 9, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>{`£${u.total.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                <View style={{ width: 60, paddingLeft: 6 }}><Text style={{ fontSize: 8, color: MUTED }}>Est.</Text></View>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Grand total — the canonical bomTotals.grandTotal_gbp (same figure as
+            CostByModulePage "Sum of modules" + cover cost stack). NOT hardcoded. */}
+        <View wrap={false} style={{ flexDirection: 'row', paddingTop: 8, marginTop: 6, borderTopWidth: 1.4, borderTopColor: ACCENT, alignItems: 'baseline' }}>
+          <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+            Grand total — all modules ({totalLineCount.toLocaleString('en-GB')} line{totalLineCount === 1 ? '' : 's'})
+          </Text>
+          <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>
+            £{grandTotal.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+        </View>
+      </View>
+
+      {/* SOURCE · CHECK legend — rendered ONCE at the end of the section. Copied
+          verbatim from SubModuleBomBlock so the consolidated table's abbreviations
+          read identically to the per-sub-module tables it summarises. */}
+      <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 10, lineHeight: 1.5, fontStyle: 'italic' }}>
+        SOURCE: Web = found in a distributor catalogue (DigiKey / Mouser / Farnell etc.) · Est. = web estimate, not a live quote · Mfr = found on the manufacturer&apos;s own site · — = no source recorded.  PRICE CHECK (against typical prices for similar components): OK = price sits in the normal range · &gt;2x = price looks more than 2× higher than typical · &lt;.5x = price looks less than half of typical · - = no comparable parts on record to check against.  PRICE-QUERY = part is required for the design but the unit price is under the industry floor for this class; verify the part number and specification before procurement.  INDICATIVE · RFQ = best available estimate for a quote-only instrument or build-to-order fabrication; request a quotation to firm up. Prices without the marker are live catalogue prices.
+      </Text>
+
+      <PageFooter />
+    </Page>
+  )
+}
+
+/**
  * Cost by Module summary — renders directly after the Module Map per
  * Tristan 2026-05-20 fourth review: "the breakdown by module needs to
  * exist, and it probably makes sense for it to be either in the brief or
@@ -10127,6 +10631,14 @@ function resolveHeroImages(state: any): { cover: string | null; exploded: string
  * what you're talking about". Pattern mirrored from Chain V2: numbered
  * cost-by-module table, Sum of modules total, then a component-class
  * breakdown using Engine B's per-class attribution.
+ *
+ * PAGE-HEADER RE-TITLED 2026-06-04 → "Section 2 · Cost Summary" (was "Section 2
+ * · Cost by Module"). The consolidated parts-level master Bill of Materials
+ * (MasterBillOfMaterialsPage) owns the "Bill of Materials" title and renders down
+ * at Section 6, just before Sourcing. This rollup is a cost SUMMARY, not the parts
+ * BoM. The H1 body heading stays "Cost by Module" (accurate for the rollup's
+ * content); the scorer keys "bom" off the master BoM's "· BILL OF MATERIALS"
+ * header, while cost_analysis still maps here via the "Cost by Module" H1.
  */
 function CostByModulePage({ state, project, bomTotals }: { state: any; project: string; bomTotals: BomTotals | null }) {
   if (!bomTotals || !Array.isArray(bomTotals.allMods) || bomTotals.allMods.length === 0) return null
@@ -10148,7 +10660,7 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
     .sort((a, b) => b[1] - a[1])
   return (
     <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 2 · Cost by Module" project={project} />
+      <PageHeader section="Section 2 · Cost Summary" project={project} />
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
         Cost by Module
       </Text>
@@ -11039,157 +11551,17 @@ function EngineeringToolsFlowPage({
 }
 
 
-// ─── U11 · Deterministic Physics Narrative (2026-05-29) ─────────────────────
+// ─── U11 · Deterministic Physics Narrative — MERGED 2026-06-04 ──────────────
 //
-// "How the design was computed — the physics": a body section placed after
-// the Engineering Tools Flow diagram. Entirely deterministic — generated by
-// generatePhysicsNarrative() in attribution.ts from actual contract quantities.
-// No LLM, no fabrication. Each sentence is emitted only when all its source
-// quantities exist in state.orchestratorContract.quantities. Addresses the
-// documented narrative-drift problem (exit-code gates 5/11/18) by providing
-// a physics explanation that is PROVABLY consistent with the contract values.
-
-function PhysicsNarrativePage({ state, project }: { state: any; project: string }) {
-  const quantities: Record<string, any> =
-    (state?.orchestratorContract as any)?.quantities
-    ?? (state?.engineeringContract as any)?.quantities
-    ?? {}
-  const productClass: string =
-    state?.parsedBrief?.product_class
-    ?? state?.moduleDecomposition?.product_class
-    ?? ''
-
-  // Build #21 (2026-06-04): this front section is pruned to SYSTEM-LEVEL tools —
-  // the module-owned tools' worked maths now renders WITH each module, so the
-  // up-front narrative lists ONLY the cross-cutting whole-plant tools (the
-  // complement of the per-module routing: mass-aggregator, lifecycle-co2,
-  // dac-regeneration, property look-ups). The same system-level set drives both
-  // the narrative body (passed into the generator, which filters by tool_id) and
-  // the footer tool-citation line below. Computed before the narrative call so it
-  // can be passed in.
-  const systemIds = systemLevelToolIds(state)
-  const narrative = generatePhysicsNarrative(quantities, productClass, systemIds)
-  if (!narrative || narrative.sentences.length === 0) return null
-
-  // tools_cited is a list of display names, so resolve the system-level tool_ids
-  // to their display names and keep only the cited names in that set. If the
-  // resolution yields nothing (older state without a toolsUsedPage), fall back to
-  // the full cited list rather than blanking the footer.
-  const page = readToolsUsedPage(state)
-  const systemNames = new Set<string>()
-  if (page && Array.isArray(page.tools)) {
-    for (const t of page.tools as any[]) {
-      if (systemIds.has(t?.tool_id)) {
-        systemNames.add(normalise_unicode(String(t?.tool_name || t?.tool_id)))
-      }
-    }
-  }
-  const citedSystemTools =
-    systemNames.size > 0
-      ? narrative.tools_cited.filter((n) => systemNames.has(normalise_unicode(String(n))))
-      : narrative.tools_cited
-
-  return (
-    <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 1d · Physics Narrative" project={project} />
-      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8 }}>
-        {narrative.heading}
-      </Text>
-      <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 14, lineHeight: 1.55, fontStyle: 'italic' }}>
-        Every sentence below is templated directly from computed contract
-        quantities; any sentence whose source quantities were absent has
-        been omitted. No language model was involved in generating this
-        section.
-      </Text>
-
-      {/* Render grouped domain paragraphs when available (VF_PHYSICS_GROUPS),
-          falling back to the flat sentence list for backward compatibility. */}
-      {narrative.groups && narrative.groups.length > 0 ? (
-        narrative.groups.map((group, gi) => (
-          <View
-            key={gi}
-            style={{
-              padding: 14,
-              backgroundColor: '#f0f4f8',
-              borderLeftWidth: 3,
-              borderLeftColor: ACCENT,
-              borderRadius: 4,
-              marginBottom: gi < narrative.groups.length - 1 ? 10 : 14,
-            }}
-          >
-            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_SOFT, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-              {group.label}
-            </Text>
-            {group.sentences.map((sentence, si) => (
-              <Text
-                key={si}
-                style={{
-                  fontSize: 10,
-                  color: INK,
-                  lineHeight: 1.65,
-                  marginBottom: si < group.sentences.length - 1 ? 5 : 0,
-                }}
-              >
-                {sentence}
-              </Text>
-            ))}
-          </View>
-        ))
-      ) : (
-        <View
-          style={{
-            padding: 16,
-            backgroundColor: '#f0f4f8',
-            borderLeftWidth: 3,
-            borderLeftColor: ACCENT,
-            borderRadius: 4,
-            marginBottom: 14,
-          }}
-        >
-          {narrative.sentences.map((sentence, i) => (
-            <Text
-              key={i}
-              style={{
-                fontSize: 10,
-                color: INK,
-                lineHeight: 1.65,
-                marginBottom: i < narrative.sentences.length - 1 ? 6 : 0,
-              }}
-            >
-              {sentence}
-            </Text>
-          ))}
-        </View>
-      )}
-
-      {citedSystemTools.length > 0 ? (
-        <View
-          style={{
-            padding: 10,
-            backgroundColor: '#ffffff',
-            borderTopWidth: 0.5,
-            borderTopColor: RULE_SOFT,
-          }}
-        >
-          <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>
-              {'System-level tools cited in this section: '}
-            </Text>
-            {normalise_unicode(citedSystemTools.join('   ·   '))}
-          </Text>
-          <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic', lineHeight: 1.4 }}>
-            Each tool&apos;s version, licence and source are listed in the
-            one-line-per-tool Tools-Used index at the end of this report; the
-            worked calculations for module-specific tools are shown with their
-            module.
-          </Text>
-        </View>
-      ) : null}
-
-      <PageFooter />
-    </Page>
-  )
-}
+// The former standalone PhysicsNarrativePage ("How the design was computed —
+// the physics", Section 1d) rendered HALF-EMPTY for tool-light system-level
+// sets and duplicated the System Overview as a second Section-1d block. It was
+// folded into SystemOverviewPage as the "The numbers behind it" sub-block (one
+// coherent section): the same deterministic system-level physics cards from
+// generatePhysicsNarrative() (CoolProp property-look-up now excluded) plus a
+// new net-CO2 reconciliation card, both under their own credibility note. See
+// SystemOverviewPage BLOCK 4. The standalone page + its render-tree call were
+// removed in the same change; no other consumer existed.
 
 // ─── Build #19e (2026-05-22) · Tools-Used end-page ─────────────────────────
 //
@@ -12306,30 +12678,29 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           orchestrator did not run for this chain. Sits AFTER Brief Provenance
           so the reader sees the brief first, then how it was computed. */}
       <EngineeringToolsFlowPage state={state} project={project} bomTotals={bomTotals} statePath={statePath} />
-      {/* U11 · Physics Narrative (2026-05-29): deterministic prose section
-          generated from actual contract quantities — no LLM. Each sentence
-          is emitted only when all source quantities are present. Currently
-          wired for vertical-farm class; other classes see null (section
-          skipped). Placed after Engineering Tools Flow so the reader sees
-          the dependency graph, then the computed narrative explaining WHY
-          each quantity is what it is via the causal physics chain. */}
-      <PhysicsNarrativePage state={state} project={project} />
-      {/* System Overview (universal — Tristan 2026-05-24, task #117): three
+      {/* System Overview (universal — Tristan 2026-05-24, task #117): four
           blocks — WHAT IT DOES (combines parsed brief product_description +
           mission + target_customers), HOW IT WORKS (stitches per-module
           overview sentences via cross_module_grammar_links mechanism+detail),
-          MODULES AT A GLANCE (one-sentence purpose per module). Template-
-          driven from existing state — no extra LLM call. Sits AFTER
-          Engineering Tools Flow so the reader meets the brief, sees how it
-          was computed, then gets the plain-English system architecture
-          before dropping into per-module pages. */}
+          MODULES AT A GLANCE (one-sentence purpose per module), and THE NUMBERS
+          BEHIND IT (2026-06-04 merge — the former standalone "How the design was
+          computed — the physics" page, which rendered half-empty, folded in as a
+          deterministic sub-block: a net-CO2 reconciliation card + the system-
+          level physics cards templated from computed contract quantities, no
+          LLM, under their own credibility note). Template-driven from existing
+          state — no extra LLM call. Sits AFTER Engineering Tools Flow so the
+          reader meets the brief, sees how it was computed, then gets the
+          plain-English system architecture before dropping into per-module
+          pages. */}
       <SystemOverviewPage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
-      {/* ITER-10.5 fourth review (Tristan 2026-05-20): Cost-by-module
-          summary lives directly after the Module Map so the reader meets
-          the system architecture, then immediately sees where the spend
-          lands per module + per component class, then dives into the
-          individual modules below. */}
+      {/* ITER-10.5 fourth review (Tristan 2026-05-20): Cost-by-module summary
+          lives directly after the Module Map (running header "Section 2 · Cost
+          Summary") so the reader meets the system architecture, sees where the spend
+          lands per module + per component class, then dives into the individual
+          modules below. The consolidated master Bill of Materials moved DOWN to
+          Section 6, immediately before Sourcing (Tristan 2026-06-04): the reader sees
+          the design first, then the canonical parts list that feeds procurement. */}
       <CostByModulePage state={state} project={project} bomTotals={bomTotals} />
       {modules.map((m: any, idx: number) => (
         <ModuleSection
@@ -12355,6 +12726,16 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           sub-block under "Risk & Integration Analysis". The standalone
           SystemLevelRisksPage component is no longer called. */}
       <RiskPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
+      {/* Section 6 · Bill of Materials (Tristan 2026-06-04): consolidated master
+          priced-parts list — every line from bomTotals in ONE canonical table,
+          grouped by module, with module subtotals + a grand total. Placed AFTER the
+          modules + Risk and immediately BEFORE Sourcing, so the reader meets the
+          design first, then the canonical parts list that feeds procurement. THE fix
+          for the "bom" section (was 4.5/10 — the scorer found only a cost rollup; the
+          real parts tables were scattered per-sub-module). Pure presentation
+          consolidation of existing bomTotals — no part, manufacturer, part number
+          or price invented (gate-20 safety line). */}
+      <MasterBillOfMaterialsPage project={project} bomTotals={bomTotals} partLinkMap={partLinkMap} />
       <SuppliersPage state={state} project={project} />
       <CompliancePage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       {/* ITER-10.5 fifth review (Tristan 2026-05-20): standalone Design

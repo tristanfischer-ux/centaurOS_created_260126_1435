@@ -660,7 +660,15 @@ function renderWordProse(word: WordSpec): string {
   ])
   const leftovers = mods.filter(m => !recognised.has(m.kind))
   const leftoverClause = leftovers.length
-    ? ` (additional: ${leftovers.map(m => `${humaniseId(m.kind)}: ${modValue(m)}`).join('; ')})`
+    ? ` (additional: ${leftovers.map(m => {
+        // Money leftovers (list_price_gbp etc.) render as proper currency (£21,000),
+        // never the raw "list price gbp: 21000"; a £-value is self-labelling so the key drops.
+        if (/price|gbp|cost/i.test(m.kind)) {
+          const n = Number(String(modValue(m)).replace(/[^0-9.]/g, ''))
+          if (Number.isFinite(n) && n > 0) return `£${Math.round(n).toLocaleString('en-GB')}`
+        }
+        return `${humaniseId(m.kind)}: ${modValue(m)}`
+      }).join('; ')})`
     : ''
 
   const finalProse = `${opener}${perfClause}${complianceClause}${leftoverClause}${procClause}`.trim()

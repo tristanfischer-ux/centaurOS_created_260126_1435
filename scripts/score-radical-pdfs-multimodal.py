@@ -359,7 +359,14 @@ _HEADER_SIGNATURES: dict[str, list[str]] = {
                            "BRIEFCOMPLIANCE", "PHYSICSNARRATIVE",
                            "SYSTEMOVERVIEW", "DESIGNTRADE-OFFS"],
     "design_modules":     ["·MODULES", "·MODULE", "ENGINEERINGTOOLSFLOW"],
-    "bom":                ["COSTBYMODULE"],
+    # "bom" is the parts-level Bill of Materials (the master parts table). Anchor to
+    # its section header "SECTION N · BILL OF MATERIALS". The leading "·" is REQUIRED:
+    # a bare "BILLOFMATERIALS" also matched prose mentions in a page's first 6 lines
+    # (the cover blurb, the engineering-contract paragraph, the cost verdict) and
+    # pulled non-BoM pages into the bom score. "COSTBYMODULE" stays as a fallback for
+    # dossiers without a master BoM (and the cost rollup is BoM-adjacent). Before all
+    # this, "bom" anchored only to COSTBYMODULE and scored the cost rollup, not a BoM.
+    "bom":                ["·BILLOFMATERIALS", "COSTBYMODULE"],
     "cost_analysis":      ["COSTBYMODULE", "BRIEFCOMPLIANCE"],
     # The rendered banner is "SECTION 7 · SOURCING & PROCUREMENT" (de-spaced:
     # "SECTION7·SOURCING&PROCUREMENT"), NOT "SOURCING STRATEGY". The old lone

@@ -129,12 +129,27 @@ function buildCostVerdict(state: any): string {
   if (total == null) {
     return 'The bill of materials has not been priced, so no cost verdict can be given yet; firm quotations against the named manufacturers are the next step.'
   }
-  let s = `The priced bill of materials rolls up to ${fmtGbp(total)} ex-works`
-  if (cr.priced_lines != null) {
-    s += ` across ${cr.priced_lines} priced line${Number(cr.priced_lines) === 1 ? '' : 's'}`
-    if (num(cr.unpriced_lines)) s += ` (${cr.unpriced_lines} line${Number(cr.unpriced_lines) === 1 ? '' : 's'} still to quote)`
+  // The master BoM table totals the raw-materials parts (cr.bom_total_gbp); the
+  // ex-works figure (total) adds manufacturing, labour, overhead and margin. State
+  // BOTH when they differ so the BoM table total and this verdict reconcile visibly,
+  // rather than reading as two contradictory totals for the same priced lines.
+  const bomParts = num(cr.bom_total_gbp)
+  let s: string
+  if (bomParts != null && bomParts > 0 && Math.abs(bomParts - total) > total * 0.02) {
+    s = `The priced bill of materials totals ${fmtGbp(bomParts)}`
+    if (cr.priced_lines != null) {
+      s += ` across ${cr.priced_lines} priced line${Number(cr.priced_lines) === 1 ? '' : 's'}`
+      if (num(cr.unpriced_lines)) s += ` (${cr.unpriced_lines} line${Number(cr.unpriced_lines) === 1 ? '' : 's'} still to quote)`
+    }
+    s += `; the fully-costed design reaches ${fmtGbp(total)} ex-works (parts plus manufacturing, labour and margin).`
+  } else {
+    s = `The priced bill of materials rolls up to ${fmtGbp(total)} ex-works`
+    if (cr.priced_lines != null) {
+      s += ` across ${cr.priced_lines} priced line${Number(cr.priced_lines) === 1 ? '' : 's'}`
+      if (num(cr.unpriced_lines)) s += ` (${cr.unpriced_lines} line${Number(cr.unpriced_lines) === 1 ? '' : 's'} still to quote)`
+    }
+    s += '.'
   }
-  s += '.'
   if (ceiling != null && ceiling > 0) {
     const ratio = total / ceiling
     if (ratio <= 1.05) {

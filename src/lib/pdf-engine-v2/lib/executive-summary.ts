@@ -84,7 +84,7 @@ export function buildExecutiveSummary(input: ExecSummaryInput): ExecSummary {
     outcome += ` The breaches the reader must accept or design out: ${input.failSummaries.slice(0, 3).join('; ')}.`
   }
   if (typeof input.exWorksCostGbp === 'number' && input.exWorksCostGbp > 0) {
-    outcome += ` The bill of materials rolls up to ${fmtGbpCompact(input.exWorksCostGbp)} ex-works`
+    outcome += ` The fully-costed design reaches ${fmtGbpCompact(input.exWorksCostGbp)} ex-works`
     outcome += input.costPerUnit ? ` (${input.costPerUnit}).` : '.'
   }
   outcome = outcome.trim() || 'The design closes against the brief; see the Brief Compliance section for the per-constraint pass/fail.'

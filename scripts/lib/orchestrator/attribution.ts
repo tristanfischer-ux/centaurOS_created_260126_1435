@@ -723,6 +723,17 @@ export function generatePhysicsNarrative(
 // No fabrication: only quantities that carry a real tool provenance + a finite
 // numeric value are included.
 
+// 2026-06-04 (System-Overview merge): tools whose output is a PROPERTY LOOK-UP
+// rather than a headline design result are excluded from the system-level
+// "numbers behind it" cards. CoolProp returns coolant density / specific-heat
+// (a thermophysical look-up feeding other tools) — it is an input, not a result
+// a carbon-capture buyer reads as an outcome. The look-up still appears in the
+// end-of-report Tools-Used provenance index; only the up-front summary drops it.
+// A Set keeps this an explicit, extensible denylist for any future look-up tool.
+const SYSTEM_NARRATIVE_TOOL_DENYLIST = new Set<string>([
+  'coolprop:refrigerant-properties',
+])
+
 const TOOL_DISPLAY_PREFIX: Record<string, string> = {
   pybamm: 'PyBaMM', coolprop: 'CoolProp', ngspice: 'ngspice', pandapower: 'pandapower',
   psychrolib: 'PsychroLib', fluids: 'Fluids', ht: 'Heat-Transfer', hvac: 'HVAC',
@@ -771,6 +782,10 @@ function generateUniversalPhysicsNarrative(
     // brief-/emitter-/contract-sourced values are excluded so this reflects the
     // TOOLS' calculations, not restated inputs.
     if (typeof toolId !== 'string' || !toolId.includes(':') || /^(brief|emitter|contract|user|derived)/i.test(toolId)) continue
+    // 2026-06-04 (System-Overview merge): drop property-look-up tools (CoolProp
+    // coolant density / cp) — an input feeding other tools, not a headline
+    // design result. Still listed in the end-of-report Tools-Used index.
+    if (SYSTEM_NARRATIVE_TOOL_DENYLIST.has(toolId)) continue
     // 2026-06-04 (physics-narrative prune): when a system-level allowlist is
     // supplied, skip module-owned tools — their worked maths now renders WITH
     // their module, so the front section keeps only the cross-cutting whole-plant
