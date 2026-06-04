@@ -132,3 +132,37 @@ change turns B1/B2/B3 from "a human noticed" into "the planner self-composed."
 Today the engine enforces A3, C1, C3, and D1. The gap to autonomy is the **NEW** checks above —
 chiefly **B4 (independent cost sanity)** and the **feature-conditional completeness planner (§4)**.
 Build those two and roughly half the questions Tristan asked this session stop needing a human.
+
+---
+
+## 6. Where every improvement is tracked — and what the NEXT archetype inherits for free
+
+**Tristan's question (2026-06-04): "are you keeping track of all the improvements and why so we can do new archetypes more easily?"** Yes — in five places: (1) **MemPalace drawers** — one per non-obvious gotcha with the *why* (search `forgeos` wing); (2) **regression-harness invariants** — the mechanical guards (each fix that could regress); (3) **commit messages** — the change + rationale; (4) **the handover** + `CURRENT-SUMMARY.md`; (5) **this doc** — the human-readable playbook.
+
+**But the real "easier" isn't the docs — it's that most fixes are now UNIVERSAL, so the next archetype never hits the gotcha.** Below, every dimension this build surfaced, tagged **[U]** = universal (inherited automatically) or **[C]** = class-specific (still per-archetype work).
+
+### Presentation (render)
+- **[U] Per-sub-module BoM tables** — `allMods.find(m=>m.module===id)` dropped tables for duplicate module-ids → **positional resolution**. (The duplicate-module-id is a RECURRING root: it also broke cost reconciliation + the Physics-Critic `where` path. Prefer positional/token resolution over find-by-id/blind-index everywhere.)
+- **[U] No mid-sentence truncation** — `clip()`/`slice()` caps cut sentences; react-pdf wraps, so caps must be generous. Two independent sources (risk + brief compliance table).
+- **[U] Meta-finding filter** — the Physics Critic emits non-physical pipeline/data findings ("the design JSON is truncated") that must NEVER render as customer risks (`META_FINDING_RE`/`isPhysicalRisk`), in the register AND module annotations.
+- **[U] Sourcing = procurement** — show a **main contractor** (EPC/lead-integrator role) + **key subcontractors** grouped by scope, each with a profile + real contact (website + enquiry route, never fabricated phone/email) — not a manufacturer-by-role table or bare counts. **[C]** the per-OEM profile/website map is curated class data.
+
+### Cost
+- **[U] Emitter list_price pins persist on early-return** — a fully-priced (dense) BoM hit `targets===0` → early-return BEFORE the foot-of-main write → all pins lost → cost undercounted (£21,923 vs £855k). Audit every early-return in a state-mutating script.
+- **[U] Single source of truth for ex-works** — `costStack` persisted once; cover + feasibility + cost-sanity quote ONE figure.
+- **[U] Independent cost-sanity gate (32)** — £/output-unit vs ex-works industry bands; catches under- AND over-counting on unseen classes.
+- **[C→U PENDING] Cost-stack MODEL must be class-aware** — a bespoke engineered-to-order plant needs an **EPC stack** (equipment → engineering → installation → commissioning → contractor margin), NOT the consumer-product "channel markup → channel list price" model. Drive off annual production volume (low = EPC, high = product). This is the current `bom`-section drag.
+
+### Engineering fidelity — the corrective principle (Tristan's strongest directive)
+- **[U] Never ship a part the engine knows is wrong.** A gate/critic that FLAGS but doesn't FIX/BLOCK is a coherence failure. Physics-Critic **enforcement (gate 33, block)** + **auto-correct (Phase 2, LLM re-spec + re-check ≤2 passes)**. Generalise: any actionable fault (sizing/material/jurisdiction/pricing/missing-section) is auto-corrected or blocked, never surfaced as an unresolved defect.
+- **[U] Locate parts by tokens, accept both `where`-path forms** (`/N` and `[N]`) — the live Critic uses bracket form (gate-33 was silently never firing) and the index resolves to the wrong part when module names duplicate.
+- **[U] Components sized from tool loads** — transformer/boiler/feeder from `orchestratorContract.quantities`, not arbitrary defaults (auto-correct + Physics Critic enforce this).
+
+### Jurisdiction & evaluation
+- **[U] Standards match the brief's jurisdiction** (gate 19) — tool NAMES + narrative must not hard-cite a foreign code (ASME=US, PED/BS EN 13445=UK). Cite the code in the jurisdiction-aware compliance layer, keep tool names neutral.
+- **[U] The council scorer** — per-section page subsets (large PDFs no longer HTTP-400), ≥2-model requirement (a single model's uniform 10.00 can NEVER PASS again), Claude routed via OpenRouter not the dead direct Anthropic key.
+
+### Emitter
+- **[C] Every sub-module needs a parts list proportional to scope** (≥4 priced), not gate-23's bare ≥1 — class-specific emitter work; a BoM-density check is the universal guard.
+
+**Net for the next archetype:** the **[U]** items above (the large majority) now fire/render/score correctly with zero per-class work. What remains genuinely per-archetype: the 6–7 wiring layers (§1), the curated OEM/profile data, and the emitter parts density. Close the cost-stack model + the feature-conditional planner (§4) and that per-archetype surface shrinks again.
