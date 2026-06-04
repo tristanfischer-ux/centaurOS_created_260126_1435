@@ -210,11 +210,33 @@ function normSeverity(s: any): 'high' | 'med' | 'low' {
 
 const SEV_RANK: Record<string, number> = { high: 0, med: 1, low: 2 }
 
+// Non-physical META-FINDINGS that the Physics Critic occasionally emits about the
+// DATA/PIPELINE/MODEL rather than the physical plant — e.g. "the design JSON
+// payload is truncated… invalid JSON… missing structural details". These are
+// artefacts of how the design was serialised/generated, NOT engineering risks of
+// the built plant, so they must NEVER surface in the customer-facing risk register.
+// Universal across every product class: drop any issue whose text OR title matches.
+// Exported so the renderer can apply the SAME guard to the per-module "Engineering
+// check" annotations, which read state.physicsCritique.issues directly.
+export const META_FINDING_RE = /json|payload|truncat|parse|parsing|pipeline|schema|invalid syntax|missing structural details|design generation|design generator|serialis|serializ|\bthe model\b|\bllm\b/i
+
+export function isPhysicalRisk(i: any): boolean {
+  const haystack = `${String(i?.issue ?? '')} ${String(i?.dimension ?? '')} ${String(i?.suggested_check ?? i?.suggested_fix ?? '')}`
+  return !META_FINDING_RE.test(haystack)
+}
+
 function buildRisks(state: any): FeasibilityRisk[] {
-  const issues = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
+  const rawIssues = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
+  // Filter out non-physical meta-findings (pipeline/data/model artefacts) before
+  // ranking — they are not plant risks and must not reach the rendered register.
+  const issues = rawIssues.filter(isPhysicalRisk)
   const risks: FeasibilityRisk[] = issues.map((i: any): FeasibilityRisk => {
-    const detail = clip(String(i?.issue ?? ''), 320)
-    const mitigation = clip(String(i?.suggested_check ?? i?.suggested_fix ?? ''), 240)
+    // Caps are generous (not layout limits — react-pdf wraps freely): they exist
+    // only to bound a pathological run-on, NOT to truncate a Physics-Critic
+    // sentence mid-thought. Raised 2026-06-04 (CO₂ risk-section truncation) so
+    // full sentences render — the boiler/centrifuge findings were cut at "~275…".
+    const detail = clip(String(i?.issue ?? ''), 700)
+    const mitigation = clip(String(i?.suggested_check ?? i?.suggested_fix ?? ''), 500)
     // Title = the dimension, humanised, as a short risk heading.
     const dim = String(i?.dimension ?? 'engineering').replace(/_/g, ' ')
     const title = firstSentence(detail) || dim
@@ -238,7 +260,7 @@ function buildRegulatoryFlags(state: any): string[] {
   // Compliance-gate verdict adds context when it flagged the class.
   const cg = state?.complianceGate
   if (cg && String(cg.verdict ?? '').toUpperCase() === 'WARN' && cg.reason) {
-    out.push(`Compliance check: ${clip(String(cg.reason), 160)}`)
+    out.push(`Compliance check: ${clip(String(cg.reason), 400)}`)
   }
   // De-duplicate, cap.
   return Array.from(new Set(out)).slice(0, 8)
@@ -254,7 +276,7 @@ function buildManufacturingFlags(state: any): string[] {
   for (const c of ac) {
     const d = String(c?.description ?? c ?? '').trim()
     if (!d) continue
-    if (MFG_RE.test(d)) out.push(clip(d, 200))
+    if (MFG_RE.test(d)) out.push(clip(d, 400))
   }
   const batch = num(state?.parsedBrief?.constraints?.batch_size?.value)
   if (batch != null && batch > 0) {

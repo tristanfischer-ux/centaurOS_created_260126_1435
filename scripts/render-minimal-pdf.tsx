@@ -26,7 +26,7 @@ import { fileURLToPath } from 'url'
 import { generateSubmoduleParagraph } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { getClassStandards, mergeBriefAndClassStandards, type RegulatoryStandard } from '../src/lib/pdf-engine-v2/class-standards'
 import { getClassHazards, computeHazardRPN, type ClassHazard } from '../src/lib/pdf-engine-v2/class-hazards'
-import { buildFeasibilityAssessment } from '../src/lib/pdf-engine-v2/lib/feasibility-assessment'
+import { buildFeasibilityAssessment, isPhysicalRisk } from '../src/lib/pdf-engine-v2/lib/feasibility-assessment'
 import { resolvePriceBand, type PriceBand, type PriceBandVerdict } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasibility-gate'
 import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
@@ -7143,7 +7143,12 @@ function ModuleSection({
   // "Engineering Review Notes" beige callout at module bottom is removed.
   const physicsBySubId = new Map<string, any[]>()
   const physicsModuleLevel: any[] = []
-  const _allFindings: any[] = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
+  // 2026-06-04: drop non-physical META-FINDINGS (pipeline/data/model artefacts —
+  // e.g. "the design JSON payload is truncated… missing bolted saddles") with the
+  // SAME guard the risk register (feasibility-assessment.ts buildRisks) applies.
+  // Without this they reach the per-module/sub-module "Engineering check"
+  // annotations even though they are not plant risks. Universal across classes.
+  const _allFindings: any[] = (Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []).filter(isPhysicalRisk)
   const _moduleSubModules = (moduleSpec.sub_modules ?? []) as Array<{ id: string }>
   for (const f of _allFindings) {
     const sev = String(f.severity ?? '').toLowerCase()
@@ -7687,7 +7692,7 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
                   <View key={`fr-${ri}`} minPresenceAhead={90} style={{ marginBottom: 8, padding: 10, backgroundColor: st.bg, borderLeftWidth: 4, borderLeftColor: st.bar, borderRadius: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 3 }}>
                       <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: st.bar, letterSpacing: 0.8, marginRight: 6 }}>{st.tag}</Text>
-                      <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: st.fg }}>{clean_prose(r.title.length > 110 ? r.title.slice(0, 109).trimEnd() + '…' : r.title)}</Text>
+                      <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: st.fg }}>{clean_prose(r.title.length > 200 ? r.title.slice(0, 199).trimEnd() + '…' : r.title)}</Text>
                     </View>
                     <Text style={{ fontSize: 9, color: '#475569', lineHeight: 1.5, marginBottom: r.mitigation ? 3 : 0 }}>{clean_prose(r.detail)}</Text>
                     {r.mitigation ? (
@@ -9259,16 +9264,29 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
             <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8, letterSpacing: 0.6 }}>
               DELIVERY ROLES &amp; NAMED MANUFACTURERS
             </Text>
-            <View style={{ flexDirection: 'row', borderBottomWidth: 0.8, borderBottomColor: INK, paddingBottom: 4, marginBottom: 4 }}>
-              <Text style={{ flex: 3, fontSize: 8, color: MUTED, letterSpacing: 0.6 }}>DELIVERY ROLE</Text>
-              <Text style={{ width: 70, fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>MANUFACTURERS</Text>
-            </View>
-            {bomRoles.map((r, ri) => (
-              <View key={`bomrole-${ri}`} wrap={false} style={{ flexDirection: 'row', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT }}>
-                <Text style={{ flex: 3, fontSize: 9.5, color: INK, lineHeight: 1.4 }}>{clean_prose(String(r.label))}</Text>
-                <Text style={{ width: 70, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>{r.candidates}</Text>
-              </View>
-            ))}
+            {/* Each row: the delivery role as a heading, then the actual OEM
+                manufacturer NAMES beneath. Previously the right column showed a
+                bare count (11 / 18 / …) under a "MANUFACTURERS" header, so the
+                section read as blank — the named suppliers the BoM pins
+                (Sulzer, Grundfos, Alfa Laval, GEA, Endress+Hauser …) never
+                appeared. 2026-06-04 fix. */}
+            {bomRoles.map((r, ri) => {
+              const names: string[] = Array.isArray((r as { manufacturers?: string[] }).manufacturers)
+                ? (r as { manufacturers?: string[] }).manufacturers as string[]
+                : []
+              const namesText = names.length > 0 ? names.map((n) => clean_prose(String(n))).join(' · ') : ''
+              return (
+                <View key={`bomrole-${ri}`} wrap={false} style={{ paddingTop: 7, paddingBottom: 7, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: namesText ? 3 : 0 }}>
+                    <Text style={{ flex: 1, fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35 }}>{clean_prose(String(r.label))}</Text>
+                    <Text style={{ width: 90, fontSize: 8, color: MUTED, textAlign: 'right' }}>{`${r.candidates} manufacturer${r.candidates === 1 ? '' : 's'}`}</Text>
+                  </View>
+                  {namesText ? (
+                    <Text style={{ fontSize: 9.5, color: ACCENT, fontFamily: 'Helvetica-Bold', lineHeight: 1.45 }}>{namesText}</Text>
+                  ) : null}
+                </View>
+              )
+            })}
             <View style={{ marginTop: 14, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT }}>
               <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55 }}>
                 Manufacturers are taken from the verified bill of materials, not a supplier-discovery search. Named companies indicate the product platform the design specifies; for each role a buyer should confirm current lead-time, obtain a firm quotation, and qualify at least one equivalent second source before committing the order.

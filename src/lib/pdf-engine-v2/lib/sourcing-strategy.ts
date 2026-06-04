@@ -17,6 +17,11 @@ export interface SourcingArchetype {
   id: string
   label: string
   candidates: number
+  /** Distinct pinned manufacturer NAMES for this role (BoM-derived path only).
+   *  The renderer prints these in the "named manufacturers" column so the
+   *  suppliers section shows real OEM names (Grundfos, Alfa Laval, GEA…), not a
+   *  bare count. Absent for the discovered-supplier path (which renders cards). */
+  manufacturers?: string[]
 }
 
 export interface SourcingStrategy {
@@ -123,6 +128,17 @@ function humaniseModuleId(id: string): string {
     .trim()
 }
 
+// Generic placeholder "manufacturer" values that are NOT real company names —
+// they describe the procurement route (fabricated / bespoke / custom) or are
+// stub markers. They must not appear in the named-manufacturers list nor inflate
+// the distinct-manufacturer count. Universal across product classes.
+const GENERIC_MFR_RE = /^(fabricated|bespoke|custom|customised|customized|generic|tbd|to be confirmed|n\/?a|none|various|multiple|standard|in[-\s]?house|oem|unknown|commodity|assorted|misc(?:ellaneous)?)$/i
+
+function isRealManufacturer(name: string): boolean {
+  const n = String(name ?? '').trim()
+  return n.length > 0 && !GENERIC_MFR_RE.test(n)
+}
+
 /** Pull (moduleId, component, manufacturer) triples from partVerifications or the module tree. */
 function collectPinnedParts(state: any): Array<{ moduleId: string; component: string; manufacturer: string }> {
   const out: Array<{ moduleId: string; component: string; manufacturer: string }> = []
@@ -130,7 +146,7 @@ function collectPinnedParts(state: any): Array<{ moduleId: string; component: st
   const pv = Array.isArray(state?.partVerifications) ? state.partVerifications : []
   for (const p of pv) {
     const man = String(p?.manufacturer ?? '').trim()
-    if (!man) continue
+    if (!isRealManufacturer(man)) continue
     const component = String(p?.word_name ?? p?.word_id ?? '').replace(/_/g, ' ').trim()
     const moduleId = String(p?.module ?? '').trim()
     out.push({ moduleId, component, manufacturer: man })
@@ -147,7 +163,7 @@ function collectPinnedParts(state: any): Array<{ moduleId: string; component: st
         for (const mc of mcs) {
           if (String(mc?.kind ?? '').toLowerCase() === 'manufacturer') man = String(mc?.value ?? mc?.text ?? '').trim()
         }
-        if (!man) continue
+        if (!isRealManufacturer(man)) continue
         const component = String(w?.name_human ?? w?.word_id ?? '').replace(/_/g, ' ').trim()
         out.push({ moduleId, component, manufacturer: man })
       }
@@ -185,7 +201,10 @@ export function deriveSourcingArchetypesFromState(state: any): SourcingArchetype
     const label = components
       ? `${humaniseModuleId(role.module)} — ${components}`
       : humaniseModuleId(role.module)
-    archetypes.push({ id: role.module, label, candidates: role.manufacturers.size })
+    // Surface the actual manufacturer NAMES (sorted, de-duplicated) so the
+    // renderer can show "Sulzer, Alfa Laval, GEA" rather than a bare "11".
+    const manufacturers = Array.from(role.manufacturers).map((m) => m.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b))
+    archetypes.push({ id: role.module, label, candidates: manufacturers.length, manufacturers })
   }
   return archetypes
 }
