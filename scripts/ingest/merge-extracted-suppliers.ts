@@ -34,6 +34,14 @@
  *
  * Does NOT delete or modify the source pretraining_extracted_suppliers table.
  *
+ * EMBED-ON-WRITE (growing-DB): this script inserts the bare row, then
+ * auto-fires enrich-new-suppliers.ts (--write), which deep-enriches AND embeds
+ * each new row into supplier_embeddings (its embedWriteBack step). Any row the
+ * scoped enricher does not reach is caught by the one-off backfill
+ * (scripts/ingest/backfill-supplier-embeddings.mjs) — so the invariant "every
+ * named companies row has a supplier_embeddings row" still holds. This script
+ * therefore does not embed directly; it delegates to the enricher + backfill.
+ *
  * British spelling throughout.
  * Pre-change mempalace search: supplier dedupe companies merge -> 0 drawers loaded
  */

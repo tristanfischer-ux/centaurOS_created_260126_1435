@@ -37,8 +37,44 @@
  *   - relevance_score bumps to max(old, new); we don't downgrade.
  */
 import { execFileSync } from 'child_process'
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+import { homedir } from 'os'
+import Database from 'better-sqlite3'
+// Supplier embed-on-write guarantee (growing-DB): a freshly-persisted
+// web-fallback supplier MUST get a supplier_embeddings row in the SAME pass so
+// it is immediately semantically searchable — the invariant is "no new
+// companies row without a supplier_embeddings row". Shared with
+// background-enrichment.ts.
+import { upsertSupplierEmbedding } from './embed-supplier'
 
 const FORGE_TRUTH_DB = '/Users/tristanfischer/.forge-truth/forge-truth.db'
+
+/**
+ * OpenAI key for the embed-on-write step. Loaded the same way the sibling
+ * enrichers do (env first, then the standard secrets locations). When absent,
+ * embed-on-write degrades to a skip — the companies row is still written and
+ * the one-off backfill (scripts/ingest/backfill-supplier-embeddings.mjs) fills
+ * the missing embedding later.
+ */
+const OPENAI_KEY: string = (() => {
+  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY
+  for (const f of [
+    resolve(process.cwd(), '.env.local'),
+    resolve(homedir(), '.claude/secrets/openai.env'),
+    resolve(homedir(), 'secrets/openai.env'),
+    resolve(homedir(), 'Developer/Forge-Capital/.env'),
+  ]) {
+    try {
+      if (!existsSync(f)) continue
+      const m = readFileSync(f, 'utf-8').match(/OPENAI_API_KEY=([^\s'"]+)/)
+      if (m) return m[1]
+    } catch {
+      /* ignore */
+    }
+  }
+  return ''
+})()
 
 /** Min Flash-Lite score (0-10) required for a web candidate to be persisted. */
 export const MIN_PERSIST_SCORE = 6
@@ -329,6 +365,9 @@ export interface PersistResult {
   id: string
   action: 'insert' | 'update' | 'skip'
   reason?: string
+  /** The de-polluted company name actually written — carried out so the
+   *  embed-on-write step can build the embed-text without re-deriving it. */
+  cleanedName?: string
 }
 
 /**
@@ -402,7 +441,7 @@ export function persistWebFallbackCandidate(
     const updateSql = `UPDATE companies SET ${sets.join(', ')} WHERE id = '${sqlEscape(existing.id)}'`
     try {
       execFileSync('sqlite3', [FORGE_TRUTH_DB, updateSql], { encoding: 'utf8' })
-      return { id: existing.id, action: 'update' }
+      return { id: existing.id, action: 'update', cleanedName }
     } catch (err: any) {
       console.error(`[persist] update failed for ${cleanedName}: ${err.message}`)
       return { id: existing.id, action: 'skip', reason: 'update sql error' }
@@ -453,7 +492,7 @@ export function persistWebFallbackCandidate(
   )`
   try {
     execFileSync('sqlite3', [FORGE_TRUTH_DB, insertSql], { encoding: 'utf8' })
-    return { id, action: 'insert' }
+    return { id, action: 'insert', cleanedName }
   } catch (err: any) {
     console.error(`[persist] insert failed for ${cleanedName}: ${err.message}`)
     return { id, action: 'skip', reason: 'insert sql error' }
@@ -509,19 +548,30 @@ export function queryArchetypeTaggedCandidates(
 
 /**
  * Batch helper: run persistWebFallbackCandidate over every web-sourced
- * candidate in a single archetype's output. Failures are non-fatal — the
- * supplier section still renders normally even if persistence fails.
+ * candidate in a single archetype's output, then EMBED each persisted row into
+ * supplier_embeddings (the embed-on-write guarantee — a new companies row is
+ * never left semantically invisible). Failures are non-fatal — the supplier
+ * section still renders normally even if persistence or embedding fails.
+ *
+ * Async because the embed step calls OpenAI. When OPENAI_KEY is absent the
+ * embed step is a no-op skip and the one-off backfill fills the gap later; the
+ * companies write still happens synchronously, so the supplier section is
+ * unaffected.
  *
  * Caller is expected to pass the FINAL candidate list (post dedup, post
  * capability extraction) so we only persist what made it into the PDF.
  */
-export function persistArchetypeWebCandidates(
+export async function persistArchetypeWebCandidates(
   candidates: WebFallbackCandidateLike[],
   archetype: ArchetypeLike,
   brief: string,
   productClass: string,
-): { inserted: number; updated: number; skipped: number; skipReasons: string[] } {
-  const counts = { inserted: 0, updated: 0, skipped: 0, skipReasons: [] as string[] }
+): Promise<{ inserted: number; updated: number; skipped: number; embedded: number; skipReasons: string[] }> {
+  const counts = { inserted: 0, updated: 0, skipped: 0, embedded: 0, skipReasons: [] as string[] }
+  // Pair each persisted row with its source candidate so the embed-text can use
+  // the candidate's capability_oneliner + description.
+  const toEmbed: Array<{ companyId: string; candidate: WebFallbackCandidateLike; cleanedName: string }> = []
+
   for (const c of candidates) {
     if (c.source !== 'web-fallback') continue
     const r = persistWebFallbackCandidate(c, archetype, brief, productClass)
@@ -531,6 +581,47 @@ export function persistArchetypeWebCandidates(
       counts.skipped += 1
       if (r.reason) counts.skipReasons.push(r.reason)
     }
+    if ((r.action === 'insert' || r.action === 'update') && r.id) {
+      toEmbed.push({ companyId: r.id, candidate: c, cleanedName: r.cleanedName ?? c.name })
+    }
   }
+
+  // Embed-on-write pass. One better-sqlite3 handle for the whole batch; the
+  // sqlite3-CLI writes above have already committed (separate process), so this
+  // handle sees the rows. busy_timeout + WAL so the parts-embedding agent
+  // writing the same DB concurrently doesn't cause a lock failure.
+  if (toEmbed.length > 0 && OPENAI_KEY) {
+    let db: Database.Database | null = null
+    try {
+      db = new Database(FORGE_TRUTH_DB)
+      db.pragma('journal_mode = WAL')
+      db.pragma('busy_timeout = 10000')
+      for (const t of toEmbed) {
+        try {
+          const res = await upsertSupplierEmbedding(
+            db,
+            t.companyId,
+            {
+              name: t.cleanedName,
+              capability: t.candidate.capability_oneliner,
+              description: t.candidate.description,
+              country: t.candidate.country,
+              city: t.candidate.city,
+              snippet: t.candidate.llm_reasoning,
+            },
+            OPENAI_KEY,
+          )
+          if (res.action === 'embedded') counts.embedded += 1
+        } catch (err: any) {
+          console.error(`[persist] embed-on-write failed for ${t.companyId}: ${err?.message ?? err}`)
+        }
+      }
+    } catch (err: any) {
+      console.error(`[persist] embed-on-write DB open failed: ${err?.message ?? err}`)
+    } finally {
+      try { db?.close() } catch { /* no-op */ }
+    }
+  }
+
   return counts
 }

@@ -3372,6 +3372,93 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL.supplier_write_paths_embed_on_write (2026-06-04) ────────────
+  // The supplier-side growing-DB embed-on-write guarantee (Tristan: "new
+  // suppliers, not just new parts — whenever added, embedded so searchable;
+  // always DB-first"). `companies` rows are semantically searchable ONLY via a
+  // matching `supplier_embeddings` row; before this fix only ~48% had one, so
+  // every NEW web-sourced supplier was invisible to semantic search. The two
+  // write paths now BOTH call upsertSupplierEmbedding (scripts/supplier-
+  // enrichment/embed-supplier.ts) right after they write the companies row:
+  //   • persist-web-fallback.ts (in-line INSERT during the chain), and
+  //   • background-enrichment.ts (detached deep-enrichment UPDATE).
+  // This SOURCE-SCAN invariant fails if either call site is removed — i.e. if a
+  // future edit re-introduces the add-without-embed gap. Pure (no DB / no
+  // network — always runs). Skips gracefully if a file is absent.
+  {
+    const root = resolve(dirname(snapshotPath), '../..')
+    const persistPath = resolve(root, 'scripts/supplier-enrichment/persist-web-fallback.ts')
+    const bgPath = resolve(root, 'scripts/lib/background-enrichment.ts')
+    const helperPath = resolve(root, 'scripts/supplier-enrichment/embed-supplier.ts')
+    if (existsSync(persistPath) && existsSync(bgPath) && existsSync(helperPath)) {
+      const persistTxt = readFileSync(persistPath, 'utf-8')
+      const bgTxt = readFileSync(bgPath, 'utf-8')
+      const helperTxt = readFileSync(helperPath, 'utf-8')
+      const persistEmbeds = /upsertSupplierEmbedding\s*\(/.test(persistTxt)
+      const bgEmbeds = /upsertSupplierEmbedding\s*\(/.test(bgTxt)
+      // The helper MUST store JSON-array TEXT (not a Float32LE BLOB) so it
+      // matches the existing supplier_embeddings read side (local-corpus.ts
+      // JSON.parse). Guard the storage format too — a BLOB write would silently
+      // corrupt every new row for the semantic-search reader.
+      const helperStoresJsonText = /JSON\.stringify\(\s*vec\s*\)/.test(helperTxt) && /text-embedding-3-small/.test(helperTxt)
+      assertions.push(assertEq(
+        'UNIVERSAL.supplier_write_paths_embed_on_write',
+        'Both supplier write paths (persist-web-fallback.ts in-line INSERT + background-enrichment.ts deep-enrichment UPDATE) call upsertSupplierEmbedding, and embed-supplier.ts stores the vector as JSON-array TEXT (text-embedding-3-small) matching the existing supplier_embeddings read side — the growing-DB embed-on-write guarantee for suppliers (2026-06-04).',
+        persistEmbeds && bgEmbeds && helperStoresJsonText ? 1 : 0,
+        (v) => v === 1,
+        () => `Supplier embed-on-write regressed: persist-web-fallback calls upsertSupplierEmbedding=${persistEmbeds}, background-enrichment calls upsertSupplierEmbedding=${bgEmbeds}, helper stores JSON-array TEXT=${helperStoresJsonText} (need ALL three). A FALSE means a new companies row could be written WITHOUT a supplier_embeddings row (invisible to semantic supplier search) OR the embedding is stored in the wrong format (BLOB) the reader can't parse. Restore the upsertSupplierEmbedding call / JSON.stringify(vec) storage.`,
+      ))
+    }
+  }
+
+  // ── UNIVERSAL.supplier_embeddings_cover_companies (2026-06-04) ────────────
+  // The DATA-STATE complement to the source-scan above: assert that named
+  // `companies` rows are ~100% covered by `supplier_embeddings` in the live
+  // forge-truth.db. After the one-off backfill (scripts/ingest/backfill-
+  // supplier-embeddings.mjs) + embed-on-write, coverage should be ≥99% of named
+  // companies (the only un-embeddable rows are embed-failures + nameless rows).
+  // This catches silent regression: if a write path stops embedding, the gap
+  // re-opens and coverage drifts down. Skips gracefully when forge-truth.db is
+  // absent (CI) — same convention as the other live-DB guards.
+  {
+    const dbPath = resolve(homedir(), '.forge-truth', 'forge-truth.db')
+    if (!existsSync(dbPath)) {
+      assertions.push({ id: 'UNIVERSAL.supplier_embeddings_cover_companies', description: 'supplier-embedding coverage (skipped — forge-truth.db unavailable)', passed: true, detail: 'forge-truth.db not present — skipped' })
+    } else {
+      let coveragePct = 100
+      let named = 0
+      let namedEmbedded = 0
+      let dbErr: string | null = null
+      let cdb: Database.Database | null = null
+      try {
+        cdb = new Database(dbPath, { readonly: true })
+        cdb.pragma('busy_timeout = 5000')
+        named = (cdb.prepare(`SELECT COUNT(*) AS n FROM companies WHERE name IS NOT NULL AND TRIM(name) != ''`).get() as { n: number }).n
+        namedEmbedded = (cdb.prepare(`
+          SELECT COUNT(*) AS n FROM companies c
+          WHERE c.name IS NOT NULL AND TRIM(c.name) != ''
+            AND EXISTS (SELECT 1 FROM supplier_embeddings se WHERE se.company_id = c.id)
+        `).get() as { n: number }).n
+        coveragePct = named > 0 ? (namedEmbedded / named) * 100 : 100
+      } catch (e) {
+        dbErr = String((e as Error).message).slice(0, 120)
+      } finally {
+        try { cdb?.close() } catch { /* no-op */ }
+      }
+      // On a DB error, degrade to skip (pass) rather than false-fail.
+      const ok = dbErr !== null || coveragePct >= 99
+      assertions.push(assertEq(
+        'UNIVERSAL.supplier_embeddings_cover_companies',
+        'Live forge-truth.db: ≥99% of named companies have a supplier_embeddings row (the supplier growing-DB embed-on-write + one-off backfill keep semantic supplier search ~fully covered). 2026-06-04.',
+        ok ? 1 : 0,
+        (v) => v === 1,
+        () => dbErr
+          ? `forge-truth.db query failed (${dbErr}) — skipped`
+          : `Supplier-embedding coverage dropped to ${coveragePct.toFixed(1)}% (${namedEmbedded}/${named} named companies). A write path likely stopped embedding-on-write, re-opening the add-without-embed gap. Re-run scripts/ingest/backfill-supplier-embeddings.mjs and confirm persist-web-fallback.ts + background-enrichment.ts still call upsertSupplierEmbedding.`,
+      ))
+    }
+  }
+
   // ── UNIVERSAL.enrich_null_prices_only_writes_distributor_verified ─────────
   // Locks the verify-leg property of the ingest-side price back-fill
   // (scripts/ingest/enrich-null-prices.ts), built 2026-06-01 to populate
@@ -4346,6 +4433,69 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.physics_critic_autocorrect_targets_named_part_findings', description: 'physics-critic auto-correct selection', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── UNIVERSAL: growing-DB write-back paths EMBED on insert (2026-06-04) ──────
+  //
+  // UNIVERSAL.growing_db_writeback_embeds_on_insert — the moat compounds only if
+  // every part the chain writes back is ALSO embedded, so the Stage 17.6 cosine
+  // RAG can retrieve it next run. Audited 2026-06-04: the two chain-side write-back
+  // INSERTs (distributor cascade → library-writeback.ts; on-the-fly emitter
+  // completion → emitter-completion.ts) were storing rows with embedding=NULL, so
+  // 1,800+ distributor + 383 emitter rows were invisible to the embedding RAG (the
+  // DB grew in rows but not retrievable coverage). This static source guard catches
+  // a regression where someone re-introduces a NULL-embedding INSERT on either
+  // chain write-back path: the INSERT statement MUST carry the `embedding, embed_hash`
+  // columns AND the file MUST compute `embedText(...)` before that INSERT. Pure
+  // source check (no snapshot needed) — mirrors I12b.metric_map_mirror_in_sync.
+  try {
+    const writebackFiles: Array<{ rel: string; label: string }> = [
+      { rel: '../src/lib/pdf-engine-v2/lib/distributors/library-writeback.ts', label: 'library-writeback.ts (distributor cascade)' },
+      { rel: '../src/lib/pdf-engine-v2/lib/emitter-completion.ts', label: 'emitter-completion.ts (on-the-fly completion)' },
+    ]
+    const problems: string[] = []
+    for (const { rel, label } of writebackFiles) {
+      let src = ''
+      try {
+        src = readFileSync(resolve(__dirname, rel), 'utf-8')
+      } catch {
+        problems.push(`${label}: source unreadable at ${rel}`)
+        continue
+      }
+      // Locate every INSERT ... INTO pretraining_extracted_parts (... column list ...)
+      // and confirm the column list names both embedding + embed_hash. The column
+      // list runs to the first ')' after the table name (the column block).
+      const insertRe = /INSERT(?:\s+OR\s+\w+)?\s+INTO\s+pretraining_extracted_parts\s*\(([^)]*)\)/gi
+      let m: RegExpExecArray | null
+      let found = 0
+      while ((m = insertRe.exec(src)) !== null) {
+        found++
+        const colBlock = m[1]
+        const hasEmbedding = /\bembedding\b/.test(colBlock)
+        const hasHash = /\bembed_hash\b/.test(colBlock)
+        if (!hasEmbedding || !hasHash) {
+          problems.push(
+            `${label}: an INSERT INTO pretraining_extracted_parts omits ${!hasEmbedding ? 'embedding' : ''}${!hasEmbedding && !hasHash ? ' + ' : ''}${!hasHash ? 'embed_hash' : ''} — every write-back row must carry the 1536-d vector`,
+          )
+        }
+      }
+      if (found === 0) {
+        problems.push(`${label}: no INSERT INTO pretraining_extracted_parts found (did the write-back move? update this invariant)`)
+      }
+      // The file must also actually compute an embedding (await embedText / embedText helper present).
+      if (!/embedText\s*\(/.test(src)) {
+        problems.push(`${label}: no embedText(...) call — the row would be NULL-embedded`)
+      }
+    }
+    assertions.push(assertEq(
+      'UNIVERSAL.growing_db_writeback_embeds_on_insert',
+      'both chain write-back paths (library-writeback.ts + emitter-completion.ts) INSERT pretraining_extracted_parts WITH embedding + embed_hash and compute embedText before the insert (no NULL-embedded row enters via write-back)',
+      problems.length,
+      (n) => n === 0,
+      () => `growing-DB write-back embedding regression: ${problems.join('; ')}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.growing_db_writeback_embeds_on_insert', description: 'growing-DB write-back embeds on insert', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   // ── P3: uncostable-module disclosure — XOR + byte-identical + no fabricated mass (2026-06-02) ──

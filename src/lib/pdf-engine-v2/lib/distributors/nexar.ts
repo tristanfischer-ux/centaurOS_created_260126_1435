@@ -177,7 +177,8 @@ export async function lookupSkuNexar(mpn: string): Promise<DistributorResult | n
       leadWeeks: null,
       fetchedAt: new Date().toISOString(),
     }
-    recordDistributorHit(result)
+    // fire-and-forget: embeds THEN inserts (never a NULL-embedded row); never blocks the return
+    void recordDistributorHit(result).catch(() => {})
     return result
   } catch (err) {
     console.warn(`[nexar] fetch error for mpn=${mpn}: ${(err as Error).message}`)

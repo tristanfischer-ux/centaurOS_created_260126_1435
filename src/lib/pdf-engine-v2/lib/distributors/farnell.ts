@@ -140,7 +140,8 @@ export async function lookupSkuFarnell(mpn: string, manufacturerHint?: string | 
       leadWeeks,
       fetchedAt: new Date().toISOString(),
     }
-    recordDistributorHit(result)
+    // fire-and-forget: embeds THEN inserts (never a NULL-embedded row); never blocks the return
+    void recordDistributorHit(result).catch(() => {})
     setCached(manufacturerHint ?? result.manufacturer ?? '', mpn, 'farnell', result)
     return result
   } catch (err) {

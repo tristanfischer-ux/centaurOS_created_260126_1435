@@ -32,12 +32,53 @@ import Database from 'better-sqlite3'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { homedir } from 'node:os'
+import { createHash } from 'node:crypto'
 import type { DistributorResult } from './mouser'
 
 let dbHandle: Database.Database | null | undefined = undefined
 let insertStmt: Database.Statement | null = null
 let cascadeDocId: number = 0
 let warnedMissing = false
+
+// ---------------------------------------------------------------------------
+// Embedding (text-embedding-3-small, 1536-d, Float32LE BLOB). MUST match the
+// read side (`scripts/lib/orchestrator/library-candidate-query.ts` /
+// `src/lib/pdf-engine-v2/radical/g5-rag.ts` / `scripts/rag/reference_lookup.py`)
+// and the other write paths (`background-enrichment.ts`, `_ingest-co2-harvest.mjs`)
+// so a distributor-cascade row is retrievable by the Stage 17.6 cosine query the
+// moment it is written. Without this a cascade hit grows the row count but stays
+// invisible to the embedding RAG — the audited 2026-06-04 gap.
+// ---------------------------------------------------------------------------
+const OPENAI_KEY = process.env.OPENAI_API_KEY || ''
+const EMBEDDING_MODEL = 'text-embedding-3-small'
+const EMBEDDING_DIMS = 1536
+
+/** sha256(embed_source) prefix — same idempotency convention as the corpus. */
+function embedHashOf(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 32)
+}
+
+/** Embed one string → Float32LE Buffer, or null on any failure (graceful). */
+async function embedText(text: string): Promise<Buffer | null> {
+  if (!OPENAI_KEY) return null
+  try {
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: text.slice(0, 4096), model: EMBEDDING_MODEL, dimensions: EMBEDDING_DIMS }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { data?: Array<{ embedding: number[] }> }
+    const vec = data.data?.[0]?.embedding
+    if (!vec || vec.length !== EMBEDDING_DIMS) return null
+    const buf = Buffer.alloc(EMBEDDING_DIMS * 4)
+    for (let i = 0; i < EMBEDDING_DIMS; i++) buf.writeFloatLE(vec[i], i * 4)
+    return buf
+  } catch {
+    return null
+  }
+}
 
 function getDb(): Database.Database | null {
   if (dbHandle !== undefined) return dbHandle
@@ -98,10 +139,19 @@ function getDb(): Database.Database | null {
 }
 
 /**
- * Fire-and-forget write-back of a single distributor hit.
- * Never throws. Never blocks the caller.
+ * Write-back of a single distributor hit, WITH its 1536-d embedding so the row
+ * is immediately retrievable by the Stage 17.6 cosine RAG.
+ *
+ * INVARIANT: this path never writes a NULL-embedded row when OPENAI_API_KEY is
+ * present — the embedding is computed BEFORE the INSERT. If the key is absent
+ * (or the embed call fails) it degrades to a NULL-embedded row (graceful — the
+ * idempotent backfill `scripts/ingest/backfill-embeddings.ts` sweeps those), and
+ * never blocks the chain. Awaited by the distributor adapters, which are already
+ * making a network round-trip, so one cheap embed before returning is negligible.
+ *
+ * Never throws.
  */
-export function recordDistributorHit(result: DistributorResult | null): void {
+export async function recordDistributorHit(result: DistributorResult | null): Promise<void> {
   if (!result) return
   const mfg = (result.manufacturer || '').trim()
   const mpn = (result.mpn || '').trim()
@@ -111,6 +161,14 @@ export function recordDistributorHit(result: DistributorResult | null): void {
   try {
     const description = (result.description || `${mfg} ${mpn}`).slice(0, 1024)
     const productUrl = result.productUrl || ''
+    // Canonical embed recipe: [part_name, manufacturer, part_number, raw_excerpt]
+    // .filter(Boolean).join(' ') — identical to background-enrichment.ts +
+    // _ingest-co2-harvest.mjs so retrieval is by the same canonicalisation we index.
+    const embedSource = [description.slice(0, 256), mfg, mpn, description]
+      .filter(Boolean)
+      .join(' ')
+    const embedding = await embedText(embedSource)
+    const embedHash = embedding ? embedHashOf(embedSource) : null
     insertStmt.run(
       cascadeDocId,                            // document_id — synthetic 'distributor_cascade' row
       description.slice(0, 256),               // part_name
@@ -121,8 +179,8 @@ export function recordDistributorHit(result: DistributorResult | null): void {
       description,                             // raw_excerpt
       0.9,                                     // confidence — real distributor catalogue hit
       null,                                    // component_class (unknown)
-      null,                                    // embedding — background-enrichment backfills
-      null,                                    // embed_hash
+      embedding,                               // embedding — 1536-d Float32LE BLOB (nullable)
+      embedHash,                               // embed_hash — sha256(embed_source) prefix
       productUrl || null,                      // source_doc_id — distributor product URL
       new Date().toISOString(),                // discovered_at
       `distributor:${result.source}`,          // discovery_source

@@ -2394,9 +2394,9 @@ async function enrichSuppliers(state: any): Promise<SupplierArchetypeOutput[]> {
     // the procurement-card capability_oneliner, not just the raw Brave snippet.
     // Non-fatal — failures don't block PDF rendering.
     if (webCandidates.length > 0) {
-      const persistCounts = persistArchetypeWebCandidates(candidates, archetype, brief, productClass)
+      const persistCounts = await persistArchetypeWebCandidates(candidates, archetype, brief, productClass)
       if (persistCounts.inserted > 0 || persistCounts.updated > 0 || persistCounts.skipped > 0) {
-        console.log(`  [${archetype.id}] persisted web candidates → inserted: ${persistCounts.inserted}, updated: ${persistCounts.updated}, skipped: ${persistCounts.skipped}${persistCounts.skipReasons.length ? ' (' + persistCounts.skipReasons.slice(0, 3).join('; ') + ')' : ''}`)
+        console.log(`  [${archetype.id}] persisted web candidates → inserted: ${persistCounts.inserted}, updated: ${persistCounts.updated}, embedded: ${persistCounts.embedded}, skipped: ${persistCounts.skipped}${persistCounts.skipReasons.length ? ' (' + persistCounts.skipReasons.slice(0, 3).join('; ') + ')' : ''}`)
       }
     }
 

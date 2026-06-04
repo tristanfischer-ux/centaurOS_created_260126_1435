@@ -203,7 +203,8 @@ export async function lookupSkuDigikey(mpn: string, manufacturerHint?: string | 
     }
     // Cache the hit (30-day TTL) and write back to the parts library.
     setCached(mfgKey, mpn, 'digikey', result)
-    recordDistributorHit(result)
+    // fire-and-forget: embeds THEN inserts (never a NULL-embedded row); never blocks the return
+    void recordDistributorHit(result).catch(() => {})
     return result
   } catch (err) {
     console.warn(`[digikey] lookup failed for ${mpn}:`, (err as Error).message)

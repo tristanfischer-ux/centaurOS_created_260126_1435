@@ -163,7 +163,8 @@ export async function lookupSkuMouser(mpn: string, manufacturerHint?: string | n
       leadWeeks,
       fetchedAt: new Date().toISOString(),
     }
-    recordDistributorHit(result)
+    // fire-and-forget: embeds THEN inserts (never a NULL-embedded row); never blocks the return
+    void recordDistributorHit(result).catch(() => {})
     setCached(manufacturerHint ?? result.manufacturer ?? '', mpn, 'mouser', result)
     return result
   } catch (err) {

@@ -61,8 +61,46 @@ import Database from 'better-sqlite3'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { homedir } from 'node:os'
+import { createHash } from 'node:crypto'
 import { runEmitterCompletenessGate } from './emitter-completeness-gate'
 import { callFastExtract, GROK_4_3, GEMINI_3_1_FLASH_LITE } from './openrouter-models'
+
+// ── Embedding (text-embedding-3-small, 1536-d, Float32LE BLOB) ───────────────
+// MUST match the read side (Stage 17.6 cosine RAG) + the other write paths
+// (background-enrichment.ts, library-writeback.ts, _ingest-co2-harvest.mjs) so an
+// emitter-completion row is retrievable the moment it is written. Without this an
+// LLM-completed part grows the row count but stays invisible to the embedding RAG
+// — the audited 2026-06-04 gap (emitter_completion:llm 383 rows / 0 embedded).
+const OPENAI_KEY = process.env.OPENAI_API_KEY || ''
+const EMBEDDING_MODEL = 'text-embedding-3-small'
+const EMBEDDING_DIMS = 1536
+
+/** sha256(embed_source) prefix — same idempotency convention as the corpus. */
+function embedHashOf(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 32)
+}
+
+/** Embed one string → Float32LE Buffer, or null on any failure (graceful). */
+async function embedText(text: string): Promise<Buffer | null> {
+  if (!OPENAI_KEY) return null
+  try {
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: text.slice(0, 4096), model: EMBEDDING_MODEL, dimensions: EMBEDDING_DIMS }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { data?: Array<{ embedding: number[] }> }
+    const vec = data.data?.[0]?.embedding
+    if (!vec || vec.length !== EMBEDDING_DIMS) return null
+    const buf = Buffer.alloc(EMBEDDING_DIMS * 4)
+    for (let i = 0; i < EMBEDDING_DIMS; i++) buf.writeFloatLE(vec[i], i * 4)
+    return buf
+  } catch {
+    return null
+  }
+}
 
 // ── Minimal structural types (avoid circular import with ModuleSpec) ─────────
 
@@ -534,13 +572,13 @@ function getEmitterCompletionDocId(db: Database.Database): number {
  * LLM declined to give an MPN we store the honest descriptor (still a valid
  * row — future runs at least get the manufacturer + component type).
  */
-function writeBackGenerated(
+async function writeBackGenerated(
   dbPath: string,
   part: GeneratedPart,
   className: string,
   moduleId: string,
   subModuleId: string,
-): boolean {
+): Promise<boolean> {
   let db: Database.Database | null = null
   try {
     if (!existsSync(dbPath)) return false
@@ -564,12 +602,24 @@ function writeBackGenerated(
     }
 
     const excerpt = (part.one_line || `${part.manufacturer} ${part.name}`).slice(0, 1024)
+    // Embed BEFORE the INSERT so the row is retrievable by the Stage 17.6 cosine
+    // RAG the moment it lands. Canonical recipe: [part_name, manufacturer,
+    // part_number, raw_excerpt].filter(Boolean).join(' ') — identical to
+    // background-enrichment.ts + _ingest-co2-harvest.mjs. Degrades to a
+    // NULL-embedded row only when OPENAI_API_KEY is absent / the call fails (the
+    // idempotent backfill sweeps those); never blocks the row write.
+    const embedSource = [part.name.slice(0, 256), part.manufacturer, storedPn, excerpt]
+      .filter(Boolean)
+      .join(' ')
+    const embedding = await embedText(embedSource)
+    const embedHash = embedding ? embedHashOf(embedSource) : null
     db.prepare(`
       INSERT INTO pretraining_extracted_parts
         (document_id, part_name, manufacturer, part_number,
          module_assignment, sub_module_assignment, raw_excerpt,
-         confidence, component_class, discovered_at, discovery_source)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         confidence, component_class, embedding, embed_hash,
+         discovered_at, discovery_source)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       docId,
       part.name.slice(0, 256),
@@ -580,6 +630,8 @@ function writeBackGenerated(
       excerpt,
       0.6, // generated-on-the-fly — lower than a real distributor hit (0.9)
       `${className}_completion`,
+      embedding,                                    // 1536-d Float32LE BLOB (nullable)
+      embedHash,                                    // sha256(embed_source) prefix
       new Date().toISOString(),
       'emitter_completion:llm',
     )
@@ -774,7 +826,7 @@ export async function completeEmitterGaps(
           realMpnFromLlm = gen.part_number
           // 3b. WRITE BACK so next run is a DB-first hit ("good next time").
           if (!opts.skipWriteback) {
-            const wrote = writeBackGenerated(dbPath, gen, className, gap.module_id, gap.sub_module_id)
+            const wrote = await writeBackGenerated(dbPath, gen, className, gap.module_id, gap.sub_module_id)
             if (wrote) log(`[emitter-completion]      ↳ wrote back ${manufacturer} to pretraining_extracted_parts`)
           }
         }
@@ -972,7 +1024,7 @@ export async function fillBlankWordMpns(
       const gen = await generatePart(className, cand.moduleId, cand.subId, `${cand.name}; ${describeSubModule(cand.sub)}`, model, opts.designContext ?? '')
       if (!gen || !gen.manufacturer) continue
       if (!opts.skipWriteback) {
-        const wrote = writeBackGenerated(dbPath, gen, className, cand.moduleId, cand.subId)
+        const wrote = await writeBackGenerated(dbPath, gen, className, cand.moduleId, cand.subId)
         if (wrote) log(`[fill-blank-mpn]      ↳ wrote back ${gen.manufacturer} to pretraining_extracted_parts`)
       }
       // gate-20 SAFETY: emit the honest non-structured descriptor, NOT gen's
