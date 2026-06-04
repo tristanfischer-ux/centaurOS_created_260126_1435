@@ -333,6 +333,39 @@ const MASS_COMPONENT_SCOPE_TOKENS = new Set<string>([
   'foundation', 'enclosure', 'cabinet', 'module', 'rack', 'pack', 'cell',
 ])
 
+// 2026-06-04 (gate-18 FIX — co2-mineralisation PROSE-form vessel false-positive).
+// VESSEL-TYPE discriminator for MASS clustering. The co2-mineralisation dossier
+// quotes the ABSORBER COLUMN's 316L shell ("6 mm wall thickness for the 316L
+// shell, resulting in a 1274.38 kg mass") on pages 26/30/34 and the REACTOR
+// shell ("the reactor shell, designed for 8 mm thickness, has a mass of 904.93
+// kg") on pages 37/43. These are PHYSICALLY DISTINCT vessels (different vessel,
+// different wall thickness, different mass) — never a contradiction. But both
+// shell-mass sentences share the generic family anchor "mass", carry NO STRONG
+// qualifier inside the ±6-token window, and are free PROSE (no "=" assignment),
+// so the field-anchored + mass-scope splits both miss them and they collapse
+// into ONE cluster → false 33.91% HIGH → exit 18.
+//
+// The DISTINGUISHING signal is the VESSEL TYPE the sentence is about (the
+// primary fix) corroborated by the SHELL WALL THICKNESS (6 mm vs 8 mm — present
+// for both, symmetric). `vesselSignatureOf()` reads the WIDE window (the noun
+// "reactor"/"absorber" anchors the clause but sits beyond the ±6-token window)
+// and folds a vessel signature into the MASS cluster key. Two mentions of the
+// SAME vessel get the SAME signature → still cluster → a genuine same-vessel
+// contradiction (absorber 1274 kg on p26 vs 1500 kg on p30) still fires HIGH.
+// Two mentions of DIFFERENT vessels get DIFFERENT signatures → distinct clusters
+// → no false HIGH. UNIVERSAL across every process / chemical / multi-vessel
+// class (amine capture, distillation, crystallisation, water treatment, …),
+// not just co2 — every such dossier describes several vessels each with its own
+// shell mass. Word-boundary matched against the lowercased wide window.
+const VESSEL_TYPE_TOKENS: ReadonlyArray<string> = [
+  'absorber', 'stripper', 'scrubber', 'reactor', 'column', 'vessel', 'tank',
+  'reboiler', 'condenser', 'crystalliser', 'crystallizer', 'dryer', 'drier',
+  'filter', 'centrifuge', 'separator', 'exchanger', 'heater', 'cooler', 'pump',
+  'hopper', 'silo', 'mixer', 'clarifier', 'thickener', 'membrane', 'contactor',
+  'regenerator',
+]
+const VESSEL_TYPE_REGEX = new RegExp(`\\b(${VESSEL_TYPE_TOKENS.join('|')})\\b`)
+
 /** Classify an occurrence's role from its local window tokens.
  *   achieved   = the design's delivered value ("Mission: deliver 2.69 MWh")
  *   req-floor  = a brief minimum / floor ("2.5 MWh minimum")
@@ -516,6 +549,16 @@ interface NumericOccurrence {
    * clusters so a run-on "name = a, name = b, name = c" sentence does not
    * collapse every value into one false contradiction. Added 2026-06-03. */
   fieldKey: string | null
+  /** A WIDER raw context window (≈220 chars before + 120 after, whitespace-
+   * collapsed, lowercased) than `contextWindow`. The ±6/±4 token windows and the
+   * 60-char `contextWindow` are too narrow to see a VESSEL-TYPE noun that anchors
+   * the whole clause but sits 8-12 tokens from the number (e.g. "The reactor
+   * shell, designed for 8 mm thickness, has a mass of 904.93 kg" — "reactor" is
+   * ~11 tokens before the value). `vesselSignatureOf()` scans this window so a
+   * MASS occurrence describing the absorber/column shell does not cluster with
+   * one describing the reactor shell. Added 2026-06-04 (co2-mineralisation
+   * gate-18 prose-form vessel false-positive). */
+  wideWindow: string
 }
 
 /** Extract the FIELD NAME from a tool-output assignment "<field> = <number>".
@@ -781,6 +824,17 @@ function extractOccurrences(pageText: string, page: number): NumericOccurrence[]
     const preTokens = preTokensRaw.slice(-6) // last 6 tokens preceding the number
     const postTokens = postTokensRaw.slice(0, 4) // first 4 tokens after the unit
     const contextWindow = `${preText.slice(-60)}[${m[0]}]${postText.slice(0, 40)}`.replace(/\s+/g, ' ').trim()
+    // WIDER window (≈220 pre + 120 post) for vessel-type signature detection —
+    // the vessel noun ("reactor"/"absorber"/"column") that anchors a shell-mass
+    // sentence routinely sits beyond the ±6 token / 60-char windows above. The
+    // NUMBER marker `\f` (a char that never survives pdftotext into prose) is
+    // inserted at the number's position so `vesselSignatureOf` can pick the
+    // vessel noun + thickness NEAREST the number rather than the first in the
+    // window — without that, a preceding DIFFERENT-vessel sentence inside the
+    // 220-char pre-window would hijack the signature (council Finding A).
+    const widePre = cleaned.slice(Math.max(0, matchStart - 220), matchStart)
+    const widePost = cleaned.slice(matchStart + m[0].length, matchStart + m[0].length + 120)
+    const wideWindow = `${widePre}\f${widePost}`.replace(/[^\S\f]+/g, ' ').trim().toLowerCase()
     // Field-anchored cluster key for tool-output assignments "<field> = <N>".
     const fieldKey = extractAssignmentFieldKey(preText)
     occurrences.push({
@@ -795,6 +849,7 @@ function extractOccurrences(pageText: string, page: number): NumericOccurrence[]
       preTokens,
       postTokens,
       fieldKey,
+      wideWindow,
     })
   }
   return occurrences
@@ -945,6 +1000,91 @@ function massScopeOf(occ: NumericOccurrence): 'system' | 'component' | 'neutral'
   return 'neutral'
 }
 
+/** Compute a VESSEL signature for a MASS occurrence from its WIDE window:
+ *   `<vessel-type>:<shell-wall-thickness-mm>`
+ *
+ * Two independent, additive discriminants — EITHER differing forces a cluster
+ * split:
+ *   1. VESSEL TYPE (primary): the vessel-type noun NEAREST the number
+ *      (absorber / reactor / column / stripper / …). Empty when none in window.
+ *   2. SHELL WALL THICKNESS (corroborating): a "<N> mm" value co-located with a
+ *      shell/wall/thickness cue ("6 mm wall thickness for the 316L shell" → 6;
+ *      "reactor shell, designed for 8 mm thickness" → 8), the one NEAREST the
+ *      number. Empty when no such thickness is near. This is SYMMETRIC for the
+ *      co2 case (the absorber sentence carries no in-clause vessel noun but DOES
+ *      carry "6 mm", the reactor carries both "reactor" and "8 mm"), so the
+ *      masses split on the thickness axis even when the vessel-type axis is
+ *      one-sided.
+ *
+ * NEAREST-not-first (council Finding A): the number's position in the wide
+ * window is marked by `\f`. Both discriminants pick the candidate whose match is
+ * CLOSEST to that marker, NOT the first from the window start. Without this, a
+ * preceding DIFFERENT-vessel sentence inside the 220-char pre-window ("The
+ * absorber shell is 1274 kg. The reactor shell ... 905 kg") would hijack the
+ * reactor number's signature to "absorber" — mis-attributing it and risking a
+ * MERGE that masks a real contradiction. Nearest-match makes the reactor number
+ * resolve to "reactor" and the absorber number to "absorber". Nearest-match also
+ * blunts Finding B (a far-away "50 mm flange" loses to the in-clause wall gauge).
+ *
+ * Returns '' (empty) when NEITHER signal is present — ordinary non-vessel MASS
+ * prose (a payload, a transport cap, a generic "total mass") is then keyed
+ * exactly as before, so behaviour is byte-for-byte unchanged off the vessel
+ * path. Determinism guarantee (anti-neuter): the same vessel sentence always
+ * yields the same signature, so two cross-page mentions of ONE vessel still
+ * share a cluster and a genuine same-vessel mass contradiction still fires HIGH.
+ *
+ * Only MASS uses this (called from `cluster()` under `feat.family === 'MASS'`);
+ * other families are unaffected. */
+export function vesselSignatureOf(occ: { wideWindow: string }): string {
+  const w = occ.wideWindow // already lowercased + whitespace-collapsed, number = '\f'
+  const marker = w.indexOf('\f')
+  const numPos = marker >= 0 ? marker : Math.floor(w.length / 2)
+  // Distance from the number marker to a match spanning [start, end).
+  const distTo = (start: number, end: number): number =>
+    numPos < start ? start - numPos : numPos > end ? numPos - end : 0
+  // VESSEL TYPE — scan all matches, keep the one nearest the number.
+  let vessel = ''
+  let bestVesselDist = Infinity
+  const vRe = new RegExp(VESSEL_TYPE_REGEX.source, 'g')
+  let vm: RegExpExecArray | null
+  while ((vm = vRe.exec(w)) !== null) {
+    const d = distTo(vm.index, vm.index + vm[0].length)
+    if (d < bestVesselDist) { bestVesselDist = d; vessel = vm[1] }
+  }
+  // SHELL WALL THICKNESS (corroborating, secondary) — a "<N> mm" whose ±40-char
+  // neighbourhood mentions a shell/wall/thickness cue (the pressure-envelope wall
+  // gauge, not an unrelated 0.4 m dia or 50 mm flange face). Integers only (wall
+  // gauges are whole mm). Accept a gauge only when BOTH:
+  //   (a) it is within THICKNESS_NEAR_CHARS of the number marker (a wall gauge
+  //       describes the SAME vessel as the mass only when it is in the same
+  //       clause; real distances are 26 chars (reactor) / 51 chars (absorber)),
+  //   AND
+  //   (b) NO vessel noun lies strictly BETWEEN the gauge and the number — that
+  //       intervening noun marks a vessel boundary, so the gauge belongs to a
+  //       different vessel and must not bleed across (council Finding A/B: in
+  //       "the absorber … 1274 kg. the reactor shell, 8 mm thickness …" the
+  //       reactor's "8 mm" must not stamp the absorber number's signature).
+  // Keep the qualifying gauge nearest the number.
+  const THICKNESS_NEAR_CHARS = 60
+  let thickness = ''
+  let bestThkDist = Infinity
+  const mmRe = /(\d{1,3})\s*mm\b/g
+  let mm: RegExpExecArray | null
+  while ((mm = mmRe.exec(w)) !== null) {
+    const around = w.slice(Math.max(0, mm.index - 40), mm.index + mm[0].length + 40)
+    if (!/\b(?:shell|wall|thickness|thick|gauge|plate)\b/.test(around)) continue
+    const mmEnd = mm.index + mm[0].length
+    const d = distTo(mm.index, mmEnd)
+    if (d > THICKNESS_NEAR_CHARS) continue
+    // Reject if a vessel noun sits between the gauge and the number (boundary).
+    const between = numPos > mmEnd ? w.slice(mmEnd, numPos) : w.slice(numPos, mm.index)
+    if (VESSEL_TYPE_REGEX.test(between)) continue
+    if (d < bestThkDist) { bestThkDist = d; thickness = mm[1] }
+  }
+  if (!vessel && !thickness) return ''
+  return `${vessel}:${thickness}`
+}
+
 function featurize(occ: NumericOccurrence): OccurrenceFeatures {
   const pre = classifyTokens(occ.preTokens)
   const post = classifyTokens(occ.postTokens)
@@ -1002,6 +1142,14 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
     // single-component) so an 8,500 kg machine-mass cap never clusters with a
     // 4,500 kg cast-iron base mass. Other families pass scope='' (no effect).
     const scope = feat.family === 'MASS' ? massScopeOf(feat.occ) : ''
+    // 2026-06-04 FIX: MASS gets an extra VESSEL signature (vessel-type +
+    // shell wall thickness) so an ABSORBER-COLUMN shell mass never clusters with
+    // a REACTOR shell mass (co2-mineralisation: 1274.38 kg absorber vs 904.93 kg
+    // reactor false HIGH). Non-vessel MASS prose yields '' → no effect; two
+    // mentions of the SAME vessel yield the SAME signature → a genuine same-vessel
+    // mass contradiction still fires. Other families pass vessel='' (no effect).
+    const vessel = feat.family === 'MASS' ? vesselSignatureOf(feat.occ) : ''
+    const vesselSeg = vessel ? `|vessel=${vessel}` : ''
     // 2026-06-03 FIELD-ANCHORED clustering (co2-mineralisation gate-18 fix). When
     // the number is the RHS of a tool-output assignment "<field_name> = <value>",
     // the SPECIFIC field preceding the "=" (absorber_shell_mass,
@@ -1021,7 +1169,7 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
       // Anchor-based clustering: family + anchor + strong-qualifier-set + role
       // (+ mass-scope for MASS) (+ field for tool-output assignments).
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}|scope=${scope}${field}`
+      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${field}`
     } else if (PART_SPECIFIC_FAMILIES.has(feat.family)) {
       // No fallback clustering for part-specific families UNLESS the occurrence
       // is a tool-output assignment with an explicit field name. A bare
@@ -1034,7 +1182,7 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
       // were dropped from MASS clustering and could not be checked at all.
       if (!occ.fieldKey) continue
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|qual=${qualSorted}|role=${role}|scope=${scope}${field}`
+      key = `${feat.family}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${field}`
     } else {
       // Fallback for non-part-specific families: family + head +
       // strong-qualifier-set. Stricter — requires EXACT head-token match.

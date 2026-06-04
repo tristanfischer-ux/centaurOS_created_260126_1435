@@ -3791,6 +3791,80 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
           'gate 18: the SAME tool field assigned two different values across pages ("total plant mass = 18,779 kg" vs "= 25,000 kg") still fires >= 1 HIGH — field-anchoring must not mask a real same-field contradiction',
           realFieldHigh, (n) => n >= 1, (n) => `expected >= 1 HIGH on a genuine same-field cross-page contradiction, got ${n} — the field-anchored fix is over-masking`,
         ))
+
+        // ── gate-18 VESSEL-TYPE clustering (2026-06-04 co2-mineralisation) ──
+        // Distinct from the field-anchored block above: those are "<field> = N"
+        // tool-output ASSIGNMENTS. THIS is free PROSE — different vessels' shell
+        // masses written as sentences with NO "=" and NO strong qualifier in the
+        // ±6-token window. The co2-mineralisation dossier quoted the ABSORBER
+        // COLUMN's 316L shell ("6 mm wall thickness for the 316L shell, resulting
+        // in a 1274.38 kg mass", p26/30/34) and the REACTOR shell ("the reactor
+        // shell, designed for 8 mm thickness, has a mass of 904.93 kg", p37/43).
+        // Both are MASS / anchor=mass / no qualifier / prose, so they collapsed
+        // into ONE cluster → false 33.91% HIGH → exit 18. The vessel signature
+        // (vessel-type noun NEAREST the number + the in-clause shell wall gauge)
+        // splits them. These fixtures lock the behaviour BOTH ways. Short single-
+        // clause lines keep each "NNNN kg" off the cupsfilter ~80-col wrap edge
+        // (a wrapped "127\n4 kg" would corrupt the number — not a code concern).
+        //
+        // FALSE-POSITIVE shapes — must be 0 HIGH:
+        const fpVesselAbsReactor = mkPdf('fp-vessel', [
+          'Absorber.\n6 mm wall thickness, 316L shell.\nShell mass 1274 kg.',
+          'Absorber.\n6 mm wall thickness, 316L shell.\nShell mass 1274 kg.',
+          'Absorber.\n6 mm wall thickness, 316L shell.\nShell mass 1274 kg.',
+          'Reactor.\nThe reactor shell, 8 mm thickness.\nShell mass 905 kg.',
+          'Reactor.\nThe reactor shell, 8 mm thickness.\nShell mass 905 kg.',
+        ])
+        // two DIFFERENT vessels that share the SAME 8 mm wall gauge still split
+        // on the vessel-type axis (the thickness axis alone would wrongly merge):
+        const fpReactorStripperSameThk = mkPdf('fp-vessel-samethk', [
+          'Reactor.\nThe reactor shell, 8 mm thickness.\nShell mass 905 kg.',
+          'Reactor.\nThe reactor shell, 8 mm thickness.\nShell mass 905 kg.',
+          'Stripper.\nThe stripper shell, 8 mm thickness.\nShell mass 1400 kg.',
+          'Stripper.\nThe stripper shell, 8 mm thickness.\nShell mass 1400 kg.',
+        ])
+        // ANTI-NEUTER: a SAME-vessel cross-page mass contradiction MUST still
+        // fire (the split must key on vessel IDENTITY, not blanket-suppress
+        // "316L shell"). Absorber 1274 kg vs 1500 kg:
+        const realSameAbsorber = mkPdf('real-vessel-abs', [
+          'Absorber.\n6 mm wall thickness, 316L shell.\nShell mass 1274 kg.',
+          'Absorber.\n6 mm wall thickness, 316L shell.\nShell mass 1274 kg.',
+          'Absorber.\n6 mm wall thickness, 316L shell.\nShell mass 1500 kg.',
+          'Absorber.\n6 mm wall thickness, 316L shell.\nShell mass 1500 kg.',
+        ])
+        // ANTI-NEUTER: same reactor 905 kg vs 1400 kg also still fires:
+        const realSameReactor = mkPdf('real-vessel-rct', [
+          'Reactor.\nThe reactor shell, 8 mm thickness.\nShell mass 905 kg.',
+          'Reactor.\nThe reactor shell, 8 mm thickness.\nShell mass 905 kg.',
+          'Reactor.\nThe reactor shell, 8 mm thickness.\nShell mass 1400 kg.',
+          'Reactor.\nThe reactor shell, 8 mm thickness.\nShell mass 1400 kg.',
+        ])
+
+        const fpVesselHigh = highCount(fpVesselAbsReactor)
+        const fpVesselSameThkHigh = highCount(fpReactorStripperSameThk)
+        const realAbsHigh = highCount(realSameAbsorber)
+        const realRctHigh = highCount(realSameReactor)
+
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_vessel_type_splits_distinct_vessels',
+          'gate 18: an ABSORBER shell mass (1274 kg) and a REACTOR shell mass (905 kg) in free prose form DISTINCT clusters → 0 HIGH (co2-mineralisation prose-form vessel false-positive guard); the vessel-type signature must separate them',
+          fpVesselHigh, (n) => n === 0, (n) => `${n} HIGH on absorber-shell vs reactor-shell masses — vessel-type clustering has regressed (different vessels are collapsing into one cluster)`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_vessel_type_splits_even_with_same_thickness',
+          'gate 18: a REACTOR shell and a STRIPPER shell that share the SAME 8 mm wall gauge but differ in mass form DISTINCT clusters → 0 HIGH — the vessel-TYPE axis (not just the thickness axis) must split them',
+          fpVesselSameThkHigh, (n) => n === 0, (n) => `${n} HIGH on reactor-vs-stripper (both 8 mm) — the vessel-type token axis has regressed (thickness-only would wrongly merge)`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_same_vessel_mass_contradiction_still_fires',
+          'gate 18: the SAME absorber shell quoted at 1274 kg then 1500 kg across pages still fires >= 1 HIGH — the vessel split must key on vessel IDENTITY, never blanket-suppress "316L shell" (anti-neuter)',
+          realAbsHigh, (n) => n >= 1, (n) => `expected >= 1 HIGH on a genuine same-vessel (absorber) mass contradiction, got ${n} — the vessel-type fix is over-masking real contradictions`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_same_reactor_mass_contradiction_still_fires',
+          'gate 18: the SAME reactor shell quoted at 905 kg then 1400 kg across pages still fires >= 1 HIGH — anti-neuter for the reactor vessel signature',
+          realRctHigh, (n) => n >= 1, (n) => `expected >= 1 HIGH on a genuine same-vessel (reactor) mass contradiction, got ${n} — the vessel-type fix is over-masking`,
+        ))
       } catch (err) {
         assertions.push({ id: 'UNIVERSAL.gate18_mass_scope_and_recommendation_splits', description: 'gate 18 mass-scope + recommendation-role fixture check', passed: false, detail: `fixture build/run failed: ${String(err).slice(0, 200)}` })
       }
