@@ -656,6 +656,7 @@ function resolveQty(quantities: Record<string, any>, key: string): number | unde
 export function generatePhysicsNarrative(
   quantities: Record<string, any>,
   productClass?: string,
+  systemLevelToolIds?: Set<string> | null,
 ): PhysicsNarrative | null {
   if (!quantities || typeof quantities !== 'object') return null
 
@@ -663,9 +664,19 @@ export function generatePhysicsNarrative(
   // UNIVERSAL data-driven narrative (2026-05-31) — walks each quantity's tool
   // provenance so the section renders for all 35 classes, not just VF. This was
   // VF-only ("the only class currently wired") until now.
+  //
+  // 2026-06-04 (physics-narrative prune): the per-module "How this is computed"
+  // worked blocks now render each module-owned tool's maths WITH its module, so
+  // listing every tool's quantities up front duplicated the pressure-vessel /
+  // reactor / agitation / fluids / pump lines both here AND at their module. The
+  // renderer passes the system-level tool-id set (the complement of the
+  // per-module routing) so this front section is pruned to the cross-cutting
+  // whole-plant tools only (mass-aggregator, lifecycle-co2, dac-regeneration,
+  // property look-ups). When the set is absent (legacy callers / older state) the
+  // full universal narrative is emitted, preserving backward behaviour.
   const classKey = (productClass ?? '').toLowerCase()
   const isVF = classKey.includes('vertical') || classKey.includes('farm')
-  if (!isVF) return generateUniversalPhysicsNarrative(quantities)
+  if (!isVF) return generateUniversalPhysicsNarrative(quantities, systemLevelToolIds)
 
   const allSentences: string[] = []
   const toolsCited: string[] = []
@@ -746,7 +757,10 @@ function formatPhysVal(value: number, unit: string): string {
   return `${n}${u}`
 }
 
-function generateUniversalPhysicsNarrative(quantities: Record<string, any>): PhysicsNarrative | null {
+function generateUniversalPhysicsNarrative(
+  quantities: Record<string, any>,
+  systemLevelToolIds?: Set<string> | null,
+): PhysicsNarrative | null {
   const byTool = new Map<string, { display: string; items: string[] }>()
   const order: string[] = []
 
@@ -757,6 +771,13 @@ function generateUniversalPhysicsNarrative(quantities: Record<string, any>): Phy
     // brief-/emitter-/contract-sourced values are excluded so this reflects the
     // TOOLS' calculations, not restated inputs.
     if (typeof toolId !== 'string' || !toolId.includes(':') || /^(brief|emitter|contract|user|derived)/i.test(toolId)) continue
+    // 2026-06-04 (physics-narrative prune): when a system-level allowlist is
+    // supplied, skip module-owned tools — their worked maths now renders WITH
+    // their module, so the front section keeps only the cross-cutting whole-plant
+    // tools (the complement of the per-module routing). A non-empty set acts as a
+    // strict allowlist; an empty or absent set means "no pruning" (legacy state /
+    // a design where every tool maps to a module would otherwise blank the page).
+    if (systemLevelToolIds && systemLevelToolIds.size > 0 && !systemLevelToolIds.has(toolId)) continue
     const value: unknown = (q as any).value
     if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) continue
     const unit: string = typeof (q as any).unit === 'string' ? (q as any).unit : ''

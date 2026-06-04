@@ -303,6 +303,160 @@ function extractCropFromBriefText(briefText: string, productDescription: string)
   return null
 }
 
+// ─── Class-agnostic (UNIVERSAL) fallback inference ───────────────────────────
+//
+// The CLASS_AUGMENT_DEFAULTS table only covers the ~20 product classes that
+// have shipped. For an UNSEEN / unmapped class (e.g. "co2_mineralisation",
+// "dac", "pemfc") the per-class row is absent, so the four string/mass HARD
+// fields used to fall straight through to `source:"missing"` — exactly the
+// gap Tristan flagged on the CO₂ dossier (max_mass_kg / target_process /
+// target_material / design_life all rendered red "not specified in brief"
+// while max_dimensions_mm + operating_environment were correctly italic
+// "inferred by LLM", because the Stage-1 parser prompt infers those two).
+//
+// This builds a generic ClassAugmentDefaults on the fly from the brief's OWN
+// text (mission + description + additional_constraints + named products),
+// so the engine stays UNIVERSAL (no per-class hand-coding — the same code
+// path serves any future archetype). Values are deliberately defensible and,
+// for mass, deliberately GENEROUS (a clearly-inferred road-transport envelope,
+// never a tight cap that could drive a false compliance PASS — per the
+// brief-provenance guard). Every field carries a basis string in its
+// augmentation-log rationale, matching the class-default path.
+//
+// Only the four fields with NO existing inference site are produced here:
+//   target_process, target_material, design_life, max_mass_kg.
+// op_env + dimensions are left to the Stage-1 parser (which already infers
+// them); batch_size + unit_cost_ceiling have their own dedicated paths above.
+
+/** Signals that the product is a (continuous or batch) chemical / process plant. */
+function looksLikeProcessPlant(text: string): boolean {
+  return /\b(chemical|process)\s+plant\b|\bprocess\s+skid\b|\bcaptur\w*\b|\bmineralis\w*\b|\bmineraliz\w*\b|\belectroly\w*\b|\bdistillation\b|\bstripper\b|\bscrubber\b|\bpacked\s+column\b|\breactor\b|\bsolvent\b|\bcrystallis\w*\b|\bcrystalliz\w*\b|\bfermentation\b|\bcatalyt\w*\b|\brefiner\w*\b/.test(text)
+}
+
+/** Signals that the product is built as a road-transportable skid / container. */
+function looksSkidOrContainerised(text: string): boolean {
+  return /\bskid[-\s]?mounted\b|\bskid\s+module\b|\bcontaineris\w*\b|\bcontaineriz\w*\b|\btransportable\b|\bmodular\b|\bISO\s+container\b|\b(20|40)\s?ft\b|\btrailer\b|\bplinth\b/.test(text)
+}
+
+/**
+ * Extract the construction material(s) + saleable product(s) the brief names,
+ * to build a defensible target_material string for an unmapped class.
+ * Returns null when nothing recognisable is named (genuinely un-inferable).
+ */
+function inferGenericMaterial(text: string, isProcessPlant: boolean): string | null {
+  const materials: string[] = []
+  // Primary fabrication material (vessels / piping / structure).
+  const MAT_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+    { pattern: /\b316l?\s*(?:stainless)?\b|\bstainless\s+steel\b/i, label: '316/316L stainless steel fabrication' },
+    { pattern: /\bduplex\s+stainless\b/i,                           label: 'duplex stainless steel fabrication' },
+    { pattern: /\bhastelloy\b/i,                                    label: 'Hastelloy corrosion-resistant alloy' },
+    { pattern: /\btitanium\b/i,                                     label: 'titanium fabrication' },
+    { pattern: /\bcarbon\s+steel\b/i,                               label: 'carbon-steel fabrication' },
+    { pattern: /\bglass[-\s]?lined\b/i,                             label: 'glass-lined steel vessels' },
+    { pattern: /\bHDPE\b|\bpolyethylene\b/i,                        label: 'HDPE / polymer wetted parts' },
+    { pattern: /\bGRP\b|\bGFRP\b|\bfibre[-\s]?glass\b|\bfiberglass\b/i, label: 'GRP / fibreglass tankage' },
+  ]
+  for (const { pattern, label } of MAT_PATTERNS) {
+    if (pattern.test(text)) { materials.push(label); break } // one primary material is enough
+  }
+  // Saleable / OUTPUT products named in the brief (feedstocks/reagents excluded —
+  // they are inputs, not what the plant produces). Order-preserving + de-duped.
+  const products: string[] = []
+  const PRODUCT_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+    { pattern: /\bcalcium\s+carbonate\b|\bCaCO3\b/i,               label: 'calcium carbonate' },
+    { pattern: /\bpotassium\s+sul(?:f|ph)ate\b|\bK2SO4\b/i,         label: 'potassium sulfate' },
+    { pattern: /\bhydrogen\b|\bH2\b/i,                              label: 'hydrogen' },
+    { pattern: /\boxygen\b|\bO2\b/i,                                label: 'oxygen' },
+    { pattern: /\bammonia\b|\bNH3\b/i,                              label: 'ammonia' },
+    { pattern: /\bmethanol\b/i,                                     label: 'methanol' },
+    { pattern: /\bsodium\s+carbonate\b|\bsoda\s+ash\b/i,            label: 'sodium carbonate' },
+  ]
+  for (const { pattern, label } of PRODUCT_PATTERNS) {
+    if (pattern.test(text) && !products.includes(label)) products.push(label)
+  }
+  if (materials.length === 0 && products.length === 0) return null
+  // When products are named on a process plant but the brief didn't name an
+  // explicit fabrication alloy, default the construction to stainless (the norm
+  // for wet chemical-process duty) so the material string carries BOTH the build
+  // material and the saleable products — e.g. "316L stainless fabrication;
+  // products: calcium carbonate + potassium sulfate".
+  if (materials.length === 0 && products.length > 0 && isProcessPlant) {
+    materials.push('316/316L stainless-steel process fabrication')
+  }
+  const parts: string[] = []
+  if (materials.length) parts.push(materials.join('; '))
+  if (products.length) parts.push(`products: ${products.join(' + ')}`)
+  return parts.join('; ')
+}
+
+/**
+ * Build a class-agnostic ClassAugmentDefaults for an unmapped class from the
+ * brief text alone. Returns ONLY the fields it can genuinely infer; callers
+ * skip any field this leaves undefined (it stays `source:"missing"`).
+ */
+function inferGenericDefaults(
+  productClass: string,
+  rawBriefText: string,
+  productDescription: string,
+  missionStatement: string,
+): Partial<Pick<ClassAugmentDefaults, 'target_process' | 'target_material' | 'design_life' | 'mass_kg'>> & { rationale_basis: string } {
+  const text = `${missionStatement} ${productDescription} ${rawBriefText}`
+  const isProcessPlant = looksLikeProcessPlant(text)
+  const isSkid = looksSkidOrContainerised(text)
+  const out: Partial<Pick<ClassAugmentDefaults, 'target_process' | 'target_material' | 'design_life' | 'mass_kg'>> & { rationale_basis: string } = {
+    rationale_basis: `class-agnostic inference from brief text for unmapped class "${productClass}"`,
+  }
+
+  // ── target_process ──────────────────────────────────────────────────────
+  // Prefer a one-line process summary distilled from the mission/description.
+  if (isProcessPlant) {
+    // Name the principal unit operations the brief mentions, so the process
+    // string is grounded rather than generic boilerplate.
+    const ops: string[] = []
+    if (/\bcaptur\w*\b/i.test(text)) ops.push('capture')
+    if (/\bmineralis\w*|\bmineraliz\w*|\bcarbonat\w*/i.test(text)) ops.push('mineral carbonation')
+    if (/\bdistillation|\bstripper\b/i.test(text)) ops.push('solvent stripping / distillation')
+    if (/\bcrystallis\w*|\bcrystalliz\w*/i.test(text)) ops.push('crystallisation')
+    if (/\belectroly\w*/i.test(text)) ops.push('electrolysis')
+    if (/\bfermentation\b/i.test(text)) ops.push('fermentation')
+    const opPhrase = ops.length ? ops.join(' + ') : 'reaction + separation'
+    out.target_process = `Continuous chemical process: ${opPhrase}; field-erected ${isSkid ? 'skid-mounted modular' : 'fixed'} plant with closed-loop solvent/reagent recovery and automated process control`
+  } else if (isSkid) {
+    out.target_process = 'Modular skid / containerised fabrication: subsystem assembly, piping + harness integration, factory-acceptance test, field erection on prepared foundation'
+  }
+
+  // ── target_material ─────────────────────────────────────────────────────
+  const mat = inferGenericMaterial(text, isProcessPlant)
+  if (mat) {
+    out.target_material = mat
+  } else if (isProcessPlant) {
+    out.target_material = '304/316 stainless-steel process fabrication (vessels, piping, structure)'
+  }
+
+  // ── design_life ─────────────────────────────────────────────────────────
+  // Chemical / process plant: 20–25 yr is the industry norm for static process
+  // equipment + pressure vessels (PED / ASME VIII design life). Skidded
+  // industrial equipment without a process signal: a slightly shorter band.
+  if (isProcessPlant) {
+    out.design_life = '20–25 yr (chemical-process-plant design life; static process equipment + pressure vessels per PED / ASME VIII; periodic re-inspection)'
+  } else if (isSkid) {
+    out.design_life = '15–20 yr (skid-mounted industrial equipment design life)'
+  }
+
+  // ── max_mass_kg ─────────────────────────────────────────────────────────
+  // DELIBERATELY GENEROUS road-transport envelope — never a tight cap that
+  // could drive a false compliance PASS (brief-provenance guard). A skid-
+  // mounted process plant ships as transportable skid modules on a standard
+  // articulated low-loader: gross-mass road limit ≈ 40,000 kg (44 t GVW UK
+  // artic less ≈ tractor + trailer tare). Only inferred when the brief reads
+  // as skid / containerised / transportable; a fixed plant has no single mass.
+  if (isSkid) {
+    out.mass_kg = 40_000
+  }
+
+  return out
+}
+
 // ─── unit_cost_ceiling inference ─────────────────────────────────────────────
 //
 // Uses the class MARKET_BANDS midpoint of the premium tier as the ceiling,
@@ -444,7 +598,41 @@ export function augmentBrief(
     if (prefix) defaults = CLASS_AUGMENT_DEFAULTS[prefix]
   }
 
-  const suffix = defaults?.class_rationale_suffix ?? `class-aware default for product class "${productClass}"`
+  // UNIVERSAL fallback: when the class has no CLASS_AUGMENT_DEFAULTS row, infer
+  // the four string/mass HARD fields from the brief text itself (mission +
+  // description + constraints), so an UNSEEN archetype (e.g. co2_mineralisation,
+  // dac, pemfc) still gets defensible `source:"inferred"` values instead of
+  // falling through to red "missing". Only produced when `defaults` is absent;
+  // each field this leaves undefined stays `missing` (genuinely un-inferable).
+  const additionalConstraintsText = (c.additional_constraints ?? [])
+    .map(ac => ac.description ?? '')
+    .join('. ')
+  const generic = defaults
+    ? undefined
+    : inferGenericDefaults(
+        productClass,
+        `${rawBriefText} ${additionalConstraintsText}`,
+        brief.product_description ?? '',
+        brief.mission_statement ?? '',
+      )
+  // `effectiveDefaults` carries ONLY the four fields the generic inferrer can
+  // produce; the four field-fill branches below each check field-presence, so a
+  // missing generic field is skipped (not forced). For a mapped class this is
+  // just `defaults`.
+  const effectiveDefaults: Partial<ClassAugmentDefaults> | undefined = defaults ?? (
+    generic && (generic.target_process || generic.target_material || generic.design_life || generic.mass_kg != null)
+      ? {
+          target_process: generic.target_process,
+          target_material: generic.target_material,
+          design_life: generic.design_life,
+          mass_kg: generic.mass_kg,
+        } as Partial<ClassAugmentDefaults>
+      : undefined
+  )
+
+  const suffix = defaults?.class_rationale_suffix
+    ?? generic?.rationale_basis
+    ?? `class-aware default for product class "${productClass}"`
 
   // ── Helper: record an augmentation and return updated field ───────────────
 
@@ -522,12 +710,12 @@ export function augmentBrief(
 
   // ── 2. max_mass_kg ───────────────────────────────────────────────────────
 
-  if (defaults && (c.max_mass_kg.value === null || c.max_mass_kg.source === 'missing')) {
+  if (effectiveDefaults?.mass_kg != null && (c.max_mass_kg.value === null || c.max_mass_kg.source === 'missing')) {
     const result = fillField(
       'max_mass_kg',
       c.max_mass_kg.value,
       c.max_mass_kg.source as 'user' | 'inferred' | 'missing',
-      defaults.mass_kg,
+      effectiveDefaults.mass_kg,
       `${suffix}`,
     )
     c.max_mass_kg = { value: result.value, source: result.source }
@@ -547,13 +735,13 @@ export function augmentBrief(
 
   // ── 3. target_process ────────────────────────────────────────────────────
 
-  if (defaults && (c.target_process.value === null || c.target_process.source === 'missing')) {
+  if (effectiveDefaults?.target_process && (c.target_process.value === null || c.target_process.source === 'missing')) {
     const result = fillField(
       'target_process',
       c.target_process.value,
       c.target_process.source as 'user' | 'inferred' | 'missing',
-      defaults.target_process,
-      `Class-canonical process for ${productClass}. ${suffix}`,
+      effectiveDefaults.target_process,
+      `${defaults ? `Class-canonical process for ${productClass}.` : `Process inferred from brief mission/description for ${productClass}.`} ${suffix}`,
     )
     c.target_process = { value: result.value, source: result.source }
   } else {
@@ -573,9 +761,11 @@ export function augmentBrief(
   // For vertical_farm we try to extract the named crop from the brief text
   // before falling back to the generic class default.
 
-  if (defaults && (c.target_material.value === null || c.target_material.source === 'missing')) {
-    let materialValue = defaults.target_material
-    let materialRationale = `Class-canonical material for ${productClass}. ${suffix}`
+  if (effectiveDefaults?.target_material && (c.target_material.value === null || c.target_material.source === 'missing')) {
+    let materialValue = effectiveDefaults.target_material
+    let materialRationale = defaults
+      ? `Class-canonical material for ${productClass}. ${suffix}`
+      : `Material/products inferred from brief text for ${productClass}. ${suffix}`
 
     if (productClass === 'vertical_farm') {
       const crop = extractCropFromBriefText(rawBriefText, brief.product_description)
@@ -630,12 +820,12 @@ export function augmentBrief(
 
   // ── 6. design_life ───────────────────────────────────────────────────────
 
-  if (defaults && (c.design_life.value === null || c.design_life.source === 'missing')) {
+  if (effectiveDefaults?.design_life && (c.design_life.value === null || c.design_life.source === 'missing')) {
     const result = fillField(
       'design_life',
       c.design_life.value,
       c.design_life.source as 'user' | 'inferred' | 'missing',
-      defaults.design_life,
+      effectiveDefaults.design_life,
       `Industry-standard service life for ${productClass} per applicable design standard. ${suffix}`,
     )
     c.design_life = { value: result.value, source: result.source }

@@ -5122,6 +5122,32 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
       // environment legitimately move cycle length ±20%. Surfaces the design's
       // assumed cycle so a divergence from the brief is visible, not hidden.
       crop_cycle_days:             { qtyKey: 'crop_cycle_days',           label: 'Crop cycle', unit: 'days', tolerancePct: 20, kind: 'ceiling' },
+      // ── CO₂-mineralisation plant production / feed rates (gate 17, 2026-06-04) ──
+      // The brief states each product/feed rate in kg/day; the stoichiometry tool
+      // (reaction:stoichiometry-balance) emits the achieved rate in t/day. These
+      // are pure unit conversions (×1000) onto the tool's own product quantity —
+      // exactly like the BESS kWh/MWh aliases above — so the compliance table
+      // shows the real DESIGN ACHIEVED rate + PASS instead of "—"/unverified.
+      // CaCO₃ 2274 vs 2300 (-1.1%), K₂SO₄ 3960 vs 3900 (+1.5%), KOH 2550 vs 2600
+      // (-1.9%) all land inside ±5%. Direction is FLOOR (deliver ≥ the briefed
+      // output) for the products; KOH make-up is the feed the design needs and is
+      // shown as a floor too (the design's required make-up, within tolerance).
+      caco3_production_kg_per_day: { qtyKey: 'caco3_product_t_day',        label: 'CaCO₃ production rate',  unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
+      k2so4_production_kg_per_day: { qtyKey: 'k2so4_product_t_day',        label: 'K₂SO₄ production rate',  unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
+      koh_feed_kg_per_day:         { qtyKey: 'koh_makeup_t_day',          label: 'KOH make-up feed rate', unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
+      // CO₂ capture: the contract emits NO standalone capture-rate quantity (only
+      // co2_capture_efficiency_pct). It IS deterministically derivable from the
+      // CaCO₃ product via the plant's 1:1 CO₂→CaCO₃ mineralisation stoichiometry —
+      // every captured CO₂ molecule reports to one CaCO₃ molecule, so captured
+      // CO₂ (kg/day) = CaCO₃ (t/day) × 1000 × M(CO₂)/M(CaCO₃) = ×1000 × 44.0095 /
+      // 100.0869. 2.27421 t/day → 1000.0 kg/day, landing exactly on the brief's
+      // 1 t/day capture basis (the stoichiometry tool's own internal basis). The
+      // factor is a PHYSICAL CONSTANT (two molar masses), no more fragile than the
+      // ×1000 conversions above; the explicit "(from CaCO₃ stoichiometry)" label
+      // flags the derivation for review if caco3_product_t_day is ever repurposed.
+      // (Coding-council 2026-06-04: GLM-5.1 Option A over a "—" unverified row —
+      // surfacing a deterministically-derivable value is more honest than "—".)
+      co2_capture_kg_per_day:      { qtyKey: 'caco3_product_t_day',        label: 'CO₂ capture rate (from CaCO₃ stoichiometry)', unit: 'kg/day', convert: (v) => v * 1000 * 44.0095 / 100.0869, tolerancePct: 5, kind: 'floor' },
     }
     for (const m of briefMetrics) {
       const km = String(m?.key_metric ?? '')
@@ -5194,6 +5220,43 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
         deltaText: delta,
         tradeOffNarrative: narrative,
       })
+    }
+
+    // ── Gypsum feed — GROUNDED CORRECTION, not a breach (gate 17, 2026-06-04) ──
+    // The brief states gypsum_feed = 3100 kg/day, but the user never specified a
+    // gypsum rate — the engine first inferred ~3.1 t/day, then the reaction
+    // stoichiometry required ~3.91 t/day to make the CaCO₃ from the 1 t/day CO₂
+    // capture. The achieved value (gypsum_feed_t_day, ~3910 kg/day) is the
+    // CORRECT, stoichiometrically-required feed; the brief's 3100 is the engine's
+    // earlier wrong inference. Rendering this as a red 'fail' (+26%) would imply
+    // the DESIGN is deficient when it is actually right; rendering it 'pass' would
+    // be a false-pass (achieved ≠ brief). The honest treatment (coding-council
+    // 2026-06-04, unanimous) is 'unknown' — amber/neutral, achieved value SHOWN,
+    // with a note explaining the grounded correction. The ComplianceStatus enum is
+    // {pass,fail,unknown}; 'unknown' is the table's neutral state. The same
+    // correction is already documented in the brief-rewrite section (~line 4203).
+    // Handled here (not in METRIC_MAP) precisely because the generic map loop
+    // would force a binary pass/fail and a t/day→kg/day mismatch would otherwise
+    // fall through the universal pass as a bare "—" with no achieved value or note.
+    if (!_renderedMetricKeys.has('gypsum_feed_kg_per_day')) {
+      const gypsumBrief = briefMetrics.find((m) => String(m?.key_metric ?? '') === 'gypsum_feed_kg_per_day')
+      const gypsumBriefVal = typeof gypsumBrief?.value === 'number' && Number.isFinite(gypsumBrief.value) ? gypsumBrief.value : null
+      const gypsumAch = _qtyFromOrch(quantities, 'gypsum_feed_t_day')
+      if (gypsumBriefVal != null && gypsumAch) {
+        _renderedMetricKeys.add('gypsum_feed_kg_per_day')
+        const achievedKgDay = gypsumAch.value * 1000
+        rows.push({
+          constraint: 'Gypsum feed rate',
+          briefTarget: `${gypsumBriefVal} kg/day`,
+          designAchieved: `${Math.round(achievedKgDay).toLocaleString('en-GB')} kg/day`,
+          status: 'unknown',
+          deltaText: 'corrected',
+          tradeOffNarrative:
+            `You named gypsum as the calcium source but no rate, so the brief's ${gypsumBriefVal.toLocaleString('en-GB')} kg/day was the engine's first inference. ` +
+            `The reaction stoichiometry — to make the ${'~'}2.3 t/day CaCO₃ from the 1 t/day CO₂ capture — requires ${Math.round(achievedKgDay).toLocaleString('en-GB')} kg/day of gypsum (CaSO₄·2H₂O). ` +
+            `The design sizes the gypsum feed system for this higher, stoichiometrically-grounded figure; the brief value is shown for reference but is not a deficiency in the design.`,
+        })
+      }
     }
 
     // ── Universal completeness pass (2026-05-30): emit a row for every brief
@@ -5920,6 +5983,41 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
           </View>
         )
       })}
+
+      {/* Block 1b (2026-06-04): grounded-correction / note rows. An 'unknown'
+          row that carries a tradeOffNarrative is NOT an unverifiable gap — it is
+          a deliberately-noted correction (e.g. the CO₂-mineralisation gypsum feed,
+          where the brief's stated rate was the engine's earlier inference and the
+          design uses the higher stoichiometrically-required value). The failed-row
+          trade-off block below only iterates status==='fail', so without this the
+          note would never reach the reader. Renders amber (neutral), never red. */}
+      {unknownRows.some((r) => r.tradeOffNarrative) ? (
+        <View style={{ marginTop: 16 }}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#b45309', marginBottom: 6 }}>
+            Notes on corrected / unverified constraints
+          </Text>
+          {unknownRows.filter((r) => r.tradeOffNarrative).map((row, i) => (
+            <View
+              key={`note-${i}`}
+              style={{
+                marginBottom: 10,
+                padding: 10,
+                backgroundColor: '#fffbeb',
+                borderLeftWidth: 3,
+                borderLeftColor: '#b45309',
+              }}
+              minPresenceAhead={70}
+            >
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#92400e', marginBottom: 4 }}>
+                {row.constraint}: brief {row.briefTarget} {'->'} design {row.designAchieved} ({row.deltaText})
+              </Text>
+              <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.6 }}>
+                {normalise_unicode(String(row.tradeOffNarrative ?? ''))}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {/* Block 2: CAPEX / OPEX / output trade-off discussion. One block per
           failed constraint, with REAL engineering reasoning. Hidden when no
@@ -10887,16 +10985,22 @@ function PhysicsNarrativePage({ state, project }: { state: any; project: string 
     ?? state?.moduleDecomposition?.product_class
     ?? ''
 
-  const narrative = generatePhysicsNarrative(quantities, productClass)
+  // Build #21 (2026-06-04): this front section is pruned to SYSTEM-LEVEL tools —
+  // the module-owned tools' worked maths now renders WITH each module, so the
+  // up-front narrative lists ONLY the cross-cutting whole-plant tools (the
+  // complement of the per-module routing: mass-aggregator, lifecycle-co2,
+  // dac-regeneration, property look-ups). The same system-level set drives both
+  // the narrative body (passed into the generator, which filters by tool_id) and
+  // the footer tool-citation line below. Computed before the narrative call so it
+  // can be passed in.
+  const systemIds = systemLevelToolIds(state)
+  const narrative = generatePhysicsNarrative(quantities, productClass, systemIds)
   if (!narrative || narrative.sentences.length === 0) return null
 
-  // Build #21 (2026-06-04): this front section cites only SYSTEM-LEVEL tools —
-  // module-owned tool detail now lives inside each module. tools_cited is a
-  // list of display names, so resolve the system-level tool_ids to their
-  // display names and keep only the cited names in that set. If the resolution
-  // yields nothing (older state without a toolsUsedPage), fall back to the full
-  // cited list rather than blanking the footer.
-  const systemIds = systemLevelToolIds(state)
+  // tools_cited is a list of display names, so resolve the system-level tool_ids
+  // to their display names and keep only the cited names in that set. If the
+  // resolution yields nothing (older state without a toolsUsedPage), fall back to
+  // the full cited list rather than blanking the footer.
   const page = readToolsUsedPage(state)
   const systemNames = new Set<string>()
   if (page && Array.isArray(page.tools)) {
@@ -11614,41 +11718,10 @@ const COMPUTE_AMBER_LINE = '#f0d8c9'     // block border
 const COMPUTE_WORKED_BG = '#fffdfb'      // worked box background
 const COMPUTE_WORKED_LINE = '#efddd0'    // worked box border
 
-// Shared worked-calculation renderer — the SAME formula -> substituted-numbers
-// -> "assumes" presentation the Tools-Used appendix used (render-minimal-pdf
-// ToolsUsedPage, 2026-06-02/06-03). Extracted so the per-module "How this
-// module was computed" block (build #21, 2026-06-04) and any other consumer
-// render tool.worked identically. `accentColour` lets the per-module block tint
-// the maths amber to match the mockup while the appendix kept navy.
-function WorkedCalcSteps({ worked, accentColour }: { worked: any[]; accentColour: string }) {
-  if (!Array.isArray(worked) || worked.length === 0) return null
-  return (
-    <>
-      {worked.map((wc: any, wi: number) => (
-        <View key={wi} style={{ marginBottom: 5 }}>
-          <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{normalise_unicode(String(wc.label ?? ''))}</Text>
-          </Text>
-          {/* Symbolic formula above the substituted numbers, so the reader can
-              tell what each number represents (Tristan 2026-06-03). */}
-          {wc.formula ? (
-            <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK_SOFT, lineHeight: 1.5, marginLeft: 6 }}>
-              {normalise_unicode(String(wc.formula))}
-            </Text>
-          ) : null}
-          <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: accentColour, lineHeight: 1.5, marginLeft: 6 }}>
-            {normalise_unicode(String(wc.substitution ?? ''))}
-          </Text>
-          {Array.isArray(wc.assumptions) && wc.assumptions.length > 0 ? (
-            <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.45, marginLeft: 6 }}>
-              {normalise_unicode('assumes: ' + wc.assumptions.join('; '))}
-            </Text>
-          ) : null}
-        </View>
-      ))}
-    </>
-  )
-}
+// (2026-06-04) The former shared `WorkedCalcSteps` renderer was inlined into
+// ToolsComputedBlock below: each worked step is now its own atomic, non-wrapping
+// peach ROW so no coloured View ever spans a page break (the full-page-peach-gap
+// fix). It had no other consumer.
 
 // Build #21/#22 (2026-06-04) — "How this is computed" block, shared core.
 // For a given list of tool_ids, renders each tool's display name + its full
@@ -11657,6 +11730,25 @@ function WorkedCalcSteps({ worked, accentColour }: { worked: any[]; accentColour
 // Mockup: REPORT-LAYOUT-MOCKUP.html block 2 ("Each module — engineering, then
 // its parts"). `compact` tightens spacing + heading for the per-SUB-MODULE
 // placement (Build #22). Empty `toolIds` → null (the mockup's empty state).
+//
+// 2026-06-04 (Module-7 pressure-drop full-page-peach-gap fix — coding-council
+// Gemini 3.1 Pro + Grok 4.3, unanimous): react-pdf's pagination engine CANNOT
+// hold a backgroundColor/border on a View that WRAPS across a page boundary —
+// when it splits a wrapping node, it forces the continuation fragment's Yoga
+// height to the FULL remaining page height to bound the surviving children, so
+// the colour paints down to the footer (the "big empty peach box then footer"
+// gap on the continuation page). No flex / overflow / minPresenceAhead /
+// wrap={false} prop fixes this for a block that is genuinely TALLER than a page
+// (a single tool can emit 10+ worked steps): wrap={false} hard-overflows.
+// THE ONLY ROBUST FIX is to decouple the colour from the wrapping container —
+// the outer container is fully TRANSPARENT (it may wrap freely) and the peach
+// background + side borders live on each ATOMIC, non-wrapping ROW (header bar,
+// intro, each tool-name line, each individual worked-calc step + its sub-labels).
+// The first emitted row carries the top cap (top border + top radii), the last
+// row the bottom cap, so the block still reads as one continuous peach card but
+// no single coloured View ever spans a page break. Per-worked-STEP granularity
+// is the safe unit (one step is always < 1 page; even one tool's worked list can
+// exceed a page). Each row is wrap={false} (always smaller than a page).
 function ToolsComputedBlock({
   toolIds, state, heading, intro, compact,
 }: { toolIds: string[]; state: any; heading: string; intro: string; compact?: boolean }) {
@@ -11675,99 +11767,175 @@ function ToolsComputedBlock({
     )
   if (tools.length === 0) return null
 
-  return (
+  const PEACH = COMPUTE_AMBER_SOFT
+  const PEACH_LINE = COMPUTE_AMBER_LINE
+  const PADX = 11
+
+  // Build a flat ordered list of atomic ROW renderers. Each becomes its own
+  // wrap={false} peach View; caps (top/bottom radius + edge border) are applied
+  // by index so the stack reads as one continuous card. side() = peach bg + L/R
+  // borders shared by every row.
+  const side = { backgroundColor: PEACH, borderLeftWidth: 0.8, borderRightWidth: 0.8, borderColor: PEACH_LINE }
+  const rowNodes: React.ReactNode[] = []
+
+  // Header bar row.
+  rowNodes.push(
     <View
       style={{
-        marginBottom: compact ? 8 : 14,
-        marginLeft: compact ? 36 : 0,
-        borderWidth: 0.8,
-        borderColor: COMPUTE_AMBER_LINE,
-        backgroundColor: COMPUTE_AMBER_SOFT,
-        borderRadius: 6,
-        overflow: 'hidden',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: compact ? 5 : 7,
+        paddingHorizontal: PADX,
+        borderBottomWidth: 0.8,
+        borderBottomColor: '#f3ddcf',
       }}
-      // Protect the header + first tool name so the block doesn't orphan its
-      // heading at a page foot; the worked steps below flow/break naturally.
-      minPresenceAhead={compact ? 60 : 70}
     >
-      {/* compute-h: amber header bar */}
-      <View
+      <Text style={{ flex: 1, fontSize: compact ? 9 : 10, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER_DEEP }}>
+        {heading}
+      </Text>
+      <Text
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingVertical: compact ? 5 : 7,
-          paddingHorizontal: 11,
-          borderBottomWidth: 0.8,
-          borderBottomColor: '#f3ddcf',
+          fontSize: 6.5,
+          fontFamily: 'Helvetica-Bold',
+          color: COMPUTE_AMBER,
+          letterSpacing: 0.4,
+          borderWidth: 0.6,
+          borderColor: '#eccdba',
+          backgroundColor: '#ffffff',
+          paddingVertical: 1.5,
+          paddingHorizontal: 5,
+          borderRadius: 3,
         }}
       >
-        <Text style={{ flex: 1, fontSize: compact ? 9 : 10, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER_DEEP }}>
-          {heading}
-        </Text>
-        <Text
-          style={{
-            fontSize: 6.5,
-            fontFamily: 'Helvetica-Bold',
-            color: COMPUTE_AMBER,
-            letterSpacing: 0.4,
-            borderWidth: 0.6,
-            borderColor: '#eccdba',
-            backgroundColor: '#ffffff',
-            paddingVertical: 1.5,
-            paddingHorizontal: 5,
-            borderRadius: 3,
-          }}
-        >
-          ENGINEERING DETAIL
-        </Text>
-      </View>
+        ENGINEERING DETAIL
+      </Text>
+    </View>,
+  )
 
-      {/* compute-body */}
-      <View style={{ paddingVertical: compact ? 7 : 9, paddingHorizontal: 11 }}>
-        <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5, marginBottom: compact ? 6 : 8 }}>
-          {intro}
-        </Text>
+  // Intro row.
+  rowNodes.push(
+    <View style={{ paddingTop: compact ? 7 : 9, paddingBottom: compact ? 4 : 6, paddingHorizontal: PADX }}>
+      <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>{intro}</Text>
+    </View>,
+  )
 
-        {tools.map((tool: any, ti: number) => {
-          const worked: any[] = Array.isArray(tool.worked) ? tool.worked : []
-          return (
+  // Per-tool rows: a tool-name line, then either each worked step as its own row
+  // (inside a light worked-box rendered per-step so the box itself never wraps)
+  // or the no-worked-block fallback line.
+  tools.forEach((tool: any, ti: number) => {
+    const worked: any[] = Array.isArray(tool.worked) ? tool.worked : []
+    const lastTool = ti === tools.length - 1
+    rowNodes.push(
+      <View style={{ paddingTop: ti === 0 ? 0 : 9, paddingBottom: worked.length > 0 ? 4 : 0, paddingHorizontal: PADX }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK }}>
+          {normalise_unicode(tool.tool_name || tool.tool_id)}
+          <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
+            {tool.tool_version ? `  v${tool.tool_version}` : ''}
+          </Text>
+        </Text>
+      </View>,
+    )
+    if (worked.length > 0) {
+      // "WORKED CALCULATION" caption row (top of the inner worked box).
+      rowNodes.push(
+        <View style={{ paddingHorizontal: PADX }}>
+          <View
+            style={{
+              backgroundColor: COMPUTE_WORKED_BG,
+              borderTopWidth: 0.6, borderLeftWidth: 0.6, borderRightWidth: 0.6,
+              borderColor: COMPUTE_WORKED_LINE,
+              borderTopLeftRadius: 5, borderTopRightRadius: 5,
+              paddingTop: 8, paddingHorizontal: 10, paddingBottom: 4,
+            }}
+          >
+            <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER, letterSpacing: 0.4 }}>
+              WORKED CALCULATION — EVERY NUMBER CHECKABLE BY HAND
+            </Text>
+          </View>
+        </View>,
+      )
+      // Each worked step is its own row — a continuation of the inner worked box
+      // (L/R border, no radius), the final step closes the box (bottom border +
+      // bottom radii). This keeps every coloured View shorter than a page.
+      worked.forEach((wc: any, wi: number) => {
+        const lastStep = wi === worked.length - 1
+        rowNodes.push(
+          <View style={{ paddingHorizontal: PADX }}>
             <View
-              key={tool.tool_id || `mtool-${ti}`}
-              style={{ marginBottom: ti < tools.length - 1 ? 9 : 0 }}
-              minPresenceAhead={40}
+              style={{
+                backgroundColor: COMPUTE_WORKED_BG,
+                borderLeftWidth: 0.6, borderRightWidth: 0.6,
+                borderBottomWidth: lastStep ? 0.6 : 0,
+                borderColor: COMPUTE_WORKED_LINE,
+                borderBottomLeftRadius: lastStep ? 5 : 0,
+                borderBottomRightRadius: lastStep ? 5 : 0,
+                paddingHorizontal: 10,
+                paddingBottom: lastStep ? 8 : 0,
+              }}
             >
-              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: worked.length > 0 ? 4 : 0 }}>
-                {normalise_unicode(tool.tool_name || tool.tool_id)}
-                <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
-                  {tool.tool_version ? `  v${tool.tool_version}` : ''}
-                </Text>
+              <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5, marginBottom: 1 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{normalise_unicode(String(wc.label ?? ''))}</Text>
               </Text>
-              {worked.length > 0 ? (
-                <View
-                  style={{
-                    backgroundColor: COMPUTE_WORKED_BG,
-                    borderWidth: 0.6,
-                    borderColor: COMPUTE_WORKED_LINE,
-                    borderRadius: 5,
-                    paddingVertical: 8,
-                    paddingHorizontal: 10,
-                  }}
-                >
-                  <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER, letterSpacing: 0.4, marginBottom: 6 }}>
-                    WORKED CALCULATION — EVERY NUMBER CHECKABLE BY HAND
-                  </Text>
-                  <WorkedCalcSteps worked={worked} accentColour={COMPUTE_AMBER} />
-                </View>
-              ) : (
-                <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic', lineHeight: 1.45 }}>
-                  Output quantities listed in the Tools-Used index; no step-by-step
-                  worked block was emitted by this tool.
+              {wc.formula ? (
+                <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK_SOFT, lineHeight: 1.5, marginLeft: 6 }}>
+                  {normalise_unicode(String(wc.formula))}
                 </Text>
+              ) : null}
+              <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: COMPUTE_AMBER, lineHeight: 1.5, marginLeft: 6 }}>
+                {normalise_unicode(String(wc.substitution ?? ''))}
+              </Text>
+              {Array.isArray(wc.assumptions) && wc.assumptions.length > 0 ? (
+                <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.45, marginLeft: 6, marginBottom: lastStep ? 0 : 5 }}>
+                  {normalise_unicode('assumes: ' + wc.assumptions.join('; '))}
+                </Text>
+              ) : (
+                <View style={{ marginBottom: lastStep ? 0 : 5 }} />
               )}
             </View>
-          )
-        })}
-      </View>
+          </View>,
+        )
+      })
+    } else {
+      rowNodes.push(
+        <View style={{ paddingHorizontal: PADX, paddingBottom: lastTool ? 0 : 0 }}>
+          <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic', lineHeight: 1.45 }}>
+            Output quantities listed in the Tools-Used index; no step-by-step
+            worked block was emitted by this tool.
+          </Text>
+        </View>,
+      )
+    }
+  })
+
+  // A final spacer row gives the card its bottom padding inside the peach edge.
+  rowNodes.push(<View style={{ height: compact ? 7 : 9, paddingHorizontal: PADX }} />)
+
+  const lastIdx = rowNodes.length - 1
+  return (
+    <View
+      style={{ marginBottom: compact ? 8 : 14, marginLeft: compact ? 36 : 0 }}
+      // Keep the header + first row together so the card doesn't orphan its
+      // heading at a page foot; the wrapper is transparent so this reservation
+      // paints nothing if it pushes to the next page.
+      minPresenceAhead={compact ? 60 : 70}
+    >
+      {rowNodes.map((node, i) => (
+        <View
+          key={i}
+          wrap={false}
+          style={{
+            ...side,
+            borderTopWidth: i === 0 ? 0.8 : 0,
+            borderTopLeftRadius: i === 0 ? 6 : 0,
+            borderTopRightRadius: i === 0 ? 6 : 0,
+            borderBottomWidth: i === lastIdx ? 0.8 : 0,
+            borderBottomLeftRadius: i === lastIdx ? 6 : 0,
+            borderBottomRightRadius: i === lastIdx ? 6 : 0,
+          }}
+        >
+          {node}
+        </View>
+      ))}
     </View>
   )
 }

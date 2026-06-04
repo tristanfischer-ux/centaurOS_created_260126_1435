@@ -130,6 +130,19 @@ const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   // _mm the next (iter-vf6). Both map to the same achieved tier-clearance quantity.
   max_plant_height_mm: { qtyKey: 'tier_canopy_clearance_cm', label: 'Max plant height (tier clearance)' },
   crop_cycle_days: { qtyKey: 'crop_cycle_days', label: 'Crop cycle' },
+  // CO₂-mineralisation production / feed rates (gate 17, 2026-06-04) — mirror the
+  // renderer METRIC_MAP additions. Brief states kg/day; stoichiometry tool emits
+  // t/day (×1000 convert in the renderer). co2_capture is derived in the renderer
+  // from the CaCO₃ product via 1:1 CO₂→CaCO₃ molar stoichiometry, so its achieved
+  // quantity is also caco3_product_t_day. gypsum_feed_kg_per_day is deliberately
+  // NOT mirrored here: the renderer renders it via a dedicated grounded-correction
+  // row (status 'unknown' + note, achieved gypsum_feed_t_day×1000), not via the
+  // generic METRIC_MAP loop — so it is NOT a "renderer-blindness" miss. The
+  // gate-17 auditor recognises gypsum_feed_kg_per_day's achieved presence below.
+  caco3_production_kg_per_day: { qtyKey: 'caco3_product_t_day', label: 'CaCO₃ production rate' },
+  k2so4_production_kg_per_day: { qtyKey: 'k2so4_product_t_day', label: 'K₂SO₄ production rate' },
+  koh_feed_kg_per_day: { qtyKey: 'koh_makeup_t_day', label: 'KOH make-up feed rate' },
+  co2_capture_kg_per_day: { qtyKey: 'caco3_product_t_day', label: 'CO₂ capture rate (from CaCO₃ stoichiometry)' },
 }
 
 // HARD constraint categories — when a brief constraint falls into one of

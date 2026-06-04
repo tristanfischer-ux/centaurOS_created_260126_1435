@@ -54,6 +54,7 @@ import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { buildContract } from './lib/engineering-contract'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
+import { augmentBrief } from '../src/lib/pdf-engine-v2/brief-augment'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
 import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { CLASS_HAZARDS, getClassHazards } from '../src/lib/pdf-engine-v2/class-hazards'
@@ -603,6 +604,86 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       costStackOk,
       (ok) => ok,
       () => `cost stack mis-resolved: co2 channel=${co2cs.ratios.channel_markup_factor} (want 0); unmappedPlant=${unmappedPlant.class_key}/${unmappedPlant.ratios.channel_markup_factor} (want bespoke_plant_default/0); consumer=${consumerGadget.class_key}/${consumerGadget.ratios.channel_markup_factor} (want DEFAULT/>0). A bespoke plant getting a channel markup is the CO2 "Channel list price" bug.`,
+    ))
+  }
+
+  // ── UNIVERSAL.brief_augment_infers_mandatory_for_unmapped_class ──────────
+  // Brief-provenance lever (Tristan 2026-06-04): the LLM-interpreted brief must
+  // INFER sensible values for the mandatory HARD constraints rather than leaving
+  // them red "not specified in brief". augmentBrief already does this for the ~20
+  // CLASS_AUGMENT_DEFAULTS classes; the gap was an UNMAPPED class (e.g.
+  // co2_mineralisation) where defaults are absent — all four string/mass fields
+  // (max_mass_kg / target_process / target_material / design_life) fell through to
+  // `source:"missing"` while max_dimensions_mm + operating_environment were
+  // parser-inferred. The class-agnostic fallback (inferGenericDefaults) now derives
+  // those four from the brief text. Three guards, all pure (no LLM, no DB):
+  //   (a) INFER: an unmapped skid-mounted chemical-process brief → all four fields
+  //       flip to `source:"inferred"` with non-null values, and the four leave
+  //       missing_mandatory_fields (the renderer's red banner shrinks).
+  //   (b) GENEROUS-MASS: the inferred mass cap is a generous road-transport
+  //       envelope (≥ 30,000 kg), never a tight cap that could drive a false PASS.
+  //   (c) UN-INFERABLE-STAYS-MISSING: a no-signal unmapped class keeps all four
+  //       `missing` (no fabricated inference) — the discipline that the genuinely
+  //       unknowable is still surfaced as missing.
+  {
+    const mkBrief = (desc: string, mission: string): any => ({
+      project_id: 't', product_description: desc, mission_statement: mission,
+      target_customers: '', why_now: '',
+      constraints: {
+        unit_cost_ceiling: { value: 1_900_000, currency: 'GBP', source: 'user' },
+        max_mass_kg: { value: null, source: 'missing' },
+        max_dimensions_mm: { w: null, d: null, h: null, source: 'missing' },
+        target_performance: { key_metric: null, value: null, unit: null, source: 'missing', metrics: [] },
+        target_process: { value: null, source: 'missing' },
+        target_material: { value: null, source: 'missing' },
+        batch_size: { value: 6, source: 'user' },
+        design_life: { value: null, source: 'missing' },
+        operating_environment: { temp_min_c: 20, temp_max_c: 120, source: 'inferred' },
+        safety_standards: [], additional_constraints: [],
+      },
+      missing_mandatory_fields: ['max_mass_kg', 'target_process', 'target_material', 'design_life'],
+      confidence: 'HIGH',
+    })
+
+    // (a)+(b): unmapped skid-mounted CO2 mineralisation process plant.
+    const co2Brief = mkBrief(
+      'A modular, skid-mounted chemical process plant that captures CO2 with MEA solvent and mineralises it with gypsum to produce calcium carbonate and potassium sulfate.',
+      'Provide industrial CO2 emitters with on-site carbon capture that generates revenue through mineralisation into saleable solid products.',
+    )
+    const co2Res = augmentBrief(co2Brief, 'co2_mineralisation', 'skid-mounted carbon-capture and mineral-carbonation chemical process plant, transportable on a standard trailer, calcium carbonate + potassium sulfate products')
+    const cc = co2Brief.constraints
+    const inferOk =
+      cc.max_mass_kg.source === 'inferred' && typeof cc.max_mass_kg.value === 'number' &&
+      cc.target_process.source === 'inferred' && !!cc.target_process.value &&
+      cc.target_material.source === 'inferred' && !!cc.target_material.value &&
+      cc.design_life.source === 'inferred' && !!cc.design_life.value &&
+      cc.operating_environment.source === 'inferred' && // parser inference untouched
+      (cc.max_mass_kg.value as number) >= 30_000 &&
+      co2Brief.missing_mandatory_fields.length === 0 &&
+      co2Res.still_missing.length === 0
+    assertions.push(assertEq(
+      'UNIVERSAL.brief_augment_infers_mandatory_for_unmapped_class',
+      'augmentBrief: unmapped skid process-plant → 4 mandatory fields inferred (not missing), mass cap generous, banner clears',
+      inferOk,
+      (ok) => ok,
+      () => `unmapped-class augmentation failed: mass=${JSON.stringify(cc.max_mass_kg)}, process=${cc.target_process.source}, material=${cc.target_material.source}, life=${cc.design_life.source}, op_env=${cc.operating_environment.source}, missing=${JSON.stringify(co2Brief.missing_mandatory_fields)}. The CO2 dossier "not specified in brief" red banner regressed — inferGenericDefaults in brief-augment.ts is the suspect.`,
+    ))
+
+    // (c): no-signal unmapped class — all four STAY missing (no false inference).
+    const blankBrief = mkBrief('A widget', 'To make a widget')
+    augmentBrief(blankBrief, 'mystery_unknown_class', 'a widget that does a thing')
+    const bc = blankBrief.constraints
+    const stayMissingOk =
+      bc.max_mass_kg.source === 'missing' && bc.max_mass_kg.value === null &&
+      bc.target_process.source === 'missing' &&
+      bc.target_material.source === 'missing' &&
+      bc.design_life.source === 'missing'
+    assertions.push(assertEq(
+      'UNIVERSAL.brief_augment_un_inferable_stays_missing',
+      'augmentBrief: no-signal unmapped class keeps mandatory fields missing (no fabricated inference)',
+      stayMissingOk,
+      (ok) => ok,
+      () => `a no-signal class got a fabricated inference: mass=${bc.max_mass_kg.source}, process=${bc.target_process.source}, material=${bc.target_material.source}, life=${bc.design_life.source}. inferGenericDefaults must only fire on a genuine process/skid signal.`,
     ))
   }
 
@@ -1454,6 +1535,28 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     (n) => n === 0,
     () => `METRIC_MAP mirror desync (or source parse failed) — only in renderer: [${onlyRenderer.join(', ')}]; only in audit: [${onlyAudit.join(', ')}]. Keep render-minimal-pdf.tsx::METRIC_MAP and brief-constraint-completeness-audit.ts::KNOWN_METRIC_MAP identical.`,
   ))
+
+  // I12c (2026-06-04): ToolsComputedBlock must NOT paint a backgroundColor on a View
+  // that react-pdf may WRAP across a page boundary — the paginator stretches the
+  // continuation fragment to full page height, painting the bg down to the footer
+  // (the "full-page peach box" gap that failed gate-11 as v11 exit 11). The fix
+  // structures the block as a transparent wrapping container + per-row ATOMIC
+  // wrap={false} Views that each carry the peach bg. Source check: the per-row-array
+  // pattern (rowNodes) + wrap={false} must both survive — a revert to a single
+  // wrapping coloured View would drop them and re-introduce the page-filling gap.
+  {
+    const rmpSrc = readFileSync(resolve(__dirname, 'render-minimal-pdf.tsx'), 'utf-8')
+    const tcbStart = rmpSrc.indexOf('function ToolsComputedBlock')
+    const tcb = tcbStart >= 0 ? rmpSrc.slice(tcbStart, rmpSrc.indexOf('function ModuleToolsCallout', tcbStart)) : ''
+    const okStructure = tcb.includes('rowNodes') && tcb.includes('wrap={false}')
+    assertions.push(assertEq(
+      'I12c.compute_block_rows_unwrappable',
+      'ToolsComputedBlock builds atomic per-row wrap={false} nodes (no backgroundColor on a wrapping container -> no full-page-bg gap)',
+      okStructure ? 0 : 1,
+      (n) => n === 0,
+      () => 'ToolsComputedBlock regressed: the per-row-array (rowNodes) + wrap={false} pattern is gone. A backgroundColor on a WRAPPABLE View paints to the page footer on the continuation page (the peach-gap bug, gate-11 / v11 exit 11). Keep the outer wrapper transparent and put the bg on per-row wrap={false} Views.',
+    ))
+  }
 
   // VF.scale_fallback_audit — P1-4 (2026-05-23): VF emitter logs
   // SCALE_FALLBACK_FIRED when the orchestrator's tool plan didn't populate a
