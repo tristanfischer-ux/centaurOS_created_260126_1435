@@ -36,6 +36,36 @@ export interface CostLine {
   component_class: string | null
   unit_price_gbp: number
   quantity: number
+  /**
+   * Provenance tier of unit_price_gbp. Lines whose price is REAL/SOURCED — a
+   * distributor / DB quote ('actual'), an emitter catalogue pin, or a corpus
+   * real-price match ('corpus_price') — are NOT estimates, so the ceiling
+   * sanity-bound and the identical-price fingerprint do NOT apply to them
+   * (Tristan 2026-06-04: a £60k boiler with a real Fulton price must not be
+   * flagged against a £15k generic-thermal ESTIMATE ceiling). Absent / any
+   * estimate tier behaves exactly as before (audited).
+   */
+  price_tier?: 'actual' | 'estimate' | 'tbd' | string | null
+  /**
+   * Explicit sourced override. When true the line is treated as real/sourced
+   * regardless of price_tier (e.g. an emitter list_price pin that renders as a
+   * distributor price, or a corpus_price estimate-tier line). Set by the
+   * renderer from distributor_price_source / engine_b_estimate_source.
+   */
+  price_sourced?: boolean
+}
+
+/**
+ * A line is REAL/SOURCED (not an estimate) when its price came from a
+ * distributor / DB quote, an emitter catalogue pin, or a corpus real-price
+ * match. The ceiling is a sanity bound for ESTIMATES only — a real sourced
+ * price is its own ground truth and must never be flagged against a generic
+ * class-anchor estimate ceiling. Conservative by construction: anything not
+ * positively known to be sourced is still audited as an estimate.
+ */
+function isSourcedLine(ln: CostLine): boolean {
+  if (ln.price_sourced === true) return true
+  return ln.price_tier === 'actual' || ln.price_tier === 'corpus_price'
 }
 
 export interface CostSanityFinding {
@@ -89,8 +119,12 @@ export function auditCostSanity(
     if (!Number.isFinite(price) || price <= 0) continue
     const cls = String(ln.component_class ?? '')
     const name = String(ln.word_name ?? '')
+    const sourced = isSourcedLine(ln)
 
-    // 3. non-physical line still inside the per-unit capital BoM
+    // 3. non-physical line still inside the per-unit capital BoM.
+    // The NON_PHYSICAL check is NAME-based (a certification / software line),
+    // independent of price provenance, so it still fires on sourced lines —
+    // a real-priced "DO-178C certification" is still mis-routed into capital.
     if (NON_PHYSICAL_RE.test(name)) {
       findings.push({
         kind: 'non_physical_in_capital',
@@ -102,9 +136,13 @@ export function auditCostSanity(
       continue
     }
 
-    // 2. per-line type outlier vs class ceiling
+    // 2. per-line type outlier vs class ceiling.
+    // SKIP sourced lines: the ceiling is a sanity bound for ESTIMATES, not for
+    // a real distributor / corpus / pinned price. A £60k boiler with a real
+    // Fulton catalogue price must not be flagged 4× against a £15k generic-
+    // thermal ESTIMATE ceiling (Tristan 2026-06-04).
     const ceil = classCeil[cls]
-    if (typeof ceil === 'number' && ceil > 0 && price > ceil * OUTLIER_MULTIPLE) {
+    if (!sourced && typeof ceil === 'number' && ceil > 0 && price > ceil * OUTLIER_MULTIPLE) {
       const egregious = price > ceil * EGREGIOUS_MULTIPLE
       findings.push({
         kind: 'per_line_type_outlier',
@@ -116,9 +154,16 @@ export function auditCostSanity(
     }
   }
 
-  // 1. identical-price fingerprint
+  // 1. identical-price fingerprint.
+  // SKIP sourced lines: the fingerprint is the signature of classifier mis-
+  // bucketing (many ESTIMATE lines collapsed onto one class anchor). Real
+  // sourced prices can legitimately coincide (two Eaton valves both £450 from
+  // the corpus, several parts genuinely priced at a round catalogue figure)
+  // and are NOT evidence of mis-bucketing — counting them produces false
+  // fingerprints. Only estimate-tier lines participate.
   const byPrice = new Map<number, Set<string>>()
   for (const ln of lines) {
+    if (isSourcedLine(ln)) continue
     const price = Math.round(Number(ln.unit_price_gbp))
     if (!Number.isFinite(price) || price < FINGERPRINT_MIN_PRICE_GBP) continue
     let names = byPrice.get(price)

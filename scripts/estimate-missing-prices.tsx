@@ -144,8 +144,8 @@ interface PriceEstimate {
   curve_multiplier: number
   reference_unit_cost_gbp: number
   annual_volume: number
-  classification_source: 'corpus' | 'flash_lite' | 'fallback' | 'curated' | 'db_cache' | 'rule_based'
-  estimate_source: 'curve' | 'flash_lite_unknown_class' | 'db_cache'
+  classification_source: 'corpus' | 'flash_lite' | 'fallback' | 'curated' | 'db_cache' | 'rule_based' | 'corpus_price'
+  estimate_source: 'curve' | 'flash_lite_unknown_class' | 'db_cache' | 'corpus_price'
   // U1 class ceiling flag — set when the final price was clamped by PRICE_CEILING_BY_COMPONENT_CLASS
   price_class_ceiling_clamped?: boolean
   price_class_ceiling_note?: string
@@ -238,6 +238,273 @@ class CorpusClassifier {
     }
     this.memo.set(key, result)
     return result
+  }
+
+  close() {
+    this.db?.close()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CORPUS REAL-PRICE LOOKUP (2026-06-04) — the growing-DB pricing primary.
+//
+// The CorpusClassifier above reads only the corpus row's component_class and
+// throws away its real `unit_price_gbp`. So a branded part with NO distributor
+// cascade hit fell straight to the Engine-B CLASS ANCHOR — collapsing many
+// distinct parts onto one price (the £7,500-×4 fingerprint on the CO₂ dossier)
+// and bucketing a £60k Fulton boiler as generic `thermal` (ceiling £15k) so the
+// cost self-check false-flagged it 4×.
+//
+// This lookup PREFERS the corpus's own real price for a part (DB-first, per the
+// growing-DB principle): for a part that carries a manufacturer (and ideally an
+// MPN), find a corpus row with a MATCHING manufacturer AND a strong MPN / part-
+// name match AND a non-null unit_price_gbp — preferring verified, higher-
+// confidence rows — and use THAT real price instead of the class anchor.
+//
+// SCOPING (the zero-regression guarantee): rows are filtered to the part's OWN
+// product-class corpus tag (component_class = <product_class_corpus_tag>, e.g.
+// 'co2_mineralisation'). The harvest writes parts back class-tagged with the
+// product-class slug (growing-DB principle), so a product class whose corpus
+// has NO priced product-class-tagged rows (BESS, wind: 0 such rows) gets ZERO
+// candidates → byte-identical to today. It also blocks cross-class price bleed
+// (a CO₂ "Grundfos CRNE" price can never leak onto a BESS "Grundfos TPE3").
+//
+// MATCH PRECISION (the critical safety property — see matchCorpusPrice): a row
+// only wins on manufacturer-token match AND (exact/near MPN match OR ≥2 strong
+// shared name tokens). A loose LIKE '%name%' is deliberately NOT used — it
+// could pull a wrong part's price. No manufacturer / no confident match →
+// returns null and the caller keeps the class-anchor fallback unchanged.
+// ---------------------------------------------------------------------------
+
+export interface CorpusPriceRow {
+  part_name: string | null
+  manufacturer: string | null
+  part_number: string | null
+  unit_price_gbp: number | null
+  discovery_source: string | null
+  confidence: number | null
+}
+
+export interface CorpusPriceMatch {
+  unit_price_gbp: number
+  matched_row: CorpusPriceRow
+  match_kind: 'mpn' | 'name'
+  reason: string
+}
+
+// Manufacturer / part-number tokens that carry NO identity (a placeholder, a
+// fabrication marker, or a generic English filler) — never used to match.
+const MANUFACTURER_STOPWORDS = new Set([
+  'fabricated', 'fabrication', 'bespoke', 'custom', 'customfab', 'tbd', 'tba',
+  'n/a', 'na', 'none', 'unspecified', 'unknown', 'various', 'generic', 'oem',
+  'multiple', 'assorted',
+])
+
+const NAME_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'kit', 'set', 'pack', 'unit', 'units',
+  'assembly', 'module', 'system', 'sub', 'sub-module', 'word', 'item', 'type',
+  'made', 'order', 'alternate', 'alt', 'spare', 'main', 'aux', 'standard',
+  'small', 'large', 'medium', 'left', 'right', 'upper', 'lower', 'inlet',
+  'outlet', 'process', 'plant', 'new', 'high', 'low', 'mid', 'duty', 'grade',
+])
+
+/** Normalise a manufacturer string to a lower-case identity token set,
+ *  dropping stopwords + bracketed asides. */
+function manufacturerTokens(raw: string | null | undefined): Set<string> {
+  const s = String(raw ?? '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')      // drop "(Crouse-Hinds)" asides
+    .replace(/[^a-z0-9+]+/g, ' ')
+    .trim()
+  const out = new Set<string>()
+  for (const t of s.split(/\s+/)) {
+    if (t.length < 2) continue
+    if (MANUFACTURER_STOPWORDS.has(t)) continue
+    out.add(t)
+  }
+  return out
+}
+
+function manufacturerIsReal(raw: string | null | undefined): boolean {
+  return manufacturerTokens(raw).size > 0
+}
+
+/** Normalise an MPN for comparison: lower-case, strip all non-alphanumerics.
+ *  Returns '' for placeholders / too-short tokens. */
+function normaliseMpn(raw: string | null | undefined): string {
+  const s = String(raw ?? '').toLowerCase()
+  if (/^(tbd|tba|n\/a|na|none|custom|generic|placeholder|fabricated|bespoke)/.test(s)) return ''
+  // Keep only the leading SKU token (the corpus often appends a free-text gloss:
+  // "Electropack EP100 (multi-unit package, frame count TBD)" → "electropackep100"
+  // would over-merge, so take alphanumerics of the first parenthesis-free chunk).
+  const head = s.split('(')[0]
+  const alnum = head.replace(/[^a-z0-9]+/g, '')
+  return alnum.length >= 4 ? alnum : ''
+}
+
+/** Distinctive lower-case name tokens (length ≥ 4, not a generic stopword,
+ *  not a pure number). Used for the strong-name-overlap fallback when there
+ *  is no usable MPN on one side. */
+function strongNameTokens(raw: string | null | undefined): Set<string> {
+  const s = String(raw ?? '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+  const out = new Set<string>()
+  for (const t of s.split(/\s+/)) {
+    if (t.length < 4) continue
+    if (NAME_STOPWORDS.has(t)) continue
+    if (/^\d+$/.test(t)) continue
+    out.add(t)
+  }
+  return out
+}
+
+/** Rank key for preferring rows: verified first, then higher confidence. */
+function corpusRowRank(r: CorpusPriceRow): number {
+  const verified = /verified/i.test(String(r.discovery_source ?? '')) ? 1 : 0
+  const conf = Number.isFinite(Number(r.confidence)) ? Number(r.confidence) : 0
+  return verified * 100 + conf // verified dominates; confidence breaks ties
+}
+
+/**
+ * PURE corpus real-price matcher (no DB; takes the candidate rows). Returns the
+ * confident match's real unit_price_gbp, or null when no confident match.
+ *
+ * A candidate row must FIRST share a manufacturer identity token with the part
+ * (so a price can never cross manufacturers). Then it qualifies on EITHER:
+ *   • MPN match — normalised MPNs equal, or one is a prefix of the other and the
+ *     shorter is ≥ 5 chars (handles "EP100" vs "EP100A"); the strongest signal.
+ *   • Strong name overlap — ≥ 2 distinctive shared name tokens (e.g. "stirred"
+ *     + "carbonation" + "reactor"); used when an MPN is absent on either side.
+ * A single shared generic token (just "pump", just "valve") is NOT enough —
+ * that is exactly the loose match that would pull a wrong part's price, so it
+ * is rejected. Among qualifying rows, prefer MPN matches over name matches,
+ * then verified over candidate, then higher confidence.
+ *
+ * Exported for the regression harness (tested without a DB, like classifyByRules).
+ */
+export function matchCorpusPrice(
+  rows: CorpusPriceRow[],
+  ctx: { word_name: string; manufacturer: string | null; part_number: string | null },
+): CorpusPriceMatch | null {
+  const partMfrTokens = manufacturerTokens(ctx.manufacturer)
+  if (partMfrTokens.size === 0) return null // no real manufacturer → never fire
+
+  const partMpn = normaliseMpn(ctx.part_number)
+  const partNameTokens = strongNameTokens(ctx.word_name)
+
+  type Scored = { row: CorpusPriceRow; price: number; kind: 'mpn' | 'name'; rank: number; overlap: number }
+  const qualifying: Scored[] = []
+
+  for (const r of rows) {
+    const price = Number(r.unit_price_gbp)
+    if (!Number.isFinite(price) || price <= 0) continue
+
+    // 1. manufacturer identity must overlap (≥1 shared real token).
+    const rowMfrTokens = manufacturerTokens(r.manufacturer)
+    if (rowMfrTokens.size === 0) continue
+    let mfrShared = false
+    for (const t of partMfrTokens) {
+      if (rowMfrTokens.has(t)) { mfrShared = true; break }
+    }
+    if (!mfrShared) continue
+
+    // 2a. MPN match (strongest).
+    const rowMpn = normaliseMpn(r.part_number)
+    let mpnHit = false
+    if (partMpn && rowMpn) {
+      if (partMpn === rowMpn) mpnHit = true
+      else if (partMpn.startsWith(rowMpn) && rowMpn.length >= 5) mpnHit = true
+      else if (rowMpn.startsWith(partMpn) && partMpn.length >= 5) mpnHit = true
+    }
+    if (mpnHit) {
+      qualifying.push({ row: r, price, kind: 'mpn', rank: corpusRowRank(r), overlap: 99 })
+      continue
+    }
+
+    // 2b. strong name overlap (≥2 distinctive shared tokens). Same manufacturer
+    // is already established, so 2 shared specific tokens is a confident match.
+    const rowNameTokens = strongNameTokens(r.part_name)
+    let overlap = 0
+    for (const t of partNameTokens) if (rowNameTokens.has(t)) overlap += 1
+    if (overlap >= 2) {
+      qualifying.push({ row: r, price, kind: 'name', rank: corpusRowRank(r), overlap })
+    }
+  }
+
+  if (qualifying.length === 0) return null
+
+  // Prefer MPN matches over name matches; then more name overlap; then verified
+  // / higher confidence; then the LOWER price (procurement-conservative tie-break).
+  qualifying.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === 'mpn' ? -1 : 1
+    if (b.overlap !== a.overlap) return b.overlap - a.overlap
+    if (b.rank !== a.rank) return b.rank - a.rank
+    return a.price - b.price
+  })
+  const best = qualifying[0]
+  const r = best.row
+  return {
+    unit_price_gbp: best.price,
+    matched_row: r,
+    match_kind: best.kind,
+    reason:
+      `corpus_price (${best.kind} match): ${r.manufacturer ?? '?'} ${r.part_number ?? ''} "${String(r.part_name ?? '').slice(0, 48)}" ` +
+      `@ £${best.price} [${/verified/i.test(String(r.discovery_source ?? '')) ? 'verified' : 'candidate'}, conf ${r.confidence ?? '?'}]`,
+  }
+}
+
+/**
+ * CorpusPriceLookup — DB wrapper around matchCorpusPrice. Reads the corpus rows
+ * for ONE product-class tag once (cheap: ≤ a few hundred priced rows per class),
+ * then matches each part in memory via the pure matcher. Read-only DB.
+ */
+class CorpusPriceLookup {
+  private db: Database.Database | null = null
+  private rows: CorpusPriceRow[] = []
+  enabled = false
+
+  constructor(productClassCorpusTag: string) {
+    const tag = String(productClassCorpusTag ?? '').trim()
+    if (!tag) return
+    if (!existsSync(FORGE_TRUTH_DB)) return
+    try {
+      this.db = new Database(FORGE_TRUTH_DB, { readonly: true })
+      const stmt = this.db.prepare(`
+        SELECT part_name, manufacturer, part_number, unit_price_gbp, discovery_source, confidence
+        FROM pretraining_extracted_parts
+        WHERE component_class = ?
+          AND unit_price_gbp IS NOT NULL
+          AND unit_price_gbp > 0
+          AND manufacturer IS NOT NULL
+          AND TRIM(manufacturer) <> ''
+      `)
+      this.rows = stmt.all(tag) as CorpusPriceRow[]
+      // Only enable when the product-class corpus actually has priced rows.
+      // Classes with none (BESS / wind) leave enabled=false → never fires →
+      // byte-identical pricing to before this change.
+      this.enabled = this.rows.length > 0
+    } catch {
+      this.db?.close()
+      this.db = null
+      this.enabled = false
+    }
+  }
+
+  lookup(ctx: PartContext): CorpusPriceMatch | null {
+    if (!this.enabled) return null
+    if (!manufacturerIsReal(ctx.manufacturer)) return null
+    return matchCorpusPrice(this.rows, {
+      word_name: ctx.word_name,
+      manufacturer: ctx.manufacturer,
+      part_number: ctx.part_number,
+    })
+  }
+
+  get rowCount(): number {
+    return this.rows.length
   }
 
   close() {
@@ -1106,6 +1373,15 @@ async function main() {
   // Step 1 — corpus classification pass. Free, sub-millisecond per lookup.
   // -------------------------------------------------------------------------
   const corpus = new CorpusClassifier()
+  // Growing-DB REAL-PRICE lookup, scoped to this product class's corpus tag.
+  // enabled=false (→ never fires) for any product class with no priced product-
+  // class-tagged rows, guaranteeing byte-identical pricing for those classes.
+  const corpusPrice = new CorpusPriceLookup(productClass)
+  if (corpusPrice.enabled) {
+    console.log(`[estimate] corpus real-price lookup ENABLED for class '${productClass}' (${corpusPrice.rowCount} priced corpus rows)`)
+  } else {
+    console.log(`[estimate] corpus real-price lookup disabled for class '${productClass}' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged`)
+  }
   const classByWordId = new Map<string, ComponentClass | 'unknown'>()
   const classSource = new Map<string, 'corpus' | 'flash_lite' | 'fallback' | 'db_cache' | 'rule_based'>()
   const needsClassify: PartContext[] = []
@@ -1257,6 +1533,45 @@ async function main() {
       }
       // library_only source: part is real but no pricing data — fall through
       // to curated/curve for the price, but log the confirmed-real status.
+    }
+
+    // ── CORPUS REAL-PRICE (2026-06-04): growing-DB pricing primary ───────────
+    // Fallback order (canonical, extended): 1. emitter list_price pin (pre-step)
+    // → 2. DB cascade cache (above) → 3. CORPUS real price (this block) →
+    // 4. curated industrial table → 5. Engine-B curve. The corpus carries real
+    // per-part `unit_price_gbp` harvested for THIS product class (e.g. the 90
+    // CO₂ parts at doc 1213); preferring those over the class anchor breaks the
+    // many-distinct-parts-at-one-price collapse and gives a £60k boiler its real
+    // price. Only fires on a CONFIDENT manufacturer + MPN / strong-name match
+    // (matchCorpusPrice); no match → falls through unchanged.
+    const corpusMatch = corpusPrice.lookup(ctx)
+    // Reject only a genuinely corrupt corpus figure (≤0 or absurdly large) — a
+    // data-entry error, not a real price. Critically we do NOT clamp to the
+    // per-class sanity band: that band is calibrated for ESTIMATES (a generic
+    // thermal cold-plate caps at £15k), but a corpus match is a REAL SOURCED
+    // price that is its own ground truth — clamping a real £35k process boiler
+    // down to the £15k generic-thermal ceiling is exactly the wrong-anchor bug
+    // this fix removes (Tristan 2026-06-04: the boiler must keep its real price).
+    const CORPUS_PRICE_ABSURD_MAX_GBP = 10_000_000
+    if (corpusMatch && corpusMatch.unit_price_gbp > 0 && corpusMatch.unit_price_gbp <= CORPUS_PRICE_ABSURD_MAX_GBP) {
+      const cls = classByWordId.get(ctx.word_id) ?? 'unknown'
+      const priced = corpusMatch.unit_price_gbp
+      results.push({
+        ctx,
+        estimate: {
+          price_estimate_gbp: round2(priced),
+          estimate_low_gbp: round2(priced * 0.85),
+          estimate_high_gbp: round2(priced * 1.20),
+          reasoning: `Engine B ${corpusMatch.reason}. Real corpus price used instead of the class anchor (growing-DB principle).`,
+          component_class: cls,
+          curve_multiplier: 1.0,
+          reference_unit_cost_gbp: corpusMatch.unit_price_gbp,
+          annual_volume: annualVolume,
+          classification_source: 'corpus_price',
+          estimate_source: 'corpus_price',
+        },
+      })
+      continue
     }
 
     // 2026-05-28 INTERIM: curated real catalogue price for cascade-miss
@@ -1419,14 +1734,15 @@ async function main() {
   }
 
   corpus.close()
+  corpusPrice.close()
 
   // -------------------------------------------------------------------------
   // Step 4 — write back into state.partVerifications.
   // -------------------------------------------------------------------------
   let updated = 0
   let synthesised = 0
-  const bySource = { corpus: 0, flash_lite: 0, fallback: 0, curated: 0, db_cache: 0, rule_based: 0 }
-  const byEstimate = { curve: 0, flash_lite_unknown_class: 0, db_cache: 0 }
+  const bySource = { corpus: 0, flash_lite: 0, fallback: 0, curated: 0, db_cache: 0, rule_based: 0, corpus_price: 0 }
+  const byEstimate = { curve: 0, flash_lite_unknown_class: 0, db_cache: 0, corpus_price: 0 }
   const classCounts: Record<string, number> = {}
 
   for (const { ctx, estimate } of results) {

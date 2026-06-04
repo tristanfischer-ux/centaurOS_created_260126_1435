@@ -1189,7 +1189,14 @@ export function computeBomTotals(state: any): BomTotals | null {
         // unreliable" banner. ACTUAL (distributor-sourced) prices and macro-
         // contract overrides are never touched. Same CATEGORY_KEYWORD_CEILINGS
         // table Engine B uses on the curve path — one source of truth.
-        if (tier === 'estimate' && contract_override_reason === null && unit_price_gbp > 0) {
+        // A corpus_price line carries a REAL sourced unit_price_gbp (growing-DB
+        // match) even though it lands in the 'estimate' tier (it sets
+        // price_estimate_gbp, not distributor_price_gbp). It must NOT be clamped
+        // down to a generic keyword ceiling — that is the whole point of the fix
+        // (a £60k Fulton boiler keeps its real price). Treat it as sourced here.
+        const isCorpusPriced = String(v?.engine_b_estimate_source ?? '') === 'corpus_price'
+          || String(v?.engine_b_classification_source ?? '') === 'corpus_price'
+        if (tier === 'estimate' && !isCorpusPriced && contract_override_reason === null && unit_price_gbp > 0) {
           const nm = String(w.name_human || v?.word_name || w.id || '')
           const kwCeil = keywordCeilingGbp(
             nm,
@@ -1387,6 +1394,18 @@ export function computeBomTotals(state: any): BomTotals | null {
               component_class: row.engine_b_component_class ?? null,
               unit_price_gbp: Number(row.unit_price_gbp ?? 0),
               quantity: Number(row.quantity ?? 1) || 1,
+              // Carry price provenance so auditCostSanity skips REAL/SOURCED
+              // lines (distributor/DB quote, emitter catalogue pin, or corpus
+              // real-price match). The ceiling + identical-price fingerprint
+              // are sanity signals for ESTIMATES only — a £60k boiler with a
+              // real Fulton price must not be flagged against a £15k generic-
+              // thermal estimate ceiling (Tristan 2026-06-04).
+              price_tier: row.price_tier,
+              price_sourced:
+                row.price_tier === 'actual' ||
+                String(v?.distributor_price_source ?? '') === 'emitter_list_price' ||
+                String(v?.engine_b_estimate_source ?? '') === 'corpus_price' ||
+                String(v?.engine_b_classification_source ?? '') === 'corpus_price',
             })
             // P3: track capital lines + their declared material for the
             // uncostable-module disclosure. A module whose capital lines sum to
@@ -1771,7 +1790,11 @@ function applyBatchEconomics(state: any, bomTotals: BomTotals | null, slugHint?:
   // distributor-only lines) still get W3 so we don't over-correct them.
   const rowAlreadyVolumeAnchored = (p: any): boolean => {
     const s = p?.engine_b_estimate_source
-    return s === 'curve' || s === 'flash_lite_unknown_class'
+    // 'corpus_price' (2026-06-04) is a REAL catalogue price from the growing-DB
+    // corpus — like db_cache / the curated table it is already at catalogue
+    // scale and must NOT be re-multiplied by the W3 batch factor (that would
+    // shrink a £60k boiler to ~£5k). db_cache is likewise real-priced.
+    return s === 'curve' || s === 'flash_lite_unknown_class' || s === 'corpus_price' || s === 'db_cache'
   }
 
   // Rebuild module / sub-module / grand totals from scaled line totals so

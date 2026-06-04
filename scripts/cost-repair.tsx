@@ -285,6 +285,19 @@ async function main() {
       leaveAsIs++
       continue
     }
+    // 2026-06-04: NEVER override a corpus real-price match. estimate-missing-
+    // prices.tsx tags engine_b_estimate_source='corpus_price' when it sourced a
+    // real per-part unit_price_gbp from the growing-DB corpus (verified/candidate
+    // harvest row). Like the emitter pin, this is a sourced price, not a class-
+    // anchor estimate — cost-repair's corpus-reconciliation must not second-guess
+    // it (it IS the corpus price). Same rationale as the emitter-pin skip above.
+    if (pv[idx].engine_b_estimate_source === 'corpus_price') {
+      pv[idx].cost_repair_action = 'left_as_is'
+      pv[idx].cost_repair_reasoning =
+        `[CORPUS-PRICE] price_estimate_gbp=£${Number(pv[idx].price_estimate_gbp).toFixed(2)} is an authoritative growing-DB corpus real price; cost-repair skipped (LLM proposed: ${r.action}${typeof r.corrected_unit_price_gbp === 'number' ? ` £${r.corrected_unit_price_gbp}` : ''}).`
+      leaveAsIs++
+      continue
+    }
     pv[idx].cost_repair_action = r.action
     pv[idx].cost_repair_reasoning = r.reasoning
     pv[idx].cost_repair_confidence = r.confidence

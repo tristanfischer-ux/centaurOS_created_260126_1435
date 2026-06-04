@@ -68,7 +68,8 @@ import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/
 import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, tokenize as emitterTokenize, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
-import { classifyByRules } from './estimate-missing-prices'
+import { classifyByRules, matchCorpusPrice, type CorpusPriceRow } from './estimate-missing-prices'
+import { auditCostSanity as _auditCostSanityForCorpus } from './lib/cost-self-assessment'
 import { keywordCeilingGbp, PRICE_CEILING_BY_COMPONENT_CLASS, isConsumable, classCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
 import { applyPatches } from '../src/lib/pdf-engine-v2/radical/universal-repair'
 import { OPTIONAL_MODULES } from './lib/orchestrator/brief-scope-filter'
@@ -3109,6 +3110,69 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `dryer=${dryer} shower=${shower} column=${column} steam=${steam} reactor=${reactor} lineReactor=${lineReactor} bolt=${bolt} fuse=${fuse}`,
+    ))
+  }
+
+  // ── UNIVERSAL.corpus_price_prefers_real_over_class_anchor ─────────────────
+  // Guards the 2026-06-04 BoM price-classifier fix: the estimator must PREFER a
+  // part's REAL per-part unit_price_gbp from the growing-DB corpus over the
+  // single class anchor (the £7,500-×4 collapse + the £60k Fulton boiler
+  // bucketed as generic `thermal` and false-flagged 4× on the CO₂ dossier). The
+  // match must be PRECISE (manufacturer + MPN / ≥2 strong name tokens) so it can
+  // NEVER pull a wrong part's price, and must NOT fire without a manufacturer
+  // (the class-anchor fallback is preserved exactly → zero regression for
+  // classes whose corpus has no priced product-class-tagged rows). Both
+  // directions asserted on the PURE matcher (no DB), plus the cost-self-check
+  // sourced-skip so a real boiler price is never flagged against an estimate
+  // ceiling.
+  {
+    // Synthetic corpus rows standing in for the harvested co2_mineralisation
+    // parts (real prices, verified/candidate provenance).
+    const rows: CorpusPriceRow[] = [
+      { part_name: 'Packaged electric steam boiler (right-scaled for ~450 kg/h pilot)', manufacturer: 'Fulton', part_number: 'Electropack EP100', unit_price_gbp: 35000, discovery_source: 'stage0_harvest:verified', confidence: 0.85 },
+      { part_name: 'Absorber structured packing', manufacturer: 'Sulzer', part_number: 'Mellapak 250.Y', unit_price_gbp: 5000, discovery_source: 'stage0_harvest:verified', confidence: 0.9 },
+      { part_name: 'Amine circulation / feed / recycle pump (vertical multistage)', manufacturer: 'Grundfos', part_number: 'CRNE 5-5', unit_price_gbp: 3850, discovery_source: 'stage0_harvest:verified', confidence: 0.8 },
+      // A SAME-manufacturer DIFFERENT-part (Eaton junction box) used to prove the
+      // matcher will NOT pull this £320 price onto an Eaton valve (no MPN match,
+      // no ≥2 strong shared name tokens — only the manufacturer token in common).
+      { part_name: 'Ex e junction box (Zone 1)', manufacturer: 'Eaton (Crouse-Hinds)', part_number: 'GHG', unit_price_gbp: 320, discovery_source: 'stage0_harvest:candidate', confidence: 0.55 },
+    ]
+    // POSITIVE — real corpus price used (MPN match), full £35k NOT clamped to a
+    // class ceiling (the matcher returns the real price; the caller does not
+    // sanity-clamp a sourced price).
+    const boiler = matchCorpusPrice(rows, { word_name: 'electric steam generator', manufacturer: 'Fulton', part_number: 'Electropack EP100 (multi-unit package)' })
+    const boilerOk = boiler !== null && boiler.unit_price_gbp === 35000 && boiler.match_kind === 'mpn'
+    // POSITIVE — strong-name match when MPN model differs (CRNE 5-8 vs corpus CRNE 5-5).
+    const pump = matchCorpusPrice(rows, { word_name: 'MEA circulation pump', manufacturer: 'Grundfos', part_number: 'CRNE 5-8' })
+    const pumpOk = pump !== null && pump.unit_price_gbp === 3850
+    // NEGATIVE — NO manufacturer → never fires (class-anchor fallback preserved).
+    const noMfr = matchCorpusPrice(rows, { word_name: 'reclaimed wash-water tank', manufacturer: 'fabricated', part_number: 'fabricated 316L tank' })
+    const noMfrOk = noMfr === null
+    // PRECISION — same manufacturer (Eaton) but a DIFFERENT part type → must NOT
+    // pull the £320 junction-box price onto a drain valve (the wrong-price guard).
+    const wrongPull = matchCorpusPrice(rows, { word_name: 'reactor drain valve', manufacturer: 'Eaton', part_number: 'None' })
+    const precisionOk = wrongPull === null
+    // COST-CHECK — a sourced (corpus_price / actual) £60k boiler line must NOT be
+    // flagged as a per-line type outlier against the £15k thermal ESTIMATE
+    // ceiling, while a genuine ESTIMATE-tier outlier at the same price IS flagged.
+    const ceil = { thermal: 15000 }
+    const sourcedBoiler = _auditCostSanityForCorpus(
+      [{ word_name: 'electric steam generator', component_class: 'thermal', unit_price_gbp: 60000, quantity: 1, price_tier: 'estimate', price_sourced: true }],
+      ceil,
+    )
+    const estimateBoiler = _auditCostSanityForCorpus(
+      [{ word_name: 'electric steam generator', component_class: 'thermal', unit_price_gbp: 60000, quantity: 1, price_tier: 'estimate', price_sourced: false }],
+      ceil,
+    )
+    const costSkipOk = sourcedBoiler.findings.length === 0
+      && estimateBoiler.findings.some((f) => f.kind === 'per_line_type_outlier')
+    const ok = boilerOk && pumpOk && noMfrOk && precisionOk && costSkipOk
+    assertions.push(assertEq(
+      'UNIVERSAL.corpus_price_prefers_real_over_class_anchor',
+      'matchCorpusPrice returns a part\'s REAL corpus unit_price_gbp on a confident manufacturer+MPN / strong-name match (Fulton boiler £35k, Grundfos CRNE £3,850) but NEVER without a manufacturer and NEVER pulls a same-manufacturer wrong part\'s price (Eaton valve ≠ Eaton junction box £320); and auditCostSanity SKIPS a sourced (corpus_price/actual) line against the estimate ceiling while still flagging a true estimate outlier — guards the 2026-06-04 growing-DB BoM price-classifier fix (breaks the £7,500-×4 collapse + keeps the £60k boiler unflagged)',
+      ok,
+      (v: boolean) => v === true,
+      () => `boiler£35k=${boilerOk} pump£3850=${pumpOk} noMfr→null=${noMfrOk} precision(noWrongPull)=${precisionOk} costSkip=${costSkipOk}`,
     ))
   }
 
