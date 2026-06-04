@@ -28,6 +28,7 @@ const PUBLIC_ROUTES = [
     '/pricing',  // Public pricing page
     '/techniques',  // Public manufacturing techniques explorer (SEO)
     '/demo',  // Public demo page
+    '/brief',  // Public concierge brief intake (the homepage "Get your brief" CTA)
     '/blog',  // Public blog (content group)
     '/api/admin/dashboard',  // Standalone admin dashboard (own password gate)
     '/api/admin/snapshot-pdf',  // Agent-callable PDF download (CRON_SECRET Bearer at route)
