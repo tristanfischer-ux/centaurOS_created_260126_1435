@@ -33,6 +33,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 
 import { withUser } from "@/lib/server-action-utils"
+import { classifyProduct } from "@/lib/pdf-engine-v2/product-classifier"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 
@@ -242,6 +243,15 @@ export async function POST(
             resolvedProjectId = created.id as string
         }
 
+        // Classify the brief at submit time so the status workspace can decide
+        // whether to show the "new kind of system" research dialogue (a NOVEL
+        // archetype the engine has no reference library for — 60-90 min) vs the
+        // generic running banner (a KNOWN system — ~30 min). The detected_*
+        // columns are additive + nullable (see migration
+        // 20260604000000_add_novel_archetype_detection.sql); the surfacing code
+        // is null-safe so this is forward-compatible.
+        const classification = classifyProduct(brief_text)
+
         // Insert the parent pdf_engine_runs row. Worker will pick this up.
         // When variations are supplied, the parent row stores them as jsonb so
         // the download UI can show "this is variant 0 of N" siblings without
@@ -251,15 +261,18 @@ export async function POST(
             user_id: user.id,
             brief_text,
             status: "pending",
+            detected_class: classification.productClass,
+            detected_confidence: classification.confidence,
+            detected_tech_domains: classification.technologyDomains,
         }
         if (variations && variations.length > 0) {
             parentInsert.variations = variations
         }
-        const { data: run, error: runErr } = await admin
-            .from("pdf_engine_runs")
-            .insert(parentInsert)
-            .select("id")
-            .single()
+        // insertRunRow tolerates a prod database where the migration has not yet
+        // been applied: if the insert fails because the detected_* columns don't
+        // exist, it retries WITHOUT them. This keeps the existing submit flow
+        // working before/after the migration lands.
+        const { data: run, error: runErr } = await insertRunRow(admin, parentInsert)
 
         if (runErr || !run) {
             return NextResponse.json(
@@ -275,18 +288,25 @@ export async function POST(
         // pre-composed effective brief so the worker doesn't have to re-fetch.
         const variationJobIds: string[] = []
         if (variations && variations.length > 0) {
-            const childRows = variations.map((v) => ({
-                project_id: resolvedProjectId,
-                user_id: user.id,
-                brief_text: composeVariationBrief(brief_text, v),
-                status: "pending" as const,
-                variation_of: parentJobId,
-                variation_label: v.label,
-            }))
-            const { data: children, error: childErr } = await admin
-                .from("pdf_engine_runs")
-                .insert(childRows)
-                .select("id")
+            const childRows = variations.map((v) => {
+                const childBrief = composeVariationBrief(brief_text, v)
+                const childClass = classifyProduct(childBrief)
+                return {
+                    project_id: resolvedProjectId,
+                    user_id: user.id,
+                    brief_text: childBrief,
+                    status: "pending" as const,
+                    variation_of: parentJobId,
+                    variation_label: v.label,
+                    detected_class: childClass.productClass,
+                    detected_confidence: childClass.confidence,
+                    detected_tech_domains: childClass.technologyDomains,
+                }
+            })
+            const { data: children, error: childErr } = await insertRunRows(
+                admin,
+                childRows,
+            )
 
             if (childErr || !children) {
                 // Parent row already inserted — leave it. Surface the error so
@@ -336,4 +356,104 @@ function composeVariationBrief(
         return `${trimmed}\n\n${labelLine}\n\n${override}`
     }
     return `${trimmed}\n\n${labelLine}`
+}
+
+type AdminClient = ReturnType<typeof createAdminClient>
+
+/** Postgres / PostgREST codes raised when an insert column doesn't exist yet. */
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"])
+const DETECTED_KEYS = [
+    "detected_class",
+    "detected_confidence",
+    "detected_tech_domains",
+] as const
+
+function looksLikeMissingDetectedColumn(err: {
+    code?: string | null
+    message?: string | null
+} | null): boolean {
+    if (!err) return false
+    if (err.code && MISSING_COLUMN_CODES.has(err.code)) return true
+    const msg = (err.message ?? "").toLowerCase()
+    return (
+        msg.includes("detected_class") ||
+        msg.includes("detected_confidence") ||
+        msg.includes("detected_tech_domains")
+    )
+}
+
+function stripDetectedKeys<T extends Record<string, unknown>>(
+    row: T,
+): Record<string, unknown> {
+    const copy: Record<string, unknown> = { ...row }
+    for (const k of DETECTED_KEYS) delete copy[k]
+    return copy
+}
+
+/**
+ * Insert the parent run row, tolerating a database where the novel-archetype
+ * migration (20260604000000) has not yet been applied. On a missing-column
+ * error the detected_* fields are stripped and the insert retried, so the
+ * existing submit flow keeps working before the migration lands on prod.
+ */
+async function insertRunRow(
+    admin: AdminClient,
+    row: Record<string, unknown>,
+): Promise<{ data: { id: string } | null; error: { message?: string } | null }> {
+    const first = await admin
+        .from("pdf_engine_runs")
+        .insert(row)
+        .select("id")
+        .single()
+    if (!first.error) {
+        return { data: first.data as { id: string } | null, error: null }
+    }
+    if (!looksLikeMissingDetectedColumn(first.error)) {
+        return { data: null, error: first.error }
+    }
+    console.warn(
+        "[submit] detected_* columns absent — retrying parent insert without them. " +
+            "Apply migration 20260604000000_add_novel_archetype_detection.sql.",
+    )
+    const retry = await admin
+        .from("pdf_engine_runs")
+        .insert(stripDetectedKeys(row))
+        .select("id")
+        .single()
+    return {
+        data: retry.data as { id: string } | null,
+        error: retry.error,
+    }
+}
+
+/**
+ * Bulk-insert variation child rows with the same migration-tolerant retry as
+ * insertRunRow.
+ */
+async function insertRunRows(
+    admin: AdminClient,
+    rows: Record<string, unknown>[],
+): Promise<{ data: { id: string }[] | null; error: { message?: string } | null }> {
+    const first = await admin
+        .from("pdf_engine_runs")
+        .insert(rows)
+        .select("id")
+    if (!first.error) {
+        return { data: first.data as { id: string }[] | null, error: null }
+    }
+    if (!looksLikeMissingDetectedColumn(first.error)) {
+        return { data: null, error: first.error }
+    }
+    console.warn(
+        "[submit] detected_* columns absent — retrying variation inserts without them. " +
+            "Apply migration 20260604000000_add_novel_archetype_detection.sql.",
+    )
+    const retry = await admin
+        .from("pdf_engine_runs")
+        .insert(rows.map(stripDetectedKeys))
+        .select("id")
+    return {
+        data: retry.data as { id: string }[] | null,
+        error: retry.error,
+    }
 }

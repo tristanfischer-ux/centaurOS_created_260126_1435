@@ -22,6 +22,10 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
+import { isNovelArchetype } from "@/lib/pdf-engine-v2/product-classifier"
+
+import { NovelArchetypeCard } from "./novel-archetype-card"
+
 export interface ChainRun {
     id: string
     status: string
@@ -31,6 +35,9 @@ export interface ChainRun {
     createdAt: string | null
     startedAt: string | null
     readyAt: string | null
+    detectedClass: string | null
+    detectedConfidence: string | null
+    detectedTechDomains: string[]
 }
 
 interface Props {
@@ -51,6 +58,13 @@ export function ChainWorkspaceView({
     const router = useRouter()
     const isTerminal = run?.status === "ready" || run?.status === "failed"
     const [, setTick] = useState(0)
+
+    // A NOVEL archetype (LOW confidence or unknown class) takes 60–90 min and
+    // gets the dedicated research-status dialogue while pending/running. A KNOWN
+    // system takes ~30 min and keeps the generic banner.
+    const novel = isNovelArchetype(run?.detectedClass, run?.detectedConfidence)
+    const showNovelCard =
+        novel && (run?.status === "pending" || run?.status === "running")
 
     // Poll every 30s while the chain is running. router.refresh() re-runs the
     // server component which re-queries pdf_engine_runs and re-mints the
@@ -77,7 +91,9 @@ export function ChainWorkspaceView({
             <header className="w2-chain-header">
                 <h1>{projectName}</h1>
                 <p className="w2-chain-sub">
-                    Engineering report — chain engine, 60–90 min end-to-end.
+                    {novel
+                        ? "Engineering report — a new kind of system, 60–90 min end-to-end."
+                        : "Engineering report — chain engine, around 30 min end-to-end."}
                 </p>
             </header>
 
@@ -131,6 +147,26 @@ export function ChainWorkspaceView({
                         <pre className="w2-chain-error-log">{run.errorLog}</pre>
                     ) : null}
                 </section>
+            ) : showNovelCard ? (
+                <>
+                    <NovelArchetypeCard
+                        briefSubject={projectSubject}
+                        detectedClass={run.detectedClass}
+                        status={run.status === "running" ? "running" : "pending"}
+                    />
+                    {elapsedSeconds > 0 ? (
+                        <p className="w2-chain-elapsed w2-chain-elapsed-standalone">
+                            Elapsed: {formatDuration(elapsedSeconds)} · this page
+                            refreshes every 30 seconds. You can close the tab —
+                            the research runs server-side.
+                        </p>
+                    ) : (
+                        <p className="w2-chain-elapsed w2-chain-elapsed-standalone">
+                            This page refreshes every 30 seconds. You can close
+                            the tab — the research runs server-side.
+                        </p>
+                    )}
+                </>
             ) : (
                 <section className="w2-chain-panel w2-chain-running">
                     <h2>
@@ -138,7 +174,7 @@ export function ChainWorkspaceView({
                     </h2>
                     <p>
                         {run.status === "running"
-                            ? "The chain is running on the Mac Studio worker. This page polls every 30 seconds. Typical heatpump-class runs take 60–90 minutes."
+                            ? "The chain is running on the Mac Studio worker. This page polls every 30 seconds. A known system like this takes around 30 minutes."
                             : "Waiting for the worker to claim this job. The worker polls every 30 seconds; the job should start within a minute."}
                     </p>
                     {elapsedSeconds > 0 ? (
@@ -214,6 +250,10 @@ export function ChainWorkspaceView({
                     font-size: 13px;
                     color: #555;
                     margin: 8px 0;
+                }
+                .w2-chain-elapsed-standalone {
+                    margin: 4px 4px 16px;
+                    color: #9ca3af;
                 }
                 .w2-chain-note {
                     font-size: 12px;

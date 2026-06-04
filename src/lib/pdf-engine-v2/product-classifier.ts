@@ -266,6 +266,28 @@ export function classifyProduct(briefText: string): ProductClassification {
   }
 }
 
+/**
+ * Decide whether a classification represents a NOVEL archetype — a "new kind of
+ * system" the engine has no deep reference library for, which takes 60-90 min to
+ * research from scratch rather than the ~30 min a KNOWN system takes.
+ *
+ * A run is novel when the classifier either could not place the brief into any
+ * known product class (`unknown`) or placed it with only LOW confidence. Both
+ * mean the same thing to the founder: there's no off-the-shelf reference, so the
+ * engine has to study comparable systems and build the library before drafting.
+ *
+ * Null-safe: callers pass values straight off a pdf_engine_runs row, which may be
+ * null for rows inserted before the detected_* columns existed. A null verdict is
+ * treated as NOT novel (the generic banner is the safe default).
+ */
+export function isNovelArchetype(
+  productClass: string | null | undefined,
+  confidence: string | null | undefined,
+): boolean {
+  if (!productClass && !confidence) return false
+  return confidence === 'LOW' || productClass === 'unknown'
+}
+
 const COMMON_REQUIRED = ['product_type', 'target_cost', 'production_volume', 'jurisdiction']
 
 const SPECIFIC_FIELDS: Record<string, string[]> = {

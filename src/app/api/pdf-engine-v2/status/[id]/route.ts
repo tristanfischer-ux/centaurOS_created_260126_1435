@@ -39,6 +39,10 @@ interface StatusOk {
     error_log: string | null
     brief_text: string
     project_id: string | null
+    /** classifyProduct() verdict captured at submit (null pre-migration). */
+    detected_class: string | null
+    detected_confidence: string | null
+    detected_tech_domains: string[] | null
 }
 
 interface StatusErr {
@@ -59,13 +63,50 @@ export async function GET(
     return withUser(async ({ user }) => {
         const admin = createAdminClient()
 
-        const { data: run, error: runErr } = await admin
-            .from("pdf_engine_runs")
-            .select(
-                "id, user_id, project_id, brief_text, status, started_at, ready_at, pdf_storage_path, error_log",
-            )
-            .eq("id", runId)
-            .maybeSingle()
+        // detected_* are additive/nullable (migration 20260604000000). Select
+        // them defensively; fall back to the base columns if the migration has
+        // not yet been applied (the columns are absent → select errors).
+        const BASE_COLS =
+            "id, user_id, project_id, brief_text, status, started_at, ready_at, pdf_storage_path, error_log"
+        const DETECTED_COLS = `${BASE_COLS}, detected_class, detected_confidence, detected_tech_domains`
+        // A runtime (non-literal) select string defeats the typed client's
+        // column inference (it narrows .data to `never`), so cast through
+        // unknown to an explicit row shape. detected_* are optional — absent
+        // pre-migration.
+        type RunRow = {
+            id: string
+            user_id: string
+            project_id: string | null
+            brief_text: string | null
+            status: string
+            started_at: string | null
+            ready_at: string | null
+            pdf_storage_path: string | null
+            error_log: string | null
+            detected_class?: string | null
+            detected_confidence?: string | null
+            detected_tech_domains?: unknown
+        }
+        let run: RunRow | null = null
+        let runErr: { message?: string } | null = null
+        {
+            const withDetected = await admin
+                .from("pdf_engine_runs")
+                .select(DETECTED_COLS)
+                .eq("id", runId)
+                .maybeSingle()
+            if (!withDetected.error) {
+                run = (withDetected.data as unknown as RunRow | null) ?? null
+            } else {
+                const base = await admin
+                    .from("pdf_engine_runs")
+                    .select(BASE_COLS)
+                    .eq("id", runId)
+                    .maybeSingle()
+                run = (base.data as unknown as RunRow | null) ?? null
+                runErr = base.error
+            }
+        }
 
         if (runErr || !run || run.user_id !== user.id) {
             // Same response whether the row is missing or belongs to another
@@ -90,6 +131,11 @@ export async function GET(
             }
         }
 
+        const rawDomains = run.detected_tech_domains
+        const detectedTechDomains: string[] | null = Array.isArray(rawDomains)
+            ? rawDomains.filter((v): v is string => typeof v === "string")
+            : null
+
         const response: StatusOk = {
             status: run.status as StatusOk["status"],
             started_at: (run.started_at as string | null) ?? null,
@@ -98,6 +144,10 @@ export async function GET(
             error_log: (run.error_log as string | null) ?? null,
             brief_text: (run.brief_text as string) ?? "",
             project_id: (run.project_id as string | null) ?? null,
+            detected_class: (run.detected_class as string | null | undefined) ?? null,
+            detected_confidence:
+                (run.detected_confidence as string | null | undefined) ?? null,
+            detected_tech_domains: detectedTechDomains,
         }
 
         return NextResponse.json(response)
