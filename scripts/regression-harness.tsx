@@ -47,6 +47,7 @@ import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { evaluatePhysicsCriticEnforcement } from './lib/physics-critic-enforcement'
 import { selectCorrectableFindings, locateWordForFinding, parseCorrection } from './lib/physics-critic-autocorrect'
+import { rrfFuse, parseEmbedding, EMBEDDING_DIMS as DUAL_EMBEDDING_DIMS } from '../src/lib/pdf-engine-v2/lib/retrieval/dual-search'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
@@ -4496,6 +4497,73 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.growing_db_writeback_embeds_on_insert', description: 'growing-DB write-back embeds on insert', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── UNIVERSAL: hybrid retrieval FUSES lexical + semantic (2026-06-04) ────────
+  //
+  // UNIVERSAL.dual_search_fuses_lexical_and_semantic — the shared hybrid-search
+  // substrate (src/lib/pdf-engine-v2/lib/retrieval/dual-search.ts) is what makes
+  // every DB lookup HYBRID (Tristan 2026-06-04: "query by LIKE AND by embedding,
+  // FUSE the two — higher quality than either alone"). First proved on the
+  // supplier lookup (enrich-state-with-suppliers.tsx), reusable for parts/specs.
+  // The whole value rests on the Reciprocal Rank Fusion maths being correct, so
+  // this invariant exercises rrfFuse() directly (pure — no DB, no snapshot):
+  //   (a) a row that is TOP of the LEXICAL list only (absent from semantic — the
+  //       exact-name case where the embedding ranked it low) STILL surfaces in the
+  //       fused top-k. This is the "lexical saves it" half.
+  //   (b) a row that is TOP of the SEMANTIC list only (absent from lexical — the
+  //       capability-synonym case the LIKE missed) STILL surfaces. "Semantic saves it".
+  //   (c) a row present in BOTH lists outranks a row that wins only ONE — the
+  //       union-of-strengths property that makes hybrid beat either alone.
+  //   (d) RRF uses the canonical k=60 (1/(60+rank0)); absence is null, not rank 0.
+  //   (e) parseEmbedding round-trips BOTH storage formats (json_text +
+  //       f32le_blob) so a fused row can come from EITHER table.
+  // A regression here (e.g. someone "simplifies" RRF to a raw-score sum, or drops
+  // a list, or breaks one embedding format) would silently make hybrid no better
+  // than a single retriever — the precise failure this whole workstream removes.
+  try {
+    // Synthetic ranked lists mirroring a real supplier query: 'LEXONLY' is the
+    // exact company-name hit the embedding buried; 'SEMONLY' is the synonym hit
+    // the keyword-LIKE never saw; 'BOTH' appears mid-pack in each.
+    const lexical = { label: 'lexical', ids: ['LEXONLY', 'noise_a', 'BOTH'] }
+    const semantic = { label: 'semantic', ids: ['SEMONLY', 'noise_b', 'BOTH'] }
+    const fused = rrfFuse([lexical, semantic], 60)
+    const byId = new Map(fused.map((f) => [f.id, f]))
+    const topK = new Set(fused.slice(0, 4).map((f) => f.id))
+
+    const both = byId.get('BOTH')!
+    const lexOnly = byId.get('LEXONLY')!
+    const semOnly = byId.get('SEMONLY')!
+
+    // Embedding-format round-trip: same vector via both storage conventions.
+    const sampleVec = Array.from({ length: DUAL_EMBEDDING_DIMS }, (_, i) => (i % 5) * 0.02 - 0.03)
+    const jsonParsed = parseEmbedding(JSON.stringify(sampleVec), 'json_text')
+    const blobBuf = Buffer.alloc(DUAL_EMBEDDING_DIMS * 4)
+    for (let i = 0; i < DUAL_EMBEDDING_DIMS; i++) blobBuf.writeFloatLE(sampleVec[i], i * 4)
+    const blobParsed = parseEmbedding(blobBuf, 'f32le_blob')
+
+    const checks: Array<[string, boolean]> = [
+      ['a lexical-only top row surfaces in the fused result (lexical saves it)', topK.has('LEXONLY')],
+      ['a semantic-only top row surfaces in the fused result (semantic saves it)', topK.has('SEMONLY')],
+      ['a row in BOTH lists outranks a row winning only one (union of strengths)', both.rrf_score > lexOnly.rrf_score && both.rrf_score > semOnly.rrf_score],
+      ['BOTH is ranked first overall', fused[0].id === 'BOTH'],
+      ['RRF uses canonical k=60: a rank-0-only row scores 1/60', Math.abs(lexOnly.rrf_score - 1 / 60) < 1e-9],
+      ['BOTH score equals 1/62 + 1/62 (mid-rank in each list)', Math.abs(both.rrf_score - (1 / 62 + 1 / 62)) < 1e-9],
+      ['absence from a list is recorded as null (not rank 0)', lexOnly.ranks.semantic === null && semOnly.ranks.lexical === null],
+      ['json_text embedding parses to 1536 dims', jsonParsed !== null && jsonParsed.length === DUAL_EMBEDDING_DIMS],
+      ['f32le_blob embedding parses to 1536 dims', blobParsed !== null && blobParsed.length === DUAL_EMBEDDING_DIMS],
+      ['malformed embedding cell returns null (never throws)', parseEmbedding('not-json', 'json_text') === null && parseEmbedding(Buffer.alloc(8), 'f32le_blob') === null],
+    ]
+    const failed = checks.filter(([, ok]) => !ok).map(([n]) => n)
+    assertions.push(assertEq(
+      'UNIVERSAL.dual_search_fuses_lexical_and_semantic',
+      'dualSearch RRF fusion surfaces a lexical-only top row AND a semantic-only top row, a both-lists row outranks a one-list winner, k=60 is canonical, absence is null, and parseEmbedding round-trips both json_text + f32le_blob formats (10 cases)',
+      failed.length,
+      (n) => n === 0,
+      () => `hybrid-retrieval RRF/parse regression on: ${failed.join('; ')}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.dual_search_fuses_lexical_and_semantic', description: 'dual-search RRF fusion', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   // ── P3: uncostable-module disclosure — XOR + byte-identical + no fabricated mass (2026-06-02) ──

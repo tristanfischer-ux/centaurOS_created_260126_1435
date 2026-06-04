@@ -40,6 +40,10 @@ import {
 // VF slot-backfill (task #18): pure backfill-selection logic extracted so it
 // can be unit-tested independently of the I/O-heavy enrichment loop.
 import { pickBackfillCandidates, extractApex } from '../src/lib/pdf-engine-v2/lib/supplier-slot-backfill'
+// Hybrid DB-first retrieval (Tristan 2026-06-04): augment the keyword-LIKE
+// candidate lookup with a SEMANTIC arm over supplier_embeddings, fused by
+// Reciprocal Rank Fusion. The shared substrate is parts-reusable.
+import { dualSearch, type DualSearchHit } from '../src/lib/pdf-engine-v2/lib/retrieval/dual-search'
 
 const FORGE_TRUTH_DB = '/Users/tristanfischer/.forge-truth/forge-truth.db'
 const CANDIDATES_PER_ARCHETYPE = 3
@@ -71,6 +75,35 @@ const OPENROUTER_KEY = (() => {
 
 if (!OPENROUTER_KEY) {
   console.error('[enrich-suppliers] WARNING: OPENROUTER_API_KEY not found — LLM scoring disabled, will fall back to keyword filter only')
+}
+
+/**
+ * OpenAI key for the SEMANTIC arm of the hybrid candidate lookup (it embeds the
+ * supplier-need text to cosine-rank supplier_embeddings). Loaded the same way as
+ * the other keys; set into process.env so dualSearch()'s embedQueryText() finds
+ * it. When absent, dualSearch degrades to its lexical (LIKE) arm only — i.e. the
+ * exact behaviour we had before, so suppliers never get WORSE without the key.
+ */
+const OPENAI_KEY = (() => {
+  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY
+  const candidates = [
+    '/Users/tristanfischer/.claude/secrets/openai.env',
+    '/Users/tristanfischer/.claude/secrets/openrouter.env',
+    '/Users/tristanfischer/secrets/openai.env',
+    '/Users/tristanfischer/Developer/Forge-Capital/.env',
+  ]
+  for (const f of candidates) {
+    if (existsSync(f)) {
+      const content = readFileSync(f, 'utf-8')
+      const m = content.match(/OPENAI_API_KEY=([^\s]+)/)
+      if (m) return m[1]
+    }
+  }
+  return ''
+})()
+if (OPENAI_KEY && !process.env.OPENAI_API_KEY) process.env.OPENAI_API_KEY = OPENAI_KEY
+if (!OPENAI_KEY) {
+  console.error('[enrich-suppliers] WARNING: OPENAI_API_KEY not found — hybrid supplier lookup runs lexical-only (no semantic arm)')
 }
 
 /**
@@ -1185,6 +1218,111 @@ function queryCandidates(archetype: SupplierArchetype, limit: number, excludeIds
   return collected
 }
 
+/**
+ * SEMANTIC arm of the candidate lookup (Tristan 2026-06-04 — hybrid DB-first).
+ *
+ * `queryCandidates` above is LEXICAL-only: profile + keyword-LIKE over name /
+ * description / specialties. It misses rows where the capability is phrased as a
+ * SYNONYM of the archetype keywords (e.g. an archetype keyed "battery pack
+ * assembly" misses a company whose description says "module integration for
+ * lithium-ion energy storage"). This helper runs the SEMANTIC arm: embed the
+ * supplier-need text and cosine-rank `supplier_embeddings` (JSON-array TEXT,
+ * text-embedding-3-small/1536), fused with the lexical list by Reciprocal Rank
+ * Fusion inside dualSearch(). It applies the SAME quality predicate the lexical
+ * query uses (CH-verified, enriched/approved/pushed, region, has-website) so a
+ * semantic candidate is at parity with a lexical one — the only new thing is
+ * that synonyms now surface rows the LIKE arm never saw.
+ *
+ * Returns the SAME CompanyRow shape so the caller can concat it with the lexical
+ * pool; the existing dedupAndPick() collapses overlaps by id. Degrades to an
+ * empty list (never throws) when OPENAI_API_KEY is absent or the DB is busy —
+ * suppliers never get worse than the prior lexical-only behaviour.
+ */
+async function dualSearchCandidates(
+  archetype: SupplierArchetype,
+  limit: number,
+  excludeIds: Set<string>,
+): Promise<{ rows: CompanyRow[]; diagnostic: string; lexicalOnlySaved: number }> {
+  // The supplier-need sentence — what this archetype must DO. Drives BOTH arms:
+  // dualSearch tokenises it for LIKE and embeds it for cosine.
+  const needText = [
+    archetype.label,
+    archetype.function_description,
+    archetype.capabilities.join(', '),
+    archetype.search_keywords.join(', '),
+  ]
+    .filter(Boolean)
+    .join('. ')
+
+  // Same quality bar as queryCandidates' SQL (minus the per-profile loop —
+  // semantic search is profile-agnostic by design: it finds the right firm
+  // wherever it sits). Region + CH-verification + status + website preserved.
+  const regionList = archetype.preferred_regions.map((r) => sqlEscape(r))
+  const regionsIn = regionList.length > 0 ? regionList.map((r) => `'${r}'`).join(',') : "''"
+  const excludeClause =
+    excludeIds.size > 0
+      ? ` AND id NOT IN (${Array.from(excludeIds).map((i) => `'${sqlEscape(i)}'`).join(',')})`
+      : ''
+  const where =
+    `status IN ('enriched','approved','pushed') ` +
+    `AND country IN (${regionsIn}) ` +
+    `AND website_url IS NOT NULL AND website_url != '' ` +
+    `AND ch_company_number IS NOT NULL AND ch_company_number != ''` +
+    excludeClause
+
+  let result
+  try {
+    result = await dualSearch<CompanyRow>({
+      table: 'companies',
+      idColumn: 'id',
+      // Lexical arm columns: name + description + specialties (the same text
+      // the legacy keyword filter concatenated).
+      lexicalCols: ['name', 'description', 'specialties'],
+      // Extra columns to hydrate the CompanyRow payload.
+      selectCols: [
+        'country', 'city', 'website_url', 'contact_name', 'contact_title',
+        'contact_email', 'status', 'ch_company_number', 'relevance_score',
+      ],
+      // Semantic arm: supplier_embeddings (JSON-array TEXT), keyed company_id.
+      embedding: {
+        table: 'supplier_embeddings',
+        column: 'embedding',
+        format: 'json_text',
+        joinColumn: 'company_id',
+      },
+      queryText: needText,
+      k: limit,
+      where,
+      dbPath: FORGE_TRUTH_DB,
+    })
+  } catch (err: any) {
+    return { rows: [], diagnostic: `dual-search threw: ${String(err?.message ?? err).slice(0, 120)}`, lexicalOnlySaved: 0 }
+  }
+
+  // Count rows the SEMANTIC arm surfaced that the LEXICAL arm did NOT — these
+  // are the synonym saves the old keyword-only path would have dropped.
+  let lexicalOnlySaved = 0
+  const rows: CompanyRow[] = result.hits.map((h: DualSearchHit<CompanyRow>) => {
+    if (h.lexical_rank === null && h.semantic_rank !== null) lexicalOnlySaved += 1
+    const r = h.row as Partial<CompanyRow>
+    return {
+      id: String(h.id),
+      name: String(r.name ?? ''),
+      country: (r.country as string | null) ?? null,
+      city: (r.city as string | null) ?? null,
+      website_url: (r.website_url as string | null) ?? null,
+      contact_name: (r.contact_name as string | null) ?? null,
+      contact_title: (r.contact_title as string | null) ?? null,
+      contact_email: (r.contact_email as string | null) ?? null,
+      description: (r.description as string | null) ?? null,
+      status: String(r.status ?? 'enriched'),
+      ch_company_number: (r.ch_company_number as string | null) ?? null,
+      relevance_score: Number(r.relevance_score ?? 0),
+    }
+  })
+  return { rows, diagnostic: result.diagnostic, lexicalOnlySaved }
+}
+
 function classifyConfidence(row: CompanyRow): 'high' | 'medium' | 'low' {
   const chVerified = Boolean(row.ch_company_number)
   if ((row.status === 'approved' || row.status === 'pushed') && chVerified) return 'high'
@@ -2282,6 +2420,15 @@ async function enrichSuppliers(state: any): Promise<SupplierArchetypeOutput[]> {
     const brief = generateSupplierBrief(productBrief, archetype)
     // Pull a LARGER pool than we need so the LLM scorer has options to filter from
     const rows = queryCandidates(archetype, POOL_PER_ARCHETYPE, globalExclude)
+    // Hybrid DB-first (Tristan 2026-06-04): ALSO run the SEMANTIC arm over
+    // supplier_embeddings, fused with lexical via RRF inside dualSearch. Catches
+    // capability synonyms the keyword-LIKE above misses. Same quality predicate
+    // (CH-verified + region + status) so candidates are at parity; dedupAndPick
+    // collapses any overlap with `rows`. Degrades to [] without OPENAI key.
+    const dual = await dualSearchCandidates(archetype, POOL_PER_ARCHETYPE, globalExclude)
+    if (dual.rows.length > 0) {
+      console.log(`  [${archetype.id}] +${dual.rows.length} hybrid candidate(s) (${dual.diagnostic})${dual.lexicalOnlySaved > 0 ? ` — ${dual.lexicalOnlySaved} semantic-only save(s) the keyword filter missed` : ''}`)
+    }
     // Bug #5 (Tristan 2026-05-18): ALSO pull previously-persisted web-fallback
     // rows tagged with this archetype. The standard queryCandidates() requires
     // ch_company_number which excludes web-sourced rows; queryArchetypeTaggedCandidates
@@ -2291,7 +2438,9 @@ async function enrichSuppliers(state: any): Promise<SupplierArchetypeOutput[]> {
     if (archetypeTaggedRows.length > 0) {
       console.log(`  [${archetype.id}] +${archetypeTaggedRows.length} archetype-tagged row(s) from prior web-fallback persistence`)
     }
-    const dedupedPool = dedupAndPick([...archetypeTaggedRows, ...rows], POOL_PER_ARCHETYPE)
+    // Order matters for dedupAndPick (first occurrence wins): archetype-tagged
+    // web-persisted rows first, then lexical DB rows, then semantic-only saves.
+    const dedupedPool = dedupAndPick([...archetypeTaggedRows, ...rows, ...dual.rows], POOL_PER_ARCHETYPE)
 
     // Score each candidate via Flash-Lite — pass BoM context so the scorer
     // can reason about integration fit (P10a, 2026-05-17).
