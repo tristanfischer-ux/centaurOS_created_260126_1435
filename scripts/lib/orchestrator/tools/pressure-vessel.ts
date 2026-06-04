@@ -20,7 +20,12 @@ const VENV_PYTHON = resolve(__dirname, '..', '..', '..', '..', '.venv', 'bin', '
 
 export const pressureVesselTool: Tool<any, any> = {
   id: 'pressure-vessel:design',
-  name: 'Pressure Vessel Design ASME BPVC',
+  // Jurisdiction-NEUTRAL name (2026-06-04, gate-19): the previous "ASME BPVC" name
+  // hard-cited a US pressure code that propagated into the narrative and failed the
+  // jurisdictional-standards audit on UK/EU briefs. The wall calc (hoop stress) is
+  // code-agnostic; the design CODE (PED/BS EN 13445 for UK, ASME VIII for US) is
+  // cited in the jurisdiction-aware compliance/hazards layer, not the tool name.
+  name: 'Pressure Vessel Wall Design (hoop-stress sizing)',
   version: '1.0.0',
   license: 'free-proprietary',
   source_url: 'internal://forgeos/structural',

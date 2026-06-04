@@ -132,7 +132,18 @@ function deriveParams(c: ContractInProgress): Co2MinParams {
   // +15 % engineering margin, rounded up to the next 50 kg/h boiler frame size.
   const boilerSteamKgH = q(c, 'boiler_steam_capacity_kg_h',
     Math.ceil((totalSteamKgH * 1.15) / 50) * 50)
-  const boilerElectricalKw = Math.round(steamThermalKw / 0.98)     // electric element input
+  // ── Boiler element sizing (gate-4 Physics-Critic fix, 2026-06-04) ──
+  // The element must raise the boiler's RATED steam output, not merely the bare
+  // consumer duty: a boiler advertised at boilerSteamKgH kg/h needs an element
+  // that can actually evaporate that much. From ~80 °C feedwater to LP steam the
+  // sensible + latent demand is ≈ kg/h × (sensible ≈ 167 kJ/kg + latent 2150 kJ/kg)
+  // ⁄ 3600 ⁄ 0.98 element-efficiency. Sized from boilerSteamKgH it tracks the rating
+  // automatically (450 kg/h ⇒ ~300 kW, vs the old 215 kW that could only make ~325 kg/h).
+  const STEAM_SENSIBLE_KJ_KG = 167
+  const boilerElementDutyKw =
+    (boilerSteamKgH * (STEAM_SENSIBLE_KJ_KG + STEAM_LATENT_KJ_KG)) / 3600 / 0.98
+  // Round UP to the next standard 10 kW element-bank frame (450 kg/h ⇒ 300 kW).
+  const boilerElectricalKw = Math.ceil(boilerElementDutyKw / 10) * 10
 
   // ── Plant electrical-load + transformer sizing (gate Physics-Critic fix) ──
   // The connected active load is dominated by the electric steam boiler
@@ -370,10 +381,15 @@ function emitK2so4Recovery(p: Co2MinParams): DesignModule {
       cc('mea_stripper_pot', 'regenerated-MEA stripping reboil pot', 'chemical_reaction_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'steam-heated stripping pot freeing MEA from the filtrate'), mod('dimension', '1.5 m³'),
        mod('part_number', 'fabricated jacketed 316L stripping pot — bespoke vessel'), mod('list_price_gbp', '10000'), mod('regulatory', 'PED 2014/68/EU')]),
+    // Gericke GLD 115 (larger trough/screw frame, ~250 kg/h) replaces the GLD 87
+    // (rated ~106 kg/h): Physics-Critic gate-4 fix 2026-06-04 — the GLD 87 left no
+    // throughput margin against the ~104 kg/h KOH feed and was undersized for a
+    // ≥200 kg/h solids target. The GLD 115 keeps the same corrosion-rated enclosed
+    // screw construction at the larger trough/drive size.
     word('koh_dosing_feeder_word', 'KOH solids dosing feeder',
       cc('koh_dosing_feeder', 'KOH solids dosing feeder', 'mass_fluid_transport_process', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'enclosed screw feeder, corrosion-rated'), mod('capacity', String((p.kohTpd * 1000 / 24).toFixed(0)), 'kg/h'), mod('manufacturer', 'Gericke'),
-       mod('part_number', 'GLD 87'), mod('list_price_gbp', '11000'), mod('regulatory', 'COSHH')]),
+      [mod('quantity', '×1'), mod('form', 'enclosed screw feeder, corrosion-rated'), mod('capacity', '250', 'kg/h'), mod('manufacturer', 'Gericke'),
+       mod('part_number', 'GLD 115'), mod('list_price_gbp', '15500'), mod('regulatory', 'COSHH')]),
     word('k2so4_centrifuge_word', 'K2SO4 pusher centrifuge',
       cc('k2so4_centrifuge', 'K2SO4 pusher centrifuge', 'mass_fluid_transport_process', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'single-stage pusher centrifuge'), mod('capacity', String((p.k2so4Tpd * 1000 / 24).toFixed(0)), 'kg/h'), mod('manufacturer', 'Andritz'),
@@ -464,8 +480,11 @@ function emitThermalUtilities(p: Co2MinParams): DesignModule {
     `a ${p.boilerSteamKgH.toFixed(0)} kg/h packaged electric steam boiler serving the distillation reboiler, the K2SO4 crystalliser heater and the MEA stripping pot, plus hot air for two drying stages and closed-loop cooling water`, [
     word('steam_generator_word', 'electric steam generator',
       cc('steam_generator', 'electric steam generator', 'thermal_transfer_function', 'steel'),
+      // Price bumped £52k → £62k for the larger element bank: Physics-Critic gate-4
+      // fix 2026-06-04 sized the element from the boiler's RATED steam output
+      // (450 kg/h ⇒ 300 kW, up from the old 215 kW that could only evaporate ~325 kg/h).
       [mod('quantity', '×1'), mod('form', `packaged electric steam boiler, ${p.boilerElectricalKw} kW element`), mod('capacity', String(p.boilerSteamKgH.toFixed(0)), 'kg/h'), mod('manufacturer', 'Cochran'),
-       mod('part_number', 'packaged electric steam boiler — bespoke package'), mod('list_price_gbp', '52000'), mod('regulatory', 'PED 2014/68/EU')]),
+       mod('part_number', 'packaged electric steam boiler — bespoke package'), mod('list_price_gbp', '62000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('hot_air_heater_word', 'hot-air process heater',
       cc('hot_air_heater', 'electric hot-air process heater', 'thermal_transfer_function', 'steel'),
       [mod('quantity', '×2'), mod('form', 'finned electric duct heater'), mod('capacity', String(p.dryerHeatKw.toFixed(0)), 'kW each'), mod('manufacturer', 'Kanthal'),
