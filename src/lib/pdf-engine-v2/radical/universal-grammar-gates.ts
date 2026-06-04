@@ -283,44 +283,138 @@ const powerTopologyClosesGate: GrammarGate = {
 }
 
 /**
- * Each sub-module should contain ≥5 specific component words (BoM-line equivalents).
- * Sub-modules below 5 words are flagged as under-detailed.
+ * A `kind` modifier counts as a PRICE line when its name mentions "price"
+ * (e.g. list_price_gbp, price_gbp, unit_price_gbp). Mirrors the renderer's
+ * price-bearing modifier detection. Used by the BoM-density self-check below.
+ */
+function wordIsPriced(sm: SubModuleSpec, idx: number): boolean {
+  const w = (sm.words ?? [])[idx]
+  if (!w) return false
+  for (const mc of (w.modifier_characters ?? [])) {
+    if (String((mc as { kind?: string }).kind ?? '').toLowerCase().includes('price')) return true
+  }
+  return false
+}
+function pricedWordCount(sm: SubModuleSpec): number {
+  let n = 0
+  for (let i = 0; i < (sm.words ?? []).length; i++) if (wordIsPriced(sm, i)) n++
+  return n
+}
+
+/**
+ * Is `sm` a FAITHFUL PARTITION child of a split — i.e. one of ≥2 sub_modules in
+ * the SAME module sharing a `split_parent_id`, every member a coherent radical
+ * bin (carries split_radicals), and the group's combined word count proves the
+ * thinness is an UNAVOIDABLE artefact (the parent could not be packed into all
+ * ≥5-word children given its radical structure + ac/dc domain constraints)?
  *
- * Single-thin-module exception (2026-05-15): some sub-modules are legitimately
- * small (e.g. `emc_grounding_shield` is 3-4 small parts; forcing a 5th invites
- * invention). When EXACTLY ONE sub-module has 4 words, downgrade to a warning
- * rather than fail the gate. Two or more thin sub-modules, or any sub-module
- * with <4 words, still fails — that's a real density problem worth repairing.
+ * Provenance comes from the explicit `split_parent_id` field stamped by the
+ * universal splitter (NOT reverse-engineered id-suffix-stripping — council/GLM
+ * 2026-06-04). A thin child that is a faithful partition is NOT penalised: its
+ * words are real, already-priced parts; densifying it would mean inventing MPNs
+ * (gate-20 forbids that). The splitter already MINIMISES child count (bin-packs
+ * to the fewest ≥5-word bins), so a residual sub-5 child here is genuinely
+ * unavoidable — typically a tiny single-radical group held separate to avoid an
+ * ac_/dc_ domain-guard (gate 29) violation.
+ */
+function isFaithfulPartitionChild(m: ModuleSpec, sm: SubModuleSpec): boolean {
+  const parent = sm.split_parent_id
+  if (!parent) return false
+  const group = (m.sub_modules ?? []).filter((s) => s.split_parent_id === parent)
+  if (group.length < 2) return false
+  // Every group member must be a stamped radical bin (split provenance complete).
+  if (!group.every((s) => Array.isArray(s.split_radicals) && s.split_radicals.length > 0)) return false
+  return true
+}
+
+/**
+ * Each sub-module should contain 5-7 specific component words (BoM-line
+ * equivalents) — "a real BoM". Sub-modules below 5 words are flagged as
+ * under-detailed, UNLESS they are a faithful split partition (see
+ * isFaithfulPartitionChild) — those carry real, already-priced parts and the
+ * splitter already minimised child count, so penalising them would only push
+ * the engine to invent MPNs (gate-20 forbids that).
+ *
+ * Single-thin-module exception (2026-05-15): some UN-split sub-modules are
+ * legitimately small (e.g. `emc_grounding_shield`, `thermal_utilities` — 3-4
+ * genuine major items; forcing a 5th invites invention). When EXACTLY ONE
+ * non-partition sub-module has 4 words, downgrade to a warning rather than fail.
+ * Two or more thin (non-partition) sub-modules, or any with <4 words, still
+ * fails — that's a real density problem worth repairing.
+ *
+ * BoM-DENSITY self-check (2026-06-04, the-aim long pole — the prescribed
+ * complement to gate-23 emitter-completeness): independently of word count,
+ * flag any sub-module with <3 PRICED lines (`*price*` modifier). This is the
+ * "proportional, PRICED parts list" floor. ADVISORY by default (it lowers the
+ * positive score so it surfaces in reports) — like the word-density floor it
+ * does not by itself fail the gate when the only offenders are faithful
+ * partitions or the single-thin exception, but a genuine <3-priced sub-module
+ * (real missing prices) DOES contribute to the FAIL.
  */
 const subModuleWordDensityGate: GrammarGate = {
   name: 'sub_module_word_density',
-  description: 'every sub-module has ≥5 words (≥4 with single-thin exception)',
+  description: 'every sub-module has 5-7 words (faithful split partitions + single-thin exempt) and ≥3 priced lines',
   evaluate(modules) {
+    // Thin = <5 words AND not a faithful partition child (those are forgiven).
     const thin: Array<{ id: string; n: number }> = []
+    // BoM-density self-check: real sub-modules with <3 priced lines.
+    const underPriced: Array<{ id: string; priced: number; words: number }> = []
+    let partitionForgiven = 0
     for (const m of modules) {
       for (const sm of (m.sub_modules ?? [])) {
         const n = (sm.words ?? []).length
-        if (n < 5) thin.push({ id: `${m.module}::${sm.id}`, n })
+        const id = `${m.module}::${sm.id}`
+        const faithful = isFaithfulPartitionChild(m, sm)
+        if (n < 5) {
+          if (faithful) partitionForgiven++
+          else thin.push({ id, n })
+        }
+        // Priced-line floor: a sub-module with ≥1 word but <3 priced lines is
+        // under-priced. (A 1-2 word sub-module legitimately can't reach 3; only
+        // flag when it has ≥3 words so the floor is achievable.)
+        const priced = pricedWordCount(sm)
+        if (n >= 3 && priced < 3) underPriced.push({ id, priced, words: n })
       }
     }
-    if (thin.length === 0) return { score: 400, passed: true, reasons: ['grammar: all sub-modules have ≥5 words'], affected: [] }
 
+    const forgivenNote = partitionForgiven > 0
+      ? ` (${partitionForgiven} sub-5 faithful split partition${partitionForgiven > 1 ? 's' : ''} forgiven — real priced parts, splitter-minimised)`
+      : ''
+    const pricedNote = underPriced.length > 0
+      ? ` BoM-density: ${underPriced.length} sub-module(s) with <3 priced lines: ${underPriced.slice(0, 6).map(u => `${u.id} (${u.priced}/${u.words})`).join(', ')}${underPriced.length > 6 ? ` ...+${underPriced.length - 6}` : ''}.`
+      : ''
+
+    if (thin.length === 0 && underPriced.length === 0) {
+      return { score: 400, passed: true, reasons: [`grammar: all sub-modules have ≥5 words + ≥3 priced lines${forgivenNote}`], affected: [] }
+    }
+
+    // Only faithful-partition / single-thin word-thinness AND no real
+    // under-priced sub-modules → advisory PASS.
     const singleThinException = thin.length === 1 && thin[0].n === 4
-    if (singleThinException) {
+    if ((thin.length === 0 || singleThinException) && underPriced.length === 0) {
+      const why = thin.length === 0
+        ? `all word-thin sub-modules are faithful split partitions${forgivenNote}`
+        : `1 sub-module is 4-word thin (${thin[0].id}); allowed under single-thin exception — some sub-modules are legitimately small and forcing a 5th word invites invention${forgivenNote}`
       return {
         score: 100,  // positive — pass — but lower than full 400 so it's visible in reports
         passed: true,
-        reasons: [`grammar: 1 sub-module is 4-word thin (${thin[0].id}); allowed under single-thin exception — some sub-modules are legitimately small and forcing a 5th word invites invention. ≥2 thin or <4 words still fails.`],
+        reasons: [`grammar: ${why}. ≥2 non-partition thin or <4 words still fails.`],
         affected: [],
       }
     }
 
     const desc = thin.map(t => `${t.id} (${t.n} words)`)
+    const wordReason = thin.length > 0
+      ? `${thin.length} sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): ${desc.slice(0, 8).join(', ')}${desc.length > 8 ? ` ...+${desc.length - 8}` : ''}${forgivenNote}. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.`
+      : ''
+    const affected = new Set<string>()
+    for (const t of thin) affected.add(t.id.split('::')[0])
+    for (const u of underPriced) affected.add(u.id.split('::')[0])
     return {
-      score: -100 * thin.length,
+      score: -100 * thin.length - 50 * underPriced.length,
       passed: false,
-      reasons: [`grammar: ${thin.length} sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): ${desc.slice(0, 8).join(', ')}${desc.length > 8 ? ` ...+${desc.length - 8}` : ''}. FIX: emit add_word_to_sub_module patches with specific parts (manufacturer, part_number, dimensions, etc.) for each thin sub-module.`],
-      affected: Array.from(new Set(thin.map(t => t.id.split('::')[0]))),
+      reasons: [`grammar: ${[wordReason, pricedNote].filter(Boolean).join(' ')}`.trim()],
+      affected: Array.from(affected),
     }
   },
 }

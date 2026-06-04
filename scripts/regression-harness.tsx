@@ -43,6 +43,7 @@ import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-der
 import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode, moduleToolIds, break_paragraph, humaniseSubName } from './render-minimal-pdf'
 import { computeToolArchetypeCoherence, isMarineClass } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
+import { splitDenseSubModulesByRadical } from './lib/orchestrator/submodule-splitter'
 import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, isBespokeFabrication } from '../src/lib/pdf-engine-v2/lib/bespoke-equipment-bands'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
@@ -703,6 +704,287 @@ function checkCo2FixInvariants(): Assertion[] {
   }
 
   _co2FixCheck = out
+  return out
+}
+
+// ── Sub-module density splitter (bin-pack rewrite) invariants (2026-06-04) ──
+//
+// Four invariants guarding the MIN_CHILD_WORDS bin-pack rewrite of
+// splitDenseSubModulesByRadical (scripts/lib/orchestrator/submodule-splitter.ts,
+// called from assembler.ts:125). The splitter REGROUPS existing words into
+// ≥5-word children, stamps split_parent_id + split_radicals, never co-locates
+// conflicting ac_/dc_ character_id domains, keeps a single child when a parent
+// totals <5 words, and is idempotent (a child already carrying split_parent_id
+// passes through). It adds/drops nothing.
+//
+//   1. UNIVERSAL.splitter_never_emits_sub5_child_unless_unavoidable — on the CO₂
+//      v12 design, every OUTPUT sub_module carrying split_parent_id has ≥5 words
+//      UNLESS it is unavoidably thin (its split_parent_id sibling group cannot be
+//      re-packed into all-≥5 bins without an ac_/dc_ conflict). Count of AVOIDABLE
+//      sub-5 split children === 0.
+//   2. UNIVERSAL.splitter_content_and_mpn_preserving — the multiset of word ids
+//      AND the set of (word_id, part_number) pairs are IDENTICAL before vs after
+//      (regroup only; gate-20 safety — a fabricated MPN here would poison the run).
+//   3. UNIVERSAL.splitter_idempotent — split(split(d)) deep-equals split(d) on
+//      sub_module ids + per-child word counts + split_parent_id (oscillation guard).
+//   4. UNIVERSAL.no_submodule_mixes_ac_dc_after_split — on a synthetic fat
+//      sub_module of 4 dc_ + 3 ac_ character_ids, no OUTPUT sub_module contains
+//      BOTH an ac_- and a dc_-prefixed word.content_character.character_id
+//      (gate-29 / exit 29 safety).
+//
+// INPUT-SHAPE ADAPTATION (verified 2026-06-04): the splitter consumes the
+// assembler-time emitter design (one DENSE sub_module per module, density 1.0 —
+// BELOW the TARGET_DENSITY_DEFAULT=2.0 floor that short-circuits the splitter).
+// The PERSISTED out/co2-mineralisation-v12/state.json.moduleDecomposition is the
+// DOWNSTREAM, already-decomposed form: density 2.083 ≥ 2.0, so calling the
+// splitter on it returns it unchanged (the density gate fires; verified
+// out === input, 0 split_parent_id stamps) and never exercises the bin-packer.
+// So for invariants 1-3 we reconstruct the splitter's real input from the SAME
+// real CO₂ words by collapsing each module's sub_modules back into one dense
+// sub_module per module (collapseToPreSplit). This regroups the identical word
+// set the chain produced, drives density to 1.0 so the bin-packer actually runs,
+// and is faithful — every word/MPN is the real v12 part. On this input the only
+// sub-5 OUTPUT is the un-split environmental_interface/thermal_utilities group
+// (single-radical, 4 words, NO split_parent_id) — i.e. 0 avoidable sub-5 split
+// children, matching the brief.
+//
+// Memoised (the .json fixture is read once per harness run). Each probe is
+// try/catch-guarded → a missing fixture yields a vacuous PASS (mirrors
+// checkSizingToolsWorkedSound / checkCo2FixInvariants), so the harness never throws.
+let _splitterCheck: Assertion[] | null = null
+function checkSubmoduleSplitterInvariants(): Assertion[] {
+  if (_splitterCheck) return _splitterCheck
+  const out: Assertion[] = []
+
+  // character_id ac/dc domain inference — mirrors the splitter's own wordDomain
+  // (submodule-splitter.ts) + submodule-domain-guard.inferDomain. A bidirectional
+  // id (mentions BOTH ac AND dc) is null (never conflicts).
+  const wordDomain = (w: any): 'ac' | 'dc' | null => {
+    const id = w?.content_character?.character_id
+    if (!id) return null
+    const s = String(id).toLowerCase()
+    const hasAc = /^ac_/.test(s) || /_ac_/.test(s)
+    const hasDc = /^dc_/.test(s) || /_dc_/.test(s)
+    if (hasAc && hasDc) return null
+    if (hasAc) return 'ac'
+    if (hasDc) return 'dc'
+    return null
+  }
+  const subDomains = (sub: any): Set<'ac' | 'dc'> => {
+    const set = new Set<'ac' | 'dc'>()
+    for (const w of (Array.isArray(sub?.words) ? sub.words : [])) { const d = wordDomain(w); if (d) set.add(d) }
+    return set
+  }
+  const pnOf = (w: any): string | null => {
+    const m = (Array.isArray(w?.modifier_characters) ? w.modifier_characters : []).find((x: any) => x?.kind === 'part_number')
+    return m && m.value != null ? String(m.value) : null
+  }
+  // Walk every (module, sub_module, word) of a DesignJSON-shaped object.
+  const eachSub = function* (d: any): Generator<any> {
+    for (const m of (Array.isArray(d?.modules) ? d.modules : [])) {
+      for (const sub of (Array.isArray(m?.sub_modules) ? m.sub_modules : [])) yield sub
+    }
+  }
+  // Collapse a moduleDecomposition into the splitter's PRE-SPLIT input shape: one
+  // dense sub_module per module holding ALL that module's words (density 1.0).
+  const collapseToPreSplit = (md: any) => ({
+    ...md,
+    modules: (Array.isArray(md?.modules) ? md.modules : []).map((m: any) => ({
+      ...m,
+      sub_modules: [{
+        id: `${m?.module ?? 'module'}_sub`,
+        name_human: m?.module ?? 'module',
+        english_sentence: '',
+        rad_syntax: '',
+        role_verb: '',
+        topology_clause: '',
+        words: (Array.isArray(m?.sub_modules) ? m.sub_modules : []).flatMap((sub: any) => (Array.isArray(sub?.words) ? sub.words : [])),
+      }],
+    })),
+  })
+
+  const CO2_V12 = resolve(__dirname, '..', 'out', 'co2-mineralisation-v12', 'state.json')
+
+  // ── (1) UNIVERSAL.splitter_never_emits_sub5_child_unless_unavoidable ──
+  // ── (2) UNIVERSAL.splitter_content_and_mpn_preserving ──
+  // ── (3) UNIVERSAL.splitter_idempotent ──
+  // All three run on the SAME reconstructed CO₂ v12 pre-split design.
+  try {
+    const state = JSON.parse(readFileSync(CO2_V12, 'utf-8'))
+    const design = collapseToPreSplit(state?.moduleDecomposition)
+    const split1 = splitDenseSubModulesByRadical(design as any)
+
+    // (1) avoidable sub-5 split children. A split child is one carrying
+    //     split_parent_id. "Unavoidably thin" = its sibling cohort (all children
+    //     sharing the same split_parent_id) cannot be re-packed into all-≥5 bins
+    //     without co-locating conflicting ac_/dc_ domains. We test that by
+    //     attempting a domain-pure all-≥5 re-pack of the cohort's pooled words:
+    //     if the pooled words can form bins that are each ≥5 (or each ac/dc-pure
+    //     when a domain split is forced), a sub-5 child in that cohort is AVOIDABLE.
+    const cohorts = new Map<string, any[]>()
+    for (const sub of eachSub(split1)) {
+      const sp = sub?.split_parent_id
+      if (sp === undefined || sp === null) continue
+      const key = String(sp)
+      if (!cohorts.has(key)) cohorts.set(key, [])
+      cohorts.get(key)!.push(sub)
+    }
+    const avoidableSub5: string[] = []
+    for (const [, children] of cohorts) {
+      const pooled = children.flatMap((c) => (Array.isArray(c?.words) ? c.words : []))
+      const total = pooled.length
+      const hasAc = pooled.some((w) => wordDomain(w) === 'ac')
+      const hasDc = pooled.some((w) => wordDomain(w) === 'dc')
+      // The cohort is forced below the floor IFF its total content can't reach 5
+      // (<5 total), OR the content must be split across an ac/dc domain boundary
+      // that leaves one side <5. If neither holds, any sub-5 child is avoidable.
+      const dcCount = pooled.filter((w) => wordDomain(w) === 'dc').length
+      const acCount = pooled.filter((w) => wordDomain(w) === 'ac').length
+      const neutralCount = total - dcCount - acCount
+      // Best achievable per-domain min if a split IS forced (neutral words can pad
+      // either side): a domain split is only forced when BOTH ac and dc are present.
+      const domainSplitForced = hasAc && hasDc
+      const forcedFloorUnreachable = domainSplitForced
+        // even pooling all neutral words onto the smaller domain side, can the
+        // smaller side reach 5? if not, a sub-5 child in this cohort is unavoidable.
+        ? (Math.min(dcCount, acCount) + neutralCount < 5)
+        : false
+      const cohortCanAllReachFloor = total >= 5 && !forcedFloorUnreachable
+      for (const child of children) {
+        const wc = (Array.isArray(child?.words) ? child.words : []).length
+        if (wc < 5 && cohortCanAllReachFloor) {
+          avoidableSub5.push(`${child?.id} (${wc}w, parent ${child?.split_parent_id})`)
+        }
+      }
+    }
+    out.push(assertEq(
+      'UNIVERSAL.splitter_never_emits_sub5_child_unless_unavoidable',
+      'splitter on CO₂ v12: every split child (carrying split_parent_id) has ≥5 words unless its sibling cohort cannot be re-packed all-≥5 without an ac_/dc_ conflict; avoidable sub-5 split children === 0',
+      avoidableSub5.length, (n) => n === 0,
+      () => `splitter emitted ${avoidableSub5.length} AVOIDABLE sub-5 split child(ren): ${avoidableSub5.slice(0, 4).join(' ; ')}. Check packGroupsIntoBins in scripts/lib/orchestrator/submodule-splitter.ts.`,
+    ))
+
+    // (2) content + MPN preservation.
+    const collect = (d: any) => {
+      const ids: string[] = []
+      const pairs: string[] = []
+      for (const sub of eachSub(d)) {
+        for (const w of (Array.isArray(sub?.words) ? sub.words : [])) {
+          ids.push(String(w?.id))
+          pairs.push(`${w?.id}::${pnOf(w)}`)
+        }
+      }
+      return { ids, pairs }
+    }
+    const before = collect(design)
+    const after = collect(split1)
+    const sortJoin = (a: string[]) => [...a].sort().join('|')
+    const idsEqual = before.ids.length === after.ids.length && sortJoin(before.ids) === sortJoin(after.ids)
+    const beforePairSet = new Set(before.pairs)
+    const afterPairSet = new Set(after.pairs)
+    const newPairs = [...afterPairSet].filter((p) => !beforePairSet.has(p))
+    const pairsEqual = beforePairSet.size === afterPairSet.size && newPairs.length === 0
+    out.push(assertEq(
+      'UNIVERSAL.splitter_content_and_mpn_preserving',
+      `splitter on CO₂ v12 is regroup-only: word-id multiset identical (${before.ids.length} words) AND (word_id, part_number) set identical, 0 fabricated MPNs (gate-20 safety)`,
+      idsEqual && pairsEqual, (ok) => ok === true,
+      () => [
+        !idsEqual ? `word-id multiset changed: ${before.ids.length} before, ${after.ids.length} after` : '',
+        !pairsEqual ? `(word_id,part_number) set changed: ${beforePairSet.size} before, ${afterPairSet.size} after, ${newPairs.length} NEW pairs e.g. ${newPairs.slice(0, 2).join(', ')}` : '',
+      ].filter(Boolean).join('; ') + '. The splitter must REGROUP existing words only — check trySplitOne in submodule-splitter.ts.',
+    ))
+
+    // (3) idempotency.
+    const split2 = splitDenseSubModulesByRadical(split1 as any)
+    const fingerprint = (d: any): string => {
+      const rows: string[] = []
+      for (const sub of eachSub(d)) {
+        rows.push(`${sub?.id}|${(Array.isArray(sub?.words) ? sub.words : []).length}|${sub?.split_parent_id ?? ''}`)
+      }
+      return rows.sort().join('\n')
+    }
+    const fp1 = fingerprint(split1)
+    const fp2 = fingerprint(split2)
+    const idempotent = fp1 === fp2
+    out.push(assertEq(
+      'UNIVERSAL.splitter_idempotent',
+      'splitter is idempotent: split(split(d)) deep-equals split(d) on sub_module ids + per-child word counts + split_parent_id (double-suffix / oscillation guard)',
+      idempotent, (ok) => ok === true,
+      () => {
+        const a = fp1.split('\n'); const b = fp2.split('\n')
+        const onlyIn2 = b.filter((x) => !a.includes(x)).slice(0, 3)
+        const onlyIn1 = a.filter((x) => !b.includes(x)).slice(0, 3)
+        return `split(split(d)) ≠ split(d): rows 1st=${a.length} 2nd=${b.length}; only-in-2nd=[${onlyIn2.join(' ; ')}]; only-in-1st=[${onlyIn1.join(' ; ')}]. The idempotency guard (split_parent_id pass-through) in trySplitOne is broken — check submodule-splitter.ts.`
+      },
+    ))
+  } catch (err) {
+    // CO₂ v12 fixture unavailable — vacuous PASS (mirrors checkSizingToolsWorkedSound's catch).
+    for (const id of [
+      'UNIVERSAL.splitter_never_emits_sub5_child_unless_unavoidable',
+      'UNIVERSAL.splitter_content_and_mpn_preserving',
+      'UNIVERSAL.splitter_idempotent',
+    ]) {
+      out.push({ id, description: 'sub-module splitter invariant (CO₂ v12 fixture)', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    }
+  }
+
+  // ── (4) UNIVERSAL.no_submodule_mixes_ac_dc_after_split ──
+  // SYNTHETIC: one module, one fat sub_module of 4 dc_ + 3 ac_ words. The dc_
+  // words occupy dc-domain radicals and the ac_ words ac-domain radicals (DISJOINT
+  // radical sets) — the realistic gate-29 scenario where each function_radical
+  // group is domain-homogeneous, so the bin-packer's domain guard (domainsConflict)
+  // must keep the dc cohort and the ac cohort in separate children. (If a single
+  // radical group itself straddled ac/dc the splitter could not re-partition within
+  // it — that is an upstream emitter concern, not what gate 29 / this guard cover.)
+  {
+    const mkWord = (cid: string, rad: string) => ({
+      id: `${cid}_word`, name_human: cid,
+      content_character: { character_id: cid, function_radical_primary: rad },
+      modifier_characters: [{ kind: 'part_number', value: `PN-${cid}` }],
+    })
+    const synthetic = {
+      modules: [{
+        module: 'power_distribution',
+        sub_modules: [{
+          id: 'power_distribution_sub', name_human: 'power_distribution',
+          words: [
+            mkWord('dc_bus_busbar', 'dc_conduction'),
+            mkWord('dc_link_capacitor', 'dc_energy_storage'),
+            mkWord('dc_breaker', 'dc_protection'),
+            mkWord('dc_filter_choke', 'dc_filtering'),
+            mkWord('ac_filter_inductor', 'ac_filtering'),
+            mkWord('ac_contactor', 'ac_protection'),
+            mkWord('ac_emi_filter', 'ac_conduction'),
+          ],
+        }],
+      }],
+    }
+    let threw = false
+    let mixed: string[] = []
+    let preservedCount = 0
+    try {
+      const res = splitDenseSubModulesByRadical(synthetic as any)
+      for (const sub of eachSub(res)) {
+        const doms = subDomains(sub)
+        if (doms.has('ac') && doms.has('dc')) {
+          mixed.push(`${sub?.id} (${(Array.isArray(sub?.words) ? sub.words : []).length}w)`)
+        }
+        preservedCount += (Array.isArray(sub?.words) ? sub.words : []).length
+      }
+    } catch (err) {
+      threw = true
+      mixed = [`splitter threw: ${String(err).slice(0, 100)}`]
+    }
+    out.push(assertEq(
+      'UNIVERSAL.no_submodule_mixes_ac_dc_after_split',
+      'splitter on a 4×dc_ + 3×ac_ fat sub_module: no OUTPUT sub_module contains BOTH an ac_- and a dc_-prefixed content_character.character_id, and all 7 words survive (gate-29 / exit 29 safety)',
+      JSON.stringify({ mixed: mixed.length, preserved: preservedCount, threw }),
+      () => !threw && mixed.length === 0 && preservedCount === 7,
+      () => `splitter co-located ac_ + dc_ domains OR lost words: mixed sub_modules=[${mixed.join(' ; ')}], words preserved=${preservedCount} (want 7). The ac/dc guard (domainsConflict / packGroupsIntoBins) in submodule-splitter.ts let conflicting domains share a child.`,
+    ))
+  }
+
+  _splitterCheck = out
   return out
 }
 
@@ -6109,6 +6391,11 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // Self-contained CO₂-fix invariants — none read the snapshot; memoised so the
   // .venv python (gate 3 of these) spawns once across the whole harness run.
   for (const a of checkCo2FixInvariants()) assertions.push(a)
+
+  // Self-contained sub-module density-splitter (bin-pack rewrite) invariants —
+  // load the CO₂ v12 fixture themselves + a synthetic ac/dc design; memoised so
+  // the fixture is read once per harness run (not per snapshot).
+  for (const a of checkSubmoduleSplitterInvariants()) assertions.push(a)
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }

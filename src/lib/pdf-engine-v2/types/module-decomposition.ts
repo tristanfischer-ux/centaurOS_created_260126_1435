@@ -669,6 +669,23 @@ export interface SubModuleSpec {
    * Audit trail + verbatim render target for the §4.5 PDF block.
    */
   rad_syntax?: string
+  /**
+   * Provenance stamped by the universal sub-module splitter
+   * (`scripts/lib/orchestrator/submodule-splitter.ts`, 2026-06-04) when this
+   * sub_module was produced by bin-packing a larger fat sub_module's words into
+   * ≥MIN_CHILD_WORDS children. Equals the SOURCE sub_module's id (shared across
+   * all children of the same split). Present ⇒ this is a faithful partition.
+   *
+   * Read by `subModuleWordDensityGate` (universal-grammar-gates.ts): a child
+   * below the 5-word floor is FORGIVEN (downgraded to advisory-pass) when it is
+   * one of a split group whose members are coherent radical bins — i.e. the
+   * thinness is an UNAVOIDABLE partition artefact of real, already-priced parts,
+   * NOT a genuinely under-detailed sub_module. Also drives the splitter's own
+   * idempotency guard (never re-split an already-split child).
+   */
+  split_parent_id?: string
+  /** The function-radicals this split child contains (sorted, diagnostic). */
+  split_radicals?: string[]
 }
 
 // ---------------------------------------------------------------------------
