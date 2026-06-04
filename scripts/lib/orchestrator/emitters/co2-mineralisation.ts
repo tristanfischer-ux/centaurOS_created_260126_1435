@@ -392,8 +392,13 @@ function emitK2so4Recovery(p: Co2MinParams): DesignModule {
        mod('part_number', 'GLD 115'), mod('list_price_gbp', '15500'), mod('regulatory', 'COSHH')]),
     word('k2so4_centrifuge_word', 'K2SO4 pusher centrifuge',
       cc('k2so4_centrifuge', 'K2SO4 pusher centrifuge', 'mass_fluid_transport_process', 'stainless_steel'),
+      // Andritz/KMPT pusher-centrifuge line is the SZ series (single/two-stage,
+      // basket 400-1,400 mm). Stage-0 web harvest 2026-06-04 could not confirm any
+      // Andritz "P-3" pusher model (null from all distributors) — corrected to the
+      // real SZ series at series level only; the exact frame is picked at quotation
+      // (gate-20: no fabricated frame suffix).
       [mod('quantity', '×1'), mod('form', 'single-stage pusher centrifuge'), mod('capacity', String((p.k2so4Tpd * 1000 / 24).toFixed(0)), 'kg/h'), mod('manufacturer', 'Andritz'),
-       mod('part_number', 'P-3 pusher centrifuge'), mod('list_price_gbp', '23000')]),
+       mod('part_number', 'SZ (frame TBD at quotation)'), mod('list_price_gbp', '23000')]),
     word('k2so4_slurry_feed_pump_word', 'K2SO4 slurry feed pump',
       cc('k2so4_slurry_feed_pump', 'crystalliser-to-centrifuge slurry feed pump', 'mass_fluid_transport_process', 'stainless_steel'),
       [mod('quantity', '×2'), mod('form', 'progressive-cavity slurry pump, 1 duty + 1 standby'), mod('manufacturer', 'SEEPEX'),
@@ -480,11 +485,16 @@ function emitThermalUtilities(p: Co2MinParams): DesignModule {
     `a ${p.boilerSteamKgH.toFixed(0)} kg/h packaged electric steam boiler serving the distillation reboiler, the K2SO4 crystalliser heater and the MEA stripping pot, plus hot air for two drying stages and closed-loop cooling water`, [
     word('steam_generator_word', 'electric steam generator',
       cc('steam_generator', 'electric steam generator', 'thermal_transfer_function', 'steel'),
-      // Price bumped £52k → £62k for the larger element bank: Physics-Critic gate-4
-      // fix 2026-06-04 sized the element from the boiler's RATED steam output
-      // (450 kg/h ⇒ 300 kW, up from the old 215 kW that could only evaporate ~325 kg/h).
-      [mod('quantity', '×1'), mod('form', `packaged electric steam boiler, ${p.boilerElectricalKw} kW element`), mod('capacity', String(p.boilerSteamKgH.toFixed(0)), 'kg/h'), mod('manufacturer', 'Cochran'),
-       mod('part_number', 'packaged electric steam boiler — bespoke package'), mod('list_price_gbp', '62000'), mod('regulatory', 'PED 2014/68/EU')]),
+      // Manufacturer corrected Cochran → Fulton (Stage-0 web harvest 2026-06-04):
+      // Cochran's electric line (EB90) starts at ~3,000 kg/h — ~7× oversized for this
+      // ~450 kg/h pilot. The right-scaled verified line is the Fulton Electropack
+      // (18-100 kW / 29-153 kg/h per unit, e.g. EP100); a ~450 kg/h / ~300 kW duty
+      // is met by a multi-unit Electropack arrangement. Quantity stays ×1 (one packaged
+      // multi-element steam skid). Price ~£60k for the multi-unit Fulton package matches
+      // the harvest's Electropack budget band and preserves the cost-stack reconciliation.
+      // Element still sized from the RATED steam output (450 kg/h ⇒ 300 kW): Physics-Critic gate-4 2026-06-04.
+      [mod('quantity', '×1'), mod('form', `packaged electric steam boiler, ${p.boilerElectricalKw} kW element (multi-unit Electropack)`), mod('capacity', String(p.boilerSteamKgH.toFixed(0)), 'kg/h'), mod('manufacturer', 'Fulton'),
+       mod('part_number', 'Electropack EP100 (multi-unit package, frame count TBD at quotation)'), mod('list_price_gbp', '60000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('hot_air_heater_word', 'hot-air process heater',
       cc('hot_air_heater', 'electric hot-air process heater', 'thermal_transfer_function', 'steel'),
       [mod('quantity', '×2'), mod('form', 'finned electric duct heater'), mod('capacity', String(p.dryerHeatKw.toFixed(0)), 'kW each'), mod('manufacturer', 'Kanthal'),
