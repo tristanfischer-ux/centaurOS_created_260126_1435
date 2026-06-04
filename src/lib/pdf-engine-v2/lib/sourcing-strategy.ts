@@ -230,3 +230,192 @@ export function buildSourcingStrategyFromState(
   if (fromDiscovered) return fromDiscovered
   return buildSourcingStrategy(deriveSourcingArchetypesFromState(state))
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROCUREMENT / CONTRACTOR FRAMING (2026-06-04)
+//
+// Tristan: a sourcing section should read like a procurement plan — "normally
+// you show the main contractor and the key sub-contractors and explain what
+// they do and give info about them and contact details." A bare manufacturer-
+// by-role table does not. The two helpers below turn the pinned-manufacturer
+// list into (1) a recommended MAIN-CONTRACTOR role and (2) KEY-SUBCONTRACTOR
+// entries grouped by scope, each carrying a one-line company profile and an
+// HONEST contact route: the REAL company website + a "UK sales enquiry via …"
+// note. We never fabricate a phone number or an email address — the published
+// website and its sales-enquiry route is the truthful contact detail.
+
+export interface OemProfile {
+  /** One-line "who they are" — sector / country / standing. Empty if unknown. */
+  profile: string
+  /** REAL corporate website (bare host, e.g. "sulzer.com"). Empty if unknown. */
+  website: string
+}
+
+// Curated map of the major process-plant / industrial equipment OEMs that the
+// BoM pins across the chemical, separations, rotating-equipment, instrumentation,
+// electrical and safety scopes. REAL websites only — these are the manufacturers'
+// published corporate domains (verified, not catalogue/distributor pages). One-
+// line profiles are factual sector/country/standing descriptions. When an OEM is
+// NOT in this map the renderer still lists it by name under its scope, with the
+// honest "website not on file — search the company name for the sales enquiry"
+// route, so coverage degrades gracefully without ever inventing a contact.
+const OEM_PROFILES: Record<string, OemProfile> = {
+  // — Separations, columns, mass-transfer internals, rotating equipment —
+  'sulzer':                 { profile: 'Swiss pumps, mixing and separation-technology group; supplier of distillation/absorption column internals, static mixers and process pumps.', website: 'sulzer.com' },
+  'koch-glitsch':           { profile: 'Global mass-transfer specialist (US/Koch Industries); structured/random packing, trays and column internals for distillation and absorption.', website: 'koch-glitsch.com' },
+  'alfa laval':             { profile: 'Swedish leader in heat transfer, separation and fluid handling; plate/spiral heat exchangers, decanters and process modules.', website: 'alfalaval.com' },
+  'kelvion':                { profile: 'German heat-exchanger manufacturer (formerly GEA Heat Exchangers); plate, shell-and-tube and air-cooled exchangers.', website: 'kelvion.com' },
+  'gea':                    { profile: 'German process-technology group; evaporators, dryers, separators, crystallisation and liquid/solid processing plant.', website: 'gea.com' },
+  'gea messo':              { profile: 'GEA crystallisation business (Messo); industrial crystallisers and evaporative/cooling crystallisation systems.', website: 'gea.com' },
+  'andritz':               { profile: 'Austrian plant-and-equipment group; separation, filtration, centrifuges and solid/liquid processing technology.', website: 'andritz.com' },
+  'bhs-sonthofen':          { profile: 'German process-equipment maker; vacuum belt and pressure filters, mixers and crushing technology for solid/liquid separation.', website: 'bhs-sonthofen.de' },
+  'howden':                 { profile: 'UK-headquartered air- and gas-handling specialist; industrial fans, blowers and compressors.', website: 'howden.com' },
+  'busch':                  { profile: 'German vacuum-pump and systems manufacturer; rotary-vane, screw and liquid-ring vacuum technology for process duty.', website: 'buschvacuum.com' },
+  'becker':                 { profile: 'German manufacturer of rotary-vane vacuum pumps and compressors for industrial process applications.', website: 'becker-international.com' },
+  'grundfos':               { profile: 'Danish pump manufacturer; one of the world’s largest, supplying centrifugal, dosing and circulation pumps for process and utility duty.', website: 'grundfos.com' },
+  'seepex':                 { profile: 'German progressive-cavity pump manufacturer; metering and transfer of viscous, abrasive and shear-sensitive media.', website: 'seepex.com' },
+  'warman':                 { profile: 'Slurry-pump brand (Weir Minerals); heavy-duty centrifugal slurry pumps for abrasive process duty.', website: 'global.weir' },
+  'eagleburgmann':          { profile: 'German/global mechanical-seal and sealing-systems supplier for pumps, agitators and rotating equipment.', website: 'eagleburgmann.com' },
+
+  // — Reactors, agitation, drives —
+  'de dietrich':            { profile: 'French glass-lined reactor and process-equipment manufacturer (De Dietrich Process Systems); corrosion-resistant reactors and columns.', website: 'dedietrich.com' },
+  'ekato':                  { profile: 'German agitation-and-mixing technology specialist; agitators, mixing systems and sealing for reactors.', website: 'ekato.com' },
+  'sew-eurodrive':          { profile: 'German drive-technology manufacturer; geared motors, gear units and variable-speed drives.', website: 'sew-eurodrive.com' },
+  'schenck process':        { profile: 'German measuring-and-process-technology group; weighing, feeding, screening and bulk-material handling.', website: 'schenckprocess.com' },
+  'gericke':                { profile: 'Swiss bulk-solids handling specialist; feeders, mixers and pneumatic conveying for powder processing.', website: 'gericke.net' },
+
+  // — Instrumentation & control —
+  'endress+hauser':         { profile: 'Swiss process-instrumentation leader; flow, level, pressure, temperature and analytical measurement.', website: 'endress.com' },
+  'emerson':                { profile: 'US automation group (Rosemount/Fisher/Micro Motion); measurement instruments, control valves and process automation.', website: 'emerson.com' },
+  'siemens':                { profile: 'German industrial-technology group; PLC/DCS automation, instrumentation, motors and electrical equipment.', website: 'siemens.com' },
+  'abb':                    { profile: 'Swiss-Swedish electrification and automation group; motors, drives, instrumentation, switchgear and control systems.', website: 'abb.com' },
+  'pepperl+fuchs':          { profile: 'German manufacturer of industrial sensors and explosion-protection (intrinsic-safety) interface equipment.', website: 'pepperl-fuchs.com' },
+
+  // — Electrical, distribution, enclosures, cabling —
+  'schneider electric':     { profile: 'French energy-management and automation group; low-voltage switchgear, distribution and control products.', website: 'se.com' },
+  'rittal':                 { profile: 'German enclosure-and-systems manufacturer; industrial enclosures, climate control and power distribution.', website: 'rittal.com' },
+  'spelsberg':              { profile: 'German manufacturer of industrial junction boxes and enclosures for electrical installation.', website: 'spelsberg.com' },
+  'prysmian':               { profile: 'Italian/global cable manufacturer; power and control cabling for industrial and utility installation.', website: 'prysmian.com' },
+  'roxtec':                 { profile: 'Swedish manufacturer of modular cable- and pipe-transit sealing systems for safety and EMC.', website: 'roxtec.com' },
+  'cmp products':           { profile: 'UK manufacturer of industrial and hazardous-area cable glands and cable-cleat systems.', website: 'cmp-products.com' },
+
+  // — Safety, relief, fire, gas detection —
+  'dräger':                 { profile: 'German safety-technology manufacturer; gas detection, respiratory protection and personal safety equipment.', website: 'draeger.com' },
+  'leser':                  { profile: 'German manufacturer of safety relief valves; the largest European safety-valve maker.', website: 'leser.com' },
+  'protego':                { profile: 'German specialist in flame arresters, pressure/vacuum relief valves and tank-protection equipment.', website: 'protego.com' },
+  'hughes safety showers':  { profile: 'UK manufacturer of emergency safety showers and eye/face-wash equipment for chemical sites.', website: 'hughes-safety-showers.co.uk' },
+
+  // — Thermal / utilities —
+  'cochran':                { profile: 'UK boiler manufacturer; packaged steam and hot-water boilers and heat-recovery plant.', website: 'cochran.co.uk' },
+  'kanthal':                { profile: 'Swedish heating-technology manufacturer (Sandvik); industrial electric heating elements and systems.', website: 'kanthal.com' },
+  'pfannenberg':            { profile: 'German manufacturer of industrial cooling units, chillers and enclosure climate-control equipment.', website: 'pfannenberg.com' },
+  'heating energy systems': { profile: 'Process-heating equipment supplier; industrial air-heating and thermal-utility packages.', website: '' },
+
+  // — End-of-line packaging / handling —
+  'premier tech':           { profile: 'Canadian packaging-systems group; bagging, palletising and weighing equipment for bulk solids.', website: 'premiertech.com' },
+  'robopac':                { profile: 'Italian end-of-line packaging manufacturer (Aetna Group); stretch-wrapping and pallet-securing systems.', website: 'robopac.com' },
+  'italdibipack':           { profile: 'Italian manufacturer of shrink-wrapping and bagging packaging machinery.', website: 'italdibipack.com' },
+  'audion':                 { profile: 'Dutch manufacturer of bag-sealing and packaging machinery for industrial lines.', website: 'audion.com' },
+  'interroll':              { profile: 'Swiss material-handling manufacturer; conveyor rollers, drives and conveyor modules.', website: 'interroll.com' },
+}
+
+/** Normalise an OEM name for map lookup (lower-case, collapse whitespace). */
+function oemKey(name: string): string {
+  return String(name ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Look up a curated OEM profile. Exact key first, then a forgiving contains-match
+ * so "GEA Messo" → GEA, "Weir / Warman" → Warman etc. Returns null when the OEM
+ * is not in the curated map (the renderer then lists it by name with the honest
+ * "search the company for the sales enquiry" route — never a fabricated contact).
+ */
+export function lookupOemProfile(name: string): OemProfile | null {
+  const k = oemKey(name)
+  if (!k) return null
+  if (OEM_PROFILES[k]) return OEM_PROFILES[k]
+  for (const [mapKey, prof] of Object.entries(OEM_PROFILES)) {
+    if (k.includes(mapKey) || mapKey.includes(k)) return prof
+  }
+  return null
+}
+
+export interface SubcontractorEntry {
+  /** Real OEM / company name. */
+  name: string
+  /** One-line company profile (who they are) — '' when not on file. */
+  profile: string
+  /** REAL website host — '' when not on file (renderer shows search route). */
+  website: string
+}
+
+export interface SubcontractorScope {
+  /** Human delivery-role / scope heading (e.g. "Mass / Fluid Transport & Process"). */
+  scope: string
+  /** What this scope supplies — the representative components in the role. */
+  supplies: string
+  /** Industry-typical lead-time band for the scope (from bandFor). */
+  lead_band: string
+  /** Whether the scope sits on the long-lead critical path. */
+  critical: boolean
+  /** The named OEMs delivering this scope, each with profile + contact route. */
+  subcontractors: SubcontractorEntry[]
+}
+
+export interface MainContractorRecommendation {
+  /** The recommended lead-contractor role title. */
+  role: string
+  /** What the main contractor does (the responsibilities paragraph). */
+  responsibilities: string
+  /** What the buyer should look for when appointing one. */
+  selection: string
+}
+
+/**
+ * The recommended MAIN-CONTRACTOR role. For a bespoke pilot plant the buyer's
+ * chosen EPC / lead integrator cannot be named, so this is presented as the
+ * recommended lead-contractor ROLE with its responsibilities and selection
+ * criteria. Universal across process-plant / industrial classes.
+ */
+export function buildMainContractorRecommendation(): MainContractorRecommendation {
+  return {
+    role: 'Process-plant EPC / lead integrator (main contractor)',
+    responsibilities:
+      'Appoint a process-plant engineering, procurement and construction (EPC) contractor, or a lead systems integrator, as the single point of responsibility for the build. The main contractor owns overall design integration across the equipment packages below, coordinates procurement and expediting against the named original-equipment manufacturers (OEMs), manages mechanical/electrical installation and field erection of the skid and the field-erected columns, and runs commissioning and performance acceptance — so the buyer holds one accountable party for schedule, interfaces and a working plant rather than a set of disconnected equipment orders.',
+    selection:
+      'Look for a contractor with demonstrable chemical / process-plant pilot or modular-skid delivery experience, PED 2014/68/EU and ATEX competence for the pressure and hazardous-area scope, an in-house or partnered controls team for the instrumentation and automation package, and a track record integrating third-party OEM equipment. For a one-tonne-per-day pilot a mid-size specialist EPC or a modular process-skid integrator is a better fit than a large infrastructure prime.',
+  }
+}
+
+/**
+ * Build the KEY-SUBCONTRACTOR scopes from the BoM's pinned manufacturers,
+ * grouped by delivery module (= procurement scope). Each scope carries its
+ * representative components, its lead-time band, and the named OEMs delivering
+ * it — each OEM with a one-line profile and an honest contact route. Reuses the
+ * same archetype derivation + lead-band logic as the strategy prose, so the
+ * subcontractor groupings and the lead-time narrative stay consistent. Returns
+ * [] when the BoM names no manufacturers. Pure + deterministic.
+ */
+export function buildSubcontractorScopes(state: any): SubcontractorScope[] {
+  const archetypes = deriveSourcingArchetypesFromState(state)
+  const scopes: SubcontractorScope[] = []
+  for (const a of archetypes) {
+    const names = Array.isArray(a.manufacturers) ? a.manufacturers : []
+    if (names.length === 0) continue
+    const band = bandFor(String(a.label ?? ''), String(a.id ?? ''))
+    // The label is "Module Name — component, component"; split the scope heading
+    // from the representative components for a cleaner two-line presentation.
+    const parts = String(a.label ?? '').split(/\s+[—–-]\s+/)
+    const scope = (parts[0] || humaniseModuleId(String(a.id ?? ''))).trim()
+    const supplies = (parts.slice(1).join(' — ') || scope).trim()
+    const subcontractors: SubcontractorEntry[] = names.map((n) => {
+      const prof = lookupOemProfile(n)
+      return { name: String(n).trim(), profile: prof?.profile ?? '', website: prof?.website ?? '' }
+    })
+    scopes.push({ scope, supplies, lead_band: band.band, critical: band.critical, subcontractors })
+  }
+  // Critical (long-lead) scopes first so the reader sees the schedule-driving
+  // packages at the top of the subcontractor list.
+  scopes.sort((x, y) => (x.critical === y.critical ? 0 : x.critical ? -1 : 1))
+  return scopes
+}

@@ -32,7 +32,7 @@ import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasib
 import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { computeImprovementPlan } from '../src/lib/pdf-engine-v2/lib/auto-improve'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
-import { buildSourcingStrategyFromState, deriveSourcingArchetypesFromState, countPinnedManufacturers } from '../src/lib/pdf-engine-v2/lib/sourcing-strategy'
+import { buildSourcingStrategyFromState, deriveSourcingArchetypesFromState, countPinnedManufacturers, buildMainContractorRecommendation, buildSubcontractorScopes } from '../src/lib/pdf-engine-v2/lib/sourcing-strategy'
 import { checkMacroMaterialRate, inferMacroMaterial, getMaterialPrice } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import {
@@ -5134,7 +5134,14 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
   //    - For bullets containing a measurable quantity (e.g. "400 V", "5 days",
   //      "80%") we downgrade to 'unknown' and note "stated constraint — verify
   //      in engineering narrative" so the reader knows to check.
-  //    - Labels truncated at 90 chars to avoid table overflow.
+  //    - Full brief sentence is rendered (2026-06-04): the constraint column is
+  //      a flexed cell that wraps cleanly in react-pdf, so the old 90-char slice
+  //      was needlessly cutting real brief constraints mid-sentence ("…recovery
+  //      via wash-water distillation and …", "instrument…" for "instrument
+  //      air", "besid…" for "beside the skid"). Universal across classes — the
+  //      reader must see the WHOLE constraint to judge PASS/FAIL. A high 400-char
+  //      guard remains only to defend the table against a pathological
+  //      paragraph-length bullet; no real brief constraint sentence reaches it.
   //    - Shape is identical to all other ComplianceRow entries so the existing
   //      renderer handles them without modification.
   const additionalConstraints: any[] = Array.isArray(constraints.additional_constraints)
@@ -5143,7 +5150,7 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
   for (const ac of additionalConstraints) {
     const bullet = String(ac?.description ?? ac ?? '').trim()
     if (!bullet) continue
-    const label = bullet.length > 90 ? bullet.slice(0, 87) + '…' : bullet
+    const label = bullet.length > 400 ? bullet.slice(0, 397) + '…' : bullet
     // Flag bullets that look like they contain a measurable value — these should
     // be validated against the engineering narrative rather than auto-passed.
     const hasMeasurable = /\d+\s*(?:v\b|hz\b|days?\b|hours?\b|%|kw\b|mw\b|kva\b|kg\b|°c\b|bar\b|kpa\b|kwh\b|mwh\b|cycles?\b|years?\b|hours?\b|mins?\b)/i.test(bullet)
@@ -9233,66 +9240,113 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
 
   const survivingSuppliers = suppliers.filter(archetypeHasSurvivingCard)
 
-  // BoM-FALLBACK page (2026-06-03): no discovered candidate cards, but the BoM
-  // pins real manufacturers → render the sourcing strategy + a manufacturer →
-  // delivery-role table so the section is substantive (lead-times, dual-source,
-  // MOQ) instead of absent. Universal across classes.
+  // BoM-FALLBACK page (2026-06-03; restructured to a PROCUREMENT plan 2026-06-04):
+  // no discovered candidate cards, but the BoM pins real manufacturers. Tristan:
+  // a sourcing section should read like a procurement plan — "normally you show
+  // the main contractor and the key sub-contractors and explain what they do and
+  // give info about them and contact details." So instead of a bare role→names
+  // table this renders (1) a recommended MAIN-CONTRACTOR role (process-plant EPC /
+  // lead integrator — single-point responsibility), (2) the KEY SUBCONTRACTORS
+  // grouped by scope, each named OEM carrying a one-line company profile + an
+  // HONEST contact route (the real website + "UK sales enquiry via …"; never a
+  // fabricated phone/email), and (3) the retained lead-time / dual-source / MOQ
+  // strategy summary. Universal across process-plant / industrial classes.
   if (survivingSuppliers.length === 0) {
     if (!sourcingStrategy && bomRoles.length === 0) return null
+    const mainContractor = buildMainContractorRecommendation()
+    const subScopes = buildSubcontractorScopes(state)
     return (
       <Page size="A4" style={PAGE_STYLE}>
-        <PageHeader section="Section 7 · Sourcing strategy" project={project} />
+        <PageHeader section="Section 7 · Sourcing & procurement" project={project} />
         <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-          Sourcing strategy
+          Sourcing &amp; procurement
         </Text>
         <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14, lineHeight: 1.5 }}>
           {bomManufacturerCount > 0
-            ? `Each major component in the bill of materials is specified against a named manufacturer — ${bomManufacturerCount} distinct manufacturers across ${bomRoles.length} delivery roles. The procurement strategy below is built from those pinned manufacturers: lead-time bands, single-source risk and order strategy by role. A buyer should issue a request-for-quote to each named manufacturer plus at least one equivalent second source before committing the bill of materials.`
-            : 'Procurement strategy by delivery role — lead-time bands, single-source risk and order strategy.'}
+            ? `How to procure and build this plant: a recommended main contractor to hold single-point responsibility, the key equipment subcontractors the design specifies (${bomManufacturerCount} named original-equipment manufacturers across ${subScopes.length || bomRoles.length} equipment scopes — what each supplies, who they are, and how to reach them), and a lead-time, single-source and order strategy. A buyer should appoint the main contractor, then issue a request-for-quote to each named subcontractor plus at least one equivalent second source before committing the bill of materials.`
+            : 'How to procure and build this plant — a recommended main contractor, the key equipment subcontractors, and a lead-time, single-source and order strategy.'}
         </Text>
+
+        {/* 1 — MAIN CONTRACTOR. Recommended lead-contractor ROLE (a bespoke
+            pilot cannot name the buyer's chosen EPC), with responsibilities +
+            selection criteria so the reader knows what the role does and what
+            to look for. */}
+        <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 6 }}>
+          Main contractor
+        </Text>
+        <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8', borderRadius: 4 }} minPresenceAhead={90}>
+          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 5 }}>{mainContractor.role}</Text>
+          <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 6 }}>{mainContractor.responsibilities}</Text>
+          <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold' }}>What to look for. </Text>{mainContractor.selection}
+          </Text>
+        </View>
+
+        {/* 2 — KEY SUBCONTRACTORS grouped by equipment scope. Critical (long-
+            lead) scopes first. Each named OEM: profile (who they are) + honest
+            contact route (real website link + "UK sales enquiry via …"). */}
+        {subScopes.length > 0 && (
+          <>
+            <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 4 }}>
+              Key subcontractors
+            </Text>
+            <Text style={{ fontSize: 9, color: MUTED, marginBottom: 10, lineHeight: 1.5 }}>
+              The major equipment original-equipment manufacturers (OEMs) the design specifies, grouped by procurement scope. For each: what they supply, a one-line company profile, and the contact route — the manufacturer&apos;s published website, through which a UK sales enquiry is raised. Phone numbers and email addresses are deliberately not stated: the website and its sales-enquiry route is the verifiable contact detail.
+            </Text>
+            {subScopes.map((sc, si) => (
+              <View key={`scope-${si}`} style={{ marginBottom: 14 }} minPresenceAhead={70}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 }}>
+                  <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35 }}>{clean_prose(sc.scope)}</Text>
+                  <View style={{ backgroundColor: sc.critical ? '#fee2e2' : '#e2e8f0', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 3, marginLeft: 8 }}>
+                    <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: sc.critical ? '#b91c1c' : INK_SOFT, letterSpacing: 0.3 }}>
+                      {sc.critical ? `CRITICAL PATH · ${sc.lead_band}` : `LEAD ${sc.lead_band}`}
+                    </Text>
+                  </View>
+                </View>
+                {sc.supplies && sc.supplies !== sc.scope ? (
+                  <Text style={{ fontSize: 9, color: MUTED, lineHeight: 1.45, marginBottom: 6 }}>Supplies: {clean_prose(sc.supplies)}</Text>
+                ) : null}
+                {sc.subcontractors.map((oem, oi) => {
+                  const host = String(oem.website ?? '').trim()
+                  const url = host ? (host.startsWith('http') ? host : `https://${host}`) : ''
+                  return (
+                    <View key={`oem-${si}-${oi}`} wrap={false} style={{ marginBottom: 6, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: RULE_SOFT }}>
+                      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35, marginBottom: 1 }}>{clean_prose(oem.name)}</Text>
+                      {oem.profile ? (
+                        <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.45, marginBottom: 2 }}>{clean_prose(oem.profile)}</Text>
+                      ) : null}
+                      {url ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Link src={url} style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, textDecoration: 'none', marginRight: 6 }}>{host}</Link>
+                          <Text style={{ fontSize: 8.5, color: MUTED }}>· UK sales enquiry via {host}</Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 8.5, color: MUTED }}>Contact: search &quot;{clean_prose(oem.name)}&quot; for the manufacturer&apos;s sales enquiry page (website not on file).</Text>
+                      )}
+                    </View>
+                  )
+                })}
+              </View>
+            ))}
+          </>
+        )}
+
+        {/* 3 — Retained lead-time / dual-source / MOQ strategy summary. */}
         {sourcingStrategy && (
-          <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8', borderRadius: 4 }} minPresenceAhead={80}>
-            <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>Strategy summary</Text>
+          <View style={{ marginTop: 4, marginBottom: 14, padding: 10, backgroundColor: '#f7f8fa', borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT, borderRadius: 4 }} minPresenceAhead={80}>
+            <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>Lead-time, single-source &amp; order strategy</Text>
             <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}>{sourcingStrategy.identification}</Text>
             <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Lead time. </Text>{sourcingStrategy.lead_time}</Text>
             <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Dual-source risk. </Text>{sourcingStrategy.dual_source}</Text>
             <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Order strategy. </Text>{sourcingStrategy.moq}</Text>
           </View>
         )}
-        {bomRoles.length > 0 && (
-          <>
-            <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8, letterSpacing: 0.6 }}>
-              DELIVERY ROLES &amp; NAMED MANUFACTURERS
-            </Text>
-            {/* Each row: the delivery role as a heading, then the actual OEM
-                manufacturer NAMES beneath. Previously the right column showed a
-                bare count (11 / 18 / …) under a "MANUFACTURERS" header, so the
-                section read as blank — the named suppliers the BoM pins
-                (Sulzer, Grundfos, Alfa Laval, GEA, Endress+Hauser …) never
-                appeared. 2026-06-04 fix. */}
-            {bomRoles.map((r, ri) => {
-              const names: string[] = Array.isArray((r as { manufacturers?: string[] }).manufacturers)
-                ? (r as { manufacturers?: string[] }).manufacturers as string[]
-                : []
-              const namesText = names.length > 0 ? names.map((n) => clean_prose(String(n))).join(' · ') : ''
-              return (
-                <View key={`bomrole-${ri}`} wrap={false} style={{ paddingTop: 7, paddingBottom: 7, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: namesText ? 3 : 0 }}>
-                    <Text style={{ flex: 1, fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35 }}>{clean_prose(String(r.label))}</Text>
-                    <Text style={{ width: 90, fontSize: 8, color: MUTED, textAlign: 'right' }}>{`${r.candidates} manufacturer${r.candidates === 1 ? '' : 's'}`}</Text>
-                  </View>
-                  {namesText ? (
-                    <Text style={{ fontSize: 9.5, color: ACCENT, fontFamily: 'Helvetica-Bold', lineHeight: 1.45 }}>{namesText}</Text>
-                  ) : null}
-                </View>
-              )
-            })}
-            <View style={{ marginTop: 14, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT }}>
+        {(subScopes.length > 0 || bomRoles.length > 0) && (
+            <View style={{ marginTop: 4, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT }}>
               <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55 }}>
-                Manufacturers are taken from the verified bill of materials, not a supplier-discovery search. Named companies indicate the product platform the design specifies; for each role a buyer should confirm current lead-time, obtain a firm quotation, and qualify at least one equivalent second source before committing the order.
+                The named subcontractors are taken from the verified bill of materials, not a supplier-discovery search — they indicate the equipment platform the design specifies. The main contractor is a recommended role, not a named appointment: for a bespoke pilot the buyer selects the engineering, procurement and construction partner. For every scope, confirm current lead-time, obtain a firm quotation, and qualify at least one equivalent second source before committing the order.
               </Text>
             </View>
-          </>
         )}
         <PageFooter />
       </Page>
