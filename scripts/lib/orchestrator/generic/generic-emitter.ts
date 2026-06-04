@@ -38,6 +38,7 @@ import {
 import { deriveGenericSkeleton } from './derive-skeleton'
 import { loadClassComponents } from './component-source'
 import { buildCrossModuleLinks } from './build-links'
+import { applyFamilySizing } from './sizing'
 
 /**
  * Emit a DesignJSON generically from the class-reference graph + corpus components.
@@ -70,6 +71,14 @@ export async function emitGenericDesign(
 
   const modules = deriveGenericSkeleton(graph, brief, envelope, contract, componentsByModule)
 
+  // Per-class-family SIZING: attach the engineering contract's already-computed
+  // coupled-physics quantities (real counts + ratings) onto the component words,
+  // keyed by component type. Mutates `modules` in place. This closes the Phase-1
+  // under-provisioning (CMUs/modules/sensors at ×1) that capped the Physics Critic's
+  // engineering_plausibility — the lone wall from the Phase-1 verdict. No-op for a
+  // class whose family has no ruleset yet (Phase-1 baseline structure stands).
+  const sizing = applyFamilySizing(modules, contract, envelope.class)
+
   // Cross-module links from the real graph topology + the per-class required-link
   // registry (oriented so the directional grammar gates pass). Candidate class
   // keys cover both the fine envelope class and the contract's product_class so
@@ -87,7 +96,8 @@ export async function emitGenericDesign(
     rationale_excluded:
       `Generic emitter (wall-3 Phase-1): ${modules.length} modules derived from the ` +
       `${graph.product_class} class-reference graph; ${corpusModules > 0 ? `component detail unioned from the corpus (${corpusModules} module group(s))` : 'component detail from the universal taxonomy floor'}; ` +
-      `${links.length} cross-module links from graph edges + required-connection registry. ` +
+      `${links.length} cross-module links from graph edges + required-connection registry; ` +
+      `${sizing.family ? `${sizing.sized} component words sized from the ${sizing.family}-family contract physics` : 'no family sizing ruleset for this class (Phase-1 baseline structure)'}. ` +
       `OPTIONAL modules the brief does not signal are pruned downstream by applyBriefScopeFilter; ` +
       `real parts + exact MPNs are supplied by the chain's emitter-completion + fill-blank-MPN passes.`,
     brief_overview_prose: {

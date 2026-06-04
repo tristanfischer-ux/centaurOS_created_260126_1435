@@ -14,6 +14,7 @@ import { getClassConnections, mechanismToKind } from '../src/lib/pdf-engine-v2/c
 import { deriveGenericSkeleton } from './lib/orchestrator/generic/derive-skeleton'
 import { loadClassComponents } from './lib/orchestrator/generic/component-source'
 import { buildCrossModuleLinks } from './lib/orchestrator/generic/build-links'
+import { applyFamilySizing } from './lib/orchestrator/generic/sizing'
 
 const MIN_WORDS = 5
 const MIN_MODS = 4
@@ -39,6 +40,11 @@ async function main(): Promise<void> {
     quantities: {
       cell_count: { value: 4536 },
       module_count: { value: 189 },
+      bms_slave_count: { value: 210 },
+      bus_continuous_current_a: { value: 1250 },
+      cell_capacity_ah: { value: 280 },
+      cell_voltage_v: { value: 3.2 },
+      rack_count: { value: 15 },
       nameplate_capacity_kwh: { value: 2500 },
       continuous_power_kw: { value: 1000 },
     },
@@ -51,6 +57,11 @@ async function main(): Promise<void> {
     contract as never,
     components,
   )
+
+  // SIZING LAYER: attach the contract's computed engineering to the component words.
+  const sizing = applyFamilySizing(modules as never, contract as never, 'bess')
+  if (sizing.family !== 'battery') fails.push(`sizing family resolved to '${sizing.family}' (expected 'battery')`)
+  if (sizing.sized < 5) fails.push(`applyFamilySizing sized only ${sizing.sized} words (expected ≥5 — CMU/cells/inverter/busbar/etc.)`)
 
   // 1. one module per graph node
   if (modules.length !== graph.nodes.length) {
@@ -145,6 +156,22 @@ async function main(): Promise<void> {
   // 8. sensor_has_receiver precondition: sensing module is a from_module
   if (!links.some((l) => l.from_module === 'sensing_instrumentation')) {
     fails.push('sensing_instrumentation is never a from_module (sensor_has_receiver would fail)')
+  }
+
+  // 9. SIZING attached real engineering: a cell-monitoring word carries the contract
+  //    bms_slave_count (210, the under-provisioning fix), an inverter/PCS word a power rating.
+  const allWords = modules.flatMap((m) =>
+    (m.sub_modules as Array<{ id: string; words?: Array<{ id?: string; name_human?: string; modifier_characters?: Array<{ kind: string; value: string; unit?: string }> }> }>)
+      .flatMap((sm) => sm.words ?? []),
+  )
+  const cmu = allWords.find((w) => /monitor|cmu|bms.?slave/i.test(`${w.id ?? ''} ${w.name_human ?? ''}`))
+  if (cmu) {
+    const q = cmu.modifier_characters?.find((m) => m.kind === 'quantity')?.value
+    if (q !== '×210') fails.push(`cell-monitoring word quantity is '${q}' (expected ×210 from bms_slave_count — under-provisioning not fixed)`)
+  }
+  const inv = allWords.find((w) => /inverter|pcs|power.?conversion|bidirectional/i.test(`${w.id ?? ''} ${w.name_human ?? ''}`))
+  if (inv && !inv.modifier_characters?.some((m) => m.kind === 'rating_primary')) {
+    fails.push('inverter/PCS word has no rating_primary (sizing did not attach the power rating)')
   }
 
   if (fails.length) {
