@@ -68,7 +68,7 @@ import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/
 import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, tokenize as emitterTokenize, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
-import { classifyByRules, matchCorpusPrice, type CorpusPriceRow } from './estimate-missing-prices'
+import { classifyByRules, matchCorpusPrice, resolveEmitterPinPrice, type CorpusPriceRow } from './estimate-missing-prices'
 import { auditCostSanity as _auditCostSanityForCorpus } from './lib/cost-self-assessment'
 import { keywordCeilingGbp, PRICE_CEILING_BY_COMPONENT_CLASS, isConsumable, classCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
 import { applyPatches } from '../src/lib/pdf-engine-v2/radical/universal-repair'
@@ -3173,6 +3173,54 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `boiler£35k=${boilerOk} pump£3850=${pumpOk} noMfr→null=${noMfrOk} precision(noWrongPull)=${precisionOk} costSkip=${costSkipOk}`,
+    ))
+  }
+
+  // ── UNIVERSAL.emitter_pin_corpus_override_prefers_real_but_keeps_unmatched ─
+  // Guards the 2026-06-04 EMITTER PIN-OVERRIDE: the harvest's real corpus prices
+  // must override the emitter list_price_gbp pin (not just unpinned estimates) so
+  // the rounded author-guess pins (CO₂: £2,400/£4,200/£7,500 ×N) collapse no more.
+  // resolveEmitterPinPrice REUSES matchCorpusPrice and asserts BOTH directions:
+  //   (1) a pinned part with a manufacturer + MPN matching a priced corpus row
+  //       gets the corpus price (source 'corpus_price', OVERRIDING the pin);
+  //   (2) a pinned part the corpus can't confidently match KEEPS its pin EXACTLY;
+  //   (3) a bespoke / fabricated / made-to-order pin KEEPS its pin even with a
+  //       real fabricator manufacturer + a name match (collateral-damage guard);
+  //   (4) an empty corpus (a class with no priced product-class rows — BESS/wind)
+  //       ALWAYS keeps the pin → byte-identical pricing for those classes.
+  {
+    const rows: CorpusPriceRow[] = [
+      { part_name: 'Amine circulation / feed / recycle pump (vertical multistage)', manufacturer: 'Grundfos', part_number: 'CRNE 5-5', unit_price_gbp: 3850, discovery_source: 'stage0_harvest:verified', confidence: 0.8 },
+      { part_name: 'Progressive-cavity slurry pump (CaCO3 / gypsum)', manufacturer: 'SEEPEX', part_number: 'BN35-6L', unit_price_gbp: 6000, discovery_source: 'stage0_harvest:verified', confidence: 0.85 },
+      { part_name: 'PLC / DCS controller + remote I/O', manufacturer: 'Siemens', part_number: 'SIMATIC S7-1500', unit_price_gbp: 15000, discovery_source: 'stage0_harvest:verified', confidence: 0.9 },
+    ]
+    // (1) MPN-matched pinned part → corpus price overrides the rounded pin. The
+    // emitter pinned SEEPEX BN 35-6L at £6,800 (rounded guess); corpus has the
+    // real £6,000 under the same MPN → override.
+    const seepex = resolveEmitterPinPrice(6800, { word_name: 'CaCO3 slurry transfer pump', manufacturer: 'SEEPEX', part_number: 'BN 35-6L' }, rows)
+    const seepexOk = seepex.source === 'corpus_price' && seepex.price_gbp === 6000 && seepex.corpus_match?.match_kind === 'mpn'
+    // (1b) strong-name + same-manufacturer match when the MPN model differs
+    // (Grundfos CRNE 5-8 pin vs corpus CRNE 5-5) → still overrides £4,200 → £3,850.
+    const grundfos = resolveEmitterPinPrice(4200, { word_name: 'MEA circulation pump', manufacturer: 'Grundfos', part_number: 'CRNE 5-8' }, rows)
+    const grundfosOk = grundfos.source === 'corpus_price' && grundfos.price_gbp === 3850
+    // (2) a pinned part the corpus has NO confident match for keeps its pin. A
+    // Festo valve shares NO manufacturer with any row → matchCorpusPrice null.
+    const noMatch = resolveEmitterPinPrice(2400, { word_name: 'process shut-off valve', manufacturer: 'Festo', part_number: 'VZWF-B-L' }, rows)
+    const noMatchOk = noMatch.source === 'emitter_list_price' && noMatch.price_gbp === 2400 && noMatch.corpus_match === null
+    // (3) a BESPOKE / made-to-order pin keeps its pin even though it shares a
+    // manufacturer + name tokens with a corpus pump (the collateral-damage guard).
+    const bespoke = resolveEmitterPinPrice(9000, { word_name: 'bespoke fabricated slurry circulation pump — made to order', manufacturer: 'SEEPEX', part_number: 'fabricated BN35-6L skid — bespoke' }, rows)
+    const bespokeOk = bespoke.source === 'emitter_list_price' && bespoke.price_gbp === 9000
+    // (4) empty corpus (disabled class — no priced product-class rows) → keep pin.
+    const disabled = resolveEmitterPinPrice(75000, { word_name: 'power conversion system', manufacturer: 'Sungrow', part_number: 'SC1000UD-MV' }, [])
+    const disabledOk = disabled.source === 'emitter_list_price' && disabled.price_gbp === 75000
+    const ok = seepexOk && grundfosOk && noMatchOk && bespokeOk && disabledOk
+    assertions.push(assertEq(
+      'UNIVERSAL.emitter_pin_corpus_override_prefers_real_but_keeps_unmatched',
+      'resolveEmitterPinPrice OVERRIDES an emitter list_price_gbp pin with the harvest\'s REAL corpus price on a confident manufacturer+MPN / strong-name match (SEEPEX BN35-6L £6,800-pin→£6,000, Grundfos CRNE £4,200-pin→£3,850) but KEEPS the pin EXACTLY when the corpus has no confident match (Festo valve £2,400), when the part is bespoke/made-to-order (even with a real manufacturer+name overlap), and when the class corpus is empty (BESS/wind → byte-identical) — guards the 2026-06-04 pin-override that breaks the £2,400/£4,200/£7,500-×N rounded-pin collapse without touching fabricated or non-co2 pins',
+      ok,
+      (v: boolean) => v === true,
+      () => `seepexMPN→£6000=${seepexOk} grundfosName→£3850=${grundfosOk} noMatch→keepPin=${noMatchOk} bespoke→keepPin=${bespokeOk} emptyCorpus→keepPin=${disabledOk}`,
     ))
   }
 

@@ -456,6 +456,85 @@ export function matchCorpusPrice(
   }
 }
 
+// A corpus real-price is its own ground truth; only reject a genuinely corrupt
+// figure (≤0 or absurdly large = a data-entry error, not a real price). NOT
+// clamped to the per-class estimate sanity band — that band is calibrated for
+// ESTIMATES (a generic thermal cold-plate caps at £15k), but a real £35k process
+// boiler must keep its sourced price (Tristan 2026-06-04). Shared by the
+// unpinned corpus tier (Step 3) and the pin-override resolver below.
+export const CORPUS_PRICE_ABSURD_MAX_GBP = 10_000_000
+
+export interface PinPriceResolution {
+  /** The effective unit price to use for the pinned part. */
+  price_gbp: number
+  /** Where that price came from: a confident corpus override, or the kept pin. */
+  source: 'corpus_price' | 'emitter_list_price'
+  /** The corpus match details when source === 'corpus_price' (else null). */
+  corpus_match: CorpusPriceMatch | null
+}
+
+/**
+ * True when the pinned part is a BESPOKE / FABRICATED / MADE-TO-ORDER line — its
+ * list_price_gbp pin is a project-specific quotation, NOT a catalogue SKU, so a
+ * generic catalogue corpus price must NOT override it (the collateral-damage
+ * guard the task calls for: "fabricated / made-to-order parts keep their pin").
+ * Detected on the part_number / word_name free text (the manufacturer may be a
+ * real fabricator like De Dietrich / Koch-Glitsch). Catalogue parts whose model
+ * merely carries a sizing note (e.g. Fulton "Electropack EP100 … frame count
+ * TBD") are NOT excluded by the bare "tbd" token alone — only an explicit
+ * bespoke / made-to-order / fabricated phrase preserves the pin.
+ */
+function isFabricatedPinPart(word_name: string | null | undefined, part_number: string | null | undefined): boolean {
+  const hay = `${String(word_name ?? '')} ${String(part_number ?? '')}`.toLowerCase()
+  return /\b(?:fabricat\w*|bespoke|made[-\s]?to[-\s]?order|built[-\s]?to[-\s]?order|custom[-\s]?(?:fab|built|made)|one[-\s]?off|site[-\s]?fabricated|weld(?:ed)?[-\s]?fabrication)\b/.test(hay)
+}
+
+/**
+ * PURE pin-override resolver (no DB; takes the candidate corpus rows).
+ *
+ * An emitter `list_price_gbp` pin is an author catalogue guess — many CO₂ pins
+ * collapse onto identical rounded values (£2,400 ×N, £7,500 ×N) which read as
+ * fabricated. When the SAME part carries a real manufacturer + MPN / strong name
+ * that the class's harvested corpus CONFIDENTLY matches to a REAL `unit_price_gbp`,
+ * that sourced price overrides the rounded pin (growing-DB principle).
+ *
+ * Reuses `matchCorpusPrice` UNCHANGED for the confident-match decision (shared
+ * manufacturer + MPN-match OR ≥2 distinctive name tokens; prefers verified, then
+ * higher confidence). Collateral-damage guards (the pin wins) — the pin is
+ * PRESERVED EXACTLY when ANY of:
+ *   • the part has no real manufacturer (matchCorpusPrice would return null);
+ *   • the part is BESPOKE / FABRICATED / made-to-order (its pin is a project
+ *     quotation, not a catalogue SKU — a generic corpus catalogue price must not
+ *     override it, even with a real fabricator manufacturer + a name match);
+ *   • the corpus has no confident match for it;
+ *   • the matched corpus row's price is null / ≤0 / absurd.
+ * Only a real (verified or non-null real unit_price_gbp) confident corpus figure
+ * for a CATALOGUE part wins. SCOPING is the caller's job: the rows passed are
+ * already filtered to the part's OWN product-class corpus tag, so a class with no
+ * priced rows (BESS / wind) yields zero candidates → the pin is byte-identical to
+ * before this change.
+ *
+ * Exported for the regression harness (tested without a DB, like matchCorpusPrice).
+ */
+export function resolveEmitterPinPrice(
+  pinGbp: number,
+  ctx: { word_name: string; manufacturer: string | null; part_number: string | null },
+  corpusRows: CorpusPriceRow[],
+): PinPriceResolution {
+  const keepPin: PinPriceResolution = { price_gbp: pinGbp, source: 'emitter_list_price', corpus_match: null }
+  // No real manufacturer on the pinned part → matchCorpusPrice would return null
+  // anyway; short-circuit so a fabricated pin is provably preserved.
+  if (!manufacturerIsReal(ctx.manufacturer)) return keepPin
+  // Bespoke / fabricated / made-to-order line → keep the project-quotation pin
+  // (do not let a generic catalogue corpus price override a one-off fabrication).
+  if (isFabricatedPinPart(ctx.word_name, ctx.part_number)) return keepPin
+  const match = matchCorpusPrice(corpusRows, ctx)
+  if (!match) return keepPin
+  // Only a real, non-corrupt corpus price wins over the pin.
+  if (!(match.unit_price_gbp > 0) || match.unit_price_gbp > CORPUS_PRICE_ABSURD_MAX_GBP) return keepPin
+  return { price_gbp: match.unit_price_gbp, source: 'corpus_price', corpus_match: match }
+}
+
 /**
  * CorpusPriceLookup — DB wrapper around matchCorpusPrice. Reads the corpus rows
  * for ONE product-class tag once (cheap: ≤ a few hundred priced rows per class),
@@ -501,6 +580,20 @@ class CorpusPriceLookup {
       manufacturer: ctx.manufacturer,
       part_number: ctx.part_number,
     })
+  }
+
+  /**
+   * Pin-override resolver for an emitter list_price_gbp pin (delegates to the
+   * pure resolveEmitterPinPrice with THIS class's already-loaded corpus rows).
+   * Disabled class (no priced rows for the tag) → always keeps the pin, so
+   * pricing stays byte-identical for those classes.
+   */
+  resolvePin(
+    pinGbp: number,
+    ctx: { word_name: string; manufacturer: string | null; part_number: string | null },
+  ): PinPriceResolution {
+    if (!this.enabled) return { price_gbp: pinGbp, source: 'emitter_list_price', corpus_match: null }
+    return resolveEmitterPinPrice(pinGbp, ctx, this.rows)
   }
 
   get rowCount(): number {
@@ -1249,6 +1342,18 @@ async function main() {
     }
   }
 
+  // Growing-DB REAL-PRICE lookup, scoped to this product class's corpus tag.
+  // Constructed HERE (before the pin pre-step) so the pin override below can
+  // reuse it; the unpinned corpus tier in Step 3 uses the SAME instance.
+  // enabled=false (→ never fires) for any product class with no priced product-
+  // class-tagged rows, guaranteeing byte-identical pricing for those classes.
+  const corpusPrice = new CorpusPriceLookup(productClass)
+  if (corpusPrice.enabled) {
+    console.log(`[estimate] corpus real-price lookup ENABLED for class '${productClass}' (${corpusPrice.rowCount} priced corpus rows)`)
+  } else {
+    console.log(`[estimate] corpus real-price lookup disabled for class '${productClass}' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged`)
+  }
+
   // ── Pre-step: emitter-pinned list_price_gbp → distributor_price_gbp ─────────
   // When a word has mod('list_price_gbp', '<N>') in modifier_characters, treat
   // that as an authoritative catalogue-pinned price and set distributor_price_gbp
@@ -1261,7 +1366,23 @@ async function main() {
   // didn't flag a 3.8× discrepancy. The list_price_gbp modifier pins the Mouser
   // catalogue price (£133.78) in the emitter source so no downstream step can
   // drift it. Codified L31 council Fix 3 (2026-05-25).
+  //
+  // ── CORPUS PIN-OVERRIDE (2026-06-04) ─────────────────────────────────────
+  // Many emitter pins are ROUNDED author guesses that collapse onto identical
+  // values (CO₂: £2,400 ×5, £7,500 ×4, £4,200 ×4) and read as fabricated → the
+  // BoM identical-price fingerprint fires (bom score stuck 4.50). When the SAME
+  // pinned word carries a real manufacturer + MPN / strong name that THIS class's
+  // harvested corpus CONFIDENTLY matches to a real unit_price_gbp (Grundfos CRNE
+  // 5-5 £3,850, SEEPEX BN35-6L £6,000, Siemens S7-1500 £15k, Alfa Laval M6 …),
+  // that sourced price OVERRIDES the rounded pin (growing-DB principle), tagged
+  // engine_b_estimate_source='corpus_price' so the renderer treats it as a real
+  // sourced price (price_sourced=true → excluded from the fingerprint). The
+  // resolver reuses matchCorpusPrice UNCHANGED; a fabricated / no-MPN pin, or any
+  // pin the corpus cannot confidently match, KEEPS its pin EXACTLY (the collateral-
+  // damage guard). Scoping is byte-safe: corpusPrice.enabled=false for classes
+  // with no priced co2-tag rows (BESS / wind) → resolvePin always keeps the pin.
   let listPricePinned = 0
+  let pinCorpusOverridden = 0
   for (const m of state.moduleDecomposition?.modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
       for (const w of sm.words ?? []) {
@@ -1271,9 +1392,34 @@ async function main() {
         if (!isFinite(listPrice) || listPrice <= 0) continue
         const key = compoundKey(m.module, sm.id, w.id)
         const existing = verifByCompoundId.get(key) ?? verifByLegacyWordId.get(w.id)
+        // The part's identity for the corpus pin-override: prefer the existing
+        // verification row's mfr/MPN (carries any upstream enrichment), else read
+        // the emitter modifier_characters. Needed in BOTH branches.
+        const mfgMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'manufacturer')
+        const pnMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'part_number')
+        const pinMfr = existing?.manufacturer ?? (mfgMod ? String(mfgMod.value) : null)
+        const pinPn = existing?.part_number ?? (pnMod ? String(pnMod.value) : null)
+        // CORPUS PIN-OVERRIDE: a confident shared-manufacturer + MPN / strong-name
+        // corpus match with a REAL unit_price_gbp replaces the rounded pin; no
+        // confident match (incl. fabricated / no-MPN parts, disabled class) →
+        // resolution.source stays 'emitter_list_price' → the pin is preserved
+        // EXACTLY (byte-identical for non-co2 classes).
+        const resolution = corpusPrice.resolvePin(listPrice, {
+          word_name: w.name_human || w.id,
+          manufacturer: pinMfr,
+          part_number: pinPn,
+        })
+        const effectivePrice = resolution.price_gbp
+        const corpusWon = resolution.source === 'corpus_price'
+        if (corpusWon) pinCorpusOverridden++
+        // Source tags: a corpus override renders as a real sourced price
+        // (engine_b_estimate_source='corpus_price' → price_sourced=true → excluded
+        // from the identical-price fingerprint); a kept pin renders exactly as it
+        // did before this change ('emitter_list_price').
+        const priceSourceTag = corpusWon ? 'corpus_price' : 'emitter_list_price'
         if (existing) {
-          existing.distributor_price_gbp = listPrice
-          existing.distributor_price_source = 'emitter_list_price'
+          existing.distributor_price_gbp = effectivePrice
+          existing.distributor_price_source = priceSourceTag
           // 2026-06-03 co2_mineralisation cost-undercount fix: ALSO populate
           // price_estimate_gbp so EVERY downstream reader sees the pinned
           // catalogue price, not just the ones that consult the distributor
@@ -1283,27 +1429,39 @@ async function main() {
           // ?? price_estimate_gbp ?? unit_price_gbp and never looks at
           // distributor_price_gbp — so a distributor-only pin was invisible to
           // it. Setting both keeps one authoritative number across all readers.
-          existing.price_estimate_gbp = listPrice
-          existing.price_estimate_source = 'emitter_list_price'
+          existing.price_estimate_gbp = effectivePrice
+          existing.price_estimate_source = priceSourceTag
+          if (corpusWon) {
+            // Render reads engine_b_estimate_source / engine_b_classification_source
+            // === 'corpus_price' to mark the line price_sourced (fingerprint-skip).
+            existing.engine_b_estimate_source = 'corpus_price'
+            existing.engine_b_classification_source = 'corpus_price'
+            existing.price_estimate_reasoning = `${resolution.corpus_match!.reason}. Real corpus price overrode the £${listPrice} emitter pin (growing-DB principle).`
+          }
         } else {
-          const mfgMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'manufacturer')
-          const pnMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'part_number')
           const newRow: any = {
             id: key,
             module: m.module,
             sub_module_id: sm.id,
             word_id: w.id,
             word_name: w.name_human || w.id,
-            manufacturer: mfgMod ? String(mfgMod.value) : null,
-            part_number: pnMod ? String(pnMod.value) : null,
+            manufacturer: pinMfr,
+            part_number: pinPn,
             status: 'verified',
             confidence: 'high',
-            distributor_price_gbp: listPrice,
-            distributor_price_source: 'emitter_list_price',
+            distributor_price_gbp: effectivePrice,
+            distributor_price_source: priceSourceTag,
             // See note above: mirror onto price_estimate_gbp for universal
             // reader coverage (gate 21 et al. don't read distributor_price_gbp).
-            price_estimate_gbp: listPrice,
-            price_estimate_source: 'emitter_list_price',
+            price_estimate_gbp: effectivePrice,
+            price_estimate_source: priceSourceTag,
+            ...(corpusWon
+              ? {
+                  engine_b_estimate_source: 'corpus_price',
+                  engine_b_classification_source: 'corpus_price',
+                  price_estimate_reasoning: `${resolution.corpus_match!.reason}. Real corpus price overrode the £${listPrice} emitter pin (growing-DB principle).`,
+                }
+              : {}),
           }
           state.partVerifications.push(newRow)
           verifByCompoundId.set(key, newRow)
@@ -1314,6 +1472,9 @@ async function main() {
   }
   if (listPricePinned > 0) {
     console.log(`[estimate] pinned ${listPricePinned} parts from emitter list_price_gbp modifiers (bypasses Engine B curve)`)
+  }
+  if (pinCorpusOverridden > 0) {
+    console.log(`[estimate] corpus pin-override: ${pinCorpusOverridden}/${listPricePinned} pinned parts re-priced from a confident real corpus match (rounded author pins replaced by sourced prices; non-matching pins preserved)`)
   }
 
   // Collect all targets that need estimates
@@ -1373,15 +1534,8 @@ async function main() {
   // Step 1 — corpus classification pass. Free, sub-millisecond per lookup.
   // -------------------------------------------------------------------------
   const corpus = new CorpusClassifier()
-  // Growing-DB REAL-PRICE lookup, scoped to this product class's corpus tag.
-  // enabled=false (→ never fires) for any product class with no priced product-
-  // class-tagged rows, guaranteeing byte-identical pricing for those classes.
-  const corpusPrice = new CorpusPriceLookup(productClass)
-  if (corpusPrice.enabled) {
-    console.log(`[estimate] corpus real-price lookup ENABLED for class '${productClass}' (${corpusPrice.rowCount} priced corpus rows)`)
-  } else {
-    console.log(`[estimate] corpus real-price lookup disabled for class '${productClass}' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged`)
-  }
+  // corpusPrice (the growing-DB REAL-PRICE lookup) is constructed earlier, just
+  // before the pin pre-step, and reused here for the unpinned-target tier.
   const classByWordId = new Map<string, ComponentClass | 'unknown'>()
   const classSource = new Map<string, 'corpus' | 'flash_lite' | 'fallback' | 'db_cache' | 'rule_based'>()
   const needsClassify: PartContext[] = []
@@ -1552,7 +1706,8 @@ async function main() {
     // price that is its own ground truth — clamping a real £35k process boiler
     // down to the £15k generic-thermal ceiling is exactly the wrong-anchor bug
     // this fix removes (Tristan 2026-06-04: the boiler must keep its real price).
-    const CORPUS_PRICE_ABSURD_MAX_GBP = 10_000_000
+    // CORPUS_PRICE_ABSURD_MAX_GBP is the shared module-level constant (also used
+    // by the pin-override resolver) — same corrupt-figure ceiling for both tiers.
     if (corpusMatch && corpusMatch.unit_price_gbp > 0 && corpusMatch.unit_price_gbp <= CORPUS_PRICE_ABSURD_MAX_GBP) {
       const cls = classByWordId.get(ctx.word_id) ?? 'unknown'
       const priced = corpusMatch.unit_price_gbp
