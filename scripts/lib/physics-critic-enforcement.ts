@@ -71,8 +71,14 @@ import type { CritiqueReport, CritiqueIssue } from '../../src/lib/pdf-engine-v2/
 export function whereNamesSpecificComponent(where: string): boolean {
   const w = String(where ?? '').trim()
   if (!w) return false
-  // a path that drills to an individual word/part/component/item leaf
-  if (/\b(?:word|part|component|item|element)s?\s*[/_:#-]?\s*\d+/i.test(w)) return true
+  // a path that drills to an individual word/part/component/item leaf.
+  // The Physics Critic emits the BRACKET form in practice — e.g.
+  //   "energy_conversion_transduction/sub_modules[3]/words[0]" — so the index
+  //   separator class MUST include "[" (verified 2026-06-04: the live CO₂
+  //   critique's `words[0]` was silently rejected by the slash-only form, so
+  //   gate 33 + the Phase-2 corrector both selected ZERO findings). We also keep
+  //   the slash/underscore/colon/hash/dash forms ("words/3", "word_3", "part-7").
+  if (/\b(?:word|part|component|item|element)s?\s*[[/_:#-]?\s*\d+/i.test(w)) return true
   if (/\/words?\//i.test(w) || /\/parts?\//i.test(w) || /\/components?\//i.test(w)) return true
   return false
 }
@@ -104,6 +110,20 @@ const CONCRETE_FAILURE_PATTERNS: Array<{ tag: string; re: RegExp }> = [
   { tag: 'undersized-vs-load', re: /\b(?:under-?sized|under-?rated|insufficient(?:ly)?\s+rated|too\s+small|cannot\s+(?:supply|deliver|handle|carry|reject|dissipate)|unable\s+to\s+(?:supply|deliver|handle|carry))\b/i },
   { tag: 'undersized-vs-load', re: /\brated\b[^.]{0,40}?\b(?:below|less\s+than|under|short\s+of)\b[^.]{0,40}?\b(?:required|demand|load|continuous|peak|design)\b/i },
   { tag: 'undersized-vs-load', re: /\b(?:exceed|above|over|beyond|greater\s+than)\b[^.]{0,60}?\b(?:rating|rated\s+(?:current|power|capacity|load|flow|torque)|capacity\s+of\s+the)\b/i },
+  // 2026-06-04: the live CO₂ feeder HIGH phrased undersizing as "rated for only
+  //   106 kg/h … creates a severe bottleneck, limiting the maximum throughput …
+  //   a 35% deficit against the brief" — none of the patterns above matched it,
+  //   so the named-part HIGH evaded gate 33 and the corrector. These add the
+  //   determinate-undersizing phrasings the Critic actually uses. Still
+  //   conservative: each asserts a real exceedance/shortfall, not a hedge.
+  // "rated for only/just/merely <N> <unit>" — an explicit under-rating callout.
+  { tag: 'undersized-vs-load', re: /\brated\s+(?:for|at|to)\s+(?:only|just|merely)\b/i },
+  // a severe bottleneck created by the part / limiting throughput-output-capacity.
+  { tag: 'undersized-vs-load', re: /\b(?:severe\s+)?bottleneck\b/i },
+  { tag: 'undersized-vs-load', re: /\blimit(?:s|ing|ed)?\b[^.]{0,60}?\b(?:throughput|output|production|capacity|flow|rate|delivery)\b/i },
+  // an explicit deficit / shortfall of N% against the brief/requirement/demand.
+  { tag: 'undersized-vs-load', re: /\b(?:deficit|shortfall|short\s+by|falls?\s+short)\b[^.]{0,60}?\b(?:against|of|below|versus|vs\.?|relative\s+to)\b/i },
+  { tag: 'undersized-vs-load', re: /\b\d+(?:\.\d+)?\s*%\s+(?:deficit|shortfall|below|short)\b/i },
   // pressure / voltage vs rating
   { tag: 'pressure-vs-rating', re: /\b(?:operat\w+|design|working|process)\s+pressure\b[^.]{0,80}?\b(?:exceed|above|over|beyond|higher\s+than)\b[^.]{0,40}?\b(?:rating|rated|max)/i },
   { tag: 'voltage-vs-rating', re: /\b(?:operat\w+|bus|system|string|dc|ac)\s+voltage\b[^.]{0,80}?\b(?:exceed|above|over|beyond|higher\s+than)\b[^.]{0,40}?\b(?:rating|rated|withstand|insulation)/i },

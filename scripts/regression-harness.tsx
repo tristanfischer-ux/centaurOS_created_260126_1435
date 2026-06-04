@@ -46,6 +46,7 @@ import { composeToolGraph } from './lib/orchestrator/auto-planner'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { evaluatePhysicsCriticEnforcement } from './lib/physics-critic-enforcement'
+import { selectCorrectableFindings, locateWordForFinding, parseCorrection } from './lib/physics-critic-autocorrect'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
@@ -4054,6 +4055,80 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.physics_critic_enforcement_blocks_failing_part', description: 'physics-critic enforcement decision', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── UNIVERSAL: physics-critic AUTO-CORRECT targets named-part findings only (2026-06-04) ──
+  //
+  // UNIVERSAL.physics_critic_autocorrect_targets_named_part_findings — the Phase-2 self-correcting
+  // loop (physics-critic-autocorrect.ts) FIXES a flagged part and re-checks, instead of listing the
+  // fault as a customer risk (Tristan, twice: "you should automatically be fixing, not just saying
+  // they are there"). The whole feature is safe ONLY if the corrector SELECTS exactly the right
+  // findings — the feeder/boiler/material-style named-part HIGHs (where → …/words[N] + a concrete
+  // failure mode) — and SKIPS the vague/holistic and non-physical (JSON-truncation) findings, so it
+  // never re-specs a part that wasn't actually flagged for a physical failure. The selector reuses the
+  // gate-33 classifier (issueIsBlocking), so this also guards the live CO₂ bracket-path shape the
+  // critic actually emits ("…/sub_modules[N]/words[M]" — the form that silently evaded BOTH gate 33
+  // and the corrector until the 2026-06-04 whereNamesSpecificComponent bracket fix). Pure logic; the
+  // synthetic critique mirrors the real CO₂-mineralisation critique shape verbatim. Also asserts the
+  // locate-by-part-tokens resolution (the LLM `where` index is unreliable when a module name repeats)
+  // and the parse-skip of garbage replies.
+  try {
+    const mkIssue = (o: Partial<{ severity: string; confidence: string; where: string; issue: string; suggested_check: string }>) => ({
+      dimension: 'engineering_plausibility', severity: 'high', confidence: 'high',
+      where: 'structure_containment/sub_modules[0]/words[0]', issue: 'placeholder', ...o,
+    }) as any
+    const mkCrit = (issues: any[]) => ({ scores: {}, headline: '', issues, what_worked: [], model: 't', latency_ms: 0 }) as any
+
+    // (1) MDPE tank — material-vs-temperature, NAMED part, bracket path. SELECTED.
+    const mdpe = mkIssue({ issue: 'The MDPE buffer tank is on the 120 °C MEA-stripper loop; MDPE has a maximum service temperature of 60-80 °C and melts around 120-130 °C, so it will lose structural integrity and fail.', suggested_check: 'Replace with a 316L stainless steel vessel rated for 120 °C.' })
+    // (2) Screw feeder — undersized-vs-load, the LIVE CO₂ phrasing verbatim. SELECTED.
+    const feeder = mkIssue({ where: 'energy_conversion_transduction/sub_modules[3]/words[0]', issue: 'The Gericke GLD 87 screw feeder is rated for only 106 kg/h. This creates a severe bottleneck, limiting the maximum K2SO4 throughput to 2.54 t/day (a 35% deficit against the brief).', suggested_check: 'Upsize the Gericke screw feeder to a model rated for at least 200 kg/h.' })
+    // (3) Vague holistic HIGH — no named part, hedge. SKIPPED.
+    const vague = mkIssue({ where: 'whole_system', issue: 'The system is over-constrained; perform a detailed load-list analysis to verify the overall energy balance.' })
+    // (4) JSON-truncation HIGH — names a path but NOT a physical part failure. SKIPPED.
+    const jsonTrunc = mkIssue({ where: 'structure_containment/sub_modules[0]/words[3]', issue: "The design JSON payload is truncated abruptly at the end of the last module ('part_num'...), resulting in invalid JSON syntax." })
+    // (5) MED severity, named + concrete — SKIPPED (only HIGH is auto-corrected; gate-severity).
+    const medFinding = mkIssue({ severity: 'med', issue: 'The Cochran boiler element exceeds its maximum service temperature and will melt.' })
+
+    const selected = selectCorrectableFindings(mkCrit([mdpe, feeder, vague, jsonTrunc, medFinding]))
+    const selWheres = new Set(selected.map((s) => s.issue.where))
+
+    // locate-by-part-tokens: a design with TWO modules sharing a name; the bracket index
+    // would mis-resolve, so the corrector MUST resolve by the part tokens in the issue.
+    const w = (id: string, name: string, mods: Array<[string, string]>) => ({ id, name_human: name, content_character: { character_id: id }, modifier_characters: mods.map(([k, v]) => ({ kind: k, value: v })) })
+    const modulesTwoSameName = [
+      { module: 'structure_containment', sub_modules: [{ sub_module_id: 'mea_buffer_storage', words: [w('buffer_tank_word', 'MEA buffer tank', [['material', 'MDPE'], ['form', 'MDPE buffer tank']]), w('tank_level_probe_word', 'tank level probe', [['manufacturer', 'VEGA'], ['part_number', 'VEGAFLEX 81']])] }] },
+      { module: 'structure_containment', sub_modules: [{ sub_module_id: 'frame_saddles', words: [w('bolted_saddle_word', 'bolted saddle', [['material', 'S355']])] }] },
+    ]
+    const loc = locateWordForFinding(modulesTwoSameName, mdpe)
+    const vagueLoc = locateWordForFinding(modulesTwoSameName, vague)
+
+    // parse-skip: a garbage LLM reply must be treated as declined (never patched).
+    const garbageParse = parseCorrection('the model rambled with no json at all')
+
+    const checks: Array<[string, boolean]> = [
+      ['selects exactly the 2 named-part HIGHs', selected.length === 2],
+      ['selects the MDPE material-vs-temperature finding', selWheres.has('structure_containment/sub_modules[0]/words[0]')],
+      ['selects the undersized feeder finding (live CO₂ phrasing)', selWheres.has('energy_conversion_transduction/sub_modules[3]/words[0]')],
+      ['SKIPS the vague holistic finding', !selWheres.has('whole_system')],
+      ['SKIPS the JSON-truncation finding', !selWheres.has('structure_containment/sub_modules[0]/words[3]')],
+      ['MDPE tagged material-vs-temperature', selected.find((s) => s.issue.where.startsWith('structure'))?.failure_mode === 'material-vs-temperature'],
+      ['feeder tagged undersized-vs-load', selected.find((s) => s.issue.where.startsWith('energy'))?.failure_mode === 'undersized-vs-load'],
+      ['locate resolves MDPE to buffer_tank_word by part tokens', loc?.word_id === 'buffer_tank_word'],
+      ['locate picks the FIRST same-named module (index 0)', loc?.module_index === 0],
+      ['vague finding does NOT resolve to a word', vagueLoc === null],
+      ['garbage LLM reply parses as declined', garbageParse.declined === true],
+    ]
+    const failed = checks.filter(([, ok]) => !ok).map(([n]) => n)
+    assertions.push(assertEq(
+      'UNIVERSAL.physics_critic_autocorrect_targets_named_part_findings',
+      'physics-critic Phase-2 auto-correct SELECTS the feeder/boiler/material named-part HIGHs (bracket path + concrete failure mode) and SKIPS vague/holistic/JSON/MED findings; locates the named word by part tokens; treats garbage LLM replies as declined (11 cases)',
+      failed.length,
+      (n) => n === 0,
+      () => `physics-critic auto-correct selection/locate wrong on: ${failed.join('; ')}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.physics_critic_autocorrect_targets_named_part_findings', description: 'physics-critic auto-correct selection', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   // ── P3: uncostable-module disclosure — XOR + byte-identical + no fabricated mass (2026-06-02) ──

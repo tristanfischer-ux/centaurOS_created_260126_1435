@@ -116,6 +116,7 @@ import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engi
 import { verifyAllParts, stripUnverifiedParts, inheritPartNumberFromDeterministicSibling, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
 import { runPhysicsCritic, type CritiqueReport } from '../src/lib/pdf-engine-v2/radical/physics-critic'
 import { evaluatePhysicsCriticEnforcement, physicsCriticEnforceModeFromEnv } from './lib/physics-critic-enforcement'
+import { runPhysicsCriticAutocorrect, physicsCriticAutocorrectModeFromEnv, selectCorrectableFindings, type PhysicsCriticAutocorrectResult } from './lib/physics-critic-autocorrect'
 // Phase C pipeline integration REVERTED 2026-05-15 per coding council (5/5
 // REVERT). Registry pre-seed of reviewer prompts caused score regression and
 // risked registry pollution by ingesting LLM-coined aliases as canonical
@@ -3160,6 +3161,8 @@ async function main() {
   // the AUDIT + later inspection can see WHY the chain blocked (or why it allowed
   // ship). SHADOW by default. See physics-critic-enforcement.ts.
   let physicsCriticEnforcement: ReturnType<typeof evaluatePhysicsCriticEnforcement> | null = null
+  // Phase-2 auto-correct record (gate 33 self-correcting loop). SHADOW by default.
+  let physicsCriticAutocorrect: PhysicsCriticAutocorrectResult | null = null
   try {
     critique = await runPhysicsCritic({
       modules: design.modules ?? [],
@@ -3184,6 +3187,90 @@ async function main() {
     console.error(`[chain] physics critic threw: ${(err as Error).message}; continuing without`)
   }
   logAction({ step: 'physics_critic', latency_ms: Date.now() - tCritic, ok: critique !== null, scores: critique?.scores, issue_count: critique?.issues.length ?? 0 })
+
+  // ── Physics-critic PHASE-2 AUTO-CORRECT (gate 33 self-correcting loop, SHADOW by
+  //    default, 2026-06-04): the engine FIXES a part the Critic flagged and RE-CHECKS,
+  //    instead of merely listing the fault (Tristan, twice: "you should automatically be
+  //    fixing, not just saying they are there"). Runs AFTER the Critic, BEFORE the
+  //    enforcement-gate decision below — so in ENABLED mode the gate sees the
+  //    POST-correction critique (a fault the corrector cleared no longer blocks).
+  //
+  //    For each blocking-eligible HIGH finding (SAME classifier as gate 33 —
+  //    issueIsBlocking: names a …/words/N part + a concrete failure mode), it locates the
+  //    named word by its OWN part tokens (the LLM `where` indices are unreliable when a
+  //    module name repeats — verified on the CO₂ release), asks the fast LLM to re-spec a
+  //    REAL, in-class, brief-respecting replacement (e.g. upsize the Gericke GLD 87 feeder
+  //    @106 kg/h → a ≥200 kg/h model with updated PN + price), patches modifier_characters
+  //    in place (same surgical idiom as Stage 10.5 Part Reality Check), then RE-RUNS the
+  //    Critic; corrections whose fault cleared are kept; loop ≤2 passes. Anything still
+  //    uncorrectable falls through to the gate-33 block below.
+  //
+  //    Mode via PHYSICS_CRITIC_AUTOCORRECT: default SHADOW — compute + record the
+  //    corrections it WOULD apply against a DEEP COPY, never mutate the shipped design
+  //    (this first build cannot silently rewrite designs). ENABLED (=1) mutates the real
+  //    design.modules + updates `critique` so the enforcement gate reads the corrected
+  //    state. Respects the four prior-art guardrails documented at the head of
+  //    physics-critic-autocorrect.ts (A1 identity-lock, brief-pinned protection, gate-20
+  //    real-MPN, category-preservation).
+  if (critique && selectCorrectableFindings(critique).length > 0) {
+    const acMode = physicsCriticAutocorrectModeFromEnv(process.env.PHYSICS_CRITIC_AUTOCORRECT)
+    console.error(`\n[chain] STEP 7.5b: physics-critic PHASE-2 AUTO-CORRECT (${acMode === 'enabled' ? 'ENABLED — patches the shipped design' : 'SHADOW — records would-be corrections, does NOT mutate the design'})`)
+    const tAuto = Date.now()
+    try {
+      physicsCriticAutocorrect = await runPhysicsCriticAutocorrect({
+        modules: design.modules ?? [],
+        critique,
+        parsedBrief: parsedResult.data,
+        productClass,
+        mode: acMode,
+        maxPasses: 2,
+        log: (rec) => logAction(rec),
+        // Inject the fast-LLM re-spec caller: Gemini 3.5 Flash (the Critic's own model —
+        // reasoning-first, sharp on engineering maths), Grok 4.3 fallback. temperature 0.
+        llm: async (prompt: string) => {
+          const callOnce = async (model: string): Promise<string> => {
+            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://forge-os.com/autocorrect' },
+              body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' }, max_tokens: 4096, temperature: 0 }),
+            })
+            if (!res.ok) throw new Error(`OpenRouter ${res.status} from ${model}`)
+            const j = await res.json() as any
+            return j?.choices?.[0]?.message?.content ?? ''
+          }
+          try { return await callOnce(FLASH_3_5) } catch { return await callOnce(GROK_4_3) }
+        },
+        // Re-critique callback: re-run the Physics Critic on the (working) modules.
+        reCritique: async (mods: any[]) => runPhysicsCritic({
+          modules: mods,
+          brief: parsedResult.data,
+          keyMetrics,
+          productClass,
+          apiKey,
+          contractTradeOffs: buildContractTradeOffs(engineeringContract),
+        }),
+      })
+      const r = physicsCriticAutocorrect
+      console.error(`[chain] physics auto-correct (${r.mode}): selected ${r.selected} blocking finding(s) → corrected ${r.corrected}, declined ${r.declined}, unlocatable ${r.unlocatable}, still-uncorrectable ${r.uncorrectable_after_passes} after ${r.passes_run} pass(es)`)
+      for (const rec of r.records.slice(0, 6)) {
+        const beforeStr = Object.entries(rec.before).map(([k, v]) => `${k}=${v}`).join(', ') || '(none)'
+        const afterStr = Object.entries(rec.after).map(([k, v]) => `${k}=${v}`).join(', ') || '(none)'
+        console.error(`  • [${rec.status}] ${rec.failure_mode} @ ${rec.resolved_path} (${rec.match_method}): {${beforeStr}} → {${afterStr}}${rec.note ? ` — ${rec.note}` : ''}`)
+      }
+      // ENABLED: the corrector mutated design.modules in place; adopt the post-correction
+      // critique so the enforcement gate below blocks ONLY on faults still present.
+      // SHADOW: r.final_critique is the original critique (design unchanged), so the gate
+      // behaves exactly as if auto-correct were off.
+      if (acMode === 'enabled' && r.final_critique) {
+        critique = r.final_critique
+        writeFileSync(resolve(outDir, '7-5b-physics-critique-postcorrect.json'), JSON.stringify(critique, null, 2))
+        console.error(`[chain] physics auto-correct ENABLED: enforcement gate will read the POST-correction critique (${critique.issues.length} issue(s))`)
+      }
+    } catch (err) {
+      console.error(`[chain] physics auto-correct threw: ${(err as Error).message}; continuing with the original critique`)
+    }
+    logAction({ step: 'physics_autocorrect_stage', latency_ms: Date.now() - tAuto, mode: acMode, ok: physicsCriticAutocorrect !== null, corrected: physicsCriticAutocorrect?.corrected ?? 0, uncorrectable: physicsCriticAutocorrect?.uncorrectable_after_passes ?? 0 })
+  }
 
   // ── Physics-critic CORRECTIVE enforcement (gate 33, SHADOW by default, 2026-06-04):
   //    make the Physics Critic block-on-known-failure rather than advisory-only —
@@ -3566,6 +3653,7 @@ async function main() {
         physicsLedger,
         physicsCritique: critique,
         physicsCriticEnforcement,  // gate 33 corrective-physics decision (shadow by default)
+        physicsCriticAutocorrect,  // gate 33 PHASE-2 self-correcting loop (shadow by default; mutates design when PHYSICS_CRITIC_AUTOCORRECT=1)
         briefTargetReconciliation: r,
         brief: briefBlock,
         acceptanceStatus: 'not_accepted',
@@ -4952,6 +5040,7 @@ async function main() {
     },
     physicsCritique: critique,
     physicsCriticEnforcement,  // gate 33 corrective-physics decision (shadow by default, exit 33 when PHYSICS_CRITIC_ENFORCING)
+    physicsCriticAutocorrect,  // gate 33 PHASE-2 self-correcting loop (shadow by default; mutates design + post-correction critique when PHYSICS_CRITIC_AUTOCORRECT=1)
     // 2026-05-20 iter-9 Step 1: physics repair loop diagnostics (Tristan
     // "design that does work" directive). state.physicsRepair carries the
     // 2026-05-23 prune #2: state.physicsRepair removed (no reader). The
