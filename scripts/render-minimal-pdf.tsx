@@ -6533,12 +6533,57 @@ function gatherSystemLevelRisks(state: any): EngineeringReviewNote[] {
   return out
 }
 
-/** Sub-module subtotal from BoM (council recommendation — helps procurement). */
-function subModuleBomSubtotal(bomTotals: BomTotals | null, moduleId: string, subModuleId: string): { lines: BomLineWithStatus[]; subtotal: number } {
+/**
+ * Resolve the BomMod that belongs to a given rendered ModuleSection.
+ *
+ * 2026-06-03 (co2_mineralisation BoM RENDERING fault — Tristan: "in many sub
+ * modules there is a description but no bom table is showing at all"):
+ * `moduleDecomposition.modules[]` can legitimately carry DUPLICATE taxonomy
+ * `module` ids — e.g. the CO₂ amine plant has THREE distinct process trains
+ * (MEA absorption, CaCO₃ filter/dry line, MEA recovery) that all share the
+ * `mass_fluid_transport_process` id, and TWO under `energy_conversion_transduction`.
+ * `computeBomTotals` correctly keeps every entry as a SEPARATE BomMod (same
+ * `order_modules` ordering as the render-side `modules` array — so they align
+ * index-for-index). But `bomTotals.allMods.find(m => m.module === id)` returns
+ * the FIRST BomMod with that id, so the 2nd/3rd duplicate-id ModuleSection
+ * looked up the WRONG module's subs → its sub-module ids were absent → every
+ * `SubModuleBomBlock` returned null → the description rendered with NO parts
+ * table. 8 of 25 CO₂ sub-modules lost their table this way; the BoM council
+ * section scored 2.0.
+ *
+ * Fix: resolve POSITIONALLY. `modules` (render) and `bomTotals.allMods` are
+ * both produced by `order_modules` over the same source array, so the BomMod
+ * at `position` (the ModuleSection's zero-based index) is the right instance.
+ * We trust the position only when its `.module` id matches `moduleId`
+ * (defends against any future divergence in ordering/length); otherwise fall
+ * back to a first-by-id `.find()` (legacy behaviour, correct when ids are
+ * unique). Universal — applies to ANY class whose decomposition repeats a
+ * taxonomy module id, not just CO₂.
+ */
+function resolveModuleBom(bomTotals: BomTotals | null, moduleId: string, position?: number): BomMod | null {
+  if (!bomTotals) return null
+  if (typeof position === 'number' && position >= 0 && position < bomTotals.allMods.length) {
+    const atPos = bomTotals.allMods[position]
+    if (atPos && atPos.module === moduleId) return atPos
+  }
+  return bomTotals.allMods.find(m => m.module === moduleId) ?? null
+}
+
+/** Sub-module subtotal from BoM (council recommendation — helps procurement).
+ *  Pass `mod` (the already-resolved BomMod for THIS ModuleSection) so the sub
+ *  lookup is scoped to the correct module instance when taxonomy `module` ids
+ *  repeat (see resolveModuleBom). Falls back to first-by-id resolution from
+ *  `moduleId` for callers that don't pre-resolve. */
+function subModuleBomSubtotal(
+  bomTotals: BomTotals | null,
+  moduleId: string,
+  subModuleId: string,
+  mod?: BomMod | null,
+): { lines: BomLineWithStatus[]; subtotal: number } {
   if (!bomTotals) return { lines: [], subtotal: 0 }
-  const mod = bomTotals.allMods.find(m => m.module === moduleId)
-  if (!mod) return { lines: [], subtotal: 0 }
-  const sub = mod.subs.find(s => s.id === subModuleId)
+  const resolved = mod ?? bomTotals.allMods.find(m => m.module === moduleId) ?? null
+  if (!resolved) return { lines: [], subtotal: 0 }
+  const sub = resolved.subs.find(s => s.id === subModuleId)
   if (!sub) return { lines: [], subtotal: 0 }
   return { lines: sub.parts as BomLineWithStatus[], subtotal: sub.subtotal_gbp }
 }
@@ -7049,8 +7094,20 @@ function ModuleSection({
       paragraph: livePara,
     })
   }
+  // 2026-06-03 (BoM RENDERING fault fix, companion to resolveModuleBom): the
+  // natural-language `by_module` block is keyed by taxonomy module id, so when
+  // that id REPEATS (three `mass_fluid_transport_process` process trains in the
+  // CO₂ amine plant) every duplicate-id ModuleSection receives the SAME nl
+  // block. Its `sub_module_sentences` carry sub ids belonging to only ONE train
+  // — ADDING them here would inject phantom sub-modules from a sibling train
+  // onto this page, each rendering a description with NO parts table (the parts
+  // live in the sibling's BomMod). So ENRICH ONLY sub ids THIS module instance
+  // actually owns (already seeded from moduleSpec.sub_modules); never ADD a new
+  // entry from the nl layer. When module ids are unique this is byte-identical
+  // (moduleSpec.sub_modules already covers every id the nl block references).
   for (const s of (nl?.sub_module_sentences ?? [])) {
-    const existing = subModulesById.get(s.sub_module_id) ?? { name: humanise(s.sub_module_id), sentence: '', paragraph: '' }
+    const existing = subModulesById.get(s.sub_module_id)
+    if (!existing) continue
     existing.sentence = clean_prose(s.sentence_en)
     if (s.paragraph_en && s.paragraph_en.length > existing.paragraph.length) {
       existing.paragraph = clean_prose(s.paragraph_en)
@@ -7069,7 +7126,12 @@ function ModuleSection({
   // ITER-10.5: status strip is COST ONLY (Tristan D15). Review-note count,
   // part count, and procurement-exception count chips are dropped — Tristan
   // said only Cost is scanned by the reader.
-  const moduleBom = bomTotals?.allMods.find(m => m.module === moduleSpec.module) ?? null
+  // 2026-06-03 (BoM RENDERING fault fix): resolve POSITIONALLY by this section's
+  // index (index is 1-based → position index-1) so a duplicate taxonomy
+  // `module` id (e.g. three `mass_fluid_transport_process` process trains in
+  // the CO₂ amine plant) maps to the CORRECT BomMod instead of the first-by-id
+  // one. Falls back to first-by-id when the position doesn't line up.
+  const moduleBom = resolveModuleBom(bomTotals ?? null, moduleSpec.module, index - 1)
   const moduleCostGbp = moduleBom?.subtotal_gbp ?? 0
   const recs = partRecommendations ?? []
   const badges = manualReviewBadges ?? []
@@ -7345,7 +7407,7 @@ function ModuleSection({
         // ITER-10.5: clean Chain V2 BoM + numbered Notes block (Tristan ref
         // image #2). Replaces the cramped 3-deep numbering + 4-letter
         // status badges of iter-10.
-        const { lines: subBomLines, subtotal: subBomSubtotal } = subModuleBomSubtotal(bomTotals ?? null, moduleSpec.module, sm.id)
+        const { lines: subBomLines, subtotal: subBomSubtotal } = subModuleBomSubtotal(bomTotals ?? null, moduleSpec.module, sm.id, moduleBom)
         const notes = state ? noteCollectorForSubModule(subBomLines, recs, badges, state, moduleSpec.module, sm.id, physicsBySubId.get(sm.id) ?? []) : []
         const noteIndexMap = new Map<string, number>()
         for (const n of notes) {

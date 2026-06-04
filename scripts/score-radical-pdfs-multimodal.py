@@ -11,7 +11,7 @@ Usage:
 Methodology:
     1. Find all radical.pdf files in batch-dir/<slug>/radical.pdf
     2. Convert each to 150 DPI PNGs using pdftoppm
-    3. Score each PDF with 3 LLMs (Gemini-2.5-Pro via OR, Claude Opus 4.7 direct, Qwen3-VL via OR)
+    3. Score each PDF with 3 LLMs, ALL via OpenRouter (Gemini-2.5-Pro, Claude Opus 4.7 as anthropic/claude-opus-4-7, Qwen3-VL)
     4. Calibrate: if any score ≥3 below the other two, drop it as outlier
     5. Compute mean of remaining scores per section
     6. Write markdown report comparing V1 vs V2
@@ -62,8 +62,9 @@ _record_council_score = _load_recorder()
 # ─── .env.local auto-loader ──────────────────────────────────────────────────
 # Self-load the repo's .env.local so this scorer records a score REGARDLESS of
 # how it's invoked (direct shell, cron, subagent). The council needs
-# ANTHROPIC_API_KEY — an eval-tooling exception; the engine pipeline itself is
-# Anthropic-free — and that key lives in .env.local, NOT in ~/.claude/secrets/.
+# OPENROUTER_API_KEY (all three judges — Gemini, Claude, Qwen — route through
+# OpenRouter; Claude as `anthropic/claude-opus-4-7`), and that key lives in
+# .env.local, NOT in ~/.claude/secrets/.
 # A run that can't find the key exits 1 and writes NOTHING to
 # council-scores.jsonl, which is exactly the "losing information" failure this
 # whole permanent-log feature exists to prevent. Removing the "forgot to source
@@ -95,22 +96,8 @@ _load_dotenv_local()
 
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 ANTHROPIC_KEY  = os.environ.get("ANTHROPIC_API_KEY", "")
-
-# Validate keys at startup — fail loud rather than produce silent "—" cells
-_missing_keys: list[str] = []
-if not ANTHROPIC_KEY:
-    _missing_keys.append("ANTHROPIC_API_KEY")
-if not OPENROUTER_KEY:
-    _missing_keys.append("OPENROUTER_API_KEY")
-if _missing_keys:
-    print(
-        f"ERROR: Missing required environment variables: {', '.join(_missing_keys)}\n"
-        "Export them before running, e.g.:\n"
-        "  source .env.local  # if using dotenv file\n"
-        "  export ANTHROPIC_API_KEY=sk-ant-...",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+# NOTE: startup key validation lives just AFTER the MODELS table below (it needs
+# to inspect each seat's provider), not here.
 
 # ─── Per-SECTION scoring (root fix for HTTP 400 on large dossiers) ───────────
 # THE OLD FAILURE: every model was sent the WHOLE PDF in one request. On the
@@ -172,8 +159,19 @@ MODELS = [
     {
         "id": "claude",
         "label": "Claude Opus 4.7",
-        "provider": "anthropic",
-        "model": "claude-opus-4-7",
+        # Routed through OpenRouter (NOT the direct api.anthropic.com path): the
+        # direct Anthropic key sits at £0 credit so every direct call returns
+        # HTTP 400 "credit balance too low", dropping the panel from 3 judges to
+        # 2. OpenRouter credit is full, exposes the SAME model as
+        # `anthropic/claude-opus-4-7`, and accepts the OpenAI-style multimodal
+        # message format build_section_messages_openrouter already builds — so
+        # Claude rides the exact Gemini/Qwen call path. (Confirmed model id in
+        # src/lib/pdf-engine-v2/lib/openrouter-models.ts :: CLAUDE_OPUS_4_7.)
+        "provider": "openrouter",
+        "model": "anthropic/claude-opus-4-7",
+        # Opus 4.7 rejects a `temperature` parameter; omit it on the OpenRouter
+        # call too in case OpenRouter forwards it to the upstream Anthropic API.
+        "omit_temperature": True,
     },
     {
         "id": "qwen",
@@ -182,6 +180,27 @@ MODELS = [
         "model": "qwen/qwen3-vl-235b-a22b-instruct",
     },
 ]
+
+# Validate keys at startup — fail loud rather than produce silent "—" cells.
+# Only OPENROUTER_API_KEY is required now: ALL THREE judges (Gemini, Claude,
+# Qwen) route through OpenRouter. The direct Anthropic path is a dormant
+# fallback, so ANTHROPIC_API_KEY is required ONLY if a MODELS entry is manually
+# switched back to provider="anthropic".
+_missing_keys: list[str] = []
+if not OPENROUTER_KEY:
+    _missing_keys.append("OPENROUTER_API_KEY")
+_uses_direct_anthropic = any(m.get("provider") == "anthropic" for m in MODELS)
+if _uses_direct_anthropic and not ANTHROPIC_KEY:
+    _missing_keys.append("ANTHROPIC_API_KEY (a seat still uses provider='anthropic')")
+if _missing_keys:
+    print(
+        f"ERROR: Missing required environment variables: {', '.join(_missing_keys)}\n"
+        "Export them before running, e.g.:\n"
+        "  source .env.local  # if using dotenv file\n"
+        "  export OPENROUTER_API_KEY=sk-or-...",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 SECTIONS = [
     "cover",
@@ -594,13 +613,23 @@ def _http_post_with_retries(req_factory, who: str) -> "urllib.response.addinfour
     raise RuntimeError(f"{who}: exhausted retries with no exception captured")
 
 
-def call_openrouter(model: str, messages: list[dict], max_tokens: int = 4096) -> str:
-    payload = json.dumps({
+def call_openrouter(
+    model: str,
+    messages: list[dict],
+    max_tokens: int = 4096,
+    omit_temperature: bool = False,
+) -> str:
+    body: dict = {
         "model": model,
         "messages": messages,
         "max_tokens": max_tokens,
-        "temperature": 0.1,
-    }).encode("utf-8")
+    }
+    # claude-opus-4-7 rejects `temperature`; omit it for that seat (OpenRouter
+    # may forward the field upstream). All other seats keep the deterministic
+    # low-temperature setting.
+    if not omit_temperature:
+        body["temperature"] = 0.1
+    payload = json.dumps(body).encode("utf-8")
 
     def _make_req():
         return urllib.request.Request(
@@ -831,11 +860,19 @@ def score_section_with_model(
         return None
     try:
         if provider == "anthropic":
+            # Legacy fallback ONLY: the Claude seat now routes through OpenRouter
+            # (provider="openrouter") because the direct Anthropic key is at £0
+            # credit. This branch is kept so a seat could be pointed back at the
+            # direct API if its balance is ever topped up, but no MODELS entry
+            # uses it on the active path.
             messages = build_section_messages_anthropic(section_pngs, section, slug)
             raw = call_anthropic(model, messages, max_tokens=700)
         else:
             messages = build_section_messages_openrouter(section_pngs, section, slug)
-            raw = call_openrouter(model, messages, max_tokens=700)
+            raw = call_openrouter(
+                model, messages, max_tokens=700,
+                omit_temperature=model_cfg.get("omit_temperature", False),
+            )
         return parse_single_score(raw)
     except PayloadTooLargeError as e:
         # Should not happen with ≤8 images; surface loudly if it does.
@@ -1234,7 +1271,7 @@ def run(args):
     lines.append("")
     lines.append(f"**Date:** 2026-05-10  ")
     lines.append(f"**Shadow batch:** `{batch_dir.name}`  ")
-    lines.append(f"**Council models:** `google/gemini-3.1-pro-preview` · `anthropic/claude-opus-4-7` · `qwen/qwen3-vl-235b-a22b-instruct`")
+    lines.append(f"**Council models (all via OpenRouter):** `google/gemini-3.1-pro-preview` · `anthropic/claude-opus-4-7` · `qwen/qwen3-vl-235b-a22b-instruct`")
     lines.append(f"**Methodology:** 150 DPI PNG conversion via `pdftoppm`; 3-LLM multimodal scoring per PDF; outlier calibration (drop score ≥3 below other two); mean of calibrated valid scores per cell.  ")
     lines.append(f"**Changes scored:** P1 template cross-contamination fix, P2 Feasibility Assessment section, P3 Executive Summary section, DRC rename, BOM legend fix.")
     lines.append("")

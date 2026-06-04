@@ -446,9 +446,11 @@ function emitMeaRecovery(p: Co2MinParams): DesignModule {
       [mod('quantity', '×1'), mod('form', 'centrifugal column-feed pump'), mod('manufacturer', 'Grundfos'),
        mod('part_number', 'CRNE 10-5'), mod('list_price_gbp', '4300')]),
     word('reclaim_water_tank_word', 'reclaimed wash-water tank',
-      cc('reclaim_water_tank', 'reclaimed wash-water tank', 'mass_fluid_transport_process', 'polymer_thermoplastic'),
-      [mod('quantity', '×1'), mod('form', 'buffer tank'), mod('dimension', '3 m³'), mod('manufacturer', 'Forsterr'),
-       mod('part_number', 'moulded MDPE buffer tank — made to order'), mod('list_price_gbp', '1500')]),
+      cc('reclaim_water_tank', 'reclaimed wash-water tank', 'mass_fluid_transport_process', 'stainless_steel'),
+      // 316L (not MDPE): the MEA-recovery loop runs to 120 °C; polyethylene tops
+      // out ~60-80 °C and would fail (Physics Critic HIGH, 2026-06-04).
+      [mod('quantity', '×1'), mod('form', 'buffer tank'), mod('dimension', '3 m³'), mod('manufacturer', 'fabricated'),
+       mod('part_number', 'fabricated 316L stainless insulated buffer tank, 3 m³ — made to order (hot MEA-recovery loop ≤120 °C)'), mod('list_price_gbp', '7500')]),
   ])
   return { module: 'mass_fluid_transport_process', display_name: 'MEA Recovery & Recycle',
     module_brief: `Wash-water distillation recovers MEA and reclaims wash water in a closed solvent loop, minimising MEA make-up and effluent.`,
