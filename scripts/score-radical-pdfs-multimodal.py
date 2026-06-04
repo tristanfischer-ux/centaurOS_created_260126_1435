@@ -361,7 +361,17 @@ _HEADER_SIGNATURES: dict[str, list[str]] = {
     "design_modules":     ["·MODULES", "·MODULE", "ENGINEERINGTOOLSFLOW"],
     "bom":                ["COSTBYMODULE"],
     "cost_analysis":      ["COSTBYMODULE", "BRIEFCOMPLIANCE"],
-    "sourcing_strategy":  ["SOURCINGSTRATEGY"],
+    # The rendered banner is "SECTION 7 · SOURCING & PROCUREMENT" (de-spaced:
+    # "SECTION7·SOURCING&PROCUREMENT"), NOT "SOURCING STRATEGY". The old lone
+    # "SOURCINGSTRATEGY" signature matched ZERO pages on every real dossier, so
+    # the empty-section fallback fired and mapped sourcing to page (num_pages-3)
+    # — which on the 95-page CO2 dossier was a "Tools Used in this Report"
+    # pressure-vessel page, scoring 0.00 across all three judges and tanking the
+    # mean. Anchor to the ACTUAL banner text instead. "·SOURCING" is the robust
+    # core (the banner always reads "SECTION N · SOURCING …"); the fuller
+    # signatures are kept so a banner-text drift back to "STRATEGY" still matches.
+    "sourcing_strategy":  ["·SOURCING", "SOURCING&PROCUREMENT",
+                           "SOURCING&", "SOURCINGSTRATEGY"],
     "feasibility_notes":  ["RISK&INTEGRATION", "RISKANALYSIS",
                            "REGULATORY&COMPLIANCE", "REGULATORY&"],
     "sources_references": ["TOOLSUSEDINTHISREPORT", "TOOLSUSED", "REFERENCES",
@@ -453,7 +463,28 @@ def build_section_page_map(pdf_path: Path, num_pages: int) -> dict[str, list[int
     if not mapping["cost_analysis"]:
         mapping["cost_analysis"] = mapping["bom"]
     if not mapping["sourcing_strategy"]:
-        mapping["sourcing_strategy"] = [max(1, num_pages - 3)]
+        # CONTENT-anchored fallback (NOT a fixed offset). The old [num_pages - 3]
+        # guess landed on a Tools/Appendix/Investors page on long dossiers — the
+        # exact 0.00 bug. If the banner ever fails to match, find the page(s)
+        # whose BODY contains the unmistakable sourcing-section vocabulary
+        # ("main contractor", "key subcontractors", "procurement") and use those.
+        SOURCING_BODY_ANCHORS = (
+            "MAINCONTRACTOR", "KEYSUBCONTRACTOR", "SUBCONTRACTOR", "PROCUREMENT",
+        )
+        body_hits = [
+            i for i, pg in enumerate(page_texts[:num_pages], start=1)
+            if any(a in _despace_upper(pg) for a in SOURCING_BODY_ANCHORS)
+        ]
+        if body_hits:
+            mapping["sourcing_strategy"] = body_hits
+        else:
+            # Last resort: a mid-late CONTENT page, never the final pages (which
+            # are Tools/Appendix/Investors). Sit just before the appendix block.
+            appendix_start = min(
+                (p for p in mapping["appendix_technical"] if p <= num_pages),
+                default=num_pages,
+            )
+            mapping["sourcing_strategy"] = [max(1, appendix_start - 1)]
     if not mapping["feasibility_notes"]:
         mapping["feasibility_notes"] = [max(1, num_pages - 5)]
     if not mapping["sources_references"]:
