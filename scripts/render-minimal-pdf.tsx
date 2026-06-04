@@ -34,7 +34,6 @@ import { computeImprovementPlan } from '../src/lib/pdf-engine-v2/lib/auto-improv
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { buildSourcingStrategyFromState, deriveSourcingArchetypesFromState, countPinnedManufacturers, buildMainContractorRecommendation, buildSubcontractorScopes } from '../src/lib/pdf-engine-v2/lib/sourcing-strategy'
 import { checkMacroMaterialRate, inferMacroMaterial, getMaterialPrice } from '../src/lib/pdf-engine-v2/lib/material-prices'
-import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import {
   MARKET_BANDS,
   classifyBandPosition,
@@ -10558,8 +10557,19 @@ function EngineeringToolsFlowPage({
 }) {
   const page = readToolsUsedPage(state)
   if (!page) return null
-  const tools: any[] = Array.isArray(page.tools) ? page.tools : []
-  if (tools.length === 0) return null
+  const allTools: any[] = Array.isArray(page.tools) ? page.tools : []
+  if (allTools.length === 0) return null
+
+  // Build #21 (2026-06-04): this front section now summarises ONLY the
+  // SYSTEM-LEVEL tools — the cross-cutting whole-plant tools that belong to no
+  // single module (mass/envelope aggregation, lifecycle CO2, plant-wide
+  // regeneration energy, feasibility). Each module-owned tool's worked maths
+  // moved INTO that module's "How this module was computed" block, so it no
+  // longer repeats up front. The dependency PNG still shows the full data-flow
+  // graph (it IS a whole-plant artefact); the text fallback + the inline node
+  // list below are filtered to the system-level set.
+  const systemIds = systemLevelToolIds(state)
+  const tools: any[] = allTools.filter((t: any) => systemIds.has(t?.tool_id))
 
   // The chain writes tools-flow.png alongside state.json in the same outDir.
   const stateDir = dirname(statePath)
@@ -10568,14 +10578,18 @@ function EngineeringToolsFlowPage({
 
   return (
     <Page size="A4" orientation="landscape" wrap={false} style={PAGE_STYLE}>
-      <PageHeader section="Section 1c · Engineering Tools Flow" project={project} />
+      <PageHeader section="Section 1c · How the whole plant was computed" project={project} />
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Engineering tools — how the design was computed
+        How the whole plant was computed
       </Text>
       <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 10, lineHeight: 1.55 }}>
-        The brief feeds every engineering tool used to compute this design; each
-        tool's output flows into the Engineering Contract, which drives the parts
-        Library, the Reviewers, and finally the Bill of Materials.
+        These are the cross-cutting, system-level tools — the ones whose numbers
+        belong to the plant as a whole, not to any single module. The brief feeds
+        every engineering tool; each tool&apos;s output flows into the
+        Engineering Contract, which drives the parts Library, the Reviewers, and
+        finally the Bill of Materials. The worked calculation for a tool that
+        sizes one module&apos;s equipment now sits with that module, under its
+        &ldquo;How this module was computed&rdquo; heading.
       </Text>
 
       {pngExists ? (
@@ -10674,9 +10688,12 @@ function EngineeringToolsFlowPage({
       )}
 
       <Text style={{ fontSize: 9, color: MUTED, marginTop: 6, lineHeight: 1.5, fontStyle: 'italic', textAlign: 'center' }}>
-        Each box is an engineering tool that ran; arrows show the real data-flow
-        dependencies (feeds_into graph from the ClassToolPlan). Per-tool inputs
-        and outputs are listed in the Tools-Used appendix.
+        The diagram shows the full whole-plant data-flow: each box is an
+        engineering tool that ran and arrows show the real dependencies
+        (feeds_into graph from the ClassToolPlan). The worked calculations for
+        module-specific tools are shown with their module; a one-line-per-tool
+        provenance index (name, version, licence, source) is at the end of the
+        report.
       </Text>
 
       <PageFooter />
@@ -10707,6 +10724,27 @@ function PhysicsNarrativePage({ state, project }: { state: any; project: string 
 
   const narrative = generatePhysicsNarrative(quantities, productClass)
   if (!narrative || narrative.sentences.length === 0) return null
+
+  // Build #21 (2026-06-04): this front section cites only SYSTEM-LEVEL tools —
+  // module-owned tool detail now lives inside each module. tools_cited is a
+  // list of display names, so resolve the system-level tool_ids to their
+  // display names and keep only the cited names in that set. If the resolution
+  // yields nothing (older state without a toolsUsedPage), fall back to the full
+  // cited list rather than blanking the footer.
+  const systemIds = systemLevelToolIds(state)
+  const page = readToolsUsedPage(state)
+  const systemNames = new Set<string>()
+  if (page && Array.isArray(page.tools)) {
+    for (const t of page.tools as any[]) {
+      if (systemIds.has(t?.tool_id)) {
+        systemNames.add(normalise_unicode(String(t?.tool_name || t?.tool_id)))
+      }
+    }
+  }
+  const citedSystemTools =
+    systemNames.size > 0
+      ? narrative.tools_cited.filter((n) => systemNames.has(normalise_unicode(String(n))))
+      : narrative.tools_cited
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
@@ -10781,7 +10819,7 @@ function PhysicsNarrativePage({ state, project }: { state: any; project: string 
         </View>
       )}
 
-      {narrative.tools_cited.length > 0 ? (
+      {citedSystemTools.length > 0 ? (
         <View
           style={{
             padding: 10,
@@ -10792,14 +10830,15 @@ function PhysicsNarrativePage({ state, project }: { state: any; project: string 
         >
           <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45 }}>
             <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>
-              {'Tools cited in this section: '}
+              {'System-level tools cited in this section: '}
             </Text>
-            {normalise_unicode(narrative.tools_cited.join('   ·   '))}
+            {normalise_unicode(citedSystemTools.join('   ·   '))}
           </Text>
           <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic', lineHeight: 1.4 }}>
-            Full tool provenance — version, license, physics basis, and every
-            quantity computed — is listed in the Tools Used appendix near the
-            end of this report.
+            Each tool&apos;s version, licence and source are listed in the
+            one-line-per-tool Tools-Used index at the end of this report; the
+            worked calculations for module-specific tools are shown with their
+            module.
           </Text>
         </View>
       ) : null}
@@ -10811,12 +10850,14 @@ function PhysicsNarrativePage({ state, project }: { state: any; project: string 
 
 // ─── Build #19e (2026-05-22) · Tools-Used end-page ─────────────────────────
 //
-// Lists every verified engineering tool that contributed at least one
-// numerical claim to the report — with paper citation, physics basis,
-// confidence class, and a truncated list of the actual quantities the
-// tool computed for THIS design. Plus a section listing tools that are
-// available in the orchestrator's registry but were not used for this
-// design (so the reader sees the full engineering inventory).
+// Build #21 (2026-06-04): the per-tool WORKED-CALC blocks moved UP into each
+// module's "How this module was computed" block (ModuleToolsCallout) so the
+// maths sits with the equipment it sizes. This end page is now a COMPACT
+// one-line-per-tool PROVENANCE INDEX (name · version · licence · source) for
+// the audit trail — every tool stays listed (audit completeness), without the
+// heavy maths repeated 60+ pages from the number. Mockup: REPORT-LAYOUT-
+// MOCKUP.html footer ("a terse tool + provenance index stays at the back for
+// the audit trail").
 //
 // Data spec: scripts/lib/orchestrator/attribution.ts ToolsUsedPage. The
 // state.toolsUsedPage field is set by orchestrate.ts via buildToolsUsedPage().
@@ -10908,197 +10949,81 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
   if (!page) return null
   if (!Array.isArray(page.tools) || page.tools.length === 0) return null
 
+  // Terse provenance index (build #21, 2026-06-04). One row per tool:
+  // name · version · licence · source. The worked maths now lives in each
+  // module's "How this module was computed" block; this page is the audit
+  // trail, so EVERY tool that produced a claim is listed — just without the
+  // heavy step-by-step calculations repeated here.
+  const tools: any[] = (page.tools as any[]).slice().sort((a, b) =>
+    String(a?.tool_name || a?.tool_id).localeCompare(String(b?.tool_name || b?.tool_id)),
+  )
+
   return (
     <Page size="A4" style={PAGE_STYLE}>
       <PageHeader section="Section · Tools Used in This Report" project={project} />
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
         Tools Used in This Report
       </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 18, lineHeight: 1.55 }}>
-        {page.intro || (
-          'Every numerical value in this document was computed by one of the '
-          + 'verified engineering tools below. Each tool is open-source or '
-          + 'free-to-use; the listed version is what was invoked; the listed '
-          + 'paper or standard is the underlying physics. Anyone with the same '
-          + 'tool version can reproduce the same output from the same input.'
-        )}
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14, lineHeight: 1.55 }}>
+        Every numerical value in this document was computed by one of the
+        verified engineering tools below. The step-by-step worked calculation
+        for each tool is shown with the module it sizes, under that module&apos;s
+        &ldquo;How this module was computed&rdquo; heading. This index records
+        every tool used — name, version, licence and source — so the result is
+        reproducible: anyone with the same tool version can reproduce the same
+        output from the same input.
       </Text>
 
-      {page.tools.map((tool: any, ti: number) => {
-        const claims: any[] = Array.isArray(tool.claims) ? tool.claims : []
-        // Fix 1 (2026-05-30): replaced whole-card minPresenceAhead with a
-        // small heading+first-line guard (~65pt). The old formula
-        // (120 + claims.length*10) caused every card that couldn't fit in
-        // remaining space to jump to a fresh page, stranding 40-60% whitespace.
-        // With 65pt we only protect the heading row and one line of narrative;
-        // the rest of the card flows continuously — react-pdf page-breaks
-        // mid-card cleanly rather than skipping a full page.
-        // visibleClaims = claims intentionally kept — all claims shown per
-        // Tristan's 2026-05-24 explicit instruction "show ALL claims".
-        const visibleClaims = claims
-        const extraClaims: number = 0
-        const reserveHeight = 65
-        return (
-          <View
-            key={tool.tool_id || `tool-${ti}`}
-            style={{ marginBottom: 14, padding: 12, backgroundColor: '#f8fafc', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }}
-            minPresenceAhead={reserveHeight}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
-              <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK }}>
-                {normalise_unicode(tool.tool_name || tool.tool_id)}
-                <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
-                  {tool.tool_version ? `  v${tool.tool_version}` : ''}
-                </Text>
+      {/* Column header row */}
+      <View
+        style={{
+          flexDirection: 'row',
+          borderBottomWidth: 0.8,
+          borderBottomColor: RULE,
+          paddingBottom: 4,
+          marginBottom: 2,
+        }}
+      >
+        <Text style={{ flex: 1, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>TOOL</Text>
+        <Text style={{ width: 48, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>VERSION</Text>
+        <Text style={{ width: 86, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>LICENCE</Text>
+        <Text style={{ width: 150, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>SOURCE</Text>
+      </View>
+
+      {tools.map((tool: any, ti: number) => (
+        <View
+          key={tool.tool_id || `tool-${ti}`}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            paddingVertical: 4,
+            borderBottomWidth: 0.4,
+            borderBottomColor: RULE_SOFT,
+          }}
+          wrap={false}
+        >
+          <View style={{ flex: 1, paddingRight: 6, flexDirection: 'row', alignItems: 'baseline' }}>
+            <Text style={{ flex: 1, fontSize: 8.5, color: INK, lineHeight: 1.4 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold' }}>{normalise_unicode(tool.tool_name || tool.tool_id)}</Text>
+              <Text style={{ color: MUTED }}>{`  (${tool.tool_id})`}</Text>
+            </Text>
+            {tool.confidence_class ? (
+              <Text style={{ fontSize: 6.5, marginLeft: 4, fontFamily: 'Helvetica-Bold', ...confidenceBadgeStyle(tool.confidence_class) }}>
+                {String(tool.confidence_class).toUpperCase()}
               </Text>
-              {tool.tool_license ? (
-                <Text style={{ fontSize: 8, color: MUTED }}>{tool.tool_license}</Text>
-              ) : null}
-              {tool.confidence_class ? (
-                <Text style={{ fontSize: 8, marginLeft: 6, fontFamily: 'Helvetica-Bold', ...confidenceBadgeStyle(tool.confidence_class) }}>
-                  {String(tool.confidence_class).toUpperCase()}
-                </Text>
-              ) : null}
-            </View>
-
-            {/* Natural-language narrative for the reader (Tristan 2026-05-22).
-                Rendered BEFORE the academic Paper/Physics blocks so a non-
-                specialist can understand what the tool does without parsing
-                citation strings. See src/lib/pdf-engine-v2/tool-narratives.ts. */}
-            {(() => {
-              const narr = getToolNarrative(tool.tool_id)
-              if (!narr) return null
-              // 2026-05-23: pipe narrative fields through normalise_unicode so
-              // CO₂ subscript-2, ¹⁰⁴ superscripts, ≈ ≤ ≥ etc render as ASCII.
-              // Without this, default Helvetica falls back to garbled glyphs
-              // for U+2082 et al — eVTOL chain 2 audit showed "CO₂-equivalent"
-              // rendering as "CO‚-equivalent" in the appendix.
-              return (
-                <View style={{ marginTop: 4, marginBottom: 8, padding: 8, backgroundColor: '#ffffff', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
-                  <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
-                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What it does. </Text>
-                    {normalise_unicode(narr.description)}
-                  </Text>
-                  <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
-                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Origin. </Text>
-                    {normalise_unicode(narr.origin)}
-                  </Text>
-                  <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
-                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What the results mean. </Text>
-                    {normalise_unicode(narr.results_interpretation)}
-                  </Text>
-                  <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
-                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>How it was used here. </Text>
-                    {normalise_unicode(narr.usage_pattern)}
-                  </Text>
-                </View>
-              )
-            })()}
-
-            {tool.tool_paper ? (
-              <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5, marginBottom: 2 }}>
-                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Reference paper / standard: </Text>
-                {tool.tool_paper}
-                {tool.tool_doi ? (
-                  <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.tool_doi}`}</Text>
-                ) : null}
-              </Text>
-            ) : null}
-
-            {tool.physics_basis ? (
-              <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5, marginBottom: 2 }}>
-                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Underlying math: </Text>
-                {tool.physics_basis}
-                {tool.physics_paper_doi ? (
-                  <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.physics_paper_doi}`}</Text>
-                ) : null}
-              </Text>
-            ) : null}
-
-            {/* Worked calculation (2026-06-02): inputs -> formula -> substituted
-                numbers -> result, so a reviewer can check the maths by hand without
-                the source code. The substitution is built in the tool's own compute()
-                from its live values (drift-safe). Universal: shows for any tool whose
-                Python emitted a `worked` block; stubs emit none, so nothing fake shows. */}
-            {Array.isArray(tool.worked) && tool.worked.length > 0 ? (
-              <View style={{ marginTop: 4, marginBottom: 6, padding: 8, backgroundColor: '#ffffff', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
-                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
-                  Worked calculation — every number below is checkable by hand:
-                </Text>
-                {tool.worked.map((wc: any, wi: number) => (
-                  <View key={wi} style={{ marginBottom: 5 }}>
-                    <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
-                      <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{normalise_unicode(String(wc.label ?? ''))}</Text>
-                    </Text>
-                    {/* 2026-06-03 (Tristan): show the SYMBOLIC formula above the substituted
-                        numbers — without it the reader sees "(10 - 0.1) / 0.4 = 24.75" and
-                        cannot tell what the numbers represent. formula = "LHS = <expr in symbols>";
-                        substitution = "LHS = <numbers> = result". Together they read as a
-                        standard worked example (formula line, then substituted line). */}
-                    {wc.formula ? (
-                      <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK_SOFT, lineHeight: 1.5, marginLeft: 6 }}>
-                        {normalise_unicode(String(wc.formula))}
-                      </Text>
-                    ) : null}
-                    <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK, lineHeight: 1.5, marginLeft: 6 }}>
-                      {normalise_unicode(String(wc.substitution ?? ''))}
-                    </Text>
-                    {Array.isArray(wc.assumptions) && wc.assumptions.length > 0 ? (
-                      <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.45, marginLeft: 6 }}>
-                        {normalise_unicode('assumes: ' + wc.assumptions.join('; '))}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            {tool.tool_source_url ? (
-              <Text style={{ fontSize: 9, color: MUTED, marginBottom: 6 }}>
-                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Source: </Text>
-                {tool.tool_source_url}
-              </Text>
-            ) : null}
-
-            {visibleClaims.length > 0 ? (
-              <View style={{ marginTop: 4, paddingTop: 4, borderTopWidth: 0.4, borderTopColor: RULE_SOFT }}>
-                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>
-                  Quantities this tool computed for this design:
-                </Text>
-                {visibleClaims.map((claim, ci) => {
-                  const v = Number.isFinite(claim.value)
-                    ? claim.value.toLocaleString(undefined, { maximumFractionDigits: 4 })
-                    : String(claim.value ?? '—')
-                  return (
-                    <Text key={ci} style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
-                      {`  • ${claim.field} = ${v}${claim.unit ? ` ${claim.unit}` : ''}`}
-                      {claim.input_summary && claim.input_summary !== '(none)' ? (
-                        <Text style={{ color: MUTED }}>{`  (input: ${truncate(claim.input_summary, 80)})`}</Text>
-                      ) : null}
-                    </Text>
-                  )
-                })}
-                {extraClaims > 0 ? (
-                  <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic', marginTop: 2 }}>
-                    {`  ... and ${extraClaims} more claim${extraClaims === 1 ? '' : 's'} from the same tool.`}
-                  </Text>
-                ) : null}
-              </View>
             ) : null}
           </View>
-        )
-      })}
-
-      {/*
-        2026-05-23 universal fix: the "available_but_unused" list is the
-        GLOBAL tool registry minus the tools that ran for this design — so
-        a heat-pump report ends up listing pvlib solar, aeroelastic flutter,
-        airframe FEA, and 145 other tools that have no semantic relevance to
-        a heat pump. The reader interprets this as "these tools were
-        considered for this design" which is misleading and adds 6-10 pages
-        of noise. Hidden from the PDF; the data is still in state.json /
-        4-orchestrator-tools-used.json for debug.
-      */}
+          <Text style={{ width: 48, fontSize: 8, color: INK_SOFT }}>
+            {tool.tool_version ? `v${tool.tool_version}` : '—'}
+          </Text>
+          <Text style={{ width: 86, fontSize: 7.5, color: INK_SOFT, paddingRight: 4 }}>
+            {tool.tool_license || 'free-proprietary'}
+          </Text>
+          <Text style={{ width: 150, fontSize: 7, fontFamily: 'Courier', color: MUTED }}>
+            {normalise_unicode(String(tool.tool_source_url || '—'))}
+          </Text>
+        </View>
+      ))}
 
       <View style={{ marginTop: 14, paddingTop: 8, borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
         <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45, fontStyle: 'italic' }}>
@@ -11111,11 +11036,6 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
       <PageFooter />
     </Page>
   )
-}
-
-function truncate(s: string, n: number): string {
-  if (!s) return ''
-  return s.length > n ? s.slice(0, n - 1) + '…' : s
 }
 
 // ─── Build #19f (2026-05-22) · per-module "Tools Used in this Section" ────
@@ -11161,11 +11081,27 @@ function moduleToolIds(moduleSpec: any, state: any): string[] {
     candidateNames.push(String(dpKey).toLowerCase())
   }
 
-  // For each candidate name, find matching quantities in the contract
+  // For each candidate name, find matching quantities in the contract.
+  // The match is a substring test on the IDENTITY stem of each name — i.e.
+  // after stripping the noise suffix tokens that carry no equipment identity:
+  // the `_word` marker the emitter appends to every word id, and the
+  // measured-attribute + unit tail on a quantity name (…_duty_kw, …_area_m2,
+  // …_flow_kg_h). Without this strip a legitimate pairing such as
+  // `k2so4_recrystalliser_word` vs `k2so4_crystalliser_duty_kw` never matches
+  // (neither raw string contains the other), so the whole K2SO4 module routed
+  // to ZERO tools and its "How this module was computed" block rendered empty.
+  // Stemming `recrystall→crystall` closes the last gap (the emitter says
+  // *re*crystalliser; the crystalliser tool's quantities say crystalliser).
+  // This only normalises the comparison — the routing mechanism is unchanged
+  // (module sub-module words + derived_parameters → contract-quantity
+  // provenance.tool_id).
   for (const candidate of candidateNames) {
+    const candStem = toolMatchStem(candidate)
+    if (!candStem) continue
     for (const qName of Object.keys(quantities)) {
-      const qLower = qName.toLowerCase()
-      if (candidate === qLower || candidate.includes(qLower) || qLower.includes(candidate)) {
+      const qStem = toolMatchStem(qName)
+      if (!qStem) continue
+      if (candStem === qStem || candStem.includes(qStem) || qStem.includes(candStem)) {
         const tid = quantities[qName]?.provenance?.tool_id
         if (typeof tid === 'string' && tid) toolIds.add(tid)
       }
@@ -11175,45 +11111,234 @@ function moduleToolIds(moduleSpec: any, state: any): string[] {
   return Array.from(toolIds)
 }
 
+// Noise suffix tokens that carry no equipment-identity signal: the measured
+// attribute a quantity reports, and its unit. Stripping these from the TAIL of
+// a name (plus the `_word` emitter marker) lets the substring match in
+// moduleToolIds join a module word to the quantity it drives.
+const TOOL_MATCH_MEASURE_TOKENS = new Set<string>([
+  'word', 'duty', 'area', 'diameter', 'dia', 'flow', 'power', 'rate', 'count',
+  'total', 'mass', 'volume', 'vol', 'length', 'height', 'width', 'depth',
+  'load', 'speed', 'temp', 'pressure', 'density', 'velocity', 'head', 'frac',
+  'fraction', 'ratio', 'margin', 'demand',
+])
+const TOOL_MATCH_UNIT_TOKENS = new Set<string>([
+  'kw', 'kwh', 'mw', 'w', 'm', 'm2', 'm3', 'mm', 'cm', 'kg', 'g', 't', 'tpd',
+  'kgh', 'h', 's', 'c', 'v', 'kv', 'a', 'ka', 'hz', 'pa', 'kpa', 'mpa', 'bar',
+  'pct', 'gbp', 'rpm', 'ntu', 'htu', 'db', 'dba',
+])
+
+function toolMatchStem(name: string): string {
+  const parts = name.toLowerCase().split(/_+/).filter(Boolean)
+  // Drop trailing measure/unit/marker tokens — they describe what is reported,
+  // not which piece of equipment it belongs to.
+  while (
+    parts.length > 0 &&
+    (TOOL_MATCH_MEASURE_TOKENS.has(parts[parts.length - 1]) ||
+      TOOL_MATCH_UNIT_TOKENS.has(parts[parts.length - 1]))
+  ) {
+    parts.pop()
+  }
+  // Stem recrystall→crystall so the emitter's "recrystalliser" word joins the
+  // crystalliser tool's "crystalliser" quantities.
+  return parts.map((p) => p.replace(/^re(crystall)/, '$1')).join('_')
+}
+
+// System-level tools = every tool that produced a claim for this design MINUS
+// the union of tools any single module claimed via moduleToolIds. These are the
+// cross-cutting, whole-plant tools (mass/envelope aggregation, lifecycle CO2,
+// plant-wide regeneration energy, feasibility) that belong to no one module.
+// Used to (a) drive the up-front "How the whole plant was computed" summary and
+// (b) keep the front sections from repeating the module-owned tool detail that
+// now lives inside each module.
+function systemLevelToolIds(state: any): Set<string> {
+  const page = readToolsUsedPage(state)
+  const usedIds = new Set<string>()
+  if (page && Array.isArray(page.tools)) {
+    for (const t of page.tools as any[]) {
+      const tid = t?.tool_id
+      if (typeof tid === 'string' && tid) usedIds.add(tid)
+    }
+  }
+  const moduleOwned = new Set<string>()
+  const modules: any[] = state?.moduleDecomposition?.modules ?? []
+  for (const m of modules) {
+    for (const tid of moduleToolIds(m, state)) moduleOwned.add(tid)
+  }
+  const systemIds = new Set<string>()
+  for (const tid of usedIds) {
+    if (!moduleOwned.has(tid)) systemIds.add(tid)
+  }
+  return systemIds
+}
+
+// Mockup palette for the "How this module was computed" block — the forge
+// amber tones from REPORT-LAYOUT-MOCKUP.html (light theme). Scoped to this
+// block; the rest of the report keeps the navy ACCENT.
+const COMPUTE_AMBER = '#c2410c'          // --accent (forge amber)
+const COMPUTE_AMBER_DEEP = '#9a3412'     // compute-h text
+const COMPUTE_AMBER_SOFT = '#fdf2ec'     // --accent-soft (header tint)
+const COMPUTE_AMBER_LINE = '#f0d8c9'     // block border
+const COMPUTE_WORKED_BG = '#fffdfb'      // worked box background
+const COMPUTE_WORKED_LINE = '#efddd0'    // worked box border
+
+// Shared worked-calculation renderer — the SAME formula -> substituted-numbers
+// -> "assumes" presentation the Tools-Used appendix used (render-minimal-pdf
+// ToolsUsedPage, 2026-06-02/06-03). Extracted so the per-module "How this
+// module was computed" block (build #21, 2026-06-04) and any other consumer
+// render tool.worked identically. `accentColour` lets the per-module block tint
+// the maths amber to match the mockup while the appendix kept navy.
+function WorkedCalcSteps({ worked, accentColour }: { worked: any[]; accentColour: string }) {
+  if (!Array.isArray(worked) || worked.length === 0) return null
+  return (
+    <>
+      {worked.map((wc: any, wi: number) => (
+        <View key={wi} style={{ marginBottom: 5 }}>
+          <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{normalise_unicode(String(wc.label ?? ''))}</Text>
+          </Text>
+          {/* Symbolic formula above the substituted numbers, so the reader can
+              tell what each number represents (Tristan 2026-06-03). */}
+          {wc.formula ? (
+            <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK_SOFT, lineHeight: 1.5, marginLeft: 6 }}>
+              {normalise_unicode(String(wc.formula))}
+            </Text>
+          ) : null}
+          <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: accentColour, lineHeight: 1.5, marginLeft: 6 }}>
+            {normalise_unicode(String(wc.substitution ?? ''))}
+          </Text>
+          {Array.isArray(wc.assumptions) && wc.assumptions.length > 0 ? (
+            <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.45, marginLeft: 6 }}>
+              {normalise_unicode('assumes: ' + wc.assumptions.join('; '))}
+            </Text>
+          ) : null}
+        </View>
+      ))}
+    </>
+  )
+}
+
+// Build #21 (2026-06-04) — per-module "How this module was computed" block.
+// Replaces the thin "TOOLS USED IN THIS SECTION" name-list. For each tool that
+// produced a quantity feeding THIS module (moduleToolIds), renders the tool's
+// display name + its full worked-calc block, so the engineering maths that
+// sizes a module's equipment sits WITH that equipment instead of in the end-
+// of-report appendix 60+ pages away. Mockup: REPORT-LAYOUT-MOCKUP.html block 2
+// ("Each module — engineering, then its parts"). Catalogue-only modules route
+// to no tool → the `ids.length === 0` guard returns null and they correctly
+// show no block (the mockup's empty state).
 function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any }) {
   const page = readToolsUsedPage(state)
   if (!page) return null
   const ids = moduleToolIds(moduleSpec, state)
   if (ids.length === 0) return null
 
-  // Resolve display names from the toolsUsedPage
-  const displays: string[] = []
-  for (const tid of ids) {
-    const tool = (page.tools as any[]).find(t => t?.tool_id === tid)
-    if (tool) {
-      const name = normalise_unicode(tool.tool_name || tid)
-      const version = tool.tool_version ? ` v${tool.tool_version}` : ''
-      displays.push(`${name}${version}`)
-    } else {
-      displays.push(tid)
-    }
-  }
-  if (displays.length === 0) return null
+  // Resolve each routed tool to its full record (name + version + worked maths)
+  // from the toolsUsedPage. Keep a stable order by display name.
+  const toolsForModule = ids
+    .map((tid) => {
+      const tool = (page.tools as any[]).find((t) => t?.tool_id === tid)
+      return tool ?? { tool_id: tid, tool_name: tid, tool_version: '', worked: [] }
+    })
+    .sort((a, b) =>
+      String(a.tool_name || a.tool_id).localeCompare(String(b.tool_name || b.tool_id)),
+    )
+  if (toolsForModule.length === 0) return null
 
   return (
     <View
       style={{
-        backgroundColor: '#f0f4f8',
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        marginBottom: 12,
-        borderLeftWidth: 3,
-        borderLeftColor: ACCENT_SOFT,
-        borderRadius: 3,
+        marginBottom: 14,
+        borderWidth: 0.8,
+        borderColor: COMPUTE_AMBER_LINE,
+        backgroundColor: COMPUTE_AMBER_SOFT,
+        borderRadius: 6,
+        overflow: 'hidden',
       }}
-      wrap={false}
+      // Protect the header + first tool name so the block doesn't orphan its
+      // heading at a page foot; the worked steps below flow/break naturally.
+      minPresenceAhead={70}
     >
-      <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: ACCENT, letterSpacing: 0.6, marginBottom: 2 }}>
-        TOOLS USED IN THIS SECTION
-      </Text>
-      <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5 }}>
-        {displays.join('   ·   ')}
-      </Text>
+      {/* compute-h: amber header bar */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 7,
+          paddingHorizontal: 11,
+          borderBottomWidth: 0.8,
+          borderBottomColor: '#f3ddcf',
+        }}
+      >
+        <Text style={{ flex: 1, fontSize: 10, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER_DEEP }}>
+          How this module was computed
+        </Text>
+        <Text
+          style={{
+            fontSize: 6.5,
+            fontFamily: 'Helvetica-Bold',
+            color: COMPUTE_AMBER,
+            letterSpacing: 0.4,
+            borderWidth: 0.6,
+            borderColor: '#eccdba',
+            backgroundColor: '#ffffff',
+            paddingVertical: 1.5,
+            paddingHorizontal: 5,
+            borderRadius: 3,
+          }}
+        >
+          ENGINEERING DETAIL
+        </Text>
+      </View>
+
+      {/* compute-body */}
+      <View style={{ paddingVertical: 9, paddingHorizontal: 11 }}>
+        <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5, marginBottom: 8 }}>
+          The engineering tools below computed the quantities that size this
+          module&apos;s equipment. Every number is checkable by hand from the
+          worked steps; full version, licence and provenance for each tool are
+          listed in the Tools-Used index at the end of the report.
+        </Text>
+
+        {toolsForModule.map((tool: any, ti: number) => {
+          const worked: any[] = Array.isArray(tool.worked) ? tool.worked : []
+          return (
+            <View
+              key={tool.tool_id || `mtool-${ti}`}
+              style={{ marginBottom: ti < toolsForModule.length - 1 ? 9 : 0 }}
+              minPresenceAhead={40}
+            >
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: worked.length > 0 ? 4 : 0 }}>
+                {normalise_unicode(tool.tool_name || tool.tool_id)}
+                <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
+                  {tool.tool_version ? `  v${tool.tool_version}` : ''}
+                </Text>
+              </Text>
+              {worked.length > 0 ? (
+                <View
+                  style={{
+                    backgroundColor: COMPUTE_WORKED_BG,
+                    borderWidth: 0.6,
+                    borderColor: COMPUTE_WORKED_LINE,
+                    borderRadius: 5,
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                  }}
+                >
+                  <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER, letterSpacing: 0.4, marginBottom: 6 }}>
+                    WORKED CALCULATION — EVERY NUMBER CHECKABLE BY HAND
+                  </Text>
+                  <WorkedCalcSteps worked={worked} accentColour={COMPUTE_AMBER} />
+                </View>
+              ) : (
+                <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic', lineHeight: 1.45 }}>
+                  Output quantities listed in the Tools-Used index; no step-by-step
+                  worked block was emitted by this tool.
+                </Text>
+              )}
+            </View>
+          )
+        })}
+      </View>
     </View>
   )
 }
