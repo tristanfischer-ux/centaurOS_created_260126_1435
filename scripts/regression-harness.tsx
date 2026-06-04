@@ -40,7 +40,8 @@ import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync } from '
 import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
-import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode } from './render-minimal-pdf'
+import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode, moduleToolIds } from './render-minimal-pdf'
+import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, isBespokeFabrication } from '../src/lib/pdf-engine-v2/lib/bespoke-equipment-bands'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
@@ -288,7 +289,7 @@ function checkSizingToolsWorkedSound(): Assertion[] {
       // some worked lines (e.g. the Eckert flow parameter F_LV = (L/G) x sqrt(rho_G/rho_L),
       // the Colburn NTU log form). Skip those lines rather than mis-evaluate them; the
       // arithmetic-only lines still fully exercise the substitution<->result reconciliation.
-      if (/\b(sqrt|cbrt|ln|log|log10|exp)\b/i.test(exprStr)) continue
+      if (/\b(sqrt|cbrt|ln|log10|log|exp|ceil_to_standard|ceil|round|floor|min|max|abs)\s*\(/i.test(exprStr)) continue
       const evald = evalArith(exprStr)
       let resultNum = Number(wc?.result?.value)
       if (!isFinite(resultNum)) {
@@ -381,6 +382,55 @@ function checkSizingToolsWorkedSound(): Assertion[] {
         && num(dryer, 'heater_duty_kw') >= 1 && num(dryer, 'heater_duty_kw') <= 2000
         && num(dryer, 'drying_air_mass_flow_kg_h') > 0,
       () => `error=${dryer?.error} | bad=${r4.bad.slice(0, 1).join(' | ')} | duty=${dryer?.heater_duty_kw} air=${dryer?.drying_air_mass_flow_kg_h}`,
+    ))
+    // electrical + bagging sizing tools (added 2026-06-04 with the modules 8/12 coverage tools) —
+    // same idiom, exercised directly on the CO2-plant fixture.
+    const tx = runTool('electrical_transformer_sizing.py', {
+      transformer_name: 'plant distribution transformer', plant_load_kw: 561, power_factor: 0.9,
+      headroom_fraction: 0.25, primary_voltage_v: 11000, secondary_voltage_v: 400, phases: 3,
+    })
+    const rtx = reEvalWorked(tx?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.electrical_bagging_sizing_tools_worked_calc_sound.transformer',
+      'electrical:transformer-sizing ok on CO2 fixture, kVA 630-1000 + sec current > pri current, worked[] re-evaluates within 1%',
+      JSON.stringify({ bad: rtx.bad.length, kva: tx?.transformer_kva, ip: tx?.transformer_primary_current_a, is: tx?.transformer_secondary_current_a, err: tx?.error }),
+      () => !tx?.error && rtx.bad.length === 0
+        && num(tx, 'transformer_kva') >= 630 && num(tx, 'transformer_kva') <= 1000
+        && num(tx, 'transformer_secondary_current_a') > num(tx, 'transformer_primary_current_a')
+        && num(tx, 'transformer_primary_current_a') > 0,
+      () => `error=${tx?.error} | bad=${rtx.bad.slice(0, 1).join(' | ')} | kVA=${tx?.transformer_kva}`,
+    ))
+    const cab = runTool('electrical_cable_sizing.py', {
+      cable_name: 'main LV feeder', load_kw: 561, voltage_v: 400, power_factor: 0.9, phases: 3,
+      length_m: 35, nominal_voltage_v: 400, conductor: 'copper',
+      ambient_derate_ca: 0.94, grouping_derate_cg: 0.80, n_parallel: 2, max_voltdrop_pct: 5.0,
+    })
+    const rcab = reEvalWorked(cab?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.electrical_bagging_sizing_tools_worked_calc_sound.cable',
+      'electrical:cable-sizing ok on CO2 fixture, CSA 16-400 mm2 + design current 700-1100 A + volt-drop within 5%, worked[] re-evaluates within 1%',
+      JSON.stringify({ bad: rcab.bad.length, csa: cab?.main_feeder_cable_csa_mm2, ib: cab?.feeder_design_current_a, vd: cab?.cable_voltdrop_pct, err: cab?.error }),
+      () => !cab?.error && rcab.bad.length === 0
+        && num(cab, 'main_feeder_cable_csa_mm2') >= 16 && num(cab, 'main_feeder_cable_csa_mm2') <= 400
+        && num(cab, 'feeder_design_current_a') >= 700 && num(cab, 'feeder_design_current_a') <= 1100
+        && num(cab, 'cable_voltdrop_pct') > 0 && num(cab, 'cable_voltdrop_pct') <= 5,
+      () => `error=${cab?.error} | bad=${rcab.bad.slice(0, 1).join(' | ')} | CSA=${cab?.main_feeder_cable_csa_mm2} Ib=${cab?.feeder_design_current_a} Vd%=${cab?.cable_voltdrop_pct}`,
+    ))
+    const bag = runTool('bagging_throughput_sizing.py', {
+      line_name: 'solids bagging line (K2SO4)', product_mass_rate_t_day: 3.96, bag_kg: 25,
+      operating_hours_per_day: 16, silo_buffer_hours: 24, bulk_density_kg_m3: 1300,
+      silo_ullage_fraction: 0.15, n_products: 2,
+    })
+    const rbag = reEvalWorked(bag?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.electrical_bagging_sizing_tools_worked_calc_sound.bagging',
+      'bagging:throughput-sizing ok on CO2 fixture, 1-60 bags/h + line kg/h ~ bags/h x 25 + silo 0.5-30 m3, worked[] re-evaluates within 1%',
+      JSON.stringify({ bad: rbag.bad.length, bh: bag?.bagging_rate_bags_h, kgh: bag?.bagging_line_kg_h, silo: bag?.day_silo_volume_m3, err: bag?.error }),
+      () => !bag?.error && rbag.bad.length === 0
+        && num(bag, 'bagging_rate_bags_h') >= 1 && num(bag, 'bagging_rate_bags_h') <= 60
+        && Math.abs(num(bag, 'bagging_line_kg_h') - num(bag, 'bagging_rate_bags_h') * 25) / Math.max(num(bag, 'bagging_line_kg_h'), 1e-9) <= 0.01
+        && num(bag, 'day_silo_volume_m3') >= 0.5 && num(bag, 'day_silo_volume_m3') <= 30,
+      () => `error=${bag?.error} | bad=${rbag.bad.slice(0, 1).join(' | ')} | bags/h=${bag?.bagging_rate_bags_h} kg/h=${bag?.bagging_line_kg_h} silo=${bag?.day_silo_volume_m3}`,
     ))
   } catch (err) {
     // .venv python unavailable — skip (vacuous pass), do not fail the harness.
@@ -4538,7 +4588,9 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         const subst = String(wc?.substitution ?? '')
         const parts = subst.split('=')
         if (parts.length < 3) continue
-        const evald = evalArith(parts.slice(1, -1).join('='))
+        const ex = parts.slice(1, -1).join('=')
+        if (/\b(sqrt|cbrt|ln|log10|log|exp|ceil_to_standard|ceil|round|floor|min|max|abs)\s*\(/i.test(ex)) continue
+        const evald = evalArith(ex)
         let resultNum = Number(wc?.result?.value)
         if (!isFinite(resultNum)) {
           const m = String(parts[parts.length - 1]).replace(/,/g, '').match(/-?[0-9.]+(?:[eE][+-]?[0-9]+)?/)
@@ -5625,6 +5677,68 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // crystalliser / dryer) exercised directly on a CO2-scale fixture: ok + sane headline
   // band + worked[] arithmetic reconciliation within 1%. Memoised (spawns once per run).
   for (const a of checkSizingToolsWorkedSound()) assertions.push(a)
+
+  // ── UNIVERSAL.bespoke_equipment_band_flags_honest_fabrication (2026-06-04) ──
+  // Bespoke chemical-process fabrication has NO catalogue price, so Engine C's corpus-median
+  // REF flag mis-fired on ~79% of priced lines (a £650 vessel support read <.5x vs a £29,500
+  // whole-skid corpus match). The bespoke-equipment band anchors those lines on a per-class
+  // engineering envelope so an honestly-costed fabrication reads in_range, only outliers flag.
+  {
+    const credibleBespoke =
+      bespokeFlagFor(20000, bespokeEquipmentReference('jacketed 316L stirred-tank reactor', { volume_m3: 3 })!, 2.0, 0.5).flag === 'in_range' &&
+      bespokeFlagFor(21000, bespokeEquipmentReference('forced-circulation crystalliser', { capacity: 100 })!, 2.0, 0.5).flag === 'in_range' &&
+      bespokeFlagFor(22500, bespokeEquipmentReference('pusher centrifuge', { capacity: 165 })!, 2.0, 0.5).flag === 'in_range' &&
+      bespokeFlagFor(650, bespokeEquipmentReference('vessel supports + saddles bolted structural-steel')!, 2.0, 0.5).flag === 'in_range' &&
+      bespokeFlagFor(1200, bespokeEquipmentReference('reactor internal baffles welded 316L')!, 2.0, 0.5).flag === 'in_range'
+    const bespokeGuards =
+      classifyBespokeEquipment('reactor drain valve') === null &&
+      classifyBespokeEquipment('crystalliser agitator VSD') === null &&
+      classifyBespokeEquipment('crystalliser agitator') === 'agitator' &&
+      classifyBespokeEquipment('mother-liquor recycle pump') === 'process_pump' &&
+      bespokeFlagFor(900000, bespokeEquipmentReference('jacketed 316L stirred-tank reactor', { volume_m3: 3 })!, 2.0, 0.5).flag === 'over' &&
+      isBespokeFabrication('packed absorber column', undefined, 'fabricated 316L packed column — bespoke vessel') === true
+    assertions.push(assertEq(
+      'UNIVERSAL.bespoke_equipment_band_flags_honest_fabrication',
+      'bespoke-equipment band: honest 316L vessel/crystalliser/centrifuge/support/baffle -> in_range; sub-component guard + genuine outlier preserved',
+      credibleBespoke && bespokeGuards,
+      (ok) => ok === true,
+      () => `bespoke-equipment band mis-flagged: credible=${credibleBespoke} guards=${bespokeGuards}. Check src/lib/pdf-engine-v2/lib/bespoke-equipment-bands.ts.`,
+    ))
+  }
+
+  // ── UNIVERSAL.tool_router_concept_tools_reach_role_module (2026-06-04) ──
+  // Tools whose output is a cross-cutting domain with NO matching BoM word (control-systems:pid,
+  // fire-suppression:nfpa, corrosion:anode, noise-emission:dba) must reach their ROLE module via
+  // the Tier-B concept lexicon (pre-fix bug: modules 8-12 showed no computation), and must NOT
+  // over-match onto an unrelated module. Skips gracefully when a tool id is absent.
+  {
+    const cq = state?.orchestratorContract?.quantities ?? {}
+    const toolOf = (substr: string): string | null =>
+      (Object.values(cq).map((v: any) => v?.provenance?.tool_id).find((t: any) => typeof t === 'string' && t.includes(substr)) as string | undefined) ?? null
+    const expectRoutes: Array<[string, RegExp]> = [
+      ['control-systems', /control_compute_communication/],
+      ['fire-suppression', /safety_protection/],
+      ['corrosion', /structure_containment/],
+      ['noise', /safety_protection|structure_containment/],
+    ]
+    const cmods: any[] = state?.moduleDecomposition?.modules ?? []
+    const routeBad: string[] = []
+    for (const [sub, keyRe] of expectRoutes) {
+      const tid = toolOf(sub)
+      if (!tid) continue
+      const hosts = cmods
+        .map((m: any, i: number) => ({ i, key: String(m?.module ?? '') }))
+        .filter((h: any) => moduleToolIds(cmods[h.i], state).includes(tid))
+      if (hosts.length !== 1) { routeBad.push(`${tid} -> ${hosts.length} modules (want 1)`); continue }
+      if (!keyRe.test(hosts[0].key)) routeBad.push(`${tid} -> ${hosts[0].key} (want ${keyRe})`)
+    }
+    assertions.push(assertEq(
+      'UNIVERSAL.tool_router_concept_tools_reach_role_module',
+      'concept tools (control/fire/corrosion/noise) each route to exactly one role-matching module',
+      routeBad.length, (n) => n === 0,
+      () => `concept-tool routing wrong: ${routeBad.join('; ')}`,
+    ))
+  }
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }

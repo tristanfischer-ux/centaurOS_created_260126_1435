@@ -4150,6 +4150,79 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
 // column (because that's what the engineering pipeline actually consumed);
 // the verbatim original is still the user's raw text, unchanged.
 
+// ─── Brief provenance: "what you specified" vs "what the engine added" ─────
+// (Build #23, 2026-06-04 — Tristan's explicit request.)
+//
+// The brief the pipeline consumes (state.brief.original_text) is ALREADY the
+// engine-EXPANDED brief — target market, product tonnages, feedstock tonnages,
+// a cost ceiling, operating temperatures, a full regulatory list and an
+// expected-sub-modules list, NONE of which the user wrote. Rendering that as
+// "the original brief" hides the line between user intent and engine inference.
+//
+// This block restores it: it carries the user's VERBATIM original (the short
+// brief they actually submitted) and an explicit list of what the engine added
+// on top, each item labelled. It is opt-in per dossier via a content signature
+// on the expanded brief, so every OTHER report is byte-for-byte unchanged. To
+// add another custom brief, add an entry: { signature, userOriginal, engineAdded }.
+//
+// The £ cost ceiling is flagged SPECIALLY because the parser tags it
+// source:'user' even though the user never set it — and it drives the
+// feasibility gate (the report's "under budget" claim is measured against a
+// budget the user never specified). The gypsum feedstock correction is shown
+// because the engine first inferred ~3.1 t/day then the reaction stoichiometry
+// required ~3.91 t/day.
+interface EngineAddedItem { label: string; detail: string; flag?: boolean }
+interface UserOriginalBrief {
+  signature: RegExp           // matched against the engine-expanded brief text
+  userOriginal: string        // the user's verbatim submitted brief
+  engineAdded: EngineAddedItem[]
+}
+const USER_ORIGINAL_BRIEFS: UserOriginalBrief[] = [
+  {
+    // CO₂ capture + mineralisation plant. Verbatim user original is stored at
+    // src/lib/pdf-engine-v2/briefs/custom/co2-mineralisation-plant.ORIGINAL.md.
+    signature: /react with gypsum to form calcium carbonate|mineral[- ]?carbonation chemical process plant/i,
+    userOriginal:
+      'Capture CO2 at 1 tonne per day with 30 w% MEA, react with gypsum to form calcium carbonate, ' +
+      'filter the calcium carbonate to form filtercake. Wash the cake with water to remove MEA. ' +
+      'Air blow the cake and then dry with hot air. React filtrate with KOH solid to form K2SO4. ' +
+      'Filter off the solid K2SO4. Reuse the recovered MEA to capture more CO2. Recrystallise the K2SO4 ' +
+      'to remove MEA from the K2SO4. Filter off the solids, dry solids with hot air. Distil wash water ' +
+      'from CaCO3 to recover the MEA and wash water. Package up the solids in 25 kg bags.',
+    engineAdded: [
+      {
+        label: 'Cost ceiling — £1,900,000 ex-works',
+        detail:
+          'You set no budget. The engine inferred a £1,900,000 ex-works ceiling AND uses it to drive the '
+          + 'feasibility gate — every "below ceiling / under budget" verdict in this report is measured against '
+          + 'a budget you never specified. Treat the headroom as engine self-assessment, not a margin against '
+          + 'your number.',
+        flag: true,
+      },
+      {
+        label: 'Gypsum feedstock — corrected to ~3.91 t/day',
+        detail:
+          'You named gypsum as the calcium source but no rate. The engine first inferred ~3.1 t/day, then the '
+          + 'reaction stoichiometry (to make the CaCO₃ from 1 t/day CO₂) required ~3.91 t/day. The higher, '
+          + 'stoichiometric figure is what the design sizes the gypsum feed system for.',
+      },
+      { label: 'Target market', detail: 'Cement / lime / anaerobic-digestion biogas / energy-from-waste CO₂ emitters, plus agricultural and industrial-mineral off-takers; UK + EU deployment.' },
+      { label: 'Product tonnages', detail: '~2.3 t/day precipitated calcium carbonate and ~3.9 t/day potassium sulfate (derived from the 1 t/day CO₂ capture rate).' },
+      { label: 'Potassium hydroxide feedstock', detail: '~2.6 t/day KOH make-up (derived from the sulfate balance).' },
+      { label: 'Operating temperatures', detail: 'Ambient to 120 °C across reaction, drying and distillation; atmospheric to low-pressure operation.' },
+      { label: 'Production volume', detail: '6 plants per year (used for the batch / amortisation basis).' },
+      { label: 'Regulatory list', detail: 'UKCA + CE, Pressure Equipment Directive 2014/68/EU, DSEAR + ATEX 2014/34/EU, COSHH, Machinery Directive 2006/42/EC, environmental permitting, GB + EU fertiliser regulation, BS EN ISO chemical-plant standards — all inferred from the chemistry and duty, none stated by you.' },
+      { label: 'Expected sub-modules', detail: 'The absorber/packing/demister, carbonation reactor, vacuum/belt filter, hot-air dryers, KOH dosing + reaction vessel, K₂SO₄ filter + recrystalliser, wash-water distillation, MEA recovery loop, pumps/slurry handling, heat exchangers + utilities, instrumentation/control and bagging line were enumerated by the engine from your process steps.' },
+    ],
+  },
+]
+function matchUserOriginalBrief(expandedText: string): UserOriginalBrief | null {
+  const t = String(expandedText || '')
+  if (!t) return null
+  for (const e of USER_ORIGINAL_BRIEFS) if (e.signature.test(t)) return e
+  return null
+}
+
 function BriefProvenancePage({ state, project }: { state: any; project: string }) {
   const brief = state.brief ?? {}
   const originalText: string = (
@@ -4197,6 +4270,12 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
   const originalParagraphs = originalText.length > 0
     ? originalText.split(/\n\s*\n/).map((p: string) => p.trim()).filter((p: string) => p.length > 0)
     : []
+
+  // Build #23: the user's verbatim short original + the engine-added list,
+  // when this dossier matches a known custom brief. null for every other
+  // dossier → the "what you specified vs what the engine added" block is
+  // simply not rendered and the page is unchanged.
+  const userBrief = matchUserOriginalBrief(originalText)
 
   // Render the structured interpretation. The parser emits nested JSON;
   // we surface it as field/value pairs rather than raw JSON because the
@@ -4398,13 +4477,93 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
         </View>
       ) : null}
 
+      {/* 2.0 What you specified vs what the engine added (Build #23). Only
+          rendered when this dossier matches a known custom brief; otherwise the
+          page keeps its original 2.1/2.2 structure. */}
+      {userBrief ? (
+        <View style={{ marginBottom: 18 }}>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 4, marginBottom: 6 }}>
+            2.0 What you specified, and what the engine added
+          </Text>
+          <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 10, lineHeight: 1.5, fontStyle: 'italic' }}>
+            Everything downstream is built from the engine&apos;s expanded reading of your brief. This block
+            separates the two: your brief exactly as you wrote it, then each thing the engine inferred on top
+            of it. Engine-added items are assumptions — sensible, but yours to confirm.
+          </Text>
+
+          {/* What you specified — verbatim user original */}
+          <Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
+            What you specified
+          </Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 6, fontStyle: 'italic' }}>
+            Your original brief, verbatim — no edits, no normalisation.
+          </Text>
+          <View style={{ padding: 10, backgroundColor: '#f1f7f3', borderLeftWidth: 3, borderLeftColor: '#2f8f6b', marginBottom: 14 }} minPresenceAhead={50}>
+            <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.6 }}>
+              {normalise_unicode(userBrief.userOriginal)}
+            </Text>
+          </View>
+
+          {/* What the engine added — labelled list */}
+          <Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
+            What the engine added
+          </Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 8, fontStyle: 'italic' }}>
+            Inferred by the engine, not stated by you. Each is an assumption the design rests on.
+          </Text>
+          {userBrief.engineAdded.map((item, i) => (
+            <View
+              key={`eng-add-${i}`}
+              style={{
+                marginBottom: 7,
+                padding: 9,
+                borderLeftWidth: 3,
+                borderLeftColor: item.flag ? '#c2410c' : ACCENT_SOFT,
+                backgroundColor: item.flag ? '#fdf2ec' : '#f7faff',
+                borderRadius: 3,
+              }}
+              minPresenceAhead={36}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 }}>
+                <Text style={{ flex: 1, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: item.flag ? '#9a3412' : INK }}>
+                  {normalise_unicode(item.label)}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 6.5,
+                    fontFamily: 'Helvetica-Bold',
+                    letterSpacing: 0.4,
+                    color: item.flag ? '#ffffff' : ACCENT,
+                    backgroundColor: item.flag ? '#c2410c' : '#eef2fb',
+                    paddingVertical: 1.5,
+                    paddingHorizontal: 5,
+                    borderRadius: 3,
+                  }}
+                >
+                  {item.flag ? 'ENGINE-ADDED · DRIVES FEASIBILITY' : 'ENGINE-ADDED'}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5 }}>
+                {normalise_unicode(item.detail)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       {/* 2.1 Original brief verbatim. Monospace-feel via tighter letter spacing
-          + neutral background so it reads as a quoted source document. */}
+          + neutral background so it reads as a quoted source document. When a
+          user-original is known (2.0 above), this is RELABELLED as the
+          engine-EXPANDED brief, because that is what state.brief.original_text
+          actually holds (Build #23) — calling it "the original" would be the
+          very conflation 2.0 exists to fix. */}
       <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 8, marginBottom: 6 }}>
-        2.1 Original brief, as submitted
+        {userBrief ? '2.1 Engine-expanded brief, as submitted to the pipeline' : '2.1 Original brief, as submitted'}
       </Text>
       <Text style={{ fontSize: 9, color: MUTED, marginBottom: 8, fontStyle: 'italic' }}>
-        Verbatim text from the submitted brief file. No edits, no normalisation.
+        {userBrief
+          ? 'The engine’s expanded brief — your wording plus every engine-added item from 2.0, folded into one document. This is the exact text the pipeline consumed.'
+          : 'Verbatim text from the submitted brief file. No edits, no normalisation.'}
       </Text>
       {originalParagraphs.length > 0 ? (
         <View style={{ padding: 10, backgroundColor: '#fafafa', borderLeftWidth: 2, borderLeftColor: RULE_SOFT, marginBottom: 16 }}>
@@ -7554,6 +7713,12 @@ function ModuleSection({
                 {partLinkMap && partLinkMap.size > 0 ? renderProseWithLinks(chunk, partLinkMap) : chunk}
               </Text>
             ))}
+            {/* Build #22 (2026-06-04): the worked calculation for each engineering
+                tool that sizes THIS sub-module's equipment renders here, above the
+                sub-module's parts table — pushing the maths down from the module
+                top to the specific sub-module it grounds (Tristan's request). A
+                sub-module with no routed tool renders nothing. */}
+            {state ? <SubModuleToolsCallout state={state} moduleSpec={moduleSpec} subId={sm.id} /> : null}
             <SubModuleBomBlock
               bomLines={subBomLines}
               subtotal={subBomSubtotal}
@@ -11050,81 +11215,30 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
 // document real sense of rigour" — show per-section which tools backed
 // the numbers IN THAT section.
 
-function moduleToolIds(moduleSpec: any, state: any): string[] {
-  const page = readToolsUsedPage(state)
-  if (!page || !Array.isArray(page.tools) || page.tools.length === 0) return []
-  // Build set of tool_ids from the engineering contract for every quantity
-  // touched by this module's sub-modules + derived_parameters. Prefer the
-  // orchestrator's enriched contract (carries typed-quantity provenance per
-  // Build #19d); fall back to the legacy chain contract when ORCHESTRATOR=0.
-  const contract =
-    state?.orchestratorContract
-    || state?.engineeringContract
-    || state?.orchestrator?.contract
-    || null
-  const quantities: Record<string, any> = contract?.quantities && typeof contract.quantities === 'object'
-    ? contract.quantities
-    : {}
-
-  const toolIds = new Set<string>()
-  const candidateNames: string[] = []
-  for (const sm of (moduleSpec?.sub_modules ?? [])) {
-    for (const w of (sm?.words ?? [])) {
-      const nm: string[] = [w?.id, w?.name_human, w?.content_character?.character_id]
-        .filter((x: unknown): x is string => typeof x === 'string')
-        .map(s => s.toLowerCase().replace(/[-\s]+/g, '_'))
-      candidateNames.push(...nm)
-    }
-  }
-  // Module's derived parameters
-  for (const dpKey of Object.keys(moduleSpec?.derived_parameters ?? {})) {
-    candidateNames.push(String(dpKey).toLowerCase())
-  }
-
-  // For each candidate name, find matching quantities in the contract.
-  // The match is a substring test on the IDENTITY stem of each name — i.e.
-  // after stripping the noise suffix tokens that carry no equipment identity:
-  // the `_word` marker the emitter appends to every word id, and the
-  // measured-attribute + unit tail on a quantity name (…_duty_kw, …_area_m2,
-  // …_flow_kg_h). Without this strip a legitimate pairing such as
-  // `k2so4_recrystalliser_word` vs `k2so4_crystalliser_duty_kw` never matches
-  // (neither raw string contains the other), so the whole K2SO4 module routed
-  // to ZERO tools and its "How this module was computed" block rendered empty.
-  // Stemming `recrystall→crystall` closes the last gap (the emitter says
-  // *re*crystalliser; the crystalliser tool's quantities say crystalliser).
-  // This only normalises the comparison — the routing mechanism is unchanged
-  // (module sub-module words + derived_parameters → contract-quantity
-  // provenance.tool_id).
-  for (const candidate of candidateNames) {
-    const candStem = toolMatchStem(candidate)
-    if (!candStem) continue
-    for (const qName of Object.keys(quantities)) {
-      const qStem = toolMatchStem(qName)
-      if (!qStem) continue
-      if (candStem === qStem || candStem.includes(qStem) || qStem.includes(candStem)) {
-        const tid = quantities[qName]?.provenance?.tool_id
-        if (typeof tid === 'string' && tid) toolIds.add(tid)
-      }
-    }
-  }
-
-  return Array.from(toolIds)
-}
-
 // Noise suffix tokens that carry no equipment-identity signal: the measured
-// attribute a quantity reports, and its unit. Stripping these from the TAIL of
-// a name (plus the `_word` emitter marker) lets the substring match in
-// moduleToolIds join a module word to the quantity it drives.
+// attribute a quantity reports, and its unit. Stripping these from a name
+// (plus the `_word` emitter marker) lets the token match in the tool router
+// join a module word to the quantity it drives. (Used both for the legacy
+// stem comparison and to derive a quantity's IDENTITY tokens.)
 const TOOL_MATCH_MEASURE_TOKENS = new Set<string>([
   'word', 'duty', 'area', 'diameter', 'dia', 'flow', 'power', 'rate', 'count',
   'total', 'mass', 'volume', 'vol', 'length', 'height', 'width', 'depth',
   'load', 'speed', 'temp', 'pressure', 'density', 'velocity', 'head', 'frac',
-  'fraction', 'ratio', 'margin', 'demand',
+  'fraction', 'ratio', 'margin', 'demand', 'interval', 'time', 'utilisation',
+  'budget', 'thickness', 'stress', 'effectiveness', 'ua', 'factor', 'flag',
+  'current', 'capacity', 'yield', 'makeup', 'feed', 'product',
+  'circulation', 'replacement', 'settling', 'phase', 'hydraulic', 'motor',
+  // NB: 'safety' is deliberately NOT stripped — it is the identity token of the
+  // safety_protection module archetype (Tier B), and only appears as noise in
+  // '…_safety_factor', where 'factor' is already stripped and the equipment
+  // noun (reactor/…) carries the match. Stripping it sent noise → the wrong
+  // module on a tie.
 ])
 const TOOL_MATCH_UNIT_TOKENS = new Set<string>([
   'kw', 'kwh', 'mw', 'w', 'm', 'm2', 'm3', 'mm', 'cm', 'kg', 'g', 't', 'tpd',
   'kgh', 'h', 's', 'c', 'v', 'kv', 'a', 'ka', 'hz', 'pa', 'kpa', 'mpa', 'bar',
-  'pct', 'gbp', 'rpm', 'ntu', 'htu', 'db', 'dba',
+  'pct', 'gbp', 'rpm', 'ntu', 'htu', 'db', 'dba', 'years', 'year', 'minutes',
+  'min', 'deg', 'mol', 'gj', 'kj', 'per', 'day', 'k', 'kp',
 ])
 
 function toolMatchStem(name: string): string {
@@ -11141,6 +11255,325 @@ function toolMatchStem(name: string): string {
   // Stem recrystall→crystall so the emitter's "recrystalliser" word joins the
   // crystalliser tool's "crystalliser" quantities.
   return parts.map((p) => p.replace(/^re(crystall)/, '$1')).join('_')
+}
+
+// IDENTITY tokens of a name: split on separators, drop the measure/unit/marker
+// tokens ANYWHERE in the name (not just the tail), recrystall→crystall stem.
+// Equipment nouns survive; measured-attribute + unit words are removed. Used by
+// the tool router on both sides of the join (quantity name vs sub-module words).
+function toolMatchIdentityTokens(name: string): string[] {
+  return String(name)
+    .toLowerCase()
+    .replace(/[-\s:]+/g, '_')
+    .split(/_+/)
+    .filter(Boolean)
+    .filter((t) => !TOOL_MATCH_MEASURE_TOKENS.has(t) && !TOOL_MATCH_UNIT_TOKENS.has(t))
+    .map((t) => t.replace(/^re(crystall)/, '$1'))
+    .filter(Boolean)
+}
+
+// ─── Tool → sub-module router (Build #22, 2026-06-04) ──────────────────────
+//
+// Replaces the per-MODULE "any candidate-stem substring matches any quantity-
+// stem" matcher (Build #19f). That matcher had TWO faults visible on the CO₂
+// dossier: (a) MISSES — tools whose quantities describe a domain that exists as
+// a MODULE ROLE but NOT as a named BoM word (control-systems:pid → ph_loop_*;
+// fire-suppression:nfpa → fire_*; corrosion:anode → cp_*; noise-emission:dba →
+// plant_sound_*) reached ZERO module because no word contains those tokens, so
+// Process Control / Safety / Skid all rendered an empty "How this module was
+// computed" block; (b) OVER-MATCHES — an incidental shared stem (a dryer/
+// crystalliser quantity matching the carbonation module) routed a tool onto an
+// unrelated module. The "any substring on either side" test is both too loose
+// (false hits) and, for word-less domains, useless.
+//
+// The router fixes both with a single per-state pass that routes each QUANTITY
+// to ONE best sub-module, then aggregates tool_ids up:
+//
+//   TIER A (equipment tools — the common case): score each sub-module by the
+//   number of the quantity's IDENTITY tokens that appear in that sub-module's
+//   word ids (×2 each). A token that is NOT a generic process-stream prefix
+//   (caco3/k2so4/koh/mea/co2/gypsum/slurry/…) counts as "specific". The
+//   single best sub-module wins; accept only when ≥1 SPECIFIC token matched
+//   (or a strong ≥2-token match that clearly beats the runner-up). This kills
+//   the over-matches — a lone generic-prefix collision no longer routes a tool.
+//
+//   TIER B (concept tools): a small UNIVERSAL lexicon maps a tool whose output
+//   is a cross-cutting engineering DOMAIN (control / fire-suppression /
+//   corrosion-cathodic-protection / noise) to the canonical module-archetype
+//   key it belongs to (control_compute_communication / safety_protection /
+//   structure_containment). Keys on the archetype tokens present in EVERY
+//   ForgeOS design, so it is class-agnostic — not CO₂-specific wiring. Concept
+//   tools SKIP Tier A entirely, because their quantities' stray tokens (ph,
+//   loop, protection, plant) are exactly what collide with unrelated parts.
+//
+//   SYSTEM-LEVEL: whole-plant aggregators (lifecycle-co2, mass-aggregator,
+//   regeneration-energy) and pure material-property lookups (coolprop) route to
+//   NO module — they belong to the up-front "how the whole plant was computed"
+//   summary, which is what systemLevelToolIds() already expects. A plant_/
+//   total_/recommended_-prefixed quantity is system-level UNLESS its tool has a
+//   concept route (noise's plant_sound_power_dba is still equipment-level).
+//
+// Result on CO₂ v10 (validated before/after, 73 tool-bearing quantities):
+// Process Control ← control-systems:pid, Safety ← fire-suppression:nfpa, Skid
+// Structure ← corrosion:anode + noise-emission:dba now populate; no tool lands
+// on an unrelated module; the previously-correct equipment routings are
+// preserved. Catalogue-only modules (Instrumentation, Electrical, Bagging,
+// Thermal Utilities) correctly route to nothing → empty-state block.
+
+interface ToolRoute { moduleIdx: number; subModuleIdx: number }
+
+// Generic process-stream / fluid-state prefixes + structurally-generic words.
+// These appear on MANY unrelated part words, so a match on one of these ALONE
+// is not enough to route a tool (it must be paired with a specific equipment
+// noun, OR be a strong multi-token win). Equipment nouns (reactor, crystalliser,
+// absorber, stripper, dryer, condenser, reboiler, pump, column…) are NOT here —
+// those are exactly the specific signal the router relies on.
+const TOOL_ROUTE_GENERIC_TOKENS = new Set<string>([
+  'caco3', 'k2so4', 'koh', 'mea', 'co2', 'gypsum', 'slurry', 'cake', 'wash',
+  'filtrate', 'plant', 'loop', 'ph', 'liquid', 'lean', 'rich', 'mother',
+  'reclaim', 'hot', 'cold', 'cooling', 'process', 'system', 'line', 'unit',
+])
+
+// Concept lexicon: a tool whose output is a cross-cutting engineering domain →
+// the module-archetype tokens it belongs to + sub-module-kind hints for the
+// finer placement. Universal: the archetype keys (control_compute_communication,
+// safety_protection, structure_containment, environmental_interface) are the
+// canonical module roles present in every design, not CO₂-specific.
+const TOOL_CONCEPT_ROUTES: Array<{ match: RegExp; moduleKinds: string[]; subHints: string[] }> = [
+  { match: /control[-_]systems|:pid|pid[-_]tuning/, moduleKinds: ['control', 'compute', 'communication'], subHints: ['control'] },
+  { match: /fire[-_]suppression|(?:^|[-_:])fire(?:[-_:]|$)|nfpa/, moduleKinds: ['safety', 'protection'], subHints: ['fire', 'suppression', 'mass', 'fluid', 'protection'] },
+  { match: /corrosion|anode|cathodic/, moduleKinds: ['structure', 'containment'], subHints: ['structure', 'skid', 'containment'] },
+  // Noise → safety/enclosure, NOT the thermal/environmental utilities module
+  // (Tristan: noise belongs to "enclosure/safety"). Prefer safety_protection;
+  // structure_containment (the acoustic enclosure) is the fallback. environmental
+  // is deliberately excluded so plant_sound_* doesn't land on Thermal Utilities.
+  { match: /noise|acoustic|:dba|(?:^|[-_:])sound(?:[-_:]|$)/, moduleKinds: ['safety', 'protection', 'structure', 'containment'], subHints: ['enclosure', 'structure', 'protection', 'skid'] },
+]
+// Whole-plant aggregators + pure property lookups: never route to a module.
+const TOOL_SYSTEM_LEVEL = /lifecycle[-_]co2|mass[-_]aggregator|coolprop|regeneration[-_]energy/
+// Plant-wide quantity prefixes (system-level UNLESS the tool has a concept route).
+const TOOL_SYSTEM_QUANTITY_PREFIX = /^(plant_|total_plant|recommended_|mass_budget_)/
+
+function readToolContract(state: any): Record<string, any> {
+  const contract =
+    state?.orchestratorContract
+    || state?.engineeringContract
+    || state?.orchestrator?.contract
+    || null
+  return contract?.quantities && typeof contract.quantities === 'object' ? contract.quantities : {}
+}
+
+// Identity tokens for a sub-module = the union of its words' identity tokens +
+// its own id's identity tokens. This is the pool a quantity's tokens match
+// against in Tier A.
+function subModuleIdentityTokenSet(sm: any): Set<string> {
+  const t = new Set<string>()
+  for (const w of (sm?.words ?? [])) {
+    for (const x of [w?.id, w?.content_character?.character_id]) {
+      if (typeof x === 'string') for (const tk of toolMatchIdentityTokens(x)) t.add(tk)
+    }
+  }
+  for (const tk of toolMatchIdentityTokens(sm?.id ?? '')) t.add(tk)
+  return t
+}
+
+// Identity tokens that describe a module's ROLE: archetype key + display name +
+// derived-parameter keys. Tier B matches concept-tool moduleKinds against this.
+function moduleKindTokenSet(m: any): Set<string> {
+  const t = new Set<string>()
+  for (const tk of toolMatchIdentityTokens(String(m?.module ?? ''))) t.add(tk)
+  for (const tk of toolMatchIdentityTokens(String(m?.display_name ?? ''))) t.add(tk)
+  for (const dpKey of Object.keys(m?.derived_parameters ?? {})) {
+    for (const tk of toolMatchIdentityTokens(dpKey)) t.add(tk)
+  }
+  return t
+}
+
+// Memoised per-state routing: tool_id → set of "moduleIdx:subModuleIdx" cells.
+// Keyed on the state object identity (WeakMap) so MinimalDocument's many
+// module/sub-module renders share one computation.
+const _toolRouteCache = new WeakMap<object, Map<string, Set<string>>>()
+
+function computeToolRoutes(state: any): Map<string, Set<string>> {
+  if (state && typeof state === 'object' && _toolRouteCache.has(state)) {
+    return _toolRouteCache.get(state)!
+  }
+  const result = new Map<string, Set<string>>() // tool_id → {"mi:si"}
+  const page = readToolsUsedPage(state)
+  const modules: any[] = state?.moduleDecomposition?.modules ?? []
+  if (!page || !Array.isArray(page.tools) || page.tools.length === 0 || modules.length === 0) {
+    if (state && typeof state === 'object') _toolRouteCache.set(state, result)
+    return result
+  }
+  const quantities = readToolContract(state)
+  const subTokens: Set<string>[][] = modules.map((m) => (m?.sub_modules ?? []).map(subModuleIdentityTokenSet))
+  const modKindTokens: Set<string>[] = modules.map(moduleKindTokenSet)
+
+  const routeQuantity = (qName: string, toolId: string): ToolRoute | null => {
+    const conceptRule = TOOL_CONCEPT_ROUTES.find((r) => r.match.test(toolId))
+    if (TOOL_SYSTEM_LEVEL.test(toolId)) return null
+    const qTokens = toolMatchIdentityTokens(qName)
+    if (qTokens.length === 0) return null
+
+    // TIER A — equipment tools (skipped for concept tools + plant-wide quantities)
+    if (!conceptRule && !TOOL_SYSTEM_QUANTITY_PREFIX.test(qName)) {
+      const scored: Array<{ mi: number; si: number; sc: number; specific: number }> = []
+      for (let mi = 0; mi < modules.length; mi++) {
+        const subs = modules[mi]?.sub_modules ?? []
+        for (let si = 0; si < subs.length; si++) {
+          let sc = 0
+          let specific = 0
+          for (const tk of qTokens) {
+            if (subTokens[mi][si].has(tk)) {
+              sc += 2
+              if (!TOOL_ROUTE_GENERIC_TOKENS.has(tk)) specific++
+            }
+          }
+          if (sc > 0) scored.push({ mi, si, sc, specific })
+        }
+      }
+      scored.sort((a, b) => b.specific - a.specific || b.sc - a.sc)
+      const top = scored[0]
+      if (top) {
+        const second = scored[1]
+        const beatsSecond = !second || top.specific > second.specific || top.sc > second.sc
+        // Accept on a SPECIFIC (non-generic) token, or a strong ≥2-token win
+        // that clearly beats the runner-up. A lone generic-prefix collision
+        // (the old over-match) no longer routes the tool.
+        if (top.specific >= 1 || (top.sc >= 4 && beatsSecond)) {
+          return { moduleIdx: top.mi, subModuleIdx: top.si }
+        }
+      }
+    }
+
+    // TIER B — concept tools → module archetype + sub-module-kind hint.
+    // moduleKinds is ORDERED by preference: an earlier-listed kind outweighs a
+    // later one, so a tie between two candidate modules resolves to the
+    // preferred archetype (e.g. noise → safety_protection ahead of
+    // structure_containment) rather than to module-array order.
+    if (conceptRule) {
+      let bestModule = { mi: -1, score: 0 }
+      for (let mi = 0; mi < modules.length; mi++) {
+        let sc = 0
+        for (let ki = 0; ki < conceptRule.moduleKinds.length; ki++) {
+          if (modKindTokens[mi].has(conceptRule.moduleKinds[ki])) {
+            sc += conceptRule.moduleKinds.length - ki // earlier kind = higher weight
+          }
+        }
+        if (sc > bestModule.score) bestModule = { mi, score: sc }
+      }
+      if (bestModule.mi >= 0) {
+        const subs = modules[bestModule.mi]?.sub_modules ?? []
+        let bestSub = { si: 0, score: 0 }
+        for (let si = 0; si < subs.length; si++) {
+          let sc = 0
+          const subId = String(subs[si]?.id ?? '').toLowerCase()
+          for (const h of conceptRule.subHints) {
+            if (subTokens[bestModule.mi][si].has(h) || subId.includes(h)) sc++
+          }
+          if (sc > bestSub.score) bestSub = { si, score: sc }
+        }
+        return { moduleIdx: bestModule.mi, subModuleIdx: bestSub.si }
+      }
+    }
+    return null
+  }
+
+  for (const qName of Object.keys(quantities)) {
+    const toolId = quantities[qName]?.provenance?.tool_id
+    if (typeof toolId !== 'string' || !toolId) continue
+    const route = routeQuantity(qName, toolId)
+    if (!route) continue
+    if (!result.has(toolId)) result.set(toolId, new Set<string>())
+    result.get(toolId)!.add(`${route.moduleIdx}:${route.subModuleIdx}`)
+  }
+
+  if (state && typeof state === 'object') _toolRouteCache.set(state, result)
+  return result
+}
+
+// Resolve a module/sub-module spec to its index in the decomposition, so the
+// renderer (which is handed the spec, not the index) can look up its routes.
+function moduleIndexOf(state: any, moduleSpec: any): number {
+  const modules: any[] = state?.moduleDecomposition?.modules ?? []
+  // Identity by reference first (same object the router iterated), then by the
+  // module archetype key, then by display name.
+  let idx = modules.indexOf(moduleSpec)
+  if (idx >= 0) return idx
+  const key = String(moduleSpec?.module ?? '')
+  const disp = String(moduleSpec?.display_name ?? '')
+  for (let i = 0; i < modules.length; i++) {
+    if (key && String(modules[i]?.module ?? '') === key && String(modules[i]?.display_name ?? '') === disp) return i
+  }
+  for (let i = 0; i < modules.length; i++) {
+    if (key && String(modules[i]?.module ?? '') === key) return i
+  }
+  return -1
+}
+
+function subModuleIndexOf(moduleSpec: any, subSpec: any, subId?: string): number {
+  const subs: any[] = moduleSpec?.sub_modules ?? []
+  if (subSpec) {
+    const i = subs.indexOf(subSpec)
+    if (i >= 0) return i
+  }
+  if (subId != null) {
+    for (let i = 0; i < subs.length; i++) if (String(subs[i]?.id ?? '') === String(subId)) return i
+  }
+  return -1
+}
+
+// Tool_ids whose quantities routed to ANY sub-module of this module. Backwards-
+// compatible replacement for the Build #19f moduleToolIds — same signature,
+// same "tools that back this module's numbers" meaning, but now via the router
+// (no misses for word-less domains, no incidental-substring over-matches).
+export function moduleToolIds(moduleSpec: any, state: any): string[] {
+  const mi = moduleIndexOf(state, moduleSpec)
+  if (mi < 0) return []
+  const routes = computeToolRoutes(state)
+  const ids = new Set<string>()
+  const prefix = `${mi}:`
+  for (const [toolId, cells] of routes) {
+    for (const cell of cells) {
+      if (cell.startsWith(prefix)) { ids.add(toolId); break }
+    }
+  }
+  return Array.from(ids)
+}
+
+// Tool_ids whose quantities routed to THIS SPECIFIC sub-module (Build #22).
+// Drives the per-sub-module "How this is computed" block — the worked maths for
+// a tool sits with the equipment it sizes, not lumped at the module top.
+function subModuleToolIds(state: any, moduleSpec: any, subSpec: any, subId?: string): string[] {
+  const mi = moduleIndexOf(state, moduleSpec)
+  if (mi < 0) return []
+  const si = subModuleIndexOf(moduleSpec, subSpec, subId)
+  if (si < 0) return []
+  const routes = computeToolRoutes(state)
+  const cell = `${mi}:${si}`
+  const ids = new Set<string>()
+  for (const [toolId, cells] of routes) {
+    if (cells.has(cell)) ids.add(toolId)
+  }
+  return Array.from(ids)
+}
+
+// Tool_ids that genuinely SPAN the whole module — i.e. routed to ≥2 distinct
+// sub-modules of this module. These keep a module-level block (the per-sub
+// blocks would duplicate). A tool routed to exactly one sub-module renders ONLY
+// in that sub-module (returned by subModuleToolIds), not at module level.
+function moduleSpanningToolIds(state: any, moduleSpec: any): string[] {
+  const mi = moduleIndexOf(state, moduleSpec)
+  if (mi < 0) return []
+  const routes = computeToolRoutes(state)
+  const prefix = `${mi}:`
+  const ids: string[] = []
+  for (const [toolId, cells] of routes) {
+    let countInModule = 0
+    for (const cell of cells) if (cell.startsWith(prefix)) countInModule++
+    if (countInModule >= 2) ids.push(toolId)
+  }
+  return ids
 }
 
 // System-level tools = every tool that produced a claim for this design MINUS
@@ -11217,24 +11650,22 @@ function WorkedCalcSteps({ worked, accentColour }: { worked: any[]; accentColour
   )
 }
 
-// Build #21 (2026-06-04) — per-module "How this module was computed" block.
-// Replaces the thin "TOOLS USED IN THIS SECTION" name-list. For each tool that
-// produced a quantity feeding THIS module (moduleToolIds), renders the tool's
-// display name + its full worked-calc block, so the engineering maths that
-// sizes a module's equipment sits WITH that equipment instead of in the end-
-// of-report appendix 60+ pages away. Mockup: REPORT-LAYOUT-MOCKUP.html block 2
-// ("Each module — engineering, then its parts"). Catalogue-only modules route
-// to no tool → the `ids.length === 0` guard returns null and they correctly
-// show no block (the mockup's empty state).
-function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any }) {
+// Build #21/#22 (2026-06-04) — "How this is computed" block, shared core.
+// For a given list of tool_ids, renders each tool's display name + its full
+// worked-calc block, so the engineering maths that sizes equipment sits WITH
+// that equipment instead of in the end-of-report appendix 60+ pages away.
+// Mockup: REPORT-LAYOUT-MOCKUP.html block 2 ("Each module — engineering, then
+// its parts"). `compact` tightens spacing + heading for the per-SUB-MODULE
+// placement (Build #22). Empty `toolIds` → null (the mockup's empty state).
+function ToolsComputedBlock({
+  toolIds, state, heading, intro, compact,
+}: { toolIds: string[]; state: any; heading: string; intro: string; compact?: boolean }) {
   const page = readToolsUsedPage(state)
-  if (!page) return null
-  const ids = moduleToolIds(moduleSpec, state)
-  if (ids.length === 0) return null
+  if (!page || !Array.isArray(page.tools) || toolIds.length === 0) return null
 
   // Resolve each routed tool to its full record (name + version + worked maths)
   // from the toolsUsedPage. Keep a stable order by display name.
-  const toolsForModule = ids
+  const tools = toolIds
     .map((tid) => {
       const tool = (page.tools as any[]).find((t) => t?.tool_id === tid)
       return tool ?? { tool_id: tid, tool_name: tid, tool_version: '', worked: [] }
@@ -11242,12 +11673,13 @@ function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any
     .sort((a, b) =>
       String(a.tool_name || a.tool_id).localeCompare(String(b.tool_name || b.tool_id)),
     )
-  if (toolsForModule.length === 0) return null
+  if (tools.length === 0) return null
 
   return (
     <View
       style={{
-        marginBottom: 14,
+        marginBottom: compact ? 8 : 14,
+        marginLeft: compact ? 36 : 0,
         borderWidth: 0.8,
         borderColor: COMPUTE_AMBER_LINE,
         backgroundColor: COMPUTE_AMBER_SOFT,
@@ -11256,21 +11688,21 @@ function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any
       }}
       // Protect the header + first tool name so the block doesn't orphan its
       // heading at a page foot; the worked steps below flow/break naturally.
-      minPresenceAhead={70}
+      minPresenceAhead={compact ? 60 : 70}
     >
       {/* compute-h: amber header bar */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 7,
+          paddingVertical: compact ? 5 : 7,
           paddingHorizontal: 11,
           borderBottomWidth: 0.8,
           borderBottomColor: '#f3ddcf',
         }}
       >
-        <Text style={{ flex: 1, fontSize: 10, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER_DEEP }}>
-          How this module was computed
+        <Text style={{ flex: 1, fontSize: compact ? 9 : 10, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER_DEEP }}>
+          {heading}
         </Text>
         <Text
           style={{
@@ -11291,20 +11723,17 @@ function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any
       </View>
 
       {/* compute-body */}
-      <View style={{ paddingVertical: 9, paddingHorizontal: 11 }}>
-        <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5, marginBottom: 8 }}>
-          The engineering tools below computed the quantities that size this
-          module&apos;s equipment. Every number is checkable by hand from the
-          worked steps; full version, licence and provenance for each tool are
-          listed in the Tools-Used index at the end of the report.
+      <View style={{ paddingVertical: compact ? 7 : 9, paddingHorizontal: 11 }}>
+        <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5, marginBottom: compact ? 6 : 8 }}>
+          {intro}
         </Text>
 
-        {toolsForModule.map((tool: any, ti: number) => {
+        {tools.map((tool: any, ti: number) => {
           const worked: any[] = Array.isArray(tool.worked) ? tool.worked : []
           return (
             <View
               key={tool.tool_id || `mtool-${ti}`}
-              style={{ marginBottom: ti < toolsForModule.length - 1 ? 9 : 0 }}
+              style={{ marginBottom: ti < tools.length - 1 ? 9 : 0 }}
               minPresenceAhead={40}
             >
               <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: worked.length > 0 ? 4 : 0 }}>
@@ -11340,6 +11769,52 @@ function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any
         })}
       </View>
     </View>
+  )
+}
+
+// Module-level block (Build #22): renders ONLY tools that genuinely SPAN the
+// whole module — i.e. whose quantities sized equipment in ≥2 of the module's
+// sub-modules (e.g. a stoichiometry/heat-exchanger tool feeding several trains).
+// A tool that sizes exactly one sub-module's equipment is NOT shown here — its
+// worked block renders inside that sub-module (SubModuleToolsCallout), per
+// Tristan's request to push computation down to the sub-modules. A module whose
+// tools each map to a single sub-module gets NO module-level block (returns
+// null) — exactly the desired "all the maths is in the sub-modules" state.
+function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any }) {
+  const spanning = moduleSpanningToolIds(state, moduleSpec)
+  if (spanning.length === 0) return null
+  return (
+    <ToolsComputedBlock
+      toolIds={spanning}
+      state={state}
+      heading="How this module was computed (spanning tools)"
+      intro="The engineering tools below size equipment across more than one of this module's sub-modules, so their worked calculation is shown once here. Tools that size a single sub-module appear with that sub-module below. Full version, licence and provenance for every tool are in the Tools-Used index at the end of the report."
+    />
+  )
+}
+
+// Per-SUB-MODULE block (Build #22): the worked calculation for each tool whose
+// quantities ground THIS sub-module's words/quantities, rendered above this
+// sub-module's parts table. This is the granularity Tristan asked for — "more
+// computation taking place in the submodules… at the moment they all look like
+// they're at the module level." A sub-module with no routed tool renders no
+// block (empty-state preserved).
+function SubModuleToolsCallout({ state, moduleSpec, subId }: { state: any; moduleSpec: any; subId: string }) {
+  // Tools that span ≥2 sub-modules of this module are shown ONCE at module
+  // level (ModuleToolsCallout); exclude them here so the same worked block
+  // doesn't render twice within one module. A tool routed to exactly this one
+  // sub-module is NOT spanning → it renders here, with its equipment.
+  const spanning = new Set(moduleSpanningToolIds(state, moduleSpec))
+  const ids = subModuleToolIds(state, moduleSpec, undefined, subId).filter((id) => !spanning.has(id))
+  if (ids.length === 0) return null
+  return (
+    <ToolsComputedBlock
+      toolIds={ids}
+      state={state}
+      compact
+      heading="How this is computed"
+      intro="The engineering tool(s) below computed the quantities that size this sub-module's equipment — every number is checkable by hand from the worked steps."
+    />
   )
 }
 

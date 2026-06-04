@@ -29,6 +29,11 @@ import './tools/reactor-cstr-pfr-sizing'         // reactor:cstr-pfr-sizing — 
 import './tools/crystalliser-evaporator-sizing'  // crystalliser:evaporator-sizing — duty + U·A·ΔT area + magma vessel (CoolProp h_fg + Perry)
 import './tools/absorption-column-htu-ntu'       // absorption:column-htu-ntu — H=HTU·NTU (Colburn) + flooding diameter (Eckert GPDC)
 import './tools/dryer-thermal-sizing'            // dryer:thermal-sizing — evap load + air flow (humidity pick-up) + heater duty (psychrolib)
+// 2026-06-04 ELECTRICAL + BAGGING sizing — ground the CO2 plant's Electrical
+// Distribution + Bagging & Packaging modules (no electrical/bagging tool existed):
+import './tools/electrical-transformer-sizing'   // electrical:transformer-sizing — kVA + primary/secondary currents (IEC 60076)
+import './tools/electrical-cable-sizing'         // electrical:cable-sizing — feeder CSA + design current + volt-drop (BS 7671 / IEC 60364)
+import './tools/bagging-throughput-sizing'       // bagging:throughput-sizing — bags/h + line kg/h + day-silo volume (Perry's ch.21)
 // 2026-05-25: octopart-stub replaced by distributor-cascade-real which calls
 // findSkuForPart (Mouser + Digi-Key + Farnell + LCSC + Nexar in parallel).
 // Same tool ID 'octopart:parts-lookup' preserved so TOOL_INPUT_HINTS + mermaid

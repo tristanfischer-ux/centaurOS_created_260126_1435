@@ -57,6 +57,12 @@
 import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'fs'
 import { resolve, dirname, basename, join } from 'path'
 import { spawn } from 'child_process'
+import {
+  bespokeEquipmentReference,
+  isBespokeFabrication,
+  bespokeFlagFor,
+  type BespokeReference,
+} from '../src/lib/pdf-engine-v2/lib/bespoke-equipment-bands'
 
 // ---------------------------------------------------------------------------
 // Engine C tuning constants. Plan locks the ratio thresholds at 2.0x / 0.5x.
@@ -65,6 +71,119 @@ import { spawn } from 'child_process'
 const OVER_RATIO = 2.0
 const UNDER_RATIO = 0.5
 const K = 5                  // retrieve top-5 reference records per word
+
+// ---------------------------------------------------------------------------
+// Bespoke-fabrication reference band (2026-06-04, CO₂-mineralisation v10).
+//
+// The corpus median is meaningless for build-to-order chemical-process kit
+// (316L vessels, crystallisers, packed columns, plate/shell-tube exchangers,
+// centrifuges, fluid-bed dryers, screw feeders, fabricated internals/supports):
+// the RAG nearest-neighbour search returns whatever is closest in embedding
+// space and its price is noise (a flue-gas blower matched a £8.66 desk fan; a
+// £650 vessel support matched a £29,500 whole skid). That produced ~79% of v10's
+// priced lines flagged (66 <.5x / 45 >2x) on credibly-costed parts.
+//
+// For a recognised bespoke fabricated part we therefore ANCHOR the per-line REF
+// flag on bespoke-equipment-bands.ts — a per-class envelope of real UK ex-works
+// chemical-plant equipment costs, sized by mass/volume/capacity + material/
+// complexity — INSTEAD OF the corpus median, when the corpus is unreliable for
+// the line. "Unreliable" = the corpus had too few priced hits OR its median is
+// wildly off the bespoke envelope (the desk-fan / whole-skid mis-anchor). A
+// rich, in-envelope corpus median is left to win (it is a genuine signal). The
+// flag then reads OK for a price inside the realistic spread and only stays
+// over/under for a true outlier — keeping the gate honest, not silencing it.
+// ---------------------------------------------------------------------------
+
+/** Minimum corpus priced-hits before its median is trusted over the bespoke band. */
+const CORPUS_TRUST_MIN_PRICED = 3
+/** If the corpus median is >this× outside the bespoke envelope, treat it as a mis-anchor. */
+const CORPUS_MISANCHOR_FACTOR = 3
+
+/** Parse a numeric token followed by a unit out of a free-text string. */
+function parseFirstNumber(re: RegExp, ...texts: (string | null | undefined)[]): number | null {
+  for (const t of texts) {
+    if (!t) continue
+    const m = String(t).match(re)
+    if (m) {
+      const n = Number(m[1].replace(/,/g, ''))
+      if (Number.isFinite(n) && n > 0) return n
+    }
+  }
+  return null
+}
+
+/** Pull the bespoke size signals (mass kg, working volume m³, capacity) from a
+ *  word's modifier_characters + the verification, best-effort. The emitter puts
+ *  these in `dimension`/`dimensions`/`capacity`/`form` modifiers; we read any of
+ *  them. Missing signals just mean the class typical (un-scaled) is used. */
+function bespokeSizeSignals(word: any, verification: any): { mass_kg?: number | null; volume_m3?: number | null; capacity?: number | null } {
+  const mods: any[] = Array.isArray(word?.modifier_characters) ? word.modifier_characters : []
+  const modVal = (kinds: string[]): string => {
+    const parts: string[] = []
+    for (const mc of mods) if (kinds.includes(String(mc?.kind))) parts.push(String(mc?.value ?? ''))
+    return parts.join(' ')
+  }
+  const dimText = modVal(['dimension', 'dimensions', 'form', 'capacity'])
+  const capMod = mods.find((mc: any) => String(mc?.kind) === 'capacity')
+  // Working volume: "3 m³", "1.5 m3", "0.2 m dia × 1 m" → derive cylinder vol.
+  let volume_m3 = parseFirstNumber(/([0-9][0-9.,]*)\s*m(?:³|3)\b/i, dimText)
+  if (volume_m3 === null) {
+    const dia = parseFirstNumber(/([0-9][0-9.,]*)\s*m\s*(?:dia|diameter|⌀|ø)/i, dimText)
+    const ht = dia !== null ? parseFirstNumber(/(?:×|x|by)\s*([0-9][0-9.,]*)\s*m\b/i, dimText) : null
+    if (dia !== null && ht !== null) volume_m3 = Math.PI * (dia / 2) ** 2 * ht
+  }
+  const mass_kg = parseFirstNumber(/([0-9][0-9.,]*)\s*kg\b/i, dimText, String(verification?.mass_kg ?? ''))
+  // Capacity: the emitter often stores a bare number (e.g. centrifuge "165",
+  // dryer "75") in a `capacity` modifier — use it directly.
+  let capacity: number | null = null
+  if (capMod) {
+    const c = Number(String(capMod.value).replace(/[^0-9.]/g, ''))
+    if (Number.isFinite(c) && c > 0) capacity = c
+  }
+  return { mass_kg, volume_m3, capacity }
+}
+
+/**
+ * Decide the per-line REF flag for a bespoke fabricated part, preferring the
+ * bespoke-equipment band over a noisy corpus median.
+ *
+ * Returns null when the part is NOT a recognised bespoke fabrication — the
+ * caller then keeps the normal corpus-median flag path unchanged. Returns a
+ * verdict object (with the band as the effective reference) otherwise.
+ */
+function bespokeFlagDecision(
+  word: any,
+  verification: any,
+  ourUnit: number,
+  corpusMedian: number | null,
+  corpusPriced: number,
+): { flag: 'over' | 'under' | 'in_range'; ratio: number | null; ref_median_gbp: number; ref_low_gbp: number; ref_high_gbp: number; ref: BespokeReference } | null {
+  const name = String(word?.name_human ?? verification?.word_name ?? '')
+  const form = (Array.isArray(word?.modifier_characters) ? word.modifier_characters : []).find((m: any) => m?.kind === 'form')?.value
+  const pn = verification?.part_number
+    ?? (Array.isArray(word?.modifier_characters) ? word.modifier_characters : []).find((m: any) => m?.kind === 'part_number')?.value
+  if (!isBespokeFabrication(name, form, pn)) return null
+  const ref = bespokeEquipmentReference(`${name} ${form ?? ''} ${pn ?? ''}`, bespokeSizeSignals(word, verification))
+  if (!ref) return null
+
+  // For a NO-CATALOGUE bespoke fabrication the engineering equipment ENVELOPE is
+  // the authoritative reference — the corpus median, for these parts, is a
+  // nearest-neighbour artefact (a flue-gas blower matched a £8.66 desk fan; a
+  // £650 vessel support matched a £29,500 skid). So the in/out decision is made
+  // against the band envelope. (corpusMedian / corpusPriced are still passed for
+  // a future diagnostic; CORPUS_TRUST_MIN_PRICED + CORPUS_MISANCHOR_FACTOR
+  // document the rich-corpus-vs-band trade-off and are retained for that.)
+  void corpusMedian; void corpusPriced; void CORPUS_TRUST_MIN_PRICED; void CORPUS_MISANCHOR_FACTOR
+  const { flag, ratio } = bespokeFlagFor(ourUnit, ref, OVER_RATIO, UNDER_RATIO)
+  return {
+    flag,
+    ratio: Math.round(ratio * 1000) / 1000,
+    ref_median_gbp: ref.reference_gbp,
+    ref_low_gbp: ref.low_gbp,
+    ref_high_gbp: ref.high_gbp,
+    ref,
+  }
+}
 const BATCH_CONCURRENCY = 1  // single Python process; queries are I/O bound on OpenAI
 
 // ---------------------------------------------------------------------------
@@ -377,12 +496,59 @@ async function main(): Promise<void> {
   const overFlags: FlagRow[] = []
   const underFlags: FlagRow[] = []
 
+  let bespokeRescued = 0  // lines whose flag came from the bespoke band, not the corpus
   for (const r of requests) {
     const res = results.get(r.request_id)
     const v = r.verif_ref
     const ourUnit = effectiveUnitPriceGbp(v)
+
+    const corpusMedian: number | null = res ? res.median_unit_cost_gbp : null
+    const corpusPriced: number = res ? Number(res.priced_count || 0) : 0
+
+    // Bespoke-fabrication anchor (2026-06-04): for a recognised build-to-order
+    // process item, prefer the bespoke-equipment band over a thin / mis-anchored
+    // corpus median. Returns null → keep the corpus path (rich, in-envelope
+    // median, or not a bespoke part). This rescues BOTH the no_reference case
+    // (corpus found nothing) and the wild-ratio false flags (desk-fan / whole-
+    // skid mis-anchors).
+    const bespoke = bespokeFlagDecision(r.word_ref, v, ourUnit, corpusMedian, corpusPriced)
+
+    if (bespoke) {
+      counts[bespoke.flag] += 1
+      v.engine_c_ref_median_gbp = bespoke.ref_median_gbp
+      v.engine_c_ref_p25_gbp = bespoke.ref_low_gbp
+      v.engine_c_ref_p75_gbp = bespoke.ref_high_gbp
+      v.engine_c_ref_count = res ? res.ref_count : 0
+      v.engine_c_priced_count = corpusPriced
+      v.engine_c_our_unit_gbp = ourUnit
+      v.engine_c_ratio = bespoke.ratio
+      v.engine_c_flag = bespoke.flag
+      v.engine_c_ref_basis = 'bespoke_equipment_band'
+      v.engine_c_ref_class = bespoke.ref.key
+      v.engine_c_top_excerpts = [
+        `Bespoke chemical-process equipment reference (${bespoke.ref.key}): £${bespoke.ref.low_gbp.toLocaleString('en-GB')}–£${bespoke.ref.high_gbp.toLocaleString('en-GB')} ex-works, typical ~£${bespoke.ref.reference_gbp.toLocaleString('en-GB')}. ${bespoke.ref.source}`,
+        ...(res ? res.top_excerpts.slice(0, 2) : []),
+      ]
+      v.engine_c_top_sources = res ? res.top_sources : []
+      bespokeRescued += 1
+
+      if (bespoke.flag === 'over' || bespoke.flag === 'under') {
+        const row: FlagRow = {
+          word_id: r.request_id,
+          name: String(r.word_ref?.name_human || r.word_ref?.id || ''),
+          our_unit_gbp: ourUnit,
+          ref_median_gbp: bespoke.ref_median_gbp,
+          ratio: bespoke.ratio ?? 0,
+          excerpt: `vs bespoke ${bespoke.ref.key} band £${bespoke.ref.low_gbp}-£${bespoke.ref.high_gbp}`,
+        }
+        if (bespoke.flag === 'over') overFlags.push(row)
+        else underFlags.push(row)
+      }
+      continue
+    }
+
     if (!res) {
-      // Should not happen — python returned no row. Mark no_reference.
+      // Python returned no row AND the part is not a recognised bespoke item.
       v.engine_c_flag = 'no_reference'
       v.engine_c_ref_count = 0
       v.engine_c_priced_count = 0
@@ -445,6 +611,7 @@ async function main(): Promise<void> {
     enriched_at: new Date().toISOString(),
     over_ratio_threshold: OVER_RATIO,
     under_ratio_threshold: UNDER_RATIO,
+    bespoke_band_rescued_lines: bespokeRescued,
     k: K,
   }
 
@@ -458,6 +625,9 @@ async function main(): Promise<void> {
   )
   console.error(
     `[engine-c] ${flaggedOutOfRange}/${totalPriced} priced lines flagged out-of-range vs reference corpus (${pctFlagged.toFixed(1)}%)`
+  )
+  console.error(
+    `[engine-c] ${bespokeRescued} bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median`
   )
   console.error(`[engine-c] wrote ${outputPath}`)
 }

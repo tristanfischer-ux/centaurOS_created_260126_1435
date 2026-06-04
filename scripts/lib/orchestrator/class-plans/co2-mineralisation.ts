@@ -961,6 +961,147 @@ const stepK2so4DryerSizing: ToolStep = {
 }
 
 // ===========================================================================
+// 27. electrical:transformer-sizing — PLANT DISTRIBUTION TRANSFORMER. [2026-06-04 electrical sizing]
+//     Grounds the Electrical Distribution module (module=power_distribution),
+//     which showed NO computation because the engine had no electrical sizing
+//     tool. From the real connected plant load (~561 kW; electrical_load_kw, the
+//     boiler + duct heaters + shrink tunnel + pumps/agitators/blowers) + a 0.9
+//     power factor it sizes the cast-resin transformer: apparent power kVA, the
+//     next IEC 60076 standard rating with headroom, and the primary/secondary
+//     line currents. electrical_transformer_sizing.py input keys: plant_load_kw,
+//     power_factor, headroom_fraction, primary_voltage_v, secondary_voltage_v,
+//     phases. REAL outputs: transformer_kva, transformer_primary_current_a,
+//     transformer_secondary_current_a.
+//     The transformer_* output names match the module's transformer_word stem so
+//     moduleToolIds() routes electrical:transformer-sizing into the Electrical
+//     Distribution "How this module was computed" block.
+// ===========================================================================
+const stepTransformerSizing: ToolStep = {
+  tool_id: 'electrical:transformer-sizing',
+  required: false,
+  feeds_into: ['electrical:cable-sizing', 'mass-aggregator:envelope-check'] as string[],
+  input_from_contract: (c: ContractInProgress) => ({
+    transformer_name: 'plant distribution transformer',
+    plant_load_kw: q(c, 'electrical_load_kw', 561),   // connected active load (boiler + heaters + drives)
+    power_factor: 0.9,                                 // VSD-fed motor-load displacement pf
+    headroom_fraction: 0.25,                           // spare capacity over demand
+    primary_voltage_v: 11000,                          // 11 kV HV supply
+    secondary_voltage_v: 400,                          // 400 V LV distribution
+    phases: 3,
+  }),
+  contract_update: (c: ContractInProgress, output: any) => {
+    const p = provFor('electrical:transformer-sizing', '1.0.0', 'free-proprietary', 'internal://forgeos/electrical')
+    return { ...c, quantities: { ...c.quantities,
+      // Headline output quantities — names match the transformer_word stem so the
+      // renderer routes this tool into the Electrical Distribution module.
+      transformer_kva: mkQty(num(output, 'transformer_kva') ?? 800, 'kVA', 'power', p('transformer_kva'), 'plant distribution transformer rating'),
+      transformer_primary_current_a: mkQty(num(output, 'transformer_primary_current_a') ?? 42, 'A', 'current', p('transformer_primary_current_a'), 'transformer 11 kV primary current'),
+      transformer_secondary_current_a: mkQty(num(output, 'transformer_secondary_current_a') ?? 1154.7, 'A', 'current', p('transformer_secondary_current_a'), 'transformer 400 V secondary current'),
+    } }
+  },
+}
+
+// ===========================================================================
+// 28. electrical:cable-sizing — MAIN LV FEEDER CABLE. [2026-06-04 electrical sizing]
+//     Grounds the Electrical Distribution module feeder run (the SWA/LSZH power
+//     bundle, previously LLM-guessed). From the plant load (~561 kW @ 400 V) it
+//     computes the design current (~900 A), selects the smallest standard CSA
+//     whose BS 7671 de-rated ampacity carries it (300 mm² Cu × 2 parallel), and
+//     checks the volt-drop (~0.6%). electrical_cable_sizing.py input keys:
+//     load_kw, voltage_v, power_factor, phases, length_m, nominal_voltage_v,
+//     conductor, ambient_derate_ca, grouping_derate_cg, n_parallel,
+//     max_voltdrop_pct. REAL outputs: main_feeder_cable_csa_mm2,
+//     feeder_design_current_a, cable_voltdrop_pct.
+//     The mandated csa/feeder/voltdrop output names do not share a stem with the
+//     emitter's cable word, so an additional power_control_cables_csa_mm2 alias
+//     (same tool provenance, same value) is emitted to route electrical:cable-
+//     sizing into the Electrical Distribution module via the power_control_cables
+//     word stem.
+// ===========================================================================
+const stepCableSizing: ToolStep = {
+  tool_id: 'electrical:cable-sizing',
+  required: false,
+  feeds_into: ['mass-aggregator:envelope-check'] as string[],
+  input_from_contract: (c: ContractInProgress) => ({
+    cable_name: 'main LV feeder',
+    load_kw: q(c, 'electrical_load_kw', 561),          // whole-plant load on the main feeder
+    voltage_v: 400,
+    power_factor: 0.9,
+    phases: 3,
+    length_m: 35,                                      // transformer LV board → MCC run
+    nominal_voltage_v: 400,
+    conductor: 'copper',                               // SWA copper feeder
+    ambient_derate_ca: 0.94,                           // 35 °C plant ambient (BS 7671 Ca)
+    grouping_derate_cg: 0.80,                          // grouped on tray/ladder (Cg)
+    n_parallel: 2,                                     // 2 parallel runs per phase
+    max_voltdrop_pct: 5.0,                             // BS 7671 §525 advisory ceiling
+  }),
+  contract_update: (c: ContractInProgress, output: any) => {
+    const p = provFor('electrical:cable-sizing', '1.0.0', 'free-proprietary', 'internal://forgeos/electrical')
+    const csaMm2 = num(output, 'main_feeder_cable_csa_mm2') ?? 300
+    return { ...c, quantities: { ...c.quantities,
+      // Headline output quantities (the prompt-mandated names).
+      main_feeder_cable_csa_mm2: mkQty(csaMm2, 'mm2', 'area', p('main_feeder_cable_csa_mm2'), 'main LV feeder conductor CSA (per run)'),
+      feeder_design_current_a: mkQty(num(output, 'feeder_design_current_a') ?? 899.7, 'A', 'current', p('feeder_design_current_a'), 'main feeder design current'),
+      cable_voltdrop_pct: mkQty(num(output, 'cable_voltdrop_pct') ?? 0.57, '%', 'dimensionless', p('cable_voltdrop_pct'), 'main feeder volt-drop'),
+      // Alias (same value, same tool provenance) whose stem matches the emitter's
+      // power_control_cables word so moduleToolIds() routes this tool into the
+      // Electrical Distribution module's "How this module was computed" block.
+      power_control_cables_csa_mm2: mkQty(csaMm2, 'mm2', 'area', p('main_feeder_cable_csa_mm2'), 'SWA power-cable conductor CSA (per run)'),
+    } }
+  },
+}
+
+// ===========================================================================
+// 29. bagging:throughput-sizing — SOLIDS BAGGING + PACKAGING LINE. [2026-06-04 bagging sizing]
+//     Grounds the Bagging & Packaging module (display "Bagging & Packaging"),
+//     which showed NO computation because the engine had no bagging sizing tool.
+//     From the stoichiometric product rates (K2SO4 ~3.96 t/day sizes the line; a
+//     CaCO3 ~2.27 t/day silo is also sized) at 25 kg/bag it computes the bagger
+//     fill rate (bags/h), the line throughput (kg/h) and the day-silo volumes.
+//     bagging_throughput_sizing.py input keys: product_mass_rate_t_day, bag_kg,
+//     operating_hours_per_day, silo_buffer_hours, bulk_density_kg_m3,
+//     silo_ullage_fraction, n_products. REAL outputs: bagging_rate_bags_h,
+//     bagging_line_kg_h, day_silo_volume_m3.
+//     The bagging_* output names match the module's bag/bagger word stems; an
+//     additional open_mouth_bagger_rate_bags_h + product_storage_silo_volume_m3
+//     alias pair (same tool provenance) pins the route to the bagger + silo
+//     EQUIPMENT words so moduleToolIds() routes bagging:throughput-sizing into
+//     the Bagging & Packaging module.
+// ===========================================================================
+const stepBaggingSizing: ToolStep = {
+  tool_id: 'bagging:throughput-sizing',
+  required: false,
+  feeds_into: [] as string[],
+  input_from_contract: (c: ContractInProgress) => ({
+    line_name: 'solids bagging line (K2SO4)',
+    product_mass_rate_t_day: q(c, 'k2so4_product_t_day', 3.96),  // larger product stream sizes the line
+    bag_kg: 25,                                        // 25 kg net-weigh bags
+    operating_hours_per_day: 16,                       // two-shift bagging basis
+    silo_buffer_hours: 24,                             // one-day product buffer silo
+    bulk_density_kg_m3: 1300,                          // K2SO4 loose bulk density
+    silo_ullage_fraction: 0.15,                        // 15% freeboard
+    n_products: 2,                                     // CaCO3 + K2SO4 day-silos
+  }),
+  contract_update: (c: ContractInProgress, output: any) => {
+    const p = provFor('bagging:throughput-sizing', '1.0.0', 'free-proprietary', 'internal://forgeos/process')
+    const bagsH = num(output, 'bagging_rate_bags_h') ?? 9.75
+    const siloM3 = num(output, 'day_silo_volume_m3') ?? 3.45
+    return { ...c, quantities: { ...c.quantities,
+      // Headline output quantities (the prompt-mandated names).
+      bagging_rate_bags_h: mkQty(bagsH, 'bags/h', 'dimensionless', p('bagging_rate_bags_h'), 'open-mouth bagger fill rate'),
+      bagging_line_kg_h: mkQty(num(output, 'bagging_line_kg_h') ?? 243.8, 'kg/h', 'mass_flow', p('bagging_line_kg_h'), 'bagging-line throughput'),
+      day_silo_volume_m3: mkQty(siloM3, 'm3', 'volume', p('day_silo_volume_m3'), 'product day-silo volume'),
+      // Aliases (same values, same tool provenance) whose stems match the
+      // emitter's open_mouth_bagger + product_storage_silo equipment words so
+      // moduleToolIds() routes this tool into the Bagging & Packaging module.
+      open_mouth_bagger_rate_bags_h: mkQty(bagsH, 'bags/h', 'dimensionless', p('bagging_rate_bags_h'), 'open-mouth bagger fill rate'),
+      product_storage_silo_volume_m3: mkQty(siloM3, 'm3', 'volume', p('day_silo_volume_m3'), 'product storage day-silo volume'),
+    } }
+  },
+}
+
+// ===========================================================================
 // 18. mass-aggregator:envelope-check — SKID MASS BUDGET vs road envelope. [was existing]
 //     Pure-TS tool: SUMS supplied mass buckets vs max_mass_kg_envelope. Couples in
 //     the three column/reactor shell masses from the pressure-vessel steps.
@@ -1000,7 +1141,7 @@ const stepMassAgg: ToolStep = {
 export const CO2_MINERALISATION_PLAN: ClassToolPlan = {
   id: 'co2_mineralisation:plant',
   envelope_predicate: (e) => e.class === 'co2_mineralisation',
-  // 25 genuine tool invocations across 18 distinct tool_ids. Ordering reflects the
+  // 28 genuine tool invocations across 21 distinct tool_ids. Ordering reflects the
   // unit-operation dependency DAG: the regeneration-energy + the three columns/reactor
   // size first; their heat duties feed the heat-exchanger network; the line + pump +
   // coolant properties follow; the safety/control/acoustic/carbon tools run; the
@@ -1040,6 +1181,14 @@ export const CO2_MINERALISATION_PLAN: ClassToolPlan = {
     stepK2so4CrystalliserSizing,  // 24  crystalliser duty + area + magma vessel
     stepCaco3DryerSizing,         // 25  CaCO3 dryer duty + air flow
     stepK2so4DryerSizing,         // 26  K2SO4 dryer (multi-instance: dryer:thermal-sizing ×2)
+    // 2026-06-04 ELECTRICAL + BAGGING SIZING: ground the two currently-ungrounded
+    // modules (Electrical Distribution + Bagging & Packaging) that showed NO
+    // computation because the engine had no electrical/bagging sizing tools. The
+    // transformer + feeder cable size from the plant load (electrical_load_kw); the
+    // bagging line sizes from the stoichiometric product rates (k2so4_product_t_day).
+    stepTransformerSizing,        // 27  transformer kVA + primary/secondary currents (IEC 60076)
+    stepCableSizing,              // 28  main feeder CSA + design current + volt-drop (BS 7671)
+    stepBaggingSizing,            // 29  bagger bags/h + line kg/h + day-silo volume
     stepMassAgg,             // 18 (envelope check; consumes shell masses + stoichiometry feed)
   ],
   coupled_pairs: [] as Array<[string, string]>,
