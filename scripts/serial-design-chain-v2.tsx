@@ -115,6 +115,7 @@ import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-der
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
 import { verifyAllParts, stripUnverifiedParts, inheritPartNumberFromDeterministicSibling, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
 import { runPhysicsCritic, type CritiqueReport } from '../src/lib/pdf-engine-v2/radical/physics-critic'
+import { evaluatePhysicsCriticEnforcement, physicsCriticEnforceModeFromEnv } from './lib/physics-critic-enforcement'
 // Phase C pipeline integration REVERTED 2026-05-15 per coding council (5/5
 // REVERT). Registry pre-seed of reviewer prompts caused score regression and
 // risked registry pollution by ingesting LLM-coined aliases as canonical
@@ -3154,6 +3155,11 @@ async function main() {
   console.error(`\n[chain] STEP 7.5: physics critic (post-R3, pre-R4)`)
   const tCritic = Date.now()
   let critique: CritiqueReport | null = null
+  // Physics-critic CORRECTIVE enforcement decision (gate 33). Computed below from
+  // the live critique, persisted into state as state.physicsCriticEnforcement so
+  // the AUDIT + later inspection can see WHY the chain blocked (or why it allowed
+  // ship). SHADOW by default. See physics-critic-enforcement.ts.
+  let physicsCriticEnforcement: ReturnType<typeof evaluatePhysicsCriticEnforcement> | null = null
   try {
     critique = await runPhysicsCritic({
       modules: design.modules ?? [],
@@ -3178,6 +3184,42 @@ async function main() {
     console.error(`[chain] physics critic threw: ${(err as Error).message}; continuing without`)
   }
   logAction({ step: 'physics_critic', latency_ms: Date.now() - tCritic, ok: critique !== null, scores: critique?.scores, issue_count: critique?.issues.length ?? 0 })
+
+  // ── Physics-critic CORRECTIVE enforcement (gate 33, SHADOW by default, 2026-06-04):
+  //    make the Physics Critic block-on-known-failure rather than advisory-only —
+  //    the "never ship a part the engine KNOWS will fail" guarantee (Tristan:
+  //    "what is the point of suggesting a part that it knows will fail?"). The
+  //    pure decision `evaluatePhysicsCriticEnforcement` BLOCKS only on a HIGH +
+  //    high/medium-confidence finding that NAMES a specific part AND describes a
+  //    CONCRETE failure mode (material-vs-temperature, undersized-vs-load,
+  //    pressure/voltage-vs-rating) — e.g. the CO₂ MDPE buffer tank spec'd for a
+  //    120 °C MEA-stripper loop. A vague/holistic concern, a low/unknown flag, or
+  //    a MED never blocks (gate-severity philosophy: a KNOWN-WRONG part hard-exits,
+  //    a soft deviation flags + renders). SHADOW by default — records
+  //    state.physicsCriticEnforcement + logs the verdict + NEVER exits. ENFORCING
+  //    is opt-in via PHYSICS_CRITIC_ENFORCING (off/0/false/shadow→off; anything
+  //    truthy→on): a blocking fault then hard-exits 33. Default OFF so an in-flight
+  //    re-run is never affected. Phase 2 (auto-correct the flagged part + re-check)
+  //    is the next step — see the design note at the foot of physics-critic-enforcement.ts.
+  {
+    // SHADOW telemetry always reflects what an enforcing run WOULD do, so the
+    // operator sees the block decision in the logs before flipping the flag.
+    const physMode = physicsCriticEnforceModeFromEnv(process.env.PHYSICS_CRITIC_ENFORCING)
+    physicsCriticEnforcement = evaluatePhysicsCriticEnforcement(critique, physMode === 'on' ? 'on' : 'off')
+    // Recompute in 'on' for the shadow log regardless of mode, so shadow runs are informative.
+    const shadowDecision = evaluatePhysicsCriticEnforcement(critique, 'on')
+    if (shadowDecision.blockingFaults.length > 0) {
+      console.error(`[chain] physics-critic enforcement (${physMode === 'on' ? 'ENFORCING' : 'shadow'}): ${shadowDecision.blockingFaults.length} BLOCKING known-failure fault(s) — a part the engine knows will fail:`)
+      for (const f of shadowDecision.blockingFaults.slice(0, 6)) console.error(`  ✗ [${f.failure_mode}/${f.confidence}] @ ${f.where}: ${f.issue}`)
+    } else {
+      console.error(`[chain] physics-critic enforcement (${physMode === 'on' ? 'ENFORCING' : 'shadow'}): no known-failure part — ship allowed.`)
+    }
+    logAction({ step: 'physics_critic_enforce', ok: shadowDecision.blockingFaults.length === 0, mode: physMode, blocking_faults: shadowDecision.blockingFaults.length, reasons: shadowDecision.reasons, would_exit: shadowDecision.shouldExit })
+    if (physMode === 'on' && physicsCriticEnforcement.shouldExit) {
+      console.error(`[chain] physics-critic ENFORCING: BLOCKING (exit ${physicsCriticEnforcement.exitCode}) — the design recommends ${physicsCriticEnforcement.blockingFaults.length} part(s) the Physics Critic proved will FAIL. Refusing to ship a known-failing part. Fix the flagged part(s) (or run Phase-2 auto-correct) and re-run.`)
+      process.exit(physicsCriticEnforcement.exitCode)
+    }
+  }
 
   // Build R4 systemAppend including critic findings. NOTE: R4 is LM-only,
   // not actually grounded. Verified 2026-05-16 — OpenRouter ignores the
@@ -3523,6 +3565,7 @@ async function main() {
         complianceGate: complianceGate ?? null,
         physicsLedger,
         physicsCritique: critique,
+        physicsCriticEnforcement,  // gate 33 corrective-physics decision (shadow by default)
         briefTargetReconciliation: r,
         brief: briefBlock,
         acceptanceStatus: 'not_accepted',
@@ -4908,6 +4951,7 @@ async function main() {
       recommendations_unknown: partRecommendations.filter(r => r.confidence === 'unknown').length,
     },
     physicsCritique: critique,
+    physicsCriticEnforcement,  // gate 33 corrective-physics decision (shadow by default, exit 33 when PHYSICS_CRITIC_ENFORCING)
     // 2026-05-20 iter-9 Step 1: physics repair loop diagnostics (Tristan
     // "design that does work" directive). state.physicsRepair carries the
     // 2026-05-23 prune #2: state.physicsRepair removed (no reader). The

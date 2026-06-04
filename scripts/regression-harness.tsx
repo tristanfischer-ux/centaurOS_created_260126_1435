@@ -45,6 +45,7 @@ import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
+import { evaluatePhysicsCriticEnforcement } from './lib/physics-critic-enforcement'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
@@ -3992,6 +3993,67 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.self_audit_enforcement_blocks_deception', description: 'self-audit enforcement decision', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── UNIVERSAL: physics-critic enforcing blocks a KNOWN-failing part, never a vague concern (2026-06-04) ──
+  //
+  // UNIVERSAL.physics_critic_enforcement_blocks_failing_part — evaluatePhysicsCriticEnforcement() is the
+  // PURE decision the chain's enforcing mode (PHYSICS_CRITIC_ENFORCING) calls to hard-exit when the
+  // Physics Critic has flagged a SPECIFIC part with a CONCRETE, high-confidence failure mode (the
+  // "never ship a part the engine knows will fail" guarantee, Tristan 2026-06-04). A corrective ladder
+  // is only safe if that decision is exactly right: a HIGH + high/medium-confidence finding that NAMES a
+  // specific part (where → …/words/N) AND describes a concrete failure mode (material-vs-temperature,
+  // undersized-vs-load, pressure-vs-rating) MUST block; a vague/holistic concern, a low/unknown flag, a
+  // MED, or an advisory "verify the rating" MUST NOT (gate-severity: KNOWN-WRONG hard-exits, a soft
+  // deviation flags + renders). Asserts BOTH directions on synthetic critiques — pure logic, no snapshot.
+  // The blocking case is the real CO₂-mineralisation MDPE-tank-at-120 °C finding verbatim shape.
+  try {
+    const issue = (o: Partial<{ severity: string; confidence: string; where: string; issue: string; suggested_check: string }>) => ({
+      dimension: 'engineering_plausibility', severity: 'high', confidence: 'high',
+      where: 'mass_fluid_transport_process/MEA Recovery & Recycle/sub_modules/0/words/3',
+      issue: 'placeholder', ...o,
+    }) as any
+    const crit = (issues: any[]) => ({ scores: {}, headline: '', issues, what_worked: [], model: 't', latency_ms: 0 }) as any
+    const onDec = (issues: any[]) => evaluatePhysicsCriticEnforcement(crit(issues), 'on')
+    const offDec = (issues: any[]) => evaluatePhysicsCriticEnforcement(crit(issues), 'off')
+
+    // the real CO₂ MDPE buffer-tank @ 120 °C finding — a named part + concrete material-vs-temperature failure
+    const mdpe = issue({ issue: 'The design specifies a moulded MDPE buffer tank for a loop operating at 120 °C. MDPE has a maximum service temperature of 60-80 °C and melts around 120-130 °C, meaning it will lose structural integrity and fail.', suggested_check: 'Replace with a 316L stainless steel vessel rated for the operating temperature.' })
+    // a named part undersized vs its load — should also block
+    const undersized = issue({ where: 'environmental_interface/Thermal Utilities/sub_modules/0/words/0', issue: 'The 215 kW heating element cannot supply the 282 kW required to vaporise 450 kg/h of steam; the element is undersized for the design load.' })
+    // a vague / holistic concern (no specific part path, hedge-only) — must NOT block
+    const vague = issue({ where: 'power_distribution/Electrical Distribution', confidence: 'medium', issue: 'Perform a detailed electrical load list and diversity factor analysis to ensure the MCC and transformer are sized correctly for simultaneous peak operations.' })
+    // a part-naming finding but only advisory ("verify") — must NOT block
+    const advisory = issue({ issue: 'Verify the boiler heating element rating against the maximum steam output specification.' })
+    // right shape but MED severity — must NOT block (only HIGH blocks)
+    const medFinding = issue({ severity: 'med', issue: 'The MDPE tank at 120 °C exceeds its maximum service temperature and will melt.' })
+    // right shape but low confidence — must NOT block (Critic honesty contract)
+    const lowConf = issue({ confidence: 'low', issue: 'The MDPE tank at 120 °C exceeds its maximum service temperature and will melt.' })
+
+    const checks: Array<[string, boolean]> = [
+      ['MDPE-at-120C blocks (on)',          onDec([mdpe]).shouldExit === true],
+      ['undersized element blocks (on)',    onDec([undersized]).shouldExit === true],
+      ['exit code is 33',                   onDec([mdpe]).exitCode === 33],
+      ['blockingFaults populated',          onDec([mdpe]).blockingFaults.length === 1],
+      ['failure_mode tagged material-temp', onDec([mdpe]).blockingFaults[0]?.failure_mode === 'material-vs-temperature'],
+      ['vague concern NOT block (on)',      onDec([vague]).shouldExit === false],
+      ['advisory verify NOT block (on)',    onDec([advisory]).shouldExit === false],
+      ['MED severity NOT block (on)',       onDec([medFinding]).shouldExit === false],
+      ['low confidence NOT block (on)',     onDec([lowConf]).shouldExit === false],
+      ['zero HIGHs NOT block (on)',         onDec([]).shouldExit === false],
+      ['off mode never blocks',             offDec([mdpe, undersized]).shouldExit === false],
+      ['mixed: blocks on the real fault',   onDec([vague, advisory, medFinding, mdpe]).shouldExit === true],
+    ]
+    const failed = checks.filter(([, ok]) => !ok).map(([n]) => n)
+    assertions.push(assertEq(
+      'UNIVERSAL.physics_critic_enforcement_blocks_failing_part',
+      `physics-critic enforcing blocks a KNOWN-failing part (named part + concrete failure mode: MDPE@120 °C, undersized element) and NEVER a vague concern / advisory / MED / low-confidence / zero-HIGH (12 cases)`,
+      failed.length,
+      (n) => n === 0,
+      () => `physics-critic enforcement decision wrong on: ${failed.join('; ')}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.physics_critic_enforcement_blocks_failing_part', description: 'physics-critic enforcement decision', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   // ── P3: uncostable-module disclosure — XOR + byte-identical + no fabricated mass (2026-06-02) ──
