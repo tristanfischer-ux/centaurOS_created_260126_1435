@@ -258,9 +258,21 @@ function buildRegulatoryFlags(state: any): string[] {
     out.push(code && name ? `${code} — ${name}` : code || name)
   }
   // Compliance-gate verdict adds context when it flagged the class.
+  // 2026-06-04: the gate's WARN reason for an unregistered class is a DEV-facing
+  // string ("No class-standards registered for '…'. Compliance check skipped …")
+  // that leaked the internal registry concept into the customer-facing Risk
+  // page — and contradicted the populated standards table on the Regulatory
+  // page. Reword the no-registry case to a customer-facing line (no source-file
+  // / registry reference); pass through any other genuine WARN reason verbatim.
   const cg = state?.complianceGate
   if (cg && String(cg.verdict ?? '').toUpperCase() === 'WARN' && cg.reason) {
-    out.push(`Compliance check: ${clip(String(cg.reason), 400)}`)
+    const reason = String(cg.reason)
+    const isNoRegistry = /class-standards|No class-standards registered|No regulatory standards registered/i.test(reason)
+    out.push(
+      isNoRegistry
+        ? 'No standing class-wide standards profile applies; the standards listed are those declared in the brief and must be verified by a qualified engineer before sale.'
+        : `Compliance check: ${clip(reason, 400)}`,
+    )
   }
   // De-duplicate, cap.
   return Array.from(new Set(out)).slice(0, 8)

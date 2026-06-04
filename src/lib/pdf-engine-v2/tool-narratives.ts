@@ -1220,6 +1220,73 @@ export const TOOL_NARRATIVES: Record<string, ToolNarrative> = {
     results_interpretation: 'stride_threats enumerates Spoofing/Tampering/Repudiation/Information-disclosure/DoS/Elevation-of-privilege risks specific to the design. dread_score per threat (0-50 scale) prioritises which to mitigate first. compliance_gap_count tells how far the design is from passing ETSI EN 303 645 or ISO 27001.',
     usage_pattern: 'Runs in the security gate for any connected product. Outputs feed the security-controls section + the firmware update + crypto BoM line items.',
   },
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Chemical-process / separations tools (CO₂ capture, mineralisation,
+  // crystallisation, drying, packaging — chemical-plant archetypes)
+  // ──────────────────────────────────────────────────────────────────────
+  'absorption:column-htu-ntu': {
+    description: 'Sizes a packed gas-absorption or stripping column — the packed height and shell diameter needed to transfer a target amount of a solute (e.g. CO₂ into an amine solvent) between a gas and a liquid stream, with a check against the flooding velocity.',
+    origin: 'In-tree implementation of the classic HTU–NTU (height-of-a-transfer-unit × number-of-transfer-units) method from Treybal, Mass-Transfer Operations (3rd ed.) and Perry\'s Chemical Engineers\' Handbook ch. 14. Flooding velocity from the Eckert generalised pressure-drop correlation for random packing.',
+    results_interpretation: 'NTU counts how many ideal transfer units the separation demands (higher = harder duty); HTU is the packing height that delivers one unit, so packed_height = HTU × NTU. The diameter is set so the gas velocity stays a safe fraction (~70 %) below flooding — too small a diameter floods the column and the liquid is blown back up the packing.',
+    usage_pattern: 'The first separations tool in a capture/stripping train: it fixes the absorber and stripper geometry, which then feed the pressure-vessel shell-mass tool, the pump head, and the BoM column line items.',
+  },
+
+  'crystalliser:evaporator-sizing': {
+    description: 'Sizes an evaporative or cooling crystalliser — the heat-transfer area, vessel diameter, and reboiler/cooling duty needed to crystallise a dissolved salt (e.g. K₂SO₄, CaCO₃) out of a saturated process liquor at a target production rate.',
+    origin: 'In-tree implementation of the evaporative-crystalliser energy + mass balance from Perry\'s Chemical Engineers\' Handbook ch. 18 (Mullin, Crystallization, 4th ed.). Solubility-vs-temperature data sets the achievable yield per pass; the latent-heat balance sets the evaporation duty.',
+    results_interpretation: 'duty_kw is the heat the reboiler must supply (evaporative) or the cooler must remove (cooling) to drop the liquor below saturation. area_m2 and diameter_m size the vessel for the required vapour or cooling load. If the duty is large relative to the product rate the salt is highly soluble and the design pays a heavy energy penalty per tonne.',
+    usage_pattern: 'Runs after the upstream reaction/absorption fixes the liquor composition; its duty feeds the thermal-utilities load and the BoM crystalliser + agitator line items.',
+  },
+
+  'dryer:thermal-sizing': {
+    description: 'Sizes a thermal dryer — the hot-air mass flow and heating duty needed to drive moisture off a wet solid product (filter cake) down to a target residual-moisture specification at a given throughput.',
+    origin: 'In-tree implementation of the convective-drying psychrometric mass-and-energy balance from Perry\'s Chemical Engineers\' Handbook ch. 12 (Mujumdar, Handbook of Industrial Drying). Drying-air enthalpy from humid-air psychrometrics; evaporation load from the free-moisture removed.',
+    results_interpretation: 'duty_kw is the heat required to evaporate the free moisture plus heat the air and solids; air_flow_kg_h is the carrier-gas rate that removes the vapour without re-saturating. A duty that dwarfs the product rate means the cake enters very wet — the upstream filter/centrifuge should remove more water mechanically (far cheaper than thermal drying).',
+    usage_pattern: 'Sits at the back of the solids train after crystallisation + filtration; its duty feeds the thermal-utilities total and the BoM dryer + heater line items.',
+  },
+
+  'bagging:throughput-sizing': {
+    description: 'Sizes the product packaging line — the bagging rate (bags/hour), day-silo buffer volume, and storage-silo volume needed to package a granular product at its production rate without bottlenecking upstream.',
+    origin: 'In-tree implementation of standard bulk-solids packaging-line throughput rules (FEM 2.581 bulk-handling guidance; open-mouth / valve-bagger nominal rates from Premier Tech, Haver & Boecker datasheets). Silo sizing from the required buffer hours × volumetric product rate ÷ bulk density.',
+    results_interpretation: 'bags_h must keep pace with production or product backs up; line_kg_h is the mass throughput the bagger sustains. The day-silo and storage-silo volumes set how many hours of product the plant can hold between bagging shifts — too small a buffer forces the whole plant to stop when the packaging line does.',
+    usage_pattern: 'The final equipment tool in a solids plant; it fixes the packaging + storage BoM line items and confirms the back end can absorb the front end\'s output rate.',
+  },
+
+  'electrical:cable-sizing': {
+    description: 'Sizes the plant power cabling — the conductor cross-sectional area for the main feeder and sub-circuits so each cable carries its design current within the allowed voltage-drop and temperature limits.',
+    origin: 'In-tree implementation of the IEC 60364-5-52 cable-sizing method (current-carrying capacity, installation-method derating, voltage-drop limit). Conductor resistivity and ampacity tables per IEC 60228 conductor classes.',
+    results_interpretation: 'csa_mm2 is the copper/aluminium cross-section each run needs; voltdrop_pct must stay under the limit (typically ≤ 5 % for power circuits) or motors see reduced starting torque. A design_current that pushes the cable into a very large CSA is a signal to step up the distribution voltage instead.',
+    usage_pattern: 'Runs once the connected load is known; it fixes the cable BoM line items and the feeder current that the transformer-sizing tool consumes.',
+  },
+
+  'electrical:transformer-sizing': {
+    description: 'Sizes the plant supply transformer — the kVA rating and the primary/secondary full-load currents needed to feed the total connected electrical load with headroom.',
+    origin: 'In-tree implementation of standard transformer sizing per IEC 60076: rating = connected load ÷ power factor × diversity/utilisation, with primary and secondary currents from S = √3·V·I for a three-phase unit.',
+    results_interpretation: 'kva is the transformer nameplate the supply needs; primary_current_a and secondary_current_a size the switchgear and cabling on each side. If the rating sits far above the running load the plant is paying for under-utilised iron; far below and the transformer overheats at peak demand.',
+    usage_pattern: 'Runs after the connected load is totalled; its kVA + currents feed the electrical-distribution BoM (transformer, switchgear) and the cable-sizing tool.',
+  },
+
+  'reaction:stoichiometry-balance': {
+    description: 'Closes the overall reaction mass balance — converts the target product rate (e.g. tonnes/day of CaCO₃) into the required feed rates of every reactant (CO₂, alkali, make-up chemicals) from the balanced reaction stoichiometry.',
+    origin: 'In-tree implementation of conservation-of-mass on the balanced chemical equation(s) — element and species balances per Felder & Rousseau, Elementary Principles of Chemical Processes. Molar masses from IUPAC atomic weights.',
+    results_interpretation: 'Each feed/product rate is the mass flow that makes the reaction balance at the stated conversion — they must sum (in minus out) to zero by element. These are the anchor numbers the whole plant is sized around; if the CO₂-in does not match the CaCO₃-out by carbon balance, every downstream size is wrong.',
+    usage_pattern: 'One of the first tools to run — it sets the throughput every other tool sizes against (column duty, reactor volume, crystalliser rate, bagging rate all scale from these flows).',
+  },
+
+  'reaction:feasibility-gibbs': {
+    description: 'Checks whether a proposed reaction is thermodynamically feasible — computes the Gibbs free-energy change and equilibrium constant at the operating temperature to confirm the reaction proceeds in the intended direction.',
+    origin: 'In-tree implementation of ΔG = ΔH − TΔS and K = exp(−ΔG/RT) from standard thermochemical data (NIST-JANAF tables; Atkins, Physical Chemistry). Temperature dependence via the van\'t Hoff relation.',
+    results_interpretation: 'A negative ΔG (and K > 1) means the reaction is spontaneous in the forward direction at that temperature — the feasibility flag passes. A positive ΔG means the reaction will not proceed as written without driving it (excess reagent, product removal, or a different temperature); the flag fails and the route must change.',
+    usage_pattern: 'A go/no-go gate run before the plant is sized — it confirms the chemistry is real before any equipment tool spends effort on a route that cannot work.',
+  },
+
+  'reactor:cstr-pfr-sizing': {
+    description: 'Sizes the main reaction vessel — the reactor volume, residence time, and shell geometry (diameter, height, wall thickness) needed to reach the target conversion at the design throughput, for a stirred-tank (CSTR) or plug-flow (PFR) reactor.',
+    origin: 'In-tree implementation of the CSTR/PFR design equations from Fogler, Elements of Chemical Reaction Engineering (4th ed.) — volume from the reaction-rate law × required conversion ÷ feed rate. Shell hoop stress per the thin-wall pressure-vessel relation (ASME BPVC Sec. VIII Div. 1 basis).',
+    results_interpretation: 'volume_m3 is the working volume that delivers the target conversion at the design flow; a longer residence time means a bigger (more expensive) vessel. hoop_stress_mpa vs the material yield, and wall_thickness_mm, confirm the shell holds the operating pressure with margin. yield_safety_factor shows how much conversion headroom the size carries.',
+    usage_pattern: 'The core vessel tool — it consumes the stoichiometry feed rates and the kinetics, then feeds the agitation-power tool (impeller in this volume) and the reactor + agitator BoM line items.',
+  },
 }
 
 /**

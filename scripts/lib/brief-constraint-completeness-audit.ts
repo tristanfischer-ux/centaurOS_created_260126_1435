@@ -139,6 +139,13 @@ const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   // row (status 'unknown' + note, achieved gypsum_feed_t_day×1000), not via the
   // generic METRIC_MAP loop — so it is NOT a "renderer-blindness" miss. The
   // gate-17 auditor recognises gypsum_feed_kg_per_day's achieved presence below.
+  // 2026-06-04: mirror the renderer's spelled-out CO₂ brief-metric keys (the
+  // live brief uses calcium_carbonate_/potassium_sulfate_/potassium_hydroxide_
+  // feed_, not the caco3_/k2so4_/koh_ abbreviations). Kept identical to
+  // render-minimal-pdf.tsx::METRIC_MAP per the I12b keyset-sync invariant.
+  calcium_carbonate_production_kg_per_day: { qtyKey: 'caco3_product_t_day', label: 'CaCO₃ production rate' },
+  potassium_sulfate_production_kg_per_day: { qtyKey: 'k2so4_product_t_day', label: 'K₂SO₄ production rate' },
+  potassium_hydroxide_feed_kg_per_day: { qtyKey: 'koh_makeup_t_day', label: 'KOH make-up feed rate' },
   caco3_production_kg_per_day: { qtyKey: 'caco3_product_t_day', label: 'CaCO₃ production rate' },
   k2so4_production_kg_per_day: { qtyKey: 'k2so4_product_t_day', label: 'K₂SO₄ production rate' },
   koh_feed_kg_per_day: { qtyKey: 'koh_makeup_t_day', label: 'KOH make-up feed rate' },

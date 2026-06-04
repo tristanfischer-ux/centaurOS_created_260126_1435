@@ -32,9 +32,9 @@
  *   8  agitation:power                 carbonation reactor agitator power
  *   9  agitation:power                 K2SO4 crystalliser agitator power
  *   10 fluids:pipe-sizing              rich-MEA / CaCO3-slurry transfer line      [was existing]
- *   11 irrigation:pump-sizing          MEA circulation pump (head + motor kW)
+ *   11 process:pump-sizing             MEA circulation pump (TDH + motor kW; Darcy-Weisbach)
  *   12 coolprop:refrigerant-properties condenser coolant (50% glycol) ρ + cp
- *   13 corrosion:anode-sizing          cathodic protection (MEA + KOH wetted steel)
+ *   13 (removed)                       corrosion:anode-sizing deleted — no CP duty on a skid in air
  *   14 control-systems:pid-tuning      carbonation-reactor pH control loop
  *   15 noise-emission:dba              occupational noise (pumps / blowers / dryer)
  *   16 fire-suppression:nfpa           clean-agent suppression (combustible MEA)
@@ -79,15 +79,13 @@
  *   - coolprop on 50% propylene glycol (INCOMP::APG[0.50]) returns REAL liquid density
  *     (1034 kg/m3) + liquid cp (3.59 kJ/kg·K). Its saturation pressure is 0 for an
  *     incompressible fluid, so we DO NOT read that field — only the two real properties.
- *   - corrosion:anode-sizing models a galvanic CP system; we pass the wetted steel
- *     surface as `stainless_316` (the tool's 316 alloy key) and the low-salinity
- *     process-water environment. It returns a real protection current + anode mass.
- *   - pressure-vessel:design models a thin-wall cylinder under EXTERNAL pressure set by
- *     depth_m. For these INTERNALLY-pressurised columns/reactor we pass a
- *     PRESSURE-EQUIVALENT depth so hoop stress + wall + shell MASS (geometry × density,
- *     exact + pressure-independent) come out at the real design pressure, and we surface
- *     the YIELD safety factor (the governing check for internal pressure) — NOT the
- *     external-buckling top-level `safety_factor`, which is physically inapplicable.
+ *   - pressure-vessel:design is invoked in mode:'internal' for these INTERNALLY-
+ *     pressurised columns/reactor: it sizes the shell from the real INTERNAL design
+ *     gauge pressure (3 barg) via the ASME VIII Div.1 UG-27 hoop-stress wall rule and
+ *     reports the YIELD safety factor (the governing check for internal pressure). NO
+ *     seawater / depth / external-hydrostatic maths — the old depthEquivM "pressure-
+ *     equivalent seawater depth" hack (physically inapplicable to a chemical plant) is
+ *     GONE. The AUV/submersible classes keep the default mode:'external' path.
  *
  * Each tool step's contract_update WRITES ≥1 real quantity (with tool provenance) so
  * the "Tools Used in This Report" appendix + the "Engineering Tools Flow" page
@@ -145,14 +143,14 @@ function withDesignParameters(quantities: Record<string, any>): Record<string, a
   }
 }
 
-// Shared column-geometry helper: pressure-equivalent depth for a 3 barg design
-// pressure (pressure_vessel.py sets external pressure = rho_seawater·g·depth_m).
-const depthEquivM = (designPressurePa: number) => Math.round((designPressurePa / (1025 * 9.80665)) * 10) / 10
-
 // ===========================================================================
 // 1. pressure-vessel:design — MEA ABSORBER COLUMN shell.
-//    Tall packed column; DN900 × ~9 m, 3 barg design. Reads REAL outputs:
-//    wall_thickness_mm, mass_kg, hoop_stress_mpa, yield_safety_factor.
+//    Tall packed column; DN900 × ~9 m, 3 barg INTERNAL design pressure. Reads
+//    REAL outputs: wall_thickness_mm, mass_kg, hoop_stress_mpa, yield_safety_factor.
+//    mode:'internal' sizes the shell from the INTERNAL gauge pressure (ASME VIII
+//    Div.1 UG-27 hoop stress) — a real chemical-plant pressure vessel, NOT the
+//    fake "29.8 m of seawater" external-hydrostatic hack the old depthEquivM
+//    helper produced.
 // ===========================================================================
 const stepAbsorberVessel: ToolStep = {
   tool_id: 'pressure-vessel:design',
@@ -162,11 +160,13 @@ const stepAbsorberVessel: ToolStep = {
     const diaMm = Math.round(q(c, 'absorber_diameter_mm', 900))
     const htMm = Math.round(q(c, 'absorber_height_mm', 9000))
     return {
-      depth_m: depthEquivM(0.3e6),      // 3 barg packed-column design pressure
+      mode: 'internal' as const,        // internal-pressure process column
+      design_pressure_barg: 3.0,        // 3 barg packed-column design pressure
       diameter_mm: diaMm,
-      wall_thickness_mm: 6,             // trial wall; tool reports stress + SF
+      wall_thickness_mm: 6,             // trial wall floor; tool computes the UG-27 minimum
       length_mm: htMm,
       material: 'steel_316L',           // stainless packed absorber (in MATERIALS)
+      corrosion_allowance_mm: 3.0,
       safety_factor_required: 2.0,
     }
   },
@@ -182,7 +182,8 @@ const stepAbsorberVessel: ToolStep = {
 
 // ===========================================================================
 // 2. pressure-vessel:design — MEA STRIPPER / REGENERATOR COLUMN shell.
-//    DN750 × ~8 m, 3 barg. Distinct quantity names from the absorber.
+//    DN750 × ~8 m, 3 barg INTERNAL design pressure. mode:'internal' (UG-27 hoop
+//    stress). Distinct quantity names from the absorber.
 // ===========================================================================
 const stepStripperVessel: ToolStep = {
   tool_id: 'pressure-vessel:design',
@@ -192,11 +193,13 @@ const stepStripperVessel: ToolStep = {
     const diaMm = Math.round(q(c, 'stripper_diameter_mm', 750))
     const htMm = Math.round(q(c, 'stripper_height_mm', 8000))
     return {
-      depth_m: depthEquivM(0.3e6),
+      mode: 'internal' as const,        // internal-pressure process column
+      design_pressure_barg: 3.0,
       diameter_mm: diaMm,
-      wall_thickness_mm: 6,
+      wall_thickness_mm: 6,             // trial wall floor; tool computes the UG-27 minimum
       length_mm: htMm,
       material: 'steel_316L',
+      corrosion_allowance_mm: 3.0,
       safety_factor_required: 2.0,
     }
   },
@@ -334,7 +337,9 @@ const stepCondenserHx: ToolStep = {
 
 // ===========================================================================
 // 7. pressure-vessel:design — GYPSUM CARBONATION REACTOR shell. [was existing]
-//    Jacketed stirred tank, 3 barg design. L/D ≈ 1.5 from contract volume.
+//    Jacketed stirred tank, 3 barg INTERNAL design pressure. L/D ≈ 1.5 from
+//    contract volume. mode:'internal' (UG-27 hoop stress) — the YIELD safety
+//    factor is the genuine governing check for an internally-pressurised vessel.
 // ===========================================================================
 const stepReactorVessel: ToolStep = {
   tool_id: 'pressure-vessel:design',
@@ -346,11 +351,13 @@ const stepReactorVessel: ToolStep = {
     const diameterM = Math.cbrt((4 * volM3) / (1.5 * Math.PI))
     const lengthM = 1.5 * diameterM
     return {
-      depth_m: depthEquivM(0.3e6),                 // pressure-equivalent (3 barg)
+      mode: 'internal' as const,                    // internal-pressure jacketed reactor
+      design_pressure_barg: 3.0,                    // 3 barg design pressure
       diameter_mm: Math.round(diameterM * 1000),
-      wall_thickness_mm: 8,                         // trial wall; tool reports stress + SF
+      wall_thickness_mm: 8,                         // trial wall floor; tool computes the UG-27 minimum
       length_mm: Math.round(lengthM * 1000),
       material: 'steel_316L',                       // jacketed stainless reactor
+      corrosion_allowance_mm: 3.0,
       safety_factor_required: 2.0,
     }
   },
@@ -360,8 +367,8 @@ const stepReactorVessel: ToolStep = {
       reactor_wall_thickness_mm: mkQty(num(output, 'wall_thickness_mm') ?? 8, 'mm', 'length', p('wall_thickness_mm'), 'carbonation reactor'),
       reactor_shell_mass_kg: mkQty(num(output, 'mass_kg') ?? 922, 'kg', 'mass', p('mass_kg'), 'carbonation reactor shell'),
       reactor_hoop_stress_mpa: mkQty(num(output, 'hoop_stress_mpa') ?? 28, 'MPa', 'pressure', p('hoop_stress_mpa'), 'carbonation reactor'),
-      // Internally-pressurised vessel → the YIELD safety factor governs (not the
-      // external-buckling top-level `safety_factor`, which is physically inapplicable).
+      // Internally-pressurised vessel → the YIELD safety factor governs (internal
+      // mode returns it directly as the governing safety check).
       reactor_yield_safety_factor: mkQty(num(output, 'yield_safety_factor') ?? 10, '', 'dimensionless', p('yield_safety_factor'), 'yield-governing (internal pressure)'),
     } }
   },
@@ -437,7 +444,7 @@ const stepCrystalliserAgitator: ToolStep = {
 const stepFluids: ToolStep = {
   tool_id: 'fluids:pipe-sizing',
   required: false,
-  feeds_into: ['irrigation:pump-sizing', 'mass-aggregator:envelope-check'] as string[],
+  feeds_into: ['process:pump-sizing', 'mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => {
     const meaCircM3H = q(c, 'mea_circulation_m3_h', 3)
     return {
@@ -460,30 +467,41 @@ const stepFluids: ToolStep = {
 }
 
 // ===========================================================================
-// 11. irrigation:pump-sizing — MEA CIRCULATION PUMP (head + motor sizing).
-//     irrigation_pump_sizing.py input keys: total_emitters, flow_per_emitter_l_h,
-//     system_type, pressure_loss_kpa, static_head_m, pipe_length_m, pipe_diameter_mm.
-//     A single circulation duty = one "emitter" at the full flow. REAL outputs:
-//     pump_head_m, motor_power_kw, recommended_motor_kw, hydraulic_power_w, pump_flow_lpm.
+// 11. process:pump-sizing — MEA CIRCULATION PUMP (head + motor sizing).
+//     A PROCESS centrifugal pump (NOT an irrigation/sprinkler system): total
+//     dynamic head = static lift + Darcy-Weisbach pipe friction + process
+//     backpressure (column packing + exchangers + filter); motor power
+//     P = rho g Q H / eta. process_pump_sizing.py input keys: flow_m3_h,
+//     fluid_density_kg_m3, fluid_viscosity_pa_s, static_head_m, pipe_length_m,
+//     pipe_diameter_mm, roughness_mm, process_backpressure_kpa, pump_efficiency,
+//     motor_efficiency. REAL outputs: pump_head_m, recommended_motor_kw,
+//     motor_power_kw, hydraulic_power_w, pipe_velocity_m_s, reynolds.
+//     Replaces the old irrigation:pump-sizing (drip/NFT/sprinkler, Hazen-
+//     Williams, "n_emitters") hack — that worked-calc made no sense in a
+//     chemical plant.
 // ===========================================================================
 const stepCirculationPump: ToolStep = {
-  tool_id: 'irrigation:pump-sizing',
+  tool_id: 'process:pump-sizing',
   required: false,
   feeds_into: ['mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => {
     const meaCircM3H = q(c, 'mea_circulation_m3_h', 3)
     return {
-      total_emitters: 1,                          // single circulation duty point
-      flow_per_emitter_l_h: meaCircM3H * 1000,     // full circulation flow in L/h
-      system_type: 'sprinkler',                    // medium-head centrifugal duty
-      pressure_loss_kpa: 250,                      // column packing + exchangers + filter
+      pump_name: 'MEA circulation pump',
+      flow_m3_h: meaCircM3H,                       // full circulation duty flow
+      fluid_density_kg_m3: 1000,                   // 30 wt% aqueous MEA ≈ water
+      fluid_viscosity_pa_s: 0.0013,                // warm aqueous amine ≈ water
       static_head_m: 12,                           // absorber-top static lift
-      pipe_length_m: 40,
-      pipe_diameter_mm: 50,
+      pipe_length_m: 40,                           // absorber sump → reactor run
+      pipe_diameter_mm: 50,                        // DN50 process header
+      roughness_mm: 0.015,                         // drawn stainless tube
+      process_backpressure_kpa: 250,               // column packing + exchangers + filter dP
+      pump_efficiency: 0.65,                       // centrifugal at duty point
+      motor_efficiency: 0.90,
     }
   },
   contract_update: (c: ContractInProgress, output: any) => {
-    const p = provFor('irrigation:pump-sizing', '1.0.0', 'free-proprietary', 'internal://forgeos/process')
+    const p = provFor('process:pump-sizing', '1.0.0', 'free-proprietary', 'internal://forgeos/process')
     return { ...c, quantities: { ...c.quantities,
       mea_pump_head_m: mkQty(num(output, 'pump_head_m') ?? 37.7, 'm', 'length', p('pump_head_m'), 'MEA circulation pump head'),
       mea_pump_motor_kw: mkQty(num(output, 'recommended_motor_kw', 'motor_power_kw') ?? 0.75, 'kW', 'power', p('recommended_motor_kw'), 'MEA circulation pump motor'),
@@ -516,33 +534,19 @@ const stepCoolantProps: ToolStep = {
 }
 
 // ===========================================================================
-// 13. corrosion:anode-sizing — CATHODIC PROTECTION of MEA + KOH wetted steel.
-//     corrosion_anode_sizing.py input keys: hull_material, hull_area_m2,
-//     salinity_ppt, water_temp_c, mission_life_years, anode_material.
-//     REAL outputs: total_current_required_a, anode_mass_kg_actual_installed,
-//     anode_count, replacement_interval_years.
+// 13. (REMOVED 2026-06-04) corrosion:anode-sizing — was CATHODIC PROTECTION of
+//     MEA + KOH wetted steel. DELETED: a road-transportable skid sitting in AIR
+//     has NO cathodic-protection duty (CP is a galvanic/impressed-current method
+//     for steel IMMERSED in an electrolyte — seawater, soil, a buried tank). The
+//     corrosion_anode_sizing.py tool models a marine hull's sacrificial anodes
+//     (DNV-RP-B401), which is physically inapplicable here. Internal-wetted
+//     corrosion of the columns/reactor is covered by each vessel's
+//     corrosion_allowance_mm (3 mm) in the pressure-vessel:design step. Removing
+//     the step also drops the cp_protection_current / cp_anode_mass /
+//     cp_anode_replacement_interval quantities so "sacrificial anodes" + a
+//     cathodic-protection current stop appearing in the physics narrative + the
+//     risk/safety section of a CO2 chemical-plant dossier.
 // ===========================================================================
-const stepCorrosion: ToolStep = {
-  tool_id: 'corrosion:anode-sizing',
-  required: false,
-  feeds_into: ['mass-aggregator:envelope-check'] as string[],
-  input_from_contract: (c: ContractInProgress) => ({
-    hull_material: 'stainless_316',               // 316 wetted vessels/lines (tool alloy key)
-    hull_area_m2: q(c, 'wetted_steel_area_m2', 45),
-    salinity_ppt: 5,                              // low-conductivity process water (not seawater)
-    water_temp_c: 40,                             // warm amine/process liquor
-    mission_life_years: 20,
-    anode_material: 'aluminium_zinc_indium',
-  }),
-  contract_update: (c: ContractInProgress, output: any) => {
-    const p = provFor('corrosion:anode-sizing', '1.0.0', 'free-proprietary', 'internal://forgeos/corrosion')
-    return { ...c, quantities: { ...c.quantities,
-      cp_protection_current_a: mkQty(num(output, 'total_current_required_a') ?? 0.23, 'A', 'current', p('total_current_required_a'), 'cathodic-protection current'),
-      cp_anode_mass_kg: mkQty(num(output, 'anode_mass_kg_actual_installed') ?? 20, 'kg', 'mass', p('anode_mass_kg_actual_installed'), 'sacrificial anodes installed'),
-      cp_anode_replacement_interval_years: mkQty(num(output, 'replacement_interval_years') ?? 18, 'yr', 'time', p('replacement_interval_years'), 'anode replacement interval'),
-    } }
-  },
-}
 
 // ===========================================================================
 // 14. control-systems:pid-tuning — CARBONATION-REACTOR pH CONTROL LOOP.
@@ -1074,8 +1078,8 @@ const stepBaggingSizing: ToolStep = {
   required: false,
   feeds_into: [] as string[],
   input_from_contract: (c: ContractInProgress) => ({
-    line_name: 'solids bagging line (K2SO4)',
-    product_mass_rate_t_day: q(c, 'k2so4_product_t_day', 3.96),  // larger product stream sizes the line
+    line_name: 'solids bagging + packaging line (CaCO3 + K2SO4)',
+    product_mass_rate_t_day: q(c, 'caco3_product_t_day', 2.27) + q(c, 'k2so4_product_t_day', 3.96),  // BOTH product streams bag on one net-weigh line (~6.23 t/day -> ~249 bags/day, matching the spec + bagger capacity)
     bag_kg: 25,                                        // 25 kg net-weigh bags
     operating_hours_per_day: 16,                       // two-shift bagging basis
     silo_buffer_hours: 24,                             // one-day product buffer silo
@@ -1162,7 +1166,9 @@ export const CO2_MINERALISATION_PLAN: ClassToolPlan = {
     stepFluids,              // 10 → pump
     stepCirculationPump,     // 11
     stepCoolantProps,        // 12
-    stepCorrosion,           // 13
+    // 13 (corrosion:anode-sizing) REMOVED 2026-06-04 — no cathodic-protection duty
+    //    on a road-transportable skid in air; internal-wetted corrosion is covered
+    //    by each vessel's corrosion_allowance_mm.
     stepPidControl,          // 14
     stepNoise,               // 15
     stepFireSuppression,     // 16

@@ -29,6 +29,7 @@ import './tools/reactor-cstr-pfr-sizing'         // reactor:cstr-pfr-sizing — 
 import './tools/crystalliser-evaporator-sizing'  // crystalliser:evaporator-sizing — duty + U·A·ΔT area + magma vessel (CoolProp h_fg + Perry)
 import './tools/absorption-column-htu-ntu'       // absorption:column-htu-ntu — H=HTU·NTU (Colburn) + flooding diameter (Eckert GPDC)
 import './tools/dryer-thermal-sizing'            // dryer:thermal-sizing — evap load + air flow (humidity pick-up) + heater duty (psychrolib)
+import './tools/process-pump-sizing'             // process:pump-sizing — TDH (static + Darcy-Weisbach friction + backpressure) + motor kW (Karassik; replaces irrigation:pump-sizing hack)
 // 2026-06-04 ELECTRICAL + BAGGING sizing — ground the CO2 plant's Electrical
 // Distribution + Bagging & Packaging modules (no electrical/bagging tool existed):
 import './tools/electrical-transformer-sizing'   // electrical:transformer-sizing — kVA + primary/secondary currents (IEC 60076)

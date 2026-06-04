@@ -48,6 +48,7 @@ import { buildContractForChain, type EngineeringContract } from './lib/engineeri
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
+import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
 // The orchestrator's assembler.ts lazy-loads emitBessDesign internally via
 // `await import('../deterministic-emitter')` at assembler.ts:130 — that path
@@ -5967,6 +5968,65 @@ async function main() {
     } catch (err) {
       console.error(`[chain] cost-sanity (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
       logAction({ step: 'cost_sanity_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tCS })
+    }
+  }
+
+  // ── Tool-archetype coherence gate (gate 34, SHADOW by default, 2026-06-04): the
+  //    AIM self-correction net for the CO₂-mineralisation "wrong physics" bug — a
+  //    UNIVERSAL engine must never present marine / domain-mismatched worked-calcs
+  //    inside a non-marine plant. On the CO₂ release the engine reached for MARINE
+  //    stand-in tools when no in-class process tool existed and rendered their
+  //    worked-calcs straight into the dossier: pressure-vessel:design computed
+  //    "external hydrostatic at 29.8 m seawater depth, rho_water=1025" (a SUBMERSIBLE
+  //    HULL collapse check), corrosion:anode-sizing computed DNV-RP-B401 "sacrificial
+  //    anode" / "A_hull" cathodic protection (a SHIP-HULL calc) + seeded cp_anode_*
+  //    quantities, and irrigation:pump-sizing computed Hazen-Williams "sprinkler"
+  //    maths with n_emitters. None is wrong PHYSICS in the abstract (all legitimate
+  //    on the `auv` class) — it is wrong CLASS. This gate scans every tool's worked-
+  //    calcs + every contract quantity for MARINE / IRRIGATION markers and, on a
+  //    class that is NOT marine, emits a HIGH per offending tool. Pure + deterministic
+  //    (no LLM). SHADOW by default: records state.toolArchetypeCoherence + logs the
+  //    would-block verdict + NEVER exits. ENFORCING is opt-in via TOOL_ARCHETYPE_ENFORCING
+  //    (off→shadow); a HIGH then hard-exits 34 (gate-severity: WRONGNESS exits). The
+  //    marine markers are SUPPRESSED on a marine class (legitimate there), so an AUV
+  //    dossier never trips. Self-contained re-read of the final state (toolsUsedPage +
+  //    orchestratorContract are persisted above). Kill: CHAIN_SKIP_TOOL_ARCHETYPE=1.
+  //    See tool-archetype-coherence-audit.ts.
+  if (!process.env.CHAIN_SKIP_TOOL_ARCHETYPE) {
+    const tTA = Date.now()
+    try {
+      const taState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const ta = computeToolArchetypeCoherence(taState)
+      taState.toolArchetypeCoherence = ta
+      writeFileSync(statePath, JSON.stringify(taState, null, 2))
+      console.error(`[chain] tool-archetype coherence (shadow): ${ta.verdict.toUpperCase()} — ${ta.message}`)
+      for (const f of ta.findings.slice(0, 8)) console.error(`  ✗ ${f.tool_id} [${f.family}:${f.marker}] (${f.surface})`)
+      logAction({
+        step: 'tool_archetype_coherence_shadow', ok: true, verdict: ta.verdict,
+        product_class: ta.product_class, is_marine_class: ta.is_marine_class,
+        findings: ta.findings.length, tools_scanned: ta.tools_scanned,
+        quantities_scanned: ta.quantities_scanned,
+        offending: ta.findings.map((f) => `${f.tool_id}:${f.family}:${f.marker}`),
+        latency_ms: Date.now() - tTA,
+      })
+      // ENFORCING (opt-in via TOOL_ARCHETYPE_ENFORCING): a HIGH domain-mismatch hard-exits
+      // so it never ships. Default is OFF (shadow) so an in-flight re-run is never blocked.
+      // State is already persisted above, so the verdict is recorded even when we exit here.
+      const taMode = toolArchetypeEnforceModeFromEnv(process.env.TOOL_ARCHETYPE_ENFORCING)
+      if (taMode === 'on') {
+        const decision = evaluateToolArchetypeEnforcement(ta, taMode)
+        if (decision.shouldExit) {
+          console.error(`[chain] tool-archetype coherence ENFORCING: BLOCKING (exit ${decision.exitCode}) — the design presents ${decision.reasons.length} domain-mismatched (marine/irrigation) tool calc(s) in a non-marine "${ta.product_class || 'unknown'}" class. The engine grabbed a wrong-domain stand-in for a missing process tool. Fix the class-plan tool wiring and re-run.`)
+          for (const r of decision.reasons.slice(0, 8)) console.error(`  ✗ ${r}`)
+          logAction({ step: 'tool_archetype_coherence_enforce', ok: false, exit_code: decision.exitCode, verdict: ta.verdict, reasons: decision.reasons, latency_ms: Date.now() - tTA })
+          process.exit(decision.exitCode)
+        }
+        console.error(`[chain] tool-archetype coherence enforcing: no domain-mismatched tool — ship allowed (verdict ${ta.verdict}).`)
+        logAction({ step: 'tool_archetype_coherence_enforce', ok: true, verdict: ta.verdict })
+      }
+    } catch (err) {
+      console.error(`[chain] tool-archetype coherence (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
+      logAction({ step: 'tool_archetype_coherence_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tTA })
     }
   }
 

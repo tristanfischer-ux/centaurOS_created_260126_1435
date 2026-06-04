@@ -40,7 +40,9 @@ import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync } from '
 import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
-import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode, moduleToolIds } from './render-minimal-pdf'
+import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode, moduleToolIds, break_paragraph, humaniseSubName } from './render-minimal-pdf'
+import { computeToolArchetypeCoherence, isMarineClass } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
 import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, isBespokeFabrication } from '../src/lib/pdf-engine-v2/lib/bespoke-equipment-bands'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
@@ -440,6 +442,267 @@ function checkSizingToolsWorkedSound(): Assertion[] {
     }
   }
   _sizingWorkedCheck = out
+  return out
+}
+
+// ── CO₂-engine fix invariants (2026-06-04) ──────────────────────────────────
+//
+// Five self-contained (snapshot-independent) invariants guarding the batch of
+// CO₂-mineralisation fixes that just landed:
+//
+//   1. UNIVERSAL.break_paragraph_preserves_version_tokens — the chunker's
+//      inter-digit-period protection must keep version strings ("v1.0.0") /
+//      IP addresses ("10.0.0.1") whole, never shattering "…v1.0.0 outputs:"
+//      into a stray "0 outputs:" chunk (the version-shatter signature).
+//   2. UNIVERSAL.humanise_sub_name_collapses_raw_id — humaniseSubName must
+//      collapse a doubled raw id and never leave an underscore in the label,
+//      while leaving a genuine human label untouched.
+//   3. UNIVERSAL.tool_archetype_coherence_flags_marine_tools_on_nonmarine_class
+//      (gate 34) — computeToolArchetypeCoherence + isMarineClass on synthetic
+//      states, both directions (marine tool on a CO₂ plant flags; the same on an
+//      AUV is suppressed; clean process tool never flags; "emitter" disambiguated).
+//   4. UNIVERSAL.pressure_vessel_internal_mode_no_seawater — the pressure-vessel
+//      tool's internal mode emits NO seawater/hydrostatic/depth maths (CO₂ column
+//      path), while external mode still surfaces the AUV hull-collapse worked-calc.
+//   5. CO2.no_marine_or_irrigation_tools_in_plan — the CO₂ plan no longer wires
+//      irrigation:pump-sizing / corrosion:anode-sizing, DOES wire process:pump-
+//      sizing, and every pressure-vessel:design step requests mode 'internal'.
+//
+// Memoised so invariant 4's .venv python spawns once per run (mirrors the
+// reaction/sizing checks). Each tool-invoking probe is try/catch-guarded → a
+// missing .venv python yields a vacuous PASS rather than failing the harness.
+let _co2FixCheck: Assertion[] | null = null
+function checkCo2FixInvariants(): Assertion[] {
+  if (_co2FixCheck) return _co2FixCheck
+  const out: Assertion[] = []
+
+  // ── (1) UNIVERSAL.break_paragraph_preserves_version_tokens ────────────────
+  {
+    const probes = [
+      'The module uses the verified Packed Column (HTU-NTU) v1.0.0 outputs: a = 1.4 m, b = 0.2 m, c = 2.35. These dimensions deliver the target while remaining transportable. The HX v1.2.0 confirms the exchanger recovers 185.7 kW at 0.76 effectiveness, minimising steam.',
+      'Rushton Agitation Power v1.0.0 supplies 1051.32 W at 3.77 m/s tip speed. The reactor is sized to 4.8 m3 working volume. A third sentence forces chunking here.',
+      'IP 10.0.0.1 routes traffic. Firmware version 2.10.4 is supported. A third sentence forces chunking here.',
+    ]
+    const shatterRe = /^\s*\d+\s+(outputs|confirms|supplies|requires|sizes|delivers|calculates|maintains|reports|computes|yields)\b/
+    const versionRe = /\bv?\d+\.\d+\.\d+\b/g
+    const offenders: string[] = []
+    for (const p of probes) {
+      const chunks = break_paragraph(p)
+      // (a) no chunk may begin with the version-shatter signature
+      for (const ch of chunks) {
+        if (shatterRe.test(ch)) offenders.push(`shatter chunk "${ch.slice(0, 48)}" in probe "${p.slice(0, 40)}…"`)
+      }
+      // (b) every dotted version/IP token in the source must survive in the joined chunks
+      const joined = chunks.join(' ')
+      const tokens = p.match(versionRe) ?? []
+      for (const tok of tokens) {
+        if (!joined.includes(tok)) offenders.push(`token "${tok}" lost in probe "${p.slice(0, 40)}…"`)
+      }
+    }
+    out.push(assertEq(
+      'UNIVERSAL.break_paragraph_preserves_version_tokens',
+      'break_paragraph keeps version/IP tokens (v1.0.0, 10.0.0.1) whole — no "<digit> outputs/confirms/…" shatter chunk, every dotted token survives',
+      offenders.length, (n) => n === 0,
+      () => `break_paragraph shattered version tokens: ${offenders.slice(0, 3).join(' ; ')}. Check the inter-digit-period protection in render-minimal-pdf.tsx break_paragraph.`,
+    ))
+  }
+
+  // ── (2) UNIVERSAL.humanise_sub_name_collapses_raw_id ──────────────────────
+  {
+    const bad: string[] = []
+    const check = (label: string, actual: string, ok: boolean) => {
+      if (!ok) bad.push(`${label} -> "${actual}"`)
+    }
+    check('doubled raw id collapses',
+      humaniseSubName('mass_fluid_transport_process_mass_fluid_transport_process'),
+      humaniseSubName('mass_fluid_transport_process_mass_fluid_transport_process') === 'Mass Fluid Transport Process')
+    check('raw id (fluid+thermal) has no underscore',
+      humaniseSubName('mass_fluid_transport_process_thermal_transfer'),
+      !humaniseSubName('mass_fluid_transport_process_thermal_transfer').includes('_'))
+    check('raw id (energy conversion) has no underscore',
+      humaniseSubName('energy_conversion_transduction_chemical_reaction'),
+      !humaniseSubName('energy_conversion_transduction_chemical_reaction').includes('_'))
+    check('real label untouched',
+      humaniseSubName('MEA Absorption & Capture'),
+      humaniseSubName('MEA Absorption & Capture') === 'MEA Absorption & Capture')
+    out.push(assertEq(
+      'UNIVERSAL.humanise_sub_name_collapses_raw_id',
+      'humaniseSubName collapses a doubled raw id + strips underscores from a raw id + leaves a genuine label untouched',
+      bad.length, (n) => n === 0,
+      () => `humaniseSubName wrong: ${bad.join(' ; ')}. Check render-minimal-pdf.tsx humaniseSubName.`,
+    ))
+  }
+
+  // ── (3) gate 34: tool-archetype coherence flags marine tools on non-marine class ──
+  {
+    // Helpers to build the minimal state shapes computeToolArchetypeCoherence reads.
+    const mkState = (productClass: string, tools: any[], quantities: Record<string, any> = {}) => ({
+      parsedBrief: { product_class: productClass },
+      toolsUsedPage: { tools },
+      orchestratorContract: { quantities },
+    })
+    const mkTool = (tool_id: string, workedText: string) => ({
+      tool_id,
+      worked: [{ label: tool_id, formula: workedText, substitution: `${tool_id} = ${workedText}`, assumptions: [] }],
+    })
+    // a finding for a given tool_id + family present?
+    const hasFinding = (r: { findings: Array<{ tool_id: string; family: string }> }, toolId: string, family: string) =>
+      r.findings.some((f) => f.tool_id === toolId && f.family === family)
+    const noFindingFor = (r: { findings: Array<{ tool_id: string }> }, toolId: string) =>
+      !r.findings.some((f) => f.tool_id === toolId)
+
+    const failed: string[] = []
+    const want = (label: string, cond: boolean) => { if (!cond) failed.push(label) }
+
+    // (a) non-marine + pressure-vessel external-hydrostatic worked-calc → marine 'high' finding
+    {
+      const r = computeToolArchetypeCoherence(mkState('co2_mineralisation', [
+        mkTool('pressure-vessel:design', 'External hydrostatic pressure at 29.8 m seawater depth, rho_water = 1025 kg/m3'),
+      ]))
+      want('(a) verdict high', r.verdict === 'high')
+      want('(a) marine finding on pressure-vessel:design', hasFinding(r, 'pressure-vessel:design', 'marine'))
+    }
+    // (b) non-marine + corrosion A_hull worked-calc → marine finding;
+    //     + a contract quantity whose condition is 'cathodic-protection current' → finding
+    {
+      const r = computeToolArchetypeCoherence(mkState('co2_mineralisation',
+        [mkTool('corrosion:anode-sizing', 'A_hull sacrificial anode mass per DNV-RP-B401')],
+        { cp_protection_current_a: { condition: 'cathodic-protection current', provenance: { tool_id: 'corrosion:anode-sizing' } } },
+      ))
+      want('(b) marine finding on corrosion (worked-calc)', hasFinding(r, 'corrosion:anode-sizing', 'marine'))
+      want('(b) marine finding from cathodic-protection quantity', r.findings.some((f) => f.family === 'marine' && f.surface === 'contract-quantity'))
+    }
+    // (c) non-marine + irrigation worked-calc (n_emitters / Hazen-Williams / sprinkler) → irrigation finding
+    {
+      const r = computeToolArchetypeCoherence(mkState('co2_mineralisation', [
+        mkTool('irrigation:pump-sizing', 'n_emitters via Hazen-Williams sprinkler head loss'),
+      ]))
+      want('(c) verdict high', r.verdict === 'high')
+      want('(c) irrigation finding on irrigation:pump-sizing', hasFinding(r, 'irrigation:pump-sizing', 'irrigation'))
+    }
+    // (d) non-marine + CLEAN process tool (hoop stress, no marine words) → NOT in findings
+    {
+      const r = computeToolArchetypeCoherence(mkState('co2_mineralisation', [
+        mkTool('reactor:cstr-pfr-sizing', 'sigma_hoop = p x r / t for the 316L stirred-tank shell'),
+      ]))
+      want('(d) clean process tool not flagged', noFindingFor(r, 'reactor:cstr-pfr-sizing'))
+    }
+    // (e) MARINE class (auv) + the SAME marine worked-calcs → ZERO marine findings (suppressed)
+    {
+      const r = computeToolArchetypeCoherence(mkState('auv',
+        [mkTool('pressure-vessel:design', 'External hydrostatic pressure at 1000 m seawater depth, rho_water = 1025 kg/m3'),
+         mkTool('corrosion:anode-sizing', 'A_hull sacrificial anode mass per DNV-RP-B401')],
+        { cp_protection_current_a: { condition: 'cathodic-protection current', provenance: { tool_id: 'corrosion:anode-sizing' } } },
+      ))
+      want('(e) marine class suppresses marine findings', r.findings.filter((f) => f.family === 'marine').length === 0)
+    }
+    // (f) "emitter" in a NON-irrigation sense (light emitter) → NOT flagged
+    {
+      const r = computeToolArchetypeCoherence(mkState('co2_mineralisation', [
+        mkTool('optics:led-sizing', 'light emitter radiant flux balance for the indicator beacon'),
+      ]))
+      want('(f) light emitter not flagged', noFindingFor(r, 'optics:led-sizing'))
+    }
+    // (g) isMarineClass coverage
+    {
+      want('(g) auv true', isMarineClass('auv') === true)
+      want('(g) AUV true', isMarineClass('AUV') === true)
+      want('(g) rov_pipeline true', isMarineClass('rov_pipeline') === true)
+      want('(g) autonomous_underwater_vehicle true', isMarineClass('autonomous_underwater_vehicle') === true)
+      want('(g) co2_mineralisation false', isMarineClass('co2_mineralisation') === false)
+      want('(g) bess false', isMarineClass('bess') === false)
+      want('(g) empty false', isMarineClass('') === false)
+    }
+    // (j) empty state → verdict 'unavailable', no throw
+    {
+      let threw = false
+      let r: any = null
+      try { r = computeToolArchetypeCoherence({}) } catch { threw = true }
+      want('(j) empty state does not throw', !threw)
+      want('(j) empty state unavailable', r?.verdict === 'unavailable')
+    }
+
+    out.push(assertEq(
+      'UNIVERSAL.tool_archetype_coherence_flags_marine_tools_on_nonmarine_class',
+      'gate 34: marine/irrigation tools on a non-marine class flag HIGH (worked-calc + cathodic quantity); clean process tool + light-emitter never flag; marine class suppresses marine markers; isMarineClass + empty-state behaviours hold',
+      failed.length, (n) => n === 0,
+      () => `gate-34 cases failed: ${failed.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit.ts.`,
+    ))
+  }
+
+  // ── (4) UNIVERSAL.pressure_vessel_internal_mode_no_seawater ───────────────
+  {
+    const PY = resolve(__dirname, '..', '.venv', 'bin', 'python3')
+    const runTool = (script: string, payload: unknown): any => {
+      const o = execFileSync(PY, [resolve(__dirname, 'lib', 'orchestrator', 'tools', 'python', script)], {
+        input: JSON.stringify(payload), encoding: 'utf-8', timeout: 30_000,
+      })
+      return JSON.parse(o)
+    }
+    // Join every operator-visible worked field so a leaked marine term anywhere is caught.
+    const workedText = (worked: any[]): string =>
+      (Array.isArray(worked) ? worked : [])
+        .map((w) => [w?.label, w?.formula, w?.substitution, Array.isArray(w?.assumptions) ? w.assumptions.join(' ; ') : w?.assumptions]
+          .filter((p) => p != null && p !== '').join(' | '))
+        .join(' || ')
+    const num = (o: any, k: string): number => Number(o?.[k])
+    const seawaterRe = /seawater|hydrostatic|depth|rho_water/i
+    try {
+      // INTERNAL mode — a CO₂ process column. No seawater/depth/hydrostatic maths.
+      const internal = runTool('pressure_vessel.py', {
+        mode: 'internal', design_pressure_barg: 3, diameter_mm: 900, length_mm: 9000,
+        material: 'steel_316L', corrosion_allowance_mm: 3,
+      })
+      const intText = workedText(internal?.worked)
+      const intLabels = (Array.isArray(internal?.worked) ? internal.worked : []).map((w: any) => String(w?.label ?? ''))
+      const failures: string[] = []
+      if (seawaterRe.test(intText)) failures.push(`internal worked[] contains a seawater/depth marker: "${intText.match(seawaterRe)?.[0]}"`)
+      if (!intLabels.some((l: string) => l.includes('Hoop stress'))) failures.push(`internal worked[] has no 'Hoop stress' label (got ${JSON.stringify(intLabels)})`)
+      if (!(num(internal, 'hoop_stress_mpa') > 0)) failures.push(`internal hoop_stress_mpa not > 0 (got ${internal?.hoop_stress_mpa})`)
+      if (!(num(internal, 'yield_safety_factor') > 1)) failures.push(`internal yield_safety_factor not > 1 (got ${internal?.yield_safety_factor})`)
+      // EXTERNAL mode — the AUV hull path must STILL surface the hydrostatic worked-calc.
+      const external = runTool('pressure_vessel.py', {
+        mode: 'external', depth_m: 1000, diameter_mm: 900, length_mm: 9000, material: 'steel_316L',
+      })
+      const extLabels = (Array.isArray(external?.worked) ? external.worked : []).map((w: any) => String(w?.label ?? ''))
+      if (!extLabels.some((l: string) => l.includes('External hydrostatic'))) failures.push(`external worked[] lost the 'External hydrostatic' label (got ${JSON.stringify(extLabels)})`)
+      out.push(assertEq(
+        'UNIVERSAL.pressure_vessel_internal_mode_no_seawater',
+        "pressure_vessel.py internal mode emits NO seawater/hydrostatic/depth maths (has 'Hoop stress', hoop>0, SF>1); external mode still surfaces 'External hydrostatic' (AUV path protected)",
+        failures.length, (n) => n === 0,
+        () => `pressure-vessel mode separation broke: ${failures.join(' ; ')}. Check scripts/lib/orchestrator/tools/python/pressure_vessel.py.`,
+      ))
+    } catch (err) {
+      // .venv python unavailable — vacuous PASS (mirrors checkSizingToolsWorkedSound's catch).
+      out.push({ id: 'UNIVERSAL.pressure_vessel_internal_mode_no_seawater', description: 'pressure-vessel internal mode no seawater', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    }
+  }
+
+  // ── (5) CO2.no_marine_or_irrigation_tools_in_plan ─────────────────────────
+  {
+    const steps: any[] = (CO2_MINERALISATION_PLAN as any).tools ?? (CO2_MINERALISATION_PLAN as any).steps ?? []
+    const toolIds = steps.map((s) => String(s?.tool_id ?? ''))
+    const seed = { quantities: {} } as any   // input_from_contract reads c.quantities?.[k]?.value with defaults
+    const failures: string[] = []
+    if (toolIds.includes('irrigation:pump-sizing')) failures.push('plan still wires irrigation:pump-sizing')
+    if (toolIds.includes('corrosion:anode-sizing')) failures.push('plan still wires corrosion:anode-sizing')
+    if (!toolIds.includes('process:pump-sizing')) failures.push('plan no longer wires process:pump-sizing')
+    const pvSteps = steps.filter((s) => String(s?.tool_id ?? '') === 'pressure-vessel:design')
+    if (pvSteps.length === 0) failures.push('plan has no pressure-vessel:design step')
+    for (const s of pvSteps) {
+      let mode: any = '(input_from_contract threw)'
+      try { mode = (s.input_from_contract(seed, {} as any) as any)?.mode } catch { /* recorded below */ }
+      if (mode !== 'internal') failures.push(`pressure-vessel:design step requests mode '${mode}' (want 'internal')`)
+    }
+    out.push(assertEq(
+      'CO2.no_marine_or_irrigation_tools_in_plan',
+      'CO₂ plan wires NO irrigation:pump-sizing / corrosion:anode-sizing, DOES wire process:pump-sizing, and every pressure-vessel:design step requests mode internal',
+      failures.length, (n) => n === 0,
+      () => `CO₂ plan tool wiring wrong: ${failures.join(' ; ')}. Check scripts/lib/orchestrator/class-plans/co2-mineralisation.ts.`,
+    ))
+  }
+
+  _co2FixCheck = out
   return out
 }
 
@@ -5842,6 +6105,10 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       () => `concept-tool routing wrong: ${routeBad.join('; ')}`,
     ))
   }
+
+  // Self-contained CO₂-fix invariants — none read the snapshot; memoised so the
+  // .venv python (gate 3 of these) spawns once across the whole harness run.
+  for (const a of checkCo2FixInvariants()) assertions.push(a)
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }

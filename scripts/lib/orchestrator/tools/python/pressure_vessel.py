@@ -2,11 +2,27 @@
 """
 scripts/lib/orchestrator/tools/python/pressure_vessel.py
 
-Pressure vessel design for AUV / submersible / deep-sea housings.
+Pressure vessel design — TWO physics modes:
+
+  mode = "external" (default): AUV / submersible / deep-sea HOUSING under
+      EXTERNAL hydrostatic pressure set by water depth. Hoop stress + external-
+      pressure buckling govern. (The original AUV-class behaviour, unchanged.)
+
+  mode = "internal": a process column / reactor / tank under INTERNAL design
+      gauge pressure (a chemical plant, NOT the seabed). Sizes a thin-wall
+      cylinder from the INTERNAL design pressure via the ASME VIII Div.1 UG-27
+      circumferential-stress rule t = P D / (2 S E - 1.2 P) + corrosion
+      allowance, surfaces the hoop stress at the adopted wall, and computes the
+      shell mass from geometry x steel density. NO seawater / depth / external-
+      hydrostatic maths appears. (Mirrors reactor_cstr_pfr_sizing.py's shell
+      wall calc so a CO2/chemical-plant column reads as a real pressure vessel,
+      not a fake "29.8 m of seawater" hack.)
+
 Reads JSON from stdin, writes JSON to stdout.
 
-Input:
+EXTERNAL-mode input:
     {
+      "mode": "external",               # optional; default
       "depth_m": 1000.0,
       "diameter_mm": 200.0,
       "wall_thickness_mm": 8.0,
@@ -15,7 +31,22 @@ Input:
       "safety_factor_required": 2.0
     }
 
-Output:
+INTERNAL-mode input:
+    {
+      "mode": "internal",
+      "design_pressure_barg": 3.0,      # OR design_pressure_mpa; internal gauge
+      "diameter_mm": 900.0,
+      "length_mm": 9000.0,
+      "material": "steel_316L",
+      "corrosion_allowance_mm": 3.0,    # optional (default 3.0)
+      "weld_joint_efficiency": 0.85,    # optional (default 0.85, spot-RT)
+      "allowable_stress_mpa": null,     # optional override; else 0.6 x yield
+      "safety_factor_required": 2.0
+    }
+    (wall_thickness_mm is OPTIONAL in internal mode — the tool COMPUTES the
+    minimum wall from the pressure; if supplied it is used as a floor.)
+
+EXTERNAL Output:
     {
       "depth_m": 1000.0,
       "external_pressure_mpa": 10.13,
@@ -29,11 +60,25 @@ Output:
       ...
     }
 
-Hoop stress (thin-wall cylinder): σ_h = P × r / t  (when t < r/10)
-For thick wall (t > r/10), Lamé equation used.
-Buckling of external-pressure cylinder: Bresse formula simplified
+INTERNAL Output:
+    {
+      "mode": "internal",
+      "design_pressure_barg": 3.0,
+      "design_pressure_mpa": 0.3,
+      "wall_thickness_mm": 8.0,         # adopted shell wall (>= 5 mm handling min)
+      "hoop_stress_mpa": 16.9,          # at the adopted wall, internal pressure
+      "yield_safety_factor": 17.2,      # yield / hoop (governing check)
+      "mass_kg": 1274.0,
+      "passes": true,
+      ...
+    }
 
-Reference: ASME BPVC Sec VIII Div 1, Roark's Formulas for Stress & Strain.
+Hoop stress (thin-wall cylinder): σ_h = P × r / t  (when t < r/10)
+For thick wall (t > r/10), Lamé equation used (external mode).
+Buckling of external-pressure cylinder: Bresse formula simplified (external mode).
+Internal-pressure shell thickness: ASME VIII Div.1 UG-27 circumferential stress.
+
+Reference: ASME BPVC Sec VIII Div 1 (UG-27), Roark's Formulas for Stress & Strain.
 """
 from __future__ import annotations
 
@@ -54,9 +99,9 @@ PROVENANCE = {
     "tool_license": 'proprietary',
     "tool_source_url": '(in-tree)',
     "tool_paper": 'ASME BPVC Section VIII Division 1 (2023 edition)',
-    "physics_basis": "Thin-wall cylinder hoop stress σ_h = pD/(2t). Roark's Formulas for Stress and Strain Table 13.1 for thick-wall corrections. External-pressure buckling per ASME Code Case 2286.",
+    "physics_basis": "EXTERNAL mode (AUV/submersible): thin-wall cylinder hoop stress σ_h = pD/(2t) under external hydrostatic pressure; Roark's Formulas for Stress and Strain Table 13.1 for thick-wall corrections; external-pressure buckling per ASME Code Case 2286. INTERNAL mode (process column/reactor/tank): minimum shell thickness from internal design pressure via ASME VIII Div.1 UG-27 circumferential stress t = P D / (2 S E - 1.2 P) + corrosion allowance, hoop stress σ_h = P D / (2 t) reported at the adopted wall, shell mass from cylinder-wall geometry × steel density.",
     "confidence_class": 'standard',
-    "last_reviewed_date": "2026-05-22",
+    "last_reviewed_date": "2026-06-04",
 }
 
 
@@ -75,6 +120,202 @@ MATERIALS = {
 
 
 def compute(payload: dict) -> dict:
+    """Dispatch on `mode`: 'internal' (process column/reactor/tank under internal
+    design pressure) or 'external' (AUV/submersible housing under external
+    hydrostatic pressure — the default, unchanged historical behaviour)."""
+    mode = str(payload.get("mode", "external")).strip().lower()
+    if mode == "internal":
+        return compute_internal(payload)
+    if mode not in ("external", ""):
+        raise ValueError(f"mode must be 'internal' or 'external', got {mode!r}")
+    return compute_external(payload)
+
+
+def compute_internal(payload: dict) -> dict:
+    """Size a thin-wall cylinder from INTERNAL design pressure (a process column /
+    reactor / tank in a chemical plant). ASME VIII Div.1 UG-27 circumferential-
+    stress wall + hoop stress + shell mass from geometry. NO seawater / depth /
+    external-hydrostatic maths. Mirrors reactor_cstr_pfr_sizing.py's shell calc."""
+    diameter_mm = float(payload.get("diameter_mm", 900.0))
+    length_mm = float(payload.get("length_mm", diameter_mm * 3.0))
+    material = str(payload.get("material", "steel_316L"))
+    sf_required = float(payload.get("safety_factor_required", 2.0))
+    if material not in MATERIALS:
+        raise ValueError(f"unknown material {material!r}; known: {list(MATERIALS.keys())}")
+    mat = MATERIALS[material]
+
+    # Internal design gauge pressure (barg preferred; MPa accepted as override).
+    if payload.get("design_pressure_mpa") is not None:
+        p_design_mpa = float(payload["design_pressure_mpa"])
+        p_design_barg = p_design_mpa / 0.1
+    else:
+        p_design_barg = float(payload.get("design_pressure_barg", 3.0))
+        p_design_mpa = p_design_barg * 0.1                 # 1 bar = 0.1 MPa
+    if p_design_mpa <= 0:
+        raise ValueError("internal design pressure must be > 0")
+
+    # Allowable stress S: supplied, else ASME-style ~0.6 x yield.
+    s_allow = payload.get("allowable_stress_mpa")
+    if s_allow is None:
+        s_allow_mpa = 0.6 * mat["yield_mpa"]
+        s_basis = "0.6 x yield (no datasheet allowable supplied)"
+    else:
+        s_allow_mpa = float(s_allow)
+        s_basis = "supplied allowable stress"
+    weld_eff = float(payload.get("weld_joint_efficiency", 0.85))      # E (spot-RT)
+    corr_mm = float(payload.get("corrosion_allowance_mm", 3.0))
+
+    # ASME VIII Div.1 UG-27 circumferential (hoop): t = P R / (S E - 0.6 P); D = 2R
+    #   => t = P D / (2 S E - 1.2 P)
+    denom = (2.0 * s_allow_mpa * weld_eff - 1.2 * p_design_mpa)
+    if denom <= 0:
+        raise ValueError("design pressure too high for allowable stress (negative wall thickness)")
+    t_pressure_mm = p_design_mpa * diameter_mm / denom
+    t_min_mm = t_pressure_mm + corr_mm
+    # Practical handling minimum (Sinnott: small vessels rarely below ~5 mm),
+    # and a supplied wall (if any) is treated as a floor.
+    wall_floor_mm = float(payload.get("wall_thickness_mm", 0.0))
+    wall_t_mm = max(t_min_mm, 5.0, wall_floor_mm)
+
+    # Geometry
+    r_inner_mm = diameter_mm / 2.0
+    r_outer_mm = r_inner_mm + wall_t_mm
+
+    # Hoop stress at the adopted wall, internal pressure (thin-wall): σ_h = P D / (2 t)
+    sigma_hoop_mpa = p_design_mpa * diameter_mm / (2.0 * wall_t_mm)
+    # Yield safety factor (the governing check for an internally-pressurised vessel).
+    yield_sf = mat["yield_mpa"] / max(1e-6, sigma_hoop_mpa)
+
+    # Shell mass: cylindrical wall + 2 flat-head plates (conservative vs torispherical).
+    cyl_wall_vol_mm3 = math.pi * (r_outer_mm ** 2 - r_inner_mm ** 2) * length_mm
+    head_vol_mm3 = 2.0 * (math.pi * r_outer_mm ** 2) * wall_t_mm
+    cyl_mass_kg = (cyl_wall_vol_mm3 / 1e9) * mat["density"]
+    head_mass_kg = (head_vol_mm3 / 1e9) * mat["density"]
+    total_mass_kg = cyl_mass_kg + head_mass_kg
+
+    passes = yield_sf >= sf_required
+
+    # ----- worked[] — drift-safe, chained off rounded intermediates, INTERNAL maths -----
+    p_design_mpa_r = round(p_design_mpa, 4)
+    p_design_barg_r = round(p_design_barg, 3)
+    s_allow_r = round(s_allow_mpa, 2)
+    t_pressure_r = round(t_pressure_mm, 4)
+    t_adopt_r = round(wall_t_mm, 3)
+    sigma_hoop_r = round(sigma_hoop_mpa, 3)
+    yield_sf_r = round(yield_sf, 3)
+    cyl_mass_r = round(cyl_mass_kg, 3)
+    head_mass_r = round(head_mass_kg, 3)
+
+    worked = [
+        worked_calc(
+            label="Internal design pressure",
+            formula="p_design_mpa = p_design_barg x 0.1",
+            values={"p_design_barg": (p_design_barg_r, "barg")},
+            result=p_design_mpa_r, result_unit="MPa",
+            assumptions=["internal gauge design pressure of the process vessel",
+                         "1 bar = 0.1 MPa"],
+        ),
+        worked_calc(
+            label="Shell minimum thickness (hoop stress, internal pressure)",
+            formula="t = p_design x D / (2 x S x E - 1.2 x p_design) + corr",
+            values={
+                "p_design": (p_design_mpa_r, "MPa"),
+                "D": (round(diameter_mm, 1), "mm"),
+                "S": (s_allow_r, "MPa"),
+                "E": (weld_eff, ""),
+                "corr": (corr_mm, "mm"),
+            },
+            result=round(t_pressure_mm + corr_mm, 3), result_unit="mm",
+            assumptions=["ASME VIII Div.1 UG-27 circumferential-stress form (BS EN 13445 equivalent)",
+                         s_basis, f"+ {corr_mm} mm corrosion allowance",
+                         f"adopted shell t = {t_adopt_r} mm (>= 5 mm practical handling minimum)"],
+        ),
+        worked_calc(
+            label="Hoop stress at adopted wall (internal pressure)",
+            formula="sigma_hoop = p_design x D / (2 x t)",
+            values={
+                "p_design": (p_design_mpa_r, "MPa"),
+                "D": (round(diameter_mm, 1), "mm"),
+                "t": (t_adopt_r, "mm"),
+            },
+            result=sigma_hoop_r, result_unit="MPa",
+            assumptions=["thin-wall cylinder under internal pressure"],
+        ),
+        worked_calc(
+            label="Yield safety factor (hoop-governing, internal pressure)",
+            formula="SF_yield = yield_mpa / sigma_hoop",
+            values={
+                "yield_mpa": (mat["yield_mpa"], "MPa"),
+                "sigma_hoop": (sigma_hoop_r, "MPa"),
+            },
+            result=yield_sf_r, result_unit="",
+            assumptions=[f"material {material}; yield from datasheet/standard",
+                         "internal-pressure vessel — yield governs (no external-buckling check)"],
+        ),
+        worked_calc(
+            label="Cylinder wall mass",
+            formula="mass = pi x (r_outer^2 - r_inner^2) x length_mm x density / 1e9",
+            values={
+                "r_outer": (round(r_outer_mm, 2), "mm"),
+                "r_inner": (round(r_inner_mm, 2), "mm"),
+                "length_mm": (round(length_mm, 1), "mm"),
+                "density": (mat["density"], "kg/m3"),
+            },
+            result=cyl_mass_r, result_unit="kg",
+            assumptions=[f"material {material}", "cylindrical shell only; heads computed separately",
+                         "1e9 converts mm3 to m3"],
+        ),
+        worked_calc(
+            label="Head mass (2 flat-plate heads)",
+            formula="mass = 2 x pi x r_outer^2 x t x density / 1e9",
+            values={
+                "r_outer": (round(r_outer_mm, 2), "mm"),
+                "t": (t_adopt_r, "mm"),
+                "density": (mat["density"], "kg/m3"),
+            },
+            result=head_mass_r, result_unit="kg",
+            assumptions=["flat-head approximation (conservative vs torispherical); 2 heads",
+                         "1e9 converts mm3 to m3"],
+        ),
+        worked_calc(
+            label="Total vessel shell mass",
+            formula="total_mass = mass_cylinder + mass_heads",
+            values={
+                "mass_cylinder": (cyl_mass_r, "kg"),
+                "mass_heads": (head_mass_r, "kg"),
+            },
+            result=round(total_mass_kg, 3), result_unit="kg",
+            assumptions=[],
+        ),
+    ]
+
+    return {
+        "mode": "internal",
+        "diameter_mm": diameter_mm,
+        "length_mm": length_mm,
+        "material": material,
+        "yield_strength_mpa": mat["yield_mpa"],
+        "ultimate_strength_mpa": mat.get("ult_mpa"),
+        "design_pressure_barg": round(p_design_barg, 3),
+        "design_pressure_mpa": round(p_design_mpa, 4),
+        "allowable_stress_mpa": round(s_allow_mpa, 2),
+        "weld_joint_efficiency": weld_eff,
+        "corrosion_allowance_mm": corr_mm,
+        "wall_thickness_pressure_mm": round(t_pressure_mm, 4),
+        "wall_thickness_mm": round(wall_t_mm, 3),
+        "hoop_stress_mpa": round(sigma_hoop_mpa, 3),
+        "yield_safety_factor": round(yield_sf, 3),
+        "safety_factor": round(yield_sf, 3),          # internal-pressure governing check
+        "cylinder_mass_kg": round(cyl_mass_kg, 3),
+        "head_mass_kg": round(head_mass_kg, 3),
+        "mass_kg": round(total_mass_kg, 3),
+        "safety_factor_required": sf_required,
+        "passes": passes,
+        "worked": worked,
+    }
+
+
+def compute_external(payload: dict) -> dict:
     depth_m = float(payload.get("depth_m", 1000.0))
     diameter_mm = float(payload.get("diameter_mm", 200.0))
     wall_t_mm = float(payload.get("wall_thickness_mm", 8.0))

@@ -45,6 +45,7 @@ import { isConsumable, CLASS_PRICE_SANITY_BOUNDS, keywordCeilingGbp } from '../s
 import { classifyByRules } from './estimate-missing-prices'
 import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
+import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
 
@@ -101,6 +102,38 @@ function humanise(id: string): string {
     if (/^\d/.test(w)) return w
     return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
   }).join(' ')
+}
+
+/**
+ * Humanise a sub-module display name that may itself be a RAW snake_case
+ * identifier. The emitter sometimes sets `name_human` to a bare id (e.g.
+ * 'mass_fluid_transport_process_mass_fluid_transport_process') instead of a
+ * readable label, so the renderer can't blindly trust name_human. When the
+ * value looks like a raw id (lowercase, underscore-separated, no spaces) we
+ * humanise it AND collapse an immediately-repeated archetype phrase (the
+ * doubled "…process_…process" the taxonomy id concatenation produces). When
+ * it already contains spaces/capitals it's a real label and passes through.
+ * 2026-06-04 (CO₂ IF-ROOM (a): raw identifiers in sub-module headings).
+ */
+export function humaniseSubName(raw: string): string {
+  const s = String(raw || '').trim()
+  if (!s) return s
+  // Real label already? (has a space, or any uppercase letter) → leave as-is.
+  if (/\s/.test(s) || /[A-Z]/.test(s)) return s
+  // Raw id: lowercase + underscores only. Humanise, then collapse a verbatim
+  // repeated run of words (e.g. "Mass Fluid Transport Process Mass Fluid
+  // Transport Process" → "Mass Fluid Transport Process").
+  if (!/^[a-z0-9]+(?:_[a-z0-9]+)+$/.test(s)) return humanise(s)
+  const words = humanise(s).split(' ')
+  for (let len = Math.floor(words.length / 2); len >= 1; len--) {
+    const head = words.slice(0, len).join(' ')
+    const next = words.slice(len, len * 2).join(' ')
+    if (head.toLowerCase() === next.toLowerCase()) {
+      // Drop the duplicated tail block, keep any trailing remainder.
+      return [...words.slice(0, len), ...words.slice(len * 2)].join(' ').trim()
+    }
+  }
+  return words.join(' ')
 }
 
 /**
@@ -3102,7 +3135,7 @@ function CoverPage({
             differentiated costs. Residuals are logged for the engine's learning
             loop, never shown to the reader. */}
         <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 2, marginBottom: 12 }}>
-          FORGE ENGINEERING DESIGN DOSSIER · CONCEPT STAGE
+          DESIGN DOSSIER · CONCEPT STAGE
         </Text>
         <View style={{ height: 1, backgroundColor: ACCENT, marginBottom: 18 }} />
         <Text style={{ fontSize: 26, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.15, marginBottom: 14 }}>
@@ -3468,7 +3501,7 @@ function PageFooter() {
     <View style={{ position: 'absolute', bottom: 30, left: 64, right: 64 }} fixed>
       <View style={{ height: 0.6, backgroundColor: RULE_SOFT, marginBottom: 6 }} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 8, color: MUTED }}>Forge Engineering Design Dossier · Concept Stage</Text>
+        <Text style={{ fontSize: 8, color: MUTED }}>Design Dossier · Concept Stage</Text>
         <Text
           style={{ fontSize: 8, color: MUTED }}
           render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
@@ -4376,8 +4409,9 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
           })
           continue
         }
-        // Fallback — serialise compactly.
-        constraintRows.push({ key: ckey, rendered: JSON.stringify(obj), source: src })
+        // Fallback — NEVER dump raw JSON ({"value":null,"source":"missing"}) into a customer
+        // dossier: show the value if present, else a clean dash (the "· not specified" tag explains).
+        constraintRows.push({ key: ckey, rendered: obj.value != null ? String(obj.value) : '—', source: src })
       }
       for (const r of constraintRows) {
         const isInferred = r.source === 'inferred'
@@ -5132,6 +5166,17 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
       // (-1.9%) all land inside ±5%. Direction is FLOOR (deliver ≥ the briefed
       // output) for the products; KOH make-up is the feed the design needs and is
       // shown as a floor too (the design's required make-up, within tolerance).
+      // 2026-06-04 key-name fix (gate-17 "—" regression): the live CO₂ brief
+      // emits SPELLED-OUT metric keys (calcium_carbonate_/potassium_sulfate_/
+      // potassium_hydroxide_feed_), NOT the abbreviated caco3_/k2so4_/koh_ keys
+      // the map was first seeded with — so the loop `continue`d on a key-miss
+      // and every product/feed cell rendered "—". Both spellings are now mapped
+      // (spelled-out is the brief's actual form; the abbreviations stay as
+      // defensive aliases in case a future brief uses them). Same qtyKey + ×1000
+      // t/day→kg/day conversion either way.
+      calcium_carbonate_production_kg_per_day: { qtyKey: 'caco3_product_t_day', label: 'CaCO₃ production rate',  unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
+      potassium_sulfate_production_kg_per_day: { qtyKey: 'k2so4_product_t_day', label: 'K₂SO₄ production rate',  unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
+      potassium_hydroxide_feed_kg_per_day:     { qtyKey: 'koh_makeup_t_day',    label: 'KOH make-up feed rate', unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
       caco3_production_kg_per_day: { qtyKey: 'caco3_product_t_day',        label: 'CaCO₃ production rate',  unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
       k2so4_production_kg_per_day: { qtyKey: 'k2so4_product_t_day',        label: 'K₂SO₄ production rate',  unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
       koh_feed_kg_per_day:         { qtyKey: 'koh_makeup_t_day',          label: 'KOH make-up feed rate', unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
@@ -6573,7 +6618,7 @@ function ModuleConnectionMapPageWithExploded({
  * readable chunks. Aim for ~2-3 sentences per chunk; keep at least 2 chunks
  * when the source is >450 chars so the reader has a breathing line.
  */
-function break_paragraph(p: string): string[] {
+export function break_paragraph(p: string): string[] {
   const txt = p.trim()
   if (!txt) return ['']
   // Protect decimal-number periods (0.022) and part-number periods (975.840) from
@@ -6582,7 +6627,15 @@ function break_paragraph(p: string): string[] {
   // the leading `"0."` because nothing matches it. Confirmed root cause of
   // every leading-token truncation in iter-64 PDFs (drawer_forgeos_gotchas_227e3c8fd74fcd32).
   const PERIOD_PLACEHOLDER = ''
-  const protectedTxt = txt.replace(/(\d)\.(\d)/g, `$1${PERIOD_PLACEHOLDER}$2`)
+  // 2026-06-04 (CO₂ P4 fix): use a ZERO-WIDTH lookbehind/lookahead so EVERY
+  // period sitting between two digits is protected — including chained dots in
+  // a version string ("v1.0.0") or IP address ("10.0.0.1"). The old consuming
+  // form /(\d)\.(\d)/ ate the digit on each side, so in "1.0.0" only the FIRST
+  // dot matched (the shared '0' was already consumed); the SECOND dot then read
+  // as a sentence boundary and shattered "…v1.0.0 outputs:" into a stray chunk
+  // beginning "0 outputs:" (likewise "0 confirms"/"0 supplies"). Zero-width
+  // matches overlap, so consecutive inter-digit dots are all replaced.
+  const protectedTxt = txt.replace(/(?<=\d)\.(?=\d)/g, PERIOD_PLACEHOLDER)
   const sentences = protectedTxt.match(/[^.!?]+[.!?]+(\s|$)/g) ?? [protectedTxt]
   const restored = sentences.map(s => s.replace(new RegExp(PERIOD_PLACEHOLDER, 'g'), '.'))
   const cleaned = restored.map(s => s.trim()).filter(s => s.length > 0)
@@ -7404,7 +7457,9 @@ function ModuleSection({
       // the chokepoint before reaching the Helvetica-Bold heading at line ~6637.
       // Without this, ε-NTU renders as '‚' (zero-advance low-9 quotation mark)
       // which smears onto the following text span — gate-11 overlap finding.
-      name: normalise_unicode(sm.name_human || humanise(sm.id)),
+      // humaniseSubName guards against name_human being a RAW id (CO₂ emitter
+      // emitted 'mass_fluid_transport_process_mass_fluid_transport_process').
+      name: normalise_unicode(humaniseSubName(sm.name_human || sm.id)),
       sentence: '',
       paragraph: livePara,
     })
@@ -7548,7 +7603,7 @@ function ModuleSection({
         )
         for (let i = 0; i < subModulesRaw.length; i += 1) {
           const sm = subModulesRaw[i]
-          const smName = clean_prose(sm?.name_human || humanise(sm?.id || '')).trim()
+          const smName = clean_prose(humaniseSubName(sm?.name_human || sm?.id || '')).trim()
           if (!smName) continue
           // topology_clause carries the wiring/arrangement hint
           // (e.g. "wired in 15 racks of 1P × 250S = 800 V per rack");
@@ -7896,9 +7951,28 @@ function CompliancePage({ state, project, manualReviewBadges }: { state: any; pr
         Standards that govern this product class. Compliance is dictated by jurisdiction + use case BEFORE the design exists; the design downstream must demonstrate conformity with the mandatory items below.
       </Text>
       {/* Manual Review callout removed per Tristan fifth review. */}
-      <Text style={{ fontSize: 10, color: INK_SOFT, marginBottom: 18, lineHeight: 1.55 }}>
-        {clean_prose(classBlock.compliance_summary)}
-      </Text>
+      {/* 2026-06-04: when the product class has no class-standards.ts entry,
+          getClassStandards() returns a DEV-facing stub summary ("No regulatory
+          standards registered for product class '…'. Add an entry to
+          class-standards.ts …"). That leaked a source-file instruction to the
+          customer — directly above a fully-populated standards table built from
+          the brief's own safety_standards (merged.length>0, else this page
+          early-returns). Suppress the dev stub whenever the table is non-empty
+          and substitute a clean customer-facing line; render the real summary
+          only when it is genuine (not the stub). */}
+      {(() => {
+        const summary = String(classBlock.compliance_summary ?? '')
+        const isDevStub = /class-standards\.ts|No regulatory standards registered for product class/i.test(summary)
+        const text = isDevStub
+          ? 'The standards below govern this product class, drawn from the brief’s stated safety and regulatory requirements. Mandatory items must be demonstrated by the downstream detailed design; de-facto items are industry-standard practice for this class.'
+          : summary
+        if (!text.trim()) return null
+        return (
+          <Text style={{ fontSize: 10, color: INK_SOFT, marginBottom: 18, lineHeight: 1.55 }}>
+            {clean_prose(text)}
+          </Text>
+        )
+      })()}
 
       {/* Header row */}
       <View style={{ flexDirection: 'row', borderBottomWidth: 0.8, borderBottomColor: INK, paddingBottom: 4, marginBottom: 4 }}>
@@ -11218,11 +11292,15 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
   if (!page) return null
   if (!Array.isArray(page.tools) || page.tools.length === 0) return null
 
-  // Terse provenance index (build #21, 2026-06-04). One row per tool:
-  // name · version · licence · source. The worked maths now lives in each
-  // module's "How this module was computed" block; this page is the audit
-  // trail, so EVERY tool that produced a claim is listed — just without the
-  // heavy step-by-step calculations repeated here.
+  // Methodology / provenance reference (build #23, 2026-06-04 — restores the
+  // per-tool substance dropped by the build-#21 terse-index collapse, which
+  // regressed sources_references 7.5→3.0 + appendix_technical 8.67→6.5). For
+  // EACH tool this shows name · version · licence · source PLUS the plain-
+  // English narrative (what it does / origin / what the results mean / how it
+  // was used) AND the quantities it computed for THIS design. The step-by-step
+  // worked CALCULATION now lives with each module under its "How this module
+  // was computed" heading, so it is NOT repeated here (no duplication); this
+  // page is the methodology + provenance reference, substantive again.
   const tools: any[] = (page.tools as any[]).slice().sort((a, b) =>
     String(a?.tool_name || a?.tool_id).localeCompare(String(b?.tool_name || b?.tool_id)),
   )
@@ -11233,71 +11311,138 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
         Tools Used in This Report
       </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14, lineHeight: 1.55 }}>
-        Every numerical value in this document was computed by one of the
-        verified engineering tools below. The step-by-step worked calculation
-        for each tool is shown with the module it sizes, under that module&apos;s
-        &ldquo;How this module was computed&rdquo; heading. This index records
-        every tool used — name, version, licence and source — so the result is
-        reproducible: anyone with the same tool version can reproduce the same
-        output from the same input.
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 16, lineHeight: 1.55 }}>
+        {page.intro || (
+          'Every numerical value in this document was computed by one of the '
+          + 'verified engineering tools below. Each tool is open-source or '
+          + 'free-to-use; the listed version is what was invoked. This page is '
+          + 'the methodology and provenance reference — what each tool does, the '
+          + 'paper or standard it rests on, and the quantities it produced for '
+          + 'this design. The step-by-step worked calculation for each tool is '
+          + 'shown with the module it sizes, under that module’s “How this '
+          + 'module was computed” heading. Anyone with the same tool version can '
+          + 'reproduce the same output from the same input.'
+        )}
       </Text>
 
-      {/* Column header row */}
-      <View
-        style={{
-          flexDirection: 'row',
-          borderBottomWidth: 0.8,
-          borderBottomColor: RULE,
-          paddingBottom: 4,
-          marginBottom: 2,
-        }}
-      >
-        <Text style={{ flex: 1, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>TOOL</Text>
-        <Text style={{ width: 48, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>VERSION</Text>
-        <Text style={{ width: 86, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>LICENCE</Text>
-        <Text style={{ width: 150, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>SOURCE</Text>
-      </View>
+      {tools.map((tool: any, ti: number) => {
+        const claims: any[] = Array.isArray(tool.claims) ? tool.claims : []
+        // Small heading+first-line guard (~65pt) so the card heading and one
+        // line of narrative stay together; the rest of the card flows and
+        // page-breaks cleanly (avoids the whole-card jump that stranded
+        // 40-60% whitespace — fix carried over from the pre-collapse build).
+        const reserveHeight = 65
+        const narr = getToolNarrative(tool.tool_id)
+        return (
+          <View
+            key={tool.tool_id || `tool-${ti}`}
+            style={{ marginBottom: 14, padding: 12, backgroundColor: '#f8fafc', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }}
+            minPresenceAhead={reserveHeight}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
+              <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK }}>
+                {normalise_unicode(tool.tool_name || tool.tool_id)}
+                <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
+                  {tool.tool_version ? `  v${tool.tool_version}` : ''}
+                </Text>
+                <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: MUTED }}>{`  (${tool.tool_id})`}</Text>
+              </Text>
+              {tool.tool_license ? (
+                <Text style={{ fontSize: 8, color: MUTED }}>{tool.tool_license}</Text>
+              ) : null}
+              {tool.confidence_class ? (
+                <Text style={{ fontSize: 8, marginLeft: 6, fontFamily: 'Helvetica-Bold', ...confidenceBadgeStyle(tool.confidence_class) }}>
+                  {String(tool.confidence_class).toUpperCase()}
+                </Text>
+              ) : null}
+            </View>
 
-      {tools.map((tool: any, ti: number) => (
-        <View
-          key={tool.tool_id || `tool-${ti}`}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            paddingVertical: 4,
-            borderBottomWidth: 0.4,
-            borderBottomColor: RULE_SOFT,
-          }}
-          wrap={false}
-        >
-          <View style={{ flex: 1, paddingRight: 6, flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ flex: 1, fontSize: 8.5, color: INK, lineHeight: 1.4 }}>
-              <Text style={{ fontFamily: 'Helvetica-Bold' }}>{normalise_unicode(tool.tool_name || tool.tool_id)}</Text>
-              <Text style={{ color: MUTED }}>{`  (${tool.tool_id})`}</Text>
-            </Text>
-            {tool.confidence_class ? (
-              <Text style={{ fontSize: 6.5, marginLeft: 4, fontFamily: 'Helvetica-Bold', ...confidenceBadgeStyle(tool.confidence_class) }}>
-                {String(tool.confidence_class).toUpperCase()}
+            {/* Natural-language narrative for the reader (Tristan 2026-05-22).
+                Rendered so a non-specialist can understand what the tool does,
+                where it comes from, and how to read its results — without
+                parsing citation strings. See tool-narratives.ts. All fields
+                piped through normalise_unicode so CO₂ subscripts / ≈ ≤ ≥ render. */}
+            {narr ? (
+              <View style={{ marginTop: 4, marginBottom: 8, padding: 8, backgroundColor: '#ffffff', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
+                <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What it does. </Text>
+                  {normalise_unicode(narr.description)}
+                </Text>
+                <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Origin. </Text>
+                  {normalise_unicode(narr.origin)}
+                </Text>
+                <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What the results mean. </Text>
+                  {normalise_unicode(narr.results_interpretation)}
+                </Text>
+                <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>How it was used here. </Text>
+                  {normalise_unicode(narr.usage_pattern)}
+                </Text>
+              </View>
+            ) : null}
+
+            {tool.tool_paper ? (
+              <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5, marginBottom: 2 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Reference paper / standard: </Text>
+                {normalise_unicode(String(tool.tool_paper))}
+                {tool.tool_doi ? (
+                  <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.tool_doi}`}</Text>
+                ) : null}
               </Text>
             ) : null}
+
+            {tool.physics_basis ? (
+              <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5, marginBottom: 2 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Underlying math: </Text>
+                {normalise_unicode(String(tool.physics_basis))}
+                {tool.physics_paper_doi ? (
+                  <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.physics_paper_doi}`}</Text>
+                ) : null}
+              </Text>
+            ) : null}
+
+            {tool.tool_source_url ? (
+              <Text style={{ fontSize: 9, color: MUTED, marginBottom: 6 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Source: </Text>
+                {normalise_unicode(String(tool.tool_source_url))}
+              </Text>
+            ) : null}
+
+            {/* Quantities this tool computed for THIS design — the provenance
+                payoff: every number traces to the tool + version above. The
+                step-by-step worked maths is NOT repeated here; it renders with
+                each module under "How this module was computed". */}
+            {claims.length > 0 ? (
+              <View style={{ marginTop: 4, paddingTop: 4, borderTopWidth: 0.4, borderTopColor: RULE_SOFT }}>
+                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>
+                  Quantities this tool computed for this design:
+                </Text>
+                {claims.map((claim, ci) => {
+                  const v = Number.isFinite(claim.value)
+                    ? Number(claim.value).toLocaleString(undefined, { maximumFractionDigits: 4 })
+                    : String(claim.value ?? '—')
+                  const inp = typeof claim.input_summary === 'string' ? claim.input_summary : ''
+                  return (
+                    <Text key={ci} style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
+                      {`  • ${normalise_unicode(String(claim.field))} = ${v}${claim.unit ? ` ${normalise_unicode(String(claim.unit))}` : ''}`}
+                      {inp && inp !== '(none)' ? (
+                        <Text style={{ color: MUTED }}>{`  (input: ${normalise_unicode(inp.length > 80 ? inp.slice(0, 79) + '…' : inp)})`}</Text>
+                      ) : null}
+                    </Text>
+                  )
+                })}
+              </View>
+            ) : null}
           </View>
-          <Text style={{ width: 48, fontSize: 8, color: INK_SOFT }}>
-            {tool.tool_version ? `v${tool.tool_version}` : '—'}
-          </Text>
-          <Text style={{ width: 86, fontSize: 7.5, color: INK_SOFT, paddingRight: 4 }}>
-            {tool.tool_license || 'free-proprietary'}
-          </Text>
-          <Text style={{ width: 150, fontSize: 7, fontFamily: 'Courier', color: MUTED }}>
-            {normalise_unicode(String(tool.tool_source_url || '—'))}
-          </Text>
-        </View>
-      ))}
+        )
+      })}
 
       <View style={{ marginTop: 14, paddingTop: 8, borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
         <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45, fontStyle: 'italic' }}>
           {page.disclaimer || (
-            'The ForgeOS PDF engine orchestrates the tools and renders this PDF but does not itself compute the engineering numbers. Tool outputs are accurate within their documented operating domains; certified procurement requires separate engineer sign-off.'
+            'Anvil orchestrates the tools and renders this PDF but does not itself compute the engineering numbers. Tool outputs are accurate within their documented operating domains; certified procurement requires separate engineer sign-off.'
           )}
         </Text>
       </View>
@@ -11513,7 +11658,22 @@ function computeToolRoutes(state: any): Map<string, Set<string>> {
   const subTokens: Set<string>[][] = modules.map((m) => (m?.sub_modules ?? []).map(subModuleIdentityTokenSet))
   const modKindTokens: Set<string>[] = modules.map(moduleKindTokenSet)
 
-  const routeQuantity = (qName: string, toolId: string): ToolRoute | null => {
+  // Per-quantity routing RECORD. For Tier-A routes we also keep the full scored
+  // candidate list + the winning confidence, so a second pass can break exact
+  // ties using SIBLING-QUANTITY AGREEMENT (another quantity of the SAME tool that
+  // claims a tied cell more strongly). This fixes the lone-generic-token tie that
+  // landed e.g. bagging's `day_silo_volume_m3` (token {silo}) on a foreign
+  // sub-module that happened to host a mis-placed `*_storage_silo_word`, when the
+  // same tool's `product_storage_silo_volume_m3` already claimed the real Bagging
+  // sub-module at higher confidence. Without sibling-agreement, the per-quantity
+  // tie resolved to lowest module index — the wrong cell.
+  type ScoredCell = { mi: number; si: number; sc: number; specific: number }
+  interface RouteRecord {
+    route: ToolRoute
+    tierA?: { scored: ScoredCell[]; winSpecific: number; winSc: number }
+  }
+
+  const routeQuantity = (qName: string, toolId: string): RouteRecord | null => {
     const conceptRule = TOOL_CONCEPT_ROUTES.find((r) => r.match.test(toolId))
     if (TOOL_SYSTEM_LEVEL.test(toolId)) return null
     const qTokens = toolMatchIdentityTokens(qName)
@@ -11521,7 +11681,7 @@ function computeToolRoutes(state: any): Map<string, Set<string>> {
 
     // TIER A — equipment tools (skipped for concept tools + plant-wide quantities)
     if (!conceptRule && !TOOL_SYSTEM_QUANTITY_PREFIX.test(qName)) {
-      const scored: Array<{ mi: number; si: number; sc: number; specific: number }> = []
+      const scored: ScoredCell[] = []
       for (let mi = 0; mi < modules.length; mi++) {
         const subs = modules[mi]?.sub_modules ?? []
         for (let si = 0; si < subs.length; si++) {
@@ -11545,7 +11705,10 @@ function computeToolRoutes(state: any): Map<string, Set<string>> {
         // that clearly beats the runner-up. A lone generic-prefix collision
         // (the old over-match) no longer routes the tool.
         if (top.specific >= 1 || (top.sc >= 4 && beatsSecond)) {
-          return { moduleIdx: top.mi, subModuleIdx: top.si }
+          return {
+            route: { moduleIdx: top.mi, subModuleIdx: top.si },
+            tierA: { scored, winSpecific: top.specific, winSc: top.sc },
+          }
         }
       }
     }
@@ -11577,19 +11740,69 @@ function computeToolRoutes(state: any): Map<string, Set<string>> {
           }
           if (sc > bestSub.score) bestSub = { si, score: sc }
         }
-        return { moduleIdx: bestModule.mi, subModuleIdx: bestSub.si }
+        return { route: { moduleIdx: bestModule.mi, subModuleIdx: bestSub.si } }
       }
     }
     return null
   }
 
+  // Pass 1 — route every quantity, keeping each Tier-A record so pass 2 can
+  // resolve exact ties with sibling-quantity agreement.
+  interface QRecord { qName: string; toolId: string; rec: RouteRecord }
+  const records: QRecord[] = []
   for (const qName of Object.keys(quantities)) {
     const toolId = quantities[qName]?.provenance?.tool_id
     if (typeof toolId !== 'string' || !toolId) continue
-    const route = routeQuantity(qName, toolId)
-    if (!route) continue
+    const rec = routeQuantity(qName, toolId)
+    if (!rec) continue
+    records.push({ qName, toolId, rec })
+  }
+
+  // Pass 1.5 — per TOOL, the best (specific, sc) confidence any of its quantities
+  // achieved on each candidate cell. Used only to break EXACT ties.
+  const bestCellConfByTool = new Map<string, Map<string, { specific: number; sc: number }>>()
+  for (const { toolId, rec } of records) {
+    if (!rec.tierA) continue
+    let m = bestCellConfByTool.get(toolId)
+    if (!m) { m = new Map(); bestCellConfByTool.set(toolId, m) }
+    for (const cell of rec.tierA.scored) {
+      const key = `${cell.mi}:${cell.si}`
+      const prev = m.get(key)
+      if (!prev || cell.specific > prev.specific || (cell.specific === prev.specific && cell.sc > prev.sc)) {
+        m.set(key, { specific: cell.specific, sc: cell.sc })
+      }
+    }
+  }
+
+  // Pass 2 — emit final routes, switching a Tier-A quantity to a cell it ties
+  // with (same specific AND sc) when a SIBLING quantity of the same tool claims
+  // that tied cell STRICTLY more strongly than the originally-chosen cell. This
+  // is purely additive: a quantity only ever moves to a cell its own tool already
+  // routes to with higher confidence — never to an unrelated module.
+  for (const { toolId, rec } of records) {
+    let chosen = rec.route
+    if (rec.tierA) {
+      const { scored, winSpecific, winSc } = rec.tierA
+      const chosenKey = `${chosen.moduleIdx}:${chosen.subModuleIdx}`
+      const siblings = bestCellConfByTool.get(toolId)
+      const chosenSib = siblings?.get(chosenKey) ?? { specific: winSpecific, sc: winSc }
+      let best: { mi: number; si: number; specific: number; sc: number } | null = null
+      for (const cell of scored) {
+        // only EXACT ties with the winner are eligible to switch
+        if (cell.specific !== winSpecific || cell.sc !== winSc) continue
+        if (cell.mi === chosen.moduleIdx && cell.si === chosen.subModuleIdx) continue
+        const sib = siblings?.get(`${cell.mi}:${cell.si}`)
+        if (!sib) continue
+        const beatsChosen = sib.specific > chosenSib.specific || (sib.specific === chosenSib.specific && sib.sc > chosenSib.sc)
+        if (!beatsChosen) continue
+        if (!best || sib.specific > best.specific || (sib.specific === best.specific && sib.sc > best.sc)) {
+          best = { mi: cell.mi, si: cell.si, specific: sib.specific, sc: sib.sc }
+        }
+      }
+      if (best) chosen = { moduleIdx: best.mi, subModuleIdx: best.si }
+    }
     if (!result.has(toolId)) result.set(toolId, new Set<string>())
-    result.get(toolId)!.add(`${route.moduleIdx}:${route.subModuleIdx}`)
+    result.get(toolId)!.add(`${chosen.moduleIdx}:${chosen.subModuleIdx}`)
   }
 
   if (state && typeof state === 'object') _toolRouteCache.set(state, result)
