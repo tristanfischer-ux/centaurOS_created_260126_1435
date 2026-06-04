@@ -4640,7 +4640,7 @@ async function main() {
     if (process.env.CHAIN_SKIP_G5_RAG !== '1') {
       const tRag = Date.now()
       try {
-        const ragStats = await enrichWithRagSuggestions(design.modules ?? [], partVerifications)
+        const ragStats = await enrichWithRagSuggestions(design.modules ?? [], partVerifications, { productClass })
         const total = ragStats.suggestions_high + ragStats.suggestions_medium + ragStats.suggestions_low
         console.error(`[chain] G5 RAG: ${ragStats.queries_in} queries → ${total} suggestions (high=${ragStats.suggestions_high}, medium=${ragStats.suggestions_medium}, low=${ragStats.suggestions_low}, below_threshold=${ragStats.suggestions_below_threshold}, corpus=${ragStats.corpus_rows} rows)${ragStats.error ? ` — error: ${ragStats.error}` : ''}`)
         logAction({ step: 'g5_rag_suggestions', latency_ms: Date.now() - tRag, ...ragStats })

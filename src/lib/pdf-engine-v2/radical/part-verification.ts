@@ -1563,7 +1563,7 @@ function buildPreStripTechnicalSummary(
 export async function enrichWithRagSuggestions(
   modules: ModuleSpec[],
   verifications: PartVerification[],
-  options: { dbPath?: string; apiKey?: string } = {},
+  options: { dbPath?: string; apiKey?: string; productClass?: string } = {},
 ): Promise<{
   queries_in: number
   suggestions_high: number

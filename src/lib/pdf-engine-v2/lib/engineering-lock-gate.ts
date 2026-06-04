@@ -12,6 +12,11 @@
  *   2. For every safety-standards citation the brief's jurisdiction requires,
  *      call lookupStandard() from knowledge/standards-writeback.ts. Add to
  *      a standards-enrichment block on the contract.
+ *   2b. Look up a class-level reference product from pretraining_products
+ *      (DB-first hybrid → web-on-miss → writeback) and ATTACH its module
+ *      decomposition + key specs + suppliers to contract.product_ontology, which
+ *      the generator consumes (closes the audited products step-6 "grows a DB
+ *      nobody reads" gap, 2026-06-04 — previously this lookup was discarded).
  *   3. Hard FAIL (exit code 22) if any HARD-required quantity slot is STILL
  *      missing after both DB + web fallback.
  *   4. Save the locked-in enrichments to the output directory.
@@ -40,7 +45,7 @@
 import { lookupSpec } from './knowledge/specs-writeback'
 import { lookupStandard } from './knowledge/standards-writeback'
 import { lookupProduct } from './knowledge/products-writeback'
-import type { EngineeringContract } from '../../../../scripts/lib/engineering-contract'
+import type { EngineeringContract, ProductOntology } from '../../../../scripts/lib/engineering-contract'
 
 // ── HARD-required quantity slots per product class ──────────────────────────
 // These slots MUST be filled after lock-gate runs. Exit code 22 if any remain
@@ -113,8 +118,19 @@ function inferJurisdiction(brief: any): string {
 export interface LockGateResult {
   filled_slots: Array<{ spec_key: string; value: string; unit: string; source: 'db' | 'web' | null }>
   filled_standards: Array<{ standard_name: string; scope: string; source: 'db' | 'web' | null }>
-  /** Class-level product enrichment (best-effort; non-fatal). */
-  product_enrichment: { found: boolean; source: 'db' | 'web' | null; key_specs_count: number; standards_count: number }
+  /** Class-level product enrichment. When found, the ontology (modules / key
+   *  specs / suppliers) is ATTACHED to contract.product_ontology and consumed by
+   *  the generator — `attached_to_contract` records that it reached the contract. */
+  product_enrichment: {
+    found: boolean
+    source: 'db' | 'web' | null
+    reference_product: string | null
+    modules_count: number
+    key_specs_count: number
+    suppliers_count: number
+    standards_count: number
+    attached_to_contract: boolean
+  }
   hard_miss_slots: string[]
   exit_code_22: boolean
 }
@@ -134,7 +150,11 @@ export async function lockEngineering(
   const result: LockGateResult = {
     filled_slots: [],
     filled_standards: [],
-    product_enrichment: { found: false, source: null, key_specs_count: 0, standards_count: 0 },
+    product_enrichment: {
+      found: false, source: null, reference_product: null,
+      modules_count: 0, key_specs_count: 0, suppliers_count: 0, standards_count: 0,
+      attached_to_contract: false,
+    },
     hard_miss_slots: [],
     exit_code_22: false,
   }
@@ -202,23 +222,52 @@ export async function lockEngineering(
   })
   await Promise.all(standardsPromises)
 
-  // ── Phase 2b: class-level product lookup (best-effort, non-fatal) ─────
-  // Queries pretraining_products for a class-level row (e.g. "BESS container").
-  // If found, captures metadata to the result for the regression harness +
-  // future generator stages. Does NOT mutate the contract.
+  // ── Phase 2b: class-level product lookup → ATTACH to the contract ────
+  // Queries pretraining_products (DB-first HYBRID → web-on-miss → writeback) for
+  // a reference product in this class. PRE-2026-06-04 this result was DISCARDED
+  // ("does NOT mutate the contract"), so the growing DB grew a row nobody read.
+  // NOW: the looked-up module decomposition + key specs + suppliers are attached
+  // to contract.product_ontology, which generatorSystem() renders into the LLM
+  // prompt (so the generator emits modules that MATCH a real reference product)
+  // and which persists on state.engineeringContract for the renderer. Closes the
+  // audited products step-6 gap. Still non-fatal: a miss leaves the contract as-is.
   try {
-    const productNameHint = `${productClass} container`.trim()
-    if (productNameHint && productClass) {
+    // Use the class name as the lookup query (not "<class> container", which only
+    // matched containerised BESS). The hybrid lexical+semantic arms resolve the
+    // closest reference product for ANY class. Brief-derived hints (the product
+    // name in the brief) would be even better, but class-level is the universal
+    // floor and matches how the DB is keyed (product_class column).
+    const productQuery = (contract.brief_summary || productClass.replace(/_/g, ' ')).slice(0, 200)
+    if (productClass) {
       const pres = await lookupProduct({
-        product_name: productNameHint,
+        product_name: productQuery,
         product_class: productClass,
       })
       if (pres.found) {
+        const modules = (pres.modules ?? []).filter((m) => m && m.module)
+        const ontology: ProductOntology = {
+          reference_product: pres.product_name ?? productQuery,
+          manufacturer: pres.manufacturer ?? null,
+          source: (pres.source ?? 'db') as 'db' | 'web',
+          modules,
+          key_specs: pres.key_specs ?? {},
+          suppliers: pres.suppliers ?? [],
+        }
+        // ATTACH — the load-bearing line. Only attach when there is something
+        // worth grounding on (modules OR specs), so an empty hit doesn't add noise.
+        const hasContent = modules.length > 0 || Object.keys(ontology.key_specs).length > 0
+        if (hasContent) {
+          contract.product_ontology = ontology
+        }
         result.product_enrichment = {
           found: true,
           source: pres.source,
-          key_specs_count: Object.keys(pres.key_specs ?? {}).length,
+          reference_product: ontology.reference_product,
+          modules_count: modules.length,
+          key_specs_count: Object.keys(ontology.key_specs).length,
+          suppliers_count: ontology.suppliers.length,
           standards_count: (pres.standards ?? []).length,
+          attached_to_contract: hasContent,
         }
       }
     }

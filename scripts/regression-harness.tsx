@@ -4449,13 +4449,20 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // chain write-back path: the INSERT statement MUST carry the `embedding, embed_hash`
   // columns AND the file MUST compute `embedText(...)` before that INSERT. Pure
   // source check (no snapshot needed) — mirrors I12b.metric_map_mirror_in_sync.
+  // P1 (2026-06-04 audit): specs + standards writebacks were ADDED to this list —
+  // their INSERTs landed embedding=NULL, so web-grown spec/standard rows stayed
+  // search-invisible until a MANUAL backfill (`scripts/ingest/backfill-embeddings.ts`).
+  // The same source guard now spans all four chain write-back paths, each keyed to
+  // its own target table.
   try {
-    const writebackFiles: Array<{ rel: string; label: string }> = [
-      { rel: '../src/lib/pdf-engine-v2/lib/distributors/library-writeback.ts', label: 'library-writeback.ts (distributor cascade)' },
-      { rel: '../src/lib/pdf-engine-v2/lib/emitter-completion.ts', label: 'emitter-completion.ts (on-the-fly completion)' },
+    const writebackFiles: Array<{ rel: string; label: string; table: string }> = [
+      { rel: '../src/lib/pdf-engine-v2/lib/distributors/library-writeback.ts', label: 'library-writeback.ts (distributor cascade)', table: 'pretraining_extracted_parts' },
+      { rel: '../src/lib/pdf-engine-v2/lib/emitter-completion.ts', label: 'emitter-completion.ts (on-the-fly completion)', table: 'pretraining_extracted_parts' },
+      { rel: '../src/lib/pdf-engine-v2/lib/knowledge/specs-writeback.ts', label: 'specs-writeback.ts (lock-gate spec discovery)', table: 'pretraining_extracted_specs' },
+      { rel: '../src/lib/pdf-engine-v2/lib/knowledge/standards-writeback.ts', label: 'standards-writeback.ts (lock-gate standard discovery)', table: 'pretraining_extracted_standards' },
     ]
     const problems: string[] = []
-    for (const { rel, label } of writebackFiles) {
+    for (const { rel, label, table } of writebackFiles) {
       let src = ''
       try {
         src = readFileSync(resolve(__dirname, rel), 'utf-8')
@@ -4463,10 +4470,10 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         problems.push(`${label}: source unreadable at ${rel}`)
         continue
       }
-      // Locate every INSERT ... INTO pretraining_extracted_parts (... column list ...)
-      // and confirm the column list names both embedding + embed_hash. The column
-      // list runs to the first ')' after the table name (the column block).
-      const insertRe = /INSERT(?:\s+OR\s+\w+)?\s+INTO\s+pretraining_extracted_parts\s*\(([^)]*)\)/gi
+      // Locate every INSERT ... INTO <table> (... column list ...) and confirm the
+      // column list names both embedding + embed_hash. The column list runs to the
+      // first ')' after the table name (the column block).
+      const insertRe = new RegExp(`INSERT(?:\\s+OR\\s+\\w+)?\\s+INTO\\s+${table}\\s*\\(([^)]*)\\)`, 'gi')
       let m: RegExpExecArray | null
       let found = 0
       while ((m = insertRe.exec(src)) !== null) {
@@ -4476,12 +4483,12 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         const hasHash = /\bembed_hash\b/.test(colBlock)
         if (!hasEmbedding || !hasHash) {
           problems.push(
-            `${label}: an INSERT INTO pretraining_extracted_parts omits ${!hasEmbedding ? 'embedding' : ''}${!hasEmbedding && !hasHash ? ' + ' : ''}${!hasHash ? 'embed_hash' : ''} — every write-back row must carry the 1536-d vector`,
+            `${label}: an INSERT INTO ${table} omits ${!hasEmbedding ? 'embedding' : ''}${!hasEmbedding && !hasHash ? ' + ' : ''}${!hasHash ? 'embed_hash' : ''} — every write-back row must carry the 1536-d vector`,
           )
         }
       }
       if (found === 0) {
-        problems.push(`${label}: no INSERT INTO pretraining_extracted_parts found (did the write-back move? update this invariant)`)
+        problems.push(`${label}: no INSERT INTO ${table} found (did the write-back move? update this invariant)`)
       }
       // The file must also actually compute an embedding (await embedText / embedText helper present).
       if (!/embedText\s*\(/.test(src)) {
@@ -4490,13 +4497,113 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
     assertions.push(assertEq(
       'UNIVERSAL.growing_db_writeback_embeds_on_insert',
-      'both chain write-back paths (library-writeback.ts + emitter-completion.ts) INSERT pretraining_extracted_parts WITH embedding + embed_hash and compute embedText before the insert (no NULL-embedded row enters via write-back)',
+      'all four chain write-back paths (library-writeback.ts + emitter-completion.ts → pretraining_extracted_parts; specs-writeback.ts → pretraining_extracted_specs; standards-writeback.ts → pretraining_extracted_standards) INSERT WITH embedding + embed_hash and compute embedText before the insert (no NULL-embedded row enters via write-back)',
       problems.length,
       (n) => n === 0,
       () => `growing-DB write-back embedding regression: ${problems.join('; ')}`,
     ))
   } catch (err) {
     assertions.push({ id: 'UNIVERSAL.growing_db_writeback_embeds_on_insert', description: 'growing-DB write-back embeds on insert', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── UNIVERSAL.knowledge_reads_are_hybrid (2026-06-04 audit P2/P3) ────────────
+  //
+  // The parts / specs / standards reads must be HYBRID — route through the shared
+  // dualSearch (lexical LIKE arm + cosine semantic arm, RRF-fused), NOT a single
+  // arm. Pre-fix (FORGE-ENGINE-DB-AUDIT.md): parts was cosine-ONLY (g5-rag.ts
+  // `topMatch` over an in-memory matrix) and specs/standards were keyword-ONLY. A
+  // regression here (someone reverts a read to one arm, or drops the dualSearch
+  // import) silently makes the lookup no better than a single retriever — the exact
+  // failure this workstream removes. Pure source-scan (no snapshot, no DB):
+  //   • g5-rag.ts (Stage 17.6 parts RAG) imports + calls dualSearch, and the dead
+  //     cosine-only `topMatch`/`loadCorpus` scaffold is GONE (would re-introduce the
+  //     single-arm path if re-added).
+  //   • specs-writeback.ts + standards-writeback.ts import + call dualSearch in
+  //     their read cascade (the 1b hybrid stage between the keyed read and web).
+  try {
+    const readFiles: Array<{ rel: string; label: string; forbid?: RegExp; forbidLabel?: string }> = [
+      {
+        rel: '../src/lib/pdf-engine-v2/radical/g5-rag.ts',
+        label: 'g5-rag.ts (Stage 17.6 parts RAG)',
+        forbid: /function\s+topMatch\b|function\s+loadCorpus\b/,
+        forbidLabel: 'the dead cosine-only topMatch/loadCorpus scaffold is back — that is the single-arm path the hybrid fix removed',
+      },
+      { rel: '../src/lib/pdf-engine-v2/lib/knowledge/specs-writeback.ts', label: 'specs-writeback.ts read cascade' },
+      { rel: '../src/lib/pdf-engine-v2/lib/knowledge/standards-writeback.ts', label: 'standards-writeback.ts read cascade' },
+    ]
+    const problems: string[] = []
+    for (const { rel, label, forbid, forbidLabel } of readFiles) {
+      let src = ''
+      try {
+        src = readFileSync(resolve(__dirname, rel), 'utf-8')
+      } catch {
+        problems.push(`${label}: source unreadable at ${rel}`)
+        continue
+      }
+      // Must IMPORT dualSearch from the shared retrieval module …
+      const importsDual = /from\s+['"][^'"]*retrieval\/dual-search['"]/.test(src) && /\bdualSearch\b/.test(src)
+      // … and actually CALL it.
+      const callsDual = /\bdualSearch\s*[<(]/.test(src)
+      if (!importsDual) problems.push(`${label}: does not import dualSearch from lib/retrieval/dual-search — read is not hybrid`)
+      if (!callsDual) problems.push(`${label}: never calls dualSearch(...) — read is not hybrid`)
+      if (forbid && forbid.test(src)) problems.push(`${label}: ${forbidLabel}`)
+    }
+    assertions.push(assertEq(
+      'UNIVERSAL.knowledge_reads_are_hybrid',
+      'parts (g5-rag.ts) + specs-writeback.ts + standards-writeback.ts route their DB read through the shared dualSearch (lexical+semantic RRF-fused), and the parts cosine-only topMatch/loadCorpus scaffold stays deleted (P2/P3 audit fix — no single-arm regression)',
+      problems.length,
+      (n) => n === 0,
+      () => `knowledge-read hybrid regression: ${problems.join('; ')}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.knowledge_reads_are_hybrid', description: 'parts/specs/standards reads are hybrid', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── UNIVERSAL.products_loop_closed (2026-06-04 audit P5) ─────────────────────
+  // pretraining_products "grew a DB nobody reads" — lookup discarded, no embedding
+  // column, lexical-only. Guards all three fixed steps in one place: USE (the lock
+  // gate attaches contract.product_ontology), EMBED (the UPSERT carries
+  // embedding+embed_hash via embedText), HYBRID (the read routes through dualSearch).
+  try {
+    const wb = readFileSync(resolve(__dirname, '../src/lib/pdf-engine-v2/lib/knowledge/products-writeback.ts'), 'utf-8')
+    const lg = readFileSync(resolve(__dirname, '../src/lib/pdf-engine-v2/lib/engineering-lock-gate.ts'), 'utf-8')
+    const problems: string[] = []
+    const ins = /INSERT(?:\s+OR\s+\w+)?\s+INTO\s+pretraining_products\s*\(([^)]*)\)/i.exec(wb)
+    if (!ins) problems.push('products-writeback.ts: no INSERT INTO pretraining_products found')
+    else if (!/\bembedding\b/.test(ins[1]) || !/\bembed_hash\b/.test(ins[1])) problems.push('products-writeback.ts: UPSERT omits embedding/embed_hash')
+    if (!/embedText\s*\(/.test(wb)) problems.push('products-writeback.ts: no embedText(...) — row would be NULL-embedded')
+    if (!/from\s+['"][^'"]*retrieval\/dual-search['"]/.test(wb) || !/\bdualSearch\s*[<(]/.test(wb)) problems.push('products-writeback.ts: read not routed through dualSearch (not hybrid)')
+    if (!/contract\.product_ontology\s*=/.test(lg)) problems.push('engineering-lock-gate.ts: lookup result not attached to contract.product_ontology (USE step regressed)')
+    assertions.push(assertEq(
+      'UNIVERSAL.products_loop_closed',
+      'pretraining_products loop closed: lock gate attaches contract.product_ontology (USE), UPSERT embeds-on-write (EMBED), read routes through dualSearch (HYBRID)',
+      problems.length, (n) => n === 0,
+      () => `products growing-DB loop regression: ${problems.join('; ')}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.products_loop_closed', description: 'products growing-DB loop closed', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
+  }
+
+  // ── UNIVERSAL.methods_loop_closed (2026-06-04 audit P6 — embed + hybrid) ─────
+  // Class reference graphs: EMBED (class_graph_embeddings sibling via embedText,
+  // re-fired after writebackDiscoveredNode/Edge) + HYBRID (findSimilarClassGraphs
+  // via dualSearch). The WEB-DISCOVERY-on-miss cell is the auto-harvest build,
+  // tracked separately.
+  try {
+    const cg = readFileSync(resolve(__dirname, '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db.ts'), 'utf-8')
+    const problems: string[] = []
+    if (!/class_graph_embeddings/.test(cg)) problems.push('class-reference-graph-db.ts: no class_graph_embeddings table — graphs not embedded')
+    if (!/embedText\s*\(/.test(cg)) problems.push('class-reference-graph-db.ts: no embedText(...) — graphs would be NULL-embedded')
+    if (!/findSimilarClassGraphs/.test(cg)) problems.push('class-reference-graph-db.ts: no findSimilarClassGraphs — no hybrid graph read')
+    if (!/from\s+['"][^'"]*retrieval\/dual-search['"]/.test(cg) || !/\bdualSearch\s*[<(]/.test(cg)) problems.push('class-reference-graph-db.ts: hybrid read not routed through dualSearch')
+    assertions.push(assertEq(
+      'UNIVERSAL.methods_loop_closed',
+      'class reference graphs embed-on-write (class_graph_embeddings + embedText, re-fired after node/edge writeback) + hybrid read (findSimilarClassGraphs via dualSearch); web-discovery-on-miss is the auto-harvest build',
+      problems.length, (n) => n === 0,
+      () => `methods growing-DB loop regression: ${problems.join('; ')}`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.methods_loop_closed', description: 'methods graph loop closed', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   // ── UNIVERSAL: hybrid retrieval FUSES lexical + semantic (2026-06-04) ────────

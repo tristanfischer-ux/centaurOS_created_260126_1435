@@ -35,6 +35,7 @@ import Database from 'better-sqlite3'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { homedir } from 'node:os'
+import { createHash } from 'node:crypto'
 import type {
   ProductClassGraph,
   GraphNode,
@@ -47,6 +48,10 @@ import {
   ensureGraphsRegistered,
   getClassReferenceGraph,
 } from '../../class-reference-graph.js'
+import {
+  dualSearch,
+  type DualSearchHit,
+} from '../retrieval/dual-search.js'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +60,50 @@ const LLM_SOURCE = 'llm'
 const LLM_CONFIDENCE = 0.7
 const MAX_RETRY = 3
 const RETRY_DELAY_MS = 50
+
+// ── Embedding (text-embedding-3-small, 1536-d, Float32LE BLOB) ───────────────
+// MIRRORS library-writeback.ts:52-81 + specs-writeback.ts:56-85 + products-
+// writeback.ts:55-84 EXACTLY (the `pretraining_extracted_*` f32le_blob
+// convention) so a class graph is retrievable by the same hybrid (dual-search.ts)
+// cosine query the moment it is bootstrapped or grown by writeback. Stored in a
+// SIBLING table `class_graph_embeddings` keyed by graph_id (mirrors
+// supplier_embeddings being a side table of companies) — the structural
+// class_reference_graphs row stays untouched. Without this the class topology is
+// search-INVISIBLE: a new/unseen class cannot find the closest existing topology
+// to adapt, and writebackDiscoveredNode/Edge grow nodes/edges nobody can
+// semantically reach (the audited 2026-06-04 methods EMBED + HYBRID gap).
+const OPENAI_KEY = process.env.OPENAI_API_KEY || ''
+const EMBEDDING_MODEL = 'text-embedding-3-small'
+const EMBEDDING_DIMS = 1536
+
+/** sha256(embed_source) prefix — same idempotency convention as the corpus. */
+function embedHashOf(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 32)
+}
+
+/** Embed one string → Float32LE Buffer, or null on any failure (graceful). */
+async function embedText(text: string): Promise<Buffer | null> {
+  if (!OPENAI_KEY) return null
+  const src = (text || '').trim()
+  if (!src) return null
+  try {
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: src.slice(0, 4096), model: EMBEDDING_MODEL, dimensions: EMBEDDING_DIMS }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { data?: Array<{ embedding: number[] }> }
+    const vec = data.data?.[0]?.embedding
+    if (!vec || vec.length !== EMBEDDING_DIMS) return null
+    const buf = Buffer.alloc(EMBEDDING_DIMS * 4)
+    for (let i = 0; i < EMBEDDING_DIMS; i++) buf.writeFloatLE(vec[i], i * 4)
+    return buf
+  } catch {
+    return null
+  }
+}
 
 // ── Class-graph slug resolution (single source of truth) ─────────────────────
 // The chain emits an ENGINE product_class (e.g. `wind_turbine`, `h2_electrolyser`,
@@ -166,6 +215,8 @@ let _stmtGetEdges: Database.Statement | null = null
 let _stmtInsertNode: Database.Statement | null = null
 let _stmtInsertEdge: Database.Statement | null = null
 let _stmtBootstrapGraph: Database.Statement | null = null
+let _stmtUpsertEmbedding: Database.Statement | null = null
+let _stmtGetGraphById: Database.Statement | null = null
 
 function getDb(): Database.Database | null {
   if (_db !== undefined) return _db
@@ -193,6 +244,13 @@ function getDb(): Database.Database | null {
       SELECT id, product_class, display_name, scope_notes
       FROM class_reference_graphs
       WHERE product_class = ?
+      LIMIT 1
+    `)
+
+    _stmtGetGraphById = db.prepare(`
+      SELECT id, product_class, display_name, scope_notes
+      FROM class_reference_graphs
+      WHERE id = ?
       LIMIT 1
     `)
 
@@ -234,6 +292,37 @@ function getDb(): Database.Database | null {
       INSERT OR IGNORE INTO class_reference_graphs
         (product_class, display_name, source, schema_version, scope_notes)
       VALUES (?, ?, 'llm_bootstrap', 'bootstrap-v1', ?)
+    `)
+
+    // Sibling embedding table keyed by graph_id (mirrors supplier_embeddings ↔
+    // companies). One row per graph; embedding is a 1536-d Float32LE BLOB (the
+    // pretraining_extracted_* convention). embed_hash makes the (re)embed
+    // idempotent — skip the network call when the topology text is unchanged.
+    // CREATE … IF NOT EXISTS so this self-provisions on first open (no migration
+    // file needed; matches how supplier_embeddings / investor_embeddings were
+    // created out-of-band).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS class_graph_embeddings (
+        graph_id   INTEGER PRIMARY KEY REFERENCES class_reference_graphs(id) ON DELETE CASCADE,
+        embedding  BLOB    NOT NULL,
+        embed_hash TEXT    NOT NULL,
+        model      TEXT    NOT NULL,
+        dims       INTEGER NOT NULL,
+        created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+      )
+    `)
+
+    _stmtUpsertEmbedding = db.prepare(`
+      INSERT INTO class_graph_embeddings
+        (graph_id, embedding, embed_hash, model, dims, updated_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(graph_id) DO UPDATE SET
+        embedding  = excluded.embedding,
+        embed_hash = excluded.embed_hash,
+        model      = excluded.model,
+        dims       = excluded.dims,
+        updated_at = datetime('now')
     `)
 
     _db = db
@@ -312,6 +401,89 @@ function reconstructEdge(row: EdgeRow): ConnectionEdge {
     fluid: parseJsonSafe<FluidEnvelope>(row.fluid_json),
     source_references: parseJsonSafe<string[]>(row.source_references_json),
     notes: row.notes ?? undefined,
+  }
+}
+
+// ── Embed-text recipe + (re)embed-on-write ────────────────────────────────────
+
+/**
+ * Render a class reference graph as the canonical embed-text — the TOPOLOGY as
+ * a string, so a query like "CO2 capture and mineralisation plant" lands near
+ * the graphs whose nodes/edges describe the same physical machine.
+ *
+ *   display_name + scope_notes
+ *   + every node's `class_id` and `role`
+ *   + every edge's `from_class → to_class` and its `mechanism` (the physical
+ *     connection — dc_busbar / cooling_loop / can_bus / …)
+ *
+ * Space-joined, deduped-by-construction in source order. This is the SAME text
+ * the lexical arm of findSimilarClassGraphs searches over (display_name +
+ * scope_notes), so query↔index align: the lexical arm catches an exact class
+ * token, the semantic arm catches a synonymous topology.
+ */
+function buildGraphEmbedSource(
+  graph: { display_name: string; scope_notes?: string | null },
+  nodes: NodeRow[],
+  edges: EdgeRow[],
+): string {
+  const parts: string[] = []
+  if (graph.display_name) parts.push(graph.display_name)
+  if (graph.scope_notes) parts.push(graph.scope_notes)
+  for (const n of nodes) {
+    parts.push(n.class_id)
+    if (n.role) parts.push(n.role)
+  }
+  for (const e of edges) {
+    parts.push(`${e.from_class} ${e.to_class}`)
+    if (e.mechanism) parts.push(e.mechanism)
+  }
+  return parts.filter(Boolean).join(' ').slice(0, 4096)
+}
+
+/**
+ * (Re)embed a single graph by id and UPSERT it into class_graph_embeddings.
+ * Idempotent: skips the network call when the topology text hash is unchanged
+ * (the same embed_hash already stored). Fire-and-forget friendly — never throws.
+ * Returns 'embedded' | 'unchanged' | 'skipped' | 'failed' for the backfill
+ * harness to count; callers that don't care can ignore it.
+ *
+ * Called after writebackDiscoveredNode/Edge mutate the graph and after the
+ * bootstrap row is created, so the embedding always reflects the CURRENT
+ * topology — the "(re)embed whenever the graph mutates" guarantee.
+ */
+async function reembedGraph(
+  graphId: number,
+): Promise<'embedded' | 'unchanged' | 'skipped' | 'failed'> {
+  const db = getDb()
+  if (!db || !_stmtGetGraphById || !_stmtGetNodes || !_stmtGetEdges || !_stmtUpsertEmbedding) {
+    return 'skipped'
+  }
+  try {
+    const graphRow = _stmtGetGraphById.get(graphId) as GraphRow | undefined
+    if (!graphRow) return 'skipped'
+    const nodeRows = _stmtGetNodes.all(graphId) as NodeRow[]
+    const edgeRows = _stmtGetEdges.all(graphId) as EdgeRow[]
+    const embedSource = buildGraphEmbedSource(graphRow, nodeRows, edgeRows)
+    if (!embedSource) return 'skipped'
+    const newHash = embedHashOf(embedSource)
+
+    // Idempotency: if the stored hash already matches this topology text, the
+    // vector is current — no network call.
+    const existing = db
+      .prepare(`SELECT embed_hash FROM class_graph_embeddings WHERE graph_id = ?`)
+      .get(graphId) as { embed_hash: string } | undefined
+    if (existing && existing.embed_hash === newHash) return 'unchanged'
+
+    const embedding = await embedText(embedSource)
+    if (!embedding) return 'failed' // no key / non-200 / wrong dims — graceful
+
+    await retryWrite(() => {
+      _stmtUpsertEmbedding!.run(graphId, embedding, newHash, EMBEDDING_MODEL, EMBEDDING_DIMS)
+    }, `embed:graph:${graphId}`)
+    return 'embedded'
+  } catch (err) {
+    console.warn(`[class-reference-graph-db] reembedGraph(${graphId}) failed: ${(err as Error).message}`)
+    return 'failed'
   }
 }
 
@@ -429,6 +601,10 @@ export function writebackDiscoveredNode(
       }, `node:${productClass}:${node.class_id}`)
 
       console.error(`[class-reference-graph-db] wrote node source=llm class=${productClass} node=${node.class_id}`)
+
+      // (Re)embed the graph so the grown topology is immediately semantically
+      // searchable (the EMBED-on-write guarantee). Idempotent on the hash.
+      await reembedGraph(graphRow.id)
     } catch (err) {
       console.warn(`[class-reference-graph-db] writebackDiscoveredNode failed: ${(err as Error).message}`)
     }
@@ -486,6 +662,10 @@ export function writebackDiscoveredEdge(
       }, `edge:${productClass}:${edge.from_class}->${edge.to_class}`)
 
       console.error(`[class-reference-graph-db] wrote edge source=llm class=${productClass} ${edge.from_class}->${edge.to_class}`)
+
+      // (Re)embed the graph so the grown topology is immediately semantically
+      // searchable (the EMBED-on-write guarantee). Idempotent on the hash.
+      await reembedGraph(graphRow.id)
     } catch (err) {
       console.warn(`[class-reference-graph-db] writebackDiscoveredEdge failed: ${(err as Error).message}`)
     }
@@ -585,6 +765,136 @@ export async function getClassReferenceGraphDBFirst(
   return null
 }
 
+// ── Public: HYBRID semantic read — nearest existing class graphs ──────────────
+
+export interface SimilarClassGraph {
+  /** Canonical product_class slug of the matched graph row. */
+  product_class: string
+  display_name: string
+  scope_notes?: string
+  /** 0-based rank in the lexical (LIKE) arm, or null if it did not appear. */
+  lexical_rank: number | null
+  /** 0-based rank in the semantic (cosine) arm, or null if it did not appear. */
+  semantic_rank: number | null
+  /** Fused Reciprocal Rank Fusion score (higher = closer). */
+  rrf_score: number
+}
+
+interface GraphLexicalRow {
+  id: number
+  product_class: string
+  display_name: string
+  scope_notes: string | null
+}
+
+/**
+ * HYBRID DB-first search for the class graphs closest to a free-text class
+ * description — the read the auto-harvest uses to seed an UNSEEN class from its
+ * nearest neighbour ("CO2 capture and mineralisation plant" → the bioreactor /
+ * dac / fluid-processing graphs whose topology it can adapt instead of deriving
+ * from scratch).
+ *
+ * Lexical arm: LIKE over `display_name` + `scope_notes` (catches an exact class
+ * token). Semantic arm: cosine over the `class_graph_embeddings` BLOB joined to
+ * the graph row by graph_id (catches a synonymous topology the LIKE misses).
+ * RRF-fused via the shared `dualSearch` — the SAME substrate suppliers + parts
+ * use, so the fusion behaviour is identical across stores.
+ *
+ * Never throws: a missing DB, an un-embedded corpus, or a missing OPENAI key all
+ * degrade to lexical-only (or empty) with the dualSearch diagnostic. Excludes
+ * `excludeClass` (the unseen class itself, if a bootstrap row already exists) so
+ * a class never returns itself as its own nearest neighbour.
+ */
+export async function findSimilarClassGraphs(
+  text: string,
+  k: number = 5,
+  opts: { excludeClass?: string; dbPath?: string; queryEmbedding?: number[] | null } = {},
+): Promise<SimilarClassGraph[]> {
+  const query = String(text ?? '').trim()
+  if (!query) return []
+
+  const where = opts.excludeClass
+    ? `product_class <> '${String(opts.excludeClass).replace(/'/g, "''")}'`
+    : undefined
+
+  let result
+  try {
+    result = await dualSearch<GraphLexicalRow>({
+      table: 'class_reference_graphs',
+      idColumn: 'id',
+      lexicalCols: ['display_name', 'scope_notes'],
+      selectCols: ['product_class'],
+      embedding: {
+        table: 'class_graph_embeddings',
+        column: 'embedding',
+        format: 'f32le_blob',
+        joinColumn: 'graph_id',
+      },
+      queryText: query,
+      queryEmbedding: opts.queryEmbedding ?? undefined,
+      k,
+      where,
+      dbPath: opts.dbPath,
+    })
+  } catch (err) {
+    console.warn(`[class-reference-graph-db] findSimilarClassGraphs failed: ${(err as Error).message}`)
+    return []
+  }
+
+  return result.hits.map((h: DualSearchHit<GraphLexicalRow>) => ({
+    product_class: String(h.row.product_class ?? ''),
+    display_name: String(h.row.display_name ?? ''),
+    scope_notes: h.row.scope_notes == null ? undefined : String(h.row.scope_notes),
+    lexical_rank: h.lexical_rank,
+    semantic_rank: h.semantic_rank,
+    rrf_score: h.rrf_score,
+  }))
+}
+
+// ── Public: backfill / explicit (re)embed (for the scheduled sweep + tests) ──
+
+/** (Re)embed the graph for one product_class slug (alias-resolved). Returns the
+ *  reembedGraph outcome. Used by the backfill + the verify harness. */
+export async function reembedClassGraph(
+  productClass: string,
+): Promise<'embedded' | 'unchanged' | 'skipped' | 'failed' | 'no-row'> {
+  const db = getDb()
+  if (!db || !_stmtGetGraph) return 'skipped'
+  const slug = resolveClassGraphSlug(productClass)
+  const row = (_stmtGetGraph.get(slug) ?? _stmtGetGraph.get(String(productClass).trim().toLowerCase())) as
+    | GraphRow
+    | undefined
+  if (!row) return 'no-row'
+  return reembedGraph(row.id)
+}
+
+/**
+ * (Re)embed EVERY graph in class_reference_graphs (the backfill). Idempotent —
+ * graphs whose topology text is unchanged are skipped without a network call.
+ * Returns a per-outcome tally. Safe to schedule as a belt-and-braces sweep, the
+ * same role scripts/ingest/backfill-embeddings.ts plays for parts/specs.
+ */
+export async function reembedAllGraphs(): Promise<{
+  total: number
+  embedded: number
+  unchanged: number
+  skipped: number
+  failed: number
+}> {
+  const db = getDb()
+  const tally = { total: 0, embedded: 0, unchanged: 0, skipped: 0, failed: 0 }
+  if (!db) return tally
+  const ids = (db.prepare(`SELECT id FROM class_reference_graphs ORDER BY id`).all() as Array<{ id: number }>).map(
+    (r) => r.id,
+  )
+  tally.total = ids.length
+  for (const id of ids) {
+    const outcome = await reembedGraph(id)
+    tally[outcome] += 1
+  }
+  return tally
+}
+
 /** Test-only reset hook — clears the module-scoped DB handle. */
 export function _resetForTests(): void {
   if (_db) {
@@ -592,10 +902,12 @@ export function _resetForTests(): void {
   }
   _db = undefined
   _stmtGetGraph = null
+  _stmtGetGraphById = null
   _stmtGetNodes = null
   _stmtGetEdges = null
   _stmtInsertNode = null
   _stmtInsertEdge = null
   _stmtBootstrapGraph = null
+  _stmtUpsertEmbedding = null
   _warnedMissing = false
 }

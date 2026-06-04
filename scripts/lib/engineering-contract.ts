@@ -215,6 +215,43 @@ export interface EngineeringContract {
   // Null when the product_class has no entry in MARKET_BANDS (e.g. TBD
   // classes or very niche products). Renderer skips the band block when null.
   market_band?: MarketBand | null
+
+  // product_ontology — class-level reference-product knowledge looked up from
+  // pretraining_products by the Engineering Lock Gate (lockEngineering), 2026-06-04.
+  //
+  // PROBLEM it closes: the lock gate ALREADY looked the product up
+  // (engineering-lock-gate.ts) but DISCARDED the result ("best-effort, non-fatal,
+  // does NOT mutate the contract") — so the growing pretraining_products DB grew a
+  // row nobody downstream consumed (audited 2026-06-04, products step 6). The
+  // looked-up module decomposition + key specs + suppliers never reached the
+  // generator, so an unseen-archetype run got zero grounding from the corpus.
+  //
+  // CONSUMPTION: generatorSystem() (serial-design-chain-v2.tsx) renders this into
+  // the LLM system prompt as a REFERENCE PRODUCT ONTOLOGY block (alongside the
+  // deterministic-quantities block), so the generator emits modules/sub-modules
+  // that MATCH real reference products instead of inventing a decomposition. It is
+  // ALSO persisted on state.engineeringContract for the renderer's per-module
+  // callout. Optional: absent when the lookup misses or returns no ontology.
+  product_ontology?: ProductOntology | null
+}
+
+/**
+ * Class-level reference-product ontology attached to the contract by the
+ * Engineering Lock Gate from a pretraining_products hit. Drives the generator.
+ */
+export interface ProductOntology {
+  /** Matched reference product (e.g. 'Tesla Megapack 3'). */
+  reference_product: string
+  /** Manufacturer of the reference product. */
+  manufacturer: string | null
+  /** Where the row came from: the pretraining DB or a fresh web lookup. */
+  source: 'db' | 'web'
+  /** Module → sub-module decomposition of the reference product. */
+  modules: Array<{ module: string; sub_modules: string[] }>
+  /** Key engineering specs of the reference product (spec_key → value). */
+  key_specs: Record<string, unknown>
+  /** Named suppliers for the reference product (role / name / url). */
+  suppliers: Array<{ role?: string; name: string; url?: string }>
 }
 
 export interface ContractClosureResult {

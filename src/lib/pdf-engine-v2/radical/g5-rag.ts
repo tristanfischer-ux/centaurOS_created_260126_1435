@@ -10,27 +10,40 @@
  * often returned another plausible-but-fabricated SKU or "uncertain".
  *
  * This module adds a retrieval-augmented step: for each unverified part,
- * embed its description and cosine-search the Phase 4 corpus
+ * embed its description and search the Phase 4 corpus
  * (`~/.forge-truth/forge-truth.db` table `pretraining_extracted_parts`,
- * ~31k rows with text-embedding-3-small 1536-d vectors, 25,872 with real
- * part numbers) for the closest semantically-similar real part. If a strong
- * match exists (similarity ≥ threshold), the chain surfaces it as a
- * "Plausible alternative based on corpus" suggestion on the BoM row.
+ * ~38k rows with text-embedding-3-small 1536-d vectors) for the closest real
+ * part. If a strong match exists (similarity ≥ threshold), the chain surfaces
+ * it as a "Plausible alternative based on corpus" suggestion on the BoM row.
+ *
+ * HYBRID RETRIEVAL (P2, 2026-06-04 audit fix): this used to be cosine-ONLY
+ * (`topMatch` over an in-memory matrix). The audit (FORGE-ENGINE-DB-AUDIT.md)
+ * flagged parts as the one store that embeds its writes but never FUSES the
+ * lexical + semantic arms — so an exact part-name / MPN-token the embedding
+ * ranks low was invisible here. The retrieval now routes through the shared
+ * `dualSearch` (lib/retrieval/dual-search.ts): SQL-LIKE lexical arm over
+ * [part_name, manufacturer, raw_excerpt] + cosine semantic arm over the
+ * same-table f32le_blob embedding, fused by Reciprocal Rank Fusion. The
+ * confidence bucket below is still keyed on the cosine of the FUSED winner
+ * (computed from its stored embedding) so the honesty thresholds are unchanged
+ * — the lexical arm only ever RESCUES a row the cosine missed, never relaxes
+ * the bar. The single batched query embedding is computed once and injected
+ * into dualSearch (`queryEmbedding`) so cost/latency is unchanged.
  *
  * Design constraints:
- *   - Universal across product classes — no per-class hard-coding.
+ *   - Universal across product classes — no per-class hard-coding (the optional
+ *     productClass only prepends a short DOMAIN-ANCHOR phrase to the query text,
+ *     mirroring scripts/lib/orchestrator/library-candidate-query.ts, so cosine
+ *     biases toward the right domain — it does NOT branch behaviour by class).
  *   - Fail-soft: corpus missing, OPENAI_API_KEY missing, OpenAI 5xx, etc.
- *     all return null and let G5 proceed without the RAG annotation.
+ *     all return an empty map and let G5 proceed without the RAG annotation.
  *   - Batched: one OpenAI embeddings call for ALL unverified parts in the
- *     run, then in-process cosine math against a one-time-loaded matrix.
- *   - Latency budget: cold corpus load ~1-2s for 25k rows × 1536 d (160 MB
- *     of float32), one embed call ~500ms for 100 inputs, scan ~30ms per
- *     query. Total ~3s for a typical 80-part-batch run; well inside budget.
+ *     run; each vector is then injected into dualSearch per query.
  *   - Persisted on PartVerification as `g5_rag_suggestion`. Renderer reads
  *     it from there and surfaces a note next to the unverified line.
  *
- * Threshold tuning (similarity is cosine on L2-normalised text-embedding-3-
- * small vectors, so cos ∈ [-1, 1]):
+ * Threshold tuning (similarity is cosine on text-embedding-3-small vectors,
+ * so cos ∈ [-1, 1]):
  *   ≥ 0.70 → "high"   — confident substitution; surface SKU explicitly
  *   ≥ 0.55 → "medium" — surface SKU with "consider" framing
  *   ≥ 0.45 → "low"    — surface SKU as "closest corpus match" only
@@ -44,10 +57,15 @@
  * Cost: 1 embed call/run × ~100 inputs ≈ £0.00015. Negligible.
  */
 
-import Database from 'better-sqlite3'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
 import { resolve as resolvePath } from 'path'
+import {
+  dualSearch,
+  parseEmbedding,
+  cosineSimilarity,
+  EMBEDDING_DIMS as DUAL_EMBEDDING_DIMS,
+} from '../lib/retrieval/dual-search'
 
 // ───────────────────────────────────────────────────────────────────────────
 // Public types
@@ -106,10 +124,13 @@ const SIM_MEDIUM = 0.55
 const SIM_LOW = 0.45
 const EMBED_BATCH = 100
 const QUERY_TEXT_CAP = 1024
-/** Hard cap on corpus rows loaded into memory per call. The corpus has ~25.8k
- * rows with part_numbers + embeddings (2026-05-20 census). 100k is a 4x
- * safety ceiling — if it ever explodes past that the loader will spike RAM. */
-const MAX_CORPUS_ROWS = 100_000
+/** Per-query fused candidate depth. dualSearch RRF-fuses the lexical + semantic
+ * arms and returns the top-k FUSED rows; the WINNER (rank 0) is the hybrid pick
+ * (a row strong in BOTH arms can outrank a row strong in only one — the whole
+ * point of fusion). We emit that winner; the small k keeps the per-query work
+ * tight. The cosine of the winner (re-scored from its own embedding) drives the
+ * honesty bucket so the SIM_* thresholds stay anchored on semantic closeness. */
+const FUSED_TOP_K = 5
 
 // ───────────────────────────────────────────────────────────────────────────
 // Embedding (OpenAI)
@@ -144,184 +165,114 @@ async function embedBatch(texts: string[], apiKey: string): Promise<number[][]> 
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Product-class domain anchor (mirrors library-candidate-query.ts).
+//
+// Without a domain prefix the cosine arm drifts toward adjacent domains whose
+// corpus is denser (BESS L26: a Generac generator fuse out-ranked a BESS fuse
+// for "safety consumable for battery cabinet"). Prepending a short (≤10-token)
+// domain phrase anchors the embedding in the right product domain BEFORE the
+// part description steers further. Optional — empty when no class is supplied
+// or the class is unknown (behaviour-preserving for callers that pass nothing).
+// ───────────────────────────────────────────────────────────────────────────
+
+const PRODUCT_CLASS_ANCHOR_TERMS: Record<string, string> = {
+  bess:                      'battery energy storage system lithium iron phosphate LFP grid-scale containerised',
+  energy_storage:            'battery energy storage system lithium iron phosphate LFP grid-scale containerised',
+  'bess-utility-scale':      'battery energy storage system lithium iron phosphate LFP grid-scale containerised',
+  residential_ess:           'residential battery energy storage LFP home inverter',
+  haps:                      'high altitude platform station solar stratospheric drone pseudo-satellite',
+  wind:                      'wind turbine nacelle rotor blade gearbox tower offshore onshore',
+  wind_turbine:              'wind turbine nacelle rotor blade gearbox tower offshore onshore',
+  'vertical-farm':           'vertical farm hydroponic LED lighting climate-controlled indoor agriculture',
+  vertical_farm:             'vertical farm hydroponic LED lighting climate-controlled indoor agriculture',
+  heatpump:                  'heat pump compressor R290 refrigerant evaporator condenser HVAC residential',
+  heat_pump:                 'heat pump compressor R290 refrigerant evaporator condenser HVAC residential',
+  thermal_system:            'heat pump compressor refrigerant evaporator condenser HVAC thermal',
+  mini_split_heatpump:       'heat pump compressor R290 refrigerant mini-split HVAC',
+  'ev-charger':              'electric vehicle charger DC fast charging CCS2 SiC inverter',
+  ev_charger:                'electric vehicle charger DC fast charging CCS2 SiC inverter',
+  dc_fast_ev_charger:        'electric vehicle charger DC fast charging CCS2 SiC inverter',
+  bioreactor:                'bioreactor GMP single-use mammalian cell culture sterile peristaltic',
+  auv:                       'autonomous underwater vehicle AUV subsea sonar INS thruster',
+  drone:                     'drone consumer cinematography quadrotor BLDC',
+  consumer_cinematography_drone: 'drone consumer cinematography quadrotor BLDC',
+  'edge-ai':                 'edge AI inference server GPU rack-mount NVMe',
+  edge_ai_server:            'edge AI inference server GPU rack-mount NVMe',
+  cgm:                       'continuous glucose monitor wearable medical biosensor disposable',
+  wearable_medical:          'wearable medical biosensor disposable glucose monitor',
+  wearable_medical_device:   'wearable medical biosensor disposable glucose monitor',
+}
+
+/** Return the domain anchor string for a product class slug, or empty string. */
+function anchorTermsForClass(productClass: string | undefined): string {
+  if (!productClass) return ''
+  const anchor = PRODUCT_CLASS_ANCHOR_TERMS[productClass]
+  if (anchor) return anchor
+  const lower = productClass.toLowerCase()
+  for (const [key, terms] of Object.entries(PRODUCT_CLASS_ANCHOR_TERMS)) {
+    if (lower.includes(key) || key.includes(lower.split(/[-_]/)[0])) return terms
+  }
+  return ''
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // Query-text composition
 //
 // Mirrors the corpus's `_compose_text_row()` in scripts/rag/retrieve.py L96-111
 // so query embeddings live in the same semantic space the corpus rows were
 // embedded against. The corpus joins (part_name, manufacturer, part_number)
-// with a "|" + raw_excerpt. We match the structure on the query side.
+// with a "|" + raw_excerpt. We match the structure on the query side, with an
+// optional product-class domain anchor prepended (see above).
 // ───────────────────────────────────────────────────────────────────────────
 
-function composeQueryText(q: RagQuery): string {
+function composeQueryText(q: RagQuery, productClass?: string): string {
+  const anchor = anchorTermsForClass(productClass)
   const head = [q.word_name, q.manufacturer, q.part_number].filter(s => s && String(s).trim().length > 0).join(' ')
   const techSummary = q.technical_summary && q.technical_summary.trim().length > 0
     ? ' | ' + q.technical_summary.trim()
     : ''
-  return (head + techSummary).slice(0, QUERY_TEXT_CAP)
+  const anchorPrefix = anchor ? anchor + ' ' : ''
+  return (anchorPrefix + head + techSummary).slice(0, QUERY_TEXT_CAP)
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Corpus loader
+// Corpus row shape + the seed-exclusion predicate
 // ───────────────────────────────────────────────────────────────────────────
 
-interface CorpusEntry {
+/** The columns dualSearch hands back per fused hit (lexicalCols + selectCols).
+ *  `embedding` rides along so we can re-score the FUSED winner's cosine and keep
+ *  the honesty-threshold buckets unchanged. */
+interface CorpusRow {
   id: number
-  document_id: number | null
-  part_name: string
-  manufacturer: string
-  part_number: string
+  part_name: string | null
+  manufacturer: string | null
+  raw_excerpt: string | null
+  part_number: string | null
   component_class: string | null
-  excerpt: string | null
-}
-
-interface LoadedCorpus {
-  /** Flat Float32Array of size N × 1536, row-major, L2-normalised. */
-  matrix: Float32Array
-  entries: CorpusEntry[]
+  document_id: number | null
+  embedding: Buffer | string | null
 }
 
 /**
- * Load all parts-with-embeddings into a normalised in-memory matrix. Done
- * once per call (the chain runs a single G5 RAG pass per pipeline). Module-
- * level cache would help for long-lived processes but the chain is a one-shot
- * tsx invocation — the corpus load happens at most once per run anyway.
+ * Same-table SQL predicate (appended with AND to BOTH dualSearch arms).
  *
- * Performance note: 25,872 rows × 1536 floats × 4 bytes = ~159 MB. Stays
- * comfortably under typical Node heap.
+ * 1. embedding IS NOT NULL — only rows the semantic arm can score.
+ * 2. part_number present — a description-only "match" doesn't help pick a SKU.
+ * 3. EXCLUDE source_type='engine_c_seed' (2026-05-20 Task #69 audit): those ~72
+ *    synthetic seed rows were generated to MATCH the briefs that produce our
+ *    fabricated SKUs, so they self-match at ~0.85 and would turn the RAG layer
+ *    into a circular "the engine matches the engine" hallucination amplifier.
+ *    Expressed as a same-table correlated sub-query (dualSearch has no LEFT JOIN
+ *    to pretraining_spec_documents) — NULL-source_type docs are NOT in the
+ *    sub-query so legacy real-datasheet rows are correctly KEPT.
  *
- * Filters to rows that have a NON-empty part_number — without that field a
- * "match" would just be "we found a description-only entry" which doesn't
- * help the engineer pick a real SKU.
+ * Trusted/static SQL (no user input) — safe to inline per dualSearch's `where`
+ * contract.
  */
-function loadCorpus(dbPath: string): LoadedCorpus | null {
-  if (!existsSync(dbPath)) return null
-  let db: Database.Database
-  try {
-    db = new Database(dbPath, { readonly: true, fileMustExist: true })
-  } catch {
-    return null
-  }
-  try {
-    // IMPORTANT corpus filter (2026-05-20 Task #69 audit):
-    // EXCLUDE pretraining_spec_documents.source_type='engine_c_seed' rows.
-    // Those 72 rows are synthetic seed data injected to give Engine C
-    // (reference-price anchoring) a baseline when the real corpus thins out
-    // for a product class. Their part-name + part_number text was generated
-    // to MATCH the briefs that produce our fabricated SKUs, so they create
-    // ~0.85 self-matches that look authoritative but are not grounded in any
-    // real datasheet or distributor catalogue. Letting them through would
-    // turn the RAG layer into a circular "the engine matches the engine"
-    // hallucination amplifier.
-    //
-    // Keep: source_type IN ('distributor_listing', 'manufacturer_datasheet')
-    // and (legacy) rows with NULL source_type (older Phase 4 PDF extractions
-    // before the source_type column was added — those are real datasheets).
-    const rows = db.prepare(`
-      SELECT pep.id, pep.document_id, pep.part_name, pep.manufacturer, pep.part_number,
-             pep.component_class, pep.raw_excerpt, pep.embedding
-      FROM pretraining_extracted_parts pep
-      LEFT JOIN pretraining_spec_documents psd ON pep.document_id = psd.id
-      WHERE pep.embedding IS NOT NULL
-        AND pep.part_number IS NOT NULL
-        AND TRIM(pep.part_number) != ''
-        AND (psd.source_type IS NULL OR psd.source_type != 'engine_c_seed')
-      LIMIT ${MAX_CORPUS_ROWS}
-    `).all() as Array<{
-      id: number
-      document_id: number | null
-      part_name: string | null
-      manufacturer: string | null
-      part_number: string | null
-      component_class: string | null
-      raw_excerpt: string | null
-      embedding: Buffer | null
-    }>
-
-    if (rows.length === 0) return null
-
-    const N = rows.length
-    const matrix = new Float32Array(N * EMBEDDING_DIMS)
-    const entries: CorpusEntry[] = []
-    let kept = 0
-    for (let i = 0; i < N; i++) {
-      const r = rows[i]
-      const buf = r.embedding
-      if (!buf || buf.length < EMBEDDING_DIMS * 4) continue
-      // Read 1536 little-endian float32s and L2-normalise inline.
-      let sumSq = 0
-      const base = kept * EMBEDDING_DIMS
-      for (let j = 0; j < EMBEDDING_DIMS; j++) {
-        const v = buf.readFloatLE(j * 4)
-        matrix[base + j] = v
-        sumSq += v * v
-      }
-      const norm = Math.sqrt(sumSq) || 1
-      if (norm !== 1) {
-        for (let j = 0; j < EMBEDDING_DIMS; j++) {
-          matrix[base + j] /= norm
-        }
-      }
-      entries.push({
-        id: r.id,
-        document_id: r.document_id ?? null,
-        part_name: (r.part_name ?? '').trim(),
-        manufacturer: (r.manufacturer ?? '').trim(),
-        part_number: (r.part_number ?? '').trim(),
-        component_class: r.component_class ?? null,
-        excerpt: (r.raw_excerpt ?? '').slice(0, 240) || null,
-      })
-      kept++
-    }
-    if (kept === 0) return null
-    // Trim the matrix if any rows were skipped (short buffers etc.).
-    const trimmed = kept === N ? matrix : matrix.subarray(0, kept * EMBEDDING_DIMS) as Float32Array
-    // subarray returns a view; we want an owned Float32Array so cosineSearch
-    // can hold it past this function's scope. Copy if it was trimmed.
-    const final = kept === N ? matrix : new Float32Array(trimmed)
-    return { matrix: final, entries }
-  } finally {
-    db.close()
-  }
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// Cosine search
-// ───────────────────────────────────────────────────────────────────────────
-
-/** L2-normalise a 1536-d query vector in place. Returns the same array. */
-function normaliseInPlace(v: number[] | Float32Array): Float32Array {
-  let sumSq = 0
-  for (let i = 0; i < v.length; i++) sumSq += v[i] * v[i]
-  const norm = Math.sqrt(sumSq) || 1
-  const out = new Float32Array(v.length)
-  for (let i = 0; i < v.length; i++) out[i] = v[i] / norm
-  return out
-}
-
-/** Top-1 cosine match. Returns { idx, score } where score is the dot product
- *  of normalised vectors (== cosine similarity). */
-function topMatch(query: Float32Array, corpus: LoadedCorpus): { idx: number; score: number } | null {
-  const N = corpus.entries.length
-  if (N === 0) return null
-  const M = corpus.matrix
-  let bestIdx = -1
-  let bestScore = -2
-  for (let i = 0; i < N; i++) {
-    const base = i * EMBEDDING_DIMS
-    let dot = 0
-    // Manual loop — hotter than Array.reduce. 1536 mults per row × 25k rows
-    // is ~38M FLOPs per query; V8 inlines this fine.
-    for (let j = 0; j < EMBEDDING_DIMS; j++) {
-      dot += query[j] * M[base + j]
-    }
-    if (dot > bestScore) {
-      bestScore = dot
-      bestIdx = i
-    }
-  }
-  if (bestIdx < 0) return null
-  return { idx: bestIdx, score: bestScore }
-}
+const CORPUS_WHERE =
+  `embedding IS NOT NULL ` +
+  `AND part_number IS NOT NULL AND TRIM(part_number) != '' ` +
+  `AND document_id NOT IN (SELECT id FROM pretraining_spec_documents WHERE source_type = 'engine_c_seed')`
 
 // ───────────────────────────────────────────────────────────────────────────
 // Public API
@@ -332,6 +283,11 @@ export interface RagLookupOptions {
   dbPath?: string
   /** Override OpenAI API key (defaults to process.env.OPENAI_API_KEY). */
   apiKey?: string
+  /** Optional product-class slug (e.g. 'bess'). When set, a short domain-anchor
+   *  phrase is prepended to the query text so the semantic arm biases toward the
+   *  right product domain (mirrors library-candidate-query.ts). Omit for the
+   *  legacy un-anchored behaviour. */
+  productClass?: string
 }
 
 export interface RagLookupResult {
@@ -381,17 +337,15 @@ export async function lookupCorpusSuggestions(
     return { suggestions: out, stats }
   }
   const dbPath = options.dbPath ?? DEFAULT_DB
-  const corpus = loadCorpus(dbPath)
-  if (!corpus) {
+  if (!existsSync(dbPath)) {
     stats.error = `corpus unavailable at ${dbPath}`
     return { suggestions: out, stats }
   }
-  stats.corpus_rows = corpus.entries.length
 
   // Dedup queries by composed text to save embedding budget when two
   // unverified parts have identical descriptions (rare but happens with
   // generic descriptors like "container door" × N).
-  const composed: string[] = queries.map(composeQueryText)
+  const composed: string[] = queries.map((q) => composeQueryText(q, options.productClass))
   const uniqueTexts: string[] = []
   const textIdx = new Map<string, number>()
   const queryToText: number[] = []
@@ -407,7 +361,9 @@ export async function lookupCorpusSuggestions(
   }
 
   // Embed in batches (OpenAI accepts up to 2048 inputs per call, we cap at
-  // 100 to keep latency tight + give clear retry granularity).
+  // 100 to keep latency tight + give clear retry granularity). The vectors are
+  // INJECTED into dualSearch (queryEmbedding) so the hybrid retrieval re-uses
+  // the single batched embed rather than embedding once per query.
   const embeddings: number[][] = new Array(uniqueTexts.length)
   try {
     for (let i = 0; i < uniqueTexts.length; i += EMBED_BATCH) {
@@ -423,21 +379,66 @@ export async function lookupCorpusSuggestions(
     return { suggestions: out, stats }
   }
 
-  // Search per query (each query is independent; reuse embeddings where
-  // queries share composed text).
+  // HYBRID search per query via the shared dualSearch (lexical LIKE over
+  // [part_name, manufacturer, raw_excerpt] + cosine semantic arm over the
+  // same-table f32le_blob embedding, RRF-fused). Each query injects its
+  // pre-computed vector so the batched embed is re-used. The confidence bucket
+  // is re-derived from the cosine of the FUSED WINNER (parseEmbedding of the
+  // hit's own embedding cell) — so the lexical arm can RESCUE a row the cosine
+  // ranked low, while the honesty thresholds (SIM_*) stay anchored on cosine.
   for (let i = 0; i < queries.length; i++) {
     const q = queries[i]
     const vec = embeddings[queryToText[i]]
-    if (!vec || vec.length !== EMBEDDING_DIMS) continue
-    const normalised = normaliseInPlace(vec)
-    const top = topMatch(normalised, corpus)
-    if (!top) continue
-    const sim = top.score
-    if (sim < SIM_LOW) {
+    if (!vec || vec.length !== DUAL_EMBEDDING_DIMS) continue
+    const queryText = composed[queryToText[i]]
+
+    let result
+    try {
+      result = await dualSearch<CorpusRow>({
+        table: 'pretraining_extracted_parts',
+        idColumn: 'id',
+        lexicalCols: ['part_name', 'manufacturer', 'raw_excerpt'],
+        // `embedding` rides along so we can re-score the winner's cosine;
+        // the rest are the display/provenance fields the suggestion needs.
+        selectCols: ['part_number', 'component_class', 'document_id', 'embedding'],
+        embedding: {
+          table: 'pretraining_extracted_parts',
+          column: 'embedding',
+          format: 'f32le_blob',
+          joinColumn: 'id',
+        },
+        queryText,
+        queryEmbedding: vec,
+        k: FUSED_TOP_K,
+        where: CORPUS_WHERE,
+        dbPath,
+      })
+    } catch {
+      continue
+    }
+    stats.corpus_rows = Math.max(stats.corpus_rows, result.semantic_count, result.lexical_count)
+    if (result.hits.length === 0) continue
+
+    // The RRF WINNER (rank 0) is the HYBRID pick — a row that ranks well in
+    // BOTH the lexical (exact part-name / MPN-token) and semantic arms beats a
+    // row strong in only one. This is exactly what the cosine-only path could
+    // not do: rescue an exact-name match the embedding buried. The cosine of
+    // THAT winner (from its own embedding) drives the honesty bucket so the
+    // SIM_* thresholds remain anchored on semantic closeness — the lexical arm
+    // changes WHICH row wins, never RELAXES the bar.
+    const winner = result.hits[0].row
+    const winnerVec = winner.embedding != null
+      ? parseEmbedding(winner.embedding as Buffer | string, 'f32le_blob')
+      : null
+    const sim = winnerVec ? cosineSimilarity(vec, winnerVec) : Number.NaN
+    if (!(sim >= SIM_LOW)) {
+      // Below the honesty floor (or unparseable vector) — do not claim a match.
       stats.suggestions_below_threshold++
       continue
     }
-    const entry = corpus.entries[top.idx]
+    const row = winner
+    const manufacturer = (row.manufacturer ?? '').trim()
+    const partNumber = (row.part_number ?? '').trim()
     const confidence: 'high' | 'medium' | 'low' =
       sim >= SIM_HIGH ? 'high' : sim >= SIM_MEDIUM ? 'medium' : 'low'
     if (confidence === 'high') stats.suggestions_high++
@@ -446,24 +447,24 @@ export async function lookupCorpusSuggestions(
 
     const reasoning = (
       confidence === 'high'
-        ? `Corpus has a real ${entry.manufacturer || 'manufacturer'} part (${entry.part_number}) closely matching "${q.word_name}" — similarity ${sim.toFixed(3)}.`
+        ? `Corpus has a real ${manufacturer || 'manufacturer'} part (${partNumber}) closely matching "${q.word_name}" — similarity ${sim.toFixed(3)} (hybrid lexical+semantic).`
         : confidence === 'medium'
-          ? `Corpus contains a related real part (${entry.manufacturer || '?'} ${entry.part_number}); consider as a starting point — similarity ${sim.toFixed(3)}.`
-          : `Closest real corpus part is ${entry.manufacturer || '?'} ${entry.part_number}, but similarity is low (${sim.toFixed(3)}); use as a search hint only.`
+          ? `Corpus contains a related real part (${manufacturer || '?'} ${partNumber}); consider as a starting point — similarity ${sim.toFixed(3)} (hybrid lexical+semantic).`
+          : `Closest real corpus part is ${manufacturer || '?'} ${partNumber}, but similarity is low (${sim.toFixed(3)}); use as a search hint only.`
     )
 
     out.set(q.id, {
       similarity: sim,
       confidence,
       match: {
-        part_name: entry.part_name,
-        manufacturer: entry.manufacturer,
-        part_number: entry.part_number,
-        component_class: entry.component_class,
-        excerpt: entry.excerpt,
+        part_name: (row.part_name ?? '').trim(),
+        manufacturer,
+        part_number: partNumber,
+        component_class: row.component_class ?? null,
+        excerpt: (row.raw_excerpt ?? '').slice(0, 240) || null,
       },
-      source_row_id: entry.id,
-      source_document_id: entry.document_id,
+      source_row_id: Number(row.id),
+      source_document_id: row.document_id ?? null,
       generated_at: new Date().toISOString(),
       reasoning,
     })

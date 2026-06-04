@@ -3067,6 +3067,35 @@ function CoverPage({
           }
           return null
         })()}
+        {/* Reference-product grounding (2026-06-04): the Engineering Lock Gate
+            looks up a class-level reference product from the growing
+            pretraining_products DB (DB-first hybrid → web-on-miss → writeback)
+            and attaches its module decomposition + key specs to
+            state.engineeringContract.product_ontology. This surfaces that
+            provenance so the reader knows the design was anchored against a real
+            product. Closes the audited "grows a DB nobody reads" gap — the looked-
+            up ontology now reaches the rendered output instead of being discarded. */}
+        {(() => {
+          const po = (state?.engineeringContract as any)?.product_ontology
+          if (!po || !po.reference_product) return null
+          const modCount = Array.isArray(po.modules) ? po.modules.length : 0
+          const specCount = po.key_specs && typeof po.key_specs === 'object' ? Object.keys(po.key_specs).length : 0
+          const mfr = po.manufacturer ? ` (${String(po.manufacturer)})` : ''
+          const bits: string[] = []
+          if (modCount > 0) bits.push(`${modCount} reference ${modCount === 1 ? 'subsystem' : 'subsystems'}`)
+          if (specCount > 0) bits.push(`${specCount} key ${specCount === 1 ? 'spec' : 'specs'}`)
+          const detail = bits.length ? ` — anchored ${bits.join(' + ')}` : ''
+          return (
+            <View style={{ marginBottom: 14, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#f0f9ff', borderLeftWidth: 3, borderLeftColor: '#0284c7', borderRadius: 2 }}>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#075985', letterSpacing: 1.5, marginBottom: 2 }}>
+                DESIGNED AGAINST REFERENCE PRODUCT
+              </Text>
+              <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+                {String(po.reference_product)}{mfr}{detail}.
+              </Text>
+            </View>
+          )
+        })()}
         {/* Cost self-correction (2026-06-01, Tristan "fix it, don't flag it"):
             no cover banner. Estimate-tier instrument prices that inherited a high
             class anchor are re-priced to type-realistic ceilings in the BoM loop
