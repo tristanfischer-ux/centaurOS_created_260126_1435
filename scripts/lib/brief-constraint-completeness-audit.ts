@@ -150,7 +150,52 @@ const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   k2so4_production_kg_per_day: { qtyKey: 'k2so4_product_t_day', label: 'K₂SO₄ production rate' },
   koh_feed_kg_per_day: { qtyKey: 'koh_makeup_t_day', label: 'KOH make-up feed rate' },
   co2_capture_kg_per_day: { qtyKey: 'caco3_product_t_day', label: 'CO₂ capture rate (from CaCO₃ stoichiometry)' },
+  // 2026-06-05: mirror the renderer METRIC_MAP additions for the registered
+  // co2_mineralisation contract's brief-aligned achieved keys. The LIVE brief
+  // states capture/output as co2_capture_capacity_kg_per_day (1000),
+  // co2_capture_capacity_kg_per_hr (42), calcium_carbonate_output_kg_per_day
+  // (2300) and potassium_sulfate_output_kg_per_day (3900); the contract emits the
+  // achieved values under capture_capacity_tco2_per_day / co2_capture_rate_kg_per_hour
+  // / caco3_output_t_per_day / k2so4_output_t_per_day (t/day → ×1000 in the
+  // renderer; kg/hr direct). Kept identical to render-minimal-pdf.tsx::METRIC_MAP
+  // per the I12b keyset-sync invariant so gate-17 agrees these rows are covered.
+  co2_capture_capacity_kg_per_day: { qtyKey: 'capture_capacity_tco2_per_day', label: 'CO₂ capture capacity' },
+  co2_capture_capacity_kg_per_hr: { qtyKey: 'co2_capture_rate_kg_per_hour', label: 'CO₂ capture capacity' },
+  calcium_carbonate_output_kg_per_day: { qtyKey: 'caco3_output_t_per_day', label: 'CaCO₃ output rate' },
+  potassium_sulfate_output_kg_per_day: { qtyKey: 'k2so4_output_t_per_day', label: 'K₂SO₄ output rate' },
 }
+
+// ── SEMANTIC-CONCEPT COVERAGE (mirror of render-minimal-pdf.tsx, 2026-06-05) ──
+// FIX 1 added a UNIT-SUFFIX-AGNOSTIC semantic resolver to the renderer's
+// _buildComplianceRows: a brief metric is matched to a contract quantity by a
+// shared CONCEPT id (unit-stripped base + synonym map) so ANY suffix the brief
+// parser picks (co2_capture_capacity_tpd / _kg_per_day / _t_per_day …) resolves.
+// This is a PLAIN string→string map (NOT a `qtyKey:`-shaped entry) so the I12b
+// METRIC_MAP-mirror invariant — which counts `<key>: { qtyKey: '…'` lines across
+// the two files — is unaffected; the I12b parity is between KNOWN_METRIC_MAP above
+// and the renderer's METRIC_MAP, both of which carry the same key set.
+//
+// gate-17 itself already treats EVERY brief metric as VISIBLE (rendererWouldEmit-
+// MetricRow returns true — the universal-completeness pass guarantees a row), so
+// these concept synonyms do not change the gate's pass/fail. They are mirrored
+// here per the house triple-write rule and to keep the two files' notion of
+// "which CO₂-mineralisation metrics get a REAL audited (vs informational) row"
+// identical, so a future edit to one file is mechanically traceable to the other.
+// Keys = unit-stripped base of EITHER the brief key or the contract-quantity key.
+const KNOWN_METRIC_CONCEPT_SYNONYMS: Record<string, string> = {
+  co2_capture_capacity: 'co2_capture_capacity',
+  capture_capacity_tco2: 'co2_capture_capacity',
+  capture_capacity: 'co2_capture_capacity',
+  co2_capture_rate: 'co2_capture_rate',
+  calcium_carbonate_output: 'caco3_output',
+  caco3_output: 'caco3_output',
+  potassium_sulfate_output: 'k2so4_output',
+  k2so4_output: 'k2so4_output',
+}
+// Referenced for parity/grep-traceability with the renderer; the gate's decision
+// does not branch on it (every metric already renders a row). `void` keeps the
+// no-unused-vars build clean without changing behaviour.
+void KNOWN_METRIC_CONCEPT_SYNONYMS
 
 // HARD constraint categories — when a brief constraint falls into one of
 // these and the compliance table lacks a corresponding row, gate 17 emits

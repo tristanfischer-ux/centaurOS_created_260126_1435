@@ -249,6 +249,25 @@ const STRONG_QUALIFIERS = new Set<string>([
   // all the aircraft/vehicle masses together. Added 2026-05-31 (haps go-wide:
   // 52.7 kg empty / 75 kg / 95 kg takeoff mashed into one "mass" contradiction).
   'empty', 'laden', 'unladen', 'takeoff', 'mtom', 'mtow', 'tare', 'kerb', 'payload',
+  // Pressure-vessel COMPONENT-SHAPE discriminators — a vessel's CYLINDRICAL
+  // SHELL mass (mass = pi x (R_out^2 - R_in^2) x height x density) and its
+  // FLAT-HEAD / dished / torispherical HEADS mass (mass = 2 x pi x R^2 x t x
+  // density) are two PHYSICALLY DISTINCT components of ONE vessel, never the
+  // same quantity. The two worked-calcs print side-by-side ("cylindrical shell
+  // only; heads computed separately") with the SAME family anchor ("mass") and
+  // — crucially — the SAME garbage assignment field key ("/ 1e9 =" → "0001e9"),
+  // so they collapse into one cluster and fire a false HIGH (co2-mineralisation
+  // 685.079 kg shell vs 231.961 kg heads, 98.82% variance). The shape lexeme
+  // sits in the per-occurrence window ("… = [685.079 kg] assumes: … cylindrical"
+  // vs "… = [231.961 kg] assumes: flat-head …"), so making it STRONG splits the
+  // cluster on the existing per-occurrence qualifier path. A shell-mass and a
+  // head-mass are never meant to be equal, so this can only SPLIT (reduce false
+  // positives) — two SHELL masses that disagree across pages both carry "shell"/
+  // "cylindrical" → still cluster → a genuine same-component contradiction still
+  // fires. Added 2026-06-05 (co2-mineralisation gate-18 shell-vs-head false-pos).
+  'cylindrical', 'cylindric', 'cylinder', 'shell',
+  'flat-head', 'flathead', 'flat-plate', 'flatplate', 'head', 'heads',
+  'dished', 'torispherical', 'hemispherical', 'ellipsoidal', 'endcap', 'end-cap',
 ])
 
 /** WEAK qualifiers do NOT split clusters — "minimum target capacity" should
@@ -332,6 +351,95 @@ const MASS_COMPONENT_SCOPE_TOKENS = new Set<string>([
   'ribbing', 'casing', 'housing', 'rotor', 'stator', 'blade', 'hub', 'tower',
   'foundation', 'enclosure', 'cabinet', 'module', 'rack', 'pack', 'cell',
 ])
+
+// 2026-06-05 (gate-18 FIX — co2-mineralisation ACHIEVED-vs-CONSTRAINT mass MED).
+// CONSTRAINT-ROLE discriminator. A brief CAP / CEILING / LIMIT value ("Maximum
+// gross mass 40,000 kg") and the design's ACHIEVED value ("12,250 kg") are two
+// DIFFERENT quantities — the ceiling vs the result — never a contradiction
+// (achieved ≠ limit is the whole point; an achieved value that BREACHES the cap
+// is a DESIGN breach caught by gate 30 payload, NOT a cross-page numeric drift).
+// Normally `roleOf` separates them (the achieved value gets role=achieved), but
+// the cover KPI card prints the cap and the achieved value SIDE BY SIDE
+// ("Max gross mass 40,000 kg  12,250 kg  PASS"), so the limit lexeme "max"
+// lands in the per-occurrence window of BOTH numbers → both read role=neutral →
+// they cluster (106% variance MED). The decisive signal is ADJACENCY: a
+// constraint value is IMMEDIATELY preceded by the limit lexeme (allowing the
+// anchor noun "mass"/"weight", a strong scope word "gross"/"net", and the family
+// unit between), whereas the achieved value sits AFTER an intervening
+// "<cap-value> <unit>" pair. `constraintRoleOf()` walks preTokens right-to-left
+// from the number and reports 'constraint' only when it reaches a limit lexeme
+// BEFORE hitting any bare number (a number means "this value follows another
+// value" → it is the achieved column, not the cap). UNIVERSAL across families
+// (a £-ceiling, a kW-cap, a kg-limit all benefit) and only ever SPLITS, so a
+// genuine contradiction between two CAPS (two different stated ceilings) still
+// shares role=constraint → still clusters → still fires.
+const CONSTRAINT_LIMIT_LEXEMES = new Set<string>([
+  'max', 'maximum', 'cap', 'capped', 'ceiling', 'ceil', 'limit', 'limited',
+  'budget', 'upper', 'not-exceed', 'notexceed', 'not-to-exceed', 'nte', 'ub',
+])
+// Tokens that may sit BETWEEN the limit lexeme and the number without breaking
+// the adjacency (the anchor noun, strong scope/shape words, and family units).
+const CONSTRAINT_SKIP_TOKENS = new Set<string>([
+  'mass', 'weight', 'gross', 'net', 'system', 'total', 'overall',
+  'kg', 't', 'tonne', 'tonnes', 'kw', 'mw', 'gw', 'kwh', 'mwh', 'gwh',
+  'v', 'kv', 'a', 'ka', 'gbp', '£', 'of', 'the',
+])
+
+// 2026-06-05 (gate-18 FIX — co2-mineralisation MULTI-VOLTAGE three-phase current).
+// CURRENT-family worked-calc signature. A three-phase line current computed at a
+// DIFFERENT VOLTAGE LEVEL is a DIFFERENT quantity even though the formula is
+// identical: I = S / (√3 × V). The transformer worked-calc prints the 11 kV
+// PRIMARY current ("I = 800 x 1000 / (sqrt(3) x 11,000) = 41.99 A") and the
+// 400 V SECONDARY current ("… / (sqrt(3) x 400) = 1,154.7 A") with the SAME
+// family anchor "current", SAME (empty) qualifiers, SAME role — so they cluster
+// and fire a false HIGH (41.99 vs 1154.7 vs 1196.42, 144% variance). A THIRD
+// value (1,196.42 A) is the DE-RATED design TARGET I_t = I_b/(Ca×Cg) — a
+// different quantity again (a derated current carrying capacity, not a line
+// current). `currentCalcSignatureOf()` folds two CURRENT-only discriminants into
+// the cluster key:
+//   (a) the VOLTAGE OPERAND of the √3 substitution (11000 vs 400) — different
+//       operand ⇒ different voltage level ⇒ different current; and
+//   (b) a DERATED/TARGET flag (i_t / de-rated / tabulated-current / Ca×Cg
+//       correction) — these are the task-named "target"/"derated"/"I_t" strong
+//       discriminators, kept CURRENT-LOCAL (not added to global STRONG_QUALIFIERS)
+//       so the L54 energy requirement/achieved role logic, which depends on
+//       "target" staying WEAK, is untouched.
+// Returns '' when neither signal is present (ordinary current prose keyed exactly
+// as before). Only SPLITS: two currents at the SAME voltage operand share the
+// signature → a genuine same-level current contradiction still fires HIGH.
+const CURRENT_DERATED_TARGET_REGEX =
+  /\bi_t\b|\bde-?rated\b|tabulated[- ]current|\bca\s*[x×*·]\s*cg\b|correction\s*factor/
+export function currentCalcSignatureOf(occ: { wideWindow: string }): string {
+  const w = occ.wideWindow // lowercased + whitespace-collapsed, number marked '\f'
+  const marker = w.indexOf('\f')
+  const numPos = marker >= 0 ? marker : Math.floor(w.length / 2)
+  // (a) √3 (or 1.732) substitution voltage operand. The wide window can hold
+  // MORE THAN ONE √3 substitution (the primary-current calc "(sqrt(3) x 11,000)"
+  // bleeds into the secondary-current "(sqrt(3) x 400)" window), so pick the
+  // operand whose match is NEAREST the number marker — mirrors vesselSignatureOf.
+  // The substitution that produced THIS value sits immediately before the "=
+  // [value]", i.e. just before the marker, so the nearest match is the right one.
+  let voltageOperand = ''
+  let bestDist = Infinity
+  const vRe = /(?:sqrt\s*\(\s*3\s*\)|√\s*3|root\s*3|1\.732)\s*[x×*·]\s*([0-9][0-9,\.]*)/g
+  let vm: RegExpExecArray | null
+  while ((vm = vRe.exec(w)) !== null) {
+    const start = vm.index
+    const end = vm.index + vm[0].length
+    const dist = numPos < start ? start - numPos : numPos > end ? numPos - end : 0
+    if (dist < bestDist) {
+      const n = parseFloat(vm[1].replace(/,/g, ''))
+      if (Number.isFinite(n) && n > 0) { bestDist = dist; voltageOperand = String(Math.round(n)) }
+    }
+  }
+  // (b) derated / target carrying-capacity marker — anchored to THIS value's
+  // clause (within ~90 chars of the number) so a derate note elsewhere in the
+  // wide window doesn't stamp a plain line current.
+  const clause = w.slice(Math.max(0, numPos - 90), numPos + 30)
+  const derated = CURRENT_DERATED_TARGET_REGEX.test(clause) ? 'derated' : ''
+  if (!voltageOperand && !derated) return ''
+  return `${voltageOperand}|${derated}`
+}
 
 // 2026-06-04 (gate-18 FIX — co2-mineralisation PROSE-form vessel false-positive).
 // VESSEL-TYPE discriminator for MASS clustering. The co2-mineralisation dossier
@@ -719,7 +827,7 @@ function isPartOfRange(cleaned: string, matchStart: number): boolean {
   return false
 }
 
-function extractOccurrences(pageText: string, page: number): NumericOccurrence[] {
+export function extractOccurrences(pageText: string, page: number): NumericOccurrence[] {
   const cleaned = stripBoilerplate(pageText)
   const occurrences: NumericOccurrence[] = []
   // Generic numeric+unit regex. Matches "3.5 MWh", "3,750", "800 V", "1,022 MWh",
@@ -1000,6 +1108,33 @@ function massScopeOf(occ: NumericOccurrence): 'system' | 'component' | 'neutral'
   return 'neutral'
 }
 
+/** Classify whether an occurrence is a CONSTRAINT (a stated cap/ceiling/limit)
+ * by ADJACENCY: walk preTokens right-to-left from the number, skipping only the
+ * anchor noun / strong scope word / family unit, and return 'constraint' iff a
+ * limit lexeme (max / maximum / cap / ceiling / limit / budget / …) is reached
+ * BEFORE any bare number. A bare number means this value sits AFTER another
+ * "<value> <unit>" pair (the cap printed just before it) → it is the achieved
+ * column, NOT the cap, so it stays neutral. This splits a cover KPI card's
+ * "Max gross mass 40,000 kg  12,250 kg" — the 40,000 (cap, limit lexeme
+ * adjacent) from the 12,250 (achieved, preceded by the cap value+unit). Returns
+ * 'constraint' or '' (no effect off the constraint path). Universal across
+ * families; only ever SPLITS, never merges. Added 2026-06-05. */
+export function constraintRoleOf(occ: NumericOccurrence): 'constraint' | '' {
+  for (let i = occ.preTokens.length - 1; i >= 0; i--) {
+    const t = occ.preTokens[i].toLowerCase().replace(/[^a-z0-9_£-]/g, '')
+    if (!t) continue
+    if (CONSTRAINT_LIMIT_LEXEMES.has(t)) return 'constraint'
+    // A bare number before reaching a limit lexeme ⇒ this value follows another
+    // value (the cap) ⇒ it is the achieved/second column, not the constraint.
+    if (/^\d+([.,]\d+)?$/.test(t)) return ''
+    if (CONSTRAINT_SKIP_TOKENS.has(t)) continue
+    // Any other meaningful word means the limit lexeme (if any) is too far from
+    // the number to bind it — stop and treat as non-constraint.
+    return ''
+  }
+  return ''
+}
+
 /** Compute a VESSEL signature for a MASS occurrence from its WIDE window:
  *   `<vessel-type>:<shell-wall-thickness-mm>`
  *
@@ -1121,7 +1256,7 @@ function featurize(occ: NumericOccurrence): OccurrenceFeatures {
  * not be clustered just because both windows contain the word "footprint". */
 const PART_SPECIFIC_FAMILIES = new Set<UnitFamily>(['LENGTH', 'MASS', 'VOLTAGE', 'CURRENT'])
 
-function cluster(occurrences: NumericOccurrence[]): Cluster[] {
+export function cluster(occurrences: NumericOccurrence[]): Cluster[] {
   const clusters = new Map<string, Cluster>()
   for (const occ of occurrences) {
     const feat = featurize(occ)
@@ -1164,12 +1299,30 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
     // contradiction (the same field assigned two different values across pages)
     // still shares one field key → still clusters → still fires HIGH.
     const field = occ.fieldKey ? `|field=${occ.fieldKey}` : ''
+    // 2026-06-05 FIX (universal): a CONSTRAINT value (a stated cap/ceiling/limit
+    // immediately adjacent — "Maximum gross mass 40,000 kg") splits from an
+    // ACHIEVED/computed value ("12,250 kg") that the cover KPI card prints right
+    // beside it. Without this the limit lexeme leaks into both windows and they
+    // cluster (co2: 12,250 achieved vs 40,000 cap, false MED). Off-path
+    // occurrences yield '' (no effect). Two caps that disagree still share
+    // constraint → still cluster → still flag.
+    const constraint = constraintRoleOf(occ)
+    const constraintSeg = constraint ? `|cstr=${constraint}` : ''
+    // 2026-06-05 FIX (CURRENT only): a three-phase line current computed at a
+    // DIFFERENT voltage level (I = S/(√3×V): 11 kV primary 41.99 A vs 400 V
+    // secondary 1154.7 A), and a DE-RATED design target I_t, are distinct
+    // quantities even though the family anchor "current" + qualifiers match.
+    // Fold the √3 voltage operand + derated/target flag into the key. Non-current
+    // families pass '' (no effect); two currents at the SAME voltage operand
+    // share the signature → a genuine same-level contradiction still fires.
+    const current = feat.family === 'CURRENT' ? currentCalcSignatureOf(occ) : ''
+    const currentSeg = current ? `|i=${current}` : ''
     let key: string
     if (feat.anchor) {
       // Anchor-based clustering: family + anchor + strong-qualifier-set + role
       // (+ mass-scope for MASS) (+ field for tool-output assignments).
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${field}`
+      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${field}${constraintSeg}${currentSeg}`
     } else if (PART_SPECIFIC_FAMILIES.has(feat.family)) {
       // No fallback clustering for part-specific families UNLESS the occurrence
       // is a tool-output assignment with an explicit field name. A bare
@@ -1182,7 +1335,7 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
       // were dropped from MASS clustering and could not be checked at all.
       if (!occ.fieldKey) continue
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${field}`
+      key = `${feat.family}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${field}${constraintSeg}${currentSeg}`
     } else {
       // Fallback for non-part-specific families: family + head +
       // strong-qualifier-set. Stricter — requires EXACT head-token match.
@@ -1190,7 +1343,7 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
       // (e.g. table rows that quote the same spec twice).
       const headSorted = [...feat.head].sort().join('+')
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|head=${headSorted}|qual=${qualSorted}|role=${role}${field}`
+      key = `${feat.family}|head=${headSorted}|qual=${qualSorted}|role=${role}${field}${constraintSeg}${currentSeg}`
     }
     let c = clusters.get(key)
     if (!c) {
@@ -1242,7 +1395,7 @@ export function isRoundingFamily(occ: ReadonlyArray<{ rawValue: string | number;
   return true
 }
 
-function buildFindings(clusters: Cluster[]): { findings: ConsistencyFinding[]; skippedSingletons: number } {
+export function buildFindings(clusters: Cluster[]): { findings: ConsistencyFinding[]; skippedSingletons: number } {
   const findings: ConsistencyFinding[] = []
   let skippedSingletons = 0
   for (const c of clusters) {
