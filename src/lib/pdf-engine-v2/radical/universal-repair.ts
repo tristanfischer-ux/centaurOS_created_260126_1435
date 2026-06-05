@@ -248,7 +248,7 @@ For \`word_modifier_richness\` failures (many words need 5+ modifiers each), pre
 
 The chain's applyReviewerPatches sees an add_word_to_sub_module-like patch with the SAME id → merges new modifier_characters into the existing word (skipping kind+value dupes). One patch enriches one word with 5-10 modifiers in a single move.
 
-For \`sub_module_word_density\` failures (sub-modules with <5 words), emit add_word_to_sub_module patches with NEW words and full modifier sets.
+Do NOT fabricate NEW words to satisfy \`sub_module_word_density\` (sub-modules with <5 words): the gate forgives faithful split partitions + the single-thin exception, and the no-new-part_number rule below means any fabricated word becomes a prose-only "Filler word N" placeholder that pollutes the BoM. An under-covered sub-module is an emitter coverage gap (fix in deterministic-emitter.ts), NOT a Phase 2 padding task — leave it at its real word count.
 
 ARCHITECTURAL CONSTRAINT (2026-05-26 — do not violate):
 You may NOT add new BoM words with part numbers (part_number modifier) — those must come from the deterministic-emitter. The chain HARD REJECTS any patch adding a new word_id with a part_number modifier (exit path via applyPatches allowlist guard). You may only modify existing words' modifiers and add prose-only words (description / commentary / english_sentence updates). When a sub_module is missing BoM coverage, that is an emitter gap to be fixed in deterministic-emitter.ts, not a Phase 2 repair task.

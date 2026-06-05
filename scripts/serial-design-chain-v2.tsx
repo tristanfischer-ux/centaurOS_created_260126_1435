@@ -1297,9 +1297,14 @@ function computeDensityTargets(design: any): string {
     }
   }
   if (thinSubs.length === 0 && thinWords.length === 0) return ''
-  const subList = thinSubs.length > 0
-    ? `\nUNDER-DENSE SUB-MODULES (you MUST emit add_word_to_sub_module patches with NEW words until each reaches ≥5 words):\n${thinSubs.map(s => '  - ' + s).join('\n')}`
-    : ''
+  // Do NOT instruct the reviewer to fabricate NEW words to reach the ≥5-word
+  // floor: gate-20 forbids new part_number words, so the LLM can only emit
+  // prose-only "Filler word N" placeholders that pollute the BoM. The
+  // sub_module_word_density gate already forgives faithful split partitions +
+  // the single-thin exception; a genuine sub-module gap is an emitter coverage
+  // issue (fix in deterministic-emitter.ts), not a Phase-2 padding task. (2026-06-05)
+  const subList = ''
+  void thinSubs
   // Cap word list to keep prompt manageable (≤ 80 worst cases) — reviewer will
   // generalise from these examples to the rest.
   const wordList = thinWords.length > 0

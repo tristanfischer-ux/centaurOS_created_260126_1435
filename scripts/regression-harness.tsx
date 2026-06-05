@@ -1014,11 +1014,11 @@ function checkAdvisorEngagementInvariants(): Assertion[] {
   // ── (3) hybrid split: full cards live in the Engagement Plan, NOT on module pages ──
   // 2026-06-05 hybrid refactor. The full specialist cards (AdvisorSpecialistCard,
   // carrying the "What a strong answer looks like" callouts) MUST render only in the
-  // consolidated EngagementPlanPage (Section 14) — never inline at the foot of each
+  // consolidated EngagementPlanPage (Section 13) — never inline at the foot of each
   // module, where they bled into the multimodal scorer's per-module page samples and
   // dropped design_modules / bom / grammar / visual below the ≥8 floor. The per-module
   // ModuleAdvisorBlock must be a TIGHT pointer (the "Validate this design with: … full
-  // questions in the Engagement Plan (Section 14)" cross-reference) that does NOT
+  // questions in the Engagement Plan (Section 13)" cross-reference) that does NOT
   // instantiate AdvisorSpecialistCard. Source-structural guard (mirrors I12c): a revert
   // to inline cards re-adds <AdvisorSpecialistCard inside ModuleAdvisorBlock and trips
   // this. Snapshot-independent.
@@ -1039,24 +1039,48 @@ function checkAdvisorEngagementInvariants(): Assertion[] {
       if (!engagementPlan) bad.push('EngagementPlanPage function not found in render-minimal-pdf.tsx')
       // The pointer must NOT render the full specialist card…
       if (moduleBlock && /<AdvisorSpecialistCard\b/.test(moduleBlock)) {
-        bad.push('ModuleAdvisorBlock instantiates <AdvisorSpecialistCard — the full cards leaked back onto the module page (they belong in EngagementPlanPage / Section 14)')
+        bad.push('ModuleAdvisorBlock instantiates <AdvisorSpecialistCard — the full cards leaked back onto the module page (they belong in EngagementPlanPage / Section 13)')
       }
       // …and must carry the cross-reference pointer instead.
-      if (moduleBlock && !/Engagement Plan \(Section 14\)/.test(moduleBlock)) {
-        bad.push('ModuleAdvisorBlock no longer carries the "Engagement Plan (Section 14)" pointer cross-reference')
+      if (moduleBlock && !/Engagement Plan \(Section 13\)/.test(moduleBlock)) {
+        bad.push('ModuleAdvisorBlock no longer carries the "Engagement Plan (Section 13)" pointer cross-reference')
       }
       // The consolidated section MUST render the full specialist cards.
       if (engagementPlan && !/<AdvisorSpecialistCard\b/.test(engagementPlan)) {
-        bad.push('EngagementPlanPage does NOT instantiate <AdvisorSpecialistCard — the consolidated full cards are missing from Section 14')
+        bad.push('EngagementPlanPage does NOT instantiate <AdvisorSpecialistCard — the consolidated full cards are missing from Section 13')
       }
     } catch (err) {
       bad.push(`could not read render-minimal-pdf.tsx: ${String(err).slice(0, 100)}`)
     }
     out.push(assertEq(
       'UNIVERSAL.advisor_full_cards_only_in_engagement_plan',
-      'the full advisor cards render only in the consolidated EngagementPlanPage (Section 14); each module page carries only a tight pointer — the cards never bleed back into the per-module scorer samples',
+      'the full advisor cards render only in the consolidated EngagementPlanPage (Section 13); each module page carries only a tight pointer — the cards never bleed back into the per-module scorer samples',
       bad.length, (n) => n === 0,
-      () => `advisor hybrid split regressed: ${bad.join(' ; ')}. Keep the full <AdvisorSpecialistCard> stack in EngagementPlanPage; ModuleAdvisorBlock must stay a one-line "Validate this design with: … Engagement Plan (Section 14)" pointer.`,
+      () => `advisor hybrid split regressed: ${bad.join(' ; ')}. Keep the full <AdvisorSpecialistCard> stack in EngagementPlanPage; ModuleAdvisorBlock must stay a one-line "Validate this design with: … Engagement Plan (Section 13)" pointer.`,
+    ))
+  }
+
+  // ── Phase-2 density-repair must NOT fabricate filler words ── (2026-06-05)
+  // The reviewer-repair prompt used to order "emit NEW words until each sub-module
+  // reaches >=5 words"; gate-20 forbids new part_number words, so the LLM could only
+  // emit prose-only "Filler word N" placeholders that polluted the BoM. The
+  // sub_module_word_density gate already forgives faithful split partitions, so the
+  // padding was both harmful and unnecessary. Source-structural guard.
+  {
+    const bad: string[] = []
+    try {
+      const chainSrc = readFileSync(resolve(__dirname, 'serial-design-chain-v2.tsx'), 'utf-8')
+      const repairSrc = readFileSync(resolve(__dirname, '../src/lib/pdf-engine-v2/radical/universal-repair.ts'), 'utf-8')
+      if (/NEW words until each reaches/.test(chainSrc)) bad.push('serial-design-chain-v2.tsx still orders "NEW words until each reaches >=5" (filler-padding instruction)')
+      if (/with NEW words and full modifier sets/.test(repairSrc)) bad.push('universal-repair.ts still instructs emitting NEW words for sub_module_word_density failures (filler padding)')
+    } catch (err) {
+      bad.push(`could not read density-repair sources: ${String(err).slice(0, 100)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.density_repair_does_not_fabricate_filler_words',
+      'the Phase-2 sub_module_word_density repair never orders the LLM to fabricate NEW words to hit the >=5-word floor (those become prose-only "Filler word N" BoM placeholders); modifier-enrichment of EXISTING words only',
+      bad.length, (n) => n === 0,
+      () => `filler-padding instruction regressed: ${bad.join(' ; ')}. Thin sub-modules must carry their real word count; a genuine gap is an emitter coverage issue, not a Phase-2 padding task.`,
     ))
   }
 
