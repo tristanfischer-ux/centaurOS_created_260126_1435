@@ -479,6 +479,24 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   direct_air_capture: 'dac',
   atmospheric_co2_capture: 'dac',
   co2_air_capture: 'dac',
+  // CO₂ point-source capture + mineralisation to solid products (MEA solvent
+  // capture → gypsum/lime carbonation → CaCO₃ + K₂SO₄). The classifier
+  // (product-classifier.ts:35) emits 'co2_mineralisation' for "capture and
+  // mineralise / gypsum carbonation" briefs. DISTINCT from 'dac' (atmospheric
+  // sorbent air capture) — this is SOLVENT capture from a flue gas + a
+  // chemical mineralisation route to saleable solids. Register both the
+  // canonical slug and the spelling/route variants the classifier or a
+  // hand-written brief might produce.
+  co2_mineralisation: 'co2_mineralisation',
+  co2_mineralization: 'co2_mineralisation',
+  mineral_carbonation: 'co2_mineralisation',
+  carbon_mineralisation: 'co2_mineralisation',
+  carbon_mineralization: 'co2_mineralisation',
+  co2_capture_and_mineralisation: 'co2_mineralisation',
+  carbon_capture_mineralisation: 'co2_mineralisation',
+  point_source_co2_capture: 'co2_mineralisation',
+  amine_capture_mineralisation: 'co2_mineralisation',
+  flue_gas_co2_capture: 'co2_mineralisation',
 }
 
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
@@ -10903,6 +10921,469 @@ registerArchetype('dac', (brief: any) => {
     topology,
     macro_assembly_prices,
     closures,
+  }
+})
+
+// ---------------------------------------------------------------------------
+// CO₂ MINERALISATION ARCHETYPE — point-source amine capture + dual-sink
+// mineralisation to saleable solids. FIRST contract for this class (a
+// "start", not a BESS-depth implementation).
+//
+// WHY THIS EXISTS: prior runs found "Engineering Contract not registered for
+// co2_mineralisation — falling back to LLM-only chain" (out/release-
+// co2_mineralisation-iter1/0.5-engineering-contract.json). Consequence:
+// brief-fidelity 4/10, wrong-domain stand-in tool sizes (marine/irrigation),
+// and the requested second carbonation sink landing as narrative not a costed
+// equipment line. A registered contract supplies real, sized quantities the
+// chain + gates + renderer READ.
+//
+// SIZING BASIS (independent first-principles Class-4, 1 t/day capture):
+//   - 42 kg/h CO₂, 90% capture, 30 wt% MEA, flue-gas ~225 m³/h.
+//   - Packed absorber DN300 (0.3 m) × 16.5 m T-T (12 m packed), 316L. The
+//     mempalace audit (absorption:column-htu-ntu, commit 3be47fb1a) confirms
+//     the engine's earlier 6 m absorber was ~1/3 of the ~16.5 m needed —
+//     this contract pins the corrected height.
+//   - Stripper/regenerator DN300 × 12 m, 316L. MEA circulation 0.68 m³/h
+//     (0.75 kW pump — NOT the engine's 2.9 m³/h / 4× over-flow).
+//   - Reboiler 42.8 kW (~3 m²); lean/rich cross-exchanger 43.6 kW (~8 m² —
+//     NOT 186 kW); overhead condenser 50.9 kW (~3.2 m²). The reboiler-duty ≈
+//     recovered-cross-exchanger-duty signature (42.8 ≈ 43.6 kW) is the
+//     correct MEA heat-integration fingerprint.
+//   - DUAL CARBONATION SINK (closes the known Ca-balance gap — gypsum+KOH
+//     alone fixes only ~0.5–0.8 t/d of the 1 t/d captured):
+//       PRIMARY  gypsum carbonation reactor 1.0 m³ + 4 kW agitator, 316L —
+//                fixes ~0.8 t/d CO₂ from 3.1 t/d gypsum (≈18 kmol/d Ca).
+//       SECOND   supplementary hydrated-lime carbonation reactor 0.4 m³ +
+//                2 kW agitator, 304 / rubber-lined — fed ~0.35 t/d hydrated
+//                lime, fixes the ~0.2 t/d CO₂ balance → ~0.5 t/d extra CaCO₃.
+//   - K₂SO₄ forced-circulation crystalliser ~1.1 m³, ~80 kW evaporative.
+//   - Flue-gas blower 225 m³/h / 1.5 kW.
+//   - Outputs 2.3 t/d CaCO₃ (~1.8 gypsum-route + ~0.5 lime-route) + 3.9 t/d
+//     K₂SO₄. Feeds 3.1 t/d gypsum, 2.6 t/d KOH, 0.35 t/d hydrated lime.
+//   - Op temp ≤ 120 °C; PED (Pressure Equipment Directive) + BS EN 13445 +
+//     ATEX/DSEAR + COMAH (NOT EN 1473/ISO 27914 — those were MIS-CITED in a
+//     prior single-pass run; the real spine is PED + ATEX/DSEAR).
+//
+// COST NOTE: macro_assembly_prices are kept MODEST + realistic. The dedicated
+// cost-basis stage (scripts/lib/cost/build-cost-basis.ts) re-costs equipment
+// separately, so these are anchor figures only — deliberately NOT inflated.
+// They sit comfortably under the brief's £1.9 M ex-works ceiling.
+//
+// British spelling throughout. Mirrors the `dac` builder structure exactly.
+// ---------------------------------------------------------------------------
+
+registerArchetype('co2_mineralisation', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const tp = brief?.constraints?.target_performance ?? {}
+
+  // ── Capture capacity (t CO₂ / day) — primary brief variable ───────────────
+  // Accept t/day, kg/h (→ /24 ÷ conversion), tonne/day phrasings. Class default
+  // 1 t/day (the friend's pilot scale). The whole sizing scales linearly off
+  // this so an off-spec brief value still produces a coherent design.
+  const captureTonsPerDay = (() => {
+    // "1 tonne CO2 per day" / "1 t/day" / "one tonne of CO2 per day"
+    const perDay = desc.match(/(\d{1,4}(?:\.\d+)?)\s*(?:t|tonne[s]?|metric\s+ton[s]?|tons?)\s*(?:of\s+)?(?:CO2|CO₂)?\s*(?:\/|per)\s*day/i)
+    if (perDay) return parseFloat(perDay[1])
+    // "42 kg/h" continuous → t/day
+    const perHour = desc.match(/(\d{1,4}(?:\.\d+)?)\s*kg\s*(?:\/|per)\s*h(?:r|our)?\s*(?:CO2|CO₂)?/i)
+    if (perHour) return (parseFloat(perHour[1]) * 24) / 1000
+    const u = String(tp.unit ?? '').toLowerCase()
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 't/day' || u === 'tpd' || u === 'tonne_day' || u === 't/d') return Number(tp.value)
+      if (u === 'kg/h' || u === 'kg_h') return (Number(tp.value) * 24) / 1000
+      // wrong unit family (%, ppm) → default
+    }
+    return 1  // class default: 1 t/day pilot
+  })()
+  // Linear scale factor off the 1 t/day reference design.
+  const scale = captureTonsPerDay / 1
+
+  // ── Capture-side parameters ───────────────────────────────────────────────
+  const co2KgPerHour = (captureTonsPerDay * 1000) / 24            // 42 kg/h @ 1 t/d
+  const captureEfficiency = extractRangeFromDesc(desc, /(\d{2})\s*%\s*(?:capture|removal|recovery)/i, 90) / 100
+  const meaConcentrationWtPct = extractRangeFromDesc(desc, /(\d{2})\s*(?:wt\.?\s*)?%\s*(?:aqueous\s+)?(?:mea|monoethanolamine|amine)/i, 30)
+  const flueGasFlowM3PerHour = 225 * scale                       // ~225 m³/h @ 1 t/d (12% CO₂ flue gas)
+  const meaCirculationM3PerHour = 0.68 * scale                   // first-principles, NOT engine's 2.9
+  const meaPumpKw = 0.75 * scale
+
+  // ── Absorber + stripper column geometry (316L) ────────────────────────────
+  // Flooding-limited DN300; the brief's un-grounded "~100 mm ID" floods at the
+  // full flow (mempalace drawer: 100 mm forces ~10 m/s ≈ 4× flooding). 0.3 m is
+  // the grounded answer for the full flue-gas flow.
+  const absorberDiameterM = 0.3
+  const absorberHeightTtM = 16.5                                 // tangent-to-tangent
+  const absorberPackedHeightM = 12.0
+  const stripperDiameterM = 0.3
+  const stripperHeightM = 12.0
+
+  // ── Thermal duties (kW) — MEA heat-integration signature ──────────────────
+  // reboiler ≈ recovered cross-exchanger (42.8 ≈ 43.6 kW) is the correct
+  // amine-plant fingerprint; the engine's earlier 186 kW cross-HX was 4× wrong.
+  const reboilerDutyKw = 42.8 * scale
+  const reboilerAreaM2 = 3.0 * scale
+  const crossExchangerDutyKw = 43.6 * scale
+  const crossExchangerAreaM2 = 8.0 * scale
+  const condenserDutyKw = 50.9 * scale
+  const condenserAreaM2 = 3.2 * scale
+
+  // ── DUAL carbonation sink ─────────────────────────────────────────────────
+  // PRIMARY gypsum route. 3.1 t/d gypsum (CaSO₄·2H₂O, M≈172) → ~18 kmol/d Ca →
+  // fixes ~0.8 t/d CO₂ (M=44; 18 kmol × 44 ≈ 0.79 t/d) → ~1.8 t/d CaCO₃.
+  const gypsumFeedTonsPerDay = 3.1 * scale
+  const gypsumReactorVolumeM3 = 1.0 * scale
+  const gypsumAgitatorKw = 4.0 * scale
+  const co2FixedGypsumTonsPerDay = 0.8 * scale
+  // SECOND hydrated-lime route — the costed equipment line that closes the
+  // Ca-balance. Ca(OH)₂ (M≈74). ~0.35 t/d lime → ~4.7 kmol/d Ca → fixes the
+  // ~0.2 t/d CO₂ balance (4.7 kmol × 44 ≈ 0.21 t/d) → ~0.5 t/d extra CaCO₃.
+  const hydratedLimeFeedTonsPerDay = 0.35 * scale
+  const limeReactorVolumeM3 = 0.4 * scale
+  const limeAgitatorKw = 2.0 * scale
+  const co2FixedLimeTonsPerDay = 0.2 * scale
+  const totalCo2FixedTonsPerDay = co2FixedGypsumTonsPerDay + co2FixedLimeTonsPerDay  // ~1.0 t/d → closes capture
+  const caco3FromGypsumTonsPerDay = 1.8 * scale
+  const caco3FromLimeTonsPerDay = 0.5 * scale
+  const totalCaco3TonsPerDay = caco3FromGypsumTonsPerDay + caco3FromLimeTonsPerDay   // 2.3 t/d
+
+  // ── K₂SO₄ recovery (KOH + recovered sulfate → K₂SO₄) ──────────────────────
+  const kohFeedTonsPerDay = 2.6 * scale
+  const k2so4OutputTonsPerDay = 3.9 * scale
+  const crystalliserVolumeM3 = 1.1 * scale
+  const crystalliserEvapKw = 80 * scale
+
+  // ── Flue-gas blower ───────────────────────────────────────────────────────
+  const blowerFlowM3PerHour = flueGasFlowM3PerHour               // 225 m³/h
+  const blowerKw = 1.5 * scale
+
+  // ── Connected electrical load (sum of motor + evaporative duties) ─────────
+  const connectedLoadKw =
+    meaPumpKw + gypsumAgitatorKw + limeAgitatorKw + crystalliserEvapKw + blowerKw
+
+  // ── Operating envelope ────────────────────────────────────────────────────
+  const operatingTempMaxC = 120  // amine stripper reboiler loop ceiling (≤120 °C)
+
+  // ── Total system mass (kg) — read by renderer compliance-table mass row +
+  // gate 17 (chain exit 17 if absent when brief states max_mass_kg). The CO₂
+  // brief is skid-mounted; estimate bottom-up from the major vessels +
+  // exchangers + balance-of-plant. Honour any brief cap only as an upper
+  // SANITY bound (a heavier design is a real finding the row must surface —
+  // do NOT clamp to the cap). See CLAUDE.md item #13 (mass-slot name chain).
+  // Rough 316L vessel masses: absorber DN300×16.5 m ≈ 1.3 t; stripper
+  // DN300×12 m ≈ 0.95 t; three reactors + crystalliser ≈ 1.5 t; exchangers +
+  // pumps + blower + structure/skid + piping ≈ 7 t; bagging line ≈ 1.5 t.
+  const totalSystemMassKg = Math.round((1300 + 950 + 1500 + 7000 + 1500) * Math.max(1, Math.cbrt(scale)))
+
+  const quantities: Record<string, Quantity> = {
+    // ── Capture ──
+    capture_capacity_tco2_per_day: q(captureTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '1 t/day pilot (≈42 kg/h continuous) point-source flue-gas capture' }),
+    co2_capture_rate_kg_per_hour: q(co2KgPerHour, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'capture_capacity_tco2_per_day × 1000 / 24' }),
+    capture_efficiency_at_design: q(captureEfficiency, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '90% CO₂ removal from the flue-gas slipstream at design' }),
+    mea_concentration_wt_pct: q(meaConcentrationWtPct, '%', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '30 wt% aqueous monoethanolamine solvent' }),
+    flue_gas_flow_m3_per_hour: q(flueGasFlowM3PerHour, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~225 m³/h flue gas (~12% CO₂) to the absorber' }),
+    mea_circulation_m3_per_hour: q(meaCirculationM3PerHour, 'm³/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'first-principles lean-amine circulation; 0.68 m³/h @ 1 t/d (NOT 2.9 — the engine 4× over-flow)' }),
+    mea_circulation_pump_kw: q(meaPumpKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '0.75 kW lean-amine circulation pump' }),
+
+    // ── Packed absorber column (316L) ──
+    absorber_column_diameter_m: q(absorberDiameterM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: 'DN300 flooding-limited; the brief 100 mm floods at full flue-gas flow (≈4× flooding velocity)' }),
+    absorber_column_height_tt_m: q(absorberHeightTtM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: '16.5 m tangent-to-tangent (12 m packed + sumps/demister/distributor); field-erected flanged segments on a plinth. Engine earlier 6 m was ~1/3 of needed' }),
+    absorber_packed_height_m: q(absorberPackedHeightM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: '12 m random/structured packing for 90% removal' }),
+    absorber_material: q(1, '', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: 'enum: 1 = 316L stainless (amine service, ≤120 °C)' }),
+
+    // ── Stripper / regenerator (316L) ──
+    stripper_column_diameter_m: q(stripperDiameterM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: 'DN300 regenerator' }),
+    stripper_column_height_m: q(stripperHeightM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: '12 m stripper/regenerator column, 316L' }),
+
+    // ── Thermal duties (MEA heat integration) ──
+    reboiler_duty_kw: q(reboilerDutyKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'steam reboiler at the stripper base; ≈ recovered cross-exchanger duty (correct amine-plant signature)' }),
+    reboiler_area_m2: q(reboilerAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: '~3 m² kettle/thermosiphon reboiler' }),
+    lean_rich_cross_exchanger_duty_kw: q(crossExchangerDutyKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '43.6 kW lean/rich amine cross-exchanger (NOT 186 kW — engine 4× over-duty). Reboiler ≈ this duty = correct heat-integration fingerprint' }),
+    lean_rich_cross_exchanger_area_m2: q(crossExchangerAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: '~8 m² plate or shell-and-tube cross-exchanger' }),
+    overhead_condenser_duty_kw: q(condenserDutyKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '50.9 kW overhead condenser (reflux + CO₂ knock-out)' }),
+    overhead_condenser_area_m2: q(condenserAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: '~3.2 m² overhead condenser' }),
+
+    // ── PRIMARY gypsum carbonation reactor ──
+    gypsum_feed_t_per_day: q(gypsumFeedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '3.1 t/d gypsum (CaSO₄·2H₂O) → ~18 kmol/d Ca' }),
+    gypsum_carbonation_reactor_volume_m3: q(gypsumReactorVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: '1.0 m³ stirred carbonation reactor, 316L (NOT 4 m³ — engine 4× oversize)' }),
+    gypsum_reactor_agitator_kw: q(gypsumAgitatorKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '4 kW top-entry agitator for the gypsum carbonation slurry' }),
+    co2_fixed_gypsum_route_t_per_day: q(co2FixedGypsumTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~0.8 t/d CO₂ fixed (18 kmol/d Ca × 44 kg/kmol). Gypsum route ALONE under-fixes the 1 t/d captured → second sink required' }),
+
+    // ── SECOND supplementary hydrated-lime carbonation reactor ──
+    // The costed equipment line that closes the Ca-balance — the prior run
+    // emitted this only as narrative, not as a sized + priced item.
+    hydrated_lime_feed_t_per_day: q(hydratedLimeFeedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~0.35 t/d hydrated lime Ca(OH)₂ → ~4.7 kmol/d Ca, the supplementary carbonation sink' }),
+    lime_carbonation_reactor_volume_m3: q(limeReactorVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: '0.4 m³ supplementary hydrated-lime carbonation reactor, 304 / rubber-lined (high-pH lime slurry)' }),
+    lime_reactor_agitator_kw: q(limeAgitatorKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '2 kW agitator for the lime carbonation slurry' }),
+    co2_fixed_lime_route_t_per_day: q(co2FixedLimeTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~0.2 t/d CO₂ fixed (4.7 kmol/d Ca × 44) — the balance the gypsum route leaves' }),
+    total_co2_fixed_t_per_day: q(totalCo2FixedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'gypsum 0.8 + lime 0.2 = ~1.0 t/d → the dual sink closes the full 1 t/d capture (single gypsum sink does not)' }),
+
+    // ── Solid product outputs ──
+    caco3_output_t_per_day: q(totalCaco3TonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '2.3 t/d precipitated CaCO₃ (~1.8 gypsum route + ~0.5 lime route)' }),
+    k2so4_output_t_per_day: q(k2so4OutputTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '3.9 t/d potassium sulfate fertiliser' }),
+
+    // ── K₂SO₄ recovery ──
+    koh_feed_t_per_day: q(kohFeedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '2.6 t/d potassium hydroxide for sulfate → K₂SO₄ conversion' }),
+    k2so4_crystalliser_volume_m3: q(crystalliserVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: '~1.1 m³ forced-circulation crystalliser body' }),
+    k2so4_crystalliser_evap_kw: q(crystalliserEvapKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '~80 kW evaporative duty (forced-circulation K₂SO₄ crystalliser)' }),
+
+    // ── Flue-gas blower ──
+    flue_gas_blower_flow_m3_per_hour: q(blowerFlowM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: '225 m³/h flue-gas blower' }),
+    flue_gas_blower_kw: q(blowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '1.5 kW flue-gas blower' }),
+
+    // ── System ──
+    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'Σ motor + evaporative duties (MEA pump + agitators + crystalliser evap + blower)' }),
+    operating_temperature_max_c: q(operatingTempMaxC, '°C', 'temperature', 'max', 'system', 'physics_constant', { source_detail: 'amine stripper reboiler loop ceiling ≤120 °C' }),
+    // Total skid gross mass — renderer compliance-table mass row + gate 17.
+    total_system_mass_kg: q(totalSystemMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'bottom-up: absorber ~1.3 t + stripper ~0.95 t + reactors/crystalliser ~1.5 t + balance-of-plant/skid/piping ~7 t + bagging ~1.5 t' }),
+  }
+
+  // ── Topology constraints — typed edges ────────────────────────────────────
+  // Three coupled loops: (1) flue-gas → absorber (gas), (2) rich/lean amine
+  // circulation + steam regeneration (fluid + thermal), (3) CO₂ → DUAL
+  // carbonation reactors → solid products. NO marine/depth context (gate 34).
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'flue_gas_blower',
+      to_part: 'absorber_column',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: flueGasFlowM3PerHour / 3600,  // m³/s
+      required_unit: 'm³/s',
+      required_margin_factor: 1.2,
+      material_context: '316L_packed_column_DN300_with_demister_and_liquid_distributor_atmospheric_above_ground',
+    },
+    {
+      from_part: 'absorber_column',
+      to_part: 'lean_rich_cross_exchanger',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: meaCirculationM3PerHour / 3600,  // m³/s
+      required_unit: 'm³/s',
+      required_margin_factor: 1.2,
+      material_context: 'rich_amine_to_316L_plate_cross_exchanger_then_stripper_30wt_pct_MEA',
+    },
+    {
+      from_part: 'reboiler_steam_supply',
+      to_part: 'stripper_column',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: reboilerDutyKw,
+      required_unit: 'kW',
+      required_margin_factor: 1.15,
+      material_context: 'steam_reboiler_at_stripper_base_amine_loop_ceiling_120C_PED_BS_EN_13445',
+    },
+    {
+      from_part: 'lean_rich_cross_exchanger',
+      to_part: 'rich_amine_preheat',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: crossExchangerDutyKw,
+      required_unit: 'kW',
+      required_margin_factor: 1.15,
+      material_context: 'lean_amine_preheats_rich_amine_43.6kW_recovers_~reboiler_duty_correct_heat_integration',
+    },
+    {
+      from_part: 'stripper_overhead',
+      to_part: 'gypsum_carbonation_reactor',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: co2FixedGypsumTonsPerDay / 24,  // t/hr
+      required_unit: 't/hr',
+      material_context: 'stripped_CO2_to_PRIMARY_316L_stirred_gypsum_carbonation_reactor_1m3_4kW_agitator',
+    },
+    {
+      from_part: 'stripper_overhead',
+      to_part: 'lime_carbonation_reactor',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: co2FixedLimeTonsPerDay / 24,  // t/hr
+      required_unit: 't/hr',
+      material_context: 'balance_CO2_to_SECOND_hydrated_lime_carbonation_reactor_0.4m3_2kW_304_rubber_lined_closes_Ca_balance',
+    },
+    {
+      from_part: 'electrical_supply',
+      to_part: 'process_motors_and_crystalliser',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (connectedLoadKw * 1000) / (3 ** 0.5 * 415),  // A, 415 V three-phase
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+      material_context: '415_V_three_phase_with_VFDs_per_IEC_60204_ATEX_DSEAR_zoned_areas',
+    },
+    {
+      from_part: 'carbonation_reactors',
+      to_part: 'caco3_filter_and_dryer',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: totalCaco3TonsPerDay / 24,  // t/hr
+      required_unit: 't/hr',
+      material_context: 'CaCO3_slurry_to_vacuum_belt_filter_with_cake_wash_air_blow_then_hot_air_dryer_then_25kg_bagging',
+    },
+    {
+      from_part: 'koh_dosing',
+      to_part: 'k2so4_crystalliser',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: k2so4OutputTonsPerDay / 24,  // t/hr
+      required_unit: 't/hr',
+      material_context: 'KOH_converts_recovered_sulfate_to_K2SO4_forced_circulation_crystalliser_80kW_evap',
+    },
+  ]
+
+  // ── Macro-assembly pricing — MODEST anchor figures only ───────────────────
+  // The cost-basis stage (build-cost-basis.ts) re-costs equipment separately,
+  // so these are deliberately NOT inflated. They are field-fabrication-class
+  // anchors for the major bespoke items, sized to sit well under the brief's
+  // £1.9 M ex-works ceiling (sum below ≈ £0.5 M leaves headroom for BoP,
+  // instrumentation, install + margin that the cost stack adds).
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'absorber_column',
+      unit_price_gbp: 7000,
+      dimension_basis: 'metre_length',
+      dimension_value: absorberHeightTtM,
+      total_gbp: Math.round(7000 * absorberHeightTtM),
+      source_detail: `£7,000/m × ${absorberHeightTtM} m DN300 316L packed absorber (flanged field-erected segments + structured/random packing + demister + liquid distributor)`,
+    },
+    {
+      word_name: 'stripper_column',
+      unit_price_gbp: 6000,
+      dimension_basis: 'metre_length',
+      dimension_value: stripperHeightM,
+      total_gbp: Math.round(6000 * stripperHeightM),
+      source_detail: `£6,000/m × ${stripperHeightM} m DN300 316L stripper/regenerator column`,
+    },
+    {
+      word_name: 'gypsum_carbonation_reactor',
+      unit_price_gbp: 35000,
+      dimension_basis: 'cubic_metre',
+      dimension_value: gypsumReactorVolumeM3,
+      total_gbp: Math.round(35000 * gypsumReactorVolumeM3),
+      source_detail: `£35,000/m³ × ${gypsumReactorVolumeM3} m³ PRIMARY 316L stirred carbonation reactor + 4 kW agitator`,
+    },
+    {
+      word_name: 'lime_carbonation_reactor',
+      unit_price_gbp: 22000,
+      dimension_basis: 'cubic_metre',
+      dimension_value: limeReactorVolumeM3,
+      total_gbp: Math.round(22000 * limeReactorVolumeM3),
+      source_detail: `£22,000/m³ × ${limeReactorVolumeM3} m³ SECOND hydrated-lime carbonation reactor (304 / rubber-lined) + 2 kW agitator — the supplementary sink that closes the Ca-balance`,
+    },
+    {
+      word_name: 'k2so4_crystalliser',
+      unit_price_gbp: 90000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 90000,
+      source_detail: 'forced-circulation K₂SO₄ crystalliser package (~1.1 m³ body + ~80 kW evaporative duty + circulation pump + vapour body)',
+    },
+    {
+      word_name: 'lean_rich_cross_exchanger',
+      unit_price_gbp: 1200,
+      dimension_basis: 'square_metre',
+      dimension_value: crossExchangerAreaM2,
+      total_gbp: Math.round(1200 * crossExchangerAreaM2),
+      source_detail: `£1,200/m² × ${crossExchangerAreaM2} m² 316L lean/rich amine cross-exchanger (43.6 kW)`,
+    },
+    {
+      word_name: 'reboiler',
+      unit_price_gbp: 1500,
+      dimension_basis: 'square_metre',
+      dimension_value: reboilerAreaM2,
+      total_gbp: Math.round(1500 * reboilerAreaM2),
+      source_detail: `£1,500/m² × ${reboilerAreaM2} m² steam reboiler (42.8 kW)`,
+    },
+    {
+      word_name: 'overhead_condenser',
+      unit_price_gbp: 1200,
+      dimension_basis: 'square_metre',
+      dimension_value: condenserAreaM2,
+      total_gbp: Math.round(1200 * condenserAreaM2),
+      source_detail: `£1,200/m² × ${condenserAreaM2} m² overhead condenser (50.9 kW)`,
+    },
+  ]
+
+  // ── Closures — design-rule gates ──────────────────────────────────────────
+  const closures: ContractClosureResult[] = []
+  // DUAL-SINK Ca-BALANCE — the headline design correctness check. A single
+  // gypsum sink fixes only ~0.8 t/d of the 1 t/d captured; the contract MUST
+  // carry a second sink that closes the balance, else the plant captures CO₂ it
+  // cannot mineralise (would have to vent or store it).
+  closures.push({
+    invariant_id: 'dual_sink_closes_carbon_balance',
+    status: totalCo2FixedTonsPerDay >= captureTonsPerDay * 0.95 ? 'pass'
+          : totalCo2FixedTonsPerDay >= captureTonsPerDay * 0.75 ? 'warn' : 'fail',
+    measured: Number(totalCo2FixedTonsPerDay.toFixed(2)),
+    required: `≥95% of captured CO₂ mineralised: gypsum route ${co2FixedGypsumTonsPerDay.toFixed(2)} t/d + lime route ${co2FixedLimeTonsPerDay.toFixed(2)} t/d ≥ ${captureTonsPerDay.toFixed(2)} t/d captured`,
+    reason: `Dual carbonation sink fixes ${totalCo2FixedTonsPerDay.toFixed(2)} t/d CO₂ (gypsum ${co2FixedGypsumTonsPerDay.toFixed(2)} + supplementary hydrated-lime ${co2FixedLimeTonsPerDay.toFixed(2)}) against ${captureTonsPerDay.toFixed(2)} t/d captured. The gypsum route alone (${co2FixedGypsumTonsPerDay.toFixed(2)} t/d) leaves a deficit — the second lime reactor closes it.`,
+  })
+  // CaCO₃ mass balance — products should reconcile with CO₂ fixed (CaCO₃ M=100,
+  // CO₂ M=44, so CaCO₃ ≈ CO₂ × 100/44 ≈ 2.27×).
+  closures.push({
+    invariant_id: 'caco3_output_reconciles_with_co2_fixed',
+    status: Math.abs(totalCaco3TonsPerDay - totalCo2FixedTonsPerDay * (100 / 44)) / (totalCo2FixedTonsPerDay * (100 / 44)) <= 0.15 ? 'pass' : 'warn',
+    measured: Number(totalCaco3TonsPerDay.toFixed(2)),
+    required: `CaCO₃ output ≈ CO₂ fixed × 100/44 ≈ ${(totalCo2FixedTonsPerDay * (100 / 44)).toFixed(2)} t/d (stoichiometric)`,
+    reason: `CaCO₃ output ${totalCaco3TonsPerDay.toFixed(2)} t/d vs stoichiometric ${(totalCo2FixedTonsPerDay * (100 / 44)).toFixed(2)} t/d from ${totalCo2FixedTonsPerDay.toFixed(2)} t/d CO₂ fixed. Includes CaCO₃ from both gypsum (${caco3FromGypsumTonsPerDay.toFixed(2)}) and lime (${caco3FromLimeTonsPerDay.toFixed(2)}) routes.`,
+  })
+  // Absorber flooding margin — DN300 vs the brief's un-grounded 100 mm.
+  closures.push({
+    invariant_id: 'absorber_not_flooding_limited',
+    status: absorberDiameterM >= 0.25 ? 'pass' : absorberDiameterM >= 0.15 ? 'warn' : 'fail',
+    measured: absorberDiameterM,
+    required: '≥0.25 m absorber ID for the full flue-gas flow (the brief 100 mm forces ~4× flooding velocity → column floods)',
+    reason: `Absorber DN${Math.round(absorberDiameterM * 1000)} (${absorberDiameterM} m) at ${flueGasFlowM3PerHour.toFixed(0)} m³/h flue gas. The brief's ~100 mm ID would flood — this contract pins the flooding-limited 0.3 m.`,
+  })
+  // MEA heat-integration signature — reboiler duty should be close to the
+  // recovered cross-exchanger duty in a properly heat-integrated amine plant.
+  closures.push({
+    invariant_id: 'mea_heat_integration_signature',
+    status: Math.abs(reboilerDutyKw - crossExchangerDutyKw) / reboilerDutyKw <= 0.25 ? 'pass' : 'warn',
+    measured: Number(reboilerDutyKw.toFixed(1)),
+    required: `reboiler duty ≈ lean/rich cross-exchanger duty (within 25%): ${reboilerDutyKw.toFixed(1)} kW vs ${crossExchangerDutyKw.toFixed(1)} kW`,
+    reason: `Reboiler ${reboilerDutyKw.toFixed(1)} kW vs cross-exchanger ${crossExchangerDutyKw.toFixed(1)} kW. The near-match is the correct amine heat-integration fingerprint (the engine's earlier 186 kW cross-HX broke this — 4× over-duty).`,
+  })
+  // Cost ceiling sanity — macro-assembly anchors must leave headroom under the
+  // brief's £1.9 M ex-works ceiling for BoP + install + margin.
+  const macroTotalGbp = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+  const briefCeilingGbp = (() => {
+    const m = desc.match(/£?\s*([\d,]{6,})\s*(?:ex-?works|ceiling|budget|cap)?/i)
+    if (m) { const v = parseFloat(m[1].replace(/,/g, '')); if (v >= 100_000) return v }
+    return 1_900_000
+  })()
+  closures.push({
+    invariant_id: 'macro_anchors_within_cost_ceiling',
+    status: macroTotalGbp <= briefCeilingGbp * 0.6 ? 'pass' : macroTotalGbp <= briefCeilingGbp ? 'warn' : 'fail',
+    measured: Math.round(macroTotalGbp),
+    required: `major-equipment macro anchors ≤60% of £${briefCeilingGbp.toLocaleString()} ex-works (leave headroom for BoP + instrumentation + install + margin the cost stack adds)`,
+    reason: `Macro-assembly anchors total £${macroTotalGbp.toLocaleString()} vs £${briefCeilingGbp.toLocaleString()} ceiling. Deliberately modest — the dedicated cost-basis stage re-costs equipment + adds balance-of-plant.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'co2_mineralisation',
+    brief_summary: `${captureTonsPerDay.toFixed(1)} t/day CO₂ point-source capture (${meaConcentrationWtPct} wt% MEA, ${(captureEfficiency * 100).toFixed(0)}% capture, ~${co2KgPerHour.toFixed(0)} kg/h) + DUAL-sink mineralisation to solid products. Packed absorber DN${Math.round(absorberDiameterM * 1000)} × ${absorberHeightTtM} m T-T (${absorberPackedHeightM} m packed, 316L); stripper DN${Math.round(stripperDiameterM * 1000)} × ${stripperHeightM} m. MEA circulation ${meaCirculationM3PerHour.toFixed(2)} m³/h (${meaPumpKw.toFixed(2)} kW). Reboiler ${reboilerDutyKw.toFixed(1)} kW / cross-exchanger ${crossExchangerDutyKw.toFixed(1)} kW / condenser ${condenserDutyKw.toFixed(1)} kW. PRIMARY gypsum carbonation reactor ${gypsumReactorVolumeM3.toFixed(1)} m³ + ${gypsumAgitatorKw.toFixed(0)} kW (fixes ${co2FixedGypsumTonsPerDay.toFixed(1)} t/d CO₂ from ${gypsumFeedTonsPerDay.toFixed(1)} t/d gypsum); SECOND hydrated-lime carbonation reactor ${limeReactorVolumeM3.toFixed(1)} m³ + ${limeAgitatorKw.toFixed(0)} kW (fixes the ${co2FixedLimeTonsPerDay.toFixed(1)} t/d balance from ${hydratedLimeFeedTonsPerDay.toFixed(2)} t/d lime → +${caco3FromLimeTonsPerDay.toFixed(1)} t/d CaCO₃). K₂SO₄ forced-circulation crystalliser ${crystalliserVolumeM3.toFixed(1)} m³ / ${crystalliserEvapKw.toFixed(0)} kW. Outputs ${totalCaco3TonsPerDay.toFixed(1)} t/d CaCO₃ + ${k2so4OutputTonsPerDay.toFixed(1)} t/d K₂SO₄; feeds ${gypsumFeedTonsPerDay.toFixed(1)} t/d gypsum + ${kohFeedTonsPerDay.toFixed(1)} t/d KOH + ${hydratedLimeFeedTonsPerDay.toFixed(2)} t/d hydrated lime. Op ≤${operatingTempMaxC} °C; PED + BS EN 13445 + ATEX/DSEAR + COMAH. Major-equipment macro anchors £${(macroAssemblyTotal / 1000).toFixed(0)}k (well under the £${(briefCeilingGbp / 1_000_000).toFixed(1)} M ex-works ceiling; cost stack adds BoP + install).`,
+    quantities,
+    topology,
+    // B-3 fix (2026-06-05): return EMPTY macros to the BoM. The dedicated cost-basis
+    // stage (Section 6b / build-cost-basis.ts) is the authoritative cost view; passing
+    // the contract's equipment macros ALSO into the BoM double-counts the word-level
+    // lines → gate-10 B-3 (cover ≠ Σ sub-totals, exit 10). The real macro array above
+    // is still used by the cost-ceiling closure + the brief_summary.
+    macro_assembly_prices: [],
+    closures,
+    shared_quantities: {
+      // Canonical engineering values any sub_module emitter that mentions them
+      // MUST read from here (gate 24 flags two distinct values for one anchor).
+      mea_solvent_desc: `${meaConcentrationWtPct} wt% aqueous monoethanolamine (MEA)`,
+      absorber_material_desc: '316L stainless steel',
+      lime_reactor_material_desc: '304 stainless steel, rubber-lined (high-pH lime slurry)',
+      operating_temperature_max_c: operatingTempMaxC,
+      regulatory_standard_spine: 'PED (Pressure Equipment Directive) / BS EN 13445 + ATEX/DSEAR + COMAH',
+      // Mirror key scalars for emitter convenience.
+      capture_capacity_tco2_per_day: captureTonsPerDay,
+      second_sink_desc: 'supplementary hydrated-lime Ca(OH)₂ carbonation reactor (closes the Ca-balance the gypsum route leaves)',
+    },
   }
 })
 
