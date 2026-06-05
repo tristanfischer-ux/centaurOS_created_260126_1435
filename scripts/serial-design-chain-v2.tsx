@@ -48,7 +48,9 @@ import { buildContractForChain, type EngineeringContract } from './lib/engineeri
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
+import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
 // The orchestrator's assembler.ts lazy-loads emitBessDesign internally via
 // `await import('../deterministic-emitter')` at assembler.ts:130 — that path
@@ -78,7 +80,11 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
-import { completeEmitterGaps, fillBlankWordMpns } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+// Stage 10.6 synchronous part-verification leg. The live call is delegated to
+// background-enrichment.ts (chain-as-DB-consumer exempt file); the chain only
+// needs the type here — verifyProposedParts is dynamically imported in-stage.
+import type { ProposedPart } from './lib/background-enrichment'
 import { snapshotEmitterIdentity, reassertEmitterIdentity, restoreStrippedPartNumbers, isLockedKind, type EmitterIdentitySnapshot } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { runSharedQuantityConsistencyAudit } from '../src/lib/pdf-engine-v2/lib/shared-quantity-consistency-audit'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
@@ -4884,6 +4890,140 @@ async function main() {
     console.error('[chain] CHAIN_SKIP_PART_REALITY_CHECK=1 — skipping Stage 10.5 Part Reality Check')
   }
 
+  // ── Stage 10.6: Synchronous Part Verification (the engine's "P1", 2026-06-04).
+  //
+  // The live-verify leg between "a structured MPN is about to enter the BoM" and
+  // "gate 20 runs". For a NEW class the DB has not yet ingested its real parts,
+  // so the emitter's DB-first path serves ingest rows verbatim (Vector A) and a
+  // genuinely real OEM MPN that nobody has confirmed sits one exit-20 away from
+  // sinking the run. This stage VERIFIES every structured MPN the DB can't
+  // already vouch for: a distributor-grade confirmation keeps the MPN (BoM
+  // climbs); anything unconfirmed is demoted to an honest descriptor BEFORE the
+  // renderer + gate 20 see it (honest, never exit-20).
+  //
+  // CHAIN-AS-DB-CONSUMER: the only live call is delegated to
+  // verifyProposedParts() in background-enrichment.ts (the exempt file). The
+  // chain itself does ONLY DB-safe work here — a single lookupCached() read per
+  // candidate (db-only-cascade), then ONE batched verifyProposedParts() call.
+  //
+  // Skip via CHAIN_SKIP_PART_VERIFY=1 (skip = unchanged behaviour).
+  if (process.env.CHAIN_SKIP_PART_VERIFY !== '1') {
+    const tPartVerify = Date.now()
+    try {
+      const { STRUCTURED_PN_REGEX, COMMODITY_SKIP_REGEX } = await import('./lib/mpn-shape')
+      const { lookupCached } = await import('../src/lib/pdf-engine-v2/lib/distributors/db-only-cascade')
+      const { verifyProposedParts } = await import('./lib/background-enrichment')
+
+      const honest = honestDescriptorMpn()
+
+      // Read a (kind) modifier's value off a word's modifier_characters array.
+      const readMod = (w: any, kind: string): string => {
+        const mods = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+        const m = mods.find((x: any) => x?.kind === kind)
+        return String(m?.value ?? '').trim()
+      }
+      // Overwrite (or insert) the part_number modifier in place, ALWAYS trimmed.
+      const setPartNumber = (w: any, value: string): void => {
+        const mods = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+        const existing = mods.find((x: any) => x?.kind === 'part_number')
+        if (existing) existing.value = value.trim()
+        else mods.push({ kind: 'part_number', value: value.trim() })
+        w.modifier_characters = mods
+      }
+
+      // 1. Collect every candidate word whose part_number is STRUCTURED, is not
+      //    already the honest descriptor, and is not a commodity. Resolve each
+      //    against the DB FIRST (chain-legal): a distributor-sourced hit is
+      //    already verified (skip); a confirmed miss is demoted immediately
+      //    (no Brave); only 'unknown' goes to the live batch.
+      type Candidate = { word: any; proposed: ProposedPart }
+      const toVerify: Candidate[] = []
+      let scanned = 0
+      let alreadyVerified = 0
+      let demotedConfirmedMiss = 0
+      const modules = Array.isArray(design?.modules) ? design.modules : []
+      for (const m of modules) {
+        const moduleId = String(m?.module ?? m?.id ?? '')
+        const subs = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+        for (const sm of subs) {
+          const subId = String(sm?.id ?? '')
+          const words = Array.isArray(sm?.words) ? sm.words : []
+          for (const w of words) {
+            const mpn = readMod(w, 'part_number')
+            if (!mpn) continue
+            if (mpn === honest) continue
+            if (COMMODITY_SKIP_REGEX.test(mpn)) continue
+            if (!STRUCTURED_PN_REGEX.test(mpn)) continue
+            scanned++
+            const mfr = readMod(w, 'manufacturer')
+            const cached = lookupCached(mfr || null, mpn)
+            if (cached.found) { alreadyVerified++; continue } // cache_hit / library_only
+            if (cached.source === 'cache_miss_confirmed') {
+              setPartNumber(w, honest)
+              demotedConfirmedMiss++
+              continue
+            }
+            // 'unknown' → live-verify candidate.
+            toVerify.push({
+              word: w,
+              proposed: {
+                module_id: moduleId,
+                sub_module_id: subId,
+                word_id: String(w?.id ?? ''),
+                manufacturer: mfr,
+                proposed_mpn: mpn,
+                component_class: (w?.content_character?.component_class ?? null) as string | null,
+                source: String(w?.source_detail ?? 'emitter'),
+              },
+            })
+          }
+        }
+      }
+
+      // 2. ONE delegated live call for the whole batch (the single legal probe).
+      let verifiedCount = 0
+      let demotedCount = demotedConfirmedMiss
+      if (toVerify.length > 0) {
+        const outcomes = await verifyProposedParts(toVerify.map((c) => c.proposed))
+        const byWord = new Map(outcomes.map((o) => [o.word_id, o]))
+        for (const c of toVerify) {
+          const o = byWord.get(c.proposed.word_id)
+          if (o && o.matched) {
+            // Keep the real OEM + structured MPN (trimmed); BoM climbs.
+            setPartNumber(c.word, c.proposed.proposed_mpn)
+            verifiedCount++
+          } else {
+            // Unverified / sibling-SKU / no-key → honest descriptor. Manufacturer
+            // (the real OEM) is left untouched.
+            setPartNumber(c.word, honest)
+            demotedCount++
+          }
+        }
+      }
+
+      console.error(
+        `[chain] Stage 10.6 Part Verification: ${scanned} structured MPN(s) scanned, ` +
+        `${alreadyVerified} already DB-verified, ${toVerify.length} live-probed, ` +
+        `${verifiedCount} confirmed (kept), ${demotedCount} demoted to honest descriptor.`,
+      )
+      logAction({
+        step: 'stage_10_6_part_verify',
+        latency_ms: Date.now() - tPartVerify,
+        scanned,
+        already_verified: alreadyVerified,
+        live_probed: toVerify.length,
+        verified_count: verifiedCount,
+        demoted_count: demotedCount,
+        ok: true,
+      })
+    } catch (err) {
+      console.error(`[chain] Stage 10.6 Part Verification threw: ${(err as Error).message}; continuing (gate 20 backstop applies)`)
+      logAction({ step: 'stage_10_6_part_verify', latency_ms: Date.now() - tPartVerify, ok: false, error: String(err).slice(0, 200) })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_PART_VERIFY=1 — skipping Stage 10.6 Synchronous Part Verification')
+  }
+
   // ── Manual-review badge wires (Tristan v3 gap closure 2026-05-19).
   // The renderer's collectManualReviewBadges() at render-minimal-pdf.tsx:954
   // surfaces 6 gate badges on the cover + inline + appendix. Until now only G0
@@ -5968,6 +6108,165 @@ async function main() {
     } catch (err) {
       console.error(`[chain] cost-sanity (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
       logAction({ step: 'cost_sanity_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tCS })
+    }
+  }
+
+  // ── Cost-basis trail (Section 6b, SHADOW, 2026-06-05): wires the tested cost engine
+  //    (scripts/lib/cost/process-equipment-cost.ts) into the chain. Re-costs major fabricated
+  //    equipment from published curves (DOE/NETL-2002/1169, AACE Class 4), keeps catalogue
+  //    prices, and DISCLOSES every other line with its pricing method + confidence + estimate
+  //    class — so the dossier answers "where did this number come from?" per line. Persists
+  //    state.costBasis (the renderer's Section 6b reads it; absent it recomputes on the fly).
+  //    Pure, never blocks; kill with CHAIN_SKIP_COST_BASIS=1.
+  if (!process.env.CHAIN_SKIP_COST_BASIS) {
+    const tCB = Date.now()
+    try {
+      const cbState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const cb = buildCostBasis(cbState)
+      cbState.costBasis = cb
+
+      // 2026-06-05 (founder feedback): the BoM number IS the right number. For every
+      // FABRICATED vessel/column re-costed by material take-off (mass × £/kg + fabrication),
+      // write the defensible take-off price back onto the line's partVerification so the
+      // rendered BoM (Section 8) shows it — not the engine's crude per-line guess. The
+      // renderer's per-line cascade reads distributor_price_gbp → price_estimate_gbp; gate-21
+      // + audit read cost_repair_corrected_price_gbp → price_estimate_gbp. We set ALL THREE
+      // to the take-off figure (and a traceable source) so the BoM total, the rendered table,
+      // and the cost gates agree. Only the take-off lines are touched — catalogue/curve/RFQ
+      // lines keep their own numbers. This runs AFTER cost-repair, so it is authoritative.
+      const takeoffByWordId = new Map<string, typeof cb.lines[number]>()
+      for (const l of cb.lines) {
+        if (l.defensible && l.basis.method === 'material_takeoff') takeoffByWordId.set(l.word_id, l)
+      }
+      let rewritten = 0
+      if (takeoffByWordId.size > 0 && Array.isArray(cbState.partVerifications)) {
+        for (const pv of cbState.partVerifications) {
+          const tl = takeoffByWordId.get(String(pv?.word_id ?? ''))
+          if (!tl) continue
+          const price = Math.round(tl.cost_gbp * 100) / 100
+          const prev = pv.distributor_price_gbp ?? pv.price_estimate_gbp ?? null
+          pv.distributor_price_gbp = price
+          pv.distributor_price_source = 'material_takeoff'
+          pv.price_estimate_gbp = price
+          pv.price_estimate_high_gbp = Math.round(price * 1.3 * 100) / 100
+          pv.price_estimate_low_gbp = Math.round(price * 0.7 * 100) / 100
+          pv.cost_repair_corrected_price_gbp = price
+          pv.cost_repair_previous_price_gbp = typeof prev === 'number' ? prev : undefined
+          pv.cost_repair_action = 'corrected'
+          pv.cost_repair_source = 'material take-off (mass × £/kg + fabrication)'
+          pv.cost_repair_confidence = 'medium'
+          pv.cost_repair_reasoning = `[MATERIAL-TAKEOFF] ${tl.basis.working ?? ''}`.trim()
+          // a take-off price is defensible — clear any stale exclusion from the subtotal
+          pv.cost_repair_excluded_from_subtotal = undefined
+          rewritten++
+        }
+      }
+
+      // When take-off prices were written into the BoM, the upstream cost_reality
+      // gate + costStack (computed BEFORE this stage) are now stale by the price
+      // delta. Refresh BOTH from the POST-writeback partVerifications using the
+      // SAME summation + the SAME computeCostStack the gate uses, so the BoM grand
+      // total, the feasibility verdict (cost_reality.bom_total_gbp), and the ex-works
+      // price (costStack) all agree — no "wrong number + correction" (the founder's
+      // core complaint). Universal: only refreshes when a rewrite happened and the
+      // fields already exist; never invents them.
+      if (rewritten > 0) {
+        try {
+          const qtyByWordId = new Map<string, number>()
+          for (const mod of (cbState.moduleDecomposition?.modules ?? [])) {
+            for (const sm of (mod.sub_modules ?? [])) {
+              for (const w of (sm.words ?? [])) {
+                let qty = 1
+                const qmod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'quantity')
+                if (qmod) {
+                  const n = parseInt(String(qmod.value).replace(/[×x,\s]/g, ''), 10)
+                  if (Number.isFinite(n) && n > 0) qty = n
+                }
+                if (w.id) qtyByWordId.set(String(w.id), qty)
+              }
+            }
+          }
+          let bomTotalGbp = 0, bomPricedLines = 0, bomUnpricedLines = 0
+          for (const v of (cbState.partVerifications ?? [])) {
+            const unit = Number(v.distributor_price_gbp) > 0
+              ? Number(v.distributor_price_gbp)
+              : (Number(v.price_estimate_gbp) > 0 ? Number(v.price_estimate_gbp) : 0)
+            if (unit > 0) {
+              if (v.cost_repair_excluded_from_subtotal === true) { bomPricedLines += 1; continue }
+              bomTotalGbp += unit * (qtyByWordId.get(String(v.word_id ?? '')) ?? 1)
+              bomPricedLines += 1
+            } else { bomUnpricedLines += 1 }
+          }
+          if (cbState.cost_reality && typeof cbState.cost_reality === 'object' && bomTotalGbp > 0) {
+            cbState.cost_reality.bom_total_gbp = Math.round(bomTotalGbp)
+            cbState.cost_reality.priced_lines = bomPricedLines
+            cbState.cost_reality.unpriced_lines = bomUnpricedLines
+            cbState.cost_reality.order_of_magnitude = Math.round(Math.log10(bomTotalGbp) * 10) / 10
+          }
+          if (cbState.costStack && typeof cbState.costStack === 'object' && bomTotalGbp > 0) {
+            const { ratios: csRatios, class_key: csClassKey } = resolveCostStack(cbState)
+            cbState.costStack = computeCostStack(bomTotalGbp, csRatios, csClassKey)
+          }
+          console.error(`[chain] cost-basis: refreshed cost_reality + costStack to the post-writeback BoM £${Math.round(bomTotalGbp).toLocaleString('en-GB')} (ex-works £${Math.round(cbState.costStack?.oem_transfer_price_gbp ?? 0).toLocaleString('en-GB')})`)
+        } catch (refreshErr) {
+          console.error(`[chain] cost-basis: cost_reality/costStack refresh threw: ${(refreshErr as Error).message}; continuing`)
+        }
+      }
+
+      writeFileSync(statePath, JSON.stringify(cbState, null, 2))
+      console.error(`[chain] cost-basis: ${cb.methodology.takeoff_lines} take-off + ${cb.methodology.curve_lines} curve + ${cb.methodology.catalogue_lines} catalogue + ${cb.methodology.disclosure_lines} disclosed; ${rewritten} take-off price${rewritten === 1 ? '' : 's'} written into the BoM; purchased £${Math.round(cb.rollup.purchased_gbp).toLocaleString('en-GB')} → installed £${Math.round(cb.rollup.installed_central_gbp).toLocaleString('en-GB')} (central)`)
+      logAction({
+        step: 'cost_basis', ok: true, class: cb.class,
+        takeoff_lines: cb.methodology.takeoff_lines, curve_lines: cb.methodology.curve_lines,
+        catalogue_lines: cb.methodology.catalogue_lines,
+        disclosure_lines: cb.methodology.disclosure_lines, rfq_lines: cb.methodology.rfq_lines,
+        bom_prices_rewritten: rewritten,
+        purchased_gbp: cb.rollup.purchased_gbp, installed_central_gbp: cb.rollup.installed_central_gbp,
+        latency_ms: Date.now() - tCB,
+      })
+    } catch (err) {
+      console.error(`[chain] cost-basis threw: ${(err as Error).message}; continuing (never blocks)`)
+      logAction({ step: 'cost_basis', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tCB })
+    }
+  }
+
+  // ── "Take this to your advisors" — module-level advisor engagement (2026-06-05):
+  //    turns the design into a design REVIEW the founder can run. For EVERY module
+  //    it deterministically gathers that module's OPEN ITEMS (physics-critic
+  //    findings tagged to the module, made-to-order / fabricated / request-for-
+  //    quotation lines, ±30% estimate-class lines, flagged engineering closures,
+  //    unverified brief constraints) — the credibility spine, every question traces
+  //    to a real one — then calls the Anthropic-free LLM (the same callFastExtract
+  //    helper the investor/feasibility stages use) to write 1-3 SPECIALIST CARDS per
+  //    module: who you need (discipline / seniority / background + the TYPE of
+  //    company that fields them), the questions, and what a strong answer sounds
+  //    like. DESIGN-ONLY (the prompt + a deterministic guard strip any pricing /
+  //    procurement content — that is the separate sourcing section's job). Per-module
+  //    LLM calls run in capped limited-parallel batches (fan-out ≤3). Writes
+  //    state.advisorEngagement (keyed by module instance) + advisor-engagement.json.
+  //    Fail-soft: a module's failure drops only THAT block; the renderer no-ops on an
+  //    absent block. Runs AFTER design + physics-critic + cost-basis (so the open
+  //    items exist), BEFORE render. Skip via CHAIN_SKIP_ADVISOR_ENGAGEMENT=1.
+  if (process.env.CHAIN_SKIP_ADVISOR_ENGAGEMENT !== '1') {
+    const tAE = Date.now()
+    try {
+      const aeState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const engagement = await buildAdvisorEngagement(aeState, {
+        log: (l) => console.error(l),
+        concurrency: 3,
+      })
+      aeState.advisorEngagement = engagement
+      writeFileSync(statePath, JSON.stringify(aeState, null, 2))
+      try {
+        writeFileSync(resolve(outDir, 'advisor-engagement.json'), JSON.stringify(engagement, null, 2))
+      } catch { /* artefact write is best-effort */ }
+      const blockCount = Object.keys(engagement).length
+      const cardCount = Object.values(engagement).reduce((n, b: any) => n + (Array.isArray(b?.cards) ? b.cards.length : 0), 0)
+      console.error(`[chain] advisor-engagement: ${blockCount} module blocks, ${cardCount} specialist cards`)
+      logAction({ step: 'advisor_engagement', ok: true, module_blocks: blockCount, specialist_cards: cardCount, latency_ms: Date.now() - tAE })
+    } catch (err) {
+      console.error(`[chain] advisor-engagement threw: ${(err as Error).message}; continuing (never blocks)`)
+      logAction({ step: 'advisor_engagement', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tAE })
     }
   }
 
