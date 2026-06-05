@@ -40,10 +40,12 @@ import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync } from '
 import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
-import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode, moduleToolIds, break_paragraph, humaniseSubName } from './render-minimal-pdf'
+import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode, moduleToolIds, break_paragraph, humaniseSubName, workedStepIdentity, toolBlockSignature, engineAddedItemVisible } from './render-minimal-pdf'
+import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
-import { splitDenseSubModulesByRadical } from './lib/orchestrator/submodule-splitter'
+import { co2MineralisationEmitter } from './lib/orchestrator/emitters/co2-mineralisation'
+import { splitDenseSubModulesByRadical, TARGET_DENSITY_DEFAULT, MIN_CHILD_WORDS_DEFAULT } from './lib/orchestrator/submodule-splitter'
 import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, isBespokeFabrication } from '../src/lib/pdf-engine-v2/lib/bespoke-equipment-bands'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
@@ -70,9 +72,10 @@ import { checkBriefFeasibility } from '../src/lib/pdf-engine-v2/lib/brief-feasib
 import { checkBriefAdherence } from './brief-adherence'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
+import { gatherModuleOpenItems, questionHasProcurementLeak } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
-import { isRoundingFamily } from './lib/cross-page-numeric-consistency-audit'
+import { isRoundingFamily, extractOccurrences as gate18ExtractOccurrences, cluster as gate18Cluster, buildFindings as gate18BuildFindings, currentCalcSignatureOf, constraintRoleOf } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, tokenize as emitterTokenize, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { classifyByRules, matchCorpusPrice, resolveEmitterPinPrice, type CorpusPriceRow } from './estimate-missing-prices'
 import { auditCostSanity as _auditCostSanityForCorpus } from './lib/cost-self-assessment'
@@ -703,25 +706,391 @@ function checkCo2FixInvariants(): Assertion[] {
     ))
   }
 
+  // ── (6) CO2.second_lime_carbonation_sink_present (house rule #11, 2026-06-05) ──
+  // The brief mandates TWO carbonation sinks: a PRIMARY gypsum reactor PLUS a SECONDARY
+  // hydrated-lime reactor carbonating the balance (Ca(OH)2 + CO2 -> CaCO3 + H2O). The lime
+  // CHEMISTRY existed in the contract but there was NO physical lime reactor — the design
+  // emitted only a gypsum reactor sub_module. This invariant asserts, DETERMINISTICALLY and
+  // snapshot-independently, that (a) the CO₂ class plan WIRES a lime-reactor sizing step that
+  // emits a lime_reactor_shell_mass_kg contract quantity, and (b) the deterministic emitter
+  // produces a lime-carbonation sub_module carrying ≥1 part_number-bearing word — so the second
+  // sink can never silently regress out of the design or the contract.
+  {
+    const failures: string[] = []
+
+    // (a) the class plan must wire a reactor:cstr-pfr-sizing step whose contract_update emits
+    //     lime_reactor_shell_mass_kg (the BoM take-off + envelope key). Exercise EVERY
+    //     reactor-sizing step's contract_update with a stub tool output; at least one must
+    //     write lime_reactor_shell_mass_kg. (No python — pure key-presence check.)
+    const steps: any[] = (CO2_MINERALISATION_PLAN as any).tools ?? (CO2_MINERALISATION_PLAN as any).steps ?? []
+    const stubOut = {
+      working_volume_total_m3: 2.0, vessel_diameter_m: 1.29, vessel_height_m: 1.93,
+      shell_mass_kg_total: 420, power_w: 292, tip_speed_m_s: 3.0,
+    }
+    let limeMassEmitted = false
+    for (const s of steps) {
+      try {
+        const updated = s.contract_update?.({ quantities: { hydrated_lime_feed_t_per_day: { value: 0.35 } } }, stubOut)
+        if (updated?.quantities?.lime_reactor_shell_mass_kg?.value != null) limeMassEmitted = true
+      } catch { /* a step that throws on this seed is not the lime step */ }
+    }
+    if (!limeMassEmitted) failures.push('no class-plan step emits a lime_reactor_shell_mass_kg quantity (the secondary lime reactor sizing is missing from co2-mineralisation.ts)')
+
+    // (b) the deterministic emitter must produce a lime-carbonation sub_module with a
+    //     lime-carbonation word + ≥1 part_number modifier (gate-23) on a dual-sink contract.
+    try {
+      const contract: any = { quantities: {
+        target_capture_tpd: { value: 1 },
+        co2_fixed_lime_route_t_per_day: { value: 0.2 },
+        hydrated_lime_feed_t_per_day: { value: 0.35 },
+        lime_reactor_volume_m3: { value: 2.0 },
+        lime_reactor_shell_mass_kg: { value: 420 },
+      } }
+      const design: any = co2MineralisationEmitter(contract, {} as any, {} as any)
+      const mods: any[] = design?.modules ?? []
+      const limeMod = mods.find((m) => String(m?.display_name ?? '').toLowerCase().includes('lime carbonation reactor'))
+      if (!limeMod) failures.push('emitter produced NO lime-carbonation module (display_name "Lime Carbonation Reactor …")')
+      const limeWords: any[] = limeMod?.sub_modules?.flatMap((sm: any) => sm?.words ?? []) ?? []
+      const hasLimeWord = limeWords.some((w) => /lime_carbonation_reactor|lime_carbonation/.test(String(w?.content_character?.character_id ?? '')))
+      if (!hasLimeWord) failures.push('the lime module has no lime_carbonation_reactor word')
+      const limeSub: any = limeMod?.sub_modules?.[0]
+      const subHasPn = (limeSub?.words ?? []).some((w: any) => (w?.modifier_characters ?? []).some((mc: any) => mc?.kind === 'part_number'))
+      if (!subHasPn) failures.push('the lime_carbonation sub_module carries no part_number-bearing word (gate-23 emitter-completeness would fail)')
+      // distinct display_name (no Map collision with the gypsum / K2SO4 energy_conversion modules)
+      const names = mods.map((m) => String(m?.display_name ?? ''))
+      if (names.filter((n) => n === (limeMod?.display_name ?? '')).length !== 1) failures.push('the lime module display_name collides with another module (Map overwrite risk)')
+    } catch (err) {
+      failures.push(`emitter threw building the lime sub_module: ${String(err).slice(0, 120)}`)
+    }
+
+    out.push(assertEq(
+      'CO2.second_lime_carbonation_sink_present',
+      'CO₂ dual-sink: the class plan emits a lime_reactor_shell_mass_kg quantity AND the deterministic emitter produces a lime-carbonation sub_module with ≥1 part_number-bearing word (the second carbonation sink is real, sized, costed equipment — never silently absent)',
+      failures.length, (n) => n === 0,
+      () => `second lime carbonation sink missing/incomplete: ${failures.join(' ; ')}. Check scripts/lib/orchestrator/class-plans/co2-mineralisation.ts (stepLimeReactorSizing) + scripts/lib/orchestrator/emitters/co2-mineralisation.ts (emitLimeCarbonationReactor).`,
+    ))
+  }
+
   _co2FixCheck = out
   return out
 }
 
-// ── Sub-module density splitter (bin-pack rewrite) invariants (2026-06-04) ──
+// ── Render worked-calc de-dup + Executive-Summary prose invariants (2026-06-05) ─
 //
-// Four invariants guarding the MIN_CHILD_WORDS bin-pack rewrite of
-// splitDenseSubModulesByRadical (scripts/lib/orchestrator/submodule-splitter.ts,
-// called from assembler.ts:125). The splitter REGROUPS existing words into
-// ≥5-word children, stamps split_parent_id + split_radicals, never co-locates
-// conflicting ac_/dc_ character_id domains, keeps a single child when a parent
-// totals <5 words, and is idempotent (a child already carrying split_parent_id
-// passes through). It adds/drops nothing.
+// Guards the two render-side fixes made after the co2-mineralisation-2sink-v6
+// review:
+//   (A) FIX 1 — exact-repeat worked-calc collapse (render-minimal-pdf.tsx
+//       ToolsComputedBlock). The universal sub-module splitter routes one tool
+//       to several cells, so an IDENTICAL worked block (e.g. pressure-vessel
+//       685.079 kg → 917.041 kg) printed 3×. The dedup collapses ONLY exact
+//       repeats (key = formula⋮substitution). Two invariants assert that
+//       (1) an identical block produces the SAME signature (→ collapses) while a
+//       block with a different substitution (316L 685 kg vs 304L 154 kg, or
+//       400 V vs 11 kV current) produces a DIFFERENT signature (→ never
+//       collapses); (2) a step with no formula/substitution has an EMPTY
+//       identity (never dedupable) so it can never be wrongly collapsed.
+//   (B) FIX 2 — Executive-Summary prose (buildExecutiveSummary). Assert a
+//       noun-phrase mission/why_now produce GRAMMATICAL prose (no ", to Skid-"
+//       junction; why_now introduced with a lead-in), and that a zero-breach
+//       outcome NEVER contradicts the next-steps paragraph ("no breaches" must
+//       not co-occur with "the breached subsystems").
+//
+// Snapshot-independent (pure functions on synthetic inputs), memoised.
+let _dedupExecCheck: Assertion[] | null = null
+function checkDedupAndExecSummaryInvariants(): Assertion[] {
+  if (_dedupExecCheck) return _dedupExecCheck
+  const out: Assertion[] = []
+
+  // ── (A1) exact repeats collapse, distinct calcs do not ────────────────────
+  // Real shapes from the v6 state: pressure-vessel 316L cylinder-wall step vs
+  // reactor 304L shell-mass step; 400 V cable current vs 11 kV transformer
+  // current. Same (formula, substitution) → identical key; any difference → not.
+  const stepShellMass316 = { label: 'Cylinder wall mass', formula: 'mass = pi x (r_outer^2 - r_inner^2) x length_mm x density / 1e9', substitution: 'mass = pi x (759.5^2 - 751.5^2) x 2,255 x 8,000 / 1e9 = 685.079 kg' }
+  const stepShellMass316Copy = { label: 'Cylinder wall mass', formula: 'mass = pi x (r_outer^2 - r_inner^2) x length_mm x density / 1e9', substitution: 'mass = pi x (759.5^2 - 751.5^2) x 2,255 x 8,000 / 1e9 = 685.079 kg' }
+  const stepShellMass304 = { label: 'Shell mass (wall + 2 heads) per reactor', formula: 'm = ...', substitution: 'm = (pi x (428.2^2 - 423.2^2) x 1,015.7 + 2 x pi x 428.2^2 x 5) x 8,000 / 1e9 = 154.74 kg' }
+  const currentAt400 = { label: 'Design current', formula: 'I = S x 1000 / (sqrt(3) x U_LL)', substitution: 'I = 561 x 1000 / (sqrt(3) x 400) = 810.0 A' }
+  const currentAt11k = { label: 'Primary current', formula: 'I = S x 1000 / (sqrt(3) x U_LL)', substitution: 'I = 800 x 1000 / (sqrt(3) x 11,000) = 41.99 A' }
+
+  const idEq = workedStepIdentity(stepShellMass316) === workedStepIdentity(stepShellMass316Copy)
+  const idShellDistinct = workedStepIdentity(stepShellMass316) !== workedStepIdentity(stepShellMass304)
+  const idCurrentDistinct = workedStepIdentity(currentAt400) !== workedStepIdentity(currentAt11k)
+  out.push(assertEq(
+    'UNIVERSAL.render_worked_dedup_collapses_exact_repeat_not_distinct',
+    'worked-calc step identity: identical 316L shell-mass steps share a key (collapse); 316L≠304L shell mass and 400V≠11kV current have distinct keys (never collapsed)',
+    idEq && idShellDistinct && idCurrentDistinct,
+    (ok) => ok === true,
+    () => `step-identity dedup wrong: identicalKeysEqual=${idEq} shellDistinct=${idShellDistinct} currentDistinct=${idCurrentDistinct}. See workedStepIdentity in render-minimal-pdf.tsx.`,
+  ))
+
+  // Whole-block signature: a full 2-step block equals its byte copy (→ whole-
+  // block collapse) but differs from a block whose 2nd step changed (→ render).
+  const blockA = [stepShellMass316, currentAt11k]
+  const blockACopy = [stepShellMass316Copy, currentAt11k]
+  const blockB = [stepShellMass316, currentAt400]
+  const sigEq = toolBlockSignature(blockA) !== '' && toolBlockSignature(blockA) === toolBlockSignature(blockACopy)
+  const sigDistinct = toolBlockSignature(blockA) !== toolBlockSignature(blockB)
+  out.push(assertEq(
+    'UNIVERSAL.render_worked_dedup_block_signature_exact_only',
+    'tool-block signature equals its exact copy but differs when any step changes',
+    sigEq && sigDistinct,
+    (ok) => ok === true,
+    () => `block-signature dedup wrong: copyEqual=${sigEq} changedDistinct=${sigDistinct}. See toolBlockSignature in render-minimal-pdf.tsx.`,
+  ))
+
+  // ── (A2) a step with no checkable derivation has EMPTY identity ───────────
+  // (never dedupable → a bare-label step can never be wrongly collapsed; and a
+  // block containing one falls back to per-step, never whole-block collapse).
+  const bareStep = { label: 'Heading only' }
+  const emptyId = workedStepIdentity(bareStep) === ''
+  const blockWithBareNotWholeCollapsible = toolBlockSignature([stepShellMass316, bareStep]) === ''
+  out.push(assertEq(
+    'UNIVERSAL.render_worked_dedup_empty_identity_never_collapses',
+    'a step with no formula/substitution has empty identity and is never whole-block-collapsed',
+    emptyId && blockWithBareNotWholeCollapsible,
+    (ok) => ok === true,
+    () => `empty-identity guard wrong: emptyId=${emptyId} bareBlockNotWhole=${blockWithBareNotWholeCollapsible}.`,
+  ))
+
+  // ── (B1) noun-phrase mission/why_now → grammatical prose, no broken junction ─
+  const execNounPhrase = buildExecutiveSummary({
+    productName: 'a CO2 mineralisation system',
+    mission: 'Skid-mounted CO2 capture + mineral-carbonation plant capturing 1.0 t CO2/day.',
+    targetCustomers: 'Industrial CO2 emitters in the UK and EU',
+    whyNow: 'Increasing regulatory pressure on industrial emissions and the need for viable carbon capture.',
+    headline: { label: 'CO2 capture', value: 1, unit: 't/day' },
+    compliancePass: 14, complianceFail: 0, complianceTotal: 17,
+    failSummaries: [],
+    exWorksCostGbp: 1_670_000, costPerUnit: null,
+    improvementActions: [],
+  })
+  const noBrokenJunction = !/,\s*to\s+Skid/i.test(execNounPhrase.product) && execNounPhrase.product.includes(': skid-mounted')
+  const whyNowLeadIn = /timing is driven by increasing regulatory pressure/i.test(execNounPhrase.product)
+  out.push(assertEq(
+    'UNIVERSAL.exec_summary_noun_phrase_mission_reads_grammatical',
+    'executive summary: a noun-phrase mission/why_now produce grammatical prose (colon junction, why_now lead-in), not a broken ", to {NounPhrase}" splice',
+    noBrokenJunction && whyNowLeadIn,
+    (ok) => ok === true,
+    () => `exec-summary prose junction wrong: noBrokenJunction=${noBrokenJunction} whyNowLeadIn=${whyNowLeadIn}. product="${execNounPhrase.product.slice(0, 160)}". See executive-summary.ts.`,
+  ))
+
+  // ── (B2) zero-breach outcome must NOT contradict next-steps ───────────────
+  const outcomeSaysNoBreach = /with no breaches/i.test(execNounPhrase.outcome)
+  const nextNoBreachContradiction = !/breached subsystems/i.test(execNounPhrase.next_steps)
+  // And the inverse: a breaching design SHOULD name the breached subsystems.
+  const execWithBreach = buildExecutiveSummary({
+    productName: 'a BESS', mission: 'Store 3.5 MWh.', targetCustomers: 'UK grid', whyNow: 'Frequency response demand.',
+    headline: { label: 'Usable energy', value: 2.69, unit: 'MWh' },
+    compliancePass: 12, complianceFail: 2, complianceTotal: 17,
+    failSummaries: ['unit cost 670% over the ceiling', 'usable energy 23% short'],
+    exWorksCostGbp: 1_340_000, costPerUnit: '£498/kWh',
+    improvementActions: ['add 2 racks', 'raise the budget'],
+  })
+  const breachNamesSubsystems = /breached subsystems/i.test(execWithBreach.next_steps)
+  out.push(assertEq(
+    'UNIVERSAL.exec_summary_no_breach_contradiction',
+    'executive summary: "no breaches" outcome does not co-occur with "the breached subsystems" next-step; a real breach DOES name them',
+    outcomeSaysNoBreach && nextNoBreachContradiction && breachNamesSubsystems,
+    (ok) => ok === true,
+    () => `exec-summary breach consistency wrong: noBreachOutcome=${outcomeSaysNoBreach} noContradiction=${nextNoBreachContradiction} breachNamesSubsystems=${breachNamesSubsystems}.`,
+  ))
+
+  // ── (C) inferred-cost-ceiling engine-added item suppressed iff brief set a USER ceiling ─
+  // The Brief Provenance page's hardcoded "what the engine added" table is matched by a
+  // CONTENT signature, so the CO₂ entry attaches to a LATER dossier whose parsed brief
+  // actually set a user budget (the £3M dual-sink run). The inferred-£1.9M-ceiling item
+  // ("you set no budget") then contradicts the real £3M ceiling shown in the compliance
+  // table. engineAddedItemVisible must HIDE that item when unit_cost_ceiling.source==='user'
+  // (with a value), and SHOW it otherwise; every non-cost-ceiling item always shows.
+  const costCeilingItem = { label: 'Cost ceiling — £1,900,000 ex-works', detail: 'You set no budget. The engine inferred…', flag: true, kind: 'inferred_cost_ceiling' as const }
+  const gypsumItem = { label: 'Gypsum feedstock — corrected to ~3.91 t/day', detail: 'You named gypsum…' }
+  const userCeilingState = { parsedBrief: { constraints: { unit_cost_ceiling: { value: 3_000_000, currency: 'GBP', source: 'user' } } } }
+  const inferredCeilingState = { parsedBrief: { constraints: { unit_cost_ceiling: { value: 1_900_000, currency: 'GBP', source: 'inferred' } } } }
+  const noCeilingState = { parsedBrief: { constraints: {} } }
+  const hiddenWhenUserSet = engineAddedItemVisible(costCeilingItem, userCeilingState) === false
+  const shownWhenInferred = engineAddedItemVisible(costCeilingItem, inferredCeilingState) === true
+  const shownWhenAbsent = engineAddedItemVisible(costCeilingItem, noCeilingState) === true
+  const otherItemAlwaysShown = engineAddedItemVisible(gypsumItem, userCeilingState) === true
+  out.push(assertEq(
+    'UNIVERSAL.inferred_cost_ceiling_item_suppressed_when_user_set_budget',
+    'Brief Provenance: the inferred-cost-ceiling engine-added item is hidden when the parsed brief set a USER unit_cost_ceiling, shown when source!=="user" (inferred/absent); non-cost-ceiling items always show',
+    hiddenWhenUserSet && shownWhenInferred && shownWhenAbsent && otherItemAlwaysShown,
+    (ok) => ok === true,
+    () => `engineAddedItemVisible wrong: hiddenWhenUserSet=${hiddenWhenUserSet} shownWhenInferred=${shownWhenInferred} shownWhenAbsent=${shownWhenAbsent} otherItemAlwaysShown=${otherItemAlwaysShown}. See engineAddedItemVisible in render-minimal-pdf.tsx.`,
+  ))
+
+  _dedupExecCheck = out
+  return out
+}
+
+// ── "Take this to your advisors" generator invariants (2026-06-05) ──────────────
+//
+// Two self-contained invariants guarding the module-level advisor-engagement
+// generator (src/lib/pdf-engine-v2/lib/advisor-engagement.ts):
+//
+//   1. UNIVERSAL.advisor_grounds_physics_finding_to_module — gatherModuleOpenItems
+//      must produce ≥1 GROUNDED open item (kind 'physics', tracing to
+//      7-5-physics-critique.json) for the module instance a high-severity
+//      physics-critic finding is tagged to, and must NOT leak that finding into a
+//      sibling module that shares the same duplicate taxonomy id. This is the
+//      credibility spine: every advisor question must trace to a real open item.
+//   2. UNIVERSAL.advisor_strips_procurement_leak — questionHasProcurementLeak must
+//      flag a pricing / procurement / get-a-quote question (so the DESIGN-ONLY
+//      contract holds even if the LLM drifts) and must NOT flag a pure design
+//      question. The advisor block is deliberately design-only; pricing + sourcing
+//      live in a separate section.
+//
+// Snapshot-independent (synthetic states), memoised.
+let _advisorCheck: Assertion[] | null = null
+function checkAdvisorEngagementInvariants(): Assertion[] {
+  if (_advisorCheck) return _advisorCheck
+  const out: Assertion[] = []
+
+  // ── (1) grounding: a physics finding surfaces as a grounded item on the right module ──
+  {
+    // Two modules sharing a DUPLICATE taxonomy id (the CO₂ amine-plant signature).
+    // The physics finding sits on instance 0's sub-module 0; it must NOT appear on
+    // instance 1 (which has its own, different sub-modules).
+    const modules = [
+      {
+        module: 'mass_fluid_transport_process',
+        module_human: 'MEA Absorption & Capture',
+        sub_modules: [
+          { id: 'absorber_train', words: [{ id: 'packed_absorber_column_word', name_human: 'packed absorber column', modifier_characters: [{ kind: 'form', value: 'fabricated counter-current column, flanged segments' }] }] },
+        ],
+      },
+      {
+        module: 'mass_fluid_transport_process',
+        module_human: 'CaCO3 Filtration & Drying',
+        sub_modules: [
+          { id: 'filter_dry_line', words: [{ id: 'belt_filter_word', name_human: 'belt filter', modifier_characters: [] }] },
+        ],
+      },
+    ]
+    const state = {
+      moduleDecomposition: { product_class: 'co2_mineralisation', modules },
+      physicsCritique: {
+        issues: [
+          {
+            dimension: 'engineering_plausibility', severity: 'high', confidence: 'high',
+            where: 'mass_fluid_transport_process/sub_modules[0]/words[0]',
+            issue: 'The absorber column diameter of 0.2 m is too small for the 500 kg/h flue gas flow rate — the gas velocity ~4.65 m/s exceeds the typical flooding limit of 1.0-2.0 m/s.',
+            suggested_check: 'Open the column to at least 0.45 m and raise the packing height to 8-12 m.',
+          },
+        ],
+      },
+    }
+    const itemsInstance0 = gatherModuleOpenItems(state, modules, 0)
+    const itemsInstance1 = gatherModuleOpenItems(state, modules, 1)
+    const physicsOn0 = itemsInstance0.filter((it) => it.kind === 'physics')
+    const physicsOn1 = itemsInstance1.filter((it) => it.kind === 'physics')
+    const tracesToCritique = physicsOn0.length > 0 && /7-5-physics-critique\.json/.test(physicsOn0[0].trace)
+    const fails: string[] = []
+    if (physicsOn0.length < 1) fails.push('instance 0 (MEA Absorption) got NO grounded physics open item for the absorber-flooding finding')
+    if (!tracesToCritique) fails.push('the physics open item does not trace to 7-5-physics-critique.json')
+    if (physicsOn1.length > 0) fails.push('the finding LEAKED onto instance 1 (a sibling sharing the duplicate module id)')
+    out.push(assertEq(
+      'UNIVERSAL.advisor_grounds_physics_finding_to_module',
+      'gatherModuleOpenItems grounds a high-severity physics finding to the correct module instance (traces to 7-5-physics-critique.json) and does not leak it to a duplicate-id sibling',
+      fails.length, (n) => n === 0,
+      () => `advisor grounding wrong: ${fails.join(' ; ')}. Check gatherModuleOpenItems in advisor-engagement.ts.`,
+    ))
+  }
+
+  // ── (2) design-only guard: procurement-leak detector both directions ──────────
+  {
+    const bad: string[] = []
+    const leakQ = { question: 'Can you give us a firm price and the lead time to supply this column?', grounded_in: 'x', strong_answer: 'A good supplier quotes a price within two weeks.' }
+    const designQ = { question: 'Is the 0.2 metre absorber column diameter large enough, or will the gas velocity flood the packing?', grounded_in: 'physics critique', strong_answer: 'A strong answer reaches for a flooding correlation and asks for the real gas flow first.' }
+    if (!questionHasProcurementLeak(leakQ)) bad.push('a "firm price + lead time" question was NOT flagged as a procurement leak')
+    if (questionHasProcurementLeak(designQ)) bad.push('a pure design (column-flooding) question WAS wrongly flagged as a procurement leak')
+    out.push(assertEq(
+      'UNIVERSAL.advisor_strips_procurement_leak',
+      'questionHasProcurementLeak flags a pricing/procurement question and passes a pure design question (the advisor block is design-only)',
+      bad.length, (n) => n === 0,
+      () => `advisor procurement guard wrong: ${bad.join(' ; ')}. Check PROCUREMENT_LEAK_RE / questionHasProcurementLeak in advisor-engagement.ts.`,
+    ))
+  }
+
+  // ── (3) hybrid split: full cards live in the Engagement Plan, NOT on module pages ──
+  // 2026-06-05 hybrid refactor. The full specialist cards (AdvisorSpecialistCard,
+  // carrying the "What a strong answer looks like" callouts) MUST render only in the
+  // consolidated EngagementPlanPage (Section 14) — never inline at the foot of each
+  // module, where they bled into the multimodal scorer's per-module page samples and
+  // dropped design_modules / bom / grammar / visual below the ≥8 floor. The per-module
+  // ModuleAdvisorBlock must be a TIGHT pointer (the "Validate this design with: … full
+  // questions in the Engagement Plan (Section 14)" cross-reference) that does NOT
+  // instantiate AdvisorSpecialistCard. Source-structural guard (mirrors I12c): a revert
+  // to inline cards re-adds <AdvisorSpecialistCard inside ModuleAdvisorBlock and trips
+  // this. Snapshot-independent.
+  {
+    const bad: string[] = []
+    try {
+      const rmpSrc = readFileSync(resolve(__dirname, 'render-minimal-pdf.tsx'), 'utf-8')
+      const sliceFn = (name: string): string => {
+        const start = rmpSrc.indexOf(`function ${name}(`)
+        if (start < 0) return ''
+        // Body ends at the next top-level "function " declaration.
+        const next = rmpSrc.indexOf('\nfunction ', start + 1)
+        return rmpSrc.slice(start, next < 0 ? undefined : next)
+      }
+      const moduleBlock = sliceFn('ModuleAdvisorBlock')
+      const engagementPlan = sliceFn('EngagementPlanPage')
+      if (!moduleBlock) bad.push('ModuleAdvisorBlock function not found in render-minimal-pdf.tsx')
+      if (!engagementPlan) bad.push('EngagementPlanPage function not found in render-minimal-pdf.tsx')
+      // The pointer must NOT render the full specialist card…
+      if (moduleBlock && /<AdvisorSpecialistCard\b/.test(moduleBlock)) {
+        bad.push('ModuleAdvisorBlock instantiates <AdvisorSpecialistCard — the full cards leaked back onto the module page (they belong in EngagementPlanPage / Section 14)')
+      }
+      // …and must carry the cross-reference pointer instead.
+      if (moduleBlock && !/Engagement Plan \(Section 14\)/.test(moduleBlock)) {
+        bad.push('ModuleAdvisorBlock no longer carries the "Engagement Plan (Section 14)" pointer cross-reference')
+      }
+      // The consolidated section MUST render the full specialist cards.
+      if (engagementPlan && !/<AdvisorSpecialistCard\b/.test(engagementPlan)) {
+        bad.push('EngagementPlanPage does NOT instantiate <AdvisorSpecialistCard — the consolidated full cards are missing from Section 14')
+      }
+    } catch (err) {
+      bad.push(`could not read render-minimal-pdf.tsx: ${String(err).slice(0, 100)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.advisor_full_cards_only_in_engagement_plan',
+      'the full advisor cards render only in the consolidated EngagementPlanPage (Section 14); each module page carries only a tight pointer — the cards never bleed back into the per-module scorer samples',
+      bad.length, (n) => n === 0,
+      () => `advisor hybrid split regressed: ${bad.join(' ; ')}. Keep the full <AdvisorSpecialistCard> stack in EngagementPlanPage; ModuleAdvisorBlock must stay a one-line "Validate this design with: … Engagement Plan (Section 14)" pointer.`,
+    ))
+  }
+
+  _advisorCheck = out
+  return out
+}
+
+// ── Sub-module density splitter (density-aware bin-pack) invariants ──
+// (2026-06-04; density-budget reconciliation 2026-06-05)
+//
+// Four invariants guarding the bin-pack of splitDenseSubModulesByRadical
+// (scripts/lib/orchestrator/submodule-splitter.ts, called from assembler.ts via
+// finalise()). The splitter REGROUPS existing words into children, stamps
+// split_parent_id + split_radicals, never co-locates conflicting ac_/dc_
+// character_id domains, keeps a single child when a parent totals <MIN_CHILD_WORDS
+// words, and is idempotent (a child already carrying split_parent_id passes
+// through). It adds/drops nothing.
+//
+// TWO FLOORS THAT FIGHT (the 2026-06-05 reconciliation): (i) each child ≥
+// MIN_CHILD_WORDS words (the BoM `sub_module_word_density` gate) pulls toward
+// FEWER, fatter children; (ii) mean ≥ TARGET_DENSITY sub-modules/module (the
+// audit-pdf-run D-1 floor) pulls toward MORE children. Commit 9c65d7b93 optimised
+// ONLY (i) and collapsed co2 from ~2.08 to ~1.15, tripping D-1. The splitter now
+// runs a DESIGN-WIDE density budget: it packs toward ≥MIN_CHILD_WORDS but un-merges
+// just enough children to reach TARGET_DENSITY, so a sub-MIN child is emitted ONLY
+// when the density floor (or the ac/dc guard) demands it — never gratuitously.
 //
 //   1. UNIVERSAL.splitter_never_emits_sub5_child_unless_unavoidable — on the CO₂
-//      v12 design, every OUTPUT sub_module carrying split_parent_id has ≥5 words
-//      UNLESS it is unavoidably thin (its split_parent_id sibling group cannot be
-//      re-packed into all-≥5 bins without an ac_/dc_ conflict). Count of AVOIDABLE
-//      sub-5 split children === 0.
+//      v12 design, every OUTPUT sub_module carrying split_parent_id has ≥
+//      MIN_CHILD_WORDS words UNLESS it is unavoidable: its split_parent_id cohort
+//      cannot be re-packed all-≥MIN without an ac_/dc_ conflict, OR re-merging it
+//      would drop the WHOLE design below TARGET_DENSITY (the density floor wins the
+//      fight). GRATUITOUS = a sub-MIN child whose cohort COULD merge all-≥MIN AND
+//      whose removal would leave the design still ≥ TARGET_DENSITY. Count === 0.
 //   2. UNIVERSAL.splitter_content_and_mpn_preserving — the multiset of word ids
 //      AND the set of (word_id, part_number) pairs are IDENTICAL before vs after
 //      (regroup only; gate-20 safety — a fabricated MPN here would poison the run).
@@ -743,10 +1112,10 @@ function checkCo2FixInvariants(): Assertion[] {
 // real CO₂ words by collapsing each module's sub_modules back into one dense
 // sub_module per module (collapseToPreSplit). This regroups the identical word
 // set the chain produced, drives density to 1.0 so the bin-packer actually runs,
-// and is faithful — every word/MPN is the real v12 part. On this input the only
-// sub-5 OUTPUT is the un-split environmental_interface/thermal_utilities group
-// (single-radical, 4 words, NO split_parent_id) — i.e. 0 avoidable sub-5 split
-// children, matching the brief.
+// and is faithful — every word/MPN is the real v12 part. The density budget lifts
+// the design to EXACTLY the TARGET_DENSITY floor (24/12 = 2.000), so there is no
+// headroom to shed a child — every sub-MIN OUTPUT child is density-required, i.e.
+// 0 GRATUITOUS sub-MIN split children.
 //
 // Memoised (the .json fixture is read once per harness run). Each probe is
 // try/catch-guarded → a missing fixture yields a vacuous PASS (mirrors
@@ -814,13 +1183,37 @@ function checkSubmoduleSplitterInvariants(): Assertion[] {
     const design = collapseToPreSplit(state?.moduleDecomposition)
     const split1 = splitDenseSubModulesByRadical(design as any)
 
-    // (1) avoidable sub-5 split children. A split child is one carrying
-    //     split_parent_id. "Unavoidably thin" = its sibling cohort (all children
-    //     sharing the same split_parent_id) cannot be re-packed into all-≥5 bins
-    //     without co-locating conflicting ac_/dc_ domains. We test that by
-    //     attempting a domain-pure all-≥5 re-pack of the cohort's pooled words:
-    //     if the pooled words can form bins that are each ≥5 (or each ac/dc-pure
-    //     when a domain split is forced), a sub-5 child in that cohort is AVOIDABLE.
+    // (1) avoidable (GRATUITOUS) sub-5 split children. A split child is one carrying
+    //     split_parent_id. A sub-5 split child is PERMITTED ("unavoidable") when it is
+    //     there for one of TWO reasons:
+    //       (a) DOMAIN — its sibling cohort (all children sharing the same
+    //           split_parent_id) cannot be re-packed all-≥5 without co-locating
+    //           conflicting ac_/dc_ domains (the original guard), OR
+    //       (b) DENSITY — re-merging it away would drop the WHOLE design below the
+    //           TARGET_DENSITY (2.0) mean sub-modules/module floor (audit-pdf-run
+    //           D-1). The two floors FIGHT on chemical-process classes: a co2 module
+    //           of atomic 4-word radical groups CANNOT make all-≥5 children AND hold
+    //           a mean of 2.0, so the splitter keeps some 4-word children to honour
+    //           the density floor. Those are REQUIRED, not gratuitous.
+    //     A sub-5 child is GRATUITOUS (FAIL) only when its cohort COULD re-pack all-≥5
+    //     (reason (a) does not apply) AND the design has HEADROOM to shed one child
+    //     and still clear TARGET_DENSITY (reason (b) does not apply) — i.e. it should
+    //     have been merged. Each re-merge removes exactly one child, so the design
+    //     headroom test is (totalChildren − 1) ≥ TARGET_DENSITY × totalModules. At
+    //     the density floor exactly (our co2 case, 26/13) there is NO headroom, so
+    //     every sub-5 child is forgiven; a naïve revert to one-child-per-radical
+    //     OVER-splits above the floor, leaving headroom → its mergeable sub-5 children
+    //     are flagged. This catches gratuitous splitting while permitting the density-
+    //     required thin children the 2.0 floor demands.
+    let totalChildren = 0
+    let totalModules = 0
+    for (const m of (Array.isArray(split1?.modules) ? split1.modules : [])) {
+      totalModules++
+      totalChildren += (Array.isArray(m?.sub_modules) ? m.sub_modules : []).length
+    }
+    // Design headroom: can we shed ONE child and still clear the density floor?
+    const designHasDensityHeadroom = (totalChildren - 1) >= TARGET_DENSITY_DEFAULT * totalModules
+
     const cohorts = new Map<string, any[]>()
     for (const sub of eachSub(split1)) {
       const sp = sub?.split_parent_id
@@ -831,13 +1224,15 @@ function checkSubmoduleSplitterInvariants(): Assertion[] {
     }
     const avoidableSub5: string[] = []
     for (const [, children] of cohorts) {
+      // A cohort with a single child was kept whole (not split) — never gratuitous.
+      if (children.length < 2) continue
       const pooled = children.flatMap((c) => (Array.isArray(c?.words) ? c.words : []))
       const total = pooled.length
       const hasAc = pooled.some((w) => wordDomain(w) === 'ac')
       const hasDc = pooled.some((w) => wordDomain(w) === 'dc')
-      // The cohort is forced below the floor IFF its total content can't reach 5
-      // (<5 total), OR the content must be split across an ac/dc domain boundary
-      // that leaves one side <5. If neither holds, any sub-5 child is avoidable.
+      // The cohort is forced below the floor by DOMAIN IFF the content must be split
+      // across an ac/dc boundary that leaves one side <5 (total<5 can't arise here —
+      // a multi-child cohort pools ≥ its children's words).
       const dcCount = pooled.filter((w) => wordDomain(w) === 'dc').length
       const acCount = pooled.filter((w) => wordDomain(w) === 'ac').length
       const neutralCount = total - dcCount - acCount
@@ -852,16 +1247,18 @@ function checkSubmoduleSplitterInvariants(): Assertion[] {
       const cohortCanAllReachFloor = total >= 5 && !forcedFloorUnreachable
       for (const child of children) {
         const wc = (Array.isArray(child?.words) ? child.words : []).length
-        if (wc < 5 && cohortCanAllReachFloor) {
+        // GRATUITOUS = sub-5 AND cohort could merge to all-≥5 (not domain-forced)
+        // AND the design could absorb one fewer child without breaching density.
+        if (wc < 5 && cohortCanAllReachFloor && designHasDensityHeadroom) {
           avoidableSub5.push(`${child?.id} (${wc}w, parent ${child?.split_parent_id})`)
         }
       }
     }
     out.push(assertEq(
       'UNIVERSAL.splitter_never_emits_sub5_child_unless_unavoidable',
-      'splitter on CO₂ v12: every split child (carrying split_parent_id) has ≥5 words unless its sibling cohort cannot be re-packed all-≥5 without an ac_/dc_ conflict; avoidable sub-5 split children === 0',
+      `splitter on CO₂ v12: every split child (carrying split_parent_id) has ≥${MIN_CHILD_WORDS_DEFAULT} words UNLESS it is unavoidable — its cohort can't re-pack all-≥${MIN_CHILD_WORDS_DEFAULT} without an ac_/dc_ conflict, OR re-merging it would drop the design below the ${TARGET_DENSITY_DEFAULT} density floor (the two floors fight; density wins). Gratuitous sub-${MIN_CHILD_WORDS_DEFAULT} split children === 0`,
       avoidableSub5.length, (n) => n === 0,
-      () => `splitter emitted ${avoidableSub5.length} AVOIDABLE sub-5 split child(ren): ${avoidableSub5.slice(0, 4).join(' ; ')}. Check packGroupsIntoBins in scripts/lib/orchestrator/submodule-splitter.ts.`,
+      () => `splitter emitted ${avoidableSub5.length} GRATUITOUS sub-${MIN_CHILD_WORDS_DEFAULT} split child(ren) (design density ${totalModules ? (totalChildren / totalModules).toFixed(3) : '?'} has headroom above ${TARGET_DENSITY_DEFAULT}, so these could be merged): ${avoidableSub5.slice(0, 4).join(' ; ')}. Check packGroupsIntoBins / the density budget in scripts/lib/orchestrator/submodule-splitter.ts.`,
     ))
 
     // (2) content + MPN preservation.
@@ -4256,6 +4653,74 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // ── UNIVERSAL.gate18_strong_qualifier_splits_no_mask ──────────────────────
+  // Guards the 2026-06-05 gate-18 three strong-qualifier splits added after the
+  // co2-mineralisation-2sink-v6 false positives:
+  //   1. SHELL-vs-HEAD mass — a vessel's cylindrical shell mass (685.079 kg) and
+  //      its flat-head/heads mass (231.961 kg) are distinct components, not a
+  //      contradiction; the shape lexeme (cylindrical/shell vs flat-head/head)
+  //      is now STRONG and splits them.
+  //   2. MULTI-VOLTAGE three-phase current — I = S/(√3×V) at 11 kV primary
+  //      (41.99 A) vs 400 V secondary (1,154.7 A) is two quantities; the √3
+  //      voltage operand + derated/target flag split them.
+  //   3. ACHIEVED-vs-CAP mass — a "Maximum gross mass 40,000 kg" cap and the
+  //      achieved "12,250 kg" beside it on the cover KPI card are the limit vs
+  //      the result; the adjacency-gated constraint role splits them.
+  // Runs the REAL extractOccurrences → cluster → buildFindings on synthetic page
+  // text. CRITICAL anti-neuter clauses assert genuine contradictions STILL fire
+  // HIGH: a same-role usable-energy gap (3.5 vs 2.69 MWh — the BESS L22 bug the
+  // gate exists for) and a SAME-voltage current gap (1,154.7 vs 1,300 A at 400 V)
+  // must both stay HIGH. A strong qualifier may only SPLIT (cut false positives),
+  // never MERGE/MASK, so both directions are asserted.
+  {
+    const highCountFor = (pages: Record<number, string>): number => {
+      const all: ReturnType<typeof gate18ExtractOccurrences> = []
+      for (const [p, text] of Object.entries(pages)) all.push(...gate18ExtractOccurrences(text, Number(p)))
+      const { findings } = gate18BuildFindings(gate18Cluster(all))
+      return findings.filter((f) => f.severity === 'HIGH').length
+    }
+    // FALSE positives — must be 0 HIGH after the fix.
+    const fpShellHead = highCountFor({
+      1: 'cylinder wall mass mass = pi x (759.5^2 - 751.5^2) x 2,255 x 8,000 / 1e9 = 685.079 kg assumes: material steel_316L; cylindrical shell only; heads computed separately',
+      2: 'head mass (2 flat-plate heads) mass = 2 x pi x 759.5^2 x 8 x 8,000 / 1e9 = 231.961 kg assumes: flat-head approximation (conservative)',
+      3: 'cylinder wall mass mass = pi x (759.5^2 - 751.5^2) x 2,255 x 8,000 / 1e9 = 685.079 kg assumes: material steel_316L; cylindrical shell',
+    })
+    const fpMultiV = highCountFor({
+      1: 'primary line current I = S x 1000 / (sqrt(3) x U_LL) I = 800 x 1000 / (sqrt(3) x 11,000) = 41.99 A assumes: three-phase line current',
+      2: 'secondary line current I = S x 1000 / (sqrt(3) x U_LL) I = 800 x 1000 / (sqrt(3) x 400) = 1,154.7 A assumes: three-phase line current',
+    })
+    const fpAchievedCap = highCountFor({
+      1: 'physical specification Maximum gross mass 40,000 kg operating temperature',
+      2: 'design achieved Max gross mass 40,000 kg 12,250 kg PASS -69% CO2 capture',
+    })
+    // TRUE contradictions — must STILL be ≥1 HIGH (anti-neuter).
+    const trueEnergy = highCountFor({
+      1: 'USABLE ENERGY CAPACITY the system delivers 3.5 MWh of usable energy to the grid',
+      2: 'Mission the design delivers 2.69 MWh of usable energy after conversion losses',
+      3: 'Module 4 the pack provides 2.69 MWh of usable energy at the point of connection',
+    })
+    const trueSameVoltage = highCountFor({
+      1: 'secondary line current I = 800 x 1000 / (sqrt(3) x 400) = 1,154.7 A assumes: three-phase line current',
+      2: 'secondary line current I = 900 x 1000 / (sqrt(3) x 400) = 1,300 A assumes: three-phase line current',
+    })
+    // Pure helper directional checks.
+    const sigA = currentCalcSignatureOf({ wideWindow: '(sqrt(3) x 11,000) = \f assumes' })
+    const sigB = currentCalcSignatureOf({ wideWindow: '(sqrt(3) x 400) = \f assumes' })
+    const sigDifferByVoltage = sigA !== '' && sigB !== '' && sigA !== sigB
+    const cstrCap = constraintRoleOf({ preTokens: ['Maximum', 'gross', 'mass'], postTokens: [] } as any)
+    const cstrAchieved = constraintRoleOf({ preTokens: ['Max', 'gross', 'mass', '40', '000', 'kg'], postTokens: [] } as any)
+    const cstrSplits = cstrCap === 'constraint' && cstrAchieved === ''
+    const ok = fpShellHead === 0 && fpMultiV === 0 && fpAchievedCap === 0 &&
+      trueEnergy >= 1 && trueSameVoltage >= 1 && sigDifferByVoltage && cstrSplits
+    assertions.push(assertEq(
+      'UNIVERSAL.gate18_strong_qualifier_splits_no_mask',
+      'gate-18 strong-qualifier splits (shell≠head mass, multi-voltage current, achieved≠cap mass) drop the co2-mineralisation-v6 false positives to 0 HIGH while a same-role usable-energy gap (3.5 vs 2.69 MWh) and a SAME-voltage current gap (1154.7 vs 1300 A @ 400 V) STILL fire HIGH — guards the 2026-06-05 fix never masks a real contradiction',
+      ok,
+      (v: boolean) => v === true,
+      () => `fpShellHead=${fpShellHead} fpMultiV=${fpMultiV} fpAchievedCap=${fpAchievedCap} (all want 0); trueEnergy=${trueEnergy} trueSameVoltage=${trueSameVoltage} (both want >=1); sigDifferByVoltage=${sigDifferByVoltage} cstrSplits=${cstrSplits} (cap=${cstrCap} achieved=${cstrAchieved})`,
+    ))
+  }
+
   // ── UNIVERSAL.discover_skips_material_words ───────────────────────────────
   // Guards the 2026-06-01 discover-on-miss blank-word brander (fillBlankWordMpns).
   // The coding-council BLOCKER: the catalogue-vs-structure filter must NOT try to
@@ -5802,6 +6267,62 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     assertions.push({ id: 'UNIVERSAL.normalise_unicode_strips_gate11_glyphs', description: 'gate-11 glyph sanitiser', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
+  // ── gate-17: compliance matcher is ROBUST to brief-parser unit-suffix variance
+  //    (2026-06-05) ──────────────────────────────────────────────────────────
+  //
+  // UNIVERSAL.compliance_matcher_resolves_unit_variant_capture_capacity — the
+  // brief parser is non-deterministic on the unit SUFFIX it appends to a metric
+  // key: the SAME "1 t/day CO₂ capture" sentence parses as co2_capture_capacity_tpd
+  // one run and co2_capture_capacity_kg_per_day the next, while the contract emits
+  // the achieved value under a DIFFERENT stem (capture_capacity_tco2_per_day). The
+  // exact-key METRIC_MAP missed the _tpd variant → the row rendered an evasive "—"
+  // instead of a real PASS (co2-mineralisation-2sink-v5: "9 of 16 verified" with the
+  // 4 output/capture rows unverified). FIX 1 added a unit-suffix-AGNOSTIC semantic
+  // resolver (unit-stripped base + concept-synonym map + rate-family conversion).
+  // This guards it: a _tpd-keyed capture-capacity brief metric + a _tco2_per_day
+  // contract quantity MUST resolve to a real PASS row with the achieved value — and
+  // it must NOT auto-PASS a raw feedstock (gypsum) the contract can't back. Pure,
+  // snapshot-independent (synthetic minimal state).
+  try {
+    const synthState: any = {
+      parsedBrief: { constraints: { target_performance: { metrics: [
+        { key_metric: 'co2_capture_capacity_tpd',    value: 1,   unit: 't/day', category: 'scale' },
+        { key_metric: 'calcium_carbonate_output_tpd', value: 2.3, unit: 't/day', category: 'scale' },
+        { key_metric: 'co2_capture_rate_kg_per_h',    value: 42,  unit: 'kg/h',  category: 'scale' },
+        { key_metric: 'gypsum_feed_tpd',              value: 3.1, unit: 't/day', category: 'scale' },
+      ] } } },
+      orchestratorContract: { quantities: {
+        capture_capacity_tco2_per_day: { value: 1,     unit: 't/day' },
+        caco3_output_t_per_day:        { value: 2.3,   unit: 't/day' },
+        co2_capture_rate_kg_per_hour:  { value: 41.67, unit: 'kg/h'  },
+        gypsum_feed_t_day:             { value: 3.91,  unit: 't/day' },  // stoichiometric — NOT the brief's 3.1
+      } },
+    }
+    const rows: any[] = _buildComplianceRows(synthState, null) as any[]
+    const findRow = (frag: string) => rows.find((r) => String(r?.constraint ?? '').toLowerCase().includes(frag))
+    const cap = findRow('capture capacity')
+    const caco3 = findRow('caco')
+    const rate = findRow('capture rate')
+    const gypsum = findRow('gypsum')
+    // The three design-OUTPUTs resolve to a real PASS (achieved value shown, not "—").
+    const outputsPass =
+      cap?.status === 'pass' && String(cap?.designAchieved ?? '').includes('1') && !String(cap?.designAchieved).startsWith('—') &&
+      caco3?.status === 'pass' && String(caco3?.designAchieved ?? '').includes('2.3') &&
+      rate?.status === 'pass' && /41\.67|42/.test(String(rate?.designAchieved ?? ''))
+    // The raw feedstock is NOT force-PASSed off a stoichiometric mismatch (3.91 ≠ 3.1):
+    // it renders as the grounded-correction 'unknown' row, never a green 'pass'.
+    const feedstockNotFalsePass = !gypsum || gypsum.status !== 'pass'
+    assertions.push(assertEq(
+      'UNIVERSAL.compliance_matcher_resolves_unit_variant_capture_capacity',
+      'gate-17: a _tpd / _kg_per_h-keyed capture-capacity / CaCO₃ / rate brief metric resolves to a real PASS row via the unit-suffix-agnostic semantic matcher (not an evasive "—"); a raw feedstock with no backable achieved (gypsum 3.91≠brief 3.1) is NOT force-PASSed',
+      outputsPass && feedstockNotFalsePass,
+      (v) => v === true,
+      () => `semantic resolver regressed: capture=${JSON.stringify(cap)} caco3=${JSON.stringify(caco3)} rate=${JSON.stringify(rate)} gypsum=${JSON.stringify(gypsum)}. A _tpd-suffixed brief metric must map to the _tco2_per_day/_t_per_day contract quantity (unit-stripped base + concept synonym in render-minimal-pdf.tsx _resolveSemanticConcept), and gypsum must stay the grounded-correction 'unknown'.`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.compliance_matcher_resolves_unit_variant_capture_capacity', description: 'gate-17 unit-variant resolver', passed: false, detail: `threw: ${String(err).slice(0, 200)}` })
+  }
+
   // ── task #39/#38: HARD mass constraint never silently dropped (2026-06-03) ───
   //
   // UNIVERSAL.mass_constraint_row_present_when_brief_states_cap — when the brief
@@ -6396,6 +6917,15 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // load the CO₂ v12 fixture themselves + a synthetic ac/dc design; memoised so
   // the fixture is read once per harness run (not per snapshot).
   for (const a of checkSubmoduleSplitterInvariants()) assertions.push(a)
+
+  // Self-contained advisor-engagement generator invariants — synthetic states,
+  // memoised; guards the deterministic grounding spine + the design-only guard.
+  for (const a of checkAdvisorEngagementInvariants()) assertions.push(a)
+
+  // Self-contained render-side fix invariants (2026-06-05): exact-repeat
+  // worked-calc collapse keys + Executive-Summary prose grammaticality /
+  // breach-consistency. Pure functions on synthetic inputs, memoised.
+  for (const a of checkDedupAndExecSummaryInvariants()) assertions.push(a)
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
