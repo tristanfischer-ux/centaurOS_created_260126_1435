@@ -3921,11 +3921,21 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
         <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
           Engagement Plan — who to speak to
         </Text>
-        <Text style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
+        <Text style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 10 }}>
           Each module&#8217;s design questions below, grouped by the specialist who should answer them; this is your outreach
           checklist for expert validation.
         </Text>
-        <View style={{ height: 0.8, backgroundColor: RULE, marginTop: 8, marginBottom: 8 }} />
+        {/* The single section-level call-to-action (replaces the per-card "Book a
+            call" footer that used to repeat on all ~22 cards). House callout idiom:
+            neutral #eef4fb tint + a single ACCENT left-rule, matching
+            AboutThisDocumentCallout. ONE instance for the whole section. */}
+        <View style={{ backgroundColor: '#eef4fb', borderLeftWidth: 3, borderLeftColor: ACCENT, padding: 11, marginBottom: 14, borderRadius: 3 }}>
+          <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: ACCENT }}>Don&#8217;t have these specialists? </Text>
+            Fractional Forge can introduce you to vetted specialists for any of the roles below &#8212; get in touch and we&#8217;ll
+            put the right people in front of the open questions.
+          </Text>
+        </View>
         {blocks.map((block, bi) => {
           const moduleName = britishise(normalise_unicode(String(block?.module_name ?? '').trim())) ||
             humanise(String(block?.module_id ?? ''))
@@ -3934,23 +3944,26 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
             // The module sub-heading + its first card stay together (minPresenceAhead,
             // NOT wrap={false}) so a heading is never orphaned at a page foot and the
             // growing card stack page-breaks cleanly — the gate-11 overlap-safe idiom.
-            <View key={`engplan-mod-${bi}`} style={{ marginTop: bi > 0 ? 14 : 4 }} minPresenceAhead={150}>
-              <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: ADV_MUTED, letterSpacing: 0.8, marginBottom: 2 }}>
+            // House style: MUTED module label + ACCENT module heading + a thin RULE
+            // under the heading (matches the SubHead / Section-intro treatment); the
+            // cards are NOT boxed in a green border — they flow as ink-on-white with
+            // the per-card neutral header panel carrying the visual separation.
+            <View key={`engplan-mod-${bi}`} style={{ marginTop: bi > 0 ? 16 : 2 }} minPresenceAhead={150}>
+              <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.8, marginBottom: 2 }}>
                 MODULE {String(bi + 1)}
               </Text>
-              <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 6 }}>
+              <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>
                 {moduleName}
               </Text>
+              <View style={{ height: 0.6, backgroundColor: RULE_SOFT, marginBottom: 8 }} />
               {block.intro ? (
-                <Text style={{ fontSize: 8.5, color: ADV_MUTED, lineHeight: 1.4, marginBottom: 8 }}>
+                <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45, marginBottom: 10 }}>
                   {britishise(normalise_unicode(String(block.intro)))}
                 </Text>
               ) : null}
-              <View style={{ borderWidth: 0.8, borderColor: ADV_GREEN_LINE, borderRadius: 5, overflow: 'hidden' }}>
-                {cards.map((card, ci) => (
-                  <AdvisorSpecialistCard key={`engplan-card-${bi}-${ci}`} card={card} cardNo={ci + 1} />
-                ))}
-              </View>
+              {cards.map((card, ci) => (
+                <AdvisorSpecialistCard key={`engplan-card-${bi}-${ci}`} card={card} cardNo={ci + 1} />
+              ))}
             </View>
           )
         })}
@@ -8496,53 +8509,54 @@ function ModuleDesignTradeOffsBlock({ state, moduleId }: { state: any; moduleId:
 // ── "Take this to your advisors" advisor block (2026-06-05) ─────────────────────
 //
 // Renders state.advisorEngagement[<moduleId>#<index>] at the END of each module's
-// section, matching the APPROVED mockup (mockups/co2-module-advisor-block-
-// mockup.html): a header, an intro, then one to three SPECIALIST CARDS. Each card:
-// "The specialist you need" → role → background → "Typically at" (company type) →
-// "Covers" → "What to ask them" (numbered questions, each with the open-item it is
-// grounded in + a green "What a strong answer looks like" callout) → a "Book a call
-// with Tristan" footer. LIGHT MODE only, inline styles, British spelling, no
-// acronyms (the generator's prompt enforces this in the copy). Every card is
-// wrap={false}; the whole block is try/catch-guarded and returns null on error so
-// a render fault never crashes the page. Colours mirror the mockup's light-mode
-// idiom mapped onto the dossier palette (ACCENT navy for headers, a green family
-// for the strong-answer callout, a blue family for the specialist-who panel).
+// section: a header, an intro with ONE section-level call-to-action, then per
+// module a heading and one to three SPECIALIST CARDS. Each card: role → background
+// → "Typically at" (company type) → "Covers" → "What to ask them" (numbered
+// questions, each with the open-item it is grounded in + a quiet "A strong answer"
+// sub-note). LIGHT MODE only, inline styles, British spelling, no acronyms (the
+// generator's prompt enforces this in the copy). Every question row is wrap={false};
+// the whole block is try/catch-guarded and returns null on error so a render fault
+// never crashes the page.
+//
+// 2026-06-05 house-style restyle (founder feedback): the cards used to use the
+// approved mockup's SATURATED blue specialist panels + green strong-answer callouts
+// + a per-card "Book a call with Fractional Forge" footer — which read like a
+// different template and repeated the call-to-action ~22 times. The cards now use
+// the dossier's restrained ink + single-ACCENT + thin-RULE_SOFT treatment (neutral
+// #f7f8fa header panel with an ACCENT left-rule, the strong answer as a muted italic
+// sub-note); the call-to-action is a SINGLE house callout in the section intro.
 
-// Advisor-block palette — light-mode, drawn from the mockup, kept distinct from the
-// global INK/ACCENT so the block reads as the mockup's design while sitting inside
-// the dossier. All pale fills (no dark panels).
+// Advisor-block palette — only the per-module POINTER (ModuleAdvisorBlock) still
+// uses a small green family for its one-line "Validate this design with: …" rule;
+// the consolidated Section-13 cards use the global INK/ACCENT/RULE_SOFT tokens.
 const ADV_GREEN = '#1f6f54'
-const ADV_GREEN_SOFT = '#e7f1ec'
 const ADV_GREEN_LINE = '#cfe5db'
-const ADV_BLUE = '#1d4e79'
-const ADV_BLUE_SOFT = '#e9f1f8'
-const ADV_BLUE_LINE = '#cfe0ef'
 const ADV_MUTED = '#5b6671'
 
 function AdvisorQuestionRow({ n, question, groundedIn, strongAnswer }: { n: number; question: string; groundedIn: string; strongAnswer: string }) {
-  // Compacted to the mockup's density (2026-06-05): tighter row padding, smaller
-  // counter, smaller fonts + line-height so a whole advisor block stays ≤ ~0.7
-  // page. Structure unchanged (number → question → grounded → strong-answer).
+  // 2026-06-05 house-style restyle (founder feedback: the saturated blue/green
+  // panels looked like a different template). Now matches the dossier's restrained
+  // ink + single-accent + thin-rule treatment used by Cost Methodology / Taking
+  // this forward: a small ACCENT numeral, the question in INK, the "grounded in"
+  // trace as a MUTED sub-line, and the expected answer as a QUIET italic sub-note
+  // (not a loud green box). Structure unchanged (number → question → grounded →
+  // strong-answer); only the palette/weight changed.
   return (
-    <View style={{ flexDirection: 'row', paddingVertical: 5, borderTopWidth: 0.6, borderTopColor: '#eef2f6' }} wrap={false}>
-      <View style={{ width: 15, height: 15, borderRadius: 7.5, backgroundColor: ADV_BLUE_SOFT, alignItems: 'center', justifyContent: 'center', marginRight: 7, marginTop: 0.5 }}>
-        <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: ADV_BLUE }}>{String(n)}</Text>
-      </View>
+    <View style={{ flexDirection: 'row', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: RULE_SOFT }} wrap={false}>
+      <Text style={{ width: 14, fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, lineHeight: 1.35, marginTop: 0.5 }}>{String(n)}</Text>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 8.5, color: INK, lineHeight: 1.35 }}>{britishise(normalise_unicode(question))}</Text>
+        <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4 }}>{britishise(normalise_unicode(question))}</Text>
         {groundedIn ? (
-          <Text style={{ fontSize: 7, color: ADV_MUTED, lineHeight: 1.3, marginTop: 2 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold', color: '#39424c' }}>Grounded in: </Text>
+          <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.35, marginTop: 2 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Grounded in: </Text>
             {britishise(normalise_unicode(groundedIn))}
           </Text>
         ) : null}
         {strongAnswer ? (
-          <View style={{ marginTop: 3, paddingVertical: 4, paddingHorizontal: 7, backgroundColor: ADV_GREEN_SOFT, borderLeftWidth: 2, borderLeftColor: ADV_GREEN, borderRadius: 2 }}>
-            <Text style={{ fontSize: 7.5, color: '#34403a', lineHeight: 1.3 }}>
-              <Text style={{ fontFamily: 'Helvetica-Bold', color: ADV_GREEN }}>Strong answer — </Text>
-              {britishise(normalise_unicode(strongAnswer))}
-            </Text>
-          </View>
+          <Text style={{ fontSize: 7.5, color: MUTED, fontFamily: 'Helvetica-Oblique', lineHeight: 1.35, marginTop: 2 }}>
+            <Text style={{ fontFamily: 'Helvetica-BoldOblique', color: INK_SOFT }}>A strong answer — </Text>
+            {britishise(normalise_unicode(strongAnswer))}
+          </Text>
         ) : null}
       </View>
     </View>
@@ -8553,40 +8567,46 @@ function AdvisorSpecialistCard({ card, cardNo }: { card: AdvisorCard; cardNo: nu
   const questions = Array.isArray(card?.questions) ? card.questions : []
   if (questions.length === 0) return null
   return (
-    // minPresenceAhead keeps the specialist-who header with at least its first
-    // question; the card flows + page-breaks cleanly for the rest (growing
-    // content → never wrap={false} on the whole card, per the layout-overlap
-    // lesson). Each question row is itself wrap={false}.
-    <View style={{ borderTopWidth: cardNo > 1 ? 4 : 0, borderTopColor: '#eef2f6' }} minPresenceAhead={120}>
-      {/* The specialist-who panel (pale blue) — compacted to the mockup density */}
-      <View style={{ paddingVertical: 7, paddingHorizontal: 10, backgroundColor: ADV_BLUE_SOFT, borderBottomWidth: 0.8, borderBottomColor: ADV_BLUE_LINE }}>
-        <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: ADV_BLUE, letterSpacing: 0.5, marginBottom: 3 }}>
-          {String(cardNo)} · THE SPECIALIST YOU NEED
+    // 2026-06-05 house-style restyle. The specialist header is now the dossier's
+    // canonical light panel (neutral #f7f8fa tint + a single ACCENT left-rule —
+    // the same idiom as AboutThisDocumentCallout and the Physical-specification
+    // block), NOT a saturated blue panel; the per-card "Book a call with Fractional
+    // Forge" footer is GONE (one section-level call-to-action lives in the
+    // EngagementPlanPage intro instead). minPresenceAhead keeps the specialist
+    // header with at least its first question; the card flows + page-breaks cleanly
+    // for the rest (growing content → never wrap={false} on the whole card, per the
+    // layout-overlap lesson). Each question row is itself wrap={false}. Cards within
+    // a module are separated by a thin house rule (RULE_SOFT), not a 4-px slab.
+    <View style={{ marginTop: cardNo > 1 ? 12 : 0, paddingTop: cardNo > 1 ? 12 : 0, borderTopWidth: cardNo > 1 ? 0.6 : 0, borderTopColor: RULE_SOFT }} minPresenceAhead={120}>
+      {/* The specialist header — house neutral-tint panel with a single accent rule */}
+      <View style={{ paddingVertical: 8, paddingHorizontal: 11, backgroundColor: '#f7f8fa', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 3 }}>
+        <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.6, marginBottom: 3 }}>
+          SPECIALIST {String(cardNo)}
         </Text>
-        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>
+        <Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>
           {britishise(normalise_unicode(String(card.specialist_role ?? '')))}
         </Text>
         {card.background ? (
-          <Text style={{ fontSize: 8, color: '#2c353d', lineHeight: 1.35, marginBottom: 4 }}>
+          <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.4, marginBottom: card.typically_at || card.covers ? 4 : 0 }}>
             {britishise(normalise_unicode(String(card.background)))}
           </Text>
         ) : null}
         {card.typically_at ? (
-          <View style={{ flexDirection: 'row', backgroundColor: '#ffffff', borderWidth: 0.6, borderColor: ADV_BLUE_LINE, borderRadius: 3, paddingVertical: 4, paddingHorizontal: 7, marginBottom: card.covers ? 4 : 0 }}>
-            <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: ADV_BLUE, letterSpacing: 0.4, width: 48, marginTop: 0.5 }}>TYPICALLY AT</Text>
-            <Text style={{ flex: 1, fontSize: 8, color: '#33414e', lineHeight: 1.3 }}>{britishise(normalise_unicode(String(card.typically_at)))}</Text>
-          </View>
+          <Text style={{ fontSize: 8, color: MUTED, lineHeight: 1.35 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Typically at: </Text>
+            {britishise(normalise_unicode(String(card.typically_at)))}
+          </Text>
         ) : null}
         {card.covers ? (
-          <Text style={{ fontSize: 7, color: ADV_MUTED, lineHeight: 1.3 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold', color: '#39424c' }}>Covers: </Text>
+          <Text style={{ fontSize: 8, color: MUTED, lineHeight: 1.35, marginTop: 1 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Covers: </Text>
             {britishise(normalise_unicode(String(card.covers)))}
           </Text>
         ) : null}
       </View>
       {/* What to ask them */}
-      <View style={{ paddingHorizontal: 10, paddingTop: 3, paddingBottom: 2 }}>
-        <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: ADV_MUTED, letterSpacing: 0.5, marginTop: 4, marginBottom: 1 }}>
+      <View style={{ paddingHorizontal: 3, paddingTop: 2 }}>
+        <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.6, marginTop: 6, marginBottom: 2 }}>
           WHAT TO ASK THEM
         </Text>
         {questions.map((q, qi) => (
@@ -8598,16 +8618,6 @@ function AdvisorSpecialistCard({ card, cardNo }: { card: AdvisorCard; cardNo: nu
             strongAnswer={String(q?.strong_answer ?? '')}
           />
         ))}
-      </View>
-      {/* Book-a-call footer (per card, matching the mockup) */}
-      <View style={{ marginHorizontal: 10, marginTop: 6, marginBottom: 8, paddingVertical: 6, paddingHorizontal: 10, backgroundColor: ADV_GREEN_SOFT, borderWidth: 0.6, borderColor: ADV_GREEN_LINE, borderRadius: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} wrap={false}>
-        <Text style={{ flex: 1, fontSize: 7.5, color: '#2c4034', lineHeight: 1.3, paddingRight: 8 }}>
-          <Text style={{ fontFamily: 'Helvetica-Bold', color: ADV_GREEN }}>Don&apos;t have this specialist? </Text>
-          Fractional Forge can put a vetted specialist in front of this part of the design.
-        </Text>
-        <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#ffffff', backgroundColor: ADV_GREEN, paddingVertical: 4, paddingHorizontal: 9, borderRadius: 3 }}>
-          Book a call with Fractional Forge
-        </Text>
       </View>
     </View>
   )

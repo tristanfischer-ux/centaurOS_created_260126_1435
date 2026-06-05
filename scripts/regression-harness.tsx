@@ -1060,6 +1060,58 @@ function checkAdvisorEngagementInvariants(): Assertion[] {
     ))
   }
 
+  // ── (4) one section call-to-action, not one per card ── (2026-06-05 house-style restyle)
+  // Founder feedback: the per-specialist-card "Book a call with Fractional Forge"
+  // footer repeated on all ~22 cards and the saturated blue/green panels looked like
+  // a different template. The restyle (a) removes the per-card call-to-action — the
+  // AdvisorSpecialistCard body must carry NO "Book a call" / "introduce you to vetted
+  // specialists" string — and (b) places exactly ONE section-level call-to-action in
+  // the EngagementPlanPage intro. This source-structural guard fails if the per-card
+  // footer is re-added OR the single section CTA is duplicated/lost. Comment lines are
+  // stripped before testing so the explanatory comments (which mention the old phrase)
+  // do not trip it. Snapshot-independent.
+  {
+    const bad: string[] = []
+    try {
+      const rmpSrc = readFileSync(resolve(__dirname, 'render-minimal-pdf.tsx'), 'utf-8')
+      // Strip whole-line `//` comments so an explanatory comment mentioning the old
+      // footer phrase is not counted as a rendered occurrence.
+      const stripComments = (s: string): string =>
+        s.split('\n').filter((ln) => !/^\s*\/\//.test(ln)).join('\n')
+      const sliceFn = (name: string): string => {
+        const start = rmpSrc.indexOf(`function ${name}(`)
+        if (start < 0) return ''
+        const next = rmpSrc.indexOf('\nfunction ', start + 1)
+        return stripComments(rmpSrc.slice(start, next < 0 ? undefined : next))
+      }
+      const card = sliceFn('AdvisorSpecialistCard')
+      const engagementPlan = sliceFn('EngagementPlanPage')
+      const countOccurrences = (hay: string, needle: string): number => hay.split(needle).length - 1
+      if (!card) bad.push('AdvisorSpecialistCard function not found in render-minimal-pdf.tsx')
+      if (!engagementPlan) bad.push('EngagementPlanPage function not found in render-minimal-pdf.tsx')
+      // (a) the per-card footer must be GONE from the specialist card.
+      if (card && /Book a call/.test(card)) {
+        bad.push('AdvisorSpecialistCard still renders a "Book a call" footer — the per-card call-to-action must be removed (one section-level CTA lives in EngagementPlanPage)')
+      }
+      if (card && /introduce you to vetted specialists/.test(card)) {
+        bad.push('AdvisorSpecialistCard renders the section call-to-action copy — the CTA belongs once in the EngagementPlanPage intro, not on every card')
+      }
+      // (b) exactly ONE section call-to-action in the consolidated section.
+      const ctaCount = engagementPlan ? countOccurrences(engagementPlan, 'introduce you to vetted specialists') : 0
+      if (engagementPlan && ctaCount !== 1) {
+        bad.push(`EngagementPlanPage has ${ctaCount} section call-to-action instances (expected exactly 1: "Fractional Forge can introduce you to vetted specialists …")`)
+      }
+    } catch (err) {
+      bad.push(`could not read render-minimal-pdf.tsx: ${String(err).slice(0, 100)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.engagement_plan_single_call_to_action',
+      'the Engagement Plan carries exactly one section-level call-to-action; the specialist cards carry none (no per-card "Book a call" footer)',
+      bad.length, (n) => n === 0,
+      () => `engagement-plan CTA regressed: ${bad.join(' ; ')}. Keep the single Fractional-Forge call-to-action in the EngagementPlanPage intro; AdvisorSpecialistCard must render no call-to-action.`,
+    ))
+  }
+
   // ── Phase-2 density-repair must NOT fabricate filler words ── (2026-06-05)
   // The reviewer-repair prompt used to order "emit NEW words until each sub-module
   // reaches >=5 words"; gate-20 forbids new part_number words, so the LLM could only
