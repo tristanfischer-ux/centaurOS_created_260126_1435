@@ -100,57 +100,135 @@ TANK_H = 1.50
 RECOVERY_X, RECOVERY_Y, RECOVERY_Z = 4.55, -0.55, 2.10  # MEA recovery distillation
 
 
-# ═══════ Module — structure_containment: skid frame, walkway, ladder ════════
-# Base channels around the 0..6 m x -1.2..+1.2 m footprint.
+# ═══════ Module — structure_containment: OPEN SKID FRAME, deck, walkway, ladder
+# This plant is a TRANSPORTABLE SKID MODULE — an OPEN structural-steel skid
+# frame (corner posts + perimeter rails + diagonal cross-bracing on a structural
+# deck), NOT an enclosed/glass container. The hero pass paints these members
+# SOLID galvanised steel (hero_open_frame=True at run_render_pipeline) so the
+# frame reads as braced steelwork, not a translucent shipping box.
+
+# ── Skid BASE: structural sole-plate channels + longitudinal bearers ─────────
+# Perimeter sole-plate (the equipment sits ON this skid deck — a clear datum).
 for name, loc, size in [
-    ("co1_base_front_channel", (W / 2, -1.12, 0.06), (W, 0.10, 0.12)),
-    ("co1_base_rear_channel", (W / 2, 1.12, 0.06), (W, 0.10, 0.12)),
-    ("co1_base_left_channel", (0.05, 0.0, 0.06), (0.10, D, 0.12)),
-    ("co1_base_right_channel", (W - 0.05, 0.0, 0.06), (0.10, D, 0.12)),
+    ("co1_base_front_channel", (W / 2, -1.12, 0.08), (W, 0.14, 0.18)),
+    ("co1_base_rear_channel", (W / 2, 1.12, 0.08), (W, 0.14, 0.18)),
+    ("co1_base_left_channel", (0.07, 0.0, 0.08), (0.14, D, 0.18)),
+    ("co1_base_right_channel", (W - 0.07, 0.0, 0.08), (0.14, D, 0.18)),
 ]:
     fl.add_box(name, loc, size, MAT["stainless"], "structure_containment", MO)
 
-for i, x in enumerate([1.0, 2.0, 3.0, 4.0, 5.0]):
-    fl.add_box(f"co1_base_crossmember_{i}", (x, 0.0, 0.12), (0.08, 2.20, 0.08),
+# Two longitudinal I-beam bearers running the length of the skid (the spine the
+# vessels are bolted down to) — reads as the structural deck the plant sits on.
+for by in (-0.62, 0.62):
+    fl.add_box(f"co1_base_bearer_{by:+.2f}", (W / 2, by, 0.10), (W - 0.2, 0.12, 0.16),
+               MAT["stainless"], "structure_containment", MO)
+# Transverse deck cross-members tie the two bearers (skid deck grid).
+for i, x in enumerate([0.6, 1.4, 2.2, 3.0, 3.8, 4.6, 5.4]):
+    fl.add_box(f"co1_base_crossmember_{i}", (x, 0.0, 0.10), (0.10, 2.20, 0.14),
+               MAT["stainless"], "structure_containment", MO)
+# ISO-style fork/crane lift lugs at the four base corners (transportable skid).
+for i, (lx, ly) in enumerate([(0.18, -1.12), (0.18, 1.12), (W - 0.18, -1.12), (W - 0.18, 1.12)]):
+    fl.add_box(f"co1_skid_lift_lug_{i}", (lx, ly, 0.20), (0.16, 0.10, 0.10),
                MAT["stainless"], "structure_containment", MO)
 
-# Eight 90 mm square posts (taller skid → intermediate posts mid-span).
+# ── Open frame: corner + intermediate posts (90 mm box section) ──────────────
 for i, (x, y) in enumerate([
     (0.09, -1.12), (0.09, 1.12), (3.0, -1.12), (3.0, 1.12),
     (W - 0.09, -1.12), (W - 0.09, 1.12),
 ]):
-    fl.add_box(f"co1_corner_post_{i}", (x, y, H / 2), (0.09, 0.09, H),
+    fl.add_box(f"co1_corner_post_{i}", (x, y, H / 2), (0.10, 0.10, H),
                MAT["stainless"], "structure_containment", MO)
 
 # Top perimeter frame.
 for name, loc, size in [
-    ("co1_top_front_channel", (W / 2, -1.12, H - 0.05), (W, 0.08, 0.08)),
-    ("co1_top_rear_channel", (W / 2, 1.12, H - 0.05), (W, 0.08, 0.08)),
-    ("co1_top_left_channel", (0.05, 0.0, H - 0.05), (0.08, D, 0.08)),
-    ("co1_top_right_channel", (W - 0.05, 0.0, H - 0.05), (0.08, D, 0.08)),
+    ("co1_top_front_channel", (W / 2, -1.12, H - 0.05), (W, 0.10, 0.10)),
+    ("co1_top_rear_channel", (W / 2, 1.12, H - 0.05), (W, 0.10, 0.10)),
+    ("co1_top_left_channel", (0.05, 0.0, H - 0.05), (0.10, D, 0.10)),
+    ("co1_top_right_channel", (W - 0.05, 0.0, H - 0.05), (0.10, D, 0.10)),
 ]:
     fl.add_box(name, loc, size, MAT["stainless"], "structure_containment", MO)
 
-# Mid-height tie ring to brace the tall columns.
-fl.add_box("co1_mid_tie_front", (W / 2, -1.12, 2.0), (W, 0.06, 0.06),
+# Mid-height perimeter tie ring (braces the tall columns + frames the bays).
+fl.add_box("co1_mid_tie_front", (W / 2, -1.12, 2.0), (W, 0.07, 0.07),
            MAT["stainless"], "structure_containment", MO)
-fl.add_box("co1_mid_tie_rear", (W / 2, 1.12, 2.0), (W, 0.06, 0.06),
+fl.add_box("co1_mid_tie_rear", (W / 2, 1.12, 2.0), (W, 0.07, 0.07),
            MAT["stainless"], "structure_containment", MO)
 
-# Service walkway on -Y side at deck height, with grating slats.
-fl.add_box("co1_service_walkway_plate", (W / 2, -0.95, 0.20), (5.7, 0.40, 0.05),
+# ── Diagonal CROSS-BRACING — the unambiguous "open structural frame" signal ──
+# Knee/V braces in the two end bays (front + rear faces) + a sway brace on each
+# open end. Drawn with add_pipe between EXACT frame node points so the members
+# snap to the corners and never overshoot the bay (the rotation-maths version
+# overshot). A braced open frame reads instantly as structural steelwork.
+BRACE_R = 0.035
+Z_BOT = 0.18      # brace foot just above the sole-plate
+Z_TOP = H - 0.10  # brace head just below the top rail
+# Front + rear faces: a V-brace (apex at mid-span bottom-rail, feet at the two
+# top corners) in the LEFT end bay (x 0.1→1.0) and RIGHT end bay (x 5.0→5.9).
+for bx0, bx1, tag in [(0.12, 1.0, "L"), (W - 1.0, W - 0.12, "R")]:
+    bxm = (bx0 + bx1) / 2
+    for face_y in (-1.12, 1.12):
+        # diagonal up-left and up-right forming an inverted-V (knee brace pair)
+        fl.add_pipe(f"co1_brace_{tag}_a_{face_y:+.2f}",
+                    [(bxm, face_y, Z_BOT), (bx0, face_y, Z_TOP)], BRACE_R,
+                    MAT["stainless"], "structure_containment", MO)
+        fl.add_pipe(f"co1_brace_{tag}_b_{face_y:+.2f}",
+                    [(bxm, face_y, Z_BOT), (bx1, face_y, Z_TOP)], BRACE_R,
+                    MAT["stainless"], "structure_containment", MO)
+# Two open ends (left x≈0.10, right x≈W-0.10): a single sway diagonal across the
+# end face (bottom-front corner → top-rear corner) so the ends read as braced.
+for ex in (0.12, W - 0.12):
+    fl.add_pipe(f"co1_brace_end_{ex:.2f}",
+                [(ex, -1.12, Z_BOT), (ex, 1.12, Z_TOP)], BRACE_R,
+                MAT["stainless"], "structure_containment", MO)
+
+# ── Service walkway on -Y side at deck height (open grating) ─────────────────
+fl.add_box("co1_service_walkway_plate", (W / 2, -0.95, 0.24), (5.7, 0.42, 0.05),
            MAT["walkway"], "structure_containment", MO)
 for i in range(18):
     x = 0.3 + i * 0.32
-    fl.add_box(f"co1_walkway_grating_{i}", (x, -0.95, 0.235), (0.04, 0.38, 0.012),
+    fl.add_box(f"co1_walkway_grating_{i}", (x, -0.95, 0.275), (0.04, 0.40, 0.012),
                MAT["stainless"], "structure_containment", MO)
 
-# Elevated platform around the two tall columns (operators reach top trays).
-fl.add_box("co1_column_platform", (0.85, 0.0, 2.05), (1.3, 2.0, 0.05),
+# ── Elevated operator ACCESS PLATFORM around the two tall columns ────────────
+# (NOT a container floor — an open grated platform so operators reach the upper
+# column trays/manways. Built with open grating + toe-board + 2-rail handrail so
+# it unambiguously reads as a walk-on platform, and the access ladder lands on
+# its front-left corner.)
+PLAT_Z = 2.05            # grating top-surface datum
+fl.add_box("co1_column_platform", (0.85, 0.0, PLAT_Z), (1.3, 2.0, 0.05),
            MAT["walkway"], "structure_containment", MO)
-for i, (x, y) in enumerate([(0.25, -0.95), (0.25, 0.95), (1.45, -0.95), (1.45, 0.95)]):
-    fl.add_cyl(f"co1_platform_handrail_post_{i}", (x, y, 2.45), 0.018, 0.80,
+# Open grating slats on the platform (see-through => clearly a platform deck).
+for i in range(11):
+    gx = 0.28 + i * 0.12
+    fl.add_box(f"co1_platform_grating_{i}", (gx, 0.0, PLAT_Z + 0.03), (0.05, 1.96, 0.012),
                MAT["stainless"], "structure_containment", MO)
+# Platform support brackets down to the skid deck (the platform is held UP).
+for i, (px, py) in enumerate([(0.25, -0.95), (1.45, -0.95), (0.25, 0.95), (1.45, 0.95)]):
+    fl.add_box(f"co1_platform_support_{i}", (px, py, PLAT_Z / 2 + 0.12), (0.07, 0.07, PLAT_Z - 0.24),
+               MAT["stainless"], "structure_containment", MO)
+# Toe-board kick-plate around the platform edge.
+for name, loc, size in [
+    ("co1_platform_toe_front", (0.85, -0.99, PLAT_Z + 0.10), (1.30, 0.02, 0.12)),
+    ("co1_platform_toe_rear", (0.85, 0.99, PLAT_Z + 0.10), (1.30, 0.02, 0.12)),
+    ("co1_platform_toe_left", (0.21, 0.0, PLAT_Z + 0.10), (0.02, 2.0, 0.12)),
+]:
+    fl.add_box(name, loc, size, MAT["walkway"], "structure_containment", MO)
+# Handrail posts (corners + mid-span) at the platform perimeter.
+rail_posts = [(0.25, -0.95), (0.25, 0.95), (1.45, -0.95), (1.45, 0.95),
+              (0.85, -0.95), (0.85, 0.95), (0.25, 0.0), (1.45, 0.0)]
+for i, (x, y) in enumerate(rail_posts):
+    fl.add_cyl(f"co1_platform_handrail_post_{i}", (x, y, PLAT_Z + 0.50), 0.020, 0.95,
+               MAT["stainless"], "structure_containment", MO)
+# Top + mid handrail runs around the front + two ends (back left open to ladder).
+for name, loc, size in [
+    ("co1_platform_handrail_top_front", (0.85, -0.95, PLAT_Z + 0.95), (1.30, 0.025, 0.025)),
+    ("co1_platform_handrail_mid_front", (0.85, -0.95, PLAT_Z + 0.50), (1.30, 0.022, 0.022)),
+    ("co1_platform_handrail_top_rear", (0.85, 0.95, PLAT_Z + 0.95), (1.30, 0.025, 0.025)),
+    ("co1_platform_handrail_mid_rear", (0.85, 0.95, PLAT_Z + 0.50), (1.30, 0.022, 0.022)),
+    ("co1_platform_handrail_top_right", (1.45, 0.0, PLAT_Z + 0.95), (0.025, 2.0, 0.025)),
+    ("co1_platform_handrail_mid_right", (1.45, 0.0, PLAT_Z + 0.50), (0.022, 2.0, 0.022)),
+]:
+    fl.add_box(name, loc, size, MAT["stainless"], "structure_containment", MO)
 
 
 # ═══════ Module — energy_conversion_transduction: columns + reactor ═════════
@@ -424,14 +502,58 @@ fl.add_cyl("co9_centrifuge_drive_motor", (CENTRIFUGE_X + 0.6, CENTRIFUGE_Y, CENT
 
 
 # ═══════ Module — maintenance_serviceability: ladder, drains, eyes, spares ══
-# Caged access ladder to the column platform on the -Y side.
-for x in [0.20, 0.34]:
-    fl.add_cyl(f"co10_column_ladder_rail_{x:.2f}", (x, -1.15, 1.15), 0.014, 2.20,
+# ── CAGED VERTICAL ACCESS LADDER from skid deck UP to the column platform ────
+# The platform is a SECOND LEVEL (grating top at z=2.05) — so the access route
+# MUST be visible (Tristan). This is a caged fixed ladder on the -Y face,
+# aligned under the platform's left bay, with the stiles continuing ~0.9 m above
+# the landing (standard step-off), a step-through landing onto the platform, and
+# a hooped safety cage. Rendered in the maintenance accent so the access route
+# pops against the steel frame.
+LAD_X = 0.62                       # ladder centreline (under platform left bay)
+LAD_Y = -1.16                      # just in front of the skid front rail (y=-1.12)
+LAD_W = 0.24                       # stile gauge
+LAD_FOOT = 0.20                    # bottom rung ~ skid deck
+LAD_LAND = 2.05                    # landing = platform grating top
+LAD_TOP = LAD_LAND + 0.90          # stiles continue above the landing
+lad_mid = (LAD_FOOT + LAD_TOP) / 2.0
+lad_h = LAD_TOP - LAD_FOOT
+# Two side stiles (thicker so they read).
+for sx in (LAD_X - LAD_W / 2, LAD_X + LAD_W / 2):
+    fl.add_cyl(f"co10_ladder_stile_{sx:.2f}", (sx, LAD_Y, lad_mid), 0.022, lad_h,
                MAT["maint"], "maintenance_serviceability", MO)
-for i in range(10):
-    z = 0.30 + i * 0.20
-    fl.add_cyl(f"co10_column_ladder_rung_{i}", (0.27, -1.15, z), 0.011, 0.18,
+# Rungs every ~0.28 m from deck to landing.
+n_rungs = int((LAD_LAND - LAD_FOOT) / 0.28) + 1
+for i in range(n_rungs):
+    z = LAD_FOOT + i * 0.28
+    fl.add_cyl(f"co10_ladder_rung_{i}", (LAD_X, LAD_Y, z), 0.016, LAD_W,
                MAT["maint"], "maintenance_serviceability", MO, rotation=(0, math.radians(90), 0))
+# Hooped safety CAGE — tidy concentric hoops (centred on the ladder line) from
+# ~1.0 m up to the landing, tied by longitudinal stringers so it reads as a
+# proper cylindrical cage, not loose loops. Radius just clears the rungs.
+cage_r = 0.24
+cage_cy = LAD_Y - 0.10          # hoop centre just outboard of the rungs
+cage_hoop_z = [1.00, 1.35, 1.70, 2.05]
+for i, z in enumerate(cage_hoop_z):
+    fl.add_torus(f"co10_ladder_cage_hoop_{i}", (LAD_X, cage_cy, z), cage_r, 0.012,
+                 MAT["maint"], "maintenance_serviceability", MO, rotation=(math.radians(90), 0, 0))
+# Five cage stringers around the outboard semicircle tying the hoops vertically.
+for j, ang in enumerate([-70, -35, 0, 35, 70]):
+    sx = LAD_X + cage_r * math.sin(math.radians(ang))
+    sy = cage_cy - cage_r * math.cos(math.radians(ang))
+    fl.add_cyl(f"co10_ladder_cage_stringer_{j}", (sx, sy, (1.00 + 2.05) / 2), 0.009, 2.05 - 1.00,
+               MAT["maint"], "maintenance_serviceability", MO)
+# Step-through LANDING — a clear grated walk-on bridging the ladder top to the
+# platform front edge (ladder face y=-1.16 → platform front edge y=-1.0). Made
+# chunky + overlapping the platform so the route ladder→platform is unmistakable.
+fl.add_box("co10_ladder_landing_plate", (LAD_X, -1.03, LAD_LAND + 0.02), (LAD_W + 0.20, 0.42, 0.05),
+           MAT["maint"], "maintenance_serviceability", MO)
+# Grab rails flanking the step-through (the gap in the platform handrail).
+for sx in (LAD_X - LAD_W / 2 - 0.05, LAD_X + LAD_W / 2 + 0.05):
+    fl.add_cyl(f"co10_ladder_gate_post_{sx:.2f}", (sx, -1.02, LAD_LAND + 0.48), 0.018, 0.96,
+               MAT["maint"], "maintenance_serviceability", MO)
+# Short top hand-hold hoop the operator grabs stepping off the ladder.
+fl.add_torus("co10_ladder_stepoff_hoop", (LAD_X, -0.92, LAD_LAND + 0.95), 0.18, 0.014,
+             MAT["maint"], "maintenance_serviceability", MO, rotation=(math.radians(90), 0, 0))
 # Manual drain valves at the base of each vessel.
 for i, (x, y) in enumerate([
     (ABSORBER_X, ABSORBER_Y), (STRIPPER_X, STRIPPER_Y), (REACTOR_X, REACTOR_Y),
@@ -470,4 +592,9 @@ fl.add_box("co3_front_instruction_placard", (5.35, 0.77, 0.35), (0.18, 0.006, 0.
 
 fl.add_lights(target_centre=(W / 2, 0, H / 2), fill_energy=240, fill_size=14)
 fl.make_world_white()
-fl.run_render_pipeline(OUT, MO, structure_module_id="structure_containment")
+# hero_open_frame=True: this is an OPEN transportable SKID (field-erected
+# columns on a structural steel frame), NOT an enclosed/glass container — paint
+# the frame SOLID steel in the hero so it reads as braced open steelwork on a
+# skid deck, not a translucent shipping box with a floating floor.
+fl.run_render_pipeline(OUT, MO, structure_module_id="structure_containment",
+                       hero_open_frame=True)

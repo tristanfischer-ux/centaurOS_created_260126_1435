@@ -933,6 +933,34 @@ def make_hero_ghost():
     return HERO_GHOST
 
 
+def make_hero_open_frame_steel():
+    """OPAQUE galvanised structural-steel material for the hero pass when a
+    template opts into hero_open_frame=True (skid / field-erected / open-rack
+    form factors — NOT enclosed containers).
+
+    The default hero treatment (make_hero_ghost) makes EVERY
+    structure_containment object translucent. For a sealed enclosure that reads
+    as a glass cover the equipment pops through — correct. But for an OPEN SKID
+    the structure IS the deliverable (corner posts + perimeter rails + cross-
+    bracing + deck + walkway), and ghosting it makes thin frame members + a
+    flat deck plate read as a translucent shipping container with a mysterious
+    floating floor (Tristan, CO2-mineralisation render, raised 3×). Painting the
+    frame as SOLID steel makes it read as what it is: an open structural skid.
+
+    Returned material is opaque, mid-metallic, slightly warm galv grey so it
+    separates from the studio mid-grey world without b+looming to white.
+    """
+    STEEL = bpy.data.materials.new("hero_open_frame_steel")
+    STEEL.use_nodes = True
+    sb = STEEL.node_tree.nodes["Principled BSDF"]
+    # Linear-space galvanised grey (~display 0.62). Opaque, metallic so the
+    # frame members catch the key sun and read as box-section steel.
+    sb.inputs["Base Color"].default_value = (0.34, 0.35, 0.38, 1.0)
+    sb.inputs["Metallic"].default_value = 0.85
+    sb.inputs["Roughness"].default_value = 0.42
+    return STEEL
+
+
 # ─── Module objects bookkeeping ──────────────────────────────────────────
 
 
@@ -963,7 +991,7 @@ def restore_materials_from_snap(snap):
 
 def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_containment",
                         flat_form_factor=False, hero_camera_override=None,
-                        hero_cycles=False):
+                        hero_cycles=False, hero_open_frame=False):
     """Render the standard Forge engineering set:
     - 3 spatial views (top + corner FR + corner BL), no Freestyle
     - 1 Option-2 hero (ghosted structure + saturated modules), no Freestyle
@@ -980,6 +1008,13 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
         camera to a tighter near-horizontal angle.
       hero_camera_override: optional dict {loc, target, ortho_scale} to override
         the auto-computed hero camera.
+      hero_open_frame: when True, the hero pass paints structure_containment
+        objects SOLID galvanised steel (make_hero_open_frame_steel) instead of
+        the default translucent ghost. Use for OPEN SKID / field-erected /
+        open-rack form factors where the structure is an open frame, not a
+        sealed enclosure — ghosting an open frame reads as a glass shipping
+        container with a floating floor. Default False preserves the
+        translucent-cover behaviour for every enclosed-container template.
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -996,15 +1031,20 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
         bpy.ops.render.render(write_still=True)
         print(f"[forge] {cam_spec['name']}.png")
 
-    # ─── Pass 2: hero with ghosted shell ───
-    HERO_GHOST = make_hero_ghost()
+    # ─── Pass 2: hero with ghosted shell (or solid open frame) ───
+    # hero_open_frame=True → paint the structure SOLID steel so an open skid
+    # reads as a structural frame, not a translucent glass container. Default
+    # (False) keeps the translucent ghost so an enclosed container reads as a
+    # see-through cover. The render_minimal/hero CAMERA + everything else is
+    # identical — only the structure material differs.
+    HERO_STRUCTURE_MAT = make_hero_open_frame_steel() if hero_open_frame else make_hero_ghost()
     structure_objs = module_objects.get(structure_module_id, []) if structure_module_id else []
     hero_snap = {}
     for obj in structure_objs:
         if obj.data and obj.data.materials:
             hero_snap[obj.name] = list(obj.data.materials)
             obj.data.materials.clear()
-            obj.data.materials.append(HERO_GHOST)
+            obj.data.materials.append(HERO_STRUCTURE_MAT)
 
     clear_cameras()
     if hero_camera_override:
