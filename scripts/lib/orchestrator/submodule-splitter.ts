@@ -87,9 +87,13 @@
 
 import type { DesignJSON, DesignModule } from './assembler'
 
-// Per-class minimum sub-modules-per-module floor below which the splitter
-// will aggressively split. Above this floor it is more conservative.
-const TARGET_DENSITY_DEFAULT = 2.0
+// Mean sub-modules-per-module density floor the splitter holds (the audit-pdf-run
+// D-1 floor). The density budget (in splitDenseSubModulesByRadical) un-merges
+// children just far enough to reach this mean, then stops; a design already at/above
+// this density is passed through untouched (early return). Exported so the regression
+// harness shares the SAME floor when deciding whether a sub-min child was REQUIRED to
+// hold the density (permitted) or could have been merged away (gratuitous).
+export const TARGET_DENSITY_DEFAULT = 2.0
 
 // Minimum words an OUTPUT child sub-module must carry. Mirrors the downstream
 // `sub_module_word_density` gate floor (5-7 words = "a real BoM"). The bin-packer
@@ -98,9 +102,10 @@ const TARGET_DENSITY_DEFAULT = 2.0
 // 5. Held at the gate floor exactly (5): packing to ≥5 already lands most bins in
 // the 5-7 band, and aiming higher would over-merge distinct radicals into junk
 // drawers (council: Gemini "Frankenstein sub-modules"). A bin that genuinely
-// cannot reach 5 (total content <5, or blocked by an ac_/dc_ domain split) stays
-// honest and is forgiven by the gate via split_parent_id provenance.
-const MIN_CHILD_WORDS_DEFAULT = 5
+// cannot reach 5 (total content <5, or blocked by an ac_/dc_ domain split, or kept
+// split to hold the density floor) stays honest and is forgiven by the gate via
+// split_parent_id provenance. Exported so the harness shares the same word floor.
+export const MIN_CHILD_WORDS_DEFAULT = 5
 
 // ---------------------------------------------------------------------------
 // LOCAL TYPES — mirror the per-class emitter shape (structural — they don't
@@ -257,78 +262,75 @@ interface RadicalGroup {
   words: WordLike[]
 }
 
+const binWordCount = (bin: RadicalGroup[]): number => bin.reduce((n, g) => n + g.words.length, 0)
+
 /**
- * packGroupsIntoBins — pack whole radical groups into the FEWEST bins such that
- * every bin reaches `minWords` where the content allows, never interleaving
- * individual words and never co-locating conflicting ac_/dc_ domains.
+ * packGroupsIntoBins — pack whole radical groups into bins that reach `minWords`
+ * where the content allows, WITHOUT dropping below `targetBins` bins, never
+ * interleaving individual words and never co-locating conflicting ac_/dc_ domains.
+ *
+ * The two floors FIGHT on chemical-process classes: (i) ≥minWords-word children
+ * (BoM word-density) pulls toward FEWER, fatter bins; (ii) ≥TARGET_DENSITY
+ * sub-modules/module (the D-1 section-count density) pulls toward MORE bins.
+ * `targetBins` is objective (ii)'s per-module quota, computed design-wide by the
+ * caller (`splitDenseSubModulesByRadical`) so the whole design holds the 2.0 mean.
+ * Within that quota this packer maximises ≥minWords children — i.e. it produces
+ * AS MANY ≥minWords children as possible while still emitting ≥targetBins bins.
  *
  * Strategy (deterministic, order-stable):
- *   1. Any group already ≥ minWords stands alone (a dense, single-radical bin).
- *   2. The remaining sub-min groups are accreted, largest-first, into a single
- *      carry bin; when the carry bin clears minWords it is sealed and a fresh
- *      carry bin starts. A group that would create an ac_/dc_ conflict with the
- *      current carry bin opens its own bin instead (kept separate even if <min).
- *   3. A trailing carry bin still < minWords is appended to the SMALLEST sealed
- *      multi-radical bin if that keeps it ≤ a sane upper bound and introduces no
- *      domain conflict; otherwise it ships as its own (honest sub-min) bin, which
- *      the gate forgives via split_parent_id provenance.
+ *   1. Seed one bin per radical group (the maximal split — highest density,
+ *      every radical its own child; this is the OLD `1112bb865` behaviour).
+ *   2. Greedily MERGE the two domain-compatible bins that most improve the word
+ *      floor (smallest-fragment-first: merging a 1-word bin into a 4-word bin
+ *      removes two sub-min children for one merge), but STOP as soon as the bin
+ *      count would fall below `targetBins`. A merge is only taken while at least
+ *      one bin is still < minWords (no merging once every bin clears the floor)
+ *      AND it does not create an ac_/dc_ conflict.
+ *   3. The remaining sub-min bins are UNAVOIDABLE: merging any away would breach
+ *      either the density quota (drop below targetBins) or the domain guard. The
+ *      gate forgives them via split_parent_id provenance.
  *
- * Returns bins in a deterministic order: dense single-radical bins first (in the
- * original groupOrder), then the accreted multi-radical bins.
+ * With targetBins = 1 this collapses to the FEWEST ≥minWords bins (the pure
+ * word-floor pack); with targetBins = groups.length it returns the maximal
+ * per-radical split untouched. The caller chooses the point on that spectrum.
  */
-function packGroupsIntoBins(groups: RadicalGroup[], minWords: number): RadicalGroup[][] {
-  const dense: RadicalGroup[][] = []
-  const small: RadicalGroup[] = []
-  for (const g of groups) {
-    if (g.words.length >= minWords) dense.push([g])
-    else small.push(g)
+function packGroupsIntoBins(
+  groups: RadicalGroup[],
+  minWords: number,
+  targetBins = 1,
+): RadicalGroup[][] {
+  // 1. Maximal split: one bin per radical group, in groupOrder (deterministic).
+  const bins: RadicalGroup[][] = groups.map((g) => [g])
+  const floor = Math.max(1, targetBins)
+
+  // 2. Merge toward ≥minWords while we have headroom above the density quota and
+  //    at least one bin is still under the word floor.
+  while (bins.length > floor && bins.some((b) => binWordCount(b) < minWords)) {
+    // Find the best merge: among all domain-compatible ordered pairs (i<j) where
+    // at least one side is sub-min, pick the pair whose COMBINED size is smallest
+    // (consolidates the thinnest fragments first → fewest sub-min children for the
+    // money), tie-broken by the lowest indices for determinism.
+    let best: { i: number; j: number; combined: number } | null = null
+    for (let i = 0; i < bins.length; i++) {
+      const wi = binWordCount(bins[i])
+      for (let j = i + 1; j < bins.length; j++) {
+        const wj = binWordCount(bins[j])
+        // Only worth merging if it retires a sub-min bin (one side < floor word count).
+        if (wi >= minWords && wj >= minWords) continue
+        const a = bins[i].flatMap((g) => g.words)
+        const b = bins[j].flatMap((g) => g.words)
+        if (domainsConflict(a, b)) continue
+        const combined = wi + wj
+        if (best === null || combined < best.combined) best = { i, j, combined }
+      }
+    }
+    if (best === null) break // every remaining sub-min bin is domain-locked
+    // Merge j into i (i<j) and drop j; preserves groupOrder of the survivor.
+    bins[best.i] = [...bins[best.i], ...bins[best.j]]
+    bins.splice(best.j, 1)
   }
 
-  // Accrete the sub-min groups, largest-first (stable: ties keep groupOrder),
-  // into carry bins.
-  const smallSorted = [...small].sort((a, b) => b.words.length - a.words.length)
-  const packed: RadicalGroup[][] = []
-  let carry: RadicalGroup[] = []
-  let carryWords = 0
-  const carryWordList = (): WordLike[] => carry.flatMap((g) => g.words)
-  for (const g of smallSorted) {
-    if (carry.length > 0 && domainsConflict(carryWordList(), g.words)) {
-      // Cannot merge without an ac/dc conflict — seal the carry bin (even if
-      // still <min) and give this group its own bin.
-      packed.push(carry)
-      packed.push([g])
-      carry = []
-      carryWords = 0
-      continue
-    }
-    carry.push(g)
-    carryWords += g.words.length
-    if (carryWords >= minWords) {
-      packed.push(carry)
-      carry = []
-      carryWords = 0
-    }
-  }
-  if (carry.length > 0) {
-    // Trailing under-min carry: try to fold into the smallest existing
-    // multi-radical bin (prefer the ones we just accreted, then dense singles)
-    // without a domain conflict; else ship it as its own honest sub-min bin.
-    const candidates = [...packed, ...dense]
-      .map((bin, idx) => ({ bin, idx, words: bin.reduce((n, g) => n + g.words.length, 0), fromPacked: idx < packed.length }))
-      .sort((a, b) => a.words - b.words || a.idx - b.idx)
-    const tail = carryWordList()
-    let folded = false
-    for (const c of candidates) {
-      const binWords = c.bin.flatMap((g) => g.words)
-      if (domainsConflict(binWords, tail)) continue
-      c.bin.push(...carry)
-      folded = true
-      break
-    }
-    if (!folded) packed.push(carry)
-  }
-
-  return [...dense, ...packed]
+  return bins
 }
 
 // ---------------------------------------------------------------------------
@@ -394,13 +396,80 @@ export function splitDenseSubModulesByRadical(
     return design
   }
 
-  // Second pass: split dense sub-modules in each module.
+  // ── DENSITY BUDGET (the two-floor reconciliation) ──────────────────────────
+  // The word floor (each child ≥min_child_words) and the section-count density
+  // floor (mean ≥density_floor sub-modules/module) FIGHT on chemical-process
+  // classes: packing every sub to the FEWEST ≥min_child_words bins maximises word
+  // density but can collapse the mean below density_floor (the 9c65d7b93 regression
+  // — co2 fell to ~1.15). So we choose, per splittable sub, a `targetBins` quota on
+  // the spectrum between its FEWEST-bins pack (max word-density, fewest children)
+  // and its MAXIMAL per-radical split (max children), such that the WHOLE design
+  // clears density_floor while merging as much as the budget allows (fewest sub-min
+  // children). A child below min_child_words is then emitted ONLY when un-merging it
+  // is REQUIRED to hold the density floor (or a domain split forces it) — never
+  // gratuitously.
+  const planned = planSplittableSubs(
+    (design.modules ?? []) as DesignModule[],
+    { min_words, min_radicals, min_child_words },
+  )
+  // Total children if every splittable sub is packed to its FEWEST bins (maximal
+  // merge), plus the fixed children of every non-splittable sub (always 1).
+  let floorChildren = 0
+  for (const m of (design.modules ?? []) as DesignModule[]) {
+    for (const sub of (((m as any).sub_modules ?? []) as SubModuleLike[])) {
+      const p = planned.get(sub)
+      floorChildren += p ? p.minBins : 1
+    }
+  }
+  // The minimum total children the design needs to reach the mean density floor.
+  const neededChildren = Math.ceil(density_floor * total_mods)
+  // Raise targetBins (un-merge) to cover the deficit, SPREADING the extra children
+  // so density lifts evenly and no sub fragments into tiny pieces. Each extra child
+  // goes to the sub with the FEWEST children so far (so every divisible sub earns a
+  // 2nd child — lifting a whole module off density-1 — before any earns a 3rd; this
+  // maximises the modules cleared per increment and keeps child sizes as even as the
+  // radical groups allow). Ties broken toward (a) the sub whose extra child stays
+  // ABOVE the word floor where possible — i.e. the one with the largest resulting
+  // words-per-child, which keeps the most children ≥min_child_words — then (b)
+  // deterministically by id. A sub-min child is therefore emitted ONLY when the
+  // density floor demands the extra split AND the atomic radical groups can't form
+  // two ≥min_child_words pieces (e.g. a {4,4} sub → [4,4]); never gratuitously.
+  let deficit = neededChildren - floorChildren
+  const plans = [...planned.values()]
+  while (deficit > 0) {
+    let pick: SubSplitPlan | null = null
+    for (const p of plans) {
+      if (p.targetBins >= p.maxBins) continue
+      // words-per-child if this sub takes its next child — larger keeps children fatter.
+      const wpcP = p.words / (p.targetBins + 1)
+      if (pick === null) { pick = p; continue }
+      const wpcPick = pick.words / (pick.targetBins + 1)
+      if (
+        p.targetBins < pick.targetBins ||
+        (p.targetBins === pick.targetBins && (
+          wpcP > wpcPick ||
+          (wpcP === wpcPick && String(p.baseId).localeCompare(String(pick.baseId)) < 0)
+        ))
+      ) {
+        pick = p
+      }
+    }
+    if (pick === null) break // every sub is at its maximal per-radical split
+    pick.targetBins++
+    deficit--
+  }
+
+  // Second pass: split dense sub-modules in each module using the budgeted quota.
   const newModules: DesignModule[] = []
   for (const m of (design.modules ?? []) as DesignModule[]) {
     const newSubs: unknown[] = []
     const existingSubs = ((m as any).sub_modules ?? []) as SubModuleLike[]
     for (const sub of existingSubs) {
-      const result = trySplitOne(sub, m.module, { min_words, min_radicals, rename_unnamed, min_child_words })
+      const p = planned.get(sub)
+      const result = trySplitOne(sub, m.module, {
+        min_words, min_radicals, rename_unnamed, min_child_words,
+        target_bins: p ? p.targetBins : 1,
+      })
       newSubs.push(...result)
     }
     newModules.push({ ...m, sub_modules: newSubs as unknown[] })
@@ -408,16 +477,85 @@ export function splitDenseSubModulesByRadical(
   return { ...design, modules: newModules }
 }
 
+/** Per-splittable-sub plan: its radical-group structure plus the achievable
+ *  child-count band (minBins = fewest ≥min_child_words bins; maxBins = one per
+ *  radical group) and a mutable `targetBins` the density budget raises from
+ *  minBins toward maxBins. Non-splittable subs (single radical, too few words, or
+ *  already stamped) are absent → they always contribute exactly one child. */
+interface SubSplitPlan {
+  baseId: string
+  words: number
+  /** Fewest-bins (word-density-optimal) child count — the density budget's floor. */
+  minBins: number
+  /** Maximal (one-per-radical-group) child count — the density budget's ceiling. */
+  maxBins: number
+  /** The budgeted child count for this sub: raised from minBins toward maxBins only
+   *  as far as the design-wide density floor requires. */
+  targetBins: number
+}
+
+function planSplittableSubs(
+  modules: DesignModule[],
+  opts: { min_words: number; min_radicals: number; min_child_words: number },
+): Map<SubModuleLike, SubSplitPlan> {
+  const out = new Map<SubModuleLike, SubSplitPlan>()
+  for (const m of modules) {
+    const moduleName = m.module
+    for (const sub of (((m as any).sub_modules ?? []) as SubModuleLike[])) {
+      // Mirror trySplitOne's no-split predicates EXACTLY so the plan and the split
+      // agree on which subs are splittable.
+      if (sub.split_parent_id !== undefined && sub.split_parent_id !== null) continue
+      const words = Array.isArray(sub.words) ? sub.words : []
+      if (words.length < opts.min_words) continue
+      const radicalGroups = groupByRadical(words)
+      if (radicalGroups.length < opts.min_radicals) continue
+      if (words.length < opts.min_child_words) continue
+      // A sub is SPLITTABLE iff it has ≥min_radicals radical groups (maxBins ≥ 2):
+      // the density budget can always un-merge it from 1 child up to maxBins. The
+      // FEWEST-bins pack (targetBins=1) is the word-density-optimal floor — it may
+      // be 1 (e.g. a 9-word {5,4} sub folds to a single 9-word child) yet the sub
+      // is STILL splittable to 2 when density needs it. So we do NOT skip minBins=1
+      // subs (the old `if (minBins <= 1) continue` wrongly dropped exactly the 2-
+      // radical subs the budget most cheaply lifts off density-1).
+      const maxBins = radicalGroups.length
+      const minBins = packGroupsIntoBins(radicalGroups, opts.min_child_words, 1).length
+      const baseId = typeof sub.id === 'string' ? sub.id : `${moduleName}_sub`
+      out.set(sub, { baseId, words: words.length, minBins, maxBins, targetBins: minBins })
+    }
+  }
+  return out
+}
+
+/** Group a sub's words by function_radical_primary, preserving first-seen radical
+ *  order (deterministic) and word order within each radical. */
+function groupByRadical(words: WordLike[]): RadicalGroup[] {
+  const groups = new Map<string, WordLike[]>()
+  const order: string[] = []
+  for (const w of words) {
+    const radical = w?.content_character?.function_radical_primary ?? 'misc'
+    if (!groups.has(radical)) {
+      groups.set(radical, [])
+      order.push(radical)
+    }
+    groups.get(radical)!.push(w)
+  }
+  return order.map((r) => ({ radical: r, words: groups.get(r)! }))
+}
+
 /**
  * Try to split one sub-module by function radical. Returns 1 sub-module
  * (unchanged) if splitting doesn't apply, OR N sub-modules — each a bin of
- * one-or-more whole radical groups packed to ≥ min_child_words where the
- * content allows (see packGroupsIntoBins).
+ * one-or-more whole radical groups packed to ≥ min_child_words where the content
+ * allows AND the per-module density quota (`target_bins`) permits (see
+ * packGroupsIntoBins). `target_bins` is the design-wide density budget's quota for
+ * this sub (defaults to 1 = pack to the fewest ≥min_child_words bins when called
+ * outside the budgeted path); the packer maximises ≥min_child_words children
+ * while still emitting ≥target_bins of them.
  */
 function trySplitOne(
   sub: SubModuleLike,
   moduleName: string,
-  opts: { min_words: number; min_radicals: number; rename_unnamed: boolean; min_child_words: number },
+  opts: { min_words: number; min_radicals: number; rename_unnamed: boolean; min_child_words: number; target_bins?: number },
 ): SubModuleLike[] {
   // IDEMPOTENCY GUARD: a sub_module already stamped with split_parent_id is a
   // prior split output — never re-split / re-suffix it (avoids double-suffix
@@ -429,20 +567,12 @@ function trySplitOne(
 
   // Group by function_radical_primary (preserve first-seen radical order so the
   // output is deterministic and word order within a radical is unchanged).
-  const groups = new Map<string, WordLike[]>()
-  const groupOrder: string[] = []
-  for (const w of words) {
-    const radical = w?.content_character?.function_radical_primary ?? 'misc'
-    if (!groups.has(radical)) {
-      groups.set(radical, [])
-      groupOrder.push(radical)
-    }
-    groups.get(radical)!.push(w)
-  }
+  const radicalGroups = groupByRadical(words)
+  const groupOrder = radicalGroups.map((g) => g.radical)
 
   // If fewer than min_radicals distinct radicals, splitting would be
   // arbitrary — pass through unchanged.
-  if (groups.size < opts.min_radicals) {
+  if (radicalGroups.length < opts.min_radicals) {
     // Rename unnamed sub-module if requested.
     if (opts.rename_unnamed && (!sub.name_human || sub.name_human === '?')) {
       return [{ ...sub, name_human: `${moduleName}_${shortenRadical(groupOrder[0])}` }]
@@ -459,9 +589,9 @@ function trySplitOne(
     return [{ ...sub, split_parent_id: baseId, split_radicals: groupOrder.slice().sort() }]
   }
 
-  // Pack the whole radical groups into the fewest ≥min_child_words bins.
-  const radicalGroups: RadicalGroup[] = groupOrder.map((r) => ({ radical: r, words: groups.get(r)! }))
-  const bins = packGroupsIntoBins(radicalGroups, opts.min_child_words)
+  // Pack the whole radical groups into ≥min_child_words bins, but never below the
+  // density budget's per-sub quota (target_bins). target_bins=1 ⇒ fewest bins.
+  const bins = packGroupsIntoBins(radicalGroups, opts.min_child_words, opts.target_bins ?? 1)
 
   // Degenerate pack (everything folded into one bin) → no real split; pass the
   // original through (stamped) rather than rename a single fat sub_module.
