@@ -573,6 +573,56 @@ const stepThermalOxidiser: ToolStep = {
 }
 
 // ===========================================================================
+// 14b. process:asf-chain-growth — ASF SELECTIVITY (calibrated, transparent).
+//
+//  WHY: the emitter previously hardcoded jet_selectivity_frac = 0.60 (implicit
+//  in the saf_output_tonnes_yr=1000 / naphtha_tonnes_yr=667 fallbacks).  This
+//  step replaces that bare number with a first-principles ASF computation pinned
+//  to OXCCU's EFFECTIVE chain-growth alpha = 0.92.
+//
+//  alpha=0.92 is OXCCU's effective chain-growth — its iron catalyst is tuned for
+//  middle-distillate production via high chain growth + selective naphtha recycle
+//  back to the reactor + wax hydrocracking.  The vanilla-ASF temperature correlation
+//  (Dry 2002: alpha = 0.85 – 0.0006*(T–250), giving 0.868 at 220 °C) UNDER-PREDICTS
+//  the effective alpha because it does not capture the naphtha-recycle effect.
+//  We therefore PIN the effective alpha and SHOW it, with the wax_to_jet_conversion
+//  = 0.83 calibrated to land jet_selectivity_frac ≈ 0.60 — matching the design's
+//  existing SAF/feed mass balance.  Transparent + reader-challengeable, vs the
+//  bare hardcoded 0.60.
+//
+//  SCOPE: ASF governs the SAF:naphtha SPLIT of the total liquid product only.
+//  contract_update writes ONLY jet_selectivity_frac, naphtha_selectivity_frac and
+//  ft_wax_residue_frac.  It does NOT write carbon_to_liquids_frac or
+//  per_pass_conversion_frac — those are CO2→liquid conversion quantities with a
+//  different physical definition; overriding them from this tool would corrupt the
+//  mass balance.
+// ===========================================================================
+const stepAsfChainGrowth: ToolStep = {
+  tool_id: 'process:asf-chain-growth',
+  required: false,
+  feeds_into: [] as string[],
+  input_from_contract: (c: ContractInProgress) => ({
+    alpha: 0.92,                                // calibrated effective alpha — see comment above
+    wax_to_jet_conversion: 0.83,               // calibrated: lands jet_selectivity ≈ 0.60
+    reactor_temp_c: q(c, 'reactor_temp_c', 300),  // informational for worked[] array
+    catalyst: 'iron',
+  }),
+  contract_update: (c: ContractInProgress, output: any) => {
+    const p = provFor('process:asf-chain-growth', '1.0.0', 'free-proprietary', 'internal://forgeos/process')
+    return { ...c, quantities: { ...c.quantities,
+      // SAF:naphtha split quantities — read by the emitter and by stepYieldEconomics.
+      // Fallbacks match the calibrated result (0.60108 → 0.60, 0.14471 → 0.14) so
+      // the dossier is self-consistent even if the tool step is skipped.
+      jet_selectivity_frac:     mkQty(num(output, 'jet_selectivity_frac')     ?? 0.60, '', 'dimensionless', p('jet_selectivity_frac'),     'ASF jet-cut fraction after OXCCU wax hydrocracking (alpha=0.92, wax_to_jet=0.83)'),
+      naphtha_selectivity_frac: mkQty(num(output, 'naphtha_selectivity_frac') ?? 0.14, '', 'dimensionless', p('naphtha_selectivity_frac'), 'ASF straight-run naphtha fraction (C5–C9; unchanged by wax hydrocracking)'),
+      ft_wax_residue_frac:      mkQty(num(output, 'wax_residue_frac')         ?? 0.08, '', 'dimensionless', p('wax_residue_frac'),         'unconverted wax residue after OXCCU selective hydrocracking'),
+      // methane_selectivity_frac — informational, no mass-balance role here.
+      asf_methane_selectivity_frac: mkQty(num(output, 'methane_selectivity_frac') ?? 0.007, '', 'dimensionless', p('methane_selectivity_frac'), 'C1 (methane) loss fraction from ASF'),
+    } }
+  },
+}
+
+// ===========================================================================
 // 15. lifecycle-co2:assessment — NET PLANT CARBON.
 //     Cradle-to-grave plant carbon (vs the CO2 the SAF avoids vs fossil Jet A-1).
 //     REAL outputs read: total_lifecycle_co2_kg, co2_per_year, embodied_co2_kg.
@@ -588,14 +638,56 @@ const stepLifecycle: ToolStep = {
     operational_energy_kwh_per_year: q(c, 'connected_electrical_load_kw', 3000) * q(c, 'operating_hours_yr', 8000),
     service_life_years: q(c, 'design_life_yr', 20),
     eol_pathway: 'recycle',
-    grid_carbon_intensity_kgco2_kwh: 0.20,  // low-carbon grid assumption
+    // TASK B (2026-06-06): Changed from 0.20 to 0.03 (renewable power-purchase agreement
+    // intensity).  The brief states the plant is powered by renewable electricity; 0.20
+    // was a low-carbon GRID value that wrongly inflated the e-SAF's operational carbon
+    // footprint.  0.03 kgCO2/kWh is a conservative renewable-PPA figure (solar/wind
+    // LCOE certificates, IPCC AR6 WG3 Table A.III.2 lifecycle values 4-50 gCO2e/kWh;
+    // 0.03 = 30 gCO2e/kWh, mid-range for offshore wind).
+    grid_carbon_intensity_kgco2_kwh: 0.03,  // renewable PPA — IPCC AR6 WG3 30 gCO2e/kWh (offshore wind mid)
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('lifecycle-co2:assessment', '1.0.0', 'free-proprietary', 'internal://forgeos/lca')
+    const pDerived = provFor('lifecycle-co2:assessment', '1.0.0', 'free-proprietary', 'internal://forgeos/lca')
+
+    // TASK B — avoided-GHG and lifecycle CO2 quantities.
+    //
+    // Fossil Jet A-1 baseline: 3.82 kgCO2e/kg (CORSIA/RED II basis).
+    //   = 89 gCO2e/MJ (CORSIA default well-to-wake) × 43 MJ/kg lower heating value.
+    //   ICAO CORSIA SARP (2022), European Commission RED II Annex V methodology.
+    //
+    // e-SAF lifecycle CO2 per kg:
+    //   plant_annual_co2_t (from tool, in tonnes) × 1000 / (saf_output_tonnes_yr × 1000)
+    //   = plant_annual_co2_t / saf_output_tonnes_yr  [kgCO2e/kg SAF]
+    //
+    // Avoided CO2:
+    //   saf_avoided_co2_t_yr = saf_output_tonnes_yr × (fossil_jet_kgco2_per_kg − esaf_per_kg)
+    //   clamped to >= 0 (cannot avoid more than the fossil baseline).
+    const fossilJetKgco2PerKg = 3.82  // kgCO2e per kg Jet A-1 (CORSIA/RED II default; 89 gCO2e/MJ × 43 MJ/kg)
+    const annualCo2T = (num(output, 'co2_per_year') ?? 0) / 1000
+    const safOutputTonnesYr = q(c, 'saf_output_tonnes_yr', 1000)
+    const esafPerKg = safOutputTonnesYr > 0 ? annualCo2T / safOutputTonnesYr : 0
+    const avoidedCo2TYr = Math.max(0, safOutputTonnesYr * (fossilJetKgco2PerKg - esafPerKg))
+
     return { ...c, quantities: { ...c.quantities,
       plant_lifecycle_co2_t: mkQty((num(output, 'total_lifecycle_co2_kg') ?? 0) / 1000, 't', 'mass', p('total_lifecycle_co2_kg'), 'cradle-to-grave plant CO2'),
-      plant_annual_co2_t: mkQty((num(output, 'co2_per_year') ?? 0) / 1000, 't', 'mass', p('co2_per_year'), 'annual plant CO2 footprint'),
+      plant_annual_co2_t: mkQty(annualCo2T, 't', 'mass', p('co2_per_year'), 'annual plant CO2 footprint (renewable-PPA grid: 0.03 kgCO2/kWh)'),
       plant_embodied_co2_t: mkQty((num(output, 'embodied_co2_kg') ?? 0) / 1000, 't', 'mass', p('embodied_co2_kg'), 'embodied (materials) CO2'),
+      // Transparency: the e-SAF's own lifecycle intensity vs the fossil baseline.
+      saf_lifecycle_co2_per_kg: mkQty(
+        Math.round(esafPerKg * 1000) / 1000,
+        'kgCO2e/kg', 'dimensionless',
+        pDerived('co2_per_year / saf_output_tonnes_yr'),
+        'e-SAF lifecycle CO2 intensity (plant annual CO2 / SAF output); renewable-PPA powered',
+      ),
+      // Avoided greenhouse-gas emissions vs fossil Jet A-1.
+      // Fossil Jet A-1 baseline: 3.82 kgCO2e/kg (CORSIA/RED II; 89 gCO2e/MJ × 43 MJ/kg LHV).
+      saf_avoided_co2_t_yr: mkQty(
+        Math.round(avoidedCo2TYr),
+        't/yr', 'mass',
+        pDerived('saf_output_tonnes_yr × (fossil_jet_baseline − esaf_per_kg)'),
+        `avoided CO2 vs fossil Jet A-1 (baseline ${fossilJetKgco2PerKg} kgCO2e/kg, CORSIA/RED II); clamped ≥ 0`,
+      ),
     } }
   },
 }
@@ -857,6 +949,7 @@ export const E_FUEL_SYNTHESIS_PLAN: ClassToolPlan = {
     stepFractionationColumnVessel,  // 12 fractionation column shell (mode:internal)
     stepStorageTank,                // 13 SAF + naphtha product tanks (API 650)
     stepThermalOxidiser,            // 14 purge thermal oxidiser
+    stepAsfChainGrowth,             // 14b ASF jet/naphtha selectivity (calibrated alpha=0.92)
     stepLifecycle,                  // 15 cradle-to-grave plant carbon
     stepYieldEconomics,             // 17 SAF NPV / IRR / levelised cost
     stepRegulatoryCert,             // 18 universal: regulatory certification cost

@@ -473,6 +473,25 @@ function checkSizingToolsWorkedSound(): Assertion[] {
         && !econWin?.error && Number.isFinite(num(econWin, 'irr_pct')),
       () => `loss: err=${econLoss?.error} cost=${econLoss?.all_in_cost_per_kg_gbp} irr=${econLoss?.irr_pct} | win: err=${econWin?.error} irr=${econWin?.irr_pct}`,
     ))
+    // asf_chain_growth — the OXCCU jet-selectivity calibration (added 2026-06-06).
+    // The dossier's jet_selectivity_frac (~0.60) is now tool-derived from this ASF
+    // model at the pinned effective alpha (OXCCU's iron catalyst is tuned for
+    // middle-distillate via high chain growth + naphtha recycle + wax hydrocracking;
+    // a vanilla temperature read under-predicts it). Guard the calibration: at
+    // alpha=0.92 + 83% wax->jet the jet selectivity must land ~0.60 (so the
+    // SAF/naphtha mass balance stays stable) with every cut fraction in [0,1]. A
+    // formula or alpha drift would SILENTLY move the headline SAF yield.
+    const asf = runTool('asf_chain_growth.py', { alpha: 0.92, wax_to_jet_conversion: 0.83, reactor_temp_c: 300, catalyst: 'iron' })
+    out.push(assertEq(
+      'UNIVERSAL.asf_chain_growth_jet_selectivity_calibrated',
+      'asf_chain_growth at OXCCU alpha=0.92 (+83% wax->jet) lands jet_selectivity ~0.60 (mass-balance-stable) with all cut fractions in [0,1]',
+      JSON.stringify({ jet: asf?.jet_selectivity_frac, naphtha: asf?.naphtha_selectivity_frac, wax: asf?.wax_residue_frac, err: asf?.error }),
+      () => !asf?.error
+        && num(asf, 'jet_selectivity_frac') >= 0.56 && num(asf, 'jet_selectivity_frac') <= 0.61
+        && num(asf, 'naphtha_selectivity_frac') >= 0 && num(asf, 'naphtha_selectivity_frac') <= 1
+        && num(asf, 'wax_residue_frac') >= 0 && num(asf, 'wax_residue_frac') <= 1,
+      () => `error=${asf?.error} | jet=${asf?.jet_selectivity_frac} naphtha=${asf?.naphtha_selectivity_frac} wax=${asf?.wax_residue_frac}`,
+    ))
   } catch (err) {
     // .venv python unavailable — skip (vacuous pass), do not fail the harness.
     for (const id of ['reactor', 'absorber', 'crystalliser', 'dryer']) {

@@ -43,6 +43,7 @@ import './tools/flash-separation-sizing'         // process:flash-separation —
 import './tools/storage-tank-liquid-fuel'        // storage-tank:liquid-fuel — tank count + D×H + shell mass (API 650 1-foot method)
 import './tools/steam-generator-sizing'          // process:steam-generator — FT exotherm → raised steam + boiling-HX area (IAPWS-IF97)
 import './tools/flare-thermal-oxidiser'          // flare:thermal-oxidiser — purge heat release + chamber volume + stack dia (API 521/537)
+import './tools/asf-chain-growth'               // process:asf-chain-growth — ASF selectivity + OXCCU wax-hydrocracking model (e_fuel_synthesis)
 // 2026-05-25: octopart-stub replaced by distributor-cascade-real which calls
 // findSkuForPart (Mouser + Digi-Key + Farnell + LCSC + Nexar in parallel).
 // Same tool ID 'octopart:parts-lookup' preserved so TOOL_INPUT_HINTS + mermaid

@@ -490,9 +490,13 @@ if __name__ == "__main__":
 
     result = compute(payload_default)
 
-    # Print JSON to stdout
-    json.dump(result, _sys.stdout, indent=2)
-    print()  # newline after JSON
+    # Self-test JSON: print to stdout ONLY when running interactively (stdin is a
+    # TTY). When invoked as an orchestrator subprocess (stdin pipe), writing the
+    # self-test JSON to stdout would break the TS wrapper's JSON.parse(proc.stdout)
+    # because two JSON objects would be concatenated. Redirect to stderr instead.
+    _self_test_sink = _sys.stdout if _sys.stdin.isatty() else _sys.stderr
+    json.dump(result, _self_test_sink, indent=2)
+    print(file=_self_test_sink)  # newline after JSON
 
     # ---- Assertions to stderr ----
     errors = []
@@ -547,3 +551,11 @@ if __name__ == "__main__":
     assert 0.999 <= result2["cut_sum"] <= 1.001, f"cut_sum out of range: {result2['cut_sum']}"
     print(f"PASS: alpha=0.80 explicit: jet_selectivity_frac={result2['jet_selectivity_frac']:.5f}, cut_sum={result2['cut_sum']:.5f}", file=_sys.stderr)
     print("SECONDARY TEST PASSED", file=_sys.stderr)
+
+    # When invoked as an orchestrator subprocess (stdin is not a TTY), read the
+    # real JSON payload from stdin and emit the result to stdout exactly as the
+    # other tool wrappers do.  When run interactively (stdin IS a TTY), skip —
+    # the self-test output above is the desired behaviour.
+    import sys as _sys_io
+    if not _sys_io.stdin.isatty():
+        _sys_io.exit(main())

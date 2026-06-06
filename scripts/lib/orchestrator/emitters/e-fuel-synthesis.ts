@@ -121,6 +121,10 @@ function sizeTankDH(workingVolumeM3: number): { diaM: number; heightM: number } 
 interface EFuelParams {
   safOutputTonnesYr: number
   safOutputKgH: number
+  // ASF-derived selectivity: populated by the process:asf-chain-growth tool step;
+  // fallback 0.60 matches the calibrated result (alpha=0.92, wax_to_jet=0.83 →
+  // jet_selectivity_frac=0.601) so the emitter is self-consistent pre-orchestration.
+  jetSelectivityFrac: number
   naphthaTonnesYr: number
   totalLiquidsTonnesYr: number
   co2FeedKgH: number
@@ -169,6 +173,10 @@ function deriveParams(c: ContractInProgress): EFuelParams {
   return {
     safOutputTonnesYr,
     safOutputKgH,
+    // Read jet_selectivity_frac from the contract (written by the ASF tool step).
+    // Fallback 0.60 = calibrated result (alpha=0.92, wax_to_jet=0.83) so the
+    // emitter produces a consistent SAF/naphtha split even pre-orchestration.
+    jetSelectivityFrac: q(c, 'jet_selectivity_frac', 0.60),
     naphthaTonnesYr: q(c, 'naphtha_tonnes_yr', 667),
     totalLiquidsTonnesYr: q(c, 'total_liquids_tonnes_yr', 1667),
     co2FeedKgH: q(c, 'co2_feed_kg_h', 1000),
