@@ -58,6 +58,8 @@ import { composeToolGraph } from './lib/orchestrator/auto-planner'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { evaluatePhysicsCriticEnforcement } from './lib/physics-critic-enforcement'
+import { scrubModuleParagraph, buildFrozenQuantitiesBlock, roundToSigFigs } from '../src/lib/pdf-engine-v2/radical/module-paragraph-llm'
+import { buildNaturalLanguageLayer as buildNlLayerForHarness } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { selectCorrectableFindings, locateWordForFinding, parseCorrection } from './lib/physics-critic-autocorrect'
 import { rrfFuse, parseEmbedding, EMBEDDING_DIMS as DUAL_EMBEDDING_DIMS } from '../src/lib/pdf-engine-v2/lib/retrieval/dual-search'
 import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
@@ -556,6 +558,98 @@ function checkCo2FixInvariants(): Assertion[] {
       'humaniseSubName collapses a doubled raw id, maps taxonomy chains to plain English (no "etc"), strips underscores, leaves a genuine label + a real part id untouched',
       bad.length, (n) => n === 0,
       () => `humaniseSubName wrong: ${bad.join(' ; ')}. Check render-minimal-pdf.tsx humaniseSubName / TAXONOMY_ID_PLAIN.`,
+    ))
+  }
+
+  // ── (2a) UNIVERSAL.module_overview_is_llm_not_concat (2026-06-06, FIX 1+3) ──────
+  // The deterministic-emitter path left every module overview_paragraph_en
+  // empty, so the renderer echoed nl.paragraph_en — a VERBATIM concat of the
+  // module's sub-module sentences (also rendered in the per-sub-module deep dive)
+  // PLUS BoM-dump "(additional:" / "(part " fragments. FIX 1 (revived Piece 1F
+  // module-paragraph-llm.ts) writes a real LLM overview grounded in the frozen
+  // contract; FIX 3 (renderer) de-dups the fallback so a module overview is
+  // never a verbatim sub-module concat. This invariant guards BOTH halves with
+  // pure functions on a synthetic module — no snapshot, no network.
+  {
+    const bad: string[] = []
+    // (a) scrubModuleParagraph removes the forbidden BoM-dump fragments.
+    const dirty = 'The carbonation reactor (part CR-101) (additional: £4,200) processes the feed and the absorber column (additional £18,400) captures CO2.'
+    const scrubbed = scrubModuleParagraph(dirty)
+    if (/\(additional\b/i.test(scrubbed)) bad.push(`scrub left "(additional" -> "${scrubbed.slice(0, 80)}"`)
+    if (/\(part\b/i.test(scrubbed)) bad.push(`scrub left "(part" -> "${scrubbed.slice(0, 80)}"`)
+
+    // (b) Build the REAL deterministic concat (what the old fallback rendered)
+    // from a synthetic 2-sub-module module, and assert a plausible LLM overview
+    // is NOT a verbatim duplicate of it. Mirrors the renderer cascade contract.
+    const synthModule: any = {
+      module: 'energy_storage_source',
+      module_brief: 'Stores 3.5 MWh of usable energy and delivers 1 MW continuous discharge.',
+      derived_parameters: {},
+      allowed_radicals: [],
+      applicability_confidence: 'high',
+      grammar_links: [],
+      sub_modules: [
+        { id: 'cell_string', name_human: 'cell string', role_verb: 'stores',
+          words: [{ id: 'lfp_cell_word', name_human: 'lithium iron phosphate cell', content_character: { name_human: 'lithium iron phosphate cell' }, modifier_characters: [] }] },
+        { id: 'rack_structure', name_human: 'rack structure', role_verb: 'supports',
+          words: [{ id: 'rack_frame_word', name_human: 'steel rack frame', content_character: { name_human: 'steel rack frame' }, modifier_characters: [] }] },
+      ],
+    }
+    const nlSynth: any = buildNlLayerForHarness([synthModule])
+    const deterministicConcat = String(nlSynth?.by_module?.energy_storage_source?.paragraph_en ?? '')
+    const subSentences: string[] = (nlSynth?.by_module?.energy_storage_source?.sub_module_sentences ?? [])
+      .map((s: any) => String(s?.sentence_en ?? '').trim())
+      .filter((s: string) => s.length > 0)
+    // A realistic LLM overview (the FIX 1 product) — flowing prose, not a concat.
+    const llmOverview =
+      'The energy storage source holds 3.5 MWh of usable capacity and sustains 1 MW of continuous discharge. Energy lives in a cell string of lithium iron phosphate cells whose stacks are clamped inside a steel rack structure across charge and discharge.'
+    const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase()
+    if (deterministicConcat.length === 0) bad.push('deterministic concat empty — buildNaturalLanguageLayer changed shape')
+    if (subSentences.length < 2) bad.push(`expected >=2 sub-module sentences, got ${subSentences.length}`)
+    if (norm(llmOverview) === norm(deterministicConcat)) bad.push('LLM overview equals deterministic concat verbatim')
+    // The deterministic concat MUST embed each sub-module's sentence verbatim
+    // (proves it is the dup-prone thing FIX 3 must avoid echoing); the LLM
+    // overview must NOT embed those sentences verbatim.
+    const concatHasAllSubs = subSentences.every((s) => norm(deterministicConcat).includes(norm(s)))
+    const llmHasAnySubVerbatim = subSentences.some((s) => norm(llmOverview).includes(norm(s)))
+    if (!concatHasAllSubs) bad.push(`deterministic concat does NOT embed every sub-module sentence verbatim -> "${deterministicConcat.slice(0, 90)}"`)
+    if (llmHasAnySubVerbatim) bad.push('LLM overview echoes a sub-module sentence verbatim (would be a duplicate)')
+
+    out.push(assertEq(
+      'UNIVERSAL.module_overview_is_llm_not_concat',
+      'module overview is LLM prose grounded in the frozen contract, not a verbatim concat of its sub-module sentences, and carries no "(additional:" / "(part " BoM-dump fragment',
+      bad.length, (n) => n === 0,
+      () => `module-overview invariant failed: ${bad.join(' ; ')}. See module-paragraph-llm.ts (FIX 1) + render-minimal-pdf.tsx overview cascade (FIX 3).`,
+    ))
+  }
+
+  // ── (2a2) UNIVERSAL.frozen_quantities_block_rounds_and_suppresses (FIX 1) ──────
+  // The frozen-quantities block fed to the module-paragraph LLM must round 4+dp
+  // solver output to <=3 sig figs and refuse to quote giant equilibrium
+  // constants (the 16-digit k2so4_loop_equilibrium_K=61,621,006,169,164,950
+  // false-precision the scorer flagged). The model is told to cite ONLY this
+  // block, so pre-rounding here is the belt-and-braces guard.
+  {
+    const bad: string[] = []
+    if (roundToSigFigs(0.2346, 3) !== 0.235) bad.push(`roundToSigFigs(0.2346) = ${roundToSigFigs(0.2346, 3)} (want 0.235)`)
+    if (roundToSigFigs(396.62, 3) !== 397) bad.push(`roundToSigFigs(396.62) = ${roundToSigFigs(396.62, 3)} (want 397)`)
+    if (roundToSigFigs(4.8035, 3) !== 4.8) bad.push(`roundToSigFigs(4.8035) = ${roundToSigFigs(4.8035, 3)} (want 4.8)`)
+    const block = buildFrozenQuantitiesBlock({
+      absorber_diameter_m: 0.2346,
+      reactor_power_density_w_m3: 396.62,
+      k2so4_loop_equilibrium_K: 61621006169164950,
+      coolant_chemistry_desc: 'propylene glycol',
+    })
+    // No 4+-decimal number survives in the block text.
+    if (/[0-9]+\.[0-9]{4,}/.test(block.text)) bad.push(`block kept a 4+dp number -> "${block.text}"`)
+    // The giant equilibrium constant is NOT quoted (suppressed to a qualitative note).
+    if (/616210061691649|61,621,006,169,164,950/.test(block.text)) bad.push('block quoted the 16-digit equilibrium constant verbatim')
+    if (!/0\.235\b/.test(block.text)) bad.push(`block missing rounded 0.235 -> "${block.text}"`)
+    out.push(assertEq(
+      'UNIVERSAL.frozen_quantities_block_rounds_and_suppresses',
+      'the frozen-quantities block fed to the module-paragraph LLM rounds 4+dp solver output to <=3 sig figs and suppresses 10+-digit equilibrium constants',
+      bad.length, (n) => n === 0,
+      () => `frozen-quantities block wrong: ${bad.join(' ; ')}. See buildFrozenQuantitiesBlock / roundToSigFigs in module-paragraph-llm.ts.`,
     ))
   }
 

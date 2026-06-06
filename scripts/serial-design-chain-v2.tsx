@@ -99,6 +99,7 @@ import { runSubModuleDomainGuard } from '../src/lib/pdf-engine-v2/lib/submodule-
 import { runPayloadRatingAudit } from '../src/lib/pdf-engine-v2/lib/payload-rating-audit'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
+import { generateModuleParagraphs } from '../src/lib/pdf-engine-v2/radical/module-paragraph-llm'
 import { applyJurisdictionFilterToModules, applyJurisdictionFilterToNlLayer, applyJurisdictionFilterToBriefProse } from './lib/jurisdiction-prose-filter'
 import { translate } from '../src/lib/pdf-engine-v2/radical/universal-translator'
 import { runArithmeticGates } from '../src/lib/pdf-engine-v2/radical/universal-arithmetic-gates'
@@ -5165,6 +5166,56 @@ async function main() {
     : (allPassed && !v5GateFlagged && designDecisions.length === 0)
     ? 'accepted_clean'
     : (designDecisions.length > 0 || v5GateFlagged ? 'accepted_with_decisions' : 'not_accepted')
+
+  // ── FIX 1 (2026-06-06): LLM-written MODULE overview paragraphs ──────────────
+  // The deterministic-emitter path leaves every module's overview_paragraph_en
+  // empty, so the renderer falls back to a mechanical concat of the module's
+  // sub-module sentences (summary + each deterministic-template sentence) — the
+  // multimodal scorer reads that as robotic/repetitive/false-precision and drops
+  // design_modules (~7.0-7.3) and grammar_language (~7.0-7.5) below the 8.0
+  // floor. Revive Piece 1F: a real LLM writes each module one flowing overview
+  // paragraph GROUNDED in the FROZEN orchestratorContract.quantities (numbers
+  // come ONLY from those audited values, rounded to <=3 sig figs, no
+  // "(additional:"/"(part " BoM-dump fragments, each sub-module mentioned once,
+  // British spelling, acronyms expanded). UNIVERSAL — any class on this path.
+  //
+  // Placement is deliberate: AFTER the emitter + every modifier-mutating stage
+  // + BOTH deterministic sub-module prose pre-fill passes (the "silent
+  // defeaters" at ~line 3592 + ~line 4022 that overwrite sub-module
+  // english_sentence) + the emitter-identity re-assert, and BEFORE
+  // buildNaturalLanguageLayer below. The pre-fill passes touch sub-module
+  // english_sentence ONLY (which feeds nl.paragraph_en, the concat fallback);
+  // they never touch module overview_paragraph_en, so the LLM prose written here
+  // survives untouched to line ~5184 where it is copied into
+  // nl.by_module[*].paragraph_en_llm and wins the renderer cascade
+  // (overview_paragraph_en || paragraph_en_llm || paragraph_en || module_brief).
+  // Graceful: a per-module LLM failure keeps that module's deterministic
+  // fallback; never aborts the run. Skip via CHAIN_SKIP_MODULE_PARAGRAPH_LLM=1.
+  if (process.env.CHAIN_SKIP_MODULE_PARAGRAPH_LLM !== '1') {
+    try {
+      const frozenQuantities =
+        (orchEngineeringContract as Record<string, any> | null)?.quantities ?? null
+      const paraLayer = await generateModuleParagraphs(
+        (design.modules ?? []) as any[],
+        frozenQuantities,
+      )
+      console.error(
+        `[chain] module-paragraph-llm: ${paraLayer.llm_success_count}/${paraLayer.module_count} module overviews written by LLM ` +
+        `(${paraLayer.model_used}); the rest kept their deterministic fallback`,
+      )
+      logAction({
+        step: 'module_paragraph_llm',
+        module_count: paraLayer.module_count,
+        llm_success_count: paraLayer.llm_success_count,
+        model: paraLayer.model_used,
+      })
+    } catch (err) {
+      console.error(`[chain] module-paragraph-llm: stage failed, kept deterministic overviews (${(err as Error).message})`)
+      logAction({ step: 'module_paragraph_llm_error', error: (err as Error).message })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_MODULE_PARAGRAPH_LLM=1 — keeping deterministic module overviews')
+  }
 
   // ── Save final state, build NL layer, render PDF
   // L32 data-binding fix (2026-05-26): refresh rad_syntax on every sub-module

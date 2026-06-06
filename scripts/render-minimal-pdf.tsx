@@ -918,7 +918,15 @@ function strip_bom_dump_fragments(s: string): string {
   if (!s) return ''
   return s
     .replace(/\s*\((?:additional|add\.?)\s*:?\s*£[\d,]+(?:\.\d+)?\s*\)/gi, '')
-    .replace(/\s*\(part\s+[^)]{1,40}\)/gi, '')
+    // FIX 3 follow-on (2026-06-06): the {1,40} cap let long fabricated-item
+    // descriptors survive in the sub-module deep-dive prose — e.g. "(part
+    // welded galvanised structural-steel skid frame - fabricated)" (52 chars),
+    // "(part reinforced column support plinth and frame - fabricated)" (57). The
+    // scorer reads those as BoM-dump fragments. Widen to {1,90} so the long
+    // fabricated/made-to-order descriptors are stripped too. Still bounded (not
+    // greedy-to-EOL) and still anchored on a parenthetical that OPENS with the
+    // literal "part " token, which genuine prose almost never does.
+    .replace(/\s*\(part\s+[^)]{1,90}\)/gi, '')
     .replace(/\s{2,}/g, ' ')
     .replace(/\s+([.,;:])/g, '$1')
     .trim()
@@ -9566,11 +9574,39 @@ function ModuleSection({
   const id = moduleSpec.module
   const title = module_title(moduleSpec)
   // Priority: unified-prose Stage 1.7 emission → Piece 1F LLM paragraph → deterministic → brief.
-  const overviewSource =
-    moduleSpec.overview_paragraph_en ||
-    nl?.paragraph_en_llm ||
-    nl?.paragraph_en ||
-    moduleSpec.module_brief
+  //
+  // FIX 3 (2026-06-06, design_modules/grammar universal-fix): when the FIRST
+  // two preferred sources (LLM-written overview_paragraph_en from chain Piece
+  // 1F + paragraph_en_llm) are BOTH absent, the cascade used to fall to
+  // nl.paragraph_en — which is generateModuleParagraph()'s output: a module
+  // summary sentence followed by the VERBATIM CONCAT of every sub-module's
+  // deterministic sentence. Those exact sentences are ALSO rendered in the
+  // per-sub-module deep-dive below, so the module overview became a verbatim
+  // duplicate of its own sub-module bodies (the scorer's "module paragraph ===
+  // concat of its sub-module sentences in 9/13 modules" penalty). De-dup: in
+  // that fallback-only case, render a TIGHT 2-3 sentence module summary
+  // (module_brief / first overview sentences) instead of the full concat.
+  const hasLlmOverview =
+    (typeof moduleSpec.overview_paragraph_en === 'string' && moduleSpec.overview_paragraph_en.trim().length > 0) ||
+    (typeof nl?.paragraph_en_llm === 'string' && nl.paragraph_en_llm.trim().length > 0)
+  let overviewSource: string
+  if (hasLlmOverview) {
+    overviewSource =
+      moduleSpec.overview_paragraph_en ||
+      nl?.paragraph_en_llm
+  } else {
+    // No LLM prose for this module — avoid echoing the sub-module concat.
+    // Prefer the module_brief (a genuine 2-3 sentence module summary written by
+    // the decomposition emitter); fall back to the first two sentences of the
+    // deterministic concat (the module summary clause, NOT the sub-module body)
+    // so the overview still says something but is not a verbatim sub-module dup.
+    const brief = typeof moduleSpec.module_brief === 'string' ? moduleSpec.module_brief.trim() : ''
+    // 1 sentence only: sentence 1 of the concat is generateModuleSentence's
+    // module-summary clause ("The X module organises N sub-modules (…)") — NOT a
+    // sub-module body sentence — so it can never be a verbatim sub-module dup.
+    const summaryFromConcat = moduleSummarySentences({ overview_paragraph_en: nl?.paragraph_en }, 1)
+    overviewSource = brief || summaryFromConcat || ''
+  }
   const overview = clean_prose(overviewSource)
   const overviewChunks = break_paragraph(overview)
 
