@@ -203,14 +203,55 @@ function buildProvenMargins(quantities: any): FeasibilityProvenMargin[] {
   return out
 }
 
-function buildProvenSummary(quantities: any, toolCount: number): string {
+// 2026-06-06 (FIX 6): readable name for a tool-id, derived from the id itself so
+// the proven-engineering summary can name the tools that ACTUALLY ran rather than
+// a hardcoded catalogue. The id is "<domain>:<variant>" (e.g.
+// "reaction:cstr-pfr-sizing", "ht:ntu-heat-exchanger", "lifecycle-co2:assessment").
+// We take the variant (or the whole id when there's no colon), turn separators
+// into spaces, and apply a few readability fixups. Pure, dependency-free.
+function toolIdToReadable(toolId: string): string {
+  const raw = String(toolId ?? '').trim()
+  if (!raw) return ''
+  const afterColon = raw.includes(':') ? raw.slice(raw.indexOf(':') + 1) : raw
+  let s = afterColon.replace(/[-_:]+/g, ' ').trim()
+  // Common abbreviations → readable, applied as whole words.
+  s = s
+    .replace(/\bcstr pfr\b/gi, 'reactor')
+    .replace(/\bntu\b/gi, 'heat-exchanger')
+    .replace(/\bnpv\b/gi, 'economics')
+    .replace(/\bco2\b/gi, 'CO₂')
+    .replace(/\bfmea\b/gi, 'reliability')
+    .replace(/\bcert\b/gi, 'certification')
+  return s
+}
+
+// Build a concise, DE-DUPLICATED phrase listing the kinds of analysis that ran,
+// from the actual tool-id list. Caps the phrase length so the sentence stays
+// readable. Empty string when no tools ran.
+function describeToolsRun(toolIds: string[]): string {
+  const names = Array.from(new Set(toolIds.map(toolIdToReadable).filter(Boolean)))
+  if (names.length === 0) return ''
+  const shown = names.slice(0, 8)
+  const more = names.length - shown.length
+  const list = shown.join(', ')
+  return more > 0 ? `${list}, and ${more} more` : list
+}
+
+function buildProvenSummary(quantities: any, toolCount: number, toolIds: string[]): string {
   const n = quantities ? Object.keys(quantities).length : 0
   if (n === 0) {
     return 'The core engineering quantities for this design have not yet been computed by the analysis tools.'
   }
   let s = `The design is grounded in ${n} engineering quantit${n === 1 ? 'y' : 'ies'} computed by`
   s += toolCount > 0 ? ` ${toolCount} validated analysis tools` : ' the analysis tool chain'
-  s += ' (heat-exchanger sizing, pressure-vessel design, agitation power, corrosion/cathodic-protection, fire-suppression sizing, life-cycle CO₂ and a mass-envelope check), so the thermal duties, structural margins and energy demands below are calculated rather than assumed.'
+  // 2026-06-06 (FIX 6): name the tools that ACTUALLY ran (from _tools_run), not a
+  // hardcoded CO₂-mineralisation catalogue. The old static list ("agitation
+  // power, corrosion/cathodic-protection, fire-suppression …") leaked tools that
+  // never ran on, e.g., the e_fuel SAF plant. Class-neutral + truthful.
+  const toolsPhrase = describeToolsRun(toolIds)
+  s += toolsPhrase
+    ? ` (${toolsPhrase}), so the thermal duties, structural margins and energy demands below are calculated rather than assumed.`
+    : ', so the thermal duties, structural margins and energy demands below are calculated rather than assumed.'
   return s
 }
 
@@ -316,15 +357,19 @@ function buildManufacturingFlags(state: any): string[] {
 
 export function buildFeasibilityAssessment(state: any): FeasibilityAssessment {
   const quantities = state?.orchestratorContract?.quantities ?? state?.engineeringContract?.quantities ?? null
-  const toolCount = Array.isArray(state?.orchestratorContract?._tools_run)
-    ? state.orchestratorContract._tools_run.length
+  // 2026-06-06 (FIX 6): the actual tool-id list the chain ran — used to NAME the
+  // tools in the proven-engineering summary instead of a hardcoded catalogue.
+  // Prefer orchestratorContract._tools_run; fall back to the toolsUsedPage ids.
+  const toolIds: string[] = Array.isArray(state?.orchestratorContract?._tools_run)
+    ? state.orchestratorContract._tools_run.map((t: any) => String(t))
     : Array.isArray(state?.toolsUsedPage?.tools)
-      ? state.toolsUsedPage.tools.length
-      : 0
+      ? state.toolsUsedPage.tools.map((t: any) => String(t?.tool_id ?? '')).filter(Boolean)
+      : []
+  const toolCount = toolIds.length
 
   const cost_verdict = buildCostVerdict(state)
   const proven_margins = buildProvenMargins(quantities)
-  const proven_summary = buildProvenSummary(quantities, toolCount)
+  const proven_summary = buildProvenSummary(quantities, toolCount, toolIds)
   const risks = buildRisks(state)
   const regulatory_flags = buildRegulatoryFlags(state)
   const manufacturing_flags = buildManufacturingFlags(state)

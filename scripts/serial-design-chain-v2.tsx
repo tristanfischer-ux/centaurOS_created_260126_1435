@@ -62,6 +62,8 @@ import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-eng
 // + every class plan into the orchestrator's global registry + planner.
 import './lib/orchestrator/register-all'
 import { orchestrateDesign } from './lib/orchestrator/orchestrate'
+import { detectEnvelope, isFieldErected, formFactorForClass } from './lib/orchestrator/envelope'
+import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constraint-normaliser'
 import type { ContractInProgress as OrchestratorContract } from './lib/orchestrator/types'
 // Stage 17.6 — LIBRARY-INFORMED CANDIDATE QUERY (2026-05-24).
 // After Stage 17.5 orchestrator computes physics + emitter populates the
@@ -2371,6 +2373,44 @@ async function main() {
     still_missing: augResult.still_missing,
     summary: augResult.summary,
   })
+
+  // ── U5b: Field-erected mass-constraint normalisation (2026-06-05) ─────────
+  // A field-erected process plant (Power-to-Liquid / FT SAF, CO₂ mineralisation,
+  // DAC, SMR, electrolyser) has NO single plant-wide gross-mass cap — equipment
+  // ships as modular skids + field-erected columns, each within road-transport
+  // limits. But U5 / the parser frequently INFERS a max_mass_kg, which the
+  // renderer then applies as a CONTAINERISED cap (bogus "Max gross mass" row +
+  // "container count 2" finding). Drop ONLY an INFERRED plant-wide cap for a
+  // field-erected envelope, recording it in constraints._dropped_inferred[] (a
+  // brief-STATED cap is kept; per-skid road limits are enforced by the
+  // mass-aggregator). Universal across the 5 plant classes; containerised /
+  // mobile classes are unaffected (their form_factor is not field-erected).
+  try {
+    // 2026-06-06 FIX D: resolve the form factor CLASS-AWARELY. detectEnvelope on
+    // the bare constraints returns 'generic' for a registered process-plant class
+    // (e_fuel_synthesis / co2_mineralisation / dac / smr / h2_electrolyser) whose
+    // field-erected nature is declared by the CLASS resolver — so the old
+    // detectEnvelope(constraints) path made U5b silently NOT fire and the inferred
+    // plant-wide cap (e_fuel 40,000 kg) survived into the compliance table. The
+    // class-aware form factor matches the contract envelope.
+    const ffForMass = formFactorForClass(productClass, parsedResult.data.constraints as any)
+    const envForMass = { form_factor: ffForMass }
+    if (isFieldErected(envForMass)) {
+      const massNorm = normaliseFieldErectedMassConstraint(parsedResult.data.constraints as any, envForMass)
+      if (massNorm.dropped && massNorm.record) {
+        console.error(`  [U5b] dropped inferred plant-wide max_mass_kg cap (${massNorm.record.value} kg) — field-erected ${productClass}; per-skid road limits apply`)
+        logAction({
+          step: 'field_erected_mass_normalisation_u5b',
+          product_class: productClass,
+          dropped_field: massNorm.record.field,
+          dropped_value: massNorm.record.value,
+          reason: massNorm.record.reason,
+        })
+      }
+    }
+  } catch (e) {
+    console.error(`  [U5b] field-erected mass normalisation skipped: ${(e as Error).message}`)
+  }
 
   writeFileSync(resolve(outDir, '1-parsed-brief.json'), JSON.stringify(parsedResult.data, null, 2))
 

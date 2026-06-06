@@ -353,7 +353,48 @@ const stepRadiator = universalStep('radiator:sizing', 'radiator_sizing')
 const stepFluids = universalStep('fluids:pipe-sizing', 'fluids_pipe_sizing')
 const stepControl = universalStep('control-systems:pid-tuning', 'control_systems')
 const stepThermal = universalStep('thermal-envelope:check', 'thermal_envelope')
-const stepMassAgg = universalStep('mass-aggregator:envelope-check', 'mass_aggregator')
+
+// FIELD-ERECTED PLANT mass check (2026-06-05). A Small Modular Reactor is a fixed
+// installation, not a containerised product → site mass + per-skid road check, no
+// plant-wide containerised utilisation / container count. NOTE: the SMR reactor
+// pressure vessel (~350 t) legitimately EXCEEDS the road-transport abnormal-load
+// limit — that is a REAL "ships as a field-erected / heavy-lift segment" signal the
+// council wanted preserved, not hidden. Replaces the prior universalStep passthrough
+// (which sent the wrong input shape).
+const stepMassAgg: ToolStep = {
+  tool_id: 'mass-aggregator:envelope-check',
+  required: false,
+  feeds_into: [] as string[],
+  input_from_contract: (c: ContractInProgress) => {
+    const rpvMassKg = c.quantities?.rpv_mass_kg?.value ?? 350_000
+    const transformerMassKg = c.quantities?.gsu_transformer_mass_kg?.value ?? 75_000
+    return {
+      total_cell_mass_kg: 40_000,               // steam generators, pumps, internals
+      transformer_mass_kg: transformerMassKg,   // generator step-up transformer
+      rack_count: 1,
+      rack_mass_kg_each_estimate: rpvMassKg,     // reactor pressure vessel (single heaviest item)
+      pcs_mass_kg_estimate: 20_000,             // primary coolant pumps + drives
+      container_tare_kg_estimate: 10_000,       // structural steel skids
+      max_mass_kg_envelope: 44000,              // per-segment road limit (NOT a plant-wide cap)
+      field_erected: true,
+      road_transport_limit_kg: 44000,
+    }
+  },
+  contract_update: (c: ContractInProgress, output: any) => {
+    const v = (k: string): number | undefined => {
+      const x = output?.[k]; return typeof x === 'number' && Number.isFinite(x) ? x : undefined
+    }
+    const prov = (f: string) => ({
+      source: 'tool:mass-aggregator:envelope-check' as const,
+      tool_id: 'mass-aggregator:envelope-check',
+      invocation_output_field: f,
+      duration_ms: 0,
+    } as any)
+    return { ...c, quantities: { ...c.quantities,
+      total_plant_mass_kg: { value: v('total_system_mass_kg') ?? 495_000, unit: 'kg', family: 'mass' as const, basis: 'dry' as const, scope: 'system' as const, uncertainty_pct: 15, temporal_resolution_s: null, condition: 'site mass (field-erected)', provenance: prov('total_system_mass_kg') },
+    } }
+  },
+}
 const stepRegulatoryCost = universalStep('regulatory-cert-cost:lookup', 'regulatory_cert_cost')
 const stepLcaCo2 = universalStep('lifecycle-co2:assessment', 'lifecycle_co2')
 const stepSupplyRisk = universalStep('supply-chain-risk:scoring', 'supply_chain_risk')

@@ -268,6 +268,44 @@ const STRONG_QUALIFIERS = new Set<string>([
   'cylindrical', 'cylindric', 'cylinder', 'shell',
   'flat-head', 'flathead', 'flat-plate', 'flatplate', 'head', 'heads',
   'dished', 'torispherical', 'hemispherical', 'ellipsoidal', 'endcap', 'end-cap',
+  // FUEL-PRODUCT / PROCESS-STREAM / PROCESS-EQUIPMENT discriminators (2026-06-06,
+  // e_fuel_synthesis gate-18 false-positive: a finished-SAF/product tank shell
+  // mass (6,269 kg) and a NAPHTHA co-product tank shell mass (3,554 kg) are TWO
+  // PHYSICALLY DISTINCT tanks — never a contradiction — but both say "tank" +
+  // "shell mass" so the vessel signature returns "tank:" for both and they
+  // collapse into one cluster → false 55% HIGH → exit 18). A synthetic-fuel /
+  // chemical plant has MANY same-family quantities for genuinely different
+  // products, streams and unit-ops; without these tokens the audit clusters e.g.
+  // the CO2 compressor and the H2 compressor, or the reactor and the column,
+  // together. These mirror the existing nameplate≠usable / dc≠ac / chiller≠pump /
+  // shell≠head precedent: two occurrences only cluster if they share the SAME
+  // strong component qualifier. When the discriminating token lands in the ±6/±4
+  // token window it splits via the per-occurrence qualifier path; when it sits
+  // further out (a whole-clause noun) `streamProductSignatureOf` (wide-window,
+  // nearest-to-number) folds it into the MASS/POWER cluster key as a backstop.
+  // Only ever SPLITS (cuts false positives) — two SAF-tank masses that disagree
+  // across pages both carry "saf"/"product" → still cluster → a genuine
+  // same-product contradiction still fires HIGH.
+  // — fuel products / co-products / cuts:
+  'saf', 'jet', 'kerosene', 'kerosine', 'naphtha', 'syncrude', 'syngas',
+  'diesel', 'gasoline', 'petrol', 'methanol', 'ammonia', 'wax', 'paraffin',
+  'condensate', 'distillate', 'residue', 'product', 'co-product', 'coproduct',
+  'byproduct', 'by-product', 'offtake', 'off-take',
+  // — process streams / services:
+  'co2', 'h2', 'hydrogen', 'oxygen', 'nitrogen', 'steam', 'recycle', 'recycled',
+  'purge', 'makeup', 'make-up', 'feed', 'feedstock', 'tailgas', 'tail-gas',
+  'flue', 'reformate', 'effluent', 'permeate', 'retentate', 'reflux', 'bottoms',
+  'overhead', 'sour', 'sweet', 'lean', 'rich',
+  // — process equipment / unit-ops (only meaningful where the same family anchor
+  //   would otherwise merge two different unit-ops; "tank"/"vessel"/"reactor"/
+  //   "column" are ALSO vessel-type tokens, kept here so the per-occurrence path
+  //   can split a POWER/LENGTH occurrence the vessel signature (MASS-only) can't):
+  'reactor', 'column', 'separator', 'drum', 'tank', 'vessel', 'exchanger',
+  'compressor', 'heater', 'oxidiser', 'oxidizer', 'reformer', 'electrolyser',
+  'electrolyzer', 'fractionator', 'fractionation', 'hydrocracker', 'reboiler',
+  'condenser', 'cooler', 'knockout', 'scrubber', 'absorber', 'stripper',
+  // — thermal / position senses:
+  'hot', 'cold', 'warm',
 ])
 
 /** WEAK qualifiers do NOT split clusters — "minimum target capacity" should
@@ -473,6 +511,80 @@ const VESSEL_TYPE_TOKENS: ReadonlyArray<string> = [
   'regenerator',
 ]
 const VESSEL_TYPE_REGEX = new RegExp(`\\b(${VESSEL_TYPE_TOKENS.join('|')})\\b`)
+
+// 2026-06-06 (gate-18 FIX — e_fuel_synthesis PROSE-form product/stream false-pos).
+// FUEL-PRODUCT / PROCESS-STREAM signature for MASS + POWER clustering. The
+// e_fuel dossier quotes a finished-SAF / product tank shell mass ("API 650
+// atmospheric welded steel tank (6269.2 kg shell mass)") and a NAPHTHA co-product
+// tank shell mass ("naphtha tank (3554.26 kg shell mass)") in ADJACENT sentences
+// on the same flattened page. Both say "tank" + "shell mass", so `vesselSignatureOf`
+// returns "tank:" for BOTH and they collapse → false 55% HIGH → exit 18. The
+// distinguishing signal is the FUEL PRODUCT / PROCESS STREAM the clause is about
+// (saf/product vs naphtha; co2 vs h2 compressor; etc.). The naphtha token sits in
+// the naphtha occurrence's ±6 window (so the per-occurrence qualifier path already
+// splits it), but the SAF occurrence's narrow window has NO product token — its
+// product noun ("Finished SAF is … stored in a … tank") is ~12 tokens upstream,
+// beyond the ±6 window. `streamProductSignatureOf` reads the WIDE window and folds
+// the product/stream noun NEAREST the number into the cluster key (mirroring
+// `vesselSignatureOf`'s nearest-not-first rule via the `\f` number marker), so the
+// SAF tank and naphtha tank get DIFFERENT signatures and split. Two mentions of
+// the SAME product get the SAME signature → still cluster → a genuine same-product
+// contradiction (two different SAF-tank masses across pages) still fires HIGH.
+// UNIVERSAL across every synthetic-fuel / chemical / refinery / power-to-X class
+// (FT, methanol, ammonia, SAF, e-diesel, …) — every such dossier describes several
+// products and streams each with its own mass/power. Returns '' when no product/
+// stream noun is in the window → ordinary MASS/POWER prose keyed exactly as before.
+const PRODUCT_STREAM_TOKENS: ReadonlyArray<string> = [
+  // fuel products / co-products / cuts (whole-word; "saf" etc. also STRONG quals)
+  'saf', 'jet', 'kerosene', 'kerosine', 'naphtha', 'syncrude', 'syngas',
+  'diesel', 'gasoline', 'petrol', 'methanol', 'ammonia', 'paraffin',
+  'condensate', 'distillate',
+  // process streams / services
+  'co2', 'h2', 'hydrogen', 'oxygen', 'nitrogen', 'recycle', 'purge',
+  'tailgas', 'tail-gas', 'flue', 'reformate', 'effluent', 'permeate',
+  'reflux', 'bottoms', 'overhead',
+  // process-equipment / unit-op nouns (wide-window backstop for the case where a
+  // POWER/MASS value's distinguishing equipment noun sits beyond the ±6 window —
+  // e.g. an 833 kW thermal OXIDISER vs a 133 kW PREHEATER both in "…, NNNN kg,
+  // [value] capacity), operating over …" prose, where neither carries a STRONG
+  // qualifier in the narrow window). These only ever SPLIT (two values for the
+  // SAME equipment noun still cluster → a genuine same-equipment contradiction
+  // still fires). 2026-06-06 e_fuel.
+  'oxidiser', 'oxidizer', 'preheater', 'reheater', 'superheater', 'reboiler',
+  'reactor', 'fractionator', 'fractionation', 'hydrocracker', 'electrolyser',
+  'electrolyzer', 'reformer', 'gasifier', 'absorber', 'stripper', 'scrubber',
+  'crystalliser', 'crystallizer', 'centrifuge', 'dryer', 'evaporator',
+]
+const PRODUCT_STREAM_REGEX = new RegExp(`\\b(${PRODUCT_STREAM_TOKENS.join('|')})\\b`)
+
+/** Compute a FUEL-PRODUCT / PROCESS-STREAM signature for a MASS or POWER
+ * occurrence from its WIDE window: the product/stream noun NEAREST the number.
+ *
+ * Mirrors `vesselSignatureOf` exactly (nearest-to-the-`\f`-marker, not first in
+ * window) so a preceding DIFFERENT-product sentence inside the 220-char pre-window
+ * cannot hijack the signature. Returns '' when no product/stream noun is in the
+ * window — non-product MASS/POWER prose is then keyed byte-for-byte as before, so
+ * behaviour is unchanged off the product path. Determinism: the same clause always
+ * yields the same signature → two cross-page mentions of ONE product still share a
+ * cluster → a genuine same-product contradiction still fires HIGH. Only ever
+ * SPLITS. Used by MASS and POWER (both routinely carry per-product/per-stream
+ * scalars in process-plant dossiers). */
+export function streamProductSignatureOf(occ: { wideWindow: string }): string {
+  const w = occ.wideWindow // lowercased + whitespace-collapsed, number marked '\f'
+  const marker = w.indexOf('\f')
+  const numPos = marker >= 0 ? marker : Math.floor(w.length / 2)
+  let product = ''
+  let bestDist = Infinity
+  const re = new RegExp(PRODUCT_STREAM_REGEX.source, 'g')
+  let m: RegExpExecArray | null
+  while ((m = re.exec(w)) !== null) {
+    const start = m.index
+    const end = m.index + m[0].length
+    const dist = numPos < start ? start - numPos : numPos > end ? numPos - end : 0
+    if (dist < bestDist) { bestDist = dist; product = m[1] }
+  }
+  return product
+}
 
 /** Classify an occurrence's role from its local window tokens.
  *   achieved   = the design's delivered value ("Mission: deliver 2.69 MWh")
@@ -1285,6 +1397,17 @@ export function cluster(occurrences: NumericOccurrence[]): Cluster[] {
     // mass contradiction still fires. Other families pass vessel='' (no effect).
     const vessel = feat.family === 'MASS' ? vesselSignatureOf(feat.occ) : ''
     const vesselSeg = vessel ? `|vessel=${vessel}` : ''
+    // 2026-06-06 FIX (MASS + POWER): a FUEL-PRODUCT / PROCESS-STREAM signature
+    // (the product/stream noun nearest the number in the wide window) so a
+    // finished-SAF/product tank shell mass never clusters with a NAPHTHA tank
+    // shell mass (e_fuel: 6269.2 kg vs 3554.26 kg false HIGH), nor a CO2 compressor
+    // power with an H2 compressor power. Backstops the per-occurrence product
+    // qualifiers for the case where the product noun sits beyond the ±6 window.
+    // Non-product MASS/POWER prose yields '' → no effect; two mentions of the SAME
+    // product yield the SAME signature → a genuine same-product contradiction still
+    // fires. Other families pass stream='' (no effect).
+    const stream = feat.family === 'MASS' || feat.family === 'POWER' ? streamProductSignatureOf(feat.occ) : ''
+    const streamSeg = stream ? `|stream=${stream}` : ''
     // 2026-06-03 FIELD-ANCHORED clustering (co2-mineralisation gate-18 fix). When
     // the number is the RHS of a tool-output assignment "<field_name> = <value>",
     // the SPECIFIC field preceding the "=" (absorber_shell_mass,
@@ -1322,7 +1445,7 @@ export function cluster(occurrences: NumericOccurrence[]): Cluster[] {
       // Anchor-based clustering: family + anchor + strong-qualifier-set + role
       // (+ mass-scope for MASS) (+ field for tool-output assignments).
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${field}${constraintSeg}${currentSeg}`
+      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${streamSeg}${field}${constraintSeg}${currentSeg}`
     } else if (PART_SPECIFIC_FAMILIES.has(feat.family)) {
       // No fallback clustering for part-specific families UNLESS the occurrence
       // is a tool-output assignment with an explicit field name. A bare
@@ -1335,7 +1458,7 @@ export function cluster(occurrences: NumericOccurrence[]): Cluster[] {
       // were dropped from MASS clustering and could not be checked at all.
       if (!occ.fieldKey) continue
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${field}${constraintSeg}${currentSeg}`
+      key = `${feat.family}|qual=${qualSorted}|role=${role}|scope=${scope}${vesselSeg}${streamSeg}${field}${constraintSeg}${currentSeg}`
     } else {
       // Fallback for non-part-specific families: family + head +
       // strong-qualifier-set. Stricter — requires EXACT head-token match.
@@ -1343,7 +1466,7 @@ export function cluster(occurrences: NumericOccurrence[]): Cluster[] {
       // (e.g. table rows that quote the same spec twice).
       const headSorted = [...feat.head].sort().join('+')
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|head=${headSorted}|qual=${qualSorted}|role=${role}${field}${constraintSeg}${currentSeg}`
+      key = `${feat.family}|head=${headSorted}|qual=${qualSorted}|role=${role}${streamSeg}${field}${constraintSeg}${currentSeg}`
     }
     let c = clusters.get(key)
     if (!c) {

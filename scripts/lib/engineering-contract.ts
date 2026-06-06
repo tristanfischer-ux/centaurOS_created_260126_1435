@@ -497,6 +497,16 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   point_source_co2_capture: 'co2_mineralisation',
   amine_capture_mineralisation: 'co2_mineralisation',
   flue_gas_co2_capture: 'co2_mineralisation',
+  // e_fuel_synthesis — Power-to-Liquid Fischer-Tropsch SAF plant (2026-06-05).
+  // Single-step CO₂ hydrogenation over an iron FT catalyst → jet-range paraffins
+  // (SAF) + naphtha. DISTINCT from 'dac' (atmospheric sorbent capture) and
+  // 'co2_mineralisation' (solvent capture → solid carbonates): this CONVERTS
+  // captured CO₂ + renewable H₂ into liquid fuels. Mirrors the envelope.ts
+  // CLASS_ALIASES additions for consistency.
+  e_fuel_synthesis: 'e_fuel_synthesis',
+  power_to_liquid: 'e_fuel_synthesis',
+  fischer_tropsch: 'e_fuel_synthesis',
+  ptl_saf: 'e_fuel_synthesis',
 }
 
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
@@ -11383,6 +11393,306 @@ registerArchetype('co2_mineralisation', (brief: any) => {
       // Mirror key scalars for emitter convenience.
       capture_capacity_tco2_per_day: captureTonsPerDay,
       second_sink_desc: 'supplementary hydrated-lime Ca(OH)₂ carbonation reactor (closes the Ca-balance the gypsum route leaves)',
+    },
+  }
+})
+
+// ---------------------------------------------------------------------------
+// e_fuel_synthesis ARCHETYPE — Power-to-Liquid Fischer-Tropsch Sustainable
+// Aviation Fuel (SAF) plant. FIRST contract for this class (a "start", mirroring
+// the co2_mineralisation builder structure exactly).
+//
+// WHY THIS EXISTS: without a registered contract the chain falls back to the
+// LLM-only path ("Engineering Contract not registered for e_fuel_synthesis") and
+// the orchestrator's auto-planner reaches for wrong-domain stand-in tools. A
+// registered contract supplies real, sized quantities the chain + gates + tools
+// READ, and pins the brief-mandated SAF output + H₂:CO₂ ratio (the lock-gate
+// HARD slots for this class).
+//
+// SIZING BASIS (OXCCU first-commercial, ~1,000 t/yr SAF; design-council revised):
+//   - SAF 1,000 t/yr (~125 kg/h; ~3,425 L/day at 0.80 kg/L over 8,000 h/yr) +
+//     naphtha co-product. Jet selectivity ~60% of the liquid product → total
+//     liquids ~1,670 t/yr (SAF 1,000 + naphtha ~670).
+//   - Feeds: CO₂ ~1,000 kg/h, renewable H₂ ~140 kg/h; inlet H₂:CO₂ molar 3.0
+//     (CO₂ + 3 H₂ → -CH₂- + 2 H₂O; iron WGS shifts the internal effective ratio).
+//   - ~13.1 kmol/h CO₂ converted to liquids; carbon-to-liquids ~65% over the
+//     recycle loop; per-pass conversion ~40%; small purge ~150 kg/h to the
+//     thermal oxidiser to prevent inert build-up.
+//   - Reactor 200-350 °C / 20-30 bar (design point 300 °C, 25 bar). FT is
+//     STRONGLY EXOTHERMIC — ~600 kW of reaction heat REMOVED as raised steam
+//     (the steam-generator tool sizes steam_raised_kg_h at runtime; net steam
+//     exporter). NOT a fired-heat-dominated duty.
+//   - 8,000 operating hours/yr; ≥20-year design life; FOAK capex ≤ £45 M
+//     (nth-of-a-kind target ≤ £20 M).
+//
+// PROVENANCE: brief-stated hard numbers → source 'brief'; values a tool computes
+// at runtime (steam raised, compressor power, separator/tank/flare/heater
+// geometry) are seeded here as 'calculator' anchor values and OVERWRITTEN by the
+// class-plan's contract_update with tool provenance (mirrors how co2 seeds
+// reactor/crystalliser quantities a tool later refines); engineering estimates
+// with no tool carry a 'calculator' source + an explicit "engineering_estimate:"
+// source_detail (the contract Quantity.source enum has no 'class_anchor' member —
+// that lives in the orchestrator's tool-provenance layer).
+//
+// COST NOTE: macro_assembly_prices returns EMPTY (mirrors co2's B-3 fix) — the
+// dedicated cost-basis stage re-costs equipment; passing equipment macros ALSO
+// into the BoM double-counts (gate-10 B-3, exit 10).
+//
+// British spelling throughout. Mirrors the `co2_mineralisation` builder structure.
+// NO marine/depth context anywhere (gate 34).
+// ---------------------------------------------------------------------------
+
+registerArchetype('e_fuel_synthesis', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const tp = brief?.constraints?.target_performance ?? {}
+
+  // ── SAF output (t/yr) — primary brief variable ────────────────────────────
+  // Accept "1,000 tonnes/year", "1000 t/yr", litres/day (→ /0.80 kg/L), or a
+  // target_performance value. Class default 1,000 t/yr (the first-commercial
+  // OXCCU plant). The whole sizing scales linearly off this reference design.
+  const safOutputTonnesYr = (() => {
+    const tYr = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(?:t|tonne[s]?|metric\s+ton[s]?|tons?)\s*(?:of\s+)?(?:finished\s+)?(?:saf|sustainable\s+aviation\s+fuel|fuel|jet)?\s*(?:\/|per)\s*(?:yr|year|annum|a)\b/i)
+    if (tYr) return parseFloat(tYr[1].replace(/,/g, ''))
+    const lpd = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(?:l|litre[s]?|liter[s]?)\s*(?:\/|per)\s*day/i)
+    if (lpd) return (parseFloat(lpd[1].replace(/,/g, '')) * 0.80 * 365) / 1000
+    const u = String(tp.unit ?? '').toLowerCase()
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 't/yr' || u === 'tpy' || u === 'tonne_yr' || u === 't/year') return Number(tp.value)
+      if (u === 'kg/h' || u === 'kg_h') return (Number(tp.value) * 8000) / 1000  // at 8,000 h/yr
+    }
+    return 1000  // class default: 1,000 t/yr first-commercial plant
+  })()
+  // Linear scale factor off the 1,000 t/yr reference design.
+  const scale = safOutputTonnesYr / 1000
+
+  // ── Operating hours + product slate ───────────────────────────────────────
+  const operatingHoursYr = extractRangeFromDesc(desc, /(?:≥\s*)?(\d{4,5})\s*(?:operating\s+)?h(?:ours?|rs?)?\s*(?:\/|per)\s*(?:yr|year)/i, 8000)
+  const safOutputKgH = (safOutputTonnesYr * 1000) / operatingHoursYr        // ~125 kg/h @ 1,000 t/yr / 8,000 h
+  const jetSelectivityFrac = extractRangeFromDesc(desc, /(?:jet[\s-]?range\s+)?(?:\(?saf\)?\s+)?selectivity\s*(?:≥|>=|of)?\s*(\d{2})\s*%/i, 60) / 100
+  // Total liquids = SAF / jet-selectivity (the SAF cut is `jetSelectivityFrac` of
+  // the liquid product). Naphtha = the balance.
+  const totalLiquidsTonnesYr = safOutputTonnesYr / jetSelectivityFrac        // ~1,667 t/yr @ 60%
+  const naphthaTonnesYr = totalLiquidsTonnesYr - safOutputTonnesYr           // ~667 t/yr
+  const safOutputLpd = (safOutputKgH * 24) / 0.80                            // ~3,750 L/day at 0.80 kg/L
+
+  // ── Feedstocks + reaction (CO₂ + 3 H₂ → -CH₂- + 2 H₂O) ────────────────────
+  const co2FeedKgH = extractRangeFromDesc(desc, /(?:co2|co₂)[^\d]{0,40}?(\d{2,5})\s*kg\s*(?:\/|per)\s*h/i, 1000) * scale
+  const h2FeedKgH = extractRangeFromDesc(desc, /(?:hydrogen|h2|h₂)[^\d]{0,40}?(\d{2,4})\s*kg\s*(?:\/|per)\s*h/i, 140) * scale
+  // Inlet molar ratio H₂:CO₂. MW H₂=2.016, CO₂=44.01. From the feeds:
+  // (h2/2.016)/(co2/44.01). Pinned to the stoichiometric 3.0 (lock-gate HARD slot).
+  const h2Co2MolarRatio = (() => {
+    const fromFeeds = (h2FeedKgH / 2.016) / (co2FeedKgH / 44.01)
+    return Number.isFinite(fromFeeds) && fromFeeds > 1 && fromFeeds < 6 ? Number(fromFeeds.toFixed(2)) : 3.0
+  })()
+  const carbonToLiquidsFrac = extractRangeFromDesc(desc, /(?:≥\s*)?(\d{2})\s*%\s*(?:of\s+the\s+)?(?:feed\s+)?(?:co2|co₂|carbon)\s+converted/i, 65) / 100
+  const perPassConversionFrac = 0.40  // per-pass conversion (recycle-to-near-extinction)
+  // CO₂ converted to liquids [kmol/h] = co2_feed × carbon-to-liquids / MW_CO₂.
+  const co2ConvertedKmolH = Number(((co2FeedKgH * carbonToLiquidsFrac) / 44.01).toFixed(2))  // ~13.1 kmol/h
+  // Purge to the thermal oxidiser: the carbon NOT converted to liquids leaves as
+  // light ends/inerts; a small purge prevents inert build-up. ~150 kg/h anchor
+  // from the carbon balance (~15% of the 1,000 kg/h CO₂-equivalent feed not recycled).
+  const purgeFlowKgH = Number((co2FeedKgH * 0.15).toFixed(0))  // ~150 kg/h @ 1,000 kg/h CO₂
+
+  // ── Reactor conditions ────────────────────────────────────────────────────
+  const reactorTempC = 300    // design point within the brief's 200-350 °C band
+  const reactorPressureBar = 25  // design point within the brief's 20-30 bar band
+  // FT exotherm [kW] — the dominant thermal duty, REMOVED as raised steam. ~165
+  // kJ/mol CO₂ hydrogenated → Q = co2_converted[kmol/h] × 165[MJ/kmol] / 3.6 → kW.
+  const ftExothermKw = Number(((co2ConvertedKmolH * 165) / 3.6).toFixed(0))  // ~600 kW @ 13.1 kmol/h
+
+  // ── Plant economics + life ────────────────────────────────────────────────
+  const plantCapexGbpFoak = (() => {
+    const m = desc.match(/≤?\s*£?\s*([\d,]{6,})\s*(?:for\s+the\s+first|foak|first[\s-]?of[\s-]?a[\s-]?kind)/i)
+    if (m) { const v = parseFloat(m[1].replace(/,/g, '')); if (v >= 1_000_000) return v }
+    return 45_000_000
+  })()
+  const designLifeYr = extractRangeFromDesc(desc, /(?:≥\s*)?(\d{2})\s*[- ]?year[s]?\s*(?:design\s+life|for\s+the\s+plant|service\s+life)/i, 20)
+
+  // ── Connected electrical load (brief: ≤ 3.0 MW) ───────────────────────────
+  const electricalLoadKw = extractRangeFromDesc(desc, /(?:≤|<=|up\s+to)?\s*(\d(?:\.\d)?)\s*MW\s*(?:for\s+the\s+synthesis|plant\s+electrical|electrical\s+load)/i, 3) * 1000 * scale
+
+  // ── Total system mass (kg) — renderer compliance-table mass row + gate 17.
+  // Skid-mounted PtL plant: feed compressors + FT reactor + separators +
+  // fractionation column + tanks + balance-of-plant. Bottom-up rough estimate;
+  // scales sub-linearly (cube-root) with throughput.
+  const totalSystemMassKg = Math.round((2500 + 4000 + 3000 + 6000 + 3500) * Math.max(1, Math.cbrt(scale)))
+
+  const quantities: Record<string, Quantity> = {
+    // ── Product output (brief-stated) ──
+    saf_output_tonnes_yr: q(safOutputTonnesYr, 't/yr', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '≥1,000 t/yr finished SAF (first-commercial OXCCU PtL train); lock-gate HARD slot (exit 22)' }),
+    saf_output_kg_h: q(Number(safOutputKgH.toFixed(1)), 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'saf_output_tonnes_yr × 1000 / operating_hours_yr (~125 kg/h @ 1,000 t/yr / 8,000 h)' }),
+    saf_output_lpd: q(Number(safOutputLpd.toFixed(0)), 'L/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'saf_output_kg_h × 24 / 0.80 kg/L (~3,425-3,750 L/day finished SAF)' }),
+    total_liquids_tonnes_yr: q(Number(totalLiquidsTonnesYr.toFixed(0)), 't/yr', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'SAF / jet_selectivity_frac (~1,670 t/yr total liquid product at 60% jet selectivity)' }),
+    naphtha_tonnes_yr: q(Number(naphthaTonnesYr.toFixed(0)), 't/yr', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'total_liquids − SAF (~670 t/yr naphtha co-product)' }),
+    jet_selectivity_frac: q(jetSelectivityFrac, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '≥60% jet-range (SAF) selectivity of the liquid product; balance to naphtha' }),
+
+    // ── Feedstocks + reaction stoichiometry ──
+    co2_feed_kg_h: q(Number(co2FeedKgH.toFixed(0)), 'kg/h', 'flow_rate', 'continuous', 'system', 'brief', { source_detail: '~1,000 kg/h biogenic CO₂ at the battery limit (≈8,000 t/yr)' }),
+    h2_feed_kg_h: q(Number(h2FeedKgH.toFixed(0)), 'kg/h', 'flow_rate', 'continuous', 'system', 'brief', { source_detail: '~140 kg/h renewable hydrogen at the battery limit (≈1,120 t/yr), ≥99.9% purity' }),
+    h2_co2_molar_ratio: q(h2Co2MolarRatio, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'inlet H₂:CO₂ molar ≈3.0 (CO₂ + 3 H₂ → -CH₂- + 2 H₂O; iron WGS shifts the internal effective ratio); lock-gate HARD slot (exit 22)' }),
+    co2_converted_kmol_h: q(co2ConvertedKmolH, 'kmol/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'co2_feed × carbon_to_liquids_frac / 44.01 (~13.1 kmol/h CO₂ to liquids); feeds the steam-generator exotherm sizing' }),
+    carbon_to_liquids_frac: q(carbonToLiquidsFrac, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '≥65% of feed CO₂ converted to liquid product over the recycle loop (council-revised from 85%)' }),
+    per_pass_conversion_frac: q(perPassConversionFrac, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'engineering_estimate: ~40% per-pass conversion (recycle-to-near-extinction)' }),
+    purge_flow_kg_h: q(purgeFlowKgH, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'engineering_estimate: ~150 kg/h purge from the carbon balance (≈15% of CO₂-equivalent feed) to the thermal oxidiser to prevent inert build-up' }),
+
+    // ── Reactor conditions ──
+    reactor_temp_c: q(reactorTempC, '°C', 'temperature', 'rated', 'module', 'calculator', { source_detail: 'design point 300 °C within the brief 200-350 °C single-step CO₂-hydrogenation band' }),
+    reactor_pressure_bar: q(reactorPressureBar, 'bar', 'pressure', 'rated', 'module', 'calculator', { source_detail: 'design point 25 bar within the brief 20-30 bar band' }),
+    ft_exotherm_kw: q(ftExothermKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'co2_converted_kmol_h × ~165 kJ/mol / 3.6 (~600 kW); the FT exotherm is the dominant thermal duty, REMOVED as raised steam (sized by process:steam-generator)' }),
+    // steam_raised_kg_h — LEFT for the process:steam-generator tool (per task);
+    // not seeded here so the tool's contract_update supplies it with tool provenance.
+
+    // ── Plant economics + envelope ──
+    operating_hours_yr: q(operatingHoursYr, 'h/yr', 'time', 'rated', 'system', 'brief', { source_detail: '≥8,000 operating hours/year (continuously operated)' }),
+    plant_capex_gbp_foak: q(plantCapexGbpFoak, 'GBP', 'currency', 'gross', 'system', 'brief', { source_detail: '≤£45 M first-of-a-kind installed capital (battery limit: receipt → synthesis → upgrading → storage); nth-of-a-kind target ≤£20 M' }),
+    design_life_yr: q(designLifeYr, 'yr', 'time', 'lifetime', 'system', 'brief', { source_detail: '≥20-year plant design life; catalyst charge a replaceable line item (≥2-year service interval)' }),
+    connected_electrical_load_kw: q(Number(electricalLoadKw.toFixed(0)), 'kW', 'power', 'continuous', 'system', 'brief', { source_detail: '≤3.0 MW for the synthesis-and-upgrading plant (feed/recycle compression, pumps, heat-tracing, controls)' }),
+    total_system_mass_kg: q(totalSystemMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'bottom-up skid estimate: compressors ~2.5 t + FT reactor ~4 t + separators ~3 t + fractionation column ~6 t + tanks/BoP ~3.5 t' }),
+  }
+
+  // ── Topology constraints — typed edges (NO marine/depth context; gate 34) ──
+  // The coupled loops: feed compression → reactor; reactor exotherm → steam;
+  // reactor effluent → 3-phase separation → recycle-recompression; product →
+  // fractionation → storage; purge → thermal oxidiser.
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'co2_feed_compressor',
+      to_part: 'ft_synthesis_reactor',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: co2FeedKgH / 3600,  // kg/s
+      required_unit: 'kg/s',
+      required_margin_factor: 1.2,
+      material_context: 'CO2_compressed_~1.5_to_25_bar_blended_with_H2_and_recycle_then_preheated_to_reactor_inlet',
+    },
+    {
+      from_part: 'h2_feed_compressor',
+      to_part: 'ft_synthesis_reactor',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: h2FeedKgH / 3600,  // kg/s
+      required_unit: 'kg/s',
+      required_margin_factor: 1.2,
+      material_context: 'renewable_H2_compressed_to_25_bar_inlet_H2_to_CO2_molar_3.0_stainless_hydrogen_service',
+    },
+    {
+      from_part: 'ft_synthesis_reactor',
+      to_part: 'waste_heat_steam_generator',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: ftExothermKw,
+      required_unit: 'kW',
+      required_margin_factor: 1.15,
+      material_context: 'FT_exotherm_~600kW_removed_as_raised_steam_boiling_HX_net_steam_exporter_NOT_fired_heat',
+    },
+    {
+      from_part: 'ft_synthesis_reactor',
+      to_part: 'three_phase_separator',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: (co2FeedKgH + h2FeedKgH) / 3600,  // kg/s effluent basis
+      required_unit: 'kg/s',
+      required_margin_factor: 1.2,
+      material_context: 'reactor_effluent_to_hot_and_cold_3phase_separators_tail_gas_process_water_syncrude_wax',
+    },
+    {
+      from_part: 'three_phase_separator',
+      to_part: 'recycle_gas_compressor',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: (co2FeedKgH * (1 - perPassConversionFrac)) / 3600,  // kg/s unconverted recycle
+      required_unit: 'kg/s',
+      required_margin_factor: 1.2,
+      material_context: 'unconverted_tail_gas_recompressed_and_recycled_to_near_extinction_small_purge_to_oxidiser',
+    },
+    {
+      from_part: 'purge_line',
+      to_part: 'thermal_oxidiser',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: purgeFlowKgH / 3600,  // kg/s
+      required_unit: 'kg/s',
+      required_margin_factor: 1.2,
+      material_context: 'small_purge_~150kg_h_to_enclosed_thermal_oxidiser_1000C_residence_for_CO_VOC_destruction',
+    },
+    {
+      from_part: 'fractionation_column',
+      to_part: 'saf_and_naphtha_storage',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: totalLiquidsTonnesYr / (operatingHoursYr) * 1000 / 3600,  // kg/s liquids
+      required_unit: 'kg/s',
+      material_context: 'upgraded_liquid_fractionated_into_SAF_naphtha_residue_then_to_atmospheric_API650_tanks',
+    },
+    {
+      from_part: 'electrical_supply',
+      to_part: 'process_compressors_and_pumps',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (electricalLoadKw * 1000) / (3 ** 0.5 * 415),  // A, 415 V three-phase
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+      material_context: '400_415V_three_phase_LV_behind_an_11kV_MV_transformer_with_VSDs_ATEX_DSEAR_zoned_areas',
+    },
+  ]
+
+  // ── Closures — design-rule gates ──────────────────────────────────────────
+  const closures: ContractClosureResult[] = []
+  // H₂:CO₂ molar ratio in the stoichiometric window — the headline reaction check.
+  closures.push({
+    invariant_id: 'h2_co2_ratio_in_stoichiometric_window',
+    status: h2Co2MolarRatio >= 2.0 && h2Co2MolarRatio <= 4.0 ? 'pass' : 'fail',
+    measured: h2Co2MolarRatio,
+    required: 'inlet H₂:CO₂ molar ratio ∈ [2,4] for CO₂ + 3 H₂ → -CH₂- + 2 H₂O over the iron FT catalyst',
+    reason: `Inlet H₂:CO₂ molar ratio ${h2Co2MolarRatio} (stoichiometric 3.0; iron WGS shifts the internal effective ratio). Within the [2,4] window.`,
+  })
+  // SAF output positive + reconciles with the liquid slate.
+  closures.push({
+    invariant_id: 'saf_output_positive_and_reconciles',
+    status: safOutputTonnesYr > 0 && totalLiquidsTonnesYr >= safOutputTonnesYr ? 'pass' : 'fail',
+    measured: Number(safOutputTonnesYr.toFixed(0)),
+    required: `SAF output > 0 and ≤ total liquids (${totalLiquidsTonnesYr.toFixed(0)} t/yr); SAF = ${(jetSelectivityFrac * 100).toFixed(0)}% jet selectivity of the liquid product`,
+    reason: `SAF ${safOutputTonnesYr.toFixed(0)} t/yr + naphtha ${naphthaTonnesYr.toFixed(0)} t/yr = ${totalLiquidsTonnesYr.toFixed(0)} t/yr total liquids at ${(jetSelectivityFrac * 100).toFixed(0)}% jet selectivity.`,
+  })
+  // Carbon-to-liquids in a physically plausible band over the recycle loop.
+  closures.push({
+    invariant_id: 'carbon_to_liquids_plausible',
+    status: carbonToLiquidsFrac >= 0.5 && carbonToLiquidsFrac <= 0.95 ? 'pass' : 'warn',
+    measured: carbonToLiquidsFrac,
+    required: 'carbon-to-liquids ∈ [0.5, 0.95] over the recycle loop (recycle-to-near-extinction with a small purge)',
+    reason: `Carbon-to-liquids ${(carbonToLiquidsFrac * 100).toFixed(0)}% over the recycle loop. ${co2ConvertedKmolH} kmol/h CO₂ to liquids; balance purged + combusted in the thermal oxidiser.`,
+  })
+  // Capex within the brief's FOAK ceiling (sanity bound).
+  closures.push({
+    invariant_id: 'capex_within_foak_ceiling',
+    status: plantCapexGbpFoak <= 45_000_000 * Math.max(1, scale) ? 'pass' : 'warn',
+    measured: plantCapexGbpFoak,
+    required: '≤£45 M first-of-a-kind installed capital (nth-of-a-kind target ≤£20 M)',
+    reason: `FOAK capex anchor £${(plantCapexGbpFoak / 1_000_000).toFixed(1)} M for the ${safOutputTonnesYr.toFixed(0)} t/yr first-commercial PtL synthesis-and-upgrading plant (PtL is capital-intensive at FOAK scale).`,
+  })
+
+  return {
+    product_class: 'e_fuel_synthesis',
+    brief_summary: `${safOutputTonnesYr.toFixed(0)} t/yr Sustainable Aviation Fuel (SAF) via single-step Power-to-Liquid Fischer-Tropsch (CO₂ + 3 H₂ → -CH₂- + 2 H₂O over an iron catalyst) + ~${naphthaTonnesYr.toFixed(0)} t/yr naphtha co-product. SAF ~${safOutputKgH.toFixed(0)} kg/h (~${safOutputLpd.toFixed(0)} L/day) at ${(jetSelectivityFrac * 100).toFixed(0)}% jet selectivity over ${operatingHoursYr} h/yr. Feeds ~${co2FeedKgH.toFixed(0)} kg/h biogenic CO₂ + ~${h2FeedKgH.toFixed(0)} kg/h renewable H₂ (inlet H₂:CO₂ molar ${h2Co2MolarRatio}). ~${co2ConvertedKmolH} kmol/h CO₂ to liquids; carbon-to-liquids ${(carbonToLiquidsFrac * 100).toFixed(0)}% over the recycle loop (~${perPassConversionFrac * 100}% per-pass; ~${purgeFlowKgH} kg/h purge to a thermal oxidiser). Reactor ${reactorTempC} °C / ${reactorPressureBar} bar; FT exotherm ~${ftExothermKw} kW recovered as raised steam (net steam exporter). ≤£${(plantCapexGbpFoak / 1_000_000).toFixed(0)} M FOAK capex; ≥${designLifeYr}-year design life; ≤${(electricalLoadKw / 1000).toFixed(1)} MW electrical. COMAH + DSEAR/ATEX + PED + IEC 61511/61508; ASTM D7566 A1 (FT-SPK).`,
+    quantities,
+    topology,
+    // B-3 fix (mirror co2): return EMPTY macros to the BoM. The dedicated cost-basis
+    // stage (build-cost-basis.ts) is the authoritative cost view; passing equipment
+    // macros ALSO into the BoM double-counts the word-level lines → gate-10 B-3 (exit 10).
+    macro_assembly_prices: [],
+    closures,
+    shared_quantities: {
+      // Canonical engineering values any sub_module emitter that mentions them
+      // MUST read from here (gate 24 flags two distinct values for one anchor).
+      reactor_temperature_c: reactorTempC,
+      reactor_pressure_bar: reactorPressureBar,
+      catalyst_desc: 'shaped/structured iron-based Fischer-Tropsch catalyst (single-step CO₂ hydrogenation; pyrophoric when reduced — handling hazard)',
+      regulatory_standard_spine: 'COMAH 2015 + DSEAR/ATEX (BS EN 60079) + PED 2014/68/EU (BS EN 13445) + IEC 61511/61508 (SIS/ESD)',
+      product_spec_standard: 'ASTM D7566 Annex A1 (Fischer-Tropsch SPK), ASTM D1655 + UK DEF STAN 91-091 finished blend',
+      // Mirror key scalars for emitter convenience.
+      saf_output_tonnes_yr: safOutputTonnesYr,
+      h2_co2_molar_ratio: h2Co2MolarRatio,
+      hydrogen_service_material_desc: 'stainless steel, hydrogen-compatible (low-temperature/embrittlement-rated for ≥99.9% H₂ service)',
     },
   }
 })

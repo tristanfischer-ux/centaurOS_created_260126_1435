@@ -72,6 +72,7 @@ const VENV_PY = resolve(__dirname, '..', '..', '..', '..', '.venv', 'bin', 'pyth
 
 const APPLICABLE_CLASSES = new Set<string>([
   'co2_mineralisation',
+  'e_fuel_synthesis',  // 2026-06-05 Power-to-Liquid FT SAF plant (liquid product/reflux pumps)
   'dac',
   'fluid_processing',
   'water_treatment',

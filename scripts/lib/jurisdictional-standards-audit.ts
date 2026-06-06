@@ -160,6 +160,17 @@ const ALWAYS_ACCEPTED_CODES = new Set<string>([
   // 2026-05-25 after BESS L23 council scored 84 of 121 jurisdiction-audit
   // HIGH findings as UL 94 false-positives.
   'UL 94',
+  // Aviation turbine fuel specifications are INTERNATIONAL de-facto standards —
+  // there is no BS/EN/ISO equivalent. ASTM D7566 (synthetic blendstocks incl.
+  // FT-SPK), ASTM D1655 (Jet A / Jet A-1) and ASTM D4054 (new-pathway
+  // qualification) are the global SAF/jet certification basis cited in EVERY
+  // jurisdiction; the UK reference DEF STAN 91-091 itself aligns to them. Accept
+  // universally (same rationale as UL 9540A). Added 2026-06-05 after the
+  // e_fuel_synthesis (Power-to-Liquid SAF) L1 run flagged "ASTM D7566" as a
+  // false-positive foreign citation in a UK aviation-fuel brief.
+  'ASTM D7566',
+  'ASTM D1655',
+  'ASTM D4054',
 ])
 
 /** Standards FAMILIES accepted per jurisdiction. A standard from a family NOT

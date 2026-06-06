@@ -9,6 +9,7 @@
  */
 
 import { useState, type FormEvent } from "react"
+import Link from "next/link"
 import { submitBrief } from "@/actions/brief"
 
 const CSS = `
@@ -86,8 +87,8 @@ export function BriefIntake() {
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <header className="topbar">
         <div className="row">
-          <a className="brand" href="/"><span className="flame" /> Fractional&nbsp;Forge</a>
-          <a className="back" href="/">&larr; Back to home</a>
+          <Link className="brand" href="/"><span className="flame" /> Fractional&nbsp;Forge</Link>
+          <Link className="back" href="/">&larr; Back to home</Link>
         </div>
       </header>
       <main>

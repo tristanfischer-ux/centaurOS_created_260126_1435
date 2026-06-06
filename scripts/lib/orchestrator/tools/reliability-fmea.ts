@@ -14,6 +14,7 @@ import { registerTool } from '../registry'
 import type { Tool, ToolResult } from '../types'
 import { spawnSync } from 'child_process'
 import { resolve } from 'path'
+import { isProcessPlantClass, markNotEstimatedForClass } from './generic-tool-class-applicability'
 
 const PYTHON_SCRIPT = resolve(__dirname, 'python', 'reliability_fmea.py')
 const VENV_PYTHON = resolve(__dirname, '..', '..', '..', '..', '.venv', 'bin', 'python3')
@@ -27,7 +28,7 @@ export const reliabilityFmeaTool: Tool<any, any> = {
   domain: 'mechanical',
   pinned_environment: { python: '3.14.4' },
   applicable_to() { return true },
-  async invoke(input: any): Promise<ToolResult<any>> {
+  async invoke(input: any, contract?: any): Promise<ToolResult<any>> {
     const t0 = Date.now()
     const payload = JSON.stringify(input)
     const proc = spawnSync(VENV_PYTHON, [PYTHON_SCRIPT], {
@@ -65,6 +66,23 @@ export const reliabilityFmeaTool: Tool<any, any> = {
         error: `JSON parse: ${(err as Error).message}; stdout: ${proc.stdout.slice(0, 200)}`,
       }
     }
+    // 2026-06-06 (FIX 5): the part-count FIT reliability model is calibrated for
+    // discrete manufactured products; on a continuous process plant it returns an
+    // absurd system MTBF (e.g. 0.21 yr on the e_fuel SAF plant). Declare it
+    // not-estimated-for-this-class (status + reason kept ALONGSIDE the numbers so
+    // the class-plan arithmetic does not regress); the renderer suppresses the
+    // number. The tool still ran + is listed (presence-check intact).
+    const warnings: string[] = []
+    if (output && typeof output === 'object' && isProcessPlantClass(contract?.product_class)) {
+      output = markNotEstimatedForClass(
+        output,
+        'plant reliability is set by process-equipment MTBF (rotating machinery, '
+        + 'pressure vessels, instrumented protective functions) and a HAZOP/LOPA + '
+        + 'RAM study, not a discrete part-count FIT roll-up; quantify with vendor '
+        + 'MTBF data and an availability model at FEED stage.',
+      )
+      warnings.push('reliability-fmea not calibrated for process-plant class — output marked not_estimated_for_class')
+    }
     return {
       ok: true,
       output,
@@ -80,7 +98,7 @@ export const reliabilityFmeaTool: Tool<any, any> = {
         timestamp: new Date().toISOString(),
         duration_ms,
       },
-      warnings: [],
+      warnings,
     }
   },
 }

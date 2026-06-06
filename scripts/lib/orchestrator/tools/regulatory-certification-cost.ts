@@ -14,6 +14,7 @@ import { registerTool } from '../registry'
 import type { Tool, ToolResult } from '../types'
 import { spawnSync } from 'child_process'
 import { resolve } from 'path'
+import { isProcessPlantClass, markNotEstimatedForClass } from './generic-tool-class-applicability'
 
 const PYTHON_SCRIPT = resolve(__dirname, 'python', 'regulatory_certification_cost.py')
 const VENV_PYTHON = resolve(__dirname, '..', '..', '..', '..', '.venv', 'bin', 'python3')
@@ -27,7 +28,7 @@ export const regulatoryCertificationCostTool: Tool<any, any> = {
   domain: 'standards',
   pinned_environment: { python: '3.14.4' },
   applicable_to() { return true },
-  async invoke(input: any): Promise<ToolResult<any>> {
+  async invoke(input: any, contract?: any): Promise<ToolResult<any>> {
     const t0 = Date.now()
     const payload = JSON.stringify(input)
     const proc = spawnSync(VENV_PYTHON, [PYTHON_SCRIPT], {
@@ -65,6 +66,25 @@ export const regulatoryCertificationCostTool: Tool<any, any> = {
         error: `JSON parse: ${(err as Error).message}; stdout: ${proc.stdout.slice(0, 200)}`,
       }
     }
+    // 2026-06-06 (FIX 5): the certification-cost lookup is keyed to discrete-
+    // product conformity schemes (CE/UKCA marking, type approval, EMC test) and
+    // returned £0 / 0 months for the process plant — but a COMAH / PED / ATEX /
+    // DSEAR major-hazard installation carries a substantial, schedule-driving
+    // safety-case and design-code cost that this table does not hold. Declare
+    // not-estimated-for-this-class rather than render a misleading £0; the
+    // renderer suppresses the number. Tool still ran + is listed.
+    const warnings: string[] = []
+    if (output && typeof output === 'object' && isProcessPlantClass(contract?.product_class)) {
+      output = markNotEstimatedForClass(
+        output,
+        'a major-hazard process installation is certified under the process-safety '
+        + 'regime (COMAH safety case, PED / EN 13445 vessel codes, DSEAR / ATEX '
+        + 'hazardous-area assessment, environmental permitting), not a discrete-'
+        + 'product conformity scheme; the certification cost & critical path must be '
+        + 'scoped with a process-safety consultant at FEED stage.',
+      )
+      warnings.push('regulatory-cert-cost not calibrated for process-plant class — output marked not_estimated_for_class')
+    }
     return {
       ok: true,
       output,
@@ -80,7 +100,7 @@ export const regulatoryCertificationCostTool: Tool<any, any> = {
         timestamp: new Date().toISOString(),
         duration_ms,
       },
-      warnings: [],
+      warnings,
     }
   },
 }

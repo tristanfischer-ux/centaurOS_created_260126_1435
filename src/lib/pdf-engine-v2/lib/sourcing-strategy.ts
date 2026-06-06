@@ -132,11 +132,54 @@ function humaniseModuleId(id: string): string {
 // they describe the procurement route (fabricated / bespoke / custom) or are
 // stub markers. They must not appear in the named-manufacturers list nor inflate
 // the distinct-manufacturer count. Universal across product classes.
+// FULLY-ANCHORED single-token / exact-phrase stubs.
 const GENERIC_MFR_RE = /^(fabricated|bespoke|custom|customised|customized|generic|tbd|to be confirmed|n\/?a|none|various|multiple|standard|in[-\s]?house|oem|unknown|commodity|assorted|misc(?:ellaneous)?)$/i
 
-function isRealManufacturer(name: string): boolean {
+// SUBSTRING descriptive-phrase markers (2026-06-05, e_fuel_synthesis). The
+// supplier directory listed non-companies as suppliers — "made-to-order
+// fabrication", "proprietary catalyst supplier", "to be sourced" — because the
+// fully-anchored RE above only catches single-word stubs. These describe a
+// PROCUREMENT ROUTE, not a company, so any value CONTAINING one is rejected.
+// Universal across product classes (a real OEM name never contains these).
+const GENERIC_MFR_PHRASE_RE = /\b(made.?to.?order|proprietary|in.?house|to.?be.?(sourced|confirmed|determined|advised|specified)|various(?:\s+suppliers)?|multiple\s+suppliers|specialist\s+(?:fabricator|supplier|vendor|manufacturer)|local\s+(?:fabricator|supplier|fabrication)|(?:custom|bespoke)\s+(?:fab|fabrication|fabricated|build|made|assembly)\b|\bcustom[\s-]?fab\b|by\s+others|not\s+(?:yet\s+)?(?:selected|specified|determined))\b/i
+
+// Generic procurement nouns. A value that ENDS in one of these AND carries NO
+// proper-noun (capitalised) token is a description, not a company name — e.g.
+// "made-to-order fabrication", "proprietary catalyst supplier" end in a generic
+// noun with no capitalised company token, so they are rejected; "Burckhardt
+// Compression" / "Alfa Laval" carry a capitalised proper noun, so they pass.
+const TRAILING_GENERIC_NOUN_RE = /\b(fabrication|fabricator|supplier|manufacturer|vendor|supply|sourcing|procurement|integrator)s?\.?$/i
+
+/** True if the value contains at least one proper-noun token: a capitalised
+ *  word (≥2 chars, initial uppercase) OR an all-caps acronym (≥2 chars, e.g.
+ *  ABB, GEA, KSB, SEW). Common lowercased generic nouns never qualify. */
+function hasProperNounToken(name: string): boolean {
+  const tokens = String(name ?? '').split(/[\s/&.,()-]+/).filter(Boolean)
+  for (const t of tokens) {
+    // Initial-capital word (Burckhardt, Compression, Laval) — but a single all-
+    // lowercase generic ("fabrication") never matches.
+    if (/^[A-Z][A-Za-z]+$/.test(t) && t.length >= 2) return true
+    // All-caps acronym company token (ABB, GEA, KSB, SEW, BHS).
+    if (/^[A-Z0-9]{2,}$/.test(t) && /[A-Z]/.test(t)) return true
+  }
+  return false
+}
+
+/** Exported for the regression harness — true for a real company name, false
+ *  for a generic procurement-route description / stub. */
+export function isRealManufacturer(name: string): boolean {
   const n = String(name ?? '').trim()
-  return n.length > 0 && !GENERIC_MFR_RE.test(n)
+  if (n.length === 0) return false
+  // 1. Exact single-token / phrase stubs.
+  if (GENERIC_MFR_RE.test(n)) return false
+  // 2. Descriptive procurement-route phrases (substring).
+  if (GENERIC_MFR_PHRASE_RE.test(n)) return false
+  // 3. Ends in a generic procurement noun AND has no proper-noun token → it is a
+  //    description ("proprietary catalyst supplier"), not a company. A real OEM
+  //    that legitimately ends in such a noun (e.g. a brand literally named "…
+  //    Compression") still carries a capitalised proper noun, so it survives.
+  if (TRAILING_GENERIC_NOUN_RE.test(n) && !hasProperNounToken(n)) return false
+  return true
 }
 
 /** Pull (moduleId, component, manufacturer) triples from partVerifications or the module tree. */

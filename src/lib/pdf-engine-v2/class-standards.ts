@@ -256,8 +256,27 @@ const HAPS: ClassStandards = {
 
 // ─── Registry ───────────────────────────────────────────────────────────────
 
+const E_FUEL_SYNTHESIS: ClassStandards = {
+  product_class: 'e_fuel_synthesis',
+  display_name: 'Power-to-Liquid Fischer-Tropsch SAF Plant',
+  compliance_summary: 'A Power-to-Liquid SAF plant sits at the intersection of major-hazard process safety and aviation-fuel product certification. The product cut must qualify as ASTM D7566 Annex A1 Fischer-Tropsch Synthetic Paraffinic Kerosene and the finished blend meet ASTM D1655 / UK DEF STAN 91-091; the plant itself is governed by the COMAH 2015 major-accident regime, DSEAR/ATEX explosive-atmosphere law (BS EN 60079), the Pressure Equipment Directive (BS EN 13445) for the HP synthesis vessels, and IEC 61511/61508 functional safety for the SIS/ESD.',
+  standards: [
+    { code: 'ASTM D7566 Annex A1', title: 'Standard Specification for Aviation Turbine Fuel Containing Synthesised Hydrocarbons — Annex A1 (Fischer-Tropsch SPK)', jurisdiction: 'global', category: 'sector_specific', mandatory: true,  typical_compliance_cost_gbp: 120_000, typical_lead_time_weeks: 52, applies_because: 'The qualifying specification for Fischer-Tropsch Synthetic Paraffinic Kerosene; the SAF cut must meet Annex A1 to be blended (up to 50%) into aviation turbine fuel. First-of-a-kind qualification involves an extended fuel-property + fit-for-purpose programme.' },
+    { code: 'ASTM D1655',          title: 'Standard Specification for Aviation Turbine Fuels (Jet A / Jet A-1)',                                                                       jurisdiction: 'global', category: 'sector_specific', mandatory: true,  typical_compliance_cost_gbp: 40_000,  typical_lead_time_weeks: 16, applies_because: 'The finished blended jet fuel placed on the market must meet the Jet A-1 specification; the FT-SPK blend is certified against D1655 for the delivered product.' },
+    { code: 'DEF STAN 91-091',     title: 'Turbine Fuel, Kerosine Type, Jet A-1 (UK Ministry of Defence Defence Standard)',                                                          jurisdiction: 'UK',     category: 'sector_specific', mandatory: true,  typical_compliance_cost_gbp: 30_000,  typical_lead_time_weeks: 16, applies_because: 'The UK reference specification for Jet A-1; the finished blend supplied into the UK market is certified against DEF STAN 91-091 (additives, conductivity, fit-for-purpose).' },
+    { code: 'COMAH 2015',          title: 'Control of Major Accident Hazards Regulations 2015',                                                                                       jurisdiction: 'UK',     category: 'system_safety',   mandatory: true,  typical_compliance_cost_gbp: 90_000,  typical_lead_time_weeks: 40, applies_because: 'The flammable + toxic inventory (hydrogen, carbon monoxide, hydrocarbons, finished fuel) brings the site within the major-accident-hazard regime; a safety report / safety case + land-use-planning consultation is required.' },
+    { code: 'DSEAR',               title: 'Dangerous Substances and Explosive Atmospheres Regulations 2002',                                                                          jurisdiction: 'UK',     category: 'system_safety',   mandatory: true,  typical_compliance_cost_gbp: 25_000,  typical_lead_time_weeks: 12, applies_because: 'Mandatory explosive-atmosphere risk assessment + hazardous-area classification for the flammable gas + vapour inventory; drives Ex-equipment selection and zoning.' },
+    { code: 'ATEX 2014/34/EU',     title: 'Equipment and Protective Systems Intended for Use in Potentially Explosive Atmospheres',                                                  jurisdiction: 'EU',     category: 'system_safety',   mandatory: true,  typical_compliance_cost_gbp: 20_000,  typical_lead_time_weeks: 10, applies_because: 'All equipment installed in the classified hazardous areas (motors, instruments, junction boxes) must carry the appropriate ATEX category for the zone.' },
+    { code: 'PED 2014/68/EU',      title: 'Pressure Equipment Directive',                                                                                                             jurisdiction: 'EU',     category: 'system_safety',   mandatory: true,  typical_compliance_cost_gbp: 35_000,  typical_lead_time_weeks: 16, applies_because: 'The 20–30 bar synthesis reactor, separators, knock-out drums, steam drum and HP exchangers are pressure equipment requiring conformity assessment + CE marking.' },
+    { code: 'BS EN 13445',         title: 'Unfired Pressure Vessels',                                                                                                                 jurisdiction: 'EU',     category: 'system_safety',   mandatory: true,  typical_compliance_cost_gbp: 18_000,  typical_lead_time_weeks: 12, applies_because: 'The harmonised design + fabrication + test code used to demonstrate PED conformity for the bespoke synthesis + separation vessels.' },
+    { code: 'IEC 61511',           title: 'Functional Safety — Safety Instrumented Systems for the Process Industry Sector',                                                         jurisdiction: 'IEC',    category: 'functional_safety', mandatory: true, typical_compliance_cost_gbp: 28_000, typical_lead_time_weeks: 14, applies_because: 'The emergency-shutdown + high-temperature/high-pressure trips that protect the synthesis loop must be designed, verified and proof-tested to a target Safety Integrity Level under IEC 61511 (with IEC 61508 for the devices).' },
+    { code: 'EI 1530',             title: 'Energy Institute — Design, Construction, Operation and Maintenance of Aviation Fuelling Facilities',                                       jurisdiction: 'industry', category: 'sector_specific', mandatory: true, typical_compliance_cost_gbp: 12_000, typical_lead_time_weeks: 8,  applies_because: 'The aviation-fuel storage + tanker-loading facility (additisation, metering, earthing, overfill protection) is designed and operated to the EI 1530 aviation-fuelling code.' },
+  ],
+}
+
 export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   energy_storage: ENERGY_STORAGE,
+  e_fuel_synthesis:     E_FUEL_SYNTHESIS,
   thermal_system:       HEATPUMP,
   vertical_farm:  VERTICAL_FARM,
   ev_charger:     EV_CHARGER,
@@ -292,6 +311,7 @@ function resolveClassKey(productClass: string): string | null {
     [/\b(bioreactor|fermenter|cell[-\s]?culture)\b/, 'bioreactor'],
     [/\b(auv|underwater\s+vehicle|subsea)\b/, 'auv'],
     [/\b(haps|stratospheric|high[-\s]?altitude\s+platform)\b/, 'haps'],
+    [/\b(e[-\s]?fuel|power[-\s]?to[-\s]?liquid|fischer[-\s]?tropsch|\bptl\b|sustainable\s+aviation\s+fuel|\bsaf\b|e[-\s]?kerosene)\b/, 'e_fuel_synthesis'],
   ]
   for (const [rx, key] of aliases) {
     if (rx.test(lower)) return key

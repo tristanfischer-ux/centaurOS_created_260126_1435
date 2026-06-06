@@ -444,6 +444,7 @@ export const COST_STACK: Record<string, CostStackRatios> = {
   // stack drops the "Channel list price" step (channel = 0, direct) and carries
   // civils + field erection + commissioning as the install layer.
   co2_mineralisation: { ...ARCH_BESPOKE_ENGINEERED_PLANT, notes: 'CO2 capture + mineralisation plant — bespoke engineered-to-order, direct EPC sale (no distributor channel). Civils + field erection + commissioning install. Calibrate against Phase 4 corpus pilot-plant CAPEX once Engine C lands.' },
+  e_fuel_synthesis: { ...ARCH_BESPOKE_ENGINEERED_PLANT, notes: 'Power-to-Liquid Fischer-Tropsch SAF plant — bespoke engineered-to-order, direct EPC sale (no distributor channel). FT reactor + feed/recycle compressors + fractionation + product storage; civils + field erection + commissioning dominate FOAK CAPEX.' },
   dac: { ...ARCH_BESPOKE_ENGINEERED_PLANT, notes: 'Direct-air-capture plant — bespoke engineered-to-order, direct EPC sale (no distributor channel).' },
   smr: { ...ARCH_BESPOKE_ENGINEERED_PLANT, manufacturer_margin_factor: 0.15, installation_cost_factor: 0.70, notes: 'Small modular reactor — bespoke engineered-to-order power plant, direct EPC sale (no distributor channel). Civils + nuclear-grade field erection + commissioning dominate CAPEX.' },
   h2_electrolyser: { ...ARCH_BESPOKE_ENGINEERED_PLANT, manufacturer_margin_factor: 0.15, notes: 'Hydrogen electrolyser plant — bespoke engineered-to-order, direct EPC sale (no distributor channel). Mirrors hydrogen_electrolyser canonical; EPC + commissioning.' },

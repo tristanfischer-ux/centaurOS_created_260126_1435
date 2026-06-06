@@ -851,6 +851,27 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
     bom_scale_factor: 1.0,
   },
 
+  e_fuel_synthesis: {
+    natural_metric: '£ per t/yr SAF capacity (Power-to-Liquid FT plant installed)',
+    metric_compute: (state) => {
+      // e_fuel_synthesis scales off SAF output (t/yr), not kW. Mirrors the dac
+      // throughput pattern: prefer a keyMetrics scalar, else the brief target.
+      return keyMetricNumber(state, 'saf_output_tonnes_yr')
+        || keyMetricNumber(state, 'saf_output_tpy')
+        || targetPerformanceValueAs(state, 'tpy')
+        || 1
+    },
+    market_band_low: 12_000,
+    market_band_high: 60_000,
+    sources: [
+      'OXCCU / Fischer-Tropsch e-SAF FOAK CAPEX design-council estimates 2026 (Gemini 3.1 £18k, Grok 4.3 £38k, MiMo-v2.5 £40-80k per t/yr SAF)',
+      'IEA Renewables 2024 + Concawe e-fuels 2024 (Power-to-Liquid synthetic-kerosene CAPEX intensity)',
+      'Royal Society / ICCT Power-to-Liquid SAF cost reviews 2023-24',
+    ],
+    notes: 'Installed CAPEX per annual tonne of SAF capacity for a first-of-a-kind Power-to-Liquid Fischer-Tropsch plant (battery limit: feed receipt/conditioning + synthesis + separation/recycle + upgrading + fractionation + utilities + product storage). FOAK micro-scale (~1,000 t/yr) sits at the high end; nth-of-a-kind + larger trains drop materially. Excludes the H2 supply plant + CO2 source.',
+    bom_scale_factor: 1.0,
+  },
+
   solid_state_battery: {
     natural_metric: '£/kWh installed (solid-state lithium-metal battery pack, EV-class)',
     metric_compute: (state) => {
@@ -919,6 +940,10 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
   direct_air_capture: undefined as unknown as PriceBand,
   e_vtol: undefined as unknown as PriceBand,
   cnc: undefined as unknown as PriceBand,
+  // 2026-06-05 e_fuel_synthesis aliases (orchestrator product_class slug variants).
+  power_to_liquid: undefined as unknown as PriceBand,
+  fischer_tropsch: undefined as unknown as PriceBand,
+  ptl_saf: undefined as unknown as PriceBand,
 }
 
 // Wire up the product_class aliases. Done after the literal so each entry
@@ -936,6 +961,10 @@ PRICE_BANDS.small_modular_reactor = PRICE_BANDS.smr
 PRICE_BANDS.direct_air_capture = PRICE_BANDS.dac
 PRICE_BANDS.e_vtol = PRICE_BANDS.evtol
 PRICE_BANDS.cnc = PRICE_BANDS.cnc_machine
+// 2026-06-05 e_fuel_synthesis aliases.
+PRICE_BANDS.power_to_liquid = PRICE_BANDS.e_fuel_synthesis
+PRICE_BANDS.fischer_tropsch = PRICE_BANDS.e_fuel_synthesis
+PRICE_BANDS.ptl_saf = PRICE_BANDS.e_fuel_synthesis
 
 // Resolves a band for the given state. Tries the product_class first
 // (canonical) and falls back to the iter-output slug if the caller passes

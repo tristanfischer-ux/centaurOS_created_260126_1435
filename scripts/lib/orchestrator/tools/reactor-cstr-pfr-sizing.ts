@@ -82,6 +82,7 @@ const VENV_PY = resolve(__dirname, '..', '..', '..', '..', '.venv', 'bin', 'pyth
 // bioreactor, plus the bespoke-plant fallback classes).
 const APPLICABLE_CLASSES = new Set<string>([
   'co2_mineralisation',
+  'e_fuel_synthesis',  // 2026-06-05 Power-to-Liquid FT SAF plant (FT reactor sizing)
   'dac',
   'fluid_processing',
   'water_treatment',

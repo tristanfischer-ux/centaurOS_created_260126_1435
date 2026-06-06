@@ -188,6 +188,16 @@ function getProductClassSlug(state: any): string {
   ).toLowerCase()
 }
 
+// Source-of-truth validity set for ComponentClass: the keys of COMPONENT_CURVES
+// are exactly the real component classes. Used to reject corpus values that are
+// actually PRODUCT-CLASS slugs (the harvest overloads component_class to also
+// tag parts with the product-class for class-scoped price lookup) so they never
+// leak into the §17 component-class breakdown. (2026-06-06 FIX C.)
+const VALID_COMPONENT_CLASSES: ReadonlySet<string> = new Set<string>(Object.keys(COMPONENT_CURVES))
+function isValidComponentClass(v: string): v is ComponentClass {
+  return VALID_COMPONENT_CLASSES.has(v)
+}
+
 // ---------------------------------------------------------------------------
 // Corpus lookup — for a given part name, find a matching pretraining row and
 // return its component_class. Uses case-insensitive contains-match against
@@ -231,7 +241,26 @@ class CorpusClassifier {
     try {
       const row = this.stmt.get(needle) as any
       if (row && row.component_class) {
-        result = row.component_class as ComponentClass | 'unknown'
+        const raw = String(row.component_class)
+        // VALIDITY GUARD (2026-06-06 FIX C): the corpus `component_class` column
+        // is ALSO used by the growing-DB harvest to stamp parts with the
+        // PRODUCT-CLASS slug (e.g. 'co2_mineralisation', 'e_fuel_synthesis') for
+        // class-scoped real-price lookup. Those product-class slugs are NOT real
+        // ComponentClass members, so returning one (via the blind `as ComponentClass`
+        // cast) leaked a bogus "CO2 Mineralisation" component-class line into the
+        // §17 breakdown of EVERY other class whose generic part name happened to
+        // LIKE-match a co2_mineralisation-tagged corpus row (e_fuel: one £6,800
+        // line). Only accept a value that is an actual ComponentClass (a key of
+        // COMPONENT_CURVES) or the literal 'unknown'; otherwise return null so the
+        // caller falls back to the NAME_KEYWORD_RULES / Flash-Lite classifier.
+        // Universal + zero-regression: legitimate component classes still pass; a
+        // product-class slug never can. See growing-DB principle (component_class
+        // is overloaded as both the true class AND the harvest product-class tag).
+        if (raw === 'unknown' || isValidComponentClass(raw)) {
+          result = raw as ComponentClass | 'unknown'
+        } else {
+          result = null
+        }
       }
     } catch {
       result = null
@@ -715,12 +744,47 @@ const NAME_KEYWORD_RULES: RuleEntry[] = [
   { pattern: /\b(circulator.pump|dosing.pump|glycol.pump|coolant.pump|coolant.circulation|coolant.loop)\b/i, cls: 'mechanical_assembly' },
   // ── Transformers / magnetics ──────────────────────────────────────────────
   { pattern: /\b(step.up.transformer|step.down.transformer|isolation.transformer|distribution.transformer|dry.type.transformer|cast.resin.transformer)\b/i, cls: 'magnetic' },
+  // 2026-06-05 (e_fuel_synthesis): a bare `transformer` is an electrical magnetic
+  // (MV/LV site distribution transformer) → magnetic is correct. Placed AFTER the
+  // qualified-reactor rule below would be wrong order; transformer never collides
+  // with a process "reactor", so this bare rule is safe. Process equipment never
+  // carries the token "transformer".
+  { pattern: /\btransformer\b/i, cls: 'magnetic' },
   // 2026-06-03: qualified the bare `reactor` token → it was swallowing PROCESS /
   // nuclear reactors ("carbonation reactor", "reactor pressure vessel") as
   // `magnetic`. An electrical reactor is always qualified (line / smoothing / AC /
   // DC / series / shunt / current-limiting); bare "reactor" now falls through to
   // the process-equipment rules above. Universal correctness fix.
   { pattern: /\b(emi.filter|line.filter|common.mode.choke|differential.mode.choke|dc.choke|ac.choke|(line|smoothing|series|shunt|current.?limiting|ac|dc).?reactor)\b/i, cls: 'magnetic' },
+  // ── Process equipment — Power-to-Liquid / Fischer-Tropsch SAF plant (2026-06-05, e_fuel_synthesis) ──
+  // A SAF plant's BoM names process-plant unit-operations (fired heaters, FT
+  // reactors, hydrocrackers, fractionation columns, knock-out drums, ESD valves,
+  // a distributed control system, catalyst charges) that had NO rule here and fell
+  // through to the corpus token-classifier — which mis-bucketed them on noise (the
+  // L8 SAF run showed "35% Magnetic, Battery Cell, Bioreactor" on a process plant).
+  // These ADDITIVE rules route each to its TYPE-correct class. COUNCIL REGRESSION
+  // GUARD: SPECIFIC multi-word patterns ONLY — no bare `separator`/`cell`/`isolator`
+  // rule (a battery "cell separator" is a micro-porous membrane; an FT "separator"
+  // is a pressure vessel — the two must not collide). Verified against the battery
+  // terms (cell separator, battery cell, BMS isolator, line reactor) — none match.
+  // Fired / process heating + reforming → thermal (ceiling £15k):
+  { pattern: /\b(fired.?heater|process.?furnace|reformer(?!ate)|feed.?preheater|combined.?feed.?heater)\b/i, cls: 'thermal' },
+  { pattern: /\b(thermal.?oxidiser|thermal.?oxidizer|enclosed.?(ground.?)?(flare|oxidiser|oxidizer)|incinerator|catalytic.?oxidiser|catalytic.?oxidizer)\b/i, cls: 'thermal' },
+  { pattern: /\b(waste.?heat.?(steam.?)?(generator|recovery|boiler)|heat.?recovery.?steam.?generator|\bhrsg\b)\b/i, cls: 'thermal' },
+  // Compression + reaction / conversion rotating + reactor assemblies → mechanical_assembly (ceiling £20k):
+  { pattern: /\b(compressor\b|reciprocating.?compressor|centrifugal.?compressor|screw.?compressor|diaphragm.?compressor|recycle.?compressor|booster.?compressor)\b/i, cls: 'mechanical_assembly' },
+  { pattern: /\b(fischer.?tropsch.?reactor|\bft.?reactor\b|hydrocrack\w*|hydrotreat\w*|isomerisation.?reactor|isomerization.?reactor|synthesis.?reactor|slurry.?bubble.?column.?reactor)\b/i, cls: 'mechanical_assembly' },
+  { pattern: /\b(turbo.?expander|expander.?compressor|hot.?gas.?expander)\b/i, cls: 'mechanical_assembly' },
+  // Separation columns + drums + wetted vessels → fluid_path (ceiling £10k):
+  { pattern: /\b(fractionation.?column|fractionating.?column|debutaniser|debutanizer|deethaniser|deethanizer|product.?splitter.?column)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(three.?phase.?separator|3.?phase.?separator|two.?phase.?separator|knock.?out.?drum|\bko.?drum\b|flash.?drum|steam.?drum|surge.?drum|reflux.?drum|overhead.?drum|coalescer|guard.?bed)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(esd.?valve|emergency.?shut.?(down|off).?valve|blowdown.?valve|depressuring.?valve|sdv\b|bdv\b)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(api.?650.?tank|api650.?tank|product.?storage.?tank|saf.?(storage.?)?tank|naphtha.?(storage.?)?tank|kerosene.?(storage.?)?tank|crude.?storage.?tank)\b/i, cls: 'fluid_path' },
+  // Process control + safety instrumentation + detection → electronic_pcb (ceiling matches control gear):
+  { pattern: /\b(distributed.?control.?system|\bdcs\b|safety.?instrumented.?system|\bsis\b|emergency.?shutdown.?system|\besd.?system\b|burner.?management.?system|\bbms.?panel\b)\b/i, cls: 'electronic_pcb' },
+  { pattern: /\b(fire.?(and.?|&.?)?gas.?(system|panel|detection)|f.?&.?g.?(system|panel)|gas.?detector|flame.?detector|ir.?flame.?detector|point.?gas.?detector|open.?path.?gas.?detector)\b/i, cls: 'electronic_pcb' },
+  // Catalyst charges / reaction consumables (per-fill inputs, NEVER capital) → consumable:
+  { pattern: /\b(catalyst.?charge|catalyst.?(inventory|load|fill|bed.?charge)|ft.?catalyst|fischer.?tropsch.?catalyst|cobalt.?catalyst|iron.?catalyst|reduction.?activation|catalyst.?reduction)\b/i, cls: 'consumable' },
   // ── Process equipment — chemical / process plant (2026-06-03, co2_mineralisation) ──
   // Process unit-operations (dryers, reboilers, condensers, columns, reactors,
   // crystallisers, safety showers, bunds) have no rules below and fall through to
