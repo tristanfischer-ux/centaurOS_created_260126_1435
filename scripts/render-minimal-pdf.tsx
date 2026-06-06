@@ -6055,7 +6055,14 @@ function _metricRateBase(key: string): string {
   }
   // Also run the universal single-token strip for the simpler families (kwh, mw…),
   // so a brief key like rated_power_kw and a contract key rated_power_mw share a base.
-  return _stripMetricUnitSuffix(raw) || raw
+  let base = _stripMetricUnitSuffix(raw) || raw
+  // Strip a TRAILING non-semantic qualifier the brief parser adds inconsistently
+  // (synthesis_temperature_MAX vs synthesis_temperature; also _min/_target/_nominal/
+  // _rated/_avg/_peak) so the SAME concept resolves regardless of which qualifier the
+  // parser emitted this run — brief-parser key-name non-determinism (2026-06-06, L14:
+  // synthesis_temperature_max_c fell to "—" because _max kept it off the synonym map).
+  base = base.replace(/_(max|min|target|nominal|rated|avg|mean|peak)$/, '')
+  return base
 }
 
 // Canonicalise differing brief/contract stems for the SAME design-output concept.
@@ -6798,6 +6805,19 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
       //       a real PASS without a per-suffix METRIC_MAP alias.
       // When neither resolves, fall through to the universal-completeness pass.
       let mapping = METRIC_MAP[km]
+      if (!mapping) {
+        // Brief-parser key-name variance (2026-06-06): a variant key (e.g.
+        // saf_production_kg_per_h vs the canonical _kg_per_hr) misses the EXACT
+        // METRIC_MAP key — fall back to the entry whose rate-BASE AND unit match, so
+        // the same metric resolves regardless of the parser's unit-suffix spelling
+        // this run. Unit-matched so a kg/h variant never grabs the t/yr sibling
+        // (saf_production_kg_per_hr vs saf_production_tpy share base 'saf_production').
+        const kmBase = _metricRateBase(km)
+        const kmUnit = _normUnitToken(String(m?.unit ?? ''))
+        for (const mk of Object.keys(METRIC_MAP)) {
+          if (_metricRateBase(mk) === kmBase && _normUnitToken(METRIC_MAP[mk].unit) === kmUnit) { mapping = METRIC_MAP[mk]; break }
+        }
+      }
       let achievedConverted: number | null = null
       if (mapping) {
         if (briefVal == null) continue

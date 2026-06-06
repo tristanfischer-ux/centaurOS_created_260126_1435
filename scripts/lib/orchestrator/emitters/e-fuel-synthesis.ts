@@ -229,7 +229,7 @@ function deriveParams(c: ContractInProgress): EFuelParams {
 // CO2 dry + sulphur/oxygen guard beds, H2 receipt/buffer, feed compressors.
 function emitFeedstockConditioning(p: EFuelParams): DesignModule {
   const sub = makeSub('feedstock_receipt_conditioning', 'feedstock receipt & conditioning', 'conditions',
-    `~${p.co2FeedKgH.toFixed(0)} kg/h biogenic CO2 is dried and passed over sulphur/oxygen guard beds, ~${p.h2FeedKgH.toFixed(0)} kg/h renewable H2 is received into buffer storage, and each stream is compressed to the ${p.reactorPressureBar.toFixed(0)} bar synthesis pressure`, [
+    `~${p.co2FeedKgH.toFixed(0)} kg/h biogenic CO2 is dried and compressed to the ${p.reactorPressureBar.toFixed(0)} bar synthesis pressure, then heated and passed over ZnO/deoxo sulphur+oxygen guard beds (~360 °C chemisorption temperature); ~${p.h2FeedKgH.toFixed(0)} kg/h renewable H2 is received into buffer storage and compressed to the same pressure`, [
     word('co2_feed_compressor_word', 'CO2 feed compressor',
       cc('co2_feed_compressor', 'multistage CO2 feed compressor', 'mass_fluid_transport_process', 'stainless_steel'),
       // Real Burckhardt/Howden process-compressor line; series-level descriptor (no
@@ -250,7 +250,7 @@ function emitFeedstockConditioning(p: EFuelParams): DesignModule {
     word('sulphur_guard_bed_word', 'sulphur/oxygen guard bed',
       cc('sulphur_guard_bed', 'sulphur + oxygen polishing guard bed', 'chemical_reaction_function', 'stainless_steel'),
       // Lead/lag guard-bed vessels — bespoke fabricated, honest descriptor (gate-20 safe).
-      [mod('quantity', 'x2'), mod('form', 'lead/lag guard-bed vessels, ZnO + deoxo catalyst removing sulphur + oxygen traces that poison the FT catalyst'), mod('dimension', '0.8 m dia x 2.5 m'), mod('manufacturer', 'made-to-order fabrication'),
+      [mod('quantity', 'x2'), mod('form', 'lead/lag guard-bed vessels operating at ~360 °C (the compressed feed is electrically heated to the ZnO chemisorption temperature upstream of the beds — compression precedes heating, so the compressors handle cool gas), ZnO + deoxo catalyst removing sulphur + oxygen traces that poison the FT catalyst'), mod('dimension', '0.8 m dia x 2.5 m'), mod('manufacturer', 'made-to-order fabrication'),
        // BESPOKE fabricated guard-bed vessels (per vessel, x2) — FOAK estimate.
        mod('part_number', 'fabricated 316L lead/lag guard-bed vessel pair — bespoke vessel'), mod('list_price_gbp', '95000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('guard_bed_adsorbent_word', 'guard-bed adsorbent + deoxo charge',
@@ -388,7 +388,14 @@ function emitSeparationRecycle(p: EFuelParams): DesignModule {
 // Hydrocracker/hydrotreater, isomerisation, fractionation column.
 function emitUpgradingFractionation(p: EFuelParams): DesignModule {
   const sub = makeSub('upgrading_fractionation_train', 'upgrading & fractionation train', 'upgrades',
-    `the syncrude/wax is hydrocracked and isomerised/dewaxed (consuming an HP H2 slip-stream) then fractionated in a ${p.fractionationColumnDiameterM.toFixed(1)} m column into an on-spec SAF (jet) cut, a naphtha co-product (~${p.naphthaTonnesYr.toFixed(0)} t/yr) and a small recycle residue`, [
+    `the cold (~35 °C) syncrude/wax is first reheated to hydroprocessing temperature in a feed/effluent heat exchanger plus electric trim heater, then hydrocracked and isomerised/dewaxed (consuming an HP H2 slip-stream) and fractionated in a ${p.fractionationColumnDiameterM.toFixed(1)} m column into an on-spec SAF (jet) cut, a naphtha co-product (~${p.naphthaTonnesYr.toFixed(0)} t/yr) and a small recycle residue`, [
+    word('syncrude_preheater_word', 'syncrude feed/effluent preheater',
+      cc('syncrude_preheater', 'syncrude feed/effluent heat exchanger + electric trim heater', 'thermal_transfer_function', 'stainless_steel'),
+      // Addresses the physics-critic gap (L12): the cold ~35 °C syncrude condensed in
+      // separation must be reheated to hydroprocessing temperature before the hydrocracker.
+      [mod('quantity', 'x1'), mod('form', 'feed/effluent heat exchanger recovering heat from the hot hydrocracker effluent to reheat the cold (~35 °C) syncrude to hydroprocessing inlet temperature, with an electric trim heater to reach reactor temperature'), mod('capacity', '210', 'kW'), mod('manufacturer', 'Kelvion'),
+       // Engineered-to-order syncrude feed/effluent exchanger + electric trim heater — FOAK estimate.
+       mod('part_number', 'syncrude feed/effluent shell-and-tube exchanger + electric trim heater — engineered'), mod('list_price_gbp', '95000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('hydrocracker_reactor_word', 'hydrocracker/hydrotreater reactor',
       cc('hydrocracker_reactor', 'syncrude hydrocracker/hydrotreater reactor', 'chemical_reaction_function', 'stainless_steel'),
       // Bespoke fabricated trickle-bed hydroprocessing reactor — honest descriptor.
