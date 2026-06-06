@@ -50,30 +50,54 @@ PROVENANCE = {
 
 def calculate_irr(cashflows: list[float], guess: float = 0.10,
                   tolerance: float = 1e-6, max_iter: int = 100) -> float | None:
-    """Newton-Raphson IRR with bisection fallback."""
-    r = guess
-    for _ in range(max_iter):
-        npv = sum(cf / (1 + r) ** t for t, cf in enumerate(cashflows))
-        d_npv = sum(-t * cf / (1 + r) ** (t + 1) for t, cf in enumerate(cashflows))
-        if abs(d_npv) < 1e-12:
-            break
-        r_new = r - npv / d_npv
-        if abs(r_new - r) < tolerance:
-            return r_new
-        r = r_new
+    """Newton-Raphson IRR with bisection fallback. Returns None when no IRR exists.
 
-    # Bisection fallback
-    low, high = -0.99, 5.0
-    for _ in range(200):
-        mid = (low + high) / 2
-        npv_mid = sum(cf / (1 + mid) ** t for t, cf in enumerate(cashflows))
-        if abs(npv_mid) < tolerance:
-            return mid
-        npv_low = sum(cf / (1 + low) ** t for t, cf in enumerate(cashflows))
-        if npv_low * npv_mid < 0:
-            high = mid
-        else:
-            low = mid
+    Robustness (2026-06-06): a never-profitable project — every post-year-0 cashflow
+    <= 0 (e.g. a FOAK e-fuel/DAC plant priced below cost) — has NO real IRR: NPV is
+    monotonic and never crosses zero for r > -1. The old Newton step diverged on such
+    a series, driving r huge until (1+r)**t raised OverflowError ('Result too large'),
+    which crashed the whole tool (exit 3) and silently dropped the levelised cost.
+    Guard it: return None directly for no-sign-change series, clamp/abort a diverging
+    Newton step, and catch OverflowError. The levelised cost is computed separately
+    (it does not depend on the IRR), so it always survives now.
+    """
+    # An IRR can only exist with at least one positive AND one negative cashflow.
+    if not any(cf > 0 for cf in cashflows) or not any(cf < 0 for cf in cashflows):
+        return None
+    # If every cashflow after the year-0 outlay is non-positive, NPV never crosses
+    # zero for r > -1 -> no IRR (and the Newton step would diverge + overflow).
+    if all(cf <= 0 for cf in cashflows[1:]):
+        return None
+    try:
+        r = guess
+        for _ in range(max_iter):
+            if r <= -0.9999:                       # (1+r) base would be <= 0
+                break
+            npv = sum(cf / (1 + r) ** t for t, cf in enumerate(cashflows))
+            d_npv = sum(-t * cf / (1 + r) ** (t + 1) for t, cf in enumerate(cashflows))
+            if abs(d_npv) < 1e-12:
+                break
+            r_new = r - npv / d_npv
+            if not math.isfinite(r_new) or abs(r_new) > 1e6:   # diverged
+                break
+            if abs(r_new - r) < tolerance:
+                return r_new
+            r = r_new
+
+        # Bisection fallback on a bounded bracket
+        low, high = -0.99, 5.0
+        for _ in range(200):
+            mid = (low + high) / 2
+            npv_mid = sum(cf / (1 + mid) ** t for t, cf in enumerate(cashflows))
+            if abs(npv_mid) < tolerance:
+                return mid
+            npv_low = sum(cf / (1 + low) ** t for t, cf in enumerate(cashflows))
+            if npv_low * npv_mid < 0:
+                high = mid
+            else:
+                low = mid
+    except OverflowError:
+        return None
     return None
 
 

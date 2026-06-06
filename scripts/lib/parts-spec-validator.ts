@@ -1144,6 +1144,247 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     category: 'aerosol_fire_suppression',
     notes: 'Stat-X T16450ES: condensed aerosol fire suppression generator, 450 g charge, electrical activation, UL Listed, FM Approved, NFPA 2010. BESS rack-level fire protection per NFPA 855 Section 15.6. Claiming >900 g charge on a T16450ES is wrong (that is T16900ES territory). Source: https://www.statx.com/products/generators/t16450es',
   },
+
+  // ── Universal process-plant I&C catalogue (added 2026-06-06) ──────────────
+  // Entries added for the _universal-instrumentation.ts emitter so gate-13
+  // can validate claimed ratings against manufacturer datasheets. All MPNs
+  // verified against manufacturer catalogues; rated_pressure_max_bar /
+  // rated_temp_max_c filled where gate-13 spec validation is meaningful.
+
+  // Emerson Rosemount 3051CD — gauge/differential pressure transmitter
+  // Datasheet: Rosemount 3051C series, 4–20 mA HART, range 0–250 bar,
+  // –40 to +85 °C electronics, 316L/316SST wetted, ATEX II 2G.
+  // Source: emerson.com/en-us/catalog/rosemount-3051-pressure-transmitter
+  {
+    manufacturer: 'Emerson',
+    part_number_pattern: /^Rosemount\s+3051(?:C?D?[A-Z]?)?$/i,
+    category: 'pressure_transmitter',
+    notes: 'Emerson Rosemount 3051CD: coplanar gauge/differential pressure transmitter, 4–20 mA HART, process range 0.025 inH2O to 3626 psi (0–250 bar), –40 to +85 °C electronics, 316L wetted. ATEX II 2G, SIL 2/3. Any pressure claim > 250 bar is outside the standard process range; use 3051CA (absolute) or a higher-rated transmitter. Source: emerson.com/en-us/catalog/rosemount-3051.',
+  },
+  // Alias for the short form used in co2-mineralisation emitter
+  {
+    manufacturer: 'Emerson',
+    part_number_pattern: /^Rosemount\s+3051$/i,
+    category: 'pressure_transmitter',
+    notes: 'Emerson Rosemount 3051 (short-form alias): see Rosemount 3051CD entry for full spec.',
+  },
+
+  // Endress+Hauser Cerabar PMP71 — gauge pressure transmitter, ceramic/metallic
+  // Datasheet: PMP71 up to 400 bar, –40 to +150 °C process, 4–20 mA HART.
+  // Source: endress.com/en/field-instruments-overview/pressure/Cerabar-PMP71
+  {
+    manufacturer: 'Endress+Hauser',
+    part_number_pattern: /^Cerabar\s+PMP71$/i,
+    category: 'pressure_transmitter',
+    notes: 'Endress+Hauser Cerabar PMP71: ceramic or metallic measuring cell gauge pressure transmitter, 4–20 mA HART, process range to 400 bar, temperature –40 to +150 °C, ATEX II 2G Ex ia. Any claim > 400 bar is outside the catalogue range.',
+  },
+
+  // Endress+Hauser iTHERM TM411 — compact temperature head transmitter with Pt100
+  // Datasheet: TM411, –50 to +250 °C (standard) / to +600 °C (high-temp), 4–20 mA.
+  // Source: endress.com/en/field-instruments-overview/temperature/TM411
+  {
+    manufacturer: 'Endress+Hauser',
+    part_number_pattern: /^iTHERM\s+TM411$/i,
+    category: 'temperature_transmitter',
+    notes: 'Endress+Hauser iTHERM TM411: compact 4–20 mA HART head transmitter for Pt100/Pt1000/thermocouple, –50 to +600 °C (variant-dependent), 16-bit resolution, ATEX II 2G Ex ia. Claiming >600 °C for the standard process variant is wrong.',
+  },
+
+  // Endress+Hauser Promag W 400 — electromagnetic flow transmitter
+  // Datasheet: W 400 electromagnetic flowmeter, DN10–DN1200, 4–20 mA HART / PROFIBUS PA.
+  // Source: endress.com/en/field-instruments-overview/flow/Promag-W-400
+  {
+    manufacturer: 'Endress+Hauser',
+    part_number_pattern: /^Promag\s+W\s+400$/i,
+    category: 'electromagnetic_flow_transmitter',
+    notes: 'Endress+Hauser Promag W 400: electromagnetic flow transmitter, DN10–DN1200, 4–20 mA HART + PROFIBUS PA, max process pressure 40 bar (PN40), –20 to +150 °C fluid, 316L/316Ti liner. Any claim > 40 bar process pressure is wrong for the standard version. Suitable for aqueous and slurry streams. ATEX II 2G.',
+  },
+
+  // Endress+Hauser Promass Q 300 — Coriolis mass flow transmitter
+  // Datasheet: Promass Q 300, dual bent-tube Coriolis, DN4–DN200, up to 200 bar.
+  // Source: endress.com/en/field-instruments-overview/flow/Promass-Q-300
+  {
+    manufacturer: 'Endress+Hauser',
+    part_number_pattern: /^Promass\s+Q\s+300$/i,
+    category: 'coriolis_mass_flow_transmitter',
+    notes: 'Endress+Hauser Promass Q 300: dual bent-tube Coriolis mass flow transmitter, DN4–DN200, max 200 bar, –200 to +350 °C, accuracy ±0.05% mass flow. Any claim > 200 bar or > 350 °C is outside the catalogue envelope.',
+  },
+
+  // Endress+Hauser Micropilot FMR62 — 80 GHz radar level transmitter
+  // Datasheet: FMR62, 0.1–120 m range, –40 to +250 °C process, PN40, ATEX II 1G.
+  // Source: endress.com/en/field-instruments-overview/level/Micropilot-FMR62
+  {
+    manufacturer: 'Endress+Hauser',
+    part_number_pattern: /^Micropilot\s+FMR62$/i,
+    category: 'radar_level_transmitter',
+    notes: 'Endress+Hauser Micropilot FMR62: 80 GHz free-space radar level transmitter, range 0.1–120 m, –40 to +250 °C process temperature, max 40 bar (PN40), 4–20 mA HART / PROFIBUS PA, ATEX II 1G Ex ia. SIL 2. Any range claim > 120 m or pressure > 40 bar is wrong.',
+  },
+
+  // VEGA VEGAFLEX 83 — guided-wave radar level transmitter
+  // Datasheet: VEGAFLEX 83, range to 75 m, –196 to +450 °C, up to 160 bar.
+  // Source: vega.com/en-gb/products/product-catalog/level/guided-radar-tdr/VEGAFLEX-83
+  {
+    manufacturer: 'VEGA',
+    part_number_pattern: /^VEGAFLEX\s+83$/i,
+    category: 'guided_wave_radar_level_transmitter',
+    notes: 'VEGA VEGAFLEX 83: guided-wave (TDR) radar level transmitter, range to 75 m, –196 to +450 °C, up to 160 bar, 4–20 mA HART / PROFIBUS PA. ATEX Zone 0/20. Claiming > 160 bar or > 75 m range is wrong. Best used on reactors, separators, and standpipes where free-space radar antennas cannot be used.',
+  },
+
+  // Endress+Hauser Liquiline CM442 — multiparameter transmitter (pH + conductivity)
+  // Datasheet: CM442, dual-channel, Memosens digital sensors, 4–20 mA HART.
+  // Source: endress.com/en/field-instruments-overview/liquid-analysis/Liquiline-CM442
+  {
+    manufacturer: 'Endress+Hauser',
+    part_number_pattern: /^Liquiline\s+CM442$/i,
+    category: 'ph_conductivity_transmitter',
+    notes: 'Endress+Hauser Liquiline CM442: dual-channel multiparameter transmitter for pH, ORP, conductivity, turbidity, etc., via Memosens digital sensors. Two 4–20 mA outputs, HART. No pressure or current rating — gate-13 only checks category correctness for this entry.',
+  },
+
+  // Dräger Polytron 8700 — fixed electrochemical/catalytic gas transmitter
+  // Datasheet: Polytron 8700, H2 / CO / HC selectable, ATEX II 1G Ex ia,
+  // 4–20 mA output, IP66. Range 0–100% LEL (catalytic) or 0–4000 ppm (EC).
+  // Source: draeger.com/en_uk/Safety/Fixed-Gas-Detection/Polytron-8700
+  {
+    manufacturer: 'Dräger',
+    part_number_pattern: /^Polytron\s+8700$/i,
+    category: 'fixed_gas_detector',
+    notes: 'Dräger Polytron 8700: fixed electrochemical (CO, H2S, NH3, etc.) or catalytic bead (flammable HC/H2) gas transmitter. 4–20 mA + relay, IP66, ATEX II 1G Ex ia, EN 60079-29-1 certified. Selectable sensor head for H2 / CO / LCH4 / LEL. No electrical current rating — category correctness is the validation here. Source: draeger.com.',
+  },
+
+  // ABB EL3060 Uras26 — extractive multi-component NDIR gas analyser
+  // Datasheet: EL3060 analyser system with Uras26 infrared detector,
+  // measures CO2, CO, CH4, N2O, SO2, NO simultaneously. QAL1 certified.
+  // Source: abb.com/en/continuous-gas-analyzers/el3060
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^EL3060\s+Uras26$/i,
+    category: 'process_gas_analyser',
+    notes: 'ABB EL3060 Uras26: extractive multi-component NDIR gas analyser system. Measures CO2, CO, CH4, N2O, SO2, NO and O2 (with paramagnetic detector). EN 15267-3 QAL1 certified for CEMs applications. ATEX II 2G available. Typical UK list price ~£9,500 for process-grade configuration. Source: abb.com/en/continuous-gas-analyzers/el3060.',
+  },
+
+  // Emerson Fisher GX + DVC6200 — globe/rotary control valve + digital positioner
+  // Datasheet: Fisher GX Control Valve, ASME B16.34, PN40; DVC6200 HART positioner.
+  // Source: emerson.com/en-us/automation/fisher/control-valves/gx-control-valve
+  {
+    manufacturer: 'Emerson Fisher',
+    part_number_pattern: /^GX\s*\+\s*DVC6200$/i,
+    category: 'control_valve',
+    notes: 'Emerson Fisher GX globe/rotary control valve body (ASME B16.34, rated to PN16–PN160 depending on trim) with Fisher DVC6200 HART digital positioner. Any process pressure claim > 160 bar is outside the standard PN160 body rating. SIL 3 capable with redundant positioner. Source: emerson.com/en-us/automation/fisher.',
+  },
+
+  // Spelsberg 81040001 — polycarbonate field junction box
+  // Datasheet: TK PC 1809-6-t, 180×110×90 mm, polycarbonate, IP65, M20 knockouts.
+  // Source: spelsberg.com/en-gb/products/product-overview/junction-boxes/81040001
+  {
+    manufacturer: 'Spelsberg',
+    part_number_pattern: /^81040001$/i,
+    category: 'field_junction_box',
+    notes: 'Spelsberg 81040001 (TK PC 1809-6-t): polycarbonate IP65 junction box, 180×110×90 mm, 6×M20 knock-outs, grey lid, DIN-rail compatible. No electrical rating — no current passes through the enclosure. Category: IP65 field cable marshalling enclosure.',
+  },
+
+  // Siemens 6ES7155-6AU01-0CN0 — ET 200SP HA IM 155-6 PN/2 interface module
+  // Datasheet: SIMATIC ET 200SP HA, 32–512 I/O channels, PROFINET, –40 to +70 °C.
+  // Source: siemens.com/global/en/products/automation/simatic-s7/et-200sp.html
+  {
+    manufacturer: 'Siemens',
+    part_number_pattern: /^6ES7155-6AU01-0CN0$/i,
+    category: 'remote_io_interface_module',
+    notes: 'Siemens SIMATIC ET 200SP HA IM 155-6 PN/2 (6ES7155-6AU01-0CN0): high-availability remote I/O interface module, 2×PROFINET ports, ring topology, 32–512 I/O channels, –40 to +70 °C, IP20 (cabinet mount). No electrical current rating — the module routes digital signals only.',
+  },
+
+  // Siemens 6ES7131-6BH01-0BA0 — ET 200SP digital input card (DI 16×24 V DC)
+  // Source: siemens.com SIMATIC ET 200SP DI 16×24VDC HF
+  {
+    manufacturer: 'Siemens',
+    part_number_pattern: /^6ES7131-6BH01-0BA0$/i,
+    category: 'digital_io_card',
+    notes: 'Siemens ET 200SP DI 16×24 V DC HF (6ES7131-6BH01-0BA0): 16-channel digital input card, 24 V DC, high-feature diagnostics, ISOMAX galvanic isolation. No current rating — digital signal only (10 mA typical input current). Source: siemens.com.',
+  },
+
+  // Siemens 6ES7134-6GF00-0AA1 — ET 200SP analogue input card (AI 8×I 2/4-wire)
+  // Source: siemens.com SIMATIC ET 200SP AI 8xI 2/4-wire HF
+  {
+    manufacturer: 'Siemens',
+    part_number_pattern: /^6ES7134-6GF00-0AA1$/i,
+    category: 'analogue_io_card',
+    notes: 'Siemens ET 200SP AI 8×I 2/4-wire HF (6ES7134-6GF00-0AA1): 8-channel 4–20 mA analogue input card, 16-bit resolution, diagnostics, –10 V to +10 V or 0–20 mA / 4–20 mA. No current rating — accepts 4–20 mA process signals. Source: siemens.com.',
+  },
+
+  // Siemens 6AV2124-0QC02-0AX1 — SIMATIC HMI TP1500 Comfort 15-inch touch panel
+  // Source: siemens.com/global/en/products/automation/simatic-hmi/panels/tp1500-comfort.html
+  {
+    manufacturer: 'Siemens',
+    part_number_pattern: /^6AV2124-0QC02-0AX1$/i,
+    category: 'hmi_panel',
+    notes: 'Siemens SIMATIC TP1500 Comfort (6AV2124-0QC02-0AX1): 15-inch widescreen TFT industrial HMI, multi-touch, PROFINET/MPI, USB, CF/SD slot, 24 V DC, IP65 front. 24 V DC supply. Any claim of >30 V input is wrong.',
+  },
+
+  // Siemens SCALANCE XC208 — managed industrial PROFINET switch
+  // Datasheet: SCALANCE XC208, 8×10/100 Mbit/s, ring (MRP), –40 to +70 °C.
+  // Source: siemens.com/global/en/products/automation/industrial-communication/scalance-x/xc-200.html
+  {
+    manufacturer: 'Siemens',
+    part_number_pattern: /^SCALANCE\s+XC208$/i,
+    category: 'profinet_switch',
+    notes: 'Siemens SCALANCE XC208: managed 8-port 100 Mbit/s industrial Ethernet switch, PROFINET conformance Class C, ring redundancy (MRP), –40 to +70 °C, DIN-rail. No electrical current or voltage rating — signal switching only (24 V DC supply).',
+  },
+
+  // ABB ACS580-01 — general-purpose VFD ≤15 kW (pumps / agitators / fans)
+  // Datasheet: ACS580-01, 380–480 V AC, 0.75–55 kW (01 frame to R7), IP55, STO SIL 2.
+  // Source: abb.com/drives/en/products/acs580
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^ACS580-01$/i,
+    category: 'variable_frequency_drive',
+    rated_voltage_ac_v: 480,
+    rated_power_kw: 55,
+    notes: 'ABB ACS580-01: general-purpose VFD, 380–480 V AC, 0.75–55 kW (01 frame series), IP55, STO SIL 2, EN 61800-3 C2, Modbus/EtherNet-IP. Claiming >55 kW on the -01 frame is wrong (use ACS880-07 for higher power). Source: abb.com/drives.',
+  },
+
+  // ABB ACS880-07 — industrial VFD, 15–250 kW wall/floor (compressors / large motors)
+  // Datasheet: ACS880-07, 380–690 V AC, 15–250 kW, IP55, DTC, STO SIL 3.
+  // Source: abb.com/drives/en/products/acs880
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^ACS880-07$/i,
+    category: 'variable_frequency_drive',
+    rated_voltage_ac_v: 690,
+    rated_power_kw: 250,
+    notes: 'ABB ACS880-07: industrial VFD, 380–690 V AC, 15–250 kW (wall/floor-mount 07 frame), IP55, DTC motor control, STO SIL 3, ABB Ability connected. Claiming >250 kW on the -07 frame is wrong (use ACS880-17 cabinet drive for >250 kW). Source: abb.com/drives.',
+  },
+
+  // ABB MNS Form-4 — low-voltage motor control centre
+  // Datasheet: MNS Form-4, withdrawable units, IEC 61439-2, Ue 690 V AC max, Icw 50 kA.
+  // Source: abb.com/en/products/sace-mns-low-voltage-motor-control-centres
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^MNS\s+Form-4(?:\s+motor\s+control\s+centre\s+[-—]\s+configured)?$/i,
+    category: 'motor_control_centre',
+    rated_voltage_ac_v: 690,
+    rated_current_a: 6300,
+    notes: 'ABB MNS Form-4 motor control centre: withdrawable-unit MCC to IEC 61439-2, rated Ue ≤ 690 V AC, Icw 50 kA/1 s, Form-4 full compartmentalisation. Any claim of >690 V input or >6300 A busbar is wrong for the standard MNS range (use MNS IS for higher short-circuit). Source: abb.com SACE MNS catalogue.',
+  },
+
+  // Eaton 93PM — online double-conversion UPS, 10–200 kVA
+  // Datasheet: 93PM, 10–200 kVA, 3-phase in/out, 480 V or 400 V, IEC 62040-3 Class 1.
+  // Source: eaton.com/us/en-us/catalog/backup-power-ups-surge-it-power-distribution/93pm.html
+  {
+    manufacturer: 'Eaton',
+    part_number_pattern: /^93PM$/i,
+    category: 'uninterruptible_power_supply',
+    rated_voltage_ac_v: 480,
+    rated_power_kw: 200,
+    notes: 'Eaton 93PM: online double-conversion UPS, 10–200 kVA, 3-phase in/single or 3-phase out, 480 V or 400 V, IEC 62040-3 VFI Class 1, NFPA 70 compliant. Any claim >200 kVA for a single 93PM chassis is wrong (multiple units in parallel cover higher loads). Source: eaton.com.',
+  },
+
+  // Rittal VX25 8284.500 — large floor-standing enclosure for marshalling
+  // Datasheet: VX25 8284.500, 600 W×2000 H×600 D mm, steel, IP55/IP66 with kit, RAL7035.
+  // Source: rittal.com/com_en/products/product/VX25-8284500
+  {
+    manufacturer: 'Rittal',
+    part_number_pattern: /^VX25\s+8284\.500$/i,
+    category: 'marshalling_cabinet',
+    notes: 'Rittal VX25 8284.500: floor-standing steel enclosure, 600 W×2000 H×600 D mm, IP55 with standard kit, IP66 with optional kit, RAL7035, bayed, DIN-rail mountable, multiple cable entry options. No electrical rating — passive enclosure. Source: rittal.com VX25 series.',
+  },
 ]
 
 // ── PARSERS ──────────────────────────────────────────────────────────────────

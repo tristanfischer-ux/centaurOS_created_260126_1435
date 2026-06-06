@@ -129,12 +129,20 @@ const stepFtGibbs: ToolStep = {
   required: false,
   feeds_into: [] as string[],
   input_from_contract: (c: ContractInProgress) => ({
-    reaction_name: 'Fischer-Tropsch CO2 hydrogenation (single-step, iron catalyst)',
+    reaction_name: 'Fischer-Tropsch CO2 hydrogenation (single-step, iron catalyst; n-hexadecane jet surrogate)',
+    // FIX 2026-06-06: ΔGf is undefined for the "-CH2-" repeat unit (no real species,
+    // no CAS), so the Gibbs tool SILENTLY FAILED (Python exit 3, nothing written —
+    // the FT feasibility verdict never reached the dossier). Use n-hexadecane
+    // (C16H34, CAS 544-76-3), the ASTM FT-SPK jet-cut surrogate with a real Gibbs of
+    // formation, and balance on that basis:
+    //   16 CO2 + 49 H2 -> C16H34 + 32 H2O   (C 16=16, O 32=32, H 98=34+64; H2:CO2=3.06,
+    //   matching the brief — note 49 H2 not 33: a paraffin's chain-ends add 2 H over
+    //   16×-CH2-).
     species: [
-      { name: 'CO2', coeff: -1, cas: '124-38-9', phase: 'g' },
-      { name: 'H2', coeff: -3, cas: '1333-74-0', phase: 'g' },
-      { name: 'CH2', coeff: 1, phase: 'l' },          // -CH2- jet-range paraffin repeat unit
-      { name: 'H2O', coeff: 2, cas: '7732-18-5', phase: 'g' },
+      { name: 'CO2', coeff: -16, cas: '124-38-9', phase: 'g' },
+      { name: 'H2', coeff: -49, cas: '1333-74-0', phase: 'g' },
+      { name: 'hexadecane', coeff: 1, cas: '544-76-3', phase: 'l' },  // C16H34 jet surrogate (real ΔGf)
+      { name: 'H2O', coeff: 32, cas: '7732-18-5', phase: 'g' },
     ],
     temperatures_k: [298.15, q(c, 'reactor_temp_c', 300) + 273.15],
   }),
@@ -142,8 +150,12 @@ const stepFtGibbs: ToolStep = {
     const p = provFor('reaction:feasibility-gibbs', '1.0.0', 'MIT', 'github.com/CalebBell/chemicals')
     const verdict = String(output?.verdict ?? 'feasible')
     const verdictFlag = verdict === 'feasible' ? 1 : verdict === 'borderline' ? 0 : -1
+    // The tool returns ΔG for the reaction AS WRITTEN (per mol C16H34, i.e. a 16×CO2
+    // basis). Normalise to per-mol-CO2 for a reader-interpretable figure (~-59 kJ/mol).
+    const dgRxn = num(output, 'delta_g_rxn_298k_kj_mol')
+    const dgPerCo2 = dgRxn != null ? Math.round((dgRxn / 16) * 10) / 10 : -59
     return { ...c, quantities: { ...c.quantities,
-      ft_reaction_delta_g_kj_mol: mkQty(num(output, 'delta_g_rxn_298k_kj_mol') ?? -120, 'kJ/mol', 'energy', p('delta_g_rxn_298k_kj_mol'), `298 K; verdict=${verdict}`),
+      ft_reaction_delta_g_kj_mol: mkQty(dgPerCo2, 'kJ/mol', 'energy', p('delta_g_rxn_298k_kj_mol'), `298 K, per mol CO2 (n-C16 surrogate basis); verdict=${verdict}`),
       ft_reaction_feasibility_flag: mkQty(verdictFlag, '', 'dimensionless', p('verdict'), `${verdict} (data confidence: ${String(output?.lowest_data_confidence ?? 'medium')})`),
     } }
   },
@@ -600,11 +612,36 @@ const stepYieldEconomics: ToolStep = {
   feeds_into: [] as string[],
   input_from_contract: (c: ContractInProgress) => {
     const capex = q(c, 'plant_capex_gbp_foak', 45_000_000)
+    const hours = q(c, 'operating_hours_yr', 8000)
+    // FIX 2026-06-06: opex was a flat `capex × 8%` — which IGNORES the dominant cost
+    // of any Power-to-Liquid plant: green hydrogen (60-80% of opex). At 140 kg/h H2
+    // and £5/kg, H2 alone is ~£5.6M/yr — more than the old £3.6M total opex, so the
+    // levelised cost (£5.85/kg) sat BELOW its own hydrogen floor. Build opex up
+    // explicitly from H2 + electricity + CO2 feedstock + fixed O&M. Prices are
+    // class-anchor defaults, overridable via contract quantities.
+    const h2PriceGbpKg = q(c, 'h2_price_gbp_kg', 5.0)             // delivered green H2
+    const elecPriceGbpKwh = q(c, 'electricity_price_gbp_kwh', 0.10)
+    const co2PriceGbpT = q(c, 'co2_price_gbp_t', 45)             // captured/biogenic CO2 delivered
+    // Electricity load summed from the real compressor/pump/preheater tool outputs
+    // (battery-limit plant; the electrolyser making the H2 is OUT of scope — its
+    // energy is already priced into the imported-H2 £/kg above).
+    const elecLoadKw =
+      q(c, 'co2_feed_compressor_power_kw', 73) +
+      q(c, 'h2_feed_compressor_power_kw', 140) +
+      q(c, 'recycle_gas_compressor_power_kw', 40) +
+      q(c, 'feed_preheater_input_kw', 133) +
+      q(c, 'product_pump_motor_kw', 1) +
+      120 /* utilities: cooling water + instrument air + N2 + lighting */
+    const h2Opex = q(c, 'h2_feed_kg_h', 140) * hours * h2PriceGbpKg
+    const elecOpex = elecLoadKw * hours * elecPriceGbpKwh
+    const co2Opex = (q(c, 'co2_feed_kg_h', 1000) / 1000) * hours * co2PriceGbpT
+    const fixedOpex = capex * 0.04                               // labour + maintenance + iron-catalyst replacement (~4% capex/yr)
+    const opexGbpYr = Math.round(h2Opex + elecOpex + co2Opex + fixedOpex)
     return {
       annual_yield_kg: q(c, 'saf_output_tonnes_yr', 1000) * 1000,   // SAF kg/yr
       capex_gbp: capex,
-      opex_gbp_year: Math.round(capex * 0.08),    // ~8% of capex/yr (H2 + utilities + O&M anchor)
-      market_price_gbp_kg: 2.2,                    // ~£2,200/t SAF target levelised
+      opex_gbp_year: opexGbpYr,                    // explicit H2 + electricity + CO2 + fixed O&M (was capex×8%)
+      market_price_gbp_kg: 2.2,                    // ~£2,200/t SAF target (NOAK aspiration)
       discount_rate_pct: 10,
       project_life_years: q(c, 'design_life_yr', 20),
       price_inflation_pct: 2,

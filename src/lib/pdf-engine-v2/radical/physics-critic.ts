@@ -57,6 +57,19 @@ export interface CritiqueReport {
 // internal reasoning and returns empty content (verified A/B in ab-tests/).
 const FLASH_LITE_MODEL = 'google/gemini-3.5-flash'
 
+// Char cap on the design JSON fed to the critic. Raised 80K→200K (2026-06-06):
+// the universal process-instrumentation module (M8, ~18 words with full
+// modifiers) pushed process-plant designs past 80K, which truncated the LAST
+// module in the critic's input — so the critic false-flagged "design JSON
+// truncated abruptly" as an internal_coherence HIGH and tanked the score
+// (e_fuel v16: internal_coherence 5, when the actual state.json was valid and
+// the last instrument word intact). Gemini 3.5 Flash takes ~50K-token
+// (~200K-char) inputs comfortably (1M context); the output max_tokens (16K) is
+// a separate budget. The critic MUST see the whole design or its verdict is
+// meaningless. If a design ever exceeds this, trim compactDesign() rather than
+// silently clipping the tail.
+const DESIGN_JSON_CHAR_CAP = 200_000
+
 function compactDesign(modules: any[], brief: any, keyMetrics: any, partSummary: any, decisions: any[], contractTradeOffs: any): any {
   const compactModules = (modules || []).map((m: any) => ({
     module: m.module,
@@ -138,7 +151,7 @@ Return ONLY this JSON (no markdown fences, no preamble):
 }
 
 DESIGN UNDER REVIEW:
-${JSON.stringify(design, null, 2).slice(0, 80_000)}
+${JSON.stringify(design, null, 2).slice(0, DESIGN_JSON_CHAR_CAP)}
 `
 }
 

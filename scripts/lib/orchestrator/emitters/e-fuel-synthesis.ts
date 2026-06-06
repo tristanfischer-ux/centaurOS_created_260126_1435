@@ -37,6 +37,7 @@
 import { registerAssembler } from '../assembler'
 import type { ClassEmitter, DesignJSON, DesignModule } from '../assembler'
 import type { ContractInProgress } from '../types'
+import { emitProcessInstrumentation, buildPlantInstrCtx } from './_universal-instrumentation'
 
 interface Mod { kind: string; value: string; unit?: string }
 interface CC { character_id: string; name_human: string;
@@ -655,11 +656,48 @@ const emitter: ClassEmitter = (contract, _brief, _envelope): DesignJSON => {
     emitProductStorageLoading(p),   // M6
     emitControlSafety(p),           // M7
   ]
+  // M8: Universal process-plant instrumentation & control module.
+  // Build context from the already-emitted modules so equipment counts are
+  // consistent with whatever the brief has derived (e.g. compressor count from
+  // the gas:compressor-sizing tool, vessel count from the reactor + separators
+  // + tanks emitted in M1–M6). Override known params from deriveParams() where
+  // available so counts are not left to the regex scanner alone.
+  const instrCtx = buildPlantInstrCtx(modules, {
+    // M1 has 2 compressors (CO2 + H2) + recycle = 3; M5 thermal oxidiser blower = 1 more
+    compressorCount: p.co2CompressorStages > 0 ? 3 : 1,
+    // Pumps: process-water pump (M3), additive pump (M4), DI-water/utility (M5),
+    // SAF loading pump (M6), boiler feed pump (M5) — conservatively 5 total
+    pumpCount: 5,
+    // Vessels: FT reactor (M2), hot/cold separator x2 (M3), fractionation column (M4),
+    // thermal oxidiser (M5), SAF tank x2 + naphtha tank (M6) = 8 minimum
+    vesselCount: Math.max(7, p.safTankCount + 6),
+    agitatorCount: 0,
+    hasFlammableGas: true,
+    operatingPressureMaxBar: p.reactorPressureBar,
+    electricalLoadKw: p.electricalLoadKw,
+    jurisdiction: 'GB',
+    className: 'e_fuel_synthesis',
+  })
+  modules.push(emitProcessInstrumentation(instrCtx))  // M8
+
+  const links = emitCrossModuleGrammarLinks(p)
+  // M8 cross-module link: field transmitters send 4–20 mA / HART / PROFINET
+  // signals back to the DCS + SIS housed in the control_compute_communication
+  // module (M7). The sensing_instrumentation module is the PRODUCER of the
+  // measurement signals; control_compute_communication is the CONSUMER.
+  links.push({
+    from_module: 'sensing_instrumentation',
+    to_module: 'control_compute_communication',
+    mechanism: 'data' as const,
+    type: 'directional' as const,
+    detail: 'field transmitters (4–20 mA HART + PROFINET PA) + control valves → DCS + SIS signal loops; VFD speed references + status from DCS; gas-detector trips from Polytron 8700 → F&G controller → SIS ESD chain',
+  })
+
   return {
     modules,
-    cross_module_grammar_links: emitCrossModuleGrammarLinks(p),
+    cross_module_grammar_links: links,
     excluded_modules: [],
-    rationale_excluded: 'All 7 Power-to-Liquid Fischer-Tropsch SAF-plant modules (M1-M7) apply: receipt & conditioning, synthesis, separation & recycle, upgrading & fractionation, utilities & offsites, product storage & loading, control & safety.',
+    rationale_excluded: 'All 8 Power-to-Liquid Fischer-Tropsch SAF-plant modules (M1-M8) apply: receipt & conditioning, synthesis, separation & recycle, upgrading & fractionation, utilities & offsites, product storage & loading, control & safety, and process instrumentation & control.',
     brief_overview_prose: {
       overview_and_context: '',
       mission_statement: `First-commercial Power-to-Liquid Fischer-Tropsch plant producing ~${p.safOutputTonnesYr.toFixed(0)} t/yr Sustainable Aviation Fuel (~${p.safOutputKgH.toFixed(0)} kg/h) plus ~${p.naphthaTonnesYr.toFixed(0)} t/yr naphtha from ~${p.co2FeedKgH.toFixed(0)} kg/h biogenic CO2 and ~${p.h2FeedKgH.toFixed(0)} kg/h renewable H2 via single-step CO2 hydrogenation (CO2 + 3 H2 -> -CH2- + 2 H2O) over a shaped iron catalyst at ${p.reactorTempC.toFixed(0)} °C / ${p.reactorPressureBar.toFixed(0)} bar, recovering the ~${p.ftExothermKw.toFixed(0)} kW exotherm as ~${p.steamRaisedKgH.toFixed(0)} kg/h raised steam (net steam exporter), to ASTM D7566 Annex A1 (FT-SPK).`,

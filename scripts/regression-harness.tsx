@@ -447,6 +447,32 @@ function checkSizingToolsWorkedSound(): Assertion[] {
         && num(bag, 'day_silo_volume_m3') >= 0.5 && num(bag, 'day_silo_volume_m3') <= 30,
       () => `error=${bag?.error} | bad=${rbag.bad.slice(0, 1).join(' | ')} | bags/h=${bag?.bagging_rate_bags_h} kg/h=${bag?.bagging_line_kg_h} silo=${bag?.day_silo_volume_m3}`,
     ))
+    // yield-economics:npv — robustness on a NEVER-PROFITABLE FOAK project (added
+    // 2026-06-06). The IRR Newton-Raphson used to diverge then OverflowError-crash the
+    // whole tool (exit 3) when every post-year-0 cashflow was <= 0 (a FOAK e-fuel / DAC
+    // plant priced below cost) — which SILENTLY dropped the levelised cost from the
+    // dossier (the required:false orchestrator step was skipped with no surfaced error;
+    // see mempalace drawer_forgeos_gotchas_68000ca396c69591). Guard BOTH directions: a
+    // never-profitable input must still return a finite all-in cost with irr=null and NO
+    // error; a profitable input must still compute a finite IRR (normal path intact).
+    const econLoss = runTool('yield_economics_npv.py', {
+      annual_yield_kg: 1_000_000, capex_gbp: 45_000_000, opex_gbp_year: 8_240_000,
+      market_price_gbp_kg: 2.2, discount_rate_pct: 10, project_life_years: 20,
+      price_inflation_pct: 2, operational_inflation_pct: 2, tax_rate_pct: 25,
+    })
+    const econWin = runTool('yield_economics_npv.py', {
+      annual_yield_kg: 1_000_000, capex_gbp: 10_000_000, opex_gbp_year: 2_000_000,
+      market_price_gbp_kg: 12, discount_rate_pct: 10, project_life_years: 20,
+      price_inflation_pct: 2, operational_inflation_pct: 2, tax_rate_pct: 25,
+    })
+    out.push(assertEq(
+      'UNIVERSAL.yield_economics_robust_to_never_profitable',
+      'yield-economics:npv survives a never-profitable FOAK project (no IRR-overflow crash): finite all-in cost + irr=null + no error; still computes IRR on a profitable case',
+      JSON.stringify({ loss_cost: econLoss?.all_in_cost_per_kg_gbp, loss_irr: econLoss?.irr_pct, loss_err: econLoss?.error, win_irr: econWin?.irr_pct, win_err: econWin?.error }),
+      () => !econLoss?.error && Number.isFinite(num(econLoss, 'all_in_cost_per_kg_gbp')) && num(econLoss, 'all_in_cost_per_kg_gbp') > 0 && econLoss?.irr_pct == null
+        && !econWin?.error && Number.isFinite(num(econWin, 'irr_pct')),
+      () => `loss: err=${econLoss?.error} cost=${econLoss?.all_in_cost_per_kg_gbp} irr=${econLoss?.irr_pct} | win: err=${econWin?.error} irr=${econWin?.irr_pct}`,
+    ))
   } catch (err) {
     // .venv python unavailable — skip (vacuous pass), do not fail the harness.
     for (const id of ['reactor', 'absorber', 'crystalliser', 'dryer']) {
@@ -1256,6 +1282,72 @@ function checkEFuelSynthesisInvariants(): Assertion[] {
       'every e_fuel_synthesis emitted vessel/tank carrying BOTH a "D × H" dimension AND a mass implies a ≥2.5 mm average wall (no sub-mm thin-wall mass; the SAF/naphtha tanks + FT reactor are self-consistent)',
       failures.length, (n) => n === 0,
       () => `e_fuel mass-vs-geometry inconsistent: ${failures.slice(0, 4).join(' ; ')}. Check the storage-tank tool dry-mass (scripts/lib/orchestrator/tools/python/storage_tank_liquid_fuel.py) + the emitter dims/mass (scripts/lib/orchestrator/emitters/e-fuel-synthesis.ts).`,
+    ))
+  }
+
+  // ── (vi) UNIVERSAL.process_plant_has_sensing_instrumentation ────────────────
+  // Guards the universal process-plant instrumentation emitter (2026-06-06):
+  // (a) the e_fuel design has a `sensing_instrumentation` module;
+  // (b) EVERY sub_module of that module carries ≥1 part_number-bearing word
+  //     (gate-23 — no gaps for Phase-2 to fill with invented MPNs);
+  // (c) the field_instrumentation sub_module carries at minimum ONE of each of
+  //     the four mandatory transmitter classes (pressure / temperature / flow /
+  //     level) with a REAL branded MPN (Rosemount / Endress+Hauser / VEGA / ABB /
+  //     Siemens / Emerson / Dräger / Spelsberg / Eaton / Rittal / ABB);
+  // (d) the derived_parameters['total_ic_gbp'] is within the sanity band
+  //     £80,000–£800,000 (a 1,000 t/yr plant I&C is ~£120k–220k list; the upper
+  //     ceiling is loose so Phase-2 quantity adjustments don't trip the invariant
+  //     while still catching a completely degenerate cost).
+  {
+    const failures: string[] = []
+    try {
+      const contract: any = buildContract('e_fuel_synthesis', briefStub)
+      const design: any = eFuelSynthesisEmitter((contract ?? { quantities: {} }) as any, {} as any, {} as any)
+      const mods: any[] = design?.modules ?? []
+
+      const instrMod = mods.find((m: any) => m?.module === 'sensing_instrumentation')
+      if (!instrMod) {
+        failures.push('sensing_instrumentation module is ABSENT from the e_fuel design (M8 not wired)')
+      } else {
+        // (b) every sub_module has a part_number word
+        const subs: any[] = instrMod.sub_modules ?? []
+        for (const sm of subs) {
+          const hasPn = (sm?.words ?? []).some((w: any) =>
+            (w?.modifier_characters ?? []).some((mc: any) => mc?.kind === 'part_number' && String(mc?.value ?? '').trim() !== ''))
+          if (!hasPn) failures.push(`sensing_instrumentation sub_module "${sm?.id ?? sm?.name_human}" has NO part_number word (gate-23)`)
+        }
+        // (c) field_instrumentation sub_module has all four transmitter types
+        const fieldSub = subs.find((sm: any) => sm?.id === 'field_instrumentation')
+        if (!fieldSub) {
+          failures.push('field_instrumentation sub_module missing from sensing_instrumentation')
+        } else {
+          const wordIds: string[] = (fieldSub.words ?? []).map((w: any) => String(w?.id ?? ''))
+          const mpns: string[] = (fieldSub.words ?? []).flatMap((w: any) =>
+            (w?.modifier_characters ?? [])
+              .filter((mc: any) => mc?.kind === 'part_number')
+              .map((mc: any) => String(mc?.value ?? ''))
+          )
+          const BRANDED_RE = /Rosemount|Endress|Micropilot|Promag|Promass|iTHERM|VEGAFLEX|EL3060|Polytron|GX.*DVC|ACS580|ACS880|MNS|93PM|SCALANCE|6ES7|6AV2|Spelsberg|Rittal/i
+          if (!wordIds.some((id) => /pressure/i.test(id))) failures.push('field_instrumentation: no pressure transmitter word')
+          if (!wordIds.some((id) => /temperature/i.test(id))) failures.push('field_instrumentation: no temperature transmitter word')
+          if (!wordIds.some((id) => /flow/i.test(id))) failures.push('field_instrumentation: no flow transmitter word')
+          if (!wordIds.some((id) => /level/i.test(id))) failures.push('field_instrumentation: no level transmitter word')
+          if (!mpns.some((mpn) => BRANDED_RE.test(mpn))) failures.push(`field_instrumentation: no real branded MPN found (MPNs: ${mpns.slice(0, 4).join(', ')} …)`)
+        }
+        // (d) total_ic_gbp sanity band
+        const totalIcGbp = Number(instrMod.derived_parameters?.total_ic_gbp ?? 0)
+        if (!(totalIcGbp >= 80_000 && totalIcGbp <= 800_000)) {
+          failures.push(`total_ic_gbp ${totalIcGbp.toFixed(0)} is outside the sanity band [£80k, £800k]`)
+        }
+      }
+    } catch (err) {
+      failures.push(`emitter/contract threw: ${String(err).slice(0, 160)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.process_plant_has_sensing_instrumentation',
+      'e_fuel_synthesis design has a sensing_instrumentation module (M8) with ≥1 part_number word per sub_module (gate-23), field_instrumentation covers all four transmitter classes (pressure/temperature/flow/level) with real MPNs, and total I&C cost is in the £80k–800k sanity band',
+      failures.length, (n) => n === 0,
+      () => `sensing_instrumentation invariant failed: ${failures.slice(0, 6).join(' ; ')}. Check scripts/lib/orchestrator/emitters/_universal-instrumentation.ts + e-fuel-synthesis.ts M8 wiring.`,
     ))
   }
 
