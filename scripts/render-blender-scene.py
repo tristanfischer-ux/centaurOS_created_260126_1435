@@ -89,6 +89,19 @@ CLASS_TO_TEMPLATE: dict[str, str] = {
     "co2_mineralisation": "co2-mineralisation-9shot.py",
     "co2-mineralisation": "co2-mineralisation-9shot.py",
     "mineralisation": "co2-mineralisation-9shot.py",
+    # Power-to-Liquid Fischer-Tropsch SAF synthesis plant (added 2026-06-06).
+    # Bespoke template models the feed compressors + fired preheater + the hero
+    # multitubular FT reactor + steam drum + hot/cold separators + recycle
+    # compressor + hydrocracker/isomeriser + fractionation column + thermal
+    # oxidiser/flare + MV transformer + SAF/naphtha tanks + loading gantry +
+    # DCS/SIS + H2/CO gas detection on a field-erected open steel skid.
+    # "e_fuel" substring covers "e_fuel_synthesis"; the variants below are
+    # belt-and-braces for the synonyms the classifier may emit.
+    "e_fuel_synthesis": "e-fuel-synthesis-9shot.py",
+    "e-fuel-synthesis": "e-fuel-synthesis-9shot.py",
+    "e_fuel": "e-fuel-synthesis-9shot.py",
+    "power_to_liquid": "e-fuel-synthesis-9shot.py",
+    "ptl": "e-fuel-synthesis-9shot.py",
     # Phase 3 industrial + other (bootstrapped via GPT-5.5, 2026-05-24)
     "industrial_inspection_drone": "industrial-inspection-drone-9shot.py",
     "industrial-inspection-drone": "industrial-inspection-drone-9shot.py",

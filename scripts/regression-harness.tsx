@@ -41,6 +41,7 @@ import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode, moduleToolIds, break_paragraph, humaniseSubName, toTitleCaseEng, workedStepIdentity, toolBlockSignature, engineAddedItemVisible, _recoverBriefRangeBands, _bandForMetric } from './render-minimal-pdf'
+import { computeRenderQuality, resolveBlenderTemplate } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { formFactorForClass, isFieldErectedForClass } from './lib/orchestrator/envelope'
 import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constraint-normaliser'
 import { massAggregator } from './lib/orchestrator/tools/mass-aggregator'
@@ -722,6 +723,35 @@ function checkCo2FixInvariants(): Assertion[] {
       'summariseComplianceRows: pass+fail+delta+target+unverified == total (the self-audit digest line must account for every row)',
       sum === v.total && v.total === 7, (ok) => ok,
       () => `counts do not reconcile: pass${v.passCount}+fail${v.failCount}+delta${v.deltaCount}+target${v.targetCount}+unverified${v.unknownCount}=${sum} vs total ${v.total}`,
+    ))
+  }
+
+  // ── (2e) Render-quality gate: catch a generic universal-fallback Blender render ──
+  // (2026-06-06, Tristan: "the code should have stopped a bad blender model
+  // automatically"). The e_fuel dossier shipped generic flat-box images because the
+  // new class had no per-class Blender template + NO gate caught it. Assert the gate
+  // (a) PASSES a class WITH a template (e_fuel, co2 — fallback=false) and (b) FLAGS a
+  // class WITHOUT one as a HIGH BLENDER_UNIVERSAL_FALLBACK — so a future template-less
+  // class is auto-caught instead of silently shipping the wrong object.
+  {
+    const bad: string[] = []
+    const repoRoot = resolve(__dirname, '..')
+    try {
+      if (resolveBlenderTemplate('e_fuel_synthesis', repoRoot) === null) bad.push('e_fuel_synthesis has NO Blender template (would ship generic universal images)')
+      if (resolveBlenderTemplate('co2_mineralisation', repoRoot) === null) bad.push('co2_mineralisation has NO Blender template')
+      const efuel = computeRenderQuality({ moduleDecomposition: { product_class: 'e_fuel_synthesis' } }, { outDir: '/tmp/__rq_efuel_probe', repoRoot })
+      if (efuel.used_universal_fallback) bad.push('e_fuel_synthesis flagged as universal-fallback despite having a template')
+      const noTpl = computeRenderQuality({ moduleDecomposition: { product_class: '__nonexistent_class_zzz' } }, { outDir: '/tmp/__rq_none_probe', repoRoot })
+      if (!noTpl.used_universal_fallback) bad.push('a template-less class was NOT detected as universal-fallback')
+      if (!noTpl.findings.some((f) => f.severity === 'high' && f.code === 'BLENDER_UNIVERSAL_FALLBACK')) bad.push('template-less class did not produce a HIGH BLENDER_UNIVERSAL_FALLBACK finding')
+    } catch (err) {
+      bad.push(`render-quality gate threw: ${String(err).slice(0, 120)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.render_quality_gate_catches_missing_blender_template',
+      'the render-quality gate passes a class WITH a Blender template (e_fuel, co2) and flags a template-less class as a HIGH universal-fallback (so a bad/generic Blender model is auto-caught, not silently shipped)',
+      bad.length, (n) => n === 0,
+      () => `render-quality gate wrong: ${bad.join(' ; ')}.`,
     ))
   }
 

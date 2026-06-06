@@ -50,6 +50,7 @@ import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceMod
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
 // The orchestrator's assembler.ts lazy-loads emitBessDesign internally via
@@ -6371,6 +6372,50 @@ async function main() {
     } catch (err) {
       console.error(`[chain] tool-archetype coherence (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
       logAction({ step: 'tool_archetype_coherence_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tTA })
+    }
+  }
+
+  // ── Render-quality gate (2026-06-06, Tristan: "the code should have stopped a
+  //    bad blender model automatically"). The OXCCU e_fuel dossier shipped GENERIC
+  //    flat-box images at exit 0 because the brand-new class had no per-class Blender
+  //    template, so render-blender-scene.py exit-5'd and the chain fell back to the
+  //    universal renderer (the WRONG object) — and NO gate inspected image quality
+  //    (~19 of 37 dossier classes are in the same boat). This gate detects when the
+  //    render used the generic universal fallback (no per-class template AND no LLM
+  //    blender-scene.py) or produced blank/degenerate images. SHADOW by default
+  //    (records state.renderQuality + LOUD log, never exits); ENFORCING opt-in via
+  //    RENDER_QUALITY_ENFORCING hard-exits 35 on a HIGH (a generic-fallback render is
+  //    WRONGNESS — the dossier shows the wrong object). Kill: CHAIN_SKIP_RENDER_QUALITY=1.
+  //    See src/lib/pdf-engine-v2/lib/render-quality-audit.ts.
+  if (!process.env.CHAIN_SKIP_RENDER_QUALITY) {
+    const tRQ = Date.now()
+    try {
+      const rqState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const outDir = resolve(statePath, '..')
+      const repoRoot = resolve(__dirname, '..')
+      const rq = computeRenderQuality(rqState, { outDir, repoRoot })
+      rqState.renderQuality = rq
+      writeFileSync(statePath, JSON.stringify(rqState, null, 2))
+      const tag = rq.used_universal_fallback
+        ? 'UNIVERSAL-FALLBACK (generic stock images — NOT this design)'
+        : (rq.ok ? 'PASS' : 'FLAGS')
+      console.error(`[chain] render-quality (shadow): ${tag} — class="${rq.product_class}" template=${rq.template_name ?? 'NONE'} hero=${rq.hero_present} modules=${rq.module_images} thin=${rq.thin_images.length}`)
+      for (const f of rq.findings.slice(0, 5)) console.error(`  ${f.severity === 'high' ? '✗' : '·'} ${f.code}: ${f.message.slice(0, 160)}`)
+      logAction({ step: 'render_quality_shadow', ok: true, product_class: rq.product_class, used_universal_fallback: rq.used_universal_fallback, template: rq.template_name, hero: rq.hero_present, modules: rq.module_images, thin: rq.thin_images.length, findings: rq.findings.map((f) => f.code), latency_ms: Date.now() - tRQ })
+      const rqMode = renderQualityEnforceModeFromEnv(process.env.RENDER_QUALITY_ENFORCING)
+      if (rqMode === 'enforcing') {
+        const decision = evaluateRenderQualityEnforcement(rq, rqMode)
+        if (decision.block) {
+          console.error(`[chain] render-quality ENFORCING: BLOCKING (exit 35) — ${decision.reason}`)
+          logAction({ step: 'render_quality_enforce', ok: false, exit_code: 35, reason: decision.reason, latency_ms: Date.now() - tRQ })
+          process.exit(35)
+        }
+        console.error('[chain] render-quality enforcing: images OK — ship allowed.')
+        logAction({ step: 'render_quality_enforce', ok: true })
+      }
+    } catch (err) {
+      console.error(`[chain] render-quality (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
+      logAction({ step: 'render_quality_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tRQ })
     }
   }
 
