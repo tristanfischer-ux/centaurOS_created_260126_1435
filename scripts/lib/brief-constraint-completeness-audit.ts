@@ -163,6 +163,13 @@ const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   co2_capture_capacity_kg_per_hr: { qtyKey: 'co2_capture_rate_kg_per_hour', label: 'CO₂ capture capacity' },
   calcium_carbonate_output_kg_per_day: { qtyKey: 'caco3_output_t_per_day', label: 'CaCO₃ output rate' },
   potassium_sulfate_output_kg_per_day: { qtyKey: 'k2so4_output_t_per_day', label: 'K₂SO₄ output rate' },
+  // e_fuel SAF HOURLY production (2026-06-06, FIX 1). The hourly key shares its
+  // unit-stripped base "saf_production" with the ANNUAL saf_production_tpy, so it
+  // CANNOT use the semantic resolver (which would grab the annual t/yr quantity);
+  // the renderer pins it via a curated METRIC_MAP entry, mirrored here per the
+  // I12b keyset-sync invariant. (All OTHER e_fuel metrics go through the synonym
+  // map, which is NOT subject to I12b.)
+  saf_production_kg_per_hr: { qtyKey: 'saf_output_kg_h', label: 'SAF production (hourly)' },
 }
 
 // ── SEMANTIC-CONCEPT COVERAGE (mirror of render-minimal-pdf.tsx, 2026-06-05) ──
@@ -191,6 +198,33 @@ const KNOWN_METRIC_CONCEPT_SYNONYMS: Record<string, string> = {
   caco3_output: 'caco3_output',
   potassium_sulfate_output: 'k2so4_output',
   k2so4_output: 'k2so4_output',
+  // e_fuel / Power-to-Liquid Fischer-Tropsch SAF (2026-06-06 FIX B). Mirror of
+  // render-minimal-pdf.tsx::_METRIC_CONCEPT_SYNONYMS for the e_fuel concepts.
+  // Parity-only (the gate already treats every brief metric as VISIBLE). Keys =
+  // unit-stripped base of EITHER side; bases verified against _metricRateBase.
+  saf_production: 'saf_output_tpy',
+  saf_output_tonnes_yr: 'saf_output_tpy',
+  jet_range_selectivity: 'jet_selectivity',
+  jet_selectivity_frac: 'jet_selectivity',
+  co2_conversion_efficiency: 'carbon_conversion',
+  carbon_to_liquids_frac: 'carbon_conversion',
+  feedstock_co2: 'co2_feed',
+  co2_feed: 'co2_feed',
+  co2_feed_kg: 'co2_feed',
+  feedstock_h2: 'h2_feed',
+  hydrogen_feed: 'h2_feed',
+  h2_feed_kg: 'h2_feed',
+  operating_hours: 'operating_hours',
+  operating_hours_yr: 'operating_hours',
+  electrical_load: 'electrical_load',
+  plant_electrical_load: 'electrical_load',
+  connected_electrical_load: 'electrical_load',
+  synthesis_pressure: 'synthesis_pressure',
+  synthesis_pressure_max: 'synthesis_pressure',
+  reactor_pressure: 'synthesis_pressure',
+  synthesis_temp: 'synthesis_temp',
+  synthesis_temp_max: 'synthesis_temp',
+  reactor_temp: 'synthesis_temp',
 }
 // Referenced for parity/grep-traceability with the renderer; the gate's decision
 // does not branch on it (every metric already renders a row). `void` keeps the
@@ -339,10 +373,33 @@ function rendererWouldEmitCostRow(state: any): boolean {
   return hasMacroPrices || hasBom || anyPricedRow
 }
 
+// FIELD-ERECTED detection (2026-06-06 FIX D) — mirrors render-minimal-pdf.tsx
+// _buildComplianceRows. Kept in LOCKSTEP with the renderer: the renderer drops an
+// INFERRED plant-wide max_mass_kg row on a field-erected plant (the chain's U5b
+// having already dropped the cap from the active constraints), so the gate-17
+// shadow predicate must agree and NOT flag the (correctly) absent row as a missing
+// HARD constraint. A brief-STATED cap (source !== 'inferred') is never dropped.
+const _FIELD_ERECTED_FF_AUDIT: ReadonlySet<string> = new Set([
+  'skid_mounted', 'skid-mounted', 'skid mounted', 'field_erected', 'field-erected',
+  'field erected', 'plinth_mounted', 'plinth-mounted', 'plinth mounted',
+  'modular_skid', 'modular-skid', 'fixed_plant', 'fixed-plant',
+])
+function _isFieldErectedAudit(state: any): boolean {
+  const ff = String(
+    state?.orchestratorContract?.envelope?.form_factor
+    ?? state?.engineeringContract?.envelope?.form_factor
+    ?? '',
+  ).toLowerCase().trim()
+  return _FIELD_ERECTED_FF_AUDIT.has(ff)
+}
+
 function rendererWouldEmitMassRow(state: any): boolean {
   const cap = state?.parsedBrief?.constraints?.max_mass_kg
   const briefHasMass = cap && typeof cap.value === 'number' && Number.isFinite(cap.value)
   if (!briefHasMass) return false
+  // FIX D (2026-06-06): an INFERRED cap on a field-erected plant is dropped by the
+  // renderer (and the chain U5b), so the row is legitimately absent — do not flag.
+  if (_isFieldErectedAudit(state) && String((cap as any).source ?? '') === 'inferred') return false
   // 2026-06-03 (task #39/#38, gate-17): the renderer now ALWAYS emits the Max-gross-mass
   // row when the brief states a mass cap — a verified PASS/FAIL when a system-mass quantity
   // is present (total_system_mass_kg / in_container_mass_kg / ...), ELSE an honest UNVERIFIED
@@ -428,7 +485,13 @@ export function auditBriefConstraintCompleteness(state: any): BriefConstraintCom
 
   // ── 2. Max mass ───────────────────────────────────────────────────────────
   const mm = constraints.max_mass_kg
-  if (mm && typeof mm.value === 'number' && Number.isFinite(mm.value)) {
+  // FIX D (2026-06-06): an INFERRED plant-wide cap on a field-erected plant is NOT
+  // a real brief constraint — the chain U5b + renderer both drop it (a fixed plant
+  // has no plant-wide gross-mass cap). So it is neither "seen" nor a HIGH miss; the
+  // renderer legitimately omits the row. A brief-STATED cap (source !== 'inferred')
+  // is unaffected and still checked. Mirrors render-minimal-pdf.tsx + the chain U5b.
+  const _mmInferredFieldErected = mm && _isFieldErectedAudit(state) && String((mm as any).source ?? '') === 'inferred'
+  if (mm && typeof mm.value === 'number' && Number.isFinite(mm.value) && !_mmInferredFieldErected) {
     briefConstraintsSeen += 1
     if (rendererWouldEmitMassRow(state)) {
       renderedRowsEstimated += 1

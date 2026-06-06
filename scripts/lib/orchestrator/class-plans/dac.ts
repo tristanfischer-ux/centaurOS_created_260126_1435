@@ -288,7 +288,47 @@ const stepFluids = universalStep('fluids:pipe-sizing', 'fluids_pipe_sizing')
 const stepHt = universalStep('ht:heat-exchanger', 'ht_heat_exchanger')
 const stepHvac = universalStep('hvac-load:sizing', 'hvac_load_sizing')
 const stepThermal = universalStep('thermal-envelope:check', 'thermal_envelope')
-const stepMassAgg = universalStep('mass-aggregator:envelope-check', 'mass_aggregator')
+
+// FIELD-ERECTED PLANT mass check (2026-06-05). A Direct-Air-Capture plant is a
+// fixed installation (contactor banks + sorbent vessels + CO₂ compression/storage
+// skids), not a containerised product → the aggregator reports site mass + checks
+// each skid against the road-transport limit, and does NOT compute a containerised
+// utilisation / container count against a plant-wide cap. Replaces the prior
+// universalStep passthrough (which sent the wrong input shape).
+const stepMassAgg: ToolStep = {
+  tool_id: 'mass-aggregator:envelope-check',
+  required: false,
+  feeds_into: [] as string[],
+  input_from_contract: (c: ContractInProgress) => {
+    const sorbentMassKg = c.quantities?.sorbent_mass_kg?.value ?? 12_000
+    const co2StorageMassKg = c.quantities?.co2_storage_mass_kg?.value ?? 14_000
+    return {
+      total_cell_mass_kg: sorbentMassKg,        // sorbent inventory + contactor frames
+      transformer_mass_kg: 900,                 // site distribution transformer
+      rack_count: 1,
+      rack_mass_kg_each_estimate: co2StorageMassKg, // CO₂ compression / storage vessel
+      pcs_mass_kg_estimate: 3000,               // fans, blowers, vacuum pumps, compressors
+      container_tare_kg_estimate: 5000,         // transportable skid frames
+      max_mass_kg_envelope: 24000,              // per-skid road limit (NOT a plant-wide cap)
+      field_erected: true,
+      road_transport_limit_kg: 44000,
+    }
+  },
+  contract_update: (c: ContractInProgress, output: any) => {
+    const v = (k: string): number | undefined => {
+      const x = output?.[k]; return typeof x === 'number' && Number.isFinite(x) ? x : undefined
+    }
+    const prov = (f: string) => ({
+      source: 'tool:mass-aggregator:envelope-check' as const,
+      tool_id: 'mass-aggregator:envelope-check',
+      invocation_output_field: f,
+      duration_ms: 0,
+    } as any)
+    return { ...c, quantities: { ...c.quantities,
+      total_plant_mass_kg: { value: v('total_system_mass_kg') ?? 19_000, unit: 'kg', family: 'mass' as const, basis: 'dry' as const, scope: 'system' as const, uncertainty_pct: 10, temporal_resolution_s: null, condition: 'site mass (field-erected)', provenance: prov('total_system_mass_kg') },
+    } }
+  },
+}
 const stepRegulatoryCost = universalStep('regulatory-cert-cost:lookup', 'regulatory_cert_cost')
 const stepLcaCo2 = universalStep('lifecycle-co2:assessment', 'lifecycle_co2')
 const stepSupplyRisk = universalStep('supply-chain-risk:scoring', 'supply_chain_risk')

@@ -229,6 +229,11 @@ const CLASS_ALIASES: Record<string, string> = {
   direct_air_capture: 'dac',
   atmospheric_co2_capture: 'dac',
   co2_air_capture: 'dac',
+  // e_fuel_synthesis — Power-to-Liquid Fischer-Tropsch SAF plant (2026-06-05)
+  e_fuel_synthesis: 'e_fuel_synthesis',
+  power_to_liquid: 'e_fuel_synthesis',
+  fischer_tropsch: 'e_fuel_synthesis',
+  ptl_saf: 'e_fuel_synthesis',
 }
 
 function normaliseClass(raw: string): string | null {
@@ -1656,6 +1661,41 @@ function co2MinVoltageTier(_: string | null, _c: ParsedConstraints): VoltageTier
 function co2MinFormFactor(_: string | null, _c: ParsedConstraints): string { return 'skid_mounted' }
 function co2MinApplication(_: string | null, _c: ParsedConstraints): string { return 'carbon_mineralisation' }
 
+// e_fuel_synthesis — Power-to-Liquid Fischer-Tropsch SAF plant (2026-06-05).
+// Mirrors the co2_mineralisation 4-fn shape: always returns a tier so the envelope
+// resolves (the contract/tools size from the contract quantities with fallbacks).
+// Sized by SAF output: small <2,000 t/yr, medium 2,000–20,000 t/yr, large >20,000
+// t/yr (the 1,000 t/yr first-commercial OXCCU plant → 'small'). Falls back to a
+// litres/day figure (÷0.80 kg/litre × 365 → t/yr) when t/yr is absent. Skid-mounted
+// (modular skids + field-erected reactor/column on a plinth), low/medium voltage.
+function eFuelScaleTier(c: ParsedConstraints): string | null {
+  const desc = String(c.product_description ?? '').toLowerCase()
+  // 1) SAF output in tonnes/year ("1,000 tonnes/year", "1000 t/yr").
+  let tpy: number | null = null
+  const tYr = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(?:t|tonne[s]?|metric\s+ton[s]?|tons?)\s*(?:of\s+)?(?:finished\s+)?(?:saf|sustainable\s+aviation\s+fuel|fuel|jet)?\s*(?:\/|per)\s*(?:yr|year|annum|a)\b/i)
+  if (tYr) tpy = parseFloat(tYr[1].replace(/,/g, ''))
+  // 2) Fallback: litres/day → t/yr at 0.80 kg/litre.
+  if (tpy === null) {
+    const lpd = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(?:l|litre[s]?|liter[s]?)\s*(?:\/|per)\s*day/i)
+    if (lpd) tpy = (parseFloat(lpd[1].replace(/,/g, '')) * 0.80 * 365) / 1000
+  }
+  // 3) Fallback: litres/year → t/yr at 0.80 kg/litre.
+  if (tpy === null) {
+    const lYr = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,9}(?:\.\d+)?)\s*(?:l|litre[s]?|liter[s]?)\s*(?:\/|per)\s*(?:yr|year|annum)\b/i)
+    if (lYr) tpy = (parseFloat(lYr[1].replace(/,/g, '')) * 0.80) / 1000
+  }
+  const t = tpy ?? 1000 // class default: 1,000 t/yr first-commercial plant
+  if (t < 2000) return 'small'
+  if (t <= 20000) return 'medium'
+  return 'large'
+}
+function eFuelVoltageTier(_: string | null, c: ParsedConstraints): VoltageTier {
+  if (c.voltage_class_v) return classifyVoltage(c.voltage_class_v)
+  return 'low' // 400 V LV process distribution behind an 11 kV/MV site transformer
+}
+function eFuelFormFactor(_: string | null, _c: ParsedConstraints): string { return 'skid_mounted' }
+function eFuelApplication(_: string | null, _c: ParsedConstraints): string { return 'sustainable_aviation_fuel' }
+
 const DETECTORS: Record<string, ClassDetectors> = {
   bess: {
     scaleTier: bessScaleTier,
@@ -1882,6 +1922,12 @@ const DETECTORS: Record<string, ClassDetectors> = {
     formFactor: co2MinFormFactor,
     application: co2MinApplication,
   },
+  e_fuel_synthesis: {
+    scaleTier: eFuelScaleTier,
+    voltageTier: eFuelVoltageTier,
+    formFactor: eFuelFormFactor,
+    application: eFuelApplication,
+  },
 }
 
 // ---------------------------------------------------------------------------
@@ -1965,4 +2011,94 @@ export function validateEnvelope(env: BriefEnvelope): string[] {
   if (!env.form_factor) errs.push('envelope.form_factor is empty')
   if (!env.application) errs.push('envelope.application is empty')
   return errs
+}
+
+/**
+ * FIELD-ERECTED PREDICATE (2026-06-05, e_fuel_synthesis / process-plant fix).
+ *
+ * A field-erected plant is a FIXED INSTALLATION assembled on site — not a
+ * containerised / road-shippable product. Its equipment arrives as modular
+ * skids plus segments (columns, vessels) that are erected on a plinth; there
+ * is NO single plant-wide gross-mass cap (per-skid road-transport limits apply
+ * instead). Returns true when the envelope's form_factor signals one of the
+ * field-erected packagings. Pure + deterministic.
+ *
+ * USED BY:
+ *   - constraint-normaliser: drops an INFERRED plant-wide max_mass_kg cap that
+ *     would otherwise be applied (wrongly) as a containerised limit.
+ *   - the class-plans (e-fuel / co2 / dac / smr / h2): pass field_erected:true to
+ *     the mass-aggregator so it reports site mass, not a containerised
+ *     utilisation + container count.
+ *
+ * Containerised classes (BESS, EV charger) and mobile classes (drone, AUV,
+ * HAPS, vehicle) are NOT field-erected — they keep their real mass caps + the
+ * container / MTOW math. Recognises the canonical form_factor tokens plus the
+ * hyphen / space spellings the detectors emit.
+ */
+const FIELD_ERECTED_FORM_FACTORS: ReadonlySet<string> = new Set([
+  'skid_mounted',
+  'skid-mounted',
+  'skid mounted',
+  'field_erected',
+  'field-erected',
+  'field erected',
+  'plinth_mounted',
+  'plinth-mounted',
+  'plinth mounted',
+  'modular_skid',
+  'modular-skid',
+  'fixed_plant',
+  'fixed-plant',
+])
+
+export function isFieldErected(env: Pick<BriefEnvelope, 'form_factor'> | null | undefined): boolean {
+  if (!env) return false
+  const ff = String(env.form_factor ?? '').toLowerCase().trim()
+  if (!ff) return false
+  return FIELD_ERECTED_FORM_FACTORS.has(ff)
+}
+
+/**
+ * CLASS-AWARE form-factor resolution (2026-06-06 FIX D).
+ *
+ * `detectEnvelope(constraints)` derives the form factor from the BARE brief
+ * constraints with NO product-class hint, so for a registered process-plant class
+ * (e_fuel_synthesis, co2_mineralisation, dac, smr, h2_electrolyser) whose
+ * field-erected nature is declared by the CLASS resolver (e.g. eFuelFormFactor →
+ * 'skid_mounted'), it falls back to 'generic' and `isFieldErected` returns false.
+ * That made the chain's U5b inferred-max-mass-drop silently NOT fire for these
+ * plants (the e_fuel L8 inferred 40,000 kg cap survived into the compliance
+ * table). This helper resolves the form factor through the class-aware DETECTORS
+ * map FIRST (the same resolver the contract envelope uses), so the field-erected
+ * decision matches the contract envelope. Falls back to the generic detector's
+ * form_factor when the class is unregistered — universal + zero-regression
+ * (containerised / mobile classes resolve to their own non-field-erected form
+ * factor exactly as before). Returns '' when nothing resolves.
+ */
+export function formFactorForClass(
+  productClass: string | null | undefined,
+  constraints: ParsedConstraints,
+): string {
+  const slug = String(productClass ?? '').toLowerCase().trim()
+  const det = slug ? DETECTORS[slug] : undefined
+  if (det && typeof det.formFactor === 'function') {
+    try {
+      const ff = det.formFactor(null, constraints)
+      if (ff) return String(ff)
+    } catch {
+      // fall through to the generic detector
+    }
+  }
+  return String(detectEnvelope(constraints)?.form_factor ?? '')
+}
+
+/** True when the product CLASS is field-erected — class-aware (uses
+ *  formFactorForClass), so a registered plant class resolves correctly even when
+ *  the bare-constraints generic detector would say 'generic'. (2026-06-06 FIX D.) */
+export function isFieldErectedForClass(
+  productClass: string | null | undefined,
+  constraints: ParsedConstraints,
+): boolean {
+  const ff = formFactorForClass(productClass, constraints).toLowerCase().trim()
+  return !!ff && FIELD_ERECTED_FORM_FACTORS.has(ff)
 }

@@ -46,6 +46,29 @@ export interface MassAggregatorInput {
   /** Brief-target feasibility (1=met, 0=accepted shortfall). Informational
    *  context for the warning text only — does not change container_count. */
   brief_target_feasibility?: number | null
+  /**
+   * FIELD-ERECTED PLANT (2026-06-05, e_fuel_synthesis / process-plant fix).
+   * When true, the product is a FIXED INSTALLATION (a Power-to-Liquid SAF plant,
+   * a CO₂ mineralisation / DAC / SMR / electrolyser plant) assembled on site, NOT
+   * a containerised product. There is NO plant-wide gross-mass cap: the equipment
+   * arrives as modular skids + field-erected columns, each within road-transport
+   * limits. With this set, the aggregator:
+   *   - reports total_system_mass_kg as INFORMATIONAL "site mass",
+   *   - sets recommended_container_count = null (a plant is not containerised),
+   *   - does NOT compute a containerised mass_budget_utilisation against the
+   *     `max_mass_kg_envelope` cap (that cap is a per-skid road limit here, not a
+   *     plant-wide cap), and
+   *   - instead checks each SUPPLIED MASS BUCKET against the standard road-
+   *     transport abnormal-load limit (~44,000 kg) and flags any single skid /
+   *     bucket that would exceed it.
+   */
+  field_erected?: boolean
+  /**
+   * Standard road-transport abnormal-load gross-mass limit (kg) used for the
+   * per-skid check when field_erected is true. Defaults to 44,000 kg (typical UK
+   * STGO / abnormal-load articulated combination). Override per jurisdiction.
+   */
+  road_transport_limit_kg?: number
 }
 
 export interface MassAggregatorOutput {
@@ -55,14 +78,28 @@ export interface MassAggregatorOutput {
   pcs_mass_kg: number
   rack_total_mass_kg: number
   container_tare_kg: number
-  /** Difference from max envelope; positive = breach. */
+  /** Difference from max envelope; positive = breach. 0 for a field-erected plant
+   *  (no plant-wide cap to breach). */
   mass_budget_breach_kg: number
-  /** Ratio used (0.0..1.0+). 0.95 = good; >1.0 = over. */
+  /** Ratio used (0.0..1.0+). 0.95 = good; >1.0 = over. 0 for a field-erected
+   *  plant (no containerised utilisation is computed). */
   mass_budget_utilisation_pct: number
-  /** Round-up of total mass / max envelope. 1 = single container OK; ≥2 = MUST split. */
-  recommended_container_count: number
-  /** Per-container mass if split into the recommended count. */
+  /** Round-up of total mass / max envelope. 1 = single container OK; ≥2 = MUST
+   *  split. NULL for a field-erected plant — a fixed installation is not
+   *  containerised, so a container count is meaningless. */
+  recommended_container_count: number | null
+  /** Per-container mass if split into the recommended count. 0 for a
+   *  field-erected plant (no container split). */
   per_container_mass_kg: number
+  /** FIELD-ERECTED ONLY: total plant mass surfaced as informational "site mass"
+   *  (kg). Equal to total_system_mass_kg; named separately so a consumer can show
+   *  it as site mass rather than a containerised budget. undefined when the
+   *  product is containerised. */
+  site_mass_kg?: number
+  /** FIELD-ERECTED ONLY: true when no single supplied mass bucket exceeds the
+   *  road-transport abnormal-load limit (every skid is road-transportable).
+   *  undefined when the product is containerised. */
+  all_skids_road_transportable?: boolean
 }
 
 export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
@@ -87,6 +124,72 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
       + rack_total_mass_kg
       + input.container_tare_kg_estimate
     )
+
+    // FIELD-ERECTED PLANT (2026-06-05): a fixed installation, not a containerised
+    // product. There is NO plant-wide gross-mass cap to breach — report the total
+    // as informational SITE MASS, set the container count to null, skip the
+    // containerised utilisation, and instead check each supplied mass bucket
+    // against the road-transport abnormal-load limit so a genuine "won't fit on a
+    // truck" skid is still flagged.
+    if (input.field_erected) {
+      const roadLimit = (typeof input.road_transport_limit_kg === 'number' && input.road_transport_limit_kg > 0)
+        ? input.road_transport_limit_kg
+        : 44000 // UK STGO / abnormal-load articulated combination, kg
+      // Treat each supplied bucket as a candidate skid / single field-erected
+      // item. rack_total_mass_kg is the supports/saddles aggregate; the largest
+      // single shell mass is approximated by rack_mass_kg_each (per-vessel saddle
+      // + shell). We check the buckets that represent transportable single items.
+      const skidBuckets: Array<{ label: string; kg: number }> = [
+        { label: 'process equipment skid', kg: input.total_cell_mass_kg },
+        { label: 'compressors / pumps / drives skid', kg: input.pcs_mass_kg_estimate },
+        { label: 'transformer', kg: transformer_mass_kg },
+        { label: 'skid frame + bunding', kg: input.container_tare_kg_estimate },
+        { label: 'largest vessel + saddle', kg: input.rack_mass_kg_each_estimate },
+      ]
+      const overweight = skidBuckets.filter((b) => b.kg > roadLimit)
+      const all_skids_road_transportable = overweight.length === 0
+
+      const warnings: string[] = []
+      if (!all_skids_road_transportable) {
+        for (const b of overweight) {
+          warnings.push(`Field-erected plant: the ${b.label} (${Math.round(b.kg)} kg) exceeds the ${roadLimit} kg road-transport abnormal-load limit — split it into sub-skids or ship as field-erected segments.`)
+        }
+      } else {
+        warnings.push(`Field-erected plant: site mass ${Math.round(total_system_mass_kg)} kg is informational (a fixed installation, not a containerised product — no plant-wide gross-mass cap applies). Every modular skid / vessel is within the ${roadLimit} kg road-transport limit.`)
+      }
+
+      const out: MassAggregatorOutput = {
+        total_system_mass_kg: Math.round(total_system_mass_kg * 10) / 10,
+        cell_mass_kg: Math.round(input.total_cell_mass_kg * 10) / 10,
+        transformer_mass_kg: Math.round(transformer_mass_kg * 10) / 10,
+        pcs_mass_kg: Math.round(input.pcs_mass_kg_estimate * 10) / 10,
+        rack_total_mass_kg: Math.round(rack_total_mass_kg * 10) / 10,
+        container_tare_kg: Math.round(input.container_tare_kg_estimate * 10) / 10,
+        mass_budget_breach_kg: 0,
+        mass_budget_utilisation_pct: 0,
+        recommended_container_count: null,
+        per_container_mass_kg: 0,
+        site_mass_kg: Math.round(total_system_mass_kg * 10) / 10,
+        all_skids_road_transportable,
+      }
+      return {
+        ok: true,
+        output: out,
+        provenance: {
+          source: 'tool:mass-aggregator:envelope-check',
+          tool_id: 'mass-aggregator:envelope-check',
+          tool_version: '1.0.0',
+          tool_license: 'free-proprietary',
+          tool_source_url: 'internal://forgeos/orchestrator',
+          invocation_input: input,
+          pinned_versions: { algorithm: 'iso-668-container-tare-2024' },
+          timestamp: new Date(0).toISOString(),
+          duration_ms: Date.now() - t0,
+        },
+        warnings,
+      }
+    }
+
     const mass_budget_breach_kg = total_system_mass_kg - input.max_mass_kg_envelope
     const mass_budget_utilisation_pct = (total_system_mass_kg / Math.max(1, input.max_mass_kg_envelope)) * 100
     const heuristic_container_count = Math.max(1, Math.ceil(total_system_mass_kg / Math.max(1, input.max_mass_kg_envelope)))

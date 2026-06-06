@@ -42,7 +42,7 @@ import {
   type MarketBand,
   type BandPosition,
 } from '../src/lib/pdf-engine-v2/lib/market-bands'
-import { isConsumable, CLASS_PRICE_SANITY_BOUNDS, keywordCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
+import { isConsumable, CLASS_PRICE_SANITY_BOUNDS, keywordCeilingGbp, COMPONENT_CLASS_ORDER } from '../src/lib/pdf-engine-v2/component-classes'
 import { classifyByRules } from './estimate-missing-prices'
 import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
@@ -118,16 +118,106 @@ function humanise(id: string): string {
  * it already contains spaces/capitals it's a real label and passes through.
  * 2026-06-04 (CO₂ IF-ROOM (a): raw identifiers in sub-module headings).
  */
+// ── Function-taxonomy plain-English map (2026-06-06, FIX 3) ──────────────────
+// Stage 1.7 sets a sub-module's name_human to a CONCATENATED function-taxonomy
+// id — a primary archetype root followed by 1-3 finer "leaf" function tokens and
+// sometimes a trailing "etc": e.g.
+//   energy_conversion_transduction_chemical_reaction_chemical_sensing_etc
+//   mass_fluid_transport_process_thermal_transfer
+// The old humaniseSubName turned that into the gibberish
+// "Energy Conversion Transduction Chemical Reaction Chemical Sensing Etc". This
+// map gives each canonical taxonomy token a plain-English label; humaniseSubName
+// tokenises the chain (longest-token-first), maps the PRIMARY root + the first
+// leaf, and drops the rest + any "etc". UNKNOWN ids fall through to the existing
+// humanise (no regression — BESS/registered classes that already set a real
+// name_human are returned untouched by the early-exit below). IMPROVES BESS too
+// wherever a raw taxonomy id leaks (monotonic). Keys MUST be ordered irrelevant
+// (lookup is by exact token) but the TOKENS array IS sorted longest-first so the
+// greedy tokeniser never splits "energy_conversion_transduction" into pieces.
+const TAXONOMY_ID_PLAIN: Record<string, string> = {
+  // 12 canonical archetype roots (brief-specified)
+  energy_conversion_transduction: 'Energy conversion',
+  mass_fluid_transport_process: 'Fluid transport',
+  control_compute_communication: 'Control & monitoring',
+  electromagnetic_actuator: 'Actuation',
+  maintenance_serviceability: 'Maintenance & serviceability',
+  environmental_interface: 'Environmental interface',
+  structure_containment: 'Structure & containment',
+  safety_protection: 'Safety & protection',
+  sensing_instrumentation: 'Sensing & instrumentation',
+  power_distribution: 'Power distribution',
+  thermal_management: 'Thermal management',
+  hmi_ergonomics: 'Operator interface',
+  // Finer leaf-function tokens that appear after the primary root in the chain.
+  chemical_reaction: 'chemical reaction',
+  chemical_sensing: 'chemical sensing',
+  thermal_transfer: 'thermal transfer',
+  electrical_conduction: 'electrical conduction',
+  silicon_semiconductor: 'electronics',
+  signal_information_processing: 'signal processing',
+  human_machine_interface: 'operator interface',
+}
+// Tokens sorted longest-first so the greedy left-to-right matcher consumes the
+// multi-word roots whole (energy_conversion_transduction before energy/conversion).
+const _TAXONOMY_TOKENS_BY_LEN = Object.keys(TAXONOMY_ID_PLAIN).sort((a, b) => b.length - a.length)
+
+/** Tokenise a concatenated taxonomy id into its known taxonomy tokens. Returns
+ *  null when the string is not (mostly) composed of known tokens — so a genuine
+ *  snake_case part name like "co2_feed_compressor" falls through to humanise(). */
+function _splitTaxonomyChain(id: string): string[] | null {
+  const cleaned = id.replace(/_etc$/, '')
+  const parts: string[] = []
+  let rest = cleaned
+  let matchedChars = 0
+  while (rest.length > 0) {
+    let matched = false
+    for (const tok of _TAXONOMY_TOKENS_BY_LEN) {
+      if (rest === tok || rest.startsWith(tok + '_')) {
+        parts.push(tok)
+        matchedChars += tok.length
+        rest = rest.slice(tok.length).replace(/^_/, '')
+        matched = true
+        break
+      }
+    }
+    if (!matched) {
+      // Skip one underscore-delimited segment we don't recognise (keeps going so
+      // a chain that's MOSTLY taxonomy still resolves), but record it as unmatched.
+      const seg = rest.split('_')[0]
+      rest = rest.slice(seg.length).replace(/^_/, '')
+    }
+  }
+  // Only treat it as a taxonomy chain when the FIRST token is a known one and the
+  // recognised tokens cover most of the string — otherwise it's a real part id.
+  if (parts.length === 0) return null
+  if (matchedChars < cleaned.length * 0.6) return null
+  return parts
+}
+
 export function humaniseSubName(raw: string): string {
   const s = String(raw || '').trim()
   if (!s) return s
   // Real label already? (has a space, or any uppercase letter) → leave as-is.
   if (/\s/.test(s) || /[A-Z]/.test(s)) return s
-  // Raw id: lowercase + underscores only. Humanise, then collapse a verbatim
-  // repeated run of words (e.g. "Mass Fluid Transport Process Mass Fluid
-  // Transport Process" → "Mass Fluid Transport Process").
+  // Raw id: lowercase + underscores only.
   if (!/^[a-z0-9]+(?:_[a-z0-9]+)+$/.test(s)) return humanise(s)
-  const words = humanise(s).split(' ')
+  // 2026-06-06 (FIX 3): if the id is a concatenated FUNCTION-TAXONOMY chain
+  // (primary archetype root + leaf functions + maybe "etc"), render it as the
+  // plain-English PRIMARY function, optionally qualified by the first distinct
+  // leaf ("Energy conversion — chemical reaction"). This replaces the gibberish
+  // "Energy Conversion Transduction Chemical Reaction Chemical Sensing Etc".
+  const chain = _splitTaxonomyChain(s)
+  if (chain && chain.length > 0 && TAXONOMY_ID_PLAIN[chain[0]]) {
+    const primary = TAXONOMY_ID_PLAIN[chain[0]]
+    // First leaf that is DIFFERENT from the primary (so a doubled
+    // mass_fluid_transport_process_mass_fluid_transport_process → "Fluid transport").
+    const leaf = chain.slice(1).map((t) => TAXONOMY_ID_PLAIN[t]).find((l) => l && l.toLowerCase() !== primary.toLowerCase())
+    return leaf ? `${primary} — ${leaf}` : primary
+  }
+  // Not a taxonomy chain — humanise, then collapse a verbatim repeated run of
+  // words (e.g. "Mass Fluid Transport Process Mass Fluid Transport Process" →
+  // "Mass Fluid Transport Process") + strip a trailing "Etc".
+  const words = humanise(s).split(' ').filter((w) => w.toLowerCase() !== 'etc')
   for (let len = Math.floor(words.length / 2); len >= 1; len--) {
     const head = words.slice(0, len).join(' ')
     const next = words.slice(len, len * 2).join(' ')
@@ -200,16 +290,28 @@ function apply_engineering_fixups(s: string): string {
  * equivalents. Without this they render as a placeholder box / apostrophe.
  */
 export function normalise_unicode(s: string): string {
+  if (!s) return s
   return s
-    .replace(/[→➜⟶]/g, ' to ')
-    .replace(/[←⟵]/g, ' from ')
-    .replace(/[↔]/g, ' to/from ')
+    // Arrows → ASCII "->" (NOT " to ") so chemical / process notation reads
+    // exactly as the chain's own ASCII source does, e.g. the SAF cover
+    // headline "CO2 + 3 H2 -> -CH2- + 2 H2O". A reaction arrow rendered as
+    // " to " ("CO2 + 3 H2 to -CH2-") reads wrong; "->" matches the body prose
+    // (orchestratorContract.brief_summary vs brief_overview_prose) and is the
+    // form the rest of the pipeline already emits. Universal across classes.
+    .replace(/[→➜⟶⇒⟹]/g, '->')
+    .replace(/[←⟵⇐⟸]/g, '<-')
+    .replace(/[↔⟷]/g, '<->')
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
     .replace(/—/g, ' - ')
     .replace(/–/g, '-')
+    // U+2212 MINUS SIGN → ASCII hyphen-minus. The LLM emits this in
+    // worked-calcs ("ΔH = −165 kJ/mol") and Helvetica has no glyph for it
+    // (falls back to a stray box). U+2013 en-dash is handled above.
+    .replace(/−/g, '-')
     .replace(/…/g, '...')
     .replace(/×/g, 'x')
+    .replace(/÷/g, '/')
     // Unicode subscripts U+2080-U+2089 → ASCII digits. Helvetica falls back to
     // comma-like glyphs for these otherwise (drawer 227e3c8fd74fcd32 bug #7:
     // class-hazards.ts has correct H₂/CH₄/N₂/CO₂ but renders as "H,, CO, CH,,").
@@ -232,6 +334,8 @@ export function normalise_unicode(s: string): string {
     .replace(/≤/g, '<=')
     .replace(/≥/g, '>=')
     .replace(/≈/g, '~')
+    .replace(/≠/g, '!=')
+    .replace(/≡/g, '==')
     // Greek micro sign µ (U+00B5) and mu (U+03BC) → ASCII u (closest match)
     .replace(/[µμ]/g, 'u')
     // Greek small epsilon ε (U+03B5) — zero advance-width in Helvetica AFM;
@@ -251,7 +355,48 @@ export function normalise_unicode(s: string): string {
     // read "× ΔT 30°C". Spell as "delta " for readability.
     .replace(/Δ/g, 'delta ')
     .replace(/δ/g, 'delta ')
+    // Other Greek letters the LLM commonly emits in worked-calcs / physics
+    // narrative. Helvetica's AFM has none of these — each falls back to a
+    // wrong glyph (or a zero-width box that smears onto the next span and
+    // trips the gate-11 layout-overlap audit). Spell each out so it takes
+    // real advance width and reads correctly. Pi is the common offender in
+    // geometry calcs (πr², circumference); η efficiency; ρ density; α/β
+    // coefficients; λ wavelength / thermal conductivity; σ stress / Stefan-
+    // Boltzmann; θ angle. ε / Ε / µ / μ / Ω / Δ / δ are handled above.
+    .replace(/π/g, 'pi')
+    .replace(/Π/g, 'Pi')
+    .replace(/η/g, 'eta')
+    .replace(/ρ/g, 'rho')
+    .replace(/α/g, 'alpha')
+    .replace(/β/g, 'beta')
+    .replace(/[λ]/g, 'lambda')
+    .replace(/[σς]/g, 'sigma')
+    .replace(/Σ/g, 'sum ')
+    .replace(/θ/g, 'theta')
+    .replace(/φ/g, 'phi')
+    .replace(/ω/g, 'omega')
+    .replace(/γ/g, 'gamma')
+    .replace(/τ/g, 'tau')
     .replace(/[ ]/g, ' ')  // non-breaking space → space (fragile in @react-pdf)
+    // SAFETY NET (2026-06-05): after the explicit map above, any codepoint
+    // still > U+00FF that is NOT in a tiny allow-list of glyphs Helvetica /
+    // WinAnsi actually carries must NOT reach the font — react-pdf would
+    // silently emit a .notdef box that smears onto the next span (gate-11).
+    // The explicit map is authoritative; this only catches stragglers the LLM
+    // emits that we haven't enumerated. We first try an NFKD decomposition and
+    // keep the ASCII base (é→e, ½→1⁄2→ "1/2", ™→TM-ish) — but ONLY the
+    // ASCII-range output of that fold; anything that still decomposes to a
+    // non-ASCII, non-allow-listed codepoint is replaced with a single space so
+    // no unknown glyph is ever rendered. Latin-1 accented letters (À-ÿ) and
+    // the handful of Latin-1 symbols Helvetica has (— ² ³ · ° £ § © ® ± ¼ ½ ¾
+    // etc., all ≤ U+00FF or the em-dash U+2014) are preserved untouched.
+    .replace(/[^ -ÿ—]/g, (ch) => {
+      // U+2014 em-dash explicitly preserved (Helvetica/WinAnsi has it; the
+      // earlier .replace handled U+2013/U+2012 but NOT the em-dash, which we
+      // keep). Try an NFKD fold and salvage any pure-ASCII result.
+      const folded = ch.normalize('NFKD').replace(/[^ -~]/g, '')
+      return folded.length > 0 ? folded : ' '
+    })
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -360,7 +505,7 @@ const SI_UNITS_MIXED_CASE = new Map<string, string>([
   ['kgf', 'kgf'], ['nm', 'Nm'],
 ])
 
-function toTitleCaseEng(input: string): string {
+export function toTitleCaseEng(input: string): string {
   if (!input) return ''
   const ACRONYMS = new Set([
     // engineering subsystems / classes
@@ -373,8 +518,24 @@ function toTitleCaseEng(input: string): string {
     'NEMA','IP','RJ45','I2C','SPI','RS232','RS485','PPM','RPM','PSI','BTU',
     // geographic / political (Tristan 2026-05-20: "Uk" → "UK")
     'UK','EU','US','USA','GB','EEA','UAE','MENA','APAC','EMEA','ASEAN',
+    // Process-plant / Power-to-Liquid / chemical-process acronyms (2026-06-06,
+    // e_fuel SAF dossier): "E-saf" → "e-SAF", "Ptl" → "PtL", etc. UNIVERSAL —
+    // these surface across every process-plant class (DAC, SMR, FT synthesis).
+    'SAF','H2','SMR','DAC','FT','DCS','SIS','FMEA','NTU','ASTM','COMAH',
+    'DSEAR','ATEX','PED','EI','GHG','LCA','CORSIA','MEA','MDEA','PSA','TSA',
+    'NPV','CAPEX','OPEX','LCOE','MTBF','STRIDE','DREAD','HAZOP','LOPA','SIL',
   ])
-  const SMALL_WORDS = new Set(['and','or','of','the','for','to','in','on','a','an','with'])
+  // PtL is mixed-case (not all-caps) so it cannot live in the ACRONYMS set,
+  // which up-cases its members entirely. Map it explicitly.
+  const MIXED_CASE_ACRONYMS = new Map<string, string>([
+    ['ptl', 'PtL'],
+  ])
+  // e-/x- single-letter technology prefixes (e-fuel, e-SAF, e-methanol,
+  // x-by-wire): the leading letter stays lowercase, the remainder is cased by
+  // the normal rules (so "e-saf" → "e-SAF", "e-fuel" → "e-fuel"). Returned by
+  // casing the post-hyphen segment recursively through this same function.
+  const TECH_PREFIXES = new Set(['e', 'x'])
+  const SMALL_WORDS = new Set(['and','or','of','the','for','to','in','on','a','an','with','at','by','per','vs','via'])
   const tokens = input.split(/(\s+|\(|\))/)
   // Find the previous non-whitespace/non-paren token's index → so we can ask
   // "was the previous content token a number?" for the SI-unit rule.
@@ -386,17 +547,23 @@ function toTitleCaseEng(input: string): string {
     }
     return null
   }
-  return tokens.map((tok, idx) => {
-    if (/^[\s()]+$/.test(tok)) return tok
-    // If the token is already all-uppercase (≥2 letters) and contains a
-    // letter, treat it as a deliberately-cased acronym and leave it.
+  // Case a single non-whitespace token. `prevIsNumber` tells the SI-unit rule
+  // whether the preceding content token was numeric. `atStart` marks the very
+  // first content token (small-words like "of"/"the" are only lower-cased when
+  // NOT at the start). Pulled out so hyphen-segments can be cased recursively
+  // with the right context (a hyphen-split segment is never sentence-initial).
+  const caseToken = (tok: string, prevIsNumber: boolean, atStart: boolean): string => {
+    // Already all-uppercase (≥2 letters) → deliberately-cased acronym, leave it.
     if (/^[A-Z]{2,}\d*$/.test(tok)) return tok
+    const lowerTok = tok.toLowerCase()
+    // Mixed-case acronyms (PtL) preserve their canonical casing in any position
+    // — checked BEFORE the all-caps ACRONYMS set so PtL is not up-cased to PTL.
+    if (MIXED_CASE_ACRONYMS.has(lowerTok)) return MIXED_CASE_ACRONYMS.get(lowerTok)!
     const upper = tok.toUpperCase()
     if (ACRONYMS.has(upper)) return upper
     // Mixed-case SI unit lookup BEFORE the all-lowercase SI unit rule.
     // "kW", "mAh", "kPa" etc. should preserve their canonical capitalisation
     // regardless of context (always — these aren't position-sensitive).
-    const lowerTok = tok.toLowerCase()
     if (SI_UNITS_MIXED_CASE.has(lowerTok)) return SI_UNITS_MIXED_CASE.get(lowerTok)!
     // (2026-05-22 Tristan): the SI-unit rule was too aggressive — it
     // lowercased ANY short token, so part labels like "fan Speed Controller"
@@ -410,15 +577,169 @@ function toTitleCaseEng(input: string): string {
     // "umol/m²/s", "l/min", "ppfd"). The previous content token must be a
     // number — that gate prevents collapsing real noun-tokens like "fan",
     // "ozone", "pump" which are pre-token labels not unit suffixes.
-    if (/^[a-z][a-z0-9²³°\/]{0,9}$/.test(tok)) {
-      const prev = prevContent(idx)
-      const prevIsNumber = prev !== null && /^-?\d+(?:\.\d+)?$/.test(prev)
-      if (prevIsNumber) return tok.toLowerCase()
+    if (prevIsNumber && /^[a-z][a-z0-9²³°\/]{0,9}$/.test(tok)) {
+      return tok.toLowerCase()
     }
     const lower = tok.toLowerCase()
-    if (idx > 0 && SMALL_WORDS.has(lower)) return lower
+    if (!atStart && SMALL_WORDS.has(lower)) return lower
     return lower.charAt(0).toUpperCase() + lower.slice(1)
+  }
+
+  return tokens.map((tok, idx) => {
+    if (/^[\s()]+$/.test(tok)) return tok
+    const prev = prevContent(idx)
+    // 2026-06-06 (FIX 4): accept thousands-separators AND a leading approximation
+    // sign (~ / ≈) in the number detector so an SI unit after "1,000" or "~1,000"
+    // stays lowercase ("~1,000 t/yr", not "~1,000 T/yr"). The old regex only
+    // matched a bare "1000". Also handles "1,000.5".
+    const prevNumeric = prev === null ? '' : prev.replace(/^[~≈]/, '')
+    const prevIsNumber = prevNumeric !== '' && /^-?\d{1,3}(?:,\d{3})*(?:\.\d+)?$|^-?\d+(?:\.\d+)?$/.test(prevNumeric)
+    const atStart = idx === 0 || prevContent(idx) === null
+    // 2026-06-06 (FIX 4): hyphenated tokens (e-SAF, e-fuel, x-by-wire, grid-tie)
+    // were cased as ONE unit, so "E-saf" → "E-saf". Split on hyphen, case each
+    // segment, and special-case the e-/x- single-letter technology prefix (the
+    // leading letter stays lowercase; the remainder is cased normally → e-SAF,
+    // e-fuel). A bare token with no hyphen takes the fast path unchanged.
+    if (tok.includes('-') && /[a-zA-Z]/.test(tok)) {
+      const segs = tok.split('-')
+      const lead = segs[0].toLowerCase()
+      const isTechPrefix = segs.length >= 2 && TECH_PREFIXES.has(lead) && segs[0].length === 1
+      return segs
+        .map((seg, si) => {
+          if (seg === '') return seg
+          if (isTechPrefix) {
+            // e-/x- technology prefix: the prefix stays lowercase; the segment
+            // AFTER it is up-cased ONLY if it is a known acronym (e-SAF), else
+            // kept lowercase (e-fuel, e-methanol) — NOT title-cased, matching the
+            // brief's two examples (e-SAF, e-fuel). Any 3rd+ segment cases normally.
+            if (si === 0) return lead
+            if (si === 1) {
+              const segUpper = seg.toUpperCase()
+              return ACRONYMS.has(segUpper) ? segUpper : seg.toLowerCase()
+            }
+            return caseToken(seg, false, false)
+          }
+          // Ordinary hyphenated token (Grid-Tie, Lean/rich): case each segment by
+          // the normal rules. The first segment carries the at-start flag so a
+          // sentence-initial "grid-tie" capitalises "Grid".
+          return caseToken(seg, false, atStart && si === 0)
+        })
+        .join('-')
+    }
+    return caseToken(tok, prevIsNumber, atStart)
   }).join('')
+}
+
+// ── §17 component-class DISPLAY labels (2026-06-06, FIX 2) ───────────────────
+// The §17 cost-breakdown "Component-class breakdown" rows label each row with the
+// raw engine_b_component_class slug humanised ("Magnetic 35%", "Fluid Path",
+// "Oem Subsystem"). For a process plant those slugs read as jargon. This map
+// gives a plain-English label used ONLY for the §17 breakdown row labels — the
+// underlying slug VALUES (which drive cost gating / Engine B attribution) are
+// UNTOUCHED. Keys are the canonical ComponentClass slugs from
+// src/lib/pdf-engine-v2/component-classes.ts; an unmapped slug falls back to the
+// existing toTitleCaseEng(humanise(slug)) so no class regresses. Universal: the
+// readable label helps every class, process-plant or battery, and also when the
+// upstream classifier (owned separately) routes process equipment to the right
+// slug. NOT subject to any gate — pure display.
+const COMPONENT_CLASS_DISPLAY: Record<string, string> = {
+  magnetic: 'Transformers & magnetics',
+  fluid_path: 'Piping, vessels & valves',
+  thermal: 'Heat transfer & thermal',
+  mechanical_assembly: 'Rotating & mechanical equipment',
+  mechanical_fastener: 'Fasteners & fixings',
+  electronic_pcb: 'Instrumentation & control',
+  electronic_discrete: 'Discrete electronics',
+  electronic_connector: 'Connectors & terminations',
+  electronic_cable: 'Cabling & harnesses',
+  electronic_power_module: 'Power electronics',
+  sensor: 'Sensors & measurement',
+  motor_actuator: 'Motors & actuators',
+  optical: 'Optical & display',
+  structural_metal: 'Structural & enclosure',
+  structural_polymer: 'Moulded & polymer parts',
+  battery_cell: 'Battery cells & storage',
+  safety_consumable: 'Safety & consumables',
+  oem_subsystem: 'Engineered subsystems',
+  oem_hvac_chiller: 'Cooling & HVAC units',
+  oem_fire_safety: 'Fire & gas safety systems',
+  oem_smoke_detection: 'Smoke detection systems',
+  consumable: 'Consumables & media',
+  system_assemblies: 'System assemblies',
+  unclassified: 'Other / unclassified',
+}
+/** Plain-English label for a §17 component-class row. Falls back to the existing
+ *  humanise+title-case for any slug not in COMPONENT_CLASS_DISPLAY (no regression). */
+function componentClassDisplay(slug: string): string {
+  const key = String(slug ?? '').trim().toLowerCase()
+  return COMPONENT_CLASS_DISPLAY[key] ?? toTitleCaseEng(humanise(slug))
+}
+
+// ── Generic-tool not-calibrated-for-class suppression (2026-06-06, FIX 5) ─────
+// Three generic orchestrator tools (reliability-fmea, regulatory-cert-cost,
+// cybersecurity-threat-model) are calibrated for discrete manufactured PRODUCTS
+// and emit WRONG numbers for a continuous PROCESS PLANT — system MTBF 0.21 yr,
+// certification £0/0 mo, a consumer-IoT STRIDE score. The tool wrappers now stamp
+// their output `status: 'not_estimated_for_class'` for these classes (see
+// scripts/lib/orchestrator/tools/generic-tool-class-applicability.ts), but the
+// figure still reaches the renderer via the contract QUANTITY (the class-plan
+// reads the raw number). The renderer is the reader-facing surface, so it
+// suppresses these specific quantities on a process-plant class — replacing the
+// misleading number with an honest "not estimated at concept stage" line. Keyed
+// by the contract-quantity FIELD the claim carries; reasons mirror the wrappers.
+// Mirrors the tool wrapper's PROCESS_PLANT_CLASSES (kept in step deliberately —
+// the renderer cannot import the wrapper module without pulling tool-registration
+// side-effects into the PDF bundle).
+const _RENDERER_PROCESS_PLANT_RE =
+  /e_fuel_synthesis|co2_mineralis|direct_air_capture|^dac$|_dac$|electrolyser|methanol_synth|ammonia_synth|steam_methane|\bsmr\b|carbon_capture/i
+function _isProcessPlantClassForRender(productClass: unknown): boolean {
+  const c = String(productClass ?? '').trim().toLowerCase()
+  return !!c && _RENDERER_PROCESS_PLANT_RE.test(c)
+}
+// Contract-quantity field -> honest reason, for the 3 generic tools' outputs that
+// are not calibrated for a process plant. A claim/quantity whose field is here is
+// rendered as the reason instead of the (wrong) number when the class is a plant.
+const _NOT_ESTIMATED_FIELD_REASONS: Record<string, string> = {
+  plant_system_mtbf_years: 'plant reliability is set by process-equipment MTBF and a RAM/HAZOP study, not a part-count FIT roll-up',
+  reliability_system_mtbf_hours: 'plant reliability is set by process-equipment MTBF and a RAM/HAZOP study, not a part-count FIT roll-up',
+  system_mtbf_years: 'plant reliability is set by process-equipment MTBF and a RAM/HAZOP study, not a part-count FIT roll-up',
+  plant_expected_warranty_claims: 'warranty exposure follows the equipment vendors’ terms, not a product part-count FIT model',
+  reliability_warranty_claims_per_unit: 'warranty exposure follows the equipment vendors’ terms, not a product part-count FIT model',
+  regulatory_certification_cost_gbp: 'certification cost for a major-hazard plant (COMAH / PED / ATEX / DSEAR) must be scoped with a process-safety consultant at FEED stage',
+  regulatory_certification_months: 'certification schedule for a major-hazard plant (COMAH / PED / ATEX / DSEAR) must be scoped with a process-safety consultant at FEED stage',
+  cybersecurity_threat_score: 'plant cyber risk is an OT/ICS concern assessed under IEC 62443, not a consumer-product STRIDE score',
+  stride_threat_score: 'plant cyber risk is an OT/ICS concern assessed under IEC 62443, not a consumer-product STRIDE score',
+}
+/** When `field` is a generic-tool output not calibrated for a process plant AND
+ *  the class is a process plant, returns the honest reason; else null (render the
+ *  number normally). UNIVERSAL: only fires for the named fields on plant classes. */
+function notEstimatedReasonForField(field: string, productClass: unknown): string | null {
+  if (!_isProcessPlantClassForRender(productClass)) return null
+  const key = String(field ?? '').trim()
+  return _NOT_ESTIMATED_FIELD_REASONS[key] ?? null
+}
+// Signature phrases the "numbers behind it" narrative (generatePhysicsNarrative,
+// owned elsewhere) emits for the 3 not-calibrated generic tools. On a process-
+// plant class these sentences quote the wrong figures (MTBF 0.21 yr, cyber score
+// 25, £0 cert), so the renderer drops the whole sentence rather than show it.
+// Anchored on the tool's own deterministic phrasing — NOT free LLM prose.
+const _NOT_ESTIMATED_NARRATIVE_RE =
+  /\b(mtbf|mean[- ]time[- ]between[- ]failures|warranty claim|cybersecurity threat score|stride threat|regulatory certification cost)\b/i
+/** Strip "numbers behind it" sentences that quote a not-calibrated generic tool's
+ *  figure, for process-plant classes. Returns a narrative with the offending
+ *  sentences (and now-empty groups) removed, or the original when nothing matches
+ *  / the class isn't a process plant. Pure; does not mutate the input. */
+function filterNotEstimatedNarrative<T extends { sentences: string[]; groups?: Array<{ label: string; sentences: string[] }> }>(
+  narrative: T | null,
+  productClass: unknown,
+): T | null {
+  if (!narrative || !_isProcessPlantClassForRender(productClass)) return narrative
+  const keep = (s: string) => !_NOT_ESTIMATED_NARRATIVE_RE.test(String(s ?? ''))
+  const sentences = (narrative.sentences ?? []).filter(keep)
+  const groups = (narrative.groups ?? [])
+    .map((g) => ({ ...g, sentences: (g.sentences ?? []).filter(keep) }))
+    .filter((g) => g.sentences.length > 0)
+  return { ...narrative, sentences, groups }
 }
 
 // Upper-case only the ACRONYM tokens of an otherwise-lower-case phrase (the
@@ -587,13 +908,49 @@ function dedupe_duplicated_chunks(s: string): string {
   return out.join(' ').replace(/\s+/g, ' ').trim()
 }
 
+// FIX 2 (co2 prose plan, 2026-06-06): strip BoM-dump fragments that leak into
+// NARRATIVE prose — "(additional: £12,000)" and "(part 6ES7…)" parentheticals
+// belong in the bill-of-materials TABLE, not the readable module narrative. The
+// deterministic emitter sometimes appends them to english_sentence; the multimodal
+// scorer reads them as robotic word-salad. Prose-only (clean_prose is never applied
+// to BoM line rendering), so the BoM table keeps its (additional:/part) columns.
+function strip_bom_dump_fragments(s: string): string {
+  if (!s) return ''
+  return s
+    .replace(/\s*\((?:additional|add\.?)\s*:?\s*£[\d,]+(?:\.\d+)?\s*\)/gi, '')
+    .replace(/\s*\(part\s+[^)]{1,40}\)/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,;:])/g, '$1')
+    .trim()
+}
+// FIX 2 (co2 prose plan, 2026-06-06): render common chemical formulae in correct
+// case (co2 -> CO2, caco3 -> CaCO3, k2so4 -> K2SO4) so prose reads as chemistry,
+// not lower-case word-salad. ASCII digits (NOT unicode subscripts) — the renderer's
+// bundled Helvetica can't render ₂/₃ and normalise_unicode would strip them. Whole-
+// word only (\b) so it never mangles an identifier (co2_capture has no \b before "_")
+// or a longer word. "co"/"mea" deliberately omitted (collide with "Co."/ordinary words).
+const _CHEM_FORMULAE: Record<string, string> = {
+  co2: 'CO2', h2: 'H2', h2o: 'H2O', o2: 'O2', n2: 'N2', ch4: 'CH4', h2s: 'H2S',
+  caco3: 'CaCO3', k2so4: 'K2SO4', koh: 'KOH', caso4: 'CaSO4', nh3: 'NH3',
+  nox: 'NOx', sox: 'SOx',
+}
+function format_chemical_formulae(s: string): string {
+  if (!s) return ''
+  let out = s
+  for (const [lc, fmt] of Object.entries(_CHEM_FORMULAE)) {
+    out = out.replace(new RegExp(`\\b${lc}\\b`, 'gi'), (m) => (m === fmt ? m : fmt))
+  }
+  return out
+}
 function clean_prose(s: string | null | undefined): string {
   if (!s) return ''
   // Phase19 audit pipeline: HTML decode + tag strip → existing transforms →
   // British spelling normalisation. Order matters: strip tags AFTER decoding
-  // entities (so &lt;strong&gt; becomes a real tag we then strip).
+  // entities (so &lt;strong&gt; becomes a real tag we then strip). 2026-06-06
+  // (co2 prose plan FIX 2): strip BoM-dump fragments + case chemical formulae
+  // BEFORE the existing passes so narrative prose reads cleanly.
   const decoded = stripHtmlTags(decodeHtmlEntities(String(s).trim()))
-  return dedupe_duplicated_chunks(clamp_decimals_in_prose(britishise(fix_quantity_prefix(normalise_unicode(apply_engineering_fixups(strip_internal_ids(decoded)))))))
+  return dedupe_duplicated_chunks(clamp_decimals_in_prose(britishise(fix_quantity_prefix(normalise_unicode(apply_engineering_fixups(format_chemical_formulae(strip_bom_dump_fragments(strip_internal_ids(decoded)))))))))
 }
 
 // ─── Module label table (mirrored from src/lib/pdf-engine-v2/types/module-decomposition.ts) ───
@@ -855,6 +1212,16 @@ function _tokenisePartName(s: string): string[] {
   return String(s).toLowerCase().split(/[^a-z0-9]+/).filter((t) => t && t.length > 2 && !_RENDER_CLASSIFIER_STOP.has(t))
 }
 
+// Source-of-truth validity set for ComponentClass: COMPONENT_CLASS_ORDER is the
+// complete ordered list of every real component class. Used to reject corpus
+// `component_class` values that are actually PRODUCT-CLASS slugs (the growing-DB
+// harvest overloads component_class to ALSO tag parts with the product-class slug
+// — e.g. 'co2_mineralisation', 'e_fuel_synthesis' — for class-scoped price
+// lookup). (2026-06-06 FIX C: a generic e_fuel part name token-matched a
+// co2_mineralisation-tagged corpus row and leaked a bogus "CO2 Mineralisation"
+// line into the §17 component-class breakdown.)
+const _VALID_COMPONENT_CLASSES: ReadonlySet<string> = new Set<string>(COMPONENT_CLASS_ORDER)
+
 class RenderEngineBClassifier {
   private db: any = null
   private stmt: any = null
@@ -894,7 +1261,17 @@ class RenderEngineBClassifier {
     try {
       const row = this.stmt.get(pattern) as any
       if (row && typeof row.component_class === 'string' && row.component_class !== 'unknown') {
-        return row.component_class
+        // VALIDITY GUARD (2026-06-06 FIX C): only accept a real ComponentClass.
+        // The corpus component_class column is overloaded by the harvest to also
+        // carry the PRODUCT-CLASS slug ('co2_mineralisation', …); returning one
+        // leaks a bogus product-class row into the §17 component-class breakdown
+        // (the e_fuel £6,800 "CO2 Mineralisation" line). A product-class slug is
+        // never a valid component class, so reject it and let the caller fall back
+        // (token-match → 'unclassified'). Universal + zero-regression: every real
+        // component class still passes.
+        if (_VALID_COMPONENT_CLASSES.has(row.component_class)) {
+          return row.component_class
+        }
       }
     } catch {
       // ignore
@@ -3145,7 +3522,7 @@ function CoverPage({
                 DESIGNED AGAINST REFERENCE PRODUCT
               </Text>
               <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
-                {String(po.reference_product)}{mfr}{detail}.
+                {normalise_unicode(String(po.reference_product))}{normalise_unicode(mfr)}{normalise_unicode(detail)}.
               </Text>
             </View>
           )
@@ -3788,6 +4165,65 @@ function TakingForwardPage({ state, project }: { state: any; project: string }) 
     const pc = state?.physicsCritique
     const hasPhysics = !!pc && ((Array.isArray(pc.issues) && pc.issues.length > 0) || (pc.scores != null))
 
+    // (3) Decisions still open — 2026-06-06 (FIX 6): DERIVED FROM REAL STATE, not
+    // a hardcoded CO₂-mineralisation example (the old bullets leaked "second
+    // carbonation sink … lime vs gypsum" + "gypsum-to-CaCO₃ stoichiometry" onto
+    // every class's dossier). Real open items, one bullet each:
+    //   • physics-critic findings (the engine's own first-principles flags) —
+    //     filtered to PHYSICAL risks (drop JSON/pipeline meta-findings);
+    //   • brief constraints the engine had to INFER (source==='inferred') — the
+    //     user never stated them, so they are genuine open decisions;
+    //   • parsedBrief.still_missing[] — fields the brief parser flagged as absent.
+    const openItems: string[] = []
+    const _seenOpen = new Set<string>()
+    const _pushOpen = (txt: string) => {
+      const t = String(txt ?? '').trim()
+      if (!t) return
+      const key = t.toLowerCase().slice(0, 80)
+      if (_seenOpen.has(key)) return
+      _seenOpen.add(key)
+      openItems.push(t)
+    }
+    // Physics-critic findings (physical only — META_FINDING_RE drops JSON/pipeline
+    // artefacts; mirrors feasibility-assessment's isPhysicalRisk guard).
+    const _META_FINDING_RE = /json|payload|truncat|parse|parsing|pipeline|schema|invalid syntax|missing structural details|design generation|design generator|serialis|serializ|\bthe model\b|\bllm\b/i
+    const pcIssues: any[] = Array.isArray(pc?.issues) ? pc.issues : []
+    for (const iss of pcIssues) {
+      const issueText = String(iss?.issue ?? '').trim()
+      const haystack = `${issueText} ${String(iss?.dimension ?? '')} ${String(iss?.suggested_check ?? iss?.suggested_fix ?? '')}`
+      if (!issueText || _META_FINDING_RE.test(haystack)) continue
+      // First sentence keeps the bullet tight; full issue text can be long.
+      const firstSentence = issueText.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? issueText
+      _pushOpen(firstSentence.length > 220 ? firstSentence.slice(0, 217) + '…' : firstSentence)
+      if (openItems.length >= 5) break
+    }
+    // Brief constraints the engine INFERRED (the user did not state them).
+    const _constraints = state?.parsedBrief?.constraints ?? {}
+    const _INFERRED_LABELS: Record<string, string> = {
+      max_mass_kg: 'maximum gross mass', unit_cost_ceiling: 'unit cost ceiling',
+      max_dimensions_mm: 'external envelope', design_life: 'design life',
+      operating_environment: 'operating-environment range', batch_size: 'annual batch size',
+    }
+    for (const [k, v] of Object.entries(_constraints)) {
+      if (openItems.length >= 7) break
+      if (v && typeof v === 'object' && (v as any).source === 'inferred') {
+        const label = _INFERRED_LABELS[k] ?? humanise(k).toLowerCase()
+        const val = (v as any).value
+        _pushOpen(`The ${label} was INFERRED by the engine (the brief did not state it${val != null ? `; assumed ${typeof val === 'number' ? val.toLocaleString('en-GB') : String(val)}` : ''}) — confirm or set it explicitly, as it drives sizing and cost.`)
+      }
+    }
+    // Brief-parser still_missing[] (fields flagged absent), if present.
+    const _stillMissing: any[] = Array.isArray(state?.parsedBrief?.still_missing)
+      ? state.parsedBrief.still_missing
+      : Array.isArray(state?.parsedBrief?.constraints?.still_missing)
+        ? state.parsedBrief.constraints.still_missing
+        : []
+    for (const m of _stillMissing) {
+      if (openItems.length >= 8) break
+      const txt = typeof m === 'string' ? m : String((m as any)?.description ?? (m as any)?.field ?? '')
+      if (txt) _pushOpen(`Brief did not specify ${txt} — decide before procurement.`)
+    }
+
     // ── Sub-section row helpers (renderer idiom: bold accent sub-heading + bullets) ──
     const Bullet = ({ children }: { children: React.ReactNode }) => (
       <View style={{ flexDirection: 'row', marginBottom: 6 }}>
@@ -3837,35 +4273,36 @@ function TakingForwardPage({ state, project }: { state: any; project: string }) 
         {hasPhysics ? (
           <Bullet>Review the engineering issues flagged by the physics check (Section 7 / feasibility notes).</Bullet>
         ) : null}
+        {/* 2026-06-06 (FIX 6): material-rate bullet made class-neutral — the old
+            line hardcoded "316L £6/kg, fabrication ×4.5–5.5" (a CO₂-plant
+            assumption) onto every dossier. */}
         <Bullet>
-          Confirm the material rates and fabrication factors used in the cost build-up (316L &#163;6/kg, fabrication
-          &#215;4.5&#8211;5.5) against current fabricator pricing.
+          Confirm the material rates and fabrication / installation factors used in the cost build-up against current
+          fabricator and vendor pricing for this design&#8217;s materials of construction.
         </Bullet>
 
-        {/* 3 · Decisions still open */}
+        {/* 3 · Decisions still open — DERIVED FROM STATE (FIX 6) */}
         <SubHead>Decisions still open</SubHead>
-        <Bullet>
-          The second carbonation sink&#8217;s cation source (supplementary lime vs more gypsum) — fixes the calcium balance and
-          changes feedstock + product tonnages.
-        </Bullet>
-        <Bullet>
-          Metallurgy: solid 316L vs clad / rubber-lined construction for the wetted vessels — the single biggest swing on equipment
-          cost.
-        </Bullet>
-        <Bullet>
-          Confirm the brief&#8217;s gypsum-to-CaCO&#8323; stoichiometry (3.1 t/d gypsum yields ~1.8 t/d CaCO&#8323;, not the stated
-          2.3 t/d — the second sink closes the gap).
-        </Bullet>
+        {openItems.length > 0 ? (
+          openItems.map((it, i) => (
+            <Bullet key={`open-${i}`}>{it}</Bullet>
+          ))
+        ) : (
+          <Bullet>
+            No open design decisions were flagged by the engineering checks — confirm the brief&#8217;s stated assumptions
+            with a specialist before locking the contract.
+          </Bullet>
+        )}
 
-        {/* 4 · Questions to put to suppliers */}
+        {/* 4 · Questions to put to suppliers — class-neutral (FIX 6) */}
         <SubHead>Questions to put to suppliers</SubHead>
         <Bullet>
-          <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Process — </Text>
-          Guaranteed performance (capture %, product purity, solvent make-up rate) at the stated duty?
+          <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Performance — </Text>
+          Guaranteed performance against the brief&#8217;s stated duty (output, efficiency, purity / quality where applicable)?
         </Bullet>
         <Bullet>
-          <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Mechanical &amp; materials — </Text>
-          Confirmed material of construction, design code (PED / BS EN 13445), and wall thickness for each vessel?
+          <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Engineering &amp; materials — </Text>
+          Confirmed materials of construction, the governing design code / standard, and the key ratings for each major item?
         </Bullet>
         <Bullet>
           <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Cost &amp; delivery — </Text>
@@ -3873,7 +4310,7 @@ function TakingForwardPage({ state, project }: { state: any; project: string }) 
         </Bullet>
         <Bullet>
           <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Operations — </Text>
-          Utility demand (steam, power, cooling, lime/gypsum feed) and turndown?
+          Utility and consumable demand (power, heat, cooling, feedstock) and the achievable turndown?
         </Bullet>
 
         <PageFooter />
@@ -3937,8 +4374,13 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
           </Text>
         </View>
         {blocks.map((block, bi) => {
-          const moduleName = britishise(normalise_unicode(String(block?.module_name ?? '').trim())) ||
-            humanise(String(block?.module_id ?? ''))
+          // 2026-06-06 (FIX 3 extension): module_name / module_id can be a
+          // concatenated function-taxonomy chain on process-plant classes
+          // ("energy_conversion_transduction…") — humaniseSubName maps it to plain
+          // English and falls through to humanise() for real module ids (no
+          // regression), so the Engagement Plan heading never reads as gibberish.
+          const moduleName = britishise(normalise_unicode(humaniseSubName(String(block?.module_name ?? '').trim()))) ||
+            humaniseSubName(String(block?.module_id ?? ''))
           const cards = (block.cards || []).filter((c) => c && Array.isArray(c.questions) && c.questions.length > 0)
           return (
             // The module sub-heading + its first card stay together (minPresenceAhead,
@@ -5282,7 +5724,22 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
 // class's CAPEX/OPEX dimensions read as real engineering, not generic prose.
 // When the brief has no parseable constraints, renders a placeholder note.
 
-type ComplianceStatus = 'pass' | 'fail' | 'unknown'
+// 2026-06-06 (FIX 1): the status enum gained two HONEST intermediate states so a
+// row never has to choose between a false PASS and an evasive "—":
+//   • 'delta'  — the achieved value is IN RANGE but BELOW/ABOVE the brief target
+//                (a disclosed shortfall/over-shoot), shown with the numeric delta.
+//                Used for an exact-target metric the design deliberately reduced
+//                (e.g. synthesis pressure 30 → 25 bar) — a MEDIUM design deviation,
+//                rendered amber, NEVER a hidden green PASS.
+//   • 'target' — a design TARGET that requires downstream verification this engine
+//                cannot perform at concept stage (e.g. GHG reduction needs a full
+//                ISO 14067 / CORSIA lifecycle assessment; levelised cost needs a
+//                full lifecycle cost model). Rendered blue "requires verification";
+//                NEVER computed into a PASS from a generic tool (that would be
+//                greenwashing/fabrication).
+// 'unknown' stays the genuinely-no-data "—". A green "All N PASS" banner is
+// honest ONLY when every row is a verified 'pass' (delta/target/unknown all block it).
+type ComplianceStatus = 'pass' | 'fail' | 'delta' | 'target' | 'unknown'
 
 interface ComplianceRow {
   constraint: string           // human-readable label
@@ -5307,6 +5764,12 @@ export interface ComplianceVerdict {
   passCount: number
   failCount: number
   unknownCount: number
+  // 2026-06-06 (FIX 1): disclosed below/above-target deltas + design targets that
+  // require downstream verification. Both are counted SEPARATELY and BLOCK the
+  // "All PASS" banner — a disclosed shortfall or an unverified target is not a
+  // verified pass.
+  deltaCount: number
+  targetCount: number
   allVerifiedPass: boolean
   headline: string
 }
@@ -5315,13 +5778,25 @@ export function summariseComplianceRows(rows: { status: ComplianceStatus }[]): C
   const failCount = rows.filter((r) => r.status === 'fail').length
   const unknownCount = rows.filter((r) => r.status === 'unknown').length
   const passCount = rows.filter((r) => r.status === 'pass').length
-  const allVerifiedPass = total > 0 && failCount === 0 && unknownCount === 0
+  const deltaCount = rows.filter((r) => r.status === 'delta').length
+  const targetCount = rows.filter((r) => r.status === 'target').length
+  // HONEST banner: "All PASS" only when EVERY row is a verified pass. fail, delta
+  // (disclosed shortfall), target (needs verification) and unknown ("—") all
+  // disqualify it. (Council consensus 2026-06-06: delta/target must never fold
+  // into "All PASS".)
+  const allVerifiedPass = total > 0 && passCount === total
+  // Suffix listing the non-pass, non-fail residual so the headline is precise.
+  const residualBits: string[] = []
+  if (deltaCount > 0) residualBits.push(`${deltaCount} below target`)
+  if (targetCount > 0) residualBits.push(`${targetCount} pending verification`)
+  if (unknownCount > 0) residualBits.push(`${unknownCount} unverified`)
+  const residual = residualBits.length > 0 ? ` · ${residualBits.join(' · ')}` : ''
   const headline = failCount > 0
-    ? `${failCount} of ${total} brief constraints FAIL${unknownCount > 0 ? ` · ${unknownCount} unverified` : ''}`
-    : unknownCount > 0
-      ? `${passCount} of ${total} brief constraints verified PASS · ${unknownCount} unverified`
+    ? `${failCount} of ${total} brief constraints FAIL${residual}`
+    : (deltaCount + targetCount + unknownCount) > 0
+      ? `${passCount} of ${total} brief constraints verified PASS${residual}`
       : `All ${total} brief constraints PASS`
-  return { total, passCount, failCount, unknownCount, allVerifiedPass, headline }
+  return { total, passCount, failCount, unknownCount, deltaCount, targetCount, allVerifiedPass, headline }
 }
 
 /**
@@ -5496,7 +5971,11 @@ const _METRIC_UNIT_FAMILIES: Record<string, Record<string, number>> = {
 }
 
 function _normUnitToken(u: string): string {
-  return String(u ?? '').toLowerCase().replace(/²/g, '2').replace(/³/g, '3').replace(/\s+/g, '').trim()
+  // 2026-06-06 (FIX 1): also strip the degree sign so "°C" == "C" and "°c" == "c"
+  // — the brief emits "C" while the contract emits "°C" for synthesis temperature,
+  // and without this the two never matched and the row dropped to "—". Safe +
+  // universal (temperature is the only unit carrying the degree glyph).
+  return String(u ?? '').toLowerCase().replace(/²/g, '2').replace(/³/g, '3').replace(/°/g, '').replace(/\s+/g, '').trim()
 }
 
 /** Convert within a unit family; null when units are in different families or
@@ -5589,7 +6068,14 @@ function _metricRateBase(key: string): string {
   }
   // Also run the universal single-token strip for the simpler families (kwh, mw…),
   // so a brief key like rated_power_kw and a contract key rated_power_mw share a base.
-  return _stripMetricUnitSuffix(raw) || raw
+  let base = _stripMetricUnitSuffix(raw) || raw
+  // Strip a TRAILING non-semantic qualifier the brief parser adds inconsistently
+  // (synthesis_temperature_MAX vs synthesis_temperature; also _min/_target/_nominal/
+  // _rated/_avg/_peak) so the SAME concept resolves regardless of which qualifier the
+  // parser emitted this run — brief-parser key-name non-determinism (2026-06-06, L14:
+  // synthesis_temperature_max_c fell to "—" because _max kept it off the synonym map).
+  base = base.replace(/_(max|min|target|nominal|rated|avg|mean|peak)$/, '')
+  return base
 }
 
 // Canonicalise differing brief/contract stems for the SAME design-output concept.
@@ -5614,21 +6100,121 @@ const _METRIC_CONCEPT_SYNONYMS: Record<string, string> = {
   // K₂SO₄ product output — brief potassium_sulfate_output ↔ contract k2so4_output.
   potassium_sulfate_output: 'k2so4_output',
   k2so4_output: 'k2so4_output',
+  // ── e_fuel / Power-to-Liquid Fischer-Tropsch SAF (2026-06-06, FIX 1) ─────────
+  // The brief and the contract use DIFFERENT stems for the same design output, so
+  // each pair meets at a shared concept id. This is the regen-robust path (NOT
+  // subject to I12b, which only counts `qtyKey:`-shaped map lines). Unit math
+  // (frac→%, kW→MW) does NOT live here — it is declared in _METRIC_CONCEPT_META
+  // and applied per-concept in _resolveSemanticConcept (council: never put frac→%
+  // in the global unit-family table — it would corrupt other unit-less metrics).
+  // KEYS ARE THE EXACT UNIT-STRIPPED BASE of each side (verified against
+  // _metricRateBase: the stripper does NOT strip `tonnes_yr` or `frac`, so those
+  // stay in the base and the key includes them) — same convention as the CO₂
+  // entries above.
+  // SAF production (annual t/yr) — brief saf_production_tpy (base saf_production)
+  // ↔ contract saf_output_tonnes_yr (base saf_output_tonnes_yr).
+  saf_production: 'saf_output_tpy',
+  saf_output_tonnes_yr: 'saf_output_tpy',
+  // SAF production (hourly kg/h) — brief saf_production_kg_per_hr (base
+  // saf_production) collides with the tpy base above, so the per-hour concept is
+  // resolved by the curated METRIC_MAP entry instead (added below); not aliased
+  // here to avoid the two SAF time-bases sharing one concept.
+  // Jet-range selectivity — brief jet_range_selectivity_percent (base
+  // jet_range_selectivity) ↔ contract jet_selectivity_frac (base jet_selectivity_frac).
+  jet_range_selectivity: 'jet_selectivity',
+  jet_selectivity: 'jet_selectivity', // fresh-parse variant: brief key jet_selectivity_percent → base jet_selectivity (2026-06-06; L10 parser emitted the short form, L9 the jet_range_ form — both must resolve)
+  jet_selectivity_frac: 'jet_selectivity',
+  // CO₂ conversion efficiency — brief co2_conversion_efficiency_percent (base
+  // co2_conversion_efficiency) OR conversion_efficiency_percent (base conversion_efficiency,
+  // fresh-parse variant 2026-06-06) ↔ contract carbon_to_liquids_frac (base carbon_to_liquids_frac).
+  // Brief-parser key-name non-determinism: map EVERY variant the parser emits across runs.
+  co2_conversion_efficiency: 'carbon_conversion',
+  conversion_efficiency: 'carbon_conversion', // fresh-parse variant (L10)
+  carbon_conversion: 'carbon_conversion',
+  co2_conversion: 'carbon_conversion',
+  carbon_to_liquids_frac: 'carbon_conversion',
+  // Feedstock CO₂ / H₂ feed rates (kg/h) — the brief and contract use SEVERAL
+  // stems for these two design inputs; every stem meets at the shared concept id.
+  // Brief side (this L8 brief): hydrogen_feed_kg_per_hr (base hydrogen_feed),
+  // co2_feed_kg_per_hr (base co2_feed). Alt brief stem: feedstock_*_kg_per_hr
+  // (base feedstock_co2 / feedstock_h2). Contract side: co2_feed_kg_h /
+  // h2_feed_kg_h (base co2_feed_kg / h2_feed_kg). Bases verified against
+  // _metricRateBase (2026-06-06 FIX B: the prior pass only aliased the
+  // feedstock_*/contract stems, so the brief's hydrogen_feed / co2_feed bases
+  // never resolved → 2 rows rendered "—" despite the contract carrying both
+  // achieved values).
+  feedstock_co2: 'co2_feed',
+  co2_feed: 'co2_feed', // brief base co2_feed_kg_per_hr → co2_feed
+  co2_feed_kg: 'co2_feed',
+  feedstock_h2: 'h2_feed',
+  hydrogen_feed: 'h2_feed', // brief base hydrogen_feed_kg_per_hr → hydrogen_feed
+  h2_feed_kg: 'h2_feed',
+  // Operating hours per year — brief operating_hours_per_year (base
+  // operating_hours) ↔ contract operating_hours_yr (base operating_hours_yr).
+  operating_hours: 'operating_hours',
+  operating_hours_yr: 'operating_hours',
+  // Electrical load — brief electrical_load_mw (base electrical_load) OR
+  // plant_electrical_load_mw (base plant_electrical_load, this L8 brief) ↔
+  // contract connected_electrical_load_kw (base connected_electrical_load).
+  // CEILING (kW→MW converted at presentation via _METRIC_CONCEPT_META).
+  electrical_load: 'electrical_load',
+  plant_electrical_load: 'electrical_load', // brief base plant_electrical_load_mw
+  connected_electrical_load: 'electrical_load',
+  // Synthesis pressure / temperature — brief synthesis_pressure_bar /
+  // synthesis_temp_c (base synthesis_pressure / synthesis_temp) ↔ contract
+  // reactor_pressure_bar / reactor_temp_c (base reactor_pressure / reactor_temp).
+  // These are EXACT-target metrics the design deliberately REDUCED (30→25 bar,
+  // 350→300 °C) — disclosed as DELTA (below target), never a hidden PASS.
+  // The brief display label was "Synthesis pressure max", i.e. the brief key is
+  // synthesis_pressure_max_bar (base synthesis_pressure_max) — the "_max" suffix
+  // survives the unit strip, so it needs its own alias alongside the bare stem
+  // (2026-06-06 FIX B: without it the pressure row rendered "—").
+  synthesis_pressure: 'synthesis_pressure',
+  synthesis_pressure_max: 'synthesis_pressure', // brief base synthesis_pressure_max_bar
+  reactor_pressure: 'synthesis_pressure',
+  synthesis_temp: 'synthesis_temp',
+  synthesis_temp_max: 'synthesis_temp', // brief base synthesis_temp_max_c (if present)
+  synthesis_temperature: 'synthesis_temp', // brief base synthesis_temperature_c — THIS run's key (2026-06-06): without it the temp row never resolved → "—"
+  reactor_temp: 'synthesis_temp',
+  reactor_temperature: 'synthesis_temp',
 }
 function _metricConceptId(key: string): string | null {
   const base = _metricRateBase(key)
   return _METRIC_CONCEPT_SYNONYMS[base] ?? null
 }
 
-// Display metadata per resolved concept (label + FLOOR/CEILING direction). All
-// four are FLOORS — the plant must DELIVER at least the briefed output — declared
-// EXPLICITLY so the `\bco2\b` token in _CEILING_METRIC_RE never mis-infers the
-// capture rows as ceilings.
-const _METRIC_CONCEPT_META: Record<string, { label: string; kind: 'floor' | 'ceiling' | 'exact'; tolerancePct: number }> = {
+// Display metadata per resolved concept (label + comparison KIND). Kinds:
+//   'floor'   — design must DELIVER ≥ brief (over-delivery is good);
+//   'ceiling' — design must stay ≤ brief (under is good — cost, load);
+//   'exact'   — design must match brief within ±tol (PASS/FAIL only);
+//   'exact-disclose-delta' (FIX 1, 2026-06-06) — an exact-target metric the
+//     design deliberately moved off-target (synthesis P/T reduced 30→25 bar,
+//     350→300 °C): inside ±tol it PASSes; OUTSIDE ±tol it renders a disclosed
+//     'delta' (amber, below/above-target) NOT a red 'fail' — it is an
+//     intentional design choice already flagged MEDIUM in §7, so the compliance
+//     table AGREES rather than contradicting (no hidden PASS, no harsh FAIL).
+// briefFracToPercent: when true, the contract value is a FRACTION (0–1) and the
+//   brief unit is a PERCENT — multiply the achieved value by 100 at resolve time
+//   (per-concept, NOT in the global unit-family table — council 2026-06-06). The
+//   CO₂ floors are all declared EXPLICITLY so the `\bco2\b` token in
+//   _CEILING_METRIC_RE never mis-infers the capture rows as ceilings.
+type ConceptKind = 'floor' | 'ceiling' | 'exact' | 'exact-disclose-delta'
+const _METRIC_CONCEPT_META: Record<string, { label: string; kind: ConceptKind; tolerancePct: number; briefFracToPercent?: boolean }> = {
   co2_capture_capacity: { label: 'CO₂ capture capacity', kind: 'floor', tolerancePct: 5 },
   co2_capture_rate:     { label: 'CO₂ capture rate',     kind: 'floor', tolerancePct: 5 },
   caco3_output:         { label: 'CaCO₃ output rate',    kind: 'floor', tolerancePct: 5 },
   k2so4_output:         { label: 'K₂SO₄ output rate',    kind: 'floor', tolerancePct: 5 },
+  // ── e_fuel SAF concepts (2026-06-06, FIX 1) ──
+  saf_output_tpy:     { label: 'SAF production',            kind: 'floor',   tolerancePct: 5 },
+  jet_selectivity:    { label: 'Jet-range selectivity',    kind: 'floor',   tolerancePct: 5, briefFracToPercent: true },
+  carbon_conversion:  { label: 'CO₂ conversion efficiency', kind: 'floor',  tolerancePct: 5, briefFracToPercent: true },
+  co2_feed:           { label: 'CO₂ feedstock rate',       kind: 'floor',   tolerancePct: 10 },
+  h2_feed:            { label: 'H₂ feedstock rate',        kind: 'floor',   tolerancePct: 10 },
+  operating_hours:    { label: 'Operating hours per year', kind: 'floor',   tolerancePct: 5 },
+  electrical_load:    { label: 'Electrical load',          kind: 'ceiling', tolerancePct: 10 },
+  // Synthesis P/T: deliberate reductions → disclosed DELTA when below target.
+  synthesis_pressure: { label: 'Synthesis pressure',       kind: 'exact-disclose-delta', tolerancePct: 5 },
+  synthesis_temp:     { label: 'Synthesis temperature',    kind: 'exact-disclose-delta', tolerancePct: 5 },
 }
 
 // Convert a RATE value between unit families, on top of the scalar family helper.
@@ -5668,12 +6254,13 @@ function _resolveSemanticConcept(
   quantities: Record<string, any>,
   briefKey: string,
   briefUnit: string,
-): { value: number; unit: string; conceptId: string; qtyKey: string; meta: { label: string; kind: 'floor' | 'ceiling' | 'exact'; tolerancePct: number } } | null {
+): { value: number; unit: string; conceptId: string; qtyKey: string; meta: { label: string; kind: ConceptKind; tolerancePct: number; briefFracToPercent?: boolean } } | null {
   if (!quantities || typeof quantities !== 'object') return null
   const conceptId = _metricConceptId(briefKey)
   if (!conceptId) return null
   const meta = _METRIC_CONCEPT_META[conceptId]
   if (!meta) return null
+  const bUnitNorm = _normUnitToken(briefUnit)
   type Cand = { qtyKey: string; value: number; unit: string; convertible: boolean; exactUnit: boolean }
   const cands: Cand[] = []
   for (const qk of Object.keys(quantities)) {
@@ -5681,13 +6268,26 @@ function _resolveSemanticConcept(
     const q = quantities[qk]
     if (!q || typeof q !== 'object' || typeof q.value !== 'number' || !Number.isFinite(q.value)) continue
     const qUnit = String(q.unit ?? '')
+    const qUnitNorm = _normUnitToken(qUnit)
+    // FIX 1 (2026-06-06): per-concept FRACTION→PERCENT conversion. When the
+    // concept is flagged briefFracToPercent and the contract value is a fraction
+    // (unit-less / 'frac' / 'fraction') while the brief unit is a percent, multiply
+    // by 100 so 0.6 frac compares against 60 % AS 60 % and renders "60 %". This is
+    // scoped to the named concepts ONLY (council: NOT in the global unit-family
+    // table, which would corrupt other unit-less metrics like cop_seasonal).
+    const briefIsPercent = bUnitNorm === '%' || bUnitNorm === 'percent' || bUnitNorm === 'pct'
+    const qIsFraction = qUnitNorm === '' || qUnitNorm === 'frac' || qUnitNorm === 'fraction'
+    if (meta.briefFracToPercent && briefIsPercent && qIsFraction) {
+      cands.push({ qtyKey: qk, value: q.value * 100, unit: '%', convertible: true, exactUnit: false })
+      continue
+    }
     const conv = briefUnit ? _convertMetricRate(q.value, qUnit || briefUnit, briefUnit) : q.value
     cands.push({
       qtyKey: qk,
       value: conv != null ? conv : q.value,
       unit: briefUnit || qUnit,
       convertible: conv != null,
-      exactUnit: _normUnitToken(qUnit) === _normUnitToken(briefUnit),
+      exactUnit: qUnitNorm === bUnitNorm,
     })
   }
   if (cands.length === 0) return null
@@ -5753,6 +6353,59 @@ function _buildImprovementInput(state: any, bomTotals: BomTotals | null, costSta
   return { exWorksCostGbp: exWorks, costCeilingGbp: ceiling, designMassKg: designMass, massCapKg: massCap, scaleMetric, performanceMisses, hasOverpricedMaterialMacro }
 }
 
+// ── Brief RANGE-band recovery (2026-06-06, council Grok 4.3 + GLM-5.1) ─────────
+// The brief parser collapses a stated operating RANGE ("200-350 °C", "20-30 bar")
+// to a single scalar — usually the MAX. The comparator then mis-flags an in-band
+// design setpoint (300 °C, 25 bar) as a DELTA/"—" against that max as if it were an
+// EXACT target. A range-stated constraint is SATISFIED by any value in the band, so
+// an in-band design is a PASS, not a deviation (both council seats: this corrects a
+// parser bug that UNFAIRLY penalised the design — it is NOT score-gaming; "DELTA
+// -17%" wrongly implied 25 bar was 17% below target when it genuinely meets 20-30).
+//
+// Recovered DETERMINISTICALLY from the RAW brief text. A metric is a range iff an
+// explicit two-number phrase "A<sep>B <unit>" exists whose UPPER number == the
+// metric's stored value AND whose unit matches. Council edge-case guards: reads the
+// RAW brief (never an LLM-normalised "0-30" that would invent a false floor for a
+// "<= 30 bar" ceiling); requires a real physical UNIT immediately after B (so the
+// "x"/"×" of dimensions "60 m × 40 m", the "/" of ratios "1500/5A", bare years
+// "2025", and unit-less list/part-number phrases "Class 200-350 piping" never
+// match — sep excludes x/× and /); requires A<B. A pure ceiling/floor has no A-B
+// phrase so no bound is ever invented. The value==max + unit double-gate makes any
+// spurious band (e.g. "2024-2025 deployment") harmless — no metric matches it.
+type BriefBand = { min: number; max: number; unitTok: string }
+export function _recoverBriefRangeBands(briefText: string): BriefBand[] {
+  if (!briefText || typeof briefText !== 'string') return []
+  const bands: BriefBand[] = []
+  // A NUM  sep  B NUM  UNIT(must start with a letter or degree sign).
+  // sep ∈ { hyphen, en-dash, em-dash, the word "to" } — NOT "x"/"×" or "/".
+  const re = /(-?\d[\d,]*(?:\.\d+)?)\s*(?:-|–|—|\bto\b)\s*(-?\d[\d,]*(?:\.\d+)?)\s*(°?[A-Za-z][A-Za-z%·/]*)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(briefText)) !== null) {
+    const a = Number(String(m[1]).replace(/,/g, ''))
+    const b = Number(String(m[2]).replace(/,/g, ''))
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a >= b) continue
+    const unitTok = _normUnitToken(String(m[3] ?? ''))
+    if (!unitTok) continue
+    bands.push({ min: a, max: b, unitTok })
+  }
+  return bands
+}
+// A brief metric maps to a recovered band iff its stored value == the band MAX
+// (within 0.5% rounding) AND its unit matches the band's unit.
+export function _bandForMetric(bands: BriefBand[], value: number, unit: string): BriefBand | null {
+  if (!bands.length || !Number.isFinite(value)) return null
+  const uTok = _normUnitToken(unit)
+  if (!uTok) return null
+  for (const bnd of bands) {
+    if (bnd.unitTok !== uTok) continue
+    if (Math.abs(bnd.max - value) <= Math.max(Math.abs(bnd.max) * 0.005, 1e-9)) return bnd
+  }
+  return null
+}
+function _fmtBandNum(n: number): string {
+  return Number.isInteger(n) ? n.toLocaleString('en-GB') : String(n)
+}
+
 export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack?: CostStack | null): ComplianceRow[] {
   const constraints = state?.parsedBrief?.constraints
   if (!constraints || typeof constraints !== 'object') return []
@@ -5767,6 +6420,33 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
     ?? '',
   ).toLowerCase()
   const rows: ComplianceRow[] = []
+
+  // RANGE-band table recovered once from the raw brief (revised + original text),
+  // consumed by the performance-metric loop below to PASS in-band setpoints.
+  const _briefBands = _recoverBriefRangeBands(
+    [state?.brief?.revised_text, state?.brief?.original_text].filter(Boolean).join('\n'),
+  )
+
+  // FIELD-ERECTED detection (2026-06-06 FIX D, renderer-side defence-in-depth).
+  // A fixed plant installation has NO plant-wide gross-mass cap — equipment ships
+  // as modular skids checked per-skid against road limits. The chain's U5b drops an
+  // INFERRED plant-wide max_mass_kg for a field-erected envelope, but a state that
+  // predates that fix (or whose detector missed the class) still carries the
+  // inferred cap; the renderer must not then print a spurious "Max gross mass"
+  // PASS/FAIL row. We read the contract envelope's form_factor (the same value the
+  // contract built class-awarely). Only an INFERRED cap is suppressed — an
+  // explicitly brief-STATED cap (source !== 'inferred') is always shown.
+  const _FIELD_ERECTED_FF = new Set([
+    'skid_mounted', 'skid-mounted', 'skid mounted', 'field_erected', 'field-erected',
+    'field erected', 'plinth_mounted', 'plinth-mounted', 'plinth mounted',
+    'modular_skid', 'modular-skid', 'fixed_plant', 'fixed-plant',
+  ])
+  const _envForm = String(
+    state?.orchestratorContract?.envelope?.form_factor
+    ?? state?.engineeringContract?.envelope?.form_factor
+    ?? '',
+  ).toLowerCase().trim()
+  const _isFieldErectedRender = _FIELD_ERECTED_FF.has(_envForm)
 
   // 1) Unit cost ceiling vs achieved raw-materials BoM. The cover page shows
   //    the raw materials BoM as the headline cost; the brief specifies
@@ -5848,7 +6528,11 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
   //    external; removing it again would not help). The correct comparator is
   //    in_container_mass_kg (29 875 kg) — still a breach, but the correct one.
   const massCap = constraints.max_mass_kg
-  if (massCap && typeof massCap.value === 'number' && Number.isFinite(massCap.value)) {
+  // FIX D (2026-06-06): drop an INFERRED plant-wide mass cap on a field-erected
+  // plant (mirrors chain U5b). A brief-STATED cap (source !== 'inferred') is kept.
+  const _massCapIsInferredFieldErected =
+    _isFieldErectedRender && massCap && String((massCap as any).source ?? '') === 'inferred'
+  if (massCap && typeof massCap.value === 'number' && Number.isFinite(massCap.value) && !_massCapIsInferredFieldErected) {
     const target = massCap.value
     const isBessClass = productClass.includes('bess') || productClass.includes('battery') || productClass.includes('energy_storage')
     const totalMass = isBessClass
@@ -5922,7 +6606,10 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
     // Track which brief metric keys render a real (mapped) row below, so the
     // universal completeness pass that follows only adds rows for the rest.
     const _renderedMetricKeys = new Set<string>()
-    type MetricKind = 'floor' | 'ceiling' | 'exact'
+    // 'exact-disclose-delta' (FIX 1, 2026-06-06): an exact-target metric the design
+    // deliberately moved off-target renders a disclosed DELTA (amber) outside ±tol,
+    // not a red FAIL — the synonym resolver supplies this kind for synthesis P/T.
+    type MetricKind = 'floor' | 'ceiling' | 'exact' | 'exact-disclose-delta'
     const METRIC_MAP: Record<string, { qtyKey: string; label: string; unit: string; convert?: (v: number) => number; tolerancePct?: number; kind?: MetricKind }> = {
       // BESS-class energy/power (all FLOORS — brief states minimum/target performance)
       nameplate_capacity_mwh:      { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy capacity', unit: 'MWh', convert: (v) => v / 1000, tolerancePct: 5, kind: 'floor' },
@@ -6059,10 +6746,68 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
       co2_capture_capacity_kg_per_hr:      { qtyKey: 'co2_capture_rate_kg_per_hour',  label: 'CO₂ capture capacity', unit: 'kg/hr', tolerancePct: 5, kind: 'floor' },
       calcium_carbonate_output_kg_per_day: { qtyKey: 'caco3_output_t_per_day',        label: 'CaCO₃ output rate',   unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
       potassium_sulfate_output_kg_per_day: { qtyKey: 'k2so4_output_t_per_day',        label: 'K₂SO₄ output rate',   unit: 'kg/day', convert: (v) => v * 1000, tolerancePct: 5, kind: 'floor' },
+      // ── e_fuel SAF hourly production (gate-17, 2026-06-06, FIX 1) ──
+      // The HOURLY SAF metric saf_production_kg_per_hr shares the unit-stripped
+      // base "saf_production" with the ANNUAL saf_production_tpy, so the semantic
+      // resolver cannot tell them apart (it would grab the annual t/yr quantity and
+      // fail the kg/h conversion → "—"). A curated METRIC_MAP entry (checked BEFORE
+      // the resolver) pins the hourly key to the hourly contract quantity directly.
+      saf_production_kg_per_hr:    { qtyKey: 'saf_output_kg_h',          label: 'SAF production (hourly)', unit: 'kg/h', tolerancePct: 5, kind: 'floor' },
+    }
+    // FIX 1 (2026-06-06): brief metrics that are DESIGN TARGETS requiring a
+    // downstream verification this engine cannot perform at concept stage. They
+    // MUST render as 'target' (blue, "requires verification"), NEVER a computed
+    // PASS from a generic tool — computing a green PASS on lifecycle GHG or
+    // levelised cost from BoM-derived numbers is greenwashing/fabrication
+    // (council 2026-06-06). Keyed on the unit-stripped base of the brief metric.
+    // `indicativeQtyKey` (optional) discloses the engine's rough computed figure
+    // in the achieved column WITHOUT claiming it is verified — so a real breach is
+    // still VISIBLE (the levelised-cost £5,850/t vs £2,200/t target is shown), it
+    // is just honestly labelled "requires full lifecycle cost model to verify".
+    const TARGET_VERIFICATION_METRICS: Record<string, { label: string; requires: string; indicativeQtyKey?: string; indicativeUnit?: string; indicativeConvert?: (v: number) => number }> = {
+      ghg_reduction:        { label: 'GHG reduction vs fossil', requires: 'requires full lifecycle assessment (ISO 14067 / CORSIA) to verify' },
+      ghg_saving:           { label: 'GHG reduction vs fossil', requires: 'requires full lifecycle assessment (ISO 14067 / CORSIA) to verify' },
+      lifecycle_ghg_reduction: { label: 'GHG reduction vs fossil', requires: 'requires full lifecycle assessment (ISO 14067 / CORSIA) to verify' },
+      // The rate-base stripper leaves a dangling "_gbp_per" on
+      // levelised_cost_saf_gbp_per_tonne (it strips "tonne" but not the preceding
+      // "per"), so the actual base is levelised_cost_saf_gbp_per — keyed here so
+      // the live brief's metric matches. Both the clean stem and the dangling form
+      // are mapped (defensive across parser variants).
+      levelised_cost_saf:   { label: 'Levelised cost of SAF', requires: 'requires a full lifecycle cost model (electricity price, capital recovery, feedstock + utility OPEX over plant life) to verify', indicativeQtyKey: 'saf_levelised_cost_gbp_kg', indicativeUnit: 'GBP/t', indicativeConvert: (v) => v * 1000 },
+      levelised_cost_saf_gbp_per: { label: 'Levelised cost of SAF', requires: 'requires a full lifecycle cost model (electricity price, capital recovery, feedstock + utility OPEX over plant life) to verify', indicativeQtyKey: 'saf_levelised_cost_gbp_kg', indicativeUnit: 'GBP/t', indicativeConvert: (v) => v * 1000 },
+      levelised_cost_gbp_per: { label: 'Levelised cost', requires: 'requires a full lifecycle cost model to verify' },
+      levelised_cost:       { label: 'Levelised cost', requires: 'requires a full lifecycle cost model to verify' },
+      lcoe:                 { label: 'Levelised cost of energy', requires: 'requires a full lifecycle cost model to verify' },
     }
     for (const m of briefMetrics) {
       const km = String(m?.key_metric ?? '')
       const briefVal = typeof m.value === 'number' && Number.isFinite(m.value) ? m.value : null
+      // FIX 1: route design-target-requiring-verification metrics to a TARGET row
+      // BEFORE any PASS/FAIL computation, so no generic tool can fabricate a PASS.
+      const targetBase = _metricRateBase(km)
+      const targetMeta = TARGET_VERIFICATION_METRICS[targetBase]
+      if (targetMeta && briefVal != null) {
+        const briefUnit = String(m?.unit ?? '').trim()
+        let achievedDisplay = `design target — ${targetMeta.requires}`
+        if (targetMeta.indicativeQtyKey) {
+          const indQ = _qtyFromOrch(quantities, targetMeta.indicativeQtyKey)
+          if (indQ) {
+            const indVal = targetMeta.indicativeConvert ? targetMeta.indicativeConvert(indQ.value) : indQ.value
+            const indStr = Number.isInteger(indVal) ? indVal.toLocaleString('en-GB') : indVal.toFixed(indVal >= 100 ? 0 : 2)
+            achievedDisplay = `indicative ${indStr} ${targetMeta.indicativeUnit ?? briefUnit} (unverified) — ${targetMeta.requires}`
+          }
+        }
+        _renderedMetricKeys.add(km)
+        rows.push({
+          constraint: targetMeta.label,
+          briefTarget: `${briefVal} ${briefUnit}`.trim(),
+          designAchieved: achievedDisplay,
+          status: 'target',
+          deltaText: 'requires verification',
+          tradeOffNarrative: null,
+        })
+        continue
+      }
       // Resolve the achieved value + display meta. Priority:
       //   (1) a curated METRIC_MAP entry (exact key — richest, per-class tuned);
       //   (2) the UNIT-SUFFIX-AGNOSTIC semantic resolver (robust to the brief
@@ -6073,6 +6818,19 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
       //       a real PASS without a per-suffix METRIC_MAP alias.
       // When neither resolves, fall through to the universal-completeness pass.
       let mapping = METRIC_MAP[km]
+      if (!mapping) {
+        // Brief-parser key-name variance (2026-06-06): a variant key (e.g.
+        // saf_production_kg_per_h vs the canonical _kg_per_hr) misses the EXACT
+        // METRIC_MAP key — fall back to the entry whose rate-BASE AND unit match, so
+        // the same metric resolves regardless of the parser's unit-suffix spelling
+        // this run. Unit-matched so a kg/h variant never grabs the t/yr sibling
+        // (saf_production_kg_per_hr vs saf_production_tpy share base 'saf_production').
+        const kmBase = _metricRateBase(km)
+        const kmUnit = _normUnitToken(String(m?.unit ?? ''))
+        for (const mk of Object.keys(METRIC_MAP)) {
+          if (_metricRateBase(mk) === kmBase && _normUnitToken(METRIC_MAP[mk].unit) === kmUnit) { mapping = METRIC_MAP[mk]; break }
+        }
+      }
       let achievedConverted: number | null = null
       if (mapping) {
         if (briefVal == null) continue
@@ -6091,25 +6849,52 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
       // Both paths above either `continue`d or assigned non-null values; narrow for TS.
       if (briefVal == null || achievedConverted == null || mapping == null) continue
       const tol = (mapping.tolerancePct ?? 5) / 100
+      // RANGE-band override (2026-06-06, council Grok+GLM): if this brief metric is
+      // a stated RANGE (its value is the band MAX + unit matches a band recovered
+      // from the raw brief text), an IN-BAND design setpoint is a PASS — not a
+      // DELTA/FAIL against the max as if it were an exact target. Fixes the parser's
+      // range→max collapse; honest, not score-gaming (in-band genuinely complies).
+      const _band = _bandForMetric(_briefBands, briefVal, String(m?.unit ?? mapping.unit ?? ''))
       // L46 council fix (2026-05-27, 3/4 seats): kind-aware PASS/FAIL.
       // FLOOR: achieved must be >= brief (allow small under-tolerance for rounding).
       // CEILING: achieved must be <= brief (allow small over-tolerance).
       // EXACT: achieved must be within ±tolerance.
       const kind: MetricKind = mapping.kind ?? 'floor'
       let within: boolean
-      if (kind === 'floor') {
+      if (_band) {
+        // Stated RANGE: PASS when the design value sits within [min, max] (±tol on
+        // each bound for rounding). Outside the window → disclosed DELTA, not FAIL.
+        within = achievedConverted >= _band.min * (1 - tol) && achievedConverted <= _band.max * (1 + tol)
+      } else if (kind === 'floor') {
         // PASS when achieved >= brief * (1 - tol). Over-delivery is good.
         within = achievedConverted >= briefVal * (1 - tol)
       } else if (kind === 'ceiling') {
         // PASS when achieved <= brief * (1 + tol). Under-delivery is good.
         within = achievedConverted <= briefVal * (1 + tol)
       } else {
-        // EXACT — symmetric tolerance band on both sides.
+        // EXACT (and exact-disclose-delta) — symmetric tolerance band both sides.
         within = Math.abs(achievedConverted - briefVal) <= briefVal * tol
       }
-      const status: ComplianceStatus = within ? 'pass' : 'fail'
+      // FIX 1 (2026-06-06): 'exact-disclose-delta' renders a DISCLOSED DELTA
+      // (amber, below/above target) when outside tolerance — NOT a red FAIL —
+      // because it is a deliberate design reduction already flagged MEDIUM in §7
+      // (synthesis pressure 30→25 bar, temp 350→300 °C). Inside tolerance it
+      // PASSes like any exact metric. Every other kind keeps PASS/FAIL.
+      const status: ComplianceStatus = within
+        ? 'pass'
+        : (_band || kind === 'exact-disclose-delta' ? 'delta' : 'fail')
       const delta = _formatDelta(briefVal, achievedConverted, 'plain')
       let narrative: string | null = null
+      // Disclosed-delta narrative: explain the deliberate off-target choice so the
+      // compliance table AGREES with the §7 MEDIUM flag (never a silent PASS).
+      if (status === 'delta') {
+        const dir = achievedConverted < briefVal ? 'below' : 'above'
+        const achStr = Number.isInteger(achievedConverted) ? String(achievedConverted) : achievedConverted.toFixed(achievedConverted >= 100 ? 0 : 2)
+        narrative = _band
+          ? `The brief specifies a ${_fmtBandNum(_band.min)}–${_fmtBandNum(_band.max)} ${mapping.unit} window for ${mapping.label.toLowerCase()}; the design operates at ${achStr} ${mapping.unit}, just outside that window. Confirm the operating point with a process engineer before locking the design.`
+          : `The brief specifies ${briefVal} ${mapping.unit} for ${mapping.label.toLowerCase()}; the design operates at ${achStr} ${mapping.unit} (${delta}, ${dir} target). ` +
+            `This is a deliberate design choice, not a deficiency — it is flagged as a medium-severity engineering deviation in the feasibility notes (Section 7). Confirm the operating point with a process engineer before locking the design; ${mapping.label.toLowerCase()} trades against conversion, selectivity, equipment rating and cost.`
+      }
       if (status === 'fail') {
         const shortfallPct = ((briefVal - achievedConverted) / briefVal) * 100
         if (km === 'nameplate_capacity_mwh') {
@@ -6136,7 +6921,9 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
             `Lifting the achieved value requires more material or higher-grade components (CAPEX up); accepting the gap keeps the cost stack feasible. Whether this is acceptable depends on the deployment use-case — quantify the revenue or service impact of the shortfall before committing to the redesign.`
         }
       }
-      const briefDisplay = `${briefVal} ${mapping.unit}`.trim()
+      const briefDisplay = _band
+        ? `${_fmtBandNum(_band.min)}–${_fmtBandNum(_band.max)} ${mapping.unit}`.trim()
+        : `${briefVal} ${mapping.unit}`.trim()
       // Integer-valued achieveds (counts like trolley_count) render without a
       // spurious ".00"; non-integers keep 2 dp (0 dp at >=100 to avoid clutter).
       const fmtAch = (v: number) => Number.isInteger(v) ? String(v) : v.toFixed(v >= 100 ? 0 : 2)
@@ -6149,7 +6936,7 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
         briefTarget: briefDisplay,
         designAchieved: achievedDisplay,
         status,
-        deltaText: delta,
+        deltaText: (_band && within) ? 'within range' : delta,
         tradeOffNarrative: narrative,
       })
     }
@@ -6258,7 +7045,27 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
   //    AND the brief's w/d/h match the standard's dimensions within ±2%.
   const envBrief = constraints.max_dimensions_mm
   const briefHasEnvelope = envBrief && (typeof envBrief.w === 'number' || typeof envBrief.d === 'number' || typeof envBrief.h === 'number')
-  if (briefHasEnvelope) {
+  if (briefHasEnvelope && _isFieldErectedRender) {
+    // FIELD-ERECTED plot area (2026-06-06, council): for a fixed plant the brief's
+    // max_dimensions_mm is a PLOT-AREA cap (e.g. 60 m × 40 m), NOT a product
+    // bounding box — a field-erected plant has no single envelope and its plot is
+    // set at detailed site layout. Render an honest TARGET (requires a site plot
+    // plan) instead of the ambiguous "—" the bounding-box comparator produced for
+    // a w/d-only (no height) plot cap. Universal across field-erected plant classes.
+    const _pw = typeof envBrief.w === 'number' ? envBrief.w / 1000 : null
+    const _pd = typeof envBrief.d === 'number' ? envBrief.d / 1000 : null
+    const _plotStr = _pw != null && _pd != null
+      ? `${_fmtBandNum(_pw)} m × ${_fmtBandNum(_pd)} m plot`
+      : [envBrief.w, envBrief.d, envBrief.h].filter((x: any) => typeof x === 'number').map((b: number) => `${b} mm`).join(', ')
+    rows.push({
+      constraint: 'Plot area (field-erected)',
+      briefTarget: _plotStr,
+      designAchieved: 'requires site plot plan',
+      status: 'target',
+      deltaText: 'requires verification',
+      tradeOffNarrative: `A field-erected plant has no single product envelope; the ${_plotStr} cap is verified against a detailed site plot plan at the layout stage (modular skids plus field-erected columns and vessels arranged on the fixed site), not from a containerised bounding box.`,
+    })
+  } else if (briefHasEnvelope) {
     const briefDims = [envBrief.w, envBrief.d, envBrief.h].filter((x: any) => typeof x === 'number') as number[]
     const deploymentEnvelope = state?.deploymentEnvelope
     const envelopeId = String(deploymentEnvelope?.envelope_id ?? deploymentEnvelope?.id ?? deploymentEnvelope?.standard_id ?? '')
@@ -6406,6 +7213,30 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
       const stillMeasurable = /\d+\s*(?:v\b|hz\b|days?\b|hours?\b|%|kw\b|mw\b|kva\b|kg\b|°c\b|bar\b|kpa\b|kwh\b|mwh\b|cycles?\b|years?\b|hours?\b|mins?\b)/i.test(withoutBagSize)
       if (!stillMeasurable) hasMeasurable = false
     }
+    // Lifecycle/GHG/levelised-cost intent shares a downstream-verification
+    // dependency (a full LCA / lifecycle cost model) with the dedicated TARGET rows
+    // above — render it as an honest TARGET carrying its verification path, not an
+    // ambiguous "verify in narrative"/"—" (2026-06-06, council). A stretch goal
+    // (>=90% vs the >=70% qualifying threshold) is labelled as such so it is never
+    // read as a hard requirement. Universal across classes.
+    const _acLower = bullet.toLowerCase()
+    const _isLcaIntent = /(greenhouse|\bghg\b|life ?-?cycle|carbon intensity|emission intensity|co2 reduction|carbon reduction|carbon footprint)/.test(_acLower)
+    const _isCostIntent = /(levelis|leveliz|\blcoe\b|\blcoh\b|cost of (saf|fuel|energy|hydrogen|electricity)|nth-of-a-kind|first-of-a-kind)/.test(_acLower) && /(cost|£|gbp|\$|\/t\b|\/tonne|\/kg|\/kwh)/.test(_acLower)
+    if (_isLcaIntent || _isCostIntent) {
+      const _isStretch = /\bstretch\b|target\s*>?=?\s*9\d|aspiration/.test(_acLower)
+      const _requires = _isLcaIntent
+        ? 'requires full lifecycle assessment (ISO 14067 / CORSIA) to verify'
+        : 'requires a full lifecycle cost model to verify'
+      rows.push({
+        constraint: label,
+        briefTarget: _isStretch ? 'stated (stretch target)' : 'stated',
+        designAchieved: `design target — ${_requires}`,
+        status: 'target',
+        deltaText: 'requires verification',
+        tradeOffNarrative: null,
+      })
+      continue
+    }
     const status: ComplianceStatus = hasMeasurable ? 'unknown' : 'pass'
     rows.push({
       constraint: label,
@@ -6420,8 +7251,10 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
   }
 
   // Sort: FAIL first (red rows lead so the reader sees the bad news without
-  // scrolling), UNKNOWN next, PASS last.
-  const priority: Record<ComplianceStatus, number> = { fail: 0, unknown: 1, pass: 2 }
+  // scrolling), then DELTA (disclosed below-target), TARGET (needs verification),
+  // UNKNOWN, PASS last. (FIX 1, 2026-06-06: delta/target slotted between fail and
+  // unknown — they need attention but are not breaches.)
+  const priority: Record<ComplianceStatus, number> = { fail: 0, delta: 1, target: 2, unknown: 3, pass: 4 }
   rows.sort((a, b) => priority[a.status] - priority[b.status])
   return rows
 }
@@ -6796,6 +7629,13 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
   // class printed "All N PASS" directly above a table showing "—" for core
   // metrics). A green "All N PASS" is honest ONLY when every row is a verified pass.
   const unknownRows = rows.filter((r) => r.status === 'unknown')
+  // FIX 1 (2026-06-06): disclosed below/above-target deltas + design targets that
+  // require downstream verification. Both keep the banner off green (a disclosed
+  // shortfall or an unverified target is NOT a verified pass) but are NOT breaches
+  // (so they don't make the banner red). Amber tier.
+  const deltaRows = rows.filter((r) => r.status === 'delta')
+  const targetRows = rows.filter((r) => r.status === 'target')
+  const nonPassResidual = unknownRows.length + deltaRows.length + targetRows.length
   const verdict = summariseComplianceRows(rows)
   const decisionRationale = _generateDecisionRationale(rows)
   // Auto-improve (Phase 1): the quantified levers that would close each miss.
@@ -6833,9 +7673,12 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
         style={{
           marginBottom: 14,
           padding: 10,
-          backgroundColor: failedRows.length > 0 ? '#fef2f2' : (unknownRows.length > 0 ? '#fffbeb' : '#f0fdf4'),
+          // Red on any breach; amber when there's a non-pass residual (disclosed
+          // delta / unverified target / "—"); green ONLY when every row is a
+          // verified pass. delta/target keep it off green (FIX 1).
+          backgroundColor: failedRows.length > 0 ? '#fef2f2' : (nonPassResidual > 0 ? '#fffbeb' : '#f0fdf4'),
           borderLeftWidth: 3,
-          borderLeftColor: failedRows.length > 0 ? '#b91c1c' : (unknownRows.length > 0 ? '#b45309' : '#15803d'),
+          borderLeftColor: failedRows.length > 0 ? '#b91c1c' : (nonPassResidual > 0 ? '#b45309' : '#15803d'),
         }}
         minPresenceAhead={50}
       >
@@ -6844,9 +7687,9 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
         </Text>
         <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5 }}>
           {failedRows.length > 0
-            ? `The design honours ${passedCount} of the brief's constraints but breaches ${failedRows.length}${unknownRows.length > 0 ? ` and could not verify ${unknownRows.length}` : ''}. Every breach is explained as a CAPEX / OPEX / output trade-off below; treat each as a deliberate design choice requiring acceptance or a brief revision before procurement.`
-            : unknownRows.length > 0
-              ? `The design verifiably meets ${passedCount} of ${rows.length} brief constraints. ${unknownRows.length} could not be auto-verified — the design's achieved value was not computed into the engineering contract, so each is shown "—" and must be confirmed in the engineering narrative before procurement, NOT assumed to pass.`
+            ? `The design honours ${passedCount} of the brief's constraints but breaches ${failedRows.length}${nonPassResidual > 0 ? ` and ${nonPassResidual} need attention (below-target / pending verification / unverified)` : ''}. Every breach is explained as a CAPEX / OPEX / output trade-off below; treat each as a deliberate design choice requiring acceptance or a brief revision before procurement.`
+            : nonPassResidual > 0
+              ? `The design verifiably meets ${passedCount} of ${rows.length} brief constraints.${deltaRows.length > 0 ? ` ${deltaRows.length} operate below the brief target by a disclosed margin (a deliberate design choice, see the notes below).` : ''}${targetRows.length > 0 ? ` ${targetRows.length} are design targets that require downstream verification (lifecycle assessment / lifecycle cost model) before they can be claimed.` : ''}${unknownRows.length > 0 ? ` ${unknownRows.length} could not be auto-verified and are shown "—"; confirm each in the engineering narrative, NOT assumed to pass.` : ''}`
               : `Every brief constraint is met by the design as computed. No trade-off narrative is required.`}
         </Text>
       </View>
@@ -6917,15 +7760,22 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
       {rows.map((row, i) => {
         const isFail = row.status === 'fail'
         const isPass = row.status === 'pass'
-        const pillBg = isFail ? '#fee2e2' : isPass ? '#dcfce7' : '#f3f4f6'
-        const pillFg = isFail ? '#b91c1c' : isPass ? '#15803d' : MUTED
-        const rowTextColour = isFail ? '#991b1b' : INK
+        // FIX 1 (2026-06-06): DELTA renders amber (a disclosed below/above-target
+        // deviation), TARGET renders blue ("requires verification"). PASS green,
+        // FAIL red, unknown neutral grey — so the reader can tell a deliberate
+        // off-target choice (amber) from a breach (red) from an unverified target
+        // (blue) at a glance. Colours match the §7 / banner palette.
+        const isDelta = row.status === 'delta'
+        const isTarget = row.status === 'target'
+        const pillBg = isFail ? '#fee2e2' : isPass ? '#dcfce7' : isDelta ? '#fef3c7' : isTarget ? '#dbeafe' : '#f3f4f6'
+        const pillFg = isFail ? '#b91c1c' : isPass ? '#15803d' : isDelta ? '#b45309' : isTarget ? '#1d4ed8' : MUTED
+        const rowTextColour = isFail ? '#991b1b' : isDelta ? '#92400e' : INK
         // ASCII-only pill labels — Helvetica (bundled with @react-pdf) does
         // NOT carry ✓ / ✗ / ✕ glyphs; they render as substitution control
         // characters and trip the layout-overlap audit (\x13 / \x17 collide
         // with the bold pill text). The coloured pill background already
         // conveys the semantic; ASCII keeps the audit clean.
-        const symbol = isFail ? 'FAIL' : isPass ? 'PASS' : '—'
+        const symbol = isFail ? 'FAIL' : isPass ? 'PASS' : isDelta ? 'DELTA' : isTarget ? 'TARGET' : '—'
         return (
           <View
             key={`compl-row-${i}`}
@@ -6957,7 +7807,7 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
               </View>
             </View>
             <View style={{ flex: COL_DELTA }}>
-              <Text style={{ fontSize: 9, color: isFail ? '#b91c1c' : INK_SOFT, fontFamily: isFail ? 'Helvetica-Bold' : 'Helvetica' }}>{normalise_unicode(String(row.deltaText ?? ''))}</Text>
+              <Text style={{ fontSize: 9, color: isFail ? '#b91c1c' : isDelta ? '#b45309' : isTarget ? '#1d4ed8' : INK_SOFT, fontFamily: (isFail || isDelta) ? 'Helvetica-Bold' : 'Helvetica' }}>{normalise_unicode(String(row.deltaText ?? ''))}</Text>
             </View>
           </View>
         )
@@ -6969,13 +7819,16 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
           where the brief's stated rate was the engine's earlier inference and the
           design uses the higher stoichiometrically-required value). The failed-row
           trade-off block below only iterates status==='fail', so without this the
-          note would never reach the reader. Renders amber (neutral), never red. */}
-      {unknownRows.some((r) => r.tradeOffNarrative) ? (
+          note would never reach the reader. Renders amber (neutral), never red.
+          2026-06-06 (FIX 1): also includes 'delta' rows (a disclosed below/above-
+          target deviation), whose narrative explains the deliberate off-target
+          choice — same amber treatment, never red. */}
+      {[...deltaRows, ...unknownRows].some((r) => r.tradeOffNarrative) ? (
         <View style={{ marginTop: 16 }}>
           <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#b45309', marginBottom: 6 }}>
-            Notes on corrected / unverified constraints
+            Notes on below-target / corrected / unverified constraints
           </Text>
-          {unknownRows.filter((r) => r.tradeOffNarrative).map((row, i) => (
+          {[...deltaRows, ...unknownRows].filter((r) => r.tradeOffNarrative).map((row, i) => (
             <View
               key={`note-${i}`}
               style={{
@@ -7309,7 +8162,11 @@ function SystemOverviewPage({ state, project }: { state: any; project: string })
     ?? (state?.engineeringContract as any)?.quantities
     ?? {}
   const systemIds = systemLevelToolIds(state)
-  const numbersNarrative = generatePhysicsNarrative(quantities, productClass, systemIds)
+  // FIX 5: for a process plant, drop "numbers behind it" sentences that quote the
+  // 3 generic tools' non-calibrated figures (MTBF 0.21 yr, cyber score 25, £0
+  // cert) — the tool wrappers mark these not_estimated_for_class; the renderer is
+  // the reader-facing surface that honours that for the prose narrative too.
+  const numbersNarrative = filterNotEstimatedNarrative(generatePhysicsNarrative(quantities, productClass, systemIds), productClass)
   // Net-CO2 reconciliation: the single highest-value number for a carbon-
   // capture buyer (captured vs emitted → net, plus embodied payback). Null for
   // every non-carbon-capture class, so the card renders only where it applies.
@@ -8876,6 +9733,12 @@ function ModuleSection({
         subBits.push(
           `Internally this module is composed of ${subModulesRaw.length} sub-module${subModulesRaw.length === 1 ? '' : 's'}.`,
         )
+        // 2026-06-06 (FIX 7): two sub-modules that share a name/topology_clause
+        // produced the SAME verbatim interaction sentence twice ("The Fluid
+        // transport sits inside the module." printed twice). De-dup on the
+        // finished sentence so a repeated clause renders once. (FIX 3's cleaner
+        // sub-module names reduce the collisions; this catches the residual.)
+        const _seenInteractionSentences = new Set<string>()
         for (let i = 0; i < subModulesRaw.length; i += 1) {
           const sm = subModulesRaw[i]
           const smName = clean_prose(humaniseSubName(sm?.name_human || sm?.id || '')).trim()
@@ -8901,6 +9764,9 @@ function ModuleSection({
             sentence = `The ${smName} sits inside the module`
           }
           sentence += '.'
+          const dedupKey = sentence.toLowerCase().replace(/\s+/g, ' ').trim()
+          if (_seenInteractionSentences.has(dedupKey)) continue
+          _seenInteractionSentences.add(dedupKey)
           subBits.push(sentence)
         }
         const subInteractions = subBits.join(' ').replace(/\s+/g, ' ').trim()
@@ -10968,7 +11834,11 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
             {subScopes.map((sc, si) => (
               <View key={`scope-${si}`} style={{ marginBottom: 14 }} minPresenceAhead={70}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 }}>
-                  <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35 }}>{clean_prose(sc.scope)}</Text>
+                  {/* 2026-06-06 (FIX 3 extension): the procurement scope is sometimes
+                      a concatenated function-taxonomy id on process-plant classes;
+                      humaniseSubName maps it to plain English + passes real phrases
+                      through unchanged (early-exit on space/uppercase) → no regression. */}
+                  <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35 }}>{humaniseSubName(clean_prose(sc.scope))}</Text>
                   <View style={{ backgroundColor: sc.critical ? '#fee2e2' : '#e2e8f0', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 3, marginLeft: 8 }}>
                     <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: sc.critical ? '#b91c1c' : INK_SOFT, letterSpacing: 0.3 }}>
                       {sc.critical ? `CRITICAL PATH · ${sc.lead_band}` : `LEAD ${sc.lead_band}`}
@@ -11861,7 +12731,7 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
             const minPA = tailPos === 0 ? 0 : tailPos <= 2 ? 90 : 0
             return (
               <View key={cls} style={{ flexDirection: 'row', paddingVertical: 2, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false} minPresenceAhead={minPA}>
-                <Text style={{ flex: 1, fontSize: 10, color: INK }}>{toTitleCaseEng(humanise(cls))}</Text>
+                <Text style={{ flex: 1, fontSize: 10, color: INK }}>{componentClassDisplay(cls)}</Text>
                 <Text style={{ width: 100, fontSize: 10, color: INK, textAlign: 'right' }}>
                   £{amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
@@ -12749,6 +13619,9 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
   const page = readToolsUsedPage(state)
   if (!page) return null
   if (!Array.isArray(page.tools) || page.tools.length === 0) return null
+  // FIX 5: product class drives suppression of the generic-tool quantities that
+  // are not calibrated for a process plant (MTBF / cert cost / cyber score).
+  const productClass = state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? ''
 
   // Methodology / provenance reference (build #23, 2026-06-04 — restores the
   // per-tool substance dropped by the build-#21 terse-index collapse, which
@@ -12878,6 +13751,19 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
                   Quantities this tool computed for this design:
                 </Text>
                 {claims.map((claim, ci) => {
+                  // FIX 5: for a process plant, the generic-tool quantities that
+                  // are not calibrated for the class (MTBF / cert cost / cyber
+                  // score) render an honest "not estimated" line instead of the
+                  // misleading number — render-vs-audit parity with the tool's
+                  // own not_estimated_for_class status.
+                  const notEstReason = notEstimatedReasonForField(String(claim.field), productClass)
+                  if (notEstReason) {
+                    return (
+                      <Text key={ci} style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5 }}>
+                        {`  • ${normalise_unicode(String(claim.field))} — not estimated at concept stage for this class (${normalise_unicode(notEstReason)})`}
+                      </Text>
+                    )
+                  }
                   const v = Number.isFinite(claim.value)
                     ? Number(claim.value).toLocaleString(undefined, { maximumFractionDigits: 4 })
                     : String(claim.value ?? '—')

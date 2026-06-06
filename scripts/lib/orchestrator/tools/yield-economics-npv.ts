@@ -26,7 +26,7 @@ export const yieldEconomicsNpvTool: Tool<any, any> = {
   source_url: 'internal://forgeos/finance',
   domain: 'process',
   pinned_environment: { python: '3.14.4' },
-  applicable_to(envelope) { return ['vertical_farm', 'bess', 'wind_turbine', 'solar_inverter', 'h2_electrolyser'].includes(envelope.class) },
+  applicable_to(envelope) { return ['vertical_farm', 'bess', 'wind_turbine', 'solar_inverter', 'h2_electrolyser', 'e_fuel_synthesis'].includes(envelope.class) },
   async invoke(input: any): Promise<ToolResult<any>> {
     const t0 = Date.now()
     const payload = JSON.stringify(input)

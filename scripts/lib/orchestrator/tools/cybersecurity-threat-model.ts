@@ -14,6 +14,7 @@ import { registerTool } from '../registry'
 import type { Tool, ToolResult } from '../types'
 import { spawnSync } from 'child_process'
 import { resolve } from 'path'
+import { isProcessPlantClass, markNotEstimatedForClass } from './generic-tool-class-applicability'
 
 const PYTHON_SCRIPT = resolve(__dirname, 'python', 'cybersecurity_threat_model.py')
 const VENV_PYTHON = resolve(__dirname, '..', '..', '..', '..', '.venv', 'bin', 'python3')
@@ -27,7 +28,7 @@ export const cybersecurityThreatModelTool: Tool<any, any> = {
   domain: 'standards',
   pinned_environment: { python: '3.14.4' },
   applicable_to() { return true },
-  async invoke(input: any): Promise<ToolResult<any>> {
+  async invoke(input: any, contract?: any): Promise<ToolResult<any>> {
     const t0 = Date.now()
     const payload = JSON.stringify(input)
     const proc = spawnSync(VENV_PYTHON, [PYTHON_SCRIPT], {
@@ -65,6 +66,23 @@ export const cybersecurityThreatModelTool: Tool<any, any> = {
         error: `JSON parse: ${(err as Error).message}; stdout: ${proc.stdout.slice(0, 200)}`,
       }
     }
+    // 2026-06-06 (FIX 5): the STRIDE/DREAD model scores a connected consumer/
+    // industrial PRODUCT's attack surface (radios, OTA, PII, OCPP, etc.); a
+    // continuous process plant's cyber risk is an OT/ICS concern (IEC 62443
+    // zones & conduits around the DCS/SIS), so the product-scale score is
+    // meaningless here. Declare not-estimated-for-this-class; the renderer
+    // suppresses the number. Tool still ran + is listed.
+    const warnings: string[] = []
+    if (output && typeof output === 'object' && isProcessPlantClass(contract?.product_class)) {
+      output = markNotEstimatedForClass(
+        output,
+        'plant cyber risk is an operational-technology / industrial-control-system '
+        + 'concern assessed under IEC 62443 (zones & conduits around the DCS and the '
+        + 'safety-instrumented system), not a consumer-product STRIDE/DREAD score; '
+        + 'commission an OT security assessment at FEED stage.',
+      )
+      warnings.push('cybersecurity-threat-model not calibrated for process-plant class — output marked not_estimated_for_class')
+    }
     return {
       ok: true,
       output,
@@ -80,7 +98,7 @@ export const cybersecurityThreatModelTool: Tool<any, any> = {
         timestamp: new Date().toISOString(),
         duration_ms,
       },
-      warnings: [],
+      warnings,
     }
   },
 }

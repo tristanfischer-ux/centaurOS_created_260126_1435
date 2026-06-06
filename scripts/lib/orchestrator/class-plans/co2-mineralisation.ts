@@ -1274,16 +1274,32 @@ const stepMassAgg: ToolStep = {
       rack_mass_kg_each_estimate: vesselShellsKg / 8 + 120,  // saddles + the 3 shell masses (couples PV outputs)
       pcs_mass_kg_estimate: 2500,               // pumps, agitators, centrifuge, blowers, baggers
       container_tare_kg_estimate: 4500,         // 12 m galvanised transportable skid frame + bunding
-      max_mass_kg_envelope: 24000,              // standard-trailer road-transport gross-mass limit
+      max_mass_kg_envelope: 24000,              // per-skid road-transport gross-mass limit (NOT a plant-wide cap)
+      // FIELD-ERECTED PLANT (2026-06-05): a CO₂ capture + mineralisation plant is a
+      // fixed installation (transportable skid + field-erected packed columns), not
+      // a containerised product → site mass + per-skid road check, no plant-wide
+      // containerised utilisation / container count.
+      field_erected: true,
+      road_transport_limit_kg: 44000,
     }
   },
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('mass-aggregator:envelope-check', '1.0.0', 'free-proprietary', 'internal://forgeos/orchestrator')
-    return { ...c, quantities: { ...c.quantities,
+    // FIELD-ERECTED (2026-06-06 FIX D): mirror the e_fuel fix — the field-erected
+    // branch returns recommended_container_count = null + site_mass_kg; the old
+    // `?? 1` clobbered the null to 1. Emit site_mass_kg + NO container count for a
+    // field-erected plant; a containerised class still emits a real count.
+    const isFieldErected = output?.recommended_container_count == null || num(output, 'site_mass_kg') != null
+    const base: any = { ...c.quantities,
       total_plant_mass_kg: mkQty(num(output, 'total_system_mass_kg') ?? 19200, 'kg', 'mass', p('total_system_mass_kg'), 'skid + vessels'),
-      mass_budget_utilisation_pct: mkQty(num(output, 'mass_budget_utilisation_pct') ?? 80, '%', 'dimensionless', p('mass_budget_utilisation_pct'), 'vs road envelope'),
-      recommended_container_count: mkQty(num(output, 'recommended_container_count') ?? 1, '', 'dimensionless', p('recommended_container_count'), 'transport split'),
-    } }
+      mass_budget_utilisation_pct: mkQty(num(output, 'mass_budget_utilisation_pct') ?? 0, '%', 'dimensionless', p('mass_budget_utilisation_pct'), 'vs road envelope'),
+    }
+    if (isFieldErected) {
+      base.site_mass_kg = mkQty(num(output, 'site_mass_kg') ?? num(output, 'total_system_mass_kg') ?? 19200, 'kg', 'mass', p('site_mass_kg'), 'fixed installation (not containerised)')
+    } else {
+      base.recommended_container_count = mkQty(num(output, 'recommended_container_count') ?? 1, '', 'dimensionless', p('recommended_container_count'), 'transport split')
+    }
+    return { ...c, quantities: base }
   },
 }
 

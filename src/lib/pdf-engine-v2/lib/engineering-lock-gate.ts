@@ -61,6 +61,10 @@ export const HARD_REQUIRED_SLOTS: Record<string, string[]> = {
   wind_turbine: ['rated_power_kw', 'rotor_diameter_m'],
   ev_charger: ['rated_power_kw', 'dc_output_voltage_v'],
   aev_charger: ['rated_power_kw', 'dc_output_voltage_v'],
+  // e_fuel_synthesis (Power-to-Liquid Fischer-Tropsch SAF plant, 2026-06-05) —
+  // both derived by the engineering-contract builder (registerArchetype
+  // 'e_fuel_synthesis'), so they pass the lock gate.
+  e_fuel_synthesis: ['saf_output_tonnes_yr', 'h2_co2_molar_ratio'],
   // Default: no HARD required slots for classes without explicit entries.
   // The gate runs a soft fill pass for all classes regardless.
 }

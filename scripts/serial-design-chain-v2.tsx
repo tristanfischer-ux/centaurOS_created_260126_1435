@@ -50,6 +50,7 @@ import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceMod
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
 // The orchestrator's assembler.ts lazy-loads emitBessDesign internally via
@@ -62,6 +63,8 @@ import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-eng
 // + every class plan into the orchestrator's global registry + planner.
 import './lib/orchestrator/register-all'
 import { orchestrateDesign } from './lib/orchestrator/orchestrate'
+import { detectEnvelope, isFieldErected, formFactorForClass } from './lib/orchestrator/envelope'
+import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constraint-normaliser'
 import type { ContractInProgress as OrchestratorContract } from './lib/orchestrator/types'
 // Stage 17.6 — LIBRARY-INFORMED CANDIDATE QUERY (2026-05-24).
 // After Stage 17.5 orchestrator computes physics + emitter populates the
@@ -2371,6 +2374,44 @@ async function main() {
     still_missing: augResult.still_missing,
     summary: augResult.summary,
   })
+
+  // ── U5b: Field-erected mass-constraint normalisation (2026-06-05) ─────────
+  // A field-erected process plant (Power-to-Liquid / FT SAF, CO₂ mineralisation,
+  // DAC, SMR, electrolyser) has NO single plant-wide gross-mass cap — equipment
+  // ships as modular skids + field-erected columns, each within road-transport
+  // limits. But U5 / the parser frequently INFERS a max_mass_kg, which the
+  // renderer then applies as a CONTAINERISED cap (bogus "Max gross mass" row +
+  // "container count 2" finding). Drop ONLY an INFERRED plant-wide cap for a
+  // field-erected envelope, recording it in constraints._dropped_inferred[] (a
+  // brief-STATED cap is kept; per-skid road limits are enforced by the
+  // mass-aggregator). Universal across the 5 plant classes; containerised /
+  // mobile classes are unaffected (their form_factor is not field-erected).
+  try {
+    // 2026-06-06 FIX D: resolve the form factor CLASS-AWARELY. detectEnvelope on
+    // the bare constraints returns 'generic' for a registered process-plant class
+    // (e_fuel_synthesis / co2_mineralisation / dac / smr / h2_electrolyser) whose
+    // field-erected nature is declared by the CLASS resolver — so the old
+    // detectEnvelope(constraints) path made U5b silently NOT fire and the inferred
+    // plant-wide cap (e_fuel 40,000 kg) survived into the compliance table. The
+    // class-aware form factor matches the contract envelope.
+    const ffForMass = formFactorForClass(productClass, parsedResult.data.constraints as any)
+    const envForMass = { form_factor: ffForMass }
+    if (isFieldErected(envForMass)) {
+      const massNorm = normaliseFieldErectedMassConstraint(parsedResult.data.constraints as any, envForMass)
+      if (massNorm.dropped && massNorm.record) {
+        console.error(`  [U5b] dropped inferred plant-wide max_mass_kg cap (${massNorm.record.value} kg) — field-erected ${productClass}; per-skid road limits apply`)
+        logAction({
+          step: 'field_erected_mass_normalisation_u5b',
+          product_class: productClass,
+          dropped_field: massNorm.record.field,
+          dropped_value: massNorm.record.value,
+          reason: massNorm.record.reason,
+        })
+      }
+    }
+  } catch (e) {
+    console.error(`  [U5b] field-erected mass normalisation skipped: ${(e as Error).message}`)
+  }
 
   writeFileSync(resolve(outDir, '1-parsed-brief.json'), JSON.stringify(parsedResult.data, null, 2))
 
@@ -6331,6 +6372,50 @@ async function main() {
     } catch (err) {
       console.error(`[chain] tool-archetype coherence (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
       logAction({ step: 'tool_archetype_coherence_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tTA })
+    }
+  }
+
+  // ── Render-quality gate (2026-06-06, Tristan: "the code should have stopped a
+  //    bad blender model automatically"). The OXCCU e_fuel dossier shipped GENERIC
+  //    flat-box images at exit 0 because the brand-new class had no per-class Blender
+  //    template, so render-blender-scene.py exit-5'd and the chain fell back to the
+  //    universal renderer (the WRONG object) — and NO gate inspected image quality
+  //    (~19 of 37 dossier classes are in the same boat). This gate detects when the
+  //    render used the generic universal fallback (no per-class template AND no LLM
+  //    blender-scene.py) or produced blank/degenerate images. SHADOW by default
+  //    (records state.renderQuality + LOUD log, never exits); ENFORCING opt-in via
+  //    RENDER_QUALITY_ENFORCING hard-exits 35 on a HIGH (a generic-fallback render is
+  //    WRONGNESS — the dossier shows the wrong object). Kill: CHAIN_SKIP_RENDER_QUALITY=1.
+  //    See src/lib/pdf-engine-v2/lib/render-quality-audit.ts.
+  if (!process.env.CHAIN_SKIP_RENDER_QUALITY) {
+    const tRQ = Date.now()
+    try {
+      const rqState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const outDir = resolve(statePath, '..')
+      const repoRoot = resolve(__dirname, '..')
+      const rq = computeRenderQuality(rqState, { outDir, repoRoot })
+      rqState.renderQuality = rq
+      writeFileSync(statePath, JSON.stringify(rqState, null, 2))
+      const tag = rq.used_universal_fallback
+        ? 'UNIVERSAL-FALLBACK (generic stock images — NOT this design)'
+        : (rq.ok ? 'PASS' : 'FLAGS')
+      console.error(`[chain] render-quality (shadow): ${tag} — class="${rq.product_class}" template=${rq.template_name ?? 'NONE'} hero=${rq.hero_present} modules=${rq.module_images} thin=${rq.thin_images.length}`)
+      for (const f of rq.findings.slice(0, 5)) console.error(`  ${f.severity === 'high' ? '✗' : '·'} ${f.code}: ${f.message.slice(0, 160)}`)
+      logAction({ step: 'render_quality_shadow', ok: true, product_class: rq.product_class, used_universal_fallback: rq.used_universal_fallback, template: rq.template_name, hero: rq.hero_present, modules: rq.module_images, thin: rq.thin_images.length, findings: rq.findings.map((f) => f.code), latency_ms: Date.now() - tRQ })
+      const rqMode = renderQualityEnforceModeFromEnv(process.env.RENDER_QUALITY_ENFORCING)
+      if (rqMode === 'enforcing') {
+        const decision = evaluateRenderQualityEnforcement(rq, rqMode)
+        if (decision.block) {
+          console.error(`[chain] render-quality ENFORCING: BLOCKING (exit 35) — ${decision.reason}`)
+          logAction({ step: 'render_quality_enforce', ok: false, exit_code: 35, reason: decision.reason, latency_ms: Date.now() - tRQ })
+          process.exit(35)
+        }
+        console.error('[chain] render-quality enforcing: images OK — ship allowed.')
+        logAction({ step: 'render_quality_enforce', ok: true })
+      }
+    } catch (err) {
+      console.error(`[chain] render-quality (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
+      logAction({ step: 'render_quality_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tRQ })
     }
   }
 

@@ -35,6 +35,14 @@ import './tools/process-pump-sizing'             // process:pump-sizing — TDH 
 import './tools/electrical-transformer-sizing'   // electrical:transformer-sizing — kVA + primary/secondary currents (IEC 60076)
 import './tools/electrical-cable-sizing'         // electrical:cable-sizing — feeder CSA + design current + volt-drop (BS 7671 / IEC 60364)
 import './tools/bagging-throughput-sizing'       // bagging:throughput-sizing — bags/h + line kg/h + day-silo volume (Perry's ch.21)
+// 2026-06-05 e_fuel_synthesis (Power-to-Liquid Fischer-Tropsch SAF plant) — six new
+// chemical-process SIZING tools (applicable_to e_fuel_synthesis only):
+import './tools/gas-compressor-sizing'           // gas:compressor-sizing — multistage polytropic head + power + intercooler duty (GPSA §13 + Peng-Robinson Z)
+import './tools/fired-heater-sizing'             // process:fired-heater — feed-preheat/catalyst-activation duty + radiant area (API 560)
+import './tools/flash-separation-sizing'         // process:flash-separation — 3-phase separator D×L (Souders-Brown + GPSA §7 + Stokes)
+import './tools/storage-tank-liquid-fuel'        // storage-tank:liquid-fuel — tank count + D×H + shell mass (API 650 1-foot method)
+import './tools/steam-generator-sizing'          // process:steam-generator — FT exotherm → raised steam + boiling-HX area (IAPWS-IF97)
+import './tools/flare-thermal-oxidiser'          // flare:thermal-oxidiser — purge heat release + chamber volume + stack dia (API 521/537)
 // 2026-05-25: octopart-stub replaced by distributor-cascade-real which calls
 // findSkuForPart (Mouser + Digi-Key + Farnell + LCSC + Nexar in parallel).
 // Same tool ID 'octopart:parts-lookup' preserved so TOOL_INPUT_HINTS + mermaid
@@ -340,6 +348,7 @@ import './class-plans/smr'
 import './class-plans/humanoid'
 import './class-plans/dac'
 import './class-plans/co2-mineralisation' // 2026-06-03: on-topic chemical tools; stops the spacecraft/battery auto-plan contamination
+import './class-plans/e-fuel-synthesis'   // 2026-06-05: Power-to-Liquid Fischer-Tropsch SAF plant; on-topic chemical-process tool graph (no marine/irrigation tools — gate 34)
 
 // ===========================================================================
 // 2026-05-22 — 6 satellite/ground-segment EMITTERS — BESS-quality
@@ -376,6 +385,7 @@ import './emitters/humanoid'
 import './emitters/smr'
 import './emitters/dac'
 import './emitters/co2-mineralisation' // 2026-06-03 CO2 capture + mineral-carbonation plant (MEA→gypsum→CaCO3+K2SO4)
+import './emitters/e-fuel-synthesis'   // 2026-06-05 Power-to-Liquid Fischer-Tropsch SAF plant (7 modules M1–M7; CO2+3H2→-CH2-+2H2O)
 import './emitters/solid-state-battery'
 // 2026-05-22 HVAC + medical BESS-quality batch (Build #20b):
 // heat_pump_residential / dialysis_machine / ventilator / cgm

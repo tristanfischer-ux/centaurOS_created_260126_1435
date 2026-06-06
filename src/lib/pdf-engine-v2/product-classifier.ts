@@ -33,6 +33,15 @@ const DECLARED_CLASS_SIGNATURES: Array<{ re: RegExp; cls: string }> = [
   // the generic vehicle/other catches ("trailer", "skid"). Routes to the
   // co2_mineralisation emitter + envelope detector.
   { re: /mineral[\s-]?carbon(?:at|is)|capture\s+and\s+mineralis|mineralis\w*\s+(?:the\s+)?(?:captured\s+)?(?:co2|carbon)|(?:co2|carbon).{0,40}gypsum|gypsum.{0,40}(?:co2|carbon|calcium\s*carbonate|caco3)/, cls: 'co2_mineralisation' },
+  // e-fuel synthesis — Power-to-Liquid Fischer-Tropsch Sustainable Aviation Fuel
+  // (SAF) plant (2026-06-05): single-step CO₂ hydrogenation over an iron FT
+  // catalyst → jet-range paraffins + naphtha. Must beat the 'dac' rule below: the
+  // brief is FULL of "captured CO₂" + "tonnes/year" signals (the feedstock) that
+  // would otherwise trip dac's `tonnes ... co2 per year`. The brief deliberately
+  // spells "carbon dioxide" as "CO₂" and uses "water electrolysis" (NOT
+  // "electrolyser"/"direct air capture") to avoid mis-routing — this rule keys on
+  // the PRODUCT (Fischer-Tropsch / Power-to-Liquid / SAF), not the feedstock.
+  { re: /fischer[\s-]?tropsch|power[\s-]?to[\s-]?liquid|\bptl\b|sustainable\s+aviation\s+fuel|\be[\s-]?fuel|synthetic\s+(?:kerosene|paraffin|crude)|\bsaf\b\s+(?:plant|synthesis)/, cls: 'e_fuel_synthesis' },
   // Direct air capture — "direct air capture"/"DAC module"/"X tCO2/yr capture".
   // Must beat thermal_system (DAC regen uses an 80-100 °C heat-pump train, so the
   // brief is FULL of heat-pump / refrigerant / condenser / COP signals).

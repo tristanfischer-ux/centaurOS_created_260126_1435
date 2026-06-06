@@ -609,6 +609,8 @@ export const PRODUCT_CLASS_VOLUME_BUCKET: Record<string, VolumeBucket> = {
   motor_drive_vfd: 'industrial_heavy',
   chiller: 'industrial_heavy',
   energy_storage: 'industrial_heavy',
+  co2_mineralisation: 'industrial_heavy',
+  e_fuel_synthesis: 'industrial_heavy',
 
   // Mid-volume professional.
   'edge-ai': 'mid_volume',

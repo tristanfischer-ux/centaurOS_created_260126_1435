@@ -89,6 +89,42 @@ CLASS_TO_TEMPLATE: dict[str, str] = {
     "co2_mineralisation": "co2-mineralisation-9shot.py",
     "co2-mineralisation": "co2-mineralisation-9shot.py",
     "mineralisation": "co2-mineralisation-9shot.py",
+    # Power-to-Liquid Fischer-Tropsch SAF synthesis plant (added 2026-06-06).
+    # Bespoke template models the feed compressors + fired preheater + the hero
+    # multitubular FT reactor + steam drum + hot/cold separators + recycle
+    # compressor + hydrocracker/isomeriser + fractionation column + thermal
+    # oxidiser/flare + MV transformer + SAF/naphtha tanks + loading gantry +
+    # DCS/SIS + H2/CO gas detection on a field-erected open steel skid.
+    # "e_fuel" substring covers "e_fuel_synthesis"; the variants below are
+    # belt-and-braces for the synonyms the classifier may emit.
+    "e_fuel_synthesis": "e-fuel-synthesis-9shot.py",
+    "e-fuel-synthesis": "e-fuel-synthesis-9shot.py",
+    "e_fuel": "e-fuel-synthesis-9shot.py",
+    "power_to_liquid": "e-fuel-synthesis-9shot.py",
+    "ptl": "e-fuel-synthesis-9shot.py",
+    # Direct-air-capture CO2 plant (added 2026-06-06). Bespoke template models the
+    # signature louvred AIR CONTACTOR fan-wall + regeneration/calciner vessel + CO2
+    # twin-tower dryer + two-stage CO2 compression train + knock-out drum + dense-
+    # phase CO2 storage bullet + steam/heat package + dry-cooler + water tank + MV
+    # transformer + DCS/SIS + CO2 gas detection on a field-erected open steel skid.
+    "dac": "dac-9shot.py",
+    "direct_air_capture": "dac-9shot.py",
+    # Steam-methane-reforming hydrogen plant (added 2026-06-06). Bespoke template
+    # models the signature fired REFORMER FURNACE (radiant box + vertical catalyst
+    # tubes + tall flue stack) + steam drum/waste-heat boiler + HT/LT shift reactor
+    # pair + the signature PSA adsorber bank (4 tall vessels) + desulphuriser + tail-
+    # gas drum + H2 product compressor + dry-cooler + demin tank + MV transformer +
+    # DCS/SIS + H2/CO gas detection on a field-erected open steel skid.
+    # CRITICAL (2026-06-06): the registered "smr" class-plan (class-plans/smr.ts) is a
+    # NUCLEAR Small Modular Reactor, NOT steam-methane reforming. "smr" is therefore
+    # DELIBERATELY NOT a key here — the nuclear class stays template-less so the render-
+    # quality gate flags it until a proper nuclear-SMR template exists, rather than
+    # silently rendering a steam-reforming plant over a reactor. The reforming template
+    # is keyed ONLY on reforming-specific slugs (which the nuclear "smr" product_class
+    # never contains), so it can never resolve for the nuclear class.
+    "steam_methane_reform": "steam-methane-reforming-9shot.py",
+    "steam_methane_reforming": "steam-methane-reforming-9shot.py",
+    "hydrogen_reformer": "steam-methane-reforming-9shot.py",
     # Phase 3 industrial + other (bootstrapped via GPT-5.5, 2026-05-24)
     "industrial_inspection_drone": "industrial-inspection-drone-9shot.py",
     "industrial-inspection-drone": "industrial-inspection-drone-9shot.py",

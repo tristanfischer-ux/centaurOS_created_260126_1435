@@ -340,10 +340,16 @@ const stepMassAggregator: ToolStep = {
       total_cell_mass_kg: stackMassKg,
       transformer_mass_kg: ratedKw * 0.8,
       rack_count: 1,
-      max_mass_kg_envelope: c.quantities?.brief_mass_cap_kg?.value ?? 25000,
+      max_mass_kg_envelope: c.quantities?.brief_mass_cap_kg?.value ?? 25000, // per-skid road limit (NOT a plant-wide cap)
       pcs_mass_kg_estimate: ratedKw * 0.6,
       container_tare_kg_estimate: 4000,
       rack_mass_kg_each_estimate: bufferMass,
+      // FIELD-ERECTED PLANT (2026-06-05): a green-hydrogen electrolyser plant is a
+      // fixed installation (stacks + balance-of-plant skids + field-erected
+      // buffer/storage), not a single containerised product → site mass + per-skid
+      // road check, no plant-wide containerised utilisation / container count.
+      field_erected: true,
+      road_transport_limit_kg: 44000,
     }
   },
   contract_update: (c: ContractInProgress, output: any) => {

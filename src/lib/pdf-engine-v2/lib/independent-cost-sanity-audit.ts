@@ -205,6 +205,11 @@ export const CLASS_OUTPUT_BANDS: Record<string, IndustryCostBand & { aliases?: s
     aliases: ['co2_capture', 'carbon_capture', 'amine_capture', 'dac', 'direct_air_capture', 'co2_mineralization'],
     notes: 'Amine CO₂ capture + mineralisation PILOT, CAPEX per annual tonne (£1,500-10,000/(t·yr CO₂); IEA DAC 2024, Climeworks/Heirloom). Commercial-scale DAC targets sub-£1,500 but a first-of-a-kind pilot sits here.',
   },
+  e_fuel_synthesis: {
+    family: 'throughput', low: 12_000, high: 60_000, per_unit_label: '£/(t·yr SAF)',
+    aliases: ['power_to_liquid', 'fischer_tropsch', 'ptl', 'saf', 'e_kerosene'],
+    notes: 'FOAK e-SAF capex per t/yr SAF capacity; design-council est Gemini £18k/Grok £38k/MiMo £40-80k',
+  },
 }
 
 /** Wire up class-band aliases so an alias slug resolves to its canonical band. */
