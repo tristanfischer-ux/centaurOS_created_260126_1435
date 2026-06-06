@@ -1202,6 +1202,48 @@ export const TOOL_NARRATIVES: Record<string, ToolNarrative> = {
   },
 
   // ──────────────────────────────────────────────────────────────────────
+  // Process-plant unit-operation sizing tools (2026-06-06: e_fuel / PtL family).
+  // These were rendering bare (Source + Quantities only) in Appendix B because they
+  // had no narrative here — now matched to the same 4-field depth as every other tool.
+  // ──────────────────────────────────────────────────────────────────────
+  'gas:compressor-sizing': {
+    description: 'Sizes a multi-stage gas compressor — polytropic head, shaft + driver power, per-stage discharge temperature, inter-stage cooling duty, and the number of stages — for raising a gas stream to a target delivery pressure.',
+    origin: 'In-tree implementation of the GPSA Engineering Data Book polytropic-compression method, with a Peng-Robinson real-gas compressibility factor (Z) recomputed per stage and the polytropic exponent n/(n-1) derived from the specific-heat ratio and polytropic efficiency.',
+    results_interpretation: 'shaft_power_kw / driver_power_kw size the motor and the plant electrical load; the per-stage discharge temperature must stay below the seal/material limit, which sets how many inter-stage coolers are needed; intercooler_duty_kw feeds the cooling-water balance. A high stage count or discharge temperature signals an aggressive pressure ratio that needs more inter-cooling.',
+    usage_pattern: 'Invoked for any gas-compression duty — feedstock compression to synthesis pressure, tail-gas recycle recompression, hydrogen make-up. Sizes the compressor package plus its electrical and cooling demand in the bill of materials.',
+  },
+  'process:fired-heater': {
+    description: 'Sizes a fired or electric process heater — heat duty (kW), heat-transfer area, and fuel/electrical demand — to raise a process stream to its reaction-inlet temperature, plus the separate transient catalyst-activation (reduction) duty.',
+    origin: 'In-tree implementation of the standard process heat balance Q = m·Cp·dT with a radiant/convective area split following API 560 fired-heater practice (electric-trim option for low duties); specific heats taken from the chemicals/thermo property layer.',
+    results_interpretation: 'duty_kw sets the fuel-gas or electrical load and the utility balance; heat_transfer_area_m2 drives the heater size and cost. The catalyst-activation duty is a start-up transient, sized separately so the steady-state electrical demand is not overstated.',
+    usage_pattern: 'Invoked wherever a stream must be preheated to reaction temperature — combined-feed preheat ahead of the synthesis reactor, guard-bed feed heating, catalyst reduction/activation. Sizes the preheater and its energy demand.',
+  },
+  'process:flash-separation': {
+    description: 'Sizes a three-phase flash separator — vessel diameter and height — to disengage a reactor effluent into a tail-gas vapour, an aqueous process-water phase, and a liquid hydrocarbon/syncrude phase.',
+    origin: 'In-tree implementation of the Souders-Brown vapour-disengagement equation (K derated to ~0.07 m/s) for the gas-handling diameter, a 20-minute liquid-residence rule for the liquid section, and Stokes-law droplet settling for the water/oil split (GPSA separator practice).',
+    results_interpretation: 'vessel_diameter_m is set by the vapour load (Souders-Brown); vessel_height_m by liquid residence. A large diameter means the gas rate governs; a tall vessel means liquid holdup governs. The three-phase split confirms the design separates water from syncrude before downstream upgrading.',
+    usage_pattern: 'Invoked for any vapour-liquid(-liquid) separation duty — the hot and cold separators downstream of the synthesis reactor, knock-out drums. Sizes the separator vessels in the bill of materials.',
+  },
+  'process:steam-generator': {
+    description: 'Sizes a steam-raising heat-recovery system on an exothermic reactor — raised-steam flow (kg/h) and heat-transfer area — that converts the reaction exotherm into useful process steam.',
+    origin: 'In-tree heat-balance steam-raising calculation: the exotherm duty divided by the latent heat of vaporisation at the steam pressure (IAPWS-IF97 water properties) gives the steam flow; an LMTD area sizes the steam-generator surface.',
+    results_interpretation: 'steam_raised_kg_h is the credit to the site steam balance — when it exceeds the plant reboil + tracing demand the design is a net steam exporter (an operating-cost credit); heat_transfer_area_m2 sizes the steam drum / waste-heat boiler.',
+    usage_pattern: 'Invoked when an exothermic reactor heat is recovered as steam — the Fischer-Tropsch synthesis exotherm. Sizes the steam generator and feeds the utility steam balance and the net-steam-export claim.',
+  },
+  'storage-tank:liquid-fuel': {
+    description: 'Sizes atmospheric liquid-fuel storage tanks to API 650 — tank count, diameter, height, and shell mass — for finished-product (SAF, naphtha) buffer storage at the plant battery limit.',
+    origin: 'In-tree implementation of API 650 (Welded Tanks for Oil Storage): the one-foot-method shell-course thickness from hydrostatic head, plus roof, floor, and minimum-thickness plate, sized to a target days-of-storage at the production rate.',
+    results_interpretation: 'tank_count, diameter_m and height_m set the tank-farm footprint; shell_mass_kg drives the fabricated-steel cost. Days-of-storage trades tank size against road-tanker dispatch frequency — a smaller tank needs more frequent loading.',
+    usage_pattern: 'Invoked for finished-product and intermediate liquid storage — the SAF and naphtha product tanks. Sizes the storage tanks and the road-tanker loading basis.',
+  },
+  'flare:thermal-oxidiser': {
+    description: 'Sizes a thermal oxidiser / flare for purge-gas destruction — combustion-chamber duty, supplementary-fuel and combustion-air demand, and flare-tip size — to destroy a tail-gas purge to environmental-permit limits.',
+    origin: 'In-tree combustion heat balance (the purge lower heating value plus supplementary fuel raised to an adiabatic flame temperature meeting the 850 °C / 0.3 s destruction criterion), with API 521/537 flare-tip sizing for the exit velocity.',
+    results_interpretation: 'combustion_duty_kw and supplementary_fuel set the cost of destroying the purge; the chamber/residence sizing confirms the design meets the destruction-efficiency permit (>=850 °C, >=0.3 s). A large supplementary-fuel demand means a low-LHV purge (mostly inerts) — a signal to tighten the recycle.',
+    usage_pattern: 'Invoked for vent/purge destruction — the tail-gas purge that prevents inert build-up in the recycle loop, plus emergency relief. Sizes the thermal oxidiser / flare and its fuel and emissions basis.',
+  },
+
+  // ──────────────────────────────────────────────────────────────────────
   // Thermo / Properties libraries
   // ──────────────────────────────────────────────────────────────────────
   'thermo:fluid-properties': {

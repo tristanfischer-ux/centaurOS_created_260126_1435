@@ -1490,19 +1490,25 @@ function checkAdvisorEngagementInvariants(): Assertion[] {
       if (card && /introduce you to vetted specialists/.test(card)) {
         bad.push('AdvisorSpecialistCard renders the section call-to-action copy — the CTA belongs once in the EngagementPlanPage intro, not on every card')
       }
-      // (b) exactly ONE section call-to-action in the consolidated section.
+      // (b) NO Fractional Forge call-to-action anywhere (2026-06-06, Tristan: the
+      //     book-a-call / specialist-introduction CTA is REMOVED — the dossier is the
+      //     deliverable (the Fractional Forge Anvil Engine), not a sales funnel. The
+      //     Engagement Plan keeps only the specialist roles + the questions to ask.
       const ctaCount = engagementPlan ? countOccurrences(engagementPlan, 'introduce you to vetted specialists') : 0
-      if (engagementPlan && ctaCount !== 1) {
-        bad.push(`EngagementPlanPage has ${ctaCount} section call-to-action instances (expected exactly 1: "Fractional Forge can introduce you to vetted specialists …")`)
+      if (ctaCount !== 0) {
+        bad.push(`EngagementPlanPage has ${ctaCount} Fractional Forge specialist-introduction call-to-action(s) (expected 0 — the CTA is removed)`)
+      }
+      if (engagementPlan && /Book a call/.test(engagementPlan)) {
+        bad.push('EngagementPlanPage still renders a "Book a call" call-to-action — it must be removed')
       }
     } catch (err) {
       bad.push(`could not read render-minimal-pdf.tsx: ${String(err).slice(0, 100)}`)
     }
     out.push(assertEq(
-      'UNIVERSAL.engagement_plan_single_call_to_action',
-      'the Engagement Plan carries exactly one section-level call-to-action; the specialist cards carry none (no per-card "Book a call" footer)',
+      'UNIVERSAL.engagement_plan_no_call_to_action',
+      'the Engagement Plan carries NO Fractional Forge call-to-action (no per-card "Book a call" footer and no section-level book-a-call / specialist-introduction pitch) — it is the deliverable, not a sales funnel',
       bad.length, (n) => n === 0,
-      () => `engagement-plan CTA regressed: ${bad.join(' ; ')}. Keep the single Fractional-Forge call-to-action in the EngagementPlanPage intro; AdvisorSpecialistCard must render no call-to-action.`,
+      () => `engagement-plan CTA present: ${bad.join(' ; ')}. The Engagement Plan must keep only the specialist roles + questions; remove any Fractional Forge book-a-call / introduction CTA.`,
     ))
   }
 

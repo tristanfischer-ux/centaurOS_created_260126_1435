@@ -6505,9 +6505,10 @@ async function main() {
   // ensures the env var propagates when the chain is itself invoked by the
   // Mac Studio worker (process.env.PDF_ENGINE_WORKER=1 set by worker).
   const renderEnv = { ...process.env }
-  if (process.env.PDF_ENGINE_WORKER === '1' && !renderEnv.RENDER_NO_OPEN) {
-    renderEnv.RENDER_NO_OPEN = '1'
-  }
+  // 2026-06-06 (Tristan): the renderer no longer opens the raw chain-v2.pdf — the
+  // chain opens the nicely-named deliverable copy ("<YYMMDDHHMM> <Subject>.pdf")
+  // instead (created after the integrity check below).
+  renderEnv.RENDER_NO_OPEN = '1'
   // 2026-05-23 P2-5: wrap render subprocess in try/catch → exit 5 (render
   // failed) so worker can distinguish renderer crashes from integrity failures
   // (exit 6) or chain logic failures (exit 1). All non-zero exits stamp the
@@ -6557,6 +6558,37 @@ async function main() {
     console.error(`[chain] integrity check threw: ${(err as Error).message}`)
     logAction({ step: 'integrity_check', ok: false, error: String(err) })
     process.exit(6)
+  }
+
+  // 2026-06-06 (Tristan): write a human-readable deliverable copy named
+  // "<YYMMDDHHMM> <Subject>.pdf" (e.g. "2606060958 SAF.pdf") next to chain-v2.pdf
+  // (which the gates/audits keep reading) and OPEN that one in interactive runs.
+  // YY MM DD HH MM = production timestamp; Subject = short product label.
+  try {
+    const now = new Date()
+    const p2 = (n: number) => String(n).padStart(2, '0')
+    const stamp = `${p2(now.getFullYear() % 100)}${p2(now.getMonth() + 1)}${p2(now.getDate())}${p2(now.getHours())}${p2(now.getMinutes())}`
+    const stForName = JSON.parse(readFileSync(statePath, 'utf-8'))
+    const pcForName = String(
+      stForName?.moduleDecomposition?.product_class ?? stForName?.parsedBrief?.product_class ?? '',
+    ).toLowerCase().trim()
+    // Short, readable subject per dossier class (filename nicety only; humanised fallback).
+    const SUBJECTS: Record<string, string> = {
+      e_fuel_synthesis: 'SAF', co2_mineralisation: 'CO2', dac: 'DAC', smr: 'SMR',
+      h2_electrolyser: 'Hydrogen', bess: 'BESS', wind_turbine: 'Wind',
+      vertical_farm: 'Vertical Farm', heat_pump: 'Heat Pump',
+    }
+    const subject = SUBJECTS[pcForName]
+      || (pcForName ? pcForName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Design Dossier')
+    const nicePath = resolve(outDir, `${stamp} ${subject}.pdf`)
+    writeFileSync(nicePath, readFileSync(pdfPath))
+    console.error(`[chain] deliverable: ${stamp} ${subject}.pdf`)
+    logAction({ step: 'deliverable_copy', ok: true, name: `${stamp} ${subject}.pdf` })
+    if (!process.env.PDF_ENGINE_WORKER && !process.env.RENDER_NO_OPEN) {
+      try { execFileSync('open', [nicePath]) } catch { /* open is best-effort */ }
+    }
+  } catch (err) {
+    console.error(`[chain] deliverable-copy step failed (non-fatal): ${(err as Error).message}`)
   }
 
   // 2026-05-23 P0-5: auto-audit every chain run via the 5-axis audit script.

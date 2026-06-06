@@ -2505,12 +2505,16 @@ function computePriceReality(
   }
 }
 
-// Shared GBP formatter — always 2dp with thousand-separators below £10M.
-// Tristan 2026-05-17: mixing £724,349 with £38,048.28 looked inconsistent.
+// Shared GBP formatter — WHOLE POUNDS, no pence, thousand-separators below £10M.
+// Tristan 2026-06-06 (UNIVERSAL RULE): drop the decimal place everywhere. On capital
+// items (vessels, reactors, compressors — £k to £M) the pence are FALSE ACCURACY and
+// waste horizontal space (the 2dp "£900,000.00" also overflowed the BoM price column
+// and hyphen-broke into a misleading "£-"). Whole pounds reads cleanly + reconciles.
+// (Supersedes the 2026-05-17 always-2dp rule; matches fmtGBP_subtotal's integer roll-up.)
 function fmtGBP_shared(n: number): string {
   if (!Number.isFinite(n) || n === 0) return '—'
   if (n >= 10_000_000) return `£${(n / 1_000_000).toLocaleString('en-GB', { maximumFractionDigits: 1 })}M`
-  return `£${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `£${Math.round(n).toLocaleString('en-GB')}`
 }
 
 // L49 council fix (2026-05-28, 3/4 seats): sub-total column wrap.
@@ -2529,7 +2533,7 @@ function fmtGBP_subtotal(n: number): string {
   if (!Number.isFinite(n) || n === 0) return '—'
   if (n >= 10_000_000) return `£${(n / 1_000_000).toLocaleString('en-GB', { maximumFractionDigits: 1 })}M`
   if (n >= 1_000) return `£${Math.round(n).toLocaleString('en-GB')}`
-  return `£${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `£${n.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`
 }
 
 // Compact GBP formatter for price-reality badge — drops the pence so the
@@ -3900,7 +3904,7 @@ function PageFooter() {
     <View style={{ position: 'absolute', bottom: 30, left: 64, right: 64 }} fixed>
       <View style={{ height: 0.6, backgroundColor: RULE_SOFT, marginBottom: 6 }} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 8, color: MUTED }}>Design Dossier · Concept Stage</Text>
+        <Text style={{ fontSize: 8, color: MUTED }}>Fractional Forge Anvil Engine · Concept Stage</Text>
         <Text
           style={{ fontSize: 8, color: MUTED }}
           render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
@@ -4362,17 +4366,11 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
           Each module&#8217;s design questions below, grouped by the specialist who should answer them; this is your outreach
           checklist for expert validation.
         </Text>
-        {/* The single section-level call-to-action (replaces the per-card "Book a
-            call" footer that used to repeat on all ~22 cards). House callout idiom:
-            neutral #eef4fb tint + a single ACCENT left-rule, matching
-            AboutThisDocumentCallout. ONE instance for the whole section. */}
-        <View style={{ backgroundColor: '#eef4fb', borderLeftWidth: 3, borderLeftColor: ACCENT, padding: 11, marginBottom: 14, borderRadius: 3 }}>
-          <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold', color: ACCENT }}>Don&#8217;t have these specialists? </Text>
-            Fractional Forge can introduce you to vetted specialists for any of the roles below &#8212; get in touch and we&#8217;ll
-            put the right people in front of the open questions.
-          </Text>
-        </View>
+        {/* 2026-06-06 (Tristan): the Fractional Forge "book a call" / specialist-
+            introduction call-to-action is REMOVED — the dossier is the deliverable
+            (the Fractional Forge Anvil Engine), not a sales funnel. The Engagement
+            Plan keeps only the useful outreach content: the specialist roles + the
+            questions to ask them. */}
         {blocks.map((block, bi) => {
           // 2026-06-06 (FIX 3 extension): module_name / module_id can be a
           // concatenated function-taxonomy chain on process-plant classes
@@ -4390,7 +4388,7 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
             // under the heading (matches the SubHead / Section-intro treatment); the
             // cards are NOT boxed in a green border — they flow as ink-on-white with
             // the per-card neutral header panel carrying the visual separation.
-            <View key={`engplan-mod-${bi}`} style={{ marginTop: bi > 0 ? 16 : 2 }} minPresenceAhead={150}>
+            <View key={`engplan-mod-${bi}`} style={{ marginTop: bi > 0 ? 14 : 2 }} minPresenceAhead={16}>
               <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.8, marginBottom: 2 }}>
                 MODULE {String(bi + 1)}
               </Text>
@@ -4734,7 +4732,7 @@ function PerformanceCardBody({ state }: { state: any }) {
         // minPresenceAhead — variable-height section can overflow remaining
         // page space and overdraw at same Y if wrap=false (wind-turbine p18
         // overlap bug). 200pt ≈ 16 body lines reserves a safe-fit window.
-        <View key={si} style={{ marginBottom: 10 }} minPresenceAhead={200}>
+        <View key={si} style={{ marginBottom: 10 }} minPresenceAhead={40}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, letterSpacing: 1.2, marginBottom: 3, textTransform: 'uppercase' }}>
             {section.name}
           </Text>
@@ -4867,7 +4865,7 @@ function BriefRevisionNoticePage({ state, project }: { state: any; project: stri
           // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
           // minPresenceAhead — engineering review row carries variable-length
           // original/revised values; wrap=false caused page-overlap bug.
-          <View key={`rev-${idx}`} minPresenceAhead={120} style={{ marginBottom: 16 }}>
+          <View key={`rev-${idx}`} minPresenceAhead={40} style={{ marginBottom: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, flex: 1 }}>
                 Revision {idx + 1} — iter {h.iter}: {h.target_constraint}
@@ -5142,7 +5140,7 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
         // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
         // minPresenceAhead — operational headline carries 3 headline metrics
         // + deployment-context paragraph; wrap=false caused page-overlap bug.
-        <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }} minPresenceAhead={120}>
+        <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }} minPresenceAhead={40}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, letterSpacing: 0.8, marginBottom: 8 }}>
             OPERATIONAL HEADLINE — what this design must deliver
           </Text>
@@ -5543,7 +5541,7 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
       </Text>
 
       {originalText.length > 0 || parsedInterpretation ? (
-        <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#f3f4f6', borderLeftWidth: 3, borderLeftColor: ACCENT }} minPresenceAhead={60}>
+        <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#f3f4f6', borderLeftWidth: 3, borderLeftColor: ACCENT }} minPresenceAhead={40}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
             Parse summary
           </Text>
@@ -5582,7 +5580,7 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
           <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 6, fontStyle: 'italic' }}>
             Your original brief, verbatim — no edits, no normalisation.
           </Text>
-          <View style={{ padding: 10, backgroundColor: '#f1f7f3', borderLeftWidth: 3, borderLeftColor: '#2f8f6b', marginBottom: 14 }} minPresenceAhead={50}>
+          <View style={{ padding: 10, backgroundColor: '#f1f7f3', borderLeftWidth: 3, borderLeftColor: '#2f8f6b', marginBottom: 14 }} minPresenceAhead={40}>
             <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.6 }}>
               {normalise_unicode(userBrief.userOriginal)}
             </Text>
@@ -7680,7 +7678,7 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
           borderLeftWidth: 3,
           borderLeftColor: failedRows.length > 0 ? '#b91c1c' : (nonPassResidual > 0 ? '#b45309' : '#15803d'),
         }}
-        minPresenceAhead={50}
+        minPresenceAhead={40}
       >
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>
           {verdict.headline}
@@ -7698,7 +7696,7 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
       {(((state?.autoImproveLog?.applied?.length ?? 0) > 0) || (improvementPlan.verdict !== 'within_brief' && improvementPlan.levers.length > 0)) && (
         <View
           style={{ marginBottom: 14, padding: 10, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8' }}
-          minPresenceAhead={60}
+          minPresenceAhead={40}
         >
           <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>
             Auto-improve — design adjustments
@@ -7838,7 +7836,7 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
                 borderLeftWidth: 3,
                 borderLeftColor: '#b45309',
               }}
-              minPresenceAhead={70}
+              minPresenceAhead={40}
             >
               <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#92400e', marginBottom: 4 }}>
                 {row.constraint}: brief {row.briefTarget} {'->'} design {row.designAchieved} ({row.deltaText})
@@ -7875,7 +7873,7 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
                 borderLeftWidth: 3,
                 borderLeftColor: '#c2410c',
               }}
-              minPresenceAhead={80}
+              minPresenceAhead={40}
             >
               <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#9a3412', marginBottom: 4 }}>
                 {/* ASCII "->" — Helvetica's U+2192 → renders as a narrow
@@ -7900,7 +7898,7 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
       {/* Block 3: design decision rationale. Always rendered — even on
           all-PASS chains — so the reader sees the design choice was
           deliberate, not accidental. */}
-      <View style={{ marginTop: 14, padding: 10, backgroundColor: '#f7faff', borderLeftWidth: 3, borderLeftColor: ACCENT }} minPresenceAhead={60}>
+      <View style={{ marginTop: 14, padding: 10, backgroundColor: '#f7faff', borderLeftWidth: 3, borderLeftColor: ACCENT }} minPresenceAhead={40}>
         <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 4 }}>
           Design decision rationale
         </Text>
@@ -7914,7 +7912,7 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
           between "trade-off explained" and "what should I do next time".
           Hidden when no constraint fails (no rewrite is required). */}
       {briefRewrites.length > 0 ? (
-        <View style={{ marginTop: 18 }} minPresenceAhead={120}>
+        <View style={{ marginTop: 18 }} minPresenceAhead={40}>
           <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 6 }}>
             Suggested brief rewrites
           </Text>
@@ -7942,7 +7940,7 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
                 borderRadius: 4,
                 overflow: 'hidden',
               }}
-              minPresenceAhead={80}
+              minPresenceAhead={40}
             >
               {/* Callout header strip — visually scopes as alternative scenario */}
               <View style={{ backgroundColor: '#ede9fe', paddingHorizontal: 10, paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#c4b5fd' }}>
@@ -9179,10 +9177,10 @@ function SubModuleBomBlock({
           // Scoped to ≥£1M so sub-£1M unit prices (all of BESS) are unchanged.
           ? (row.unit_price_gbp >= 1_000_000
               ? `~£${Math.round(row.unit_price_gbp).toLocaleString('en-GB')}`
-              : `~£${row.unit_price_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+              : `~£${row.unit_price_gbp.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`)
           : '—'
         const lineCell = row.line_total_gbp > 0
-          ? `£${row.line_total_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          ? `£${row.line_total_gbp.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`
           : '—'
         const src = srcLabelForRow(row)
         const ref = priceRealityRefForRow(row)
@@ -9342,7 +9340,7 @@ function ModuleDesignTradeOffsBlock({ state, moduleId }: { state: any; moduleId:
     // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
     // minPresenceAhead — design trade-offs callout grows with choices array
     // (each choice = title + alt + rationale); wrap=false caused overlap bug.
-    <View style={{ marginTop: 14, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 8, backgroundColor: '#fbfcfe', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }} minPresenceAhead={120}>
+    <View style={{ marginTop: 14, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 8, backgroundColor: '#fbfcfe', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }} minPresenceAhead={40}>
       <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, letterSpacing: 0.6, marginBottom: 6 }}>
         DESIGN TRADE-OFFS — this module
       </Text>
@@ -9434,7 +9432,7 @@ function AdvisorSpecialistCard({ card, cardNo }: { card: AdvisorCard; cardNo: nu
     // for the rest (growing content → never wrap={false} on the whole card, per the
     // layout-overlap lesson). Each question row is itself wrap={false}. Cards within
     // a module are separated by a thin house rule (RULE_SOFT), not a 4-px slab.
-    <View style={{ marginTop: cardNo > 1 ? 12 : 0, paddingTop: cardNo > 1 ? 12 : 0, borderTopWidth: cardNo > 1 ? 0.6 : 0, borderTopColor: RULE_SOFT }} minPresenceAhead={120}>
+    <View style={{ marginTop: cardNo > 1 ? 12 : 0, paddingTop: cardNo > 1 ? 12 : 0, borderTopWidth: cardNo > 1 ? 0.6 : 0, borderTopColor: RULE_SOFT }} minPresenceAhead={16}>
       {/* The specialist header — house neutral-tint panel with a single accent rule */}
       <View style={{ paddingVertical: 8, paddingHorizontal: 11, backgroundColor: '#f7f8fa', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 3 }}>
         <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.6, marginBottom: 3 }}>
@@ -9687,7 +9685,7 @@ function ModuleSection({
           <View style={{ flexDirection: 'row', marginTop: 8, paddingTop: 6, borderTopWidth: 0.5, borderTopColor: RULE_SOFT }}>
             <Text style={{ fontSize: 10, color: INK_SOFT }}>
               <Text style={{ color: MUTED }}>Cost </Text>
-              <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>£{moduleCostGbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>£{moduleCostGbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
             </Text>
           </View>
         ) : null}
@@ -9989,7 +9987,7 @@ function ModuleSection({
                 the minPresenceAhead constraint forces page-break alignment.
                 The 2026-05-24 outer-reserve above strengthens this for the
                 prose → BoM transition specifically. */}
-            <View minPresenceAhead={80}>
+            <View minPresenceAhead={40}>
               <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }}>
                 <Text style={{ width: 36, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT }}>
                   {index}.{sm.idx}
@@ -10043,7 +10041,7 @@ function ModuleSection({
             Module {index} total — {title}
           </Text>
           <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
-            £{moduleCostGbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            £{moduleCostGbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </Text>
         </View>
       ) : null}
@@ -10234,7 +10232,7 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
               {feas.risks.map((r, ri) => {
                 const st = SEV_STYLE[r.severity] ?? SEV_STYLE.low
                 return (
-                  <View key={`fr-${ri}`} minPresenceAhead={90} style={{ marginBottom: 8, padding: 10, backgroundColor: st.bg, borderLeftWidth: 4, borderLeftColor: st.bar, borderRadius: 4 }}>
+                  <View key={`fr-${ri}`} minPresenceAhead={40} style={{ marginBottom: 8, padding: 10, backgroundColor: st.bg, borderLeftWidth: 4, borderLeftColor: st.bar, borderRadius: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 3 }}>
                       <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: st.bar, letterSpacing: 0.8, marginRight: 6 }}>{st.tag}</Text>
                       <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: st.fg }}>{clean_prose(r.title.length > 200 ? r.title.slice(0, 199).trimEnd() + '…' : r.title)}</Text>
@@ -10295,7 +10293,7 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
             // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false}
             // with minPresenceAhead — system-risk card has variable why/action
             // prose; wrap=false caused page-overlap bug.
-            <View key={r.id || ri} style={{ marginBottom: 10, padding: 12, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} minPresenceAhead={100}>
+            <View key={r.id || ri} style={{ marginBottom: 10, padding: 12, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} minPresenceAhead={40}>
               <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.8 }}>{r.id}</Text>
               <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#7f1d1d', marginTop: 3, marginBottom: 4 }}>{r.issue}</Text>
               <Text style={{ fontSize: 9.5, color: '#475569', lineHeight: 1.5, marginBottom: 3 }}>
@@ -10486,7 +10484,7 @@ function DesignDecisionsPage({ state, project }: { state: any; project: string }
       // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
       // minPresenceAhead — made-decision card has variable reasoning +
       // consequences list; wrap=false caused page-overlap bug.
-      <View key={`dec-${idx}`} minPresenceAhead={120} style={{ marginBottom: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
+      <View key={`dec-${idx}`} minPresenceAhead={40} style={{ marginBottom: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, flex: 1 }}>
             Decision {idx + 1} — {topic}
@@ -10528,7 +10526,7 @@ function DesignDecisionsPage({ state, project }: { state: any; project: string }
     // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
     // minPresenceAhead — open-question decision card has variable prose;
     // wrap=false caused page-overlap bug.
-    <View key={`dec-${idx}`} minPresenceAhead={120} style={{ marginBottom: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
+    <View key={`dec-${idx}`} minPresenceAhead={40} style={{ marginBottom: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
         <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, flex: 1 }}>
           Decision {idx + 1} — {humanise(d.kind)} on {clean_prose(String(d.word_name ?? d.word_id))}
@@ -10717,7 +10715,7 @@ function _PartsPendingVerificationPage_unused({ state, project }: { state: any; 
           // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
           // minPresenceAhead — uncertain-part card has variable manufacturer +
           // part-number + recommendation prose; wrap=false caused overlap bug.
-          <View key={`vrfy-${idx}`} minPresenceAhead={120} style={{ marginBottom: 12, padding: 10, backgroundColor: '#fff7ed', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#c2410c' }}>
+          <View key={`vrfy-${idx}`} minPresenceAhead={40} style={{ marginBottom: 12, padding: 10, backgroundColor: '#fff7ed', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#c2410c' }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
               <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, flex: 1 }}>
                 {clean_prose(String(v.word_name ?? v.word_id))}
@@ -11645,7 +11643,7 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
       // page boundary. react-pdf handles mid-card wrapping cleanly.
       <View
         key={`cand-${idx}`}
-        minPresenceAhead={70}
+        minPresenceAhead={40}
         style={{
           marginBottom: 10,
           padding: 12,
@@ -11812,7 +11810,7 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
         <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 6 }}>
           Main contractor
         </Text>
-        <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8', borderRadius: 4 }} minPresenceAhead={90}>
+        <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8', borderRadius: 4 }} minPresenceAhead={40}>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 5 }}>{mainContractor.role}</Text>
           <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 6 }}>{mainContractor.responsibilities}</Text>
           <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>
@@ -11832,7 +11830,7 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
               The major equipment original-equipment manufacturers (OEMs) the design specifies, grouped by procurement scope. For each: what they supply, a one-line company profile, and the contact route — the manufacturer&apos;s published website, through which a UK sales enquiry is raised. Phone numbers and email addresses are deliberately not stated: the website and its sales-enquiry route is the verifiable contact detail.
             </Text>
             {subScopes.map((sc, si) => (
-              <View key={`scope-${si}`} style={{ marginBottom: 14 }} minPresenceAhead={70}>
+              <View key={`scope-${si}`} style={{ marginBottom: 14 }} minPresenceAhead={40}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 }}>
                   {/* 2026-06-06 (FIX 3 extension): the procurement scope is sometimes
                       a concatenated function-taxonomy id on process-plant classes;
@@ -11875,7 +11873,7 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
 
         {/* 3 — Retained lead-time / dual-source / MOQ strategy summary. */}
         {sourcingStrategy && (
-          <View style={{ marginTop: 4, marginBottom: 14, padding: 10, backgroundColor: '#f7f8fa', borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT, borderRadius: 4 }} minPresenceAhead={80}>
+          <View style={{ marginTop: 4, marginBottom: 14, padding: 10, backgroundColor: '#f7f8fa', borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT, borderRadius: 4 }} minPresenceAhead={40}>
             <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>Lead-time, single-source &amp; order strategy</Text>
             <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}>{sourcingStrategy.identification}</Text>
             <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Lead time. </Text>{sourcingStrategy.lead_time}</Text>
@@ -11905,7 +11903,7 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
         Recommended companies for each delivery role — principal contractor and subcontractors. Up to 3 candidates per role. Each card carries the company identity, a concrete capability line, two or three reasons the company fits this brief, and a direct call to action.
       </Text>
       {sourcingStrategy && (
-        <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8', borderRadius: 4 }} minPresenceAhead={80}>
+        <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#eff6ff', borderLeftWidth: 3, borderLeftColor: '#1d4ed8', borderRadius: 4 }} minPresenceAhead={40}>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>Sourcing strategy</Text>
           <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}>{sourcingStrategy.identification}</Text>
           <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5, marginBottom: 5 }}><Text style={{ fontFamily: 'Helvetica-Bold' }}>Lead time. </Text>{sourcingStrategy.lead_time}</Text>
@@ -11932,7 +11930,7 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
         // Each archetype heading travels with its function_description as a unit
         // (minPresenceAhead=80pt) so the heading is never orphaned at the foot
         // of a page without at least the description line following it.
-        <View key={`arch-${archIdx}`} style={{ marginBottom: 16 }} minPresenceAhead={80}>
+        <View key={`arch-${archIdx}`} style={{ marginBottom: 16 }} minPresenceAhead={40}>
           <View style={{ marginBottom: 6, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
             <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
               {clean_prose(String(archetype.archetype_label ?? archetype.archetype_id ?? ''))}
@@ -12378,10 +12376,10 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
     const unitPriceCell = row.unit_price_gbp > 0
       ? (row.unit_price_gbp >= 1_000_000
           ? `~£${Math.round(row.unit_price_gbp).toLocaleString('en-GB')}`
-          : `~£${row.unit_price_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+          : `~£${row.unit_price_gbp.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`)
       : '—'
     const lineCell = row.line_total_gbp > 0
-      ? `£${row.line_total_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ? `£${row.line_total_gbp.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`
       : '—'
     const src = srcLabelForRow(row)
     const ref = priceRealityRefForRow(row)
@@ -12470,7 +12468,7 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
           <View key={`mbom-mod-${b.mod.module}-${mi}`}>
             {/* Module sub-header — module name (left) + module subtotal (right).
                 wrap={false} keeps the header with its first rows' header line. */}
-            <View wrap={false} minPresenceAhead={70} style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: mi === 0 ? 0 : 16, marginBottom: 2, paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
+            <View wrap={false} minPresenceAhead={40} style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: mi === 0 ? 0 : 16, marginBottom: 2, paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
               <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
                 {mi + 1}. {b.label}
               </Text>
@@ -12496,7 +12494,7 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
             word. Surfaced so the grand total reconciles. PURE read of bomTotals. */}
         {unmatchedMacros.length > 0 ? (
           <View>
-            <View wrap={false} minPresenceAhead={70} style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 16, marginBottom: 2, paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
+            <View wrap={false} minPresenceAhead={40} style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 16, marginBottom: 2, paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
               <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
                 {modBlocks.length + 1}. Major Assemblies
               </Text>
@@ -12511,10 +12509,10 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
                 <Text style={{ flex: 1.6, fontSize: 8.5, color: MUTED, fontFamily: 'Helvetica-Bold' }}>—</Text>
                 <Text style={{ width: 24, fontSize: 9, color: INK, textAlign: 'right' }}>×1</Text>
                 <View style={{ width: 62, alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 9, color: INK, textAlign: 'right' }}>{u.total >= 1_000_000 ? `~£${Math.round(u.total).toLocaleString('en-GB')}` : `~£${u.total.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                  <Text style={{ fontSize: 9, color: INK, textAlign: 'right' }}>{u.total >= 1_000_000 ? `~£${Math.round(u.total).toLocaleString('en-GB')}` : `~£${u.total.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`}</Text>
                   <Text style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', color: '#92400e', textAlign: 'right' }}>indicative · RFQ</Text>
                 </View>
-                <Text style={{ width: 49, fontSize: 9, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>{`£${u.total.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                <Text style={{ width: 49, fontSize: 9, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>{`£${u.total.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`}</Text>
                 <View style={{ width: 60, paddingLeft: 6 }}><Text style={{ fontSize: 8, color: MUTED }}>Est.</Text></View>
               </View>
             ))}
@@ -12528,7 +12526,7 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
             Grand total — all modules ({totalLineCount.toLocaleString('en-GB')} line{totalLineCount === 1 ? '' : 's'})
           </Text>
           <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>
-            £{grandTotal.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            £{grandTotal.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
           </Text>
         </View>
       </View>
@@ -12667,7 +12665,7 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
               <Text style={{ width: 28, fontSize: 10, color: MUTED }}>{idx + 1}.</Text>
               <Text style={{ flex: 1, fontSize: 10, color: INK }}>{uniqueLabelFor(m)}</Text>
               <Text style={{ fontSize: 10, color: INK, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>
-                £{m.subtotal_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                £{m.subtotal_gbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </Text>
             </View>
           )
@@ -12676,7 +12674,7 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
         <View style={{ flexDirection: 'row', paddingVertical: 7, marginTop: 4, borderTopWidth: 1, borderTopColor: ACCENT, alignItems: 'baseline' }} wrap={false}>
           <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT }}>Sum of modules</Text>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>
-            £{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            £{grandTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </Text>
         </View>
       </View>
@@ -12733,7 +12731,7 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
               <View key={cls} style={{ flexDirection: 'row', paddingVertical: 2, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false} minPresenceAhead={minPA}>
                 <Text style={{ flex: 1, fontSize: 10, color: INK }}>{componentClassDisplay(cls)}</Text>
                 <Text style={{ width: 100, fontSize: 10, color: INK, textAlign: 'right' }}>
-                  £{amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  £{amt.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </Text>
                 <Text style={{ width: 50, fontSize: 10, color: MUTED, textAlign: 'right' }}>
                   {pct < 0.5 ? '<1%' : `${pct.toFixed(0)}%`}
@@ -12757,12 +12755,12 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
             <View key={`cons-${i}`} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
               <Text style={{ flex: 1, fontSize: 10, color: INK }}>{toTitleCaseEng(r.word_name)}</Text>
               <Text style={{ width: 44, fontSize: 9, color: MUTED, textAlign: 'right' }}>×{r.quantity.toLocaleString('en-GB')}</Text>
-              <Text style={{ width: 96, fontSize: 10, color: INK, textAlign: 'right' }}>£{r.line_total_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+              <Text style={{ width: 96, fontSize: 10, color: INK, textAlign: 'right' }}>£{r.line_total_gbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
             </View>
           ))}
           <View style={{ flexDirection: 'row', paddingTop: 5, marginTop: 2, borderTopWidth: 0.8, borderTopColor: ACCENT_SOFT, alignItems: 'baseline' }} wrap={false}>
             <Text style={{ flex: 1, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: ACCENT }}>Consumables sub-total (per cycle)</Text>
-            <Text style={{ width: 96, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>£{(bomTotals.consumablesTotal_gbp ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            <Text style={{ width: 96, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>£{(bomTotals.consumablesTotal_gbp ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
           </View>
         </View>
       ) : null}
@@ -12775,12 +12773,12 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
             <View key={`ext-${i}`} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
               <Text style={{ flex: 1, fontSize: 10, color: INK }}>{toTitleCaseEng(r.word_name)}</Text>
               <Text style={{ width: 44, fontSize: 9, color: MUTED, textAlign: 'right' }}>×{r.quantity.toLocaleString('en-GB')}</Text>
-              <Text style={{ width: 96, fontSize: 10, color: INK, textAlign: 'right' }}>£{r.line_total_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+              <Text style={{ width: 96, fontSize: 10, color: INK, textAlign: 'right' }}>£{r.line_total_gbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
             </View>
           ))}
           <View style={{ flexDirection: 'row', paddingTop: 5, marginTop: 2, borderTopWidth: 0.8, borderTopColor: ACCENT_SOFT, alignItems: 'baseline' }} wrap={false}>
             <Text style={{ flex: 1, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: ACCENT }}>External sub-total</Text>
-            <Text style={{ width: 96, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>£{(bomTotals.externalTotal_gbp ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            <Text style={{ width: 96, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>£{(bomTotals.externalTotal_gbp ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
           </View>
         </View>
       ) : null}
@@ -12793,12 +12791,12 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
             <View key={`nre-${i}`} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
               <Text style={{ flex: 1, fontSize: 10, color: INK }}>{toTitleCaseEng(r.word_name)}</Text>
               <Text style={{ width: 44, fontSize: 9, color: MUTED, textAlign: 'right' }}>×{r.quantity.toLocaleString('en-GB')}</Text>
-              <Text style={{ width: 96, fontSize: 10, color: INK, textAlign: 'right' }}>£{r.line_total_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+              <Text style={{ width: 96, fontSize: 10, color: INK, textAlign: 'right' }}>£{r.line_total_gbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
             </View>
           ))}
           <View style={{ flexDirection: 'row', paddingTop: 5, marginTop: 2, borderTopWidth: 0.8, borderTopColor: '#d97706', alignItems: 'baseline' }} wrap={false}>
             <Text style={{ flex: 1, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: '#92400e' }}>Certification &amp; NRE total (one-time)</Text>
-            <Text style={{ width: 96, fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#92400e', textAlign: 'right' }}>£{(bomTotals.nreTotal_gbp ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            <Text style={{ width: 96, fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#92400e', textAlign: 'right' }}>£{(bomTotals.nreTotal_gbp ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
           </View>
         </View>
       ) : null}
@@ -12829,7 +12827,7 @@ function SystemLevelRisksPage({ state, project }: { state: any; project: string 
         // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
         // minPresenceAhead — system-risk card has variable why/action prose
         // (≈ 4-6 lines each); wrap=false caused page-overlap bug.
-        <View key={r.id || ri} style={{ marginBottom: 12, padding: 14, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} minPresenceAhead={120}>
+        <View key={r.id || ri} style={{ marginBottom: 12, padding: 14, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} minPresenceAhead={40}>
           <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.8 }}>{r.id}</Text>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#7f1d1d', marginTop: 3, marginBottom: 4 }}>{r.issue}</Text>
           <Text style={{ fontSize: 10, color: '#475569', lineHeight: 1.5, marginBottom: 3 }}>
