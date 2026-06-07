@@ -72,6 +72,8 @@ import { auditBriefConstraintCompleteness } from './lib/brief-constraint-complet
 import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { CLASS_HAZARDS, getClassHazards } from '../src/lib/pdf-engine-v2/class-hazards'
 import { auditCrossPageNumericConsistency } from './lib/cross-page-numeric-consistency-audit'
+import { computeScenarioPlanning, type ScenarioModel, type Bands } from './lib/scenario-planning'
+import { planScenariosForState } from './lib/scenario-models'
 import { priceInBand, bandFor, looksLikeRealMpn } from './ingest/enrich-null-prices'
 import { homedir, tmpdir } from 'os'
 import Database from 'better-sqlite3'
@@ -2131,6 +2133,79 @@ function runRenderer(statePath: string): { ok: boolean; pdfPath: string; pages: 
 // fixtures need building only once per harness process, not per snapshot).
 let gate18FixtureChecked = false
 
+// ── Scenario-planning invariants (Section 9b, 2026-06-07) ────────────────────
+// Class-agnostic fixture checks (run once per process) + an optional per-snapshot
+// consistency check. Guards: DCF port reproduces the SAF base; levers stay
+// EXOGENOUS (never a physical/BoM-changing lever — anchor A5); capex floored by
+// the bottom-up BoM; goal-seek flags infeasibility; the engine works on a generic
+// (non-e_fuel) model. See scripts/lib/scenario-planning.ts.
+let scenarioFixturesChecked = false
+function safScenarioFixture(): { model: ScenarioModel; bands: Bands } {
+  const model: ScenarioModel = {
+    output_unit_label: 'SAF', output_unit_short: 'kg', levelised_unit_label: '£/t SAF', levelised_display_factor: 1000,
+    capex_base_gbp: 25_000_000, bom_floor_gbp: 10_301_070, hours_base: 8000, hours_design_max: 8000,
+    annual_yield_at_base_hours: 1_000_000, output_price_base: 2.2, output_price_unit: '£/kg',
+    discount_rate_pct_base: 10, project_life_years: 20, price_inflation_pct: 2, operational_inflation_pct: 2, tax_rate_pct: 25,
+    fixed_capex_fraction: 0.04, fixed_non_capex_gbp: 0,
+    variable_costs: [
+      { id: 'h2', label: 'Hydrogen', price_base: 5.0, price_unit: '£/kg', qty_per_year_at_base_hours: 140 * 8000 },
+      { id: 'elec', label: 'Electricity', price_base: 0.10, price_unit: '£/kWh', qty_per_year_at_base_hours: 507 * 8000 },
+      { id: 'co2', label: 'CO2 feedstock', price_base: 45, price_unit: '£/t', qty_per_year_at_base_hours: 8000 },
+    ],
+  }
+  const bands: Bands = {
+    capex: { pessimistic: 30_000_000, optimistic: 18_000_000 }, output_price: { pessimistic: 1.4, optimistic: 5.9 },
+    hours: { pessimistic: 6000, optimistic: 8000 }, discount_rate_pct: { pessimistic: 12, optimistic: 8 },
+    variable_prices: { h2: { pessimistic: 6, optimistic: 2 }, elec: { pessimistic: 0.14, optimistic: 0.07 }, co2: { pessimistic: 60, optimistic: 30 } },
+  }
+  return { model, bands }
+}
+function checkScenarioInvariants(state: any): Assertion[] {
+  const out: Assertion[] = []
+  if (!scenarioFixturesChecked) {
+    scenarioFixturesChecked = true
+    try {
+      const { model, bands } = safScenarioFixture()
+      const sp = computeScenarioPlanning(model, bands, { irr_hurdle_pct: 12 })
+      const lev = sp.base.levelised_per_unit_gbp
+      const npv = sp.base.npv_gbp
+      out.push({ id: 'UNIVERSAL.scenario_recompute_matches_base', description: 'scenario DCF reproduces SAF base economics (£8.62/kg, -£75.3M)',
+        passed: Math.abs(lev - 8.62) <= 0.05 && Math.abs(npv + 75_322_752) / 75_322_752 <= 0.02,
+        detail: `levelised £${lev}/kg, NPV £${Math.round(npv / 1e6)}M` })
+      const phys = sp.meta.levers.filter((l) => /yield|selectiv|throughput|efficien/i.test(l))
+      out.push({ id: 'UNIVERSAL.scenario_levers_exogenous_only', description: 'scenario levers never include a physical (BoM-changing) lever',
+        passed: phys.length === 0, detail: phys.length ? `physical levers leaked: ${phys.join(',')}` : undefined })
+      const capexGoal = sp.goal_seek.find((g) => g.lever_id === 'capex')
+      out.push({ id: 'UNIVERSAL.scenario_capex_never_below_bom_floor', description: 'goal-seek capex below the bottom-up BoM floor is flagged infeasible',
+        passed: !!capexGoal && !capexGoal.feasible && /floor/i.test(capexGoal.reason ?? ''),
+        detail: capexGoal ? `feasible=${capexGoal.feasible} reason=${capexGoal.reason}` : 'no capex goal-seek' })
+      out.push({ id: 'UNIVERSAL.scenario_goalseek_flags_infeasible', description: 'goal-seek flags infeasible single-lever moves from a failing base',
+        passed: sp.goal_seek.some((g) => !g.feasible), detail: `${sp.goal_seek.filter((g) => !g.feasible).length} infeasible of ${sp.goal_seek.length}` })
+      const gModel: ScenarioModel = { ...model, output_unit_label: 'unit', output_unit_short: 'unit', levelised_unit_label: '£/unit', levelised_display_factor: 1, fixed_capex_fraction: 0,
+        variable_costs: [{ id: 'opex', label: 'Operating cost', price_base: 7_000_000, price_unit: '£/yr', qty_per_year_at_base_hours: 1 }] }
+      const gBands: Bands = { capex: { pessimistic: 30_000_000, optimistic: 18_000_000 }, output_price: { pessimistic: 1.4, optimistic: 5.9 }, hours: { pessimistic: 6000, optimistic: 8000 }, discount_rate_pct: { pessimistic: 12, optimistic: 8 }, variable_prices: { opex: { pessimistic: 8_000_000, optimistic: 6_000_000 } } }
+      const gsp = computeScenarioPlanning(gModel, gBands, { irr_hurdle_pct: 10 })
+      out.push({ id: 'UNIVERSAL.scenario_engine_universal', description: 'scenario engine computes for a generic (non-e_fuel) economic model',
+        passed: gsp.scenarios.length >= 2 && [gsp.base, ...gsp.scenarios].every((s) => Number.isFinite(s.npv_gbp)),
+        detail: `${gsp.scenarios.length} scenarios, all finite NPV` })
+    } catch (e) {
+      out.push({ id: 'UNIVERSAL.scenario_fixtures', description: 'scenario fixture invariants run without throwing', passed: false, detail: String(e).slice(0, 200) })
+    }
+  }
+  // per-snapshot consistency: if this state has reconstructable economics, the
+  // scenario base must reproduce the stored dossier levelised cost.
+  try {
+    const sp = planScenariosForState(state)
+    const storedLev = state?.orchestratorContract?.quantities?.saf_levelised_cost_gbp_kg?.value
+    if (sp && typeof storedLev === 'number') {
+      out.push({ id: 'UNIVERSAL.scenario_base_matches_stored_levelised', description: 'scenario base levelised reproduces the stored dossier value',
+        passed: Math.abs(sp.base.levelised_per_unit_gbp - storedLev) <= Math.max(0.1, storedLev * 0.02),
+        detail: `scenario £${sp.base.levelised_per_unit_gbp} vs stored £${storedLev}` })
+    }
+  } catch { /* economics absent on this snapshot — skip */ }
+  return out
+}
+
 function checkSnapshot(snapshotPath: string): SnapshotResult {
   const assertions: Assertion[] = []
   if (!existsSync(snapshotPath)) {
@@ -2142,6 +2217,10 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   }
   const state = JSON.parse(readFileSync(snapshotPath, 'utf-8'))
   const productClass: string = state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? ''
+
+  // Scenario-planning invariants (Section 9b) — fixture checks run once, plus a
+  // per-snapshot base-reproduction check when economics are present.
+  assertions.push(...checkScenarioInvariants(state))
 
   // I1. Renderer + PDF size
   const renderResult = runRenderer(snapshotPath)

@@ -49,6 +49,7 @@ import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { MATERIAL_RATE_GBP_PER_KG, FABRICATION_FACTOR } from './lib/cost/process-equipment-cost'
+import { EconomicsScenariosPage } from './lib/render-scenarios-section'
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
 
@@ -4550,6 +4551,7 @@ function TableOfContentsPage({ state, project }: { state: any; project: string }
       { num: '7', title: 'Risk & Integration' },
       { num: '8', title: 'Bill of Materials' },
       { num: '9', title: 'Cost Methodology' },
+      { num: '9b', title: 'Economics & Scenarios' },
       { num: '10', title: 'Sourcing & Suppliers' },
       { num: '11', title: 'Regulatory & Compliance' },
       { num: '12', title: 'Taking this forward' },
@@ -14874,6 +14876,14 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           or price invented (gate-20 safety line). */}
       <MasterBillOfMaterialsPage state={state} project={project} bomTotals={bomTotals} partLinkMap={partLinkMap} />
       <CostBasisAssumptionsPage state={state} project={project} />
+      {/* Section 9b · Economics & Scenarios (2026-06-07): deterministic
+          scenario/sensitivity analysis over EXOGENOUS economic assumptions
+          (prices, utilisation, cost of capital, capex via a BoM-floored
+          FOAK→NOAK learning curve). Base reproduces the dossier economics;
+          scenarios + tornado + base→NOAK waterfall + goal-seek "what would it
+          take". Physical levers excluded (they change the BoM). Computes from
+          state if state.scenarioPlanning is absent; returns null if no economics. */}
+      <EconomicsScenariosPage state={state} project={project} PageHeader={PageHeader} PageFooter={PageFooter} pageStyle={PAGE_STYLE} sectionLabel="Section 9b · Economics & Scenarios" />
       <SuppliersPage state={state} project={project} />
       <CompliancePage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       {/* Section 12 · Taking this forward (2026-06-05 founder-facing reframe,
