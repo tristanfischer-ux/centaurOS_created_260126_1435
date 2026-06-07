@@ -166,9 +166,7 @@ function Tornado({ sp }: { sp: ScenarioPlanning }) {
       <View style={{ flexDirection: 'row', marginTop: 1 }}>
         <View style={{ width: cName + cRange }} />
         <View style={{ width: BARW, height: 9, position: 'relative' }}>
-          <Text style={{ position: 'absolute', left: 0, top: 0, fontSize: 6, color: MUTED }}>{tick(axMin)}</Text>
-          <Text style={{ position: 'absolute', left: Math.max(0, Math.min(BARW - 18, baseX - 7)), top: 0, fontSize: 6, color: MUTED }}>base</Text>
-          <Text style={{ position: 'absolute', right: 0, top: 0, fontSize: 6, color: INK }}>{tick(axMax)}</Text>
+          <Text style={{ position: 'absolute', left: 0, top: 0, fontSize: 6, color: MUTED }}>{tick(axMin)}</Text>          <Text style={{ position: 'absolute', right: 0, top: 0, fontSize: 6, color: INK }}>{tick(axMax)}</Text>
         </View>
         <View style={{ width: cNpv }} />
       </View>
@@ -217,9 +215,7 @@ function Waterfall({ sp }: { sp: ScenarioPlanning }) {
       <View style={{ flexDirection: 'row', marginTop: 1 }}>
         <View style={{ width: cName + cChange }} />
         <View style={{ width: BARW, height: 9, position: 'relative' }}>
-          <Text style={{ position: 'absolute', left: 0, top: 0, fontSize: 6, color: MUTED }}>{tick(axMin)}</Text>
-          <Text style={{ position: 'absolute', left: Math.max(0, Math.min(BARW - 18, baseX - 7)), top: 0, fontSize: 6, color: MUTED }}>base</Text>
-          <Text style={{ position: 'absolute', right: 0, top: 0, fontSize: 6, color: INK }}>{tick(axMax)}</Text>
+          <Text style={{ position: 'absolute', left: 0, top: 0, fontSize: 6, color: MUTED }}>{tick(axMin)}</Text>          <Text style={{ position: 'absolute', right: 0, top: 0, fontSize: 6, color: INK }}>{tick(axMax)}</Text>
         </View>
         <View style={{ width: cNpv }} />
       </View>
