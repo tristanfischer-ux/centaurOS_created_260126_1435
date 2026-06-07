@@ -2101,6 +2101,49 @@ Return the corrected JSON.`
   return { design: parsed, summary: after, latency_ms: result.latency_ms }
 }
 
+/**
+ * Deterministic deduplication of SINGULAR_MOD_KINDS modifier duplicates.
+ *
+ * Problem: Phase-2 sometimes adds a second `dimension` (or `rating` /
+ * `regulatory_standard`) modifier on top of the emitter's rounded one —
+ * e.g. thermal_oxidiser_word ends up with both "0.4 m stack dia" AND
+ * "0.4142 m stack dia × 2.0209 m³ chamber". The consistency resolver then
+ * surfaces that as a design decision → gates_passed=false, intermittently.
+ *
+ * Fix: for every module → sub_module → word, collapse modifier_characters
+ * whose `kind` is in SINGULAR_MOD_KINDS to the FIRST occurrence per kind
+ * (the emitter's rounded value is the canonical, display-clean form).
+ *
+ * Mutates modules in place. Pure — does not touch carbon / cost / yield.
+ *
+ * @returns count of duplicate modifiers removed
+ */
+function dedupeSingularModifiers(modules: any[]): number {
+  const SINGULAR_MOD_KINDS = new Set(['dimension', 'rating', 'regulatory_standard'])
+  let removed = 0
+  for (const mod of modules) {
+    for (const sub of (mod.sub_modules ?? [])) {
+      for (const word of (sub.words ?? [])) {
+        const seen = new Map<string, number>()   // kind → index of first occurrence
+        const keep: any[] = []
+        for (const mc of (word.modifier_characters ?? [])) {
+          const kind: string = mc.kind ?? ''
+          if (!SINGULAR_MOD_KINDS.has(kind)) {
+            keep.push(mc)
+          } else if (!seen.has(kind)) {
+            seen.set(kind, keep.length)
+            keep.push(mc)
+          } else {
+            removed++
+          }
+        }
+        word.modifier_characters = keep
+      }
+    }
+  }
+  return removed
+}
+
 async function main() {
   const args = process.argv.slice(2)
   if (args.length < 2) {
@@ -4760,6 +4803,8 @@ async function main() {
   const tDecisions = Date.now()
   let designDecisions: DesignDecision[] = []
   try {
+    const dedupeCount = dedupeSingularModifiers(design.modules ?? [])
+    if (dedupeCount > 0) console.error(`[chain] dedupe singular modifiers: removed ${dedupeCount} duplicate dimension/rating/standard modifier(s) pre-resolution`)
     designDecisions = await resolveDesignDecisions(design.modules ?? [], currentBriefText, apiKey)
     if (designDecisions.length > 0) {
       console.error(`[chain] design decisions: ${designDecisions.length} unresolved conflict${designDecisions.length === 1 ? '' : 's'} surfaced for human review`)

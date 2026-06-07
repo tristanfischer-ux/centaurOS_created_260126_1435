@@ -492,6 +492,21 @@ function checkSizingToolsWorkedSound(): Assertion[] {
         && num(asf, 'wax_residue_frac') >= 0 && num(asf, 'wax_residue_frac') <= 1,
       () => `error=${asf?.error} | jet=${asf?.jet_selectivity_frac} naphtha=${asf?.naphtha_selectivity_frac} wax=${asf?.wax_residue_frac}`,
     ))
+    // cantera RWGS (added 2026-06-07). The reverse water-gas shift (CO2 + H2 <-> CO
+    // + H2O) is wired into the e_fuel plan via cantera:thermochemistry (GRI30 HP-
+    // equilibrium). Guard: the tool must PRODUCE CO (RWGS proceeds) for the synthesis
+    // feed — and cantera_run.py must keep CO/CO2 in its reported species (it silently
+    // dropped CO before 2026-06-07, so the e_fuel RWGS quantity would have been empty).
+    const rwgs = runTool('cantera_run.py', { mode: 'equilibrium', mechanism: 'gri30.yaml', composition: 'CO2:1, H2:3', t_in_k: 573.15, p_pa: 2_500_000 })
+    out.push(assertEq(
+      'UNIVERSAL.cantera_rwgs_equilibrium_produces_co',
+      'cantera:thermochemistry RWGS (CO2 + 3 H2 @ 573 K / 25 bar, GRI30) yields CO + H2O (the reverse water-gas shift proceeds; CO is reported, not dropped from the species list)',
+      JSON.stringify({ co: rwgs?.final_composition_mole_fractions?.CO, h2o: rwgs?.final_composition_mole_fractions?.H2O, err: rwgs?.error }),
+      () => !rwgs?.error
+        && Number(rwgs?.final_composition_mole_fractions?.CO) > 0
+        && Number(rwgs?.final_composition_mole_fractions?.H2O) > 0,
+      () => `error=${rwgs?.error} | CO=${rwgs?.final_composition_mole_fractions?.CO} H2O=${rwgs?.final_composition_mole_fractions?.H2O}`,
+    ))
   } catch (err) {
     // .venv python unavailable — skip (vacuous pass), do not fail the harness.
     for (const id of ['reactor', 'absorber', 'crystalliser', 'dryer']) {

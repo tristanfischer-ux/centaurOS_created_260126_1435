@@ -45,7 +45,7 @@ def compute(payload: dict) -> dict:
             "equilibrium_pressure_bar": round(gas.P / 1e5, 4),
             "final_composition_mole_fractions": {
                 species: round(float(gas.X[gas.species_index(species)]), 4)
-                for species in ["H2O", "H2", "O2", "OH", "H", "O", "N2"]
+                for species in ["H2O", "H2", "CO", "CO2", "CH4", "O2", "OH", "H", "O", "N2"]
                 if species in gas.species_names
             },
         }

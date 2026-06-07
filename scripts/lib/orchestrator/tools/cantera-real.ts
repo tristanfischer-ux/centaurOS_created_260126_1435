@@ -49,7 +49,7 @@ export const canteraReal: Tool<CanteraInput, CanteraOutput> = {
   domain: 'biochemistry',
   pinned_environment: { python: '3.14.4', cantera: '3.2.0' },
   applicable_to(envelope) {
-    return ['bioreactor', 'heat_pump_residential'].includes(envelope.class)
+    return ['bioreactor', 'heat_pump_residential', 'e_fuel_synthesis'].includes(envelope.class)
   },
   async invoke(input): Promise<ToolResult<CanteraOutput>> {
     const t0 = Date.now()

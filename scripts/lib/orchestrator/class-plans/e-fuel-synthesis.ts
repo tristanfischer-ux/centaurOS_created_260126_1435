@@ -573,6 +573,46 @@ const stepThermalOxidiser: ToolStep = {
 }
 
 // ===========================================================================
+// 14c. cantera:thermochemistry — RWGS EQUILIBRIUM (additive, required:false).
+//
+//  WHY: the reverse water-gas shift reaction (CO2 + H2 ⇌ CO + H2O) is a
+//  competing side-reaction in the FT reactor. Knowing the equilibrium CO and
+//  H2O mole fractions at feed conditions (300 °C / 25 bar) provides a
+//  first-principles bound on CO slip and water production that can be compared
+//  against the 3-phase flash-separator wet-gas composition. This step is PURELY
+//  ADDITIVE — it writes two new quantities (rwgs_equilibrium_co_mol_frac and
+//  rwgs_equilibrium_h2o_mol_frac) and overrides NO existing quantity.
+//
+//  GRI30 mechanism: validated for CO/CO2/H2/H2O equilibria (NIST-calibrated).
+//  RWGS equilibrium mole fractions at 573.15 K / 25 bar:
+//    CO   ≈ 0.0881
+//    H2O  ≈ 0.3297
+//  (from standalone test 2026-06-07 — CO present, confirming RWGS does proceed)
+// ===========================================================================
+const stepRwgsEquilibrium: ToolStep = {
+  tool_id: 'cantera:thermochemistry',
+  required: false,
+  feeds_into: [] as string[],
+  input_from_contract: (c: ContractInProgress) => ({
+    mode: 'equilibrium',
+    mechanism: 'gri30.yaml',
+    composition: 'CO2:1, H2:3',
+    t_in_k: q(c, 'reactor_temp_c', 300) + 273.15,
+    p_pa: q(c, 'reactor_pressure_bar', 25) * 1e5,
+  }),
+  contract_update: (c: ContractInProgress, output: any) => {
+    const molfrac = output?.final_composition_mole_fractions ?? {}
+    const p = provFor('cantera:thermochemistry', '3.2.0', 'BSD-3-Clause', 'github.com/Cantera/cantera')
+    return { ...c, quantities: { ...c.quantities,
+      // ADDITIVE — CO and H2O equilibrium mole fracs from GRI30 RWGS at feed conditions.
+      // Overrides NO existing quantity; used for informational / audit comparison only.
+      rwgs_equilibrium_co_mol_frac:  mkQty(molfrac['CO']  ?? 0, '', 'dimensionless', p('final_composition_mole_fractions.CO'),  'RWGS equilibrium CO mole fraction at feed T/P (GRI30 HP-equilibrium)'),
+      rwgs_equilibrium_h2o_mol_frac: mkQty(molfrac['H2O'] ?? 0, '', 'dimensionless', p('final_composition_mole_fractions.H2O'), 'RWGS equilibrium H2O mole fraction at feed T/P (GRI30 HP-equilibrium)'),
+    } }
+  },
+}
+
+// ===========================================================================
 // 14b. process:asf-chain-growth — ASF SELECTIVITY (calibrated, transparent).
 //
 //  WHY: the emitter previously hardcoded jet_selectivity_frac = 0.60 (implicit
@@ -727,11 +767,15 @@ const stepYieldEconomics: ToolStep = {
     const h2Opex = q(c, 'h2_feed_kg_h', 140) * hours * h2PriceGbpKg
     const elecOpex = elecLoadKw * hours * elecPriceGbpKwh
     const co2Opex = (q(c, 'co2_feed_kg_h', 1000) / 1000) * hours * co2PriceGbpT
-    const fixedOpex = capex * 0.04                               // labour + maintenance + iron-catalyst replacement (~4% capex/yr)
+    // £45M is the brief not-to-exceed ceiling; the levelised cost amortises the
+    // engineering FOAK INSTALLED build (~£25M, matching the achieved
+    // installed_asp_gbp ≈ £25.19M). Using the ceiling overstates £/kg.
+    const capexInstalled = q(c, 'plant_capex_installed_gbp', 25_000_000)
+    const fixedOpex = capexInstalled * 0.04                      // labour + maintenance + iron-catalyst replacement (~4% capex/yr)
     const opexGbpYr = Math.round(h2Opex + elecOpex + co2Opex + fixedOpex)
     return {
       annual_yield_kg: q(c, 'saf_output_tonnes_yr', 1000) * 1000,   // SAF kg/yr
-      capex_gbp: capex,
+      capex_gbp: capexInstalled,                          // FOAK installed build cost (NOT the brief £45M ceiling)
       opex_gbp_year: opexGbpYr,                    // explicit H2 + electricity + CO2 + fixed O&M (was capex×8%)
       market_price_gbp_kg: 2.2,                    // ~£2,200/t SAF target (NOAK aspiration)
       discount_rate_pct: 10,
@@ -948,7 +992,8 @@ export const E_FUEL_SYNTHESIS_PLAN: ClassToolPlan = {
     stepProductPump,                // 11 liquid product / reflux pumps (process, NOT irrigation)
     stepFractionationColumnVessel,  // 12 fractionation column shell (mode:internal)
     stepStorageTank,                // 13 SAF + naphtha product tanks (API 650)
-    stepThermalOxidiser,            // 14 purge thermal oxidiser
+    stepThermalOxidiser,            // 14  purge thermal oxidiser
+    stepRwgsEquilibrium,            // 14c RWGS equilibrium CO/H2O at feed conditions (additive, required:false)
     stepAsfChainGrowth,             // 14b ASF jet/naphtha selectivity (calibrated alpha=0.92)
     stepLifecycle,                  // 15 cradle-to-grave plant carbon
     stepYieldEconomics,             // 17 SAF NPV / IRR / levelised cost
