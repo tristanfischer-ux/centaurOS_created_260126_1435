@@ -304,7 +304,7 @@ export interface GoalSeekItem {
   feasible: boolean
   reason?: string
 }
-export interface WaterfallStep { label: string; from_npv: number; to_npv: number; delta_npv: number }
+export interface WaterfallStep { label: string; from_npv: number; to_npv: number; delta_npv: number; from_value: number; to_value: number; unit: string }
 export interface ScenarioPlanning {
   output_unit_label: string
   levelised_unit_label: string
@@ -452,7 +452,7 @@ export function computeScenarioPlanning(
       if (target === undefined || !lev) continue
       lev.set(s, target as number)
       const now = dcf(resolve(m, s)).npv_gbp
-      waterfall.push({ label: lev.label, from_npv: prev, to_npv: now, delta_npv: now - prev })
+      waterfall.push({ label: lev.label, from_npv: prev, to_npv: now, delta_npv: now - prev, from_value: lev.base, to_value: target as number, unit: lev.unit })
       prev = now
     }
   }

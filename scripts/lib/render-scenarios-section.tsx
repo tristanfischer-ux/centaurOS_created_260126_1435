@@ -29,6 +29,22 @@ function gbpM(v: number): string {
   const s = Math.abs(m) >= 100 ? m.toFixed(0) : m.toFixed(1)
   return `${v < 0 ? '-' : ''}£${s.replace('-', '')}M`
 }
+/** Format a single lever value with its unit (capex in £M; prices keep their unit). */
+function fmtLeverVal(v: number, unit: string): string {
+  if (unit === '£') return `£${Math.round(v / 1e6)}M`
+  if (unit === '%') return `${Math.round(v * 10) / 10}%`
+  if (unit === 'h/yr') return `${Math.round(v).toLocaleString('en-GB')} h`
+  if (unit.startsWith('£')) return `£${v}${unit.slice(1)}`
+  return `${v} ${unit}`
+}
+/** Format a low-to-high range with one unit suffix (e.g. "£1.4-£5.9/kg", "£18-£30M"). */
+function fmtRange(lo: number, hi: number, unit: string): string {
+  if (unit === '£') return `£${Math.round(lo / 1e6)}-£${Math.round(hi / 1e6)}M`
+  if (unit === '%') return `${Math.round(lo * 10) / 10}-${Math.round(hi * 10) / 10}%`
+  if (unit === 'h/yr') return `${Math.round(lo).toLocaleString('en-GB')}-${Math.round(hi).toLocaleString('en-GB')} h`
+  if (unit.startsWith('£')) return `£${lo}-£${hi}${unit.slice(1)}`
+  return `${lo}-${hi} ${unit}`
+}
 function leverValueDisplay(scn: ScenarioResult, t: TornadoItem): string {
   const lv = scn.lever_values
   const key = t.lever_id === 'capex' ? 'capex'
@@ -108,31 +124,32 @@ function ScenarioMatrix({ sp }: { sp: ScenarioPlanning }) {
 
 function Tornado({ sp }: { sp: ScenarioPlanning }) {
   const items = sp.tornado.filter((t) => t.delta_npv_abs > 0).slice(0, 7)
-  const all: number[] = [sp.base.npv_gbp]
-  for (const t of items) { all.push(t.npv_pessimistic, t.npv_optimistic) }
-  const lo = Math.min(...all)
-  const hi = Math.max(...all)
-  const W = 250
-  const x = (v: number) => (hi === lo ? 0 : ((v - lo) / (hi - lo)) * W)
-  const baseX = x(sp.base.npv_gbp)
+  const maxSwing = Math.max(1, ...items.map((t) => t.delta_npv_abs))
+  const barW = 88
+  const cName = 146, cBase = 60, cRange = 104, cSwing = 52
   return (
     <View style={{ marginBottom: 14 }} wrap={false}>
       <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>What moves the economics</Text>
-      <Text style={{ fontSize: 8, color: MUTED, marginBottom: 7 }}>NPV swing as each assumption moves across its plausible range (others held at base). Dashed line = base case.</Text>
+      <Text style={{ fontSize: 8, color: MUTED, marginBottom: 6 }}>Each assumption is moved on its own from its base value across the range shown (everything else held at base); the bar is the resulting swing in NPV.</Text>
+      <View style={{ flexDirection: 'row', borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT, paddingBottom: 2, marginBottom: 3 }}>
+        <Text style={{ width: cName, fontSize: 7, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4 }}>Assumption</Text>
+        <Text style={{ width: cBase, fontSize: 7, color: MUTED, textAlign: 'right' }}>Base</Text>
+        <Text style={{ width: cRange, fontSize: 7, color: MUTED, textAlign: 'right', paddingRight: 8 }}>Range tested</Text>
+        <Text style={{ width: barW, fontSize: 7, color: MUTED }}> </Text>
+        <Text style={{ width: cSwing, fontSize: 7, color: MUTED, textAlign: 'right' }}>NPV swing</Text>
+      </View>
       {items.map((t) => {
-        const left = Math.min(x(t.npv_pessimistic), x(t.npv_optimistic))
-        const width = Math.max(2, Math.abs(x(t.npv_optimistic) - x(t.npv_pessimistic)))
-        const optRight = x(t.npv_optimistic) >= x(t.npv_pessimistic)
+        const lo = Math.min(t.pessimistic_value, t.optimistic_value)
+        const hi = Math.max(t.pessimistic_value, t.optimistic_value)
         return (
-          <View key={t.lever_id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-            <Text style={{ width: 118, fontSize: 8, color: INK, textAlign: 'right', paddingRight: 6 }}>{t.label}</Text>
-            <View style={{ width: W, height: 11, position: 'relative' }}>
-              {/* base reference line */}
-              <View style={{ position: 'absolute', left: baseX, top: -1, width: 0.8, height: 13, backgroundColor: MUTED }} />
-              {/* range bar: red (worse) to green (better) split at base */}
-              <View style={{ position: 'absolute', left, width, height: 9, top: 1, backgroundColor: optRight ? GOOD : BAD, opacity: 0.32, borderRadius: 1 }} />
+          <View key={t.lever_id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3.5 }}>
+            <Text style={{ width: cName, fontSize: 8.5, color: INK }}>{t.label}</Text>
+            <Text style={{ width: cBase, fontSize: 8, color: MUTED, textAlign: 'right' }}>{fmtLeverVal(t.base_value, t.unit)}</Text>
+            <Text style={{ width: cRange, fontSize: 8, color: INK, textAlign: 'right', paddingRight: 8 }}>{fmtRange(lo, hi, t.unit)}</Text>
+            <View style={{ width: barW, height: 8, justifyContent: 'center' }}>
+              <View style={{ width: Math.max(2, (t.delta_npv_abs / maxSwing) * barW), height: 8, backgroundColor: ACCENT_SOFT, opacity: 0.4, borderRadius: 1 }} />
             </View>
-            <Text style={{ width: 56, fontSize: 7.5, color: MUTED, paddingLeft: 6 }}>±{gbpM(t.delta_npv_abs)}</Text>
+            <Text style={{ width: cSwing, fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK, textAlign: 'right' }}>±{gbpM(t.delta_npv_abs)}</Text>
           </View>
         )
       })}
@@ -144,21 +161,28 @@ function Waterfall({ sp }: { sp: ScenarioPlanning }) {
   if (!sp.waterfall.length) return null
   const noak = sp.scenarios.find((s) => s.id === 'noak')
   const maxAbs = Math.max(1, ...sp.waterfall.map((w) => Math.abs(w.delta_npv)))
-  const W = 150
   return (
     <View style={{ marginBottom: 12 }} wrap={false}>
       <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>Bridge: base to {noak?.label ?? 'NOAK'}</Text>
       <Text style={{ fontSize: 8, color: MUTED, marginBottom: 7 }}>How each assumption change adds to NPV from the FOAK base ({gbpM(sp.base.npv_gbp)}) to {gbpM(noak?.npv_gbp ?? 0)}.</Text>
+      <View style={{ flexDirection: 'row', borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT, paddingBottom: 2, marginBottom: 3 }}>
+        <Text style={{ width: 118, fontSize: 7, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4 }}>Assumption</Text>
+        <Text style={{ width: 104, fontSize: 7, color: MUTED, textAlign: 'right', paddingRight: 8 }}>Change (base to NOAK)</Text>
+        <Text style={{ width: 96, fontSize: 7, color: MUTED }}> </Text>
+        <Text style={{ width: 50, fontSize: 7, color: MUTED, textAlign: 'right', paddingRight: 6 }}>NPV add</Text>
+        <Text style={{ width: 48, fontSize: 7, color: MUTED, textAlign: 'right' }}>Running</Text>
+      </View>
       {sp.waterfall.map((w, i) => {
         const up = w.delta_npv >= 0
         return (
           <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
-            <Text style={{ width: 130, fontSize: 8, color: INK, textAlign: 'right', paddingRight: 6 }}>{w.label}</Text>
-            <View style={{ width: W, height: 9, justifyContent: 'center' }}>
-              <View style={{ width: Math.max(2, (Math.abs(w.delta_npv) / maxAbs) * W), height: 9, backgroundColor: up ? GOOD : BAD, opacity: 0.55, borderRadius: 1 }} />
+            <Text style={{ width: 118, fontSize: 8, color: INK }}>{w.label}</Text>
+            <Text style={{ width: 104, fontSize: 7.5, color: INK, textAlign: 'right', paddingRight: 8 }}>{fmtLeverVal(w.from_value, w.unit)} to {fmtLeverVal(w.to_value, w.unit)}</Text>
+            <View style={{ width: 96, height: 8, justifyContent: 'center' }}>
+              <View style={{ width: Math.max(2, (Math.abs(w.delta_npv) / maxAbs) * 96), height: 8, backgroundColor: up ? GOOD : BAD, opacity: 0.55, borderRadius: 1 }} />
             </View>
-            <Text style={{ width: 60, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: up ? GOOD : BAD, paddingLeft: 6 }}>{up ? '+' : '-'}{gbpM(Math.abs(w.delta_npv)).replace('-', '')}</Text>
-            <Text style={{ width: 52, fontSize: 7.5, color: MUTED }}>to {gbpM(w.to_npv)}</Text>
+            <Text style={{ width: 50, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: up ? GOOD : BAD, textAlign: 'right', paddingRight: 6 }}>{up ? '+' : '-'}{gbpM(Math.abs(w.delta_npv)).replace('-', '')}</Text>
+            <Text style={{ width: 48, fontSize: 7.5, color: MUTED, textAlign: 'right' }}>{gbpM(w.to_npv)}</Text>
           </View>
         )
       })}
