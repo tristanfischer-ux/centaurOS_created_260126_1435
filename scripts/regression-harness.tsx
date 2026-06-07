@@ -6123,6 +6123,41 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
           realRecHigh, (n) => n >= 1, (n) => `expected >= 1 HIGH on two conflicting recommendations, got ${n} — the fix is over-masking`,
         ))
 
+        // ── gate-18 STREAM-SIGNATURE sentence-boundary clamp (2026-06-07 coding
+        // council fix: grok-4.3 + glm-5.1 + gemini-3.1-pro). Two ADJACENT
+        // compressors with DIFFERENT feed gases (CO2 73 kW, H2 140 kW) must NOT
+        // cluster. The CO2 number's wide window bled past "…certified to API 618.
+        // A Howden …hydrogen-service…" and grabbed the NEXT component's "hydrogen",
+        // so both stream signatures became "hydrogen" → false 62.9% HIGH (blocked
+        // e_fuel v19). sentenceAroundMarker now clamps the signature scan to the
+        // number's own sentence. Council REJECTED a before-only bias + a capacity
+        // discriminator (both risked false-negatives); the clamp only NARROWS, so a
+        // genuine same-compressor contradiction still fires. Both directions locked:
+        // Anchor on "shaft power" so both occurrences cluster via the anchor path
+        // (free-prose POWER without an anchor does not fallback-cluster in a clean
+        // synthetic PDF). The anchor key folds in the SAME streamSeg from
+        // streamProductSignatureOf, so this faithfully exercises the clamp.
+        const fpCompressorStream = mkPdf('fp-compressor', [
+          'Feedstock Conditioning\nA multistage CO2 feed compressor (part API 618 reciprocating process compressor), 1000 kg/h capacity, rated shaft power 73 kW, operating over -15 to +35 C ambient, certified to API 618. A Howden multistage hydrogen-service diaphragm compressor handles the hydrogen feed.',
+          'Hydrogen Supply\nThe multistage hydrogen feed compressor (part API 618 hydrogen-service compressor), 140 kg/h capacity, rated shaft power 140 kW, operating over -15 to +35 C ambient, certified to API 618.',
+        ])
+        const realCompressorConflict = mkPdf('real-compressor', [
+          'Feedstock Conditioning\nA multistage CO2 feed compressor (part API 618 reciprocating process compressor), 1000 kg/h capacity, rated shaft power 73 kW, operating over -15 to +35 C ambient.',
+          'Power Summary\nThe multistage CO2 feed compressor (part API 618 reciprocating process compressor), 1000 kg/h capacity, rated shaft power 95 kW, operating over -15 to +35 C ambient.',
+        ])
+        const fpCompressorHigh = highCount(fpCompressorStream)
+        const realCompressorHigh = highCount(realCompressorConflict)
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_adjacent_different_stream_compressors_not_flagged',
+          'gate 18: two ADJACENT compressors with different feed gases (CO2 73 kW / H2 140 kW) produce 0 HIGH — the streamProductSignatureOf sentence-boundary clamp stops the CO2 number grabbing the next component’s "hydrogen" (2026-06-07 council fix)',
+          fpCompressorHigh, (n) => n === 0, (n) => `${n} HIGH on CO2-vs-H2 compressor power — sentenceAroundMarker has regressed (the wide window is bleeding across the component boundary again)`,
+        ))
+        assertions.push(assertEq(
+          'UNIVERSAL.gate18_genuine_same_compressor_contradiction_still_fires',
+          'gate 18: the SAME compressor (CO2 feed) quoted at 73 kW then 95 kW across pages still fires >= 1 HIGH — the boundary clamp must not mask a real same-component contradiction',
+          realCompressorHigh, (n) => n >= 1, (n) => `expected >= 1 HIGH on a genuine same-compressor power contradiction, got ${n} — the clamp is over-masking (false-negative)`,
+        ))
+
         // ── gate-18 FIELD-ANCHORED clustering (2026-06-03 co2-mineralisation) ──
         // A tool-output sentence packs many DISTINCT quantities into one run-on
         // "<field_name> = <value>, <field_name> = <value>, …" clause. Every value

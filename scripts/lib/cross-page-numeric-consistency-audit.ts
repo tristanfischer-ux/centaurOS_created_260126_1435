@@ -569,8 +569,43 @@ const PRODUCT_STREAM_REGEX = new RegExp(`\\b(${PRODUCT_STREAM_TOKENS.join('|')})
  * cluster → a genuine same-product contradiction still fires HIGH. Only ever
  * SPLITS. Used by MASS and POWER (both routinely carry per-product/per-stream
  * scalars in process-plant dossiers). */
+/** Clamp a wide window to the SENTENCE containing the number marker ('\f') so a
+ * per-occurrence noun signature cannot bleed across a component boundary into the
+ * NEXT/PREVIOUS BoM line's nouns. Coding-council verdict 2026-06-07 (grok-4.3 +
+ * glm-5.1 + gemini-3.1-pro, unanimous) — the root cause of the CO2-vs-H2 feed-
+ * compressor false-cluster: the ±wide window bled past "…rated 73 kW, … certified
+ * to API 618. A Howden … hydrogen-service …" so the CO2 number grabbed the NEXT
+ * component's "hydrogen" (nearer the number than its own "co2"). The council
+ * REJECTED a before-only bias (false-negatives — noun order is not uniform across
+ * pages) AND folding the capacity value into the key (never fold an audited value).
+ * Boundary = a sentence terminator (period / semicolon) FOLLOWED BY whitespace:
+ * this excludes decimals ("2.8 m" is digit-dot-digit, no space after the dot) and
+ * mid-spec parens ("capacity), rated"). The wide window already has newlines
+ * collapsed to spaces, so ". " / "; " are the only surviving sentence boundaries.
+ * Returns the window unchanged when no boundary is found on a side. Only ever
+ * NARROWS the scan → can REMOVE a false cluster, never hide a real contradiction
+ * (a genuine same-component contradiction keeps its noun in the same sentence). */
+export function sentenceAroundMarker(w: string): string {
+  const marker = w.indexOf('\f')
+  if (marker < 0) return w
+  const before = w.slice(0, marker)
+  let startIdx = 0
+  const beforeBoundaries = [...before.matchAll(/[.;]\s/g)]
+  if (beforeBoundaries.length) {
+    const last = beforeBoundaries[beforeBoundaries.length - 1]
+    startIdx = (last.index ?? 0) + last[0].length
+  }
+  const after = w.slice(marker + 1)
+  const afterMatch = after.match(/[.;]\s/)
+  const endIdx = afterMatch && afterMatch.index != null ? marker + 1 + afterMatch.index : w.length
+  return w.slice(startIdx, endIdx)
+}
+
 export function streamProductSignatureOf(occ: { wideWindow: string }): string {
-  const w = occ.wideWindow // lowercased + whitespace-collapsed, number marked '\f'
+  // BOUNDARY-AWARE (2026-06-07): scan only the sentence containing the number so
+  // the nearest product/stream noun is THIS component's, not the next BoM line's.
+  // See sentenceAroundMarker above for the coding-council root-cause + rationale.
+  const w = sentenceAroundMarker(occ.wideWindow) // number still marked '\f'
   const marker = w.indexOf('\f')
   const numPos = marker >= 0 ? marker : Math.floor(w.length / 2)
   let product = ''
