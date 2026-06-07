@@ -34,6 +34,7 @@ import { computeImprovementPlan } from '../src/lib/pdf-engine-v2/lib/auto-improv
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { buildSourcingStrategyFromState, deriveSourcingArchetypesFromState, countPinnedManufacturers, buildMainContractorRecommendation, buildSubcontractorScopes } from '../src/lib/pdf-engine-v2/lib/sourcing-strategy'
 import type { AdvisorModuleBlock, AdvisorCard } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
+import { buildSourcingBriefs, type SourcingBriefs, type ModuleSourcingBrief } from '../src/lib/pdf-engine-v2/lib/sourcing-brief'
 import { checkMacroMaterialRate, inferMacroMaterial, getMaterialPrice } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import {
   MARKET_BANDS,
@@ -4332,6 +4333,125 @@ function TakingForwardPage({ state, project }: { state: any; project: string }) 
   } catch { return null }
 }
 
+// ─── Section 13 · per-module "Specialists & sourcing" brief (2026-06-07) ────────
+//
+// The Fractional Forge model is a free lead magnet -> paid sourcing funnel
+// (validated by the customer + a headhunter partner): the dossier is free, the
+// revenue is the vetted INTRODUCTION to the right people + suppliers it routes to.
+// So each module carries, BELOW its advisor cards, a "Specialists & sourcing" brief
+// that tells the reader (a) the kind of EXPERT to source — the specific credentials
+// that matter, how senior, and how RARE — and (b) the kind of SUPPLIER to source —
+// the equipment TYPE + key engineering spec — and OFFERS to source both, WITHOUT
+// naming the specific people or printing brand / part-number (the paid step is the
+// vetted intro; the paid named bill of materials carries the real part numbers).
+//
+// Data comes from src/lib/pdf-engine-v2/lib/sourcing-brief.ts (pure, deterministic,
+// brand-stripped). LIGHT MODE, inline styles, British spelling, ASCII-only (the
+// derivation already strips non-WinAnsi glyphs; the renderer also runs
+// normalise_unicode). Each block is try/catch-guarded by its caller. ADDITIVE: it
+// touches no BoM table, cost stack, master bill of materials, or any gate/audit.
+
+// A single house call-to-action pill (neutral tint + accent left-rule, matching the
+// dossier's restrained idiom — NOT a saturated button). ASCII arrow style avoided.
+function SourcingCta({ label, sub }: { label: string; sub: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#f7f8fa', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 3, paddingVertical: 7, paddingHorizontal: 11, marginBottom: 6 }} wrap={false}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: ACCENT, lineHeight: 1.35 }}>
+          {britishise(normalise_unicode(label))}
+        </Text>
+        <Text style={{ fontSize: 8, color: MUTED, lineHeight: 1.4, marginTop: 1 }}>
+          {britishise(normalise_unicode(sub))}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+// The per-module "Specialists & sourcing" brief: the specialist sourcing briefs
+// (role + credentials + seniority + scarcity), then the supplier sourcing lines
+// (type + spec, brand-free). Growing content -> minPresenceAhead (NOT wrap={false})
+// to stay gate-11 (layout-overlap) safe; each row is itself wrap={false}.
+function ModuleSourcingBrief({ brief }: { brief: ModuleSourcingBrief }) {
+  try {
+    const specialists = Array.isArray(brief?.specialists) ? brief.specialists : []
+    const suppliers = Array.isArray(brief?.suppliers) ? brief.suppliers : []
+    if (specialists.length === 0 && suppliers.length === 0) return null
+    return (
+      <View style={{ marginTop: 12 }} minPresenceAhead={28}>
+        <View style={{ height: 0.6, backgroundColor: RULE_SOFT, marginBottom: 7 }} />
+        <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.7, marginBottom: 4 }}>
+          SPECIALISTS &amp; SOURCING FOR THIS MODULE
+        </Text>
+
+        {/* The experts to source */}
+        {specialists.length > 0 ? (
+          <View style={{ marginBottom: suppliers.length > 0 ? 9 : 2 }}>
+            <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK_SOFT, marginBottom: 3 }}>
+              The expert{specialists.length > 1 ? 's' : ''} to source
+            </Text>
+            {specialists.map((s, si) => (
+              <View key={`src-spec-${si}`} style={{ paddingVertical: 4, borderTopWidth: 0.5, borderTopColor: RULE_SOFT }} wrap={false}>
+                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35 }}>
+                  {britishise(normalise_unicode(String(s?.role ?? '')))}
+                </Text>
+                {s?.credentials ? (
+                  <Text style={{ fontSize: 8, color: INK_SOFT, lineHeight: 1.4, marginTop: 1.5 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Look for: </Text>
+                    {britishise(normalise_unicode(String(s.credentials)))}
+                  </Text>
+                ) : null}
+                {s?.seniority ? (
+                  <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.35, marginTop: 1.5 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Seniority: </Text>
+                    {britishise(normalise_unicode(String(s.seniority)))}
+                  </Text>
+                ) : null}
+                {s?.scarcity ? (
+                  <Text style={{ fontSize: 7.5, color: MUTED, fontFamily: 'Helvetica-Oblique', lineHeight: 1.35, marginTop: 1.5 }}>
+                    <Text style={{ fontFamily: 'Helvetica-BoldOblique', color: INK_SOFT }}>How rare: </Text>
+                    {britishise(normalise_unicode(String(s.scarcity)))}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* The suppliers to source — type + spec, brand-free */}
+        {suppliers.length > 0 ? (
+          <View style={{ marginBottom: 2 }}>
+            <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK_SOFT, marginBottom: 3 }}>
+              The supplier{suppliers.length > 1 ? 's' : ''} to source
+            </Text>
+            {/* Column header */}
+            <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: RULE_SOFT, paddingBottom: 2, marginBottom: 1 }}>
+              <Text style={{ flex: 2, fontSize: 6.5, color: MUTED, letterSpacing: 0.5 }}>PART</Text>
+              <Text style={{ flex: 3, fontSize: 6.5, color: MUTED, letterSpacing: 0.5 }}>SUPPLIER TYPE TO SOURCE</Text>
+              <Text style={{ flex: 2, fontSize: 6.5, color: MUTED, letterSpacing: 0.5 }}>KEY SPEC</Text>
+            </View>
+            {suppliers.map((sup, ui) => (
+              <View key={`src-sup-${ui}`} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT }} wrap={false}>
+                <Text style={{ flex: 2, fontSize: 8, color: INK, lineHeight: 1.3, paddingRight: 4 }}>
+                  {britishise(normalise_unicode(String(sup?.part_label ?? '')))}
+                </Text>
+                <Text style={{ flex: 3, fontSize: 8, color: INK_SOFT, lineHeight: 1.3, paddingRight: 4 }}>
+                  {britishise(normalise_unicode(String(sup?.supplier_type ?? '')))}
+                </Text>
+                <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, lineHeight: 1.3 }}>
+                  {sup?.spec ? britishise(normalise_unicode(String(sup.spec))) : 'To be confirmed on sourcing'}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </View>
+    )
+  } catch {
+    return null
+  }
+}
+
 // ─── Section 13 · Engagement Plan — who to speak to ─────────────────────────
 // 2026-06-05 HYBRID refactor. The full specialist cards used to render INLINE at
 // the foot of every module (ModuleAdvisorBlock). That bled into the multimodal
@@ -4365,6 +4485,14 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
       .sort((a, b) => indexOf(a[0]) - indexOf(b[0]))
       .map(([, b]) => b)
     if (blocks.length === 0) return null
+    // Per-module "Specialists & sourcing" briefs (2026-06-07): the brand-stripped
+    // expert + supplier sourcing content rendered under each module's cards. Pure,
+    // deterministic, fail-safe ({} on any fault). Keyed by `<moduleId>#<index>`,
+    // the SAME instance key the advisor blocks use, so a block pairs 1:1 with its
+    // sourcing brief. ADDITIVE — touches no BoM / cost / gate.
+    let sourcingBriefs: SourcingBriefs = {}
+    try { sourcingBriefs = buildSourcingBriefs(state) } catch { sourcingBriefs = {} }
+    const hasSourcing = Object.keys(sourcingBriefs).length > 0
     return (
       <Page size="A4" style={PAGE_STYLE}>
         <PageHeader section="Section 13 · Engagement Plan" project={project} />
@@ -4372,14 +4500,38 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
           Engagement Plan — who to speak to
         </Text>
         <Text style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 10 }}>
-          Each module&#8217;s design questions below, grouped by the specialist who should answer them; this is your outreach
-          checklist for expert validation.
+          For every module: the design questions to put to a specialist, the kind of expert who should answer them, and
+          the kind of supplier you will need. Each module below pairs its questions with a &#8220;Specialists &amp; sourcing&#8221;
+          brief &#8212; the credentials that matter and the supplier type plus key spec to source.
         </Text>
-        {/* 2026-06-06 (Tristan): the Fractional Forge "book a call" / specialist-
-            introduction call-to-action is REMOVED — the dossier is the deliverable
-            (the Fractional Forge Anvil Engine), not a sales funnel. The Engagement
-            Plan keeps only the useful outreach content: the specialist roles + the
-            questions to ask them. */}
+        {/* 2026-06-07: the Fractional Forge model is a free lead magnet -> paid
+            sourcing funnel (validated by the customer + a headhunter partner). The
+            paid step is the VETTED INTRODUCTION to the right people + suppliers, so
+            the section carries two clear sourcing calls-to-action + one paid-upgrade
+            callout. This supersedes the 2026-06-06 "no call-to-action" micro-
+            decision (which predated the validated sourcing model). The per-module
+            briefs name the TYPE of expert + supplier, never the specific person or
+            the brand/part-number — those are the paid step. */}
+        {hasSourcing ? (
+          <View style={{ marginBottom: 12 }} minPresenceAhead={60}>
+            <SourcingCta
+              label="Source these experts &#8212; via Fractional Forge"
+              sub="We identify, vet and introduce the named specialists each module calls for, drawn from a hardware-engineering and headhunting network."
+            />
+            <SourcingCta
+              label="Source vetted suppliers, or run it as a request for quotation &#8212; via Fractional Forge"
+              sub="We shortlist suppliers against the spec below, or run the whole bill of materials as a request for quotation to get you real quotes."
+            />
+            {/* The single paid-upgrade callout (named bill of materials + RFQ). */}
+            <View style={{ marginTop: 4, paddingVertical: 8, paddingHorizontal: 11, borderWidth: 0.8, borderColor: RULE, borderRadius: 3, backgroundColor: '#fbfcfd' }} wrap={false}>
+              <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: ACCENT }}>Paid upgrade &#8212; </Text>
+                the full named bill of materials, with real part numbers and named suppliers, is available as a paid upgrade,
+                and Fractional Forge can run it as a request for quotation to get you real quotes.
+              </Text>
+            </View>
+          </View>
+        ) : null}
         {blocks.map((block, bi) => {
           // 2026-06-06 (FIX 3 extension): module_name / module_id can be a
           // concatenated function-taxonomy chain on process-plant classes
@@ -4413,6 +4565,13 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
               {cards.map((card, ci) => (
                 <AdvisorSpecialistCard key={`engplan-card-${bi}-${ci}`} card={card} cardNo={ci + 1} />
               ))}
+              {/* Per-module "Specialists & sourcing" brief (2026-06-07): the brand-
+                  stripped expert + supplier sourcing content for THIS module, paired
+                  by the instance key. No-ops when the module has no brief. */}
+              {(() => {
+                const sb = sourcingBriefs[String(block?.module_key ?? '')]
+                return sb ? <ModuleSourcingBrief brief={sb} /> : null
+              })()}
             </View>
           )
         })}
