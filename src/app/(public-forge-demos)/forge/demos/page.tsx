@@ -48,8 +48,8 @@ export default function ForgeDemosIndexPage(): React.ReactNode {
           </h1>
         </div>
         <p className="text-base sm:text-lg text-muted-foreground max-w-3xl leading-relaxed">
-          Five real project packs generated against the live Forge pipeline on
-          25 April 2026. Each one covers brief, modules, bill of materials,
+          Six real project packs generated against the live Forge pipeline
+          between April and June 2026. Each one covers brief, modules, bill of materials,
           supplier shortlist, failure modes, standards, cost envelope, and
           open questions. Two of the five came back over the declared cost
           ceiling. The system tells you — you decide.

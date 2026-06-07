@@ -1,7 +1,7 @@
 /**
  * @file demo-projects.ts — Canonical metadata for the five Forge demo packs.
  *
- * @description Single source of truth for the five real project packs generated
+ * @description Single source of truth for the six real project packs generated
  * against the live Forge pipeline on 25 April 2026. Shared between the homepage
  * demo grid (`/`), the workspace Examples section (`/the-forge-v2`), and the
  * public demo route (`/forge/demos` + `/forge/demos/<slug>`).
@@ -218,6 +218,35 @@ export const FORGE_DEMOS: readonly ForgeDemo[] = [
       ceiling: '£155',
       headroomGbp: -199,
       headroomLabel: 'Over by £199',
+    },
+  },
+  {
+    slug: 'saf',
+    heading: 'Power-to-Liquid sustainable aviation fuel plant',
+    acronym: 'SAF, e-fuel',
+    subHeading: 'One thousand tonnes a year of synthetic jet fuel from carbon dioxide and green hydrogen',
+    summary:
+      'Single-step Fischer-Tropsch synthesis over an iron catalyst turns captured carbon dioxide and renewable hydrogen straight into jet-range paraffins, with a naphtha co-product, then hydrocracks and fractionates the cut to ASTM D7566 sustainable aviation fuel. A first-commercial concept-stage plant, sized end to end with real manufacturer part numbers, live pricing, compliance and lifecycle-carbon review, and recommended suppliers.',
+    description:
+      'A first-commercial Power-to-Liquid plant that converts captured carbon dioxide and renewable hydrogen, in a single step over an iron Fischer-Tropsch catalyst, into one thousand tonnes a year of sustainable aviation fuel plus a naphtha co-product. Eight modules cover feedstock conditioning and compression, the Fischer-Tropsch reactor with waste-heat steam recovery, three-phase separation and tail-gas recycle, hydrocracking and fractionation, utilities and offsites, product storage and loading, control and safety, and the field instrument-and-control loop. The bill of materials runs to 73 lines from 31 suppliers, with reverse-water-gas-shift equilibrium, chain-growth selectivity and a hydrogen-explicit levelised cost computed from first principles. Installed cost came back at £26.6m against a £45m ceiling — £18m of headroom on a first-of-a-kind plant.',
+    coverPath: '/forge-demos/thumbnails/06-SAF-cover.png',
+    pdfPath: '/forge-demos/06-SAF.pdf',
+    stats: {
+      pages: 100,
+      modules: 8,
+      keyParts: 60,
+      bomRows: 73,
+      suppliers: 31,
+      failureModes: 13,
+      openQuestions: 16,
+      standards: 13,
+      reviews: 6,
+    },
+    cost: {
+      unit: '£26,612,428',
+      ceiling: '£45,000,000',
+      headroomGbp: 18_387_572,
+      headroomLabel: 'Under by £18m',
     },
   },
 ] as const

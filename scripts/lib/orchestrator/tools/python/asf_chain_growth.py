@@ -3,7 +3,7 @@
 scripts/lib/orchestrator/tools/python/asf_chain_growth.py
 
 process:asf-chain-growth — FIRST-PRINCIPLES Anderson-Schulz-Flory (ASF)
-Fischer-Tropsch chain-growth / product-selectivity calculator for the OXCCU
+Fischer-Tropsch chain-growth / product-selectivity calculator for a Power-to-Liquid
 e-fuel (power-to-liquid) synthesis plant.
 
 WHAT IT DOES
@@ -25,14 +25,14 @@ WHAT IT DOES
         C17–C20    — diesel / gas-oil
         C21+       — wax
 
-    OXCCU UPGRADING MODEL: OXCCU hydrocracks wax to boost jet yield.
+    WAX UPGRADING MODEL: the process hydrocracks wax to boost jet yield.
       jet_frac_upgraded = jet_frac_raw + wax_to_jet_conversion * wax_frac_raw
       naphtha_frac_upgraded unchanged (hydrocracking targets wax, not naphtha)
 
 WHY (e-fuel synthesis plant): raw FT product selectivity was previously
     guessed by the LLM as a fixed "jet fraction" number. This replaces that
     guess with first-principles ASF chemistry, so the dossier can report:
-    (a) the theoretical straight-run jet cut, and (b) the realistic OXCCU
+    (a) the theoretical straight-run jet cut, and (b) the realistic post-upgrading
     selectivity AFTER hydrocracking the heavy wax fraction.
 
 INPUT (JSON on stdin)
@@ -43,7 +43,7 @@ INPUT (JSON on stdin)
       "catalyst": "iron",        # "iron" | "cobalt" (default "iron")
       "n_max": 50,               # max carbon number to sum (default 50)
       "wax_to_jet_conversion": 0.80,  # fraction of wax converted to jet via hydrocracking
-                                      # (OXCCU upgrading; default 0.80)
+                                      # (selective wax upgrading; default 0.80)
       "diesel_to_jet_fraction": 0.0   # fraction of diesel cut shifted to jet (default 0.0)
     }
 
@@ -99,7 +99,7 @@ PROVENANCE = {
         "to ~0.90 at 220 degC, ~0.82 at 300 degC, ~0.72 at 350 degC). "
         "For cobalt: alpha = CLAMP(0.90 - 0.0004*(T_c - 200), 0.80, 0.94) "
         "(Dry 2002: cobalt LTFT typically 0.88-0.94, weaker T-dependence). "
-        "OXCCU upgrading: wax (C21+) is hydro-cracked selectively into the "
+        "Selective wax upgrading: wax (C21+) is hydro-cracked selectively into the "
         "kerosene/jet boiling range; modelled as a fixed conversion factor "
         "wax_to_jet_conversion (default 0.80, literature range 0.70-0.90 for "
         "selective hydrocracking over Pt/SiO2 or Ni/W/Al2O3 catalysts, "
@@ -246,7 +246,7 @@ def compute(payload: dict) -> dict:
     # Verify sum (should be ~1 to within n_max truncation error)
     cut_sum = methane_frac + lpg_frac + naphtha_frac + jet_frac_raw + diesel_frac + wax_frac_raw
 
-    # ---- OXCCU upgrading model ----
+    # ---- wax upgrading model ----
     # Hydrocracking routes wax into the jet boiling range.
     # Diesel shift is a secondary option (default 0.0).
     wax_to_jet   = wax_to_jet_conversion * wax_frac_raw
@@ -367,7 +367,7 @@ def compute(payload: dict) -> dict:
 
     # Step 4: Upgrading step — wax hydrocracking
     worked.append(worked_calc(
-        label="Jet selectivity after OXCCU wax hydrocracking",
+        label="Jet selectivity after selective wax hydrocracking",
         formula="jet_selectivity = jet_raw + wax_to_jet_conversion x wax_raw + diesel_to_jet x diesel_raw",
         values={
             "jet_raw":               (round(jet_frac_raw, 5),        "fraction"),
@@ -378,9 +378,9 @@ def compute(payload: dict) -> dict:
         },
         result=round(jet_selectivity_frac, 5), result_unit="fraction",
         assumptions=[
-            "OXCCU process: wax (C21+) selectively hydro-cracked into the C10-C16 kerosene/jet boiling range",
+            "Process: wax (C21+) selectively hydro-cracked into the C10-C16 kerosene/jet boiling range",
             f"wax_to_jet_conversion = {wax_to_jet_conversion} (literature: 0.70-0.90 for selective Pt/SiO2 or Ni/W/Al2O3 hydrocracking; Steynberg & Dry 2004 ch.7)",
-            f"diesel_to_jet_fraction = {diesel_to_jet_fraction} (default 0.0: OXCCU targets wax primarily)",
+            f"diesel_to_jet_fraction = {diesel_to_jet_fraction} (default 0.0: the process targets wax primarily)",
             f"Wax residue after upgrading = {round(wax_residue_frac, 5)} (fraction remaining)",
             f"jet_selectivity_frac = {round(jet_frac_raw,5)} + {wax_to_jet_conversion} x {round(wax_frac_raw,5)} = {round(jet_selectivity_frac, 5)}",
         ],
@@ -420,7 +420,7 @@ def compute(payload: dict) -> dict:
         "wax_frac_raw":         round(wax_frac_raw,   5),
         "cut_sum":              round(cut_sum,         5),
 
-        # After OXCCU upgrading
+        # After upgrading
         "wax_to_jet_conversion":    wax_to_jet_conversion,
         "diesel_to_jet_fraction":   diesel_to_jet_fraction,
         "jet_selectivity_frac":     round(jet_selectivity_frac,     5),
@@ -464,9 +464,9 @@ def main() -> int:
 if __name__ == "__main__":
     import sys as _sys
 
-    # ---- Self-test: OXCCU LTFT case (iron, 220 degC) ----
+    # ---- Self-test: iron LTFT case (iron, 220 degC) ----
     #
-    # OXCCU operates iron LTFT at approximately 220 degC, which gives alpha ~0.88
+    # An iron LTFT process operates at approximately 220 degC, which gives alpha ~0.88
     # (iron empirical: 0.85 - 0.0006*(220-250) = 0.85 + 0.018 = 0.868, clamped to
     # the corridor [0.70, 0.92] -> 0.868).
     #
@@ -478,10 +478,10 @@ if __name__ == "__main__":
     # selectivity from iron LTFT + selective hydrocracking.
     #
     # Default temp 300 degC is HTFT territory (alpha~0.82, peak at naphtha/C5);
-    # choosing 220 degC here specifically tests the LTFT case that matches OXCCU.
+    # choosing 220 degC here specifically tests the LTFT case that matches an iron LTFT process.
 
     payload_default = {
-        "reactor_temp_c": 220.0,   # OXCCU LTFT iron operating temperature
+        "reactor_temp_c": 220.0,   # iron LTFT operating temperature
         "catalyst": "iron",
         "n_max": 50,
         "wax_to_jet_conversion": 0.80,

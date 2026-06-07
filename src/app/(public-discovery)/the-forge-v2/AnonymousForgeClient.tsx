@@ -79,6 +79,16 @@ const DEMOS = [
         stats: { pages: 49, modules: 7, bomRows: 70, suppliers: 21 },
         cost: { unit: "£354", headroomLabel: "Over by £199", isOver: true },
     },
+    {
+        slug: "06-SAF",
+        heading: "Power-to-Liquid sustainable aviation fuel plant",
+        acronym: "SAF, e-fuel",
+        subHeading: "One thousand tonnes a year of synthetic jet fuel from carbon dioxide and green hydrogen",
+        coverPath: "/forge-demos/thumbnails/06-SAF-cover.png",
+        pdfPath: "/forge-demos/06-SAF.pdf",
+        stats: { pages: 100, modules: 8, bomRows: 73, suppliers: 31 },
+        cost: { unit: "£26,612,428", headroomLabel: "Under by £18m", isOver: false },
+    },
 ] as const
 
 // ─── Signup wall copy ─────────────────────────────────────────────────────────

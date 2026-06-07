@@ -317,7 +317,7 @@ export default async function ForgeDemoDetailPage({
             href="/forge/demos"
             className="underline hover:text-international-orange transition-colors"
           >
-            See all five demo projects.
+            See all six demo projects.
           </Link>
         </p>
       </section>

@@ -143,10 +143,27 @@ const DEMOS: readonly ForgeDemo[] = [
       headroomLabel: 'Over by £199',
     },
   },
+  {
+    slug: '06-SAF',
+    heading: 'Power-to-Liquid sustainable aviation fuel plant',
+    acronym: 'SAF, e-fuel',
+    subHeading: 'One thousand tonnes a year of synthetic jet fuel from carbon dioxide and green hydrogen',
+    summary:
+      'Single-step Fischer-Tropsch synthesis over an iron catalyst turns captured carbon dioxide and renewable hydrogen straight into jet-range paraffins, with a naphtha co-product, then hydrocracks and fractionates the cut to ASTM D7566 sustainable aviation fuel. A first-commercial concept-stage plant, sized end to end with real manufacturer part numbers, live pricing, compliance and lifecycle-carbon review, and recommended suppliers.',
+    coverPath: '/forge-demos/thumbnails/06-SAF-cover.png',
+    pdfPath: '/forge-demos/06-SAF.pdf',
+    stats: { pages: 100, modules: 8, keyParts: 60, bomRows: 73, suppliers: 31 },
+    cost: {
+      unit: '£26,612,428',
+      ceiling: '£45,000,000',
+      headroomGbp: 18_387_572,
+      headroomLabel: 'Under by £18m',
+    },
+  },
 ] as const
 
 /**
- * Forge demo grid section. Renders five real project packs as evidence the
+ * Forge demo grid section. Renders six real project packs as evidence the
  * platform produces founder-grade output, complete with two over-budget cases
  * the system reports honestly rather than papering over.
  */

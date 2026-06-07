@@ -1,12 +1,12 @@
 /**
  * scripts/lib/orchestrator/tools/asf-chain-growth.ts
  *
- * process:asf-chain-growth — Anderson-Schulz-Flory (ASF) chain-growth + OXCCU
+ * process:asf-chain-growth — Anderson-Schulz-Flory (ASF) chain-growth + selective wax-upgrading
  * wax-hydrocracking selectivity model for the e-fuel (Power-to-Liquid) Fischer-
  * Tropsch SAF plant.
  *
  * Given an effective chain-growth probability alpha and the wax-to-jet conversion
- * fraction (OXCCU selective hydrocracking), the tool computes the full ASF
+ * fraction (selective hydrocracking), the tool computes the full ASF
  * weight-fraction distribution and aggregates it into the six standard FT product
  * cuts (C1/LPG/naphtha/jet/diesel/wax), producing the transparency outputs the
  * e_fuel_synthesis emitter reads:
@@ -37,7 +37,7 @@ import { resolve } from 'path'
 
 export interface AsfChainGrowthInput {
   /** Chain-growth probability alpha in (0,1).  Required — use the calibrated
-   *  effective alpha for OXCCU's iron catalyst (see class plan comment). */
+   *  effective alpha for the iron catalyst (see class plan comment). */
   alpha: number
   /** Fraction of the C21+ wax cut converted to jet (C10–C16) range by selective
    *  hydrocracking.  Default 0.80. */
@@ -61,7 +61,7 @@ export interface AsfChainGrowthOutput {
   reactor_temp_c: number
   catalyst: string
   n_max: number
-  // Raw ASF cuts (straight chain growth, before OXCCU wax upgrading)
+  // Raw ASF cuts (straight chain growth, before selective wax upgrading)
   methane_frac: number
   lpg_frac: number
   naphtha_frac: number
@@ -69,7 +69,7 @@ export interface AsfChainGrowthOutput {
   diesel_frac: number
   wax_frac_raw: number
   cut_sum: number
-  // After OXCCU wax hydrocracking
+  // After selective wax hydrocracking
   wax_to_jet_conversion: number
   diesel_to_jet_fraction: number
   jet_selectivity_frac: number       // the key output — upgraded jet cut fraction
@@ -95,7 +95,7 @@ const APPLICABLE_CLASSES = new Set<string>([
 
 export const asfChainGrowth: Tool<AsfChainGrowthInput, AsfChainGrowthOutput> = {
   id: TOOL_ID,
-  name: 'ASF Chain-Growth / FT Selectivity (OXCCU PtL)',
+  name: 'ASF Chain-Growth / FT Selectivity (PtL)',
   version: '1.0.0',
   license: 'free-proprietary',
   source_url: 'internal://forgeos/process',
