@@ -124,35 +124,54 @@ function ScenarioMatrix({ sp }: { sp: ScenarioPlanning }) {
 
 function Tornado({ sp }: { sp: ScenarioPlanning }) {
   const items = sp.tornado.filter((t) => t.delta_npv_abs > 0).slice(0, 7)
-  const maxSwing = Math.max(1, ...items.map((t) => t.delta_npv_abs))
-  const barW = 88
-  const cName = 146, cBase = 60, cRange = 104, cSwing = 52
+  // shared NPV axis over every endpoint + the base + breakeven (£0)
+  const npvs = [sp.base.npv_gbp, 0]
+  for (const t of items) npvs.push(t.npv_pessimistic, t.npv_optimistic)
+  const axMin = Math.min(...npvs), axMax = Math.max(...npvs)
+  const BARW = 168
+  const x = (v: number) => (axMax === axMin ? 0 : ((v - axMin) / (axMax - axMin)) * BARW)
+  const baseX = x(sp.base.npv_gbp), zeroX = Math.min(BARW - 1, x(0))
+  const cName = 92, cRange = 70, cNpv = 96
+  const tick = (v: number) => `${v < 0 ? '-' : ''}£${Math.abs(Math.round(v / 1e6))}M`
   return (
     <View style={{ marginBottom: 14 }} wrap={false}>
       <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>What moves the economics</Text>
-      <Text style={{ fontSize: 8, color: MUTED, marginBottom: 6 }}>Each assumption is moved on its own from its base value across the range shown (everything else held at base); the bar is the resulting swing in NPV.</Text>
-      <View style={{ flexDirection: 'row', borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT, paddingBottom: 2, marginBottom: 3 }}>
+      <Text style={{ fontSize: 8, color: MUTED, marginBottom: 6 }}>Each assumption is moved on its own across the range shown (others held at base). The bar spans the resulting NPV, read on the axis below — so you can see what each end of the range does. Dotted line = base case, solid line = breakeven (£0).</Text>
+      <View style={{ flexDirection: 'row', borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT, paddingBottom: 2, marginBottom: 4 }}>
         <Text style={{ width: cName, fontSize: 7, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4 }}>Assumption</Text>
-        <Text style={{ width: cBase, fontSize: 7, color: MUTED, textAlign: 'right' }}>Base</Text>
-        <Text style={{ width: cRange, fontSize: 7, color: MUTED, textAlign: 'right', paddingRight: 8 }}>Range tested</Text>
-        <Text style={{ width: barW, fontSize: 7, color: MUTED }}> </Text>
-        <Text style={{ width: cSwing, fontSize: 7, color: MUTED, textAlign: 'right' }}>NPV swing</Text>
+        <Text style={{ width: cRange, fontSize: 7, color: MUTED, textAlign: 'right', paddingRight: 6 }}>Range tested</Text>
+        <Text style={{ width: BARW, fontSize: 7, color: MUTED, textAlign: 'center' }}>NPV across that range</Text>
+        <Text style={{ width: cNpv, fontSize: 7, color: MUTED, textAlign: 'right' }}>NPV: low to high val</Text>
       </View>
       {items.map((t) => {
         const lo = Math.min(t.pessimistic_value, t.optimistic_value)
         const hi = Math.max(t.pessimistic_value, t.optimistic_value)
+        const lowValIsPess = t.pessimistic_value <= t.optimistic_value
+        const npvAtLow = lowValIsPess ? t.npv_pessimistic : t.npv_optimistic
+        const npvAtHigh = lowValIsPess ? t.npv_optimistic : t.npv_pessimistic
+        const barL = Math.min(x(npvAtLow), x(npvAtHigh)), barR = Math.max(x(npvAtLow), x(npvAtHigh))
         return (
           <View key={t.lever_id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3.5 }}>
-            <Text style={{ width: cName, fontSize: 8.5, color: INK }}>{t.label}</Text>
-            <Text style={{ width: cBase, fontSize: 8, color: MUTED, textAlign: 'right' }}>{fmtLeverVal(t.base_value, t.unit)}</Text>
-            <Text style={{ width: cRange, fontSize: 8, color: INK, textAlign: 'right', paddingRight: 8 }}>{fmtRange(lo, hi, t.unit)}</Text>
-            <View style={{ width: barW, height: 8, justifyContent: 'center' }}>
-              <View style={{ width: Math.max(2, (t.delta_npv_abs / maxSwing) * barW), height: 8, backgroundColor: ACCENT_SOFT, opacity: 0.4, borderRadius: 1 }} />
+            <Text style={{ width: cName, fontSize: 8, color: INK }}>{t.label}</Text>
+            <Text style={{ width: cRange, fontSize: 7.5, color: MUTED, textAlign: 'right', paddingRight: 6 }}>{fmtRange(lo, hi, t.unit)}</Text>
+            <View style={{ width: BARW, height: 11, position: 'relative' }}>
+              <View style={{ position: 'absolute', left: baseX, top: 0, width: 0.6, height: 11, backgroundColor: MUTED, opacity: 0.7 }} />
+              <View style={{ position: 'absolute', left: zeroX, top: 0, width: 0.9, height: 11, backgroundColor: INK }} />
+              <View style={{ position: 'absolute', left: barL, top: 2.5, width: Math.max(2, barR - barL), height: 6, backgroundColor: ACCENT_SOFT, opacity: 0.55, borderRadius: 1 }} />
             </View>
-            <Text style={{ width: cSwing, fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK, textAlign: 'right' }}>±{gbpM(t.delta_npv_abs)}</Text>
+            <Text style={{ width: cNpv, fontSize: 7.5, color: INK, textAlign: 'right' }}>{gbpM(npvAtLow)} to {gbpM(npvAtHigh)}</Text>
           </View>
         )
       })}
+      <View style={{ flexDirection: 'row', marginTop: 1 }}>
+        <View style={{ width: cName + cRange }} />
+        <View style={{ width: BARW, height: 9, position: 'relative' }}>
+          <Text style={{ position: 'absolute', left: 0, top: 0, fontSize: 6, color: MUTED }}>{tick(axMin)}</Text>
+          <Text style={{ position: 'absolute', left: Math.max(0, Math.min(BARW - 18, baseX - 7)), top: 0, fontSize: 6, color: MUTED }}>base</Text>
+          <Text style={{ position: 'absolute', right: 0, top: 0, fontSize: 6, color: INK }}>{tick(axMax)}</Text>
+        </View>
+        <View style={{ width: cNpv }} />
+      </View>
     </View>
   )
 }
@@ -160,32 +179,50 @@ function Tornado({ sp }: { sp: ScenarioPlanning }) {
 function Waterfall({ sp }: { sp: ScenarioPlanning }) {
   if (!sp.waterfall.length) return null
   const noak = sp.scenarios.find((s) => s.id === 'noak')
-  const maxAbs = Math.max(1, ...sp.waterfall.map((w) => Math.abs(w.delta_npv)))
+  // shared NPV axis over the base, breakeven (£0), and every step endpoint
+  const npvs = [sp.base.npv_gbp, 0]
+  for (const w of sp.waterfall) npvs.push(w.from_npv, w.to_npv)
+  const axMin = Math.min(...npvs), axMax = Math.max(...npvs)
+  const BARW = 168
+  const x = (v: number) => (axMax === axMin ? 0 : ((v - axMin) / (axMax - axMin)) * BARW)
+  const baseX = x(sp.base.npv_gbp), zeroX = Math.min(BARW - 1, x(0))
+  const cName = 96, cChange = 96, cNpv = 96
+  const tick = (v: number) => `${v < 0 ? '-' : ''}£${Math.abs(Math.round(v / 1e6))}M`
   return (
     <View style={{ marginBottom: 12 }} wrap={false}>
       <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>Bridge: base to {noak?.label ?? 'NOAK'}</Text>
-      <Text style={{ fontSize: 8, color: MUTED, marginBottom: 7 }}>How each assumption change adds to NPV from the FOAK base ({gbpM(sp.base.npv_gbp)}) to {gbpM(noak?.npv_gbp ?? 0)}.</Text>
-      <View style={{ flexDirection: 'row', borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT, paddingBottom: 2, marginBottom: 3 }}>
-        <Text style={{ width: 118, fontSize: 7, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4 }}>Assumption</Text>
-        <Text style={{ width: 104, fontSize: 7, color: MUTED, textAlign: 'right', paddingRight: 8 }}>Change (base to NOAK)</Text>
-        <Text style={{ width: 96, fontSize: 7, color: MUTED }}> </Text>
-        <Text style={{ width: 50, fontSize: 7, color: MUTED, textAlign: 'right', paddingRight: 6 }}>NPV add</Text>
-        <Text style={{ width: 48, fontSize: 7, color: MUTED, textAlign: 'right' }}>Running</Text>
+      <Text style={{ fontSize: 8, color: MUTED, marginBottom: 6 }}>Each assumption is moved in turn from the FOAK base ({gbpM(sp.base.npv_gbp)}) toward {noak?.label ?? 'NOAK'} ({gbpM(noak?.npv_gbp ?? 0)}). Each bar floats from the running NPV before the change to after it, read on the axis below — green improves NPV, red worsens it. Dotted line = base case, solid line = breakeven (£0).</Text>
+      <View style={{ flexDirection: 'row', borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT, paddingBottom: 2, marginBottom: 4 }}>
+        <Text style={{ width: cName, fontSize: 7, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4 }}>Assumption</Text>
+        <Text style={{ width: cChange, fontSize: 7, color: MUTED, textAlign: 'right', paddingRight: 6 }}>Change (base to NOAK)</Text>
+        <Text style={{ width: BARW, fontSize: 7, color: MUTED, textAlign: 'center' }}>NPV before to after</Text>
+        <Text style={{ width: cNpv, fontSize: 7, color: MUTED, textAlign: 'right' }}>Running NPV</Text>
       </View>
       {sp.waterfall.map((w, i) => {
         const up = w.delta_npv >= 0
+        const barL = Math.min(x(w.from_npv), x(w.to_npv)), barR = Math.max(x(w.from_npv), x(w.to_npv))
         return (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
-            <Text style={{ width: 118, fontSize: 8, color: INK }}>{w.label}</Text>
-            <Text style={{ width: 104, fontSize: 7.5, color: INK, textAlign: 'right', paddingRight: 8 }}>{fmtLeverVal(w.from_value, w.unit)} to {fmtLeverVal(w.to_value, w.unit)}</Text>
-            <View style={{ width: 96, height: 8, justifyContent: 'center' }}>
-              <View style={{ width: Math.max(2, (Math.abs(w.delta_npv) / maxAbs) * 96), height: 8, backgroundColor: up ? GOOD : BAD, opacity: 0.55, borderRadius: 1 }} />
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3.5 }}>
+            <Text style={{ width: cName, fontSize: 8, color: INK }}>{w.label}</Text>
+            <Text style={{ width: cChange, fontSize: 7.5, color: MUTED, textAlign: 'right', paddingRight: 6 }}>{fmtLeverVal(w.from_value, w.unit)} to {fmtLeverVal(w.to_value, w.unit)}</Text>
+            <View style={{ width: BARW, height: 11, position: 'relative' }}>
+              <View style={{ position: 'absolute', left: baseX, top: 0, width: 0.6, height: 11, backgroundColor: MUTED, opacity: 0.7 }} />
+              <View style={{ position: 'absolute', left: zeroX, top: 0, width: 0.9, height: 11, backgroundColor: INK }} />
+              <View style={{ position: 'absolute', left: barL, top: 2.5, width: Math.max(2, barR - barL), height: 6, backgroundColor: up ? GOOD : BAD, opacity: 0.55, borderRadius: 1 }} />
             </View>
-            <Text style={{ width: 50, fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: up ? GOOD : BAD, textAlign: 'right', paddingRight: 6 }}>{up ? '+' : '-'}{gbpM(Math.abs(w.delta_npv)).replace('-', '')}</Text>
-            <Text style={{ width: 48, fontSize: 7.5, color: MUTED, textAlign: 'right' }}>{gbpM(w.to_npv)}</Text>
+            <Text style={{ width: cNpv, fontSize: 7.5, color: INK, textAlign: 'right' }}>reaches {gbpM(w.to_npv)}</Text>
           </View>
         )
       })}
+      <View style={{ flexDirection: 'row', marginTop: 1 }}>
+        <View style={{ width: cName + cChange }} />
+        <View style={{ width: BARW, height: 9, position: 'relative' }}>
+          <Text style={{ position: 'absolute', left: 0, top: 0, fontSize: 6, color: MUTED }}>{tick(axMin)}</Text>
+          <Text style={{ position: 'absolute', left: Math.max(0, Math.min(BARW - 18, baseX - 7)), top: 0, fontSize: 6, color: MUTED }}>base</Text>
+          <Text style={{ position: 'absolute', right: 0, top: 0, fontSize: 6, color: INK }}>{tick(axMax)}</Text>
+        </View>
+        <View style={{ width: cNpv }} />
+      </View>
     </View>
   )
 }
