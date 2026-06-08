@@ -3924,6 +3924,68 @@ function PageFooter() {
   )
 }
 
+// ─── Part divider pages (2026-06-08) ────────────────────────────────────────
+// Frame the dossier as Tristan's three-part structure: PART 1 the engineering &
+// maths ("does it work"); PART 2 how to build it (modules/sub-modules carrying
+// design + bill-of-materials + supplier advice + expert questions in context);
+// PART 3 the consolidated act-on-it masters (full BoM, all suppliers, all
+// experts + the questions to ask them). Each part already renders as a contiguous
+// block in the Document tree; these dividers only FRAME the existing blocks —
+// purely additive, nothing reordered or removed (honours the 2026-06-04
+// in-context-grounding decision). Vertically-centred title block; WinAnsi-safe
+// punctuation only (no arrows/curly quotes — gate-11). Returns null on any error
+// so a divider can never break the PDF.
+function PartDividerPage({
+  eyebrow,
+  title,
+  question,
+  blurb,
+  contents,
+  project,
+}: {
+  eyebrow: string
+  title: string
+  question?: string
+  blurb: string
+  contents: string[]
+  project: string
+}) {
+  try {
+    return (
+      <Page size="A4" style={PAGE_STYLE}>
+        <PageHeader section={eyebrow} project={project} />
+        <PageFooter />
+        <View style={{ flexGrow: 1, justifyContent: 'center' }}>
+          <Text style={{ fontSize: 11, color: ACCENT, letterSpacing: 2.5, fontFamily: 'Helvetica-Bold', marginBottom: 12 }}>
+            {eyebrow.toUpperCase()}
+          </Text>
+          <Text style={{ fontSize: 32, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.12, marginBottom: question ? 8 : 16 }}>
+            {title}
+          </Text>
+          {question ? (
+            <Text style={{ fontSize: 14, color: ACCENT, fontFamily: 'Helvetica-Bold', marginBottom: 16 }}>
+              {question}
+            </Text>
+          ) : null}
+          <View style={{ height: 1, backgroundColor: RULE, width: 110, marginBottom: 18 }} />
+          <Text style={{ fontSize: 11, color: INK_SOFT, lineHeight: 1.65, marginBottom: 24, maxWidth: 440 }}>
+            {blurb}
+          </Text>
+          <Text style={{ fontSize: 8, color: MUTED, letterSpacing: 1.5, marginBottom: 12 }}>IN THIS PART</Text>
+          {contents.map((c, i) => (
+            <View key={`pd-${i}`} style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 7 }}>
+              <Text style={{ width: 12, fontSize: 11, color: ACCENT, fontFamily: 'Helvetica-Bold' }}>·</Text>
+              <Text style={{ flex: 1, fontSize: 10.5, color: INK, lineHeight: 1.45, maxWidth: 440 }}>{c}</Text>
+            </View>
+          ))}
+        </View>
+      </Page>
+    )
+  } catch {
+    return null
+  }
+}
+
 // ─── Cost Methodology (Section 9) ───────────────────────────────────────────
 // Reframed 2026-06-05 (founder feedback): NOT a per-line "engine vs basis" re-cost
 // overlay anymore — the Bill of Materials (Section 8) now carries the right number
@@ -4695,33 +4757,47 @@ function TableOfContentsPage({ state, project }: { state: any; project: string }
     // void the unused param explicitly so the signature stays symmetric with the
     // other page components (every page takes { state, project }).
     void state
-    const sections: { num: string; title: string }[] = [
-      { num: '1', title: 'Brief & Requirements' },
-      { num: '2', title: 'Brief Provenance' },
-      { num: '3', title: 'Brief Compliance & Trade-offs' },
-      { num: '4', title: 'System Overview' },
-      { num: '5', title: 'Cost by Module' },
-      { num: '6', title: 'Modules' },
-      { num: '7', title: 'Risk & Integration' },
-      { num: '8', title: 'Bill of Materials' },
-      { num: '9', title: 'Cost Methodology' },
-      { num: '9b', title: 'Economics & Scenarios' },
-      { num: '10', title: 'Sourcing & Suppliers' },
-      { num: '11', title: 'Regulatory & Compliance' },
-      { num: '12', title: 'Taking this forward' },
-      { num: '13', title: 'Engagement Plan — who to speak to' },
+    // Grouped into Tristan's three parts (2026-06-08), mirroring the in-document
+    // PartDividerPage breaks. The un-numbered "Engineering basis" front page is
+    // listed under Part 1 (it carries no Section number but the reader meets it
+    // first). Single column so the three part groups read top-to-bottom.
+    const parts: { label: string; entries: { num: string; title: string }[] }[] = [
+      {
+        label: 'Part 1 · The engineering',
+        entries: [
+          { num: '', title: 'Engineering basis' },
+          { num: '1', title: 'Brief & Requirements' },
+          { num: '2', title: 'Brief Provenance' },
+          { num: '3', title: 'Brief Compliance & Trade-offs' },
+          { num: '4', title: 'System Overview' },
+          { num: '5', title: 'Cost by Module' },
+        ],
+      },
+      {
+        label: 'Part 2 · How to build it',
+        entries: [
+          { num: '6', title: 'Modules & sub-modules' },
+          { num: '7', title: 'Risk & Integration' },
+        ],
+      },
+      {
+        label: 'Part 3 · Reference & procurement',
+        entries: [
+          { num: '8', title: 'Bill of Materials (consolidated)' },
+          { num: '9', title: 'Cost Methodology' },
+          { num: '9b', title: 'Economics & Scenarios' },
+          { num: '10', title: 'Sourcing & Suppliers' },
+          { num: '11', title: 'Regulatory & Compliance' },
+          { num: '12', title: 'Taking this forward' },
+          { num: '13', title: 'Engagement Plan — experts & questions' },
+          { num: 'A', title: 'Sources & References' },
+          { num: 'B', title: 'Engineering Tools Used' },
+        ],
+      },
     ]
-    const appendices: { num: string; title: string }[] = [
-      { num: 'A', title: 'Sources & References' },
-      { num: 'B', title: 'Engineering Tools Used' },
-    ]
-    // Balanced two-column split of the 13 numbered sections (1-7 | 8-13); the
-    // appendices render as their own clearly-labelled group below the columns.
-    const mid = Math.ceil(sections.length / 2)
-    const columns = [sections.slice(0, mid), sections.slice(mid)]
     const Row = ({ num, title }: { num: string; title: string }) => (
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 13 }}>
-        <Text style={{ width: 30, fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right', marginRight: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 9 }}>
+        <Text style={{ width: 30, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right', marginRight: 8 }}>
           {num}
         </Text>
         <Text style={{ fontSize: 8, color: MUTED, marginRight: 8 }}>·</Text>
@@ -4735,30 +4811,20 @@ function TableOfContentsPage({ state, project }: { state: any; project: string }
           Table of Contents
         </Text>
         <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 4, lineHeight: 1.55 }}>
-          Sections run front to back in the order below; the two appendices close
-          the report.
+          The dossier runs in three parts: the engineering (does it work), how to build it,
+          and the consolidated reference lists to procure and engage against.
         </Text>
-        <View style={{ height: 0.8, backgroundColor: RULE, marginTop: 6, marginBottom: 20 }} />
-        <Text style={{ fontSize: 8, color: MUTED, letterSpacing: 1, marginBottom: 12 }}>SECTIONS</Text>
-        <View style={{ flexDirection: 'row' }}>
-          {columns.map((col, ci) => (
-            <View key={`toc-col-${ci}`} style={{ flex: 1, paddingRight: ci === 0 ? 28 : 0 }}>
-              {col.map((e) => (
-                <Row key={`toc-${e.num}`} num={e.num} title={e.title} />
-              ))}
-            </View>
-          ))}
-        </View>
-        <View style={{ height: 0.6, backgroundColor: RULE_SOFT, marginTop: 8, marginBottom: 18 }} />
-        <Text style={{ fontSize: 8, color: MUTED, letterSpacing: 1, marginBottom: 12 }}>APPENDICES</Text>
-        <View style={{ flexDirection: 'row' }}>
-          <View style={{ flex: 1, paddingRight: 28 }}>
-            <Row num={appendices[0].num} title={appendices[0].title} />
+        <View style={{ height: 0.8, backgroundColor: RULE, marginTop: 6, marginBottom: 18 }} />
+        {parts.map((p, pi) => (
+          <View key={`toc-part-${pi}`} style={{ marginBottom: 14 }}>
+            <Text style={{ fontSize: 9, color: ACCENT, fontFamily: 'Helvetica-Bold', letterSpacing: 1, marginBottom: 10 }}>
+              {p.label.toUpperCase()}
+            </Text>
+            {p.entries.map((e, ei) => (
+              <Row key={`toc-${pi}-${ei}-${e.num || e.title}`} num={e.num} title={e.title} />
+            ))}
           </View>
-          <View style={{ flex: 1 }}>
-            <Row num={appendices[1].num} title={appendices[1].title} />
-          </View>
-        </View>
+        ))}
         <PageFooter />
       </Page>
     )
@@ -15062,7 +15128,7 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
         <PageFooter />
 
         <Text style={{ fontSize: 9, color: ACCENT, letterSpacing: 1.5, fontFamily: 'Helvetica-Bold', marginBottom: 3 }}>
-          PART 1 · ENGINEERING BASIS — DOES IT WORK?
+          ENGINEERING BASIS
         </Text>
         <Text style={{ fontSize: 21, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
           The whole plant, at a glance
@@ -15317,6 +15383,24 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           sections + Appendices A/B in render order; no page numbers (single-pass
           render). Returns null on error so it can never break the PDF. */}
       <TableOfContentsPage state={state} project={project} />
+      {/* Part dividers (2026-06-08): frame the dossier as Tristan's three-part
+          structure (engineering / build / consolidated reference). Additive —
+          the parts are already contiguous blocks; nothing is reordered. */}
+      <PartDividerPage
+        eyebrow="Part 1"
+        title={"Engineering & maths"}
+        question="Does it work?"
+        blurb={"Everything you need to judge whether the plant stands up, pulled to the front: the brief and its hard targets, how the whole process flows, the mass and energy balance, the engineering verdict on feasibility, and the headline economics."}
+        contents={[
+          'Engineering basis: process flow, mass and energy balance, feasibility verdict',
+          'Executive summary',
+          'Brief and requirements, and how it was interpreted',
+          'Brief compliance and trade-offs',
+          'System overview: how the plant works',
+          'Cost by module',
+        ]}
+        project={project}
+      />
       {/* PART 1 · ENGINEERING BASIS (increment 1, ANVIL-PDF-RESTRUCTURE-SPEC.md):
           ADDITIVE front-of-dossier consolidation — process flow + mass/energy
           balance + feasibility verdict & economics, pulled to the front so a
@@ -15387,6 +15471,17 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           Bill of Materials is Section 8, immediately before Cost Basis +
           Sourcing: design first, then the canonical parts list. */}
       <CostByModulePage state={state} project={project} bomTotals={bomTotals} />
+      <PartDividerPage
+        eyebrow="Part 2"
+        title={"How to build it"}
+        blurb={"How the plant is built, module by module. Each sub-module carries its design intent, its bill of materials, the kind of supplier to source it from, and the questions to put to a specialist. System-level risk and integration close the part."}
+        contents={[
+          'Module map: how the modules connect',
+          'Modules and sub-modules: design, bill of materials, suppliers, specialists',
+          'Risk and integration',
+        ]}
+        project={project}
+      />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
       {modules.map((m: any, idx: number) => (
         <ModuleSection
@@ -15412,6 +15507,24 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           sub-block under "Risk & Integration Analysis". The standalone
           SystemLevelRisksPage component is no longer called. */}
       <RiskPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
+      <PartDividerPage
+        eyebrow="Part 3"
+        title={"Reference & procurement"}
+        question="The consolidated lists"
+        blurb={"The act-on-it master lists, pulled together so you can procure and engage directly: the full bill of materials, every supplier, and every specialist with the questions to ask them, alongside the cost methodology, economics and source attribution."}
+        contents={[
+          'Full bill of materials',
+          'Cost basis and methodology',
+          'Economics and scenarios',
+          'Suppliers',
+          'Regulatory and compliance',
+          'Taking this forward',
+          'Engagement plan: the experts, and the questions to ask them',
+          'Sources and references',
+          'Engineering tools used',
+        ]}
+        project={project}
+      />
       {/* Section 6 · Bill of Materials (Tristan 2026-06-04): consolidated master
           priced-parts list — every line from bomTotals in ONE canonical table,
           grouped by module, with module subtotals + a grand total. Placed AFTER the
