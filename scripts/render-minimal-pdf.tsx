@@ -9901,7 +9901,16 @@ function ModuleSection({
       // which smears onto the following text span — gate-11 overlap finding.
       // humaniseSubName guards against name_human being a RAW id (CO₂ emitter
       // emitted 'mass_fluid_transport_process_mass_fluid_transport_process').
-      name: normalise_unicode(humaniseSubName(sm.name_human || sm.id)),
+      // Prefer the sub-module's PRIMARY EQUIPMENT name (words[].name_human, e.g.
+      // "packed absorber column") over the function-taxonomy id ("Fluid transport"),
+      // which is useless as an equipment label. Universal fix 2026-06-08 — the same
+      // rule the EngineeringBasis flowchart already uses. humaniseSubName passes a
+      // real name through untouched and only maps a raw taxonomy id; falls back to
+      // name_human/id for word-less sub-modules (no regression).
+      name: normalise_unicode(humaniseSubName(
+        (Array.isArray(sm.words) ? sm.words.find((w: any) => w && w.name_human) : null)?.name_human
+        || sm.name_human || sm.id,
+      )),
       sentence: '',
       paragraph: livePara,
     })
@@ -10051,7 +10060,11 @@ function ModuleSection({
         const _seenInteractionSentences = new Set<string>()
         for (let i = 0; i < subModulesRaw.length; i += 1) {
           const sm = subModulesRaw[i]
-          const smName = clean_prose(humaniseSubName(sm?.name_human || sm?.id || '')).trim()
+          // Real equipment name (words[].name_human), not the function-taxonomy id
+          // (universal fix 2026-06-08) — "The packed absorber column — …" not
+          // "The Fluid transport — …".
+          const smPrimWord = (Array.isArray(sm?.words) ? sm.words.find((w: any) => w && w.name_human) : null)?.name_human
+          const smName = clean_prose(humaniseSubName(smPrimWord || sm?.name_human || sm?.id || '')).trim()
           if (!smName) continue
           // topology_clause carries the wiring/arrangement hint
           // (e.g. "wired in 15 racks of 1P × 250S = 800 V per rack");
@@ -10114,13 +10127,21 @@ function ModuleSection({
                 has any mid-word uppercase letter or contains a digit. */}
             <Text style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, marginBottom: 8 }}>
               {(() => {
-                const firstWordMatch = purposeText.match(/^\S+/)
+                // If the purpose sentence already starts with its OWN subject
+                // ("The structure containment supplies…", "A jacketed reactor…"),
+                // render it as-is — prepending "This module (X) " creates a double
+                // subject ("This module (X) the structure containment supplies…").
+                // Universal grammar fix 2026-06-08. Only verb-led fragments
+                // ("Houses the racks…") get the "This module (X) " subject.
+                const pt = purposeText.trim()
+                if (/^(the|a|an|this|its|their|these|those|each|every|all)\b/i.test(pt)) return pt
+                const firstWordMatch = pt.match(/^\S+/)
                 const firstWord = firstWordMatch ? firstWordMatch[0] : ''
                 const isProperOrAcronym =
                   /[A-Z]/.test(firstWord.slice(1)) ||  // mid-word uppercase → acronym
                   /\d/.test(firstWord) ||              // contains digit → engineering label
                   /^(PyBaMM|BMS|EMS|PCS|HVAC|LFP|CATL|HMI|EFR|UPS|IEC|UL|NFPA|ISO|SCADA|PLC)$/.test(firstWord)
-                const tail = isProperOrAcronym ? purposeText : `${purposeText.charAt(0).toLowerCase()}${purposeText.slice(1)}`
+                const tail = isProperOrAcronym ? pt : `${pt.charAt(0).toLowerCase()}${pt.slice(1)}`
                 return `This module (${moduleName}) ${tail}`
               })()}
             </Text>
