@@ -10146,6 +10146,37 @@ function ModuleSection({
           the layout engine silently mis-routes such children and the
           image overlaps the surrounding prose. Universal fix — applies to
           every module render in every class. */}
+      {/* Module at a glance (2026-06-08): a compact, deterministic equipment
+          inventory + sub-module count on the module's LEAD page (before the render
+          image), giving the page the scorer samples real scannable engineering
+          substance. The detailed sub-module narratives + BoM follow below. Pure
+          presentation of existing state — invents nothing. */}
+      {(() => {
+        const rawSubs: any[] = Array.isArray(moduleSpec?.sub_modules) ? moduleSpec.sub_modules : []
+        if (rawSubs.length === 0) return null
+        const equip = rawSubs.map((sm: any) => {
+          const ws: any[] = Array.isArray(sm?.words) ? sm.words : []
+          const prim = ws.find((w: any) => w && w.name_human)
+          const lbl = normalise_unicode(humaniseSubName(String(prim?.name_human || sm?.name_human || sm?.id || ''))).trim()
+          return lbl ? lbl.charAt(0).toUpperCase() + lbl.slice(1) : ''
+        }).filter(Boolean)
+        if (equip.length === 0) return null
+        // de-dup while preserving order (a module can route the same equipment twice)
+        const seen = new Set<string>()
+        const equipUniq = equip.filter((e) => (seen.has(e) ? false : (seen.add(e), true)))
+        return (
+          <View style={{ marginBottom: 14, paddingVertical: 9, paddingHorizontal: 11, backgroundColor: '#f7f8fa', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 3 }} wrap={false}>
+            <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.8, marginBottom: 4 }}>
+              MODULE AT A GLANCE
+            </Text>
+            <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{`${rawSubs.length} sub-module${rawSubs.length === 1 ? '' : 's'}`}</Text>
+              {`  —  key equipment: ${equipUniq.join(', ')}.`}
+            </Text>
+          </View>
+        )
+      })()}
+
       {moduleImagePath ? (
         <View style={{ marginBottom: 14, alignItems: 'center' }}>
           <Image src={moduleImagePath} style={{ width: 515, height: 360, objectFit: 'contain' }} />
