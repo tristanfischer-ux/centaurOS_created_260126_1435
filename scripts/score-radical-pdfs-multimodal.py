@@ -251,7 +251,7 @@ Criteria for each:
 - cover: professional appearance, product name, class, cost ceiling, page count, any visual element
 - executive_summary: 3-paragraph narrative (product description / design outcome / next steps), not just a table
 - brief_requirements: quantified performance targets, regulatory standards, measurable KPIs
-- design_modules: subsystem list with functional descriptions, domain-correct subsystems for this product class
+- design_modules: the build module by module — domain-correct subsystems with functional descriptions, per-sub-module bill of materials + equipment selection, sub-module integration, system renders (the worked maths is in the separate Engineering Calculations section; do not penalise its absence here)
 - engineering_calcs: worked first-principles calculations that size the plant, grouped by module/sub-module, every number checkable by hand
 - bom: complete BOM with parts, quantities, unit costs, suppliers, MPNs (not TBD), grade quality
 - cost_analysis: total unit cost vs ceiling, cost breakdown by module, credibility of estimates
@@ -378,7 +378,14 @@ _HEADER_SIGNATURES: dict[str, list[str]] = {
     # dossiers without a master BoM (and the cost rollup is BoM-adjacent). Before all
     # this, "bom" anchored only to COSTBYMODULE and scored the cost rollup, not a BoM.
     "bom":                ["·BILLOFMATERIALS", "COSTBYMODULE"],
-    "cost_analysis":      ["COSTBYMODULE", "BRIEFCOMPLIANCE"],
+    # cost_analysis = the actual COST pages (2026-06-08 fix): the Cost Summary /
+    # Cost-by-Module rollup (header "COST SUMMARY", body H1 "Cost by Module"), the
+    # Cost Methodology (§9), AND Economics & Scenarios (§9b) — that is where the cost
+    # depth now lives. The old "BRIEFCOMPLIANCE" signature pulled the Brief-Compliance
+    # & Trade-offs pages (compliance, not cost) into the cost sample and diluted it;
+    # dropped. Brief-compliance still buckets into brief_requirements.
+    "cost_analysis":      ["COSTBYMODULE", "COSTSUMMARY", "COSTMETHODOLOGY",
+                           "ECONOMICS&SCENARIOS", "ECONOMICS&"],
     # The rendered banner is "SECTION 7 · SOURCING & PROCUREMENT" (de-spaced:
     # "SECTION7·SOURCING&PROCUREMENT"), NOT "SOURCING STRATEGY". The old lone
     # "SOURCINGSTRATEGY" signature matched ZERO pages on every real dossier, so
@@ -781,7 +788,7 @@ _SECTION_CRITERIA: dict[str, str] = {
     "cover": "professional appearance, product name, class, cost ceiling, page count, any visual element",
     "executive_summary": "3-paragraph narrative (product description / design outcome / next steps), not just a table",
     "brief_requirements": "quantified performance targets, regulatory standards, measurable KPIs",
-    "design_modules": "subsystem list with functional descriptions, domain-correct subsystems for this product class",
+    "design_modules": "the build, module by module: domain-correct subsystems with functional descriptions, the per-sub-module bill of materials and equipment selection, how the sub-modules integrate, each illustrated with a system render; the worked maths now lives in the separate Engineering Calculations section, so do not penalise its absence here",
     "engineering_calcs": "worked first-principles calculations that size the plant (HTU-NTU, flooding, duties, mass/energy balances etc.), grouped by module/sub-module, every number checkable by hand",
     "bom": "complete BOM with parts, quantities, unit costs, suppliers, MPNs (not TBD), grade quality",
     "cost_analysis": "total unit cost vs ceiling, cost breakdown by module, credibility of estimates",
