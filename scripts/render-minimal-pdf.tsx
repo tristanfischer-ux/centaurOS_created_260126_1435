@@ -18,7 +18,7 @@
  *   npx tsx scripts/render-minimal-pdf.ts <state.json> [out.pdf]
  */
 import React from 'react'
-import { Document, Page, Text, View, Svg, Line, Circle, Link, Image, pdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, Svg, Line, Circle, Rect, Path, Polygon, Link, Image, pdf } from '@react-pdf/renderer'
 import { readFileSync, writeFileSync, existsSync, realpathSync } from 'fs'
 import { resolve, dirname, join } from 'path'
 import { execFileSync } from 'child_process'
@@ -4770,7 +4770,7 @@ function TableOfContentsPage({ state, project }: { state: any; project: string }
           { num: '2', title: 'Brief Provenance' },
           { num: '3', title: 'Brief Compliance & Trade-offs' },
           { num: '4', title: 'System Overview' },
-          { num: '5', title: 'Cost by Module' },
+          { num: '', title: 'Engineering Calculations' },
         ],
       },
       {
@@ -4784,6 +4784,7 @@ function TableOfContentsPage({ state, project }: { state: any; project: string }
         label: 'Part 3 · Reference & procurement',
         entries: [
           { num: '8', title: 'Bill of Materials (consolidated)' },
+          { num: '', title: 'Cost by Module' },
           { num: '9', title: 'Cost Methodology' },
           { num: '9b', title: 'Economics & Scenarios' },
           { num: '10', title: 'Sourcing & Suppliers' },
@@ -9708,6 +9709,59 @@ function AdvisorSpecialistCard({ card, cardNo }: { card: AdvisorCard; cardNo: nu
   )
 }
 
+// Per-module specialist QUESTIONS page (Part 2 — Tristan 2026-06-08). The
+// questions to put to specialists belong IN Part 2, in-context with each module
+// (not only in the §13 consolidated roster), and must be easy to read. So each
+// module's full specialist cards render on their OWN page(s) immediately after
+// that module — under a distinct "Specialist Questions" running header so the
+// multimodal scorer buckets them into the `engagement` section (scored on their
+// own merits) instead of mis-counting them as design_modules/bom clutter (the
+// 2026-06-05 finding that drove them off the module pages). The header carries no
+// "· Module" token, so it never collides with the design_modules signature. The
+// consolidated roster stays in §13 (Part 3) as the act-at-the-end master. Reuses
+// resolveAdvisorBlock + AdvisorSpecialistCard. Returns null when the module has
+// no advisor block (older states / no-op modules) so it never adds a blank page.
+function ModuleQuestionsPage({ state, moduleSpec, index, project }: { state: any; moduleSpec: any; index: number; project: string }) {
+  try {
+    const moduleId = String(moduleSpec?.module ?? '')
+    const block = resolveAdvisorBlock(state, moduleId, index)
+    if (!block) return null
+    const cards = (block.cards || []).filter((c) => c && Array.isArray(c.questions) && c.questions.length > 0)
+    if (cards.length === 0) return null
+    const moduleName =
+      britishise(normalise_unicode(humaniseSubName(String(block?.module_name ?? moduleSpec?.display_name ?? moduleId).trim()))) ||
+      humanise(moduleId)
+    return (
+      <Page size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Specialist Questions" project={project} />
+        <PageFooter />
+        <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.8, marginBottom: 2 }}>
+          QUESTIONS FOR YOUR SPECIALISTS
+        </Text>
+        <Text style={{ fontSize: 17, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 5 }}>
+          {moduleName}
+        </Text>
+        <View style={{ height: 0.8, backgroundColor: RULE_SOFT, marginBottom: 8 }} />
+        <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 12 }}>
+          The design questions to put to a specialist for this module, the kind of expert who should answer them, and
+          what a strong answer looks like. Each question is grounded in a specific open item in this design. The
+          consolidated roster across every module is in the Engagement Plan (Section 13).
+        </Text>
+        {block.intro ? (
+          <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45, marginBottom: 12 }}>
+            {britishise(normalise_unicode(String(block.intro)))}
+          </Text>
+        ) : null}
+        {cards.map((card, ci) => (
+          <AdvisorSpecialistCard key={`mqp-card-${index}-${ci}`} card={card} cardNo={ci + 1} />
+        ))}
+      </Page>
+    )
+  } catch {
+    return null
+  }
+}
+
 /**
  * Resolve the advisor block for a module instance from state.advisorEngagement.
  * Keyed by the module INSTANCE (`<moduleId>#<index>`), falling back to the first
@@ -10128,7 +10182,9 @@ function ModuleSection({
           orchestrator tool whose output contributed to a quantity referenced
           by this module's sub-modules or derived_parameters. Renders nothing
           when the orchestrator phase didn't run for this design. */}
-      <ModuleToolsCallout moduleSpec={moduleSpec} state={state} />
+      {/* Worked calcs moved to Part 1 (EngineeringCalculationsPage, 2026-06-08) —
+          Tristan: "how this is computed" belongs in the engineering part, not the
+          build modules. ModuleToolsCallout left defined but no longer called here. */}
 
       <View style={{ marginBottom: 14 }}>
         {(overviewChunks.length > 0 ? overviewChunks : [overview || `Module ${index} of the product.`]).map((chunk, i) => (
@@ -10268,7 +10324,9 @@ function ModuleSection({
                 sub-module's parts table — pushing the maths down from the module
                 top to the specific sub-module it grounds (Tristan's request). A
                 sub-module with no routed tool renders nothing. */}
-            {state ? <SubModuleToolsCallout state={state} moduleSpec={moduleSpec} subId={sm.id} /> : null}
+            {/* Worked calcs ("how this is computed") moved to Part 1
+                (EngineeringCalculationsPage, 2026-06-08); SubModuleToolsCallout
+                left defined but no longer called here. */}
             <SubModuleBomBlock
               bomLines={subBomLines}
               subtotal={subBomSubtotal}
@@ -10311,7 +10369,11 @@ function ModuleSection({
           (Section 13) so they no longer bleed into the multimodal scorer's per-
           module page samples. No-ops when the block is absent (older state files);
           self-guarded so a render fault never crashes the page. */}
-      {state ? <ModuleAdvisorBlock state={state} moduleId={moduleSpec.module} index={index} /> : null}
+      {/* Per-module advisor pointer REMOVED 2026-06-08: the full specialist
+          questions now render in-context on a dedicated "Specialist Questions"
+          page right after this module (ModuleQuestionsPage, Part 2), so the
+          "see Section 13" pointer is redundant. The consolidated roster stays in
+          §13 (Part 3). ModuleAdvisorBlock is left defined but unused. */}
 
       <PageFooter />
     </Page>
@@ -14924,6 +14986,97 @@ function SubModuleToolsCallout({ state, moduleSpec, subId }: { state: any; modul
   )
 }
 
+// ─── PART 1 · Engineering Calculations (2026-06-08) ──────────────────────────
+// Tristan: "how this is computed" (the worked calcs) belongs in the ENGINEERING
+// part of the document, not inline in the Part-2 build modules. This page
+// consolidates EVERY sub-module's worked calculation — the same ToolsComputedBlock
+// content that used to render in §6 — grouped by module -> sub-module, in Part 1.
+// The Part-2 modules no longer carry the worked calcs (ModuleToolsCallout /
+// SubModuleToolsCallout calls removed), which also collapses the big §6 page gaps
+// (those were the large worked-calc blocks forcing early page breaks via
+// minPresenceAhead). Its own "Engineering Calculations" running header buckets it
+// into the scorer's `engineering_calcs` section (scored on its own merits, not
+// mis-counted as design_modules). try/catch -> null so a fault never breaks the PDF.
+function EngineeringCalculationsPage({ state, project }: { state: any; project: string }) {
+  try {
+    const rawModules: any[] = Array.isArray(state?.moduleDecomposition?.modules) ? state.moduleDecomposition.modules : []
+    const modules = (() => { try { return order_modules(rawModules as any) } catch { return rawModules } })()
+    if (modules.length === 0) return null
+    const perModule = modules.map((m: any) => {
+      const spanning = moduleSpanningToolIds(state, m)
+      const spanSet = new Set(spanning)
+      const subs: any[] = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+      const subBlocks = subs
+        .map((sm: any) => ({ sm, ids: subModuleToolIds(state, m, undefined, String(sm?.id ?? '')).filter((id: string) => !spanSet.has(id)) }))
+        .filter((x: any) => Array.isArray(x.ids) && x.ids.length > 0)
+      return { m, spanning, subBlocks }
+    }).filter((x: any) => x.spanning.length > 0 || x.subBlocks.length > 0)
+    if (perModule.length === 0) return null
+    return (
+      <Page size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Part 1 · Engineering Calculations" project={project} />
+        <PageFooter />
+        <Text style={{ fontSize: 9, color: ACCENT, letterSpacing: 1.5, fontFamily: 'Helvetica-Bold', marginBottom: 3 }}>
+          PART 1 · ENGINEERING CALCULATIONS
+        </Text>
+        <Text style={{ fontSize: 21, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+          How every number was computed
+        </Text>
+        <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 14, lineHeight: 1.5 }}>
+          The worked engineering calculations that size the plant, grouped by module and sub-module. Every quantity used
+          downstream in the design, the bill of materials and the costs traces to a step here, and each is checkable by
+          hand. How it is built — equipment, parts and suppliers — follows in Part 2.
+        </Text>
+        {perModule.map((entry: any, mi: number) => {
+          const m = entry.m
+          const groupLabel = String(m?.display_name || humanise(String(m?.module ?? '')) || `Module ${mi + 1}`)
+          return (
+            <View key={`ecp-${mi}`} style={{ marginTop: mi > 0 ? 16 : 2 }} minPresenceAhead={48}>
+              <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.8, marginBottom: 2 }}>
+                {`MODULE ${mi + 1}`}
+              </Text>
+              <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>
+                {britishise(normalise_unicode(groupLabel))}
+              </Text>
+              <View style={{ height: 0.6, backgroundColor: RULE_SOFT, marginBottom: 8 }} />
+              {entry.spanning.length > 0 ? (
+                <ToolsComputedBlock
+                  toolIds={entry.spanning}
+                  state={state}
+                  heading="Spanning tools — size more than one sub-module"
+                  intro="The engineering tools below size equipment across more than one of this module's sub-modules, so their worked calculation is shown once here."
+                />
+              ) : null}
+              {entry.subBlocks.map((x: any, si: number) => {
+                const ws: any[] = Array.isArray(x.sm?.words) ? x.sm.words : []
+                const prim = ws.find((w: any) => w && w.name_human)
+                const lbl = normalise_unicode(humaniseSubName(String(prim?.name_human || x.sm?.name_human || x.sm?.id || ''))).trim()
+                const subName = lbl ? lbl.charAt(0).toUpperCase() + lbl.slice(1) : `Sub-module ${si + 1}`
+                return (
+                  <View key={`ecp-${mi}-${si}`} style={{ marginTop: 9 }} minPresenceAhead={38}>
+                    <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>
+                      {subName}
+                    </Text>
+                    <ToolsComputedBlock
+                      toolIds={x.ids}
+                      state={state}
+                      compact
+                      heading="How this is computed"
+                      intro="The engineering tool(s) below computed the quantities that size this sub-module's equipment — every number is checkable by hand from the worked steps."
+                    />
+                  </View>
+                )
+              })}
+            </View>
+          )
+        })}
+      </Page>
+    )
+  } catch {
+    return null
+  }
+}
+
 // ─── PART 1 · Engineering Basis (front-of-dossier consolidation) ─────────────
 // ADDITIVE render-only section (increment 1 of the Anvil Part-1 restructure,
 // ANVIL-PDF-RESTRUCTURE-SPEC.md). Pulls the three "does it work" answers —
@@ -14960,6 +15113,114 @@ function _ebQtyUnit(q: any): string {
 // One bordered box in the process-flow diagram (a sub-module, an input, or a
 // product). Tone selects the accent: 'input'/'product' get a tinted fill so the
 // plant boundary reads at a glance; 'unit' is the neutral process box.
+// CO2-mineralisation process-flow DIAGRAM (2026-06-08) — the block-flow Tristan
+// approved on the mockup (FEASIBILITY-COPILOT-MOCKUP.html), ported to react-pdf
+// <Svg> primitives and driven by orchestratorContract.quantities so the stream
+// NUMBERS render on the diagram. Two trains: capture & solvent regeneration;
+// mineralisation & product recovery (with the lean-amine + excess-CO2 recycle
+// loops). Class-gated to co2_mineralisation by the caller; other archetypes keep
+// the generic block-flow (a universal auto-BFD generator is a separate build).
+// viewBox 800x470 rendered at the page content width. try/catch -> null so a
+// diagram fault can never break the PDF. ASCII/WinAnsi-safe text only.
+function Co2ProcessFlowDiagram({ q }: { q: Record<string, any> }) {
+  try {
+    const num = (k: string, d: number): number => {
+      const o = q?.[k]; const v = (o && typeof o === 'object') ? o.value : o
+      const n = Number(v); return Number.isFinite(n) ? n : d
+    }
+    const f = (n: number): string => String(Math.round(n * 100) / 100)
+    const absH = `${f(num('absorber_packed_height_m', 20))} m`
+    const rV = `${f(num('gypsum_reactor_volume_m3', num('carbonation_reactor_volume_m3', 5)))} m3`
+    const caco3 = `${f(num('caco3_output_t_per_day', 2.27))} t/d`
+    const k2so4 = `${f(num('k2so4_output_t_per_day', 3.95))} t/d`
+    const gypL = `gypsum ${f(num('gypsum_feed_t_per_day', 3.9))} t/d`
+    const kohL = `KOH ${f(num('koh_feed_t_per_day', 2.54))} t/d`
+    const co2L = `CO2 ${f(num('co2_capture_rate_kg_per_hour', 42) * 24 / 1000)} t/d`
+
+    const GREY = '#9aa3ad', ORANGE = '#e2562a', BLUE = '#1e3a5f', GREEN = '#1f6f54', INKC = '#0d1117', STR = '#6b7280'
+    const els: any[] = []
+    let kc = 0
+    const K = () => `co2flow-${kc++}`
+    const box = (x: number, y: number, w: number, h: number, lines: { t: string; val?: boolean; sm?: boolean }[], prod?: boolean) => {
+      els.push(<Rect key={K()} x={x} y={y} width={w} height={h} rx={5} fill={prod ? '#eef6f1' : '#ffffff'} stroke={prod ? GREEN : BLUE} strokeWidth={1.1} />)
+      const cx = x + w / 2, lh = 12.5
+      let ty = y + h / 2 - (lines.length - 1) * lh / 2 + 3.5
+      for (const L of lines) {
+        els.push(<Text key={K()} x={cx} y={ty} textAnchor="middle" fill={L.val ? BLUE : INKC} style={{ fontFamily: L.val ? 'Helvetica-Bold' : 'Helvetica', fontSize: L.sm ? 7 : 9 }}>{L.t}</Text>)
+        ty += lh
+      }
+    }
+    const head = (x: number, y: number, dir: 'R' | 'L' | 'U' | 'D', color: string = GREY) => {
+      const p = dir === 'R' ? `${x},${y} ${x - 6},${y - 3.5} ${x - 6},${y + 3.5}`
+        : dir === 'L' ? `${x},${y} ${x + 6},${y - 3.5} ${x + 6},${y + 3.5}`
+        : dir === 'U' ? `${x},${y} ${x - 3.5},${y + 6} ${x + 3.5},${y + 6}`
+        : `${x},${y} ${x - 3.5},${y - 6} ${x + 3.5},${y - 6}`
+      els.push(<Polygon key={K()} points={p} fill={color} />)
+    }
+    const ln = (x1: number, y1: number, x2: number, y2: number, color: string = GREY, dash?: boolean) =>
+      els.push(<Line key={K()} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={1.1} strokeDasharray={dash ? '4 3' : undefined} />)
+    const harrow = (x1: number, x2: number, y: number) => { ln(x1, y, x2, y); head(x2, y, x2 > x1 ? 'R' : 'L') }
+    const varrow = (x: number, y1: number, y2: number) => { ln(x, y1, x, y2); head(x, y2, y2 > y1 ? 'D' : 'U') }
+    const dpath = (d: string, ex: number, ey: number, dir: 'R' | 'L' | 'U' | 'D', color: string, dash?: boolean) => {
+      els.push(<Path key={K()} d={d} stroke={color} strokeWidth={1.1} fill="none" strokeDasharray={dash ? '4 3' : undefined} />)
+      head(ex, ey, dir, color)
+    }
+    const stream = (x: number, y: number, t: string, orange?: boolean) =>
+      els.push(<Text key={K()} x={x} y={y} fill={orange ? ORANGE : STR} style={{ fontFamily: 'Helvetica', fontSize: 7 }}>{t}</Text>)
+    const hd = (x: number, y: number, t: string) =>
+      els.push(<Text key={K()} x={x} y={y} fill={STR} style={{ fontFamily: 'Helvetica-Bold', fontSize: 8 }}>{t}</Text>)
+
+    // ── Train 1: capture & solvent regeneration ──
+    hd(8, 18, 'CAPTURE & SOLVENT REGENERATION')
+    stream(8, 96, 'flue gas'); harrow(8, 150, 100)
+    box(150, 70, 104, 60, [{ t: 'Absorber' }, { t: absH, val: true }])
+    stream(206, 46, 'treated gas'); varrow(202, 70, 46)
+    harrow(254, 300, 100)
+    box(300, 70, 98, 60, [{ t: 'Lean / rich' }, { t: 'exchanger' }])
+    harrow(398, 424, 100)
+    box(424, 70, 84, 60, [{ t: 'Stripper' }])
+    harrow(508, 534, 100)
+    box(534, 70, 96, 60, [{ t: 'Overhead' }, { t: 'condenser' }])
+    box(424, 160, 84, 36, [{ t: 'Reboiler', sm: true }])
+    varrow(466, 160, 130)
+    box(300, 160, 98, 36, [{ t: 'Lean cooler', sm: true }])
+    dpath('M424,112 L410,112 L410,178 L398,178', 398, 178, 'L', ORANGE, true)
+    dpath('M300,178 L60,178 L60,52 L180,52 L180,70', 180, 70, 'D', ORANGE, true)
+    stream(104, 170, 'lean amine recycle', true)
+    stream(440, 234, co2L)
+    dpath('M582,130 L582,240 L210,240 L210,300', 210, 300, 'D', GREY)
+    // ── Train 2: mineralisation & product recovery ──
+    hd(8, 288, 'MINERALISATION & PRODUCT RECOVERY')
+    box(150, 300, 120, 80, [{ t: 'Gypsum' }, { t: 'carbonation' }, { t: rV, val: true }])
+    stream(96, 308, gypL); stream(96, 320, kohL); ln(134, 316, 150, 330); head(150, 330, 'D')
+    stream(274, 332, 'slurry'); harrow(270, 300, 340)
+    box(300, 310, 80, 60, [{ t: 'Belt filter' }])
+    stream(384, 312, 'cake'); ln(380, 322, 412, 307); head(412, 307, 'R')
+    box(412, 284, 92, 46, [{ t: 'CaCO3 dryer' }])
+    stream(384, 374, 'filtrate'); ln(380, 358, 412, 369); head(412, 369, 'R')
+    box(412, 346, 92, 46, [{ t: 'K2SO4' }, { t: 'crystalliser' }])
+    harrow(504, 640, 307)
+    box(640, 284, 118, 46, [{ t: 'CaCO3' }, { t: caco3, val: true }], true)
+    harrow(504, 524, 369)
+    box(524, 346, 84, 46, [{ t: 'K2SO4 dryer' }])
+    harrow(608, 640, 369)
+    box(640, 346, 118, 46, [{ t: 'K2SO4' }, { t: k2so4, val: true }], true)
+    dpath('M210,380 L210,448 L36,448 L36,40 L168,40 L168,70', 168, 70, 'D', ORANGE, true)
+    stream(296, 462, 'excess CO2 recycled to absorber - nothing vented', true)
+
+    const W = 467
+    return (
+      <View wrap={false} style={{ marginBottom: 4 }}>
+        <Svg viewBox="0 0 800 470" style={{ width: W, height: (W * 470) / 800 }}>
+          {els}
+        </Svg>
+      </View>
+    )
+  } catch {
+    return null
+  }
+}
+
 function _EbFlowBox({ label, tone }: { label: string; tone?: 'unit' | 'input' | 'product' }) {
   const fill = tone === 'input' ? '#eef4fb' : tone === 'product' ? '#eef7f0' : '#ffffff'
   const border = tone === 'input' ? ACCENT_SOFT : tone === 'product' ? '#3f8a55' : RULE
@@ -14991,6 +15252,7 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
   try {
     const oc = state?.orchestratorContract ?? {}
     const quantities = (oc.quantities && typeof oc.quantities === 'object') ? oc.quantities : {}
+    const isCo2Flow = String(state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? '') === 'co2_mineralisation'
     const rawModules: any[] = Array.isArray(state?.moduleDecomposition?.modules)
       ? state.moduleDecomposition.modules
       : []
@@ -15135,7 +15397,7 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
         </Text>
         <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 16, lineHeight: 1.5 }}>
           {briefSummary
-            ? normalise_unicode(briefSummary.replace(/\s+/g, ' ').trim()).slice(0, 320)
+            ? normalise_unicode(briefSummary.replace(/\s+/g, ' ').trim()).slice(0, 317).replace(/\s+\S*$/, '') + '...'
             : 'A consolidated view of the engineering: how the plant flows, what it moves and the energy it uses, and whether it stands up.'}
           {' '}The flow, balance and verdict below are pulled to the front so feasibility can be judged before the per-module detail.
         </Text>
@@ -15146,9 +15408,15 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
             1 · Process flow
           </Text>
           <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 10, lineHeight: 1.45 }}>
-            Block-flow of the plant — one box per sub-module, grouped under its module. Reading order left-to-right; recycle and key streams are annotated below (not drawn).
+            {isCo2Flow
+              ? 'Block-flow of the plant — the equipment and the streams between them, with the key quantities on the diagram (recycle loops dashed).'
+              : 'Block-flow of the plant — one box per sub-module, grouped under its module. Reading order left-to-right; recycle and key streams are annotated below (not drawn).'}
           </Text>
 
+          {isCo2Flow ? (
+            <Co2ProcessFlowDiagram q={quantities} />
+          ) : (
+          <>
           {/* Boundary in: flue gas */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
             <_EbFlowBox label={inputLabel} tone="input" />
@@ -15211,6 +15479,8 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
               ))}
             </View>
           ) : null}
+          </>
+          )}
         </View>
 
         {/* ── BLOCK 2 · MASS & ENERGY BALANCE ────────────────────────────── */}
@@ -15397,7 +15667,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           'Brief and requirements, and how it was interpreted',
           'Brief compliance and trade-offs',
           'System overview: how the plant works',
-          'Cost by module',
+          'Engineering calculations: the worked maths, by module and sub-module',
         ]}
         project={project}
       />
@@ -15462,6 +15732,10 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           plain-English system architecture before dropping into per-module
           pages. */}
       <SystemOverviewPage state={state} project={project} />
+      {/* Part 1 · Engineering Calculations — the worked maths ("how this is
+          computed"), moved OUT of the Part-2 modules into the engineering part
+          (Tristan 2026-06-08). Closes the §6 page gaps too. */}
+      <EngineeringCalculationsPage state={state} project={project} />
       {/* Section 5 · Cost Summary (cost-by-module). Moved AHEAD of the Module
           Map in the 2026-06-05 navigability refactor so the front-to-back
           numbering stays monotonic: the reader meets the system architecture
@@ -15470,7 +15744,6 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           Map plus the per-module pages, all Section 6. The consolidated master
           Bill of Materials is Section 8, immediately before Cost Basis +
           Sourcing: design first, then the canonical parts list. */}
-      <CostByModulePage state={state} project={project} bomTotals={bomTotals} />
       <PartDividerPage
         eyebrow="Part 2"
         title={"How to build it"}
@@ -15483,7 +15756,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
         project={project}
       />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
-      {modules.map((m: any, idx: number) => (
+      {modules.map((m: any, idx: number) => ([
         <ModuleSection
           key={`${m.module}-${idx}`}
           index={idx + 1}
@@ -15500,8 +15773,17 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           state={state}
           partRecommendations={Array.isArray(state?.partRecommendations) ? state.partRecommendations : []}
           manualReviewBadges={manualReviewBadges}
-        />
-      ))}
+        />,
+        // Part 2 in-context specialist questions for this module, on their own
+        // "Specialist Questions" page right after the module (Tristan 2026-06-08).
+        <ModuleQuestionsPage
+          key={`${m.module}-${idx}-questions`}
+          state={state}
+          moduleSpec={m}
+          index={idx + 1}
+          project={project}
+        />,
+      ]))}
       {/* ITER-10.5 Phase J (Tristan Q1 answer B, 2026-05-20): MERGED.
           RiskPage now embeds the SystemLevelRisks content as its first
           sub-block under "Risk & Integration Analysis". The standalone
@@ -15535,6 +15817,9 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           consolidation of existing bomTotals — no part, manufacturer, part number
           or price invented (gate-20 safety line). */}
       <MasterBillOfMaterialsPage state={state} project={project} bomTotals={bomTotals} partLinkMap={partLinkMap} />
+      {/* Cost by module — moved OUT of Part 1 (Tristan 2026-06-08) into the Part 3
+          reference cluster, beside the master BoM + cost basis. */}
+      <CostByModulePage state={state} project={project} bomTotals={bomTotals} />
       <CostBasisAssumptionsPage state={state} project={project} />
       {/* Section 9b · Economics & Scenarios (2026-06-07): deterministic
           scenario/sensitivity analysis over EXOGENOUS economic assumptions

@@ -207,10 +207,12 @@ SECTIONS = [
     "executive_summary",
     "brief_requirements",
     "design_modules",
+    "engineering_calcs",
     "bom",
     "cost_analysis",
     "sourcing_strategy",
     "feasibility_notes",
+    "engagement",
     "grammar_language",
     "sources_references",
     "appendix_technical",
@@ -250,10 +252,12 @@ Criteria for each:
 - executive_summary: 3-paragraph narrative (product description / design outcome / next steps), not just a table
 - brief_requirements: quantified performance targets, regulatory standards, measurable KPIs
 - design_modules: subsystem list with functional descriptions, domain-correct subsystems for this product class
+- engineering_calcs: worked first-principles calculations that size the plant, grouped by module/sub-module, every number checkable by hand
 - bom: complete BOM with parts, quantities, unit costs, suppliers, MPNs (not TBD), grade quality
 - cost_analysis: total unit cost vs ceiling, cost breakdown by module, credibility of estimates
 - sourcing_strategy: supplier identification, lead times, dual-source risk, MOQ discussion
 - feasibility_notes: cost verdict, top 3 technical risks with severity, regulatory flags, manufacturing flags
+- engagement: per-module specialist questions to validate this design — specific, grounded, domain-correct questions to put to a named TYPE of expert, each with what a strong answer looks like; readable layout
 - grammar_language: engineering terminology correctness, no hallucinated subsystems, DRC/grammar pass status
 - sources_references: cited sources, search results referenced, credibility
 - appendix_technical: any supporting technical data, calculations, datasheets
@@ -267,10 +271,12 @@ Return ONLY a JSON object (no code fences, no backticks):
   "executive_summary": <int or null>,
   "brief_requirements": <int or null>,
   "design_modules": <int or null>,
+  "engineering_calcs": <int or null>,
   "bom": <int or null>,
   "cost_analysis": <int or null>,
   "sourcing_strategy": <int or null>,
   "feasibility_notes": <int or null>,
+  "engagement": <int or null>,
   "grammar_language": <int or null>,
   "sources_references": <int or null>,
   "appendix_technical": <int or null>,
@@ -359,6 +365,11 @@ _HEADER_SIGNATURES: dict[str, list[str]] = {
                            "BRIEFCOMPLIANCE", "PHYSICSNARRATIVE",
                            "SYSTEMOVERVIEW", "DESIGNTRADE-OFFS"],
     "design_modules":     ["·MODULES", "·MODULE", "ENGINEERINGTOOLSFLOW"],
+    # Part 1 Engineering Calculations page (2026-06-08): running header
+    # "ENGINEERING CALCULATIONS"; bucket the relocated worked maths into its own
+    # section (scored on its own merits), NOT design_modules. No "·MODULE" token,
+    # so it never collides with the design_modules signature above.
+    "engineering_calcs":  ["ENGINEERINGCALCULATIONS"],
     # "bom" is the parts-level Bill of Materials (the master parts table). Anchor to
     # its section header "SECTION N · BILL OF MATERIALS". The leading "·" is REQUIRED:
     # a bare "BILLOFMATERIALS" also matched prose mentions in a page's first 6 lines
@@ -381,6 +392,12 @@ _HEADER_SIGNATURES: dict[str, list[str]] = {
                            "SOURCING&", "SOURCINGSTRATEGY"],
     "feasibility_notes":  ["RISK&INTEGRATION", "RISKANALYSIS",
                            "REGULATORY&COMPLIANCE", "REGULATORY&"],
+    # Per-module specialist QUESTIONS pages (Part 2, 2026-06-08). The renderer's
+    # ModuleQuestionsPage running header reads "SPECIALIST QUESTIONS"; bucket those
+    # pages into `engagement` so the in-context questions are scored on their own
+    # merits, NOT mis-counted as design_modules/bom clutter. The header carries no
+    # "·MODULE" token, so it never collides with the design_modules signature.
+    "engagement":         ["SPECIALISTQUESTIONS"],
     "sources_references": ["TOOLSUSEDINTHISREPORT", "TOOLSUSED", "REFERENCES",
                            "POTENTIALINVESTORS", "APPENDIX·POTENTIAL"],
     "appendix_technical": ["TOOLSUSEDINTHISREPORT", "TOOLSUSED", "APPENDIX",
@@ -765,10 +782,12 @@ _SECTION_CRITERIA: dict[str, str] = {
     "executive_summary": "3-paragraph narrative (product description / design outcome / next steps), not just a table",
     "brief_requirements": "quantified performance targets, regulatory standards, measurable KPIs",
     "design_modules": "subsystem list with functional descriptions, domain-correct subsystems for this product class",
+    "engineering_calcs": "worked first-principles calculations that size the plant (HTU-NTU, flooding, duties, mass/energy balances etc.), grouped by module/sub-module, every number checkable by hand",
     "bom": "complete BOM with parts, quantities, unit costs, suppliers, MPNs (not TBD), grade quality",
     "cost_analysis": "total unit cost vs ceiling, cost breakdown by module, credibility of estimates",
     "sourcing_strategy": "supplier identification, lead times, dual-source risk, MOQ discussion",
     "feasibility_notes": "cost verdict, top 3 technical risks with severity, regulatory flags, manufacturing flags",
+    "engagement": "per-module specialist questions to validate this design: specific, grounded, domain-correct questions to put to a named TYPE of expert, each pairing the question with what a strong answer looks like; readable layout",
     "grammar_language": "engineering terminology correctness, no hallucinated subsystems, DRC/grammar pass status",
     "sources_references": "cited sources, search results referenced, credibility",
     "appendix_technical": "any supporting technical data, calculations, datasheets",
