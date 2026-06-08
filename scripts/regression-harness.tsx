@@ -366,6 +366,26 @@ function checkSizingToolsWorkedSound(): Assertion[] {
       () => `error=${absorber?.error} | bad=${r2.bad.slice(0, 1).join(' | ')} | D=${absorber?.column_diameter_m} u_design=${absorber?.design_velocity_m_s} u_flood=${absorber?.flooding_velocity_m_s}`,
     ))
 
+    // Reactive-MEA empirical packed-height override (Caspar Schoolderman, OXCCU CO2 co, 2026-06-08):
+    // the Colburn dilute model gives ~1.41 m for MEA-CO2 (zero lean loading + kinetically-enhanced
+    // mass transfer) — far too short; reality is ~20 m from public MEA pilot trials. When
+    // packed_height_override_m is supplied it MUST govern the height; the flooding diameter stays
+    // first-principles. Guards against a silent regression back to the ~1.41 m Colburn value.
+    const absorberMea = runTool('absorption_column_htu_ntu.py', {
+      column_name: 'CO2 absorber', mode: 'absorber', gas_flow_kg_h: 316, gas_density_kg_m3: 1.1,
+      y_in_mol_frac: 0.12, target_removal: 0.90, liquid_flow_kg_h: 3500, equilibrium_slope_m: 0.4,
+      htu_m: 0.6, packing_factor_fp_per_m: 66, fraction_of_flooding: 0.65, packed_height_override_m: 20,
+    })
+    out.push(assertEq(
+      'UNIVERSAL.absorption_reactive_amine_packed_height_override_governs',
+      'absorption:column-htu-ntu — packed_height_override_m (reactive-MEA empirical anchor) GOVERNS the packed height (~20 m), not the too-short Colburn dilute value (~1.41 m); flooding diameter still first-principles',
+      JSON.stringify({ H: absorberMea?.packed_height_m, D: absorberMea?.column_diameter_m, err: absorberMea?.error }),
+      () => !absorberMea?.error
+        && Math.abs(num(absorberMea, 'packed_height_m') - 20) < 0.01
+        && num(absorberMea, 'column_diameter_m') >= 0.05 && num(absorberMea, 'column_diameter_m') <= 2,
+      () => `error=${absorberMea?.error} | packed_height_m=${absorberMea?.packed_height_m} (want 20) | D=${absorberMea?.column_diameter_m}`,
+    ))
+
     // 3. crystalliser:evaporator-sizing — K2SO4 recovery (~165 kg/h product).
     const cryst = runTool('crystalliser_evaporator_sizing.py', {
       crystalliser_name: 'K2SO4 evaporative crystalliser', solute_name: 'K2SO4',
@@ -1080,68 +1100,46 @@ function checkCo2FixInvariants(): Assertion[] {
     ))
   }
 
-  // ── (6) CO2.second_lime_carbonation_sink_present (house rule #11, 2026-06-05) ──
-  // The brief mandates TWO carbonation sinks: a PRIMARY gypsum reactor PLUS a SECONDARY
-  // hydrated-lime reactor carbonating the balance (Ca(OH)2 + CO2 -> CaCO3 + H2O). The lime
-  // CHEMISTRY existed in the contract but there was NO physical lime reactor — the design
-  // emitted only a gypsum reactor sub_module. This invariant asserts, DETERMINISTICALLY and
-  // snapshot-independently, that (a) the CO₂ class plan WIRES a lime-reactor sizing step that
-  // emits a lime_reactor_shell_mass_kg contract quantity, and (b) the deterministic emitter
-  // produces a lime-carbonation sub_module carrying ≥1 part_number-bearing word — so the second
-  // sink can never silently regress out of the design or the contract.
+  // ── (6) CO2.no_lime_carbonation_sink (C. Schoolderman, OXCCU, 2026-06-08) ──
+  // SUPERSEDES the former CO2.second_lime_carbonation_sink_present invariant. The supplementary
+  // hydrated-lime carbonation reactor is REMOVED: the single gypsum carbonation reactor, run
+  // with EXCESS CO2 and the unreacted CO2 recycled to the absorber inlet, fixes the FULL 1 t/day
+  // captured CO2. This invariant LOCKS the removal: the deterministic emitter must produce NO
+  // module / sub_module / word whose id or name contains "lime" — so a stale lime reactor can
+  // never silently regress back into the design.
   {
     const failures: string[] = []
-
-    // (a) the class plan must wire a reactor:cstr-pfr-sizing step whose contract_update emits
-    //     lime_reactor_shell_mass_kg (the BoM take-off + envelope key). Exercise EVERY
-    //     reactor-sizing step's contract_update with a stub tool output; at least one must
-    //     write lime_reactor_shell_mass_kg. (No python — pure key-presence check.)
-    const steps: any[] = (CO2_MINERALISATION_PLAN as any).tools ?? (CO2_MINERALISATION_PLAN as any).steps ?? []
-    const stubOut = {
-      working_volume_total_m3: 2.0, vessel_diameter_m: 1.29, vessel_height_m: 1.93,
-      shell_mass_kg_total: 420, power_w: 292, tip_speed_m_s: 3.0,
-    }
-    let limeMassEmitted = false
-    for (const s of steps) {
-      try {
-        const updated = s.contract_update?.({ quantities: { hydrated_lime_feed_t_per_day: { value: 0.35 } } }, stubOut)
-        if (updated?.quantities?.lime_reactor_shell_mass_kg?.value != null) limeMassEmitted = true
-      } catch { /* a step that throws on this seed is not the lime step */ }
-    }
-    if (!limeMassEmitted) failures.push('no class-plan step emits a lime_reactor_shell_mass_kg quantity (the secondary lime reactor sizing is missing from co2-mineralisation.ts)')
-
-    // (b) the deterministic emitter must produce a lime-carbonation sub_module with a
-    //     lime-carbonation word + ≥1 part_number modifier (gate-23) on a dual-sink contract.
     try {
       const contract: any = { quantities: {
         target_capture_tpd: { value: 1 },
-        co2_fixed_lime_route_t_per_day: { value: 0.2 },
-        hydrated_lime_feed_t_per_day: { value: 0.35 },
-        lime_reactor_volume_m3: { value: 2.0 },
-        lime_reactor_shell_mass_kg: { value: 420 },
       } }
       const design: any = co2MineralisationEmitter(contract, {} as any, {} as any)
       const mods: any[] = design?.modules ?? []
-      const limeMod = mods.find((m) => String(m?.display_name ?? '').toLowerCase().includes('lime carbonation reactor'))
-      if (!limeMod) failures.push('emitter produced NO lime-carbonation module (display_name "Lime Carbonation Reactor …")')
-      const limeWords: any[] = limeMod?.sub_modules?.flatMap((sm: any) => sm?.words ?? []) ?? []
-      const hasLimeWord = limeWords.some((w) => /lime_carbonation_reactor|lime_carbonation/.test(String(w?.content_character?.character_id ?? '')))
-      if (!hasLimeWord) failures.push('the lime module has no lime_carbonation_reactor word')
-      const limeSub: any = limeMod?.sub_modules?.[0]
-      const subHasPn = (limeSub?.words ?? []).some((w: any) => (w?.modifier_characters ?? []).some((mc: any) => mc?.kind === 'part_number'))
-      if (!subHasPn) failures.push('the lime_carbonation sub_module carries no part_number-bearing word (gate-23 emitter-completeness would fail)')
-      // distinct display_name (no Map collision with the gypsum / K2SO4 energy_conversion modules)
-      const names = mods.map((m) => String(m?.display_name ?? ''))
-      if (names.filter((n) => n === (limeMod?.display_name ?? '')).length !== 1) failures.push('the lime module display_name collides with another module (Map overwrite risk)')
+      const hasLime = (s: any) => /lime/i.test(String(s ?? ''))
+      for (const m of mods) {
+        if (hasLime(m?.display_name) || hasLime(m?.module)) {
+          failures.push(`module "${m?.display_name ?? m?.module}" still references lime`)
+        }
+        for (const sm of (m?.sub_modules ?? [])) {
+          if (hasLime(sm?.id) || hasLime(sm?.name_human)) {
+            failures.push(`sub_module "${sm?.id ?? sm?.name_human}" still references lime`)
+          }
+          for (const w of (sm?.words ?? [])) {
+            if (hasLime(w?.id) || hasLime(w?.name_human) || hasLime(w?.content_character?.character_id)) {
+              failures.push(`word "${w?.id ?? w?.name_human}" still references lime`)
+            }
+          }
+        }
+      }
     } catch (err) {
-      failures.push(`emitter threw building the lime sub_module: ${String(err).slice(0, 120)}`)
+      failures.push(`emitter threw building the CO2 design: ${String(err).slice(0, 120)}`)
     }
 
     out.push(assertEq(
-      'CO2.second_lime_carbonation_sink_present',
-      'CO₂ dual-sink: the class plan emits a lime_reactor_shell_mass_kg quantity AND the deterministic emitter produces a lime-carbonation sub_module with ≥1 part_number-bearing word (the second carbonation sink is real, sized, costed equipment — never silently absent)',
+      'CO2.no_lime_carbonation_sink',
+      'CO₂ single-sink: the deterministic emitter produces NO module / sub_module / word whose id or name contains "lime" (the supplementary hydrated-lime carbonation sink was removed 2026-06-08 per C. Schoolderman — the single gypsum reactor with excess-CO2 + recycle fixes the full captured CO2)',
       failures.length, (n) => n === 0,
-      () => `second lime carbonation sink missing/incomplete: ${failures.join(' ; ')}. Check scripts/lib/orchestrator/class-plans/co2-mineralisation.ts (stepLimeReactorSizing) + scripts/lib/orchestrator/emitters/co2-mineralisation.ts (emitLimeCarbonationReactor).`,
+      () => `lime carbonation sink still present: ${failures.join(' ; ')}. Check scripts/lib/orchestrator/emitters/co2-mineralisation.ts (emitLimeCarbonationReactor should be deleted).`,
     ))
   }
 

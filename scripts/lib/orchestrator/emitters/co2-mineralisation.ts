@@ -95,13 +95,6 @@ interface Co2MinParams {
   absorberDiaM: number
   absorberHeightM: number
   reactorVolumeM3: number
-  // Secondary hydrated-lime carbonation sink (2026-06-05) — REAL atmospheric 304SS equipment.
-  co2LimeRouteTpd: number
-  hydratedLimeTpd: number
-  limeReactorVolumeM3: number
-  limeReactorShellMassKg: number
-  limePrepTankVolumeM3: number
-  limeDosingKgH: number
   filterAreaM2: number
   distillColDiaM: number
   dryerHeatKw: number
@@ -110,6 +103,7 @@ interface Co2MinParams {
   boilerElectricalKw: number
   electricalKw: number
   transformerKva: number
+  mccRatingKw: number
   bagKg: number
   bagsPerDay: number
 }
@@ -168,6 +162,7 @@ function deriveParams(c: ContractInProgress): Co2MinParams {
   const requiredKva = (electricalKw * 0.9 / 0.9) * 1.25
   const transformerKva = q(c, 'transformer_rating_kva',
     STD_KVA.find((r) => r >= requiredKva) ?? 1600)
+  const mccRatingKw = Math.ceil(electricalKw * 1.25 / 50) * 50  // MCC busbar rated 25% above the connected load (was rated AT the load = undersized)
 
   return {
     captureTpd: tpd,
@@ -178,18 +173,10 @@ function deriveParams(c: ContractInProgress): Co2MinParams {
     kohTpd: koh,
     meaWtPct: q(c, 'mea_wt_pct', 30),
     // ~0.40 mol CO2/mol MEA working capacity on 30 wt% MEA ⇒ ~70 kg solution per kg CO2/h.
-    meaCircM3H: q(c, 'mea_circulation_m3_h', Math.max(0.5, Math.round(kgH * 0.07 * 10) / 10)),
+    meaCircM3H: q(c, 'mea_circulation_m3_per_hour', 0.68),
     absorberDiaM: q(c, 'absorber_diameter_m', 0.4),
     absorberHeightM: q(c, 'absorber_packed_height_m', 6),
     reactorVolumeM3: q(c, 'carbonation_reactor_volume_m3', 4),
-    // Secondary hydrated-lime carbonation sink — sized by the class-plan tools (atmospheric
-    // 304SS stirred tank). lime_reactor_shell_mass_kg drives the secondary-sink BoM take-off.
-    co2LimeRouteTpd: q(c, 'co2_fixed_lime_route_t_per_day', Math.max(0, tpd - 0.8)),
-    hydratedLimeTpd: q(c, 'hydrated_lime_feed_t_per_day', 0.35),
-    limeReactorVolumeM3: q(c, 'lime_reactor_volume_m3', 2.02),
-    limeReactorShellMassKg: q(c, 'lime_reactor_shell_mass_kg', 420),
-    limePrepTankVolumeM3: q(c, 'lime_prep_tank_volume_m3', 0.4),
-    limeDosingKgH: q(c, 'lime_dosing_rate_kg_h', Math.round((q(c, 'hydrated_lime_feed_t_per_day', 0.35) * 1000 / 24) * 10) / 10),
     filterAreaM2: q(c, 'filter_area_m2', 3),
     distillColDiaM: q(c, 'distillation_column_diameter_m', 0.3),
     dryerHeatKw,
@@ -198,6 +185,7 @@ function deriveParams(c: ContractInProgress): Co2MinParams {
     boilerElectricalKw,
     electricalKw,
     transformerKva,
+    mccRatingKw,
     bagKg,
     bagsPerDay: Math.round(((caco3 + k2so4) * 1000) / bagKg),
   }
@@ -206,7 +194,7 @@ function deriveParams(c: ContractInProgress): Co2MinParams {
 // 1. CO2 absorption (MEA capture) -------------------------------------------------
 function emitAbsorptionCapture(p: Co2MinParams): DesignModule {
   const sub = makeSub('mea_absorption_train', 'MEA absorption train', 'absorbs',
-    `${p.captureKgH.toFixed(0)} kg/h CO2 absorbed into ${p.meaWtPct.toFixed(0)} wt% aqueous MEA circulating at ${p.meaCircM3H.toFixed(1)} m³/h through a ${p.absorberDiaM.toFixed(1)} m × ${p.absorberHeightM.toFixed(0)} m packed column`, [
+    `${p.captureKgH.toFixed(0)} kg/h CO2 absorbed into ${p.meaWtPct.toFixed(0)} wt% aqueous MEA circulating at ${p.meaCircM3H.toFixed(1)} m³/h through a ${p.absorberDiaM.toFixed(1)} m × ${p.absorberHeightM.toFixed(0)} m packed column; the lean amine enters at ~0.5 mol/L residual CO2 loading + ~0.2 mol/L K2SO4 (non-zero lean loading — the driving-force limit that sets the ~20 m packing height, per public MEA pilot data)`, [
     word('packed_absorber_column_word', 'packed absorber column',
       cc('packed_absorber_column', 'packed absorber column', 'mass_fluid_transport_process', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'random-packed counter-current column, flanged segments for field erection'),
@@ -246,7 +234,7 @@ function emitAbsorptionCapture(p: Co2MinParams): DesignModule {
        mod('part_number', 'fabricated 316L atmospheric storage tank — bespoke vessel'), mod('list_price_gbp', '7500'), mod('regulatory', 'DSEAR')]),
   ])
   return { module: 'mass_fluid_transport_process', display_name: 'MEA Absorption & Capture',
-    module_brief: `30 wt% aqueous MEA counter-current packed absorber captures ${p.captureKgH.toFixed(0)} kg/h CO2 from flue gas; rich amine pumped to the carbonation reactor, lean amine returned.`,
+    module_brief: `30 wt% aqueous MEA counter-current packed absorber captures ${p.captureKgH.toFixed(0)} kg/h CO2 from flue gas; rich amine pumped to the carbonation reactor, lean amine returned. MEA-CO2 absorption is fast and strongly exothermic, so it is reaction-kinetics-controlled in a thin liquid film at the gas interface (high Hatta number) — the bulk driving force is small and the column runs at 70-80 C with a temperature bulge near the top set by the cold lean-amine feed (water evaporated by the exotherm re-condenses where it is colder). Rigorous sizing is rate-based (trimolecular kinetics + Hatta film analysis with the temperature profile); the ~20 m packed height is a public MEA pilot-data anchor pending that model. Basis per C. Schoolderman (OXCCU), 2026-06-08.`,
     overview_paragraph_en: '', derived_parameters: { capture_kg_h: p.captureKgH, mea_circulation_m3_h: p.meaCircM3H, mea_wt_pct: p.meaWtPct },
     allowed_radicals: ['mass_fluid_transport_process', 'thermal_transfer_function', 'stainless_steel', 'steel'], applicability_confidence: 'high', sub_modules: [sub] }
 }
@@ -254,7 +242,7 @@ function emitAbsorptionCapture(p: Co2MinParams): DesignModule {
 // 2. Gypsum carbonation reactor ---------------------------------------------------
 function emitCarbonationReactor(p: Co2MinParams): DesignModule {
   const sub = makeSub('gypsum_carbonation_reactor', 'gypsum carbonation reactor', 'reacts',
-    `CO2-rich MEA reacts with ${p.gypsumTpd.toFixed(1)} t/day gypsum in a ${p.reactorVolumeM3.toFixed(0)} m³ stirred reactor, precipitating ${p.caco3Tpd.toFixed(1)} t/day CaCO3 and releasing sulfate to the filtrate`, [
+    `CO2-rich MEA reacts with ${p.gypsumTpd.toFixed(1)} t/day gypsum in a ${p.reactorVolumeM3.toFixed(0)} m³ stirred reactor run with EXCESS CO2 for high gypsum conversion, precipitating ${p.caco3Tpd.toFixed(1)} t/day CaCO3 and releasing sulfate to the filtrate; unreacted excess CO2 is returned to the absorber inlet (recycle), so the full captured CO2 is mineralised via gypsum alone and no separate lime carbonation sink is required`, [
     word('stirred_carbonation_reactor_word', 'stirred carbonation reactor',
       cc('stirred_carbonation_reactor', 'stirred carbonation reactor', 'chemical_reaction_function', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'baffled stirred-tank reactor, jacketed'), mod('dimension', String(p.reactorVolumeM3.toFixed(0)), 'm³'), mod('manufacturer', 'De Dietrich'),
@@ -331,68 +319,6 @@ function emitCarbonationReactor(p: Co2MinParams): DesignModule {
     module_brief: `Jacketed stirred carbonation reactor mineralises captured CO2 with gypsum to ${p.caco3Tpd.toFixed(1)} t/day CaCO3; pH/ORP-controlled, agitated, slurry pumped to filtration.`,
     overview_paragraph_en: '', derived_parameters: { reactor_volume_m3: p.reactorVolumeM3, caco3_tpd: p.caco3Tpd, gypsum_tpd: p.gypsumTpd },
     allowed_radicals: ['chemical_reaction_function', 'electromagnetic_actuator_function', 'stainless_steel'], applicability_confidence: 'high', sub_modules: [sub] }
-}
-
-// 2b. SECONDARY hydrated-lime carbonation reactor (the SECOND carbonation sink) ----
-// The brief mandates TWO carbonation sinks. The PRIMARY gypsum reactor (above) fixes
-// ~0.8 t/day CO2; this SECONDARY supplementary stirred reactor is fed a hydrated-lime
-// (calcium hydroxide) slurry and carbonates the BALANCE (~0.2 t/day): Ca(OH)2 + CO2 ->
-// CaCO3 + H2O. It is REAL, sized, costed equipment — an ATMOSPHERIC 304SS stirred tank
-// (NOT a 3 barg jacketed 316L pressure vessel; lime slurry is far less aggressive than
-// the 120 C MEA loop), sized by the class-plan reactor:cstr-pfr-sizing tool. This sub_module
-// is emitted DETERMINISTICALLY (it is part of the deterministic assembler, NOT the LLM Stage
-// 1.7), so the second sink can never silently vanish on a re-run.
-//
-// GATE SAFETY (mirrors the gypsum reactor EXACTLY):
-//  - Fabricated VESSELS (reactor + slaking tank) carry honest "made-to-order fabricated 304SS"
-//    part_number descriptors with NO real MPN — gate-20 safe (commodity descriptor, never a
-//    fabricated structured MPN), identical idiom to the gypsum reactor shell.
-//  - The dosing + transfer + agitator words carry REAL SEEPEX/ABB/Endress+Hauser catalogue MPNs
-//    (the SAME BN-series progressive-cavity frames the gypsum line uses, proven in production) —
-//    this satisfies gate-23 (>=1 part_number-bearing word) and gate-20 (real catalogue parts).
-//  - The reactor vessel carries lime_reactor_shell_mass_kg as its `mass` modifier; the word's
-//    character_id (lime_carbonation_reactor) matches the build-cost-basis.ts secondary-sink
-//    take-off matcher so the BoM prices it (mass × £5/kg × 4.5 fab + agitator ≈ £14,450).
-function emitLimeCarbonationReactor(p: Co2MinParams): DesignModule {
-  const sub = makeSub('lime_carbonation', 'supplementary hydrated-lime carbonation reactor (secondary sink)', 'reacts',
-    `the balance of the captured CO2 (~${p.co2LimeRouteTpd.toFixed(1)} t/day) reacts with a hydrated-lime (Ca(OH)2) slurry from ~${p.hydratedLimeTpd.toFixed(2)} t/day lime in a ${p.limeReactorVolumeM3.toFixed(1)} m³ atmospheric 304SS stirred reactor, precipitating additional CaCO3 (Ca(OH)2 + CO2 → CaCO3 + H2O) so the full 1 t/day of captured CO2 is mineralised`, [
-    word('lime_carbonation_reactor_word', 'lime carbonation reactor vessel',
-      cc('lime_carbonation_reactor', 'supplementary hydrated-lime carbonation reactor', 'chemical_reaction_function', 'stainless_steel'),
-      // 304SS made-to-order atmospheric vessel — honest descriptor, NO MPN (gate-20 safe, same
-      // idiom as the gypsum reactor shell). Carries lime_reactor_shell_mass_kg as its mass modifier.
-      [mod('quantity', '×1'), mod('form', 'baffled atmospheric stirred-tank reactor, 304 stainless'), mod('dimension', String(p.limeReactorVolumeM3.toFixed(1)), 'm³'), mod('mass', String(Math.round(p.limeReactorShellMassKg)), 'kg'), mod('manufacturer', 'made-to-order fabrication'),
-       mod('part_number', 'made-to-order fabricated 304SS atmospheric stirred-tank reactor — bespoke vessel'), mod('list_price_gbp', '14450'), mod('regulatory', 'PED 2014/68/EU')]),
-    word('lime_slaking_tank_word', 'lime slaking / slurry-preparation tank',
-      cc('lime_slaking_tank', 'hydrated-lime slaking and slurry-preparation tank', 'chemical_reaction_function', 'stainless_steel'),
-      // Small atmospheric prep tank — honest descriptor, NO MPN (gate-20 safe).
-      [mod('quantity', '×1'), mod('form', 'agitated atmospheric slaking/slurry-prep tank, conditions the lime feed to a pumpable slurry'), mod('dimension', String(p.limePrepTankVolumeM3.toFixed(1)), 'm³'),
-       mod('part_number', 'made-to-order fabricated 304SS atmospheric slaking/slurry-prep tank — bespoke vessel'), mod('list_price_gbp', '6000'), mod('regulatory', 'COSHH')]),
-    word('lime_reactor_agitator_word', 'lime reactor agitator',
-      cc('lime_reactor_agitator', 'lime reactor top-entry agitator', 'electromagnetic_actuator_function', 'stainless_steel'),
-      // Real Ekato/ABB-style agitator+motor — REAL MPN (gate-20 safe), mirrors the gypsum agitator words.
-      [mod('quantity', '×1'), mod('form', 'pitched-blade turbine agitator on the atmospheric lime tank'), mod('capacity', '2', 'kW'), mod('manufacturer', 'ABB'),
-       mod('part_number', 'M3BP 100LA'), mod('list_price_gbp', '900'), mod('regulatory', 'IEC 60034-30-1')]),
-    word('lime_dosing_pump_word', 'lime dosing pump',
-      cc('lime_dosing_pump', 'hydrated-lime slurry dosing pump', 'mass_fluid_transport_process', 'stainless_steel'),
-      // Real SEEPEX progressive-cavity dosing pump — the SAME BN-series the gypsum line uses
-      // (proven gate-20 in production; BN xx-6L is unstructured → MED at worst, never a blocking HIGH).
-      [mod('quantity', '×1'), mod('form', 'progressive-cavity metering pump, meters the lime slurry into the reactor'), mod('capacity', String(p.limeDosingKgH.toFixed(1)), 'kg/h'), mod('manufacturer', 'SEEPEX'),
-       mod('part_number', 'BN 5-6L'), mod('list_price_gbp', '4200')]),
-    word('lime_slurry_transfer_pump_word', 'carbonated-slurry transfer pump',
-      cc('lime_slurry_transfer_pump', 'carbonated lime-slurry transfer pump', 'mass_fluid_transport_process', 'stainless_steel'),
-      // Real SEEPEX progressive-cavity transfer pump (same frame as the K2SO4 slurry feed pump).
-      [mod('quantity', '×2'), mod('form', 'progressive-cavity slurry pump, 1 duty + 1 standby, transfers carbonated slurry to filtration'), mod('manufacturer', 'SEEPEX'),
-       mod('part_number', 'BN 17-6L'), mod('list_price_gbp', '5200')]),
-    word('lime_reactor_ph_probe_word', 'lime reactor pH probe',
-      cc('lime_reactor_ph_probe', 'lime reactor in-line pH probe', 'chemical_sensing_function', 'glass'),
-      // Real Endress+Hauser Memosens electrode (same as the gypsum reactor pH probe).
-      [mod('quantity', '×2'), mod('form', 'Memosens glass pH electrode, controls lime dosing to carbonation endpoint'), mod('manufacturer', 'Endress+Hauser'),
-       mod('part_number', 'CPS11D'), mod('list_price_gbp', '2200')]),
-  ])
-  return { module: 'energy_conversion_transduction', display_name: 'Lime Carbonation Reactor (Secondary Sink)',
-    module_brief: `Supplementary atmospheric 304SS stirred reactor carbonates the balance of the captured CO2 (~${p.co2LimeRouteTpd.toFixed(1)} t/day) with a hydrated-lime (Ca(OH)2) slurry to additional CaCO3, with lime slaking, slurry preparation and pH-controlled dosing — the SECOND carbonation sink that closes the calcium balance.`,
-    overview_paragraph_en: '', derived_parameters: { lime_reactor_volume_m3: p.limeReactorVolumeM3, lime_reactor_shell_mass_kg: p.limeReactorShellMassKg, co2_lime_route_tpd: p.co2LimeRouteTpd, hydrated_lime_tpd: p.hydratedLimeTpd },
-    allowed_radicals: ['chemical_reaction_function', 'electromagnetic_actuator_function', 'mass_fluid_transport_process', 'stainless_steel'], applicability_confidence: 'high', sub_modules: [sub] }
 }
 
 // 3. CaCO3 filtration, wash, dry --------------------------------------------------
@@ -598,7 +524,7 @@ function emitProcessControl(_p: Co2MinParams): DesignModule {
     word('plc_controller_word', 'plant PLC controller',
       cc('plc_controller', 'plant PLC controller', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
       [mod('quantity', '×1'), mod('form', 'S7-1500 CPU, fail-safe'), mod('manufacturer', 'Siemens'),
-       mod('part_number', '6ES7515-2UM02-0AB0'), mod('list_price_gbp', '3800')]),
+       mod('part_number', 'SIMATIC S7-1500F fail-safe CPU — exact model specified at procurement per final I/O count'), mod('list_price_gbp', '3800')]),
     word('io_remote_rack_word', 'remote I/O racks',
       cc('io_remote_rack', 'ET 200SP remote I/O racks', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
       [mod('quantity', '×3'), mod('form', 'ET 200SP distributed I/O station + interface module'), mod('manufacturer', 'Siemens'),
@@ -675,7 +601,7 @@ function emitElectrical(p: Co2MinParams): DesignModule {
     `${p.electricalKw.toFixed(0)} kW of pumps, agitators, heaters, blowers and drives fed from a motor control centre`, [
     word('motor_control_centre_word', 'motor control centre',
       cc('motor_control_centre', 'motor control centre', 'electrical_conduction_function', 'steel'),
-      [mod('quantity', '×1'), mod('form', 'Form 4 MCC'), mod('capacity', String(p.electricalKw.toFixed(0)), 'kW'), mod('manufacturer', 'ABB'),
+      [mod('quantity', '×1'), mod('form', 'Form 4 MCC'), mod('capacity', String(p.mccRatingKw), 'kW'), mod('manufacturer', 'ABB'),
        mod('part_number', 'MNS Form-4 motor control centre — configured'), mod('list_price_gbp', '18000'), mod('regulatory', 'BS EN 61439')]),
     word('power_control_cables_word', 'power + control cabling',
       cc('power_control_cables', 'LSZH power and control cabling', 'electrical_conduction_function', 'copper'),
@@ -775,14 +701,11 @@ function emitSafety(_p: Co2MinParams): DesignModule {
       cc('eyewash_shower', 'safety shower and eyewash', 'mass_fluid_transport_process', 'polymer_thermoplastic'),
       [mod('quantity', '×2'), mod('form', 'combination shower/eyewash'), mod('manufacturer', 'Hughes Safety Showers'),
        mod('part_number', 'EXP-MH-14G/45G'), mod('list_price_gbp', '2200'), mod('regulatory', 'BS EN 15154')]),
-    word('vent_flame_arrestor_word', 'vent flame arrestor',
-      cc('vent_flame_arrestor', 'absorber-vent flame arrestor', 'mass_fluid_transport_process', 'stainless_steel'),
-      [mod('quantity', '×2'), mod('form', 'end-of-line deflagration flame arrestor'), mod('manufacturer', 'Protego'),
-       mod('part_number', 'BE/HF'), mod('list_price_gbp', '2600'), mod('regulatory', 'BS EN ISO 16852')]),
+    // vent flame arrestor REMOVED 2026-06-08 (C. Schoolderman: no fire risk in the non-flammable MEA/CO2 process)
     word('n2_blanketing_skid_word', 'nitrogen blanketing skid',
-      cc('n2_blanketing_skid', 'tank nitrogen blanketing valve skid', 'mass_fluid_transport_process', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'inert-gas blanketing regulator skid for MEA tanks'), mod('manufacturer', 'Protego'),
-       mod('part_number', 'DK/ES blanketing valve'), mod('list_price_gbp', '3400'), mod('regulatory', 'DSEAR')]),
+      cc('n2_blanketing_skid', 'MEA-tank nitrogen blanketing skid (O2 exclusion)', 'mass_fluid_transport_process', 'stainless_steel'),
+      [mod('quantity', '×1'), mod('form', 'nitrogen blanketing regulator skid excluding O2 from the MEA storage + surge tanks to suppress OXIDATIVE amine degradation — not fire (the MEA/CO2 process is non-flammable; C. Schoolderman 2026-06-08)'), mod('manufacturer', 'Protego'),
+       mod('part_number', 'DK/ES blanketing valve'), mod('list_price_gbp', '3400')]),
     word('co2_gas_detector_word', 'CO2 + VOC gas detector',
       cc('co2_gas_detector', 'CO2 and amine-VOC gas detector', 'chemical_sensing_function', 'polymer_thermoplastic'),
       [mod('quantity', '×4'), mod('form', 'fixed NDIR CO2 head'), mod('manufacturer', 'Dräger'),
@@ -795,10 +718,7 @@ function emitSafety(_p: Co2MinParams): DesignModule {
       cc('amine_vapour_detector', 'amine/VOC vapour detectors', 'chemical_sensing_function', 'polymer_thermoplastic'),
       [mod('quantity', '×3'), mod('form', 'fixed PID VOC head for amine vapour'), mod('manufacturer', 'Dräger'),
        mod('part_number', 'Polytron 8000 PID'), mod('list_price_gbp', '2100'), mod('regulatory', 'DSEAR')]),
-    word('flame_detector_word', 'flame detector',
-      cc('flame_detector', 'optical flame detector', 'chemical_sensing_function', 'polymer_thermoplastic'),
-      [mod('quantity', '×2'), mod('form', 'IR3 optical flame detector'), mod('manufacturer', 'Dräger'),
-       mod('part_number', 'Flame 2700'), mod('list_price_gbp', '3800'), mod('regulatory', 'BS EN 61511')]),
+    // flame detector REMOVED 2026-06-08 (C. Schoolderman: no fire risk in the non-flammable MEA/CO2 process)
     word('emergency_stop_word', 'emergency shutdown system',
       cc('emergency_stop', 'emergency shutdown system', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
       [mod('quantity', '×1'), mod('form', 'SIL-2 ESD chain controller'), mod('manufacturer', 'Siemens'),
@@ -869,9 +789,7 @@ function emitBagging(p: Co2MinParams): DesignModule {
 function emitCrossModuleGrammarLinks(p: Co2MinParams) {
   return [
     { from_module: 'mass_fluid_transport_process', to_module: 'energy_conversion_transduction',
-      mechanism: 'fluid_loop' as const, type: 'directional' as const, detail: `CO2-rich MEA → gypsum carbonation reactor (${p.caco3Tpd.toFixed(1)} t/day CaCO3)` },
-    { from_module: 'mass_fluid_transport_process', to_module: 'energy_conversion_transduction',
-      mechanism: 'fluid_loop' as const, type: 'directional' as const, detail: `stripped CO2 + hydrated-lime slurry → secondary lime carbonation reactor (balance ~${p.co2LimeRouteTpd.toFixed(1)} t/day CO2)` },
+      mechanism: 'fluid_loop' as const, type: 'directional' as const, detail: `CO2-rich MEA → gypsum carbonation reactor (${p.caco3Tpd.toFixed(1)} t/day CaCO3); excess CO2 recycled to the absorber` },
     { from_module: 'energy_conversion_transduction', to_module: 'mass_fluid_transport_process',
       mechanism: 'fluid_loop' as const, type: 'directional' as const, detail: `sulfate filtrate → K2SO4 recovery; regenerated MEA → recovery loop` },
     { from_module: 'environmental_interface', to_module: 'mass_fluid_transport_process',
@@ -894,7 +812,6 @@ const emitter: ClassEmitter = (contract, _brief, _envelope): DesignJSON => {
   const modules: DesignModule[] = [
     emitAbsorptionCapture(p),
     emitCarbonationReactor(p),
-    emitLimeCarbonationReactor(p),   // SECOND carbonation sink (hydrated-lime), 2026-06-05 — deterministic
     emitCaco3Recovery(p),
     emitK2so4Recovery(p),
     emitMeaRecovery(p),
@@ -910,10 +827,10 @@ const emitter: ClassEmitter = (contract, _brief, _envelope): DesignJSON => {
     modules,
     cross_module_grammar_links: emitCrossModuleGrammarLinks(p),
     excluded_modules: [],
-    rationale_excluded: 'All 13 CO2-mineralisation process modules apply (incl. the secondary hydrated-lime carbonation sink).',
+    rationale_excluded: 'All 12 CO2-mineralisation process modules apply.',
     brief_overview_prose: {
       overview_and_context: '',
-      mission_statement: `Skid-mounted CO2 capture + mineral-carbonation plant capturing ${p.captureTpd.toFixed(1)} t CO2/day in ${p.meaWtPct.toFixed(0)} wt% MEA and mineralising ALL of it across TWO carbonation sinks: a PRIMARY gypsum stirred reactor (~0.8 t/day CO2) plus a SECONDARY supplementary hydrated-lime (Ca(OH)2) stirred reactor that carbonates the balance (~${p.co2LimeRouteTpd.toFixed(1)} t/day), together precipitating ${p.caco3Tpd.toFixed(1)} t/day CaCO3 and recovering ${p.k2so4Tpd.toFixed(1)} t/day K2SO4 fertiliser via KOH, with closed-loop MEA recovery and ${p.bagsPerDay} × 25 kg bags/day of product.`,
+      mission_statement: `Skid-mounted CO2 capture + mineral-carbonation plant capturing ${p.captureTpd.toFixed(1)} t CO2/day in ${p.meaWtPct.toFixed(0)} wt% MEA and mineralising ALL of it in a single gypsum carbonation sink: a gypsum stirred reactor run with excess CO2 (unreacted CO2 recycled to the absorber) that fixes the full ~${p.captureTpd.toFixed(1)} t/day, precipitating ${p.caco3Tpd.toFixed(1)} t/day CaCO3 and recovering ${p.k2so4Tpd.toFixed(1)} t/day K2SO4 fertiliser via KOH, with closed-loop MEA recovery and ${p.bagsPerDay} × 25 kg bags/day of product.`,
       target_customers: '',
       why_now: '',
     },

@@ -152,6 +152,17 @@ def compute(payload: dict) -> dict:
         raise ValueError("htu_m must be > 0")
     packed_height_m = htu_m * ntu
 
+    # Reactive-amine empirical override (C. Schoolderman, OXCCU CO2 co, 2026-06-08): the
+    # Colburn dilute-physical HTU-NTU model is INVALID for chemically/kinetically-enhanced
+    # MEA-CO2 absorption AND assumes zero lean loading, so it badly under-predicts packed
+    # height (~1.4 m vs ~20 m from public MEA pilot trials). When the caller supplies an
+    # empirical packed height it GOVERNS; the Colburn NTU/HTU are kept for reference only.
+    height_override_m = float(payload.get("packed_height_override_m", 0.0) or 0.0)
+    height_method = "Colburn HTU x NTU (dilute-physical)"
+    if height_override_m > 0:
+        packed_height_m = height_override_m
+        height_method = "empirical reactive-MEA anchor (public MEA pilot trials; Colburn invalid for kinetically-enhanced amine absorption + non-zero lean loading)"
+
     # ---- Column diameter via Eckert generalised pressure-drop correlation (flooding) ----
     # Flow parameter F_LV = (L/G) x sqrt(rho_G / rho_L), mass-flow ratio.
     f_lv = (liq_kg_h / gas_kg_h) * math.sqrt(rho_g / rho_l)
@@ -218,10 +229,10 @@ def compute(payload: dict) -> dict:
         ),
         worked_calc(
             label="Packed height",
-            formula="H = HTU x NTU",
-            values={"HTU": (htu_m, "m"), "NTU": (ntu_r, "")},
+            formula="H = empirical reactive-MEA anchor" if height_override_m > 0 else "H = HTU x NTU",
+            values={"H_empirical_m": (packed_height_r, "m")} if height_override_m > 0 else {"HTU": (htu_m, "m"), "NTU": (ntu_r, "")},
             result=packed_height_r, result_unit="m",
-            assumptions=[f"HTU {htu_m} m for the specified packing ({mode})"],
+            assumptions=([height_method, f"Colburn HTU x NTU would give {round(htu_m * ntu, 2)} m — rejected as invalid for reactive MEA"] if height_override_m > 0 else [f"HTU {htu_m} m for the specified packing ({mode})"]),
         ),
         worked_calc(
             label="Flow parameter (Eckert abscissa)",

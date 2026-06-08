@@ -480,7 +480,7 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   atmospheric_co2_capture: 'dac',
   co2_air_capture: 'dac',
   // CO₂ point-source capture + mineralisation to solid products (MEA solvent
-  // capture → gypsum/lime carbonation → CaCO₃ + K₂SO₄). The classifier
+  // capture → gypsum carbonation → CaCO₃ + K₂SO₄). The classifier
   // (product-classifier.ts:35) emits 'co2_mineralisation' for "capture and
   // mineralise / gypsum carbonation" briefs. DISTINCT from 'dac' (atmospheric
   // sorbent air capture) — this is SOLVENT capture from a flue gas + a
@@ -10935,17 +10935,16 @@ registerArchetype('dac', (brief: any) => {
 })
 
 // ---------------------------------------------------------------------------
-// CO₂ MINERALISATION ARCHETYPE — point-source amine capture + dual-sink
-// mineralisation to saleable solids. FIRST contract for this class (a
+// CO₂ MINERALISATION ARCHETYPE — point-source amine capture + single-sink
+// gypsum mineralisation to saleable solids. FIRST contract for this class (a
 // "start", not a BESS-depth implementation).
 //
 // WHY THIS EXISTS: prior runs found "Engineering Contract not registered for
 // co2_mineralisation — falling back to LLM-only chain" (out/release-
 // co2_mineralisation-iter1/0.5-engineering-contract.json). Consequence:
-// brief-fidelity 4/10, wrong-domain stand-in tool sizes (marine/irrigation),
-// and the requested second carbonation sink landing as narrative not a costed
-// equipment line. A registered contract supplies real, sized quantities the
-// chain + gates + renderer READ.
+// brief-fidelity 4/10, wrong-domain stand-in tool sizes (marine/irrigation).
+// A registered contract supplies real, sized quantities the chain + gates +
+// renderer READ.
 //
 // SIZING BASIS (independent first-principles Class-4, 1 t/day capture):
 //   - 42 kg/h CO₂, 90% capture, 30 wt% MEA, flue-gas ~225 m³/h.
@@ -10959,17 +10958,16 @@ registerArchetype('dac', (brief: any) => {
 //     NOT 186 kW); overhead condenser 50.9 kW (~3.2 m²). The reboiler-duty ≈
 //     recovered-cross-exchanger-duty signature (42.8 ≈ 43.6 kW) is the
 //     correct MEA heat-integration fingerprint.
-//   - DUAL CARBONATION SINK (closes the known Ca-balance gap — gypsum+KOH
-//     alone fixes only ~0.5–0.8 t/d of the 1 t/d captured):
-//       PRIMARY  gypsum carbonation reactor 1.0 m³ + 4 kW agitator, 316L —
-//                fixes ~0.8 t/d CO₂ from 3.1 t/d gypsum (≈18 kmol/d Ca).
-//       SECOND   supplementary hydrated-lime carbonation reactor 0.4 m³ +
-//                2 kW agitator, 304 / rubber-lined — fed ~0.35 t/d hydrated
-//                lime, fixes the ~0.2 t/d CO₂ balance → ~0.5 t/d extra CaCO₃.
+//   - SINGLE GYPSUM CARBONATION SINK (closes the full Ca-balance — the gypsum
+//     route fixes the FULL 1 t/d captured CO₂, run with EXCESS CO₂ and
+//     unreacted CO₂ recycled to the absorber inlet; C. Schoolderman 2026-06-08,
+//     no separate lime sink):
+//       gypsum carbonation reactor 1.3 m³ + 5 kW agitator, 316L — fixes
+//                ~1.0 t/d CO₂ from 3.9 t/d gypsum (≈22.7 kmol/d Ca).
 //   - K₂SO₄ forced-circulation crystalliser ~1.1 m³, ~80 kW evaporative.
 //   - Flue-gas blower 225 m³/h / 1.5 kW.
-//   - Outputs 2.3 t/d CaCO₃ (~1.8 gypsum-route + ~0.5 lime-route) + 3.9 t/d
-//     K₂SO₄. Feeds 3.1 t/d gypsum, 2.6 t/d KOH, 0.35 t/d hydrated lime.
+//   - Outputs 2.27 t/d CaCO₃ (gypsum route) + 3.95 t/d K₂SO₄. Feeds 3.9 t/d
+//     gypsum, 2.54 t/d KOH.
 //   - Op temp ≤ 120 °C; PED (Pressure Equipment Directive) + BS EN 13445 +
 //     ATEX/DSEAR + COMAH (NOT EN 1473/ISO 27914 — those were MIS-CITED in a
 //     prior single-pass run; the real spine is PED + ATEX/DSEAR).
@@ -11021,8 +11019,8 @@ registerArchetype('co2_mineralisation', (brief: any) => {
   // full flow (mempalace drawer: 100 mm forces ~10 m/s ≈ 4× flooding). 0.3 m is
   // the grounded answer for the full flue-gas flow.
   const absorberDiameterM = 0.3
-  const absorberHeightTtM = 16.5                                 // tangent-to-tangent
-  const absorberPackedHeightM = 12.0
+  const absorberHeightTtM = 24.5                                 // tangent-to-tangent (20 m packed + sumps/demister/distributor)
+  const absorberPackedHeightM = 20.0                             // EMPIRICAL MEA packed height ~20 m from public MEA pilot trials (C. Schoolderman, OXCCU CO2 co, 2026-06-08): the dilute Colburn HTU·NTU model is invalid for chemically-enhanced MEA absorption AND it assumed ZERO lean loading; real lean amine enters at ~0.5 mol/L CO2 + ~0.2 mol/L K2SO4, collapsing the top-of-column driving force, so ~20 m packing is required (engine's earlier 12 m / tool's 1.41 m are both far too short)
   const stripperDiameterM = 0.3
   const stripperHeightM = 12.0
 
@@ -11036,28 +11034,22 @@ registerArchetype('co2_mineralisation', (brief: any) => {
   const condenserDutyKw = 50.9 * scale
   const condenserAreaM2 = 3.2 * scale
 
-  // ── DUAL carbonation sink ─────────────────────────────────────────────────
-  // PRIMARY gypsum route. 3.1 t/d gypsum (CaSO₄·2H₂O, M≈172) → ~18 kmol/d Ca →
-  // fixes ~0.8 t/d CO₂ (M=44; 18 kmol × 44 ≈ 0.79 t/d) → ~1.8 t/d CaCO₃.
-  const gypsumFeedTonsPerDay = 3.1 * scale
-  const gypsumReactorVolumeM3 = 1.0 * scale
-  const gypsumAgitatorKw = 4.0 * scale
-  const co2FixedGypsumTonsPerDay = 0.8 * scale
-  // SECOND hydrated-lime route — the costed equipment line that closes the
-  // Ca-balance. Ca(OH)₂ (M≈74). ~0.35 t/d lime → ~4.7 kmol/d Ca → fixes the
-  // ~0.2 t/d CO₂ balance (4.7 kmol × 44 ≈ 0.21 t/d) → ~0.5 t/d extra CaCO₃.
-  const hydratedLimeFeedTonsPerDay = 0.35 * scale
-  const limeReactorVolumeM3 = 0.4 * scale
-  const limeAgitatorKw = 2.0 * scale
-  const co2FixedLimeTonsPerDay = 0.2 * scale
-  const totalCo2FixedTonsPerDay = co2FixedGypsumTonsPerDay + co2FixedLimeTonsPerDay  // ~1.0 t/d → closes capture
-  const caco3FromGypsumTonsPerDay = 1.8 * scale
-  const caco3FromLimeTonsPerDay = 0.5 * scale
-  const totalCaco3TonsPerDay = caco3FromGypsumTonsPerDay + caco3FromLimeTonsPerDay   // 2.3 t/d
+  // ── Single GYPSUM carbonation sink ────────────────────────────────────────
+  // Single GYPSUM route fixes the FULL ~1 t/d CO2 (3.9 t/d gypsum → ~22.7 kmol/d
+  // Ca → 1.0 t/d CO2 → 2.27 t/d CaCO3 + 3.95 t/d K2SO4). Run with EXCESS CO2 for
+  // high conversion; unreacted CO2 recycles to the absorber (C. Schoolderman
+  // 2026-06-08 — no separate lime sink).
+  const gypsumFeedTonsPerDay = 3.9 * scale
+  const gypsumReactorVolumeM3 = 1.3 * scale
+  const gypsumAgitatorKw = 5.0 * scale
+  const co2FixedGypsumTonsPerDay = 1.0 * scale
+  const totalCo2FixedTonsPerDay = co2FixedGypsumTonsPerDay  // 1.0 t/d gypsum route fixes the full captured CO2
+  const caco3FromGypsumTonsPerDay = 2.27 * scale
+  const totalCaco3TonsPerDay = caco3FromGypsumTonsPerDay
 
   // ── K₂SO₄ recovery (KOH + recovered sulfate → K₂SO₄) ──────────────────────
-  const kohFeedTonsPerDay = 2.6 * scale
-  const k2so4OutputTonsPerDay = 3.9 * scale
+  const kohFeedTonsPerDay = 2.54 * scale
+  const k2so4OutputTonsPerDay = 3.95 * scale
   const crystalliserVolumeM3 = 1.1 * scale
   const crystalliserEvapKw = 80 * scale
 
@@ -11067,7 +11059,7 @@ registerArchetype('co2_mineralisation', (brief: any) => {
 
   // ── Connected electrical load (sum of motor + evaporative duties) ─────────
   const connectedLoadKw =
-    meaPumpKw + gypsumAgitatorKw + limeAgitatorKw + crystalliserEvapKw + blowerKw
+    meaPumpKw + gypsumAgitatorKw + crystalliserEvapKw + blowerKw
 
   // ── Operating envelope ────────────────────────────────────────────────────
   const operatingTempMaxC = 120  // amine stripper reboiler loop ceiling (≤120 °C)
@@ -11095,8 +11087,10 @@ registerArchetype('co2_mineralisation', (brief: any) => {
 
     // ── Packed absorber column (316L) ──
     absorber_column_diameter_m: q(absorberDiameterM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: 'DN300 flooding-limited; the brief 100 mm floods at full flue-gas flow (≈4× flooding velocity)' }),
-    absorber_column_height_tt_m: q(absorberHeightTtM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: '16.5 m tangent-to-tangent (12 m packed + sumps/demister/distributor); field-erected flanged segments on a plinth. Engine earlier 6 m was ~1/3 of needed' }),
-    absorber_packed_height_m: q(absorberPackedHeightM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: '12 m random/structured packing for 90% removal' }),
+    absorber_column_height_tt_m: q(absorberHeightTtM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: '24.5 m tangent-to-tangent (20 m packed + sumps/demister/distributor); field-erected flanged segments on a plinth' }),
+    absorber_packed_height_m: q(absorberPackedHeightM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: '20 m packing for 90% removal — empirical anchor from public MEA pilot trials (C. Schoolderman 2026-06-08); reactive MEA is kinetically-enhanced (not dilute-physical) and lean amine enters at ~0.5 mol/L CO2 + ~0.2 mol/L K2SO4 (non-zero lean loading)' }),
+    lean_co2_loading_mol_l: q(0.5, 'mol/L', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'lean-amine residual CO2 loading entering the absorber top — ~0.5 mol/L, NOT zero (C. Schoolderman 2026-06-08); the non-zero lean loading is the reason ~20 m packing is required' }),
+    lean_k2so4_mol_l: q(0.2, 'mol/L', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'dissolved K2SO4 in the lean amine fed to the absorber — ~0.2 mol/L (C. Schoolderman 2026-06-08)' }),
     absorber_material: q(1, '', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: 'enum: 1 = 316L stainless (amine service, ≤120 °C)' }),
 
     // ── Stripper / regenerator (316L) ──
@@ -11115,19 +11109,11 @@ registerArchetype('co2_mineralisation', (brief: any) => {
     gypsum_feed_t_per_day: q(gypsumFeedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '3.1 t/d gypsum (CaSO₄·2H₂O) → ~18 kmol/d Ca' }),
     gypsum_carbonation_reactor_volume_m3: q(gypsumReactorVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: '1.0 m³ stirred carbonation reactor, 316L (NOT 4 m³ — engine 4× oversize)' }),
     gypsum_reactor_agitator_kw: q(gypsumAgitatorKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '4 kW top-entry agitator for the gypsum carbonation slurry' }),
-    co2_fixed_gypsum_route_t_per_day: q(co2FixedGypsumTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~0.8 t/d CO₂ fixed (18 kmol/d Ca × 44 kg/kmol). Gypsum route ALONE under-fixes the 1 t/d captured → second sink required' }),
-
-    // ── SECOND supplementary hydrated-lime carbonation reactor ──
-    // The costed equipment line that closes the Ca-balance — the prior run
-    // emitted this only as narrative, not as a sized + priced item.
-    hydrated_lime_feed_t_per_day: q(hydratedLimeFeedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~0.35 t/d hydrated lime Ca(OH)₂ → ~4.7 kmol/d Ca, the supplementary carbonation sink' }),
-    lime_carbonation_reactor_volume_m3: q(limeReactorVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: '0.4 m³ supplementary hydrated-lime carbonation reactor, 304 / rubber-lined (high-pH lime slurry)' }),
-    lime_reactor_agitator_kw: q(limeAgitatorKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '2 kW agitator for the lime carbonation slurry' }),
-    co2_fixed_lime_route_t_per_day: q(co2FixedLimeTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~0.2 t/d CO₂ fixed (4.7 kmol/d Ca × 44) — the balance the gypsum route leaves' }),
-    total_co2_fixed_t_per_day: q(totalCo2FixedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'gypsum 0.8 + lime 0.2 = ~1.0 t/d → the dual sink closes the full 1 t/d capture (single gypsum sink does not)' }),
+    co2_fixed_gypsum_route_t_per_day: q(co2FixedGypsumTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~1.0 t/d CO₂ fixed; fixes the FULL 1 t/d captured CO2 (excess-CO2 operation + recycle to absorber)' }),
+    total_co2_fixed_t_per_day: q(totalCo2FixedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~1.0 t/d → the single gypsum sink closes the full 1 t/d capture (excess-CO2 operation + recycle to absorber)' }),
 
     // ── Solid product outputs ──
-    caco3_output_t_per_day: q(totalCaco3TonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '2.3 t/d precipitated CaCO₃ (~1.8 gypsum route + ~0.5 lime route)' }),
+    caco3_output_t_per_day: q(totalCaco3TonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '2.27 t/d precipitated CaCO3 (gypsum route, full CO2)' }),
     k2so4_output_t_per_day: q(k2so4OutputTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '3.9 t/d potassium sulfate fertiliser' }),
 
     // ── K₂SO₄ recovery ──
@@ -11148,8 +11134,8 @@ registerArchetype('co2_mineralisation', (brief: any) => {
 
   // ── Topology constraints — typed edges ────────────────────────────────────
   // Three coupled loops: (1) flue-gas → absorber (gas), (2) rich/lean amine
-  // circulation + steam regeneration (fluid + thermal), (3) CO₂ → DUAL
-  // carbonation reactors → solid products. NO marine/depth context (gate 34).
+  // circulation + steam regeneration (fluid + thermal), (3) CO₂ → gypsum
+  // carbonation reactor → solid products. NO marine/depth context (gate 34).
   const topology: TopologyEdge[] = [
     {
       from_part: 'flue_gas_blower',
@@ -11198,16 +11184,7 @@ registerArchetype('co2_mineralisation', (brief: any) => {
       constraint_kind: 'flow_capacity',
       required_value: co2FixedGypsumTonsPerDay / 24,  // t/hr
       required_unit: 't/hr',
-      material_context: 'stripped_CO2_to_PRIMARY_316L_stirred_gypsum_carbonation_reactor_1m3_4kW_agitator',
-    },
-    {
-      from_part: 'stripper_overhead',
-      to_part: 'lime_carbonation_reactor',
-      mechanism: 'fluid_loop',
-      constraint_kind: 'flow_capacity',
-      required_value: co2FixedLimeTonsPerDay / 24,  // t/hr
-      required_unit: 't/hr',
-      material_context: 'balance_CO2_to_SECOND_hydrated_lime_carbonation_reactor_0.4m3_2kW_304_rubber_lined_closes_Ca_balance',
+      material_context: 'stripped_CO2_to_316L_stirred_gypsum_carbonation_reactor_1.3m3_5kW_agitator_excess_CO2_unreacted_recycled_to_absorber',
     },
     {
       from_part: 'electrical_supply',
@@ -11271,14 +11248,6 @@ registerArchetype('co2_mineralisation', (brief: any) => {
       source_detail: `£35,000/m³ × ${gypsumReactorVolumeM3} m³ PRIMARY 316L stirred carbonation reactor + 4 kW agitator`,
     },
     {
-      word_name: 'lime_carbonation_reactor',
-      unit_price_gbp: 22000,
-      dimension_basis: 'cubic_metre',
-      dimension_value: limeReactorVolumeM3,
-      total_gbp: Math.round(22000 * limeReactorVolumeM3),
-      source_detail: `£22,000/m³ × ${limeReactorVolumeM3} m³ SECOND hydrated-lime carbonation reactor (304 / rubber-lined) + 2 kW agitator — the supplementary sink that closes the Ca-balance`,
-    },
-    {
       word_name: 'k2so4_crystalliser',
       unit_price_gbp: 90000,
       dimension_basis: 'each',
@@ -11314,17 +11283,17 @@ registerArchetype('co2_mineralisation', (brief: any) => {
 
   // ── Closures — design-rule gates ──────────────────────────────────────────
   const closures: ContractClosureResult[] = []
-  // DUAL-SINK Ca-BALANCE — the headline design correctness check. A single
-  // gypsum sink fixes only ~0.8 t/d of the 1 t/d captured; the contract MUST
-  // carry a second sink that closes the balance, else the plant captures CO₂ it
-  // cannot mineralise (would have to vent or store it).
+  // SINGLE GYPSUM SINK Ca-BALANCE — the headline design correctness check. The
+  // single gypsum carbonation reactor, run with EXCESS CO₂ (unreacted CO₂
+  // recycled to the absorber inlet), fixes the FULL 1 t/d captured CO₂ — no
+  // separate lime sink (C. Schoolderman 2026-06-08).
   closures.push({
-    invariant_id: 'dual_sink_closes_carbon_balance',
+    invariant_id: 'gypsum_sink_closes_carbon_balance',
     status: totalCo2FixedTonsPerDay >= captureTonsPerDay * 0.95 ? 'pass'
           : totalCo2FixedTonsPerDay >= captureTonsPerDay * 0.75 ? 'warn' : 'fail',
     measured: Number(totalCo2FixedTonsPerDay.toFixed(2)),
-    required: `≥95% of captured CO₂ mineralised: gypsum route ${co2FixedGypsumTonsPerDay.toFixed(2)} t/d + lime route ${co2FixedLimeTonsPerDay.toFixed(2)} t/d ≥ ${captureTonsPerDay.toFixed(2)} t/d captured`,
-    reason: `Dual carbonation sink fixes ${totalCo2FixedTonsPerDay.toFixed(2)} t/d CO₂ (gypsum ${co2FixedGypsumTonsPerDay.toFixed(2)} + supplementary hydrated-lime ${co2FixedLimeTonsPerDay.toFixed(2)}) against ${captureTonsPerDay.toFixed(2)} t/d captured. The gypsum route alone (${co2FixedGypsumTonsPerDay.toFixed(2)} t/d) leaves a deficit — the second lime reactor closes it.`,
+    required: `≥95% of captured CO₂ mineralised: gypsum route ${co2FixedGypsumTonsPerDay.toFixed(2)} t/d ≥ ${captureTonsPerDay.toFixed(2)} t/d captured`,
+    reason: `Single gypsum carbonation sink fixes ${totalCo2FixedTonsPerDay.toFixed(2)} t/d CO₂ against ${captureTonsPerDay.toFixed(2)} t/d captured. Run with excess CO₂ for high gypsum conversion; unreacted CO₂ recycles to the absorber inlet, so the full captured CO₂ is mineralised via gypsum alone (no separate lime sink).`,
   })
   // CaCO₃ mass balance — products should reconcile with CO₂ fixed (CaCO₃ M=100,
   // CO₂ M=44, so CaCO₃ ≈ CO₂ × 100/44 ≈ 2.27×).
@@ -11333,7 +11302,7 @@ registerArchetype('co2_mineralisation', (brief: any) => {
     status: Math.abs(totalCaco3TonsPerDay - totalCo2FixedTonsPerDay * (100 / 44)) / (totalCo2FixedTonsPerDay * (100 / 44)) <= 0.15 ? 'pass' : 'warn',
     measured: Number(totalCaco3TonsPerDay.toFixed(2)),
     required: `CaCO₃ output ≈ CO₂ fixed × 100/44 ≈ ${(totalCo2FixedTonsPerDay * (100 / 44)).toFixed(2)} t/d (stoichiometric)`,
-    reason: `CaCO₃ output ${totalCaco3TonsPerDay.toFixed(2)} t/d vs stoichiometric ${(totalCo2FixedTonsPerDay * (100 / 44)).toFixed(2)} t/d from ${totalCo2FixedTonsPerDay.toFixed(2)} t/d CO₂ fixed. Includes CaCO₃ from both gypsum (${caco3FromGypsumTonsPerDay.toFixed(2)}) and lime (${caco3FromLimeTonsPerDay.toFixed(2)}) routes.`,
+    reason: `CaCO₃ output ${totalCaco3TonsPerDay.toFixed(2)} t/d vs stoichiometric ${(totalCo2FixedTonsPerDay * (100 / 44)).toFixed(2)} t/d from ${totalCo2FixedTonsPerDay.toFixed(2)} t/d CO₂ fixed (single gypsum route).`,
   })
   // Absorber flooding margin — DN300 vs the brief's un-grounded 100 mm.
   closures.push({
@@ -11372,7 +11341,7 @@ registerArchetype('co2_mineralisation', (brief: any) => {
 
   return {
     product_class: 'co2_mineralisation',
-    brief_summary: `${captureTonsPerDay.toFixed(1)} t/day CO₂ point-source capture (${meaConcentrationWtPct} wt% MEA, ${(captureEfficiency * 100).toFixed(0)}% capture, ~${co2KgPerHour.toFixed(0)} kg/h) + DUAL-sink mineralisation to solid products. Packed absorber DN${Math.round(absorberDiameterM * 1000)} × ${absorberHeightTtM} m T-T (${absorberPackedHeightM} m packed, 316L); stripper DN${Math.round(stripperDiameterM * 1000)} × ${stripperHeightM} m. MEA circulation ${meaCirculationM3PerHour.toFixed(2)} m³/h (${meaPumpKw.toFixed(2)} kW). Reboiler ${reboilerDutyKw.toFixed(1)} kW / cross-exchanger ${crossExchangerDutyKw.toFixed(1)} kW / condenser ${condenserDutyKw.toFixed(1)} kW. PRIMARY gypsum carbonation reactor ${gypsumReactorVolumeM3.toFixed(1)} m³ + ${gypsumAgitatorKw.toFixed(0)} kW (fixes ${co2FixedGypsumTonsPerDay.toFixed(1)} t/d CO₂ from ${gypsumFeedTonsPerDay.toFixed(1)} t/d gypsum); SECOND hydrated-lime carbonation reactor ${limeReactorVolumeM3.toFixed(1)} m³ + ${limeAgitatorKw.toFixed(0)} kW (fixes the ${co2FixedLimeTonsPerDay.toFixed(1)} t/d balance from ${hydratedLimeFeedTonsPerDay.toFixed(2)} t/d lime → +${caco3FromLimeTonsPerDay.toFixed(1)} t/d CaCO₃). K₂SO₄ forced-circulation crystalliser ${crystalliserVolumeM3.toFixed(1)} m³ / ${crystalliserEvapKw.toFixed(0)} kW. Outputs ${totalCaco3TonsPerDay.toFixed(1)} t/d CaCO₃ + ${k2so4OutputTonsPerDay.toFixed(1)} t/d K₂SO₄; feeds ${gypsumFeedTonsPerDay.toFixed(1)} t/d gypsum + ${kohFeedTonsPerDay.toFixed(1)} t/d KOH + ${hydratedLimeFeedTonsPerDay.toFixed(2)} t/d hydrated lime. Op ≤${operatingTempMaxC} °C; PED + BS EN 13445 + ATEX/DSEAR + COMAH. Major-equipment macro anchors £${(macroAssemblyTotal / 1000).toFixed(0)}k (well under the £${(briefCeilingGbp / 1_000_000).toFixed(1)} M ex-works ceiling; cost stack adds BoP + install).`,
+    brief_summary: `${captureTonsPerDay.toFixed(1)} t/day CO₂ point-source capture (${meaConcentrationWtPct} wt% MEA, ${(captureEfficiency * 100).toFixed(0)}% capture, ~${co2KgPerHour.toFixed(0)} kg/h) + single-sink gypsum mineralisation to solid products. Packed absorber DN${Math.round(absorberDiameterM * 1000)} × ${absorberHeightTtM} m T-T (${absorberPackedHeightM} m packed, 316L); stripper DN${Math.round(stripperDiameterM * 1000)} × ${stripperHeightM} m. MEA circulation ${meaCirculationM3PerHour.toFixed(2)} m³/h (${meaPumpKw.toFixed(2)} kW). Reboiler ${reboilerDutyKw.toFixed(1)} kW / cross-exchanger ${crossExchangerDutyKw.toFixed(1)} kW / condenser ${condenserDutyKw.toFixed(1)} kW. Gypsum carbonation reactor ${gypsumReactorVolumeM3.toFixed(1)} m³ + ${gypsumAgitatorKw.toFixed(0)} kW (fixes the full ${co2FixedGypsumTonsPerDay.toFixed(1)} t/d CO₂ from ${gypsumFeedTonsPerDay.toFixed(1)} t/d gypsum, run with excess CO₂ + unreacted CO₂ recycled to the absorber). K₂SO₄ forced-circulation crystalliser ${crystalliserVolumeM3.toFixed(1)} m³ / ${crystalliserEvapKw.toFixed(0)} kW. Outputs ${totalCaco3TonsPerDay.toFixed(1)} t/d CaCO₃ + ${k2so4OutputTonsPerDay.toFixed(1)} t/d K₂SO₄; feeds ${gypsumFeedTonsPerDay.toFixed(1)} t/d gypsum + ${kohFeedTonsPerDay.toFixed(1)} t/d KOH. Op ≤${operatingTempMaxC} °C; PED + BS EN 13445 + ATEX/DSEAR + COMAH. Major-equipment macro anchors £${(macroAssemblyTotal / 1000).toFixed(0)}k (well under the £${(briefCeilingGbp / 1_000_000).toFixed(1)} M ex-works ceiling; cost stack adds BoP + install).`,
     quantities,
     topology,
     // B-3 fix (2026-06-05): return EMPTY macros to the BoM. The dedicated cost-basis
@@ -11387,12 +11356,10 @@ registerArchetype('co2_mineralisation', (brief: any) => {
       // MUST read from here (gate 24 flags two distinct values for one anchor).
       mea_solvent_desc: `${meaConcentrationWtPct} wt% aqueous monoethanolamine (MEA)`,
       absorber_material_desc: '316L stainless steel',
-      lime_reactor_material_desc: '304 stainless steel, rubber-lined (high-pH lime slurry)',
       operating_temperature_max_c: operatingTempMaxC,
       regulatory_standard_spine: 'PED (Pressure Equipment Directive) / BS EN 13445 + ATEX/DSEAR + COMAH',
       // Mirror key scalars for emitter convenience.
       capture_capacity_tco2_per_day: captureTonsPerDay,
-      second_sink_desc: 'supplementary hydrated-lime Ca(OH)₂ carbonation reactor (closes the Ca-balance the gypsum route leaves)',
     },
   }
 })

@@ -8475,7 +8475,7 @@ function SystemOverviewPage({ state, project }: { state: any; project: string })
                 </Text>
                 <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.6, marginBottom: 6 }}>
                   {`Captures ${capturedStr} t CO2/yr, plant footprint ${emittedStr} t CO2/yr `}
-                  <Text style={{ color: cardLine }}>{`→ NET ${netStr} t CO2/yr`}</Text>
+                  <Text style={{ color: cardLine }}>{`-> NET ${netStr} t CO2/yr`}</Text>
                   {isNegativeFootprint ? ' (net carbon-negative).' : ' (net positive — review footprint).'}
                 </Text>
                 {embodiedStr && paybackStr ? (
@@ -8485,7 +8485,7 @@ function SystemOverviewPage({ state, project }: { state: any; project: string })
                 ) : null}
                 <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45, fontStyle: 'italic' }}>
                   {`Capture basis: ${captureBasis} t CO2/day`}
-                  {netCo2.derived_from_brief ? ' (from the brief’s stated capture rate)' : ' (computed)'}
+                  {netCo2.derived_from_brief ? " (from the brief's stated capture rate)" : ' (computed)'}
                   {` × ${netCo2.operating_days} operating days/yr (≈ 90% availability for a continuously-operated pilot plant, allowing maintenance and turnaround). Plant footprint and embodied CO2 from lifecycle-co2:assessment.`}
                 </Text>
               </View>

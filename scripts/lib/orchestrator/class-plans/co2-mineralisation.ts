@@ -48,22 +48,16 @@
  *   24 crystalliser:evaporator-sizing  K2SO4 crystalliser duty+area+vessel         [2026-06-04 Plan C sizing]
  *   25 dryer:thermal-sizing            CaCO3 cake dryer duty+air flow              [2026-06-04 Plan C sizing]
  *   26 dryer:thermal-sizing            K2SO4 cake dryer (multi-instance)           [2026-06-04 Plan C sizing]
- *   30 reactor:cstr-pfr-sizing         SECONDARY lime carbonation reactor (304SS atmospheric) [2026-06-05 2nd sink]
- *   31 agitation:power                 lime carbonation reactor agitator           [2026-06-05 2nd sink]
- *   32 reactor:cstr-pfr-sizing         lime slaking / slurry-prep tank             [2026-06-05 2nd sink]
+ *   (steps 30, 31, 32 — secondary lime carbonation reactor + agitator + slaking tank —
+ *    REMOVED 2026-06-08 per C. Schoolderman; see note below)
  *
- * 2026-06-05 SECOND-SINK ADDITION (this edit): the brief mandates TWO carbonation sinks — the
- * PRIMARY gypsum reactor (~0.8 t/day CO2) PLUS a SECONDARY supplementary hydrated-lime
- * (calcium hydroxide) reactor carbonating the balance (~0.2 t/day, Ca(OH)2 + CO2 -> CaCO3 + H2O).
- * The lime CHEMISTRY already lived in the contract (co2_fixed_lime_route_t_per_day=0.2,
- * hydrated-lime feed ~0.35 t/day) but there was NO physical lime reactor: the class plan only
- * sized the gypsum reactor + the design emitted only a gypsum_carbonation_reactor sub_module.
- * These 3 steps add the lime reactor TRAIN as REAL, sized, costed equipment — an ATMOSPHERIC
- * 304SS stirred tank (NOT a 3 barg / 120 C pressure vessel; lime slurry is far less aggressive
- * than the MEA loop) + its agitator + a lime slaking/slurry-prep tank. lime_reactor_shell_mass_kg
- * (~420 kg) drives the secondary-sink BoM take-off in build-cost-basis.ts (mass × £5/kg × 4.5
- * fab + agitator = ~£14,450). The lime_carbonation sub_module is emitted DETERMINISTICALLY in
- * emitters/co2-mineralisation.ts (NOT LLM-sampled), so the second sink can never silently vanish.
+ * 2026-06-08 SECOND-SINK REMOVAL (this edit): the secondary hydrated-lime carbonation
+ * reactor (former steps 30/31/32) is REMOVED per C. Schoolderman (CEO, OXCCU). The single
+ * gypsum carbonation reactor, run with EXCESS CO2 and the unreacted CO2 recycled to the
+ * absorber inlet, fixes the FULL 1 t/day captured CO2 (3.9 t/day gypsum → ~22.7 kmol/d Ca →
+ * 1.0 t/d CO2 → 2.27 t/d CaCO3 + 3.95 t/d K2SO4). There is no separate lime sink: the
+ * 2026-06-05 SECOND-SINK ADDITION it describes was rebalanced away in the engineering
+ * contract + emitter + this class plan on 2026-06-08.
  *
  * 2026-06-04 PLAN C SIZING ADDITION (this edit): the four chemical-process SIZING tools are
  * now wired (the 2 reaction tools were wired by a prior agent). They consume the
@@ -622,30 +616,8 @@ const stepNoise: ToolStep = {
   },
 }
 
-// ===========================================================================
-// 16. fire-suppression:nfpa — CLEAN-AGENT SUPPRESSION (combustible MEA store).
-//     fire_suppression_sizing.py input keys: agent, volume_m3, design_concentration_pct.
-//     MEA is a combustible amine; the enclosure gets an NFPA 2001 clean-agent system.
-//     REAL outputs: agent_mass_kg_with_safety_factor, total_cylinder_count,
-//     total_installed_cost_gbp.
-// ===========================================================================
-const stepFireSuppression: ToolStep = {
-  tool_id: 'fire-suppression:nfpa',
-  required: false,
-  feeds_into: ['mass-aggregator:envelope-check'] as string[],
-  input_from_contract: (c: ContractInProgress) => ({
-    agent: 'novec_1230',                          // FK-5-1-12 clean agent
-    volume_m3: q(c, 'protected_enclosure_volume_m3', 120),
-    design_concentration_pct: 5.3,                // Class-B amine design concentration
-  }),
-  contract_update: (c: ContractInProgress, output: any) => {
-    const p = provFor('fire-suppression:nfpa', '1.0.0', 'free-proprietary', 'internal://forgeos/fire')
-    return { ...c, quantities: { ...c.quantities,
-      fire_agent_mass_kg: mkQty(num(output, 'agent_mass_kg_with_safety_factor', 'agent_mass_kg') ?? 102.7, 'kg', 'mass', p('agent_mass_kg_with_safety_factor'), 'clean-agent charge'),
-      fire_cylinder_count: mkQty(num(output, 'total_cylinder_count') ?? 2, '', 'dimensionless', p('total_cylinder_count'), 'agent cylinders'),
-    } }
-  },
-}
+// 16. fire-suppression:nfpa REMOVED 2026-06-08 (C. Schoolderman: the MEA/CO2 process is
+//     non-flammable — no clean-agent suppression; flame arrestors + flame detectors dropped too).
 
 // ===========================================================================
 // 17. lifecycle-co2:assessment — NET PLANT CARBON (vs CO2 captured).
@@ -804,131 +776,10 @@ const stepCarbonationReactorSizing: ToolStep = {
   },
 }
 
-// ===========================================================================
-// 30. reactor:cstr-pfr-sizing — SECONDARY LIME CARBONATION REACTOR (CSTR). [2026-06-05 second sink]
-//     The brief requires TWO carbonation sinks: the PRIMARY gypsum reactor above
-//     (~0.8 t/day CO2) PLUS a SECONDARY supplementary stirred reactor fed with a
-//     hydrated-lime (calcium hydroxide) slurry that carbonates the BALANCE
-//     (~0.2 t/day): Ca(OH)2 + CO2 -> CaCO3 + H2O. Until now only the lime CHEMISTRY
-//     existed in the contract (co2_fixed_lime_route_t_per_day=0.2, hydrated-lime feed
-//     ~0.35 t/day) — there was NO physical lime reactor. This step sizes it as REAL
-//     equipment so the dossier's physics-critic HIGH ("no physical equipment for the
-//     secondary hydrated lime carbonation process") is closed.
-//
-//     UNLIKE the gypsum reactor (3 barg jacketed 316L), the lime slurry is far less
-//     aggressive than the 120 C MEA loop — an ATMOSPHERIC (0.5 barg) stirred tank in
-//     304 stainless. CSTR-sized for a quarter of the gypsum carbonation duty: the
-//     hydrated-lime feed (~15 kg/h from 0.35 t/day) + ~1465 kg/h recirculating
-//     carbonation liquor (a quarter of the gypsum reactor's ~4000 kg/h liquor, the
-//     lime route fixing a quarter of the CO2). Same reactor:cstr-pfr-sizing tool as
-//     the gypsum reactor; ~2 m3 working volume gives a ~420 kg 304SS shell (vs the
-//     ~772 kg 316L gypsum shell — a smaller, lower-pressure vessel, as expected).
-//     REAL outputs: working_volume_total_m3, vessel_diameter_m, vessel_height_m,
-//     shell_mass_kg_total. Distinct lime_* quantity names from the gypsum reactor.
-// ===========================================================================
-const stepLimeReactorSizing: ToolStep = {
-  tool_id: 'reactor:cstr-pfr-sizing',
-  required: false,
-  feeds_into: ['agitation:power', 'mass-aggregator:envelope-check'] as string[],
-  input_from_contract: (c: ContractInProgress) => {
-    // Hydrated-lime feed (t/day -> kg/h) + a quarter of the gypsum carbonation liquor.
-    const limeFeedKgH = (q(c, 'hydrated_lime_feed_t_per_day', 0.35) * 1000) / 24
-    const limeLiquorKgH = 1465        // recirculating lime/CaCO3 carbonation liquor (~1/4 of the gypsum loop)
-    return {
-      reactor_name: 'lime carbonation reactor',
-      reactor_type: 'cstr' as const,      // back-mixed supplementary stirred carbonation tank
-      mass_flow_kg_h: Math.round(limeFeedKgH + limeLiquorKgH),
-      density_kg_m3: 1100,                 // hydrated-lime/CaCO3 carbonation slurry (thinner than gypsum)
-      residence_time_h: 1.5,
-      length_to_diameter: 1.5,             // squat atmospheric stirred tank
-      design_pressure_barg: 0.5,           // ATMOSPHERIC (NOT the 3 barg / 120 C gypsum + MEA loop)
-      material: 'steel_304L',              // 304 stainless atmospheric vessel (in MATERIALS)
-      fill_fraction: 0.8,
-    }
-  },
-  contract_update: (c: ContractInProgress, output: any) => {
-    const p = provFor('reactor:cstr-pfr-sizing', '1.0.0', 'free-proprietary', 'internal://forgeos/process')
-    // Lime dosing rate derived from the 0.35 t/day hydrated-lime feedstock (-> kg/h).
-    const limeDosingKgH = Math.round(((q(c, 'hydrated_lime_feed_t_per_day', 0.35) * 1000) / 24) * 10) / 10
-    return { ...c, quantities: { ...c.quantities,
-      lime_reactor_volume_m3: mkQty(num(output, 'working_volume_total_m3') ?? 2.02, 'm3', 'volume', p('working_volume_total_m3'), 'lime carbonation reactor working volume'),
-      lime_reactor_diameter_m: mkQty(num(output, 'vessel_diameter_m') ?? 1.29, 'm', 'length', p('vessel_diameter_m'), 'lime carbonation reactor diameter'),
-      lime_reactor_height_m: mkQty(num(output, 'vessel_height_m') ?? 1.93, 'm', 'length', p('vessel_height_m'), 'lime carbonation reactor height'),
-      // First-principles 304SS atmospheric shell mass — drives the secondary-sink BoM
-      // take-off (mass x £5/kg x 4.5 fab + agitator) in build-cost-basis.ts.
-      lime_reactor_shell_mass_kg: mkQty(num(output, 'shell_mass_kg_total') ?? 420, 'kg', 'mass', p('shell_mass_kg_total'), 'lime carbonation reactor shell (first-principles, 304SS atmospheric)'),
-      // Dosing rate the lime dosing pump must meter (0.35 t/day hydrated lime).
-      lime_dosing_rate_kg_h: mkQty(limeDosingKgH, 'kg/h', 'mass_flow', anchorProv('hydrated-lime dosing rate from 0.35 t/day feedstock'), 'lime dosing pump duty'),
-    } }
-  },
-}
-
-// ===========================================================================
-// 31. agitation:power — SECONDARY LIME CARBONATION REACTOR AGITATOR power. [2026-06-05 second sink]
-//     Mirror of the gypsum reactor agitator (step 8) but on the smaller lime tank:
-//     a pitched-blade impeller (axial flow for lime/CaCO3 solids suspension) on the
-//     ~1.29 m atmospheric tank. agitation_power.py input keys: impeller_diameter_m,
-//     rpm, fluid_density_kg_m3, impeller_type, fluid_viscosity_pa_s, tank_diameter_m.
-//     REAL outputs: power_w, tip_speed_m_s, power_volumetric_w_m3. ~290 W on the small
-//     tank (a 2 kW-frame motor); distinct lime_reactor_agitator_* quantity names.
-// ===========================================================================
-const stepLimeReactorAgitator: ToolStep = {
-  tool_id: 'agitation:power',
-  required: false,
-  feeds_into: ['mass-aggregator:envelope-check'] as string[],
-  input_from_contract: (c: ContractInProgress) => {
-    const volM3 = q(c, 'lime_reactor_volume_m3', 2.02)
-    const tankDm = Math.cbrt((4 * volM3) / (1.5 * Math.PI))   // same L/D 1.5 cylinder as the lime shell
-    return {
-      impeller_diameter_m: Math.round(tankDm * 0.4 * 100) / 100,  // D/T ~ 0.4 pitched-blade
-      rpm: 120,
-      fluid_density_kg_m3: 1100,        // hydrated-lime/CaCO3 carbonation slurry
-      impeller_type: 'pitched_blade',   // axial-flow for lime-solids suspension
-      fluid_viscosity_pa_s: 0.004,
-      tank_diameter_m: Math.round(tankDm * 100) / 100,
-    }
-  },
-  contract_update: (c: ContractInProgress, output: any) => {
-    const p = provFor('agitation:power', '1.0.0', 'free-proprietary', 'internal://forgeos/process')
-    return { ...c, quantities: { ...c.quantities,
-      lime_reactor_agitator_power_w: mkQty(num(output, 'power_w') ?? 292, 'W', 'power', p('power_w'), 'lime carbonation reactor agitator'),
-      lime_reactor_agitator_tip_speed_m_s: mkQty(num(output, 'tip_speed_m_s') ?? 3.02, 'm/s', 'velocity', p('tip_speed_m_s'), 'lime reactor impeller tip'),
-    } }
-  },
-}
-
-// ===========================================================================
-// 32. reactor:cstr-pfr-sizing — LIME SLAKING / SLURRY-PREP TANK. [2026-06-05 second sink]
-//     The secondary sink needs lime SLAKING + slurry preparation upstream of the
-//     reactor (the brief: "lime slaking and dosing"). A small atmospheric agitated
-//     prep tank that hydrates/dilutes the lime feed to a pumpable ~10-15 wt% slurry.
-//     Sized as a 0.4 m3 working volume (1 h residence on the ~0.4 m3/h slurry make-up)
-//     atmospheric 304SS tank; ~155 kg shell. Re-uses reactor:cstr-pfr-sizing (a tank
-//     IS a degenerate CSTR for sizing purposes). Distinct lime_prep_tank_* names.
-// ===========================================================================
-const stepLimeSlakingTank: ToolStep = {
-  tool_id: 'reactor:cstr-pfr-sizing',
-  required: false,
-  feeds_into: ['mass-aggregator:envelope-check'] as string[],
-  input_from_contract: (_c: ContractInProgress) => ({
-    reactor_name: 'lime slaking / slurry-prep tank',
-    reactor_type: 'cstr' as const,
-    volumetric_flow_m3_h: 0.4,           // lime slurry make-up rate (lime feed + dilution water)
-    residence_time_h: 1.0,               // 1 h slaking/conditioning residence
-    length_to_diameter: 1.2,             // squat prep tank
-    design_pressure_barg: 0.0,           // open atmospheric prep tank
-    material: 'steel_304L',              // 304 stainless atmospheric tank
-    corrosion_allowance_mm: 3.0,
-    fill_fraction: 0.7,
-  }),
-  contract_update: (c: ContractInProgress, output: any) => {
-    const p = provFor('reactor:cstr-pfr-sizing', '1.0.0', 'free-proprietary', 'internal://forgeos/process')
-    return { ...c, quantities: { ...c.quantities,
-      lime_prep_tank_volume_m3: mkQty(num(output, 'working_volume_total_m3') ?? 0.4, 'm3', 'volume', p('working_volume_total_m3'), 'lime slaking/slurry-prep tank working volume'),
-      lime_prep_tank_shell_mass_kg: mkQty(num(output, 'shell_mass_kg_total') ?? 155, 'kg', 'mass', p('shell_mass_kg_total'), 'lime slaking/slurry-prep tank shell (304SS atmospheric)'),
-    } }
-  },
-}
+// Steps 30, 31, 32 (SECONDARY lime carbonation reactor + agitator + slaking/slurry-prep
+// tank) REMOVED 2026-06-08 per C. Schoolderman: the single gypsum carbonation reactor,
+// run with excess CO2 + recycle to the absorber, fixes the full 1 t/day captured CO2 —
+// no separate hydrated-lime sink.
 
 // ===========================================================================
 // 22. absorption:column-htu-ntu — CO2 ABSORBER (full flue gas). [2026-06-04 Plan C sizing]
@@ -945,7 +796,7 @@ const stepCo2AbsorberSizing: ToolStep = {
   tool_id: 'absorption:column-htu-ntu',
   required: false,
   feeds_into: ['mass-aggregator:envelope-check'] as string[],
-  input_from_contract: (_c: ContractInProgress) => ({
+  input_from_contract: (c: ContractInProgress) => ({
     column_name: 'CO2 absorber',
     mode: 'absorber' as const,
     gas_flow_kg_h: 316,                   // full flue-gas mass rate (1 t/day CO2 at ~12%)
@@ -957,11 +808,15 @@ const stepCo2AbsorberSizing: ToolStep = {
     htu_m: 0.6,                           // Mellapak 250Y HTU
     packing_factor_fp_per_m: 66,          // Mellapak 250Y Fp [1/m]
     fraction_of_flooding: 0.65,           // design at 65% of flooding
+    // Reactive-MEA empirical packed-height override (~20 m; C. Schoolderman 2026-06-08):
+    // Colburn HTU·NTU is invalid for kinetically-enhanced MEA + assumed zero lean loading.
+    // GOVERNS the packed height; the flooding DIAMETER stays first-principles.
+    packed_height_override_m: q(c, 'absorber_packed_height_m', 20),
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('absorption:column-htu-ntu', '1.0.0', 'free-proprietary', 'internal://forgeos/process')
     return { ...c, quantities: { ...c.quantities,
-      absorber_packed_height_m: mkQty(num(output, 'packed_height_m') ?? 1.41, 'm', 'length', p('packed_height_m'), 'CO2 absorber packed height'),
+      absorber_packed_height_m: mkQty(num(output, 'packed_height_m') ?? 20, 'm', 'length', p('packed_height_m'), 'CO2 absorber packed height (empirical reactive-MEA anchor)'),
       absorber_diameter_m: mkQty(num(output, 'column_diameter_m') ?? 0.23, 'm', 'length', p('column_diameter_m'), 'CO2 absorber diameter (flooding-grounded)'),
       absorber_ntu: mkQty(num(output, 'ntu') ?? 2.35, '', 'dimensionless', p('ntu'), 'CO2 absorber transfer units'),
     } }
@@ -1262,10 +1117,7 @@ const stepMassAgg: ToolStep = {
     const reactorShellKg = q(c, 'reactor_shell_mass_kg', 922)
     const absorberShellKg = q(c, 'absorber_shell_mass_kg', 1274)
     const stripperShellKg = q(c, 'stripper_shell_mass_kg', 940)
-    // 2026-06-05 second sink: the secondary lime carbonation reactor + slaking tank shells.
-    const limeReactorShellKg = q(c, 'lime_reactor_shell_mass_kg', 420)
-    const limePrepTankShellKg = q(c, 'lime_prep_tank_shell_mass_kg', 155)
-    const vesselShellsKg = reactorShellKg + absorberShellKg + stripperShellKg + limeReactorShellKg + limePrepTankShellKg
+    const vesselShellsKg = reactorShellKg + absorberShellKg + stripperShellKg
     return {
       // Generic mass buckets (tool sums them all):
       total_cell_mass_kg: 7000,                 // bulk process equipment: exchangers, filters, dryers, crystalliser
@@ -1306,8 +1158,9 @@ const stepMassAgg: ToolStep = {
 export const CO2_MINERALISATION_PLAN: ClassToolPlan = {
   id: 'co2_mineralisation:plant',
   envelope_predicate: (e) => e.class === 'co2_mineralisation',
-  // 31 genuine tool invocations across 21 distinct tool_ids (the 3 new second-sink lime steps
-  // re-use reactor:cstr-pfr-sizing ×2 + agitation:power ×1 — no new tool_ids). Ordering reflects the
+  // 27 genuine tool invocations across 20 distinct tool_ids (the 3 second-sink lime steps were
+  // removed 2026-06-08 per C. Schoolderman — single gypsum sink with excess-CO2 + recycle).
+  // Ordering reflects the
   // unit-operation dependency DAG: the regeneration-energy + the three columns/reactor
   // size first; their heat duties feed the heat-exchanger network; the line + pump +
   // coolant properties follow; the safety/control/acoustic/carbon tools run; the
@@ -1333,7 +1186,7 @@ export const CO2_MINERALISATION_PLAN: ClassToolPlan = {
     //    by each vessel's corrosion_allowance_mm.
     stepPidControl,          // 14
     stepNoise,               // 15
-    stepFireSuppression,     // 16
+    // 16 fire-suppression:nfpa REMOVED 2026-06-08 (C. Schoolderman: no fire risk in the non-flammable MEA/CO2 process)
     stepLifecycle,           // 17
     stepGypsumStoichiometry, // 19  first-principles mass balance (gypsum/CaCO3/K2SO4 tonnages)
     stepK2so4LoopGibbs,      // 20  novel-loop ΔG/K feasibility verdict
@@ -1344,15 +1197,9 @@ export const CO2_MINERALISATION_PLAN: ClassToolPlan = {
     // reactor_shell_mass_kg LAST before the envelope check so the first-principles value
     // (replacing the hardcoded ~922 default) feeds mass-aggregator:envelope-check.
     stepCarbonationReactorSizing, // 21  CSTR volume + vessel + shell mass (feeds envelope)
-    // 2026-06-05 SECOND SINK: the SECONDARY hydrated-lime carbonation reactor (the brief's
-    // "supplementary hydrated-lime carbonation reactor with lime slaking and dosing"). Sized
-    // here as REAL atmospheric 304SS equipment (CSTR + agitator + slaking/prep tank) for the
-    // 0.2 t/day lime CO2 route, parallel to the gypsum reactor. lime_reactor_shell_mass_kg
-    // (~420 kg) drives the secondary-sink BoM take-off in build-cost-basis.ts. The lime
-    // agitator step reads lime_reactor_volume_m3 so it follows the lime reactor sizing.
-    stepLimeReactorSizing,        // 30  lime CSTR volume + vessel + 304SS shell mass (feeds envelope)
-    stepLimeReactorAgitator,      // 31  lime reactor agitator power (reads lime_reactor_volume_m3)
-    stepLimeSlakingTank,          // 32  lime slaking / slurry-prep tank volume + shell mass
+    // Steps 30, 31, 32 (secondary lime carbonation reactor + agitator + slaking tank)
+    // REMOVED 2026-06-08 per C. Schoolderman — single gypsum sink with excess-CO2 +
+    // recycle fixes the full captured CO2; no separate hydrated-lime sink.
     stepCo2AbsorberSizing,        // 22  absorber H=HTU·NTU + flooding diameter
     stepMeaStripperSizing,        // 23  stripper (multi-instance: absorption:column-htu-ntu ×2)
     stepK2so4CrystalliserSizing,  // 24  crystalliser duty + area + magma vessel
