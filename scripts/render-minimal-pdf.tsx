@@ -14858,6 +14858,391 @@ function SubModuleToolsCallout({ state, moduleSpec, subId }: { state: any; modul
   )
 }
 
+// ─── PART 1 · Engineering Basis (front-of-dossier consolidation) ─────────────
+// ADDITIVE render-only section (increment 1 of the Anvil Part-1 restructure,
+// ANVIL-PDF-RESTRUCTURE-SPEC.md). Pulls the three "does it work" answers —
+// process flow, mass/energy balance, feasibility+economics — to the FRONT so a
+// reader can judge feasibility without hunting through the per-module §6 pages.
+// Reads ONLY existing state (no new compute): reuses the SAME numeric values
+// rendered elsewhere so there is zero cross-page numeric drift, and renders an
+// em-dash "—" for any absent field rather than crashing. The reliability rule
+// here is: NO absolute-coordinate <Svg> for the flow diagram — it is laid out
+// as wrapping rows of bordered flexbox <View> boxes with " → " <Text> connectors.
+
+// Format a contract-quantity value compactly for the balance table. Quantities
+// are stored as { value, unit, family, ... }; some are dimensionless ratios.
+function _ebFormatQtyValue(q: any): string {
+  if (q == null) return '—'
+  const v = typeof q === 'object' ? q.value : q
+  if (v == null || (typeof v === 'number' && !isFinite(v))) return '—'
+  const n = Number(v)
+  if (!isFinite(n)) return String(v)
+  // Choose precision by magnitude so "0.68", "41.7", "12,250" all read cleanly.
+  let formatted: string
+  const abs = Math.abs(n)
+  if (abs !== 0 && abs < 1) formatted = n.toLocaleString('en-GB', { maximumFractionDigits: 3 })
+  else if (abs < 100) formatted = n.toLocaleString('en-GB', { maximumFractionDigits: 1 })
+  else formatted = n.toLocaleString('en-GB', { maximumFractionDigits: 0 })
+  return formatted
+}
+
+function _ebQtyUnit(q: any): string {
+  if (q == null || typeof q !== 'object') return ''
+  return String(q.unit ?? '')
+}
+
+// One bordered box in the process-flow diagram (a sub-module, an input, or a
+// product). Tone selects the accent: 'input'/'product' get a tinted fill so the
+// plant boundary reads at a glance; 'unit' is the neutral process box.
+function _EbFlowBox({ label, tone }: { label: string; tone?: 'unit' | 'input' | 'product' }) {
+  const fill = tone === 'input' ? '#eef4fb' : tone === 'product' ? '#eef7f0' : '#ffffff'
+  const border = tone === 'input' ? ACCENT_SOFT : tone === 'product' ? '#3f8a55' : RULE
+  return (
+    <View
+      style={{
+        borderWidth: 0.8,
+        borderColor: border,
+        backgroundColor: fill,
+        borderRadius: 3,
+        paddingVertical: 4,
+        paddingHorizontal: 6,
+        maxWidth: 132,
+      }}
+    >
+      <Text style={{ fontSize: 7.5, color: INK, lineHeight: 1.25 }}>{normalise_unicode(String(label ?? ''))}</Text>
+    </View>
+  )
+}
+
+function _EbArrow() {
+  // ASCII "->" connector (NOT a unicode arrow): the bundled Helvetica renders
+  // → cleanly enough but the dossier-canonical process notation is ASCII "->"
+  // (see normalise_unicode), and ASCII avoids any glyph-metric surprises.
+  return <Text style={{ fontSize: 9, color: MUTED, marginHorizontal: 3 }}> -&gt; </Text>
+}
+
+function EngineeringBasisPage({ state, project }: { state: any; project: string }) {
+  try {
+    const oc = state?.orchestratorContract ?? {}
+    const quantities = (oc.quantities && typeof oc.quantities === 'object') ? oc.quantities : {}
+    const rawModules: any[] = Array.isArray(state?.moduleDecomposition?.modules)
+      ? state.moduleDecomposition.modules
+      : []
+    // Render in the same canonical order as the rest of the dossier.
+    const modules = (() => {
+      try { return order_modules(rawModules as any) } catch { return rawModules }
+    })()
+    if (modules.length === 0 && Object.keys(quantities).length === 0) return null
+
+    // ── Block 1 data: input + product boundary boxes ────────────────────────
+    const pb = state?.parsedBrief ?? {}
+    const briefSummary: string = String(oc.brief_summary ?? pb.product_description ?? '')
+    // ASCII subscripts throughout (CO2 not CO₂): the bundled Helvetica has no
+    // glyph for U+2082 etc. and renders a comma-like artefact — normalise_unicode
+    // strips them, but writing ASCII here keeps the source self-consistent.
+    const inputLabel = 'Flue gas (CO2 source)'
+    // Products: derive from the brief's saleable outputs (CaCO3 + K2SO4 for the
+    // CO2-mineralisation route); fall back to a generic label if unknown.
+    const productLabels: string[] = []
+    if (quantities.caco3_output_t_per_day != null) productLabels.push('Calcium carbonate (CaCO3)')
+    if (quantities.k2so4_output_t_per_day != null) productLabels.push('Potassium sulphate (K2SO4)')
+    if (productLabels.length === 0) productLabels.push('Process products')
+
+    // ── Block 1 data: recycle loops + key streams (annotated, NOT drawn) ─────
+    const topology: any[] = Array.isArray(oc.topology) ? oc.topology : []
+    const streamNotes: string[] = []
+    // MEA solvent recycle is the defining recycle loop for an amine plant.
+    if (rawModules.some((m) => /mea/i.test(String(m?.display_name ?? '')) && /recycle|recovery/i.test(String(m?.display_name ?? '')))) {
+      streamNotes.push('Recycle loop · Lean MEA solvent regenerated in the stripper and returned to the absorber (closed amine loop).')
+    }
+    const reb = quantities.reboiler_duty_kw
+    if (reb?.value != null) streamNotes.push(`Key heat stream · Reboiler duty ${_ebFormatQtyValue(reb)} ${_ebQtyUnit(reb)} drives solvent regeneration; recovered via the lean/rich cross-exchanger.`)
+    const mcirc = quantities.mea_circulation_m3_per_hour
+    if (mcirc?.value != null) streamNotes.push(`Key liquid stream · MEA circulation ${_ebFormatQtyValue(mcirc)} ${_ebQtyUnit(mcirc)} between absorber and stripper.`)
+    if (topology.length > 0) streamNotes.push(`${topology.length} routed inter-unit connections (fluid, thermal and electrical) define the plant topology.`)
+
+    // ── Block 2 data: compact mass & energy balance ─────────────────────────
+    // Curated ~8-12 key quantities; missing keys are skipped (never fabricated).
+    const balanceKeys: Array<{ key: string; label: string }> = [
+      { key: 'co2_capture_rate_kg_per_hour', label: 'CO2 capture rate' },
+      { key: 'capture_efficiency_at_design', label: 'Capture efficiency (design)' },
+      { key: 'flue_gas_flow_m3_per_hour', label: 'Flue-gas feed' },
+      { key: 'mea_circulation_m3_per_hour', label: 'MEA circulation' },
+      { key: 'gypsum_feed_t_per_day', label: 'Gypsum feed' },
+      { key: 'koh_feed_t_per_day', label: 'KOH feed' },
+      { key: 'caco3_output_t_per_day', label: 'CaCO3 product' },
+      { key: 'k2so4_output_t_per_day', label: 'K2SO4 product' },
+      // Duties: use the SYSTEM-scope quantities (cross_exchanger_duty_kw /
+      // condenser_duty_kw) — these are the SAME values the existing consolidated
+      // "What is proven" duties card (Section 7) renders under the SAME labels
+      // (186 kW / 156 kW), so this front-of-dossier balance agrees with it and
+      // introduces no cross-page conflict. (The module-scope lean_rich_* /
+      // overhead_* variants carry different numbers and would clash; the
+      // reboiler_duty_kw system value, 91 kW, already matches that card.)
+      { key: 'reboiler_duty_kw', label: 'Reboiler duty' },
+      { key: 'cross_exchanger_duty_kw', label: 'Lean/rich cross-exchanger duty' },
+      { key: 'condenser_duty_kw', label: 'Overhead condenser duty' },
+      { key: 'absorber_packed_height_m', label: 'Absorber packed height' },
+      { key: 'connected_electrical_load_kw', label: 'Connected electrical load' },
+    ]
+    const balanceRows = balanceKeys
+      .map(({ key, label }) => ({ label, q: quantities[key] }))
+      .filter((r) => r.q != null && (typeof r.q !== 'object' || r.q.value != null))
+      .slice(0, 12)
+
+    // ── Block 3 data: feasibility verdict + decisive variable + economics ────
+    const selfAudit = state?.selfAudit ?? {}
+    const physics = state?.physicsCritique ?? state?.physicsCritic ?? {}
+    const costSanity = state?.costSanity ?? {}
+    const costStack = state?.costStack ?? {}
+    const costReality = state?.cost_reality ?? {}
+
+    // Verdict line: prefer the self-audit summary; else the physics-critic
+    // headline; else a neutral statement.
+    const verdictText: string = String(
+      selfAudit.summary || physics.headline || 'Feasibility assessed across the engineering sections — see the detail that follows.'
+    )
+    // Decisive variable: the single highest-severity engineering issue's
+    // dimension/issue, if the physics critic recorded one.
+    let decisiveVar = '—'
+    try {
+      const issues: any[] = Array.isArray(physics.issues) ? physics.issues : []
+      const high = issues.find((i) => String(i?.severity).toLowerCase() === 'high') || issues[0]
+      if (high) {
+        const dim = String(high.dimension ?? '').replace(/_/g, ' ')
+        const txt = String(high.issue ?? '').trim()
+        decisiveVar = txt ? `${dim ? dim + ' — ' : ''}${txt}` : (dim || '—')
+      }
+    } catch { /* leave as — */ }
+
+    // Headline economics. Levelised cost: the independent cost-sanity gate
+    // already computes £/output-unit — reuse its EXACT figure (no recompute).
+    const lev = (costSanity && typeof costSanity.cost_per_output_unit === 'number' && isFinite(costSanity.cost_per_output_unit))
+      ? costSanity.cost_per_output_unit
+      : null
+    // per_unit_label carries "£/(t·yr CO₂)" — normalise the subscript to ASCII
+    // (the bundled Helvetica renders ₂ as a comma-like glyph that collides with
+    // the adjacent ")"; caught by audit-pdf-layout V-1).
+    const levUnit = normalise_unicode(String(costSanity?.band?.per_unit_label ?? (costSanity?.output_unit_label ? `£/${costSanity.output_unit_label}` : '')))
+    const exWorks = (typeof costStack.oem_transfer_price_gbp === 'number')
+      ? costStack.oem_transfer_price_gbp
+      : (typeof costReality.bom_total_gbp === 'number' ? costReality.bom_total_gbp : null)
+    // Net carbon: reuse the renderer's own lifecycle reconciliation (the same one the
+    // "Net carbon" card uses) — captured minus operational footprint = net t/yr.
+    const co2Day = quantities.total_co2_fixed_t_per_day ?? quantities.co2_fixed_gypsum_route_t_per_day ?? quantities.capture_capacity_tco2_per_day
+    const netCo2Eb = (() => { try { return computeNetCo2Reconciliation(state) } catch { return null } })()
+    const netCarbonStr = (netCo2Eb && typeof netCo2Eb.net_t_yr === 'number' && isFinite(netCo2Eb.net_t_yr))
+      ? `${netCo2Eb.net_t_yr >= 0 ? '+' : ''}${Math.round(netCo2Eb.net_t_yr).toLocaleString('en-GB')} t/yr${netCo2Eb.net_t_yr > 0 ? ' (net-negative)' : ''}`
+      : '—'
+    const economics: Array<{ label: string; value: string }> = [
+      {
+        label: 'Levelised capital cost',
+        value: lev != null ? `£${Math.round(lev).toLocaleString('en-GB')}${levUnit ? ' ' + levUnit : ''}` : '—',
+      },
+      {
+        label: 'Ex-works plant cost',
+        value: exWorks != null ? `£${Math.round(exWorks).toLocaleString('en-GB')}` : '—',
+      },
+      {
+        label: 'CO2 captured',
+        value: (co2Day && co2Day.value != null) ? `${_ebFormatQtyValue(co2Day)} ${_ebQtyUnit(co2Day)}` : '—',
+      },
+      {
+        label: 'Net carbon (lifecycle)',
+        value: netCarbonStr,
+      },
+    ]
+    const verdictBadge = String(costSanity?.verdict ?? '').toUpperCase() || (selfAudit?.ok ? 'PASS' : '')
+
+    const sectionTone = '#0f2740'
+
+    return (
+      <Page size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Part 1 · Engineering Basis" project={project} />
+        <PageFooter />
+
+        <Text style={{ fontSize: 9, color: ACCENT, letterSpacing: 1.5, fontFamily: 'Helvetica-Bold', marginBottom: 3 }}>
+          PART 1 · ENGINEERING BASIS — DOES IT WORK?
+        </Text>
+        <Text style={{ fontSize: 21, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+          The whole plant, at a glance
+        </Text>
+        <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 16, lineHeight: 1.5 }}>
+          {briefSummary
+            ? normalise_unicode(briefSummary.replace(/\s+/g, ' ').trim()).slice(0, 320)
+            : 'A consolidated view of the engineering: how the plant flows, what it moves and the energy it uses, and whether it stands up.'}
+          {' '}The flow, balance and verdict below are pulled to the front so feasibility can be judged before the per-module detail.
+        </Text>
+
+        {/* ── BLOCK 1 · PROCESS FLOW ─────────────────────────────────────── */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: sectionTone, marginBottom: 2 }}>
+            1 · Process flow
+          </Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 10, lineHeight: 1.45 }}>
+            Block-flow of the plant — one box per sub-module, grouped under its module. Reading order left-to-right; recycle and key streams are annotated below (not drawn).
+          </Text>
+
+          {/* Boundary in: flue gas */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+            <_EbFlowBox label={inputLabel} tone="input" />
+            <_EbArrow />
+            <Text style={{ fontSize: 7.5, color: MUTED, fontStyle: 'italic' }}>feeds the process</Text>
+          </View>
+
+          {/* Module groups: each module = a labelled group of sub-module boxes */}
+          {modules.map((m: any, mi: number) => {
+            const groupLabel = String(m?.display_name || humanise(String(m?.module ?? '')) || `Module ${mi + 1}`)
+            const subs: any[] = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+            const boxes = subs.length > 0
+              ? subs.map((sm: any) => {
+                  // Label each box by its REAL primary equipment (the sub-module's first
+                  // named word, e.g. "packed absorber column"), NOT the function-taxonomy id.
+                  const ws: any[] = Array.isArray(sm?.words) ? sm.words : []
+                  const prim = ws.find((w: any) => w && w.name_human)
+                  const lbl = String(prim?.name_human || sm?.name_human || sm?.id || '')
+                  // sentence-case (capital first letter only) — NOT title-case, which mangles
+                  // chemical formulas (CaCO3 -> Caco3, K2SO4 -> K2so4) and pH.
+                  const t = normalise_unicode(humaniseSubName(lbl)).trim()
+                  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t
+                })
+              : [groupLabel]
+            return (
+              <View key={`${m?.module ?? 'mod'}-${mi}`} style={{ marginBottom: 7 }} wrap={false}>
+                <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 3 }}>
+                  {`${mi + 1}. ${groupLabel}`}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {boxes.map((b: string, bi: number) => (
+                    <View key={bi} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <_EbFlowBox label={b || '—'} tone="unit" />
+                      {bi < boxes.length - 1 ? <_EbArrow /> : null}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )
+          })}
+
+          {/* Boundary out: products */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+            <Text style={{ fontSize: 7.5, color: MUTED, fontStyle: 'italic', marginRight: 4 }}>products out:</Text>
+            {productLabels.map((p, pi) => (
+              <View key={pi} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <_EbFlowBox label={p} tone="product" />
+                {pi < productLabels.length - 1 ? <Text style={{ fontSize: 9, color: MUTED, marginHorizontal: 3 }}> · </Text> : null}
+              </View>
+            ))}
+          </View>
+
+          {/* Recycle loops + key streams (annotated, not routed) */}
+          {streamNotes.length > 0 ? (
+            <View style={{ marginTop: 9, paddingTop: 7, borderTopWidth: 0.5, borderTopColor: RULE_SOFT }}>
+              {streamNotes.map((n, ni) => (
+                <Text key={ni} style={{ fontSize: 7.5, color: INK_SOFT, lineHeight: 1.4, marginBottom: 1.5 }}>
+                  {normalise_unicode(String(n ?? ''))}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </View>
+
+        {/* ── BLOCK 2 · MASS & ENERGY BALANCE ────────────────────────────── */}
+        <View style={{ marginBottom: 16 }} wrap={false}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: sectionTone, marginBottom: 2 }}>
+            2 · Mass &amp; energy balance
+          </Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 8, lineHeight: 1.45 }}>
+            Key streams and duties — the same computed values used throughout the dossier.
+          </Text>
+          {balanceRows.length > 0 ? (
+            <View style={{ borderWidth: 0.6, borderColor: RULE, borderRadius: 4 }}>
+              {/* header row */}
+              <View style={{ flexDirection: 'row', backgroundColor: '#f3f5f8', paddingVertical: 4, paddingHorizontal: 8, borderBottomWidth: 0.6, borderBottomColor: RULE }}>
+                <Text style={{ flex: 1, fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK }}>Quantity</Text>
+                <Text style={{ width: 86, fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK, textAlign: 'right' }}>Value</Text>
+                <Text style={{ width: 64, fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK, textAlign: 'right' }}>Unit</Text>
+              </View>
+              {balanceRows.map((r, ri) => (
+                <View
+                  key={ri}
+                  style={{
+                    flexDirection: 'row',
+                    paddingVertical: 3.5,
+                    paddingHorizontal: 8,
+                    borderBottomWidth: ri < balanceRows.length - 1 ? 0.4 : 0,
+                    borderBottomColor: RULE_SOFT,
+                    alignItems: 'baseline',
+                  }}
+                >
+                  <Text style={{ flex: 1, fontSize: 8.5, color: INK }}>{normalise_unicode(r.label)}</Text>
+                  <Text style={{ width: 86, fontSize: 8.5, color: INK, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>{_ebFormatQtyValue(r.q)}</Text>
+                  <Text style={{ width: 64, fontSize: 8.5, color: MUTED, textAlign: 'right' }}>{normalise_unicode(_ebQtyUnit(r.q)) || '—'}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={{ fontSize: 8.5, color: MUTED }}>Balance quantities not available for this design.</Text>
+          )}
+        </View>
+
+        {/* ── BLOCK 3 · FEASIBILITY VERDICT + ECONOMICS ──────────────────── */}
+        <View wrap={false}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: sectionTone, marginBottom: 2 }}>
+            3 · Feasibility verdict &amp; economics
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
+            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, marginRight: 6 }}>Verdict</Text>
+            {verdictBadge ? (
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#1f6b3a', backgroundColor: '#e7f4ec', paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 2 }}>
+                {verdictBadge}
+              </Text>
+            ) : null}
+          </View>
+          <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.45, marginBottom: 6 }}>
+            {normalise_unicode(verdictText.replace(/\s+/g, ' ').trim())}
+          </Text>
+          <View style={{ marginBottom: 9 }}>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 1.5 }}>Decisive variable</Text>
+            <Text style={{ fontSize: 8, color: MUTED, lineHeight: 1.4 }}>
+              {decisiveVar === '—' ? '—' : normalise_unicode(decisiveVar.replace(/\s+/g, ' ').trim()).slice(0, 360)}
+            </Text>
+          </View>
+
+          {/* Headline economics — 4 compact cards */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {economics.map((e, ei) => (
+              <View
+                key={ei}
+                style={{
+                  width: '50%',
+                  paddingVertical: 5,
+                  paddingHorizontal: 8,
+                  borderWidth: 0.5,
+                  borderColor: RULE_SOFT,
+                  borderRadius: 3,
+                  marginBottom: 4,
+                  marginRight: ei % 2 === 0 ? '1.5%' : 0,
+                }}
+              >
+                <Text style={{ fontSize: 7.5, color: MUTED, marginBottom: 1.5 }}>{normalise_unicode(e.label)}</Text>
+                <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: e.value === '—' ? MUTED : ACCENT }}>{normalise_unicode(e.value)}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={{ fontSize: 7, color: MUTED, fontStyle: 'italic', marginTop: 4, lineHeight: 1.4 }}>
+            Levelised capital cost and ex-works plant cost are the same figures reconciled in the Cost sections; net lifecycle carbon (where available) reconciles the captured CO2 against the operational footprint.
+          </Text>
+        </View>
+      </Page>
+    )
+  } catch (err) {
+    // Never break the PDF — this is an additive front-matter consolidation.
+    console.error('[render-minimal-pdf] EngineeringBasisPage render error (skipped):', err)
+    return null
+  }
+}
+
 function MinimalDocument({ state, subject, statePath }: { state: any; subject: string; statePath: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   const rawModules = state.moduleDecomposition?.modules ?? []
@@ -14932,6 +15317,14 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           sections + Appendices A/B in render order; no page numbers (single-pass
           render). Returns null on error so it can never break the PDF. */}
       <TableOfContentsPage state={state} project={project} />
+      {/* PART 1 · ENGINEERING BASIS (increment 1, ANVIL-PDF-RESTRUCTURE-SPEC.md):
+          ADDITIVE front-of-dossier consolidation — process flow + mass/energy
+          balance + feasibility verdict & economics, pulled to the front so a
+          reader can judge "does it work?" before the per-module §6 detail. This
+          increment does NOT reorder/remove any existing section (later
+          increments do). Sits directly after the Table of Contents, ahead of
+          the Executive Summary. Returns null on any error or empty state. */}
+      <EngineeringBasisPage state={state} project={project} />
       {/* ITER-10.5 (Tristan-defined 2026-05-20):
           Brief sits immediately after Cover. Operational Headline is folded
           INTO BriefPage as a banner at the top (HeadlinePage component
