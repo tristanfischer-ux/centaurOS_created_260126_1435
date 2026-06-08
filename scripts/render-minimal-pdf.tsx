@@ -3555,9 +3555,11 @@ function CoverPage({
           {subject}
         </Text>
         <Text style={{ fontSize: 11, color: INK_SOFT, lineHeight: 1.5 }}>
-          {process.env.DOSSIER_VARIANT === 'free'
-            ? 'A concept-stage engineering design dossier: from the product brief to a buildable, costed design — modules and sub-modules, a full bill of materials by part class, specification and indicative pricing (named part numbers and suppliers come with the paid upgrade), compliance and risk review, and the specialists to speak to. Study-grade for early decision-making — not a for-construction or certified design.'
-            : 'A concept-stage engineering design dossier: from the product brief to a buildable, costed design — modules and sub-modules, a full bill of materials with real manufacturer part numbers and live pricing, compliance and risk review, and recommended suppliers. Study-grade for early decision-making — not a for-construction or certified design.'}
+          A concept-stage engineering design dossier: from the product brief to a
+          buildable, costed design — modules and sub-modules, a full bill of
+          materials with real manufacturer part numbers and live pricing,
+          compliance and risk review, and recommended suppliers. Study-grade for
+          early decision-making — not a for-construction or certified design.
         </Text>
         {/* Task #87 (2026-05-18) — provisional class-registry note.
             Amber, not red — informational only, not blocking. Fires when
@@ -4520,14 +4522,9 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
               label="Source vetted suppliers, or run it as a request for quotation &#8212; via Fractional Forge"
               sub="We shortlist suppliers against the spec below, or run the whole bill of materials as a request for quotation to get you real quotes."
             />
-            {/* The single paid-upgrade callout (named bill of materials + RFQ). */}
-            <View style={{ marginTop: 4, paddingVertical: 8, paddingHorizontal: 11, borderWidth: 0.8, borderColor: RULE, borderRadius: 3, backgroundColor: '#fbfcfd' }} wrap={false}>
-              <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
-                <Text style={{ fontFamily: 'Helvetica-Bold', color: ACCENT }}>Paid upgrade &#8212; </Text>
-                the full named bill of materials, with real part numbers and named suppliers, is available as a paid upgrade,
-                and Fractional Forge can run it as a request for quotation to get you real quotes.
-              </Text>
-            </View>
+            {/* No "named-BOM paid upgrade" rung (killed 2026-06-08): commodity parts are
+                shown free; the paid value is sourcing the bespoke build + experts and the
+                request-for-quote run, both covered by the two CTAs above. */}
           </View>
         ) : null}
         {blocks.map((block, bi) => {
@@ -13890,19 +13887,19 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
               <View style={{ marginTop: 4, marginBottom: 8, padding: 8, backgroundColor: '#ffffff', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
                 <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
                   <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What it does. </Text>
-                  {normalise_unicode(redactNarr(narr.description))}
+                  {normalise_unicode(narr.description)}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
                   <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Origin. </Text>
-                  {normalise_unicode(redactNarr(narr.origin))}
+                  {normalise_unicode(narr.origin)}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
                   <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What the results mean. </Text>
-                  {normalise_unicode(redactNarr(narr.results_interpretation))}
+                  {normalise_unicode(narr.results_interpretation)}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
                   <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>How it was used here. </Text>
-                  {normalise_unicode(redactNarr(narr.usage_pattern))}
+                  {normalise_unicode(narr.usage_pattern)}
                 </Text>
               </View>
             ) : null}
@@ -14861,61 +14858,6 @@ function SubModuleToolsCallout({ state, moduleSpec, subId }: { state: any; modul
   )
 }
 
-// DOSSIER_VARIANT=free: when the free edition renders, stripNamesDeep() sets this to a
-// brand-redaction function so render-time CODE-INJECTED text (tool narratives from
-// tool-narratives.ts, which never passes through state) is name-free too. null = paid.
-let FREE_BRAND_REDACT: ((s: string) => string) | null = null
-const redactNarr = (s: any): string => (FREE_BRAND_REDACT ? FREE_BRAND_REDACT(String(s ?? '')) : String(s ?? ''))
-
-// DOSSIER_VARIANT=free: deep-clone state with all manufacturer / part-number identity
-// nulled, so the FREE edition of the dossier withholds named parts + suppliers (they
-// stay in the REAL state for the gates; only this render copy is name-free). The PAID
-// edition (default) is unchanged. Strips name keys AND modifier_characters whose kind
-// is manufacturer/part_number (the brand lives in `.value` there). Tristan 2026-06-07.
-function stripNamesDeep(state: any): any {
-  // Pass 1: collect the distinctive manufacturer + part-number strings so we can also
-  // redact them where the engine wove them into PROSE (module narratives, sourcing
-  // strategy, cost methodology), not just structured fields.
-  const GENERIC = new Set(['custom', 'generic', 'tbd', 'bespoke', 'various', 'standard', 'n/a', 'none', 'unknown', 'other', 'to be confirmed', 'to be selected', 'custom fabrication', 'off-the-shelf'])
-  const brands = new Set<string>()
-  const consider = (v: any) => {
-    if (typeof v !== 'string') return
-    const s = v.trim()
-    if (s.length >= 4 && !/^[-\d.\s/]+$/.test(s) && !GENERIC.has(s.toLowerCase())) brands.add(s)
-  }
-  const collect = (o: any): void => {
-    if (Array.isArray(o)) { o.forEach(collect); return }
-    if (o && typeof o === 'object') {
-      if (o.kind === 'manufacturer' || o.kind === 'part_number') consider(o.value)
-      for (const [k, v] of Object.entries(o)) {
-        if (k === 'manufacturer' || k === 'part_number' || k === 'recommended_manufacturer' || k === 'recommended_part_number' || k === 'mpn') consider(v)
-        collect(v)
-      }
-    }
-  }
-  collect(state)
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const sorted = [...brands].sort((a, b) => b.length - a.length).map(esc)
-  let rx: RegExp | null = null
-  try { rx = sorted.length ? new RegExp('(?<!\\w)(?:' + sorted.join('|') + ')(?!\\w)', 'g') : null } catch { rx = null }
-  const redact = (s: string) => rx ? s.replace(rx, '').replace(/\s{2,}/g, ' ').replace(/\s+([,.;:)])/g, '$1').replace(/\(\s+/g, '(').trim() : s
-  FREE_BRAND_REDACT = redact  // expose so render-time code-injected text (tool narratives) is redacted too
-  // Pass 2: deep-clone, null name fields + modifier values, redact brand mentions in prose.
-  const clone = (o: any): any => {
-    if (Array.isArray(o)) return o.map(clone)
-    if (o && typeof o === 'object') {
-      const out: any = {}
-      for (const [k, v] of Object.entries(o)) {
-        out[k] = (k === 'manufacturer' || k === 'part_number' || k === 'recommended_manufacturer' || k === 'recommended_part_number' || k === 'mpn') ? null : clone(v)
-      }
-      if ((out.kind === 'manufacturer' || out.kind === 'part_number') && 'value' in out) out.value = null
-      return out
-    }
-    return typeof o === 'string' ? redact(o) : o
-  }
-  return clone(state)
-}
-
 function MinimalDocument({ state, subject, statePath }: { state: any; subject: string; statePath: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   const rawModules = state.moduleDecomposition?.modules ?? []
@@ -15202,10 +15144,7 @@ async function main() {
   console.error(`[render-minimal-pdf] modules: ${(state.moduleDecomposition?.modules ?? []).length}`)
   console.error(`[render-minimal-pdf] rendering...`)
 
-  // DOSSIER_VARIANT=free -> render a name-free edition (paid upgrade reveals names).
-  // Original `state` is untouched so the post-render macro-claims below stay accurate.
-  const renderState = process.env.DOSSIER_VARIANT === 'free' ? stripNamesDeep(state) : state
-  const blob = await pdf(<MinimalDocument state={renderState} subject={subject} statePath={statePath} />).toBlob()
+  const blob = await pdf(<MinimalDocument state={state} subject={subject} statePath={statePath} />).toBlob()
   const buffer = Buffer.from(await blob.arrayBuffer())
   writeFileSync(outPath, buffer)
   const sizeKb = (buffer.length / 1024).toFixed(1)
