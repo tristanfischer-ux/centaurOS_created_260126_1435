@@ -9445,7 +9445,7 @@ function SubModuleBomBlock({
           the reader doesn't have to guess at the abbreviations. */}
       <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: RULE, paddingBottom: 3 }}>
         <Text style={{ flex: 2.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART</Text>
-        <Text style={{ flex: 1.4, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>MANUFACTURER</Text>
+        <Text style={{ flex: 1.4, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, paddingRight: 6 }}>MANUFACTURER</Text>
         <Text style={{ flex: 1.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART NUMBER</Text>
         <Text style={{ width: 24, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>QTY</Text>
         {/* 2026-05-25 BESS L23 council item #4 — T-1 detector flagged ×1 £10,000.00
@@ -9493,8 +9493,8 @@ function SubModuleBomBlock({
         // strikethrough indicates it isn't in the sub-total.
         const isExcluded = row.cost_repair_excluded_from_subtotal === true
         const partTextStyle = isExcluded
-          ? { flex: 2.6, fontSize: 9, color: MUTED, textDecoration: 'line-through' as const }
-          : { flex: 2.6, fontSize: 9, color: INK }
+          ? { flex: 2.6, fontSize: 9, color: MUTED, paddingRight: 8, textDecoration: 'line-through' as const }
+          : { flex: 2.6, fontSize: 9, color: INK, paddingRight: 8 }
         const lineTextStyle = isExcluded
           ? { width: 49, fontSize: 9, color: MUTED, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold', textDecoration: 'line-through' as const }
           : { width: 49, fontSize: 9, color: INK, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold' }
@@ -9508,7 +9508,7 @@ function SubModuleBomBlock({
               {row.word_name ? toTitleCaseEng(normalise_unicode(row.word_name)) : '—'}
               {noteIdx ? <Text style={NOTE_MARK_STYLE}> {noteIdx}</Text> : null}
             </Text>
-            <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT }}>{row.manufacturer ?? '—'}</Text>
+            <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT, paddingRight: 6 }}>{row.manufacturer ?? '—'}</Text>
             {(() => {
               // ITER-10.5 (Tristan 2026-05-20): part-number cell becomes a
               // distributor / manufacturer link when partLinkMap has the SKU
@@ -12823,7 +12823,7 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
   const TableHead = () => (
     <View wrap={false} style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: RULE, paddingBottom: 3, marginTop: 4 }}>
       <Text style={{ flex: 2.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART</Text>
-      <Text style={{ flex: 1.4, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>MANUFACTURER</Text>
+      <Text style={{ flex: 1.4, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, paddingRight: 6 }}>MANUFACTURER</Text>
       <Text style={{ flex: 1.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART NUMBER</Text>
       <Text style={{ width: 24, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>QTY</Text>
       <Text style={{ width: 62, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>UNIT (£)</Text>
