@@ -15531,7 +15531,24 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
         value: netCarbonStr,
       },
     ]
-    const verdictBadge = String(costSanity?.verdict ?? '').toUpperCase() || (selfAudit?.ok ? 'PASS' : '')
+    // The verdict must reflect a KNOWN ship-blocking defect: a green "PASS" sitting
+    // above "physically impossible … HIGH severity" reads as broken (editorial review).
+    // If the physics critic / self-audit carries a HIGH or blocking finding, downgrade a
+    // PASS to CONDITIONAL. (2026-06-09 universal.)
+    const _physHigh = (() => {
+      try {
+        const pc: any = state?.physicsCritique || {}
+        const f: any[] = Array.isArray(pc.findings) ? pc.findings : Array.isArray(pc.issues) ? pc.issues : []
+        if (f.some((x: any) => String(x?.severity ?? '').toLowerCase() === 'high')) return true
+        const sa: any = state?.selfAudit || {}
+        if (Array.isArray(sa.blocking_defects) && sa.blocking_defects.length > 0) return true
+      } catch { /* ignore */ }
+      return false
+    })()
+    const _baseVerdict = String(costSanity?.verdict ?? '').toUpperCase() || (selfAudit?.ok ? 'PASS' : '')
+    const verdictBadge = _physHigh && (_baseVerdict === 'PASS' || _baseVerdict === 'CLEAN' || _baseVerdict === '')
+      ? 'CONDITIONAL — open design defect'
+      : _baseVerdict
 
     const sectionTone = '#0f2740'
 
@@ -15681,7 +15698,7 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
             <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, marginRight: 6 }}>Verdict</Text>
             {verdictBadge ? (
-              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#1f6b3a', backgroundColor: '#e7f4ec', paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 2 }}>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', ...(/CONDITIONAL|CAVEAT|FAIL|DEFECT/i.test(verdictBadge) ? { color: '#92400e', backgroundColor: '#fef3c7' } : { color: '#1f6b3a', backgroundColor: '#e7f4ec' }), paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 2 }}>
                 {verdictBadge}
               </Text>
             ) : null}

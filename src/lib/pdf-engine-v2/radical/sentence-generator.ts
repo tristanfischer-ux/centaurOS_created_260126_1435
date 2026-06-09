@@ -355,6 +355,16 @@ export function capitaliseFirst(s: string): string {
  * A name_human that is empty/absent → humaniseId(sub.id) (existing behaviour).
  */
 function resolveSubmoduleLabel(subModule: SubModuleSpec): string {
+  // Prefer the primary EQUIPMENT word's name ("packed absorber column") over the
+  // function-taxonomy name_human ("mass fluid transport process") — the taxonomy
+  // reads as jargon when used as a sentence subject ("The mass fluid transport
+  // process absorbs 5 components"). 2026-06-09 universal; the equipment names are
+  // the same ones the module headings + flowchart already use.
+  const words: any[] = Array.isArray((subModule as any).words) ? (subModule as any).words : []
+  for (const w of words) {
+    const nm = String((w as any)?.content_character?.name_human || (w as any)?.name_human || '').trim()
+    if (nm && !(nm.includes('_') && !nm.includes(' '))) return nm
+  }
   const raw = (subModule.name_human ?? '').trim()
   if (!raw) return humaniseId(subModule.id)
   // Contains underscore but NO space → looks like a snake_case internal ID.
