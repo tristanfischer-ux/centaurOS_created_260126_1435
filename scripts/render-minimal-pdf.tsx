@@ -1009,6 +1009,55 @@ function format_chemical_formulae(s: string): string {
   }
   return out
 }
+// ── Dossier TIER (free / paid) — redaction model (Tristan 2026-06-09) ─────────
+// Free and paid render the SAME document; the FREE edition MASKS the actionable
+// specifics — manufacturer/brand names (-> "Company N"), BoM item + part-number,
+// and websites — while ALL costs + the engineering prose stay visible. Brands leak
+// in the PROSE too (sub-module sentences name "De Dietrich" etc.), so masking is
+// applied centrally in clean_prose, NOT only the BoM cells. ASCII tokens only
+// (Helvetica has no lock glyph -> would trip gate-11). DOSSIER_TIER=free turns it
+// on; default 'paid' = no change. Acceptance test = the leak-audit (render free ->
+// grep every known manufacturer -> 0). Drawer forgeos_gotchas_26b798791a8525bb.
+const DOSSIER_TIER = String(process.env.DOSSIER_TIER || 'paid').toLowerCase()
+const IS_FREE_TIER = DOSSIER_TIER === 'free'
+const TIER_UPGRADE = 'Upgrade to reveal'
+const _companyAliases = new Map<string, string>()
+let _companyAliasN = 0
+function companyAlias(mfr: string | null | undefined): string {
+  const m = String(mfr ?? '').trim()
+  if (!m || /^(generic|tbd|t\.b\.d|n\/?a|various|unknown|none)$/i.test(m)) return m
+  const key = m.toLowerCase()
+  let a = _companyAliases.get(key)
+  if (!a) { a = `Company ${++_companyAliasN}`; _companyAliases.set(key, a) }
+  return a
+}
+let _brandMaskRules: Array<{ re: RegExp; alias: string }> = []
+function registerManufacturersForMasking(state: any): void {
+  if (!IS_FREE_TIER) return
+  try {
+    const names = new Set<string>()
+    const add = (m: any) => { const s = String(m ?? '').trim(); if (s.length >= 3 && !/^(generic|tbd|t\.b\.d|n\/?a|various|unknown|none)$/i.test(s)) names.add(s) }
+    for (const v of (Array.isArray(state?.partVerifications) ? state.partVerifications : [])) add(v?.manufacturer)
+    const mods = Array.isArray(state?.moduleDecomposition?.modules) ? state.moduleDecomposition.modules : []
+    for (const m of mods) for (const sm of (Array.isArray(m?.sub_modules) ? m.sub_modules : [])) for (const w of (Array.isArray(sm?.words) ? sm.words : [])) {
+      for (const mc of (Array.isArray(w?.modifier_characters) ? w.modifier_characters : [])) {
+        if (String(mc?.kind ?? '').toLowerCase() === 'manufacturer') add(mc?.value)
+      }
+    }
+    _brandMaskRules = Array.from(names)
+      .sort((a, b) => b.length - a.length) // longest-first so multi-word brands mask before any substring
+      .map((name) => ({ re: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), alias: companyAlias(name) }))
+  } catch { _brandMaskRules = [] }
+}
+function maskBrandsInText(text: string): string {
+  if (!IS_FREE_TIER || !text) return text
+  let t = text
+  for (const { re, alias } of _brandMaskRules) t = t.replace(re, alias)
+  // strip websites / URLs (the named source is the paid upgrade)
+  t = t.replace(/\bhttps?:\/\/\S+/gi, TIER_UPGRADE).replace(/\s*\b[\w-]+\.(?:com|io|co\.uk|net|org|eu|de)\b/gi, '')
+  return t
+}
+
 function clean_prose(s: string | null | undefined): string {
   if (!s) return ''
   // Phase19 audit pipeline: HTML decode + tag strip → existing transforms →
@@ -1017,7 +1066,10 @@ function clean_prose(s: string | null | undefined): string {
   // (co2 prose plan FIX 2): strip BoM-dump fragments + case chemical formulae
   // BEFORE the existing passes so narrative prose reads cleanly.
   const decoded = stripHtmlTags(decodeHtmlEntities(String(s).trim()))
-  return dedupe_duplicated_chunks(clamp_decimals_in_prose(britishise(fix_quantity_prefix(normalise_unicode(apply_engineering_fixups(format_chemical_formulae(strip_bom_dump_fragments(strip_internal_ids(strip_engine_leakage(decoded))))))))))
+  const cleaned = dedupe_duplicated_chunks(clamp_decimals_in_prose(britishise(fix_quantity_prefix(normalise_unicode(apply_engineering_fixups(format_chemical_formulae(strip_bom_dump_fragments(strip_internal_ids(strip_engine_leakage(decoded))))))))))
+  // FREE-tier redaction: mask manufacturer/brand names + websites woven into the
+  // prose (the BoM cells are masked separately). No-op on the paid tier.
+  return IS_FREE_TIER ? maskBrandsInText(cleaned) : cleaned
 }
 
 // 2026-06-09 universal: swap a leading FUNCTION-TAXONOMY subject ("The mass fluid
@@ -3592,6 +3644,12 @@ function CoverPage({
             (present on some classes, absent on others) and read as messy clutter
             at the top of the cover. The provenance still lives in state for any
             internal use; it is simply no longer surfaced on the cover. */}
+        {IS_FREE_TIER ? (
+          <View style={{ marginBottom: 14, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: '#fffbeb', borderLeftWidth: 3, borderLeftColor: '#b45309', borderRadius: 2 }}>
+            <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#92400e', letterSpacing: 1, marginBottom: 2 }}>FREE EDITION</Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>The full engineering, the costs and the structure are all here. Upgrade to the full report to reveal the named parts, the suppliers, and the experts to speak to.</Text>
+          </View>
+        ) : null}
         {/* Cost self-correction (2026-06-01, Tristan "fix it, don't flag it"):
             no cover banner. Estimate-tier instrument prices that inherited a high
             class anchor are re-priced to type-realistic ceilings in the BoM loop
@@ -9500,15 +9558,15 @@ function SubModuleBomBlock({
             style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
           >
             <Text style={partTextStyle}>
-              {row.word_name ? toTitleCaseEng(normalise_unicode(row.word_name)) : '—'}
+              {IS_FREE_TIER ? TIER_UPGRADE : (row.word_name ? toTitleCaseEng(normalise_unicode(row.word_name)) : '—')}
               {noteIdx ? <Text style={NOTE_MARK_STYLE}> {noteIdx}</Text> : null}
             </Text>
-            <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT, paddingRight: 6 }}>{row.manufacturer ?? '—'}</Text>
+            <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT, paddingRight: 6 }}>{IS_FREE_TIER ? (companyAlias(row.manufacturer) || TIER_UPGRADE) : (row.manufacturer ?? '—')}</Text>
             {(() => {
               // ITER-10.5 (Tristan 2026-05-20): part-number cell becomes a
               // distributor / manufacturer link when partLinkMap has the SKU
               // (same map the narrative uses via renderProseWithLinks).
-              const pn = row.part_number
+              const pn = IS_FREE_TIER ? null : row.part_number
               // 2026-05-24 (HAPS L1 audit-pdf-layout exit 11): a 20-char
               // hyphenated part_number like "RWC-CF-RIB-NACA23012" overflowed
               // the flex:1.6 column (~99pt) and ran into the QTY column, with
@@ -12853,7 +12911,7 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
     const lineTextStyle = isExcluded
       ? { width: 49, fontSize: 9, color: MUTED, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold', textDecoration: 'line-through' as const }
       : { width: 49, fontSize: 9, color: INK, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold' }
-    const pn = row.part_number
+    const pn = IS_FREE_TIER ? null : row.part_number
     // normalise_unicode BEFORE the hyphen→ZWSP break-insertion (gate-11,
     // layout-overlap fix #5, 2026-06-05). The part-number/form cell can carry a
     // long made-to-order DESCRIPTION (e.g. "fabricated 316L … (hot MEA-recovery
@@ -12874,9 +12932,9 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
         style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
       >
         <Text style={partTextStyle}>
-          {row.word_name ? toTitleCaseEng(normalise_unicode(row.word_name)) : '—'}
+          {IS_FREE_TIER ? TIER_UPGRADE : (row.word_name ? toTitleCaseEng(normalise_unicode(row.word_name)) : '—')}
         </Text>
-        <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT }}>{row.manufacturer ?? '—'}</Text>
+        <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT }}>{IS_FREE_TIER ? (companyAlias(row.manufacturer) || TIER_UPGRADE) : (row.manufacturer ?? '—')}</Text>
         {linked && linked.url ? (
           <Link src={linked.url} style={{ flex: 1.6, fontSize: 8.5, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold', textDecoration: 'underline' }}>
             {pnWithBreaks}
@@ -15801,6 +15859,10 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
 
 function MinimalDocument({ state, subject, statePath }: { state: any; subject: string; statePath: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
+  // FREE-tier: pre-build the manufacturer -> "Company N" alias map + brand-mask
+  // regexes from state BEFORE any prose/BoM renders, so prose masking + the BoM
+  // manufacturer cells use the SAME consistent aliases. No-op on the paid tier.
+  registerManufacturersForMasking(state)
   const rawModules = state.moduleDecomposition?.modules ?? []
   const modules = order_modules(rawModules as Array<{ module: string; display_name?: string }>)
   const links = state.moduleDecomposition?.cross_module_grammar_links ?? []
