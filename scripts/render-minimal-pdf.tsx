@@ -14115,8 +14115,30 @@ const _CLAIM_TOKEN_FIXUPS: Record<string, string> = {
   mcc: 'MCC', vsd: 'VSD', dc: 'DC', ac: 'AC', cstr: 'CSTR', pfr: 'PFR', cepci: 'CEPCI',
   gbp: 'GBP', usd: 'USD', kva: 'kVA', pct: '(%)', rpm: 'RPM', id: 'inner diameter', od: 'outer diameter',
 }
-function humaniseClaimField(field: string): string {
-  const s = String(field || '').replace(/_/g, ' ').trim()
+// Unit-suffix tokens conventionally appended to quantity identifiers
+// (reboiler_duty_kw, feed_t_day, co2_capture_rate_kg_h, bags_h). When the claim
+// renders its unit SEPARATELY, the trailing suffix duplicates it AND mis-cases it
+// ("Reboiler Duty Kw = 91 kW"). Strip the trailing suffix token(s) only when a unit
+// is present. UNIVERSAL — these are class-agnostic SI/engineering unit names.
+const _UNIT_SUFFIX_TOKENS = new Set([
+  'm','mm','cm','km','m2','m3','mm2','mm3',
+  'kw','mw','w','kwh','mwh','wh','kva','kvar','va','j','kj','mj',
+  'kg','g','t','kt','mg','lb','tonne','tonnes',
+  'h','hr','hrs','s','sec','min','day','yr','year','month','d',
+  'k','pa','kpa','mpa','bar','psi','barg',
+  'v','kv','mv','a','ka','ma','hz','khz','mhz',
+  'pct','percent','ppm','ppb','rpm','gbp','usd','eur',
+  'lpm','gpm','l','ml','bags','units','ea','no',
+  'deg','degc','rad','dba','db','mol','kmol','mols','nm','um',
+])
+function humaniseClaimField(field: string, unit?: any): string {
+  let parts = String(field || '').split('_').filter(Boolean)
+  if (unit && String(unit).trim()) {
+    while (parts.length > 1 && _UNIT_SUFFIX_TOKENS.has(parts[parts.length - 1].toLowerCase())) {
+      parts.pop()
+    }
+  }
+  const s = parts.join(' ').trim()
   if (!s) return ''
   const toks = s.split(/\s+/).map((t) => {
     const fx = _CLAIM_TOKEN_FIXUPS[t.toLowerCase()]
@@ -14124,8 +14146,13 @@ function humaniseClaimField(field: string): string {
     if (/\d/.test(t) || t === t.toUpperCase()) return t // keep digit-bearing / all-caps as-is
     return t
   })
+  // Sentence-case the first ALL-lowercase word. A token that is already mixed-case
+  // (a fixup like "pH") or all-caps (an acronym) is left untouched — capitalising it
+  // would turn "pH" into "PH".
   for (let i = 0; i < toks.length; i += 1) {
-    if (/^[a-z]/.test(toks[i])) { toks[i] = toks[i].charAt(0).toUpperCase() + toks[i].slice(1); break }
+    if (/^[a-z]/.test(toks[i]) && toks[i] === toks[i].toLowerCase()) {
+      toks[i] = toks[i].charAt(0).toUpperCase() + toks[i].slice(1); break
+    }
   }
   return toks.join(' ')
 }
@@ -14282,7 +14309,7 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
                   if (notEstReason) {
                     return (
                       <Text key={ci} style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5 }}>
-                        {`  • ${normalise_unicode(humaniseClaimField(String(claim.field)))} — not estimated at concept stage for this class (${normalise_unicode(notEstReason)})`}
+                        {`  • ${normalise_unicode(humaniseClaimField(String(claim.field), claim.unit))} — not estimated at concept stage for this class (${normalise_unicode(notEstReason)})`}
                       </Text>
                     )
                   }
@@ -14290,7 +14317,7 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
                   const inp = typeof claim.input_summary === 'string' ? claim.input_summary : ''
                   return (
                     <Text key={ci} style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
-                      {`  • ${normalise_unicode(humaniseClaimField(String(claim.field)))} = ${v}${claim.unit ? ` ${normalise_unicode(String(claim.unit))}` : ''}`}
+                      {`  • ${normalise_unicode(humaniseClaimField(String(claim.field), claim.unit))} = ${v}${claim.unit ? ` ${normalise_unicode(String(claim.unit))}` : ''}`}
                       {inp && inp !== '(none)' ? (
                         <Text style={{ color: MUTED }}>{`  (input: ${normalise_unicode(inp.length > 80 ? inp.slice(0, 79) + '…' : inp)})`}</Text>
                       ) : null}
