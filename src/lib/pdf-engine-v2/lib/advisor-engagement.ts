@@ -61,7 +61,7 @@ export interface AdvisorCard {
   typically_at: string
   /** Which parts / sub-modules of the module this specialist owns. */
   covers: string
-  /** 1-3 questions, each grounded in a real open item. */
+  /** Exactly 2 questions, each grounded in a real open item. */
   questions: AdvisorQuestion[]
 }
 
@@ -454,10 +454,10 @@ const SYSTEM_PROMPT =
   '5. Name a TYPE of company in "typically_at" (e.g. "a carbon-capture process consultancy", "an equipment vendor\'s application-engineering group") — NEVER a specific named firm.\n' +
   '6. Different parts of one module often need DIFFERENT specialists. Use AT MOST 2 cards. Put the most important open item (a high-severity physics finding) with the most senior, most specific specialist, in card 1.\n' +
   '7. BREVITY IS A HARD CONSTRAINT — this block is a tight checklist, not an essay. Obey EVERY cap:\n' +
-  '   • at most 2 cards per module; at most 2 questions per card.\n' +
+  '   • at most 2 cards per module; EXACTLY 2 questions per card — always two, a single question is not enough.\n' +
   '   • each "question" ≤ 18 words. One sharp sentence. State the single thing to confirm. Do NOT restate the part\'s whole spec; do NOT pile up clauses.\n' +
   '   • each "strong_answer" ≤ 22 words. Say what a good answer reaches for; do NOT repeat the question, do NOT add a separate "a weak answer…" clause unless it fits the budget.\n' +
-  '   • "background" ≤ 14 words. "typically_at" ≤ 8 words. "covers" ≤ 10 words. "specialist_role" ≤ 10 words. "intro" ≤ 22 words.\n' +
+  '   • "background" ≤ 24 words — genuinely useful, specific hands-on experience (the actual systems/processes they must have delivered), not a generic title. "typically_at" ≤ 8 words. "covers" ≤ 10 words. "specialist_role" ≤ 10 words. "intro" ≤ 22 words.\n' +
   '   • Crisp and concrete. No padding, no boilerplate, no framing repeated across cards or modules ("This is the single most important conversation…"). Cut every word that is not doing work.\n' +
   'Return STRICT JSON only — no prose, no markdown fences. Your first character must be {.'
 
@@ -475,12 +475,12 @@ function buildUserPrompt(moduleNm: string, productClass: string, items: OpenItem
     `Produce the specialist cards for THIS module. Return STRICT JSON of the shape:\n` +
     `{"intro": "<≤22 words: how many specialists this module needs and why, design-only>", "cards": [{` +
     `"specialist_role": "<≤10-word discipline + seniority headline, e.g. 'A chartered chemical / process engineer'>", ` +
-    `"background": "<≤14 words: the exact hands-on background needed to answer well>", ` +
+    `"background": "<≤24 words: the exact hands-on experience that matters — concrete + genuinely useful (the specific systems / processes they must have delivered), not a generic title>", ` +
     `"typically_at": "<≤8 words: the TYPE of company that fields this person — never a named firm>", ` +
     `"covers": "<≤10 words: which parts of this module this specialist owns>", ` +
     `"questions": [{"question": "<≤18-word sharp design question>", "grounded_in": "<the open item it traces to, naming the source trace>", "strong_answer": "<≤22 words: what a strong answer reaches for>"}]` +
     `}]}\n` +
-    `Use AT MOST 2 cards. Each card has AT MOST 2 questions. Obey EVERY word cap (rule 7) — crisp checklist, no padding. DESIGN ONLY. No acronyms. British spelling.`
+    `Use AT MOST 2 cards. Each card has EXACTLY 2 questions (always two). Obey EVERY word cap (rule 7) — crisp checklist, no padding. DESIGN ONLY. No acronyms. British spelling.`
   )
 }
 
@@ -539,7 +539,7 @@ function sanitiseCard(card: any): AdvisorCard | null {
   if (questions.length === 0) return null
   return {
     specialist_role: role,
-    background: expandAcronyms(clipWords(String(card.background ?? ''), 14)),
+    background: expandAcronyms(clipWords(String(card.background ?? ''), 24)),
     typically_at: expandAcronyms(clipWords(String(card.typically_at ?? ''), 8)),
     covers: expandAcronyms(clipWords(String(card.covers ?? ''), 10)),
     questions,
