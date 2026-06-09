@@ -370,14 +370,19 @@ _HEADER_SIGNATURES: dict[str, list[str]] = {
     # section (scored on its own merits), NOT design_modules. No "·MODULE" token,
     # so it never collides with the design_modules signature above.
     "engineering_calcs":  ["ENGINEERINGCALCULATIONS"],
-    # "bom" is the parts-level Bill of Materials (the master parts table). Anchor to
-    # its section header "SECTION N · BILL OF MATERIALS". The leading "·" is REQUIRED:
-    # a bare "BILLOFMATERIALS" also matched prose mentions in a page's first 6 lines
-    # (the cover blurb, the engineering-contract paragraph, the cost verdict) and
-    # pulled non-BoM pages into the bom score. "COSTBYMODULE" stays as a fallback for
-    # dossiers without a master BoM (and the cost rollup is BoM-adjacent). Before all
-    # this, "bom" anchored only to COSTBYMODULE and scored the cost rollup, not a BoM.
-    "bom":                ["·BILLOFMATERIALS", "COSTBYMODULE"],
+    # "bom" is the parts-level Bill of Materials (the master parts table). Its running
+    # header is "BILL OF MATERIALS" (de-spaced "BILLOFMATERIALS"). 2026-06-09: the
+    # renderer dropped the out-of-order "SECTION N ·" prefix from running headers, so
+    # the old "·BILLOFMATERIALS" anchor matched ZERO pages and bom fell back (via the
+    # COSTBYMODULE alias + the empty-bom fallback) to the Cost-by-Module page — scoring
+    # a cost rollup AS a BoM (bom cratered to 3.67 on an otherwise-fine dossier). Fix:
+    # match the bare "BILLOFMATERIALS" token, but ONLY against the RUNNING-HEADER line
+    # (first non-empty line) — `bom` is in _LINE1_ANCHORED_SECTIONS below — so the prose
+    # mentions in body lines 2-6 (cost methodology / risk analysis / appendix, which say
+    # "Bill-of-Materials" or "bill of materials") no longer pollute the bom sample.
+    # COSTBYMODULE removed (it belongs to cost_analysis; the empty-bom fallback at
+    # build_section_page_map still covers a dossier that genuinely has no master BoM).
+    "bom":                ["BILLOFMATERIALS"],
     # cost_analysis = the actual COST pages (2026-06-08 fix): the Cost Summary /
     # Cost-by-Module rollup (header "COST SUMMARY", body H1 "Cost by Module"), the
     # Cost Methodology (§9), AND Economics & Scenarios (§9b) — that is where the cost
@@ -461,9 +466,18 @@ def build_section_page_map(pdf_path: Path, num_pages: int) -> dict[str, list[int
     # The header is in the first few lines of each page; use the de-spaced first
     # ~6 lines as the matchable header blob.
     page_headers: list[str] = []
+    page_header_line1: list[str] = []
     for pg in page_texts:
         lines = [l for l in pg.splitlines() if l.strip()]
         page_headers.append(_despace_upper(" ".join(lines[:6])))
+        # The RUNNING-HEADER line only (first non-empty line). Some signatures must
+        # match the header line exclusively, not the first-6-lines blob, because their
+        # token also appears as a prose phrase in body text (e.g. "BILLOFMATERIALS").
+        page_header_line1.append(_despace_upper(lines[0]) if lines else "")
+
+    # Sections whose signature is matched against the running-header line ONLY (see
+    # the "bom" comment in _HEADER_SIGNATURES) rather than the first-6-lines blob.
+    _LINE1_ANCHORED_SECTIONS = {"bom"}
 
     mapping: dict[str, list[int]] = {s: [] for s in SECTIONS}
     mapping["cover"] = [1]
@@ -472,7 +486,8 @@ def build_section_page_map(pdf_path: Path, num_pages: int) -> dict[str, list[int
         if idx > num_pages:
             break
         for section, sigs in _HEADER_SIGNATURES.items():
-            if any(sig in header for sig in sigs):
+            hdr = page_header_line1[idx - 1] if section in _LINE1_ANCHORED_SECTIONS else header
+            if any(sig in hdr for sig in sigs):
                 if idx not in mapping[section]:
                     mapping[section].append(idx)
 
