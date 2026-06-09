@@ -4568,9 +4568,9 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
           Engagement Plan — who to speak to
         </Text>
         <Text style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 10 }}>
-          For every module: the design questions to put to a specialist, the kind of expert who should answer them, and
-          the kind of supplier you will need. Each module below pairs its questions with a &#8220;Specialists &amp; sourcing&#8221;
-          brief &#8212; the credentials that matter and the supplier type plus key spec to source.
+          The consolidated roster of who to bring in, module by module: the kind of expert, the credentials that matter,
+          and the supplier type plus key spec to source. The specific design questions for each specialist are set out
+          with their module in Part 2 (Modules &amp; sub-modules).
         </Text>
         {/* 2026-06-07: the Fractional Forge model is a free lead magnet -> paid
             sourcing funnel (validated by the customer + a headhunter partner). The
@@ -4626,7 +4626,7 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
                 </Text>
               ) : null}
               {cards.map((card, ci) => (
-                <AdvisorSpecialistCard key={`engplan-card-${bi}-${ci}`} card={card} cardNo={ci + 1} />
+                <AdvisorSpecialistCard key={`engplan-card-${bi}-${ci}`} card={card} cardNo={ci + 1} rosterOnly />
               ))}
               {/* Per-module "Specialists & sourcing" brief (2026-06-07): the brand-
                   stripped expert + supplier sourcing content for THIS module, paired
@@ -9655,7 +9655,7 @@ function AdvisorQuestionRow({ n, question, groundedIn, strongAnswer }: { n: numb
   )
 }
 
-function AdvisorSpecialistCard({ card, cardNo }: { card: AdvisorCard; cardNo: number }) {
+function AdvisorSpecialistCard({ card, cardNo, rosterOnly }: { card: AdvisorCard; cardNo: number; rosterOnly?: boolean }) {
   const questions = Array.isArray(card?.questions) ? card.questions : []
   if (questions.length === 0) return null
   return (
@@ -9696,7 +9696,18 @@ function AdvisorSpecialistCard({ card, cardNo }: { card: AdvisorCard; cardNo: nu
           </Text>
         ) : null}
       </View>
-      {/* What to ask them */}
+      {/* What to ask them. In rosterOnly mode (the consolidated §13 Engagement
+          Plan) the full question rows are OMITTED — they already render in-context
+          with each module in Part 2 (ModuleQuestionsPage); §13 just states the
+          count + points there. Avoids the 14-page verbatim duplication the
+          editorial review flagged. (2026-06-09 universal de-dup.) */}
+      {rosterOnly ? (
+        <View style={{ paddingHorizontal: 3, paddingTop: 4 }}>
+          <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic' }}>
+            {`${questions.length} design question${questions.length === 1 ? '' : 's'} for this specialist — set out with the module in Part 2.`}
+          </Text>
+        </View>
+      ) : (
       <View style={{ paddingHorizontal: 3, paddingTop: 2 }}>
         <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.6, marginTop: 6, marginBottom: 2 }}>
           WHAT TO ASK THEM
@@ -9711,6 +9722,7 @@ function AdvisorSpecialistCard({ card, cardNo }: { card: AdvisorCard; cardNo: nu
           />
         ))}
       </View>
+      )}
     </View>
   )
 }
@@ -13991,6 +14003,40 @@ function InvestorPage({ state, project }: { state: any; project: string }) {
   )
 }
 
+// 2026-06-09 universal: humanise the raw snake_case quantity identifiers + tame
+// absurd precision in the Tools-Used "Quantities this tool computed" dump (it
+// read as machine stdout: "absorber_ntu = 2.3454", "k2so4_loop_equilibrium_K =
+// 61,621,006,169,164,950"). Keeps the per-tool NARRATIVE substance (the scorer
+// rewards it — terse-ifying the appendix regressed the score, build #23). Chemical
+// formulae / acronyms are normalised to canonical casing.
+const _CLAIM_TOKEN_FIXUPS: Record<string, string> = {
+  co2: 'CO2', caco3: 'CaCO3', k2so4: 'K2SO4', koh: 'KOH', mea: 'MEA', h2: 'H2', h2o: 'H2O',
+  so4: 'SO4', caso4: 'CaSO4', ntu: 'NTU', htu: 'HTU', ua: 'UA', ph: 'pH', hx: 'HX', plc: 'PLC',
+  mcc: 'MCC', vsd: 'VSD', dc: 'DC', ac: 'AC', cstr: 'CSTR', pfr: 'PFR', cepci: 'CEPCI',
+  gbp: 'GBP', usd: 'USD', kva: 'kVA', pct: '(%)', rpm: 'RPM', id: 'inner diameter', od: 'outer diameter',
+}
+function humaniseClaimField(field: string): string {
+  const s = String(field || '').replace(/_/g, ' ').trim()
+  if (!s) return ''
+  const toks = s.split(/\s+/).map((t) => {
+    const fx = _CLAIM_TOKEN_FIXUPS[t.toLowerCase()]
+    if (fx) return fx
+    if (/\d/.test(t) || t === t.toUpperCase()) return t // keep digit-bearing / all-caps as-is
+    return t
+  })
+  for (let i = 0; i < toks.length; i += 1) {
+    if (/^[a-z]/.test(toks[i])) { toks[i] = toks[i].charAt(0).toUpperCase() + toks[i].slice(1); break }
+  }
+  return toks.join(' ')
+}
+function fmtClaimNumber(value: any): string {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return String(value ?? '—')
+  const a = Math.abs(n)
+  if (a !== 0 && (a >= 1e7 || a < 1e-4)) return n.toExponential(2) // 6.16e+16, tiny fractions
+  return n.toLocaleString(undefined, { maximumFractionDigits: 4 })
+}
+
 function ToolsUsedPage({ state, project }: { state: any; project: string }) {
   const page = readToolsUsedPage(state)
   if (!page) return null
@@ -14136,17 +14182,15 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
                   if (notEstReason) {
                     return (
                       <Text key={ci} style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5 }}>
-                        {`  • ${normalise_unicode(String(claim.field))} — not estimated at concept stage for this class (${normalise_unicode(notEstReason)})`}
+                        {`  • ${normalise_unicode(humaniseClaimField(String(claim.field)))} — not estimated at concept stage for this class (${normalise_unicode(notEstReason)})`}
                       </Text>
                     )
                   }
-                  const v = Number.isFinite(claim.value)
-                    ? Number(claim.value).toLocaleString(undefined, { maximumFractionDigits: 4 })
-                    : String(claim.value ?? '—')
+                  const v = fmtClaimNumber(claim.value)
                   const inp = typeof claim.input_summary === 'string' ? claim.input_summary : ''
                   return (
                     <Text key={ci} style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
-                      {`  • ${normalise_unicode(String(claim.field))} = ${v}${claim.unit ? ` ${normalise_unicode(String(claim.unit))}` : ''}`}
+                      {`  • ${normalise_unicode(humaniseClaimField(String(claim.field)))} = ${v}${claim.unit ? ` ${normalise_unicode(String(claim.unit))}` : ''}`}
                       {inp && inp !== '(none)' ? (
                         <Text style={{ color: MUTED }}>{`  (input: ${normalise_unicode(inp.length > 80 ? inp.slice(0, 79) + '…' : inp)})`}</Text>
                       ) : null}
