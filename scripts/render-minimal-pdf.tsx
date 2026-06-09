@@ -564,6 +564,27 @@ export function toTitleCaseEng(input: string): string {
   // which up-cases its members entirely. Map it explicitly.
   const MIXED_CASE_ACRONYMS = new Map<string, string>([
     ['ptl', 'PtL'],
+    // Mixed-case engineering tokens the title-caser would otherwise mangle
+    // ("Ph probe" → "pH probe"; "I/o" → "I/O"). UNIVERSAL across instrument lists.
+    ['ph', 'pH'],
+    ['i/o', 'I/O'],
+  ])
+  // Chemical formulae are case-SENSITIVE in a way the title-caser cannot infer
+  // from spelling: "K2SO4" splits to K-2-S-O-4 so it fails the all-caps acronym
+  // test (digit in the middle) and the tail is lower-cased → "K2so4"; "CaCO3" →
+  // "Caco3"; "Na2SO4" → "Na2so4". A token whose lower-cased form is a known
+  // process-chemistry formula is restored to canonical casing. UNIVERSAL — these
+  // recur across every chemical-process class (DAC, SMR, FT, electrolysis, cement,
+  // scrubbing). Add new formulae here; zero false-positive risk (exact-map lookup).
+  const CHEM_FORMULAE = new Map<string, string>([
+    ['k2so4', 'K2SO4'], ['caco3', 'CaCO3'], ['caso4', 'CaSO4'],
+    ['na2so4', 'Na2SO4'], ['na2co3', 'Na2CO3'], ['nahco3', 'NaHCO3'],
+    ['naoh', 'NaOH'], ['h2so4', 'H2SO4'], ['h2o', 'H2O'], ['h2o2', 'H2O2'],
+    ['nh3', 'NH3'], ['nh4', 'NH4'], ['cao', 'CaO'], ['mgo', 'MgO'],
+    ['mgco3', 'MgCO3'], ['ch4', 'CH4'], ['c2h4', 'C2H4'], ['nox', 'NOx'],
+    ['so2', 'SO2'], ['so3', 'SO3'], ['no2', 'NO2'], ['n2', 'N2'], ['o2', 'O2'],
+    ['feso4', 'FeSO4'], ['fecl3', 'FeCl3'], ['mgso4', 'MgSO4'],
+    ['k2co3', 'K2CO3'], ['kcl', 'KCl'], ['nacl', 'NaCl'],
   ])
   // e-/x- single-letter technology prefixes (e-fuel, e-SAF, e-methanol,
   // x-by-wire): the leading letter stays lowercase, the remainder is cased by
@@ -594,6 +615,9 @@ export function toTitleCaseEng(input: string): string {
     // Mixed-case acronyms (PtL) preserve their canonical casing in any position
     // — checked BEFORE the all-caps ACRONYMS set so PtL is not up-cased to PTL.
     if (MIXED_CASE_ACRONYMS.has(lowerTok)) return MIXED_CASE_ACRONYMS.get(lowerTok)!
+    // Chemical-formula restore (K2SO4 / CaCO3 / Na2SO4 …) — BEFORE the all-caps
+    // and SI-unit rules so a lower-cased "caco3" after a number is still fixed.
+    if (CHEM_FORMULAE.has(lowerTok)) return CHEM_FORMULAE.get(lowerTok)!
     const upper = tok.toUpperCase()
     if (ACRONYMS.has(upper)) return upper
     // Mixed-case SI unit lookup BEFORE the all-lowercase SI unit rule.
