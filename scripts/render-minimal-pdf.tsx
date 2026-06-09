@@ -1025,7 +1025,7 @@ const _companyAliases = new Map<string, string>()
 let _companyAliasN = 0
 function companyAlias(mfr: string | null | undefined): string {
   const m = String(mfr ?? '').trim()
-  if (!m || /^(generic|tbd|t\.b\.d|n\/?a|various|unknown|none)$/i.test(m)) return m
+  if (!m || /^(generic|tbd|t\.b\.d|tbc|n\/?a|various|unknown|none|internal|in[- ]?house|fabricated|fabrication|bespoke|custom|made[- ]to[- ]order|standard)$/i.test(m)) return m
   const key = m.toLowerCase()
   let a = _companyAliases.get(key)
   if (!a) { a = `Company ${++_companyAliasN}`; _companyAliases.set(key, a) }
@@ -1036,7 +1036,7 @@ function registerManufacturersForMasking(state: any): void {
   if (!IS_FREE_TIER) return
   try {
     const names = new Set<string>()
-    const add = (m: any) => { const s = String(m ?? '').trim(); if (s.length >= 3 && !/^(generic|tbd|t\.b\.d|n\/?a|various|unknown|none)$/i.test(s)) names.add(s) }
+    const add = (m: any) => { const s = String(m ?? '').trim(); if (s.length >= 3 && !/^(generic|tbd|t\.b\.d|tbc|n\/?a|various|unknown|none|internal|in[- ]?house|fabricated|fabrication|bespoke|custom|made[- ]to[- ]order|standard)$/i.test(s)) names.add(s) }
     for (const v of (Array.isArray(state?.partVerifications) ? state.partVerifications : [])) add(v?.manufacturer)
     const mods = Array.isArray(state?.moduleDecomposition?.modules) ? state.moduleDecomposition.modules : []
     for (const m of mods) for (const sm of (Array.isArray(m?.sub_modules) ? m.sub_modules : [])) for (const w of (Array.isArray(sm?.words) ? sm.words : [])) {
@@ -1046,7 +1046,10 @@ function registerManufacturersForMasking(state: any): void {
     }
     _brandMaskRules = Array.from(names)
       .sort((a, b) => b.length - a.length) // longest-first so multi-word brands mask before any substring
-      .map((name) => ({ re: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), alias: companyAlias(name) }))
+      // WORD-BOUNDARY guard (Tristan 2026-06-09): short brands like "GEA" were matching
+      // INSIDE words ("switch[gea]r" -> "switchCompany 45r"). Require a non-alphanumeric
+      // boundary either side so a brand only masks as a standalone token.
+      .map((name) => ({ re: new RegExp('(?<![A-Za-z0-9])' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![A-Za-z0-9])', 'gi'), alias: companyAlias(name) }))
   } catch { _brandMaskRules = [] }
 }
 function maskBrandsInText(text: string): string {
@@ -4307,7 +4310,9 @@ function SourcesReferencesPage({ state, project }: { state: any; project: string
         {implementing.map((x, i) => <Row key={'i' + i} a={x.s} b={x.c} />)}
 
         <H>Equipment &amp; supplier data</H>
-        {supplierList.length
+        {IS_FREE_TIER
+          ? <Text style={{ fontSize: 8.5, color: MUTED }}>{supplierList.length} manufacturer datasheets underpin the Bill of Materials. {TIER_UPGRADE} (full report) to see the named suppliers.</Text>
+          : supplierList.length
           ? supplierList.map(([m, u], i) => <Row key={'s' + i} a={m} b={u ? 'manufacturer datasheet / product centre' : 'manufacturer catalogue'} />)
           : <Text style={{ fontSize: 8.5, color: MUTED }}>Supplier datasheets cited per line in the Bill of Materials (Section 8).</Text>}
 
@@ -9332,9 +9337,13 @@ function noteTextForFlaggedRow(row: BomPartRow, recommendations: any[]): string 
   if (!c.subRow) return null
   // Strip the iter-10 arrow/symbol prefixes; they made sense alongside a
   // badge but now the note IS the signal.
-  return c.subRow
+  const note = c.subRow
     .replace(/^[→ⓘ]\s*/u, '')
     .replace(/^Use instead:\s*/, 'Suggested alternative supplier — ')
+  // FREE tier: these verification caveats name the manufacturer ("Verify with
+  // manufacturer (Sulzer)…") outside clean_prose — mask the brand here, the one
+  // funnel every flagged-row note passes through.
+  return IS_FREE_TIER ? maskBrandsInText(note) : note
 }
 
 /** Collect notes for one sub-module from every source the chain emits.
@@ -12370,11 +12379,16 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
                   const url = host ? (host.startsWith('http') ? host : `https://${host}`) : ''
                   return (
                     <View key={`oem-${si}-${oi}`} wrap={false} style={{ marginBottom: 6, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: RULE_SOFT }}>
-                      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35, marginBottom: 1 }}>{clean_prose(oem.name)}</Text>
-                      {oem.profile ? (
+                      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35, marginBottom: 1 }}>{IS_FREE_TIER ? (companyAlias(oem.name) || TIER_UPGRADE) : clean_prose(oem.name)}</Text>
+                      {/* FREE tier: the profile is brand-IDENTIFYING ("Swiss-Swedish electrification
+                          group" = a specific firm) and the website domain IS the brand — both hidden,
+                          replaced by a single upgrade line. Named supplier + contact = the paid step. */}
+                      {(!IS_FREE_TIER && oem.profile) ? (
                         <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.45, marginBottom: 2 }}>{clean_prose(oem.profile)}</Text>
                       ) : null}
-                      {url ? (
+                      {IS_FREE_TIER ? (
+                        <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic' }}>Named supplier + contact — {TIER_UPGRADE} (full report).</Text>
+                      ) : url ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
                           <Link src={url} style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, textDecoration: 'none', marginRight: 6 }}>{host}</Link>
                           <Text style={{ fontSize: 8.5, color: MUTED }}>· UK sales enquiry via {host}</Text>
@@ -14200,6 +14214,10 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
   // FIX 5: product class drives suppression of the generic-tool quantities that
   // are not calibrated for a process plant (MTBF / cert cost / cyber score).
   const productClass = state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? ''
+  // Tier mask — in the free edition, strip vendor/brand names + URLs from the
+  // methodology narratives, reference papers and claim inputs (Appendix B was a
+  // residual brand-leak site outside clean_prose). No-op in paid.
+  const mb = (x: any) => (IS_FREE_TIER ? maskBrandsInText(String(x ?? '')) : String(x ?? ''))
 
   // Methodology / provenance reference (build #23, 2026-06-04 — restores the
   // per-tool substance dropped by the build-#21 terse-index collapse, which
@@ -14275,19 +14293,19 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
               <View style={{ marginTop: 4, marginBottom: 8, padding: 8, backgroundColor: '#ffffff', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
                 <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
                   <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What it does. </Text>
-                  {normalise_unicode(narr.description)}
+                  {normalise_unicode(mb(narr.description))}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
                   <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Origin. </Text>
-                  {normalise_unicode(narr.origin)}
+                  {normalise_unicode(mb(narr.origin))}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
                   <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What the results mean. </Text>
-                  {normalise_unicode(narr.results_interpretation)}
+                  {normalise_unicode(mb(narr.results_interpretation))}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
                   <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>How it was used here. </Text>
-                  {normalise_unicode(narr.usage_pattern)}
+                  {normalise_unicode(mb(narr.usage_pattern))}
                 </Text>
               </View>
             ) : null}
@@ -14295,7 +14313,7 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
             {tool.tool_paper ? (
               <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5, marginBottom: 2 }}>
                 <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Reference paper / standard: </Text>
-                {normalise_unicode(String(tool.tool_paper))}
+                {normalise_unicode(mb(tool.tool_paper))}
                 {tool.tool_doi ? (
                   <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.tool_doi}`}</Text>
                 ) : null}
@@ -14305,14 +14323,14 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
             {tool.physics_basis ? (
               <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5, marginBottom: 2 }}>
                 <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Underlying math: </Text>
-                {normalise_unicode(String(tool.physics_basis))}
+                {normalise_unicode(mb(tool.physics_basis))}
                 {tool.physics_paper_doi ? (
                   <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.physics_paper_doi}`}</Text>
                 ) : null}
               </Text>
             ) : null}
 
-            {tool.tool_source_url ? (
+            {!IS_FREE_TIER && tool.tool_source_url ? (
               <Text style={{ fontSize: 9, color: MUTED, marginBottom: 6 }}>
                 <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Source: </Text>
                 {normalise_unicode(String(tool.tool_source_url))}
@@ -14343,7 +14361,7 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
                     )
                   }
                   const v = fmtClaimNumber(claim.value)
-                  const inp = typeof claim.input_summary === 'string' ? claim.input_summary : ''
+                  const inp = mb(typeof claim.input_summary === 'string' ? claim.input_summary : '')
                   return (
                     <Text key={ci} style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
                       {`  • ${normalise_unicode(humaniseClaimField(String(claim.field), claim.unit))} = ${v}${claim.unit ? ` ${normalise_unicode(String(claim.unit))}` : ''}`}
