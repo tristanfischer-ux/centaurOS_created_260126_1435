@@ -9394,12 +9394,14 @@ function SubModuleBomBlock({
   subModuleName,
   noteIndexMap,
   partLinkMap,
+  showLegend,
 }: {
   bomLines: BomPartRow[]
   subtotal: number
   subModuleName: string
   noteIndexMap: Map<string, number>
   partLinkMap?: Map<string, { url: string; title: string | null; manufacturer: string }>
+  showLegend?: boolean
 }) {
   if (bomLines.length === 0) return null
   // 2026-05-23-bugfix: react-pdf wrap={false} on tables >12 rows triggers
@@ -9578,9 +9580,15 @@ function SubModuleBomBlock({
           the user — need to explain what it does." Drops the internal
           "corpus" term and describes the price-sanity check as comparing
           against typical prices for similar components. */}
-      <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 4, lineHeight: 1.5, fontStyle: 'italic' }}>
-        SOURCE: Web = found in a distributor catalogue (DigiKey / Mouser / Farnell etc.) · Est. = web estimate, not a live quote · Mfr = found on the manufacturer&apos;s own site · — = no source recorded.  PRICE CHECK (against typical prices for similar components): OK = price sits in the normal range · &gt;2x = price looks more than 2× higher than typical · &lt;.5x = price looks less than half of typical · - = no comparable parts on record to check against.  PRICE-QUERY = part is required for the design but the unit price is under the industry floor for this class; verify the part number and specification before procurement.  INDICATIVE · RFQ = best available estimate for a quote-only instrument or build-to-order fabrication; request a quotation to firm up. Prices without the marker are live catalogue prices.
-      </Text>
+      {/* Render-once (2026-06-09): the SOURCE/PRICE-CHECK key is a fixed legend; it
+          was reprinted under EVERY sub-module BoM (~20×). showLegend is true only for
+          the first module's first sub-module, so the key appears once in Part 2 (and
+          once more under the consolidated master BoM in Part 3). */}
+      {showLegend ? (
+        <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 4, lineHeight: 1.5, fontStyle: 'italic' }}>
+          SOURCE: Web = found in a distributor catalogue (DigiKey / Mouser / Farnell etc.) · Est. = web estimate, not a live quote · Mfr = found on the manufacturer&apos;s own site · — = no source recorded.  PRICE CHECK (against typical prices for similar components): OK = price sits in the normal range · &gt;2x = price looks more than 2× higher than typical · &lt;.5x = price looks less than half of typical · - = no comparable parts on record to check against.  PRICE-QUERY = part is required for the design but the unit price is under the industry floor for this class; verify the part number and specification before procurement.  INDICATIVE · RFQ = best available estimate for a quote-only instrument or build-to-order fabrication; request a quotation to firm up. Prices without the marker are live catalogue prices.
+        </Text>
+      ) : null}
     </View>
   )
 }
@@ -10463,6 +10471,7 @@ function ModuleSection({
               subModuleName={britishise(sm.name)}
               noteIndexMap={noteIndexMap}
               partLinkMap={partLinkMap}
+              showLegend={index === 1 && smIdx === 0}
             />
             <NotesBlock notes={notes} />
           </View>
