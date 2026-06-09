@@ -3883,7 +3883,7 @@ function CoverPage({
       <View style={{ position: 'absolute', bottom: 56, left: 60, right: 60 }}>
         <View style={{ height: 1, backgroundColor: RULE, marginBottom: 14 }} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 9, color: MUTED }}>Project: {projectId}</Text>
+          <Text style={{ fontSize: 9, color: MUTED }}>{/^(chain-v2|forge-engineering)/.test(projectId) ? 'Fractional Forge · concept design' : `Project: ${projectId}`}</Text>
           <Text style={{ fontSize: 9, color: MUTED }}>Generated {new Date().toISOString().split('T')[0]}</Text>
         </View>
       </View>
@@ -3892,17 +3892,23 @@ function CoverPage({
 }
 
 function PageHeader({ section, project }: { section: string; project: string }) {
-  // Constrain section text width + force project flexShrink:0 so a long section
-  // label (e.g. "Section 5 · Parts Pending Verification — Plausible but Unverified (1/3)")
-  // wraps within its own column instead of overlapping the project id below or
-  // chewing its leading character (drawer_forgeos_gotchas_227e3c8fd74fcd32 bug #5).
+  // 2026-06-09 universal cleanup:
+  // (1) The build/run id (`project`, e.g. "chain-v2-1780905834188") is no longer
+  //     rendered — it was leaking onto EVERY page header as machine output.
+  // (2) Drop a leading "Section <n> · " NUMERIC prefix at render time. The Part
+  //     1/2/3 structure drives navigation now, and the hardcoded per-page section
+  //     numbers had drifted out of order + duplicated (two §4, two §7/§12, three
+  //     §8, a "Section 5" stranded in Part 3). Stripping here is the single
+  //     universal fix; "Appendix X · " / "Part N · " / "Contents" are left intact
+  //     (they don't match the pattern).
+  void project
+  const label = section.replace(/^Section\s+\S+\s+·\s+/i, '')
   return (
     <View style={{ position: 'absolute', top: 24, left: 64, right: 64 }} fixed>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 }}>
         <Text style={{ fontSize: 8, color: MUTED, letterSpacing: 1, flex: 1, paddingRight: 12 }}>
-          {section.toUpperCase()}
+          {label.toUpperCase()}
         </Text>
-        <Text style={{ fontSize: 8, color: MUTED, flexShrink: 0 }}>{project}</Text>
       </View>
       <View style={{ height: 0.6, backgroundColor: RULE_SOFT }} />
     </View>
@@ -4796,12 +4802,12 @@ function TableOfContentsPage({ state, project }: { state: any; project: string }
         ],
       },
     ]
-    const Row = ({ num, title }: { num: string; title: string }) => (
+    // Section numbers dropped (2026-06-09): the Parts drive navigation and the
+    // body section numbers were out of order / duplicated, so the ToC is a clean
+    // bulleted list per part. `num` is accepted but ignored (callers unchanged).
+    const Row = ({ title }: { num?: string; title: string }) => (
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 9 }}>
-        <Text style={{ width: 30, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right', marginRight: 8 }}>
-          {num}
-        </Text>
-        <Text style={{ fontSize: 8, color: MUTED, marginRight: 8 }}>·</Text>
+        <Text style={{ width: 12, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, marginRight: 8 }}>·</Text>
         <Text style={{ flex: 1, fontSize: 11, color: INK, lineHeight: 1.4 }}>{title}</Text>
       </View>
     )
