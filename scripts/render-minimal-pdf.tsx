@@ -242,6 +242,32 @@ function strip_internal_ids(s: string): string {
   return s.replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+){1,}\b/g, (m) => humanise(m).toLowerCase())
 }
 
+// 2026-06-09 universal: scrub engine internals / reviewer notes that leaked into
+// customer-facing prose (editorial review). Wired into clean_prose, so every prose
+// field that goes through the chokepoint is cleaned. Patterns are specific to the
+// leaks found (named-reviewer date attributions, the QA self-critique, code
+// identifiers) so legitimate prose is untouched.
+function strip_engine_leakage(s: string): string {
+  if (!s) return ''
+  return s
+    // reviewer attribution parenthetical, e.g. "(...; C. Schoolderman 2026-06-08)"
+    .replace(/\s*\([^()]*\b[A-Z]\.\s?[A-Z][a-z]+\s+20\d\d-\d\d-\d\d[^()]*\)/g, '')
+    // bare reviewer attribution "; C. Schoolderman 2026-06-08"
+    .replace(/[;,]?\s*\b[A-Z]\.\s?[A-Z][a-z]+\s+20\d\d-\d\d-\d\d\b/g, '')
+    // internal QA self-critique sentence ("… extreme false precision …")
+    .replace(/[^.]*\bextreme false precision\b[^.]*\.\s*/gi, '')
+    // leaked code identifiers: state.x.y, basis.x = N, foo.json
+    .replace(/\bstate\.[A-Za-z0-9_.]+/g, '')
+    .replace(/\bbasis\.[A-Za-z0-9_]+(?:\s*=\s*\w+)?/g, '')
+    .replace(/\b[\w-]+\.json\b/gi, '')
+    // leaked raw `(form: "…")` modifier payloads (frequently truncated, e.g. <=2.5…)
+    .replace(/\s*\(form:\s*"[^"]*"?[^)]*\)/gi, '')
+    // tidy any leading separator / double spaces left behind
+    .replace(/^\s*[·•|,;:–—-]\s*/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 /**
  * Engineering-check fixup: iter-09's grammar verdicts flagged the main DC
  * contactor (300 A nameplate) as undersized 3.3× for the 1,000 A pack current
@@ -960,7 +986,7 @@ function clean_prose(s: string | null | undefined): string {
   // (co2 prose plan FIX 2): strip BoM-dump fragments + case chemical formulae
   // BEFORE the existing passes so narrative prose reads cleanly.
   const decoded = stripHtmlTags(decodeHtmlEntities(String(s).trim()))
-  return dedupe_duplicated_chunks(clamp_decimals_in_prose(britishise(fix_quantity_prefix(normalise_unicode(apply_engineering_fixups(format_chemical_formulae(strip_bom_dump_fragments(strip_internal_ids(decoded)))))))))
+  return dedupe_duplicated_chunks(clamp_decimals_in_prose(britishise(fix_quantity_prefix(normalise_unicode(apply_engineering_fixups(format_chemical_formulae(strip_bom_dump_fragments(strip_internal_ids(strip_engine_leakage(decoded))))))))))
 }
 
 // ─── Module label table (mirrored from src/lib/pdf-engine-v2/types/module-decomposition.ts) ───
@@ -4365,8 +4391,8 @@ function TakingForwardPage({ state, project }: { state: any; project: string }) 
 
         {/* 3 · Decisions still open — DERIVED FROM STATE (FIX 6) */}
         <SubHead>Decisions still open</SubHead>
-        {openItems.length > 0 ? (
-          openItems.map((it, i) => (
+        {openItems.map((it) => clean_prose(it)).filter(Boolean).length > 0 ? (
+          openItems.map((it) => clean_prose(it)).filter(Boolean).map((it, i) => (
             <Bullet key={`open-${i}`}>{it}</Bullet>
           ))
         ) : (
@@ -8260,12 +8286,17 @@ function readParsedBriefForOverview(state: any): any {
  * piggyback on its sentence detection.
  */
 function moduleSummarySentences(m: any, maxSentences: number = 2): string {
-  const source =
+  const rawSource =
     (typeof m?.overview_paragraph_en === 'string' && m.overview_paragraph_en.trim().length > 0
       ? m.overview_paragraph_en
       : typeof m?.module_brief === 'string' && m.module_brief.trim().length > 0
         ? m.module_brief
         : '') || ''
+  // Route the LLM overview through the prose chokepoint before sentence-splitting:
+  // normalise_unicode kills the CO2-subscript mojibake ("CO‚"/"K‚SO„") that was
+  // reaching the System Overview + module PURPOSE, and strip_engine_leakage removes
+  // any leaked internals. (2026-06-09 universal mojibake/leak fix.)
+  const source = clean_prose(rawSource)
   const cleaned = source.replace(/\s+/g, ' ').trim()
   if (!cleaned) return ''
   // 2026-05-24 RE-FIX: prior versions used `replace(new RegExp(PH, 'g'), '.')`
@@ -9641,7 +9672,7 @@ function AdvisorQuestionRow({ n, question, groundedIn, strongAnswer }: { n: numb
         {groundedIn ? (
           <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.35, marginTop: 2 }}>
             <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Grounded in: </Text>
-            {britishise(normalise_unicode(groundedIn))}
+            {britishise(normalise_unicode(strip_engine_leakage(groundedIn)))}
           </Text>
         ) : null}
         {strongAnswer ? (
