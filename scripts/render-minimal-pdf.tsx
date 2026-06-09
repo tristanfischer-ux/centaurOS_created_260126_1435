@@ -18,7 +18,7 @@
  *   npx tsx scripts/render-minimal-pdf.ts <state.json> [out.pdf]
  */
 import React from 'react'
-import { Document, Page, Text, View, Svg, Line, Circle, Rect, Path, Polygon, Link, Image, pdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, Svg, Line, Circle, Rect, Path, Polygon, Link, Image, Font, pdf } from '@react-pdf/renderer'
 import { readFileSync, writeFileSync, existsSync, realpathSync } from 'fs'
 import { resolve, dirname, join } from 'path'
 import { execFileSync } from 'child_process'
@@ -53,6 +53,13 @@ import { MATERIAL_RATE_GBP_PER_KG, FABRICATION_FACTOR } from './lib/cost/process
 import { EconomicsScenariosPage } from './lib/render-scenarios-section'
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
+
+// 2026-06-09 universal (visual review): disable react-pdf's automatic word
+// hyphenation. It was breaking part numbers / long descriptors mid-word in the BoM
+// tables ("jack-eted", "agi-tated", "MANUFACTUR-ER") and inserting a stray extra
+// hyphen into already-hyphenated MPNs ("6ES7155-6AU01" -> "6ES7155--6AU01", read as
+// "--"). Returning [word] = never hyphenate; react-pdf still wraps at spaces.
+Font.registerHyphenationCallback((word) => [word])
 
 const INK = '#0d1117'
 const INK_SOFT = '#3b4252'
