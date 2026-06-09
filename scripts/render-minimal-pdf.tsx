@@ -9791,7 +9791,14 @@ function AdvisorSpecialistCard({ card, cardNo, rosterOnly }: { card: AdvisorCard
 function ModuleQuestionsPage({ state, moduleSpec, index, project }: { state: any; moduleSpec: any; index: number; project: string }) {
   try {
     const moduleId = String(moduleSpec?.module ?? '')
-    const block = resolveAdvisorBlock(state, moduleId, index)
+    // B3 fix (2026-06-09): advisorEngagement is keyed by the module's ORIGINAL index in
+    // moduleDecomposition.modules ("<moduleId>#<globalIdx>"), but pages render in PRESENTATION
+    // order. For duplicate module ids (3× mass_fluid_transport_process) the ordered index hit
+    // the WRONG block (MEA Absorption showed CaCO3's questions; Module 7 showed Gypsum's).
+    // Resolve by the module's original index (identity match), falling back to the render index.
+    const _rawMods: any[] = Array.isArray(state?.moduleDecomposition?.modules) ? state.moduleDecomposition.modules : []
+    const _globalIdx = _rawMods.indexOf(moduleSpec)
+    const block = resolveAdvisorBlock(state, moduleId, _globalIdx >= 0 ? _globalIdx + 1 : index)
     if (!block) return null
     const cards = (block.cards || []).filter((c) => c && Array.isArray(c.questions) && c.questions.length > 0)
     if (cards.length === 0) return null
@@ -9960,7 +9967,11 @@ function ModuleSection({
   // so we don't need to re-run the pipeline just to see the new prose.
   const subModulesById = new Map<string, { name: string; sentence: string; paragraph: string }>()
   for (const sm of (moduleSpec.sub_modules ?? [])) {
-    const livePara = clean_prose(generateSubmoduleParagraph(sm as any))
+    // swapTaxonomySubject also catches sub-module LLM-prose that opens with the
+    // module's function-taxonomy ("The mass fluid transport process separates 5
+    // components" -> "The <module> module separates …"); the deterministic builder
+    // is fixed separately via resolveSubmoduleLabel. (2026-06-09)
+    const livePara = swapTaxonomySubject(clean_prose(generateSubmoduleParagraph(sm as any)), moduleSpec)
     subModulesById.set(sm.id, {
       // normalise_unicode applied here so ε/µ/CO₂ in name_human go through
       // the chokepoint before reaching the Helvetica-Bold heading at line ~6637.
