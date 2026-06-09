@@ -314,35 +314,39 @@ function buildWordSpecIndex(modules: any[]): Map<
 // best-known offenders generically (a Capitalised word immediately followed by a
 // model token like "SMV" / "Type 316"), but we keep it conservative to avoid
 // mangling real words. In practice the form field is brand-free; this is defence.
-const TRAILING_MODEL_CODE_RE = /\s*[-—–]\s*(engineered package|packaged skid|configured|bespoke vessel|made-to-order fabrication|engineered|package)\b.*$/i
-
+// "SUPPLIER TYPE TO SOURCE" must name the KIND OF VENDOR to approach for a part —
+// NOT restate the part (Tristan 2026-06-09: "random-packed counter-current column"
+// is the part again, "not a supplier at all"). Map the equipment class (read from
+// the part label + form descriptor, brand-free) to a genuine supplier CATEGORY via
+// a universal keyword table. Software / sizing "tools" are not procurable suppliers
+// → empty category (dropped by the caller). Falls back to a generic process-equipment
+// supplier. Class-agnostic — the categories are universal across archetypes.
+const SUPPLIER_CATEGORY_RULES: Array<[RegExp, string]> = [
+  [/\b(software|sizing tool|\btool\b|\bmodel\b|calculator|spreadsheet)\b/i, ''], // not a supplier — drop
+  [/\b(column|absorber|stripper|scrubber|\btower\b|contactor|packing|mellapak|\btray\b|internals)\b/i, 'packed-column / tower fabricator + internals supplier'],
+  [/\b(heat exchanger|exchanger|condenser|reboiler|cooler|chiller|evaporator|economiser)\b/i, 'heat-exchanger OEM'],
+  [/\bpump\b/i, 'process-pump manufacturer'],
+  [/\b(compressor|blower|\bfan\b)\b/i, 'compressor / blower OEM'],
+  [/\b(filter|centrifuge|dryer|drier|\bpress\b|clarifier|cyclone|thickener|separator)\b/i, 'solids-separation equipment OEM'],
+  [/\b(valve|actuator|regulator)\b/i, 'valve / actuator manufacturer'],
+  [/\b(instrument|sensor|probe|transmitter|analy[sz]er|\bmeter\b|gauge|detector|monitor)\b/i, 'instrumentation vendor'],
+  [/\b(motor|\bdrive\b|\bvfd\b|inverter|switchgear|\bmcc\b|\bpanel\b|\bplc\b|control|electrical|cable|wiring)\b/i, 'electrical / controls integrator'],
+  [/\b(conveyor|hopper|feeder|bagging|bagger|packaging|\bsilo\b|\bscrew\b|elevator)\b/i, 'bulk-materials handling OEM'],
+  [/\b(skid|\bframe\b|structural|containment|enclosure|container|platform|baseplate)\b/i, 'skid / structural fabricator'],
+  [/\b(pipe|piping|manifold|spool|ducting|\bduct\b)\b/i, 'piping / ducting fabricator'],
+  [/\b(reactor|crystalli[sz]er|carbonat|vessel|\bdrum\b|\btank\b|reservoir|bunker)\b/i, 'process-vessel / pressure-vessel fabricator'],
+]
 /**
- * Turn a word's `form` descriptor into a clean supplier TYPE phrase: drop the
- * trailing procurement qualifier ("- engineered package", "- bespoke vessel"),
- * expand acronyms, cap + clip. If the form is empty, fall back to the part label
- * itself (e.g. "CO2 feed compressor" -> a "compressor" supplier type).
+ * Map a part (label + form descriptor) to the KIND OF SUPPLIER to source it from.
+ * Returns '' for non-procurable items (software / sizing tools) so the caller drops
+ * them. Universal keyword table; falls back to a generic process-equipment supplier.
  */
-// Descriptive connectives that begin a FUNCTIONAL clause ("...smoothing the supply",
-// "...blending make-up gas", "...for jet-range selectivity"). Cutting the type at the
-// first of these keeps it a clean equipment CLASS rather than a full spec sentence —
-// the function is conveyed elsewhere; the supplier needs the class + the spec tokens.
-const FUNCTION_CLAUSE_RE = /\s+\b(?:smoothing|blending|raising|returning|removing|engineered|disengaging|tracking|reducing|reducing\/activating|downstream|protecting|condensing|taking|operating|sized|on each|that\b|which\b|to the\b|to prevent\b|for\b)\b.*$/i
-
 function deriveSupplierType(form: string, label: string): string {
-  let t = tidy(form)
-  if (t) {
-    t = t.replace(TRAILING_MODEL_CODE_RE, '')
-    // Keep only the leading TYPE clause: cut at the first comma, then at the first
-    // functional connective, so the type reads as a class, not a spec sentence.
-    const firstClause = t.split(',')[0]
-    if (firstClause && firstClause.split(' ').length >= 2) t = firstClause
-    const trimmed = t.replace(FUNCTION_CLAUSE_RE, '').trim()
-    if (trimmed.split(' ').length >= 2) t = trimmed
+  const hay = `${tidy(label)} ${tidy(form)}`.toLowerCase()
+  for (const [re, cat] of SUPPLIER_CATEGORY_RULES) {
+    if (re.test(hay)) return cat // '' (tools) → dropped by buildSupplierLines
   }
-  if (!t) t = tidy(label).replace(/\bword\b/gi, '')
-  // cap LAST (after acronym expansion) so an expanded acronym like "ZnO" -> "zinc
-  // oxide" still gets a capital initial in the rendered supplier type.
-  return cap(expandAcronyms(clipWords(t, 12)))
+  return 'specialist process-equipment supplier'
 }
 
 // A modifier value "carries a unit" when it contains a non-numeric unit token

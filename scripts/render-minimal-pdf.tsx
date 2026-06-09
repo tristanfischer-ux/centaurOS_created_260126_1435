@@ -3587,35 +3587,11 @@ function CoverPage({
           }
           return null
         })()}
-        {/* Reference-product grounding (2026-06-04): the Engineering Lock Gate
-            looks up a class-level reference product from the growing
-            pretraining_products DB (DB-first hybrid → web-on-miss → writeback)
-            and attaches its module decomposition + key specs to
-            state.engineeringContract.product_ontology. This surfaces that
-            provenance so the reader knows the design was anchored against a real
-            product. Closes the audited "grows a DB nobody reads" gap — the looked-
-            up ontology now reaches the rendered output instead of being discarded. */}
-        {(() => {
-          const po = (state?.engineeringContract as any)?.product_ontology
-          if (!po || !po.reference_product) return null
-          const modCount = Array.isArray(po.modules) ? po.modules.length : 0
-          const specCount = po.key_specs && typeof po.key_specs === 'object' ? Object.keys(po.key_specs).length : 0
-          const mfr = po.manufacturer ? ` (${String(po.manufacturer)})` : ''
-          const bits: string[] = []
-          if (modCount > 0) bits.push(`${modCount} reference ${modCount === 1 ? 'subsystem' : 'subsystems'}`)
-          if (specCount > 0) bits.push(`${specCount} key ${specCount === 1 ? 'spec' : 'specs'}`)
-          const detail = bits.length ? ` — anchored ${bits.join(' + ')}` : ''
-          return (
-            <View style={{ marginBottom: 14, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#f0f9ff', borderLeftWidth: 3, borderLeftColor: '#0284c7', borderRadius: 2 }}>
-              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#075985', letterSpacing: 1.5, marginBottom: 2 }}>
-                DESIGNED AGAINST REFERENCE PRODUCT
-              </Text>
-              <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
-                {normalise_unicode(String(po.reference_product))}{normalise_unicode(mfr)}{normalise_unicode(detail)}.
-              </Text>
-            </View>
-          )
-        })()}
+        {/* Reference-product grounding blurb REMOVED (Tristan 2026-06-09): the
+            "DESIGNED AGAINST REFERENCE PRODUCT" box rendered inconsistently
+            (present on some classes, absent on others) and read as messy clutter
+            at the top of the cover. The provenance still lives in state for any
+            internal use; it is simply no longer surfaced on the cover. */}
         {/* Cost self-correction (2026-06-01, Tristan "fix it, don't flag it"):
             no cover banner. Estimate-tier instrument prices that inherited a high
             class anchor are re-priced to type-realistic ceilings in the BoM loop
@@ -3978,11 +3954,23 @@ function PageHeader({ section, project }: { section: string; project: string }) 
   //     (they don't match the pattern).
   void project
   const label = section.replace(/^Section\s+\S+\s+·\s+/i, '')
+  // PART-number prefix (Tristan 2026-06-09): every page header must read
+  // "PART N · <SECTION>" so the reader always knows which part they're in. The
+  // part is inferred from the (class-agnostic) section vocabulary; Appendix /
+  // Contents / Part-divider labels keep their own form (no prefix).
+  const key = label.replace(/[^a-z0-9]/gi, '').toUpperCase()
+  let display = label
+  if (!/^PART\d|^APPENDIX|^CONTENTS/.test(key)) {
+    let part = '1' // engineering basis, exec summary, brief*, provenance, compliance, how-computed, system overview, calcs
+    if (/^MODULE\d|SPECIALISTQUESTION|RISK.*INTEGRAT/.test(key)) part = '2'
+    else if (/BILLOFMATERIAL|COST|SOURCING|PROCUREMENT|REGULATOR|TAKINGTHIS|TAKINGFORWARD|ENGAGEMENT|SUPPLIERSTOSOURCE/.test(key)) part = '3'
+    display = `Part ${part} · ${label}`
+  }
   return (
     <View style={{ position: 'absolute', top: 24, left: 64, right: 64 }} fixed>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 }}>
         <Text style={{ fontSize: 8, color: MUTED, letterSpacing: 1, flex: 1, paddingRight: 12 }}>
-          {label.toUpperCase()}
+          {display.toUpperCase()}
         </Text>
       </View>
       <View style={{ height: 0.6, backgroundColor: RULE_SOFT }} />
@@ -4517,49 +4505,18 @@ function SourcingCta({ label, sub }: { label: string; sub: string }) {
 // to stay gate-11 (layout-overlap) safe; each row is itself wrap={false}.
 function ModuleSourcingBrief({ brief }: { brief: ModuleSourcingBrief }) {
   try {
-    const specialists = Array.isArray(brief?.specialists) ? brief.specialists : []
     const suppliers = Array.isArray(brief?.suppliers) ? brief.suppliers : []
-    if (specialists.length === 0 && suppliers.length === 0) return null
+    // Experts are NOT repeated here (Tristan 2026-06-09): the specialist cards above
+    // (role + background + what they cover + the question count) already present them.
+    // Re-listing role + Look-for / Seniority / How-rare said the same thing twice, so
+    // this block now carries ONLY the suppliers-to-source table.
+    if (suppliers.length === 0) return null
     return (
       <View style={{ marginTop: 12 }} minPresenceAhead={28}>
         <View style={{ height: 0.6, backgroundColor: RULE_SOFT, marginBottom: 7 }} />
         <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.7, marginBottom: 4 }}>
-          SPECIALISTS &amp; SOURCING FOR THIS MODULE
+          SUPPLIERS TO SOURCE FOR THIS MODULE
         </Text>
-
-        {/* The experts to source */}
-        {specialists.length > 0 ? (
-          <View style={{ marginBottom: suppliers.length > 0 ? 9 : 2 }}>
-            <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK_SOFT, marginBottom: 3 }}>
-              The expert{specialists.length > 1 ? 's' : ''} to source
-            </Text>
-            {specialists.map((s, si) => (
-              <View key={`src-spec-${si}`} style={{ paddingVertical: 4, borderTopWidth: 0.5, borderTopColor: RULE_SOFT }} wrap={false}>
-                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.35 }}>
-                  {britishise(normalise_unicode(String(s?.role ?? '')))}
-                </Text>
-                {s?.credentials ? (
-                  <Text style={{ fontSize: 8, color: INK_SOFT, lineHeight: 1.4, marginTop: 1.5 }}>
-                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Look for: </Text>
-                    {britishise(normalise_unicode(String(s.credentials)))}
-                  </Text>
-                ) : null}
-                {s?.seniority ? (
-                  <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.35, marginTop: 1.5 }}>
-                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Seniority: </Text>
-                    {britishise(normalise_unicode(String(s.seniority)))}
-                  </Text>
-                ) : null}
-                {s?.scarcity ? (
-                  <Text style={{ fontSize: 7.5, color: MUTED, fontFamily: 'Helvetica-Oblique', lineHeight: 1.35, marginTop: 1.5 }}>
-                    <Text style={{ fontFamily: 'Helvetica-BoldOblique', color: INK_SOFT }}>How rare: </Text>
-                    {britishise(normalise_unicode(String(s.scarcity)))}
-                  </Text>
-                ) : null}
-              </View>
-            ))}
-          </View>
-        ) : null}
 
         {/* The suppliers to source — type + spec, brand-free */}
         {suppliers.length > 0 ? (
@@ -8112,7 +8069,18 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: 
               <Text style={{ fontSize: 9, color: INK_SOFT }}>{normalise_unicode(String(row.briefTarget ?? ''))}</Text>
             </View>
             <View style={{ flex: COL_ACHIEVED, paddingRight: 6 }}>
-              <Text style={{ fontSize: 9, color: rowTextColour, fontFamily: isFail ? 'Helvetica-Bold' : 'Helvetica' }}>{normalise_unicode(String(row.designAchieved ?? ''))}</Text>
+              {/* Blank check (Tristan 2026-06-09): never ship a bare "-" / "—" design-achieved
+                  cell — it reads as "we didn't mention anything". Replace any empty / placeholder
+                  value with an honest, explicit "Not computed at concept stage". */}
+              {(() => {
+                const a = String(row.designAchieved ?? '').trim()
+                const blank = !a || a === '-' || a === '—' || /^(n\/?a|tbd|tbc|none)$/i.test(a)
+                return (
+                  <Text style={{ fontSize: 9, color: blank ? MUTED : rowTextColour, fontFamily: isFail ? 'Helvetica-Bold' : 'Helvetica', fontStyle: blank ? 'italic' : 'normal' }}>
+                    {blank ? 'Not computed at concept stage' : normalise_unicode(a)}
+                  </Text>
+                )
+              })()}
             </View>
             <View style={{ flex: COL_STATUS, paddingRight: 6 }}>
               <View style={{ backgroundColor: pillBg, paddingVertical: 2, paddingHorizontal: 5, borderRadius: 3, alignSelf: 'flex-start' }}>
@@ -15145,7 +15113,7 @@ function ToolsComputedBlock({
   const lastIdx = rowNodes.length - 1
   return (
     <View
-      style={{ marginBottom: compact ? 8 : 14, marginLeft: compact ? 36 : 0 }}
+      style={{ marginBottom: compact ? 8 : 14, marginLeft: compact ? 14 : 0 }}
       // Keep the header + first row together so the card doesn't orphan its
       // heading at a page foot; the wrapper is transparent so this reservation
       // paints nothing if it pushes to the next page.
@@ -15914,23 +15882,21 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
         question="Does it work?"
         blurb={"Everything you need to judge whether the plant stands up, pulled to the front: the brief and its hard targets, how the whole process flows, the mass and energy balance, the engineering verdict on feasibility, and the headline economics."}
         contents={[
-          'Engineering basis: process flow, mass and energy balance, feasibility verdict',
           'Executive summary',
           'Brief and requirements, and how it was interpreted',
           'Brief compliance and trade-offs',
+          'How the whole plant was computed',
           'System overview: how the plant works',
+          'Engineering basis: process flow, mass and energy balance, feasibility verdict',
           'Engineering calculations: the worked maths, by module and sub-module',
         ]}
         project={project}
       />
-      {/* PART 1 · ENGINEERING BASIS (increment 1, ANVIL-PDF-RESTRUCTURE-SPEC.md):
-          ADDITIVE front-of-dossier consolidation — process flow + mass/energy
-          balance + feasibility verdict & economics, pulled to the front so a
-          reader can judge "does it work?" before the per-module §6 detail. This
-          increment does NOT reorder/remove any existing section (later
-          increments do). Sits directly after the Table of Contents, ahead of
-          the Executive Summary. Returns null on any error or empty state. */}
-      <EngineeringBasisPage state={state} project={project} />
+      {/* EngineeringBasisPage (process flow + mass/energy balance + feasibility
+          verdict + headline economics) MOVED to after System Overview
+          (Tristan 2026-06-09): the reader meets the executive summary + brief +
+          how-it-was-computed + system overview FIRST, then the whole-plant-at-a-
+          glance, then the worked calculations. */}
       {/* ITER-10.5 (Tristan-defined 2026-05-20):
           Brief sits immediately after Cover. Operational Headline is folded
           INTO BriefPage as a banner at the top (HeadlinePage component
@@ -15984,6 +15950,10 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           plain-English system architecture before dropping into per-module
           pages. */}
       <SystemOverviewPage state={state} project={project} />
+      {/* Whole-plant-at-a-glance — process flow + mass/energy balance + feasibility
+          verdict + headline economics (moved here 2026-06-09: after the brief +
+          system overview, before the worked maths). */}
+      <EngineeringBasisPage state={state} project={project} />
       {/* Part 1 · Engineering Calculations — the worked maths ("how this is
           computed"), moved OUT of the Part-2 modules into the engineering part
           (Tristan 2026-06-08). Closes the §6 page gaps too. */}
