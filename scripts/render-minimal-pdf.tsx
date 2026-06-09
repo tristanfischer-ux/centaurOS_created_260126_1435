@@ -15736,7 +15736,7 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
           <View style={{ marginBottom: 9 }}>
             <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 1.5 }}>Decisive variable</Text>
             <Text style={{ fontSize: 8, color: MUTED, lineHeight: 1.4 }}>
-              {decisiveVar === '—' ? '—' : normalise_unicode(decisiveVar.replace(/\s+/g, ' ').trim()).slice(0, 360)}
+              {decisiveVar === '—' ? '—' : (() => { const t = normalise_unicode(decisiveVar.replace(/\s+/g, ' ').trim()); return t.length > 360 ? t.slice(0, 360).replace(/\s+\S*$/, '') + '…' : t })()}
             </Text>
           </View>
 
@@ -15746,7 +15746,10 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
               <View
                 key={ei}
                 style={{
-                  width: '50%',
+                  // 48.5% (not 50%) so 48.5 + 1.5 margin + 48.5 < 100 and two cards
+                  // fit per row — at 50% + 1.5% margin the row overflowed and forced a
+                  // single column with the right half blank (visual review). (2026-06-09)
+                  width: '48.5%',
                   paddingVertical: 5,
                   paddingHorizontal: 8,
                   borderWidth: 0.5,
