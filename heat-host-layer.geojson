@@ -1,0 +1,609 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.859754,
+     51.801299
+    ]
+   },
+   "properties": {
+    "name": "Stone House Nursing Home",
+    "postcode": "HP17 8QX",
+    "beds": 35,
+    "heat_kw": 18,
+    "boxes_absorbable": 6,
+    "offgas": "off",
+    "offgas_label": "Likely OFF-gas (oil) \u2014 target",
+    "note": "\u2605 Father's home \u00b7 CONFIRMED OIL (EPC Sep'25) \u00b7 PRIME target",
+    "stone_house": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.849224,
+     51.800756
+    ]
+   },
+   "properties": {
+    "name": "Bartlett's (Peverel Court)",
+    "postcode": "HP17 8RP",
+    "beds": 62,
+    "heat_kw": 31,
+    "boxes_absorbable": 11,
+    "offgas": "off",
+    "offgas_label": "Likely OFF-gas (oil) \u2014 target",
+    "note": "Stone \u00b7 electric + oil, OFF-GAS (EPC) \u00b7 high heat value",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.93844,
+     51.774333
+    ]
+   },
+   "properties": {
+    "name": "Haddenham Park",
+    "postcode": "HP17 8FH",
+    "beds": 81,
+    "heat_kw": 40,
+    "boxes_absorbable": 15,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "CONFIRMED mains gas (EPC Jun'25)",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.780334,
+     51.795944
+    ]
+   },
+   "properties": {
+    "name": "Hampden Hall",
+    "postcode": "HP22 5ZB",
+    "beds": 120,
+    "heat_kw": 60,
+    "boxes_absorbable": 22,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Likely mains gas (35 meters in postcode)",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.789151,
+     51.771596
+    ]
+   },
+   "properties": {
+    "name": "Fremantle Court",
+    "postcode": "HP22 5XL",
+    "beds": 90,
+    "heat_kw": 45,
+    "boxes_absorbable": 17,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "CONFIRMED mains gas (EPC Feb'24)",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.76407,
+     51.841874
+    ]
+   },
+   "properties": {
+    "name": "Hulcott Nursing Home",
+    "postcode": "HP22 5AX",
+    "beds": 49,
+    "heat_kw": 24,
+    "boxes_absorbable": 9,
+    "offgas": "off",
+    "offgas_label": "Likely OFF-gas (oil) \u2014 target",
+    "note": "CONFIRMED OIL (EPC Oct'23) \u00b7 prime target",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.847254,
+     51.712402
+    ]
+   },
+   "properties": {
+    "name": "Cherry Tree (Saunderton)",
+    "postcode": "HP27 9NG",
+    "beds": 52,
+    "heat_kw": 26,
+    "boxes_absorbable": 10,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Likely mains gas (no EPC; 26 meters)",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.915831,
+     51.658044
+    ]
+   },
+   "properties": {
+    "name": "Chiltern Grange",
+    "postcode": "HP14 3GG",
+    "beds": 75,
+    "heat_kw": 38,
+    "boxes_absorbable": 14,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "CONFIRMED mains gas (EPC Nov'25) \u2014 ruled out",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.827524,
+     51.724247
+    ]
+   },
+   "properties": {
+    "name": "Icknield Court",
+    "postcode": "HP27 0HE",
+    "beds": 90,
+    "heat_kw": 45,
+    "boxes_absorbable": 17,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "CONFIRMED mains gas (EPC May'19)",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.858759,
+     51.7378
+    ]
+   },
+   "properties": {
+    "name": "Old School House",
+    "postcode": "HP27 9SF",
+    "beds": 12,
+    "heat_kw": 6,
+    "boxes_absorbable": 2,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Likely mains gas (no EPC; 20 meters)",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.720159,
+     51.7215
+    ]
+   },
+   "properties": {
+    "name": "Woodlands Park",
+    "postcode": "HP16 9LS",
+    "beds": 31,
+    "heat_kw": 16,
+    "boxes_absorbable": 6,
+    "offgas": "off",
+    "offgas_label": "Likely OFF-gas (oil) \u2014 target",
+    "note": "CONFIRMED OIL (EPC Dec'21) \u00b7 target",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.973503,
+     52.011064
+    ]
+   },
+   "properties": {
+    "name": "Maids Moreton Hall",
+    "postcode": "MK18 1QF",
+    "beds": 60,
+    "heat_kw": 30,
+    "boxes_absorbable": 11,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "CONFIRMED mains gas (EPC)",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.971825,
+     52.012416
+    ]
+   },
+   "properties": {
+    "name": "The Red House",
+    "postcode": "MK18 1QL",
+    "beds": 32,
+    "heat_kw": 16,
+    "boxes_absorbable": 6,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Likely mains gas (residential EPC)",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.88241,
+     51.946
+    ]
+   },
+   "properties": {
+    "name": "Swan House (Winslow)",
+    "postcode": "MK18 3DR",
+    "beds": 32,
+    "heat_kw": 16,
+    "boxes_absorbable": 6,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Winslow \u2014 market town, gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.882618,
+     51.946398
+    ]
+   },
+   "properties": {
+    "name": "Shaftesbury Court (Winslow)",
+    "postcode": "MK18 3HA",
+    "beds": 18,
+    "heat_kw": 9,
+    "boxes_absorbable": 3,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Winslow \u2014 market town, gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.97306,
+     51.987736
+    ]
+   },
+   "properties": {
+    "name": "Lace Hill Manor",
+    "postcode": "MK18 7RB",
+    "beds": 62,
+    "heat_kw": 31,
+    "boxes_absorbable": 11,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Buckingham fringe \u2014 gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.716721,
+     51.972446
+    ]
+   },
+   "properties": {
+    "name": "The Lindens (Stoke Hammond)",
+    "postcode": "MK17 9BN",
+    "beds": 60,
+    "heat_kw": 30,
+    "boxes_absorbable": 11,
+    "offgas": "off",
+    "offgas_label": "Likely OFF-gas (oil) \u2014 target",
+    "note": "CONFIRMED OIL (EPC Nov'24) \u00b7 target",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.750424,
+     51.765274
+    ]
+   },
+   "properties": {
+    "name": "Cherry Tree House (Wendover)",
+    "postcode": "HP22 6DH",
+    "beds": 20,
+    "heat_kw": 10,
+    "boxes_absorbable": 4,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Wendover \u2014 town, gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.747094,
+     51.770931
+    ]
+   },
+   "properties": {
+    "name": "The Crossings (Wendover)",
+    "postcode": "HP22 6LX",
+    "beds": 4,
+    "heat_kw": 2,
+    "boxes_absorbable": 1,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Wendover \u2014 town, gas (tiny)",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.76486,
+     51.809828
+    ]
+   },
+   "properties": {
+    "name": "Aston Manor",
+    "postcode": "HP22 3BZ",
+    "beds": 88,
+    "heat_kw": 44,
+    "boxes_absorbable": 16,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Aylesbury \u2014 town, gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.820842,
+     51.818548
+    ]
+   },
+   "properties": {
+    "name": "Avondale",
+    "postcode": "HP19 8EH",
+    "beds": 90,
+    "heat_kw": 45,
+    "boxes_absorbable": 17,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Aylesbury \u2014 town, gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.850078,
+     51.836119
+    ]
+   },
+   "properties": {
+    "name": "Chartwell Manor",
+    "postcode": "HP18 1BB",
+    "beds": 61,
+    "heat_kw": 30,
+    "boxes_absorbable": 11,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Aylesbury (Berryfields) \u2014 gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.817423,
+     51.820016
+    ]
+   },
+   "properties": {
+    "name": "Hillside Nursing Home",
+    "postcode": "HP19 8AB",
+    "beds": 68,
+    "heat_kw": 34,
+    "boxes_absorbable": 13,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Aylesbury fringe \u2014 gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.807952,
+     51.830314
+    ]
+   },
+   "properties": {
+    "name": "Lakeside Watermead",
+    "postcode": "HP19 0WH",
+    "beds": 49,
+    "heat_kw": 24,
+    "boxes_absorbable": 9,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Aylesbury fringe \u2014 gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.83686,
+     51.828068
+    ]
+   },
+   "properties": {
+    "name": "Lewin House",
+    "postcode": "HP19 9HP",
+    "beds": 70,
+    "heat_kw": 35,
+    "boxes_absorbable": 13,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Aylesbury \u2014 town, gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.790997,
+     51.801198
+    ]
+   },
+   "properties": {
+    "name": "Mandeville Grange",
+    "postcode": "HP21 9PB",
+    "beds": 31,
+    "heat_kw": 16,
+    "boxes_absorbable": 6,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Aylesbury \u2014 town, gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.7999,
+     51.807313
+    ]
+   },
+   "properties": {
+    "name": "Byron House",
+    "postcode": "HP21 9LP",
+    "beds": 28,
+    "heat_kw": 14,
+    "boxes_absorbable": 5,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Aylesbury \u2014 town, gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.825302,
+     51.807722
+    ]
+   },
+   "properties": {
+    "name": "The Chestnuts",
+    "postcode": "HP21 8JN",
+    "beds": 64,
+    "heat_kw": 32,
+    "boxes_absorbable": 12,
+    "offgas": "on",
+    "offgas_label": "Likely on mains gas",
+    "note": "Aylesbury \u2014 town, gas",
+    "stone_house": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.83961,
+     51.667261
+    ]
+   },
+   "properties": {
+    "name": "YOU \u2014 HP14 4AA",
+    "postcode": "HP14 4AA",
+    "offgas": "user",
+    "note": "Your location"
+   }
+  }
+ ]
+}
