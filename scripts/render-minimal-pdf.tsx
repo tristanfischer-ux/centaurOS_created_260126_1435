@@ -5728,7 +5728,10 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
       const constraintRows: Array<{ key: string; rendered: string; source: string }> = []
       for (const [ckey, cval] of Object.entries(constraints)) {
         if (cval == null) continue
-        if (ckey === 'safety_standards' || ckey === 'additional_constraints') continue
+        // Skip internal meta-keys (leading underscore, e.g. `_dropped_inferred`)
+        // + known non-constraint bookkeeping fields — engine internals, never
+        // customer-facing constraint rows. Universal across all classes.
+        if (ckey.startsWith('_') || ckey === 'safety_standards' || ckey === 'additional_constraints' || ckey === 'still_missing') continue
         if (typeof cval !== 'object') {
           constraintRows.push({ key: ckey, rendered: String(cval), source: 'user' })
           continue
