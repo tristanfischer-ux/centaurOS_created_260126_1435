@@ -989,6 +989,24 @@ function clean_prose(s: string | null | undefined): string {
   return dedupe_duplicated_chunks(clamp_decimals_in_prose(britishise(fix_quantity_prefix(normalise_unicode(apply_engineering_fixups(format_chemical_formulae(strip_bom_dump_fragments(strip_internal_ids(strip_engine_leakage(decoded))))))))))
 }
 
+// 2026-06-09 universal: swap a leading FUNCTION-TAXONOMY subject ("The mass fluid
+// transport process …") for the real module name ("The MEA Absorption & Capture
+// module …"). The taxonomy phrase == humanise(module id), so the swap is
+// deterministic. Applied to BOTH the full module overview paragraph (ModuleSection)
+// and the 1-2 sentence summary (moduleSummarySentences -> System Overview / PURPOSE).
+// Handles mid-paragraph recurrences after a sentence break too.
+function swapTaxonomySubject(text: string, mod: any): string {
+  if (!text) return text
+  const taxPhrase = humanise(String(mod?.module ?? '')).trim()
+  const disp = (typeof mod?.display_name === 'string' && mod.display_name.trim().length > 0) ? mod.display_name.trim() : ''
+  if (!taxPhrase || !disp || taxPhrase.toLowerCase() === disp.toLowerCase()) return text
+  const esc = taxPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return text
+    .replace(new RegExp(`^the\\s+${esc}\\s+module\\b`, 'i'), `The ${disp} module`)
+    .replace(new RegExp(`^the\\s+${esc}\\b`, 'i'), `The ${disp} module`)
+    .replace(new RegExp(`([.;]\\s+)the\\s+${esc}\\b`, 'gi'), `$1the ${disp} module`)
+}
+
 // ─── Module label table (mirrored from src/lib/pdf-engine-v2/types/module-decomposition.ts) ───
 
 const MODULE_LABELS: Record<string, string> = {
@@ -8296,7 +8314,7 @@ function moduleSummarySentences(m: any, maxSentences: number = 2): string {
   // normalise_unicode kills the CO2-subscript mojibake ("CO‚"/"K‚SO„") that was
   // reaching the System Overview + module PURPOSE, and strip_engine_leakage removes
   // any leaked internals. (2026-06-09 universal mojibake/leak fix.)
-  const source = clean_prose(rawSource)
+  const source = swapTaxonomySubject(clean_prose(rawSource), m)
   const cleaned = source.replace(/\s+/g, ' ').trim()
   if (!cleaned) return ''
   // 2026-05-24 RE-FIX: prior versions used `replace(new RegExp(PH, 'g'), '.')`
@@ -9932,7 +9950,7 @@ function ModuleSection({
     const summaryFromConcat = moduleSummarySentences({ overview_paragraph_en: nl?.paragraph_en }, 1)
     overviewSource = brief || summaryFromConcat || ''
   }
-  const overview = clean_prose(overviewSource)
+  const overview = swapTaxonomySubject(clean_prose(overviewSource), moduleSpec)
   const overviewChunks = break_paragraph(overview)
 
   // Phase A: prefer `paragraph_en` (rich 150-200 word prose woven from every
