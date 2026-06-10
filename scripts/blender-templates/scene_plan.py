@@ -235,12 +235,113 @@ def _dim_of(word):
     return plural or singular
 
 
+# ── enclosure / structural shell detection ─────────────────────────────────────
+ENCLOSURE_RE = re.compile(
+    r'enclosure|chassis|\bcontainer\b|\bshell\b|cabinet|housing|chamber|\bskid\b|'
+    r'fuselage|\bhull\b|casing|cubicle|rack[_\s-]?frame|primary[_\s-]?structure|'
+    r'airframe|spaceframe|\btote\b|frame_structure|\bbay\b|module_frame', re.I)
+STRUCTURE_MODULE_RE = re.compile(r'structure|containment|chassis|enclosure|airframe|\bframe\b', re.I)
+
+
+def _item_bbox(it):
+    """Axis-aligned bounding box (w, d, h) in metres for a plan item."""
+    prim, p = it['primitive'], it['params']
+    if prim in ('compound_vessel', 'cyl'):
+        r = p.get('radius', 0.1)
+        return (2 * r, 2 * r, p.get('height', 0.3))
+    if prim == 'compound_motor':
+        r = p['body_radius']
+        return (2 * r, 2 * r, p['body_length'])
+    if prim == 'compound_finned_heatsink':
+        return (p['width'], p['depth'], p['height'])
+    if prim == 'frustum':
+        r = p['radius_bottom']
+        return (2 * r, 2 * r, p['height'])
+    if prim == 'pipe':
+        r = p['radius']
+        return (2 * r, 2 * r, p['length'])
+    s = p.get('size', (0.15, 0.15, 0.15))
+    return (s[0], s[1], s[2])
+
+
+def _bbox_vol(it):
+    w, d, h = _item_bbox(it)
+    return w * d * h
+
+
+def estimate_envelope(items):
+    """No brief envelope → bound the product from its own components: total packed
+    volume → a cube, never smaller than the largest single component."""
+    vol = 0.0
+    maxdim = 0.3
+    for it in items:
+        w, d, h = _item_bbox(it)
+        vol += w * d * h * min(it.get('qty', 1), 12)
+        maxdim = max(maxdim, w, d, h)
+    side = (vol * 6.0) ** (1.0 / 3.0) if vol > 0 else 1.0
+    side = max(0.6, min(side, 8.0), maxdim * 1.25)
+    return (side, side, side)
+
+
+def topo_region(topo, W, D, H):
+    """Map a sub-module topology_clause → a target centre + spread INSIDE the
+    envelope (origin-centred in XY, floor at z=0). THIS is what turns a parts list
+    into an assembly: 'forms the base' sits low, 'mounted on top' sits high,
+    'central' in the core, front/rear/side at the corresponding faces."""
+    t = (topo or '').lower()
+    cx, cy, cz = 0.0, 0.0, H * 0.5
+    sx, sy, sz = W * 0.74, D * 0.74, H * 0.66
+    if re.search(r'base|bottom|floor|foundation|lower|plinth|\bskid\b|sump|underside|ground', t):
+        cz, sz = H * 0.17, H * 0.30
+    elif re.search(r'\btop\b|roof|upper|\blid\b|canopy|gondola|crown|overhead|\bmast\b', t):
+        cz, sz = H * 0.83, H * 0.30
+    elif re.search(r'central|centre|center|middle|\bcore\b|heart|primary', t):
+        cz, sz = H * 0.5, H * 0.42
+    if re.search(r'front|forward|\bbow\b|\bnose\b|intake', t):
+        cy, sy = -D * 0.31, D * 0.32
+    elif re.search(r'\brear\b|\bback\b|\baft\b|stern|exhaust|\boutlet\b', t):
+        cy, sy = D * 0.31, D * 0.32
+    if re.search(r'\bleft\b|\bport\b', t):
+        cx, sx = -W * 0.31, W * 0.32
+    elif re.search(r'right|starboard', t):
+        cx, sx = W * 0.31, W * 0.32
+    if re.search(r'\bside\b|perimeter|\bwall\b|external|exterior|\bskin\b|outboard|flank', t):
+        sx, sy = W * 0.92, D * 0.92
+    return (cx, cy, cz), (sx, sy, sz)
+
+
+def _pack_region(grp, center, spread, env, placed):
+    """Lay a region's components into a tidy 3-D grid centred on the region target,
+    largest-first, clamped to stay inside the envelope. No overlap within a region."""
+    W, D, H = env
+    cx, cy, cz = center
+    sx, sy, sz = spread
+    grp.sort(key=lambda it: -max(_item_bbox(it)))
+    cell = max([max(_item_bbox(it)) for it in grp] + [0.05]) * 1.22
+    cols = max(1, int(sx // cell))
+    rows = max(1, int(sy // cell))
+    per_layer = cols * rows
+    for i, it in enumerate(grp):
+        layer, rem = divmod(i, per_layer)
+        r, c = divmod(rem, cols)
+        w, d, h = _item_bbox(it)
+        px = cx + (c - (cols - 1) / 2.0) * cell
+        py = cy + (r - (rows - 1) / 2.0) * cell
+        pz = max(h / 2.0, cz - sz / 2.0 + h / 2.0 + layer * cell)
+        px = max(-W / 2 + w / 2, min(W / 2 - w / 2, px))
+        py = max(-D / 2 + d / 2, min(D / 2 - d / 2, py))
+        pz = max(h / 2.0, min(H - h / 2.0, pz))
+        it['location'] = (round(px, 3), round(py, 3), round(pz, 3))
+        placed.append(it)
+
+
 def build_scene_plan(state):
-    """Walk the component tree → a deterministic, non-overlapping, grouped scene
-    plan. Returns {'envelope': (W,D,H) m, 'modules': [id…], 'items': [PlanItem…]}.
-    PlanItem = {module_id, sub_id, name, family, primitive, params, location,
-    qty, dim_source}. Pure — no bpy. Layout: components grouped by module in a
-    tidy floor grid, sized honestly, sitting on Z=0 (an engineering exploded view).
+    """Walk the component tree → a deterministic ASSEMBLED scene plan: a structural
+    shell at the product envelope, with the internals positioned INSIDE it by each
+    sub-module's topology_clause (base / top / central / front / side) and packed
+    without overlap. Returns {'envelope':(W,D,H), 'modules':[…],
+    'structure_module': id|None, 'items':[PlanItem…]}. PlanItem = {module_id,
+    sub_id, name, family, primitive, params, location, qty, dim_source}. Pure (no bpy).
     """
     md = state.get('moduleDecomposition') or {}
     modules = md.get('modules') or []
@@ -249,11 +350,12 @@ def build_scene_plan(state):
     D = (env.get('d') or 0) / 1000.0
     H = (env.get('h') or 0) / 1000.0
 
-    # 1) build the per-word items (type + size) first, grouped by module
-    by_module = []
+    # 1) per-word items (type + size), remembering module + topology
+    items = []
+    module_order = []
     for m in modules:
         mid = m.get('module') or 'module'
-        words = []
+        had = False
         for sm in m.get('sub_modules') or []:
             sid = sm.get('id') or ''
             topo = (sm.get('topology_clause') or '').lower()
@@ -263,62 +365,55 @@ def build_scene_plan(state):
                 fam = archetype_of(cid, name)
                 dim = _dim_of(w)
                 prim, params = size_for_primitive(fam, parse_dim_to_metres(dim))
-                words.append({
-                    'sub_id': sid, 'name': name, 'family': fam, 'primitive': prim,
-                    'params': params, 'qty': _qty_of(w), 'topo': topo, 'dim_source': dim,
+                items.append({
+                    'module_id': mid, 'sub_id': sid, 'name': name, 'family': fam,
+                    'primitive': prim, 'params': params, 'qty': _qty_of(w),
+                    'topo': topo, 'dim_source': dim, 'location': (0.0, 0.0, 0.0),
                 })
-        if words:
-            by_module.append((mid, words))
+                had = True
+        if had:
+            module_order.append(mid)
 
-    # 2) lay modules out on a floor grid; components in a sub-grid per module.
-    n = len(by_module)
-    if n == 0:
-        return {'envelope': (W, D, H), 'modules': [], 'items': []}
-    cols = max(1, int(math.ceil(math.sqrt(n))))
-    rows = int(math.ceil(n / cols))
-    # cell footprint: use the envelope if known, else a default 2 m grid.
-    cell_w = (W / cols) if W > 0 else 2.0
-    cell_d = (D / rows) if D > 0 else 2.0
-    x0 = -(cols - 1) * cell_w / 2.0
-    y0 = -(rows - 1) * cell_d / 2.0
+    if not items:
+        return {'envelope': (W, D, H), 'modules': [], 'structure_module': None, 'items': []}
 
-    items = []
-    for idx, (mid, words) in enumerate(by_module):
-        cr, cc = divmod(idx, cols)
-        cx = x0 + cc * cell_w
-        cy = y0 + cr * cell_d
-        # sub-grid for this module's components
-        k = len(words)
-        scols = max(1, int(math.ceil(math.sqrt(k))))
-        srows = int(math.ceil(k / scols))
-        sp_x = cell_w / (scols + 1)
-        sp_y = cell_d / (srows + 1)
-        for wi, wd in enumerate(words):
-            sr, sc = divmod(wi, scols)
-            px = cx + (sc - (scols - 1) / 2.0) * sp_x
-            py = cy + (sr - (srows - 1) / 2.0) * sp_y
-            # Z: rest on the floor; topology 'top/elevated' lifts it, 'base' keeps low
-            half_h = _item_half_height(wd['primitive'], wd['params'])
-            pz = half_h
-            if re.search(r'\btop\b|elevat|roof|upper|canopy|gondola', wd['topo']):
-                pz = (H if H > 0 else 2.0) - half_h
-            items.append({
-                'module_id': mid, 'sub_id': wd['sub_id'], 'name': wd['name'],
-                'family': wd['family'], 'primitive': wd['primitive'], 'params': wd['params'],
-                'qty': wd['qty'], 'location': (round(px, 3), round(py, 3), round(pz, 3)),
-                'dim_source': wd['dim_source'],
-            })
-    return {'envelope': (W, D, H), 'modules': [mid for mid, _ in by_module], 'items': items}
+    # 2) envelope: brief value, else bound it from the components
+    if not (W > 0 and D > 0 and H > 0):
+        W, D, H = estimate_envelope(items)
 
+    # 3) structural SHELL — the largest enclosure-like component becomes the product
+    #    body at envelope size (run_render_pipeline ghosts the structure module so it
+    #    reads as a translucent shell the internals sit inside). Else a structure module.
+    enclosure = None
+    for it in items:
+        if ENCLOSURE_RE.search('{} {}'.format(it['name'] or '', it['family'])):
+            if enclosure is None or _bbox_vol(it) > _bbox_vol(enclosure):
+                enclosure = it
+    structure_module = enclosure['module_id'] if enclosure else None
+    if structure_module is None:
+        for mid in module_order:
+            if STRUCTURE_MODULE_RE.search(mid):
+                structure_module = mid
+                break
 
-def _item_half_height(primitive, params):
-    if primitive in ('compound_vessel', 'compound_motor', 'cyl'):
-        return params.get('height', params.get('body_length', 0.3)) / 2.0
-    if primitive == 'frustum':
-        return params.get('height', 0.2) / 2.0
-    if primitive == 'pipe':
-        return params.get('radius', 0.05)
-    if primitive == 'compound_finned_heatsink':
-        return params.get('height', 0.1) / 2.0
-    size = params.get('size', (0.15, 0.15, 0.15))
-    return size[2] / 2.0
+    placed = []
+    internals = items
+    if enclosure is not None:
+        enclosure['primitive'] = 'box'
+        enclosure['params'] = {'size': (W * 0.98, D * 0.98, H * 0.98)}
+        enclosure['location'] = (0.0, 0.0, round(H * 0.5, 3))
+        enclosure['is_shell'] = True  # compile renders this translucent so internals show
+        placed.append(enclosure)
+        internals = [it for it in items if it is not enclosure]
+
+    # 4) assemble: group internals by topology region, pack each region inside the shell
+    groups = {}
+    for it in internals:
+        (cx, cy, cz), (sx, sy, sz) = topo_region(it['topo'], W, D, H)
+        key = (round(cx, 2), round(cy, 2), round(cz, 2), round(sx, 2), round(sy, 2), round(sz, 2))
+        groups.setdefault(key, ([], (cx, cy, cz), (sx, sy, sz)))[0].append(it)
+    for _key, (grp, center, spread) in groups.items():
+        _pack_region(grp, center, spread, (W, D, H), placed)
+
+    return {'envelope': (W, D, H), 'modules': module_order,
+            'structure_module': structure_module, 'items': placed}

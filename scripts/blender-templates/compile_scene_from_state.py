@@ -80,13 +80,17 @@ def main():
     # module_objects[module] directly — no setdefault — so the keys must pre-exist).
     module_objects = fl.make_module_dict(plan['modules'])
     mats = {}
+    # translucent shell so the internals read THROUGH the product body (the
+    # difference between "parts in a box" and "parts strewn on the floor").
+    shell_mat = fl.make_mat('univ_shell', (0.62, 0.66, 0.72), metallic=0.0, roughness=0.3, alpha=0.12)
     created = 0
     for item in plan['items']:
         mid = item['module_id']
         if mid not in mats:
             mats[mid] = fl.module_accent_mat(mid)
+        mat = shell_mat if item.get('is_shell') else mats[mid]
         try:
-            _instantiate(item, mats[mid], module_objects)
+            _instantiate(item, mat, module_objects)
             created += 1
         except Exception as e:  # one bad item must never kill the render
             print('[compile_scene] skipped %s (%s): %s' % (item.get('name'), item.get('primitive'), e))
@@ -95,11 +99,12 @@ def main():
           % (created, len(plan['items']), len(module_objects), plan['envelope']))
 
     fl.add_lights()
-    # structure_module_id: none of our modules is guaranteed an "enclosure" — pass the
-    # first module so the pipeline's translucent-shell treatment has a target; it is
-    # harmless if that module isn't a true shell.
-    structure_id = plan['modules'][0] if plan['modules'] else None
-    fl.run_render_pipeline(out_dir, module_objects, structure_module_id=structure_id)
+    # structure_module_id: the plan detects the shell/structure module so the pipeline
+    # ghosts it translucent and the internals read as sitting inside the body.
+    structure_id = plan.get('structure_module') or (plan['modules'][0] if plan['modules'] else None)
+    # hero_open_frame: render the shell as an open edge-frame (not a solid box) so the
+    # internals read THROUGH the product body — the "how it fits together" view.
+    fl.run_render_pipeline(out_dir, module_objects, structure_module_id=structure_id, hero_open_frame=True)
     print('[compile_scene] render complete →', out_dir)
 
 
