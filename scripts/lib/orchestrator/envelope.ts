@@ -1961,7 +1961,7 @@ const DETECTORS: Record<string, ClassDetectors> = {
  * four per-class enumerations — selectPlan, the assembler, and the contract
  * archetype registry also need generic fallbacks before an unseen class renders.
  */
-function genericEnvelope(constraints: ParsedConstraints): BriefEnvelope {
+export function genericEnvelope(constraints: ParsedConstraints): BriefEnvelope {
   const rawClass = String(constraints.product_class ?? '')
     .toLowerCase().trim().replace(/[\s_]+/g, '-') || 'generic'
   const v = constraints.voltage_class_v

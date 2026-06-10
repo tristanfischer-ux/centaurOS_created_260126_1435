@@ -438,6 +438,20 @@ export interface ContractInProgress {
   /** Diagnostic: tools that have run so far (in order). Used by the
    *  executor for fixed-point iteration tracking. */
   _tools_run: string[]
+
+  /** G4 provenance (W0, tracker #21): the deterministic class-fit
+   *  contradiction verdict. Present when the classifier's product_class was
+   *  checked against the brief's operating domain; `fit: 'contradiction'`
+   *  means the class was downgraded to the registry-miss/generic path so the
+   *  universal fallbacks fire. Structurally typed to avoid a types.ts →
+   *  class-fit-check import cycle (the canonical shape is ClassFitResult). */
+  class_fit?: {
+    fit: 'ok' | 'contradiction'
+    class_slug: string
+    brief_domain: string
+    class_domain: string
+    findings: Array<{ signal: string; severity: string; detail: string; evidence: string }>
+  }
 }
 
 /** Alias for the completed Contract after all tools + verifier passed. */

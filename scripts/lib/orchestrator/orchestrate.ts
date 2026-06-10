@@ -23,7 +23,9 @@
  *     validators (prose-validator.ts is the narrator sandwich)
  */
 
-import { detectEnvelope, validateEnvelope } from './envelope'
+import { detectEnvelope, validateEnvelope, genericEnvelope } from './envelope'
+import { buildEnvelopeVector } from './envelope-vector'
+import { checkClassFit, type ClassFitResult } from './class-fit-check'
 import { selectPlan } from './planner'
 import { composeFallbackPlan } from './auto-plan-fallback'
 import { runToolPlan } from './executor'
@@ -76,7 +78,7 @@ export async function orchestrateDesign(
   const loud_failures = !allow_silent_fallback
 
   // ── Step 1: Detect envelope ────────────────────────────────────────────
-  const envelope = detectEnvelope(parsedConstraints)
+  let envelope = detectEnvelope(parsedConstraints)
   if (!envelope) {
     const detail = buildEnvelopeFailureDetail(parsedConstraints)
     const prefix = loud_failures ? '[LOUD] ' : ''
@@ -90,6 +92,25 @@ export async function orchestrateDesign(
   if (envErrors.length > 0) {
     const prefix = loud_failures ? '[LOUD] ' : ''
     return failResult(initialContract, envErrors.map(e => `${prefix}envelope validation: ${e}`), fallback_on_failure)
+  }
+
+  // ── Step 1b: W0 deterministic class-fit contradiction check (tracker #21).
+  // The product-classifier is ADVISORY (G2). If the brief's operating domain
+  // contradicts the assigned class (e.g. a fully-immersed subsea tidal kite
+  // classified wind_turbine), DOWNGRADE to the registry-miss/generic envelope
+  // so the universal fallbacks fire (envelope-vector tier-b/c, generic
+  // emitter, sizing families), per G3. Record the verdict for G4 provenance.
+  const classFit = applyClassFitCheck(envelope, parsedConstraints)
+  if (classFit.fit === 'contradiction') {
+    const downgraded = genericEnvelope(parsedConstraints)
+    console.error(
+      `[orchestrator] CLASS-FIT CONTRADICTION (W0): classifier assigned "${classFit.class_slug}" ` +
+      `(${classFit.class_domain} domain) but the brief operates in the ${classFit.brief_domain} domain. ` +
+      `Routing as REGISTRY-MISS (envelope.class "${envelope.class}" → "${downgraded.class}", scale_tier generic) ` +
+      `so the universal path fires instead of a wrong-class dossier. Findings: ` +
+      classFit.findings.filter(f => f.severity === 'high').map(f => f.detail).join(' | '),
+    )
+    envelope = downgraded
   }
 
   // ── Step 2: Select tool plan ──────────────────────────────────────────
@@ -119,11 +140,20 @@ export async function orchestrateDesign(
     }
   }
 
-  // Annotate the Contract envelope (if not already set)
+  // Annotate the Contract envelope (if not already set) + G4 class-fit note.
   const contractWithEnv: ContractInProgress = {
     ...initialContract,
     envelope,
     _tools_run: [...(initialContract._tools_run ?? [])],
+    class_fit: {
+      fit: classFit.fit,
+      class_slug: classFit.class_slug,
+      brief_domain: classFit.brief_domain,
+      class_domain: String(classFit.class_domain),
+      findings: classFit.findings.map(f => ({
+        signal: f.signal, severity: f.severity, detail: f.detail, evidence: f.evidence,
+      })),
+    },
   }
 
   // ── Step 3: Run tool plan ─────────────────────────────────────────────
@@ -191,6 +221,27 @@ export async function orchestrateDesign(
     design: assemblerOutcome.design,
     tools_used_page: toolsUsedPage,
   }
+}
+
+/**
+ * W0 READY INTEGRATION FUNCTION (tracker #21). Builds the envelope vector for
+ * the constraints and runs the deterministic class-fit contradiction check
+ * against the assigned class. Pure + deterministic (no LLM). Exported so the
+ * chain can call it directly if it ever wires the check ahead of the
+ * orchestrator; orchestrateDesign calls it internally (step 1b).
+ *
+ * The classifier output reaches this via parsedConstraints.product_class (the
+ * normalised slug also lives on envelope.class). We check the constraints'
+ * declared product_class — the classifier's verdict — NOT the post-downgrade
+ * envelope class.
+ */
+export function applyClassFitCheck(
+  envelope: { class: string },
+  parsedConstraints: ParsedConstraints,
+): ClassFitResult {
+  const vector = buildEnvelopeVector(parsedConstraints)
+  const slug = String(parsedConstraints.product_class ?? envelope.class ?? '')
+  return checkClassFit(parsedConstraints, vector, slug)
 }
 
 function failResult(
