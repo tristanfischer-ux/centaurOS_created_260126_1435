@@ -466,6 +466,65 @@ def extract_parts(state):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# GEOMETRY-FAMILY DISPATCH (2026-06-10)
+# ───────────────────────────────────────────────────────────────────────────
+# The generator's ONE strategy (process-plant, tuned on e-fuel) lays parts out
+# as process REGIONS of vessels/machines on an open skid + an overhead pipe
+# rack. That is wrong for a battery system: a BESS is ROWS OF RACKS in a
+# container, not scattered vessels. detect_geometry_family() picks the strategy
+# from the part NAMES (universal — no per-class hand-coding): rack_farm when the
+# rack/cabinet vocabulary dominates the vessel/machine vocabulary, else the
+# process_plant default. panel_array / aero_body are later stubs (return
+# process_plant for now so any unknown archetype still renders).
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Vocabulary that marks a RACK-FARM archetype (battery/server/switchgear rows).
+RACK_FARM_RE = re.compile(
+    r"\bcell\b|\bcells\b|\brack\b|\bracks\b|\bmodule\b|\bbattery\b|\bcabinet\b|"
+    r"\bserver\b|\bbusbar\b|\bbms\b|\bpcs\b|\binverter\b", re.IGNORECASE)
+# Vocabulary that marks a PROCESS-PLANT archetype (vessels + rotating machines).
+PROCESS_PLANT_RE = re.compile(
+    r"\bvessel\b|\bcolumn\b|\breactor\b|\btank\b|\bseparator\b|\bdrum\b|"
+    r"\bpump\b|\bcompressor\b|distillation|\babsorber\b", re.IGNORECASE)
+
+
+def detect_geometry_family(parts, modules):
+    """Return the geometry FAMILY for this design — 'rack_farm' or
+    'process_plant' (panel_array / aero_body are later stubs). Heuristic on the
+    physical part NAMES: count names matching the rack/cabinet vocabulary vs the
+    vessel/rotating-machine vocabulary; rack_farm when the first set dominates,
+    else process_plant (the default for any unknown archetype). Logs the decision
+    + counts. Deterministic + universal — no per-class branch."""
+    rack_hits = sum(1 for p in parts if RACK_FARM_RE.search(str(p.name)))
+    proc_hits = sum(1 for p in parts if PROCESS_PLANT_RE.search(str(p.name)))
+    family = "rack_farm" if rack_hits > proc_hits else "process_plant"
+    print(f"[univ] geometry family = {family}  "
+          f"(rack/cabinet name matches = {rack_hits}, "
+          f"vessel/machine name matches = {proc_hits}, "
+          f"of {len(parts)} physical parts)")
+    return family
+
+
+def qval(quantities, key, default=None):
+    """Read a numeric value from the orchestratorContract.quantities map, which
+    stores each quantity as {"value": N, "unit": …, …}. Returns the float value
+    or `default` if absent/unparseable. Tolerates a bare number too (older
+    state shapes). Universal helper used by the rack-farm placer to derive the
+    rack grid from the engineering contract (rack_count, cells_per_rack, …)."""
+    if not isinstance(quantities, dict):
+        return default
+    q = quantities.get(key)
+    if q is None:
+        return default
+    if isinstance(q, dict):
+        q = q.get("value")
+    try:
+        return float(q)
+    except (TypeError, ValueError):
+        return default
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Region ordering — topological sort of fluid_loop edges, then rank fallback
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -2080,6 +2139,422 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# GEOMETRY-FAMILY STRATEGIES — place_process_plant (default) + place_rack_farm
+# ───────────────────────────────────────────────────────────────────────────
+# Both strategies take the SAME signature and return the SAME tuple so main()
+# can dispatch on the family and keep the INSPECT/PDF render + summary common:
+#   (bbox_mm, region_centres, frame_top_mm, routed, unresolved)
+# place_process_plant is the verbatim original pipeline (regions on an open
+# braced skid + overhead pipe rack); place_rack_farm is the BESS pipeline (rows
+# of battery racks in a container + a balance-of-plant lineup + coolant/bus runs).
+# ═══════════════════════════════════════════════════════════════════════════
+
+def place_process_plant(parts, regions, topology, MAT, MO):
+    """PROCESS-PLANT strategy (the original, e-fuel-tuned pipeline). Lay the
+    physical parts out as process REGIONS across serpentine banks on a TALL braced
+    open skid that hugs the equipment bulk, build the overhead pipe-rack structure,
+    and route every topology edge as an overhead-rack run (round process pipe /
+    copper cable tray). Behaviour-identical to the pre-dispatch main(): the refactor
+    only moved these steps into a function. Returns
+    (bbox, region_centres, frame_top_mm, routed, unresolved)."""
+    # 4. place parts
+    bbox, region_centres = place_all(parts, regions, MAT, MO)
+    print(f"[univ] plant bbox (mm): {bbox}")
+
+    # 5. TALL braced skid frame that HUGS THE EQUIPMENT BULK (Fix 1, FRAME FIT).
+    #    BOTH the footprint AND the height target come from the NON-tall equipment
+    #    only (is_tall_for_frame excludes stacks/flares/slim towers); those tall
+    #    items poke THROUGH the roof rather than dragging the frame up + out.
+    equip_bbox = equipment_bbox_mm(parts, margin_mm=0.0)   # frame adds FRAME_MARGIN
+    equip_tops = [p.anchors["top"][2] for p in parts
+                  if p.anchors and not is_tall_for_frame(p)]
+    tallest = max(equip_tops) if equip_tops else SKID_FRAME_MIN_HEIGHT_MM
+    frame_h = max(SKID_FRAME_MIN_HEIGHT_MM, tallest * SKID_FRAME_HEIGHT_FRAC)
+    build_skid_frame(equip_bbox, frame_h, MAT, MO)
+
+    # 5b. PHYSICAL PIPE-RACK STRUCTURE (Fix 2): light grey beams + posts at the
+    #     shared rack elevation so the overhead pipes visibly rest on a rack.
+    build_pipe_rack(equip_bbox, frame_h, MAT, MO)
+
+    # 6. route topology like a real OVERHEAD PIPE RACK (Fix 3): all runs share a
+    #    rack elevation just below the frame roof. Pass the frame top so the rack
+    #    sits beneath it (and ON the Fix-2 rack structure).
+    routed, unresolved = route_topology(topology, parts, MAT, MO,
+                                        frame_top_mm=frame_h,
+                                        region_centres=region_centres,
+                                        bbox_mm=bbox)
+    print(f"[univ] topology routed = {routed}/{len(topology)}; "
+          f"unresolved = {len(unresolved)}")
+    return bbox, region_centres, frame_h, routed, unresolved
+
+
+# ── RACK-FARM strategy config (mm) ─────────────────────────────────────────
+# A battery energy storage system reads as ROWS OF TALL NARROW RACK CABINETS in
+# neat lines with AISLES between them, inside a shipping-container enclosure, with
+# the power-conversion + thermal balance-of-plant lined up along one end. These
+# constants set that look; all derived from the engineering contract's rack grid
+# (rack_count / cells_per_rack / parallel_strings) so the count is data-driven.
+RACK_W_MM          = 600.0    # one battery rack cabinet width (along the row)
+RACK_D_MM          = 850.0    # rack depth (front-to-back)
+RACK_H_MM          = 2200.0   # rack height (tall narrow cabinet, like the templates)
+RACK_PITCH_MM      = 720.0    # centre-to-centre pitch within a row (rack_w + gap)
+RACK_AISLE_MM      = 1500.0   # walking aisle between back-to-back rack rows
+RACK_ROW_GAP_MM    = 1500.0   # end gap before the balance-of-plant lineup
+RACK_MAX_PER_ROW   = 10       # cap a single row's length; wrap to more rows beyond
+BOP_LANE_W_MM      = 2400.0   # depth of the balance-of-plant lane along the end wall
+BOP_GAP_MM         = 500.0    # gap between successive BoP skids in the lineup
+CONTAINER_MARGIN_MM = 700.0   # clearance from racks+BoP bulk to the container walls
+CONTAINER_WALL_MM  = 90.0     # container wall/roof thickness
+# Default rack grid when the contract is silent (so an unparametrised BESS still
+# renders sensibly) — a single 40-ft-container-ish 2-row × N layout.
+RACK_FALLBACK_COUNT = 14
+
+
+def _derive_rack_grid(quantities, parts):
+    """Decide (n_racks, n_rows, racks_per_row) for the rack farm, deterministically.
+    Primary signal: the engineering contract's rack_count (and parallel_strings_total
+    as a cross-check). Fallback: count the parts whose NAME marks them a rack/module
+    (so an unparametrised design still gets a sane grid), else RACK_FALLBACK_COUNT.
+    Rows are chosen so each row is ≤ RACK_MAX_PER_ROW and the grid stays compact
+    (≈ as many rows as keep racks_per_row ≤ a container-ish 8-10). Returns the
+    triple + the basis string for logging."""
+    rc = qval(quantities, "rack_count")
+    if rc is None:
+        rc = qval(quantities, "parallel_strings_total")
+        basis = "parallel_strings_total" if rc is not None else None
+    else:
+        basis = "rack_count"
+    if rc is None:
+        # count rack/module-named parts as a proxy (excludes cells, which are the
+        # thousands we deliberately do NOT render one-by-one)
+        rack_named = sum(1 for p in parts
+                         if re.search(r"\brack\b|\bmodule\b", str(p.name), re.IGNORECASE)
+                         and not re.search(r"\bcell\b", str(p.name), re.IGNORECASE))
+        rc = rack_named if rack_named >= 4 else RACK_FALLBACK_COUNT
+        basis = f"name-count({rack_named})" if rack_named >= 4 else "fallback"
+    n_racks = max(2, int(round(rc)))
+    # pick rows: minimise rows while keeping racks_per_row ≤ RACK_MAX_PER_ROW.
+    n_rows = max(1, math.ceil(n_racks / RACK_MAX_PER_ROW))
+    racks_per_row = math.ceil(n_racks / n_rows)
+    return n_racks, n_rows, racks_per_row, basis
+
+
+def place_rack_farm(parts, regions, topology, MAT, MO):
+    """RACK-FARM strategy (BESS / battery energy storage). Render the design as a
+    real battery system: ROWS OF BATTERY RACKS (tall narrow cabinets) in neat lines
+    with aisles, the power-conversion + thermal balance-of-plant skids lined up
+    along one end wall, the whole lot enclosed in a shipping-container-like shell,
+    and the electrical/thermal topology routed as DC-bus cable trays + coolant pipes
+    to the chiller. The thousands of cells are AGGREGATED into the racks (never
+    drawn one-by-one). Same return tuple as place_process_plant:
+    (bbox, region_centres, frame_top_mm, routed, unresolved)."""
+    quantities = {}
+    # quantities live on the orchestratorContract; topology was sliced from the
+    # same place, but we re-read the contract here via the module-level _STATE set
+    # by main() so the placer stays a pure function of (parts, topology, contract).
+    quantities = _RACKFARM_QUANTITIES or {}
+
+    n_racks, n_rows, racks_per_row, basis = _derive_rack_grid(quantities, parts)
+    cells_per_rack = qval(quantities, "cells_per_rack")
+    cell_count = qval(quantities, "cell_count")
+    print(f"[univ][rackfarm] rack grid: {n_racks} racks "
+          f"= {n_rows} row(s) × {racks_per_row} "
+          f"(basis: {basis}); cells_per_rack={cells_per_rack}, "
+          f"cell_count={cell_count} aggregated into the racks (not drawn individually)")
+
+    steel = _steel_mat(MAT)
+    rack_frame_mat = MAT.get("battery") or fl.make_mat(
+        "m_rf_rack", (0.02, 0.14, 1.00), metallic=0.05, roughness=0.45)
+    if "u_rf_cell" not in MAT:
+        MAT["u_rf_cell"] = fl.make_mat("m_rf_cell", (0.02, 0.025, 0.05),
+                                       metallic=0.10, roughness=0.55)
+    cell_mat = MAT["u_rf_cell"]
+    if "u_rf_busbar" not in MAT:
+        MAT["u_rf_busbar"] = fl.make_mat("m_rf_busbar", (1.00, 0.45, 0.00),
+                                         metallic=0.30, roughness=0.40)
+    busbar_mat = MAT["u_rf_busbar"]
+
+    # ── 1. ROWS OF RACKS ────────────────────────────────────────────────────
+    # Lay rows along X. Successive rows step back in +Y, separated by an aisle.
+    # Each rack is a tall narrow cabinet (frame shell + recessed dark cell stack +
+    # a copper bus stripe up the front) so the row reads as a battery line-up, like
+    # the BESS templates. The cells are AGGREGATED into that one recessed volume —
+    # we never instantiate the thousands of prismatic cells.
+    rack_mod = "energy_storage_source"
+    if rack_mod not in MO:
+        MO[rack_mod] = []
+    row_pitch = RACK_D_MM + RACK_AISLE_MM
+    row_len_mm = racks_per_row * RACK_PITCH_MM
+    rack_anchor_by_index = []     # (cx, cy, top_z) per placed rack, for bus routing
+    placed = 0
+    for row in range(n_rows):
+        y_row = row * row_pitch
+        n_this = min(racks_per_row, n_racks - placed)
+        for col in range(n_this):
+            cx = col * RACK_PITCH_MM
+            nm = f"u_rf_rack_r{row}_c{col}"
+            # frame shell
+            fl.add_box(f"{nm}_frame",
+                       (cx * fl.MM, y_row * fl.MM, (DECK_Z_MM + RACK_H_MM / 2) * fl.MM),
+                       (RACK_W_MM * fl.MM, RACK_D_MM * fl.MM, RACK_H_MM * fl.MM),
+                       rack_frame_mat, module=rack_mod, module_objects=MO)
+            # recessed dark cell stack (the aggregated cells)
+            fl.add_box(f"{nm}_cells",
+                       (cx * fl.MM, y_row * fl.MM, (DECK_Z_MM + RACK_H_MM / 2) * fl.MM),
+                       ((RACK_W_MM - 120) * fl.MM, (RACK_D_MM - 140) * fl.MM,
+                        (RACK_H_MM - 360) * fl.MM),
+                       cell_mat, module=rack_mod, module_objects=MO)
+            # copper bus stripe up the front (+Y) face — the rack DC bus
+            fl.add_box(f"{nm}_bus",
+                       (cx * fl.MM, (y_row + RACK_D_MM / 2 - 30) * fl.MM,
+                        (DECK_Z_MM + RACK_H_MM / 2) * fl.MM),
+                       (60 * fl.MM, 40 * fl.MM, (RACK_H_MM - 360) * fl.MM),
+                       busbar_mat, module=rack_mod, module_objects=MO)
+            # plinth
+            fl.add_box(f"{nm}_plinth",
+                       (cx * fl.MM, y_row * fl.MM, (DECK_Z_MM + 70) * fl.MM),
+                       ((RACK_W_MM + 40) * fl.MM, (RACK_D_MM + 40) * fl.MM, 140 * fl.MM),
+                       steel, module=rack_mod, module_objects=MO)
+            rack_anchor_by_index.append((cx, y_row, DECK_Z_MM + RACK_H_MM))
+        placed += n_this
+
+    racks_x0 = -RACK_W_MM / 2
+    racks_x1 = (racks_per_row - 1) * RACK_PITCH_MM + RACK_W_MM / 2
+    racks_y0 = -RACK_D_MM / 2
+    racks_y1 = (n_rows - 1) * row_pitch + RACK_D_MM / 2
+
+    # ── 2. BALANCE-OF-PLANT LINEUP along the +X end wall ────────────────────
+    # PCS / inverter, switchgear, transformer, BMS controller and the THERMAL gear
+    # (chiller / HVAC) skidded in a lineup beyond the rack rows (like the template's
+    # external chiller + PCS + transformer + RMU + control lineup). We pull the real
+    # parts from the design by their module / name so the lineup reflects the BoM.
+    bop_x = racks_x1 + RACK_ROW_GAP_MM
+    bop_y_centre = (racks_y0 + racks_y1) / 2
+    bop_items = _select_bop_items(parts)
+    region_centres = {}
+    bop_anchor = {}               # role → (cx, cy, top_z) for topology routing
+    cursor_y = bop_y_centre - (sum(it[2] for it in bop_items)
+                               + BOP_GAP_MM * max(0, len(bop_items) - 1)) / 2.0
+    for role, part_or_none, depth_mm, w_mm, h_mm, rgb in bop_items:
+        cx = bop_x + w_mm / 2
+        cy = cursor_y + depth_mm / 2
+        nm = f"u_rf_bop_{role}"
+        mat = MAT.get(f"u_rf_bop_{role}") or fl.make_mat(
+            f"m_rf_bop_{role}", rgb, metallic=0.35, roughness=0.42)
+        MAT[f"u_rf_bop_{role}"] = mat
+        mod = part_or_none.module_id if part_or_none else "energy_conversion_transduction"
+        if mod not in MO:
+            MO[mod] = []
+        if role == "chiller":
+            # chiller reads as a skid + two fan shrouds on top (heat rejection)
+            fl.add_box(f"{nm}_skid",
+                       (cx * fl.MM, cy * fl.MM, (DECK_Z_MM + h_mm / 2) * fl.MM),
+                       (w_mm * fl.MM, depth_mm * fl.MM, h_mm * fl.MM), mat,
+                       module=mod, module_objects=MO)
+            for fdy in (-depth_mm * 0.25, depth_mm * 0.25):
+                fl.add_cyl(f"{nm}_fan_{fdy:.0f}",
+                           (cx * fl.MM, (cy + fdy) * fl.MM,
+                            (DECK_Z_MM + h_mm + 40) * fl.MM),
+                           min(w_mm, depth_mm) * 0.22 * fl.MM, 80 * fl.MM,
+                           steel, module=mod, module_objects=MO)
+        else:
+            fl.add_box(f"{nm}_body",
+                       (cx * fl.MM, cy * fl.MM, (DECK_Z_MM + h_mm / 2) * fl.MM),
+                       (w_mm * fl.MM, depth_mm * fl.MM, h_mm * fl.MM), mat,
+                       module=mod, module_objects=MO)
+        bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
+        region_centres[role] = (cx, cy)
+        cursor_y += depth_mm + BOP_GAP_MM
+    bop_x1 = bop_x + max((it[3] for it in bop_items), default=BOP_LANE_W_MM)
+
+    # ── 3. CONTAINER ENCLOSURE around racks + aisles + BoP ──────────────────
+    # A shipping-container-like shell (floor + roof + 4 walls) sized to the rack
+    # block + the BoP lineup + margin, REPLACING the open process skid. In INSPECT
+    # mode apply_inspection_materials renders u_skid_* as the faint wireframe, so we
+    # name the enclosure with that prefix and it reads as the same faint cage that
+    # lets the interior show.
+    enc_x0 = racks_x0 - CONTAINER_MARGIN_MM
+    enc_x1 = bop_x1 + CONTAINER_MARGIN_MM
+    enc_y0 = racks_y0 - CONTAINER_MARGIN_MM
+    enc_y1 = max(racks_y1, bop_y_centre + BOP_LANE_W_MM) + CONTAINER_MARGIN_MM
+    enc_w = enc_x1 - enc_x0
+    enc_d = enc_y1 - enc_y0
+    enc_h = RACK_H_MM + 2 * CONTAINER_MARGIN_MM
+    enc_cx = (enc_x0 + enc_x1) / 2
+    enc_cy = (enc_y0 + enc_y1) / 2
+    _build_container_enclosure(enc_cx, enc_cy, DECK_Z_MM, enc_w, enc_d, enc_h, MAT, MO)
+    frame_top_mm = DECK_Z_MM + enc_h
+    print(f"[univ][rackfarm] container enclosure: {enc_w/1000:.1f}×{enc_d/1000:.1f} m "
+          f"footprint, {enc_h/1000:.1f} m tall; BoP lineup of {len(bop_items)} skids")
+
+    # ── 4. TOPOLOGY: electrical bus (racks→DC bus→PCS→transformer) as cable
+    #    trays + thermal (PCS/racks→heat rejection) as coolant pipes to the chiller.
+    #    Reuse the existing overhead-rack router + cable-tray / pipe primitives.
+    bbox = {"x0": enc_x0, "x1": enc_x1, "y0": enc_y0, "y1": enc_y1}
+    routed, unresolved = _route_rack_farm_topology(
+        topology, parts, rack_anchor_by_index, bop_anchor, region_centres,
+        frame_top_mm, bbox, MAT, MO)
+    print(f"[univ][rackfarm] topology routed = {routed}/{len(topology)}; "
+          f"unresolved = {len(unresolved)}")
+
+    # region_centres also carries the rack block centroid for completeness
+    region_centres["rack_block"] = ((racks_x0 + racks_x1) / 2, (racks_y0 + racks_y1) / 2)
+    return bbox, region_centres, frame_top_mm, routed, unresolved
+
+
+# Module-level handoff of the contract quantities to place_rack_farm (set in main()
+# right before dispatch). Kept module-level rather than threading a new arg through
+# the shared placer signature, so place_process_plant's signature is unchanged.
+_RACKFARM_QUANTITIES = None
+
+
+# Balance-of-plant roles for the rack-farm lineup, in lineup order. Each entry:
+#   (role, name_regex, depth_mm, width_mm, height_mm, rgb)
+# The placer matches the FIRST design part whose name hits the regex (to reflect
+# the actual BoM + tag the skid to that part's module); if none match, the skid is
+# still drawn (a real BESS always has these) so the lineup reads complete.
+_BOP_ROLES = [
+    ("pcs",         r"\bpcs\b|inverter",                 1100.0, 900.0, 1900.0, (0.45, 0.55, 0.68)),
+    ("switchgear",  r"switchgear|breaker|\brmu\b|main bus|ac main",
+                                                          900.0, 800.0, 2000.0, (0.30, 0.34, 0.40)),
+    ("transformer", r"transformer",                      1500.0, 1100.0, 1300.0, (0.02, 0.22, 1.00)),
+    ("bms_ctrl",    r"\bbms\b|ems |\bems\b|controller|scada",
+                                                          700.0, 700.0, 1800.0, (0.05, 0.42, 1.00)),
+    ("chiller",     r"chiller|hvac|cooling unit|air handler|condens",
+                                                          1000.0, 1400.0, 1400.0, (0.95, 0.84, 0.55)),
+]
+
+
+def _select_bop_items(parts):
+    """Build the balance-of-plant lineup list. For each role in _BOP_ROLES, find the
+    first matching design part (to reflect the BoM + carry its module tag); the skid
+    is drawn whether or not a part matches (a real BESS always has PCS / switchgear /
+    transformer / controller / thermal gear). Returns
+    [(role, part_or_None, depth_mm, width_mm, height_mm, rgb), …] in lineup order."""
+    items = []
+    for role, rx, depth, w, h, rgb in _BOP_ROLES:
+        rxc = re.compile(rx, re.IGNORECASE)
+        match = next((p for p in parts if rxc.search(str(p.name))), None)
+        items.append((role, match, depth, w, h, rgb))
+    return items
+
+
+def _build_container_enclosure(cx, cy, base_z_mm, w_mm, d_mm, h_mm, MAT, MO):
+    """Shipping-container-like enclosure (floor + roof + 4 walls), tagged with the
+    STRUCTURE_MODULE_ID and named u_skid_* so INSPECT mode renders it as the SAME
+    faint wireframe the process-skid frame uses (interior reads through it). cx/cy =
+    footprint centre (mm); base_z_mm = floor underside. Deterministic + universal."""
+    enc_mat = fl.make_mat("m_rf_container", (0.55, 0.56, 0.58),
+                          metallic=0.30, roughness=0.50)
+    sid = STRUCTURE_MODULE_ID
+    if sid not in MO:
+        MO[sid] = []
+    t = CONTAINER_WALL_MM
+
+    def _mm3(t3):
+        return tuple(c * fl.MM for c in t3)
+
+    # floor + roof
+    fl.add_box("u_skid_rf_floor", _mm3((cx, cy, base_z_mm + t / 2)),
+               _mm3((w_mm, d_mm, t)), enc_mat, module=sid, module_objects=MO)
+    fl.add_box("u_skid_rf_roof", _mm3((cx, cy, base_z_mm + h_mm - t / 2)),
+               _mm3((w_mm, d_mm, t)), enc_mat, module=sid, module_objects=MO)
+    # 4 walls (back = -Y solid; front = +Y; both ends). Front wall kept so the
+    # enclosure reads as a closed container; INSPECT renders all of them faint.
+    wall_h = h_mm - 2 * t
+    fl.add_box("u_skid_rf_wall_back", _mm3((cx, cy - d_mm / 2 + t / 2, base_z_mm + h_mm / 2)),
+               _mm3((w_mm, t, wall_h)), enc_mat, module=sid, module_objects=MO)
+    fl.add_box("u_skid_rf_wall_front", _mm3((cx, cy + d_mm / 2 - t / 2, base_z_mm + h_mm / 2)),
+               _mm3((w_mm, t, wall_h)), enc_mat, module=sid, module_objects=MO)
+    fl.add_box("u_skid_rf_wall_left", _mm3((cx - w_mm / 2 + t / 2, cy, base_z_mm + h_mm / 2)),
+               _mm3((t, d_mm, wall_h)), enc_mat, module=sid, module_objects=MO)
+    fl.add_box("u_skid_rf_wall_right", _mm3((cx + w_mm / 2 - t / 2, cy, base_z_mm + h_mm / 2)),
+               _mm3((t, d_mm, wall_h)), enc_mat, module=sid, module_objects=MO)
+
+
+def _route_rack_farm_topology(topology, parts, rack_anchors, bop_anchor,
+                              region_centres, frame_top_mm, bbox, MAT, MO):
+    """Route the BESS topology, reusing the existing overhead-rack router + the
+    cable-tray (electrical) and pipe (thermal/fluid) primitives. We resolve each
+    edge endpoint against the rack-farm anchors FIRST (a rack/cell/dc-bus end → the
+    rack-block bus point; a pcs/transformer/chiller/heat-rejection end → its BoP
+    skid anchor), then fall back to the generic part resolver for anything else.
+    electrical_bus → copper cable tray; thermal / fluid_loop → coolant pipe to the
+    chiller. Returns (routed, unresolved)."""
+    rack_z = rack_elevation_mm(frame_top_mm)
+    # DC bus collector point = centroid of the rack tops (where rack buses gather)
+    if rack_anchors:
+        bx = sum(a[0] for a in rack_anchors) / len(rack_anchors)
+        by = sum(a[1] for a in rack_anchors) / len(rack_anchors)
+        bz = max(a[2] for a in rack_anchors)
+        rack_bus_pt = (bx, by, bz)
+    else:
+        rack_bus_pt = ((bbox["x0"] + bbox["x1"]) / 2, (bbox["y0"] + bbox["y1"]) / 2,
+                       DECK_Z_MM + RACK_H_MM)
+
+    ROLE_RE = {
+        "pcs":         re.compile(r"\bpcs\b|inverter|dc[_ ]?bus|dc[- ]?link", re.IGNORECASE),
+        "transformer": re.compile(r"transformer|\bgrid\b|enclosure_atmosphere|atmosphere", re.IGNORECASE),
+        "chiller":     re.compile(r"chiller|heat[_ ]?reject|cooling|hvac|coolant|thermal", re.IGNORECASE),
+        "switchgear":  re.compile(r"switchgear|breaker|\brmu\b", re.IGNORECASE),
+        "bms_ctrl":    re.compile(r"\bbms\b|\bems\b|controller|scada", re.IGNORECASE),
+    }
+    RACK_END_RE = re.compile(r"\brack\b|\bcell\b|string|\bmodule\b|\bpack\b|battery",
+                             re.IGNORECASE)
+
+    def _resolve(endpoint_name):
+        """Return an (x,y,z) mm point for a topology endpoint, rack-farm aware."""
+        nm = str(endpoint_name)
+        if RACK_END_RE.search(nm) and not re.search(r"transformer|pcs|inverter", nm, re.IGNORECASE):
+            return rack_bus_pt
+        for role, rx in ROLE_RE.items():
+            if rx.search(nm) and role in bop_anchor:
+                return bop_anchor[role]
+        # generic part fallback (the process-plant resolver)
+        p = resolve_endpoint(nm, parts)
+        if p is not None and p.placed_xyz_mm is not None:
+            return (p.placed_xyz_mm[0], p.placed_xyz_mm[1],
+                    p.anchors["top"][2] if p.anchors else p.placed_xyz_mm[2])
+        return None
+
+    routed = 0
+    unresolved = []
+    for i, e in enumerate(topology):
+        frm = e.get("from_part", "")
+        to = e.get("to_part", "")
+        mech = e.get("mechanism", "fluid_loop")
+        a = _resolve(frm)
+        b = _resolve(to)
+        if a is None or b is None:
+            miss = [n for n, pt in ((frm, a), (to, b)) if pt is None]
+            unresolved.append((frm, to, mech, miss))
+            print(f"[univ][rackfarm] edge {i} UNRESOLVED ({mech}): {frm} -> {to} "
+                  f"[missing: {', '.join(miss)}]")
+            continue
+        rack_zi = rack_z + RACK_TIER_PITCH_MM * (routed % 4)
+        waypoints = route_rack(a, b, rack_zi)
+        nm = f"u_route_rf_{i}_{mech}"
+        try:
+            if mech == "electrical_bus":
+                _draw_cable_tray(nm, waypoints, MAT, MO)
+            else:
+                colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
+                mkey = f"u_pipe_{mech}"
+                if mkey not in MAT:
+                    MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35, roughness=0.35)
+                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=MAT[mkey],
+                                 flanges=True,
+                                 module="mass_fluid_transport_process",
+                                 module_objects=MO)
+            routed += 1
+            print(f"[univ][rackfarm] routed edge {i} ({mech}): {frm} -> {to}")
+        except Exception as ex:  # noqa: BLE001 — never let one bad route kill the run
+            unresolved.append((frm, to, mech, [f"route_error:{ex}"]))
+            print(f"[univ][rackfarm] edge {i} route FAILED: {ex}")
+    return routed, unresolved
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Lighting + skid frame + main
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -2258,6 +2733,31 @@ def _inspect_colour_for_part(part):
     return INSPECT_TYPE_COLOUR.get(part.shape, INSPECT_DEFAULT_COLOUR)
 
 
+# Flat-matte INSPECT colours for the rack-farm object families (keyed by the
+# build_part-independent u_rf_* object names). Cells dark, rack frame battery-blue,
+# bus copper, BoP skids by role. Matched by substring on the object name.
+_INSPECT_RACKFARM = [
+    ("_cells",        (0.10, 0.12, 0.22)),   # aggregated cell stack = dark navy
+    ("_bus",          (0.95, 0.55, 0.10)),   # rack DC bus stripe = copper-orange
+    ("_plinth",       (0.50, 0.52, 0.55)),   # plinth = mid grey steel
+    ("_rack_",        (0.18, 0.30, 0.78)),   # rack frame = battery blue
+    ("bop_pcs",       (0.40, 0.50, 0.66)),   # PCS / inverter = steel blue-grey
+    ("bop_switchgear",(0.42, 0.44, 0.50)),   # switchgear = dark grey
+    ("bop_transformer",(0.20, 0.34, 0.80)),  # transformer = deep blue
+    ("bop_bms_ctrl",  (0.20, 0.46, 0.92)),   # BMS / EMS controller = bright blue
+    ("bop_chiller",   (0.80, 0.72, 0.50)),   # chiller / thermal = tan
+]
+
+
+def _inspect_rackfarm_colour(name):
+    """Flat-matte INSPECT colour for a rack-farm object, by its name role. Falls
+    back to the battery-blue rack colour for any unmatched u_rf_* helper."""
+    for key, rgb in _INSPECT_RACKFARM:
+        if key in name:
+            return rgb
+    return (0.18, 0.30, 0.78)
+
+
 def apply_inspection_materials(parts):
     """Re-skin the whole scene for the CAD-inspection pass (NON-destructive to
     geometry — only materials change):
@@ -2349,6 +2849,16 @@ def apply_inspection_materials(parts):
             obj.data.materials.clear()
             obj.data.materials.append(_matte((1.00, 0.45, 0.00)))
             n_pipe += 1
+            continue
+        # ── RACK-FARM geometry (u_rf_*) → flat matte by sub-part role, so the
+        #    rows of racks + the BoP lineup read by colour in the judging surface
+        #    (these objects aren't owned by a Part, so they'd otherwise fall to the
+        #    neutral-grey unmatched bucket). Keyed by the object-name suffix/role. ──
+        if nm.startswith("u_rf_"):
+            rf_colour = _inspect_rackfarm_colour(nm)
+            obj.data.materials.clear()
+            obj.data.materials.append(_matte(rf_colour))
+            n_equip += 1
             continue
         # ── Equipment → flat matte colour by the owning part's TYPE ──
         colour = None
@@ -2609,7 +3119,9 @@ def main():
           f"capped parts: {undim_tall or 'none'}")
 
     # 2. order regions in process flow
-    topology = state.get("orchestratorContract", {}).get("topology", []) or []
+    contract = state.get("orchestratorContract", {}) or {}
+    topology = contract.get("topology", []) or []
+    quantities = contract.get("quantities", {}) or {}
     regions, region_edges = order_regions(parts, topology)
     print(f"[univ] region order (L->R): {regions}")
 
@@ -2618,36 +3130,21 @@ def main():
                         "mass_fluid_transport_process"})
     MO = fl.make_module_dict(module_ids)
 
-    # 4. place parts
-    bbox, region_centres = place_all(parts, regions, MAT, MO)
-    print(f"[univ] plant bbox (mm): {bbox}")
-
-    # 5. TALL braced skid frame that HUGS THE EQUIPMENT BULK (Fix 1, FRAME FIT).
-    #    BOTH the footprint AND the height target come from the NON-tall equipment
-    #    only (is_tall_for_frame excludes stacks/flares/slim towers); those tall
-    #    items poke THROUGH the roof rather than dragging the frame up + out.
-    equip_bbox = equipment_bbox_mm(parts, margin_mm=0.0)   # frame adds FRAME_MARGIN
-    equip_tops = [p.anchors["top"][2] for p in parts
-                  if p.anchors and not is_tall_for_frame(p)]
-    tallest = max(equip_tops) if equip_tops else SKID_FRAME_MIN_HEIGHT_MM
-    frame_h = max(SKID_FRAME_MIN_HEIGHT_MM, tallest * SKID_FRAME_HEIGHT_FRAC)
-    build_skid_frame(equip_bbox, frame_h, MAT, MO)
-
-    # 5b. PHYSICAL PIPE-RACK STRUCTURE (Fix 2): light grey beams + posts at the
-    #     shared rack elevation so the overhead pipes visibly rest on a rack.
-    #     Spans the equipment bulk (same bbox as the frame) at frame_h's rack
-    #     level — kept subordinate (thin, light grey).
-    build_pipe_rack(equip_bbox, frame_h, MAT, MO)
-
-    # 6. route topology like a real OVERHEAD PIPE RACK (Fix 3): all runs share a
-    #    rack elevation just below the frame roof. Pass the frame top so the rack
-    #    sits beneath it (and ON the Fix-2 rack structure).
-    routed, unresolved = route_topology(topology, parts, MAT, MO,
-                                        frame_top_mm=frame_h,
-                                        region_centres=region_centres,
-                                        bbox_mm=bbox)
-    print(f"[univ] topology routed = {routed}/{len(topology)}; "
-          f"unresolved = {len(unresolved)}")
+    # 4-6. GEOMETRY-FAMILY DISPATCH — pick + run the placement strategy. rack_farm
+    #      (BESS-style rows of racks in a container + BoP lineup + bus/coolant runs)
+    #      vs process_plant (the default: regions on an open skid + overhead pipe
+    #      rack). Both return the SAME tuple so the INSPECT/PDF render below is
+    #      common to both. panel_array / aero_body are later stubs (→ process_plant).
+    modules = state.get("moduleDecomposition", {}).get("modules", [])
+    family = detect_geometry_family(parts, modules)
+    if family == "rack_farm":
+        global _RACKFARM_QUANTITIES
+        _RACKFARM_QUANTITIES = quantities
+        bbox, region_centres, frame_h, routed, unresolved = place_rack_farm(
+            parts, regions, topology, MAT, MO)
+    else:
+        bbox, region_centres, frame_h, routed, unresolved = place_process_plant(
+            parts, regions, topology, MAT, MO)
 
     # ── INSPECT MODE (default ON) — the FAST visual-judge surface ──
     # When INSPECT=1 (the loop's default), render the CLEAN CAD-inspection set
@@ -2685,6 +3182,7 @@ def main():
     # final summary line for the caller
     print("[univ] SUMMARY "
           + json.dumps({
+              "geometry_family": family,
               "physical_parts": len(parts),
               "dropped": len(dropped),
               "topology_total": len(topology),
