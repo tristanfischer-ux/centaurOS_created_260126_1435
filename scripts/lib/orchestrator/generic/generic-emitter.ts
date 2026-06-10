@@ -38,6 +38,17 @@ import {
 import { deriveGenericSkeleton } from './derive-skeleton'
 import { loadClassComponents } from './component-source'
 import { buildCrossModuleLinks } from './build-links'
+// E6a (tracker #22): bootstrap-on-miss for the class-reference graph. A NOVEL
+// slug (W0-minted or plain registry-miss) has no graph in the DB or baked TS —
+// previously a hard throw (exit 7). The bootstrap harvests one (corpus-first +
+// ONE structured LLM call), validates deterministically, stores a G1
+// 'candidate' row in forge-truth.db class_graph_candidates, and hands the
+// graph back IN-MEMORY for this run only (no auto-promotion to the canonical
+// class_reference_graphs table). Env-gated CLASS_GRAPH_BOOTSTRAP (default ON;
+// =0 disables). Scope-safe: this code path is only reachable on the
+// UNIVERSAL_GENERIC_EMITTER registry-miss path — registered classes always
+// resolve their graph above and never get here.
+import { bootstrapClassGraph } from './bootstrap-class-graph'
 // E2 (2026-06-10): the sizing-family PLUG-IN REGISTRY replaces the legacy
 // single-family applyFamilySizing call. Importing the barrel registers every
 // family (battery / process-plant / aero-platforms) and composes all that
@@ -60,15 +71,51 @@ export async function emitGenericDesign(
   envelope: BriefEnvelope,
 ): Promise<DesignJSON> {
   const slug = resolveClassGraphSlug(envelope.class)
-  const graph = await getClassReferenceGraphDBFirst(slug)
+  let graph = await getClassReferenceGraphDBFirst(slug)
+  // G4 provenance of the graph the skeleton derives from.
+  let graphProvenance = 'db-first/baked'
 
   if (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
-    throw new Error(
-      `generic emitter: no class-reference graph for class='${envelope.class}' ` +
-        `(resolved slug='${slug}'). Seed a graph in ` +
-        `src/lib/pdf-engine-v2/class-reference-graphs/ (or rely on bootstrap-on-miss) ` +
-        `before forcing the generic path.`,
-    )
+    // E6a bootstrap-on-miss (default ON for this registry-miss-only path).
+    const bootstrapEnabled = process.env.CLASS_GRAPH_BOOTSTRAP !== '0'
+    if (bootstrapEnabled) {
+      console.error(
+        `[generic-emitter] no class-reference graph for class='${envelope.class}' (resolved slug='${slug}') ` +
+          `— invoking E6a bootstrap-on-miss (corpus-first + one ${'google/gemini-3.5-flash'} harvest, G1 candidate store)`,
+      )
+      const boot = await bootstrapClassGraph(slug, brief, envelope)
+      if (boot.ok) {
+        graph = boot.graph
+        graphProvenance =
+          `${boot.provenance} (candidate_id=${boot.candidate.id}, version=${boot.candidate.version}, ` +
+          `status=${boot.candidate.status}, reused=${boot.candidate.reused}, attempts=${boot.attempts})`
+        console.error(
+          `[generic-emitter] graph BOOTSTRAPPED for slug='${boot.candidate.slug}': ` +
+            `${graph.nodes.length} nodes / ${graph.edges.length} edges — ${graphProvenance}. ` +
+            `Stored row stays 'candidate' (G1): NOT promoted to class_reference_graphs.`,
+        )
+      } else {
+        // G3: honest structured failure record — the chain keeps its exit-7.
+        throw new Error(
+          `generic emitter: no class-reference graph for class='${envelope.class}' (resolved slug='${slug}') ` +
+            `AND bootstrap-on-miss FAILED — honest bootstrap-failure record: ` +
+            JSON.stringify({
+              stage: boot.stage,
+              attempts: boot.attempts,
+              error: boot.error,
+              validation_errors: boot.validation_errors.slice(0, 10),
+            }) +
+            `. Fix: re-run (transient LLM failure), seed a graph in src/lib/pdf-engine-v2/class-reference-graphs/, ` +
+            `or inspect class_graph_candidates in ~/.forge-truth/forge-truth.db.`,
+        )
+      }
+    } else {
+      throw new Error(
+        `generic emitter: no class-reference graph for class='${envelope.class}' ` +
+          `(resolved slug='${slug}') and CLASS_GRAPH_BOOTSTRAP=0 disabled bootstrap-on-miss. ` +
+          `Seed a graph in src/lib/pdf-engine-v2/class-reference-graphs/ or re-enable the bootstrap.`,
+      )
+    }
   }
 
   // Tier A: union the real component lists for this class from the corpus
@@ -126,7 +173,7 @@ export async function emitGenericDesign(
     excluded_modules: [],
     rationale_excluded:
       `Generic emitter (wall-3 Phase-1): ${modules.length} modules derived from the ` +
-      `${graph.product_class} class-reference graph; ${corpusModules > 0 ? `component detail unioned from the corpus (${corpusModules} module group(s))` : 'component detail from the universal taxonomy floor'}; ` +
+      `${graph.product_class} class-reference graph [graph provenance: ${graphProvenance}]; ${corpusModules > 0 ? `component detail unioned from the corpus (${corpusModules} module group(s))` : 'component detail from the universal taxonomy floor'}; ` +
       `${links.length} cross-module links from graph edges + required-connection registry; ` +
       `${sizing.families.length > 0 ? `${sizing.sized} component words sized by sizing-family plug-in(s) [${sizing.families.join(', ')}] composing over the contract physics` : (sizingError ? `sizing-family layer reported a structured gap (${sizingError}) — structure left un-sized, gates will flag` : 'no sizing-family claims this class (Phase-1 baseline structure)')}. ` +
       `OPTIONAL modules the brief does not signal are pruned downstream by applyBriefScopeFilter; ` +
