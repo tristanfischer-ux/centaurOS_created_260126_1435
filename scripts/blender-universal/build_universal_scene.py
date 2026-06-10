@@ -503,43 +503,113 @@ PANEL_ARRAY_RE = re.compile(
 BATTERY_SYSTEM_RE = re.compile(
     r"\bcell\b|\bcells\b|\bbattery\b|\bbms\b|\bpcs\b|\binverter\b|\bbusbar\b",
     re.IGNORECASE)
+# Vocabulary that marks an AERO-BODY archetype (a flight vehicle — aircraft or
+# spacecraft — that flies in FREE SPACE, never sits in a skid/container/grow room).
+# This must WIN over the industrial rack/vessel markers for a HAPS solar aircraft
+# (whose BoM legitimately carries "battery"/"cell"/"module" words that would
+# otherwise pull it into rack_farm) and a satellite (whose "bus"/"module"/"panel"
+# would scatter as industrial boxes). Universal — keyed on part NAMES + module ids,
+# no per-class hand-coding.
+AERO_BODY_RE = re.compile(
+    r"fuselage|\bwing\b|empennage|\btail\s?boom\b|\bv-?tail\b|propeller|\brotor\b|"
+    r"airframe|nacelle|\bspar\b|aerostat|gondola|solar.?array|solar.?laminate|"
+    r"payload|\bbus\b|reaction.?wheel|thruster|antenna|deployable|satellite|"
+    r"spacecraft|avionics|aileron|elevon|gimbal|magnetorquer|star.?tracker|"
+    r"\bpitot\b|propellant|drag.?sail|\bnacelle\b|monocoque|flight.?control",
+    re.IGNORECASE)
+# Sub-type split: AIRCRAFT (a winged / propeller-driven / aerostat air vehicle)
+# vs SPACECRAFT (a bus-centred satellite with arrays/thrusters/reaction wheels).
+AERO_AIRCRAFT_RE = re.compile(
+    r"\bwing\b|fuselage|propeller|\brotor\b|empennage|aerostat|gondola|airframe|"
+    r"\bv-?tail\b|\btail\s?boom\b|nacelle|\bspar\b|\belevon\b|aileron|\bpitot\b|"
+    r"\bpylon\b|monocoque|landing.?skid", re.IGNORECASE)
+AERO_SPACECRAFT_RE = re.compile(
+    r"\bbus\b|reaction.?wheel|thruster|solar.?array|payload.?bay|deployable|"
+    r"satellite|spacecraft|magnetorquer|star.?tracker|propellant|drag.?sail|"
+    r"thrust.?tube|espa|separation.?ring|sun.?sensor|deorbit|\bxenon\b|hydrazine|"
+    r"radiator.?panel|\bmli\b", re.IGNORECASE)
+
+
+def detect_aero_subtype(parts, modules):
+    """Classify an AERO-BODY design as 'aircraft' or 'spacecraft' from the part
+    NAMES + the module display names/ids (universal — no per-class hand-coding).
+    Aircraft vocab (wing/fuselage/propeller/empennage/aerostat/airframe) vs
+    spacecraft vocab (bus/reaction-wheel/thruster/solar-array/satellite). Returns
+    (subtype, aircraft_hits, spacecraft_hits). Ties → 'aircraft' (a winged air
+    vehicle is the more common visual default; a true satellite always carries the
+    strong spacecraft markers and wins decisively)."""
+    blob_extra = " ".join(
+        f"{m.get('display_name') or ''} {m.get('module') or ''}" for m in (modules or []))
+    air = sum(1 for p in parts if AERO_AIRCRAFT_RE.search(str(p.name)))
+    spc = sum(1 for p in parts if AERO_SPACECRAFT_RE.search(str(p.name)))
+    # the module ids are a strong signal too (aerodynamic_wing / propulsion_motor_prop
+    # vs energy_conversion_transduction + the satellite_smallsat tells in names)
+    air += len(AERO_AIRCRAFT_RE.findall(blob_extra))
+    spc += len(AERO_SPACECRAFT_RE.findall(blob_extra))
+    subtype = "spacecraft" if spc > air else "aircraft"
+    return subtype, air, spc
 
 
 def detect_geometry_family(parts, modules):
-    """Return the geometry FAMILY for this design — 'panel_array', 'rack_farm' or
-    'process_plant' (aero_body is a later stub). Heuristic on the physical part
-    NAMES (universal — no per-class hand-coding):
+    """Return the geometry FAMILY for this design — 'aero_body', 'panel_array',
+    'rack_farm' or 'process_plant'. Heuristic on the physical part NAMES (universal
+    — no per-class hand-coding):
 
-      • panel_array (VF grow-rack) FIRST: when the GROW vocabulary dominates AND
-        the BATTERY-SYSTEM vocabulary does not — a vertical farm has grow-RACKS
-        but they are NOT battery racks. Testing the grow vocab here lets it WIN
-        over the generic "rack"/"module" token that would otherwise pull a VF into
-        rack_farm. We require grow_hits to beat BOTH the battery markers and the
-        process-vessel markers so a real plant/battery is never mis-routed.
+      • aero_body (FLIGHT VEHICLE) FIRST: when the aircraft/spacecraft vocabulary
+        leads. A HAPS solar aircraft + a satellite must read as real vehicles in
+        FREE SPACE, NOT as industrial boxes in a skid/container — and their BoM
+        carries "battery"/"cell"/"module"/"bus" words that would otherwise pull
+        them into rack_farm. So aero wins over the rack/vessel markers when its
+        vocabulary dominates (aero_hits beat BOTH the rack and the vessel markers).
+        Sub-type (aircraft vs spacecraft) drives the placer.
+      • panel_array (VF grow-rack): the GROW vocabulary dominates AND the
+        BATTERY-SYSTEM vocabulary does not — a vertical farm has grow-RACKS but
+        they are NOT battery racks.
       • rack_farm: the rack/cabinet vocabulary dominates the vessel/machine one
         (battery / server / switchgear rows).
       • process_plant: the default for any unknown archetype.
 
-    Logs the decision + counts. Deterministic + universal — no per-class branch."""
+    Logs the decision + counts (+ aero subtype). Deterministic + universal."""
+    aero_hits = sum(1 for p in parts if AERO_BODY_RE.search(str(p.name)))
     grow_hits = sum(1 for p in parts if PANEL_ARRAY_RE.search(str(p.name)))
     batt_hits = sum(1 for p in parts if BATTERY_SYSTEM_RE.search(str(p.name)))
     rack_hits = sum(1 for p in parts if RACK_FARM_RE.search(str(p.name)))
     proc_hits = sum(1 for p in parts if PROCESS_PLANT_RE.search(str(p.name)))
-    # panel_array wins when grow vocab leads and the design is clearly NOT a
-    # battery system (grow_hits > battery markers) and not a process plant.
-    if grow_hits > 0 and grow_hits > batt_hits and grow_hits >= proc_hits:
+    subtype = None
+    # aero_body wins when the flight-vehicle vocabulary leads BOTH the industrial
+    # rack and the process-vessel markers (so a real plant/battery/VF is never
+    # mis-routed to aero). A HAPS hits wing/fuselage/propeller/spar/solar-array
+    # many times over its 1-2 incidental "battery"/"cell" words; a satellite hits
+    # bus/reaction-wheel/thruster/antenna/array over its few generic boxes.
+    if aero_hits > 0 and aero_hits >= rack_hits and aero_hits >= proc_hits \
+            and aero_hits >= grow_hits:
+        family = "aero_body"
+        subtype, air_h, spc_h = detect_aero_subtype(parts, modules)
+    elif grow_hits > 0 and grow_hits > batt_hits and grow_hits >= proc_hits:
         family = "panel_array"
     elif rack_hits > proc_hits:
         family = "rack_farm"
     else:
         family = "process_plant"
-    print(f"[univ] geometry family = {family}  "
-          f"(grow/panel name matches = {grow_hits}, "
+    print(f"[univ] geometry family = {family}"
+          + (f" / {subtype}" if subtype else "") + "  "
+          f"(aero/flight-vehicle matches = {aero_hits}, "
+          f"grow/panel name matches = {grow_hits}, "
           f"battery-system matches = {batt_hits}, "
           f"rack/cabinet matches = {rack_hits}, "
           f"vessel/machine matches = {proc_hits}, "
           f"of {len(parts)} physical parts)")
+    if subtype:
+        print(f"[univ] aero subtype = {subtype} "
+              f"(aircraft markers = {air_h}, spacecraft markers = {spc_h})")
+    # stash the subtype module-level so main() can pass it to the placer without
+    # changing detect_geometry_family's single-return contract.
+    global _AERO_SUBTYPE
+    _AERO_SUBTYPE = subtype
     return family
+
+
+_AERO_SUBTYPE = None   # set by detect_geometry_family; read by main() at dispatch
 
 
 def qval(quantities, key, default=None):
@@ -3495,6 +3565,880 @@ def place_panel_array(parts, regions, topology, MAT, MO):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# AERO-BODY STRATEGY — aircraft + spacecraft (flight vehicles, 2026-06-10)
+# ───────────────────────────────────────────────────────────────────────────
+# The LAST of the four geometry families. Unlike process_plant / rack_farm /
+# panel_array — all of which sit equipment INSIDE a skid / container / grow room —
+# a flight vehicle flies in FREE SPACE. So aero_body builds NO skid frame and NO
+# enclosure: it renders the VEHICLE itself — a central fuselage/bus carrying its
+# wings / solar arrays / propellers / antennas / booms — on an OPTIONAL faint
+# ground plane (aircraft only; a satellite floats). The placer dispatches on the
+# detected SUBTYPE:
+#   • aircraft  → a long slender fuselage along +X, a high-aspect-ratio wing
+#     spanning ±Y mounted high, a tail/empennage aft, propulsion pods + propellers
+#     spread along the wing, thin solar cells tiled on the wing upper surface, a
+#     gondola/payload pod under the fuselage, landing skids; remaining classified
+#     parts (avionics / battery / payload / sensors / antennas) placed in/under/on
+#     the fuselage by their module + name role.
+#   • spacecraft → a central BUS box, two deployed solar-array wings on booms ±Y,
+#     antennas (dish + horns) on the nadir (−Z) face, reaction wheels / thrusters
+#     (copper cylinders) on the bus, payload optics on a face, deployable booms;
+#     remaining parts placed on/around the bus.
+# All geometry is millimetre-based (× fl.MM) like every other strategy. Objects are
+# named u_aero_* so apply_inspection_materials recolours them by role in INSPECT.
+# Same return tuple as the other strategies: (bbox, region_centres, frame_top_mm,
+# routed, unresolved). Deterministic + universal — sizes come from the contract
+# quantities (wingspan_m / chord_m / wing_area_m2 for the aircraft; mass_kg /
+# solar_array_area_m2 / radiator_area_m2 for the spacecraft) with sane fallbacks.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Module-level handoff of the contract quantities + subtype to place_aero_body
+# (set in main() right before dispatch), mirroring _RACKFARM_QUANTITIES so the
+# shared placer signature stays unchanged.
+_AERO_QUANTITIES = None
+
+# ── Aircraft (HAPS) geometry defaults (mm) — overridden by contract quantities ──
+AC_FUSELAGE_DIA_MM   = 620.0    # fuselage pod diameter (a touch fatter than the
+                                # 0.46 m template so the body reads against a 35 m wing)
+AC_WING_THICK_MM     = 130.0    # wing skin thickness (a readable high-aspect aerofoil)
+AC_WING_SPAN_FALLBACK_MM = 25000.0   # wingspan when the contract is silent
+AC_WING_CHORD_FALLBACK_MM = 1600.0   # wing chord when the contract is silent
+AC_FUS_LEN_FRAC      = 0.34     # fuselage length ≈ this × wingspan (slender body)
+AC_SOLAR_THICK_MM    = 18.0     # PV laminate thickness on the wing upper surface
+AC_PROP_DIA_MM       = 2000.0   # propeller disc diameter (large, reads at vehicle scale)
+AC_POD_DIA_MM        = 320.0    # motor-pod / nacelle diameter (substantial, legible)
+AC_N_PROPS_DEFAULT   = 6        # propeller count when no motor count is given
+
+# ── Spacecraft (satellite) geometry defaults (mm) ──
+SC_BUS_FALLBACK_MM   = 900.0    # bus cube side when no size derivable
+SC_PANEL_THICK_MM    = 28.0     # solar-array panel thickness
+SC_ARRAY_PANELS      = 3        # panels per array wing (per side)
+SC_BOOM_DIA_MM       = 70.0     # solar-array deploy boom diameter
+SC_DISH_DIA_MM       = 520.0    # high-gain dish diameter
+
+
+def _aero_mat(MAT, key, rgb, metallic=0.30, roughness=0.45, emission=0.0):
+    """Cache + return a shared aero material so repeated calls don't churn the
+    material list. Keyed u_aero_<key>."""
+    mk = f"u_aero_{key}"
+    if mk not in MAT:
+        MAT[mk] = fl.make_mat(f"m_aero_{key}", rgb, metallic=metallic,
+                              roughness=roughness, emission_strength=emission)
+    return MAT[mk]
+
+
+def _aero_palette(MAT):
+    """The shared aero-body material set (PRODUCTION render colours; the INSPECT
+    pass recolours u_aero_* by role separately). Light-grey skins, grey structure,
+    dark-blue solar, dark props, copper thrusters."""
+    return {
+        "skin":     _aero_mat(MAT, "skin",     (0.80, 0.82, 0.86), 0.25, 0.42),
+        "structure":_aero_mat(MAT, "structure",(0.55, 0.57, 0.61), 0.45, 0.40),
+        "solar":    _aero_mat(MAT, "solar",    (0.03, 0.06, 0.42), 0.20, 0.30),
+        "prop":     _aero_mat(MAT, "prop",     (0.05, 0.06, 0.09), 0.10, 0.42),
+        "antenna":  _aero_mat(MAT, "antenna",  (0.82, 0.84, 0.88), 0.30, 0.40),
+        "thruster": _aero_mat(MAT, "thruster", (0.72, 0.45, 0.20), 0.65, 0.35),
+        "payload":  _aero_mat(MAT, "payload",  (0.12, 0.14, 0.18), 0.30, 0.30),
+        "avionics": _aero_mat(MAT, "avionics", (0.22, 0.42, 0.78), 0.25, 0.40),
+        "radiator": _aero_mat(MAT, "radiator", (0.88, 0.89, 0.92), 0.20, 0.40),
+        "mli":      _aero_mat(MAT, "mli",      (0.86, 0.74, 0.30), 0.30, 0.45),
+        "skid":     _aero_mat(MAT, "skid",     (0.60, 0.62, 0.66), 0.55, 0.40),
+    }
+
+
+# Roles the remaining classified parts are binned into, by NAME, so a part lands
+# in a SENSIBLE place on the vehicle rather than scattered on a deck.
+_AERO_SENSOR_RE  = re.compile(r"sensor|imu|ins|pitot|air.?data|gnss|gps|star.?track|"
+                              r"sun.?sensor|camera|eo/?ir|imager|optical|lens|"
+                              r"\bvane\b|magnetometer", re.IGNORECASE)
+_AERO_ANTENNA_RE = re.compile(r"antenna|dish|transceiver|transmitter|helical|patch|"
+                              r"isoflux|satcom|s-?band|x-?band|comm|telemetry|"
+                              r"data.?link|rf\b", re.IGNORECASE)
+_AERO_AVIONICS_RE = re.compile(r"comput|avionic|controller|flight.?control|autopilot|"
+                               r"\bobc\b|\bfpga\b|processor|board|\bplc\b|"
+                               r"data.?handl|\bbus\b.?regulat|pcdu|\bcdh\b|"
+                               r"\becu\b|software|\bplc\b|encrypt|memory", re.IGNORECASE)
+_AERO_BATTERY_RE = re.compile(r"battery|\bcell\b|\bbms\b|\bpack\b|power.?module|"
+                              r"\bpcdu\b|\beps\b|\bpsu\b|regulat|converter|mppt|"
+                              r"isolation.?diode|isolation.?relay|contactor", re.IGNORECASE)
+_AERO_PAYLOAD_RE = re.compile(r"payload|instrument|imager|camera|sensor.?bench|"
+                              r"optical.?bench|\bmx-?\d", re.IGNORECASE)
+_AERO_THRUSTER_RE = re.compile(r"thruster|reaction.?wheel|magnetorquer|propellant|"
+                               r"\bppu\b|xenon|hydrazine|latch.?valve|flow.?control",
+                               re.IGNORECASE)
+
+
+def _qmm(quantities, key, default_mm):
+    """A length quantity in metres → mm, with a mm fallback. Reads the {value:…}
+    shape (or a bare number). Universal helper for the aero placers."""
+    v = qval(quantities, key)
+    return (v * 1000.0) if (v is not None and v > 0) else default_mm
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# AIRCRAFT (HAPS) — fuselage along +X, wing spanning ±Y, mounted high
+# ───────────────────────────────────────────────────────────────────────────
+
+def _aero_build_fuselage(cx, cz, length_mm, dia_mm, P, MO, mod="structure_containment"):
+    """A long slender fuselage along +X: a cylindrical centre body + a tapered
+    nose (−X) + a tapered tail cone (+X). Returns the fuselage extents + an anchor
+    dict for placing avionics/battery inside + the tail-attach point. All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    R = dia_mm / 2.0
+    ln = length_mm * 0.20      # nose
+    lt = length_mm * 0.24      # tail cone
+    lb = length_mm - ln - lt   # straight body
+    x0 = cx - length_mm / 2.0
+    body_xc = x0 + ln + lb / 2.0
+    # straight body (axis X)
+    fl.add_cyl("u_aero_fuselage_body", (body_xc * fl.MM, 0.0, cz * fl.MM),
+               R * fl.MM, lb * fl.MM, P["skin"], module=mod, module_objects=MO,
+               rotation=(0, math.radians(90), 0))
+    # nose cone (−X) + tail cone (+X)
+    fl.add_frustum("u_aero_fuselage_nose",
+                   ((x0 + ln / 2.0) * fl.MM, 0.0, cz * fl.MM),
+                   R * 0.30 * fl.MM, R * fl.MM, ln * fl.MM, P["skin"],
+                   module=mod, module_objects=MO, rotation=(0, math.radians(-90), 0))
+    fl.add_frustum("u_aero_fuselage_tail",
+                   ((x0 + ln + lb + lt / 2.0) * fl.MM, 0.0, cz * fl.MM),
+                   R * fl.MM, R * 0.18 * fl.MM, lt * fl.MM, P["skin"],
+                   module=mod, module_objects=MO, rotation=(0, math.radians(-90), 0))
+    return {
+        "x0": x0, "x1": x0 + length_mm, "R": R, "cz": cz,
+        "nose": (x0 + ln * 0.4, 0.0, cz),
+        "tail": (x0 + length_mm, 0.0, cz),
+        "body_x0": x0 + ln, "body_x1": x0 + ln + lb,
+        "belly": cz - R, "crown": cz + R,
+    }
+
+
+def _aero_build_wing(fus, span_mm, chord_mm, P, MO, mod="aerodynamic_wing"):
+    """A high-aspect-ratio wing spanning ±Y, mounted HIGH on the fuselage crown so
+    it visibly crosses the body as one continuous member. Skin box + two full-span
+    spar cylinders + tip caps. Returns the wing plane (z, chord centre, span) for
+    tiling solar cells + hanging propulsion pods. All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    # wing sits just above the fuselage crown (high-wing), at the fuselage mid-X
+    wx = (fus["body_x0"] + fus["body_x1"]) / 2.0
+    wz = fus["crown"] + AC_WING_THICK_MM * 0.4
+    skin = fl.add_box("u_aero_wing_skin", (wx * fl.MM, 0.0, wz * fl.MM),
+                      (chord_mm * fl.MM, span_mm * fl.MM, AC_WING_THICK_MM * fl.MM),
+                      P["skin"], module=mod, module_objects=MO)  # noqa: F841
+    # two spanwise spars (front + rear) running the full span
+    for j, cxo in enumerate((-chord_mm * 0.26, chord_mm * 0.24)):
+        fl.add_cyl(f"u_aero_wing_spar{j}",
+                   ((wx + cxo) * fl.MM, 0.0, (wz - 2.0) * fl.MM),
+                   AC_WING_THICK_MM * 0.34 * fl.MM, span_mm * 0.99 * fl.MM,
+                   P["structure"], module=mod, module_objects=MO,
+                   rotation=(math.radians(90), 0, 0))
+    # tip caps (winglet-ish end plates) so the span reads as a finished wing
+    for sy, side in ((-span_mm / 2.0, "L"), (span_mm / 2.0, "R")):
+        fl.add_box(f"u_aero_wing_tip_{side}",
+                   (wx * fl.MM, sy * fl.MM, (wz + AC_WING_THICK_MM * 0.6) * fl.MM),
+                   (chord_mm * 0.78 * fl.MM, AC_WING_THICK_MM * fl.MM,
+                    AC_WING_THICK_MM * 2.4 * fl.MM),
+                   P["structure"], module=mod, module_objects=MO)
+    return {"x": wx, "z": wz, "chord": chord_mm, "span": span_mm,
+            "le_x": wx - chord_mm / 2.0, "te_x": wx + chord_mm / 2.0,
+            "top_z": wz + AC_WING_THICK_MM / 2.0}
+
+
+def _aero_build_solar_on_wing(wing, n_cells_chord, P, MO, mod="solar_array_skin"):
+    """Tile thin dark-blue PV cells across the wing UPPER surface (the full-span
+    HAPS solar skin). One row of panels per chord band, panels stepped along the
+    span — AGGREGATED (we draw readable panels, not the thousands of laminate
+    cells). All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    span = wing["span"]
+    chord = wing["chord"]
+    z = wing["top_z"] + AC_SOLAR_THICK_MM / 2.0
+    n_span = max(8, int(span / 1800.0))          # panels along the span
+    panel_w = span / n_span * 0.94               # along Y
+    rows = max(1, int(n_cells_chord))
+    band = (chord * 0.84) / rows                  # along X (chord)
+    for r in range(rows):
+        xc = wing["x"] - chord * 0.42 + band * (r + 0.5)
+        for s in range(n_span):
+            yc = -span / 2.0 + span / n_span * (s + 0.5)
+            fl.add_box(f"u_aero_solar_r{r}_s{s}",
+                       (xc * fl.MM, yc * fl.MM, z * fl.MM),
+                       (band * 0.86 * fl.MM, panel_w * fl.MM, AC_SOLAR_THICK_MM * fl.MM),
+                       P["solar"], module=mod, module_objects=MO)
+
+
+def _aero_build_props(wing, fus, n_props, P, MO, mod="propulsion_motor_prop"):
+    """Distributed propulsion: N motor PODS hung on the wing leading edge, each
+    with a PROPELLER disc forward of it, spread symmetrically across the span (the
+    HAPS distributed-electric layout). Returns the list of pod anchors. All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    span = wing["span"]
+    n = max(2, int(n_props))
+    # symmetric span stations, skipping the very centre (fuselage) + the tips
+    usable = span * 0.86
+    pod_dia = AC_POD_DIA_MM
+    # props sit FORWARD of the leading edge + slightly BELOW wing level so they are
+    # NOT occluded by the wing skin in the iso/hero views (a tractor layout).
+    prop_z = wing["z"] - pod_dia * 0.5
+    le_x = wing["le_x"]
+    R = AC_PROP_DIA_MM / 2.0
+    anchors = []
+    for i in range(n):
+        frac = (i + 0.5) / n
+        yc = -usable / 2.0 + usable * frac
+        # motor pod (capsule along X) projecting FORWARD from under the leading edge
+        podx = le_x - pod_dia * 0.9
+        fl.add_cyl(f"u_aero_pod{i}", (podx * fl.MM, yc * fl.MM, prop_z * fl.MM),
+                   pod_dia / 2.0 * fl.MM, pod_dia * 2.2 * fl.MM, P["structure"],
+                   module=mod, module_objects=MO, rotation=(0, math.radians(90), 0))
+        # short pylon from the pod up to the wing leading edge (visible mount)
+        fl.add_box(f"u_aero_podpylon{i}",
+                   ((le_x) * fl.MM, yc * fl.MM,
+                    ((prop_z + wing["z"]) / 2.0) * fl.MM),
+                   (pod_dia * 0.5 * fl.MM, pod_dia * 0.5 * fl.MM,
+                    abs(wing["z"] - prop_z) * fl.MM),
+                   P["structure"], module=mod, module_objects=MO)
+        # PROPELLER: hub + 3 blades in the Y–Z plane (axis = X, a tractor prop),
+        # well forward of the pod nose so the full disc reads clear of the wing.
+        hub_x = podx - pod_dia * 1.6
+        fl.add_cyl(f"u_aero_prophub{i}", (hub_x * fl.MM, yc * fl.MM, prop_z * fl.MM),
+                   R * 0.12 * fl.MM, pod_dia * 0.7 * fl.MM, P["prop"],
+                   module=mod, module_objects=MO, rotation=(0, math.radians(90), 0))
+        for b in range(3):
+            theta = 2 * math.pi * b / 3.0
+            rmid = R * 0.52
+            yy = yc + rmid * math.cos(theta)
+            zz = prop_z + rmid * math.sin(theta)
+            fl.add_box(f"u_aero_propblade{i}_{b}",
+                       (hub_x * fl.MM, yy * fl.MM, zz * fl.MM),
+                       (R * 0.07 * fl.MM, R * 0.12 * fl.MM, R * 0.92 * fl.MM),
+                       P["prop"], module=mod, module_objects=MO,
+                       rotation=(math.radians(16), -theta, 0))
+        anchors.append((hub_x, yc, prop_z))
+    return anchors
+
+
+def _aero_build_tail(fus, P, MO, mod="aerodynamic_wing"):
+    """Twin tail booms extending aft (+X) from the wing region to a V-tail at the
+    end (the HAPS empennage). All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    boom_len = (fus["x1"] - fus["body_x1"]) + (fus["body_x1"] - fus["body_x0"]) * 0.45
+    boom_x0 = fus["body_x1"] - (fus["body_x1"] - fus["body_x0"]) * 0.10
+    boom_dia = AC_FUSELAGE_DIA_MM * 0.16
+    sep = AC_FUSELAGE_DIA_MM * 1.6     # boom separation in Y
+    end_x = boom_x0 + boom_len
+    for sy, side in ((-sep / 2.0, "L"), (sep / 2.0, "R")):
+        fl.add_cyl(f"u_aero_tailboom_{side}",
+                   ((boom_x0 + boom_len / 2.0) * fl.MM, sy * fl.MM, fus["cz"] * fl.MM),
+                   boom_dia / 2.0 * fl.MM, boom_len * fl.MM, P["structure"],
+                   module=mod, module_objects=MO, rotation=(0, math.radians(90), 0))
+        # canted V-tail fin at the boom end
+        fin_h = AC_FUSELAGE_DIA_MM * 1.7
+        fl.add_box(f"u_aero_vtail_{side}",
+                   (end_x * fl.MM, sy * fl.MM, (fus["cz"] + fin_h * 0.45) * fl.MM),
+                   (AC_FUSELAGE_DIA_MM * 1.5 * fl.MM, AC_WING_THICK_MM * 0.8 * fl.MM,
+                    fin_h * fl.MM), P["skin"], module=mod, module_objects=MO,
+                   rotation=(0, math.radians(0), math.radians(24 if sy < 0 else -24)))
+    # horizontal stabiliser tying the two booms at the tail
+    fl.add_box("u_aero_hstab",
+               (end_x * fl.MM, 0.0, fus["cz"] * fl.MM),
+               (AC_FUSELAGE_DIA_MM * 1.4 * fl.MM, (sep + AC_FUSELAGE_DIA_MM) * fl.MM,
+                AC_WING_THICK_MM * 0.7 * fl.MM), P["skin"],
+               module=mod, module_objects=MO)
+    return {"end": (end_x, 0.0, fus["cz"])}
+
+
+def _aero_build_gondola(fus, P, MO, mod="payload_thermal_imager"):
+    """A payload gondola/pod slung UNDER the fuselage belly (where the EO/IR
+    imager + science payload ride), + a pair of belly landing skids. Returns the
+    gondola anchor so payload parts cluster there. All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    R = fus["R"]
+    gx = (fus["body_x0"] + fus["body_x1"]) / 2.0 + R * 1.2
+    gz = fus["belly"] - R * 0.9
+    fl.add_cyl("u_aero_gondola", (gx * fl.MM, 0.0, gz * fl.MM),
+               R * 0.7 * fl.MM, R * 2.4 * fl.MM, P["payload"],
+               module=mod, module_objects=MO, rotation=(0, math.radians(90), 0))
+    # a gimbal ball at the gondola nose (the EO/IR turret)
+    fl.add_sphere("u_aero_gondola_turret",
+                  ((gx - R * 1.2) * fl.MM, 0.0, (gz - R * 0.2) * fl.MM),
+                  R * 0.5 * fl.MM, P["payload"], module=mod, module_objects=MO)
+    # belly landing skids (two longitudinal skis on short struts)
+    smod = "structure_containment"
+    if smod not in MO:
+        MO[smod] = []
+    for sy, side in ((-R * 0.8, "L"), (R * 0.8, "R")):
+        skid_z = fus["belly"] - R * 1.7
+        fl.add_cyl(f"u_aero_skid_{side}",
+                   ((fus["body_x0"] + fus["body_x1"]) / 2.0 * fl.MM, sy * fl.MM,
+                    skid_z * fl.MM),
+                   R * 0.10 * fl.MM, (fus["body_x1"] - fus["body_x0"]) * 0.7 * fl.MM,
+                   P["skid"], module=smod, module_objects=MO,
+                   rotation=(0, math.radians(90), 0))
+        for sxo in (-0.32, 0.32):
+            sx = (fus["body_x0"] + fus["body_x1"]) / 2.0 + sxo * (fus["body_x1"] - fus["body_x0"])
+            fl.add_cyl(f"u_aero_skidstrut_{side}_{sxo:+.2f}",
+                       (sx * fl.MM, sy * fl.MM, (fus["belly"] - R * 0.85) * fl.MM),
+                       R * 0.05 * fl.MM, R * 1.7 * fl.MM, P["skid"],
+                       module=smod, module_objects=MO)
+    return {"anchor": (gx, 0.0, gz)}
+
+
+def _aero_place_aircraft(parts, quantities, P, MO):
+    """Build the HAPS aircraft + bin the remaining classified parts onto it. Returns
+    (bbox_mm, region_centres, vehicle_anchors). Free-space — no skid frame."""
+    span = _qmm(quantities, "wingspan_m", AC_WING_SPAN_FALLBACK_MM)
+    chord = _qmm(quantities, "chord_m", AC_WING_CHORD_FALLBACK_MM)
+    fus_len = max(span * AC_FUS_LEN_FRAC, chord * 3.0)
+    cz = max(3000.0, span * 0.12)   # fly the vehicle above z=0 (free space)
+    # 1. fuselage
+    fus = _aero_build_fuselage(0.0, cz, fus_len, AC_FUSELAGE_DIA_MM, P, MO)
+    # 2. high-aspect wing
+    wing = _aero_build_wing(fus, span, chord, P, MO)
+    # 3. tail / empennage
+    tail = _aero_build_tail(fus, P, MO)
+    # 4. distributed propulsion pods + propellers. Count from the propeller words
+    #    (summing their quantity modifiers) — a HAPS "CF folding propeller ×6"
+    #    gives 6; clamp to a readable even 4-8. Default when the BoM is silent.
+    prop_qty = sum(p.qty for p in parts
+                   if re.search(r"propeller|brushless.?(drive.?)?motor|\besc\b",
+                                str(p.name), re.IGNORECASE))
+    if prop_qty >= 2:
+        n_props = max(4, min(8, prop_qty if prop_qty % 2 == 0 else prop_qty + 1))
+    else:
+        n_props = AC_N_PROPS_DEFAULT
+    prop_anchors = _aero_build_props(wing, fus, n_props, P, MO)
+    # 5. PV solar skin on the wing
+    _aero_build_solar_on_wing(wing, n_cells_chord=2, P=P, MO=MO)
+    # 6. payload gondola + landing skids
+    gond = _aero_build_gondola(fus, P, MO)
+
+    # ── bin the remaining classified parts onto the airframe by role ──
+    anchors = {"fuselage": fus, "wing": wing, "tail": tail, "gondola": gond,
+               "prop_anchors": prop_anchors}
+    _aero_bin_parts_aircraft(parts, fus, wing, gond, P, MO)
+
+    region_centres = {
+        "wing": (wing["x"], 0.0), "fuselage": ((fus["x0"] + fus["x1"]) / 2.0, 0.0),
+        "tail": (tail["end"][0], 0.0), "gondola": (gond["anchor"][0], 0.0),
+    }
+    # bbox from the actual built extents (span dominates Y; fuselage+tail dominate X)
+    bbox = {"x0": fus["x0"] - chord, "x1": tail["end"][0] + chord,
+            "y0": -span / 2.0 - chord, "y1": span / 2.0 + chord}
+    return bbox, region_centres, anchors, cz
+
+
+def _aero_bin_parts_aircraft(parts, fus, wing, gond, P, MO):
+    """Place each remaining classified part (the avionics / sensors / antennas /
+    battery / payload BoM that the airframe builders did not already represent) at
+    a SENSIBLE airframe station by its NAME role — small boxes/cylinders inside or
+    on the fuselage, under the nose, on the crown, or in the gondola — rather than
+    scattering them on a deck. Deterministic + universal (role regexes only)."""
+    R = fus["R"]
+    bx0, bx1 = fus["body_x0"], fus["body_x1"]
+    cz = fus["cz"]
+    # running cursors so multiple parts of a role stack neatly along the fuselage
+    cur = {"avionics": bx0 + (bx1 - bx0) * 0.20, "battery": bx0 + (bx1 - bx0) * 0.40,
+           "sensor": fus["nose"][0], "antenna": bx0 + (bx1 - bx0) * 0.30,
+           "payload": gond["anchor"][0], "other": bx0 + (bx1 - bx0) * 0.55}
+    step = max(120.0, (bx1 - bx0) * 0.06)
+    for p in parts:
+        nm = str(p.name)
+        # skip the structural/aero parts the builders already drew as the airframe
+        if re.search(r"\bwing\b|fuselage|\bspar\b|\brib\b|propeller|\bv-?tail\b|"
+                     r"tail.?boom|\bpylon\b|monocoque|\bskin\b|elevon|landing.?skid|"
+                     r"motor|nacelle|solar|pv\b|laminate|cart|trolley|console|"
+                     r"\bgcs\b|ground.?(station|dish)|basestation",
+                     nm, re.IGNORECASE):
+            continue
+        pref = _aero_part_prefix(p.name)
+        if _AERO_SENSOR_RE.search(nm):
+            role, x, y, z = "sensor", cur["sensor"], 0.0, fus["belly"] + R * 0.2
+            cur["sensor"] -= step * 0.5
+        elif _AERO_ANTENNA_RE.search(nm):
+            role, x, y, z = "antenna", cur["antenna"], 0.0, fus["crown"] + R * 0.5
+            cur["antenna"] += step
+        elif _AERO_BATTERY_RE.search(nm):
+            role, x, y, z = "battery", cur["battery"], 0.0, cz
+            cur["battery"] += step
+        elif _AERO_PAYLOAD_RE.search(nm):
+            role, x, y, z = "payload", cur["payload"], 0.0, gond["anchor"][2]
+            cur["payload"] += step * 0.6
+        elif _AERO_AVIONICS_RE.search(nm):
+            role, x, y, z = "avionics", cur["avionics"], 0.0, cz + R * 0.2
+            cur["avionics"] += step
+        else:
+            role, x, y, z = "other", cur["other"], R * 0.4, cz
+            cur["other"] += step
+        _aero_emit_part_glyph(pref, role, x, y, z, R, P, MO, p)
+
+
+def _aero_part_prefix(name):
+    """Object-name prefix for a binned aero part — distinct u_aero_p_ namespace so
+    the INSPECT recolour maps it by ROLE, and it never collides with the airframe
+    builders' fixed names."""
+    return "u_aero_p_" + re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")[:34]
+
+
+def _aero_emit_part_glyph(pref, role, x, y, z, R, P, MO, part):
+    """Emit ONE small glyph for a binned part: an antenna as a dish+mast, a sensor
+    as a small turret, a thruster/reaction-wheel as a copper cylinder, everything
+    else as a compact avionics box. Tagged to the part's own module. All mm."""
+    mod = part.module_id
+    if mod not in MO:
+        MO[mod] = []
+    if role == "antenna":
+        # a small dish on a short mast (HGA / patch antenna)
+        fl.add_cyl(pref + "_mast", (x * fl.MM, y * fl.MM, z * fl.MM),
+                   R * 0.04 * fl.MM, R * 0.7 * fl.MM, P["antenna"],
+                   module=mod, module_objects=MO)
+        dish = fl.add_sphere(pref + "_dish", (x * fl.MM, y * fl.MM, (z + R * 0.45) * fl.MM),
+                             R * 0.34 * fl.MM, P["antenna"], module=mod, module_objects=MO)
+        dish.scale = (1.0, 1.0, 0.32)
+    elif role == "sensor":
+        fl.add_cyl(pref + "_turret", (x * fl.MM, y * fl.MM, z * fl.MM),
+                   R * 0.22 * fl.MM, R * 0.30 * fl.MM, P["payload"],
+                   module=mod, module_objects=MO, rotation=(math.radians(90), 0, 0))
+        fl.add_sphere(pref + "_lens", (x * fl.MM, y * fl.MM, (z - R * 0.2) * fl.MM),
+                      R * 0.14 * fl.MM, P["payload"], module=mod, module_objects=MO)
+    elif role == "thruster":
+        fl.add_cyl(pref + "_body", (x * fl.MM, y * fl.MM, z * fl.MM),
+                   R * 0.16 * fl.MM, R * 0.4 * fl.MM, P["thruster"],
+                   module=mod, module_objects=MO)
+    elif role == "payload":
+        fl.add_box(pref + "_box", (x * fl.MM, y * fl.MM, z * fl.MM),
+                   (R * 0.7 * fl.MM, R * 0.7 * fl.MM, R * 0.6 * fl.MM), P["payload"],
+                   module=mod, module_objects=MO)
+    elif role == "battery":
+        fl.add_box(pref + "_tray", (x * fl.MM, y * fl.MM, z * fl.MM),
+                   (R * 0.6 * fl.MM, R * 1.2 * fl.MM, R * 0.5 * fl.MM), P["avionics"],
+                   module=mod, module_objects=MO)
+    else:  # avionics / other → a compact box
+        fl.add_box(pref + "_box", (x * fl.MM, y * fl.MM, z * fl.MM),
+                   (R * 0.55 * fl.MM, R * 0.7 * fl.MM, R * 0.45 * fl.MM), P["avionics"],
+                   module=mod, module_objects=MO)
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# SPACECRAFT (satellite) — central bus, deployed arrays ±Y, antennas on nadir
+# ───────────────────────────────────────────────────────────────────────────
+
+def _aero_build_bus(side_mm, P, MO, mod="structure_containment"):
+    """The central satellite BUS: a box body + a thrust-tube cylinder through its
+    centre (the primary load path) + an ESPA/separation ring at the −Z (launch)
+    face. Returns the bus extents + face anchors. cz floats the bus above z=0 so
+    the arrays/antennas have room. All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    cz = side_mm * 1.4          # float the bus above the ground plane (free space)
+    half = side_mm / 2.0
+    fl.add_box("u_aero_bus_body", (0.0, 0.0, cz * fl.MM),
+               (side_mm * fl.MM, side_mm * fl.MM, side_mm * fl.MM), P["mli"],
+               module=mod, module_objects=MO)
+    # thrust tube through the bus centre (axis Z)
+    fl.add_cyl("u_aero_bus_thrusttube", (0.0, 0.0, cz * fl.MM),
+               side_mm * 0.22 * fl.MM, side_mm * 1.02 * fl.MM, P["structure"],
+               module=mod, module_objects=MO)
+    # ESPA / separation ring at the −Z launch face
+    fl.add_cyl("u_aero_bus_sepring", (0.0, 0.0, (cz - half - side_mm * 0.08) * fl.MM),
+               side_mm * 0.30 * fl.MM, side_mm * 0.14 * fl.MM, P["structure"],
+               module=mod, module_objects=MO)
+    return {"cz": cz, "half": half, "side": side_mm,
+            "nadir": cz - half, "zenith": cz + half,
+            "plusY": half, "minusY": -half, "plusX": half, "minusX": -half}
+
+
+def _aero_build_solar_wings(bus, area_m2, P, MO, mod="energy_conversion_transduction"):
+    """Two DEPLOYED solar-array wings on booms either side (±Y) of the bus — thin
+    dark-blue panel stacks (the satellite's defining silhouette). Panel size from
+    the array area (split across the two wings × SC_ARRAY_PANELS panels). Returns
+    the array tip anchors. All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    side = bus["side"]
+    # total array area (m²) → per-panel size. Fall back to a sensible wing.
+    area_mm2 = (area_m2 * 1e6) if area_m2 and area_m2 > 0 else (side * side * 6.0)
+    n_panels_total = 2 * SC_ARRAY_PANELS
+    panel_area = area_mm2 / n_panels_total
+    panel_h = max(side * 0.9, math.sqrt(panel_area / 1.6))   # along Z (~aspect 1.6)
+    panel_w = max(side * 0.7, panel_area / panel_h)          # along Y (out from bus)
+    cz = bus["cz"]
+    tips = []
+    for sgn, side_tag in ((-1, "L"), (1, "R")):
+        # yoke / deploy boom out from the bus +Y/−Y face
+        boom_len = side * 0.6
+        boom_y0 = sgn * (bus["half"])
+        fl.add_cyl(f"u_aero_arrayboom_{side_tag}",
+                   (0.0, (boom_y0 + sgn * boom_len / 2.0) * fl.MM, cz * fl.MM),
+                   SC_BOOM_DIA_MM / 2.0 * fl.MM, boom_len * fl.MM, P["structure"],
+                   module="mass_fluid_transport_process", module_objects=MO,
+                   rotation=(math.radians(90), 0, 0))
+        y_inner = boom_y0 + sgn * boom_len
+        for k in range(SC_ARRAY_PANELS):
+            yc = y_inner + sgn * (panel_w * (k + 0.5) + panel_w * k * 0.04)
+            fl.add_box(f"u_aero_arraypanel_{side_tag}{k}",
+                       (0.0, yc * fl.MM, cz * fl.MM),
+                       (SC_PANEL_THICK_MM * fl.MM, panel_w * 0.95 * fl.MM,
+                        panel_h * fl.MM), P["solar"], module=mod, module_objects=MO)
+        tips.append((0.0, y_inner + sgn * panel_w * SC_ARRAY_PANELS, cz))
+    return {"tips": tips, "span": (panel_w * SC_ARRAY_PANELS + side) * 2.0,
+            "panel_h": panel_h}
+
+
+def _aero_build_antennas(bus, parts, P, MO, mod="control_compute_communication"):
+    """Communications antennas on the NADIR (−Z, Earth-facing) face: a high-gain
+    DISH + a couple of horn/patch antennas. Count taken from the antenna-named
+    parts (so the BoM is reflected) with a sensible minimum. All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    side = bus["side"]
+    nadir = bus["nadir"]
+    # high-gain dish on a short mast
+    fl.add_cyl("u_aero_hga_mast", (side * 0.18 * fl.MM, 0.0, (nadir - side * 0.18) * fl.MM),
+               side * 0.04 * fl.MM, side * 0.36 * fl.MM, P["antenna"],
+               module=mod, module_objects=MO)
+    dish = fl.add_sphere("u_aero_hga_dish",
+                         (side * 0.18 * fl.MM, 0.0, (nadir - side * 0.42) * fl.MM),
+                         SC_DISH_DIA_MM / 2.0 * fl.MM, P["antenna"],
+                         module=mod, module_objects=MO)
+    dish.scale = (1.0, 1.0, 0.30)
+    # two horn / patch antennas across the nadir face
+    for i, sx in enumerate((-side * 0.22, side * 0.0)):
+        fl.add_cyl(f"u_aero_horn{i}",
+                   (sx * fl.MM, side * 0.22 * fl.MM, (nadir - side * 0.12) * fl.MM),
+                   side * 0.07 * fl.MM, side * 0.2 * fl.MM, P["antenna"],
+                   module=mod, module_objects=MO, rotation=(0, 0, 0))
+    return {"hga": (side * 0.18, 0.0, nadir - side * 0.42)}
+
+
+def _aero_build_adcs_thrusters(bus, parts, P, MO):
+    """Reaction wheels + thrusters as small COPPER cylinders on the bus, plus the
+    propellant tank inside the bus footprint. Counts from the part names. All mm."""
+    side = bus["side"]
+    cz = bus["cz"]
+    amod = "control_compute_communication"
+    pmod = "mass_fluid_transport_process"
+    for m in (amod, pmod):
+        if m not in MO:
+            MO[m] = []
+    # 3-4 reaction wheels in a pyramid on the +Z deck (zenith)
+    n_rw = sum(p.qty for p in parts if re.search(r"reaction.?wheel", str(p.name), re.IGNORECASE))
+    n_rw = max(3, min(4, n_rw or 4))
+    for i in range(n_rw):
+        ang = 2 * math.pi * i / n_rw
+        rx = side * 0.22 * math.cos(ang)
+        ry = side * 0.22 * math.sin(ang)
+        fl.add_cyl(f"u_aero_reactionwheel{i}",
+                   (rx * fl.MM, ry * fl.MM, (bus["zenith"] - side * 0.12) * fl.MM),
+                   side * 0.10 * fl.MM, side * 0.12 * fl.MM, P["thruster"],
+                   module=amod, module_objects=MO)
+    # magnetorquer rods along two bus edges
+    for i, (ax, ay, rot) in enumerate(((1, 0, (0, math.radians(90), 0)),
+                                       (0, 1, (math.radians(90), 0, 0)))):
+        fl.add_cyl(f"u_aero_magnetorquer{i}",
+                   (0.0, 0.0, (cz + side * 0.30) * fl.MM),
+                   side * 0.03 * fl.MM, side * 0.7 * fl.MM, P["thruster"],
+                   module=amod, module_objects=MO, rotation=rot)
+    # thrusters on the −Z / corners (the EP + monoprop thrusters fire aft)
+    n_th = sum(p.qty for p in parts if re.search(r"thruster", str(p.name), re.IGNORECASE))
+    n_th = max(1, min(4, n_th or 2))
+    for i in range(n_th):
+        sx = (-1 if i % 2 == 0 else 1) * side * 0.32
+        sy = (-1 if i < 2 else 1) * side * 0.32
+        fl.add_cyl(f"u_aero_thruster{i}",
+                   (sx * fl.MM, sy * fl.MM, (bus["nadir"] + side * 0.02) * fl.MM),
+                   side * 0.05 * fl.MM, side * 0.16 * fl.MM, P["thruster"],
+                   module=pmod, module_objects=MO)
+        # a small nozzle bell on the −Z end
+        fl.add_frustum(f"u_aero_thrusterbell{i}",
+                       (sx * fl.MM, sy * fl.MM, (bus["nadir"] - side * 0.06) * fl.MM),
+                       side * 0.04 * fl.MM, side * 0.09 * fl.MM, side * 0.10 * fl.MM,
+                       P["thruster"], module=pmod, module_objects=MO,
+                       rotation=(0, 0, 0))
+    # propellant tank (sphere) inside the bus
+    fl.add_sphere("u_aero_propellant_tank", (0.0, 0.0, cz * fl.MM),
+                  side * 0.26 * fl.MM, P["structure"], module=pmod, module_objects=MO)
+
+
+def _aero_build_radiators(bus, parts, P, MO, mod="environmental_interface"):
+    """Body-mounted radiator panels on the ±X faces + a deorbit drag-sail stub on
+    the zenith deck (when present in the BoM). The thermal + EOL cues. All mm."""
+    if mod not in MO:
+        MO[mod] = []
+    side = bus["side"]
+    cz = bus["cz"]
+    for sgn, tag in ((-1, "minusX"), (1, "plusX")):
+        fl.add_box(f"u_aero_radiator_{tag}",
+                   ((sgn * (bus["half"] + side * 0.03)) * fl.MM, 0.0, cz * fl.MM),
+                   (side * 0.05 * fl.MM, side * 0.92 * fl.MM, side * 0.92 * fl.MM),
+                   P["radiator"], module=mod, module_objects=MO)
+    # deorbit drag sail (a thin square membrane on a short mast at zenith)
+    if any(re.search(r"drag.?sail|deorbit", str(p.name), re.IGNORECASE) for p in parts):
+        fl.add_box("u_aero_dragsail",
+                   (side * 0.6 * fl.MM, side * 0.6 * fl.MM, (bus["zenith"] + side * 0.5) * fl.MM),
+                   (side * 1.2 * fl.MM, side * 1.2 * fl.MM, 8.0 * fl.MM),
+                   P["mli"], module="safety_protection", module_objects=MO)
+
+
+def _aero_place_spacecraft(parts, quantities, P, MO):
+    """Build the satellite + bin remaining parts onto the bus. Returns
+    (bbox_mm, region_centres, vehicle_anchors, cz). Free-space — no enclosure."""
+    # bus side from mass (heavier ≈ bigger) with an array-area cross-check + fallback
+    mass = qval(quantities, "mass_kg") or qval(quantities, "total_system_mass_kg")
+    if mass and mass > 0:
+        # crude: a small-sat of M kg ≈ a bus of side ~ (M/120)^(1/3) m, clamped
+        side = max(600.0, min(2000.0, (mass / 120.0) ** (1.0 / 3.0) * 1000.0))
+    else:
+        side = SC_BUS_FALLBACK_MM
+    array_area = qval(quantities, "solar_array_area_m2")
+
+    bus = _aero_build_bus(side, P, MO)
+    arrays = _aero_build_solar_wings(bus, array_area, P, MO)
+    ant = _aero_build_antennas(bus, parts, P, MO)
+    _aero_build_adcs_thrusters(bus, parts, P, MO)
+    _aero_build_radiators(bus, parts, P, MO)
+
+    # bin remaining parts onto / around the bus faces
+    _aero_bin_parts_spacecraft(parts, bus, P, MO)
+
+    region_centres = {"bus": (0.0, 0.0), "array_L": (0.0, -arrays["span"] / 4.0),
+                      "array_R": (0.0, arrays["span"] / 4.0)}
+    span_y = arrays["span"]
+    bbox = {"x0": -side * 1.2, "x1": side * 1.2,
+            "y0": -span_y / 2.0 - side, "y1": span_y / 2.0 + side}
+    anchors = {"bus": bus, "arrays": arrays, "antennas": ant}
+    return bbox, region_centres, anchors, bus["cz"]
+
+
+def _aero_bin_parts_spacecraft(parts, bus, P, MO):
+    """Place the remaining classified satellite parts (avionics / sensors / battery
+    / payload that the bus builders did not already represent) ON the bus faces by
+    NAME role — sensors + payload optics on the zenith/sun-facing deck, avionics +
+    battery as boxes mounted to the bus walls — rather than scattering them. All
+    mm; deterministic + universal."""
+    side = bus["side"]
+    cz = bus["cz"]
+    half = bus["half"]
+    cur = {"sensor": -side * 0.3, "avionics": -side * 0.3, "battery": -side * 0.3,
+           "payload": -side * 0.3, "other": -side * 0.3}
+    step = side * 0.22
+    for p in parts:
+        nm = str(p.name)
+        # skip the parts the bus builders already drew
+        if re.search(r"\bbus\b.?structure|thrust.?tube|separation.?ring|espa|"
+                     r"solar.?(array|panel|cell)|array.?drive|yoke|hold-?down|"
+                     r"reaction.?wheel|magnetorquer|thruster|propellant|antenna|"
+                     r"dish|isoflux|high-?gain|transmitter|transceiver|radiator|"
+                     r"drag.?sail|heat.?pipe|\bmli\b|thermal.?strap|umbilical",
+                     nm, re.IGNORECASE):
+            continue
+        pref = _aero_part_prefix(p.name)
+        if _AERO_SENSOR_RE.search(nm) or _AERO_PAYLOAD_RE.search(nm):
+            # star trackers / sun sensors / optical bench on the zenith deck
+            role = "payload" if _AERO_PAYLOAD_RE.search(nm) else "sensor"
+            x, y, z = cur[role], side * 0.28, bus["zenith"] + side * 0.06
+            cur[role] += step
+        elif _AERO_BATTERY_RE.search(nm):
+            role = "battery"
+            x, y, z = cur["battery"], -half - side * 0.06, cz
+            cur["battery"] += step
+        else:
+            role = "avionics"
+            x, y, z = cur["avionics"], half + side * 0.06, cz
+            cur["avionics"] += step
+        _aero_emit_part_glyph(pref, role, x, y, z, side * 0.55, P, MO, p)
+
+
+# ── faint ground plane (aircraft only) ──────────────────────────────────────
+def _aero_build_ground_plane(bbox, base_z_mm, MO):
+    """A faint, large ground plane far BELOW an aircraft (optional context so the
+    vehicle doesn't float in a void). Named u_skid_* so INSPECT renders it as the
+    SAME faint wireframe the other families' skids use. A SATELLITE gets none (it
+    floats in space). Deterministic; geometry only."""
+    sid = STRUCTURE_MODULE_ID
+    if sid not in MO:
+        MO[sid] = []
+    cx = (bbox["x0"] + bbox["x1"]) / 2.0
+    cy = (bbox["y0"] + bbox["y1"]) / 2.0
+    w = (bbox["x1"] - bbox["x0"]) * 1.6
+    d = (bbox["y1"] - bbox["y0"]) * 1.6
+    plane_mat = fl.make_mat("m_aero_ground", (0.62, 0.64, 0.68),
+                            metallic=0.0, roughness=0.85)
+    fl.add_box("u_skid_aero_ground",
+               (cx * fl.MM, cy * fl.MM, base_z_mm * fl.MM),
+               (w * fl.MM, d * fl.MM, 40.0 * fl.MM), plane_mat,
+               module=sid, module_objects=MO)
+
+
+def _aero_route_topology(topology, parts, anchors, subtype, frame_top_mm, bbox,
+                         MAT, MO):
+    """Route the aero-body topology — mostly ELECTRICAL / DATA edges (solar → bus →
+    loads, payload → comms) — as thin CABLE RUNS / booms, NOT fluid pipe. Reuses the
+    overhead-rack router for orthogonal runs but at the VEHICLE scale. Endpoints
+    resolve against the vehicle anchors first (solar/array/wing → the array/wing
+    centroid; battery/bus/pack → the fuselage/bus centre; motor/propulsion → a prop
+    pod; antenna/comms/payload → the antenna/gondola), then fall back to the generic
+    part resolver. It is fine if FEWER edges resolve — we report the count. Returns
+    (routed, unresolved)."""
+    # Build a small role→point map from whichever vehicle was built.
+    role_pts = {}
+    if subtype == "aircraft":
+        fus = anchors["fuselage"]; wing = anchors["wing"]; gond = anchors["gondola"]
+        bus_pt = ((fus["body_x0"] + fus["body_x1"]) / 2.0, 0.0, fus["cz"])
+        role_pts = {
+            "solar": (wing["x"], 0.0, wing["top_z"]),
+            "array": (wing["x"], 0.0, wing["top_z"]),
+            "wing":  (wing["x"], 0.0, wing["top_z"]),
+            "battery": bus_pt, "pack": bus_pt, "bus": bus_pt,
+            "payload": gond["anchor"], "gondola": gond["anchor"],
+            "motor": (anchors["prop_anchors"][0] if anchors["prop_anchors"] else bus_pt),
+            "propuls": (anchors["prop_anchors"][0] if anchors["prop_anchors"] else bus_pt),
+            "antenna": (fus["body_x1"], 0.0, fus["crown"] + fus["R"]),
+        }
+        default_pt = bus_pt
+    else:
+        bus = anchors["bus"]; arrays = anchors["arrays"]; ant = anchors["antennas"]
+        bus_pt = (0.0, 0.0, bus["cz"])
+        role_pts = {
+            "solar": (arrays["tips"][0] if arrays["tips"] else bus_pt),
+            "array": (arrays["tips"][0] if arrays["tips"] else bus_pt),
+            "battery": bus_pt, "pack": bus_pt, "bus": bus_pt, "pcdu": bus_pt,
+            "eps": bus_pt, "payload": (0.0, bus["side"] * 0.28, bus["zenith"]),
+            "antenna": ant["hga"], "comms": ant["hga"], "transmit": ant["hga"],
+            "thruster": (0.0, 0.0, bus["nadir"]), "propuls": (0.0, 0.0, bus["nadir"]),
+        }
+        default_pt = bus_pt
+
+    # shared run elevation = just above the vehicle (the wing top / bus zenith),
+    # so the harness rises clear of the body then runs to the target — a real loom.
+    vehicle_top = (anchors["wing"]["top_z"] if subtype == "aircraft"
+                   else anchors["bus"]["zenith"])
+    rack_z = max(frame_top_mm, vehicle_top)
+
+    def _resolve(name):
+        low = str(name).lower()
+        for key, pt in role_pts.items():
+            if key in low and pt:
+                return pt
+        p = resolve_endpoint(name, parts)
+        if p is not None and p.placed_xyz_mm is not None:
+            return (p.placed_xyz_mm[0], p.placed_xyz_mm[1],
+                    p.anchors["top"][2] if p.anchors else p.placed_xyz_mm[2])
+        return default_pt
+
+    routed = 0
+    unresolved = []
+    for i, e in enumerate(topology):
+        frm = e.get("from_part", "")
+        to = e.get("to_part", "")
+        mech = e.get("mechanism", "electrical_bus")
+        a = _resolve(frm)
+        b = _resolve(to)
+        if a is None or b is None:
+            unresolved.append((frm, to, mech, ["unresolved"]))
+            print(f"[univ][aero] edge {i} UNRESOLVED ({mech}): {frm} -> {to}")
+            continue
+        # thin cable run on a shared elevation just above the vehicle
+        rz = rack_z + 1.0 * (routed % 3) * 80.0
+        waypoints = route_rack(a, b, rz)
+        nm = f"u_aero_route_{i}_{mech}"
+        try:
+            # aero edges are electrical/data → cable tray; only an explicit fluid/
+            # thermal loop (rare here) draws as a pipe.
+            if mech in ("fluid_loop", "thermal"):
+                colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
+                mkey = f"u_pipe_{mech}"
+                if mkey not in MAT:
+                    MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35,
+                                            roughness=0.35)
+                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM * 0.5, material=MAT[mkey],
+                                 flanges=False, module="mass_fluid_transport_process",
+                                 module_objects=MO)
+            else:
+                _draw_aero_cable(nm, waypoints, MAT, MO)
+            routed += 1
+            print(f"[univ][aero] routed edge {i} ({mech}): {frm} -> {to}")
+        except Exception as ex:  # noqa: BLE001
+            unresolved.append((frm, to, mech, [f"route_error:{ex}"]))
+            print(f"[univ][aero] edge {i} route FAILED: {ex}")
+    return routed, unresolved
+
+
+def _draw_aero_cable(nm, waypoints_mm, MAT, MO):
+    """A THIN copper cable run (round, slim) along the orthogonal waypoints — the
+    aero-scale harness between solar/bus/loads. Distinct from the fat industrial
+    cable tray; here the runs are slim wires on a flight vehicle. All mm."""
+    if "u_aero_cable" not in MAT:
+        MAT["u_aero_cable"] = fl.make_mat("m_aero_cable", (1.00, 0.50, 0.05),
+                                          metallic=0.45, roughness=0.40)
+    cab = MAT["u_aero_cable"]
+    for a, b in zip(waypoints_mm[:-1], waypoints_mm[1:]):
+        ax, ay, az = (float(c) for c in a)
+        bx, by, bz = (float(c) for c in b)
+        dx, dy, dz = bx - ax, by - ay, bz - az
+        ln = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if ln < 1.0:
+            continue
+        cx, cy, cz = (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2
+        if abs(dz) >= abs(dx) and abs(dz) >= abs(dy):
+            rot = (0, 0, 0)
+        elif abs(dx) >= abs(dy):
+            rot = (0, math.radians(90), 0)
+        else:
+            rot = (math.radians(90), 0, 0)
+        fl.add_cyl(f"{nm}_seg{int(cx)}_{int(cy)}_{int(cz)}",
+                   (cx * fl.MM, cy * fl.MM, cz * fl.MM),
+                   45.0 * fl.MM, ln * fl.MM, cab,
+                   module="mass_fluid_transport_process", module_objects=MO,
+                   rotation=rot)
+
+
+def place_aero_body(parts, regions, topology, MAT, MO, subtype=None):
+    """AERO-BODY strategy — a FLIGHT VEHICLE in FREE SPACE (no skid / container /
+    grow room). Dispatches on the detected SUBTYPE: 'aircraft' builds a HAPS-style
+    solar aircraft (fuselage + high-aspect wing + tail + distributed props + PV skin
+    + payload gondola + skids), 'spacecraft' builds a satellite (central bus +
+    deployed solar-array wings + nadir antennas + reaction wheels/thrusters +
+    radiators). The remaining classified parts are placed sensibly ON/IN the body
+    by their role. Topology routes as thin electrical/data CABLE runs/booms (not
+    fluid pipe); fewer edges may resolve — the count is reported. Same return tuple
+    as the other strategies: (bbox, region_centres, frame_top_mm, routed, unresolved)."""
+    quantities = _AERO_QUANTITIES or {}
+    subtype = subtype or "aircraft"
+    P = _aero_palette(MAT)
+
+    if subtype == "spacecraft":
+        bbox, region_centres, anchors, cz = _aero_place_spacecraft(
+            parts, quantities, P, MO)
+        print(f"[univ][aero] SPACECRAFT bus side ≈ "
+              f"{anchors['bus']['side']/1000:.2f} m, array span ≈ "
+              f"{anchors['arrays']['span']/1000:.1f} m; antennas on nadir face")
+        frame_top_mm = anchors["bus"]["zenith"] + anchors["bus"]["side"] * 0.6
+    else:
+        bbox, region_centres, anchors, cz = _aero_place_aircraft(
+            parts, quantities, P, MO)
+        wing = anchors["wing"]
+        print(f"[univ][aero] AIRCRAFT wingspan ≈ {wing['span']/1000:.1f} m, "
+              f"chord ≈ {wing['chord']/1000:.2f} m, fuselage along X; "
+              f"distributed props + PV wing skin")
+        # optional faint ground plane FAR below the aircraft (context, not a skid)
+        _aero_build_ground_plane(bbox, base_z_mm=-cz * 0.4, MO=MO)
+        frame_top_mm = wing["top_z"] + (bbox["x1"] - bbox["x0"]) * 0.05
+
+    # topology as thin cable runs / booms (electrical/data dominate)
+    routed, unresolved = _aero_route_topology(
+        topology, parts, anchors, subtype, frame_top_mm, bbox, MAT, MO)
+    print(f"[univ][aero] topology routed = {routed}/{len(topology)}; "
+          f"unresolved = {len(unresolved)}")
+    return bbox, region_centres, frame_top_mm, routed, unresolved
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Lighting + skid frame + main
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -3770,6 +4714,73 @@ def _inspect_panelarray_colour(name):
     return (0.74, 0.76, 0.80)
 
 
+# Flat-matte INSPECT colours for the AERO-BODY object families (keyed by the
+# u_aero_* object names). Fuselage/bus LIGHT GREY, wing/structure GREY, solar
+# panels DARK BLUE, propellers DARK, antennas LIGHT GREY, thrusters/reaction-wheels
+# COPPER, payload dark, avionics blue. MORE SPECIFIC keys MUST precede catch-alls
+# (every binned-part object starts u_aero_p_; detail keys like _dish/_lens are
+# substrings of the body names). Matched by substring on the object name, in order.
+_INSPECT_AERO = [
+    # ── solar (dark blue) — FIRST so it wins over any structure key ──
+    ("_solar",        (0.05, 0.08, 0.45)),   # aircraft wing PV cells = dark blue
+    ("_arraypanel",   (0.05, 0.08, 0.45)),   # satellite array panel = dark blue
+    ("_arrayboom",    (0.55, 0.57, 0.61)),   # array deploy boom = grey structure
+    # ── propellers / props (dark) ──
+    ("_propblade",    (0.05, 0.06, 0.09)),   # propeller blade = near-black
+    ("_prophub",      (0.10, 0.11, 0.14)),   # propeller hub = dark
+    ("_pod",          (0.55, 0.57, 0.61)),   # motor pod / nacelle = grey structure
+    # ── thrusters / reaction wheels / magnetorquers (copper) ──
+    ("_thrusterbell", (0.78, 0.50, 0.24)),   # thruster nozzle bell = copper
+    ("_thruster",     (0.72, 0.45, 0.20)),   # thruster body = copper
+    ("_reactionwheel",(0.74, 0.47, 0.22)),   # reaction wheel = copper
+    ("_magnetorquer", (0.74, 0.47, 0.22)),   # magnetorquer rod = copper
+    ("_propellant",   (0.62, 0.64, 0.68)),   # propellant tank = grey
+    # ── antennas (light grey) ──
+    ("_hga_dish",     (0.84, 0.86, 0.90)),   # high-gain dish = light grey
+    ("_hga_mast",     (0.78, 0.80, 0.84)),
+    ("_horn",         (0.82, 0.84, 0.88)),   # horn / patch antenna = light grey
+    ("_dish",         (0.84, 0.86, 0.90)),   # binned-part dish = light grey
+    ("_mast",         (0.78, 0.80, 0.84)),
+    # ── radiators / MLI / drag sail ──
+    ("_radiator",     (0.88, 0.89, 0.92)),   # radiator panel = near-white
+    ("_dragsail",     (0.86, 0.74, 0.30)),   # deorbit drag sail = gold MLI
+    # ── payload / sensors (dark) ──
+    ("_turret",       (0.12, 0.14, 0.18)),   # sensor turret = dark
+    ("_lens",         (0.08, 0.10, 0.14)),   # sensor / camera lens = darkest
+    ("_gondola",      (0.14, 0.16, 0.20)),   # payload gondola = dark
+    # ── landing skids (grey) ──
+    ("_skid",         (0.60, 0.62, 0.66)),   # landing skid / strut = grey
+    ("_skidstrut",    (0.60, 0.62, 0.66)),
+    # ── fuselage / bus bodies (LIGHT GREY) ──
+    ("_fuselage",     (0.80, 0.82, 0.86)),   # fuselage body / nose / tail = light grey
+    ("_bus_body",     (0.86, 0.74, 0.30)),   # satellite bus (MLI-wrapped) = gold
+    ("_bus_thrusttube",(0.55, 0.57, 0.61)),  # thrust tube = grey structure
+    ("_bus_sepring",  (0.55, 0.57, 0.61)),   # separation / ESPA ring = grey
+    # ── wing + tail + structure (grey) ──
+    ("_wing_skin",    (0.74, 0.77, 0.82)),   # wing skin = light steel grey
+    ("_wing_spar",    (0.55, 0.57, 0.61)),   # wing spar = grey structure
+    ("_wing_tip",     (0.60, 0.62, 0.66)),   # wing tip cap = grey
+    ("_vtail",        (0.74, 0.77, 0.82)),   # V-tail fin = light grey
+    ("_hstab",        (0.74, 0.77, 0.82)),   # horizontal stab = light grey
+    ("_tailboom",     (0.55, 0.57, 0.61)),   # tail boom = grey structure
+    ("_podpylon",     (0.55, 0.57, 0.61)),   # pod pylon = grey
+    # ── binned-part body glyphs (by role suffix) ──
+    ("_p_",           (0.30, 0.46, 0.80)),   # binned avionics/other box = blue
+]
+
+
+def _inspect_aero_colour(name):
+    """Flat-matte INSPECT colour for an aero-body object, by its name role. Falls
+    back to light grey for any unmatched u_aero_* helper. The binned-part role is
+    carried in the GLYPH suffix (_dish/_turret/_tray/_box) so a part lands on the
+    right colour even though its prefix is the part name."""
+    low = name.lower()
+    for key, rgb in _INSPECT_AERO:
+        if key in low:
+            return rgb
+    return (0.74, 0.76, 0.80)
+
+
 def apply_inspection_materials(parts):
     """Re-skin the whole scene for the CAD-inspection pass (NON-destructive to
     geometry — only materials change):
@@ -3881,6 +4892,20 @@ def apply_inspection_materials(parts):
             gr_colour = _inspect_panelarray_colour(nm)
             obj.data.materials.clear()
             obj.data.materials.append(_matte(gr_colour))
+            n_equip += 1
+            continue
+        # ── AERO-BODY geometry (u_aero_*) → flat matte by role: fuselage/bus light
+        #    grey, wing/structure grey, solar dark blue, props dark, antennas light
+        #    grey, thrusters copper. Covers BOTH the airframe builders' fixed names
+        #    AND the binned-part glyphs (u_aero_p_*). Routed aero cables (u_aero_route_)
+        #    keep their copper colour (matched by _p_? no — handled here as copper). ──
+        if nm.startswith("u_aero_"):
+            if nm.startswith("u_aero_route_"):
+                ar_colour = (1.00, 0.50, 0.05)   # cable harness = copper-orange
+            else:
+                ar_colour = _inspect_aero_colour(nm)
+            obj.data.materials.clear()
+            obj.data.materials.append(_matte(ar_colour))
             n_equip += 1
             continue
         # ── Equipment → flat matte colour by the owning part's TYPE ──
@@ -4154,15 +5179,21 @@ def main():
     MO = fl.make_module_dict(module_ids)
 
     # 4-6. GEOMETRY-FAMILY DISPATCH — pick + run the placement strategy:
-    #      panel_array (VF: rows of multi-tier grow racks + canopy + LED panels +
-    #      climate/nutrient BoP in a grow room), rack_farm (BESS: rows of racks in a
-    #      container + BoP lineup + bus/coolant runs), or process_plant (the default:
-    #      regions on an open skid + overhead pipe rack). All return the SAME tuple
-    #      so the INSPECT/PDF render below is common. aero_body is a later stub
-    #      (→ process_plant).
+    #      aero_body (FLIGHT VEHICLE: a HAPS aircraft or a satellite in FREE SPACE —
+    #      central fuselage/bus + wings/solar-arrays + props/thrusters + antennas, NO
+    #      skid/container), panel_array (VF: rows of multi-tier grow racks + canopy +
+    #      LED panels + climate/nutrient BoP in a grow room), rack_farm (BESS: rows of
+    #      racks in a container + BoP lineup + bus/coolant runs), or process_plant (the
+    #      default: regions on an open skid + overhead pipe rack). All return the SAME
+    #      tuple so the INSPECT/PDF render below is common.
     modules = state.get("moduleDecomposition", {}).get("modules", [])
     family = detect_geometry_family(parts, modules)
-    if family == "panel_array":
+    if family == "aero_body":
+        global _AERO_QUANTITIES
+        _AERO_QUANTITIES = quantities
+        bbox, region_centres, frame_h, routed, unresolved = place_aero_body(
+            parts, regions, topology, MAT, MO, subtype=_AERO_SUBTYPE)
+    elif family == "panel_array":
         global _PANELARRAY_QUANTITIES
         _PANELARRAY_QUANTITIES = quantities
         bbox, region_centres, frame_h, routed, unresolved = place_panel_array(
@@ -4213,6 +5244,7 @@ def main():
     print("[univ] SUMMARY "
           + json.dumps({
               "geometry_family": family,
+              "aero_subtype": _AERO_SUBTYPE,
               "physical_parts": len(parts),
               "dropped": len(dropped),
               "topology_total": len(topology),
