@@ -207,6 +207,7 @@ SECTIONS = [
     "executive_summary",
     "brief_requirements",
     "design_modules",
+    "engineering_basis",
     "engineering_calcs",
     "bom",
     "cost_analysis",
@@ -252,6 +253,7 @@ Criteria for each:
 - executive_summary: 3-paragraph narrative (product description / design outcome / next steps), not just a table
 - brief_requirements: quantified performance targets, regulatory standards, measurable KPIs
 - design_modules: the build module by module — domain-correct subsystems with functional descriptions, per-sub-module bill of materials + equipment selection, sub-module integration, system renders (the worked maths is in the separate Engineering Calculations section; do not penalise its absence here)
+- engineering_basis: the Part 1 engineering foundation — process/block flow diagram, mass & energy balance table, and the feasibility verdict + headline economics (levelised cost / ex-works CAPEX / lifecycle carbon); a reader should grasp the whole design's engineering basis and whether it physically/economically closes
 - engineering_calcs: worked first-principles calculations that size the plant, grouped by module/sub-module, every number checkable by hand
 - bom: complete BOM with parts, quantities, unit costs, suppliers, MPNs (not TBD), grade quality
 - cost_analysis: total unit cost vs ceiling, cost breakdown by module, credibility of estimates
@@ -271,6 +273,7 @@ Return ONLY a JSON object (no code fences, no backticks):
   "executive_summary": <int or null>,
   "brief_requirements": <int or null>,
   "design_modules": <int or null>,
+  "engineering_basis": <int or null>,
   "engineering_calcs": <int or null>,
   "bom": <int or null>,
   "cost_analysis": <int or null>,
@@ -369,6 +372,13 @@ _HEADER_SIGNATURES: dict[str, list[str]] = {
     # "ENGINEERING CALCULATIONS"; bucket the relocated worked maths into its own
     # section (scored on its own merits), NOT design_modules. No "·MODULE" token,
     # so it never collides with the design_modules signature above.
+    # Part 1 Engineering Basis page (2026-06-10): verified renderer banner
+    # "Part 1 · Engineering Basis" @ render-minimal-pdf.tsx:15638 → de-spaced
+    # "PART1·ENGINEERINGBASIS". Scored as its OWN section (process flow + mass/
+    # energy balance + feasibility verdict + headline economics) — previously the
+    # whole front page was UNSCORED because no signature matched. No "·MODULE"
+    # token and distinct from "ENGINEERINGCALCULATIONS", so no section collision.
+    "engineering_basis":  ["ENGINEERINGBASIS"],
     "engineering_calcs":  ["ENGINEERINGCALCULATIONS"],
     # "bom" is the parts-level Bill of Materials (the master parts table). Its running
     # header is "BILL OF MATERIALS" (de-spaced "BILLOFMATERIALS"). 2026-06-09: the
@@ -424,8 +434,20 @@ _HEADER_SIGNATURES: dict[str, list[str]] = {
 # on these is exactly the false-PASS this fix exists to prevent.
 HARD_SECTIONS = {
     "executive_summary", "brief_requirements", "design_modules",
+    # Part-1 engineering is pass-blocking (2026-06-10 Phase 0): a dossier that
+    # fails to render a real Engineering Basis or Engineering Calculations section
+    # must NOT pass — this is THE section the engine exists to produce well.
+    "engineering_basis", "engineering_calcs",
     "bom", "cost_analysis", "sourcing_strategy", "feasibility_notes",
 }
+
+
+# Sections that must score an HONEST NULL when genuinely absent, never a
+# positional cover-page fallback. The Part-1 engineering sections: a dossier that
+# never rendered an Engineering Basis / Engineering Calculations page must FAIL
+# (both are HARD_SECTIONS) rather than score the cover page as "engineering" — the
+# CO2-v7 mis-page bug (drawer 2026-06-04). 2026-06-10 Phase 0.
+NULL_IF_ABSENT = {"engineering_basis", "engineering_calcs"}
 
 
 def _despace_upper(s: str) -> str:
@@ -433,6 +455,28 @@ def _despace_upper(s: str) -> str:
     upper-case, so the renderer's letter-spaced 'S E C T I O N 2' and the plain
     'SECTION 2' both collapse to 'SECTION2'."""
     return "".join(s.split()).upper()
+
+
+def _assert_part1_signatures_match() -> None:
+    """Invariant (2026-06-10 Phase 0): the Part-1 engineering section signatures
+    MUST match the renderer's actual running-header banners, or the section
+    silently mis-maps (the CO2-v7 0.00 mis-page class of bug). The renderer banners
+    are fixed strings in render-minimal-pdf.tsx (Engineering Basis @ :15638,
+    Engineering Calculations @ :15249). If a banner is renamed, update BOTH the
+    renderer PageHeader and the signature here — this assert fails loudly until they
+    agree, so iter-N catches iter-(N+1)."""
+    renderer_banners = {
+        "engineering_basis": "Part 1 · Engineering Basis",
+        "engineering_calcs": "Part 1 · Engineering Calculations",
+    }
+    for section, banner in renderer_banners.items():
+        hdr = _despace_upper(banner)
+        sigs = _HEADER_SIGNATURES.get(section, [])
+        assert any(sig in hdr for sig in sigs), (
+            f"scorer signature drift: section '{section}' signatures {sigs} do not "
+            f"match renderer banner '{banner}' (de-spaced '{hdr}'). Update "
+            f"_HEADER_SIGNATURES or the renderer PageHeader."
+        )
 
 
 def build_section_page_map(pdf_path: Path, num_pages: int) -> dict[str, list[int]]:
@@ -578,8 +622,13 @@ def select_section_pages(
 
     pages = [p for p in section_map.get(section, []) if 1 <= p <= num_pages]
     if not pages:
-        # last-ditch: cover page so the model at least returns a (low) score
-        return [1]
+        # The Part-1 engineering sections must NEVER positionally fall back to the
+        # cover (CO2-v7 mis-page bug): a genuinely-absent engineering section scores
+        # an HONEST null (empty list → no model scores it → 0 models), and because
+        # both are HARD_SECTIONS that forces a FAIL — the engine must not pass on
+        # engineering it never rendered. Other sections keep the cover last-ditch so
+        # the model still returns a (low) score. 2026-06-10 Phase 0.
+        return [] if section in NULL_IF_ABSENT else [1]
     return _sample_pages(pages, MAX_IMAGES_PER_SECTION)
 
 
@@ -975,6 +1024,7 @@ def score_pdf_per_section(
     Image subsets are cached per (page-tuple) so identical page sets (e.g. bom and
     cost_analysis both reading the COST BY MODULE pages) don't double-encode.
     """
+    _assert_part1_signatures_match()  # fail loud if a Part-1 banner/signature drifts
     num_pages = len(all_pngs)
     section_map = build_section_page_map(pdf_path, num_pages)
 
