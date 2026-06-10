@@ -1,6 +1,24 @@
 # Universal Engineering (Part 1) + Universal Blender (Part 2) — Build Plan
 
-**Author:** Claude (Opus 4.8) · **Date:** 2026-06-10 · **Status:** DRAFT for Tristan's review/re-sequencing — no code has landed.
+**Author:** Claude (Opus 4.8) · **Date:** 2026-06-10 · **Status:** IN BUILD — Phase 0 + Phase 1-grounding + Phase 3 (4 families) landed, tested, **deployed**.
+
+---
+
+## ▶ RESUME HERE (2026-06-10, written before a compaction)
+
+**Mission:** universal, physics-first engine — ≥9 on EVERY engineering section for ANY archetype, self-correcting. Diagnosis + scope: mempalace drawer `forgeos_decisions_c9fd2af014689501`. Gotchas to load: `…8f461538…` (this doc's D4 set is MISLABELLED — thruster/satellite/edge-ai are hand-wired; only the deployable antenna tests the spine), `…7924b6b8…` (registered ≠ ≥9; cost-sanity input-power-denominator bug on propulsion), `…b7294b96…` (origin not always green; tsx-harness↔jest glob collision).
+
+**DONE this session — git `main @ e4b8f0c3c`, pushed + DEPLOYED (all off-by-default, no prod behaviour change until flags flip):**
+- **Phase 0** ✅ — `engineering_basis` scored + both engineering sections in `HARD_SECTIONS` + empty→null (`scripts/score-radical-pdfs-multimodal.py`); **gate-36** Part-1 completeness halts a hollow Part 1 (`src/lib/pdf-engine-v2/lib/part-one-completeness-audit.ts`; enforce flag `PART_ONE_COMPLETENESS_ENFORCING`, default off).
+- **Phase 1 grounding** ✅ — auto-planner writes real tool outputs → contract (`scripts/lib/orchestrator/part-one-grounding.ts` + `auto-plan-fallback.ts`); flag `UNIVERSAL_AUTO_PLAN_GROUND` (default off).
+- **Phase 3 sizing** ✅ (4 families) — `scripts/lib/orchestrator/generic/sizing.ts`: `battery`, `process_plant`, `thermal_rejection`, `spacecraft`. Geometry is **derived FROM the calc** (`vesselDimsFromVolume`/`radiatorDimsFromHeat`/`solarArrayDimsFromPower`). An UNMAPPED class → **UNION** of all families (each rule param-gated). Tests: `generic/sizing-phase3.test.tsx` (12).
+
+**NEXT — do in this order:**
+1. **Phase 2 — feature-derived applicability** (the right tools fire for an unseen class). SAFE/ADDITIVE design: each tool's `applicable_to(envelope)` returns true if `(class ∈ its allowlist — preserves every registered class)` OR `(a physical-feature predicate matches)`. Add a shared feature-predicate layer + a manifest `applicable` field so the auto-planner (`auto-plan-fallback.ts`) AND the executor (`executor.ts` ~line 129 — currently NO applicability check on the auto-plan path) honour it. This excludes domain-wrong tools (the compute_heat spacecraft-radiator / satellite £23M misfire). ~138 wrappers in `scripts/lib/orchestrator/tools/`.
+2. **Phase 3 cont.** — add `power_electronics`, `structural`, `rotating_machine` families to `generic/sizing.ts` (same param-gated, geometry-from-calc pattern); extend `sizing-phase3.test.tsx`.
+3. Phase 4 (universal mass/energy-balance table + auto-flow-diagram — de-CO₂-hardcode `render-minimal-pdf.tsx` ~`:15526`), Phase 5 (Blender compiler consuming the dims — wire the orphaned `generate-blender-scene.tsx::buildDigest` into the chain at `serial-design-chain-v2.tsx:5693`), Phase 6 (pixel render-gate + scale lighting).
+
+**Increment discipline:** build → co-located jest `.test.tsx` → `npx jest <path>` + `npx eslint --quiet <files>` → commit w/ a `regression-harness:` line → push (=deploy; off-by-default is safe). NEVER `git add -A`. **Validate universality on a TRULY-UNREGISTERED class (deployable antenna or a new slug), NOT the hand-wired thruster/satellite/edge-ai.** Chain run: `PA_PIPELINE=true RADICAL_PHASE_3_PER_MODULE=true npx tsx scripts/serial-design-chain-v2.tsx <brief.md> <out-dir>`.
 
 **The goal (Tristan, verbatim intent):**
 1. The **Part 1 engineering section** (Engineering Basis → Brief Provenance → System Overview → Engineering Calculations) must score a consistent **≥9**, using **deterministic physics**, with the system **automatically selecting the right tools** — for *every* form factor / archetype (battery storage, drones, cubesats, anything).
