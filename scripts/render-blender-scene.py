@@ -53,6 +53,17 @@ CLASS_TO_TEMPLATE: dict[str, str] = {
     "wearable_medical_device": "cgm-9shot.py",
     "edge_ai": "edge-ai-9shot.py",
     "edge-ai": "edge-ai-9shot.py",
+    # Modular ~1 kW AI-inference compute-heat brick (added 2026-06-07). Bespoke
+    # template models a sealed 0.30 x 0.45 x 0.55 m desktop brick: vertical compute
+    # PCB (accelerator + copper cold-plate + NVMe + RJ45/Starlink) + AC-DC PSU +
+    # sealed coolant loop (cold-plate -> pump -> reservoir) + brazed-plate heat
+    # exchanger with host water quick-connects + dry-cooler radiator + top fan +
+    # 13 A inlet / RCBO / surge / MID revenue meter + leak safety + front status
+    # display + service panel. Keyed on the underscore substring "compute_heat",
+    # which the classifier's "compute_heat_module" product_class contains; no other
+    # key (heat_pump / heatpump / etc.) is a substring of compute_heat_module.
+    "compute_heat_module": "compute-heat-module-9shot.py",
+    "compute_heat": "compute-heat-module-9shot.py",
     "ev_charger": "ev-charger-9shot.py",
     "ev-charger": "ev-charger-9shot.py",
     "dc_fast_ev_charger": "ev-charger-9shot.py",

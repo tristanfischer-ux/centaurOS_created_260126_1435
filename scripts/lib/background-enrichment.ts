@@ -59,22 +59,49 @@ import { createHash } from 'crypto'
 // we touch ALSO gets a supplier_embeddings row so it is semantically
 // searchable. Shared with persist-web-fallback.ts.
 import { upsertSupplierEmbedding } from '../supplier-enrichment/embed-supplier'
+// Shared MPN-shape predicate — the verify leg's POISON GUARD compares
+// normaliseMpn(returned) === normaliseMpn(proposed). Same module the chain
+// (Stage 10.6) + gate 20 use, so all three agree on equality.
+import { normaliseMpn } from './mpn-shape'
+
+// ---------------------------------------------------------------------------
+// Entry-point detection. This file is BOTH an executable (detached post-chain
+// enrichment job) AND a library (the chain imports verifyProposedParts for the
+// Stage 10.6 synchronous part-verification leg). When IMPORTED, none of the
+// script bootstrap below — argv parse, real-DB open + migrations, prepared
+// statements, main() — must fire; importing only needs the exported library
+// functions + the Brave/embedding helpers. The script bootstrap is gated on
+// IS_MAIN (same idiom as fictional-pn-audit.ts). verifyProposedParts is fully
+// self-contained: it opens its OWN DB handle from opts.dbPath and never touches
+// the script singletons below, so the test + the chain reach it without the
+// real forge-truth.db ever being opened.
+// ---------------------------------------------------------------------------
+
+const IS_MAIN = /background-enrichment\.(?:ts|js|mjs|cjs)$/.test(process.argv[1] ?? '')
 
 // ---------------------------------------------------------------------------
 // CLI args + env loading (mirror chain's pattern so detached child has keys)
 // ---------------------------------------------------------------------------
 
-const argv = process.argv.slice(2)
-if (argv.length < 2) {
-  console.error('Usage: background-enrichment.ts <state.json> <outDir>')
-  process.exit(1)
-}
-const STATE_PATH = resolve(argv[0])
-const OUT_DIR = resolve(argv[1])
+// Script-only bindings (assigned in the IS_MAIN bootstrap below; left undefined
+// on import — every consumer of them runs only via main(), which is itself
+// IS_MAIN-gated).
+let STATE_PATH = ''
+let OUT_DIR = ''
 
-if (!existsSync(STATE_PATH)) {
-  console.error(`[background-enrichment] state file missing: ${STATE_PATH}`)
-  process.exit(1)
+if (IS_MAIN) {
+  const argv = process.argv.slice(2)
+  if (argv.length < 2) {
+    console.error('Usage: background-enrichment.ts <state.json> <outDir>')
+    process.exit(1)
+  }
+  STATE_PATH = resolve(argv[0])
+  OUT_DIR = resolve(argv[1])
+
+  if (!existsSync(STATE_PATH)) {
+    console.error(`[background-enrichment] state file missing: ${STATE_PATH}`)
+    process.exit(1)
+  }
 }
 
 // Load env from the same places the chain does. Detached children don't
@@ -126,7 +153,8 @@ const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || ''
 // ---------------------------------------------------------------------------
 
 const DB_PATH = resolve(homedir(), '.forge-truth/forge-truth.db')
-const LOG_PATH = resolve(OUT_DIR, 'background-enrichment.jsonl')
+// Script-only — assigned in the IS_MAIN bootstrap once OUT_DIR is known.
+let LOG_PATH = ''
 const RUNTIME_CAP_MS = 600_000 // hard 10 min ceiling
 const BRAVE_ENDPOINT = 'https://api.search.brave.com/res/v1/web/search'
 const BRAVE_INTER_CALL_MS = 1_100 // free-tier rate-limit gate
@@ -173,13 +201,19 @@ function timedOut(): boolean {
 
 // ---------------------------------------------------------------------------
 // DB open + schema migration (idempotent — IF NOT EXISTS pattern)
+//
+// SCRIPT-ONLY: the real forge-truth.db handle, its migrations, prepared
+// statements and the synthetic doc id are all gated behind IS_MAIN (assigned by
+// bootstrapScriptDb() at the bottom of the file). On IMPORT none of this runs —
+// verifyProposedParts opens its OWN handle from opts.dbPath, so the real DB is
+// never touched by the chain's import or by the unit test.
 // ---------------------------------------------------------------------------
 
-const db = new Database(DB_PATH)
-db.pragma('journal_mode = WAL')
-db.pragma('busy_timeout = 5000')
+let db: Database.Database | null = null
+let CHAIN_REVIEW_DOC_ID = 1
 
 function ensureColumn(table: string, col: string, type: string) {
+  if (!db) return
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
   if (!cols.find((c) => c.name === col)) {
     db.prepare(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`).run()
@@ -187,56 +221,71 @@ function ensureColumn(table: string, col: string, type: string) {
   }
 }
 
-// companies columns the supplier-enrichment payload needs.
-ensureColumn('companies', 'capability', 'TEXT')
-ensureColumn('companies', 'materials_handled', 'TEXT')
-ensureColumn('companies', 'founded_year', 'INTEGER')
-ensureColumn('companies', 'employee_band', 'TEXT')
-ensureColumn('companies', 'revenue_band', 'TEXT')
-ensureColumn('companies', 'geographic_reach', 'TEXT')
-ensureColumn('companies', 'recent_news', 'TEXT')
-ensureColumn('companies', 'enriched_at', 'TEXT')
-// certifications already exists on companies (column index 14, default-NULL).
-// Reuse rather than adding a duplicate column.
+function bootstrapScriptDb(): void {
+  // OUT_DIR is set by the IS_MAIN argv block; the JSONL log lives beside it.
+  LOG_PATH = resolve(OUT_DIR, 'background-enrichment.jsonl')
+  db = new Database(DB_PATH)
+  db.pragma('journal_mode = WAL')
+  db.pragma('busy_timeout = 5000')
 
-// pretraining_extracted_parts: source_doc_id may exist; ensure idempotency
-// columns + UNIQUE INDEX on (manufacturer, part_number) so re-runs are no-ops.
-ensureColumn('pretraining_extracted_parts', 'source_doc_id', 'TEXT')
-ensureColumn('pretraining_extracted_parts', 'discovered_at', 'TEXT')
-ensureColumn('pretraining_extracted_parts', 'discovery_source', 'TEXT')
+  // companies columns the supplier-enrichment payload needs.
+  ensureColumn('companies', 'capability', 'TEXT')
+  ensureColumn('companies', 'materials_handled', 'TEXT')
+  ensureColumn('companies', 'founded_year', 'INTEGER')
+  ensureColumn('companies', 'employee_band', 'TEXT')
+  ensureColumn('companies', 'revenue_band', 'TEXT')
+  ensureColumn('companies', 'geographic_reach', 'TEXT')
+  ensureColumn('companies', 'recent_news', 'TEXT')
+  ensureColumn('companies', 'enriched_at', 'TEXT')
+  // certifications already exists on companies (column index 14, default-NULL).
+  // Reuse rather than adding a duplicate column.
 
-// NOTE: pretraining_extracted_parts already contains ~400 case-insensitive
-// duplicate (manufacturer, part_number) groups from the historical distributor
-// ingest sweep. A UNIQUE INDEX would FAIL at creation against the existing
-// data. We rely on the `partExistsStmt` pre-check below for idempotency
-// instead. Future cleanup (separate task) could de-dup the table and add the
-// index then. The pre-check is sufficient for our use-case: each chain run
-// adds at most a handful of new parts, and each is looked up before insert.
+  // pretraining_extracted_parts: source_doc_id may exist; ensure idempotency
+  // columns + UNIQUE INDEX on (manufacturer, part_number) so re-runs are no-ops.
+  ensureColumn('pretraining_extracted_parts', 'source_doc_id', 'TEXT')
+  ensureColumn('pretraining_extracted_parts', 'discovered_at', 'TEXT')
+  ensureColumn('pretraining_extracted_parts', 'discovery_source', 'TEXT')
 
-// pretraining_extracted_parts requires a non-NULL document_id with a FK to
-// pretraining_spec_documents.id. We get-or-create a single "chain_review"
-// synthetic document row up-front and reuse its id for every part we INSERT.
-const CHAIN_REVIEW_DOC_ID: number = (() => {
-  try {
-    const row = db.prepare(`
-      SELECT id FROM pretraining_spec_documents
-      WHERE source_type = 'chain_review' AND distributor IS NULL
-      ORDER BY id ASC LIMIT 1
-    `).get() as { id: number } | undefined
-    if (row?.id) return row.id
-    // Insert one. pretraining_spec_documents schema: most fields nullable, only
-    // id is the PK. We populate source_type so the row is distinguishable.
-    const r = db.prepare(`
-      INSERT INTO pretraining_spec_documents (source_type)
-      VALUES ('chain_review')
-    `).run()
-    return Number(r.lastInsertRowid)
-  } catch (err) {
-    logAction({ action_type: 'doc_create', target_kind: 'meta', target_key: 'chain_review_doc', status: 'failed', error: String(err).slice(0, 200) })
-    return 1 // fall back to id=1 (highest probability existing row); insert will likely fail but log will record it
-  }
-})()
-logAction({ action_type: 'doc_create', target_kind: 'meta', target_key: 'chain_review_doc', status: 'ok', details: { document_id: CHAIN_REVIEW_DOC_ID } })
+  // NOTE: pretraining_extracted_parts already contains ~400 case-insensitive
+  // duplicate (manufacturer, part_number) groups from the historical distributor
+  // ingest sweep. A UNIQUE INDEX would FAIL at creation against the existing
+  // data. We rely on the `partExistsStmt` pre-check below for idempotency
+  // instead. Future cleanup (separate task) could de-dup the table and add the
+  // index then. The pre-check is sufficient for our use-case: each chain run
+  // adds at most a handful of new parts, and each is looked up before insert.
+
+  // pretraining_extracted_parts requires a non-NULL document_id with a FK to
+  // pretraining_spec_documents.id. We get-or-create a single "chain_review"
+  // synthetic document row up-front and reuse its id for every part we INSERT.
+  CHAIN_REVIEW_DOC_ID = (() => {
+    try {
+      const row = db!.prepare(`
+        SELECT id FROM pretraining_spec_documents
+        WHERE source_type = 'chain_review' AND distributor IS NULL
+        ORDER BY id ASC LIMIT 1
+      `).get() as { id: number } | undefined
+      if (row?.id) return row.id
+      // Insert one. pretraining_spec_documents schema: most fields nullable, only
+      // id is the PK. We populate source_type so the row is distinguishable.
+      const r = db!.prepare(`
+        INSERT INTO pretraining_spec_documents (source_type)
+        VALUES ('chain_review')
+      `).run()
+      return Number(r.lastInsertRowid)
+    } catch (err) {
+      logAction({ action_type: 'doc_create', target_kind: 'meta', target_key: 'chain_review_doc', status: 'failed', error: String(err).slice(0, 200) })
+      return 1 // fall back to id=1 (highest probability existing row); insert will likely fail but log will record it
+    }
+  })()
+  logAction({ action_type: 'doc_create', target_kind: 'meta', target_key: 'chain_review_doc', status: 'ok', details: { document_id: CHAIN_REVIEW_DOC_ID } })
+
+  // Prepared statements bound to the freshly-opened handle.
+  classifierStmt = db.prepare(CLASSIFIER_SQL)
+  partExistsStmt = db.prepare(PART_EXISTS_SQL)
+  partInsertStmt = db.prepare(PART_INSERT_SQL)
+  supplierLookupStmt = db.prepare(SUPPLIER_LOOKUP_SQL)
+  supplierUpdateStmt = db.prepare(SUPPLIER_UPDATE_SQL)
+}
 
 // ---------------------------------------------------------------------------
 // Brave search helper (matches enrich-state-with-suppliers.tsx behaviour:
@@ -303,6 +352,365 @@ async function embedText(text: string): Promise<Buffer | null> {
     return buf
   } catch {
     return null
+  }
+}
+
+// ===========================================================================
+// SYNCHRONOUS PART-VERIFICATION LEG (the engine's "P1") — exported library API
+//
+// Tristan 2026-06-04: a new class's REAL parts must get distributor-verified
+// IN-RUN (BoM climbs), and hallucinated / non-buyable structured MPNs must be
+// demoted to an honest descriptor BEFORE gate 20 runs (no exit-20).
+//
+// The chain's Stage 10.6 collects every structured-MPN word that the DB cannot
+// already vouch for (db-only-cascade returned 'unknown') and calls
+// verifyProposedParts() ONCE. This is the SINGLE delegated live call — it is
+// architecturally legal because it lives in background-enrichment.ts (the
+// chain-as-DB-consumer rule exempts this file; the chain itself never touches a
+// live API). Brave (web search), NOT a distributor adapter, is the prober.
+//
+// POISON GUARD (the #1 ship-bug this design exists to avoid): Brave returning a
+// SIBLING SKU (proposed PV-200ANH1, the web shows PV-160ANH1) must NEVER cache
+// the proposed MPN as verified. Existence requires the NORMALISED PROPOSED MPN
+// itself to appear as a bounded token in the hit's TITLE or URL (a sibling in
+// the title fails this), AND we only ever write distributor_cascade_cache
+// miss=0 / a pretraining_extracted_parts row when
+// normaliseMpn(returned) === normaliseMpn(proposed) (matched === true).
+//
+// No Brave key → every outcome verified:false (the chain then demotes each word
+// to the honest descriptor — we NEVER silently keep an unverified structured
+// MPN).
+// ===========================================================================
+
+export interface ProposedPart {
+  module_id: string
+  sub_module_id: string
+  word_id: string
+  manufacturer: string
+  proposed_mpn: string
+  component_class: string | null
+  source: string
+}
+
+export interface VerifyOutcome {
+  word_id: string
+  /** True only when matched (a distributor-grade exact MPN confirmation). */
+  verified: boolean
+  /** The best structured MPN token found in the winning hit (transparency). */
+  returned_mpn: string | null
+  /** normaliseMpn(returned) === normaliseMpn(proposed). The poison guard. */
+  matched: boolean
+  /** 'brave' when a live probe ran; 'no_key' when BRAVE_KEY was absent. */
+  source: string
+}
+
+export interface VerifyProposedPartsOpts {
+  braveKey?: string
+  timeoutMsPerPart?: number
+  maxConcurrent?: number
+  dbPath?: string
+  /** Test/seam hook: replace the live Brave call with a deterministic responder.
+   *  When provided, NO network call is made. Returns the BraveResult[] for a
+   *  ("mfr" "mpn" datasheet) query. */
+  braveResponder?: (mfr: string, mpn: string) => Promise<BraveResult[]>
+}
+
+// Bounded-token existence: does the normalised proposed MPN appear as a whole
+// whitespace/URL-delimited token in the text? Splitting on separators that are
+// NOT part of an MPN ([\s/?&=#,;]) keeps "PV-200ANH1" whole, so a sibling
+// "PV-160ANH1" token normalises to a DIFFERENT value and fails the check.
+function mpnAppearsAsBoundedToken(text: string, proposedMpn: string): boolean {
+  const want = normaliseMpn(proposedMpn)
+  if (!want) return false
+  for (const tok of String(text ?? '').split(/[\s/?&=#,;()[\]{}"'<>|]+/)) {
+    if (tok && normaliseMpn(tok) === want) return true
+  }
+  return false
+}
+
+// Pull the single structured MPN-looking token that drove the existence claim
+// from the winning hit — used to populate returned_mpn. We prefer the token
+// that normalises to the proposed MPN (the match); otherwise the longest
+// alphanumeric-with-separator token (a likely sibling SKU, for transparency).
+function extractReturnedMpn(text: string, proposedMpn: string): string | null {
+  const want = normaliseMpn(proposedMpn)
+  const toks = String(text ?? '').split(/[\s/?&=#,;()[\]{}"'<>|]+/).filter(Boolean)
+  for (const tok of toks) if (normaliseMpn(tok) === want) return tok
+  let best: string | null = null
+  for (const tok of toks) {
+    // A SKU-shaped token: has a digit and a separator and ≥4 alnum chars.
+    if (/[-_/.]/.test(tok) && /\d/.test(tok) && normaliseMpn(tok).length >= 4) {
+      if (!best || tok.length > best.length) best = tok
+    }
+  }
+  return best
+}
+
+// Manufacturer co-occurrence: the OEM name (or a meaningful token of it)
+// appears in the hit's title/description/url. Short/stop tokens are ignored so
+// a one-letter brand fragment can't spuriously satisfy the check.
+function manufacturerCoOccurs(hit: BraveResult, manufacturer: string): boolean {
+  const hay = `${hit.name} ${hit.description} ${hit.url}`.toLowerCase()
+  const mfr = String(manufacturer ?? '').toLowerCase().trim()
+  if (!mfr) return false
+  if (hay.includes(mfr)) return true
+  const toks = mfr.split(/[^a-z0-9]+/).filter((t) => t.length >= 3 && !MFR_STOP.has(t))
+  if (toks.length === 0) return false
+  return toks.some((t) => hay.includes(t))
+}
+const MFR_STOP = new Set(['the', 'and', 'inc', 'ltd', 'llc', 'gmbh', 'co', 'corp', 'group', 'international', 'industries', 'technologies', 'technology', 'systems', 'electric', 'electronics'])
+
+// Upsert distributor_cascade_cache, honouring idx_dcc_unique(LOWER(mfr),
+// LOWER(pn), source). source is always 'brave' for verify-leg writes so we
+// never collide with an ingest-written 'mouser'/'farnell' row for the same MPN.
+// expires_at uses the SAME TTL the reader (db-only-cascade) applies: 30 days
+// for a hit (miss=0), 7 days for a confirmed miss (miss=1).
+function upsertCascadeCache(
+  verifyDb: Database.Database,
+  manufacturer: string,
+  partNumber: string,
+  miss: 0 | 1,
+  resultJson: string | null,
+): void {
+  const now = Date.now()
+  const ttlMs = miss === 1 ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000
+  const fetchedAt = new Date(now).toISOString()
+  const expiresAt = new Date(now + ttlMs).toISOString()
+  try {
+    verifyDb.prepare(`
+      INSERT INTO distributor_cascade_cache
+        (manufacturer, part_number, source, result_json, fetched_at, expires_at, miss)
+      VALUES (?, ?, 'brave', ?, ?, ?, ?)
+      ON CONFLICT(LOWER(manufacturer), LOWER(part_number), source)
+      DO UPDATE SET
+        result_json = excluded.result_json,
+        fetched_at  = excluded.fetched_at,
+        expires_at  = excluded.expires_at,
+        miss        = excluded.miss
+    `).run(manufacturer, partNumber, resultJson, fetchedAt, expiresAt, miss)
+  } catch {
+    // Best-effort: a malformed row must never break the verify leg.
+  }
+}
+
+/**
+ * Verify a batch of proposed (manufacturer, MPN) pairs against live Brave web
+ * search, growing the DB on confirmation. Network-free when opts.braveResponder
+ * is supplied (test seam). Opens its OWN read-write DB handle from opts.dbPath
+ * (default forge-truth.db) — never the script singleton — so it is safe to call
+ * from the chain or a unit test.
+ *
+ * For each proposed part:
+ *   • matched (proposed MPN bounded in title/URL + mfr co-occurs + returned ===
+ *     proposed) → verified:true; upsert distributor_cascade_cache(miss=0,
+ *     'brave') AND a class-tagged pretraining_extracted_parts row
+ *     (discovery_source 'verify_leg:brave_confirmed', confidence 0.85).
+ *   • Brave returns hits but none matches (sibling SKU / description-only /
+ *     wrong mfr) → verified:false, matched:false, NO miss=0 write (poison
+ *     guard).
+ *   • Brave returns ZERO hits → verified:false; upsert
+ *     distributor_cascade_cache(miss=1, 'brave') (confirmed-absent).
+ *   • No Brave key (and no responder) → verified:false, source 'no_key', no
+ *     write (the chain demotes to honest descriptor).
+ */
+export async function verifyProposedParts(
+  proposed: ProposedPart[],
+  opts: VerifyProposedPartsOpts = {},
+): Promise<VerifyOutcome[]> {
+  const braveKey = opts.braveKey ?? BRAVE_KEY
+  const timeoutMs = opts.timeoutMsPerPart ?? 8_000
+  const maxConcurrent = Math.max(1, opts.maxConcurrent ?? 4)
+  const dbPath = opts.dbPath ?? DB_PATH
+  const responder = opts.braveResponder
+
+  // No way to probe → every word falls back to honest descriptor downstream.
+  if (!responder && !braveKey) {
+    return proposed.map((p) => ({
+      word_id: p.word_id,
+      verified: false,
+      returned_mpn: null,
+      matched: false,
+      source: 'no_key',
+    }))
+  }
+
+  // Own handle (read-write) — NEVER the script singleton. Missing file → we
+  // can still verify, just can't write back (graceful).
+  let verifyDb: Database.Database | null = null
+  try {
+    if (existsSync(dbPath)) {
+      verifyDb = new Database(dbPath)
+      verifyDb.pragma('journal_mode = WAL')
+      verifyDb.pragma('busy_timeout = 5000')
+    }
+  } catch {
+    verifyDb = null
+  }
+
+  const partInsert = verifyDb
+    ? verifyDb.prepare(PART_INSERT_SQL)
+    : null
+  const partExists = verifyDb
+    ? verifyDb.prepare(PART_EXISTS_SQL)
+    : null
+  const verifyDocId = verifyDb ? getVerifyLegDocId(verifyDb) : 1
+
+  const probe = async (p: ProposedPart): Promise<VerifyOutcome> => {
+    const outcome: VerifyOutcome = {
+      word_id: p.word_id,
+      verified: false,
+      returned_mpn: null,
+      matched: false,
+      source: 'brave',
+    }
+    let hits: BraveResult[] = []
+    try {
+      const call = responder
+        ? responder(p.manufacturer, p.proposed_mpn)
+        : braveSearch(`"${p.manufacturer}" "${p.proposed_mpn}" datasheet`, 5)
+      hits = await withTimeout(call, timeoutMs, [] as BraveResult[])
+    } catch {
+      hits = []
+    }
+
+    // CONFIRMED ABSENT — zero hits → write a miss=1 row so the next run is a
+    // fast cache_miss_confirmed (db-only-cascade) and the word is demoted
+    // without ever hitting Brave again.
+    if (hits.length === 0) {
+      if (verifyDb) upsertCascadeCache(verifyDb, p.manufacturer, p.proposed_mpn, 1, null)
+      return outcome
+    }
+
+    // EXISTENCE: the proposed MPN must appear as a bounded token in a hit's
+    // TITLE or URL (NOT description-only) AND the manufacturer must co-occur in
+    // that SAME hit.
+    let winningHit: BraveResult | null = null
+    for (const hit of hits) {
+      const inTitleOrUrl =
+        mpnAppearsAsBoundedToken(hit.name, p.proposed_mpn) ||
+        mpnAppearsAsBoundedToken(hit.url, p.proposed_mpn)
+      if (inTitleOrUrl && manufacturerCoOccurs(hit, p.manufacturer)) {
+        winningHit = hit
+        break
+      }
+    }
+
+    if (!winningHit) {
+      // Hits exist but none confirms the proposed MPN (sibling SKU, wrong mfr,
+      // or proposed only in the description). POISON GUARD: NO miss=0 write.
+      // For transparency, surface the best sibling token we saw.
+      const sample = hits[0]
+      outcome.returned_mpn = extractReturnedMpn(`${sample.name} ${sample.url}`, p.proposed_mpn)
+      return outcome
+    }
+
+    // MATCHED — returned === proposed by construction of the existence check.
+    const returned = extractReturnedMpn(`${winningHit.name} ${winningHit.url}`, p.proposed_mpn)
+    outcome.returned_mpn = returned
+    outcome.matched = normaliseMpn(returned) === normaliseMpn(p.proposed_mpn)
+    outcome.verified = outcome.matched
+
+    if (outcome.matched && verifyDb) {
+      // (a) keep the structured MPN → cache it as a verified hit (miss=0).
+      const resultJson = JSON.stringify({
+        source: 'brave',
+        mpn: p.proposed_mpn,
+        manufacturer: p.manufacturer,
+        description: `${winningHit.name}`.slice(0, 300),
+        priceGBP: [],
+        stockUK: null,
+        datasheetUrl: winningHit.url || null,
+        productUrl: winningHit.url || '',
+        leadWeeks: null,
+        fetchedAt: new Date().toISOString(),
+      })
+      upsertCascadeCache(verifyDb, p.manufacturer, p.proposed_mpn, 0, resultJson)
+
+      // (b) grow pretraining_extracted_parts (class-tagged) so a future run
+      // serves this as a DB-first hit. Idempotent via partExists pre-check
+      // (the table can't carry the UNIQUE index — see bootstrap note).
+      try {
+        const already = partExists?.get(p.manufacturer, p.proposed_mpn) as { id: number } | undefined
+        if (!already && partInsert) {
+          const className = (p.component_class && p.component_class.trim())
+            ? p.component_class.trim()
+            : 'verify_leg'
+          const partName = `${p.manufacturer} ${p.proposed_mpn}`.slice(0, 256)
+          const embedSource = [partName, p.manufacturer, p.proposed_mpn, winningHit.name]
+            .filter(Boolean)
+            .join(' ')
+          const embedding = await embedText(embedSource)
+          const embedHash = embedding
+            ? createHash('sha256').update(embedSource).digest('hex').slice(0, 32)
+            : null
+          partInsert.run(
+            verifyDocId,
+            partName,
+            p.manufacturer,
+            p.proposed_mpn,
+            p.module_id,
+            p.sub_module_id,
+            `${winningHit.name} — ${winningHit.description}`.slice(0, 1200),
+            0.85,                                       // brave-confirmed (> generated 0.6, < distributor 0.9)
+            className,
+            embedding,
+            embedHash,
+            `verify_leg:${p.word_id}`,
+            new Date().toISOString(),
+            'verify_leg:brave_confirmed',
+          )
+        }
+      } catch {
+        // Writeback is best-effort; the verified outcome still stands.
+      }
+    }
+    return outcome
+  }
+
+  // Bounded-concurrency pool (default 4). braveSearch enforces the 1.1 s
+  // inter-call rate gate internally, so a small pool stays inside free-tier.
+  const outcomes: VerifyOutcome[] = new Array(proposed.length)
+  let next = 0
+  async function worker() {
+    while (next < proposed.length) {
+      const i = next++
+      outcomes[i] = await probe(proposed[i])
+    }
+  }
+  const workers: Promise<void>[] = []
+  for (let i = 0; i < Math.min(maxConcurrent, proposed.length); i++) workers.push(worker())
+  await Promise.all(workers)
+
+  try { verifyDb?.close() } catch { /* no-op */ }
+  return outcomes
+}
+
+// Per-process timeout wrapper that resolves to a fallback rather than rejecting
+// (a slow Brave probe must not abort the whole batch).
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((res) => {
+    let settled = false
+    const t = setTimeout(() => { if (!settled) { settled = true; res(fallback) } }, ms)
+    p.then((v) => { if (!settled) { settled = true; clearTimeout(t); res(v) } })
+     .catch(() => { if (!settled) { settled = true; clearTimeout(t); res(fallback) } })
+  })
+}
+
+// get-or-create a synthetic spec-document row for verify-leg parts (FK target
+// for pretraining_extracted_parts.document_id, which is NOT NULL).
+function getVerifyLegDocId(verifyDb: Database.Database): number {
+  try {
+    const row = verifyDb.prepare(`
+      SELECT id FROM pretraining_spec_documents
+      WHERE source_type = 'verify_leg' ORDER BY id ASC LIMIT 1
+    `).get() as { id: number } | undefined
+    if (row?.id) return row.id
+    const r = verifyDb.prepare(`
+      INSERT INTO pretraining_spec_documents (source_type) VALUES ('verify_leg')
+    `).run()
+    return Number(r.lastInsertRowid)
+  } catch {
+    return 1
   }
 }
 
@@ -399,7 +807,7 @@ const CLASSIFIER_STOPS = new Set([
   'the', 'a', 'an', 'for', 'of', 'with', 'to', 'and', 'or', 'in', 'on', 'at', 'from', 'by',
   'word', 'assembly', 'pack', 'unit', 'module', 'board', 'main', 'primary', 'secondary',
 ])
-const classifierStmt = db.prepare(`
+const CLASSIFIER_SQL = `
   SELECT component_class, COUNT(*) AS n
   FROM pretraining_extracted_parts
   WHERE component_class IS NOT NULL
@@ -408,9 +816,11 @@ const classifierStmt = db.prepare(`
   GROUP BY component_class
   ORDER BY n DESC
   LIMIT 1
-`)
+`
+let classifierStmt: Database.Statement | null = null
 function inferComponentClass(partName: string): string | null {
   if (!partName) return null
+  if (!classifierStmt) return null
   const key = String(partName).toLowerCase().trim()
   if (!key) return null
   try {
@@ -508,13 +918,13 @@ function walkSuppliers(state: any): DiscoveredSupplier[] {
 // Persist a part
 // ---------------------------------------------------------------------------
 
-const partExistsStmt = db.prepare(`
+const PART_EXISTS_SQL = `
   SELECT id FROM pretraining_extracted_parts
   WHERE LOWER(manufacturer) = LOWER(?)
     AND LOWER(part_number) = LOWER(?)
   LIMIT 1
-`)
-const partInsertStmt = db.prepare(`
+`
+const PART_INSERT_SQL = `
   INSERT OR IGNORE INTO pretraining_extracted_parts
   (document_id, part_name, manufacturer, part_number,
    module_assignment, sub_module_assignment, raw_excerpt,
@@ -522,9 +932,12 @@ const partInsertStmt = db.prepare(`
    source_doc_id, discovered_at, discovery_source)
   VALUES
   (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`)
+`
+let partExistsStmt: Database.Statement | null = null
+let partInsertStmt: Database.Statement | null = null
 
 async function processPart(part: DiscoveredPart): Promise<'inserted' | 'skipped' | 'failed'> {
+  if (!partExistsStmt || !partInsertStmt) return 'failed' // bootstrap not run (script-only path)
   // 1. Idempotency check.
   const existing = partExistsStmt.get(part.manufacturer, part.part_number) as { id: number } | undefined
   if (existing) {
@@ -630,15 +1043,15 @@ async function processPart(part: DiscoveredPart): Promise<'inserted' | 'skipped'
 // Persist a supplier (UPDATE existing row by domain)
 // ---------------------------------------------------------------------------
 
-const supplierLookupStmt = db.prepare(`
+const SUPPLIER_LOOKUP_SQL = `
   SELECT id, name, enriched_at, capability, description, category, subcategory,
          specialties, materials_handled, certifications, country, city,
          raw_snippet, recent_news, supabase_listing_id
   FROM companies
   WHERE domain = ?
   LIMIT 1
-`)
-const supplierUpdateStmt = db.prepare(`
+`
+const SUPPLIER_UPDATE_SQL = `
   UPDATE companies
   SET capability = COALESCE(?, capability),
       materials_handled = COALESCE(?, materials_handled),
@@ -651,7 +1064,9 @@ const supplierUpdateStmt = db.prepare(`
       enriched_at = ?,
       updated_at = datetime('now')
   WHERE id = ?
-`)
+`
+let supplierLookupStmt: Database.Statement | null = null
+let supplierUpdateStmt: Database.Statement | null = null
 
 interface SupplierRow {
   id: string
@@ -672,6 +1087,7 @@ interface SupplierRow {
 }
 
 async function processSupplier(supplier: DiscoveredSupplier): Promise<'enriched' | 'skipped' | 'failed'> {
+  if (!db || !supplierLookupStmt || !supplierUpdateStmt) return 'failed' // bootstrap not run (script-only path)
   const row = supplierLookupStmt.get(supplier.domain) as SupplierRow | undefined
   if (!row) {
     // Web-fallback persist hasn't fired yet, or the row was created with a
@@ -932,20 +1348,27 @@ async function main(): Promise<number> {
     )
   } catch { /* non-fatal */ }
 
-  try { db.close() } catch { /* ignore */ }
+  try { db?.close() } catch { /* ignore */ }
   return 0
 }
 
-main().catch((err) => {
-  logAction({
-    action_type: 'fatal',
-    target_kind: 'meta',
-    target_key: STATE_PATH,
-    status: 'failed',
-    error: String(err).slice(0, 300),
+// Run the detached enrichment job ONLY when invoked as a script. On import (the
+// chain's Stage 10.6 verify leg, or the unit test) this block is skipped — no
+// argv, no real-DB open, no main(). bootstrapScriptDb() opens the real handle +
+// prepares the script statements just before main() needs them.
+if (IS_MAIN) {
+  bootstrapScriptDb()
+  main().catch((err) => {
+    logAction({
+      action_type: 'fatal',
+      target_kind: 'meta',
+      target_key: STATE_PATH,
+      status: 'failed',
+      error: String(err).slice(0, 300),
+    })
+    try { db?.close() } catch { /* ignore */ }
+    process.exit(1)
+  }).then((code) => {
+    if (typeof code === 'number') process.exit(code)
   })
-  try { db.close() } catch { /* ignore */ }
-  process.exit(1)
-}).then((code) => {
-  if (typeof code === 'number') process.exit(code)
-})
+}

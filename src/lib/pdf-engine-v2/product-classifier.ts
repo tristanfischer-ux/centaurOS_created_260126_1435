@@ -49,6 +49,18 @@ const DECLARED_CLASS_SIGNATURES: Array<{ re: RegExp; cls: string }> = [
   // Humanoid / legged robot. Must beat ev_charger (humanoid ships a charging
   // dock) and the generic aerospace catch (humanoid briefs say "payload per arm").
   { re: /humanoid|biped(?:al)?\s+robot|legged\s+robot|two[\s-]?legged\s+robot|teleoperat(?:ion|ed)\s+robot/, cls: 'humanoid' },
+  // Compute-heat brick (2026-06-07): a modular ~1 kW AI-INFERENCE unit whose
+  // DEFINING output is low-grade HEAT RECOVERED into a hot-water loop (one heats
+  // a home cylinder → tens heat a pool → hundreds heat a factory, by replication).
+  // Must beat edge_ai (line ~83): the brief is full of "inference"/"compute" +
+  // "appliance" that would trip the baked edge_ai 1U-rack emitter, which ignores
+  // the heat-recovery + brick form (the prior residential-AI run scored 3/10 this
+  // way). Deliberately left UNREGISTERED (no archetype builder, no class-plan,
+  // not in envelope CLASS_ALIASES) so it routes to the UNIVERSAL auto-planner
+  // (composeFallbackPlan) — the AIM test on a never-seen archetype — NOT a baked
+  // emitter. Keyed on heat-RECOVERY compute so it never catches the heat-REJECTING
+  // residential-ai-node brief or a generic edge-AI server.
+  { re: /compute[\s-]?heat\s+brick|heat[\s-]?recovery.{0,60}(?:inference|ai\s+compute|compute\s+(?:brick|node|unit|module))|(?:inference|compute)[\s-]?(?:brick|node|unit|module).{0,60}heat[\s-]?recovery/, cls: 'compute_heat_module' },
 ]
 
 export function classifyProduct(briefText: string): ProductClassification {

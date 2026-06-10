@@ -65,6 +65,14 @@ import { lookupCached, type DbCascadeSource } from '../../src/lib/pdf-engine-v2/
 // don't re-check them here — gate 13 already covers their existence claim.
 import { KNOWN_PART_AUTHORITATIVE } from './parts-spec-validator'
 
+// ── MPN-SHAPE PREDICATES (shared single source of truth) ──────────────────────
+// COMMODITY_SKIP_REGEX + STRUCTURED_PN_REGEX were extracted to mpn-shape.ts
+// (2026-06-04) so this gate and the synchronous part-verification leg (Stage
+// 10.6 + verifyProposedParts) agree byte-for-byte on what is a structured MPN
+// worth verifying vs a commodity descriptor to skip. Behaviour is identical to
+// the prior in-file definitions.
+import { COMMODITY_SKIP_REGEX, STRUCTURED_PN_REGEX } from './mpn-shape'
+
 function isInCuratedTable(mpn: string, manufacturer: string | null): boolean {
   if (!mpn) return false
   const mpnNorm = mpn.trim()
@@ -79,27 +87,12 @@ function isInCuratedTable(mpn: string, manufacturer: string | null): boolean {
   )
 }
 
-// ── COMMODITY / SKIP PATTERNS ────────────────────────────────────────────────
-// Catalogue-class commodity descriptors: valid items but not uniquely
-// findable via an exact MPN search (a distributor search for "M6" returns
-// thousands of bolt variants — the MPN is a category, not a specific part).
-// These are LOW severity at most; we don't emit HIGH for them.
-// Pattern covers:
-//   M2 / M2.5 / M3 / M4 / M5 / M6 / M8 / M10 / M12 metric fasteners
-//   Generic/standard/N/A/TBD/various
-//   Pure-numeric catalogue codes (e.g. "100", "200") — too ambiguous
-//   Commodity descriptors with obvious category prefixes
-// Commodity skip: metric fasteners, generic placeholders, declared-custom items,
-// dimension+category descriptors (20mm angle), and pure-spec-prefix tokens
-// (100A fuse, 50V rail). These items are valid but un-findable by exact MPN
-// search; flagging them as missing is noise, not signal.
-const COMMODITY_SKIP_REGEX = /^(?:M\d{1,2}(?:\.\d)?\s*(?:x\s*\d+)?|generic|standard|n\/?a|tbd|various|custom|bespoke|oem|\d{1,4}mm?\s*(?:angle|plate|rod|tube|pipe|cable|wire|bracket|channel|gland|trunking)?|\d+(?:\.\d+)?\s*(?:A|V|W|kW|kVA|kWh|MWh|Hz|mm|m|kg)\s*[-_/]?\s*\w*)$/i
-
-// Structured part-number pattern: uppercase letters + digits + separator +
-// more alphanumerics. This is the shape of most manufacturer part numbers
-// (e.g. "STM32H743ZIT6", "C310-1500V", "170M6810", "ABCD-1234-5X").
-// Parts matching this regex AND not found in any distributor are HIGH.
-const STRUCTURED_PN_REGEX = /^[A-Z0-9]{3,}[-_/][A-Z0-9]{1,}(?:[-_/][A-Z0-9]{1,})*$/
+// ── COMMODITY / STRUCTURED PATTERNS ──────────────────────────────────────────
+// COMMODITY_SKIP_REGEX (metric fasteners, generic placeholders, dimension +
+// category descriptors, pure-spec-prefix tokens) and STRUCTURED_PN_REGEX
+// (the shape of most manufacturer part numbers — alphanumeric + separator +
+// alphanumeric) now live in ./mpn-shape.ts (imported above) so this gate and
+// the Stage 10.6 verify leg share one definition. Behaviour unchanged.
 
 // Short alphanumeric (3-4 chars) — too ambiguous for a distributor search to
 // return a meaningful miss. LOW severity.

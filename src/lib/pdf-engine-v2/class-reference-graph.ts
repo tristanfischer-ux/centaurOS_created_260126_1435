@@ -487,6 +487,7 @@ export async function ensureGraphsRegistered(): Promise<void> {
   await import('./class-reference-graphs/bess-utility-scale.js')
   await import('./class-reference-graphs/bioreactor.js')
   await import('./class-reference-graphs/chiller.js')
+  await import('./class-reference-graphs/compute-heat-module.js')
   await import('./class-reference-graphs/dc-fast-ev-charger.js')
   await import('./class-reference-graphs/distribution-transformer.js')
   await import('./class-reference-graphs/fuel-cell-power-module.js')

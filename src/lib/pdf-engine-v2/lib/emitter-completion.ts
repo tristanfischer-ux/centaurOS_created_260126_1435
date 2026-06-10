@@ -185,7 +185,7 @@ export interface CompleteEmitterGapsOpts {
 // MUST stay non-structured (no [A-Z0-9]{3,}[-_/]… pattern) AND ideally contain
 // a gate-20 skip token ("specify"). This guarantees fictional-pn-audit treats
 // it as a commodity/unverifiable descriptor (LOW/MED, never HIGH / exit 20).
-function honestDescriptorMpn(): string {
+export function honestDescriptorMpn(): string {
   // Short + gate-20-safe (non-structured, contains 'TBD' commodity token so
   // fictional-pn-audit skips it). The `form` modifier carries the full
   // "manufacturer — confirm at detailed design" sentence; the part_number
@@ -567,10 +567,18 @@ function getEmitterCompletionDocId(db: Database.Database): number {
 
 /**
  * Persist a generated completion so the NEXT run is a DB-first hit.
- * Best-effort: never throws. The part_number stored is the REAL one the LLM
- * proposed when it gave one (so future dbFirstLookup can serve it); when the
- * LLM declined to give an MPN we store the honest descriptor (still a valid
- * row — future runs at least get the manufacturer + component type).
+ * Best-effort: never throws.
+ *
+ * VECTOR B FIX (2026-06-04): we ALWAYS store the honest descriptor, NEVER the
+ * raw LLM-proposed part_number. Previously a ≥3-char proposed MPN was stored
+ * verbatim, so the next run served it DB-first and buildCompletionWord('db')
+ * emitted that unverified structured MPN straight into the BoM — exactly the
+ * hallucination gate 20 exists to catch. A generated row's value is the
+ * manufacturer + component type (future runs get those); the live-verify leg
+ * (Stage 10.6) is the ONLY path permitted to promote a structured MPN, and it
+ * upserts distributor_cascade_cache / pretraining_extracted_parts itself once a
+ * distributor confirms the part. Storing the honest descriptor here keeps the
+ * grown row gate-20-safe (it never re-emits a structured MPN nobody verified).
  */
 async function writeBackGenerated(
   dbPath: string,
@@ -587,9 +595,10 @@ async function writeBackGenerated(
     db.pragma('busy_timeout = 2000')
     const docId = getEmitterCompletionDocId(db)
 
-    const storedPn = part.part_number && part.part_number.length >= 3
-      ? part.part_number
-      : honestDescriptorMpn()
+    // Always the honest descriptor for the generated path (Vector B). The raw
+    // proposed MPN is deliberately discarded — only a distributor-confirmed MPN
+    // (written by the Stage 10.6 verify leg) may become a structured DB row.
+    const storedPn = honestDescriptorMpn()
 
     // Idempotency: skip if this (manufacturer, part_number) already present.
     const exists = db.prepare(`
