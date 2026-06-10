@@ -1,0 +1,59 @@
+{
+  "co2_mineralisation": {
+    "class": "co2_mineralisation",
+    "scale_tier": "pilot",
+    "voltage_tier": "low",
+    "form_factor": "skid_mounted",
+    "application": "carbon_mineralisation"
+  },
+  "compute_heat_module": {
+    "class": "edge_ai",
+    "scale_tier": "rack_1u",
+    "voltage_tier": "low",
+    "form_factor": "rack_1u",
+    "application": "llm_inference"
+  },
+  "e_fuel_synthesis": {
+    "class": "e_fuel_synthesis",
+    "scale_tier": "small",
+    "voltage_tier": "low",
+    "form_factor": "skid_mounted",
+    "application": "sustainable_aviation_fuel"
+  },
+  "edge_ai_server": {
+    "class": "edge_ai",
+    "scale_tier": "rack_1u",
+    "voltage_tier": "low",
+    "form_factor": "rack_1u",
+    "application": "llm_inference"
+  },
+  "energy_storage": {
+    "class": "bess",
+    "scale_tier": "utility_containerised",
+    "voltage_tier": "medium",
+    "form_factor": "container_40hc",
+    "application": "front_of_meter",
+    "nameplate_kwh": 3125
+  },
+  "haps": {
+    "class": "haps",
+    "scale_tier": "medium",
+    "voltage_tier": "extra_low",
+    "form_factor": "fixed_wing",
+    "application": "civilian_telecom"
+  },
+  "satellite_smallsat": {
+    "class": "satellite_smallsat",
+    "scale_tier": "smallsat",
+    "voltage_tier": "low",
+    "form_factor": "bus_panel",
+    "application": "earth_observation"
+  },
+  "vertical_farm": {
+    "class": "vertical_farm",
+    "scale_tier": "commercial",
+    "voltage_tier": "low",
+    "form_factor": "container_40hc",
+    "application": "leafy_greens"
+  }
+}

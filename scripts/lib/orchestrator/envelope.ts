@@ -19,6 +19,10 @@
  */
 
 import type { BriefEnvelope, ParsedConstraints } from './types'
+// E1 universal envelope vector (tier b of the cascade — see detectEnvelope).
+// Module cycle with envelope-vector.ts is intentional + safe: both sides only
+// call the other inside function bodies (mirrors envelope ↔ constraint-normaliser).
+import { buildEnvelopeVector, injectionCandidates } from './envelope-vector'
 import {
   findScaleMetric,
   POWER_KW,
@@ -1970,7 +1974,15 @@ function genericEnvelope(constraints: ParsedConstraints): BriefEnvelope {
   }
 }
 
-export function detectEnvelope(constraints: ParsedConstraints): BriefEnvelope | null {
+/**
+ * TIER (a) — the ORIGINAL strict behaviour, byte-for-byte semantics:
+ * registered classes run their exact detectors; an unregistered class gets
+ * the permissive genericEnvelope; a registered class whose brief lacks the
+ * detector's expected scale metric returns NULL. Exported so the E1
+ * envelope-vector cascade (and the regression tests) can distinguish a
+ * genuine tier-(a) hit from a fallback.
+ */
+export function detectEnvelopeStrict(constraints: ParsedConstraints): BriefEnvelope | null {
   const klass = normaliseClass(constraints.product_class)
   // UNIVERSAL fallback: an unregistered class (not in the classifier, or with no
   // detector) gets a permissive generic envelope so the pipeline can attempt any
@@ -1980,7 +1992,7 @@ export function detectEnvelope(constraints: ParsedConstraints): BriefEnvelope | 
 
   const detectors = DETECTORS[klass]
   const scaleTier = detectors.scaleTier(constraints)
-  if (!scaleTier) return null // registered class but brief insufficient to classify (genuine signal — do not mask)
+  if (!scaleTier) return null // registered class but brief insufficient to classify
 
   const voltageTier = detectors.voltageTier(scaleTier, constraints)
   const formFactor = detectors.formFactor(scaleTier, constraints)
@@ -1997,6 +2009,97 @@ export function detectEnvelope(constraints: ParsedConstraints): BriefEnvelope | 
     nameplate_kwh: nameplateKwh,
     voltage_class_v: voltageClassV,
   }
+}
+
+/** The normalised registered class for these constraints, or null when the
+ *  class is unregistered (E1 helper for the envelope-vector cascade). */
+export function registeredClassOf(constraints: ParsedConstraints): string | null {
+  const klass = normaliseClass(constraints.product_class)
+  return klass && DETECTORS[klass] ? klass : null
+}
+
+/**
+ * E1 tier-(b)/(c) helper: re-run the REGISTERED class's exact detector with
+ * an injected target_performance {value, unit} (a quantity the universal
+ * envelope vector extracted, or tier (c) inferred). The class detector's
+ * findScaleMetric step 1 reads target_performance first, so a same-family
+ * injection resolves the tier through the SAME thresholds tier (a) uses —
+ * no parallel tier logic to drift. Returns null when the injected metric's
+ * unit family doesn't match the class's expected scale family (the
+ * self-guard that stops e.g. a payload mass faking a HAPS wingspan).
+ */
+export function detectRegisteredWithInjectedMetric(
+  klass: string,
+  constraints: ParsedConstraints,
+  metric: { value: number; unit: string },
+): BriefEnvelope | null {
+  if (!DETECTORS[klass]) return null
+  const clone: ParsedConstraints = {
+    ...constraints,
+    product_class: klass,
+    target_performance: { value: metric.value, unit: metric.unit },
+  }
+  return detectEnvelopeStrict(clone)
+}
+
+/**
+ * E1 tier-(b) last resort for a REGISTERED class whose scale metric cannot
+ * be determined: a valid envelope with scale_tier 'generic' so the chain
+ * proceeds (selectPlan predicates for 36/37 classes match on class alone;
+ * BESS additionally gates on scale_tier and falls through to the
+ * auto-planner — still strictly better than the old hard exit 7).
+ * voltage/form/application come from the class's OWN detectors (they
+ * tolerate a null scale tier and fall back to class defaults).
+ */
+export function classGenericEnvelope(klass: string, constraints: ParsedConstraints): BriefEnvelope | null {
+  const detectors = DETECTORS[klass]
+  if (!detectors) return genericEnvelope(constraints)
+  return {
+    class: klass,
+    scale_tier: 'generic',
+    voltage_tier: detectors.voltageTier(null, constraints),
+    form_factor: detectors.formFactor(null, constraints),
+    application: detectors.application(null, constraints),
+    nameplate_kwh: detectors.nameplateKwh?.(constraints),
+    voltage_class_v: constraints.voltage_class_v,
+  }
+}
+
+/**
+ * E1 (2026-06-10) — 3-TIER CASCADE (kills wall W1, chain exit 7 on
+ * envelope-null):
+ *   tier (a) detectEnvelopeStrict — registered exact detectors, UNTOUCHED;
+ *            zero behaviour change when it succeeds (proven identical on
+ *            all 8 briefs-rerun/*.md — envelope-vector.test.ts).
+ *   tier (b) on the registered-class metric-MISS path ONLY: build the
+ *            universal envelope vector (envelope-vector.ts), trial-inject
+ *            its scale-eligible quantities through the class's own
+ *            detector (deny-list guarded: altitude/coverage/tether/payload
+ *            etc. never inject), else return a class-generic envelope —
+ *            NON-NULL, so the orchestrator proceeds instead of exiting 7.
+ *   tier (c) LLM inference is NOT called from this sync path — it lives in
+ *            envelope-vector.ts::resolveEnvelopeUniversal() (async), the
+ *            single integration function the chain adopts (see that
+ *            module's header tracker note).
+ * Unregistered classes keep the pre-E1 genericEnvelope path unchanged.
+ */
+export function detectEnvelope(constraints: ParsedConstraints): BriefEnvelope | null {
+  const strict = detectEnvelopeStrict(constraints)
+  if (strict) return strict
+
+  // Registered class, metric-MISS → tier (b). Lazy import shape (top-level
+  // ESM import below) is safe: envelope.ts ↔ envelope-vector.ts only call
+  // each other inside function bodies (same pattern as the existing
+  // envelope.ts ↔ constraint-normaliser.ts cycle).
+  const klass = registeredClassOf(constraints)
+  if (!klass) return null // unreachable: strict only returns null for registered classes
+
+  const vector = buildEnvelopeVector(constraints)
+  for (const cand of injectionCandidates(vector)) {
+    const env = detectRegisteredWithInjectedMetric(klass, constraints, { value: cand.value, unit: cand.unit })
+    if (env) return env
+  }
+  return classGenericEnvelope(klass, constraints)
 }
 
 /**

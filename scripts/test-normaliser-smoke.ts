@@ -77,12 +77,16 @@ test('1,500 L parser miss, found via desc', {
   target_performance: { value: 8, unit: 'hr-1' },
 }, { class: 'bioreactor', scale_tier: 'production' })
 
-console.log('Scenario 7: graceful null when no volume anywhere')
-test('no volume anywhere → null', {
+console.log('Scenario 7: no volume anywhere → E1 tier-(b) class-generic envelope (was null pre-E1)')
+// E1 (2026-06-10): detectEnvelope no longer returns null on the registered-class
+// metric-MISS path — that null was wall W1 (chain exit 7). The cascade now
+// returns a class-generic envelope (scale_tier 'generic') so the orchestrator
+// proceeds; the STRICT pre-E1 behaviour lives on as detectEnvelopeStrict.
+test('no volume anywhere → bioreactor/generic (tier b)', {
   product_class: 'bioreactor',
   product_description: 'A bioreactor.',
   target_performance: { value: 8, unit: 'hr-1' },
-}, null)
+}, { class: 'bioreactor', scale_tier: 'generic' })
 
 console.log('\n══ HEAT PUMP ═════════════════════════════════════════════════════════')
 console.log('Scenario 1: parser picked SCOP (suspected bug)')
