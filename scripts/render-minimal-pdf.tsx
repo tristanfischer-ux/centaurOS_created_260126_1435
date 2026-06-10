@@ -49,6 +49,14 @@ import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
 import { computeNetInfeasibilityFlag } from './lib/brief-infeasibility-net'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { buildToolSelectionNarrative, type ToolNarrativeEntry } from './lib/tool-selection-narrative'
+import {
+  buildEngineeringLedger,
+  formatInputs as ledgerFormatInputs,
+  formatOutputs as ledgerFormatOutputs,
+  formatProvenanceStrip as ledgerProvenanceStrip,
+  type EngineeringLedger,
+  type LedgerEntry,
+} from './lib/engineering-ledger'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { MATERIAL_RATE_GBP_PER_KG, FABRICATION_FACTOR } from './lib/cost/process-equipment-cost'
@@ -4922,8 +4930,7 @@ function TableOfContentsPage({ state, project }: { state: any; project: string }
           { num: '4', title: 'System Overview' },
           { num: '', title: 'Engineering Basis' },
           { num: '', title: 'How the Whole Plant Was Computed' },
-          { num: '', title: 'Tool Selection & Sequencing' },
-          { num: '', title: 'Engineering Calculations' },
+          { num: '', title: 'Engineering — Computed Tool by Tool' },
         ],
       },
       {
@@ -14101,89 +14108,17 @@ function EngineeringToolsFlowPage({
   )
 }
 
-// ─── Increment 1A (2026-06-10) · Tool selection & sequencing narrative ──────
+// ─── Tool selection & sequencing — FOLDED 2026-06-10 ───────────────────────
 //
-// The diagram page above shows WHICH tools ran and the feeds_into edges, but a
-// reader can't judge the AUTO-SELECTION from boxes-and-arrows alone. This page
-// renders, in deterministic prose (no LLM — the engine's tool selection is a
-// per-class typed plan keyed on the brief envelope, so its explanation is
-// derived purely from state), WHY each tool was chosen and HOW the tools
-// interact + sequence. Data sources are traced in
-// scripts/lib/tool-selection-narrative.ts. This is a SEPARATE wrapping portrait
-// page (NOT crammed onto the non-wrapping landscape diagram page above, which
-// would clip): the summary paragraph, then one block per tool — name in bold +
-// a 2-3 sentence rationale built from owns/whySelected/inputs/outputs/
-// sequencing. Each block is wrap={false} so it never splits across a page
-// boundary; the blocks flow across as many pages as needed. try/catch → null so
-// a narrative fault can never break the PDF (matches the file's other pages).
-function ToolSelectionNarrativePage({ state, project }: { state: any; project: string }) {
-  let summary = ''
-  let entries: ToolNarrativeEntry[] = []
-  try {
-    const n = buildToolSelectionNarrative(state)
-    summary = String(n?.summary ?? '').trim()
-    entries = Array.isArray(n?.tools) ? n.tools : []
-  } catch {
-    return null
-  }
-  // Nothing to add beyond the diagram page's intro when no tools ran.
-  if (entries.length === 0) return null
-
-  return (
-    <Page size="A4" style={PAGE_STYLE} wrap>
-      <PageHeader section="Section 4 · Tool selection & sequencing" project={project} />
-      <Text style={{ fontSize: 16, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Tool selection &amp; sequencing
-      </Text>
-      <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 12, lineHeight: 1.55 }}>
-        {summary}
-      </Text>
-      {entries.map((t, i) => (
-        <View
-          key={`tsn-${i}`}
-          style={{
-            marginBottom: 9,
-            paddingLeft: 9,
-            borderLeftWidth: 2,
-            borderLeftColor: ACCENT,
-          }}
-          wrap={false}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 }}>
-            <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK }}>
-              {`${i + 1}. ${asciiSafe(t.name)}`}
-            </Text>
-            <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Oblique', color: MUTED }}>
-              {asciiSafe(t.id)}
-            </Text>
-          </View>
-          <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 1.5 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold', color: ACCENT }}>Owns: </Text>
-            {asciiSafe(t.owns)}{' '}
-            {asciiSafe(t.whySelected)}
-          </Text>
-          <Text style={{ fontSize: 8.5, color: '#28313f', lineHeight: 1.45, marginBottom: 1.5 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold', color: MUTED }}>Inputs: </Text>
-            {asciiSafe(t.inputs)}{'  '}
-            <Text style={{ fontFamily: 'Helvetica-Bold', color: MUTED }}>Outputs: </Text>
-            {asciiSafe(t.outputs)}
-          </Text>
-          <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold' }}>Sequencing: </Text>
-            {asciiSafe(t.sequencing)}
-          </Text>
-        </View>
-      ))}
-      <Text style={{ fontSize: 8, color: MUTED, marginTop: 6, lineHeight: 1.5, fontStyle: 'italic' }}>
-        This rationale is generated deterministically from the recorded tool run
-        — the execution order, each tool&apos;s computed quantities, and the
-        feeds_into dependency edges. It is not an LLM narration; the engine&apos;s
-        tool selection is itself deterministic.
-      </Text>
-      <PageFooter />
-    </Page>
-  )
-}
+// The former standalone "Tool selection & sequencing" page (Increment 1A) was
+// MERGED into the per-tool consolidated section (EngineeringConsolidatedToolPage,
+// "Engineering — computed tool by tool"). Its descriptor content — each tool's
+// §N + what it computes / why selected + Inputs<-§x / Outputs->§y — now renders
+// in the SAME block as that tool's worked maths, ordered §1…§N, so the maths sits
+// WITH the tool that produced it (owner's instruction 2026-06-10) rather than two
+// pages apart. The tool-selection-narrative helper is still the source of the
+// descriptor prose; only the standalone PAGE was removed. The "How the whole
+// plant was computed" DIAGRAM page (above) stays as the high-level map.
 
 
 // ─── U11 · Deterministic Physics Narrative — MERGED 2026-06-04 ──────────────
@@ -14379,6 +14314,10 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
   const tools: any[] = (page.tools as any[]).slice().sort((a, b) =>
     String(a?.tool_name || a?.tool_id).localeCompare(String(b?.tool_name || b?.tool_id)),
   )
+  // §-cross-reference ledger — prefix each per-tool quantity card with the SAME
+  // stable §-number the Tool Selection + Engineering Calculations pages use, so
+  // a reader can match a card here to the worked block there. Null-safe.
+  const ledger = ledgerFor(state)
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
@@ -14408,6 +14347,8 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
         // 40-60% whitespace — fix carried over from the pre-collapse build).
         const reserveHeight = 65
         const narr = getToolNarrative(tool.tool_id)
+        const sectionNo = ledger?.byToolId.get(tool.tool_id)?.num
+        const cardName = `${sectionNo != null ? `§${sectionNo} · ` : ''}${normalise_unicode(tool.tool_name || tool.tool_id)}`
         return (
           <View
             key={tool.tool_id || `tool-${ti}`}
@@ -14416,7 +14357,7 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
           >
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
               <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK }}>
-                {normalise_unicode(tool.tool_name || tool.tool_id)}
+                {cardName}
                 <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
                   {tool.tool_version ? `  v${tool.tool_version}` : ''}
                 </Text>
@@ -15056,6 +14997,48 @@ function workedDedupSeenSet(state: any): Set<string> {
   if (!s) { s = new Set<string>(); _workedDedupSeen.set(state, s) }
   return s
 }
+
+// ── §-cross-reference ledger, render-scoped cache (2026-06-10) ──────────────
+// The engineering ledger (scripts/lib/engineering-ledger.ts) assigns a STABLE
+// §-number to each tool by execution order + records its §-ref inputs/outputs.
+// It is the SINGLE SOURCE OF TRUTH for §-numbers across all three render sites
+// (Tool Selection, Engineering Calculations, the per-tool quantity cards), so a
+// number reads identically wherever it appears. Cached on `state` identity
+// (mirrors _toolRouteCache) so the 60+ ToolsComputedBlock renders share one
+// build. Never throws (the helper is try/caught internally + here).
+const _ledgerCache = new WeakMap<object, EngineeringLedger>()
+function ledgerFor(state: any): EngineeringLedger | null {
+  if (!state || typeof state !== 'object') {
+    try { return buildEngineeringLedger(state) } catch { return null }
+  }
+  const hit = _ledgerCache.get(state)
+  if (hit) return hit
+  let lg: EngineeringLedger | null = null
+  try { lg = buildEngineeringLedger(state) } catch { lg = null }
+  if (lg) _ledgerCache.set(state, lg)
+  return lg
+}
+
+// ── §-keyed worked-block de-duplication (2026-06-10) ────────────────────────
+// The sub-module splitter routes ONE tool to several cells, so the SAME tool's
+// worked block would render under each (e.g. pressure-vessel:design under
+// Module 3 + Module 8). Per the owner's traceability ask, we render a tool's
+// FULL worked block ONCE — under its §N, at the FIRST place it appears in
+// document order — and at every later location emit a one-line cross-reference
+// ("Sized in §N · <Tool> — see Engineering Calculations") instead of reprinting
+// the maths. This is distinct from (and supersedes, for the §-world) the older
+// step-signature collapse above: it keys on tool_id + §, so it is exact, needs
+// no formula comparison, and always points the reader at the canonical block.
+// react-pdf renders the Document tree synchronously in tree order, so the FIRST
+// ToolsComputedBlock to emit a given tool is deterministically the canonical
+// one. Keyed on `state` identity → resets automatically for a fresh render.
+const _ledgerToolRendered = new WeakMap<object, Set<string>>()
+function ledgerRenderedToolSet(state: any): Set<string> {
+  if (!state || typeof state !== 'object') return new Set<string>()
+  let s = _ledgerToolRendered.get(state)
+  if (!s) { s = new Set<string>(); _ledgerToolRendered.set(state, s) }
+  return s
+}
 function workedDedupFirstToolMap(state: any): Map<string, string> {
   if (!state || typeof state !== 'object') return new Map<string, string>()
   let m = _workedDedupFirstTool.get(state)
@@ -15082,6 +15065,120 @@ export function toolBlockSignature(worked: any[]): string {
   // repeat — fall back to per-step collapse rather than whole-block.
   if (parts.some((p) => p === '')) return ''
   return parts.join('‖')
+}
+
+// ─── §-CONSOLIDATED Engineering section (2026-06-10) ─────────────────────────
+// MERGE of the former standalone "Tool selection & sequencing" page +
+// "Engineering Calculations" page into ONE per-tool consolidated section,
+// ordered §1…§N by execution order. The owner's instruction: "if you're doing a
+// §20 Mass Budget Aggregator and it says where the inputs are and what the
+// outputs are, it is useful to actually have the maths THERE rather than
+// anywhere else." So each tool now renders ONE block carrying BOTH its
+// descriptor (what it computes / why selected / Inputs<-§x / Outputs->§y, from
+// the SAME ledger + tool-selection-narrative helpers the old page used) AND its
+// worked maths (from the SAME toolsUsedPage[].worked data the old page used),
+// plus a "Sizes:" label so the module/equipment context the module-ordered page
+// carried is not lost. The standalone Tool-selection page is removed; the
+// "How the whole plant was computed" DIAGRAM page + the Tools-Used appendix are
+// untouched. NO new compute, NO LLM; pulls only data already in `state`.
+
+// Reverse the tool→cells routing into a per-tool list of "Sizes: <module> —
+// <equipment>" labels. Mirrors EngineeringCalculationsPage's own sub-name logic
+// (primary word's name_human → humaniseSubName) so the wording matches. The
+// label is module-display + the sub-module's primary part; module-spanning tools
+// list each cell. Empty for a system-level tool the router placed nowhere (e.g.
+// the mass aggregator) — that context lives in its Inputs<-§ line instead.
+function toolSizesLabels(state: any, toolId: string): string[] {
+  try {
+    const routes = computeToolRoutes(state)
+    const cells = routes.get(toolId)
+    if (!cells || cells.size === 0) return []
+    const modules: any[] = state?.moduleDecomposition?.modules ?? []
+    const labels: string[] = []
+    const seen = new Set<string>()
+    // Stable order: by module index then sub index.
+    const sorted = Array.from(cells).sort((a, b) => {
+      const [am, as] = a.split(':').map(Number)
+      const [bm, bs] = b.split(':').map(Number)
+      return am - bm || as - bs
+    })
+    for (const cell of sorted) {
+      const [mi, si] = cell.split(':').map(Number)
+      const m = modules[mi]
+      if (!m) continue
+      const subs: any[] = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+      const sm = subs[si]
+      const modName = String(m?.display_name || humanise(String(m?.module ?? '')) || `Module ${mi + 1}`)
+      let part = ''
+      if (sm) {
+        const ws: any[] = Array.isArray(sm?.words) ? sm.words : []
+        const prim = ws.find((w: any) => w && w.name_human)
+        part = humaniseSubName(String(prim?.name_human || sm?.name_human || sm?.id || '')).trim()
+      }
+      const label = part ? `${britishise(normalise_unicode(modName))} — ${normalise_unicode(part)}` : britishise(normalise_unicode(modName))
+      if (label && !seen.has(label)) { seen.add(label); labels.push(label) }
+    }
+    return labels
+  } catch {
+    return []
+  }
+}
+
+// A single tool's consolidated entry: §-number, identity, the descriptor prose
+// (owns / whySelected from the tool-selection narrative), the ledger entry (for
+// the §-ref Inputs/Outputs + provenance strip), its worked-calc steps, and the
+// equipment it sizes. Assembled ONCE per render from the shared helpers.
+interface ConsolidatedToolEntry {
+  num: number
+  id: string
+  name: string
+  owns: string
+  whySelected: string
+  led: LedgerEntry | undefined
+  worked: any[]
+  sizes: string[]
+}
+
+// Assemble the §-ordered consolidated tool list. The ledger's `order` IS the
+// execution order (§1…§N) and the single source of §-numbers; the narrative
+// supplies the descriptor prose; toolsUsedPage[].worked supplies the maths.
+// Null-safe: returns [] when no orchestrator tools ran.
+function buildConsolidatedToolList(state: any): ConsolidatedToolEntry[] {
+  try {
+    const ledger = ledgerFor(state)
+    if (!ledger || ledger.order.length === 0) return []
+    const page = readToolsUsedPage(state)
+    const toolById = new Map<string, any>()
+    for (const t of (Array.isArray(page?.tools) ? page!.tools : [])) {
+      const id = String(t?.tool_id ?? '')
+      if (id) toolById.set(id, t)
+    }
+    let narrativeById = new Map<string, ToolNarrativeEntry>()
+    try {
+      const n = buildToolSelectionNarrative(state)
+      for (const t of (Array.isArray(n?.tools) ? n.tools : [])) narrativeById.set(t.id, t)
+    } catch { narrativeById = new Map() }
+
+    const out: ConsolidatedToolEntry[] = []
+    ledger.order.forEach((id, i) => {
+      const led = ledger.byToolId.get(id)
+      const nar = narrativeById.get(id)
+      const tool = toolById.get(id)
+      out.push({
+        num: led?.num ?? (i + 1),
+        id,
+        name: led?.name ?? String(tool?.tool_name || id),
+        owns: String(nar?.owns ?? '').trim(),
+        whySelected: String(nar?.whySelected ?? '').trim(),
+        led,
+        worked: Array.isArray(tool?.worked) ? tool.worked : [],
+        sizes: toolSizesLabels(state, id),
+      })
+    })
+    return out
+  } catch {
+    return []
+  }
 }
 
 // (2026-06-04) The former shared `WorkedCalcSteps` renderer was inlined into
@@ -15137,6 +15234,12 @@ function ToolsComputedBlock({
   // colour constants). Both are keyed on `state` identity → reset per render.
   const dedupSeen = workedDedupSeenSet(state)
   const dedupFirstTool = workedDedupFirstToolMap(state)
+  // §-cross-reference ledger (single source of truth for §-numbers) + the
+  // render-scoped "this tool's full block already printed" set that drives the
+  // §-keyed de-dup (full block once under its §N, a one-line cross-reference at
+  // every later location). Both null-safe.
+  const ledger = ledgerFor(state)
+  const ledgerToolRendered = ledgerRenderedToolSet(state)
   // ── DEDUP IS OPT-IN (2026-06-05) ───────────────────────────────────────────
   // Default OFF: every tool's full worked[] steps print, with NO collapse and NO
   // "not repeated"/"as above" stub. The collapse BACKFIRED — the stubs landed on
@@ -15217,17 +15320,46 @@ function ToolsComputedBlock({
     if (blockSig !== '' && !dedupFirstTool.has(blockSig)) dedupFirstTool.set(blockSig, toolDisplayName)
     const firstToolName = blockSig !== '' ? dedupFirstTool.get(blockSig) : undefined
 
+    // ── §-cross-reference heading + de-dup (2026-06-10) ──────────────────────
+    // The §N comes from the ledger (stable, execution-order). A tool whose full
+    // worked block ALREADY printed earlier in this document collapses to a
+    // single cross-reference line pointing at its §N — so the maths prints once
+    // and a reader at the second location is sent to the canonical block. The
+    // FIRST occurrence (in tree order) prints in full and is marked rendered.
+    const led = ledger?.byToolId.get(tool.tool_id)
+    const sectionNo = led?.num
+    const headingLabel = sectionNo ? `§${sectionNo} · ${toolDisplayName}` : toolDisplayName
+    const sectionCrossRef = sectionNo != null && ledgerToolRendered.has(tool.tool_id)
+
     rowNodes.push(
-      <View style={{ paddingTop: ti === 0 ? 0 : 9, paddingBottom: worked.length > 0 ? 4 : 0, paddingHorizontal: PADX }}>
+      <View style={{ paddingTop: ti === 0 ? 0 : 9, paddingBottom: worked.length > 0 ? (sectionCrossRef ? 0 : 4) : 0, paddingHorizontal: PADX }}>
         <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK }}>
-          {toolDisplayName}
+          {headingLabel}
           <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
             {tool.tool_version ? `  v${tool.tool_version}` : ''}
           </Text>
         </Text>
+        {led && !sectionCrossRef ? (
+          <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.4, marginTop: 1 }}>
+            {normalise_unicode(ledgerProvenanceStrip(led))}
+          </Text>
+        ) : null}
       </View>,
     )
-    if (worked.length > 0 && wholeBlockRepeat) {
+    // Claim this tool's §N for the FIRST place its full content renders, so any
+    // later location collapses to the cross-reference above.
+    if (sectionNo != null && !sectionCrossRef) ledgerToolRendered.add(tool.tool_id)
+    if (sectionCrossRef) {
+      // This tool's full worked block was rendered earlier under its §N — emit a
+      // one-line cross-reference instead of reprinting the maths (step 4 de-dup).
+      rowNodes.push(
+        <View style={{ paddingHorizontal: PADX, paddingBottom: 0 }}>
+          <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic', lineHeight: 1.45 }}>
+            {`Sized in §${sectionNo} · ${toolDisplayName} — see the full worked calculation in Engineering Calculations.`}
+          </Text>
+        </View>,
+      )
+    } else if (worked.length > 0 && wholeBlockRepeat) {
       // Entire worked block is a byte-identical repeat of one shown earlier —
       // collapse to a single muted back-reference instead of reprinting every
       // step. The heading above still tells the reader this tool sized this
@@ -15410,32 +15542,178 @@ function SubModuleToolsCallout({ state, moduleSpec, subId }: { state: any; modul
   )
 }
 
-// ─── PART 1 · Engineering Calculations (2026-06-08) ──────────────────────────
-// Tristan: "how this is computed" (the worked calcs) belongs in the ENGINEERING
-// part of the document, not inline in the Part-2 build modules. This page
-// consolidates EVERY sub-module's worked calculation — the same ToolsComputedBlock
-// content that used to render in §6 — grouped by module -> sub-module, in Part 1.
-// The Part-2 modules no longer carry the worked calcs (ModuleToolsCallout /
-// SubModuleToolsCallout calls removed), which also collapses the big §6 page gaps
-// (those were the large worked-calc blocks forcing early page breaks via
-// minPresenceAhead). Its own "Engineering Calculations" running header buckets it
-// into the scorer's `engineering_calcs` section (scored on its own merits, not
-// mis-counted as design_modules). try/catch -> null so a fault never breaks the PDF.
-function EngineeringCalculationsPage({ state, project }: { state: any; project: string }) {
-  try {
-    const rawModules: any[] = Array.isArray(state?.moduleDecomposition?.modules) ? state.moduleDecomposition.modules : []
-    const modules = (() => { try { return order_modules(rawModules as any) } catch { return rawModules } })()
-    if (modules.length === 0) return null
-    const perModule = modules.map((m: any) => {
-      const spanning = moduleSpanningToolIds(state, m)
-      const spanSet = new Set(spanning)
-      const subs: any[] = Array.isArray(m?.sub_modules) ? m.sub_modules : []
-      const subBlocks = subs
-        .map((sm: any) => ({ sm, ids: subModuleToolIds(state, m, undefined, String(sm?.id ?? '')).filter((id: string) => !spanSet.has(id)) }))
-        .filter((x: any) => Array.isArray(x.ids) && x.ids.length > 0)
-      return { m, spanning, subBlocks }
-    }).filter((x: any) => x.spanning.length > 0 || x.subBlocks.length > 0)
-    if (perModule.length === 0) return null
+// ─── PART 1 · Engineering — computed tool by tool (CONSOLIDATED 2026-06-10) ───
+// MERGES the former standalone "Tool selection & sequencing" page + the module-
+// ordered "Engineering Calculations" page into ONE per-tool section, ordered
+// §1…§N by execution order. Each tool renders ONE consolidated block holding
+// BOTH its descriptor (what it computes / why selected / Inputs<-§x / Outputs->
+// §y) AND — immediately, in the same block — its WORKED CALCULATION, so a reader
+// at "§20 Mass Budget Aggregator" sees its maths THERE (owner's instruction),
+// not on a separate page. A "Sizes:" line keeps the module/equipment context the
+// old module-ordered page carried. A tool with no worked maths (an aggregator)
+// shows its descriptor + an explicit "No standalone worked calculation —
+// aggregates upstream results" line. Pulls only data already in state (ledger +
+// tool-selection-narrative + toolsUsedPage[].worked); NO new compute, NO LLM.
+//
+// Pagination: a single tool can emit 7+ worked steps and exceed a page, so this
+// follows ToolsComputedBlock's proven idiom — the coloured card is built from a
+// flat list of ATOMIC wrap={false} rows (descriptor rows + worked-box rows),
+// each carrying the peach side-border, with top/bottom caps on the first/last
+// row of the tool's block. No single coloured View ever spans a page break
+// (the full-page-peach-gap fix). try/catch -> null so a fault never breaks the PDF.
+function EngineeringConsolidatedToolPage({ state, project }: { state: any; project: string }) {
+  // Data assembly is internally try/caught (buildConsolidatedToolList +
+  // toolSizesLabels both return safe defaults on fault), so NO outer try/catch
+  // wraps the returned JSX — react-hooks/error-boundaries forbids constructing
+  // JSX inside try/catch, and an empty list already short-circuits to null.
+  {
+    const entries = buildConsolidatedToolList(state)
+    if (entries.length === 0) return null
+
+    // Peach card palette — identical to ToolsComputedBlock so the section reads
+    // consistently with the rest of the engineering typography.
+    const PEACH = COMPUTE_AMBER_SOFT
+    const PEACH_LINE = COMPUTE_AMBER_LINE
+    const PADX = 11
+    const side = { backgroundColor: PEACH, borderLeftWidth: 0.8, borderRightWidth: 0.8, borderColor: PEACH_LINE }
+
+    // Build the flat atomic-row stack for ONE tool's consolidated block.
+    const toolRows = (e: ConsolidatedToolEntry): React.ReactNode[] => {
+      const rows: React.ReactNode[] = []
+      const headingLabel = `§${e.num} · ${asciiSafe(e.name)}`
+      // Header bar: §N · name (left) + tool_id (right).
+      rows.push(
+        <View
+          style={{
+            flexDirection: 'row', alignItems: 'baseline',
+            paddingVertical: 6, paddingHorizontal: PADX,
+            borderBottomWidth: 0.8, borderBottomColor: '#f3ddcf',
+          }}
+        >
+          <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER_DEEP }}>
+            {headingLabel}
+          </Text>
+          <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Oblique', color: MUTED }}>
+            {asciiSafe(e.id)}
+          </Text>
+        </View>,
+      )
+      // Descriptor: what it computes + why selected.
+      if (e.owns || e.whySelected) {
+        rows.push(
+          <View style={{ paddingTop: 7, paddingBottom: 3, paddingHorizontal: PADX }}>
+            <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
+              {e.owns ? (<><Text style={{ fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER }}>What it computes: </Text>{asciiSafe(e.owns)} </>) : null}
+              {e.whySelected ? asciiSafe(e.whySelected) : null}
+            </Text>
+          </View>,
+        )
+      }
+      // Inputs / Outputs §-ref lines (single source of truth: the ledger).
+      if (e.led) {
+        rows.push(
+          <View style={{ paddingTop: 1, paddingBottom: 3, paddingHorizontal: PADX }}>
+            <Text style={{ fontSize: 8.5, color: '#28313f', lineHeight: 1.45 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: MUTED }}>Inputs {'<- '}</Text>
+              {asciiSafe(ledgerFormatInputs(e.led))}
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#28313f', lineHeight: 1.45, marginTop: 1 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: MUTED }}>Outputs {'-> '}</Text>
+              {asciiSafe(ledgerFormatOutputs(e.led))}
+            </Text>
+          </View>,
+        )
+      }
+      // "Sizes:" — the module/equipment this tool's maths grounds (context the
+      // module-ordered page carried). Omitted for a tool the router placed
+      // nowhere (its Inputs<-§ line already names what it aggregates).
+      if (e.sizes.length > 0) {
+        rows.push(
+          <View style={{ paddingTop: 1, paddingBottom: 4, paddingHorizontal: PADX }}>
+            <Text style={{ fontSize: 8, color: MUTED, lineHeight: 1.45 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold' }}>Sizes: </Text>
+              {asciiSafe(e.sizes.join('; '))}
+            </Text>
+          </View>,
+        )
+      }
+
+      // WORKED CALCULATION — immediately under the descriptor, in the same block.
+      if (e.worked.length > 0) {
+        // Caption row (top of the inner white worked box).
+        rows.push(
+          <View style={{ paddingHorizontal: PADX, paddingTop: 2 }}>
+            <View
+              style={{
+                backgroundColor: COMPUTE_WORKED_BG,
+                borderTopWidth: 0.6, borderLeftWidth: 0.6, borderRightWidth: 0.6,
+                borderColor: COMPUTE_WORKED_LINE,
+                borderTopLeftRadius: 5, borderTopRightRadius: 5,
+                paddingTop: 8, paddingHorizontal: 10, paddingBottom: 4,
+              }}
+            >
+              <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER, letterSpacing: 0.4 }}>
+                WORKED CALCULATION — EVERY NUMBER CHECKABLE BY HAND
+              </Text>
+            </View>
+          </View>,
+        )
+        // Each worked step is its own row — a continuation of the inner white box
+        // (L/R border, no radius); the last step closes the box (bottom border +
+        // radii). Keeps every coloured View shorter than a page.
+        e.worked.forEach((wc: any, wi: number) => {
+          const lastStep = wi === e.worked.length - 1
+          rows.push(
+            <View style={{ paddingHorizontal: PADX }}>
+              <View
+                style={{
+                  backgroundColor: COMPUTE_WORKED_BG,
+                  borderLeftWidth: 0.6, borderRightWidth: 0.6,
+                  borderBottomWidth: lastStep ? 0.6 : 0,
+                  borderColor: COMPUTE_WORKED_LINE,
+                  borderBottomLeftRadius: lastStep ? 5 : 0,
+                  borderBottomRightRadius: lastStep ? 5 : 0,
+                  paddingHorizontal: 10,
+                  paddingBottom: lastStep ? 8 : 0,
+                }}
+              >
+                <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5, marginBottom: 1 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{normalise_unicode(String(wc.label ?? ''))}</Text>
+                </Text>
+                {wc.formula ? (
+                  <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK_SOFT, lineHeight: 1.5, marginLeft: 6 }}>
+                    {normalise_unicode(String(wc.formula))}
+                  </Text>
+                ) : null}
+                <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: COMPUTE_AMBER, lineHeight: 1.5, marginLeft: 6 }}>
+                  {normalise_unicode(String(wc.substitution ?? ''))}
+                </Text>
+                {Array.isArray(wc.assumptions) && wc.assumptions.length > 0 ? (
+                  <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.45, marginLeft: 6, marginBottom: lastStep ? 0 : 5 }}>
+                    {normalise_unicode('assumes: ' + wc.assumptions.join('; '))}
+                  </Text>
+                ) : (
+                  <View style={{ marginBottom: lastStep ? 0 : 5 }} />
+                )}
+              </View>
+            </View>,
+          )
+        })
+      } else {
+        // No worked maths (an aggregator / property look-up): say so explicitly.
+        rows.push(
+          <View style={{ paddingHorizontal: PADX, paddingTop: 2, paddingBottom: 2 }}>
+            <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic', lineHeight: 1.45 }}>
+              No standalone worked calculation — aggregates upstream results.
+            </Text>
+          </View>,
+        )
+      }
+      // Bottom padding row inside the peach edge.
+      rows.push(<View style={{ height: 8, paddingHorizontal: PADX }} />)
+      return rows
+    }
+
     return (
       <Page size="A4" style={PAGE_STYLE}>
         <PageHeader section="Part 1 · Engineering Calculations" project={project} />
@@ -15444,60 +15722,53 @@ function EngineeringCalculationsPage({ state, project }: { state: any; project: 
           PART 1 · ENGINEERING CALCULATIONS
         </Text>
         <Text style={{ fontSize: 21, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-          How every number was computed
+          Engineering — computed tool by tool
         </Text>
-        <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 14, lineHeight: 1.5 }}>
-          The worked engineering calculations that size the plant, grouped by module and sub-module. Every quantity used
-          downstream in the design, the bill of materials and the costs traces to a step here, and each is checkable by
-          hand. How it is built — equipment, parts and suppliers — follows in Part 2.
+        <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 6, lineHeight: 1.5 }}>
+          Every engineering tool the engine auto-selected, in the order it ran (§1…§{entries.length}). Each block states
+          what the tool computes and why it was chosen, names the §-numbers it reads (Inputs) and the §-numbers or the
+          Bill of Materials it feeds (Outputs), then shows its worked calculation — so the maths sits with the tool that
+          produced it, checkable by hand. How it is built — equipment, parts and suppliers — follows in Part 2.
         </Text>
-        {perModule.map((entry: any, mi: number) => {
-          const m = entry.m
-          const groupLabel = String(m?.display_name || humanise(String(m?.module ?? '')) || `Module ${mi + 1}`)
+        <Text style={{ fontSize: 8, color: MUTED, marginBottom: 12, lineHeight: 1.5, fontStyle: 'italic' }}>
+          The §-numbers are stable and shared across the report: an Inputs line naming §3 points at the §3 block here;
+          the Tools-Used index at the back lists the same §-numbers. This rationale and ordering are generated
+          deterministically from the recorded tool run — it is not an LLM narration.
+        </Text>
+        {entries.map((e: ConsolidatedToolEntry, ei: number) => {
+          const rows = toolRows(e)
+          const lastIdx = rows.length - 1
           return (
-            <View key={`ecp-${mi}`} style={{ marginTop: mi > 0 ? 16 : 2 }} minPresenceAhead={48}>
-              <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.8, marginBottom: 2 }}>
-                {`MODULE ${mi + 1}`}
-              </Text>
-              <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>
-                {britishise(normalise_unicode(groupLabel))}
-              </Text>
-              <View style={{ height: 0.6, backgroundColor: RULE_SOFT, marginBottom: 8 }} />
-              {entry.spanning.length > 0 ? (
-                <ToolsComputedBlock
-                  toolIds={entry.spanning}
-                  state={state}
-                  heading="Spanning tools — size more than one sub-module"
-                  intro="The engineering tools below size equipment across more than one of this module's sub-modules, so their worked calculation is shown once here."
-                />
-              ) : null}
-              {entry.subBlocks.map((x: any, si: number) => {
-                const ws: any[] = Array.isArray(x.sm?.words) ? x.sm.words : []
-                const prim = ws.find((w: any) => w && w.name_human)
-                const lbl = normalise_unicode(humaniseSubName(String(prim?.name_human || x.sm?.name_human || x.sm?.id || ''))).trim()
-                const subName = lbl ? lbl.charAt(0).toUpperCase() + lbl.slice(1) : `Sub-module ${si + 1}`
-                return (
-                  <View key={`ecp-${mi}-${si}`} style={{ marginTop: 9 }} minPresenceAhead={38}>
-                    <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>
-                      {subName}
-                    </Text>
-                    <ToolsComputedBlock
-                      toolIds={x.ids}
-                      state={state}
-                      compact
-                      heading="How this is computed"
-                      intro="The engineering tool(s) below computed the quantities that size this sub-module's equipment — every number is checkable by hand from the worked steps."
-                    />
-                  </View>
-                )
-              })}
+            <View
+              key={`ect-${ei}`}
+              style={{ marginBottom: 12 }}
+              // Keep the header + first descriptor row together so a tool's
+              // heading never orphans at a page foot; transparent wrapper paints
+              // nothing if the reservation pushes to the next page.
+              minPresenceAhead={70}
+            >
+              {rows.map((node, i) => (
+                <View
+                  key={i}
+                  wrap={false}
+                  style={{
+                    ...side,
+                    borderTopWidth: i === 0 ? 0.8 : 0,
+                    borderTopLeftRadius: i === 0 ? 6 : 0,
+                    borderTopRightRadius: i === 0 ? 6 : 0,
+                    borderBottomWidth: i === lastIdx ? 0.8 : 0,
+                    borderBottomLeftRadius: i === lastIdx ? 6 : 0,
+                    borderBottomRightRadius: i === lastIdx ? 6 : 0,
+                  }}
+                >
+                  {node}
+                </View>
+              ))}
             </View>
           )
         })}
       </Page>
     )
-  } catch {
-    return null
   }
 }
 
@@ -16118,8 +16389,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           'System overview: how the plant works',
           'Engineering basis: process flow, mass and energy balance, feasibility verdict',
           'How the whole plant was computed: the tool dependency graph',
-          'Tool selection and sequencing: why each tool was chosen, and in what order',
-          'Engineering calculations: the worked maths, by module and sub-module',
+          'Engineering — computed tool by tool: why each tool was chosen, what it reads and feeds, and its worked maths',
         ]}
         project={project}
       />
@@ -16192,16 +16462,17 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           Engineering Basis (2026-06-10 reorder): the reader knows what the plant
           IS before seeing HOW it was computed. */}
       <EngineeringToolsFlowPage state={state} project={project} bomTotals={bomTotals} statePath={statePath} />
-      {/* Increment 1A (2026-06-10): deterministic "Tool selection & sequencing"
-          narrative — WHY each tool was auto-selected + HOW they interact +
-          sequence. Sits immediately after the dependency diagram so a reader
-          can judge the auto-selection in prose, not just boxes-and-arrows.
-          Renders null when no orchestrator tools ran (legacy / LLM-fallback). */}
-      <ToolSelectionNarrativePage state={state} project={project} />
-      {/* Part 1 · Engineering Calculations — the worked maths ("how this is
-          computed"), moved OUT of the Part-2 modules into the engineering part
-          (Tristan 2026-06-08). Closes the §6 page gaps too. */}
-      <EngineeringCalculationsPage state={state} project={project} />
+      {/* Part 1 · Engineering — computed tool by tool (CONSOLIDATED 2026-06-10):
+          the former standalone "Tool selection & sequencing" page + the module-
+          ordered "Engineering Calculations" page MERGED into ONE per-tool section,
+          §1…§N by execution order. Each tool's descriptor (what it computes / why
+          chosen / Inputs<-§x / Outputs->§y) renders TOGETHER with its worked maths
+          — so "§20 Mass Budget Aggregator" shows its numbers THERE, not on a
+          separate page (Tristan 2026-06-10). The "How the whole plant was computed"
+          DIAGRAM page (above) stays as the map; this is the per-tool detail. Sits
+          immediately after the dependency diagram so the reader meets the map, then
+          the per-tool detail. Renders null when no orchestrator tools ran. */}
+      <EngineeringConsolidatedToolPage state={state} project={project} />
       {/* Section 5 · Cost Summary (cost-by-module). Moved AHEAD of the Module
           Map in the 2026-06-05 navigability refactor so the front-to-back
           numbering stays monotonic: the reader meets the system architecture
