@@ -107,7 +107,88 @@ const BATTERY: SizingRule[] = [
     size: (p) => [...qty(1), ...spec('dimension', num(p, 'dc_bus_voltage_v'), 'V range')] },
 ]
 
-const FAMILIES: Record<string, SizingRule[]> = { battery: BATTERY }
+// ── helper: find the first numeric param whose KEY matches a pattern (tool output
+//    names vary — reactor_volume_m3 / tank_volume_m3 / working_volume_m3 / …).
+function findNum(p: SizingParams, patterns: RegExp[]): number | undefined {
+  for (const [k, v] of Object.entries(p)) {
+    if (typeof v === 'number' && Number.isFinite(v) && patterns.some((rx) => rx.test(k))) return v
+  }
+  return undefined
+}
+
+/**
+ * Derive a cylindrical vessel's CONSISTENT dimensions from its working volume.
+ * Pick aspect ratio AR = L/D, then D = (4V/(π·AR))^(1/3), L = AR·D. The emitted
+ * dimension is geometrically guaranteed to hold the stated volume — fixing the
+ * "58.7 L tank drawn 450 × 300 mm" class of bug (a Ø450 × 300 cylinder holds only
+ * 47.7 L, not 58.7 L). Wall thickness folds into the SAME dimension string (one
+ * value per kind — the modifier-consistency gate rejects two `dimension` mods) via
+ * ASME VIII UG-27 hoop stress when a design pressure is supplied. Pure; exported
+ * for tests. Returns [] when no volume is supplied (never invents geometry).
+ */
+export function vesselDimsFromVolume(
+  volume_m3: number | undefined,
+  aspect = 3,
+  design_pressure_bar?: number,
+): ModifierCharacter[] {
+  if (volume_m3 === undefined || volume_m3 <= 0) return []
+  const D = Math.cbrt((4 * volume_m3) / (Math.PI * aspect))
+  const Dmm = Math.round(D * 1000)
+  const Lmm = Math.round(aspect * D * 1000)
+  let dimStr = `Ø${Dmm} × ${Lmm} mm (cylinder, L/D ${aspect}, sized from ${Math.round(volume_m3 * 1000) / 1000} m³)`
+  if (design_pressure_bar !== undefined && design_pressure_bar > 0) {
+    const P = design_pressure_bar * 0.1 // bar → MPa
+    const S = 138 // 304SS allowable stress, MPa
+    const E = 0.85 // longitudinal joint efficiency
+    const tmm = Math.round(((P * (Dmm / 2)) / (S * E - 0.6 * P) + 3) * 10) / 10 // UG-27 hoop + 3 mm corrosion
+    dimStr = `Ø${Dmm} × ${Lmm} mm × ${tmm} mm wall (L/D ${aspect}, ASME UG-27 @ ${design_pressure_bar} bar)`
+  }
+  return [
+    mod('capacity', String(Math.round(volume_m3 * 1000) / 1000), 'm³ working volume'),
+    mod('dimension', dimStr),
+  ]
+}
+
+/** Pipe/line bore from volumetric flow at a design velocity: D = √(4Q/(π·v)). */
+export function pipeBoreFromFlow(flow_m3_h: number | undefined, velocity_m_s = 2): ModifierCharacter[] {
+  if (flow_m3_h === undefined || flow_m3_h <= 0) return []
+  const D = Math.sqrt((4 * (flow_m3_h / 3600)) / (Math.PI * velocity_m_s))
+  return [mod('dimension', `DN${Math.round(D * 1000)} bore (${velocity_m_s} m/s design velocity)`)]
+}
+
+/** Keep the FIRST modifier per kind — used in the universal union path so two
+ *  families matching one word can't emit duplicate-kind conflicts (the bug the
+ *  modifier-consistency gate exists to catch). */
+function dedupeByKind(mods: ModifierCharacter[]): ModifierCharacter[] {
+  const seen = new Set<string>()
+  const out: ModifierCharacter[] = []
+  for (const m of mods) if (!seen.has(m.kind)) { seen.add(m.kind); out.push(m) }
+  return out
+}
+
+// ── PROCESS-PLANT family — emits SELF-CONSISTENT geometry from contract physics.
+//    Every rule is param-gated (emits [] when the contract lacks the source), so it
+//    only fires when a real tool produced the quantity (grounded via Phase 1). The
+//    vessel rule is the centrepiece: dimensions are DERIVED from the working volume,
+//    so a tank/reactor is the right size by construction (the satellite-tank bug).
+const PROCESS_PLANT: SizingRule[] = [
+  { id: 'vessel', match: /tank|vessel|reactor|column|drum|separator|absorber|stripper|crystallis|crystalliz|scrubber|digester|fermenter|autoclave|recrystallis/i,
+    size: (p) => vesselDimsFromVolume(
+      findNum(p, [/(reactor|tank|vessel|working|absorber|stripper|column|buffer|storage|carbonation)_?volume_?m3/i, /volume_m3$/i]),
+      3,
+      findNum(p, [/design_pressure_bar/i, /operating_pressure_bar/i, /pressure_bar/i]),
+    ) },
+  { id: 'pump', match: /\bpump\b|circulation|metering|dosing/i,
+    size: (p) => [...spec('rating_primary', findNum(p, [/flow_?rate_?m3_?h/i, /circulation_?m3_?h/i, /pump_?flow/i]), 'm³/h'), ...spec('performance', findNum(p, [/^head_?m$|pump_?head_?m/i]), 'm head')] },
+  { id: 'heat_exchanger', match: /heat[_\s-]?exchanger|\bhx\b|cooler|condenser|reboiler|economiser|economizer/i,
+    size: (p) => [...spec('rating_primary', findNum(p, [/duty_?kw|heat_?duty|thermal_?duty_?kw|reboiler_?duty/i]), 'kW duty'), ...spec('capacity', findNum(p, [/hx_?area_?m2|exchange_?area_?m2|heat_?transfer_?area_?m2/i]), 'm² area')] },
+  { id: 'compressor_blower', match: /compressor|blower|\bfan\b/i,
+    size: (p) => [...spec('rating_primary', findNum(p, [/compressor_?power_?kw|blower_?power_?kw|gas_?power_?kw/i]), 'kW'), ...spec('capacity', findNum(p, [/gas_?flow_?m3_?h|gas_?nm3_?h/i]), 'm³/h')] },
+  { id: 'pipe_line', match: /\bpipe\b|piping|\bline\b|manifold|\bheader\b/i,
+    size: (p) => pipeBoreFromFlow(findNum(p, [/process_?flow_?m3_?h|line_?flow_?m3_?h|flow_?rate_?m3_?h/i])) },
+]
+
+const FAMILIES: Record<string, SizingRule[]> = { battery: BATTERY, process_plant: PROCESS_PLANT }
 
 // Class → sizing family (coarse; same intent as build-links FAMILY_KEY). Extend as
 // new families gain a ruleset; an unmapped class is left un-sized (Phase-1 baseline).
@@ -121,6 +202,16 @@ const FAMILY_OF: Record<string, string> = {
   marine_ess: 'battery',
   second_life_battery_pack: 'battery',
   vehicle_battery_pack: 'battery',
+  // process-plant family. Most are registered with hand plans + bypass this layer;
+  // the mapping documents intent + applies if one hits the generic path. An UNMAPPED
+  // (truly novel) class gets the universal UNION of all families below.
+  co2_mineralisation: 'process_plant',
+  co2_capture: 'process_plant',
+  direct_air_capture: 'process_plant',
+  e_fuel: 'process_plant',
+  e_fuel_synthesis: 'process_plant',
+  chemical_plant: 'process_plant',
+  water_treatment: 'process_plant',
 }
 
 function flattenParams(contract: ContractInProgress): SizingParams {
@@ -153,9 +244,16 @@ export function applyFamilySizing(
   contract: ContractInProgress,
   className: string,
 ): { family: string | null; sized: number } {
-  const family = FAMILY_OF[String(className ?? '').trim().toLowerCase()] ?? null
-  const rules = family ? FAMILIES[family] : undefined
-  if (!rules) return { family: null, sized: 0 }
+  const mapped = FAMILY_OF[String(className ?? '').trim().toLowerCase()]
+  // Registered class → its single family (first-match-wins, exact prior behaviour).
+  // UNSEEN class → the UNION of every family's rules. Each rule is param-gated, so it
+  // only fires when the contract actually supplies its source quantity (grounded via
+  // Phase 1) — this is the universal path that sizes a never-seen archetype from
+  // whatever physics its tools produced, with no per-class wiring. 2026-06-10 Phase 3.
+  const family = mapped ?? 'universal'
+  const rules = mapped ? FAMILIES[mapped] : Object.values(FAMILIES).flat()
+  if (!rules || rules.length === 0) return { family: null, sized: 0 }
+  const unionMode = !mapped
 
   const p = flattenParams(contract)
   let sized = 0
@@ -163,9 +261,15 @@ export function applyFamilySizing(
     for (const sm of m.sub_modules ?? []) {
       for (const w of sm.words ?? []) {
         const hay = `${w.id ?? ''} ${w.name_human ?? ''} ${w.content_character?.character_id ?? ''} ${w.content_character?.name_human ?? ''}`.toLowerCase()
-        const rule = rules.find((r) => r.match.test(hay))
-        if (!rule) continue
-        const add = rule.size(p)
+        let add: ModifierCharacter[]
+        if (unionMode) {
+          // Apply EVERY matching rule and merge (dedupe by kind keeps the first
+          // value, so two families can't emit a duplicate-kind conflict).
+          add = dedupeByKind(rules.filter((r) => r.match.test(hay)).flatMap((r) => r.size(p)))
+        } else {
+          const rule = rules.find((r) => r.match.test(hay))
+          add = rule ? rule.size(p) : []
+        }
         if (add.length) {
           mergeMods(w, add)
           sized += 1
