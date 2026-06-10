@@ -43,6 +43,7 @@ import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-der
 import { _buildComplianceRows, summariseComplianceRows, computeBomTotals, normalise_unicode, moduleToolIds, break_paragraph, humaniseSubName, toTitleCaseEng, workedStepIdentity, toolBlockSignature, engineAddedItemVisible, _recoverBriefRangeBands, _bandForMetric } from './render-minimal-pdf'
 import { computeRenderQuality, resolveBlenderTemplate } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { formFactorForClass, isFieldErectedForClass } from './lib/orchestrator/envelope'
+import { computeNetInfeasibilityFlag } from './lib/brief-infeasibility-net'
 import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constraint-normaliser'
 import { massAggregator } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
@@ -1144,6 +1145,67 @@ function checkCo2FixInvariants(): Assertion[] {
   }
 
   _co2FixCheck = out
+  return out
+}
+
+// ── UNIVERSAL.brief_infeasibility_flag_nets_oscillation (gate-18, 2026-06-10) ──
+// edge_ai_server rerun failed gate 18 (exit 18, cross-page numeric consistency):
+// the Phase-0 brief refinement loop OSCILLATED (peak_power_draw_kw 3.7 → 0.4 →
+// 3.7 kW) and state.brief.brief_infeasibility_flag recorded only the LAST leg,
+// so the cover banner claimed "the brief's target (0.4 kW) is not physically
+// achievable … relaxed to 3.7 kW" while p.13 prose correctly quoted the brief's
+// REAL 3.7 kW target — a TRUE narrative-vs-narrative contradiction (0.4 kW was
+// the chain's own intermediate value, never the user's ask). The renderer now
+// reconciles the flag to the NET revision via computeNetInfeasibilityFlag()
+// (deterministic, provenance-backed from revision_history — plan E5 auto-correct
+// guard). This invariant pins both directions:
+//   (a) A→B→A oscillation  → null (banner suppressed; no net relaxation)
+//   (b) A→B→C net change   → flag quotes A (the user's value), not B
+//   (c) no provenance      → flag passes through untouched
+//   (d) unapplied legs ignored; non-matching constraints ignored
+function checkBriefInfeasibilityNetInvariant(): Assertion[] {
+  const out: Assertion[] = []
+  const bad: string[] = []
+  const want = (label: string, cond: boolean) => { if (!cond) bad.push(label) }
+
+  const flagLastLeg = { constraint: 'peak_power_draw_kw', original: '0.4 kW', revised: '3.7 kW', factor: '9.25x increase' }
+  const oscillation = [
+    { target_constraint: 'peak_power_draw_kw', original_value: '3.7 kW', revised_value: '0.4 kW', applied: true },
+    { target_constraint: 'peak_power_draw_kw', original_value: '0.4 kW', revised_value: '3.7 kW', applied: true },
+  ]
+
+  // (a) the edge_ai oscillation: net no-op → banner suppressed
+  want('(a) A→B→A oscillation nets to null', computeNetInfeasibilityFlag(flagLastLeg, oscillation) === null)
+
+  // (b) A→B→C: net flag quotes the USER's original value A, with a recomputed net factor
+  const netChange = [
+    { target_constraint: 'unit_cost_ceiling_gbp', original_value: '£12,000', revised_value: '£4,000', applied: true },
+    { target_constraint: 'unit_cost_ceiling_gbp', original_value: '£4,000', revised_value: '£36,000', applied: true },
+  ]
+  const f2 = computeNetInfeasibilityFlag({ constraint: 'unit_cost_ceiling_gbp', original: '£4,000', revised: '£36,000', factor: '9x increase' }, netChange)
+  want('(b) A→B→C nets to A→C', f2 != null && f2.original === '£12,000' && f2.revised === '£36,000')
+  want('(b) net factor recomputed (3× increase)', f2 != null && /^3× increase$/.test(f2.factor))
+
+  // (c) no revision history → flag passes through untouched (no provenance to reconcile)
+  const f3 = computeNetInfeasibilityFlag(flagLastLeg, [])
+  want('(c) no provenance → passthrough', f3 === flagLastLeg)
+  want('(c2) null flag stays null', computeNetInfeasibilityFlag(null, oscillation) === null)
+
+  // (d) unapplied legs + other constraints are ignored when computing the net
+  const mixed = [
+    { target_constraint: 'peak_power_draw_kw', original_value: '3.7 kW', revised_value: '0.4 kW', applied: false }, // proposed, never applied
+    { target_constraint: 'noise_level_dba', original_value: '42 dBA', revised_value: '65 dBA', applied: true },     // different constraint
+    { target_constraint: 'peak_power_draw_kw', original_value: '3.7 kW', revised_value: '7.4 kW', applied: true },
+  ]
+  const f4 = computeNetInfeasibilityFlag({ constraint: 'peak_power_draw_kw', original: '3.7 kW', revised: '7.4 kW', factor: '2x increase' }, mixed)
+  want('(d) unapplied/foreign legs ignored', f4 != null && f4.original === '3.7 kW' && f4.revised === '7.4 kW' && /^2× increase$/.test(f4.factor))
+
+  out.push(assertEq(
+    'UNIVERSAL.brief_infeasibility_flag_nets_oscillation',
+    'computeNetInfeasibilityFlag reconciles the cover infeasibility banner to the NET brief revision: A→B→A oscillation suppresses the banner, A→B→C quotes the user\'s original value with a net factor, missing provenance passes through, unapplied/foreign legs ignored (gate-18 edge_ai 0.4-vs-3.7 kW fix)',
+    bad.length, (n) => n === 0,
+    () => `brief-infeasibility net reconciliation wrong: ${bad.join(' ; ')}. Check scripts/lib/brief-infeasibility-net.ts + the cover banner in render-minimal-pdf.tsx.`,
+  ))
   return out
 }
 
@@ -8104,6 +8166,10 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // Self-contained CO₂-fix invariants — none read the snapshot; memoised so the
   // .venv python (gate 3 of these) spawns once across the whole harness run.
   for (const a of checkCo2FixInvariants()) assertions.push(a)
+
+  // Self-contained gate-18 brief-infeasibility net-reconciliation invariant
+  // (2026-06-10 edge_ai 0.4-vs-3.7 kW cover-banner oscillation fix).
+  for (const a of checkBriefInfeasibilityNetInvariant()) assertions.push(a)
 
   // Self-contained e_fuel_synthesis (Power-to-Liquid Fischer-Tropsch SAF plant)
   // RENDER-PATH invariants — emitter module/part_number coverage + contract

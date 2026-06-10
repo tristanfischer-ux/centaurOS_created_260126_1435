@@ -46,6 +46,7 @@ import {
 import { isConsumable, CLASS_PRICE_SANITY_BOUNDS, keywordCeilingGbp, COMPONENT_CLASS_ORDER } from '../src/lib/pdf-engine-v2/component-classes'
 import { classifyByRules } from './estimate-missing-prices'
 import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
+import { computeNetInfeasibilityFlag } from './lib/brief-infeasibility-net'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
@@ -3549,9 +3550,17 @@ function CoverPage({
         {/* Render-with-flag (2026-06-01): when the brief's target was physically
             infeasible and got relaxed beyond the normal cap, lead with a prominent
             "brief target infeasible" callout so the relaxed numbers below are never
-            mistaken for the brief's actual ask. */}
+            mistaken for the brief's actual ask.
+            Gate-18 fix (2026-06-10): the stored flag records only the LAST leg of
+            the Phase-0 revision loop, so an OSCILLATION (edge_ai 3.7→0.4→3.7 kW)
+            mislabelled the chain's own intermediate value as "the brief's target"
+            and contradicted the body prose (cross-page exit 18). Reconcile to the
+            NET revision from revision_history (deterministic, provenance-backed):
+            net no-op → no banner; net change → banner quotes the brief's REAL
+            original value. See scripts/lib/brief-infeasibility-net.ts. */}
         {(() => {
-          const flag = (state as any)?.brief?.brief_infeasibility_flag
+          const rawFlag = (state as any)?.brief?.brief_infeasibility_flag
+          const flag = computeNetInfeasibilityFlag(rawFlag, (state as any)?.brief?.revision_history)
           if (!flag) return null
           const c = String(flag.constraint ?? '').replace(/_/g, ' ')
           return (
