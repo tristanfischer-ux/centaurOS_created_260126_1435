@@ -4050,14 +4050,17 @@ function PageHeader({ section, project }: { section: string; project: string }) 
   const key = label.replace(/[^a-z0-9]/gi, '').toUpperCase()
   let display = label
   if (!/^PART\d|^APPENDIX|^CONTENTS/.test(key)) {
-    let part = '1' // engineering basis, exec summary, brief*, provenance, compliance, how-computed, system overview, calcs
-    // Part 2 = the build: per-module pages ("Module N ·" → MODULEN), the Module
-    // Map + its exploded view ("Modules" / "Modules — Exploded view" → MODULES…),
-    // specialist questions, and risk/integration. The `MODULES` plural was the
-    // orphaned-header bug: the Module Map opens Part 2 but `^MODULE\d` only
-    // matched the numbered per-module pages, so the map + exploded view mis-tagged
-    // as "PART 1 · MODULES" (2026-06-10 fix). Universal across all classes.
-    if (/^MODULE\d|^MODULES|SPECIALISTQUESTION|RISK.*INTEGRAT/.test(key)) part = '2'
+    let part = '1' // engineering basis, exec summary, brief*, provenance, compliance, how-computed, calcs
+    // Part 2 = the build: the System Overview (moved here 2026-06-10 — "how it
+    // works" orientation prose opens the build), per-module pages ("Module N ·" →
+    // MODULEN), the Module Map + its exploded view ("Modules" / "Modules —
+    // Exploded view" → MODULES…), specialist questions, and risk/integration. The
+    // `MODULES` plural was the orphaned-header bug: the Module Map opens Part 2 but
+    // `^MODULE\d` only matched the numbered per-module pages, so the map + exploded
+    // view mis-tagged as "PART 1 · MODULES" (2026-06-10 fix). SYSTEMOVERVIEW added
+    // 2026-06-10 so the moved System Overview tags Part 2 even via a Section-N
+    // header form. Universal across all classes.
+    if (/^MODULE\d|^MODULES|SYSTEMOVERVIEW|SPECIALISTQUESTION|RISK.*INTEGRAT/.test(key)) part = '2'
     else if (/BILLOFMATERIAL|COST|SOURCING|PROCUREMENT|REGULATOR|TAKINGTHIS|TAKINGFORWARD|ENGAGEMENT|SUPPLIERSTOSOURCE/.test(key)) part = '3'
     display = `Part ${part} · ${label}`
   }
@@ -4902,24 +4905,27 @@ function TableOfContentsPage({ state, project }: { state: any; project: string }
     const parts: { label: string; entries: { num: string; title: string }[] }[] = [
       {
         // Order mirrors the Part-1 render sequence + the Part-1 cover list
-        // (2026-06-10 reorder): what the plant IS (system overview + engineering
-        // basis) precedes how it was COMPUTED (tool dependency graph + tool
-        // selection). No page numbers — single-pass render, `num` is ignored.
+        // (2026-06-10 reorder v2): exec summary → Brief (merged requirements +
+        // provenance) → brief compliance → engineering basis → how-the-whole-
+        // plant-was-computed DIAGRAM → THE ENGINEERING PROBLEM → tool by tool →
+        // cost summary. System Overview moved to Part 2. No page numbers —
+        // single-pass render, `num` is ignored.
         label: 'Part 1 · The engineering',
         entries: [
           { num: '', title: 'Executive Summary' },
-          { num: '1', title: 'Brief & Requirements' },
-          { num: '2', title: 'Brief Provenance' },
+          { num: '1', title: 'Brief (requirements & provenance)' },
           { num: '3', title: 'Brief Compliance & Trade-offs' },
-          { num: '4', title: 'System Overview' },
           { num: '', title: 'Engineering Basis' },
           { num: '', title: 'How the Whole Plant Was Computed' },
+          { num: '', title: 'The Engineering Problem' },
           { num: '', title: 'Engineering — Computed Tool by Tool' },
+          { num: '', title: 'Cost Summary' },
         ],
       },
       {
         label: 'Part 2 · How to build it',
         entries: [
+          { num: '4', title: 'System Overview' },
           { num: '6', title: 'Modules & sub-modules' },
           { num: '7', title: 'Risk & Integration' },
         ],
@@ -5054,15 +5060,20 @@ function ExecutiveSummaryPage({ state, project, bomTotals, costStack, priceReali
   // Open high-severity engineering defect (item 8): the single highest-severity
   // OPEN physics-critic finding the design still carries — surfaced so the
   // summary is honest about feasibility. Prefer a concise self-audit blocking
-  // defect, else the physics-critique HIGH issue (dimension + issue). Trimmed to
-  // one sentence; null when there is no open high-severity defect.
+  // defect, else the physics-critique HIGH issue (dimension + issue). Rendered
+  // in FULL (2026-06-10): the previous 240-char slice cut the defect sentence
+  // mid-word ("…cannot be shipped vertically on…" on the CO2 reactor), leaving
+  // the open-defect statement incomplete. The text wraps to multiple lines in
+  // the Design-outcome paragraph, so there is no layout reason to truncate it;
+  // an honest open-defect must read as a complete sentence. null when there is
+  // no open high-severity defect.
   const openDefect = (() => {
     try {
       const sa: any = state?.selfAudit ?? {}
       if (Array.isArray(sa.blocking_defects) && sa.blocking_defects.length > 0) {
         const d = sa.blocking_defects[0]
         const t = String(typeof d === 'string' ? d : (d?.issue ?? d?.summary ?? '')).replace(/\s+/g, ' ').trim()
-        if (t) return t.length > 240 ? t.slice(0, 240).replace(/\s+\S*$/, '') + '…' : t
+        if (t) return t
       }
       const pc: any = state?.physicsCritique ?? {}
       const issues: any[] = Array.isArray(pc.issues) ? pc.issues : Array.isArray(pc.findings) ? pc.findings : []
@@ -5071,7 +5082,7 @@ function ExecutiveSummaryPage({ state, project, bomTotals, costStack, priceReali
         const dim = String(high.dimension ?? '').replace(/_/g, ' ').trim()
         const iss = String(high.issue ?? '').replace(/\s+/g, ' ').trim()
         const t = iss ? `${dim ? dim + ' — ' : ''}${iss}` : dim
-        if (t) return t.length > 240 ? t.slice(0, 240).replace(/\s+\S*$/, '') + '…' : t
+        if (t) return t
       }
     } catch { /* none */ }
     return null
@@ -5544,12 +5555,20 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 1 · Brief & Requirements" project={project} />
+      {/* MERGE 2026-06-10 (Tristan): "Brief & Requirements" + "Brief Provenance"
+          are now ONE section titled "Brief". This page is the requirements half
+          (operational headline + physical spec + timing); the provenance half
+          (parse summary, verbatim brief, "what you specified vs what the engine
+          added") follows immediately under the SAME "Brief" running header. The
+          numeric "Performance characteristics" spec-sheet that used to render
+          here was REMOVED — it duplicated the Brief Compliance table (same
+          target-vs-achieved metrics), which is now the single home for those. */}
+      <PageHeader section="Section 1 · Brief" project={project} />
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Brief and Requirements
+        Brief
       </Text>
       <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
-        What the product is and what it must do.
+        What the product is and what it must do, and how the brief was interpreted.
       </Text>
 
       {km ? (
@@ -5593,10 +5612,14 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
 
       {whyNow ? (<><SubHeading>Why now</SubHeading><Paragraph>{whyNow}</Paragraph></>) : null}
 
-      {/* ITER-10.5 third review (Tristan 2026-05-20): Performance
-          Characteristics folded INTO the Brief page so there's one
-          section, not two. */}
-      <PerformanceCardBody state={state} />
+      {/* REMOVED 2026-06-10 (Tristan merge): the "Performance characteristics"
+          numeric spec-sheet (PerformanceCardBody) rendered here previously. It
+          listed the same per-metric brief-target-vs-value pairs as the Brief
+          Compliance table one section later — a duplicate metric listing. The
+          Brief Compliance table is now the single home for target-vs-achieved;
+          this merged Brief section carries only the operational headline, the
+          physical-specification block, the overview and the timing ("Why now").
+          The PerformanceCardBody component is retained but no longer called. */}
 
       <PageFooter />
     </Page>
@@ -5797,7 +5820,11 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
       { key: 'product_description', label: 'Product description' },
       { key: 'mission_statement', label: 'Mission' },
       { key: 'target_customers', label: 'Target customers' },
-      { key: 'why_now', label: 'Why now' },
+      // 'why_now' DROPPED here (2026-06-10 Brief merge): the timing is already
+      // shown as the "Why now" prose subsection on the requirements half of this
+      // merged Brief section, so listing it again as a structured-parse row was a
+      // duplicate. Mission / target customers remain because their purpose here is
+      // the parse AUDIT (what the LLM interpreted), distinct from the prose view.
       { key: 'confidence', label: 'Parser confidence' },
     ]
     for (const { key, label } of ORDERED_KEYS) {
@@ -5950,9 +5977,14 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 2 · Brief Provenance" project={project} />
+      {/* MERGE 2026-06-10 (Tristan): this is the provenance half of the unified
+          "Brief" section — same "Section 1 · Brief" running header as the
+          requirements half (which renders immediately before it), so the reader
+          sees ONE "Brief" section spanning both. Title reframed as a sub-part
+          ("Brief — provenance") rather than a fresh standalone section. */}
+      <PageHeader section="Section 1 · Brief" project={project} />
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Brief provenance
+        Brief — provenance
       </Text>
       <Text style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>
         What you asked for, and how we interpreted it.
@@ -5988,7 +6020,7 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
       {userBrief ? (
         <View style={{ marginBottom: 18 }}>
           <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 4, marginBottom: 6 }}>
-            2.0 What you specified, and what the engine added
+            What you specified, and what the engine added
           </Text>
           <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 10, lineHeight: 1.5, fontStyle: 'italic' }}>
             Everything downstream is built from the engine&apos;s expanded reading of your brief. This block
@@ -6063,7 +6095,7 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
           actually holds (Build #23) — calling it "the original" would be the
           very conflation 2.0 exists to fix. */}
       <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 8, marginBottom: 6 }}>
-        {userBrief ? '2.1 Engine-expanded brief, as submitted to the pipeline' : '2.1 Original brief, as submitted'}
+        {userBrief ? 'Engine-expanded brief, as submitted to the pipeline' : 'Original brief, as submitted'}
       </Text>
       <Text style={{ fontSize: 9, color: MUTED, marginBottom: 8, fontStyle: 'italic' }}>
         {userBrief
@@ -6092,7 +6124,7 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
           LLM-inferred fields (source !== 'user') so the user can audit which
           constraints came from them vs which the LLM added. */}
       <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 6, marginBottom: 6 }}>
-        2.2 LLM-interpreted brief, as consumed by the pipeline
+        LLM-interpreted brief, as consumed by the pipeline
       </Text>
       <Text style={{ fontSize: 9, color: MUTED, marginBottom: 8, fontStyle: 'italic' }}>
         Structured parse output. Every field shown here is what the downstream
@@ -8621,7 +8653,11 @@ function SystemOverviewPage({ state, project }: { state: any; project: string })
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 4 · System Overview" project={project} />
+      {/* Part 2 (2026-06-10 reorder): System Overview moved out of Part 1 into the
+          build section. Header tagged "Part 2 · System Overview" directly so the
+          running header reads PART 2; the PageHeader Part-2 inference also matches
+          SYSTEMOVERVIEW as a belt-and-braces universal guard. */}
+      <PageHeader section="Part 2 · System Overview" project={project} />
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
         System Overview — how this design works
       </Text>
@@ -15472,8 +15508,9 @@ function SubModuleToolsCallout({ state, moduleSpec, subId }: { state: any; modul
 // row of the tool's block. No single coloured View ever spans a page break
 // (the full-page-peach-gap fix). try/catch -> null so a fault never breaks the PDF.
 // ─── PART 1 · The engineering problem — and why these tools (2026-06-10) ─────
-// ADDITIVE, DETERMINISTIC render-only section. Sits AFTER System Overview and
-// BEFORE the consolidated tool-by-tool engineering section. It states, in
+// ADDITIVE, DETERMINISTIC render-only section. Sits AFTER the how-the-whole-plant-
+// was-computed dependency DIAGRAM and BEFORE the consolidated tool-by-tool
+// engineering section (2026-06-10 reorder v2) — the lead-in to the maths. It states, in
 // founder-readable language, the PHYSICS/ENGINEERING PROBLEM the design has to
 // solve, then presents the auto-selected tools as the ANSWER to each sub-problem
 // — carrying the SAME §-numbers used everywhere else (from buildEngineeringLedger
@@ -16197,11 +16234,14 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
             reboiler / cross-exchanger / condenser duties + absorber height already
             render in Block 2's mass & energy balance table below). The intro is
             now a single navigational lead-in; the plant identity stays in System
-            Overview, the numbers in the balance table — each idea has one home. */}
+            Overview, the numbers in the balance table — each idea has one home.
+            Cross-ref updated 2026-06-10 v2: System Overview moved to Part 2, so it
+            is no longer "above" — the pointer now reads "in Part 2" (the plain-
+            English plant identity still has exactly one home; not re-duplicated). */}
         <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 16, lineHeight: 1.5 }}>
           The process flow, the mass and energy balance, and the feasibility verdict are pulled
           to the front here so the plant can be judged on the engineering before the per-module
-          detail. System Overview (above) covers what the plant is and how it works.
+          detail. The System Overview at the start of Part 2 covers what the plant is and how it works.
         </Text>
 
         {/* ── BLOCK 1 · PROCESS FLOW ─────────────────────────────────────── */}
@@ -16606,25 +16646,28 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
         eyebrow="Part 1"
         title={"Engineering & maths"}
         question="Does it work?"
-        blurb={"Everything you need to judge whether the plant stands up, pulled to the front: the brief and its hard targets, how the whole process flows, the mass and energy balance, the engineering verdict on feasibility, and the headline economics."}
+        blurb={"Everything you need to judge whether the plant stands up, pulled to the front: the brief and its hard targets, the brief-compliance verdict, the mass and energy balance, how the whole plant was computed, the engineering problem and the worked maths tool by tool, and the headline economics."}
         contents={[
           'Executive summary',
-          'Brief and requirements, and how it was interpreted',
-          'Brief provenance: the original brief vs the structured parse',
+          'Brief: requirements, the operational headline and physical spec, plus provenance — the original brief vs the structured parse',
           'Brief compliance and trade-offs',
-          'System overview: how the plant works',
           'Engineering basis: process flow, mass and energy balance, feasibility verdict',
           'How the whole plant was computed: the tool dependency graph',
+          'The engineering problem: the physics each tool must solve',
           'Engineering — computed tool by tool: why each tool was chosen, what it reads and feeds, and its worked maths',
           'Cost summary: ex-works, installed and levelised cost, and the top cost contributors',
         ]}
         project={project}
       />
-      {/* Part-1 reading flow (2026-06-10 reorder): executive summary → brief →
-          brief provenance → brief compliance → SYSTEM OVERVIEW → ENGINEERING
-          BASIS (whole-plant balance + verdict) → HOW THE WHOLE PLANT WAS COMPUTED
-          (tool dependency graph) → TOOL SELECTION & SEQUENCING → engineering
-          calculations. "What the plant IS" precedes "how it was COMPUTED". */}
+      {/* Part-1 reading flow (2026-06-10 reorder v2, Tristan reviewed Part 1):
+          executive summary → BRIEF (merged requirements + provenance) → brief
+          compliance → ENGINEERING BASIS (whole-plant balance + verdict) → HOW THE
+          WHOLE PLANT WAS COMPUTED (tool dependency graph) → THE ENGINEERING PROBLEM
+          (lead-in to the maths) → engineering tool-by-tool (worked calcs) → cost
+          summary. SYSTEM OVERVIEW moved OUT of Part 1 into Part 2 (it opens the
+          build). "Brief & Requirements" + "Brief Provenance" merged into ONE
+          "Brief" section; the duplicate Performance-characteristics spec-sheet was
+          removed (Brief Compliance is the single home for target-vs-achieved). */}
       {/* ITER-10.5 (Tristan-defined 2026-05-20):
           Brief sits immediately after Cover. Operational Headline is folded
           INTO BriefPage as a banner at the top (HeadlinePage component
@@ -16635,13 +16678,15 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
       {state.brief?.was_revised ? <BriefRevisionNoticePage state={state} project={project} /> : null}
       <ExecutiveSummaryPage state={state} project={project} bomTotals={bomTotals} costStack={costStack} priceReality={priceReality} />
       <BriefPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
-      {/* Brief Provenance (universal — codified 2026-05-24): verbatim
-          original brief + LLM-interpreted structured parse, side-by-side
-          so the reader can audit how the LLM read the user's intent.
-          Tristan: "the LLM brief is the origin of everything downstream
-          of that". Renders for every archetype — universal contract.
-          Sits AFTER BriefPage so the reader meets the high-level brief
-          first, then drops into the audit-trail. */}
+      {/* Brief — provenance (MERGED into the "Brief" section 2026-06-10): the
+          provenance half of the unified Brief section — verbatim original brief +
+          LLM-interpreted structured parse + "what you specified vs what the engine
+          added", so the reader can audit how the LLM read the user's intent.
+          Tristan: "the LLM brief is the origin of everything downstream of that".
+          Renders for every archetype — universal contract. Shares the "Section 1 ·
+          Brief" running header with BriefPage (immediately above) so the two read
+          as ONE section: the reader meets the requirements half, then drops into
+          the provenance/audit-trail half. */}
       <BriefProvenancePage state={state} project={project} />
       {/* Brief Compliance & Design Trade-offs (universal — task #115,
           2026-05-24): for each brief constraint (cost ceiling, mass cap,
@@ -16654,37 +16699,18 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           for, BEFORE Engineering Tools Flow so the trade-off shapes how the
           tool chain is interpreted. */}
       <BriefComplianceTradeOffsPage state={state} project={project} bomTotals={bomTotals} costStack={costStack} />
-      {/* REORDER 2026-06-10 (Tristan): "what the plant IS" before "how it was
-          COMPUTED". System Overview + Engineering Basis now sit AHEAD of the two
-          tooling pages (Engineering Tools Flow + Tool Selection), so the reader
-          meets the plant — what it does, how it works, the whole-plant balance +
-          feasibility verdict — before the dependency graph and the tool-selection
-          narrative that explain HOW those numbers were produced. */}
-      {/* System Overview (universal — Tristan 2026-05-24, task #117): four
-          blocks — WHAT IT DOES (combines parsed brief product_description +
-          mission + target_customers), HOW IT WORKS (stitches per-module
-          overview sentences via cross_module_grammar_links mechanism+detail),
-          MODULES AT A GLANCE (one-sentence purpose per module), and THE NUMBERS
-          BEHIND IT (2026-06-04 merge — the former standalone "How the design was
-          computed — the physics" page, which rendered half-empty, folded in as a
-          deterministic sub-block: a net-CO2 reconciliation card + the system-
-          level physics cards templated from computed contract quantities, no
-          LLM, under their own credibility note). Template-driven from existing
-          state — no extra LLM call. Sits AFTER Brief Compliance so the reader
-          meets the brief, then gets the plain-English system architecture before
-          the whole-plant balance + the how-it-was-computed pages. */}
-      <SystemOverviewPage state={state} project={project} />
-      {/* The engineering problem — and why these tools (2026-06-10):
-          DETERMINISTIC, gated by the tools that actually ran. States the
-          physics/engineering PROBLEM the design must solve, then shows the
-          selected §-tools as the ANSWER to each sub-problem (same §-numbers
-          used elsewhere). Sits AFTER System Overview and BEFORE the
-          consolidated tool-by-tool engineering section. NO LLM. */}
-      <EngineeringProblemPage state={state} project={project} />
+      {/* REORDER 2026-06-10 v2 (Tristan, reviewed Part 1): the Part-1 maths flow
+          is now Engineering Basis → How-the-whole-plant-was-computed DIAGRAM →
+          The Engineering Problem → Engineering tool-by-tool. The reader meets the
+          whole-plant balance + feasibility verdict, then the tool DEPENDENCY MAP,
+          then the PROBLEM statement as the lead-in to the maths, then the per-tool
+          worked calculations. SYSTEM OVERVIEW (the "how it works" prose) MOVED OUT
+          of Part 1 into Part 2 (it is build/orientation narrative, not
+          first-principles engineering) — it now opens the build section. */}
       {/* Whole-plant-at-a-glance — process flow + mass/energy balance + feasibility
-          verdict + headline economics (sits after System Overview: the reader sees
-          what the plant is, then the whole-plant balance + verdict, BEFORE the
-          how-it-was-computed tooling pages). */}
+          verdict + headline economics. Opens the Part-1 maths: the reader sees the
+          whole-plant balance + verdict before the dependency map, the problem
+          statement, and the per-tool worked calculations. */}
       <EngineeringBasisPage state={state} project={project} />
       {/* Engineering Tools Flow (universal — task #113, 2026-05-24): per-tool
           3-column block showing the INPUTS each engineering tool consumed,
@@ -16692,10 +16718,18 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           orchestrator's _tools_run order is the data-flow sequence; each
           output is annotated with the downstream tool that consumes it (or
           "→ flows to BoM" for terminal outputs). Renders null when the
-          orchestrator did not run for this chain. Sits AFTER System Overview +
-          Engineering Basis (2026-06-10 reorder): the reader knows what the plant
-          IS before seeing HOW it was computed. */}
+          orchestrator did not run for this chain. This is the "How the whole
+          plant was computed" DEPENDENCY MAP — it sits AFTER the Engineering Basis
+          and BEFORE the engineering-problem lead-in. */}
       <EngineeringToolsFlowPage state={state} project={project} bomTotals={bomTotals} statePath={statePath} />
+      {/* The engineering problem — and why these tools (2026-06-10):
+          DETERMINISTIC, gated by the tools that actually ran. States the
+          physics/engineering PROBLEM the design must solve, then shows the
+          selected §-tools as the ANSWER to each sub-problem (same §-numbers
+          used elsewhere). REORDER v2: sits AFTER the how-the-whole-plant-was-
+          computed dependency DIAGRAM and BEFORE the consolidated tool-by-tool
+          section — it is the lead-in to the maths. NO LLM. */}
+      <EngineeringProblemPage state={state} project={project} />
       {/* Part 1 · Engineering — computed tool by tool (CONSOLIDATED 2026-06-10):
           the former standalone "Tool selection & sequencing" page + the module-
           ordered "Engineering Calculations" page MERGED into ONE per-tool section,
@@ -16704,8 +16738,9 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           — so "§20 Mass Budget Aggregator" shows its numbers THERE, not on a
           separate page (Tristan 2026-06-10). The "How the whole plant was computed"
           DIAGRAM page (above) stays as the map; this is the per-tool detail. Sits
-          immediately after the dependency diagram so the reader meets the map, then
-          the per-tool detail. Renders null when no orchestrator tools ran. */}
+          immediately after the engineering-problem lead-in so the reader meets the
+          map, then the problem, then the per-tool detail. Renders null when no
+          orchestrator tools ran. */}
       <EngineeringConsolidatedToolPage state={state} project={project} />
       {/* Cost Summary panel (RESTORED 2026-06-10, item 9): a standalone Part-1
           economics panel — ex-works/CAPEX, installed all-in, levelised cost per
@@ -16724,14 +16759,27 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
       <PartDividerPage
         eyebrow="Part 2"
         title={"How to build it"}
-        blurb={"How the plant is built, module by module. Each sub-module carries its design intent, its bill of materials, the kind of supplier to source it from, and the questions to put to a specialist. System-level risk and integration close the part."}
+        blurb={"How the plant is built. It opens with a plain-English system overview — what it does and how it works — then walks the plant module by module. Each sub-module carries its design intent, its bill of materials, the kind of supplier to source it from, and the questions to put to a specialist. System-level risk and integration close the part."}
         contents={[
+          'System overview: what it does and how it works',
           'Module map: how the modules connect',
           'Modules and sub-modules: design, bill of materials, suppliers, specialists',
           'Risk and integration',
         ]}
         project={project}
       />
+      {/* System Overview (MOVED to Part 2, 2026-06-10 Tristan reorder): the
+          plain-English "how it works" orientation — WHAT IT DOES (parsed brief
+          product_description + mission + target_customers), HOW IT WORKS (per-
+          module overview sentences stitched via cross_module_grammar_links),
+          MODULES AT A GLANCE, and THE NUMBERS BEHIND IT (net-CO2 reconciliation +
+          system-level physics cards, deterministic). This is build/orientation
+          prose, not first-principles engineering, so it now OPENS Part 2 (the
+          build) instead of sitting in Part 1. Its running header tags PART 2 ·
+          SYSTEM OVERVIEW (PageHeader infers Part 2 for SYSTEMOVERVIEW). Template-
+          driven from existing state — no extra LLM call. Sits immediately after
+          the Part-2 divider, before the Module Map. */}
+      <SystemOverviewPage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
       {modules.map((m: any, idx: number) => ([
         <ModuleSection

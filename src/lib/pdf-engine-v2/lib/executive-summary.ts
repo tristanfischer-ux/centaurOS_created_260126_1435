@@ -154,7 +154,12 @@ export function buildExecutiveSummary(input: ExecSummaryInput): ExecSummary {
   // Open engineering defect (item 8): be honest about an unresolved high-severity
   // issue rather than implying a clean pass. Surfaced after the cost so the
   // feasibility picture is complete (the verdict the next paragraph builds on).
-  const defect = String(input.openDefect ?? '').trim()
+  // Strip any trailing sentence terminator on the defect text so the template's
+  // own full stop is not doubled ("…for shipping.." → "…for shipping."). The
+  // 240-char slice that used to truncate this also hid the doubled period; with
+  // the full sentence now rendered (2026-06-10), the source's own "." would show
+  // alongside the template's, so normalise it here.
+  const defect = String(input.openDefect ?? '').trim().replace(/[.!?]+$/, '')
   if (defect) {
     outcome += ` One engineering issue remains open and must be resolved before detailed design: ${defect}.`
   }
