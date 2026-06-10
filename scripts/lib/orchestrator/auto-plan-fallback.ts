@@ -40,6 +40,7 @@ import { join } from 'path'
 import { composeToolGraph, type ToolIOSchema, type ComposedToolGraph } from './auto-planner'
 import { getTool } from './registry'
 import { groundToolOutputs } from './part-one-grounding'
+import { designFeatures, toolDomainRelevant } from './design-features'
 import type {
   BriefEnvelope,
   ClassToolPlan,
@@ -71,6 +72,16 @@ export function autoPlanEnabled(): boolean {
  *  auto-planner), so flipping it can never alter an existing class. */
 export function autoPlanGroundEnabled(): boolean {
   const v = process.env.UNIVERSAL_AUTO_PLAN_GROUND
+  return v === '1' || v === 'true' || v === 'on'
+}
+
+/** Phase-2 feature-applicability filter (default OFF, 2026-06-10). When ON, the
+ *  composed plan for an unseen class excludes tools whose DOMAIN the design does
+ *  not have (design-features.ts) — so a novel class can't pull a domain-wrong tool
+ *  (the compute_heat electrolyser/drone misfire). Affects ONLY unregistered classes.
+ *  Enable: UNIVERSAL_FEATURE_FILTER=1. */
+export function autoPlanFeatureFilterEnabled(): boolean {
+  const v = process.env.UNIVERSAL_FEATURE_FILTER
   return v === '1' || v === 'true' || v === 'on'
 }
 
@@ -156,7 +167,17 @@ export function composeFallbackPlan(
 ): { plan: ClassToolPlan; graph: ComposedToolGraph } | null {
   if (!autoPlanEnabled()) return null
 
-  const registry = registryOverride ?? loadToolIORegistry()
+  const registryAll = registryOverride ?? loadToolIORegistry()
+  // Phase 2 (off by default): exclude tools whose DOMAIN the design doesn't have, so
+  // a novel class can't pull a domain-wrong tool. Falls back to the unfiltered set if
+  // the filter would leave too few producers (a feature-map miss must never starve
+  // the planner). 2026-06-10.
+  let registry = registryAll
+  if (autoPlanFeatureFilterEnabled()) {
+    const features = designFeatures(envelope)
+    const filtered = registryAll.filter((s) => toolDomainRelevant(s.domain, features))
+    if (filtered.length >= Math.min(8, registryAll.length)) registry = filtered
+  }
   if (registry.length === 0) return null
 
   const graph = composeToolGraph(
