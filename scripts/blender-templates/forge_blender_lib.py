@@ -1213,3 +1213,823 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
 
     restore_materials_from_snap(all_orig)
     print(f"[forge] DONE — {out_dir}")
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# B1 (2026-06-10) — Parametric form-factor primitive library
+# ANVIL-UNIVERSAL-LOOP-PLAN.md WS-B/B1. Pure-additive: nothing above this
+# line changed; existing templates are untouched.
+#
+# CONVENTIONS (differ deliberately from the legacy add_* helpers):
+#   - ALL public dimensions/locations are in MILLIMETRES. Converted to
+#     Blender metres internally (1 BU = 1 m, same scale the templates use).
+#   - Ground-standing primitives (vessel, skid, rack row, enclosure, tower,
+#     hull, gantry, rotating machine, panel stack, foundation) take
+#     location_mm = BASE-CENTRE: (x, y) of the footprint centre, z of the
+#     UNDERSIDE — so stacking "on top of" something is base_z = parent top.
+#   - Airframe primitives (fuselage, wing, pod, propeller) take
+#     location_mm = volume centre (aircraft parts hang in space).
+#   - Every primitive returns an ASSEMBLY dict:
+#       {"name", "root", "parts", "centre_m", "size_m", ...extras}
+#     and stamps custom properties consumed by forge_scene_checks.py:
+#       obj["fl_module"]    — module tag (mirrors the module_objects dict)
+#       obj["fl_assembly"]  — assembly instance name
+#       obj["fl_relations"] — JSON list of {"rel", "target"} declarations
+#       obj["fl_structure_root"] — True on declared structure roots
+#   - Placement ontology (plan WS-B/B1): contains | supports | attached_to
+#     via declare_relation(); clearance_zone via add_clearance_zone().
+#     Parts inside an assembly are auto-attached_to the assembly root.
+# ═════════════════════════════════════════════════════════════════════════
+import json
+
+PRIMITIVE_API_VERSION = "1.0.0"
+
+MM = 0.001  # millimetres → Blender metres (1 BU = 1 m)
+
+
+def _mm(v):
+    """Scalar millimetres → metres."""
+    return float(v) * MM
+
+
+def _mm3(t):
+    """(x, y, z) millimetres → metres tuple."""
+    return tuple(float(c) * MM for c in t)
+
+
+def stamp_primitive_api_version():
+    """Record the primitive-API version on the scene (versioned API — plan
+    G-rule: stored scenes record the version; compatibility-checked on read)."""
+    try:
+        bpy.context.scene["fl_primitive_api_version"] = PRIMITIVE_API_VERSION
+    except (AttributeError, TypeError):
+        pass
+
+
+def tag_module(obj, module_id):
+    """Stamp the module tag as a custom property so deterministic scene
+    checks (forge_scene_checks.py) can read module membership from the scene
+    itself — not just from the in-memory module_objects dict."""
+    if obj is not None and module_id:
+        obj["fl_module"] = str(module_id)
+
+
+def sync_module_tags(module_objects):
+    """Stamp fl_module custom props from a legacy module_objects dict.
+    Lets the deterministic checks run on scenes composed with the old
+    add_box/add_cyl-only idiom (hand templates) without modifying them."""
+    for module_id, objs in (module_objects or {}).items():
+        for obj in objs:
+            tag_module(obj, module_id)
+
+
+# ─── Placement relations (contains | supports | attached_to) ─────────────
+
+_RELATION_KINDS = ("contains", "supports", "attached_to")
+
+
+def _resolve_obj(thing):
+    """Accept a Blender object OR an assembly dict; return the root object."""
+    if isinstance(thing, dict):
+        return thing.get("root")
+    return thing
+
+
+def declare_relation(subject, relation, target):
+    """Declare `subject --relation--> target` as scene data.
+
+    relation ∈ {"contains", "supports", "attached_to"}:
+      contains    — subject's volume encloses target (enclosure contains rack)
+      supports    — subject carries target's weight (skid supports vessel)
+      attached_to — subject is fastened to target (wing attached_to fuselage)
+
+    subject/target may be Blender objects or assembly dicts (roots used).
+    Stored as a JSON list in subject["fl_relations"] so the deterministic
+    checks can rebuild the connectivity graph from the scene alone."""
+    if relation not in _RELATION_KINDS:
+        raise ValueError(f"unknown relation {relation!r} — use one of {_RELATION_KINDS}")
+    s = _resolve_obj(subject)
+    t = _resolve_obj(target)
+    if s is None or t is None:
+        return
+    rels = json.loads(s.get("fl_relations", "[]"))
+    entry = {"rel": relation, "target": t.name}
+    if entry not in rels:
+        rels.append(entry)
+    s["fl_relations"] = json.dumps(rels)
+
+
+def declare_structure_root(thing):
+    """Mark an object/assembly as a structure root. The connectivity check
+    requires every module-tagged object to reach SOME declared root via
+    relations — multiple roots are fine (e.g. an aircraft AND a plant skid
+    in the same composed scene)."""
+    root = _resolve_obj(thing)
+    if root is not None:
+        root["fl_structure_root"] = True
+
+
+def add_clearance_zone(name, location_mm, size_mm, owner=None):
+    """Declare a rectangular keep-clear volume (maintenance access, vent
+    blast path, crane swing). Created as a non-rendering EMPTY so it never
+    appears in output; forge_scene_checks.clearance_zones_empty() verifies
+    no mesh intrudes. location_mm = volume CENTRE (mm); size_mm = (w, d, h)
+    full extents (mm). owner (assembly dict/name) is exempt from the check
+    (a door zone may abut its own enclosure)."""
+    bpy.ops.object.empty_add(type="CUBE", location=_mm3(location_mm))
+    zone = bpy.context.active_object
+    zone.name = name
+    zone.empty_display_size = 0.5
+    sx, sy, sz = _mm3(size_mm)
+    zone.scale = (sx, sy, sz)
+    zone["fl_clearance_zone"] = True
+    zone["fl_zone_size_m"] = [sx, sy, sz]
+    if owner is not None:
+        owner_name = owner["name"] if isinstance(owner, dict) else str(owner)
+        zone["fl_zone_owner"] = owner_name
+    return zone
+
+
+def _parts_bbox_m(parts):
+    """World-space union AABB of a list of mesh objects → (centre, size)."""
+    bpy.context.view_layer.update()
+    xs, ys, zs = [], [], []
+    for obj in parts:
+        if obj is None or getattr(obj, "type", None) != "MESH":
+            continue
+        for v in obj.bound_box:
+            wv = obj.matrix_world @ mathutils.Vector(v)
+            xs.append(wv.x); ys.append(wv.y); zs.append(wv.z)
+    if not xs:
+        return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
+    centre = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, (min(zs) + max(zs)) / 2)
+    size = (max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs))
+    return centre, size
+
+
+def _finalise_assembly(name, root, parts, module=None, extras=None):
+    """Stamp custom props + auto-relations for a freshly built primitive.
+    Every part is attached_to the assembly root (so the connectivity check
+    only needs ONE declared relation per assembly, on the root)."""
+    stamp_primitive_api_version()
+    for p in parts:
+        if p is None:
+            continue
+        p["fl_assembly"] = name
+        tag_module(p, module)
+        if p is not root:
+            declare_relation(p, "attached_to", root)
+    centre, size = _parts_bbox_m(parts)
+    asm = {"name": name, "root": root, "parts": [p for p in parts if p is not None],
+           "centre_m": centre, "size_m": size}
+    if extras:
+        asm.update(extras)
+    return asm
+
+
+# ─── Airframe set ─────────────────────────────────────────────────────────
+
+
+def prim_fuselage(name, length_mm, diameter_mm, location_mm=(0, 0, 0), material=None,
+                  nose_fraction=0.20, tail_fraction=0.26,
+                  module=None, module_objects=None):
+    """Aircraft fuselage: cylindrical centre body + tapered nose (forward,
+    -Y) + tapered tail cone (aft, +Y). Fore-aft axis = Y (template
+    convention, see haps-9shot.py). location_mm = volume CENTRE in mm.
+    Returns assembly dict; root = centre body."""
+    L = _mm(length_mm)
+    R = _mm(diameter_mm) / 2
+    cx, cy, cz = _mm3(location_mm)
+    ln = L * nose_fraction
+    lt = L * tail_fraction
+    lb = L - ln - lt
+    y0 = cy - L / 2
+    body = add_cyl(f"{name}_body", (cx, y0 + ln + lb / 2, cz), R, lb, material,
+                   module=module, module_objects=module_objects,
+                   rotation=(math.radians(90), 0, 0))
+    nose = add_frustum(f"{name}_nose", (cx, y0 + ln / 2, cz), R * 0.28, R, ln, material,
+                       module=module, module_objects=module_objects,
+                       rotation=(math.radians(-90), 0, 0))
+    tail = add_frustum(f"{name}_tailcone", (cx, y0 + ln + lb + lt / 2, cz), R, R * 0.16, lt,
+                       material, module=module, module_objects=module_objects,
+                       rotation=(math.radians(-90), 0, 0))
+    return _finalise_assembly(name, body, [body, nose, tail], module,
+                              extras={"radius_m": R, "length_m": L})
+
+
+def prim_wing(name, span_mm, chord_mm, thickness_mm, location_mm=None, fuselage=None,
+              mount="high", chord_offset_mm=0.0, material=None, material_spar=None,
+              n_spars=2, module=None, module_objects=None):
+    """Continuous wing THROUGH/ON a fuselage: single skin box spanning X
+    + spar cylinders running full span. Dimensions in mm.
+
+    Pass fuselage= the prim_fuselage() assembly to auto-position: the wing
+    centres on the fuselage X/Z, mounted "high" (skin centred at the
+    fuselage crown so the wing visibly sits ON the body and crosses it as
+    one continuous member — never two floating half-wings) or "mid"
+    (through the axis). chord_offset_mm shifts the wing fore/aft.
+    Auto-declares wing attached_to fuselage. Or pass explicit location_mm
+    (volume centre)."""
+    span = _mm(span_mm)
+    chord = _mm(chord_mm)
+    t = _mm(thickness_mm)
+    if fuselage is not None and location_mm is None:
+        fx, fy, fz = fuselage["centre_m"]
+        zoff = fuselage.get("radius_m", 0.0) * (0.85 if mount == "high" else 0.0)
+        cx, cy, cz = fx, fy + _mm(chord_offset_mm), fz + zoff
+    elif location_mm is not None:
+        cx, cy, cz = _mm3(location_mm)
+    else:
+        raise ValueError("prim_wing needs location_mm or fuselage=")
+    parts = []
+    skin = add_box(f"{name}_skin", (cx, cy, cz), (span, chord, t), material,
+                   module=module, module_objects=module_objects)
+    parts.append(skin)
+    spar_mat = material_spar or material
+    spar_ys = [cy - chord * 0.30, cy + chord * 0.28][:max(1, n_spars)]
+    for i, sy in enumerate(spar_ys):
+        parts.append(add_cyl(f"{name}_spar_{i+1}", (cx, sy, cz), t * 0.38, span * 0.99,
+                             spar_mat, module=module, module_objects=module_objects,
+                             rotation=(0, math.radians(90), 0)))
+    for sx, side in [(cx - span / 2 + t * 0.5, "L"), (cx + span / 2 - t * 0.5, "R")]:
+        parts.append(add_box(f"{name}_tip_{side}", (sx, cy, cz),
+                             (t, chord * 0.82, t * 2.2), spar_mat,
+                             module=module, module_objects=module_objects))
+    asm = _finalise_assembly(name, skin, parts, module,
+                             extras={"span_m": span, "chord_m": chord})
+    if fuselage is not None:
+        declare_relation(asm, "attached_to", fuselage)
+    return asm
+
+
+def prim_tail(name, boom_length_mm, boom_diameter_mm, hstab_span_mm, hstab_chord_mm,
+              fin_height_mm, fuselage=None, location_mm=None, material=None,
+              material_surface=None, module=None, module_objects=None):
+    """Tail group: boom extending aft (+Y) + horizontal stabiliser + vertical
+    fin at the boom end. Dimensions in mm. Pass fuselage= to start the boom
+    at the fuselage tail (auto attached_to); else location_mm = boom START
+    point (volume centre of the boom root)."""
+    lb = _mm(boom_length_mm)
+    rb = _mm(boom_diameter_mm) / 2
+    hspan = _mm(hstab_span_mm)
+    hchord = _mm(hstab_chord_mm)
+    fh = _mm(fin_height_mm)
+    if fuselage is not None and location_mm is None:
+        fx, fy, fz = fuselage["centre_m"]
+        sx, sy, sz = fx, fy + fuselage["length_m"] / 2 - lb * 0.06, fz + fuselage.get("radius_m", 0) * 0.25
+    elif location_mm is not None:
+        sx, sy, sz = _mm3(location_mm)
+    else:
+        raise ValueError("prim_tail needs location_mm or fuselage=")
+    surf_mat = material_surface or material
+    parts = []
+    boom = add_cyl(f"{name}_boom", (sx, sy + lb / 2, sz), rb, lb, material,
+                   module=module, module_objects=module_objects,
+                   rotation=(math.radians(90), 0, 0))
+    parts.append(boom)
+    end_y = sy + lb - hchord * 0.4
+    parts.append(add_box(f"{name}_hstab", (sx, end_y, sz), (hspan, hchord, hchord * 0.12),
+                         surf_mat, module=module, module_objects=module_objects))
+    parts.append(add_box(f"{name}_fin", (sx, end_y, sz + fh / 2),
+                         (fh * 0.10, hchord * 0.9, fh), surf_mat,
+                         module=module, module_objects=module_objects))
+    asm = _finalise_assembly(name, boom, parts, module)
+    if fuselage is not None:
+        declare_relation(asm, "attached_to", fuselage)
+    return asm
+
+
+def prim_pod(name, length_mm, diameter_mm, location_mm, material=None,
+             pylon_to_z_mm=None, parent=None, module=None, module_objects=None):
+    """Underslung pod/nacelle: capsule (cylinder + nose/tail frustums) along
+    Y. location_mm = pod volume CENTRE (mm). pylon_to_z_mm: if given, a
+    pylon box runs from the pod crown up/down to that world z (mm) — use it
+    to visibly join the pod to a wing. parent= assembly → attached_to."""
+    L = _mm(length_mm)
+    R = _mm(diameter_mm) / 2
+    cx, cy, cz = _mm3(location_mm)
+    lb = L * 0.62
+    le = (L - lb) / 2
+    parts = []
+    body = add_cyl(f"{name}_body", (cx, cy, cz), R, lb, material,
+                   module=module, module_objects=module_objects,
+                   rotation=(math.radians(90), 0, 0))
+    parts.append(body)
+    parts.append(add_frustum(f"{name}_nose", (cx, cy - lb / 2 - le / 2, cz), R * 0.45, R, le,
+                             material, module=module, module_objects=module_objects,
+                             rotation=(math.radians(-90), 0, 0)))
+    parts.append(add_frustum(f"{name}_tail", (cx, cy + lb / 2 + le / 2, cz), R, R * 0.30, le,
+                             material, module=module, module_objects=module_objects,
+                             rotation=(math.radians(-90), 0, 0)))
+    if pylon_to_z_mm is not None:
+        pz = _mm(pylon_to_z_mm)
+        top = cz + R
+        h = abs(pz - top)
+        if h > 1e-4:
+            zc = (pz + top) / 2
+            parts.append(add_box(f"{name}_pylon", (cx, cy, zc), (R * 0.7, lb * 0.55, h),
+                                 material, module=module, module_objects=module_objects))
+    asm = _finalise_assembly(name, body, parts, module, extras={"radius_m": R})
+    if parent is not None:
+        declare_relation(asm, "attached_to", parent)
+    return asm
+
+
+def prim_propeller(name, diameter_mm, n_blades, location_mm, material=None,
+                   material_hub=None, axis="y", pitch_deg=14.0, parent=None,
+                   module=None, module_objects=None):
+    """Propeller: hub + n_blades thin blades in the rotation plane normal to
+    `axis` ("y" = conventional puller/pusher on a Y fore-aft airframe; "z" =
+    lift rotor). diameter_mm = disc diameter; location_mm = hub centre (mm).
+    parent= assembly (pod/fuselage) → attached_to."""
+    R = _mm(diameter_mm) / 2
+    cx, cy, cz = _mm3(location_mm)
+    hub_r = max(R * 0.10, 0.02)
+    hub_mat = material_hub or material
+    parts = []
+    hub_rot = (math.radians(90), 0, 0) if axis == "y" else (0, 0, 0)
+    hub = add_cyl(f"{name}_hub", (cx, cy, cz), hub_r, hub_r * 1.6, hub_mat,
+                  module=module, module_objects=module_objects, rotation=hub_rot)
+    parts.append(hub)
+    blade_len = R * 0.94
+    blade_w = max(R * 0.13, 0.015)
+    blade_t = max(R * 0.035, 0.006)
+    for i in range(int(n_blades)):
+        theta = 2 * math.pi * i / int(n_blades)
+        rmid = hub_r + blade_len / 2
+        if axis == "y":
+            loc = (cx + rmid * math.cos(theta), cy, cz + rmid * math.sin(theta))
+            rot = (math.radians(pitch_deg), -theta, 0)
+            size = (blade_len, blade_t, blade_w)
+        else:  # axis == "z": lift rotor, blades in XY plane
+            loc = (cx + rmid * math.cos(theta), cy + rmid * math.sin(theta), cz)
+            rot = (0, math.radians(pitch_deg), theta)
+            size = (blade_len, blade_w, blade_t)
+        parts.append(add_box(f"{name}_blade_{i+1}", loc, size, material,
+                             module=module, module_objects=module_objects, rotation=rot))
+    asm = _finalise_assembly(name, hub, parts, module)
+    if parent is not None:
+        declare_relation(asm, "attached_to", parent)
+    return asm
+
+
+# ─── Plant / industrial set ───────────────────────────────────────────────
+
+
+def prim_vessel(name, diameter_mm, length_mm, location_mm, material=None,
+                orientation="horizontal", material_support=None,
+                support_height_mm=120, n_ports=1, module=None, module_objects=None):
+    """Pressure vessel / tank with dished (torispherical-read) ends.
+    diameter_mm × length_mm overall (tan-line to tan-line + dishes).
+    orientation: "horizontal" (axis X, on 2 saddles) | "vertical" (axis Z,
+    on 4 legs). location_mm = BASE-CENTRE (underside of supports) in mm.
+    Returns assembly with extras: "ports_m" {"top": (x,y,z)} — connect
+    prim_pipe_run() between vessel ports. Root = shell."""
+    R = _mm(diameter_mm) / 2
+    L = _mm(length_mm)
+    hs = _mm(support_height_mm)
+    bx, by, bz = _mm3(location_mm)
+    dish = R * 0.35
+    lb = max(L - 2 * dish, R * 0.5)
+    sup_mat = material_support or material
+    parts = []
+    if orientation == "horizontal":
+        cz = bz + hs + R
+        shell = add_cyl(f"{name}_shell", (bx, by, cz), R, lb, material,
+                        module=module, module_objects=module_objects,
+                        rotation=(0, math.radians(90), 0))
+        parts.append(shell)
+        for sx, side in [(bx - lb / 2, "W"), (bx + lb / 2, "E")]:
+            end = add_sphere(f"{name}_head_{side}", (sx, by, cz), R, material,
+                             module=module, module_objects=module_objects)
+            end.scale = (0.40, 1.0, 1.0)
+            parts.append(end)
+        for sx, side in [(bx - lb * 0.30, "W"), (bx + lb * 0.30, "E")]:
+            parts.append(add_box(f"{name}_saddle_{side}", (sx, by, bz + hs / 2),
+                                 (R * 0.45, R * 1.7, hs), sup_mat,
+                                 module=module, module_objects=module_objects))
+        port_xyz = (bx, by, cz + R)
+    else:  # vertical
+        cz = bz + hs + lb / 2
+        shell = add_cyl(f"{name}_shell", (bx, by, cz), R, lb, material,
+                        module=module, module_objects=module_objects)
+        parts.append(shell)
+        for sz_, side in [(bz + hs, "bot"), (bz + hs + lb, "top")]:
+            end = add_sphere(f"{name}_head_{side}", (bx, by, sz_), R, material,
+                             module=module, module_objects=module_objects)
+            end.scale = (1.0, 1.0, 0.40)
+            parts.append(end)
+        for i in range(4):
+            ang = math.pi / 4 + i * math.pi / 2
+            parts.append(add_box(f"{name}_leg_{i+1}",
+                                 (bx + R * 0.85 * math.cos(ang), by + R * 0.85 * math.sin(ang), bz + hs / 2),
+                                 (R * 0.16, R * 0.16, hs), sup_mat,
+                                 module=module, module_objects=module_objects))
+        port_xyz = (bx, by, bz + hs + lb + dish)
+    for i in range(max(0, int(n_ports))):
+        px = port_xyz[0] + (i - (n_ports - 1) / 2) * R * 0.6 * (1 if orientation == "horizontal" else 0)
+        parts.append(add_cyl(f"{name}_port_{i+1}", (px, port_xyz[1], port_xyz[2]),
+                             R * 0.13, R * 0.35, material,
+                             module=module, module_objects=module_objects))
+    return _finalise_assembly(name, shell, parts, module,
+                              extras={"ports_m": {"top": port_xyz}, "radius_m": R})
+
+
+def prim_skid_frame(name, width_mm, depth_mm, height_mm, location_mm, material=None,
+                    n_cross_members=3, member_mm=120, deck=True, material_deck=None,
+                    module=None, module_objects=None):
+    """Open structural skid: perimeter base rails + cross members + corner
+    posts + top perimeter rails + optional deck plate. width(X) × depth(Y)
+    × height(Z) in mm; location_mm = BASE-CENTRE. Root = first long rail.
+    Use hero_open_frame=True in run_render_pipeline for skid scenes."""
+    w = _mm(width_mm); d = _mm(depth_mm); h = _mm(height_mm); m = _mm(member_mm)
+    bx, by, bz = _mm3(location_mm)
+    parts = []
+    root = None
+    for level, zc in [("base", bz + m / 2), ("top", bz + h - m / 2)]:
+        for sy, side in [(by - d / 2 + m / 2, "S"), (by + d / 2 - m / 2, "N")]:
+            r = add_box(f"{name}_{level}_rail_{side}", (bx, sy, zc), (w, m, m), material,
+                        module=module, module_objects=module_objects)
+            parts.append(r)
+            if root is None:
+                root = r
+        for sx, side in [(bx - w / 2 + m / 2, "W"), (bx + w / 2 - m / 2, "E")]:
+            parts.append(add_box(f"{name}_{level}_end_{side}", (sx, by, zc),
+                                 (m, d - 2 * m, m), material,
+                                 module=module, module_objects=module_objects))
+    for i in range(int(n_cross_members)):
+        sx = bx - w / 2 + (i + 1) * w / (n_cross_members + 1)
+        parts.append(add_box(f"{name}_cross_{i+1}", (sx, by, bz + m / 2),
+                             (m, d - 2 * m, m), material,
+                             module=module, module_objects=module_objects))
+    for sx, sy, corner in [(bx - w / 2 + m / 2, by - d / 2 + m / 2, "SW"),
+                           (bx + w / 2 - m / 2, by - d / 2 + m / 2, "SE"),
+                           (bx - w / 2 + m / 2, by + d / 2 - m / 2, "NW"),
+                           (bx + w / 2 - m / 2, by + d / 2 - m / 2, "NE")]:
+        parts.append(add_box(f"{name}_post_{corner}", (sx, sy, bz + h / 2),
+                             (m, m, h - 2 * m), material,
+                             module=module, module_objects=module_objects))
+    if deck:
+        parts.append(add_box(f"{name}_deck", (bx, by, bz + h + m * 0.15),
+                             (w, d, m * 0.3), material_deck or material,
+                             module=module, module_objects=module_objects))
+    return _finalise_assembly(name, root, parts, module,
+                              extras={"top_z_m": bz + h + (m * 0.3 if deck else 0)})
+
+
+def prim_pipe_rack(name, length_mm, width_mm, height_mm, location_mm, material=None,
+                   n_bays=3, n_tiers=2, member_mm=150, module=None, module_objects=None):
+    """Pipe rack: (n_bays+1) portal frames along X (2 posts + a cross beam
+    per tier) + longitudinal stringers each tier. length(X) × width(Y) ×
+    height(Z) mm; location_mm = BASE-CENTRE."""
+    L = _mm(length_mm); w = _mm(width_mm); h = _mm(height_mm); m = _mm(member_mm)
+    bx, by, bz = _mm3(location_mm)
+    parts = []
+    root = None
+    tier_zs = [bz + h * (i + 1) / n_tiers for i in range(int(n_tiers))]
+    for f in range(int(n_bays) + 1):
+        fx = bx - L / 2 + f * L / n_bays
+        for sy, side in [(by - w / 2 + m / 2, "S"), (by + w / 2 - m / 2, "N")]:
+            p = add_box(f"{name}_post_{f+1}{side}", (fx, sy, bz + h / 2), (m, m, h),
+                        material, module=module, module_objects=module_objects)
+            parts.append(p)
+            if root is None:
+                root = p
+        for ti, tz in enumerate(tier_zs):
+            parts.append(add_box(f"{name}_beam_{f+1}_t{ti+1}", (fx, by, tz - m / 2),
+                                 (m, w, m), material,
+                                 module=module, module_objects=module_objects))
+    for ti, tz in enumerate(tier_zs):
+        for sy, side in [(by - w / 2 + m / 2, "S"), (by + w / 2 - m / 2, "N")]:
+            parts.append(add_box(f"{name}_stringer_t{ti+1}{side}", (bx, sy, tz - m / 2),
+                                 (L, m * 0.7, m * 0.7), material,
+                                 module=module, module_objects=module_objects))
+    return _finalise_assembly(name, root, parts, module, extras={"tier_zs_m": tier_zs})
+
+
+def prim_rack_row(name, n_racks, rack_width_mm, rack_depth_mm, rack_height_mm,
+                  pitch_mm, location_mm, material=None, material_internal=None,
+                  axis="x", module=None, module_objects=None):
+    """Row of equipment racks/cabinets on a shared pitch (battery racks,
+    server racks, switchgear line-up). Each rack = frame shell + recessed
+    dark internal + plinth. location_mm = BASE-CENTRE of the whole row;
+    racks repeat along `axis` ("x"|"y") at pitch_mm. All mm."""
+    rw = _mm(rack_width_mm); rd = _mm(rack_depth_mm); rh = _mm(rack_height_mm)
+    pitch = _mm(pitch_mm)
+    bx, by, bz = _mm3(location_mm)
+    n = int(n_racks)
+    inner_mat = material_internal or material
+    parts = []
+    root = None
+    for i in range(n):
+        off = (i - (n - 1) / 2) * pitch
+        cx, cy = (bx + off, by) if axis == "x" else (bx, by + off)
+        frame = add_box(f"{name}_rack_{i+1:02d}_frame", (cx, cy, bz + rh / 2),
+                        (rw, rd, rh), material,
+                        module=module, module_objects=module_objects)
+        parts.append(frame)
+        if root is None:
+            root = frame
+        parts.append(add_box(f"{name}_rack_{i+1:02d}_internal", (cx, cy, bz + rh / 2),
+                             (rw * 0.84, rd * 0.84, rh * 0.80), inner_mat,
+                             module=module, module_objects=module_objects))
+        parts.append(add_box(f"{name}_rack_{i+1:02d}_plinth", (cx, cy, bz + rh * 0.02),
+                             (rw * 1.04, rd * 1.04, rh * 0.04), material,
+                             module=module, module_objects=module_objects))
+    return _finalise_assembly(name, root, parts, module)
+
+
+def prim_enclosure(name, width_mm, depth_mm, height_mm, location_mm, material=None,
+                   door_faces=("front",), wall_mm=60, material_door=None,
+                   module=None, module_objects=None):
+    """Enclosure / container shell: floor + roof + 4 walls; faces listed in
+    door_faces ("front"=+Y, "back"=-Y, "left"=-X, "right"=+X) get a slightly
+    proud door leaf + handle. width(X) × depth(Y) × height(Z) mm;
+    location_mm = BASE-CENTRE. Root = floor (tag the assembly
+    structure_containment and the render pipeline's translucent-hero
+    treatment applies as usual)."""
+    w = _mm(width_mm); d = _mm(depth_mm); h = _mm(height_mm); t = _mm(wall_mm)
+    bx, by, bz = _mm3(location_mm)
+    door_mat = material_door or material
+    parts = []
+    floor = add_box(f"{name}_floor", (bx, by, bz + t / 2), (w, d, t), material,
+                    module=module, module_objects=module_objects)
+    parts.append(floor)
+    parts.append(add_box(f"{name}_roof", (bx, by, bz + h - t / 2), (w, d, t), material,
+                         module=module, module_objects=module_objects))
+    face_geo = {
+        "front": ((bx, by + d / 2 - t / 2, bz + h / 2), (w, t, h - 2 * t), (0, 1, 0)),
+        "back":  ((bx, by - d / 2 + t / 2, bz + h / 2), (w, t, h - 2 * t), (0, -1, 0)),
+        "left":  ((bx - w / 2 + t / 2, by, bz + h / 2), (t, d, h - 2 * t), (-1, 0, 0)),
+        "right": ((bx + w / 2 - t / 2, by, bz + h / 2), (t, d, h - 2 * t), (1, 0, 0)),
+    }
+    for face, (loc, size, normal) in face_geo.items():
+        parts.append(add_box(f"{name}_wall_{face}", loc, size, material,
+                             module=module, module_objects=module_objects))
+        if face in door_faces:
+            nx, ny, _ = normal
+            leaf_w = (min(w, d) * 0.42)
+            leaf_h = h * 0.72
+            dloc = (loc[0] + nx * t, loc[1] + ny * t, bz + leaf_h / 2 + t)
+            dsize = (leaf_w, t * 0.8, leaf_h) if ny else (t * 0.8, leaf_w, leaf_h)
+            parts.append(add_box(f"{name}_door_{face}", dloc, dsize, door_mat,
+                                 module=module, module_objects=module_objects))
+            hloc = (dloc[0] + (leaf_w * 0.38 if ny else nx * t),
+                    dloc[1] + (ny * t if ny else leaf_w * 0.38),
+                    bz + h * 0.45)
+            parts.append(add_box(f"{name}_handle_{face}", hloc,
+                                 (0.03, 0.03, 0.18), door_mat,
+                                 module=module, module_objects=module_objects))
+    return _finalise_assembly(name, floor, parts, module)
+
+
+def prim_tower(name, height_mm, base_width_mm, location_mm, material=None,
+               taper=0.45, material_flange=None, module=None, module_objects=None):
+    """Tubular tower/mast: tapered tube + base flange + top platform disc.
+    taper = top diameter as a fraction of base. height/base width in mm;
+    location_mm = BASE-CENTRE. Root = tube."""
+    h = _mm(height_mm)
+    rb = _mm(base_width_mm) / 2
+    rt = rb * max(0.05, min(1.0, taper))
+    bx, by, bz = _mm3(location_mm)
+    parts = []
+    tube = add_frustum(f"{name}_tube", (bx, by, bz + h / 2), rb, rt, h, material,
+                       module=module, module_objects=module_objects, vertices=32)
+    parts.append(tube)
+    parts.append(add_cyl(f"{name}_base_flange", (bx, by, bz + rb * 0.05), rb * 1.25,
+                         rb * 0.1, material_flange or material,
+                         module=module, module_objects=module_objects))
+    parts.append(add_cyl(f"{name}_top_platform", (bx, by, bz + h + rt * 0.1), rt * 1.5,
+                         rt * 0.2, material_flange or material,
+                         module=module, module_objects=module_objects))
+    return _finalise_assembly(name, tube, parts, module, extras={"top_z_m": bz + h})
+
+
+def prim_hull(name, length_mm, beam_mm, depth_mm, location_mm, material=None,
+              material_deck=None, module=None, module_objects=None):
+    """Marine hull: main hull body + tapered bow (forward, +X) + deck plate
+    + keel strip. length(X) × beam(Y) × depth(Z) mm; location_mm =
+    BASE-CENTRE (keel underside). Root = hull body."""
+    L = _mm(length_mm); B = _mm(beam_mm); D = _mm(depth_mm)
+    bx, by, bz = _mm3(location_mm)
+    lbow = L * 0.26
+    lmain = L - lbow
+    cz = bz + D / 2
+    parts = []
+    body = add_box(f"{name}_body", (bx - lbow / 2, by, cz), (lmain, B, D), material,
+                   module=module, module_objects=module_objects)
+    parts.append(body)
+    bow = add_frustum(f"{name}_bow", (bx + lmain / 2 - lbow / 2 + lbow / 2, by, cz),
+                      B / 2, B * 0.10, lbow, material,
+                      module=module, module_objects=module_objects,
+                      rotation=(0, math.radians(90), 0), vertices=24)
+    bow.scale = (1.0, 1.0, D / B)  # squash circular cone to hull depth
+    parts.append(bow)
+    parts.append(add_box(f"{name}_deck", (bx - lbow / 2, by, bz + D - D * 0.02),
+                         (lmain, B * 0.96, D * 0.04), material_deck or material,
+                         module=module, module_objects=module_objects))
+    parts.append(add_box(f"{name}_keel", (bx - lbow / 2, by, bz + D * 0.02),
+                         (lmain * 0.9, B * 0.08, D * 0.04), material,
+                         module=module, module_objects=module_objects))
+    return _finalise_assembly(name, body, parts, module)
+
+
+def prim_gantry(name, span_mm, height_mm, location_mm, material=None,
+                leg_mm=300, beam_mm=400, axis="x", with_trolley=True,
+                material_trolley=None, module=None, module_objects=None):
+    """Gantry/portal frame: 2 legs + main beam across the top (+ optional
+    trolley block under the beam centre). span along `axis` ("x"|"y"),
+    height in mm; location_mm = BASE-CENTRE. Root = beam."""
+    s = _mm(span_mm); h = _mm(height_mm); lw = _mm(leg_mm); bh = _mm(beam_mm)
+    bx, by, bz = _mm3(location_mm)
+    parts = []
+    if axis == "x":
+        beam = add_box(f"{name}_beam", (bx, by, bz + h - bh / 2), (s, lw, bh), material,
+                       module=module, module_objects=module_objects)
+        leg_locs = [(bx - s / 2 + lw / 2, by, "W"), (bx + s / 2 - lw / 2, by, "E")]
+    else:
+        beam = add_box(f"{name}_beam", (bx, by, bz + h - bh / 2), (lw, s, bh), material,
+                       module=module, module_objects=module_objects)
+        leg_locs = [(bx, by - s / 2 + lw / 2, "S"), (bx, by + s / 2 - lw / 2, "N")]
+    parts.append(beam)
+    for lx, ly, side in leg_locs:
+        parts.append(add_box(f"{name}_leg_{side}", (lx, ly, bz + (h - bh) / 2),
+                             (lw, lw, h - bh), material,
+                             module=module, module_objects=module_objects))
+        parts.append(add_box(f"{name}_foot_{side}", (lx, ly, bz + lw * 0.1),
+                             (lw * 1.8, lw * 1.8, lw * 0.2), material,
+                             module=module, module_objects=module_objects))
+    if with_trolley:
+        parts.append(add_box(f"{name}_trolley", (bx, by, bz + h - bh - lw * 0.4),
+                             (lw * 1.4, lw * 1.4, lw * 0.8),
+                             material_trolley or material,
+                             module=module, module_objects=module_objects))
+    return _finalise_assembly(name, beam, parts, module)
+
+
+def prim_rotating_machine(name, body_diameter_mm, body_length_mm, location_mm,
+                          material=None, material_shaft=None, material_base=None,
+                          axis="x", module=None, module_objects=None):
+    """Rotating machine (motor/pump/turbine/compressor): baseplate + feet +
+    cylindrical body along `axis` ("x"|"y") + shaft stub at the drive end +
+    end bells + terminal box. body d × l in mm; location_mm = BASE-CENTRE
+    (underside of baseplate). Root = body."""
+    R = _mm(body_diameter_mm) / 2
+    L = _mm(body_length_mm)
+    bx, by, bz = _mm3(location_mm)
+    base_t = R * 0.18
+    foot_h = R * 0.30
+    cz = bz + base_t + foot_h + R
+    rot = (0, math.radians(90), 0) if axis == "x" else (math.radians(90), 0, 0)
+    dx, dy = (1, 0) if axis == "x" else (0, 1)
+    parts = []
+    base = add_box(f"{name}_baseplate", (bx, by, bz + base_t / 2),
+                   (L * 1.35 if dx else R * 2.4, R * 2.4 if dx else L * 1.35, base_t),
+                   material_base or material, module=module, module_objects=module_objects)
+    body = add_cyl(f"{name}_body", (bx, by, cz), R, L, material,
+                   module=module, module_objects=module_objects, rotation=rot)
+    parts += [body, base]
+    for s, side in [(-1, "DE"), (1, "NDE")]:
+        parts.append(add_frustum(f"{name}_endbell_{side}",
+                                 (bx + dx * s * (L / 2 + R * 0.1), by + dy * s * (L / 2 + R * 0.1), cz),
+                                 R, R * 0.55, R * 0.25, material,
+                                 module=module, module_objects=module_objects,
+                                 rotation=(0, math.radians(s * 90), 0) if axis == "x"
+                                 else (math.radians(-s * 90), 0, 0)))
+        parts.append(add_box(f"{name}_foot_{side}",
+                             (bx + dx * s * L * 0.32, by + dy * s * L * 0.32, bz + base_t + foot_h / 2),
+                             (R * 0.5 if dx else R * 1.9, R * 1.9 if dx else R * 0.5, foot_h),
+                             material_base or material,
+                             module=module, module_objects=module_objects))
+    parts.append(add_cyl(f"{name}_shaft", (bx + dx * (L / 2 + R * 0.45), by + dy * (L / 2 + R * 0.45), cz),
+                         R * 0.16, R * 0.7, material_shaft or material,
+                         module=module, module_objects=module_objects, rotation=rot))
+    parts.append(add_box(f"{name}_terminal_box", (bx, by, cz + R + R * 0.18),
+                         (R * 0.5, R * 0.5, R * 0.36), material_shaft or material,
+                         module=module, module_objects=module_objects))
+    return _finalise_assembly(name, body, parts, module)
+
+
+def prim_panel_stack(name, n_panels, panel_width_mm, panel_height_mm, panel_depth_mm,
+                     pitch_mm, location_mm, material=None, axis="y",
+                     module=None, module_objects=None):
+    """Repeated flat panels on a pitch (PV strings, filter banks, plate
+    stacks, electrolyser cells). Panels face along `axis` ("y"|"x"), i.e.
+    width×height plates pitched along that axis. All mm; location_mm =
+    BASE-CENTRE of the stack."""
+    pw = _mm(panel_width_mm); ph = _mm(panel_height_mm); pd = _mm(panel_depth_mm)
+    pitch = _mm(pitch_mm)
+    bx, by, bz = _mm3(location_mm)
+    n = int(n_panels)
+    parts = []
+    root = None
+    for i in range(n):
+        off = (i - (n - 1) / 2) * pitch
+        if axis == "y":
+            loc, size = (bx, by + off, bz + ph / 2), (pw, pd, ph)
+        else:
+            loc, size = (bx + off, by, bz + ph / 2), (pd, pw, ph)
+        p = add_box(f"{name}_panel_{i+1:02d}", loc, size, material,
+                    module=module, module_objects=module_objects)
+        parts.append(p)
+        if root is None:
+            root = p
+    return _finalise_assembly(name, root, parts, module)
+
+
+def prim_foundation(name, width_mm, depth_mm, thickness_mm, location_mm, material=None,
+                    module=None, module_objects=None):
+    """Concrete foundation slab / baseplate. width(X) × depth(Y) ×
+    thickness(Z) mm; location_mm = BASE-CENTRE (underside). Root = slab."""
+    w = _mm(width_mm); d = _mm(depth_mm); t = _mm(thickness_mm)
+    bx, by, bz = _mm3(location_mm)
+    slab = add_box(f"{name}_slab", (bx, by, bz + t / 2), (w, d, t), material,
+                   module=module, module_objects=module_objects)
+    return _finalise_assembly(name, slab, [slab], module,
+                              extras={"top_z_m": bz + t})
+
+
+# ─── Connection routing (pipes / cables / ducts) ──────────────────────────
+
+
+def route_orthogonal(start_mm, end_mm, rise_mm=600.0):
+    """Manhattan route between two points (mm): rise vertically above the
+    higher endpoint by rise_mm, traverse X then Y at that level, drop to the
+    end point. Returns a waypoint list (mm) for prim_pipe_run(). Degenerate
+    legs (< 1 mm) are dropped."""
+    sx, sy, sz = (float(c) for c in start_mm)
+    ex, ey, ez = (float(c) for c in end_mm)
+    zt = max(sz, ez) + float(rise_mm)
+    raw = [(sx, sy, sz), (sx, sy, zt), (ex, sy, zt), (ex, ey, zt), (ex, ey, ez)]
+    pts = [raw[0]]
+    for p in raw[1:]:
+        if max(abs(p[0] - pts[-1][0]), abs(p[1] - pts[-1][1]), abs(p[2] - pts[-1][2])) > 1.0:
+            pts.append(p)
+    return pts
+
+
+def _fillet_waypoints_m(pts_m, radius_m, samples=4):
+    """Replace each interior corner of an ORTHOGONAL polyline with a sampled
+    quarter-arc of radius radius_m (clamped to 45% of each adjacent leg).
+    Non-perpendicular corners fall back to a 2-point chamfer."""
+    if radius_m <= 0 or len(pts_m) < 3:
+        return list(pts_m)
+    out = [mathutils.Vector(pts_m[0])]
+    for i in range(1, len(pts_m) - 1):
+        A = mathutils.Vector(pts_m[i - 1])
+        P = mathutils.Vector(pts_m[i])
+        B = mathutils.Vector(pts_m[i + 1])
+        u = (P - A); la = u.length; u.normalize()
+        v = (B - P); lb = v.length; v.normalize()
+        if (u - v).length < 1e-6:  # straight-through point
+            continue
+        r = min(radius_m, la * 0.45, lb * 0.45)
+        p1 = P - u * r
+        p2 = P + v * r
+        if abs(u.dot(v)) > 1e-3:  # not perpendicular — chamfer
+            out += [p1, p2]
+            continue
+        C = p1 + v * r
+        for k in range(samples + 1):
+            th = (k / samples) * math.pi / 2
+            out.append(C - v * r * math.cos(th) + u * r * math.sin(th))
+    out.append(mathutils.Vector(pts_m[-1]))
+    return [tuple(p) for p in out]
+
+
+def prim_pipe_run(name, waypoints_mm, diameter_mm, material=None,
+                  bend_radius_mm=None, flanges=True, connect=(),
+                  module=None, module_objects=None):
+    """Routed pipe/cable/duct run along an orthogonal waypoint path (mm),
+    with real bend radii at the corners (quarter-arc fillets; default bend
+    radius = 1.5D) and flanges at both ends. Use route_orthogonal() to
+    generate waypoints between two ports, or pass them explicitly.
+    connect=(asm_a, asm_b, ...) declares the run attached_to each — the
+    module linkage that makes the connectivity check pass and the geometry
+    read as a connected plant."""
+    dia = _mm(diameter_mm)
+    r_bend = _mm(bend_radius_mm) if bend_radius_mm is not None else dia * 1.5
+    pts_m = [_mm3(p) for p in waypoints_mm]
+    if len(pts_m) < 2:
+        raise ValueError("prim_pipe_run needs >= 2 waypoints")
+    path = _fillet_waypoints_m(pts_m, r_bend)
+    pipe = add_pipe(f"{name}_tube", path, dia / 2, material,
+                    module=module, module_objects=module_objects, bevel_segments=6)
+    parts = [pipe]
+    if flanges:
+        for pt, nbr, side in [(pts_m[0], pts_m[1], "A"), (pts_m[-1], pts_m[-2], "B")]:
+            d = (mathutils.Vector(nbr) - mathutils.Vector(pt)).normalized()
+            if abs(d.z) > 0.9:
+                rot = (0, 0, 0)
+            elif abs(d.x) > 0.9:
+                rot = (0, math.radians(90), 0)
+            else:
+                rot = (math.radians(90), 0, 0)
+            parts.append(add_cyl(f"{name}_flange_{side}", pt, dia * 0.85, dia * 0.35,
+                                 material, module=module, module_objects=module_objects,
+                                 rotation=rot))
+    pipe["fl_pipe_run"] = True
+    asm = _finalise_assembly(name, pipe, parts, module)
+    for other in connect:
+        declare_relation(asm, "attached_to", other)
+    return asm
