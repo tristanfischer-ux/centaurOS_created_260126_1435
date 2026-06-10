@@ -46,6 +46,7 @@ import {
 import { isConsumable, CLASS_PRICE_SANITY_BOUNDS, keywordCeilingGbp, COMPONENT_CLASS_ORDER } from '../src/lib/pdf-engine-v2/component-classes'
 import { classifyByRules } from './estimate-missing-prices'
 import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
+import { selectUniversalBalanceRows } from './lib/eng-basis-balance'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
@@ -15342,6 +15343,14 @@ function _ebQtyUnit(q: any): string {
   return String(q.unit ?? '')
 }
 
+// A label is "blank-ish" when it is empty OR a serialised null sentinel (the
+// `display_name: None` raw-ID problem — Python None / "null" / "TBD" leaking into
+// a box label). Treat those as empty so the caller's `|| fallback` chain fires.
+function _blankish(s: unknown): string {
+  const t = String(s ?? '').trim()
+  return /^(none|null|undefined|nan|n\/?a|tbd|-|—|\.)$/i.test(t) ? '' : t
+}
+
 // One bordered box in the process-flow diagram (a sub-module, an input, or a
 // product). Tone selects the accent: 'input'/'product' get a tinted fill so the
 // plant boundary reads at a glance; 'unit' is the neutral process box.
@@ -15522,8 +15531,19 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
     if (topology.length > 0) streamNotes.push(`${topology.length} routed inter-unit connections (fluid, thermal and electrical) define the plant topology.`)
 
     // ── Block 2 data: compact mass & energy balance ─────────────────────────
-    // Curated ~8-12 key quantities; missing keys are skipped (never fabricated).
-    const balanceKeys: Array<{ key: string; label: string }> = [
+    // CO2-mineralisation keeps its CURATED key list — the duties use the SYSTEM-
+    // scope quantities (cross_exchanger_duty_kw / condenser_duty_kw) that match
+    // the consolidated "What is proven" duties card (186 kW / 156 kW) and the
+    // reboiler_duty_kw system value (91 kW), so this front-of-dossier balance
+    // agrees with it and introduces no cross-page conflict (the module-scope
+    // lean_rich_* / overhead_* variants carry different numbers and would clash).
+    // EVERY OTHER class derives the balance UNIVERSALLY from the contract's own
+    // quantities (Phase 4.1, 2026-06-10) — the gate-17 Brief-Compliance pattern:
+    // auto-render the balance-relevant terms (mass/volume flows, thermal duties,
+    // electrical power, energy, the headline efficiency), never fabricate. This
+    // removes the blank-balance failure for every non-CO2 archetype. Missing
+    // keys are skipped; nothing is invented.
+    const co2BalanceKeys: Array<{ key: string; label: string }> = [
       { key: 'co2_capture_rate_kg_per_hour', label: 'CO2 capture rate' },
       { key: 'capture_efficiency_at_design', label: 'Capture efficiency (design)' },
       { key: 'flue_gas_flow_m3_per_hour', label: 'Flue-gas feed' },
@@ -15532,23 +15552,18 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
       { key: 'koh_feed_t_per_day', label: 'KOH feed' },
       { key: 'caco3_output_t_per_day', label: 'CaCO3 product' },
       { key: 'k2so4_output_t_per_day', label: 'K2SO4 product' },
-      // Duties: use the SYSTEM-scope quantities (cross_exchanger_duty_kw /
-      // condenser_duty_kw) — these are the SAME values the existing consolidated
-      // "What is proven" duties card (Section 7) renders under the SAME labels
-      // (186 kW / 156 kW), so this front-of-dossier balance agrees with it and
-      // introduces no cross-page conflict. (The module-scope lean_rich_* /
-      // overhead_* variants carry different numbers and would clash; the
-      // reboiler_duty_kw system value, 91 kW, already matches that card.)
       { key: 'reboiler_duty_kw', label: 'Reboiler duty' },
       { key: 'cross_exchanger_duty_kw', label: 'Lean/rich cross-exchanger duty' },
       { key: 'condenser_duty_kw', label: 'Overhead condenser duty' },
       { key: 'absorber_packed_height_m', label: 'Absorber packed height' },
       { key: 'connected_electrical_load_kw', label: 'Connected electrical load' },
     ]
-    const balanceRows = balanceKeys
-      .map(({ key, label }) => ({ label, q: quantities[key] }))
-      .filter((r) => r.q != null && (typeof r.q !== 'object' || r.q.value != null))
-      .slice(0, 12)
+    const balanceRows = (isCo2Flow
+      ? co2BalanceKeys
+          .map(({ key, label }) => ({ label, q: quantities[key] }))
+          .filter((r) => r.q != null && (typeof r.q !== 'object' || r.q.value != null))
+      : selectUniversalBalanceRows(quantities, humanise)
+    ).slice(0, 12)
 
     // ── Block 3 data: feasibility verdict + decisive variable + economics ────
     const selfAudit = state?.selfAudit ?? {}
@@ -15675,7 +15690,7 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
 
           {/* Module groups: each module = a labelled group of sub-module boxes */}
           {modules.map((m: any, mi: number) => {
-            const groupLabel = String(m?.display_name || humanise(String(m?.module ?? '')) || `Module ${mi + 1}`)
+            const groupLabel = String(_blankish(m?.display_name) || humanise(String(m?.module ?? '')) || `Module ${mi + 1}`)
             const subs: any[] = Array.isArray(m?.sub_modules) ? m.sub_modules : []
             const boxes = subs.length > 0
               ? subs.map((sm: any) => {
@@ -15683,7 +15698,7 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
                   // named word, e.g. "packed absorber column"), NOT the function-taxonomy id.
                   const ws: any[] = Array.isArray(sm?.words) ? sm.words : []
                   const prim = ws.find((w: any) => w && w.name_human)
-                  const lbl = String(prim?.name_human || sm?.name_human || sm?.id || '')
+                  const lbl = String(_blankish(prim?.name_human) || _blankish(sm?.name_human) || _blankish(sm?.id) || '')
                   // sentence-case (capital first letter only) — NOT title-case, which mangles
                   // chemical formulas (CaCO3 -> Caco3, K2SO4 -> K2so4) and pH.
                   const t = normalise_unicode(humaniseSubName(lbl)).trim()
