@@ -21,7 +21,9 @@
 import type { BriefEnvelope, ParsedConstraints } from './types'
 // E1 universal envelope vector (tier b of the cascade — see detectEnvelope).
 // Module cycle with envelope-vector.ts is intentional + safe: both sides only
-// call the other inside function bodies (mirrors envelope ↔ constraint-normaliser).
+// call the other inside function bodies. The unit families live in the LEAF
+// module ./unit-families (tracker #19, 2026-06-10) so neither side of this
+// cycle ever touches a half-initialised module at import time.
 import { buildEnvelopeVector, injectionCandidates } from './envelope-vector'
 import {
   findScaleMetric,
@@ -37,7 +39,7 @@ import {
   TEMPERATURE_MK,
   CUBESAT_U,
   ELEMENT_COUNT,
-} from './constraint-normaliser'
+} from './unit-families'
 
 // ---------------------------------------------------------------------------
 // CLASS NORMALISATION — classifier slugs to orchestrator class IDs.

@@ -122,6 +122,12 @@
  */
 
 import type { BriefEnvelope, ParsedConstraints } from './types'
+// LEAF module (tracker #19, 2026-06-10): these families are accessed at
+// MODULE level below (FAMILY_PROBES), so they must come from a module with
+// no orchestrator imports. Importing them from constraint-normaliser created
+// the import-order crash "Cannot access 'ENERGY_KWH' before initialization"
+// via the cycle constraint-normaliser → envelope → envelope-vector →
+// constraint-normaliser.
 import {
   POWER_KW,
   ENERGY_KWH,
@@ -137,7 +143,7 @@ import {
   convertToCanonical,
   asArray,
   type UnitFamily,
-} from './constraint-normaliser'
+} from './unit-families'
 import {
   detectEnvelopeStrict,
   registeredClassOf,
