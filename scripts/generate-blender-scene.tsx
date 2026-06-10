@@ -33,6 +33,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { execFileSync } from 'child_process'
+import { pickGeometryDim } from './lib/blender-digest-dims'
 
 const DEFAULT_MODEL = process.env.BLENDER_GEN_MODEL || 'openai/gpt-5.5'
 const FALLBACK_MODEL = process.env.BLENDER_GEN_FALLBACK || 'anthropic/claude-sonnet-4.6'
@@ -159,11 +160,15 @@ function buildDigest(state: any): string {
         const w = words[wi]
         const cid = (w?.content_character?.character_id) || ''
         let qty = 1
-        let dims: string | null = null
         for (const mod of w?.modifier_characters || []) {
           if (mod?.kind === 'quantity') qty = parseInt0(String(mod.value || '')) || 1
-          if (mod?.kind === 'dimensions') dims = String(mod.value || '')
         }
+        // Real geometry for the scene: prefer the multi-axis 'dimensions' bbox,
+        // else a GEOMETRIC singular 'dimension' (every Phase-3 sizing dim — Ø×L
+        // tanks, pipe bores, reflector apertures — is singular). Scalar specs
+        // mis-filed under 'dimension' (3.2 V, 22 AWG) are filtered out. This is
+        // the geometry-from-calc → Blender link (Phase 5). See blender-digest-dims.
+        const dims = pickGeometryDim(w?.modifier_characters)
         const dimStr = dims ? ` [${dims}]` : ''
         lines.push(`    ${wi + 1}. ×${qty} ${JSON.stringify(w.name_human || '')} (id=${cid})${dimStr}`)
       }
