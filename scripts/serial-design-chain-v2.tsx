@@ -50,6 +50,7 @@ import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceMod
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { computePartOneCompleteness, evaluatePartOneCompletenessEnforcement, partOneCompletenessEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/part-one-completeness-audit'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -6250,6 +6251,46 @@ async function main() {
     } catch (err) {
       console.error(`[chain] cost-sanity (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
       logAction({ step: 'cost_sanity_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tCS })
+    }
+  }
+
+  // ── Part-1 completeness gate (Phase 0, SHADOW by default, 2026-06-10): the
+  //    self-correcting net that would have caught the compute_heat "1 kW
+  //    spacecraft-radiator" dossier. Reads orchestratorContract.quantities and
+  //    asks: does Part 1 have REAL engineering physics, or is it ONLY auto-planned
+  //    breadcrumb flags (auto_planned_tool_ran__*) with nothing grounded? Verified
+  //    on out/compute-heat-module-v5 (9 breadcrumbs, 0 real → HOLLOW) vs BESS (76
+  //    real → PASS). SHADOW by default: records state.partOneCompleteness + logs +
+  //    NEVER exits. ENFORCING opt-in via PART_ONE_COMPLETENESS_ENFORCING; a 'hollow'
+  //    verdict then hard-exits 36. Pure + deterministic (no LLM). Kill:
+  //    CHAIN_SKIP_PART_ONE_COMPLETENESS=1.
+  if (!process.env.CHAIN_SKIP_PART_ONE_COMPLETENESS) {
+    const tP1 = Date.now()
+    try {
+      const p1State = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const p1 = computePartOneCompleteness(p1State)
+      p1State.partOneCompleteness = p1
+      writeFileSync(statePath, JSON.stringify(p1State, null, 2))
+      console.error(`[chain] part-1 completeness (shadow): ${p1.verdict.toUpperCase()} — ${p1.message}`)
+      logAction({
+        step: 'part_one_completeness_shadow', ok: true, verdict: p1.verdict,
+        real_quantity_count: p1.real_quantity_count, breadcrumb_count: p1.breadcrumb_count,
+        worked_calc_step_count: p1.worked_calc_step_count, reasons: p1.reasons, latency_ms: Date.now() - tP1,
+      })
+      const p1Mode = partOneCompletenessEnforceModeFromEnv(process.env.PART_ONE_COMPLETENESS_ENFORCING)
+      if (p1Mode === 'on') {
+        const decision = evaluatePartOneCompletenessEnforcement(p1, p1Mode)
+        if (decision.shouldExit) {
+          console.error(`[chain] part-1 completeness ENFORCING: BLOCKING (exit ${decision.exitCode}) — ${decision.reason}`)
+          logAction({ step: 'part_one_completeness_enforce', ok: false, exit_code: decision.exitCode, verdict: p1.verdict, reason: decision.reason, latency_ms: Date.now() - tP1 })
+          process.exit(decision.exitCode)
+        }
+        console.error(`[chain] part-1 completeness enforcing: not hollow — ship allowed (verdict ${p1.verdict}).`)
+        logAction({ step: 'part_one_completeness_enforce', ok: true, verdict: p1.verdict })
+      }
+    } catch (err) {
+      console.error(`[chain] part-1 completeness (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
+      logAction({ step: 'part_one_completeness_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tP1 })
     }
   }
 
