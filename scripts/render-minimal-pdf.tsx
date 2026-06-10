@@ -57,6 +57,10 @@ import {
   type EngineeringLedger,
   type LedgerEntry,
 } from './lib/engineering-ledger'
+import {
+  buildEngineeringProblemNarrative,
+  type EngineeringProblem,
+} from './lib/engineering-problem-narrative'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { MATERIAL_RATE_GBP_PER_KG, FABRICATION_FACTOR } from './lib/cost/process-equipment-cost'
@@ -15561,6 +15565,148 @@ function SubModuleToolsCallout({ state, moduleSpec, subId }: { state: any; modul
 // each carrying the peach side-border, with top/bottom caps on the first/last
 // row of the tool's block. No single coloured View ever spans a page break
 // (the full-page-peach-gap fix). try/catch -> null so a fault never breaks the PDF.
+// ─── PART 1 · The engineering problem — and why these tools (2026-06-10) ─────
+// ADDITIVE, DETERMINISTIC render-only section. Sits AFTER System Overview and
+// BEFORE the consolidated tool-by-tool engineering section. It states, in
+// founder-readable language, the PHYSICS/ENGINEERING PROBLEM the design has to
+// solve, then presents the auto-selected tools as the ANSWER to each sub-problem
+// — carrying the SAME §-numbers used everywhere else (from buildEngineeringLedger
+// via the pure engineering-problem-narrative helper; §-numbers are NOT recomputed
+// here). HARD CONSTRAINT: it is GATED BY THE TOOLS THAT ACTUALLY RAN — only a
+// sub-problem with ≥1 real tool appears, and only §-numbers that genuinely fired
+// are cited. NO LLM: re-running the chain reproduces it exactly; the prose comes
+// from the authored per-domain library, assembled by the real run. Typography
+// mirrors EngineeringConsolidatedToolPage (peach card, §-refs, ASCII "->" arrows
+// — Helvetica has no arrow glyph). try/catch -> null so a fault never breaks the
+// PDF. The "-> solved by" line uses the helper's §-tools verbatim.
+function _engProblemSolvedByLine(p: EngineeringProblem): string {
+  // "§14 (packed-absorption column), §2 (heat exchanger)" — names every §-tool
+  // that answers this sub-problem, in §-order (the helper already sorts them).
+  return p.tools.map((t) => `§${t.num} (${asciiSafe(t.name)})`).join(', ')
+}
+
+function EngineeringProblemPage({ state, project }: { state: any; project: string }) {
+  // Data assembly is internally try/caught in the pure helper (returns a safe
+  // empty narrative on fault); an empty problem list short-circuits to null, so
+  // NO outer try/catch wraps the returned JSX (react-hooks/error-boundaries
+  // forbids constructing JSX inside try/catch).
+  {
+    let narrative: { opening: string; problems: EngineeringProblem[] }
+    try {
+      narrative = buildEngineeringProblemNarrative(state)
+    } catch {
+      narrative = { opening: '', problems: [] }
+    }
+    if (!narrative || !Array.isArray(narrative.problems) || narrative.problems.length === 0) return null
+
+    // Peach card palette — identical to EngineeringConsolidatedToolPage so the
+    // section reads consistently with the rest of the engineering typography.
+    const PEACH = COMPUTE_AMBER_SOFT
+    const PEACH_LINE = COMPUTE_AMBER_LINE
+    const PADX = 11
+    const side = { backgroundColor: PEACH, borderLeftWidth: 0.8, borderRightWidth: 0.8, borderColor: PEACH_LINE }
+
+    // Build one problem's atomic-row stack (header bar + paragraph + solved-by).
+    const problemRows = (p: EngineeringProblem): React.ReactNode[] => {
+      const rows: React.ReactNode[] = []
+      // Header bar: the bold problem title.
+      rows.push(
+        <View
+          style={{
+            paddingVertical: 6, paddingHorizontal: PADX,
+            borderBottomWidth: 0.8, borderBottomColor: '#f3ddcf',
+          }}
+        >
+          <Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER_DEEP }}>
+            {asciiSafe(p.domainTitle)}
+          </Text>
+        </View>,
+      )
+      // The authored problem paragraph (omitted for the 'other' catch-all, which
+      // carries no narrative — it renders only the supporting-calculation tag).
+      if (p.problemParagraph) {
+        rows.push(
+          <View style={{ paddingTop: 7, paddingBottom: 3, paddingHorizontal: PADX }}>
+            <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55 }}>
+              {asciiSafe(p.problemParagraph)}
+            </Text>
+          </View>,
+        )
+      } else {
+        rows.push(
+          <View style={{ paddingTop: 6, paddingBottom: 2, paddingHorizontal: PADX }}>
+            <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic', lineHeight: 1.45 }}>
+              Supporting calculation that the design also required.
+            </Text>
+          </View>,
+        )
+      }
+      // "-> solved by §14 (…), §2 (…)" — ASCII arrow; the §-tools verbatim.
+      rows.push(
+        <View style={{ paddingTop: 1, paddingBottom: 6, paddingHorizontal: PADX }}>
+          <Text style={{ fontSize: 8.5, color: '#28313f', lineHeight: 1.45 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: COMPUTE_AMBER }}>{'-> solved by '}</Text>
+            {_engProblemSolvedByLine(p)}
+          </Text>
+        </View>,
+      )
+      return rows
+    }
+
+    return (
+      <Page size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Part 1 · The Engineering Problem" project={project} />
+        <PageFooter />
+        <Text style={{ fontSize: 9, color: ACCENT, letterSpacing: 1.5, fontFamily: 'Helvetica-Bold', marginBottom: 3 }}>
+          PART 1 · THE ENGINEERING PROBLEM
+        </Text>
+        <Text style={{ fontSize: 21, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+          The engineering problem — and why these tools
+        </Text>
+        <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 6, lineHeight: 1.5 }}>
+          {asciiSafe(narrative.opening)}
+        </Text>
+        <Text style={{ fontSize: 8, color: MUTED, marginBottom: 12, lineHeight: 1.5, fontStyle: 'italic' }}>
+          This section is generated deterministically from the tools the engine actually ran — every sub-problem listed
+          has at least one real tool behind it, and every §-number cited is one that genuinely fired. The full worked
+          calculation for each §-tool follows in the next section.
+        </Text>
+        {narrative.problems.map((p: EngineeringProblem, pi: number) => {
+          const rows = problemRows(p)
+          const lastIdx = rows.length - 1
+          return (
+            <View
+              key={`epp-${pi}`}
+              style={{ marginBottom: 12 }}
+              // Keep a problem's title + first body row together so a heading never
+              // orphans at a page foot; transparent wrapper paints nothing.
+              minPresenceAhead={60}
+            >
+              {rows.map((node, i) => (
+                <View
+                  key={i}
+                  wrap={false}
+                  style={{
+                    ...side,
+                    borderTopWidth: i === 0 ? 0.8 : 0,
+                    borderTopLeftRadius: i === 0 ? 6 : 0,
+                    borderTopRightRadius: i === 0 ? 6 : 0,
+                    borderBottomWidth: i === lastIdx ? 0.8 : 0,
+                    borderBottomLeftRadius: i === lastIdx ? 6 : 0,
+                    borderBottomRightRadius: i === lastIdx ? 6 : 0,
+                  }}
+                >
+                  {node}
+                </View>
+              ))}
+            </View>
+          )
+        })}
+      </Page>
+    )
+  }
+}
+
 function EngineeringConsolidatedToolPage({ state, project }: { state: any; project: string }) {
   // Data assembly is internally try/caught (buildConsolidatedToolList +
   // toolSizesLabels both return safe defaults on fault), so NO outer try/catch
@@ -16447,6 +16593,13 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           meets the brief, then gets the plain-English system architecture before
           the whole-plant balance + the how-it-was-computed pages. */}
       <SystemOverviewPage state={state} project={project} />
+      {/* The engineering problem — and why these tools (2026-06-10):
+          DETERMINISTIC, gated by the tools that actually ran. States the
+          physics/engineering PROBLEM the design must solve, then shows the
+          selected §-tools as the ANSWER to each sub-problem (same §-numbers
+          used elsewhere). Sits AFTER System Overview and BEFORE the
+          consolidated tool-by-tool engineering section. NO LLM. */}
+      <EngineeringProblemPage state={state} project={project} />
       {/* Whole-plant-at-a-glance — process flow + mass/energy balance + feasibility
           verdict + headline economics (sits after System Overview: the reader sees
           what the plant is, then the whole-plant balance + verdict, BEFORE the
