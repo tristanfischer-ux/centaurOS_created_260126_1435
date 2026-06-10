@@ -277,6 +277,101 @@ const STRUCTURAL: SizingRule[] = [
     size: (p) => spec('rating_primary', findNum(p, [/structure_?mass_?kg|frame_?mass_?kg|primary_?structure_?mass_?kg/i]), 'kg') },
 ]
 
+/**
+ * Electrical-machine ACTIVE envelope from shaft power + speed via air-gap shear.
+ * Torque T = P/ω (ω = 2π·N/60); the rotor surface carries a tangential shear
+ * σ_tan, so T = σ_tan·(π/2)·D²·L. With L = λ·D → D = (2T/(π·σ_tan·λ))^(1/3),
+ * L = λD. σ_tan ≈ 35 kPa industrial air-cooled (≈55 kPa liquid-cooled). This is
+ * the active air-gap envelope (the frame is larger) — the physics-derived figure,
+ * not a guessed frame size; verified 6 MW @ 12 rpm → Ø4.4 m (real direct-drive
+ * 4–5 m), 200 kW @ 1500 rpm → Ø285 mm. P in kW, N in rpm. Pure; exported for
+ * tests. Returns [] when power OR speed is missing (never invents geometry).
+ */
+export function machineDimsFromPower(
+  power_kw: number | undefined,
+  rpm: number | undefined,
+  shear_kpa = 35,
+  aspect = 1,
+): ModifierCharacter[] {
+  if (power_kw === undefined || power_kw <= 0 || rpm === undefined || rpm <= 0) return []
+  const omega = (2 * Math.PI * rpm) / 60 // rad/s
+  const torque_nm = (power_kw * 1000) / omega
+  const sigma = shear_kpa * 1000 // Pa
+  const D = Math.cbrt((2 * torque_nm) / (Math.PI * sigma * aspect))
+  const Dmm = Math.round(D * 1000)
+  const Lmm = Math.round(aspect * D * 1000)
+  return [
+    mod('rating_primary', String(Math.round(power_kw * 100) / 100), 'kW shaft'),
+    mod('performance', String(Math.round(torque_nm)), 'N·m torque'),
+    mod('dimension', `Ø${Dmm} × ${Lmm} mm active (air-gap σ ${shear_kpa} kPa, ${rpm} rpm)`),
+  ]
+}
+
+/**
+ * Centrifugal impeller outer diameter from developed head + speed. Euler head
+ * H ≈ ψ·u₂²/g (ψ ≈ 0.5 head coefficient) → tip speed u₂ = √(g·H/ψ), diameter
+ * D₂ = 60·u₂/(π·N). Verified 50 m @ 2900 rpm → Ø206 mm (real ~200 mm). H in m,
+ * N in rpm. Pure; exported. [] when head OR speed is missing.
+ */
+export function impellerDimsFromHead(
+  head_m: number | undefined,
+  rpm: number | undefined,
+  head_coeff = 0.5,
+): ModifierCharacter[] {
+  if (head_m === undefined || head_m <= 0 || rpm === undefined || rpm <= 0) return []
+  const u2 = Math.sqrt((9.81 * head_m) / head_coeff) // m/s tip speed
+  const D2 = (60 * u2) / (Math.PI * rpm)
+  return [mod('dimension', `Ø${Math.round(D2 * 1000)} mm impeller (ψ ${head_coeff}, ${rpm} rpm, tip ${Math.round(u2)} m/s)`)]
+}
+
+/**
+ * Solid round shaft diameter from transmitted power + speed via torsional shear:
+ * τ = 16T/(π·D³) → D = (16T/(π·τ))^(1/3), torque T = P/ω. τ_allow ≈ 40 MPa (steel
+ * shaft with keyway + fatigue derate). Verified 200 kW @ 1500 rpm → Ø55 mm. P in
+ * kW, N in rpm. Pure; exported. [] when power OR speed is missing.
+ */
+export function shaftDiaFromPower(
+  power_kw: number | undefined,
+  rpm: number | undefined,
+  tau_mpa = 40,
+): ModifierCharacter[] {
+  if (power_kw === undefined || power_kw <= 0 || rpm === undefined || rpm <= 0) return []
+  const omega = (2 * Math.PI * rpm) / 60
+  const torque_nm = (power_kw * 1000) / omega
+  const D = Math.cbrt((16 * torque_nm) / (Math.PI * tau_mpa * 1e6))
+  return [mod('dimension', `Ø${Math.round(D * 1000)} mm shaft (torsion τ ${tau_mpa} MPa, ${Math.round(torque_nm)} N·m)`)]
+}
+
+// ── ROTATING-MACHINE family — electrical machines sized from shaft power + speed
+//    via air-gap shear (Ø from torque), centrifugal impellers from head + speed,
+//    shafts from torsional stress. Covers motors / generators / turbines / pumps /
+//    compressors / flywheels. Geometry follows the calc; every rule param-gated.
+const ROTATING_MACHINE: SizingRule[] = [
+  { id: 'electrical_machine', match: /\bmotor\b|generator|alternator|\bpmsm\b|\bbldc\b|induction[_\s-]?(motor|machine)|\bgenset\b|servo[_\s-]?motor|traction[_\s-]?motor|\bstator\b/i,
+    size: (p) => machineDimsFromPower(
+      findNum(p, [/machine_?power_?kw|generator_?power_?kw|motor_?power_?kw|shaft_?power_?kw|rated_?power_?kw|continuous_?power_?kw/i]),
+      findNum(p, [/machine_?rpm|generator_?rpm|motor_?rpm|shaft_?rpm|rated_?rpm|rotational_?speed_?rpm|\brpm\b/i]),
+    ) },
+  { id: 'turbine', match: /turbine|\bexpander\b|turbo[_\s-]?expander/i,
+    size: (p) => machineDimsFromPower(
+      findNum(p, [/turbine_?power_?kw|expander_?power_?kw|shaft_?power_?kw|rated_?power_?kw/i]),
+      findNum(p, [/turbine_?rpm|shaft_?rpm|rated_?rpm|\brpm\b/i]),
+      55, 0.6,
+    ) },
+  { id: 'impeller', match: /impeller|centrifugal|\bvolute\b|compressor[_\s-]?wheel|fan[_\s-]?wheel|pump[_\s-]?wheel/i,
+    size: (p) => [
+      ...impellerDimsFromHead(findNum(p, [/^head_?m$|pump_?head_?m|developed_?head_?m|discharge_?head_?m/i]), findNum(p, [/impeller_?rpm|pump_?rpm|rated_?rpm|\brpm\b/i])),
+      ...spec('rating_primary', findNum(p, [/hydraulic_?power_?kw|pump_?power_?kw|shaft_?power_?kw/i]), 'kW'),
+    ] },
+  { id: 'shaft', match: /\bshaft\b|\bspindle\b|coupling|\bspline\b/i,
+    size: (p) => shaftDiaFromPower(
+      findNum(p, [/shaft_?power_?kw|machine_?power_?kw|rated_?power_?kw|continuous_?power_?kw/i]),
+      findNum(p, [/shaft_?rpm|machine_?rpm|rated_?rpm|\brpm\b/i]),
+    ) },
+  { id: 'bearing', match: /bearing|journal|thrust[_\s-]?pad/i,
+    size: (p) => spec('rating_primary', findNum(p, [/bearing_?load_?kn|radial_?load_?kn|axial_?load_?kn|thrust_?load_?kn/i]), 'kN') },
+]
+
 const FAMILIES: Record<string, SizingRule[]> = {
   battery: BATTERY,
   process_plant: PROCESS_PLANT,
@@ -284,6 +379,7 @@ const FAMILIES: Record<string, SizingRule[]> = {
   spacecraft: SPACECRAFT,
   power_electronics: POWER_ELECTRONICS,
   structural: STRUCTURAL,
+  rotating_machine: ROTATING_MACHINE,
 }
 
 // Class → sizing family (coarse; same intent as build-links FAMILY_KEY). Extend as
@@ -308,6 +404,12 @@ const FAMILY_OF: Record<string, string> = {
   e_fuel_synthesis: 'process_plant',
   chemical_plant: 'process_plant',
   water_treatment: 'process_plant',
+  // NOTE: rotating-machine classes (wind/hydro turbine, pump skid, motor/genset,
+  // compressor) are deliberately LEFT UNMAPPED — they are multi-family (a wind
+  // turbine also needs `structural` tower/foundation + `power_electronics`
+  // converter), so the UNION path serves them better than a single-family map,
+  // and every registered rotating class bypasses this layer via its hand plan
+  // anyway. The `rotating_machine` family below is reached through the union.
 }
 
 function flattenParams(contract: ContractInProgress): SizingParams {

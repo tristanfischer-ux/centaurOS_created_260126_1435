@@ -2,7 +2,7 @@
 // headline assertion: the emitted vessel dimension is GEOMETRICALLY consistent
 // with the sized volume — i.e. geometry follows the calculation (the fix for the
 // satellite "58.7 L tank drawn 450 × 300 mm" bug).
-import { vesselDimsFromVolume, pipeBoreFromFlow, applyFamilySizing, radiatorDimsFromHeat, solarArrayDimsFromPower } from './sizing'
+import { vesselDimsFromVolume, pipeBoreFromFlow, applyFamilySizing, radiatorDimsFromHeat, solarArrayDimsFromPower, machineDimsFromPower, impellerDimsFromHead, shaftDiaFromPower } from './sizing'
 
 function parseCyl(dim: string): { D: number; L: number } | null {
   const m = dim.match(/Ø(\d+)\s*×\s*(\d+)\s*mm/)
@@ -138,5 +138,53 @@ describe('Phase 3 cont — power-electronics + structural (the deployable antenn
   it('a power-electronics heatsink is sized from its dissipation', () => {
     const { mods } = sizeOne('finned aluminium heatsink', { dissipation_kw: 0.8 }, 'novel_inverter_thing')
     expect(+mods.find((m) => m.kind === 'capacity').value).toBeCloseTo(0.8 * 1000 / 800, 1) // 1 m²
+  })
+})
+
+describe('Phase 3 cont — rotating-machine family (Ø follows torque / head / shear)', () => {
+  function ØofDim(mods: any[]): number {
+    return +(mods.find((m: any) => m.kind === 'dimension')!.value as string).match(/Ø(\d+)/)![1]
+  }
+  it('electrical-machine active Ø follows torque (6 MW @ 12 rpm ≈ 4–5 m direct-drive)', () => {
+    const m = machineDimsFromPower(6000, 12)
+    const torque = +m.find((x) => x.kind === 'performance')!.value
+    const expected = (6000 * 1000) / ((2 * Math.PI * 12) / 60) // T = P/ω
+    expect(Math.abs(torque - expected) / expected).toBeLessThan(0.01)
+    const Dmm = ØofDim(m)
+    expect(Dmm).toBeGreaterThan(3000)
+    expect(Dmm).toBeLessThan(7000) // real direct-drive 4–5 m active
+  })
+  it('a small high-speed motor is FAR smaller for the same family (200 kW @ 1500 rpm ≈ 0.3 m)', () => {
+    const Dmm = ØofDim(machineDimsFromPower(200, 1500))
+    expect(Dmm).toBeGreaterThan(150)
+    expect(Dmm).toBeLessThan(450) // mm — orders below the 6 MW machine, from physics alone
+  })
+  it('centrifugal impeller Ø follows head + speed (50 m @ 2900 rpm ≈ 200 mm)', () => {
+    const Dmm = ØofDim(impellerDimsFromHead(50, 2900))
+    expect(Dmm).toBeGreaterThan(150)
+    expect(Dmm).toBeLessThan(260)
+  })
+  it('shaft Ø follows transmitted torque (200 kW @ 1500 rpm ≈ 55 mm)', () => {
+    const Dmm = ØofDim(shaftDiaFromPower(200, 1500))
+    expect(Dmm).toBeGreaterThan(40)
+    expect(Dmm).toBeLessThan(75)
+  })
+  it('helpers never invent geometry without BOTH power and speed', () => {
+    expect(machineDimsFromPower(200, undefined)).toHaveLength(0)
+    expect(machineDimsFromPower(undefined, 1500)).toHaveLength(0)
+    expect(impellerDimsFromHead(50, 0)).toHaveLength(0)
+    expect(shaftDiaFromPower(0, 1500)).toHaveLength(0)
+  })
+  it('an UNSEEN class sizes its generator from power + speed via the union (no family map)', () => {
+    const contract: any = { quantities: { generator_power_kw: { value: 250 }, generator_rpm: { value: 1800 } } }
+    const modules: any[] = [{ sub_modules: [{ words: [
+      { id: 'gen', name_human: 'permanent-magnet generator', content_character: { character_id: 'pmsm' }, modifier_characters: [] },
+    ] }] }]
+    const r = applyFamilySizing(modules, contract, 'novel_genset_widget')
+    expect(r.family).toBe('universal') // unmapped → union reaches rotating_machine
+    expect(r.sized).toBe(1)
+    const mods = modules[0].sub_modules[0].words[0].modifier_characters as any[]
+    expect(mods.find((m) => m.kind === 'dimension').value).toMatch(/Ø\d+ × \d+ mm active/)
+    expect(mods.find((m) => m.kind === 'performance')).toBeDefined() // torque carried through
   })
 })
