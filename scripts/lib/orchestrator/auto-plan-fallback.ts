@@ -39,6 +39,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { composeToolGraph, type ToolIOSchema, type ComposedToolGraph } from './auto-planner'
 import { getTool } from './registry'
+import { groundToolOutputs } from './part-one-grounding'
 import type {
   BriefEnvelope,
   ClassToolPlan,
@@ -59,6 +60,18 @@ import type {
  *  UNIVERSAL_AUTO_PLAN=0 to disable. */
 export function autoPlanEnabled(): boolean {
   return process.env.UNIVERSAL_AUTO_PLAN !== '0'
+}
+
+/** Phase-1 GROUNDING flag (default OFF — conservative first wire, 2026-06-10).
+ *  When ON, a composed-plan tool's DECLARED outputs that it actually produced as
+ *  finite numbers are written into the contract as typed quantities (so Part 1
+ *  stops being hollow for novel classes — gate 36), IN ADDITION to the breadcrumb.
+ *  OFF = legacy breadcrumb-only behaviour. Enable: UNIVERSAL_AUTO_PLAN_GROUND=1.
+ *  Affects ONLY unregistered/novel classes (registered classes bypass the
+ *  auto-planner), so flipping it can never alter an existing class. */
+export function autoPlanGroundEnabled(): boolean {
+  const v = process.env.UNIVERSAL_AUTO_PLAN_GROUND
+  return v === '1' || v === 'true' || v === 'on'
 }
 
 /**
@@ -154,8 +167,9 @@ export function composeFallbackPlan(
   )
   if (graph.order.length === 0) return null
 
+  const outputKeysByTool = new Map(registry.map((s) => [s.tool_id, s.output_keys]))
   const tools: ToolStep[] = graph.order.map((tool_id) =>
-    synthesiseStep(tool_id, graph),
+    synthesiseStep(tool_id, graph, outputKeysByTool.get(tool_id) ?? []),
   )
 
   const plan: ClassToolPlan = {
@@ -180,7 +194,11 @@ export function composeFallbackPlan(
  * map — see module header for why). `required: false` guarantees a tool
  * failure cannot halt the composed plan.
  */
-function synthesiseStep(tool_id: string, graph: ComposedToolGraph): ToolStep {
+function synthesiseStep(
+  tool_id: string,
+  graph: ComposedToolGraph,
+  declaredOutputKeys: readonly string[] = [],
+): ToolStep {
   const feeds_into = graph.feeds_into
     .filter((e) => e.from === tool_id)
     .map((e) => e.to)
@@ -194,10 +212,16 @@ function synthesiseStep(tool_id: string, graph: ComposedToolGraph): ToolStep {
       quantities: c.quantities,
       brief,
     }),
-    contract_update: (c: ContractInProgress) => ({
+    // contract_update now receives the tool's real output (executor.ts:145). When
+    // grounding is enabled (UNIVERSAL_AUTO_PLAN_GROUND, default OFF) the tool's
+    // DECLARED outputs that it produced as finite numbers are written as typed
+    // quantities (Phase 1 — part-one-grounding.ts), turning "tool ran" into "the
+    // tool's physics is in the contract". The breadcrumb is kept for diagnostics.
+    contract_update: (c: ContractInProgress, output?: unknown) => ({
       ...c,
       quantities: {
         ...c.quantities,
+        ...(autoPlanGroundEnabled() ? groundToolOutputs(tool_id, declaredOutputKeys, output) : {}),
         [`auto_planned_tool_ran__${tool_id.replace(/[^a-z0-9]+/gi, '_')}`]: {
           value: 1,
           unit: 'flag',
