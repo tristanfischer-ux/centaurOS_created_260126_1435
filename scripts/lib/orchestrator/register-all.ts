@@ -337,6 +337,18 @@ import './tools/sorbent-kinetics'
 import './tools/regeneration-energy'
 import './tools/contactor-geometry'
 
+// 2026-06-10 — 6 NEW first-principles space-physics tools (roadmap families with
+// ZERO prior implementation). FAMILY-APPLICABLE (keyed on a physical feature, not
+// class-gated); each declares output_keys (grounding) + a feature predicate +
+// a self-test. Pre-change mempalace search: orchestrator tool wrapper + manifest
+// + applicable predicate → 6 drawers loaded.
+import './tools/feep-thrust'               // propulsion:feep-thrust — Field-Emission EP: F=I_b sqrt(2 m_i V_b/q); Isp=v_e/g0 (Goebel & Katz 2008)
+import './tools/mpd-thrust'                // propulsion:mpd-thrust — self-field MPD: F=b(mu0/4pi)I_d^2, b=ln(r_a/r_c)+0.75 (Jahn 1968 / Maecker 1955)
+import './tools/tdoa-fdoa-geolocation'     // rf:tdoa-fdoa-geolocation — emitter CRLB: sigma_pos~c sigma_t GDOP (+FDOA) (Torrieri 1984)
+import './tools/deployable-boom'           // structures:deployable-boom — cantilever: delta=F L^3/(3 E I); f1=(1.875^2/2pi)sqrt(EI/rho A L^4) (Blevins 1979)
+import './tools/reflector-surface-rms'     // antenna:reflector-surface-rms — Ruze: eta=exp(-(4pi eps/lambda)^2); G=G0-L_ruze (Ruze 1966)
+import './tools/balloon-buoyancy'          // aero:balloon-buoyancy — Archimedes + US-76: float where rho_air(h*)=m_total/V+rho_gas (US Std Atm 1976)
+
 // Class plans for 10 priority new classes
 import './class-plans/evtol'
 import './class-plans/quantum-computer'

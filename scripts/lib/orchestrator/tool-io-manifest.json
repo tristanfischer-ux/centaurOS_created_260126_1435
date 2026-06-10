@@ -77,6 +77,33 @@
     ],
     "output_source": "python:run"
   },
+  "aero:balloon-buoyancy": {
+    "input_keys": [
+      "gas_volume_m3",
+      "lift_gas",
+      "payload_mass_kg",
+      "balloon_mass_kg"
+    ],
+    "output_keys": [
+      "float_altitude_m",
+      "gross_lift_n",
+      "free_lift_n",
+      "float_altitude_km",
+      "air_density_at_float_kg_m3",
+      "gas_density_at_float_kg_m3",
+      "air_temp_at_float_k",
+      "air_pressure_at_float_pa",
+      "gross_lift_sea_level_n",
+      "total_mass_kg"
+    ],
+    "cost_basis": [
+      "balloon_envelope_assembly"
+    ],
+    "seen_in": [
+      "(feature: lighter-than-air/HAPS-balloon)"
+    ],
+    "output_source": "python:run"
+  },
   "aeroelastic-flutter:wing": {
     "input_keys": [
       "air_density_kg_m3",
@@ -221,6 +248,32 @@
       "wind-turbine"
     ],
     "output_source": "class-plan"
+  },
+  "antenna:reflector-surface-rms": {
+    "input_keys": [
+      "aperture_diameter_m",
+      "frequency_ghz",
+      "wavelength_m",
+      "surface_rms_m",
+      "aperture_efficiency"
+    ],
+    "output_keys": [
+      "surface_rms_mm",
+      "ruze_loss_db",
+      "effective_gain_dbi",
+      "ideal_gain_dbi",
+      "ruze_efficiency",
+      "hpbw_deg",
+      "wavelength_m",
+      "lambda_over_20_m"
+    ],
+    "cost_basis": [
+      "reflector_dish_assembly"
+    ],
+    "seen_in": [
+      "(feature: antenna/reflector)"
+    ],
+    "output_source": "python:run"
   },
   "arc-flash:ieee-1584": {
     "input_keys": [
@@ -4321,6 +4374,56 @@
     ],
     "output_source": "class-plan"
   },
+  "propulsion:feep-thrust": {
+    "input_keys": [
+      "beam_current_a",
+      "beam_voltage_v",
+      "propellant"
+    ],
+    "output_keys": [
+      "thrust_n",
+      "isp_s",
+      "exhaust_velocity_ms",
+      "input_power_w",
+      "thrust_un",
+      "mass_flow_rate_kg_s",
+      "thrust_to_power_mn_per_kw",
+      "ion_mass_kg",
+      "ion_charge_c"
+    ],
+    "cost_basis": [
+      "feep_thruster_assembly"
+    ],
+    "seen_in": [
+      "(feature: electric-propulsion)"
+    ],
+    "output_source": "python:run"
+  },
+  "propulsion:mpd-thrust": {
+    "input_keys": [
+      "discharge_current_a",
+      "anode_radius_m",
+      "cathode_radius_m",
+      "mass_flow_kg_s",
+      "discharge_voltage_v"
+    ],
+    "output_keys": [
+      "thrust_n",
+      "isp_s",
+      "discharge_power_w",
+      "exhaust_velocity_ms",
+      "geometry_factor_b",
+      "thrust_efficiency",
+      "thrust_to_power_n_per_kw"
+    ],
+    "cost_basis": [
+      "mpd_thruster_assembly"
+    ],
+    "seen_in": [
+      "(feature: electric-propulsion/plasma)"
+    ],
+    "output_source": "python:run"
+  },
   "protection-coordination:dc-ac": {
     "input_keys": [
       "bus_resistance_ohm",
@@ -4942,6 +5045,32 @@
     ],
     "output_source": "none"
   },
+  "rf:tdoa-fdoa-geolocation": {
+    "input_keys": [
+      "timing_error_s",
+      "n_sensors",
+      "emitter_range_km",
+      "gdop_pair",
+      "freq_hz",
+      "fdoa_error_hz",
+      "relative_velocity_ms",
+      "bandwidth_hz",
+      "snr_db"
+    ],
+    "output_keys": [
+      "geolocation_accuracy_m",
+      "gdop",
+      "cep_m",
+      "tdoa_range_error_m",
+      "geolocation_accuracy_tdoa_m",
+      "geolocation_accuracy_fdoa_m"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "(feature: RF-payload/SIGINT)"
+    ],
+    "output_source": "python:run"
+  },
   "rolling-resistance:cycling": {
     "input_keys": [
       "air_density_kg_m3",
@@ -5282,6 +5411,38 @@
     "cost_basis": [],
     "seen_in": [
       "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
+  },
+  "structures:deployable-boom": {
+    "input_keys": [
+      "deployed_length_m",
+      "outer_radius_m",
+      "wall_thickness_m",
+      "youngs_modulus_pa",
+      "density_kg_m3",
+      "tip_load_n",
+      "tip_mass_kg",
+      "stowed_length_m"
+    ],
+    "output_keys": [
+      "tip_deflection_mm",
+      "first_mode_hz",
+      "deployed_length_m",
+      "stowed_length_m",
+      "first_mode_bare_hz",
+      "section_area_m2",
+      "second_moment_area_m4",
+      "bending_stiffness_ei_nm2",
+      "boom_mass_kg",
+      "stow_ratio",
+      "packaging_efficiency"
+    ],
+    "cost_basis": [
+      "deployable_boom_assembly"
+    ],
+    "seen_in": [
+      "(feature: deployable-structure)"
     ],
     "output_source": "python:run"
   },

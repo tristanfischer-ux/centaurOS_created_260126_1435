@@ -537,6 +537,112 @@ function checkSizingToolsWorkedSound(): Assertion[] {
       out.push({ id: `UNIVERSAL.chemical_process_sizing_tools_worked_calc_sound.${id}`, description: 'chemical-process sizing tool worked-calc sound', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     }
   }
+  try {
+    // ── 6 NEW first-principles SPACE-PHYSICS tools (2026-06-10) ──────────────
+    // Roadmap families with ZERO prior implementation, now added FAMILY-APPLICABLE
+    // (feature-keyed, not class-gated) with declared output_keys + a worked-calc
+    // trace. Same idiom as the chemical-process block: run via .venv, re-evaluate
+    // every arithmetic worked line within 1%, and bound each headline output to
+    // its physical range. Guards a formula/constant drift from silently moving a
+    // headline thruster Isp / geolocation accuracy / boom mode / dish gain / float
+    // altitude. Each tool's own python self-test asserts the same ranges; this is
+    // the in-harness mechanical guard so iter-N catches iter-(N+1).
+
+    // 1. propulsion:feep-thrust — indium FEEP at 1 mA / 6 kV. Isp 4000-12000 s,
+    //    P = I_b*V_b exactly, thrust micro-newton class.
+    const feep = runTool('feep_thrust.py', { beam_current_a: 1.0e-3, beam_voltage_v: 6000.0, propellant: 'indium' })
+    const rfeep = reEvalWorked(feep?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.space_physics_tools_worked_calc_sound.feep',
+      `propulsion:feep-thrust ok (indium 1mA/6kV): Isp 4000-12000 s + P=I_b*V_b + thrust>0, worked[] re-evaluates within 1% (${rfeep.checked} checked)`,
+      JSON.stringify({ bad: rfeep.bad.length, isp: feep?.isp_s, P: feep?.input_power_w, F: feep?.thrust_n, err: feep?.error }),
+      () => !feep?.error && rfeep.bad.length === 0
+        && num(feep, 'isp_s') >= 4000 && num(feep, 'isp_s') <= 12000
+        && Math.abs(num(feep, 'input_power_w') - 1.0e-3 * 6000.0) < 1e-6
+        && num(feep, 'thrust_n') > 0,
+      () => `error=${feep?.error} | bad=${rfeep.bad.slice(0, 1).join(' | ')} | isp=${feep?.isp_s} P=${feep?.input_power_w} F=${feep?.thrust_n}`,
+    ))
+
+    // 2. propulsion:mpd-thrust — 10 kA self-field MPD. Isp 1000-5000 s, thrust N-class,
+    //    geometry factor b = ln(r_a/r_c)+0.75 = ln(5)+0.75.
+    const mpd = runTool('mpd_thrust.py', { discharge_current_a: 10000.0, anode_radius_m: 0.05, cathode_radius_m: 0.01, mass_flow_kg_s: 1.2e-3, discharge_voltage_v: 60.0 })
+    const rmpd = reEvalWorked(mpd?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.space_physics_tools_worked_calc_sound.mpd',
+      `propulsion:mpd-thrust ok (10 kA, r_a/r_c=5): Isp 1000-5000 s + thrust 1-200 N + b=ln(5)+0.75, worked[] re-evaluates within 1% (${rmpd.checked} checked)`,
+      JSON.stringify({ bad: rmpd.bad.length, isp: mpd?.isp_s, F: mpd?.thrust_n, b: mpd?.geometry_factor_b, err: mpd?.error }),
+      () => !mpd?.error && rmpd.bad.length === 0
+        && num(mpd, 'isp_s') >= 1000 && num(mpd, 'isp_s') <= 5000
+        && num(mpd, 'thrust_n') >= 1 && num(mpd, 'thrust_n') <= 200
+        && Math.abs(num(mpd, 'geometry_factor_b') - (Math.log(5) + 0.75)) < 1e-4,
+      () => `error=${mpd?.error} | bad=${rmpd.bad.slice(0, 1).join(' | ')} | isp=${mpd?.isp_s} F=${mpd?.thrust_n} b=${mpd?.geometry_factor_b}`,
+    ))
+
+    // 3. rf:tdoa-fdoa-geolocation — 30 ns / 4 sensors. accuracy 1-5000 m, CEP>=sigma,
+    //    TDOA range error = c*sigma_t.
+    const geo = runTool('tdoa_fdoa_geolocation.py', { timing_error_s: 3.0e-8, n_sensors: 4, emitter_range_km: 800.0, gdop_pair: 3.0, freq_hz: 1.5e9, fdoa_error_hz: 1.0, relative_velocity_ms: 7500.0 })
+    const rgeo = reEvalWorked(geo?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.space_physics_tools_worked_calc_sound.geolocation',
+      `rf:tdoa-fdoa-geolocation ok (30 ns, 4 sensors): accuracy 1-5000 m + CEP>=sigma + range_err=c*sigma_t, worked[] re-evaluates within 1% (${rgeo.checked} checked)`,
+      JSON.stringify({ bad: rgeo.bad.length, acc: geo?.geolocation_accuracy_m, cep: geo?.cep_m, re: geo?.tdoa_range_error_m, err: geo?.error }),
+      () => !geo?.error && rgeo.bad.length === 0
+        && num(geo, 'geolocation_accuracy_m') >= 1 && num(geo, 'geolocation_accuracy_m') <= 5000
+        && num(geo, 'cep_m') >= num(geo, 'geolocation_accuracy_m')
+        && Math.abs(num(geo, 'tdoa_range_error_m') - 299792458.0 * 3.0e-8) < 1e-3,
+      () => `error=${geo?.error} | bad=${rgeo.bad.slice(0, 1).join(' | ')} | acc=${geo?.geolocation_accuracy_m} cep=${geo?.cep_m} re=${geo?.tdoa_range_error_m}`,
+    ))
+
+    // 4. structures:deployable-boom — 5 m Al boom. f1 in (0,50] Hz, deflection finite>0,
+    //    tip-mass f1 <= bare f1, stow ratio < 1.
+    const boom = runTool('deployable_boom.py', { deployed_length_m: 5.0, outer_radius_m: 0.02, wall_thickness_m: 0.0003, youngs_modulus_pa: 7.0e10, density_kg_m3: 2700.0, tip_load_n: 5.0, tip_mass_kg: 0.5, stowed_length_m: 0.3 })
+    const rboom = reEvalWorked(boom?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.space_physics_tools_worked_calc_sound.deployable_boom',
+      `structures:deployable-boom ok (5 m Al): f1 in (0,50] Hz + deflection>0 + f1_tip<=f1_bare + stow_ratio<1, worked[] re-evaluates within 1% (${rboom.checked} checked)`,
+      JSON.stringify({ bad: rboom.bad.length, f1: boom?.first_mode_hz, d: boom?.tip_deflection_mm, sr: boom?.stow_ratio, err: boom?.error }),
+      () => !boom?.error && rboom.bad.length === 0
+        && num(boom, 'first_mode_hz') > 0 && num(boom, 'first_mode_hz') <= 50
+        && num(boom, 'tip_deflection_mm') > 0 && num(boom, 'tip_deflection_mm') < 5000
+        && num(boom, 'first_mode_hz') <= num(boom, 'first_mode_bare_hz') + 1e-9
+        && num(boom, 'stow_ratio') > 0 && num(boom, 'stow_ratio') < 1,
+      () => `error=${boom?.error} | bad=${rboom.bad.slice(0, 1).join(' | ')} | f1=${boom?.first_mode_hz} defl=${boom?.tip_deflection_mm} stow=${boom?.stow_ratio}`,
+    ))
+
+    // 5. antenna:reflector-surface-rms — 3 m Ku dish, 0.5 mm RMS. Ruze loss < 1 dB
+    //    (eps<lambda/20), gain 30-70 dBi, net = ideal - loss.
+    const dish = runTool('reflector_surface_rms.py', { aperture_diameter_m: 3.0, frequency_ghz: 12.0, surface_rms_m: 0.0005, aperture_efficiency: 0.65 })
+    const rdish = reEvalWorked(dish?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.space_physics_tools_worked_calc_sound.reflector_rms',
+      `antenna:reflector-surface-rms ok (3 m Ku, 0.5 mm RMS): Ruze loss <1 dB + gain 30-70 dBi + net=ideal-loss, worked[] re-evaluates within 1% (${rdish.checked} checked)`,
+      JSON.stringify({ bad: rdish.bad.length, loss: dish?.ruze_loss_db, g: dish?.effective_gain_dbi, g0: dish?.ideal_gain_dbi, err: dish?.error }),
+      () => !dish?.error && rdish.bad.length === 0
+        && num(dish, 'ruze_loss_db') >= 0 && num(dish, 'ruze_loss_db') <= 1
+        && num(dish, 'effective_gain_dbi') >= 30 && num(dish, 'effective_gain_dbi') <= 70
+        && Math.abs(num(dish, 'effective_gain_dbi') - (num(dish, 'ideal_gain_dbi') - num(dish, 'ruze_loss_db'))) < 1e-3,
+      () => `error=${dish?.error} | bad=${rdish.bad.slice(0, 1).join(' | ')} | loss=${dish?.ruze_loss_db} G=${dish?.effective_gain_dbi} G0=${dish?.ideal_gain_dbi}`,
+    ))
+
+    // 6. aero:balloon-buoyancy — 5000 m3 He, 130 kg total. Float 18-35 km (HAPS band),
+    //    free lift ~0 at equilibrium, US-76 sea-level density ~1.225.
+    const bal = runTool('balloon_buoyancy.py', { gas_volume_m3: 5000.0, lift_gas: 'helium', payload_mass_kg: 50.0, balloon_mass_kg: 80.0 })
+    const rbal = reEvalWorked(bal?.worked)
+    out.push(assertEq(
+      'UNIVERSAL.space_physics_tools_worked_calc_sound.balloon',
+      `aero:balloon-buoyancy ok (5000 m3 He, 130 kg): float 18-35 km + |free_lift| small at equilibrium + sea-level gross>weight, worked[] re-evaluates within 1% (${rbal.checked} checked)`,
+      JSON.stringify({ bad: rbal.bad.length, h: bal?.float_altitude_km, fl: bal?.free_lift_n, glsl: bal?.gross_lift_sea_level_n, err: bal?.error }),
+      () => !bal?.error && rbal.bad.length === 0
+        && num(bal, 'float_altitude_km') >= 18 && num(bal, 'float_altitude_km') <= 35
+        && Math.abs(num(bal, 'free_lift_n')) <= 0.02 * num(bal, 'total_mass_kg') * 9.80665 + 5.0
+        && num(bal, 'gross_lift_sea_level_n') > num(bal, 'total_mass_kg') * 9.80665,
+      () => `error=${bal?.error} | bad=${rbal.bad.slice(0, 1).join(' | ')} | h=${bal?.float_altitude_km}km free=${bal?.free_lift_n} glsl=${bal?.gross_lift_sea_level_n}`,
+    ))
+  } catch (err) {
+    for (const id of ['feep', 'mpd', 'geolocation', 'deployable_boom', 'reflector_rms', 'balloon']) {
+      out.push({ id: `UNIVERSAL.space_physics_tools_worked_calc_sound.${id}`, description: 'space-physics first-principles tool worked-calc sound', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    }
+  }
   _sizingWorkedCheck = out
   return out
 }
