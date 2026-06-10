@@ -288,6 +288,58 @@ export function buildClassFitCorpus(parsedBrief: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
+// PROVISIONAL-SLUG MINTING (W0 refinement, tracker #22) — on a contradiction
+// the envelope must NOT keep the contradicted class label (wind_turbine →
+// "wind-turbine" routed a subsea kite to the WIND class-reference graph).
+// Deterministically mint a novel slug from the brief's own naming so every
+// downstream keyed store (class-reference graph, corpus components, candidate
+// tables, blender dispatch) keys on an HONEST novel identity instead.
+// ---------------------------------------------------------------------------
+
+export const PROVISIONAL_SLUG_RE = /^[a-z0-9_]{1,64}$/
+
+/** Slugify free text to the candidate-store alphabet /^[a-z0-9_]{1,64}$/.
+ *  Returns '' when nothing usable survives sanitisation. */
+export function sanitiseProvisionalSlug(v: unknown): string {
+  const slug = String(v ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64)
+    .replace(/_+$/g, '')
+  return PROVISIONAL_SLUG_RE.test(slug) ? slug : ''
+}
+
+/**
+ * Mint a deterministic provisional class slug for a novel archetype from the
+ * parsed brief. Source precedence (first usable wins):
+ *   1. the brief's name/title field — `project_id` (the parser's product
+ *      name slug, e.g. "tidal-kite-subsea-generator"), then `product_name` /
+ *      `product_title` / `title` / `name` variants;
+ *   2. `fallbackStem` (the brief FILENAME stem, when the caller knows it);
+ *   3. the head noun phrase of `product_description` (first clause, first 6
+ *      words, leading articles stripped);
+ *   4. the literal 'novel_unclassified' (never empty — the slug keys DB rows).
+ * Pure + deterministic: same brief → same slug, no LLM.
+ */
+export function mintProvisionalSlug(parsedBrief: unknown, fallbackStem?: string): string {
+  const b = (parsedBrief ?? {}) as Record<string, any>
+  const named = [b.project_id, b.product_name, b.product_title, b.title, b.name, fallbackStem]
+  for (const c of named) {
+    const slug = sanitiseProvisionalSlug(c)
+    if (slug) return slug
+  }
+  const firstClause = str(b.product_description).split(/[.;:\n]/)[0] ?? ''
+  const nounPhrase = firstClause
+    .trim()
+    .replace(/^(a|an|the)\s+/i, '')
+    .split(/\s+/)
+    .slice(0, 6)
+    .join('_')
+  return sanitiseProvisionalSlug(nounPhrase) || 'novel_unclassified'
+}
+
+// ---------------------------------------------------------------------------
 // NEGATIVE-TOKEN GUARDS (signal c) — direct token↔domain incompatibilities.
 // Each token, when present, is incompatible with the listed class-domains.
 // HIGH severity. Overlaps signal (a) but gives an explicit, auditable cite.

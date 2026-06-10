@@ -24,7 +24,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { buildEnvelopeVector } from './envelope-vector'
-import { checkClassFit } from './class-fit-check'
+import { checkClassFit, mintProvisionalSlug, sanitiseProvisionalSlug, PROVISIONAL_SLUG_RE } from './class-fit-check'
 import type { ParsedConstraints } from './types'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -132,6 +132,32 @@ function main(): void {
     // module returned a well-formed result (did not throw / mislabel domains).
     check(`${file} vs ${wrongClass}: well-formed result`, r.fit === 'ok' || r.fit === 'contradiction')
   }
+
+  // ── T-e: provisional-slug minting (tracker #22 W0 refinement) ────────
+  console.log('\nT-e — provisional slug minting on contradiction')
+  const tidalSlug = mintProvisionalSlug(tidalC)
+  check('tidal-kite minted slug is tidal-ish (NOT wind)', /tidal/.test(tidalSlug) && !/wind/.test(tidalSlug),
+    `minted="${tidalSlug}"`)
+  check('tidal-kite minted slug matches /^[a-z0-9_]{1,64}$/', PROVISIONAL_SLUG_RE.test(tidalSlug),
+    `minted="${tidalSlug}"`)
+  console.log(`     minted: "${tidalSlug}"`)
+  // Determinism: same brief → same slug.
+  check('minting is deterministic', mintProvisionalSlug(tidalC) === tidalSlug)
+  // Fallback 2: filename stem when the brief carries no name field.
+  check('filename-stem fallback', mintProvisionalSlug({}, 'tidal-kite-generator') === 'tidal_kite_generator',
+    mintProvisionalSlug({}, 'tidal-kite-generator'))
+  // Fallback 3: product_description head noun phrase (articles stripped).
+  const descOnly = { product_description: 'A utility-scale underwater tidal kite that harvests kinetic energy.' }
+  const descSlug = mintProvisionalSlug(descOnly)
+  check('description-noun-phrase fallback is tidal-ish', /tidal/.test(descSlug) && PROVISIONAL_SLUG_RE.test(descSlug),
+    `minted="${descSlug}"`)
+  // Fallback 4: never empty.
+  check('empty brief → novel_unclassified', mintProvisionalSlug({}) === 'novel_unclassified',
+    mintProvisionalSlug({}))
+  // Sanitiser: hostile input is neutralised to the safe alphabet.
+  const hostile = sanitiseProvisionalSlug(`x'; DROP TABLE class_reference_graphs;--`)
+  check('sanitiser neutralises hostile input', hostile === '' || PROVISIONAL_SLUG_RE.test(hostile),
+    `sanitised="${hostile}"`)
 
   console.log(`\n${'='.repeat(60)}`)
   console.log(`PASSED ${passed} / ${passed + failed}`)

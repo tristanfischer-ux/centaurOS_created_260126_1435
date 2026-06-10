@@ -25,7 +25,7 @@
 
 import { detectEnvelope, validateEnvelope, genericEnvelope } from './envelope'
 import { buildEnvelopeVector } from './envelope-vector'
-import { checkClassFit, type ClassFitResult } from './class-fit-check'
+import { checkClassFit, mintProvisionalSlug, type ClassFitResult } from './class-fit-check'
 import { selectPlan } from './planner'
 import { composeFallbackPlan } from './auto-plan-fallback'
 import { runToolPlan } from './executor'
@@ -101,12 +101,21 @@ export async function orchestrateDesign(
   // so the universal fallbacks fire (envelope-vector tier-b/c, generic
   // emitter, sizing families), per G3. Record the verdict for G4 provenance.
   const classFit = applyClassFitCheck(envelope, parsedConstraints)
+  let mintedSlug: string | null = null
   if (classFit.fit === 'contradiction') {
     const downgraded = genericEnvelope(parsedConstraints)
+    // W0 refinement (tracker #22): genericEnvelope keeps the CONTRADICTED class
+    // label (wind_turbine → "wind-turbine"), which then keys every downstream
+    // store (class-reference graph, corpus components, blender dispatch) to the
+    // WRONG class. Mint a deterministic provisional slug from the brief's own
+    // naming instead, so the novel archetype carries an honest identity.
+    mintedSlug = mintProvisionalSlug(parsedConstraints)
+    downgraded.class = mintedSlug
     console.error(
       `[orchestrator] CLASS-FIT CONTRADICTION (W0): classifier assigned "${classFit.class_slug}" ` +
       `(${classFit.class_domain} domain) but the brief operates in the ${classFit.brief_domain} domain. ` +
-      `Routing as REGISTRY-MISS (envelope.class "${envelope.class}" → "${downgraded.class}", scale_tier generic) ` +
+      `Routing as REGISTRY-MISS with a MINTED provisional slug (envelope.class "${envelope.class}" → ` +
+      `"${downgraded.class}", scale_tier generic — contradicted label "${classFit.class_slug}" NOT kept) ` +
       `so the universal path fires instead of a wrong-class dossier. Findings: ` +
       classFit.findings.filter(f => f.severity === 'high').map(f => f.detail).join(' | '),
     )
@@ -150,6 +159,12 @@ export async function orchestrateDesign(
       class_slug: classFit.class_slug,
       brief_domain: classFit.brief_domain,
       class_domain: String(classFit.class_domain),
+      // G4 provenance (tracker #22): on a contradiction, record BOTH the
+      // contradicted classifier label AND the minted provisional slug the
+      // envelope now carries, so the dossier can surface the re-route honestly.
+      ...(mintedSlug
+        ? { contradicted_class: classFit.class_slug, minted_slug: mintedSlug }
+        : {}),
       findings: classFit.findings.map(f => ({
         signal: f.signal, severity: f.severity, detail: f.detail, evidence: f.evidence,
       })),

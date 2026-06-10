@@ -450,6 +450,12 @@ export interface ContractInProgress {
     class_slug: string
     brief_domain: string
     class_domain: string
+    /** G4 provenance (tracker #22): set ONLY on a contradiction — the
+     *  classifier label that was rejected... */
+    contradicted_class?: string
+    /** ...and the deterministic provisional slug minted from the brief that
+     *  the envelope now carries instead. */
+    minted_slug?: string
     findings: Array<{ signal: string; severity: string; detail: string; evidence: string }>
   }
 }
