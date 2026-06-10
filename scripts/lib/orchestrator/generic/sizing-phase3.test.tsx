@@ -2,7 +2,7 @@
 // headline assertion: the emitted vessel dimension is GEOMETRICALLY consistent
 // with the sized volume — i.e. geometry follows the calculation (the fix for the
 // satellite "58.7 L tank drawn 450 × 300 mm" bug).
-import { vesselDimsFromVolume, pipeBoreFromFlow, applyFamilySizing } from './sizing'
+import { vesselDimsFromVolume, pipeBoreFromFlow, applyFamilySizing, radiatorDimsFromHeat, solarArrayDimsFromPower } from './sizing'
 
 function parseCyl(dim: string): { D: number; L: number } | null {
   const m = dim.match(/Ø(\d+)\s*×\s*(\d+)\s*mm/)
@@ -77,5 +77,39 @@ describe('Phase 3 — applyFamilySizing reaches an UNSEEN class via the universa
     expect(r.family).toBe('battery')
     const qty = modules[0].sub_modules[0].words[0].modifier_characters.find((m: any) => m.kind === 'quantity')
     expect(qty.value).toBe('×3920')
+  })
+})
+
+describe('Phase 3 — thermal + spacecraft families (geometry follows the calc)', () => {
+  it('radiator panel area follows heat load (terrestrial ~800 W/m²); side²≈area', () => {
+    const m = radiatorDimsFromHeat(8) // 8 kW terrestrial
+    const area = +m.find((x) => x.kind === 'capacity')!.value // m²
+    expect(area).toBeCloseTo(8000 / 800, 1) // 10 m²
+    const s = (+(m.find((x) => x.kind === 'dimension')!.value as string).match(/(\d+) × /)![1]) / 1000
+    expect(Math.abs(s * s - area) / area).toBeLessThan(0.02)
+  })
+  it('space radiator is far larger than terrestrial for the same heat (radiative)', () => {
+    const ter = +radiatorDimsFromHeat(8, 'terrestrial').find((x) => x.kind === 'capacity')!.value
+    const spc = +radiatorDimsFromHeat(8, 'space').find((x) => x.kind === 'capacity')!.value
+    expect(spc).toBeGreaterThan(ter)
+  })
+  it('solar array area follows power: A = P/(flux·η)', () => {
+    const area = +solarArrayDimsFromPower(1000).find((x) => x.kind === 'capacity')!.value
+    expect(area).toBeCloseTo(1000 / (1361 * 0.3), 1) // ~2.45 m²
+  })
+  it('helpers never invent geometry without their source quantity', () => {
+    expect(radiatorDimsFromHeat(undefined)).toHaveLength(0)
+    expect(solarArrayDimsFromPower(0)).toHaveLength(0)
+  })
+  it('an UNSEEN spacecraft sizes its propellant COPV from volume via the union (no 450×300 bug)', () => {
+    const contract: any = { quantities: { copv_volume_m3: { value: 0.0587 }, copv_pressure_bar: { value: 200 } } }
+    const modules: any[] = [{ sub_modules: [{ words: [
+      { id: 'tank', name_human: 'xenon COPV propellant tank', content_character: { character_id: 'copv' }, modifier_characters: [] },
+    ] }] }]
+    expect(applyFamilySizing(modules, contract, 'novel_satellite_thing').family).toBe('universal')
+    const dim = modules[0].sub_modules[0].words[0].modifier_characters.find((m: any) => m.kind === 'dimension')!.value as string
+    const D = +dim.match(/Ø(\d+)/)![1], L = +dim.match(/× (\d+) mm/)![1]
+    const V = Math.PI * Math.pow(D / 2000, 2) * (L / 1000)
+    expect(Math.abs(V - 0.0587) / 0.0587).toBeLessThan(0.03) // COPV holds its volume
   })
 })

@@ -188,7 +188,78 @@ const PROCESS_PLANT: SizingRule[] = [
     size: (p) => pipeBoreFromFlow(findNum(p, [/process_?flow_?m3_?h|line_?flow_?m3_?h|flow_?rate_?m3_?h/i])) },
 ]
 
-const FAMILIES: Record<string, SizingRule[]> = { battery: BATTERY, process_plant: PROCESS_PLANT }
+/**
+ * Flat-panel radiator area + dimensions from a heat load. SPACE: radiative
+ * A = Q/(ε·σ·(T_rad⁴ − T_sink⁴)). TERRESTRIAL: forced-air finned A = Q/flux
+ * (~800 W/m²). Square panel (side = √A). Q in kW. Pure; exported for tests.
+ */
+export function radiatorDimsFromHeat(
+  heat_kw: number | undefined,
+  mode: 'space' | 'terrestrial' = 'terrestrial',
+  t_rad_k = 320,
+  t_sink_k = 250,
+): ModifierCharacter[] {
+  if (heat_kw === undefined || heat_kw <= 0) return []
+  const Q = heat_kw * 1000 // W
+  const area_m2 = mode === 'space'
+    ? Q / (0.85 * 5.670374e-8 * (Math.pow(t_rad_k, 4) - Math.pow(t_sink_k, 4)))
+    : Q / 800
+  const side_mm = Math.round(Math.sqrt(area_m2) * 1000)
+  return [
+    mod('rating_primary', String(Math.round(heat_kw * 100) / 100), 'kW heat rejection'),
+    mod('capacity', String(Math.round(area_m2 * 100) / 100), 'm² radiating area'),
+    mod('dimension', `${side_mm} × ${side_mm} mm panel (${mode}, sized from ${Math.round(heat_kw * 100) / 100} kW)`),
+  ]
+}
+
+/** Solar-array area + dimensions from electrical power: A = P/(flux·η). Space
+ *  flux 1361 W/m², η ~0.30 (triple-junction). P in W. Square. Pure; exported. */
+export function solarArrayDimsFromPower(power_w: number | undefined, flux_w_m2 = 1361, eff = 0.3): ModifierCharacter[] {
+  if (power_w === undefined || power_w <= 0) return []
+  const area_m2 = power_w / (flux_w_m2 * eff)
+  const side_mm = Math.round(Math.sqrt(area_m2) * 1000)
+  return [
+    mod('rating_primary', String(Math.round(power_w)), 'W BoL'),
+    mod('capacity', String(Math.round(area_m2 * 100) / 100), 'm² array'),
+    mod('dimension', `${side_mm} × ${side_mm} mm (η ${Math.round(eff * 100)}%, sized from ${Math.round(power_w)} W)`),
+  ]
+}
+
+// ── THERMAL-REJECTION family — radiator/cold-plate panels sized from heat load
+//    (compute-heat, edge-compute, spacecraft thermal). Param-gated.
+const THERMAL_REJECTION: SizingRule[] = [
+  { id: 'radiator', match: /radiator|heat[_\s-]?reject|dry[_\s-]?cooler|finned|thermal[_\s-]?panel/i,
+    size: (p) => radiatorDimsFromHeat(
+      findNum(p, [/heat[_\s-]?(load|reject|dissipat).*kw/i, /thermal_?(load|dissipation)_?kw/i, /waste_?heat_?kw/i, /dissipated_?power_?kw/i]),
+      findNum(p, [/orbit|altitude_?km|t_?sink/i]) !== undefined ? 'space' : 'terrestrial',
+    ) },
+]
+
+// ── SPACECRAFT family — propellant tanks (volume→geometry), solar arrays
+//    (power→area), thrusters, reaction wheels. Param-gated. Covers satellite /
+//    thruster archetypes; the propellant tank reuses the vessel geometry so a
+//    COPV is the right size for its volume (the satellite-run bug).
+const SPACECRAFT: SizingRule[] = [
+  { id: 'propellant_tank', match: /propellant|\bcopv\b|xenon|fuel[_\s-]?tank|oxidiser|oxidizer|\bn2o\b|hydrazine/i,
+    size: (p) => vesselDimsFromVolume(
+      findNum(p, [/propellant_?volume_?m3|tank_?volume_?m3|copv_?volume_?m3|fuel_?volume_?m3/i]),
+      2.5,
+      findNum(p, [/tank_?pressure_?bar|copv_?pressure_?bar|design_?pressure_?bar/i]),
+    ) },
+  { id: 'solar_array', match: /solar[_\s-]?array|solar[_\s-]?panel|photovolta|solar[_\s-]?cell/i,
+    size: (p) => solarArrayDimsFromPower(findNum(p, [/solar_?power_?w|array_?power_?w|generated_?power_?w|power_?bol_?w/i])) },
+  { id: 'thruster', match: /thruster|nozzle|combustion[_\s-]?chamber|\bengine\b/i,
+    size: (p) => [...spec('rating_primary', findNum(p, [/^thrust_?n$|thrust_?newton/i]), 'N thrust'), ...spec('performance', findNum(p, [/^isp_?s$|specific_?impulse_?s/i]), 's Isp')] },
+  { id: 'reaction_wheel', match: /reaction[_\s-]?wheel|momentum[_\s-]?wheel|\bcmg\b|control[_\s-]?moment/i,
+    size: (p) => spec('rating_primary', findNum(p, [/momentum_?nms|angular_?momentum_?nms/i]), 'Nms') },
+]
+
+const FAMILIES: Record<string, SizingRule[]> = {
+  battery: BATTERY,
+  process_plant: PROCESS_PLANT,
+  thermal_rejection: THERMAL_REJECTION,
+  spacecraft: SPACECRAFT,
+}
 
 // Class → sizing family (coarse; same intent as build-links FAMILY_KEY). Extend as
 // new families gain a ruleset; an unmapped class is left un-sized (Phase-1 baseline).
