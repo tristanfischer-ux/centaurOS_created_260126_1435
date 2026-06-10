@@ -113,3 +113,30 @@ describe('Phase 3 — thermal + spacecraft families (geometry follows the calc)'
     expect(Math.abs(V - 0.0587) / 0.0587).toBeLessThan(0.03) // COPV holds its volume
   })
 })
+
+describe('Phase 3 cont — power-electronics + structural (the deployable antenna)', () => {
+  function sizeOne(name: string, q: Record<string, number>, cls = 'deployable_composite_antenna') {
+    const quantities: any = {}; for (const [k, v] of Object.entries(q)) quantities[k] = { value: v }
+    const modules: any[] = [{ sub_modules: [{ words: [
+      { id: 'w', name_human: name, content_character: { character_id: 'x' }, modifier_characters: [] },
+    ] }] }]
+    const r = applyFamilySizing(modules, { quantities } as any, cls)
+    return { r, mods: modules[0].sub_modules[0].words[0].modifier_characters as any[] }
+  }
+  it('a deployable antenna reflector dimension follows its aperture (unseen class, union)', () => {
+    const { r, mods } = sizeOne('wrapped-rib parabolic reflector antenna', { aperture_diameter_m: 2.7 })
+    expect(r.family).toBe('universal')
+    const dim = mods.find((m) => m.kind === 'dimension')
+    expect(dim.value).toBe('2.7')
+    expect(dim.unit).toBe('m aperture')
+  })
+  it('a deployable boom carries deployed + stowed dimensions', () => {
+    const { mods } = sizeOne('astrotube deployable boom', { deployed_length_m: 5, stowed_length_m: 0.1 })
+    expect(mods.find((m) => m.kind === 'dimension').value).toBe('5')
+    expect(mods.find((m) => m.kind === 'capacity').value).toBe('0.1')
+  })
+  it('a power-electronics heatsink is sized from its dissipation', () => {
+    const { mods } = sizeOne('finned aluminium heatsink', { dissipation_kw: 0.8 }, 'novel_inverter_thing')
+    expect(+mods.find((m) => m.kind === 'capacity').value).toBeCloseTo(0.8 * 1000 / 800, 1) // 1 m²
+  })
+})

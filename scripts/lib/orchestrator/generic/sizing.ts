@@ -254,11 +254,36 @@ const SPACECRAFT: SizingRule[] = [
     size: (p) => spec('rating_primary', findNum(p, [/momentum_?nms|angular_?momentum_?nms/i]), 'Nms') },
 ]
 
+// ── POWER-ELECTRONICS family — converters/drives rated from power, semiconductors
+//    from current/voltage, heatsinks sized from dissipation (reusing the radiator).
+const POWER_ELECTRONICS: SizingRule[] = [
+  { id: 'converter', match: /converter|\bpsu\b|rectifier|inverter|\bvfd\b|\bdrive\b|power[_\s-]?supply|\bdc.?dc\b/i,
+    size: (p) => [...spec('rating_primary', findNum(p, [/converter_?power_?kw|psu_?power_?kw|rated_?power_?kw|continuous_?power_?kw|inverter_?power_?kw/i]), 'kW'), ...spec('performance', findNum(p, [/converter_?efficiency_?pct|efficiency_?pct/i]), '% efficiency')] },
+  { id: 'semiconductor', match: /\bigbt\b|mosfet|\bsic\b|\bgan\b|power[_\s-]?module|thyristor|diode[_\s-]?module/i,
+    size: (p) => [...spec('rating_primary', findNum(p, [/switch_?current_?a|device_?current_?a|module_?current_?a/i]), 'A'), ...spec('dimension', findNum(p, [/blocking_?voltage_?v|device_?voltage_?v/i]), 'V blocking')] },
+  { id: 'pe_heatsink', match: /heat[_\s-]?sink|heatsink/i,
+    size: (p) => radiatorDimsFromHeat(findNum(p, [/dissipation_?kw|loss_?kw|heat_?loss_?kw|pe_?loss_?kw/i]), 'terrestrial') },
+]
+
+// ── STRUCTURAL family — antennas/reflectors from aperture, deployable booms from
+//    deployed length, primary structure from mass. Covers the deployable composite
+//    antenna (the genuinely-unregistered validation archetype).
+const STRUCTURAL: SizingRule[] = [
+  { id: 'antenna_reflector', match: /antenna|reflector|\bdish\b|aperture|feed[_\s-]?horn|radome/i,
+    size: (p) => spec('dimension', findNum(p, [/aperture_?diameter_?m|aperture_?m|reflector_?diameter_?m|dish_?diameter_?m|antenna_?diameter_?m/i]), 'm aperture') },
+  { id: 'deployable_boom', match: /\bboom\b|\bmast\b|deployable|\bstrut\b|\btruss\b|\btube\b/i,
+    size: (p) => [...spec('dimension', findNum(p, [/deployed_?length_?m|boom_?length_?m|mast_?length_?m|span_?m/i]), 'm deployed'), ...spec('capacity', findNum(p, [/stowed_?length_?m|stowed_?diameter_?m/i]), 'm stowed')] },
+  { id: 'frame_structure', match: /\bframe\b|chassis|primary[_\s-]?structure|bracket|housing|enclosure/i,
+    size: (p) => spec('rating_primary', findNum(p, [/structure_?mass_?kg|frame_?mass_?kg|primary_?structure_?mass_?kg/i]), 'kg') },
+]
+
 const FAMILIES: Record<string, SizingRule[]> = {
   battery: BATTERY,
   process_plant: PROCESS_PLANT,
   thermal_rejection: THERMAL_REJECTION,
   spacecraft: SPACECRAFT,
+  power_electronics: POWER_ELECTRONICS,
+  structural: STRUCTURAL,
 }
 
 // Class → sizing family (coarse; same intent as build-links FAMILY_KEY). Extend as
