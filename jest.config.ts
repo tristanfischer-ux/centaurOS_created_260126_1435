@@ -33,6 +33,12 @@ const config: Config = {
         '<rootDir>/tests/e2e/',
         '<rootDir>/.claude/worktrees/',
         '<rootDir>/_archive/',
+        // tsx-harness tests: hand-rolled ok() runner executed via `npx tsx`,
+        // NOT jest it()/test() blocks. Jest's glob sweeps them up and fails
+        // "must contain at least one test", blocking the pre-push hook. Run them
+        // directly: npx tsx "scripts/lib/cost/<name>.test.tsx" (2026-06-10).
+        '<rootDir>/scripts/lib/cost/build-cost-basis\\.test\\.tsx$',
+        '<rootDir>/scripts/lib/cost/process-equipment-cost\\.test\\.tsx$',
     ],
     // Only match test files with .test. or .spec. patterns
     testMatch: [

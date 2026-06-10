@@ -372,6 +372,28 @@ function resolveSubmoduleLabel(subModule: SubModuleSpec): string {
   return raw
 }
 
+/**
+ * Sub-module label for the LISTING sentence (generateSubmoduleSentence), which
+ * names word 1 immediately after the subject. Using the first equipment word as
+ * the subject there is always redundant ("The steel bracket comprises steel
+ * bracket.", "The LFP prismatic cells consists of LFP prismatic cells and …"),
+ * so this resolver prefers the SUB-MODULE's own human name and only falls back
+ * to humaniseId(id) when name_human is absent or a snake_case-ID leak.
+ *
+ * 2026-06-10 regression fix: commit 246c7ff71 pointed generateSubmoduleSentence
+ * at resolveSubmoduleLabel (equipment-preferring) — correct for the PARAGRAPH
+ * form ("… comprises 5 components", where word 1 is NOT named adjacent) but it
+ * broke the 4 listing-sentence tests. The paragraph keeps resolveSubmoduleLabel;
+ * the listing sentence uses this name-preferring resolver.
+ */
+function resolveSubmoduleNameLabel(subModule: SubModuleSpec): string {
+  const raw = (subModule.name_human ?? '').trim()
+  if (!raw) return humaniseId(subModule.id)
+  // Contains underscore but NO space → looks like a snake_case internal ID.
+  if (raw.includes('_') && !raw.includes(' ')) return humaniseId(subModule.id)
+  return raw
+}
+
 // ---------------------------------------------------------------------------
 // generateSubmoduleSentence — one English sentence per sub-module
 // ---------------------------------------------------------------------------
@@ -450,10 +472,12 @@ export function generateSubmoduleSentence(
     return ensureTerminalPunctuation(subModule.english_sentence.trim())
   }
   const style = options?.style ?? 'verbose'
-  // Bug fix (prose-quality L26 — 2026-05-25): use resolveSubmoduleLabel so
-  // snake_case name_human values (e.g. "energy_storage_source_electrochemical_energy")
-  // are humanised instead of rendered verbatim as the sentence subject.
-  const subject = resolveSubmoduleLabel(subModule)
+  // Bug fix (prose-quality L26 — 2026-05-25): humanise snake_case name_human
+  // values instead of rendering them verbatim as the sentence subject.
+  // 2026-06-10: use the NAME-preferring resolver (NOT equipment-preferring
+  // resolveSubmoduleLabel) — this listing sentence names word 1 right after the
+  // subject, so an equipment subject is always redundant. See resolveSubmoduleNameLabel.
+  const subject = resolveSubmoduleNameLabel(subModule)
   const rawVerb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
   // Universal fix #E (2026-05-22): make the verb agree with subject number.
   const verb = pluraliseVerb(rawVerb, subject)
