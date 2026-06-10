@@ -1,0 +1,1247 @@
+{
+  "primitive_api_version": "1.0.0",
+  "functions": {
+    "init_scene": {
+      "params": [],
+      "doc": "Reset Blender to empty state, configure render engine for engineering output."
+    },
+    "make_default_palette": {
+      "params": [],
+      "doc": "Standard Forge engineering palette \u2014 pure pigments, amber-not-yellow for"
+    },
+    "make_mat": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "rgb",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "metallic",
+          "required": false,
+          "default": "0.0"
+        },
+        {
+          "name": "roughness",
+          "required": false,
+          "default": "0.55"
+        },
+        {
+          "name": "alpha",
+          "required": false,
+          "default": "1.0"
+        },
+        {
+          "name": "kind",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "clearcoat",
+          "required": false,
+          "default": "0.0"
+        },
+        {
+          "name": "ior",
+          "required": false,
+          "default": "1.45"
+        },
+        {
+          "name": "emission_strength",
+          "required": false,
+          "default": "0.0"
+        }
+      ],
+      "doc": "Principled BSDF material. Pass kind=\"painted_steel\" etc. (see"
+    },
+    "make_module_dict": {
+      "params": [
+        {
+          "name": "module_ids",
+          "required": true,
+          "default": null
+        }
+      ],
+      "doc": "(no docstring)"
+    },
+    "add_lights": {
+      "params": [
+        {
+          "name": "target_centre",
+          "required": false,
+          "default": "(0, 0, 0)"
+        },
+        {
+          "name": "sun_energy",
+          "required": false,
+          "default": "3.0"
+        },
+        {
+          "name": "fill_energy",
+          "required": false,
+          "default": "60"
+        },
+        {
+          "name": "fill_size",
+          "required": false,
+          "default": "2.5"
+        }
+      ],
+      "doc": "Phase A 2026-05-24: 4-light rig for grounded components + soft side fill."
+    },
+    "make_world_white": {
+      "params": [],
+      "doc": "Studio mid-grey world background."
+    },
+    "run_render_pipeline": {
+      "params": [
+        {
+          "name": "out_dir",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "module_objects",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "structure_module_id",
+          "required": false,
+          "default": "'structure_containment'"
+        },
+        {
+          "name": "flat_form_factor",
+          "required": false,
+          "default": "False"
+        },
+        {
+          "name": "hero_camera_override",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "hero_cycles",
+          "required": false,
+          "default": "False"
+        },
+        {
+          "name": "hero_open_frame",
+          "required": false,
+          "default": "False"
+        }
+      ],
+      "doc": "Render the standard Forge engineering set:"
+    },
+    "get_module_profile": {
+      "params": [
+        {
+          "name": "module_id",
+          "required": true,
+          "default": null
+        }
+      ],
+      "doc": "Return the visual profile dict for module_id, or None if unrecognised."
+    },
+    "module_accent_mat": {
+      "params": [
+        {
+          "name": "module_id",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "fallback_rgb",
+          "required": false,
+          "default": "(0.55, 0.56, 0.58)"
+        }
+      ],
+      "doc": "Convenience: return a Principled BSDF material using the module's"
+    },
+    "tag_module": {
+      "params": [
+        {
+          "name": "obj",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "module_id",
+          "required": true,
+          "default": null
+        }
+      ],
+      "doc": "Stamp the module tag as a custom property so deterministic scene"
+    },
+    "sync_module_tags": {
+      "params": [
+        {
+          "name": "module_objects",
+          "required": true,
+          "default": null
+        }
+      ],
+      "doc": "Stamp fl_module custom props from a legacy module_objects dict."
+    },
+    "declare_relation": {
+      "params": [
+        {
+          "name": "subject",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "relation",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "target",
+          "required": true,
+          "default": null
+        }
+      ],
+      "doc": "Declare `subject --relation--> target` as scene data."
+    },
+    "declare_structure_root": {
+      "params": [
+        {
+          "name": "thing",
+          "required": true,
+          "default": null
+        }
+      ],
+      "doc": "Mark an object/assembly as a structure root. The connectivity check"
+    },
+    "add_clearance_zone": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "size_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "owner",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Declare a rectangular keep-clear volume (maintenance access, vent"
+    },
+    "prim_fuselage": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "length_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "diameter_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": false,
+          "default": "(0, 0, 0)"
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "nose_fraction",
+          "required": false,
+          "default": "0.2"
+        },
+        {
+          "name": "tail_fraction",
+          "required": false,
+          "default": "0.26"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Aircraft fuselage: cylindrical centre body + tapered nose (forward,"
+    },
+    "prim_wing": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "span_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "chord_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "thickness_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "fuselage",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "mount",
+          "required": false,
+          "default": "'high'"
+        },
+        {
+          "name": "chord_offset_mm",
+          "required": false,
+          "default": "0.0"
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "material_spar",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "n_spars",
+          "required": false,
+          "default": "2"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Continuous wing THROUGH/ON a fuselage: single skin box spanning X"
+    },
+    "prim_tail": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "boom_length_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "boom_diameter_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "hstab_span_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "hstab_chord_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "fin_height_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "fuselage",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "location_mm",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "material_surface",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Tail group: boom extending aft (+Y) + horizontal stabiliser + vertical"
+    },
+    "prim_pod": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "length_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "diameter_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "pylon_to_z_mm",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "parent",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Underslung pod/nacelle: capsule (cylinder + nose/tail frustums) along"
+    },
+    "prim_propeller": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "diameter_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "n_blades",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "material_hub",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "axis",
+          "required": false,
+          "default": "'y'"
+        },
+        {
+          "name": "pitch_deg",
+          "required": false,
+          "default": "14.0"
+        },
+        {
+          "name": "parent",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Propeller: hub + n_blades thin blades in the rotation plane normal to"
+    },
+    "prim_vessel": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "diameter_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "length_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "orientation",
+          "required": false,
+          "default": "'horizontal'"
+        },
+        {
+          "name": "material_support",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "support_height_mm",
+          "required": false,
+          "default": "120"
+        },
+        {
+          "name": "n_ports",
+          "required": false,
+          "default": "1"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Pressure vessel / tank with dished (torispherical-read) ends."
+    },
+    "prim_skid_frame": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "width_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "depth_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "height_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "n_cross_members",
+          "required": false,
+          "default": "3"
+        },
+        {
+          "name": "member_mm",
+          "required": false,
+          "default": "120"
+        },
+        {
+          "name": "deck",
+          "required": false,
+          "default": "True"
+        },
+        {
+          "name": "material_deck",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Open structural skid: perimeter base rails + cross members + corner"
+    },
+    "prim_pipe_rack": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "length_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "width_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "height_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "n_bays",
+          "required": false,
+          "default": "3"
+        },
+        {
+          "name": "n_tiers",
+          "required": false,
+          "default": "2"
+        },
+        {
+          "name": "member_mm",
+          "required": false,
+          "default": "150"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Pipe rack: (n_bays+1) portal frames along X (2 posts + a cross beam"
+    },
+    "prim_rack_row": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "n_racks",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "rack_width_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "rack_depth_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "rack_height_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "pitch_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "material_internal",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "axis",
+          "required": false,
+          "default": "'x'"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Row of equipment racks/cabinets on a shared pitch (battery racks,"
+    },
+    "prim_enclosure": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "width_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "depth_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "height_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "door_faces",
+          "required": false,
+          "default": "('front',)"
+        },
+        {
+          "name": "wall_mm",
+          "required": false,
+          "default": "60"
+        },
+        {
+          "name": "material_door",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Enclosure / container shell: floor + roof + 4 walls; faces listed in"
+    },
+    "prim_tower": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "height_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "base_width_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "taper",
+          "required": false,
+          "default": "0.45"
+        },
+        {
+          "name": "material_flange",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Tubular tower/mast: tapered tube + base flange + top platform disc."
+    },
+    "prim_hull": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "length_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "beam_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "depth_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "material_deck",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Marine hull: main hull body + tapered bow (forward, +X) + deck plate"
+    },
+    "prim_gantry": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "span_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "height_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "leg_mm",
+          "required": false,
+          "default": "300"
+        },
+        {
+          "name": "beam_mm",
+          "required": false,
+          "default": "400"
+        },
+        {
+          "name": "axis",
+          "required": false,
+          "default": "'x'"
+        },
+        {
+          "name": "with_trolley",
+          "required": false,
+          "default": "True"
+        },
+        {
+          "name": "material_trolley",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Gantry/portal frame: 2 legs + main beam across the top (+ optional"
+    },
+    "prim_rotating_machine": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "body_diameter_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "body_length_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "material_shaft",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "material_base",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "axis",
+          "required": false,
+          "default": "'x'"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Rotating machine (motor/pump/turbine/compressor): baseplate + feet +"
+    },
+    "prim_panel_stack": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "n_panels",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "panel_width_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "panel_height_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "panel_depth_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "pitch_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "axis",
+          "required": false,
+          "default": "'y'"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Repeated flat panels on a pitch (PV strings, filter banks, plate"
+    },
+    "prim_foundation": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "width_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "depth_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "thickness_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "location_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Concrete foundation slab / baseplate. width(X) \u00d7 depth(Y) \u00d7"
+    },
+    "route_orthogonal": {
+      "params": [
+        {
+          "name": "start_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "end_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "rise_mm",
+          "required": false,
+          "default": "600.0"
+        }
+      ],
+      "doc": "Manhattan route between two points (mm): rise vertically above the"
+    },
+    "prim_pipe_run": {
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "waypoints_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "diameter_mm",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "material",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "bend_radius_mm",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "flanges",
+          "required": false,
+          "default": "True"
+        },
+        {
+          "name": "connect",
+          "required": false,
+          "default": "()"
+        },
+        {
+          "name": "module",
+          "required": false,
+          "default": "None"
+        },
+        {
+          "name": "module_objects",
+          "required": false,
+          "default": "None"
+        }
+      ],
+      "doc": "Routed pipe/cable/duct run along an orthogonal waypoint path (mm),"
+    }
+  }
+}

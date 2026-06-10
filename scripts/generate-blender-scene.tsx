@@ -391,7 +391,13 @@ async function main(): Promise<number> {
   }
   const templatePath = resolveTemplate(productClass)
   if (!templatePath) {
+    // B2/B3 (2026-06-10): registry-miss classes now have an on-the-fly
+    // authored path — scripts/author-blender-scene.tsx
+    // (authorBlenderSceneForRegistryMiss). NOT wired into the chain yet
+    // (serial-design-chain-v2.tsx dirty in another workstream); see
+    // ANVIL-UNIVERSAL-TRACKER.md item 10. Hand templates stay the fast path.
     console.error(`[geom-gen] no template for product_class=${JSON.stringify(productClass)}; runner will use universal renderer`)
+    console.error(`[geom-gen] registry-miss authored path available: npx tsx scripts/author-blender-scene.tsx ${statePath} --out ${dirname(statePath)}`)
     return 5
   }
 

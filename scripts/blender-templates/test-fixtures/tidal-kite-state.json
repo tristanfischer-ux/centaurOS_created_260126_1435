@@ -1,0 +1,195 @@
+{
+  "_comment": "Hand-built realistic design digest source for the B2/B3 author-loop end-to-end test (tidal-kite-generator HOLDOUT, briefs-holdout/tidal-kite-generator.md). Mirrors the real state.json field shapes (parsedBrief / moduleDecomposition / orchestratorContract). The envelope is the DEPLOYMENT-SCENE envelope: kite depicted at the operating point 84 m downstream (+Y) of the seabed gravity anchor, 24 m above seabed, taut 87 m tether (within the brief's 80-120 m tether range). This file is the regression fixture for scripts/author-blender-scene.tsx.",
+  "parsedBrief": {
+    "product_class": "tidal_kite_generator",
+    "mission_statement": "Harvest predictable tidal-stream energy with a tethered underwater kite that flies a figure-of-eight across the current, multiplying flow velocity over a shrouded turbine.",
+    "product_description": "Utility-scale fully-submerged tidal kite: 12 m carbon-composite hydrofoil wing carrying a sealed nacelle with a 1.6 m shrouded axial-flow turbine and 500 kW direct-drive permanent-magnet generator; subsea power electronics export at 3.3 kV down a synthetic tether to a gravity-base seabed foundation; neutrally-to-slightly-positively buoyant, 20-year marine service.",
+    "constraints": {
+      "max_dimensions_mm": { "w": 12600, "d": 92000, "h": 27000, "source": "deployment_scene_envelope" },
+      "max_mass_kg": 11000,
+      "unit_cost_ceiling": 2600000,
+      "operating_environment": { "medium": "seawater", "temp_min_c": 4, "temp_max_c": 18, "depth_band_m": "15-40 below MSL" }
+    }
+  },
+  "moduleDecomposition": {
+    "product_class": "tidal_kite_generator",
+    "productClassDescription": "Tethered subsea tidal-kite energy converter. DEPICT AT THE OPERATING POINT: seabed gravity foundation at the scene origin; kite assembly (wing + nacelle + turbine) 84 m downstream (+Y) of the anchor and 24 m above the seabed; the 87 m tether runs TAUT and STRAIGHT (2-point pipe run) from the foundation padeye up to the nacelle belly. Fore-aft axis of the nacelle = Y (nose into the current, -Y).",
+    "modules": [
+      {
+        "module": "hydrofoil_wing",
+        "module_brief": "12 m span carbon-composite hydrofoil wing, the lifting body the whole kite hangs from; nacelle mounts under the wing centre.",
+        "derived_parameters": { "wing_span_m": 12, "chord_m": 2.2, "wing_thickness_mm": 350, "aspect_ratio": 5.5, "mass_kg": 2900 },
+        "sub_modules": [
+          {
+            "id": "wing_primary_structure",
+            "name_human": "hydrofoil wing box",
+            "topology_clause": "continuous wing spanning X, mounted HIGH over the nacelle so the nacelle hangs beneath the wing centre",
+            "words": [
+              { "id": "wing_skin_word", "name_human": "carbon-composite wing skin", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "12000 × 2200 × 350 mm" } ] },
+              { "id": "wing_spar_word", "name_human": "carbon box spar", "modifier_characters": [ { "kind": "quantity", "value": "2" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "module": "structure_nacelle",
+        "module_brief": "Sealed cylindrical nacelle slung under the wing centre; structural backbone of the kite; houses generator, power electronics and avionics.",
+        "derived_parameters": { "nacelle_length_m": 4.8, "nacelle_diameter_m": 1.4, "mass_kg": 1750 },
+        "sub_modules": [
+          {
+            "id": "nacelle_pressure_body",
+            "name_human": "sealed nacelle body",
+            "topology_clause": "fore-aft along Y under the wing centre; turbine shroud at the nose (-Y), tail surfaces aft (+Y)",
+            "words": [
+              { "id": "nacelle_shell_word", "name_human": "filament-wound nacelle shell", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "4800 × 1400 dia mm" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "module": "turbine_rotor",
+        "module_brief": "Shrouded axial-flow water turbine at the nacelle nose; 1.6 m rotor inside a 2.0 m duct shroud.",
+        "derived_parameters": { "rotor_diameter_m": 1.6, "n_blades": 3, "shroud_diameter_m": 2.0, "shroud_length_m": 1.1, "mass_kg": 620 },
+        "sub_modules": [
+          {
+            "id": "shrouded_turbine",
+            "name_human": "shrouded axial turbine",
+            "topology_clause": "rotor disc normal to the flow (rotation plane normal to Y), centred on the nacelle axis at the nose",
+            "words": [
+              { "id": "turbine_rotor_word", "name_human": "3-blade axial rotor", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "1600 dia mm" } ] },
+              { "id": "turbine_shroud_word", "name_human": "GRP duct shroud", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "2000 dia × 1100 mm" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "module": "generator_pto",
+        "module_brief": "500 kW direct-drive permanent-magnet generator immediately behind the turbine, inside the nacelle.",
+        "derived_parameters": { "rated_power_kw": 500, "generator_diameter_m": 1.1, "generator_length_m": 1.6, "mass_kg": 1450 },
+        "sub_modules": [
+          {
+            "id": "pm_generator",
+            "name_human": "direct-drive PM generator",
+            "topology_clause": "coaxial with the turbine, inside the nacelle forward section (contained by the nacelle)",
+            "words": [
+              { "id": "pm_generator_word", "name_human": "PM generator", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "1600 × 1100 dia mm" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "module": "power_electronics",
+        "module_brief": "Subsea variable-speed drive + 3.3 kV export converter in a pressure-rated enclosure in the nacelle aft section.",
+        "derived_parameters": { "enclosure_w_mm": 1400, "enclosure_d_mm": 900, "enclosure_h_mm": 700, "export_voltage_kv": 3.3, "mass_kg": 540 },
+        "sub_modules": [
+          {
+            "id": "subsea_vsd",
+            "name_human": "subsea power-electronics enclosure",
+            "topology_clause": "inside the nacelle aft of the generator (contained by the nacelle)",
+            "words": [
+              { "id": "vsd_enclosure_word", "name_human": "pressure-rated VSD enclosure", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "1400 × 900 × 700 mm" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "module": "flight_control_avionics",
+        "module_brief": "Autonomous flight-control computer with depth/attitude sensing; small sealed pod in the nacelle mid-section.",
+        "derived_parameters": { "avionics_w_mm": 800, "avionics_d_mm": 600, "avionics_h_mm": 500, "mass_kg": 160 },
+        "sub_modules": [
+          {
+            "id": "flight_computer",
+            "name_human": "flight-control avionics pod",
+            "topology_clause": "inside the nacelle mid-section (contained by the nacelle)",
+            "words": [
+              { "id": "avionics_pod_word", "name_human": "avionics pod", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "800 × 600 × 500 mm" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "module": "buoyancy_ballast",
+        "module_brief": "Wing-tip buoyancy pods trimming the kite to neutral-to-slightly-positive buoyancy.",
+        "derived_parameters": { "pod_length_mm": 1800, "pod_diameter_mm": 450, "n_pods": 2, "mass_kg": 380 },
+        "sub_modules": [
+          {
+            "id": "buoyancy_pods",
+            "name_human": "wing-tip buoyancy pods",
+            "topology_clause": "one pod at each wing tip, axis fore-aft (Y), attached to the wing",
+            "words": [
+              { "id": "buoyancy_pod_word", "name_human": "syntactic-foam buoyancy pod", "modifier_characters": [ { "kind": "quantity", "value": "2" }, { "kind": "dimensions", "value": "1800 × 450 dia mm" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "module": "flight_control_surfaces",
+        "module_brief": "Aft tail group (boom + elevator + rudder) steering the figure-of-eight trajectory.",
+        "derived_parameters": { "boom_length_mm": 2600, "boom_diameter_mm": 140, "hstab_span_mm": 3200, "hstab_chord_mm": 600, "fin_height_mm": 900, "mass_kg": 180 },
+        "sub_modules": [
+          {
+            "id": "tail_group",
+            "name_human": "tail control surfaces",
+            "topology_clause": "boom extends aft (+Y) from the nacelle; elevator + rudder at the boom end",
+            "words": [
+              { "id": "tail_group_word", "name_human": "tail boom + elevator + rudder", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "2600 boom, 3200 hstab span mm" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "module": "tether_mooring",
+        "module_brief": "87 m taut synthetic tether (within the 80-120 m brief band) from the nacelle belly to the foundation padeye; carries the 3.3 kV export umbilical; wet-mateable connector at the lower end.",
+        "derived_parameters": { "tether_length_m": 87, "tether_diameter_mm": 120, "downstream_offset_m": 84, "operating_height_above_seabed_m": 24, "mass_kg": 900 },
+        "sub_modules": [
+          {
+            "id": "tether_assembly",
+            "name_human": "synthetic tether + export umbilical",
+            "topology_clause": "STRAIGHT taut run (2-point) from the foundation padeye at the origin up to the nacelle belly at (0, 84 m, 24 m)",
+            "words": [
+              { "id": "tether_word", "name_human": "HMPE synthetic tether with embedded 3.3 kV umbilical", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "87000 × 120 dia mm" } ] },
+              { "id": "wet_mate_connector_word", "name_human": "wet-mateable HV connector", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "600 × 300 dia mm" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "module": "seabed_foundation_interface",
+        "module_brief": "Gravity-base concrete foundation on the seabed at the scene origin with a padeye/gantry tether attachment; the structure root of the deployed system.",
+        "derived_parameters": { "base_w_mm": 7000, "base_d_mm": 7000, "base_thickness_mm": 1300, "padeye_height_mm": 1600, "mass_kg": 38000 },
+        "sub_modules": [
+          {
+            "id": "gravity_base",
+            "name_human": "gravity-base foundation",
+            "topology_clause": "flat on the seabed (z=0) at the scene origin; padeye gantry on top centre receives the tether",
+            "words": [
+              { "id": "gravity_base_word", "name_human": "ballasted concrete gravity base", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "7000 × 7000 × 1300 mm" } ] },
+              { "id": "padeye_word", "name_human": "tether padeye gantry", "modifier_characters": [ { "kind": "quantity", "value": "1" }, { "kind": "dimensions", "value": "1600 mm tall" } ] }
+            ]
+          }
+        ]
+      }
+    ],
+    "cross_module_grammar_links": [
+      { "from_module": "turbine_rotor", "to_module": "generator_pto", "mechanism": "shaft", "type": "directional", "detail": "direct-drive coaxial shaft, no gearbox" },
+      { "from_module": "generator_pto", "to_module": "power_electronics", "mechanism": "electrical_bus", "type": "directional", "detail": "variable-frequency stator output to subsea VSD" },
+      { "from_module": "power_electronics", "to_module": "tether_mooring", "mechanism": "electrical_bus", "type": "directional", "detail": "3.3 kV export down the tether-embedded umbilical" },
+      { "from_module": "flight_control_avionics", "to_module": "flight_control_surfaces", "mechanism": "data", "type": "directional", "detail": "actuation commands for elevator/rudder trajectory control" },
+      { "from_module": "buoyancy_ballast", "to_module": "hydrofoil_wing", "mechanism": "mechanical", "type": "bidirectional", "detail": "wing-tip pods bolted to the wing tips" },
+      { "from_module": "structure_nacelle", "to_module": "hydrofoil_wing", "mechanism": "mechanical", "type": "bidirectional", "detail": "nacelle slung under the wing centre section" },
+      { "from_module": "tether_mooring", "to_module": "seabed_foundation_interface", "mechanism": "mechanical", "type": "bidirectional", "detail": "tether terminates at the gravity-base padeye" }
+    ]
+  },
+  "orchestratorContract": {
+    "product_class": "tidal_kite_generator",
+    "quantities": {
+      "rated_power_kw": { "value": 500, "unit": "kW", "family": "power", "source": "brief" },
+      "wing_span_m": { "value": 12, "unit": "m", "family": "length", "source": "brief" },
+      "rotor_diameter_m": { "value": 1.6, "unit": "m", "family": "length", "source": "brief" },
+      "tether_length_m": { "value": 87, "unit": "m", "family": "length", "source": "calculator", "source_detail": "taut straight-line at depicted operating point sqrt(84^2+24^2)" },
+      "operating_height_above_seabed_m": { "value": 24, "unit": "m", "family": "length", "source": "brief", "source_detail": "device flies 15-40 m below MSL in 60-120 m water" },
+      "device_dry_mass_kg": { "value": 8880, "unit": "kg", "family": "mass", "source": "calculator", "source_detail": "sum of kite-side modules, under the 11,000 kg brief cap" },
+      "export_voltage_kv": { "value": 3.3, "unit": "kV", "family": "voltage", "source": "brief" }
+    }
+  }
+}

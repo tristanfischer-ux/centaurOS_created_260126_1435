@@ -58,6 +58,7 @@ import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
+import { buildAuthorDigest, buildCheckSpec } from './author-blender-scene'
 import { evaluatePhysicsCriticEnforcement } from './lib/physics-critic-enforcement'
 import { scrubModuleParagraph, buildFrozenQuantitiesBlock, roundToSigFigs } from '../src/lib/pdf-engine-v2/radical/module-paragraph-llm'
 import { buildNaturalLanguageLayer as buildNlLayerForHarness } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
@@ -929,6 +930,54 @@ function checkCo2FixInvariants(): Assertion[] {
       'the render-quality gate passes a class WITH a Blender template (e_fuel, co2) and flags a template-less class as a HIGH universal-fallback (so a bad/generic Blender model is auto-caught, not silently shipped)',
       bad.length, (n) => n === 0,
       () => `render-quality gate wrong: ${bad.join(' ; ')}.`,
+    ))
+  }
+
+  // ── (2f) B2/B3 authored-scene path: digest/check-spec derivation + static-validator allowlist ──
+  // (2026-06-10, ANVIL item 10). Two regression surfaces: (a) buildAuthorDigest +
+  // buildCheckSpec must keep deriving the deterministic B3 check spec from a
+  // registry-miss state (tidal-kite holdout fixture) — modules, envelope, and the
+  // tethered-platform CoM scoping (CoM check scopes to ANCHOR modules for tethered
+  // classes; full-scene CoM on a flying kite would always fail). (b) the AST
+  // allowlist validator is the LLM-authored-code supply-chain gate — it MUST
+  // reject a script that imports bpy/subprocess (G1: authored candidates are
+  // sandboxed to the fl.* primitive API).
+  {
+    const bad: string[] = []
+    try {
+      const fixturePath = resolve(__dirname, 'blender-templates', 'test-fixtures', 'tidal-kite-state.json')
+      const d = buildAuthorDigest(JSON.parse(readFileSync(fixturePath, 'utf-8')))
+      if (d.classSlug !== 'tidal_kite_generator') bad.push(`classSlug=${d.classSlug}`)
+      if (d.moduleIds.length !== 10) bad.push(`moduleIds.length=${d.moduleIds.length} (want 10)`)
+      if (d.envelopeMm.join('x') !== '12600x92000x27000') bad.push(`envelope=${d.envelopeMm.join('x')}`)
+      const spec = buildCheckSpec(d)
+      if (!Array.isArray(spec.expected_modules) || spec.expected_modules.length !== 10) bad.push('spec.expected_modules wrong')
+      const com = spec.com?.[0]
+      if (!com) bad.push('spec.com missing (fixture has per-module masses)')
+      else if (!Array.isArray(com.scope) || !com.scope.includes('seabed_foundation_interface')) {
+        bad.push(`CoM not scoped to anchor modules on a tethered class (scope=${JSON.stringify(com.scope)})`)
+      }
+      // (b) static validator must reject a non-allowlisted import.
+      const PY = existsSync(resolve(__dirname, '..', '.venv', 'bin', 'python3'))
+        ? resolve(__dirname, '..', '.venv', 'bin', 'python3') : 'python3'
+      const evil = join(mkdtempSync('/tmp/forge-b2-inv-'), 'evil.py')
+      writeFileSync(evil, 'import os\nimport sys\nimport math\nimport subprocess\nfrom pathlib import Path\nimport forge_blender_lib as fl\nfl.init_scene()\n')
+      let rejected = false
+      try {
+        execFileSync(PY, [
+          resolve(__dirname, 'blender-templates', 'validate_authored_scene.py'),
+          evil, resolve(__dirname, 'blender-templates', 'primitive-api-schema.json'),
+        ], { encoding: 'utf-8', timeout: 30_000 })
+      } catch { rejected = true }
+      if (!rejected) bad.push('static validator ACCEPTED a script importing subprocess (allowlist breach)')
+    } catch (err) {
+      bad.push(`threw: ${String(err).slice(0, 160)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.authored_scene_digest_spec_and_allowlist',
+      'B2/B3: buildAuthorDigest+buildCheckSpec derive the tidal-kite holdout check spec (10 modules, envelope, anchor-scoped CoM) and validate_authored_scene.py rejects non-allowlisted imports (LLM-authored-code supply-chain gate)',
+      bad.length, (n) => n === 0,
+      () => `authored-scene path regressed: ${bad.join(' ; ')}.`,
     ))
   }
 
