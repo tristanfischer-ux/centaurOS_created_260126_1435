@@ -6130,29 +6130,55 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       const MODULE_HEADER_RE = /^\s*\d+\.\s+([A-Z][A-Za-z0-9\s&/().,+-]*?)\s+£([\d,.]+)/
       const lines = pdfText.split('\n')
       let coverBom: number | null = null
-      let sumHeaders = 0
-      let headerRows = 0
+      // FIX (2026-06-10, two false-fail bugs found while diagnosing the B-3
+      // exit-10 rerun batch — energy_storage / vertical_farm / satellite_smallsat):
+      // (a) DEDUPE BY LABEL — the audit keys header rows into a Map (last
+      //     occurrence wins), so the same module header rendered on BOTH the
+      //     Cost-by-Module summary AND the Master BoM section page (page added
+      //     afd93fe42, AFTER this invariant was written) counts ONCE. This
+      //     invariant previously summed every line occurrence → Σ ≈ 2× cover →
+      //     false fail on every snapshot rendered since the master page shipped.
+      // (b) £M-SHORT COVER — covers ≥ £10M render shortened ("£23.2M",
+      //     satellite_smallsat). The old `£([\d,.]+)` capture read that as
+      //     £23.2 → false gap. Use the audit's parsePoundAmount semantics
+      //     (plain £N,NNN + £N.NK/M/B short forms).
+      const headerByLabel = new Map<string, number>()
       let digitLabelRows = 0
       let digitLabelCaptured = 0
       // First, count digit-bearing module rows in the "Cost by module" table by
       // a looser shape (number-dot ... £amount) so we can prove the fixed regex
       // captures the ones the OLD regex dropped.
       const LOOSE_ROW_RE = /^\s*\d+\.\s+\S.*£[\d,.]+\s*$/
+      const parseGbpAmount = (s: string): number | null => {
+        const cleaned = s.replace(/\s+/g, '')
+        const mPlain = cleaned.match(/£([\d,]+\.?\d*)$/)
+        if (mPlain) return parseFloat(mPlain[1].replace(/,/g, ''))
+        const mShort = cleaned.match(/£([\d.]+)([KMB])/i)
+        if (mShort) {
+          const mult = { K: 1e3, M: 1e6, B: 1e9 }[mShort[2].toUpperCase() as 'K' | 'M' | 'B'] ?? 1
+          return parseFloat(mShort[1]) * mult
+        }
+        return null
+      }
       for (const line of lines) {
         if (/Raw materials BoM/i.test(line) && coverBom == null) {
-          const m = line.match(/£([\d,.]+)/)
-          if (m) { const v = parseFloat(m[1].replace(/,/g, '')); if (Number.isFinite(v)) coverBom = v }
+          const m = line.match(/£[\d,.MKB]+/)
+          if (m) { const v = parseGbpAmount(m[0]); if (v != null && Number.isFinite(v)) coverBom = v }
         }
         const looksLikeModuleRow = LOOSE_ROW_RE.test(line) && /[A-Z][A-Za-z]/.test(line)
         const hasDigitInLabel = looksLikeModuleRow && /^\s*\d+\.\s+[A-Z][A-Za-z\s]*\d/.test(line)
         const mh = line.match(MODULE_HEADER_RE)
         if (mh) {
           const amt = parseFloat(mh[2].replace(/,/g, ''))
-          if (Number.isFinite(amt) && amt > 0) { sumHeaders += amt; headerRows++ }
+          // Same key normalisation as audit-pdf-bom.ts (`moduleKey + '__header'`),
+          // Map.set so a repeated header (summary page + master-BoM page) counts once.
+          if (Number.isFinite(amt) && amt > 0) headerByLabel.set(mh[1].toLowerCase().trim().replace(/\s+/g, '_'), amt)
           if (hasDigitInLabel) digitLabelCaptured++
         }
         if (hasDigitInLabel) digitLabelRows++
       }
+      const headerRows = headerByLabel.size
+      const sumHeaders = Array.from(headerByLabel.values()).reduce((a, v) => a + v, 0)
       // Only assert when there IS a parseable cover total + at least one module
       // header row (i.e. the doc actually has the BoM summary table).
       if (coverBom != null && headerRows > 0) {
