@@ -1,80 +1,39 @@
 /**
  * scripts/lib/orchestrator/sizing-families/units.ts
  *
- * Self-contained unit-conversion for the sizing-family G6 boundary.
+ * Unit-conversion families for the sizing-family G6 boundary.
  *
- * WHY LOCAL (2026-06-10): the canonical helpers live in
- * `../constraint-normaliser` (the `convertToCanonical` / UnitFamily family —
- * the orchestrator member of the `targetPerformanceValueAs` helper family).
- * Importing them AT RUNTIME pulls in the constraint-normaliser → envelope →
- * envelope-vector → constraint-normaliser cycle that E1's concurrently-landed
- * `envelope-vector.ts` introduced (module-level ENERGY_KWH access during the
- * cycle → ReferenceError when the sizing layer is the first to load
- * constraint-normaliser). A sizing layer must NOT transitively depend on
- * envelope DETECTION, so the conversion is mirrored here, byte-equivalent to
- * constraint-normaliser's tables.
+ * UNIFIED (2026-06-10, tracker #19): the canonical helpers now live in the
+ * LEAF module `../unit-families` (zero orchestrator imports — the
+ * constraint-normaliser → envelope → envelope-vector cycle that forced this
+ * file to duplicate the tables was broken in the same increment). The
+ * families shared with the orchestrator (UnitFamily, convertToCanonical,
+ * POWER_KW, ENERGY_KWH, MASS_KG, AREA_M2) are RE-EXPORTED from the leaf;
+ * the sizing-only families (VOLUME_M3 — canonical m³, unlike the
+ * orchestrator's VOLUME_L — plus MASS_FLOW_T_DAY, VELOCITY_M_S,
+ * DENSITY_KG_M3) stay declared here.
  *
- * POST-MERGE TODO (once E1's circular import is resolved): replace this file's
- * imports with `import { convertToCanonical, POWER_KW, ... } from
- * '../constraint-normaliser'` and delete the duplicated tables.
+ * NOTE: the leaf's convertToCanonical is behaviourally identical to the
+ * previous local copy for every family in this file — all alias/conversion
+ * keys are already lowercase with no internal whitespace, so the local
+ * copy's extra raw-key fallback lookups could never fire.
  *
  * British spelling throughout.
  */
 
-/** Structurally identical to constraint-normaliser's UnitFamily. */
-export interface UnitFamily {
-  canonical: string
-  aliases: ReadonlyArray<string>
-  conversions: Readonly<Record<string, number>>
-}
+export type { UnitFamily } from '../unit-families'
+export { convertToCanonical, POWER_KW, ENERGY_KWH, MASS_KG, AREA_M2 } from '../unit-families'
 
-function normUnit(raw: string | null | undefined): string {
-  if (raw == null) return ''
-  return String(raw).toLowerCase().trim().replace(/\s+/g, '')
-}
+import type { UnitFamily } from '../unit-families'
 
-/** Convert (value, raw_unit) → family canonical unit. null when not in family.
- *  Identical semantics to constraint-normaliser.convertToCanonical. */
-export function convertToCanonical(value: number, rawUnit: string, family: UnitFamily): number | null {
-  const u = normUnit(rawUnit)
-  const canon = normUnit(family.canonical)
-  if (u === canon) return value
-  if (family.aliases.map(normUnit).includes(u)) return value
-  const multiplier = family.conversions[u] ?? family.conversions[rawUnit] ?? family.conversions[String(rawUnit).toLowerCase().trim()]
-  if (multiplier !== undefined) return value * multiplier
-  return null
-}
+// ── sizing-only families (no orchestrator equivalent — keep local) ──
 
-// ── families used by the sizing-family plugins (mirror constraint-normaliser) ──
-
-export const POWER_KW: UnitFamily = {
-  canonical: 'kw',
-  aliases: ['kw'],
-  conversions: { w: 0.001, mw: 1000, gw: 1_000_000, kwe: 1, kwt: 1, mwe: 1000, mwt: 1000 },
-}
-
-export const ENERGY_KWH: UnitFamily = {
-  canonical: 'kwh',
-  aliases: ['kwh'],
-  conversions: { wh: 0.001, mwh: 1000, gwh: 1_000_000 },
-}
-
+/** Volume with canonical m³ (the orchestrator's VOLUME_L is litre-canonical;
+ *  process-plant sizing reasons in cubic metres). */
 export const VOLUME_M3: UnitFamily = {
   canonical: 'm3',
   aliases: ['m3', 'm³', 'cubicmetre', 'cubicmetres'],
   conversions: { l: 0.001, litre: 0.001, litres: 0.001, ml: 0.000_001 },
-}
-
-export const MASS_KG: UnitFamily = {
-  canonical: 'kg',
-  aliases: ['kg', 'kilogram', 'kilograms', 'kilo', 'kilos'],
-  conversions: { g: 0.001, mg: 0.000_001, t: 1000, ton: 1000, tons: 1000, tonne: 1000, tonnes: 1000, mt: 1000, lb: 0.453_592, lbs: 0.453_592 },
-}
-
-export const AREA_M2: UnitFamily = {
-  canonical: 'm2',
-  aliases: ['m2', 'm²', 'sqm'],
-  conversions: { cm2: 0.0001, 'cm²': 0.0001, mm2: 0.000_001, ft2: 0.092_903, sqft: 0.092_903, ha: 10_000, hectare: 10_000, hectares: 10_000 },
 }
 
 /** Mass flow in tonnes/day. */
