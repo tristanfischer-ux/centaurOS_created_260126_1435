@@ -53,8 +53,9 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs'
-import { resolve, dirname, basename } from 'path'
+import { resolve, dirname, basename, isAbsolute } from 'path'
 import { spawnSync } from 'child_process'
+import Database from 'better-sqlite3'
 
 const TEMPLATES_DIR = resolve(__dirname, 'blender-templates')
 const BLENDER = process.env.BLENDER_BIN || '/Applications/Blender.app/Contents/MacOS/Blender'
@@ -400,9 +401,56 @@ function blenderVerify(scenePath: string, specPath: string, reportPath: string,
 
 // ─── G1 candidate store ────────────────────────────────────────────────────
 
-function recordCandidate(classSlug: string, scenePath: string, reportPath: string,
-                         apiVersion: string, outDir: string): string {
-  const sql = `CREATE TABLE IF NOT EXISTS authored_scene_candidates (
+// classSlug is LLM/brief-derived (slugify of product_class) → treat as
+// UNTRUSTED at this boundary. slugify() upstream already restricts the
+// alphabet, but recordCandidate is exported and must defend itself
+// (security item 18: the old sqlite3-CLI string-interpolated INSERT was an
+// injection surface into ~/.forge-truth/forge-truth.db).
+const CLASS_SLUG_RE = /^[a-z0-9_]{1,64}$/
+const API_VERSION_RE = /^\d+\.\d+\.\d+$/
+
+export function assertCandidateStoreInputs(classSlug: string, apiVersion: string,
+                                           scenePath: string, reportPath: string): void {
+  const reject = (field: string, value: unknown, rule: string): never => {
+    throw new Error(`[author] candidate-store input rejected: ` + JSON.stringify({
+      error: 'candidate_store_input_rejected',
+      field, rule, value: String(value).slice(0, 120),
+    }))
+  }
+  if (typeof classSlug !== 'string' || !CLASS_SLUG_RE.test(classSlug)) {
+    reject('classSlug', classSlug, 'must match /^[a-z0-9_]{1,64}$/')
+  }
+  if (typeof apiVersion !== 'string' || !API_VERSION_RE.test(apiVersion)) {
+    reject('apiVersion', apiVersion, 'must match /^\\d+\\.\\d+\\.\\d+$/')
+  }
+  for (const [field, p] of [['scenePath', scenePath], ['reportPath', reportPath]] as const) {
+    if (typeof p !== 'string' || !isAbsolute(p)) reject(field, p, 'must be an absolute path constructed by this script')
+    if (p.includes("'")) reject(field, p, 'must not contain single quotes')
+  }
+}
+
+export function recordCandidate(classSlug: string, scenePath: string, reportPath: string,
+                                apiVersion: string, outDir: string): string {
+  // Validate BEFORE any use (throws a structured error on bad input).
+  assertCandidateStoreInputs(classSlug, apiVersion, scenePath, reportPath)
+  const script = readFileSync(scenePath, 'utf-8')
+  const checksJson = readFileSync(reportPath, 'utf-8')
+  // Debug artefact (replaces the old candidate-insert.sql, which was a copy
+  // of the interpolated SQL): parameters only — values are NEVER spliced
+  // into SQL text; they go through better-sqlite3 parameter binding below.
+  writeFileSync(resolve(outDir, 'candidate-insert.json'), JSON.stringify({
+    db: FORGE_TRUTH_DB,
+    class_slug: classSlug,
+    api_version: apiVersion,
+    scene_path: scenePath,
+    report_path: reportPath,
+    script_bytes: Buffer.byteLength(script),
+    checks_bytes: Buffer.byteLength(checksJson),
+  }, null, 2))
+  let db: InstanceType<typeof Database> | null = null
+  try {
+    db = new Database(FORGE_TRUTH_DB, { timeout: 30_000 })
+    db.exec(`CREATE TABLE IF NOT EXISTS authored_scene_candidates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   class_slug TEXT NOT NULL,
   version INTEGER NOT NULL,
@@ -412,22 +460,25 @@ function recordCandidate(classSlug: string, scenePath: string, reportPath: strin
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate','shadow','approved')),
   UNIQUE(class_slug, version)
-);
-INSERT INTO authored_scene_candidates (class_slug, version, script, api_version, checks_json, status)
-VALUES ('${classSlug}',
-        COALESCE((SELECT MAX(version) FROM authored_scene_candidates WHERE class_slug='${classSlug}'), 0) + 1,
-        readfile('${scenePath}'), '${apiVersion}', readfile('${reportPath}'), 'candidate');
-SELECT 'candidate id=' || id || ' class=' || class_slug || ' version=' || version || ' status=' || status
-  FROM authored_scene_candidates WHERE class_slug='${classSlug}' ORDER BY version DESC LIMIT 1;
-`
-  const sqlPath = resolve(outDir, 'candidate-insert.sql')
-  writeFileSync(sqlPath, sql)
-  const r = spawnSync('sqlite3', [FORGE_TRUTH_DB], { input: sql, encoding: 'utf-8', timeout: 30_000 })
-  if (r.status !== 0) {
-    console.error(`[author] candidate-store insert FAILED: ${r.stderr}`)
-    return `INSERT FAILED: ${(r.stderr || '').slice(0, 200)}`
+);`)
+    // Single atomic statement preserves the COALESCE(MAX(version)) semantics
+    // even with concurrent writers; every value arrives via binding.
+    const info = db.prepare(
+      `INSERT INTO authored_scene_candidates (class_slug, version, script, api_version, checks_json, status)
+       VALUES (@slug,
+               COALESCE((SELECT MAX(version) FROM authored_scene_candidates WHERE class_slug = @slug), 0) + 1,
+               @script, @apiVersion, @checksJson, 'candidate')`
+    ).run({ slug: classSlug, script, apiVersion, checksJson })
+    const row = db.prepare(
+      `SELECT id, class_slug, version, status FROM authored_scene_candidates WHERE rowid = ?`
+    ).get(info.lastInsertRowid) as { id: number; class_slug: string; version: number; status: string }
+    return `candidate id=${row.id} class=${row.class_slug} version=${row.version} status=${row.status}`
+  } catch (err: any) {
+    console.error(`[author] candidate-store insert FAILED: ${err?.message || err}`)
+    return `INSERT FAILED: ${String(err?.message || err).slice(0, 200)}`
+  } finally {
+    db?.close()
   }
-  return (r.stdout || '').trim()
 }
 
 // ─── The loop (B3) — chain-integration surface ─────────────────────────────
