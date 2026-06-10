@@ -4703,11 +4703,14 @@ function EngagementPlanPage({ state, project }: { state: any; project: string })
             // The module sub-heading + its first card stay together (minPresenceAhead,
             // NOT wrap={false}) so a heading is never orphaned at a page foot and the
             // growing card stack page-breaks cleanly — the gate-11 overlap-safe idiom.
+            // 2026-06-10: reserve raised 16 → 40 (the label + heading + rule alone are
+            // ~38pt; a 16pt token reserve let the heading start at the content floor —
+            // same page-foot smear family as the specialist card, see AdvisorSpecialistCard).
             // House style: MUTED module label + ACCENT module heading + a thin RULE
             // under the heading (matches the SubHead / Section-intro treatment); the
             // cards are NOT boxed in a green border — they flow as ink-on-white with
             // the per-card neutral header panel carrying the visual separation.
-            <View key={`engplan-mod-${bi}`} style={{ marginTop: bi > 0 ? 14 : 2 }} minPresenceAhead={16}>
+            <View key={`engplan-mod-${bi}`} style={{ marginTop: bi > 0 ? 14 : 2 }} minPresenceAhead={40}>
               <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.8, marginBottom: 2 }}>
                 MODULE {String(bi + 1)}
               </Text>
@@ -9795,9 +9798,29 @@ function AdvisorSpecialistCard({ card, cardNo, rosterOnly }: { card: AdvisorCard
     // for the rest (growing content → never wrap={false} on the whole card, per the
     // layout-overlap lesson). Each question row is itself wrap={false}. Cards within
     // a module are separated by a thin house rule (RULE_SOFT), not a 4-px slab.
-    <View style={{ marginTop: cardNo > 1 ? 12 : 0, paddingTop: cardNo > 1 ? 12 : 0, borderTopWidth: cardNo > 1 ? 0.6 : 0, borderTopColor: RULE_SOFT }} minPresenceAhead={16}>
-      {/* The specialist header — house neutral-tint panel with a single accent rule */}
-      <View style={{ paddingVertical: 8, paddingHorizontal: 11, backgroundColor: '#f7f8fa', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 3 }}>
+    //
+    // 2026-06-10 gate-11 smear fix (compute_heat_module page 76, 5th+ recurrence of
+    // the page-foot smear family). minPresenceAhead={16} was a TOKEN reserve: the
+    // header panel below is ~90-115pt of unbreakable visual unit, so a card starting
+    // with ~16pt left committed the panel at the content floor and react-pdf's
+    // overflow shrink collapsed each Text to zero height — five lines stacked at the
+    // same Y, only margins advancing the cursor (the AUDIT-LAYOUT Y-deltas matched
+    // the Text margins exactly). minPresenceAhead is ALSO unreliable for children
+    // nested inside a wrapping parent View (shouldBreak's breakingImprovesPresence
+    // blind spot — drawer forgeos_fixes_9debe6e76a794b62), and these cards are
+    // nested inside the per-module wrapper in EngagementPlanPage. Two-part fix:
+    // (a) the reserve below is now 96pt ≈ the header panel's realistic height, and
+    // (b) the BOUNDED header panel itself carries wrap={false} — in the layout
+    // engine `(shouldSplit && !canWrap)` moves the whole panel to the next page
+    // atomically at ANY nesting depth, unconditionally (not gated by the
+    // first-child blind spot). The GROWING part of the card (question rows) stays
+    // wrappable, so the "never wrap={false} on the whole card" lesson still holds.
+    // Guard: UNIVERSAL.advisor_header_panel_unbreakable in regression-harness.tsx.
+    <View style={{ marginTop: cardNo > 1 ? 12 : 0, paddingTop: cardNo > 1 ? 12 : 0, borderTopWidth: cardNo > 1 ? 0.6 : 0, borderTopColor: RULE_SOFT }} minPresenceAhead={96}>
+      {/* The specialist header — house neutral-tint panel with a single accent rule.
+          wrap={false}: this panel is a BOUNDED unit (≤ ~130pt) and must never be
+          split at a page foot (gate-11 smear, 2026-06-10). */}
+      <View style={{ paddingVertical: 8, paddingHorizontal: 11, backgroundColor: '#f7f8fa', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 3 }} wrap={false}>
         <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.6, marginBottom: 3 }}>
           SPECIALIST {String(cardNo)}
         </Text>
@@ -12878,13 +12901,20 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
   // modules" prints and the cover cost stack is built from) — never a hardcode.
   const totalLineCount = modBlocks.reduce((acc, b) => acc + b.lines.length, 0)
   const grandTotal = bomTotals.grandTotal_gbp
-  // unmatched macro-assembly lines (big-ticket items with no emitter word, e.g. a
-  // wind gearbox) ARE part of grandTotal_gbp but have no per-module BoM row; we
-  // surface them as a final consolidated group so the grand total reconciles for
-  // the reader instead of appearing to under-sum. PURE read — names + totals come
-  // straight from bomTotals.unmatchedMacros.
-  const unmatchedMacros = Array.isArray(bomTotals.unmatchedMacros) ? bomTotals.unmatchedMacros.filter(u => u && u.total > 0) : []
-  const unmatchedMacroTotal = bomTotals.unmatchedMacroTotal_gbp ?? 0
+  // NOTE (2026-06-10, gate-10 B-3 fix — energy_storage / vertical_farm /
+  // satellite_smallsat all exit-10 on the same defect): this page previously
+  // ALSO rendered bomTotals.unmatchedMacros as a trailing "N+1. Major
+  // Assemblies" section. That block predated the 2026-05-28 computeBomTotals
+  // fix (BESS L55) which now gives EVERY unmatched macro a visible module home
+  // — a synthetic "<Macro> (assembly)" row pushed into the best-match module,
+  // whose subtotal (and grandTotal) already include the macro's money. Keeping
+  // the extra section presented the same money TWICE: the rendered module
+  // headers summed to grandTotal + unmatchedMacroTotal while the cover and the
+  // "Grand total — all modules" row showed grandTotal, a document
+  // self-contradiction audit-pdf-bom.ts B-3 correctly flags (cover ≠ Σ module
+  // sub-totals, gap == unmatchedMacroTotal on all three failing archetypes).
+  // The macros stay fully visible inside their home modules; no separate
+  // section may render them again.
 
   // Shared 7-column header — identical structure to SubModuleBomBlock's header.
   const TableHead = () => (
@@ -13022,35 +13052,13 @@ function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: {
           </View>
         ))}
 
-        {/* Unmatched macro-assemblies — big-ticket items (e.g. a gearbox / PM
-            generator) that ARE in the grand total but have no per-module emitter
-            word. Surfaced so the grand total reconciles. PURE read of bomTotals. */}
-        {unmatchedMacros.length > 0 ? (
-          <View>
-            <View wrap={false} minPresenceAhead={40} style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 16, marginBottom: 2, paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: ACCENT }}>
-              <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
-                {modBlocks.length + 1}. Major Assemblies
-              </Text>
-              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>
-                {fmtGBP_subtotal(unmatchedMacroTotal)}
-              </Text>
-            </View>
-            {unmatchedMacros.map((u, ui) => (
-              <View key={`mbom-macro-${ui}`} wrap={false} style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}>
-                <Text style={{ flex: 2.6, fontSize: 9, color: INK }}>{toTitleCaseEng(normalise_unicode(String(u.name ?? '')))}</Text>
-                <Text style={{ flex: 1.4, fontSize: 8.5, color: MUTED }}>—</Text>
-                <Text style={{ flex: 1.6, fontSize: 8.5, color: MUTED, fontFamily: 'Helvetica-Bold' }}>—</Text>
-                <Text style={{ width: 24, fontSize: 9, color: INK, textAlign: 'right' }}>×1</Text>
-                <View style={{ width: 62, alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 9, color: INK, textAlign: 'right' }}>{u.total >= 1_000_000 ? `~£${Math.round(u.total).toLocaleString('en-GB')}` : `~£${u.total.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`}</Text>
-                  <Text style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', color: '#92400e', textAlign: 'right' }}>indicative · RFQ</Text>
-                </View>
-                <Text style={{ width: 49, fontSize: 9, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>{`£${u.total.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`}</Text>
-                <View style={{ width: 60, paddingLeft: 6 }}><Text style={{ fontSize: 8, color: MUTED }}>Est.</Text></View>
-              </View>
-            ))}
-          </View>
-        ) : null}
+        {/* Unmatched macro-assemblies are NOT rendered as a separate "Major
+            Assemblies" section: computeBomTotals (2026-05-28 BESS L55 fix)
+            already injects each one as a visible synthetic "(assembly)" row
+            inside its best-match home module, so the module rows + subtotals
+            above ALREADY contain them. Rendering them again here double-
+            presented the same money and broke cover ≡ Σ module sub-totals
+            (gate-10 B-3, 2026-06-10). */}
 
         {/* Grand total — the canonical bomTotals.grandTotal_gbp (same figure as
             CostByModulePage "Sum of modules" + cover cost stack). NOT hardcoded. */}

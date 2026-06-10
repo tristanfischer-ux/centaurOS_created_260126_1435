@@ -1732,6 +1732,84 @@ function checkAdvisorEngagementInvariants(): Assertion[] {
     ))
   }
 
+  // ── Advisor header panel unbreakable + no token minPresenceAhead reserves ──
+  // (2026-06-10, gate-11 exit-11 on compute_heat_module page 76 — 5th+ recurrence of
+  // the page-foot smear family.) Two source-structural guards on render-minimal-pdf.tsx:
+  //
+  // (a) AdvisorSpecialistCard's BOUNDED header panel (the #f7f8fa neutral-tint panel:
+  //     SPECIALIST label → role → background → "Typically at" → "Covers", ≤ ~130pt)
+  //     must carry wrap={false}. minPresenceAhead is NOT a sufficient guard for it:
+  //     it is silently ignored for first-children inside a wrapping parent View
+  //     (shouldBreak's breakingImprovesPresence blind spot, drawer
+  //     forgeos_fixes_9debe6e76a794b62) and these cards render NESTED inside the
+  //     per-module wrapper in EngagementPlanPage. wrap={false} is honoured at any
+  //     nesting depth via the layout engine's `(shouldSplit && !canWrap)` disjunct,
+  //     which is unconditional. Without it, a card starting near the content floor
+  //     had the panel's five Texts shrunk to zero height — stacked at the same Y with
+  //     only margins advancing (AUDIT-LAYOUT Y-deltas matched the Text margins).
+  //
+  // (b) NO minPresenceAhead in the whole renderer may be a TOKEN reserve (< 28pt).
+  //     28pt ≈ the smallest legitimate keep-together unit (one 7.5pt label line +
+  //     one body line + margins). Every prior recurrence of this family began with
+  //     an under-estimated reserve letting a multi-line block start in space it
+  //     could not fit; the floor trips the anti-pattern at build time, before a
+  //     chain run has to surface it as gate-11 exit 11.
+  {
+    const bad: string[] = []
+    try {
+      const rmpRaw = readFileSync(resolve(__dirname, 'render-minimal-pdf.tsx'), 'utf-8')
+      // Strip whole-line `//` comments (kept as empty lines so reported line
+      // numbers stay correct) — explanatory comments that MENTION the old
+      // minPresenceAhead={16} or the panel colour must not trip the scans below
+      // (mirrors the CTA invariant's stripComments idiom).
+      const rmpSrc = rmpRaw
+        .split('\n')
+        .map((ln) => (/^\s*\/\//.test(ln) ? '' : ln))
+        .join('\n')
+      const sliceFn = (name: string): string => {
+        const start = rmpSrc.indexOf(`function ${name}(`)
+        if (start < 0) return ''
+        const next = rmpSrc.indexOf('\nfunction ', start + 1)
+        return rmpSrc.slice(start, next < 0 ? undefined : next)
+      }
+      // (a) the specialist header panel must be an atomic (wrap={false}) unit.
+      const card = sliceFn('AdvisorSpecialistCard')
+      if (!card) {
+        bad.push('AdvisorSpecialistCard function not found in render-minimal-pdf.tsx')
+      } else {
+        const panelIdx = card.indexOf("backgroundColor: '#f7f8fa'")
+        if (panelIdx < 0) {
+          bad.push('AdvisorSpecialistCard header panel (#f7f8fa) not found — if the panel was restyled, update this invariant to track the new panel and KEEP it wrap={false}')
+        } else {
+          // The wrap={false} must sit on the SAME <View …> tag as the panel style.
+          const tagStart = card.lastIndexOf('<View', panelIdx)
+          const tagEnd = card.indexOf('>', panelIdx)
+          const tag = tagStart >= 0 && tagEnd > tagStart ? card.slice(tagStart, tagEnd + 1) : ''
+          if (!/wrap=\{false\}/.test(tag)) {
+            bad.push('AdvisorSpecialistCard header panel lost wrap={false} — the bounded panel can again be split at a page foot and smear (gate-11 exit 11, compute_heat 2026-06-10)')
+          }
+        }
+      }
+      // (b) no token minPresenceAhead reserves anywhere in the renderer.
+      const MIN_RESERVE_PT = 28
+      for (const m of rmpSrc.matchAll(/minPresenceAhead=\{(\d+(?:\.\d+)?)\}/g)) {
+        const v = Number(m[1])
+        if (v < MIN_RESERVE_PT) {
+          const line = rmpSrc.slice(0, m.index).split('\n').length
+          bad.push(`minPresenceAhead={${m[1]}} at render-minimal-pdf.tsx:${line} is a token reserve (< ${MIN_RESERVE_PT}pt) — under-estimated reserves are how the page-foot smear family recurs; size the reserve to the block's realistic first-unit height`)
+        }
+      }
+    } catch (err) {
+      bad.push(`could not read render-minimal-pdf.tsx: ${String(err).slice(0, 100)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.advisor_header_panel_unbreakable',
+      'the AdvisorSpecialistCard header panel is an atomic wrap={false} unit and no minPresenceAhead in the renderer is a token (<28pt) reserve — the two ingredients of the recurring gate-11 page-foot text smear',
+      bad.length, (n) => n === 0,
+      () => `page-foot smear guard regressed: ${bad.join(' ; ')}. Bounded multi-line panels must be wrap={false}; growing stacks use a REALISTIC minPresenceAhead (>=28pt, sized to the first unbreakable unit).`,
+    ))
+  }
+
   // ── Phase-2 density-repair must NOT fabricate filler words ── (2026-06-05)
   // The reviewer-repair prompt used to order "emit NEW words until each sub-module
   // reaches >=5 words"; gate-20 forbids new part_number words, so the LLM could only
@@ -2288,6 +2366,70 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
           (found) => found,
           () => `PDF did not contain "${expectedString}" (whitespace-normalised) — IndustryBandBlock returned null or the band was not resolved`,
         ))
+      }
+    }
+  }
+
+  // ── UNIVERSAL.master_bom_headers_reconcile_with_cover (2026-06-10) ───────
+  // In-harness mirror of gate-10 B-3 (audit-pdf-bom.ts): the cover "Raw
+  // materials BoM" headline must equal the sum of the rendered per-module
+  // header rows ("N. <Label> £<amount>" — Cost-by-Module summary + Master BoM
+  // section headers, deduped by label exactly as the audit does) within
+  // max(£50, 0.2%). Root cause this guards (energy_storage / vertical_farm /
+  // satellite_smallsat 2026-06-10 rerun, all exit 10): MasterBillOfMaterialsPage
+  // rendered bomTotals.unmatchedMacros as an EXTRA "N+1. Major Assemblies"
+  // section even though computeBomTotals (2026-05-28 BESS L55 fix) already
+  // injects every unmatched macro as a synthetic in-module row — the same
+  // money presented twice, so Σ(rendered headers) = cover + unmatchedMacroTotal.
+  // Any re-introduction of a duplicate money section (or a header-row format
+  // drift the audit can't parse) fails this on the next harness run instead of
+  // burning a chain run to find it at gate 10.
+  {
+    if (renderResult.ok && existsSync(renderResult.pdfPath)) {
+      let layoutText = ''
+      try {
+        layoutText = execFileSync('pdftotext', ['-layout', renderResult.pdfPath, '-'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
+      } catch { /* pdftotext absent — skip gracefully (same convention as other PDF-text invariants) */ }
+      if (layoutText) {
+        // Same parser as audit-pdf-bom.ts (parsePoundAmount + the two regexes);
+        // inlined because that file is a script whose import would execute main().
+        const parseGbp = (s: string): number | null => {
+          const cleaned = s.replace(/\s+/g, '')
+          const mPlain = cleaned.match(/£([\d,]+\.?\d*)$/)
+          if (mPlain) return parseFloat(mPlain[1].replace(/,/g, ''))
+          const mShort = cleaned.match(/£([\d.]+)([KMB])/i)
+          if (mShort) {
+            const mult = { K: 1e3, M: 1e6, B: 1e9 }[mShort[2].toUpperCase() as 'K' | 'M' | 'B'] ?? 1
+            return parseFloat(mShort[1]) * mult
+          }
+          return null
+        }
+        let cover: number | null = null
+        const headerMap = new Map<string, number>()
+        for (const line of layoutText.split('\n')) {
+          if (cover == null && /Raw materials BoM/i.test(line)) {
+            const m = line.match(/£[\d,.MKB]+/)
+            if (m) cover = parseGbp(m[0])
+          }
+          const mh = line.match(/^\s*\d+\.\s+([A-Z][A-Za-z0-9\s&/().,+-]*?)\s+£([\d,.]+)/)
+          if (mh) {
+            const amount = parseGbp('£' + mh[2])
+            if (amount && amount > 0) headerMap.set(mh[1].toLowerCase().trim().replace(/\s+/g, '_'), amount)
+          }
+        }
+        if (cover != null && cover > 0 && headerMap.size > 0) {
+          const headerSum = Array.from(headerMap.values()).reduce((a, v) => a + v, 0)
+          const gap = Math.abs(cover - headerSum)
+          const tolerance = Math.max(50, cover * 0.002)
+          const coverGbp = cover
+          assertions.push(assertEq(
+            'UNIVERSAL.master_bom_headers_reconcile_with_cover',
+            'cover Raw-materials-BoM ≡ Σ rendered per-module header rows (gate-10 B-3 mirror, max(£50, 0.2%))',
+            gap,
+            (g) => g <= tolerance,
+            (g) => `cover £${Math.round(coverGbp).toLocaleString()} vs Σ headers £${Math.round(headerSum).toLocaleString()} — gap £${Math.round(g).toLocaleString()} > tolerance £${Math.round(tolerance).toLocaleString()} (${headerMap.size} header rows: ${Array.from(headerMap.keys()).slice(0, 14).join(', ')})`,
+          ))
+        }
       }
     }
   }
