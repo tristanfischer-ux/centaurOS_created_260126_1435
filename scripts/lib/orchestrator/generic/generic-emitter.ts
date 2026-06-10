@@ -38,7 +38,14 @@ import {
 import { deriveGenericSkeleton } from './derive-skeleton'
 import { loadClassComponents } from './component-source'
 import { buildCrossModuleLinks } from './build-links'
-import { applyFamilySizing } from './sizing'
+// E2 (2026-06-10): the sizing-family PLUG-IN REGISTRY replaces the legacy
+// single-family applyFamilySizing call. Importing the barrel registers every
+// family (battery / process-plant / aero-platforms) and composes all that
+// score above threshold over a shared quantity namespace. `applySizingFamilies`
+// merges the deltas (word modifiers via the same mergeMods → BATTERY byte-
+// identity). The legacy applyFamilySizing stays in ./sizing as the regression
+// oracle but is no longer on the production path.
+import { applySizingFamilies } from '../sizing-families'
 
 /**
  * Emit a DesignJSON generically from the class-reference graph + corpus components.
@@ -71,13 +78,37 @@ export async function emitGenericDesign(
 
   const modules = deriveGenericSkeleton(graph, brief, envelope, contract, componentsByModule)
 
-  // Per-class-family SIZING: attach the engineering contract's already-computed
-  // coupled-physics quantities (real counts + ratings) onto the component words,
-  // keyed by component type. Mutates `modules` in place. This closes the Phase-1
-  // under-provisioning (CMUs/modules/sensors at ×1) that capped the Physics Critic's
-  // engineering_plausibility — the lone wall from the Phase-1 verdict. No-op for a
-  // class whose family has no ruleset yet (Phase-1 baseline structure stands).
-  const sizing = applyFamilySizing(modules, contract, envelope.class)
+  // Per-class-FAMILY SIZING (E2 plug-in registry): every family scoring above
+  // threshold for this class composes in dependency order over a shared quantity
+  // namespace, attaching the contract's coupled-physics quantities (real counts +
+  // ratings) onto the component words AND deriving the family budget (e.g. aero
+  // wing area / cruise power / battery mass). The caller merges the deltas; the
+  // BATTERY family is byte-identical to the legacy path. Closes the Phase-1
+  // under-provisioning (the lone wall from the Phase-1 verdict). A class no family
+  // claims is left un-sized (Phase-1 baseline structure stands).
+  //
+  // LOUD-FAILURE policy (G6): a structured SizingFamilyError (missing / unit-
+  // mismatched / out-of-range required quantity, or a composition conflict) is a
+  // real engineering-input gap. We surface it as an honest emitter note + leave
+  // the structure un-sized rather than crash the whole generic emit; the gates +
+  // physics critic then flag the thin sizing (better than a hollow PDF, per G3).
+  let sizing: { families: string[]; sized: number } = { families: [], sized: 0 }
+  let sizingError: string | null = null
+  try {
+    const applied = applySizingFamilies(
+      modules as never[],
+      contract,
+      brief,
+      envelope.class,
+      // E1 seam: the canonical envelope-vector is produced by E1; pass the
+      // BriefEnvelope structurally (carries class/scale_tier/form_factor) until
+      // the envelope-vector is threaded here post-merge.
+      envelope as never,
+    )
+    sizing = { families: applied.families, sized: applied.sized }
+  } catch (err) {
+    sizingError = err instanceof Error ? err.message : String(err)
+  }
 
   // Cross-module links from the real graph topology + the per-class required-link
   // registry (oriented so the directional grammar gates pass). Candidate class
@@ -97,7 +128,7 @@ export async function emitGenericDesign(
       `Generic emitter (wall-3 Phase-1): ${modules.length} modules derived from the ` +
       `${graph.product_class} class-reference graph; ${corpusModules > 0 ? `component detail unioned from the corpus (${corpusModules} module group(s))` : 'component detail from the universal taxonomy floor'}; ` +
       `${links.length} cross-module links from graph edges + required-connection registry; ` +
-      `${sizing.family ? `${sizing.sized} component words sized from the ${sizing.family}-family contract physics` : 'no family sizing ruleset for this class (Phase-1 baseline structure)'}. ` +
+      `${sizing.families.length > 0 ? `${sizing.sized} component words sized by sizing-family plug-in(s) [${sizing.families.join(', ')}] composing over the contract physics` : (sizingError ? `sizing-family layer reported a structured gap (${sizingError}) — structure left un-sized, gates will flag` : 'no sizing-family claims this class (Phase-1 baseline structure)')}. ` +
       `OPTIONAL modules the brief does not signal are pruned downstream by applyBriefScopeFilter; ` +
       `real parts + exact MPNs are supplied by the chain's emitter-completion + fill-blank-MPN passes.`,
     brief_overview_prose: {

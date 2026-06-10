@@ -23,6 +23,17 @@
  * from real contract counts. Physics-bounded discipline (drawer about scaling
  * formulas): ratings are continuous unless the contract names a peak/transient.
  *
+ * E2 STATUS (2026-06-10, ANVIL increment E2): this file is now the LEGACY
+ * REFERENCE implementation. The production call path is the sizing-family
+ * plug-in registry (`../sizing-families/`): `generic-emitter.ts` calls
+ * `applySizingFamilies` (registry) instead of `applyFamilySizing` (here).
+ * The BATTERY rule table below is the single source of truth — the battery
+ * plugin imports it — and `applyFamilySizing` is RETAINED UNCHANGED as the
+ * old-vs-new byte-identity oracle for the E2 regression test
+ * (`scripts/test-sizing-families.tsx` section A + harness invariant
+ * `UNIVERSAL.sizing_family_battery_port_byte_identical`). Do not delete until
+ * the registry path has soaked a full chain run.
+ *
  * British spelling throughout.
  */
 
@@ -30,35 +41,37 @@ import type { ContractInProgress } from '../types'
 import { mod, type ModifierCharacter } from './emitter-primitives'
 
 // Minimal structural shapes (avoid importing DesignModule's heavy type here).
-interface WordLike {
+// Exported for the sizing-family rule engine (E2) — shapes must stay in lockstep.
+export interface WordLike {
   id?: string
   name_human?: string
   content_character?: { character_id?: string; name_human?: string }
   modifier_characters?: ModifierCharacter[]
 }
-interface SubModuleLike { words?: WordLike[] }
-interface ModuleLike { sub_modules?: SubModuleLike[] }
+export interface SubModuleLike { words?: WordLike[] }
+export interface ModuleLike { sub_modules?: SubModuleLike[] }
 
 export interface SizingParams {
   [k: string]: number | string
 }
 
-type SizeFn = (p: SizingParams) => ModifierCharacter[]
-interface SizingRule {
+export type SizeFn = (p: SizingParams) => ModifierCharacter[]
+export interface SizingRule {
   id: string
   match: RegExp
   size: SizeFn
 }
 
 // ── helpers (return [] when the contract lacks the source quantity — never invent)
-function num(p: SizingParams, k: string): number | undefined {
+// Exported for the sizing-family plugins (E2) — same never-invent discipline.
+export function num(p: SizingParams, k: string): number | undefined {
   const v = p[k]
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined
 }
-function qty(v: number | undefined): ModifierCharacter[] {
+export function qty(v: number | undefined): ModifierCharacter[] {
   return v !== undefined && v >= 1 ? [mod('quantity', `×${Math.round(v)}`)] : []
 }
-function spec(kind: string, v: number | undefined, unit: string): ModifierCharacter[] {
+export function spec(kind: string, v: number | undefined, unit: string): ModifierCharacter[] {
   if (v === undefined) return []
   const rounded = Math.round(v * 100) / 100
   return [mod(kind, String(rounded), unit)]
@@ -67,7 +80,7 @@ function spec(kind: string, v: number | undefined, unit: string): ModifierCharac
 // ── BATTERY family — every value sourced from the engineering contract's COMPUTED
 //    quantities. Ordered MOST-SPECIFIC first (first match wins); rack before module
 //    so "battery_module_racks" sizes as racks, not modules.
-const BATTERY: SizingRule[] = [
+export const BATTERY: SizingRule[] = [
   { id: 'cell_monitoring', match: /monitor|\bcmu\b|bms[_\s-]?slave|cell[_\s-]?balanc/i,
     size: (p) => qty(num(p, 'bms_slave_count')) },
   { id: 'controller', match: /bms[_\s-]?master|\bems\b|scada|energy[_\s-]?management|controller|gateway/i,
@@ -111,7 +124,7 @@ const FAMILIES: Record<string, SizingRule[]> = { battery: BATTERY }
 
 // Class → sizing family (coarse; same intent as build-links FAMILY_KEY). Extend as
 // new families gain a ruleset; an unmapped class is left un-sized (Phase-1 baseline).
-const FAMILY_OF: Record<string, string> = {
+export const FAMILY_OF: Record<string, string> = {
   energy_storage: 'battery',
   bess: 'battery',
   'bess-utility-scale': 'battery',
@@ -123,7 +136,7 @@ const FAMILY_OF: Record<string, string> = {
   vehicle_battery_pack: 'battery',
 }
 
-function flattenParams(contract: ContractInProgress): SizingParams {
+export function flattenParams(contract: ContractInProgress): SizingParams {
   const out: SizingParams = {}
   const q = (contract?.quantities ?? {}) as Record<string, { value?: unknown } | undefined>
   for (const [k, v] of Object.entries(q)) {
@@ -133,8 +146,10 @@ function flattenParams(contract: ContractInProgress): SizingParams {
   return out
 }
 
-/** Replace existing modifiers of the same kind, then append the sized ones. */
-function mergeMods(word: WordLike, add: ModifierCharacter[]): void {
+/** Replace existing modifiers of the same kind, then append the sized ones.
+ *  Exported: the sizing-family delta-merge uses EXACTLY this function so the
+ *  BATTERY port stays byte-identical (E2 regression test). */
+export function mergeMods(word: WordLike, add: ModifierCharacter[]): void {
   if (add.length === 0) return
   const kinds = new Set(add.map((m) => m.kind))
   const kept = (word.modifier_characters ?? []).filter((m) => !kinds.has(m.kind))
@@ -142,6 +157,9 @@ function mergeMods(word: WordLike, add: ModifierCharacter[]): void {
 }
 
 /**
+ * LEGACY (E2, 2026-06-10): retained as the old-vs-new byte-identity ORACLE for
+ * the sizing-family registry port — no longer called by generic-emitter.ts.
+ *
  * Attach the contract's computed engineering (real quantities + ratings) to the
  * generic component words for the class's FAMILY. Mutates `modules` in place.
  *
