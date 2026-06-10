@@ -47,12 +47,11 @@ import { isConsumable, CLASS_PRICE_SANITY_BOUNDS, keywordCeilingGbp, COMPONENT_C
 import { classifyByRules } from './estimate-missing-prices'
 import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
 import { computeNetInfeasibilityFlag } from './lib/brief-infeasibility-net'
-import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { buildToolSelectionNarrative, type ToolNarrativeEntry } from './lib/tool-selection-narrative'
 import {
   buildEngineeringLedger,
-  formatInputs as ledgerFormatInputs,
-  formatOutputs as ledgerFormatOutputs,
+  formatInputsDetailed as ledgerFormatInputsDetailed,
+  formatOutputsDetailed as ledgerFormatOutputsDetailed,
   formatProvenanceStrip as ledgerProvenanceStrip,
   type EngineeringLedger,
   type LedgerEntry,
@@ -787,29 +786,10 @@ function notEstimatedReasonForField(field: string, productClass: unknown): strin
   const key = String(field ?? '').trim()
   return _NOT_ESTIMATED_FIELD_REASONS[key] ?? null
 }
-// Signature phrases the "numbers behind it" narrative (generatePhysicsNarrative,
-// owned elsewhere) emits for the 3 not-calibrated generic tools. On a process-
-// plant class these sentences quote the wrong figures (MTBF 0.21 yr, cyber score
-// 25, £0 cert), so the renderer drops the whole sentence rather than show it.
-// Anchored on the tool's own deterministic phrasing — NOT free LLM prose.
-const _NOT_ESTIMATED_NARRATIVE_RE =
-  /\b(mtbf|mean[- ]time[- ]between[- ]failures|warranty claim|cybersecurity threat score|stride threat|regulatory certification cost)\b/i
-/** Strip "numbers behind it" sentences that quote a not-calibrated generic tool's
- *  figure, for process-plant classes. Returns a narrative with the offending
- *  sentences (and now-empty groups) removed, or the original when nothing matches
- *  / the class isn't a process plant. Pure; does not mutate the input. */
-function filterNotEstimatedNarrative<T extends { sentences: string[]; groups?: Array<{ label: string; sentences: string[] }> }>(
-  narrative: T | null,
-  productClass: unknown,
-): T | null {
-  if (!narrative || !_isProcessPlantClassForRender(productClass)) return narrative
-  const keep = (s: string) => !_NOT_ESTIMATED_NARRATIVE_RE.test(String(s ?? ''))
-  const sentences = (narrative.sentences ?? []).filter(keep)
-  const groups = (narrative.groups ?? [])
-    .map((g) => ({ ...g, sentences: (g.sentences ?? []).filter(keep) }))
-    .filter((g) => g.sentences.length > 0)
-  return { ...narrative, sentences, groups }
-}
+// (2026-06-10) `filterNotEstimatedNarrative` + its `_NOT_ESTIMATED_NARRATIVE_RE`
+// were removed with the System-Overview "numbers behind it" block (item 4) — they
+// had no other consumer. `notEstimatedReasonForField` above is unaffected (still
+// used by the Tools-Used appendix).
 
 // Upper-case only the ACRONYM tokens of an otherwise-lower-case phrase (the
 // product-class slug humanised to words) WITHOUT title-casing the rest, so
@@ -5053,6 +5033,45 @@ function ExecutiveSummaryPage({ state, project, bomTotals, costStack, priceReali
   )
   const article = /^[aeiou]/i.test(classReadable) ? 'an' : 'a'
   const productName = (pdName && pdName.length <= 90 ? pdName : `${article} ${classReadable} system`).replace(/\.$/, '')
+  // Levelised capital cost (item 8): reuse the independent cost-sanity gate's
+  // EXACT £/output-unit figure + its unit label (the same number the Engineering
+  // Basis economics card shows), so the exec summary surfaces BOTH the headline
+  // ex-works cost and the levelised cost. null → omitted gracefully.
+  const _cs = state?.costSanity ?? {}
+  // The per_unit_label is the UNIT only (e.g. "£/(t·yr CO2)"). It already carries
+  // the "£/" so the value is rendered as the bare number + the unit label; when
+  // only a plain output-unit label is available, fall back to "£<n>/<unit>".
+  const _levUnit = normalise_unicode(String(_cs?.band?.per_unit_label ?? '')).trim()
+  const levelisedCost = (typeof _cs?.cost_per_output_unit === 'number' && isFinite(_cs.cost_per_output_unit) && _cs.cost_per_output_unit > 0)
+    ? (_levUnit
+        ? `${Math.round(_cs.cost_per_output_unit).toLocaleString('en-GB')} ${_levUnit}`
+        : `£${Math.round(_cs.cost_per_output_unit).toLocaleString('en-GB')}${_cs?.output_unit_label ? '/' + normalise_unicode(String(_cs.output_unit_label)).trim() : ''}`)
+    : null
+  // Open high-severity engineering defect (item 8): the single highest-severity
+  // OPEN physics-critic finding the design still carries — surfaced so the
+  // summary is honest about feasibility. Prefer a concise self-audit blocking
+  // defect, else the physics-critique HIGH issue (dimension + issue). Trimmed to
+  // one sentence; null when there is no open high-severity defect.
+  const openDefect = (() => {
+    try {
+      const sa: any = state?.selfAudit ?? {}
+      if (Array.isArray(sa.blocking_defects) && sa.blocking_defects.length > 0) {
+        const d = sa.blocking_defects[0]
+        const t = String(typeof d === 'string' ? d : (d?.issue ?? d?.summary ?? '')).replace(/\s+/g, ' ').trim()
+        if (t) return t.length > 240 ? t.slice(0, 240).replace(/\s+\S*$/, '') + '…' : t
+      }
+      const pc: any = state?.physicsCritique ?? {}
+      const issues: any[] = Array.isArray(pc.issues) ? pc.issues : Array.isArray(pc.findings) ? pc.findings : []
+      const high = issues.find((i) => String(i?.severity ?? '').toLowerCase() === 'high')
+      if (high) {
+        const dim = String(high.dimension ?? '').replace(/_/g, ' ').trim()
+        const iss = String(high.issue ?? '').replace(/\s+/g, ' ').trim()
+        const t = iss ? `${dim ? dim + ' — ' : ''}${iss}` : dim
+        if (t) return t.length > 240 ? t.slice(0, 240).replace(/\s+\S*$/, '') + '…' : t
+      }
+    } catch { /* none */ }
+    return null
+  })()
   const summary = buildExecutiveSummary({
     productName,
     mission: String(bop.mission_statement ?? pb.mission_statement ?? ''),
@@ -5063,6 +5082,8 @@ function ExecutiveSummaryPage({ state, project, bomTotals, costStack, priceReali
     failSummaries,
     exWorksCostGbp: exWorks,
     costPerUnit,
+    levelisedCost,
+    openDefect,
     improvementActions: plan.levers.map((l) => l.action),
   })
   return (
@@ -5491,8 +5512,8 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
   // followed by an empty paragraph — leaking visible blank sections.
   const pb = state.parsedBrief ?? {}
   const overview = clean_prose(bp.overview_and_context)
-  const mission = clean_prose(bp.mission_statement)
-  const customers = clean_prose(bp.target_customers) || clean_prose(pb.target_customers)
+  // mission + target_customers no longer read here (item 7b de-dup) — they render
+  // on the Executive Summary + System Overview. Why-now stays (timing context).
   const whyNow = clean_prose(bp.why_now) || clean_prose(pb.why_now)
   const modules = state.moduleDecomposition?.modules ?? []
 
@@ -5555,12 +5576,16 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
 
       {overview ? (<><SubHeading>Overview</SubHeading><Paragraph>{overview}</Paragraph></>) : null}
 
-      {mission ? (<><SubHeading>Mission</SubHeading><Paragraph>{mission}</Paragraph></>) : null}
-
-      {/* Bug fix #15 (2026-05-22): suppress heading entirely when no content.
-          Previously rendered an SubHeading + empty Paragraph, leaking blank
-          "Target customers" + "Why now" sections to the cover. */}
-      {customers ? (<><SubHeading>Target customers</SubHeading><Paragraph>{customers}</Paragraph></>) : null}
+      {/* DE-DUP 2026-06-10 (item 7b): the "Mission" and "Target customers"
+          subsections were removed here — both are carried verbatim by the
+          Executive Summary product paragraph (one page earlier) AND the System
+          Overview "What it does" block (which combines product description +
+          mission + target customers). This Brief & Requirements page keeps the
+          content that is UNIQUE to it: the operational-headline metrics, the
+          physical spec block, the overview-and-context prose, the timing, and the
+          numeric performance card. The structured-parse provenance of the same
+          mission/customers fields is shown — for a different purpose (audit of
+          how the LLM read the brief) — on the Brief Provenance page. */}
 
       {whyNow ? (<><SubHeading>Why now</SubHeading><Paragraph>{whyNow}</Paragraph></>) : null}
 
@@ -7145,6 +7170,26 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
       // fail the kg/h conversion → "—"). A curated METRIC_MAP entry (checked BEFORE
       // the resolver) pins the hourly key to the hourly contract quantity directly.
       saf_production_kg_per_hr:    { qtyKey: 'saf_output_kg_h',          label: 'SAF production (hourly)', unit: 'kg/h', tolerancePct: 5, kind: 'floor' },
+      // ── CO₂-mineralisation BRIEF-INPUT specs the design ADOPTS (item 5, 2026-06-10) ──
+      // These are brief INPUTS the design carries (a feedstock rate / a solvent
+      // spec), NOT design OUTPUTS — so they were excluded from the semantic
+      // resolver (which is scoped to delivered outputs) and fell to the universal
+      // pass as a dead "Not computed at concept stage / —". They are NOT
+      // unverifiable: the contract holds the value the design ACTUALLY adopts
+      // (mea_concentration_wt_pct = 30 %, exactly the brief spec; koh_makeup_t_day
+      // = 2.55 t/day, the design's required make-up within tolerance of the
+      // briefed 2.6). Mapping them here echoes that adopted value as the achieved
+      // value with an honest PASS — the design genuinely carries/meets the input,
+      // so a green row is truthful (Tristan: "for these brief feedstock/spec
+      // inputs the design value IS the brief value, so echo it and mark it met").
+      // MEA concentration is EXACT (the design adopts the briefed wt%); KOH
+      // make-up is a FLOOR (the design provides at least the required feed). The
+      // _tpd / _t_per_day / _kg_per_day suffix variants resolve via the rate-base
+      // fallback already in the loop, so only the canonical brief key is mapped.
+      mea_solvent_concentration_wt_percent: { qtyKey: 'mea_concentration_wt_pct', label: 'MEA solvent concentration', unit: '%', tolerancePct: 5, kind: 'exact' },
+      mea_concentration_wt_percent:         { qtyKey: 'mea_concentration_wt_pct', label: 'MEA solvent concentration', unit: '%', tolerancePct: 5, kind: 'exact' },
+      potassium_hydroxide_feedstock_tpd:    { qtyKey: 'koh_makeup_t_day',         label: 'KOH feedstock (make-up)', unit: 't/day', tolerancePct: 5, kind: 'floor' },
+      koh_feedstock_tpd:                    { qtyKey: 'koh_makeup_t_day',         label: 'KOH feedstock (make-up)', unit: 't/day', tolerancePct: 5, kind: 'floor' },
     }
     // FIX 1 (2026-06-06): brief metrics that are DESIGN TARGETS requiring a
     // downstream verification this engine cannot perform at concept stage. They
@@ -7358,7 +7403,16 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
     // gypsum_feed_t_per_day inferred). Stays 'unknown' (grounded correction), so it
     // never inflates the verified-PASS tally — it just shows the explanatory row +
     // the real ~3.91 t/day stoichiometric figure instead of a bare "—" this run.
-    const gypsumBriefMetric = briefMetrics.find((m) => _metricRateBase(String(m?.key_metric ?? '')) === 'gypsum_feed')
+    // 2026-06-10 (item 5): the live brief states this as gypsum_FEEDSTOCK_tpd
+    // (base "gypsum_feedstock"), but the rate-base of the earlier _feed_ variant
+    // is "gypsum_feed" — so the grounded-correction row never fired and the
+    // constraint fell to the universal pass as a dead "Not computed / —". Match
+    // BOTH bases so the row renders its real ~3.91 t/day stoichiometric figure
+    // + the grounded-correction note regardless of which the brief parser emits.
+    const gypsumBriefMetric = briefMetrics.find((m) => {
+      const base = _metricRateBase(String(m?.key_metric ?? ''))
+      return base === 'gypsum_feed' || base === 'gypsum_feedstock'
+    })
     const gypsumBriefKey = gypsumBriefMetric ? String(gypsumBriefMetric.key_metric ?? '') : ''
     if (gypsumBriefKey && !_renderedMetricKeys.has(gypsumBriefKey)) {
       const gypsumBriefVal = typeof gypsumBriefMetric?.value === 'number' && Number.isFinite(gypsumBriefMetric.value) ? gypsumBriefMetric.value : null
@@ -8554,46 +8608,12 @@ function SystemOverviewPage({ state, project }: { state: any; project: string })
     purpose: moduleSummarySentences(m, 1) || `The ${humanise(m.module).toLowerCase()} block of the ${classLabel}.`,
   }))
 
-  // ─── BLOCK 4: THE NUMBERS BEHIND IT ────────────────────────────────────
-  // 2026-06-04 (System-Overview merge): the system-level physics cards (the
-  // former standalone "How the design was computed — the physics" page, which
-  // rendered half-empty) now fold IN here as a sub-block of one coherent
-  // section. WHAT/HOW above is the LLM-written narrative; the numbers below are
-  // DETERMINISTIC — templated straight from computed contract quantities, no
-  // language model — so the credibility note is distinct and stays. The cards
-  // are pruned to the cross-cutting whole-plant tools (the complement of the
-  // per-module routing); each module-owned tool's worked maths sits WITH its
-  // module. CoolProp (a coolant-property look-up, not a headline result) is
-  // dropped via the denylist in generatePhysicsNarrative.
-  const quantities: Record<string, any> =
-    (state?.orchestratorContract as any)?.quantities
-    ?? (state?.engineeringContract as any)?.quantities
-    ?? {}
-  const systemIds = systemLevelToolIds(state)
-  // FIX 5: for a process plant, drop "numbers behind it" sentences that quote the
-  // 3 generic tools' non-calibrated figures (MTBF 0.21 yr, cyber score 25, £0
-  // cert) — the tool wrappers mark these not_estimated_for_class; the renderer is
-  // the reader-facing surface that honours that for the prose narrative too.
-  const numbersNarrative = filterNotEstimatedNarrative(generatePhysicsNarrative(quantities, productClass, systemIds), productClass)
-  // Net-CO2 reconciliation: the single highest-value number for a carbon-
-  // capture buyer (captured vs emitted → net, plus embodied payback). Null for
-  // every non-carbon-capture class, so the card renders only where it applies.
-  const netCo2 = computeNetCo2Reconciliation(state)
-  // Resolve the system-level tool_ids to display names for the cited-tools
-  // footer (same logic the old page used), so the line lists only system tools.
-  const numbersToolsPage = readToolsUsedPage(state)
-  const systemToolNames = new Set<string>()
-  if (numbersToolsPage && Array.isArray(numbersToolsPage.tools)) {
-    for (const t of numbersToolsPage.tools as any[]) {
-      if (systemIds.has(t?.tool_id)) systemToolNames.add(normalise_unicode(String(t?.tool_name || t?.tool_id)))
-    }
-  }
-  const citedNumbersTools = numbersNarrative
-    ? (systemToolNames.size > 0
-        ? numbersNarrative.tools_cited.filter((n) => systemToolNames.has(normalise_unicode(String(n))))
-        : numbersNarrative.tools_cited)
-    : []
-  const hasNumbersBlock = !!(netCo2 || (numbersNarrative && numbersNarrative.sentences.length > 0))
+  // ─── BLOCK 4 "THE NUMBERS BEHIND IT" REMOVED 2026-06-10 (Tristan) ──────────
+  // The deterministic two-tool numbers snippet + its data prep (physics
+  // narrative, net-CO2 card, cited-tools footer) were removed here. The full
+  // per-tool engineering ledger (Part 1 · Engineering — computed tool by tool)
+  // supersedes it; the net-CO2 reconciliation also renders on the Engineering
+  // Basis economics card, so no figure is lost. See the removed JSX below.
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
@@ -8668,125 +8688,13 @@ function SystemOverviewPage({ state, project }: { state: any; project: string })
         ))}
       </View>
 
-      {/* BLOCK 4 — THE NUMBERS BEHIND IT (merged 2026-06-04 from the former
-          standalone Physics Narrative page). DETERMINISTIC: templated from
-          computed contract quantities, no LLM — hence the distinct credibility
-          note below, which must stay separate from the WHAT/HOW narrative. */}
-      {hasNumbersBlock ? (
-        <View style={{ marginTop: 16 }}>
-          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 6 }}>
-            The numbers behind it
-          </Text>
-          <Text style={{ fontSize: 9, color: MUTED, marginBottom: 12, lineHeight: 1.5, fontStyle: 'italic' }}>
-            Every figure below is templated directly from computed contract
-            quantities; any figure whose source quantities were absent has been
-            omitted. No language model was involved in generating this block.
-          </Text>
-
-          {/* NET CARBON card — the headline reconciliation for a carbon-capture
-              buyer. Deterministic; sits under the credibility note. */}
-          {netCo2 ? (() => {
-            const capturedStr = Math.round(netCo2.captured_t_yr).toLocaleString('en-GB')
-            const emittedStr = Math.round(netCo2.emitted_t_yr).toLocaleString('en-GB')
-            const netRounded = Math.round(netCo2.net_t_yr)
-            const netStr = `${netRounded >= 0 ? '+' : ''}${netRounded.toLocaleString('en-GB')}`
-            const isNegativeFootprint = netCo2.net_t_yr > 0
-            const cardBg = isNegativeFootprint ? '#eef7f0' : '#fdf2ec'
-            const cardLine = isNegativeFootprint ? '#2f855a' : '#c2410c'
-            const embodiedStr = netCo2.embodied_t > 0
-              ? netCo2.embodied_t.toLocaleString('en-GB', { maximumFractionDigits: 1 })
-              : null
-            // Payback: months when < 1 year (the expected ~2.3 months here), else years.
-            let paybackStr = ''
-            if (Number.isFinite(netCo2.payback_years) && netCo2.payback_years > 0) {
-              paybackStr = netCo2.payback_years < 1
-                ? `${(netCo2.payback_years * 12).toLocaleString('en-GB', { maximumFractionDigits: 1 })} months`
-                : `${netCo2.payback_years.toLocaleString('en-GB', { maximumFractionDigits: 1 })} years`
-            }
-            const captureBasis = netCo2.capture_t_day.toLocaleString('en-GB', { maximumFractionDigits: 2 })
-            return (
-              <View
-                style={{
-                  padding: 14,
-                  backgroundColor: cardBg,
-                  borderLeftWidth: 3,
-                  borderLeftColor: cardLine,
-                  borderRadius: 4,
-                  marginBottom: 12,
-                }}
-                wrap={false}
-              >
-                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_SOFT, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                  Net carbon
-                </Text>
-                <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.6, marginBottom: 6 }}>
-                  {`Captures ${capturedStr} t CO2/yr, plant footprint ${emittedStr} t CO2/yr `}
-                  <Text style={{ color: cardLine }}>{`-> NET ${netStr} t CO2/yr`}</Text>
-                  {isNegativeFootprint ? ' (net carbon-negative).' : ' (net positive — review footprint).'}
-                </Text>
-                {embodiedStr && paybackStr ? (
-                  <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, marginBottom: 6 }}>
-                    {`Embodied CO2 (${embodiedStr} t) repaid in ~${paybackStr} at the net rate.`}
-                  </Text>
-                ) : null}
-                <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45, fontStyle: 'italic' }}>
-                  {`Capture basis: ${captureBasis} t CO2/day`}
-                  {netCo2.derived_from_brief ? " (from the brief's stated capture rate)" : ' (computed)'}
-                  {` × ${netCo2.operating_days} operating days/yr (≈ 90% availability for a continuously-operated pilot plant, allowing maintenance and turnaround). Plant footprint and embodied CO2 from lifecycle-co2:assessment.`}
-                </Text>
-              </View>
-            )
-          })() : null}
-
-          {/* System-level physics cards — the former Physics Narrative content,
-              grouped by tool. CoolProp excluded (property look-up). */}
-          {numbersNarrative && numbersNarrative.groups && numbersNarrative.groups.length > 0
-            ? numbersNarrative.groups.map((group, gi) => (
-                <View
-                  key={`numbers-grp-${gi}`}
-                  style={{
-                    padding: 12,
-                    backgroundColor: '#f0f4f8',
-                    borderLeftWidth: 3,
-                    borderLeftColor: ACCENT,
-                    borderRadius: 4,
-                    marginBottom: gi < numbersNarrative.groups.length - 1 ? 8 : 10,
-                  }}
-                  wrap={false}
-                >
-                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_SOFT, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                    {group.label}
-                  </Text>
-                  {group.sentences.map((sentence, si) => (
-                    <Text
-                      key={`numbers-grp-${gi}-${si}`}
-                      style={{ fontSize: 10, color: INK, lineHeight: 1.65, marginBottom: si < group.sentences.length - 1 ? 5 : 0 }}
-                    >
-                      {normalise_unicode(sentence)}
-                    </Text>
-                  ))}
-                </View>
-              ))
-            : null}
-
-          {citedNumbersTools.length > 0 ? (
-            <View style={{ padding: 10, backgroundColor: '#ffffff', borderTopWidth: 0.5, borderTopColor: RULE_SOFT }}>
-              <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45 }}>
-                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>
-                  {'System-level tools cited in this block: '}
-                </Text>
-                {normalise_unicode(citedNumbersTools.join('   ·   '))}
-              </Text>
-              <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic', lineHeight: 1.4 }}>
-                Each tool&apos;s version, licence and source are listed in the
-                one-line-per-tool Tools-Used index at the end of this report; the
-                worked calculations for module-specific tools are shown with their
-                module.
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
+      {/* BLOCK 4 "THE NUMBERS BEHIND IT" REMOVED 2026-06-10 (Tristan): "these
+          feel weird that they're just being added here … remove it completely —
+          there's a lot more going on than just those numbers." The full per-tool
+          engineering ledger (Part 1 · Engineering — computed tool by tool, §1…§N,
+          every quantity + worked maths) supersedes this two-tool snippet. The
+          net-CO2 reconciliation it carried also lives on the Engineering Basis
+          "headline economics" card, so no number is lost. */}
 
       <PageFooter />
     </Page>
@@ -14121,17 +14029,15 @@ function EngineeringToolsFlowPage({
 // plant was computed" DIAGRAM page (above) stays as the high-level map.
 
 
-// ─── U11 · Deterministic Physics Narrative — MERGED 2026-06-04 ──────────────
+// ─── U11 · Deterministic Physics Narrative — REMOVED 2026-06-10 ─────────────
 //
-// The former standalone PhysicsNarrativePage ("How the design was computed —
-// the physics", Section 1d) rendered HALF-EMPTY for tool-light system-level
-// sets and duplicated the System Overview as a second Section-1d block. It was
-// folded into SystemOverviewPage as the "The numbers behind it" sub-block (one
-// coherent section): the same deterministic system-level physics cards from
-// generatePhysicsNarrative() (CoolProp property-look-up now excluded) plus a
-// new net-CO2 reconciliation card, both under their own credibility note. See
-// SystemOverviewPage BLOCK 4. The standalone page + its render-tree call were
-// removed in the same change; no other consumer existed.
+// History: the standalone PhysicsNarrativePage ("How the design was computed —
+// the physics") was folded into SystemOverviewPage as the "The numbers behind
+// it" sub-block (2026-06-04). That whole sub-block was then REMOVED 2026-06-10
+// (item 4, Tristan: "remove it completely — there's a lot more going on than
+// just those numbers") — superseded by the full per-tool engineering ledger
+// (Part 1 · Engineering — computed tool by tool). The generatePhysicsNarrative
+// import + the filterNotEstimatedNarrative helper were removed with it.
 
 // ─── Build #19e (2026-05-22) · Tools-Used end-page ─────────────────────────
 //
@@ -15609,17 +15515,21 @@ function EngineeringConsolidatedToolPage({ state, project }: { state: any; proje
           </View>,
         )
       }
-      // Inputs / Outputs §-ref lines (single source of truth: the ledger).
+      // Inputs / Outputs lines (single source of truth: the ledger). VALUE-LEVEL
+      // (item 2, 2026-06-10): name the SPECIFIC quantity per destination/source
+      // where the per-quantity link resolved ("reboiler duty -> §5; reboiler hx
+      // ua -> §20"), falling back to the tool-level §-ref for any link that did
+      // not resolve. ASCII arrows ("<-"/"->") — Helvetica has no arrow glyph.
       if (e.led) {
         rows.push(
           <View style={{ paddingTop: 1, paddingBottom: 3, paddingHorizontal: PADX }}>
             <Text style={{ fontSize: 8.5, color: '#28313f', lineHeight: 1.45 }}>
               <Text style={{ fontFamily: 'Helvetica-Bold', color: MUTED }}>Inputs {'<- '}</Text>
-              {asciiSafe(ledgerFormatInputs(e.led))}
+              {asciiSafe(ledgerFormatInputsDetailed(e.led))}
             </Text>
             <Text style={{ fontSize: 8.5, color: '#28313f', lineHeight: 1.45, marginTop: 1 }}>
               <Text style={{ fontFamily: 'Helvetica-Bold', color: MUTED }}>Outputs {'-> '}</Text>
-              {asciiSafe(ledgerFormatOutputs(e.led))}
+              {asciiSafe(ledgerFormatOutputsDetailed(e.led))}
             </Text>
           </View>,
         )
@@ -15831,6 +15741,28 @@ function Co2ProcessFlowDiagram({ q }: { q: Record<string, any> }) {
     const gypL = `gypsum ${f(num('gypsum_feed_t_per_day', 3.9))} t/d`
     const kohL = `KOH ${f(num('koh_feed_t_per_day', 2.54))} t/d`
     const co2L = `CO2 ${f(num('co2_capture_rate_kg_per_hour', 42) * 24 / 1000)} t/d`
+    // §-computed equipment + stream labels (item 6, 2026-06-10) — every value
+    // below is read straight from a contract quantity (the SAME system-scope keys
+    // the Engineering Basis mass & energy balance table uses, so the diagram and
+    // the table agree — no cross-page numeric conflict, gate-18). A missing
+    // quantity collapses to '' via valOrEmpty and the box simply omits that line
+    // (never a fabricated number). The §-numbers themselves live in the per-tool
+    // blocks; here the figures tie each box to its computed quantity.
+    const valOrEmpty = (k: string, unit: string, dp = 0): string => {
+      const o = q?.[k]; const v = (o && typeof o === 'object') ? o.value : o
+      const n = Number(v)
+      if (!Number.isFinite(n)) return ''
+      const r = dp > 0 ? Math.round(n * 10 ** dp) / 10 ** dp : Math.round(n)
+      return `${r} ${unit}`.trim()
+    }
+    const stripH = valOrEmpty('stripper_packed_height_m', 'm', 1)        // ~1.7 m
+    const cxDuty = valOrEmpty('cross_exchanger_duty_kw', 'kW')           // ~186 kW
+    const conDuty = valOrEmpty('condenser_duty_kw', 'kW')                // ~156 kW
+    const rebDuty = valOrEmpty('reboiler_duty_kw', 'kW')                 // ~91 kW
+    const caDryDuty = valOrEmpty('caco3_dryer_duty_kw', 'kW')           // ~17.8 kW
+    const kCrystA = valOrEmpty('k2so4_crystalliser_area_m2', 'm2', 1)   // ~13.1 m2
+    const flueFlow = valOrEmpty('flue_gas_flow_m3_per_hour', 'm3/h')    // ~225 m3/h
+    const meaCirc = valOrEmpty('mea_circulation_m3_per_hour', 'm3/h', 2) // ~0.68 m3/h
 
     const GREY = '#9aa3ad', ORANGE = '#e2562a', BLUE = '#1e3a5f', GREEN = '#1f6f54', INKC = '#0d1117', STR = '#6b7280'
     const els: any[] = []
@@ -15865,25 +15797,31 @@ function Co2ProcessFlowDiagram({ q }: { q: Record<string, any> }) {
     const hd = (x: number, y: number, t: string) =>
       els.push(<Text key={K()} x={x} y={y} fill={STR} style={{ fontFamily: 'Helvetica-Bold', fontSize: 8 }}>{t}</Text>)
 
+    // Build a box line list, dropping any empty value line so a missing quantity
+    // never prints a blank/zero (item 6). The label line always shows.
+    type BL = { t: string; val?: boolean; sm?: boolean }
+    const withVal = (head: BL[], value: string): BL[] =>
+      value ? [...head, { t: value, val: true, sm: true }] : head
+
     // ── Train 1: capture & solvent regeneration ──
     hd(8, 18, 'CAPTURE & SOLVENT REGENERATION')
-    stream(8, 96, 'flue gas'); harrow(8, 150, 100)
-    box(150, 70, 104, 60, [{ t: 'Absorber' }, { t: absH, val: true }])
+    stream(8, 90, 'flue gas'); if (flueFlow) stream(8, 100, flueFlow, false); harrow(8, 150, 104)
+    box(150, 70, 104, 64, [{ t: 'Absorber' }, { t: absH, val: true }])
     stream(206, 46, 'treated gas'); varrow(202, 70, 46)
-    harrow(254, 300, 100)
-    box(300, 70, 98, 60, [{ t: 'Lean / rich' }, { t: 'exchanger' }])
-    harrow(398, 424, 100)
-    box(424, 70, 84, 60, [{ t: 'Stripper' }])
-    harrow(508, 534, 100)
-    box(534, 70, 96, 60, [{ t: 'Overhead' }, { t: 'condenser' }])
-    box(424, 160, 84, 36, [{ t: 'Reboiler', sm: true }])
-    varrow(466, 160, 130)
+    harrow(254, 300, 104)
+    box(300, 66, 98, 64, withVal([{ t: 'Lean / rich' }, { t: 'exchanger' }], cxDuty))
+    harrow(398, 424, 104)
+    box(424, 66, 84, 64, withVal([{ t: 'Stripper' }], stripH))
+    harrow(508, 534, 104)
+    box(534, 66, 96, 64, withVal([{ t: 'Overhead' }, { t: 'condenser' }], conDuty))
+    box(424, 158, 84, 40, withVal([{ t: 'Reboiler', sm: true }], rebDuty))
+    varrow(466, 158, 134)
     box(300, 160, 98, 36, [{ t: 'Lean cooler', sm: true }])
-    dpath('M424,112 L410,112 L410,178 L398,178', 398, 178, 'L', ORANGE, true)
+    dpath('M424,114 L410,114 L410,178 L398,178', 398, 178, 'L', ORANGE, true)
     dpath('M300,178 L60,178 L60,52 L180,52 L180,70', 180, 70, 'D', ORANGE, true)
-    stream(104, 170, 'lean amine recycle', true)
-    stream(440, 234, co2L)
-    dpath('M582,130 L582,240 L210,240 L210,300', 210, 300, 'D', GREY)
+    stream(96, 168, 'lean amine recycle', true); if (meaCirc) stream(96, 177, meaCirc, true)
+    stream(440, 240, co2L)
+    dpath('M582,130 L582,246 L210,246 L210,300', 210, 300, 'D', GREY)
     // ── Train 2: mineralisation & product recovery ──
     hd(8, 288, 'MINERALISATION & PRODUCT RECOVERY')
     box(150, 300, 120, 80, [{ t: 'Gypsum' }, { t: 'carbonation' }, { t: rV, val: true }])
@@ -15891,10 +15829,10 @@ function Co2ProcessFlowDiagram({ q }: { q: Record<string, any> }) {
     stream(274, 332, 'slurry'); harrow(270, 300, 340)
     box(300, 310, 80, 60, [{ t: 'Belt filter' }])
     stream(384, 312, 'cake'); ln(380, 322, 412, 307); head(412, 307, 'R')
-    box(412, 284, 92, 46, [{ t: 'CaCO3 dryer' }])
+    box(412, 282, 92, 48, withVal([{ t: 'CaCO3 dryer' }], caDryDuty))
     stream(384, 374, 'filtrate'); ln(380, 358, 412, 369); head(412, 369, 'R')
-    box(412, 346, 92, 46, [{ t: 'K2SO4' }, { t: 'crystalliser' }])
-    harrow(504, 640, 307)
+    box(412, 344, 92, 50, withVal([{ t: 'K2SO4' }, { t: 'crystalliser' }], kCrystA))
+    harrow(504, 640, 306)
     box(640, 284, 118, 46, [{ t: 'CaCO3' }, { t: caco3, val: true }], true)
     harrow(504, 524, 369)
     box(524, 346, 84, 46, [{ t: 'K2SO4 dryer' }])
@@ -15958,8 +15896,7 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
     if (modules.length === 0 && Object.keys(quantities).length === 0) return null
 
     // ── Block 1 data: input + product boundary boxes ────────────────────────
-    const pb = state?.parsedBrief ?? {}
-    const briefSummary: string = String(oc.brief_summary ?? pb.product_description ?? '')
+    // (briefSummary digest removed 2026-06-10, item 7a — see the trimmed intro.)
     // ASCII subscripts throughout (CO2 not CO₂): the bundled Helvetica has no
     // glyph for U+2082 etc. and renders a comma-like artefact — normalise_unicode
     // strips them, but writing ASCII here keeps the source self-consistent.
@@ -16107,11 +16044,18 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
         <Text style={{ fontSize: 21, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
           The whole plant, at a glance
         </Text>
+        {/* Intro trimmed 2026-06-10 (item 7a): the page previously re-stated the
+            brief_summary plant-description digest here, which (a) duplicated the
+            System Overview "What it does / How it works" (the plain-English home
+            for what the plant IS) and (b) duplicated the figures it quoted (the
+            reboiler / cross-exchanger / condenser duties + absorber height already
+            render in Block 2's mass & energy balance table below). The intro is
+            now a single navigational lead-in; the plant identity stays in System
+            Overview, the numbers in the balance table — each idea has one home. */}
         <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 16, lineHeight: 1.5 }}>
-          {briefSummary
-            ? normalise_unicode(briefSummary.replace(/\s+/g, ' ').trim()).slice(0, 317).replace(/\s+\S*$/, '') + '...'
-            : 'A consolidated view of the engineering: how the plant flows, what it moves and the energy it uses, and whether it stands up.'}
-          {' '}The flow, balance and verdict below are pulled to the front so feasibility can be judged before the per-module detail.
+          The process flow, the mass and energy balance, and the feasibility verdict are pulled
+          to the front here so the plant can be judged on the engineering before the per-module
+          detail. System Overview (above) covers what the plant is and how it works.
         </Text>
 
         {/* ── BLOCK 1 · PROCESS FLOW ─────────────────────────────────────── */}
@@ -16294,6 +16238,142 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
   }
 }
 
+// ─── PART 1 · Cost Summary panel (RESTORED 2026-06-10, item 9) ───────────────
+// A standalone, at-a-glance economics panel for Part 1: the headline capital
+// cost (ex-works / OEM transfer price), the installed all-in price, the levelised
+// capital cost per unit of output, and a simple breakdown of the top cost
+// contributors (the modules carrying the most spend). The earlier dossier
+// (out/co2-control-v2) had a proper Cost Summary; only a 4-tile cover snippet
+// survived. This restores the panel. DETERMINISTIC — every figure is read from
+// state (costStack / costSanity / bomTotals); a missing source omits that line
+// rather than fabricating. Block-level try/catch -> null so it never breaks the
+// PDF. ASCII-safe text; £ is WinAnsi.
+function CostSummaryPanel({ state, project, bomTotals, costStack }: { state: any; project: string; bomTotals: BomTotals | null; costStack?: CostStack | null }) {
+  try {
+    const cs: any = state?.costSanity ?? {}
+    const cr: any = state?.cost_reality ?? {}
+    // Headline figures, all optional.
+    const exWorks = (costStack && typeof costStack.oem_transfer_price_gbp === 'number' && costStack.oem_transfer_price_gbp > 0)
+      ? costStack.oem_transfer_price_gbp
+      : (typeof cr.bom_total_gbp === 'number' && cr.bom_total_gbp > 0 ? cr.bom_total_gbp : (bomTotals?.grandTotal_gbp ?? null))
+    const rawBom = (costStack && typeof costStack.raw_materials_bom_gbp === 'number' && costStack.raw_materials_bom_gbp > 0)
+      ? costStack.raw_materials_bom_gbp
+      : (bomTotals?.grandTotal_gbp ?? null)
+    const installed = (costStack && typeof costStack.installed_asp_gbp === 'number' && costStack.installed_asp_gbp > 0)
+      ? costStack.installed_asp_gbp : null
+    const levVal = (typeof cs?.cost_per_output_unit === 'number' && isFinite(cs.cost_per_output_unit) && cs.cost_per_output_unit > 0)
+      ? cs.cost_per_output_unit : null
+    const levUnit = normalise_unicode(String(cs?.band?.per_unit_label ?? '')).trim()
+    const levStr = levVal != null
+      ? (levUnit ? `${Math.round(levVal).toLocaleString('en-GB')} ${levUnit}` : `£${Math.round(levVal).toLocaleString('en-GB')}${cs?.output_unit_label ? '/' + normalise_unicode(String(cs.output_unit_label)).trim() : ''}`)
+      : null
+
+    // Nothing to show → render nothing (graceful).
+    if (exWorks == null && rawBom == null && installed == null && levStr == null) return null
+
+    const fmtGbp = (n: number): string => {
+      if (n >= 1e6) return `£${(n / 1e6).toLocaleString('en-GB', { maximumFractionDigits: 2 })}M`
+      if (n >= 1e3) return `£${Math.round(n / 1e3).toLocaleString('en-GB')}k`
+      return `£${Math.round(n).toLocaleString('en-GB')}`
+    }
+
+    // Tiles: ex-works (headline), installed ASP, levelised cost. Each omitted if absent.
+    const tiles: Array<{ label: string; value: string; sub?: string; accent?: boolean }> = []
+    if (exWorks != null) tiles.push({ label: 'Ex-works (CAPEX)', value: fmtGbp(exWorks), sub: 'OEM transfer price', accent: true })
+    if (installed != null) tiles.push({ label: 'Installed (all-in)', value: fmtGbp(installed), sub: 'incl. channel + install' })
+    if (levStr != null) tiles.push({ label: 'Levelised capital cost', value: levStr, sub: 'per unit of output' })
+
+    // Top cost contributors — modules by sub-total (capital only). Top 6.
+    const mods: BomMod[] = Array.isArray(bomTotals?.allMods) ? bomTotals!.allMods : []
+    const contributors = mods
+      .filter((m) => typeof m?.subtotal_gbp === 'number' && m.subtotal_gbp > 0)
+      .map((m) => ({ label: String(m.display_name || m.label || m.module || 'Module'), gbp: m.subtotal_gbp }))
+      .sort((a, b) => b.gbp - a.gbp)
+      .slice(0, 6)
+    const contribTotal = contributors.reduce((acc, c) => acc + c.gbp, 0)
+    const grand = bomTotals?.grandTotal_gbp ?? contribTotal
+
+    return (
+      <Page size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Part 1 · Cost Summary" project={project} />
+        <PageFooter />
+        <Text style={{ fontSize: 9, color: ACCENT, letterSpacing: 1.5, fontFamily: 'Helvetica-Bold', marginBottom: 3 }}>
+          COST SUMMARY
+        </Text>
+        <Text style={{ fontSize: 21, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+          What it costs, at a glance
+        </Text>
+        <Text style={{ fontSize: 9.5, color: MUTED, marginBottom: 14, lineHeight: 1.5 }}>
+          The headline economics: the capital cost ex-works, the installed all-in price, and the
+          levelised capital cost per unit of output. The full cost methodology, per-line bill of
+          materials and economic scenarios are in Part 3.
+        </Text>
+
+        {/* Headline tiles */}
+        {tiles.length > 0 ? (
+          <View style={{ flexDirection: 'row', marginBottom: 16 }}>
+            {tiles.map((t, i) => (
+              <View
+                key={`cost-tile-${i}`}
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  marginRight: i < tiles.length - 1 ? 8 : 0,
+                  backgroundColor: t.accent ? '#fdf2ec' : '#f7f8fa',
+                  borderRadius: 5,
+                  borderLeftWidth: 3,
+                  borderLeftColor: t.accent ? COMPUTE_AMBER : ACCENT_SOFT,
+                }}
+              >
+                <Text style={{ fontSize: 8, color: MUTED, letterSpacing: 0.5, marginBottom: 4, textTransform: 'uppercase' }}>{t.label}</Text>
+                <Text style={{ fontSize: 16, fontFamily: 'Helvetica-Bold', color: t.accent ? COMPUTE_AMBER_DEEP : INK }}>{normalise_unicode(t.value)}</Text>
+                {t.sub ? <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 2, fontStyle: 'italic' }}>{t.sub}</Text> : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Top cost contributors */}
+        {contributors.length > 0 ? (
+          <View style={{ borderWidth: 0.6, borderColor: RULE, borderRadius: 4 }}>
+            <View style={{ flexDirection: 'row', backgroundColor: '#f3f5f8', paddingVertical: 5, paddingHorizontal: 10, borderBottomWidth: 0.6, borderBottomColor: RULE }}>
+              <Text style={{ flex: 1, fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK }}>Top cost contributors (by module)</Text>
+              <Text style={{ width: 90, fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK, textAlign: 'right' }}>Sub-total</Text>
+              <Text style={{ width: 50, fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK, textAlign: 'right' }}>Share</Text>
+            </View>
+            {contributors.map((c, i) => {
+              const pct = grand > 0 ? (c.gbp / grand) * 100 : 0
+              return (
+                <View key={`contrib-${i}`} style={{ flexDirection: 'row', paddingVertical: 4, paddingHorizontal: 10, borderBottomWidth: i < contributors.length - 1 ? 0.4 : 0, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
+                  <Text style={{ flex: 1, fontSize: 9, color: INK }}>{normalise_unicode(c.label)}</Text>
+                  <Text style={{ width: 90, fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, textAlign: 'right' }}>{fmtGbp(c.gbp)}</Text>
+                  <Text style={{ width: 50, fontSize: 8.5, color: MUTED, textAlign: 'right' }}>{pct >= 0.5 ? `${pct.toFixed(0)}%` : '<1%'}</Text>
+                </View>
+              )
+            })}
+            {typeof grand === 'number' && grand > 0 ? (
+              <View style={{ flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 10, borderTopWidth: 0.8, borderTopColor: ACCENT_SOFT, alignItems: 'baseline' }} wrap={false}>
+                <Text style={{ flex: 1, fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT }}>Raw materials bill of materials (capital total)</Text>
+                <Text style={{ width: 90, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>{fmtGbp(grand)}</Text>
+                <Text style={{ width: 50 }} />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        <Text style={{ fontSize: 8, color: MUTED, marginTop: 10, lineHeight: 1.5, fontStyle: 'italic' }}>
+          The ex-works figure rolls the raw materials bill of materials up through assembly, factory
+          overhead and manufacturer margin (the full stack is in the Cost Basis section, Part 3).
+          Concept-stage estimate: confirm the big-ticket fabricated lines with vendor quotes before procurement.
+        </Text>
+      </Page>
+    )
+  } catch (err) {
+    console.error('[render-minimal-pdf] CostSummaryPanel render error (skipped):', err)
+    return null
+  }
+}
+
 function MinimalDocument({ state, subject, statePath }: { state: any; subject: string; statePath: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   // FREE-tier: pre-build the manufacturer -> "Company N" alias map + brand-mask
@@ -16390,6 +16470,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           'Engineering basis: process flow, mass and energy balance, feasibility verdict',
           'How the whole plant was computed: the tool dependency graph',
           'Engineering — computed tool by tool: why each tool was chosen, what it reads and feeds, and its worked maths',
+          'Cost summary: ex-works, installed and levelised cost, and the top cost contributors',
         ]}
         project={project}
       />
@@ -16473,6 +16554,12 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           immediately after the dependency diagram so the reader meets the map, then
           the per-tool detail. Renders null when no orchestrator tools ran. */}
       <EngineeringConsolidatedToolPage state={state} project={project} />
+      {/* Cost Summary panel (RESTORED 2026-06-10, item 9): a standalone Part-1
+          economics panel — ex-works/CAPEX, installed all-in, levelised cost per
+          output unit, and the top cost contributors. Closes Part 1 ("does it
+          work" → "what does it cost") before the build detail in Part 2. The
+          full cost methodology + per-module cost + master BoM live in Part 3. */}
+      <CostSummaryPanel state={state} project={project} bomTotals={bomTotals} costStack={costStack} />
       {/* Section 5 · Cost Summary (cost-by-module). Moved AHEAD of the Module
           Map in the 2026-06-05 navigability refactor so the front-to-back
           numbering stays monotonic: the reader meets the system architecture

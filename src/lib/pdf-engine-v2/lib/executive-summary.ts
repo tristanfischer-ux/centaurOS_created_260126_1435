@@ -32,6 +32,17 @@ export interface ExecSummaryInput {
   /** Ex-works cost + its per-output-unit rendering, e.g. 1_385_966 + "£516/kWh". */
   exWorksCostGbp: number | null
   costPerUnit: string | null
+  /** Levelised capital cost per output unit, pre-formatted with its unit label,
+   *  e.g. "£4,269/(t·yr CO2)" — distinct from costPerUnit (which is the raw
+   *  ex-works/output ratio). Sourced from the independent cost-sanity gate so the
+   *  exec summary headline cost AND the levelised cost both appear (item 8). null
+   *  when no levelised figure was computed (omitted gracefully). */
+  levelisedCost?: string | null
+  /** The single highest-severity OPEN engineering defect the design still carries
+   *  (e.g. "a reactor-envelope violation flagged high severity"), so the summary
+   *  is honest about feasibility rather than implying a clean pass. null when the
+   *  design has no open high-severity defect (item 8). */
+  openDefect?: string | null
   /** Auto-improve lever actions (the "to close the gaps" recommendations). */
   improvementActions: string[]
 }
@@ -131,7 +142,21 @@ export function buildExecutiveSummary(input: ExecSummaryInput): ExecSummary {
   }
   if (typeof input.exWorksCostGbp === 'number' && input.exWorksCostGbp > 0) {
     outcome += ` The fully-costed design reaches ${fmtGbpCompact(input.exWorksCostGbp)} ex-works`
-    outcome += input.costPerUnit ? ` (${input.costPerUnit}).` : '.'
+    outcome += input.costPerUnit ? ` (${input.costPerUnit})` : ''
+    // Levelised cost (item 8): surface it alongside the headline ex-works cost so
+    // the buyer sees both the capital figure AND the cost per unit of output. The
+    // figure is already formatted with its unit label by the caller.
+    const lev = String(input.levelisedCost ?? '').trim()
+    outcome += lev ? `, and a levelised capital cost of ${lev}.` : '.'
+  } else if (String(input.levelisedCost ?? '').trim()) {
+    outcome += ` The design's levelised capital cost is ${String(input.levelisedCost).trim()}.`
+  }
+  // Open engineering defect (item 8): be honest about an unresolved high-severity
+  // issue rather than implying a clean pass. Surfaced after the cost so the
+  // feasibility picture is complete (the verdict the next paragraph builds on).
+  const defect = String(input.openDefect ?? '').trim()
+  if (defect) {
+    outcome += ` One engineering issue remains open and must be resolved before detailed design: ${defect}.`
   }
   outcome = outcome.trim() || 'The design closes against the brief; see the Brief Compliance section for the per-constraint pass/fail.'
 

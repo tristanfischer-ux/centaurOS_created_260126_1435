@@ -819,6 +819,60 @@ function checkCo2FixInvariants(): Assertion[] {
     ))
   }
 
+  // ── (2d) UNIVERSAL.compliance_brief_input_constraints_echo_adopted (2026-06-10, item 5) ──
+  // A brief-INPUT constraint the design CARRIES (a feedstock rate, a solvent spec)
+  // must render its ADOPTED value (the contract quantity the design uses) with an
+  // honest status — NEVER a dead "Not computed at concept stage" / "—" unknown-
+  // blank row. The three CO₂-mineralisation cases Tristan flagged: MEA solvent
+  // concentration (the design adopts the briefed wt% exactly → PASS), KOH feedstock
+  // (the design's required make-up within tolerance → PASS), gypsum feedstock (the
+  // design needs MORE than the briefed inference → grounded-correction 'unknown'
+  // but with the REAL ~3.91 t/day achieved value shown, never blank). Drives the
+  // real _buildComplianceRows against a minimal synthetic CO₂ state.
+  {
+    const bad: string[] = []
+    const synthCo2: any = {
+      moduleDecomposition: { product_class: 'co2_mineralisation' },
+      parsedBrief: { product_class: 'co2_mineralisation', constraints: { target_performance: { metrics: [
+        { key_metric: 'mea_solvent_concentration_wt_percent', value: 30, unit: '%' },
+        { key_metric: 'potassium_hydroxide_feedstock_tpd', value: 2.6, unit: 't/day' },
+        { key_metric: 'gypsum_feedstock_tpd', value: 3.1, unit: 't/day' },
+      ] } } },
+      orchestratorContract: { quantities: {
+        mea_concentration_wt_pct: { value: 30, unit: '%' },
+        koh_makeup_t_day: { value: 2.55, unit: 't/day' },
+        gypsum_feed_t_day: { value: 3.91, unit: 't/day' },
+        // the gypsum grounded-correction needs the CaCO3 product present for its note.
+        caco3_output_t_per_day: { value: 2.3, unit: 't/day' },
+      } },
+    }
+    try {
+      const rows = _buildComplianceRows(synthCo2, null, null)
+      const byLabel = (needle: string) => rows.find((r) => r.constraint.toLowerCase().includes(needle))
+      const isBlank = (a: string) => { const t = String(a ?? '').trim(); return !t || t === '-' || t === '—' || /^(n\/?a|tbd|tbc|none)$/i.test(t) }
+      const mea = byLabel('mea solvent concentration')
+      const koh = byLabel('koh feedstock')
+      const gyp = byLabel('gypsum feed')
+      if (!mea) bad.push('MEA solvent concentration row missing (must render, not drop)')
+      else if (mea.status !== 'pass') bad.push(`MEA concentration status='${mea.status}' want 'pass' (design adopts 30% exactly)`)
+      else if (!/30/.test(mea.designAchieved)) bad.push(`MEA achieved='${mea.designAchieved}' want '30 %'`)
+      if (!koh) bad.push('KOH feedstock row missing')
+      else if (koh.status !== 'pass') bad.push(`KOH feedstock status='${koh.status}' want 'pass' (2.55 within 5% of 2.6)`)
+      else if (isBlank(koh.designAchieved)) bad.push(`KOH achieved blank ('${koh.designAchieved}') — must echo the adopted ~2.55 t/day`)
+      if (!gyp) bad.push('Gypsum feed row missing')
+      else if (isBlank(gyp.designAchieved)) bad.push(`Gypsum achieved blank ('${gyp.designAchieved}') — must show the real ~3.91 t/day, not "—"`)
+      else if (!/3\.91|3\.9/.test(gyp.designAchieved)) bad.push(`Gypsum achieved='${gyp.designAchieved}' want the stoichiometric ~3.91 t/day`)
+    } catch (err) {
+      bad.push(`_buildComplianceRows(co2 brief-inputs) threw: ${String(err).slice(0, 120)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.compliance_brief_input_constraints_echo_adopted',
+      'a brief-input constraint the design carries (MEA wt%, KOH feedstock, gypsum feedstock) renders its adopted/achieved value with an honest status — never a dead "Not computed / —" row',
+      bad.length, (n) => n === 0,
+      () => `brief-input compliance rows wrong: ${bad.join(' ; ')}. Check render-minimal-pdf.tsx _buildComplianceRows METRIC_MAP (mea_solvent_concentration_wt_percent / potassium_hydroxide_feedstock_tpd) + the gypsum grounded-correction base-match.`,
+    ))
+  }
+
   // ── (2b) RANGE-aware compliance: an in-band design setpoint PASSes (2026-06-06) ──
   // The brief states synthesis conditions as RANGES (200-350 °C, 20-30 bar); the
   // parser collapses each to its max. With the raw brief text present, an in-band

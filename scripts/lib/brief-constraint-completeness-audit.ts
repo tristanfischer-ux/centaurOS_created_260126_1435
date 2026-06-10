@@ -170,6 +170,15 @@ const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   // I12b keyset-sync invariant. (All OTHER e_fuel metrics go through the synonym
   // map, which is NOT subject to I12b.)
   saf_production_kg_per_hr: { qtyKey: 'saf_output_kg_h', label: 'SAF production (hourly)' },
+  // CO₂-mineralisation BRIEF-INPUT specs the design adopts (2026-06-10, item 5).
+  // These brief INPUTS (a solvent spec + a feedstock rate) were falling to a dead
+  // "Not computed / —" because METRIC_MAP didn't know them; the renderer now maps
+  // them to the contract quantity the design ACTUALLY adopts. Mirrored here per
+  // the I12b keyset-sync invariant so gate-17 agrees the rows are covered.
+  mea_solvent_concentration_wt_percent: { qtyKey: 'mea_concentration_wt_pct', label: 'MEA solvent concentration' },
+  mea_concentration_wt_percent: { qtyKey: 'mea_concentration_wt_pct', label: 'MEA solvent concentration' },
+  potassium_hydroxide_feedstock_tpd: { qtyKey: 'koh_makeup_t_day', label: 'KOH feedstock (make-up)' },
+  koh_feedstock_tpd: { qtyKey: 'koh_makeup_t_day', label: 'KOH feedstock (make-up)' },
 }
 
 // ── SEMANTIC-CONCEPT COVERAGE (mirror of render-minimal-pdf.tsx, 2026-06-05) ──

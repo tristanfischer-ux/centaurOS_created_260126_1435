@@ -64,6 +64,25 @@ export type ContractSink = 'Bill of Materials'
 export type InputRef = SectionRef | BriefRef
 export type OutputRef = SectionRef | ContractSink
 
+/** A specific output quantity of THIS tool resolved to the §-block that
+ *  consumes it. `quantity` is the humanised contract-field label (e.g. "reboiler
+ *  duty"); `to` is the destination §-ref. Populated only where a quantity↔consumer
+ *  link is confidently resolvable (this tool's output_field/field/manifest
+ *  output_keys share enough tokens with the downstream tool's manifest
+ *  input_keys); an unresolved downstream §-ref falls back to the tool-level
+ *  `outputsTo` entry and carries NO per-quantity edge (never fabricated). */
+export interface QuantityOutputEdge {
+  quantity: string
+  to: SectionRef
+}
+/** A specific input quantity THIS tool consumes resolved to the §-block that
+ *  produced it. `quantity` is the humanised input label; `from` is the source
+ *  §-ref. Same resolution discipline as QuantityOutputEdge. */
+export interface QuantityInputEdge {
+  quantity: string
+  from: SectionRef
+}
+
 export interface LedgerEntry {
   /** Stable §-number, assigned by execution order (1-based). */
   num: number
@@ -75,6 +94,14 @@ export interface LedgerEntry {
   inputsFrom: InputRef[]
   /** Downstream §-refs (edges where from==this); 'Bill of Materials' if none. */
   outputsTo: OutputRef[]
+  /** Per-quantity OUTPUT edges (item 2, 2026-06-10): which specific output
+   *  quantity of this tool feeds which downstream §. A subset of `outputsTo` —
+   *  only the §-destinations whose consumed quantity could be resolved appear
+   *  here; the rest stay tool-level in `outputsTo`. May be empty. */
+  outputEdges: QuantityOutputEdge[]
+  /** Per-quantity INPUT edges (item 2): which specific input quantity this tool
+   *  consumes from which upstream §. Subset of the §-refs in `inputsFrom`. */
+  inputEdges: QuantityInputEdge[]
   /** True when this tool lies on a directed cycle (a coupled fixed-point loop). */
   inCycle: boolean
 }
@@ -474,6 +501,156 @@ function buildSectionForQuantity(
 export const LEDGER_FUZZY_THRESHOLD = 0.5
 
 // ---------------------------------------------------------------------------
+// Per-quantity edge resolution (item 2, 2026-06-10).
+// ---------------------------------------------------------------------------
+//
+// For an edge from → to, decide WHICH specific output quantities of `from` the
+// downstream tool `to` consumes, so the dossier can read
+// "Outputs -> reboiler duty -> §5; reboiler hx ua -> §20" instead of the
+// tool-level "§5, §20". The link is detected by matching THIS tool's per-quantity
+// output tokens (the union of the contract `field` tokens + the tool's native
+// `output_field` tokens) against the DOWNSTREAM tool's manifest `input_keys`
+// tokens. Resolution is STRICT (mirrors briefInputsForTool): a link requires
+// ≥2 shared NON-GENERIC specific tokens with a single input key, OR full subset
+// coverage of a small non-generic token set — so a lone generic-token brush
+// (a "duty"/"power"/"mass" collision) never invents a value-level link. When a
+// downstream §-destination resolves NO specific quantity it is simply absent from
+// the per-quantity edge list and stays tool-level in `outputsTo` (the caller's
+// formatter falls back to the bare §-ref for it — never a fabricated link).
+
+/** A producible output quantity of a tool: its reader-facing humanised label
+ *  (from the contract `field`) plus the union of significant link-tokens drawn
+ *  from BOTH the contract `field` and the tool's native `output_field`. The
+ *  manifest output_keys augment a tool that emitted no claims. */
+interface ToolOutputQuantity {
+  /** Humanised contract field, e.g. "reboiler duty" (the reader-facing label). */
+  label: string
+  /** Union of significant tokens used to match against a consumer's input keys. */
+  tokens: Set<string>
+}
+
+/** Build, per tool_id, the list of its output quantities (label + match tokens).
+ *  Claims drive it (each claim.field is a contract quantity the tool produced);
+ *  the claim's native output_field tokens are unioned in so a tool whose contract
+ *  field renamed the native output (reboiler_duty_kw ← heat_transfer_kw) still
+ *  matches a downstream input named for the native concept. A tool with no claims
+ *  falls back to its manifest output_keys (label = humanised key). De-duplicated
+ *  by label, first-seen order preserved (stable). */
+function buildToolOutputQuantities(
+  page: any,
+  manifest: Record<string, ToolIO> | null,
+): Map<string, ToolOutputQuantity[]> {
+  const out = new Map<string, ToolOutputQuantity[]>()
+  const tools: any[] = Array.isArray(page?.tools) ? page.tools : []
+  for (const t of tools) {
+    const tid = String(t?.tool_id ?? '')
+    if (!tid) continue
+    const byLabel = new Map<string, ToolOutputQuantity>()
+    const claims: any[] = Array.isArray(t?.claims) ? t.claims : []
+    for (const c of claims) {
+      const field = String(c?.field ?? '')
+      if (!field) continue
+      const label = humaniseField(field)
+      if (!label) continue
+      const tokens = significantTokens(field)
+      for (const tk of significantTokens(String(c?.output_field ?? ''))) tokens.add(tk)
+      const existing = byLabel.get(label)
+      if (existing) { for (const tk of tokens) existing.tokens.add(tk) }
+      else byLabel.set(label, { label, tokens })
+    }
+    // No claims → manifest output_keys (label from the key itself).
+    if (byLabel.size === 0) {
+      for (const ok of (manifest?.[tid]?.output_keys ?? [])) {
+        const label = humaniseField(ok)
+        if (!label || byLabel.has(label)) continue
+        byLabel.set(label, { label, tokens: significantTokens(ok) })
+      }
+    }
+    out.set(tid, Array.from(byLabel.values()))
+  }
+  return out
+}
+
+/** True iff a producible quantity's tokens link to ONE of the consumer tool's
+ *  manifest input keys: ≥2 shared NON-GENERIC tokens with a single key, OR full
+ *  coverage of a small (≤2-token) non-generic input-key set. Mirrors the strict
+ *  brief-input bridge so a lone generic-token collision never claims a link. */
+function quantityLinksToConsumer(qtyTokens: Set<string>, consumerInputKeys: string[]): boolean {
+  if (qtyTokens.size === 0 || consumerInputKeys.length === 0) return false
+  const qSpecific = new Set([...qtyTokens].filter((t) => !_GENERIC_LINK_TOKENS.has(t)))
+  if (qSpecific.size === 0) return false
+  for (const ik of consumerInputKeys) {
+    const ikAll = significantTokens(ik)
+    const ikSpecific = new Set([...ikAll].filter((t) => !_GENERIC_LINK_TOKENS.has(t)))
+    if (ikSpecific.size === 0) continue
+    let shared = 0
+    for (const tk of qSpecific) if (ikSpecific.has(tk)) shared++
+    if (shared >= 2) return true
+    // Full subset coverage of a tiny key (e.g. a 1-2 specific-token input key
+    // entirely covered by the quantity) is also a confident link.
+    if (ikSpecific.size <= 2 && shared === ikSpecific.size) return true
+  }
+  return false
+}
+
+/** Resolve, for one tool, the per-quantity OUTPUT edges: for each downstream
+ *  §-consumer, which of this tool's output quantities that consumer reads. Each
+ *  (quantity, downstream §) pair that resolves becomes one edge. A downstream that
+ *  resolves nothing is omitted (stays tool-level). Quantities sorted by label,
+ *  downstreams by §, for deterministic output. */
+function resolveOutputEdges(
+  fromId: string,
+  downstreamIds: string[],
+  outputQtysByTool: Map<string, ToolOutputQuantity[]>,
+  manifest: Record<string, ToolIO> | null,
+  refOf: (id: string) => SectionRef,
+): QuantityOutputEdge[] {
+  const qtys = outputQtysByTool.get(fromId) ?? []
+  if (qtys.length === 0 || downstreamIds.length === 0) return []
+  const edges: QuantityOutputEdge[] = []
+  for (const toId of downstreamIds) {
+    const consumerInputs = manifest?.[toId]?.input_keys ?? []
+    if (consumerInputs.length === 0) continue
+    const ref = refOf(toId)
+    for (const q of qtys) {
+      if (quantityLinksToConsumer(q.tokens, consumerInputs)) {
+        edges.push({ quantity: q.label, to: ref })
+      }
+    }
+  }
+  // Stable order: by destination §, then quantity label.
+  edges.sort((a, b) => a.to.num - b.to.num || a.quantity.localeCompare(b.quantity))
+  return edges
+}
+
+/** Resolve, for one tool, the per-quantity INPUT edges: for each upstream
+ *  §-producer, which of THAT producer's output quantities this tool consumes
+ *  (i.e. the mirror of resolveOutputEdges from the consumer's side). */
+function resolveInputEdges(
+  toId: string,
+  upstreamIds: string[],
+  outputQtysByTool: Map<string, ToolOutputQuantity[]>,
+  manifest: Record<string, ToolIO> | null,
+  refOf: (id: string) => SectionRef,
+): QuantityInputEdge[] {
+  const myInputs = manifest?.[toId]?.input_keys ?? []
+  if (myInputs.length === 0 || upstreamIds.length === 0) return []
+  const edges: QuantityInputEdge[] = []
+  for (const fromId of upstreamIds) {
+    const producerQtys = outputQtysByTool.get(fromId) ?? []
+    if (producerQtys.length === 0) continue
+    const ref = refOf(fromId)
+    for (const q of producerQtys) {
+      if (quantityLinksToConsumer(q.tokens, myInputs)) {
+        edges.push({ quantity: q.label, from: ref })
+      }
+    }
+  }
+  edges.sort((a, b) => a.from.num - b.from.num || a.quantity.localeCompare(b.quantity))
+  return edges
+}
+
+// ---------------------------------------------------------------------------
 // Entry point.
 // ---------------------------------------------------------------------------
 
@@ -542,6 +719,10 @@ export function buildEngineeringLedger(state: any): EngineeringLedger {
       (k) => String(quantities[k]?.source ?? '') === 'brief',
     )
 
+    // Per-tool producible output quantities (label + match tokens) — built once,
+    // drives the per-quantity OUTPUT/INPUT edge resolution (item 2).
+    const outputQtysByTool = buildToolOutputQuantities(page, manifest)
+
     // Build each entry.
     const byToolId = new Map<string, LedgerEntry>()
     for (const id of order) {
@@ -556,12 +737,20 @@ export function buildEngineeringLedger(state: any): EngineeringLedger {
       const outputsTo: OutputRef[] =
         downstream.length > 0 ? downstream.map(refOf) : ['Bill of Materials']
 
+      // Per-quantity edges (item 2): name the specific quantity per destination /
+      // source where confidently resolvable; unresolved destinations stay
+      // tool-level in outputsTo/inputsFrom (the formatter falls back for them).
+      const outputEdges = resolveOutputEdges(id, downstream, outputQtysByTool, manifest, refOf)
+      const inputEdges = resolveInputEdges(id, upstream, outputQtysByTool, manifest, refOf)
+
       byToolId.set(id, {
         num,
         id,
         name: nameOf(id),
         inputsFrom,
         outputsTo,
+        outputEdges,
+        inputEdges,
         inCycle: inCycle.has(id),
       })
     }
@@ -637,4 +826,94 @@ export function formatProvenanceStrip(entry: LedgerEntry): string {
     outStr = (entry.outputsTo as SectionRef[]).map((r) => `§${r.num}`).join(', ')
   }
   return `Inputs <- ${inStr} · Outputs -> ${outStr}`
+}
+
+// ---------------------------------------------------------------------------
+// VALUE-LEVEL formatters (item 2, 2026-06-10) — name the SPECIFIC quantity that
+// flows to/from each §, falling back to the tool-level §-ref where a per-quantity
+// link could not be resolved (never fabricated). ASCII arrows ("->"/"<-").
+// ---------------------------------------------------------------------------
+
+/** The §-destination tool-ids of this tool that DID resolve at least one
+ *  per-quantity output edge (so the tool-level fallback can list only the rest). */
+function _resolvedOutputDestNums(entry: LedgerEntry): Set<number> {
+  const s = new Set<number>()
+  for (const e of entry.outputEdges) s.add(e.to.num)
+  return s
+}
+function _resolvedInputSrcNums(entry: LedgerEntry): Set<number> {
+  const s = new Set<number>()
+  for (const e of entry.inputEdges) s.add(e.from.num)
+  return s
+}
+
+/**
+ * Detailed OUTPUTS clause naming the specific quantity per destination:
+ *   "reboiler duty -> §5; reboiler hx ua -> §20; also feeds §7"
+ * Resolved per-quantity edges render value-level (grouped by quantity, so a
+ * quantity feeding two §s reads "x -> §5, §7"); any §-destination with NO
+ * resolved quantity is appended tool-level as "also feeds §a, §b". A terminal
+ * tool renders the Bill-of-Materials sink. Returns the plain tool-level
+ * `formatOutputs` string when there are no per-quantity edges at all (so the
+ * caller's behaviour is unchanged for tools whose links never resolve).
+ */
+export function formatOutputsDetailed(entry: LedgerEntry): string {
+  if (entry.outputsTo.length === 1 && entry.outputsTo[0] === 'Bill of Materials') {
+    return 'the engineering contract / Bill of Materials'
+  }
+  if (entry.outputEdges.length === 0) return formatOutputs(entry)
+  // Group resolved edges by quantity label (stable: edges already §-then-label
+  // sorted, so first appearance order of a label is deterministic).
+  const byQty = new Map<string, number[]>()
+  for (const e of entry.outputEdges) {
+    const arr = byQty.get(e.quantity) ?? []
+    if (!arr.includes(e.to.num)) arr.push(e.to.num)
+    byQty.set(e.quantity, arr)
+  }
+  const parts: string[] = []
+  for (const [qty, nums] of byQty) {
+    parts.push(`${qty} -> ${nums.map((n) => `§${n}`).join(', ')}`)
+  }
+  // Tool-level fallback for destinations no quantity resolved to.
+  const resolved = _resolvedOutputDestNums(entry)
+  const unresolved = (entry.outputsTo as SectionRef[])
+    .filter((r) => !resolved.has(r.num))
+    .map((r) => r.num)
+  if (unresolved.length) parts.push(`also feeds ${unresolved.map((n) => `§${n}`).join(', ')}`)
+  return parts.join('; ')
+}
+
+/**
+ * Detailed INPUTS clause naming the specific quantity per source:
+ *   "reboiler duty (from §1); also from §3; brief value capture capacity"
+ * Resolved per-quantity input edges render value-level (grouped by quantity);
+ * any upstream §-source with NO resolved quantity is appended tool-level; brief
+ * drivers follow. Returns the plain `formatInputs` string when there are no
+ * per-quantity input edges (caller behaviour unchanged for unresolved tools).
+ */
+export function formatInputsDetailed(entry: LedgerEntry): string {
+  const briefRefs = entry.inputsFrom.filter(isBriefRef) as BriefRef[]
+  const briefClause = briefRefs.length
+    ? `brief ${briefRefs.length === 1 ? 'value' : 'values'} ${briefRefs.map((b) => b.brief).join(', ')}`
+    : ''
+  if (entry.inputEdges.length === 0) {
+    // No resolved per-quantity input — defer entirely to the tool-level clause.
+    return formatInputs(entry)
+  }
+  const byQty = new Map<string, number[]>()
+  for (const e of entry.inputEdges) {
+    const arr = byQty.get(e.quantity) ?? []
+    if (!arr.includes(e.from.num)) arr.push(e.from.num)
+    byQty.set(e.quantity, arr)
+  }
+  const parts: string[] = []
+  for (const [qty, nums] of byQty) {
+    parts.push(`${qty} (from ${nums.map((n) => `§${n}`).join(', ')})`)
+  }
+  const resolved = _resolvedInputSrcNums(entry)
+  const secRefs = entry.inputsFrom.filter(isSectionRef) as SectionRef[]
+  const unresolved = secRefs.filter((r) => !resolved.has(r.num)).map((r) => r.num)
+  if (unresolved.length) parts.push(`also from ${unresolved.map((n) => `§${n}`).join(', ')}`)
+  if (briefClause) parts.push(briefClause)
+  return parts.join('; ')
 }

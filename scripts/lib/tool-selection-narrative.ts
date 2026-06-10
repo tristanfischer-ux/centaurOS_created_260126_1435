@@ -137,17 +137,38 @@ function humaniseField(field: string): string {
   return toks.join(' ').trim()
 }
 
-/** Join a list as English: "a", "a and b", "a, b and c". Caps at `max`. */
-function joinEnglish(items: string[], max = 3): string {
+/** Join a list as English: "a", "a and b", "a, b, c and d".
+ *  NO TRUNCATION (2026-06-10, Tristan: "I don't want '+6 more' — give ALL the
+ *  information; you won't get another chance to see it"). When `max` is omitted
+ *  (the default), EVERY item is listed; the old "(+N more)" cap is gone. A caller
+ *  may still pass an explicit `max` to cap a genuinely-unbounded list, in which
+ *  case the remainder is still summarised as "(+N more)" — but no internal caller
+ *  does, so the per-tool "What it computes" / "why selected" lines now enumerate
+ *  every quantity the tool produces. */
+function joinEnglish(items: string[], max?: number): string {
   const xs = items.filter(Boolean)
   if (xs.length === 0) return ''
-  const shown = xs.slice(0, max)
+  const shown = max != null ? xs.slice(0, max) : xs
   const more = xs.length - shown.length
   let s: string
   if (shown.length === 1) s = shown[0]
   else s = `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}`
   if (more > 0) s += ` (+${more} more)`
   return s
+}
+
+/** De-duplicate a string list, preserving first-seen order. Used so a full
+ *  (uncapped) enumeration of humanised fields doesn't repeat a label when two
+ *  contract keys humanise to the same English phrase. */
+function dedupePreserveOrder(items: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const it of items) {
+    if (!it || seen.has(it)) continue
+    seen.add(it)
+    out.push(it)
+  }
+  return out
 }
 
 function titleClass(cls: string): string {
@@ -396,8 +417,10 @@ function nameOf(facts: Map<string, ToolFacts>, id: string): string {
  *  manifest output keys; finally to the humanised tool id. */
 function describeOwns(f: ToolFacts): string {
   const fields = f.producedFields.length ? f.producedFields : f.manifestOutputs
-  const human = fields.map(humaniseField).filter(Boolean)
-  if (human.length) return joinEnglish(human, 3)
+  // NO cap (2026-06-10, item 1): list EVERY quantity the tool computes so the
+  // consolidated per-tool "What it computes" line is complete — no "(+N more)".
+  const human = dedupePreserveOrder(fields.map(humaniseField).filter(Boolean))
+  if (human.length) return joinEnglish(human)
   return humaniseToolId(f.id).toLowerCase()
 }
 
@@ -411,13 +434,14 @@ function buildEntry(
 ): ToolNarrativeEntry {
   const owns = describeOwns(f)
 
-  // whySelected — the outputs the design/contract needs from this tool.
-  const producedHuman = f.producedFields.map(humaniseField).filter(Boolean)
+  // whySelected — the outputs the design/contract needs from this tool. NO cap
+  // (item 1): every produced quantity is named, not just the first three.
+  const producedHuman = dedupePreserveOrder(f.producedFields.map(humaniseField).filter(Boolean))
   let whySelected: string
   if (producedHuman.length) {
-    whySelected = `Selected because the engineering contract needs ${joinEnglish(producedHuman, 3)}; this is the in-class tool that produces ${producedHuman.length > 1 ? 'those quantities' : 'that quantity'} deterministically from first principles.`
+    whySelected = `Selected because the engineering contract needs ${joinEnglish(producedHuman)}; this is the in-class tool that produces ${producedHuman.length > 1 ? 'those quantities' : 'that quantity'} deterministically from first principles.`
   } else if (f.manifestOutputs.length) {
-    whySelected = `Selected by the ${titleClass(readProductClass(state))} tool plan to compute ${joinEnglish(f.manifestOutputs.map(humaniseField), 3)}.`
+    whySelected = `Selected by the ${titleClass(readProductClass(state))} tool plan to compute ${joinEnglish(dedupePreserveOrder(f.manifestOutputs.map(humaniseField)))}.`
   } else {
     whySelected = `Selected by the ${titleClass(readProductClass(state))} tool plan as part of the deterministic tool sequence.`
   }
@@ -426,22 +450,22 @@ function buildEntry(
   const upstreamNames = f.upstream.map((u) => nameOf(facts, u))
   const briefInputs = describeBriefInputs(f, state)
   const inputParts: string[] = []
-  if (upstreamNames.length) inputParts.push(`takes upstream results from ${joinEnglish(upstreamNames, 3)}`)
-  if (briefInputs.length) inputParts.push(`reads ${joinEnglish(briefInputs, 3)} from the brief`)
+  if (upstreamNames.length) inputParts.push(`takes upstream results from ${joinEnglish(dedupePreserveOrder(upstreamNames))}`)
+  if (briefInputs.length) inputParts.push(`reads ${joinEnglish(briefInputs)} from the brief`)
   let inputs: string
   if (inputParts.length) {
     inputs = capitalise(inputParts.join('; ')) + '.'
   } else if (f.manifestInputs.length) {
-    inputs = `Consumes ${joinEnglish(f.manifestInputs.map(humaniseField), 3)}.`
+    inputs = `Consumes ${joinEnglish(dedupePreserveOrder(f.manifestInputs.map(humaniseField)))}.`
   } else {
     inputs = 'Runs from the brief envelope and the partial engineering contract.'
   }
 
-  // outputs — downstream consumers.
+  // outputs — downstream consumers. NO cap (item 1): every downstream consumer.
   const downstreamNames = f.downstream.map((d) => nameOf(facts, d))
   let outputs: string
   if (downstreamNames.length) {
-    outputs = `Feeds ${joinEnglish(downstreamNames, 3)}.`
+    outputs = `Feeds ${joinEnglish(dedupePreserveOrder(downstreamNames))}.`
   } else {
     outputs = 'Terminal in the data-flow graph — its results land directly in the engineering contract (no downstream tool depends on them).'
   }

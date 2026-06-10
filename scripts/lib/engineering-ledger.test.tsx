@@ -19,6 +19,8 @@ import {
   isBriefRef,
   formatInputs,
   formatOutputs,
+  formatInputsDetailed,
+  formatOutputsDetailed,
   formatProvenanceStrip,
   type SectionRef,
   type BriefRef,
@@ -173,5 +175,124 @@ describe('buildEngineeringLedger', () => {
     expect(lg.order).toEqual([])
     expect(lg.byToolId.size).toBe(0)
     expect(lg.sectionForQuantity.size).toBe(0)
+  })
+})
+
+// ───────────────────────────────────────────────────────────────────────────
+// Per-quantity edge resolution (item 2, 2026-06-10): name the SPECIFIC quantity
+// per destination/source, with a tool-level fallback for unresolved links.
+// Uses REAL registered tool ids so the checked-in tool-io-manifest.json supplies
+// the input_keys/output_keys the resolver matches against (the synthetic tool:a/
+// b/c ids carry no manifest, so they exercise the no-edge fallback path).
+// ───────────────────────────────────────────────────────────────────────────
+describe('engineering-ledger per-quantity edges (item 2)', () => {
+  // fluids:pipe-sizing emits pipe_diameter_mm; process:pump-sizing's manifest
+  // input_keys include pipe_diameter_mm → the value-level link must resolve.
+  // mass-aggregator:envelope-check is a terminal sink whose input_keys include
+  // mea_pump_motor (via *_pump_motor_kw) — a second resolved destination.
+  function pipeChainState() {
+    return {
+      moduleDecomposition: { product_class: 'co2_mineralisation' },
+      orchestratorContract: {
+        _tools_run: ['fluids:pipe-sizing', 'process:pump-sizing', 'mass-aggregator:envelope-check'],
+        quantities: {},
+      },
+      toolsUsedPage: {
+        tools: [
+          {
+            tool_id: 'fluids:pipe-sizing',
+            tool_name: 'Fluids Pipe Sizing',
+            claims: [
+              { field: 'pipe_diameter_mm', value: 50, unit: 'mm', output_field: 'pipe_diameter_mm' },
+            ],
+          },
+          {
+            tool_id: 'process:pump-sizing',
+            tool_name: 'Process Pump Sizing',
+            claims: [
+              { field: 'mea_pump_motor_kw', value: 0.75, unit: 'kW', output_field: 'pump_motor_kw' },
+            ],
+          },
+          { tool_id: 'mass-aggregator:envelope-check', tool_name: 'Mass Aggregator', claims: [] },
+        ],
+        flow_edges: [
+          { from: 'fluids:pipe-sizing', to: 'process:pump-sizing' },
+          { from: 'fluids:pipe-sizing', to: 'mass-aggregator:envelope-check' },
+          { from: 'process:pump-sizing', to: 'mass-aggregator:envelope-check' },
+        ],
+      },
+    }
+  }
+
+  const lg = buildEngineeringLedger(pipeChainState())
+
+  it('resolves a specific output quantity to its consuming §', () => {
+    const pipe = lg.byToolId.get('fluids:pipe-sizing')!
+    // pipe diameter feeds the pump sizing (§2): a per-quantity OUTPUT edge.
+    const toPump = pipe.outputEdges.find((e) => e.to.num === 2)
+    expect(toPump).toBeTruthy()
+    expect(toPump!.quantity).toMatch(/pipe diameter/)
+  })
+
+  it('names the quantity in the detailed Outputs clause, tool-level fallback for the rest', () => {
+    const pipe = lg.byToolId.get('fluids:pipe-sizing')!
+    const out = formatOutputsDetailed(pipe)
+    // pipe diameter -> §2 named; the mass-aggregator (§3) has no resolved
+    // quantity from pipe sizing, so it falls back to a tool-level "also feeds §3".
+    expect(out).toMatch(/pipe diameter -> §2/)
+    expect(out).toMatch(/also feeds §3/)
+    // it must NOT invent a quantity name for the §3 fallback.
+    expect(out).not.toMatch(/-> §3/)
+  })
+
+  it('resolves a specific input quantity to its producing § (mirror direction)', () => {
+    const pump = lg.byToolId.get('process:pump-sizing')!
+    // the pump reads pipe_diameter_mm from §1 (fluids) — a per-quantity INPUT edge.
+    const fromFluids = pump.inputEdges.find((e) => e.from.num === 1)
+    expect(fromFluids).toBeTruthy()
+    expect(fromFluids!.quantity).toMatch(/pipe diameter/)
+    const ins = formatInputsDetailed(pump)
+    expect(ins).toMatch(/pipe diameter \(from §1\)/)
+  })
+
+  it('never fabricates a value-level link when keys do not match', () => {
+    // A tool whose output shares NO specific token with the downstream input
+    // keys gets ZERO output edges and the detailed clause degrades to the plain
+    // tool-level §-ref (formatOutputs), never a fabricated "<quantity> -> §n".
+    const st = {
+      moduleDecomposition: { product_class: 'co2_mineralisation' },
+      orchestratorContract: {
+        _tools_run: ['noise-emission:dba', 'mass-aggregator:envelope-check'],
+        quantities: {},
+      },
+      toolsUsedPage: {
+        tools: [
+          {
+            tool_id: 'noise-emission:dba',
+            tool_name: 'Noise Emission',
+            claims: [{ field: 'sound_pressure_level_dba', value: 72, unit: 'dBA', output_field: 'spl_dba' }],
+          },
+          { tool_id: 'mass-aggregator:envelope-check', tool_name: 'Mass Aggregator', claims: [] },
+        ],
+        flow_edges: [{ from: 'noise-emission:dba', to: 'mass-aggregator:envelope-check' }],
+      },
+    }
+    const l2 = buildEngineeringLedger(st)
+    const noise = l2.byToolId.get('noise-emission:dba')!
+    expect(noise.outputEdges.length).toBe(0)
+    // detailed === plain tool-level when nothing resolved.
+    expect(formatOutputsDetailed(noise)).toBe(formatOutputs(noise))
+    expect(formatOutputsDetailed(noise)).not.toMatch(/->\s*§/)
+  })
+
+  it('the synthetic manifest-less chain yields no per-quantity edges (degrades cleanly)', () => {
+    // tool:a/b/c carry no manifest entry → resolver finds no input_keys → no
+    // edges, and the detailed formatter equals the tool-level one.
+    const l3 = buildEngineeringLedger(makeState())
+    const b = l3.byToolId.get('tool:b')!
+    expect(b.outputEdges.length).toBe(0)
+    expect(b.inputEdges.length).toBe(0)
+    expect(formatOutputsDetailed(b)).toBe(formatOutputs(b))
+    expect(formatInputsDetailed(b)).toBe(formatInputs(b))
   })
 })
