@@ -478,10 +478,16 @@ def extract_parts(state):
 # process_plant for now so any unknown archetype still renders).
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Vocabulary that marks a RACK-FARM archetype (battery/server/switchgear rows).
+# Vocabulary that marks a RACK-FARM archetype — ROWS OF CABINETS. This is the
+# GENERIC rack/cabinet family (battery is ONE flavour; compute/server is another;
+# switchgear/generic cabinets a third). It must trigger on a compute SERVER rack
+# (GPU/CPU sleds in a chassis) just as it does on a battery rack — both render as
+# rows of cabinets — so the battery vocabulary is NO LONGER a precondition.
+# Universal — keyed on the cabinet/rack/server NAMES only, no per-class coding.
 RACK_FARM_RE = re.compile(
     r"\bcell\b|\bcells\b|\brack\b|\bracks\b|\bmodule\b|\bbattery\b|\bcabinet\b|"
-    r"\bserver\b|\bbusbar\b|\bbms\b|\bpcs\b|\binverter\b", re.IGNORECASE)
+    r"\bserver\b|\bbusbar\b|\bbms\b|\bpcs\b|\binverter\b|\bchassis\b|\bsled\b|"
+    r"\bnode\b|blade.?server|rack.?unit|rack.?mount|enclosure.?bay", re.IGNORECASE)
 # Vocabulary that marks a PROCESS-PLANT archetype (vessels + rotating machines).
 PROCESS_PLANT_RE = re.compile(
     r"\bvessel\b|\bcolumn\b|\breactor\b|\btank\b|\bseparator\b|\bdrum\b|"
@@ -502,6 +508,46 @@ PANEL_ARRAY_RE = re.compile(
 # panel_array and let the rack_farm test decide.
 BATTERY_SYSTEM_RE = re.compile(
     r"\bcell\b|\bcells\b|\bbattery\b|\bbms\b|\bpcs\b|\binverter\b|\bbusbar\b",
+    re.IGNORECASE)
+# The COMPUTE / SERVER rack-farm FLAVOUR discriminator (strong, near-exclusive
+# server-hardware markers). When a rack farm's parts hit these, it's a COMPUTE
+# rack (rows of SERVER cabinets + cooling/CRAC + PDU + network switch + UPS),
+# NOT a battery rack. Tokens chosen to be unique to data-centre/edge compute
+# hardware so they don't leak into a battery/switchgear lineup: GPU/EPYC sleds,
+# motherboards, DIMMs, NVMe, PCIe risers, BMC/IPMI, SFPnn, 1U/2U/4U chassis.
+COMPUTE_RACK_RE = re.compile(
+    r"\bserver\b|\bsled\b|blade.?server|rack.?unit|\b[124]u\b|\bgpu\b|"
+    r"motherboard|\bdimm\b|\bnvme\b|inference|\bbmc\b|\bipmi\b|\briser\b|"
+    r"\bepyc\b|\bpcie\b|\bsfp\d|\bsocket\b", re.IGNORECASE)
+# Vocabulary that marks a TOWER-MACHINE archetype (a wind turbine + similar
+# tower-mounted rotating machines: tower + nacelle + rotor/blades on a hub + a
+# foundation, with a power-conversion BoP lineup at the base). This is a 5th
+# geometry family — a turbine is emphatically NOT an aircraft (no fuselage/wing)
+# and NOT a process plant. Universal — keyed on the tower/nacelle/rotor NAMES.
+TOWER_MACHINE_RE = re.compile(
+    r"\btower\b|\bnacelle\b|\brotor\b|\bblade\b|\bblades\b|\bturbine\b|\bhub\b|"
+    r"\byaw\b|\bpylon\b|\bmast\b|\bgearbox\b|\bpitch\b", re.IGNORECASE)
+# A tower machine must be GROUND-MOUNTED: it needs a tower/foundation present so a
+# stray "rotor"/"blade" on a non-turbine (e.g. an edge-server "dual-rotor fan",
+# a pump impeller "blade") can never alone route a design to tower_machine.
+TOWER_BASE_RE = re.compile(
+    r"foundation|\btower\b|monopile|\bpile\b|footing|\bplinth\b|\bbedplate\b",
+    re.IGNORECASE)
+# DEFINITIVE aircraft markers — a winged air vehicle MUST carry a FUSELAGE/airframe
+# AND a WING. A rotor+nacelle with neither is a turbine, not a plane (the wind
+# misdetection). Both predicates must hold for is_true_aircraft.
+AIRCRAFT_FUSELAGE_RE = re.compile(
+    r"fuselage|airframe|monocoque|tail.?boom|\bempennage\b|\bgondola\b|aerostat",
+    re.IGNORECASE)
+AIRCRAFT_WING_RE = re.compile(
+    r"\bwing\b|\bspar\b|\baileron\b|\belevon\b|wing.?rib|wing.?skin", re.IGNORECASE)
+# DEFINITIVE spacecraft markers — a satellite carries a BUS + SOLAR-ARRAY +
+# THRUSTER/reaction-wheel constellation. Require ≥2 distinct such markers so a
+# stray "main bus contactor" / "lighting bus cable" never reads as a spacecraft.
+SPACECRAFT_DEF_RE = re.compile(
+    r"\bbus\b|solar.?array|\bthruster\b|reaction.?wheel|magnetorquer|"
+    r"star.?tracker|propellant|bus.?structure|thrust.?tube|separation.?ring|"
+    r"\bespa\b|sun.?sensor|\bdeorbit\b|drag.?sail|\bmli\b|radiator.?panel",
     re.IGNORECASE)
 # Vocabulary that marks an AERO-BODY archetype (a flight vehicle — aircraft or
 # spacecraft — that flies in FREE SPACE, never sits in a skid/container/grow room).
@@ -550,62 +596,150 @@ def detect_aero_subtype(parts, modules):
     return subtype, air, spc
 
 
+def _distinct_hits(parts, rx):
+    """Count DISTINCT part NAMES that match `rx` (a part repeated under the same
+    name counts once). Used where a 'how many different cues' threshold matters —
+    e.g. panel_array needs ≥2 DISTINCT grow/cultivation cues so a single stray
+    'LED indicator' on a compute server never mis-routes a non-farm to a grow room."""
+    seen = set()
+    for p in parts:
+        nm = str(p.name)
+        if rx.search(nm):
+            seen.add(nm.lower())
+    return len(seen)
+
+
+def is_true_aircraft(parts):
+    """A design is a real winged AIRCRAFT only if its parts carry BOTH a fuselage/
+    airframe marker AND a wing marker. Deterministic gate that stops a wind turbine
+    (rotor + nacelle + blades, no fuselage/wing) reading as a plane."""
+    has_fuse = any(AIRCRAFT_FUSELAGE_RE.search(str(p.name)) for p in parts)
+    has_wing = any(AIRCRAFT_WING_RE.search(str(p.name)) for p in parts)
+    return has_fuse and has_wing
+
+
+def is_true_spacecraft(parts):
+    """A design is a real SPACECRAFT only if ≥2 DISTINCT bus/solar-array/thruster
+    markers are present, so an isolated 'bus' word (a contactor / cable) on a
+    non-spacecraft never reads as a satellite."""
+    return _distinct_hits(parts, SPACECRAFT_DEF_RE) >= 2
+
+
+def detect_rack_flavour(parts):
+    """Sub-flavour of a rack farm: 'battery' | 'compute' | 'generic'. Picks the
+    flavour whose vocabulary dominates the parts: BATTERY when battery-system
+    markers (cell/battery/bms/pcs) lead, COMPUTE when server-hardware markers
+    (GPU/EPYC/DIMM/NVMe/PCIe/1U chassis) lead, else GENERIC (bare rack/cabinet
+    rows). Deterministic + universal — no per-class hand-coding. Returns
+    (flavour, battery_hits, compute_hits)."""
+    batt = sum(1 for p in parts if BATTERY_SYSTEM_RE.search(str(p.name)))
+    comp = sum(1 for p in parts if COMPUTE_RACK_RE.search(str(p.name)))
+    if comp > batt:
+        flavour = "compute"
+    elif batt > 0:
+        flavour = "battery"
+    else:
+        flavour = "generic"
+    return flavour, batt, comp
+
+
+_RACK_FLAVOUR = None    # set by detect_geometry_family; read by main() / placer
+
+
 def detect_geometry_family(parts, modules):
-    """Return the geometry FAMILY for this design — 'aero_body', 'panel_array',
-    'rack_farm' or 'process_plant'. Heuristic on the physical part NAMES (universal
-    — no per-class hand-coding):
+    """Return the geometry FAMILY for this design — one of 'aero_body',
+    'tower_machine', 'panel_array', 'rack_farm' or 'process_plant'. Heuristic on
+    the physical part NAMES (universal — no per-class hand-coding). Precedence
+    (first match wins), each guarded so a stray token can't mis-route:
 
-      • aero_body (FLIGHT VEHICLE) FIRST: when the aircraft/spacecraft vocabulary
-        leads. A HAPS solar aircraft + a satellite must read as real vehicles in
-        FREE SPACE, NOT as industrial boxes in a skid/container — and their BoM
-        carries "battery"/"cell"/"module"/"bus" words that would otherwise pull
-        them into rack_farm. So aero wins over the rack/vessel markers when its
-        vocabulary dominates (aero_hits beat BOTH the rack and the vessel markers).
-        Sub-type (aircraft vs spacecraft) drives the placer.
-      • panel_array (VF grow-rack): the GROW vocabulary dominates AND the
-        BATTERY-SYSTEM vocabulary does not — a vertical farm has grow-RACKS but
-        they are NOT battery racks.
-      • rack_farm: the rack/cabinet vocabulary dominates the vessel/machine one
-        (battery / server / switchgear rows).
-      • process_plant: the default for any unknown archetype.
+      1. aero_body (FLIGHT VEHICLE in FREE SPACE) — ONLY a TRUE aircraft (fuselage
+         AND wing markers) or a TRUE spacecraft (≥2 distinct bus/solar-array/
+         thruster markers), AND the aero vocabulary leads. The fuselage∧wing /
+         multi-spacecraft gate stops a wind turbine (rotor + nacelle + blades, no
+         fuselage/wing) grabbing aero on its incidental rotor/nacelle words. A
+         HAPS keeps aero; a satellite keeps aero. Sub-type drives the placer.
+      2. tower_machine (WIND TURBINE + tower archetypes) — tower/nacelle/rotor/
+         blade/turbine/hub/yaw vocabulary present AND a tower/foundation present
+         (ground-mounted), AND it is NOT a true aircraft/spacecraft. A free-
+         standing tower + nacelle + rotor + blades + foundation + a BoP lineup.
+      3. panel_array (VF grow-rack) — ≥2 DISTINCT grow/cultivation cues AND the
+         grow vocabulary leads the battery vocabulary. The ≥2-distinct gate stops
+         a single stray 'LED indicator'/'plant' word routing a non-farm here.
+      4. rack_farm (ROWS OF CABINETS — battery | compute | generic) — the generic
+         rack/cabinet/server vocabulary leads the vessel/machine one. Battery is
+         one flavour; a compute SERVER rack (GPU/CPU sleds) is another; the
+         flavour is resolved by detect_rack_flavour for the placer.
+      5. process_plant — the default for any unknown archetype.
 
-    Logs the decision + counts (+ aero subtype). Deterministic + universal."""
+    Logs the decision + per-family hit counts (+ aero subtype / rack flavour).
+    Deterministic + universal."""
     aero_hits = sum(1 for p in parts if AERO_BODY_RE.search(str(p.name)))
     grow_hits = sum(1 for p in parts if PANEL_ARRAY_RE.search(str(p.name)))
+    grow_distinct = _distinct_hits(parts, PANEL_ARRAY_RE)
     batt_hits = sum(1 for p in parts if BATTERY_SYSTEM_RE.search(str(p.name)))
     rack_hits = sum(1 for p in parts if RACK_FARM_RE.search(str(p.name)))
     proc_hits = sum(1 for p in parts if PROCESS_PLANT_RE.search(str(p.name)))
+    tower_hits = sum(1 for p in parts if TOWER_MACHINE_RE.search(str(p.name)))
+    tower_grounded = any(TOWER_BASE_RE.search(str(p.name)) for p in parts)
+    true_aircraft = is_true_aircraft(parts)
+    true_spacecraft = is_true_spacecraft(parts)
     subtype = None
-    # aero_body wins when the flight-vehicle vocabulary leads BOTH the industrial
-    # rack and the process-vessel markers (so a real plant/battery/VF is never
-    # mis-routed to aero). A HAPS hits wing/fuselage/propeller/spar/solar-array
-    # many times over its 1-2 incidental "battery"/"cell" words; a satellite hits
-    # bus/reaction-wheel/thruster/antenna/array over its few generic boxes.
-    if aero_hits > 0 and aero_hits >= rack_hits and aero_hits >= proc_hits \
-            and aero_hits >= grow_hits:
+    flavour = None
+    air_h = spc_h = 0
+
+    # 1. AERO — gated on a DEFINITIVE flight-vehicle signature so rotor/nacelle
+    #    alone (a turbine) never qualifies. Aero must also lead the industrial
+    #    markers (a real plant/battery/VF is never mis-routed to aero).
+    if (true_aircraft or true_spacecraft) and aero_hits > 0 \
+            and aero_hits >= rack_hits and aero_hits >= proc_hits \
+            and aero_hits >= grow_hits and aero_hits >= tower_hits:
         family = "aero_body"
         subtype, air_h, spc_h = detect_aero_subtype(parts, modules)
-    elif grow_hits > 0 and grow_hits > batt_hits and grow_hits >= proc_hits:
+        # the definitive predicates override a noisy generic-vocab tie
+        if true_spacecraft and not true_aircraft:
+            subtype = "spacecraft"
+        elif true_aircraft and not true_spacecraft:
+            subtype = "aircraft"
+    # 2. TOWER MACHINE — turbine vocabulary + a ground tower/foundation, and NOT a
+    #    real flight vehicle. A rotor+nacelle+tower with no fuselage/wing lands here.
+    elif tower_hits > 0 and tower_grounded \
+            and not (true_aircraft or true_spacecraft) \
+            and tower_hits >= proc_hits and tower_hits >= grow_hits:
+        family = "tower_machine"
+    # 3. PANEL ARRAY (VF) — ≥2 DISTINCT grow cues + grow leads battery.
+    elif grow_distinct >= 2 and grow_hits > batt_hits and grow_hits >= proc_hits:
         family = "panel_array"
+    # 4. RACK FARM — generic rack/cabinet/server vocabulary leads the vessels.
     elif rack_hits > proc_hits:
         family = "rack_farm"
+        flavour, _bh, _ch = detect_rack_flavour(parts)
+    # 5. PROCESS PLANT — default.
     else:
         family = "process_plant"
+
     print(f"[univ] geometry family = {family}"
-          + (f" / {subtype}" if subtype else "") + "  "
-          f"(aero/flight-vehicle matches = {aero_hits}, "
-          f"grow/panel name matches = {grow_hits}, "
-          f"battery-system matches = {batt_hits}, "
-          f"rack/cabinet matches = {rack_hits}, "
-          f"vessel/machine matches = {proc_hits}, "
-          f"of {len(parts)} physical parts)")
+          + (f" / {subtype}" if subtype else "")
+          + (f" / {flavour}" if flavour else "") + "  "
+          f"(aero/flight-vehicle = {aero_hits}, "
+          f"tower-machine = {tower_hits} [grounded={tower_grounded}], "
+          f"grow/panel = {grow_hits} (distinct {grow_distinct}), "
+          f"battery-system = {batt_hits}, "
+          f"rack/cabinet/server = {rack_hits}, "
+          f"vessel/machine = {proc_hits}, "
+          f"of {len(parts)} physical parts; "
+          f"true_aircraft={true_aircraft}, true_spacecraft={true_spacecraft})")
     if subtype:
         print(f"[univ] aero subtype = {subtype} "
               f"(aircraft markers = {air_h}, spacecraft markers = {spc_h})")
-    # stash the subtype module-level so main() can pass it to the placer without
-    # changing detect_geometry_family's single-return contract.
-    global _AERO_SUBTYPE
+    if flavour:
+        _fl, bh, ch = detect_rack_flavour(parts)
+        print(f"[univ] rack flavour = {flavour} "
+              f"(battery markers = {bh}, compute/server markers = {ch})")
+    # stash the subtype + flavour module-level so main() can pass them to the
+    # placer without changing detect_geometry_family's single-return contract.
+    global _AERO_SUBTYPE, _RACK_FLAVOUR
     _AERO_SUBTYPE = subtype
+    _RACK_FLAVOUR = flavour
     return family
 
 
@@ -2325,6 +2459,10 @@ RACK_FALLBACK_COUNT = 14
 RACK_MODULE_MIN     = 6       # fewest module shelves drawn in a rack
 RACK_MODULE_MAX     = 10      # most module shelves drawn in a rack
 RACK_MODULES_DEFAULT = 8      # when cells_per_rack is silent
+# Compute-rack SLED count (denser than battery modules — the 1U/2U server look).
+RACK_SLED_MIN       = 8
+RACK_SLED_MAX       = 14
+RACK_SLED_BONUS     = 3       # sleds = module-count + this, clamped to MIN..MAX
 RACK_MODULE_GAP_MM  = 26.0    # thin gap between successive stacked modules
 RACK_DOOR_FRAME_MM  = 45.0    # thickness of the front-door frame stiles/rails
 RACK_TOP_RESERVE_MM = 360.0   # head/foot reserve of the cabinet not given to modules
@@ -2373,16 +2511,35 @@ def _rack_module_count(cells_per_rack):
 
 def _build_battery_rack(nm, cx, y_row, deck_z_mm, cells_per_rack,
                         frame_mat, cell_mat, busbar_mat, steel, MAT,
-                        rack_mod, MO):
-    """One battery rack cabinet WITH module detail (Fix 2, 2026-06-10). The shelf
-    divisions must read from EVERY judge camera (front-elevation looks at the rack
-    BACK, side + iso see the ±Y faces at an angle), so the detail is built CAMERA-
-    AGNOSTIC: a vertical stack of N full-depth, full-width battery MODULES (battery-
-    blue boxes) separated by thin DARK spacer bands that span the whole rack depth
-    — so a viewer from ANY direction sees blue module bands cut by dark shelf-lines,
-    never a monolith. On top: a thin front-door frame (stiles + rails) + a slim dark
-    fascia/handle strip per module on the +Y face + the copper DC bus + a plinth.
+                        rack_mod, MO, flavour="battery"):
+    """One RACK CABINET WITH horizontal-division detail (Fix 2, 2026-06-10;
+    generalised to compute racks 2026-06-10). The divisions must read from EVERY
+    judge camera (front-elevation looks at the rack BACK, side + iso see the ±Y
+    faces at an angle), so the detail is built CAMERA-AGNOSTIC: a vertical stack of
+    N full-depth, full-width horizontal UNITS separated by thin DARK spacer bands
+    that span the whole rack depth — a viewer from ANY direction sees unit bands cut
+    by dark shelf-lines, never a monolith. On top: a thin front-door frame (stiles +
+    rails) + a slim fascia strip per unit on the +Y face + a vertical bus/cable
+    spine + a plinth.
+
+    `flavour` selects the SAME rows-of-cabinets geometry with role-appropriate skin:
+      • 'battery' — battery-blue MODULES + a copper DC bus stripe (a BESS rack).
+      • 'compute' — light-grey SERVER SLEDS + a slim dark cable spine (a server
+        rack: the bands read as horizontal 1U/2U sleds, the dominant data-centre
+        cue). Same geometry, swapped material + bus colour. The unit count is the
+        sled count (a touch denser than battery modules).
+      • 'generic' — neutral cabinet bays, grey skin.
     Deterministic + universal: keyed only on the rack constants + cells_per_rack."""
+    # ── flavour skin: module/sled body colour + bus colour ──
+    if flavour == "compute":
+        body_mat = _bop_secondary_mat(MAT, "sled", (0.62, 0.64, 0.68), 0.55, 0.42)
+        bus_mat = _bop_secondary_mat(MAT, "cablespine", (0.14, 0.15, 0.18), 0.30, 0.55)
+    elif flavour == "generic":
+        body_mat = _bop_secondary_mat(MAT, "genbay", (0.50, 0.52, 0.56), 0.45, 0.45)
+        bus_mat = busbar_mat
+    else:  # battery
+        body_mat = frame_mat
+        bus_mat = busbar_mat
     w, d, h = RACK_W_MM, RACK_D_MM, RACK_H_MM
     cz_mid = deck_z_mm + h / 2
     front_y = y_row + d / 2                        # the +Y cabinet face plane
@@ -2392,22 +2549,26 @@ def _build_battery_rack(nm, cx, y_row, deck_z_mm, cells_per_rack,
                (w * fl.MM, d * fl.MM, h * fl.MM),
                cell_mat, module=rack_mod, module_objects=MO)
 
-    # ── stacked battery MODULES (full depth/width) with dark gap bands between ──
+    # ── stacked horizontal UNITS (full depth/width) with dark gap bands between ──
+    # battery → MODULES; compute → SERVER SLEDS (denser, the 1U/2U look).
     n_mod = _rack_module_count(cells_per_rack)
+    if flavour == "compute":
+        n_mod = max(RACK_SLED_MIN, min(RACK_SLED_MAX, n_mod + RACK_SLED_BONUS))
     usable_h = max(h - RACK_TOP_RESERVE_MM, h * 0.5)
-    z0 = deck_z_mm + (h - usable_h) / 2          # bottom of the module stack
+    z0 = deck_z_mm + (h - usable_h) / 2          # bottom of the unit stack
     slot_h = usable_h / n_mod                     # pitch of one shelf
-    mod_h = max(40.0, slot_h - RACK_MODULE_GAP_MM)  # module body height (< slot → gap)
+    mod_h = max(40.0, slot_h - RACK_MODULE_GAP_MM)  # unit body height (< slot → gap)
     mod_w = w - 24.0                              # near-full width (slim side reveal)
     mod_d = d + 12.0                              # proud of ±Y faces so it's the skin
     for i in range(n_mod):
         mcz = z0 + slot_h * (i + 0.5)
-        # battery-blue module body — the visible band on every face
+        # unit body (battery-blue module / grey server sled) — visible on every face
         fl.add_box(f"{nm}_mod{i}",
                    (cx * fl.MM, y_row * fl.MM, mcz * fl.MM),
                    (mod_w * fl.MM, mod_d * fl.MM, mod_h * fl.MM),
-                   frame_mat, module=rack_mod, module_objects=MO)
-        # slim dark fascia/handle strip across the +Y face of this module
+                   body_mat, module=rack_mod, module_objects=MO)
+        # slim dark fascia/handle strip across the +Y face of this unit (server
+        # bezel / battery handle) — the front-of-unit cue
         fl.add_box(f"{nm}_fascia{i}",
                    (cx * fl.MM, (front_y + 8.0) * fl.MM, (mcz + mod_h * 0.28) * fl.MM),
                    (mod_w * 0.7 * fl.MM, 26.0 * fl.MM, mod_h * 0.16 * fl.MM),
@@ -2430,11 +2591,12 @@ def _build_battery_rack(nm, cx, y_row, deck_z_mm, cells_per_rack,
                     RACK_DOOR_FRAME_MM * fl.MM),
                    steel, module=rack_mod, module_objects=MO)
 
-    # copper bus stripe up the front (+Y) face — the rack DC bus
+    # vertical bus/cable spine up the front (+Y) face — copper DC bus (battery) or
+    # a slim dark cable-management spine (compute).
     fl.add_box(f"{nm}_bus",
                (cx * fl.MM, (front_y + 24.0) * fl.MM, cz_mid * fl.MM),
                (60 * fl.MM, 40 * fl.MM, (h - 360) * fl.MM),
-               busbar_mat, module=rack_mod, module_objects=MO)
+               bus_mat, module=rack_mod, module_objects=MO)
     # plinth
     fl.add_box(f"{nm}_plinth",
                (cx * fl.MM, y_row * fl.MM, (deck_z_mm + 70) * fl.MM),
@@ -2670,18 +2832,30 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     # same place, but we re-read the contract here via the module-level _STATE set
     # by main() so the placer stays a pure function of (parts, topology, contract).
     quantities = _RACKFARM_QUANTITIES or {}
+    # FLAVOUR (battery | compute | generic) set by detect_geometry_family. A compute
+    # rack farm renders SERVER racks + a compute BoP (cooling/CRAC + PDU + network +
+    # UPS) instead of PCS/transformer/chiller; battery is the original BESS path.
+    flavour = _RACK_FLAVOUR or "battery"
 
     n_racks, n_rows, racks_per_row, basis = _derive_rack_grid(quantities, parts)
     cells_per_rack = qval(quantities, "cells_per_rack")
     cell_count = qval(quantities, "cell_count")
-    print(f"[univ][rackfarm] rack grid: {n_racks} racks "
+    unit_word = "sleds" if flavour == "compute" else "modules/cells"
+    print(f"[univ][rackfarm] flavour = {flavour}; rack grid: {n_racks} racks "
           f"= {n_rows} row(s) × {racks_per_row} "
           f"(basis: {basis}); cells_per_rack={cells_per_rack}, "
-          f"cell_count={cell_count} aggregated into the racks (not drawn individually)")
+          f"cell_count={cell_count} aggregated into the racks as {unit_word} "
+          f"(not drawn individually)")
 
     steel = _steel_mat(MAT)
-    rack_frame_mat = MAT.get("battery") or fl.make_mat(
-        "m_rf_rack", (0.02, 0.14, 1.00), metallic=0.05, roughness=0.45)
+    # rack body colour per flavour: battery-blue for a BESS, server-grey for compute.
+    if flavour == "compute":
+        rack_frame_mat = _bop_secondary_mat(MAT, "sled", (0.62, 0.64, 0.68), 0.55, 0.42)
+    elif flavour == "generic":
+        rack_frame_mat = _bop_secondary_mat(MAT, "genbay", (0.50, 0.52, 0.56), 0.45, 0.45)
+    else:
+        rack_frame_mat = MAT.get("battery") or fl.make_mat(
+            "m_rf_rack", (0.02, 0.14, 1.00), metallic=0.05, roughness=0.45)
     if "u_rf_cell" not in MAT:
         MAT["u_rf_cell"] = fl.make_mat("m_rf_cell", (0.02, 0.025, 0.05),
                                        metallic=0.10, roughness=0.55)
@@ -2712,7 +2886,7 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             nm = f"u_rf_rack_r{row}_c{col}"
             _build_battery_rack(nm, cx, y_row, DECK_Z_MM, cells_per_rack,
                                 rack_frame_mat, cell_mat, busbar_mat, steel, MAT,
-                                rack_mod, MO)
+                                rack_mod, MO, flavour=flavour)
             rack_anchor_by_index.append((cx, y_row, DECK_Z_MM + RACK_H_MM))
         placed += n_this
 
@@ -2728,7 +2902,7 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     # parts from the design by their module / name so the lineup reflects the BoM.
     bop_x = racks_x1 + RACK_ROW_GAP_MM
     bop_y_centre = (racks_y0 + racks_y1) / 2
-    bop_items = _select_bop_items(parts)
+    bop_items = _select_bop_items(parts, flavour)
     region_centres = {}
     bop_anchor = {}               # role → (cx, cy, top_z) for topology routing
     cursor_y = bop_y_centre - (sum(it[2] for it in bop_items)
@@ -2760,13 +2934,17 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             _build_bop_cabinet_lineup(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                       mat, steel, MAT, mod, MO, n_sections=2,
                                       louvres=True, louvre_rgb=(0.22, 0.24, 0.28))
-        elif role == "chiller":
+        elif role in ("chiller", "cooling"):   # BESS chiller / compute CRAC-CRAH
             _build_bop_chiller(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                mat, steel, MAT, MO, mod)
+        elif role in ("pdu", "ups"):           # compute power: tall cabinet lineup
+            _build_bop_cabinet_lineup(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+                                      mat, steel, MAT, mod, MO, n_sections=2,
+                                      louvres=True, louvre_rgb=(0.22, 0.24, 0.28))
         elif role == "fire":
             _build_bop_fire(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                             mat, steel, MAT, mod, MO)
-        else:  # bms_ctrl + any other controller role → small wall cabinet
+        else:  # bms_ctrl / network / any other controller role → small wall cabinet
             _build_bop_wall_cabinet(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                     mat, steel, MAT, mod, MO)
         bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
@@ -2837,15 +3015,38 @@ _BOP_ROLES = [
                                                           700.0, 800.0, 1700.0, (0.80, 0.20, 0.16)),
 ]
 
+# Balance-of-plant roles for a COMPUTE rack farm (a server room / edge node): the
+# data-centre BoP — cooling (CRAC/CRAH), power distribution (PDU), network switch,
+# and a UPS — instead of the BESS PCS/transformer/chiller. Same (role, regex,
+# depth, width, height, rgb) shape; each role dispatches to an existing BoP builder
+# (cooling→chiller/fan-array, pdu/ups→cabinet lineup, network→wall cabinet).
+_BOP_ROLES_COMPUTE = [
+    ("cooling",  r"crac|crah|cooling|air handler|hvac|condens|chiller|precision air",
+                                                          1000.0, 1600.0, 1400.0, (0.72, 0.80, 0.88)),
+    ("pdu",      r"\bpdu\b|power distribution|busway|rack power|power strip",
+                                                          700.0, 900.0, 2000.0, (0.34, 0.38, 0.44)),
+    ("network",  r"network|switch|\btor\b|leaf|spine|router|fabric|sfp|uplink",
+                                                          600.0, 700.0, 1500.0, (0.30, 0.46, 0.40)),
+    ("ups",      r"\bups\b|uninterrupt|battery backup|\bpsu\b|rectifier|power supply",
+                                                          900.0, 1100.0, 1900.0, (0.40, 0.44, 0.52)),
+    # data centres carry clean-agent fire suppression too — always drawn.
+    ("fire",     r"fire|suppress|aerosol|novec|fm[- ]?200|clean[- ]?agent",
+                                                          700.0, 800.0, 1700.0, (0.80, 0.20, 0.16)),
+]
 
-def _select_bop_items(parts):
-    """Build the balance-of-plant lineup list. For each role in _BOP_ROLES, find the
-    first matching design part (to reflect the BoM + carry its module tag); the skid
-    is drawn whether or not a part matches (a real BESS always has PCS / switchgear /
-    transformer / controller / thermal gear). Returns
+
+def _select_bop_items(parts, flavour="battery"):
+    """Build the balance-of-plant lineup list, picking the role table by FLAVOUR:
+    the BESS lineup (_BOP_ROLES: PCS / switchgear / transformer / BMS / chiller /
+    fire) for a battery or generic rack farm, or the data-centre lineup
+    (_BOP_ROLES_COMPUTE: cooling / PDU / network / UPS / fire) for a compute rack
+    farm. For each role, find the first matching design part (to reflect the BoM +
+    carry its module tag); the skid is drawn whether or not a part matches (a real
+    system always has these), so the lineup reads complete. Returns
     [(role, part_or_None, depth_mm, width_mm, height_mm, rgb), …] in lineup order."""
+    table = _BOP_ROLES_COMPUTE if flavour == "compute" else _BOP_ROLES
     items = []
-    for role, rx, depth, w, h, rgb in _BOP_ROLES:
+    for role, rx, depth, w, h, rgb in table:
         rxc = re.compile(rx, re.IGNORECASE)
         match = next((p for p in parts if rxc.search(str(p.name))), None)
         items.append((role, match, depth, w, h, rgb))
@@ -3562,6 +3763,342 @@ def place_panel_array(parts, regions, topology, MAT, MO):
     region_centres["rack_block"] = ((racks_x0 + racks_x1) / 2,
                                     (racks_y0 + racks_y1) / 2)
     return bbox, region_centres, frame_top_mm, routed, unresolved
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TOWER-MACHINE STRATEGY — wind turbine + similar tower archetypes (2026-06-10)
+# ───────────────────────────────────────────────────────────────────────────
+# The 5th geometry family. A wind turbine is NOT an aircraft (no fuselage/wing),
+# NOT a process plant (no vessels), NOT a rack farm (no cabinet rows): it is a
+# FREE-STANDING TALL TOWER carrying a nacelle + a 3-blade rotor on a hub, on a
+# foundation, with a power-conversion balance-of-plant lineup at the base. So
+# tower_machine builds NO skid frame and NO enclosure (like aero) — it renders the
+# MACHINE itself on a faint ground plane:
+#   • a tall TAPERED TOWER tube (wide base → narrow top), grey;
+#   • a NACELLE box at the tower top (the gearbox/generator housing), grey;
+#   • a 3-blade ROTOR on a HUB at the FRONT (+X) of the nacelle: a hub cone + N
+#     long tapered aerofoil blades at 360/N° spacing, white;
+#   • a FOUNDATION pad/plinth at the base (concrete-grey);
+#   • a BoP lineup (converter / transformer / switchgear / SCADA) as a small row
+#     of cabinets at the tower base, by role.
+# All geometry is millimetre-based (× fl.MM). Objects are named u_tm_* so
+# apply_inspection_materials recolours them by role in INSPECT. Same return tuple
+# as the other strategies. Deterministic + universal — sizes come from the contract
+# quantities (rotor_diameter_m / hub_height_m / blade_count / blade_root_chord_m)
+# with sane fallbacks, so it works on any tower machine, not just this turbine.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── Tower-machine geometry fallbacks (mm) when the contract is silent ──
+TM_HUB_HEIGHT_FALLBACK_MM   = 50000.0   # tower/hub height
+TM_ROTOR_DIA_FALLBACK_MM    = 45000.0   # rotor diameter (blade tip to tip)
+TM_BLADE_COUNT_FALLBACK     = 3
+TM_TOWER_BASE_DIA_FRAC      = 0.085     # tower base diameter ≈ this × hub height
+TM_TOWER_TOP_DIA_FRAC       = 0.55      # tower top diameter ≈ this × base diameter
+TM_NACELLE_LEN_FRAC         = 0.10      # nacelle length ≈ this × rotor diameter
+TM_NACELLE_W_FRAC           = 0.55      # nacelle width/height ≈ this × its length
+TM_HUB_DIA_FRAC             = 0.055     # hub diameter ≈ this × rotor diameter
+TM_BLADE_ROOT_CHORD_FRAC    = 0.10      # blade root chord ≈ this × rotor radius (fallback)
+TM_BOP_GAP_MM               = 600.0     # gap between base BoP cabinets
+TM_BOP_STANDOFF_MM          = 6000.0    # BoP lineup offset from the tower centre (−Y)
+
+
+def _tm_palette(MAT):
+    """Cache + return the tower-machine materials (used for the PDF/non-INSPECT
+    render; INSPECT recolours by name). Tower/nacelle light grey, blades white,
+    hub grey, foundation concrete-grey."""
+    P = {}
+    def mk(key, rgb, met=0.30, rough=0.45):
+        mk2 = f"u_tm_{key}"
+        if mk2 not in MAT:
+            MAT[mk2] = fl.make_mat(f"m_tm_{key}", rgb, metallic=met, roughness=rough)
+        return MAT[mk2]
+    P["tower"]   = mk("tower",   (0.82, 0.83, 0.85), 0.35, 0.42)
+    P["nacelle"] = mk("nacelle", (0.80, 0.81, 0.84), 0.40, 0.40)
+    P["blade"]   = mk("blade",   (0.95, 0.95, 0.96), 0.05, 0.45)
+    P["hub"]     = mk("hub",     (0.66, 0.68, 0.72), 0.45, 0.40)
+    P["found"]   = mk("found",   (0.62, 0.61, 0.58), 0.0,  0.85)
+    return P
+
+
+def _tm_build_blade(nm, hub_xyz_mm, angle_rad, length_mm, root_chord_mm, mat,
+                    mod, MO):
+    """One tapered aerofoil BLADE radiating from the hub centre in the rotor plane
+    (the Y–Z plane, since the rotor faces +X). `angle_rad` sets the blade's clock
+    position around the hub axis. Built as a chain of frustums root→tip so it reads
+    as a real wind blade: a fat rounded root tapering to a thin tip, with a slight
+    twist suggested by narrowing chord. Deterministic; geometry only."""
+    hx, hy, hz = hub_xyz_mm
+    n_seg = 5
+    # blade lies in the Y–Z plane; +X offset keeps it just in front of the hub.
+    dir_y, dir_z = math.cos(angle_rad), math.sin(angle_rad)
+    seg_len = length_mm / n_seg
+    for s in range(n_seg):
+        r0 = s * seg_len
+        r1 = (s + 1) * seg_len
+        rc = r0 + seg_len / 2
+        # chord tapers from root_chord at root to ~12% at the tip (aerofoil planform)
+        frac0 = 1.0 - 0.88 * (r0 / length_mm)
+        frac1 = 1.0 - 0.88 * (r1 / length_mm)
+        c0 = max(root_chord_mm * 0.12, root_chord_mm * frac0)
+        c1 = max(root_chord_mm * 0.12, root_chord_mm * frac1)
+        cy = hy + dir_y * rc
+        cz = hz + dir_z * rc
+        # a thin aerofoil: a frustum whose cross radius ≈ chord/2, flattened later
+        seg = fl.add_frustum(
+            f"{nm}_seg{s}",
+            (hx * fl.MM, cy * fl.MM, cz * fl.MM),
+            (c0 / 2) * fl.MM, (c1 / 2) * fl.MM, seg_len * fl.MM, mat,
+            module=mod, module_objects=MO, vertices=10,
+            rotation=(math.radians(90) * (1 if abs(dir_z) < 0.999 else 1), 0, 0))
+        # orient the segment to point along (dir_y, dir_z): rotate about X so its
+        # local +Z aligns with the radial direction, then flatten chord-wise (thin).
+        try:
+            seg.rotation_euler = (math.atan2(dir_y, dir_z) * -1.0, 0.0, 0.0)
+            seg.scale = (0.16, seg.scale[1] if hasattr(seg, "scale") else 1.0, 1.0)
+        except (AttributeError, TypeError):
+            pass
+
+
+def place_tower_machine(parts, regions, topology, MAT, MO):
+    """TOWER-MACHINE strategy (wind turbine + similar tower archetypes). Renders the
+    machine itself in FREE SPACE on a faint ground plane: a tapered tower tube + a
+    nacelle at the top + a 3-blade rotor on a hub at the nacelle front + a foundation
+    pad at the base + a BoP cabinet lineup at the tower base. Sizes come from the
+    contract (rotor_diameter_m / hub_height_m / blade_count / blade_root_chord_m)
+    with fallbacks. Same return tuple as the other strategies:
+    (bbox, region_centres, frame_top_mm, routed, unresolved)."""
+    quantities = _TOWERMACHINE_QUANTITIES or {}
+    P = _tm_palette(MAT)
+
+    # ── 1. derive dimensions from the engineering contract ──
+    hub_h = (qval(quantities, "hub_height_m") or 0) * 1000.0 or TM_HUB_HEIGHT_FALLBACK_MM
+    rotor_d = (qval(quantities, "rotor_diameter_m") or 0) * 1000.0 or TM_ROTOR_DIA_FALLBACK_MM
+    n_blades = int(qval(quantities, "blade_count") or TM_BLADE_COUNT_FALLBACK)
+    n_blades = max(2, min(5, n_blades))
+    root_chord = (qval(quantities, "blade_root_chord_m") or 0) * 1000.0 \
+        or (rotor_d / 2) * TM_BLADE_ROOT_CHORD_FRAC
+    base_dia = hub_h * TM_TOWER_BASE_DIA_FRAC
+    top_dia = base_dia * TM_TOWER_TOP_DIA_FRAC
+    nac_len = rotor_d * TM_NACELLE_LEN_FRAC
+    nac_w = nac_len * TM_NACELLE_W_FRAC
+    hub_dia = rotor_d * TM_HUB_DIA_FRAC
+    blade_len = (rotor_d / 2) - hub_dia / 2
+    print(f"[univ][tower] turbine: hub_height={hub_h/1000:.1f} m, "
+          f"rotor_dia={rotor_d/1000:.1f} m, {n_blades} blades "
+          f"(len {blade_len/1000:.1f} m, root chord {root_chord/1000:.2f} m); "
+          f"tower base Ø{base_dia/1000:.2f}→top Ø{top_dia/1000:.2f} m; "
+          f"nacelle {nac_len/1000:.1f}×{nac_w/1000:.2f} m")
+
+    tm_mod = "energy_conversion_transduction"
+    if tm_mod not in MO:
+        MO[tm_mod] = []
+    struct_mod = STRUCTURE_MODULE_ID
+    if struct_mod not in MO:
+        MO[struct_mod] = []
+
+    # ── 2. FOUNDATION pad/plinth at the base ──
+    found_dia = base_dia * 2.4
+    found_h = max(900.0, base_dia * 0.55)
+    fl.add_cyl("u_tm_found_pad",
+               (0.0, 0.0, (DECK_Z_MM + found_h / 2) * fl.MM),
+               (found_dia / 2) * fl.MM, found_h * fl.MM, P["found"],
+               module=struct_mod, module_objects=MO)
+    base_z = DECK_Z_MM + found_h        # tower springs from the foundation top
+
+    # ── 3. TOWER — a tall TAPERED tube (frustum), wide base → narrow top ──
+    fl.add_frustum("u_tm_tower",
+                   (0.0, 0.0, (base_z + hub_h / 2) * fl.MM),
+                   (base_dia / 2) * fl.MM, (top_dia / 2) * fl.MM,
+                   hub_h * fl.MM, P["tower"],
+                   module=struct_mod, module_objects=MO, vertices=32)
+    tower_top_z = base_z + hub_h
+
+    # ── 4. NACELLE box at the tower top (gearbox/generator housing) ──
+    nac_cz = tower_top_z + nac_w / 2
+    fl.add_box("u_tm_nacelle",
+               (0.0, 0.0, nac_cz * fl.MM),
+               (nac_len * fl.MM, nac_w * fl.MM, nac_w * fl.MM), P["nacelle"],
+               module=tm_mod, module_objects=MO)
+    # a small yaw collar where the nacelle meets the tower
+    fl.add_cyl("u_tm_yaw",
+               (0.0, 0.0, (tower_top_z + nac_w * 0.06) * fl.MM),
+               (top_dia / 2 * 1.15) * fl.MM, (nac_w * 0.14) * fl.MM, P["hub"],
+               module=tm_mod, module_objects=MO)
+
+    # ── 5. HUB + ROTOR at the nacelle FRONT (+X face) ──
+    hub_x = nac_len / 2 + hub_dia * 0.4
+    hub_xyz = (hub_x, 0.0, nac_cz)
+    # hub: a short cone (spinner) pointing +X
+    fl.add_frustum("u_tm_hub",
+                   ((hub_x + hub_dia * 0.2) * fl.MM, 0.0, nac_cz * fl.MM),
+                   (hub_dia / 2) * fl.MM, (hub_dia / 2 * 0.45) * fl.MM,
+                   hub_dia * fl.MM, P["hub"],
+                   module=tm_mod, module_objects=MO, vertices=24,
+                   rotation=(0, math.radians(90), 0))
+    # N blades at 360/N° around the hub axis (rotor plane = Y–Z, faces +X)
+    for b in range(n_blades):
+        ang = (2 * math.pi / n_blades) * b + math.pi / 2   # first blade points up
+        _tm_build_blade(f"u_tm_blade{b}", hub_xyz, ang, blade_len, root_chord,
+                        P["blade"], tm_mod, MO)
+
+    # ── 6. faint GROUND PLANE far below (context; named u_skid_* → faint wire) ──
+    plane_extent = max(rotor_d, found_dia) * 1.4
+    plane_mat = fl.make_mat("m_tm_ground", (0.62, 0.64, 0.68),
+                            metallic=0.0, roughness=0.85)
+    fl.add_box("u_skid_tm_ground",
+               (0.0, 0.0, (DECK_Z_MM - 20.0) * fl.MM),
+               (plane_extent * fl.MM, plane_extent * fl.MM, 40.0 * fl.MM),
+               plane_mat, module=struct_mod, module_objects=MO)
+
+    # ── 7. BoP lineup at the tower base (converter/transformer/switchgear/SCADA) ──
+    region_centres = {}
+    bop_anchor = {}
+    bop_items = _select_tm_bop_items(parts)
+    steel = _steel_mat(MAT)
+    # lay the cabinets in a row in −Y, clear of the foundation, along X about centre.
+    bop_y = -(found_dia / 2 + TM_BOP_STANDOFF_MM)
+    total_w = sum(it[3] for it in bop_items) + TM_BOP_GAP_MM * max(0, len(bop_items) - 1)
+    cursor_x = -total_w / 2
+    for role, part_or_none, depth_mm, w_mm, h_mm, rgb in bop_items:
+        cx = cursor_x + w_mm / 2
+        cy = bop_y
+        nm = f"u_tm_bop_{role}"
+        mat = MAT.get(f"u_tm_bop_{role}") or fl.make_mat(
+            f"m_tm_bop_{role}", rgb, metallic=0.35, roughness=0.42)
+        MAT[f"u_tm_bop_{role}"] = mat
+        mod = part_or_none.module_id if part_or_none else tm_mod
+        if mod not in MO:
+            MO[mod] = []
+        if role == "transformer":
+            _build_bop_transformer(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+                                   mat, steel, MAT, mod, MO)
+        elif role in ("converter", "switchgear"):
+            _build_bop_cabinet_lineup(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+                                      mat, steel, MAT, mod, MO, n_sections=2,
+                                      louvres=True)
+        else:  # scada / controller → small wall cabinet
+            _build_bop_wall_cabinet(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+                                    mat, steel, MAT, mod, MO)
+        bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
+        region_centres[role] = (cx, cy)
+        cursor_x += w_mm + TM_BOP_GAP_MM
+
+    # ── 8. bbox + frame_top + topology ──
+    half = max(rotor_d / 2, found_dia / 2) + 1000.0
+    bbox = {"x0": -half, "x1": half,
+            "y0": min(-half, bop_y - 2000.0), "y1": half}
+    frame_top_mm = nac_cz + rotor_d / 2 + 1000.0   # blade-tip-up clearance
+    region_centres["tower"] = (0.0, 0.0)
+    region_centres["nacelle"] = (0.0, 0.0)
+
+    routed, unresolved = _route_tower_machine_topology(
+        topology, parts, hub_xyz, (0.0, 0.0, nac_cz),
+        (0.0, 0.0, base_z + 1500.0), bop_anchor, frame_top_mm, bbox, MAT, MO)
+    print(f"[univ][tower] BoP lineup of {len(bop_items)} cabinets; "
+          f"topology routed = {routed}/{len(topology)}; unresolved = {len(unresolved)}")
+    return bbox, region_centres, frame_top_mm, routed, unresolved
+
+
+# Module-level handoff of the contract quantities to place_tower_machine (set in
+# main() right before dispatch), mirroring _RACKFARM_QUANTITIES.
+_TOWERMACHINE_QUANTITIES = None
+
+
+# Balance-of-plant roles for a tower machine's base lineup, in order. Each entry:
+#   (role, name_regex, depth_mm, width_mm, height_mm, rgb). The placer matches the
+# first design part whose name hits the regex (to tag the cabinet to its module);
+# the cabinet is drawn whether or not a part matches (a turbine always has a
+# converter + transformer + switchgear + SCADA at the base).
+_TM_BOP_ROLES = [
+    ("converter",   r"converter|inverter|\bigbt\b|power module|frequency converter|rectifier",
+                                                          1100.0, 1300.0, 1900.0, (0.45, 0.55, 0.68)),
+    ("transformer", r"transformer",                      1500.0, 1300.0, 1300.0, (0.30, 0.40, 0.62)),
+    ("switchgear",  r"switchgear|breaker|\brmu\b|grid.?side|ac main|main bus",
+                                                          900.0, 1000.0, 2000.0, (0.34, 0.38, 0.44)),
+    ("scada",       r"scada|\bplc\b|controller|control cabinet|turbine plc|condition monitor",
+                                                          700.0, 800.0, 1800.0, (0.30, 0.46, 0.40)),
+]
+
+
+def _select_tm_bop_items(parts):
+    """Build the tower-machine base BoP lineup. For each role in _TM_BOP_ROLES, find
+    the first matching design part (to reflect the BoM + carry its module tag); the
+    cabinet is drawn whether or not a part matches. Returns
+    [(role, part_or_None, depth_mm, width_mm, height_mm, rgb), …]."""
+    items = []
+    for role, rx, depth, w, h, rgb in _TM_BOP_ROLES:
+        rxc = re.compile(rx, re.IGNORECASE)
+        match = next((p for p in parts if rxc.search(str(p.name))), None)
+        items.append((role, match, depth, w, h, rgb))
+    return items
+
+
+def _route_tower_machine_topology(topology, parts, hub_pt, nacelle_pt, base_pt,
+                                  bop_anchor, frame_top_mm, bbox, MAT, MO):
+    """Route the turbine topology as thin electrical/data CABLE runs down the tower
+    to the base BoP. Endpoints resolve against the turbine anchors first (rotor/
+    blade/pitch → hub; nacelle/gearbox/generator/yaw → nacelle; tower/base/grid →
+    base; converter/transformer/switchgear/scada → their BoP cabinet), then fall
+    back to the generic part resolver. Fewer edges may resolve; the count is
+    reported. Returns (routed, unresolved)."""
+    HUB_RE  = re.compile(r"\brotor\b|\bblade\b|\bpitch\b|\bhub\b|aerodynamic", re.IGNORECASE)
+    NAC_RE  = re.compile(r"nacelle|gearbox|generator|\byaw\b|main shaft|bedplate|drivetrain", re.IGNORECASE)
+    BASE_RE = re.compile(r"\btower\b|\bbase\b|\bgrid\b|foundation|down.?tower|cable", re.IGNORECASE)
+    ROLE_RE = {
+        "converter":   re.compile(r"converter|inverter|\bigbt\b|rectifier|power module", re.IGNORECASE),
+        "transformer": re.compile(r"transformer|\bgrid\b", re.IGNORECASE),
+        "switchgear":  re.compile(r"switchgear|breaker|\brmu\b", re.IGNORECASE),
+        "scada":       re.compile(r"scada|\bplc\b|controller|condition monitor", re.IGNORECASE),
+    }
+
+    def _resolve(endpoint_name):
+        nm = str(endpoint_name)
+        for role, rx in ROLE_RE.items():
+            if rx.search(nm) and role in bop_anchor:
+                return bop_anchor[role]
+        if HUB_RE.search(nm):
+            return hub_pt
+        if NAC_RE.search(nm):
+            return nacelle_pt
+        if BASE_RE.search(nm):
+            return base_pt
+        p = resolve_endpoint(nm, parts)
+        if p is not None and p.placed_xyz_mm is not None:
+            return (p.placed_xyz_mm[0], p.placed_xyz_mm[1],
+                    p.anchors["top"][2] if p.anchors else p.placed_xyz_mm[2])
+        return None
+
+    routed = 0
+    unresolved = []
+    for i, e in enumerate(topology):
+        frm = e.get("from_part", "")
+        to = e.get("to_part", "")
+        mech = e.get("mechanism", "electrical_bus")
+        a = _resolve(frm)
+        b = _resolve(to)
+        if a is None or b is None:
+            miss = [n for n, pt in ((frm, a), (to, b)) if pt is None]
+            unresolved.append((frm, to, mech, miss))
+            continue
+        # route down-tower: a simple 3-point L (source → above-base → base point)
+        waypoints = [a, (b[0], b[1], min(a[2], nacelle_pt[2])), b]
+        nm = f"u_tm_route_{i}_{mech}"
+        try:
+            if mech in ("electrical_bus", "data_link", "control_signal", "signal"):
+                _draw_cable_tray(nm, waypoints, MAT, MO)
+            else:
+                colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
+                mkey = f"u_pipe_{mech}"
+                if mkey not in MAT:
+                    MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35, roughness=0.35)
+                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=MAT[mkey],
+                                 flanges=True, module="mass_fluid_transport_process",
+                                 module_objects=MO)
+            routed += 1
+        except Exception as ex:  # noqa: BLE001 — never let one bad route kill the run
+            unresolved.append((frm, to, mech, [f"route_error:{ex}"]))
+            print(f"[univ][tower] edge {i} route FAILED: {ex}")
+    return routed, unresolved
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -4650,12 +5187,36 @@ _INSPECT_RACKFARM = [
     ("bop_bms_ctrl",  (0.20, 0.46, 0.92)),   # BMS / EMS controller = bright blue
     ("bop_chiller",   (0.80, 0.72, 0.50)),   # chiller / thermal = tan
     ("bop_fire",      (0.80, 0.20, 0.16)),   # fire-suppression skid = red
+    # compute BoP roles (a server-room lineup) — distinct from the BESS bodies
+    ("bop_cooling",   (0.72, 0.80, 0.88)),   # CRAC / CRAH cooling = pale blue-grey
+    ("bop_pdu",       (0.36, 0.40, 0.46)),   # power distribution = dark grey
+    ("bop_network",   (0.28, 0.50, 0.42)),   # network switch = green-grey
+    ("bop_ups",       (0.42, 0.46, 0.54)),   # UPS = steel grey
 ]
+
+# COMPUTE-flavour overrides for the shared rack object keys (same object names as a
+# battery rack, but a server rack must read GREY, not battery-blue, with a dark
+# cable spine rather than a copper DC bus). Consulted by _inspect_rackfarm_colour
+# when the detected flavour is 'compute'. Battery/generic keep the table above.
+_INSPECT_RACKFARM_COMPUTE = {
+    "_frame":  (0.16, 0.17, 0.20),   # recessed cabinet shell = neutral dark
+    "_fascia": (0.12, 0.13, 0.15),   # sled bezel strip = darkest (shelf-line)
+    "_mod":    (0.66, 0.68, 0.72),   # server SLED body = light grey
+    "_rack_":  (0.60, 0.62, 0.66),   # rack frame fallback = grey
+    "_bus":    (0.16, 0.17, 0.20),   # cable-management spine = dark
+}
 
 
 def _inspect_rackfarm_colour(name):
-    """Flat-matte INSPECT colour for a rack-farm object, by its name role. Falls
-    back to the battery-blue rack colour for any unmatched u_rf_* helper."""
+    """Flat-matte INSPECT colour for a rack-farm object, by its name role. When the
+    detected rack FLAVOUR is 'compute', the shared rack keys (_mod / _rack_ / _bus)
+    map to server-grey + a dark cable spine instead of battery-blue + copper bus, so
+    a compute rack reads as a SERVER rack in the judge surface. Falls back to the
+    battery-blue rack colour for any unmatched u_rf_* helper."""
+    if _RACK_FLAVOUR == "compute":
+        for key, rgb in _INSPECT_RACKFARM_COMPUTE.items():
+            if key in name:
+                return rgb
     for key, rgb in _INSPECT_RACKFARM:
         if key in name:
             return rgb
@@ -4712,6 +5273,43 @@ def _inspect_panelarray_colour(name):
         if key in name:
             return rgb
     return (0.74, 0.76, 0.80)
+
+
+# Flat-matte INSPECT colours for the TOWER-MACHINE object families (keyed by the
+# u_tm_* object names). Tower/nacelle LIGHT GREY, blades WHITE, hub/yaw GREY,
+# foundation CONCRETE-GREY, BoP cabinets by role. MORE SPECIFIC keys MUST precede
+# catch-alls; the BoP detail keys (bushing/fin/louvre…) are shared with the
+# rack-farm builders so reuse the same colours. Matched by substring, in order.
+_INSPECT_TOWERMACHINE = [
+    # ── BoP role detail parts (precede role bodies + the broad turbine keys) ──
+    ("_bushing",      (0.86, 0.86, 0.82)),   # transformer HV bushing = porcelain
+    ("_fin",          (0.34, 0.36, 0.40)),   # transformer radiator fin = dark steel
+    ("_conservator",  (0.30, 0.34, 0.42)),   # transformer oil conservator = steel
+    ("_louvre",       (0.20, 0.22, 0.26)),   # cabinet vent louvre = dark slat
+    ("_door",         (0.26, 0.30, 0.38)),   # control cabinet door = dark
+    ("_vent",         (0.20, 0.22, 0.26)),   # control cabinet vent = dark
+    ("bop_converter", (0.40, 0.50, 0.66)),   # converter cabinet = steel blue-grey
+    ("bop_transformer",(0.28, 0.38, 0.62)),  # transformer = blue-grey
+    ("bop_switchgear",(0.34, 0.38, 0.44)),   # switchgear = dark grey
+    ("bop_scada",     (0.30, 0.46, 0.40)),   # SCADA / control = green-grey
+    # ── turbine geometry (after BoP so a bop_* body never matches these) ──
+    ("_blade",        (0.95, 0.95, 0.96)),   # rotor blade = WHITE
+    ("_hub",          (0.66, 0.68, 0.72)),   # rotor hub / spinner = grey
+    ("_yaw",          (0.60, 0.62, 0.66)),   # yaw collar = grey
+    ("_nacelle",      (0.80, 0.81, 0.84)),   # nacelle housing = light grey
+    ("_tower",        (0.82, 0.83, 0.85)),   # tower tube = light grey
+    ("_found",        (0.62, 0.61, 0.58)),   # foundation pad = concrete grey
+    ("_plinth",       (0.50, 0.52, 0.55)),   # BoP plinth = mid grey steel
+]
+
+
+def _inspect_towermachine_colour(name):
+    """Flat-matte INSPECT colour for a tower-machine object, by its name role.
+    Falls back to the tower light grey for any unmatched u_tm_* helper."""
+    for key, rgb in _INSPECT_TOWERMACHINE:
+        if key in name:
+            return rgb
+    return (0.82, 0.83, 0.85)
 
 
 # Flat-matte INSPECT colours for the AERO-BODY object families (keyed by the
@@ -4892,6 +5490,20 @@ def apply_inspection_materials(parts):
             gr_colour = _inspect_panelarray_colour(nm)
             obj.data.materials.clear()
             obj.data.materials.append(_matte(gr_colour))
+            n_equip += 1
+            continue
+        # ── TOWER-MACHINE geometry (u_tm_*) → flat matte by role: tower/nacelle
+        #    light grey, blades white, hub/yaw grey, foundation concrete, BoP by
+        #    role. Routed cables (u_tm_route_) keep their copper colour. These
+        #    objects aren't owned by a Part, so they'd otherwise fall to the
+        #    neutral-grey unmatched bucket. ──
+        if nm.startswith("u_tm_"):
+            if nm.startswith("u_tm_route_"):
+                tm_colour = (1.00, 0.50, 0.05)   # cable run = copper-orange
+            else:
+                tm_colour = _inspect_towermachine_colour(nm)
+            obj.data.materials.clear()
+            obj.data.materials.append(_matte(tm_colour))
             n_equip += 1
             continue
         # ── AERO-BODY geometry (u_aero_*) → flat matte by role: fuselage/bus light
@@ -5181,11 +5793,13 @@ def main():
     # 4-6. GEOMETRY-FAMILY DISPATCH — pick + run the placement strategy:
     #      aero_body (FLIGHT VEHICLE: a HAPS aircraft or a satellite in FREE SPACE —
     #      central fuselage/bus + wings/solar-arrays + props/thrusters + antennas, NO
-    #      skid/container), panel_array (VF: rows of multi-tier grow racks + canopy +
-    #      LED panels + climate/nutrient BoP in a grow room), rack_farm (BESS: rows of
-    #      racks in a container + BoP lineup + bus/coolant runs), or process_plant (the
-    #      default: regions on an open skid + overhead pipe rack). All return the SAME
-    #      tuple so the INSPECT/PDF render below is common.
+    #      skid/container), tower_machine (WIND TURBINE: tower + nacelle + 3-blade
+    #      rotor + foundation + base BoP, free-standing), panel_array (VF: rows of
+    #      multi-tier grow racks + canopy + LED panels + climate/nutrient BoP),
+    #      rack_farm (battery OR compute: rows of racks in a container + BoP lineup +
+    #      bus/coolant runs), or process_plant (the default: regions on an open skid +
+    #      overhead pipe rack). All return the SAME tuple so the INSPECT/PDF render
+    #      below is common.
     modules = state.get("moduleDecomposition", {}).get("modules", [])
     family = detect_geometry_family(parts, modules)
     if family == "aero_body":
@@ -5193,6 +5807,11 @@ def main():
         _AERO_QUANTITIES = quantities
         bbox, region_centres, frame_h, routed, unresolved = place_aero_body(
             parts, regions, topology, MAT, MO, subtype=_AERO_SUBTYPE)
+    elif family == "tower_machine":
+        global _TOWERMACHINE_QUANTITIES
+        _TOWERMACHINE_QUANTITIES = quantities
+        bbox, region_centres, frame_h, routed, unresolved = place_tower_machine(
+            parts, regions, topology, MAT, MO)
     elif family == "panel_array":
         global _PANELARRAY_QUANTITIES
         _PANELARRAY_QUANTITIES = quantities
