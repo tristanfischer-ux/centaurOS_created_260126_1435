@@ -48,6 +48,7 @@ import { classifyByRules } from './estimate-missing-prices'
 import { auditCostSanity, type CostLine } from './lib/cost-self-assessment'
 import { computeNetInfeasibilityFlag } from './lib/brief-infeasibility-net'
 import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
+import { buildToolSelectionNarrative, type ToolNarrativeEntry } from './lib/tool-selection-narrative'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { MATERIAL_RATE_GBP_PER_KG, FABRICATION_FACTOR } from './lib/cost/process-equipment-cost'
@@ -4012,6 +4013,32 @@ function CoverPage({
   )
 }
 
+// Increment 1A (2026-06-10): WinAnsi-safe text for the deterministic
+// tool-selection narrative. The built-in PDF Helvetica only carries WinAnsi
+// glyphs, so a tool name like "HT ε-NTU Heat Exchanger" or a claim with a Greek
+// / math symbol would drop a glyph (or throw) if passed raw. Transliterate the
+// engineering symbols we actually emit, then strip anything still outside
+// printable WinAnsi (curly quotes, em/en dash and the mid-dot ARE in WinAnsi, so
+// they survive). Deterministic + pure.
+const _ASCII_TRANSLIT: Record<string, string> = {
+  'ε': 'eps', 'η': 'eta', 'μ': 'u', 'µ': 'u', 'σ': 'sigma', 'ρ': 'rho', 'Δ': 'delta',
+  'δ': 'delta', 'θ': 'theta', 'λ': 'lambda', 'π': 'pi', 'φ': 'phi', 'ω': 'omega',
+  'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'τ': 'tau', 'Σ': 'Sum', 'Ω': 'Ohm',
+  '×': 'x', '÷': '/', '√': 'sqrt', '∞': 'inf', '≈': '~', '≤': '<=', '≥': '>=',
+  '≠': '!=', '°': ' deg', '→': '->', '←': '<-', '↔': '<->', '⋮': ':', '‖': '|',
+  '²': '2', '³': '3', '½': '1/2', '¼': '1/4',
+}
+function asciiSafe(s: unknown): string {
+  let out = String(s ?? '')
+  for (const [k, v] of Object.entries(_ASCII_TRANSLIT)) {
+    if (out.includes(k)) out = out.split(k).join(v)
+  }
+  // Keep printable ASCII + the WinAnsi punctuation react-pdf's Helvetica renders
+  // fine (curly quotes 0x2018-0x201D, dashes 0x2013-0x2014, bullet/mid-dot,
+  // pound, section, degree). Drop any other non-ASCII to avoid a missing glyph.
+  return out.replace(/[^\x20-\x7E£§°·–—‘’“”•]/g, '')
+}
+
 function PageHeader({ section, project }: { section: string; project: string }) {
   // 2026-06-09 universal cleanup:
   // (1) The build/run id (`project`, e.g. "chain-v2-1780905834188") is no longer
@@ -4032,7 +4059,13 @@ function PageHeader({ section, project }: { section: string; project: string }) 
   let display = label
   if (!/^PART\d|^APPENDIX|^CONTENTS/.test(key)) {
     let part = '1' // engineering basis, exec summary, brief*, provenance, compliance, how-computed, system overview, calcs
-    if (/^MODULE\d|SPECIALISTQUESTION|RISK.*INTEGRAT/.test(key)) part = '2'
+    // Part 2 = the build: per-module pages ("Module N ·" → MODULEN), the Module
+    // Map + its exploded view ("Modules" / "Modules — Exploded view" → MODULES…),
+    // specialist questions, and risk/integration. The `MODULES` plural was the
+    // orphaned-header bug: the Module Map opens Part 2 but `^MODULE\d` only
+    // matched the numbered per-module pages, so the map + exploded view mis-tagged
+    // as "PART 1 · MODULES" (2026-06-10 fix). Universal across all classes.
+    if (/^MODULE\d|^MODULES|SPECIALISTQUESTION|RISK.*INTEGRAT/.test(key)) part = '2'
     else if (/BILLOFMATERIAL|COST|SOURCING|PROCUREMENT|REGULATOR|TAKINGTHIS|TAKINGFORWARD|ENGAGEMENT|SUPPLIERSTOSOURCE/.test(key)) part = '3'
     display = `Part ${part} · ${label}`
   }
@@ -4876,13 +4909,20 @@ function TableOfContentsPage({ state, project }: { state: any; project: string }
     // first). Single column so the three part groups read top-to-bottom.
     const parts: { label: string; entries: { num: string; title: string }[] }[] = [
       {
+        // Order mirrors the Part-1 render sequence + the Part-1 cover list
+        // (2026-06-10 reorder): what the plant IS (system overview + engineering
+        // basis) precedes how it was COMPUTED (tool dependency graph + tool
+        // selection). No page numbers — single-pass render, `num` is ignored.
         label: 'Part 1 · The engineering',
         entries: [
-          { num: '', title: 'Engineering basis' },
+          { num: '', title: 'Executive Summary' },
           { num: '1', title: 'Brief & Requirements' },
           { num: '2', title: 'Brief Provenance' },
           { num: '3', title: 'Brief Compliance & Trade-offs' },
           { num: '4', title: 'System Overview' },
+          { num: '', title: 'Engineering Basis' },
+          { num: '', title: 'How the Whole Plant Was Computed' },
+          { num: '', title: 'Tool Selection & Sequencing' },
           { num: '', title: 'Engineering Calculations' },
         ],
       },
@@ -13924,6 +13964,18 @@ function EngineeringToolsFlowPage({
   const systemIds = systemLevelToolIds(state)
   const tools: any[] = allTools.filter((t: any) => systemIds.has(t?.tool_id))
 
+  // Increment 1A (2026-06-10): replace the identical-for-every-dossier intro
+  // boilerplate with a DETERMINISTIC reasoned summary of WHY the engine
+  // selected this tool set + HOW the tools sequence (no LLM — the selection is
+  // deterministic, so its explanation is too). Pure helper; try/catch so a
+  // narrative fault can never break the page (matches the file's other pages).
+  let selectionSummary = ''
+  try {
+    selectionSummary = String(buildToolSelectionNarrative(state)?.summary ?? '').trim()
+  } catch {
+    selectionSummary = ''
+  }
+
   // The chain writes tools-flow.png alongside state.json in the same outDir.
   const stateDir = dirname(statePath)
   const pngPath = join(stateDir, 'tools-flow.png')
@@ -13936,13 +13988,8 @@ function EngineeringToolsFlowPage({
         How the whole plant was computed
       </Text>
       <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 10, lineHeight: 1.55 }}>
-        These are the cross-cutting, system-level tools — the ones whose numbers
-        belong to the plant as a whole, not to any single module. The brief feeds
-        every engineering tool; each tool&apos;s output flows into the
-        Engineering Contract, which drives the parts Library, the Reviewers, and
-        finally the Bill of Materials. The worked calculation for a tool that
-        sizes one module&apos;s equipment now sits with that module, under its
-        &ldquo;How this module was computed&rdquo; heading.
+        {selectionSummary ||
+          'These are the cross-cutting, system-level tools — the ones whose numbers belong to the plant as a whole, not to any single module. The brief feeds every engineering tool; each tool’s output flows into the Engineering Contract, which drives the parts Library, the Reviewers, and finally the Bill of Materials. The worked calculation for a tool that sizes one module’s equipment now sits with that module, under its “How this module was computed” heading.'}
       </Text>
 
       {pngExists ? (
@@ -14049,6 +14096,90 @@ function EngineeringToolsFlowPage({
         report.
       </Text>
 
+      <PageFooter />
+    </Page>
+  )
+}
+
+// ─── Increment 1A (2026-06-10) · Tool selection & sequencing narrative ──────
+//
+// The diagram page above shows WHICH tools ran and the feeds_into edges, but a
+// reader can't judge the AUTO-SELECTION from boxes-and-arrows alone. This page
+// renders, in deterministic prose (no LLM — the engine's tool selection is a
+// per-class typed plan keyed on the brief envelope, so its explanation is
+// derived purely from state), WHY each tool was chosen and HOW the tools
+// interact + sequence. Data sources are traced in
+// scripts/lib/tool-selection-narrative.ts. This is a SEPARATE wrapping portrait
+// page (NOT crammed onto the non-wrapping landscape diagram page above, which
+// would clip): the summary paragraph, then one block per tool — name in bold +
+// a 2-3 sentence rationale built from owns/whySelected/inputs/outputs/
+// sequencing. Each block is wrap={false} so it never splits across a page
+// boundary; the blocks flow across as many pages as needed. try/catch → null so
+// a narrative fault can never break the PDF (matches the file's other pages).
+function ToolSelectionNarrativePage({ state, project }: { state: any; project: string }) {
+  let summary = ''
+  let entries: ToolNarrativeEntry[] = []
+  try {
+    const n = buildToolSelectionNarrative(state)
+    summary = String(n?.summary ?? '').trim()
+    entries = Array.isArray(n?.tools) ? n.tools : []
+  } catch {
+    return null
+  }
+  // Nothing to add beyond the diagram page's intro when no tools ran.
+  if (entries.length === 0) return null
+
+  return (
+    <Page size="A4" style={PAGE_STYLE} wrap>
+      <PageHeader section="Section 4 · Tool selection & sequencing" project={project} />
+      <Text style={{ fontSize: 16, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Tool selection &amp; sequencing
+      </Text>
+      <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 12, lineHeight: 1.55 }}>
+        {summary}
+      </Text>
+      {entries.map((t, i) => (
+        <View
+          key={`tsn-${i}`}
+          style={{
+            marginBottom: 9,
+            paddingLeft: 9,
+            borderLeftWidth: 2,
+            borderLeftColor: ACCENT,
+          }}
+          wrap={false}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 }}>
+            <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK }}>
+              {`${i + 1}. ${asciiSafe(t.name)}`}
+            </Text>
+            <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Oblique', color: MUTED }}>
+              {asciiSafe(t.id)}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 1.5 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: ACCENT }}>Owns: </Text>
+            {asciiSafe(t.owns)}{' '}
+            {asciiSafe(t.whySelected)}
+          </Text>
+          <Text style={{ fontSize: 8.5, color: '#28313f', lineHeight: 1.45, marginBottom: 1.5 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: MUTED }}>Inputs: </Text>
+            {asciiSafe(t.inputs)}{'  '}
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: MUTED }}>Outputs: </Text>
+            {asciiSafe(t.outputs)}
+          </Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold' }}>Sequencing: </Text>
+            {asciiSafe(t.sequencing)}
+          </Text>
+        </View>
+      ))}
+      <Text style={{ fontSize: 8, color: MUTED, marginTop: 6, lineHeight: 1.5, fontStyle: 'italic' }}>
+        This rationale is generated deterministically from the recorded tool run
+        — the execution order, each tool&apos;s computed quantities, and the
+        feeds_into dependency edges. It is not an LLM narration; the engine&apos;s
+        tool selection is itself deterministic.
+      </Text>
       <PageFooter />
     </Page>
   )
@@ -15971,8 +16102,9 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           render). Returns null on error so it can never break the PDF. */}
       <TableOfContentsPage state={state} project={project} />
       {/* Part dividers (2026-06-08): frame the dossier as Tristan's three-part
-          structure (engineering / build / consolidated reference). Additive —
-          the parts are already contiguous blocks; nothing is reordered. */}
+          structure (engineering / build / consolidated reference). The parts are
+          contiguous blocks; the dividers only FRAME them. (Page order WITHIN Part
+          1 was tuned 2026-06-10 for reading flow — see the reorder note below.) */}
       <PartDividerPage
         eyebrow="Part 1"
         title={"Engineering & maths"}
@@ -15981,19 +16113,21 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
         contents={[
           'Executive summary',
           'Brief and requirements, and how it was interpreted',
+          'Brief provenance: the original brief vs the structured parse',
           'Brief compliance and trade-offs',
-          'How the whole plant was computed',
           'System overview: how the plant works',
           'Engineering basis: process flow, mass and energy balance, feasibility verdict',
+          'How the whole plant was computed: the tool dependency graph',
+          'Tool selection and sequencing: why each tool was chosen, and in what order',
           'Engineering calculations: the worked maths, by module and sub-module',
         ]}
         project={project}
       />
-      {/* EngineeringBasisPage (process flow + mass/energy balance + feasibility
-          verdict + headline economics) MOVED to after System Overview
-          (Tristan 2026-06-09): the reader meets the executive summary + brief +
-          how-it-was-computed + system overview FIRST, then the whole-plant-at-a-
-          glance, then the worked calculations. */}
+      {/* Part-1 reading flow (2026-06-10 reorder): executive summary → brief →
+          brief provenance → brief compliance → SYSTEM OVERVIEW → ENGINEERING
+          BASIS (whole-plant balance + verdict) → HOW THE WHOLE PLANT WAS COMPUTED
+          (tool dependency graph) → TOOL SELECTION & SEQUENCING → engineering
+          calculations. "What the plant IS" precedes "how it was COMPUTED". */}
       {/* ITER-10.5 (Tristan-defined 2026-05-20):
           Brief sits immediately after Cover. Operational Headline is folded
           INTO BriefPage as a banner at the top (HeadlinePage component
@@ -16023,15 +16157,12 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           for, BEFORE Engineering Tools Flow so the trade-off shapes how the
           tool chain is interpreted. */}
       <BriefComplianceTradeOffsPage state={state} project={project} bomTotals={bomTotals} costStack={costStack} />
-      {/* Engineering Tools Flow (universal — task #113, 2026-05-24): per-tool
-          3-column block showing the INPUTS each engineering tool consumed,
-          a short description of the tool, and the OUTPUTS it produced. The
-          orchestrator's _tools_run order is the data-flow sequence; each
-          output is annotated with the downstream tool that consumes it (or
-          "→ flows to BoM" for terminal outputs). Renders null when the
-          orchestrator did not run for this chain. Sits AFTER Brief Provenance
-          so the reader sees the brief first, then how it was computed. */}
-      <EngineeringToolsFlowPage state={state} project={project} bomTotals={bomTotals} statePath={statePath} />
+      {/* REORDER 2026-06-10 (Tristan): "what the plant IS" before "how it was
+          COMPUTED". System Overview + Engineering Basis now sit AHEAD of the two
+          tooling pages (Engineering Tools Flow + Tool Selection), so the reader
+          meets the plant — what it does, how it works, the whole-plant balance +
+          feasibility verdict — before the dependency graph and the tool-selection
+          narrative that explain HOW those numbers were produced. */}
       {/* System Overview (universal — Tristan 2026-05-24, task #117): four
           blocks — WHAT IT DOES (combines parsed brief product_description +
           mission + target_customers), HOW IT WORKS (stitches per-module
@@ -16042,15 +16173,31 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           deterministic sub-block: a net-CO2 reconciliation card + the system-
           level physics cards templated from computed contract quantities, no
           LLM, under their own credibility note). Template-driven from existing
-          state — no extra LLM call. Sits AFTER Engineering Tools Flow so the
-          reader meets the brief, sees how it was computed, then gets the
-          plain-English system architecture before dropping into per-module
-          pages. */}
+          state — no extra LLM call. Sits AFTER Brief Compliance so the reader
+          meets the brief, then gets the plain-English system architecture before
+          the whole-plant balance + the how-it-was-computed pages. */}
       <SystemOverviewPage state={state} project={project} />
       {/* Whole-plant-at-a-glance — process flow + mass/energy balance + feasibility
-          verdict + headline economics (moved here 2026-06-09: after the brief +
-          system overview, before the worked maths). */}
+          verdict + headline economics (sits after System Overview: the reader sees
+          what the plant is, then the whole-plant balance + verdict, BEFORE the
+          how-it-was-computed tooling pages). */}
       <EngineeringBasisPage state={state} project={project} />
+      {/* Engineering Tools Flow (universal — task #113, 2026-05-24): per-tool
+          3-column block showing the INPUTS each engineering tool consumed,
+          a short description of the tool, and the OUTPUTS it produced. The
+          orchestrator's _tools_run order is the data-flow sequence; each
+          output is annotated with the downstream tool that consumes it (or
+          "→ flows to BoM" for terminal outputs). Renders null when the
+          orchestrator did not run for this chain. Sits AFTER System Overview +
+          Engineering Basis (2026-06-10 reorder): the reader knows what the plant
+          IS before seeing HOW it was computed. */}
+      <EngineeringToolsFlowPage state={state} project={project} bomTotals={bomTotals} statePath={statePath} />
+      {/* Increment 1A (2026-06-10): deterministic "Tool selection & sequencing"
+          narrative — WHY each tool was auto-selected + HOW they interact +
+          sequence. Sits immediately after the dependency diagram so a reader
+          can judge the auto-selection in prose, not just boxes-and-arrows.
+          Renders null when no orchestrator tools ran (legacy / LLM-fallback). */}
+      <ToolSelectionNarrativePage state={state} project={project} />
       {/* Part 1 · Engineering Calculations — the worked maths ("how this is
           computed"), moved OUT of the Part-2 modules into the engineering part
           (Tristan 2026-06-08). Closes the §6 page gaps too. */}
