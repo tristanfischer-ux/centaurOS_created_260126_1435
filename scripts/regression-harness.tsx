@@ -1471,6 +1471,57 @@ function checkEFuelSynthesisInvariants(): Assertion[] {
 //       outcome NEVER contradicts the next-steps paragraph ("no breaches" must
 //       not co-occur with "the breached subsystems").
 //
+// ─────────────────────────────────────────────────────────────────────────────
+// E0 TOOL-I/O MANIFEST invariant (ANVIL-UNIVERSAL-LOOP-PLAN, 2026-06-10).
+// `scripts/lib/orchestrator/tool-io-manifest.json` is the auto-planner's tool
+// inventory (auto-plan-fallback.ts :: loadToolIORegistry skips empty-output
+// tools). Pre-E0 it had 84/178 tools with EMPTY output_keys — invisible to
+// composeToolGraph. The E0 backfill (harvest-tool-io.ts merging class-plan
+// canonical keys with the Python wrappers' live-run ground truth) leaves an
+// IRREDUCIBLE remainder of 15: dangling class-plan tool_ids with no matching
+// registered wrapper (e.g. 'control-systems:run' vs the registered
+// 'control-systems:pid-tuning') — backfilling those would be guessing.
+// Guards: (a) the manifest never regresses below the backfilled coverage
+// (≤15 empty, each from the known dangling set); (b) every entry carries the
+// merge provenance field `output_source`, so a stale/old harvester build
+// (which would silently clobber the python-derived keys) fails loudly.
+let _toolIOManifestCheck: Assertion[] | null = null
+function checkToolIOManifestInvariants(): Assertion[] {
+  if (_toolIOManifestCheck) return _toolIOManifestCheck
+  const out: Assertion[] = []
+  const KNOWN_DANGLING = new Set([
+    'atmospheric-scintillation:turbulence', 'cell-balance-model:bms', 'control-systems:run',
+    'electro-absorption-modulator:design', 'fso:link-budget', 'hvac-load:sizing',
+    'mplc-turbulence-compensation:adaptive-optics', 'opencv-machine-vision:inspection',
+    'pcsel-laser:design', 'phased-array-antenna:radiation-pattern', 'pointing-acquisition-tracking:control',
+    'quantum-chip-packaging:flip-chip', 'qutip:qubit-dynamics', 'rf-mems-beamsteering:design', 'scikit-fem:run',
+  ])
+  try {
+    const manifestPath = resolve(__dirname, 'lib', 'orchestrator', 'tool-io-manifest.json')
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as Record<
+      string,
+      { input_keys?: string[]; output_keys?: string[]; output_source?: string }
+    >
+    const ids = Object.keys(manifest)
+    const empty = ids.filter((id) => (manifest[id].output_keys ?? []).length === 0)
+    const unknownEmpty = empty.filter((id) => !KNOWN_DANGLING.has(id))
+    const missingSource = ids.filter((id) => !manifest[id].output_source)
+    out.push(assertEq(
+      'UNIVERSAL.tool_io_manifest_backfilled',
+      `tool-io-manifest stays backfilled: ≥199 tools, ≤${KNOWN_DANGLING.size} empty output_keys (all from the known dangling-id set), every entry carries output_source`,
+      { total: ids.length, empties: empty.length, unknownEmpty, missingSource: missingSource.length },
+      (v) => v.total >= 199 && v.empties <= KNOWN_DANGLING.size && v.unknownEmpty.length === 0 && v.missingSource === 0,
+      (v) => `manifest regressed: total=${v.total} (need ≥199), empty output_keys=${v.empties} (cap ${KNOWN_DANGLING.size}), ` +
+        `unexpected empty ids=[${v.unknownEmpty.slice(0, 6).join(', ')}], entries without output_source=${v.missingSource}. ` +
+        `Regenerate with \`npx tsx scripts/lib/orchestrator/harvest-tool-io.ts\` (it merges class-plan canonical keys with the python wrappers' live-run I/O; an old harvester build clobbers the backfill).`,
+    ))
+  } catch (err) {
+    out.push({ id: 'UNIVERSAL.tool_io_manifest_backfilled', description: 'tool-io-manifest backfilled', passed: false, detail: `manifest unreadable: ${String(err).slice(0, 160)}` })
+  }
+  _toolIOManifestCheck = out
+  return out
+}
+
 // Snapshot-independent (pure functions on synthetic inputs), memoised.
 let _dedupExecCheck: Assertion[] | null = null
 function checkDedupAndExecSummaryInvariants(): Assertion[] {
@@ -8190,6 +8241,10 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // worked-calc collapse keys + Executive-Summary prose grammaticality /
   // breach-consistency. Pure functions on synthetic inputs, memoised.
   for (const a of checkDedupAndExecSummaryInvariants()) assertions.push(a)
+
+  // Self-contained E0 tool-I/O manifest invariant — file-only (no registry
+  // import), memoised; guards the auto-planner's backfilled tool inventory.
+  for (const a of checkToolIOManifestInvariants()) assertions.push(a)
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }

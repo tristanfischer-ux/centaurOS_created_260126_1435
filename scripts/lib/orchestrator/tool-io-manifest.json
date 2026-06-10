@@ -1,17 +1,96 @@
 {
+  "absorption:column-htu-ntu": {
+    "input_keys": [
+      "column_name",
+      "equilibrium_slope_m",
+      "fraction_of_flooding",
+      "gas_density_kg_m3",
+      "gas_flow_kg_h",
+      "gas_molar_mass_kg_kmol",
+      "htu_m",
+      "liquid_density_kg_m3",
+      "liquid_flow_kg_h",
+      "liquid_molar_mass_kg_kmol",
+      "liquid_viscosity_cp",
+      "mode",
+      "n_columns",
+      "packed_height_override_m",
+      "packing_factor_fp_per_m",
+      "target_removal",
+      "x_in_mol_frac",
+      "y_in_mol_frac"
+    ],
+    "output_keys": [
+      "absorption_factor",
+      "column_area_m2",
+      "column_diameter_m",
+      "column_diameter_mm",
+      "data_sources",
+      "design_velocity_m_s",
+      "eckert_ordinate_y_flood",
+      "flooding_velocity_m_s",
+      "flow_parameter_flv",
+      "gas_molar_flow_kmol_h",
+      "gas_volumetric_flow_m3_s",
+      "liquid_molar_flow_kmol_h",
+      "ntu",
+      "packed_height_m",
+      "y_out_mol_frac"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation"
+    ],
+    "output_source": "python:run"
+  },
   "acoustic-modem:link-budget": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "bandwidth_hz",
+      "depth_m",
+      "detection_threshold_db",
+      "directivity_index_db",
+      "distance_km",
+      "frequency_khz",
+      "modulation",
+      "noise_level_db_re_1upa2_hz",
+      "salinity_ppt",
+      "source_level_db_re_1upa",
+      "water_temp_c"
+    ],
+    "output_keys": [
+      "absorption_db_per_km",
+      "ber_estimate",
+      "capacity_utilization",
+      "data_rate_bps",
+      "link_viable",
+      "noise_level_total_db",
+      "propagation_delay_ms",
+      "shannon_capacity_bps",
+      "snr_db",
+      "sound_speed_ms",
+      "source_level_db",
+      "transmission_loss_db"
+    ],
     "cost_basis": [],
     "seen_in": [
       "auv"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "aeroelastic-flutter:wing": {
     "input_keys": [
       "air_density_kg_m3",
+      "airspeed_ms",
+      "cg_offset_pct_chord",
       "chord_m",
+      "cl_alpha_per_rad",
       "cruise_velocity_m_s",
+      "density_kg_m3",
+      "e_aero_center_to_pitch_axis",
+      "ei_bending_nm2",
+      "gj_torsion_nm2",
+      "mass_per_m_kg",
+      "wing_span_m",
       "wingspan_m"
     ],
     "output_keys": [
@@ -22,14 +101,19 @@
     "cost_basis": [],
     "seen_in": [
       "haps"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "aerosandbox:airfoil-analysis": {
     "input_keys": [
       "air_density_kg_m3",
+      "airfoil_name",
+      "alpha_deg",
       "chord_m",
       "cruise_speed_km_h",
       "cruise_velocity_m_s",
+      "mach",
+      "reynolds",
       "wingspan_m"
     ],
     "output_keys": [
@@ -46,7 +130,8 @@
       "drone",
       "evtol",
       "haps"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "aerosandbox:bemt": {
     "input_keys": [
@@ -65,20 +150,46 @@
     ],
     "seen_in": [
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "agitation:power": {
     "input_keys": [
+      "fluid_density_kg_m3",
+      "fluid_viscosity_pa_s",
+      "gassed",
+      "impeller_diameter_m",
+      "impeller_type",
+      "qg_vvm",
+      "rpm",
+      "tank_diameter_m",
       "vessel_diameter_m"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "gassed_power_ratio",
+      "power_number",
+      "power_ungassed_w",
+      "power_volumetric_w_m3",
+      "power_w",
+      "reynolds_impeller",
+      "tank_volume_m3_assumed",
+      "tip_speed_m_s"
+    ],
     "cost_basis": [],
     "seen_in": [
-      "bioreactor"
-    ]
+      "bioreactor",
+      "co2-mineralisation"
+    ],
+    "output_source": "python:run"
   },
   "airframe-fea:landing": {
     "input_keys": [
+      "arm_length_m",
+      "descent_velocity_ms",
+      "drone_mass_kg",
+      "frame_csa_mm2",
+      "frame_material",
+      "landing_gear",
       "max_mass_kg"
     ],
     "output_keys": [
@@ -88,10 +199,12 @@
     "cost_basis": [],
     "seen_in": [
       "haps"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "ambiance:isa-atmosphere": {
     "input_keys": [
+      "altitude_m",
       "cruise_altitude_m",
       "hub_height_m"
     ],
@@ -106,13 +219,23 @@
       "evtol",
       "haps",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "arc-flash:ieee-1584": {
     "input_keys": [
+      "clearing_time_ms",
+      "electrode_config",
+      "enclosure_depth_mm",
+      "enclosure_height_mm",
+      "enclosure_width_mm",
       "ev_pcc_short_circuit_ka",
+      "gap_mm",
       "pcc_fault_ka",
-      "pcc_short_circuit_ka"
+      "pcc_short_circuit_ka",
+      "prospective_fault_current_ka",
+      "voltage_v",
+      "working_distance_mm"
     ],
     "output_keys": [
       "arc_flash_incident_cal_cm2",
@@ -123,7 +246,8 @@
       "bess",
       "ev-charger",
       "solar-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "atmospheric-scintillation:turbulence": {
     "input_keys": [
@@ -135,48 +259,168 @@
     "cost_basis": [],
     "seen_in": [
       "fso"
-    ]
+    ],
+    "output_source": "none"
   },
   "attitude:disturbance-torque": {
     "input_keys": [
+      "altitude_km",
+      "area_facing_sun_m2",
+      "area_facing_velocity_m2",
+      "cg_offset_m",
       "cubesat_u",
+      "drag_coefficient",
+      "inertia_tensor_kgm2",
       "mass_kg",
-      "orbital_altitude_km"
+      "orbital_altitude_km",
+      "orbital_period_s",
+      "solar_reflectivity"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "actuator_one_orbit_nms",
+      "actuator_required_nms",
+      "aero_torque_nm",
+      "atmospheric_density_kg_m3",
+      "dynamic_pressure_pa",
+      "gravity_gradient_torque_nm",
+      "orbital_period_min",
+      "orbital_velocity_ms",
+      "solar_radiation_pressure_pa",
+      "solar_torque_nm",
+      "total_disturbance_nm"
+    ],
     "cost_basis": [],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "auv-hydro:drag-buoyancy": {
     "input_keys": [
+      "beam_m",
+      "c_d",
+      "depth_m",
       "hull_diameter_m",
+      "hull_form",
       "hull_length_m",
+      "length_m",
       "operating_depth_m",
-      "seawater_density_kg_m3"
+      "salinity_ppt",
+      "seawater_density_kg_m3",
+      "velocity_m_s",
+      "water_temp_c"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "absolute_pressure_bar",
+      "absolute_pressure_pa",
+      "body_volume_m3",
+      "buoyancy_n",
+      "drag_force_n",
+      "drag_power_w",
+      "frontal_area_m2",
+      "hydrostatic_pressure_bar",
+      "hydrostatic_pressure_pa",
+      "reynolds_number",
+      "seawater_density_kg_m3",
+      "wetted_area_m2"
+    ],
     "cost_basis": [],
     "seen_in": [
       "auv"
-    ]
+    ],
+    "output_source": "python:run"
+  },
+  "bagging:throughput-sizing": {
+    "input_keys": [
+      "bag_kg",
+      "bulk_density_kg_m3",
+      "line_name",
+      "n_products",
+      "operating_hours_per_day",
+      "product_mass_rate_t_day",
+      "silo_buffer_hours",
+      "silo_ullage_fraction"
+    ],
+    "output_keys": [
+      "bagging_line_kg_h",
+      "bagging_rate_bags_h",
+      "bags_per_day",
+      "data_sources",
+      "day_silo_stored_mass_kg",
+      "day_silo_volume_m3",
+      "day_silo_working_volume_m3"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation"
+    ],
+    "output_source": "python:run"
+  },
+  "battery-c-rate-thermal:check": {
+    "input_keys": [
+      "ambient_c",
+      "c_rate",
+      "cell_capacity_ah",
+      "cell_internal_resistance_mohm",
+      "cooling",
+      "flight_duration_min"
+    ],
+    "output_keys": [
+      "actual_temp_rise_at_end_flight_k",
+      "capacity_loss_pct_per_flight",
+      "cell_mass_kg",
+      "cell_surface_area_m2",
+      "cell_temp_at_end_flight_c",
+      "current_a",
+      "h_cooling_w_m2k",
+      "heat_generated_polarisation_w",
+      "heat_generated_resistive_w",
+      "heat_generated_total_w",
+      "max_c_rate_within_cooling",
+      "recommended_max_c_rate",
+      "safety_status",
+      "steady_state_temp_c",
+      "steady_state_temp_rise_k",
+      "thermal_runaway_temp_c",
+      "thermal_time_constant_s",
+      "vent_threshold_c"
+    ],
+    "cost_basis": [],
+    "seen_in": [],
+    "output_source": "python:run"
   },
   "battery-eclipse:cycle": {
     "input_keys": [
+      "allowed_dod_pct",
       "avg_power_w",
+      "battery_capacity_wh",
       "bol_power_kw",
       "cold_case_temp_c",
       "delta_v_budget_ms",
       "design_life_years",
+      "eclipse_duration_minutes",
+      "eclipse_fraction_pct",
       "ep_isp_s",
       "hot_case_temp_c",
+      "load_power_w_during_eclipse",
       "mass_kg",
+      "mission_years",
       "orbital_altitude_km",
       "propellant_mass_kg",
       "thermal_rejection_min_kw"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "battery_oversize_factor",
+      "capacity_required_wh",
+      "cycle_count_per_year",
+      "cycles_available_at_dod",
+      "cycles_per_day",
+      "discharge_depth_pct_per_orbit",
+      "discharge_per_orbit_wh",
+      "feasible_for_life",
+      "orbital_period_min",
+      "total_cycles_lifetime"
+    ],
     "cost_basis": [
       "deployable_radiator",
       "electric_propulsion_thruster",
@@ -188,11 +432,17 @@
       "satellite-cubesat",
       "satellite-geo-comsat",
       "satellite-smallsat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "battery-li-s:cell-sizing": {
     "input_keys": [
-      "battery_capacity_kwh"
+      "battery_capacity_kwh",
+      "capacity_ah",
+      "cell_voltage_v",
+      "target_energy_kwh",
+      "target_lifetime_cycles",
+      "use_case"
     ],
     "output_keys": [
       "actual_pack_capacity_ah",
@@ -207,25 +457,50 @@
     ],
     "seen_in": [
       "haps"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "beamforming-codebook:dft-hybrid": {
     "input_keys": [
+      "codebook_type",
       "num_elements",
-      "scan_angle_max_deg"
+      "scan_angle_deg",
+      "scan_angle_max_deg",
+      "signal_freq_ghz"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "array_gain_broadside_db",
+      "codebook_index_bits",
+      "codebook_size",
+      "computational_complexity_ops",
+      "effective_gain_at_scan_db",
+      "element_spacing_mm",
+      "hpbw_at_scan_deg",
+      "hpbw_broadside_deg",
+      "max_scan_angle_deg",
+      "n_independent_beams",
+      "num_RF_chains",
+      "scan_loss_db",
+      "wavelength_mm"
+    ],
     "cost_basis": [],
     "seen_in": [
       "phased-array"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "bemt-propeller:thrust": {
     "input_keys": [
       "air_density_kg_m3",
+      "airspeed_m_s",
+      "altitude_m",
+      "diameter_inch",
       "motor_count",
+      "num_blades",
       "num_rotors",
-      "rotor_diameter_m"
+      "pitch_inch",
+      "rotor_diameter_m",
+      "rpm"
     ],
     "output_keys": [
       "prop_efficiency",
@@ -243,54 +518,140 @@
     "seen_in": [
       "drone",
       "evtol"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "biocompatibility:iso-10993": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "contact_duration",
+      "contact_type",
+      "materials"
+    ],
+    "output_keys": [
+      "materials_analysed",
+      "materials_failed",
+      "overall_pass",
+      "per_material",
+      "required_iso10993_parts",
+      "required_iso10993_parts_list",
+      "warnings"
+    ],
     "cost_basis": [],
     "seen_in": [
       "cgm",
       "dialysis-machine",
       "ventilator"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "biosteam:fermentation-stoich": {
     "input_keys": [
-      "working_volume_l"
+      "product",
+      "substrate",
+      "substrate_mass_kg",
+      "working_volume_l",
+      "yield_factor"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "actual_yield_pct",
+      "byproduct_co2_kg",
+      "product_mass_kg",
+      "product_mass_theoretical_kg",
+      "stoichiometry_ratio_per_substrate_mol",
+      "substrate_molecular_weight_g_mol",
+      "theoretical_yield_pct"
+    ],
     "cost_basis": [],
     "seen_in": [
       "bioreactor"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "blood-pump:sizing": {
     "input_keys": [
       "arterial_pressure_cmh2o",
       "blood_flow_rate_ml_per_min",
+      "num_rollers",
+      "pressure_head_mmhg",
+      "pump_efficiency",
+      "rotor_diameter_mm",
+      "target_flow_ml_min",
+      "tubing_id_mm",
       "venous_pressure_cmh2o"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "exposure_time_s",
+      "hemolysis_index_pct",
+      "hemolysis_risk_score",
+      "hydraulic_power_w",
+      "motor_torque_ncm",
+      "motor_torque_nm",
+      "pump_rpm",
+      "torque_compression_nm",
+      "torque_hydraulic_nm",
+      "tube_velocity_m_s",
+      "v_per_rev_geometric_ml",
+      "volume_per_rev_ml",
+      "wall_shear_stress_pa"
+    ],
     "cost_basis": [
       "peristaltic_blood_pump"
     ],
     "seen_in": [
       "dialysis-machine"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "building-envelope:heat-loss": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "building_volume_m3",
+      "door_area_m2",
+      "door_u_value",
+      "floor_area_m2",
+      "floor_u_value",
+      "indoor_set_c",
+      "infiltration_ach",
+      "outdoor_min_c",
+      "roof_area_m2",
+      "roof_u_value",
+      "thermal_bridge_factor_pct",
+      "wall_area_m2",
+      "wall_u_value",
+      "window_area_m2",
+      "window_u_value"
+    ],
+    "output_keys": [
+      "annual_heating_kwh",
+      "annual_kwh_per_m2",
+      "delta_t_design",
+      "design_heat_loss_kw",
+      "design_heat_loss_w",
+      "fabric_breakdown_w",
+      "fabric_loss_w",
+      "heat_loss_per_m2_floor_w",
+      "heat_pump_oversized_pct",
+      "nzeb_compliant",
+      "passivhaus_compliant",
+      "recommended_heat_pump_kw",
+      "specific_heat_loss_w_per_k",
+      "thermal_bridge_loss_w",
+      "u_values_used",
+      "ventilation_loss_w"
+    ],
     "cost_basis": [],
     "seen_in": [
       "heat-pump-residential"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "bvlos-part23:certification": {
     "input_keys": [
+      "autonomy_level",
+      "design_mass_kg",
       "gross_takeoff_mass_kg",
-      "num_passengers"
+      "num_passengers",
+      "operations",
+      "region"
     ],
     "output_keys": [
       "cert_timeline_years",
@@ -300,13 +661,21 @@
     "cost_basis": [],
     "seen_in": [
       "evtol"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "cable:ampacity": {
     "input_keys": [
       "ac_continuous_current_a",
       "ac_input_current_a",
-      "hub_height_m"
+      "ambient_c",
+      "cable_material",
+      "continuous_current_a",
+      "hub_height_m",
+      "installation",
+      "length_m",
+      "voltage_class_v",
+      "voltage_drop_max_pct"
     ],
     "output_keys": [
       "ac_input_cable_csa_mm2"
@@ -319,11 +688,16 @@
       "ev-charger",
       "solar-inverter",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "cable:thermal-rating": {
     "input_keys": [
+      "ambient_c",
       "cable_length_m",
+      "conductor_material",
+      "continuous_current_a",
+      "cooling",
       "output_current_max_a"
     ],
     "output_keys": [
@@ -334,18 +708,34 @@
     ],
     "seen_in": [
       "ev-charger"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "calibration-imperfection:phase-gain": {
     "input_keys": [
+      "amplitude_taper",
+      "gain_error_db_rms",
       "num_elements",
+      "phase_error_deg_rms",
       "phase_rms_target_deg"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "calibration_yield_pct",
+      "gain_error_rms_linear",
+      "gain_loss_db",
+      "hpbw_broadening_pct",
+      "meets_n_30db_SLL",
+      "phase_error_rms_rad",
+      "pointing_error_arcmin",
+      "sidelobe_level_db",
+      "sidelobe_level_ideal_db",
+      "sidelobe_rise_db"
+    ],
     "cost_basis": [],
     "seen_in": [
       "phased-array"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "cantera:reaction-equilibrium": {
     "input_keys": [],
@@ -355,7 +745,8 @@
     "cost_basis": [],
     "seen_in": [
       "dac"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "cantera:thermochemistry": {
     "input_keys": [
@@ -363,12 +754,16 @@
       "battery_mass_kg",
       "cell_temperature_c",
       "cold_case_temp_c",
+      "composition",
       "hot_case_temp_c",
       "magnetorquer_mass_kg",
       "mass_kg",
+      "mechanism",
       "mission_duration_years",
       "mli_mass_kg",
+      "mode",
       "operating_pressure_bar",
+      "p_pa",
       "pcm_mass_kg",
       "propellant_class",
       "propellant_mass_kg",
@@ -377,7 +772,10 @@
       "reaction_wheel_mass_kg",
       "rtg_required_power_w",
       "solar_array_mass_kg",
+      "species",
       "stack_temperature_c",
+      "t_in_k",
+      "t_k",
       "thermal_rejection_min_kw"
     ],
     "output_keys": [
@@ -390,23 +788,31 @@
       "rtg_radioisotope_generator"
     ],
     "seen_in": [
+      "e-fuel-synthesis",
       "h2-electrolyser",
       "pemfc",
       "propulsion-thruster-product",
       "satellite-geo-comsat",
       "satellite-interplanetary",
       "satellite-smallsat"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "ccs-protocol:compliance": {
-    "input_keys": [],
+    "input_keys": [
+      "max_current_a",
+      "max_voltage_v",
+      "plug_type",
+      "protocol_version"
+    ],
     "output_keys": [
       "ccs_certificate_count"
     ],
     "cost_basis": [],
     "seen_in": [
       "ev-charger"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "cell-balance-model:bms": {
     "input_keys": [
@@ -417,11 +823,17 @@
     "cost_basis": [],
     "seen_in": [
       "humanoid"
-    ]
+    ],
+    "output_source": "none"
   },
   "cell-balance:model": {
     "input_keys": [
-      "cell_count"
+      "balancing_current_ma",
+      "balancing_type",
+      "cell_capacity_ah",
+      "cell_count",
+      "cell_imbalance_pct_initial",
+      "chemistry"
     ],
     "output_keys": [
       "balance_current_ma"
@@ -429,11 +841,15 @@
     "cost_basis": [],
     "seen_in": [
       "ups-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "ceramic-electrolyte:conductivity": {
     "input_keys": [
-      "grain_size_um"
+      "grain_boundary_pct",
+      "grain_size_um",
+      "material",
+      "temperature_c"
     ],
     "output_keys": [
       "electrolyte_areal_resistance_ohm_cm2",
@@ -443,38 +859,96 @@
     "cost_basis": [],
     "seen_in": [
       "solid-state-battery"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "chemical-propulsion:sizing": {
     "input_keys": [
+      "delta_v_target_ms",
+      "dry_mass_kg",
       "isp_s",
       "propellant_class",
+      "propulsion_type",
+      "redundancy",
       "thrust_n",
       "thruster_isp_s"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "Isp_assumed_s",
+      "burn_time_min_at_thrust",
+      "burn_time_s_at_thrust",
+      "feedline_mass_kg",
+      "fuel_mass_kg",
+      "fuel_volume_l",
+      "initial_mass_kg",
+      "mass_flow_rate_kg_s",
+      "mixture_ratio_OF",
+      "oxidiser_mass_kg",
+      "oxidiser_volume_l",
+      "propellant_mass_kg",
+      "tank_mass_kg",
+      "tank_volume_l",
+      "thrust_per_thruster_n",
+      "thruster_count",
+      "thruster_mass_each_kg",
+      "thrusters_total_mass_kg",
+      "total_propulsion_mass_kg"
+    ],
     "cost_basis": [
       "thruster_assembly"
     ],
     "seen_in": [
       "propulsion-thruster-product"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "clean-in-place:cip": {
     "input_keys": [
-      "total_volume_l"
+      "cleaning_temp_c",
+      "soil_type",
+      "total_volume_l",
+      "vessel_surface_area_m2",
+      "vessel_volume_l"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "cost_chemicals_gbp",
+      "cost_effluent_treatment_gbp",
+      "cost_energy_gbp",
+      "cost_per_cycle_gbp",
+      "cost_water_gbp",
+      "cycle_time_h",
+      "cycle_time_min",
+      "detergent_l",
+      "effluent_cod_mg_l_estimate",
+      "effluent_ph_handling",
+      "effluent_volume_l",
+      "energy_kwh_heating",
+      "energy_kwh_pumping",
+      "energy_kwh_total",
+      "hno3_30_l",
+      "naoh_50_l",
+      "step_durations_min",
+      "verification_methods",
+      "water_consumption_l",
+      "water_consumption_m3"
+    ],
     "cost_basis": [],
     "seen_in": [
       "bioreactor"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "co2-enrichment:sizing": {
     "input_keys": [
+      "ach_air_changes_per_hour",
       "canopy_area_m2",
       "co2_target_ppm",
+      "crop",
+      "growing_area_m2",
+      "leaf_area_index",
       "photoperiod_hours",
+      "room_height_m",
+      "target_co2_ppm",
       "target_crop_id"
     ],
     "output_keys": [
@@ -489,36 +963,83 @@
     ],
     "seen_in": [
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "coherent-optical-receiver:dpsk-qpsk": {
     "input_keys": [
       "data_rate_gbps",
+      "lo_power_dbm",
+      "modulation",
+      "signal_photons_per_bit",
       "wavelength_nm"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "ber",
+      "ber_after_FEC",
+      "bits_per_symbol",
+      "fec_corrects",
+      "lo_required_power_dbm",
+      "photon_energy_j",
+      "photons_for_ber_1e_9",
+      "quantum_power_at_input_dbm",
+      "receiver_sensitivity_at_1e_9_w",
+      "receiver_sensitivity_dbm",
+      "shot_noise_limit_dbm",
+      "snr_db",
+      "symbol_rate_gsym_s"
+    ],
     "cost_basis": [],
     "seen_in": [
       "fso"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "cold-gas-thruster:sizing": {
     "input_keys": [
       "delta_v_budget_ms",
-      "mass_kg"
+      "mass_kg",
+      "propellant",
+      "regulator_pressure_bar",
+      "tank_pressure_bar",
+      "tank_volume_l",
+      "thrust_n_per_thruster",
+      "total_impulse_required_ns"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "Isp_s",
+      "lifetime_impulses",
+      "mass_flow_rate_kg_s_per_thruster",
+      "max_propellant_per_tank_kg",
+      "propellant_mass_kg",
+      "regulator_mass_kg",
+      "storage_form",
+      "tank_count",
+      "tank_mass_kg",
+      "thruster_count_recommended",
+      "thruster_mass_each_kg",
+      "thruster_total_mass_kg",
+      "total_system_mass_kg"
+    ],
     "cost_basis": [
       "cold_gas_thruster_assembly"
     ],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "control-systems:pid-tuning": {
     "input_keys": [
+      "controller_type",
+      "lambda_imc_s",
+      "plant_denominator",
+      "plant_numerator",
       "rated_power_kw",
-      "rotor_diameter_m"
+      "rotor_diameter_m",
+      "target_response",
+      "target_value",
+      "tuning_method"
     ],
     "output_keys": [
       "attitude_loop_phase_margin_deg",
@@ -535,6 +1056,7 @@
     ],
     "cost_basis": [],
     "seen_in": [
+      "co2-mineralisation",
       "cryostat",
       "dialysis-machine",
       "drone",
@@ -546,7 +1068,8 @@
       "quantum-computer",
       "ventilator",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "control-systems:run": {
     "input_keys": [],
@@ -555,18 +1078,31 @@
     "seen_in": [
       "3d-printer-fdm",
       "cnc-machine"
-    ]
+    ],
+    "output_source": "none"
   },
   "coolprop:refrigerant-properties": {
     "input_keys": [
       "chamber_temp_c",
       "cond_saturation_c",
       "dialysate_temp_c",
+      "fluid",
       "inverter_dissipated_kw",
       "system_thermal_dissipation_kw",
-      "target_gas_temp_c"
+      "target_gas_temp_c",
+      "temperature_c"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "cp_liquid_kj_kgk",
+      "enthalpy_liquid_kj_kg",
+      "enthalpy_vapour_kj_kg",
+      "flammability_class",
+      "latent_heat_kj_kg",
+      "liquid_density_kg_m3",
+      "saturation_pressure_at_temp_bar",
+      "saturation_temp_at_10bar_c",
+      "vapour_density_kg_m3"
+    ],
     "cost_basis": [
       "liquid_cooling_loop"
     ],
@@ -575,6 +1111,7 @@
       "bess",
       "bioreactor",
       "cnc-machine",
+      "co2-mineralisation",
       "dialysis-machine",
       "e-bike",
       "ev-charger",
@@ -584,26 +1121,66 @@
       "solar-inverter",
       "ups-inverter",
       "ventilator"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "corrosion:anode-sizing": {
     "input_keys": [
+      "anode_material",
+      "hull_area_m2",
       "hull_diameter_m",
       "hull_length_m",
-      "operating_depth_m"
+      "hull_material",
+      "mission_life_years",
+      "operating_depth_m",
+      "salinity_ppt",
+      "water_temp_c"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "anode_alloy",
+      "anode_capacity_ahkg",
+      "anode_consumption_kg_per_year",
+      "anode_cost_gbp",
+      "anode_count",
+      "anode_effective_capacity_ahkg",
+      "anode_efficiency",
+      "anode_mass_kg_actual_installed",
+      "anode_mass_kg_calculated",
+      "anode_size_kg_each",
+      "current_density_ma_m2",
+      "driving_voltage_v",
+      "environment",
+      "install_cost_gbp",
+      "replacement_interval_years",
+      "total_charge_required_ah",
+      "total_cost_gbp",
+      "total_current_required_a"
+    ],
     "cost_basis": [],
     "seen_in": [
       "auv"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "cryocooler:sizing": {
     "input_keys": [
+      "cooler_type",
+      "cooling_load_w",
       "heat_load_4k_w",
-      "heat_load_50k_w"
+      "heat_load_50k_w",
+      "sink_temp_k",
+      "target_temp_k"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "carnot_efficiency_at_op",
+      "cop_actual",
+      "cop_carnot_max",
+      "efficiency_pct_carnot",
+      "in_temperature_range",
+      "input_power_w",
+      "mass_kg",
+      "microphonic_vibration_n"
+    ],
     "cost_basis": [
       "pulse_tube_cryocooler",
       "pulse_tube_pre_cooler"
@@ -611,10 +1188,61 @@
     "seen_in": [
       "cryostat",
       "quantum-computer"
-    ]
+    ],
+    "output_source": "python:run"
+  },
+  "crystalliser:evaporator-sizing": {
+    "input_keys": [
+      "crystalliser_name",
+      "feed_density_kg_m3",
+      "feed_solute_concentration_g_l",
+      "feed_temp_c",
+      "length_to_diameter",
+      "magma_density_kg_m3",
+      "magma_residence_time_h",
+      "n_units",
+      "operating_pressure_kpa",
+      "overall_htc_w_m2k",
+      "solubility_g_per_100g_water",
+      "solute_mass_rate_kg_h",
+      "solute_name",
+      "steam_temp_c",
+      "target_recovery"
+    ],
+    "output_keys": [
+      "boiling_point_c",
+      "data_sources",
+      "driving_dt_k",
+      "duty_evaporation_kw",
+      "duty_sensible_kw",
+      "duty_total_kw",
+      "feed_mass_kg_h",
+      "feed_volume_m3_h",
+      "heat_transfer_area_m2",
+      "latent_heat_kj_kg",
+      "solute_in_liquor_kg_h",
+      "solute_product_kg_h",
+      "solute_residual_kg_h",
+      "steam_consumption_kg_h",
+      "vessel_diameter_m",
+      "vessel_height_m",
+      "vessel_volume_m3",
+      "water_evaporated_kg_h",
+      "water_in_feed_kg_h"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation"
+    ],
+    "output_source": "python:run"
   },
   "cybersecurity-threat-model:stride": {
-    "input_keys": [],
+    "input_keys": [
+      "authentication_method",
+      "connectivity_types",
+      "data_sensitivity",
+      "firmware_update_method"
+    ],
     "output_keys": [
       "cyber_threat_severity_score",
       "stride_threat_score"
@@ -625,6 +1253,7 @@
       "auv",
       "bioreactor",
       "cnc-machine",
+      "e-fuel-synthesis",
       "ev-charger",
       "h2-electrolyser",
       "pemfc",
@@ -632,12 +1261,18 @@
       "ups-inverter",
       "vertical-farm",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "dac:contactor-geometry": {
     "input_keys": [
+      "air_velocity_m_s",
+      "fan_static_pressure_pa",
+      "site_air_co2_ppm",
       "sorbent_capacity_mmol_g",
-      "target_capture_tpd"
+      "sorbent_kinetics_kg_kg_hr",
+      "target_capture_tpd",
+      "target_co2_per_year_tons"
     ],
     "output_keys": [
       "contactor_count",
@@ -649,12 +1284,18 @@
     "cost_basis": [],
     "seen_in": [
       "dac"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "dac:regeneration-energy": {
     "input_keys": [
+      "ambient_temp_c",
+      "capture_capacity_g_co2_g_sorbent",
+      "heat_source",
+      "regeneration_temp_c",
       "sorbent_capacity_mmol_g",
       "sorbent_mass_kg",
+      "sorbent_type",
       "target_capture_tpd"
     ],
     "output_keys": [
@@ -665,12 +1306,19 @@
     ],
     "cost_basis": [],
     "seen_in": [
+      "co2-mineralisation",
       "dac"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "dac:sorbent-kinetics": {
     "input_keys": [
-      "target_capture_tpd"
+      "air_co2_ppm",
+      "contact_time_s",
+      "humidity_pct",
+      "sorbent",
+      "target_capture_tpd",
+      "temperature_c"
     ],
     "output_keys": [
       "sorbent_capacity_mmol_g",
@@ -681,24 +1329,54 @@
     "cost_basis": [],
     "seen_in": [
       "dac"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "defrost-cycle:model": {
     "input_keys": [
+      "ambient_temp_c",
+      "defrost_method",
+      "evaporator_temp_c",
+      "hot_water_storage_l",
       "min_ambient_c",
       "outdoor_hx_area_m2",
-      "rated_thermal_kw"
+      "rated_heating_capacity_kw",
+      "rated_thermal_kw",
+      "rh_pct"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "annual_defrost_kwh_penalty",
+      "annual_defrost_minutes",
+      "annual_frost_hours_estimated",
+      "defrost_duration_minutes",
+      "defrost_frequency_per_hour",
+      "defrost_interval_minutes",
+      "defrost_threshold_g",
+      "delta_humidity_ratio_kg_kg",
+      "energy_penalty_pct",
+      "frost_forming_conditions",
+      "frost_mass_flow_g_per_min",
+      "hot_water_capacity_lost_l",
+      "hot_water_capacity_lost_pct",
+      "humidity_ratio_air_kg_kg",
+      "humidity_ratio_coil_sat_kg_kg"
+    ],
     "cost_basis": [],
     "seen_in": [
       "heat-pump-residential"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "dehumidification:sizing": {
     "input_keys": [
+      "dehumidifier_type",
       "hvac_moisture_load_kg_h",
+      "indoor_db_c",
+      "indoor_rh_target_pct",
+      "moisture_load_kg_h",
       "operating_temp_c",
+      "outdoor_db_c",
+      "outdoor_rh_pct",
       "plant_transpiration_kg_day",
       "target_rh_pct"
     ],
@@ -716,59 +1394,149 @@
     "seen_in": [
       "heat-pump-residential",
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "delta-v-budget:mission": {
     "input_keys": [
       "design_life_years",
+      "dry_mass_kg",
+      "isp_assumed_s",
+      "launch_vehicle",
+      "maneuvers",
+      "mission_years",
+      "orbit_target",
       "orbital_altitude_km"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "deorbit_delta_v_ms",
+      "exhaust_velocity_ms",
+      "launch_insertion_delta_v_ms",
+      "lv_injection_bias_ms",
+      "margin_pct",
+      "mass_ratio",
+      "n_maneuvers",
+      "other_delta_v_ms",
+      "stationkeeping_delta_v_ms",
+      "stationkeeping_delta_v_ms_per_year",
+      "total_delta_v_ms",
+      "total_delta_v_with_margin_ms",
+      "total_propellant_mass_kg"
+    ],
     "cost_basis": [],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "dilution-fridge:cooling-power": {
     "input_keys": [
       "base_temp_mk",
       "cooling_power_uw_at_100mK",
       "he3_flow_umol_s",
-      "sample_space_mm"
+      "helium_3_flow_umol_s",
+      "pulse_tube_capacity_w_at_4k",
+      "sample_space_mm",
+      "stage_count",
+      "target_base_temp_mk"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "achievable_base_temp_mk_at_zero_load",
+      "cool_down_time_hours",
+      "cooling_power_mw_at_1K",
+      "cooling_power_uw_at_100mK",
+      "cooling_power_uw_at_base",
+      "cooling_power_w_at_4K",
+      "he4_equivalent_capacity_l",
+      "ideal_at_100mK_uw",
+      "kapitza_derate",
+      "max_heat_load_at_base_uw"
+    ],
     "cost_basis": [
       "dilution_unit_assembly"
     ],
     "seen_in": [
       "cryostat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "dissolved-oxygen:control": {
     "input_keys": [
+      "do_setpoint_pct",
       "kla_per_h",
+      "kla_per_hour",
+      "organism",
+      "organism_our_mmol_l_h",
+      "pressure_atm",
+      "temperature_c",
       "working_volume_l"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "agitation_speed_rpm",
+      "airflow_lpm",
+      "airflow_vvm_required",
+      "c_sat_air_mgl",
+      "c_sat_air_mmol_l",
+      "do_response_time_s",
+      "do_setpoint_mgl",
+      "do_setpoint_mmol_l",
+      "driving_force_mmol_l",
+      "kla_adequate",
+      "kla_per_hour_available",
+      "kla_required_per_hour",
+      "o2_supplementation_needed",
+      "otr_required_mmol_l_h",
+      "our_mmol_l_h",
+      "target_p_v_w_m3"
+    ],
     "cost_basis": [],
     "seen_in": [
       "bioreactor"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "downstream-chromatography:sizing": {
     "input_keys": [
+      "column_diameter_cm",
+      "dbc_mg_per_ml_resin",
+      "feedstock_volume_l",
+      "resin_type",
+      "target_protein_mass_g",
       "working_volume_l"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "column_bed_height_cm",
+      "column_volume_l",
+      "column_volume_ml",
+      "cost_per_cycle_gbp",
+      "cycle_count",
+      "eluent_volume_per_cycle_l",
+      "linear_velocity_cm_h",
+      "resin_cost_gbp",
+      "resin_cost_per_l_gbp",
+      "resin_lifetime_cycles",
+      "time_per_cycle_h",
+      "total_buffer_cost_gbp",
+      "total_cycle_time_h",
+      "total_eluent_volume_l",
+      "total_run_cost_gbp",
+      "yield_pct_overall",
+      "yield_pct_per_cycle"
+    ],
     "cost_basis": [],
     "seen_in": [
       "bioreactor"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "downwash-recirculation:multirotor": {
     "input_keys": [
+      "altitude_agl_m",
       "gross_takeoff_mass_kg",
-      "num_rotors"
+      "num_rotors",
+      "rotor_diameter_m",
+      "rotor_disk_loading_n_m2",
+      "rotor_spacing_diameters"
     ],
     "output_keys": [
       "induced_velocity_ms",
@@ -777,30 +1545,170 @@
     "cost_basis": [],
     "seen_in": [
       "evtol"
-    ]
+    ],
+    "output_source": "class-plan"
+  },
+  "dryer:thermal-sizing": {
+    "input_keys": [
+      "ambient_air_rh_pct",
+      "ambient_air_temp_c",
+      "dryer_name",
+      "heater_efficiency",
+      "inlet_air_temp_c",
+      "moisture_basis",
+      "moisture_in_pct",
+      "moisture_out_pct",
+      "n_units",
+      "outlet_air_rh_pct",
+      "outlet_air_temp_c",
+      "pressure_pa",
+      "wet_solids_kg_h"
+    ],
+    "output_keys": [
+      "air_enthalpy_rise_kj_kg",
+      "ambient_humidity_ratio_kg_kg",
+      "bone_dry_solids_kg_h",
+      "data_sources",
+      "drying_air_mass_flow_kg_h",
+      "drying_air_mass_flow_kg_h_per_unit",
+      "heater_duty_kw",
+      "heater_duty_kw_per_unit",
+      "humid_air_volumetric_flow_m3_h",
+      "humid_air_volumetric_flow_m3_h_per_unit",
+      "humidity_pickup_kg_kg",
+      "inlet_humidity_ratio_kg_kg",
+      "outlet_humidity_ratio_kg_kg",
+      "product_kg_h",
+      "water_evaporated_kg_h",
+      "water_in_kg_h",
+      "water_out_kg_h"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation"
+    ],
+    "output_source": "python:run"
   },
   "eer-seer:calc": {
     "input_keys": [
+      "is_ducted",
+      "part_load_data",
+      "rated_cooling_btuh",
+      "rated_power_w",
       "rated_thermal_kw"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "cop_at_eer",
+      "eer_btuh_per_w",
+      "energy_star_class",
+      "meets_energy_star_standard",
+      "meets_most_efficient",
+      "part_load_eer_used",
+      "rated_cooling_kw",
+      "seer",
+      "seer2",
+      "weights_per_load"
+    ],
     "cost_basis": [],
     "seen_in": [
       "heat-pump-residential"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "electric-propulsion:sizing": {
     "input_keys": [
+      "available_power_w",
+      "delta_v_target_ms",
+      "dry_mass_kg",
+      "ep_type",
       "isp_s",
+      "mission_duration_days",
       "thrust_n"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "Isp_s",
+      "PPU_efficiency_pct",
+      "PPU_mass_kg",
+      "burn_time_s",
+      "feasible_in_mission_duration",
+      "mass_flow_rate_kg_s",
+      "propellant_mass_kg",
+      "propellant_type",
+      "tank_mass_kg",
+      "thrust_efficiency",
+      "thrust_mn",
+      "thruster_count",
+      "thruster_unit_mass_kg",
+      "total_burn_time_days",
+      "total_propulsion_mass_kg",
+      "total_thrust_n"
+    ],
     "cost_basis": [
       "thruster_assembly"
     ],
     "seen_in": [
       "propulsion-thruster-product"
-    ]
+    ],
+    "output_source": "python:run"
+  },
+  "electrical:cable-sizing": {
+    "input_keys": [
+      "ambient_derate_ca",
+      "cable_name",
+      "conductor",
+      "design_current_a",
+      "grouping_derate_cg",
+      "length_m",
+      "load_kw",
+      "max_voltdrop_pct",
+      "n_parallel",
+      "nominal_voltage_v",
+      "phases",
+      "power_factor",
+      "voltage_v"
+    ],
+    "output_keys": [
+      "cable_voltdrop_pct",
+      "data_sources",
+      "feeder_design_current_a",
+      "main_feeder_cable_csa_mm2",
+      "mv_per_a_m",
+      "selected_ampacity_a",
+      "selected_ampacity_total_a",
+      "tabulated_current_target_a",
+      "voltdrop_within_limit"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation"
+    ],
+    "output_source": "python:run"
+  },
+  "electrical:transformer-sizing": {
+    "input_keys": [
+      "headroom_fraction",
+      "phases",
+      "plant_load_kw",
+      "power_factor",
+      "primary_voltage_v",
+      "secondary_voltage_v",
+      "standard_ratings_kva",
+      "transformer_name"
+    ],
+    "output_keys": [
+      "apparent_power_demand_kva",
+      "data_sources",
+      "rating_off_standard_ladder",
+      "required_with_headroom_kva",
+      "transformer_kva",
+      "transformer_primary_current_a",
+      "transformer_secondary_current_a"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation"
+    ],
+    "output_source": "python:run"
   },
   "electro-absorption-modulator:design": {
     "input_keys": [
@@ -811,14 +1719,19 @@
     "cost_basis": [],
     "seen_in": [
       "fso"
-    ]
+    ],
+    "output_source": "none"
   },
   "electrolyser:efficiency": {
     "input_keys": [
+      "cell_current_density_a_cm2",
       "cell_temperature_c",
+      "membrane_type",
       "operating_pressure_bar",
+      "pressure_bar",
       "rated_power_kw",
-      "stack_efficiency_lhv_pct"
+      "stack_efficiency_lhv_pct",
+      "temperature_c"
     ],
     "output_keys": [
       "current_density_a_cm2",
@@ -831,13 +1744,17 @@
     ],
     "seen_in": [
       "h2-electrolyser"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "enclosure-emc:margin": {
     "input_keys": [
       "ble_tx_power_dbm",
+      "enclosure_material",
+      "frequency_mhz",
       "rated_power_kw",
-      "target_shielding_db"
+      "target_shielding_db",
+      "target_standard"
     ],
     "output_keys": [
       "emc_margin_db"
@@ -850,12 +1767,19 @@
       "phased-array",
       "quantum-computer",
       "solar-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "ev-charging-curve:taper": {
     "input_keys": [
+      "battery_chemistry",
+      "battery_kwh",
+      "battery_temp_c",
+      "max_power_kw",
       "output_voltage_max_v",
-      "rated_power_kw"
+      "rated_power_kw",
+      "soc_start_pct",
+      "soc_target_pct"
     ],
     "output_keys": [
       "peak_power_kw",
@@ -864,26 +1788,54 @@
     "cost_basis": [],
     "seen_in": [
       "ev-charger"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "extruder:thermal": {
     "input_keys": [
+      "ambient_c",
       "bed_temp_c",
       "filament_diameter_mm",
-      "nozzle_temp_c"
+      "flow_rate_g_s",
+      "heater_w",
+      "material",
+      "nozzle_temp_c",
+      "set_temp_c"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "axial_melt_velocity_m_s",
+      "cooling_fan_required_cfm",
+      "flow_rate_g_min",
+      "heater_capacity_w",
+      "heater_utilisation_pct",
+      "material_cp_jgk",
+      "material_k_thermal_wm_k",
+      "material_t_glass_c",
+      "melt_zone_length_mm",
+      "p_ambient_loss_w",
+      "p_melt_required_w",
+      "p_required_total_w",
+      "steady_state_temp_c",
+      "temp_lag_s"
+    ],
     "cost_basis": [],
     "seen_in": [
       "3d-printer-fdm"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "fan-coil:sizing": {
     "input_keys": [
+      "airflow_cms",
+      "coil_load_kw",
+      "coil_type",
+      "face_velocity_m_s",
+      "filter_required_class",
       "heat_dissipation_kw",
       "hvac_airflow_cms",
       "hvac_chiller_capacity_kw",
-      "rated_thermal_kw"
+      "rated_thermal_kw",
+      "static_pressure_pa"
     ],
     "output_keys": [
       "ahu_coil_face_area_m2",
@@ -902,7 +1854,37 @@
       "edge-ai",
       "heat-pump-residential",
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
+  },
+  "fire-suppression:nfpa": {
+    "input_keys": [
+      "agent",
+      "design_concentration_pct",
+      "volume_m3"
+    ],
+    "output_keys": [
+      "actual_charge_kg",
+      "agent_cost_gbp",
+      "agent_mass_kg",
+      "agent_mass_kg_with_safety_factor",
+      "agent_name",
+      "cylinder_hardware_gbp",
+      "cylinder_size_kg",
+      "detection_panel_gbp",
+      "discharge_time_s",
+      "gwp",
+      "is_lithium_ion_design",
+      "odp",
+      "pipe_nozzle_gbp",
+      "retention_time_minutes",
+      "sufficient_for_lithium_ion",
+      "total_cylinder_count",
+      "total_installed_cost_gbp"
+    ],
+    "cost_basis": [],
+    "seen_in": [],
+    "output_source": "python:run"
   },
   "fire-suppression:sizing": {
     "input_keys": [
@@ -914,29 +1896,87 @@
     "cost_basis": [],
     "seen_in": [
       "ev-charger"
-    ]
+    ],
+    "output_source": "class-plan"
+  },
+  "flare:thermal-oxidiser": {
+    "input_keys": [
+      "comb_temp_c",
+      "excess_air_frac",
+      "exit_velocity_ms",
+      "flue_mw",
+      "lhv_mj_kg",
+      "purge_flow_kg_h",
+      "residence_s",
+      "stoich_air_kg_per_kg"
+    ],
+    "output_keys": [
+      "chamber_volume_m3",
+      "combustion_air_kg_h",
+      "data_sources",
+      "flue_density_kg_m3",
+      "flue_gas_kg_h",
+      "flue_volumetric_m3_s",
+      "heat_release_kw",
+      "stack_diameter_m"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
   },
   "flow-compliance:respiratory": {
     "input_keys": [
+      "compliance_ml_cmh2o",
       "compliance_ml_per_cmh2o",
+      "ie_ratio",
       "peak_inspiratory_pressure_cmh2o",
       "peep_cmh2o",
+      "resistance_cmh2o_l_s",
       "resistance_cmh2o_per_lpm",
-      "tidal_volume_ml"
+      "respiratory_rate_bpm",
+      "tidal_volume_ml",
+      "waveform"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "auto_peep_risk",
+      "cycle_time_ms",
+      "expiratory_time_ms",
+      "ie_ratio_io_e",
+      "inspiratory_flow_l_min",
+      "inspiratory_time_ms",
+      "lung_protective_dp_lt_15",
+      "lung_protective_pp_lt_30",
+      "mean_airway_pressure_cmh2o",
+      "minute_ventilation_l_min",
+      "p_elastic_cmh2o",
+      "p_resistive_cmh2o",
+      "peak_pressure_cmh2o",
+      "plateau_pressure_cmh2o",
+      "rc_time_constant_s"
+    ],
     "cost_basis": [],
     "seen_in": [
       "ventilator"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "fluids:pipe-sizing": {
     "input_keys": [
       "dialysate_density_kg_m3",
       "dialysate_flow_rate_ml_per_min",
+      "elevation_change_m",
+      "fittings_count_per_type",
+      "flow_rate_m3_s",
+      "fluid",
+      "fluid_temperature_c",
       "gas_density_at_btps_kg_m3",
       "irrigation_pump_flow_m3_h",
+      "length_m",
       "peak_inspiratory_flow_lpm",
+      "pipe_diameter_mm",
+      "roughness_mm",
       "tray_count"
     ],
     "output_keys": [
@@ -948,10 +1988,12 @@
       "patient_circuit_disposable"
     ],
     "seen_in": [
+      "co2-mineralisation",
       "dialysis-machine",
       "ventilator",
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "fluids:run": {
     "input_keys": [
@@ -973,7 +2015,8 @@
       "cnc-machine",
       "h2-electrolyser",
       "pemfc"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "fso:link-budget": {
     "input_keys": [
@@ -987,11 +2030,24 @@
     "cost_basis": [],
     "seen_in": [
       "fso"
-    ]
+    ],
+    "output_source": "none"
   },
   "g99:dynamic-compliance": {
     "input_keys": [
-      "continuous_power_kw"
+      "connection_voltage_kv",
+      "continuous_power_kw",
+      "design_continuous_freq_max_hz",
+      "design_continuous_freq_min_hz",
+      "design_droop_pct",
+      "design_freq_ride_max_hz",
+      "design_freq_ride_min_hz",
+      "design_hvrt_ceiling_pu",
+      "design_lfsm_o_trigger_hz",
+      "design_lvrt_floor_duration_s",
+      "design_lvrt_floor_pu",
+      "design_power_factor",
+      "rated_power_kw"
     ],
     "output_keys": [
       "g99_compliance_ok"
@@ -999,12 +2055,57 @@
     "cost_basis": [],
     "seen_in": [
       "bess"
-    ]
+    ],
+    "output_source": "class-plan"
+  },
+  "gas:compressor-sizing": {
+    "input_keys": [
+      "composition",
+      "intercool_t_k",
+      "k_cp_cv",
+      "mass_flow_kg_h",
+      "max_stage_ratio",
+      "mech_eff",
+      "mol_weight",
+      "p_in_bar",
+      "p_out_bar",
+      "poly_eff",
+      "t_in_k"
+    ],
+    "output_keys": [
+      "data_sources",
+      "discharge_t_k",
+      "driver_power_kw",
+      "intercooler_total_duty_kw",
+      "mixture_k",
+      "mixture_mw",
+      "n_stages",
+      "overall_pressure_ratio",
+      "property_basis",
+      "shaft_power_kw",
+      "stage_pressure_ratio",
+      "warnings",
+      "z_inlet",
+      "z_outlet"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
   },
   "gear-ratio:bicycle": {
     "input_keys": [
+      "battery_capacity_kwh",
+      "battery_v",
+      "drive_efficiency",
+      "max_torque_nm",
+      "motor_kv",
+      "pulley_teeth_motor",
+      "pulley_teeth_wheel",
       "range_km",
-      "rated_motor_power_w"
+      "rated_motor_power_w",
+      "wheel_diameter_mm"
     ],
     "output_keys": [
       "battery_v",
@@ -1016,12 +2117,19 @@
     "cost_basis": [],
     "seen_in": [
       "e-bike"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "gearbox-load:spectrum": {
     "input_keys": [
+      "availability_pct",
       "drivetrain_type",
-      "rated_power_kw"
+      "lifetime_years",
+      "mean_wind_ms",
+      "rated_power_kw",
+      "rated_torque_nm",
+      "rotor_rpm_rated",
+      "turbulence_intensity_pct"
     ],
     "output_keys": [
       "gearbox_design_life_h",
@@ -1033,11 +2141,16 @@
     ],
     "seen_in": [
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "gimbal:cog-balance": {
     "input_keys": [
-      "payload_kg"
+      "gimbal_stage_count",
+      "mount_point_xyz_mm",
+      "payload_dimensions_mm",
+      "payload_kg",
+      "payload_mass_g"
     ],
     "output_keys": [
       "gimbal_torque_required_ncm",
@@ -1046,38 +2159,76 @@
     "cost_basis": [],
     "seen_in": [
       "drone"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "glucose-sensor:amperometric": {
     "input_keys": [
+      "bias_voltage_mv",
+      "electrode_area_mm2",
+      "enzyme_type",
+      "glucose_mg_dl",
       "glucose_range_mg_dl_max",
       "glucose_range_mg_dl_min",
+      "operating_days",
       "sensor_mard_pct",
+      "temperature_c",
       "wear_duration_days"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "bias_optimality_factor",
+      "current_density_nA_per_mM",
+      "current_total_nA",
+      "drift_at_day_n_pct",
+      "drift_pct_per_day",
+      "glucose_mM",
+      "glucose_mg_dl_input",
+      "km_mM",
+      "linear_range_max_mg_dl",
+      "operating_days_assessed",
+      "response_time_s",
+      "saturation_glucose_mM",
+      "saturation_glucose_mg_dl",
+      "temperature_factor"
+    ],
     "cost_basis": [
       "enzyme_electrode_assembly"
     ],
     "seen_in": [
       "cgm"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "grounding-lightning:ieee-998": {
-    "input_keys": [],
+    "input_keys": [
+      "container_dimensions_m",
+      "lpl_target",
+      "rod_count",
+      "rod_diameter_mm",
+      "rod_length_m",
+      "site_soil_resistivity_ohm_m"
+    ],
     "output_keys": [
       "spd_rating_ka"
     ],
     "cost_basis": [],
     "seen_in": [
       "solar-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "gust-response:drone": {
     "input_keys": [
+      "airspeed_ms",
+      "cl_alpha_per_rad",
       "cruise_speed_km_h",
+      "drone_dimensions_m",
+      "drone_mass_kg",
       "gross_takeoff_mass_kg",
-      "mtow_kg"
+      "gust_speed_ms",
+      "is_multirotor",
+      "mtow_kg",
+      "wing_area_m2"
     ],
     "output_keys": [
       "gust_recovery_time_s",
@@ -1088,13 +2239,23 @@
     "seen_in": [
       "drone",
       "evtol"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "gust-response:haps-atmospheric": {
     "input_keys": [
+      "airspeed_ms",
+      "altitude_km",
+      "cl_alpha_per_rad",
       "cruise_altitude_m",
+      "latitude_deg",
+      "mass_kg",
       "max_mass_kg",
-      "wing_area_m2"
+      "mission_duration_hours",
+      "season",
+      "wing_area_m2",
+      "wing_loading_pa",
+      "wing_span_m"
     ],
     "output_keys": [
       "design_gust_ms",
@@ -1104,27 +2265,72 @@
     "cost_basis": [],
     "seen_in": [
       "haps"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "heat-pipe:sizing": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "evap_cond_dt_k",
+      "heat_load_w",
+      "operating_temp_k",
+      "orientation",
+      "pipe_length_m",
+      "pipe_type",
+      "working_fluid"
+    ],
+    "output_keys": [
+      "capillary_head_pa",
+      "fluid_compatible_with_temp",
+      "gravity_derate_factor",
+      "mass_per_meter_kg",
+      "mass_total_kg",
+      "max_heat_transport_w",
+      "max_heat_transport_w_corrected",
+      "max_heat_transport_w_m",
+      "merit_number_w_m2",
+      "pipe_diameter_mm",
+      "pipe_inner_diameter_mm",
+      "pipe_outer_diameter_mm",
+      "pressure_drop_pa",
+      "recommended_count",
+      "wick_permeability_m2",
+      "wick_pore_size_um",
+      "wick_type"
+    ],
     "cost_basis": [],
     "seen_in": [
       "cryostat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "helium-circulation:dilution": {
     "input_keys": [
-      "he3_flow_umol_s"
+      "dilution_rate_mol_s",
+      "he3_flow_umol_s",
+      "pumping_speed_l_s",
+      "vacuum_chamber_volume_l"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "3He_cost_estimate_gbp",
+      "3He_inventory_required_l",
+      "3He_inventory_required_mol",
+      "annual_inventory_loss_pct",
+      "dilution_rate_umol_s",
+      "gas_handling_pressure_bar",
+      "gas_handling_pressure_mbar",
+      "leak_tightness_required_mbar_l_s",
+      "mass_flow_mol_s",
+      "residence_time_s",
+      "still_pressure_mbar",
+      "throughput_mbar_l_s"
+    ],
     "cost_basis": [
       "helium_3_inventory"
     ],
     "seen_in": [
       "cryostat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "ht:heat-exchanger": {
     "input_keys": [
@@ -1140,14 +2346,20 @@
     "seen_in": [
       "h2-electrolyser",
       "solar-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "ht:ntu-heat-exchanger": {
     "input_keys": [
+      "c_ratio",
       "cond_saturation_c",
+      "configuration",
       "dialysate_temp_c",
       "heat_rejection_kw",
       "hvac_airflow_cms",
+      "hx_type",
+      "n_shell_tube",
+      "ntu",
       "operating_temp_c",
       "rated_thermal_kw",
       "thermal_power_mwt",
@@ -1167,17 +2379,25 @@
       "pemfc_radiator"
     ],
     "seen_in": [
+      "co2-mineralisation",
       "dialysis-machine",
+      "e-fuel-synthesis",
       "heat-pump-residential",
       "pemfc",
       "phased-array",
       "smr",
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "humanoid:dexterity-kinematics": {
     "input_keys": [
-      "finger_dof"
+      "dof_per_finger",
+      "finger_count",
+      "finger_dof",
+      "finger_length_mm",
+      "target_grip_force_n",
+      "thumb_opposable"
     ],
     "output_keys": [
       "dexterity_index",
@@ -1186,11 +2406,18 @@
     "cost_basis": [],
     "seen_in": [
       "humanoid"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "humanoid:dynamic-walking-zmp": {
     "input_keys": [
-      "total_mass_kg"
+      "com_height_m",
+      "foot_size_mm",
+      "robot_mass_kg",
+      "step_period_s",
+      "stride_length_m",
+      "total_mass_kg",
+      "walking_speed_ms"
     ],
     "output_keys": [
       "stride_freq_hz",
@@ -1200,12 +2427,17 @@
     "cost_basis": [],
     "seen_in": [
       "humanoid"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "humanoid:joint-actuator-torque": {
     "input_keys": [
+      "dynamic_acceleration_m_s2",
+      "gear_ratio",
       "height_m",
       "joint_count",
+      "joint_type",
+      "lever_arm_m",
       "payload_mass_kg",
       "total_mass_kg"
     ],
@@ -1219,7 +2451,8 @@
     "cost_basis": [],
     "seen_in": [
       "humanoid"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "hvac-load:sizing": {
     "input_keys": [
@@ -1234,21 +2467,31 @@
     "seen_in": [
       "ev-charger",
       "solar-inverter"
-    ]
+    ],
+    "output_source": "none"
   },
   "hvac:load-sizing": {
     "input_keys": [
+      "airflow_cms",
       "aux_load_kw",
       "canopy_area_m2",
       "chamber_temp_c",
       "cop_rated",
       "heat_dissipation_kw",
+      "indoor_db_c",
+      "indoor_rh_pct",
+      "latent_load_kw_or_moisture_kg_h",
       "led_heat_load_kw",
       "led_installed_power_kw",
       "operating_temp_c",
+      "outdoor_db_c",
+      "outdoor_rh_pct",
       "plant_transpiration_kg_day",
       "rated_spindle_power_kw",
       "rated_thermal_kw",
+      "safety_factor",
+      "sensible_load_kw",
+      "supply_air_dt_k",
       "target_rh_pct"
     ],
     "output_keys": [
@@ -1275,7 +2518,8 @@
       "edge-ai",
       "heat-pump-residential",
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "iec-standards:lookup": {
     "input_keys": [
@@ -1287,13 +2531,17 @@
     "cost_basis": [],
     "seen_in": [
       "bess"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "inference-throughput:edge": {
     "input_keys": [
+      "accelerator",
+      "batch_size",
       "gpu_count",
       "inference_tps",
-      "model_size_b"
+      "model_size_b",
+      "quantization"
     ],
     "output_keys": [
       "accelerator_power_kw",
@@ -1304,20 +2552,52 @@
     "cost_basis": [],
     "seen_in": [
       "edge-ai"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "ins:navigation-drift": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "accelerometer_grade",
+      "average_speed_ms",
+      "dvl_accuracy_pct",
+      "dvl_present",
+      "gyro_grade",
+      "mission_duration_hours"
+    ],
+    "output_keys": [
+      "accel_bias_mg",
+      "accel_stability_ug",
+      "attitude_drift_deg_per_hour",
+      "dvl_cost_gbp",
+      "gyro_bias_deg_hr",
+      "gyro_bias_stability_deg_hr",
+      "gyro_size_class",
+      "imu_cost_gbp",
+      "position_drift_m_per_hour",
+      "position_drift_m_per_hour_inertial_only",
+      "recommendations",
+      "surface_fix_interval_minutes_recommended",
+      "total_attitude_drift_deg",
+      "total_navigation_cost_gbp",
+      "total_position_drift_m"
+    ],
     "cost_basis": [],
     "seen_in": [
       "auv",
       "drone"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "irrigation:pump-sizing": {
     "input_keys": [
       "canopy_area_m2",
+      "flow_per_emitter_l_h",
+      "pipe_diameter_mm",
+      "pipe_length_m",
+      "pressure_loss_kpa",
+      "static_head_m",
+      "system_type",
+      "total_emitters",
       "tray_count"
     ],
     "output_keys": [
@@ -1332,35 +2612,76 @@
     ],
     "seen_in": [
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "kla-oxygen:transfer": {
     "input_keys": [
       "agitation_power_per_l_w",
+      "do_concentration_pct",
+      "fluid_viscosity_pa_s",
+      "impeller_type",
       "otr_mmol_l_h",
+      "power_volumetric_w_m3",
+      "superficial_velocity_m_s",
       "working_volume_l"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "do_current_kg_m3",
+      "do_current_pct",
+      "do_saturation_kg_m3",
+      "driving_force_kg_m3",
+      "impeller_scaling_vs_rushton",
+      "kla_per_hour",
+      "kla_per_second",
+      "otr_kg_m3_hr",
+      "otr_mmol_l_hr",
+      "viscosity_correction_factor"
+    ],
     "cost_basis": [],
     "seen_in": [
       "bioreactor"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "launch-vibration:miles-eqn": {
     "input_keys": [
-      "mass_kg"
+      "axis",
+      "damping_ratio",
+      "first_natural_frequency_hz",
+      "launch_vehicle",
+      "mass_kg",
+      "payload_mass_kg"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "amplification_factor_Q",
+      "fatigue_cycles_launch",
+      "fatigue_cycles_lifetime",
+      "fatigue_cycles_qualification",
+      "mass_derate_factor",
+      "peak_load_factor",
+      "psd_input_g2_hz",
+      "quasi_static_long_g",
+      "random_grms_input",
+      "random_grms_response",
+      "sine_peak_g_input",
+      "sine_peak_g_response"
+    ],
     "cost_basis": [],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "led-par:efficacy": {
     "input_keys": [
       "canopy_area_m2",
+      "driver_efficiency",
+      "growing_area_m2",
+      "input_watts",
       "led_installed_power_kw",
       "led_ppfd_umol_m2_s",
+      "led_type",
       "photoperiod_hours",
       "target_ppfd_umol_m2_s"
     ],
@@ -1375,11 +2696,17 @@
     ],
     "seen_in": [
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "li-metal-dendrite:monroe-newman": {
     "input_keys": [
-      "operating_current_density_ma_cm2"
+      "current_density_ma_cm2",
+      "li_thickness_um",
+      "operating_current_density_ma_cm2",
+      "separator_modulus_gpa",
+      "stack_pressure_mpa",
+      "temperature_c"
     ],
     "output_keys": [
       "critical_current_density_ma_cm2",
@@ -1389,17 +2716,23 @@
     "cost_basis": [],
     "seen_in": [
       "solid-state-battery"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "lifecycle-co2:assessment": {
     "input_keys": [
       "battery_capacity_kwh",
+      "bom_materials",
       "build_volume_l",
+      "eol_pathway",
       "ev_total_system_mass_kg",
+      "grid_carbon_intensity_kgco2_kwh",
       "hvac_chiller_capacity_kw",
       "led_installed_power_kw",
       "mtow_air_kg",
+      "operational_energy_kwh_per_year",
       "rated_spindle_power_kw",
+      "service_life_years",
       "total_electrical_kw",
       "total_system_mass_kg",
       "trolley_count",
@@ -1420,8 +2753,10 @@
       "auv",
       "bioreactor",
       "cnc-machine",
+      "co2-mineralisation",
       "drone",
       "e-bike",
+      "e-fuel-synthesis",
       "ev-charger",
       "evtol",
       "h2-electrolyser",
@@ -1431,16 +2766,30 @@
       "ups-inverter",
       "vertical-farm",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "link-budget:rf": {
     "input_keys": [
+      "atmospheric_loss_db",
+      "bandwidth_hz",
       "bandwidth_mhz",
       "cruise_altitude_m",
+      "distance_km",
       "eirp_dbw",
+      "frequency_ghz",
       "link_range_km",
+      "modulation",
       "operating_frequency_ghz",
-      "orbital_altitude_km"
+      "orbital_altitude_km",
+      "polarisation_loss_db",
+      "required_ebno_db",
+      "rx_antenna_gain_dbi",
+      "rx_pointing_loss_db",
+      "system_noise_temp_k",
+      "tx_antenna_gain_dbi",
+      "tx_pointing_loss_db",
+      "tx_power_w"
     ],
     "output_keys": [
       "rf_cn0_dbhz",
@@ -1454,28 +2803,71 @@
       "haps",
       "phased-array",
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "magnetic-shielding:mu-metal": {
     "input_keys": [
+      "external_field_gauss",
       "sample_space_mm",
+      "shield_diameter_m",
+      "shield_layers",
+      "shield_length_m",
+      "target_attenuation_db",
       "target_magnetic_attenuation_db"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "actual_attenuation_db",
+      "external_field_uT",
+      "internal_field_gauss",
+      "internal_field_nT",
+      "mass_kg",
+      "meets_target",
+      "mu_metal_thickness_mm",
+      "mu_metal_thickness_required_mm",
+      "mu_r_used",
+      "open_end_loss_factor",
+      "saturated",
+      "shielding_factor"
+    ],
     "cost_basis": [],
     "seen_in": [
       "cryostat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "magnetorquer:sizing": {
     "input_keys": [
-      "orbital_altitude_km"
+      "altitude_km",
+      "coil_type",
+      "desired_torque_nm",
+      "latitude_deg",
+      "orbital_altitude_km",
+      "power_budget_w",
+      "voltage_v"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "apparent_permeability",
+      "coil_area_m2",
+      "coil_current_a",
+      "coil_diameter_m",
+      "coil_mass_kg",
+      "coil_power_w",
+      "coil_resistance_ohm",
+      "coil_turns",
+      "coil_wire_area_mm2",
+      "coil_wire_length_m",
+      "earth_b_field_microtesla",
+      "earth_b_field_t",
+      "magnetic_dipole_moment_am2",
+      "magnetic_dipole_moment_required_am2",
+      "time_to_unload_minutes"
+    ],
     "cost_basis": [],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "mass-aggregator:envelope-check": {
     "input_keys": [
@@ -1488,6 +2880,7 @@
       "brief_mass_cap_kg",
       "brief_target_feasibility",
       "buffer_tank_mass_kg",
+      "co2_storage_mass_kg",
       "cold_plate_mass_kg",
       "container_count",
       "continuous_power_kw",
@@ -1497,6 +2890,7 @@
       "cubesat_u",
       "enclosure_mass_kg",
       "gross_takeoff_mass_kg",
+      "gsu_transformer_mass_kg",
       "hub_height_m",
       "hull_mass_kg",
       "hvac_chiller_capacity_kw",
@@ -1521,7 +2915,9 @@
       "rated_spindle_power_kw",
       "rated_thermal_kw",
       "reaction_wheel_mass_kg",
+      "rpv_mass_kg",
       "solar_array_mass_kg",
+      "sorbent_mass_kg",
       "system_mass_with_external_kg",
       "target_endurance_h",
       "thruster_count",
@@ -1548,10 +2944,13 @@
       "bioreactor",
       "cgm",
       "cnc-machine",
+      "co2-mineralisation",
       "cryostat",
+      "dac",
       "dialysis-machine",
       "drone",
       "e-bike",
+      "e-fuel-synthesis",
       "edge-ai",
       "ev-charger",
       "evtol",
@@ -1563,46 +2962,114 @@
       "phased-array",
       "quantum-computer",
       "satellite-cubesat",
+      "smr",
       "solar-inverter",
       "ups-inverter",
       "ventilator",
       "vertical-farm",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "microwave-control-pulse:drag": {
     "input_keys": [
       "anharmonicity_mhz",
+      "pulse_amplitude_v",
+      "pulse_duration_ns",
+      "pulse_shape",
       "qubit_frequency_ghz",
       "single_qubit_gate_ns"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "calibration_error_pct",
+      "decoherence_loss_pct",
+      "gate_error",
+      "gate_fidelity",
+      "leakage_no_correction",
+      "leakage_pct",
+      "rabi_rate_mhz",
+      "rotation_angle_pi_units",
+      "rotation_angle_rad",
+      "single_qubit_gate_error_target_1e_4",
+      "supports_fault_tolerance_threshold_1e_2"
+    ],
     "cost_basis": [],
     "seen_in": [
       "quantum-computer"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "mission-endurance:depth": {
     "input_keys": [
       "battery_capacity_kwh",
       "cruise_power_kw",
+      "cruise_speed_ms",
+      "depth_rating_m",
+      "drag_coefficient_cd",
+      "frontal_area_m2",
+      "hotel_power_w",
+      "housing_material",
+      "mission_duration_hours",
       "operating_depth_m",
-      "propulsion_efficiency"
+      "payload_power_w",
+      "propulsion_efficiency",
+      "vehicle_volume_l"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "battery_capacity_required_kwh",
+      "battery_cell_mass_kg",
+      "battery_pack_mass_kg",
+      "battery_pack_volume_l",
+      "drag_force_n",
+      "energy_required_kwh",
+      "energy_required_wh",
+      "neutral_buoyancy_check",
+      "pressure_bar",
+      "pressure_housing_mass_kg",
+      "pressure_housing_material",
+      "pressure_housing_thickness_mm",
+      "pressure_pa",
+      "propulsion_power_w",
+      "surplus_payload_capacity_kg",
+      "total_payload_mass_kg",
+      "total_power_w",
+      "vehicle_displaced_mass_kg",
+      "vehicle_energy_density_wh_per_l"
+    ],
     "cost_basis": [],
     "seen_in": [
       "auv"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "mli:multi-layer-insulation": {
     "input_keys": [
       "cold_case_temp_c",
       "cubesat_u",
+      "edge_treatment",
       "hot_case_temp_c",
-      "shroud_area_m2"
+      "layer_material",
+      "num_layers",
+      "shroud_area_m2",
+      "spacer_type",
+      "temperature_cold_k",
+      "temperature_hot_k"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "effective_emissivity",
+      "effective_emissivity_radiation_only",
+      "equivalent_thermal_conductivity_w_mk",
+      "film_emissivity_per_side",
+      "heat_leak_conduction_w_m2",
+      "heat_leak_ideal_w_m2",
+      "heat_leak_radiation_w_m2",
+      "heat_leak_w_m2",
+      "mass_film_g_m2",
+      "mass_g_m2",
+      "mass_kg_m2",
+      "mass_spacer_g_m2",
+      "penetration_penalty_pct"
+    ],
     "cost_basis": [
       "mli_thermal_blanket"
     ],
@@ -1610,36 +3077,98 @@
       "cryostat",
       "quantum-computer",
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "monod:growth-kinetics": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "initial_biomass_g_l",
+      "initial_substrate_g_l",
+      "max_growth_rate_per_hour",
+      "substrate",
+      "substrate_affinity_ks_g_l",
+      "target_biomass_g_l",
+      "working_volume_l",
+      "yield_coefficient_g_g"
+    ],
+    "output_keys": [
+      "biomass_final_g_l",
+      "biomass_final_kg_total",
+      "doubling_time_h",
+      "ks_g_l",
+      "mu_max_per_hour",
+      "peak_substrate_uptake_g_h",
+      "productivity_g_l_h",
+      "specific_substrate_uptake_q_s_max_g_g_h",
+      "substrate_consumed_g_l",
+      "substrate_consumed_g_total",
+      "substrate_limited",
+      "substrate_name",
+      "target_achievable",
+      "time_to_target_biomass_h",
+      "yield_coefficient_yxs"
+    ],
     "cost_basis": [],
     "seen_in": [
       "bioreactor"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "motion-kinematics:steps-per-mm": {
     "input_keys": [
+      "axis_length_mm",
+      "belt_pitch_mm",
+      "belt_pulley_teeth",
       "build_x_mm",
       "build_y_mm",
       "build_z_mm",
-      "max_print_speed_mm_s"
+      "friction_coefficient",
+      "max_print_speed_mm_s",
+      "microstepping",
+      "motor_step_angle_deg",
+      "moving_mass_kg",
+      "target_accel_mm_s2",
+      "target_print_speed_mm_s"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "feasible",
+      "force_acceleration_n",
+      "force_friction_n",
+      "force_required_n",
+      "full_steps_per_rev",
+      "max_accel_mm_s2",
+      "max_step_freq_hz",
+      "motor_torque_available_at_speed_ncm",
+      "motor_torque_required_ncm",
+      "pulley_radius_mm",
+      "pulley_teeth",
+      "step_angle_deg",
+      "steps_per_mm",
+      "torque_margin_pct",
+      "travel_per_rev_mm"
+    ],
     "cost_basis": [],
     "seen_in": [
       "3d-printer-fdm"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "motor-prop:matching": {
     "input_keys": [
       "battery_v",
+      "battery_voltage",
       "gross_takeoff_mass_kg",
       "motor_count",
+      "motor_idle_current_a",
+      "motor_internal_resistance_ohm",
+      "motor_kv",
       "mtow_kg",
+      "num_motors",
       "num_rotors",
+      "payload_kg",
+      "prop_blades",
+      "prop_diameter_inch",
+      "prop_pitch_inch",
       "rotor_diameter_m",
       "total_mass_kg"
     ],
@@ -1662,11 +3191,20 @@
       "drone",
       "e-bike",
       "evtol"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "motor:altitude-derating": {
     "input_keys": [
-      "propulsion_each_w"
+      "ambient_pressure_kpa",
+      "ambient_temp_c",
+      "cooling",
+      "motor_diameter_mm",
+      "motor_efficiency_at_sl",
+      "motor_length_mm",
+      "motor_power_w",
+      "propulsion_each_w",
+      "surface_emissivity"
     ],
     "output_keys": [
       "continuous_power_w",
@@ -1677,7 +3215,8 @@
     "cost_basis": [],
     "seen_in": [
       "haps"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "mplc-turbulence-compensation:adaptive-optics": {
     "input_keys": [
@@ -1688,13 +3227,20 @@
     "cost_basis": [],
     "seen_in": [
       "fso"
-    ]
+    ],
+    "output_source": "none"
   },
   "mppt:sandia-tracking": {
     "input_keys": [
+      "array_open_circuit_v",
+      "array_short_circuit_a",
+      "cell_temp_c",
       "dc_input_voltage_v",
+      "i_mp_ratio_stc",
+      "irradiance_w_m2",
       "mppt_count",
-      "rated_power_kw"
+      "rated_power_kw",
+      "v_mp_ratio_stc"
     ],
     "output_keys": [
       "mppt_efficiency_pct",
@@ -1705,22 +3251,52 @@
     ],
     "seen_in": [
       "solar-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "mrr-chip-load:milling": {
     "input_keys": [
-      "rated_spindle_power_kw"
+      "axial_depth_mm",
+      "cutting_speed_m_min",
+      "feed_per_tooth_mm",
+      "material",
+      "num_flutes",
+      "radial_depth_mm",
+      "rated_spindle_power_kw",
+      "tool_diameter_mm"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "chip_area_per_tooth_mm2",
+      "chip_thickness_mean_mm",
+      "cutting_force_n",
+      "cutting_force_per_tooth_n",
+      "engagement_fraction",
+      "feed_rate_mm_min",
+      "k_s_n_mm2",
+      "mrr_cm3_min",
+      "spindle_power_kw",
+      "spindle_rpm",
+      "spindle_torque_nm",
+      "taylor_c",
+      "taylor_n",
+      "teeth_engaged",
+      "tool_life_minutes"
+    ],
     "cost_basis": [],
     "seen_in": [
       "cnc-machine"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "network-bandwidth:budget": {
     "input_keys": [
       "inference_tps",
-      "network_throughput_gbe"
+      "inferences_per_sec",
+      "latency_budget_ms",
+      "link_type",
+      "network_throughput_gbe",
+      "output_kbytes_per_inference",
+      "redundancy_factor"
     ],
     "output_keys": [
       "network_headroom_factor",
@@ -1729,7 +3305,8 @@
     "cost_basis": [],
     "seen_in": [
       "edge-ai"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "ngspice:pcs-simulation": {
     "input_keys": [
@@ -1741,12 +3318,14 @@
       "dc_bus_voltage_v",
       "dc_input_voltage_v",
       "hover_power_kw",
+      "mode",
       "physical_qubit_count",
       "polarisation_voltage_v",
       "qubit_frequency_ghz",
       "rated_motor_power_w",
       "rated_power_kw",
       "rated_spindle_power_kw",
+      "topology",
       "total_power_kw"
     ],
     "output_keys": [
@@ -1798,33 +3377,74 @@
       "ups-inverter",
       "ventilator",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "noise-emission:dba": {
     "input_keys": [
+      "compressor_kw",
       "compressor_power_kw",
+      "compressor_type",
+      "distance_m",
+      "fan_diameter_mm",
+      "fan_rpm",
+      "mounting",
       "rated_thermal_kw"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "cabinet_lw_dba",
+      "compliance_eu_ecodesign_2024",
+      "compliance_uk_pdr_42db",
+      "compressor_lw_dba",
+      "eu_ecodesign_limit_db",
+      "fan_lw_dba",
+      "mounting_correction_db",
+      "recommendations",
+      "refrigerant_lw_dba",
+      "sound_power_db_lw_total",
+      "sound_pressure_db_at_1m",
+      "sound_pressure_db_at_distance"
+    ],
     "cost_basis": [],
     "seen_in": [
+      "co2-mineralisation",
       "heat-pump-residential"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "nrlmsise00:leo-density": {
     "input_keys": [
-      "orbital_altitude_km"
+      "altitude_km",
+      "latitude_deg",
+      "local_solar_time_h",
+      "orbital_altitude_km",
+      "solar_activity"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "density_kg_m3",
+      "f10_7_index_sfu",
+      "gravity_local_ms2",
+      "mean_molecular_weight_kg_mol",
+      "note",
+      "pressure_pa",
+      "scale_height_m",
+      "temperature_k"
+    ],
     "cost_basis": [],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "nutrient-solution:chemistry": {
     "input_keys": [
       "fertigation_reservoir_l",
-      "target_crop_id"
+      "reservoir_volume_l",
+      "target_crop",
+      "target_crop_id",
+      "target_ec_ms_cm",
+      "target_ph",
+      "water_source_ppm_dissolved"
     ],
     "output_keys": [
       "nutrient_dosing_rate_ml_min",
@@ -1836,15 +3456,41 @@
     "cost_basis": [],
     "seen_in": [
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "obstacle-avoidance:sensor": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "drone_max_speed_ms",
+      "fov_deg",
+      "frame_rate_hz",
+      "max_deceleration_ms2",
+      "max_range_m",
+      "sensor_type"
+    ],
+    "output_keys": [
+      "blind_spot_fraction",
+      "blind_spot_solid_angle_sr",
+      "blind_spot_volume_m3",
+      "braking_distance_at_max_speed_m",
+      "minimum_rate_for_dynamic_obstacles_hz",
+      "recommendations",
+      "safety_margin_ratio",
+      "sensor_cost_gbp_per_unit",
+      "sensor_mass_g_per_unit",
+      "sensors_for_360_deg_coverage",
+      "sufficient_range",
+      "sufficient_rate",
+      "total_cost_360_gbp",
+      "total_latency_ms",
+      "total_mass_g_360",
+      "weather_capable"
+    ],
     "cost_basis": [],
     "seen_in": [
       "drone"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "octopart:parts-lookup": {
     "input_keys": [],
@@ -1854,7 +3500,8 @@
     "cost_basis": [],
     "seen_in": [
       "bess"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "opencv-machine-vision:inspection": {
     "input_keys": [],
@@ -1862,72 +3509,189 @@
     "cost_basis": [],
     "seen_in": [
       "auv"
-    ]
+    ],
+    "output_source": "none"
+  },
+  "opendss:feeder-flow": {
+    "input_keys": [
+      "feeder_length_km",
+      "pcc_voltage_kv",
+      "rated_power_kw"
+    ],
+    "output_keys": [
+      "feeder_losses_kw",
+      "pcc_voltage_phase_v",
+      "pcc_voltage_pu",
+      "pcc_voltage_within_en50160_limits",
+      "solution_converged"
+    ],
+    "cost_basis": [],
+    "seen_in": [],
+    "output_source": "python:run"
   },
   "optical-atp:closed-loop": {
     "input_keys": [
       "aperture_diameter_mm",
-      "tracking_loop_bandwidth_hz"
+      "link_range_km",
+      "platform_vibration_hz",
+      "rx_aperture_mm",
+      "tracking_loop_bandwidth_hz",
+      "tx_jitter_arcsec_rms",
+      "wavelength_nm"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "ATP_bandwidth_hz",
+      "acquisition_time_s",
+      "beam_divergence_half_angle_arcsec",
+      "beam_divergence_urad",
+      "disturbance_rejection_at_vib_db",
+      "fade_margin_db",
+      "fade_margin_positive",
+      "pointing_adequate",
+      "pointing_loss_db",
+      "pointing_margin_arcsec",
+      "required_pointing_accuracy_arcsec",
+      "slew_loop_bandwidth_hz",
+      "spot_diameter_at_rx_m",
+      "spot_radius_at_rx_cm"
+    ],
     "cost_basis": [],
     "seen_in": [
       "fso"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "orbit-propagator:j2": {
     "input_keys": [
+      "altitude_apogee_km",
+      "altitude_perigee_km",
+      "argument_perigee_deg",
       "battery_mass_kg",
+      "central_body",
       "chem_isp_s",
       "cryocooler_mass_kg",
       "cubesat_u",
       "delta_v_budget_ms",
+      "eccentricity",
+      "inclination_deg",
       "mass_kg",
       "mission_duration_years",
       "mli_mass_kg",
       "orbital_altitude_km",
+      "propagation_time_days",
       "propellant_mass_kg",
       "propellant_tank_mass_kg",
+      "raan_deg",
       "radiator_mass_kg",
       "reaction_wheel_mass_kg",
       "rtg_mass_kg",
-      "solar_array_mass_kg"
+      "semi_major_axis_km",
+      "solar_array_mass_kg",
+      "tle_line1",
+      "tle_line2",
+      "true_anomaly_deg"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "J2",
+      "arg_perigee_drift_deg_per_day",
+      "arg_perigee_propagated_deg",
+      "body_radius_km",
+      "eclipse_duration_minutes",
+      "eclipse_fraction_pct",
+      "ground_track_repeat_days",
+      "is_sun_synchronous",
+      "mean_motion_rad_s",
+      "mean_motion_rev_per_day",
+      "mu_km3s2",
+      "n_orbits_propagated",
+      "node_drift_deg_per_day",
+      "node_drift_rad_s",
+      "orbital_period_hours",
+      "orbital_period_min",
+      "orbital_period_s",
+      "raan_propagated_deg",
+      "sun_sync_drift_target_deg_per_day",
+      "true_anomaly_propagated_deg"
+    ],
     "cost_basis": [],
     "seen_in": [
       "satellite-cubesat",
       "satellite-interplanetary"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "orbital-thermal:sat-balance": {
     "input_keys": [
+      "albedo_factor",
       "avg_power_w",
       "cubesat_u",
-      "orbital_altitude_km"
+      "earth_ir_w_m2",
+      "eclipse_fraction_pct",
+      "internal_dissipation_w",
+      "ir_emissivity",
+      "orbital_altitude_km",
+      "solar_absorptivity",
+      "sun_facing_area_m2",
+      "surface_area_m2"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "albedo_flux_w_m2",
+      "alpha_over_epsilon",
+      "altitude_km",
+      "equilibrium_temp_c_avg",
+      "equilibrium_temp_c_eclipse",
+      "equilibrium_temp_c_sun",
+      "q_albedo_w",
+      "q_earth_ir_w",
+      "q_in_eclipse_total_w",
+      "q_in_sun_total_w",
+      "q_internal_w",
+      "q_solar_w",
+      "radiator_area_required_m2",
+      "radiator_setpoint_c",
+      "solar_flux_w_m2",
+      "view_factor_earth"
+    ],
     "cost_basis": [],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "osmosis-membrane:dialyser": {
     "input_keys": [
+      "blood_flow_ml_min",
       "blood_flow_rate_ml_per_min",
+      "dialysate_flow_ml_min",
       "dialysate_flow_rate_ml_per_min",
       "membrane_area_m2",
+      "patient_v_total_l",
       "session_duration_hours",
+      "session_minutes",
+      "solute",
       "transmembrane_pressure_mmhg",
       "ultrafiltration_rate_ml_per_h"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "Kt_V_per_session",
+      "URR_pct",
+      "creatinine_clearance_ml_min",
+      "dialyser_efficiency",
+      "ekt_v_equilibrated",
+      "kdoqi_adequate_kt_v_ge_1_4",
+      "koa_solute_ml_min_per_m2",
+      "koa_urea_ml_min_per_m2",
+      "solute_clearance_ml_min",
+      "urea_KoA_total_ml_min",
+      "urea_clearance_ml_min"
+    ],
     "cost_basis": [
       "dialyser_hollow_fibre"
     ],
     "seen_in": [
       "dialysis-machine"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "pandapower:grid-integration": {
     "input_keys": [
@@ -1936,11 +3700,14 @@
       "chiller_compressor_power_kw",
       "continuous_power_kw",
       "dehumidifier_electrical_kw",
+      "grid_strength",
       "hvac_compressor_power_kw",
       "irrigation_pump_motor_kw",
       "led_installed_power_kw",
+      "pcc_voltage_kv",
       "rated_electrical_kw",
       "rated_power_kw",
+      "region",
       "supply_kw_available",
       "thermal_power_mwt"
     ],
@@ -1969,15 +3736,39 @@
       "ups-inverter",
       "vertical-farm",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "pcm:thermal-storage": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "container_material",
+      "pcm_mass_g",
+      "pcm_material",
+      "peak_duration_minutes",
+      "target_absorption_w"
+    ],
+    "output_keys": [
+      "container_k_boost",
+      "container_mass_kg",
+      "energy_event_kj",
+      "latent_heat_kj_kg",
+      "mass_efficiency_kj_per_kg",
+      "melting_temp_c",
+      "response_time_s",
+      "solidification_time_minutes",
+      "solidification_time_s",
+      "sufficient_capacity",
+      "thermal_conductivity_effective_w_mk",
+      "thermal_conductivity_pcm_w_mk",
+      "total_absorption_kj",
+      "total_system_mass_kg",
+      "utilisation_pct"
+    ],
     "cost_basis": [],
     "seen_in": [
       "cryostat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "pcsel-laser:design": {
     "input_keys": [
@@ -1990,26 +3781,46 @@
     ],
     "seen_in": [
       "fso"
-    ]
+    ],
+    "output_source": "none"
   },
   "peep-valve:sizing": {
     "input_keys": [
+      "max_flow_l_min",
       "peak_inspiratory_flow_lpm",
-      "peep_cmh2o"
+      "peep_cmh2o",
+      "peep_target_cmh2o",
+      "safety_pressure_cmh2o",
+      "valve_type"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "dead_space_ml",
+      "iso_80601_2_12_compliant",
+      "pressure_drop_at_max_flow_cmh2o",
+      "pressure_drop_pa",
+      "relief_pressure_setting_cmh2o",
+      "relief_response_ms",
+      "sound_emission_dba",
+      "valve_cv_required",
+      "valve_kv_required"
+    ],
     "cost_basis": [
       "exhalation_valve_peep_module"
     ],
     "seen_in": [
       "ventilator"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "pem-membrane:sizing": {
     "input_keys": [
+      "active_area_per_cell_cm2",
       "current_density_a_cm2",
+      "faradaic_efficiency",
       "polarisation_voltage_v",
-      "rated_power_kw"
+      "rated_power_kw",
+      "target_h2_kg_per_day",
+      "voltage_v"
     ],
     "output_keys": [
       "membrane_active_area_m2",
@@ -2019,14 +3830,20 @@
     "cost_basis": [],
     "seen_in": [
       "h2-electrolyser"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "pemfc:membrane-humidification": {
     "input_keys": [
       "cell_count",
+      "current_a_per_cm2",
+      "dry_air_flow_lpm",
+      "membrane_thickness_um",
       "operating_pressure_bar",
       "rated_power_kw",
-      "stack_temperature_c"
+      "relative_humidity_in_pct",
+      "stack_temperature_c",
+      "temperature_c"
     ],
     "output_keys": [
       "humidifier_water_kg_h",
@@ -2035,14 +3852,19 @@
     "cost_basis": [],
     "seen_in": [
       "pemfc"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "pemfc:polarisation-curve": {
     "input_keys": [
+      "humidity_pct",
       "operating_pressure_bar",
+      "platinum_loading_mg_cm2",
+      "pressure_bar",
       "pt_loading_mg_cm2",
       "rated_power_kw",
-      "stack_temperature_c"
+      "stack_temperature_c",
+      "temperature_c"
     ],
     "output_keys": [
       "cell_voltage_v",
@@ -2056,13 +3878,18 @@
     ],
     "seen_in": [
       "pemfc"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "pemfc:pt-loading-optimisation": {
     "input_keys": [
       "current_density_a_cm2",
       "durability_hours",
-      "rated_power_kw"
+      "durability_target_hours",
+      "pt_price_gbp_per_g",
+      "rated_power_kw",
+      "stack_active_area_m2",
+      "target_power_density_w_cm2"
     ],
     "output_keys": [
       "total_pt_kg"
@@ -2070,11 +3897,18 @@
     "cost_basis": [],
     "seen_in": [
       "pemfc"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "pest-control:uvc-dose": {
     "input_keys": [
-      "canopy_area_m2"
+      "canopy_area_m2",
+      "contaminant_type",
+      "exposure_time_s",
+      "lamp_uvc_w",
+      "room_volume_m3",
+      "target_distance_m",
+      "target_kill_log_reduction"
     ],
     "output_keys": [
       "uvc_energy_kwh_cycle",
@@ -2085,17 +3919,41 @@
     "cost_basis": [],
     "seen_in": [
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "ph-titration:sizing": {
     "input_keys": [
+      "acid_concentration_m",
+      "base_concentration_m",
+      "biomass_g_l",
+      "buffer_capacity_meq_l",
+      "organism_co2_production_g_h",
+      "starting_ph",
+      "target_ph",
       "working_volume_l"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "acid_dose_rate_ml_min",
+      "acid_l_per_24h",
+      "base_dose_rate_ml_min",
+      "base_l_per_24h",
+      "buffer_capacity_meq_per_l",
+      "co2_production_g_h",
+      "delta_ph",
+      "h_plus_generation_rate_mol_h",
+      "initial_bolus_dose_ml",
+      "initial_bolus_mol_h_needed",
+      "needs_acid",
+      "needs_base",
+      "ph_swing_per_minute_uncontrolled",
+      "recommended_titrant"
+    ],
     "cost_basis": [],
     "seen_in": [
       "bioreactor"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "phased-array-antenna:radiation-pattern": {
     "input_keys": [
@@ -2110,25 +3968,39 @@
     ],
     "seen_in": [
       "phased-array"
-    ]
+    ],
+    "output_source": "none"
   },
   "pilot-workload:cooper-harper": {
-    "input_keys": [],
+    "input_keys": [
+      "autonomy_level",
+      "control_force_n",
+      "max_pitch_rate_deg_s",
+      "max_roll_rate_deg_s",
+      "response_time_ms",
+      "stability_margin_db"
+    ],
     "output_keys": [
       "cooper_harper_rating"
     ],
     "cost_basis": [],
     "seen_in": [
       "evtol"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "plant-growth:yield": {
     "input_keys": [
       "canopy_area_m2",
+      "co2_ppm",
       "co2_target_ppm",
+      "crop",
+      "dli_mol_m2_day",
+      "growing_area_m2",
       "led_dli_mol_m2_day",
       "operating_temp_c",
-      "target_crop_id"
+      "target_crop_id",
+      "temperature_c"
     ],
     "output_keys": [
       "crop_annual_yield_kg_m2",
@@ -2142,7 +4014,8 @@
     "cost_basis": [],
     "seen_in": [
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "pointing-acquisition-tracking:control": {
     "input_keys": [
@@ -2153,13 +4026,19 @@
     "cost_basis": [],
     "seen_in": [
       "fso"
-    ]
+    ],
+    "output_source": "none"
   },
   "power-module:sizing": {
     "input_keys": [
+      "load_factor",
+      "module_efficiency_pct",
+      "module_unit_kw",
       "output_current_max_a",
       "output_voltage_max_v",
-      "rated_power_kw"
+      "rated_power_kw",
+      "redundancy_n_plus",
+      "total_power_kw"
     ],
     "output_keys": [
       "module_efficiency_pct",
@@ -2170,21 +4049,34 @@
     ],
     "seen_in": [
       "ev-charger"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "pressure-vessel:design": {
     "input_keys": [
+      "allowable_stress_mpa",
       "core_lifetime_years",
+      "corrosion_allowance_mm",
+      "depth_m",
+      "design_pressure_barg",
+      "design_pressure_mpa",
+      "diameter_mm",
       "external_pressure_bar",
       "hull_diameter_m",
       "hull_length_m",
+      "length_mm",
+      "material",
+      "mode",
       "o2_cylinder_pressure_bar",
       "o2_cylinder_volume_l",
       "operating_depth_m",
       "operating_pressure_bar",
+      "safety_factor_required",
       "target_capture_tpd",
       "vessel_diameter_m",
-      "vessel_height_m"
+      "vessel_height_m",
+      "wall_thickness_mm",
+      "weld_joint_efficiency"
     ],
     "output_keys": [
       "buffer_tank_mass_kg",
@@ -2202,28 +4094,220 @@
     "seen_in": [
       "auv",
       "bioreactor",
+      "co2-mineralisation",
       "cryostat",
       "dac",
+      "e-fuel-synthesis",
       "h2-electrolyser",
       "pemfc",
       "smr",
       "ventilator"
-    ]
+    ],
+    "output_source": "class-plan"
+  },
+  "process:asf-chain-growth": {
+    "input_keys": [
+      "catalyst",
+      "diesel_to_jet_fraction",
+      "n_max",
+      "reactor_temp_c",
+      "wax_to_jet_conversion"
+    ],
+    "output_keys": [
+      "alpha",
+      "alpha_basis",
+      "alpha_source",
+      "carbon_to_liquids_frac",
+      "cut_sum",
+      "data_sources",
+      "diesel_frac",
+      "diesel_residue_frac",
+      "jet_frac_raw",
+      "jet_selectivity_frac",
+      "lpg_frac",
+      "methane_frac",
+      "methane_selectivity_frac",
+      "naphtha_frac",
+      "naphtha_selectivity_frac",
+      "peak_carbon_number",
+      "wax_frac_raw",
+      "wax_residue_frac"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
+  },
+  "process:fired-heater": {
+    "input_keys": [
+      "avg_radiant_flux_kw_m2",
+      "cp_kj_kgk",
+      "efficiency",
+      "latent_kj_kg",
+      "mass_flow_kg_h",
+      "mode",
+      "t_in_k",
+      "t_out_k",
+      "vaporise_frac"
+    ],
+    "output_keys": [
+      "data_sources",
+      "delta_t_k",
+      "efficiency_used",
+      "heating_element_kw",
+      "input_duty_kw",
+      "process_duty_kw"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
+  },
+  "process:flash-separation": {
+    "input_keys": [
+      "aqueous_flow_kg_h",
+      "droplet_um",
+      "liq_residence_min",
+      "liquid_hc_flow_kg_h",
+      "mesh",
+      "orientation",
+      "p_bar",
+      "rho_aq_kg_m3",
+      "rho_l_kg_m3",
+      "rho_v_kg_m3",
+      "t_k",
+      "vapour_flow_kg_h"
+    ],
+    "output_keys": [
+      "data_sources",
+      "holdup_volume_m3",
+      "k_factor_used",
+      "l_over_d",
+      "liquid_residence_min",
+      "mesh_fitted",
+      "oil_water_settling_ok",
+      "operating_pressure_bar",
+      "operating_temperature_k",
+      "settling_time_s",
+      "vapour_cross_section_m2",
+      "vapour_velocity_max_ms",
+      "vessel_diameter_m",
+      "vessel_length_m"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
+  },
+  "process:pump-sizing": {
+    "input_keys": [
+      "fittings_equiv_length_m",
+      "flow_m3_h",
+      "fluid_density_kg_m3",
+      "fluid_viscosity_pa_s",
+      "motor_efficiency",
+      "pipe_diameter_mm",
+      "pipe_length_m",
+      "process_backpressure_kpa",
+      "pump_efficiency",
+      "pump_name",
+      "roughness_mm",
+      "static_head_m"
+    ],
+    "output_keys": [
+      "darcy_friction_factor",
+      "data_sources",
+      "head_breakdown",
+      "hydraulic_power_w",
+      "motor_power_kw",
+      "motor_power_w",
+      "pipe_velocity_m_s",
+      "pump_flow_lpm",
+      "pump_head_m",
+      "pump_type",
+      "recommended_motor_kw",
+      "reynolds",
+      "shaft_power_w"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation",
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
+  },
+  "process:steam-generator": {
+    "input_keys": [
+      "co2_converted_kmol_h",
+      "dh_rxn_kj_mol",
+      "exotherm_duty_kw",
+      "feedwater_t_k",
+      "reactor_t_k",
+      "steam_pressure_bar",
+      "u_w_m2k"
+    ],
+    "output_keys": [
+      "data_sources",
+      "drum_volume_m3",
+      "exotherm_duty_basis",
+      "h_fg_kj_kg",
+      "heat_transfer_area_m2",
+      "lmtd_k",
+      "steam_property_basis",
+      "steam_raised_kg_h",
+      "steam_tsat_c",
+      "warnings"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
   },
   "propellant-tank:sizing": {
     "input_keys": [
-      "propellant_mass_kg"
+      "feed_type",
+      "material",
+      "max_pressure_bar",
+      "propellant_mass_kg",
+      "propellant_type",
+      "safety_factor"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "feedline_mass_kg",
+      "furniture_mass_kg",
+      "mass_fraction_pct",
+      "propellant_density_kgm3",
+      "propellant_volume_l",
+      "shell_mass_kg",
+      "tank_inner_diameter_mm",
+      "tank_inner_radius_mm",
+      "tank_mass_kg",
+      "tank_volume_l",
+      "total_dry_mass_kg",
+      "ullage_pct",
+      "wall_thickness_min_gauge_mm",
+      "wall_thickness_mm"
+    ],
     "cost_basis": [],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "propeller:low-re-bemt": {
     "input_keys": [
       "air_density_kg_m3",
-      "cruise_velocity_m_s"
+      "airspeed_ms",
+      "chord_m",
+      "cruise_velocity_m_s",
+      "diameter_m",
+      "num_blades",
+      "pitch_m",
+      "rpm"
     ],
     "output_keys": [
       "mach_tip",
@@ -2234,11 +4318,20 @@
     "cost_basis": [],
     "seen_in": [
       "haps"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "protection-coordination:dc-ac": {
     "input_keys": [
+      "bus_resistance_ohm",
+      "coordination_pairs",
       "dc_bus_voltage_v",
+      "devices",
+      "grid_sc_mva",
+      "pack_resistance_ohm",
+      "pcc_voltage_kv",
+      "transformer_impedance_pct",
+      "transformer_kva",
       "transformer_rating_kva"
     ],
     "output_keys": [
@@ -2249,12 +4342,16 @@
     "cost_basis": [],
     "seen_in": [
       "bess"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "psychrolib:humid-air": {
     "input_keys": [
+      "dry_bulb_c",
       "min_ambient_c",
       "operating_temp_c",
+      "pressure_pa",
+      "relative_humidity_pct",
       "target_gas_temp_c",
       "target_rh_pct"
     ],
@@ -2272,13 +4369,19 @@
       "heat-pump-residential",
       "ventilator",
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "pvlib:solar-irradiance": {
     "input_keys": [
+      "altitude_m",
       "cruise_altitude_m",
+      "latitude",
+      "longitude",
+      "model",
       "orbital_altitude_km",
       "target_solar_flux_w_m2",
+      "time_utc",
       "wing_area_m2"
     ],
     "output_keys": [
@@ -2295,7 +4398,8 @@
       "satellite-interplanetary",
       "satellite-smallsat",
       "solar-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "pybamm:cell-sizing": {
     "input_keys": [
@@ -2308,18 +4412,25 @@
       "bus_voltage_v",
       "cell_capacity_ah",
       "cell_capacity_kwh",
+      "cell_chemistry",
       "cell_count",
+      "cell_count_authoritative",
       "cell_voltage_v",
       "cells_per_rack",
+      "cells_per_rack_authoritative",
       "continuous_power_kw",
       "dc_bus_voltage_v",
       "dod_fraction",
       "inverter_dissipated_kw",
       "parallel_strings_per_rack",
+      "parallel_strings_per_rack_authoritative",
       "peak_power_kw",
       "rack_count",
+      "rack_count_authoritative",
       "rated_power_kw",
       "series_cells_per_string",
+      "series_cells_per_string_authoritative",
+      "target_energy_kwh",
       "total_motor_power_kw",
       "usable_capacity_kwh",
       "usable_capacity_kwh_requested"
@@ -2366,7 +4477,8 @@
       "humanoid",
       "solid-state-battery",
       "ups-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "quantum-chip-packaging:flip-chip": {
     "input_keys": [
@@ -2377,30 +4489,62 @@
     "cost_basis": [],
     "seen_in": [
       "quantum-computer"
-    ]
+    ],
+    "output_source": "none"
   },
   "qubit-chip-thermal:base-plate": {
     "input_keys": [
+      "attenuator_count",
       "base_plate_temp_mk",
-      "physical_qubit_count"
+      "microwave_power_per_line_dbm",
+      "microwave_signal_count",
+      "physical_qubit_count",
+      "qubit_count"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "T1_degradation_factor",
+      "actual_base_temp_mk",
+      "cooling_margin_pct",
+      "cooling_power_available_uW",
+      "heat_load_uW",
+      "max_supportable_qubits_at_this_temp",
+      "per_line_heat_load_uW",
+      "signal_heat_load_uW",
+      "static_heat_load_uW",
+      "thermal_envelope_ok"
+    ],
     "cost_basis": [],
     "seen_in": [
       "quantum-computer"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "qubit-count-to-logical:error-correction": {
     "input_keys": [
       "code_distance",
+      "code_type",
       "gate_fidelity",
-      "physical_qubit_count"
+      "physical_error_rate",
+      "physical_qubit_count",
+      "target_logical_error_rate"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "actual_logical_error_rate",
+      "below_threshold",
+      "code_distance_required",
+      "code_distance_used",
+      "logical_qubit_count",
+      "overhead_ratio",
+      "physical_qubits_per_logical",
+      "suppression_per_distance_increase_log10",
+      "threshold_pct",
+      "threshold_required_pct"
+    ],
     "cost_basis": [],
     "seen_in": [
       "quantum-computer"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "qutip:qubit-dynamics": {
     "input_keys": [
@@ -2414,12 +4558,21 @@
     "cost_basis": [],
     "seen_in": [
       "quantum-computer"
-    ]
+    ],
+    "output_source": "none"
   },
   "radiator:spacecraft-sizing": {
     "input_keys": [
+      "dissipation_w",
       "inverter_dissipated_kw",
-      "thermal_rejection_min_kw"
+      "radiator_temp_k",
+      "safety_margin_pct",
+      "sink_temp_k",
+      "solar_incidence_factor",
+      "surface_alpha",
+      "surface_epsilon",
+      "thermal_rejection_min_kw",
+      "view_factor_to_space"
     ],
     "output_keys": [
       "radiator_area_m2",
@@ -2429,39 +4582,168 @@
     "seen_in": [
       "evtol",
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "reaction-wheel:sizing": {
     "input_keys": [
-      "mass_kg"
+      "disturbance_torque_nm",
+      "mass_kg",
+      "max_slew_rate_deg_s",
+      "satellite_inertia_kgm2",
+      "slew_amplitude_deg",
+      "wheel_count"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "angular_accel_rad_s2",
+      "desat_method_recommended",
+      "momentum_capacity_nms",
+      "momentum_capacity_per_axis_nms",
+      "saturation_rpm",
+      "torque_required_nm",
+      "torque_required_per_axis_nm",
+      "wheel_count_n",
+      "wheel_geometry_redundant",
+      "wheel_mass_each_kg",
+      "wheel_mass_kg"
+    ],
     "cost_basis": [
       "reaction_wheel_assembly"
     ],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
+  },
+  "reaction:feasibility-gibbs": {
+    "input_keys": [
+      "reaction_name",
+      "species",
+      "temperatures_k"
+    ],
+    "output_keys": [
+      "data_sources",
+      "delta_g_rxn_298k_kj_mol",
+      "delta_h_rxn_298k_kj_mol",
+      "equilibrium_constant_K",
+      "gibbs_formation_table",
+      "lowest_data_confidence",
+      "results_by_temperature",
+      "verdict"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation",
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
+  },
+  "reaction:stoichiometry-balance": {
+    "input_keys": [
+      "basis",
+      "reaction_name",
+      "species"
+    ],
+    "output_keys": [
+      "atom_balanced",
+      "data_sources",
+      "element_net_atoms",
+      "mass_balance_products_t_day",
+      "mass_balance_reactants_t_day",
+      "mass_closure_pct",
+      "mass_flows_kg_day",
+      "mass_flows_t_day",
+      "warnings"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation",
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
+  },
+  "reactor:cstr-pfr-sizing": {
+    "input_keys": [
+      "allowable_stress_mpa",
+      "corrosion_allowance_mm",
+      "density_kg_m3",
+      "design_pressure_barg",
+      "fill_fraction",
+      "length_to_diameter",
+      "mass_flow_kg_h",
+      "material",
+      "n_reactors",
+      "rate_constant_per_h",
+      "reactor_name",
+      "reactor_type",
+      "residence_time_h",
+      "target_conversion",
+      "volumetric_flow_m3_h",
+      "weld_joint_efficiency"
+    ],
+    "output_keys": [
+      "data_sources",
+      "residence_time_basis",
+      "shell_mass_kg_per_reactor",
+      "shell_mass_kg_total",
+      "shell_thickness_mm",
+      "vessel_diameter_m",
+      "vessel_gross_volume_m3",
+      "vessel_height_m",
+      "working_volume_per_reactor_m3",
+      "working_volume_total_m3"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "co2-mineralisation",
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
   },
   "recovery-method:logistics": {
     "input_keys": [
+      "mother_ship_class",
       "mtow_air_kg",
-      "operating_depth_m"
+      "operating_depth_m",
+      "recovery_method",
+      "recovery_sea_state",
+      "vehicle_mass_kg"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "additional_equipment",
+      "cost_per_recovery_gbp",
+      "crew_required",
+      "max_sea_state_for_method",
+      "message",
+      "mother_ship_capability_ok",
+      "platform_required",
+      "recovery_time_minutes",
+      "recovery_viable",
+      "sea_state_description",
+      "wave_height_m",
+      "weather_window_required_hours",
+      "wind_kts"
+    ],
     "cost_basis": [],
     "seen_in": [
       "auv"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "refrigeration-cycle:cop": {
     "input_keys": [
       "cond_saturation_c",
+      "cond_temp_c",
+      "cooling_load_kw",
       "evap_saturation_c",
+      "evap_temp_c",
       "hvac_chiller_capacity_kw",
+      "isentropic_efficiency",
       "operating_temp_c",
       "rated_thermal_kw",
-      "refrigerant"
+      "refrigerant",
+      "subcool_k",
+      "superheat_k"
     ],
     "output_keys": [
       "chiller_compressor_power_kw",
@@ -2475,20 +4757,40 @@
     "seen_in": [
       "heat-pump-residential",
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "regulatory-caa:part107": {
     "input_keys": [
-      "mtow_kg"
+      "country",
+      "mass_kg",
+      "mtow_kg",
+      "operation",
+      "urban_or_rural"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "authority",
+      "category",
+      "insurance_required_min_gbp",
+      "insurance_typical_commercial_gbp",
+      "licence_cost_gbp",
+      "operating_restrictions",
+      "registration_renewal_yrs",
+      "required_certification",
+      "training_hours"
+    ],
     "cost_basis": [],
     "seen_in": [
       "drone"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "regulatory-cert-cost:lookup": {
-    "input_keys": [],
+    "input_keys": [
+      "product_class",
+      "region",
+      "target_market_volume_units_per_year"
+    ],
     "output_keys": [
       "cert_critical_path_months",
       "cost_estimate_gbp",
@@ -2504,6 +4806,7 @@
       "bioreactor",
       "cnc-machine",
       "e-bike",
+      "e-fuel-synthesis",
       "ev-charger",
       "evtol",
       "h2-electrolyser",
@@ -2513,36 +4816,97 @@
       "ups-inverter",
       "vertical-farm",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "regulatory-faa:airspace": {
     "input_keys": [
-      "cruise_altitude_m"
+      "altitude_ceiling_ft",
+      "area_polygon_km2",
+      "country",
+      "cruise_altitude_m",
+      "mission_duration_hours"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "additional_requirements",
+      "annual_renewal_required",
+      "atc_coordination_required",
+      "class_a_max_ft",
+      "class_a_min_ft",
+      "classes_traversed",
+      "estimated_cost_gbp",
+      "notam_lead_time_days",
+      "operating_permit_form",
+      "operating_permit_required",
+      "permit_lead_time_days",
+      "transponder_required",
+      "uas_authority"
+    ],
     "cost_basis": [],
     "seen_in": [
       "haps"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "regulatory-fda:cgmp": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "batch_size_l",
+      "market",
+      "product_type"
+    ],
+    "output_keys": [
+      "audit_cost_gbp",
+      "bla_filing_cost_gbp",
+      "fda_class",
+      "fda_pathway",
+      "ind_bla_filing_cost_gbp",
+      "ind_filing_cost_gbp",
+      "regulator",
+      "regulatory_pathway",
+      "required_documentation",
+      "scale_phase",
+      "stability_studies_years",
+      "total_regulatory_cost_gbp",
+      "uplift_factor_market",
+      "validation_runs_required"
+    ],
     "cost_basis": [],
     "seen_in": [
       "bioreactor"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "regulatory-imo:maritime": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "area_of_operation",
+      "autonomy_degree",
+      "country_flag",
+      "displacement_kg",
+      "hull_length_m",
+      "propulsion_type"
+    ],
+    "output_keys": [
+      "annual_class_survey_required",
+      "annual_survey_cost_gbp",
+      "autonomy_degree_mass",
+      "insurance_class_required",
+      "registration_cost_gbp",
+      "required_certifications"
+    ],
     "cost_basis": [],
     "seen_in": [
       "auv"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "reliability-fmea:system": {
-    "input_keys": [],
+    "input_keys": [
+      "components",
+      "replacement_cost_pct_of_unit",
+      "service_call_cost_gbp",
+      "unit_cost_gbp",
+      "warranty_years"
+    ],
     "output_keys": [
       "mtbf_hours",
       "reliability_system_mtbf_hours",
@@ -2556,6 +4920,7 @@
       "bioreactor",
       "cnc-machine",
       "e-bike",
+      "e-fuel-synthesis",
       "ev-charger",
       "h2-electrolyser",
       "pemfc",
@@ -2563,7 +4928,8 @@
       "ups-inverter",
       "vertical-farm",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "rf-mems-beamsteering:design": {
     "input_keys": [
@@ -2573,11 +4939,20 @@
     "cost_basis": [],
     "seen_in": [
       "phased-array"
-    ]
+    ],
+    "output_source": "none"
   },
   "rolling-resistance:cycling": {
     "input_keys": [
-      "total_mass_kg"
+      "air_density_kg_m3",
+      "drive_efficiency",
+      "rider_position",
+      "road_grade_pct",
+      "tire_pressure_bar",
+      "tire_type",
+      "total_mass_kg",
+      "velocity_ms",
+      "wheel_diameter_inch"
     ],
     "output_keys": [
       "battery_power_required_w",
@@ -2588,12 +4963,19 @@
     "cost_basis": [],
     "seen_in": [
       "e-bike"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "rotor-tilt-transition:dynamics": {
     "input_keys": [
+      "cl_max",
+      "disk_area_per_rotor_m2",
+      "forward_speed_ms",
       "gross_takeoff_mass_kg",
-      "num_rotors"
+      "mass_kg",
+      "num_rotors",
+      "tilt_angle_deg",
+      "wing_area_m2"
     ],
     "output_keys": [
       "lift_force_n",
@@ -2603,14 +4985,22 @@
     "cost_basis": [],
     "seen_in": [
       "evtol"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "runtime:peukert-discharge": {
     "input_keys": [
+      "battery_capacity_kwh",
+      "battery_chemistry",
       "battery_kwh",
+      "dod_max_pct",
       "efficiency_pct",
+      "inverter_efficiency_pct",
+      "load_kw",
       "nameplate_capacity_kwh",
-      "rated_power_kw"
+      "peukert_exponent",
+      "rated_power_kw",
+      "storage_days_since_charge"
     ],
     "output_keys": [
       "runtime_min_full_load",
@@ -2619,7 +5009,8 @@
     "cost_basis": [],
     "seen_in": [
       "ups-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "scikit-fem:run": {
     "input_keys": [
@@ -2638,7 +5029,8 @@
       "3d-printer-fdm",
       "auv",
       "cnc-machine"
-    ]
+    ],
+    "output_source": "none"
   },
   "scikit-fem:tower": {
     "input_keys": [
@@ -2655,21 +5047,44 @@
     ],
     "seen_in": [
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "scop:seasonal": {
     "input_keys": [
+      "climate_zone",
+      "cop_at_a12w35",
+      "cop_at_a2w35",
+      "cop_at_am7w35",
       "cop_rated",
+      "nominal_cop_at_a7w35",
       "rated_thermal_kw"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "T_design_c",
+      "annual_heating_hours",
+      "bin_results",
+      "cop_inputs",
+      "eta_s_pct",
+      "eu_label",
+      "scop_average",
+      "scop_cold_estimate",
+      "scop_warm_estimate",
+      "total_elec_consumption_relative",
+      "total_heat_demand_relative"
+    ],
     "cost_basis": [],
     "seen_in": [
       "heat-pump-residential"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "smr:biological-shielding": {
     "input_keys": [
+      "distance_m",
+      "reactor_power_mwt",
+      "shield_material",
+      "target_dose_usv_h",
       "thermal_power_mwt"
     ],
     "output_keys": [
@@ -2680,11 +5095,16 @@
     "cost_basis": [],
     "seen_in": [
       "smr"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "smr:decay-heat-loca": {
     "input_keys": [
-      "thermal_power_mwt"
+      "fuel_burnup_mwd_kg",
+      "operating_time_years",
+      "reactor_power_mwt",
+      "thermal_power_mwt",
+      "time_after_shutdown_s"
     ],
     "output_keys": [
       "decay_heat_1hr_pct",
@@ -2695,14 +5115,19 @@
     "cost_basis": [],
     "seen_in": [
       "smr"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "smr:neutron-physics-keff": {
     "input_keys": [
       "core_height_m",
       "core_radius_m",
       "core_volume_m3",
-      "fuel_enrichment_pct"
+      "fuel_density_g_cm3",
+      "fuel_enrichment_pct",
+      "fuel_volume_m3",
+      "moderator_type",
+      "reflector_present"
     ],
     "output_keys": [
       "core_lifetime_years",
@@ -2713,19 +5138,39 @@
     "cost_basis": [],
     "seen_in": [
       "smr"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "solar-array:spacecraft": {
     "input_keys": [
       "avg_power_w",
       "bol_power_kw",
+      "cell_efficiency_pct",
       "cubesat_u",
       "design_life_years",
+      "eclipse_fraction_pct",
+      "eol_degradation_pct",
       "mission_duration_years",
+      "orbit",
       "orbital_altitude_km",
-      "solar_constant_w_m2"
+      "packing_factor_pct",
+      "required_orbital_avg_power_w",
+      "solar_constant_w_m2",
+      "sun_pointing_accuracy_deg"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "array_area_m2",
+      "array_mass_kg",
+      "cell_count_estimate",
+      "cos_misalign_loss",
+      "eol_avg_power_w",
+      "eta_distribution",
+      "peak_power_w",
+      "solar_flux_w_m2",
+      "specific_power_w_per_kg",
+      "string_voltage_v_recommended",
+      "sun_fraction_pct"
+    ],
     "cost_basis": [
       "lithium_battery_pack",
       "solar_panel_assembly"
@@ -2735,31 +5180,69 @@
       "satellite-geo-comsat",
       "satellite-interplanetary",
       "satellite-smallsat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "sonar:acoustic-attenuation": {
-    "input_keys": [],
-    "output_keys": [],
+    "input_keys": [
+      "depth_m",
+      "distance_km",
+      "frequency_khz",
+      "ph",
+      "salinity_ppt",
+      "water_temp_c"
+    ],
+    "output_keys": [
+      "absorption_loss_db",
+      "attenuation_db_per_km",
+      "path_loss_db",
+      "sound_speed_m_s",
+      "spreading_loss_db",
+      "wavelength_m"
+    ],
     "cost_basis": [],
     "seen_in": [
       "auv"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "spindle:thermal": {
     "input_keys": [
+      "ambient_c",
+      "bearing_temp_target_c",
+      "bearing_type",
+      "duty_cycle",
+      "max_rpm",
       "max_spindle_rpm",
-      "rated_spindle_power_kw"
+      "rated_spindle_power_kw",
+      "spindle_power_kw"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "bearing_temp_c",
+      "bearing_temp_max_allowed_c",
+      "cooling_oil_kg_s",
+      "cooling_oil_lpm",
+      "feasible_with_chiller_5kw",
+      "heat_dissipation_kw",
+      "loss_factor_pct",
+      "oil_delta_t_k",
+      "speed_factor"
+    ],
     "cost_basis": [],
     "seen_in": [
       "cnc-machine"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "stack-compression:pressure": {
     "input_keys": [
+      "cell_area_cm2",
       "cell_count",
-      "stack_pressure_target_mpa"
+      "frame_material",
+      "stack_count",
+      "stack_pressure_target_mpa",
+      "stack_thickness_mm",
+      "target_contact_pressure_mpa"
     ],
     "output_keys": [
       "compression_plate_thickness_mm",
@@ -2770,10 +5253,43 @@
     "cost_basis": [],
     "seen_in": [
       "solid-state-battery"
-    ]
+    ],
+    "output_source": "class-plan"
+  },
+  "storage-tank:liquid-fuel": {
+    "input_keys": [
+      "allow_stress_mpa",
+      "corrosion_allow_mm",
+      "daily_production_m3",
+      "days_storage",
+      "fill_fraction",
+      "h_over_d",
+      "joint_eff",
+      "max_tank_m3",
+      "product_density_kg_m3"
+    ],
+    "output_keys": [
+      "data_sources",
+      "shell_mass_kg_each",
+      "shell_mass_kg_total",
+      "shell_thickness_mm",
+      "tank_count",
+      "tank_diameter_m",
+      "tank_height_m",
+      "total_volume_m3",
+      "volume_per_tank_m3"
+    ],
+    "cost_basis": [],
+    "seen_in": [
+      "e-fuel-synthesis"
+    ],
+    "output_source": "python:run"
   },
   "supply-chain-risk:scoring": {
     "input_keys": [
+      "bom_parts",
+      "destination_country",
+      "dual_sourcing_required",
       "hvac_chiller_capacity_kw",
       "led_installed_power_kw"
     ],
@@ -2789,6 +5305,7 @@
       "bioreactor",
       "cnc-machine",
       "e-bike",
+      "e-fuel-synthesis",
       "ev-charger",
       "h2-electrolyser",
       "haps",
@@ -2797,13 +5314,19 @@
       "ups-inverter",
       "vertical-farm",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "thermal-envelope:ladder": {
     "input_keys": [
+      "ambient_c",
+      "enclosure",
       "heat_dissipation_kw",
+      "heatsink_type",
       "max_inlet_temp_c",
-      "power_consumption_mw"
+      "max_junction_c",
+      "power_consumption_mw",
+      "tdp_w"
     ],
     "output_keys": [
       "chassis_airflow_cfm",
@@ -2818,18 +5341,61 @@
       "evtol",
       "fso",
       "phased-array"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "thermal-strap:conduction": {
     "input_keys": [
+      "bending_radius_mm",
+      "cross_section_mm2",
+      "end_attachment",
+      "length_mm",
+      "material",
       "thermal_strap_target_w_k"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "bend_radius_to_diameter_ratio",
+      "bulk_resistance_k_w",
+      "contact_conductance_w_m2k",
+      "contact_resistance_per_end_k_w",
+      "effective_conductance_w_k",
+      "equivalent_diameter_mm",
+      "flexibility_score",
+      "mass_g",
+      "mass_kg",
+      "thermal_conductivity_w_mk",
+      "thermal_resistance_k_w"
+    ],
     "cost_basis": [],
     "seen_in": [
       "cryostat",
       "quantum-computer"
-    ]
+    ],
+    "output_source": "python:run"
+  },
+  "thermo:fluid-properties": {
+    "input_keys": [
+      "chemical",
+      "extra_props",
+      "pressure_bar",
+      "temperature_c"
+    ],
+    "output_keys": [
+      "cas_number",
+      "chemical_canonical_name",
+      "density_kg_m3",
+      "formula",
+      "heat_capacity_j_kg_k",
+      "latent_heat_vapourisation_j_kg",
+      "molecular_weight_g_mol",
+      "phase",
+      "thermal_conductivity_w_m_k",
+      "vapour_pressure_pa",
+      "viscosity_pa_s"
+    ],
+    "cost_basis": [],
+    "seen_in": [],
+    "output_source": "python:run"
   },
   "thermo:run": {
     "input_keys": [
@@ -2841,15 +5407,22 @@
     "cost_basis": [],
     "seen_in": [
       "h2-electrolyser"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "transport-logistics:routing": {
     "input_keys": [
       "bed_travel_x_mm",
       "build_z_mm",
+      "destination_country",
       "ev_total_system_mass_kg",
       "hull_length_m",
+      "mode",
       "mtow_air_kg",
+      "origin_country",
+      "product_dimensions_mm",
+      "product_mass_kg",
+      "quantity_per_shipment",
       "rated_spindle_power_kw",
       "rotor_diameter_m",
       "total_system_mass_kg",
@@ -2868,6 +5441,7 @@
       "auv",
       "bioreactor",
       "cnc-machine",
+      "e-fuel-synthesis",
       "ev-charger",
       "h2-electrolyser",
       "pemfc",
@@ -2875,24 +5449,45 @@
       "ups-inverter",
       "vertical-farm",
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "tsiolkovsky:delta-v": {
     "input_keys": [
       "cold_gas_isp_s",
+      "dry_mass_kg",
+      "g0",
       "mass_kg",
+      "propellant_mass_kg",
+      "specific_impulse_s"
+    ],
+    "output_keys": [
+      "delta_v_ms",
+      "exhaust_velocity_ms",
+      "final_mass_kg",
+      "initial_mass_kg",
+      "mass_ratio",
+      "propellant_mass_fraction",
       "propellant_mass_kg"
     ],
-    "output_keys": [],
     "cost_basis": [],
     "seen_in": [
       "satellite-cubesat"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "warranty-reliability:battery": {
     "input_keys": [
+      "average_dod_pct",
+      "average_temp_c",
+      "battery_unit_cost_gbp",
+      "c_rate_average",
+      "cell_chemistry",
+      "cycle_count_per_year",
       "operating_current_density_ma_cm2",
-      "stack_pressure_mpa"
+      "stack_pressure_mpa",
+      "warranty_target_soh_pct",
+      "warranty_years"
     ],
     "output_keys": [
       "battery_warranty_years",
@@ -2905,46 +5500,112 @@
     "seen_in": [
       "solid-state-battery",
       "ups-inverter"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "water-treatment-ro:sizing": {
     "input_keys": [
+      "daily_water_demand_l",
       "dialysate_flow_rate_ml_per_min",
+      "feed_water_tds_mg_l",
+      "operating_hours_per_day",
+      "recovery_target_pct",
+      "target_tds_mg_l",
       "water_recovery_pct"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "daily_energy_kwh",
+      "element_area_m2",
+      "element_count",
+      "energy_kwh_per_m3",
+      "estimated_capex_gbp",
+      "estimated_membrane_replacement_yr",
+      "feed_flow_lph",
+      "flux_lmh",
+      "membrane_type",
+      "permeate_flow_lph",
+      "permeate_flow_m3_h",
+      "permeate_tds_mg_l",
+      "pretreatment_required",
+      "pump_pressure_bar",
+      "recovery_pct",
+      "reject_tds_mg_l",
+      "reject_water_l_day",
+      "reject_water_m3_day",
+      "rejection_pct",
+      "ro_membrane_area_m2",
+      "target_tds_met"
+    ],
     "cost_basis": [
       "reverse_osmosis_water_module"
     ],
     "seen_in": [
       "dialysis-machine"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "wearable-battery:life": {
     "input_keys": [
+      "ambient_temp_c",
       "battery_capacity_mah",
+      "battery_type",
       "battery_voltage_v",
+      "transmit_burst_ms",
+      "transmit_duty_pct",
       "wear_duration_days"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "average_current_uA",
+      "average_power_mW",
+      "battery_voltage_v",
+      "capacity_used_mAh",
+      "cgm_14day_headroom_pct",
+      "effective_capacity_mAh",
+      "estimated_days",
+      "estimated_hours",
+      "estimated_years",
+      "feasibility",
+      "mcu_sleep_current_uA",
+      "peak_tx_power_mW",
+      "rated_capacity_mAh",
+      "self_discharge_equiv_uA",
+      "sensor_current_uA",
+      "temperature_capacity_factor",
+      "total_average_drain_uA",
+      "tx_avg_contribution_uA",
+      "tx_burst_current_mA",
+      "tx_duty_cycle_pct"
+    ],
     "cost_basis": [
       "silver_oxide_battery"
     ],
     "seen_in": [
       "cgm"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "wind-resource:iec61400": {
     "input_keys": [
+      "availability_pct",
+      "cp_max",
+      "cut_in_ms",
       "cut_in_wind_speed_m_s",
+      "cut_out_ms",
       "cut_out_wind_speed_m_s",
       "hub_height_m",
+      "mean_wind_speed_ms",
+      "rated_ms",
       "rated_power_kw",
       "rated_wind_speed_m_s",
+      "ref_height_m",
       "rotor_cp_max",
       "rotor_diameter_m",
+      "roughness_class",
       "site_mean_wind_m_s",
-      "site_weibull_k"
+      "site_weibull_k",
+      "turbine_type",
+      "wake_loss_pct",
+      "weibull_k"
     ],
     "output_keys": [
       "annual_energy_kwh",
@@ -2953,7 +5614,8 @@
     "cost_basis": [],
     "seen_in": [
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "wind-resource:iec61400-site": {
     "input_keys": [
@@ -2967,22 +5629,50 @@
     "cost_basis": [],
     "seen_in": [
       "wind-turbine"
-    ]
+    ],
+    "output_source": "class-plan"
   },
   "wireless-link-budget:friis": {
     "input_keys": [
-      "ble_tx_power_dbm"
+      "antenna_gain_rx_dbi",
+      "antenna_gain_tx_dbi",
+      "ble_tx_power_dbm",
+      "body_absorption",
+      "distance_m",
+      "frequency_ghz",
+      "rx_sensitivity_dbm",
+      "tx_power_dbm"
     ],
-    "output_keys": [],
+    "output_keys": [
+      "body_absorption_loss_db",
+      "feasibility",
+      "free_space_path_loss_db",
+      "link_margin_db",
+      "max_range_m",
+      "rx_power_dbm",
+      "total_path_loss_db",
+      "wavelength_m"
+    ],
     "cost_basis": [],
     "seen_in": [
       "cgm"
-    ]
+    ],
+    "output_source": "python:run"
   },
   "yield-economics:npv": {
     "input_keys": [
+      "annual_energy_kwh",
       "annual_yield_kg",
+      "capex_gbp",
+      "crop",
+      "discount_rate_pct",
+      "market_price_gbp_kg",
+      "operational_inflation_pct",
+      "opex_gbp_year",
+      "price_inflation_pct",
+      "project_life_years",
       "target_crop_id",
+      "tax_rate_pct",
       "total_electrical_kw"
     ],
     "output_keys": [
@@ -2996,7 +5686,9 @@
     ],
     "cost_basis": [],
     "seen_in": [
+      "e-fuel-synthesis",
       "vertical-farm"
-    ]
+    ],
+    "output_source": "class-plan"
   }
 }
