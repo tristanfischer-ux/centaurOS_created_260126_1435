@@ -324,6 +324,17 @@ def parse_dimension(dim_value):
         return {"kind": "box", "w_mm": float(m.group(1)), "d_mm": float(m.group(2)),
                 "h_mm": float(m.group(3))}
 
+    # "<a> x <b> mm"  (TWO-figure box, millimetres) — the common DEVICE datasheet
+    # footprint (e.g. the edge-AI GPU card "267 x 111 mm", an insulin-pump board).
+    # Read as a flat plate: w × d × a thin default height so a small device part
+    # gets a real footprint instead of falling to the type-default box.
+    m = re.search(r"(-?\d+(?:\.\d+)?)\s*x\s*(-?\d+(?:\.\d+)?)\s*mm", s)
+    if m:
+        w = float(m.group(1))
+        d = float(m.group(2))
+        return {"kind": "box", "w_mm": w, "d_mm": d,
+                "h_mm": max(8.0, min(w, d) * 0.5)}
+
     # generic "<a> m x <b> m" without 'dia' → treat as cyl dia × length
     m = re.search(r"(-?\d+(?:\.\d+)?)\s*m\s*x\s*(-?\d+(?:\.\d+)?)\s*m", s)
     if m:
@@ -449,9 +460,13 @@ def extract_parts(state):
                 if NON_PHYSICAL_RE.search(name):
                     dropped.append(name)
                     continue
+                # Accept BOTH "dimension" (singular) and "dimensions" (plural) —
+                # real states emit either (the corpus uses ~2:1 singular:plural),
+                # so reading only the singular silently dropped the size of many
+                # device parts (e.g. the edge-AI GPU card carries "dimensions").
                 dim = None
                 for mc in mods:
-                    if mc.get("kind") == "dimension":
+                    if mc.get("kind") in ("dimension", "dimensions"):
                         dim = parse_dimension(mc.get("value"))
                         if dim:
                             break
@@ -576,6 +591,83 @@ AERO_SPACECRAFT_RE = re.compile(
     r"radiator.?panel|\bmli\b", re.IGNORECASE)
 
 
+# ── RACK-STRUCTURE vs BATTERY-CHEMISTRY split (2026-06-11) ──────────────────
+# A real RACK FARM is dominated by physical RACK/CABINET/SERVER STRUCTURE parts
+# (the cabinets the rows are made of). The BATTERY-CHEMISTRY tokens (cell/battery/
+# bms/pcs/module) leak into many NON-rack archetypes — an AGV traction battery, an
+# insulin-pump cell, a robot field "module" — and were hijacking those devices into
+# rack_farm. So the rack_farm GATE keys on STRUCTURE parts (this regex), not on the
+# chemistry markers. "module"/"node" are deliberately EXCLUDED here (too generic —
+# an I/O "module" is not a rack); a genuine server uses chassis/sled/rack/blade.
+RACK_STRUCT_RE = re.compile(
+    r"\brack\b|\bracks\b|\bcabinet\b|\bserver\b|\bsled\b|\bchassis\b|"
+    r"blade.?server|rack.?unit|rack.?mount|enclosure.?bay", re.IGNORECASE)
+# REQUIRED process-plant VESSEL vocabulary (task 2026-06-11): process_plant must
+# REQUIRE genuine vessel vocab to fire — NOT bare pump/compressor (those are
+# machines that appear in robots/AUVs/AGVs too). "contactor" is EXCLUDED (an
+# electrical contactor is not a vessel). A real plant has MANY vessels; a lone
+# "trim tank" on an AUV must NOT make it a process plant — so the gate counts
+# DISTINCT vessel-named parts and needs ≥ PROCESS_VESSEL_MIN_DISTINCT of them.
+PROCESS_VESSEL_RE = re.compile(
+    r"\bvessel\b|\bcolumn\b|\breactor\b|\btank\b|\bseparator\b|\bdrum\b|"
+    r"distillation|\babsorber\b|\bstripper\b|crystalli|\bscrubber\b|"
+    r"\bcondenser\b|\breboiler\b|\bcoalescer\b|fractionat|\bevaporator\b|"
+    r"\bflash\b|\bdigester\b|\bclarifier\b|\bcyclone\b|\bhydrocyclone\b",
+    re.IGNORECASE)
+PROCESS_VESSEL_MIN_DISTINCT = 2   # a plant has ≥2 distinct vessels; 1 ≠ a plant
+# product_class tokens that mark a RACK/SERVER/STORAGE archetype — the secondary
+# signal that lets a THIN state (generic part names, no rack vocab) still route to
+# rack_farm, e.g. the compute-heat-module state whose part names are placeholders
+# ("Main Controller", "Power Converter") but whose product_class IS the signal.
+RACK_CLASS_RE = re.compile(
+    r"compute|server|gpu|data.?cent|edge.?ai|edge_ai|inference|hpc|"
+    r"battery|bess|energy.?storage|storage|ups|switchgear|\brack\b|"
+    r"telecom|datacenter", re.IGNORECASE)
+# product_class / vocab that marks a COMPUTE rack (vs a battery rack) — used by the
+# rack-FLAVOUR resolver so a GPU/compute brick reads as a SERVER rack even when its
+# part names lack the strong server-hardware vocab (the compute-heat-module case).
+COMPUTE_CLASS_RE = re.compile(
+    r"compute|server|gpu|data.?cent|edge.?ai|edge_ai|inference|hpc|"
+    r"datacenter|\bhsm\b|telecom", re.IGNORECASE)
+# product_class / vocab that marks a BATTERY rack flavour explicitly.
+BATTERY_CLASS_RE = re.compile(
+    r"battery|bess|energy.?storage|\bups\b|\bess\b", re.IGNORECASE)
+# MARINE / SUBMERSIBLE markers (mirrors gate-34 isMarineClass) — an AUV/ROV/UUV
+# legitimately carries "thruster" + "ballast" + a "tank", which were tripping the
+# AERO (thruster→spacecraft) and PROCESS-PLANT (tank→plant) gates. When these lead,
+# the design is a marine vehicle → it must reach GENERIC ASSEMBLY, not aero/plant.
+MARINE_RE = re.compile(
+    r"\bhull\b|pressure.?hull|subsea|\bauv\b|\buuv\b|\brov\b|submar|underwater|"
+    r"torpedo|\bballast\b|drop.?weight|bathyal|\bsonar\b|\bdvl\b|"
+    r"wet.?mate|seawater|buoyan|\bbilge\b|syntactic.?foam|"
+    r"acoustic.?modem|pressure.?compensat",
+    re.IGNORECASE)
+# NOTE: 'thruster' + 'fairing' are deliberately EXCLUDED from MARINE_RE — a
+# SATELLITE legitimately carries 'electric-propulsion thruster' / 'monopropellant
+# thruster' (2 hits) and an aircraft a 'fairing', so keying marine on them would
+# steal a satellite from aero. The submersible markers above (hull / subsea /
+# ballast / sonar / DVL / wet-mate / seawater / buoyancy / syntactic-foam /
+# acoustic-modem) are unambiguous: a satellite has ZERO; an AUV has many.
+MARINE_CLASS_RE = re.compile(
+    r"auv|uuv|\brov\b|submar|subsea|underwater|torpedo|\bsonar\b|marine|"
+    r"bathyal|\bglider\b", re.IGNORECASE)
+
+
+def product_class_of(state):
+    """The design's product_class, tried across the four places a state may carry
+    it (parsedBrief → moduleDecomposition → orchestratorContract → keyMetrics),
+    lower-cased. '' when absent. Used by the family gates as the SECONDARY signal
+    (the part NAMES remain the primary signal) so a thin state still routes well."""
+    if not isinstance(state, dict):
+        return ""
+    for holder in ("parsedBrief", "moduleDecomposition", "orchestratorContract",
+                   "keyMetrics"):
+        pc = (state.get(holder) or {}).get("product_class")
+        if pc:
+            return str(pc).lower()
+    return ""
+
+
 def detect_aero_subtype(parts, modules):
     """Classify an AERO-BODY design as 'aircraft' or 'spacecraft' from the part
     NAMES + the module display names/ids (universal — no per-class hand-coding).
@@ -625,16 +717,34 @@ def is_true_spacecraft(parts):
     return _distinct_hits(parts, SPACECRAFT_DEF_RE) >= 2
 
 
-def detect_rack_flavour(parts):
+def detect_rack_flavour(parts, product_class=""):
     """Sub-flavour of a rack farm: 'battery' | 'compute' | 'generic'. Picks the
     flavour whose vocabulary dominates the parts: BATTERY when battery-system
     markers (cell/battery/bms/pcs) lead, COMPUTE when server-hardware markers
     (GPU/EPYC/DIMM/NVMe/PCIe/1U chassis) lead, else GENERIC (bare rack/cabinet
     rows). Deterministic + universal — no per-class hand-coding. Returns
-    (flavour, battery_hits, compute_hits)."""
+    (flavour, battery_hits, compute_hits).
+
+    The product_class is a STRONG override (2026-06-11): a GPU / compute brick
+    whose part NAMES are thin placeholders ('Main Controller', 'Inverter Bridge'
+    — no server vocab) still reads COMPUTE because its product_class IS the signal
+    (the compute-heat-module case, which had 0 compute markers + 2 incidental
+    battery markers 'Inverter Bridge'/'Distribution Busbar' and so flipped to
+    battery). A class compute-token forces compute; a class battery-token (with no
+    compute token) forces battery. Part-name markers decide only when the class is
+    silent/ambiguous."""
     batt = sum(1 for p in parts if BATTERY_SYSTEM_RE.search(str(p.name)))
     comp = sum(1 for p in parts if COMPUTE_RACK_RE.search(str(p.name)))
-    if comp > batt:
+    pc = str(product_class or "")
+    class_compute = bool(COMPUTE_CLASS_RE.search(pc))
+    class_battery = bool(BATTERY_CLASS_RE.search(pc)) and not class_compute
+    # 1. product_class is authoritative when it names the flavour.
+    if class_compute:
+        flavour = "compute"
+    elif class_battery:
+        flavour = "battery"
+    # 2. else the part-name markers (original behaviour).
+    elif comp > batt:
         flavour = "compute"
     elif batt > 0:
         flavour = "battery"
@@ -646,101 +756,144 @@ def detect_rack_flavour(parts):
 _RACK_FLAVOUR = None    # set by detect_geometry_family; read by main() / placer
 
 
-def detect_geometry_family(parts, modules):
+def detect_geometry_family(parts, modules, product_class=""):
     """Return the geometry FAMILY for this design — one of 'aero_body',
-    'tower_machine', 'panel_array', 'rack_farm' or 'process_plant'. Heuristic on
-    the physical part NAMES (universal — no per-class hand-coding). Precedence
+    'tower_machine', 'panel_array', 'rack_farm', 'process_plant' or the universal
+    'generic_assembly' default. Heuristic on the physical part NAMES (universal —
+    no per-class hand-coding), with product_class as a SECONDARY signal. Precedence
     (first match wins), each guarded so a stray token can't mis-route:
 
-      1. aero_body (FLIGHT VEHICLE in FREE SPACE) — ONLY a TRUE aircraft (fuselage
-         AND wing markers) or a TRUE spacecraft (≥2 distinct bus/solar-array/
-         thruster markers), AND the aero vocabulary leads. The fuselage∧wing /
-         multi-spacecraft gate stops a wind turbine (rotor + nacelle + blades, no
-         fuselage/wing) grabbing aero on its incidental rotor/nacelle words. A
-         HAPS keeps aero; a satellite keeps aero. Sub-type drives the placer.
-      2. tower_machine (WIND TURBINE + tower archetypes) — tower/nacelle/rotor/
-         blade/turbine/hub/yaw vocabulary present AND a tower/foundation present
-         (ground-mounted), AND it is NOT a true aircraft/spacecraft. A free-
-         standing tower + nacelle + rotor + blades + foundation + a BoP lineup.
-      3. panel_array (VF grow-rack) — ≥2 DISTINCT grow/cultivation cues AND the
-         grow vocabulary leads the battery vocabulary. The ≥2-distinct gate stops
-         a single stray 'LED indicator'/'plant' word routing a non-farm here.
-      4. rack_farm (ROWS OF CABINETS — battery | compute | generic) — the generic
-         rack/cabinet/server vocabulary leads the vessel/machine one. Battery is
-         one flavour; a compute SERVER rack (GPU/CPU sleds) is another; the
-         flavour is resolved by detect_rack_flavour for the placer.
-      5. process_plant — the default for any unknown archetype.
+      1. aero_body (FLIGHT VEHICLE in FREE SPACE) — a TRUE aircraft (fuselage AND
+         wing) or a TRUE spacecraft (≥2 distinct bus/solar-array/thruster markers),
+         the aero vocabulary leads, AND the design is NOT marine. The fuselage∧wing
+         / multi-spacecraft gate stops a wind turbine (rotor + nacelle, no fuselage/
+         wing) grabbing aero; the MARINE guard stops an AUV (whose 'thruster' words
+         trip the spacecraft gate) reading as a satellite.
+      2. tower_machine (WIND TURBINE) — tower/nacelle/rotor/blade/turbine/hub/yaw
+         present AND a tower/foundation present (ground-mounted), AND not a flight
+         vehicle. A free-standing tower + nacelle + rotor + blades + foundation.
+      3. panel_array (VF grow-rack) — ≥2 DISTINCT grow/cultivation cues AND grow
+         leads battery. The ≥2-distinct gate stops a stray 'LED indicator'/'plant'.
+      4. rack_farm (ROWS OF CABINETS — battery | compute | generic) — REQUIRES
+         genuine RACK STRUCTURE: the rack/cabinet/server vocabulary leads the
+         vessels AND (≥RACK_STRUCT_MIN actual rack/cabinet/server-structure parts
+         are present OR the product_class names a rack/server/storage archetype).
+         The STRUCTURE requirement is the 2026-06-11 breadth fix: the bare battery-
+         chemistry tokens (cell/battery/bms/module) used to hijack an AGV traction
+         battery / an insulin-pump cell / a robot 'module' into a battery rack farm;
+         now a device with 1-2 incidental battery parts but no real racks falls
+         through to generic_assembly. compute-heat (thin part names, 0 structure)
+         still routes via its product_class.
+      5. process_plant — REQUIRES genuine vessel vocab: ≥PROCESS_VESSEL_MIN_DISTINCT
+         DISTINCT vessel-named parts (vessel/column/reactor/tank/separator/drum/
+         distillation/absorber/stripper/scrubber/…). A lone 'trim tank' on an AUV
+         no longer makes it a plant; a real plant has many vessels.
+      6. generic_assembly — the TRUE universal default for ANY archetype that fits
+         no specific family (robot, AUV, small device, vehicle): the parts laid out
+         grouped by MODULE region, each as its classified shape or a neutral sized
+         box, connected by the shared topology router. NOT wrong vessels, NOT vomit.
 
     Logs the decision + per-family hit counts (+ aero subtype / rack flavour).
     Deterministic + universal."""
+    pc = str(product_class or "")
     aero_hits = sum(1 for p in parts if AERO_BODY_RE.search(str(p.name)))
     grow_hits = sum(1 for p in parts if PANEL_ARRAY_RE.search(str(p.name)))
     grow_distinct = _distinct_hits(parts, PANEL_ARRAY_RE)
     batt_hits = sum(1 for p in parts if BATTERY_SYSTEM_RE.search(str(p.name)))
     rack_hits = sum(1 for p in parts if RACK_FARM_RE.search(str(p.name)))
+    struct_hits = sum(1 for p in parts if RACK_STRUCT_RE.search(str(p.name)))
     proc_hits = sum(1 for p in parts if PROCESS_PLANT_RE.search(str(p.name)))
+    vessel_distinct = _distinct_hits(parts, PROCESS_VESSEL_RE)
     tower_hits = sum(1 for p in parts if TOWER_MACHINE_RE.search(str(p.name)))
     tower_grounded = any(TOWER_BASE_RE.search(str(p.name)) for p in parts)
+    # RACK-FARM evidence: real rack STRUCTURE present, or the class names a rack.
+    rack_class = bool(RACK_CLASS_RE.search(pc))
+    rack_evidence = struct_hits >= RACK_STRUCT_MIN or rack_class
     true_aircraft = is_true_aircraft(parts)
     true_spacecraft = is_true_spacecraft(parts)
+    # MARINE: a submersible vehicle leads with hull/ballast/sonar/subsea markers,
+    # or its product_class says so. Stops a marine AUV (whose 'thruster' words trip
+    # the loose true_spacecraft gate, and whose 'trim tank' trips the plant gate)
+    # reading as a satellite or a process plant. MARINE_RE is thruster-free, so a
+    # satellite scores 0 unambiguous marine markers and is NEVER marine; an AUV
+    # scores many (hull / subsea / ballast / sonar / DVL / syntactic-foam / …).
+    # When is_marine, the aero + plant gates are suppressed (see below) and the AUV
+    # falls through to generic_assembly — a submarine, not a satellite/plant.
+    marine_hits = sum(1 for p in parts if MARINE_RE.search(str(p.name)))
+    is_marine = bool(MARINE_CLASS_RE.search(pc)) or marine_hits >= 2
     subtype = None
     flavour = None
     air_h = spc_h = 0
 
-    # 1. AERO — gated on a DEFINITIVE flight-vehicle signature so rotor/nacelle
-    #    alone (a turbine) never qualifies. Aero must also lead the industrial
-    #    markers (a real plant/battery/VF is never mis-routed to aero).
-    if (true_aircraft or true_spacecraft) and aero_hits > 0 \
+    # 1. AERO — DEFINITIVE flight-vehicle signature, aero leads, NOT marine.
+    if (true_aircraft or true_spacecraft) and aero_hits > 0 and not is_marine \
             and aero_hits >= rack_hits and aero_hits >= proc_hits \
             and aero_hits >= grow_hits and aero_hits >= tower_hits:
         family = "aero_body"
         subtype, air_h, spc_h = detect_aero_subtype(parts, modules)
-        # the definitive predicates override a noisy generic-vocab tie
         if true_spacecraft and not true_aircraft:
             subtype = "spacecraft"
         elif true_aircraft and not true_spacecraft:
             subtype = "aircraft"
-    # 2. TOWER MACHINE — turbine vocabulary + a ground tower/foundation, and NOT a
-    #    real flight vehicle. A rotor+nacelle+tower with no fuselage/wing lands here.
+    # 2. TOWER MACHINE — turbine vocab + a ground tower/foundation, not a flight
+    #    vehicle, not marine (a tidal-kite stays tower; an AUV does not).
     elif tower_hits > 0 and tower_grounded \
-            and not (true_aircraft or true_spacecraft) \
+            and not (true_aircraft or true_spacecraft) and not is_marine \
             and tower_hits >= proc_hits and tower_hits >= grow_hits:
         family = "tower_machine"
     # 3. PANEL ARRAY (VF) — ≥2 DISTINCT grow cues + grow leads battery.
     elif grow_distinct >= 2 and grow_hits > batt_hits and grow_hits >= proc_hits:
         family = "panel_array"
-    # 4. RACK FARM — generic rack/cabinet/server vocabulary leads the vessels.
-    elif rack_hits > proc_hits:
+    # 4. RACK FARM — rack vocab leads vessels AND genuine rack STRUCTURE present
+    #    (≥RACK_STRUCT_MIN structure parts) OR the class names a rack/server. The
+    #    structure requirement stops a device's incidental battery/cell/module
+    #    tokens routing it here.
+    elif rack_hits > proc_hits and rack_evidence:
         family = "rack_farm"
-        flavour, _bh, _ch = detect_rack_flavour(parts)
-    # 5. PROCESS PLANT — default.
-    else:
+        flavour, _bh, _ch = detect_rack_flavour(parts, pc)
+    # 5. PROCESS PLANT — REQUIRES ≥PROCESS_VESSEL_MIN_DISTINCT distinct vessels,
+    #    and NOT marine (an AUV's ballast/trim tanks are not a process plant).
+    elif vessel_distinct >= PROCESS_VESSEL_MIN_DISTINCT and not is_marine:
         family = "process_plant"
+    # 6. GENERIC ASSEMBLY — the universal default for any unmatched archetype.
+    else:
+        family = "generic_assembly"
 
     print(f"[univ] geometry family = {family}"
           + (f" / {subtype}" if subtype else "")
           + (f" / {flavour}" if flavour else "") + "  "
-          f"(aero/flight-vehicle = {aero_hits}, "
+          f"(product_class={pc or '∅'}; "
+          f"aero/flight-vehicle = {aero_hits}, "
           f"tower-machine = {tower_hits} [grounded={tower_grounded}], "
           f"grow/panel = {grow_hits} (distinct {grow_distinct}), "
           f"battery-system = {batt_hits}, "
-          f"rack/cabinet/server = {rack_hits}, "
-          f"vessel/machine = {proc_hits}, "
+          f"rack/cabinet/server = {rack_hits} (structure {struct_hits}, "
+          f"rack_class={rack_class}), "
+          f"vessel = {proc_hits} (distinct {vessel_distinct}), "
+          f"marine = {marine_hits} (is_marine={is_marine}), "
           f"of {len(parts)} physical parts; "
           f"true_aircraft={true_aircraft}, true_spacecraft={true_spacecraft})")
     if subtype:
         print(f"[univ] aero subtype = {subtype} "
               f"(aircraft markers = {air_h}, spacecraft markers = {spc_h})")
     if flavour:
-        _fl, bh, ch = detect_rack_flavour(parts)
+        _fl, bh, ch = detect_rack_flavour(parts, pc)
         print(f"[univ] rack flavour = {flavour} "
-              f"(battery markers = {bh}, compute/server markers = {ch})")
+              f"(battery markers = {bh}, compute/server markers = {ch}, "
+              f"class={pc or '∅'})")
     # stash the subtype + flavour module-level so main() can pass them to the
     # placer without changing detect_geometry_family's single-return contract.
     global _AERO_SUBTYPE, _RACK_FLAVOUR
     _AERO_SUBTYPE = subtype
     _RACK_FLAVOUR = flavour
     return family
+
+
+# Minimum number of genuine rack/cabinet/server-STRUCTURE parts for rack_farm to
+# fire on STRUCTURE evidence alone (BESS≈13, edge-AI≈6 qualify; a device with 1-2
+# incidental rack/cabinet words does NOT). A thin compute state with 0 structure
+# still routes via its product_class (rack_class). Tuned 2026-06-11.
+RACK_STRUCT_MIN = 3
 
 
 _AERO_SUBTYPE = None   # set by detect_geometry_family; read by main() at dispatch
@@ -2427,6 +2580,262 @@ def place_process_plant(parts, regions, topology, MAT, MO):
     print(f"[univ] topology routed = {routed}/{len(topology)}; "
           f"unresolved = {len(unresolved)}")
     return bbox, region_centres, frame_h, routed, unresolved
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# GENERIC-ASSEMBLY strategy (2026-06-11) — the UNIVERSAL default for ANY
+# archetype that fits no specific family: a robot, an AUV, a small medical
+# device, a vehicle. The goal is a SENSIBLE generic render — parts grouped by
+# their owning MODULE, each drawn at its real size (its classified shape if that
+# shape is sensible, else a neutral BOX sized to the real dims), the modules laid
+# out as compact bays, the topology drawn as routed connectors between the parts,
+# and a LIGHT optional bounding frame (a thin floor pad + a low perimeter rail) —
+# NOT the tall braced process skid, NOT the overhead pipe rack, NOT forced
+# vessels. NEUTRAL inspect colours keyed by MODULE index so the assembly reads as
+# grouped-by-subsystem (M1 blue, M2 teal, …), not by process-vessel type.
+# ───────────────────────────────────────────────────────────────────────────
+# DENSITY: parts pack tighter than the plant (a device is small + dense, not a
+# plant on a skid). A LOW floor + perimeter rail keeps it reading as one assembled
+# unit without the tall-frame occlusion. Topology routes JUST above the equipment.
+# ═══════════════════════════════════════════════════════════════════════════
+
+GA_FRAME_MARGIN_MM   = 500.0   # clearance from the equipment bulk to the light frame
+GA_FRAME_RAIL_MM     = 90.0    # section of the low floor pad / perimeter rail members
+GA_ROUTE_CLEARANCE_MM = 700.0  # topology routes this far above the tallest equipment
+GA_FRAME_MIN_HEIGHT_MM = 1200.0  # a flat assembly still gets a shallow frame box
+# Module-index INSPECT palette — a neutral, evenly-spaced, light-mode set so each
+# MODULE reads as one colour group (the assembly's subsystems), distinct by hue but
+# all low-saturation so SHAPE still reads. Cycled by module index; universal.
+GA_MODULE_COLOURS = [
+    (0.42, 0.55, 0.72),   # M-index 0 — blue-steel
+    (0.30, 0.66, 0.62),   # 1 — teal
+    (0.80, 0.72, 0.56),   # 2 — tan
+    (0.62, 0.58, 0.74),   # 3 — muted violet
+    (0.56, 0.70, 0.50),   # 4 — sage green
+    (0.82, 0.62, 0.46),   # 5 — terracotta
+    (0.50, 0.64, 0.78),   # 6 — sky steel
+    (0.74, 0.66, 0.40),   # 7 — ochre
+    (0.46, 0.68, 0.70),   # 8 — sea grey-teal
+    (0.70, 0.56, 0.62),   # 9 — dusty rose
+    (0.58, 0.62, 0.50),   # 10 — olive grey
+    (0.52, 0.56, 0.66),   # 11 — slate
+]
+# A part whose classified shape is a PROCESS-PLANT vessel/tower/stack/tank should
+# NOT render as a vessel in a generic assembly (a robot's "controller cabinet" is
+# fine as a cabinet, but a stray "tank"/"column"/"reactor"/"stack" classification
+# on a device part would draw a chemical vessel). These shapes are RE-MAPPED to a
+# neutral BOX (sized to the same dims) so the generic render never shows a vessel.
+GA_VESSEL_SHAPES = {"tall_column", "tall_vessel", "vertical_vessel",
+                    "horizontal_vessel", "tank", "stack", "inline_spool"}
+# Below this layout scale the assembly is a small DEVICE — render its rotating
+# machines (pump/compressor) as boxes too, because build_machine floors the body
+# at ~400 mm and would balloon a few-mm device pump. A machine-scale assembly
+# (robot/AGV) stays above this and keeps its machines as machines.
+GA_MACHINE_AS_BOX_BELOW_SCALE = 0.30
+
+# Module-level handoffs (set by place_generic_assembly for the INSPECT recolour +
+# the contract quantities), mirroring the other placers' module-level pattern.
+_GA_QUANTITIES = None
+_GA_PART_MODULE_COLOUR = {}   # part-object-prefix → module-index rgb (INSPECT)
+
+# The plant-scale layout constants (MIN_REGION_WIDTH 3.5 m, BANK pitch 8 m, the
+# big/med/small block DYs …) assume METRE-scale process vessels. A centimetre-scale
+# DEVICE (an insulin pump: 13 mm median part) laid with those constants scatters a
+# handful of specks across a 14 m empty frame. The generic placer therefore SCALES
+# the layout spacing to the parts' characteristic size, so a small device packs into
+# a small bench + a big machine keeps the roomy plant-grade spacing. These are the
+# layout globals it scales (a copy is restored after place_all).
+# DECK_Z_MM (the 300 mm skid-deck datum every part sits on) is scaled too — a
+# 14 mm pod on a fixed 300 mm deck floats on a tall stand above its own floor pad.
+_GA_SCALED_GLOBALS = ("MIN_REGION_WIDTH_MM", "MAX_REGION_WIDTH_MM", "REGION_GAP_MM",
+                      "PART_GAP_MM", "BIG_BLOCK_DY_MM", "MED_BLOCK_DY_MM",
+                      "BANK_LANE_PITCH_MM", "BANK_COMPACT_GAP_MM", "FRAME_MARGIN_MM",
+                      "DECK_Z_MM")
+GA_LAYOUT_REF_MM   = 800.0   # the part footprint-side the plant constants assume
+GA_LAYOUT_SCALE_MIN = 0.08   # floor: a tiny device still spaces parts ≥ 8% of plant
+GA_LAYOUT_SCALE_MAX = 1.0    # never UP-scale past the plant-grade spacing
+
+
+def _ga_layout_scale(parts):
+    """Scale factor for the generic-assembly layout spacing = the parts' MEDIAN
+    footprint-side ÷ the plant reference (GA_LAYOUT_REF_MM), clamped to
+    [GA_LAYOUT_SCALE_MIN, GA_LAYOUT_SCALE_MAX]. A device whose parts are ~13 mm
+    gets ~0.08 (a tight bench); a machine whose parts are ~800 mm gets 1.0 (the
+    full plant-grade spacing). Deterministic + universal — derived from geometry,
+    no per-class data."""
+    import statistics as _st
+    sides = []
+    for p in parts:
+        fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+        sides.append((max(1.0, fx) * max(1.0, fy)) ** 0.5)
+    if not sides:
+        return 1.0
+    med = _st.median(sides)
+    return max(GA_LAYOUT_SCALE_MIN, min(GA_LAYOUT_SCALE_MAX, med / GA_LAYOUT_REF_MM))
+
+
+def _ga_module_index_map(parts):
+    """Map each MODULE id present in the parts to a stable 0-based index, in
+    FIRST-APPEARANCE order across the parts list (which already follows the
+    authored module order). Deterministic + universal."""
+    order = []
+    for p in parts:
+        if p.module_id not in order:
+            order.append(p.module_id)
+    return {mid: i for i, mid in enumerate(order)}
+
+
+def place_generic_assembly(parts, regions, topology, MAT, MO):
+    """GENERIC-ASSEMBLY strategy — the universal default. Lay the parts grouped by
+    MODULE region using the SHARED region/banking layout (place_all), each part
+    built at its real size by build_part (its classified shape, EXCEPT process
+    vessels/towers/tanks which are re-mapped to a neutral sized box so a device
+    never shows a chemical vessel), wrap the bulk in a LIGHT floor pad + low
+    perimeter rail (not the tall skid / pipe rack), and route every topology edge
+    as a connector between the resolved part anchors at a low overhead elevation.
+    Same return tuple as the other strategies:
+    (bbox, region_centres, frame_top_mm, routed, unresolved)."""
+    # 1. RE-MAP shapes that would render WRONG in a generic assembly to a neutral
+    #    sized box (dims preserved → footprint + silhouette unchanged, only the shape
+    #    family changes). TWO cases:
+    #      (a) process VESSELS/towers/tanks — a stray 'tank'/'column'/'reactor'
+    #          classification on a device part must never draw a chemical vessel.
+    #      (b) at DEVICE SCALE, rotating MACHINES (pump/compressor) — build_machine
+    #          floors the body at ~400 mm, so a 6 mm 'lead-screw micro pump' would
+    #          balloon into a 0.4-0.8 m machine among 14 mm parts. A box honours the
+    #          real 6 mm dims. A machine-scale assembly (robot/AGV, scale≈1) keeps
+    #          its machines AS machines (a real pump/motor reads better as a machine).
+    scale = _ga_layout_scale(parts)
+    device_scale = scale < GA_MACHINE_AS_BOX_BELOW_SCALE
+    remap_shapes = set(GA_VESSEL_SHAPES)
+    if device_scale:
+        remap_shapes |= {"pump", "compressor"}
+    remapped = 0
+    for p in parts:
+        if p.shape in remap_shapes:
+            p.shape = "box"
+            remapped += 1
+    midx = _ga_module_index_map(parts)
+    print(f"[univ][generic] {len(parts)} parts in {len(midx)} module groups; "
+          f"re-mapped {remapped} vessel/machine-shaped part(s) to neutral box "
+          f"(device_scale={device_scale})")
+
+    # 2. LAYOUT — reuse the shared region/banking placement, but SCALE its spacing
+    #    constants to the parts' size (so a centimetre device packs into a small
+    #    bench instead of scattering across a metre-scale empty frame). place_all
+    #    groups parts by region into compact, square-ish bays (big parts back, medium
+    #    middle, small front), builds each via build_part (setting anchors + placed
+    #    centre), and returns the equipment bbox + region centres. No plant assumption
+    #    lives in place_all — it is pure grouped layout — so it is exactly right here.
+    saved = {k: globals()[k] for k in _GA_SCALED_GLOBALS}
+    try:
+        for k in _GA_SCALED_GLOBALS:
+            globals()[k] = saved[k] * scale
+        print(f"[univ][generic] layout scale = {scale:.3f} "
+              f"(MIN_REGION_WIDTH {globals()['MIN_REGION_WIDTH_MM']/1000:.2f} m, "
+              f"REGION_GAP {globals()['REGION_GAP_MM']/1000:.2f} m, "
+              f"BANK_PITCH {globals()['BANK_LANE_PITCH_MM']/1000:.2f} m)")
+        bbox, region_centres = place_all(parts, regions, MAT, MO)
+    finally:
+        for k in _GA_SCALED_GLOBALS:
+            globals()[k] = saved[k]
+    print(f"[univ][generic] assembly bbox (mm): {bbox}")
+
+    # 3. LIGHT bounding frame — a thin floor pad + a low perimeter rail that HUGS
+    #    the equipment outline (NOT the tall braced skid + overhead pipe rack). It
+    #    reads as the bench/baseplate the assembly sits on. Named u_skid_* so the
+    #    INSPECT recolour renders it as the faint wireframe (equipment shows above).
+    #    The frame-height floor + route clearance SCALE with the assembly (a 14 mm
+    #    pod must not sit under a 1.2 m roof) but never below a small absolute floor.
+    equip_bbox = equipment_bbox_mm(parts, margin_mm=0.0)
+    equip_tops = [p.anchors["top"][2] for p in parts if p.anchors]
+    tallest = max(equip_tops) if equip_tops else GA_FRAME_MIN_HEIGHT_MM
+    frame_min_h = max(120.0, GA_FRAME_MIN_HEIGHT_MM * scale)
+    frame_top_mm = max(frame_min_h, tallest + GA_FRAME_RAIL_MM * scale)
+    _build_generic_frame(equip_bbox, frame_top_mm, MAT, MO, scale=scale)
+
+    # 4. TOPOLOGY — route every edge as a connector between the resolved part
+    #    anchors, at a LOW overhead elevation just above the equipment (there is no
+    #    tall frame to hang an overhead rack from). Reuses the shared route_topology
+    #    (nozzle pick + mechanism colours + abstract-endpoint resolver) so a robot's
+    #    power/data/control edges + an AUV's electrical/control edges all draw. The
+    #    pipe DIAMETER + per-run Z stagger SCALE with the assembly so a cm-scale
+    #    device's connectors don't render as a 190 mm tube dwarfing the parts.
+    route_top_mm = tallest + max(120.0, GA_ROUTE_CLEARANCE_MM * scale)
+    pipe_saved = (globals()["PIPE_DIA_MM"], globals()["RACK_TIER_PITCH_MM"])
+    try:
+        globals()["PIPE_DIA_MM"] = max(12.0, pipe_saved[0] * scale)
+        globals()["RACK_TIER_PITCH_MM"] = max(20.0, pipe_saved[1] * scale)
+        routed, unresolved = route_topology(topology, parts, MAT, MO,
+                                            frame_top_mm=route_top_mm,
+                                            region_centres=region_centres,
+                                            bbox_mm=bbox)
+    finally:
+        globals()["PIPE_DIA_MM"], globals()["RACK_TIER_PITCH_MM"] = pipe_saved
+    print(f"[univ][generic] topology routed = {routed}/{len(topology)}; "
+          f"unresolved = {len(unresolved)} (pipe dia "
+          f"{max(12.0, pipe_saved[0] * scale):.0f} mm)")
+
+    # 5. record each part-object prefix → its MODULE-index colour for the INSPECT
+    #    recolour (so the assembly reads grouped by subsystem, not by vessel type).
+    global _GA_PART_MODULE_COLOUR
+    _GA_PART_MODULE_COLOUR = {}
+    for p in parts:
+        rgb = GA_MODULE_COLOURS[midx[p.module_id] % len(GA_MODULE_COLOURS)]
+        _GA_PART_MODULE_COLOUR[_part_prefix(p.name)] = rgb
+
+    return bbox, region_centres, frame_top_mm, routed, unresolved
+
+
+def _build_generic_frame(bbox_mm, frame_top_mm, MAT, MO, scale=1.0):
+    """A LIGHT bench/baseplate for a generic assembly: a thin floor pad (perimeter
+    base rails + a few cross members, via the lib skid primitive) PLUS a single low
+    perimeter rail at frame_top so the assembly reads as ONE unit sitting on a
+    bench — WITHOUT the tall braced posts / X-bracing / overhead pipe-rack of the
+    process skid. Named u_skid_* so apply_inspection_materials renders it as the
+    faint wireframe the equipment shows through. The rail section + floor margin
+    SCALE with the assembly so a 14 mm device doesn't sit in a 90 mm-bar cage.
+    Universal + deterministic."""
+    margin = max(40.0, GA_FRAME_MARGIN_MM * scale)
+    x0, x1 = bbox_mm["x0"] - margin, bbox_mm["x1"] + margin
+    y0, y1 = bbox_mm["y0"] - margin, bbox_mm["y1"] + margin
+    w, d = x1 - x0, y1 - y0
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    m = max(8.0, GA_FRAME_RAIL_MM * scale)
+    sid = STRUCTURE_MODULE_ID
+    if sid not in MO:
+        MO[sid] = []
+    steel = fl.make_mat("m_ga_steel", (0.45, 0.47, 0.52), metallic=0.7, roughness=0.45)
+    deck = fl.make_mat("m_ga_deck", (0.30, 0.34, 0.40), metallic=0.4, roughness=0.5)
+
+    # Thin floor pad (base rails + cross members + a deck) — the bench the assembly
+    # sits on. Low height so it never occludes the equipment.
+    base_h = max(40.0, m * 2)
+    fl.prim_skid_frame("u_skid_base", w, d, base_h, (cx, cy, 0.0),
+                       material=steel, material_deck=deck,
+                       n_cross_members=max(2, int(w / max(400.0, 2600.0 * scale))),
+                       module=sid, module_objects=MO)
+
+    def _mm3(t):
+        return tuple(c * fl.MM for c in t)
+
+    # 4 short corner posts + a single low perimeter rail at frame_top — a light
+    # cage outline, no bracing. Skipped if the assembly is essentially flat.
+    H = max(base_h + m, frame_top_mm)
+    if H - base_h > m * 1.5:
+        for px in (x0 + m / 2, x1 - m / 2):
+            for py in (y0 + m / 2, y1 - m / 2):
+                fl.add_box(f"u_skid_post_{px:.0f}_{py:.0f}",
+                           _mm3((px, py, base_h + (H - base_h) / 2)),
+                           _mm3((m, m, H - base_h)), steel,
+                           module=sid, module_objects=MO)
+        for (sx, sy, sw, sd) in [(cx, y0 + m / 2, w, m), (cx, y1 - m / 2, w, m),
+                                 (x0 + m / 2, cy, m, d), (x1 - m / 2, cy, m, d)]:
+            fl.add_box(f"u_skid_toprail_{sx:.0f}_{sy:.0f}",
+                       _mm3((sx, sy, H - m / 2)), _mm3((sw, sd, m)),
+                       steel, module=sid, module_objects=MO)
+    print(f"[univ][generic] light frame: {w/1000:.1f}×{d/1000:.1f} m floor pad, "
+          f"{H/1000:.1f} m perimeter rail")
 
 
 # ── RACK-FARM strategy config (mm) ─────────────────────────────────────────
@@ -5393,9 +5802,15 @@ def apply_inspection_materials(parts):
     Returns a count dict for the run summary."""
     # 1. Build prefix → colour map from the parts list (LONGEST prefix first so a
     #    short prefix never shadows a more specific longer one — deterministic).
+    #    GENERIC-ASSEMBLY override: when place_generic_assembly populated the
+    #    per-part MODULE-index colour map, key each part to its MODULE colour (so the
+    #    assembly reads grouped by subsystem) instead of its shape-type colour.
+    ga_colour = _GA_PART_MODULE_COLOUR or {}
     pref_colour = []
     for p in parts:
-        pref_colour.append((_part_prefix(p.name), _inspect_colour_for_part(p)))
+        pref = _part_prefix(p.name)
+        colour = ga_colour.get(pref) or _inspect_colour_for_part(p)
+        pref_colour.append((pref, colour))
     pref_colour.sort(key=lambda t: len(t[0]), reverse=True)
 
     # 2. One cached matte material per distinct colour (dedupe by rounded rgb).
@@ -5801,7 +6216,8 @@ def main():
     #      overhead pipe rack). All return the SAME tuple so the INSPECT/PDF render
     #      below is common.
     modules = state.get("moduleDecomposition", {}).get("modules", [])
-    family = detect_geometry_family(parts, modules)
+    product_class = product_class_of(state)
+    family = detect_geometry_family(parts, modules, product_class)
     if family == "aero_body":
         global _AERO_QUANTITIES
         _AERO_QUANTITIES = quantities
@@ -5821,6 +6237,11 @@ def main():
         global _RACKFARM_QUANTITIES
         _RACKFARM_QUANTITIES = quantities
         bbox, region_centres, frame_h, routed, unresolved = place_rack_farm(
+            parts, regions, topology, MAT, MO)
+    elif family == "generic_assembly":
+        global _GA_QUANTITIES
+        _GA_QUANTITIES = quantities
+        bbox, region_centres, frame_h, routed, unresolved = place_generic_assembly(
             parts, regions, topology, MAT, MO)
     else:
         bbox, region_centres, frame_h, routed, unresolved = place_process_plant(
