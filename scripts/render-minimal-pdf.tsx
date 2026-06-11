@@ -12571,16 +12571,23 @@ function resolveModuleImage(productClass: string, moduleId: string, state?: any)
     return briefHero
   }
   const slug = classToSlug(productClass)
-  if (!slug) return null
+  // Universal-CAD hero as the final per-module fallback (Tristan 2026-06-11): when
+  // there's no brief/template module image, show the deterministic universal-CAD
+  // render from the real engineering — the same uniform illustration the caller
+  // captions per module (mirrors the brief-hero fallback above). Fills the gap for
+  // unmapped/templateless classes like e-fuel.
+  const cadHero = typeof state?.cad_hero_image_path === 'string' && existsSync(state.cad_hero_image_path)
+    ? state.cad_hero_image_path : null
+  if (!slug) return cadHero
   // 2026-05-20 (Tristan second review): the static class image is the wrong
   // scale for container/warehouse-sized briefs ("completely the wrong
   // size"). When the brief envelope clearly exceeds the static-render
   // implied scale, return null — the caller renders an EnvelopeOutline
   // proportional placeholder instead.
-  if (state !== undefined && briefEnvelopeMismatchesStaticHero(state)) return null
+  if (state !== undefined && briefEnvelopeMismatchesStaticHero(state)) return cadHero
   const projectRoot = resolve(__dirname, '..')
   const path = resolve(projectRoot, 'public', 'heroes', slug, `module-${moduleId}.png`)
-  return existsSync(path) ? path : null
+  return existsSync(path) ? path : cadHero
 }
 
 /** True when the brief envelope clearly exceeds the static-render PNG's
@@ -12815,18 +12822,29 @@ function resolveHeroImages(state: any): { cover: string | null; exploded: string
     state?.parsedBrief?.product_class ??
     ''
   const slug = classToSlug(raw)
-  if (!slug) return { cover: null, exploded: null }
-  // 2026-05-20 (Tristan second review): when brief envelope clearly exceeds
-  // the static-render scale, suppress static + render proportional outline
-  // in the caller instead. Static is OK only for desktop / cabinet briefs.
-  if (briefEnvelopeMismatchesStaticHero(state)) return { cover: null, exploded: null }
   const projectRoot = resolve(__dirname, '..')
-  const coverPath = resolve(projectRoot, 'public', 'heroes', `${slug}-cover.png`)
-  const explodedPath = resolve(projectRoot, 'public', 'heroes', `${slug}-exploded.png`)
-  return {
-    cover: existsSync(coverPath) ? coverPath : null,
-    exploded: existsSync(explodedPath) ? explodedPath : null,
+  // Static template cover stays PRIMARY where it exists (Tristan 2026-06-10).
+  // Null when the class isn't slug-mapped (e.g. e_fuel_synthesis) or when the brief
+  // envelope clearly exceeds the static-render scale (static is OK only for
+  // desktop / cabinet briefs; otherwise the caller draws a proportional outline).
+  let cover: string | null = null
+  let exploded: string | null = null
+  if (slug && !briefEnvelopeMismatchesStaticHero(state)) {
+    const coverPath = resolve(projectRoot, 'public', 'heroes', `${slug}-cover.png`)
+    const explodedPath = resolve(projectRoot, 'public', 'heroes', `${slug}-exploded.png`)
+    cover = existsSync(coverPath) ? coverPath : null
+    exploded = existsSync(explodedPath) ? explodedPath : null
   }
+  // UNIVERSAL-CAD FALLBACK (Tristan 2026-06-11 "why aren't we using the new blender
+  // images?"): when no template cover exists, use the deterministic universal-CAD
+  // hero produced from the REAL engineering (state.cad_hero_image_path, written by
+  // generate_drawing_set.py / the chain). Templates stay primary — this only FILLS
+  // the gap (e-fuel has no template and otherwise shows no 3D image at all).
+  if (!cover) {
+    const cadHero = typeof state?.cad_hero_image_path === 'string' ? state.cad_hero_image_path : null
+    if (cadHero && existsSync(cadHero)) cover = cadHero
+  }
+  return { cover, exploded }
 }
 
 // ─── ITER-10 NEW PAGES ─────────────────────────────────────────────────────
