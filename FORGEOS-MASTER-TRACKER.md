@@ -165,7 +165,7 @@ The de-cage fix (1faac282d) resolved the "real mess" (cage gone, well-framed via
 "not a mess but not great from a pipework perspective — still looks odd". ITERATION WORK (not blocking).
 Render kept PULLED from the dossier (2D-drawing-led) until the pipework iterates clean, then re-feature.
 
-## ♻ COST-SYSTEM RECONCILE (found 2026-06-11 — pre-change-search miss)
+## ♻ COST-SYSTEM RECONCILE — ✅ DONE 2026-06-11 (build-cost-basis now universal)
 TWO DOE/NETL cost systems now exist: (1) `scripts/lib/cost/build-cost-basis.ts` — PER-CLASS
 (CLASS_EQUIPMENT_MAPS only covers co2_mineralisation), builds `state.costBasis` (cost_gbp + `defensible`
 flag) but ONLY DISCLOSES on the Cost Methodology page, never writes back to the BoM. (2)
@@ -176,3 +176,5 @@ CLEAN MERGE (follow-up, not done): make build-cost-basis UNIVERSAL by using bom-
 as its no-class-map fallback → ONE source of defensible prices that feeds BOTH the methodology page AND
 the writeback. Then drop the separate bom-cost-grounding chain stage. Lesson: pre-change mempalace/grep
 for existing cost logic BEFORE building a cost module (I missed build-cost-basis).
+
+**Reconcile landed (commit pending): build-cost-basis.ts now delegates UNMAPPED lines to bom-cost-grounding's universal detection over the SAME DOE/NETL curves — ONE cost engine, all classes. e-fuel went 0→11 defensible cost-basis lines; co2 unchanged; build-cost-basis.test 21/21; methodology page shows defensible for any class. Remaining (minor): the chain has my cost-grounding writeback stage (6113) AND build-cost-basis (6339) both calling groundBomLineCost — to fully dedup, move the writeback after build-cost-basis and read state.costBasis. Not divergent (one engine); just a redundant call.**

@@ -17,6 +17,12 @@ import {
   toFt2, m3hToCfm,
   type CostBasis, type EquipmentSpec, type TakeoffSpec, type CostMethod,
 } from './process-equipment-cost'
+// Reconcile (2026-06-11): the UNIVERSAL grounding engine. build-cost-basis used to be
+// co2-only (CLASS_EQUIPMENT_MAPS) and disclose every other class; now it delegates
+// unmapped lines to bom-cost-grounding's universal form/name detection over the SAME
+// DOE/NETL curves — one cost engine, all classes. (No cycle: bom-cost-grounding imports
+// only process-equipment-cost, never this file.)
+import { groundBomLineCost } from './bom-cost-grounding'
 
 /**
  * A class-equipment map entry produces EITHER a curve spec (DOE/NETL `costProcessEquipment`)
@@ -214,6 +220,15 @@ export function buildCostBasis(state: any): CostBasisReport {
   const equipMap = CLASS_EQUIPMENT_MAPS[klass] ?? []
   const catMap = CATALOGUE_OVERRIDES[klass] ?? []
   const masses = readContractMasses(state)
+  // Reconcile fallback inputs: word-by-id (groundBomLineCost needs the BoM word's
+  // modifier_characters, not the partVerification) + the grounding context.
+  const wordById = new Map<string, any>()
+  for (const m of (state?.moduleDecomposition?.modules ?? []))
+    for (const sm of (m?.sub_modules ?? []))
+      for (const w of (sm?.words ?? [])) if (w?.id) wordById.set(String(w.id), w)
+  const ec: any = state?.engineeringContract ?? {}
+  const oc: any = state?.orchestratorContract ?? {}
+  const groundCtx: any = { quantities: { ...(ec.quantities ?? {}), ...(oc.quantities ?? {}) }, macroAssemblyPrices: ec.macro_assembly_prices, installMode: 'skid' }
 
   const lines: CostBasisLine[] = []
   let takeoff = 0, curve = 0, cat = 0, disc = 0, rfq = 0, purchased = 0
@@ -244,6 +259,25 @@ export function buildCostBasis(state: any): CostBasisReport {
       else cat++ // vendor_quote (rfqRange) counts as a quote line
       purchased += gbp; continue
     }
+    // 2.5) UNIVERSAL defensible fallback (reconcile 2026-06-11): no per-class equipMap
+    // entry matched → use bom-cost-grounding's universal form/name detection over the
+    // SAME DOE/NETL curves, so EVERY class gets defensible costs (not only the hand-
+    // mapped co2). It returns a full CostBasis (cost_basis) we use directly. Only the
+    // fabricated-equipment path (doe-netl-class4, high/medium confidence) re-costs here;
+    // catalogue parts + low-confidence still fall through to disclosure below.
+    const word = wordById.get(wid)
+    if (word) {
+      const g: any = groundBomLineCost(word, groundCtx)
+      if (g && g.price_gbp != null && g.cost_basis && g.provenance === 'doe-netl-class4' &&
+          (g.confidence === 'high' || g.confidence === 'medium')) {
+        lines.push({ word_id: wid, label, module: pv?.module, engine_price_gbp: enginePrice, cost_gbp: g.price_gbp, defensible: true, basis: g.cost_basis, working: g.cost_basis.working })
+        if (g.cost_basis.rfq_recommended) rfq++
+        if (g.cost_basis.method === 'material_takeoff') takeoff++
+        else if (g.cost_basis.method === 'capacity_factored') curve++
+        else cat++
+        purchased += g.price_gbp; continue
+      }
+    }
     // 3) disclosure of the engine's own price
     const basis = disclosureBasis(pv)
     lines.push({ word_id: wid, label, module: pv?.module, engine_price_gbp: enginePrice, cost_gbp: basis.result_gbp, defensible: false, basis })
@@ -253,9 +287,9 @@ export function buildCostBasis(state: any): CostBasisReport {
 
   const factorLow = 2.5, factorCentral = 3.0, factorHigh = 3.5
   const installedCentral = Math.round(purchased * factorCentral) // skid-modular factor, NOT stick-built Lang
-  const statement = equipMap.length
+  const statement = (takeoff + curve + cat) > 0
     ? `${takeoff} fabricated vessel${takeoff === 1 ? '' : 's'}/column${takeoff === 1 ? '' : 's'} re-costed by material take-off (mass × £/kg + fabrication factor, AACE Class 4 ±30%); ${curve} lines from published equipment cost curves (DOE/NETL-2002/1169); ${cat} catalogue/quote lines; ${disc} indicative engine estimates disclosed with their confidence. ${rfq} lines flagged for vendor RFQ.`
-    : `No process-equipment cost map for class "${klass}" yet — every line is disclosed with its engine pricing method and confidence (indicative). Wire a class map in build-cost-basis.ts to re-cost the major equipment.`
+    : `Every line is disclosed with its engine pricing method and confidence (indicative) — no fabricated process equipment was detected to re-cost for class "${klass}".`
 
   return {
     class: klass,
