@@ -16692,6 +16692,60 @@ function buildDistributionCablingPages(project: string, statePath?: string): any
   } catch { return [] }
 }
 
+// Part 2 manufacturing layer (Option A EVOLVE, Tristan 2026-06-11 "how you manufacture
+// it"): the make-vs-buy classification (M1) + the per-made-item process route + steps
+// (M2), surfaced as a "How it is manufactured" section. The make-vs-buy verdict is
+// passed into the route (ctx.assumeMade) so the two layers AGREE. Additive Part-2
+// section; renders nothing if the modules are absent. Pure (signal-keyed modules).
+function buildManufacturingPlanPages(state: any, project: string): any[] {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { classifyMakeVsBuy, makeVsBuySummary } = require('./lib/cost/bom-make-vs-buy')
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { processRoute, processRouteSummary } = require('./lib/cost/bom-process-route')
+    const words: any[] = []
+    for (const m of (state?.moduleDecomposition?.modules ?? []))
+      for (const sm of (m?.sub_modules ?? []))
+        for (const w of (sm?.words ?? [])) words.push(w)
+    if (words.length === 0) return []
+    const verifications: any = {}
+    for (const v of (state?.partVerifications ?? [])) if (v?.word_id) verifications[v.word_id] = { manufacturer: v.manufacturer, part_number: v.part_number }
+    const mbSum = makeVsBuySummary(words, { verifications })
+    const prSum = processRouteSummary(words)
+    const made: Array<{ name: string; category: string; process: string; steps: string[] }> = []
+    for (const w of words) {
+      const mb = classifyMakeVsBuy(w, { verifications })
+      if (mb.category === 'bought') continue
+      const r = processRoute(w, { assumeMade: true })
+      made.push({ name: String(w.name_human ?? w.id ?? ''), category: String(mb.category), process: String(r.primary_process ?? ''), steps: Array.isArray(r.steps) ? r.steps : [] })
+    }
+    return [(
+      <Page key="mfg-plan" size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Part 2 · How it is manufactured" project={project} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>How it is manufactured</Text>
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 6, lineHeight: 1.55 }}>{String(mbSum?.notes ?? '')}</Text>
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 12, lineHeight: 1.55 }}>{String(prSum?.note ?? '')}</Text>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 5 }}>Made items — manufacturing route</Text>
+        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: RULE, paddingBottom: 3 }}>
+          <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>ITEM</Text>
+          <Text style={{ width: 74, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>MAKE</Text>
+          <Text style={{ width: 90, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>PROCESS</Text>
+          <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>KEY STEPS</Text>
+        </View>
+        {made.slice(0, 22).map((x, i) => (
+          <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT, paddingVertical: 3, alignItems: 'baseline' }}>
+            <Text style={{ flex: 2, fontSize: 8, color: INK }}>{x.name}</Text>
+            <Text style={{ width: 74, fontSize: 7.5, color: MUTED }}>{x.category.replace(/-/g, ' ')}</Text>
+            <Text style={{ width: 90, fontSize: 7.5, color: MUTED }}>{x.process.replace(/-/g, ' ')}</Text>
+            <Text style={{ flex: 2, fontSize: 7, color: MUTED }}>{x.steps.slice(0, 4).join(' » ').slice(0, 130)}</Text>
+          </View>
+        ))}
+        {made.length > 22 ? <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6 }}>{`… and ${made.length - 22} more made items (full routes in the manufacturing pack).`}</Text> : null}
+      </Page>
+    )]
+  } catch { return [] }
+}
+
 function MinimalDocument({ state, subject, statePath }: { state: any; subject: string; statePath: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   // FREE-tier: pre-build the manufacturer -> "Company N" alias map + brand-mask
@@ -16951,6 +17005,8 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           RiskPage now embeds the SystemLevelRisks content as its first
           sub-block under "Risk & Integration Analysis". The standalone
           SystemLevelRisksPage component is no longer called. */}
+      {/* Part 2 manufacturing layer (M1 make-vs-buy + M2 process route) — "how you manufacture it". */}
+      {buildManufacturingPlanPages(state, project)}
       <RiskPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <PartDividerPage
         eyebrow="Part 3"
