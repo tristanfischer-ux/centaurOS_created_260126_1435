@@ -3779,6 +3779,160 @@ def write_parts_manifest(out_dir, parts):
     return manifest
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# ROUTE-WAYPOINT MANIFEST  (the data the PIPING ISOMETRIC generator consumes)
+# ═══════════════════════════════════════════════════════════════════════════
+# After routing, every drawn run is in _ROUTE_LOG (its orthogonal polyline) and —
+# when it was sized — its ConnectionSpec is in _CONN_SPECS (from/to/mechanism/DN/OD/
+# service). We JOIN the two by run name + project each route into one manifest entry:
+# the routed polyline + an elbow at every bend + a tee at every shared spine origin +
+# a reducer where a tap leaves a fatter trunk. draw_isometric.py reads this file (and
+# reconstruct_process() from draw_pid.py) to lay each MAJOR line out as a real iso.
+#
+# PURE EXPORT (reads the route log + the specs already built; writes ONE file). The
+# kill switch ROUTE_SKIP_MANIFEST=1 skips ALL of it, so a run with vs without proves
+# the renders / route-audit / connection-schedule are byte-identical — it changes
+# nothing else.
+
+# Short SERVICE code from a material_context / endpoint names — IDENTICAL table to
+# draw_pid._service_code so the manifest's best-effort line number agrees with the
+# P&ID + line list (the iso ALSO re-derives via reconstruct_process for the exact
+# match; this keeps the manifest readable + self-consistent on its own).
+_RM_SERVICE_TABLE = [
+    ("steam", "ST"), ("condensate", "CD"), ("cooling", "CW"), ("coolant", "CW"),
+    ("h2", "H2"), ("hydrogen", "H2"), ("co2", "CO"), ("tail_gas", "TG"),
+    ("tail gas", "TG"), ("recycle", "RC"), ("purge", "PG"), ("amine", "AM"),
+    ("slurry", "SL"), ("naphtha", "NP"), ("saf", "PR"), ("syncrude", "SC"),
+    ("flue", "FG"), ("vent", "VT"), ("water", "WT"),
+]
+
+
+def _rm_service_code(frm, to, mc):
+    blob = f"{frm or ''} {to or ''} {mc or ''}".lower()
+    for needle, code in _RM_SERVICE_TABLE:
+        if needle in blob:
+            return code
+    return "PR"   # generic process line
+
+
+def _rm_dn_label(size_label):
+    """Pull a compact DN / CSA token out of a connection size_label for the line no.
+    'DN200' → 'DN200'; '3×400 mm²' → '' (electrical buses don't get a DN suffix)."""
+    if not size_label:
+        return ""
+    m = re.search(r"\bDN\s?(\d+)\b", str(size_label), re.I)
+    if m:
+        return "DN" + m.group(1)
+    return ""
+
+
+def _rm_fittings(waypoints, trunk_origin=None, is_tap=False):
+    """Derive the in-line fittings from a routed orthogonal polyline:
+      • an ELBOW at every interior bend (the direction changes between two legs);
+      • a TEE at the run's start when it taps off a shared trunk/spine origin;
+      • a REDUCER on a tap (a branch leaving a fatter header is a smaller bore).
+    Orthogonal routes only ever turn 90°, so every interior vertex where the travel
+    axis changes is a single elbow. Returns a list of {type, at:[x,y,z]} (mm)."""
+    fittings = []
+    if is_tap and waypoints:
+        fittings.append({"type": "tee", "at": [round(c, 1) for c in waypoints[0]]})
+        fittings.append({"type": "reducer", "at": [round(c, 1) for c in waypoints[0]]})
+    n = len(waypoints)
+    for k in range(1, n - 1):
+        p, q, r = waypoints[k - 1], waypoints[k], waypoints[k + 1]
+        # the axis that changed between leg p→q and leg q→r: if the dominant motion
+        # axis differs, q is a 90° bend → an elbow.
+        d1 = (q[0] - p[0], q[1] - p[1], q[2] - p[2])
+        d2 = (r[0] - q[0], r[1] - q[1], r[2] - q[2])
+        ax1 = max(range(3), key=lambda i: abs(d1[i]))
+        ax2 = max(range(3), key=lambda i: abs(d2[i]))
+        moved1 = abs(d1[ax1]) > 1.0
+        moved2 = abs(d2[ax2]) > 1.0
+        if moved1 and moved2 and ax1 != ax2:
+            fittings.append({"type": "elbow", "at": [round(c, 1) for c in q]})
+    return fittings
+
+
+def write_route_manifest(out_dir):
+    """Write <out_dir>/route-manifest.json — one entry per ROUTED connection (the
+    topology + derived edges that get drawn). The piping-isometric generator's input.
+
+    Each entry: {line_number, mechanism, from_tag, to_tag, size_label, outer_dia_mm,
+    waypoints_mm:[[x,y,z]...], fittings:[{type,at}]}. The waypoints are the EXACT
+    orthogonal polyline _ROUTE_LOG recorded; the size/from/to/service come from the
+    matching ConnectionSpec (joined by run name). PURE EXPORT — see header.
+
+    Kill switch: ROUTE_SKIP_MANIFEST=1 skips the whole thing (proves byte-identical
+    renders / route-audit / schedule with or without)."""
+    if not out_dir:
+        return {"lines": [], "count": 0}
+    if os.environ.get("ROUTE_SKIP_MANIFEST", "").strip() not in ("", "0", "false", "no"):
+        print("[route-manifest] SKIPPED (ROUTE_SKIP_MANIFEST set)")
+        return {"lines": [], "count": 0, "skipped": True}
+    os.makedirs(out_dir, exist_ok=True)
+
+    # index the sized ConnectionSpecs by run name (the join key _draw_run stamps on
+    # both the route-log entry's `name` and the spec's `run_name`). LAST spec wins for
+    # a duplicated name (the trunk/tap split uses distinct names, so collisions are
+    # only a re-emitted identical run — the later one is the kept geometry).
+    spec_by_name = {}
+    for s in _CONN_SPECS:
+        nm = s.get("run_name")
+        if nm:
+            spec_by_name[nm] = s
+
+    # trunk names → so a tap that shares the trunk's spine origin is marked is_tap.
+    trunk_names = {s.get("run_name") for s in _CONN_SPECS
+                   if str(s.get("role") or "").lower() == "trunk"}
+
+    rows = []
+    seq = 200            # mirrors draw_pid's loop base (200 + i) for the line number.
+    for i, r in enumerate(_ROUTE_LOG, start=1):
+        nm = r.get("name")
+        wp = [[round(float(c), 1) for c in p] for p in r.get("waypoints", [])]
+        spec = spec_by_name.get(nm, {})
+        mech = r.get("mech") or spec.get("mechanism") or ""
+        frm = spec.get("from_part")
+        to = spec.get("to_part")
+        size_label = spec.get("size_label")
+        outer_dia = spec.get("outer_dia_mm")
+        mc = spec.get("material_context") or ""
+        role = str(spec.get("role") or "").lower()
+        is_tap = (role == "branch")
+        svc = _rm_service_code(frm, to, mc)
+        dn = _rm_dn_label(size_label)
+        line_number = f"{seq + i}-{svc}" + (f"-{dn}" if dn else "")
+        rows.append({
+            "line_number": line_number,
+            "run_name": nm,
+            "mechanism": mech,
+            "role": role or None,
+            "from_tag": frm,
+            "to_tag": to,
+            "service": mc or None,
+            "size_label": size_label,
+            "outer_dia_mm": outer_dia,
+            "length_m": spec.get("length_m"),
+            "waypoints_mm": wp,
+            "fittings": _rm_fittings(r.get("waypoints", []), is_tap=is_tap),
+        })
+
+    manifest = {"schema": "route-manifest/1", "count": len(rows),
+                "note": ("One entry per routed connection (the drawn orthogonal "
+                         "polyline + an elbow at each bend). line_number mirrors "
+                         "draw_pid; the isometric re-matches via reconstruct_process "
+                         "for the exact P&ID/line-list number."),
+                "lines": rows}
+    with open(os.path.join(out_dir, "route-manifest.json"), "w") as fh:
+        json.dump(manifest, fh, indent=2, ensure_ascii=False)
+    n_fit = sum(len(r["fittings"]) for r in rows)
+    n_wp = sum(len(r["waypoints_mm"]) for r in rows)
+    print(f"[route-manifest] wrote {len(rows)} routed lines "
+          f"({n_wp} waypoints, {n_fit} fittings) → "
+          f"{os.path.join(out_dir, 'route-manifest.json')}")
+    return manifest
+
+
 def write_connection_schedule(out_dir):
     """PHASE C — the BoM feedback. Flatten every sized ConnectionSpec into the
     distribution SCHEDULE (connection_schedule), write it to connection-schedule.json
@@ -4993,6 +5147,11 @@ def _sized_dia_mm(nm, mech, waypoints, edge, carried_value=None, role=None):
             f"Run {spec.get('from_part') or '?'}→{spec.get('to_part') or '?'}:{tail}")
     if role:
         spec["role"] = role
+    # Stash the edge's material_context (the SERVICE description) on the spec so the
+    # route-manifest export (joined to _ROUTE_LOG by run_name) can carry the service +
+    # derive the same draw_pid line number. Additive: nothing else reads this key.
+    if e.get("material_context") is not None:
+        spec.setdefault("material_context", e.get("material_context"))
     _CONN_SPECS.append(spec)
 
     od = spec.get("outer_dia_mm")
@@ -10140,6 +10299,13 @@ def main():
     # the render / route / schedule paths.
     parts_manifest = write_parts_manifest(out_dir, parts)
 
+    # ── ROUTE-WAYPOINT MANIFEST — the data the PIPING ISOMETRIC drawing consumes.
+    # Joins the routed polylines (_ROUTE_LOG) to their sized specs (_CONN_SPECS) and
+    # writes route-manifest.json (one entry per drawn connection: waypoints + fittings
+    # + DN + service + endpoints). PURE EXPORT — gated by ROUTE_SKIP_MANIFEST so a run
+    # with vs without proves the renders / route-audit / schedule are unchanged.
+    route_manifest = write_route_manifest(out_dir)
+
     # ── INSPECT MODE (default ON) — the FAST visual-judge surface ──
     # When INSPECT=1 (the loop's default), render the CLEAN CAD-inspection set
     # (bright light deck, flat-matte by part type, de-emphasised frame, four
@@ -10187,6 +10353,7 @@ def main():
               "route_audit": route_metrics,
               "connection_schedule_totals": conn_schedule.get("totals"),
               "parts_manifest_count": parts_manifest.get("count"),
+              "route_manifest_count": route_manifest.get("count"),
               "inspect": _inspect_summary,
           }))
 
