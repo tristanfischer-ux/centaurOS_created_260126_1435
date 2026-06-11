@@ -12,8 +12,11 @@ correcting**, and the optimisation loops **converged** (engineering AND Blender)
 rendered into the PDF**, not sitting in /tmp.
 
 ## 🎯 CURRENT FOCUS
-**W2.1 — wire the 8 drawings into the dossier PDF render.** (Was blocked on a false "foreign-dirty"
-premise; Tristan confirmed 2026-06-11 there are NO other terminals — the chain is mine to edit.)
+**W4 — evolve Part 2 with the manufacturing layer (Option A, Tristan 2026-06-11).** Keep modules/
+sub-modules/BoM as the spine; ADD make-vs-buy + process route + assembly sequence + cost-of-goods
+build-up, ADDITIVELY (never replace the in-context BoM). The 8 drawings are the VISUAL form of this
+layer (GA = assembly, P&ID/process-schedules = process route, cable/panel schedules = make/buy scope) —
+their placement is being decided WITH the manufacturing layer, not separately.
 
 ## ▶ NEXT 3 (in order)
 1. **W2.1** Get the 8 drawings into the rendered PDF (investigate render integration point → wire → verify a real dossier shows them).
@@ -31,16 +34,30 @@ premise; Tristan confirmed 2026-06-11 there are NO other terminals — the chain
 - ⏳ W1.x polish families to 10/10 each (robotics/marine/device still sensible-fallback). [orig loop]
 - Files: `scripts/blender-universal/build_universal_scene.py` (+ `connection_sizing.py`).
 
-### W2 · The 8 design-and-construction drawings 🔄 (BUILT, NOT in the PDF)
+### W2 · The 8 design-and-construction drawings 🔄 (BUILT, NOT in the PDF) — LEAD-AND-WEAVE
 - ✅ All 8 generators built + self-verified: cable schedule, single-line diagram, P&ID, panel/load
   schedule, GA, process schedules (line/valve/instrument), HVAC layout, piping isometrics.
 - ✅ Cross-referenced by identical tags (203-ST-DN200 same on P&ID + line list + iso).
-- ❌ **W2.1 — wire all 8 into the dossier PDF render.** ← THE GAP. Currently output to /tmp as PNGs.
-  - [ ] find the render integration point in `serial-design-chain-v2.tsx` / `render-minimal-pdf.tsx`.
-  - [ ] generate the drawing set from the SAME state the dossier renders from.
-  - [ ] add the drawings as PDF pages (a "Design & construction drawings" section).
-  - [ ] verify on a real dossier (open the PDF, see all 8).
-- Files: `scripts/blender-universal/draw_*.py`.
+- **Placement (Tristan 2026-06-11): LEAD-AND-WEAVE.** 3 SYSTEM drawings (GA, single-line, P&ID) OPEN
+  Part 2 as the design anchor; 5 schedules/details (cable schedule, panel schedule, process schedules,
+  isometrics, HVAC) WEAVE in-line with the manufacturing-layer content they back.
+- ❌ **W2.1a — driver** `generate_drawing_set.py`: dossier state.json → 8 drawing PNGs in `<outDir>/drawings/`
+  (run build_universal_scene.py if the schedule/route artifacts are absent, else reuse; then the 8 draw_*.py).
+- ❌ **W2.1b — chain step**: generate the drawings during the run (after the engineering contract is ready).
+- ❌ **W2.1c — renderer**: 3 system drawings open Part 2; 5 schedules weave into the W4 manufacturing layer.
+- ❌ **W2.1d — verify** on a real dossier PDF (open it, see all 8 placed right).
+- Files: `scripts/blender-universal/draw_*.py` (+ new `generate_drawing_set.py`).
+
+### W4 · Part 2 manufacturing layer (Option A EVOLVE) 🔄 — the drawings' table-form twin
+- ❌ **M1 make-vs-buy** — classify each BoM word bought-off-shelf / fabricated / custom-made (derivable:
+  real MPN+manufacturer ⇒ buy; bespoke/fabricated marker ⇒ make). Backs cable/process schedules.
+- ❌ **M2 process route** — per MADE item, how it's manufactured (machined/fabricated/cast/PCB/wound).
+  Backs the P&ID + isometrics.
+- ❌ **M3 assembly sequence** — build order parts → sub-assemblies → modules → system (from module
+  hierarchy + topology). Backs the GA.
+- ❌ **M4 cost-of-goods build-up** — unit COGS = materials + labour + process + overhead, built on
+  `process-equipment-cost.ts` (DOE/NETL curves) — NOT LLM guesses. The "cost of goods sold" gap.
+- Extend, don't duplicate: `sourcing-strategy.ts` already does who-makes-it (contractor scopes).
 
 ### W3 · Convergence + optimisation loops 🔄 (BUILT, not wired, round-count not reported)
 - ✅ Physics↔CAD convergence loop (`convergence_loop.py`) — fixed point, contraction proof, 2-4 iters.
@@ -84,6 +101,20 @@ premise; Tristan confirmed 2026-06-11 there are NO other terminals — the chain
 - `8ef37b417` connection sizing engine · earlier: 5 geometry families + routing + Phase D/D2
 
 ## DECISIONS · CONSTRAINTS · CORRECTIONS
+- **2026-06-11 — Part 2 = OPTION A "EVOLVE"** (Tristan). Keep modules/sub-modules/BoM spine; ADD a
+  manufacturing layer (make-vs-buy · process route · assembly sequence · cost-of-goods build-up),
+  ADDITIVELY (his 2026-06-04 hard rule: in-context BoM stays, masters are additive never replacements).
+  Foundations already exist — `sourcing-strategy.ts` (who-makes-it: main-contractor + subcontractor
+  scopes; core-chain step 5) and `scripts/lib/cost/process-equipment-cost.ts` (DOE/NETL-2002/1169
+  Class-4 cost curves, material rate, fabrication factor, skid-vs-stick install factor). Cost-of-goods
+  MUST build on those real curves, NOT LLM guesses (the CO₂ dossier burned on LLM-authored prices; a
+  gate-32 aggregate PASS ≠ defensible per-line cost). Map: `PART2-ARCHITECTURE-MAP.md`. Pre-change
+  mempalace search done → 6 drawers (dossier 3-part structure, core value chain, two cost pipelines,
+  CO₂ cost-defensibility, DOE/NETL curves, assembly-dedup).
+- **Dossier is already THREE parts** (commit 8be0d7512): Part 1 engineering · Part 2 "how to build it"
+  (modules + in-context BoM + risk) · Part 3 "Reference & procurement" (master BoM, suppliers,
+  economics, sourcing, engagement). The manufacturing layer + drawings land in Part 2.
+- **8 drawings placement — OPEN (asked Tristan 2026-06-11).** They pair with the manufacturing layer.
 - **2026-06-11 — NO other terminals on this project** (Tristan). The "foreign-dirty / don't edit
   serial-design-chain-v2.tsx" rule was a WRONG premise — the dirty set is 37 trivial lines, last
   committed by Tristan 4 days ago. The chain IS mine to edit. This unblocks W2.1 + W4.
