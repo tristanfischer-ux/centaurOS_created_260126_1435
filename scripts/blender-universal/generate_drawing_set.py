@@ -162,6 +162,15 @@ def generate_drawing_set(state_path: str | Path,
     schedules = _group(SCHEDULE_DRAWINGS)
     n_ok = sum(1 for d in system + schedules if d["ok"])
 
+    # The Block-Flow Diagram (D1 fix) is the PART-1 process-flow overview — distinct
+    # from the Part-2 system/schedule drawings. It needs ONLY state.json (the CAD
+    # artifacts are optional enrichment), so it runs regardless of have_cad (it
+    # renders even when Blender is absent). The renderer's EngineeringBasisPage reads
+    # block_flow_diagram to replace the degraded process-flow box-list for non-CO2.
+    bfd_ok = _run_generator("draw_bfd.py", out_dir, state_path,
+                            "block-flow-diagram.png", log)
+    bfd_path = str(out_dir / "drawings" / "block-flow-diagram.png") if bfd_ok else None
+
     # The universal-CAD HERO render for the dossier cover + per-module fallback
     # (build_universal_scene.py writes inspect-iso.png to out_dir). The chain reads
     # manifest["hero"] → state.cad_hero_image_path so the new Blender image lands in
@@ -185,6 +194,8 @@ def generate_drawing_set(state_path: str | Path,
         "schedule_drawings": schedules,
         # the universal-CAD hero render → state.cad_hero_image_path (cover + module fallback).
         "hero": hero_abs,
+        # the Part-1 process-flow Block-Flow Diagram (D1 fix) → EngineeringBasisPage.
+        "block_flow_diagram": bfd_path,
         # the cable schedule is the connection schedule rendered as a table.
         "cable_schedule_source": ("connection-schedule.json"
                                   if (out_dir / "connection-schedule.json").exists()

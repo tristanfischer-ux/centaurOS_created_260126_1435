@@ -16082,11 +16082,17 @@ function _EbArrow() {
   return <Text style={{ fontSize: 9, color: MUTED, marginHorizontal: 3 }}> -&gt; </Text>
 }
 
-function EngineeringBasisPage({ state, project }: { state: any; project: string }) {
+function EngineeringBasisPage({ state, project, statePath }: { state: any; project: string; statePath?: string }) {
   try {
     const oc = state?.orchestratorContract ?? {}
     const quantities = (oc.quantities && typeof oc.quantities === 'object') ? oc.quantities : {}
     const isCo2Flow = String(state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? '') === 'co2_mineralisation'
+    // D1 fix (Tristan 2026-06-11): the universal auto-BFD (draw_bfd.py, written into
+    // <outDir>/drawings/block-flow-diagram.png by generate_drawing_set.py) REPLACES the
+    // degraded process-flow box-list for every non-CO2 class — a real process-ordered
+    // flow diagram with the streams drawn. Absent ⇒ the box-list still renders (fallback).
+    const bfdPath = statePath ? join(dirname(statePath), 'drawings', 'block-flow-diagram.png') : null
+    const bfdExists = !!bfdPath && existsSync(bfdPath)
     const rawModules: any[] = Array.isArray(state?.moduleDecomposition?.modules)
       ? state.moduleDecomposition.modules
       : []
@@ -16268,13 +16274,17 @@ function EngineeringBasisPage({ state, project }: { state: any; project: string 
             1 · Process flow
           </Text>
           <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 10, lineHeight: 1.45 }}>
-            {isCo2Flow
-              ? 'Block-flow of the plant — the equipment and the streams between them, with the key quantities on the diagram (recycle loops dashed).'
+            {isCo2Flow || bfdExists
+              ? 'Block-flow of the plant — the equipment and the streams between them in process order, with the key quantities on the diagram (recycle loops dashed).'
               : 'Block-flow of the plant — one box per sub-module, grouped under its module. Reading order left-to-right; recycle and key streams are annotated below (not drawn).'}
           </Text>
 
           {isCo2Flow ? (
             <Co2ProcessFlowDiagram q={quantities} />
+          ) : bfdExists ? (
+            <View style={{ alignItems: 'center', marginVertical: 4 }}>
+              <Image src={bfdPath!} style={{ width: '100%', objectFit: 'contain' }} />
+            </View>
           ) : (
           <>
           {/* Boundary in: flue gas */}
@@ -16763,7 +16773,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           verdict + headline economics. Opens the Part-1 maths: the reader sees the
           whole-plant balance + verdict before the dependency map, the problem
           statement, and the per-tool worked calculations. */}
-      <EngineeringBasisPage state={state} project={project} />
+      <EngineeringBasisPage state={state} project={project} statePath={statePath} />
       {/* Engineering Tools Flow (universal — task #113, 2026-05-24): per-tool
           3-column block showing the INPUTS each engineering tool consumed,
           a short description of the tool, and the OUTPUTS it produced. The
