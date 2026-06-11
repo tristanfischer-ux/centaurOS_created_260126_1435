@@ -3346,6 +3346,439 @@ def _safe_num(x):
         return 0.0
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# PARTS-POSITION MANIFEST  (the data the GA + isometric drawings consume)
+# ───────────────────────────────────────────────────────────────────────────
+# After placement, EVERY physical part carries placed_xyz_mm (its CENTRE) + a
+# resolved geometry (footprint from the SAME resolved_dims_mm/footprint_mm the
+# placer used). write_parts_manifest projects that into a small, deterministic
+# parts-manifest.json — one row per placed part with its tag, module, shape, the
+# centre position (mm), the real dims (w/d/h box OR dia/len cylinder), and a
+# derived EQUIPMENT TAG (ISA letter + running number). It is PURE EXPORT: it
+# reads already-placed state, writes ONE file, and touches nothing on the
+# render / route / schedule paths. Always writes (gated only on out_dir).
+
+# ISA equipment-tag letters by part SHAPE (the placer's classified shape is the
+# strongest signal). A few shapes carry two plausible letters, disambiguated by
+# the NAME below (e.g. a 'reactor' tall_vessel → R, a generic tall_vessel → V).
+_TAG_LETTER_BY_SHAPE = {
+    "compressor":        "K",   # compressor / blower / fan driver
+    "pump":              "P",
+    "tall_column":       "C",   # column / tower / absorber / stripper
+    "tall_vessel":       "R",   # reactor (overridden to V for non-reactor)
+    "vertical_vessel":   "V",   # guard bed / dryer / filter / coalescer
+    "horizontal_vessel": "V",   # separator / drum / knock-out (D via name)
+    "tank":              "T",   # bulk storage (TK via name)
+    "stack":             "S",   # flare / oxidiser / chimney stack
+    "package_box":       "H",   # fired heater / steam generator / boiler
+    "skid_box":          "Z",   # packaged skid
+    "transformer_box":   "TX",
+    "cabinet":           "EP",  # switchgear / MCC / board (electrical panel)
+    "cabinet_small":     "EP",  # VFD / control / I/O cabinet
+    "gantry":            "G",
+    "inline_spool":      "M",   # static mixer / in-line spool
+    "instrument":        "I",   # valve / transmitter / analyser (field device)
+    "box":               "X",
+}
+
+# NAME overrides — the engineer's noun decides the letter when the shape is
+# ambiguous (a heat exchanger is a horizontal_vessel by shape but is E by tag; a
+# reboiler/condenser likewise). First match wins; checked on the part NAME only.
+_TAG_LETTER_BY_NAME = [
+    (re.compile(r"reboiler|condenser|exchang|\bcooler\b|\bhx\b|chiller|"
+                r"economi[sz]er|interchang|pre.?heat", re.I), "E"),
+    (re.compile(r"reactor|reaction|hydrocrack|hydrotreat|isomeris|isomeriz|"
+                r"\bcstr\b|\bpfr\b|carbonation|crystallis|crystalliz", re.I), "R"),
+    (re.compile(r"column|tower|absorber|stripper|scrubber|fractionat|"
+                r"distillat|contactor", re.I), "C"),
+    (re.compile(r"separator|knock.?out|\bko\b.?drum|\bdrum\b|flash|coalesc|"
+                r"demister|decanter|3.?phase|three.?phase", re.I), "D"),
+    (re.compile(r"compressor|blower|\bfan\b|booster", re.I), "K"),
+    (re.compile(r"\bpump\b", re.I), "P"),
+    (re.compile(r"storage|\btank\b|reservoir|\bsump\b|bullet|sphere", re.I), "TK"),
+    (re.compile(r"oxidi[sz]er|flare|stack|chimney|incinerat", re.I), "S"),
+    (re.compile(r"steam.?gen|boiler|fired.?heat|furnace|waste.?heat", re.I), "H"),
+    (re.compile(r"transformer", re.I), "TX"),
+]
+
+
+def _equipment_letter(part):
+    """The ISA tag letter for a placed part.
+
+    The placer's SHAPE wins for FIELD DEVICES (a 'reactor thermowell' or a
+    'reactor pressure-relief valve' is shape=instrument → I, never R just because
+    the name references the reactor it protects); same for an in-line spool/mixer
+    (M). For real EQUIPMENT shapes the NAME noun is most specific (a heat-exchanger
+    horizontal_vessel is E, a separator drum is D) and wins over the shape default;
+    fall back to the shape letter, else 'X'."""
+    if part.shape == "instrument":
+        return "I"
+    if part.shape == "inline_spool":
+        return "M"
+    head = _name_head(part.name)
+    for rx, letter in _TAG_LETTER_BY_NAME:
+        if rx.search(head):
+            return letter
+    return _TAG_LETTER_BY_SHAPE.get(part.shape, "X")
+
+
+def _world_bbox_mm_by_prefix(parts):
+    """Union the WORLD-SPACE bounding box (mm) of every placed Blender MESH object,
+    grouped by the part prefix that built it (longest-prefix-first, the SAME mapping
+    apply_inspection_materials uses). This is the UNIVERSAL geometry source: every
+    placement family (process-plant, rack-farm, panel-array, tower-machine, aero,
+    generic) populates the Blender scene, even the ones that never back-annotate
+    part.placed_xyz_mm. Returns {prefix: (xmin,xmax,ymin,ymax,zmin,zmax) in mm}.
+
+    Excludes the structure/frame/route/datum helpers (u_skid_/u_rack_/u_route_/
+    u_pipe_/u_ground_) so an equipment footprint is the EQUIPMENT, not the skid it
+    sits in. Coords are Blender units (1 BU = 1 m) × 1000 → mm, via each object's
+    matrix_world over its 8 local bound_box corners."""
+    prefixes = sorted({_part_prefix(p.name) for p in parts},
+                      key=len, reverse=True)
+    acc = {}
+    SKIP = ("u_skid_", "u_rack_", "u_route_", "u_pipe_", "u_ground_", "u_grid_",
+            "u_datum_", "u_dim_")
+    for obj in list(bpy.data.objects):
+        if getattr(obj, "type", None) != "MESH" or obj.data is None:
+            continue
+        nm = obj.name
+        if any(nm.startswith(s) for s in SKIP):
+            continue
+        pref = None
+        for pr in prefixes:           # longest first → most specific wins
+            if nm.startswith(pr):
+                pref = pr
+                break
+        if pref is None:
+            continue
+        mw = obj.matrix_world
+        try:
+            _V = __import__("mathutils").Vector
+            corners = [mw @ _V(c) for c in obj.bound_box]
+        except Exception:
+            continue
+        xs = [c.x for c in corners]
+        ys = [c.y for c in corners]
+        zs = [c.z for c in corners]
+        b = acc.get(pref)
+        lo_x, hi_x = min(xs) * 1000.0, max(xs) * 1000.0
+        lo_y, hi_y = min(ys) * 1000.0, max(ys) * 1000.0
+        lo_z, hi_z = min(zs) * 1000.0, max(zs) * 1000.0
+        if b is None:
+            acc[pref] = [lo_x, hi_x, lo_y, hi_y, lo_z, hi_z]
+        else:
+            b[0] = min(b[0], lo_x); b[1] = max(b[1], hi_x)
+            b[2] = min(b[2], lo_y); b[3] = max(b[3], hi_y)
+            b[4] = min(b[4], lo_z); b[5] = max(b[5], hi_z)
+    return {k: tuple(v) for k, v in acc.items()}
+
+
+# ── SYNTHETIC-EQUIPMENT grouping for the AGGREGATE placement families ────────
+# rack_farm / panel_array / tower_machine / aero_body build their geometry under
+# their OWN object-naming scheme (u_rf_*, u_gr_*, u_tm_*, u_aero_*) instead of
+# instantiating one build_part() per BoM word — the cells / racks / blades are
+# aggregated, the BoP is a small set of role skids. So per-word matching finds
+# NOTHING. For those families we recover the GA equipment by grouping the DRAWN
+# synthetic objects into equipment BLOCKS by a family-aware key, and tag each by
+# its role. This keeps the manifest UNIVERSAL: every family yields a real set of
+# tagged, positioned, dimensioned equipment outlines for the GA, even when the
+# words themselves were never drawn as discrete parts.
+
+# role token (in the synthetic object name) → (ISA tag letter, human label, round?)
+_SYN_ROLE = {
+    # rack-farm BoP + racks
+    "rack":      ("BR", "Battery / equipment rack", False),
+    "pcs":       ("PCS", "Power conversion system", False),
+    "chiller":   ("CH", "Liquid chiller / cooling skid", False),
+    "bms":       ("BMS", "Battery management controller", False),
+    "bms_ctrl":  ("BMS", "Battery management controller", False),
+    "fire":      ("FS", "Fire suppression skid", False),
+    "transformer": ("TX", "Step-up transformer", False),
+    "switchgear": ("SG", "Switchgear / LV board", False),
+    # tower-machine
+    "tower":     ("WT", "Turbine tower", True),
+    "nacelle":   ("WT", "Nacelle", False),
+    "blade":     ("BL", "Rotor blade", False),
+    "foundation": ("FD", "Foundation", True),
+    "hub":       ("HB", "Rotor hub", True),
+    # panel-array (vertical farm)
+    "growrack":  ("GR", "Grow rack", False),
+    "canopy":    ("CN", "Grow canopy", False),
+    "hvac":      ("AH", "Air-handling / HVAC skid", False),
+    "nutrient":  ("NT", "Nutrient / dosing skid", False),
+    "water":     ("WS", "Water treatment skid", False),
+    "co2":       ("GS", "CO2 enrichment skid", False),
+    "control":   ("EP", "Control cabinet", False),
+    # aero-body
+    "fuselage":  ("AB", "Airframe / bus", True),
+    "wing":      ("WG", "Wing / solar array", False),
+    "prop":      ("PR", "Propulsor", True),
+    "antenna":   ("AN", "Antenna / payload", False),
+    "bus":       ("AB", "Spacecraft bus", False),
+    "array":     ("SA", "Solar array", False),
+}
+
+# Recognised synthetic prefixes → a regex that captures (block_key, role) from the
+# object name, so each distinct piece of kit becomes ONE manifest row. block_key
+# makes a rack r0c0 distinct from r0c1; role drives the tag.
+_SYN_PREFIX_RE = [
+    # rack-farm racks: u_rf_rack_r0_c0_<detail> → block 'rack_r0_c0', role 'rack'
+    (re.compile(r"^(u_rf_rack_r\d+_c\d+)_"), "rack"),
+    # rack-farm BoP with a bay index: u_rf_bop_pcs_bay0_<detail> → block keeps bay
+    (re.compile(r"^(u_rf_bop_([a-z]+(?:_[a-z]+)?)_bay\d+)"), None),
+    # rack-farm BoP single: u_rf_bop_chiller_<detail> → block 'bop_chiller'
+    (re.compile(r"^(u_rf_bop_([a-z]+(?:_ctrl)?))_"), None),
+    # tower-machine: u_tm_<role><idx?>_<detail>
+    (re.compile(r"^(u_tm_(tower|nacelle|hub|foundation|blade\d*))"), None),
+    # panel-array grow racks: u_gr_rack_<r>_<c>_<detail>
+    (re.compile(r"^(u_gr_rack_\d+_\d+)"), "growrack"),
+    # panel-array BoP: u_gr_bop_<role>_<detail>
+    (re.compile(r"^(u_gr_bop_([a-z0-9]+))"), None),
+    # aero-body: u_aero_<role><idx?>_<detail>
+    (re.compile(r"^(u_aero_([a-z]+)\d*)"), None),
+]
+
+
+def _syn_role_from_block(block_key: str, explicit_role):
+    """Pull the role token out of a synthetic block key (or use the explicit role
+    the regex assigned). Maps to (letter, label, round) via _SYN_ROLE; unknown
+    roles fall back to a neutral 'EQ' tag so nothing is silently dropped."""
+    role = explicit_role
+    if role is None:
+        # the 2nd capture group (if any) is the role; else infer from tokens.
+        toks = block_key.split("_")
+        for t in toks:
+            if t in _SYN_ROLE:
+                role = t
+                break
+        if role is None:
+            # join two tokens for compound roles (bms_ctrl)
+            for i in range(len(toks) - 1):
+                j = f"{toks[i]}_{toks[i+1]}"
+                if j in _SYN_ROLE:
+                    role = j
+                    break
+    if role and role in _SYN_ROLE:
+        return role, _SYN_ROLE[role]
+    return (role or "equipment"), ("EQ", _humanise_role(role or "equipment"), False)
+
+
+def _humanise_role(role: str) -> str:
+    return role.replace("_", " ").strip().capitalize() or "Equipment"
+
+
+def _synthetic_equipment_rows(parts, region_rank_default):
+    """Build manifest rows from the DRAWN synthetic equipment objects (rack-farm /
+    panel-array / tower-machine / aero-body). Groups MESH objects by the family
+    block key, unions each block's world bbox (mm), and emits one tagged row per
+    block. Returns rows[] (same schema as build_parts_manifest's per-word rows)."""
+    _V = __import__("mathutils").Vector
+    blocks = {}   # block_key → [role, bbox list]
+    for obj in list(bpy.data.objects):
+        if getattr(obj, "type", None) != "MESH" or obj.data is None:
+            continue
+        nm = obj.name
+        if nm.startswith(("u_skid_", "u_route_", "u_pipe_", "u_trunk_", "u_tap_")):
+            continue
+        block_key = role = None
+        for rx, fixed_role in _SYN_PREFIX_RE:
+            m = rx.match(nm)
+            if m:
+                block_key = m.group(1)
+                role = fixed_role
+                break
+        if not block_key:
+            continue
+        try:
+            corners = [obj.matrix_world @ _V(c) for c in obj.bound_box]
+        except Exception:
+            continue
+        xs = [c.x * 1000.0 for c in corners]
+        ys = [c.y * 1000.0 for c in corners]
+        zs = [c.z * 1000.0 for c in corners]
+        b = blocks.get(block_key)
+        if b is None:
+            blocks[block_key] = [role, [min(xs), max(xs), min(ys), max(ys),
+                                        min(zs), max(zs)]]
+        else:
+            bb = b[1]
+            bb[0] = min(bb[0], min(xs)); bb[1] = max(bb[1], max(xs))
+            bb[2] = min(bb[2], min(ys)); bb[3] = max(bb[3], max(ys))
+            bb[4] = min(bb[4], min(zs)); bb[5] = max(bb[5], max(zs))
+
+    entries = []
+    for block_key, (explicit_role, bb) in blocks.items():
+        role, (letter, label, is_round) = _syn_role_from_block(block_key, explicit_role)
+        cx = (bb[0] + bb[1]) / 2.0
+        cy = (bb[2] + bb[3]) / 2.0
+        cz = (bb[4] + bb[5]) / 2.0
+        w = bb[1] - bb[0]; dep = bb[3] - bb[2]; h = bb[5] - bb[4]
+        entries.append((block_key, role, letter, label, is_round,
+                        cx, cy, cz, w, dep, h))
+
+    # deterministic order: by role letter, then Y, X, Z
+    entries.sort(key=lambda e: (e[2], round(e[6], 1), round(e[5], 1), round(e[7], 1),
+                                e[0]))
+    counters = {}
+    rows = []
+    for (block_key, role, letter, label, is_round,
+         cx, cy, cz, w, dep, h) in entries:
+        counters[letter] = counters.get(letter, 100) + 1
+        equip_tag = f"{letter}-{counters[letter]}"
+        if is_round:
+            dims = {"dia": round(max(w, dep), 1), "len": round(h, 1)}
+        else:
+            dims = {"w": round(w, 1), "d": round(dep, 1), "h": round(h, 1)}
+        rows.append({
+            "tag": block_key,
+            "equipment_tag": equip_tag,
+            "name": label,
+            "module": role,
+            "shape": "synthetic_block",
+            "qty": 1,
+            "pos_mm": [round(cx, 1), round(cy, 1), round(cz, 1)],
+            "dims_mm": dims,
+        })
+    return rows
+
+
+def build_parts_manifest(parts):
+    """Build the deterministic parts-manifest rows for every PLACED physical part.
+
+    Geometry comes from the placed BLENDER OBJECTS' world bounding boxes (universal
+    across every placement family), keyed by each part's object prefix. A part with
+    no objects in the scene (aggregated into a rack, or a pure-line word) is omitted
+    — the manifest lists what was actually DRAWN. The as-placed centre is the bbox
+    centre on x/y; for z the row carries the bbox CENTRE z (the GA spans z about it).
+
+    Determinism: rows are tag-assigned in a STABLE order (region rank, then Y, X, Z,
+    then name) so the same scene always yields the same equipment tags. Each row:
+    {tag, equipment_tag, name, module, shape, qty, pos_mm:[x,y,z], dims_mm:{...}}.
+    `tag` is the slugged object prefix; `equipment_tag` is the ISA letter + a
+    per-letter running number (K-101, P-101, R-101, V-101, D-101, E-101, TK-101…)."""
+    bbox_by_pref = _world_bbox_mm_by_prefix(parts)
+
+    # one Part per object-prefix (the richest by region rank wins the metadata; a
+    # name that slugged identically is the same drawn equipment).
+    by_pref = {}
+    for p in parts:
+        pref = _part_prefix(p.name)
+        if pref not in bbox_by_pref:
+            continue                 # this word drew nothing (aggregated / abstract)
+        by_pref.setdefault(pref, p)
+
+    entries = []
+    for pref, p in by_pref.items():
+        xmin, xmax, ymin, ymax, zmin, zmax = bbox_by_pref[pref]
+        cx = (xmin + xmax) / 2.0
+        cy = (ymin + ymax) / 2.0
+        cz = (zmin + zmax) / 2.0
+        w = xmax - xmin
+        dep = ymax - ymin
+        h = zmax - zmin
+        entries.append((pref, p, cx, cy, cz, w, dep, h))
+
+    # stable deterministic order for tag assignment
+    entries.sort(key=lambda e: (e[1].region_rank, round(e[3], 1), round(e[2], 1),
+                                round(e[4], 1), e[1].name.lower()))
+
+    counters = {}
+    rows = []
+    for pref, p, cx, cy, cz, w, dep, h in entries:
+        letter = _equipment_letter(p)
+        counters[letter] = counters.get(letter, 100) + 1
+        equip_tag = f"{letter}-{counters[letter]}"
+        # round vs square footprint: a cylinder-shaped part reports {dia,len}.
+        round_shape = p.shape in ("tall_column", "tall_vessel", "vertical_vessel",
+                                  "tank", "stack", "horizontal_vessel",
+                                  "inline_spool")
+        if round_shape:
+            if p.shape in ("horizontal_vessel", "inline_spool"):
+                # lies on its side: diameter = the smaller of footprint depth/height,
+                # length = the long axis (the larger of width/depth footprint).
+                dia = round(min(dep, h) if min(dep, h) > 1 else max(dep, h), 1)
+                length = round(max(w, dep), 1)
+            else:
+                dia = round(max(w, dep), 1)        # plan footprint diameter
+                length = round(h, 1)               # standing height
+            dims = {"dia": dia, "len": length}
+        else:
+            dims = {"w": round(w, 1), "d": round(dep, 1), "h": round(h, 1)}
+        rows.append({
+            "tag": pref,
+            "equipment_tag": equip_tag,
+            "name": p.name,
+            "module": p.module_id,
+            "shape": p.shape,
+            "qty": int(p.qty) if p.qty else 1,
+            "pos_mm": [round(cx, 1), round(cy, 1), round(cz, 1)],
+            "dims_mm": dims,
+        })
+
+    # AGGREGATE FAMILIES (rack-farm / panel-array / tower-machine / aero-body) draw
+    # their kit under a synthetic naming scheme, so per-word matching above finds
+    # (almost) nothing. When that happens, recover the GA equipment from the drawn
+    # synthetic blocks instead — keeps the manifest universal across families.
+    if len(rows) < 4:
+        syn = _synthetic_equipment_rows(parts, REGION_PRIORITY_DEFAULT)
+        if len(syn) > len(rows):
+            return syn
+    return rows
+
+
+def write_parts_manifest(out_dir, parts):
+    """Write <out_dir>/parts-manifest.json — the parts-position export the GA +
+    isometric drawing generators consume. PURE EXPORT (reads placed state, writes
+    one file). Returns the manifest dict (also handy for the SUMMARY line).
+
+    Kill switch: GA_SKIP_MANIFEST=1 skips ALL manifest work (the bbox reads + the
+    write) — used to prove the render / route-audit outputs are byte-identical with
+    or without the manifest export (it must change NOTHING else)."""
+    if not out_dir:
+        return {"parts": [], "count": 0}
+    if os.environ.get("GA_SKIP_MANIFEST", "").strip() not in ("", "0", "false", "no"):
+        print("[parts-manifest] SKIPPED (GA_SKIP_MANIFEST set)")
+        return {"parts": [], "count": 0, "skipped": True}
+    os.makedirs(out_dir, exist_ok=True)
+    rows = build_parts_manifest(parts)
+    # overall placed-equipment bounding box (mm) — the GA's plant L×W×H source.
+    if rows:
+        xs, ys, zs_lo, zs_hi = [], [], [], []
+        for r in rows:
+            x, y, z = r["pos_mm"]
+            d = r["dims_mm"]
+            if "dia" in d:
+                hw = hd = d["dia"] / 2.0
+                hh = d["len"]
+            else:
+                hw, hd, hh = d["w"] / 2.0, d["d"] / 2.0, d["h"]
+            xs += [x - hw, x + hw]
+            ys += [y - hd, y + hd]
+            zs_lo.append(z - hh / 2.0)
+            zs_hi.append(z + hh / 2.0)
+        bbox = {
+            "x_min_mm": round(min(xs), 1), "x_max_mm": round(max(xs), 1),
+            "y_min_mm": round(min(ys), 1), "y_max_mm": round(max(ys), 1),
+            "z_min_mm": round(min(zs_lo), 1), "z_max_mm": round(max(zs_hi), 1),
+        }
+        bbox["length_mm"] = round(bbox["x_max_mm"] - bbox["x_min_mm"], 1)
+        bbox["width_mm"] = round(bbox["y_max_mm"] - bbox["y_min_mm"], 1)
+        bbox["height_mm"] = round(bbox["z_max_mm"] - max(0.0, bbox["z_min_mm"]), 1)
+    else:
+        bbox = {}
+    manifest = {"schema": "parts-manifest/1", "count": len(rows),
+                "bbox_mm": bbox, "parts": rows}
+    with open(os.path.join(out_dir, "parts-manifest.json"), "w") as fh:
+        json.dump(manifest, fh, indent=2)
+    print(f"[parts-manifest] wrote {len(rows)} placed parts → "
+          f"{os.path.join(out_dir, 'parts-manifest.json')}"
+          + (f"  (plant {bbox.get('length_mm', 0)/1000:.1f}×"
+             f"{bbox.get('width_mm', 0)/1000:.1f}×"
+             f"{bbox.get('height_mm', 0)/1000:.1f} m)" if bbox else ""))
+    return manifest
+
+
 def write_connection_schedule(out_dir):
     """PHASE C — the BoM feedback. Flatten every sized ConnectionSpec into the
     distribution SCHEDULE (connection_schedule), write it to connection-schedule.json
@@ -9701,6 +10134,12 @@ def main():
     # schedule (cable-m by CSA, pipe-m by DN, duct-m by size) + flag out-of-spec runs.
     conn_schedule = write_connection_schedule(out_dir)
 
+    # ── PARTS-POSITION MANIFEST — the data the GA + isometric drawings consume.
+    # Every part is now placed (placed_xyz_mm + anchors set above); project that
+    # into parts-manifest.json. PURE EXPORT — always writes, disturbs nothing on
+    # the render / route / schedule paths.
+    parts_manifest = write_parts_manifest(out_dir, parts)
+
     # ── INSPECT MODE (default ON) — the FAST visual-judge surface ──
     # When INSPECT=1 (the loop's default), render the CLEAN CAD-inspection set
     # (bright light deck, flat-matte by part type, de-emphasised frame, four
@@ -9747,6 +10186,7 @@ def main():
               "regions": regions,
               "route_audit": route_metrics,
               "connection_schedule_totals": conn_schedule.get("totals"),
+              "parts_manifest_count": parts_manifest.get("count"),
               "inspect": _inspect_summary,
           }))
 
