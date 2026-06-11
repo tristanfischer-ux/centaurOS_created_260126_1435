@@ -278,6 +278,27 @@ INSPECT_BED_RE = re.compile(
     re.IGNORECASE,
 )
 INSPECT_DEFAULT_COLOUR = (0.72, 0.74, 0.76)  # unmatched part → neutral light grey
+# Access / connection STEEL (platforms, caged ladders, nozzle stubs, manways) —
+# a deliberate mid structural-grey so these read as INTENTIONAL steelwork, NOT as
+# the neutral "unmatched" default. Darker + more neutral than INSPECT_DEFAULT so
+# the eye separates "platform/ladder steel" from a genuinely-unmatched helper.
+# (Task 2026-06-11 process-plant polish: the ladder hoops/stringers + topology
+# nozzle stubs were landing in the unmatched bucket; the vessel-prefixed platform
+# rings + vessel nozzles were inheriting the vessel skin. Both should be steel.)
+INSPECT_ACCESS_STEEL_COLOUR = (0.58, 0.60, 0.63)
+# Object-name TOKENS that mark a mesh as access/connection steel, regardless of
+# which vessel prefix it carries. Matched as a SUBSTRING of the object name in
+# apply_inspection_materials BEFORE the part-prefix equipment fallback, so the
+# vessel-prefixed decorations (u_<vessel>_platform_*/_platrail_/_neck/_flange/
+# _manway/_ntop/_nbot) get steel instead of the vessel colour, and the
+# non-part-owned ladder/stub prefixes (u_ladhoop_/u_ladstr_/u_stub_) leave the
+# unmatched bucket. Universal — every process plant grows these from the same
+# helpers (_add_platforms_and_ladder / _spawn_nozzle_stub / _add_vessel_nozzles).
+INSPECT_ACCESS_STEEL_RE = re.compile(
+    r"u_ladhoop_|u_ladstr_|u_stub_|"          # caged-ladder + routing nozzle stubs
+    r"_platform_|_platrail_|"                  # access platform ring + its handrail
+    r"_neck\b|_flange\b|_manway\b|_ntop\b|_nbot\b",  # vessel nozzle stubs + manway
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2872,6 +2893,16 @@ RACK_MODULES_DEFAULT = 8      # when cells_per_rack is silent
 RACK_SLED_MIN       = 8
 RACK_SLED_MAX       = 14
 RACK_SLED_BONUS     = 3       # sleds = module-count + this, clamped to MIN..MAX
+# Compute-sled FRONT-FACE detail (Task 2026-06-11): each server sled gets a thin
+# full-width front BEZEL + a small row of status-LED dots + a row of drive-bay
+# slots so a rack reads as STACKED 1U/2U SERVERS, not a plain cabinet. Counts
+# capped so 14 racks × ~11 sleds stays sane (instanced, a few details per sled).
+RACK_SLED_N_LEDS    = 3       # status-LED dots per sled (left cluster, emissive)
+RACK_SLED_N_BAYS    = 4       # drive-bay slots per sled (right row)
+# Hard cap on the number of FACE-DETAIL objects (bezel + LEDs + bays) per rack;
+# once hit, remaining sleds get the bezel only (still reads as a stacked server),
+# so a tall (14-sled) rack can't blow the object budget.
+RACK_COMPUTE_FACE_DETAIL_CAP = 110
 RACK_MODULE_GAP_MM  = 26.0    # thin gap between successive stacked modules
 RACK_DOOR_FRAME_MM  = 45.0    # thickness of the front-door frame stiles/rails
 RACK_TOP_RESERVE_MM = 360.0   # head/foot reserve of the cabinet not given to modules
@@ -2918,6 +2949,56 @@ def _rack_module_count(cells_per_rack):
     return max(RACK_MODULE_MIN, min(RACK_MODULE_MAX, n))
 
 
+def _build_compute_sled_face(nm, cam_face_y, cx, mcz, mod_w, mod_h, bezel_mat,
+                             led_mat, bay_mat, rack_mod, MO, with_detail=True):
+    """The CAMERA-FACING (−Y) face of ONE server sled, so a compute rack reads as
+    STACKED 1U/2U SERVERS rather than a plain cabinet (Task 2026-06-11). The hero /
+    iso / front inspection cameras all view the rack block from the −Y side, so the
+    server detail MUST go on the −Y face (the +Y face is the hidden BACK). Builds:
+      • a thin FULL-WIDTH front BEZEL plate proud of the sled face in −Y (the
+        dominant 'a server lives in this slot' cue);
+      • a small left cluster of RACK_SLED_N_LEDS status-LED dots (named '…_led{k}'
+        so the INSPECT recolour makes them GLOW — the lit activity/power LEDs);
+      • a right row of RACK_SLED_N_BAYS drive-BAY slots (the 2.5"/3.5" carriers).
+    `cam_face_y` = the sled's −Y face plane (mm); detail projects in −Y toward the
+    camera. `with_detail=False` draws the bezel ONLY (past the per-rack detail cap so
+    a tall rack stays within budget). Instanced — a handful of boxes per sled."""
+    bezel_t = 60.0                                   # bezel depth (proud of the face)
+    by = cam_face_y - bezel_t / 2                     # bezel centre, proud in −Y
+    bezel_h = mod_h * 0.86                            # near-full sled height
+    bezel_w = mod_w * 0.96                            # near-full sled width
+    # ── full-width front bezel plate (the dominant stacked-server cue) ──
+    fl.add_box(f"{nm}_bezel",
+               (cx * fl.MM, by * fl.MM, mcz * fl.MM),
+               (bezel_w * fl.MM, bezel_t * fl.MM, bezel_h * fl.MM),
+               bezel_mat, module=rack_mod, module_objects=MO)
+    if not with_detail:
+        return
+    face_y = cam_face_y - bezel_t - 20.0             # LEDs/bays sit PROUD of the bezel
+    # ── status-LED dots (left cluster) — chunky discs, emissive in INSPECT ──
+    led_x0 = cx - bezel_w * 0.42                      # LED cluster at the LEFT edge
+    led_r = max(0.016, mod_h * 0.10 * fl.MM)          # readable at rack-farm zoom
+    led_pitch = bezel_w * 0.085
+    for k in range(RACK_SLED_N_LEDS):
+        lx = led_x0 + k * led_pitch
+        fl.add_cyl(f"{nm}_led{k}",
+                   (lx * fl.MM, face_y * fl.MM, mcz * fl.MM),
+                   led_r, 44.0 * fl.MM, led_mat,
+                   module=rack_mod, module_objects=MO,
+                   rotation=(math.radians(90), 0, 0))
+    # ── drive-bay slots (right row) — recessed vertical carriers, clearly proud ──
+    bay_x0 = cx - bezel_w * 0.04                      # bays span the centre→right
+    bay_span = bezel_w * 0.56
+    bay_pitch = bay_span / RACK_SLED_N_BAYS
+    bay_w = bay_pitch * 0.66                          # slot width (< pitch → reveal)
+    for k in range(RACK_SLED_N_BAYS):
+        bx = bay_x0 + (k + 0.5) * bay_pitch
+        fl.add_box(f"{nm}_bay{k}",
+                   (bx * fl.MM, face_y * fl.MM, mcz * fl.MM),
+                   (bay_w * fl.MM, 40.0 * fl.MM, bezel_h * 0.66 * fl.MM),
+                   bay_mat, module=rack_mod, module_objects=MO)
+
+
 def _build_battery_rack(nm, cx, y_row, deck_z_mm, cells_per_rack,
                         frame_mat, cell_mat, busbar_mat, steel, MAT,
                         rack_mod, MO, flavour="battery"):
@@ -2943,6 +3024,11 @@ def _build_battery_rack(nm, cx, y_row, deck_z_mm, cells_per_rack,
     if flavour == "compute":
         body_mat = _bop_secondary_mat(MAT, "sled", (0.62, 0.64, 0.68), 0.55, 0.42)
         bus_mat = _bop_secondary_mat(MAT, "cablespine", (0.14, 0.15, 0.18), 0.30, 0.55)
+        # server-face detail materials: dark bezel plate, lit-green status LEDs
+        # (emissive in INSPECT via the _led recolour), dark recessed drive bays.
+        bezel_mat = _bop_secondary_mat(MAT, "sledbezel", (0.20, 0.21, 0.24), 0.35, 0.50)
+        led_mat = _bop_secondary_mat(MAT, "sledled", (0.30, 0.95, 0.45), 0.20, 0.30)
+        bay_mat = _bop_secondary_mat(MAT, "sledbay", (0.10, 0.11, 0.13), 0.30, 0.55)
     elif flavour == "generic":
         body_mat = _bop_secondary_mat(MAT, "genbay", (0.50, 0.52, 0.56), 0.45, 0.45)
         bus_mat = busbar_mat
@@ -2969,6 +3055,8 @@ def _build_battery_rack(nm, cx, y_row, deck_z_mm, cells_per_rack,
     mod_h = max(40.0, slot_h - RACK_MODULE_GAP_MM)  # unit body height (< slot → gap)
     mod_w = w - 24.0                              # near-full width (slim side reveal)
     mod_d = d + 12.0                              # proud of ±Y faces so it's the skin
+    face_detail_objs = 0          # running per-rack compute face-detail budget
+    per_sled_detail = 1 + RACK_SLED_N_LEDS + RACK_SLED_N_BAYS  # bezel + LEDs + bays
     for i in range(n_mod):
         mcz = z0 + slot_h * (i + 0.5)
         # unit body (battery-blue module / grey server sled) — visible on every face
@@ -2976,12 +3064,26 @@ def _build_battery_rack(nm, cx, y_row, deck_z_mm, cells_per_rack,
                    (cx * fl.MM, y_row * fl.MM, mcz * fl.MM),
                    (mod_w * fl.MM, mod_d * fl.MM, mod_h * fl.MM),
                    body_mat, module=rack_mod, module_objects=MO)
-        # slim dark fascia/handle strip across the +Y face of this unit (server
-        # bezel / battery handle) — the front-of-unit cue
-        fl.add_box(f"{nm}_fascia{i}",
-                   (cx * fl.MM, (front_y + 8.0) * fl.MM, (mcz + mod_h * 0.28) * fl.MM),
-                   (mod_w * 0.7 * fl.MM, 26.0 * fl.MM, mod_h * 0.16 * fl.MM),
-                   cell_mat, module=rack_mod, module_objects=MO)
+        if flavour == "compute":
+            # POPULATED SERVER SLED: full-width bezel + status-LED row + drive bays
+            # on the −Y (CAMERA-FACING) face so the rack reads as stacked 1U/2U
+            # servers. Past the per-rack detail cap, draw the bezel only (still a
+            # stacked-server silhouette). cam_face_y = the sled's −Y body face.
+            want_detail = (face_detail_objs + per_sled_detail
+                           <= RACK_COMPUTE_FACE_DETAIL_CAP)
+            _build_compute_sled_face(
+                f"{nm}_s{i}", y_row - mod_d / 2, cx, mcz, mod_w, mod_h,
+                bezel_mat, led_mat, bay_mat, rack_mod, MO,
+                with_detail=want_detail)
+            face_detail_objs += per_sled_detail if want_detail else 1
+        else:
+            # slim dark fascia/handle strip across the +Y face of this unit
+            # (battery module handle) — the front-of-unit cue
+            fl.add_box(f"{nm}_fascia{i}",
+                       (cx * fl.MM, (front_y + 8.0) * fl.MM,
+                        (mcz + mod_h * 0.28) * fl.MM),
+                       (mod_w * 0.7 * fl.MM, 26.0 * fl.MM, mod_h * 0.16 * fl.MM),
+                       cell_mat, module=rack_mod, module_objects=MO)
 
     # ── thin front-door frame: 2 stiles (sides) + 2 rails (top/bottom) on +Y ──
     fy = front_y + 18.0                           # door frame proud of module faces
@@ -6076,6 +6178,12 @@ _INSPECT_RACKFARM = [
 # cable spine rather than a copper DC bus). Consulted by _inspect_rackfarm_colour
 # when the detected flavour is 'compute'. Battery/generic keep the table above.
 _INSPECT_RACKFARM_COMPUTE = {
+    # populated-server FACE detail (MORE SPECIFIC keys first; _led also glows via
+    # the emissive special-case in the u_rf_ recolour branch). These turn a plain
+    # sled into a stacked 1U/2U server: dark bezel + lit status LEDs + drive bays.
+    "_bezel":  (0.18, 0.19, 0.22),   # sled front bezel plate = dark
+    "_led":    (0.30, 0.95, 0.45),   # status-LED dot = lit green (fallback colour)
+    "_bay":    (0.10, 0.11, 0.13),   # drive-bay slot = darkest recess
     "_frame":  (0.16, 0.17, 0.20),   # recessed cabinet shell = neutral dark
     "_fascia": (0.12, 0.13, 0.15),   # sled bezel strip = darkest (shelf-line)
     "_mod":    (0.66, 0.68, 0.72),   # server SLED body = light grey
@@ -6393,9 +6501,15 @@ def apply_inspection_materials(parts):
         #    (these objects aren't owned by a Part, so they'd otherwise fall to the
         #    neutral-grey unmatched bucket). Keyed by the object-name suffix/role. ──
         if nm.startswith("u_rf_"):
-            rf_colour = _inspect_rackfarm_colour(nm)
             obj.data.materials.clear()
-            obj.data.materials.append(_matte(rf_colour))
+            # Compute-sled status LEDs ("_led") GLOW (emissive) so a rack reads as
+            # POPULATED servers with lit activity/power indicators — a flat-matte
+            # green dot reads as a dull speck in the shadowless INSPECT pass (same
+            # root-cause as the grow-rack LED panel). Everything else flat-matte.
+            if "_led" in nm:
+                obj.data.materials.append(_emissive((0.32, 0.98, 0.48), strength=2.4))
+            else:
+                obj.data.materials.append(_matte(_inspect_rackfarm_colour(nm)))
             n_equip += 1
             continue
         # ── PANEL-ARRAY / grow-rack geometry (u_gr_*) → flat matte by sub-part
@@ -6440,6 +6554,18 @@ def apply_inspection_materials(parts):
                 ar_colour = _inspect_aero_colour(nm)
             obj.data.materials.clear()
             obj.data.materials.append(_matte(ar_colour))
+            n_equip += 1
+            continue
+        # ── Access / connection STEEL → deliberate mid structural-grey ──
+        #    Platforms, caged ladders, nozzle stubs + manways. Some of these carry
+        #    a VESSEL prefix (so they'd inherit the vessel skin from the fallback
+        #    below) and some carry no part prefix at all (u_ladhoop_/u_ladstr_/
+        #    u_stub_, which would fall to the neutral-grey unmatched bucket). Both
+        #    are intentional steelwork — colour them explicitly BEFORE the part
+        #    fallback so they read as steel and leave the unmatched count. ──
+        if INSPECT_ACCESS_STEEL_RE.search(nm):
+            obj.data.materials.clear()
+            obj.data.materials.append(_matte(INSPECT_ACCESS_STEEL_COLOUR))
             n_equip += 1
             continue
         # ── Equipment → flat matte colour by the owning part's TYPE ──
