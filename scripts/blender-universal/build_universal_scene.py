@@ -212,8 +212,16 @@ SKID_POST_MM             = 180    # box-section size of frame posts/rails (subst
 # Pipe radius ~1.7× (Tristan 2026-06-10): the runs read as thin wires. 110→190 mm.
 PIPE_DIA_MM = 190           # nominal routed-pipe diameter (substantial pipe run)
 MECH_COLOUR = {             # sRGB; make_mat handles linear conversion
-    "fluid_loop":    (0.42, 0.52, 0.62),   # steel blue-grey
-    "thermal":       (0.85, 0.25, 0.20),   # red (hot/steam)
+    "fluid_loop":    (0.42, 0.52, 0.62),   # steel blue-grey (generic process pipe)
+    # DIRECTIONAL fluid mechanisms (derived flows): a SUPPLY feed and its RETURN must
+    # read as TWO visually distinct lines (Tristan 2026-06-11 — "supply + return must
+    # be two clearly distinct lines"). Supply = bright blue (hub → consumer); return =
+    # teal/dark-blue (consumer → collector → back to the hub).
+    "fluid_supply":  (0.12, 0.45, 0.95),   # bright blue — supply/feed fan-out
+    "fluid_return":  (0.00, 0.62, 0.62),   # teal/dark-blue — closed-loop return
+    "thermal":       (0.85, 0.25, 0.20),   # red (hot/steam) — thermal SUPPLY
+    "thermal_return":(0.55, 0.20, 0.42),   # magenta-red — coolant RETURN (distinct from
+                                           # the red thermal supply so the loop reads)
     "electrical_bus":(1.00, 0.45, 0.00),   # copper/orange
     "mechanical":    (0.55, 0.56, 0.60),   # grey
     "data":          (0.30, 0.65, 0.45),   # green
@@ -2913,6 +2921,442 @@ def audit_routes(parts, out_dir):
     return metrics
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# UNIVERSAL FLOW-DERIVATION (2026-06-11) — the connectivity the sparse explicit
+# topology omits. A BESS state ships ONE edge (lfp_cell_string → dc_bus); a VF
+# ships no water loop at all. A real schematic shows the DETAILED per-unit flows:
+# the DC bus fanning out to EVERY rack, the fertigation reservoir feeding each
+# grow rack and a return-drainage grid carrying the water back. This engine
+# DERIVES those flows from the parts' CONNECTIVITY ROLE + the mechanism they
+# belong to — keyed ON ROLE, never on archetype. There is NO `if vertical_farm`.
+#
+# The model (role + mechanism):
+#   • HUB       — a distribution / source part that fans out to many consumers:
+#                 electrical (panel/busbar/PDU/switchboard/UPS/combiner),
+#                 fluid-supply (reservoir/manifold/header/supply-or-circulation
+#                 pump/fertigation source), thermal (chiller/CRAC/condenser).
+#   • CONSUMER  — the REPEATED RENDERED UNITS the placer emitted (the rack
+#                 anchors: 15 BESS racks, 8 VF trolleys, the edge-AI racks) PLUS
+#                 a discrete big load (an HVAC unit). NEVER the leaf parts
+#                 (3,750 cells, 400 drip emitters) — those are aggregated.
+#   • COLLECTOR — a return/recovery part that gathers a loop back to its source:
+#                 drain/return/sump/condensate/recycle/recovery/drainage-grid.
+#
+# Per mechanism present we derive:
+#   hub → branch to EACH consumer (supply fan-out), and — WHEN a collector exists
+#   for that mechanism — each consumer → collector → back to the source hub (a
+#   CLOSED return loop). Coloured by mechanism AND direction (supply vs return =
+#   two distinct lines). The derived edges are then routed on the SAME clean
+#   RackPlan / route_on_spine engine as the explicit topology, so the per-rack
+#   fan-out gets lanes + tiers (no spaghetti, no over-equipment).
+#
+# DEFER on rich topology: a process-flow graph with ≥ DERIVE_RICH_TOPOLOGY_EDGES
+# explicit edges (e-fuel: 8) is already a faithful schematic — we do NOT override
+# it; we only derive to fill an obvious MISSING electrical fan-out (a panel→loads
+# bus the topology omitted). So e-fuel stays essentially unchanged.
+# ───────────────────────────────────────────────────────────────────────────
+
+# A topology with at least this many explicit edges is RICH (a real process-flow
+# graph). We defer to it: derive only a missing electrical fan-out, never a full
+# supply/return loop. e-fuel ships 8; BESS/VF/edge-AI ship 3/3/5.
+DERIVE_RICH_TOPOLOGY_EDGES = 6
+
+# ── ROLE detectors — robust, mechanism-scoped (NOT brittle exact regexes). A HUB
+#    is a DISTRIBUTION / SOURCE-named part of a mechanism that has many consumers;
+#    these patterns must catch the edge-AI power hub whether it is named "PDU",
+#    "power supply" or "distribution board", so they are deliberately broad. ──
+# Electrical distribution hub: a panel / bus / PDU / switchboard / UPS / combiner.
+HUB_ELECTRICAL_RE = re.compile(
+    r"\bpanel\b|busbar|\bbus\b|\bbusway\b|distribution|switch ?board|switch ?gear|"
+    r"\bpdu\b|\bups\b|combiner|power\s+supply|\bpsu\b|main\s+breaker|"
+    r"power\s+distribution|rack\s+power|\bmcc\b|consumer\s+unit|\bboard\b",
+    re.IGNORECASE)
+# Fluid-SUPPLY hub: a source reservoir / manifold / header / main, or a supply /
+# circulation / fertigation pump that pushes the loop out to the consumers.
+HUB_FLUID_SUPPLY_RE = re.compile(
+    r"reservoir|manifold|\bheader\b|\bmain\b|"
+    r"supply\s+pump|circulation\s+pump|circulating\s+pump|"
+    r"fertigation\s+(?:reservoir|pump|tank|skid|unit)|fertigation|"
+    r"distribution\s+pump|process\s+pump|nutrient\s+(?:tank|reservoir)",
+    re.IGNORECASE)
+# Thermal hub: a chiller / cooling unit / CRAC / condenser that rejects heat and
+# feeds chilled coolant to the consumers.
+HUB_THERMAL_RE = re.compile(
+    r"chiller|cooling\s+(?:unit|skid|plant|system)|\bcrac\b|\bcrah\b|condenser|"
+    r"\bahu\b|air\s+handler|cooling\s+tower|heat\s+rejection|coolant\s+(?:skid|unit)|"
+    r"precision\s+air|liquid\s+cooling",
+    re.IGNORECASE)
+# COLLECTOR / RETURN: a part that gathers a loop back to its source.
+COLLECTOR_RE = re.compile(
+    r"\bdrain\b|\breturn\b|\bsump\b|condensate|recycle|recovery|collection|"
+    r"drainage[\s_-]?grid|\bdrainage\b|effluent|recirculation\s+(?:tank|sump)|"
+    r"coolant\s+return|water\s+return",
+    re.IGNORECASE)
+# Thermal-specific collector (a coolant/condensate return path) so a thermal loop
+# closes to the chiller and a fluid loop closes to the reservoir — separately.
+COLLECTOR_THERMAL_RE = re.compile(
+    r"coolant\s+return|condensate|heat\s+rejection|chilled\s+return|"
+    r"\breturn\s+pipe\b|cooling\s+return",
+    re.IGNORECASE)
+# The PRECISE coolant-loop return (outranks a weaker 'condensate' HVAC match when
+# both exist, e.g. a BESS has both an HVAC condensate pump and a coolant return pipe
+# — the cooling LOOP returns via the latter).
+COLLECTOR_THERMAL_STRONG_RE = re.compile(
+    r"coolant\s+return|chilled\s+return|cooling\s+return|\breturn\s+pipe\b",
+    re.IGNORECASE)
+# A discrete BIG LOAD that is a CONSUMER in its own right (a whole HVAC unit, a
+# heat-pump, a big motor) — distinct from the repeated rack units. Used so the
+# electrical hub also feeds the climate plant, not only the racks.
+BIG_LOAD_RE = re.compile(
+    r"\bhvac\b|\bdx\b\s+hvac|\bahu\b|air\s+handler|heat\s+pump|chiller|"
+    r"\bcrac\b|\bcrah\b|compressor\s+unit|condensing\s+unit|"
+    r"climate\s+(?:unit|system)|dehumidifier",
+    re.IGNORECASE)
+# Tokens that, when present, DISQUALIFY a part from being a hub/consumer even if a
+# broad pattern matched — a LABEL, a sensor, a small accessory is never a hub.
+ROLE_EXCLUDE_RE = re.compile(
+    r"\blabel\b|\bsticker\b|\btag\b|\bsensor\b|\bprobe\b|\bgauge\b|\bdetector\b|"
+    r"\bcard\b|\bgland\b|\bseal\b|\bfuse\b|\bpadlock\b|\bcable\b|\bwire\b|"
+    r"\bbracket\b|\bmount\b|\bcertif|\baudit\b|\bport\b|warning|hazard|"
+    r"\bbreaker\b\s+\w*label",
+    re.IGNORECASE)
+
+
+def _role_part_top(part):
+    """The (x,y,z) point a derived flow attaches to on a placed part — its TOP
+    anchor (where a bus / supply header drops onto / leaves from overhead), or its
+    centre. None for an unplaced part."""
+    if part.placed_xyz_mm is None:
+        return None
+    if part.anchors and "top" in part.anchors:
+        return tuple(part.anchors["top"])
+    return tuple(part.placed_xyz_mm)
+
+
+def _find_role_parts(parts, role_re, mech_hint=None):
+    """All PLACED parts whose name matches role_re and is not excluded, best first
+    (longest match-token name last so the most specific source wins). Universal —
+    keyed only on the part NAME (role), never on archetype/class."""
+    hits = []
+    for p in parts:
+        nm = str(p.name)
+        if ROLE_EXCLUDE_RE.search(nm):
+            continue
+        if role_re.search(nm) and p.placed_xyz_mm is not None:
+            hits.append(p)
+    # prefer the part with the FEWEST tokens (a "fertigation reservoir" beats a
+    # "fertigation reservoir level sensor bracket"): a cleaner source name.
+    hits.sort(key=lambda p: len(p.match_tokens))
+    return hits
+
+
+def _best_hub(parts, role_re):
+    """The single best HUB part for a mechanism (the cleanest source-named match),
+    or None. Used as the fan-out origin + the return-loop destination."""
+    hits = _find_role_parts(parts, role_re)
+    return hits[0] if hits else None
+
+
+def _has_role_part(parts, role_re, prefer_re=None):
+    """The cleanest part NAME matching role_re, IGNORING whether it was placed (the
+    rack placers aggregate parts into racks/skids, so a 'coolant return pipe' or
+    'return drainage grid' has no placed_xyz_mm — but its EXISTENCE still tells us a
+    return path is in the BoM, and the caller synthesises the geometric return port).
+    When `prefer_re` is given, a match hitting it OUTRANKS one that doesn't (so the
+    precise 'coolant return pipe' beats a weaker 'condensate' match). Returns the
+    name str or None. Universal — name/role only, no archetype."""
+    best = None          # (preferred_bool, -ntokens, name) — higher tuple wins
+    for p in parts:
+        nm = str(p.name)
+        if ROLE_EXCLUDE_RE.search(nm):
+            continue
+        if role_re.search(nm):
+            rank = (1 if (prefer_re and prefer_re.search(nm)) else 0,
+                    -len(p.match_tokens))
+            if best is None or rank > best[0]:
+                best = (rank, nm)
+    return best[1] if best else None
+
+
+def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
+                 hub_anchors=None, electrical_chain=None,
+                 hubs=None, collectors=None):
+    """UNIVERSAL per-unit flow derivation. Returns a list of DERIVED edge dicts in
+    the `resolved`-shape `_emit_routes_on_plan` consumes (concrete 3D a_xyz/b_xyz,
+    a_abstract/b_abstract=True so they route straight onto the spine), so the
+    derived fan-out is routed on the SAME clean RackPlan engine as the explicit
+    topology — lanes + tiers, no spaghetti, audited.
+
+    Args:
+      parts             : Part list — HUBs/COLLECTORs are found here BY ROLE for a
+                          placer that places its parts (process-plant). The rack
+                          placers DON'T place individual parts (they aggregate them
+                          into racks + BoP skids), so they pass the resolved hub /
+                          collector anchors explicitly (see `hubs`/`collectors`).
+      consumer_anchors  : list of (x,y,z) — the REPEATED RENDERED UNITS the placer
+                          emitted (rack tops). NEVER leaf parts.
+      explicit_topology : the contract topology (to DEFER when it is rich, and to
+                          know which mechanisms the explicit graph already covers).
+      mechanisms_present: set/iterable of family strings to derive for, any of
+                          {"electrical","fluid","thermal"}. The placer passes the
+                          families its archetype actually has wired.
+      hubs              : {family: (name, (x,y,z))} — the placer's RESOLVED hub
+                          point per family (the BoP skid that IS the panel / the
+                          fertigation reservoir / the chiller). Universal: the
+                          placer maps its OWN BoP role names → the three families;
+                          derive_flows is archetype-agnostic. Takes priority over
+                          part-role detection.
+      collectors        : {family: (name, (x,y,z))} — the placer's RESOLVED return /
+                          collector point per family (the recirculation/effluent
+                          skid for fluid, the coolant-return skid for thermal). When
+                          present the loop CLOSES: consumer → collector → hub.
+      hub_anchors       : optional {role: (x,y,z)} BoP anchors (legacy fallback used
+                          only if `hubs` lacks a family).
+      electrical_chain  : optional ORDERED list of (name, (x,y,z)) downstream
+                          electrical-stage anchors (e.g. [("pcs",pt),("transformer",
+                          pt)]). The rack block is collected to the first stage and
+                          each stage chained to the next — so the BESS reads
+                          DC-bus → each rack → PCS → transformer. Role-keyed, never
+                          archetype-keyed.
+
+    Each derived edge feeds the SAME emitter, so over-equipment / detour / crossing
+    self-audit covers them exactly like the explicit edges."""
+    hub_anchors = hub_anchors or {}
+    hubs = hubs or {}
+    collectors = collectors or {}
+    derived = []
+    n_explicit = len(explicit_topology or [])
+    rich = n_explicit >= DERIVE_RICH_TOPOLOGY_EDGES
+    next_i = [10_000]   # synthetic edge indices (well above any real topology index)
+
+    def _emit(a_xyz, b_xyz, mech, a_nm, b_nm):
+        if a_xyz is None or b_xyz is None:
+            return
+        i = next_i[0]; next_i[0] += 1
+        derived.append({
+            "i": i, "mech": mech,
+            "a_xyz": tuple(float(c) for c in a_xyz),
+            "b_xyz": tuple(float(c) for c in b_xyz),
+            "a_abstract": True, "b_abstract": True,
+            "a_conn": None, "b_conn": None, "b_branch": [],
+            "pa": None, "pb": None, "a_nm": a_nm, "b_nm": b_nm,
+        })
+
+    if not consumer_anchors:
+        return derived
+
+    # ── resolve a mechanism's HUB origin point: the placer's explicit `hubs[family]`
+    #    FIRST (the BoP skid it sited), then a PART matched by role, then a legacy
+    #    BoP-role anchor. So a rack placer (no placed parts) still finds its hub. ──
+    def _hub_for(family, role_re, *anchor_roles):
+        if family in hubs and hubs[family] and hubs[family][1] is not None:
+            return tuple(hubs[family][1]), hubs[family][0]
+        hub = _best_hub(parts, role_re)
+        if hub is not None:
+            return _role_part_top(hub), str(hub.name)
+        for r in anchor_roles:
+            if r in hub_anchors:
+                return tuple(hub_anchors[r]), r
+        return None, None
+
+    def _collector_for(family, role_re):
+        if family in collectors and collectors[family] and collectors[family][1] is not None:
+            return tuple(collectors[family][1]), collectors[family][0]
+        coll = _best_hub(parts, role_re)
+        if coll is not None:
+            return _role_part_top(coll), str(coll.name)
+        return None, None
+
+    # The consumer-spread bounds (for siting a return PORT distinct from the supply
+    # port when there is no separate return skid — a manifold loop returns to the
+    # SAME plant item via a different header, so we offset the return port across
+    # the rack block so supply + return read as two distinct lines that close).
+    _cx0 = min(c[0] for c in consumer_anchors)
+    _cx1 = max(c[0] for c in consumer_anchors)
+    _cy0 = min(c[1] for c in consumer_anchors)
+    _cy1 = max(c[1] for c in consumer_anchors)
+
+    def _return_port(hub_pt, ret_part_name):
+        """A return-header port distinct from the supply hub, used to CLOSE a loop
+        when the return is a (non-placed) PART (coolant-return pipe / drainage grid)
+        rather than a separate BoP skid. Sits on the FAR side of the rack block from
+        the hub (offset along the longer consumer axis), at the hub elevation, so
+        the return runs back to the plant item via its own header — two distinct
+        lines. Returns (pt, name) or (None,None) if no return part exists."""
+        if ret_part_name is None:
+            return None, None
+        # offset the port to the opposite end of the rack block from the hub, on the
+        # longer spread axis, by a clear margin so it never coincides with supply.
+        if (_cx1 - _cx0) >= (_cy1 - _cy0):
+            far_x = _cx0 if hub_pt[0] > (_cx0 + _cx1) / 2 else _cx1
+            port = (far_x, (_cy0 + _cy1) / 2, hub_pt[2])
+        else:
+            far_y = _cy0 if hub_pt[1] > (_cy0 + _cy1) / 2 else _cy1
+            port = ((_cx0 + _cx1) / 2, far_y, hub_pt[2])
+        if math.dist(port[:2], hub_pt[:2]) < 300.0:
+            return None, None
+        return port, ret_part_name
+
+    # ── ELECTRICAL: hub → EACH consumer (DC bus / panel / PDU fan-out). ──────────
+    # Derived ALWAYS when an electrical mechanism is present (even on a rich
+    # topology: a process plant's panel→loads bus is exactly the fan-out the sparse
+    # graph omits) — this is the one derivation we add even when we DEFER.
+    if "electrical" in mechanisms_present:
+        hub_pt, hub_nm = _hub_for("electrical", HUB_ELECTRICAL_RE, "pdu", "panel",
+                                  "switchgear", "ups", "pcs", "bms_ctrl", "control")
+        if hub_pt is not None:
+            for k, c in enumerate(consumer_anchors):
+                _emit(hub_pt, c, "electrical_bus", hub_nm, f"rack[{k}]")
+            # also feed each discrete BIG LOAD from the same electrical hub: a placed
+            # HVAC / heat-pump PART (process-plant path) AND the thermal/fluid BoP
+            # skids (the chiller + reservoir pumps are powered equipment) — so the
+            # panel→HVAC bus the topology omitted is drawn. De-dup on point.
+            big_pts = []
+            for bl in _find_role_parts(parts, BIG_LOAD_RE):
+                big_pts.append((_role_part_top(bl), str(bl.name)))
+            for fam in ("thermal", "fluid"):
+                if fam in hubs and hubs[fam] and hubs[fam][1] is not None:
+                    big_pts.append((tuple(hubs[fam][1]), hubs[fam][0]))
+            seen_pt = set()
+            for pt, nm in big_pts:
+                if pt is None or math.dist(pt[:2], hub_pt[:2]) < 300.0:
+                    continue
+                key = (round(pt[0]), round(pt[1]))
+                if key in seen_pt:
+                    continue
+                seen_pt.add(key)
+                _emit(hub_pt, pt, "electrical_bus", hub_nm, nm)
+        # DOWNSTREAM electrical chain: rack block → first stage (PCS) → next
+        # (transformer) → … So the power path reads in series, not just a fan-out.
+        # Role-keyed via the anchors the placer passed; absent ⇒ skipped.
+        if electrical_chain:
+            cx = sum(c[0] for c in consumer_anchors) / len(consumer_anchors)
+            cy = sum(c[1] for c in consumer_anchors) / len(consumer_anchors)
+            cz = max(c[2] for c in consumer_anchors)
+            prev_pt, prev_nm = (cx, cy, cz), "rack_block"
+            for stage_nm, stage_pt in electrical_chain:
+                if stage_pt is None:
+                    continue
+                _emit(prev_pt, stage_pt, "electrical_bus", prev_nm, stage_nm)
+                prev_pt, prev_nm = stage_pt, stage_nm
+
+    # On a RICH process-flow graph we STOP here: the fluid/thermal loops are
+    # already authored as real edges; do not override them (e-fuel stays intact).
+    if rich:
+        return derived
+
+    # ── FLUID-SUPPLY: source hub → EACH consumer; then (if a collector exists)
+    #    each consumer → COLLECTOR → back to the source (a CLOSED return loop). ──
+    if "fluid" in mechanisms_present:
+        hub_pt, hub_nm = _hub_for("fluid", HUB_FLUID_SUPPLY_RE, "nutrient", "water")
+        coll_pt, coll_nm = _collector_for("fluid", COLLECTOR_RE)
+        # If no separate return SKID resolved, look for a return PART (return-drainage
+        # grid / drain / recirculation) so the loop can still close via a return port.
+        # _has_role_part ignores placement (the part may be aggregated into a rack).
+        if coll_pt is None and hub_pt is not None:
+            rp_nm = _has_role_part(parts, COLLECTOR_RE)
+            if rp_nm is not None:
+                coll_pt, coll_nm = _return_port(hub_pt, rp_nm)
+        if hub_pt is not None:
+            for k, c in enumerate(consumer_anchors):
+                _emit(hub_pt, c, "fluid_supply", hub_nm, f"rack[{k}]")
+            # close the loop only when the return point is a genuinely DIFFERENT
+            # location from the supply hub (else the return overlays supply — a
+            # duplicate, not a loop the eye reads).
+            if coll_pt is not None and math.dist(coll_pt[:2], hub_pt[:2]) > 300.0:
+                for k, c in enumerate(consumer_anchors):
+                    _emit(c, coll_pt, "fluid_return", f"rack[{k}]", coll_nm)
+                _emit(coll_pt, hub_pt, "fluid_return", coll_nm, hub_nm)
+
+    # ── THERMAL: chiller hub → EACH consumer; then (if a coolant-return collector
+    #    exists) each consumer → coolant-return → back to the chiller. ───────────
+    if "thermal" in mechanisms_present:
+        hub_pt, hub_nm = _hub_for("thermal", HUB_THERMAL_RE, "chiller", "cooling",
+                                  "hvac")
+        tcoll_pt, tcoll_nm = _collector_for("thermal", COLLECTOR_THERMAL_RE)
+        # No separate coolant-return SKID? Close the loop via a return PART (coolant
+        # return pipe / condensate) routed back to a return port on the chiller.
+        # _has_role_part ignores placement (the return pipe is aggregated into racks).
+        if tcoll_pt is None and hub_pt is not None:
+            rp_nm = _has_role_part(parts, COLLECTOR_THERMAL_RE,
+                                   prefer_re=COLLECTOR_THERMAL_STRONG_RE)
+            if rp_nm is not None:
+                tcoll_pt, tcoll_nm = _return_port(hub_pt, rp_nm)
+        if hub_pt is not None:
+            for k, c in enumerate(consumer_anchors):
+                _emit(hub_pt, c, "thermal", hub_nm, f"rack[{k}]")
+            # close the loop only if the return point is genuinely DIFFERENT from the
+            # chiller hub (a separate coolant-return skid / return port) — else the
+            # "return" would overlay the supply and read as a duplicate, not a loop.
+            if tcoll_pt is not None and \
+                    math.dist(tcoll_pt[:2], hub_pt[:2]) > 300.0:
+                for k, c in enumerate(consumer_anchors):
+                    _emit(c, tcoll_pt, "thermal_return", f"rack[{k}]", tcoll_nm)
+                _emit(tcoll_pt, hub_pt, "thermal_return", tcoll_nm, hub_nm)
+
+    return derived
+
+
+def _bop_anchors_to_families(bop_anchor, parts):
+    """Map a placer's role→(x,y,z) BoP anchors to derive_flows' family `hubs` +
+    `collectors` dicts, classifying each BoP skid BY ROLE (its role key + the name
+    of the design part it represents). Universal: a 'nutrient'/'fertigation' skid
+    is the fluid hub, a 'water'/'effluent'/'drain' skid is the fluid collector, a
+    'chiller'/'hvac'/'cooling' skid is the thermal hub, a 'panel'/'pdu'/'control'/
+    'switchgear' skid is the electrical hub — no archetype branch. The placer owns
+    the role NAMES; this maps them to the three families the engine reasons about."""
+    hubs, collectors = {}, {}
+    # representative part name per role (for nicer edge labels), best-effort.
+    def _role_blob(role):
+        # the role key itself plus any design part whose name hits the role token
+        return role
+    for role, pt in (bop_anchor or {}).items():
+        blob = _role_blob(role)
+        # COLLECTORS first (a 'water'/'drain'/'return' skid is a return, not a hub).
+        if COLLECTOR_RE.search(blob) or role in ("water", "drain", "return", "effluent"):
+            collectors.setdefault("fluid", (role, pt))
+            continue
+        if COLLECTOR_THERMAL_RE.search(blob):
+            collectors.setdefault("thermal", (role, pt))
+            continue
+        # HUBS by family.
+        if HUB_THERMAL_RE.search(blob) or role in ("chiller", "cooling", "hvac", "crac"):
+            hubs.setdefault("thermal", (role, pt))
+        elif HUB_FLUID_SUPPLY_RE.search(blob) or role in ("nutrient", "fertigation"):
+            hubs.setdefault("fluid", (role, pt))
+        elif HUB_ELECTRICAL_RE.search(blob) or role in ("pdu", "panel", "control",
+                                                        "switchgear", "ups", "bms_ctrl"):
+            hubs.setdefault("electrical", (role, pt))
+    return hubs, collectors
+
+
+def _mechanisms_present_in(topology, parts, extra=()):
+    """Which mechanism FAMILIES this design has, for derive_flows. Reads the
+    explicit topology's mechanisms AND scans the parts for hub/collector evidence,
+    so a design with NO explicit fluid edge but a fertigation reservoir + a
+    return-drainage grid (VF) still derives its water loop. Universal — keyed on
+    mechanism evidence, never on class. `extra` lets a placer force a family it
+    knows it has (e.g. rack-farm always has electrical + thermal)."""
+    present = set(extra)
+    MECH_TO_FAMILY = {
+        "electrical_bus": "electrical", "electrical": "electrical",
+        "fluid_loop": "fluid", "fluid": "fluid", "fluid_supply": "fluid",
+        "fluid_return": "fluid", "thermal": "thermal", "thermal_return": "thermal",
+    }
+    for e in (topology or []):
+        fam = MECH_TO_FAMILY.get(e.get("mechanism", ""))
+        if fam:
+            present.add(fam)
+    # part-evidence: a fluid-supply hub OR a fluid collector ⇒ a fluid loop exists.
+    if _best_hub(parts, HUB_FLUID_SUPPLY_RE) or _best_hub(parts, COLLECTOR_RE):
+        present.add("fluid")
+    if _best_hub(parts, HUB_THERMAL_RE):
+        present.add("thermal")
+    if _best_hub(parts, HUB_ELECTRICAL_RE):
+        present.add("electrical")
+    return present
+
+
 # Shapes that have a real SHELL a nozzle stub can grow out of (Fix 1). A box,
 # cabinet, instrument or gantry has no curved shell, so a pipe simply lands on it.
 STUB_SHAPES = {"tall_column", "tall_vessel", "vertical_vessel", "horizontal_vessel",
@@ -4363,23 +4807,29 @@ def _route_rack_farm_topology(topology, parts, rack_anchors, bop_anchor,
         "switchgear":  re.compile(r"switchgear|breaker|\brmu\b", re.IGNORECASE),
         "bms_ctrl":    re.compile(r"\bbms\b|\bems\b|controller|scada", re.IGNORECASE),
     }
-    RACK_END_RE = re.compile(r"\brack\b|\bcell\b|string|\bmodule\b|\bpack\b|battery",
-                             re.IGNORECASE)
+    # Non-LETTER boundaries so underscore-joined endpoints (lfp_cell_string,
+    # battery_rack, dc_module) match — \b fails between two word chars incl. '_'.
+    RACK_END_RE = re.compile(
+        r"(?<![a-z])(?:rack|cell|string|module|pack|battery)(?![a-z])",
+        re.IGNORECASE)
 
     def _resolve(endpoint_name):
-        """Return an (x,y,z) mm point for a topology endpoint, rack-farm aware."""
+        """Return ((x,y,z) mm point, is_rack_aggregate) for a topology endpoint,
+        rack-farm aware. is_rack_aggregate flags the endpoint as the WHOLE rack
+        block (its single centroid bus point) so the caller can DROP the aggregate
+        explicit edge in favour of the derived per-rack fan-out."""
         nm = str(endpoint_name)
         if RACK_END_RE.search(nm) and not re.search(r"transformer|pcs|inverter", nm, re.IGNORECASE):
-            return rack_bus_pt
+            return rack_bus_pt, True
         for role, rx in ROLE_RE.items():
             if rx.search(nm) and role in bop_anchor:
-                return bop_anchor[role]
+                return bop_anchor[role], False
         # generic part fallback (the process-plant resolver)
         p = resolve_endpoint(nm, parts)
         if p is not None and p.placed_xyz_mm is not None:
             return (p.placed_xyz_mm[0], p.placed_xyz_mm[1],
-                    p.anchors["top"][2] if p.anchors else p.placed_xyz_mm[2])
-        return None
+                    p.anchors["top"][2] if p.anchors else p.placed_xyz_mm[2]), False
+        return None, False
 
     # ── Build the BESS equipment bboxes (rack block cells + BoP skids) so the rack
     # spine can sit in the maintenance aisle + the over-equipment audit has targets.
@@ -4400,13 +4850,21 @@ def _route_rack_farm_topology(topology, parts, rack_anchors, bop_anchor,
         frm = e.get("from_part", "")
         to = e.get("to_part", "")
         mech = e.get("mechanism", "fluid_loop")
-        a = _resolve(frm)
-        b = _resolve(to)
+        a, a_agg = _resolve(frm)
+        b, b_agg = _resolve(to)
         if a is None or b is None:
             miss = [n for n, pt in ((frm, a), (to, b)) if pt is None]
             unresolved.append((frm, to, mech, miss))
             print(f"[univ][rackfarm] edge {i} UNRESOLVED ({mech}): {frm} -> {to} "
                   f"[missing: {', '.join(miss)}]")
+            continue
+        # AGGREGATE rack edge (e.g. lfp_cell_string → dc_bus): the derived per-rack
+        # fan-out below DRAWS the real version (DC bus → each of the 15 racks), so we
+        # DROP the single-centroid explicit edge — it would just be a redundant line
+        # to the rack-block midpoint, the exact "ONE bus run not per-rack" defect.
+        if a_agg or b_agg:
+            print(f"[univ][rackfarm] edge {i} ({mech}) {frm} -> {to} is a rack "
+                  f"aggregate — superseded by derived per-rack fan-out")
             continue
         # rack-farm endpoints are AGGREGATE points (rack bus / BoP anchor), not single
         # Part objects, so a_abstract/b_abstract = True (route straight to/from them,
@@ -4417,6 +4875,29 @@ def _route_rack_farm_topology(topology, parts, rack_anchors, bop_anchor,
             "a_conn": None, "b_conn": None, "b_branch": [],
             "pa": None, "pb": None, "a_nm": frm, "b_nm": to,
         })
+
+    # ── UNIVERSAL per-rack flow DERIVATION: DC bus → each rack (+ PCS/transformer),
+    #    chiller → each rack → coolant-return → chiller. The consumers are the
+    #    rack anchors the placer emitted; hubs/collectors are found by ROLE on the
+    #    BoM parts (with the BoP skids as anchor fallbacks). Routed on the SAME
+    #    spine engine so the fan-out is clean (lanes/tiers, audited). A rack farm
+    #    always has electrical + thermal; fluid is added if the parts evidence it.
+    mech_present = _mechanisms_present_in(topology, parts,
+                                          extra=("electrical", "thermal"))
+    hubs, collectors = _bop_anchors_to_families(bop_anchor, parts)
+    # downstream electrical chain (role-keyed): rack block → PCS → transformer for a
+    # BESS; the compute flavour has no PCS/transformer so the chain is empty (just
+    # the PDU → racks fan-out). Built from the BoP anchors the placer already sited.
+    e_chain = [(r, bop_anchor[r]) for r in ("pcs", "transformer")
+               if r in bop_anchor]
+    derived = derive_flows(parts, rack_anchors, topology, mech_present,
+                           hub_anchors=bop_anchor, hubs=hubs, collectors=collectors,
+                           electrical_chain=e_chain)
+    print(f"[univ][rackfarm] derived per-unit flows = {len(derived)} "
+          f"(mechanisms: {sorted(mech_present)}; hubs: "
+          f"{ {k: v[0] for k, v in hubs.items()} }; e-chain: {[r for r, _ in e_chain]})")
+    resolved.extend(derived)
+
     routed, emit_unresolved = _emit_routes_on_plan(
         resolved, plan, rack_z, MAT, MO,
         pipe_module="mass_fluid_transport_process", tag="rf_")
@@ -4941,25 +5422,28 @@ def _route_panel_array_topology(topology, parts, rack_anchor_by_index, bop_ancho
         "water":    re.compile(r"steril|effluent|\buv\b|filter|drain|recirculation|"
                                r"\bvalve\b", re.IGNORECASE),
     }
+    # Non-LETTER boundaries (not \b) so UNDERSCORE-joined topology endpoints match:
+    # \b sits between two word chars at 'led_array' (the '_a' is mid-word) so \barray\b
+    # never fires on 'led_array'. (?<![a-z]) / (?![a-z]) treat '_' as a separator.
     GROW_END_RE = re.compile(
-        r"\bgrow\b|\bgrowing\b|\btray\b|\bcanopy\b|\bled\b|\btier\b|\bcrop\b|"
-        r"\bplant\b|propagation|\barray\b|trolley", re.IGNORECASE)
+        r"(?<![a-z])(?:grow|growing|tray|canopy|led|tier|crop|plant|propagation|"
+        r"array|trolley)(?![a-z])", re.IGNORECASE)
 
     def _resolve(endpoint_name):
+        """Return ((x,y,z), kind) where kind ∈ {"rack","bop","part","none"} so the
+        caller can DROP a grow-aggregate edge (replaced by the derived per-rack
+        loop) and skip an unresolvable one rather than misrouting it to the centroid."""
         nm = str(endpoint_name)
         if GROW_END_RE.search(nm):
-            return rack_bus_pt
+            return rack_bus_pt, "rack"
         for role, rx in ROLE_RE.items():
             if rx.search(nm) and role in bop_anchor:
-                return bop_anchor[role]
+                return bop_anchor[role], "bop"
         p = resolve_endpoint(nm, parts)
         if p is not None and p.placed_xyz_mm is not None:
             return (p.placed_xyz_mm[0], p.placed_xyz_mm[1],
-                    p.anchors["top"][2] if p.anchors else p.placed_xyz_mm[2])
-        # last resort: an unresolved climate/fluid endpoint routes to the rack
-        # bus point so a 3-edge VF still draws all its services (never strand an
-        # edge on a missing aggregate endpoint like 'condensate_loop').
-        return rack_bus_pt
+                    p.anchors["top"][2] if p.anchors else p.placed_xyz_mm[2]), "part"
+        return None, "none"
 
     # ── Build the grow-room equipment bboxes (grow-rack block + BoP skids) so the
     # rack spine sits in the maintenance aisle + the over-equipment audit has targets.
@@ -4978,10 +5462,17 @@ def _route_panel_array_topology(topology, parts, rack_anchor_by_index, bop_ancho
         frm = e.get("from_part", "")
         to = e.get("to_part", "")
         mech = e.get("mechanism", "fluid_loop")
-        a = _resolve(frm)
-        b = _resolve(to)
+        a, a_kind = _resolve(frm)
+        b, b_kind = _resolve(to)
+        # A GROW-aggregate endpoint (led_array / canopy / trolley) is the WHOLE rack
+        # block — the derived per-rack loop below draws the real fan-out, so DROP the
+        # single-centroid explicit edge (the "ONE bus, no water loop" defect).
+        if a_kind == "rack" or b_kind == "rack":
+            print(f"[univ][panelarray] edge {i} ({mech}) {frm} -> {to} is a grow "
+                  f"aggregate — superseded by derived per-rack fan-out")
+            continue
         if a is None or b is None:
-            miss = [n for n, pt in ((frm, a), (to, b)) if pt is None]
+            miss = [n for n, k in ((frm, a_kind), (to, b_kind)) if k == "none"]
             unresolved.append((frm, to, mech, miss))
             print(f"[univ][panelarray] edge {i} UNRESOLVED ({mech}): {frm} -> {to} "
                   f"[missing: {', '.join(miss)}]")
@@ -4992,6 +5483,24 @@ def _route_panel_array_topology(topology, parts, rack_anchor_by_index, bop_ancho
             "a_conn": None, "b_conn": None, "b_branch": [],
             "pa": None, "pb": None, "a_nm": frm, "b_nm": to,
         })
+
+    # ── UNIVERSAL per-rack flow DERIVATION: panel → each grow rack (+ HVAC) for the
+    #    LED power; fertigation reservoir → each rack → return-drainage-grid →
+    #    reservoir for the closed WATER loop; HVAC/AHU → each rack for climate. The
+    #    consumers are the grow-rack anchors the placer emitted; hubs/collectors are
+    #    found by ROLE on the BoM parts. A VF always has electrical + fluid; thermal
+    #    is added when an HVAC/AHU hub is present.
+    mech_present = _mechanisms_present_in(topology, parts,
+                                          extra=("electrical", "fluid"))
+    hubs, collectors = _bop_anchors_to_families(bop_anchor, parts)
+    derived = derive_flows(parts, rack_anchor_by_index, topology, mech_present,
+                           hub_anchors=bop_anchor, hubs=hubs, collectors=collectors)
+    print(f"[univ][panelarray] derived per-unit flows = {len(derived)} "
+          f"(mechanisms: {sorted(mech_present)}; hubs: "
+          f"{ {k: v[0] for k, v in hubs.items()} }; "
+          f"collectors: { {k: v[0] for k, v in collectors.items()} })")
+    resolved.extend(derived)
+
     routed, emit_unresolved = _emit_routes_on_plan(
         resolved, plan, rack_z, MAT, MO,
         pipe_module="irrigation_nutrient", tag="pa_")
