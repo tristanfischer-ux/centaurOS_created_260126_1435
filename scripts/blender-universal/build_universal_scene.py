@@ -184,6 +184,13 @@ BANK_COMPACT_GAP_MM = 3600  # clear gap between adjacent compacted bank lanes �
                             # pipe-rack maintenance AISLE (was 1.6 m, too tight for the
                             # overhead rack spine + lanes; 3.6 m gives the spine a
                             # genuine corridor so cross-laterals only span one bank)
+# FLOW-LAYOUT (2026-06-11): the process train stays a SINGLE left→right lane while
+# its total width is under this — so every connected stage is X-adjacent and the
+# pipe runs are SHORT (the whole point of the flow layout). A train wider than this
+# folds along the flow into ≤ N_BANKS lanes. Generous (~52 m) so the typical 5-6
+# region plant reads as one clean process row; folding only kicks in for a genuinely
+# long train (8+ wide regions) where one row would be an unreadable ribbon.
+FLOW_TRAIN_SINGLE_LANE_MAX_MM = 52000
 # Within a region bay, the three sub-blocks are offset in Y from the bay base.
 # Fix 2 DENSITY (Tristan 2026-06-10): offsets pulled in so big/medium/small NEST
 # closer — the old 5000/2200 spread left an empty middle band in every bay (visible
@@ -999,6 +1006,163 @@ def order_regions(parts, topology):
 
     regions = sorted(set(p.region_key for p in parts), key=sort_key)
     return regions, region_edges
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# UNIVERSAL FLOW-LAYOUT ordering (2026-06-11) — drive the X-position of every
+# region from the CONNECTIVITY GRAPH (the explicit topology flow edges), NOT the
+# module decomposition. The module rank scatters flow-connected equipment: a
+# reactor (energy_conversion module) ends up in a different bank from its feed
+# compressor (mass_fluid module) and its product separator (mass_fluid module).
+# This orders the regions so each process stage sits ADJACENT to the stage it
+# feeds — feed → reaction → separation → upgrading → product as a process TRAIN —
+# and pushes the NON-FLOW regions (utilities / electrical / control / instruments
+# / structure / safety / packaging — the parts not in the flow graph) to the
+# periphery instead of interleaving them through the train. Keyed ONLY on the
+# connectivity graph + a rank tie-break; universal, no CO2/e-fuel special case.
+# ───────────────────────────────────────────────────────────────────────────
+# A flow edge is a fluid OR thermal connection (material/heat actually travels
+# between the two stages). electrical_bus is EXCLUDED from the flow train — it is
+# a utility DISTRIBUTION bus (a star from the incomer to every motor), not a
+# process-train hand-off; the routing engine already draws it as a busway, and
+# its endpoints (the electrical-supply region) belong on the periphery.
+_FLOW_MECHANISMS = {"fluid_loop", "fluid", "fluid_supply", "fluid_return",
+                    "thermal", "steam", "process", "gas", "slurry"}
+
+
+def flow_order_regions(parts, topology):
+    """Order the process regions for the FLOW-LAYOUT (the process-train placement).
+
+    Returns (flow_regions, periphery_regions):
+      • flow_regions — the regions that participate in the material/heat flow
+        graph, ordered left→right by their FLOW POSITION (a longest-path
+        levelling from the sources/feed to the sinks/product, so a stage always
+        sits to the RIGHT of every stage that feeds it and DIRECTLY-connected
+        stages end up adjacent). Rank + first-appearance break ties so a chain
+        the topology leaves undirected (e.g. upgrading→product when no explicit
+        edge exists) still follows the authored M-order.
+      • periphery_regions — every other region (no flow edge touches it):
+        utilities, electrical distribution, control, instrumentation, structure,
+        safety, packaging. These go to the BACK row, off the train.
+
+    Deterministic + universal — derived from the connectivity graph, no class
+    data. When the topology carries no usable flow edge at all (a design that
+    ships only an electrical star, say) flow_regions is empty and the caller
+    falls back to the rank order for the whole plant (parts are never dropped)."""
+    all_regions = list(dict.fromkeys(p.region_key for p in parts))  # first-appearance
+    rank = {p.region_key: p.region_rank for p in parts}
+    seen = {rk: i for i, rk in enumerate(all_regions)}
+
+    # Resolve a topology part name onto its region (same token-overlap matcher the
+    # rest of the placer uses, with the discriminator guard so h2_* never lands on
+    # the CO2 compressor).
+    def region_of_partname(pname):
+        toks = tokenise(pname)
+        best = None
+        for p in parts:
+            score = token_overlap(toks, p.match_tokens)
+            if score > 0 and (best is None or score > best[0]):
+                best = (score, p.region_key)
+        return best[1] if best else None
+
+    # Build the DIRECTED region flow graph from the flow-mechanism edges. A self
+    # edge (both endpoints in the same region) marks that region as a flow region
+    # but adds no ordering constraint.
+    succ = {rk: set() for rk in all_regions}    # region → regions it feeds
+    pred = {rk: set() for rk in all_regions}
+    flow_touched = set()                        # regions touched by ANY flow edge
+    for e in topology:
+        if e.get("mechanism") not in _FLOW_MECHANISMS:
+            continue
+        ra = region_of_partname(e.get("from_part", ""))
+        rb = region_of_partname(e.get("to_part", ""))
+        if ra:
+            flow_touched.add(ra)
+        if rb:
+            flow_touched.add(rb)
+        if ra and rb and ra != rb:
+            succ[ra].add(rb)
+            pred[rb].add(ra)
+
+    flow_regions_set = {rk for rk in all_regions if rk in flow_touched}
+    periphery = [rk for rk in all_regions if rk not in flow_regions_set]
+
+    if not flow_regions_set:
+        return [], all_regions      # no flow graph → caller uses rank order for all
+
+    # LONGEST-PATH LEVELLING from the sources. level[r] = the longest directed
+    # chain of flow edges ending at r (so a stage is always to the RIGHT of every
+    # stage feeding it). Recycle / return streams create cycles; we break a
+    # back-edge by ignoring any predecessor with rank ≥ this region's rank (the
+    # recycle compressor that feeds BACK to the reactor has a HIGHER rank, so the
+    # forward longest-path is preserved and the loop-back sits NEAR its source).
+    INF_GUARD = len(flow_regions_set) + 2
+    level = {rk: 0 for rk in flow_regions_set}
+    for _ in range(INF_GUARD):                  # relax until stable (DAG depth bound)
+        changed = False
+        for rk in flow_regions_set:
+            for pr in pred[rk]:
+                if pr not in flow_regions_set:
+                    continue
+                if rank.get(pr, REGION_PRIORITY_DEFAULT) > rank.get(rk, REGION_PRIORITY_DEFAULT):
+                    continue                    # back-edge (recycle) — skip for level
+                if level[pr] + 1 > level[rk]:
+                    level[rk] = level[pr] + 1
+                    changed = True
+        if not changed:
+            break
+
+    # WEAKLY-CONNECTED COMPONENTS — keep each connected sub-chain CONTIGUOUS. The
+    # explicit topology often omits a hand-off edge between two adjacent process
+    # blocks (e.g. e-fuel ships M2→M3 separation and M4→M6 upgrading→product but
+    # NO M3→M4 edge), so the two chains are disconnected in the graph. Ordering by
+    # bare level would INTERLEAVE them (M1, M4, M2, M6, M3 …) — a scrambled read.
+    # Instead we (1) find the connected components, (2) order WITHIN a component by
+    # (level, rank, seen) so the connectivity order rules a real chain, and (3)
+    # order the COMPONENTS by their min member rank then min appearance — so the
+    # upgrading→product chain follows the separation chain (rank 30 < 40) and the
+    # whole plant still reads feed→reaction→separation→upgrading→product. Directly-
+    # connected stages always land adjacent (same component, consecutive levels).
+    adj = {rk: set() for rk in flow_regions_set}
+    for rk in flow_regions_set:
+        for nb in succ[rk] | pred[rk]:
+            if nb in flow_regions_set:
+                adj[rk].add(nb)
+                adj[nb].add(rk)
+    comp_id = {}
+    comps = []
+    for rk in flow_regions_set:
+        if rk in comp_id:
+            continue
+        stack = [rk]
+        comp = []
+        comp_id[rk] = len(comps)
+        while stack:
+            cur = stack.pop()
+            comp.append(cur)
+            for nb in adj[cur]:
+                if nb not in comp_id:
+                    comp_id[nb] = len(comps)
+                    stack.append(nb)
+        comps.append(comp)
+
+    def _comp_sort_key(comp):
+        return (min(rank.get(rk, REGION_PRIORITY_DEFAULT) for rk in comp),
+                min(seen[rk] for rk in comp))
+    comps.sort(key=_comp_sort_key)
+
+    flow_regions = []
+    for comp in comps:
+        comp_sorted = sorted(
+            comp,
+            key=lambda rk: (level[rk], rank.get(rk, REGION_PRIORITY_DEFAULT), seen[rk]),
+        )
+        flow_regions.extend(comp_sorted)
+
+    # Order the periphery by rank too (utilities before control before instruments)
+    # so the back row still reads sensibly.
+    periphery.sort(key=lambda rk: (rank.get(rk, REGION_PRIORITY_DEFAULT), seen[rk]))
+    return flow_regions, periphery
 
 
 def token_overlap(a_tokens, b_tokens):
@@ -1875,6 +2039,40 @@ def _balanced_bank_split(region_list, widths, n_banks):
     return [region_list[a:b] for a, b in bounds]
 
 
+# FLOW-LAYOUT handoff (2026-06-11): place_process_plant sets this to
+# (flow_regions, periphery_regions) so place_all lays the flow regions as a
+# process TRAIN folded ALONG THE FLOW (connected stages adjacent) with the
+# non-flow regions pushed to a BACK row. None → the legacy width-balanced
+# rank-order banking (every other family + the no-flow-graph fallback).
+_PLANT_FLOW_PLAN = None
+# Set by place_all to the set of region_keys that ended up in the TRAIN lanes (the
+# flow regions actually placed), so place_process_plant can site the pipe-rack
+# spine to bisect the TRAIN equipment (short flow taps) — not the train↔periphery
+# aisle (which is far behind the train, inflating every flow run's riser).
+_PLANT_FLOW_TRAIN_REGIONS = None
+
+
+def _flow_fold_banks(flow_regions, region_w, n_lanes):
+    """Fold the FLOW-ORDERED region list into ≤ n_lanes contiguous lanes so the
+    process train stays compact WITHOUT breaking flow-adjacency. Unlike the
+    width-balanced module split (which reorders for equal lane widths and scatters
+    connected stages), this keeps the flow order INTACT and only cuts the train
+    into contiguous runs at width-balanced fold points. Because the lanes are
+    serpentined (odd lanes reversed) by the caller, the region at a fold boundary
+    sits at the SAME X as its flow-neighbour in the next lane — so directly-
+    connected stages remain adjacent (side-by-side across the aisle) even across a
+    fold. Returns a list of contiguous region sub-lists (flow order preserved)."""
+    n = len(flow_regions)
+    if n_lanes <= 1 or n <= 1:
+        return [list(flow_regions)]
+    n_lanes = min(n_lanes, n)
+    # Contiguous width-balanced cut over the FLOW ORDER (same DP as the rank
+    # splitter, but the input order is the connectivity order, not the rank list —
+    # so the cut never reorders the train, it only chooses where to wrap).
+    return _balanced_bank_split(flow_regions,
+                                [region_w[rk] for rk in flow_regions], n_lanes)
+
+
 def place_all(parts, regions, MAT, MO):
     """Arrange the process regions in process-flow order across N SERPENTINE
     BANKS (lanes stacked in Y). Bank 0 flows left→right; bank 1 sits behind it
@@ -1882,6 +2080,14 @@ def place_all(parts, regions, MAT, MO):
     roughly SQUARE — an 8-region, 70-part plant laid in a single lane is a ~55 m
     ribbon (aspect 5); folded into 2 banks it is a compact ~30 m × ~24 m skid
     (aspect ~1.3) that frames cleanly and reads as an assembled plant.
+
+    FLOW-LAYOUT (2026-06-11): when _PLANT_FLOW_PLAN is set (place_process_plant),
+    the bank assignment is GRAPH-DRIVEN — the flow regions are laid as a process
+    TRAIN in connectivity order (feed→reaction→separation→upgrading→product),
+    folded ALONG THE FLOW so connected stages stay adjacent, and the NON-FLOW
+    regions (utilities / electrical / control / instruments) are pushed to a BACK
+    row off the train rather than interleaved through it. Falls back to the
+    width-balanced rank banking below when no flow plan is set.
 
     DENSITY (Fix 2, Tristan 2026-06-10): banks are split by a width-BALANCED
     contiguous partition (not equal region count) so neither bank is left far
@@ -1895,12 +2101,52 @@ def place_all(parts, regions, MAT, MO):
     region_list = [rk for rk in regions if any(p.region_key == rk for p in parts)]
     n_banks = max(1, min(N_BANKS, len(region_list)))
 
-    # Pre-estimate each region's width, then split banks to BALANCE total width.
+    # Pre-estimate each region's width (needed by every banking path below).
     region_parts = {rk: [p for p in parts if p.region_key == rk]
                     for rk in region_list}
     region_w = {rk: _estimate_region_width(region_parts[rk]) for rk in region_list}
-    banks = _balanced_bank_split(region_list,
-                                 [region_w[rk] for rk in region_list], n_banks)
+
+    if _PLANT_FLOW_PLAN is not None:
+        # ── GRAPH-DRIVEN FLOW LAYOUT ──────────────────────────────────────────
+        # banks = [flow lane(s) … , periphery lane]. The flow train is folded
+        # along the flow into the FRONT lanes (so the process reads left→right and
+        # connected stages stay adjacent); the periphery (non-flow) regions go to
+        # ONE back lane behind the train. Any region missing from the plan (should
+        # not happen — the plan covers every region) is appended to the periphery
+        # so a part is never dropped.
+        flow_regions, periphery = _PLANT_FLOW_PLAN
+        present = set(region_list)
+        flow_regions = [rk for rk in flow_regions if rk in present]
+        periphery = [rk for rk in periphery if rk in present]
+        covered = set(flow_regions) | set(periphery)
+        periphery += [rk for rk in region_list if rk not in covered]   # safety net
+        # Give the TRAIN the bank budget; the periphery takes one extra back lane.
+        # The train stays a SINGLE left→right lane while its total width fits under
+        # FLOW_TRAIN_SINGLE_LANE_MAX_MM — that gives the SHORTEST connections (every
+        # stage X-adjacent to the stage it feeds, no cross-lane pipe). Only a train
+        # too wide to read in one row folds along the flow into ≤ N_BANKS lanes
+        # (serpentined, so the fold-boundary stages still sit adjacent across the
+        # aisle). Keeping the typical 5-6 region plant a single lane is what makes
+        # the pipe runs short; the periphery lane behind it keeps the footprint sane.
+        train_w = sum(region_w[rk] for rk in flow_regions) \
+            + REGION_GAP_MM * max(0, len(flow_regions) - 1)
+        train_lanes = 1 if train_w <= FLOW_TRAIN_SINGLE_LANE_MAX_MM \
+            else min(N_BANKS, max(1, len(flow_regions)))
+        banks = _flow_fold_banks(flow_regions, region_w, train_lanes) if flow_regions else []
+        # Publish the TRAIN regions so place_process_plant sites the spine to bisect
+        # the train (short flow taps), not the far train↔periphery aisle.
+        global _PLANT_FLOW_TRAIN_REGIONS
+        _PLANT_FLOW_TRAIN_REGIONS = set(flow_regions)
+        if periphery:
+            banks = banks + [periphery]      # periphery is the LAST (back) lane
+        banks = [b for b in banks if b]
+        n_banks = max(1, len(banks))
+        print(f"[univ][flow] train lanes={len(banks) - (1 if periphery else 0)} "
+              f"(regions {flow_regions}); periphery back row={periphery}")
+    else:
+        # ── LEGACY width-balanced RANK banking (every other family) ───────────
+        banks = _balanced_bank_split(region_list,
+                                     [region_w[rk] for rk in region_list], n_banks)
 
     # Common centreline = the widest bank's total span; shorter banks centre to it
     # (no lopsided empty corner). Each bank's span = Σ widths + gaps between them.
@@ -2751,6 +2997,45 @@ def _make_rack_plan_from_bank_aisle(bbox_mm, base_z_mm, parts, axis="x"):
     return plan
 
 
+def _make_rack_plan_for_flow_train(bbox_mm, base_z_mm, parts, axis="x"):
+    """FLOW-LAYOUT rack plan: run the X-spine through the MIDDLE of the process
+    TRAIN (the flow regions), so every flow run taps it across at most ~half the
+    train-row depth — short risers, low detour — instead of the train↔periphery
+    aisle the generic bisector would pick (that aisle sits at the train's BACK
+    edge, 5-6 m behind the front of the row, so a flow tap from a front vessel
+    detours all the way up to it and back). The spine Y = the area-weighted Y
+    centre of the TRAIN equipment (the row's middle), and the audit/lane band uses
+    the train's Y extent. Falls back to the published-aisle plan when there is no
+    train (no flow plan was active). Universal — keyed only on which regions are
+    the flow train, no class data."""
+    train_regions = _PLANT_FLOW_TRAIN_REGIONS
+    if not train_regions or axis != "x":
+        return _make_rack_plan_from_bank_aisle(bbox_mm, base_z_mm, parts, axis=axis)
+    train_parts = [p for p in parts if p.region_key in train_regions]
+    bboxes = equipment_xy_bboxes_mm(parts)           # audit against ALL equipment
+    train_bboxes = [bb for bb in (part_xy_bbox_mm(p) for p in train_parts)
+                    if bb is not None]
+    if not train_bboxes:
+        return _make_rack_plan_from_bank_aisle(bbox_mm, base_z_mm, parts, axis=axis)
+    # Spine Y = the bisecting free aisle of the TRAIN equipment only (a real aisle
+    # through the row when there is one — e.g. between a back vessel band and a
+    # front instrument band — else the train's Y centre). Using only the train
+    # bboxes keeps the spine in the row, never dragged back to the periphery.
+    ylo = min(bb[1] for bb in train_bboxes)
+    yhi = max(bb[3] for bb in train_bboxes)
+    spine_y, aisle_w = _free_aisle_position(train_bboxes, "x", ylo, yhi)
+    if aisle_w < 600.0:                              # no real internal aisle → centre
+        spine_y = (ylo + yhi) / 2.0
+        aisle_w = max(800.0, (yhi - ylo) * 0.25)
+    x0, x1 = bbox_mm["x0"], bbox_mm["x1"]
+    plan = RackPlan("x", spine_y, x0, x1, base_z_mm,
+                    spine_y - aisle_w / 2, spine_y + aisle_w / 2, bboxes)
+    print(f"[univ][spine] axis=x  spine_y={spine_y:.0f}  aisle={aisle_w:.0f} mm "
+          f"(flow-train bisector, {len(train_bboxes)} train equip of "
+          f"{len(bboxes)})  x∈[{x0:.0f},{x1:.0f}]")
+    return plan
+
+
 # ── Deterministic ROUTE AUDIT — the harsh self-check (Tristan 2026-06-11) ─────
 # Computes the THREE hard acceptance numbers from the emitted polylines + the
 # equipment bboxes, and writes them to route-audit.json so the result is a fact,
@@ -2874,6 +3159,9 @@ def audit_routes(parts, out_dir):
         ratio = (horiz_len / straight) if straight > 2000.0 else 1.0
         detours.append((round(ratio, 3), r["name"]))
     max_detour = max(detours, default=(1.0, None))
+    if os.environ.get("ROUTE_DEBUG"):
+        for d, nm in sorted(detours, reverse=True):
+            print(f"[univ][route-dbg] detour {d:.3f}  {nm}")
     # same-elevation crossings: every pair of horizontal legs at the same Z
     horiz = []   # (p, q, z, name)
     for r in _ROUTE_LOG:
@@ -4018,14 +4306,27 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
 
 def place_process_plant(parts, regions, topology, MAT, MO):
     """PROCESS-PLANT strategy (the original, e-fuel-tuned pipeline). Lay the
-    physical parts out as process REGIONS across serpentine banks on a TALL braced
-    open skid that hugs the equipment bulk, build the overhead pipe-rack structure,
-    and route every topology edge as an overhead-rack run (round process pipe /
-    copper cable tray). Behaviour-identical to the pre-dispatch main(): the refactor
-    only moved these steps into a function. Returns
+    physical parts out as a process TRAIN driven by the CONNECTIVITY GRAPH (the
+    flow topology) — each stage adjacent to the stage it feeds, feed→reaction→
+    separation→upgrading→product reading left→right, with the non-flow regions
+    (utilities / electrical / control / instruments) pushed to a back row — on a
+    TALL braced open skid that hugs the equipment bulk, then build the overhead
+    pipe-rack structure and route every topology edge as an overhead-rack run
+    (round process pipe / copper cable tray). Returns
     (bbox, region_centres, frame_top_mm, routed, unresolved)."""
-    # 4. place parts
-    bbox, region_centres = place_all(parts, regions, MAT, MO)
+    # 4. place parts — GRAPH-DRIVEN flow layout (the process train). Compute the
+    #    flow order + periphery from the connectivity graph, hand it to place_all,
+    #    and always reset the global so no other family/call sees it. Empty flow
+    #    train (a design with no usable flow edge) → place_all's rank fallback.
+    global _PLANT_FLOW_PLAN
+    flow_regions, periphery = flow_order_regions(parts, topology)
+    print(f"[univ][flow] flow order (feed→product): {flow_regions}")
+    print(f"[univ][flow] periphery (non-flow → back row): {periphery}")
+    _PLANT_FLOW_PLAN = (flow_regions, periphery) if flow_regions else None
+    try:
+        bbox, region_centres = place_all(parts, regions, MAT, MO)
+    finally:
+        _PLANT_FLOW_PLAN = None
     print(f"[univ] plant bbox (mm): {bbox}")
 
     # 5. TALL braced skid frame that HUGS THE EQUIPMENT BULK (Fix 1, FRAME FIT).
@@ -4043,16 +4344,22 @@ def place_process_plant(parts, regions, topology, MAT, MO):
     #     shared rack elevation so the overhead pipes visibly rest on a rack.
     build_pipe_rack(equip_bbox, frame_h, MAT, MO)
 
-    # 6. route topology on a real OVERHEAD PIPE-RACK SPINE down the inter-bank AISLE.
-    #    The placement KNOWS the aisle (the Y-gap between the serpentine banks,
-    #    published by _compact_banks_in_y as _PLANT_BANK_AISLES); we site the spine
-    #    there so the long runs travel in the corridor, never over equipment.
+    # 6. route topology on a real OVERHEAD PIPE-RACK SPINE. FLOW LAYOUT: the spine
+    #    runs through the MIDDLE of the process TRAIN (the flow regions) so flow
+    #    taps are short — _make_rack_plan_for_flow_train bisects the train, NOT the
+    #    train↔periphery aisle (which sits far behind the row and would force every
+    #    flow run to detour up to it). Falls back to the published inter-bank aisle
+    #    when no flow train was placed. Reset the train handoff afterwards.
+    global _PLANT_FLOW_TRAIN_REGIONS
     rack_base_z = rack_elevation_mm(frame_h)
-    rack_plan = _make_rack_plan_from_bank_aisle(bbox, rack_base_z, parts, axis="x")
-    routed, unresolved = route_topology(topology, parts, MAT, MO,
-                                        frame_top_mm=frame_h,
-                                        region_centres=region_centres,
-                                        bbox_mm=bbox, rack_plan=rack_plan)
+    try:
+        rack_plan = _make_rack_plan_for_flow_train(bbox, rack_base_z, parts, axis="x")
+        routed, unresolved = route_topology(topology, parts, MAT, MO,
+                                            frame_top_mm=frame_h,
+                                            region_centres=region_centres,
+                                            bbox_mm=bbox, rack_plan=rack_plan)
+    finally:
+        _PLANT_FLOW_TRAIN_REGIONS = None
     print(f"[univ] topology routed = {routed}/{len(topology)}; "
           f"unresolved = {len(unresolved)}")
     return bbox, region_centres, frame_h, routed, unresolved

@@ -231,6 +231,86 @@ check(len(g2) == 0 and len(p2) == 2,
 check(B.TRUNK_MIN_CONSUMERS == 3, "trunk threshold = 3 distinct consumers")
 
 
+# ── 8. FLOW-LAYOUT region ordering (place_process_plant process train) ────────
+#      flow_order_regions must (a) order the flow regions in CONNECTIVITY order so
+#      directly-connected stages are ADJACENT, keeping each connected sub-chain
+#      CONTIGUOUS (a disconnected upgrading→product chain is NOT interleaved with
+#      the main feed→reaction→separation chain), and (b) push every NON-FLOW region
+#      (control / instruments — touched by no flow edge) to the periphery. Keyed on
+#      the connectivity graph, universal. Regression-harness rule 11 for the
+#      2026-06-11 UNIVERSAL FLOW-LAYOUT.
+print("[8] flow_order_regions — process-train ordering + periphery split")
+
+
+def _rpart(name, region_key, rank):
+    """A Part carrying an explicit region_key + region_rank (what extract_parts
+    sets from the module display name), for the region-ordering tests."""
+    return B.Part(name, "mod", region_key, rank, "box", None, 1, "")
+
+
+# An e-fuel-shaped design: M1 feed → M2 reaction → M3 separation (one chain), and a
+# SEPARATE M4 upgrading → M6 product chain (no explicit M3→M4 edge), plus M5
+# utilities fed by the reactor (thermal), and M7/M8 non-flow (control/instruments).
+flow_parts = [
+    _rpart("CO2 feed compressor", "M1 Feed", 10),
+    _rpart("synthesis reactor", "M2 Reaction", 20),
+    _rpart("3-phase separator", "M3 Separation", 30),
+    _rpart("fractionation column", "M4 Upgrading", 40),
+    _rpart("waste-heat steam generator", "M5 Utilities", 60),
+    _rpart("SAF storage tank", "M6 Storage", 50),
+    _rpart("safety instrumented system", "M7 Control", 70),
+    _rpart("pressure transmitters", "M8 Instruments", 70),
+]
+flow_topo = [
+    {"mechanism": "fluid_loop", "from_part": "feed compressor", "to_part": "synthesis reactor"},
+    {"mechanism": "fluid_loop", "from_part": "synthesis reactor", "to_part": "separator"},
+    {"mechanism": "thermal", "from_part": "synthesis reactor", "to_part": "steam generator"},
+    {"mechanism": "fluid_loop", "from_part": "fractionation column", "to_part": "storage tank"},
+    # an electrical bus must NOT pull its endpoints into the flow train:
+    {"mechanism": "electrical_bus", "from_part": "pressure transmitters", "to_part": "feed compressor"},
+]
+flow_regions, periphery = B.flow_order_regions(flow_parts, flow_topo)
+idx = {rk: i for i, rk in enumerate(flow_regions)}
+# (a) the non-flow control/instruments regions are in the PERIPHERY, not the train.
+check("M7 Control" in periphery and "M8 Instruments" in periphery,
+      "control + instruments (no flow edge) → periphery")
+check("M7 Control" not in flow_regions and "M8 Instruments" not in flow_regions,
+      "control + instruments NOT in the flow train")
+# (b) the flow regions ARE the connected ones (M1,M2,M3,M4,M5,M6).
+check(set(flow_regions) == {"M1 Feed", "M2 Reaction", "M3 Separation",
+                            "M4 Upgrading", "M5 Utilities", "M6 Storage"},
+      f"flow train = the 6 flow-connected regions (got {flow_regions})")
+# (c) directly-connected stages are ADJACENT: feed next to reaction, reaction next
+#     to separation, upgrading next to its product storage.
+check(abs(idx["M1 Feed"] - idx["M2 Reaction"]) == 1,
+      "feed compression adjacent to reaction")
+check(abs(idx["M2 Reaction"] - idx["M3 Separation"]) == 1,
+      "reaction adjacent to separation")
+check(abs(idx["M4 Upgrading"] - idx["M6 Storage"]) == 1,
+      "upgrading adjacent to its product storage")
+# (d) the main feed→reaction→separation chain reads left→right in flow order.
+check(idx["M1 Feed"] < idx["M2 Reaction"] < idx["M3 Separation"],
+      "main train reads feed→reaction→separation left→right")
+# (e) the disconnected M4→M6 chain stays CONTIGUOUS (not interleaved through the
+#     main chain): no main-chain region sits BETWEEN M4 and M6.
+lo, hi = sorted((idx["M4 Upgrading"], idx["M6 Storage"]))
+between = [rk for rk, i in idx.items() if lo < i < hi]
+check(between == [], f"upgrading→product chain is contiguous (nothing between: {between})")
+# (f) electrical_bus is NOT a flow mechanism (its endpoints don't force the train).
+check("electrical_bus" not in B._FLOW_MECHANISMS,
+      "electrical_bus excluded from the flow-train mechanisms")
+check("fluid_loop" in B._FLOW_MECHANISMS and "thermal" in B._FLOW_MECHANISMS,
+      "fluid_loop + thermal ARE flow-train mechanisms")
+
+# A design with NO usable flow edge (only an electrical star) → empty flow train,
+# every region falls to periphery so the caller uses the rank fallback (no drop).
+noflow_parts = [_rpart("inverter", "Power", 60), _rpart("controller", "Control", 70)]
+noflow_topo = [{"mechanism": "electrical_bus", "from_part": "inverter", "to_part": "controller"}]
+nf_flow, nf_periph = B.flow_order_regions(noflow_parts, noflow_topo)
+check(nf_flow == [] and set(nf_periph) == {"Power", "Control"},
+      "no flow edge ⇒ empty train + all regions to periphery (rank fallback, no drop)")
+
+
 # ── summary ──────────────────────────────────────────────────────────────────
 print()
 if _FAILS:
