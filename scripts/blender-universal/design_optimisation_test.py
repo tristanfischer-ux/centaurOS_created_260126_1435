@@ -95,6 +95,39 @@ check(r8.get("applicable") is False,
       "E8 floor above ladder (busbar) → applicable=False, graceful no-op")
 
 # --------------------------------------------------------------------------
+print("\nECONOMIC-DISTRIBUTION SUMMARY")
+
+# E9 — a ladder-topped cable (e.g. the e-fuel 8×400 bus) contributes £0 honestly.
+maxed = do.cs._spec(kind="cable", from_part="incomer", to_part="board",
+                    carried_rating=5217.0, csa_mm2=400.0, n_parallel=8, length_m=20.0)
+s9 = do.economic_distribution_summary([maxed])
+check(s9["totals"]["lifetime_saving_gbp"] == 0.0 and s9["rows"][0]["worthwhile"] is False,
+      "E9 ladder-topped 400 mm² cable → £0 saving, worthwhile=False (honest)")
+
+# E10 — a sub-maximal cable on a REALISTIC thermal floor saves a defensible sum.
+# 400 A / 60 m, thermal-legal floor 185 mm² (BS 7671 Method C ballpark).
+realistic = do.cs._spec(kind="cable", from_part="board", to_part="compressor",
+                        carried_rating=400.0, csa_mm2=185.0, n_parallel=1, length_m=60.0)
+s10 = do.economic_distribution_summary([realistic])
+row = s10["rows"][0]
+check(row["economic_csa"] >= row["thermal_csa"] and row["lifetime_saving_gbp"] >= 0,
+      f"E10 sub-maximal cable upsizes {row['thermal_csa']}→{row['economic_csa']} mm², "
+      f"save £{row['lifetime_saving_gbp']:.0f}")
+
+# E11 — plant total = Σ of the worthwhile rows' savings (no double-count, no leak).
+plant = [maxed, realistic,
+         do.cs._spec(kind="cable", from_part="board", to_part="lights",
+                     carried_rating=32.0, csa_mm2=6.0, n_parallel=1, length_m=25.0),
+         do.cs._spec(kind="pipe", from_part="a", to_part="b",  # non-cable ignored
+                     carried_rating=0.3, csa_mm2=None, length_m=10.0)]
+s11 = do.economic_distribution_summary(plant)
+hand = sum(r["lifetime_saving_gbp"] for r in s11["rows"] if r["worthwhile"])
+check(abs(s11["totals"]["lifetime_saving_gbp"] - hand) < 0.01
+      and s11["totals"]["cables_considered"] == 3,  # the pipe is excluded
+      f"E11 plant total £{s11['totals']['lifetime_saving_gbp']:.0f} = Σ worthwhile rows; "
+      f"3 cables considered (pipe excluded)")
+
+# --------------------------------------------------------------------------
 print("\nLAYOUT-LENGTH MINIMISATION")
 
 nodes = ["feed", "react", "sep", "compress", "product"]

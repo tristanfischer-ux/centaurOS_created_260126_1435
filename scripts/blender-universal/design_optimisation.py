@@ -345,7 +345,98 @@ def minimise_layout_length(
 
 
 # ===========================================================================
-# 3. Demo (real-ish numbers) when run directly.
+# 3. Economic-distribution SUMMARY — the reportable BoM artifact.
+#
+#   Runs the economic optimiser over every CABLE in a sized connection schedule
+#   and rolls up the plant-wide lifetime saving, so the dossier/BoM can SHOW the
+#   reader "we sized this cable for cost, not just for heat, and here is what it
+#   saved over the plant's life". PURE; additive; changes no existing output.
+# ===========================================================================
+
+def economic_distribution_summary(specs: list[dict], *,
+                                  financial: Optional[dict] = None) -> dict:
+    """For every CABLE spec in `specs` (each carrying csa_mm2, n_parallel,
+    carried_rating [A] and length_m — the shape connection_sizing emits), compute
+    the economic-conductor optimum + its lifetime saving, and return per-cable
+    rows + a plant total. A busbar or an already-ladder-topped cable contributes
+    £0 honestly (no upsize available — reported as `worthwhile: False`). PURE.
+
+    financial: optional overrides forwarded to economic_conductor_csa (operating
+        hours, utilisation, energy price, discount rate, horizon).
+
+    Returns:
+      { rows: [ {from, to, current_a, length_m, thermal_csa, economic_csa,
+                 steps_up, lifetime_saving_gbp, annual_kwh_saved, worthwhile} ],
+        totals: { cables_considered, cables_upsized, lifetime_saving_gbp,
+                  annual_kwh_saved },
+        assumptions: [...],   cost_source }
+    """
+    fin = financial or {}
+    fwd = {k: fin[k] for k in (
+        "operating_hours_per_year", "utilisation", "loss_load_factor",
+        "energy_price_gbp_per_kwh", "discount_rate", "horizon_years",
+        "conductor_temp_c") if k in fin}
+    rows = []
+    total_saving = 0.0
+    total_kwh = 0.0
+    upsized = 0
+    considered = 0
+    for s in specs:
+        if s.get("kind") != "cable":
+            continue
+        csa = cs._f(s.get("csa_mm2"))
+        i_a = cs._f(s.get("carried_rating"))
+        length_m = cs._f(s.get("length_m"))
+        if csa <= 0 or i_a <= 0 or length_m <= 0:
+            continue
+        considered += 1
+        n_par = max(1, int(cs._f(s.get("n_parallel"), 1) or 1))
+        r = economic_conductor_csa(i_a, length_m, thermal_min_csa_mm2=csa,
+                                   n_parallel=n_par, **fwd)
+        if not r.get("applicable", False):
+            rows.append({
+                "from": s.get("from_part"), "to": s.get("to_part"),
+                "current_a": round(i_a, 1), "length_m": round(length_m, 2),
+                "thermal_csa": csa, "economic_csa": csa, "steps_up": 0,
+                "lifetime_saving_gbp": 0.0, "annual_kwh_saved": 0.0,
+                "worthwhile": False, "note": r.get("reason", "not applicable"),
+            })
+            continue
+        saving = cs._f(r.get("lifetime_saving_gbp"))
+        kwh = cs._f(r.get("annual_loss_reduction_kwh"))
+        if r.get("worthwhile"):
+            upsized += 1
+            total_saving += saving
+            total_kwh += kwh
+        rows.append({
+            "from": s.get("from_part"), "to": s.get("to_part"),
+            "current_a": round(i_a, 1), "length_m": round(length_m, 2),
+            "thermal_csa": r["thermal_min_csa"], "economic_csa": r["economic_csa"],
+            "steps_up": r["ladder_steps_up"],
+            "lifetime_saving_gbp": round(saving, 2),
+            "annual_kwh_saved": round(kwh, 1),
+            "worthwhile": bool(r.get("worthwhile")),
+        })
+    return {
+        "rows": rows,
+        "totals": {
+            "cables_considered": considered,
+            "cables_upsized": upsized,
+            "lifetime_saving_gbp": round(total_saving, 2),
+            "annual_kwh_saved": round(total_kwh, 1),
+        },
+        "assumptions": [
+            "economic conductor = lifetime-cheapest CSA at/above the thermal "
+            "minimum (Kelvin's law / IEC 60287-3-2)",
+            "an already-maxed cable or busbar contributes £0 (no upsize available)",
+            f"financial basis: {fin or 'defaults'} (see economic_conductor_csa)",
+        ],
+        "cost_source": cs.COST_SOURCE_MODEL,
+    }
+
+
+# ===========================================================================
+# 4. Demo (real-ish numbers) when run directly.
 # ===========================================================================
 
 def _demo() -> None:
