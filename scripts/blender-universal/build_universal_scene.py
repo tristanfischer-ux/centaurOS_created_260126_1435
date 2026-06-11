@@ -3608,9 +3608,22 @@ GR_TIER_MAX        = 12       # clamp ceiling for derived tier count
 GR_TRAY_THICK_MM   = 55.0     # grow-tray pan thickness
 GR_CANOPY_THICK_MM = 90.0     # green canopy slab thickness sitting on the tray
 GR_CANOPY_INSET_MM = 130.0    # canopy inset from the tray edges (margin all round)
-GR_LED_THICK_MM    = 40.0     # LED panel fixture thickness (thin flat board)
+GR_LED_THICK_MM    = 26.0     # LED lit-panel face thickness (thin flat board)
+GR_LED_HOUSE_MM    = 60.0     # LED housing-frame depth (thin dark surround)
 GR_LED_DROP_MM     = 150.0    # LED panel hangs this far under the shelf above
+GR_LED_INSET_MM    = 90.0     # LED panel inset from the shelf footprint edges
 GR_FRAME_POST_MM   = 60.0     # square section of the rack corner posts
+GR_SHELF_RAIL_MM   = 45.0     # horizontal shelf-rail section at each tier
+GR_TRAY_PAN_LIP_MM = 28.0     # tray-pan side-wall height above the pan floor
+GR_CANOPY_DETAIL   = "channels"  # per-tier crop detail: "channels" (NFT rows) /
+                                 # "pucks" (plant grid). channels = cheapest.
+GR_N_CHANNELS      = 5        # NFT/hydroponic channels drawn per grow tray
+GR_PUCK_COLS       = 6        # plant-puck grid columns (when detail = "pucks")
+GR_PUCK_ROWS       = 3        # plant-puck grid rows    (when detail = "pucks")
+# Hard cap on crop-detail objects PER RACK so per-rack object counts stay sane
+# (channels: n_tiers × GR_N_CHANNELS; a 12-tier rack = 60; pucks would be
+# n_tiers × cols × rows = 216 at 12 tiers, so pucks auto-thin above this cap).
+GR_CROP_DETAIL_CAP = 90
 GR_RACK_PITCH_MM   = GR_RACK_DEPTH_MM + 1200.0   # row centre-to-centre = depth + aisle
 GR_AISLE_MM        = 1200.0   # maintenance aisle between rack rows
 GR_RACK_GAP_X_MM   = 400.0    # gap between racks placed end-to-end along a row
@@ -3666,19 +3679,30 @@ def _derive_grow_grid(quantities, parts):
 
 
 def _build_grow_rack(nm, cx, y_row, deck_z_mm, n_tiers,
-                     frame_mat, tray_mat, canopy_mat, led_mat, MAT, MO):
-    """ONE multi-tier grow rack: a tall shelving FRAME (4 corner posts + a top
-    rail ring) carrying N stacked horizontal GROW-TRAY shelves, each with a green
-    CANOPY slab on top, and a thin flat LED PANEL fixture hung UNDER the shelf
-    above to light this tier. The tray + canopy are the green grow area; the LED
-    panel is the bright fixture. Built CAMERA-AGNOSTIC (full-width/full-depth
-    shelves) so the tier stack reads from every judge camera. Deterministic +
-    universal: keyed only on the rack constants + n_tiers. Tags:
-      growing_canopy  ← frame + trays + canopy
-      lighting_array  ← LED panels."""
+                     frame_mat, tray_mat, canopy_mat, led_mat,
+                     led_house_mat, channel_mat, castor_mat, MAT, MO):
+    """ONE multi-tier mobile grow rack, built to READ as a real grow rack:
+      • FRAME — 4 corner uprights + top/base perimeter rails + per-tier
+        horizontal shelf rails (front/back/sides) so each tier is an open framed
+        shelf, not a floating slab; industrial CASTORS at the 4 base corners
+        (the mobile-trolley cue).
+      • GROW BED per tier — a shallow tray PAN + a green CANOPY slab + light crop
+        DETAIL (a few NFT/hydroponic CHANNELS along the tray, or a sparse grid of
+        plant PUCKS) so the bed reads as growing, not a painted slab. Crop detail
+        is cheap instanced shapes, capped per rack (GR_CROP_DETAIL_CAP).
+      • LIGHTING per tier — a bright emissive LED lit FACE + a thin dark HOUSING
+        frame, inset under the shelf above, so the lit tiers are unmistakable.
+    Built CAMERA-AGNOSTIC (full-width/full-depth shelves) so the tier stack reads
+    from every judge camera. Deterministic + universal: keyed only on the rack
+    constants + n_tiers. Tags:
+      growing_canopy  ← frame + shelf rails + tray pans + canopy + crop detail + castors
+      lighting_array  ← LED lit faces + housings."""
     w, d = GR_RACK_LEN_MM, GR_RACK_DEPTH_MM
+    # Top-tier headroom: leave room for the top tier's canopy + its LED panel +
+    # the LED housing in clear air (so the topmost lit panel doesn't jam onto the
+    # top canopy — matches the inter-tier clearance the lower tiers get).
     top_z = deck_z_mm + GR_TIER_BASE_MM + GR_TIER_PITCH_MM * (n_tiers - 1) \
-        + GR_CANOPY_THICK_MM + 180.0
+        + GR_CANOPY_THICK_MM + 320.0
     frame_h = top_z - deck_z_mm
     cmod = "growing_canopy"
     lmod = "lighting_array"
@@ -3686,7 +3710,7 @@ def _build_grow_rack(nm, cx, y_row, deck_z_mm, n_tiers,
         if mod not in MO:
             MO[mod] = []
 
-    # ── shelving frame: 4 corner posts + top rail ring + base rail ring ──
+    # ── shelving FRAME: 4 corner uprights + top/base perimeter rails ──────────
     px = w / 2 - GR_FRAME_POST_MM / 2
     py = d / 2 - GR_FRAME_POST_MM / 2
     for sx in (-px, px):
@@ -3709,40 +3733,138 @@ def _build_grow_rack(nm, cx, y_row, deck_z_mm, n_tiers,
                    (w * fl.MM, GR_FRAME_POST_MM * fl.MM, GR_FRAME_POST_MM * fl.MM),
                    frame_mat, module=cmod, module_objects=MO)
 
-    # ── N stacked grow-tier shelves: tray pan + green canopy + LED panel ──
+    # geometry shared by every tier
+    shelf_w = w - GR_FRAME_POST_MM * 2 + GR_SHELF_RAIL_MM   # rail runs span the posts
+    shelf_d = d - GR_FRAME_POST_MM * 2 + GR_SHELF_RAIL_MM
     tray_w = w - GR_FRAME_POST_MM * 2 - 30.0
     tray_d = d - GR_FRAME_POST_MM * 2 - 30.0
+    # choose crop detail + auto-thin so per-rack object count stays under the cap
+    detail = GR_CANOPY_DETAIL
+    if detail == "pucks" and n_tiers * GR_PUCK_COLS * GR_PUCK_ROWS > GR_CROP_DETAIL_CAP:
+        detail = "channels"   # pucks too dense for a tall rack → fall back to channels
+    crop_drawn = 0
+
+    # ── N stacked grow-tier SHELVES ──────────────────────────────────────────
     for k in range(n_tiers):
         z_shelf = deck_z_mm + GR_TIER_BASE_MM + GR_TIER_PITCH_MM * k
-        # grow-tray pan (light steel) — the shelf the crop sits in
-        fl.add_box(f"{nm}_tray{k}",
+
+        # (a) Fix 3 — per-tier horizontal shelf RAILS (front + back + 2 sides),
+        #     so each tier reads as an open framed shelf the tray rests on (not a
+        #     floating slab). Tagged STRUCTURE-of-the-canopy (growing_canopy).
+        rz = z_shelf - GR_TRAY_PAN_LIP_MM
+        for sy in (-py, py):
+            fl.add_box(f"{nm}_shelfrailX_{k}_{'B' if sy < 0 else 'F'}",
+                       (cx * fl.MM, (y_row + sy) * fl.MM, rz * fl.MM),
+                       (shelf_w * fl.MM, GR_SHELF_RAIL_MM * fl.MM,
+                        GR_SHELF_RAIL_MM * fl.MM),
+                       frame_mat, module=cmod, module_objects=MO)
+        for sx in (-px, px):
+            fl.add_box(f"{nm}_shelfrailY_{k}_{'L' if sx < 0 else 'R'}",
+                       ((cx + sx) * fl.MM, y_row * fl.MM, rz * fl.MM),
+                       (GR_SHELF_RAIL_MM * fl.MM, shelf_d * fl.MM,
+                        GR_SHELF_RAIL_MM * fl.MM),
+                       frame_mat, module=cmod, module_objects=MO)
+
+        # (b) Fix 2 — grow-tray PAN (thin floor) — the shallow shelf the crop
+        #     sits in (no longer a thick slab; the green canopy is what reads).
+        fl.add_box(f"{nm}_traypan{k}",
                    (cx * fl.MM, y_row * fl.MM, z_shelf * fl.MM),
                    (tray_w * fl.MM, tray_d * fl.MM, GR_TRAY_THICK_MM * fl.MM),
                    tray_mat, module=cmod, module_objects=MO)
-        # green canopy slab sitting on the tray (the grow area / leafy greens)
+
+        # (c) Fix 2 — green CANOPY slab on the tray (the leafy-greens grow area).
+        canopy_w = tray_w - GR_CANOPY_INSET_MM
+        canopy_d = tray_d - GR_CANOPY_INSET_MM
+        canopy_z = z_shelf + GR_TRAY_THICK_MM / 2 + GR_CANOPY_THICK_MM / 2
         fl.add_box(f"{nm}_canopy{k}",
-                   (cx * fl.MM, y_row * fl.MM,
-                    (z_shelf + GR_TRAY_THICK_MM / 2 + GR_CANOPY_THICK_MM / 2) * fl.MM),
-                   ((tray_w - GR_CANOPY_INSET_MM) * fl.MM,
-                    (tray_d - GR_CANOPY_INSET_MM) * fl.MM, GR_CANOPY_THICK_MM * fl.MM),
+                   (cx * fl.MM, y_row * fl.MM, canopy_z * fl.MM),
+                   (canopy_w * fl.MM, canopy_d * fl.MM, GR_CANOPY_THICK_MM * fl.MM),
                    canopy_mat, module=cmod, module_objects=MO)
-        # LED panel fixture hung UNDER the NEXT shelf up, lighting THIS tier's
-        # canopy (top tier's panel hangs from the top frame rail).
-        led_z = z_shelf + GR_TIER_PITCH_MM - GR_LED_DROP_MM
+
+        # (d) Fix 2 — light crop DETAIL across the canopy so it reads as a growing
+        #     bed, not a painted slab: a few NFT/hydroponic CHANNELS running along
+        #     the tray, OR a sparse grid of plant PUCKS. Cheap instanced shapes,
+        #     capped per rack. Skipped if the cap is already hit.
+        if crop_drawn < GR_CROP_DETAIL_CAP:
+            top_canopy = canopy_z + GR_CANOPY_THICK_MM / 2
+            if detail == "pucks":
+                pw = canopy_w / (GR_PUCK_COLS + 1)
+                pd = canopy_d / (GR_PUCK_ROWS + 1)
+                puck_r = min(pw, pd) * 0.28
+                for ci in range(GR_PUCK_COLS):
+                    for ri in range(GR_PUCK_ROWS):
+                        if crop_drawn >= GR_CROP_DETAIL_CAP:
+                            break
+                        bxp = cx - canopy_w / 2 + pw * (ci + 1)
+                        byp = y_row - canopy_d / 2 + pd * (ri + 1)
+                        fl.add_cyl(f"{nm}_puck{k}_{ci}_{ri}",
+                                   (bxp * fl.MM, byp * fl.MM,
+                                    (top_canopy + 18.0) * fl.MM),
+                                   max(0.012, puck_r * fl.MM), 70.0 * fl.MM,
+                                   canopy_mat, module=cmod, module_objects=MO)
+                        crop_drawn += 1
+            else:  # "channels" — rows of NFT/hydroponic gullies along the tray X
+                ch_pitch = canopy_d / GR_N_CHANNELS
+                ch_w = ch_pitch * 0.46
+                ch_len = canopy_w * 0.96
+                for ci in range(GR_N_CHANNELS):
+                    if crop_drawn >= GR_CROP_DETAIL_CAP:
+                        break
+                    byc = y_row - canopy_d / 2 + ch_pitch * (ci + 0.5)
+                    fl.add_box(f"{nm}_channel{k}_{ci}",
+                               (cx * fl.MM, byc * fl.MM,
+                                (top_canopy + 12.0) * fl.MM),
+                               (ch_len * fl.MM, ch_w * fl.MM, 50.0 * fl.MM),
+                               channel_mat, module=cmod, module_objects=MO)
+                    crop_drawn += 1
+
+        # (e) Fix 1 — LED PANEL fixture hung UNDER the NEXT shelf up, lighting
+        #     THIS tier's canopy: a BIG bright emissive lit FACE + a thin dark
+        #     HOUSING frame, slightly inset under the shelf so the lit tier is
+        #     unmistakable. The face spans nearly the full tray footprint and
+        #     sits in clear air above the canopy (well below the shelf above) so
+        #     the glow is never occluded. Top tier's panel hangs from the top rail.
+        led_z = z_shelf + GR_LED_DROP_MM + GR_CANOPY_THICK_MM + 40.0
+        led_ceiling = z_shelf + GR_TIER_PITCH_MM - GR_LED_HOUSE_MM - 30.0
         if k == n_tiers - 1:
-            led_z = deck_z_mm + frame_h - GR_LED_DROP_MM - 60.0
-        fl.add_box(f"{nm}_led{k}",
+            led_ceiling = deck_z_mm + frame_h - GR_LED_HOUSE_MM - 90.0
+        led_z = min(led_z, led_ceiling)               # never poke through the shelf above
+        led_w = tray_w - GR_LED_INSET_MM * 2          # broad — almost the full shelf
+        led_d = tray_d - GR_LED_INSET_MM * 2
+        # thin dark housing as a PERIMETER FRAME around the lit face (NOT a solid
+        # lid — a full slab would occlude the bright panel from the top camera and
+        # read as a dark rack from above). 4 thin bars hugging the panel edge.
+        hz = led_z + GR_LED_THICK_MM / 2 + GR_LED_HOUSE_MM / 2 - 6.0
+        hbar = 46.0
+        for sy in (-1, 1):
+            fl.add_box(f"{nm}_ledhouse{k}_{'B' if sy < 0 else 'F'}",
+                       (cx * fl.MM, (y_row + sy * (led_d / 2 + hbar / 2)) * fl.MM,
+                        hz * fl.MM),
+                       ((led_w + 2 * hbar) * fl.MM, hbar * fl.MM,
+                        GR_LED_HOUSE_MM * fl.MM),
+                       led_house_mat, module=lmod, module_objects=MO)
+        for sx in (-1, 1):
+            fl.add_box(f"{nm}_ledhouse{k}_{'L' if sx < 0 else 'R'}",
+                       ((cx + sx * (led_w / 2 + hbar / 2)) * fl.MM, y_row * fl.MM,
+                        hz * fl.MM),
+                       (hbar * fl.MM, led_d * fl.MM, GR_LED_HOUSE_MM * fl.MM),
+                       led_house_mat, module=lmod, module_objects=MO)
+        # bright lit face (emissive in INSPECT via the _ledpanel recolour branch).
+        # Open underside + open top (perimeter-only housing) → the glow reads from
+        # the top camera AND as a bright band in the tier gap from iso/side.
+        fl.add_box(f"{nm}_ledpanel{k}",
                    (cx * fl.MM, y_row * fl.MM, led_z * fl.MM),
-                   ((tray_w - 60.0) * fl.MM, (tray_d - 200.0) * fl.MM,
-                    GR_LED_THICK_MM * fl.MM),
+                   (led_w * fl.MM, led_d * fl.MM, GR_LED_THICK_MM * fl.MM),
                    led_mat, module=lmod, module_objects=MO)
 
     # ── industrial castors at the 4 base corners (the mobile-trolley cue) ──
-    for sx in (-px + 40.0, px - 40.0):
-        for sy in (-py + 40.0, py - 40.0):
+    cradius, cheight = 65.0, 130.0
+    for sx in (-px + 50.0, px - 50.0):
+        for sy in (-py + 50.0, py - 50.0):
             fl.add_cyl(f"{nm}_castor_{'L' if sx < 0 else 'R'}{'B' if sy < 0 else 'F'}",
-                       ((cx + sx) * fl.MM, (y_row + sy) * fl.MM, (deck_z_mm + 50.0) * fl.MM),
-                       50.0 * fl.MM, 100.0 * fl.MM, frame_mat,
+                       ((cx + sx) * fl.MM, (y_row + sy) * fl.MM,
+                        (deck_z_mm + cheight / 2) * fl.MM),
+                       cradius * fl.MM, cheight * fl.MM, castor_mat,
                        module=cmod, module_objects=MO,
                        rotation=(math.radians(90), 0, 0))
     return top_z
@@ -4069,11 +4191,28 @@ def place_panel_array(parts, regions, topology, MAT, MO):
                                          metallic=0.0, roughness=0.62)
     canopy_mat = MAT["u_gr_canopy"]
     if "u_gr_led" not in MAT:
-        # bright white-blue LED panel (emissive so it reads as a lit fixture)
-        MAT["u_gr_led"] = fl.make_mat("m_gr_led", (0.70, 0.85, 1.00),
-                                      metallic=0.0, roughness=0.30,
-                                      emission_strength=1.4)
+        # bright white-blue LED lit FACE (emissive so it reads as a lit fixture
+        # in the PDF pass; INSPECT pass re-applies an emissive matte via the
+        # _ledpanel recolour branch). Strong emission so the lit tiers glow.
+        MAT["u_gr_led"] = fl.make_mat("m_gr_led", (0.74, 0.86, 1.00),
+                                      metallic=0.0, roughness=0.28,
+                                      emission_strength=3.0)
     led_mat = MAT["u_gr_led"]
+    if "u_gr_ledhouse" not in MAT:
+        # thin dark housing frame around the lit LED face
+        MAT["u_gr_ledhouse"] = fl.make_mat("m_gr_ledhouse", (0.20, 0.22, 0.26),
+                                           metallic=0.45, roughness=0.42)
+    led_house_mat = MAT["u_gr_ledhouse"]
+    if "u_gr_channel" not in MAT:
+        # NFT/hydroponic channel — pale white-grey gully running along the tray
+        MAT["u_gr_channel"] = fl.make_mat("m_gr_channel", (0.86, 0.90, 0.94),
+                                          metallic=0.10, roughness=0.40)
+    channel_mat = MAT["u_gr_channel"]
+    if "u_gr_castor" not in MAT:
+        # dark rubber/steel castor wheel at the rack base
+        MAT["u_gr_castor"] = fl.make_mat("m_gr_castor", (0.16, 0.17, 0.20),
+                                         metallic=0.30, roughness=0.55)
+    castor_mat = MAT["u_gr_castor"]
 
     # ── 1. ROWS OF MULTI-TIER GROW RACKS ────────────────────────────────────
     rack_pitch_x = GR_RACK_LEN_MM + GR_RACK_GAP_X_MM
@@ -4089,6 +4228,7 @@ def place_panel_array(parts, regions, topology, MAT, MO):
             nm = f"u_gr_rack_r{row}_c{col}"
             top_z = _build_grow_rack(nm, cx, y_row, DECK_Z_MM, n_tiers,
                                      frame_mat, tray_mat, canopy_mat, led_mat,
+                                     led_house_mat, channel_mat, castor_mat,
                                      MAT, MO)
             rack_anchor_by_index.append((cx, y_row, top_z))
             rack_tops.append(top_z)
@@ -5797,13 +5937,19 @@ def _inspect_rackfarm_colour(name):
 # detail parts like "_tank"/"_fan" are substrings of role bodies). Matched by
 # substring on the object name, in order.
 _INSPECT_PANELARRAY = [
-    # ── grow-rack sub-parts ──
+    # ── grow-rack sub-parts (MORE SPECIFIC keys first) ──
+    ("_channel",    (0.86, 0.90, 0.94)),   # NFT/hydroponic channel = pale white-grey
+    ("_puck",       (0.18, 0.72, 0.22)),   # plant puck / net-pot crop = vivid green
     ("_canopy",     (0.10, 0.62, 0.16)),   # green canopy / grow area = GREEN
-    ("_tray",       (0.78, 0.80, 0.83)),   # grow-tray pan = light steel grey
-    ("_led",        (0.72, 0.86, 1.00)),   # LED panel fixture = bright white-blue
+    ("_traypan",    (0.74, 0.77, 0.81)),   # grow-tray pan = light steel grey
+    ("_tray",       (0.78, 0.80, 0.83)),   # grow-tray (fallback) = light steel grey
+    ("_ledhouse",   (0.22, 0.24, 0.28)),   # LED panel housing frame = dark fixture
+    ("_ledpanel",   (0.74, 0.86, 1.00)),   # LED lit face (emissive; this is fallback)
+    ("_led",        (0.72, 0.86, 1.00)),   # LED (legacy/fallback) = bright white-blue
+    ("_shelfrail",  (0.70, 0.72, 0.76)),   # per-tier shelf rail = light grey
     ("_post",       (0.74, 0.76, 0.80)),   # rack frame post = light grey
     ("_railx",      (0.74, 0.76, 0.80)),   # rack frame rail = light grey
-    ("_castor",     (0.20, 0.22, 0.26)),   # castor = dark
+    ("_castor",     (0.18, 0.19, 0.22)),   # castor wheel = dark
     ("_rack_",      (0.74, 0.76, 0.80)),   # rack frame fallback = light grey
     # ── BoP role detail parts (precede the role bodies) ──
     ("_ductwork",   (0.55, 0.78, 0.88)),   # HVAC duct = pale blue
@@ -5989,6 +6135,20 @@ def apply_inspection_materials(parts):
                 fl._to_linear(rgb), metallic=0.0, roughness=0.78)
         return mat_cache[key]
 
+    # Emissive matte for LIT fixtures (e.g. grow-rack LED panels) — same flat
+    # CAD look but glows, so a "lit tier" reads as unmistakably illuminated even
+    # in the otherwise-shadowless INSPECT pass (a plain pale-blue matte slab
+    # reads as a faint grey gap and was missed). strength tuned to glow clearly
+    # against the 0.85 light deck without blooming out the green canopy above.
+    def _emissive(rgb, strength=2.6):
+        key = ("emit", tuple(round(c, 3) for c in rgb), round(strength, 2))
+        if key not in mat_cache:
+            mat_cache[key] = fl.make_mat(
+                f"m_inspect_emit_{rgb[0]:.2f}_{rgb[1]:.2f}_{rgb[2]:.2f}",
+                fl._to_linear(rgb), metallic=0.0, roughness=0.30,
+                emission_strength=strength)
+        return mat_cache[key]
+
     # 3. Frame material: mid-grey, thin, semi-transparent edges so it never
     #    occludes. Kept LIGHT + low-alpha so the diagonal pipe braces (which are
     #    thin cylinders, not wireframed) recede into the deck rather than reading
@@ -6067,9 +6227,14 @@ def apply_inspection_materials(parts):
         #    Part, so they'd otherwise fall to the neutral-grey unmatched bucket).
         #    Keyed by the object-name suffix/role (canopy green, LED white-blue). ──
         if nm.startswith("u_gr_"):
-            gr_colour = _inspect_panelarray_colour(nm)
             obj.data.materials.clear()
-            obj.data.materials.append(_matte(gr_colour))
+            # The LED panel lit FACE glows (emissive) so the lit tiers are
+            # unmistakable; its thin housing frame ("_ledhouse") stays a matte
+            # dark fixture body. Everything else flat-matte by sub-part role.
+            if "_ledpanel" in nm:
+                obj.data.materials.append(_emissive((0.74, 0.86, 1.00)))
+            else:
+                obj.data.materials.append(_matte(_inspect_panelarray_colour(nm)))
             n_equip += 1
             continue
         # ── TOWER-MACHINE geometry (u_tm_*) → flat matte by role: tower/nacelle
