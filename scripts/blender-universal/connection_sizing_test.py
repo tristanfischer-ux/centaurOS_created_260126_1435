@@ -548,6 +548,109 @@ def main() -> int:
         print(f"       + {r['name']}  {r['qty']} {r['unit']} @ £{r['unit_price_gbp']:,.1f} "
               f"= £{r['line_total_gbp']:,.0f}  [{r['module']}]")
 
+    # ---- 11. PHASE D2 ACTUATION — auto-insert a sub-distribution + re-route -------
+    #   A CONSTRUCTED infeasible fan-out: a 48 V LV hub feeding 8 racks (240 A each,
+    #   1920 A total) sitting 300 m away. The un-actuated D2 only RECOMMENDS; the
+    #   actuation must INSERT a sub-distribution + re-size so EVERY run comes in-spec.
+    print("\nD2 ACTUATION — auto-insert a sub-distribution + re-route:")
+    LV_V = 48.0
+    HAUL_M = 300.0
+    SHARE_A = 240.0
+    N_RACKS = 8
+    TOTAL_A = SHARE_A * N_RACKS
+    d2_hub = {"from_part": "switchgear", "to_part": "(busway)",
+              "mechanism": "electrical_bus", "constraint_kind": "current_rating",
+              "required_value": TOTAL_A, "required_unit": "A",
+              "required_margin_factor": 1.0, "material_context": f"{LV_V:g} V DC bus",
+              "system_voltage_v": LV_V}
+    d2_branches = [{"from_part": "switchgear", "to_part": f"rack[{k}]",
+                    "mechanism": "electrical_bus", "constraint_kind": "current_rating",
+                    "required_value": SHARE_A, "required_unit": "A",
+                    "required_margin_factor": 1.0,
+                    "material_context": f"{LV_V:g} V DC bus",
+                    "system_voltage_v": LV_V} for k in range(N_RACKS)]
+
+    # 11a. The UN-ACTUATED path on the long LV trunk only RECOMMENDS (D2, not resolved).
+    trunk_unact = cs.size_connection_to_spec(dict(d2_hub), HAUL_M, carried_value=TOTAL_A)
+    check("D2 (un-actuated) long LV trunk is OUT of spec + carries a recommendation",
+          trunk_unact["within_spec"] is False
+          and bool(trunk_unact["design_recommendation"]))
+    check("d2_actuation_applicable() flags this trunk as an actuable D2 case",
+          cs.d2_actuation_applicable(trunk_unact) is True)
+    check("an IN-SPEC trunk is NOT flagged actuable (no spurious actuation)",
+          cs.d2_actuation_applicable(
+              cs.size_connection_to_spec(dict(BESS_DC_BUS), 12.0)) is False)
+
+    # 11b. ACTUATE: insert a sub-distribution, re-route MV feeder + short LV branches.
+    act = cs.size_d2_actuation(
+        hub_edge=d2_hub, total_value=TOTAL_A, branch_edges=d2_branches,
+        long_haul_m=HAUL_M, lv_voltage_v=LV_V,
+        branch_local_lengths=[6.0] * N_RACKS, local_busway_m=20.0)
+
+    sd = act["sub_distribution"]
+    f = act["feeder"]
+    bw = act["local_busway"]
+    print(f"     (sub-dist {sd['transformer_kva']:g} kVA {sd['primary_voltage_v']:g}V→"
+          f"{sd['secondary_voltage_v']:g}V | feeder {f['size_label']} Vd "
+          f"{f['drop_pct_or_velocity']}% | busway {bw['size_label']} Vd "
+          f"{bw['drop_pct_or_velocity']}% | branch0 {act['branches'][0]['size_label']} "
+          f"Vd {act['branches'][0]['drop_pct_or_velocity']}%)")
+
+    check("actuation INSERTS a sub-distribution (a step-down transformer, kVA > 0)",
+          sd.get("kind") == "transformer" and cs._f(sd.get("transformer_kva")) > 0
+          and cs._f(sd.get("primary_voltage_v")) > LV_V)   # stepped UP to MV
+    check("the FEEDER is a thin MV run (sized at the MV primary current, not LV)",
+          abs(cs._f(f.get("system_voltage_v")) - sd["primary_voltage_v"]) < 1.0
+          and cs._f(f.get("carried_rating")) < TOTAL_A)     # MV current ≪ LV total
+    check("the FEEDER comes IN-SPEC over the long haul (MV step-up resolved it)",
+          f["within_spec"] is True and cs._f(f.get("length_m")) >= HAUL_M - 1.0)
+    check("the local LV BUSWAY (short span) is IN-SPEC",
+          bw is not None and bw["within_spec"] is True)
+    check("EVERY local LV branch is IN-SPEC (re-sized over the SHORT local length)",
+          all(b["within_spec"] is True for b in act["branches"]))
+    check("ACTUATION RESOLVES the spec: feeder + busway + all branches in-spec",
+          act["resolved"] is True)
+    # The whole point vs the un-actuated case: out-of-spec count goes 1 (trunk) → 0.
+    actuated_specs = [f, bw] + act["branches"]
+    n_oos_after = sum(1 for s in actuated_specs if s.get("within_spec") is False)
+    check("0 out-of-spec runs AFTER actuation (vs the infeasible trunk before)",
+          n_oos_after == 0 and trunk_unact["within_spec"] is False)
+
+    # 11c. The re-sized branches are GENUINELY local (short length), not the long haul.
+    check("re-sized branches are LOCAL (length ≪ the 300 m haul that broke LV)",
+          all(cs._f(b.get("length_m")) < HAUL_M / 4.0 for b in act["branches"]))
+
+    # 11d. The actuated runs COST + SCHEDULE cleanly (transformer priced by kVA).
+    sd_spec = cs._spec(kind="transformer", mechanism="electrical_bus",
+                       carried_rating=sd["transformer_kva"], carried_unit="kVA",
+                       size_label=(f"{sd['primary_voltage_v']:g}/"
+                                   f"{sd['secondary_voltage_v']:g} V sub-distribution"),
+                       within_spec=True)
+    sd_spec["role"] = "transformer"; sd_spec["transformer_kva"] = sd["transformer_kva"]
+    sd_spec["from_part"] = "(primary)"; sd_spec["to_part"] = "(secondary)"
+    costed_act = cs.connection_schedule_costed(actuated_specs + [sd_spec])
+    ta = costed_act["totals"]
+    xrow = [r for r in costed_act["rows"] if r.get("role") == "transformer"]
+    check("actuated schedule prices the sub-distribution by kVA (transformer £ > 0)",
+          ta["transformer_gbp"] > 0 and len(xrow) == 1
+          and abs(xrow[0]["line_total_gbp"]
+                  - cs._f(sd["transformer_kva"]) * cs.TRANSFORMER_GBP_PER_KVA) < 0.5)
+    check("actuated schedule £ reconciles (grand == Σ row line totals)",
+          abs(ta["grand_total_gbp"]
+              - sum(r["line_total_gbp"] for r in costed_act["rows"])) < 0.5)
+
+    # 11e. SINGLE-RUN actuation (a passthrough point-to-point, not a fan-out): one
+    #      infeasible long LV run → sub-distribution + 1 short branch, resolved.
+    act1 = cs.size_d2_actuation(
+        hub_edge=d2_hub, total_value=TOTAL_A, branch_edges=[dict(d2_hub)],
+        long_haul_m=HAUL_M, lv_voltage_v=LV_V,
+        branch_local_lengths=[8.0], local_busway_m=None)
+    check("single-run actuation resolves (feeder + 1 short branch in-spec, no busway)",
+          act1["resolved"] is True and act1["local_busway"] is None
+          and len(act1["branches"]) == 1
+          and act1["branches"][0]["within_spec"] is True
+          and act1["feeder"]["within_spec"] is True)
+
     # ---- Verdict ----
     print()
     if failures:

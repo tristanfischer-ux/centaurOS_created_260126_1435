@@ -342,6 +342,10 @@ DEFAULT_ENDS_PER_RUN = 2
 # is priced by its copper MASS, not the per-metre cable ladder. UK-2026 ~£18/kg
 # fabricated + installed (copper ~£8-9/kg raw, ~2× for fabrication + supports).
 BUSBAR_GBP_PER_KG = 18.0
+# Distribution / sub-distribution transformer £/kVA installed (oil-filled pad-mount +
+# connection + commissioning) — UK-2026 supply+install. Used both by the step-down
+# tree row and by a standalone D2-actuation sub-distribution spec.
+TRANSFORMER_GBP_PER_KVA = 28.0
 # Fallback signal/control bundle + member rates (thin, fixed) — UK-2026 supply+install.
 SIGNAL_BUNDLE_GBP_PER_M = 6.0       # data/control/fibre bundle on tray
 SIGNAL_TERMINATION_GBP = 12.0       # connectorised end (RJ45/fibre/terminal)
@@ -403,6 +407,26 @@ LV_REACH_VOLTAGE_CEILING_V = 1000.0
 # Liquid-pipe ΔP practical ceiling [kPa] over a single run before a fatter pipe is
 # the wrong answer (pump the fluid / relocate / boost locally instead).
 PRACTICAL_MAX_PIPE_DP_KPA = 500.0
+
+# --- D2 ACTUATION (auto-insert a sub-distribution + re-route) thresholds -------
+# When D2 fires on an LV fan-out that's infeasible over the distance, the ACTUATION
+# (size_d2_actuation, gated behind CONN_D2_ACTUATE in the scene builder) re-designs
+# the run as a step-down hierarchy: ONE feeder hub→sub-distribution sized for the
+# TOTAL load, stepped UP to MV for the long haul (so the feeder is low-current and
+# THIN), then SHORT LV branches from the sub-distribution to each local consumer.
+# The medium voltage the long feeder steps up to (a standard UK primary distribution
+# voltage). At this voltage the same kVA draws ~LV_V/MV_V less current, so the long
+# feeder is in-spec where the LV run was not.
+D2_ACTUATION_MV_FEEDER_V = 11_000.0
+# The LOCAL distance [m] the sub-distribution sits from its consumer cluster — the
+# branches are re-sized over THIS short length (in-spec at LV), NOT the long haul.
+# The scene builder passes the REAL geometric tap length; this is the pure-logic
+# fallback when no measured local length is supplied.
+D2_ACTUATION_LOCAL_BRANCH_M = 8.0
+# The local LV busway along the consumer cluster (the re-sized trunk-equivalent on
+# the LV side of the step-down) is also a SHORT local run; this is its fallback
+# length when the builder supplies none.
+D2_ACTUATION_LOCAL_BUSWAY_M = 20.0
 
 
 # ---------------------------------------------------------------------------
@@ -1769,6 +1793,285 @@ def size_distribution_tree(hub_edge: dict, branch_edges: list[dict],
 
 
 # ---------------------------------------------------------------------------
+# 7c. PHASE D2 ACTUATION — auto-insert a sub-distribution + RE-ROUTE the run.
+#
+#   size_connection_to_spec()'s D2 RECOMMENDS a sub-distribution when a fan-out is
+#   infeasible at LV over the distance (a long high-current LV run). It does NOT
+#   change the design — it leaves a best-effort fat conductor + a text recommendation.
+#
+#   size_d2_actuation() makes D2 *ACT*: it RE-DESIGNS the infeasible fan-out as a
+#   step-down hierarchy and returns specs that come back IN-SPEC —
+#     1. a SUB-DISTRIBUTION node (a local panel / step-down transformer marker placed
+#        NEAR the consumer cluster, between the source hub and the far consumers);
+#     2. ONE FEEDER hub→sub-distribution sized for the TOTAL load — stepped UP to MV
+#        (D2_ACTUATION_MV_FEEDER_V) for the long haul, so the feeder current is the
+#        MV-side primary current (≈ LV_V/MV_V smaller) and the feeder is THIN +
+#        in-spec where the LV run was not (modelled via electrical_transformer_sizing.py);
+#     3. SHORT LV BRANCHES from the sub-distribution to each local consumer, re-sized
+#        over the SHORT local distance (in-spec at LV) — the original infeasible
+#        long-LV run is GONE;
+#     4. (when the consumers ride a local busway) a SHORT LV local busway from the
+#        sub-distribution along the cluster, carrying the total LV-side current over
+#        the short local span (in-spec).
+#
+#   PURE — reuses size_connection_to_spec / electrical_transformer_sizing.py; no
+#   geometry. The SCENE BUILDER (build_universal_scene.py, gated CONN_D2_ACTUATE=1)
+#   calls this, renders the returned sub-distribution box + feeder + short branches,
+#   and feeds every returned spec into the schedule so they are recorded + costed.
+#
+#   UNIVERSAL — keyed purely on the D2 condition (an electrical LV fan-out whose
+#   long-haul run is past the practical LV reach), never on archetype.
+# ---------------------------------------------------------------------------
+
+def d2_actuation_applicable(trunk_spec: dict) -> bool:
+    """True when a sized trunk/feeder spec is a D2 case the actuation can RESOLVE:
+    an ELECTRICAL run (cable/busbar) that breached spec AND carries a
+    design_recommendation (the LV-reach / ladder-exhausted D2 signal). Pipes/ducts
+    and in-spec runs are never actuated (the sub-distribution answer is electrical).
+    """
+    if not isinstance(trunk_spec, dict):
+        return False
+    if trunk_spec.get("kind") not in ("cable", "busbar"):
+        return False
+    if not trunk_spec.get("design_recommendation"):
+        return False
+    # only the LV-reach / ladder-exhausted D2 (not a pipe split/boost) is actuable.
+    return trunk_spec.get("within_spec") is False
+
+
+def size_d2_actuation(hub_edge: dict,
+                      total_value: float,
+                      branch_edges: list[dict],
+                      long_haul_m: float,
+                      lv_voltage_v: float,
+                      branch_local_lengths: Optional[list[float]] = None,
+                      local_busway_m: Optional[float] = None,
+                      mv_feeder_v: float = D2_ACTUATION_MV_FEEDER_V,
+                      sub_distribution_name: str = "sub_distribution") -> dict:
+    """ACTUATE D2: re-design an infeasible LV electrical fan-out as a step-down
+    hierarchy that comes back IN-SPEC. PURE (no Blender).
+
+    Args:
+      hub_edge:   the SOURCE hub edge (carries mechanism / material_context / the
+                  electrical constraint_kind). Its from_part names the source.
+      total_value: the TOTAL design load the fan-out carries [A] (the trunk value —
+                  Σ branch shares, already margin-applied).
+      branch_edges: the per-consumer edges (each carries its own required_value share
+                  + from/to part names) — re-sized LOCALLY off the sub-distribution.
+      long_haul_m: the long distance source→cluster that made the LV run infeasible
+                  [m] (the volt-drop / reach length, e.g. the CONN_TEST_LONG_RUN_M
+                  injection or a genuinely long routed run).
+      lv_voltage_v: the LV system voltage the consumers run at [V] (e.g. 48).
+      branch_local_lengths: the SHORT local length of each branch off the sub-
+                  distribution [m] (the real geometric tap length). Defaults to
+                  D2_ACTUATION_LOCAL_BRANCH_M each when None / short.
+      local_busway_m: the SHORT local span of the LV busway along the cluster [m]
+                  (the re-sized trunk-equivalent on the LV side). When None, no
+                  separate local busway spec is emitted (the branches tap the
+                  sub-distribution directly).
+      mv_feeder_v: the medium voltage the long feeder steps up to [V] (default 11 kV).
+      sub_distribution_name: the name stamped on the sub-distribution node + used as
+                  the from_part of the local branches.
+
+    Returns a dict:
+      { 'sub_distribution': {name, kind, primary_voltage_v, secondary_voltage_v,
+                             transformer_kva, primary_current_a, secondary_current_a,
+                             total_value, unit, tool_used, note},
+        'feeder': ConnectionSpec (hub→sub-distribution, MV, thin, in-spec),
+        'local_busway': ConnectionSpec|None (sub-distribution→cluster, LV, short),
+        'branches': [ConnectionSpec, ...] (sub-distribution→each consumer, LV, short),
+        'resolved': bool (True iff feeder + busway + every branch are within_spec),
+        'before': {...the original infeasible run's numbers...} }
+
+    The returned specs already have role stamped (feeder / local_busway / branch) and
+    are ready for connection_schedule / connection_cost (they carry length_m, sizes,
+    within_spec). `sub_distribution` is rendered by the scene builder as a panel/
+    transformer box near the cluster + costed by kVA (the existing transformer £/kVA).
+    """
+    mech = hub_edge.get("mechanism", "electrical_bus")
+    ck = hub_edge.get("constraint_kind", "current_rating")
+    unit = hub_edge.get("required_unit") or "A"
+    src_name = hub_edge.get("from_part") or "source"
+    mc = hub_edge.get("material_context")
+    lv_voltage_v = _f(lv_voltage_v, DEFAULT_SYSTEM_VOLTAGE_V) or DEFAULT_SYSTEM_VOLTAGE_V
+    total_value = _f(total_value)
+
+    # ---- 1. SUB-DISTRIBUTION: a step-down transformer MV→LV sized for the total --
+    # The LV-side load in kW (3-phase apparent ~ active here): P = √3·V_lv·I_total.
+    load_kw = math.sqrt(3.0) * lv_voltage_v * total_value / 1000.0
+    xr = run_tool("electrical_transformer_sizing.py", {
+        "transformer_name": f"{sub_distribution_name} step-down",
+        "plant_load_kw": max(0.1, load_kw),
+        "power_factor": 0.95,
+        "headroom_fraction": 0.25,
+        "primary_voltage_v": mv_feeder_v,
+        "secondary_voltage_v": lv_voltage_v,
+        "phases": 3,
+    })
+    if "error" not in xr:
+        kva = _f(xr.get("transformer_kva"))
+        i_pri = _f(xr.get("transformer_primary_current_a"))
+        i_sec = _f(xr.get("transformer_secondary_current_a"))
+        xfmr_tool = "electrical_transformer_sizing.py"
+    else:
+        # Deterministic fallback if the tool is unreachable: kVA from load + headroom,
+        # primary/secondary currents from S/(√3·U). No fabricated constants.
+        kva = (load_kw / 0.95) * 1.25
+        i_pri = kva * 1000.0 / (math.sqrt(3.0) * mv_feeder_v)
+        i_sec = kva * 1000.0 / (math.sqrt(3.0) * lv_voltage_v)
+        xfmr_tool = "S=P/pf×1.25 + I=S/(√3·U) (transformer tool unavailable)"
+
+    sub_distribution = {
+        "name": sub_distribution_name,
+        "kind": "transformer",   # a local step-down panel/transformer marker
+        "primary_voltage_v": mv_feeder_v,
+        "secondary_voltage_v": lv_voltage_v,
+        "transformer_kva": round(kva, 1),
+        "primary_current_a": round(i_pri, 1),
+        "secondary_current_a": round(i_sec, 1),
+        "total_value": round(total_value, 1),
+        "unit": unit,
+        "tool_used": xfmr_tool,
+        "note": (f"local sub-distribution: {mv_feeder_v:g} V MV feeder → {kva:g} kVA "
+                 f"step-down → {lv_voltage_v:g} V LV near the cluster "
+                 f"(HV primary {i_pri:.0f} A vs LV secondary {i_sec:.0f} A)"),
+    }
+
+    # ---- 2. FEEDER hub→sub-distribution, MV, sized for the MV primary current ----
+    # Carries the TOTAL load but at MV, so the current is the transformer PRIMARY
+    # current (≈ lv/mv smaller). Sized over the LONG haul — in-spec because it is MV.
+    feeder_edge = {
+        "from_part": src_name, "to_part": sub_distribution_name, "mechanism": mech,
+        "constraint_kind": ck, "required_value": i_pri, "required_unit": "A",
+        "required_margin_factor": 1.0,
+        # Pin the feeder system voltage to MV explicitly so the volt-drop% is taken
+        # against MV (NOT the LV test-override) — _infer_system_voltage reads this key.
+        "system_voltage_v": mv_feeder_v,
+        "material_context": f"{mv_feeder_v:g} V MV feeder",
+    }
+    feeder = _size_actuation_run(feeder_edge, long_haul_m, role="feeder")
+    feeder["actuation_role"] = "feeder"
+
+    # ---- 3. LOCAL LV BUSWAY sub-distribution→cluster (short), carries total LV I ----
+    local_busway = None
+    if local_busway_m is not None:
+        busway_edge = {
+            "from_part": sub_distribution_name, "to_part": "(local busway)",
+            "mechanism": mech, "constraint_kind": ck,
+            "required_value": total_value, "required_unit": unit,
+            "required_margin_factor": 1.0,
+            "system_voltage_v": lv_voltage_v,
+            "material_context": mc or f"{lv_voltage_v:g} V LV bus",
+        }
+        local_busway = _size_actuation_run(busway_edge, _f(local_busway_m),
+                                           role="local_busway")
+        local_busway["actuation_role"] = "local_busway"
+
+    # ---- 4. SHORT LV BRANCHES sub-distribution→each consumer (short local length) --
+    branches: list[dict] = []
+    n = len(branch_edges)
+    for k, be in enumerate(branch_edges):
+        local_len = D2_ACTUATION_LOCAL_BRANCH_M
+        if branch_local_lengths and k < len(branch_local_lengths):
+            ll = _f(branch_local_lengths[k])
+            if ll > 0:
+                local_len = ll
+        margin = _f(be.get("required_margin_factor"), 1.0) or 1.0
+        share = _f(be.get("required_value")) * margin
+        to_nm = be.get("to_part") or f"consumer[{k}]"
+        if share <= 0:
+            # A consumer with NO current rating (e.g. a thermal load swept into the
+            # electrical fan-out) would size a degenerate 0 mm² busbar; emit a minimal
+            # in-spec sense/control lead instead (honest: nothing to size a power
+            # conductor from). Keeps the actuation 0-out-of-spec + the schedule clean.
+            bs = _spec(
+                kind="cable", mechanism=be.get("mechanism", mech),
+                carried_rating=None, carried_unit=be.get("required_unit") or unit,
+                size_label="2.5 mm² (sense)", outer_dia_mm=12.0,
+                drop_pct_or_velocity=None, within_spec=True,
+                spec_limit="no current rating — minimum lead",
+                material_qty_desc=f"2.5 mm² Cu sense lead, {local_len:.1f} m",
+                tool_used="(actuation branch — consumer carried no current rating)",
+                assumptions=["D2 ACTUATION branch: consumer edge carried no current "
+                             "rating; drawn as a minimum 2.5 mm² sense lead (not a "
+                             "degenerate 0 mm² busbar)"],
+                notes="actuation branch with no rating — minimum lead",
+            )
+            bs["role"] = "branch"; bs["actuation_role"] = "branch"
+            bs["from_part"] = sub_distribution_name; bs["to_part"] = to_nm
+            bs["csa_mm2"] = 2.5; bs["n_parallel"] = 1
+            branches.append(bs)
+            continue
+        b_edge = {
+            "from_part": sub_distribution_name,
+            "to_part": to_nm,
+            "mechanism": be.get("mechanism", mech),
+            "constraint_kind": be.get("constraint_kind", ck),
+            "required_value": share, "required_unit": be.get("required_unit") or unit,
+            "required_margin_factor": 1.0,
+            "system_voltage_v": lv_voltage_v,
+            "material_context": be.get("material_context") or mc
+                                 or f"{lv_voltage_v:g} V LV bus",
+        }
+        bs = _size_actuation_run(b_edge, local_len, role="branch")
+        bs["actuation_role"] = "branch"
+        branches.append(bs)
+
+    feeder_ok = feeder.get("within_spec") is True
+    busway_ok = (local_busway is None) or (local_busway.get("within_spec") is True)
+    branches_ok = all(b.get("within_spec") is True for b in branches) if branches else True
+    resolved = bool(feeder_ok and busway_ok and branches_ok)
+
+    return {
+        "sub_distribution": sub_distribution,
+        "feeder": feeder,
+        "local_busway": local_busway,
+        "branches": branches,
+        "resolved": resolved,
+        "before": {
+            "lv_voltage_v": lv_voltage_v,
+            "total_value": round(total_value, 1),
+            "unit": unit,
+            "long_haul_m": round(_f(long_haul_m), 1),
+            "reach_a_m": round(total_value * _f(long_haul_m), 0),
+            "practical_lv_reach_a_m": PRACTICAL_LV_REACH_A_M,
+        },
+        "n_branches": n,
+    }
+
+
+def _size_actuation_run(edge: dict, length_m: float, role: str) -> dict:
+    """Size ONE actuation run via size_connection_to_spec with the TWO Phase-D3 test
+    levers NEUTRALISED, because the actuation has ALREADY decided this run's true
+    length AND true voltage and pinned them on the edge:
+
+      * CONN_TEST_LONG_RUN_M — the global 'inject a long run' lever must not
+        re-stretch a deliberately-SHORT actuation branch (the whole point of the
+        sub-distribution is that the branches are local); the explicit length passed
+        here is honoured exactly.
+      * CONN_TEST_LV_VOLTAGE_V — the 'what-if this were an LV system' lever must not
+        clobber the feeder's pinned MV voltage (the feeder is GENUINELY medium voltage
+        — that is how the step-up makes it thin + in-spec); each actuation edge carries
+        an explicit system_voltage_v (MV feeder vs LV branch/busway) which _infer_
+        system_voltage must honour, so the test override is dropped for the call.
+
+    Stamps role + actuation provenance."""
+    saved_len = os.environ.pop("CONN_TEST_LONG_RUN_M", None)
+    saved_lv = os.environ.pop("CONN_TEST_LV_VOLTAGE_V", None)
+    try:
+        spec = size_connection_to_spec(dict(edge), _f(length_m))
+    finally:
+        if saved_len is not None:
+            os.environ["CONN_TEST_LONG_RUN_M"] = saved_len
+        if saved_lv is not None:
+            os.environ["CONN_TEST_LV_VOLTAGE_V"] = saved_lv
+    spec["role"] = role
+    spec["from_part"] = edge.get("from_part")
+    spec["to_part"] = edge.get("to_part")
+    return spec
+
+
+# ---------------------------------------------------------------------------
 # 7b. COST — price a sized ConnectionSpec from the documented supply+install
 #     ladders above. PURE. Every result is stamped with cost_source so the
 #     dossier can disclose it is a MODEL, not engine/distributor data.
@@ -1880,6 +2183,23 @@ def connection_cost(spec: dict,
         }
 
     mech = spec.get("mechanism")
+
+    # ---- TRANSFORMER / SUB-DISTRIBUTION (a packaged step-down unit, NOT a metre-run)
+    #      — priced by kVA (the same £/kVA the schedule's tree-transformer row uses).
+    #      A D2-actuation sub-distribution arrives as a standalone kind='transformer'
+    #      spec in _CONN_SPECS; price it here so it isn't dropped to the £/m fallback.
+    if kind == "transformer":
+        kva = _f(spec.get("transformer_kva") or spec.get("carried_rating"))
+        install = kva * TRANSFORMER_GBP_PER_KVA
+        basis = (f"transformer £{TRANSFORMER_GBP_PER_KVA:g}/kVA × {kva:g} kVA installed "
+                 f"(pad-mount step-down + connection + commissioning)")
+        # unit_cost_gbp carries the £/kVA rate; qty stays the (zero) run length.
+        return {
+            "unit_cost_gbp": TRANSFORMER_GBP_PER_KVA, "qty": round(L, 2),
+            "install_gbp": round(install, 2), "termination_gbp": 0.0,
+            "line_total_gbp": round(install, 2),
+            "cost_source": COST_SOURCE_MODEL, "cost_basis": basis,
+        }
 
     # ---- DATA / CONTROL / FIBRE bundle (thin, fixed) — by MECHANISM first, so a
     #      signal lead that the sizer labelled kind='cable' still gets the flat
@@ -2054,7 +2374,7 @@ def connection_schedule(specs: list[dict]) -> list[dict]:
                 # price it by kVA (UK-2026 distribution-transformer installed
                 # rate ~£28/kVA: oil-filled pad-mount + connection + commissioning).
                 kva = _f(t.get("transformer_kva"))
-                xfmr_total = round(kva * 28.0, 2)
+                xfmr_total = round(kva * TRANSFORMER_GBP_PER_KVA, 2)
                 rows.append({
                     "mechanism": "electrical_bus",
                     "from": "(primary)", "to": "(secondary)",
@@ -2066,12 +2386,12 @@ def connection_schedule(specs: list[dict]) -> list[dict]:
                     "within_spec": True,
                     "qty": t.get("note"),
                     "role": "transformer",
-                    "unit_cost_gbp": 28.0,
+                    "unit_cost_gbp": TRANSFORMER_GBP_PER_KVA,
                     "install_gbp": xfmr_total,
                     "termination_gbp": 0.0,
                     "line_total_gbp": xfmr_total,
                     "cost_source": COST_SOURCE_MODEL,
-                    "cost_basis": f"transformer £28/kVA × {kva:g} kVA installed",
+                    "cost_basis": f"transformer £{TRANSFORMER_GBP_PER_KVA:g}/kVA × {kva:g} kVA installed",
                     "upsized": False,
                     "original_size": None,
                     "upsize_iterations": 0,

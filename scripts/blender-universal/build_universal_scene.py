@@ -241,6 +241,22 @@ CONN_FALLBACK_DIA_MM = 60.0
 # (a 1.5 mm² control lead ≈ 12 mm) stays visible at plant zoom without being so fat
 # it hides the step-down. A sized value ABOVE this is used as-is (the whole point).
 CONN_MIN_RENDER_DIA_MM = 12.0
+# ── PHASE D2 ACTUATION (auto-insert a sub-distribution + re-route) ───────────────
+# OFF BY DEFAULT. When a fan-out trunk is a D2 case (a long high-current LV run that
+# size_connection_to_spec can only RECOMMEND re-designing), enabling this makes the
+# engine ACT: it inserts a local sub-distribution (step-down transformer) marker near
+# the consumer cluster, runs ONE thin MV feeder from the source hub to it, and re-routes
+# the consumers as SHORT LV branches off the sub-distribution — all re-sized IN-SPEC
+# (connection_sizing.size_d2_actuation). Gated so real archetypes at normal limits are
+# BYTE-IDENTICAL unless actuation is explicitly enabled (CONN_D2_ACTUATE=1).
+CONN_D2_ACTUATE = os.environ.get("CONN_D2_ACTUATE", "").strip() not in ("", "0", "false", "no")
+# Physical footprint [mm] of the rendered sub-distribution box (a local LV panel /
+# step-down transformer kiosk). Coarse — it is a MARKER that the re-design happened,
+# placed between the source hub and the far consumers, near the cluster.
+SUBDIST_BOX_MM = (1400.0, 1000.0, 1800.0)   # W(along) × D(cross) × H
+# Sub-distribution marker colour (a distinct yellow-amber kiosk so it reads as the
+# inserted step-down, separate from the orange electrical runs).
+SUBDIST_COLOUR = (0.92, 0.74, 0.18)
 MECH_COLOUR = {             # sRGB; make_mat handles linear conversion
     "fluid_loop":    (0.42, 0.52, 0.62),   # steel blue-grey (generic process pipe)
     # DIRECTIONAL fluid mechanisms (derived flows): a SUPPLY feed and its RETURN must
@@ -3336,6 +3352,10 @@ def write_connection_schedule(out_dir):
     and log a [conn-schedule] roll-up (total cable-m by CSA, pipe-m by DN, duct-m by
     size) plus a [conn-WARN] line per run that is NOT within spec (volt-drop /
     velocity over limit) — the seed of the iterate loop. Returns the schedule dict."""
+    # Ensure the target dir exists before writing (the inspect-render makedirs runs on
+    # a different code path / later, so a fresh BLENDER_OUT_DIR would otherwise drop the
+    # schedule + bom .md with 'No such file or directory').
+    os.makedirs(out_dir, exist_ok=True)
     specs = list(_CONN_SPECS)
     rows = cs.connection_schedule(specs)
 
@@ -4583,6 +4603,332 @@ def _spine_pt(rack_plan, along_v, slot):
     return (rack_plan.spine_pos + off, a, tz)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE D2 ACTUATION (scene side) — render the inserted sub-distribution + the
+# re-routed step-down hierarchy. Pure logic is connection_sizing.size_d2_actuation;
+# here we DRAW it (the box marker + the thin MV feeder + the short LV branches) and
+# RECORD every re-sized spec in _CONN_SPECS so the schedule + cost pick them up.
+# Gated by CONN_D2_ACTUATE (default OFF) at the call site.
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _draw_presized_run(nm, mech, waypoints, spec, MAT, MO, pipe_module,
+                       own_parts=()):
+    """Draw ONE run at a PRE-SIZED ConnectionSpec's diameter (the D2-actuation re-sized
+    feeder / busway / branch), record THAT spec in _CONN_SPECS (so it is scheduled +
+    costed), and log it for the route audit. Mirrors _draw_run but does NOT re-size —
+    the diameter + spec come from connection_sizing.size_d2_actuation, which already
+    measured the right length per run (long MV feeder vs short LV branch)."""
+    import copy
+    s = copy.deepcopy(spec)
+    # keep THIS polyline's measured length on the recorded spec (the actuation sized
+    # it at the SAME length we route here, but record the exact rendered run length).
+    s["length_m"] = round(_polyline_len_m(waypoints), 2)
+    s["run_name"] = nm
+    _CONN_SPECS.append(s)
+    od = s.get("outer_dia_mm")
+    if od is None or not (od > 0):
+        od = CONN_FALLBACK_DIA_MM
+    od = max(od, CONN_MIN_RENDER_DIA_MM)
+    if mech == "electrical_bus":
+        _draw_cable_tray(nm, waypoints, MAT, MO, dia_mm=od)
+    else:
+        fl.prim_pipe_run(nm, waypoints, od, material=_mech_pipe_mat(mech, MAT),
+                         flanges=True, module=pipe_module, module_objects=MO)
+    a_xy = (waypoints[0][0], waypoints[0][1])
+    b_xy = (waypoints[-1][0], waypoints[-1][1])
+    _route_log_add(nm, mech, waypoints, a_xy, b_xy, own_parts=own_parts)
+
+
+def _emit_sub_distribution_box(nm, centre_xyz, sub_distribution, MAT, MO,
+                               pipe_module):
+    """Render the inserted SUB-DISTRIBUTION as a small panel/transformer kiosk box at
+    `centre_xyz` (near the consumer cluster) and record it in _CONN_SPECS as a costed
+    'transformer' row (priced by kVA via the existing connection_schedule path). The
+    box SITS ON THE FLOOR (its base at z=0), between the source hub and the far
+    consumers — a visible marker that the long LV run was re-designed into a step-down.
+    Returns the top-centre point (the feeder lands here / the local busway leaves here).
+    """
+    w, d, h = SUBDIST_BOX_MM
+    cx, cy = float(centre_xyz[0]), float(centre_xyz[1])
+    base_z = 0.0
+    loc = ((cx) * fl.MM, (cy) * fl.MM, (base_z + h / 2.0) * fl.MM)
+    size = (w * fl.MM, d * fl.MM, h * fl.MM)
+    mkey = "u_subdist_mat"
+    if mkey not in MAT:
+        MAT[mkey] = fl.make_mat("m_u_subdist", SUBDIST_COLOUR, metallic=0.3, roughness=0.5)
+    fl.add_box(nm, loc, size, MAT[mkey], module=pipe_module, module_objects=MO)
+    # Record a transformer spec so the schedule prints + costs the sub-distribution as
+    # the packaged step-down unit it is (connection_schedule prices role=transformer by
+    # kVA). Shape mirrors size_distribution_tree's `transformer` dict consumed there.
+    sd_spec = cs._spec(
+        kind="transformer", mechanism="electrical_bus",
+        carried_rating=sub_distribution.get("transformer_kva"), carried_unit="kVA",
+        size_label=(f"{sub_distribution.get('primary_voltage_v'):g}/"
+                    f"{sub_distribution.get('secondary_voltage_v'):g} V sub-distribution"),
+        outer_dia_mm=None, within_spec=True,
+        spec_limit="step-down transformer (sub-distribution)",
+        material_qty_desc=sub_distribution.get("note"),
+        tool_used=sub_distribution.get("tool_used"),
+        assumptions=["D2 ACTUATION: local sub-distribution inserted near the consumer "
+                     "cluster — the long LV run is re-designed as MV feeder + short LV "
+                     "branches (connection_sizing.size_d2_actuation)"],
+        notes=sub_distribution.get("note"),
+    )
+    sd_spec["role"] = "transformer"
+    sd_spec["from_part"] = "(primary)"
+    sd_spec["to_part"] = "(secondary)"
+    sd_spec["transformer_kva"] = sub_distribution.get("transformer_kva")
+    sd_spec["primary_voltage_v"] = sub_distribution.get("primary_voltage_v")
+    sd_spec["secondary_voltage_v"] = sub_distribution.get("secondary_voltage_v")
+    sd_spec["primary_current_a"] = sub_distribution.get("primary_current_a")
+    sd_spec["secondary_current_a"] = sub_distribution.get("secondary_current_a")
+    sd_spec["run_name"] = nm
+    _CONN_SPECS.append(sd_spec)
+    return (cx, cy, base_z + h)
+
+
+def _actuate_trunk_group(group, rack_plan, slot, rack_base_z, MAT, MO, pipe_module,
+                         tag, trunk_spec, trunk_len_m):
+    """D2 ACTUATION geometry: REPLACE an infeasible long-LV trunk fan-out with a
+    step-down hierarchy that comes IN-SPEC —
+      1. a SUB-DISTRIBUTION box near the consumer cluster centroid;
+      2. ONE thin MV FEEDER from the source hub to the sub-distribution (sized for the
+         total, stepped up to MV → low current → in-spec over the long haul);
+      3. a SHORT LV local busway from the sub-distribution along the cluster;
+      4. SHORT LV TAPS from the busway to each consumer.
+    All re-sized by connection_sizing.size_d2_actuation (the pure logic) over the REAL
+    LOCAL tap lengths, then drawn at those sizes + recorded in _CONN_SPECS. Returns the
+    number of runs emitted (box + feeder + busway + N taps). Universal — keyed on the
+    D2 condition, never archetype."""
+    mech = group["mech"]
+    origin = group["origin_xyz"]
+    consumers = group["consumers"]
+    along = rack_plan._along
+    tz = rack_plan.tier_z(slot)
+
+    # ── SUB-DISTRIBUTION placement: the consumer-cluster centroid (X,Y). It sits
+    #    BETWEEN the source hub and the far consumers because the centroid of the
+    #    consumers is, by construction, in the middle of the cluster the hub feeds.
+    cxs = [float(c["xyz"][0]) for c in consumers]
+    cys = [float(c["xyz"][1]) for c in consumers]
+    sd_centre = (sum(cxs) / len(cxs), sum(cys) / len(cys))
+
+    # ── The LV-side system voltage the consumers run at (for the actuation maths).
+    #    Honour the D3 what-if knob so the forced-D2 demo runs at its 48 V; else read
+    #    the trunk spec's own inferred system voltage.
+    lv_v = trunk_spec.get("system_voltage_v") or cs.DEFAULT_SYSTEM_VOLTAGE_V
+    _lv_knob = os.environ.get("CONN_TEST_LV_VOLTAGE_V")
+    if _lv_knob:
+        try:
+            v = float(_lv_knob)
+            if v > 0:
+                lv_v = v
+        except (TypeError, ValueError):
+            pass
+
+    # ── The REAL short local length of each tap = the routed sub-distribution→consumer
+    #    distance (centroid box top → consumer drop), in metres. This is what makes the
+    #    branches in-spec: they are genuinely local now.
+    sd_top_xy = sd_centre
+    branch_local_lengths = []
+    for c in consumers:
+        cx, cy, cz = (float(v) for v in c["xyz"])
+        # over to the consumer's along-coord on the lane, cross, drop — same shape the
+        # taps will actually take; its length is the local branch length.
+        dx = abs(cx - sd_top_xy[0]); dy = abs(cy - sd_top_xy[1])
+        local_len = (dx + dy) * fl.MM + (SUBDIST_BOX_MM[2] * fl.MM)  # +box height drop
+        branch_local_lengths.append(max(0.5, local_len))
+
+    # ── The local LV busway span = the cluster extent along the row, in metres.
+    cons_al = [along(c["xyz"]) for c in consumers]
+    busway_span_mm = (max(cons_al) - min(cons_al)) if len(cons_al) > 1 else 0.0
+    local_busway_m = max(1.0, busway_span_mm * fl.MM)
+
+    # ── Re-design (pure logic): the sub-distribution kVA, the MV feeder, the short
+    #    LV busway + branches — all re-sized IN-SPEC.
+    branch_edges = [c.get("edge") or {} for c in consumers]
+    act = cs.size_d2_actuation(
+        hub_edge=group.get("trunk_edge") or {},
+        total_value=cs._f(trunk_spec.get("carried_rating")),
+        branch_edges=branch_edges,
+        long_haul_m=trunk_len_m,
+        lv_voltage_v=lv_v,
+        branch_local_lengths=branch_local_lengths,
+        local_busway_m=local_busway_m,
+        sub_distribution_name=f"{group['origin_nm']}_subdist",
+    )
+
+    emitted = 0
+    # 1. SUB-DISTRIBUTION box at the cluster centroid.
+    sd_nm = f"u_subdist_{tag}{slot}_{mech}"
+    sd_top = _emit_sub_distribution_box(sd_nm, sd_centre, act["sub_distribution"],
+                                        MAT, MO, pipe_module)
+    emitted += 1
+
+    # 2. FEEDER: source hub (origin) → sub-distribution top. Thin MV — routed on spine.
+    feeder_a = (origin[0], origin[1], origin[2])
+    feeder_b = (sd_top[0], sd_top[1], tz)
+    feeder_wp = route_on_spine(rack_plan, slot, feeder_a, feeder_b,
+                               a_abstract=True, b_abstract=True, own=())
+    # land the feeder on the sub-distribution top.
+    feeder_wp = list(feeder_wp) + [(sd_top[0], sd_top[1], sd_top[2])]
+    feeder_nm = f"u_feeder_{tag}{slot}_{mech}"
+    try:
+        _draw_presized_run(feeder_nm, mech, feeder_wp, act["feeder"], MAT, MO,
+                           pipe_module)
+        emitted += 1
+    except Exception as ex:  # noqa: BLE001
+        print(f"[univ] D2 feeder {feeder_nm} FAILED: {ex}")
+
+    # 3. LOCAL LV BUSWAY: sub-distribution → along the consumer row (short local span),
+    #    on this group's lane + tier (parallel to other busways, no crossing).
+    if act.get("local_busway") is not None:
+        far_al = max(cons_al, key=lambda v: abs(v - along(sd_top)))
+        if rack_plan.axis == "x":
+            bus_a = (sd_top[0], sd_top[1], sd_top[2])
+            bus_b = (rack_plan._clamp_along(far_al), sd_top[1], tz)
+        else:
+            bus_a = (sd_top[0], sd_top[1], sd_top[2])
+            bus_b = (sd_top[0], rack_plan._clamp_along(far_al), tz)
+        busway_wp = route_on_spine(rack_plan, slot, bus_a, bus_b,
+                                   a_abstract=True, b_abstract=True, own=())
+        busway_nm = f"u_localbus_{tag}{slot}_{mech}"
+        try:
+            _draw_presized_run(busway_nm, mech, busway_wp, act["local_busway"],
+                               MAT, MO, pipe_module)
+            emitted += 1
+        except Exception as ex:  # noqa: BLE001
+            print(f"[univ] D2 local busway {busway_nm} FAILED: {ex}")
+
+    # 4. SHORT LV TAPS: the local busway → each consumer (over + cross + drop), each at
+    #    its re-sized LOCAL branch spec.
+    for k, c in enumerate(consumers):
+        cx, cy, cz = (float(v) for v in c["xyz"])
+        tap_on_bus = _spine_pt(rack_plan, along(c["xyz"]), slot)
+        if rack_plan.axis == "x":
+            raw = [tap_on_bus, (cx, tap_on_bus[1], tz), (cx, cy, tz), (cx, cy, cz)]
+        else:
+            raw = [tap_on_bus, (tap_on_bus[0], cy, tz), (cx, cy, tz), (cx, cy, cz)]
+        tap_wp = [raw[0]]
+        for p in raw[1:]:
+            if max(abs(p[0] - tap_wp[-1][0]), abs(p[1] - tap_wp[-1][1]),
+                   abs(p[2] - tap_wp[-1][2])) > 1.0:
+                tap_wp.append(p)
+        tap_nm = f"u_subtap_{tag}{slot}_{mech}_{k}"
+        try:
+            _draw_presized_run(tap_nm, mech, tap_wp, act["branches"][k], MAT, MO,
+                               pipe_module, own_parts=(c.get("pb"),))
+            emitted += 1
+        except Exception as ex:  # noqa: BLE001
+            print(f"[univ] D2 sub-tap {tap_nm} FAILED: {ex}")
+
+    res = "RESOLVED (0 out-of-spec)" if act.get("resolved") else "PARTIAL"
+    sd = act["sub_distribution"]
+    print(f"[univ][D2-ACTUATE] {tag}{slot} ({mech}): inserted {group['origin_nm']}"
+          f"_subdist {sd['transformer_kva']:g} kVA {sd['primary_voltage_v']:g}V→"
+          f"{sd['secondary_voltage_v']:g}V near cluster; feeder "
+          f"{act['feeder']['size_label']} (Vd {act['feeder']['drop_pct_or_velocity']}%) "
+          f"+ {len(consumers)} short LV branches — {res}")
+    return emitted
+
+
+def _actuate_passthrough_run(r, waypoints, rack_plan, slot, rack_base_z, MAT, MO,
+                             pipe_module, tag, edge_i, run_spec):
+    """D2 ACTUATION for a SINGLE long-LV passthrough electrical run (a point-to-point
+    edge, NOT a fan-out): insert a sub-distribution NEAR THE DESTINATION, run a thin MV
+    feeder from the source to it, and ONE short LV branch from the sub-distribution to
+    the destination. Resolves the infeasible long run in-spec. Returns runs emitted
+    (box + feeder + branch). Mirrors _actuate_trunk_group with a single consumer."""
+    mech = r["mech"]
+    a_xyz, b_xyz = r["a_xyz"], r["b_xyz"]
+    edge = r.get("edge") or {}
+    # SUB-DISTRIBUTION near the DESTINATION (b). Offset it slightly back toward the
+    # source so it sits BETWEEN source and load (not inside the destination part).
+    sd_centre = (0.85 * float(b_xyz[0]) + 0.15 * float(a_xyz[0]),
+                 0.85 * float(b_xyz[1]) + 0.15 * float(a_xyz[1]))
+
+    lv_v = run_spec.get("system_voltage_v") or cs.DEFAULT_SYSTEM_VOLTAGE_V
+    _lv_knob = os.environ.get("CONN_TEST_LV_VOLTAGE_V")
+    if _lv_knob:
+        try:
+            v = float(_lv_knob)
+            if v > 0:
+                lv_v = v
+        except (TypeError, ValueError):
+            pass
+
+    total = cs._f(run_spec.get("carried_rating"))
+    long_haul_m = _polyline_len_m(waypoints)
+    # the one branch's REAL short local length = sub-distribution → destination.
+    dx = abs(float(b_xyz[0]) - sd_centre[0]); dy = abs(float(b_xyz[1]) - sd_centre[1])
+    local_len = max(0.5, (dx + dy) * fl.MM + SUBDIST_BOX_MM[2] * fl.MM)
+
+    act = cs.size_d2_actuation(
+        hub_edge=edge,
+        total_value=total,
+        branch_edges=[edge],
+        long_haul_m=long_haul_m,
+        lv_voltage_v=lv_v,
+        branch_local_lengths=[local_len],
+        local_busway_m=None,   # single consumer → no separate local busway
+        sub_distribution_name=f"{r.get('b_nm') or 'load'}_subdist",
+    )
+
+    emitted = 0
+    tz = rack_plan.tier_z(slot) if rack_plan is not None else rack_base_z
+    sd_nm = f"u_subdist_{tag}{edge_i}_{mech}"
+    sd_top = _emit_sub_distribution_box(sd_nm, sd_centre, act["sub_distribution"],
+                                        MAT, MO, pipe_module)
+    emitted += 1
+
+    # FEEDER: source (a) → sub-distribution top (thin MV).
+    feeder_a = (float(a_xyz[0]), float(a_xyz[1]), float(a_xyz[2]))
+    if rack_plan is not None:
+        feeder_wp = route_on_spine(rack_plan, slot, feeder_a,
+                                   (sd_top[0], sd_top[1], tz),
+                                   a_abstract=r.get("a_abstract", False),
+                                   b_abstract=True, own=())
+    else:
+        feeder_wp = route_rack(feeder_a, (sd_top[0], sd_top[1], tz), rack_base_z)
+    feeder_wp = list(feeder_wp) + [(sd_top[0], sd_top[1], sd_top[2])]
+    feeder_nm = f"u_feeder_{tag}{edge_i}_{mech}"
+    try:
+        _draw_presized_run(feeder_nm, mech, feeder_wp, act["feeder"], MAT, MO,
+                           pipe_module, own_parts=(r.get("pa"),))
+        emitted += 1
+    except Exception as ex:  # noqa: BLE001
+        print(f"[univ] D2 passthrough feeder {feeder_nm} FAILED: {ex}")
+
+    # SHORT LV BRANCH: sub-distribution → destination (b).
+    branch_b = (float(b_xyz[0]), float(b_xyz[1]), float(b_xyz[2]))
+    br_wp = [(sd_top[0], sd_top[1], sd_top[2]),
+             (sd_top[0], sd_top[1], tz),
+             (branch_b[0], branch_b[1], tz),
+             branch_b]
+    dedup = [br_wp[0]]
+    for p in br_wp[1:]:
+        if max(abs(p[0] - dedup[-1][0]), abs(p[1] - dedup[-1][1]),
+               abs(p[2] - dedup[-1][2])) > 1.0:
+            dedup.append(p)
+    branch_nm = f"u_subbranch_{tag}{edge_i}_{mech}"
+    try:
+        _draw_presized_run(branch_nm, mech, dedup, act["branches"][0], MAT, MO,
+                           pipe_module, own_parts=(r.get("pb"),))
+        emitted += 1
+    except Exception as ex:  # noqa: BLE001
+        print(f"[univ] D2 passthrough branch {branch_nm} FAILED: {ex}")
+
+    sd = act["sub_distribution"]
+    res = "RESOLVED (0 out-of-spec)" if act.get("resolved") else "PARTIAL"
+    print(f"[univ][D2-ACTUATE] {tag}{edge_i} ({mech}) passthrough {r['a_nm']}→{r['b_nm']}: "
+          f"inserted {sd['transformer_kva']:g} kVA {sd['primary_voltage_v']:g}V→"
+          f"{sd['secondary_voltage_v']:g}V near load; feeder {act['feeder']['size_label']} "
+          f"(Vd {act['feeder']['drop_pct_or_velocity']}%) + 1 short LV branch "
+          f"{act['branches'][0]['size_label']} (Vd {act['branches'][0]['drop_pct_or_velocity']}%) "
+          f"— {res}")
+    return emitted
+
+
 def _emit_trunk_group(group, rack_plan, slot, rack_base_z, MAT, MO, pipe_module,
                       tag):
     """Emit ONE fan-out group as a HEADER/BUSWAY: a single TRUNK along the row of
@@ -4632,6 +4978,31 @@ def _emit_trunk_group(group, rack_plan, slot, rack_base_z, MAT, MO, pipe_module,
     trunk_wp = route_on_spine(rack_plan, slot, o_far_pt, far_pt,
                               a_abstract=True, b_abstract=True, own=())
     trunk_nm = f"u_trunk_{tag}{slot}_{mech}"
+
+    # ── PHASE D2 ACTUATION (gated, default OFF) ──────────────────────────────────
+    # If this is an ELECTRICAL fan-out whose trunk is a D2 case (a long high-current
+    # LV run size_connection_to_spec can only RECOMMEND re-designing), and actuation is
+    # enabled, ACT: replace the infeasible long trunk + long taps with a sub-distribution
+    # + thin MV feeder + short LV branches (all re-sized in-spec). The infeasible run is
+    # gone; nothing below this block runs for this group.
+    trunk_edge_for_d2 = group.get("trunk_edge")
+    if (CONN_D2_ACTUATE and mech == "electrical_bus"
+            and isinstance(trunk_edge_for_d2, dict)
+            and trunk_edge_for_d2.get("required_value") is not None):
+        try:
+            trunk_len_m = _polyline_len_m(trunk_wp)
+            # size the trunk to learn its D2 status (size_connection_to_spec honours the
+            # CONN_TEST_LONG_RUN_M injection, so the forced-long case is recognised). Cheap:
+            # the same call inside _draw_run would hit the sizing cache.
+            t_eval = cs.size_connection_to_spec(dict(trunk_edge_for_d2), trunk_len_m,
+                                                carried_value=None)
+            if cs.d2_actuation_applicable(t_eval):
+                return _actuate_trunk_group(group, rack_plan, slot, rack_base_z, MAT, MO,
+                                            pipe_module, tag, t_eval, trunk_len_m)
+        except Exception as ex:  # noqa: BLE001 — actuation must never crash the run;
+            # fall through to the normal trunk+taps on any failure.
+            print(f"[univ][D2-ACTUATE] {tag}{slot} ({mech}) actuation skipped: {ex}")
+
     try:
         # the TRUNK carries the SUMMED load (group['trunk_edge']) → renders FATTER
         # than any tap. role='trunk' for the schedule.
@@ -4750,6 +5121,22 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
                                    rack_base_z + RACK_TIER_PITCH_MM * (slot % 4))
         nm = f"u_route_{tag}{i}_{mech}"
         try:
+            # ── PHASE D2 ACTUATION on a PASSTHROUGH electrical run (gated, default OFF).
+            # A single long high-current LV point-to-point run (e.g. rack_block→pcs at
+            # 1953 A / 300 m / 48 V) is a D2 case too; ACT on it — insert a sub-distribution
+            # near the DESTINATION, feed it thin MV from the source, short LV branch to the
+            # one consumer. Resolves the run in-spec; nothing below runs for this edge.
+            if (CONN_D2_ACTUATE and mech == "electrical_bus"
+                    and isinstance(r.get("edge"), dict)
+                    and r["edge"].get("required_value") is not None):
+                t_eval = cs.size_connection_to_spec(dict(r["edge"]),
+                                                    _polyline_len_m(waypoints))
+                if cs.d2_actuation_applicable(t_eval):
+                    n_act = _actuate_passthrough_run(
+                        r, waypoints, rack_plan, slot, rack_base_z, MAT, MO,
+                        pipe_module, tag, i, t_eval)
+                    routed += n_act
+                    continue
             # SIZE this passthrough run at its REAL diameter from the edge rating (the
             # raw topology edge carried on the resolved dict). One size for the whole
             # run; the cable tray / pipe both honour it.
