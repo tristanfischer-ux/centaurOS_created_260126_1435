@@ -164,3 +164,15 @@ two questions exposed this. Close it:
 The de-cage fix (1faac282d) resolved the "real mess" (cage gone, well-framed via inspect-hero). Tristan:
 "not a mess but not great from a pipework perspective — still looks odd". ITERATION WORK (not blocking).
 Render kept PULLED from the dossier (2D-drawing-led) until the pipework iterates clean, then re-feature.
+
+## ♻ COST-SYSTEM RECONCILE (found 2026-06-11 — pre-change-search miss)
+TWO DOE/NETL cost systems now exist: (1) `scripts/lib/cost/build-cost-basis.ts` — PER-CLASS
+(CLASS_EQUIPMENT_MAPS only covers co2_mineralisation), builds `state.costBasis` (cost_gbp + `defensible`
+flag) but ONLY DISCLOSES on the Cost Methodology page, never writes back to the BoM. (2)
+`scripts/lib/cost/bom-cost-grounding.ts` (W8.2, mine) — UNIVERSAL (any class), AND writes back
+(chain stage overwrites partVerifications prices). Both build on process-equipment-cost.ts. NOT pure
+duplication (mine is universal where build-cost-basis is co2-only) but they overlap.
+CLEAN MERGE (follow-up, not done): make build-cost-basis UNIVERSAL by using bom-cost-grounding's detection
+as its no-class-map fallback → ONE source of defensible prices that feeds BOTH the methodology page AND
+the writeback. Then drop the separate bom-cost-grounding chain stage. Lesson: pre-change mempalace/grep
+for existing cost logic BEFORE building a cost module (I missed build-cost-basis).

@@ -16645,6 +16645,53 @@ function buildProcessFlowPage(state: any, project: string, statePath?: string): 
   } catch { return [] }
 }
 
+// W4.1 (Tristan 2026-06-11 "the BoM based in reality"): the cabling/piping/ductwork
+// that connects the equipment has ALWAYS been omitted from the dossier BoM. The routed
+// CAD model sizes every run from its real rating + measured length (connection-schedule.json,
+// written by build_universal_scene.py). This ADDITIVE section surfaces those costed runs —
+// it does NOT touch the existing module BoM reconciliation (a separate Part-3 section).
+// Returns [] (renders nothing) when the schedule is absent. Array of <Page> per the idiom.
+function buildDistributionCablingPages(project: string, statePath?: string): any[] {
+  try {
+    if (!statePath) return []
+    const schedPath = join(dirname(statePath), 'connection-schedule.json')
+    if (!existsSync(schedPath)) return []
+    const sched: any = JSON.parse(readFileSync(schedPath, 'utf-8'))
+    const rows: any[] = Array.isArray(sched?.rows) ? sched.rows : []
+    if (rows.length === 0) return []
+    const t: any = sched.totals ?? {}
+    const gbp = (n: any) => (n == null ? '—' : '£' + Math.round(Number(n)).toLocaleString('en-GB'))
+    return [(
+      <Page key="dist-bom" size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Part 3 · Distribution & cabling" project={project} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>Distribution &amp; cabling</Text>
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 12, lineHeight: 1.55 }}>{'The cabling, piping and ductwork that connect the equipment — sized from the routed CAD model (each run’s cross-section from its real rating and measured length), and historically omitted from the bill of materials. Costs are a UK-2026 supply+install model (material + labour + terminations), not engine or distributor data. AACE Class 4, indicative.'}</Text>
+        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: RULE, paddingBottom: 3 }}>
+          <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>RUN (FROM / TO)</Text>
+          <Text style={{ width: 78, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>TYPE</Text>
+          <Text style={{ width: 58, fontSize: 7.5, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>SIZE</Text>
+          <Text style={{ width: 46, fontSize: 7.5, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>LENGTH</Text>
+          <Text style={{ width: 60, fontSize: 7.5, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>COST</Text>
+        </View>
+        {rows.map((r: any, i: number) => (
+          <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT, paddingVertical: 3, alignItems: 'baseline' }}>
+            <Text style={{ flex: 2, fontSize: 8, color: INK }}>{`${String(r.from ?? '?').replace(/_/g, ' ')} » ${String(r.to ?? '?').replace(/_/g, ' ')}`}</Text>
+            <Text style={{ width: 78, fontSize: 7.5, color: MUTED }}>{String(r.mechanism ?? '').replace(/_/g, ' ')}</Text>
+            <Text style={{ width: 58, fontSize: 8, color: INK, textAlign: 'right' }}>{String(r.size ?? '—')}</Text>
+            <Text style={{ width: 46, fontSize: 8, color: MUTED, textAlign: 'right' }}>{r.length_m ? `${Number(r.length_m).toFixed(1)} m` : '—'}</Text>
+            <Text style={{ width: 60, fontSize: 8, color: ACCENT, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>{gbp(r.line_total_gbp)}</Text>
+          </View>
+        ))}
+        <View style={{ flexDirection: 'row', marginTop: 6, paddingTop: 4, borderTopWidth: 1, borderTopColor: RULE }}>
+          <Text style={{ flex: 1, fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK }}>Distribution &amp; cabling total (supply + install)</Text>
+          <Text style={{ width: 60, fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>{gbp(t.grand_total_gbp)}</Text>
+        </View>
+        <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 8, lineHeight: 1.4 }}>{`Cable ${gbp(t.cable_gbp)} + pipe ${gbp(t.pipe_gbp)} + terminations ${gbp(t.terminations_gbp)}. Basis: ${String(t.cost_source ?? 'model:uk-2026-supply+install')}. Sizes per the connection schedule; lengths are the routed-polyline runs.`}</Text>
+      </Page>
+    )]
+  } catch { return [] }
+}
+
 function MinimalDocument({ state, subject, statePath }: { state: any; subject: string; statePath: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   // FREE-tier: pre-build the manufacturer -> "Company N" alias map + brand-mask
@@ -16933,6 +16980,8 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           consolidation of existing bomTotals — no part, manufacturer, part number
           or price invented (gate-20 safety line). */}
       <MasterBillOfMaterialsPage state={state} project={project} bomTotals={bomTotals} partLinkMap={partLinkMap} />
+      {/* W4.1: the routed cable/pipe/duct runs the BoM has always omitted (additive Part-3 section). */}
+      {buildDistributionCablingPages(project, statePath)}
       {/* Cost by module — moved OUT of Part 1 (Tristan 2026-06-08) into the Part 3
           reference cluster, beside the master BoM + cost basis. */}
       <CostByModulePage state={state} project={project} bomTotals={bomTotals} />
