@@ -3246,6 +3246,90 @@ def audit_routes(parts, out_dir):
     return metrics
 
 
+def _write_connection_bom_md(out_dir, rows, totals):
+    """Write a readable COSTED distribution BoM table to connection-bom.md:
+    mechanism | from→to | size | length m | qty | £, grouped by mechanism with
+    per-mechanism subtotals + a grand total. The £ are a documented MODEL
+    (totals['cost_source']) — the header says so, plainly."""
+    # group rows by mechanism, preserving first-seen order.
+    by_mech = {}
+    mech_order = []
+    for r in rows:
+        m = r.get("mechanism") or "(other)"
+        if m not in by_mech:
+            by_mech[m] = []
+            mech_order.append(m)
+        by_mech[m].append(r)
+
+    def _g(x):
+        return f"£{_safe_num(x):,.0f}"
+
+    lines = []
+    lines.append("# Distribution & cabling — costed BoM")
+    lines.append("")
+    lines.append(f"**Cost source:** `{totals.get('cost_source')}` — a DOCUMENTED "
+                 "UK-2026 supply+install unit-cost model (cable £/m by CSA, pipe "
+                 "£/m by DN, duct £/m by side, + per-termination hardware). These "
+                 "are NOT engine/distributor data: the engine has no per-metre "
+                 "cable/pipe/duct cost source, so this is a transparent quoting "
+                 "model (treat as ±30%). See connection_sizing.py COST MODEL header.")
+    lines.append("")
+    lines.append(f"- Runs sized: **{totals.get('runs_sized', len(rows))}**  ·  "
+                 f"out of spec: {totals.get('runs_out_of_spec', 0)}  ·  "
+                 f"auto-upsized: {totals.get('runs_upsized', 0)}")
+    lines.append(f"- Cable {_g(totals.get('cable_gbp'))}  ·  "
+                 f"Pipe {_g(totals.get('pipe_gbp'))}  ·  "
+                 f"Duct {_g(totals.get('duct_gbp'))}"
+                 + (f"  ·  Transformer {_g(totals.get('transformer_gbp'))}"
+                    if _safe_num(totals.get('transformer_gbp')) else "")
+                 + (f"  ·  Other {_g(totals.get('other_gbp'))}"
+                    if _safe_num(totals.get('other_gbp')) else ""))
+    lines.append(f"- Terminations & connection hardware: "
+                 f"{_g(totals.get('terminations_gbp'))}  "
+                 f"(metre/install {_g(totals.get('install_gbp'))})")
+    lines.append("")
+    lines.append(f"## Grand total: {_g(totals.get('grand_total_gbp'))}")
+    lines.append("")
+
+    for m in mech_order:
+        grp = by_mech[m]
+        sub = sum(_safe_num(r.get("line_total_gbp")) for r in grp)
+        lines.append(f"### {m}  —  subtotal {_g(sub)}")
+        lines.append("")
+        lines.append("| from → to | size | length (m) | qty | unit £/m | line £ |")
+        lines.append("|---|---|---:|---:|---:|---:|")
+        for r in grp:
+            frm = r.get("from") or "?"
+            to = r.get("to") or "?"
+            size = r.get("size") or "(unsized)"
+            L = r.get("length_m")
+            Ls = f"{_safe_num(L):.1f}" if L is not None else "—"
+            qty = r.get("qty") or "—"
+            # keep the qty cell short in the table.
+            qty = str(qty)
+            if len(qty) > 42:
+                qty = qty[:39] + "…"
+            unit = r.get("unit_cost_gbp")
+            us = f"£{_safe_num(unit):,.1f}" if unit is not None else "—"
+            line = _g(r.get("line_total_gbp"))
+            lines.append(f"| {frm} → {to} | {size} | {Ls} | {qty} | {us} | {line} |")
+        lines.append("")
+
+    try:
+        with open(os.path.join(out_dir, "connection-bom.md"), "w") as fh:
+            fh.write("\n".join(lines) + "\n")
+    except OSError as ex:
+        print(f"[univ][conn-bom] md write FAILED: {ex}")
+
+
+def _safe_num(x):
+    """float(x) or 0.0 — keeps the md writer robust against None/strings."""
+    try:
+        return float(x) if x is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def write_connection_schedule(out_dir):
     """PHASE C — the BoM feedback. Flatten every sized ConnectionSpec into the
     distribution SCHEDULE (connection_schedule), write it to connection-schedule.json
@@ -3311,6 +3395,12 @@ def write_connection_schedule(out_dir):
     def _round_map(d):
         return {k: round(v, 1) for k, v in sorted(d.items())}
 
+    # COST — roll every costed row's all-in line total into per-category £ totals
+    # (the rows already carry unit_cost_gbp / install_gbp / termination_gbp /
+    # line_total_gbp / cost_source from connection_sizing.connection_cost; this is
+    # the same split connection_schedule_costed() computes). MODEL costs, disclosed.
+    cost_totals = cs.connection_schedule_costed(specs)["totals"]
+
     schedule = {
         "rows": rows,
         "specs": specs,           # full ConnectionSpecs (auditable: tool, assumptions)
@@ -3323,6 +3413,16 @@ def write_connection_schedule(out_dir):
             "runs_out_of_spec": len(warns),
             "runs_upsized": len(upsized_runs),               # PHASE D1
             "design_recommendations": len(design_feedback),  # PHASE D2
+            # --- COST roll-up (model:uk-2026-supply+install) ---
+            "cable_gbp": cost_totals["cable_gbp"],
+            "pipe_gbp": cost_totals["pipe_gbp"],
+            "duct_gbp": cost_totals["duct_gbp"],
+            "transformer_gbp": cost_totals["transformer_gbp"],
+            "other_gbp": cost_totals["other_gbp"],
+            "terminations_gbp": cost_totals["terminations_gbp"],
+            "install_gbp": cost_totals["install_gbp"],
+            "grand_total_gbp": cost_totals["grand_total_gbp"],
+            "cost_source": cost_totals["cost_source"],
         },
         "out_of_spec": warns,
         "upsized": upsized_runs,        # PHASE D1 — auto-upsized runs (size grew)
@@ -3335,12 +3435,19 @@ def write_connection_schedule(out_dir):
     except OSError as ex:
         print(f"[univ][conn-schedule] write FAILED: {ex}")
 
+    # Readable costed BoM table — connection-bom.md (mechanism | from→to | size |
+    # length | qty | £), grouped by mechanism with subtotals + a grand total.
+    _write_connection_bom_md(out_dir, rows, schedule["totals"])
+
     t = schedule["totals"]
     print(f"[conn-schedule] {t['runs_sized']} runs sized; "
           f"cable-m by CSA: {t['cable_m_by_csa']}; "
           f"pipe-m by DN: {t['pipe_m_by_dn']}; "
           f"duct-m by size: {t['duct_m_by_size']}"
           + (f"; other-m: {t['other_m']}" if t['other_m'] else ""))
+    print(f"[conn-bom] cable £{t['cable_gbp']:,.0f} | pipe £{t['pipe_gbp']:,.0f} | "
+          f"duct £{t['duct_gbp']:,.0f} | total £{t['grand_total_gbp']:,.0f} "
+          f"(terminations £{t['terminations_gbp']:,.0f}; source {t['cost_source']})")
     # PHASE D — surface the volt-drop limit in force + the loop's response counts.
     print(f"[conn-schedule] volt-drop limit {schedule['voltdrop_limit_pct']:g}% "
           f"(env CONN_VOLTDROP_LIMIT_PCT); D1 upsized {t['runs_upsized']} run(s); "

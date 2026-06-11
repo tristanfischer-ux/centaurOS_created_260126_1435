@@ -258,6 +258,114 @@ GAS_VELOCITY_LIMIT_MS = 30.0       # gas erosion limit (API RP 14E ballpark)
 STEAM_VELOCITY_LIMIT_MS = 45.0     # steam line erosion ceiling
 
 
+# ===========================================================================
+# 1b. COST MODEL — supply+install unit-cost ladders for the distribution BoM.
+#
+#   PROVENANCE / HONESTY (read this before trusting a £):
+#   The engine has NO per-metre cable / pipe / duct cost source anywhere
+#   (verified 2026-06-11: scripts/lib/, src/lib/pdf-engine-v2/, the
+#   class-reference-graphs and the distributor cascade all price COMPONENTS by
+#   part number, never a conductor/pipe/duct by the metre — the dossier BoM has
+#   historically OMITTED cabling/piping/ductwork entirely). So these ladders are
+#   a DOCUMENTED MODEL, not engine data. Every costed row is stamped
+#   cost_source="model:uk-2026-supply+install" so the dossier can disclose it.
+#
+#   BASIS (UK, 2026, ex-VAT, SUPPLY + INSTALL — material + labour to pull/lay,
+#   terminate-excluded-here-and-charged-separately-per-termination, tray/trench/
+#   support included as a per-metre allowance). Figures are order-of-magnitude
+#   trade rates triangulated from SPON's Mechanical & Electrical Price Book
+#   ranges, ECA/BEAMA installed-cable guidance, and typical M&E subcontractor
+#   schedules-of-rates. They are deliberately ROUND. Treat as ±30%.
+#
+#   - CABLE  £/m by conductor CSA, PER CONDUCTOR (single core, Cu, LV/MV power,
+#     installed on tray or in trench). A run's cable cost =
+#       £/m(CSA) × length_m × n_parallel × n_cores_for_the_run.
+#     n_cores defaults to 1 (the sizer reports a per-conductor CSA; a 3-phase +
+#     N + earth run would set conductors_per_run=5 — we keep 1 unless the spec
+#     says otherwise, and DOCUMENT that this is a per-conductor rate so a caller
+#     can scale it). A copper BUSBAR is priced by its copper MASS (below), not
+#     this ladder.
+#   - PIPE   £/m by DN (carbon-steel process pipe installed with fittings +
+#     supports + a basic paint/lag allowance). Stainless / exotic alloys cost
+#     more — a `pipe_material_factor` (parsed from material_context) lifts it
+#     (316L ≈ 1.9×, Hastelloy/Inconel ≈ 3.5×, copper/cu ≈ 1.4×, plastic/PVC ≈
+#     0.6×). Steam/gas lines use the same DN ladder (the pipe is the pipe).
+#   - DUCT   £/m by the standard side dimension (galvanised rectangular sheet-
+#     metal duct, installed with hangers + a flexible-connection allowance).
+#   - TERMINATION  a per-END cost (glands, lugs, crimps, terminations, flanges,
+#     duct connectors). Two ends per run by default. Electrical terminations
+#     scale up with CSA (a 400 mm² lug + gland is far dearer than a 2.5 mm² one);
+#     pipe terminations scale with DN (a DN200 flange-pair vs a DN15 union).
+#
+#   These are STATED so the dossier shows exactly where each £ came from. None of
+#   it is fabricated engine output — it is a transparent quoting model.
+# ===========================================================================
+
+# £/m PER CONDUCTOR by CSA [mm²] — Cu power cable, UK-2026 supply+install.
+CABLE_COST_GBP_PER_M_BY_CSA = {
+    1.5: 3.0, 2.5: 4.0, 4: 5.5, 6: 6.5, 10: 8.5, 16: 11.0, 25: 15.0,
+    35: 19.0, 50: 24.0, 70: 31.0, 95: 39.0, 120: 47.0, 150: 57.0,
+    185: 68.0, 240: 84.0, 300: 100.0, 400: 130.0,
+}
+# £/m by DN label — carbon-steel process pipe, UK-2026 supply+install
+# (material + fittings + supports + basic finish). Lifted by pipe_material_factor.
+PIPE_COST_GBP_PER_M_BY_DN = {
+    "DN15": 18.0, "DN20": 22.0, "DN25": 28.0, "DN32": 34.0, "DN40": 40.0,
+    "DN50": 48.0, "DN65": 60.0, "DN80": 74.0, "DN100": 95.0, "DN125": 130.0,
+    "DN150": 165.0, "DN200": 210.0, "DN250": 275.0, "DN300": 340.0,
+}
+# £/m by standard duct SIDE [mm] — galvanised rectangular duct, UK-2026
+# supply+install (sheet metal + hangers + flexible-connection allowance).
+DUCT_COST_GBP_PER_M_BY_SIDE = {
+    150: 12.0, 200: 16.0, 250: 20.0, 300: 25.0, 400: 33.0, 500: 42.0,
+    600: 52.0, 800: 64.0, 1000: 75.0, 1200: 88.0, 1500: 105.0,
+}
+# Per-TERMINATION (per END) £ — electrical, by conductor CSA [mm²] (lug + gland +
+# crimp + labour). Two ends per run by default.
+TERMINATION_GBP_ELEC_BY_CSA = {
+    1.5: 6.0, 2.5: 6.0, 4: 7.0, 6: 8.0, 10: 10.0, 16: 14.0, 25: 18.0,
+    35: 24.0, 50: 30.0, 70: 40.0, 95: 52.0, 120: 66.0, 150: 82.0,
+    185: 100.0, 240: 130.0, 300: 160.0, 400: 210.0,
+}
+# Per-TERMINATION (per END) £ — fluid/duct, by DN label (flange pair amortised
+# to one end, gasket, bolts, labour) — a DN200 flanged end ≫ a DN15 union.
+TERMINATION_GBP_FLUID_BY_DN = {
+    "DN15": 14.0, "DN20": 16.0, "DN25": 20.0, "DN32": 26.0, "DN40": 32.0,
+    "DN50": 42.0, "DN65": 55.0, "DN80": 70.0, "DN100": 95.0, "DN125": 130.0,
+    "DN150": 170.0, "DN200": 240.0, "DN250": 320.0, "DN300": 420.0,
+}
+# Duct termination (connector / flexible joint) per end — coarse, by side band.
+TERMINATION_GBP_DUCT = 35.0
+# Default ends per run (a cable/pipe is terminated at BOTH ends).
+DEFAULT_ENDS_PER_RUN = 2
+# Copper busbar £/kg installed (bar + supports + insulators + labour); a busbar
+# is priced by its copper MASS, not the per-metre cable ladder. UK-2026 ~£18/kg
+# fabricated + installed (copper ~£8-9/kg raw, ~2× for fabrication + supports).
+BUSBAR_GBP_PER_KG = 18.0
+# Fallback signal/control bundle + member rates (thin, fixed) — UK-2026 supply+install.
+SIGNAL_BUNDLE_GBP_PER_M = 6.0       # data/control/fibre bundle on tray
+SIGNAL_TERMINATION_GBP = 12.0       # connectorised end (RJ45/fibre/terminal)
+MEMBER_GBP_PER_M = 28.0             # generic structural steel tie per metre
+MEMBER_TERMINATION_GBP = 25.0       # bolted/welded end connection
+# Unidentified-size fallback per-metre cost (un-rated edge rendered at a stub size).
+FALLBACK_GBP_PER_M = 12.0
+
+# The single label every model-derived cost row carries so the dossier discloses
+# that these £ came from a documented quoting MODEL, not engine/distributor data.
+COST_SOURCE_MODEL = "model:uk-2026-supply+install"
+
+# Material multipliers for pipe cost, parsed from material_context (carbon = 1.0).
+PIPE_MATERIAL_FACTORS = (
+    # (substring tuple, factor, label)
+    (("hastelloy", "inconel", "incoloy", "monel", "titanium", "duplex",
+      "super duplex", "c-276", "c276"), 3.5, "exotic alloy"),
+    (("316", "304", "stainless", "ss ", "cres", "1.4404", "1.4301"), 1.9, "stainless steel"),
+    (("copper", "cu ", "cupronickel", "cuni"), 1.4, "copper"),
+    (("pvc", "upvc", "cpvc", "hdpe", "mdpe", "pp ", "polyprop", "plastic",
+      "grp", "frp", "abs "), 0.6, "plastic/composite"),
+)
+
+
 def _voltdrop_limit_pct() -> float:
     """The active volt-drop ceiling [%]. Reads CONN_VOLTDROP_LIMIT_PCT each call
     (so a test can set it per-process) and falls back to the BS 7671 5% advisory.
@@ -1661,6 +1769,227 @@ def size_distribution_tree(hub_edge: dict, branch_edges: list[dict],
 
 
 # ---------------------------------------------------------------------------
+# 7b. COST — price a sized ConnectionSpec from the documented supply+install
+#     ladders above. PURE. Every result is stamped with cost_source so the
+#     dossier can disclose it is a MODEL, not engine/distributor data.
+# ---------------------------------------------------------------------------
+
+def _ladder_cost_for_csa(csa_mm2: float, table: dict) -> tuple[float, float]:
+    """£ for the nearest ladder CSA >= csa_mm2 (clamped to the ends). Returns
+    (rate, ladder_csa). A busbar's huge equivalent CSA clamps to the top rung."""
+    if csa_mm2 is None or csa_mm2 <= 0:
+        keys = sorted(table)
+        return table[keys[0]], keys[0]
+    keys = sorted(table)
+    for k in keys:
+        if k >= csa_mm2 - 1e-9:
+            return table[k], k
+    return table[keys[-1]], keys[-1]
+
+
+def _parse_csa_from_label(size_label: Optional[str]) -> Optional[float]:
+    """Pull the per-conductor CSA [mm²] out of a size label like '95 mm²',
+    '3×400 mm²' (→ 400 the per-conductor size) or a busbar label '(2880 mm²)'."""
+    if not size_label:
+        return None
+    import re as _re
+    # parenthesised busbar area first: '... (2880 mm²)'
+    m = _re.search(r"\(([\d.]+)\s*mm²\)", size_label)
+    if m:
+        return float(m.group(1))
+    # the LAST 'N mm²' in the label is the per-conductor CSA ('3×400 mm²' → 400).
+    last = None
+    for m in _re.finditer(r"([\d.]+)\s*mm²", size_label):
+        last = float(m.group(1))
+    return last
+
+
+def _pipe_material_factor(material_context: Optional[str]) -> tuple[float, str]:
+    """Material multiplier on the carbon-steel pipe rate (carbon = 1.0)."""
+    if not material_context:
+        return 1.0, "carbon steel (assumed)"
+    s = material_context.lower()
+    for subs, factor, label in PIPE_MATERIAL_FACTORS:
+        if any(k in s for k in subs):
+            return factor, label
+    return 1.0, "carbon steel"
+
+
+def _dn_label_from_spec(spec: dict) -> Optional[str]:
+    """Best-effort DN label for a pipe spec (the size_label is the DN for pipes;
+    a compatibility/nominal edge already carries 'DN25 (nominal)')."""
+    lbl = spec.get("size_label") or ""
+    import re as _re
+    m = _re.search(r"(DN\d+)", lbl)
+    return m.group(1) if m else None
+
+
+def _duct_sides_from_spec(spec: dict) -> Optional[int]:
+    """The larger duct side [mm] from a '600×400 duct' label (priced by the
+    larger side band)."""
+    lbl = spec.get("size_label") or ""
+    import re as _re
+    m = _re.search(r"(\d+)\s*[×x]\s*(\d+)", lbl)
+    if not m:
+        return None
+    return max(int(m.group(1)), int(m.group(2)))
+
+
+def connection_cost(spec: dict,
+                    conductors_per_run: Optional[int] = None,
+                    ends_per_run: int = DEFAULT_ENDS_PER_RUN) -> dict:
+    """Price ONE sized ConnectionSpec from the documented supply+install ladders.
+
+    PURE. Returns a cost dict:
+      { unit_cost_gbp, qty, install_gbp, termination_gbp, line_total_gbp,
+        cost_source, cost_basis }
+    where:
+      * unit_cost_gbp  = the per-metre rate actually used (£/m), AFTER the
+        per-conductor × n_parallel × n_cores expansion for a cable (so a reader
+        can multiply unit_cost_gbp × length and reproduce the material line);
+      * qty            = the run length [m] (the BoM quantity for the metre-rate);
+      * install_gbp    = the material+install metre cost = unit_cost_gbp × length;
+      * termination_gbp= the per-end glands/lugs/flanges × ends_per_run;
+      * line_total_gbp = install_gbp + termination_gbp (the run's all-in £);
+      * cost_source    = COST_SOURCE_MODEL (disclosed as a MODEL, not engine data);
+      * cost_basis     = a short human string naming the rate + multipliers used.
+
+    The metre-rate splits material+labour-to-lay (install_gbp) from the connection
+    hardware (termination_gbp) so the dossier can show both. NOTHING here is
+    engine/distributor data — see the COST MODEL header for the basis.
+
+    Args:
+      conductors_per_run: cores per cable run (default 1 — the sizer reports a
+        per-conductor CSA). Set to 5 for a 3-phase+N+earth feeder, etc.
+      ends_per_run: terminations to count (default 2 — both ends of the run)."""
+    kind = spec.get("kind")
+    L = max(0.0, _f(spec.get("length_m")))
+    n_par = max(1, int(_f(spec.get("n_parallel"), 1) or 1))
+    n_cores = max(1, int(conductors_per_run)) if conductors_per_run else 1
+    ends = max(0, int(ends_per_run))
+
+    def _result(unit_rate, install, term, basis):
+        return {
+            "unit_cost_gbp": round(unit_rate, 2),
+            "qty": round(L, 2),
+            "install_gbp": round(install, 2),
+            "termination_gbp": round(term, 2),
+            "line_total_gbp": round(install + term, 2),
+            "cost_source": COST_SOURCE_MODEL,
+            "cost_basis": basis,
+        }
+
+    mech = spec.get("mechanism")
+
+    # ---- DATA / CONTROL / FIBRE bundle (thin, fixed) — by MECHANISM first, so a
+    #      signal lead that the sizer labelled kind='cable' still gets the flat
+    #      bundle rate (NOT the power-cable CSA ladder).
+    if kind == "fibre" or mech in ("data", "control", "optical"):
+        unit_rate = SIGNAL_BUNDLE_GBP_PER_M
+        install = unit_rate * L
+        term = SIGNAL_TERMINATION_GBP * ends
+        basis = (f"signal bundle £{SIGNAL_BUNDLE_GBP_PER_M:g}/m + "
+                 f"£{SIGNAL_TERMINATION_GBP:g}/connector × {ends} ends")
+        return _result(unit_rate, install, term, basis)
+
+    # ---- CABLE: per-conductor £/m × length × n_parallel × n_cores ----
+    if kind == "cable":
+        csa = _parse_csa_from_label(spec.get("size_label")) or _f(spec.get("csa_mm2"))
+        per_m_1c, ladder_csa = _ladder_cost_for_csa(csa, CABLE_COST_GBP_PER_M_BY_CSA)
+        conductors = n_par * n_cores
+        unit_rate = per_m_1c * conductors           # effective £/m for the whole run
+        install = unit_rate * L
+        term_1, _tcsa = _ladder_cost_for_csa(csa, TERMINATION_GBP_ELEC_BY_CSA)
+        # each end terminates every parallel conductor of every core.
+        term = term_1 * conductors * ends
+        basis = (f"cable £{per_m_1c:g}/m·conductor @ {ladder_csa:g} mm² × "
+                 f"{conductors} conductor(s) ({n_par}∥×{n_cores} core) + "
+                 f"£{term_1:g}/end-lug × {ends} ends")
+        return _result(unit_rate, install, term, basis)
+
+    # ---- BUSBAR: priced by copper MASS (not the cable ladder) ----
+    if kind == "busbar":
+        csa = _parse_csa_from_label(spec.get("size_label")) or _f(spec.get("csa_mm2"))
+        # copper mass = CSA[m²] × length[m] × ρ_Cu; £ = mass × £/kg.
+        mass_kg = (max(0.0, csa) * 1e-6) * L * RHO_CU
+        install = mass_kg * BUSBAR_GBP_PER_KG
+        unit_rate = install / L if L > 0 else 0.0
+        # busbar terminations: bolted joints/risers — price at the top elec lug.
+        term_1 = TERMINATION_GBP_ELEC_BY_CSA[400]
+        term = term_1 * ends
+        basis = (f"busbar {csa:.0f} mm² Cu → {mass_kg:.1f} kg × £{BUSBAR_GBP_PER_KG:g}/kg "
+                 f"installed + £{term_1:g}/end joint × {ends} ends")
+        return _result(unit_rate, install, term, basis)
+
+    # ---- PIPE (incl. steam/gas — the pipe is the pipe): £/m by DN × material ----
+    if kind == "pipe":
+        dn = _dn_label_from_spec(spec)
+        per_m = PIPE_COST_GBP_PER_M_BY_DN.get(dn) if dn else None
+        if per_m is None:
+            per_m = PIPE_COST_GBP_PER_M_BY_DN["DN50"]   # neutral mid fallback
+            dn = dn or "DN50?"
+        mat_factor, mat_label = _pipe_material_factor(spec.get("material_context")
+                                                      or _spec_material_ctx(spec))
+        unit_rate = per_m * mat_factor
+        install = unit_rate * L
+        term_1 = (TERMINATION_GBP_FLUID_BY_DN.get(dn)
+                  or TERMINATION_GBP_FLUID_BY_DN["DN50"]) * mat_factor
+        term = term_1 * ends
+        basis = (f"pipe £{per_m:g}/m @ {dn} × {mat_factor:g} ({mat_label}) + "
+                 f"£{term_1:.0f}/flanged-end × {ends} ends")
+        return _result(unit_rate, install, term, basis)
+
+    # ---- DUCT: £/m by the larger standard side ----
+    if kind == "duct":
+        side = _duct_sides_from_spec(spec)
+        if side is not None:
+            # nearest standard duct side >= the larger side.
+            chosen = next((s for s in DUCT_SIZE_LADDER if s >= side), DUCT_SIZE_LADDER[-1])
+        else:
+            chosen = 400
+        per_m = DUCT_COST_GBP_PER_M_BY_SIDE.get(chosen, DUCT_COST_GBP_PER_M_BY_SIDE[400])
+        unit_rate = per_m
+        install = unit_rate * L
+        term = TERMINATION_GBP_DUCT * ends
+        basis = (f"duct £{per_m:g}/m @ {chosen} mm side + "
+                 f"£{TERMINATION_GBP_DUCT:g}/connector × {ends} ends")
+        return _result(unit_rate, install, term, basis)
+
+    # (data/control/optical handled at the top, by mechanism.)
+
+    # ---- MECHANICAL member / structural tie ----
+    if kind == "member" or mech == "mechanical":
+        unit_rate = MEMBER_GBP_PER_M
+        install = unit_rate * L
+        term = MEMBER_TERMINATION_GBP * ends
+        basis = (f"steel tie £{MEMBER_GBP_PER_M:g}/m + "
+                 f"£{MEMBER_TERMINATION_GBP:g}/end × {ends} ends")
+        return _result(unit_rate, install, term, basis)
+
+    # ---- UNKNOWN / unsized: a documented neutral per-metre fallback ----
+    unit_rate = FALLBACK_GBP_PER_M
+    install = unit_rate * L
+    term = 0.0
+    basis = (f"unsized/{kind} run — neutral £{FALLBACK_GBP_PER_M:g}/m allowance "
+             f"(no rating to price hardware from)")
+    return _result(unit_rate, install, term, basis)
+
+
+def _spec_material_ctx(spec: dict) -> Optional[str]:
+    """material_context isn't stamped on the spec by size_*; reconstruct a hint
+    for pipe-material from the recorded phase + assumptions so stainless/exotic
+    process lines lift off the carbon-steel base rate even post-sizing."""
+    parts = []
+    for a in (spec.get("assumptions") or []):
+        if isinstance(a, str):
+            parts.append(a)
+    n = spec.get("notes")
+    if isinstance(n, str):
+        parts.append(n)
+    return " ".join(parts) if parts else None
+
+
+# ---------------------------------------------------------------------------
 # 8. PUBLIC: connection_schedule
 # ---------------------------------------------------------------------------
 
@@ -1686,6 +2015,10 @@ def connection_schedule(specs: list[dict]) -> list[dict]:
             drop_str = f"{drop:g} m/s"
         else:
             drop_str = f"{drop:g}"
+        # COST — price the run from the documented supply+install ladders. PURE;
+        # the row carries the per-metre rate, the install £, the termination £,
+        # the all-in line total and the cost_source so the dossier discloses it.
+        c = connection_cost(spec)
         rows.append({
             "mechanism": spec.get("mechanism"),
             "from": spec.get("from_part"),
@@ -1698,6 +2031,13 @@ def connection_schedule(specs: list[dict]) -> list[dict]:
             "within_spec": spec.get("within_spec"),
             "qty": spec.get("material_qty_desc"),
             "role": role or spec.get("role"),
+            # --- COST (model:uk-2026-supply+install) ---
+            "unit_cost_gbp": c["unit_cost_gbp"],
+            "install_gbp": c["install_gbp"],
+            "termination_gbp": c["termination_gbp"],
+            "line_total_gbp": c["line_total_gbp"],
+            "cost_source": c["cost_source"],
+            "cost_basis": c["cost_basis"],
             # Phase-D surface (uniform shape; None/False when nothing fired).
             "upsized": bool(spec.get("upsized")),
             "original_size": spec.get("original_size_label"),
@@ -1710,6 +2050,11 @@ def connection_schedule(specs: list[dict]) -> list[dict]:
             _emit(item["trunk"], role="trunk")
             if item.get("transformer"):
                 t = item["transformer"]
+                # A step-down transformer is a packaged unit, not a metre-run —
+                # price it by kVA (UK-2026 distribution-transformer installed
+                # rate ~£28/kVA: oil-filled pad-mount + connection + commissioning).
+                kva = _f(t.get("transformer_kva"))
+                xfmr_total = round(kva * 28.0, 2)
                 rows.append({
                     "mechanism": "electrical_bus",
                     "from": "(primary)", "to": "(secondary)",
@@ -1721,12 +2066,187 @@ def connection_schedule(specs: list[dict]) -> list[dict]:
                     "within_spec": True,
                     "qty": t.get("note"),
                     "role": "transformer",
+                    "unit_cost_gbp": 28.0,
+                    "install_gbp": xfmr_total,
+                    "termination_gbp": 0.0,
+                    "line_total_gbp": xfmr_total,
+                    "cost_source": COST_SOURCE_MODEL,
+                    "cost_basis": f"transformer £28/kVA × {kva:g} kVA installed",
+                    "upsized": False,
+                    "original_size": None,
+                    "upsize_iterations": 0,
+                    "design_recommendation": None,
                 })
             for b in item["branches"]:
                 _emit(b, role="branch")
         else:
             _emit(item)
     return rows
+
+
+# ---------------------------------------------------------------------------
+# 8b. PUBLIC: connection_schedule_costed  — the COSTED schedule + a totals block.
+# ---------------------------------------------------------------------------
+
+def _cost_bucket_for_row(row: dict) -> str:
+    """Which cost-total bucket a costed row falls in (cable / pipe / duct /
+    transformer / other). Used to roll the per-run line totals into totals."""
+    role = row.get("role")
+    if role == "transformer":
+        return "transformer"
+    size = (row.get("size") or "")
+    mech = (row.get("mechanism") or "")
+    if "mm²" in size or "Cu bar" in size or mech == "electrical_bus":
+        return "cable"
+    if size.startswith("DN") or "(nominal)" in size:
+        return "pipe"
+    if "duct" in size.lower():
+        return "duct"
+    return "other"
+
+
+def connection_schedule_costed(specs: list[dict]) -> dict:
+    """The COSTED schedule: every row from connection_schedule (now carrying its
+    cost fields) PLUS a `totals` block that splits the all-in £ by category and a
+    grand total. PURE.
+
+    Returns:
+      { 'rows': [...costed rows...],
+        'totals': { 'cable_gbp', 'pipe_gbp', 'duct_gbp', 'transformer_gbp',
+                    'other_gbp', 'terminations_gbp', 'install_gbp',
+                    'grand_total_gbp', 'cost_source' } }
+
+    `terminations_gbp` is the sum of every row's termination hardware (glands /
+    lugs / flanges / connectors); `install_gbp` is the sum of every row's
+    material+labour metre cost; grand_total = install + terminations =
+    Σ line_total_gbp. The per-category buckets (cable/pipe/duct/…) are the FULL
+    line totals (metre + terminations) so they add up to the grand total."""
+    rows = connection_schedule(specs)
+    cat_total = {"cable": 0.0, "pipe": 0.0, "duct": 0.0,
+                 "transformer": 0.0, "other": 0.0}
+    term_total = 0.0
+    install_total = 0.0
+    for r in rows:
+        bucket = _cost_bucket_for_row(r)
+        cat_total[bucket] += _f(r.get("line_total_gbp"))
+        term_total += _f(r.get("termination_gbp"))
+        install_total += _f(r.get("install_gbp"))
+    grand = sum(cat_total.values())
+    totals = {
+        "cable_gbp": round(cat_total["cable"], 2),
+        "pipe_gbp": round(cat_total["pipe"], 2),
+        "duct_gbp": round(cat_total["duct"], 2),
+        "transformer_gbp": round(cat_total["transformer"], 2),
+        "other_gbp": round(cat_total["other"], 2),
+        "terminations_gbp": round(term_total, 2),
+        "install_gbp": round(install_total, 2),
+        "grand_total_gbp": round(grand, 2),
+        "cost_source": COST_SOURCE_MODEL,
+    }
+    return {"rows": rows, "totals": totals}
+
+
+# ---------------------------------------------------------------------------
+# 8c. PUBLIC: merge_distribution_bom  — the dossier CONSUMPTION HOOK.
+# ---------------------------------------------------------------------------
+
+def merge_distribution_bom(dossier_bom_rows: list[dict],
+                           schedule: dict,
+                           module_name: str = "Distribution & cabling",
+                           group_by_mechanism: bool = True) -> list[dict]:
+    """Append the costed distribution runs to an existing dossier BoM as a new
+    'Distribution & cabling' section, matching a typical dossier BoM row shape:
+
+        { name, qty, unit, unit_price_gbp, line_total_gbp, module }
+
+    THE HOOK a dossier calls to actually PRINT the cabling/piping/ductwork the
+    BoM has historically omitted. PURE — returns a NEW list (input untouched).
+
+    Args:
+      dossier_bom_rows: the dossier's existing BoM rows (any shape; passed through
+        unchanged — we only APPEND).
+      schedule: either a connection_schedule_costed() result ({rows, totals}) OR a
+        write_connection_schedule() dict (it carries `rows` + cost totals too) OR a
+        raw list of costed rows.
+      module_name: the BoM section label for the appended rows.
+      group_by_mechanism: True → one BoM line per (mechanism, size) group with the
+        runs summed (the readable dossier shape: '12 × 240 mm² DC bus cable runs');
+        False → one BoM line per individual run.
+
+    Returns the merged list: [*dossier_bom_rows, *distribution_rows]. When
+    group_by_mechanism, a final 'Terminations & connection hardware' line and the
+    section total are folded into the per-group lines (each group line's
+    line_total includes its share of terminations), so Σ(appended line_total) ==
+    the schedule grand total."""
+    # Normalise the schedule arg → a list of costed rows.
+    if isinstance(schedule, dict):
+        rows = schedule.get("rows") or []
+    elif isinstance(schedule, list):
+        rows = schedule
+    else:
+        rows = []
+
+    out = list(dossier_bom_rows or [])
+    if not rows:
+        return out
+
+    if not group_by_mechanism:
+        for r in rows:
+            mech = r.get("mechanism") or "distribution"
+            size = r.get("size") or "(unsized)"
+            frm = r.get("from") or "?"
+            to = r.get("to") or "?"
+            out.append({
+                "name": f"{mech} run {frm}→{to} — {size}",
+                "qty": 1,
+                "unit": "run",
+                "unit_price_gbp": round(_f(r.get("line_total_gbp")), 2),
+                "line_total_gbp": round(_f(r.get("line_total_gbp")), 2),
+                "module": module_name,
+            })
+        return out
+
+    # GROUPED: collapse runs sharing (mechanism, size) into one BoM line, summing
+    # the run lengths + the all-in line totals (metre cost + terminations).
+    groups: dict[tuple, dict] = {}
+    order: list[tuple] = []
+    for r in rows:
+        mech = r.get("mechanism") or "distribution"
+        size = r.get("size") or "(unsized)"
+        key = (mech, size)
+        if key not in groups:
+            groups[key] = {"mech": mech, "size": size, "n_runs": 0,
+                           "length_m": 0.0, "line_total_gbp": 0.0,
+                           "cost_source": r.get("cost_source") or COST_SOURCE_MODEL}
+            order.append(key)
+        g = groups[key]
+        g["n_runs"] += 1
+        g["length_m"] += _f(r.get("length_m"))
+        g["line_total_gbp"] += _f(r.get("line_total_gbp"))
+
+    for key in order:
+        g = groups[key]
+        is_metre = g["length_m"] > 0
+        # BoM quantity = total metres for a metre-run; else a count of units.
+        if is_metre:
+            qty = round(g["length_m"], 1)
+            unit = "m"
+            unit_price = round(g["line_total_gbp"] / g["length_m"], 2) if g["length_m"] else 0.0
+            name = f"{g['mech']} — {g['size']} ({g['n_runs']} run{'s' if g['n_runs'] != 1 else ''})"
+        else:
+            qty = g["n_runs"]
+            unit = "unit"
+            unit_price = round(g["line_total_gbp"] / max(1, g["n_runs"]), 2)
+            name = f"{g['mech']} — {g['size']}"
+        out.append({
+            "name": name,
+            "qty": qty,
+            "unit": unit,
+            "unit_price_gbp": unit_price,
+            "line_total_gbp": round(g["line_total_gbp"], 2),
+            "module": module_name,
+        })
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1753,8 +2273,19 @@ def _demo() -> None:
         size_connection_to_spec(vf_drip, 8.0),
         size_connection_to_spec(efuel_thermal, 20.0),
     ]
-    for r in connection_schedule(specs):
+    costed = connection_schedule_costed(specs)
+    for r in costed["rows"]:
         print(json.dumps(r, ensure_ascii=False))
+    print("# totals:", json.dumps(costed["totals"], ensure_ascii=False))
+    # CONSUMPTION HOOK demo — append to a sample dossier BoM.
+    sample_bom = [{"name": "Battery rack", "qty": 16, "unit": "unit",
+                   "unit_price_gbp": 42000.0, "line_total_gbp": 672000.0,
+                   "module": "Energy storage"}]
+    merged = merge_distribution_bom(sample_bom, costed)
+    print(f"# merged BoM: {len(sample_bom)} → {len(merged)} rows "
+          f"(+{len(merged) - len(sample_bom)} distribution lines)")
+    for r in merged[len(sample_bom):]:
+        print("#   +", json.dumps(r, ensure_ascii=False))
 
     # PHASE D demo — a 48 V LV bus far from its load: D1 upsizes the fixable case,
     # D2 recommends a re-design when the reach is excessive.

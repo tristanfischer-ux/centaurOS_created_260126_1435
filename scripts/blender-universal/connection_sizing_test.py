@@ -448,6 +448,106 @@ def main() -> int:
           and clean["design_recommendation"] is None
           and clean["final_size_label"] == clean["size_label"])
 
+    # ---- 10. COST MODEL — the distribution BoM (connection_cost / _costed / merge) ----
+    print("\nCOST MODEL — distribution BoM (model:uk-2026-supply+install):")
+
+    # Re-size the canonical edges with the Phase-D entry point so each spec
+    # carries its length (connection_cost prices from length_m + n_parallel).
+    c_dc = cs.size_connection_to_spec(dict(BESS_DC_BUS), 12.0)
+    c_drip = cs.size_connection_to_spec(dict(VF_DRIP), 8.0)
+    c_thermal = cs.size_connection_to_spec(dict(EFUEL_THERMAL), 20.0)
+    c_busbar = cs.size_connection_to_spec(dict(BUSBAR_HUGE), 10.0)
+
+    cost_dc = cs.connection_cost(c_dc)
+    cost_drip = cs.connection_cost(c_drip)
+    cost_thermal = cs.connection_cost(c_thermal)
+    cost_busbar = cs.connection_cost(c_busbar)
+
+    # 10a. Every cost is PRESENT, POSITIVE, and LABELLED with the model source.
+    for nm, cst in (("DC bus", cost_dc), ("drip", cost_drip),
+                    ("thermal", cost_thermal), ("busbar", cost_busbar)):
+        check(f"{nm} cost present + positive (unit/install/line all > 0)",
+              cst["unit_cost_gbp"] > 0 and cst["install_gbp"] > 0
+              and cst["line_total_gbp"] > 0)
+        check(f"{nm} cost_source labelled as the documented MODEL",
+              cst["cost_source"] == "model:uk-2026-supply+install"
+              and isinstance(cst.get("cost_basis"), str) and len(cst["cost_basis"]) > 0)
+
+    # 10b. line_total = install + terminations (the £ adds up).
+    for nm, cst in (("DC bus", cost_dc), ("drip", cost_drip), ("thermal", cost_thermal)):
+        check(f"{nm} line_total == install + terminations (arithmetic closes)",
+              abs(cst["line_total_gbp"]
+                  - (cst["install_gbp"] + cst["termination_gbp"])) < 0.05)
+
+    # 10c. Costs track size: a fat 778 kW DN200 coolant run costs MORE per metre
+    #      than a DN15 drip; a 1562 A bus costs more than a drip too.
+    check("DN200 coolant £/m >> DN15 drip £/m (size drives cost)",
+          cost_thermal["unit_cost_gbp"] > 5.0 * cost_drip["unit_cost_gbp"])
+    check("1562 A DC-bus run line-total >> drip line-total",
+          cost_dc["line_total_gbp"] > 5.0 * cost_drip["line_total_gbp"])
+
+    # 10d. Stainless pipe costs MORE than the same DN in carbon steel (material factor).
+    ss_edge = dict(EFUEL_THERMAL); ss_edge["material_context"] = "316L stainless coolant"
+    c_ss = cs.size_connection_to_spec(ss_edge, 20.0)
+    cost_ss = cs.connection_cost(c_ss)
+    check("316L stainless pipe £/m > carbon-steel pipe £/m (material factor)",
+          cost_ss["unit_cost_gbp"] > cost_thermal["unit_cost_gbp"])
+
+    # 10e. connection_schedule rows now CARRY the cost fields.
+    sched_rows = cs.connection_schedule([c_dc, c_drip, c_thermal])
+    check("schedule rows carry cost fields (line_total + cost_source)",
+          all(("line_total_gbp" in r and "unit_cost_gbp" in r
+               and r.get("cost_source") == "model:uk-2026-supply+install")
+              for r in sched_rows))
+
+    # 10f. connection_schedule_costed totals split by category + add to the grand total.
+    costed = cs.connection_schedule_costed([c_dc, c_drip, c_thermal])
+    tot = costed["totals"]
+    check("costed totals: grand_total == cable + pipe + duct + transformer + other",
+          abs(tot["grand_total_gbp"]
+              - (tot["cable_gbp"] + tot["pipe_gbp"] + tot["duct_gbp"]
+                 + tot["transformer_gbp"] + tot["other_gbp"])) < 0.05)
+    check("costed totals: grand_total == Σ row line totals",
+          abs(tot["grand_total_gbp"]
+              - sum(r["line_total_gbp"] for r in costed["rows"])) < 0.05)
+    check("costed totals: cable £ and pipe £ both > 0 for a mixed schedule",
+          tot["cable_gbp"] > 0 and tot["pipe_gbp"] > 0)
+    print(f"     (totals: cable £{tot['cable_gbp']:,.0f} | pipe £{tot['pipe_gbp']:,.0f} | "
+          f"duct £{tot['duct_gbp']:,.0f} | terminations £{tot['terminations_gbp']:,.0f} | "
+          f"grand £{tot['grand_total_gbp']:,.0f})")
+
+    # 10g. THE CONSUMPTION HOOK — merge_distribution_bom adds a section to a dossier BoM.
+    sample_bom = [
+        {"name": "Battery rack assembly", "qty": 16, "unit": "unit",
+         "unit_price_gbp": 42000.0, "line_total_gbp": 672000.0, "module": "Energy storage"},
+        {"name": "PCS inverter", "qty": 4, "unit": "unit",
+         "unit_price_gbp": 18000.0, "line_total_gbp": 72000.0, "module": "Power conversion"},
+    ]
+    merged = cs.merge_distribution_bom(sample_bom, costed)
+    added = merged[len(sample_bom):]
+    check("merge hook ADDS a 'Distribution & cabling' section (rows grew)",
+          len(merged) > len(sample_bom)
+          and all(r.get("module") == "Distribution & cabling" for r in added))
+    check("merge hook does NOT mutate the original dossier rows",
+          merged[:len(sample_bom)] == sample_bom and len(sample_bom) == 2)
+    check("merge rows match the dossier BoM shape (name/qty/unit/unit_price_gbp/line_total_gbp/module)",
+          all(all(k in r for k in ("name", "qty", "unit", "unit_price_gbp",
+                                   "line_total_gbp", "module")) for r in added))
+    check("merge rows carry positive line totals",
+          all(r["line_total_gbp"] > 0 for r in added))
+    check("Σ appended line totals == the schedule grand total (no £ lost in the merge)",
+          abs(sum(r["line_total_gbp"] for r in added) - tot["grand_total_gbp"]) < 0.5)
+    # ungrouped variant: one row per run.
+    merged_ungrouped = cs.merge_distribution_bom([], costed, group_by_mechanism=False)
+    check("merge ungrouped emits one BoM line per run",
+          len(merged_ungrouped) == len(costed["rows"]))
+    print(f"     (merge: {len(sample_bom)} dossier rows → {len(merged)} "
+          f"(+{len(added)} distribution lines); "
+          f"section £{sum(r['line_total_gbp'] for r in added):,.0f})")
+    for r in added:
+        print(f"       + {r['name']}  {r['qty']} {r['unit']} @ £{r['unit_price_gbp']:,.1f} "
+              f"= £{r['line_total_gbp']:,.0f}  [{r['module']}]")
+
     # ---- Verdict ----
     print()
     if failures:
