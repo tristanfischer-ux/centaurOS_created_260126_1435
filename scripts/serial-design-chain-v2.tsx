@@ -6112,6 +6112,75 @@ async function main() {
     // renderer can read it for the G1b badge).
     if (complianceGate) liveState.complianceGate = complianceGate
 
+    // ── BoM COST-GROUNDING (W8.2, Tristan 2026-06-11 "is the BoM based in reality?")
+    //    Replace LLM-authored BoM prices with REAL ones: DOE/NETL-2002/1169 Class-4
+    //    curves for fabricated process equipment + the distributor cache for catalogue
+    //    parts (scripts/lib/cost/bom-cost-grounding.ts). Quantities are already
+    //    physics-grounded (the engineering contract); this closes the PRICE gap
+    //    (e-fuel: 70/73 lines were "unknown"-provenance LLM guesses). The rendered
+    //    price lives in partVerifications[].{distributor_price_gbp|price_estimate_gbp},
+    //    matched to each word by word_id. We OVERWRITE only HIGH/MEDIUM-confidence
+    //    grounded lines (skip low-confidence + the understated-flagship cases the
+    //    module flags — e.g. engineered API-618 compressors, left at their prior price
+    //    + RFQ), and record provenance/basis on every grounded line for the Cost Basis
+    //    page. Gated CHAIN_SKIP_BOM_COST_GROUNDING; NON-FATAL (never blocks render).
+    if (process.env.CHAIN_SKIP_BOM_COST_GROUNDING !== '1') {
+      try {
+        const tCost = Date.now()
+        const { groundBomLineCost } = await import('./lib/cost/bom-cost-grounding')
+        const ec: any = liveState.engineeringContract ?? {}
+        const oc: any = liveState.orchestratorContract ?? {}
+        const groundCtx: any = {
+          quantities: { ...(ec.quantities ?? {}), ...(oc.quantities ?? {}) },
+          macroAssemblyPrices: ec.macro_assembly_prices,
+          installMode: 'skid',
+        }
+        const verifByWordId = new Map<string, any>()
+        for (const v of (Array.isArray(liveState.partVerifications) ? liveState.partVerifications : [])) {
+          if (v?.word_id) verifByWordId.set(v.word_id, v)
+        }
+        let overwritten = 0, recordedOnly = 0
+        for (const m of (liveState.moduleDecomposition?.modules ?? [])) {
+          for (const sm of (m.sub_modules ?? [])) {
+            for (const w of (sm.words ?? [])) {
+              const r: any = groundBomLineCost(w, groundCtx)
+              if (!r || r.provenance === 'no-ground' || r.price_gbp == null) continue
+              const v = verifByWordId.get(w.id)
+              if (!v) continue
+              v.cost_grounding_provenance = r.provenance
+              v.cost_grounding_basis = r.basis
+              v.cost_grounding_price_gbp = r.price_gbp
+              v.cost_grounding_confidence = r.confidence
+              // UNDERSTATEMENT GUARD: the DOE/NETL shell-mass floor understates
+              // ENGINEERED / SPECIALISED equipment (API-618 compressors, the FT
+              // reactor with catalyst+tubes) — it would push e.g. a £650k compressor
+              // down to a £135k floor, which is wrong. So never let the grounding
+              // DRASTICALLY UNDERCUT the prior price (< 0.5×): keep the prior figure
+              // (record the DOE estimate for transparency, RFQ the difference). The
+              // grounding's real value is correcting INDEFENSIBLY-CHEAP LLM lines UP
+              // (preheater £90k→£209k, cooler £180k→£570k) — those still overwrite.
+              const prior = typeof v.distributor_price_gbp === 'number'
+                ? v.distributor_price_gbp
+                : (typeof v.price_estimate_gbp === 'number' ? v.price_estimate_gbp : 0)
+              const drasticUndercut = prior > 0 && r.price_gbp < 0.5 * prior
+              if ((r.confidence === 'high' || r.confidence === 'medium') && !drasticUndercut) {
+                if (r.provenance === 'distributor-cache') v.distributor_price_gbp = r.price_gbp
+                else v.price_estimate_gbp = r.price_gbp
+                overwritten++
+              } else {
+                recordedOnly++
+              }
+            }
+          }
+        }
+        console.log(`[chain] bom-cost-grounding: ${overwritten} lines re-priced from DOE/NETL + cache (real), ${recordedOnly} recorded-only (low-confidence kept at prior price)`)
+        logAction({ step: 'bom_cost_grounding', overwritten, recordedOnly, latency_ms: Date.now() - tCost, ok: true })
+      } catch (err) {
+        console.error(`[chain] bom-cost-grounding failed (non-fatal): ${(err as Error).message}`)
+        logAction({ step: 'bom_cost_grounding', ok: false, error: String(err).slice(0, 200) })
+      }
+    }
+
     // ── Final emitter-identity re-assert (2026-05-31): the deterministic emitter
     //    is the SOLE authority on part identity (architecture anchor A1). A LATE
     //    stage (Stage 10.5 part-reality-check / R4 grounded fact-check) strips

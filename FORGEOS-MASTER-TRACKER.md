@@ -159,3 +159,8 @@ two questions exposed this. Close it:
 - Q1: Part 2 "how you manufacture it" — depth wanted? (process route + make-vs-buy + key process
   steps, or full manufacturing-process sheets?) — default: process route + make/buy + BoM first.
 - Q2: rounds-to-optimise target — is the goal "report the count" or "drive a fixed N every run"?
+
+## 🐞 D2 — INSPECT render pipework still reads "odd" (Tristan 2026-06-11, iteration work)
+The de-cage fix (1faac282d) resolved the "real mess" (cage gone, well-framed via inspect-hero). Tristan:
+"not a mess but not great from a pipework perspective — still looks odd". ITERATION WORK (not blocking).
+Render kept PULLED from the dossier (2D-drawing-led) until the pipework iterates clean, then re-feature.
