@@ -180,7 +180,10 @@ BANK_LANE_PITCH_MM = 8000   # initial Y pitch between bank lanes (a generous fir
 # their MEASURED depth + this small gap, so there is no dead empty band between the
 # two lanes (the old fixed 8 m pitch left a deep empty middle/front bay — the frame
 # was far deeper than the equipment). A walkway-width gap keeps them readable.
-BANK_COMPACT_GAP_MM = 1600  # clear gap between adjacent compacted bank lanes (~1.6 m)
+BANK_COMPACT_GAP_MM = 3600  # clear gap between adjacent compacted bank lanes — a REAL
+                            # pipe-rack maintenance AISLE (was 1.6 m, too tight for the
+                            # overhead rack spine + lanes; 3.6 m gives the spine a
+                            # genuine corridor so cross-laterals only span one bank)
 # Within a region bay, the three sub-blocks are offset in Y from the bay base.
 # Fix 2 DENSITY (Tristan 2026-06-10): offsets pulled in so big/medium/small NEST
 # closer — the old 5000/2200 spread left an empty middle band in every bay (visible
@@ -1954,6 +1957,9 @@ def _compact_banks_in_y(parts, bank_of_region, region_centres, n_banks):
     k-1. ONLY the Y of each part (and region_centre) moves — X / Z and the L→R
     process order are preserved. Universal: derived from placed geometry, no class
     data. No-op when there is a single bank."""
+    global _PLANT_BANK_AISLES
+    _PLANT_BANK_AISLES = []
+    final_bands = []      # (front_y, back_y) per bank AFTER the Y-shift, for the spine
     if n_banks <= 1:
         return
     # group placed parts by bank
@@ -1980,11 +1986,13 @@ def _compact_banks_in_y(parts, bank_of_region, region_centres, n_banks):
             hi = h if hi is None else max(hi, h)
         extents[b] = (lo, hi)
 
-    # Pull each bank FORWARD (−Y) to close any EXCESS empty band in front of it —
-    # but never push a bank backward (the shelf-packers already make banks deep;
-    # forcing a bank back would only re-grow the footprint). A bank moves only when
-    # the gap to the previous bank's back edge EXCEEDS BANK_COMPACT_GAP_MM; it then
-    # closes to exactly that gap. The first bank stays put.
+    # Re-base each bank so the gap to the previous bank's back edge is EXACTLY
+    # BANK_COMPACT_GAP_MM — a real maintenance/pipe-rack AISLE. This both PULLS a
+    # bank forward (closing a dead empty band) AND PUSHES it back when the banks
+    # were packed tighter than the aisle (so the overhead rack spine has a genuine
+    # corridor to run down). The first bank stays put; L→R process order + X/Z are
+    # untouched. (Pushing back grows the footprint slightly — a worthwhile trade for
+    # a clean rack aisle; the frame re-hugs the new extent.)
     ordered = sorted(extents.keys())
     prev_back = None
     moved = set()        # object pointers already shifted (guards prefix overlap)
@@ -1994,11 +2002,9 @@ def _compact_banks_in_y(parts, bank_of_region, region_centres, n_banks):
         if prev_back is None:
             target_front = lo            # keep first bank where it is
         else:
-            desired_front = prev_back + BANK_COMPACT_GAP_MM
-            # only pull FORWARD to close excess space; never push back
-            target_front = desired_front if lo > desired_front else lo
+            target_front = prev_back + BANK_COMPACT_GAP_MM   # ENFORCE the aisle gap
         shift = target_front - lo
-        if shift < -1.0:
+        if abs(shift) > 1.0:
             # Move EVERY Blender object this bank's parts created — matched by each
             # part's object-name PREFIX (build_part names all of a part's sub-meshes
             # — shell, heads, skirt, tray rings, platforms, ladders, nozzles — with
@@ -2016,7 +2022,19 @@ def _compact_banks_in_y(parts, bank_of_region, region_centres, n_banks):
                 if b2 == b and rk in region_centres:
                     cx, cy = region_centres[rk]
                     region_centres[rk] = (cx, cy + shift)
+        # record this bank's FINAL Y-band (front, back) so place_process_plant can
+        # site the pipe-rack spine in the aisle BETWEEN banks (not over equipment).
+        final_bands.append((target_front, target_front + depth))
         prev_back = target_front + depth      # this bank's (possibly shifted) back edge
+
+    # Publish the inter-bank aisle centres + widths (the gaps between consecutive
+    # final bank bands) for the router. The WIDEST one is the main rack aisle.
+    # (_PLANT_BANK_AISLES already declared global + reset at the top of this fn.)
+    final_bands.sort()
+    for (f0, b0), (f1, b1) in zip(final_bands[:-1], final_bands[1:]):
+        aisle_lo, aisle_hi = b0, f1
+        if aisle_hi - aisle_lo > 1.0:
+            _PLANT_BANK_AISLES.append(((aisle_lo + aisle_hi) / 2.0, aisle_hi - aisle_lo))
 
 
 def _shift_objects_by_prefix(prefixes, dy_mm, moved):
@@ -2235,7 +2253,14 @@ def route_rack(start_mm, end_mm, rack_z_mm):
     the source to the rack elevation, run along X then Y AT the rack level, then
     drop vertically to the target. No diagonals — pure Manhattan on a shared rack.
     rack_z_mm is clamped to sit ABOVE both endpoints (a real rack is overhead).
-    Degenerate (<1 mm) legs are dropped so a stacked source/target stays clean."""
+    Degenerate (<1 mm) legs are dropped so a stacked source/target stays clean.
+
+    LEGACY per-pipe router. Kept ONLY for the single-body families (tower-machine
+    down-tower runs, aero harness) where there is no equipment row to thread a
+    shared spine through. The multi-equipment families (process-plant, rack-farm,
+    panel-array, generic-assembly) now route on a shared RackPlan spine via
+    route_on_spine() — see the PIPE-RACK SPINE ENGINE below — so their parallel
+    runs sit in lanes on a real corridor instead of each crossing the deck."""
     sx, sy, sz = (float(c) for c in start_mm)
     ex, ey, ez = (float(c) for c in end_mm)
     zt = max(float(rack_z_mm), sz + 200.0, ez + 200.0)   # never below an endpoint
@@ -2250,6 +2275,642 @@ def route_rack(start_mm, end_mm, rack_z_mm):
                abs(p[2] - pts[-1][2])) > 1.0:
             pts.append(p)
     return pts
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PIPE-RACK SPINE ENGINE (2026-06-11) — the real fix for the "insane piping".
+# ───────────────────────────────────────────────────────────────────────────
+# A real plant does NOT route each pipe independently as source→X→Y→target at a
+# common height (that crosses other pipes, cuts across equipment, and sends an
+# edge endpoint round the whole building). It carries every line up onto a shared
+# PIPE RACK that runs down the AISLE between the equipment rows, gives each line
+# its own LANE (lateral offset) so parallels sit side-by-side, and stacks lines
+# that would otherwise cross onto different TIERS (elevations). This engine does
+# exactly that, deterministically, for ANY family:
+#
+#   1. The placement strategy (which knows the layout) builds a RackPlan: the
+#      spine AXIS ('x' or 'y'), the spine cross-axis POSITION (in the free aisle,
+#      NEVER over equipment), the along-axis EXTENT, the rack base elevation, and
+#      the equipment XY bboxes (so the router can keep horizontals off them).
+#   2. route_on_spine() routes one edge: source nozzle → riser UP to its tier →
+#      short lateral to the SPINE (at its lane offset) → run ALONG the spine to the
+#      target's along-spine coordinate → short lateral OFF the spine → drop DOWN to
+#      the target nozzle. The only horizontal that travels any distance is ON the
+#      spine, which lives in the aisle — so it never crosses equipment.
+#   3. LANES: each edge gets a distinct lateral offset; parallel runs never overlap.
+#   4. TIERS: edges whose along-spine intervals overlap are coloured onto distinct
+#      elevations (interval-graph greedy colouring), so any unavoidable crossing
+#      happens at a different height — zero same-Z crossings.
+#   5. ABSTRACT endpoints (electrical incomer / aggregate group) connect to the
+#      spine at the NEAREST point (their along-axis coord is CLAMPED into the spine
+#      extent) — no perimeter detour.
+# Universal + deterministic: all geometry is derived from the layout the placer
+# already computed; no per-class data, no LLM.
+# ═══════════════════════════════════════════════════════════════════════════
+
+RACK_LANE_PITCH_MM   = 360.0   # lateral offset between adjacent lanes on the spine
+RACK_LANE_SPAN_MM    = 2600.0  # total lateral band the lanes are spread across (caps
+                               # the offset so lanes stay within the aisle width)
+RACK_LATERAL_MIN_MM  = 300.0   # shortest lateral/riser leg (≥ pipe bend radius so the
+                               # fillet on prim_pipe_run always fits)
+RACK_TIER_MAX        = 16      # give every run its OWN elevation tier up to this many
+                               # edges (zero same-Z crossings); beyond it, fall back to
+                               # interval-graph tier colouring (reuse disjoint spans)
+RACK_DIRECT_MAX_MM   = 13000.0 # an edge whose endpoints are within this XY distance is
+                               # a LOCAL jumper: route it DIRECT (clean L) if that
+                               # avoids equipment, instead of detouring to the spine.
+                               # Longer edges always take the spine (visual coherence).
+# Inter-bank aisle bands [(centre_y, width), …] published by _compact_banks_in_y so
+# place_process_plant sites the rack spine in the REAL aisle between the equipment
+# banks (not over equipment). Reset every run; empty for a single-bank plant.
+_PLANT_BANK_AISLES = []
+
+
+def part_xy_bbox_mm(part):
+    """The XY footprint bounding box (x0,y0,x1,y1) in mm of a PLACED part —
+    its centre ± half its resolved footprint. Returns None for an unplaced part."""
+    if part.placed_xyz_mm is None:
+        return None
+    cx, cy = part.placed_xyz_mm[0], part.placed_xyz_mm[1]
+    fx, fy, _ = footprint_mm(resolved_dims_mm(part))
+    return (cx - fx / 2.0, cy - fy / 2.0, cx + fx / 2.0, cy + fy / 2.0)
+
+
+def part_top_z_mm(part):
+    """The part's TOP elevation (mm) — where a horizontal pipe at or above this Z
+    clears it. Uses the placed top anchor; falls back to centre + half height."""
+    if part.anchors and "top" in part.anchors:
+        return part.anchors["top"][2]
+    if part.placed_xyz_mm is None:
+        return DECK_Z_MM
+    _, _, h = footprint_mm(resolved_dims_mm(part))
+    return part.placed_xyz_mm[2] + h / 2.0
+
+
+_OWN_MATCH_TOL_MM = 250.0   # ≥ the bbox shrink, so an unshrunk OWN bbox still matches
+                            # its shrunk entry in the global equipment list
+
+
+def _bbox_is_own(bb, own):
+    """True if equipment bbox `bb` is one of THIS run's own source/target parts
+    `own`. Compares only the XY corners (ignores any 5th top_z element) with a
+    tolerance that absorbs the inward shrink applied to the global list, so an
+    unshrunk own-bbox still matches its shrunk global twin (and a riser/drop at a
+    part's own footprint is never miscounted as 'over OTHER equipment')."""
+    for ob in own:
+        if all(abs(bb[k] - ob[k]) < _OWN_MATCH_TOL_MM for k in range(4)):
+            return True
+    return False
+
+
+def equipment_xy_bboxes_mm(parts, shrink_mm=120.0):
+    """List of (x0,y0,x1,y1,top_z) for every placed part — the XY footprint (shrunk
+    inward by shrink_mm so a riser/drop at the shell EDGE isn't counted) plus the
+    part's TOP elevation. A horizontal pipe segment 'clears' a part when its Z is
+    ABOVE top_z; only a pipe BELOW a part's top that overlaps it in XY actually
+    clips it (an overhead rack legitimately flies over SHORT equipment). Used by the
+    route audit + the direct-route + corridor clearance tests."""
+    out = []
+    for p in parts:
+        bb = part_xy_bbox_mm(p)
+        if bb is None:
+            continue
+        x0, y0, x1, y1 = bb
+        if (x1 - x0) > 2 * shrink_mm and (y1 - y0) > 2 * shrink_mm:
+            x0 += shrink_mm; y0 += shrink_mm; x1 -= shrink_mm; y1 -= shrink_mm
+        out.append((x0, y0, x1, y1, part_top_z_mm(p)))
+    return out
+
+
+def _free_aisle_position(bboxes, axis, lo_cross, hi_cross):
+    """Find the cross-axis coordinate of the MAIN AISLE — the empty band that best
+    separates the equipment into two halves, so the spine runs down the middle of
+    the plant (not down a thin gap at the front edge). Returns (centre, width).
+
+    axis='x' means the spine RUNS along X, so the cross axis is Y; axis='y' mirrors.
+    We project the equipment onto the cross axis, merge into occupied blocks, take
+    the gaps between blocks, and SCORE each gap = its width but PENALISED by its
+    distance from the equipment centre (a central aisle beats an equally-wide edge
+    margin). The interior gap that splits the plant wins; falls back to the centre."""
+    occ = []
+    span_lo = span_hi = None
+    for bb in bboxes:                       # bb may be (x0,y0,x1,y1) or +top_z
+        x0, y0, x1, y1 = bb[0], bb[1], bb[2], bb[3]
+        a, b = (y0, y1) if axis == "x" else (x0, x1)
+        occ.append((a, b))
+        span_lo = a if span_lo is None else min(span_lo, a)
+        span_hi = b if span_hi is None else max(span_hi, b)
+    if not occ:
+        return (lo_cross + hi_cross) / 2.0, (hi_cross - lo_cross)
+    occ.sort()
+    merged = [list(occ[0])]
+    for a, b in occ[1:]:
+        if a <= merged[-1][1] + 1.0:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    centre = (span_lo + span_hi) / 2.0
+    total = max(1.0, span_hi - span_lo)
+    # The MAIN AISLE is the gap that best BISECTS the plant — equipment on BOTH
+    # sides, so every part reaches the spine across at most HALF the plant depth
+    # (not the whole of it). We score each interior gap (between two merged blocks)
+    # by (a) how evenly it splits the equipment by count, (b) its width, (c) how
+    # central it is. A gap with lots of equipment on both sides and near the middle
+    # wins — that is the through-aisle a real plant lays its main rack down. Edge
+    # margins (nothing on one side) score ~0 and are rejected.
+    n_parts = len(occ)
+    starts = sorted(a for a, _ in occ)
+    best = None   # (score, mid, width)
+    for (a_lo, a_hi), (b_lo, b_hi) in zip(merged[:-1], merged[1:]):
+        gap_lo, gap_hi = a_hi, b_lo
+        w = gap_hi - gap_lo
+        if w < 1.0:
+            continue
+        mid = (gap_lo + gap_hi) / 2.0
+        # parts whose centre is below / above the gap midpoint
+        below = sum(1 for a, b in occ if (a + b) / 2.0 < mid)
+        above = n_parts - below
+        balance = (min(below, above) / max(1, n_parts / 2.0))   # 0 (edge) … 1 (50/50)
+        central = 1.0 - min(1.0, abs(mid - centre) / (total / 2.0))
+        width_term = min(1.0, w / 1500.0)                       # saturate ~1.5 m aisle
+        # bisection dominates (an aisle MUST have equipment on both sides); width +
+        # centrality break ties between equally-balanced candidate gaps.
+        score = balance * (1.0 + 0.4 * width_term + 0.3 * central)
+        if best is None or score > best[0]:
+            best = (score, mid, w)
+    if best is not None and best[0] > 0.05:
+        return best[1], best[2]
+    # no bisecting interior gap (one solid block, or all parts on one side): put the
+    # spine at the equipment Y-CENTRE so cross-laterals are as short as possible.
+    return centre, 0.0
+
+
+class RackPlan:
+    """A shared pipe-rack corridor the router threads every run through.
+
+    axis        : 'x' or 'y' — the direction the SPINE runs (the plant's primary
+                  axis; horizontals on the spine travel along it).
+    spine_pos   : the cross-axis coordinate of the spine centreline (mm) — placed
+                  in the free aisle by the strategy, NEVER over equipment.
+    lo, hi      : the along-axis extent of the spine (mm).
+    base_z      : the lowest rack tier elevation (mm); higher tiers stack above it.
+    cross_lo/hi : the cross-axis band the lanes may spread across (the aisle width).
+    bboxes      : equipment XY bboxes (for the audit / future corridor refinement).
+
+    assign(edges): one-shot allocation of a LANE + a TIER to every edge, where each
+    edge is (along_a, along_b) its two along-axis endpoint coordinates (used to
+    build the interval graph for tier colouring). Call once before routing; then
+    route_on_spine() reads the per-edge lane/tier the plan stored."""
+
+    __slots__ = ("axis", "spine_pos", "lo", "hi", "base_z", "cross_lo", "cross_hi",
+                 "bboxes", "_lane", "_tier", "_n_tiers")
+
+    def __init__(self, axis, spine_pos, lo, hi, base_z, cross_lo, cross_hi, bboxes):
+        self.axis = "x" if axis == "x" else "y"
+        self.spine_pos = float(spine_pos)
+        self.lo = float(min(lo, hi))
+        self.hi = float(max(lo, hi))
+        self.base_z = float(base_z)
+        self.cross_lo = float(min(cross_lo, cross_hi))
+        self.cross_hi = float(max(cross_lo, cross_hi))
+        self.bboxes = list(bboxes or [])
+        self._lane = {}     # edge index → signed lane index (…-1,0,+1…)
+        self._tier = {}     # edge index → tier index (0 = base)
+        self._n_tiers = 1
+
+    def _along(self, xyz):
+        """The along-spine coordinate of a 3D point."""
+        return xyz[0] if self.axis == "x" else xyz[1]
+
+    def _clamp_along(self, v):
+        return max(self.lo, min(self.hi, v))
+
+    def assign(self, intervals):
+        """intervals = list of (along_a, along_b) per edge (already clamped to the
+        spine). Allocate a distinct LANE (lateral offset, centred about the spine and
+        fitted inside the aisle band) AND a distinct TIER (elevation) to every edge.
+
+        TIERS: each edge gets its OWN tier up to RACK_TIER_MAX, then the greedy
+        interval-graph colouring reuses a tier only for edges whose along-spine spans
+        do NOT overlap (so two pipes never share an elevation where they could cross).
+        For the small edge counts these families carry (≤ ~16), every edge typically
+        lands on a unique tier → zero same-elevation crossings, guaranteed. LANES then
+        keep parallel runs on the same tier visually side-by-side."""
+        n = len(intervals)
+        # --- lanes: centre + fit inside the aisle band so a lane never hits equipment.
+        aisle_half = max(0.0, (self.cross_hi - self.cross_lo) / 2.0 - RACK_LATERAL_MIN_MM)
+        max_off = min(RACK_LANE_SPAN_MM / 2.0, aisle_half) if aisle_half > 0 else \
+            RACK_LANE_SPAN_MM / 2.0
+        pitch = RACK_LANE_PITCH_MM
+        if n > 1 and max_off > 0:
+            pitch = min(RACK_LANE_PITCH_MM, (2.0 * max_off) / (n - 1))
+        for i in range(n):
+            raw = i - (n - 1) / 2.0                 # …-1,0,+1… centred
+            self._lane[i] = raw * pitch
+        # --- tiers: unique-per-edge first (best separation), capped, then colour. ---
+        order = sorted(range(n), key=lambda i: (intervals[i][0], intervals[i][1]))
+        tier_of = {}
+        if n <= RACK_TIER_MAX:
+            # plenty of head-room → give every edge its own tier (zero same-Z cross).
+            for rank, i in enumerate(order):
+                tier_of[i] = rank
+        else:
+            # many edges → greedy interval colouring: reuse a tier only for edges
+            # whose along-spine ranges are disjoint (they can't cross at that Z).
+            for i in order:
+                a_i, b_i = intervals[i]
+                used = set()
+                for j in order:
+                    if j in tier_of:
+                        a_j, b_j = intervals[j]
+                        if a_i < b_j and a_j < b_i:
+                            used.add(tier_of[j])
+                t = 0
+                while t in used:
+                    t += 1
+                tier_of[i] = t
+        self._tier = tier_of
+        self._n_tiers = (max(tier_of.values()) + 1) if tier_of else 1
+
+    def lane_offset(self, i):
+        return self._lane.get(i, 0.0)
+
+    def tier_z(self, i):
+        return self.base_z + RACK_TIER_PITCH_MM * self._tier.get(i, 0)
+
+
+def _polyline_over_equipment(waypoints, bboxes, own):
+    """Count the HORIZONTAL legs of an orthogonal polyline that pass over equipment
+    (any bbox not in `own`). Shared by the direct-route decision + mirrors the audit
+    rule, so 'would this route be clean?' is judged with the SAME test the audit uses."""
+    n = 0
+    for p, q in zip(waypoints[:-1], waypoints[1:]):
+        if not _seg_horizontal(p, q):
+            continue
+        for bb in bboxes:
+            if own and _bbox_is_own(bb, own):
+                continue
+            if _seg_over_bbox(p, q, bb):
+                n += 1
+                break
+    return n
+
+
+def _direct_route(plan, i, a_xyz, b_xyz, own):
+    """A SHORT LOCAL jumper between two nearby parts: rise to this run's tier, run
+    along X then Y (an L) at that tier, drop to the target — NO trip to the central
+    spine. Used when the two endpoints are close AND the L-route is clear of OTHER
+    equipment, so adjacent units get a direct pipe (how a real plant runs a local
+    jumper) instead of a wasteful detour up to the rack aisle and back. The run still
+    sits on its own TIER, so it never shares an elevation with another run. Returns
+    the waypoints, or None if the direct L crosses other equipment (caller falls back
+    to the spine)."""
+    ax, ay, az = (float(c) for c in a_xyz)
+    bx, by, bz = (float(c) for c in b_xyz)
+    tz = plan.tier_z(i)
+    # two orthogonal orderings (X-first vs Y-first); pick the clean one, preferring
+    # the one whose horizontal legs avoid equipment.
+    cand_xy = [(ax, ay, az), (ax, ay, tz), (bx, ay, tz), (bx, by, tz), (bx, by, bz)]
+    cand_yx = [(ax, ay, az), (ax, ay, tz), (ax, by, tz), (bx, by, tz), (bx, by, bz)]
+    best = None
+    for cand in (cand_xy, cand_yx):
+        pts = [cand[0]]
+        for p in cand[1:]:
+            if max(abs(p[0] - pts[-1][0]), abs(p[1] - pts[-1][1]),
+                   abs(p[2] - pts[-1][2])) > 1.0:
+                pts.append(p)
+        over = _polyline_over_equipment(pts, plan.bboxes, own)
+        if best is None or over < best[0]:
+            best = (over, pts)
+    return best[1] if best and best[0] == 0 else None
+
+
+def _corridor_clear_along_cross(plan, fixed_along, cross_a, cross_b, own):
+    """True if a CROSS-axis segment (the lateral that connects a part to the spine),
+    held at along-axis coord `fixed_along`, sweeping the cross axis from cross_a to
+    cross_b, is CLEAR of every equipment bbox except this run's own endpoints `own`.
+    axis='x' → the lateral runs along Y at X=fixed_along; axis='y' → along X."""
+    c_lo, c_hi = (min(cross_a, cross_b), max(cross_a, cross_b))
+    for bb in plan.bboxes:
+        if own and _bbox_is_own(bb, own):
+            continue
+        x0, y0, x1, y1 = bb[0], bb[1], bb[2], bb[3]
+        if plan.axis == "x":            # lateral ∥ Y at X=fixed_along
+            if x0 <= fixed_along <= x1 and not (y1 < c_lo or y0 > c_hi):
+                return False
+        else:                           # lateral ∥ X at Y=fixed_along
+            if y0 <= fixed_along <= y1 and not (x1 < c_lo or x0 > c_hi):
+                return False
+    return True
+
+
+def _nearest_clear_cross_along(plan, start_along, cross_a, cross_b, own):
+    """Find an along-axis coordinate NEAR start_along where the cross-lateral to the
+    spine (from cross_a to cross_b) is clear of OTHER equipment, so the lateral drops
+    through a column GAP instead of over a neighbour. Tries the part's own coord
+    first (no shift if its column is already clear), then steps outward in small
+    increments. Returns the chosen along-coord (clamped to the spine span). Falls
+    back to start_along if nothing clears within the search window (audit will flag
+    it; better a short over-equipment stub than a wild detour)."""
+    if _corridor_clear_along_cross(plan, start_along, cross_a, cross_b, own):
+        return start_along
+    step = RACK_LANE_PITCH_MM
+    for k in range(1, 28):              # up to ~10 m of search either way
+        for sign in (+1, -1):
+            cand = plan._clamp_along(start_along + sign * step * k)
+            if _corridor_clear_along_cross(plan, cand, cross_a, cross_b, own):
+                return cand
+    return start_along
+
+
+def route_on_spine(plan, i, a_xyz, b_xyz, a_abstract=False, b_abstract=False,
+                   own=()):
+    """Route ONE edge onto the shared rack spine and return PURELY-ORTHOGONAL mm
+    waypoints (every leg moves on ONE axis). Path (axis='x' shown; 'y' mirrors):
+
+        source nozzle                 (ax, ay, az)
+        riser UP                      (ax, ay, tz)
+        align to a CLEAR column       (ca, ay, tz)    — X-move over its OWN bay
+        CROSS-lateral down to spine   (ca, spine_y, tz)— Y through a clear column gap
+        run ALONG the spine           (cb, spine_y, tz)— the ONLY long X horizontal
+        CROSS-lateral up off spine    (cb, by, tz)    — Y through a clear column gap
+        align back to the target      (bx, by, tz)    — X-move over the TARGET's bay
+        drop DOWN to the target       (bx, by, bz)
+
+    The cross-lateral (the long Y leg from a part to the central aisle) is routed at
+    a CLEAR column coordinate (ca/cb) found by _nearest_clear_cross_along, so it
+    drops through a gap between equipment rather than over a neighbour. The short
+    X-aligning legs sit over the run's OWN source/target bay (allowed). The only
+    long along-axis run is ON the spine in the aisle. Abstract endpoints keep their
+    own cross-coordinate (plant edge); their along-coord is clamped into the spine.
+    tz + lane from plan.assign(); tz forced above both endpoints."""
+    ax, ay, az = (float(c) for c in a_xyz)
+    bx, by, bz = (float(c) for c in b_xyz)
+    # Elevation = a GLOBAL shared rack floor + this run's own TIER offset. The same
+    # floor for every run is exactly how a real overhead rack works (all the steel is
+    # at one height); the riser/drop simply bridges the nozzle up OR down to it, and
+    # the per-run tier keeps any two horizontals at distinct Z (zero same-Z crossings
+    # — NOT clamped to each endpoint, which used to collapse runs onto a tall vessel's
+    # top). A nozzle above the rack (tall column/tank) just drops DOWN to the rack.
+    tz = plan.tier_z(i)
+    lane = plan.lane_offset(i)
+    own = tuple(own)
+    # clear-column search (drop into a gap between equipment) is opt-in: on dense
+    # plants the X-jog it adds can lengthen the path more than the over-equipment it
+    # avoids. Default OFF — a straight cross-lateral at the part's own coord, which
+    # is short + reads clean; enable with ROUTE_CLEAR_COLUMNS=1.
+    use_clear = os.environ.get("ROUTE_CLEAR_COLUMNS", "").strip() not in ("", "0", "false")
+    if plan.axis == "x":
+        spine_y = plan.spine_pos + lane     # the spine lane (cross-axis = Y)
+        ca = (_nearest_clear_cross_along(plan, ax, ay, spine_y, own)
+              if use_clear and not a_abstract else ax)
+        cb = (_nearest_clear_cross_along(plan, bx, by, spine_y, own)
+              if use_clear and not b_abstract else bx)
+        raw = [
+            (ax, ay, az),                   # source nozzle
+            (ax, ay, tz),                   # riser up at the part's own X
+            (ca, ay, tz),                   # X-align to a clear column (over own bay)
+            (ca, spine_y, tz),              # cross-lateral (Y) down to the spine lane
+            (cb, spine_y, tz),              # run ALONG the spine (X) in the aisle
+            (cb, by, tz),                   # cross-lateral (Y) up off the spine
+            (bx, by, tz),                   # X-align back over the target's bay
+            (bx, by, bz),                   # drop to the target nozzle
+        ]
+    else:
+        spine_x = plan.spine_pos + lane     # cross-axis = X
+        ca = (_nearest_clear_cross_along(plan, ay, ax, spine_x, own)
+              if use_clear and not a_abstract else ay)
+        cb = (_nearest_clear_cross_along(plan, by, bx, spine_x, own)
+              if use_clear and not b_abstract else by)
+        raw = [
+            (ax, ay, az),
+            (ax, ay, tz),
+            (ax, ca, tz),
+            (spine_x, ca, tz),
+            (spine_x, cb, tz),
+            (bx, cb, tz),
+            (bx, by, tz),
+            (bx, by, bz),
+        ]
+    # drop degenerate (<1 mm) legs so a stacked/co-incident endpoint stays clean
+    pts = [raw[0]]
+    for p in raw[1:]:
+        if max(abs(p[0] - pts[-1][0]), abs(p[1] - pts[-1][1]),
+               abs(p[2] - pts[-1][2])) > 1.0:
+            pts.append(p)
+    return pts
+
+
+def make_rack_plan_for_rows(bbox_mm, base_z_mm, bboxes, axis="x"):
+    """Build a RackPlan whose spine runs down the widest free aisle of a
+    ROW-LAYOUT plant (process-plant banks, rack-farm / panel-array rows). The
+    spine is laid along `axis` (the long plant axis), positioned in the free aisle
+    on the cross axis, spanning the plant extent on the along axis. Universal:
+    derived purely from the placed bbox + equipment footprints."""
+    x0, x1 = bbox_mm["x0"], bbox_mm["x1"]
+    y0, y1 = bbox_mm["y0"], bbox_mm["y1"]
+    if axis == "x":
+        spine_pos, aisle_w = _free_aisle_position(bboxes, "x", y0, y1)
+        plan = RackPlan("x", spine_pos, x0, x1, base_z_mm,
+                        spine_pos - aisle_w / 2, spine_pos + aisle_w / 2, bboxes)
+        print(f"[univ][spine] axis=x  spine_y={spine_pos:.0f}  aisle={aisle_w:.0f} mm  "
+              f"x∈[{x0:.0f},{x1:.0f}] y∈[{y0:.0f},{y1:.0f}]  ({len(bboxes)} equip)")
+        return plan
+    spine_pos, aisle_w = _free_aisle_position(bboxes, "y", x0, x1)
+    plan = RackPlan("y", spine_pos, y0, y1, base_z_mm,
+                    spine_pos - aisle_w / 2, spine_pos + aisle_w / 2, bboxes)
+    print(f"[univ][spine] axis=y  spine_x={spine_pos:.0f}  aisle={aisle_w:.0f} mm  "
+          f"x∈[{x0:.0f},{x1:.0f}] y∈[{y0:.0f},{y1:.0f}]  ({len(bboxes)} equip)")
+    return plan
+
+
+def _make_rack_plan_from_bank_aisle(bbox_mm, base_z_mm, parts, axis="x"):
+    """Build a RackPlan whose spine sits in the WIDEST inter-bank aisle the
+    placement published (_PLANT_BANK_AISLES, the Y-gaps between serpentine banks).
+    This is the corridor the strategy KNOWS — far more reliable than inferring an
+    aisle from raw bboxes. Falls back to make_rack_plan_for_rows (gap inference)
+    when there is no published aisle (single-bank plant)."""
+    bboxes = equipment_xy_bboxes_mm(parts)
+    aisles = sorted(_PLANT_BANK_AISLES or [], key=lambda t: -t[1])   # widest first
+    if not aisles or axis != "x":
+        return make_rack_plan_for_rows(bbox_mm, base_z_mm, bboxes, axis=axis)
+    spine_y, aisle_w = aisles[0]
+    x0, x1 = bbox_mm["x0"], bbox_mm["x1"]
+    plan = RackPlan("x", spine_y, x0, x1, base_z_mm,
+                    spine_y - aisle_w / 2, spine_y + aisle_w / 2, bboxes)
+    print(f"[univ][spine] axis=x  spine_y={spine_y:.0f}  aisle={aisle_w:.0f} mm "
+          f"(inter-bank)  x∈[{x0:.0f},{x1:.0f}]  ({len(bboxes)} equip)")
+    return plan
+
+
+# ── Deterministic ROUTE AUDIT — the harsh self-check (Tristan 2026-06-11) ─────
+# Computes the THREE hard acceptance numbers from the emitted polylines + the
+# equipment bboxes, and writes them to route-audit.json so the result is a fact,
+# not an eyeball:
+#   • over_equipment_segments — horizontal pipe legs whose XY span passes over any
+#     equipment footprint (target 0).
+#   • max_detour_ratio — the longest routed path / straight-line source→target XY
+#     distance (target ≤ ~1.6; flags a perimeter detour).
+#   • same_elevation_crossings — pairs of horizontal legs that cross in XY at the
+#     SAME Z (target 0; tiers must resolve every crossing).
+_ROUTE_LOG = []   # list of dicts: {name, mech, waypoints, a_xy, b_xy, own_bboxes}
+
+
+def _route_log_reset():
+    _ROUTE_LOG.clear()
+
+
+def _route_log_add(name, mech, waypoints, a_xy, b_xy, own_parts=()):
+    """Record one emitted run for the audit. own_parts = the (≤2) source/target
+    Part objects this run connects, so the audit can EXCLUDE their footprints from
+    the over-equipment test (a riser/drop legitimately starts at its own part edge —
+    that is not 'a horizontal across OTHER equipment')."""
+    own = []
+    for p in own_parts:
+        if p is not None:
+            bb = part_xy_bbox_mm(p)
+            if bb is not None:
+                own.append(bb)
+    _ROUTE_LOG.append({"name": name, "mech": mech,
+                       "waypoints": [tuple(float(c) for c in p) for p in waypoints],
+                       "a_xy": (float(a_xy[0]), float(a_xy[1])),
+                       "b_xy": (float(b_xy[0]), float(b_xy[1])),
+                       "own_bboxes": own})
+
+
+def _seg_horizontal(p, q, z_tol=50.0):
+    """True if the segment p→q is a (near-)horizontal run (its Z barely changes and
+    it actually moves in XY) — the legs that must not cross equipment / each other."""
+    return (abs(p[2] - q[2]) <= z_tol
+            and (abs(p[0] - q[0]) > 1.0 or abs(p[1] - q[1]) > 1.0))
+
+
+_CLEAR_OVER_MM = 150.0   # a horizontal this far ABOVE a part's top clears it cleanly
+
+
+def _seg_over_bbox(p, q, bb):
+    """Does the horizontal segment p→q (axis-aligned) CLIP the equipment bb? bb is
+    (x0,y0,x1,y1[,top_z]). It clips when the segment overlaps the footprint in XY
+    AND the segment runs at or below the part's top (an overhead rack legitimately
+    FLIES OVER equipment shorter than the rack — that is clearance, not a clip).
+    When bb has no top_z (4-tuple) any XY overlap counts (height-agnostic callers)."""
+    x0, y0, x1, y1 = bb[0], bb[1], bb[2], bb[3]
+    sx0, sx1 = min(p[0], q[0]), max(p[0], q[0])
+    sy0, sy1 = min(p[1], q[1]), max(p[1], q[1])
+    if sx1 < x0 or sx0 > x1 or sy1 < y0 or sy0 > y1:
+        return False
+    if len(bb) >= 5:
+        seg_z = (p[2] + q[2]) / 2.0
+        if seg_z >= bb[4] - _CLEAR_OVER_MM:   # pipe is above the part top → clears it
+            return False
+    return True
+
+
+def _segs_cross_xy(p1, p2, q1, q2):
+    """True if axis-aligned horizontal segments p1p2 and q1q2 properly cross in XY
+    (one runs ∥X, the other ∥Y, and they intersect at an interior point — not a
+    shared endpoint touch). Returns False for parallel or merely-touching legs."""
+    def _orient(a, b):
+        if abs(a[0] - b[0]) <= 1.0:
+            return "y"            # runs along Y (X constant)
+        if abs(a[1] - b[1]) <= 1.0:
+            return "x"            # runs along X (Y constant)
+        return None
+    o1, o2 = _orient(p1, p2), _orient(q1, q2)
+    if o1 is None or o2 is None or o1 == o2:
+        return False
+    # name the X-running one (h) and the Y-running one (v)
+    (h1, h2), (v1, v2) = ((p1, p2), (q1, q2)) if o1 == "x" else ((q1, q2), (p1, p2))
+    hy = h1[1]                                  # the horizontal leg's constant Y
+    vx = v1[0]                                  # the vertical leg's constant X
+    hx0, hx1 = min(h1[0], h2[0]), max(h1[0], h2[0])
+    vy0, vy1 = min(v1[1], v2[1]), max(v1[1], v2[1])
+    eps = 1.0
+    return (hx0 + eps < vx < hx1 - eps) and (vy0 + eps < hy < vy1 - eps)
+
+
+def audit_routes(parts, out_dir):
+    """Compute the three hard acceptance numbers from _ROUTE_LOG + equipment
+    bboxes, print them, and write route-audit.json. Returns the metrics dict."""
+    bboxes = equipment_xy_bboxes_mm(parts)
+    over = 0
+    over_detail = []
+    detours = []
+
+    # over-equipment + detour-ratio per route. A segment that passes over THIS run's
+    # own source/target part is fine (the riser/drop starts there); a segment ABOVE a
+    # part's top clears it (overhead rack); only a horizontal that would CLIP OTHER
+    # equipment (overlaps in XY and runs at/below that part's top) counts.
+    for r in _ROUTE_LOG:
+        wp = r["waypoints"]
+        own = r.get("own_bboxes", [])
+        horiz_len = 0.0     # XY (plan-view) length only — risers/drops don't detour
+        for p, q in zip(wp[:-1], wp[1:]):
+            horiz_len += math.hypot(q[0] - p[0], q[1] - p[1])
+            if _seg_horizontal(p, q):
+                for bb in bboxes:
+                    if _bbox_is_own(bb, own):
+                        continue
+                    if _seg_over_bbox(p, q, bb):
+                        over += 1
+                        over_detail.append(r["name"])
+                        if os.environ.get("ROUTE_DEBUG"):
+                            print(f"[univ][route-dbg] {r['name']} seg "
+                                  f"({p[0]:.0f},{p[1]:.0f})->({q[0]:.0f},{q[1]:.0f}) "
+                                  f"over bbox ({bb[0]:.0f},{bb[1]:.0f},{bb[2]:.0f},{bb[3]:.0f})")
+                        break
+        straight = math.dist(r["a_xy"], r["b_xy"])
+        # detour = plan-view routed length / straight XY distance. A short cross-aisle
+        # tap to the spine (straight ~ a metre) inflates harmlessly; only count the
+        # ratio when the straight run is long enough to be a meaningful comparison.
+        ratio = (horiz_len / straight) if straight > 2000.0 else 1.0
+        detours.append((round(ratio, 3), r["name"]))
+    max_detour = max(detours, default=(1.0, None))
+    # same-elevation crossings: every pair of horizontal legs at the same Z
+    horiz = []   # (p, q, z, name)
+    for r in _ROUTE_LOG:
+        wp = r["waypoints"]
+        for p, q in zip(wp[:-1], wp[1:]):
+            if _seg_horizontal(p, q):
+                horiz.append((p, q, round((p[2] + q[2]) / 2.0, 1), r["name"]))
+    crossings = 0
+    cross_detail = []
+    for a in range(len(horiz)):
+        pa, qa, za, na = horiz[a]
+        for b in range(a + 1, len(horiz)):
+            pb, qb, zb, nb = horiz[b]
+            if na == nb:
+                continue                       # same pipe's own corner, ignore
+            if abs(za - zb) > 30.0:
+                continue                       # different tiers → not a same-Z cross
+            if _segs_cross_xy(pa, qa, pb, qb):
+                crossings += 1
+                cross_detail.append((na, nb, za))
+    metrics = {
+        "routes": len(_ROUTE_LOG),
+        "over_equipment_segments": over,
+        "over_equipment_routes": sorted(set(over_detail)),
+        "max_detour_ratio": round(max_detour[0], 3),
+        "max_detour_route": max_detour[1],
+        "same_elevation_crossings": crossings,
+        "crossing_detail": cross_detail[:20],
+        "tiers_used_note": "tiers separate crossings; lanes keep parallels apart",
+    }
+    try:
+        with open(os.path.join(out_dir, "route-audit.json"), "w") as fh:
+            json.dump(metrics, fh, indent=2)
+    except OSError:
+        pass
+    print(f"[univ][route-audit] routes={metrics['routes']}  "
+          f"over_equipment_segments={metrics['over_equipment_segments']}  "
+          f"max_detour_ratio={metrics['max_detour_ratio']}  "
+          f"same_elevation_crossings={metrics['same_elevation_crossings']}")
+    if over_detail:
+        print(f"[univ][route-audit]   over-equipment routes: "
+              f"{', '.join(sorted(set(over_detail)))}")
+    if cross_detail:
+        print(f"[univ][route-audit]   same-Z crossings: {cross_detail[:8]}")
+    return metrics
 
 
 # Shapes that have a real SHELL a nozzle stub can grow out of (Fix 1). A box,
@@ -2439,19 +3100,21 @@ def _draw_cable_tray(nm, waypoints_mm, MAT, MO):
 
 
 def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
-                   region_centres=None, bbox_mm=None):
-    """Draw a routed CAD pipe for every resolvable edge as an OVERHEAD PIPE-RACK
-    run (Fix 3): rise from the source nozzle to a shared rack elevation just below
-    the frame roof, run ORTHOGONALLY along it (X then Y, no diagonals), then drop
-    to the target nozzle. Nozzle pick is unchanged (top head for vapour/overhead/
-    gas, bottom for liquid/bottoms) and mechanism colours are unchanged. Returns
-    (routed_count, unresolved_list)."""
-    routed = 0
-    unresolved = []
-    # Shared rack elevation: just below the frame roof if we know it, else a sane
-    # default above the deck. Each routed run is nudged up one small tier so two
-    # parallel pipes on the rack don't render as a single co-incident line.
+                   region_centres=None, bbox_mm=None, rack_plan=None):
+    """Draw a routed CAD pipe for every resolvable edge on a SHARED PIPE-RACK SPINE
+    (2026-06-11 overhaul). Two passes: (1) RESOLVE every edge's source/target to a
+    3D nozzle point (abstract endpoints → incomer / cluster centroid); (2) build a
+    RackPlan whose spine runs down the free inter-bank AISLE, assign each run a LANE
+    + a TIER (so parallels sit side-by-side and crossings stack in Z), then emit via
+    route_on_spine() — riser → spine lane → along the aisle → off the spine → drop.
+    The long horizontal travels ON the spine in the aisle, never across equipment,
+    and an abstract endpoint joins at the NEAREST spine point (no perimeter detour).
+    Nozzle pick + mechanism colours unchanged. Returns (routed_count, unresolved)."""
     rack_base_z = rack_elevation_mm(frame_top_mm)
+
+    # ── PASS 1: resolve every edge to concrete 3D endpoints (collect, don't draw) ─
+    resolved = []   # per drawable edge: dict of endpoints/metadata
+    unresolved = []
     for i, e in enumerate(topology):
         frm = e.get("from_part", "")
         to = e.get("to_part", "")
@@ -2459,12 +3122,8 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
         pa = resolve_endpoint(frm, parts)
         pb = resolve_endpoint(to, parts)
 
-        # Fix 1: when an endpoint is ABSTRACT (external supply / aggregate group)
-        # resolve_endpoint returns None. Rather than skip the edge, synthesise a
-        # routable point: an incomer marker for an external supply, or the matched-
-        # cluster centroid (+ branch drops) for a group. a_pt/b_pt hold the chosen
-        # 3D mm point; a_branch/b_branch hold any extra load drops; a_conn/b_conn
-        # the assembly to link. Concrete parts keep the nozzle + stub path below.
+        # ABSTRACT endpoints (external supply / aggregate group): synthesise a
+        # routable point (incomer marker, or matched-cluster centroid + branch drops).
         a_abstract = pa is None
         b_abstract = pb is None
         a_pt = b_pt = None
@@ -2477,7 +3136,6 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
             b_pt, b_branch, b_conn = _resolve_abstract_end(
                 to, parts, region_centres, bbox_mm, MAT, MO)
 
-        # Still unroutable after the abstract-resolver (a genuinely empty endpoint).
         if (a_abstract and a_pt is None) or (b_abstract and b_pt is None):
             miss = []
             if (a_abstract and a_pt is None) or (pa is None and not a_abstract):
@@ -2492,12 +3150,6 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
                 (not b_abstract and pb.placed_xyz_mm is None):
             unresolved.append((frm, to, mech, ["unplaced"]))
             continue
-
-        colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
-        mkey = f"u_pipe_{mech}"
-        if mkey not in MAT:
-            MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35, roughness=0.35)
-        mat = MAT[mkey]
 
         # Nozzle selection from the edge's own label/endpoint text. Abstract ends
         # use their synthesised point directly (no shell → no nozzle/stub).
@@ -2515,41 +3167,116 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
             b_xyz = _maybe_stub(pb, b_key, b_xyz, mech, i, "b", MAT, MO)
             b_conn = pb.obj_anchor
 
-        # Overhead pipe-rack route at the SHARED rack elevation (Fix 3), tiered up
-        # slightly per run so parallel pipes don't co-incide into one line.
-        rack_z = rack_base_z + RACK_TIER_PITCH_MM * (routed % 4)
-        waypoints = route_rack(a_xyz, b_xyz, rack_z)
-        nm = f"u_route_{i}_{mech}"
+        resolved.append({
+            "i": i, "mech": mech, "a_xyz": a_xyz, "b_xyz": b_xyz,
+            "a_abstract": a_abstract, "b_abstract": b_abstract,
+            "a_conn": a_conn, "b_conn": b_conn, "b_branch": b_branch,
+            "pa": None if a_abstract else pa, "pb": None if b_abstract else pb,
+            "a_nm": frm if a_abstract else pa.name,
+            "b_nm": to if b_abstract else pb.name,
+        })
+
+    # ── Build the RackPlan (spine in the free aisle) if the caller didn't pass one.
+    # Process-plant + generic-assembly stack their banks in Y, so the SPINE runs
+    # along X down the inter-bank aisle; make_rack_plan_for_rows finds that gap.
+    if rack_plan is None and bbox_mm is not None:
+        rack_plan = make_rack_plan_for_rows(
+            bbox_mm, rack_base_z, equipment_xy_bboxes_mm(parts), axis="x")
+
+    routed, emit_unresolved = _emit_routes_on_plan(
+        resolved, rack_plan, rack_base_z, MAT, MO,
+        pipe_module="mass_fluid_transport_process", tag="")
+    unresolved.extend(emit_unresolved)
+    return routed, unresolved
+
+
+def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
+                         pipe_module="mass_fluid_transport_process", tag=""):
+    """Shared PASS-2 emitter for EVERY family. `resolved` = list of edge dicts with
+    keys i, mech, a_xyz, b_xyz, a_abstract, b_abstract, a_conn, b_conn, b_branch,
+    pa, pb, a_nm, b_nm. Assigns each run a LANE + TIER on `rack_plan` (one shot),
+    then for each: tries a DIRECT clean L-jumper for short concrete edges, else
+    routes on the spine; draws a cable tray (electrical) or pipe; logs it for the
+    route audit. Returns (routed_count, unresolved). One engine → every family gets
+    the same orderly spine routing + the same self-audit coverage."""
+    unresolved = []
+    # assign lanes + tiers over the along-spine intervals of all edges
+    if rack_plan is not None and resolved:
+        intervals = []
+        for r in resolved:
+            a_al = rack_plan._clamp_along(rack_plan._along(r["a_xyz"]))
+            b_al = rack_plan._clamp_along(rack_plan._along(r["b_xyz"]))
+            intervals.append((min(a_al, b_al), max(a_al, b_al)))
+        rack_plan.assign(intervals)
+
+    routed = 0
+    for slot, r in enumerate(resolved):
+        i, mech = r["i"], r["mech"]
+        a_xyz, b_xyz = r["a_xyz"], r["b_xyz"]
+        colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
+        mkey = f"u_pipe_{mech}"
+        if mkey not in MAT:
+            MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35, roughness=0.35)
+        mat = MAT[mkey]
+        pa, pb = r.get("pa"), r.get("pb")
+        if rack_plan is not None:
+            own_bb = [bb for bb in (part_xy_bbox_mm(pa) if pa else None,
+                                    part_xy_bbox_mm(pb) if pb else None)
+                      if bb is not None]
+            # SHORT LOCAL edge between two concrete nearby parts → try a direct L
+            # jumper first (no detour to the central spine); only if that L would
+            # CLIP other equipment do we fall back to the shared spine. Long edges
+            # and abstract endpoints always take the spine.
+            straight = math.hypot(b_xyz[0] - a_xyz[0], b_xyz[1] - a_xyz[1])
+            waypoints = None
+            if (not r["a_abstract"] and not r["b_abstract"]
+                    and straight <= RACK_DIRECT_MAX_MM):
+                waypoints = _direct_route(rack_plan, slot, a_xyz, b_xyz, own_bb)
+            if waypoints is None:
+                waypoints = route_on_spine(rack_plan, slot, a_xyz, b_xyz,
+                                           r["a_abstract"], r["b_abstract"], own=own_bb)
+        else:   # no layout to thread a spine through → legacy per-pipe route
+            waypoints = route_rack(a_xyz, b_xyz,
+                                   rack_base_z + RACK_TIER_PITCH_MM * (slot % 4))
+        nm = f"u_route_{tag}{i}_{mech}"
         try:
             if mech == "electrical_bus":
-                # Fix 1: electrical runs render as a CABLE TRAY / bus-duct (copper-
-                # orange rectangular section) — visually distinct from round pipe.
-                # Main run on the rack + a short branch drop to each top matched load.
                 _draw_cable_tray(nm, waypoints, MAT, MO)
-                rack_top = waypoints[-1] if waypoints else b_xyz
-                for j, drop in enumerate(b_branch):
-                    # branch from the rack down to the load's top anchor
-                    bwp = route_rack((rack_top[0], rack_top[1], rack_top[2]),
-                                     drop, rack_z)
+                # branch drops to the top matched loads — TAP off the spine at the
+                # point NEAREST each load (short lateral + drop), not the run end.
+                for j, drop in enumerate(r.get("b_branch", [])):
+                    if rack_plan is not None:
+                        if rack_plan.axis == "x":
+                            tap = (rack_plan._clamp_along(drop[0]),
+                                   rack_plan.spine_pos + rack_plan.lane_offset(slot),
+                                   rack_plan.tier_z(slot))
+                        else:
+                            tap = (rack_plan.spine_pos + rack_plan.lane_offset(slot),
+                                   rack_plan._clamp_along(drop[1]),
+                                   rack_plan.tier_z(slot))
+                        bwp = [tap, (drop[0], drop[1], tap[2]), drop]
+                    else:
+                        bwp = route_rack((waypoints[-1][0], waypoints[-1][1],
+                                          waypoints[-1][2]), drop, rack_base_z)
                     _draw_cable_tray(f"{nm}_branch{j}", bwp, MAT, MO)
+                _route_log_add(nm, mech, waypoints, a_xyz, b_xyz, own_parts=(pa, pb))
                 routed += 1
-                a_nm = frm if a_abstract else pa.name
-                b_nm = to if b_abstract else pb.name
-                print(f"[univ] routed edge {i} ({mech}) CABLE-TRAY: "
-                      f"{a_nm}  ->  {b_nm}  (+{len(b_branch)} load drops)")
+                print(f"[univ] routed edge {tag}{i} ({mech}) CABLE-TRAY: "
+                      f"{r['a_nm']}  ->  {r['b_nm']}  "
+                      f"(+{len(r.get('b_branch', []))} load drops)")
             else:
-                conn = tuple(c for c in (a_conn, b_conn) if c is not None)
+                conn = tuple(c for c in (r.get("a_conn"), r.get("b_conn"))
+                             if c is not None)
                 fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=mat,
                                  flanges=True, connect=conn,
-                                 module="mass_fluid_transport_process",
-                                 module_objects=MO)
+                                 module=pipe_module, module_objects=MO)
+                _route_log_add(nm, mech, waypoints, a_xyz, b_xyz, own_parts=(pa, pb))
                 routed += 1
-                a_nm = frm if a_abstract else pa.name
-                b_nm = to if b_abstract else pb.name
-                print(f"[univ] routed edge {i} ({mech}): {a_nm}  ->  {b_nm}")
+                print(f"[univ] routed edge {tag}{i} ({mech}): "
+                      f"{r['a_nm']}  ->  {r['b_nm']}")
         except Exception as ex:  # noqa: BLE001 — never let one bad route kill the run
-            unresolved.append((frm, to, mech, [f"route_error:{ex}"]))
-            print(f"[univ] edge {i} route FAILED: {ex}")
+            unresolved.append((r["a_nm"], r["b_nm"], mech, [f"route_error:{ex}"]))
+            print(f"[univ] edge {tag}{i} route FAILED: {ex}")
     return routed, unresolved
 
 
@@ -2591,13 +3318,16 @@ def place_process_plant(parts, regions, topology, MAT, MO):
     #     shared rack elevation so the overhead pipes visibly rest on a rack.
     build_pipe_rack(equip_bbox, frame_h, MAT, MO)
 
-    # 6. route topology like a real OVERHEAD PIPE RACK (Fix 3): all runs share a
-    #    rack elevation just below the frame roof. Pass the frame top so the rack
-    #    sits beneath it (and ON the Fix-2 rack structure).
+    # 6. route topology on a real OVERHEAD PIPE-RACK SPINE down the inter-bank AISLE.
+    #    The placement KNOWS the aisle (the Y-gap between the serpentine banks,
+    #    published by _compact_banks_in_y as _PLANT_BANK_AISLES); we site the spine
+    #    there so the long runs travel in the corridor, never over equipment.
+    rack_base_z = rack_elevation_mm(frame_h)
+    rack_plan = _make_rack_plan_from_bank_aisle(bbox, rack_base_z, parts, axis="x")
     routed, unresolved = route_topology(topology, parts, MAT, MO,
                                         frame_top_mm=frame_h,
                                         region_centres=region_centres,
-                                        bbox_mm=bbox)
+                                        bbox_mm=bbox, rack_plan=rack_plan)
     print(f"[univ] topology routed = {routed}/{len(topology)}; "
           f"unresolved = {len(unresolved)}")
     return bbox, region_centres, frame_h, routed, unresolved
@@ -2783,19 +3513,28 @@ def place_generic_assembly(parts, regions, topology, MAT, MO):
     #    pipe DIAMETER + per-run Z stagger SCALE with the assembly so a cm-scale
     #    device's connectors don't render as a 190 mm tube dwarfing the parts.
     route_top_mm = tallest + max(120.0, GA_ROUTE_CLEARANCE_MM * scale)
-    pipe_saved = (globals()["PIPE_DIA_MM"], globals()["RACK_TIER_PITCH_MM"])
+    # Scale the ROUTING constants too (lane/tier pitch, min leg, lane span, the
+    # direct-jumper threshold) so a centimetre-scale device's spine geometry shrinks
+    # with it — a fixed 300 mm riser / 13 m direct cap would dwarf a 14 mm pod.
+    _GA_ROUTE_GLOBALS = ("PIPE_DIA_MM", "RACK_TIER_PITCH_MM", "RACK_LANE_PITCH_MM",
+                         "RACK_LATERAL_MIN_MM", "RACK_LANE_SPAN_MM", "RACK_DIRECT_MAX_MM")
+    _GA_ROUTE_FLOORS = {"PIPE_DIA_MM": 12.0, "RACK_TIER_PITCH_MM": 20.0,
+                        "RACK_LANE_PITCH_MM": 24.0, "RACK_LATERAL_MIN_MM": 20.0,
+                        "RACK_LANE_SPAN_MM": 160.0, "RACK_DIRECT_MAX_MM": 200.0}
+    route_saved = {k: globals()[k] for k in _GA_ROUTE_GLOBALS}
     try:
-        globals()["PIPE_DIA_MM"] = max(12.0, pipe_saved[0] * scale)
-        globals()["RACK_TIER_PITCH_MM"] = max(20.0, pipe_saved[1] * scale)
+        for k in _GA_ROUTE_GLOBALS:
+            globals()[k] = max(_GA_ROUTE_FLOORS[k], route_saved[k] * scale)
         routed, unresolved = route_topology(topology, parts, MAT, MO,
                                             frame_top_mm=route_top_mm,
                                             region_centres=region_centres,
                                             bbox_mm=bbox)
     finally:
-        globals()["PIPE_DIA_MM"], globals()["RACK_TIER_PITCH_MM"] = pipe_saved
+        for k in _GA_ROUTE_GLOBALS:
+            globals()[k] = route_saved[k]
     print(f"[univ][generic] topology routed = {routed}/{len(topology)}; "
           f"unresolved = {len(unresolved)} (pipe dia "
-          f"{max(12.0, pipe_saved[0] * scale):.0f} mm)")
+          f"{max(12.0, route_saved['PIPE_DIA_MM'] * scale):.0f} mm)")
 
     # 5. record each part-object prefix → its MODULE-index colour for the INSPECT
     #    recolour (so the assembly reads grouped by subsystem, not by vessel type).
@@ -3642,7 +4381,20 @@ def _route_rack_farm_topology(topology, parts, rack_anchors, bop_anchor,
                     p.anchors["top"][2] if p.anchors else p.placed_xyz_mm[2])
         return None
 
-    routed = 0
+    # ── Build the BESS equipment bboxes (rack block cells + BoP skids) so the rack
+    # spine can sit in the maintenance aisle + the over-equipment audit has targets.
+    bess_bboxes = []
+    for ax, ay, atop in (rack_anchors or []):
+        bess_bboxes.append((ax - RACK_W_MM / 2, ay - RACK_D_MM / 2,
+                            ax + RACK_W_MM / 2, ay + RACK_D_MM / 2, atop))
+    for role, (bx, by, btop) in (bop_anchor or {}).items():
+        bess_bboxes.append((bx - BOP_LANE_W_MM / 2, by - BOP_LANE_W_MM / 2,
+                            bx + BOP_LANE_W_MM / 2, by + BOP_LANE_W_MM / 2, btop))
+    # Spine along X (rows run along X) in the free aisle; the racks are short cabinets
+    # so cable trays at rack-top clear them — the audit's 3D-clearance handles that.
+    plan = make_rack_plan_for_rows(bbox, rack_z, bess_bboxes, axis="x")
+
+    resolved = []
     unresolved = []
     for i, e in enumerate(topology):
         frm = e.get("from_part", "")
@@ -3656,26 +4408,19 @@ def _route_rack_farm_topology(topology, parts, rack_anchors, bop_anchor,
             print(f"[univ][rackfarm] edge {i} UNRESOLVED ({mech}): {frm} -> {to} "
                   f"[missing: {', '.join(miss)}]")
             continue
-        rack_zi = rack_z + RACK_TIER_PITCH_MM * (routed % 4)
-        waypoints = route_rack(a, b, rack_zi)
-        nm = f"u_route_rf_{i}_{mech}"
-        try:
-            if mech == "electrical_bus":
-                _draw_cable_tray(nm, waypoints, MAT, MO)
-            else:
-                colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
-                mkey = f"u_pipe_{mech}"
-                if mkey not in MAT:
-                    MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35, roughness=0.35)
-                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=MAT[mkey],
-                                 flanges=True,
-                                 module="mass_fluid_transport_process",
-                                 module_objects=MO)
-            routed += 1
-            print(f"[univ][rackfarm] routed edge {i} ({mech}): {frm} -> {to}")
-        except Exception as ex:  # noqa: BLE001 — never let one bad route kill the run
-            unresolved.append((frm, to, mech, [f"route_error:{ex}"]))
-            print(f"[univ][rackfarm] edge {i} route FAILED: {ex}")
+        # rack-farm endpoints are AGGREGATE points (rack bus / BoP anchor), not single
+        # Part objects, so a_abstract/b_abstract = True (route straight to/from them,
+        # no own-bbox exclusion) — they sit ABOVE the racks so the tray clears them.
+        resolved.append({
+            "i": i, "mech": mech, "a_xyz": a, "b_xyz": b,
+            "a_abstract": True, "b_abstract": True,
+            "a_conn": None, "b_conn": None, "b_branch": [],
+            "pa": None, "pb": None, "a_nm": frm, "b_nm": to,
+        })
+    routed, emit_unresolved = _emit_routes_on_plan(
+        resolved, plan, rack_z, MAT, MO,
+        pipe_module="mass_fluid_transport_process", tag="rf_")
+    unresolved.extend(emit_unresolved)
     return routed, unresolved
 
 
@@ -4216,7 +4961,18 @@ def _route_panel_array_topology(topology, parts, rack_anchor_by_index, bop_ancho
         # edge on a missing aggregate endpoint like 'condensate_loop').
         return rack_bus_pt
 
-    routed = 0
+    # ── Build the grow-room equipment bboxes (grow-rack block + BoP skids) so the
+    # rack spine sits in the maintenance aisle + the over-equipment audit has targets.
+    gr_bboxes = []
+    for ax, ay, atop in (rack_anchor_by_index or []):
+        gr_bboxes.append((ax - GR_RACK_LEN_MM / 2, ay - GR_RACK_DEPTH_MM / 2,
+                          ax + GR_RACK_LEN_MM / 2, ay + GR_RACK_DEPTH_MM / 2, atop))
+    for role, (bx, by, btop) in (bop_anchor or {}).items():
+        gr_bboxes.append((bx - BOP_LANE_W_MM / 2, by - BOP_LANE_W_MM / 2,
+                          bx + BOP_LANE_W_MM / 2, by + BOP_LANE_W_MM / 2, btop))
+    plan = make_rack_plan_for_rows(bbox, rack_z, gr_bboxes, axis="x")
+
+    resolved = []
     unresolved = []
     for i, e in enumerate(topology):
         frm = e.get("from_part", "")
@@ -4230,26 +4986,16 @@ def _route_panel_array_topology(topology, parts, rack_anchor_by_index, bop_ancho
             print(f"[univ][panelarray] edge {i} UNRESOLVED ({mech}): {frm} -> {to} "
                   f"[missing: {', '.join(miss)}]")
             continue
-        rack_zi = rack_z + RACK_TIER_PITCH_MM * (routed % 4)
-        waypoints = route_rack(a, b, rack_zi)
-        nm = f"u_route_pa_{i}_{mech}"
-        try:
-            if mech == "electrical_bus":
-                _draw_cable_tray(nm, waypoints, MAT, MO)
-            else:
-                colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
-                mkey = f"u_pipe_{mech}"
-                if mkey not in MAT:
-                    MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35,
-                                            roughness=0.35)
-                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=MAT[mkey],
-                                 flanges=True, module="irrigation_nutrient",
-                                 module_objects=MO)
-            routed += 1
-            print(f"[univ][panelarray] routed edge {i} ({mech}): {frm} -> {to}")
-        except Exception as ex:  # noqa: BLE001 — never let one bad route kill the run
-            unresolved.append((frm, to, mech, [f"route_error:{ex}"]))
-            print(f"[univ][panelarray] edge {i} route FAILED: {ex}")
+        resolved.append({
+            "i": i, "mech": mech, "a_xyz": a, "b_xyz": b,
+            "a_abstract": True, "b_abstract": True,
+            "a_conn": None, "b_conn": None, "b_branch": [],
+            "pa": None, "pb": None, "a_nm": frm, "b_nm": to,
+        })
+    routed, emit_unresolved = _emit_routes_on_plan(
+        resolved, plan, rack_z, MAT, MO,
+        pipe_module="irrigation_nutrient", tag="pa_")
+    unresolved.extend(emit_unresolved)
     return routed, unresolved
 
 
@@ -4915,6 +5661,7 @@ def _route_tower_machine_topology(topology, parts, hub_pt, nacelle_pt, base_pt,
                 fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=MAT[mkey],
                                  flanges=True, module="mass_fluid_transport_process",
                                  module_objects=MO)
+            _route_log_add(nm, mech, waypoints, a, b)   # audit coverage (down-tower)
             routed += 1
         except Exception as ex:  # noqa: BLE001 — never let one bad route kill the run
             unresolved.append((frm, to, mech, [f"route_error:{ex}"]))
@@ -5866,6 +6613,7 @@ def _aero_route_topology(topology, parts, anchors, subtype, frame_top_mm, bbox,
                                  module_objects=MO)
             else:
                 _draw_aero_cable(nm, waypoints, MAT, MO)
+            _route_log_add(nm, mech, waypoints, a, b)   # audit coverage (harness)
             routed += 1
             print(f"[univ][aero] routed edge {i} ({mech}): {frm} -> {to}")
         except Exception as ex:  # noqa: BLE001
@@ -6902,6 +7650,7 @@ def main():
     modules = state.get("moduleDecomposition", {}).get("modules", [])
     product_class = product_class_of(state)
     family = detect_geometry_family(parts, modules, product_class)
+    _route_log_reset()   # fresh route log so audit_routes() sees only this run
     if family == "aero_body":
         global _AERO_QUANTITIES
         _AERO_QUANTITIES = quantities
@@ -6930,6 +7679,11 @@ def main():
     else:
         bbox, region_centres, frame_h, routed, unresolved = place_process_plant(
             parts, regions, topology, MAT, MO)
+
+    # ── ROUTE AUDIT — the harsh self-check on the pipe routing (Tristan 2026-06-11).
+    # Computes over-equipment segments / max detour ratio / same-elevation crossings
+    # from the emitted polylines + equipment footprints; writes route-audit.json.
+    route_metrics = audit_routes(parts, out_dir)
 
     # ── INSPECT MODE (default ON) — the FAST visual-judge surface ──
     # When INSPECT=1 (the loop's default), render the CLEAN CAD-inspection set
@@ -6975,6 +7729,7 @@ def main():
               "topology_routed": routed,
               "topology_unresolved": [u[:3] for u in unresolved],
               "regions": regions,
+              "route_audit": route_metrics,
               "inspect": _inspect_summary,
           }))
 
