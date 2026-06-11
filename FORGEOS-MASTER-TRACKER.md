@@ -12,17 +12,20 @@ correcting**, and the optimisation loops **converged** (engineering AND Blender)
 rendered into the PDF**, not sitting in /tmp.
 
 ## 🎯 CURRENT FOCUS
-Autonomous, 2 sub-agents max (Anthropic rate-limit, Tristan 2026-06-11). RUNNING: D1 universal auto-BFD
-(`draw_bfd.py`) + W8.2 BoM cost-grounding (`bom-cost-grounding.ts`) — both build-only, I integrate.
-✅ DONE this turn: W2.1 (drawings in PDF, pages 37-39) + W8.1 (universal-CAD hero fills cover/module gap)
-— verified end-to-end via the production path (manifest.hero → state.cad_hero_image_path → render).
-NEXT after integration: wire the BFD into EngineeringBasisPage; wire cost-grounding into the chain;
-then W4.1 (CAD cable/pipe quantities into the BoM).
+**2× SCALE-UP VERIFICATION RUN (Tristan 2026-06-11):** prove the chain self-produces a fully-coordinated
+dossier FROM SCRATCH on a harder brief — `OXCCU-SAF-2X-BRIEF.md` (2,000 t/yr, double v21's 1,000). RUNNING:
+`serial-design-chain-v2 → out/oxccu-saf-2x-v1` (node 25, gates shadow so it renders, bg id baqrj46dq). This
+forces every new subsystem (8 drawings, Part-2 manufacturing layer, DOE/NETL cost grounding, clean CAD
+render, Part-1 BFD) through the REAL production path — not a hand-patched re-render. THEN verify the PDF is
+coordinated + internally consistent at the new scale, and fix any gap the fresh run exposes.
+Static pre-run audit confirms the wiring IS present: drawings (chain L6682) + CAD hero (L6692) + cost-
+grounding (L6130) + build-cost-basis (L6338) all wired; the Part-2 manufacturing pages compute from `state`
+at render time (so they're automatic on any fresh run, not pre-baked JSON). The 2× run is the live proof.
 
 ## ▶ NEXT 3 (in order)
-1. **W2.1** Get the 8 drawings into the rendered PDF (investigate render integration point → wire → verify a real dossier shows them).
-2. **W4.1** Part 2 / bill of materials: merge the distribution BoM (cables/pipes/ducts + economic saving) into the dossier BoM.
-3. **W3.2** Instrument the optimisation loops to REPORT rounds-to-converge — engineering (convergence_loop) AND Blender (render→critique→improve). Answer Tristan's "how many rounds?".
+1. **2× VERIFY** Inspect out/oxccu-saf-2x-v1 PDF — every new subsystem present + mutually consistent at 2× scale; run gates 10/11 + cost-sanity + independent £/tonne check; fix any coordination gap.
+2. **W3.2** Instrument the optimisation loops to REPORT rounds-to-converge — engineering (convergence_loop reports `iterations`) AND Blender (render→critique→improve needs a deterministic score + counter). Tristan's "how many rounds?".
+3. **W6** BoM DATA coverage / growing-DB — the AIM's real long pole (per-class branded-parts generated on the fly).
 
 ---
 
@@ -35,30 +38,24 @@ then W4.1 (CAD cable/pipe quantities into the BoM).
 - ⏳ W1.x polish families to 10/10 each (robotics/marine/device still sensible-fallback). [orig loop]
 - Files: `scripts/blender-universal/build_universal_scene.py` (+ `connection_sizing.py`).
 
-### W2 · The 8 design-and-construction drawings 🔄 (BUILT, NOT in the PDF) — LEAD-AND-WEAVE
+### W2 · The 8 design-and-construction drawings ✅ (IN the PDF, lead-and-weave)
 - ✅ All 8 generators built + self-verified: cable schedule, single-line diagram, P&ID, panel/load
   schedule, GA, process schedules (line/valve/instrument), HVAC layout, piping isometrics.
 - ✅ Cross-referenced by identical tags (203-ST-DN200 same on P&ID + line list + iso).
-- **Placement (Tristan 2026-06-11): LEAD-AND-WEAVE.** 3 SYSTEM drawings (GA, single-line, P&ID) OPEN
-  Part 2 as the design anchor; 5 schedules/details (cable schedule, panel schedule, process schedules,
-  isometrics, HVAC) WEAVE in-line with the manufacturing-layer content they back.
-- ❌ **W2.1a — driver** `generate_drawing_set.py`: dossier state.json → 8 drawing PNGs in `<outDir>/drawings/`
-  (run build_universal_scene.py if the schedule/route artifacts are absent, else reuse; then the 8 draw_*.py).
-- ❌ **W2.1b — chain step**: generate the drawings during the run (after the engineering contract is ready).
-- ❌ **W2.1c — renderer**: 3 system drawings open Part 2; 5 schedules weave into the W4 manufacturing layer.
-- ❌ **W2.1d — verify** on a real dossier PDF (open it, see all 8 placed right).
-- Files: `scripts/blender-universal/draw_*.py` (+ new `generate_drawing_set.py`).
+- ✅ **Placement LEAD-AND-WEAVE** (Tristan 2026-06-11): system drawings open Part 2; schedules weave in.
+- ✅ **W2.1a — driver** `generate_drawing_set.py` (ac3660fcd): state.json → drawings/ + drawing-manifest.json.
+- ✅ **W2.1b — chain step** wired (serial-design-chain-v2 L6682; reuses CAD artifacts else headless Blender).
+- ✅ **W2.1c — renderer** `buildSystemDrawingPages` + woven schedules.
+- ✅ **W2.1d — verified** on e-fuel v21 (127-pp PDF, gate 11 PASS). 2× run re-verifies on a fresh build.
+- Files: `scripts/blender-universal/draw_*.py` + `generate_drawing_set.py`.
 
-### W4 · Part 2 manufacturing layer (Option A EVOLVE) 🔄 — the drawings' table-form twin
-- ❌ **M1 make-vs-buy** — classify each BoM word bought-off-shelf / fabricated / custom-made (derivable:
-  real MPN+manufacturer ⇒ buy; bespoke/fabricated marker ⇒ make). Backs cable/process schedules.
-- ❌ **M2 process route** — per MADE item, how it's manufactured (machined/fabricated/cast/PCB/wound).
-  Backs the P&ID + isometrics.
-- ❌ **M3 assembly sequence** — build order parts → sub-assemblies → modules → system (from module
-  hierarchy + topology). Backs the GA.
-- ❌ **M4 cost-of-goods build-up** — unit COGS = materials + labour + process + overhead, built on
-  `process-equipment-cost.ts` (DOE/NETL curves) — NOT LLM guesses. The "cost of goods sold" gap.
-- Extend, don't duplicate: `sourcing-strategy.ts` already does who-makes-it (contractor scopes).
+### W4 · Part 2 manufacturing layer (Option A EVOLVE) ✅ — the drawings' table-form twin
+- ✅ **M1 make-vs-buy** (`bom-make-vs-buy.ts`, 865aab420) — per-line bought/fabricated/custom; in the dossier.
+- ✅ **M2 process route** (`bom-process-route.ts`, df78a76dd) — per-made-item route + steps; in the dossier.
+- ✅ **M3 assembly sequence** (`bom-assembly-sequence.ts`, a52f744ee) — plant erection/build order page.
+- 🔄 **M4 cost-of-goods build-up** — DOE/NETL prices now ground the BoM (W8.2 + build-cost-basis reconcile);
+  full per-unit COGS split (materials+labour+process+overhead) is the remaining depth, not the price gap.
+- Renderer computes M1/M2/M3 from `state` at render (`require('./lib/cost/bom-*')`) → automatic on fresh runs.
 
 ### W3 · Convergence + optimisation loops 🔄 (BUILT, not wired, round-count not reported)
 - ✅ Physics↔CAD convergence loop (`convergence_loop.py`) — fixed point, contraction proof, 2-4 iters.
@@ -70,34 +67,28 @@ then W4.1 (CAD cable/pipe quantities into the BoM).
   so "render → critique → improve" has a measured convergence, not a vibe.
 - Files: `scripts/blender-universal/{convergence_loop,design_optimisation}.py`.
 
-### W4 · Part 2 — manufacturing + bill of materials 🔄 (the big one; Tristan flagged)
-- ❌ **W4.1 — distribution BoM into the dossier BoM** (`merge_distribution_bom()` is the ready hook;
-  cabling/piping/ductwork has historically been OMITTED entirely from the dossier BoM).
-- ❌ **W4.2 — economic-conductor saving shown in the BoM** (`economic_distribution_summary` ready).
-- ❌ **W4.3 — Part 2 "how you manufacture it"** — the manufacturing-method / process narrative.
-- Files: `connection_sizing.py::merge_distribution_bom`, chain BoM stage, Part-2 render.
+### W4b · Part 2 — bill of materials (the BoM half; was a duplicate W4 number) ✅
+- ✅ **W4.1 — distribution BoM into the dossier** (6920fc9c0) — `buildDistributionCablingPages` reads the
+  routed `connection-schedule.json`; cabling/piping/ductwork (historically OMITTED) now a costed Part-3 page.
+- ✅ **W4.2 — economic-conductor saving** surfaced (cable+pipe+terminations split + UK-2026 supply+install).
+- ✅ **W4.3 — "How it is manufactured" section** (3f0100b91) — make-vs-buy + process route narrative.
+- Files: `connection_sizing.py`, chain drawing-set step, `render-minimal-pdf.tsx` Part-2/3 builders.
 
 ### W5 · Universal CAD quality → 10/10 per archetype ⏳ (the original loop, partial)
 - ✅ process-plant, rack-farm (battery/compute), panel-array, aero (aircraft/spacecraft), tower, fallback.
 - ⏳ polish each family to a verified 10/10; perfect archetype-1 → next → … (Tristan's sequencing).
 - Detail log: `BLENDER-UNIVERSAL-LOOP-TRACKER.md`.
 
-### W8 · GROUND THE DOSSIER IN THE NEW PHYSICS + CAD (Tristan 2026-06-11) 🔴 (core gap)
-The new physics engine + universal CAD are largely DISCONNECTED from what the dossier shows. Tristan's
-two questions exposed this. Close it:
-- ❌ **W8.1 — new Blender renders into the dossier.** Dossier reads pre-baked `public/heroes/<slug>-*.png`;
-  the new universal CAD (build_universal_scene.py) renders any archetype from the real engineering but
-  isn't wired in. e_fuel_synthesis isn't even slug-mapped → e-fuel shows NO 3D image. Wire the universal
-  CAD hero/per-module/exploded renders in (+ slug-map e-fuel). Caveat: a procedural Blender approach was
-  rejected 2026-06-10 on quality — verify each family's render is dossier-grade before swapping a good
-  template; e-fuel (no current image) is a strict win.
-- ❌ **W8.2 — BoM PRICE grounding.** Real e-fuel dossier: 70/73 lines are LLM-authored price guesses
-  (provenance "unknown"), only 3/73 a live distributor price, 0 corpus. Replace LLM guesses with the
-  DOE/NETL Class-4 cost curves already in `scripts/lib/cost/process-equipment-cost.ts` + live distributor
-  cache. (= W4/M4 cost-of-goods.) Quantities ARE physics-grounded (registered engineering contract); the
-  PRICE is the weak link.
-- ❌ **W8.3 — BoM grounded in the CAD** = W4.1 (routed cable/pipe quantities from the connection schedule
-  into the BoM; today cabling/piping/ductwork is omitted entirely).
+### W8 · GROUND THE DOSSIER IN THE NEW PHYSICS + CAD (Tristan 2026-06-11) 🟢 (closed — 2× run re-verifies)
+The new physics engine + universal CAD were DISCONNECTED from the dossier. Now wired:
+- ✅ **W8.1 — new Blender renders into the dossier** (1faac282d de-cage + d77da19f9 pipework). The drawing-set
+  step writes `drawing-manifest.json` and the chain wires `manifest.hero → state.cad_hero_image_path` (L6692);
+  the renderer falls back to it. e_fuel has no template hero → the clean universal-CAD render IS the cover
+  (strict win). Conservative by design: it FALLS BACK, never overrides a good template (2026-06-10 rejection).
+- ✅ **W8.2 — BoM PRICE grounding** (4a4b717ee + a5f97993b). `bom-cost-grounding.ts` re-prices BoM lines from
+  DOE/NETL Class-4 curves + db-only distributor cache (universal); wired into the chain (L6130) with an
+  understatement guard. e-fuel went 16 lines grounded; `build-cost-basis` reconcile made it ONE engine.
+- ✅ **W8.3 — BoM grounded in the CAD** = W4.1 (routed cable/pipe quantities → costed distribution page).
 
 ### W6 · Bill-of-materials DATA coverage / growing-DB ⏳ (the AIM's real long pole)
 - The pretraining DB must self-generate per-class branded parts on the fly (DB-first → web/own-training
@@ -111,7 +102,8 @@ two questions exposed this. Close it:
 ---
 
 ## 🐞 KNOWN DEFECTS (tagged — must NOT slip again)
-- **D1 — Part-1 "1 · Process flow" is a degraded box-list for every class except CO₂** (Tristan flagged
+- ✅ **D1 — FIXED** (31eaed1cb universal auto-BFD `draw_bfd.py` + 4d1f0dcc8 wired into Part-1 + b183c6609
+  own landscape page). WAS: a degraded box-list for every class except CO₂ (Tristan flagged
   2026-06-11, "it should be a nice flow diagram — slipped through the gaps"). In `render-minimal-pdf.tsx`
   EngineeringBasisPage (~line 16276) the proper diagram (`Co2ProcessFlowDiagram` — equipment + drawn
   streams + dashed recycle + quantities) is gated on `isCo2Flow`; ONLY co2-mineralisation gets it.
@@ -126,6 +118,14 @@ two questions exposed this. Close it:
   process-ORDER the modules + draw the inter-module arrows + fix the input label.
 
 ## DONE LOG (this arc — newest first)
+- `d64aa9f3a` build-cost-basis UNIVERSAL — the cost-system reconcile (one DOE/NETL engine, all classes)
+- `d77da19f9` low local jumpers + central-corridor routing — pipework no longer "odd" (D2)
+- `b23a27d70` + `a52f744ee` M3 assembly/erection sequence page + module
+- `3f0100b91` + `df78a76dd` + `865aab420` M1 make-vs-buy + M2 process route — "How it is manufactured"
+- `6920fc9c0` distribution & cabling BoM page (the routed runs the BoM always omitted) — W4.1
+- `a5f97993b` + `4a4b717ee` bom-cost-grounding wired (DOE/NETL prices replace LLM guesses) — W8.2
+- `1faac282d` de-cage the INSPECT render + legible pipework — W8.1
+- `b183c6609` + `4d1f0dcc8` + `31eaed1cb` universal auto-BFD → Part-1 process flow, own page — D1
 - `9be4c88cf` economic_distribution_summary (saving as a BoM artifact)
 - `431d94531` convergence loop + economic-conductor & layout optimisers (45 checks)
 - `5ffb81777` piping isometrics + route export — drawing set #8, SET COMPLETE
