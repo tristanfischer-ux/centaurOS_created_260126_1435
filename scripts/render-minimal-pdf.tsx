@@ -16282,9 +16282,9 @@ function EngineeringBasisPage({ state, project, statePath }: { state: any; proje
           {isCo2Flow ? (
             <Co2ProcessFlowDiagram q={quantities} />
           ) : bfdExists ? (
-            <View style={{ alignItems: 'center', marginVertical: 4 }}>
-              <Image src={bfdPath!} style={{ width: '100%', objectFit: 'contain' }} />
-            </View>
+            <Text style={{ fontSize: 8.5, color: INK_SOFT, fontStyle: 'italic', marginBottom: 4 }}>
+              {'The full process-flow diagram — every major unit in process order with the streams drawn and recycle loops dashed — is on the next page.'}
+            </Text>
           ) : (
           <>
           {/* Boundary in: flue gas */}
@@ -16622,6 +16622,29 @@ function buildSystemDrawingPages(project: string, statePath: string): any[] {
   }
 }
 
+// D1 (Tristan 2026-06-11 "the image is too small to see"): the universal process-flow
+// BFD gets its OWN full landscape page — a wide process train is unreadable squeezed
+// into the Engineering Basis portrait column. Placed right after the Engineering Basis
+// page. Skipped for CO2 (its hand-built inline Co2ProcessFlowDiagram stays) + when the
+// BFD is absent (then the Engineering Basis box-list fallback still shows). Returns an
+// array of <Page> so react-pdf flattens it (matches the modules.map idiom).
+function buildProcessFlowPage(state: any, project: string, statePath?: string): any[] {
+  try {
+    const isCo2 = String(state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? '') === 'co2_mineralisation'
+    if (isCo2 || !statePath) return []
+    const bfd = join(dirname(statePath), 'drawings', 'block-flow-diagram.png')
+    if (!existsSync(bfd)) return []
+    return [(
+      <Page key="bfd-page" size="A4" orientation="landscape" wrap={false} style={PAGE_STYLE}>
+        <PageHeader section="Part 1 · Process flow diagram" project={project} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>Process Flow Diagram</Text>
+        <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 8, lineHeight: 1.5 }}>{'The plant in process order — the equipment and the streams between them, with the key quantities; recycle loops dashed. Projected from the as-modelled topology.'}</Text>
+        <View style={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', marginVertical: 4 }}><Image src={bfd} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></View>
+      </Page>
+    )]
+  } catch { return [] }
+}
+
 function MinimalDocument({ state, subject, statePath }: { state: any; subject: string; statePath: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   // FREE-tier: pre-build the manufacturer -> "Company N" alias map + brand-mask
@@ -16774,6 +16797,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           whole-plant balance + verdict before the dependency map, the problem
           statement, and the per-tool worked calculations. */}
       <EngineeringBasisPage state={state} project={project} statePath={statePath} />
+      {buildProcessFlowPage(state, project, statePath)}
       {/* Engineering Tools Flow (universal — task #113, 2026-05-24): per-tool
           3-column block showing the INPUTS each engineering tool consumed,
           a short description of the tool, and the OUTPUTS it produced. The
