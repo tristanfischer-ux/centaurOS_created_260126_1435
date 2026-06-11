@@ -4543,16 +4543,26 @@ def _route_tower_machine_topology(topology, parts, hub_pt, nacelle_pt, base_pt,
 # shared placer signature stays unchanged.
 _AERO_QUANTITIES = None
 
+# Module-level HERO-FRAMING hint, set by a placer that wants the INSPECT hero
+# camera tuned away from the default deck-equipment framing. None → render_inspection
+# uses its standard (industrial-deck) hero. A placer sets a dict:
+#   {"zoom": <float>,        # ortho_scale multiplier vs the bbox-fit iso (smaller = tighter)
+#    "center_z_frac": <0-1>, # hero target height as a fraction of the z-extent (0.5 = mid)
+#    "exclude_prefixes": (…)}# object-name prefixes to EXCLUDE from the bbox used for framing
+# Read once in render_inspection. The aero family sets this so a small satellite /
+# a thin 35 m aircraft frames TIGHT and centred (not lost in a bbox-fit void).
+_HERO_HINT = None
+
 # ── Aircraft (HAPS) geometry defaults (mm) — overridden by contract quantities ──
-AC_FUSELAGE_DIA_MM   = 620.0    # fuselage pod diameter (a touch fatter than the
-                                # 0.46 m template so the body reads against a 35 m wing)
-AC_WING_THICK_MM     = 130.0    # wing skin thickness (a readable high-aspect aerofoil)
+AC_FUSELAGE_DIA_MM   = 900.0    # fuselage pod diameter — slender but LEGIBLE against
+                                # a 35 m wing (0.46-0.62 m reads as an invisible thread)
+AC_WING_THICK_MM     = 150.0    # wing skin thickness (a readable high-aspect aerofoil)
 AC_WING_SPAN_FALLBACK_MM = 25000.0   # wingspan when the contract is silent
 AC_WING_CHORD_FALLBACK_MM = 1600.0   # wing chord when the contract is silent
 AC_FUS_LEN_FRAC      = 0.34     # fuselage length ≈ this × wingspan (slender body)
 AC_SOLAR_THICK_MM    = 18.0     # PV laminate thickness on the wing upper surface
-AC_PROP_DIA_MM       = 2000.0   # propeller disc diameter (large, reads at vehicle scale)
-AC_POD_DIA_MM        = 320.0    # motor-pod / nacelle diameter (substantial, legible)
+AC_PROP_DIA_MM       = 3200.0   # propeller disc diameter (large, reads on a 35 m span)
+AC_POD_DIA_MM        = 520.0    # motor-pod / nacelle diameter (substantial, legible)
 AC_N_PROPS_DEFAULT   = 6        # propeller count when no motor count is given
 
 # ── Spacecraft (satellite) geometry defaults (mm) ──
@@ -4581,6 +4591,7 @@ def _aero_palette(MAT):
         "skin":     _aero_mat(MAT, "skin",     (0.80, 0.82, 0.86), 0.25, 0.42),
         "structure":_aero_mat(MAT, "structure",(0.55, 0.57, 0.61), 0.45, 0.40),
         "solar":    _aero_mat(MAT, "solar",    (0.03, 0.06, 0.42), 0.20, 0.30),
+        "cellgrid": _aero_mat(MAT, "cellgrid", (0.42, 0.52, 0.84), 0.25, 0.40),
         "prop":     _aero_mat(MAT, "prop",     (0.05, 0.06, 0.09), 0.10, 0.42),
         "antenna":  _aero_mat(MAT, "antenna",  (0.82, 0.84, 0.88), 0.30, 0.40),
         "thruster": _aero_mat(MAT, "thruster", (0.72, 0.45, 0.20), 0.65, 0.35),
@@ -4692,27 +4703,50 @@ def _aero_build_wing(fus, span_mm, chord_mm, P, MO, mod="aerodynamic_wing"):
 
 
 def _aero_build_solar_on_wing(wing, n_cells_chord, P, MO, mod="solar_array_skin"):
-    """Tile thin dark-blue PV cells across the wing UPPER surface (the full-span
-    HAPS solar skin). One row of panels per chord band, panels stepped along the
-    span — AGGREGATED (we draw readable panels, not the thousands of laminate
-    cells). All mm."""
+    """Tile dark-blue PV CELLS across the wing UPPER surface (the full-span HAPS
+    solar skin) as a visible GRID — discrete cells with thin light-blue grid lines
+    between them, so the wing reads as a tiled cell array rather than one flat dark
+    slab. AGGREGATED (readable cells, not the thousands of laminate cells). The grid
+    spacing is sized so individual cells read at the vehicle scale. All mm."""
     if mod not in MO:
         MO[mod] = []
     span = wing["span"]
     chord = wing["chord"]
     z = wing["top_z"] + AC_SOLAR_THICK_MM / 2.0
-    n_span = max(8, int(span / 1800.0))          # panels along the span
-    panel_w = span / n_span * 0.94               # along Y
-    rows = max(1, int(n_cells_chord))
-    band = (chord * 0.84) / rows                  # along X (chord)
+    n_span = max(16, int(span / 900.0))          # cells along the span (finer)
+    cell_w = span / n_span                        # along Y (pitch)
+    rows = max(3, int(n_cells_chord) + 1)         # ≥3 cell rows across the chord
+    band = (chord * 0.86) / rows                  # along X (chord pitch)
+    x0 = wing["x"] - chord * 0.43
     for r in range(rows):
-        xc = wing["x"] - chord * 0.42 + band * (r + 0.5)
+        xc = x0 + band * (r + 0.5)
         for s in range(n_span):
-            yc = -span / 2.0 + span / n_span * (s + 0.5)
+            yc = -span / 2.0 + cell_w * (s + 0.5)
+            # discrete cell with a small gap (the gap shows the grid_mat beneath)
             fl.add_box(f"u_aero_solar_r{r}_s{s}",
                        (xc * fl.MM, yc * fl.MM, z * fl.MM),
-                       (band * 0.86 * fl.MM, panel_w * fl.MM, AC_SOLAR_THICK_MM * fl.MM),
+                       (band * 0.84 * fl.MM, cell_w * 0.84 * fl.MM,
+                        AC_SOLAR_THICK_MM * fl.MM),
                        P["solar"], module=mod, module_objects=MO)
+    # light-blue grid ribs UNDER the cells (the busbar/interconnect grid) — a few
+    # spanwise lines + chordwise lines so the tiling reads even where cells abut.
+    grid_mat = P["cellgrid"]
+    gz = z - AC_SOLAR_THICK_MM * 0.25
+    for r in range(rows + 1):
+        gx = x0 + band * r
+        fl.add_box(f"u_aero_solarcell_x{r}",
+                   (gx * fl.MM, wing["x"] * 0.0 * fl.MM, gz * fl.MM),
+                   (band * 0.10 * fl.MM, span * 0.98 * fl.MM,
+                    AC_SOLAR_THICK_MM * 0.6 * fl.MM), grid_mat,
+                   module=mod, module_objects=MO)
+    n_grid_span = min(n_span, 24)
+    for g in range(n_grid_span + 1):
+        gy = -span / 2.0 + span * g / n_grid_span
+        fl.add_box(f"u_aero_solarcell_y{g}",
+                   ((x0 + band * rows / 2.0) * fl.MM, gy * fl.MM, gz * fl.MM),
+                   (band * rows * 0.98 * fl.MM, cell_w * 0.10 * fl.MM,
+                    AC_SOLAR_THICK_MM * 0.6 * fl.MM), grid_mat,
+                   module=mod, module_objects=MO)
 
 
 def _aero_build_props(wing, fus, n_props, P, MO, mod="propulsion_motor_prop"):
@@ -4735,34 +4769,51 @@ def _aero_build_props(wing, fus, n_props, P, MO, mod="propulsion_motor_prop"):
     for i in range(n):
         frac = (i + 0.5) / n
         yc = -usable / 2.0 + usable * frac
-        # motor pod (capsule along X) projecting FORWARD from under the leading edge
-        podx = le_x - pod_dia * 0.9
+        # motor NACELLE (capsule along X) projecting FORWARD from under the leading
+        # edge, with a tapered rear fairing so it reads as a real nacelle.
+        podx = le_x - pod_dia * 1.0
+        nac_len = pod_dia * 2.6
         fl.add_cyl(f"u_aero_pod{i}", (podx * fl.MM, yc * fl.MM, prop_z * fl.MM),
-                   pod_dia / 2.0 * fl.MM, pod_dia * 2.2 * fl.MM, P["structure"],
+                   pod_dia / 2.0 * fl.MM, nac_len * fl.MM, P["structure"],
                    module=mod, module_objects=MO, rotation=(0, math.radians(90), 0))
-        # short pylon from the pod up to the wing leading edge (visible mount)
+        # tapered rear fairing of the nacelle (points aft, +X)
+        fl.add_frustum(f"u_aero_podtail{i}",
+                       ((podx + nac_len * 0.5 + pod_dia * 0.5) * fl.MM, yc * fl.MM,
+                        prop_z * fl.MM),
+                       pod_dia / 2.0 * fl.MM, pod_dia * 0.12 * fl.MM, pod_dia * fl.MM,
+                       P["structure"], module=mod, module_objects=MO,
+                       rotation=(0, math.radians(90), 0))
+        # short pylon from the nacelle up to the wing leading edge (visible mount)
         fl.add_box(f"u_aero_podpylon{i}",
                    ((le_x) * fl.MM, yc * fl.MM,
                     ((prop_z + wing["z"]) / 2.0) * fl.MM),
-                   (pod_dia * 0.5 * fl.MM, pod_dia * 0.5 * fl.MM,
+                   (pod_dia * 0.5 * fl.MM, pod_dia * 0.45 * fl.MM,
                     abs(wing["z"] - prop_z) * fl.MM),
                    P["structure"], module=mod, module_objects=MO)
-        # PROPELLER: hub + 3 blades in the Y–Z plane (axis = X, a tractor prop),
-        # well forward of the pod nose so the full disc reads clear of the wing.
-        hub_x = podx - pod_dia * 1.6
+        # PROPELLER, well forward of the nacelle nose so the full disc reads clear of
+        # the wing: a SPINNER cone (−X) + a hub + 3 chunky blades in the Y–Z plane
+        # (axis = X, a tractor prop).
+        hub_x = podx - nac_len * 0.55
         fl.add_cyl(f"u_aero_prophub{i}", (hub_x * fl.MM, yc * fl.MM, prop_z * fl.MM),
-                   R * 0.12 * fl.MM, pod_dia * 0.7 * fl.MM, P["prop"],
+                   pod_dia * 0.30 * fl.MM, pod_dia * 0.5 * fl.MM, P["prop"],
                    module=mod, module_objects=MO, rotation=(0, math.radians(90), 0))
+        # spinner cone pointing forward (−X)
+        fl.add_frustum(f"u_aero_propspinner{i}",
+                       ((hub_x - pod_dia * 0.45) * fl.MM, yc * fl.MM, prop_z * fl.MM),
+                       pod_dia * 0.30 * fl.MM, pod_dia * 0.02 * fl.MM, pod_dia * 0.6 * fl.MM,
+                       P["prop"], module=mod, module_objects=MO,
+                       rotation=(0, math.radians(-90), 0))
         for b in range(3):
             theta = 2 * math.pi * b / 3.0
-            rmid = R * 0.52
+            rmid = R * 0.54
             yy = yc + rmid * math.cos(theta)
             zz = prop_z + rmid * math.sin(theta)
+            # chunky tapered blade: wider at root, oriented radially, slight pitch
             fl.add_box(f"u_aero_propblade{i}_{b}",
                        (hub_x * fl.MM, yy * fl.MM, zz * fl.MM),
-                       (R * 0.07 * fl.MM, R * 0.12 * fl.MM, R * 0.92 * fl.MM),
+                       (R * 0.10 * fl.MM, R * 0.16 * fl.MM, R * 0.98 * fl.MM),
                        P["prop"], module=mod, module_objects=MO,
-                       rotation=(math.radians(16), -theta, 0))
+                       rotation=(math.radians(18), -theta, 0))
         anchors.append((hub_x, yc, prop_z))
     return anchors
 
@@ -5000,66 +5051,126 @@ def _aero_build_bus(side_mm, P, MO, mod="structure_containment"):
 
 
 def _aero_build_solar_wings(bus, area_m2, P, MO, mod="energy_conversion_transduction"):
-    """Two DEPLOYED solar-array wings on booms either side (±Y) of the bus — thin
-    dark-blue panel stacks (the satellite's defining silhouette). Panel size from
-    the array area (split across the two wings × SC_ARRAY_PANELS panels). Returns
-    the array tip anchors. All mm."""
+    """Two DEPLOYED solar-array wings on yokes either side (±Y) of the bus — flat,
+    SUN-FACING multi-panel arrays (the satellite's defining silhouette). Both wings
+    are built by the SAME loop with a mirrored sign, so they are identical mirror-
+    images. CRITICAL (2026-06-11): the panels lie FLAT — their broad face is the
+    X–Y plane (normal +Z), the array steps OUTBOARD along Y, and each panel is a
+    thin laminate in Z. A previous build oriented the panels normal-to-X (thin in
+    X); a 3/4 iso camera then saw one wing face-on and the other raking-edge-on, so
+    the +Y wing collapsed into a solid "beam" while the −Y wing read as panels.
+    Flat panels read identically from ANY azimuth. Panel size from the array area
+    (split across the two wings × N panels). Thin LIGHT-BLUE cell-grid lines are
+    scribed on each panel so it reads as a cell array, not a slab. All mm."""
     if mod not in MO:
         MO[mod] = []
     side = bus["side"]
-    # total array area (m²) → per-panel size. Fall back to a sensible wing.
+    # total array area (m²) → per-panel size. Fall back to a sensible wing. Use a
+    # few panels per wing so the array reads as a finished multi-panel blanket.
+    n_per_wing = SC_ARRAY_PANELS
     area_mm2 = (area_m2 * 1e6) if area_m2 and area_m2 > 0 else (side * side * 6.0)
-    n_panels_total = 2 * SC_ARRAY_PANELS
+    n_panels_total = 2 * n_per_wing
     panel_area = area_mm2 / n_panels_total
-    panel_h = max(side * 0.9, math.sqrt(panel_area / 1.6))   # along Z (~aspect 1.6)
-    panel_w = max(side * 0.7, panel_area / panel_h)          # along Y (out from bus)
+    # panel width (along the SPAN, Y) ~1.5× its depth (along the body axis, X), the
+    # usual deployable-blanket aspect; both clamped so a tiny array still reads.
+    panel_x = max(side * 0.85, math.sqrt(panel_area / 1.5))   # depth along X (body)
+    panel_y = max(side * 0.55, panel_area / panel_x)          # width along Y (span)
     cz = bus["cz"]
+    grid_mat = P["cellgrid"]
     tips = []
     for sgn, side_tag in ((-1, "L"), (1, "R")):
-        # yoke / deploy boom out from the bus +Y/−Y face
-        boom_len = side * 0.6
-        boom_y0 = sgn * (bus["half"])
+        # yoke / deploy boom out from the bus +Y/−Y face to the inboard panel edge
+        boom_len = side * 0.55
+        boom_y0 = sgn * bus["half"]
         fl.add_cyl(f"u_aero_arrayboom_{side_tag}",
                    (0.0, (boom_y0 + sgn * boom_len / 2.0) * fl.MM, cz * fl.MM),
                    SC_BOOM_DIA_MM / 2.0 * fl.MM, boom_len * fl.MM, P["structure"],
                    module="mass_fluid_transport_process", module_objects=MO,
                    rotation=(math.radians(90), 0, 0))
         y_inner = boom_y0 + sgn * boom_len
-        for k in range(SC_ARRAY_PANELS):
-            yc = y_inner + sgn * (panel_w * (k + 0.5) + panel_w * k * 0.04)
+        gap = panel_y * 0.06
+        for k in range(n_per_wing):
+            # panel centre marches OUTBOARD along Y; panel lies FLAT (broad face up)
+            yc = y_inner + sgn * (gap + panel_y * (k + 0.5) + gap * k)
             fl.add_box(f"u_aero_arraypanel_{side_tag}{k}",
                        (0.0, yc * fl.MM, cz * fl.MM),
-                       (SC_PANEL_THICK_MM * fl.MM, panel_w * 0.95 * fl.MM,
-                        panel_h * fl.MM), P["solar"], module=mod, module_objects=MO)
-        tips.append((0.0, y_inner + sgn * panel_w * SC_ARRAY_PANELS, cz))
-    return {"tips": tips, "span": (panel_w * SC_ARRAY_PANELS + side) * 2.0,
-            "panel_h": panel_h}
+                       (panel_x * fl.MM, panel_y * 0.94 * fl.MM,
+                        SC_PANEL_THICK_MM * fl.MM), P["solar"],
+                       module=mod, module_objects=MO)
+            # cell-grid lines scribed on the +Z face (thin raised ribs): a few along
+            # X (string boundaries) + a few along Y (cell rows) so the panel reads
+            # as a tiled cell blanket rather than a flat slab.
+            ztop = cz + SC_PANEL_THICK_MM * 0.5
+            nx = 3
+            for g in range(1, nx):
+                gx = -panel_x * 0.5 + panel_x * g / nx
+                fl.add_box(f"u_aero_arraycellx_{side_tag}{k}_{g}",
+                           (gx * fl.MM, yc * fl.MM, ztop * fl.MM),
+                           (panel_x * 0.012 * fl.MM, panel_y * 0.9 * fl.MM,
+                            SC_PANEL_THICK_MM * 0.5 * fl.MM), grid_mat,
+                           module=mod, module_objects=MO)
+            ny = 4
+            for g in range(1, ny):
+                gy = yc - panel_y * 0.45 + (panel_y * 0.9) * g / ny
+                fl.add_box(f"u_aero_arraycelly_{side_tag}{k}_{g}",
+                           (0.0, gy * fl.MM, ztop * fl.MM),
+                           (panel_x * 0.92 * fl.MM, panel_y * 0.012 * fl.MM,
+                            SC_PANEL_THICK_MM * 0.5 * fl.MM), grid_mat,
+                           module=mod, module_objects=MO)
+        tips.append((0.0, y_inner + sgn * (panel_y * n_per_wing + gap * n_per_wing), cz))
+    full_span = 2.0 * (boom_len + panel_y * n_per_wing + gap * n_per_wing) + side
+    return {"tips": tips, "span": full_span, "panel_h": panel_x}
 
 
 def _aero_build_antennas(bus, parts, P, MO, mod="control_compute_communication"):
-    """Communications antennas on the NADIR (−Z, Earth-facing) face: a high-gain
-    DISH + a couple of horn/patch antennas. Count taken from the antenna-named
-    parts (so the BoM is reflected) with a sensible minimum. All mm."""
+    """Communications antennas on the NADIR (−Z, Earth-facing) face: a real
+    parabolic high-gain DISH (a shallow curved reflector cap + a feed arm carrying
+    a feed horn at the focus, on a short gimbal mast) + a couple of small CONE horn
+    antennas. The dish points −Z (Earth). Counts taken from the antenna-named parts
+    (so the BoM is reflected) with a sensible minimum. All mm."""
     if mod not in MO:
         MO[mod] = []
     side = bus["side"]
     nadir = bus["nadir"]
-    # high-gain dish on a short mast
-    fl.add_cyl("u_aero_hga_mast", (side * 0.18 * fl.MM, 0.0, (nadir - side * 0.18) * fl.MM),
-               side * 0.04 * fl.MM, side * 0.36 * fl.MM, P["antenna"],
+    dx = side * 0.20            # dish offset toward +X on the nadir deck
+    R = SC_DISH_DIA_MM / 2.0    # dish rim radius
+    mast_z0 = nadir
+    mast_len = side * 0.22
+    dish_z = nadir - mast_len   # reflector vertex plane
+    # short gimbal mast from the nadir deck to the dish back
+    fl.add_cyl("u_aero_hga_mast", (dx * fl.MM, 0.0, (mast_z0 - mast_len * 0.5) * fl.MM),
+               side * 0.035 * fl.MM, mast_len * fl.MM, P["structure"],
                module=mod, module_objects=MO)
-    dish = fl.add_sphere("u_aero_hga_dish",
-                         (side * 0.18 * fl.MM, 0.0, (nadir - side * 0.42) * fl.MM),
-                         SC_DISH_DIA_MM / 2.0 * fl.MM, P["antenna"],
-                         module=mod, module_objects=MO)
-    dish.scale = (1.0, 1.0, 0.30)
-    # two horn / patch antennas across the nadir face
-    for i, sx in enumerate((-side * 0.22, side * 0.0)):
-        fl.add_cyl(f"u_aero_horn{i}",
-                   (sx * fl.MM, side * 0.22 * fl.MM, (nadir - side * 0.12) * fl.MM),
-                   side * 0.07 * fl.MM, side * 0.2 * fl.MM, P["antenna"],
-                   module=mod, module_objects=MO, rotation=(0, 0, 0))
-    return {"hga": (side * 0.18, 0.0, nadir - side * 0.42)}
+    # PARABOLIC REFLECTOR — a shallow frustum (wide rim toward −Z, narrow back)
+    # gives a real dish silhouette (a flattened sphere read as a featureless blob).
+    rim_depth = R * 0.42
+    fl.add_frustum("u_aero_hga_dish",
+                   (dx * fl.MM, 0.0, (dish_z - rim_depth * 0.5) * fl.MM),
+                   R * 0.30 * fl.MM, R * fl.MM, rim_depth * fl.MM, P["antenna"],
+                   module=mod, module_objects=MO, rotation=(0, 0, 0), vertices=40)
+    # back disc closing the reflector (so it does not read hollow from behind)
+    fl.add_cyl("u_aero_hga_dishback",
+               (dx * fl.MM, 0.0, (dish_z - rim_depth * 0.04) * fl.MM),
+               R * 0.30 * fl.MM, R * 0.06 * fl.MM, P["antenna"],
+               module=mod, module_objects=MO)
+    # tripod-style feed ARM from the rim out to the focus + a feed horn cone
+    focus_z = dish_z - rim_depth - R * 0.55
+    fl.add_cyl("u_aero_hga_feedarm",
+               ((dx + R * 0.36) * fl.MM, 0.0, (dish_z - rim_depth * 0.5) * fl.MM),
+               side * 0.02 * fl.MM, R * 1.5 * fl.MM, P["structure"],
+               module=mod, module_objects=MO, rotation=(math.radians(22), 0, 0))
+    fl.add_frustum("u_aero_hga_feed",
+                   (dx * fl.MM, 0.0, focus_z * fl.MM),
+                   side * 0.05 * fl.MM, side * 0.025 * fl.MM, side * 0.12 * fl.MM,
+                   P["antenna"], module=mod, module_objects=MO)
+    # two small CONE horn antennas across the nadir face
+    for i, sx in enumerate((-side * 0.26, -side * 0.04)):
+        fl.add_frustum(f"u_aero_horn{i}",
+                       (sx * fl.MM, side * 0.24 * fl.MM, (nadir - side * 0.16) * fl.MM),
+                       side * 0.035 * fl.MM, side * 0.085 * fl.MM, side * 0.22 * fl.MM,
+                       P["antenna"], module=mod, module_objects=MO,
+                       rotation=(0, 0, 0))
+    return {"hga": (dx, 0.0, dish_z - rim_depth)}
 
 
 def _aero_build_adcs_thrusters(bus, parts, P, MO):
@@ -5090,20 +5201,25 @@ def _aero_build_adcs_thrusters(bus, parts, P, MO):
                    (0.0, 0.0, (cz + side * 0.30) * fl.MM),
                    side * 0.03 * fl.MM, side * 0.7 * fl.MM, P["thruster"],
                    module=amod, module_objects=MO, rotation=rot)
-    # thrusters on the −Z / corners (the EP + monoprop thrusters fire aft)
+    # thruster CLUSTER on the −Z (nadir) face — a tidy pod of copper nozzle cones
+    # firing aft, grouped near the −X side so they read as one cluster and don't
+    # collide with the dish (which sits toward +X). Each thruster = a short copper
+    # body + a flared NOZZLE-BELL cone pointing −Z (the EP + monoprop thrusters).
     n_th = sum(p.qty for p in parts if re.search(r"thruster", str(p.name), re.IGNORECASE))
-    n_th = max(1, min(4, n_th or 2))
+    n_th = max(2, min(4, n_th or 4))
+    cluster_x = -side * 0.10           # cluster centred slightly −X (dish is +X)
+    spread = side * 0.12               # tight cluster spacing
     for i in range(n_th):
-        sx = (-1 if i % 2 == 0 else 1) * side * 0.32
-        sy = (-1 if i < 2 else 1) * side * 0.32
+        sx = cluster_x + (-1 if i % 2 == 0 else 1) * spread
+        sy = (-1 if i < 2 else 1) * spread
         fl.add_cyl(f"u_aero_thruster{i}",
-                   (sx * fl.MM, sy * fl.MM, (bus["nadir"] + side * 0.02) * fl.MM),
-                   side * 0.05 * fl.MM, side * 0.16 * fl.MM, P["thruster"],
+                   (sx * fl.MM, sy * fl.MM, (bus["nadir"] + side * 0.01) * fl.MM),
+                   side * 0.045 * fl.MM, side * 0.14 * fl.MM, P["thruster"],
                    module=pmod, module_objects=MO)
-        # a small nozzle bell on the −Z end
+        # flared nozzle bell on the −Z end (narrow throat → wide exit, points −Z)
         fl.add_frustum(f"u_aero_thrusterbell{i}",
-                       (sx * fl.MM, sy * fl.MM, (bus["nadir"] - side * 0.06) * fl.MM),
-                       side * 0.04 * fl.MM, side * 0.09 * fl.MM, side * 0.10 * fl.MM,
+                       (sx * fl.MM, sy * fl.MM, (bus["nadir"] - side * 0.10) * fl.MM),
+                       side * 0.105 * fl.MM, side * 0.035 * fl.MM, side * 0.14 * fl.MM,
                        P["thruster"], module=pmod, module_objects=MO,
                        rotation=(0, 0, 0))
     # propellant tank (sphere) inside the bus
@@ -5123,12 +5239,31 @@ def _aero_build_radiators(bus, parts, P, MO, mod="environmental_interface"):
                    ((sgn * (bus["half"] + side * 0.03)) * fl.MM, 0.0, cz * fl.MM),
                    (side * 0.05 * fl.MM, side * 0.92 * fl.MM, side * 0.92 * fl.MM),
                    P["radiator"], module=mod, module_objects=MO)
-    # deorbit drag sail (a thin square membrane on a short mast at zenith)
+    # deorbit drag sail — a thin square membrane CENTRED over the bus on a short
+    # mast, with two diagonal deployment booms (the EOL cue). Centred (not hung off
+    # a corner) + mast-mounted so it reads as a deployed sail, not a stray deck panel.
     if any(re.search(r"drag.?sail|deorbit", str(p.name), re.IGNORECASE) for p in parts):
+        smod = "safety_protection"
+        if smod not in MO:
+            MO[smod] = []
+        sail = side * 1.0
+        sail_z = bus["zenith"] + side * 0.55
+        # mast from the zenith deck up to the sail
+        fl.add_cyl("u_aero_dragsail_mast", (0.0, 0.0, (bus["zenith"] + side * 0.27) * fl.MM),
+                   side * 0.03 * fl.MM, side * 0.55 * fl.MM, P["structure"],
+                   module=smod, module_objects=MO)
+        # two diagonal deployment booms under the membrane (an X)
+        for rotz in (math.radians(45), math.radians(-45)):
+            fl.add_cyl("u_aero_dragsail_boom_%d" % int(math.degrees(rotz)),
+                       (0.0, 0.0, (sail_z - 6.0) * fl.MM),
+                       side * 0.02 * fl.MM, sail * 1.34 * fl.MM, P["structure"],
+                       module=smod, module_objects=MO,
+                       rotation=(math.radians(90), 0, rotz))
+        # the membrane itself (thin, gold MLI), centred over the bus
         fl.add_box("u_aero_dragsail",
-                   (side * 0.6 * fl.MM, side * 0.6 * fl.MM, (bus["zenith"] + side * 0.5) * fl.MM),
-                   (side * 1.2 * fl.MM, side * 1.2 * fl.MM, 8.0 * fl.MM),
-                   P["mli"], module="safety_protection", module_objects=MO)
+                   (0.0, 0.0, sail_z * fl.MM),
+                   (sail * fl.MM, sail * fl.MM, 8.0 * fl.MM),
+                   P["mli"], module=smod, module_objects=MO)
 
 
 def _aero_place_spacecraft(parts, quantities, P, MO):
@@ -5170,9 +5305,15 @@ def _aero_bin_parts_spacecraft(parts, bus, P, MO):
     side = bus["side"]
     cz = bus["cz"]
     half = bus["half"]
-    cur = {"sensor": -side * 0.3, "avionics": -side * 0.3, "battery": -side * 0.3,
-           "payload": -side * 0.3, "other": -side * 0.3}
-    step = side * 0.22
+    # IMPORTANT: keep binned boxes WITHIN the bus footprint in Y (|y| < half) so
+    # they never project out along the ±Y array-deploy corridor (the arrays own ±Y;
+    # a box poking into that corridor reads as junk welded to the array root).
+    # Sensors/payload ride the +Z (zenith) deck; avionics + battery tuck against the
+    # bus on the zenith deck at a small ∓Y offset, stacked along X.
+    cur = {"sensor": -side * 0.28, "avionics": -side * 0.28, "battery": -side * 0.28,
+           "payload": -side * 0.28, "other": -side * 0.28}
+    step = side * 0.20
+    span_x = side * 0.62               # keep the row inside the deck
     for p in parts:
         nm = str(p.name)
         # skip the parts the bus builders already drew
@@ -5187,17 +5328,23 @@ def _aero_bin_parts_spacecraft(parts, bus, P, MO):
         if _AERO_SENSOR_RE.search(nm) or _AERO_PAYLOAD_RE.search(nm):
             # star trackers / sun sensors / optical bench on the zenith deck
             role = "payload" if _AERO_PAYLOAD_RE.search(nm) else "sensor"
-            x, y, z = cur[role], side * 0.28, bus["zenith"] + side * 0.06
+            x = max(-span_x, min(span_x, cur[role]))
+            y, z = side * 0.24, bus["zenith"] + side * 0.05
             cur[role] += step
         elif _AERO_BATTERY_RE.search(nm):
             role = "battery"
-            x, y, z = cur["battery"], -half - side * 0.06, cz
+            x = max(-span_x, min(span_x, cur["battery"]))
+            y, z = -side * 0.22, bus["zenith"] + side * 0.05
             cur["battery"] += step
         else:
             role = "avionics"
-            x, y, z = cur["avionics"], half + side * 0.06, cz
+            x = max(-span_x, min(span_x, cur["avionics"]))
+            # stagger avionics across two short rows (±Y) so they read as discrete
+            # boxes on the deck rather than merging into one wide blue slab.
+            row = int(round((cur["avionics"] + side * 0.28) / step)) % 2
+            y, z = (side * 0.10 if row else -side * 0.10), bus["zenith"] + side * 0.05
             cur["avionics"] += step
-        _aero_emit_part_glyph(pref, role, x, y, z, side * 0.55, P, MO, p)
+        _aero_emit_part_glyph(pref, role, x, y, z, side * 0.34, P, MO, p)
 
 
 # ── faint ground plane (aircraft only) ──────────────────────────────────────
@@ -5357,6 +5504,7 @@ def place_aero_body(parts, regions, topology, MAT, MO, subtype=None):
     quantities = _AERO_QUANTITIES or {}
     subtype = subtype or "aircraft"
     P = _aero_palette(MAT)
+    global _HERO_HINT
 
     if subtype == "spacecraft":
         bbox, region_centres, anchors, cz = _aero_place_spacecraft(
@@ -5365,6 +5513,11 @@ def place_aero_body(parts, regions, topology, MAT, MO, subtype=None):
               f"{anchors['bus']['side']/1000:.2f} m, array span ≈ "
               f"{anchors['arrays']['span']/1000:.1f} m; antennas on nadir face")
         frame_top_mm = anchors["bus"]["zenith"] + anchors["bus"]["side"] * 0.6
+        # HERO: frame the whole spacecraft TIGHT + centred. Exclude the deorbit
+        # drag-sail (a large thin membrane on a long mast that otherwise inflates
+        # the frame so the bus + arrays read tiny).
+        _HERO_HINT = {"zoom": 0.92, "center_z_frac": 0.5,
+                      "exclude_prefixes": ("u_aero_dragsail",)}
     else:
         bbox, region_centres, anchors, cz = _aero_place_aircraft(
             parts, quantities, P, MO)
@@ -5375,6 +5528,11 @@ def place_aero_body(parts, regions, topology, MAT, MO, subtype=None):
         # optional faint ground plane FAR below the aircraft (context, not a skid)
         _aero_build_ground_plane(bbox, base_z_mm=-cz * 0.4, MO=MO)
         frame_top_mm = wing["top_z"] + (bbox["x1"] - bbox["x0"]) * 0.05
+        # HERO: a 35 m thin aircraft reads tiny at bbox-fit. Frame TIGHT on the
+        # airframe at wing height, and EXCLUDE the faint ground plane (it is 1.6×
+        # the airframe each way → it dominates the bbox and shrinks the vehicle).
+        _HERO_HINT = {"zoom": 0.80, "center_z_frac": 0.62,
+                      "exclude_prefixes": ("u_skid_aero_ground",)}
 
     # topology as thin cable runs / booms (electrical/data dominate)
     routed, unresolved = _aero_route_topology(
@@ -5729,12 +5887,16 @@ def _inspect_towermachine_colour(name):
 # substrings of the body names). Matched by substring on the object name, in order.
 _INSPECT_AERO = [
     # ── solar (dark blue) — FIRST so it wins over any structure key ──
+    ("_arraycell",    (0.40, 0.50, 0.82)),   # satellite array cell-grid lines = light blue
+    ("_solarcell",    (0.40, 0.50, 0.82)),   # aircraft wing cell-grid lines = light blue
     ("_solar",        (0.05, 0.08, 0.45)),   # aircraft wing PV cells = dark blue
     ("_arraypanel",   (0.05, 0.08, 0.45)),   # satellite array panel = dark blue
     ("_arrayboom",    (0.55, 0.57, 0.61)),   # array deploy boom = grey structure
     # ── propellers / props (dark) ──
     ("_propblade",    (0.05, 0.06, 0.09)),   # propeller blade = near-black
+    ("_propspinner",  (0.10, 0.11, 0.14)),   # propeller spinner cone = dark
     ("_prophub",      (0.10, 0.11, 0.14)),   # propeller hub = dark
+    ("_podtail",      (0.55, 0.57, 0.61)),   # nacelle rear fairing = grey structure
     ("_pod",          (0.55, 0.57, 0.61)),   # motor pod / nacelle = grey structure
     # ── thrusters / reaction wheels / magnetorquers (copper) ──
     ("_thrusterbell", (0.78, 0.50, 0.24)),   # thruster nozzle bell = copper
@@ -5743,14 +5905,17 @@ _INSPECT_AERO = [
     ("_magnetorquer", (0.74, 0.47, 0.22)),   # magnetorquer rod = copper
     ("_propellant",   (0.62, 0.64, 0.68)),   # propellant tank = grey
     # ── antennas (light grey) ──
-    ("_hga_dish",     (0.84, 0.86, 0.90)),   # high-gain dish = light grey
+    ("_hga_dish",     (0.84, 0.86, 0.90)),   # high-gain dish reflector + back = light grey
+    ("_hga_feed",     (0.78, 0.80, 0.84)),   # dish feed arm + feed horn = grey
     ("_hga_mast",     (0.78, 0.80, 0.84)),
     ("_horn",         (0.82, 0.84, 0.88)),   # horn / patch antenna = light grey
     ("_dish",         (0.84, 0.86, 0.90)),   # binned-part dish = light grey
     ("_mast",         (0.78, 0.80, 0.84)),
     # ── radiators / MLI / drag sail ──
     ("_radiator",     (0.88, 0.89, 0.92)),   # radiator panel = near-white
-    ("_dragsail",     (0.86, 0.74, 0.30)),   # deorbit drag sail = gold MLI
+    ("_dragsail_mast",(0.55, 0.57, 0.61)),   # drag-sail mast = grey structure
+    ("_dragsail_boom",(0.55, 0.57, 0.61)),   # drag-sail boom = grey structure
+    ("_dragsail",     (0.86, 0.74, 0.30)),   # deorbit drag sail membrane = gold MLI
     # ── payload / sensors (dark) ──
     ("_turret",       (0.12, 0.14, 0.18)),   # sensor turret = dark
     ("_lens",         (0.08, 0.10, 0.14)),   # sensor / camera lens = darkest
@@ -6045,6 +6210,31 @@ def mathutils_vec(t):
     return __import__("mathutils").Vector(t)
 
 
+def _scene_bbox_excluding(prefixes):
+    """Scene bbox (metres) over all MESH objects whose name does NOT start with any
+    of `prefixes`. Used by the HERO camera to ignore context geometry (a faint
+    aircraft ground plane, a satellite drag-sail) that would otherwise inflate the
+    frame and shrink the actual vehicle. Returns (cx,cy,cz, dx,dy,dz) or None."""
+    import mathutils
+    pre = tuple(prefixes or ())
+    xs, ys, zs = [], [], []
+    for obj in bpy.data.objects:
+        if obj.type != "MESH" or obj.data is None:
+            continue
+        if pre and obj.name.startswith(pre):
+            continue
+        for c in obj.bound_box:
+            w = obj.matrix_world @ mathutils.Vector(c)
+            xs.append(w.x); ys.append(w.y); zs.append(w.z)
+    if not xs:
+        return None
+    xmn, xmx = min(xs), max(xs)
+    ymn, ymx = min(ys), max(ys)
+    zmn, zmx = min(zs), max(zs)
+    return ((xmn + xmx) / 2, (ymn + ymx) / 2, (zmn + zmx) / 2,
+            xmx - xmn, ymx - ymn, zmx - zmn)
+
+
 def render_inspection(out_dir, bbox):
     """Render the four CLEAN CAD-inspection views (iso / top / front / side),
     each ORTHOGRAPHIC and fit to the scene bbox with a small margin. Bright,
@@ -6093,19 +6283,39 @@ def render_inspection(out_dir, bbox):
     iso_scale = _ortho_scale(math.hypot(dx, dy), dz + math.hypot(dx, dy) * 0.5)
     HERO_ZOOM = 0.70  # hero fills the frame at 0.70× the bbox-fit scale (≈1.43× bigger)
 
+    # ── HERO framing ── default: a "pulled-closer" iso biased down to the deck
+    # equipment. A placer (e.g. the aero family) may set _HERO_HINT to reframe a
+    # free-space vehicle TIGHT + centred and to EXCLUDE context geometry (ground
+    # plane / drag-sail) from the framing bbox so the vehicle is not lost in a void.
+    hero_cx, hero_cy = cx, cy
+    hero_target_z = zmn + dz * 0.30
+    hero_dx, hero_dy, hero_dz = dx, dy, dz
+    hero_zoom = HERO_ZOOM
+    hint = _HERO_HINT
+    if hint:
+        ex = _scene_bbox_excluding(hint.get("exclude_prefixes"))
+        if ex is not None:
+            hero_cx, hero_cy, _hcz, hero_dx, hero_dy, hero_dz = ex
+            hero_target_z = (_hcz - hero_dz / 2.0) + hero_dz * hint.get("center_z_frac", 0.5)
+        else:
+            hero_target_z = zmn + dz * hint.get("center_z_frac", 0.5)
+        hero_zoom = hint.get("zoom", HERO_ZOOM)
+    # hero ortho_scale fits the (possibly vehicle-only) hero bbox at the hero zoom
+    hero_iso_scale = _ortho_scale(math.hypot(hero_dx, hero_dy),
+                                  hero_dz + math.hypot(hero_dx, hero_dy) * 0.5)
+    hero_radius = max(hero_dx, hero_dy, hero_dz, 1.0) * 3.0
+
     cams = [
         # HERO — 3/4 isometric pulled CLOSER (same elev ~35° / az ~45° as the iso,
-        # 0.70× ortho_scale so the plant fills the frame + equipment detail reads).
-        # Tristan judges visually (2026-06-10): the bbox-fit iso made the plant look
-        # small + lost the nozzle/tray/rack detail. KEEP the bbox-fit iso too.
+        # ortho_scale shrunk by the hero zoom so the subject fills the frame + detail
+        # reads). Tristan judges visually (2026-06-10): the bbox-fit iso made the
+        # plant/vehicle look small + lost the detail. KEEP the bbox-fit iso too.
         {
             "name": "inspect-hero",
-            # target biased DOWN to the equipment bulk (cz is inflated by the tall
-            # flare/stack); the hero frames the deck equipment, the stack tip may
-            # leave frame — that is fine, the hero is for equipment detail.
-            "loc": (cx + radius * 0.60, cy - radius * 0.60, zmn + dz * 0.30 + radius * 0.55),
-            "target": (cx, cy, zmn + dz * 0.30),
-            "ortho_scale": iso_scale * HERO_ZOOM,
+            "loc": (hero_cx + hero_radius * 0.60, hero_cy - hero_radius * 0.60,
+                    hero_target_z + hero_radius * 0.55),
+            "target": (hero_cx, hero_cy, hero_target_z),
+            "ortho_scale": hero_iso_scale * hero_zoom,
         },
         # Isometric 3/4 from a high angle (elev ~35°, azimuth ~45°) that sees INTO
         # the plant. ortho_scale from the plant's diagonal footprint + height.
@@ -6171,6 +6381,12 @@ def main():
     print(f"[univ] state={state_path}")
     print(f"[univ] out  ={out_dir}")
     state = load_state(state_path)
+
+    # Default the HERO-framing hint to None so a non-aero family always uses the
+    # standard deck-equipment hero (only the aero placer opts into a custom frame).
+    # Guards against a stale hint if the interpreter is ever reused across runs.
+    global _HERO_HINT
+    _HERO_HINT = None
 
     fl.init_scene()
     MAT = fl.make_default_palette()
