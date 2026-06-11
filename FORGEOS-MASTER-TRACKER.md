@@ -109,6 +109,21 @@ two questions exposed this. Close it:
 
 ---
 
+## 🐞 KNOWN DEFECTS (tagged — must NOT slip again)
+- **D1 — Part-1 "1 · Process flow" is a degraded box-list for every class except CO₂** (Tristan flagged
+  2026-06-11, "it should be a nice flow diagram — slipped through the gaps"). In `render-minimal-pdf.tsx`
+  EngineeringBasisPage (~line 16276) the proper diagram (`Co2ProcessFlowDiagram` — equipment + drawn
+  streams + dashed recycle + quantities) is gated on `isCo2Flow`; ONLY co2-mineralisation gets it.
+  e-fuel + all others fall through to `modules.map(...)` box-list with 3 faults: (a) inter-module STREAMS
+  NOT DRAWN ("annotated below (not drawn)"); (b) modules render in STORED order → jumbled (M5→M1→M3→M2→M4→
+  M8→M7→M6, not process order M1→M2→…); (c) wrong input label (e-fuel shows "Flue gas (CO2 source)" but
+  feeds CO₂+H₂). ROOT CAUSE: the "universal auto-BFD generator" was deferred as "a separate build"
+  (comment line ~15928, 2026-06-08) and never built; the CO₂ one was hand-built. FIX IS NOW TRACTABLE:
+  the topology (the "8 routed inter-unit connections") + this session's flow-ordering + the new
+  `draw_pid.py` (a universal process-flow diagram FROM the topology) provide exactly what a universal
+  auto-BFD needs. Build it OR back the section with a simplified topology-driven block-flow; at minimum
+  process-ORDER the modules + draw the inter-module arrows + fix the input label.
+
 ## DONE LOG (this arc — newest first)
 - `9be4c88cf` economic_distribution_summary (saving as a BoM artifact)
 - `431d94531` convergence loop + economic-conductor & layout optimisers (45 checks)
