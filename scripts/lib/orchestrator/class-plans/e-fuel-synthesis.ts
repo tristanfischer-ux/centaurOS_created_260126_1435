@@ -414,7 +414,11 @@ const stepProductCooler: ToolStep = {
     hx_type: 'condenser' as const,          // phase-change condensing service
     c_ratio: 0.0,                           // condensing stream -> C_max -> inf
     ntu: 2.2,
-    c_min_kw_k: q(c, 'product_cooler_c_min_kw_k', 4.0),  // cooling-water side
+    // c_min (limiting heat-capacity rate) scales with the condensing/coolant flow, which
+    // is ∝ the liquid product throughput. Was a frozen q(c,'product_cooler_c_min_kw_k',4.0)
+    // that ignored the brief's production rate (audit-sizing-scale). Reference 4.0 kW/K at
+    // 1,667 t/yr total liquids → a 2x-output plant doubles the duty (sizing-scale fix 2026-06-11).
+    c_min_kw_k: 4.0 * (q(c, 'total_liquids_tonnes_yr', 1667) / 1667),
     t_hot_in_c: 250,                        // hot reactor effluent / overheads
     t_cold_in_c: 30,                        // cooling-water inlet
   }),
@@ -480,8 +484,16 @@ const stepFractionationColumnVessel: ToolStep = {
   required: false,
   feeds_into: ['mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => {
-    const diaMm = Math.round(q(c, 'fractionation_column_diameter_mm', 800))
-    const htMm = Math.round(q(c, 'fractionation_column_height_mm', 14000))
+    // Column diameter scales with vapour load (∝ throughput): cross-section A ∝ V̇, so
+    // D ∝ √throughput. Was frozen at q(c,'fractionation_column_diameter_mm',800) — a
+    // hardcoded default nothing set, so the column was the SAME size at 1,000 and 2,000
+    // t/yr (audit-sizing-scale). Reference Ø800 mm at 1,667 t/yr total liquids.
+    const totalLiq = q(c, 'total_liquids_tonnes_yr', 1667)
+    const diaMm = Math.round(800 * Math.sqrt(Math.max(totalLiq, 1) / 1667))
+    // Height is governed by the theoretical-stage count (separation difficulty), which is
+    // ~throughput-independent — so it stays ~constant (correct physics), set explicitly
+    // here rather than left as a silent frozen default.
+    const htMm = 14000
     return {
       mode: 'internal' as const,            // internal-pressure process column
       design_pressure_barg: 6.0,            // fractionation column design pressure
