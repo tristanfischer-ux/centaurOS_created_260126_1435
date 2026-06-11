@@ -1,0 +1,1409 @@
+#!/usr/bin/env python3
+"""draw_single_line.py — UNIVERSAL single-line electrical diagram (SLD) generator.
+
+The FIRST projected ENGINEERING DRAWING for the universal CAD system. It does NOT
+recompute anything and it does NOT touch build_universal_scene.py — it CONSUMES that
+generator's outputs and PROJECTS the electrical distribution into a standard SLD, the
+real engineering deliverable an electrical engineer expects.
+
+INPUTS (read-only):
+  <out>/connection-schedule.json  — the sized electrical runs (from / to / mechanism=
+        electrical|electrical_bus / size / rating A / volt-drop % / role / any D2
+        sub-distribution transformer rows / costs).  Produced by build_universal_scene.
+  <state.json>                    — the archetype state: loads + power ratings, the
+        incomer/source, and the protective devices (BoM words named breaker / contactor
+        / switchgear / busbar / fuse / RCD / isolator / relay).  Auto-discovered next to
+        the schedule, or passed explicitly.
+
+PIPELINE:
+  1. reconstruct_tree()  — rebuild SOURCE/incomer → MAIN switchboard/busbar → feeders →
+       sub-distributions (D2 transformers / panels) → final LOADS.  Each node/branch
+       carries: tag, rating (A / kVA), protective device (breaker), cable size (CSA),
+       volt-drop %.  Repeated fan-out (15 identical rack taps) collapses to ONE
+       representative feeder annotated "× N" so the drawing reads like an engineer's
+       SLD, not a 60-node graph dump.
+  2. build_sld_svg()    — draw a STANDARD single-line diagram (deterministic, light-mode
+       SVG): incomer at the TOP, a horizontal MAIN BUSBAR (heavy line), feeders/loads
+       dropping off it, a sub-distribution as a two-winding transformer feeding a
+       sub-busbar with its own loads.  Proper IEC/IEEE-style SYMBOLS (utility incomer,
+       circuit breaker, isolator/contactor, busbar, two-winding transformer, load) —
+       NOT boxes.  Title block + scope note.
+  3. rasterise()        — SVG → PNG (headless Chrome → cairosvg → rsvg-convert cascade).
+
+OUTPUTS:
+  <out>/drawings/single-line-diagram.svg
+  <out>/drawings/single-line-diagram.png
+
+Run:
+  python3 scripts/blender-universal/draw_single_line.py out/rerun-energy_storage
+  python3 scripts/blender-universal/draw_single_line.py /tmp/sld-efuel out/oxccu-saf-v21/state.json
+
+Pure Python stdlib + (optional) a rasteriser on PATH.  No Blender import.
+"""
+from __future__ import annotations
+
+import html
+import json
+import math
+import os
+import re
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DATA MODEL — the reconstructed distribution tree
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Symbol kinds an SLD node can take (drives which IEC/IEEE glyph is drawn).
+SYM_UTILITY = "utility"            # utility / grid incomer (the source)
+SYM_BUSBAR = "busbar"             # main or sub busbar (heavy horizontal line)
+SYM_TRANSFORMER = "transformer"    # two-winding transformer (two interlocked circles)
+SYM_LOAD = "load"                 # a final load / equipment block
+SYM_SOURCE_GEN = "generator"       # a generating source (circle 'G') — PV/genset feed-in
+
+
+@dataclass
+class Device:
+    """A protective / switching device drawn IN-LINE on a branch (the order is the
+    physical order from the bus down to the load)."""
+    kind: str               # 'breaker' | 'isolator' | 'contactor' | 'fuse' | 'rcd'
+    tag: str                # short label e.g. 'CB', 'Q', 'F'
+    detail: str = ""        # mfr + MPN + rating, shown beside the symbol
+
+
+@dataclass
+class Branch:
+    """A feeder / load drop off a busbar: bus → [devices…] → load (or → transformer)."""
+    from_node: str
+    to_node: str
+    label: str              # the load / destination human tag
+    rating: str = ""        # e.g. '130 A' or '1953 A'
+    cable: str = ""         # CSA / size label e.g. '25 mm²'
+    voltdrop: str = ""      # e.g. '0.04 %'
+    count: int = 1          # >1 ⇒ a collapsed fan-out (drawn once, annotated × N)
+    role: str = ""          # trunk / branch / feeder / local_busway
+    devices: list[Device] = field(default_factory=list)
+    target_sym: str = SYM_LOAD   # the destination symbol (load or transformer)
+    sub_bus: Optional["Bus"] = None   # set when this branch feeds a sub-distribution
+
+
+@dataclass
+class Transformer:
+    tag: str
+    kva: str = ""
+    ratio: str = ""         # e.g. '11000/400 V'
+    currents: str = ""      # e.g. '13→1953 A'
+    detail: str = ""        # mfr + MPN
+
+
+@dataclass
+class Bus:
+    """A busbar with its incoming feed and its outgoing branches."""
+    tag: str
+    voltage: str = ""       # e.g. '800 V DC' / '400 V AC'
+    rating: str = ""        # bus continuous rating e.g. '1250 A'
+    branches: list[Branch] = field(default_factory=list)
+    is_sub: bool = False
+
+
+@dataclass
+class Source:
+    sym: str = SYM_UTILITY
+    tag: str = "UTILITY SUPPLY"
+    detail: str = ""        # e.g. '11 kV / 33 kV grid · G99'
+    voltage: str = ""
+
+
+@dataclass
+class Converter:
+    """A power-conversion stage (PCS / inverter / rectifier) drawn as a labelled box
+    with the standard DC/AC converter glyph, in-line on the incomer between the
+    transformer and the bus."""
+    tag: str = "PCS"
+    label: str = "Power conversion system"
+    rating: str = ""
+    cable: str = ""
+    detail: str = ""        # mfr + MPN if known
+    kind: str = "dc_ac"    # 'dc_ac' (inverter) | 'ac_dc' (rectifier)
+
+
+@dataclass
+class Tree:
+    archetype: str
+    source: Source
+    incomer_devices: list[Device]          # devices between source and main bus
+    incomer_transformer: Optional[Transformer]   # step-up / step-down at the incomer
+    main_bus: Bus
+    incomer_converter: Optional[Converter] = None  # PCS / inverter in the incomer stack
+    notes: list[str] = field(default_factory=list)
+    schedule_totals: dict = field(default_factory=dict)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# INPUT LOADING
+# ═══════════════════════════════════════════════════════════════════════════
+
+def load_inputs(out_dir: str, state_path: Optional[str]):
+    """Read connection-schedule.json from out_dir and the archetype state.json.
+
+    state.json is taken from state_path if given, else auto-discovered: the schedule's
+    own dir, then any state.json a sibling out/<arch> the schedule was generated from."""
+    sched_path = Path(out_dir) / "connection-schedule.json"
+    if not sched_path.is_file():
+        raise FileNotFoundError(f"no connection-schedule.json in {out_dir} "
+                                f"(run build_universal_scene.py first)")
+    with open(sched_path) as fh:
+        schedule = json.load(fh)
+
+    state = {}
+    candidates = []
+    if state_path:
+        candidates.append(Path(state_path))
+    candidates.append(Path(out_dir) / "state.json")
+    for c in candidates:
+        if c and c.is_file():
+            with open(c) as fh:
+                state = json.load(fh)
+            break
+    return schedule, state
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PROTECTIVE-DEVICE EXTRACTION from state.json BoM
+# ═══════════════════════════════════════════════════════════════════════════
+
+# (regex on character_id / name, device kind, short tag) — order matters: the FIRST
+# match wins so 'pre-charge contactor' classes as contactor not breaker.
+_DEVICE_PATTERNS = [
+    (re.compile(r"rcd|residual_current|earth_leakage", re.I),       "rcd",       "RCD"),
+    (re.compile(r"\bfuse\b|hrc_fuse|nh_fuse", re.I),                 "fuse",      "F"),
+    (re.compile(r"isolator|disconnect(or)?|switch_disconnect", re.I),"isolator",  "Q"),
+    (re.compile(r"contactor", re.I),                                 "contactor", "K"),
+    (re.compile(r"breaker|mccb|\bmcb\b|\bacb\b|circuit_breaker|"
+                r"main_breaker", re.I),                              "breaker",   "CB"),
+]
+
+# Words that look like a protective device by name but are NOT switchgear we draw
+# (labels, padlocks, torque cards, enclosures, mounting rails, terminal blocks…).
+_DEVICE_NOISE = re.compile(
+    r"label|padlock|torque|card|enclosure|mount|rail|terminal|holder|sticker|"
+    r"placard|sign|cover|gasket|bracket", re.I)
+
+
+def _word_mfr_pn(word: dict):
+    mfr = pn = ""
+    for mc in (word.get("modifier_characters") or []):
+        k = mc.get("kind")
+        if k == "manufacturer":
+            mfr = mc.get("value", "") or mfr
+        elif k == "part_number":
+            pn = mc.get("value", "") or pn
+    return mfr, pn
+
+
+def _iter_words(state: dict):
+    md = state.get("moduleDecomposition") or {}
+    for m in (md.get("modules") or []):
+        for sm in (m.get("sub_modules") or []):
+            for w in (sm.get("words") or []):
+                cid = ""
+                cc = w.get("content_character")
+                if isinstance(cc, dict):
+                    cid = cc.get("character_id", "") or ""
+                yield w, (w.get("name_human") or ""), cid
+
+
+def extract_devices(state: dict):
+    """Pull every real protective / switching device from the state BoM, classed by
+    kind, with a short tag + a mfr/MPN detail string.  Returns a list of (kind, tag,
+    cid, name, detail) — later mapped onto tree nodes by name heuristics."""
+    out = []
+    seen = set()
+    for w, name, cid in _iter_words(state):
+        blob = f"{name} {cid}"
+        if _DEVICE_NOISE.search(blob):
+            continue
+        for rx, kind, tag in _DEVICE_PATTERNS:
+            if rx.search(blob):
+                mfr, pn = _word_mfr_pn(w)
+                detail = " ".join(x for x in (mfr, pn) if x).strip()
+                key = (kind, cid or name)
+                if key in seen:
+                    break
+                seen.add(key)
+                out.append({"kind": kind, "tag": tag, "cid": cid,
+                            "name": name.strip(), "detail": detail})
+                break
+    return out
+
+
+def _pick_device(devices, *needles, kind=None):
+    """Find the first device whose cid/name contains ANY needle (and matches kind if
+    given).  Needles are matched case-insensitively as substrings."""
+    nl = [n.lower() for n in needles]
+    for d in devices:
+        if kind and d["kind"] != kind:
+            continue
+        hay = f"{d['cid']} {d['name']}".lower()
+        if any(n in hay for n in nl):
+            return d
+    return None
+
+
+def _as_device(d, fallback_kind, fallback_tag, fallback_detail=""):
+    if d:
+        return Device(kind=d["kind"], tag=d["tag"],
+                      detail=(d["detail"] or d["name"]).strip())
+    return Device(kind=fallback_kind, tag=fallback_tag, detail=fallback_detail)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STATE quantity helpers
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _q(state: dict, key: str):
+    """Read a numeric quantity value from engineeringContract.quantities (or
+    orchestratorContract). Returns float or None."""
+    for ck in ("engineeringContract", "orchestratorContract"):
+        q = ((state.get(ck) or {}).get("quantities") or {}).get(key)
+        if isinstance(q, dict) and q.get("value") is not None:
+            try:
+                return float(q["value"])
+            except (TypeError, ValueError):
+                return None
+        if isinstance(q, (int, float)):
+            return float(q)
+    return None
+
+
+def _fmt_a(v):
+    if v is None:
+        return ""
+    return f"{v:,.0f} A" if v >= 10 else f"{v:.1f} A"
+
+
+def _fmt_kw(v):
+    if v is None:
+        return ""
+    if v >= 1000:
+        return f"{v/1000:.2f} MW".replace(".00", "")
+    return f"{v:,.0f} kW"
+
+
+def _archetype_name(state: dict, schedule: dict):
+    for ck in ("engineeringContract", "orchestratorContract", "parsedBrief"):
+        c = state.get(ck) or {}
+        pc = c.get("product_class") or c.get("productClass")
+        if pc:
+            return str(pc)
+    pid = state.get("projectId") or ""
+    return str(pid) or "universal_archetype"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TREE RECONSTRUCTION
+# ═══════════════════════════════════════════════════════════════════════════
+
+_RACK_TAP_RE = re.compile(r"^(.*?)\s*\[(\d+)\]$")   # 'rack[0]' → ('rack', 0)
+
+
+def _electrical_rows(schedule: dict):
+    return [r for r in (schedule.get("rows") or [])
+            if "electrical" in (r.get("mechanism") or "")]
+
+
+def _spec_for_row(schedule: dict, row: dict):
+    """Find the full ConnectionSpec matching a schedule row (for system_voltage_v
+    etc.). Matched on from/to + size, best-effort."""
+    for s in (schedule.get("specs") or []):
+        if (s.get("from_part") == row.get("from")
+                and s.get("to_part") == row.get("to")
+                and s.get("size_label") == row.get("size")):
+            return s
+    return None
+
+
+def _humanise(tag: str) -> str:
+    """rack_block → 'Rack block'; pcs → 'PCS'; ft_synthesis_reactor → 'FT synthesis
+    reactor'.  Upper-cases well-known acronyms."""
+    if not tag:
+        return tag
+    t = tag.strip()
+    ACR = {"pcs", "ft", "mv", "lv", "hv", "dc", "ac", "bms", "saf", "co2", "h2",
+           "ups", "pdu", "crac", "mcc", "rmu", "hvac"}
+    parts = re.split(r"[_\s]+", t)
+    words = []
+    for p in parts:
+        m = _RACK_TAP_RE.match(p)
+        if p.lower() in ACR:
+            words.append(p.upper())
+        else:
+            words.append(p)
+    s = " ".join(words)
+    return s[:1].upper() + s[1:] if s else s
+
+
+def _clean_rating(val) -> str:
+    """Tidy a schedule rating cell for the drawing: '—' / '' → '' ; keep real ratings."""
+    s = str(val or "").strip()
+    if s in ("", "—", "-", "None"):
+        return ""
+    return s
+
+
+def _clean_cable(val) -> str:
+    """Tidy a schedule size cell: the rating-less fallback strings become a short
+    'aux feeder' note rather than '(no rating — fallback)' bleeding into the SLD."""
+    s = str(val or "").strip()
+    if not s or s in ("—", "-", "None"):
+        return ""
+    low = s.lower()
+    if "no rating" in low or "fallback" in low or "sense" in low or "unsized" in low:
+        return "control / aux feeder"
+    return s
+
+
+def _bus_voltage_label(state, schedule, default=""):
+    """Best DC/system-voltage label for the MAIN bus from state, else a spec."""
+    dc = _q(state, "dc_bus_voltage_v")
+    if dc:
+        return f"{dc:,.0f} V DC"
+    # process plant LV board: use ac output / a feeder's system voltage
+    ac = _q(state, "ac_output_voltage_v")
+    if ac:
+        return f"{ac:,.0f} V AC"
+    for s in (schedule.get("specs") or []):
+        v = s.get("system_voltage_v")
+        if v:
+            return f"{v:,.0f} V"
+    return default
+
+
+def reconstruct_tree(schedule: dict, state: dict) -> Tree:
+    """Rebuild the electrical distribution tree from the schedule rows + state.
+
+    Strategy: the electrical rows already encode the modelled topology. We classify
+    each by role and from/to:
+      - 'trunk' / the bus-feeding series chain  → MAIN BUS feed + bus rating
+      - 'branch' from a switchgear/bus           → a load feeder off the MAIN BUS
+      - identical fan-out taps (rack[0..N])       → collapse to one '× N' feeder
+      - 'transformer' rows ((primary)/(secondary))→ a sub-distribution step-down whose
+        adjacent '<x>_subdist' node becomes a SUB-BUS with its own branches (D2 case)
+      - series power chain (rack_block→pcs→transformer) → drawn as a vertical
+        conversion stack feeding the grid export
+    The SOURCE + incomer protection + step-up come from state.json."""
+    arch = _archetype_name(state, schedule)
+    devices = extract_devices(state)
+    rows = _electrical_rows(schedule)
+
+    # ---- Identify the bus "hub" node: the from_part that fans out to the most
+    #      branch consumers (switchgear / electrical_supply / a board). -----------
+    fanout_counts = {}
+    for r in rows:
+        if (r.get("role") or "") in ("branch", "trunk", "feeder", "local_busway"):
+            fanout_counts[r.get("from")] = fanout_counts.get(r.get("from"), 0) + 1
+    # also count plain (role=None) branch-like rows by source
+    for r in rows:
+        if not r.get("role"):
+            fanout_counts[r.get("from")] = fanout_counts.get(r.get("from"), 0) + 1
+
+    # ---- Build the MAIN BUS --------------------------------------------------
+    main_bus = Bus(tag="MAIN SWITCHBOARD", is_sub=False)
+    main_bus.voltage = _bus_voltage_label(state, schedule)
+    bus_rating = _q(state, "bus_continuous_current_a")
+    if bus_rating:
+        main_bus.rating = _fmt_a(bus_rating)
+
+    # ---- D2 sub-distributions: map '<x>_subdist' → a sub bus, and its feeding
+    #      transformer row.  Collect them first so branch routing can attach. ----
+    subdist_buses: dict[str, Bus] = {}
+    subdist_xfmr: dict[str, Transformer] = {}
+    # transformer rows are role=='transformer' with from='(primary)' to='(secondary)';
+    # they sit IMMEDIATELY before their *_subdist feeder in schedule order — pair by
+    # the next subdist node referenced.
+    erows = rows
+    for i, r in enumerate(erows):
+        if (r.get("role") == "transformer"):
+            # find the subdist node this transformer introduces: scan forward for the
+            # first row whose from or to ends with '_subdist'.
+            sd_node = None
+            for j in range(i + 1, min(i + 4, len(erows))):
+                for ep in (erows[j].get("from"), erows[j].get("to")):
+                    if isinstance(ep, str) and ep.endswith("_subdist"):
+                        sd_node = ep
+                        break
+                if sd_node:
+                    break
+            if sd_node and sd_node not in subdist_buses:
+                subdist_buses[sd_node] = Bus(tag=_humanise(sd_node).replace("Subdist", "sub-board"),
+                                             is_sub=True)
+                ratio = (r.get("size") or "").replace(" sub-distribution", "").replace(
+                    " transformer", "")
+                subdist_xfmr[sd_node] = Transformer(
+                    tag="TX", kva=str(r.get("rating") or ""), ratio=ratio,
+                    currents=str(r.get("drop") or ""),
+                    detail=_pick_subdist_detail(devices))
+
+    # ---- Now route every electrical row. -------------------------------------
+    # Series-chain detection for the conversion path (DC → PCS → step-up → grid):
+    # rows whose from/to are both single equipment (not bus/rack/subdist) and role is
+    # None form the export chain.  We collect the chain and render it as ONE main feed.
+    used = set()
+
+    # Collapse identical fan-out taps from the SAME source into representative feeders.
+    # Key by (from_source, role, rating, size, target_base) where target_base strips the
+    # [n] index.
+    groups: dict[tuple, list[dict]] = {}
+    order: list[tuple] = []
+    for idx, r in enumerate(erows):
+        if r.get("role") == "transformer":
+            used.add(idx)
+            continue
+        to = r.get("to") or ""
+        m = _RACK_TAP_RE.match(to)
+        target_base = m.group(1) if m else to
+        key = (r.get("from"), r.get("role"), r.get("rating"), r.get("size"),
+               target_base)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append({"idx": idx, "row": r})
+
+    # Decide which source node is the MAIN bus hub: the one feeding the most groups.
+    src_group_count = {}
+    for key in order:
+        src_group_count[key[0]] = src_group_count.get(key[0], 0) + 1
+    main_hub = max(src_group_count, key=src_group_count.get) if src_group_count else None
+
+    # Build branches.
+    def _mk_branch(rep_row, count, target_base):
+        spec = _spec_for_row(schedule, rep_row)
+        vd = ""
+        drop = rep_row.get("drop") or ""
+        if isinstance(drop, str) and "Vd" in drop:
+            vd = drop.replace(" Vd", "").strip()
+        sysv = (spec or {}).get("system_voltage_v")
+        to_h = _humanise(target_base)
+        br = Branch(
+            from_node=_humanise(rep_row.get("from") or ""),
+            to_node=to_h,
+            label=to_h + (f" × {count}" if count > 1 else ""),
+            rating=_clean_rating(rep_row.get("rating")),
+            cable=_clean_cable(rep_row.get("size")),
+            voltdrop=vd,
+            count=count,
+            role=rep_row.get("role") or "",
+        )
+        if sysv and sysv not in (None,):
+            br.bus_voltage_hint = f"{sysv:,.0f} V"   # type: ignore[attr-defined]
+        return br
+
+    # First: any branch whose source is a *_subdist goes onto that sub bus.
+    for key in order:
+        rows_in = groups[key]
+        first = rows_in[0]["row"]
+        src = key[0] or ""
+        if src in subdist_buses:
+            br = _mk_branch(first, len(rows_in), key[4])
+            br.from_node = subdist_buses[src].tag
+            # skip the internal "local busway" pseudo-target
+            if "busway" in (br.to_node or "").lower():
+                continue
+            subdist_buses[src].branches.append(br)
+            for ri in rows_in:
+                used.add(ri["idx"])
+
+    # Second: the feeder rows that FEED a *_subdist (from main hub → subdist) become a
+    # transformer-terminated branch off the MAIN bus carrying the sub bus.
+    for key in order:
+        rows_in = groups[key]
+        first = rows_in[0]["row"]
+        to = key[4] or ""
+        if to in subdist_buses:
+            br = _mk_branch(first, 1, to)
+            br.target_sym = SYM_TRANSFORMER
+            br.label = _humanise(first.get("from") or "")
+            sd_bus = subdist_buses[to]
+            sd_bus.tag = "LOCAL SUB-DISTRIBUTION"
+            br.sub_bus = sd_bus
+            br.transformer = subdist_xfmr.get(to)   # type: ignore[attr-defined]
+            # the branch's destination tag is the sub bus
+            br.to_node = sd_bus.tag
+            main_bus.branches.append(br)
+            for ri in rows_in:
+                used.add(ri["idx"])
+
+    # Third: remaining rows fan out off the MAIN bus / form the conversion chain.
+    chain_rows = []
+    for key in order:
+        rows_in = groups[key]
+        if all(ri["idx"] in used for ri in rows_in):
+            continue
+        first = rows_in[0]["row"]
+        src = key[0] or ""
+        to_base = key[4] or ""
+        role = key[1] or ""
+        # series export chain: role None, both endpoints equipment (not the hub, not a
+        # rack tap, not a subdist), and they reference transformer/pcs/grid.
+        is_chainish = (role in ("", None) and src != main_hub
+                       and not _RACK_TAP_RE.match(first.get("to") or "")
+                       and src not in subdist_buses and to_base not in subdist_buses)
+        if is_chainish and any(t in f"{src} {to_base}".lower()
+                               for t in ("pcs", "transformer", "grid", "inverter",
+                                         "rectifier", "supply", "compressor", "pump")):
+            chain_rows.append((key, rows_in))
+            continue
+        # otherwise a normal load feeder off the main bus
+        br = _mk_branch(first, len(rows_in), to_base)
+        if "busway" in (br.to_node or "").lower():
+            for ri in rows_in:
+                used.add(ri["idx"])
+            continue
+        main_bus.branches.append(br)
+        for ri in rows_in:
+            used.add(ri["idx"])
+
+    # The conversion chain (rack_block → PCS → step-up transformer → grid) is the
+    # power-conversion train.  Surface its fattest run as the representative rating/size.
+    chain_rep = None
+    chain_has_pcs = False
+    chain_has_xfmr = False
+    if chain_rows:
+        def _amps(rin):
+            r = rin[1][0]["row"]
+            mt = re.match(r"\s*([\d.]+)", str(r.get("rating") or ""))
+            return float(mt.group(1)) if mt else 0.0
+        chain_rows.sort(key=_amps, reverse=True)
+        chain_rep = chain_rows[0][1][0]["row"]
+        joined = " ".join(f"{k[0]} {k[4]}".lower() for k, _ in chain_rows)
+        chain_has_pcs = any(t in joined for t in ("pcs", "inverter", "rectifier"))
+        chain_has_xfmr = "transformer" in joined
+
+    # ---- SOURCE + incomer protection from state -------------------------------
+    source, inc_devices, inc_xfmr, notes = _build_source(state, schedule, devices,
+                                                          main_bus, arch)
+    incomer_transformer = inc_xfmr
+
+    # ---- Attach protective devices to main-bus branches by name heuristics ----
+    _attach_branch_devices(main_bus, devices)
+    for sd in subdist_buses.values():
+        _attach_branch_devices(sd, devices)
+
+    # ---- Place the conversion train. -----------------------------------------
+    # For a grid-tie INVERTER-based class (BESS) the PCS sits in the INCOMER stack
+    # between the step-up transformer and the DC bus — that is the true single-line
+    # power flow (grid → TX → PCS → DC bus → rack feeders).  For other classes the
+    # remaining chain rows (e.g. a process compressor feeder) hang off the bus as loads.
+    incomer_converter = None
+    grid_tie_inverter = (source.sym == SYM_UTILITY
+                         and ("DC BUS" in main_bus.tag or chain_has_pcs))
+    if chain_rep is not None:
+        vd = ""
+        drop = chain_rep.get("drop") or ""
+        if isinstance(drop, str) and "Vd" in drop:
+            vd = drop.replace(" Vd", "").strip()
+        if grid_tie_inverter:
+            incomer_converter = Converter(
+                tag="PCS",
+                label="Power conversion system (DC ↔ AC)",
+                rating=str(chain_rep.get("rating") or "").strip(),
+                cable=str(chain_rep.get("size") or "").strip(),
+                detail=_pcs_detail(devices), kind="dc_ac")
+            # the AC main breaker guards the PCS AC side: put it in the incomer chain
+            cb = _pick_device(devices, "ac_main_breaker", "main_breaker", kind="breaker")
+            if cb and not any(d.kind == "breaker" for d in inc_devices):
+                inc_devices.append(_as_device(cb, "breaker", "CB"))
+        else:
+            # non-grid-tie: render the chain endpoint as a load feeder off the bus.
+            br = Branch(
+                from_node=main_bus.tag,
+                to_node=_humanise(chain_rep.get("to") or "Process load"),
+                label=_humanise(chain_rep.get("to") or "Process load"),
+                rating=str(chain_rep.get("rating") or "").strip(),
+                cable=str(chain_rep.get("size") or "").strip(),
+                voltdrop=vd, role="branch")
+            cb = _pick_device(devices, kind="breaker")
+            if cb:
+                br.devices.append(_as_device(cb, "breaker", "CB"))
+            main_bus.branches.append(br)
+
+    tree = Tree(archetype=arch, source=source, incomer_devices=inc_devices,
+                incomer_transformer=incomer_transformer, main_bus=main_bus,
+                incomer_converter=incomer_converter,
+                notes=notes, schedule_totals=schedule.get("totals") or {})
+    return tree
+
+
+def _pcs_detail(devices):
+    """A short detail string for the PCS — reuse the AC main breaker's mfr if no PCS
+    word carries a part number (the PCS itself is often a non-BoM macro)."""
+    return ""
+
+
+def _pick_subdist_detail(devices):
+    d = _pick_device(devices, "transformer", "subdist", "distribution")
+    return (d["detail"] or d["name"]) if d else ""
+
+
+def _attach_branch_devices(bus: Bus, devices):
+    """Heuristically place a protective device IN-LINE on each branch based on the
+    destination tag (rack → DC isolator; chiller → MCCB; conversion → main breaker)."""
+    for br in bus.branches:
+        if br.devices:
+            continue
+        to = (br.to_node or "").lower()
+        picked = None
+        if "rack" in to:
+            picked = (_pick_device(devices, "rack_dc_isolator", "rack_dc", kind="isolator")
+                      or _pick_device(devices, "string_fuse", "rack_string", kind="fuse"))
+        elif any(t in to for t in ("chiller", "hvac", "cooling", "pump", "aux")):
+            picked = (_pick_device(devices, kind="breaker")
+                      or _pick_device(devices, "isolator", kind="isolator"))
+        elif "sub-distribution" in to or br.target_sym == SYM_TRANSFORMER:
+            picked = (_pick_device(devices, "main_bus_contactor", "main_bus", kind="contactor")
+                      or _pick_device(devices, kind="breaker"))
+        if picked:
+            br.devices.append(_as_device(picked, picked["kind"], picked["tag"]))
+
+
+def _build_source(state, schedule, devices, main_bus, arch):
+    """Determine the SOURCE/incomer symbol, the incomer protection chain, and any
+    step-up/step-down transformer between source and main bus, from state.json."""
+    notes = []
+    inc_devices = []
+    inc_xfmr = None
+
+    # Grid-tie BESS: PCS exports LV (400 V) → external step-up to MV (11/33 kV) grid.
+    ac_v = _q(state, "ac_output_voltage_v")
+    has_step_up = bool(_q(state, "external_transformer_mass_kg")) or bool(
+        _pick_device(devices, "step_up", "step-up"))
+    # process plant: MV incomer → distribution transformer → LV board
+    mv_word = None
+    for w, name, cid in _iter_words(state):
+        if re.search(r"mv_transformer|distribution_transformer|mv_switchgear|"
+                     r"ring.?main|incomer|incoming_supply", f"{name} {cid}", re.I):
+            mv_word = (w, name, cid)
+            break
+
+    if mv_word is not None:
+        # MV-fed process plant.  SOURCE = utility MV incomer; transformer steps MV→LV.
+        source = Source(sym=SYM_UTILITY, tag="MV UTILITY INCOMER",
+                        detail="11 kV ring-main / DNO supply", voltage="11 kV")
+        # incomer protection: MV switchgear (isolator) + any MV breaker
+        swgr = _pick_device(devices, "mv_switchgear", "switchgear", "ring_main")
+        if swgr:
+            inc_devices.append(Device(kind="isolator", tag="RMU",
+                                      detail=(swgr["detail"] or swgr["name"])))
+        xfmr_d = _pick_device(devices, "mv_transformer", "distribution_transformer",
+                              "transformer")
+        load_kw = _q(state, "connected_electrical_load_kw")
+        inc_xfmr = Transformer(
+            tag="TX1", kva=(f"{load_kw/0.8:,.0f} kVA (≈)" if load_kw else ""),
+            ratio="11000/400 V",
+            detail=(xfmr_d["detail"] or xfmr_d["name"]) if xfmr_d else "")
+        main_bus.tag = "MAIN LV BOARD"
+        # The LV board sits on the transformer SECONDARY (400 V), not the internal
+        # process-bus default the schedule may carry — set it unconditionally.
+        main_bus.voltage = "400 V AC"
+        if load_kw:
+            main_bus.rating = _fmt_kw(load_kw) + " connected"
+        notes.append("MV ring-main supply stepped to 400 V LV board; process loads on "
+                     "Form-4 board via MCC.")
+        return source, inc_devices, inc_xfmr, notes
+
+    if has_step_up or ac_v:
+        # Grid-tie inverter-based plant (BESS): the SOURCE is the GRID (export/import);
+        # the DC bus is the internal generation node.  Draw GRID at top as utility,
+        # main bus = the DC bus, the conversion train rejoins the grid.
+        gv = "11 kV / 33 kV"
+        source = Source(sym=SYM_UTILITY, tag="GRID CONNECTION POINT",
+                        detail=f"{gv} MV grid · G99 (≤ 1 MW export)", voltage=gv)
+        # incomer step-up transformer (LV PCS → MV grid)
+        cont_kw = _q(state, "continuous_power_kw")
+        inc_xfmr = Transformer(
+            tag="TX1",
+            kva=(f"{cont_kw/0.95:,.0f} kVA" if cont_kw else ""),
+            ratio=(f"{ac_v:,.0f} V / {gv}" if ac_v else f"LV / {gv}"),
+            detail="external pad-mount step-up (IEC 62933-5-2)")
+        # G99 protection relay + AC main breaker sit at the grid interface
+        g99 = _pick_device(devices, "g99", "grid_protection", "protection_relay")
+        if g99:
+            inc_devices.append(Device(kind="rcd", tag="G99",
+                                      detail=(g99["detail"] or g99["name"])))
+        if not main_bus.voltage:
+            main_bus.voltage = _bus_voltage_label(state, schedule, "800 V DC")
+        main_bus.tag = "MAIN DC BUS"
+        notes.append("Battery DC bus → PCS inverter → external step-up transformer → "
+                     "G99 grid connection (bidirectional charge / discharge).")
+        return source, inc_devices, inc_xfmr, notes
+
+    # Generic fallback: a utility LV incomer straight onto the main board.
+    source = Source(sym=SYM_UTILITY, tag="UTILITY SUPPLY",
+                    detail="LV distribution board incomer", voltage="400 V")
+    main_inc = _pick_device(devices, "main_breaker", "incomer", kind="breaker")
+    if main_inc:
+        inc_devices.append(_as_device(main_inc, "breaker", "CB"))
+    if not main_bus.voltage:
+        main_bus.voltage = _bus_voltage_label(state, schedule, "400 V AC")
+    return source, inc_devices, inc_xfmr, notes
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SVG DRAWING  — standard single-line-diagram symbols + layout
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Light-mode palette (engineering-drawing aesthetic, NO dark theme).
+INK = "#1a1a1a"            # primary line / text
+BUS_INK = "#10243e"        # heavy busbar
+ACCENT = "#1a5fb4"         # active-conductor accent (blue)
+FILL_BG = "#ffffff"        # page
+PANEL_BG = "#f4f6f9"       # title-block / load fill
+GRID_FAINT = "#e4e8ee"     # very faint guide
+DEV_INK = "#1a1a1a"
+MUTED = "#5b6470"
+
+
+def _esc(s) -> str:
+    return html.escape(str(s if s is not None else ""), quote=True)
+
+
+class SVG:
+    """Tiny imperative SVG builder (deterministic; integer-ish coords)."""
+
+    def __init__(self, w, h):
+        self.w, self.h = w, h
+        self.parts = []
+
+    def add(self, s):
+        self.parts.append(s)
+
+    def line(self, x1, y1, x2, y2, stroke=INK, width=1.6, dash=None, cap="round"):
+        d = f' stroke-dasharray="{dash}"' if dash else ""
+        self.add(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                 f'stroke="{stroke}" stroke-width="{width}" stroke-linecap="{cap}"{d}/>')
+
+    def rect(self, x, y, w, h, stroke=INK, width=1.4, fill="none", rx=0):
+        self.add(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" '
+                 f'rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{width}"/>')
+
+    def circle(self, cx, cy, r, stroke=INK, width=1.6, fill="none"):
+        self.add(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{fill}" '
+                 f'stroke="{stroke}" stroke-width="{width}"/>')
+
+    def text(self, x, y, s, size=12, anchor="start", fill=INK, weight="normal",
+             family="Helvetica, Arial, sans-serif", mono=False, spacing=None):
+        fam = "'DejaVu Sans Mono', 'Menlo', monospace" if mono else family
+        sp = f' letter-spacing="{spacing}"' if spacing else ""
+        self.add(f'<text x="{x:.1f}" y="{y:.1f}" font-family="{fam}" '
+                 f'font-size="{size}" text-anchor="{anchor}" fill="{fill}" '
+                 f'font-weight="{weight}"{sp}>{_esc(s)}</text>')
+
+    def render(self) -> str:
+        body = "\n".join(self.parts)
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.w}" '
+                f'height="{self.h}" viewBox="0 0 {self.w} {self.h}">\n'
+                f'<rect width="{self.w}" height="{self.h}" fill="{FILL_BG}"/>\n'
+                f'{body}\n</svg>\n')
+
+
+# ---- symbol primitives (drawn around an anchor point) ------------------------
+
+def sym_utility(svg: SVG, cx, cy):
+    """Utility/grid incomer: the standard 'arrow-into-network' — a downward feed with
+    a small transformer-network glyph (circle with a sine)."""
+    r = 16
+    svg.circle(cx, cy, r, stroke=INK, width=1.8)
+    # a stylised lightning/grid mark inside
+    svg.add(f'<path d="M {cx-5:.1f} {cy-7:.1f} L {cx+2:.1f} {cy-1:.1f} '
+            f'L {cx-2:.1f} {cy+1:.1f} L {cx+5:.1f} {cy+7:.1f}" '
+            f'fill="none" stroke="{ACCENT}" stroke-width="2.2" '
+            f'stroke-linejoin="round" stroke-linecap="round"/>')
+    # feed line out the bottom
+    svg.line(cx, cy + r, cx, cy + r + 18, width=2.0)
+    return (cx, cy + r + 18)   # the exit point
+
+
+def sym_breaker(svg: SVG, cx, cy, size=11):
+    """Circuit breaker — IEC: a square drawn on the conductor (open contact in a box).
+    We use the common drawn-box-with-diagonal that engineers read as a moulded-case CB."""
+    s = size
+    svg.rect(cx - s, cy - s, 2 * s, 2 * s, stroke=DEV_INK, width=1.8, fill=FILL_BG)
+    # the contact stroke
+    svg.line(cx - s + 3, cy + s - 3, cx + s - 3, cy - s + 3, stroke=DEV_INK, width=1.8)
+    return cy + s
+
+
+def sym_isolator(svg: SVG, cx, cy, size=12):
+    """Isolator / disconnector — an open knife switch: a hinge dot, a contact dot, and
+    a blade leaning open at ~30°."""
+    s = size
+    top = cy - s
+    bot = cy + s
+    svg.circle(cx, bot, 2.0, fill=DEV_INK, stroke=DEV_INK, width=1)
+    # blade leaning open
+    bx = cx + s * 0.8
+    svg.line(cx, bot, bx, top, stroke=DEV_INK, width=1.8)
+    svg.circle(cx, top, 2.0, fill=FILL_BG, stroke=DEV_INK, width=1.4)
+    return bot
+
+
+def sym_contactor(svg: SVG, cx, cy, size=11):
+    """Contactor — like an isolator but with the characteristic open 'cup' (a small arc)
+    at the moving contact."""
+    s = size
+    top = cy - s
+    bot = cy + s
+    svg.circle(cx, bot, 2.0, fill=DEV_INK, stroke=DEV_INK, width=1)
+    bx = cx + s * 0.7
+    svg.line(cx, bot, bx, top + 1, stroke=DEV_INK, width=1.8)
+    # the contactor arc cup at the top contact
+    svg.add(f'<path d="M {cx-5:.1f} {top:.1f} Q {cx:.1f} {top+6:.1f} {cx+5:.1f} {top:.1f}" '
+            f'fill="none" stroke="{DEV_INK}" stroke-width="1.6"/>')
+    return bot
+
+
+def sym_fuse(svg: SVG, cx, cy, size=11):
+    """Fuse — IEC rectangle on the conductor with a line through it."""
+    w, h = 8, size * 1.6
+    svg.rect(cx - w, cy - h / 2, 2 * w, h, stroke=DEV_INK, width=1.6, fill=FILL_BG)
+    svg.line(cx, cy - h / 2, cx, cy + h / 2, stroke=DEV_INK, width=1.4)
+    return cy + h / 2
+
+
+def sym_rcd(svg: SVG, cx, cy, size=12):
+    """Protection relay / RCD / G99 interface relay — a diamond on the conductor."""
+    s = size
+    svg.add(f'<path d="M {cx:.1f} {cy-s:.1f} L {cx+s:.1f} {cy:.1f} '
+            f'L {cx:.1f} {cy+s:.1f} L {cx-s:.1f} {cy:.1f} Z" '
+            f'fill="{FILL_BG}" stroke="{DEV_INK}" stroke-width="1.6"/>')
+    return cy + s
+
+
+_DEVICE_GLYPH = {
+    "breaker": sym_breaker, "isolator": sym_isolator, "contactor": sym_contactor,
+    "fuse": sym_fuse, "rcd": sym_rcd,
+}
+
+
+def sym_transformer(svg: SVG, cx, cy, label_side="right", ratio="", kva="",
+                    currents="", detail="", tag="TX"):
+    """Two-winding transformer — the standard two interlocked circles, primary above
+    secondary, with terminals top + bottom.  Returns (top_terminal, bottom_terminal)."""
+    r = 15
+    gap = r * 0.9
+    top_c = (cx, cy - gap / 2)
+    bot_c = (cx, cy + gap / 2)
+    # terminals
+    svg.line(cx, top_c[1] - r - 14, cx, top_c[1] - r, width=2.0)
+    svg.line(cx, bot_c[1] + r, cx, bot_c[1] + r + 14, width=2.0)
+    # windings
+    svg.circle(*top_c, r, stroke=INK, width=1.9)
+    svg.circle(*bot_c, r, stroke=INK, width=1.9)
+    # labels
+    lx = cx + r + 10 if label_side == "right" else cx - r - 10
+    anc = "start" if label_side == "right" else "end"
+    ly = cy - 14
+    svg.text(lx, ly, tag, size=12, anchor=anc, weight="bold")
+    lines = [x for x in (kva, ratio, currents, detail) if x]
+    for k, ln in enumerate(lines):
+        svg.text(lx, ly + 14 + k * 13, ln, size=10.5, anchor=anc, fill=MUTED)
+    return (cx, top_c[1] - r - 14), (cx, bot_c[1] + r + 14)
+
+
+def sym_load(svg: SVG, cx, cy_top, w=150, label="", rating="", cable="", vd="",
+             count=1, sub=False):
+    """A final load / equipment block — labelled rectangle hanging below its drop
+    point cy_top.  Returns the block bottom y."""
+    h = 46
+    x = cx - w / 2
+    y = cy_top + 16
+    # drop into the block
+    svg.line(cx, cy_top, cx, y, width=1.8)
+    fill = PANEL_BG
+    svg.rect(x, y, w, h, stroke=INK, width=1.5, fill=fill, rx=3)
+    svg.text(cx, y + 18, label, size=11.5, anchor="middle", weight="bold")
+    sub_bits = " · ".join(b for b in (rating, cable) if b)
+    if sub_bits:
+        svg.text(cx, y + 33, sub_bits, size=9.5, anchor="middle", fill=MUTED)
+    if vd:
+        svg.text(cx, y + 44, f"ΔU {vd}", size=8.8, anchor="middle", fill=MUTED)
+    return y + h
+
+
+def sym_converter(svg: SVG, cx, cy_top, conv: "Converter", label_side="right"):
+    """Power converter (PCS / inverter / rectifier) — the standard square split by a
+    diagonal with a sine on the AC side and ⎓ on the DC side.  Drawn in-line on the
+    incomer.  Returns the bottom terminal y."""
+    s = 20
+    top = cy_top
+    box_top = top + 14
+    cx0 = cx - s
+    cy0 = box_top
+    # terminal in
+    svg.line(cx, top, cx, box_top, width=2.0)
+    svg.rect(cx0, cy0, 2 * s, 2 * s, stroke=INK, width=1.9, fill=FILL_BG)
+    # diagonal split
+    svg.line(cx0, cy0 + 2 * s, cx0 + 2 * s, cy0, stroke=INK, width=1.4)
+    # DC mark (top-left): ⎓  (a line over a dashed line)
+    svg.line(cx0 + 6, cy0 + 9, cx0 + 15, cy0 + 9, stroke=INK, width=1.3)
+    svg.add(f'<line x1="{cx0+6:.1f}" y1="{cy0+13:.1f}" x2="{cx0+15:.1f}" '
+            f'y2="{cy0+13:.1f}" stroke="{INK}" stroke-width="1.3" '
+            f'stroke-dasharray="2,2"/>')
+    # AC sine (bottom-right)
+    sx = cx0 + 2 * s - 20
+    sy = cy0 + 2 * s - 11
+    svg.add(f'<path d="M {sx:.1f} {sy:.1f} q 3 -6 6 0 q 3 6 6 0" fill="none" '
+            f'stroke="{ACCENT}" stroke-width="1.5"/>')
+    # terminal out
+    bot = cy0 + 2 * s
+    svg.line(cx, bot, cx, bot + 14, width=2.0)
+    # labels
+    lx = cx + s + 12 if label_side == "right" else cx - s - 12
+    anc = "start" if label_side == "right" else "end"
+    ly = cy0 + 4
+    svg.text(lx, ly, conv.tag, size=12, anchor=anc, weight="bold")
+    lines = [x for x in (conv.label, " · ".join(b for b in (conv.rating, conv.cable) if b),
+                         conv.detail) if x]
+    for k, ln in enumerate(lines):
+        svg.text(lx, ly + 14 + k * 13, ln, size=10, anchor=anc, fill=MUTED)
+    return bot + 14
+
+
+# ---- layout -----------------------------------------------------------------
+
+def _device_chain(svg: SVG, cx, y_start, y_end, devices):
+    """Draw the conductor from y_start to y_end with each device glyph spaced along it,
+    plus a small label beside each.  Returns nothing (line already spans)."""
+    svg.line(cx, y_start, cx, y_end, width=1.8)
+    if not devices:
+        return
+    n = len(devices)
+    span = y_end - y_start
+    for i, dev in enumerate(devices):
+        cy = y_start + span * (i + 1) / (n + 1)
+        glyph = _DEVICE_GLYPH.get(dev.kind, sym_breaker)
+        glyph(svg, cx, cy)
+        lbl = dev.tag + (f"  {dev.detail}" if dev.detail else "")
+        svg.text(cx + 18, cy + 3.5, lbl, size=9.5, anchor="start", fill=MUTED)
+
+
+def build_sld_svg(tree: Tree) -> str:
+    """Render the reconstructed tree as a standard single-line diagram SVG."""
+    main = tree.main_bus
+
+    # ----- size the canvas from branch counts -----
+    main_branches = list(main.branches)
+    n_main = max(1, len(main_branches))
+    col_w = 210
+    margin_l = 60
+    margin_r = 60
+    title_h = 138
+    legend_gutter = 220   # dedicated right-hand column for the symbol legend
+    # sub-distribution branches need extra vertical space below their parent slot.
+    has_sub = any(br.sub_bus for br in main_branches)
+
+    # ----- canvas WIDTH: room for the branches + a guaranteed-clear legend gutter on
+    #       the right (no floating whitespace, no legend/branch collision in any case).
+    diagram_w = max(margin_l + n_main * col_w, 780)
+    width = diagram_w + legend_gutter + margin_r
+    width = max(width, 1060)
+    bus_x0 = margin_l
+    bus_x1 = diagram_w                      # busbar stops before the legend gutter
+    legend_x_right = width - margin_r       # legend right edge
+
+    # ----- height is finalised after we know the incomer stack depth; draw the
+    #       incomer onto a scratch SVG first to measure, then assemble for real. ----
+    def _draw_incomer(svg, src_cx, src_cy):
+        svg.text(src_cx, src_cy - 30, tree.source.tag, size=13, anchor="middle",
+                 weight="bold")
+        if tree.source.detail:
+            svg.text(src_cx, src_cy - 16, tree.source.detail, size=10, anchor="middle",
+                     fill=MUTED)
+        exit_pt = sym_utility(svg, src_cx, src_cy)
+        y = exit_pt[1]
+        if tree.incomer_devices:
+            chain_end = y + 24 + 30 * (len(tree.incomer_devices) - 1)
+            _device_chain(svg, src_cx, y, chain_end, tree.incomer_devices)
+            y = chain_end
+        if tree.incomer_transformer:
+            svg.line(src_cx, y, src_cx, y + 14, width=2.0)
+            _t, bot_t = sym_transformer(
+                svg, src_cx, y + 14 + 30, label_side="right",
+                tag=tree.incomer_transformer.tag, kva=tree.incomer_transformer.kva,
+                ratio=tree.incomer_transformer.ratio,
+                currents=tree.incomer_transformer.currents,
+                detail=tree.incomer_transformer.detail)
+            y = bot_t[1]
+        if tree.incomer_converter:
+            svg.line(src_cx, y, src_cx, y + 10, width=2.0)
+            y = sym_converter(svg, src_cx, y + 10, tree.incomer_converter,
+                              label_side="right")
+        return y
+
+    src_cx = width / 2
+    src_cy = 70
+    scratch = SVG(width, 1000)
+    incomer_bottom = _draw_incomer(scratch, src_cx, src_cy)
+    # leave headroom above the busbar for the 2-line bus label (tag + voltage/rating).
+    bus_y = incomer_bottom + 44
+    body_h = 340 + (260 if has_sub else 0)
+    height = bus_y + body_h + title_h
+
+    svg = SVG(width, height)
+    # faint border
+    svg.rect(18, 18, width - 36, height - 36, stroke=GRID_FAINT, width=1.2)
+
+    # ===== SOURCE / INCOMER (top) =====
+    y = _draw_incomer(svg, src_cx, src_cy)
+    # drop onto the main bus
+    svg.line(src_cx, y, src_cx, bus_y, width=2.2, stroke=ACCENT)
+
+    # ===== MAIN BUSBAR =====
+    svg.line(bus_x0, bus_y, bus_x1, bus_y, stroke=BUS_INK, width=7.0, cap="butt")
+    # bus label (left) — kept clear ABOVE the heavy busbar line so nothing is occluded.
+    btag = main.tag
+    binfo = " · ".join(b for b in (main.voltage, main.rating) if b)
+    svg.text(bus_x0, bus_y - 28, btag, size=13, anchor="start", weight="bold",
+             fill=BUS_INK)
+    if binfo:
+        svg.text(bus_x0, bus_y - 14, binfo, size=10.5, anchor="start", fill=MUTED,
+                 spacing="0.2")
+    # tiny rating tag at the right end
+    svg.text(bus_x1, bus_y - 14, "Σ " + (main.rating or ""), size=10, anchor="end",
+             fill=MUTED)
+
+    # ===== BRANCHES off the main bus =====
+    # distribute branch X positions evenly across the bus
+    slots = n_main
+    inner_x0 = bus_x0 + col_w * 0.5
+    inner_x1 = bus_x1 - col_w * 0.5
+    if slots == 1:
+        xs = [(bus_x0 + bus_x1) / 2]
+    else:
+        xs = [inner_x0 + (inner_x1 - inner_x0) * i / (slots - 1) for i in range(slots)]
+
+    drop_top = bus_y
+    base_y = bus_y + 70
+    content_bottom = base_y
+
+    for bx, br in zip(xs, main_branches):
+        # tap line down from bus
+        svg.line(bx, drop_top, bx, base_y - 30, width=1.8)
+        # branch header label (rating/cable) beside the tap
+        hdr = " · ".join(b for b in (br.rating, br.cable) if b)
+        if hdr:
+            svg.text(bx + 10, drop_top + 26, hdr, size=9.3, anchor="start", fill=MUTED)
+
+        if br.sub_bus is not None:
+            bot = _draw_sub_distribution(svg, bx, base_y - 30, br, col_w)
+        else:
+            # in-line protective device(s)
+            dev_end = base_y - 8
+            if br.devices:
+                _device_chain(svg, bx, base_y - 30, dev_end, br.devices)
+            else:
+                svg.line(bx, base_y - 30, bx, dev_end, width=1.8)  # plain conductor
+            bot = sym_load(svg, bx, dev_end, w=min(178, col_w - 24),
+                           label=br.label, rating=br.rating, cable=br.cable,
+                           vd=br.voltdrop, count=br.count)
+        content_bottom = max(content_bottom, bot or base_y)
+
+    # ===== LEGEND (lower-right of the body, above the title block) =====
+    legend_y = min(content_bottom + 24, height - title_h - 170)
+    legend_y = max(legend_y, bus_y + 24)
+    _draw_legend(svg, bus_x1, legend_y)
+
+    # ===== TITLE BLOCK =====
+    _draw_title_block(svg, tree, width, height, title_h)
+    return svg.render()
+
+
+def _draw_sub_distribution(svg: SVG, bx, y_from, br: Branch, col_w):
+    """Draw: parent-bus tap → two-winding transformer → SUB-BUSBAR → its load branches."""
+    xfmr = getattr(br, "transformer", None)
+    # transformer
+    svg.line(bx, y_from, bx, y_from + 12, width=1.8)
+    tag = xfmr.tag if xfmr else "TX"
+    kva = xfmr.kva if xfmr else ""
+    ratio = xfmr.ratio if xfmr else ""
+    currents = xfmr.currents if xfmr else ""
+    detail = xfmr.detail if xfmr else ""
+    top_t, bot_t = sym_transformer(svg, bx, y_from + 12 + 30, label_side="right",
+                                   tag=tag, kva=kva, ratio=ratio, currents=currents,
+                                   detail=detail)
+    sub = br.sub_bus
+    sub_bus_y = bot_t[1] + 26
+    # sub busbar
+    sb = sub.branches
+    sn = max(1, len(sb))
+    sb_w = min(col_w * 1.7, 90 + sn * 70)
+    sbx0 = bx - sb_w / 2
+    sbx1 = bx + sb_w / 2
+    svg.line(bx, bot_t[1], bx, sub_bus_y, width=2.0, stroke=ACCENT)
+    svg.line(sbx0, sub_bus_y, sbx1, sub_bus_y, stroke=BUS_INK, width=5.5, cap="butt")
+    svg.text(sbx0, sub_bus_y - 9, sub.tag, size=10.5, anchor="start", weight="bold",
+             fill=BUS_INK)
+    # sub branches
+    if sn == 1:
+        sxs = [bx]
+    else:
+        sxs = [sbx0 + 40 + (sb_w - 80) * i / (sn - 1) for i in range(sn)]
+    sbase = sub_bus_y + 54
+    bottom = sbase
+    for sx, sbr in zip(sxs, sb):
+        svg.line(sx, sub_bus_y, sx, sbase - 26, width=1.6)
+        dev_end = sbase - 6
+        if sbr.devices:
+            _device_chain(svg, sx, sbase - 26, dev_end, sbr.devices)
+        else:
+            svg.line(sx, sbase - 26, sx, dev_end, width=1.6)
+        b = sym_load(svg, sx, dev_end, w=120, label=sbr.label, rating=sbr.rating,
+                     cable=sbr.cable, vd=sbr.voltdrop, count=sbr.count, sub=True)
+        bottom = max(bottom, b or sbase)
+    return bottom
+
+
+def _draw_title_block(svg: SVG, tree: Tree, width, height, title_h):
+    """Standard drawing title block — bottom strip with two panels: a description box
+    (left) and a drawing-metadata box (right). Robust to narrow canvases."""
+    y0 = height - title_h + 24
+    x0 = 30
+    x1 = width - 30
+    svg.line(x0, y0, x1, y0, stroke=INK, width=1.6)
+
+    # right metadata box first (fixed width), so the left panel takes the remainder.
+    bw = 300
+    bx0 = x1 - bw
+    by0 = y0 + 14
+    rows = [("DRAWING No.", "FF-SLD-001"),
+            ("REV", "—   (placeholder)"),
+            ("DATE", "YYYY-MM-DD"),
+            ("SCALE", "NTS")]
+    rh = 22
+    box_h = rh * len(rows)
+    svg.rect(bx0, by0, bw, box_h, stroke=INK, width=1.3, fill=FILL_BG)
+    for i, (k, v) in enumerate(rows):
+        ry = by0 + i * rh
+        if i:
+            svg.line(bx0, ry, bx0 + bw, ry, stroke=GRID_FAINT, width=1.0)
+        svg.line(bx0 + 108, by0, bx0 + 108, by0 + box_h, stroke=GRID_FAINT, width=1.0)
+        svg.text(bx0 + 8, ry + 15, k, size=9, fill=MUTED, weight="bold")
+        svg.text(bx0 + 116, ry + 15, v, size=9.5)
+
+    # left: project + drawing title + scope + notes
+    svg.text(x0, y0 + 24, "FRACTIONAL FORGE · ForgeOS", size=12, weight="bold")
+    svg.text(x0, y0 + 43, f"SINGLE-LINE DIAGRAM — {_humanise(tree.archetype)}",
+             size=15, weight="bold", fill=BUS_INK)
+    svg.text(x0, y0 + 61,
+             "Scope: major electrical distribution as modelled "
+             "(projected from the connection schedule).", size=9.5, fill=MUTED)
+    ny = y0 + 79
+    for note in (tree.notes or [])[:2]:
+        svg.text(x0, ny, "• " + note, size=9.2, fill=MUTED)
+        ny += 13
+    svg.text(x0, ny + 2,
+             "Auto-generated · drawn ForgeOS auto-projection · not for construction.",
+             size=8.6, fill=MUTED)
+
+
+def _draw_legend(svg: SVG, x_right, y_top):
+    """Compact symbol legend in a boxed panel, drawn TOP-RIGHT of the diagram body so it
+    never collides with the title block.  x_right = right edge to align the box to."""
+    items = [
+        ("breaker", "Circuit breaker"),
+        ("isolator", "Isolator / disconnector"),
+        ("contactor", "Contactor"),
+        ("fuse", "Fuse"),
+        ("rcd", "Protection relay"),
+        (SYM_TRANSFORMER, "Two-winding transformer"),
+        (SYM_LOAD, "Load / equipment"),
+    ]
+    bw, rowh = 188, 21
+    bh = 20 + rowh * len(items)
+    bx = x_right - bw
+    svg.rect(bx, y_top, bw, bh, stroke=GRID_FAINT, width=1.2, fill=PANEL_BG, rx=3)
+    svg.text(bx + 10, y_top + 15, "LEGEND", size=9.5, weight="bold", fill=MUTED)
+    yy = y_top + 30
+    gx = bx + 18
+    for kind, lbl in items:
+        if kind in _DEVICE_GLYPH:
+            _DEVICE_GLYPH[kind](svg, gx, yy)
+        elif kind == SYM_TRANSFORMER:
+            # mini two-circle glyph
+            svg.circle(gx, yy - 3, 5, stroke=INK, width=1.4)
+            svg.circle(gx, yy + 3, 5, stroke=INK, width=1.4)
+        elif kind == SYM_LOAD:
+            svg.rect(gx - 6, yy - 5, 12, 10, stroke=INK, width=1.3, fill=FILL_BG)
+        svg.text(gx + 16, yy + 3.5, lbl, size=8.8, fill=MUTED)
+        yy += rowh
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RASTERISATION  (SVG → PNG)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _svg_dims(svg_text: str):
+    mw = re.search(r'<svg[^>]*\bwidth="([\d.]+)"', svg_text)
+    mh = re.search(r'<svg[^>]*\bheight="([\d.]+)"', svg_text)
+    return (int(math.ceil(float(mw.group(1)))) if mw else 1200,
+            int(math.ceil(float(mh.group(1)))) if mh else 800)
+
+
+def rasterise(svg_path: Path, png_path: Path, scale: int = 2) -> bool:
+    """SVG → PNG.  Tries, in order: cairosvg (py), rsvg-convert, headless Chrome.
+    Returns True on success (PNG written)."""
+    svg_text = svg_path.read_text()
+    w, h = _svg_dims(svg_text)
+
+    # 1) cairosvg
+    try:
+        import cairosvg  # type: ignore
+        cairosvg.svg2png(url=str(svg_path), write_to=str(png_path),
+                         output_width=w * scale, output_height=h * scale,
+                         background_color="white")
+        if png_path.is_file() and png_path.stat().st_size > 1000:
+            return True
+    except Exception:
+        pass
+
+    # 2) rsvg-convert
+    rsvg = shutil.which("rsvg-convert")
+    if rsvg:
+        try:
+            subprocess.run([rsvg, "-w", str(w * scale), "-h", str(h * scale),
+                            "-b", "white", "-o", str(png_path), str(svg_path)],
+                           check=True, capture_output=True, timeout=60)
+            if png_path.is_file() and png_path.stat().st_size > 1000:
+                return True
+        except Exception:
+            pass
+
+    # 3) headless Chrome / Chromium screenshot.  window-size is the LOGICAL viewport
+    #    (the SVG's intrinsic size); force-device-scale-factor does the upscaling, so the
+    #    PNG comes out w*scale × h*scale with NO double-counting and NO extra whitespace.
+    chrome = _find_chrome()
+    if chrome:
+        try:
+            subprocess.run(
+                [chrome, "--headless", "--disable-gpu", "--no-sandbox",
+                 f"--screenshot={png_path}",
+                 f"--window-size={w},{h}",
+                 f"--force-device-scale-factor={scale}",
+                 "--default-background-color=FFFFFFFF",
+                 "--hide-scrollbars", f"file://{svg_path}"],
+                check=True, capture_output=True, timeout=90)
+            if png_path.is_file() and png_path.stat().st_size > 1000:
+                return True
+        except Exception as ex:
+            print(f"[sld] chrome rasterise failed: {ex}")
+
+    return False
+
+
+def _find_chrome():
+    for c in (
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    ):
+        if Path(c).is_file():
+            return c
+    for name in ("google-chrome", "chromium", "chromium-browser", "chrome"):
+        p = shutil.which(name)
+        if p:
+            return p
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ENTRY
+# ═══════════════════════════════════════════════════════════════════════════
+
+def generate_sld(out_dir: str, state_path: Optional[str] = None,
+                 rasterise_png: bool = True):
+    """Full pipeline: load → reconstruct → draw → write SVG (+ PNG).  Returns a dict
+    summary (paths + node/symbol counts)."""
+    schedule, state = load_inputs(out_dir, state_path)
+    tree = reconstruct_tree(schedule, state)
+    svg_text = build_sld_svg(tree)
+
+    draw_dir = Path(out_dir) / "drawings"
+    draw_dir.mkdir(parents=True, exist_ok=True)
+    svg_path = draw_dir / "single-line-diagram.svg"
+    png_path = draw_dir / "single-line-diagram.png"
+    svg_path.write_text(svg_text)
+
+    png_ok = False
+    if rasterise_png:
+        png_ok = rasterise(svg_path, png_path)
+
+    summary = {
+        "archetype": tree.archetype,
+        "svg": str(svg_path),
+        "png": str(png_path) if png_ok else None,
+        "source": tree.source.tag,
+        "main_bus": tree.main_bus.tag,
+        "main_branches": len(tree.main_bus.branches),
+        "sub_distributions": sum(1 for b in tree.main_bus.branches if b.sub_bus),
+        "transformers": (1 if tree.incomer_transformer else 0)
+                        + sum(1 for b in tree.main_bus.branches if b.sub_bus),
+        "devices_in_diagram": _count_devices(tree),
+        "loads": _count_loads(tree),
+    }
+    return summary, tree, svg_text
+
+
+def _count_devices(tree: Tree):
+    n = len(tree.incomer_devices or [])
+    for br in tree.main_bus.branches:
+        n += len(br.devices)
+        if br.sub_bus:
+            for sb in br.sub_bus.branches:
+                n += len(sb.devices)
+    return n
+
+
+def _count_loads(tree: Tree):
+    n = 0
+    for br in tree.main_bus.branches:
+        if br.sub_bus:
+            n += sum(1 for _ in br.sub_bus.branches)
+        elif br.target_sym == SYM_LOAD:
+            n += 1
+    return n
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    out_dir = argv[0]
+    state_path = argv[1] if len(argv) > 1 else None
+    try:
+        summary, _tree, _svg = generate_sld(out_dir, state_path)
+    except FileNotFoundError as ex:
+        print(f"[sld] ERROR: {ex}")
+        return 2
+    print(f"[sld] archetype       : {summary['archetype']}")
+    print(f"[sld] source          : {summary['source']}")
+    print(f"[sld] main bus        : {summary['main_bus']} "
+          f"({summary['main_branches']} branches)")
+    print(f"[sld] sub-distributions: {summary['sub_distributions']}")
+    print(f"[sld] transformers    : {summary['transformers']}")
+    print(f"[sld] devices drawn   : {summary['devices_in_diagram']}")
+    print(f"[sld] loads drawn     : {summary['loads']}")
+    print(f"[sld] SVG → {summary['svg']}")
+    if summary["png"]:
+        print(f"[sld] PNG → {summary['png']}")
+    else:
+        print("[sld] PNG not written (no rasteriser available — SVG is the master)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
