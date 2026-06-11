@@ -4369,43 +4369,126 @@ def _tm_palette(MAT):
     return P
 
 
+def _tm_basis_euler(c_hat, n_hat, r_hat):
+    """Euler angles (XYZ) for a box whose LOCAL axes (x=chord, y=thickness, z=span)
+    map to the given WORLD orthonormal basis (c_hat, n_hat, r_hat). Built from the
+    rotation matrix whose columns are those basis vectors → .to_euler(). mathutils
+    is Blender-only, imported lazily like the rest of this module."""
+    import mathutils
+    m = mathutils.Matrix((
+        (c_hat[0], n_hat[0], r_hat[0]),
+        (c_hat[1], n_hat[1], r_hat[1]),
+        (c_hat[2], n_hat[2], r_hat[2]),
+    ))
+    return m.to_euler()
+
+
 def _tm_build_blade(nm, hub_xyz_mm, angle_rad, length_mm, root_chord_mm, mat,
                     mod, MO):
-    """One tapered aerofoil BLADE radiating from the hub centre in the rotor plane
-    (the Y–Z plane, since the rotor faces +X). `angle_rad` sets the blade's clock
-    position around the hub axis. Built as a chain of frustums root→tip so it reads
-    as a real wind blade: a fat rounded root tapering to a thin tip, with a slight
-    twist suggested by narrowing chord. Deterministic; geometry only."""
+    """One tapered, TWISTED aerofoil BLADE radiating from the hub centre in the
+    rotor plane (the Y–Z plane; the rotor faces +X). `angle_rad` sets the blade's
+    clock position around the hub axis. Built as a chain of flat AEROFOIL sections
+    (boxes: chord ≫ thickness) root→tip so it reads as a real wind blade — a fat,
+    rounded, near-cylindrical root; a broad max-chord shoulder; a long taper to a
+    thin tip; and a continuous TWIST that feathers the chord from a steep root
+    pitch toward flat-in-plane at the tip. Deterministic; geometry only.
+
+    Frame per segment at radius r (all unit world vectors):
+      • r_hat = radial/span direction = (0, cos θ, sin θ)  → box local +Z (length)
+      • t_hat = in-plane tangential   = (0, -sin θ, cos θ)
+      • the chord lies in the X–t_hat plane, tilted by the local twist φ(r):
+          c_hat = cos φ · X̂ + sin φ · t_hat                → box local +X (chord)
+      • n_hat = r_hat × c_hat (thickness normal)             → box local +Y (thin)
+    """
     hx, hy, hz = hub_xyz_mm
-    n_seg = 5
-    # blade lies in the Y–Z plane; +X offset keeps it just in front of the hub.
-    dir_y, dir_z = math.cos(angle_rad), math.sin(angle_rad)
-    seg_len = length_mm / n_seg
+    ry, rz = math.cos(angle_rad), math.sin(angle_rad)     # radial (span) unit
+    ty, tz = -math.sin(angle_rad), math.cos(angle_rad)    # in-plane tangential unit
+    r_hat = (0.0, ry, rz)
+    t_hat = (0.0, ty, tz)
+    x_hat = (1.0, 0.0, 0.0)
+
+    # planform: max chord sits just outboard of the root (~22% span), then tapers.
+    # twist: steep at the root (blade is pitched + cambered into the wind), ~flat
+    # in-plane at the tip. Both are smooth functions of the span fraction f∈[0,1].
+    root_twist = math.radians(20.0)    # root chord pitched ~20° out of the rotor plane
+    tip_twist  = math.radians(3.0)     # tip nearly flat-in-plane (feathered)
+    tc_ratio   = 0.16                  # aerofoil thickness / chord (fat root section)
+
+    def chord_at(f):
+        # 0→max over the first 22% (root build-up), then linear taper to a thin tip.
+        if f < 0.22:
+            base = 0.42 + (1.0 - 0.42) * (f / 0.22)        # 0.42·c → 1.00·c
+        else:
+            base = 1.0 - 0.80 * ((f - 0.22) / 0.78)        # 1.00·c → 0.20·c
+        return max(root_chord_mm * 0.10, root_chord_mm * base)
+
+    def twist_at(f):
+        return root_twist + (tip_twist - root_twist) * (f ** 0.7)
+
+    # ── 1. rounded blade ROOT — a short cylinder (circular root stub) at the hub ──
+    root_len = length_mm * 0.10
+    root_r = root_chord_mm * 0.30
+    rcx = hx
+    rcy = hy + ry * (root_len / 2.0)
+    rcz = hz + rz * (root_len / 2.0)
+    # cylinder axis = +Z locally; spin it onto the radial direction via the basis.
+    root_eul = _tm_basis_euler(x_hat, t_hat, r_hat)
+    fl.add_cyl(f"{nm}_root", (rcx * fl.MM, rcy * fl.MM, rcz * fl.MM),
+               root_r * fl.MM, root_len * fl.MM, mat,
+               module=mod, module_objects=MO, rotation=root_eul)
+
+    # ── 2. aerofoil SECTIONS from the root stub out to the tip ──
+    n_seg = 9
+    span0 = root_len
+    aero_len = length_mm - root_len
+    seg_len = aero_len / n_seg
     for s in range(n_seg):
-        r0 = s * seg_len
-        r1 = (s + 1) * seg_len
-        rc = r0 + seg_len / 2
-        # chord tapers from root_chord at root to ~12% at the tip (aerofoil planform)
-        frac0 = 1.0 - 0.88 * (r0 / length_mm)
-        frac1 = 1.0 - 0.88 * (r1 / length_mm)
-        c0 = max(root_chord_mm * 0.12, root_chord_mm * frac0)
-        c1 = max(root_chord_mm * 0.12, root_chord_mm * frac1)
-        cy = hy + dir_y * rc
-        cz = hz + dir_z * rc
-        # a thin aerofoil: a frustum whose cross radius ≈ chord/2, flattened later
-        seg = fl.add_frustum(
-            f"{nm}_seg{s}",
-            (hx * fl.MM, cy * fl.MM, cz * fl.MM),
-            (c0 / 2) * fl.MM, (c1 / 2) * fl.MM, seg_len * fl.MM, mat,
-            module=mod, module_objects=MO, vertices=10,
-            rotation=(math.radians(90) * (1 if abs(dir_z) < 0.999 else 1), 0, 0))
-        # orient the segment to point along (dir_y, dir_z): rotate about X so its
-        # local +Z aligns with the radial direction, then flatten chord-wise (thin).
-        try:
-            seg.rotation_euler = (math.atan2(dir_y, dir_z) * -1.0, 0.0, 0.0)
-            seg.scale = (0.16, seg.scale[1] if hasattr(seg, "scale") else 1.0, 1.0)
-        except (AttributeError, TypeError):
-            pass
+        r0 = span0 + s * seg_len
+        rc = r0 + seg_len / 2.0
+        f = rc / length_mm                              # span fraction at seg centre
+        chord = chord_at(f)
+        thick = max(root_chord_mm * 0.02, chord * tc_ratio * (1.0 - 0.4 * f))
+        phi = twist_at(f)
+        # chord unit vector in the X–tangential plane, tilted by the local twist
+        cphi, sphi = math.cos(phi), math.sin(phi)
+        c_hat = (cphi * 1.0, sphi * ty, sphi * tz)
+        # thickness normal = r_hat × c_hat (orthonormal; both are unit + perpendicular)
+        n_hat = (
+            r_hat[1] * c_hat[2] - r_hat[2] * c_hat[1],
+            r_hat[2] * c_hat[0] - r_hat[0] * c_hat[2],
+            r_hat[0] * c_hat[1] - r_hat[1] * c_hat[0],
+        )
+        nmag = math.sqrt(n_hat[0] ** 2 + n_hat[1] ** 2 + n_hat[2] ** 2) or 1.0
+        n_hat = (n_hat[0] / nmag, n_hat[1] / nmag, n_hat[2] / nmag)
+        cx = hx                                          # blade stays in the hub's X
+        cy = hy + ry * rc
+        cz = hz + rz * rc
+        eul = _tm_basis_euler(c_hat, n_hat, r_hat)
+        # the box is the flat aerofoil section: chord (local X) ≫ thickness (local Y),
+        # span = seg_len (local Z). The twisted basis gives a real twisted blade.
+        fl.add_box(f"{nm}_seg{s}",
+                   (cx * fl.MM, cy * fl.MM, cz * fl.MM),
+                   (chord * fl.MM, thick * fl.MM, seg_len * 1.04 * fl.MM), mat,
+                   module=mod, module_objects=MO, rotation=eul)
+    # ── 3. a small rounded TIP cap so the blade doesn't end on a hard rectangle ──
+    f_tip = 1.0
+    tip_chord = chord_at(0.985)
+    tip_phi = twist_at(f_tip)
+    tcphi, tsphi = math.cos(tip_phi), math.sin(tip_phi)
+    tc_hat = (tcphi, tsphi * ty, tsphi * tz)
+    tn = (
+        r_hat[1] * tc_hat[2] - r_hat[2] * tc_hat[1],
+        r_hat[2] * tc_hat[0] - r_hat[0] * tc_hat[2],
+        r_hat[0] * tc_hat[1] - r_hat[1] * tc_hat[0],
+    )
+    tnm = math.sqrt(tn[0] ** 2 + tn[1] ** 2 + tn[2] ** 2) or 1.0
+    tn = (tn[0] / tnm, tn[1] / tnm, tn[2] / tnm)
+    tip_eul = _tm_basis_euler(tc_hat, tn, r_hat)
+    tcx, tcy, tcz = hx, hy + ry * length_mm, hz + rz * length_mm
+    fl.add_box(f"{nm}_tip", (tcx * fl.MM, tcy * fl.MM, tcz * fl.MM),
+               (tip_chord * 0.7 * fl.MM, tip_chord * 0.10 * fl.MM,
+                length_mm * 0.03 * fl.MM), mat,
+               module=mod, module_objects=MO, rotation=tip_eul)
 
 
 def place_tower_machine(parts, regions, topology, MAT, MO):
@@ -4445,14 +4528,29 @@ def place_tower_machine(parts, regions, topology, MAT, MO):
     if struct_mod not in MO:
         MO[struct_mod] = []
 
-    # ── 2. FOUNDATION pad/plinth at the base ──
-    found_dia = base_dia * 2.4
-    found_h = max(900.0, base_dia * 0.55)
+    # ── 2. FOUNDATION — a circular concrete pad + a raised pedestal/plinth ──
+    #    Wide low octagonal-ish pad (gravity base) + a shorter raised pedestal the
+    #    tower flange bolts onto, so the base reads as a real concrete foundation.
+    found_dia = base_dia * 2.6
+    found_h = max(900.0, base_dia * 0.50)
     fl.add_cyl("u_tm_found_pad",
                (0.0, 0.0, (DECK_Z_MM + found_h / 2) * fl.MM),
                (found_dia / 2) * fl.MM, found_h * fl.MM, P["found"],
                module=struct_mod, module_objects=MO)
-    base_z = DECK_Z_MM + found_h        # tower springs from the foundation top
+    # raised pedestal (smaller drum) on top of the pad
+    ped_dia = base_dia * 1.45
+    ped_h = found_h * 0.55
+    fl.add_cyl("u_tm_found_pedestal",
+               (0.0, 0.0, (DECK_Z_MM + found_h + ped_h / 2) * fl.MM),
+               (ped_dia / 2) * fl.MM, ped_h * fl.MM, P["found"],
+               module=struct_mod, module_objects=MO)
+    base_z = DECK_Z_MM + found_h + ped_h    # tower springs from the pedestal top
+    # tower base flange (steel ring) bolted to the pedestal
+    steel_mat = _steel_mat(MAT)
+    fl.add_cyl("u_tm_tower_baseflange",
+               (0.0, 0.0, (base_z + base_dia * 0.04) * fl.MM),
+               (base_dia / 2 * 1.12) * fl.MM, (base_dia * 0.08) * fl.MM, steel_mat,
+               module=struct_mod, module_objects=MO)
 
     # ── 3. TOWER — a tall TAPERED tube (frustum), wide base → narrow top ──
     fl.add_frustum("u_tm_tower",
@@ -4461,34 +4559,97 @@ def place_tower_machine(parts, regions, topology, MAT, MO):
                    hub_h * fl.MM, P["tower"],
                    module=struct_mod, module_objects=MO, vertices=32)
     tower_top_z = base_z + hub_h
+    # ── 3a. base access DOOR on the +X face of the tower ──
+    door_w = base_dia * 0.34
+    door_h = min(hub_h * 0.045, base_dia * 0.85)
+    door_z = base_z + door_h / 2 + base_dia * 0.10
+    # the tower radius at the door height (frustum interpolation)
+    r_door = (base_dia / 2) + ((top_dia - base_dia) / 2) * ((door_z - base_z) / hub_h)
+    door_mat = _bop_secondary_mat(MAT, "towerdoor", (0.30, 0.32, 0.36), 0.40, 0.45)
+    fl.add_box("u_tm_tower_door",
+               ((r_door * 0.92) * fl.MM, 0.0, door_z * fl.MM),
+               ((base_dia * 0.10) * fl.MM, door_w * fl.MM, door_h * fl.MM),
+               door_mat, module=struct_mod, module_objects=MO)
+    # ── 3b. a couple of flange RINGS up the tower (section joints) ──
+    n_flange = 2
+    for fi in range(1, n_flange + 1):
+        fz = base_z + hub_h * (fi / (n_flange + 1))
+        r_fl = (base_dia / 2) + ((top_dia - base_dia) / 2) * ((fz - base_z) / hub_h)
+        fl.add_cyl(f"u_tm_tower_flange{fi}",
+                   (0.0, 0.0, fz * fl.MM),
+                   (r_fl * 1.06) * fl.MM, (base_dia * 0.045) * fl.MM, steel_mat,
+                   module=struct_mod, module_objects=MO)
 
-    # ── 4. NACELLE box at the tower top (gearbox/generator housing) ──
-    nac_cz = tower_top_z + nac_w / 2
+    # ── 4. NACELLE — a STREAMLINED housing on the yaw bearing atop the tower ──
+    #    Rotor faces +X, so the nacelle front (where the spinner mounts) is +X and
+    #    its gearbox/generator tail tapers down toward the REAR (−X). Body box +
+    #    tapered rear fairing + a rounded front cap. Sits on a yaw bearing collar.
+    nac_cz = tower_top_z + nac_w * 0.62        # nacelle centreline a touch above the top
+    body_len = nac_len * 0.72
+    body_cx = -nac_len * 0.04                   # body biased slightly aft of the yaw axis
     fl.add_box("u_tm_nacelle",
-               (0.0, 0.0, nac_cz * fl.MM),
-               (nac_len * fl.MM, nac_w * fl.MM, nac_w * fl.MM), P["nacelle"],
+               (body_cx * fl.MM, 0.0, nac_cz * fl.MM),
+               (body_len * fl.MM, nac_w * fl.MM, nac_w * 0.92 * fl.MM), P["nacelle"],
                module=tm_mod, module_objects=MO)
-    # a small yaw collar where the nacelle meets the tower
+    # tapered REAR fairing (−X): the generator/cooling tail narrows aft
+    rear_x = body_cx - body_len / 2.0
+    rear_len = nac_len * 0.26
+    fl.add_frustum("u_tm_nacelle_tail",
+                   ((rear_x - rear_len / 2.0) * fl.MM, 0.0, nac_cz * fl.MM),
+                   (nac_w * 0.30) * fl.MM, (nac_w * 0.46) * fl.MM, rear_len * fl.MM,
+                   P["nacelle"], module=tm_mod, module_objects=MO, vertices=20,
+                   rotation=(0, math.radians(-90), 0))
+    # rounded FRONT cap (+X) blending the nacelle nose toward the spinner mount
+    front_x = body_cx + body_len / 2.0
+    front_len = nac_len * 0.12
+    fl.add_frustum("u_tm_nacelle_nose",
+                   ((front_x + front_len / 2.0) * fl.MM, 0.0, nac_cz * fl.MM),
+                   (nac_w * 0.46) * fl.MM, (nac_w * 0.34) * fl.MM, front_len * fl.MM,
+                   P["nacelle"], module=tm_mod, module_objects=MO, vertices=20,
+                   rotation=(0, math.radians(90), 0))
+    # small roof anemometer mast (a turbine signature) on the nacelle tail
+    fl.add_cyl("u_tm_nacelle_met",
+               ((rear_x) * fl.MM, 0.0, (nac_cz + nac_w * 0.5 + nac_w * 0.18) * fl.MM),
+               (nac_w * 0.018) * fl.MM, (nac_w * 0.36) * fl.MM, P["hub"],
+               module=tm_mod, module_objects=MO)
+    # YAW BEARING collar where the nacelle sits on the tower top
     fl.add_cyl("u_tm_yaw",
-               (0.0, 0.0, (tower_top_z + nac_w * 0.06) * fl.MM),
-               (top_dia / 2 * 1.15) * fl.MM, (nac_w * 0.14) * fl.MM, P["hub"],
+               (0.0, 0.0, (tower_top_z + nac_w * 0.10) * fl.MM),
+               (top_dia / 2 * 1.22) * fl.MM, (nac_w * 0.20) * fl.MM, P["hub"],
                module=tm_mod, module_objects=MO)
 
-    # ── 5. HUB + ROTOR at the nacelle FRONT (+X face) ──
-    hub_x = nac_len / 2 + hub_dia * 0.4
-    hub_xyz = (hub_x, 0.0, nac_cz)
-    # hub: a short cone (spinner) pointing +X
-    fl.add_frustum("u_tm_hub",
-                   ((hub_x + hub_dia * 0.2) * fl.MM, 0.0, nac_cz * fl.MM),
-                   (hub_dia / 2) * fl.MM, (hub_dia / 2 * 0.45) * fl.MM,
-                   hub_dia * fl.MM, P["hub"],
+    # ── 5. HUB (spinner) + ROTOR at the nacelle FRONT (+X) ──
+    #    A spinner = a CONE at the front of the nacelle; the blades radiate from the
+    #    spinner base. Build a hub BARREL (the blade-attach drum) + a long nose CONE.
+    spinner_base_x = front_x + front_len + hub_dia * 0.20
+    hub_xyz = (spinner_base_x, 0.0, nac_cz)     # blades radiate from the barrel centre
+    # hub barrel (blades bolt to this drum)
+    fl.add_cyl("u_tm_hub",
+               (spinner_base_x * fl.MM, 0.0, nac_cz * fl.MM),
+               (hub_dia / 2) * fl.MM, (hub_dia * 0.62) * fl.MM, P["hub"],
+               module=tm_mod, module_objects=MO,
+               rotation=(0, math.radians(90), 0))
+    # spinner NOSE cone pointing +X from the barrel front
+    nose_len = hub_dia * 1.15
+    fl.add_frustum("u_tm_spinner",
+                   ((spinner_base_x + hub_dia * 0.31 + nose_len / 2.0) * fl.MM, 0.0,
+                    nac_cz * fl.MM),
+                   (hub_dia / 2 * 1.02) * fl.MM, (hub_dia * 0.06) * fl.MM,
+                   nose_len * fl.MM, P["hub"],
                    module=tm_mod, module_objects=MO, vertices=24,
                    rotation=(0, math.radians(90), 0))
-    # N blades at 360/N° around the hub axis (rotor plane = Y–Z, faces +X)
+    # N blades at 360/N° around the hub axis (rotor plane = Y–Z, faces +X). Each
+    # blade root nests into the barrel; offset the start radius to the barrel edge.
+    blade_root_r = hub_dia * 0.42
     for b in range(n_blades):
         ang = (2 * math.pi / n_blades) * b + math.pi / 2   # first blade points up
-        _tm_build_blade(f"u_tm_blade{b}", hub_xyz, ang, blade_len, root_chord,
-                        P["blade"], tm_mod, MO)
+        # start the blade at the barrel surface, not the hub centre, so the root
+        # bolts into the spinner rather than overlapping the nacelle.
+        bx = hub_xyz[0]
+        by = hub_xyz[1] + math.cos(ang) * blade_root_r
+        bz = hub_xyz[2] + math.sin(ang) * blade_root_r
+        _tm_build_blade(f"u_tm_blade{b}", (bx, by, bz), ang,
+                        blade_len - blade_root_r, root_chord, P["blade"], tm_mod, MO)
 
     # ── 6. faint GROUND PLANE far below (context; named u_skid_* → faint wire) ──
     plane_extent = max(rotor_d, found_dia) * 1.4
@@ -4504,11 +4665,20 @@ def place_tower_machine(parts, regions, topology, MAT, MO):
     bop_anchor = {}
     bop_items = _select_tm_bop_items(parts)
     steel = _steel_mat(MAT)
-    # lay the cabinets in a row in −Y, clear of the foundation, along X about centre.
-    bop_y = -(found_dia / 2 + TM_BOP_STANDOFF_MM)
-    total_w = sum(it[3] for it in bop_items) + TM_BOP_GAP_MM * max(0, len(bop_items) - 1)
+    # The cabinet footprints in _TM_BOP_ROLES are realistic absolute sizes (~1.3-3 m)
+    # but a lone ~2 m cabinet is visually lost beside a 52 m tower. Scale the lineup
+    # up DETERMINISTICALLY toward the upper-realistic end, tied to the tower base
+    # diameter, so it reads as a recognisable down-tower equipment cluster at the
+    # hero/iso scale for ANY tower-machine size (kept ≤2.4× so it stays plausible).
+    bop_scale = max(1.0, min(2.4, base_dia / 2400.0))
+    # lay the cabinets in a row in −Y, hugging the foundation, along X about centre.
+    bop_y = -(found_dia / 2 + TM_BOP_STANDOFF_MM * 0.5)
+    s_items = [(role, p, d * bop_scale, w * bop_scale, h * bop_scale, rgb)
+               for (role, p, d, w, h, rgb) in bop_items]
+    gap = TM_BOP_GAP_MM * bop_scale
+    total_w = sum(it[3] for it in s_items) + gap * max(0, len(s_items) - 1)
     cursor_x = -total_w / 2
-    for role, part_or_none, depth_mm, w_mm, h_mm, rgb in bop_items:
+    for role, part_or_none, depth_mm, w_mm, h_mm, rgb in s_items:
         cx = cursor_x + w_mm / 2
         cy = bop_y
         nm = f"u_tm_bop_{role}"
@@ -4530,7 +4700,7 @@ def place_tower_machine(parts, regions, topology, MAT, MO):
                                     mat, steel, MAT, mod, MO)
         bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
         region_centres[role] = (cx, cy)
-        cursor_x += w_mm + TM_BOP_GAP_MM
+        cursor_x += w_mm + gap
 
     # ── 8. bbox + frame_top + topology ──
     half = max(rotor_d / 2, found_dia / 2) + 1000.0
@@ -6006,10 +6176,17 @@ _INSPECT_TOWERMACHINE = [
     ("bop_switchgear",(0.34, 0.38, 0.44)),   # switchgear = dark grey
     ("bop_scada",     (0.30, 0.46, 0.40)),   # SCADA / control = green-grey
     # ── turbine geometry (after BoP so a bop_* body never matches these) ──
-    ("_blade",        (0.95, 0.95, 0.96)),   # rotor blade = WHITE
-    ("_hub",          (0.66, 0.68, 0.72)),   # rotor hub / spinner = grey
-    ("_yaw",          (0.60, 0.62, 0.66)),   # yaw collar = grey
-    ("_nacelle",      (0.80, 0.81, 0.84)),   # nacelle housing = light grey
+    #    SPECIFIC compound keys MUST precede the broad role keys: _tower_door must
+    #    beat _tower, _tower_*flange must beat _tower, _spinner is its own grey.
+    ("_tower_door",   (0.30, 0.32, 0.36)),   # base access door = dark steel
+    ("_baseflange",   (0.58, 0.60, 0.64)),   # tower base flange = mid steel
+    ("_tower_flange", (0.58, 0.60, 0.64)),   # tower section flange ring = mid steel
+    ("_blade",        (0.95, 0.95, 0.96)),   # rotor blade (root/seg/tip) = WHITE
+    ("_spinner",      (0.66, 0.68, 0.72)),   # spinner nose cone = grey
+    ("_hub",          (0.66, 0.68, 0.72)),   # rotor hub barrel = grey
+    ("_yaw",          (0.60, 0.62, 0.66)),   # yaw bearing collar = grey
+    ("_nacelle",      (0.80, 0.81, 0.84)),   # nacelle housing (+tail/nose/met) = light grey
+    ("_pedestal",     (0.60, 0.59, 0.56)),   # foundation pedestal = concrete grey
     ("_tower",        (0.82, 0.83, 0.85)),   # tower tube = light grey
     ("_found",        (0.62, 0.61, 0.58)),   # foundation pad = concrete grey
     ("_plinth",       (0.50, 0.52, 0.55)),   # BoP plinth = mid grey steel
