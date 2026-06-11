@@ -341,6 +341,113 @@ def main() -> int:
               f"{str(r['size']):<24}{str(r['drop']):<12}"
               f"{('Y' if r['within_spec'] else 'N')}")
 
+    # ---- 9. PHASE D — the iterative design feedback loop (D1 upsize, D2 redesign) ----
+    print("\nPHASE D — iterative feedback (size_connection_to_spec):")
+
+    # 9a. D1 AUTO-UPSIZE: a constructed OUT-OF-SPEC run must climb the ladder until
+    #     in-spec — the size GROWS and the volt-drop crosses BACK under the limit.
+    #     A 48 V DC bus at 1562.5 A over 40 m trips 5% at the first conductor; D1
+    #     adds parallels / fattens CSA until in-spec (reach 62.5 kA·m < the LV-reach
+    #     ceiling, so D1 — not D2 — is the correct response).
+    d1_edge = dict(BESS_DC_BUS); d1_edge["material_context"] = "48 V DC bus"
+    d1_edge["from_part"] = "pack"; d1_edge["to_part"] = "switchboard"
+    d1_base = cs.size_connection(dict(d1_edge), 40.0)
+    d1 = cs.size_connection_to_spec(dict(d1_edge), 40.0)
+    check("D1 base run is genuinely OUT OF SPEC before the loop responds",
+          d1_base["within_spec"] is False and d1_base["drop_pct_or_velocity"] > 5.0)
+    check("D1 auto-upsize flips within_spec True (the loop RESPONDED)",
+          d1["within_spec"] is True and d1["upsized"] is True)
+    check("D1 size GREW (final conductor heavier than the original)",
+          d1["original_size_label"] == d1_base["size_label"]
+          and d1["final_size_label"] != d1["original_size_label"]
+          and d1["outer_dia_mm"] > d1_base["outer_dia_mm"])
+    check("D1 volt-drop crossed BACK under the 5% limit (before > 5 > after)",
+          d1_base["drop_pct_or_velocity"] > 5.0 >= d1["drop_pct_or_velocity"])
+    check("D1 records the driver + iteration count",
+          bool(d1["driver"]) and d1["upsize_iterations"] >= 1
+          and d1["design_recommendation"] is None)
+    print(f"     (D1: {d1['original_size_label']} → {d1['final_size_label']}  "
+          f"Vd {d1_base['drop_pct_or_velocity']}% → {d1['drop_pct_or_velocity']}% "
+          f"(≤5%), {d1['upsize_iterations']} step(s); "
+          f"dia {d1_base['outer_dia_mm']} → {d1['outer_dia_mm']} mm)")
+
+    # 9b. D2 DESIGN RECOMMENDATION: a MORE-EXTREME run (same 48 V bus, 250 m) is
+    #     past sane LV reach — the loop must NOT chase an absurd conductor; it emits
+    #     a sub-distribution / relocate recommendation instead.
+    d2 = cs.size_connection_to_spec(dict(d1_edge), 250.0)
+    check("D2 fires a design_recommendation on an excessive run",
+          bool(d2["design_recommendation"]))
+    check("D2 recommendation names sub-distribution / step-down / relocate",
+          any(k in d2["design_recommendation"].lower()
+              for k in ("sub-distribution", "step-down", "relocate")))
+    check("D2 driver cites the breach (reach / volt-drop)",
+          bool(d2["driver"]) and ("reach" in d2["driver"].lower()
+                                  or "volt-drop" in d2["driver"].lower()))
+    print(f"     (D2: reach {d2['carried_rating'] * 250.0:,.0f} A·m → "
+          f"{d2['design_recommendation'][:96]}…)")
+
+    # 9c. D1 PIPE velocity climb. The first-pass sizer rounds the bore UP (achieved
+    #     velocity ≤ target ≤ limit), so a sanely-sized liquid line is in-spec by
+    #     construction — to exercise the climb we hand _climb_fluid a manufactured
+    #     OVER-velocity DN15 pipe (DN15 at 5 m/s, well over the 3 m/s liquid limit)
+    #     and assert it steps UP the DN ladder until the velocity is within limit.
+    over_pipe = cs._spec(
+        kind="pipe", mechanism="fluid_loop",
+        carried_rating=1.0, carried_unit="kg/s",
+        size_label="DN15", outer_dia_mm=cs.PIPE_DN_OD["DN15"],
+        drop_pct_or_velocity=5.0,            # 5 m/s — over the 3 m/s liquid limit
+        within_spec=False, spec_limit="≤3 m/s velocity",
+    )
+    over_pipe["density_kg_m3"] = 1000.0
+    over_pipe["from_part"] = "pump"; over_pipe["to_part"] = "header"
+    over_pipe["dp_kpa"] = 50.0
+    fp = cs._climb_fluid(dict(over_pipe), 30.0)
+    check("D1 pipe upsize flips velocity within_spec True",
+          fp["within_spec"] is True and fp["upsized"] is True)
+    check("D1 pipe DN GREW (bigger bore, lower velocity)",
+          fp["outer_dia_mm"] > over_pipe["outer_dia_mm"]
+          and fp["drop_pct_or_velocity"] < over_pipe["drop_pct_or_velocity"]
+          and fp["drop_pct_or_velocity"] <= 3.0)
+    print(f"     (D1 pipe: {over_pipe['size_label']} → {fp['size_label']}  "
+          f"v {over_pipe['drop_pct_or_velocity']} → {fp['drop_pct_or_velocity']} m/s "
+          f"(≤3), {fp['upsize_iterations']} step(s))")
+
+    # 9d. ENV KNOB CONN_VOLTDROP_LIMIT_PCT (the D3 test lever): a run that is
+    #     comfortably in-spec at 5% must TRIP at a tight 1% limit, then D1 responds.
+    import os as _os
+    in_spec_edge = dict(BESS_DC_BUS)  # 1500 V bus, short — easily in-spec at 5%
+    in_spec_edge["from_part"] = "string"; in_spec_edge["to_part"] = "dc_bus"
+    base_5pct = cs.size_connection(dict(in_spec_edge), 60.0)
+    _saved = _os.environ.get("CONN_VOLTDROP_LIMIT_PCT")
+    try:
+        _os.environ["CONN_VOLTDROP_LIMIT_PCT"] = "0.05"  # absurdly tight → force trip
+        tight_base = cs.size_connection(dict(in_spec_edge), 60.0)
+        tight_d1 = cs.size_connection_to_spec(dict(in_spec_edge), 60.0)
+    finally:
+        if _saved is None:
+            _os.environ.pop("CONN_VOLTDROP_LIMIT_PCT", None)
+        else:
+            _os.environ["CONN_VOLTDROP_LIMIT_PCT"] = _saved
+    check("env knob: run in-spec at 5% (no spurious trip at the real limit)",
+          base_5pct["within_spec"] is True)
+    check("env knob: SAME run trips at a tight CONN_VOLTDROP_LIMIT_PCT",
+          tight_base["within_spec"] is False)
+    check("env knob: the loop responds to the tightened limit (upsize or recommend)",
+          tight_d1["upsized"] is True or bool(tight_d1["design_recommendation"]))
+    check("env knob restored — back in-spec at the default 5% limit",
+          cs.size_connection(dict(in_spec_edge), 60.0)["within_spec"] is True
+          and cs._voltdrop_limit_pct() == 5.0)
+    print(f"     (knob: {base_5pct['size_label']} @5%={base_5pct['drop_pct_or_velocity']}%(Y) "
+          f"vs @0.05%={tight_base['drop_pct_or_velocity']}%(N) → loop "
+          f"{'upsized to ' + str(tight_d1['final_size_label']) if tight_d1['upsized'] else 'recommended redesign'})")
+
+    # 9e. NO SPURIOUS UPSIZE: an already-in-spec run is returned UNCHANGED.
+    clean = cs.size_connection_to_spec(dict(BESS_DC_BUS), 12.0)
+    check("in-spec run is NOT upsized (no spurious response)",
+          clean["upsized"] is False and clean["within_spec"] is True
+          and clean["design_recommendation"] is None
+          and clean["final_size_label"] == clean["size_label"])
+
     # ---- Verdict ----
     print()
     if failures:

@@ -3261,6 +3261,8 @@ def write_connection_schedule(out_dir):
     duct_m_by_size = {}     # duct label → metres
     other_m = 0.0
     warns = []
+    design_feedback = []    # PHASE D2 — runs the engine RECOMMENDS a re-design for
+    upsized_runs = []       # PHASE D1 — runs the engine auto-upsized to reach spec
     for s in specs:
         L = float(s.get("length_m") or 0.0)
         kind = s.get("kind")
@@ -3273,6 +3275,30 @@ def write_connection_schedule(out_dir):
             duct_m_by_size[size] = duct_m_by_size.get(size, 0.0) + L
         else:
             other_m += L
+        # PHASE D1 — record every auto-upsize (size grew to bring the run in-spec).
+        if s.get("upsized"):
+            upsized_runs.append({
+                "run_name": s.get("run_name"), "mechanism": s.get("mechanism"),
+                "from": s.get("from_part"), "to": s.get("to_part"),
+                "original_size": s.get("original_size_label"),
+                "final_size": s.get("final_size_label") or size,
+                "length_m": s.get("length_m"),
+                "drop_pct_or_velocity": s.get("drop_pct_or_velocity"),
+                "upsize_iterations": s.get("upsize_iterations") or 0,
+                "driver": s.get("driver"),
+            })
+        # PHASE D2 — record every design recommendation (loop back into the design).
+        if s.get("design_recommendation"):
+            design_feedback.append({
+                "run_name": s.get("run_name"), "mechanism": s.get("mechanism"),
+                "from": s.get("from_part"), "to": s.get("to_part"),
+                "size": s.get("final_size_label") or size,
+                "length_m": s.get("length_m"),
+                "rating": (f"{s.get('carried_rating')} {s.get('carried_unit') or ''}".strip()
+                           if s.get("carried_rating") is not None else None),
+                "driver": s.get("driver"),
+                "recommendation": s.get("design_recommendation"),
+            })
         if s.get("within_spec") is False:
             warns.append({
                 "run_name": s.get("run_name"), "mechanism": s.get("mechanism"),
@@ -3295,8 +3321,13 @@ def write_connection_schedule(out_dir):
             "other_m": round(other_m, 1),
             "runs_sized": len(specs),
             "runs_out_of_spec": len(warns),
+            "runs_upsized": len(upsized_runs),               # PHASE D1
+            "design_recommendations": len(design_feedback),  # PHASE D2
         },
         "out_of_spec": warns,
+        "upsized": upsized_runs,        # PHASE D1 — auto-upsized runs (size grew)
+        "design_feedback": design_feedback,  # PHASE D2 — re-design recommendations
+        "voltdrop_limit_pct": cs._voltdrop_limit_pct(),  # the active limit (D3 knob)
     }
     try:
         with open(os.path.join(out_dir, "connection-schedule.json"), "w") as fh:
@@ -3310,6 +3341,10 @@ def write_connection_schedule(out_dir):
           f"pipe-m by DN: {t['pipe_m_by_dn']}; "
           f"duct-m by size: {t['duct_m_by_size']}"
           + (f"; other-m: {t['other_m']}" if t['other_m'] else ""))
+    # PHASE D — surface the volt-drop limit in force + the loop's response counts.
+    print(f"[conn-schedule] volt-drop limit {schedule['voltdrop_limit_pct']:g}% "
+          f"(env CONN_VOLTDROP_LIMIT_PCT); D1 upsized {t['runs_upsized']} run(s); "
+          f"D2 design recommendations: {t['design_recommendations']}")
     # min/max sized outer diameter actually rendered (the proof sizes VARY).
     od_vals = [s["outer_dia_mm"] for s in specs
                if isinstance(s.get("outer_dia_mm"), (int, float))]
@@ -3317,6 +3352,16 @@ def write_connection_schedule(out_dir):
         print(f"[conn-schedule] rendered outer_dia_mm range: "
               f"min={min(od_vals):.1f} mm  max={max(od_vals):.1f} mm  "
               f"({len(set(round(v, 1) for v in od_vals))} distinct sizes)")
+    # PHASE D1 — each auto-upsize (the cheap response: size GREW, run is now in-spec).
+    for u in upsized_runs:
+        print(f"[conn-UPSIZE] {u['run_name']} ({u['mechanism']}) {u['from']} -> "
+              f"{u['to']}: {u['original_size']} → {u['final_size']} "
+              f"in {u['upsize_iterations']} step(s) — {u['driver']}; "
+              f"now {u['drop_pct_or_velocity']} (in spec)")
+    # PHASE D2 — each design recommendation (the loop BACK into the design).
+    for d in design_feedback:
+        print(f"[conn-DESIGN] {d['run_name']} ({d['mechanism']}) {d['from']} -> "
+              f"{d['to']}: {d['recommendation']}")
     for w in warns:
         print(f"[conn-WARN] {w['run_name']} ({w['mechanism']}) {w['from']} -> "
               f"{w['to']}: {w['size']} {w['drop_pct_or_velocity']} exceeds "
@@ -4358,7 +4403,11 @@ def _sized_dia_mm(nm, mech, waypoints, edge, carried_value=None, role=None):
         _SIZING_CACHE[sig] = copy.deepcopy(spec)
     else:
         try:
-            spec = cs.size_connection(e, length_m, carried_value=carried_value)
+            # PHASE D — size + RESPOND to out-of-spec: size_connection_to_spec runs
+            # D1 (auto-upsize: climb CSA / add a parallel conductor / next DN until
+            # in-spec, so a long run renders FATTER) and D2 (when upsizing is
+            # excessive, attach a design_recommendation = local step-down / relocate).
+            spec = cs.size_connection_to_spec(e, length_m, carried_value=carried_value)
         except Exception as ex:  # noqa: BLE001 — never let sizing kill a run
             print(f"[univ][conn] sizing FAILED for {nm} ({mech}): {ex}; fallback dia")
             spec = cs._spec(kind="unsized", mechanism=mech,
@@ -4374,6 +4423,14 @@ def _sized_dia_mm(nm, mech, waypoints, edge, carried_value=None, role=None):
         spec["from_part"] = e.get("from_part")
     if e.get("to_part") is not None:
         spec["to_part"] = e.get("to_part")
+    # A cached Phase-D2 design_recommendation baked the CACHED run's endpoints into
+    # its "Run X→Y:" prefix; re-point it to THIS run's endpoints so a shared-physics
+    # tap doesn't recommend a step-down naming the wrong consumer.
+    rec = spec.get("design_recommendation")
+    if rec and rec.startswith("Run ") and ":" in rec:
+        tail = rec.split(":", 1)[1]
+        spec["design_recommendation"] = (
+            f"Run {spec.get('from_part') or '?'}→{spec.get('to_part') or '?'}:{tail}")
     if role:
         spec["role"] = role
     _CONN_SPECS.append(spec)

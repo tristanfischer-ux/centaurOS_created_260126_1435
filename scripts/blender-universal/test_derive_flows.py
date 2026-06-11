@@ -311,6 +311,76 @@ check(nf_flow == [] and set(nf_periph) == {"Power", "Control"},
       "no flow edge ⇒ empty train + all regions to periphery (rank fallback, no drop)")
 
 
+# ── PHASE D — the scene-builder schedule surfaces the iterative-feedback fields ──
+# Drives the REAL write path (B._CONN_SPECS → B.write_connection_schedule) the way
+# main() does, with three constructed runs at a tight volt-drop limit:
+#   (1) an in-spec run — must NOT be upsized (no spurious response);
+#   (2) a tripping run the ladder CAN fix — D1 auto-upsize (schedule.upsized[]);
+#   (3) an excessive LV-reach run — D2 design recommendation (schedule.design_feedback[]).
+# This guards the connection_sizing ↔ build_universal_scene wiring (the second file
+# of the Phase-D change) so a future edit that drops design_feedback / upsized from
+# the schedule is caught here, not by a visual inspection.
+import os as _os
+import tempfile as _tempfile
+import shutil as _shutil
+cs = B.cs
+_saved_lim = _os.environ.get("CONN_VOLTDROP_LIMIT_PCT")
+_tmpdir = _tempfile.mkdtemp(prefix="phaseD-sched-")
+try:
+    _os.environ["CONN_VOLTDROP_LIMIT_PCT"] = "1"   # tight, to force a trip
+    B._CONN_SPECS.clear()
+    # (1) in-spec: 1500 V bus, short — well within 1%.
+    s_ok = cs.size_connection_to_spec(
+        {"from_part": "string", "to_part": "dc_bus", "mechanism": "electrical_bus",
+         "constraint_kind": "current_rating", "required_value": 400.0,
+         "required_unit": "A", "material_context": "1500 V DC bus"}, 8.0)
+    s_ok["run_name"] = "ok_run"
+    B._CONN_SPECS.append(s_ok)
+    # (2) D1-fixable trip: 48 V LV bus at 200 A over 60 m → trips 1%, ladder fixes it.
+    s_d1 = cs.size_connection_to_spec(
+        {"from_part": "rect", "to_part": "load", "mechanism": "electrical_bus",
+         "constraint_kind": "current_rating", "required_value": 200.0,
+         "required_unit": "A", "material_context": "48 V DC bus"}, 60.0)
+    s_d1["run_name"] = "d1_run"
+    B._CONN_SPECS.append(s_d1)
+    # (3) D2 excessive reach: 48 V LV bus at 1500 A over 250 m → sub-distribution.
+    s_d2 = cs.size_connection_to_spec(
+        {"from_part": "pack", "to_part": "remote_load", "mechanism": "electrical_bus",
+         "constraint_kind": "current_rating", "required_value": 1500.0,
+         "required_unit": "A", "material_context": "48 V DC bus"}, 250.0)
+    s_d2["run_name"] = "d2_run"
+    B._CONN_SPECS.append(s_d2)
+    _sched = B.write_connection_schedule(_tmpdir)
+finally:
+    B._CONN_SPECS.clear()
+    _shutil.rmtree(_tmpdir, ignore_errors=True)
+    if _saved_lim is None:
+        _os.environ.pop("CONN_VOLTDROP_LIMIT_PCT", None)
+    else:
+        _os.environ["CONN_VOLTDROP_LIMIT_PCT"] = _saved_lim
+
+_t = _sched["totals"]
+check(_sched.get("voltdrop_limit_pct") == 1.0,
+      "Phase D: schedule records the active volt-drop limit (the D3 env knob)")
+check("design_feedback" in _sched and "upsized" in _sched,
+      "Phase D: schedule carries design_feedback[] (D2) + upsized[] (D1)")
+check(s_ok["upsized"] is False and s_ok["within_spec"] is True,
+      "Phase D: in-spec run is NOT upsized (no spurious response)")
+check(s_d1["upsized"] is True and s_d1["within_spec"] is True
+      and s_d1["final_size_label"] != s_d1["original_size_label"],
+      "Phase D: D1 auto-upsize grew the conductor + brought the run in-spec")
+check(_t["runs_upsized"] >= 1 and any(u["run_name"] == "d1_run" for u in _sched["upsized"]),
+      "Phase D: D1 upsize recorded in schedule.upsized[] with BEFORE→AFTER sizes")
+check(bool(s_d2["design_recommendation"]),
+      "Phase D: D2 emitted a design recommendation on the excessive-reach run")
+check(_t["design_recommendations"] >= 1
+      and any(d["run_name"] == "d2_run" for d in _sched["design_feedback"]),
+      "Phase D: D2 recommendation recorded in schedule.design_feedback[]")
+check(any(k in (_sched["design_feedback"][0]["recommendation"] or "").lower()
+          for k in ("sub-distribution", "step-down", "relocate")),
+      "Phase D: D2 recommendation proposes sub-distribution / step-down / relocate")
+
+
 # ── summary ──────────────────────────────────────────────────────────────────
 print()
 if _FAILS:

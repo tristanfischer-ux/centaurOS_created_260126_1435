@@ -66,8 +66,24 @@ SOURCE OF TRUTH = THE ENGINE'S OWN TOOLS (do NOT reinvent the physics)
 
 PUBLIC API (all pure):
     size_connection(edge, length_m, carried_value=None) -> ConnectionSpec dict
+    size_connection_to_spec(edge, length_m, carried_value=None) -> ConnectionSpec
+        (PHASE D — sizes, then RESPONDS to an out-of-spec result: D1 auto-upsizes
+        by climbing the size ladder until in-spec, or D2 emits a design
+        recommendation when upsizing would be excessive. This is the entry point
+        the CAD generator uses at every draw site.)
     size_distribution_tree(hub_edge, branch_edges, lengths) -> tree dict
     connection_schedule(specs) -> list[row] for the BoM feedback
+
+PHASE D — the iterative design feedback loop (env-tunable):
+    CONN_VOLTDROP_LIMIT_PCT   the volt-drop ceiling [%] (default the real 5%);
+        set low to FORCE a real run out of spec and exercise the D1/D2 response.
+    CONN_TEST_LONG_RUN_M      test lever — size electrical runs as if the load sat
+        N m away (the "inject a long test run" what-if; render geometry unchanged).
+    CONN_TEST_LV_VOLTAGE_V    test lever — size electrical runs at this LV system
+        voltage (lets the LV-reach D2 path be shown on an MV-bus archetype).
+    D1 records upsized / original_size_label / final_size_label / driver /
+       upsize_iterations on the spec; D2 records design_recommendation. The schedule
+       rolls these into upsized[] + design_feedback[] (+ [conn-UPSIZE]/[conn-DESIGN]).
 
 HONEST ASSUMPTIONS (the caller may override via material_context / kwargs):
     - target liquid velocity 1.5 m/s; compressed gas 18 m/s; steam 30 m/s;
@@ -229,12 +245,56 @@ BUSBAR_CU_A_PER_MM2 = 1.55
 DEFAULT_SYSTEM_VOLTAGE_V = 400.0    # 3-phase LV default
 DEFAULT_DC_BUS_VOLTAGE_V = 1500.0   # a "bus" current usually rides a DC bus
 
-# Volt-drop spec ceiling (BS 7671 §525 advisory).
+# Volt-drop spec ceiling (BS 7671 §525 advisory). The REAL design limit is 5%.
+# Overridable at runtime via the env knob CONN_VOLTDROP_LIMIT_PCT — this is the
+# Phase-D3 test lever: set it low (e.g. 1%) to FORCE a real short-run BESS/e-fuel
+# bus out of spec and demonstrate the D1 auto-upsize / D2 design-feedback loop,
+# WITHOUT fabricating a fake long run. At the normal 5% the real archetypes stay
+# in-spec (no spurious trips).
 DEFAULT_VOLTDROP_LIMIT_PCT = 5.0
 # Liquid line velocity ceiling (erosion / water-hammer) — within-spec test.
 LIQUID_VELOCITY_LIMIT_MS = 3.0
 GAS_VELOCITY_LIMIT_MS = 30.0       # gas erosion limit (API RP 14E ballpark)
 STEAM_VELOCITY_LIMIT_MS = 45.0     # steam line erosion ceiling
+
+
+def _voltdrop_limit_pct() -> float:
+    """The active volt-drop ceiling [%]. Reads CONN_VOLTDROP_LIMIT_PCT each call
+    (so a test can set it per-process) and falls back to the BS 7671 5% advisory.
+    A non-numeric / non-positive value falls back to the default."""
+    raw = os.environ.get("CONN_VOLTDROP_LIMIT_PCT")
+    if raw is None:
+        return DEFAULT_VOLTDROP_LIMIT_PCT
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_VOLTDROP_LIMIT_PCT
+    return v if v > 0 else DEFAULT_VOLTDROP_LIMIT_PCT
+
+
+# ---------------------------------------------------------------------------
+# Phase-D practical-ladder thresholds (the "excessive size" triggers for D2).
+# When the in-spec answer is past ANY of these, an absurd fat conductor is the
+# WRONG response — the right one is a DESIGN RECOMMENDATION (local step-down /
+# relocate the load). Stated, not hidden.
+# ---------------------------------------------------------------------------
+# A single LV cable run beyond this CSA is impractical to pull/terminate; past it
+# we cap parallels rather than chase an ever-fatter single conductor.
+PRACTICAL_MAX_CABLE_CSA_MM2 = 400.0
+# Max parallel conductors per phase before the run is "a cable farm" — beyond this
+# the honest answer is sub-distribution, not yet more parallels.
+PRACTICAL_MAX_PARALLEL = 6
+# Sane LV reach as an ampere-metre product (current × length). A 400 A load 300 m
+# away (=120,000 A·m) on LV is a textbook case for an MV feeder + local step-down,
+# regardless of how many parallels would technically hold the volt-drop.
+PRACTICAL_LV_REACH_A_M = 90_000.0
+# Below this system voltage we treat the bus as LV for the reach test (an 11 kV
+# feeder is MV and is allowed to run far — the reach test is an LV-distribution
+# heuristic, not an MV one).
+LV_REACH_VOLTAGE_CEILING_V = 1000.0
+# Liquid-pipe ΔP practical ceiling [kPa] over a single run before a fatter pipe is
+# the wrong answer (pump the fluid / relocate / boost locally instead).
+PRACTICAL_MAX_PIPE_DP_KPA = 500.0
 
 
 # ---------------------------------------------------------------------------
@@ -565,6 +625,22 @@ def _spec(**kw) -> dict:
         "density_kg_m3": None,
         "target_velocity_ms": None,
         "pressure_bar": None,
+        # Electrical-conductor provenance (None for non-electrical kinds) — set by
+        # size_electrical so the Phase-D ladder-climb can re-evaluate volt-drop at
+        # a larger conductor WITHOUT another tool round-trip (Vd ∝ 1/CSA, ∝ 1/n).
+        "csa_mm2": None,
+        "n_parallel": None,
+        "mv_per_a_m": None,
+        "system_voltage_v": None,
+        "dp_kpa": None,            # fluid pressure drop over the routed run [kPa]
+        # Phase-D auto-upsize / design-feedback provenance (always present so the
+        # schedule has a uniform shape; size_connection_to_spec fills them in).
+        "upsized": False,
+        "original_size_label": None,
+        "final_size_label": None,
+        "driver": None,
+        "upsize_iterations": 0,
+        "design_recommendation": None,
     }
     base.update(kw)
     return base
@@ -578,7 +654,21 @@ def _infer_system_voltage(edge: dict, mechanism: str) -> float:
     """Infer the system voltage to express volt-drop as a % of.
 
     Prefer an explicit edge hint; else use a DC-bus default for an
-    'electrical_bus' (these are usually DC buses) or LV otherwise."""
+    'electrical_bus' (these are usually DC buses) or LV otherwise.
+
+    PHASE-D3 TEST OVERRIDE (CONN_TEST_LV_VOLTAGE_V): forces the system voltage low
+    for the sizing decision so the LV-reach D2 path can be demonstrated on a real
+    archetype whose real bus is MV (the 1500 V BESS DC bus is correctly exempt from
+    the LV-reach test; this knob asks 'what if this were a 48 V LV system at these
+    currents?'). A what-if lever only — never changes the rendered geometry."""
+    _lv = os.environ.get("CONN_TEST_LV_VOLTAGE_V")
+    if _lv:
+        try:
+            v = float(_lv)
+            if v > 0:
+                return v
+        except (TypeError, ValueError):
+            pass
     for k in ("system_voltage_v", "nominal_voltage_v", "voltage_v"):
         if edge.get(k) is not None:
             return _f(edge[k])
@@ -633,6 +723,7 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
     """
     mechanism = edge.get("mechanism", "electrical_bus")
     v_sys = _infer_system_voltage(edge, mechanism)
+    vd_limit = _voltdrop_limit_pct()
     margin = _f(edge.get("required_margin_factor"), 1.0) or 1.0
     assumptions = [
         f"system voltage {v_sys:g} V (for volt-drop %)",
@@ -649,7 +740,7 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
             "nominal_voltage_v": v_sys,
             "conductor": "copper",
             "n_parallel": n_par,
-            "max_voltdrop_pct": DEFAULT_VOLTDROP_LIMIT_PCT,
+            "max_voltdrop_pct": vd_limit,
         })
         if "error" not in res:
             best = (n_par, res)
@@ -664,7 +755,7 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
         # testable, and so a length passed AFTER routing is honoured exactly).
         vd_v = mv_per_a_m * current_a * max(0.0, length_m) / 1000.0 / n_par
         vd_pct = 100.0 * vd_v / v_sys
-        within = vd_pct <= DEFAULT_VOLTDROP_LIMIT_PCT
+        within = vd_pct <= vd_limit
         outer = _cable_outer_dia_mm(csa, n_par)
         if n_par == 1:
             size_label = f"{csa:g} mm²"
@@ -676,7 +767,7 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
             f"selected {n_par}×{csa:g} mm² Cu; tabulated ampacity "
             f"{_f(res.get('selected_ampacity_a')):g} A/run (BS 7671 Method C)"
         )
-        return _spec(
+        spec = _spec(
             kind="cable",
             mechanism=mechanism,
             carried_rating=round(current_a, 1),
@@ -685,13 +776,20 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
             outer_dia_mm=round(outer, 1),
             drop_pct_or_velocity=round(vd_pct, 3),
             within_spec=bool(within),
-            spec_limit=f"≤{DEFAULT_VOLTDROP_LIMIT_PCT:g}% volt-drop",
+            spec_limit=f"≤{vd_limit:g}% volt-drop",
             material_qty_desc=qty,
             tool_used="electrical_cable_sizing.py",
             assumptions=assumptions,
             notes=("volt-drop over the routed length"
-                   + ("" if within else " EXCEEDS BS 7671 5% — upsize / add runs")),
+                   + ("" if within
+                      else f" EXCEEDS {vd_limit:g}% limit — upsize / add runs")),
         )
+        # Conductor provenance for the Phase-D ladder-climb (Vd ∝ 1/CSA, ∝ 1/n).
+        spec["csa_mm2"] = csa
+        spec["n_parallel"] = n_par
+        spec["mv_per_a_m"] = mv_per_a_m
+        spec["system_voltage_v"] = v_sys
+        return spec
 
     # ---- Busbar branch: too much current for stranded cable -> copper bar ----
     csa_mm2, equiv_dia, thick = _busbar_from_current(current_a)
@@ -701,13 +799,13 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
     r_ohm = rho_cu * max(0.0, length_m) / max(1e-9, csa_mm2)
     vd_v = current_a * r_ohm
     vd_pct = 100.0 * vd_v / v_sys
-    within = vd_pct <= DEFAULT_VOLTDROP_LIMIT_PCT
+    within = vd_pct <= vd_limit
     assumptions.append(
         f"current {current_a:g} A exceeds the largest stranded-cable group; sized "
         f"as a copper BUSBAR at {BUSBAR_CU_A_PER_MM2:g} A/mm² (IEC 61439 natural "
         f"convection) -> {csa_mm2:.0f} mm² bar ≈ {thick:g}×{width_mm:.0f} mm"
     )
-    return _spec(
+    spec = _spec(
         kind="busbar",
         mechanism=mechanism,
         carried_rating=round(current_a, 1),
@@ -716,12 +814,20 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
         outer_dia_mm=round(equiv_dia, 1),
         drop_pct_or_velocity=round(vd_pct, 3),
         within_spec=bool(within),
-        spec_limit=f"≤{DEFAULT_VOLTDROP_LIMIT_PCT:g}% volt-drop",
+        spec_limit=f"≤{vd_limit:g}% volt-drop",
         material_qty_desc=f"copper busbar {thick:g}×{width_mm:.0f} mm, {length_m:.1f} m",
         tool_used="busbar current-density (cable tool over-range)",
         assumptions=assumptions,
         notes="busbar — round-cable tool returned over-range, bar sized by current density",
     )
+    # Busbar volt-drop scales ∝ 1/CSA with section area (resistive); record the
+    # equivalent mv/A·m so the Phase-D climb can fatten the bar deterministically.
+    spec["csa_mm2"] = csa_mm2
+    spec["n_parallel"] = 1
+    # mv per A·m for the bar: 1000 · ρ_cu / CSA  (ρ_cu = 0.0172 Ω·mm²/m).
+    spec["mv_per_a_m"] = 1000.0 * 0.0172 / max(1e-9, csa_mm2)
+    spec["system_voltage_v"] = v_sys
+    return spec
 
 
 # ---------------------------------------------------------------------------
@@ -868,6 +974,8 @@ def size_fluid(edge: dict, length_m: float, flow_value: float,
     spec["phase"] = phase
     spec["density_kg_m3"] = round(density, 3)
     spec["target_velocity_ms"] = v_target
+    if dp_kpa is not None:
+        spec["dp_kpa"] = round(dp_kpa, 2)
     if gas_prov is not None:
         spec["pressure_bar"] = gas_prov.get("pressure_bar")
     return spec
@@ -1098,6 +1206,344 @@ def size_connection(edge: dict, length_m: float,
 
 
 # ---------------------------------------------------------------------------
+# 6b. PHASE D — the iterative design FEEDBACK LOOP.
+#
+#   size_connection() sizes ONE candidate and reports within_spec. Phase D makes
+#   that ITERATIVE: when a run is OUT OF SPEC the system RESPONDS.
+#
+#   D1  auto-upsize (the cheap response): CLIMB the size ladder (next CSA / add a
+#       parallel conductor / next DN) and re-evaluate until in-spec OR the
+#       practical ladder is exhausted. The generator renders at the FINAL
+#       (upsized) outer_dia_mm — a long run becomes a fatter cable/pipe, visibly.
+#
+#   D2  design feedback (when upsizing is EXCESSIVE): instead of an absurd
+#       conductor, emit a DESIGN RECOMMENDATION — a local sub-distribution
+#       (MV feeder to a local step-down near the load, LV locally) OR relocate the
+#       load nearer its source. This is the loop back into the design.
+#
+#   Both are PURE: D1 re-evaluates volt-drop / velocity / ΔP from the SAME
+#   first-principles relations the sizer already trusts (Vd ∝ 1/CSA ∝ 1/n_par;
+#   pipe velocity ∝ 1/area; ΔP ∝ velocity² / D), so no extra tool round-trip is
+#   needed to climb. The driver string records WHY (limit, current, length, the
+#   value that breached). The caller (the CAD generator) uses
+#   size_connection_to_spec() at every draw site instead of size_connection().
+# ---------------------------------------------------------------------------
+
+def _cable_outer_for(csa_mm2: float, n_parallel: int) -> float:
+    """Outer diameter [mm] for a (CSA, n_parallel) cable — reuses the production
+    geometry so an upsized conductor renders consistently with a first-pass one."""
+    return round(_cable_outer_dia_mm(csa_mm2, n_parallel), 1)
+
+
+def _electrical_size_label(csa_mm2: float, n_parallel: int) -> str:
+    if n_parallel <= 1:
+        return f"{csa_mm2:g} mm²"
+    return f"{n_parallel}×{csa_mm2:g} mm²"
+
+
+def _climb_electrical(spec: dict, length_m: float) -> dict:
+    """D1/D2 for a cable/busbar that breached the volt-drop limit.
+
+    Climb the conductor ladder — first add a parallel conductor, then step the CSA
+    up — re-computing the REAL routed volt-drop at each rung from the recorded
+    mv_per_a_m (Vd ∝ 1/CSA ∝ 1/n_par). Stop at the first in-spec rung. If the
+    in-spec rung is EXCESSIVE (CSA pinned at the top of the ladder AND still needs
+    many parallels, OR the ampere-metre reach is past sane LV) OR the ladder is
+    exhausted still out-of-spec → annotate a D2 design recommendation instead.
+
+    Mutates + returns the spec. Always sets upsized / original_size_label /
+    final_size_label / driver / upsize_iterations; sets design_recommendation when
+    D2 fires."""
+    vd_limit = _voltdrop_limit_pct()
+    current_a = _f(spec.get("carried_rating"))
+    v_sys = _f(spec.get("system_voltage_v"), DEFAULT_DC_BUS_VOLTAGE_V) or DEFAULT_DC_BUS_VOLTAGE_V
+    base_csa = _f(spec.get("csa_mm2"))
+    base_n = max(1, int(_f(spec.get("n_parallel"), 1) or 1))
+    base_mv = _f(spec.get("mv_per_a_m"))
+    orig_label = spec.get("size_label")
+    orig_vd = _f(spec.get("drop_pct_or_velocity"))
+
+    spec["original_size_label"] = orig_label
+
+    def _vd_pct(csa: float, n_par: int) -> float:
+        # Vd ∝ 1/CSA (resistive) and ∝ 1/n_parallel; scale the recorded mv_per_a_m
+        # of the base conductor to the trial conductor.
+        if base_csa <= 0 or base_mv <= 0:
+            return orig_vd
+        mv = base_mv * (base_csa / max(1e-9, csa))
+        vd_v = mv * current_a * max(0.0, length_m) / 1000.0 / max(1, n_par)
+        return 100.0 * vd_v / max(1e-9, v_sys)
+
+    # The ampere-metre reach (an LV-distribution sanity heuristic).
+    reach_a_m = current_a * max(0.0, length_m)
+    is_lv = v_sys <= LV_REACH_VOLTAGE_CEILING_V
+
+    # Build the climb ladder: at each n_parallel (base..MAX) sweep the CSA ladder
+    # from the current CSA upward. Prefer FEWER parallels first (add a conductor),
+    # then a fatter CSA — the cheaper, more practical response before the next.
+    iterations = 0
+    chosen = None  # (csa, n_par, vd_pct)
+    # Start the CSA sweep at the first ladder rung >= the base conductor. If the
+    # base CSA is BEYOND the ladder top (a fat busbar), the only climb dimension is
+    # more parallels of the top CSA — start at the last rung (never climb to a
+    # SMALLER CSA, which would only worsen volt-drop).
+    csa_start_idx = len(CABLE_CSA_LADDER) - 1
+    for i, c in enumerate(CABLE_CSA_LADDER):
+        if c >= base_csa - 1e-9:
+            csa_start_idx = i
+            break
+    for n_par in range(base_n, PRACTICAL_MAX_PARALLEL + 1):
+        for c in CABLE_CSA_LADDER[csa_start_idx:]:
+            # don't re-test the exact starting conductor (it already breached)
+            if n_par == base_n and abs(c - base_csa) < 1e-9:
+                continue
+            iterations += 1
+            vd = _vd_pct(c, n_par)
+            if vd <= vd_limit:
+                chosen = (c, n_par, vd)
+                break
+        if chosen is not None:
+            break
+
+    spec["upsize_iterations"] = iterations
+
+    # Is even the chosen answer EXCESSIVE? (top-of-ladder CSA forced AND multiple
+    # parallels, or the LV ampere-metre reach is past sane.) Then D2, not D1.
+    excessive_reach = is_lv and reach_a_m > PRACTICAL_LV_REACH_A_M
+
+    if chosen is not None and not excessive_reach:
+        csa, n_par, vd = chosen
+        spec["csa_mm2"] = csa
+        spec["n_parallel"] = n_par
+        spec["mv_per_a_m"] = base_mv * (base_csa / max(1e-9, csa)) if base_csa > 0 else base_mv
+        spec["size_label"] = _electrical_size_label(csa, n_par)
+        spec["final_size_label"] = spec["size_label"]
+        spec["outer_dia_mm"] = _cable_outer_for(csa, n_par)
+        spec["drop_pct_or_velocity"] = round(vd, 3)
+        spec["within_spec"] = True
+        spec["upsized"] = True
+        spec["kind"] = "cable"   # an upsized busbar is rendered as a parallel-cable group
+        spec["driver"] = (f"volt-drop {orig_vd:g}% > {vd_limit:g}% over {length_m:.0f} m "
+                          f"at {current_a:g} A on {v_sys:g} V")
+        spec["material_qty_desc"] = (
+            f"{n_par} × {csa:g} mm² Cu (parallel), {length_m:.1f} m each"
+            if n_par > 1 else f"1 × {csa:g} mm² Cu, {length_m:.1f} m")
+        spec["assumptions"] = list(spec.get("assumptions", [])) + [
+            f"D1 auto-upsize: {orig_label} → {spec['size_label']} "
+            f"({iterations} ladder step{'s' if iterations != 1 else ''}); "
+            f"volt-drop {orig_vd:g}% → {vd:.3f}% (≤ {vd_limit:g}% limit)"
+        ]
+        spec["notes"] = (f"D1 auto-upsized {orig_label} → {spec['size_label']} "
+                         f"to bring volt-drop {orig_vd:g}% under {vd_limit:g}%")
+        return spec
+
+    # ---- D2: upsizing is excessive / impossible → DESIGN RECOMMENDATION ----
+    # Pick the best-effort largest conductor for the render (fattest we tried) so
+    # the run is still visibly heavy, but flag it as the wrong answer.
+    fat_csa = CABLE_CSA_LADDER[-1]
+    fat_n = PRACTICAL_MAX_PARALLEL
+    fat_vd = _vd_pct(fat_csa, fat_n)
+    spec["csa_mm2"] = fat_csa
+    spec["n_parallel"] = fat_n
+    spec["size_label"] = _electrical_size_label(fat_csa, fat_n)
+    spec["final_size_label"] = spec["size_label"]
+    spec["outer_dia_mm"] = _cable_outer_for(fat_csa, fat_n)
+    spec["drop_pct_or_velocity"] = round(fat_vd, 3)
+    spec["within_spec"] = fat_vd <= vd_limit   # usually still False
+    spec["upsized"] = True
+
+    if excessive_reach:
+        reason = (f"{length_m:.0f} m at {current_a:g} A on {v_sys:g} V "
+                  f"(= {reach_a_m:,.0f} A·m) exceeds practical LV reach "
+                  f"(~{PRACTICAL_LV_REACH_A_M:,.0f} A·m)")
+    else:
+        reason = (f"volt-drop {orig_vd:g}% stays > {vd_limit:g}% even at "
+                  f"{PRACTICAL_MAX_PARALLEL}×{CABLE_CSA_LADDER[-1]:g} mm² over "
+                  f"{length_m:.0f} m at {current_a:g} A on {v_sys:g} V")
+    rec = (f"Run {spec.get('from_part') or '?'}→{spec.get('to_part') or '?'}: "
+           f"{reason} — recommend a LOCAL SUB-DISTRIBUTION (MV feeder to a local "
+           f"step-down transformer near the load, LV distributed locally) OR "
+           f"relocate the load nearer its source. An ever-fatter LV conductor is "
+           f"the wrong response at this reach.")
+    spec["driver"] = reason
+    spec["design_recommendation"] = rec
+    spec["assumptions"] = list(spec.get("assumptions", [])) + [
+        f"D2 design feedback: {reason}; ladder-climb exhausted/excessive → "
+        f"sub-distribution recommended (not an absurd conductor)"
+    ]
+    spec["notes"] = ("D2 DESIGN RECOMMENDATION — LV reach exceeded; "
+                     "sub-distribution / relocate (see design_recommendation)")
+    return spec
+
+
+def _climb_fluid(spec: dict, length_m: float) -> dict:
+    """D1/D2 for a pipe/duct that breached the velocity (or ΔP) limit.
+
+    Step the DN (or duct) ladder UP — velocity ∝ 1/area falls as the bore grows —
+    until the velocity is within the erosion limit AND the ΔP (which scales ∝
+    v²/D, so it falls FAST as the bore grows) is under the practical ceiling, OR
+    the ladder is exhausted. If exhausted still out-of-spec OR the in-spec answer's
+    ΔP is still over the practical ceiling → a D2 recommendation (boost/relocate)."""
+    orig_label = spec.get("size_label")
+    orig_v = _f(spec.get("drop_pct_or_velocity"))
+    spec_limit = spec.get("spec_limit") or ""
+    spec["original_size_label"] = orig_label
+    kind = spec.get("kind")
+
+    # Parse the velocity limit out of the spec_limit string ("≤3 m/s velocity").
+    import re as _re
+    m = _re.search(r"([\d.]+)\s*m/s", spec_limit or "")
+    v_limit = float(m.group(1)) if m else LIQUID_VELOCITY_LIMIT_MS
+
+    if kind != "pipe":
+        # Duct climb is rare; fall back to a single step up the duct ladder by
+        # widening the equivalent diameter (kept simple — ducts seldom breach).
+        spec["final_size_label"] = orig_label
+        spec["driver"] = f"velocity {orig_v:g} m/s > {v_limit:g} m/s over {length_m:.0f} m"
+        return spec
+
+    # Reconstruct the volumetric flow from the achieved velocity in the chosen
+    # bore so the climb is exact: Q = v_actual × area(base_bore).
+    base_bore = None
+    for label, bore in PIPE_DN_LADDER:
+        if label == orig_label:
+            base_bore = bore
+            break
+    if base_bore is None:
+        spec["final_size_label"] = orig_label
+        spec["driver"] = f"velocity {orig_v:g} m/s > {v_limit:g} m/s"
+        return spec
+    area_base = math.pi * (base_bore / 1000.0 / 2.0) ** 2
+    q_m3s = orig_v * area_base
+    density = _f(spec.get("density_kg_m3"), RHO_WATER) or RHO_WATER
+    base_dp = _f(spec.get("dp_kpa"))
+
+    iterations = 0
+    chosen = None  # (label, bore, v, dp_kpa)
+    start_idx = 0
+    for i, (label, bore) in enumerate(PIPE_DN_LADDER):
+        if label == orig_label:
+            start_idx = i + 1
+            break
+    for label, bore in PIPE_DN_LADDER[start_idx:]:
+        iterations += 1
+        area = math.pi * (bore / 1000.0 / 2.0) ** 2
+        v = q_m3s / max(1e-12, area)
+        # ΔP ∝ v² / D (Darcy, friction roughly constant across adjacent DN); scale
+        # the recorded base ΔP by (v/orig_v)² × (base_bore/bore).
+        if base_dp > 0 and orig_v > 0:
+            dp = base_dp * (v / orig_v) ** 2 * (base_bore / bore)
+        else:
+            dp = None
+        if v <= v_limit and (dp is None or dp <= PRACTICAL_MAX_PIPE_DP_KPA):
+            chosen = (label, bore, v, dp)
+            break
+
+    spec["upsize_iterations"] = iterations
+
+    if chosen is not None:
+        label, bore, v, dp = chosen
+        spec["size_label"] = label
+        spec["final_size_label"] = label
+        spec["outer_dia_mm"] = PIPE_DN_OD.get(label, bore * 1.15)
+        spec["drop_pct_or_velocity"] = round(v, 3)
+        if dp is not None:
+            spec["dp_kpa"] = round(dp, 2)
+        spec["within_spec"] = True
+        spec["upsized"] = True
+        spec["driver"] = (f"velocity {orig_v:g} m/s > {v_limit:g} m/s over "
+                          f"{length_m:.0f} m")
+        spec["material_qty_desc"] = (f"{label} pipe, {length_m:.1f} m"
+                                     + (f", ΔP≈{dp:.1f} kPa" if dp is not None else ""))
+        spec["assumptions"] = list(spec.get("assumptions", [])) + [
+            f"D1 auto-upsize: {orig_label} → {label} ({iterations} ladder "
+            f"step{'s' if iterations != 1 else ''}); velocity {orig_v:g} → "
+            f"{v:.2f} m/s (≤ {v_limit:g} m/s)"
+        ]
+        spec["notes"] = (f"D1 auto-upsized {orig_label} → {label} to bring "
+                         f"velocity {orig_v:g} m/s under {v_limit:g} m/s")
+        return spec
+
+    # ---- D2 for a pipe: ladder exhausted still out of spec ----
+    label, bore = PIPE_DN_LADDER[-1]
+    area = math.pi * (bore / 1000.0 / 2.0) ** 2
+    v = q_m3s / max(1e-12, area)
+    spec["size_label"] = label
+    spec["final_size_label"] = label
+    spec["outer_dia_mm"] = PIPE_DN_OD.get(label, bore * 1.15)
+    spec["drop_pct_or_velocity"] = round(v, 3)
+    spec["within_spec"] = v <= v_limit
+    spec["upsized"] = True
+    reason = (f"flow {q_m3s * 1000:.1f} L/s stays > {v_limit:g} m/s even at the "
+              f"largest standard bore ({label}) over {length_m:.0f} m")
+    rec = (f"Run {spec.get('from_part') or '?'}→{spec.get('to_part') or '?'}: "
+           f"{reason} — recommend splitting the duty across parallel lines, a "
+           f"local boost, or relocating the consumer nearer the source. A single "
+           f"line past {label} is the wrong response.")
+    spec["driver"] = reason
+    spec["design_recommendation"] = rec
+    spec["assumptions"] = list(spec.get("assumptions", [])) + [
+        f"D2 design feedback: {reason}; pipe ladder exhausted → split/boost/relocate"]
+    spec["notes"] = ("D2 DESIGN RECOMMENDATION — pipe ladder exhausted "
+                     "(see design_recommendation)")
+    return spec
+
+
+def size_connection_to_spec(edge: dict, length_m: float,
+                            carried_value: Optional[float] = None) -> dict:
+    """PUBLIC Phase-D entry point. Size ONE edge (via size_connection) and, when the
+    first-pass result is OUT OF SPEC, RESPOND:
+
+      * D1 — climb the size ladder (parallel conductor / fatter CSA / next DN) and
+        re-evaluate until in-spec (the run renders FATTER), or
+      * D2 — when upsizing is excessive/impossible, leave a best-effort heavy
+        conductor for the render BUT attach a design_recommendation (sub-distribution
+        / relocate) — the feedback back into the design.
+
+    Returns the ConnectionSpec with the Phase-D fields populated (upsized,
+    original_size_label, final_size_label, driver, upsize_iterations,
+    design_recommendation). An in-spec first pass is returned unchanged except
+    upsized=False + final_size_label=size_label (uniform shape for the schedule).
+
+    PHASE-D3 TEST INJECTION (CONN_TEST_LONG_RUN_M): when set to a length in metres,
+    ELECTRICAL runs are SIZED as if the load sat that far away (a "what if this load
+    were N m from its source" what-if). This is the task's "inject a long test run"
+    lever — it FORCES a real BESS/e-fuel bus out of spec so the D1/D2 response is
+    demonstrable on REAL ratings without fabricating fake edge data. It overrides
+    only the SIZING length (volt-drop / reach), never the rendered polyline."""
+    test_len_raw = os.environ.get("CONN_TEST_LONG_RUN_M")
+    eff_len = _f(length_m)
+    ck = (edge.get("constraint_kind") if isinstance(edge, dict) else None)
+    is_electrical = (ck == "current_rating"
+                     or (isinstance(edge, dict)
+                         and edge.get("mechanism") == "electrical_bus"))
+    if test_len_raw and is_electrical:
+        try:
+            inj = float(test_len_raw)
+            if inj > 0:
+                eff_len = inj
+        except (TypeError, ValueError):
+            pass
+
+    spec = size_connection(edge, eff_len, carried_value=carried_value)
+    if spec.get("within_spec") is not False:
+        spec["upsized"] = False
+        spec["final_size_label"] = spec.get("size_label")
+        return spec
+
+    kind = spec.get("kind")
+    if kind in ("cable", "busbar"):
+        return _climb_electrical(spec, eff_len)
+    if kind in ("pipe", "duct"):
+        return _climb_fluid(spec, eff_len)
+
+    # Other kinds (member/data/unknown) don't carry a climbable spec dimension.
+    spec["upsized"] = False
+    spec["final_size_label"] = spec.get("size_label")
+    return spec
+
+
+# ---------------------------------------------------------------------------
 # 7. PUBLIC: size_distribution_tree (the STEP-DOWN)
 # ---------------------------------------------------------------------------
 
@@ -1145,7 +1591,7 @@ def size_distribution_tree(hub_edge: dict, branch_edges: list[dict],
     summed_value = 0.0
     unit = None
     for be, bl in zip(branch_edges, branch_lens):
-        bspec = size_connection(be, bl)
+        bspec = size_connection_to_spec(be, bl)   # D1/D2 on each branch
         branch_specs.append(bspec)
         # accumulate the DESIGN value (rating × margin) in the branch's unit
         margin = _f(be.get("required_margin_factor"), 1.0) or 1.0
@@ -1199,7 +1645,7 @@ def size_distribution_tree(hub_edge: dict, branch_edges: list[dict],
                           branch_edges[0].get("constraint_kind") if branch_edges else "current_rating")
     trunk_edge.setdefault("mechanism",
                           branch_edges[0].get("mechanism") if branch_edges else "electrical_bus")
-    trunk_spec = size_connection(trunk_edge, trunk_len, carried_value=trunk_value)
+    trunk_spec = size_connection_to_spec(trunk_edge, trunk_len, carried_value=trunk_value)
     trunk_spec["role"] = "trunk"
     for bs in branch_specs:
         bs["role"] = "branch"
@@ -1252,6 +1698,11 @@ def connection_schedule(specs: list[dict]) -> list[dict]:
             "within_spec": spec.get("within_spec"),
             "qty": spec.get("material_qty_desc"),
             "role": role or spec.get("role"),
+            # Phase-D surface (uniform shape; None/False when nothing fired).
+            "upsized": bool(spec.get("upsized")),
+            "original_size": spec.get("original_size_label"),
+            "upsize_iterations": spec.get("upsize_iterations") or 0,
+            "design_recommendation": spec.get("design_recommendation"),
         })
 
     for item in specs:
@@ -1298,12 +1749,28 @@ def _demo() -> None:
                      "required_margin_factor": 1.15,
                      "material_context": "water/glycol coolant"}
     specs = [
-        size_connection(bess_dc, 12.0),
-        size_connection(vf_drip, 8.0),
-        size_connection(efuel_thermal, 20.0),
+        size_connection_to_spec(bess_dc, 12.0),
+        size_connection_to_spec(vf_drip, 8.0),
+        size_connection_to_spec(efuel_thermal, 20.0),
     ]
     for r in connection_schedule(specs):
         print(json.dumps(r, ensure_ascii=False))
+
+    # PHASE D demo — a 48 V LV bus far from its load: D1 upsizes the fixable case,
+    # D2 recommends a re-design when the reach is excessive.
+    print("\n# Phase D — iterative feedback:")
+    lv = {"from_part": "pack", "to_part": "load", "mechanism": "electrical_bus",
+          "constraint_kind": "current_rating", "required_value": 600.0,
+          "required_unit": "A", "material_context": "48 V DC bus"}
+    for L in (60.0, 250.0):
+        s = size_connection_to_spec(dict(lv), L)
+        tag = ("D1 upsize" if s["upsized"] and not s["design_recommendation"]
+               else "D2 recommend" if s["design_recommendation"] else "in-spec")
+        print(f"#  {L:>5.0f} m  [{tag}]  {s['original_size_label'] or s['size_label']}"
+              f" -> {s['final_size_label']}  vd={s['drop_pct_or_velocity']}%"
+              f"  spec={s['within_spec']}")
+        if s["design_recommendation"]:
+            print(f"#     {s['design_recommendation']}")
 
 
 if __name__ == "__main__":
