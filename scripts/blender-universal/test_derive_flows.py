@@ -13,6 +13,10 @@ flow-derivation work established (regression-harness rule 11):
     derived, never a fluid/thermal loop;
   • the underscore-boundary role regexes match topology endpoints (led_array,
     lfp_cell_string) that the old \\b form missed.
+  • the per-rack fan-out is GROUPED into a TRUNK-AND-BRANCH (header/busway):
+    each (hub, mechanism) feeding >= 3 consumers collapses to ONE trunk + N short
+    taps (group_fanout_trunks), supply and return on separate parallel trunks,
+    while the electrical chain + the lone collector→hub edge stay passthrough.
 
 Run:  python3 scripts/blender-universal/test_derive_flows.py
 Exit 0 = all pass; exit 1 = a failure (with the failing assertion printed).
@@ -173,6 +177,58 @@ check(B.DERIVE_RICH_TOPOLOGY_EDGES == 6, "rich-topology threshold = 6 edges")
 print("[6] no rack consumers ⇒ empty derivation")
 check(B.derive_flows(parts_bess, [], topo_bess, _mechs("electrical", "thermal")) == [],
       "no consumer anchors ⇒ no derived flows")
+
+
+# ── 7. TRUNK-AND-BRANCH grouping: the per-rack fan-out collapses to ONE trunk
+#      per (hub, mechanism) + N short taps, NOT N full runs. This is the busway
+#      invariant — keyed purely on the SHARED-ENDPOINT fan-out structure, no class.
+print("[7] trunk-and-branch fan-out grouping (header/busway)")
+# Re-use the BESS derivation from [3]: 15 racks, electrical hub + thermal hub +
+# thermal-return collector port + a 2-stage electrical chain (rack_block→pcs→txfmr).
+groups, passthrough = B.group_fanout_trunks(derived)
+by_mech = {}
+for g in groups:
+    by_mech.setdefault(g["mech"], []).append(g)
+# ONE electrical trunk (the DC/power busway) whose consumers include all 15 racks
+# (it may also pick up the big-load skids that share the hub — that's correct).
+check("electrical_bus" in by_mech and len(by_mech["electrical_bus"]) == 1,
+      f"electrical fan-out → exactly ONE trunk (got "
+      f"{len(by_mech.get('electrical_bus', []))})")
+if by_mech.get("electrical_bus"):
+    n_elec_cons = len(by_mech["electrical_bus"][0]["consumers"])
+    check(n_elec_cons >= 15,
+          f"electrical trunk taps ALL 15 racks (got {n_elec_cons} consumers)")
+# ONE thermal SUPPLY trunk + ONE thermal RETURN trunk (separate mechanisms →
+# separate parallel busways), each tapping the 15 racks.
+check("thermal" in by_mech and len(by_mech["thermal"]) == 1,
+      f"thermal supply → ONE trunk (got {len(by_mech.get('thermal', []))})")
+check("thermal_return" in by_mech and len(by_mech["thermal_return"]) == 1,
+      f"thermal return → ONE trunk (got {len(by_mech.get('thermal_return', []))})")
+if by_mech.get("thermal"):
+    check(len(by_mech["thermal"][0]["consumers"]) == 15,
+          f"thermal supply trunk taps 15 racks "
+          f"(got {len(by_mech['thermal'][0]['consumers'])})")
+# the thermal RETURN trunk's ORIGIN is the SHARED collector port (consumers gather
+# INTO it), so origin_is_a is False (the shared endpoint is the edges' b_xyz).
+if by_mech.get("thermal_return"):
+    check(by_mech["thermal_return"][0]["origin_is_a"] is False,
+          "thermal-return trunk gathers INTO the collector (shared endpoint = b_xyz)")
+# the 2-stage electrical chain (rack_block→pcs→transformer) and the lone
+# collector→hub closing edge are NOT fan-outs → they stay passthrough.
+pass_mechs = [r["mech"] for r in passthrough]
+check(any(str(r["b_nm"]) == "transformer" for r in passthrough),
+      "electrical-chain stage (→transformer) stays a passthrough edge, not a tap")
+check(any(r["mech"] == "thermal_return" for r in passthrough),
+      "the collector→hub closing edge stays passthrough (single edge, not a fan-out)")
+# a SMALL fan-out (< TRUNK_MIN_CONSUMERS) must NOT trunk — single loads route normal.
+small = [{"i": j, "mech": "electrical_bus", "a_xyz": (0.0, 0.0, 0.0),
+          "b_xyz": (1000.0 * j, 0.0, 0.0), "a_abstract": True, "b_abstract": True,
+          "a_nm": "hub", "b_nm": f"load{j}", "pa": None, "pb": None}
+         for j in range(2)]   # only 2 consumers
+g2, p2 = B.group_fanout_trunks(small)
+check(len(g2) == 0 and len(p2) == 2,
+      f"a 2-consumer fan-out does NOT trunk (got {len(g2)} groups, {len(p2)} passthrough)")
+check(B.TRUNK_MIN_CONSUMERS == 3, "trunk threshold = 3 distinct consumers")
 
 
 # ── summary ──────────────────────────────────────────────────────────────────

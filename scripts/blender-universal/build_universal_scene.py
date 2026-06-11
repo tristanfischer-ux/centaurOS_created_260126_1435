@@ -3297,6 +3297,137 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
     return derived
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# TRUNK-AND-BRANCH (HEADER / BUSWAY) GROUPING (2026-06-11)
+# ───────────────────────────────────────────────────────────────────────────
+# derive_flows correctly connects a HUB to EACH consumer in a row, but emits
+# every connection as an INDEPENDENT full-length run hub→consumer. With 15-49
+# consumers that is a dense tangled BUNDLE in plan view (every run projects onto
+# the same band). Real distribution uses a HEADER/BUSWAY: ONE trunk runs ALONG
+# the row of consumers and each consumer TAPS OFF with a SHORT branch. This
+# module detects those fan-out groups GENERICALLY — derived edges that SHARE a
+# (hub, mechanism) and reach MANY consumers — and the emitter routes each as ONE
+# trunk + N short taps instead of N full runs. Keyed ONLY on the fan-out
+# structure (a repeated endpoint over ≥ TRUNK_MIN_CONSUMERS edges of one mech),
+# NEVER on archetype. There is NO `if bess`. SUPPLY and RETURN are different
+# mechanisms (distinct colours) so each becomes its OWN parallel trunk.
+# ───────────────────────────────────────────────────────────────────────────
+
+# Minimum distinct consumers sharing a (hub, mechanism) for the fan-out to be
+# routed as a TRUNK + taps. Below this (a hub→one-load, a BoP→BoP, a hub→HVAC,
+# the 2-stage electrical chain) the normal per-edge route is cleaner.
+TRUNK_MIN_CONSUMERS = 3
+# Two endpoints within this XY distance are the "same" shared hub/collector point
+# (absorbs float noise + the tiny per-edge nozzle offsets).
+_TRUNK_SAME_PT_TOL_MM = 50.0
+
+
+def _pt_key(xyz):
+    """A rounded (x,y) key so near-coincident endpoints group together."""
+    q = _TRUNK_SAME_PT_TOL_MM
+    return (round(xyz[0] / q), round(xyz[1] / q))
+
+
+def group_fanout_trunks(resolved, min_consumers=TRUNK_MIN_CONSUMERS):
+    """Partition derived/resolved edges into TRUNK GROUPS + PASSTHROUGH edges.
+
+    A TRUNK GROUP = edges of the SAME mechanism that share ONE endpoint (the hub,
+    for a supply fan-out; the collector, for a return gather) and reach
+    >= min_consumers DISTINCT other endpoints (the consumers). The shared end is
+    the trunk ORIGIN; the distinct ends are the consumers each tap reaches.
+
+    Returns (groups, passthrough):
+      groups      : list of dicts {mech, origin_xyz, origin_nm, origin_is_a,
+                    consumers:[{xyz,nm,pa,pb,i}], edge_idxs}. `origin_is_a` is
+                    True when the SHARED point is the edges' a_xyz (supply: hub→
+                    consumer), False when it is b_xyz (return: consumer→collector).
+      passthrough : edges that are NOT part of any fan-out (single loads, BoP→BoP,
+                    hub→HVAC, the 2-stage electrical chain stages, collector→hub).
+
+    Universal: groups purely on the SHARED-ENDPOINT + mechanism structure of the
+    derived edges, never on names/archetype. Only edges flagged abstract on BOTH
+    ends are eligible (the derived fan-out is abstract→abstract; a real explicit
+    part→part edge is left to the normal router)."""
+    # bucket eligible edges by (mechanism, shared-endpoint-key) for BOTH possible
+    # shared ends, then pick, per mechanism, the endpoint that fans out the most.
+    by_a = {}   # (mech, a_key) -> [edge_idx]
+    by_b = {}   # (mech, b_key) -> [edge_idx]
+    eligible = set()
+    for idx, r in enumerate(resolved):
+        # only the derived abstract→abstract fan-out edges are trunk-eligible; an
+        # explicit part-anchored edge keeps its own (already-clean) route.
+        if not (r.get("a_abstract") and r.get("b_abstract")):
+            continue
+        if r.get("a_xyz") is None or r.get("b_xyz") is None:
+            continue
+        eligible.add(idx)
+        mech = r["mech"]
+        by_a.setdefault((mech, _pt_key(r["a_xyz"])), []).append(idx)
+        by_b.setdefault((mech, _pt_key(r["b_xyz"])), []).append(idx)
+
+    # For each candidate shared-endpoint bucket, count DISTINCT opposite endpoints
+    # (the consumers). A bucket with >= min_consumers distinct consumers is a trunk.
+    # Each edge may appear in an a-bucket AND a b-bucket; assign it to the LARGER
+    # fan-out so an edge is claimed once (the supply hub usually wins over a lone
+    # shared consumer point).
+    candidates = []   # (n_consumers, side, mech, key, [edge_idx])
+    for (mech, key), idxs in by_a.items():
+        opp = {_pt_key(resolved[i]["b_xyz"]) for i in idxs}
+        if len(opp) >= min_consumers:
+            candidates.append((len(opp), "a", mech, key, idxs))
+    for (mech, key), idxs in by_b.items():
+        opp = {_pt_key(resolved[i]["a_xyz"]) for i in idxs}
+        if len(opp) >= min_consumers:
+            candidates.append((len(opp), "b", mech, key, idxs))
+    # greedily claim the biggest fan-outs first; an edge is used by ONE trunk only.
+    candidates.sort(key=lambda c: -c[0])
+    claimed = set()
+    groups = []
+    for _, side, mech, key, idxs in candidates:
+        edge_idxs = [i for i in idxs if i in eligible and i not in claimed]
+        # re-check the distinct-consumer count after removing already-claimed edges.
+        if side == "a":
+            opp = {_pt_key(resolved[i]["b_xyz"]) for i in edge_idxs}
+        else:
+            opp = {_pt_key(resolved[i]["a_xyz"]) for i in edge_idxs}
+        if len(opp) < min_consumers:
+            continue
+        origin_is_a = (side == "a")
+        # de-dup consumers by point key (a repeated consumer point taps once).
+        seen = set()
+        consumers = []
+        for i in edge_idxs:
+            r = resolved[i]
+            cons_xyz = r["b_xyz"] if origin_is_a else r["a_xyz"]
+            ck = _pt_key(cons_xyz)
+            if ck in seen:
+                continue
+            seen.add(ck)
+            consumers.append({
+                "xyz": cons_xyz,
+                "nm": r["b_nm"] if origin_is_a else r["a_nm"],
+                # the consumer's own Part (for the over-equipment own-bbox exclusion)
+                "pb": r.get("pb") if origin_is_a else r.get("pa"),
+                "i": i,
+            })
+            claimed.add(i)
+        # claim ALL edges in this bucket (including any whose consumer point was a
+        # duplicate) so they don't fall through to passthrough as stray full runs.
+        for i in edge_idxs:
+            claimed.add(i)
+        origin_xyz = resolved[edge_idxs[0]]["a_xyz"] if origin_is_a \
+            else resolved[edge_idxs[0]]["b_xyz"]
+        origin_nm = resolved[edge_idxs[0]]["a_nm"] if origin_is_a \
+            else resolved[edge_idxs[0]]["b_nm"]
+        groups.append({
+            "mech": mech, "origin_xyz": origin_xyz, "origin_nm": origin_nm,
+            "origin_is_a": origin_is_a, "consumers": consumers,
+            "edge_idxs": list(edge_idxs),
+        })
+    passthrough = [r for idx, r in enumerate(resolved) if idx not in claimed]
+    return groups, passthrough
+
+
 def _bop_anchors_to_families(bop_anchor, parts):
     """Map a placer's role→(x,y,z) BoP anchors to derive_flows' family `hubs` +
     `collectors` dicts, classifying each BoP skid BY ROLE (its role key + the name
@@ -3634,34 +3765,180 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
     return routed, unresolved
 
 
+def _mech_pipe_mat(mech, MAT):
+    """The cached pipe material for a mechanism (mechanism-coloured)."""
+    mkey = f"u_pipe_{mech}"
+    if mkey not in MAT:
+        colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
+        MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35, roughness=0.35)
+    return MAT[mkey]
+
+
+def _draw_run(nm, mech, waypoints, a_xyz, b_xyz, MAT, MO, pipe_module,
+              conn=(), own_parts=(), log=True):
+    """Draw ONE routed run (cable-tray for electrical, round pipe otherwise) and
+    log it for the route audit. Shared by the per-edge path, the passthrough
+    path, the TRUNK and the TAP — so every emitted polyline gets the identical
+    geometry + the identical self-audit coverage."""
+    if mech == "electrical_bus":
+        _draw_cable_tray(nm, waypoints, MAT, MO)
+    else:
+        fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=_mech_pipe_mat(mech, MAT),
+                         flanges=True, connect=tuple(c for c in conn if c is not None),
+                         module=pipe_module, module_objects=MO)
+    if log:
+        _route_log_add(nm, mech, waypoints, a_xyz, b_xyz, own_parts=own_parts)
+
+
+def _spine_pt(rack_plan, along_v, slot):
+    """The point ON this run's spine lane + tier at along-spine coordinate
+    `along_v` (clamped into the spine span)."""
+    a = rack_plan._clamp_along(along_v)
+    off = rack_plan.lane_offset(slot)
+    tz = rack_plan.tier_z(slot)
+    if rack_plan.axis == "x":
+        return (a, rack_plan.spine_pos + off, tz)
+    return (rack_plan.spine_pos + off, a, tz)
+
+
+def _emit_trunk_group(group, rack_plan, slot, rack_base_z, MAT, MO, pipe_module,
+                      tag):
+    """Emit ONE fan-out group as a HEADER/BUSWAY: a single TRUNK along the row of
+    consumers (on this group's own spine lane + tier) + a SHORT orthogonal TAP
+    from the trunk to EACH consumer (over the spine to the consumer's along-coord,
+    cross to the consumer, drop). NOT N full runs back to the hub.
+
+    The trunk runs from the ORIGIN (hub for a supply, collector for a return) ALONG
+    the spine to the FARTHEST consumer's along-coord. Each tap leaves the trunk at
+    the point on the lane NEAREST its consumer — a short over + cross + drop. The
+    whole busway sits on ONE lane + ONE tier so SUPPLY and RETURN trunks (different
+    mechanisms) are parallel, never crossing. Returns the number of runs emitted."""
+    mech = group["mech"]
+    origin = group["origin_xyz"]
+    consumers = group["consumers"]
+    emitted = 0
+    if rack_plan is None:
+        # No spine to thread a trunk down → fall back to per-consumer runs (legacy).
+        for k, c in enumerate(consumers):
+            nm = f"u_route_{tag}trunk{slot}_{mech}_tap{k}"
+            wp = route_rack(origin, c["xyz"], rack_base_z + RACK_TIER_PITCH_MM * (k % 4))
+            try:
+                _draw_run(nm, mech, wp, origin, c["xyz"], MAT, MO, pipe_module)
+                emitted += 1
+            except Exception as ex:  # noqa: BLE001
+                print(f"[univ] trunk tap {nm} FAILED: {ex}")
+        return emitted
+
+    along = rack_plan._along
+    o_al = along(origin)
+    cons_al = [along(c["xyz"]) for c in consumers]
+    # the trunk spans from the origin's along-coord to the FARTHEST consumer along
+    # the row (so it physically runs ALONG the whole row of consumers).
+    far_al = max(cons_al + [o_al], key=lambda v: abs(v - o_al))
+    tz = rack_plan.tier_z(slot)
+    o_far_pt = (origin[0], origin[1], origin[2])
+    # a synthetic far end at the spine cross-position + the farthest along-coord,
+    # at the origin's own cross-coord projected onto the row — used only to drive
+    # route_on_spine so the trunk gets the riser→spine-lane→along-row geometry.
+    if rack_plan.axis == "x":
+        far_pt = (rack_plan._clamp_along(far_al), origin[1], tz)
+    else:
+        far_pt = (origin[0], rack_plan._clamp_along(far_al), tz)
+    # TRUNK: origin → along the row to the far end, on this group's lane + tier.
+    # Both ends abstract = route straight onto the spine lane (no own-bbox).
+    trunk_wp = route_on_spine(rack_plan, slot, o_far_pt, far_pt,
+                              a_abstract=True, b_abstract=True, own=())
+    trunk_nm = f"u_trunk_{tag}{slot}_{mech}"
+    try:
+        _draw_run(trunk_nm, mech, trunk_wp, o_far_pt, far_pt, MAT, MO, pipe_module)
+        emitted += 1
+        print(f"[univ] TRUNK {tag}{slot} ({mech}): {group['origin_nm']} "
+              f"busway along {len(consumers)} consumers")
+    except Exception as ex:  # noqa: BLE001
+        print(f"[univ] trunk {trunk_nm} FAILED: {ex}")
+    # TAPS: short over + cross + drop from the trunk lane to each consumer. The tap
+    # leaves the trunk at the consumer's OWN along-coord (so it is the shortest
+    # branch), runs across to the consumer XY, then drops. Each is logged so the
+    # over-equipment / crossing audit covers it; the consumer's own part bbox is
+    # excluded (the drop lands on its own footprint).
+    for k, c in enumerate(consumers):
+        cx, cy, cz = (float(v) for v in c["xyz"])
+        tap_on_trunk = _spine_pt(rack_plan, along(c["xyz"]), slot)
+        if rack_plan.axis == "x":
+            # trunk lane is at Y=spine_pos+off; go: trunk → over to consumer X (already
+            # there) → cross in Y to consumer → drop. Build orthogonal waypoints.
+            raw = [tap_on_trunk,
+                   (cx, tap_on_trunk[1], tz),   # align in X over to the consumer's X
+                   (cx, cy, tz),                # cross in Y to the consumer
+                   (cx, cy, cz)]                # drop onto the consumer
+        else:
+            raw = [tap_on_trunk,
+                   (tap_on_trunk[0], cy, tz),   # align in Y
+                   (cx, cy, tz),                # cross in X
+                   (cx, cy, cz)]                # drop
+        tap_wp = [raw[0]]
+        for p in raw[1:]:
+            if max(abs(p[0] - tap_wp[-1][0]), abs(p[1] - tap_wp[-1][1]),
+                   abs(p[2] - tap_wp[-1][2])) > 1.0:
+                tap_wp.append(p)
+        tap_nm = f"u_tap_{tag}{slot}_{mech}_{k}"
+        try:
+            _draw_run(tap_nm, mech, tap_wp, (tap_on_trunk[0], tap_on_trunk[1]),
+                      (cx, cy), MAT, MO, pipe_module, own_parts=(c.get("pb"),))
+            emitted += 1
+        except Exception as ex:  # noqa: BLE001
+            print(f"[univ] tap {tap_nm} FAILED: {ex}")
+    return emitted
+
+
 def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
                          pipe_module="mass_fluid_transport_process", tag=""):
     """Shared PASS-2 emitter for EVERY family. `resolved` = list of edge dicts with
     keys i, mech, a_xyz, b_xyz, a_abstract, b_abstract, a_conn, b_conn, b_branch,
-    pa, pb, a_nm, b_nm. Assigns each run a LANE + TIER on `rack_plan` (one shot),
-    then for each: tries a DIRECT clean L-jumper for short concrete edges, else
-    routes on the spine; draws a cable tray (electrical) or pipe; logs it for the
-    route audit. Returns (routed_count, unresolved). One engine → every family gets
-    the same orderly spine routing + the same self-audit coverage."""
+    pa, pb, a_nm, b_nm.
+
+    TRUNK-AND-BRANCH (2026-06-11): the derived per-consumer fan-out edges are first
+    grouped by group_fanout_trunks — a HUB feeding >= TRUNK_MIN_CONSUMERS consumers
+    of one mechanism becomes ONE TRUNK (header/busway) along the row + a SHORT TAP
+    to each consumer, instead of N independent full runs (the dense bundle). Each
+    mechanism (DC bus / water-supply / water-return / coolant-supply / coolant-
+    return / LED-power) gets its OWN trunk lane + tier (parallel, no crossing).
+    PASSTHROUGH edges (single loads, BoP→BoP, hub→HVAC, the electrical-chain stages,
+    collector→hub) keep the normal per-edge route. One trunk + N taps reads as a
+    real busway; the route audit covers the trunk + every tap.
+
+    Assigns lanes + tiers on `rack_plan` (one shot, one slot per trunk + one per
+    passthrough edge). Returns (routed_count, unresolved)."""
     unresolved = []
-    # assign lanes + tiers over the along-spine intervals of all edges
-    if rack_plan is not None and resolved:
+    groups, passthrough = group_fanout_trunks(resolved)
+    if groups:
+        print(f"[univ][trunk] {len(groups)} fan-out group(s) → trunk+taps: "
+              + ", ".join(f"{g['mech']}×{len(g['consumers'])}" for g in groups)
+              + f"; {len(passthrough)} passthrough edge(s)")
+
+    # SLOTS: one per passthrough edge, then one per trunk group. The lane/tier
+    # assignment runs over ALL slots so every trunk + every passthrough gets a
+    # distinct lane + tier (parallel busways, zero same-Z crossings).
+    n_pass = len(passthrough)
+    if rack_plan is not None and (passthrough or groups):
         intervals = []
-        for r in resolved:
+        for r in passthrough:
             a_al = rack_plan._clamp_along(rack_plan._along(r["a_xyz"]))
             b_al = rack_plan._clamp_along(rack_plan._along(r["b_xyz"]))
             intervals.append((min(a_al, b_al), max(a_al, b_al)))
+        for g in groups:
+            o_al = rack_plan._clamp_along(rack_plan._along(g["origin_xyz"]))
+            c_al = [rack_plan._clamp_along(rack_plan._along(c["xyz"]))
+                    for c in g["consumers"]]
+            lo, hi = min([o_al] + c_al), max([o_al] + c_al)
+            intervals.append((lo, hi))
         rack_plan.assign(intervals)
 
     routed = 0
-    for slot, r in enumerate(resolved):
+    # ── PASSTHROUGH edges: the existing per-edge direct-or-spine route. ──────────
+    for slot, r in enumerate(passthrough):
         i, mech = r["i"], r["mech"]
         a_xyz, b_xyz = r["a_xyz"], r["b_xyz"]
-        colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
-        mkey = f"u_pipe_{mech}"
-        if mkey not in MAT:
-            MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35, roughness=0.35)
-        mat = MAT[mkey]
         pa, pb = r.get("pa"), r.get("pb")
         if rack_plan is not None:
             own_bb = [bb for bb in (part_xy_bbox_mm(pa) if pa else None,
@@ -3690,15 +3967,10 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
                 # point NEAREST each load (short lateral + drop), not the run end.
                 for j, drop in enumerate(r.get("b_branch", [])):
                     if rack_plan is not None:
-                        if rack_plan.axis == "x":
-                            tap = (rack_plan._clamp_along(drop[0]),
-                                   rack_plan.spine_pos + rack_plan.lane_offset(slot),
-                                   rack_plan.tier_z(slot))
-                        else:
-                            tap = (rack_plan.spine_pos + rack_plan.lane_offset(slot),
-                                   rack_plan._clamp_along(drop[1]),
-                                   rack_plan.tier_z(slot))
-                        bwp = [tap, (drop[0], drop[1], tap[2]), drop]
+                        bwp = [_spine_pt(rack_plan, drop[0] if rack_plan.axis == "x"
+                                         else drop[1], slot),
+                               (drop[0], drop[1],
+                                rack_plan.tier_z(slot)), drop]
                     else:
                         bwp = route_rack((waypoints[-1][0], waypoints[-1][1],
                                           waypoints[-1][2]), drop, rack_base_z)
@@ -3711,7 +3983,7 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
             else:
                 conn = tuple(c for c in (r.get("a_conn"), r.get("b_conn"))
                              if c is not None)
-                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=mat,
+                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=_mech_pipe_mat(mech, MAT),
                                  flanges=True, connect=conn,
                                  module=pipe_module, module_objects=MO)
                 _route_log_add(nm, mech, waypoints, a_xyz, b_xyz, own_parts=(pa, pb))
@@ -3721,6 +3993,15 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
         except Exception as ex:  # noqa: BLE001 — never let one bad route kill the run
             unresolved.append((r["a_nm"], r["b_nm"], mech, [f"route_error:{ex}"]))
             print(f"[univ] edge {tag}{i} route FAILED: {ex}")
+
+    # ── TRUNK GROUPS: ONE busway + N short taps per fan-out group. ───────────────
+    for gi, g in enumerate(groups):
+        slot = n_pass + gi
+        try:
+            routed += _emit_trunk_group(g, rack_plan, slot, rack_base_z,
+                                        MAT, MO, pipe_module, tag)
+        except Exception as ex:  # noqa: BLE001
+            print(f"[univ] trunk group {gi} ({g['mech']}) FAILED: {ex}")
     return routed, unresolved
 
 
@@ -7732,8 +8013,14 @@ def apply_inspection_materials(parts):
                 pass
             n_frame += 1
             continue
-        # ── Routed pipes → keep mechanism colour, just flatten to matte ──
-        if nm.startswith("u_route_"):
+        # ── Routed pipes + TRUNK/TAP busways → keep mechanism colour, just flatten
+        #    to matte. u_trunk_*/u_tap_* are the header-and-branch runs (a trunk
+        #    along the consumer row + a short tap per consumer); they already carry
+        #    the mechanism colour from _mech_pipe_mat / the cable-tray material, so —
+        #    exactly like u_route_* — we keep that colour and only kill the gloss
+        #    (NOT recolour them neutral-grey via the unmatched fallback). ──
+        if nm.startswith("u_route_") or nm.startswith("u_trunk_") \
+                or nm.startswith("u_tap_"):
             for m in obj.data.materials:
                 if m is None:
                     continue
