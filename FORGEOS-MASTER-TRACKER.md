@@ -12,11 +12,12 @@ correcting**, and the optimisation loops **converged** (engineering AND Blender)
 rendered into the PDF**, not sitting in /tmp.
 
 ## 🎯 CURRENT FOCUS
-**W4 — evolve Part 2 with the manufacturing layer (Option A, Tristan 2026-06-11).** Keep modules/
-sub-modules/BoM as the spine; ADD make-vs-buy + process route + assembly sequence + cost-of-goods
-build-up, ADDITIVELY (never replace the in-context BoM). The 8 drawings are the VISUAL form of this
-layer (GA = assembly, P&ID/process-schedules = process route, cable/panel schedules = make/buy scope) —
-their placement is being decided WITH the manufacturing layer, not separately.
+Autonomous, 2 sub-agents max (Anthropic rate-limit, Tristan 2026-06-11). RUNNING: D1 universal auto-BFD
+(`draw_bfd.py`) + W8.2 BoM cost-grounding (`bom-cost-grounding.ts`) — both build-only, I integrate.
+✅ DONE this turn: W2.1 (drawings in PDF, pages 37-39) + W8.1 (universal-CAD hero fills cover/module gap)
+— verified end-to-end via the production path (manifest.hero → state.cad_hero_image_path → render).
+NEXT after integration: wire the BFD into EngineeringBasisPage; wire cost-grounding into the chain;
+then W4.1 (CAD cable/pipe quantities into the BoM).
 
 ## ▶ NEXT 3 (in order)
 1. **W2.1** Get the 8 drawings into the rendered PDF (investigate render integration point → wire → verify a real dossier shows them).
