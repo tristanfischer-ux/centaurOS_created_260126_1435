@@ -16746,6 +16746,41 @@ function buildManufacturingPlanPages(state: any, project: string): any[] {
   } catch { return [] }
 }
 
+// Part 2 manufacturing layer M3 (Tristan's Option-A evolve): the plant ASSEMBLY /
+// ERECTION SEQUENCE — the build order (civil → structural → set major equipment in
+// process order → pipework → electrical → instruments → pre-commission → commission),
+// from bom-assembly-sequence. Backs the General Arrangement drawing. Additive Part-2 page.
+function buildAssemblySequencePages(state: any, project: string, statePath?: string): any[] {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { assemblySequence } = require('./lib/cost/bom-assembly-sequence')
+    let conns: any[] = []
+    if (statePath) {
+      const sp = join(dirname(statePath), 'connection-schedule.json')
+      if (existsSync(sp)) { try { conns = JSON.parse(readFileSync(sp, 'utf-8'))?.rows ?? [] } catch { /* no runs */ } }
+    }
+    const asq: any = assemblySequence(state, { connections: conns })
+    const phases: any[] = Array.isArray(asq?.phases) ? asq.phases : []
+    if (phases.length === 0) return []
+    return [(
+      <Page key="asm-seq" size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Part 2 · Assembly & erection sequence" project={project} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>Assembly &amp; erection sequence</Text>
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 12, lineHeight: 1.55 }}>{String(asq?.narrative ?? '')}</Text>
+        {phases.map((p: any, i: number) => (
+          <View key={i} style={{ marginBottom: 7 }} wrap={false}>
+            <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: ACCENT }}>{`${p.order}. ${String(p.title ?? '')}`}</Text>
+            <Text style={{ fontSize: 8, color: INK_SOFT, marginBottom: 1, lineHeight: 1.4 }}>{String(p.scope ?? '')}</Text>
+            {Array.isArray(p.items) && p.items.length > 0
+              ? <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.4 }}>{`${p.items.slice(0, 8).join(' · ')}${p.items.length > 8 ? ` … (+${p.items.length - 8} more)` : ''}`}</Text>
+              : <Text style={{ fontSize: 7.5, color: MUTED, fontStyle: 'italic' }}>{String(p.note ?? '—')}</Text>}
+          </View>
+        ))}
+      </Page>
+    )]
+  } catch { return [] }
+}
+
 function MinimalDocument({ state, subject, statePath }: { state: any; subject: string; statePath: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   // FREE-tier: pre-build the manufacturer -> "Company N" alias map + brand-mask
@@ -17007,6 +17042,8 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           SystemLevelRisksPage component is no longer called. */}
       {/* Part 2 manufacturing layer (M1 make-vs-buy + M2 process route) — "how you manufacture it". */}
       {buildManufacturingPlanPages(state, project)}
+      {/* M3 assembly/erection sequence — the build order; backs the General Arrangement. */}
+      {buildAssemblySequencePages(state, project, statePath)}
       <RiskPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <PartDividerPage
         eyebrow="Part 3"
