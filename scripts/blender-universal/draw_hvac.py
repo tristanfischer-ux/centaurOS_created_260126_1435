@@ -1,0 +1,1622 @@
+#!/usr/bin/env python3
+"""draw_hvac.py — UNIVERSAL HVAC / DUCT-LAYOUT drawing generator.
+
+The MECHANICAL-SERVICES drawing of the set — the air-side / cooling companion to
+draw_ga.py (GA), draw_pid.py (P&ID) and draw_single_line.py (SLD).  Same contract:
+it does NOT recompute anything and it does NOT touch build_universal_scene.py — it
+CONSUMES that generator's outputs (the placed-equipment manifest + the sized
+connection schedule) plus the archetype state, and PROJECTS the air / cooling
+distribution into a standard HVAC layout: a ducted PLAN (the supply hub → served
+zones → return spine) + a SECTION, the real deliverable a building-services
+(mechanical) engineer expects to set out the air system.
+
+INPUTS (read-only):
+  <out>/parts-manifest.json   — written by build_universal_scene.py after placement.
+        Equipment positions + footprints; the AHU / DX unit / CRAC / chiller / fans
+        and the served racks/zones are picked out of this by role (name regex).
+        x = plant length (east), y = plant width (north), z = elevation (up); mm.
+  <state.json>                — the archetype state.  Two things are read:
+        (1) topology (engineeringContract / orchestratorContract) — the THERMAL / air
+            edges (hub → consumer) give the served-zone connectivity when the manifest
+            doesn't place the racks individually.
+        (2) quantities — the AIRFLOW the air system actually carries
+            (`hvac_airflow_cms` / `hvac_airflow_cmh` for an AHU; `chassis_airflow_cfm`
+            for a server CRAC) + the cooling duties (`hvac_cooling_kw`,
+            `system_thermal_dissipation_kw`, …).  This is what SIZES the ducts:
+            duct area = airflow / target velocity (~4-8 m/s) → a W×H section.
+  <out>/connection-schedule.json — OPTIONAL enrichment.  The sized thermal runs
+        (hub → rack[N], with kind=duct OR a liquid coolant DN + the carried kW + the
+        run length) give the AS-MODELLED distribution.  A LIQUID coolant loop (BESS)
+        is drawn HONESTLY as a coolant loop (double-line pipe, DN-labelled), not as
+        air ducts; an AIR system is drawn as sized rectangular ducts.
+
+DERIVED ROLE-BASED AIR SYSTEM (same hub→consumer→collector pattern as the water loop):
+  the AHU / DX unit / CRAC / chiller is the SUPPLY HUB → SUPPLY DUCTS fan out to the
+  served zones / racks → grilles / diffusers deliver into each zone → RETURN DUCTS
+  collect back to the unit.  Each duct is sized from its airflow SHARE (the hub airflow
+  split across the zones it serves) ÷ a target duct velocity → a duct cross-section,
+  rounded to a standard duct side; supply vs return are drawn distinctly (solid navy
+  supply, dashed teal return) with airflow-direction arrows + cms/cfm labels.
+
+PIPELINE:
+  1. load_inputs()      — manifest + state + (optional) schedule.
+  2. derive_air_system()— pick the supply hub(s) by role; pick the served zones (racks
+       from the manifest, else derived from the contract + a clear note); read the hub
+       airflow from the quantities; decide AIR vs LIQUID per hub from the material
+       context / coolant chemistry; build SUPPLY + RETURN ducts, each SIZED from its
+       airflow share ÷ velocity (round/rect), each carrying its flow label; attach a
+       diffuser / grille to every served zone.
+  3. build_hvac_svg()   — draw the PLAN (double-line sized ducts, diffusers, equipment
+       tags, flow arrows + cms/cfm) + a SECTION (supply high / return low over the
+       zones), a scale bar + north arrow, a supply/return/exhaust/liquid LEGEND, a
+       duct/equipment SCHEDULE, a title block + "not for construction".
+  4. rasterise()        — SVG → PNG (cairosvg → rsvg-convert → headless Chrome cascade).
+
+OUTPUTS:
+  <out>/drawings/hvac-layout.svg
+  <out>/drawings/hvac-layout.png
+
+Run:
+  python3 scripts/blender-universal/draw_hvac.py /tmp/hvac-vertical_farm out/rerun-vertical_farm/state.json
+  python3 scripts/blender-universal/draw_hvac.py /tmp/hvac-edge_ai_server out/rerun-edge_ai_server/state.json
+  python3 scripts/blender-universal/draw_hvac.py /tmp/hvac-energy_storage out/rerun-energy_storage/state.json
+
+Pure Python stdlib + (optional) a rasteriser on PATH.  No Blender import.
+"""
+from __future__ import annotations
+
+import html
+import json
+import math
+import os
+import re
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONSTANTS — air-side engineering defaults (mirrors connection_sizing.py)
+# ═══════════════════════════════════════════════════════════════════════════
+
+DEFAULT_DUCT_VELOCITY_MS = 6.0          # supply-air duct 4–8 m/s (mid-band)
+DUCT_VELOCITY_MAX_MS = 9.0              # the velocity the layout flags above
+RHO_AIR = 1.2                           # kg/m³ (≈20 °C)
+CP_AIR = 1006.0                         # J/(kg·K)
+DEFAULT_SUPPLY_DT_K = 10.0             # supply-air ΔT used for an airflow fallback
+CFM_PER_CMS = 2118.88                   # 1 m³/s = 2118.88 cfm
+
+# Standard rectangular-duct side ladder [mm] (galvanised, mirrors connection_sizing).
+_DUCT_SIDES = [150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800,
+               900, 1000, 1200, 1400, 1600]
+# Standard round-duct (spiral) diameter ladder [mm].
+_ROUND_DIA = [100, 125, 150, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DATA MODEL — the derived air / cooling distribution
+# ═══════════════════════════════════════════════════════════════════════════
+
+SERVICE_SUPPLY = "supply"        # conditioned SUPPLY air (solid navy, → zone)
+SERVICE_RETURN = "return"        # RETURN air back to the unit (dashed teal)
+SERVICE_EXHAUST = "exhaust"      # EXHAUST / relief to outside (dashed amber)
+SERVICE_LIQUID = "liquid"        # LIQUID coolant (not air) — drawn honestly as a pipe
+
+
+@dataclass
+class Equip:
+    """One placed piece of mechanical kit (hub or served zone), projected to PLAN.
+    All coords mm (x east, y north). The plan rectangle is centre ± half-footprint."""
+    tag: str                     # equipment tag, e.g. 'AHU-1', 'CRAC-1', 'R-07'
+    name: str
+    role: str                    # 'ahu' | 'crac' | 'dx' | 'chiller' | 'fan' | 'zone'
+    cx: float; cy: float          # plan centre (mm)
+    w: float; d: float; h: float  # footprint extents (mm)
+    z: float = 0.0               # centre elevation (mm)
+    is_hub: bool = False
+
+
+@dataclass
+class Duct:
+    """One sized duct (or coolant pipe) run from a hub to a served zone (or back)."""
+    frm: str                     # from equip tag
+    to: str                      # to equip tag
+    service: str                 # SERVICE_SUPPLY / _RETURN / _EXHAUST / _LIQUID
+    airflow_cms: float           # the airflow this run carries (m³/s); 0 for liquid
+    size_label: str              # '400×250' (rect) / 'Ø315' (round) / 'DN32' (liquid)
+    width_mm: float              # drawn double-line width (the larger duct side, mm)
+    velocity_ms: float = 0.0     # actual duct velocity (m/s)
+    duty_kw: float = 0.0         # carried cooling duty (kW), when known
+    length_m: float = 0.0        # run length (m), when known from the schedule
+    over_velocity: bool = False  # velocity exceeds the spec band → flagged
+
+
+@dataclass
+class Diffuser:
+    """A supply diffuser / return grille at a served zone."""
+    at: str                      # the served-zone equip tag
+    service: str                 # SERVICE_SUPPLY (diffuser) | SERVICE_RETURN (grille)
+    cx: float; cy: float          # plan position (mm)
+
+
+@dataclass
+class AirSystem:
+    archetype: str
+    hubs: list[Equip]
+    zones: list[Equip]
+    ducts: list[Duct]
+    diffusers: list[Diffuser]
+    bbox: dict
+    medium: str                  # 'air' | 'liquid' | 'mixed' — the dominant medium
+    airflow_cms: float           # the system design airflow (m³/s), 0 if pure-liquid
+    cooling_kw: float            # the system cooling duty (kW)
+    zones_derived: bool          # True when zones were derived (not placed individually)
+    notes: list[str] = field(default_factory=list)
+    schedule_present: bool = False
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# INPUT LOADING
+# ═══════════════════════════════════════════════════════════════════════════
+
+def load_inputs(out_dir: str, state_path: Optional[str],
+                manifest_path: Optional[str] = None):
+    """Read parts-manifest.json (required) + state.json (required) + the optional
+    connection-schedule.json.  Returns (manifest, state, schedule)."""
+    mp = Path(manifest_path) if manifest_path else Path(out_dir) / "parts-manifest.json"
+    if not mp.is_file():
+        raise FileNotFoundError(
+            f"no parts-manifest.json in {out_dir} (run build_universal_scene.py with "
+            f"INSPECT=1 BLENDER_OUT_DIR={out_dir} -- <state.json> first)")
+    with open(mp) as fh:
+        manifest = json.load(fh)
+
+    state = {}
+    for c in ([Path(state_path)] if state_path else []) + [Path(out_dir) / "state.json"]:
+        if c and c.is_file():
+            with open(c) as fh:
+                state = json.load(fh)
+            break
+
+    schedule = {}
+    sp = Path(out_dir) / "connection-schedule.json"
+    if sp.is_file():
+        with open(sp) as fh:
+            schedule = json.load(fh)
+    return manifest, state, schedule
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STATE / QUANTITY helpers
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _archetype_name(out_dir: str, state: dict) -> str:
+    for ck in ("parsedBrief", "engineeringContract", "orchestratorContract"):
+        c = state.get(ck) or {}
+        pc = c.get("product_class") or c.get("productClass")
+        if pc:
+            return str(pc)
+    if state.get("projectId"):
+        return str(state["projectId"])
+    base = re.sub(r"^(hvac|rerun|bl-univ)[-_]", "", Path(out_dir).name)
+    return base or "facility"
+
+
+def _quantity(state: dict, *keys):
+    """First matching quantity VALUE across both contracts (dict OR list form)."""
+    for ck in ("orchestratorContract", "engineeringContract"):
+        q = (state.get(ck) or {}).get("quantities")
+        if isinstance(q, dict):
+            for k in keys:
+                if k in q:
+                    v = q[k]
+                    return v.get("value") if isinstance(v, dict) else v
+        elif isinstance(q, list):
+            for item in q:
+                if item.get("key") in keys:
+                    return item.get("value")
+    return None
+
+
+def _topology(state: dict):
+    for ck in ("engineeringContract", "orchestratorContract"):
+        t = (state.get(ck) or {}).get("topology")
+        if isinstance(t, list) and t:
+            return t
+    return []
+
+
+def _coolant_is_liquid(state: dict) -> bool:
+    """True when the design carries a LIQUID coolant chemistry (glycol / water) — the
+    cue that the main 'thermal' loop is liquid cooling, NOT air."""
+    for ck in ("engineeringContract", "orchestratorContract"):
+        sq = (state.get(ck) or {}).get("shared_quantities") or {}
+        blob = " ".join(str(v) for v in sq.values()).lower()
+        if re.search(r"glycol|propylene|ethylene|\bmpg\b|\bmeg\b|deionised|"
+                     r"deionized|coolant", blob):
+            return True
+    return False
+
+
+def _humanise(tag: str) -> str:
+    if not tag:
+        return tag
+    ACR = {"co2", "h2", "ahu", "crac", "crah", "dx", "hvac", "led", "vf", "fcu",
+           "ac", "dc", "mv", "lv", "hv", "bess", "pcs", "it", "ups", "cfm", "cms"}
+    parts = re.split(r"[_\s]+", tag.strip())
+    out = [p.upper() if p.lower() in ACR else p for p in parts]
+    s = " ".join(out)
+    return s[:1].upper() + s[1:] if s else s
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ROLE CLASSIFICATION — which placed parts are HUBS, which are SERVED ZONES
+# ═══════════════════════════════════════════════════════════════════════════
+
+# A SUPPLY-HUB role (the thing air/coolant comes FROM).  Order matters: the first
+# match wins, so a 'CRAC' beats a generic 'fan'.
+_HUB_PATTERNS = [
+    (re.compile(r"\bcrac\b|\bcrah\b|computer.?room.?air|precision.?air|"
+                r"in.?row|inrow", re.I), "crac"),
+    (re.compile(r"\bahu\b|air.?handl|air.?handling|fan.?coil|\bfcu\b|"
+                r"\bmau\b|makeup.?air|make.?up.?air|rooftop|\brtu\b", re.I), "ahu"),
+    (re.compile(r"\bdx\b|direct.?expansion|split.?unit|condensing.?unit|"
+                r"packaged.?(ac|unit)|mini.?split|heat.?pump", re.I), "dx"),
+    (re.compile(r"chiller|cooling.?skid|coolant.?skid|refrig|cooling.?plant", re.I),
+     "chiller"),
+    (re.compile(r"\bhvac\b|climate|environmental.?control|conditioning", re.I), "ahu"),
+    (re.compile(r"\bfan\b|blower|extract|exhaust.?fan|mixing.?fan|circulat", re.I),
+     "fan"),
+]
+
+# A SERVED-ZONE role (the thing air/coolant goes TO).  Racks / grow zones / aisles.
+_ZONE_PATTERNS = [
+    re.compile(r"\brack\b|cabinet|\benclosure\b|\baisle\b|server|compute|gpu", re.I),
+    re.compile(r"grow|canopy|cultivation|bench|trolley|tier|nursery|propagat", re.I),
+]
+
+# Equipment we never treat as a served air zone or a hub (other BoP skids).
+_NEUTRAL_RE = re.compile(
+    r"control|fire|nutrient|water|dosing|switchgear|transformer|\bbms\b|"
+    r"battery management|\bpdu\b|\bups\b|inverter|\bpcs\b|power conversion", re.I)
+
+
+def _classify_role(name: str, module: str):
+    """Return ('hub', role) / ('zone', None) / (None, None) for a placed part."""
+    blob = f"{name} {module}"
+    for rx, role in _HUB_PATTERNS:
+        if rx.search(blob):
+            return "hub", role
+    for rx in _ZONE_PATTERNS:
+        if rx.search(blob):
+            return "zone", None
+    return None, None
+
+
+def _equip_from_row(r: dict) -> tuple:
+    """Project a manifest row into (cx, cy, w, d, h, z)."""
+    pos = r.get("pos_mm") or [0, 0, 0]
+    x, y, z = float(pos[0]), float(pos[1]), float(pos[2])
+    d = r.get("dims_mm") or {}
+    if "dia" in d:
+        dia = float(d.get("dia") or 0.0)
+        ln = float(d.get("len") or 0.0)
+        return x, y, dia, dia, ln, z
+    return x, y, float(d.get("w") or 0.0), float(d.get("d") or 0.0), \
+        float(d.get("h") or 0.0), z
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DUCT SIZING — airflow → standard duct cross-section
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _round_up(value, ladder):
+    for s in ladder:
+        if s >= value:
+            return s
+    return ladder[-1]
+
+
+def size_duct(airflow_cms: float, round_duct: bool = False,
+              velocity_target=DEFAULT_DUCT_VELOCITY_MS):
+    """Size a duct from an airflow (m³/s).  Returns (size_label, draw_width_mm,
+    actual_velocity_ms, over_velocity).  Rectangular by default (≈1.6:1 aspect, the
+    convention a layout shows as 'W×H'); round on request (Ø label)."""
+    airflow_cms = max(airflow_cms, 1e-4)
+    area_m2 = airflow_cms / max(velocity_target, 0.5)
+    if round_duct:
+        dia_ideal = math.sqrt(area_m2 * 4.0 / math.pi) * 1000.0
+        dia = _round_up(dia_ideal, _ROUND_DIA)
+        v = airflow_cms / max(1e-9, math.pi * (dia / 2000.0) ** 2)
+        return f"Ø{dia}", float(dia), round(v, 1), v > DUCT_VELOCITY_MAX_MS
+    side_ideal = math.sqrt(area_m2) * 1000.0
+    w = _round_up(side_ideal, _DUCT_SIDES)
+    h_ideal = area_m2 * 1e6 / max(w, 1.0)
+    h = _round_up(h_ideal, _DUCT_SIDES)
+    v = airflow_cms / max(1e-9, (w / 1000.0) * (h / 1000.0))
+    return f"{w}×{h}", float(max(w, h)), round(v, 1), v > DUCT_VELOCITY_MAX_MS
+
+
+def _cfm(cms: float) -> int:
+    return int(round(cms * CFM_PER_CMS))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SCHEDULE lookups — the as-modelled thermal runs (hub → consumer)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _thermal_rows(schedule: dict):
+    """Every thermal / duct / fluid-loop run in the schedule (the cooling distribution),
+    excluding pure electrical rows.  Returns the raw row dicts."""
+    out = []
+    for r in (schedule.get("rows") or []):
+        mech = (r.get("mechanism") or "").lower()
+        if mech in ("thermal", "thermal_return", "fluid_loop") or \
+                (r.get("kind") == "duct"):
+            out.append(r)
+    return out
+
+
+def _row_duty_kw(r: dict) -> float:
+    """Pull a kW duty out of a schedule row (the rating or the qty desc)."""
+    for fld in ("rating", "carried_rating"):
+        v = r.get(fld)
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, str):
+            m = re.search(r"([\d.]+)\s*kW", v, re.I)
+            if m:
+                return float(m.group(1))
+    m = re.search(r"\(([\d.]+)\s*kW", str(r.get("qty") or ""), re.I)
+    return float(m.group(1)) if m else 0.0
+
+
+def _row_len_m(r: dict) -> float:
+    v = r.get("length_m")
+    if isinstance(v, (int, float)):
+        return float(v)
+    m = re.search(r"([\d.]+)\s*m\b", str(r.get("qty") or ""))
+    return float(m.group(1)) if m else 0.0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DERIVE the role-based air / cooling system
+# ═══════════════════════════════════════════════════════════════════════════
+
+def derive_air_system(manifest: dict, state: dict, schedule: dict,
+                      out_dir: str) -> AirSystem:
+    """Build the supply hub → served zones → return distribution, the same
+    hub→consumer→collector pattern as the water loop.
+
+    HONESTY: a system whose main thermal loop is LIQUID coolant (glycol/water, e.g. a
+    BESS) is built as a LIQUID loop (drawn as coolant pipes, DN-sized from the schedule)
+    — NOT mis-drawn as air ducts.  An AIR system (AHU / DX / CRAC) is built as sized
+    rectangular ducts from the design airflow.  When the served zones aren't placed
+    individually in the manifest (e.g. a VF whose grow racks aggregate away), the zones
+    are DERIVED from the contract (canopy / rack count) and a clear note records it."""
+    arch = _archetype_name(out_dir, state)
+    rows = manifest.get("parts") or []
+    bbox = manifest.get("bbox_mm") or {}
+    notes: list[str] = []
+
+    # ---- partition placed kit into hubs / zones / neutral -----------------------
+    hubs: list[Equip] = []
+    zones: list[Equip] = []
+    for r in rows:
+        name = r.get("name") or ""
+        module = r.get("module") or ""
+        tag = r.get("equipment_tag") or "?"
+        role, sub = _classify_role(name, module)
+        if role == "hub":
+            cx, cy, w, d, h, z = _equip_from_row(r)
+            hubs.append(Equip(tag=_hub_tag(sub, len(hubs)), name=name, role=sub,
+                              cx=cx, cy=cy, w=w, d=d, h=h, z=z, is_hub=True))
+        elif role == "zone" and not _NEUTRAL_RE.search(f"{name} {module}"):
+            cx, cy, w, d, h, z = _equip_from_row(r)
+            zones.append(Equip(tag=tag, name=name, role="zone",
+                               cx=cx, cy=cy, w=w, d=d, h=h, z=z))
+
+    # ---- read the design airflow + cooling duty from the quantities -------------
+    # the placed-zone count feeds the per-chassis-cfm × N fallback (a server CRAC
+    # publishes airflow PER CHASSIS; the whitespace airflow is that × the racks served).
+    placed_zone_n = len(zones)
+    airflow_cms = _read_design_airflow(state, fallback_n=placed_zone_n)
+    cooling_kw = _read_cooling_kw(state, fallback_n=placed_zone_n)
+
+    # ---- decide the dominant MEDIUM (air vs liquid) -----------------------------
+    liquid = _coolant_is_liquid(state)
+    # a hub that is a 'chiller' on a liquid-coolant design ⇒ the main loop is liquid.
+    main_liquid = liquid and any(h.role == "chiller" for h in hubs)
+    # the air airflow may still exist (a container HVAC pair / cabinet AC aux load).
+    medium = "liquid" if main_liquid and not airflow_cms else (
+        "mixed" if main_liquid and airflow_cms else "air")
+
+    # ---- ensure we have a hub --------------------------------------------------
+    if not hubs:
+        # synthesise a hub at the plant edge so the layout still reads (named from the
+        # archetype's air system); record that it was derived.
+        hubs.append(_synth_hub(arch, bbox, medium))
+        notes.append("Air-handling unit not individually placed in the model — "
+                     "shown at the plant edge from the design airflow; verify position.")
+
+    # ---- served zones: placed racks, else DERIVE from the contract --------------
+    zones_derived = False
+    if not zones:
+        zones, zd_note = _derive_zones(state, bbox, arch)
+        zones_derived = True
+        if zd_note:
+            notes.append(zd_note)
+
+    # ---- build the SUPPLY + RETURN distribution ---------------------------------
+    ducts: list[Duct] = []
+    diffusers: list[Diffuser] = []
+    schedule_present = bool(_thermal_rows(schedule))
+
+    # the primary hub is the largest-footprint hub (the main AHU/CRAC/chiller).
+    hubs.sort(key=lambda e: -(e.w * e.d))
+    main_hub = hubs[0]
+
+    if medium == "liquid":
+        _build_liquid_loop(main_hub, zones, schedule, ducts, diffusers, notes)
+    else:
+        _build_air_ducts(main_hub, zones, airflow_cms, cooling_kw, schedule,
+                         ducts, diffusers, notes, medium == "mixed", state)
+
+    return AirSystem(
+        archetype=arch, hubs=hubs, zones=zones, ducts=ducts, diffusers=diffusers,
+        bbox=bbox, medium=medium, airflow_cms=airflow_cms, cooling_kw=cooling_kw,
+        zones_derived=zones_derived, notes=notes, schedule_present=schedule_present)
+
+
+def _hub_tag(role: str, idx: int) -> str:
+    base = {"crac": "CRAC", "ahu": "AHU", "dx": "DX", "chiller": "CH",
+            "fan": "EF"}.get(role, "AHU")
+    return f"{base}-{idx + 1}"
+
+
+def _read_design_airflow(state: dict, fallback_n: int = 0) -> float:
+    """The air system's design airflow (m³/s).  Reads the AHU airflow directly, else a
+    per-chassis cfm × rack count, else derives from the sensible cooling duty.
+    `fallback_n` is the count of zones actually PLACED in the model — used to multiply a
+    per-chassis cfm when the contract has no explicit rack-count quantity."""
+    cms = _quantity(state, "hvac_airflow_cms", "supply_airflow_cms", "airflow_cms")
+    if cms:
+        return float(cms)
+    cmh = _quantity(state, "hvac_airflow_cmh", "supply_airflow_cmh", "airflow_cmh")
+    if cmh:
+        return float(cmh) / 3600.0
+    # server CRAC: per-chassis cfm × the rack count (the whitespace airflow). Prefer a
+    # contract rack-count; else the number of racks the model actually placed.
+    cfm = _quantity(state, "chassis_airflow_cfm", "rack_airflow_cfm", "airflow_cfm")
+    if cfm:
+        n = _read_zone_count(state) or fallback_n or 1
+        return (float(cfm) * n) / CFM_PER_CMS
+    # last resort: derive from the sensible cooling duty (Q = ρ·cp·ΔT·V).
+    duty = _quantity(state, "hvac_sensible_load_kw", "chassis_cooling_capacity_kw")
+    if duty:
+        return (float(duty) * 1000.0) / (CP_AIR * DEFAULT_SUPPLY_DT_K) / RHO_AIR
+    return 0.0
+
+
+def _read_cooling_kw(state: dict, fallback_n: int = 0) -> float:
+    """The system cooling duty (kW).  Prefers a SYSTEM-scope quantity; a per-chassis
+    capacity (the only figure a server CRAC publishes) is multiplied by the rack count
+    so the headline is the whole-room load, not one chassis."""
+    for k in ("hvac_total_load_kw", "hvac_cooling_kw", "hvac_chiller_capacity_kw",
+              "system_thermal_dissipation_kw", "thermal_rejection_capacity_kw"):
+        v = _quantity(state, k)
+        if v:
+            return float(v)
+    # per-chassis only → scale to the whole room by the rack count.
+    v = _quantity(state, "chassis_cooling_capacity_kw")
+    if v:
+        n = _read_zone_count(state) or fallback_n or 1
+        return float(v) * n
+    return 0.0
+
+
+def _read_zone_count(state: dict) -> int:
+    for k in ("rack_count", "n_racks", "number_of_racks", "chassis_count",
+              "grow_rack_count", "n_zones", "grow_zone_count"):
+        v = _quantity(state, k)
+        if v:
+            return int(v)
+    return 0
+
+
+def _derive_zones(state: dict, bbox: dict, arch: str):
+    """When the served zones aren't placed individually, derive a sensible set of zone
+    rectangles from the contract (a rack count, else a canopy split into bays) laid out
+    in the plant footprint.  Returns (zones, note)."""
+    n = _read_zone_count(state)
+    canopy = _quantity(state, "canopy_area_m2", "cultivation_area_m2")
+    note = ""
+    if not n and canopy:
+        # split the canopy into ~4 m² grow bays for a legible zone count (capped).
+        n = max(2, min(12, int(round(float(canopy) / 8.0))))
+        note = (f"Grow zones derived from canopy {float(canopy):g} m² (not placed "
+                f"individually in the model) — shown as {n} representative grow bays.")
+    if not n:
+        n = 4
+        note = ("Served zones not placed individually in the model — shown as 4 "
+                "representative zones; verify against the room layout.")
+    elif not note:
+        note = (f"Served zones derived from the design ({n} units) — laid out "
+                f"representatively; verify positions against the room layout.")
+
+    # lay the zones as a row of grow benches along the LONGER plant axis, with a clear
+    # aisle, so they read as a served row + a duct run down the aisle (not a packed
+    # block).  Cap the count so each bench is at least ~600 mm wide on paper-legible kit.
+    x0 = bbox.get("x_min_mm", 0.0)
+    x1 = bbox.get("x_max_mm", 6000.0)
+    y0 = bbox.get("y_min_mm", 0.0)
+    y1 = bbox.get("y_max_mm", 6000.0)
+    L = max(x1 - x0, 2000.0)
+    W = max(y1 - y0, 2000.0)
+    long_is_x = L >= W
+    span = max(L, W)
+    n = max(2, min(n, int(span // 800)))          # ≥ 800 mm pitch per bench
+    note = re.sub(r"as \d+ ", f"as {n} ", note) if "as " in note else note
+    cell = span / n
+    bench_long = cell * 0.78                       # bench length along the row
+    bench_short = max(min(L, W) * 0.34, 600.0)     # bench depth (leaves an aisle)
+    zones = []
+    for i in range(n):
+        along = (x0 if long_is_x else y0) + cell * (i + 0.5)
+        cross = (y0 if long_is_x else x0) + min(L, W) * 0.66   # row offset, aisle below
+        cx, cy = (along, cross) if long_is_x else (cross, along)
+        zw = bench_long if long_is_x else bench_short
+        zd = bench_short if long_is_x else bench_long
+        zones.append(Equip(tag=f"Z-{i + 1:02d}", name="Grow zone / bench", role="zone",
+                           cx=cx, cy=cy, w=zw, d=zd, h=2000.0, z=1000.0))
+    return zones, note
+
+
+def _synth_hub(arch: str, bbox: dict, medium: str) -> Equip:
+    role = "chiller" if medium == "liquid" else "ahu"
+    x0 = bbox.get("x_min_mm", 0.0)
+    y0 = bbox.get("y_min_mm", 0.0)
+    y1 = bbox.get("y_max_mm", 6000.0)
+    # park it at the bottom-left edge of the footprint.
+    return Equip(tag=_hub_tag(role, 0), name="Air-handling unit", role=role,
+                 cx=x0 - 1200.0, cy=(y0 + y1) / 2.0, w=1600.0, d=1200.0, h=2000.0,
+                 z=1000.0, is_hub=True)
+
+
+# ── air-duct distribution -----------------------------------------------------
+
+def _build_air_ducts(hub: Equip, zones: list[Equip], airflow_cms: float,
+                     cooling_kw: float, schedule: dict, ducts: list,
+                     diffusers: list, notes: list, mixed: bool, state: dict):
+    """SUPPLY ducts hub→each zone, sized from the per-zone airflow share; a RETURN duct
+    from each zone back to the hub; a diffuser at each zone (supply) + a return grille.
+    The MAIN supply trunk + branch sizing mirrors connection_sizing's duct ladder."""
+    n = max(len(zones), 1)
+    if airflow_cms <= 0:
+        # no published airflow: back it out of the cooling duty so ducts are still sized.
+        airflow_cms = (cooling_kw * 1000.0) / (CP_AIR * DEFAULT_SUPPLY_DT_K) / RHO_AIR \
+            if cooling_kw else 0.5 * n
+        notes.append("Airflow not published — derived from the cooling duty "
+                     "(Q = ρ·cp·ΔT) to size the ducts; treat sizes as indicative.")
+    per_zone = airflow_cms / n
+
+    # MAIN supply trunk (hub → the manifold point carrying the full airflow).
+    tlabel, tw, tv, tover = size_duct(airflow_cms)
+    if tover:
+        notes.append(f"Main supply trunk velocity {tv:g} m/s exceeds the "
+                     f"{DUCT_VELOCITY_MAX_MS:g} m/s band — upsize the trunk.")
+    ducts.append(Duct(frm=hub.tag, to="__trunk__", service=SERVICE_SUPPLY,
+                      airflow_cms=airflow_cms, size_label=tlabel, width_mm=tw,
+                      velocity_ms=tv, duty_kw=cooling_kw, over_velocity=tover))
+
+    # per-zone supply branch + return + diffuser/grille.
+    for z in zones:
+        slabel, sw, sv, sover = size_duct(per_zone)
+        ducts.append(Duct(frm="__trunk__", to=z.tag, service=SERVICE_SUPPLY,
+                          airflow_cms=per_zone, size_label=slabel, width_mm=sw,
+                          velocity_ms=sv, over_velocity=sover))
+        # return branch — slightly lower velocity band → one size up area-wise.
+        rlabel, rw, rv, rover = size_duct(per_zone, velocity_target=4.5)
+        ducts.append(Duct(frm=z.tag, to=hub.tag, service=SERVICE_RETURN,
+                          airflow_cms=per_zone, size_label=rlabel, width_mm=rw,
+                          velocity_ms=rv, over_velocity=rover))
+        diffusers.append(Diffuser(at=z.tag, service=SERVICE_SUPPLY,
+                                  cx=z.cx, cy=z.cy))
+
+    # mixed system: note the parallel LIQUID loop (BESS container air pair + liquid rack
+    # cooling), so the air drawing is honest about what it does and does NOT cover.
+    if mixed:
+        notes.append("This air system handles the AUXILIARY sensible load only; the "
+                     "main equipment heat is rejected by a separate LIQUID coolant loop "
+                     "(see the P&ID / coolant schedule).")
+    else:
+        notes.append(f"Supply airflow {airflow_cms:.2f} m³/s ({_cfm(airflow_cms):,} cfm) "
+                     f"split across {n} zone(s); ducts sized at "
+                     f"≤{DUCT_VELOCITY_MAX_MS:g} m/s.")
+
+
+# ── liquid coolant loop (honest: NOT air) -------------------------------------
+
+def _build_liquid_loop(hub: Equip, zones: list[Equip], schedule: dict, ducts: list,
+                       diffusers: list, notes: list):
+    """A LIQUID coolant loop drawn honestly as coolant pipes: chiller → flow header →
+    each rack (cold plate) → return header → chiller.  DN sizes come from the connection
+    schedule (the sized coolant runs) when present, else a sensible default."""
+    rows = _thermal_rows(schedule)
+    # map a 'rack[N]'/'busway' schedule row → a DN size + duty + length.
+    main_dn, branch_dn = "DN32", "DN15"
+    main_duty = 0.0
+    branch_len = 0.0
+    for r in rows:
+        to = str(r.get("to") or "")
+        size = str(r.get("size") or "")
+        if "busway" in to or "header" in to.lower():
+            if re.match(r"DN\d+", size):
+                main_dn = size
+            main_duty = max(main_duty, _row_duty_kw(r))
+        elif "rack" in to:
+            if re.match(r"DN\d+", size):
+                branch_dn = size
+            branch_len = max(branch_len, _row_len_m(r))
+
+    dn_w = {"DN15": 21.3, "DN20": 26.9, "DN25": 33.7, "DN32": 42.4, "DN40": 48.3,
+            "DN50": 60.3, "DN65": 76.1, "DN80": 88.9, "DN100": 114.3}
+    # FLOW + RETURN main between the chiller and the rack lineup.
+    ducts.append(Duct(frm=hub.tag, to="__trunk__", service=SERVICE_LIQUID,
+                      airflow_cms=0.0, size_label=f"{main_dn} flow",
+                      width_mm=dn_w.get(main_dn, 42.4), duty_kw=main_duty))
+    ducts.append(Duct(frm="__trunk__", to=hub.tag, service=SERVICE_RETURN,
+                      airflow_cms=0.0, size_label=f"{main_dn} return",
+                      width_mm=dn_w.get(main_dn, 42.4), duty_kw=main_duty))
+    for z in zones:
+        ducts.append(Duct(frm="__trunk__", to=z.tag, service=SERVICE_LIQUID,
+                          airflow_cms=0.0, size_label=branch_dn,
+                          width_mm=dn_w.get(branch_dn, 21.3), length_m=branch_len))
+        ducts.append(Duct(frm=z.tag, to="__trunk__", service=SERVICE_RETURN,
+                          airflow_cms=0.0, size_label=branch_dn,
+                          width_mm=dn_w.get(branch_dn, 21.3)))
+        diffusers.append(Diffuser(at=z.tag, service=SERVICE_LIQUID,
+                                  cx=z.cx, cy=z.cy))
+    notes.append("LIQUID-COOLED system — this is a coolant (glycol/water) loop, NOT an "
+                 "air duct layout: chiller → flow/return headers → per-rack cold plates. "
+                 "Cabinet air-conditioning handles the small auxiliary sensible load "
+                 "only (see the P&ID).")
+    notes.append("Coolant pipe sizes (DN) taken from the connection schedule; loop shown "
+                 "as flow + return mains with per-rack branches.")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SVG primitives — identical palette + builder to the GA / P&ID / SLD
+# ═══════════════════════════════════════════════════════════════════════════
+
+INK = "#1a1a1a"            # primary line / text
+EQ_INK = "#10243e"         # equipment outline (deep navy)
+EQ_FILL = "#eef2f7"        # equipment body fill
+SUPPLY_INK = "#10243e"     # SUPPLY air duct (deep navy, solid double line)
+SUPPLY_FILL = "#dce7f4"    # supply duct body tint (cool blue)
+RETURN_INK = "#0f7b6c"     # RETURN air duct (teal, dashed)
+RETURN_FILL = "#dcefe9"    # return duct body tint
+EXHAUST_INK = "#b5772a"    # EXHAUST / relief (amber)
+LIQUID_INK = "#1a5fb4"     # LIQUID coolant pipe (blue)
+LIQUID_FILL = "#dbe7f7"
+DIM_INK = "#1a5fb4"        # dimension lines / arrows
+FILL_BG = "#ffffff"        # page
+PANEL_BG = "#f4f6f9"       # title-block / key fill
+GRID_FAINT = "#e4e8ee"     # setting-out grid / faint guide
+DATUM_INK = "#9aa3af"      # datum / centre-line grey
+MUTED = "#5b6470"
+
+
+def _service_ink(service: str):
+    return {SERVICE_SUPPLY: (SUPPLY_INK, SUPPLY_FILL),
+            SERVICE_RETURN: (RETURN_INK, RETURN_FILL),
+            SERVICE_EXHAUST: (EXHAUST_INK, "#f5e8d3"),
+            SERVICE_LIQUID: (LIQUID_INK, LIQUID_FILL)}.get(
+        service, (SUPPLY_INK, SUPPLY_FILL))
+
+
+def _esc(s) -> str:
+    return html.escape(str(s if s is not None else ""), quote=True)
+
+
+class SVG:
+    """Tiny imperative SVG builder (deterministic) — same primitives as the GA/P&ID."""
+
+    def __init__(self, w, h):
+        self.w, self.h = w, h
+        self.parts = []
+
+    def add(self, s):
+        self.parts.append(s)
+
+    def line(self, x1, y1, x2, y2, stroke=INK, width=1.4, dash=None, cap="round"):
+        d = f' stroke-dasharray="{dash}"' if dash else ""
+        self.add(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                 f'stroke="{stroke}" stroke-width="{width}" stroke-linecap="{cap}"{d}/>')
+
+    def rect(self, x, y, w, h, stroke=INK, width=1.3, fill="none", rx=0, dash=None):
+        d = f' stroke-dasharray="{dash}"' if dash else ""
+        self.add(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" '
+                 f'rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{width}"{d}/>')
+
+    def circle(self, cx, cy, r, stroke=INK, width=1.4, fill="none", dash=None):
+        d = f' stroke-dasharray="{dash}"' if dash else ""
+        self.add(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{fill}" '
+                 f'stroke="{stroke}" stroke-width="{width}"{d}/>')
+
+    def path(self, d, stroke=INK, width=1.4, fill="none", join="round", cap="round",
+             dash=None):
+        da = f' stroke-dasharray="{dash}"' if dash else ""
+        self.add(f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{width}" '
+                 f'stroke-linejoin="{join}" stroke-linecap="{cap}"{da}/>')
+
+    def text(self, x, y, s, size=11, anchor="start", fill=INK, weight="normal",
+             family="Helvetica, Arial, sans-serif", mono=False, spacing=None,
+             rotate=None):
+        fam = "'DejaVu Sans Mono', 'Menlo', monospace" if mono else family
+        sp = f' letter-spacing="{spacing}"' if spacing else ""
+        tr = f' transform="rotate({rotate} {x:.1f} {y:.1f})"' if rotate is not None else ""
+        self.add(f'<text x="{x:.1f}" y="{y:.1f}" font-family="{fam}" '
+                 f'font-size="{size}" text-anchor="{anchor}" fill="{fill}" '
+                 f'font-weight="{weight}"{sp}{tr}>{_esc(s)}</text>')
+
+    def render(self) -> str:
+        defs = (
+            '<defs>'
+            f'<marker id="dim" markerWidth="12" markerHeight="12" refX="6" refY="5" '
+            f'orient="auto" markerUnits="userSpaceOnUse">'
+            f'<path d="M0,5 L11,1.5 L8.5,5 L11,8.5 Z" fill="{DIM_INK}"/></marker>'
+            f'<marker id="airS" markerWidth="13" markerHeight="13" refX="9" refY="5" '
+            f'orient="auto" markerUnits="userSpaceOnUse">'
+            f'<path d="M1,1 L10,5 L1,9" fill="none" stroke="{SUPPLY_INK}" '
+            f'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+            f'</marker>'
+            f'<marker id="airR" markerWidth="13" markerHeight="13" refX="9" refY="5" '
+            f'orient="auto" markerUnits="userSpaceOnUse">'
+            f'<path d="M1,1 L10,5 L1,9" fill="none" stroke="{RETURN_INK}" '
+            f'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+            f'</marker>'
+            f'<marker id="airL" markerWidth="13" markerHeight="13" refX="9" refY="5" '
+            f'orient="auto" markerUnits="userSpaceOnUse">'
+            f'<path d="M1,1 L10,5 L1,9" fill="none" stroke="{LIQUID_INK}" '
+            f'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+            f'</marker>'
+            '</defs>')
+        body = "\n".join(self.parts)
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.w}" '
+                f'height="{self.h}" viewBox="0 0 {self.w} {self.h}">\n{defs}\n'
+                f'<rect width="{self.w}" height="{self.h}" fill="{FILL_BG}"/>\n'
+                f'{body}\n</svg>\n')
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SCALE — pick a standard drawing scale (shared with the GA convention)
+# ═══════════════════════════════════════════════════════════════════════════
+
+_STD_SCALES = [20, 25, 50, 75, 100, 150, 200, 250, 500, 750, 1000]
+_K_PPM = 3.78   # on-paper px per model-mm at 1:1 (1 m at 1:100 ≈ 37.8 px)
+
+
+def choose_scale(span_mm: float, avail_px: float):
+    span_mm = max(span_mm, 1.0)
+    for S in _STD_SCALES:
+        if span_mm * (_K_PPM / S) <= avail_px:
+            return S
+    return _STD_SCALES[-1]
+
+
+def _fmt_mm(v_mm: float) -> str:
+    a = abs(v_mm)
+    if a >= 1000:
+        s = f"{v_mm/1000:.2f}".rstrip("0").rstrip(".")
+        return f"{s} m"
+    return f"{v_mm:.0f} mm"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NORTH ARROW + SCALE BAR  (mirrors the GA)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def north_arrow(svg: SVG, cx, cy, r=18):
+    svg.circle(cx, cy, r, stroke=MUTED, width=1.0)
+    svg.path(f"M {cx:.1f} {cy-r+2:.1f} L {cx+5:.1f} {cy+4:.1f} L {cx:.1f} {cy+1:.1f} "
+             f"L {cx-5:.1f} {cy+4:.1f} Z", stroke=INK, width=1.0, fill=INK)
+    svg.path(f"M {cx:.1f} {cy-r+2:.1f} L {cx+5:.1f} {cy+4:.1f} L {cx:.1f} {cy+1:.1f} Z",
+             stroke=INK, width=1.0, fill=FILL_BG)
+    svg.text(cx, cy + r + 11, "N", size=11, anchor="middle", weight="bold")
+
+
+def scale_bar(svg: SVG, x, y, scale_S, px_per_mm, total_mm):
+    seg_n = 4
+    seg_mm = total_mm / seg_n
+    bar_h = 6.0
+    for i in range(seg_n):
+        sx = x + i * seg_mm * px_per_mm
+        sw = seg_mm * px_per_mm
+        fill = INK if i % 2 == 0 else FILL_BG
+        svg.rect(sx, y, sw, bar_h, stroke=INK, width=0.9, fill=fill)
+    for frac in (0.0, 0.5, 1.0):
+        tx = x + total_mm * frac * px_per_mm
+        svg.line(tx, y - 2, tx, y + bar_h + 2, stroke=INK, width=0.8)
+        svg.text(tx, y + bar_h + 13, _fmt_mm(total_mm * frac), size=8.5,
+                 anchor="middle", fill=MUTED)
+    svg.text(x, y - 5, f"SCALE 1:{int(scale_S)}", size=9.5, weight="bold", fill=INK)
+
+
+def _nice_bar_mm(scale_S: float):
+    for metres in (1, 2, 5, 10, 20, 50, 100):
+        if metres * 1000.0 / scale_S >= 20:
+            return metres * 1000.0
+    return 100 * 1000.0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DUCT + EQUIPMENT + DIFFUSER glyphs
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _draw_double_line_duct(svg, x0, y0, x1, y1, width_px, service, label=None,
+                           airflow_cms=0.0, duty_kw=0.0):
+    """Draw a duct as a SIZED DOUBLE LINE (two parallel rails width_px apart) following
+    the centre-line (x0,y0)→(x1,y1), with a centre flow arrow + a size/flow label.
+    Supply solid navy, return dashed teal, liquid solid blue — distinct per service."""
+    ink, fill = _service_ink(service)
+    dx, dy = x1 - x0, y1 - y0
+    ln = math.hypot(dx, dy) or 1.0
+    # unit normal
+    nx, ny = -dy / ln, dx / ln
+    hw = max(width_px / 2.0, 2.0)
+    # the duct body (a thin filled ribbon) + two rails.
+    ax0, ay0 = x0 + nx * hw, y0 + ny * hw
+    ax1, ay1 = x1 + nx * hw, y1 + ny * hw
+    bx0, by0 = x0 - nx * hw, y0 - ny * hw
+    bx1, by1 = x1 - nx * hw, y1 - ny * hw
+    svg.add(f'<path d="M {ax0:.1f} {ay0:.1f} L {ax1:.1f} {ay1:.1f} '
+            f'L {bx1:.1f} {by1:.1f} L {bx0:.1f} {by0:.1f} Z" '
+            f'fill="{fill}" fill-opacity="0.85" stroke="none"/>')
+    dash = "8,4" if service == SERVICE_RETURN else (
+        "10,3" if service == SERVICE_EXHAUST else None)
+    svg.line(ax0, ay0, ax1, ay1, stroke=ink, width=1.5, dash=dash)
+    svg.line(bx0, by0, bx1, by1, stroke=ink, width=1.5, dash=dash)
+    # centre-line flow arrow (a short marker-tipped segment at ~62% of the run)
+    marker = {SERVICE_SUPPLY: "airS", SERVICE_RETURN: "airR",
+              SERVICE_EXHAUST: "airS", SERVICE_LIQUID: "airL"}[service]
+    mxs, mys = x0 + dx * 0.46, y0 + dy * 0.46
+    mxe, mye = x0 + dx * 0.60, y0 + dy * 0.60
+    svg.add(f'<line x1="{mxs:.1f}" y1="{mys:.1f}" x2="{mxe:.1f}" y2="{mye:.1f}" '
+            f'stroke="{ink}" stroke-width="1.6" marker-end="url(#{marker})"/>')
+    # the size + flow label, offset off the duct, mid-run.
+    if label:
+        lx, ly = (x0 + x1) / 2.0 + nx * (hw + 9), (y0 + y1) / 2.0 + ny * (hw + 9)
+        bits = [label]
+        if airflow_cms > 0:
+            bits.append(f"{_cfm(airflow_cms):,} cfm")
+        svg.text(lx, ly, "  ".join(bits), size=7.6, anchor="middle", fill=ink,
+                 weight="bold", mono=True)
+
+
+def _draw_equipment(svg, e: Equip, px, py, pw, ph):
+    """A mechanical-kit outline (hub or zone) with its tag.  Hubs get a heavier navy
+    outline + a fan/coil tick; zones a lighter rack rectangle."""
+    if e.is_hub:
+        svg.rect(px, py, max(pw, 18), max(ph, 14), stroke=EQ_INK, width=1.8,
+                 fill=EQ_FILL, rx=2)
+        # a fan glyph (circle + 3 blades) in the corner so it reads as air-moving kit.
+        fcx, fcy = px + min(pw, ph) * 0.30, py + min(pw, ph) * 0.30
+        fr = max(min(pw, ph) * 0.16, 4)
+        svg.circle(fcx, fcy, fr, stroke=EQ_INK, width=1.0)
+        for a in (0, 120, 240):
+            ax = fcx + fr * 0.85 * math.cos(math.radians(a))
+            ay = fcy + fr * 0.85 * math.sin(math.radians(a))
+            svg.line(fcx, fcy, ax, ay, stroke=EQ_INK, width=0.8)
+    else:
+        svg.rect(px, py, max(pw, 10), max(ph, 8), stroke=EQ_INK, width=1.2,
+                 fill="#f0f3f7", rx=1)
+    if pw >= 18 and ph >= 11:
+        svg.text(px + pw / 2.0, py + ph / 2.0 + 3.2, e.tag,
+                 size=min(9.5, ph * 0.5), anchor="middle", weight="bold", fill=EQ_INK)
+        return True
+    return False
+
+
+def _draw_diffuser(svg, cx, cy, service):
+    """A supply DIFFUSER (square 4-way throw) / return GRILLE (louvre square) /
+    liquid cold-plate (hatched square) — the standard terminal symbols."""
+    s = 7.5
+    ink, _f = _service_ink(service)
+    if service == SERVICE_SUPPLY:
+        # 4-way diffuser: square + an X of throw arrows.
+        svg.rect(cx - s, cy - s, 2 * s, 2 * s, stroke=ink, width=1.2, fill=FILL_BG)
+        svg.line(cx - s, cy - s, cx + s, cy + s, stroke=ink, width=0.8)
+        svg.line(cx - s, cy + s, cx + s, cy - s, stroke=ink, width=0.8)
+    elif service == SERVICE_RETURN:
+        # return grille: square with louvre lines.
+        svg.rect(cx - s, cy - s, 2 * s, 2 * s, stroke=ink, width=1.2, fill=FILL_BG)
+        for k in (-3, 0, 3):
+            svg.line(cx - s + 1, cy + k, cx + s - 1, cy + k, stroke=ink, width=0.7)
+    else:
+        # liquid cold plate: hatched square.
+        svg.rect(cx - s, cy - s, 2 * s, 2 * s, stroke=ink, width=1.2, fill="#eef4fc")
+        svg.line(cx - s, cy, cx + s, cy, stroke=ink, width=0.7)
+        svg.line(cx, cy - s, cx, cy + s, stroke=ink, width=0.7)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MAIN LAYOUT
+# ═══════════════════════════════════════════════════════════════════════════
+
+def build_hvac_svg(sysm: AirSystem, meta: dict) -> str:
+    """Render the derived air / cooling distribution as an HVAC LAYOUT: a ducted PLAN
+    (top) + a SECTION (below), with a scale bar, north arrow, legend, schedule, title
+    block + 'not for construction'."""
+    bbox = sysm.bbox
+    all_eq = sysm.hubs + sysm.zones
+    # ----- model extents (include the hub even if it sits at the plant edge) -----
+    xs = [e.cx - e.w / 2 for e in all_eq] + [e.cx + e.w / 2 for e in all_eq]
+    ys = [e.cy - e.d / 2 for e in all_eq] + [e.cy + e.d / 2 for e in all_eq]
+    x_min = min(xs) if xs else bbox.get("x_min_mm", 0.0)
+    x_max = max(xs) if xs else bbox.get("x_max_mm", 6000.0)
+    y_min = min(ys) if ys else bbox.get("y_min_mm", 0.0)
+    y_max = max(ys) if ys else bbox.get("y_max_mm", 6000.0)
+    L = max(x_max - x_min, 1000.0)
+    W = max(y_max - y_min, 1000.0)
+    z_max = max([e.z + e.h / 2 for e in all_eq] + [bbox.get("z_max_mm", 3000.0)])
+    H = max(z_max, 2500.0)
+
+    # ----- scale: fit the plan into the working width -----
+    PLAN_MAX_W = 820.0
+    PLAN_MAX_H = 340.0
+    scale_S = max(choose_scale(L, PLAN_MAX_W), choose_scale(W, PLAN_MAX_H),
+                  choose_scale(H, 240.0))
+    ppm = _K_PPM / scale_S
+
+    plan_w = L * ppm
+    plan_h = W * ppm
+    sect_h = H * ppm
+
+    def mx(x_mm):
+        return (x_mm - x_min) * ppm
+
+    def my(y_mm):
+        return (y_max - y_mm) * ppm     # north up
+
+    # ----- sheet geometry -----
+    margin = 46
+    title_h = 156
+    plan_x = margin + 44
+    plan_y = margin + 56
+    sect_x = plan_x
+    sect_y = plan_y + plan_h + 120
+    sect_plan_h = sect_h
+
+    legend_w = 250
+    width = int(math.ceil(max(plan_x + plan_w + legend_w + 40,
+                              sect_x + plan_w + margin + 30, 1120)))
+    n_sched = max(6, min(len(sysm.ducts) + len(all_eq), 18))
+    body_bottom = max(sect_y + sect_plan_h + 70,
+                      plan_y + max(plan_h, 0) + 40 + n_sched * 13 + 60)
+    height = int(math.ceil(body_bottom + title_h))
+
+    svg = SVG(width, height)
+    svg.rect(16, 16, width - 32, height - 32, stroke=GRID_FAINT, width=1.2)
+
+    # ───────────────────────── PLAN ─────────────────────────
+    medium_word = {"air": "AIR DUCT", "liquid": "COOLANT", "mixed": "AIR DUCT"}[
+        sysm.medium]
+    svg.text(plan_x, plan_y - 30, f"{medium_word} LAYOUT — PLAN", size=13,
+             weight="bold", fill=EQ_INK, spacing="1.0")
+    svg.text(plan_x + 250, plan_y - 30, "(roof removed · looking down)", size=9.5,
+             fill=MUTED)
+    _draw_setout_grid(svg, plan_x, plan_y, plan_w, plan_h, L, W, ppm)
+    svg.rect(plan_x, plan_y, plan_w, plan_h, stroke=DATUM_INK, width=1.2, fill="none")
+
+    # plan position of each equipment + a quick lookup of its plan centre.
+    pc = {}   # tag → (px, py) plan centre
+    for e in all_eq:
+        pc[e.tag] = (plan_x + mx(e.cx), plan_y + my(e.cy))
+
+    # ----- DUCTS first (so equipment + diffusers overlay the duct ends) -----
+    # route ORTHOGONALLY: a supply trunk runs parallel to the served-zone row on the
+    # hub side, with perpendicular branch taps to each zone; a return trunk runs on the
+    # far side with perpendicular pickups.  This reads as a real ducted distribution,
+    # never a diagonal star.  Diffusers are drawn inside the same routine.
+    _draw_plan_distribution(svg, sysm, pc, ppm, plan_x, plan_y, plan_w, plan_h)
+
+    # ----- equipment outlines (hubs + zones) -----
+    for e in all_eq:
+        pw = e.w * ppm
+        ph = e.d * ppm
+        px = plan_x + mx(e.cx - e.w / 2)
+        py = plan_y + my(e.cy + e.d / 2)
+        _draw_equipment(svg, e, px, py, pw, ph)
+
+    north_arrow(svg, plan_x + plan_w - 14, plan_y + 20)
+    # overall plan dimension along the top.
+    _dim_h(svg, plan_x, plan_x + plan_w, plan_y - 14, L, ext_from=plan_y)
+
+    # ───────────────────────── SECTION ─────────────────────────
+    svg.text(sect_x, sect_y - 14, "SECTION A–A", size=13, weight="bold",
+             fill=EQ_INK, spacing="1.0")
+    svg.text(sect_x + 110, sect_y - 14,
+             "(supply high-level · return low-level · diffusers drop into the zones)",
+             size=9.0, fill=MUTED)
+    _draw_section(svg, sysm, sect_x, sect_y, plan_w, sect_plan_h, L, H, ppm, x_min, mx)
+
+    # ───────────────────────── LEGEND ─────────────────────────
+    legend_x = width - legend_w + 4
+    legend_bottom = _draw_legend(svg, sysm, legend_x, plan_y - 2, legend_w - 24)
+
+    # ───────────────────────── SCHEDULE ─────────────────────────
+    # the schedule lives in the RIGHT gutter directly below the legend (its own column),
+    # so the tall left-column section never squeezes it.
+    sched_y = legend_bottom + 18
+    _draw_schedule(svg, sysm, legend_x, sched_y, legend_w - 24,
+                   (height - title_h - 24) - sched_y)
+
+    # ───────────────────────── scale bar + title block ─────────────────────────
+    bar_total = _nice_bar_mm(scale_S)
+    scale_bar(svg, margin + 6, height - title_h - 24, scale_S, ppm, bar_total)
+    _draw_title_block(svg, sysm, meta, scale_S, width, height, title_h)
+    return svg.render()
+
+
+def _draw_plan_distribution(svg, sysm, pc, ppm, plan_x, plan_y, plan_w, plan_h):
+    """Draw the air/coolant distribution in the PLAN as an ORTHOGONAL trunk-and-branch
+    layout (the way a real duct/pipe layout routes), not a diagonal star:
+
+      • find the served-zone ROW axis (the axis the zones spread along);
+      • run a SUPPLY trunk parallel to that row, on the hub side, from the hub across
+        the row; tap a PERPENDICULAR supply branch from the trunk to each zone diffuser;
+      • run a RETURN trunk parallel on the FAR side, with perpendicular return pickups.
+
+    Each duct is a sized DOUBLE LINE; the trunk carries the size+flow label, branches
+    carry their (smaller) size.  Supply/return/liquid stay visually distinct."""
+    zc = [(z, pc[z.tag]) for z in sysm.zones if z.tag in pc]
+    hub = sysm.hubs[0]
+    hub_pt = pc.get(hub.tag, (plan_x + plan_w * 0.5, plan_y + plan_h * 0.5))
+    if not zc:
+        return
+
+    xs = [p[0] for _z, p in zc]
+    ys = [p[1] for _z, p in zc]
+    # row axis = the axis the zones spread ALONG (the longer spread).
+    row_is_x = (max(xs) - min(xs)) >= (max(ys) - min(ys))
+
+    sup_service = SERVICE_LIQUID if sysm.medium == "liquid" else SERVICE_SUPPLY
+    sup = [d for d in sysm.ducts if d.service in (SERVICE_SUPPLY, SERVICE_LIQUID)
+           and d.frm == hub.tag]
+    br = [d for d in sysm.ducts if d.service in (SERVICE_SUPPLY, SERVICE_LIQUID)
+          and d.frm != hub.tag]
+    trunk_w = (sup[0].width_mm if sup else 12) * ppm
+    branch_w = (br[0].width_mm if br else 6) * ppm
+    trunk_lbl = sup[0].size_label if sup else (br[0].size_label if br else "")
+    trunk_flow = sup[0].airflow_cms if sup else 0.0
+    branch_lbl = br[0].size_label if br else ""
+    branch_flow = br[0].airflow_cms if br else 0.0
+
+    # cross axis = perpendicular to the row; cluster zones into ROWS on it (1 or 2 for a
+    # single aisle / hot-cold-aisle pair).  A 2-row block routes the SUPPLY spine down
+    # the CENTRAL AISLE between the rows (the data-centre / containment idiom), branching
+    # up + down; RETURN runs the two outer walls.  A single row uses a hub-side trunk +
+    # a far-side return.
+    cross = ys if row_is_x else xs
+    cmid = (min(cross) + max(cross)) / 2.0
+    band_lo = [(z, p) for z, p in zc if (p[1] if row_is_x else p[0]) <= cmid + 1]
+    band_hi = [(z, p) for z, p in zc if (p[1] if row_is_x else p[0]) > cmid + 1]
+    two_rows = (max(cross) - min(cross) > 30) and band_lo and band_hi
+
+    along_lo = min(xs) if row_is_x else min(ys)
+    along_hi = max(xs) if row_is_x else max(ys)
+    pad = max(trunk_w, branch_w) / 2.0 + 14
+    first_z = zc[0][0]
+
+    def seg(a0, a1, w, service, **kw):
+        _orth_duct(svg, a0, a1, w, service, row_is_x=row_is_x, **kw)
+
+    if two_rows:
+        spine = cmid                                  # central aisle on the cross axis
+        out_lo = min(cross) - pad                      # near outer wall (return)
+        out_hi = max(cross) + pad                      # far outer wall (return)
+        # SUPPLY spine down the aisle + a leg from the hub into the spine.
+        seg(_pt(row_is_x, along_lo, spine), _pt(row_is_x, along_hi, spine), trunk_w,
+            sup_service, label=trunk_lbl, airflow_cms=trunk_flow)
+        seg(hub_pt, _pt(row_is_x, _along(hub_pt, row_is_x), spine), trunk_w,
+            sup_service)
+        # RETURN trunks on both outer walls + a leg back to the hub from the near one.
+        seg(_pt(row_is_x, along_lo, out_lo), _pt(row_is_x, along_hi, out_lo), trunk_w,
+            SERVICE_RETURN, label="return")
+        seg(_pt(row_is_x, along_lo, out_hi), _pt(row_is_x, along_hi, out_hi), trunk_w,
+            SERVICE_RETURN)
+        seg(_pt(row_is_x, _along(hub_pt, row_is_x), out_lo), hub_pt, trunk_w,
+            SERVICE_RETURN)
+        for band, outwall in ((band_lo, out_lo), (band_hi, out_hi)):
+            for z, p in band:
+                a = _along(p, row_is_x)
+                c = p[1] if row_is_x else p[0]
+                # supply branch: spine → zone diffuser (perpendicular tap)
+                seg(_pt(row_is_x, a, spine), _pt(row_is_x, a, c), branch_w, sup_service,
+                    label=branch_lbl if z is first_z else None,
+                    airflow_cms=branch_flow if z is first_z else 0.0)
+                # return branch: zone → outer wall (offset so it doesn't sit on supply)
+                seg(_pt(row_is_x, a + 8, c), _pt(row_is_x, a + 8, outwall), branch_w,
+                    SERVICE_RETURN)
+                _draw_diffuser(svg, p[0], p[1], sup_service)
+    else:
+        sup_wall = min(cross) - pad
+        ret_wall = max(cross) + pad
+        seg(hub_pt, _pt(row_is_x, _along(hub_pt, row_is_x), sup_wall), trunk_w,
+            sup_service)
+        seg(_pt(row_is_x, along_lo, sup_wall), _pt(row_is_x, along_hi, sup_wall),
+            trunk_w, sup_service, label=trunk_lbl, airflow_cms=trunk_flow)
+        seg(_pt(row_is_x, along_lo, ret_wall), _pt(row_is_x, along_hi, ret_wall),
+            trunk_w, SERVICE_RETURN, label="return")
+        seg(_pt(row_is_x, _along(hub_pt, row_is_x) + 8, ret_wall),
+            _pt(row_is_x, _along(hub_pt, row_is_x) + 8, sup_wall), trunk_w,
+            SERVICE_RETURN)
+        for z, p in zc:
+            a = _along(p, row_is_x)
+            c = p[1] if row_is_x else p[0]
+            seg(_pt(row_is_x, a, sup_wall), _pt(row_is_x, a, c), branch_w, sup_service,
+                label=branch_lbl if z is first_z else None,
+                airflow_cms=branch_flow if z is first_z else 0.0)
+            seg(_pt(row_is_x, a + 8, c), _pt(row_is_x, a + 8, ret_wall), branch_w,
+                SERVICE_RETURN)
+            _draw_diffuser(svg, p[0], p[1], sup_service)
+
+
+def _pt(row_is_x, along, cross):
+    """Compose a point from (along-axis, cross-axis) coords given the row orientation:
+    when the row runs along X, along=x and cross=y; when along Y, along=y and cross=x."""
+    return (along, cross) if row_is_x else (cross, along)
+
+
+def _along(p, row_is_x):
+    return p[0] if row_is_x else p[1]
+
+
+def _orth_duct(svg, p0, p1, width_px, service, label=None, airflow_cms=0.0,
+               row_is_x=True):
+    """Draw one ORTHOGONAL (axis-aligned) duct segment as a sized double line."""
+    _draw_double_line_duct(svg, p0[0], p0[1], p1[0], p1[1], max(width_px, 3.0),
+                           service, label=label, airflow_cms=airflow_cms)
+
+
+def _draw_setout_grid(svg, ox, oy, pw, ph, L_mm, W_mm, ppm):
+    def _pitch(span_mm):
+        for m in (2000, 5000, 10000, 20000, 50000):
+            if span_mm / m <= 8:
+                return m
+        return 100000
+    px_pitch = _pitch(L_mm)
+    py_pitch = _pitch(W_mm)
+    n = 0
+    xx = 0.0
+    while xx <= L_mm + 1:
+        gx = ox + xx * ppm
+        svg.line(gx, oy - 6, gx, oy + ph, stroke=GRID_FAINT, width=0.9)
+        svg.circle(gx, oy - 13, 6.5, stroke=DATUM_INK, width=0.8, fill=FILL_BG)
+        svg.text(gx, oy - 10, str(n + 1), size=7.5, anchor="middle", fill=MUTED)
+        xx += px_pitch
+        n += 1
+    n = 0
+    yy = W_mm
+    while yy >= -1:
+        gy = oy + (W_mm - yy) * ppm
+        svg.line(ox - 6, gy, ox + pw, gy, stroke=GRID_FAINT, width=0.9)
+        svg.circle(ox - 13, gy, 6.5, stroke=DATUM_INK, width=0.8, fill=FILL_BG)
+        svg.text(ox - 13, gy + 2.5, chr(ord("A") + n), size=7.5, anchor="middle",
+                 fill=MUTED)
+        yy -= py_pitch
+        n += 1
+
+
+def _dim_h(svg, x_a, x_b, y, value_mm, ext_from=None):
+    if x_b < x_a:
+        x_a, x_b = x_b, x_a
+    if ext_from is not None:
+        svg.line(x_a, ext_from - 3, x_a, y, stroke=DIM_INK, width=0.8)
+        svg.line(x_b, ext_from - 3, x_b, y, stroke=DIM_INK, width=0.8)
+    svg.add(f'<line x1="{x_a:.1f}" y1="{y:.1f}" x2="{x_b:.1f}" y2="{y:.1f}" '
+            f'stroke="{DIM_INK}" stroke-width="1.0" marker-start="url(#dim)" '
+            f'marker-end="url(#dim)"/>')
+    svg.text((x_a + x_b) / 2.0, y - 4, _fmt_mm(value_mm), size=10, anchor="middle",
+             fill=DIM_INK, weight="bold")
+
+
+def _draw_section(svg, sysm, ox, oy, pw, ph, L_mm, H_mm, ppm, x_min, mx):
+    """A SECTION CUT ALONG THE SERVED-ZONE ROW: the floor + the zones standing on it, a
+    SUPPLY duct at high level over them with drops to each diffuser, and a RETURN duct
+    at low level (or the coolant flow/return mains for a liquid system).  The cut is
+    taken ALONG the row the zones spread on (not always world-X), so every zone shows in
+    a line — conveys the vertical arrangement the plan can't."""
+    floor_y = oy + ph
+    # faint level lines
+    for step in (2000, 5000, 10000):
+        if H_mm / step <= 6:
+            pitch = step
+            break
+    else:
+        pitch = 20000
+    lvl = 0.0
+    while lvl <= H_mm + 1:
+        gy = floor_y - lvl * ppm
+        if gy >= oy - 1:
+            svg.line(ox, gy, ox + pw, gy, stroke=GRID_FAINT, width=0.8)
+            svg.text(ox + pw + 4, gy + 3, f"+{lvl/1000:.0f}m" if lvl else "0",
+                     size=7.5, fill=DATUM_INK)
+        lvl += pitch
+    # floor / datum
+    svg.line(ox - 8, floor_y, ox + pw + 8, floor_y, stroke=INK, width=1.6)
+    for i in range(int((pw + 16) / 12) + 1):
+        hx = ox - 8 + i * 12
+        svg.line(hx, floor_y, hx - 6, floor_y + 6, stroke=MUTED, width=0.7)
+    svg.text(ox + pw + 10, floor_y + 12, "± 0.000  FFL", size=8.4, fill=MUTED)
+
+    liquid = sysm.medium == "liquid"
+    s_ink, s_fill = _service_ink(SERVICE_LIQUID if liquid else SERVICE_SUPPLY)
+    r_ink, _rf = _service_ink(SERVICE_RETURN)
+    sup_y = oy + ph * 0.16
+    ret_y = floor_y - 18
+
+    # the section runs ALONG the row axis.  Map each item's along-coordinate to the
+    # section width.  Distinct rows (hot/cold aisle) collapse onto the one cut line —
+    # the section shows the z-arrangement, the plan shows the two rows.
+    all_eq = sysm.hubs + sysm.zones
+    axs = [e.cx for e in all_eq]
+    ays = [e.cy for e in all_eq]
+    row_is_x = (max(axs) - min(axs)) >= (max(ays) - min(ays))
+    a_lo = min(axs) if row_is_x else min(ays)
+    a_hi = max(axs) if row_is_x else max(ays)
+    a_span = max(a_hi - a_lo, 1.0)
+
+    def sx(e_along):
+        return ox + (e_along - a_lo) / a_span * pw
+
+    # zones standing on the floor, laid along the row.
+    zxs = []
+    for z in sysm.zones:
+        zw = max(z.w * ppm, 10)
+        zh = max(min(z.h, H_mm * 0.55) * ppm, 24)
+        za = z.cx if row_is_x else z.cy
+        zx = min(max(sx(za) - zw / 2, ox), ox + pw - zw)
+        zy = floor_y - zh
+        svg.rect(zx, zy, zw, zh, stroke=EQ_INK, width=1.2, fill="#f0f3f7", rx=1)
+        if zw > 16:
+            svg.text(zx + zw / 2, zy - 4, z.tag, size=7.0, anchor="middle", fill=MUTED)
+        zxs.append((zx + zw / 2, zy))
+
+    # the hub on the floor at its along-coordinate (clamped into the frame).
+    hub = sysm.hubs[0]
+    hw = max(hub.w * ppm, 16)
+    hh = max(min(hub.h, H_mm * 0.7) * ppm, 30)
+    hx = min(max(sx(hub.cx if row_is_x else hub.cy) - hw / 2, ox), ox + pw - hw)
+    svg.rect(hx, floor_y - hh, hw, hh, stroke=EQ_INK, width=1.7, fill=EQ_FILL, rx=2)
+    svg.text(hx + hw / 2, floor_y - hh - 4, hub.tag, size=8.0, anchor="middle",
+             weight="bold", fill=EQ_INK)
+
+    # supply main at high level across the zones + a return main low — drawn as a
+    # double-line band, with drops to each zone.
+    band = max(sysm.ducts[0].width_mm * ppm if sysm.ducts else 8, 6)
+    xL = min([p[0] for p in zxs] + [hx + hw]) if zxs else hx + hw
+    xR = max([p[0] for p in zxs] + [hx]) if zxs else ox + pw - 20
+    # supply
+    svg.rect(xL, sup_y - band / 2, xR - xL, band, stroke=s_ink, width=1.3,
+             fill=s_fill, rx=1)
+    svg.line(hx + hw / 2, floor_y - hh, hx + hw / 2, sup_y, stroke=s_ink, width=1.4)
+    # return
+    svg.rect(xL, ret_y - band / 2, xR - xL, band, stroke=r_ink, width=1.3,
+             fill=RETURN_FILL, rx=1, dash="6,3")
+    # drops from supply to each zone diffuser + return pickups.
+    for (zx, zy) in zxs:
+        svg.line(zx, sup_y + band / 2, zx, zy + 4, stroke=s_ink, width=1.3)
+        _draw_diffuser(svg, zx, zy + 8, SERVICE_LIQUID if liquid else SERVICE_SUPPLY)
+        svg.line(zx + 6, zy + 14, zx + 6, ret_y - band / 2, stroke=r_ink, width=1.0,
+                 dash="4,3")
+    lab_sup = "Coolant flow main" if liquid else "Supply duct (high level)"
+    lab_ret = "Coolant return main" if liquid else "Return duct (low level)"
+    svg.text(xL + 2, sup_y - band / 2 - 4, lab_sup, size=7.4, fill=s_ink, weight="bold")
+    svg.text(xL + 2, ret_y + band / 2 + 11, lab_ret, size=7.4, fill=r_ink, weight="bold")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LEGEND
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _draw_legend(svg, sysm, x, y, w):
+    rows = [
+        ("supply_duct", SERVICE_SUPPLY, "Supply air duct (sized)"),
+        ("return_duct", SERVICE_RETURN, "Return air duct"),
+        ("exhaust_duct", SERVICE_EXHAUST, "Exhaust / relief air"),
+        ("liquid", SERVICE_LIQUID, "Liquid coolant pipe"),
+        ("diffuser", SERVICE_SUPPLY, "Supply diffuser (4-way)"),
+        ("grille", SERVICE_RETURN, "Return grille"),
+        ("ahu", None, "Air-handling unit / CRAC"),
+        ("zone", None, "Served zone / rack"),
+    ]
+    # liquid-only systems hide the air-only rows + vice versa to stay honest.
+    if sysm.medium == "liquid":
+        rows = [r for r in rows if r[0] not in (
+            "supply_duct", "return_duct", "exhaust_duct", "diffuser", "grille")]
+        rows = [("liquid", SERVICE_LIQUID, "Coolant flow / return pipe"),
+                ("coldplate", SERVICE_LIQUID, "Rack cold plate"),
+                ("ahu", None, "Liquid chiller / cooling skid"),
+                ("zone", None, "Served rack")]
+    elif sysm.medium == "air":
+        rows = [r for r in rows if r[0] != "liquid"]
+
+    rowh = 26
+    header_h = 22
+    pad = 12
+    bh = header_h + pad + len(rows) * rowh
+    svg.rect(x, y, w, bh, stroke=GRID_FAINT, width=1.2, fill=PANEL_BG, rx=4)
+    svg.text(x + 12, y + 16, "LEGEND", size=10, weight="bold", fill=MUTED)
+    yy = y + header_h + 14
+    gx = x + 24
+    tx = x + 50
+    for kind, service, lbl in rows:
+        _mini_glyph(svg, gx, yy, kind, service)
+        svg.text(tx, yy + 4, lbl, size=8.6, fill=MUTED)
+        yy += rowh
+    return y + bh
+
+
+def _mini_glyph(svg, cx, cy, kind, service):
+    if kind in ("supply_duct", "return_duct", "exhaust_duct", "liquid"):
+        ink, fill = _service_ink(service)
+        dash = "5,3" if kind in ("return_duct", "exhaust_duct") else None
+        svg.rect(cx - 11, cy - 4, 22, 8, stroke=ink, width=1.3, fill=fill, rx=1,
+                 dash=dash)
+        mk = {SERVICE_SUPPLY: "airS", SERVICE_RETURN: "airR", SERVICE_EXHAUST: "airS",
+              SERVICE_LIQUID: "airL"}[service]
+        svg.add(f'<line x1="{cx-4:.1f}" y1="{cy:.1f}" x2="{cx+2:.1f}" y2="{cy:.1f}" '
+                f'stroke="{ink}" stroke-width="1.4" marker-end="url(#{mk})"/>')
+    elif kind in ("diffuser", "grille", "coldplate"):
+        sv = SERVICE_SUPPLY if kind == "diffuser" else (
+            SERVICE_LIQUID if kind == "coldplate" else SERVICE_RETURN)
+        _draw_diffuser(svg, cx, cy, sv)
+    elif kind == "ahu":
+        svg.rect(cx - 9, cy - 6, 18, 12, stroke=EQ_INK, width=1.5, fill=EQ_FILL, rx=1)
+        svg.circle(cx - 4, cy - 1, 3, stroke=EQ_INK, width=0.8)
+    else:  # zone
+        svg.rect(cx - 9, cy - 5, 18, 10, stroke=EQ_INK, width=1.1, fill="#f0f3f7", rx=1)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DUCT / EQUIPMENT SCHEDULE
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _draw_schedule(svg, sysm, x, y, w, h_max):
+    """A compact DUCT SCHEDULE: collapses identical branch sizes to a count row, lists
+    the hub(s) + the trunk + a representative branch."""
+    # collapse ducts by (service, size_label) → count + representative flow.
+    from collections import OrderedDict
+    groups = OrderedDict()
+    for d in sysm.ducts:
+        key = (d.service, d.size_label)
+        g = groups.setdefault(key, {"n": 0, "cms": d.airflow_cms, "kw": d.duty_kw,
+                                    "v": d.velocity_ms})
+        g["n"] += 1
+    rows = []
+    for (service, size), g in groups.items():
+        svc = {SERVICE_SUPPLY: "Supply", SERVICE_RETURN: "Return",
+               SERVICE_EXHAUST: "Exhaust", SERVICE_LIQUID: "Coolant"}[service]
+        meta = []
+        if g["cms"] > 0:
+            meta.append(f"{g['cms']:.2f} m³/s")
+            meta.append(f"{_cfm(g['cms']):,} cfm")
+        if g["v"] > 0:
+            meta.append(f"{g['v']:g} m/s")
+        elif g["kw"] > 0:
+            meta.append(f"{g['kw']:g} kW")
+        cnt = f"×{g['n']}" if g["n"] > 1 else ""
+        rows.append((f"{svc} {size}", f"{cnt}  {'  '.join(meta)}".strip()))
+
+    header_h = 20
+    rh = 13.0
+    pad = 8
+    rows = rows[:max(int((h_max - header_h - pad) // rh), 1)]
+    panel_h = header_h + len(rows) * rh + pad
+    svg.rect(x, y, w, panel_h, stroke=GRID_FAINT, width=1.1, fill=FILL_BG)
+    svg.rect(x, y, w, header_h, stroke=GRID_FAINT, width=1.1, fill=PANEL_BG)
+    title = "COOLANT SCHEDULE" if sysm.medium == "liquid" else "DUCT SCHEDULE"
+    svg.text(x + 8, y + 14, title, size=9.0, weight="bold", fill=MUTED)
+    yy = y + header_h + 11
+    for tag, note in rows:
+        svg.text(x + 8, yy, tag, size=8.0, weight="bold", fill=EQ_INK)
+        note = note if len(note) <= 30 else note[:29] + "…"
+        svg.text(x + 108, yy, note, size=7.6, fill=MUTED, mono=True)
+        yy += rh
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TITLE BLOCK
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _draw_title_block(svg, sysm, meta, scale_S, width, height, title_h):
+    y0 = height - title_h + 24
+    x0 = 30
+    x1 = width - 30
+    svg.line(x0, y0, x1, y0, stroke=INK, width=1.6)
+
+    bw = 320
+    bx0 = x1 - bw
+    by0 = y0 + 14
+    rows = [("DRAWING No.", "FF-HVAC-001"),
+            ("REV", "—   (placeholder)"),
+            ("DATE", "YYYY-MM-DD"),
+            ("SCALE", f"1:{int(scale_S)}  (@ A3)")]
+    rh = 22
+    box_h = rh * len(rows)
+    svg.rect(bx0, by0, bw, box_h, stroke=INK, width=1.3, fill=FILL_BG)
+    for i, (k, v) in enumerate(rows):
+        ry = by0 + i * rh
+        if i:
+            svg.line(bx0, ry, bx0 + bw, ry, stroke=GRID_FAINT, width=1.0)
+        svg.line(bx0 + 112, by0, bx0 + 112, by0 + box_h, stroke=GRID_FAINT, width=1.0)
+        svg.text(bx0 + 8, ry + 15, k, size=9, fill=MUTED, weight="bold")
+        svg.text(bx0 + 120, ry + 15, v, size=9.5)
+
+    svg.text(x0, y0 + 24, "FRACTIONAL FORGE · ForgeOS", size=12, weight="bold")
+    title = ("HVAC COOLANT LAYOUT" if sysm.medium == "liquid"
+             else "HVAC / DUCT LAYOUT")
+    svg.text(x0, y0 + 43, f"{title} — {_humanise(sysm.archetype)}",
+             size=15, weight="bold", fill=EQ_INK)
+    # the air/cooling headline.
+    if sysm.medium == "liquid":
+        head = (f"Liquid-cooled · chiller {sysm.cooling_kw:.0f} kW heat rejection · "
+                f"{len(sysm.zones)} served rack(s).")
+    else:
+        head = (f"Supply airflow {sysm.airflow_cms:.2f} m³/s "
+                f"({_cfm(sysm.airflow_cms):,} cfm) · cooling {sysm.cooling_kw:.0f} kW · "
+                f"{len(sysm.zones)} served zone(s).")
+    svg.text(x0, y0 + 61, head, size=9.5, fill=MUTED)
+    svg.text(x0, y0 + 78,
+             "Plan + section · ducts sized from airflow ÷ velocity (≤9 m/s) · "
+             "supply / return shown distinctly · datum ± 0.000 = FFL.",
+             size=9.0, fill=MUTED)
+    ny = y0 + 95
+    for note in (sysm.notes or [])[:2]:
+        svg.text(x0, ny, "• " + (note if len(note) <= 96 else note[:95] + "…"),
+                 size=8.5, fill=MUTED)
+        ny += 12
+    svg.text(x0, ny + 2,
+             "NOT FOR CONSTRUCTION — preliminary auto-generated mechanical-services "
+             "layout; verify against the P&ID + room layout before issue.",
+             size=9.0, fill="#a4332a", weight="bold")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RASTERISATION  (SVG → PNG) — identical cascade to the GA / P&ID
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _svg_dims(svg_text: str):
+    mw = re.search(r'<svg[^>]*\bwidth="([\d.]+)"', svg_text)
+    mh = re.search(r'<svg[^>]*\bheight="([\d.]+)"', svg_text)
+    return (int(math.ceil(float(mw.group(1)))) if mw else 1200,
+            int(math.ceil(float(mh.group(1)))) if mh else 800)
+
+
+def rasterise(svg_path: Path, png_path: Path, scale: int = 2) -> bool:
+    svg_text = svg_path.read_text()
+    w, h = _svg_dims(svg_text)
+    try:
+        import cairosvg  # type: ignore
+        cairosvg.svg2png(url=str(svg_path), write_to=str(png_path),
+                         output_width=w * scale, output_height=h * scale,
+                         background_color="white")
+        if png_path.is_file() and png_path.stat().st_size > 1000:
+            return True
+    except Exception:
+        pass
+    rsvg = shutil.which("rsvg-convert")
+    if rsvg:
+        try:
+            subprocess.run([rsvg, "-w", str(w * scale), "-h", str(h * scale),
+                            "-b", "white", "-o", str(png_path), str(svg_path)],
+                           check=True, capture_output=True, timeout=60)
+            if png_path.is_file() and png_path.stat().st_size > 1000:
+                return True
+        except Exception:
+            pass
+    chrome = _find_chrome()
+    if chrome:
+        try:
+            subprocess.run(
+                [chrome, "--headless", "--disable-gpu", "--no-sandbox",
+                 f"--screenshot={png_path}",
+                 f"--window-size={w},{h}",
+                 f"--force-device-scale-factor={scale}",
+                 "--default-background-color=FFFFFFFF",
+                 "--hide-scrollbars", f"file://{svg_path}"],
+                check=True, capture_output=True, timeout=90)
+            if png_path.is_file() and png_path.stat().st_size > 1000:
+                return True
+        except Exception as ex:
+            print(f"[hvac] chrome rasterise failed: {ex}")
+    return False
+
+
+def _find_chrome():
+    for c in (
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    ):
+        if Path(c).is_file():
+            return c
+    for name in ("google-chrome", "chromium", "chromium-browser", "chrome"):
+        p = shutil.which(name)
+        if p:
+            return p
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ENTRY
+# ═══════════════════════════════════════════════════════════════════════════
+
+def generate_hvac(out_dir: str, state_path: Optional[str] = None,
+                  manifest_path: Optional[str] = None, rasterise_png: bool = True):
+    """Full pipeline: load → derive air/cooling system → draw → write SVG (+ PNG)."""
+    manifest, state, schedule = load_inputs(out_dir, state_path, manifest_path)
+    sysm = derive_air_system(manifest, state, schedule, out_dir)
+    meta = {"count": manifest.get("count", 0), "schema": manifest.get("schema", "")}
+    svg_text = build_hvac_svg(sysm, meta)
+
+    draw_dir = Path(out_dir) / "drawings"
+    draw_dir.mkdir(parents=True, exist_ok=True)
+    svg_path = draw_dir / "hvac-layout.svg"
+    png_path = draw_dir / "hvac-layout.png"
+    svg_path.write_text(svg_text)
+    png_ok = rasterise(svg_path, png_path) if rasterise_png else False
+
+    summary = {
+        "archetype": sysm.archetype,
+        "medium": sysm.medium,
+        "svg": str(svg_path),
+        "png": str(png_path) if png_ok else None,
+        "hubs": len(sysm.hubs),
+        "zones": len(sysm.zones),
+        "ducts": len(sysm.ducts),
+        "diffusers": len(sysm.diffusers),
+        "airflow_cms": round(sysm.airflow_cms, 3),
+        "airflow_cfm": _cfm(sysm.airflow_cms),
+        "cooling_kw": round(sysm.cooling_kw, 1),
+        "zones_derived": sysm.zones_derived,
+        "schedule_present": sysm.schedule_present,
+    }
+    return summary, sysm, svg_text
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    out_dir = argv[0]
+    state_path = argv[1] if len(argv) > 1 else None
+    try:
+        summary, _sys, _svg = generate_hvac(out_dir, state_path)
+    except FileNotFoundError as ex:
+        print(f"[hvac] ERROR: {ex}")
+        return 2
+    print(f"[hvac] archetype  : {summary['archetype']}  ({summary['medium']})")
+    print(f"[hvac] hubs        : {summary['hubs']}  zones: {summary['zones']}"
+          f"{'  (derived)' if summary['zones_derived'] else ''}")
+    print(f"[hvac] ducts/pipes : {summary['ducts']}  diffusers: {summary['diffusers']}")
+    if summary["medium"] != "liquid":
+        print(f"[hvac] airflow     : {summary['airflow_cms']} m³/s "
+              f"({summary['airflow_cfm']:,} cfm)")
+    print(f"[hvac] cooling     : {summary['cooling_kw']} kW")
+    print(f"[hvac] schedule    : {'used' if summary['schedule_present'] else 'none'}")
+    print(f"[hvac] SVG → {summary['svg']}")
+    if summary["png"]:
+        print(f"[hvac] PNG → {summary['png']}")
+    else:
+        print("[hvac] PNG not written (no rasteriser available — SVG is the master)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
