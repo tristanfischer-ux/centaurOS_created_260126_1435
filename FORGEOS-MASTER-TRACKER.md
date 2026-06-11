@@ -81,6 +81,23 @@ their placement is being decided WITH the manufacturing layer, not separately.
 - ⏳ polish each family to a verified 10/10; perfect archetype-1 → next → … (Tristan's sequencing).
 - Detail log: `BLENDER-UNIVERSAL-LOOP-TRACKER.md`.
 
+### W8 · GROUND THE DOSSIER IN THE NEW PHYSICS + CAD (Tristan 2026-06-11) 🔴 (core gap)
+The new physics engine + universal CAD are largely DISCONNECTED from what the dossier shows. Tristan's
+two questions exposed this. Close it:
+- ❌ **W8.1 — new Blender renders into the dossier.** Dossier reads pre-baked `public/heroes/<slug>-*.png`;
+  the new universal CAD (build_universal_scene.py) renders any archetype from the real engineering but
+  isn't wired in. e_fuel_synthesis isn't even slug-mapped → e-fuel shows NO 3D image. Wire the universal
+  CAD hero/per-module/exploded renders in (+ slug-map e-fuel). Caveat: a procedural Blender approach was
+  rejected 2026-06-10 on quality — verify each family's render is dossier-grade before swapping a good
+  template; e-fuel (no current image) is a strict win.
+- ❌ **W8.2 — BoM PRICE grounding.** Real e-fuel dossier: 70/73 lines are LLM-authored price guesses
+  (provenance "unknown"), only 3/73 a live distributor price, 0 corpus. Replace LLM guesses with the
+  DOE/NETL Class-4 cost curves already in `scripts/lib/cost/process-equipment-cost.ts` + live distributor
+  cache. (= W4/M4 cost-of-goods.) Quantities ARE physics-grounded (registered engineering contract); the
+  PRICE is the weak link.
+- ❌ **W8.3 — BoM grounded in the CAD** = W4.1 (routed cable/pipe quantities from the connection schedule
+  into the BoM; today cabling/piping/ductwork is omitted entirely).
+
 ### W6 · Bill-of-materials DATA coverage / growing-DB ⏳ (the AIM's real long pole)
 - The pretraining DB must self-generate per-class branded parts on the fly (DB-first → web/own-training
   on miss → verify → writeback). Foundational for ≥8 BoM on unseen archetypes. [the-aim]
