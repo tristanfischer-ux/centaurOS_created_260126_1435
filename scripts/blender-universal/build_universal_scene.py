@@ -2626,6 +2626,17 @@ RACK_DIRECT_MAX_MM   = 13000.0 # an edge whose endpoints are within this XY dist
                                # a LOCAL jumper: route it DIRECT (clean L) if that
                                # avoids equipment, instead of detouring to the spine.
                                # Longer edges always take the spine (visual coherence).
+LOCAL_JUMPER_MAX_MM  = 6000.0  # a DIRECT jumper this short between two LOW nozzles runs
+                               # at a LOW local elevation (just over the taller endpoint),
+                               # NOT up at the overhead rack — a real plant runs a short
+                               # hop between adjacent ground equipment as a low pipe, not a
+                               # 4-5 m climb-and-return. Beyond it, the direct L (if any)
+                               # uses the rack tier; clipped routes fall back to the spine.
+LOCAL_JUMPER_CLEAR_MM = 450.0  # how far a low jumper's horizontal sits ABOVE the taller
+                               # of its two endpoints (clears the nozzle/flange + reads as
+                               # a deliberate run, never grazing the shell top).
+LOCAL_JUMPER_TIER_MM  = 260.0  # Z stagger between successive low jumpers so two that share
+                               # an area never co-incide / cross at the same elevation.
 # Inter-bank aisle bands [(centre_y, width), …] published by _compact_banks_in_y so
 # place_process_plant sites the rack spine in the REAL aisle between the equipment
 # banks (not over equipment). Reset every run; empty for a single-bank plant.
@@ -2862,33 +2873,86 @@ def _polyline_over_equipment(waypoints, bboxes, own):
     return n
 
 
+def _local_jumper_z(plan, i, a_xyz, b_xyz):
+    """The LOW elevation a short local jumper runs at: just above the TALLER of its
+    two endpoints (so it clears both nozzles + reads as a real low pipe), with a small
+    per-run stagger so two jumpers in one area never co-incide. Capped just below the
+    rack so a tall-ish pair still produces a sensible low run rather than merging into
+    the overhead rack lane."""
+    base = max(float(a_xyz[2]), float(b_xyz[2])) + LOCAL_JUMPER_CLEAR_MM
+    z = base + LOCAL_JUMPER_TIER_MM * (i % 4)
+    ceiling = plan.base_z - LOCAL_JUMPER_CLEAR_MM      # stay clear under the rack floor
+    return min(z, ceiling) if ceiling > base else base
+
+
 def _direct_route(plan, i, a_xyz, b_xyz, own):
-    """A SHORT LOCAL jumper between two nearby parts: rise to this run's tier, run
-    along X then Y (an L) at that tier, drop to the target — NO trip to the central
-    spine. Used when the two endpoints are close AND the L-route is clear of OTHER
-    equipment, so adjacent units get a direct pipe (how a real plant runs a local
-    jumper) instead of a wasteful detour up to the rack aisle and back. The run still
-    sits on its own TIER, so it never shares an elevation with another run. Returns
-    the waypoints, or None if the direct L crosses other equipment (caller falls back
-    to the spine)."""
+    """A SHORT LOCAL jumper between two nearby parts: rise just over the taller nozzle,
+    run along X then Y (an L) at that LOW local elevation, drop to the target — NO trip
+    to the overhead rack and NO 4-5 m climb-and-return. Used when the two endpoints are
+    close AND the L-route is clear of OTHER equipment, so adjacent units get a direct
+    low pipe (how a real plant runs a local jumper) instead of a wasteful detour up to
+    the rack aisle and back.
+
+    Elevation: a genuinely SHORT hop (≤ LOCAL_JUMPER_MAX_MM) between two LOW nozzles
+    runs at the LOW local elevation (`_local_jumper_z` — over the taller endpoint, with
+    a per-run stagger); a longer-but-still-direct edge keeps the rack tier so it lines
+    up with the overhead runs. Each candidate elevation is tried and the LOW one is
+    preferred whenever its L is clear; if the low L would clip OTHER equipment we fall
+    through to the rack-tier L, and if THAT clips we return None (caller takes the
+    spine). The run still sits on its own elevation, so it never shares a height with
+    another run. Returns the waypoints, or None if no clean direct L exists."""
     ax, ay, az = (float(c) for c in a_xyz)
     bx, by, bz = (float(c) for c in b_xyz)
-    tz = plan.tier_z(i)
-    # two orthogonal orderings (X-first vs Y-first); pick the clean one, preferring
-    # the one whose horizontal legs avoid equipment.
-    cand_xy = [(ax, ay, az), (ax, ay, tz), (bx, ay, tz), (bx, by, tz), (bx, by, bz)]
-    cand_yx = [(ax, ay, az), (ax, ay, tz), (ax, by, tz), (bx, by, tz), (bx, by, bz)]
-    best = None
-    for cand in (cand_xy, cand_yx):
-        pts = [cand[0]]
-        for p in cand[1:]:
-            if max(abs(p[0] - pts[-1][0]), abs(p[1] - pts[-1][1]),
-                   abs(p[2] - pts[-1][2])) > 1.0:
-                pts.append(p)
-        over = _polyline_over_equipment(pts, plan.bboxes, own)
-        if best is None or over < best[0]:
-            best = (over, pts)
-    return best[1] if best and best[0] == 0 else None
+    straight = math.hypot(bx - ax, by - ay)
+    tz_rack = plan.tier_z(i)
+    tz_low = _local_jumper_z(plan, i, a_xyz, b_xyz)
+    # Prefer the LOW elevation for a short hop between low nozzles; otherwise (longer
+    # direct edge, or a pair already near the rack) use the rack tier. Try the preferred
+    # elevation first so a clean low run wins; fall back to the rack tier only if the
+    # low L is blocked. Within each elevation, try both orthogonal orderings (X-first /
+    # Y-first) and keep the cleaner.
+    low_ok = (straight <= LOCAL_JUMPER_MAX_MM and tz_low < tz_rack - 1.0)
+    elevations = ([tz_low, tz_rack] if low_ok else [tz_rack])
+    # The plant's main equipment corridor cross-coordinate (the spine line): a long
+    # traverse reads cleanest running NEAR it (through the equipment band), not along
+    # an empty plant edge. Used to break ties between the two L orderings.
+    spine_cross = plan.spine_pos
+
+    def _long_leg_offset(pts):
+        """Plan-view distance from the spine cross-line of the candidate's LONGEST
+        horizontal leg (the dominant traverse). Lower = the long run hugs the central
+        corridor rather than skirting an empty boundary."""
+        worst = 0.0
+        best_len = -1.0
+        for p, q in zip(pts[:-1], pts[1:]):
+            if not _seg_horizontal(p, q):
+                continue
+            ln = math.hypot(q[0] - p[0], q[1] - p[1])
+            cross = ((p[1] + q[1]) / 2.0 if plan.axis == "x"
+                     else (p[0] + q[0]) / 2.0)
+            if ln > best_len:
+                best_len, worst = ln, abs(cross - spine_cross)
+        return worst
+
+    for tz in elevations:
+        cand_xy = [(ax, ay, az), (ax, ay, tz), (bx, ay, tz), (bx, by, tz), (bx, by, bz)]
+        cand_yx = [(ax, ay, az), (ax, ay, tz), (ax, by, tz), (bx, by, tz), (bx, by, bz)]
+        best = None
+        for cand in (cand_xy, cand_yx):
+            pts = [cand[0]]
+            for p in cand[1:]:
+                if max(abs(p[0] - pts[-1][0]), abs(p[1] - pts[-1][1]),
+                       abs(p[2] - pts[-1][2])) > 1.0:
+                    pts.append(p)
+            over = _polyline_over_equipment(pts, plan.bboxes, own)
+            # rank: fewest over-equipment legs first; then the ordering whose long
+            # traverse runs closest to the central corridor (avoids the empty-edge run).
+            key = (over, _long_leg_offset(pts))
+            if best is None or key < best[0]:
+                best = (key, pts)
+        if best and best[0][0] == 0:
+            return best[1]
+    return None
 
 
 def _corridor_clear_along_cross(plan, fixed_along, cross_a, cross_b, own):
