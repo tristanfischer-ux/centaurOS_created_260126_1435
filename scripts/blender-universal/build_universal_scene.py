@@ -44,6 +44,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "blender-templates"))
 import forge_blender_lib as fl
 
+# Deterministic + universal connection-sizing engine (SIBLING module, no Blender
+# import). It turns each topology edge's rating (constraint_kind + required_value
+# + required_unit + required_margin_factor + material_context) + the CAD-measured
+# run length into a REAL connection size (cable CSA / pipe DN / duct) and an
+# outer_dia_mm the generator renders the cylinder/tray at — so a 1562 A DC bus
+# renders VISIBLY FATTER than a signal line and a drip line thin, instead of every
+# run being the fabricated PIPE_DIA_MM = 190. It shells out to the repo .venv +
+# the orchestrator first-principles tools, so it runs fine under Blender's python.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import connection_sizing as cs
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIG — tune the generator here. (Tristan will edit these in a visual loop.)
@@ -217,7 +228,19 @@ SKID_POST_MM             = 180    # box-section size of frame posts/rails (subst
 
 # ── 6. Pipe palette by mechanism ───────────────────────────────────────────
 # Pipe radius ~1.7× (Tristan 2026-06-10): the runs read as thin wires. 110→190 mm.
-PIPE_DIA_MM = 190           # nominal routed-pipe diameter (substantial pipe run)
+# 2026-06-11: PIPE_DIA_MM is NO LONGER the diameter every run is drawn at. Each run
+# is now sized at its REAL outer diameter by connection_sizing.size_connection (from
+# the edge rating + the routed-polyline length); see _sized_dia_mm. PIPE_DIA_MM
+# survives ONLY as the FALLBACK diameter for an edge that carries no rating at all
+# (and for the nozzle-stub neck radius, which is geometry not a sized connection).
+PIPE_DIA_MM = 190           # FALLBACK routed-pipe diameter (un-rated edge only)
+# Fallback diameter [mm] for a DERIVED fan-out edge that has no parent rating to
+# divide (small — a thin default, NOT the fat 190). Logged + noted in the schedule.
+CONN_FALLBACK_DIA_MM = 60.0
+# Hard floor on the rendered outer diameter [mm] so even the thinnest sized run
+# (a 1.5 mm² control lead ≈ 12 mm) stays visible at plant zoom without being so fat
+# it hides the step-down. A sized value ABOVE this is used as-is (the whole point).
+CONN_MIN_RENDER_DIA_MM = 12.0
 MECH_COLOUR = {             # sRGB; make_mat handles linear conversion
     "fluid_loop":    (0.42, 0.52, 0.62),   # steel blue-grey (generic process pipe)
     # DIRECTIONAL fluid mechanisms (derived flows): a SUPPLY feed and its RETURN must
@@ -3048,9 +3071,23 @@ def _make_rack_plan_for_flow_train(bbox_mm, base_z_mm, parts, axis="x"):
 #     SAME Z (target 0; tiers must resolve every crossing).
 _ROUTE_LOG = []   # list of dicts: {name, mech, waypoints, a_xy, b_xy, own_bboxes}
 
+# Every run that gets SIZED (its diameter computed from a rating) records its
+# ConnectionSpec here, so after routing we can build the distribution SCHEDULE
+# (connection_schedule) for the BoM feedback. A trunk records the trunk spec; each
+# tap records its own (thinner) spec. Reset per run alongside _ROUTE_LOG.
+_CONN_SPECS = []   # list of ConnectionSpec dicts (see connection_sizing._spec)
+
+# Sizing memo: the N rack TAPS of a fan-out all carry the SAME rating + ~same length,
+# so size the physics ONCE per (rating-signature, rounded-length) and reuse it. Cuts
+# the per-run subprocess tool calls (electrical sweeps n_parallel 1..8) from O(racks)
+# to O(distinct sizes). Keyed on the rating, NOT the run name. Cleared per build.
+_SIZING_CACHE = {}   # signature → ConnectionSpec (template, deep-copied per use)
+
 
 def _route_log_reset():
     _ROUTE_LOG.clear()
+    _CONN_SPECS.clear()
+    _SIZING_CACHE.clear()
 
 
 def _route_log_add(name, mech, waypoints, a_xy, b_xy, own_parts=()):
@@ -3207,6 +3244,84 @@ def audit_routes(parts, out_dir):
     if cross_detail:
         print(f"[univ][route-audit]   same-Z crossings: {cross_detail[:8]}")
     return metrics
+
+
+def write_connection_schedule(out_dir):
+    """PHASE C — the BoM feedback. Flatten every sized ConnectionSpec into the
+    distribution SCHEDULE (connection_schedule), write it to connection-schedule.json
+    and log a [conn-schedule] roll-up (total cable-m by CSA, pipe-m by DN, duct-m by
+    size) plus a [conn-WARN] line per run that is NOT within spec (volt-drop /
+    velocity over limit) — the seed of the iterate loop. Returns the schedule dict."""
+    specs = list(_CONN_SPECS)
+    rows = cs.connection_schedule(specs)
+
+    # roll-up totals by size, per kind, summing the run length.
+    cable_m_by_csa = {}     # CSA label → metres (cable + busbar)
+    pipe_m_by_dn = {}       # DN label → metres
+    duct_m_by_size = {}     # duct label → metres
+    other_m = 0.0
+    warns = []
+    for s in specs:
+        L = float(s.get("length_m") or 0.0)
+        kind = s.get("kind")
+        size = s.get("size_label") or "(unsized)"
+        if kind in ("cable", "busbar"):
+            cable_m_by_csa[size] = cable_m_by_csa.get(size, 0.0) + L
+        elif kind == "pipe":
+            pipe_m_by_dn[size] = pipe_m_by_dn.get(size, 0.0) + L
+        elif kind == "duct":
+            duct_m_by_size[size] = duct_m_by_size.get(size, 0.0) + L
+        else:
+            other_m += L
+        if s.get("within_spec") is False:
+            warns.append({
+                "run_name": s.get("run_name"), "mechanism": s.get("mechanism"),
+                "from": s.get("from_part"), "to": s.get("to_part"),
+                "size": size, "length_m": s.get("length_m"),
+                "drop_pct_or_velocity": s.get("drop_pct_or_velocity"),
+                "spec_limit": s.get("spec_limit"), "notes": s.get("notes"),
+            })
+
+    def _round_map(d):
+        return {k: round(v, 1) for k, v in sorted(d.items())}
+
+    schedule = {
+        "rows": rows,
+        "specs": specs,           # full ConnectionSpecs (auditable: tool, assumptions)
+        "totals": {
+            "cable_m_by_csa": _round_map(cable_m_by_csa),
+            "pipe_m_by_dn": _round_map(pipe_m_by_dn),
+            "duct_m_by_size": _round_map(duct_m_by_size),
+            "other_m": round(other_m, 1),
+            "runs_sized": len(specs),
+            "runs_out_of_spec": len(warns),
+        },
+        "out_of_spec": warns,
+    }
+    try:
+        with open(os.path.join(out_dir, "connection-schedule.json"), "w") as fh:
+            json.dump(schedule, fh, indent=2, ensure_ascii=False)
+    except OSError as ex:
+        print(f"[univ][conn-schedule] write FAILED: {ex}")
+
+    t = schedule["totals"]
+    print(f"[conn-schedule] {t['runs_sized']} runs sized; "
+          f"cable-m by CSA: {t['cable_m_by_csa']}; "
+          f"pipe-m by DN: {t['pipe_m_by_dn']}; "
+          f"duct-m by size: {t['duct_m_by_size']}"
+          + (f"; other-m: {t['other_m']}" if t['other_m'] else ""))
+    # min/max sized outer diameter actually rendered (the proof sizes VARY).
+    od_vals = [s["outer_dia_mm"] for s in specs
+               if isinstance(s.get("outer_dia_mm"), (int, float))]
+    if od_vals:
+        print(f"[conn-schedule] rendered outer_dia_mm range: "
+              f"min={min(od_vals):.1f} mm  max={max(od_vals):.1f} mm  "
+              f"({len(set(round(v, 1) for v in od_vals))} distinct sizes)")
+    for w in warns:
+        print(f"[conn-WARN] {w['run_name']} ({w['mechanism']}) {w['from']} -> "
+              f"{w['to']}: {w['size']} {w['drop_pct_or_velocity']} exceeds "
+              f"{w['spec_limit']} over {w['length_m']} m — {w['notes']}")
+    return schedule
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3417,12 +3532,67 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
     rich = n_explicit >= DERIVE_RICH_TOPOLOGY_EDGES
     next_i = [10_000]   # synthetic edge indices (well above any real topology index)
 
-    def _emit(a_xyz, b_xyz, mech, a_nm, b_nm):
+    # ── RATING the derived fan-out from the parent explicit edge. The sparse topology
+    #    ships ONE aggregate edge per family (BESS: lfp_cell_string→dc_bus @1562.5 A
+    #    ×1.25); we DROP that single edge and DERIVE the per-rack fan-out, so the
+    #    derived edges must INHERIT its rating to be sized. The TRUNK carries the
+    #    TOTAL design value; each of the N consumer TAPS carries total/N (one rack's
+    #    share). Where no parent rating exists, the share is None ⇒ small fallback
+    #    diameter (NOT 190). Keyed on mechanism FAMILY, never archetype.
+    _FAMILY_MECHS = {
+        "electrical": ("electrical_bus", "electrical"),
+        "fluid": ("fluid_loop", "fluid", "fluid_supply", "fluid_return"),
+        "thermal": ("thermal", "thermal_return"),
+    }
+
+    def _parent_rating(family):
+        """(constraint_kind, total_design_value, unit, material_context) for a family,
+        from the LARGEST-rated matching explicit edge (× its margin = design value).
+        Returns (None, None, None, None) when the topology has no edge for it."""
+        mechs = _FAMILY_MECHS.get(family, ())
+        best = None
+        for e in (explicit_topology or []):
+            if e.get("mechanism") not in mechs:
+                continue
+            rv = e.get("required_value")
+            if rv is None:
+                continue
+            margin = e.get("required_margin_factor") or 1.0
+            design = float(rv) * float(margin)
+            if best is None or design > best[1]:
+                best = (e.get("constraint_kind"), design, e.get("required_unit"),
+                        e.get("material_context"))
+        return best if best is not None else (None, None, None, None)
+
+    # Per-family parent (constraint_kind, total_design_value, unit, material_context).
+    _RATING = {fam: _parent_rating(fam) for fam in ("electrical", "fluid", "thermal")}
+
+    def _share_edge(family, mech, a_nm, b_nm, n_consumers, is_trunk=False):
+        """Synthesize a topology-edge dict carrying the rating THIS derived segment
+        should be SIZED from: the parent family total for a trunk, total/N for one
+        consumer tap. carried_value is FINAL (margin already applied in the total),
+        so the edge sets required_margin_factor=1. None total ⇒ a rating-less edge
+        (the emitter falls back to the small default diameter)."""
+        ck, total, unit, mc = _RATING.get(family, (None, None, None, None))
+        share = None
+        if total is not None:
+            share = total if is_trunk else (total / max(1, n_consumers))
+        return {
+            "from_part": a_nm, "to_part": b_nm, "mechanism": mech,
+            "constraint_kind": ck, "required_value": share, "required_unit": unit,
+            "required_margin_factor": 1.0, "material_context": mc,
+            # parent family total, so the TRUNK emitter can size for the SUM even when
+            # the group is rebuilt from the per-consumer tap edges.
+            "parent_total_value": total, "n_consumers": n_consumers,
+            "rating_family": family,
+        }
+
+    def _emit(a_xyz, b_xyz, mech, a_nm, b_nm, edge=None):
         if a_xyz is None or b_xyz is None:
             return
         i = next_i[0]; next_i[0] += 1
         derived.append({
-            "i": i, "mech": mech,
+            "i": i, "mech": mech, "edge": edge,
             "a_xyz": tuple(float(c) for c in a_xyz),
             "b_xyz": tuple(float(c) for c in b_xyz),
             "a_abstract": True, "b_abstract": True,
@@ -3493,8 +3663,11 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
         hub_pt, hub_nm = _hub_for("electrical", HUB_ELECTRICAL_RE, "pdu", "panel",
                                   "switchgear", "ups", "pcs", "bms_ctrl", "control")
         if hub_pt is not None:
+            n_cons = len(consumer_anchors)
             for k, c in enumerate(consumer_anchors):
-                _emit(hub_pt, c, "electrical_bus", hub_nm, f"rack[{k}]")
+                _emit(hub_pt, c, "electrical_bus", hub_nm, f"rack[{k}]",
+                      edge=_share_edge("electrical", "electrical_bus", hub_nm,
+                                       f"rack[{k}]", n_cons))
             # also feed each discrete BIG LOAD from the same electrical hub: a placed
             # HVAC / heat-pump PART (process-plant path) AND the thermal/fluid BoP
             # skids (the chiller + reservoir pumps are powered equipment) — so the
@@ -3513,9 +3686,16 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
                 if key in seen_pt:
                     continue
                 seen_pt.add(key)
-                _emit(hub_pt, pt, "electrical_bus", hub_nm, nm)
+                # discrete big load (HVAC/chiller/reservoir pump): an individual
+                # feeder of UNKNOWN current (not 1/N of the bus, not the full bus) —
+                # leave rating-less so it draws at the small fallback diameter.
+                _emit(hub_pt, pt, "electrical_bus", hub_nm, nm,
+                      edge={"from_part": hub_nm, "to_part": nm,
+                            "mechanism": "electrical_bus"})
         # DOWNSTREAM electrical chain: rack block → first stage (PCS) → next
         # (transformer) → … So the power path reads in series, not just a fan-out.
+        # The WHOLE bus current flows through each stage in series, so each chain
+        # link is sized for the family TOTAL (the trunk value), reading FAT.
         # Role-keyed via the anchors the placer passed; absent ⇒ skipped.
         if electrical_chain:
             cx = sum(c[0] for c in consumer_anchors) / len(consumer_anchors)
@@ -3525,7 +3705,10 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
             for stage_nm, stage_pt in electrical_chain:
                 if stage_pt is None:
                     continue
-                _emit(prev_pt, stage_pt, "electrical_bus", prev_nm, stage_nm)
+                # the full bus current flows through this series stage → trunk total.
+                _emit(prev_pt, stage_pt, "electrical_bus", prev_nm, stage_nm,
+                      edge=_share_edge("electrical", "electrical_bus", prev_nm,
+                                       stage_nm, 1, is_trunk=True))
                 prev_pt, prev_nm = stage_pt, stage_nm
 
     # On a RICH process-flow graph we STOP here: the fluid/thermal loops are
@@ -3546,15 +3729,23 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
             if rp_nm is not None:
                 coll_pt, coll_nm = _return_port(hub_pt, rp_nm)
         if hub_pt is not None:
+            n_cons = len(consumer_anchors)
             for k, c in enumerate(consumer_anchors):
-                _emit(hub_pt, c, "fluid_supply", hub_nm, f"rack[{k}]")
+                _emit(hub_pt, c, "fluid_supply", hub_nm, f"rack[{k}]",
+                      edge=_share_edge("fluid", "fluid_supply", hub_nm,
+                                       f"rack[{k}]", n_cons))
             # close the loop only when the return point is a genuinely DIFFERENT
             # location from the supply hub (else the return overlays supply — a
-            # duplicate, not a loop the eye reads).
+            # duplicate, not a loop the eye reads). Each per-rack return = one share;
+            # the collector→hub MAIN return carries the SUM (the trunk total).
             if coll_pt is not None and math.dist(coll_pt[:2], hub_pt[:2]) > 300.0:
                 for k, c in enumerate(consumer_anchors):
-                    _emit(c, coll_pt, "fluid_return", f"rack[{k}]", coll_nm)
-                _emit(coll_pt, hub_pt, "fluid_return", coll_nm, hub_nm)
+                    _emit(c, coll_pt, "fluid_return", f"rack[{k}]", coll_nm,
+                          edge=_share_edge("fluid", "fluid_return", f"rack[{k}]",
+                                           coll_nm, n_cons))
+                _emit(coll_pt, hub_pt, "fluid_return", coll_nm, hub_nm,
+                      edge=_share_edge("fluid", "fluid_return", coll_nm, hub_nm,
+                                       n_cons, is_trunk=True))
 
     # ── THERMAL: chiller hub → EACH consumer; then (if a coolant-return collector
     #    exists) each consumer → coolant-return → back to the chiller. ───────────
@@ -3571,16 +3762,24 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
             if rp_nm is not None:
                 tcoll_pt, tcoll_nm = _return_port(hub_pt, rp_nm)
         if hub_pt is not None:
+            n_cons = len(consumer_anchors)
             for k, c in enumerate(consumer_anchors):
-                _emit(hub_pt, c, "thermal", hub_nm, f"rack[{k}]")
+                _emit(hub_pt, c, "thermal", hub_nm, f"rack[{k}]",
+                      edge=_share_edge("thermal", "thermal", hub_nm,
+                                       f"rack[{k}]", n_cons))
             # close the loop only if the return point is genuinely DIFFERENT from the
             # chiller hub (a separate coolant-return skid / return port) — else the
             # "return" would overlay the supply and read as a duplicate, not a loop.
+            # Per-rack return = one share; coolant-return MAIN → chiller = trunk total.
             if tcoll_pt is not None and \
                     math.dist(tcoll_pt[:2], hub_pt[:2]) > 300.0:
                 for k, c in enumerate(consumer_anchors):
-                    _emit(c, tcoll_pt, "thermal_return", f"rack[{k}]", tcoll_nm)
-                _emit(tcoll_pt, hub_pt, "thermal_return", tcoll_nm, hub_nm)
+                    _emit(c, tcoll_pt, "thermal_return", f"rack[{k}]", tcoll_nm,
+                          edge=_share_edge("thermal", "thermal_return", f"rack[{k}]",
+                                           tcoll_nm, n_cons))
+                _emit(tcoll_pt, hub_pt, "thermal_return", tcoll_nm, hub_nm,
+                      edge=_share_edge("thermal", "thermal_return", tcoll_nm, hub_nm,
+                                       n_cons, is_trunk=True))
 
     return derived
 
@@ -3697,6 +3896,9 @@ def group_fanout_trunks(resolved, min_consumers=TRUNK_MIN_CONSUMERS):
                 # the consumer's own Part (for the over-equipment own-bbox exclusion)
                 "pb": r.get("pb") if origin_is_a else r.get("pa"),
                 "i": i,
+                # the derived edge for THIS consumer tap (carries total/N rating) so
+                # the trunk emitter sizes each tap at its real (thinner) diameter.
+                "edge": r.get("edge"),
             })
             claimed.add(i)
         # claim ALL edges in this bucket (including any whose consumer point was a
@@ -3707,10 +3909,24 @@ def group_fanout_trunks(resolved, min_consumers=TRUNK_MIN_CONSUMERS):
             else resolved[edge_idxs[0]]["b_xyz"]
         origin_nm = resolved[edge_idxs[0]]["a_nm"] if origin_is_a \
             else resolved[edge_idxs[0]]["b_nm"]
+        # Synthesize the TRUNK edge: it carries the SUMMED design load (the parent
+        # family total — each tap is total/N, the trunk is the sum, so it renders
+        # FATTER than any tap). Built from a consumer edge's parent_total_value.
+        c0_edge = next((c["edge"] for c in consumers if c.get("edge")), None)
+        trunk_edge = None
+        if c0_edge is not None:
+            total = c0_edge.get("parent_total_value")
+            trunk_edge = {
+                "from_part": origin_nm, "to_part": "(busway)", "mechanism": mech,
+                "constraint_kind": c0_edge.get("constraint_kind"),
+                "required_value": total, "required_unit": c0_edge.get("required_unit"),
+                "required_margin_factor": 1.0,
+                "material_context": c0_edge.get("material_context"),
+            }
         groups.append({
             "mech": mech, "origin_xyz": origin_xyz, "origin_nm": origin_nm,
             "origin_is_a": origin_is_a, "consumers": consumers,
-            "edge_idxs": list(edge_idxs),
+            "edge_idxs": list(edge_idxs), "trunk_edge": trunk_edge,
         })
     passthrough = [r for idx, r in enumerate(resolved) if idx not in claimed]
     return groups, passthrough
@@ -3912,16 +4128,27 @@ def _resolve_abstract_end(endpoint_name, parts, region_centres, bbox_mm, MAT, MO
     return None, [], None
 
 
-def _draw_cable_tray(nm, waypoints_mm, MAT, MO):
+def _draw_cable_tray(nm, waypoints_mm, MAT, MO, dia_mm=None):
     """Draw an electrical run as a CABLE TRAY / bus-duct (copper-orange,
     RECTANGULAR cross-section) so it reads visually DISTINCT from round process
     pipe. Built as oriented boxes along each orthogonal leg + a couple of ladder
-    rungs per leg (the tray look). Universal — pure geometry from the waypoints."""
+    rungs per leg (the tray look). Universal — pure geometry from the waypoints.
+
+    `dia_mm` = the SIZED conductor outer diameter (busbar/cable bundle) from
+    connection_sizing; the tray width tracks it so a 1562 A DC busway reads VISIBLY
+    FATTER than a signal/control tray. None ⇒ the old nominal width (back-compat)."""
     if "u_cable_tray" not in MAT:
         MAT["u_cable_tray"] = fl.make_mat("m_u_cable_tray", (1.00, 0.45, 0.00),
                                           metallic=0.45, roughness=0.40)
     tray = MAT["u_cable_tray"]
-    tray_w = max(220.0, PIPE_DIA_MM * 1.3)   # tray slightly wider than a pipe
+    if dia_mm is not None and dia_mm > 0:
+        # tray carries the conductor(s) + clearance: ~1.4× the sized OD. A LOW floor
+        # (40 mm) so the trunk-vs-tap STEP-DOWN reads — a 93.8 mm DC-bus trunk →
+        # ~131 mm tray vs a 13.5 mm rack tap → ~40 mm tray is a clear ~3× difference;
+        # a high floor would flatten the very step-down this sizing exists to show.
+        tray_w = max(40.0, dia_mm * 1.4)
+    else:
+        tray_w = max(220.0, PIPE_DIA_MM * 1.3)   # tray slightly wider than a pipe
     tray_h = tray_w * 0.55                    # shallow rectangular section
     legs = 0
     for a, b in zip(waypoints_mm[:-1], waypoints_mm[1:]):
@@ -4037,6 +4264,9 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
             "pa": None if a_abstract else pa, "pb": None if b_abstract else pb,
             "a_nm": frm if a_abstract else pa.name,
             "b_nm": to if b_abstract else pb.name,
+            # carry the raw topology edge (its rating fields) so the emitter sizes
+            # this run at its REAL diameter instead of the PIPE_DIA_MM constant.
+            "edge": e,
         })
 
     # ── Build the RackPlan (spine in the free aisle) if the caller didn't pass one.
@@ -4062,16 +4292,116 @@ def _mech_pipe_mat(mech, MAT):
     return MAT[mkey]
 
 
-def _draw_run(nm, mech, waypoints, a_xyz, b_xyz, MAT, MO, pipe_module,
-              conn=(), own_parts=(), log=True):
-    """Draw ONE routed run (cable-tray for electrical, round pipe otherwise) and
-    log it for the route audit. Shared by the per-edge path, the passthrough
-    path, the TRUNK and the TAP — so every emitted polyline gets the identical
-    geometry + the identical self-audit coverage."""
-    if mech == "electrical_bus":
-        _draw_cable_tray(nm, waypoints, MAT, MO)
+def _polyline_len_m(waypoints):
+    """Total 3-D length of a routed polyline, in METRES (waypoints are mm). This is
+    the run length connection_sizing needs for volt-drop / dP over THIS run."""
+    total_mm = 0.0
+    for p, q in zip(waypoints[:-1], waypoints[1:]):
+        total_mm += math.sqrt((q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2
+                              + (q[2] - p[2]) ** 2)
+    return total_mm * fl.MM   # mm → metres (fl.MM = 0.001)
+
+
+def _sized_dia_mm(nm, mech, waypoints, edge, carried_value=None, role=None):
+    """THE sizing chokepoint (kills PIPE_DIA_MM = 190). Measure the routed-polyline
+    length, ask connection_sizing.size_connection for the REAL connection size from
+    the edge's rating, record the ConnectionSpec (for the schedule) and RETURN the
+    outer diameter the cylinder/tray is drawn at, in MILLIMETRES (prim_pipe_run +
+    _draw_cable_tray apply the × fl.MM mm→Blender-unit conversion internally).
+
+      edge          : the topology edge dict carrying constraint_kind / required_value
+                      / required_unit / required_margin_factor / material_context
+                      / mechanism. May be None / rating-less for a derived fan-out
+                      with no parent rating — then we fall back to a SMALL default
+                      diameter (NOT 190) and note it in the spec.
+      carried_value : OVERRIDE rating for THIS segment (a trunk = Σ load; a tap =
+                      total/N) — passed straight to size_connection.
+      role          : 'trunk' | 'branch' | None, stamped on the spec for the schedule.
+
+    Material/colour stays by-mechanism (the caller owns it); ONLY the diameter
+    changes. A 1562 A DC bus renders fat, a drip line thin — by arithmetic, not a
+    constant."""
+    import copy
+    length_m = _polyline_len_m(waypoints)
+    e = dict(edge) if isinstance(edge, dict) else {}
+    e.setdefault("mechanism", mech)
+    # The edge must carry a rating to be sized. If it has neither an explicit
+    # required_value nor an override carried_value, fall back to a small default.
+    has_rating = (carried_value is not None) or (e.get("required_value") is not None)
+
+    # Memo key: the rating-determining inputs + a 0.5 m length bucket (length only
+    # shifts volt-drop %, not the chosen size, so coarse bucketing is safe). Identical
+    # rack taps hit the cache → the physics tool runs once, not once per rack.
+    sig = (mech, e.get("constraint_kind"), e.get("required_value"),
+           e.get("required_unit"), e.get("required_margin_factor"),
+           e.get("material_context"), carried_value, round(length_m * 2) / 2.0)
+    cached = _SIZING_CACHE.get(sig)
+    if cached is not None:
+        spec = copy.deepcopy(cached)
+        spec["length_m"] = round(length_m, 2)   # keep THIS run's exact length
+    elif not has_rating and not e.get("constraint_kind"):
+        # No rating + no constraint_kind ⇒ nothing to size from. Small fallback dia.
+        spec = cs._spec(
+            kind="unsized", mechanism=mech,
+            size_label="(no rating — fallback)",
+            outer_dia_mm=CONN_FALLBACK_DIA_MM,
+            material_qty_desc=f"{mech} run, {length_m:.1f} m (no rating)",
+            tool_used="(fallback — derived edge carried no parent rating)",
+            assumptions=["no constraint_kind / required_value on this edge or its "
+                         "parent fan-out; drawn at the small fallback diameter "
+                         f"({CONN_FALLBACK_DIA_MM:g} mm), NOT the old 190 mm"],
+            notes="un-rated edge — small fallback diameter (NOT 190)",
+        )
+        spec["from_part"] = e.get("from_part")
+        spec["to_part"] = e.get("to_part")
+        spec["length_m"] = round(length_m, 2)
+        _SIZING_CACHE[sig] = copy.deepcopy(spec)
     else:
-        fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=_mech_pipe_mat(mech, MAT),
+        try:
+            spec = cs.size_connection(e, length_m, carried_value=carried_value)
+        except Exception as ex:  # noqa: BLE001 — never let sizing kill a run
+            print(f"[univ][conn] sizing FAILED for {nm} ({mech}): {ex}; fallback dia")
+            spec = cs._spec(kind="unsized", mechanism=mech,
+                            size_label="(sizing error — fallback)",
+                            outer_dia_mm=CONN_FALLBACK_DIA_MM,
+                            notes=f"sizing error: {ex}")
+            spec["length_m"] = round(length_m, 2)
+        _SIZING_CACHE[sig] = copy.deepcopy(spec)
+    spec["run_name"] = nm
+    # THIS run's own endpoints (a cache hit shares physics, NOT the from/to labels —
+    # each rack tap reaches a different consumer).
+    if e.get("from_part") is not None:
+        spec["from_part"] = e.get("from_part")
+    if e.get("to_part") is not None:
+        spec["to_part"] = e.get("to_part")
+    if role:
+        spec["role"] = role
+    _CONN_SPECS.append(spec)
+
+    od = spec.get("outer_dia_mm")
+    if od is None or not (od > 0):
+        od = CONN_FALLBACK_DIA_MM
+    od = max(od, CONN_MIN_RENDER_DIA_MM)   # keep the thinnest run visible
+    # Return in MILLIMETRES — the unit prim_pipe_run + _draw_cable_tray consume
+    # (they apply the × fl.MM mm→Blender-unit conversion internally).
+    return od
+
+
+def _draw_run(nm, mech, waypoints, a_xyz, b_xyz, MAT, MO, pipe_module,
+              conn=(), own_parts=(), log=True, edge=None, carried_value=None,
+              role=None):
+    """Draw ONE routed run (cable-tray for electrical, round pipe otherwise) at its
+    REAL sized diameter and log it for the route audit. Shared by the per-edge path,
+    the passthrough path, the TRUNK and the TAP — so every emitted polyline gets the
+    identical geometry + the identical self-audit coverage + the identical
+    rating-driven sizing. `edge`/`carried_value`/`role` drive _sized_dia_mm."""
+    dia_mm = _sized_dia_mm(nm, mech, waypoints, edge, carried_value=carried_value,
+                           role=role)
+    if mech == "electrical_bus":
+        _draw_cable_tray(nm, waypoints, MAT, MO, dia_mm=dia_mm)
+    else:
+        fl.prim_pipe_run(nm, waypoints, dia_mm,
+                         material=_mech_pipe_mat(mech, MAT),
                          flanges=True, connect=tuple(c for c in conn if c is not None),
                          module=pipe_module, module_objects=MO)
     if log:
@@ -4111,7 +4441,8 @@ def _emit_trunk_group(group, rack_plan, slot, rack_base_z, MAT, MO, pipe_module,
             nm = f"u_route_{tag}trunk{slot}_{mech}_tap{k}"
             wp = route_rack(origin, c["xyz"], rack_base_z + RACK_TIER_PITCH_MM * (k % 4))
             try:
-                _draw_run(nm, mech, wp, origin, c["xyz"], MAT, MO, pipe_module)
+                _draw_run(nm, mech, wp, origin, c["xyz"], MAT, MO, pipe_module,
+                          edge=c.get("edge"), role="branch")
                 emitted += 1
             except Exception as ex:  # noqa: BLE001
                 print(f"[univ] trunk tap {nm} FAILED: {ex}")
@@ -4138,7 +4469,10 @@ def _emit_trunk_group(group, rack_plan, slot, rack_base_z, MAT, MO, pipe_module,
                               a_abstract=True, b_abstract=True, own=())
     trunk_nm = f"u_trunk_{tag}{slot}_{mech}"
     try:
-        _draw_run(trunk_nm, mech, trunk_wp, o_far_pt, far_pt, MAT, MO, pipe_module)
+        # the TRUNK carries the SUMMED load (group['trunk_edge']) → renders FATTER
+        # than any tap. role='trunk' for the schedule.
+        _draw_run(trunk_nm, mech, trunk_wp, o_far_pt, far_pt, MAT, MO, pipe_module,
+                  edge=group.get("trunk_edge"), role="trunk")
         emitted += 1
         print(f"[univ] TRUNK {tag}{slot} ({mech}): {group['origin_nm']} "
               f"busway along {len(consumers)} consumers")
@@ -4171,8 +4505,11 @@ def _emit_trunk_group(group, rack_plan, slot, rack_base_z, MAT, MO, pipe_module,
                 tap_wp.append(p)
         tap_nm = f"u_tap_{tag}{slot}_{mech}_{k}"
         try:
+            # each TAP carries one consumer's share (c['edge'] = total/N) → thinner
+            # than the trunk. role='branch' for the schedule.
             _draw_run(tap_nm, mech, tap_wp, (tap_on_trunk[0], tap_on_trunk[1]),
-                      (cx, cy), MAT, MO, pipe_module, own_parts=(c.get("pb"),))
+                      (cx, cy), MAT, MO, pipe_module, own_parts=(c.get("pb"),),
+                      edge=c.get("edge"), role="branch")
             emitted += 1
         except Exception as ex:  # noqa: BLE001
             print(f"[univ] tap {tap_nm} FAILED: {ex}")
@@ -4249,8 +4586,12 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
                                    rack_base_z + RACK_TIER_PITCH_MM * (slot % 4))
         nm = f"u_route_{tag}{i}_{mech}"
         try:
+            # SIZE this passthrough run at its REAL diameter from the edge rating (the
+            # raw topology edge carried on the resolved dict). One size for the whole
+            # run; the cable tray / pipe both honour it.
+            dia_mm = _sized_dia_mm(nm, mech, waypoints, r.get("edge"))
             if mech == "electrical_bus":
-                _draw_cable_tray(nm, waypoints, MAT, MO)
+                _draw_cable_tray(nm, waypoints, MAT, MO, dia_mm=dia_mm)
                 # branch drops to the top matched loads — TAP off the spine at the
                 # point NEAREST each load (short lateral + drop), not the run end.
                 for j, drop in enumerate(r.get("b_branch", [])):
@@ -4262,7 +4603,7 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
                     else:
                         bwp = route_rack((waypoints[-1][0], waypoints[-1][1],
                                           waypoints[-1][2]), drop, rack_base_z)
-                    _draw_cable_tray(f"{nm}_branch{j}", bwp, MAT, MO)
+                    _draw_cable_tray(f"{nm}_branch{j}", bwp, MAT, MO, dia_mm=dia_mm)
                 _route_log_add(nm, mech, waypoints, a_xyz, b_xyz, own_parts=(pa, pb))
                 routed += 1
                 print(f"[univ] routed edge {tag}{i} ({mech}) CABLE-TRAY: "
@@ -4271,7 +4612,8 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
             else:
                 conn = tuple(c for c in (r.get("a_conn"), r.get("b_conn"))
                              if c is not None)
-                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=_mech_pipe_mat(mech, MAT),
+                fl.prim_pipe_run(nm, waypoints, dia_mm,
+                                 material=_mech_pipe_mat(mech, MAT),
                                  flanges=True, connect=conn,
                                  module=pipe_module, module_objects=MO)
                 _route_log_add(nm, mech, waypoints, a_xyz, b_xyz, own_parts=(pa, pb))
@@ -4548,11 +4890,19 @@ def place_generic_assembly(parts, regions, topology, MAT, MO):
     # Scale the ROUTING constants too (lane/tier pitch, min leg, lane span, the
     # direct-jumper threshold) so a centimetre-scale device's spine geometry shrinks
     # with it — a fixed 300 mm riser / 13 m direct cap would dwarf a 14 mm pod.
+    # Scale the sized-connection FALLBACK + MIN-RENDER diameters with the assembly
+    # too (a cm-scale device's un-rated data/control connectors must shrink with it —
+    # a fixed 60 mm fallback / 12 mm floor would dwarf a 14 mm pod). A device's edges
+    # are mostly data/control (no flow rating) so they take the fallback path; scaling
+    # it keeps them proportional. Rated edges (rare on a device) still size from the
+    # real diameter, which is already physically scaled.
     _GA_ROUTE_GLOBALS = ("PIPE_DIA_MM", "RACK_TIER_PITCH_MM", "RACK_LANE_PITCH_MM",
-                         "RACK_LATERAL_MIN_MM", "RACK_LANE_SPAN_MM", "RACK_DIRECT_MAX_MM")
+                         "RACK_LATERAL_MIN_MM", "RACK_LANE_SPAN_MM", "RACK_DIRECT_MAX_MM",
+                         "CONN_FALLBACK_DIA_MM", "CONN_MIN_RENDER_DIA_MM")
     _GA_ROUTE_FLOORS = {"PIPE_DIA_MM": 12.0, "RACK_TIER_PITCH_MM": 20.0,
                         "RACK_LANE_PITCH_MM": 24.0, "RACK_LATERAL_MIN_MM": 20.0,
-                        "RACK_LANE_SPAN_MM": 160.0, "RACK_DIRECT_MAX_MM": 200.0}
+                        "RACK_LANE_SPAN_MM": 160.0, "RACK_DIRECT_MAX_MM": 200.0,
+                        "CONN_FALLBACK_DIA_MM": 6.0, "CONN_MIN_RENDER_DIA_MM": 3.0}
     route_saved = {k: globals()[k] for k in _GA_ROUTE_GLOBALS}
     try:
         for k in _GA_ROUTE_GLOBALS:
@@ -5462,6 +5812,8 @@ def _route_rack_farm_topology(topology, parts, rack_anchors, bop_anchor,
             "a_abstract": True, "b_abstract": True,
             "a_conn": None, "b_conn": None, "b_branch": [],
             "pa": None, "pb": None, "a_nm": frm, "b_nm": to,
+            # carry the raw topology edge (rating fields) for real diameter sizing.
+            "edge": e,
         })
 
     # ── UNIVERSAL per-rack flow DERIVATION: DC bus → each rack (+ PCS/transformer),
@@ -6070,6 +6422,8 @@ def _route_panel_array_topology(topology, parts, rack_anchor_by_index, bop_ancho
             "a_abstract": True, "b_abstract": True,
             "a_conn": None, "b_conn": None, "b_branch": [],
             "pa": None, "pb": None, "a_nm": frm, "b_nm": to,
+            # carry the raw topology edge (rating fields) for real diameter sizing.
+            "edge": e,
         })
 
     # ── UNIVERSAL per-rack flow DERIVATION: panel → each grow rack (+ HVAC) for the
@@ -6748,14 +7102,16 @@ def _route_tower_machine_topology(topology, parts, hub_pt, nacelle_pt, base_pt,
         waypoints = [a, (b[0], b[1], min(a[2], nacelle_pt[2])), b]
         nm = f"u_tm_route_{i}_{mech}"
         try:
+            # SIZE the down-tower run at its real diameter from the edge rating.
+            dia_mm = _sized_dia_mm(nm, mech, waypoints, e)
             if mech in ("electrical_bus", "data_link", "control_signal", "signal"):
-                _draw_cable_tray(nm, waypoints, MAT, MO)
+                _draw_cable_tray(nm, waypoints, MAT, MO, dia_mm=dia_mm)
             else:
                 colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
                 mkey = f"u_pipe_{mech}"
                 if mkey not in MAT:
                     MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35, roughness=0.35)
-                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM, material=MAT[mkey],
+                fl.prim_pipe_run(nm, waypoints, dia_mm, material=MAT[mkey],
                                  flanges=True, module="mass_fluid_transport_process",
                                  module_objects=MO)
             _route_log_add(nm, mech, waypoints, a, b)   # audit coverage (down-tower)
@@ -7698,14 +8054,15 @@ def _aero_route_topology(topology, parts, anchors, subtype, frame_top_mm, bbox,
         nm = f"u_aero_route_{i}_{mech}"
         try:
             # aero edges are electrical/data → cable tray; only an explicit fluid/
-            # thermal loop (rare here) draws as a pipe.
+            # thermal loop (rare here) draws as a pipe, sized from its rating.
             if mech in ("fluid_loop", "thermal"):
                 colour = MECH_COLOUR.get(mech, MECH_DEFAULT_COLOUR)
                 mkey = f"u_pipe_{mech}"
                 if mkey not in MAT:
                     MAT[mkey] = fl.make_mat(f"m_{mkey}", colour, metallic=0.35,
                                             roughness=0.35)
-                fl.prim_pipe_run(nm, waypoints, PIPE_DIA_MM * 0.5, material=MAT[mkey],
+                dia_mm = _sized_dia_mm(nm, mech, waypoints, e)
+                fl.prim_pipe_run(nm, waypoints, dia_mm, material=MAT[mkey],
                                  flanges=False, module="mass_fluid_transport_process",
                                  module_objects=MO)
             else:
@@ -8788,6 +9145,11 @@ def main():
     # from the emitted polylines + equipment footprints; writes route-audit.json.
     route_metrics = audit_routes(parts, out_dir)
 
+    # ── CONNECTION SCHEDULE (Phase C) — the BoM feedback. Every run was sized at its
+    # REAL diameter from its rating; collect the ConnectionSpecs into the distribution
+    # schedule (cable-m by CSA, pipe-m by DN, duct-m by size) + flag out-of-spec runs.
+    conn_schedule = write_connection_schedule(out_dir)
+
     # ── INSPECT MODE (default ON) — the FAST visual-judge surface ──
     # When INSPECT=1 (the loop's default), render the CLEAN CAD-inspection set
     # (bright light deck, flat-matte by part type, de-emphasised frame, four
@@ -8833,6 +9195,7 @@ def main():
               "topology_unresolved": [u[:3] for u in unresolved],
               "regions": regions,
               "route_audit": route_metrics,
+              "connection_schedule_totals": conn_schedule.get("totals"),
               "inspect": _inspect_summary,
           }))
 
