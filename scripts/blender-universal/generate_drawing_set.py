@@ -162,6 +162,17 @@ def generate_drawing_set(state_path: str | Path,
     schedules = _group(SCHEDULE_DRAWINGS)
     n_ok = sum(1 for d in system + schedules if d["ok"])
 
+    # The universal-CAD HERO render for the dossier cover + per-module fallback
+    # (build_universal_scene.py writes inspect-iso.png to out_dir). The chain reads
+    # manifest["hero"] → state.cad_hero_image_path so the new Blender image lands in
+    # the PDF where a class has no template (e.g. e-fuel). Prefer the iso view.
+    hero_abs = None
+    for cand in ("inspect-iso.png", "inspect-hero.png", "cad-hero.png"):
+        p = out_dir / cand
+        if p.exists() and p.stat().st_size > 1000:
+            hero_abs = str(p)
+            break
+
     manifest = {
         "schema": "drawing-set/v1",
         "placement": "lead-and-weave",
@@ -172,6 +183,8 @@ def generate_drawing_set(state_path: str | Path,
         "system_drawings": system,
         # schedules/details WEAVE into the Part-2 manufacturing layer.
         "schedule_drawings": schedules,
+        # the universal-CAD hero render → state.cad_hero_image_path (cover + module fallback).
+        "hero": hero_abs,
         # the cable schedule is the connection schedule rendered as a table.
         "cable_schedule_source": ("connection-schedule.json"
                                   if (out_dir / "connection-schedule.json").exists()

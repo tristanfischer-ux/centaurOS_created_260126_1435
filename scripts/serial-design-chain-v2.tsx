@@ -1154,6 +1154,8 @@ YOUR JOB — four concerns, applied to the ENTIRE design:
 
    3c. ENGLISH SENTENCE — RICH PROSE PARAGRAPH (Phase A rewrite 2026-05-15, financial suppression added 2026-05-15): every sub-module's english_sentence MUST be a 150-200 word natural-English PROSE PARAGRAPH that names every word in the sub-module AND weaves in every TECHNICAL modifier_character (manufacturer, part_number, material, dimensions, rating, regulatory, operating_temp_range, ip_rating, etc.) using natural English prepositions, not as a comma list. The downstream BoM table will be built by aggregating the words/modifiers themselves — this paragraph is what the engineer READS.
 
+   SUBJECT RULE — NAME THE EQUIPMENT, NOT THE FUNCTION TAXONOMY (Tristan 2026-06-09, UNIVERSAL across every product class): the paragraph's grammatical SUBJECT must be the sub-module's REAL EQUIPMENT NAME — its primary word's name_human (words[0].name_human, e.g. "The packed absorber column …", "The stirred carbonation reactor …", "The CaCO3 vacuum belt filter …", "The MEA circulation pump …"). NEVER use the function-taxonomy label — the sub-module's id or its name_human (e.g. "the mass fluid transport process", "the energy conversion - chemical reaction", "the fluid transport", "the safety & protection - chemical sensing") — as the subject, or anywhere in the prose. Those are internal design radicals, NOT equipment; to a chemical/mechanical engineer they read as machine-generated jargon and are the single biggest readability defect in the dossier. Lead with the principal piece of equipment and name the remaining words[] naturally. The SAME rule applies to 3d (module overview): refer to each sub-module by its equipment name, never its function-radical label (write "routed through the bagging line", not "routed through the mass fluid transport process").
+
    HARD SUPPRESSION RULES (Tristan 2026-05-15, both UNIVERSAL across every product class):
      A. lead_time / "lead time" / "N-week lead" / "supplied via X with N-week" / "delivery in N weeks" / etc. — PERMANENTLY suppressed. Lead times are fabricator-specific and always require human conversation with a contract manufacturer; the engine cannot generate trustworthy lead times under any condition. NEVER mention them in prose.
      B. unit_cost_estimate_gbp / cost / price / £ / $ / € / "approximately £N" / "estimated cost" — TEMPORARILY suppressed until the BoM table + assumptions ledger exist. After that, costs return; lead times do not.
@@ -6592,6 +6594,41 @@ async function main() {
       console.error(`[chain] investor-section enrichment failed (non-fatal): ${(err as Error).message.slice(0, 120)}`)
       logAction({ step: 'investor_section', latency_ms: Date.now() - tInv, ok: false, error: String(err).slice(0, 200) })
     }
+  }
+
+  // ── Design-and-construction drawings + universal-CAD hero (Tristan 2026-06-11) ──
+  // Generate the 8 drawings + the universal-CAD hero from the FINAL state, just
+  // before render, so they land in the PDF: the 3 SYSTEM drawings (GA, single-line,
+  // P&ID) open Part 2 (lead-and-weave); the hero fills the cover + per-module image
+  // gap for templateless classes (e.g. e-fuel, which is not slug-mapped and otherwise
+  // shows no 3D image). generate_drawing_set.py reuses the routed-CAD artifacts when
+  // present else runs headless Blender; it writes drawing-manifest.json into outDir
+  // (the renderer reads it) and we wire manifest.hero → state.cad_hero_image_path.
+  // NON-FATAL: a failure here must never break the dossier — every image read in the
+  // renderer is guarded, so an absent drawing/hero simply doesn't render.
+  try {
+    const tDraw = Date.now()
+    const venvPy = resolve(__dirname, '..', '.venv', 'bin', 'python')
+    const pyBin = existsSync(venvPy) ? venvPy : 'python3'
+    execFileSync(pyBin, [resolve(__dirname, 'blender-universal', 'generate_drawing_set.py'), statePath, outDir], {
+      stdio: 'inherit',
+      cwd: resolve(__dirname, '..'),
+      env: { ...process.env },
+    })
+    const manifestPath = resolve(outDir, 'drawing-manifest.json')
+    if (existsSync(manifestPath)) {
+      const dm = JSON.parse(readFileSync(manifestPath, 'utf-8'))
+      if (dm?.hero && existsSync(dm.hero)) {
+        const onDisk = JSON.parse(readFileSync(statePath, 'utf-8'))
+        onDisk.cad_hero_image_path = dm.hero
+        writeFileSync(statePath, JSON.stringify(onDisk))
+        console.log(`[chain] drawing-set: ${dm.generated_ok}/${dm.total} drawings + hero → wired into the PDF`)
+      }
+    }
+    logAction({ step: 'drawing_set', latency_ms: Date.now() - tDraw, ok: true })
+  } catch (err) {
+    console.error(`[chain] drawing-set generation failed (non-fatal): ${(err as Error).message}`)
+    logAction({ step: 'drawing_set', ok: false, error: String(err).slice(0, 200) })
   }
 
   const pdfPath = resolve(outDir, 'chain-v2.pdf')
