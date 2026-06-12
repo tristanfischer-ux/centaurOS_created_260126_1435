@@ -29,20 +29,24 @@ forgeos_gotchas_bc02fad34b716b71). 3-layer root cause + fixes:
   aggregator's `total_plant_mass_kg` scales 1.59× — affects embodied-CO2 + transport numbers, NOT the headline
   cost. Needs the chain mass-attribution stage + a consumer check. Also: e-fuel inline L3 → shared-util dedup.
 
-## ✅ DONE 2026-06-12 — W3.2 (a) + iterative visual loop (b) + plans (c)(d)
-- **(a) `4a28ac2a6`** physics-CAD convergence wired into the chain (generate_drawing_set →
-  convergence-report.json); dossier states "converged in N iterations" (2× SAF: 2 iters).
-- **(b) `c3b643093`** ITERATIVE Blender visual loop: `render_quality_score.py` (deterministic
-  object-fraction/clip/centre) + `visual_converge.py` (render→score→reframe→re-render, round
-  counter). Verified: a forced too-tight render iterates 0.512→0.728→0.843 across rounds.
-- **(c) `0057d08a7`** `DESIGN-TO-BUDGET-PLAN.md` — fix £ → conforming design (iteration loop,
-  cost-lever operators). **(d)** `DESIGN-TO-ENVELOPE-PLAN.md` — fit a 40ft hi-cube etc. (the
-  sizing-bug detector). Both AWAIT Tristan's steer on which to BUILD first.
+## ✅ DONE 2026-06-12 — W3.2 (a)+(b) + design-to-envelope (d) + design-to-budget (c) all BUILT
+- **(a) `4a28ac2a6`** physics-CAD convergence wired into the chain → convergence-report.json; dossier
+  states "converged in N iterations" (2× SAF: 2 iters).
+- **(b) `c3b643093`** ITERATIVE Blender visual loop: `render_quality_score.py` (deterministic object-
+  fraction/clip/centre) + `visual_converge.py` (render→score→reframe→re-render). Verified iterating 0.512→0.728→0.843.
+- **(d) design-to-envelope BUILT** (`5aefd329b`+`705a4d7dd`+`19082439a`): `envelope_fit_audit.py` (partial-fit:
+  skids IN, columns/piping field-erected; the bug-finder — caught a dims defect on first run) + qty-aware
+  shelf-pack + OUTPUT-FLEX (envelope sets scale → output; 2× SAF: 1 box » 77 t/yr, 26 » 2000) +
+  `draw_envelope_pack.py` containerisation diagram + opt-in `ENVELOPE` chain step + dossier page. Verified e-fuel+co2.
+- **(c) design-to-budget BUILT** (`e8fc57124`): `budget_solve.py` — budget SETS the scale, output is the
+  dependent variable; six-tenths inverse `output=current×(budget/cost)^(1/0.6)` (½ budget→0.315≈300/1000) +
+  budget→output flex + opt-in `BUDGET` chain step + 'Design to budget' dossier page. Verified £22M→2000, £11M→630.
+- The two loops COMPOSE (budget + envelope). Both verified end-to-end (tool + chain wiring + page).
 
 ## ▶ NEXT 3 (in order)
-1. **BUILD (c) or (d)** per Tristan's steer (design-to-budget or design-to-envelope; both planned).
+1. **(c)/(d) enhancement** — the actual RE-DESIGN at the solved scale (one chain run at the flexed output/capacity), + envelope re-design loop (P4) + a vertical-farm verify (P6, the direct-flex case).
 2. **W6** BoM DATA coverage / growing-DB — the AIM's real long pole (per-class branded-parts on the fly).
-3. **tail cleanups** — wire visual_converge as an opt-in chain step + surface visual rounds in the renderer; #86 total_system_mass carbon/transport; e-fuel→shared-util dedup.
+3. **tail cleanups** — #86 total_system_mass carbon/transport; e-fuel inline-L3 → shared-util dedup; visual_converge as an opt-in chain step + surface visual rounds in the renderer.
 
 ---
 
