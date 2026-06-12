@@ -5,6 +5,17 @@ envelope size, e.g. 40 ft hi-cube shipping containers. This should really find b
 would be massively useful." His view: "the Blender model needs to be able to go through
 multiple iterations."
 
+> **REFINEMENT (Tristan, same day) — two principles:**
+> 1. **The envelope SETS THE VOLUME; OUTPUT is the dependent variable.** Forcing a design into
+>    a smaller box reduces what it can produce, and that reduction IS the answer: "if the
+>    original design grows 1,000 m² of vegetables but you say 'put it in a shipping container',
+>    you might only grow ~100 m² — there will be an impact on output." So envelope-fit is not
+>    pass/fail on the *original* output; it SOLVES the output the envelope holds and reports it.
+> 2. **Fit is PARTIAL — some items go IN the box, some come OUT.** Items that "would normally
+>    not fit properly" — piping runs, interconnects, tall columns — are legitimately taken OUT
+>    of the container (external / field-erected / run between boxes). The container holds the
+>    modular CORE; the interconnect + the giants are external and listed as such. Not all-or-nothing.
+
 ## 1. The shape of the problem
 A physical **envelope** (a 40 ft hi-cube container: internal ≈ **12.03 × 2.35 × 2.70 m**;
 a 20 ft ≈ 5.90 × 2.35 × 2.39 m; or an arbitrary building bay) is a hard SPATIAL

@@ -3,6 +3,15 @@
 **Ask (Tristan 2026-06-12):** "fix a budget and then the engine will give me a design
 that conforms to that budget. It may result in a very different design."
 
+> **REFINEMENT (Tristan, same day) — the budget SETS THE SCALE; OUTPUT is the dependent
+> variable.** This is NOT only "reduce cost". The budget is the independent input; the plant's
+> OUTPUT rises and falls with it: "with the original budget you make ~1,000 units; with HALF
+> the budget you might make only ~300 units" — and that is a perfectly acceptable ANSWER, not a
+> failure. So the engine SOLVES the capacity the budget affords (via the cost↔capacity curve)
+> and reports the output that budget buys. Almost always feasible (every budget above a min
+> scale buys SOME output) — so the default deliverable is "£B → X units", not "infeasible".
+> §1, §4 and §5 below are written to this framing.
+
 ## 1. The shape of the problem
 Today the engine runs **forward**: brief → design → cost. Design-to-budget runs the
 **inverse**: brief + £ ceiling → a design whose cost ≤ ceiling. There is rarely a
