@@ -669,9 +669,12 @@ function primarySpecValue(w: W): number {
   }
   return 0
 }
-function scaleBomPricesToThroughput(modules: DesignModule[], pRef: EFuelParams): void {
+// Genuinely ~fixed-cost equipment (control + safety electronics) — never gets the
+// class-output fallback scaling. A bigger plant needs the same DCS/SIS, not 1.5x of it.
+const FIXED_COST_LINE = /dcs|safety_instrumented|sil_barrier|fire_gas|flame_detector|esd_valve|control_cabinet/i
+function scaleBomPricesToThroughput(modules: DesignModule[], pRef: EFuelParams, pNow: EFuelParams): void {
   // reference specs from the SAME equipment emitters at the design point (M1-M7;
-  // M8 instrumentation is small-£ + count-driven, left flat).
+  // M8 instrumentation is count-driven, scaled via the class-output fallback below).
   const refModules: DesignModule[] = [
     emitFeedstockConditioning(pRef), emitSynthesis(pRef), emitSeparationRecycle(pRef),
     emitUpgradingFractionation(pRef), emitUtilitiesOffsites(pRef), emitProductStorageLoading(pRef),
@@ -681,16 +684,25 @@ function scaleBomPricesToThroughput(modules: DesignModule[], pRef: EFuelParams):
   for (const m of refModules) for (const sm of m.sub_modules) for (const w of sm.words) {
     const s = primarySpecValue(w); if (s > 0) refSpec.set(w.id, s)
   }
+  // Class-output ratio: a process line with NO scaling per-line spec (a fixed-dimension
+  // vessel, a skid, an equipment charge) still scales with the plant's production rate
+  // (six-tenths) — unless it is a fixed-cost control item. This catches the lines whose
+  // SPEC itself is a frozen literal (which the per-line ratio leaves at 1.0).
+  const classRatio = pRef.safOutputTonnesYr > 0 ? pNow.safOutputTonnesYr / pRef.safOutputTonnesYr : 1
   for (const m of modules) for (const sm of m.sub_modules) for (const w of sm.words) {
-    const now = primarySpecValue(w); const ref = refSpec.get(w.id)
-    if (!now || !ref || ref <= 0) continue
-    const ratio = now / ref
-    if (Math.abs(ratio - 1) < 0.02) continue              // spec unchanged → price unchanged
     const pm = w.modifier_characters.find(x => x.kind === 'list_price_gbp')
     if (!pm) continue
     const base = Number(pm.value)
     if (!Number.isFinite(base) || base <= 0) continue
-    pm.value = String(Math.round(base * Math.pow(ratio, 0.65)))
+    const now = primarySpecValue(w); const ref = refSpec.get(w.id)
+    let factor = 1
+    if (now && ref && ref > 0 && Math.abs(now / ref - 1) >= 0.02) {
+      factor = Math.pow(now / ref, 0.65)                  // bottom-up: this line's own size spec
+    } else if (!FIXED_COST_LINE.test(w.id) && Math.abs(classRatio - 1) >= 0.02) {
+      factor = Math.pow(classRatio, 0.65)                 // fallback: process equipment ∝ plant output
+    }
+    if (Math.abs(factor - 1) < 0.02) continue
+    pm.value = String(Math.round(base * factor))
   }
 }
 
@@ -732,7 +744,7 @@ const emitter: ClassEmitter = (contract, _brief, _envelope): DesignJSON => {
   // Layer-3 cost-scale: scale every BoM price pin to the brief's production rate
   // (six-tenths on each line's own size spec vs the 1,000 t/yr design point) so the
   // dossier cost tracks the plant size, not the design-point author guesses.
-  scaleBomPricesToThroughput(modules, deriveParams({ quantities: {} } as any))
+  scaleBomPricesToThroughput(modules, deriveParams({ quantities: {} } as any), p)
 
   const links = emitCrossModuleGrammarLinks(p)
   // M8 cross-module link: field transmitters send 4–20 mA / HART / PROFINET
