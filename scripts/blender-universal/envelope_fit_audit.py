@@ -174,7 +174,7 @@ def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube",
                 "current_output": O, "unit": headline_output.get("unit", ""),
                 "metric": headline_output.get("metric", ""),
                 "current_containers": N,
-                "output_for_containers": {str(k): round(O * k / N, 3) for k in ks},
+                "output_for_containers": {str(k): float(f"{O * k / N:.3g}") for k in ks},
                 "note": ("containerisable-footprint LINEAR flex. {0} field-erected item(s) "
                          "(reactor/columns/tanks/piping) are external at any scale — for a "
                          "process plant they govern the true output, so treat this as indicative; "
