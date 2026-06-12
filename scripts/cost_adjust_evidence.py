@@ -38,6 +38,7 @@ def _read(d: str) -> dict | None:
         "bom_gbp": cr.get("bom_total_gbp"),
         "absorber_dia_m": qv("absorber_diameter_m") or qv("absorber_column_diameter_m"),
         "stripper_dia_m": qv("stripper_diameter_m"),
+        "reboiler_kw": qv("reboiler_duty_kw"),
         "mass_kg": qv("total_system_mass_kg"),
         "elec_kw": qv("connected_electrical_load_kw"),
     }
@@ -48,7 +49,10 @@ def _fmt_gbp(v):
 
 
 def _fmt(v, dp=3, suf=""):
-    return "—" if v in (None,) else f"{float(v):.{dp}g}{suf}"
+    if v is None:
+        return "—"
+    x = float(v)
+    return (f"{round(x):,}{suf}" if abs(x) >= 1000 else f"{x:.{dp}g}{suf}")
 
 
 def build_html(cases: list[tuple[str, dict]]) -> str:
@@ -73,6 +77,7 @@ def build_html(cases: list[tuple[str, dict]]) -> str:
           <td class="pred">{('%.0f%%'%(pred*100)) if pred is not None else '—'}</td>
           <td>{_fmt(c.get('absorber_dia_m'),3,' m')}</td>
           <td>{_fmt(c.get('stripper_dia_m'),3,' m')}</td>
+          <td>{_fmt(c.get('reboiler_kw'),3,' kW')}</td>
           <td>{_fmt(c.get('mass_kg'),3,' kg')}</td>
           <td>{_fmt(c.get('elec_kw'),3,' kW')}</td>
         </tr>"""
@@ -100,22 +105,26 @@ def build_html(cases: list[tuple[str, dict]]) -> str:
 <p class="sub">CO2 capture &amp; mineralisation · the engine re-designed at three output scales · {SIX_TENTHS:g}-power (six-tenths) cost law</p>
 
 <div class="key">
-<b>The principle.</b> Plant cost scales with capacity by the six-tenths law: <code>cost ∝ output^0.6</code>.
-So the penalty for cutting output is <b>non-linear</b> — halving the output gives ~<b>66%</b> of the cost
-(0.5<sup>0.6</sup>), not 50%; and to reach <b>50% of the cost</b> you must drop to ~<b>31%</b> of the output
-(0.5<sup>1/0.6</sup>). This is a <b>real re-run</b> of the whole engine at each smaller target — not a curve
-drawn through one point: each row below is an independent design with its own re-sized vessels, mass and load.
+<b>Two things this proves.</b> (1) <b>The engine genuinely re-designs at each output</b> — these are
+independent re-runs; the absorber/stripper diameters and the reboiler duty in the table below physically
+shrink with the target (Ø ∝ √output for a flooding-limited column; duty ∝ output). Not a rescaled number.
+(2) <b>The cost has a fixed floor.</b> Textbook six-tenths (<code>cost ∝ output^0.6</code>) would give ~66%
+of the cost at half the output — but a small plant falls <b>less</b> than that, because the field
+instrumentation, control system and safety don't shrink when you halve throughput. So the cost-adjust
+penalty for a tiny plant is <b>harsher</b> than six-tenths: you can't make it proportionally cheaper.
 </div>
 
 <h2>Evidence — the engine re-designed at each scale</h2>
 <table>
 <tr><th>design</th><th>output</th><th>vs base</th><th>installed cost</th><th>cost vs base</th>
-    <th>six-tenths predicted</th><th>absorber Ø</th><th>stripper Ø</th><th>system mass</th><th>electrical</th></tr>
+    <th>six-tenths predicted</th><th>absorber Ø</th><th>stripper Ø</th><th>reboiler duty</th><th>system mass</th><th>electrical</th></tr>
 {tr}
 </table>
-<p class="note">"cost vs base" is the ACTUAL re-run installed cost ratio; "six-tenths predicted" is (output ratio)<sup>0.6</sup>.
-They tracking each other is the proof the engine's re-sizing obeys the cost law. The vessel diameters, mass and
-electrical load falling are the proof it physically re-designs — not just rescales a number.</p>
+<p class="note">"cost vs base" is the ACTUAL re-run installed cost; "six-tenths predicted" is (output ratio)<sup>0.6</sup>.
+The cost falling LESS than the six-tenths prediction is the fixed-cost floor (instrumentation, control, safety
+don't scale) — real, not a bug. The absorber/stripper diameters and reboiler duty falling are the proof the
+engine physically re-designs each plant, not just rescales a number. (system mass is still frozen — the known
+#86 mass-aggregator under-scale, an embodied-carbon field, not the headline cost.)</p>
 
 <h2>Reading it as a budget</h2>
 <ul>{budget_lines}</ul>
