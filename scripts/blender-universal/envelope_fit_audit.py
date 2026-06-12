@@ -35,6 +35,18 @@ PACK_EFFICIENCY = 0.75  # floor-area utilisation a real shelf/aisle pack achieve
 ACCESS_AISLE_M = 0.8    # walkway reserved from container WIDTH (install/wire/maintain) —
 #                         single source of truth, shared by shelf_pack + draw_envelope_pack
 
+# The parts-manifest dims_mm are the as-DRAWN Blender bounding boxes — authored for the GA
+# RENDER, not for physical packing. Two render artefacts wreck a naive pack: (1) field
+# instruments are scaled UP for visibility (a point transmitter drawn ≈1×1 m), and (2) a
+# cabinet row is drawn as ONE block of min(qty,6) units (≈4.4 m wide) while the manifest still
+# carries the full qty — so the audit multiplies an already-aggregated footprint by qty again,
+# inflating the container count ~10×. For these point-device shapes, pack the true PER-UNIT
+# physical footprint (qty then multiplies correctly); real vessels / skids keep their bbox.
+PHYSICAL_UNIT_DIMS_MM = {
+    "instrument":    (250, 250, 400),     # field transmitter / gauge / probe / small inline valve
+    "cabinet_small": (700, 500, 1800),    # ONE I/O / SIL-barrier / junction cabinet (not the drawn row)
+}
+
 # shapes that are EXTERNAL by nature (interconnects — "don't fit properly", taken out).
 EXTERNAL_SHAPE = {"inline_spool", "pipe", "pipe_run", "pipe_rack", "cable", "cable_tray",
                   "duct", "route", "stack", "gantry", "flare"}
@@ -80,8 +92,10 @@ def shelf_pack(in_box: list[dict], eL_mm: float, eW_mm: float) -> list[list[dict
         d = min(w_mm, d_mm) / 1000.0            # short side = depth
         if d > eW:                               # can't fit even rotated (shouldn't happen post-audit)
             continue
+        # label = human NAME (what the kit IS) — a reader learns nothing from a cryptic
+        # tag like "EP-105"; "SIL isolation barrier" is self-explanatory. Tag stays in the JSON.
         for _ in range(max(1, int(r.get("qty", 1) or 1))):
-            units.append((w, d, r.get("equip_tag") or r["name"], r.get("module", "?")))
+            units.append((w, d, r.get("name") or r.get("equip_tag") or "?", r.get("module", "?")))
     units.sort(key=lambda u: -u[0])
     containers: list[list[dict]] = []
     cur: list[dict] = []
@@ -111,9 +125,12 @@ def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube",
     in_box: list[dict] = []
     external: list[dict] = []
     for p in parts:
-        w, d, h = _dims(p)
-        qty = int(p.get("qty", 1) or 1)
         shape = str(p.get("shape", ""))
+        w, d, h = _dims(p)
+        phys = PHYSICAL_UNIT_DIMS_MM.get(shape)
+        if phys:                                   # render bbox is scaled/aggregated → use per-unit
+            w, d, h = phys
+        qty = int(p.get("qty", 1) or 1)
         name = p.get("name", p.get("tag", "?"))
         rec = {"name": name, "shape": shape, "qty": qty,
                "module": str(p.get("module", "?")), "equip_tag": p.get("equipment_tag", ""),
