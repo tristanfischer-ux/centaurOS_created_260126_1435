@@ -10162,6 +10162,13 @@ def render_inspection(out_dir, bbox):
     dx, dy, dz = xmx - xmn, ymx - ymn, zmx - zmn
     max_dim = max(dx, dy, dz, 1.0)
     margin = 1.10  # 10% breathing room around the plant
+    # Iterative visual loop (task #89, visual_converge.py): INSPECT_FRAME_SCALE
+    # reframes between rounds — >1 adds breathing room (fixes a CLIPPED / TOO_LARGE
+    # render), <1 pulls the camera in (fixes a TOO_SMALL render). Default 1.0 = base.
+    try:
+        margin *= max(0.6, min(2.0, float(os.environ.get("INSPECT_FRAME_SCALE", "1.0"))))
+    except ValueError:
+        pass
     radius = max_dim * 3.0  # ortho cameras: distance only sets clipping, not scale
 
     aspect = scene.render.resolution_x / scene.render.resolution_y  # 1600/1100≈1.45
