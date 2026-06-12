@@ -653,6 +653,47 @@ function emitCrossModuleGrammarLinks(p: EFuelParams) {
   ]
 }
 
+// ── Layer-3 BoM price scaling (cost-scale fix 2026-06-12, Tristan's 2x test) ──
+// Every list_price_gbp pin is a FLAT value authored for the 1,000 t/yr design point,
+// while the capacity/rating/mass specs scale with the brief — so the dossier cost was
+// blind to production (a 2x plant costed 1.04x). Scale each line's price by its OWN
+// size-spec ratio vs the design point, six-tenths rule (price ∝ spec^0.65). Bottom-up
+// + universal: a line with no scaling spec (a fixed instrument) keeps its price; a line
+// whose spec doubled gets ~1.57x. The reference is deriveParams() with NO contract
+// overrides (= the 1,000 t/yr design point, the q() fallbacks).
+const PRICE_SPEC_KINDS = ['capacity', 'rating', 'mass']
+function primarySpecValue(w: W): number {
+  for (const k of PRICE_SPEC_KINDS) {
+    const m = w.modifier_characters.find(x => x.kind === k)
+    if (m) { const n = parseFloat(String(m.value).replace(/[^0-9.eE+-]/g, '')); if (Number.isFinite(n) && n > 0) return n }
+  }
+  return 0
+}
+function scaleBomPricesToThroughput(modules: DesignModule[], pRef: EFuelParams): void {
+  // reference specs from the SAME equipment emitters at the design point (M1-M7;
+  // M8 instrumentation is small-£ + count-driven, left flat).
+  const refModules: DesignModule[] = [
+    emitFeedstockConditioning(pRef), emitSynthesis(pRef), emitSeparationRecycle(pRef),
+    emitUpgradingFractionation(pRef), emitUtilitiesOffsites(pRef), emitProductStorageLoading(pRef),
+    emitControlSafety(pRef),
+  ]
+  const refSpec = new Map<string, number>()
+  for (const m of refModules) for (const sm of m.sub_modules) for (const w of sm.words) {
+    const s = primarySpecValue(w); if (s > 0) refSpec.set(w.id, s)
+  }
+  for (const m of modules) for (const sm of m.sub_modules) for (const w of sm.words) {
+    const now = primarySpecValue(w); const ref = refSpec.get(w.id)
+    if (!now || !ref || ref <= 0) continue
+    const ratio = now / ref
+    if (Math.abs(ratio - 1) < 0.02) continue              // spec unchanged → price unchanged
+    const pm = w.modifier_characters.find(x => x.kind === 'list_price_gbp')
+    if (!pm) continue
+    const base = Number(pm.value)
+    if (!Number.isFinite(base) || base <= 0) continue
+    pm.value = String(Math.round(base * Math.pow(ratio, 0.65)))
+  }
+}
+
 const emitter: ClassEmitter = (contract, _brief, _envelope): DesignJSON => {
   const p = deriveParams(contract)
   const modules: DesignModule[] = [
@@ -687,6 +728,11 @@ const emitter: ClassEmitter = (contract, _brief, _envelope): DesignJSON => {
     className: 'e_fuel_synthesis',
   })
   modules.push(emitProcessInstrumentation(instrCtx))  // M8
+
+  // Layer-3 cost-scale: scale every BoM price pin to the brief's production rate
+  // (six-tenths on each line's own size spec vs the 1,000 t/yr design point) so the
+  // dossier cost tracks the plant size, not the design-point author guesses.
+  scaleBomPricesToThroughput(modules, deriveParams({ quantities: {} } as any))
 
   const links = emitCrossModuleGrammarLinks(p)
   // M8 cross-module link: field transmitters send 4–20 mA / HART / PROFINET
