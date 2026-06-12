@@ -214,6 +214,19 @@ def generate_drawing_set(state_path: str | Path,
         except Exception as e:  # noqa: BLE001
             log.append(f"envelope: FAILED (non-fatal): {e}")
 
+    # design-to-budget (opt-in via BUDGET env, a £ figure): solve the output the budget
+    # affords (six-tenths) → budget-report.json. Stdlib-only; non-fatal.
+    budget = os.environ.get("BUDGET", "").strip()
+    if budget:
+        try:
+            args = [sys.executable, str(_THIS.parent / "budget_solve.py"), str(state_path)]
+            if budget not in ("1", "flex", "true"):
+                args += ["--budget", budget]
+            subprocess.run(args, capture_output=True, text=True, timeout=30)
+            log.append(f"budget: {'report written' if (out_dir/'budget-report.json').exists() else 'no report'}")
+        except Exception as e:  # noqa: BLE001
+            log.append(f"budget: FAILED (non-fatal): {e}")
+
     def _group(rows: list[tuple]) -> list[dict]:
         out = []
         for key, script, png_name, title in rows:
@@ -275,6 +288,8 @@ def generate_drawing_set(state_path: str | Path,
         "envelope_fit_report": ("envelope-fit-report.json"
                                 if (out_dir / "envelope-fit-report.json").exists() else None),
         "envelope_packing_png": ("drawings/envelope-packing.png" if envelope_ok else None),
+        # design-to-budget (opt-in): the budget→output flex → dossier page.
+        "budget_report": ("budget-report.json" if (out_dir / "budget-report.json").exists() else None),
         # the cable schedule is the connection schedule rendered as a table.
         "cable_schedule_source": ("connection-schedule.json"
                                   if (out_dir / "connection-schedule.json").exists()

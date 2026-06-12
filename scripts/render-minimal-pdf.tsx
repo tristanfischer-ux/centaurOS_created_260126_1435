@@ -16752,6 +16752,45 @@ function buildEnvelopeFitPages(project: string, statePath?: string): any[] {
   } catch { return [] }
 }
 
+// Design-to-budget (Tristan 2026-06-12): if the run requested a BUDGET, the chain
+// wrote budget-report.json. Render a "Design to budget" page: the budget SETS the
+// scale, the OUTPUT is the dependent variable (six-tenths), shown as a budget→output
+// table. Renders nothing if no budget was requested.
+function buildBudgetPages(project: string, statePath?: string): any[] {
+  try {
+    if (!statePath) return []
+    const repPath = join(dirname(statePath), 'budget-report.json')
+    if (!existsSync(repPath)) return []
+    const r: any = JSON.parse(readFileSync(repPath, 'utf-8'))
+    if (r.error || !r.budget_flex) return []
+    const rows: any[] = Object.entries(r.budget_flex)
+    const gbp = (n: any) => '£' + Math.round(Number(n)).toLocaleString('en-GB')
+    return [(
+      <Page key="budget" size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Part 3 · Design to budget" project={project} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>Design to budget</Text>
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 12, lineHeight: 1.55 }}>{`Fixing a budget sets the SCALE of the plant; the output is the dependent variable — it rises and falls with the budget. Plant cost scales with capacity by the six-tenths rule, so halving the budget yields ~31% of the output, not half. This design costs ${gbp(r.current_cost_gbp)} for ${r.current_output} ${r.unit}.`}</Text>
+        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: RULE, paddingBottom: 3 }}>
+          <Text style={{ flex: 1, fontSize: 8, color: MUTED, letterSpacing: 0.5 }}>BUDGET (vs this design)</Text>
+          <Text style={{ width: 150, fontSize: 8, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>INSTALLED £</Text>
+          <Text style={{ width: 150, fontSize: 8, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>{`OUTPUT (${r.unit})`}</Text>
+        </View>
+        {rows.map(([k, v]: any, i: number) => (
+          <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT, paddingVertical: 3.5, alignItems: 'baseline', backgroundColor: k === '100%' ? '#F3F6FA' : undefined }}>
+            <Text style={{ flex: 1, fontSize: 9, color: INK, fontFamily: k === '100%' ? 'Helvetica-Bold' : 'Helvetica' }}>{k === '100%' ? `${k}  (this design)` : k}</Text>
+            <Text style={{ width: 150, fontSize: 9, color: INK, textAlign: 'right' }}>{gbp(v.budget_gbp)}</Text>
+            <Text style={{ width: 150, fontSize: 9, color: ACCENT, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>{`${Number(v.output).toLocaleString('en-GB')}`}</Text>
+          </View>
+        ))}
+        {r.target_budget_gbp ? (
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 10 }}>{`At a ${gbp(r.target_budget_gbp)} budget » ${Number(r.affordable_output).toLocaleString('en-GB')} ${r.unit}  (${r.fits_brief_output ? 'meets' : 'below'} the brief's ${r.current_output} ${r.unit}).`}</Text>
+        ) : null}
+        <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 10, lineHeight: 1.4 }}>{`${String(r.scaling ?? '')}. ${String(r.note ?? '')}`}</Text>
+      </Page>
+    )]
+  } catch { return [] }
+}
+
 // Part 2 manufacturing layer (Option A EVOLVE, Tristan 2026-06-11 "how you manufacture
 // it"): the make-vs-buy classification (M1) + the per-made-item process route + steps
 // (M2), surfaced as a "How it is manufactured" section. The make-vs-buy verdict is
@@ -17136,6 +17175,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
       {/* W4.1: the routed cable/pipe/duct runs the BoM has always omitted (additive Part-3 section). */}
       {buildDistributionCablingPages(project, statePath)}
       {buildEnvelopeFitPages(project, statePath)}
+      {buildBudgetPages(project, statePath)}
       {/* Cost by module — moved OUT of Part 1 (Tristan 2026-06-08) into the Part 3
           reference cluster, beside the master BoM + cost basis. */}
       <CostByModulePage state={state} project={project} bomTotals={bomTotals} />
