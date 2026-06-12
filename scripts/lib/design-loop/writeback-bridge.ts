@@ -57,8 +57,10 @@ function curValue(quantities: Record<string, any>, key: string): number | null {
 }
 
 /**
- * Compute the engine-quantity updates from a settled Blender pass. UNIVERSAL mapping:
- *  - connected_electrical_load_kw ← converged total demand (base + routed parasitic)
+ * Compute the engine-quantity updates from a settled Blender pass. UNIVERSAL mapping — every
+ * update is ADDITIVE (a new quantity), never an overwrite of a brief metric, so applying them
+ * cannot conflict with the narrative or a compliance cap:
+ *  - total_supply_demand_kw       ← converged demand (plant load + distribution parasitic)
  *  - system_cooling_load_kw       ← converged cooling load (only if the engine carries it)
  *  - interconnect_pipe_length_m / interconnect_cable_length_m ← measured routed totals
  * `quantities` is orchestratorContract.quantities (each value = {value, unit, ...} or a bare number).
@@ -73,14 +75,20 @@ export function computeQuantityUpdates(
   const traj = Array.isArray(conv?.trajectory) ? conv!.trajectory! : []
   const last = traj[traj.length - 1] || {}
 
-  // 1. electrical demand (converged) — the load the routed plant actually pulls
+  // 1. supply demand (converged) — ADDITIVE new quantity, NOT a replacement for the brief's
+  //    plant-load metric. The converged total = plant load + distribution parasitic (pump
+  //    friction + cable I²R); it is the SUPPLY requirement that sizes the incomer / transformer /
+  //    feeder, and is correctly slightly higher than the plant load. Writing it as a NEW key
+  //    avoids (a) overwriting the brief metric (connected_electrical_load_kw, which the prose +
+  //    compliance cap reference) and (b) a false cap breach — so the writeback is purely additive
+  //    and safe to apply without reordering the narrative.
   const converged = Number(last.total_demand_kw)
   if (Number.isFinite(converged) && converged > 0) {
-    const from = curValue(q, 'connected_electrical_load_kw')
+    const from = curValue(q, 'total_supply_demand_kw')
     updates.push({
-      key: 'connected_electrical_load_kw', from, to: converged, unit: 'kW',
+      key: 'total_supply_demand_kw', from, to: converged, unit: 'kW',
       source: 'convergence-report',
-      basis: 'converged demand = base + routed parasitic (pump friction + cable I²R)',
+      basis: 'as-routed supply demand = plant load + distribution parasitic (pump friction + cable I²R); sizes the incomer/transformer — does NOT replace the brief plant-load metric',
       rel_change: rel(from, converged),
     })
   }

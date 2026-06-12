@@ -32,18 +32,19 @@ for (const c of CASES) {
     console.error(`   ${u.key}: ${fromS} » ${u.to} ${u.unit}   (Δ ${(u.rel_change * 100).toFixed(2)}%)  ← ${u.source}`)
   }
 
-  // assertions — the converged electrical demand must be read + written
-  const elec = updates.find(u => u.key === 'connected_electrical_load_kw')
+  // assertions — the converged SUPPLY demand must be read + written ADDITIVELY (new key)
+  const elec = updates.find(u => u.key === 'total_supply_demand_kw')
   const convergedKw = (conv.trajectory || []).slice(-1)[0]?.total_demand_kw
-  check(!!elec, 'electrical-demand update produced')
+  check(!!elec, 'supply-demand update produced (additive)')
   check(!!elec && Math.abs(elec.to - Number(convergedKw)) < 0.01, `writes the converged demand (${convergedKw} kW)`)
+  check(!('total_supply_demand_kw' in quantities), 'is a NEW key (does not overwrite a brief metric)')
   // interconnect lengths must be harvested from the routed runs
   check(updates.some(u => u.key === 'interconnect_pipe_length_m'), 'pipe-length harvested from routes')
   // applyUpdates is pure + lands the value
   if (elec) {
     const after = applyUpdates(quantities, [elec])
-    check(after['connected_electrical_load_kw']?.value === elec.to, 'applyUpdates lands the value, preserves shape')
-    check(quantities['connected_electrical_load_kw']?.value !== elec.to || elec.from === elec.to, 'original quantities object untouched (pure)')
+    check(after['total_supply_demand_kw']?.value === elec.to, 'applyUpdates lands the value, preserves shape')
+    check(!('total_supply_demand_kw' in quantities), 'original quantities object untouched (pure)')
   }
   // ledger writes + reads back
   appendLedger(c.dir, { pass: 1, settled: isSettled(updates), blender_iterations: conv.iterations, updates })
