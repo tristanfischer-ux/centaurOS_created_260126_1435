@@ -136,6 +136,57 @@ def _run_generator(script: str, out_dir: Path, state_path: Path,
     return False
 
 
+def run_convergence_report(state_path: Path, out_dir: Path, log: list[str]) -> dict | None:
+    """W3.1/W3.2 — run the physics<->CAD economic-conductor convergence on the routed
+    connection schedule and emit convergence-report.json, so the dossier can state
+    'design converged in N iterations' (rounds-to-converge) instead of presenting a
+    single un-iterated pass. Non-fatal: a failure never blocks the drawing set."""
+    sched_path = out_dir / "connection-schedule.json"
+    if not sched_path.exists():
+        log.append("convergence: no connection-schedule.json — skipped (single-pass)")
+        return None
+    try:
+        sys.path.insert(0, str(_THIS))
+        import convergence_loop as cl  # sibling module
+        sched = json.loads(sched_path.read_text())
+        fluid, elec = cl.branches_from_schedule(sched)
+        base_kw = 1000.0
+        try:
+            st = json.loads(state_path.read_text())
+            q = (st.get("orchestratorContract") or {}).get("quantities") or {}
+            v = q.get("connected_electrical_load_kw") or q.get("electrical_load_kw")
+            if isinstance(v, dict):
+                v = v.get("value")
+            if isinstance(v, (int, float)) and v > 0:
+                base_kw = float(v)
+        except Exception:
+            pass
+        rep = cl.run_convergence(base_demand_kw=base_kw, fluid_branches=fluid, electrical_branches=elec)
+        out = {
+            "schema": "convergence-report/v1",
+            "loop": "physics<->CAD economic-conductor + layout fixed point",
+            "converged": rep.get("converged"),
+            "iterations": rep.get("iterations"),
+            "parasitic_kw": rep.get("parasitic_kw"),
+            "parasitic_pct": rep.get("parasitic_pct"),
+            "contraction_ratio": rep.get("contraction_ratio"),
+            "base_demand_kw": base_kw,
+            "fluid_branches": len(fluid),
+            "electrical_branches": len(elec),
+            "economic_lifetime_saving_gbp": (rep.get("optimisation") or {}).get("economic_lifetime_saving_gbp"),
+            "trajectory": rep.get("trajectory"),
+        }
+        (out_dir / "convergence-report.json").write_text(json.dumps(out, indent=1))
+        log.append(
+            f"convergence: physics<->CAD converged={out['converged']} in {out['iterations']} iters "
+            f"(parasitic {out['parasitic_kw']:.1f} kW, {out['parasitic_pct']:.2f}%); "
+            f"economic-conductor saving £{(out['economic_lifetime_saving_gbp'] or 0):,.0f}")
+        return out
+    except Exception as e:  # noqa: BLE001 — non-fatal by design
+        log.append(f"convergence: FAILED (non-fatal): {e}")
+        return None
+
+
 def generate_drawing_set(state_path: str | Path,
                          out_dir: str | Path | None = None) -> dict:
     """Generate the drawing set + write drawing-manifest.json. Returns the manifest."""
@@ -145,6 +196,9 @@ def generate_drawing_set(state_path: str | Path,
     log: list[str] = []
 
     have_cad = ensure_cad_artifacts(state_path, out_dir, log)
+
+    # W3.1/W3.2 — physics<->CAD convergence (rounds-to-converge) on the routed schedule.
+    convergence = run_convergence_report(state_path, out_dir, log)
 
     def _group(rows: list[tuple]) -> list[dict]:
         out = []
@@ -196,6 +250,13 @@ def generate_drawing_set(state_path: str | Path,
         "hero": hero_abs,
         # the Part-1 process-flow Block-Flow Diagram (D1 fix) → EngineeringBasisPage.
         "block_flow_diagram": bfd_path,
+        # W3.1/W3.2 physics<->CAD convergence (rounds-to-converge) → renderer surfaces it.
+        "convergence_report": ("convergence-report.json"
+                               if (out_dir / "convergence-report.json").exists() else None),
+        "convergence": ({"converged": convergence.get("converged"),
+                         "iterations": convergence.get("iterations"),
+                         "economic_saving_gbp": convergence.get("economic_lifetime_saving_gbp")}
+                        if convergence else None),
         # the cable schedule is the connection schedule rendered as a table.
         "cable_schedule_source": ("connection-schedule.json"
                                   if (out_dir / "connection-schedule.json").exists()

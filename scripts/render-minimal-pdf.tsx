@@ -16093,6 +16093,14 @@ function EngineeringBasisPage({ state, project, statePath }: { state: any; proje
     // flow diagram with the streams drawn. Absent ⇒ the box-list still renders (fallback).
     const bfdPath = statePath ? join(dirname(statePath), 'drawings', 'block-flow-diagram.png') : null
     const bfdExists = !!bfdPath && existsSync(bfdPath)
+    // W3.1/W3.2 (rounds-to-converge): generate_drawing_set.py writes convergence-report.json
+    // from the physics-to-CAD economic-conductor fixed-point loop. Surface the iteration
+    // count so the dossier states the design REACHED a fixed point, not a single pass.
+    let convergence: any = null
+    try {
+      const cp = statePath ? join(dirname(statePath), 'convergence-report.json') : null
+      if (cp && existsSync(cp)) convergence = JSON.parse(readFileSync(cp, 'utf-8'))
+    } catch { /* non-fatal */ }
     const rawModules: any[] = Array.isArray(state?.moduleDecomposition?.modules)
       ? state.moduleDecomposition.modules
       : []
@@ -16127,6 +16135,9 @@ function EngineeringBasisPage({ state, project, statePath }: { state: any; proje
     const mcirc = quantities.mea_circulation_m3_per_hour
     if (mcirc?.value != null) streamNotes.push(`Key liquid stream · MEA circulation ${_ebFormatQtyValue(mcirc)} ${_ebQtyUnit(mcirc)} between absorber and stripper.`)
     if (topology.length > 0) streamNotes.push(`${topology.length} routed inter-unit connections (fluid, thermal and electrical) define the plant topology.`)
+    const convergenceNote = (convergence && Number(convergence.iterations) > 0)
+      ? `Design convergence · the physics-to-CAD economic-conductor loop reached a fixed point in ${convergence.iterations} iteration${Number(convergence.iterations) === 1 ? '' : 's'} (parasitic load ${Number(convergence.parasitic_kw ?? 0).toFixed(1)} kW, ${Number(convergence.parasitic_pct ?? 0).toFixed(2)}% of demand)${Number(convergence.economic_lifetime_saving_gbp ?? 0) > 0 ? `; economic-conductor lifetime saving £${Math.round(Number(convergence.economic_lifetime_saving_gbp)).toLocaleString('en-GB')}` : ''}.`
+      : null
 
     // ── Block 2 data: compact mass & energy balance ─────────────────────────
     // Curated ~8-12 key quantities; missing keys are skipped (never fabricated).
@@ -16352,6 +16363,13 @@ function EngineeringBasisPage({ state, project, statePath }: { state: any; proje
           </>
           )}
         </View>
+
+        {/* W3.1/W3.2 rounds-to-converge — renders for every class (BFD or box-list). */}
+        {convergenceNote ? (
+          <Text style={{ fontSize: 7.5, color: MUTED, fontStyle: 'italic', marginTop: 4, marginBottom: 4, lineHeight: 1.4 }}>
+            {normalise_unicode(convergenceNote)}
+          </Text>
+        ) : null}
 
         {/* ── BLOCK 2 · MASS & ENERGY BALANCE ────────────────────────────── */}
         <View style={{ marginBottom: 16 }} wrap={false}>
