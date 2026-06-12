@@ -211,8 +211,12 @@ def generate_drawing_set(state_path: str | Path,
                            capture_output=True, text=True, timeout=150)
             envelope_ok = (out_dir / "drawings" / "envelope-packing.png").exists()
             log.append(f"envelope({envelope_name}): {'diagram + report written' if envelope_ok else 'no diagram'}")
+            if not envelope_ok:  # user REQUESTED it → do not fail silently
+                print(f"[drawing-set] ENVELOPE={envelope_name} requested but produced no diagram", file=sys.stderr)
         except Exception as e:  # noqa: BLE001
-            log.append(f"envelope: FAILED (non-fatal): {e}")
+            # user requested this → LOUD (stderr), not just a buried manifest log line.
+            print(f"[drawing-set] ENVELOPE={envelope_name} FAILED: {e}", file=sys.stderr)
+            log.append(f"envelope: FAILED: {e}")
 
     # design-to-budget (opt-in via BUDGET env, a £ figure): solve the output the budget
     # affords (six-tenths) → budget-report.json. Stdlib-only; non-fatal.
@@ -222,10 +226,14 @@ def generate_drawing_set(state_path: str | Path,
             args = [sys.executable, str(_THIS.parent / "budget_solve.py"), str(state_path)]
             if budget not in ("1", "flex", "true"):
                 args += ["--budget", budget]
-            subprocess.run(args, capture_output=True, text=True, timeout=30)
-            log.append(f"budget: {'report written' if (out_dir/'budget-report.json').exists() else 'no report'}")
+            r = subprocess.run(args, capture_output=True, text=True, timeout=30)
+            ok = (out_dir / "budget-report.json").exists()
+            log.append(f"budget: {'report written' if ok else 'no report'}")
+            if not ok:  # user REQUESTED it → LOUD
+                print(f"[drawing-set] BUDGET={budget} requested but produced no report: {r.stderr[-300:] if r.stderr else ''}", file=sys.stderr)
         except Exception as e:  # noqa: BLE001
-            log.append(f"budget: FAILED (non-fatal): {e}")
+            print(f"[drawing-set] BUDGET={budget} FAILED: {e}", file=sys.stderr)
+            log.append(f"budget: FAILED: {e}")
 
     def _group(rows: list[tuple]) -> list[dict]:
         out = []
