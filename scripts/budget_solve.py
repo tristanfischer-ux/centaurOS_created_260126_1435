@@ -34,7 +34,11 @@ def solve(state_path: Path, budget_gbp: float | None = None) -> dict:
     s = json.loads(Path(state_path).read_text())
     cs = s.get("costStack") or {}
     cr = s.get("cost_reality") or {}
-    cost = cs.get("oem_transfer_price_gbp") or cr.get("bom_total_gbp") or (cs.get("channel_list_price_gbp"))
+    # Use the INSTALLED cost (the all-in figure a buyer's budget actually pays), not the
+    # ex-works oem_transfer — anchoring to oem under-states the budget by ~35% (found by
+    # LOOKING at the rendered page: the column said 'INSTALLED £' but showed oem).
+    cost = (cs.get("installed_asp_gbp") or cs.get("oem_transfer_price_gbp")
+            or cr.get("bom_total_gbp") or cs.get("channel_list_price_gbp"))
     tp = ((s.get("parsedBrief") or {}).get("constraints") or {}).get("target_performance") or {}
     out = tp.get("value")
     if out in (None, 0):
@@ -49,7 +53,7 @@ def solve(state_path: Path, budget_gbp: float | None = None) -> dict:
 
     def output_for(b: float) -> float:
         frac = max(MIN_SCALE, (b / cost)) ** (1.0 / SIX_TENTHS)
-        return round(out * frac, 3)
+        return float(f"{out * frac:.3g}")   # 3 sig figs — no false '621.746' precision
 
     flex = {}
     for f in (0.25, 0.5, 0.75, 1.0, 1.5, 2.0):
