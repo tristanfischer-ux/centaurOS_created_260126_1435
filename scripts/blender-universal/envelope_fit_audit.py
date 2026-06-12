@@ -32,6 +32,8 @@ ENVELOPES = {
     "45ft-hi-cube": {"L": 13556, "W": 2350, "H": 2700},
 }
 PACK_EFFICIENCY = 0.75  # floor-area utilisation a real shelf/aisle pack achieves
+ACCESS_AISLE_M = 0.8    # walkway reserved from container WIDTH (install/wire/maintain) —
+#                         single source of truth, shared by shelf_pack + draw_envelope_pack
 
 # shapes that are EXTERNAL by nature (interconnects — "don't fit properly", taken out).
 EXTERNAL_SHAPE = {"inline_spool", "pipe", "pipe_run", "pipe_rack", "cable", "cable_tray",
@@ -67,8 +69,8 @@ def shelf_pack(in_box: list[dict], eL_mm: float, eW_mm: float) -> list[list[dict
     # ACCESS AISLE (real-fit fix 2026-06-12): you cannot pack a container wall-to-wall —
     # a ~0.8 m walkway is needed to install, wire, and maintain the equipment. Reserve it
     # from the usable WIDTH (equipment along one side, walkway the other) so the pack is
-    # physical, not a 99%-utilisation fantasy.
-    ACCESS_AISLE_M = 0.8
+    # physical, not a 99%-utilisation fantasy. ACCESS_AISLE_M is module-level (shared with
+    # draw_envelope_pack so the diagram draws the SAME aisle the packer reserved).
     eW = max(1.0, eW - ACCESS_AISLE_M)
     GAP = 0.15
     units = []

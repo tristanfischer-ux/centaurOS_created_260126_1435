@@ -41,53 +41,81 @@ def draw(out_dir: Path, env_name: str = "40ft-hi-cube") -> bool:
     rep = efa.audit(manifest, env_name, efa._headline_output(str(out_dir)))
     env = rep["envelope_mm"]
     eL_m, eW_m = env["L"] / 1000.0, env["W"] / 1000.0
+    # The packer reserves an access aisle from the WIDTH; draw it as a labelled band so the
+    # empty strip reads as a walkway (intentional), not as wasted space — and so the
+    # equipment footprints don't look like they fill the box when utilisation is ~35%.
+    aisle = min(getattr(efa, "ACCESS_AISLE_M", 0.8), max(0.0, eW_m - 1.0))
+    eW_eq = eW_m - aisle                                  # equipment band depth
     containers = rep["packing"]   # qty-aware placed pack from the audit (single source of truth)
     n = max(1, len(containers))
 
-    # Draw up to MAX_DRAW representative containers (stacked); note the rest. Many tiny
-    # containers stacked would be an unreadable sliver — show the concept + the totals.
+    # Draw up to MAX_DRAW representative containers; note the rest. A 40ft floor is long-thin
+    # (≈5:1) — stacking 6 of them single-column letterboxes each into an unreadable sliver, so
+    # lay them out in a 2-COLUMN grid: the content fills the frame and each container is legible.
     MAX_DRAW = 6
     drawn = containers[:MAX_DRAW]
-    GAP_C = eW_m * 0.75
-    fig_h = max(4.5, min(11.0, len(drawn) * (eW_m + GAP_C) * 0.40 + 1.4))
-    fig = plt.figure(figsize=(15.5, fig_h), dpi=140)
-    ax = fig.add_axes([0.03, 0.06, 0.60, 0.86])
+    ncol = 1 if len(drawn) <= 2 else 2
+    nrow = (len(drawn) + ncol - 1) // ncol
+    gap_x = eL_m * 0.10
+    gap_y = eW_m * 1.05                                   # room for the per-container label
+    grid_w = ncol * eL_m + (ncol - 1) * gap_x
+    fig_w = 14.5
+    fig_h = max(3.6, min(12.0, (fig_w * 0.92) * (nrow * (eW_m + gap_y)) / max(grid_w, 1e-6) + 1.3))
+    fig = plt.figure(figsize=(fig_w, fig_h), dpi=150)
+    ax = fig.add_axes([0.04, 0.13, 0.92, 0.77])
     ax.set_aspect("equal")
-    y_off = 0.0
-    for ci, c in enumerate(drawn):
-        ax.add_patch(Rectangle((0, y_off), eL_m, eW_m, fill=False, edgecolor="#222", lw=1.6))
-        ax.text(0.1, y_off + eW_m + 0.10, f"{env_name}  #{ci+1}  ({len(c)} items)",
-                fontsize=8, color="#222")
+    legend_modules: list[str] = []
+    for i, c in enumerate(drawn):
+        col, row = i % ncol, i // ncol
+        x0 = col * (eL_m + gap_x)
+        y0 = -row * (eW_m + gap_y)                        # rows descend
+        ax.add_patch(Rectangle((x0, y0), eL_m, eW_m, fill=False, edgecolor="#222", lw=1.4))
+        if aisle > 0.05:                                  # labelled access-aisle band (top strip)
+            ax.add_patch(Rectangle((x0, y0 + eW_eq), eL_m, aisle, facecolor="#f4f4f4",
+                                   edgecolor="#e2e2e2", lw=0.4, hatch="////"))
+            if i == 0:
+                ax.text(x0 + eL_m / 2, y0 + eW_eq + aisle / 2, f"access aisle  {aisle:.1f} m",
+                        ha="center", va="center", fontsize=5.5, color="#9a9a9a", style="italic")
+        ax.text(x0 + 0.05, y0 + eW_m + 0.10, f"{env_name}  #{i+1}  ·  {len(c)} skids",
+                fontsize=7.5, color="#222")
         for it in c:
-            ax.add_patch(Rectangle((it["x"], y_off + it["y"]), it["w"], it["d"],
+            ax.add_patch(Rectangle((x0 + it["x"], y0 + it["y"]), it["w"], it["d"],
                                    facecolor=_colour(it["module"]), edgecolor="white",
-                                   lw=0.5, alpha=0.9))
-            if it["w"] > 0.8 and it["d"] > 0.55:
-                ax.text(it["x"] + it["w"] / 2, y_off + it["y"] + it["d"] / 2, it["label"],
-                        ha="center", va="center", fontsize=5.0, color="white")
-        y_off += eW_m + GAP_C
-    ax.set_xlim(-0.5, eL_m + 0.5)
-    ax.set_ylim(-0.5, max(y_off, eW_m + 0.5))
+                                   lw=0.6, alpha=0.92))
+            if it["module"] not in legend_modules:
+                legend_modules.append(it["module"])
+            if it["w"] > 1.1 and it["d"] > 0.45:
+                ax.text(x0 + it["x"] + it["w"] / 2, y0 + it["y"] + it["d"] / 2, it["label"][:16],
+                        ha="center", va="center", fontsize=4.6, color="white")
+    bottom_y = -(nrow - 1) * (eW_m + gap_y)
+    sb_y = bottom_y - gap_y * 0.5                         # scale bar under the grid (lower-left)
+    ax.plot([0, 2.0], [sb_y, sb_y], color="#222", lw=1.4)
+    for xx in (0.0, 2.0):
+        ax.plot([xx, xx], [sb_y - 0.07, sb_y + 0.07], color="#222", lw=1.4)
+    ax.text(1.0, sb_y - 0.20, "2 m", ha="center", va="top", fontsize=7, color="#222")
+    ax.set_xlim(-0.4, grid_w + 0.4)
+    ax.set_ylim(sb_y - 0.45, eW_m + 0.7)
     ax.axis("off")
-    title = (f"Containerisation — {n} × {env_name}  ({rep['utilisation_pct']:.0f}% floor utilisation)")
+    title = (f"Containerisation — {n} × {env_name}  ({eL_m:.1f}×{eW_m:.2f} m floor each)  ·  "
+             f"{rep['utilisation_pct']:.0f}% floor used")
     if n > len(drawn):
-        title += f"   ·   showing {len(drawn)} of {n}"
+        title += f"  ·  showing {len(drawn)} of {n}"
     ax.set_title(title, fontsize=11, loc="left")
 
-    # side panel
-    px = fig.add_axes([0.72, 0.10, 0.26, 0.82]); px.axis("off")
-    lines = [f"FIELD-ERECTED / EXTERNAL ({rep['external_count']}):"]
-    for e in rep["external"][:16]:
-        lines.append(f"  • {e['name'][:30]} [{e['shape']}]")
-    if rep["external_count"] > 16:
-        lines.append(f"  • … +{rep['external_count']-16} more")
-    fx = rep.get("output_flex")
-    if fx:
-        lines.append("")
-        lines.append(f"OUTPUT-FLEX ({fx['metric'] or 'output'}, {fx['unit']}):")
-        for k, v in fx["output_for_containers"].items():
-            lines.append(f"  {k} container(s) → {v:g}")
-    px.text(0, 1.0, "\n".join(lines), va="top", ha="left", fontsize=7.0, family="monospace", color="#222")
+    # module colour key — a thin strip along the bottom (replaces the old redundant monospace
+    # panel; the field-erected list + output-flex are rendered as proper prose on the PDF page).
+    if legend_modules:
+        lx = fig.add_axes([0.04, 0.015, 0.92, 0.07]); lx.axis("off")
+        lx.set_xlim(0, 1); lx.set_ylim(0, 1)
+        cx = 0.0
+        for m in legend_modules[:7]:
+            label = m.replace("_", " ")[:22]
+            lx.add_patch(Rectangle((cx, 0.30), 0.016, 0.42, facecolor=_colour(m),
+                                   edgecolor="white", lw=0.5))
+            lx.text(cx + 0.022, 0.51, label, ha="left", va="center", fontsize=6.5, color="#333")
+            cx += 0.022 + 0.0115 * len(label) + 0.022
+            if cx > 0.97:
+                break
 
     drawings = out_dir / "drawings"
     drawings.mkdir(parents=True, exist_ok=True)
