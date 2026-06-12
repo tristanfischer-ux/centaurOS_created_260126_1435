@@ -167,8 +167,11 @@ const stepAbsorberVessel: ToolStep = {
   required: false,
   feeds_into: ['mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => {
-    const diaMm = Math.round(q(c, 'absorber_diameter_mm', 900))
-    const htMm = Math.round(q(c, 'absorber_height_mm', 9000))
+    // Absorber diameter scales with the gas load (∝ √capture); packing height is set
+    // by the mass-transfer units (~throughput-independent). Was frozen at 900/9000 mm
+    // regardless of the brief's capture rate (sizing-scale fix 2026-06-12, #84).
+    const diaMm = Math.round(900 * Math.sqrt(q(c, 'capture_capacity_tco2_per_day', 1)))
+    const htMm = 9000
     return {
       mode: 'internal' as const,        // internal-pressure process column
       design_pressure_barg: 3.0,        // 3 barg packed-column design pressure
@@ -200,8 +203,9 @@ const stepStripperVessel: ToolStep = {
   required: false,
   feeds_into: ['mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => {
-    const diaMm = Math.round(q(c, 'stripper_diameter_mm', 750))
-    const htMm = Math.round(q(c, 'stripper_height_mm', 8000))
+    // Stripper diameter ∝ √capture (vapour load); height is stage-count governed.
+    const diaMm = Math.round(750 * Math.sqrt(q(c, 'capture_capacity_tco2_per_day', 1)))
+    const htMm = 8000
     return {
       mode: 'internal' as const,        // internal-pressure process column
       design_pressure_barg: 3.0,
@@ -331,7 +335,7 @@ const stepCondenserHx: ToolStep = {
     hx_type: 'condenser' as const,      // phase-change condensing service
     c_ratio: 0.0,                       // condensing stream → C_max → ∞
     ntu: 2.2,
-    c_min_kw_k: q(c, 'condenser_coolant_c_min_kw_k', 2.5),  // cooling-water side
+    c_min_kw_k: 2.5 * q(c, 'capture_capacity_tco2_per_day', 1),  // cooling-water side ∝ capture (duty)
     t_hot_in_c: 100,                    // stripper overhead vapour
     t_cold_in_c: 30,                    // cooling-water / glycol inlet
   }),
@@ -425,7 +429,7 @@ const stepCrystalliserAgitator: ToolStep = {
   required: false,
   feeds_into: ['mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => {
-    const volM3 = q(c, 'crystalliser_volume_m3', 2.65)
+    const volM3 = 2.65 * q(c, 'capture_capacity_tco2_per_day', 1)  // crystalliser volume ∝ capture (residence × flow)
     const tankDm = Math.cbrt((4 * volM3) / (1.5 * Math.PI))
     return {
       impeller_diameter_m: Math.round(tankDm * 0.33 * 100) / 100,
@@ -600,7 +604,7 @@ const stepNoise: ToolStep = {
   required: false,
   feeds_into: [] as string[],
   input_from_contract: (c: ContractInProgress) => ({
-    compressor_kw: q(c, 'rotating_machinery_kw', 15),   // pumps + CO2 blower aggregate
+    compressor_kw: 15 * q(c, 'capture_capacity_tco2_per_day', 1),   // pumps + CO2 blower aggregate ∝ capture
     compressor_type: 'reciprocating',                    // CO2 feed compressor analogue
     fan_diameter_mm: 600,                                // cooling-tower / dryer fan
     fan_rpm: 900,
@@ -634,9 +638,9 @@ const stepLifecycle: ToolStep = {
   feeds_into: [] as string[],
   input_from_contract: (c: ContractInProgress) => ({
     bom_materials: [
-      { material: 'steel_316L', mass_kg: q(c, 'total_steel_mass_kg', 9000), source_region: 'EU' },
+      { material: 'steel_316L', mass_kg: Math.round(9000 * Math.pow(q(c, 'capture_capacity_tco2_per_day', 1), 0.65)), source_region: 'EU' },
     ],
-    operational_energy_kwh_per_year: q(c, 'plant_annual_energy_kwh', 850000),
+    operational_energy_kwh_per_year: Math.round(850000 * q(c, 'capture_capacity_tco2_per_day', 1)),
     service_life_years: 20,
     eol_pathway: 'recycle',
     grid_carbon_intensity_kgco2_kwh: 0.20,        // low-carbon grid assumption
@@ -675,7 +679,7 @@ const stepGypsumStoichiometry: ToolStep = {
       { name: 'K2SO4', coeff: 1, cas: '7778-80-5' },
       { name: 'H2O', coeff: 3, cas: '7732-18-5' },
     ],
-    basis: { species: 'CO2', rate: q(c, 'co2_captured_t_day', 1.0), unit: 't/day', is_mass: true },
+    basis: { species: 'CO2', rate: q(c, 'co2_captured_t_day', q(c, 'capture_capacity_tco2_per_day', 1.0)), unit: 't/day', is_mass: true },
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('reaction:stoichiometry-balance', '1.0.0', 'MIT', 'github.com/CalebBell/chemicals')

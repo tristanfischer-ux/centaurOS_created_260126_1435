@@ -110,7 +110,12 @@ interface Co2MinParams {
 }
 
 function deriveParams(c: ContractInProgress): Co2MinParams {
-  const tpd = q(c, 'target_capture_tpd', 1)
+  // The brief's capture rate lands in `capture_capacity_tco2_per_day` (the contract
+  // quantity); `target_capture_tpd` is a legacy alias rarely set. Reading only the
+  // alias froze the WHOLE plant at 1 t/day regardless of the brief (so the BoM, the
+  // equipment specs AND the Layer-3 class-output ratio were all scale-blind). Read
+  // the brief's key first (keystone fix 2026-06-12, task #84).
+  const tpd = q(c, 'capture_capacity_tco2_per_day', q(c, 'target_capture_tpd', 1))
   const kgH = (tpd * 1000) / 24
   const caco3 = tpd * (100 / 44)
   const k2so4 = tpd * (174 / 44)
