@@ -64,6 +64,12 @@ def shelf_pack(in_box: list[dict], eL_mm: float, eW_mm: float) -> list[list[dict
     the single source of truth for containers_needed (an area estimate mis-counts a
     mixed-size set, and ignoring qty under-counts)."""
     eL, eW = eL_mm / 1000.0, eW_mm / 1000.0
+    # ACCESS AISLE (real-fit fix 2026-06-12): you cannot pack a container wall-to-wall —
+    # a ~0.8 m walkway is needed to install, wire, and maintain the equipment. Reserve it
+    # from the usable WIDTH (equipment along one side, walkway the other) so the pack is
+    # physical, not a 99%-utilisation fantasy.
+    ACCESS_AISLE_M = 0.8
+    eW = max(1.0, eW - ACCESS_AISLE_M)
     GAP = 0.15
     units = []
     for r in in_box:

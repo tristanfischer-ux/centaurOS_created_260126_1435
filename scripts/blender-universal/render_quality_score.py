@@ -14,9 +14,18 @@ Measures, from the rendered PNG (no LLM, no Blender):
                        cut off at the frame edge.
   • centre_offset    — object bbox centre vs image centre (fraction of the diagonal).
   • fill_fraction    — object pixels / bbox area (solidity; very low = thin/sparse).
+  • edge_density     — high-gradient pixels / bbox area — a CRUDE legibility proxy
+                       (a tangled thin-pipe mess is mostly edges).
+
+SCOPE — BE HONEST: this score covers FRAMING (size/clipping/centring) + a gross
+CLUTTER proxy. It does NOT judge semantic correctness — whether the pipework is
+coherent, whether a cage/scaffold is spuriously rendered, whether the geometry is
+right. A render full of the "odd pipework" defect can still score 1.0. Semantic
+visual quality needs the multimodal judge or a human; the visual loop's only
+deterministic operator is REFRAME, so it fixes framing, NOT geometry.
 
 Score in [0,1]; findings name the defect + the suggested operator (reframe / shrink
-/ recentre) the visual loop applies before re-rendering.
+/ recentre / none) — 'none' = not fixable by reframing (a geometry issue).
 
 Usage:  python3 render_quality_score.py <image.png> [--json]
 """
@@ -76,6 +85,17 @@ def score_image(path: str | Path) -> dict:
     cy, cx = (y0 + y1) / 2.0, (x0 + x1) / 2.0
     diag = float(np.hypot(h, w))
     centre_offset = float(np.hypot(cy - h / 2.0, cx - w / 2.0)) / diag
+    # CLUTTER / legibility proxy (honesty fix 2026-06-12): the framing metrics above say
+    # NOTHING about whether the geometry READS — the "odd pipework / tangled / unclear at
+    # the edges" complaint. Edge density inside the object bbox is a CRUDE but real proxy:
+    # a clean set of separated volumes is mostly flat shading; a thin-pipe tangle is mostly
+    # edges. It CANNOT tell "wrong pipework" from "lots of legitimate equipment" — semantic
+    # quality needs the multimodal judge or a human. Reported + SOFT-flagged only.
+    region = a[y0:y1 + 1, x0:x1 + 1]
+    gray = region.mean(axis=2)
+    gx = np.abs(np.diff(gray, axis=1, prepend=gray[:, :1]))
+    gy = np.abs(np.diff(gray, axis=0, prepend=gray[:1, :]))
+    edge_density = float(((gx + gy) > 24.0).sum()) / max(1, gray.size)
 
     score = 1.0
     if object_fraction < TARGET_FRAC_LO:
@@ -98,6 +118,10 @@ def score_image(path: str | Path) -> dict:
         score -= 0.2
         findings.append({"code": "SPARSE", "operator": "none",
                          "message": f"bbox only {fill_fraction*100:.0f}% filled — thin/sparse geometry"})
+    if edge_density > 0.34:
+        score -= min(0.15, (edge_density - 0.34) * 1.2)
+        findings.append({"code": "CLUTTERED", "operator": "none",
+                         "message": f"edge density {edge_density*100:.0f}% — render reads busy/tangled (legibility PROXY, not a semantic pipework check)"})
 
     return {
         "schema": "render-quality-score/v1", "image": str(p),
@@ -106,6 +130,7 @@ def score_image(path: str | Path) -> dict:
         "clip_fraction": round(clip_fraction, 4),
         "centre_offset": round(centre_offset, 3),
         "fill_fraction": round(fill_fraction, 3),
+        "edge_density": round(edge_density, 3),
         "findings": findings,
     }
 

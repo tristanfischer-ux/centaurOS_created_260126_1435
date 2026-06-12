@@ -16769,7 +16769,8 @@ function buildBudgetPages(project: string, statePath?: string): any[] {
       <Page key="budget" size="A4" style={PAGE_STYLE}>
         <PageHeader section="Part 3 · Design to budget" project={project} />
         <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>Design to budget</Text>
-        <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 12, lineHeight: 1.55 }}>{`Fixing a budget sets the SCALE of the plant; the output is the dependent variable — it rises and falls with the budget. Plant cost scales with capacity by the six-tenths rule, so halving the budget yields ~31% of the output, not half. This design costs ${gbp(r.current_cost_gbp)} for ${r.current_output} ${r.unit}.`}</Text>
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 8, lineHeight: 1.55 }}>{`Fixing a budget sets the SCALE of the plant; the output is the dependent variable — it rises and falls with the budget. Plant cost scales with capacity by the six-tenths rule, so halving the budget yields ~31% of the output, not half. This design costs ${gbp(r.current_cost_gbp)} for ${r.current_output} ${r.unit}.`}</Text>
+        <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic', marginBottom: 12, lineHeight: 1.45 }}>{'These are an INDICATIVE scaling of THIS design (a power-law estimate), not a re-engineered plant. Producing the actual conforming design at a chosen budget is one engine re-run at the solved output — which re-derives the equipment, BoM, sizing and gates at that scale.'}</Text>
         <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: RULE, paddingBottom: 3 }}>
           <Text style={{ flex: 1, fontSize: 8, color: MUTED, letterSpacing: 0.5 }}>BUDGET (vs this design)</Text>
           <Text style={{ width: 150, fontSize: 8, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>INSTALLED £</Text>
