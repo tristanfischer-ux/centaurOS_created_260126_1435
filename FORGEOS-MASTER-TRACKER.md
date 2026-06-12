@@ -11,28 +11,28 @@ dossier** — Part 1 (engineering), the CAD model, the **8 design-and-constructi
 correcting**, and the optimisation loops **converged** (engineering AND Blender), with **all of it
 rendered into the PDF**, not sitting in /tmp.
 
-## 🎯 CURRENT FOCUS — W9 · COST MUST SCALE WITH PRODUCTION (Tristan's 2× test, 2026-06-12)
-The 2× SAF scale-up (OXCCU-SAF-2X-BRIEF.md, 2,000 t/yr) PROVED rendering/coordination is solid (17/17
-coordination gate, all Part-2 subsystems, clean cover, scale-consistent prose) — AND exposed the core
-defect: **the dossier cost is ~blind to production rate (a 2× plant is costed 1.04×)**. Rigorous, same-code
-(1× vs 2× control runs): installed £14.08M→£14.67M, total_system_mass 1.26×. Process physics scales perfectly
-(every flow/power 2.00×); EQUIPMENT mass + BoM cost don't. **3-layer root cause** (drawer
-forgeos_gotchas_bc02fad34b716b71): L1 `q(c,KEY,DEFAULT)` frozen sizing reads (gate built `audit-sizing-scale.ts`,
-e-fuel fixed 3f7157d29); L2 mass-aggregator HARDCODED buckets (e-fuel fixed a62602798 — derive from throughput);
-L3 (DOMINANT): all 73 BoM lines got an emitter-pinned FLAT `list_price_gbp`. **✅ FIXED for e-fuel**
-(`594b2e8d2` + harness guard `5c975323b`): a post-emit pass `scaleBomPricesToThroughput` scales each price by
-its OWN size-spec ratio vs the 1,000 t/yr design point (six-tenths). **END-TO-END RESULT: cost scaling 1.04× →
-1.275×** (BoM £8.45M→£10.77M, installed £14.08M→£17.95M for a 2× plant), gates pass, 17/17 coordination intact.
-Mechanism is universal-ready (post-emit spec-ratio, no per-pin edits). REMAINING to ~1.5× six-tenths:
-- **#86** my L2 fix scales `total_plant_mass_kg` 1.59× but the cost take-off reads `total_system_mass_kg` (still
-  1.26×) — reconcile the field (→ ~1.4× cost). CARE: check all consumers + step order.
-- **#87** generalise the L3 pass to co2 (after #84 unfreezes co2's 10 L1 specs) + the 35 product classes.
-- fixed-dimension vessels (guard beds/buffers) whose specs don't scale → emitter sizing follow-up.
+## 🎯 CURRENT FOCUS — W9 · COST SCALES WITH PRODUCTION ✅ DONE (Tristan's 2× test, 2026-06-12)
+The 2× SAF scale-up PROVED rendering coordination solid (17/17) AND exposed: the dossier cost was blind to
+production (a 2× plant costed 1.04×). **NOW FIXED across both process plants** (drawer
+forgeos_gotchas_bc02fad34b716b71). 3-layer root cause + fixes:
+- **L1** `q(c,KEY,DEFAULT)` frozen sizing reads — universal gate `audit-sizing-scale.ts` (**PASS across all 37
+  class plans**); e-fuel 3 fixed (`3f7157d29`), co2 10 fixed + capture-rate keystone (`f51977e49`).
+- **L2** mass-aggregator HARDCODED buckets — e-fuel derive-from-throughput (`a62602798`).
+- **L3** emitter-pinned FLAT `list_price_gbp` (the dominant lever) — shared util `bom-price-scale.ts`
+  (`e8f938e23`): per-line six-tenths spec-ratio + class-output fallback for frozen-spec lines, fixed-cost
+  denylist for control/safety. e-fuel `594b2e8d2`+`b4b7d5142`, co2 via the util.
+- **VERIFIED end-to-end:** e-fuel cost **1.04× → 1.575×** (BoM £8.45M→£13.30M, installed £14.08M→£22.17M,
+  v4 chain, gates pass, six-tenths ideal 1.52×); co2 emitter **2.04×** at 3× capture; harness invariant
+  `E_FUEL.bom_scales_with_throughput` (floor 1.2×). Mechanism-B audit (engineering-contract.ts) = CLEAN
+  (product classes scale via brief-derived counts; the flagged fixed topologies are legitimate).
+- **Deferred #86** (secondary): `total_system_mass_kg` (carbon/transport input) scales 1.26× while the
+  aggregator's `total_plant_mass_kg` scales 1.59× — affects embodied-CO2 + transport numbers, NOT the headline
+  cost. Needs the chain mass-attribution stage + a consumer check. Also: e-fuel inline L3 → shared-util dedup.
 
 ## ▶ NEXT 3 (in order)
-1. **W9-L3** Make the deterministic emitter scale BoM quantities + part sizes with throughput (the dominant cost-scale lever; core, all classes). THE fix for the 2× cost-blindness.
-2. **W9-L1/L2 tail** Fix co2-mineralisation's 10 frozen `q(c)` reads (same idiom as e-fuel); extend `audit-sizing-scale.ts` to catch the inline-literal freeze pattern (L2); then Mechanism-B audit of `engineering-contract.ts` authoritative quantities (BESS rack_count etc.).
-3. **W3.2** Instrument rounds-to-converge — engineering (convergence_loop reports `iterations`) + Blender visual loop (Tristan's "how many rounds?").
+1. **W3.2** Instrument rounds-to-converge — engineering (convergence_loop reports `iterations`) + Blender visual loop (Tristan's "how many rounds?"). #76, the last loop-instrumentation gap.
+2. **W6** BoM DATA coverage / growing-DB — the AIM's real long pole (per-class branded-parts generated on the fly; DB-first → web/own-training on miss → verify → writeback).
+3. **#86 + dedup tail** total_system_mass carbon/transport reconcile + e-fuel→shared-util dedup (both low-priority cleanups).
 
 ---
 
