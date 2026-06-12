@@ -29,10 +29,20 @@ forgeos_gotchas_bc02fad34b716b71). 3-layer root cause + fixes:
   aggregator's `total_plant_mass_kg` scales 1.59× — affects embodied-CO2 + transport numbers, NOT the headline
   cost. Needs the chain mass-attribution stage + a consumer check. Also: e-fuel inline L3 → shared-util dedup.
 
+## ✅ DONE 2026-06-12 — W3.2 (a) + iterative visual loop (b) + plans (c)(d)
+- **(a) `4a28ac2a6`** physics-CAD convergence wired into the chain (generate_drawing_set →
+  convergence-report.json); dossier states "converged in N iterations" (2× SAF: 2 iters).
+- **(b) `c3b643093`** ITERATIVE Blender visual loop: `render_quality_score.py` (deterministic
+  object-fraction/clip/centre) + `visual_converge.py` (render→score→reframe→re-render, round
+  counter). Verified: a forced too-tight render iterates 0.512→0.728→0.843 across rounds.
+- **(c) `0057d08a7`** `DESIGN-TO-BUDGET-PLAN.md` — fix £ → conforming design (iteration loop,
+  cost-lever operators). **(d)** `DESIGN-TO-ENVELOPE-PLAN.md` — fit a 40ft hi-cube etc. (the
+  sizing-bug detector). Both AWAIT Tristan's steer on which to BUILD first.
+
 ## ▶ NEXT 3 (in order)
-1. **W3.2** Instrument rounds-to-converge — engineering (convergence_loop reports `iterations`) + Blender visual loop (Tristan's "how many rounds?"). #76, the last loop-instrumentation gap.
-2. **W6** BoM DATA coverage / growing-DB — the AIM's real long pole (per-class branded-parts generated on the fly; DB-first → web/own-training on miss → verify → writeback).
-3. **#86 + dedup tail** total_system_mass carbon/transport reconcile + e-fuel→shared-util dedup (both low-priority cleanups).
+1. **BUILD (c) or (d)** per Tristan's steer (design-to-budget or design-to-envelope; both planned).
+2. **W6** BoM DATA coverage / growing-DB — the AIM's real long pole (per-class branded-parts on the fly).
+3. **tail cleanups** — wire visual_converge as an opt-in chain step + surface visual rounds in the renderer; #86 total_system_mass carbon/transport; e-fuel→shared-util dedup.
 
 ---
 
