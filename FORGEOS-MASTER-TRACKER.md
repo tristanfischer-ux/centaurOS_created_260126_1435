@@ -199,3 +199,35 @@ the writeback. Then drop the separate bom-cost-grounding chain stage. Lesson: pr
 for existing cost logic BEFORE building a cost module (I missed build-cost-basis).
 
 **Reconcile landed (commit pending): build-cost-basis.ts now delegates UNMAPPED lines to bom-cost-grounding's universal detection over the SAME DOE/NETL curves — ONE cost engine, all classes. e-fuel went 0→11 defensible cost-basis lines; co2 unchanged; build-cost-basis.test 21/21; methodology page shows defensible for any class. Remaining (minor): the chain has my cost-grounding writeback stage (6113) AND build-cost-basis (6339) both calling groundBomLineCost — to fully dedup, move the writeback after build-cost-basis and read state.costBasis. Not divergent (one engine); just a redundant call.**
+
+## 🔴 HOSTILE SELF-REVIEW ROUND 2 — ✅ DONE 2026-06-12 (budget + envelope features)
+Tristan: "assume the quality of the work you have done is poor… be a hostile attack… rip it apart."
+Re-attacked the design-to-budget + design-to-envelope features. The discipline that paid off: **actually
+OPENING the rendered PDF pages** (the verification skipped first time) — it found real bugs a text-grep PASS
+missed, in minutes.
+- **#1 (my own earlier attack was WRONG):** I'd claimed e-fuel cost "3-7× too low" by reading `oem_transfer`
+  (£22M). Real `installed_asp` = £34.4M = £17.2k/(t·yr), IN the £12-60k band. Corrected honestly (d9b179b52).
+- **BUDGET bug (found by LOOKING):** the budget page's "INSTALLED £" column showed `oem_transfer` (£22M), not
+  `installed_asp` (£34.4M) — same field-confusion that fooled my attack, baked into the feature. `budget_solve`
+  now anchors to installed_asp → a £11M budget buys **299 t/yr** (was a wrong 622 vs the understated £22M).
+  +3 sig figs (no "621.746"). (13d02830e)
+- **ENVELOPE diagram (found by LOOKING):** crude — equal-aspect single-column stack letterboxed each container
+  into a sliver; reserved aisle rendered as unexplained whitespace (made 35%-full look 80%-full); a monospace
+  side-panel duplicated on-page prose. Rebuilt: 2-COLUMN grid, labelled access-aisle band, 2 m scale bar, dims in
+  title, module colour legend. (e86cb0041)
+- **ENVELOPE count INFLATED 41→14 (the substance bug the good diagram exposed):** parts-manifest dims_mm are
+  as-DRAWN Blender bboxes (authored for the GA RENDER) — field instruments scaled UP for visibility (a point
+  transmitter drawn 1×1 m = 1 m²×38), and `cabinet_small` drawn as a ROW of min(qty,6) units (~4.4 m wide) while
+  the manifest still carries the full qty → audit multiplied an aggregated footprint by qty AGAIN. Fix: pack the
+  true PER-UNIT physical footprint for instrument/cabinet_small (`PHYSICAL_UNIT_DIMS_MM` in envelope_fit_audit.py);
+  vessels/skids keep their bbox. 57 in-box → **14×40ft** (was 41), 152 m² (was ~430), 38% util. Labels now human
+  NAMES ("CO2 feed compressor"), not cryptic tags ("EP-105"). (67a56ae0b, 3d2a37a89)
+- **VERIFIED ON BOTH ARCHETYPES (the modular case I'd never run):** process plant **e-fuel = 14 containers, 13
+  field-erected** (vessels/columns/reactors external), INDICATIVE *reduce*-flex (7→1000, 1→143 t/yr); modular
+  **vertical-farm = 1 container, 0 external**, DIRECT flex (1→100, 2→200 m²) — the "kit IS the output" case.
+  Both rendered pages opened + read clean.
+- Residual (honest, minor): the diagram is placed ~half-width on the PDF page (legible at full-res, a layout
+  nicety not a defect). 14 is believable but the FFD shelf-pack is loose (38% util) — a tighter packer lowers it;
+  not pursued (it is an estimate, not a stowage plan).
+- LESSON: a RENDER manifest ≠ a PHYSICAL-pack manifest; and "does the text appear" ≠ verification — open the
+  page and look.
