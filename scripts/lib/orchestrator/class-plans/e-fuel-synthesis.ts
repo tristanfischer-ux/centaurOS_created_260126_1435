@@ -937,13 +937,21 @@ const stepMassAgg: ToolStep = {
     const columnShellKg = q(c, 'fractionation_column_shell_mass_kg', 3200)
     const tankShellKg = q(c, 'product_tank_shell_mass_kg', 4500)
     const vesselShellsKg = reactorShellKg + columnShellKg + tankShellKg
+    // The bucket masses for equipment NOT individually shelled above (separators,
+    // exchangers, oxidiser, compressors, transformer, skid frame) were HARDCODED
+    // constants — so the plant mass (hence take-off cost) did not scale with the
+    // brief's production rate (the 2x SAF scale-up costed 1.04x; total_system_mass
+    // only 1.26x). Derive each from its physical driver so the total scales with
+    // throughput (bottom-up sizing-scale fix 2026-06-12, Tristan):
+    const liqRatio = q(c, 'total_liquids_tonnes_yr', 1667) / 1667         // process throughput
+    const loadRatio = q(c, 'connected_electrical_load_kw', 3000) / 3000   // electrical load
     return {
-      total_cell_mass_kg: 6000,                 // bulk process equipment: separators, exchangers, oxidiser
-      transformer_mass_kg: 900,                 // MV/LV distribution transformer
+      total_cell_mass_kg: Math.round(6000 * liqRatio),                 // separators/exchangers/oxidiser — flow/duty equipment ∝ throughput
+      transformer_mass_kg: Math.round(900 * Math.pow(loadRatio, 0.75)),// MV/LV transformer mass ∝ kVA^0.75
       rack_count: 8,                            // vessel supports + saddles + pipe racks
       rack_mass_kg_each_estimate: vesselShellsKg / 8 + 150,  // saddles + the major shell masses (couples PV outputs)
-      pcs_mass_kg_estimate: 2500,               // compressors + pumps + drives
-      container_tare_kg_estimate: 5000,         // road-transportable skid frame + bunding
+      pcs_mass_kg_estimate: Math.round(2500 * Math.pow(loadRatio, 0.7)),// compressors + pumps + drives — rotating mass ∝ power^0.7
+      container_tare_kg_estimate: Math.round(5000 * Math.pow(liqRatio, 0.6)),  // skid frame + bunding grows sub-linearly with the plant
       max_mass_kg_envelope: 24000,              // per-skid road-transport gross-mass limit (NOT a plant-wide cap)
       // FIELD-ERECTED PLANT (2026-06-05): a Power-to-Liquid SAF plant is a fixed
       // installation, not a containerised product → the aggregator reports site
