@@ -57,7 +57,8 @@ def _dims(p: dict) -> tuple[float, float, float]:
     return 0.0, 0.0, 0.0
 
 
-def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube") -> dict:
+def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube",
+          headline_output: dict | None = None) -> dict:
     env = ENVELOPES[env_name]
     eL, eW, eH = env["L"], env["W"], env["H"]
     env_sorted = sorted([eL, eW, eH], reverse=True)
@@ -94,6 +95,31 @@ def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube") -> dict:
     # (the ceil-div above is integer-safe.)
     import math
     containers_needed = max(1, math.ceil(used_m2 / floor_m2)) if used_m2 > 0 else 0
+    # OUTPUT-FLEX (Tristan: the envelope SETS the scale, OUTPUT is the dependent variable).
+    # The containerisable footprint scales ~linearly with throughput, so for a TARGET of K
+    # envelopes the design's CONTAINERISABLE output scales O × K / N. For a MODULAR class
+    # (vertical-farm grow-area, BESS energy) the containerised kit IS the output, so this
+    # directly answers "put it in 1 box → how much output?" (1000 m² → ~100 m²). For a
+    # PROCESS plant the headline output is governed by the FIELD-ERECTED core (reactor/
+    # columns, external at any scale) — flagged in the note, so the flex is indicative.
+    output_flex = None
+    if headline_output and headline_output.get("value") and containers_needed:
+        try:
+            O = float(headline_output["value"])
+            N = containers_needed
+            ks = sorted({1, 2, max(1, N // 2), N})
+            output_flex = {
+                "current_output": O, "unit": headline_output.get("unit", ""),
+                "metric": headline_output.get("metric", ""),
+                "current_containers": N,
+                "output_for_containers": {str(k): round(O * k / N, 3) for k in ks},
+                "note": ("containerisable-footprint LINEAR flex. {0} field-erected item(s) "
+                         "(reactor/columns/tanks/piping) are external at any scale — for a "
+                         "process plant they govern the true output, so treat this as indicative; "
+                         "for a modular class (grow-area, energy) it is direct.").format(len(external)),
+            }
+        except (TypeError, ValueError):
+            output_flex = None
     return {
         "schema": "envelope-fit-audit/v1",
         "envelope": env_name, "envelope_mm": env,
@@ -104,6 +130,7 @@ def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube") -> dict:
         "container_floor_m2": round(floor_m2, 1),
         "containers_needed": containers_needed,
         "utilisation_pct": round(100 * used_m2 / (containers_needed * floor_m2), 1) if containers_needed else 0.0,
+        "output_flex": output_flex,
         "external": external,
         "in_box": in_box,
         "verdict": ("CONTAINERISABLE — modular core in {0} × {1}; {2} item(s) external "
@@ -118,6 +145,28 @@ def _load_manifest(arg: str) -> dict:
     return json.loads(p.read_text())
 
 
+def _headline_output(arg: str) -> dict | None:
+    """Read the brief's primary output metric (value/unit) from the sibling state.json,
+    so the audit can report the output-flex. None if unavailable."""
+    p = Path(arg)
+    sp = (p / "state.json") if p.is_dir() else (p.parent / "state.json")
+    if not sp.exists():
+        return None
+    try:
+        s = json.loads(sp.read_text())
+        tp = ((s.get("parsedBrief") or {}).get("constraints") or {}).get("target_performance") or {}
+        v = tp.get("value")
+        if v in (None, 0):
+            mets = tp.get("metrics") or []
+            if mets:
+                v, tp = mets[0].get("value"), mets[0]
+        if v:
+            return {"value": v, "unit": tp.get("unit", ""), "metric": tp.get("key_metric", "")}
+    except Exception:
+        pass
+    return None
+
+
 def main(argv: list[str]) -> int:
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__); return 0
@@ -126,7 +175,7 @@ def main(argv: list[str]) -> int:
         env_name = argv[argv.index("--env") + 1]
     if env_name not in ENVELOPES:
         print(f"unknown envelope '{env_name}'. options: {', '.join(ENVELOPES)}"); return 2
-    rep = audit(_load_manifest(argv[0]), env_name)
+    rep = audit(_load_manifest(argv[0]), env_name, _headline_output(argv[0]))
     if "--json" in argv:
         print(json.dumps(rep, indent=1)); return 0
     print(f"  ENVELOPE FIT — {env_name} ({rep['envelope_mm']['L']}×{rep['envelope_mm']['W']}×{rep['envelope_mm']['H']} mm)")
@@ -137,6 +186,12 @@ def main(argv: list[str]) -> int:
     print(f"  external ({rep['external_count']}): "
           + ", ".join(f"{e['name']}[{e['shape']}]" for e in rep["external"][:8])
           + (" …" if rep["external_count"] > 8 else ""))
+    fx = rep.get("output_flex")
+    if fx:
+        row = "  ".join(f"{k}→{v:g}" for k, v in fx["output_for_containers"].items())
+        print(f"  OUTPUT-FLEX ({fx['metric'] or 'output'}, {fx['unit']}): {fx['current_output']:g} at "
+              f"{fx['current_containers']} containers; containers→output  {row}")
+        print(f"    note: {fx['note']}")
     return 0
 
 
