@@ -136,3 +136,6 @@ state-*.json
 /radical-phase5-*.pdf
 /radical-phase[0-9]*.json
 /radical-phase[0-9]*.pdf
+.venv/
+out/
+*.pyc

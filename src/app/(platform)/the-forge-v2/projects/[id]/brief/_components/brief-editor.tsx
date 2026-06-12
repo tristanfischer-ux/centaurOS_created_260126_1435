@@ -51,6 +51,8 @@ interface BriefEditorProps {
     designBrief: CadLabDesignBrief | null
     /** Initial brief_locked_at — null until migration lands. */
     initialLockedAt: string | null
+    /** Demo mode (no-auth demo page): skip server persistence, keep editing UX local. */
+    demoMode?: boolean
 }
 
 /** Design-brief labelled-list row. Narrowed to the six string-valued legacy
@@ -95,6 +97,7 @@ export function BriefEditor({
     initialOverview,
     designBrief,
     initialLockedAt,
+    demoMode = false,
 }: BriefEditorProps): React.ReactElement {
     // INTENT: draft is what the user types; savedOverview is what the server last
     // confirmed. "dirty" is the diff between them so the Save button only lights
@@ -142,6 +145,12 @@ export function BriefEditor({
         }
         if (!isDirty) return
 
+        if (demoMode) {
+            setSavedOverview(draft)
+            toast.success("Brief saved.")
+            return
+        }
+
         startSave(async () => {
             const result = await saveCadLabProductOverview(projectId, draft)
             if ("error" in result) {
@@ -165,6 +174,11 @@ export function BriefEditor({
             toast.error("Save or discard your changes before locking the brief.")
             return
         }
+        if (demoMode) {
+            setLockedAt(new Date().toISOString())
+            toast.success("Brief locked. Downstream artefacts now anchor to this revision.")
+            return
+        }
         startLock(async () => {
             const result = await lockCadLabBrief(projectId)
             if ("error" in result) {
@@ -177,6 +191,11 @@ export function BriefEditor({
     }
 
     function handleUnlock(): void {
+        if (demoMode) {
+            setLockedAt(null)
+            toast.success("Brief unlocked — edits are live again.")
+            return
+        }
         startLock(async () => {
             const result = await unlockCadLabBrief(projectId)
             if ("error" in result) {

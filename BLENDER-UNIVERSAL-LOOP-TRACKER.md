@@ -85,9 +85,11 @@ Build sequence (Tristan's "perfect one → next"): finish e-fuel (process-plant)
 - Assembly/placement is the hard part — a naive keyword→region heuristic = "part vomit" (rejected 2026-05-24/06-10).
 - Bank every improvement in CODE + a regression guard so iter-N catches iter-(N+1).
 
-## Status
-- [ ] P0 harness + baseline
-- [ ] P1 topology→pipework
-- [ ] P2 dim/part fidelity + deterministic checks
-- [ ] P3 batch to 10/10
-- [ ] P4 fan-out + novel-class confidence
+## Status (2026-06-11)
+- [x] P0 harness + baseline + clean light-mode INSPECT render
+- [x] P1 topology→routed pipework (nozzles, pipe rack, cable-tray bus)
+- [x] Five geometry families built + committed: process-plant (e-fuel ~8.5), rack-farm/battery (BESS ~8.5), rack-farm/compute (edge-AI), panel-array (vertical farm ~8), aero-body/aircraft+spacecraft (HAPS + satellite ~7.5), tower-machine (wind)
+- [x] Fan-out validation → caught + fixed edge-AI + wind misdetection
+- [x] Breadth hardened: generic-assembly fallback as default (any unmatched archetype renders sensibly, scale-adaptive); detection guards tightened; all 21 class graphs route with zero crashes
+- [ ] REMAINING: bespoke quality families for robotics / marine / device (currently sensible-fallback, not domain-perfect); polish existing families to 9-10; real-state validation of gap archetypes (needs chain runs); lighting + wire renders into the PDF (deferred by Tristan)
+- Commits: f31266e71 (Part-1) → 0167eac6e (space tools) → 6c80d440f → 5e169ecfe → f237bb9ab → 4148c6f66 → 105b635c8 → ed2c33647 → 2c431b9d8 (all pushed to origin/oxccu-efuel)

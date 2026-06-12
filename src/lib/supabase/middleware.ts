@@ -28,6 +28,7 @@ const PUBLIC_ROUTES = [
     '/pricing',  // Public pricing page
     '/techniques',  // Public manufacturing techniques explorer (SEO)
     '/demo',  // Public demo page
+    '/brief-demo',  // Public CO2 brief-editor demo (no auth) — temporary, client demos
     '/brief',  // Public concierge brief intake (the homepage "Get your brief" CTA)
     '/blog',  // Public blog (content group)
     '/api/admin/dashboard',  // Standalone admin dashboard (own password gate)

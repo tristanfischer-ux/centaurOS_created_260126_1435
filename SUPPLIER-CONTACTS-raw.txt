@@ -1,0 +1,538 @@
+<<<
+SUPPLIER: Sulzer
+DIVISION: Sulzer Chemtech — Separation Technology (packed absorber columns, structured & random packing, column internals, static mixers)
+OFFICIAL_SITE: https://www.sulzer.com/en/products/separation-technology
+UK_PRESENCE: Sulzer Chemtech (UK) Ltd — Leeds (Manor Mill Lane, LS11 8BR) + Middlesbrough Tower Field Service (Berners Lee Way, TeesAMP, TS2 1ED, +44 1642 873520)
+CONTACT_NAME: none verified
+POSITION: -
+EMAIL: https://solutions.sulzer.com/contact-us
+EMAIL_TYPE: enquiry-fallback
+EMAIL_BASIS: Chemtech Process Solutions enquiry form; pattern firstname.lastname@sulzer.com (LeadIQ); ContactFinder sulzer.com/en/shared/contactfinder (UK + Chemtech)
+LINKEDIN: https://www.linkedin.com/showcase/sulzer-chemtech
+PHONE: +44 1642 873520
+SOURCES: solutions.sulzer.com/contact-us; sulzer.com/en/shared/contactfinder; Net Zero Teesside CC internals win (sulzer.com news)
+CONFIDENCE: medium
+NOTES: Use Chemtech enquiry form referencing MellapakCC + Net Zero Teesside; sells direct (no UK distributor). Darren Parsons (ex-Business Area Mgr) has departed — do not use.
+>>>
+<<<
+SUPPLIER: Koch-Glitsch
+DIVISION: Koch-Glitsch UK Division (Koch Engineered Solutions Ltd); shares site with Eta Process Plant
+OFFICIAL_SITE: https://www.koch-glitsch.com
+UK_PRESENCE: Three Counties House, Festival Way, Hanley, Stoke-on-Trent ST1 5PX, +44 1782 744561
+CONTACT_NAME: Kate Caddick
+POSITION: Global Product Leader / Strategic Growth (formerly Sales Manager – North Europe) — most senior UK-linked name; no dedicated UK sales mgr found
+EMAIL: kate.caddick@kochglitsch.com
+EMAIL_TYPE: pattern-inferred
+EMAIL_BASIS: First.Last@kochglitsch.com (97%, LeadIQ); name via LinkedIn uk.linkedin.com/in/kate-caddick-02a3081b
+LINKEDIN: https://uk.linkedin.com/in/kate-caddick-02a3081b
+PHONE: +44 1782 744561
+SOURCES: koch-glitsch.com/our-business/locations/europe; LinkedIn; LeadIQ
+CONFIDENCE: medium
+NOTES: Best first move = call UK switchboard, ask for application-engineering for mass-transfer internals/packing. Direct sale (no UK distributor). CC + e-fuels active growth (ION Clean Energy, FLEXIPAC CP). Avoid unconfirmed kg.uk@kochglitsch.com.
+>>>
+<<<
+SUPPLIER: Howden
+DIVISION: Howden Compressors (Chart Industries) — screw/turbo/centrifugal/process compressors, Renfrew
+OFFICIAL_SITE: https://www.howden.com/en-gb
+UK_PRESENCE: Howden Compressors Ltd, Old Govan Road, Renfrew PA4 8XJ, +44 141 885 7500
+CONTACT_NAME: Edward Stewart
+POSITION: Senior Product Sales Manager — Howden Compressors
+EMAIL: edward.stewart@howden.com
+EMAIL_TYPE: pattern-inferred
+EMAIL_BASIS: firstname.lastname@howden.com (95%, RocketReach)
+LINKEDIN: https://www.linkedin.com/in/edward-stewart-48185b104/
+PHONE: +44 141 885 7500
+SOURCES: data-lead.com; LinkedIn; howden.com Renfrew contact; compressortech2.com H2 plant win
+CONFIDENCE: medium
+NOTES: Escalation = Calum Sharp (VP & MD, Howden Compressors). Caveat: Chart–Baker Hughes merger EC review ongoing 2026. Lead with H2 compressors / CC scope.
+>>>
+<<<
+SUPPLIER: Prysmian
+DIVISION: Prysmian UK — Electrification / Industrial & Construction (energy, MV, industrial/process cables)
+OFFICIAL_SITE: https://uk.prysmian.com
+UK_PRESENCE: Eastleigh HQ (Chickenhall Lane, SO50 6YU); plants Bishopstoke, Aberdare, Wrexham
+CONTACT_NAME: Ross Free
+POSITION: Industrial & Construction Area Sales Manager, Prysmian UK
+EMAIL: ross.free@prysmiangroup.com
+EMAIL_TYPE: pattern-inferred
+EMAIL_BASIS: first.last@prysmiangroup.com (69-92%, LeadIQ/RocketReach); name via LinkedIn
+LINKEDIN: https://uk.linkedin.com/in/ross-free-0b41694b
+PHONE: 02381 680800 (sales); 023 8029 5222 (technical)
+SOURCES: LinkedIn; uk.prysmian.com I&C; contact-us; LeadIQ
+CONFIDENCE: medium
+NOTES: Wrexham makes armoured LV/MV cable domestically (UK-sourced angle). Smaller runs may route via distributor (Rexel). Ask for MV 6.6/11kV XLPE, instrument loop cable, sealing ends.
+>>>
+<<<
+SUPPLIER: ABB
+DIVISION: ABB Measurement & Analytics (primary — CO2/process-gas analysers), Stonehouse; ABB Motion (VSDs/drives), Daresbury
+OFFICIAL_SITE: https://new.abb.com/products/measurement-products/measurement-analytics
+UK_PRESENCE: M&A: Oldends Lane, Stonehouse GL10 3TA; Motion: Daresbury Park, Warrington WA4 4BT
+CONTACT_NAME: Craig Windsor
+POSITION: ABB Measurement & Analytics UK (Stonehouse) — UK sales/customer-development (title not published)
+EMAIL: Craig.Windsor@gb.abb.com
+EMAIL_TYPE: verified
+EMAIL_BASIS: Published on pandct.com supplier directory for ABB M&A UK (note domain @gb.abb.com not @abb.com)
+LINKEDIN: none verified
+PHONE: +44 1453 826661 (M&A Stonehouse)
+SOURCES: pandct.com/products-suppliers/7345; new.abb.com/uk locations; careers.abb M&A sales role
+CONFIDENCE: medium
+NOTES: Approach M&A first (CO2 analysers = most specific). Drives: motor.sales.uk@gb.abb.com / +44 1925 741111 (also via distributors Quantum Controls, Halcyon, IDS). LV switchgear: new.abb.com/contact/form. UK domain = @gb.abb.com.
+>>>
+<<<
+SUPPLIER: Grundfos
+DIVISION: Grundfos Pumps Ltd — Industry segment, UK/Ireland/Benelux
+OFFICIAL_SITE: https://www.grundfos.com/uk
+UK_PRESENCE: Grovebury Road, Leighton Buzzard LU7 4TL; offices Warrington, Birmingham
+CONTACT_NAME: Luke Gardener
+POSITION: Industry Sales Manager, UK, Ireland and Benelux
+EMAIL: lgardener@grundfos.com
+EMAIL_TYPE: pattern-inferred
+EMAIL_BASIS: FLast@grundfos.com (86%, LeadIQ); RocketReach confirms "l" initial; name via LinkedIn + TheOrg
+LINKEDIN: https://www.linkedin.com/in/luke-gardener-073841112/
+PHONE: 01525 850000
+SOURCES: LinkedIn; theorg.com; RocketReach; LeadIQ; Companies House 00805960
+CONFIDENCE: medium
+NOTES: Exact-match role for MEA-circulation/dosing/process-water pumps. Fallback inbox grundfos-uk@sales.grundfos.com. Sells direct. Connect on LinkedIn with application hook.
+>>>
+<<<
+SUPPLIER: Siemens
+DIVISION: Siemens Digital Industries — Factory/Process Automation, GB&I
+OFFICIAL_SITE: https://www.siemens.com/uk/en/company/about/businesses/digital-industries.html
+UK_PRESENCE: Sir William Siemens House, Princess Road, Manchester M20 2UR
+CONTACT_NAME: Daniel Smalley
+POSITION: Business Manager, Factory Automation Digitalisation & Xcelerator UK&I PM
+EMAIL: daniel.smalley@siemens.com (primary); Sales.GBI.industry@siemens.com (enquiry)
+EMAIL_TYPE: pattern-inferred (primary); enquiry-fallback (secondary)
+EMAIL_BASIS: firstname.lastname@siemens.com (94.4%, RocketReach); example chris.olley@siemens.com (press); Sales.GBI.industry verified (Northern Automotive Alliance listing)
+LINKEDIN: https://uk.linkedin.com/in/danielpsmalley/
+PHONE: 0161 446 6013; 08458 507600 (Customer Care)
+SOURCES: icheme.org event; northernautoalliance.com; news.siemens.co.uk; RocketReach
+CONFIDENCE: medium
+NOTES: 20+ yrs process+discrete automation; business-mgr not field-sales → ask for a 20-min call to learn their new-account RFQ process; he routes to account/channel. Large orders direct, small via RS/Farnell.
+>>>
+<<<
+SUPPLIER: Eaton
+DIVISION: Eaton Electrical UK — Power Quality (UPS) & Industrial Controls/Machinery Safety (ex-Moeller)
+OFFICIAL_SITE: https://www.eaton.com/gb/en-gb.html
+UK_PRESENCE: Eaton Electric Ltd, 252 Bath Road, Slough SL1 4DX, +44 1753 608700; also Middleton, Manchester
+CONTACT_NAME: Mark Goulding
+POSITION: Critical Power Sales Manager, Eaton UK
+EMAIL: UKquotesPQ@eaton.com
+EMAIL_TYPE: enquiry-fallback
+EMAIL_BASIS: Verified UK Power Quality quotes team inbox (eaton.com UK customer-support); no personal email published
+LINKEDIN: https://www.linkedin.com/in/mark-goulding-cdcdp%C2%AE-2245272b/
+PHONE: +44 1753 608700 (opt 2→2)
+SOURCES: LinkedIn; eaton.com UK support; eaton.uk.com contacts
+CONFIDENCE: medium
+NOTES: Email UKquotesPQ@eaton.com addressed to Goulding for UPS/power-quality. Machinery safety (M22 e-stops) via uk-project-care form or distributors (RS/Farnell/E.Preston). Goulding is data-centre-leaning but covers industrial PQ.
+>>>
+<<<
+SUPPLIER: Schneider Electric
+DIVISION: Energy Management / Power Products UK (distribution boards, busbars, transformers, soft starters, contactors) + Industrial Automation
+OFFICIAL_SITE: https://www.se.com/uk/en/
+UK_PRESENCE: 80 Victoria Street, London SW1E 5JL, 0330 587 8030; Telford, Leeds, Ashby, Coventry, Warrington
+CONTACT_NAME: none verified
+POSITION: -
+EMAIL: https://www.se.com/uk/en/work/support/customer-care/contact-sales.jsp
+EMAIL_TYPE: enquiry-fallback
+EMAIL_BASIS: Official UK sales enquiry form; no named individual published; pattern firstname.lastname@se.com (66.9%, RocketReach)
+LINKEDIN: https://uk.linkedin.com/company/schneider-electric
+PHONE: 0330 587 8030
+SOURCES: se.com/uk contact-sales; location-maps; Companies House 02886434
+CONFIDENCE: medium
+NOTES: Submit project-sourcing enquiry (LV/MV boards, busbars, soft starters, transformers); they route to Power Products/IA rep. Smaller volumes via distributors (RS, Edmundson, Rexel).
+>>>
+<<<
+SUPPLIER: Alfa Laval
+DIVISION: Energy Division, UK & Ireland (gasketed/spiral/Compabloc heat exchangers)
+OFFICIAL_SITE: https://www.alfalaval.co.uk
+UK_PRESENCE: Alfa Laval Ltd, 7 Doman Road, Camberley GU15 3DN
+CONTACT_NAME: Marcus Halliday
+POSITION: Energy Division Channel Manager, UK & Ireland
+EMAIL: marcus.halliday@alfalaval.com
+EMAIL_TYPE: pattern-inferred
+EMAIL_BASIS: firstname.lastname@alfalaval.com (93%) confirmed by real examples marianne.hojby@ + tristan.matthews@ (pandct/maritime directory)
+LINKEDIN: https://uk.linkedin.com/pub/marcus-halliday/23/80/884
+PHONE: +44 1276 633833
+SOURCES: pandct.com (ESI Process + Fenflow appointments); maritimeindustries.org; Companies House 00187261
+CONFIDENCE: high
+NOTES: Exact scope (amine exchangers, coolers). Process-sector orders now route via distributor ESI Process (UK) Ltd — David Frame (Sales Mgr) is 2nd-line. Reach Halliday first.
+>>>
+<<<
+SUPPLIER: Dräger
+DIVISION: Dräger Safety UK Ltd — Fixed Gas Detection Systems (+ Marine & Offshore)
+OFFICIAL_SITE: https://www.draeger.com/en_uk/Safety/Fixed-Gas-Detection-Solutions
+UK_PRESENCE: Draeger Safety UK Ltd, Ullswater Close, Blyth Riverside Business Park, Blyth NE24 4RG
+CONTACT_NAME: Lawrie Kerr
+POSITION: UK Sales Manager, Fixed Gas Detection Systems (Dräger Marine & Offshore)
+EMAIL: lawrie.kerr@draeger.com
+EMAIL_TYPE: pattern-inferred
+EMAIL_BASIS: first.last@draeger.com (94.6%, RocketReach); name+title in World Oil + Platform Magazine trade press (2025)
+LINKEDIN: search "Lawrie Kerr Draeger" (Salesflow index confirms profile; URL not retrieved)
+PHONE: +44 1670 352891 (Blyth)
+SOURCES: worldoil.com 2025 contract; platform-magazine.co.uk; draeger.com CCUS page; RocketReach
+CONFIDENCE: medium
+NOTES: Lead with CCUS (Dräger has a dedicated CCUS page: CO2/amines/SO2/NOx). Fallback: Blyth switchboard ask for industrial/chemical fixed-gas-detection sales; or Aberdeen aberdeensales.uk@draeger.com. Avoid marketing.uk@draeger.com.
+>>>
+
+<<<
+SUPPLIER: Honeywell
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: Honeywell
+DIVISION: Honeywell Sensing & Safety Technologies (SST)
+OFFICIAL_SITE: https://sps.honeywell.com/us/en/products/sensing-and-iot
+UK_PRESENCE: Honeywell Control Systems Ltd (Bracknell, UK) | https://www.honeywell.com/gb/en
+CONTACT_NAME: Simon Anderson
+POSITION: Lead Customer Ma
+>>>
+
+<<<
+SUPPLIER: Rittal
+DIVISION: Industrial Enclosures / Sales
+OFFICIAL_SITE: https://www.rittal.com/uk-en/
+UK_PRESENCE: Rittal Ltd, Braithwell Way, Hellaby Industrial Estate, Hellaby, Rotherham, S66 8QY (https://www.rittal.com/uk-en/)
+CONTACT_NAME: Yannick Longbottom
+POSITION: Head of Sales UK
+EMAIL: ylongbottom@rittal.co.uk
+EMAIL_TYPE: verified
+EMAIL_BASIS: https://scoteng.org/directory/
+LINKEDIN: none
+PHONE: 07973 955 782
+SOURCES: https://www.rittal.com/uk-en/; https://scoteng.org/directory/; https://rittal.co.uk/
+CONFIDENCE: high
+NOTES: Yannick Longbottom is the Head of Sales UK. Contacting him directly is the best first move for custom/industrial enclosures, which are typically handled direct rather than via standard distributors.
+>>>
+
+<<<
+SUPPLIER: Amphenol LTW
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: Amphenol LTW
+DIVISION: Amphenol LTW (ALTW) / Amphenol Industrial Products Group (AIPG)
+OFFICIAL_SITE: https://www.amphenolltw.com
+UK_PRESENCE: Represented by Amphenol Industrial UK sales team; distributed by Mouser UK (https://www.mouser.co.uk), DigiKey UK (https://www.digikey.co.uk), 
+>>>
+
+<<<
+SUPPLIER: Analog Devices
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: 
+Wait, let's write a concise note:
+"Jitesh Patel is a UK-based Staff FAE specializing in wBMS (wireless Battery Management Systems) and automotive embedded systems. Sourcing is typically routed through strategic distributors like Arrow Electronics or Anglia."
+
+Let's double check if there are any oth
+>>>
+
+<<<
+SUPPLIER: Bender
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: 
+>>>
+
+<<<
+SUPPLIER: Bergquist
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: 
+>>>
+
+<<<
+SUPPLIER: Brady
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: 
+>>>
+
+<<<
+SUPPLIER: CIMC
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: CIMC
+DIVISION: CIMC Intermodal Equilink Co., Ltd. (CIMC Equilink)
+OFFICIAL_SITE: https://www.cimc-equilink.com
+UK_PRESENCE: Bloxwich Transport & Container Products Ltd | https://www.bloxwichdoorgear.com
+CONTACT_NAME: Rickey Wang
+POSITION: Sales & Marketing Manager (Europe, America and 
+>>>
+
+<<<
+SUPPLIER: Dräger
+DIVISION: Dräger Safety UK (Clean Energy & Fixed Gas Detection)
+OFFICIAL_SITE: https://www.draeger.com
+UK_PRESENCE: Dräger Safety UK Ltd (Blyth & Aberdeen) | https://www.draeger.com/en_uk/Home
+CONTACT_NAME: Megan Hine
+POSITION: Safe Energy Transition Business Development Manager
+EMAIL: megan.hine@draeger.com
+EMAIL_TYPE: verified
+EMAIL_BASIS: https://www.instmc.org/Events/North-of-Scotland-Christmas-Dinner
+LINKEDIN: none
+PHONE: +44 (0) 1224 701 569
+SOURCES: https://www.draeger.com/en_uk/Safety/Clean-Energy-Solutions; https://www.instmc.org/Events/North-of-Scotland-Christmas-Dinner; https://mepca-engineering.com/the-energy-transition-why-safety-matters/
+CONFIDENCE: high
+NOTES: Best first move is to email Megan Hine directly. She specializes in fixed gas detection and clean energy safety (hydrogen, CCUS, ammonia), perfectly matching the buyer's deep-tech engineering scope.
+>>>
+
+<<<
+SUPPLIER: EBM-Papst
+DIVISION: Heating & Ventilation
+OFFICIAL_SITE: https://www.ebmpapst.com
+UK_PRESENCE: ebm-papst UK Ltd (Chelmsford, Essex) | https://www.ebmpapst.com/gb/en/home.html
+CONTACT_NAME: Lee Pentecost
+POSITION: Divisional Director Heating & Ventilation
+EMAIL: lee.pentecost@uk.ebmpapst.com
+EMAIL_TYPE: verified
+EMAIL_BASIS: https://www.ebmpapst.com/gb/en/support/contact/sales-managers.html
+LINKEDIN: none
+PHONE: +44 (0) 1245 468555
+SOURCES: https://www.ebmpapst.com/gb/en/support/contact/sales-managers.html; https://www.ebmpapst.com/gb/en/home.html
+CONFIDENCE: high
+NOTES: Contact Lee Pentecost directly for OEM-level sourcing of enclosure ventilation and AHU centrifugal fans. For small/prototype quantities, ebm-papst is heavily distributed via RS, Mouser, DigiKey, and Farnell.
+>>>
+
+<<<
+SUPPLIER: Emerson
+DIVISION: Automation Solutions
+OFFICIAL_SITE: https://www.emerson.com
+UK_PRESENCE: Bredbury Park Industrial Estate, Stockport, SK6 2SU, United Kingdom | https://www.emerson.com/en-gb/automation/home
+CONTACT_NAME: Paul Wann
+POSITION: Business Director, Sustainability & Decarbonisation
+EMAIL: paul.wann@emerson.com
+EMAIL_TYPE: pattern-inferred
+EMAIL_BASIS: pattern + example url: https://www.bioindustry.org/member-directory/emerson.html
+LINKEDIN: none
+PHONE: -
+SOURCES: https://www.emersonautomationexperts.com/author/paul-wann/; https://chameleonevents.co.uk/contact-us/; https://www.bioindustry.org/member-directory/emerson.html; https://valveuser.com/asco-solenoid-valves-for-hydrogen-applications/
+CONFIDENCE: high
+NOTES: Paul Wann leads Emerson's sustainability and decarbonisation initiatives in the UK & Ireland, making him the ideal contact for e-fuel and CO2 mineralisation projects. Emerson sells both directly and through authorized distributors.
+>>>
+
+<<<
+SUPPLIER: Endress+Hauser
+DIVISION: Process Automation / Sales (UK)
+OFFICIAL_SITE: https://www.uk.endress.com
+UK_PRESENCE: Endress+Hauser Ltd (Manchester HQ) | https://www.uk.endress.com
+CONTACT_NAME: Steve Sherburn
+POSITION: Sales Director
+EMAIL: steve.sherburn@endress.com
+EMAIL_TYPE: pattern-inferred
+EMAIL_BASIS: pattern: {first}.{last}@endress.com | https://leadiq.com/c/endress-hauser-gruppe/5a1b3f9b2300002e008b4567
+LINKEDIN: none
+PHONE: +44 161 286 5050
+SOURCES: https://www.uk.endress.com; https://www.agcc.co.uk; https://www.processengineering.co.uk
+CONFIDENCE: high
+NOTES: Steve Sherburn is the UK Sales Director. Endress+Hauser is a high-end industrial instrumentation manufacturer; direct sales via their Manchester HQ is the primary route for custom reactor setups, though they also use regional partners like Integrity ISS.
+>>>
+
+<<<
+SUPPLIER: Enphase
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: 
+>>>
+
+<<<
+SUPPLIER: Genasun
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: Genasun
+DIVISION: Sunforge LLC (Genasun Division)
+OFFICIAL_SITE: https://sunforgellc.com
+UK_PRESENCE: Barden UK Ltd (https://www.barden-uk.com)
+CONTACT_NAME: Stefano Luciani
+POSITION: Business Development Director / European Representative
+EMAIL: stefano@blueskyenergyinc.com
+
+>>>
+
+<<<
+SUPPLIER: Hirschmann
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: Hirschmann
+DIVISION: Industrial Network Solutions (Belden Inc.)
+OFFICIAL_SITE: https://www.belden.com
+UK_PRESENCE: Belden Manchester Office (Manchester International
+>>>
+
+<<<
+SUPPLIER: LESER
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: LESER
+DIVISION: LESER UK Limited
+OFFICIAL_SITE: https://www.leser.com
+UK_PRESENCE: LESER UK Limited - https://www.leser.co.uk
+CONTACT_NAME: David Coleman
+POSITION: Technical Sales Manager
+EMAIL: sales@leser
+>>>
+
+<<<
+SUPPLIER: Mitsubishi Electric
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: 
+>>>
+
+<<<
+SUPPLIER: Pepperl+Fuchs
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: Pepperl+Fuchs
+DIVISION: Process Automation
+OFFICIAL_SITE: https://www.pepperl-fuchs.com
+UK_PRESENCE: Pepperl+Fuchs GB Ltd (Oldham Office) | https://www.pepperl-fuchs.com/great_britain/en/
+>>>
+
+<<<
+SUPPLIER: Pfannenberg
+DIVISION: Liquid Cooling / Thermal Management
+OFFICIAL_SITE: https://www.pfannenberg.com
+UK_PRESENCE: Pfannenberg (UK) Ltd | http://www.pfannenberg.co.uk
+CONTACT_NAME: Mark Martin Rosten-Edwards
+POSITION: Managing Director
+EMAIL: mark.rosten-edwards@pfannenberg.co.uk
+EMAIL_TYPE: verified
+EMAIL_BASIS: https://www.pfannenberg.com
+LINKEDIN: none
+PHONE: +44 1709 364844
+SOURCES: https://www.pfannenberg.com; https://theorg.com/org/pfannenberg/org-chart/mark-rosten-edwards; https://find-and-update.company-information.service.gov.uk/officers/v_g0NngBLxW5VZnWM9dBPMlpG9s/appointments
+CONFIDENCE: high
+NOTES: Reach out directly to Mark Rosten-Edwards, who has managed Pfannenberg UK's sales and operations since 2000. While standard components are sold via distributors like RS, custom chillers and skids require direct engagement.
+>>>
+
+<<<
+SUPPLIER: Phoenix Contact
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: Phoenix Contact
+DIVISION: Power to X and Process Automation / Energy Storage
+OFFICIAL_SITE: https://www.phoenixcontact.com
+UK_PRESENCE: Phoenix Contact Ltd (Telford, UK) | https://www.phoenixcontact.co.uk
+CONTACT_NAME: Farrukh Quraishi
+POSITION: International Business Development Manag
+>>>
+
+<<<
+SUPPLIER: Protego
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: 
+>>>
+
+<<<
+SUPPLIER: Roxtec
+DIVISION: Power & Process Industries
+OFFICIAL_SITE: https://www.roxtec.com
+UK_PRESENCE: Roxtec Ltd (Bury, Greater Manchester) - https://www.roxtec.com/en/contact/europe/united-kingdom/
+CONTACT_NAME: Rob Cullen
+POSITION: UK Divisional Manager, Power & Process Industries
+EMAIL: rob.cullen@uk.roxtec.com
+EMAIL_TYPE: pattern-inferred
+EMAIL_BASIS: pattern {first}.{last}@uk.roxtec.com + john.doe@uk.roxtec.com from https://prospeo.io/email-formats/roxtec-uk-ireland
+LINKEDIN: none
+PHONE: +44 7973 558 617
+SOURCES: https://www.roxtec.com/en/contact/europe/united-kingdom/; https://prospeo.io/email-formats/roxtec-uk-ireland; https://www.roxtec.com/en/about-us/news/press-releases/2022/decarbonisation-role-rob-cullen/
+CONFIDENCE: high
+NOTES: Rob Cullen is the ideal contact as his division specifically covers decarbonisation, green hydrogen, and energy storage. Roxtec sells both directly and via specialized UK distributors like Thorne & Derrick.
+>>>
+
+<<<
+SUPPLIER: Sensirion
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: Sensirion
+DIVISION: Channel Sales
+OFFICIAL_SITE: https://www.sensirion.com
+UK_PRESENCE: Anglia Components (https://www.anglia-live.com)
+CONTACT_NAME: Florian Hirsch
+POSITION: Director Channel Sales
+EMAIL:
+>>>
+
+<<<
+SUPPLIER: Spelsberg
+DIVISION: Spelsberg els UK Ltd (Enclosure Technology & Customisation)
+OFFICIAL_SITE: https://www.spelsberg.co.uk
+UK_PRESENCE: Spelsberg els UK Ltd (Telford, Shropshire) | https://www.spelsberg.co.uk/service/contact/
+CONTACT_NAME: Clare McCusker
+POSITION: National Sales Manager
+EMAIL: cmc@spelsberg.co.uk
+EMAIL_TYPE: verified
+EMAIL_BASIS: https://www.spelsberg.co.uk/service/contact/
+LINKEDIN: none
+PHONE: +44 (0)7726 694015
+SOURCES: https://www.spelsberg.co.uk/service/contact/; https://www.designsolutionsmag.co.uk/in-house-cnc-design/; https://www.enclosureanswers.com/experts/
+CONFIDENCE: high
+NOTES: Contact Clare McCusker directly for custom/bespoke junction box requirements (they offer in-house CNC machining and assembly in Telford). Standard items can also be sourced via distributors like RS, Farnell, and CPC.
+>>>
+
+<<<
+SUPPLIER: TDK
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: An elegant and highly targeted sourcing route has been identified for TDK’s passive components and sensors division (which covers both DC Link Capacitors and BMS thermal sensors/NTC thermistors). 
+
+TDK passive components and sensors are manufactured by **TDK Electronics AG**
+>>>
+
+<<<
+SUPPLIER: TE Connectivity
+CONTACT_NAME: none verified
+EMAIL_TYPE: enquiry-fallback
+CONFIDENCE: low
+NOTES: model returned no parseable block
+RAW: <<<
+SUPPLIER: TE Connectivity
+DIVISION: Aerospace, Defense & Marine (AD&M)
+OFFICIAL_SITE: https://www.te.com
+UK_PRESENCE: TE Connectivity UK Ltd (Swindon) | https://www.te.com
+CONTACT_NAME: Martin Cullen
+POSITION: Senior Business Development Manager,
+>>>

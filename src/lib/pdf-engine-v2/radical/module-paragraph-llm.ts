@@ -67,7 +67,7 @@ Required JSON shape:
 STYLE REQUIREMENTS:
 1. ONE paragraph. 110-180 words. No bullet lists. No section headings. No sub-headings.
 2. Engineering report tone: specific, factual, no marketing voice. British spelling throughout ("organised", "characterise", "behaviour", "colour", "optimised", "minimised").
-3. Mention EACH sub-module exactly ONCE, by its plain-English name, woven into the signal/process flow. Do NOT enumerate them as a list ("This module contains the following sub-modules: …"). Narrate how they work together.
+3. Mention EACH sub-module exactly ONCE, woven into the signal/process flow. Do NOT enumerate them as a list ("This module contains the following sub-modules: …"). Narrate how they work together. Refer to each sub-module by its REAL EQUIPMENT NAME (the component name from the SUB-MODULES list — e.g. "the packed absorber column", "the bagging line", "the MEA circulation pump"), NEVER by a function-taxonomy/radical phrase such as "the mass fluid transport process", "the energy conversion - chemical reaction", or "the fluid transport". Those are internal design labels, not equipment, and read as machine-generated jargon to an engineer.
 4. Follow the natural flow of the engineering domain (for a process plant: feed → reaction → separation → product handling → utilities/control; for an electrical system: source → conversion → distribution → switching → sensing → control). Close with ONE short sentence summarising the module's role.
 
 NUMBERS — THE HARD RULES (this is the most important section):
@@ -201,8 +201,20 @@ function wordLabel(w: WordSpec): string {
 
 /** One line per sub-module: "name — component, component, …". */
 function describeSubModule(sm: SubModuleSpec): string {
-  const name = String(sm.name_human ?? sm.id ?? '').replace(/_/g, ' ').trim()
   const words = Array.isArray(sm.words) ? sm.words : []
+  // SUBJECT FIX (Tristan 2026-06-09, UNIVERSAL): label the sub-module by its REAL
+  // EQUIPMENT NAME — its primary word — NOT the function-taxonomy name_human/id
+  // ("mass fluid transport process", "energy conversion - chemical reaction"). The
+  // LLM can only echo what it is handed, so feeding it the radical label is the root
+  // cause of overview prose like "routed through the mass fluid transport process".
+  // Mirrors resolveSubmoduleLabel in the renderer + the words[].name_human guidance.
+  const primaryWord = words.find((w) => {
+    const a = w as any
+    return Boolean(a?.name_human || a?.content_character?.name_human)
+  })
+  const name = primaryWord
+    ? wordLabel(primaryWord)
+    : String(sm.name_human ?? sm.id ?? '').replace(/_/g, ' ').trim()
   const compNames = Array.from(
     new Set(words.map(wordLabel).filter((s) => s.length > 0)),
   ).slice(0, 8)
