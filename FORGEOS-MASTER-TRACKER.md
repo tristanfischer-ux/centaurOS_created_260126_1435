@@ -11,21 +11,23 @@ dossier** — Part 1 (engineering), the CAD model, the **8 design-and-constructi
 correcting**, and the optimisation loops **converged** (engineering AND Blender), with **all of it
 rendered into the PDF**, not sitting in /tmp.
 
-## 🎯 CURRENT FOCUS
-**2× SCALE-UP VERIFICATION RUN (Tristan 2026-06-11):** prove the chain self-produces a fully-coordinated
-dossier FROM SCRATCH on a harder brief — `OXCCU-SAF-2X-BRIEF.md` (2,000 t/yr, double v21's 1,000). RUNNING:
-`serial-design-chain-v2 → out/oxccu-saf-2x-v1` (node 25, gates shadow so it renders, bg id baqrj46dq). This
-forces every new subsystem (8 drawings, Part-2 manufacturing layer, DOE/NETL cost grounding, clean CAD
-render, Part-1 BFD) through the REAL production path — not a hand-patched re-render. THEN verify the PDF is
-coordinated + internally consistent at the new scale, and fix any gap the fresh run exposes.
-Static pre-run audit confirms the wiring IS present: drawings (chain L6682) + CAD hero (L6692) + cost-
-grounding (L6130) + build-cost-basis (L6338) all wired; the Part-2 manufacturing pages compute from `state`
-at render time (so they're automatic on any fresh run, not pre-baked JSON). The 2× run is the live proof.
+## 🎯 CURRENT FOCUS — W9 · COST MUST SCALE WITH PRODUCTION (Tristan's 2× test, 2026-06-12)
+The 2× SAF scale-up (OXCCU-SAF-2X-BRIEF.md, 2,000 t/yr) PROVED rendering/coordination is solid (17/17
+coordination gate, all Part-2 subsystems, clean cover, scale-consistent prose) — AND exposed the core
+defect: **the dossier cost is ~blind to production rate (a 2× plant is costed 1.04×)**. Rigorous, same-code
+(1× vs 2× control runs): installed £14.08M→£14.67M, total_system_mass 1.26×. Process physics scales perfectly
+(every flow/power 2.00×); EQUIPMENT mass + BoM cost don't. **3-layer root cause** (drawer
+forgeos_gotchas_bc02fad34b716b71): L1 `q(c,KEY,DEFAULT)` frozen sizing reads (gate built `audit-sizing-scale.ts`,
+e-fuel fixed 3f7157d29); L2 mass-aggregator HARDCODED buckets (e-fuel fixed a62602798 — derive from throughput);
+**L3 (DOMINANT, not fixed): all 73 BoM lines get an emitter-pinned FLAT `list_price_gbp`, only 11 re-priced by
+size-scaling grounding → cost won't track production until the deterministic emitter scales BoM
+quantities+sizes with throughput (CORE change, all classes).** Tristan steered "bottom-up: derive every bucket
+from throughput". L1-L2 done; **L3 is a core-emitter change — scope before editing / awaiting steer.**
 
 ## ▶ NEXT 3 (in order)
-1. **2× VERIFY** Inspect out/oxccu-saf-2x-v1 PDF — every new subsystem present + mutually consistent at 2× scale; run gates 10/11 + cost-sanity + independent £/tonne check; fix any coordination gap.
-2. **W3.2** Instrument the optimisation loops to REPORT rounds-to-converge — engineering (convergence_loop reports `iterations`) AND Blender (render→critique→improve needs a deterministic score + counter). Tristan's "how many rounds?".
-3. **W6** BoM DATA coverage / growing-DB — the AIM's real long pole (per-class branded-parts generated on the fly).
+1. **W9-L3** Make the deterministic emitter scale BoM quantities + part sizes with throughput (the dominant cost-scale lever; core, all classes). THE fix for the 2× cost-blindness.
+2. **W9-L1/L2 tail** Fix co2-mineralisation's 10 frozen `q(c)` reads (same idiom as e-fuel); extend `audit-sizing-scale.ts` to catch the inline-literal freeze pattern (L2); then Mechanism-B audit of `engineering-contract.ts` authoritative quantities (BESS rack_count etc.).
+3. **W3.2** Instrument rounds-to-converge — engineering (convergence_loop reports `iterations`) + Blender visual loop (Tristan's "how many rounds?").
 
 ---
 
