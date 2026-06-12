@@ -200,6 +200,20 @@ def generate_drawing_set(state_path: str | Path,
     # W3.1/W3.2 — physics<->CAD convergence (rounds-to-converge) on the routed schedule.
     convergence = run_convergence_report(state_path, out_dir, log)
 
+    # design-to-envelope (opt-in via ENVELOPE env, e.g. '40ft-hi-cube'): fit-audit +
+    # containerisation diagram + envelope-fit-report.json. Non-fatal; only when requested.
+    envelope_name = os.environ.get("ENVELOPE", "").strip()
+    envelope_ok = False
+    if envelope_name and have_cad:
+        try:
+            subprocess.run([_venv_python(), str(_THIS / "draw_envelope_pack.py"),
+                            str(out_dir), str(state_path), "--env", envelope_name],
+                           capture_output=True, text=True, timeout=150)
+            envelope_ok = (out_dir / "drawings" / "envelope-packing.png").exists()
+            log.append(f"envelope({envelope_name}): {'diagram + report written' if envelope_ok else 'no diagram'}")
+        except Exception as e:  # noqa: BLE001
+            log.append(f"envelope: FAILED (non-fatal): {e}")
+
     def _group(rows: list[tuple]) -> list[dict]:
         out = []
         for key, script, png_name, title in rows:
@@ -257,6 +271,10 @@ def generate_drawing_set(state_path: str | Path,
                          "iterations": convergence.get("iterations"),
                          "economic_saving_gbp": convergence.get("economic_lifetime_saving_gbp")}
                         if convergence else None),
+        # design-to-envelope (opt-in): the containerisation diagram + report → dossier page.
+        "envelope_fit_report": ("envelope-fit-report.json"
+                                if (out_dir / "envelope-fit-report.json").exists() else None),
+        "envelope_packing_png": ("drawings/envelope-packing.png" if envelope_ok else None),
         # the cable schedule is the connection schedule rendered as a table.
         "cable_schedule_source": ("connection-schedule.json"
                                   if (out_dir / "connection-schedule.json").exists()

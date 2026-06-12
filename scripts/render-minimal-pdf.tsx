@@ -16710,6 +16710,48 @@ function buildDistributionCablingPages(project: string, statePath?: string): any
   } catch { return [] }
 }
 
+// Design-to-envelope (Tristan 2026-06-12): if the run requested an ENVELOPE, the
+// chain wrote envelope-fit-report.json + drawings/envelope-packing.png. Render a
+// "Containerisation & envelope fit" page: the partial-fit (modular core in the box,
+// columns/piping field-erected), the diagram, and the OUTPUT-FLEX (the envelope sets
+// the scale → the output it supports). Renders nothing if no envelope was requested.
+function buildEnvelopeFitPages(project: string, statePath?: string): any[] {
+  try {
+    if (!statePath) return []
+    const repPath = join(dirname(statePath), 'envelope-fit-report.json')
+    if (!existsSync(repPath)) return []
+    const r: any = JSON.parse(readFileSync(repPath, 'utf-8'))
+    const pngPath = join(dirname(statePath), 'drawings', 'envelope-packing.png')
+    const hasPng = existsSync(pngPath)
+    const env = r.envelope_mm ?? {}
+    const fx = r.output_flex
+    const ext: any[] = Array.isArray(r.external) ? r.external : []
+    return [(
+      <Page key="envelope-fit" size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Part 2 · Containerisation & envelope fit" project={project} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>Containerisation &amp; envelope fit</Text>
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 10, lineHeight: 1.5 }}>{`Fitting the design into a fixed ${r.envelope} envelope (${env.L}×${env.W}×${env.H} mm internal). The modular skid equipment packs into containers; tall columns/vessels and piping are field-erected (taken out of the box). A smaller envelope reduces the output the design supports — the output-flex below.`}</Text>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 4 }}>{String(r.verdict ?? '')}</Text>
+        <Text style={{ fontSize: 9, color: INK, marginBottom: 8 }}>{`${r.in_box_count} items containerise into ${r.containers_needed} × ${r.envelope} at ${r.utilisation_pct}% floor utilisation; ${r.external_count} item(s) field-erected / external.`}</Text>
+        {hasPng ? <Image src={pngPath} style={{ width: '100%', marginBottom: 8 }} /> : null}
+        {fx ? (
+          <View style={{ marginTop: 4, marginBottom: 8 }}>
+            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>Output vs envelope — the envelope sets the scale</Text>
+            <Text style={{ fontSize: 9, color: INK_SOFT }}>{Object.entries(fx.output_for_containers ?? {}).map(([k, v]: any) => `${k} container(s) » ${v} ${fx.unit}`).join('     ·     ')}</Text>
+            <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 3, lineHeight: 1.4 }}>{String(fx.note ?? '')}</Text>
+          </View>
+        ) : null}
+        {ext.length > 0 ? (
+          <View style={{ marginTop: 2 }}>
+            <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>Field-erected / external ({r.external_count})</Text>
+            <Text style={{ fontSize: 8, color: INK_SOFT, lineHeight: 1.45 }}>{ext.slice(0, 24).map((e: any) => `${String(e.name ?? '').replace(/_/g, ' ')} [${e.shape}]`).join('  ·  ')}</Text>
+          </View>
+        ) : null}
+      </Page>
+    )]
+  } catch { return [] }
+}
+
 // Part 2 manufacturing layer (Option A EVOLVE, Tristan 2026-06-11 "how you manufacture
 // it"): the make-vs-buy classification (M1) + the per-made-item process route + steps
 // (M2), surfaced as a "How it is manufactured" section. The make-vs-buy verdict is
@@ -17093,6 +17135,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
       <MasterBillOfMaterialsPage state={state} project={project} bomTotals={bomTotals} partLinkMap={partLinkMap} />
       {/* W4.1: the routed cable/pipe/duct runs the BoM has always omitted (additive Part-3 section). */}
       {buildDistributionCablingPages(project, statePath)}
+      {buildEnvelopeFitPages(project, statePath)}
       {/* Cost by module — moved OUT of Part 1 (Tristan 2026-06-08) into the Part 3
           reference cluster, beside the master BoM + cost basis. */}
       <CostByModulePage state={state} project={project} bomTotals={bomTotals} />
