@@ -173,7 +173,9 @@ const stepHvacLoadSizing: ToolStep = {
   required: false,
   feeds_into: [],
   input_from_contract: (c: any) => ({
-    sensible_load_kw: 2.0,
+    // chamber heat loss scales with surface area ∝ build_volume^(2/3) — was hardcoded for the
+    // 12 L default build volume, so a larger printer's chamber load froze.
+    sensible_load_kw: 2.0 * Math.pow((c.quantities?.build_volume_l?.value ?? 12) / 12, 2 / 3),
     target_temp_c: c.quantities?.chamber_temp_c?.value ?? 50,
     ambient_temp_c: 25,
     application: 'industrial_fdm_chamber',

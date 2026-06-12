@@ -363,12 +363,17 @@ const stepDehumid: ToolStep = {
   tool_id: 'dehumidification:sizing',
   required: false,
   feeds_into: [] as string[],
-  input_from_contract: (c: any) => ({
-    moisture_load_kg_h: 5,   // typical small-commercial latent load
-    target_rh_pct: 55,
-    air_flow_m3_h: 1000,
-    inlet_temp_c: 22,
-  }),
+  input_from_contract: (c: any) => {
+    // dehumidification load + air flow SCALE with the unit's rated thermal capacity (a bigger
+    // heat pump conditions a bigger space) — were hardcoded for the 12 kW default, freezing them.
+    const cap = c.quantities?.rated_thermal_kw?.value ?? 12
+    return {
+      moisture_load_kg_h: 5 * (cap / 12),
+      target_rh_pct: 55,
+      air_flow_m3_h: 1000 * (cap / 12),
+      inlet_temp_c: 22,
+    }
+  },
   contract_update: (c: ContractInProgress, output: any) => {
     const prov = (f: string) => ({
       source: 'tool:dehumidification:sizing' as const,

@@ -90,6 +90,7 @@ function scanToolInputLiterals(src: string): Array<{ key: string; val: string }>
     for (const m of body.matchAll(/([a-z_][a-z0-9_]*)\s*:\s*(-?[0-9][0-9_.]*)\s*(?:as const)?\s*[,}\n]/g)) {
       const key = m[1], val = m[2]
       if (seen.has(key)) continue
+      if (Number(val) === 0) continue          // a zero literal can't be a harmful freeze (scaling 0 = no-op)
       if (!isLiteralExtensive(key)) continue   // only unambiguous flow/duty/throughput drivers
       seen.add(key); out.push({ key, val })
     }
