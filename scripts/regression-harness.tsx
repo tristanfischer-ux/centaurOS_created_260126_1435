@@ -1482,6 +1482,49 @@ function checkEFuelSynthesisInvariants(): Assertion[] {
     ))
   }
 
+  // ── (ii.b) BoM prices SCALE with throughput (Layer-3 cost-scale fix 2026-06-12) ──
+  // Each list_price_gbp pin must scale with its size spec, not stay flat at the
+  // 1,000 t/yr design point — the 2x SAF scale-up exposed a 1.04x-flat dossier cost
+  // (drawer forgeos_gotchas_bc02fad34b716b71). Guards scaleBomPricesToThroughput.
+  {
+    const failures: string[] = []
+    let ratio = 0
+    try {
+      const bomPins = (d: any): number => {
+        let t = 0
+        for (const m of (d?.modules ?? [])) for (const sm of (m?.sub_modules ?? [])) for (const w of (sm?.words ?? [])) {
+          const pm = (w?.modifier_characters ?? []).find((x: any) => x?.kind === 'list_price_gbp')
+          const qm = (w?.modifier_characters ?? []).find((x: any) => x?.kind === 'quantity')
+          const qty = qm ? (parseInt(String(qm.value).replace(/[^0-9]/g, ''), 10) || 1) : 1
+          if (pm) t += Number(pm.value) * qty
+        }
+        return t
+      }
+      const oneX = eFuelSynthesisEmitter({ quantities: {} } as any, {} as any, {} as any)
+      const twoX = eFuelSynthesisEmitter({ quantities: {
+        co2_feed_kg_h: { value: 2000 }, h2_feed_kg_h: { value: 280 },
+        co2_feed_compressor_power_kw: { value: 180 }, h2_feed_compressor_power_kw: { value: 150 },
+        recycle_gas_compressor_power_kw: { value: 80 }, feed_preheater_duty_kw: { value: 260 },
+        ft_reactor_volume_m3: { value: 5 }, ft_reactor_shell_mass_kg: { value: 3600 },
+        product_cooler_duty_kw: { value: 640 }, steam_raised_kg_h: { value: 1880 },
+        connected_electrical_load_kw: { value: 6000 }, thermal_oxidiser_heat_release_kw: { value: 1660 },
+        fractionation_column_shell_mass_kg: { value: 6400 }, product_tank_shell_mass_kg: { value: 9000 },
+        total_liquids_tonnes_yr: { value: 3333 }, saf_output_tonnes_yr: { value: 2000 },
+      } } as any, {} as any, {} as any)
+      const a = bomPins(oneX), b = bomPins(twoX)
+      ratio = a > 0 ? b / a : 0
+      if (!(ratio >= 1.2)) failures.push(`BoM pin total scaled only ${ratio.toFixed(2)}x for a 2x plant (£${a.toFixed(0)} -> £${b.toFixed(0)}); expected >=1.2x — list_price_gbp pins went flat (scaleBomPricesToThroughput regressed)`)
+    } catch (err) {
+      failures.push(`emitter threw: ${String(err).slice(0, 160)}`)
+    }
+    out.push(assertEq(
+      'E_FUEL.bom_scales_with_throughput',
+      `e_fuel_synthesis BoM price total scales with the brief production rate (got ${ratio.toFixed(2)}x for a 2x plant; six-tenths target ~1.5x, floor 1.2x)`,
+      failures.length, (n) => n === 0,
+      () => `e_fuel BoM cost is throughput-blind: ${failures.slice(0, 2).join(' ; ')}. Check scaleBomPricesToThroughput in e-fuel-synthesis.ts.`,
+    ))
+  }
+
   // ── (iii) contract pins saf_output_tonnes_yr > 0 + h2_co2_molar_ratio ∈ [2,4] ──
   {
     const failures: string[] = []
