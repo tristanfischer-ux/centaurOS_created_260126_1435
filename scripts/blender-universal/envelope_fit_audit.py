@@ -57,6 +57,43 @@ def _dims(p: dict) -> tuple[float, float, float]:
     return 0.0, 0.0, 0.0
 
 
+def shelf_pack(in_box: list[dict], eL_mm: float, eW_mm: float) -> list[list[dict]]:
+    """Qty-aware first-fit-decreasing SHELF pack of the in-box items into envelopes
+    (length eL × width eW, mm). Each PHYSICAL unit (qty expanded) is placed; returns a
+    list of containers, each a list of placed {x,y,w,d,label,module} in METRES. This is
+    the single source of truth for containers_needed (an area estimate mis-counts a
+    mixed-size set, and ignoring qty under-counts)."""
+    eL, eW = eL_mm / 1000.0, eW_mm / 1000.0
+    GAP = 0.15
+    units = []
+    for r in in_box:
+        w_mm, d_mm = r["dims_mm"][0], r["dims_mm"][1]
+        w = min(max(w_mm, d_mm) / 1000.0, eL)   # long side along container length
+        d = min(w_mm, d_mm) / 1000.0            # short side = depth
+        if d > eW:                               # can't fit even rotated (shouldn't happen post-audit)
+            continue
+        for _ in range(max(1, int(r.get("qty", 1) or 1))):
+            units.append((w, d, r.get("equip_tag") or r["name"], r.get("module", "?")))
+    units.sort(key=lambda u: -u[0])
+    containers: list[list[dict]] = []
+    cur: list[dict] = []
+    shelf_y = shelf_h = x = 0.0
+    for (w, d, label, module) in units:
+        if x + w > eL + 1e-6:                    # next shelf
+            shelf_y += shelf_h + GAP; x = shelf_h = 0.0
+        if shelf_y + d > eW + 1e-6:              # container full → new container
+            if cur:
+                containers.append(cur)
+            cur, shelf_y, shelf_h, x = [], 0.0, 0.0, 0.0
+        cur.append({"x": round(x, 2), "y": round(shelf_y, 2), "w": round(w, 2),
+                    "d": round(d, 2), "label": label, "module": module})
+        x += w + GAP
+        shelf_h = max(shelf_h, d)
+    if cur:
+        containers.append(cur)
+    return containers
+
+
 def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube",
           headline_output: dict | None = None) -> dict:
     env = ENVELOPES[env_name]
@@ -71,6 +108,7 @@ def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube",
         shape = str(p.get("shape", ""))
         name = p.get("name", p.get("tag", "?"))
         rec = {"name": name, "shape": shape, "qty": qty,
+               "module": str(p.get("module", "?")), "equip_tag": p.get("equipment_tag", ""),
                "dims_mm": [round(w), round(d), round(h)],
                "footprint_m2": round((w / 1000.0) * (d / 1000.0), 2)}
         if shape in EXTERNAL_SHAPE:
@@ -88,13 +126,12 @@ def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube",
             rec["reason"] = ("too tall to stand — field-erected" if erect_only and h > eH
                              else "exceeds envelope in every orientation — field-erected")
             external.append(rec)
-    # bin-pack the in-box items by footprint into N envelopes (floor area, pack efficiency).
-    floor_m2 = (eL / 1000.0) * (eW / 1000.0) * PACK_EFFICIENCY
+    # bin-pack the in-box items (qty-aware shelf pack) — the REAL pack is the single
+    # source of truth for containers_needed + the diagram.
+    floor_m2 = (eL / 1000.0) * (eW / 1000.0)
     used_m2 = sum(r["footprint_m2"] * r["qty"] for r in in_box)
-    containers_needed = max(1, -(-int(round(used_m2 * 100)) // int(round(floor_m2 * 100)))) if used_m2 > 0 else 0
-    # (the ceil-div above is integer-safe.)
-    import math
-    containers_needed = max(1, math.ceil(used_m2 / floor_m2)) if used_m2 > 0 else 0
+    packing = shelf_pack(in_box, eL, eW)
+    containers_needed = len(packing)
     # OUTPUT-FLEX (Tristan: the envelope SETS the scale, OUTPUT is the dependent variable).
     # The containerisable footprint scales ~linearly with throughput, so for a TARGET of K
     # envelopes the design's CONTAINERISABLE output scales O × K / N. For a MODULAR class
@@ -130,6 +167,7 @@ def audit(parts_manifest: dict, env_name: str = "40ft-hi-cube",
         "container_floor_m2": round(floor_m2, 1),
         "containers_needed": containers_needed,
         "utilisation_pct": round(100 * used_m2 / (containers_needed * floor_m2), 1) if containers_needed else 0.0,
+        "packing": packing,
         "output_flex": output_flex,
         "external": external,
         "in_box": in_box,
