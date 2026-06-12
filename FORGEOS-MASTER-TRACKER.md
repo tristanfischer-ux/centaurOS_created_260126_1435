@@ -19,10 +19,15 @@ defect: **the dossier cost is ~blind to production rate (a 2× plant is costed 1
 (every flow/power 2.00×); EQUIPMENT mass + BoM cost don't. **3-layer root cause** (drawer
 forgeos_gotchas_bc02fad34b716b71): L1 `q(c,KEY,DEFAULT)` frozen sizing reads (gate built `audit-sizing-scale.ts`,
 e-fuel fixed 3f7157d29); L2 mass-aggregator HARDCODED buckets (e-fuel fixed a62602798 — derive from throughput);
-**L3 (DOMINANT, not fixed): all 73 BoM lines get an emitter-pinned FLAT `list_price_gbp`, only 11 re-priced by
-size-scaling grounding → cost won't track production until the deterministic emitter scales BoM
-quantities+sizes with throughput (CORE change, all classes).** Tristan steered "bottom-up: derive every bucket
-from throughput". L1-L2 done; **L3 is a core-emitter change — scope before editing / awaiting steer.**
+L3 (DOMINANT): all 73 BoM lines got an emitter-pinned FLAT `list_price_gbp`. **✅ FIXED for e-fuel**
+(`594b2e8d2` + harness guard `5c975323b`): a post-emit pass `scaleBomPricesToThroughput` scales each price by
+its OWN size-spec ratio vs the 1,000 t/yr design point (six-tenths). **END-TO-END RESULT: cost scaling 1.04× →
+1.275×** (BoM £8.45M→£10.77M, installed £14.08M→£17.95M for a 2× plant), gates pass, 17/17 coordination intact.
+Mechanism is universal-ready (post-emit spec-ratio, no per-pin edits). REMAINING to ~1.5× six-tenths:
+- **#86** my L2 fix scales `total_plant_mass_kg` 1.59× but the cost take-off reads `total_system_mass_kg` (still
+  1.26×) — reconcile the field (→ ~1.4× cost). CARE: check all consumers + step order.
+- **#87** generalise the L3 pass to co2 (after #84 unfreezes co2's 10 L1 specs) + the 35 product classes.
+- fixed-dimension vessels (guard beds/buffers) whose specs don't scale → emitter sizing follow-up.
 
 ## ▶ NEXT 3 (in order)
 1. **W9-L3** Make the deterministic emitter scale BoM quantities + part sizes with throughput (the dominant cost-scale lever; core, all classes). THE fix for the 2× cost-blindness.
