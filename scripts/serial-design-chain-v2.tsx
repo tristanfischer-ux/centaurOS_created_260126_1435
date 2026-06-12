@@ -122,6 +122,7 @@ import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/
 import { resolvePriceBand, targetPerformanceValueAs } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { resolveCostStack, computeCostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
+import { runWritebackPass } from './lib/design-loop/writeback-bridge'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
 import { verifyAllParts, stripUnverifiedParts, inheritPartNumberFromDeterministicSibling, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
@@ -6698,6 +6699,24 @@ async function main() {
   } catch (err) {
     console.error(`[chain] drawing-set generation failed (non-fatal): ${(err as Error).message}`)
     logAction({ step: 'drawing_set', ok: false, error: String(err).slice(0, 200) })
+  }
+
+  // ── Design-loop writeback (Increment 2): feed the settled geometry back into the engine ──
+  // generate_drawing_set just produced convergence-report.json + route-manifest.json (the
+  // physics↔CAD fixed point: routed parasitic loads + measured run lengths). Apply the ADDITIVE
+  // writeback — total_supply_demand_kw (plant load + distribution losses, sizes the incomer) +
+  // interconnect pipe/cable lengths — into state.orchestratorContract.quantities, and append the
+  // design-loop ledger. Every update is a NEW key, so this cannot conflict with the narrative or a
+  // compliance cap (no reorder needed). Non-fatal. Lands the loop's settled quantities in state for
+  // the bill-of-materials-from-settled-model + cost-adjust increments; the visible convergence note
+  // already renders from convergence-report.json. UNIVERSAL — same path for every class.
+  try {
+    const wb = runWritebackPass(statePath, outDir, { pass: 1 })
+    console.log(`[chain] design-loop writeback: ${wb.applied} settled quantit${wb.applied === 1 ? 'y' : 'ies'} fed back into the engine (settled=${wb.settled})`)
+    logAction({ step: 'design_loop_writeback', ok: true, applied: wb.applied, settled: wb.settled })
+  } catch (err) {
+    console.error(`[chain] design-loop writeback failed (non-fatal): ${(err as Error).message.slice(0, 120)}`)
+    logAction({ step: 'design_loop_writeback', ok: false, error: String(err).slice(0, 200) })
   }
 
   const pdfPath = resolve(outDir, 'chain-v2.pdf')

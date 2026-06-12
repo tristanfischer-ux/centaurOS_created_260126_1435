@@ -56,6 +56,7 @@ import { splitDenseSubModulesByRadical, TARGET_DENSITY_DEFAULT, MIN_CHILD_WORDS_
 import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, isBespokeFabrication } from '../src/lib/pdf-engine-v2/lib/bespoke-equipment-bands'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
+import { computeQuantityUpdates } from './lib/design-loop/writeback-bridge'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildAuthorDigest, buildCheckSpec } from './author-blender-scene'
@@ -243,6 +244,30 @@ function checkReactionToolsWorkedSound(): Assertion[] {
     out.push({ id: 'UNIVERSAL.reaction_gibbs_worked_sound', description: 'reaction gibbs worked sound', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
   }
   _reactionWorkedCheck = out
+  return out
+}
+
+// ── UNIVERSAL: the design-loop writeback (Increment 2) is ADDITIVE — the converged demand maps
+// to a NEW total_supply_demand_kw (plant load + distribution losses, which sizes the incomer),
+// NEVER overwriting the brief's plant-load metric connected_electrical_load_kw (which the prose +
+// the compliance cap reference). Pure-function check — no snapshot, no .venv. Would have caught the
+// overwrite mapping I shipped + corrected in Inc 1.
+function checkDesignLoopWritebackAdditive(): Assertion[] {
+  const out: Assertion[] = []
+  const conv = { iterations: 2, trajectory: [{ total_demand_kw: 6000 }, { total_demand_kw: 6013.9, cooling_load_kw: 12.5 }] }
+  const rm = { lines: [{ length_m: 14.8, mechanism: 'fluid_loop' }, { length_m: 20, mechanism: 'thermal' }, { length_m: 28.4, mechanism: 'electrical_bus' }] }
+  const quantities = { connected_electrical_load_kw: { value: 6000, unit: 'kW', source: 'brief' } }
+  const updates = computeQuantityUpdates(conv as any, rm as any, quantities)
+  const supply = updates.find(u => u.key === 'total_supply_demand_kw')
+  const touchesBriefMetric = updates.some(u => u.key === 'connected_electrical_load_kw')
+  const pipe = updates.find(u => u.key === 'interconnect_pipe_length_m')
+  out.push(assertEq(
+    'UNIVERSAL.design_loop_writeback_additive',
+    'design-loop writeback maps converged demand → NEW total_supply_demand_kw (6013.9 kW), never overwrites the brief plant-load metric, harvests interconnect length (34.8 m pipe)',
+    JSON.stringify({ supply: supply?.to, touchesBriefMetric, pipe: pipe?.to }),
+    () => !!supply && Math.abs(Number(supply.to) - 6013.9) < 0.01 && !touchesBriefMetric && !!pipe && Math.abs(Number(pipe.to) - 34.8) < 0.01,
+    () => `supply=${supply?.to} touchesBriefMetric=${touchesBriefMetric} pipe=${pipe?.to}`,
+  ))
   return out
 }
 
@@ -8398,6 +8423,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // worked[] arithmetic, exercised directly on the real CO2 reactions. Memoised so the
   // .venv python spawns once across the whole run, not per snapshot.
   for (const a of checkReactionToolsWorkedSound()) assertions.push(a)
+  for (const a of checkDesignLoopWritebackAdditive()) assertions.push(a)
 
   // Self-contained — the four chemical-process SIZING tools (reactor / absorber+stripper /
   // crystalliser / dryer) exercised directly on a CO2-scale fixture: ok + sane headline
