@@ -95,16 +95,31 @@ def build_census(parts: list[dict]) -> dict:
                 "line_total_gbp": round(cost["line_total_gbp"] * qty, 2),
                 "cost_source": cost["cost_source"], "estimated": True,
             })
-    cable = sum(r["line_total_gbp"] for r in rows if r["kind"] == "cable")
-    pipe = sum(r["line_total_gbp"] for r in rows if r["kind"] == "pipe")
+    # BULK infrastructure — the big categories the per-run lines don't carry: cable tray/ladder
+    # (shared by the cables) + pipe supports. Estimated from the census run metres (conservative
+    # model). These are what take the interconnect from "enumerated runs" to a realistic take-off.
+    cable_m = sum(r["length_m"] * r["qty_units"] for r in rows if r["kind"] == "cable")
+    pipe_m = sum(r["length_m"] * r["qty_units"] for r in rows if r["kind"] == "pipe")
+    if cable_m > 0:
+        rows.append({"role": "cable tray/ladder", "to_part": "(plant-wide)", "mechanism": "electrical_bus",
+                     "kind": "tray", "size": "ladder", "length_m": round(cable_m * 0.45, 1), "qty_units": 1,
+                     "line_total_gbp": round(cable_m * 0.45 * 42.0, 2),  # ~45% sharing, £42/m supply+install
+                     "cost_source": cs.COST_SOURCE_MODEL, "estimated": True})
+    if pipe_m > 0:
+        rows.append({"role": "pipe supports", "to_part": "(plant-wide)", "mechanism": "fluid_loop",
+                     "kind": "support", "size": "per 4 m", "length_m": round(pipe_m, 1), "qty_units": int(pipe_m // 4),
+                     "line_total_gbp": round((pipe_m / 4.0) * 38.0, 2),  # 1 support / 4 m, £38/support
+                     "cost_source": cs.COST_SOURCE_MODEL, "estimated": True})
+    cable = sum(r["line_total_gbp"] for r in rows if r["kind"] in ("cable", "tray"))
+    pipe = sum(r["line_total_gbp"] for r in rows if r["kind"] in ("pipe", "support"))
     return {
         "schema": "interconnect-census/v1",
-        "basis": "FULL-DENSITY per-equipment utility/electrical/instrument tie-in census; "
-                 "estimated standard drop lengths (model, ±range); priced " + cs.COST_SOURCE_MODEL,
+        "basis": "FULL-DENSITY per-equipment utility/electrical/instrument tie-in census + bulk "
+                 "(cable tray, pipe supports); estimated standard runs (model, ±range); priced " + cs.COST_SOURCE_MODEL,
         "census_runs": len(rows),
         "total_units": sum(r["qty_units"] for r in rows),
         "cable_gbp": round(cable, 2), "pipe_gbp": round(pipe, 2),
-        "grand_total_gbp": round(cable + pipe, 2),
+        "grand_total_gbp": round(sum(r["line_total_gbp"] for r in rows), 2),
         "rows": rows,
     }
 
