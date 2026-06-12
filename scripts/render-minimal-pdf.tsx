@@ -16736,7 +16736,7 @@ function buildDistributionCablingPages(project: string, statePath?: string): any
                   <Text style={{ flex: 1, fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK }}>Complete interconnect (routed streams + tie-in census)</Text>
                   <Text style={{ width: 60, fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>{gbp(full)}</Text>
                 </View>
-                <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6, lineHeight: 1.4 }}>{`The census enumerates every procurement-meaningful tie-in (full density; screws/fixings are a single allowance). Lengths are estimated standard drops — a conservative model (cable trays, pipe supports and conduit not yet itemised), disclosed per ${String(c.cost_source ?? 'model:uk-2026-supply+install')}.`}</Text>
+                <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6, lineHeight: 1.4 }}>{`The census enumerates every procurement-meaningful tie-in plus bulk cable tray + pipe supports (full density; screws/fixings are a single allowance). Lengths are estimated standard drops not yet footprint-scaled; conduit, glanding and commissioning are not yet itemised — a conservative model disclosed per ${String(c.cost_source ?? 'model:uk-2026-supply+install')}.`}</Text>
               </View>
             )
           } catch { return null }
