@@ -268,8 +268,11 @@ const stepReboilerHx: ToolStep = {
   required: false,
   feeds_into: ['fluids:pipe-sizing', 'mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => {
-    // Reboiler duty proxy from LP-steam rate: ~180 kg/h × 2200 kJ/kg latent ≈ 110 kW.
-    const steamKgH = q(c, 'reboiler_steam_kg_h', 180)
+    // Reboiler duty proxy from LP-steam rate: ~180 kg/h × 2200 kJ/kg latent ≈ 110 kW PER t/day CO2.
+    // Scales with the capture target (MEA regeneration steam ∝ CO2 captured) — was a hardcoded 180
+    // that froze the reboiler duty + the lean/rich cross-exchanger (validated against it) on a
+    // smaller plant.
+    const steamKgH = q(c, 'reboiler_steam_kg_h', 180 * q(c, 'capture_capacity_tco2_per_day', 1))
     const reboilerDutyKw = (steamKgH * 2200) / 3600
     const cMinKwK = Math.max(0.5, Math.round((reboilerDutyKw / 15) * 100) / 100)
     return {
@@ -301,8 +304,10 @@ const stepCrossExchangerHx: ToolStep = {
   required: false,
   feeds_into: ['mass-aggregator:envelope-check'] as string[],
   input_from_contract: (c: ContractInProgress) => {
-    // Amine-side heat-capacity rate from circulation: 3 m3/h × 1000 kg/m3 × 4.0 kJ/kg·K / 3600 ≈ 3.3 kW/K.
-    const meaCircM3H = q(c, 'mea_circulation_m3_h', 3)
+    // Amine-side heat-capacity rate from circulation: 3 m3/h × 1000 kg/m3 × 4.0 kJ/kg·K / 3600 ≈ 3.3 kW/K
+    // PER t/day CO2 — scales with the capture target (amine circulation ∝ CO2 captured); was a
+    // hardcoded 3 that froze the cross-exchanger duty on a smaller plant.
+    const meaCircM3H = q(c, 'mea_circulation_m3_h', 3 * q(c, 'capture_capacity_tco2_per_day', 1))
     const cMinKwK = Math.max(0.5, Math.round(((meaCircM3H * 1000 * 4.0) / 3600) * 100) / 100)
     return {
       hx_type: 'counterflow' as const,
@@ -803,11 +808,14 @@ const stepCo2AbsorberSizing: ToolStep = {
   input_from_contract: (c: ContractInProgress) => ({
     column_name: 'CO2 absorber',
     mode: 'absorber' as const,
-    gas_flow_kg_h: 316,                   // full flue-gas mass rate (1 t/day CO2 at ~12%)
+    // flue-gas + solvent flows SCALE with the capture target (316 kg/h flue gas + 3500 kg/h MEA
+    // per t/day CO2 at ~12% / 30 wt%) — was hardcoded for 1 t/day, which froze the absorber
+    // diameter on a smaller plant. Now a 0.5 t/day plant gets a proportionally smaller column.
+    gas_flow_kg_h: 316 * q(c, 'capture_capacity_tco2_per_day', 1),
     gas_density_kg_m3: 1.1,               // flue gas at column conditions
     y_in_mol_frac: 0.12,                  // 12% CO2 flue gas
     target_removal: 0.90,                 // 90% capture
-    liquid_flow_kg_h: 3500,               // 30 wt% MEA solvent rate
+    liquid_flow_kg_h: 3500 * q(c, 'capture_capacity_tco2_per_day', 1),
     equilibrium_slope_m: 0.4,             // favourable absorber (m = dy*/dx < 1)
     htu_m: 0.6,                           // Mellapak 250Y HTU
     packing_factor_fp_per_m: 66,          // Mellapak 250Y Fp [1/m]
@@ -837,14 +845,16 @@ const stepMeaStripperSizing: ToolStep = {
   tool_id: 'absorption:column-htu-ntu',
   required: false,
   feeds_into: ['mass-aggregator:envelope-check'] as string[],
-  input_from_contract: (_c: ContractInProgress) => ({
+  input_from_contract: (c: ContractInProgress) => ({
     column_name: 'MEA stripper',
     mode: 'stripper' as const,
-    gas_flow_kg_h: 250,                   // stripping vapour (steam + desorbed CO2)
+    // stripping-vapour + rich-amine flows SCALE with the capture target — were hardcoded for
+    // 1 t/day (and the contract was even unused, `_c`), which froze the stripper diameter.
+    gas_flow_kg_h: 250 * q(c, 'capture_capacity_tco2_per_day', 1),
     gas_density_kg_m3: 1.1,
     y_in_mol_frac: 0.12,
     target_removal: 0.90,
-    liquid_flow_kg_h: 3600,               // rich amine descending the stripper
+    liquid_flow_kg_h: 3600 * q(c, 'capture_capacity_tco2_per_day', 1),
     equilibrium_slope_m: 1.5,             // unfavourable for stripping (m > 1)
     htu_m: 0.7,                           // stripper packing HTU
     packing_factor_fp_per_m: 66,
