@@ -23,6 +23,7 @@
 
 import { registerAssembler } from '../assembler'
 import type { ClassEmitter, DesignJSON, DesignModule } from '../assembler'
+import { scaleBomPricesByThroughput } from '../bom-price-scale'
 import type { ContractInProgress } from '../types'
 
 interface Mod { kind: string; value: string; unit?: string }
@@ -823,6 +824,19 @@ const emitter: ClassEmitter = (contract, _brief, _envelope): DesignJSON => {
     emitSafety(p),
     emitBagging(p),
   ]
+
+  // Layer-3 cost-scale (2026-06-12): scale every BoM price pin to the brief's CO2
+  // capture rate (six-tenths on each line's own size spec vs the 1 t/day design
+  // point, with a class-output fallback for fixed-spec lines). See bom-price-scale.ts.
+  const pRef = deriveParams({ quantities: {} } as any)
+  const refModules: DesignModule[] = [
+    emitAbsorptionCapture(pRef), emitCarbonationReactor(pRef), emitCaco3Recovery(pRef),
+    emitK2so4Recovery(pRef), emitMeaRecovery(pRef), emitThermalUtilities(pRef),
+    emitProcessControl(pRef), emitInstrumentation(pRef), emitElectrical(pRef),
+    emitStructure(pRef), emitSafety(pRef), emitBagging(pRef),
+  ]
+  scaleBomPricesByThroughput(modules, refModules, pRef.captureTpd > 0 ? p.captureTpd / pRef.captureTpd : 1)
+
   return {
     modules,
     cross_module_grammar_links: emitCrossModuleGrammarLinks(p),
