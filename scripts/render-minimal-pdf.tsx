@@ -16705,6 +16705,42 @@ function buildDistributionCablingPages(project: string, statePath?: string): any
           <Text style={{ width: 60, fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>{gbp(t.grand_total_gbp)}</Text>
         </View>
         <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 8, lineHeight: 1.4 }}>{`Cable ${gbp(t.cable_gbp)} + pipe ${gbp(t.pipe_gbp)} + terminations ${gbp(t.terminations_gbp)}. Basis: ${String(t.cost_source ?? 'model:uk-2026-supply+install')}. Sizes per the connection schedule; lengths are the routed-polyline runs.`}</Text>
+        {(() => {
+          // Full-density tie-in census (Increment 6): beyond the major routed streams, every
+          // equipment item's standard utility/electrical/instrument tie-ins, enumerated + priced.
+          try {
+            const cp = join(dirname(statePath!), 'interconnect-census.json')
+            if (!existsSync(cp)) return null
+            const c: any = JSON.parse(readFileSync(cp, 'utf-8'))
+            if (!Array.isArray(c?.rows) || c.rows.length === 0) return null
+            const byRole: Record<string, { units: number; gbp: number }> = {}
+            for (const r of c.rows) {
+              const k = String(r.role ?? '?')
+              byRole[k] = byRole[k] || { units: 0, gbp: 0 }
+              byRole[k].units += Number(r.qty_units ?? 1)
+              byRole[k].gbp += Number(r.line_total_gbp ?? 0)
+            }
+            const full = Number(t.grand_total_gbp ?? 0) + Number(c.grand_total_gbp ?? 0)
+            return (
+              <View style={{ marginTop: 14 }}>
+                <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>Full-density tie-in census</Text>
+                <Text style={{ fontSize: 8.5, color: INK_SOFT, marginBottom: 6, lineHeight: 1.45 }}>{`Beyond the major routed streams above, every equipment item carries the standard utility, electrical and instrument tie-ins a real plant has — a power feed to each motor, a signal wire to each field instrument, drain/vent/inert-purge on each vessel, cooling water on each heat item. ${c.census_runs} tie-in types, ${c.total_units} units.`}</Text>
+                {Object.entries(byRole).sort((a: any, b: any) => b[1].gbp - a[1].gbp).map(([role, v]: any, i: number) => (
+                  <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT, paddingVertical: 2 }}>
+                    <Text style={{ flex: 1, fontSize: 8, color: INK }}>{role}</Text>
+                    <Text style={{ width: 70, fontSize: 8, color: MUTED, textAlign: 'right' }}>{`${v.units} units`}</Text>
+                    <Text style={{ width: 60, fontSize: 8, color: ACCENT, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>{gbp(v.gbp)}</Text>
+                  </View>
+                ))}
+                <View style={{ flexDirection: 'row', marginTop: 5, paddingTop: 3, borderTopWidth: 1, borderTopColor: RULE }}>
+                  <Text style={{ flex: 1, fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK }}>Complete interconnect (routed streams + tie-in census)</Text>
+                  <Text style={{ width: 60, fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>{gbp(full)}</Text>
+                </View>
+                <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6, lineHeight: 1.4 }}>{`The census enumerates every procurement-meaningful tie-in (full density; screws/fixings are a single allowance). Lengths are estimated standard drops — a conservative model (cable trays, pipe supports and conduit not yet itemised), disclosed per ${String(c.cost_source ?? 'model:uk-2026-supply+install')}.`}</Text>
+              </View>
+            )
+          } catch { return null }
+        })()}
       </Page>
     )]
   } catch { return [] }

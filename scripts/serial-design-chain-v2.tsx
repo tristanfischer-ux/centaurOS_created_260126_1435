@@ -6701,6 +6701,23 @@ async function main() {
     logAction({ step: 'drawing_set', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // ── Interconnect census (Increment 6): full-density utility/electrical/instrument tie-in take-off ──
+  // generate_drawing_set just produced parts-manifest.json. Enumerate, per equipment item, the standard
+  // tie-ins a real plant has (motor feeds, vessel drain/vent/purge, heat-item cooling water, a signal
+  // wire to every field instrument) → interconnect-census.json, priced via the same supply+install model
+  // as the routed lines. The renderer's distribution bill of materials surfaces it so the interconnect is
+  // COMPLETE, not just the 8 major streams. Non-fatal, universal (rule set keyed on shape, no class logic).
+  try {
+    const censusPy = existsSync(resolve(__dirname, '..', '.venv', 'bin', 'python'))
+      ? resolve(__dirname, '..', '.venv', 'bin', 'python') : 'python3'
+    execFileSync(censusPy, [resolve(__dirname, 'blender-universal', 'interconnect_census.py'), outDir],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..'), env: { ...process.env } })
+    logAction({ step: 'interconnect_census', ok: true })
+  } catch (err) {
+    console.error(`[chain] interconnect census failed (non-fatal): ${(err as Error).message.slice(0, 120)}`)
+    logAction({ step: 'interconnect_census', ok: false, error: String(err).slice(0, 200) })
+  }
+
   // ── Design-loop writeback (Increment 2): feed the settled geometry back into the engine ──
   // generate_drawing_set just produced convergence-report.json + route-manifest.json (the
   // physics↔CAD fixed point: routed parasitic loads + measured run lengths). Apply the ADDITIVE
