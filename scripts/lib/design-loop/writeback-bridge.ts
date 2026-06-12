@@ -153,3 +153,29 @@ export function loadJson<T>(outDir: string, name: string): T | null {
   if (!existsSync(p)) return null
   try { return JSON.parse(readFileSync(p, 'utf-8')) as T } catch { return null }
 }
+
+/**
+ * Chain-callable orchestration of ONE writeback pass: read the settled Blender artifacts from
+ * `outDir`, compute the engine-quantity updates against state.orchestratorContract.quantities,
+ * apply them to the state on disk, and append the loop ledger. Returns the updates + settle flag.
+ * Pure-IO: no LLM. Safe no-op (returns settled:true, no updates) when artifacts are absent.
+ */
+export function runWritebackPass(
+  statePath: string, outDir: string, opts: { pass?: number; tol?: number } = {},
+): { updates: QuantityUpdate[]; settled: boolean; applied: number } {
+  const conv = loadJson<ConvergenceReport>(outDir, 'convergence-report.json')
+  const rm = loadJson<RouteManifest>(outDir, 'route-manifest.json')
+  if (!conv && !rm) return { updates: [], settled: true, applied: 0 }   // nothing to feed back
+  if (!existsSync(statePath)) return { updates: [], settled: true, applied: 0 }
+  const state = JSON.parse(readFileSync(statePath, 'utf-8'))
+  const oc = state.orchestratorContract || (state.orchestratorContract = {})
+  const quantities = oc.quantities || (oc.quantities = {})
+  const updates = computeQuantityUpdates(conv, rm, quantities)
+  if (updates.length > 0) {
+    oc.quantities = applyUpdates(quantities, updates)
+    writeFileSync(statePath, JSON.stringify(state))
+  }
+  const settled = isSettled(updates, opts.tol ?? 0.005)
+  appendLedger(outDir, { pass: opts.pass ?? 1, settled, blender_iterations: conv?.iterations, updates })
+  return { updates, settled, applied: updates.length }
+}

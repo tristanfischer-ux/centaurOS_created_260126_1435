@@ -200,6 +200,20 @@ def generate_drawing_set(state_path: str | Path,
     # W3.1/W3.2 — physics<->CAD convergence (rounds-to-converge) on the routed schedule.
     convergence = run_convergence_report(state_path, out_dir, log)
 
+    # CAD_ARTIFACTS_ONLY (design-loop Increment 2): the CLOSED loop needs the routed geometry
+    # + convergence-report BEFORE the narrative/cost stages, but NOT the (expensive, redrawn-
+    # later) drawings/hero. When set, produce only the artifacts + convergence and return early;
+    # the later full generate_drawing_set call REUSES the artifacts (ensure_cad_artifacts:
+    # present ⇒ reuse), so the heavy Blender scene-build still runs once. Does NOT write
+    # drawing-manifest.json (the full late pass owns that). Zero effect when the flag is unset.
+    if os.environ.get("CAD_ARTIFACTS_ONLY", "").strip() not in ("", "0", "false"):
+        for _line in log:
+            print(f"[drawing-set] {_line}")
+        print(f"[drawing-set] CAD_ARTIFACTS_ONLY: artifacts={'ok' if have_cad else 'MISSING'}, "
+              f"convergence={'written' if convergence else 'skipped'} — returning before drawings")
+        return {"schema": "drawing-manifest/v1", "artifacts_only": True,
+                "have_cad": have_cad, "convergence": convergence is not None}
+
     # design-to-envelope (opt-in via ENVELOPE env, e.g. '40ft-hi-cube'): fit-audit +
     # containerisation diagram + envelope-fit-report.json. Non-fatal; only when requested.
     envelope_name = os.environ.get("ENVELOPE", "").strip()
@@ -317,6 +331,8 @@ def main(argv: list[str]) -> int:
     state_path = argv[0]
     out_dir = argv[1] if len(argv) > 1 else None
     m = generate_drawing_set(state_path, out_dir)
+    if m.get("artifacts_only"):
+        return 0  # the artifacts-only fast path already logged its own summary
     print(f"[drawing-set] {m['generated_ok']}/{m['total']} drawings generated "
           f"(CAD artifacts {'available' if m['cad_artifacts_available'] else 'ABSENT'})")
     for d in m["system_drawings"]:
