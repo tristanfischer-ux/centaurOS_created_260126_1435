@@ -16,6 +16,12 @@ const config: Config = {
         // remark-gfm is ESM-only and next/jest's default transformIgnorePatterns
         // blocks it from being transformed. Provide a no-op mock for unit tests.
         '^remark-gfm$': '<rootDir>/src/__mocks__/remark-gfm.ts',
+        // Strip the ESM-style `.js` extension from RELATIVE imports so jest resolves
+        // them to the `.ts` source (e.g. class-reference-graph-db.ts imports
+        // '../../class-reference-graph.js' → class-reference-graph.ts). tsx resolves
+        // this at runtime; jest needs the map. Pre-existing break from commit f8c3a596c
+        // that left 8 suites unable to load + blocked the pre-push hook.
+        '^(\\.{1,2}/.*)\\.js$': '$1',
     },
     // Allow transforming ES modules from node_modules
     transformIgnorePatterns: [
