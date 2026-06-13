@@ -164,7 +164,11 @@ def assemble(out_dir: str):
 
 if __name__ == "__main__":
     import sys
-    rows = assemble(sys.argv[1] if len(sys.argv) > 1 else "out/ras-r5-20260613")
+    pos = [a for a in sys.argv[1:] if not a.startswith("--")]
+    rows = assemble(pos[0] if pos else "out/ras-r5-20260613")
+    if "--json" in sys.argv:                      # machine mode — the TS chain consumes this
+        print(json.dumps(rows))
+        sys.exit(0)
     tot = sum(r["line_gbp"] for r in rows)
     print(f"{'TAG':7} {'STATUS':11} {'REQUIREMENT':62} {'£ LINE':>10}  BASIS")
     for r in rows:

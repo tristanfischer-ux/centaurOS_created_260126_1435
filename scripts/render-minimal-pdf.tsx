@@ -12885,6 +12885,97 @@ function resolveHeroImages(state: any): { cover: string | null; exploded: string
  * byte-for-byte so the consolidated table reads identically to the scattered
  * tables it summarises; the SOURCE · CHECK legend renders ONCE at the end.
  */
+// ─── Section 8 · Requirements-Driven Bill of Materials (Tristan 2026-06-13) ────
+// The "requirement is the durable IP" variant BoM. Every principal item is stated
+// as the engineering REQUIREMENT it must satisfy — duty computed by the physics
+// engine, size + connections measured off the Blender model, material — then the
+// FULFILMENT (a real catalogue part / a bespoke made-to-spec build / not yet
+// sourced) and the COST with its basis (catalogue quote / materials take-off /
+// bottom-up parametric). Assembled deterministically by scripts/requirements_bom.py
+// from the settled state + the Blender route/parts manifests, written into
+// state.requirementsBom by the chain before render. GUARDED — renders nothing when
+// state.requirementsBom is absent, so existing dossiers and every quality gate are
+// unaffected. Universal across archetypes (RAS / CO2 / SAF all verified).
+function RequirementsBillOfMaterialsPage({ state, project }: { state?: any; project: string }) {
+  const rows: any[] = Array.isArray(state?.requirementsBom) ? state.requirementsBom : []
+  if (rows.length === 0) return null
+  const total = rows.reduce((a, r) => a + (Number(r?.line_gbp) || 0), 0)
+  const fmt = (n: number) => `£${Math.round(Number(n) || 0).toLocaleString('en-GB')}`
+  const statusColor = (s: string) => (s === 'IDENTIFIED' ? '#15803d' : s === 'BESPOKE' ? '#1d4ed8' : '#b45309')
+  const nIdent = rows.filter(r => r?.status === 'IDENTIFIED').length
+  const nBespoke = rows.filter(r => r?.status === 'BESPOKE').length
+  const nNotFound = rows.filter(r => r?.status === 'NOT FOUND').length
+  const PER_PAGE = 24
+  const chunks: any[][] = []
+  for (let i = 0; i < rows.length; i += PER_PAGE) chunks.push(rows.slice(i, i + PER_PAGE))
+
+  const TableHead = () => (
+    <View wrap={false} style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: RULE, paddingBottom: 3, marginTop: 4 }}>
+      <Text style={{ width: 46, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>TAG</Text>
+      <Text style={{ flex: 3, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>REQUIREMENT — WHAT IT MUST DO</Text>
+      <Text style={{ width: 58, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>FULFILMENT</Text>
+      <Text style={{ flex: 1.5, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>COST BASIS</Text>
+      <Text style={{ width: 22, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>QTY</Text>
+      <Text style={{ width: 56, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LINE (£)</Text>
+    </View>
+  )
+
+  return (
+    <>
+      {chunks.map((chunk, ci) => (
+        <Page key={`req-bom-${ci}`} size="A4" style={PAGE_STYLE}>
+          <PageHeader section={`Section 8 · Requirements Register${chunks.length > 1 ? ` (page ${ci + 1} of ${chunks.length})` : ''}`} project={project} />
+          {ci === 0 ? (
+            <>
+              <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+                Requirements-Driven Bill of Materials
+              </Text>
+              <Text style={{ fontSize: 10, color: MUTED, marginBottom: 12, lineHeight: 1.5 }}>
+                The durable engineering deliverable: {rows.length.toLocaleString('en-GB')} principal item{rows.length === 1 ? '' : 's'}, each
+                stated as the REQUIREMENT it must satisfy — the duty computed by the physics engine, the size and connections measured off the
+                3D model, the material — then the FULFILMENT and the COST with its basis. A procurement team tenders against the requirement
+                column; the chosen part is one way to meet it.
+              </Text>
+              <View wrap={false} style={{ flexDirection: 'row', marginBottom: 8 }}>
+                <Text style={{ fontSize: 8.5, color: '#15803d', fontFamily: 'Helvetica-Bold', marginRight: 16 }}>{nIdent} identified · catalogue</Text>
+                <Text style={{ fontSize: 8.5, color: '#1d4ed8', fontFamily: 'Helvetica-Bold', marginRight: 16 }}>{nBespoke} bespoke · made to spec</Text>
+                {nNotFound > 0 ? <Text style={{ fontSize: 8.5, color: '#b45309', fontFamily: 'Helvetica-Bold' }}>{nNotFound} not yet sourced</Text> : null}
+              </View>
+            </>
+          ) : null}
+          <View>
+            <TableHead />
+            {chunk.map((r, i) => (
+              <View key={`req-${ci}-${i}`} wrap={false} style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}>
+                <Text style={{ width: 46, fontSize: 8.5, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>{String(r?.tag ?? '—')}</Text>
+                <Text style={{ flex: 3, fontSize: 9, color: INK }}>{normalise_unicode(String(r?.requirement ?? '—'))}</Text>
+                <Text style={{ width: 58, fontSize: 7, color: statusColor(String(r?.status)), fontFamily: 'Helvetica-Bold' }}>{String(r?.status ?? '—')}</Text>
+                <Text style={{ flex: 1.5, fontSize: 7, color: MUTED }}>{normalise_unicode(String(r?.basis ?? '—'))}</Text>
+                <Text style={{ width: 22, fontSize: 9, color: INK, textAlign: 'right' }}>×{(Number(r?.qty) || 1).toLocaleString('en-GB')}</Text>
+                <Text style={{ width: 56, fontSize: 9, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>{Number(r?.line_gbp) > 0 ? fmt(r.line_gbp) : '—'}</Text>
+              </View>
+            ))}
+            {ci === chunks.length - 1 ? (
+              <View wrap={false} style={{ flexDirection: 'row', paddingTop: 8, marginTop: 6, borderTopWidth: 1.4, borderTopColor: ACCENT, alignItems: 'baseline' }}>
+                <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+                  Requirements total ({rows.length.toLocaleString('en-GB')} line{rows.length === 1 ? '' : 's'})
+                </Text>
+                <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'right' }}>{fmt(total)}</Text>
+              </View>
+            ) : null}
+          </View>
+          {ci === chunks.length - 1 ? (
+            <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 10, lineHeight: 1.5, fontStyle: 'italic' }}>
+              FULFILMENT: IDENTIFIED = a real catalogue part, verified to meet the duty · BESPOKE = made-to-spec (tanks, vessels, fabricated steel — never off-shelf), priced by a materials take-off · NOT FOUND = the requirement is stated and sized, no catalogue match recorded yet.  COST BASIS: catalogue = distributor price · materials take-off = mass (surface area × wall × density) × £/kg fabricated + fittings · bottom-up parametric = engineering cost factor on the computed size.  Concept-stage estimate, AACE Class 4 (±30%).
+            </Text>
+          ) : null}
+          <PageFooter />
+        </Page>
+      ))}
+    </>
+  )
+}
+
 function MasterBillOfMaterialsPage({ state, project, bomTotals, partLinkMap }: { state?: any; project: string; bomTotals: BomTotals | null; partLinkMap?: Map<string, { url: string; title: string | null; manufacturer: string }> }) {
   if (!bomTotals || !Array.isArray(bomTotals.allMods) || bomTotals.allMods.length === 0) return null
   // Canonical module order — order_modules sorts allMods in place and returns the
@@ -17216,6 +17307,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           real parts tables were scattered per-sub-module). Pure presentation
           consolidation of existing bomTotals — no part, manufacturer, part number
           or price invented (gate-20 safety line). */}
+      <RequirementsBillOfMaterialsPage state={state} project={project} />
       <MasterBillOfMaterialsPage state={state} project={project} bomTotals={bomTotals} partLinkMap={partLinkMap} />
       {/* W4.1: the routed cable/pipe/duct runs the BoM has always omitted (additive Part-3 section). */}
       {buildDistributionCablingPages(project, statePath)}

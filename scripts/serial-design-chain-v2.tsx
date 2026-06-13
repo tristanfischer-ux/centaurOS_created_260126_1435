@@ -6857,6 +6857,35 @@ async function main() {
     logAction({ step: 'design_loop_writeback', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // Requirements-driven bill of materials (Tristan 2026-06-13): the "requirement is
+  // the durable IP" variant BoM. Assembled deterministically from the SETTLED state
+  // + the Blender route/parts manifests by scripts/requirements_bom.py (the same
+  // assembler the round-evidence previews use), then attached to state.requirementsBom
+  // so render-minimal-pdf.tsx's RequirementsBillOfMaterialsPage can show it. Runs
+  // AFTER the writeback so it reads the settled quantities + measured run lengths.
+  // Non-fatal: a failure just omits the page (the renderer guards on absence).
+  // UNIVERSAL — same path for every class (RAS / CO2 / SAF all verified).
+  try {
+    const reqPy = resolve(__dirname, 'requirements_bom.py')
+    const reqVenv = resolve(__dirname, '..', '.venv', 'bin', 'python')
+    const reqBin = existsSync(reqVenv) ? reqVenv : 'python3'
+    const reqOut = execFileSync(reqBin, [reqPy, outDir, '--json'], { encoding: 'utf8', cwd: resolve(__dirname, '..'), maxBuffer: 16 * 1024 * 1024 })
+    const reqRows = JSON.parse(reqOut)
+    if (Array.isArray(reqRows) && reqRows.length > 0) {
+      const st = JSON.parse(readFileSync(statePath, 'utf8'))
+      st.requirementsBom = reqRows
+      writeFileSync(statePath, JSON.stringify(st))
+      const reqTotal = reqRows.reduce((a: number, r: any) => a + (Number(r?.line_gbp) || 0), 0)
+      console.log(`[chain] requirements-driven BoM: ${reqRows.length} requirement lines (Σ £${Math.round(reqTotal).toLocaleString('en-GB')}) → state.requirementsBom`)
+      logAction({ step: 'requirements_bom', ok: true, lines: reqRows.length, total_gbp: Math.round(reqTotal) })
+    } else {
+      logAction({ step: 'requirements_bom', ok: true, lines: 0 })
+    }
+  } catch (err) {
+    console.error(`[chain] requirements-bom assembly failed (non-fatal): ${(err as Error).message.slice(0, 160)}`)
+    logAction({ step: 'requirements_bom', ok: false, error: String(err).slice(0, 200) })
+  }
+
   const pdfPath = resolve(outDir, 'chain-v2.pdf')
   // 2026-05-19 fix C2: pass RENDER_NO_OPEN=1 to renderer in worker context so
   // the renderer doesn't try to open Preview (LaunchAgent has no GUI session).
