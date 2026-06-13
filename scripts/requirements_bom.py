@@ -23,8 +23,18 @@ import json, math, os, re
 STEEL_RHO, FRP_RHO = 7850.0, 1850.0          # kg/m³
 STEEL_RATE, FRP_RATE = 2.4, 9.0              # £/kg fabricated (incl. forming + weld/lay-up)
 
-_BESPOKE_RE = re.compile(r"tank|vessel|reservoir|basin|sump|column|tower|biofilter|degass|"
+# SIMPLE bespoke = shell-dominated fabrications (a materials take-off — mass of steel/
+# FRP — is the right cost basis: the price IS mostly the shell).
+_BESPOKE_RE = re.compile(r"tank|vessel|reservoir|basin|sump|biofilter|degass|"
                          r"clarifier|skimmer|hopper|silo|frame|enclosure|structure|duct", re.I)
+# STRONG bespoke = complex fabricated PROCESS vessels. NEVER a catalogue purchase — even
+# when the emitter pinned a part_number (that 'PN' is a fabricator / licensor drawing
+# reference, not a buyable SKU). Their cost is dominated by INTERNALS / catalyst /
+# heat-exchange / engineering, NOT the shell steel — so a shell materials take-off would
+# wildly undercount them; the honest basis is the process engineering budget estimate.
+_STRONG_BESPOKE_RE = re.compile(r"reactor|distillation|fractionation|\bcolumn\b|\btower\b|"
+                                r"absorber|stripper|scrubber|contactor|crystalli|calciner|"
+                                r"\bkiln\b|digester|ferment|bioreactor|electroly", re.I)
 _TBD_RE = re.compile(r"tbd|detailed design|specify|^$", re.I)
 
 
@@ -90,6 +100,47 @@ def _materials_takeoff(name, mods):
                               f"{matlabel} = {mass:.0f} kg × £{rate}/kg + fittings")
 
 
+def _bespoke_class(name: str) -> str:
+    """'strong' | 'simple' | 'none'. STRONG = complex fabricated process vessel
+    (reactor/column/absorber/...) decided by the HEAD noun (last word) so a qualifier
+    ('reactor thermowell', 'fractionation reboiler') can't promote a catalogue component.
+    SIMPLE = shell-dominated fabrication (tank/basin/duct...) costed by a materials
+    take-off. Universal — no per-class table."""
+    head = re.sub(r"[^a-z0-9]+$", "", (name.strip().split() or [""])[-1].lower())
+    if _STRONG_BESPOKE_RE.search(head):
+        return "strong"
+    if _BESPOKE_RE.search(name or ""):
+        return "simple"
+    return "none"
+
+
+def _selftest() -> int:
+    """Guards the head-noun rule that the qualifier-over-match bug (2026-06-13) broke."""
+    cases = {
+        "Fischer-Tropsch synthesis reactor": "strong",
+        "product fractionation column · 0.8 m dia x 18 m": "strong",
+        "packed amine absorber": "strong",
+        "hydrocracker/hydrotreater reactor": "strong",
+        "reactor thermowell + temperature profile": "none",   # head = profile
+        "reactor pressure-relief valve": "none",               # head = valve
+        "fractionation reboiler": "none",                      # head = reboiler (an HX)
+        "fractionation overhead condenser": "none",            # head = condenser
+        "rearing tank · 9.5 m dia x 4.7 m": "simple",          # head = tank... but '·' splits
+        "CO2 degasser": "simple",
+        "process-water transfer pump": "none",
+    }
+    bad = 0
+    for name, want in cases.items():
+        got = _bespoke_class(name)
+        # the '·'-suffixed names: the take-off appends ' · <dim>', so test the bare noun too
+        if got != want and want in ("simple", "strong"):
+            got = _bespoke_class(name.split("·")[0].strip())
+        if got != want:
+            print(f"  FAIL  '{name}' → {got} (want {want})"); bad += 1
+    print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
+    return 1 if bad else 0
+
+
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
     def _load(n):
@@ -146,10 +197,22 @@ def assemble(out_dir: str):
                 pn = str(md.get("part_number") or "")
                 mfr = str(md.get("manufacturer") or "")
                 qy = int((re.search(r"\d+", str(md.get("quantity") or "1")) or re.search(r"(1)", "1")).group(0))
-                if pn and not _TBD_RE.search(pn):
+                bc = _bespoke_class(name)   # 'strong' (process vessel) | 'simple' (shell) | 'none'
+                if bc == "strong":
+                    # complex fabricated process vessel — bespoke regardless of any pinned
+                    # PN; cost is the engineering budget estimate, NOT a shell take-off
+                    # (which would undercount a reactor/column by orders of magnitude).
+                    status, part = "BESPOKE", "made to spec"
+                    pv = price.get(wid, 0.0)
+                    if pv > 0:
+                        gbp, basis = pv, "made-to-spec · engineering budget estimate"
+                    else:
+                        mt = _materials_takeoff(name, md)
+                        gbp, basis = (mt[0], mt[1]) if mt else (0.0, "bottom-up parametric")
+                elif pn and not _TBD_RE.search(pn):
                     status, part = "IDENTIFIED", f"{mfr} {pn}".strip()
                     gbp, basis = price.get(wid, 0.0), "catalogue"
-                elif _BESPOKE_RE.search(name):
+                elif bc == "simple":
                     mt = _materials_takeoff(name, md)
                     status, part = "BESPOKE", "made to spec"
                     gbp, basis = (mt[0], mt[1]) if mt else (price.get(wid, 0.0), "bottom-up parametric")
@@ -164,6 +227,8 @@ def assemble(out_dir: str):
 
 if __name__ == "__main__":
     import sys
+    if "--selftest" in sys.argv:
+        sys.exit(_selftest())
     pos = [a for a in sys.argv[1:] if not a.startswith("--")]
     rows = assemble(pos[0] if pos else "out/ras-r5-20260613")
     if "--json" in sys.argv:                      # machine mode — the TS chain consumes this
