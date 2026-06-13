@@ -9705,8 +9705,8 @@ def add_flat_lights(bbox_mm):
     # under AgX. A flat bright world washed the wide spatial/hero passes to a
     # pale, low-contrast grey; a darker world + strong directional fills (below)
     # keeps the geometry crisp and CLEARLY VISIBLE — the legibility goal.
-    bg.inputs["Color"].default_value = (*fl._to_linear((0.42, 0.43, 0.47)), 1.0)
-    bg.inputs["Strength"].default_value = 0.85
+    bg.inputs["Color"].default_value = (*fl._to_linear((0.62, 0.63, 0.66)), 1.0)
+    bg.inputs["Strength"].default_value = 1.0
 
     # Four soft AREA fills (big) — above + 3 sides — the PRIMARY shadowless
     # modelling light. Strong so the equipment is brightly + evenly lit against
