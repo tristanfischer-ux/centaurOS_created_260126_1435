@@ -122,7 +122,7 @@ import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/
 import { resolvePriceBand, targetPerformanceValueAs } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { resolveCostStack, computeCostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
-import { runWritebackPass } from './lib/design-loop/writeback-bridge'
+import { runSettleLoop, settlePassesFromEnv } from './lib/design-loop/settle-loop'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
 import { verifyAllParts, stripUnverifiedParts, inheritPartNumberFromDeterministicSibling, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
@@ -6801,11 +6801,21 @@ async function main() {
     const tDraw = Date.now()
     const venvPy = resolve(__dirname, '..', '.venv', 'bin', 'python')
     const pyBin = existsSync(venvPy) ? venvPy : 'python3'
-    execFileSync(pyBin, [resolve(__dirname, 'blender-universal', 'generate_drawing_set.py'), statePath, outDir], {
-      stdio: 'inherit',
-      cwd: resolve(__dirname, '..'),
-      env: { ...process.env },
+    const drawScript = resolve(__dirname, 'blender-universal', 'generate_drawing_set.py')
+    // ── Multi-pass physics↔Blender settle loop (Tristan 2026-06-13: "4 loops minimum") ──
+    // Iterate {re-lay-out + re-measure → feed the converged loads + measured run-lengths back
+    // into the engine state} to a settled fixed point: MIN 4 passes, capped at 8. Each genuine
+    // pass is one local deterministic Blender render (~75 s, no LLM, £0 API); a settled design
+    // reuses artifacts for free so later passes are cheap. On today's sparse topology it settles
+    // fast (the loop's numeric value scales with topology density — the long pole); the mechanism
+    // runs ≥4 and records the settle ledger regardless. Replaces the former single-pass
+    // generate_drawing_set + the standalone Increment-2 writeback (now once per pass, inside).
+    const minPasses = settlePassesFromEnv(process.env.UNIVERSAL_SETTLE_PASSES, 4)
+    const settle = runSettleLoop(statePath, outDir, {
+      pyBin, drawScript, cwd: resolve(__dirname, '..'), minPasses, maxPasses: 8,
     })
+    console.log(`[chain] physics↔Blender settle loop: ${settle.totalPasses} pass${settle.totalPasses === 1 ? '' : 'es'}, ${settle.forcedRenders} forced re-render${settle.forcedRenders === 1 ? '' : 's'} (rest reused free), settled at pass ${settle.settledAt ?? 'n/a'} (min ${minPasses})`)
+    logAction({ step: 'settle_loop', ok: true, passes: settle.totalPasses, forced_renders: settle.forcedRenders, settled_at: settle.settledAt, min_passes: minPasses })
     const manifestPath = resolve(outDir, 'drawing-manifest.json')
     if (existsSync(manifestPath)) {
       const dm = JSON.parse(readFileSync(manifestPath, 'utf-8'))
@@ -6839,23 +6849,10 @@ async function main() {
     logAction({ step: 'interconnect_census', ok: false, error: String(err).slice(0, 200) })
   }
 
-  // ── Design-loop writeback (Increment 2): feed the settled geometry back into the engine ──
-  // generate_drawing_set just produced convergence-report.json + route-manifest.json (the
-  // physics↔CAD fixed point: routed parasitic loads + measured run lengths). Apply the ADDITIVE
-  // writeback — total_supply_demand_kw (plant load + distribution losses, sizes the incomer) +
-  // interconnect pipe/cable lengths — into state.orchestratorContract.quantities, and append the
-  // design-loop ledger. Every update is a NEW key, so this cannot conflict with the narrative or a
-  // compliance cap (no reorder needed). Non-fatal. Lands the loop's settled quantities in state for
-  // the bill-of-materials-from-settled-model + cost-adjust increments; the visible convergence note
-  // already renders from convergence-report.json. UNIVERSAL — same path for every class.
-  try {
-    const wb = runWritebackPass(statePath, outDir, { pass: 1 })
-    console.log(`[chain] design-loop writeback: ${wb.applied} settled quantit${wb.applied === 1 ? 'y' : 'ies'} fed back into the engine (settled=${wb.settled})`)
-    logAction({ step: 'design_loop_writeback', ok: true, applied: wb.applied, settled: wb.settled })
-  } catch (err) {
-    console.error(`[chain] design-loop writeback failed (non-fatal): ${(err as Error).message.slice(0, 120)}`)
-    logAction({ step: 'design_loop_writeback', ok: false, error: String(err).slice(0, 200) })
-  }
+  // (The design-loop writeback — feeding the settled geometry's converged loads + measured
+  // run-lengths back into state.orchestratorContract.quantities + the design-loop ledger —
+  // now runs INSIDE the settle loop above, once per pass, so the quantities settle across the
+  // ≥4 passes instead of a single one-shot trip. UNIVERSAL, additive, non-fatal as before.)
 
   // Requirements-driven bill of materials (Tristan 2026-06-13): the "requirement is
   // the durable IP" variant BoM. Assembled deterministically from the SETTLED state
