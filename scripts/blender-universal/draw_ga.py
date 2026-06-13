@@ -648,8 +648,16 @@ def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart, tag_axis="x"):
     everything else a rect. Tag if it fits."""
     pw = max(pw, 1.5)
     ph = max(ph, 1.5)
-    if p.is_round and p.shape in ("tall_column", "tall_vessel", "vertical_vessel",
-                                  "tank", "stack") and ph > 10 and pw > 5:
+    if p.is_round and p.shape == "tank" and ph > 8 and pw > 5:
+        # Atmospheric OPEN-TOP process tank (RAS rearing tank etc.): a flat-top
+        # cylindrical shell with a water-surface line — NOT a domed/capsule roof.
+        # RAS rearing tanks (and most process tanks) are open to the atmosphere;
+        # the capsule arc wrongly drew every tank with a dome (Tristan 2026-06-13).
+        svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.4, fill=EQ_FILL)
+        wl = py + min(4.0, ph * 0.18)
+        svg.line(px + 1.5, wl, px + pw - 1.5, wl, stroke=DATUM_INK, width=0.7)
+    elif p.is_round and p.shape in ("tall_column", "tall_vessel", "vertical_vessel",
+                                    "stack") and ph > 10 and pw > 5:
         rx = min(pw / 2.0, 9)
         svg.path(f"M {px:.1f} {py+rx:.1f} "
                  f"A {rx:.1f} {rx:.1f} 0 0 1 {px+pw:.1f} {py+rx:.1f} "
