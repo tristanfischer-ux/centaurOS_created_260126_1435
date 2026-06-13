@@ -240,6 +240,17 @@ const CLASS_ALIASES: Record<string, string> = {
   power_to_liquid: 'e_fuel_synthesis',
   fischer_tropsch: 'e_fuel_synthesis',
   ptl_saf: 'e_fuel_synthesis',
+  // aquaculture_ras — land-based marine Recirculating Aquaculture System (2026-06-12).
+  // A continuously-operated water-treatment + life-support plant wrapped around
+  // circular fish-rearing tanks (NOT a fish-tank product). Same process-plant family
+  // as co2_mineralisation / e_fuel_synthesis — field-erected, sized by fish tonnage.
+  aquaculture_ras: 'aquaculture_ras',
+  ras: 'aquaculture_ras',
+  recirculating_aquaculture: 'aquaculture_ras',
+  recirculating_aquaculture_system: 'aquaculture_ras',
+  land_based_aquaculture: 'aquaculture_ras',
+  marine_ras: 'aquaculture_ras',
+  fish_farm_ras: 'aquaculture_ras',
 }
 
 function normaliseClass(raw: string): string | null {
@@ -1702,6 +1713,46 @@ function eFuelVoltageTier(_: string | null, c: ParsedConstraints): VoltageTier {
 function eFuelFormFactor(_: string | null, _c: ParsedConstraints): string { return 'skid_mounted' }
 function eFuelApplication(_: string | null, _c: ParsedConstraints): string { return 'sustainable_aviation_fuel' }
 
+// aquaculture_ras — land-based marine RAS (2026-06-12). Mirrors the
+// co2_mineralisation / e_fuel_synthesis 4-fn shape: ALWAYS returns a tier so the
+// envelope resolves (the contract + tools size from the contract quantities with
+// fallbacks). Sized by harvested fish output (t/yr) AND total rearing-tank volume
+// (m³) — reads either; small <50 t/yr, medium 50-500 t/yr, large >500 t/yr (the
+// 204 t/yr reference full unit → 'medium'). When only tank volume is stated, infer
+// t/yr at the brief's 60 kg/m³ harvest density × ~1 turnover/yr equivalent
+// (3,340 m³ ↔ 204 t/yr ⇒ ~61 kg harvested per m³·yr).
+function rasScaleTier(c: ParsedConstraints): string | null {
+  const desc = String(c.product_description ?? '').toLowerCase()
+  // 1) Harvested fish output in tonnes/year ("204 tonnes per year", "125 t/yr").
+  let tpy: number | null = null
+  const tYr = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,6}(?:\.\d+)?)\s*(?:t|tonne[s]?|metric\s+ton[s]?|tons?)\s*(?:of\s+)?(?:harvest(?:ed)?\s+)?(?:fish|kingfish|salmon|production)?\s*(?:\/|per)\s*(?:yr|year|annum|a)\b/i)
+  if (tYr) tpy = parseFloat(tYr[1].replace(/,/g, ''))
+  // 2) Fallback: total rearing-tank volume (m³) → t/yr at the reference 61 kg/(m³·yr)
+  //    (3,340 m³ ↔ 204 t/yr for this kingfish design).
+  if (tpy === null) {
+    const vol = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(?:cubic\s+met(?:re|er)s?|m\s*3|m³|m\^?3)\s*(?:total\s+)?(?:rearing[\s-]?)?(?:tank\s+)?(?:volume)?/i)
+    if (vol) tpy = (parseFloat(vol[1].replace(/,/g, '')) * 204) / 3340
+  }
+  // 3) Fallback: target_performance value when a t/yr unit is given.
+  if (tpy === null) {
+    const tp = c.target_performance
+    const u = String(tp?.unit ?? '').toLowerCase()
+    if (tp && Number(tp.value ?? 0) > 0 && (u === 't/yr' || u === 'tpy' || u === 'tonne_yr' || u === 't/year' || u === 'tonnes/year')) {
+      tpy = Number(tp.value)
+    }
+  }
+  const t = tpy ?? 204 // class default: 204 t/yr reference full-scale unit
+  if (t < 50) return 'small'
+  if (t <= 500) return 'medium'
+  return 'large'
+}
+function rasVoltageTier(_: string | null, c: ParsedConstraints): VoltageTier {
+  if (c.voltage_class_v) return classifyVoltage(c.voltage_class_v)
+  return 'low' // 400 V LV behind an 11 kV/MV site transformer (planned 5 MVA micro-grid)
+}
+function rasFormFactor(_: string | null, _c: ParsedConstraints): string { return 'field_erected' }
+function rasApplication(_: string | null, _c: ParsedConstraints): string { return 'land_based_marine_aquaculture' }
+
 const DETECTORS: Record<string, ClassDetectors> = {
   bess: {
     scaleTier: bessScaleTier,
@@ -1933,6 +1984,12 @@ const DETECTORS: Record<string, ClassDetectors> = {
     voltageTier: eFuelVoltageTier,
     formFactor: eFuelFormFactor,
     application: eFuelApplication,
+  },
+  aquaculture_ras: {
+    scaleTier: rasScaleTier,
+    voltageTier: rasVoltageTier,
+    formFactor: rasFormFactor,
+    application: rasApplication,
   },
 }
 

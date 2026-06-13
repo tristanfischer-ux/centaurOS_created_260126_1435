@@ -172,10 +172,16 @@ export async function assembleDesign(
   }
 
   // ── 4. Generic emitter (wall-3 miss-fallback) — GENERIC-EMITTER-PLAN.md §3 ──
-  // Flag-gated (UNIVERSAL_GENERIC_EMITTER=1) so the 35 registered classes never
-  // reach it. The single path that renders an UNSEEN class (or an Exp-A holdout):
-  // structure from the class-reference graph + downstream gap-filler parts.
-  if (process.env.UNIVERSAL_GENERIC_EMITTER === '1' || process.env.UNIVERSAL_GENERIC_EMITTER === 'true') {
+  // 2026-06-12 (Tristan): the generic emitter is the UNIVERSAL path for an UNSEEN
+  // class. Reaching here means §1-3 found NO hand-wired emitter, so we render the
+  // class GENERICALLY from the auto-planned tool graph + class-reference graph,
+  // rather than hard-failing at §5 (which forced a hand-wired model for every new
+  // archetype — exactly the "why does it need a separate model" complaint). The
+  // 50 registered classes never reach here (they fire at §1-2); only an unseen or
+  // Exp-A-held-out class does, and it should ALWAYS render generically. The env var
+  // is now only an explicit override — set UNIVERSAL_GENERIC_EMITTER=0 to restore
+  // the old hard-fail for debugging. Default = generic-emits-the-unseen-class.
+  if (process.env.UNIVERSAL_GENERIC_EMITTER !== '0' && process.env.UNIVERSAL_GENERIC_EMITTER !== 'false') {
     try {
       const { emitGenericDesign } = await import('./generic/generic-emitter')
       const design = await emitGenericDesign(contract, brief, envelope)

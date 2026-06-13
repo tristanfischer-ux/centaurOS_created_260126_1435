@@ -65,6 +65,11 @@ export const HARD_REQUIRED_SLOTS: Record<string, string[]> = {
   // both derived by the engineering-contract builder (registerArchetype
   // 'e_fuel_synthesis'), so they pass the lock gate.
   e_fuel_synthesis: ['saf_output_tonnes_yr', 'h2_co2_molar_ratio'],
+  // aquaculture_ras (land-based marine RAS, 2026-06-12) — the four sizing anchors
+  // every downstream stage reads; all derived by the engineering-contract builder
+  // (registerArchetype 'aquaculture_ras'), so they pass the lock gate. Kept minimal
+  // (per CLAUDE.md item #13 — the builder MUST emit these EXACT names or exit 22).
+  aquaculture_ras: ['annual_production_t_yr', 'total_tank_volume_m3', 'recirculation_flow_m3_h', 'heating_duty_kw'],
   // Default: no HARD required slots for classes without explicit entries.
   // The gate runs a soft fill pass for all classes regardless.
 }

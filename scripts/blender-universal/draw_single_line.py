@@ -54,6 +54,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+# Universal distribution-voltage + per-module feeder model (shared with the panel
+# schedule). Keyed on load magnitude + the connection model — never product class.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import electrical_distribution_model as edm  # noqa: E402
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # DATA MODEL — the reconstructed distribution tree
@@ -636,7 +641,173 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
                 incomer_transformer=incomer_transformer, main_bus=main_bus,
                 incomer_converter=incomer_converter,
                 notes=notes, schedule_totals=schedule.get("totals") or {})
+    # UNIVERSAL distribution-voltage auto-selection + per-module feeders. When the
+    # schedule's electrical model is a single lumped feeder at LV (the process-plant
+    # case), re-base the board onto the load-appropriate voltage (MV above ~1.5 MW)
+    # and split the aggregate into a feeder per module. Keyed on load magnitude.
+    _apply_distribution_voltage_model(tree, schedule, state)
     return tree
+
+
+def _process_electrical_branches(bus: Bus):
+    """The main-bus branches that came from the LUMPED process-electrical edge —
+    a single aggregate feeder like 'Process compressors and pumps' / 'Process
+    motors and crystalliser', fed from electrical_supply. These are the ones the
+    per-module synthesis replaces. Sub-distribution / converter / conversion-chain
+    branches are left untouched."""
+    out = []
+    for br in bus.branches:
+        if br.sub_bus is not None or br.target_sym == SYM_TRANSFORMER:
+            continue
+        frm = (br.from_node or "").lower()
+        to = (br.to_node or "").lower()
+        if (("electrical" in frm or "supply" in frm or "board" in frm
+             or "switchgear" in frm or "incomer" in frm)
+                and ("process" in to or "compressor" in to or "pump" in to
+                     or "motor" in to or "crystallis" in to)):
+            out.append(br)
+    return out
+
+
+def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
+    """UNIVERSAL — choose the distribution voltage from the connected load and, for
+    the lumped-process-feeder case, replace the single feeder with a feeder per
+    module/major load group at the chosen voltage. Mutates the tree in place.
+
+    Deterministic; archetype-agnostic (keyed on load magnitude + the connection
+    model). No-op when there is no electrical load to plan or the bus is a DC /
+    grid-tie inverter bus (those already model their own conversion train)."""
+    main = tree.main_bus
+    # Skip DC buses / grid-tie inverter classes — their voltage + conversion train
+    # are already modelled correctly (this fix targets AC process distribution).
+    if "DC" in (main.tag or "") or "DC" in (main.voltage or ""):
+        return
+    if tree.incomer_converter is not None:
+        return
+
+    # Connected load [kW] from state; else the lumped electrical run's design current.
+    load_kw = _q(state, "connected_electrical_load_kw")
+    lumped = _process_electrical_branches(main)
+    lv_current = None
+    for br in lumped:
+        m = re.match(r"\s*([\d.,]+)", str(br.rating or ""))
+        if m:
+            try:
+                lv_current = max(lv_current or 0.0, float(m.group(1).replace(",", "")))
+            except ValueError:
+                pass
+    # LV reference voltage the engine sized at. Prefer an explicit LV figure in the
+    # electrical material_context (e.g. '400_415V_three_phase'); else a spec's
+    # system_voltage_v BUT ONLY when it is a real LV value (≤ 1000 V) — the engine's
+    # _infer_system_voltage leaks a 1500 V DC-bus default onto AC process edges, which
+    # must NOT be taken as the LV reference. Final fallback 415 V.
+    lv_v = None
+    for s in (schedule.get("specs") or []):
+        if "electrical" not in (s.get("mechanism") or ""):
+            continue
+        mc = (s.get("material_context") or "")
+        mv = re.search(r"(\d{3,4})\s*[_\s]?V\b", mc) or re.search(r"(\d{3,4})V", mc)
+        if mv:
+            cand = float(mv.group(1))
+            if 100.0 <= cand <= 1000.0:
+                lv_v = cand
+                break
+        sv = s.get("system_voltage_v")
+        if sv and 100.0 <= float(sv) <= 1000.0:
+            lv_v = float(sv)
+            break
+    if lv_v is None:
+        lv_v = 415.0
+
+    plan = edm.select_distribution_voltage(load_kw, lv_design_current_a=lv_current,
+                                           lv_voltage_v=lv_v)
+    if plan is None:
+        return
+
+    # --- Re-base the MAIN board onto the chosen voltage. ----------------------
+    # In the LV case, keep an explicit board voltage _build_source already chose
+    # (e.g. the CO2 MV-ring-main → 400 V LV board) so the incomer transformer ratio
+    # stays coherent; only set it ourselves when none was set. In the MV case we set
+    # it unconditionally (the load demands MV).
+    if plan.is_mv or not main.voltage:
+        main.voltage = (f"{plan.board_voltage_label} 3-phase"
+                        + (" (MV)" if plan.is_mv else " AC"))
+    main.rating = (f"{plan.connected_load_kw:,.0f} kW connected · "
+                   f"{plan.board_current_a:,.0f} A")
+    if plan.is_mv:
+        main.tag = "MAIN MV SWITCHBOARD"
+        # The incomer is an MV utility supply straight to the MV board (a primary
+        # substation); the board's outgoing LV distribution steps down locally.
+        tree.source.tag = "MV UTILITY INCOMER"
+        tree.source.detail = f"{plan.board_voltage_label} DNO / ring-main supply"
+        tree.source.voltage = plan.board_voltage_label
+        # An incomer step-down only applies if the utility delivers at a HIGHER
+        # voltage; here the board IS at the supply MV, so drop any 11kV/400V
+        # incomer transformer the LV-default path may have added and note the
+        # local LV step-down instead.
+        tree.incomer_transformer = None
+        tree.notes = [(f"Plant connected load {plan.connected_load_kw:,.0f} kW → "
+                       f"distributed at {plan.board_voltage_label} MV "
+                       f"({plan.board_current_a:,.0f} A board); LV loads via local "
+                       f"{plan.transformer_ratio} step-down.")] + list(tree.notes or [])
+    else:
+        if not main.tag or main.tag in ("MAIN SWITCHBOARD",):
+            main.tag = "MAIN LV BOARD"
+
+    # --- Replace the lumped feeder(s) with per-module feeders. ----------------
+    if not lumped:
+        return
+    md = state.get("moduleDecomposition") or {}
+    feeders = edm.synthesise_module_feeders(
+        plan.board_current_a, plan.board_voltage_v, md.get("modules") or [],
+        total_load_kw=plan.connected_load_kw,
+        per_module_load_kw=_known_module_loads(state))
+    if not feeders:
+        return
+    # Drop the lumped branches, append the synthesised per-module feeders.
+    keep = [br for br in main.branches if br not in lumped]
+    new_branches = []
+    devices = extract_devices(state)
+    for f in feeders:
+        br = Branch(
+            from_node=main.tag,
+            to_node=f.name,
+            label=f.name,
+            rating=_fmt_a(f.current_a),
+            cable=f.size_label,
+            voltdrop="",
+            count=1,
+            role="branch",
+        )
+        # a sized standard breaker per feeder (named device if one matches the group)
+        cb = _pick_device(devices, kind="breaker")
+        if cb:
+            br.devices.append(_as_device(cb, "breaker", "CB"))
+        new_branches.append(br)
+    main.branches = keep + new_branches
+
+
+def _known_module_loads(state: dict) -> dict:
+    """{module_display_name_lower: kW} for modules whose load we can read directly
+    from the orchestrator quantities (compressor / pump / motor powers summed by the
+    module their part name implies). Best-effort; unmatched modules get the even
+    split. Universal — matches on the quantity NAME, not a per-class table."""
+    q = {}
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = ((state.get(ck) or {}).get("quantities") or {})
+        for k, v in qs.items():
+            kl = k.lower()
+            if kl.endswith("_power_kw") and any(t in kl for t in (
+                    "compressor", "pump", "motor", "fan", "blower", "mixer",
+                    "agitator", "crystallis")):
+                val = v.get("value") if isinstance(v, dict) else v
+                try:
+                    q[kl] = float(val)
+                except (TypeError, ValueError):
+                    pass
+        if q:
+            break
+    return q
 
 
 def _pcs_detail(devices):

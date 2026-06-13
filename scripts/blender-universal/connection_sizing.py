@@ -764,6 +764,15 @@ def _spec(**kw) -> dict:
         "n_parallel": None,
         "mv_per_a_m": None,
         "system_voltage_v": None,
+        # UNIVERSAL distribution-voltage provenance (set by size_electrical via
+        # _stamp_distribution): the load-appropriate board voltage + the current at
+        # that voltage, so the SLD + panel schedule present a sane MV/LV board. None
+        # for non-electrical kinds / sub-1.5 MW LV runs where LV is correct anyway.
+        "distribution_voltage_v": None,
+        "distribution_current_a": None,
+        "distribution_is_mv": None,
+        "distribution_connected_kw": None,
+        "distribution_transformer_ratio": None,
         "dp_kpa": None,            # fluid pressure drop over the routed run [kPa]
         # Phase-D auto-upsize / design-feedback provenance (always present so the
         # schedule has a uniform shape; size_connection_to_spec fills them in).
@@ -815,6 +824,101 @@ def _infer_system_voltage(edge: dict, mechanism: str) -> float:
     return DEFAULT_SYSTEM_VOLTAGE_V
 
 
+# Distribution-voltage thresholds (stated, not hidden) — mirror
+# electrical_distribution_model so connection_sizing is import-free of it (this
+# module already runs under Blender's python via subprocess; keeping it dependency
+# -light avoids a sys.path surprise there). Keyed PURELY on load magnitude.
+_LV_REF_VOLTAGE_V = 415.0            # the LV the engine sizes a process edge at
+_DIST_MV_MIN_KW = 1_500.0           # above this connected load → medium voltage
+_DIST_LV_690_CURRENT_A = 2_500.0    # LV current beyond this → 690 V (mid band)
+_DIST_MV_3300_MAX_KW = 5_000.0      # 3.3 kV up to ~5 MW
+_DIST_MV_6600_MAX_KW = 15_000.0     # 6.6 kV up to ~15 MW; above → 11 kV
+_DIST_PF = 0.95
+
+
+def _distribution_voltage_for_edge(edge: dict, current_a: float,
+                                   v_sys: float) -> Optional[dict]:
+    """Pick the load-appropriate 3-phase distribution voltage for an electrical
+    edge from its connected load, deterministically (universal — magnitude-keyed).
+
+    The connected load [kW] is taken from the edge's design current at the LV
+    reference voltage (P = √3·V·I·pf). Returns a provenance dict
+    {voltage_v, current_a, is_mv, connected_kw, lv_voltage_v, lv_current_a,
+     transformer_ratio, note} or None when there is no current to plan.
+
+    This does NOT change the conductor the run is sized as — it records what voltage
+    the load should distribute at so the SLD/panel projections read a sane board.
+    """
+    if not current_a or current_a <= 0:
+        return None
+    # The LV reference: an explicit LV figure in material_context (e.g.
+    # '400_415V_three_phase'); else the edge's system voltage IF it's a real LV
+    # value (≤1000 V — never a leaked 1500 V DC-bus default); else 415 V.
+    lv_v = None
+    mc = edge.get("material_context") or ""
+    import re as _re
+    mlv = _re.search(r"(\d{3,4})\s*[_\s]?V\b", mc) or _re.search(r"(\d{3,4})V", mc)
+    if mlv and 100.0 <= float(mlv.group(1)) <= 1000.0:
+        lv_v = float(mlv.group(1))
+    elif 100.0 <= v_sys <= 1000.0:
+        lv_v = v_sys
+    else:
+        lv_v = _LV_REF_VOLTAGE_V
+
+    connected_kw = math.sqrt(3.0) * lv_v * current_a * _DIST_PF / 1000.0
+    lv_current = current_a
+
+    if connected_kw <= _DIST_MV_MIN_KW:
+        # LV — step to 690 V only if the LV current would be impractical.
+        if lv_current > _DIST_LV_690_CURRENT_A:
+            v, is_mv = 690.0, False
+        else:
+            v, is_mv = lv_v, False
+    else:
+        if connected_kw <= _DIST_MV_3300_MAX_KW:
+            v = 3_300.0
+        elif connected_kw <= _DIST_MV_6600_MAX_KW:
+            v = 6_600.0
+        else:
+            v = 11_000.0
+        is_mv = True
+
+    board_current = (connected_kw * 1000.0) / (math.sqrt(3.0) * v * _DIST_PF)
+    vlabel = (f"{v/1000:g} kV" if v >= 1000 else f"{v:g} V")
+    note = (f"connected load ≈{connected_kw:,.0f} kW → distribute at {vlabel} "
+            f"({board_current:,.0f} A); LV would be {lv_current:,.0f} A at {lv_v:g} V"
+            if is_mv else
+            f"connected load ≈{connected_kw:,.0f} kW → {vlabel} LV board "
+            f"({board_current:,.0f} A)")
+    return {
+        "voltage_v": v,
+        "current_a": round(board_current, 1),
+        "is_mv": is_mv,
+        "connected_kw": round(connected_kw, 1),
+        "lv_voltage_v": lv_v,
+        "lv_current_a": round(lv_current, 1),
+        "transformer_ratio": (f"{v:g}/{lv_v:g} V" if is_mv else ""),
+        "note": note,
+    }
+
+
+def _stamp_distribution(spec: dict, plan: Optional[dict]) -> dict:
+    """Stamp distribution-voltage provenance onto an electrical spec (no geometry
+    change). Records distribution_voltage_v / distribution_current_a / etc. + a
+    human assumption line so the SLD + panel schedule can present a sane board."""
+    if not plan:
+        return spec
+    spec["distribution_voltage_v"] = plan["voltage_v"]
+    spec["distribution_current_a"] = plan["current_a"]
+    spec["distribution_is_mv"] = plan["is_mv"]
+    spec["distribution_connected_kw"] = plan["connected_kw"]
+    spec["distribution_transformer_ratio"] = plan["transformer_ratio"]
+    spec.setdefault("assumptions", [])
+    spec["assumptions"] = list(spec["assumptions"]) + [
+        f"distribution voltage selected from load: {plan['note']}"]
+    return spec
+
+
 def _busbar_from_current(current_a: float) -> tuple[float, float, float]:
     """Size a copper busbar BAR from current density.
 
@@ -862,6 +966,15 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
         f"design current {current_a:g} A already includes the edge margin "
         f"factor {margin:g}" if margin != 1.0 else f"design current {current_a:g} A",
     ]
+
+    # UNIVERSAL distribution-voltage provenance (keyed on load magnitude). A large
+    # connected load (>~1.5 MW) is NOT distributed at LV — a real plant goes to MV.
+    # We record the load-appropriate distribution voltage + the current it WOULD be
+    # at that voltage on the spec, so downstream projections (the single-line + the
+    # panel schedule) present a sane MV board instead of e.g. 10 kA at 400 V. The
+    # CONDUCTOR sizing/geometry below is unchanged (the routed run still sizes from
+    # the edge current); this is the model recording the correct board voltage.
+    dist_plan = _distribution_voltage_for_edge(edge, current_a, v_sys)
 
     best = None
     for n_par in range(1, 9):
@@ -921,7 +1034,7 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
         spec["n_parallel"] = n_par
         spec["mv_per_a_m"] = mv_per_a_m
         spec["system_voltage_v"] = v_sys
-        return spec
+        return _stamp_distribution(spec, dist_plan)
 
     # ---- Busbar branch: too much current for stranded cable -> copper bar ----
     csa_mm2, equiv_dia, thick = _busbar_from_current(current_a)
@@ -959,7 +1072,7 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
     # mv per A·m for the bar: 1000 · ρ_cu / CSA  (ρ_cu = 0.0172 Ω·mm²/m).
     spec["mv_per_a_m"] = 1000.0 * 0.0172 / max(1e-9, csa_mm2)
     spec["system_voltage_v"] = v_sys
-    return spec
+    return _stamp_distribution(spec, dist_plan)
 
 
 # ---------------------------------------------------------------------------

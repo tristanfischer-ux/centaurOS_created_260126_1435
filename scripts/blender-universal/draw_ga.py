@@ -740,42 +740,32 @@ def _draw_key(svg, parts, keynotes, x, y, x_right, h_max):
     rh = 13.0
     pad = 8
     # rows per column from the height budget
-    body_h = max(h_max - header_h - pad, rh)
-    rows_per_col = max(int(body_h // rh), 1)
-    col_w = 230.0
-    ncol = max(1, int(bw // col_w))
-    ncol = min(ncol, max(1, math.ceil(len(rows) / rows_per_col)))
-    cap = rows_per_col * ncol
-    shown = rows[:cap]
-    overflow = len(rows) - len(shown)
-    if overflow > 0:
-        # reserve the last visible slot for the overflow note
-        shown = rows[:cap - 1]
-    # panel box
-    used_rows_in_col = min(rows_per_col, max(1, math.ceil(
-        (len(shown) + (1 if overflow > 0 else 0)) / ncol)))
-    panel_h = header_h + used_rows_in_col * rh + pad
+    body_h = max(h_max - header_h - pad, 13.0)
+    # SHOW EVERY item (Tristan 2026-06-13: "show ALL of the equipment in the schedule,
+    # not just a select few"). Never truncate: fit ALL rows by taking as many columns as
+    # the panel width allows, then shrinking the row height to a legibility floor. The
+    # panel grows within the right gutter if still needed.
+    total = len(rows)
+    ncol = max(1, int(bw // 168))                 # ≥168 px per column (tag + name)
+    rows_per_col = max(1, math.ceil(total / ncol))
+    rh = max(6.6, min(13.0, body_h / rows_per_col))
+    fs = max(5.2, min(8.2, rh * 0.62))            # font scales with row height
+    shown = rows                                  # no cap, no overflow note
+    panel_h = header_h + rows_per_col * rh + pad
     svg.rect(x, y, bw, panel_h, stroke=GRID_FAINT, width=1.1, fill=FILL_BG)
     svg.rect(x, y, bw, header_h, stroke=GRID_FAINT, width=1.1, fill=PANEL_BG)
-    svg.text(x + 8, y + 14, "EQUIPMENT SCHEDULE", size=9.5, weight="bold", fill=MUTED)
-    yy0 = y + header_h + 12
+    svg.text(x + 8, y + 14, f"EQUIPMENT SCHEDULE  ({total} items)", size=9.5, weight="bold", fill=MUTED)
+    yy0 = y + header_h + 11
     actual_col_w = bw / ncol
     for idx, (tag, name) in enumerate(shown):
         col = idx // rows_per_col
         row = idx % rows_per_col
         cx = x + 8 + col * actual_col_w
         cy = yy0 + row * rh
-        svg.text(cx, cy, tag, size=8.2, weight="bold", fill=EQ_INK)
-        avail_chars = int((actual_col_w - 78) / 4.6)
+        svg.text(cx, cy, tag, size=fs + 0.2, weight="bold", fill=EQ_INK)
+        avail_chars = max(6, int((actual_col_w - 62) / (fs * 0.58)))
         nm = name if len(name) <= avail_chars else name[:max(avail_chars - 1, 4)] + "…"
-        svg.text(cx + 70, cy, nm, size=8.0, fill=MUTED)
-    if overflow > 0:
-        col = len(shown) // rows_per_col
-        row = len(shown) % rows_per_col
-        cx = x + 8 + col * actual_col_w
-        cy = yy0 + row * rh
-        svg.text(cx, cy, f"… +{overflow} more equipment items (see manifest)",
-                 size=8.0, fill=MUTED, weight="bold")
+        svg.text(cx + 56, cy, nm, size=fs, fill=MUTED)
 
 
 def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, W, H):

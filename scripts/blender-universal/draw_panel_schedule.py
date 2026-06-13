@@ -60,6 +60,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+# Universal distribution-voltage + per-module feeder model (shared with the SLD).
+# Keyed on load magnitude + the connection model — never product class.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import electrical_distribution_model as edm  # noqa: E402
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # INPUT LOADING  (identical contract to draw_single_line.load_inputs)
@@ -444,7 +449,146 @@ def build_schedules(schedule: dict, state: dict) -> list[Panel]:
         _set_sub_incoming(sub, sd, rows, schedule, state)
         panels.append(sub)
 
+    # ---- SYNTHESISED main board (universal fallback) ---------------------------
+    # A chemical/process archetype's routed topology has NO board node the fan-out
+    # recogniser matches (its electrical edge is a single lumped 'electrical_supply
+    # → process_compressors_and_pumps' run), so build_schedules above finds ZERO
+    # boards and the sheet would render blank. ONLY in that no-board-at-all case do
+    # we synthesise the main incomer board + one outgoing circuit per module/major
+    # load group from the connection schedule + the connected load, at the load-
+    # appropriate distribution voltage. UNIVERSAL, keyed on the connection model —
+    # not on the product class. (When ANY board was recognised — e.g. a D2 sub-board
+    # — the topology already modelled distribution, so we never synthesise.)
+    if not panels:
+        synth = _synthesise_main_board(schedule, state, rows, devices)
+        if synth is not None:
+            panels.insert(0, synth)
+
     return panels
+
+
+def _lumped_electrical_current_a(rows) -> Optional[float]:
+    """The largest electrical run's design current [A] (the lumped process-electrical
+    feeder when the topology carries one aggregate edge)."""
+    best = None
+    for r in rows:
+        a = _row_amps(r)
+        if a is not None and (best is None or a > best):
+            best = a
+    return best
+
+
+def _synthesise_main_board(schedule: dict, state: dict, rows, devices) -> Optional[Panel]:
+    """Build the MAIN incomer board + per-module outgoing circuits from the
+    connection schedule + connected load, at the auto-selected distribution voltage.
+    Returns a Panel, or None when there is no electrical load to model. UNIVERSAL."""
+    load_kw = _q(state, "connected_electrical_load_kw")
+    lumped_a = _lumped_electrical_current_a(rows)
+    # LV reference voltage: prefer an explicit LV figure in the electrical
+    # material_context; ignore a leaked ≥1000 V DC-bus default; else 415 V.
+    lv_v = None
+    for s in (schedule.get("specs") or []):
+        if "electrical" not in (s.get("mechanism") or ""):
+            continue
+        mc = s.get("material_context") or ""
+        mv = re.search(r"(\d{3,4})\s*[_\s]?V\b", mc) or re.search(r"(\d{3,4})V", mc)
+        if mv and 100.0 <= float(mv.group(1)) <= 1000.0:
+            lv_v = float(mv.group(1)); break
+        sv = s.get("system_voltage_v")
+        if sv and 100.0 <= float(sv) <= 1000.0:
+            lv_v = float(sv); break
+    if lv_v is None:
+        lv_v = 415.0
+
+    plan = edm.select_distribution_voltage(load_kw, lv_design_current_a=lumped_a,
+                                           lv_voltage_v=lv_v)
+    if plan is None:
+        return None
+
+    md = state.get("moduleDecomposition") or {}
+    feeders = edm.synthesise_module_feeders(
+        plan.board_current_a, plan.board_voltage_v, md.get("modules") or [],
+        total_load_kw=plan.connected_load_kw,
+        per_module_load_kw=_known_module_loads(state))
+    if not feeders:
+        return None
+
+    is_mv = plan.is_mv
+    panel = Panel(
+        board_id="main_switchboard",
+        name="MAIN MV SWITCHBOARD (MSB)" if is_mv else "MAIN LV BOARD (TP&N)",
+        kind="main",
+        system=(f"{plan.board_voltage_label} 3-phase (MV)" if is_mv
+                else f"{plan.board_voltage_v:,.0f} V 3-phase + N (TP&N)"),
+        voltage_v=plan.board_voltage_v,
+        is_dc=False,
+        phases=3,
+        busbar_a=plan.board_current_a,
+        incoming_a=plan.board_current_a,
+    )
+    if is_mv:
+        panel.supply = (f"{plan.board_voltage_label} DNO / ring-main supply "
+                        f"(primary substation)")
+        panel.incoming = (f"{plan.board_voltage_label} MV feeder · "
+                          f"{plan.board_current_a:,.0f} A; LV loads via local "
+                          f"{plan.transformer_ratio} step-down")
+        if plan.transformer_kva:
+            panel.transformer = f"{plan.transformer_kva:,.0f} kVA · {plan.transformer_ratio}"
+            panel.transformer_kva = plan.transformer_kva
+        panel.notes.append(
+            f"Connected load {plan.connected_load_kw:,.0f} kW exceeds practical LV "
+            f"distribution → {plan.board_voltage_label} MV switchboard "
+            f"({plan.board_current_a:,.0f} A). Outgoing MV feeders to module "
+            f"sub-stations; small LV loads via a local {plan.transformer_ratio} "
+            f"transformer.")
+    else:
+        mv_ring = any(re.search(r"mv_transformer|distribution_transformer|"
+                                r"mv_switchgear|ring.?main", f"{n} {c}", re.I)
+                      for _w, n, c in _iter_words(state))
+        panel.supply = ("11 kV ring-main → distribution transformer → 400 V LV board"
+                        if mv_ring else "Utility LV incomer (400 V distribution board)")
+        panel.incoming = (f"{plan.board_voltage_v:,.0f} V incoming · "
+                          f"{plan.board_current_a:,.0f} A")
+        panel.notes.append(
+            f"Connected load {plan.connected_load_kw:,.0f} kW → {plan.board_voltage_v:,.0f} "
+            f"V LV board ({plan.board_current_a:,.0f} A). One outgoing circuit per "
+            f"process module / major load group.")
+
+    # outgoing circuits — one per synthesised feeder.
+    for i, f in enumerate(feeders, start=1):
+        cable = _cores_for(f.size_label, False, 3)
+        dev, dev_a = _device_for(f.name, f.current_a, devices, panel)
+        note = "even split of aggregate load" if (f.note and "even split" in f.note) else ""
+        panel.circuits.append(Circuit(
+            ref=f"W{i}", description=f.name, ways=1,
+            connected_kw=f.load_kw, connected_kw_total=f.load_kw,
+            design_a=f.current_a, device=dev, device_a=dev_a,
+            cable=cable, length_m=None, voltdrop_pct=None,
+            within_spec=True, note=note))
+    return panel
+
+
+def _known_module_loads(state: dict) -> dict:
+    """{module_display_name_lower: kW} for modules whose load is directly readable
+    from the orchestrator quantities (compressor / pump / motor / fan powers). Best-
+    effort; unmatched modules get the even split. Matches on the quantity NAME, not a
+    per-class table — universal."""
+    out = {}
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = ((state.get(ck) or {}).get("quantities") or {})
+        for k, v in qs.items():
+            kl = k.lower()
+            if kl.endswith("_power_kw") and any(t in kl for t in (
+                    "compressor", "pump", "motor", "fan", "blower", "mixer",
+                    "agitator", "crystallis")):
+                val = v.get("value") if isinstance(v, dict) else v
+                try:
+                    out[kl] = float(val)
+                except (TypeError, ValueError):
+                    pass
+        if out:
+            break
+    return out
 
 
 def _is_terminal_load(row: dict) -> bool:
@@ -1260,7 +1404,12 @@ def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
     panels = build_schedules(schedule, state)
 
     md = render_markdown(archetype, panels, schedule)
-    svg_text = build_table_svg(archetype, panels, schedule) if panels else ""
+    # Always render the schedule sheet — even with zero recognised distribution boards
+    # (e.g. a chemical/process archetype whose routed topology has no board node) the SVG
+    # is a valid header-only sheet, matching draw_process_schedules.py which writes its PNG
+    # unconditionally. This is what lets the drawing embed in the PDF instead of vanishing
+    # to .md only (the 8th drawing was silently dropped for every process plant).
+    svg_text = build_table_svg(archetype, panels, schedule)
 
     draw_dir = Path(out_dir) / "drawings"
     draw_dir.mkdir(parents=True, exist_ok=True)
@@ -1268,16 +1417,13 @@ def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
     svg_path = draw_dir / "panel-schedule.svg"
     png_path = draw_dir / "panel-schedule.png"
     md_path.write_text(md)
-    png_ok = False
-    if panels:
-        svg_path.write_text(svg_text)
-        if rasterise_png:
-            png_ok = rasterise(svg_path, png_path)
+    svg_path.write_text(svg_text)
+    png_ok = rasterise(svg_path, png_path) if rasterise_png else False
 
     summary = {
         "archetype": archetype,
         "md": str(md_path),
-        "svg": str(svg_path) if panels else None,
+        "svg": str(svg_path),
         "png": str(png_path) if png_ok else None,
         "panels": [{
             "name": p.name, "board_id": p.board_id, "kind": p.kind,

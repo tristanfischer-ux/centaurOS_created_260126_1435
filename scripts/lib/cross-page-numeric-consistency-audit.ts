@@ -971,6 +971,16 @@ function isPartOfRange(cleaned: string, matchStart: number): boolean {
   // Pattern B: "<num> - <THIS>" hyphen range. Risky because dashes also
   // appear in part numbers (M22-DL); require WHITESPACE on both sides.
   if (/-?\d+(?:\.\d+)?\s+(?:to|and|\.\.|–|—|-)\s+[+-]?\s*$/.test(pre)) return true
+  // Pattern C: TEXTUAL range low-bound — "ambient to 120 °C", "atmospheric to 30 bar",
+  // "zero to 50 °C". The low end is a NAMED BASELINE (ambient / atmospheric / zero /
+  // freezing / room / cryogenic), not a number, so THIS value is the HIGH end of a
+  // range — not a scalar claim about that baseline. Without this, "Ambient to 120 °C"
+  // (a process operating range whose low end is unstated) extracts 120 and the qualifier
+  // window tags it "ambient", which then false-clusters with a genuine ambient-environment
+  // scalar ("up to 45 °C") on another page → false-positive HIGH. (co2-mineralisation
+  // 2026-06-12: process "Ambient to 120 °C" vs environmental "45 °C" are different
+  // quantities; this was the gate-18 hard-block on an otherwise-shippable dossier.)
+  if (/(?:^|[^a-z])(?:ambient|atmospheric|sub-?zero|near-?ambient|zero|freezing|room(?:\s*temperature)?|cold|chilled|cryogenic)\s+(?:to|up\s+to|through|–|—)\s*[+-]?\s*$/i.test(pre)) return true
   return false
 }
 

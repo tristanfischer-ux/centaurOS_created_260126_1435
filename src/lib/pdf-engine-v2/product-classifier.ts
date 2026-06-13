@@ -49,6 +49,16 @@ const DECLARED_CLASS_SIGNATURES: Array<{ re: RegExp; cls: string }> = [
   // Humanoid / legged robot. Must beat ev_charger (humanoid ships a charging
   // dock) and the generic aerospace catch (humanoid briefs say "payload per arm").
   { re: /humanoid|biped(?:al)?\s+robot|legged\s+robot|two[\s-]?legged\s+robot|teleoperat(?:ion|ed)\s+robot/, cls: 'humanoid' },
+  // Recirculating Aquaculture System (RAS) — a land-based fish farm that is, in
+  // engineering terms, a continuous water-treatment + life-support PROCESS PLANT
+  // (rearing tanks → drum solids filter → MBBR biofilter → CO2 degasser → pure-oxygen
+  // contactor → UV/ozone → heat → return). A NEW archetype with no hand-wired class
+  // plan: routing it to its own slug sends it to the universal auto-planner, which
+  // picks the process tools (tank/vessel sizing, pump, pipe, gas-transfer, reactor-as-
+  // biofilter, heat exchanger) from the brief physics. MUST beat the generic
+  // vehicle/marine/aerospace catches below — a kingfish RAS brief is full of
+  // "seawater", "marine", "tank" tokens that otherwise mis-route to 'vehicle'.
+  { re: /recirculating\s+aquaculture|\baquaculture\b|land[\s-]?based\s+(?:marine\s+)?(?:fish\b|aquacult)|yellowtail\s+kingfish|fish[\s-]?rearing\s+tank|recirculat\w+.{0,25}\bfish\b/, cls: 'aquaculture_ras' },
 ]
 
 export function classifyProduct(briefText: string): ProductClassification {

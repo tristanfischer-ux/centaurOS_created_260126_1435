@@ -2163,6 +2163,26 @@ async function main() {
   console.error(`[chain] brief: ${briefPath} (${brief.length} chars)`)
   logAction({ step: 'init', brief_chars: brief.length, brief_path: briefPath })
 
+  // ── Render-and-flag-by-default (Tristan 2026-06-12) ──────────────────────────
+  // A gate that finds a NON-CATASTROPHIC issue (a false-positive-prone heuristic, or
+  // an honest design-breach) must NOT hard-exit and leave NO dossier — it RECORDS the
+  // issue here and lets the chain continue to render + ship, with the finding disclosed.
+  // Only a CATASTROPHIC gate (broken/empty/un-renderable: £0 BoM, blank headline, render
+  // crash, structurally-corrupt state) hard-exits. Set CHAIN_GATE_ENFORCE=1 to restore the
+  // old hard-exit-everywhere behaviour (CI). This is the universal answer to "the system
+  // shouldn't refuse to produce anything because a gate is 4% off or mis-clustered."
+  const residualIssues: Array<{ code: number; gate: string; summary: string; severity: 'catastrophic' | 'flagged'; at: string }> = []
+  const gateBlock = (code: number, gateName: string, summary: string, opts?: { catastrophic?: boolean }): void => {
+    const enforce = opts?.catastrophic === true || !!process.env.CHAIN_GATE_ENFORCE
+    residualIssues.push({ code, gate: gateName, summary, severity: enforce ? 'catastrophic' : 'flagged', at: new Date().toISOString() })
+    logAction({ step: `gate_block_${code}`, gate: gateName, code, severity: enforce ? 'catastrophic' : 'flagged', summary, enforced: enforce })
+    if (enforce) {
+      console.error(`\n[chain] === FATAL ${gateName} (exit ${code}) ===\n${summary}`)
+      process.exit(code)
+    }
+    console.error(`[chain] ${gateName} (exit ${code}): FLAGGED (render-and-flag) — dossier ships, issue disclosed. ${summary}`)
+  }
+
   // ── Save the original brief (Phase 0 refinement loop, Tristan 2026-05-15)
   writeFileSync(resolve(outDir, '0-original-brief.md'), brief)
 
@@ -5852,6 +5872,107 @@ async function main() {
           bomUnpricedLines += 1
         }
       }
+      // ── PHYSICS-DERIVED BOTTOM-UP PRICING (Tristan 2026-06-13 "make depth physics
+      // derived"). Each exploded sub-component carries a price the emitter computed from
+      // its PARENT'S PHYSICS (a price_estimate_gbp modifier — motor £ from the pump kW,
+      // shell £ from the vessel area). Apply those: price every component bottom-up, ROLL
+      // them into their parent assembly's subtotal, and exclude the components from the
+      // grand total so nothing double-counts. Nothing is allocated; the contract anchor
+      // (below) becomes a FALLBACK only if this bottom-up sum is still implausibly small.
+      {
+        const paramById = new Map<string, number>()
+        for (const m of (liveState.moduleDecomposition?.modules ?? []))
+          for (const sm of (m.sub_modules ?? []))
+            for (const w of (sm.words ?? [])) {
+              const pe = (w.modifier_characters ?? []).find((x: any) => x.kind === 'price_estimate_gbp')
+              if (pe && w.id) { const v = parseFloat(String(pe.value)); if (Number.isFinite(v) && v > 0) paramById.set(String(w.id), v) }
+            }
+        if (paramById.size > 0) {
+          const parentRoll = new Map<string, number>()
+          for (const v of (pv as any[])) {
+            const wid = String(v.word_id ?? '')
+            const p = paramById.get(wid)
+            if (p === undefined || !wid.includes('__')) continue   // sub-components only
+            const qy = qtyByWordId.get(wid) ?? 1
+            v.price_estimate_gbp = p; v.cost_repair_corrected_price_gbp = p
+            v.distributor_price_gbp = 0; v.cost_provenance = 'parametric-physics'
+            v.cost_repair_excluded_from_subtotal = true            // rolled into the parent
+            const parentId = wid.slice(0, wid.indexOf('__'))
+            parentRoll.set(parentId, (parentRoll.get(parentId) ?? 0) + p * qy)
+          }
+          for (const v of (pv as any[])) {
+            const wid = String(v.word_id ?? '')
+            const roll = parentRoll.get(wid)
+            if (roll === undefined) continue                        // exploded-parent assemblies
+            const qy = qtyByWordId.get(wid) ?? 1
+            const unit = roll / Math.max(1, qy)
+            v.price_estimate_gbp = unit; v.cost_repair_corrected_price_gbp = unit
+            v.distributor_price_gbp = 0; v.cost_provenance = 'parametric-physics-rollup'
+            v.cost_repair_excluded_from_subtotal = false
+          }
+          bomTotalGbp = (pv as any[]).reduce((s, v) => s + (v.cost_repair_excluded_from_subtotal ? 0 : Number(v.cost_repair_corrected_price_gbp ?? v.price_estimate_gbp ?? 0) * (qtyByWordId.get(String(v.word_id ?? '')) ?? 1)), 0)
+          console.error(`[chain] physics-derived bottom-up pricing: ${paramById.size} components priced from parent physics → rolled into ${parentRoll.size} assemblies; raw BoM £${Math.round(bomTotalGbp).toLocaleString()}`)
+        }
+      }
+      // ── R1 (Recursive-Improvement-Loop, 2026-06-13): UNIVERSAL anchor re-pricing.
+      // When the engineering contract computed a design_equipment_capex_gbp ANCHOR (the
+      // super-brief's cost basis) and the bottom-up generic BoM is implausibly small
+      // against it (a scale-wrong generic BoM — an £8M plant summed at £34k because the
+      // emitter grounded to component-scale catalogue parts), re-price EVERY line by a
+      // universal component-TYPE cost weight so the BoM reconciles to the anchor with a
+      // sensible spread (vessels/tanks heavy, fasteners light). Deterministic + archetype-
+      // agnostic (no `if class`). Lines marked parametric — anchored estimates, not quotes;
+      // scale-aware part RE-SELECTION is a later loop round.
+      {
+        const anchorInstalled = Number((liveState.orchestratorContract?.quantities?.design_equipment_capex_gbp?.value) ?? 0)
+        if (anchorInstalled > 0 && bomTotalGbp > 0) {
+          const rA = resolveCostStack(liveState)
+          const compound = computeCostStack(1, rA.ratios, rA.class_key).installed_asp_gbp || 2.5
+          const trialInstalled = computeCostStack(bomTotalGbp, rA.ratios, rA.class_key).installed_asp_gbp
+          if (trialInstalled > 0 && anchorInstalled / trialInstalled > 2) {
+            const rawTarget = anchorInstalled / compound
+            const nameById = new Map<string, string>()
+            for (const m of (liveState.moduleDecomposition?.modules ?? []))
+              for (const sm of (m.sub_modules ?? []))
+                for (const w of (sm.words ?? [])) if (w.id) nameById.set(String(w.id), `${w.name_human ?? ''} ${w.content_character?.character_id ?? ''}`)
+            const TW: [RegExp, number][] = [
+              [/tank|vessel|column|reactor|drum|silo|clarifier|digester|sump|basin|crystallis|absorber|stripper|recrystallis/i, 100],
+              [/heat[\s-]?exchang|chiller|heat[\s-]?pump|boiler|condenser|reboiler|degass|cooling[\s-]?tower|economiser|evaporator/i, 70],
+              [/compressor|blower|\bpump\b|\bfan\b|turbine|centrifuge|agitator|mixer|\bmotor\b|generator/i, 50],
+              [/filter|separator|membrane|screen|cyclone|skimmer|\buv\b|ozone|steriliz|coalescer/i, 40],
+              [/transformer|switchgear|inverter|\bpcs\b|busbar|\bmcc\b|\bpanel\b|\bdrive\b|rectifier/i, 35],
+              [/frame|skid|structure|enclosure|platform|support|plinth|containment|housing|chassis/i, 30],
+              [/pipe|duct|manifold|cable|conduit|\btray\b|hose|spool/i, 15],
+              [/valve|damper|actuator|regulator|nozzle/i, 10],
+              [/sensor|transducer|probe|instrument|\bmeter\b|analyser|monitor|gauge|controller|\bplc\b/i, 8],
+              [/breaker|contactor|\bfuse\b|isolat|disconnect|\brelay\b|surge|protector|\bmccb\b|\bmcb\b|\brcd\b/i, 12],
+              [/gateway|\bhmi\b|\bi\/?o\b|network|\bswitch\b|router|\bmodule\b|conditioner|signal|interface|\bups\b|supply/i, 8],
+              [/detector|alarm|e[\s-]?stop|\bstop\b|interlock|\bbutton\b|beacon|sounder|extinguish|suppress/i, 7],
+              [/connector|terminal|junction|\bgland\b|\blug\b|wiring|harness|labelling|nameplate|\bport\b|\bpoint\b/i, 5],
+              [/fastener|gasket|bracket|\bseal\b|bolt|sundr|fitting|coupling|label|coating/i, 3],
+            ]
+            const wOf = (nm: string) => { for (const [re, w] of TW) if (re.test(nm)) return w; return 20 }
+            let totW = 0
+            const wts = (pv as any[]).map((v) => { const wt = wOf(nameById.get(String(v.word_id ?? '')) ?? String(v.name ?? '')) * (qtyByWordId.get(String(v.word_id ?? '')) ?? 1); totW += wt; return wt })
+            if (totW > 0) {
+              let newTotal = 0
+              ;(pv as any[]).forEach((v, i) => {
+                const qy = qtyByWordId.get(String(v.word_id ?? '')) ?? 1
+                const line = rawTarget * (wts[i] / totW)
+                const unit = line / Math.max(1, qy)
+                v.price_estimate_gbp = unit
+                v.cost_repair_corrected_price_gbp = unit
+                v.distributor_price_gbp = 0
+                v.cost_provenance = 'parametric'
+                v.cost_repair_excluded_from_subtotal = false
+                newTotal += line
+              })
+              console.error(`[chain] R1 anchor re-price: generic BoM £${Math.round(bomTotalGbp).toLocaleString()} → reconciled to contract anchor (raw £${Math.round(rawTarget).toLocaleString()}, installed ≈ £${(anchorInstalled / 1e6).toFixed(2)}M); ${(pv as any[]).length} lines weighted by component type`)
+              bomTotalGbp = newTotal
+            }
+          }
+        }
+      }
       const orderOfMag = bomTotalGbp > 0 ? Math.log10(bomTotalGbp) : 0
       // Plausible BoM range: £100 (consumer wearable) to £10M (utility BESS, HAPS).
       // Outside this, flag for manual review.
@@ -6921,7 +7042,7 @@ async function main() {
       console.error('║  on the sub-module wrap={false} block that overflowed the page.     ║')
       console.error('╚══════════════════════════════════════════════════════════════════════╝')
       logAction({ step: 'fatal_layout_audit', reason: 'audit-pdf-layout exit 11', status: 11 })
-      process.exit(11)
+      gateBlock(11, 'GATE 11 layout-overlap', 'Text spans overlap in the rendered PDF — see AUDIT-LAYOUT.md')
     }
     console.error(`[chain] audit-pdf-layout flagged issues (see AUDIT-LAYOUT.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -6962,7 +7083,7 @@ async function main() {
       console.error('║  (claim the real spec, OR pick a different part for the load).      ║')
       console.error('╚══════════════════════════════════════════════════════════════════════╝')
       logAction({ step: 'fatal_parts_audit', reason: 'parts-spec-validator exit 13', status: 13 })
-      process.exit(13)
+      gateBlock(13, 'GATE 13 parts-spec', 'A pinned part over-claims vs its datasheet — see AUDIT-PARTS.md')
     }
     console.error(`[chain] parts-spec-validator flagged issues (see AUDIT-PARTS.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7002,7 +7123,7 @@ async function main() {
       console.error('║  BMS slave). Whichever side is wrong, fix at the source.           ║')
       console.error('╚══════════════════════════════════════════════════════════════════════╝')
       logAction({ step: 'fatal_drift_audit', reason: 'numeric-claim-drift-detector exit 12', status: 12 })
-      process.exit(12)
+      gateBlock(12, 'GATE 12 numeric-drift', 'Narrative count diverges from a BoM quantity — see AUDIT-DRIFT.md')
     }
     console.error(`[chain] numeric-claim-drift-detector flagged issues (see AUDIT-DRIFT.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7044,7 +7165,7 @@ async function main() {
       console.error('║  quantities (e.g. ceil(1.25 × bus_continuous_current_a / 100) ×100).║')
       console.error('╚══════════════════════════════════════════════════════════════════════╝')
       logAction({ step: 'fatal_sizing_audit', reason: 'sizing-vs-design-audit exit 14', status: 14 })
-      process.exit(14)
+      gateBlock(14, 'GATE 14 sizing-vs-design', 'A component is undersized vs the design load — see AUDIT-SIZING.md')
     }
     console.error(`[chain] sizing-vs-design-audit flagged issues (see AUDIT-SIZING.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7084,7 +7205,7 @@ async function main() {
       console.error('║  with a part of the correct type (alternatives listed in audit).    ║')
       console.error('╚══════════════════════════════════════════════════════════════════════╝')
       logAction({ step: 'fatal_mispin_audit', reason: 'slot-mispin-detector exit 15', status: 15 })
-      process.exit(15)
+      gateBlock(15, 'GATE 15 slot-mispin', 'A part is the wrong TYPE for its slot — see AUDIT-MISPIN.md')
     }
     console.error(`[chain] slot-mispin-detector flagged issues (see AUDIT-MISPIN.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7129,7 +7250,7 @@ async function main() {
       console.error('  units or a different brand for >150 kW @ +50C BESS.')
       console.error('======================================================================')
       logAction({ step: 'fatal_thermal_audit', reason: 'thermal-derating-audit exit 16', status: 16 })
-      process.exit(16)
+      gateBlock(16, 'GATE 16 thermal-derating', 'A chiller is undersized at the brief ambient — see AUDIT-THERMAL.md')
     }
     console.error(`[chain] thermal-derating-audit flagged issues (see AUDIT-THERMAL.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7180,7 +7301,7 @@ async function main() {
       console.error('  emit the missing achieved-quantity field the renderer reads.')
       console.error('======================================================================')
       logAction({ step: 'fatal_completeness_audit', reason: 'brief-constraint-completeness-audit exit 17', status: 17 })
-      process.exit(17)
+      gateBlock(17, 'GATE 17 brief-completeness', 'A brief constraint is missing from the compliance table — see AUDIT-COMPLETENESS.md')
     }
     console.error(`[chain] brief-constraint-completeness-audit flagged issues (see AUDIT-COMPLETENESS.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7247,7 +7368,7 @@ async function main() {
       console.error('  presented as different engineering quantities.')
       console.error('======================================================================')
       logAction({ step: 'fatal_consistency_audit', reason: 'cross-page-numeric-consistency-audit exit 18', status: 18 })
-      process.exit(18)
+      gateBlock(18, 'GATE 18 cross-page-consistency', 'Two pages quote different values for one quantity — see AUDIT-CONSISTENCY.md')
     }
     console.error(`[chain] cross-page-numeric-consistency-audit flagged issues (see AUDIT-CONSISTENCY.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7297,7 +7418,7 @@ async function main() {
       console.error('  UK/EU BESS docs; G99 -> IEEE 1547 in US docs).')
       console.error('======================================================================')
       logAction({ step: 'fatal_jurisdiction_audit', reason: 'jurisdictional-standards-audit exit 19', status: 19 })
-      process.exit(19)
+      gateBlock(19, 'GATE 19 jurisdictional-standards', 'A cited standard is foreign to the brief jurisdiction — see AUDIT-JURISDICTION.md')
     }
     console.error(`[chain] jurisdictional-standards-audit flagged issues (see AUDIT-JURISDICTION.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7343,7 +7464,7 @@ async function main() {
       console.error('  with a "CUSTOM-" prefix so future runs skip the existence check.')
       console.error('======================================================================')
       logAction({ step: 'fatal_fictional_pn_audit', reason: 'fictional-pn-audit exit 20', status: 20 })
-      process.exit(20)
+      gateBlock(20, 'GATE 20 fictional-PN', 'A part number is unverified in any catalogue — see AUDIT-FICTIONAL-PN.md')
     }
     console.error(`[chain] fictional-pn-audit flagged issues (see AUDIT-FICTIONAL-PN.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7389,7 +7510,7 @@ async function main() {
       console.error('  update stale catalogue prices to 2025 UK market rates.')
       console.error('======================================================================')
       logAction({ step: 'fatal_per_line_price_audit', reason: 'per-line-price-plausibility-audit exit 21', status: 21 })
-      process.exit(21)
+      gateBlock(21, 'GATE 21 per-line-price', 'A line price diverges >5x from catalogue — see AUDIT-PER-LINE-PRICE.md')
     }
     console.error(`[chain] per-line-price-plausibility-audit flagged issues (see AUDIT-PER-LINE-PRICE.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
@@ -7443,6 +7564,24 @@ async function main() {
     console.error('[chain] CHAIN_SKIP_BACKGROUND_ENRICHMENT=1 — skipping live background enrichment')
   }
 
+  // Render-and-flag reconciliation: persist the residual-issue list (every gate that
+  // FLAGGED instead of hard-exiting) into state.json + a glanceable sidecar, so the
+  // dossier ships with a complete record of what the gates caught. Reaching here means
+  // no CATASTROPHIC gate fired (those exit in-place via gateBlock) — so the chain exits 0.
+  try {
+    const finalState = JSON.parse(readFileSync(statePath, 'utf-8'))
+    finalState.residualIssues = residualIssues
+    writeFileSync(statePath, JSON.stringify(finalState, null, 2))
+    if (residualIssues.length) {
+      writeFileSync(resolve(outDir, 'RESIDUAL-ISSUES.md'),
+        `# Residual issues (render-and-flag)\n\n${residualIssues.length} gate(s) flagged; dossier shipped anyway.\n\n` +
+        residualIssues.map((r) => `- **[${r.severity}] ${r.gate}** (code ${r.code}) — ${r.summary}`).join('\n') + '\n')
+    }
+  } catch {}
+  logAction({ step: 'residual_summary', total: residualIssues.length, flagged: residualIssues.filter((r) => r.severity === 'flagged').length })
+  if (residualIssues.length) {
+    console.error(`[chain] render-and-flag: ${residualIssues.length} gate(s) flagged but the dossier SHIPPED (set CHAIN_GATE_ENFORCE=1 to hard-block instead). See RESIDUAL-ISSUES.md.`)
+  }
   console.error(`\n[chain] === FINAL ===  state: ${statePath}  pdf: ${pdfPath}  status=${acceptanceStatus}  gates_passed=${allPassed}  design_decisions=${designDecisions.length}`)
 }
 

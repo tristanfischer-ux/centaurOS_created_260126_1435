@@ -57,6 +57,15 @@ import { bootstrapClassGraph } from './bootstrap-class-graph'
 // identity). The legacy applyFamilySizing stays in ./sizing as the regression
 // oracle but is no longer on the production path.
 import { applySizingFamilies } from '../sizing-families'
+// 2026-06-13 (Tristan: "everything needs to be derived from the physics engine and
+// the Blender should faithfully reflect the physics"). The fixed module×word skeleton
+// + family tables never DERIVE an archetype's real equipment from the contract — a RAS
+// shipped 0 of its 10 rearing tanks. This universal pass reads the contract's self-
+// describing quantity KEYS, sizes every matching word from the computed physics (real
+// dimension + count + rating), and SYNTHESISES the principal equipment the skeleton
+// omitted (the tanks, the biofilter, the degasser) into the right module — no per-class
+// table, any archetype. Geometry + BoM + cost then consume the same physics-sized words.
+import { applyUniversalContractSizing } from './universal-contract-sizing'
 
 /**
  * Emit a DesignJSON generically from the class-reference graph + corpus components.
@@ -157,6 +166,30 @@ export async function emitGenericDesign(
     sizingError = err instanceof Error ? err.message : String(err)
   }
 
+  // PHYSICS-DERIVED EQUIPMENT (universal, no per-class table). Runs AFTER the family
+  // plug-ins so curated/grounded dimensions win; it fills the gap they leave: it sizes
+  // every still-unsized word that a contract quantity describes, and synthesises the
+  // principal process equipment the skeleton never emitted. This is the move that makes
+  // the design + the Blender faithfully reflect the physics the contract computed.
+  let physicsEquipment = { sized: 0, synthesized: 0 }
+  try {
+    const r = applyUniversalContractSizing(modules as never[], contract, {
+      onlyUnsized: true,
+      synthesizeMissing: true,
+    })
+    physicsEquipment = { sized: r.sized, synthesized: r.synthesized }
+    if (r.sized || r.synthesized) {
+      console.error(
+        `[generic-emitter] physics-derived equipment: ${r.sized} word(s) sized from the contract; ` +
+          `${r.synthesized} principal item(s) synthesised (${r.synthesizedPhrases.join(', ') || '—'}).`,
+      )
+    }
+  } catch (err) {
+    console.error(
+      `[generic-emitter] universal contract sizing failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
+
   // Cross-module links from the real graph topology + the per-class required-link
   // registry (oriented so the directional grammar gates pass). Candidate class
   // keys cover both the fine envelope class and the contract's product_class so
@@ -176,6 +209,7 @@ export async function emitGenericDesign(
       `${graph.product_class} class-reference graph [graph provenance: ${graphProvenance}]; ${corpusModules > 0 ? `component detail unioned from the corpus (${corpusModules} module group(s))` : 'component detail from the universal taxonomy floor'}; ` +
       `${links.length} cross-module links from graph edges + required-connection registry; ` +
       `${sizing.families.length > 0 ? `${sizing.sized} component words sized by sizing-family plug-in(s) [${sizing.families.join(', ')}] composing over the contract physics` : (sizingError ? `sizing-family layer reported a structured gap (${sizingError}) — structure left un-sized, gates will flag` : 'no sizing-family claims this class (Phase-1 baseline structure)')}. ` +
+      `${physicsEquipment.sized || physicsEquipment.synthesized ? `Physics-derived equipment pass (universal, contract-keyed): ${physicsEquipment.sized} word(s) sized from the computed quantities + ${physicsEquipment.synthesized} principal equipment item(s) synthesised from the contract. ` : ''}` +
       `OPTIONAL modules the brief does not signal are pruned downstream by applyBriefScopeFilter; ` +
       `real parts + exact MPNs are supplied by the chain's emitter-completion + fill-blank-MPN passes.`,
     brief_overview_prose: {

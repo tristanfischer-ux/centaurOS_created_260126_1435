@@ -16614,14 +16614,22 @@ function CostSummaryPanel({ state, project, bomTotals, costStack }: { state: any
 // landscape. Absent manifest / PNG ⇒ returns [] (renders nothing) — the same graceful
 // existsSync philosophy as the tools-flow page. Returns an ARRAY of <Page> (matches
 // the modules.map idiom) so react-pdf flattens it into the Document. The 5
-// schedule/detail drawings weave into the Part-2 manufacturing layer separately (W4).
+// ALL drawings (system + schedule) embed here as full landscape pages.
 function buildSystemDrawingPages(project: string, statePath: string): any[] {
   try {
     const manifestPath = join(dirname(statePath), 'drawing-manifest.json')
     if (!existsSync(manifestPath)) return []
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    // Embed EVERY generated drawing in the manifest — the 3 SYSTEM drawings (general
+    // arrangement / single-line / P&ID) AND the schedule + detail drawings (process
+    // schedules, panel schedule, HVAC layout, piping-isometric index). Universal: any
+    // archetype's drawing the set produces with a real PNG renders here; an absent or
+    // failed PNG is skipped by the ok + existsSync filter, so this never breaks a class
+    // that doesn't generate a given sheet. (Was system-only — the schedule group existed
+    // in the manifest but was never wired in, so 5 of 8 drawings silently dropped.)
     const system: any[] = Array.isArray(manifest?.system_drawings) ? manifest.system_drawings : []
-    const drawable = system.filter(
+    const schedules: any[] = Array.isArray(manifest?.schedule_drawings) ? manifest.schedule_drawings : []
+    const drawable = [...system, ...schedules].filter(
       (d: any) => d?.ok && typeof d?.png_abs === 'string' && existsSync(d.png_abs),
     )
     return drawable.map((d: any, i: number) => (

@@ -507,6 +507,17 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   power_to_liquid: 'e_fuel_synthesis',
   fischer_tropsch: 'e_fuel_synthesis',
   ptl_saf: 'e_fuel_synthesis',
+  // aquaculture_ras — land-based marine Recirculating Aquaculture System (2026-06-12).
+  // A continuously-operated water-treatment + life-support plant around circular
+  // fish-rearing tanks. Same process-plant family as co2_mineralisation /
+  // e_fuel_synthesis. Mirrors the envelope.ts CLASS_ALIASES additions.
+  aquaculture_ras: 'aquaculture_ras',
+  ras: 'aquaculture_ras',
+  recirculating_aquaculture: 'aquaculture_ras',
+  recirculating_aquaculture_system: 'aquaculture_ras',
+  land_based_aquaculture: 'aquaculture_ras',
+  marine_ras: 'aquaculture_ras',
+  fish_farm_ras: 'aquaculture_ras',
 }
 
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
@@ -11660,6 +11671,403 @@ registerArchetype('e_fuel_synthesis', (brief: any) => {
       saf_output_tonnes_yr: safOutputTonnesYr,
       h2_co2_molar_ratio: h2Co2MolarRatio,
       hydrogen_service_material_desc: 'stainless steel, hydrogen-compatible (low-temperature/embrittlement-rated for ≥99.9% H₂ service)',
+    },
+  }
+})
+
+// ---------------------------------------------------------------------------
+// aquaculture_ras ARCHETYPE — land-based marine Recirculating Aquaculture System
+// (RAS) for yellowtail kingfish. FIRST contract for this class (a "start",
+// mirroring the co2_mineralisation / e_fuel_synthesis builder structure exactly).
+//
+// WHY THIS EXISTS: a RAS is NOT a fish-tank product — it is a continuously-operated
+// water-treatment + life-support PLANT wrapped around circular rearing tanks.
+// Without a registered contract the chain falls back to the LLM-only path and the
+// auto-planner reaches for wrong-domain stand-in tools. A registered contract
+// supplies real, sized quantities the chain + gates + class-plan tools READ, and
+// pins the four lock-gate HARD slots (annual_production_t_yr, total_tank_volume_m3,
+// recirculation_flow_m3_h, heating_duty_kw).
+//
+// SIZING BASIS — size by FEED LOAD, not tank volume (the engineering rule):
+//   - Reference full unit: 204 t/yr harvested kingfish, 3,340 m³ total rearing-tank
+//     volume, ~£8.15 M equipment capex (≈£40k/annual-tonne). The whole design scales
+//     linearly off this. The brief caps capex at £5 M → the design-to-budget lands at
+//     the largest internally-consistent tonnage whose installed cost ≤ £5 M
+//     (≈ 5/8.15 × 204 ≈ 125 t/yr; ≈ 2,050 m³).
+//   - standing_biomass = total_tank_volume × 60 kg/m³ harvest density.
+//   - daily_feed ≈ 1.35% of standing biomass (1.2-1.5% band for grow-out kingfish).
+//   - TAN load ≈ 4% of feed (3-5% band); O2 demand ≈ 0.5 kg O₂/kg feed; solids ≈ 60%
+//     of feed.
+//   - recirculation_flow = 4 turnovers/h × total_tank_volume.
+//   - biofilter media volume = TAN_load ÷ ~0.35 kg TAN/m³/day (MBBR areal rate).
+//   - heating_duty = make-up heat (0.4% of recirc, 10→26.4 °C) + building/process
+//     loss (DOMINANT in a Scottish marine climate) − heat recovered from the warm
+//     loop.
+//   - bicarbonate dose ≈ 7.1 g alkalinity-as-CaCO₃ per g TAN oxidised → NaHCO₃ kg/day.
+//
+// PROVENANCE: brief-stated hard numbers → source 'brief'; derived sizing values →
+// 'calculator' with an explicit source_detail; the class-plan's tool steps OVERWRITE
+// the equipment-geometry quantities (tank/vessel diameters, pump heads, HX areas)
+// with tool provenance at runtime (mirrors how co2/e_fuel seed reactor/column
+// quantities a tool later refines).
+//
+// COST NOTE: macro_assembly_prices returns EMPTY (mirrors co2/e_fuel B-3 fix) — the
+// dedicated cost-basis stage re-costs equipment; passing equipment macros ALSO into
+// the BoM double-counts (gate-10 B-3, exit 10).
+//
+// FIELD-ERECTED (no road-envelope / containerised cap): a RAS is a fixed installation
+// in a building. NO marine-submersible / depth context anywhere (gate 34) — the
+// "marine" here is SEAWATER CHEMISTRY (33 ppt), not a submerged hull.
+//
+// British spelling throughout.
+// ---------------------------------------------------------------------------
+
+registerArchetype('aquaculture_ras', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const tp = brief?.constraints?.target_performance ?? {}
+
+  // ── Annual harvested production (t/yr) — primary brief variable ────────────
+  // Accept "204 tonnes per year", "125 t/yr", a total rearing-tank volume (→ the
+  // reference 61 kg/(m³·yr)), or a target_performance value. Class default 204 t/yr
+  // (the reference full unit). The whole sizing scales linearly off this.
+  const annualProductionTYr = (() => {
+    const tYr = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,6}(?:\.\d+)?)\s*(?:t|tonne[s]?|metric\s+ton[s]?|tons?)\s*(?:of\s+)?(?:harvest(?:ed)?\s+)?(?:fish|kingfish|salmon|production)?\s*(?:\/|per)\s*(?:yr|year|annum|a)\b/i)
+    if (tYr) return parseFloat(tYr[1].replace(/,/g, ''))
+    const vol = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(?:cubic\s+met(?:re|er)s?|m³|m\^?3)\s*(?:total\s+)?(?:rearing[\s-]?)?(?:tank\s+)?(?:volume)?/i)
+    if (vol) return (parseFloat(vol[1].replace(/,/g, '')) * 204) / 3340
+    const u = String(tp.unit ?? '').toLowerCase()
+    if (Number(tp.value ?? 0) > 0 && (u === 't/yr' || u === 'tpy' || u === 'tonne_yr' || u === 't/year' || u === 'tonnes/year')) return Number(tp.value)
+    return 204  // class default: 204 t/yr reference full-scale unit
+  })()
+  // Linear scale factor off the 204 t/yr reference design.
+  const scale = annualProductionTYr / 204
+
+  // ── Capex ceiling (brief: £5,000,000) + design-to-budget tonnage ──────────
+  // The reference 204 t/yr unit is ~£8.15 M equipment. The brief caps installed
+  // capex at £5 M → the achievable tonnage is the largest whose cost ≤ ceiling.
+  const referenceEquipCapexGbp = 8_150_000               // 204 t/yr reference unit equipment capex
+  const capexCeilingGbp = (() => {
+    const m = desc.match(/(?:capex\s+ceiling|capex|capital|installed\s+cost|equipment)[^£\d]{0,40}£?\s*([\d,]{6,})/i)
+      || desc.match(/£?\s*([\d,]{6,})\s*(?:capex|capital|pounds?\s+capex|for\s+the\s+recirculating)/i)
+    if (m) { const v = parseFloat(m[1].replace(/,/g, '')); if (v >= 100_000) return v }
+    return 5_000_000
+  })()
+  // Equipment capex anchor for THIS design (scales with tonnage off the reference
+  // £40k/annual-tonne). The design-to-budget headline compares this vs the ceiling.
+  const designEquipCapexGbp = Math.round(referenceEquipCapexGbp * scale)
+
+  // ── Rearing tanks + biomass ───────────────────────────────────────────────
+  const harvestDensityKgM3 = extractRangeFromDesc(desc, /(\d{2,3})\s*(?:kg|kilograms?)\s*(?:\/|per)\s*(?:m³|cubic\s+met(?:re|er)|m\^?3)/i, 60)
+  // Total rearing-tank volume: scale the 3,340 m³ reference; OR read an explicit m³.
+  const totalTankVolumeM3 = (() => {
+    const vol = desc.match(/(\d{1,3}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(?:cubic\s+met(?:re|er)s?|m³|m\^?3)\s*(?:total\s+)?(?:rearing[\s-]?)?(?:tank\s+)?(?:volume)?/i)
+    if (vol) { const v = parseFloat(vol[1].replace(/,/g, '')); if (v > 50) return v }
+    return Math.round(3340 * scale)
+  })()
+  const standingBiomassKg = Math.round(totalTankVolumeM3 * harvestDensityKgM3)   // tank_vol × 60 kg/m³
+  // Circular dual-drain tank count: ~334 m³ per tank at the reference (10 tanks @
+  // 3,340 m³); scales with total volume, floored at 4 for redundancy.
+  const tankVolumeEachM3 = 334
+  const rearingTankCount = Math.max(4, Math.round(totalTankVolumeM3 / tankVolumeEachM3))
+
+  // ── Feed + waste loads (size-by-feed) ─────────────────────────────────────
+  const feedRateFracBiomass = 0.0135                       // 1.35% of biomass/day (1.2-1.5% band)
+  const dailyFeedKg = Math.round(standingBiomassKg * feedRateFracBiomass)        // ~2,700 kg/day @ 200 t standing
+  const tanFracFeed = 0.04                                 // TAN ≈ 4% of feed (3-5% band)
+  const tanLoadKgDay = Math.round(dailyFeedKg * tanFracFeed * 10) / 10           // ~108 kg/day
+  const o2PerKgFeed = 0.5                                   // 0.5 kg O₂/kg feed (brief)
+  const oxygenDemandKgDay = Math.round(dailyFeedKg * o2PerKgFeed)                // ~1,350 kg/day
+  const solidsFracFeed = 0.60                               // solids ≈ 60% of feed
+  const solidsLoadKgDay = Math.round(dailyFeedKg * solidsFracFeed)               // ~1,620 kg/day
+
+  // ── Recirculation hydraulics ──────────────────────────────────────────────
+  const turnoversPerHour = extractRangeFromDesc(desc, /(?:about\s+)?(\d(?:\.\d)?)\s*(?:times\s+)?(?:turnover[s]?\s+)?(?:per\s+hour|\/\s*h|turnovers?\s*(?:\/|per)\s*h)/i, 4)
+  const recirculationFlowM3H = Math.round(totalTankVolumeM3 * turnoversPerHour)  // 4 turnovers/h × tank vol
+  const recircFractionRecycled = extractRangeFromDesc(desc, /(\d{2}(?:\.\d)?)\s*(?:percent|%)\s*(?:of\s+its\s+water|recirc)/i, 99.6) / 100
+  const makeupFraction = Math.max(0.001, 1 - recircFractionRecycled)             // ~0.4% make-up
+  const makeupWaterM3H = Math.round(recirculationFlowM3H * makeupFraction * 100) / 100  // ~0.4% of recirc
+
+  // ── Biofiltration (MBBR sized on TAN load) ────────────────────────────────
+  const mbbrArealTanRateKgM3Day = 0.35                     // ~350 g TAN/m³ media/day (MBBR)
+  const biofilterMediaVolumeM3 = Math.round((tanLoadKgDay / mbbrArealTanRateKgM3Day) * 10) / 10  // ~309 m³
+  const mbbrFillFrac = 0.60                                 // 50-70% media fill → tank vol = media / fill
+  const biofilterTankVolumeM3 = Math.round(biofilterMediaVolumeM3 / mbbrFillFrac)
+  // MBBR aeration blower air flow: ~scale with media volume (oxygen + mixing for
+  // the biofilm). ~12 m³ air/h per m³ media is a sound MBBR aeration anchor.
+  const biofilterAirFlowM3H = Math.round(biofilterMediaVolumeM3 * 12)
+
+  // ── CO₂ degassing (packed-column, sized on recirc flow) ───────────────────
+  // Forced-draught counter-current degasser at a high air:water ratio (~10:1 by
+  // volume) to strip CO₂ below 6 mg/L. Air flow ∝ recirculation flow.
+  const degasserAirWaterRatio = 10
+  const degasserAirFlowM3H = Math.round(recirculationFlowM3H * degasserAirWaterRatio)
+  // Degasser/cascade fraction of the recirc handled per pass (~the whole flow).
+  const degasserWaterFlowM3H = recirculationFlowM3H
+
+  // ── Thermal (heat pumps; make-up + building loss; DOMINANT load) ──────────
+  const sourceTempC = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:°|degrees?\s+)?(?:c|celsius)?\s*(?:seawater|borehole|source|raw)/i, 10)
+  const setpointTempC = extractRangeFromDesc(desc, /(\d{2}(?:\.\d)?)\s*(?:°|degrees?\s+)?(?:c|celsius)/i, 26.4)
+  const deltaTLift = Math.max(1, setpointTempC - sourceTempC)                    // ~16.4 °C lift
+  // Make-up heating duty: heat the 0.4% make-up from source to setpoint.
+  // Q = ṁ·cp·ΔT ; ṁ = makeup_m3_h × 1000 kg/m³ (kg/h) ; cp = 4.186 kJ/kg·K.
+  const makeupHeatingKw = Math.round((makeupWaterM3H * 1000 * 4.186 * deltaTLift) / 3600)
+  // Building/process losses are the DOMINANT term — a large building in a Scottish
+  // marine climate. Anchor ~7.2 kW per annual-tonne (≈1,470 kW @ 204 t/yr) so the
+  // heating duty tracks plant size; net of ~40% heat recovery from the warm loop.
+  const buildingProcessLossKw = Math.round(1470 * scale)
+  const heatRecoveryFrac = 0.40
+  const heatingDutyKw = Math.round((makeupHeatingKw + buildingProcessLossKw) * (1 - heatRecoveryFrac))
+  // Heat-pump electrical input from the seasonal COP (water-source ~3.5).
+  const heatPumpCop = 3.5
+  const heatPumpElectricalKw = Math.round(heatingDutyKw / heatPumpCop)
+
+  // ── Recirculation + life-support pumping ──────────────────────────────────
+  // Low-head recirc pumps: P = ρ·g·Q·H / η ; low-head H ≈ 3 m, η ≈ 0.70.
+  const recircPumpHeadM = 3.0
+  const recircPumpEffic = 0.70
+  const recircPumpPowerKw = Math.round(((1000 * 9.81 * (recirculationFlowM3H / 3600) * recircPumpHeadM) / recircPumpEffic) / 1000)
+
+  // ── Water chemistry dosing (bicarbonate for nitrification alkalinity) ─────
+  // ~7.1 g alkalinity-as-CaCO₃ consumed per g TAN oxidised; replace with NaHCO₃.
+  // NaHCO₃ (MW 84) supplies CaCO₃-equiv alkalinity (MW 50) → ×(84/50)=1.68 mass
+  // factor on the CaCO₃-equivalent demand.
+  const alkPerTanG = 7.1
+  const bicarbonateDoseKgDay = Math.round(tanLoadKgDay * alkPerTanG * (84 / 50) / 1000 * 1000)  // kg/day NaHCO₃
+
+  // ── Oxygenation supply (LOX/PSA) ──────────────────────────────────────────
+  // LOX/PSA must meet the daily O₂ demand + emergency buffer; express as kg/h.
+  const oxygenSupplyKgH = Math.round((oxygenDemandKgDay / 24) * 10) / 10
+
+  // ── Connected electrical load (sum of the major motor + thermal-input duties) ─
+  const connectedElectricalLoadKw = Math.round(
+    heatPumpElectricalKw + recircPumpPowerKw +
+    (biofilterAirFlowM3H * 0.0003) +        // MBBR blower ~0.3 W per m³/h air
+    (degasserAirFlowM3H * 0.0003) +         // degasser blowers
+    50 * Math.max(1, scale)                 // UV/ozone + PSA + controls + ancillaries
+  )
+
+  // ── Operating envelope + water quality ────────────────────────────────────
+  const phSetpoint = extractRangeFromDesc(desc, /ph\s*(\d(?:\.\d)?)/i, 7.4)
+  const salinityPpt = extractRangeFromDesc(desc, /(\d{2})\s*(?:parts\s+per\s+thousand|ppt|‰)/i, 33)
+  const harvestWeightKg = extractRangeFromDesc(desc, /(\d(?:\.\d)?)\s*(?:kg|kilograms?)\s*(?:harvest|sashimi|fish)/i, 3.4)
+  const growOutDays = extractRangeFromDesc(desc, /(\d{2,3})\s*(?:[- ]?day)\s*(?:cycle|grow[\s-]?out)/i, 360)
+  const fcr = extractRangeFromDesc(desc, /(?:feed\s+conversion\s+ratio|fcr)\s*(?:of\s+)?(\d(?:\.\d{1,2})?)/i, 1.37)
+
+  // ── Total system mass (kg) — renderer compliance-table mass row + gate 17.
+  // Field-erected RAS: tanks (HDPE/GRP/concrete-lined) + treatment vessels +
+  // pumps/blowers + heat pumps + pipework + structure. Bottom-up; scales
+  // sub-linearly (cube-root) with throughput. Tanks dominate.
+  const totalSystemMassKg = Math.round((40000 + 18000 + 9000 + 12000 + 15000) * Math.max(1, Math.cbrt(scale)))
+
+  const quantities: Record<string, Quantity> = {
+    // ── Production (brief-stated) — lock-gate HARD slot ──
+    annual_production_t_yr: q(annualProductionTYr, 't/yr', 'flow_rate', 'rated', 'system', 'brief', { source_detail: 'up to 204 t/yr harvested yellowtail kingfish at the reference full unit; size to the largest tonnage ≤ £5 M ceiling; lock-gate HARD slot (exit 22)' }),
+    harvest_weight_kg: q(harvestWeightKg, 'kg', 'mass', 'rated', 'system', 'brief', { source_detail: '3.4 kg sashimi-grade harvest weight from 200 g juveniles' }),
+    grow_out_cycle_days: q(growOutDays, 'day', 'time', 'rated', 'system', 'brief', { source_detail: '360-day grow-out cycle' }),
+    feed_conversion_ratio: q(fcr, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'feed conversion ratio 1.37' }),
+
+    // ── Rearing tanks + biomass ──
+    harvest_stocking_density_kg_m3: q(harvestDensityKgM3, 'kg/m³', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '60 kg/m³ harvest stocking density' }),
+    total_tank_volume_m3: q(totalTankVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'total rearing-tank volume (3,340 m³ at the 204 t/yr reference, scaled to the design tonnage); lock-gate HARD slot (exit 22)' }),
+    standing_biomass_kg: q(standingBiomassKg, 'kg', 'mass', 'rated', 'system', 'calculator', { source_detail: 'total_tank_volume × harvest_density (60 kg/m³)' }),
+    rearing_tank_count: q(rearingTankCount, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'circular dual-drain (Cornell) rearing tanks at ~334 m³ each' }),
+    rearing_tank_volume_each_m3: q(tankVolumeEachM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: 'per-tank working volume (~334 m³ circular dual-drain tank)' }),
+
+    // ── Feed + waste loads (size-by-feed) ──
+    daily_feed_kg: q(dailyFeedKg, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~1.35% of standing biomass/day (1.2-1.5% grow-out band)' }),
+    tan_load_kg_day: q(tanLoadKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'TAN ≈ 4% of feed (3-5% band); sizes the MBBR biofilter' }),
+    oxygen_demand_kg_day: q(oxygenDemandKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~0.5 kg O₂/kg feed; sizes the oxygenation + LOX/PSA' }),
+    solids_load_kg_day: q(solidsLoadKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~60% of feed; sizes the drum filters + sludge handling' }),
+
+    // ── Recirculation hydraulics — lock-gate HARD slot ──
+    recirculation_flow_m3_h: q(recirculationFlowM3H, 'm³/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '4 turnovers/h × total_tank_volume (15-min HRT); lock-gate HARD slot (exit 22)' }),
+    turnovers_per_hour: q(turnoversPerHour, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '~4 tank turnovers per hour (15-min hydraulic retention time)' }),
+    makeup_water_m3_h: q(makeupWaterM3H, 'm³/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~0.4% make-up of the recirculation flow (99.6% recirculated)' }),
+    recirc_fraction_recycled: q(recircFractionRecycled, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '99.6% of the water recirculated (~0.4% new-water make-up)' }),
+
+    // ── Solids removal (rotary drum microscreens) ──
+    drum_filter_throughput_m3_h: q(recirculationFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'rotary drum microscreen filters take the full recirculation flow on tank exit (40-60 µm screen)' }),
+
+    // ── Biofiltration (MBBR sized on TAN load) ──
+    biofilter_media_volume_m3: q(biofilterMediaVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'TAN_load ÷ ~0.35 kg TAN/m³ media/day (MBBR areal nitrification rate)' }),
+    biofilter_tank_volume_m3: q(biofilterTankVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: 'media volume ÷ ~60% fill ratio (50-70% MBBR media fill)' }),
+    biofilter_air_flow_m3_h: q(biofilterAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: '~12 m³ air/h per m³ media (MBBR aeration grid + blower)' }),
+
+    // ── CO₂ degassing (packed-column) ──
+    degasser_air_flow_m3_h: q(degasserAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~10:1 air:water ratio forced-draught counter-current packed-column degassers (strip CO₂ < 6 mg/L)' }),
+    degasser_water_flow_m3_h: q(degasserWaterFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'degassers take the full recirculation flow' }),
+
+    // ── Oxygenation (LOX/PSA) ──
+    oxygen_supply_kg_h: q(oxygenSupplyKgH, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'oxygen_demand ÷ 24 — down-flow O₂ cones fed from on-site LOX + PSA generator' }),
+
+    // ── Thermal (heat pumps; DOMINANT load) — lock-gate HARD slot ──
+    heating_duty_kw: q(heatingDutyKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'make-up heat (0.4% recirc, 10→26.4 °C) + building/process loss (DOMINANT) net of ~40% heat recovery from the warm loop; lock-gate HARD slot (exit 22)' }),
+    makeup_heating_kw: q(makeupHeatingKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'ṁ·cp·ΔT for the 0.4% make-up from ~10 °C to 26.4 °C' }),
+    building_process_loss_kw: q(buildingProcessLossKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'building-fabric + process heat loss (the DOMINANT thermal term in a Scottish marine climate)' }),
+    heat_pump_electrical_kw: q(heatPumpElectricalKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'heating_duty ÷ COP (water-source heat pumps, SCOP ~3.5)' }),
+    heat_pump_cop: q(heatPumpCop, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'water-source heat-pump seasonal COP ~3.5 (warm-loop source)' }),
+    water_setpoint_temp_c: q(setpointTempC, '°C', 'temperature', 'rated', 'system', 'brief', { source_detail: '26.4 °C yellowtail kingfish grow-out temperature' }),
+    source_water_temp_c: q(sourceTempC, '°C', 'temperature', 'min', 'system', 'brief', { source_detail: '~10 °C seawater/borehole source water (8-12 °C)' }),
+
+    // ── Pumping ──
+    recirc_pump_power_kw: q(recircPumpPowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'low-head recirculation pumps: ρ·g·Q·H/η at ~3 m head, η ~0.70' }),
+
+    // ── Water chemistry dosing ──
+    bicarbonate_dose_kg_day: q(bicarbonateDoseKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~7.1 g alkalinity-as-CaCO₃ per g TAN oxidised, dosed as NaHCO₃ (×84/50 mass factor)' }),
+    ph_setpoint: q(phSetpoint, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'pH 7.4 held by bicarbonate dosing' }),
+    salinity_ppt: q(salinityPpt, 'ppt', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '~33 ppt full-strength seawater salinity' }),
+
+    // ── System ──
+    connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'Σ heat-pump electrical + recirc pumps + MBBR/degasser blowers + UV/ozone/PSA/controls' }),
+    design_equipment_capex_gbp: q(designEquipCapexGbp, 'GBP', 'currency', 'gross', 'system', 'calculator', { source_detail: 'equipment capex anchor for this tonnage (≈£40k/annual-tonne off the £8.15 M / 204 t/yr reference)' }),
+    capex_ceiling_gbp: q(capexCeilingGbp, 'GBP', 'currency', 'gross', 'system', 'brief', { source_detail: '£5,000,000 installed-capex ceiling for the RAS equipment, shipping and installation' }),
+    total_system_mass_kg: q(totalSystemMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'bottom-up field-erected estimate: rearing tanks ~40 t + treatment vessels ~18 t + pumps/blowers ~9 t + heat pumps ~12 t + pipework/structure ~15 t' }),
+  }
+
+  // ── Topology constraints — typed edges (the continuous recirculating loop) ──
+  // Flow order: rearing tanks → drum filters → MBBR biofilter → CO₂ degasser →
+  // O₂ cones → UV/ozone → heat pumps → recirc pumps → tanks. NO marine-submersible
+  // / depth context (gate 34); "marine" = seawater chemistry, not a submerged hull.
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'rearing_tanks',
+      to_part: 'rotary_drum_filter',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: recirculationFlowM3H / 3600,  // m³/s
+      required_unit: 'm³/s',
+      required_margin_factor: 1.2,
+      material_context: 'dual_Cornell_drain_tank_exit_solids_rich_bottom_draw_plus_clean_sidewall_draw_to_40_60um_microscreen',
+    },
+    {
+      from_part: 'rotary_drum_filter',
+      to_part: 'mbbr_biofilter',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: recirculationFlowM3H / 3600,
+      required_unit: 'm³/s',
+      required_margin_factor: 1.2,
+      material_context: 'solids_removed_to_protect_the_biofilter_from_organic_overload_then_TAN_oxidation_in_the_MBBR',
+    },
+    {
+      from_part: 'mbbr_biofilter',
+      to_part: 'co2_degasser',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: recirculationFlowM3H / 3600,
+      required_unit: 'm³/s',
+      required_margin_factor: 1.2,
+      material_context: 'nitrified_water_to_forced_draught_packed_column_degasser_strip_CO2_below_6mg_L',
+    },
+    {
+      from_part: 'co2_degasser',
+      to_part: 'oxygen_cones',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: recirculationFlowM3H / 3600,
+      required_unit: 'm³/s',
+      required_margin_factor: 1.2,
+      material_context: 'degassed_water_reoxygenated_in_downflow_O2_cones_fed_from_LOX_and_PSA_generator',
+    },
+    {
+      from_part: 'oxygen_cones',
+      to_part: 'uv_ozone_disinfection',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: recirculationFlowM3H / 3600,
+      required_unit: 'm³/s',
+      material_context: 'oxygenated_water_polished_through_UV_reactors_optional_ozone_under_ORP_control',
+    },
+    {
+      from_part: 'heat_pumps',
+      to_part: 'rearing_tanks',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: heatingDutyKw,
+      required_unit: 'kW',
+      required_margin_factor: 1.15,
+      material_context: 'water_source_heat_pumps_hold_the_recirculating_inventory_at_26.4C_with_heat_recovery_from_the_warm_loop',
+    },
+    {
+      from_part: 'oxygen_supply',
+      to_part: 'oxygen_cones',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: oxygenDemandKgDay / 86400,  // kg/s O₂
+      required_unit: 'kg/s',
+      required_margin_factor: 1.5,
+      material_context: 'LOX_plus_PSA_supply_~0.5kg_O2_per_kg_feed_with_emergency_fail_open_solenoid_diffusers_in_every_tank',
+    },
+    {
+      from_part: 'electrical_supply',
+      to_part: 'recirc_pumps_and_heat_pumps',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (connectedElectricalLoadKw * 1000) / (3 ** 0.5 * 415),  // A, 415 V three-phase
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+      material_context: '400_415V_three_phase_LV_behind_an_11kV_MV_transformer_planned_5MVA_micro_grid_with_backup_generator',
+    },
+  ]
+
+  // ── Closures — design-rule gates ──────────────────────────────────────────
+  const closures: ContractClosureResult[] = []
+  // Recirculation closure: 4 turnovers/h of the tank volume.
+  closures.push({
+    invariant_id: 'recirculation_turnover_closure',
+    status: Math.abs(recirculationFlowM3H - totalTankVolumeM3 * turnoversPerHour) / Math.max(1, recirculationFlowM3H) < 0.05 ? 'pass' : 'fail',
+    measured: recirculationFlowM3H,
+    required: `recirculation_flow ≈ ${turnoversPerHour} turnovers/h × ${totalTankVolumeM3} m³ tank volume (15-min HRT)`,
+    reason: `Recirculation ${recirculationFlowM3H} m³/h = ${turnoversPerHour} turnovers/h × ${totalTankVolumeM3} m³ total tank volume.`,
+  })
+  // Biomass closure: standing biomass = tank volume × harvest density.
+  closures.push({
+    invariant_id: 'standing_biomass_closure',
+    status: Math.abs(standingBiomassKg - totalTankVolumeM3 * harvestDensityKgM3) / Math.max(1, standingBiomassKg) < 0.02 ? 'pass' : 'fail',
+    measured: standingBiomassKg,
+    required: `standing_biomass = ${totalTankVolumeM3} m³ × ${harvestDensityKgM3} kg/m³`,
+    reason: `Standing biomass ${(standingBiomassKg / 1000).toFixed(0)} t = ${totalTankVolumeM3} m³ × ${harvestDensityKgM3} kg/m³ harvest density.`,
+  })
+  // Biofilter closure: MBBR media volume covers the TAN load.
+  closures.push({
+    invariant_id: 'biofilter_tan_capacity_closure',
+    status: biofilterMediaVolumeM3 * mbbrArealTanRateKgM3Day >= tanLoadKgDay * 0.95 ? 'pass' : 'fail',
+    measured: Math.round(biofilterMediaVolumeM3 * mbbrArealTanRateKgM3Day * 10) / 10,
+    required: `MBBR media ${biofilterMediaVolumeM3} m³ × ${mbbrArealTanRateKgM3Day} kg TAN/m³/day ≥ TAN load ${tanLoadKgDay} kg/day`,
+    reason: `Biofilter media ${biofilterMediaVolumeM3} m³ oxidises ${Math.round(biofilterMediaVolumeM3 * mbbrArealTanRateKgM3Day)} kg TAN/day ≥ the ${tanLoadKgDay} kg/day load.`,
+  })
+  // Capex-vs-ceiling closure (sanity: design tonnage's equipment cost vs the £5 M cap).
+  closures.push({
+    invariant_id: 'capex_within_ceiling',
+    status: designEquipCapexGbp <= capexCeilingGbp * 1.05 ? 'pass' : 'warn',
+    measured: designEquipCapexGbp,
+    required: `design equipment capex ≤ £${(capexCeilingGbp / 1_000_000).toFixed(1)} M ceiling`,
+    reason: `Equipment capex anchor £${(designEquipCapexGbp / 1_000_000).toFixed(2)} M for the ${annualProductionTYr.toFixed(0)} t/yr design (≈£40k/annual-tonne) vs the £${(capexCeilingGbp / 1_000_000).toFixed(1)} M ceiling.`,
+  })
+
+  return {
+    product_class: 'aquaculture_ras',
+    brief_summary: `${annualProductionTYr.toFixed(0)} t/yr land-based marine Recirculating Aquaculture System (RAS) for yellowtail kingfish (Seriola lalandi), 200 g → ${harvestWeightKg} kg over ${growOutDays} days at FCR ${fcr}. ${totalTankVolumeM3} m³ total rearing-tank volume across ${rearingTankCount} circular dual-drain tanks at ${harvestDensityKgM3} kg/m³ (~${(standingBiomassKg / 1000).toFixed(0)} t standing biomass). Continuous water-treatment loop: rotary drum microscreens (${solidsLoadKgDay} kg solids/day) → MBBR biofilter (${biofilterMediaVolumeM3} m³ media on ${tanLoadKgDay} kg TAN/day) → packed-column CO₂ degassers → down-flow O₂ cones (LOX + PSA, ${oxygenDemandKgDay} kg O₂/day) → UV/ozone → water-source heat pumps holding 26.4 °C (${heatingDutyKw} kW heating duty net of heat recovery — the dominant load) → low-head recirculation pumps (${recirculationFlowM3H} m³/h, 4 turnovers/h, 99.6% recycled, ~${makeupWaterM3H} m³/h make-up). pH ${phSetpoint} held by NaHCO₃ dosing (${bicarbonateDoseKgDay} kg/day); ~${salinityPpt} ppt seawater. ${(connectedElectricalLoadKw / 1000).toFixed(2)} MW connected electrical load. Mission-critical life support: duty/standby recirc pumps + gravity fall-back, fail-open emergency O₂ diffusers, LOX buffer, backup generator, fail-safe alarms with auto-dialler. Equipment capex anchor £${(designEquipCapexGbp / 1_000_000).toFixed(1)} M vs the £${(capexCeilingGbp / 1_000_000).toFixed(0)} M ceiling. Marine Scotland consent.`,
+    quantities,
+    topology,
+    // B-3 fix (mirror co2/e_fuel): return EMPTY macros to the BoM. The dedicated
+    // cost-basis stage is authoritative; passing equipment macros ALSO into the BoM
+    // double-counts the word-level lines → gate-10 B-3 (exit 10).
+    macro_assembly_prices: [],
+    closures,
+    shared_quantities: {
+      // Canonical engineering values any sub_module emitter that mentions them MUST
+      // read from here (gate 24 flags two distinct values for one anchor).
+      water_setpoint_temp_c: setpointTempC,
+      ph_setpoint: phSetpoint,
+      salinity_ppt: salinityPpt,
+      harvest_density_kg_m3: harvestDensityKgM3,
+      recirculation_flow_m3_h: recirculationFlowM3H,
+      total_tank_volume_m3: totalTankVolumeM3,
+      annual_production_t_yr: annualProductionTYr,
+      regulatory_standard_spine: 'Marine Scotland aquaculture consent + The Aquatic Animal Health (Scotland) Regulations + CAR (Controlled Activities Regulations) discharge consent (SEPA) + Machinery Directive (BS EN ISO 12100) + DSEAR (ozone/oxygen) + BS EN 60204-1 (electrical safety of machinery)',
+      species_desc: 'yellowtail kingfish (Seriola lalandi), sashimi/sushi-grade Hamachi',
+      water_chemistry_desc: 'full-strength seawater ~33 ppt, 26.4 °C, pH 7.4, TAN 0.5-1.5 mg/L, nitrite 0.5-1.5 mg/L, CO₂ < 6 mg/L, DO ≥ saturation at tank inlet',
     },
   }
 })

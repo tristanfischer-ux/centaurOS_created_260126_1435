@@ -80,6 +80,8 @@ NON_PHYSICAL_RE = re.compile(
     r"\bdesiccant\s+(?:fill|charge)\b|\bresin\s+(?:fill|charge)\b|"
     r"\bmedia\s+(?:fill|charge)\b|\badsorbent\s+(?:fill|charge|\+)|"
     r"\bdocumentation\b|\btraining\b|\bwarranty\b|"
+    r"\bparameters?\b|\bsizing\s+basis\b|\bdesign\s+basis\b|"  # "Reactor/Absorber Sizing Parameters" — design metadata, never a vessel
+    r"\bcontactors?\b|"                                        # a motor contactor is panel control-gear, not GA-scale equipment
     r"\bspares?\b"
     r")", re.IGNORECASE,
 )
@@ -94,6 +96,15 @@ SHAPE_RULES = [
     (r"compressor", "compressor"),
     (r"\bpump\b", "pump"),
     (r"blower|\bfan\b", "pump"),
+    # ── WATER / PROCESS TREATMENT equipment (universal — any treatment plant has
+    #    these; without a rule they fall to the DEFAULT box and their cylinder
+    #    dimension is discarded, so a 515 m³ biofilter renders as a 1 m grey box) ──
+    (r"biofilter|bioreactor|\bmbbr\b|moving.?bed|trickling|\bbiological\b", "vertical_vessel"),
+    (r"degass|deaerat|\bstripper\b|stripping", "tall_column"),
+    (r"skimmer|foam.?frac", "tall_column"),
+    (r"oxygenat|oxygen.?cone|speece", "vertical_vessel"),
+    (r"clarifier|settler|lamella|sediment", "tank"),
+    (r"\buv\b|steriliz|disinfect|ozone", "vertical_vessel"),
     # ── HORIZONTAL vessels (separation/exchange/disengagement) BEFORE the
     #    generic vertical bucket, because "separator"/"drum"/"knock-out" are the
     #    classic horizontal-on-saddles shapes. A "steam drum" + "3-phase
@@ -546,6 +557,20 @@ def extract_parts(state):
                 mods = w.get("modifier_characters", []) or []
                 form = " ".join(mc.get("value", "") for mc in mods
                                 if mc.get("kind") == "form")
+                # BoM-only sub-components (motor / valve / seal inside an assembly, id
+                # 'parent__slug') are DETAIL — not separately-placed equipment. Placing
+                # them buries the real plant in tiny boxes; the parent assembly stands for
+                # them in the layout, GA and 3D. (They still appear in the bill of materials.)
+                if "__" in str(w.get("id") or "") or "sub-component" in form.lower():
+                    dropped.append(name)
+                    continue
+                # Skeleton hardware padding that slipped the chain's strip is never a GA
+                # equipment item (a "Fastener Set" must not render as a 9 m grey box).
+                if re.search(r"\bfastener set\b|\bgasket seal\b|\bmounting (bracket|hardware)\b|"
+                             r"\bwiring harness\b|\blabelling set\b|\blifting (point|lug)\b|"
+                             r"\bnameplate\b|\bearthing boss\b", name, re.I):
+                    dropped.append(name)
+                    continue
                 # Filter on the NAME only (form prose names catalysts/resins on
                 # real vessels — see NON_PHYSICAL_RE note).
                 if NON_PHYSICAL_RE.search(name):
@@ -568,6 +593,11 @@ def extract_parts(state):
                         break
                 shape = classify_shape(name, form)
                 parts.append(Part(name, module_id, region_key, rank, shape, dim, qty, form))
+    # A qty-N big VESSEL/TANK is replicated DOWNSTREAM in build_part (one Part, N
+    # instances drawn as a compact grid, each with a unique object base-name) so the
+    # 3D render, the parts-manifest AND every 2D drawing all show N tanks. Replicating
+    # the Part HERE was wrong: the manifest unions identically-named instances by
+    # name-prefix back into ONE row, so N same-named Parts still collapsed to 1.
     return parts, dropped
 
 
@@ -1217,17 +1247,49 @@ def flow_order_regions(parts, topology):
     return flow_regions, periphery
 
 
+DISCRIMINATORS = {"h2", "co2", "hot", "cold", "saf", "naphtha", "recycle",
+                  "feed", "product", "tail", "syncrude"}
+
+
+def _token_match(x, y):
+    """Two part-name tokens count as the SAME discriminating token when they are
+    equal OR one is a clean morphological PREFIX of the other (a conservative stem
+    so a process tag's noun matches the placed part's noun across an inflection):
+    e.g. 'oxygen' ⊂ 'oxygenation', 'disinfect' ⊂ 'disinfection'. The rule is kept
+    deliberately tight — the shorter token must be ≥6 chars AND the longer at least
+    3 chars longer — so short generic words never over-match (it must NOT fold
+    'pump'/'pumps' or 'heat' together, which would steal a thermal line onto a pump
+    or vice-versa). Universal: pure string morphology, no per-archetype vocabulary."""
+    if x == y:
+        return True
+    s, l = (x, y) if len(x) <= len(y) else (y, x)
+    return len(s) >= 6 and len(l) >= len(s) + 3 and l.startswith(s)
+
+
 def token_overlap(a_tokens, b_tokens):
-    """Count of shared discriminating tokens, but REQUIRE that distinctive
-    qualifier tokens (h2/co2/hot/cold/saf/naphtha) match when present on the
-    query — so 'h2_feed_compressor' never resolves onto the CO2 compressor."""
+    """Count of shared discriminating tokens (with the conservative stem of
+    `_token_match`), but VETO a candidate that carries a CONFLICTING distinctive
+    qualifier — so 'h2_feed_compressor' (query disc {h2,feed}) never resolves onto
+    the CO2 compressor (candidate disc {co2}: co2 ∉ query → conflict → 0).
+
+    The veto fires ONLY when the candidate carries a discriminator the query does
+    NOT (a genuine RIVAL on the same axis), NOT merely because the candidate lacks
+    the query's discriminator. The old 'candidate must echo the query discriminator'
+    rule silently dropped real lines: a 'co2_degasser' tag (disc {co2}) failed to
+    reach the placed 'Degasser' (no discriminator at all) and the whole CO2-degasser
+    line vanished, even though no rival 'Degasser' existed to be confused with. A
+    candidate WITHOUT any discriminator is a valid (unqualified) match; only one
+    bearing a competing qualifier is excluded."""
     a, b = set(a_tokens), set(b_tokens)
-    DISCRIMINATORS = {"h2", "co2", "hot", "cold", "saf", "naphtha", "recycle",
-                      "feed", "product", "tail", "syncrude"}
     qd = a & DISCRIMINATORS
-    if qd and not (qd & b):
-        return 0  # a required discriminator is absent on the candidate
-    return len(a & b)
+    cd = b & DISCRIMINATORS
+    if qd and (cd - qd):
+        return 0  # candidate carries a CONFLICTING discriminator (a real rival)
+    n = 0
+    for x in a:
+        if any(_token_match(x, y) for y in b):
+            n += 1
+    return n
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1436,14 +1498,21 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
                    r * 1.08, plinth_h, steel, module=mod, module_objects=MO)
         shell = fl.add_cyl(f"{nm}_shell", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h / 2),
                            r, body_h, mat, module=mod, module_objects=MO)
-        # shallow cone roof (frustum, low rise ~0.12 D)
-        roof_h = dia_mm * fl.MM * 0.12
-        fl.add_frustum(f"{nm}_roof", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h + roof_h / 2),
-                       r, r * 0.18, roof_h, mat, module=mod, module_objects=MO, vertices=32)
-        # wind-girder ring near the top (the API-650 tank cue)
-        fl.add_torus(f"{nm}_windgirder", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h * 0.82),
-                     r + 0.02, max(0.02, r * 0.04), steel, module=mod, module_objects=MO)
-        anchors = {"top": (x_mm, y_mm, (z_bot + body_h + roof_h) / fl.MM),
+        # FLAT cover + perimeter HANDRAIL on posts — reads as a real cylindrical process
+        # tank with a top walkway, NOT a green dome (the cone roof was the blob culprit).
+        fl.add_cyl(f"{nm}_cover", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h + 0.07),
+                   r, 0.14, steel, module=mod, module_objects=MO)
+        for ang in (0, 60, 120, 180, 240, 300):
+            px = x_mm * fl.MM + math.cos(math.radians(ang)) * (r + 0.05)
+            py = y_mm * fl.MM + math.sin(math.radians(ang)) * (r + 0.05)
+            fl.add_box(f"{nm}_post_{int(ang)}", (px, py, z_bot + body_h + 0.55),
+                       (0.05, 0.05, 1.0), steel, module=mod, module_objects=MO)
+        fl.add_torus(f"{nm}_handrail", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h + 1.05),
+                     r + 0.05, max(0.025, r * 0.018), steel, module=mod, module_objects=MO)
+        # wind-girder mid-ring (shell stiffener cue)
+        fl.add_torus(f"{nm}_windgirder", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h * 0.6),
+                     r + 0.02, max(0.02, r * 0.035), steel, module=mod, module_objects=MO)
+        anchors = {"top": (x_mm, y_mm, (z_bot + body_h) / fl.MM),
                    "bottom": (x_mm, y_mm, z_bot / fl.MM),
                    "centre": (x_mm, y_mm, (z_bot + body_h / 2) / fl.MM)}
         # Fix 1: a manway + low/high side nozzles read the squat tank as a vessel.
@@ -1698,15 +1767,34 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
         else:
             dia = rd.get("dia_mm", 800)
             ln = rd.get("len_mm") or TYPE_DEFAULTS_MM[shape].get("height", 3000)
-        asm, anchors = build_vessel(nm, kind, dia, ln, x_mm, y_mm, base_z_mm, mat,
-                                    mod, MO, MAT, lagged=(shape in _LAGGED_SHAPES))
-        if shape == "tall_column":  # add visible tray rings up the column
-            _add_tray_rings(nm, anchors, dia, MAT, mod, MO)
-        # Fix 3: access platforms + caged ladder on tall columns/towers.
-        if shape in ("tall_column", "tall_vessel"):
-            _add_platforms_and_ladder(nm, anchors["top"], anchors["bottom"],
-                                      dia, MAT, mod, MO)
-        return asm, anchors
+        # qty-N vessels (e.g. a 10-tank rearing farm) render as a COMPACT grid of N
+        # DISTINCT instances centred on this part's footprint (x_mm,y_mm). Each instance
+        # gets a UNIQUE object base-name (nm_inst<idx>) so build_parts_manifest can
+        # separate them into N rows + the 2D GA shows all N. Routing uses the FIRST
+        # instance as the representative (its (asm, anchors) is returned). N==1 is
+        # byte-identical to a single vessel (inm == nm, xo == yo == 0).
+        N = max(1, min(int(getattr(part, "qty", 1) or 1), 12))
+        cols = int(math.ceil(math.sqrt(N)))
+        rows = int(math.ceil(N / cols))
+        pitch = dia * 1.4
+        first = None
+        for idx in range(N):
+            r, c = divmod(idx, cols)
+            xo = (c - (cols - 1) / 2.0) * pitch
+            yo = (r - (rows - 1) / 2.0) * pitch
+            inm = nm if N == 1 else f"{nm}_inst{idx}"
+            asm, anchors = build_vessel(inm, kind, dia, ln, x_mm + xo, y_mm + yo,
+                                        base_z_mm, mat, mod, MO, MAT,
+                                        lagged=(shape in _LAGGED_SHAPES))
+            if shape == "tall_column":  # add visible tray rings up the column
+                _add_tray_rings(inm, anchors, dia, MAT, mod, MO)
+            # Fix 3: access platforms + caged ladder on tall columns/towers.
+            if shape in ("tall_column", "tall_vessel"):
+                _add_platforms_and_ladder(inm, anchors["top"], anchors["bottom"],
+                                          dia, MAT, mod, MO)
+            if first is None:
+                first = (asm, anchors)
+        return first
 
     if shape == "stack":
         dia = rd.get("dia_mm", 500)
@@ -2396,7 +2484,7 @@ ABSTRACT_ENDPOINTS_RE = re.compile(
 # Universal: keyed only on the endpoint TEXT + token-overlap counts, no class data.
 EXTERNAL_SUPPLY_RE = re.compile(
     r"electrical_supply|power_supply|\bgrid\b|\bmains\b|incomer|utility|"
-    r"\bsupply\b|battery_limit|offsite", re.IGNORECASE)
+    r"(?:^|[_\s-])supply\b|battery_limit|offsite", re.IGNORECASE)
 # Endpoint text that signals an AGGREGATE of several parts (route to the cluster).
 GROUP_ENDPOINT_RE = re.compile(
     r"_and_|compressors_and_pumps|\bpumps\b|\bcompressors\b|\bdrives\b|"
@@ -3551,6 +3639,45 @@ def _world_bbox_mm_by_prefix(parts):
     return {k: tuple(v) for k, v in acc.items()}
 
 
+def _world_bbox_mm_for_exact_prefix(prefix):
+    """World-space bbox (mm) of every placed MESH object whose name starts with the
+    EXACT given prefix — same matrix_world maths + SKIP filter as
+    _world_bbox_mm_by_prefix, but for ONE explicit prefix. Used to separate the N
+    instances of a qty-N vessel (u_<slug>_inst0 … u_<slug>_inst{N-1}), which the
+    by-prefix union (keyed by the bare slug) would otherwise lump into one box.
+    Returns (xmin,xmax,ymin,ymax,zmin,zmax) in mm, or None if nothing matched."""
+    SKIP = ("u_skid_", "u_rack_", "u_route_", "u_pipe_", "u_ground_", "u_grid_",
+            "u_datum_", "u_dim_")
+    b = None
+    for obj in list(bpy.data.objects):
+        if getattr(obj, "type", None) != "MESH" or obj.data is None:
+            continue
+        nm = obj.name
+        if not nm.startswith(prefix):
+            continue
+        if any(nm.startswith(s) for s in SKIP):
+            continue
+        mw = obj.matrix_world
+        try:
+            _V = __import__("mathutils").Vector
+            corners = [mw @ _V(c) for c in obj.bound_box]
+        except Exception:
+            continue
+        xs = [c.x for c in corners]
+        ys = [c.y for c in corners]
+        zs = [c.z for c in corners]
+        lo_x, hi_x = min(xs) * 1000.0, max(xs) * 1000.0
+        lo_y, hi_y = min(ys) * 1000.0, max(ys) * 1000.0
+        lo_z, hi_z = min(zs) * 1000.0, max(zs) * 1000.0
+        if b is None:
+            b = [lo_x, hi_x, lo_y, hi_y, lo_z, hi_z]
+        else:
+            b[0] = min(b[0], lo_x); b[1] = max(b[1], hi_x)
+            b[2] = min(b[2], lo_y); b[3] = max(b[3], hi_y)
+            b[4] = min(b[4], lo_z); b[5] = max(b[5], hi_z)
+    return tuple(b) if b is not None else None
+
+
 # ── SYNTHETIC-EQUIPMENT grouping for the AGGREGATE placement families ────────
 # rack_farm / panel_array / tower_machine / aero_body build their geometry under
 # their OWN object-naming scheme (u_rf_*, u_gr_*, u_tm_*, u_aero_*) instead of
@@ -3747,6 +3874,31 @@ def build_parts_manifest(parts):
 
     entries = []
     for pref, p in by_pref.items():
+        # A qty-N vessel (the _VESSEL_KIND shapes build_part replicates) was drawn as
+        # N DISTINCT instances u_<slug>_inst0…inst{N-1}. Emit one row per instance —
+        # each with its OWN world bbox — so 10 rearing tanks become 10 rows (TK-101…
+        # TK-110) at distinct compact-grid positions, not one unioned mega-tank.
+        qty = int(getattr(p, "qty", 1) or 1)
+        if p.shape in _VESSEL_KIND and 2 <= qty <= 12:
+            n_inst = min(qty, 12)
+            added = 0
+            for idx in range(n_inst):
+                ibb = _world_bbox_mm_for_exact_prefix(f"{pref}_inst{idx}")
+                if ibb is None:
+                    continue
+                ixmin, ixmax, iymin, iymax, izmin, izmax = ibb
+                # one Part per instance so each row gets its own running tag + qty 1
+                ip = Part(p.name, p.module_id, p.region_key, p.region_rank,
+                          p.shape, p.dim, 1, p.form)
+                entries.append((f"{pref}_inst{idx}", ip,
+                                (ixmin + ixmax) / 2.0, (iymin + iymax) / 2.0,
+                                (izmin + izmax) / 2.0,
+                                ixmax - ixmin, iymax - iymin, izmax - izmin))
+                added += 1
+            if added:
+                continue
+            # fall through to the unioned single-row path if no instance matched
+            # (defensive — should not happen once build_part replicated the vessel)
         xmin, xmax, ymin, ymax, zmin, zmax = bbox_by_pref[pref]
         cx = (xmin + xmax) / 2.0
         cy = (ymin + ymax) / 2.0
@@ -4874,16 +5026,19 @@ def _matched_cluster(endpoint_name, parts):
     chemical discriminators are still honoured (a chemically-wrong vessel never
     joins). Returns [(score, part), …] score-descending."""
     ep_folded = {_depluralise(t) for t in tokenise(endpoint_name)}
-    DISCRIMINATORS = {"h2", "co2", "hot", "cold", "saf", "naphtha", "recycle",
-                      "feed", "product", "tail", "syncrude"}
     ep_disc = ep_folded & DISCRIMINATORS
     hits = []
     for p in parts:
         if p.placed_xyz_mm is None:
             continue
         pf = {_depluralise(t) for t in p.match_tokens}
-        # honour the endpoint's chemical discriminators when it carries any
-        if ep_disc and not (ep_disc & pf):
+        p_disc = pf & DISCRIMINATORS
+        # honour the endpoint's chemical discriminators, but exclude ONLY a part that
+        # carries a CONFLICTING discriminator (a chemically-wrong rival) — not one that
+        # merely lacks the token (same relaxation as token_overlap; an unqualified part
+        # is a valid cluster member). Mirrors the route-coverage fix so a 'co2_*' group
+        # tag still gathers its unqualified members instead of dropping them.
+        if ep_disc and (p_disc - ep_disc):
             continue
         s = len(ep_folded & pf)
         if s > 0:
@@ -5025,6 +5180,115 @@ def _draw_cable_tray(nm, waypoints_mm, MAT, MO, dia_mm=None):
     return legs
 
 
+# ── CROSS-MODULE PROCESS-LINE AUGMENTATION (universal) ────────────────────────
+# The orchestrator `topology` is the PRIMARY edge list, but on some archetypes it
+# under-describes the plant: it captures the equipment-to-equipment sequence WITHIN
+# the main process module yet omits the INTER-module process-water connections that
+# close the loop (e.g. a recirculating-aquaculture train sits largely inside one
+# fluid module, so the tank→treatment→tank legs between modules never become topology
+# edges and the 3D/P&ID look sparse — only ~4 of ~20 connections drawn). Those legs
+# DO exist, authored by the engine, in moduleDecomposition.cross_module_grammar_links
+# (module→module + mechanism). This augmentation routes the FLUID ones the topology
+# does NOT already cover, as real process lines between a representative part of each
+# module. It is deliberately FLUID-ONLY and PAIR-DEDUPED so it adds genuinely-missing
+# recirculation/service legs without (a) drawing non-physical signal/control/mount
+# links as pipes, or (b) duplicating a connection the topology already routes. On a
+# plant whose topology already spans its modules (e.g. once-through CO₂ capture) it
+# adds NOTHING. Universal — keyed purely on mechanism class + module coverage, never
+# on archetype.
+_AUG_FLUID_MECHANISMS = {
+    "fluid_routing", "fluid_loop", "fluid", "process_flow", "process_fluid",
+    "liquid", "water", "slurry",
+}
+
+
+def _module_repr_part_name(module_id, parts):
+    """Pick a representative placed-equipment NAME for `module_id` so a module→module
+    link can route to a real part. Prefers the LARGEST primary vessel/machine in the
+    module (by footprint when dimensioned), else the first non-detail part. Returns
+    None when the module has no placeable equipment (then the link is skipped)."""
+    in_mod = [p for p in parts if p.module_id == module_id]
+    if not in_mod:
+        return None
+
+    def _vol(p):
+        d = getattr(p, "dim", None)
+        if isinstance(d, (list, tuple)) and len(d) >= 3:
+            try:
+                return float(d[0]) * float(d[1]) * float(d[2])
+            except (TypeError, ValueError):
+                return 0.0
+        return 0.0
+
+    # Prefer a dimensioned MAJOR item (largest footprint); fall back to the first.
+    best = max(in_mod, key=_vol)
+    if _vol(best) > 0:
+        return best.name
+    return in_mod[0].name
+
+
+def augment_topology_cross_module(state, topology, parts):
+    """Return EXTRA topology-shaped edges for the FLUID cross-module grammar links the
+    primary `topology` does not already route (see the block comment above). Each extra
+    edge is `{from_part, to_part, mechanism:'fluid_loop', constraint_kind:'flow_capacity',
+    material_context, _augmented:True}` so it flows through the SAME route_topology /
+    sizing / manifest path as a real edge. Pure: no Blender, no mutation of `topology`."""
+    md = state.get("moduleDecomposition", {}) or {}
+    links = md.get("cross_module_grammar_links", []) or []
+    if not links:
+        return []
+
+    present_modules = {p.module_id for p in parts}
+
+    # (1) module-pairs the PRIMARY topology already connects — so we never duplicate a
+    #     drawn line. Resolve each topology endpoint to its part's module via the same
+    #     resolver the router uses; an abstract/utility endpoint contributes no module.
+    covered_pairs = set()
+    for e in topology:
+        pa = resolve_endpoint(e.get("from_part", ""), parts)
+        pb = resolve_endpoint(e.get("to_part", ""), parts)
+        if pa is not None and pb is not None and pa.module_id != pb.module_id:
+            covered_pairs.add(frozenset((pa.module_id, pb.module_id)))
+
+    extra = []
+    seen = set()
+    for l in links:
+        if not isinstance(l, dict):
+            continue
+        mech = str(l.get("mechanism") or "").lower()
+        if mech not in _AUG_FLUID_MECHANISMS:
+            continue  # FLUID transports only — never signal/control/thermal/power here
+        fm = l.get("from_module")
+        tm = l.get("to_module")
+        if not fm or not tm or fm == tm:
+            continue
+        if fm not in present_modules or tm not in present_modules:
+            continue
+        pair = frozenset((fm, tm))
+        if pair in covered_pairs or pair in seen:
+            continue
+        a_name = _module_repr_part_name(fm, parts)
+        b_name = _module_repr_part_name(tm, parts)
+        if not a_name or not b_name or a_name == b_name:
+            continue
+        seen.add(pair)
+        extra.append({
+            "from_part": a_name,
+            "to_part": b_name,
+            "mechanism": "fluid_loop",
+            "constraint_kind": "flow_capacity",
+            "material_context": "process water (inter-module recirculation/service)",
+            "_augmented": True,
+        })
+    if extra:
+        print(f"[univ] cross-module augmentation: +{len(extra)} FLUID process line(s) "
+              f"from grammar links not covered by topology "
+              f"({len(covered_pairs)} pairs already routed)")
+        for x in extra:
+            print(f"[univ]   +aug fluid: {x['from_part']} -> {x['to_part']}")
+    return extra
+
+
 def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
                    region_centres=None, bbox_mm=None, rack_plan=None):
     """Draw a routed CAD pipe for every resolvable edge on a SHARED PIPE-RACK SPINE
@@ -5047,6 +5311,16 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
         mech = e.get("mechanism", "fluid_loop")
         pa = resolve_endpoint(frm, parts)
         pb = resolve_endpoint(to, parts)
+
+        # SELF-LOOP GUARD (universal): both endpoint tags fuzzy-resolved to the SAME
+        # placed part — a zero-length line into one box, never a real run. This happens
+        # when a tag has no dedicated part and falls onto the SAME consumer its partner
+        # did (e.g. a RAS 'oxygen_supply → oxygen_cones' edge where both land on the one
+        # 'Oxygenation System' part). Treat the SOURCE as an external feed (abstract) so
+        # it draws as a real makeup/utility line from a battery-limit incomer INTO that
+        # part, instead of collapsing to a degenerate self-loop. Never archetype-keyed.
+        if pa is not None and pb is not None and pa is pb:
+            pa = None
 
         # ABSTRACT endpoints (external supply / aggregate group): synthesise a
         # routable point (incomer marker, or matched-cluster centroid + branch drops).
@@ -9434,6 +9708,9 @@ def add_flat_lights(bbox_mm):
     # modelling light. Strong so the equipment is brightly + evenly lit against
     # the darker world (high contrast, zero cast shadows).
     sz = max(30.0, span * 1.2)
+    # PROVEN even-fill studio rig (the CO2/SAF renders that look great use exactly this —
+    # do NOT replace with a single directional key; the crispness comes from equipment
+    # DETAIL under even light, not from dramatic shading).
     fills = [
         ("fl_fill_top",   (cx, cy, cz + span * 1.1), sz, 600),
         ("fl_fill_front", (cx, cy - span * 1.0, cz + span * 0.4), sz, 340),
@@ -9463,6 +9740,47 @@ def add_flat_lights(bbox_mm):
                 setattr(eevee, attr, attr == "use_gtao")  # keep AO, drop cast shadows
             except (AttributeError, TypeError):
                 continue
+        # Stronger ambient occlusion = contact shading + depth WITHOUT cast shadows
+        # (Tristan 2026-06-13 "the images need lines and shading"): crevices/contacts
+        # darken so the form reads — the flat green stops looking like a blob.
+        for attr, val in (("gtao_distance", max(0.5, span * 0.12)),
+                          ("gtao_factor", 1.0), ("gtao_quality", 0.5)):
+            try:
+                setattr(eevee, attr, val)
+            except (AttributeError, TypeError):
+                pass
+
+    # EDGE LINES (Tristan 2026-06-13 "the images need lines and shading"). Blender 5.1
+    # EEVEE-Next DROPPED Freestyle (it silently no-ops), so a smooth-shaded cylinder has
+    # no silhouette/crease line and reads as a featureless green BLOB. The replacement is
+    # a scene LINE ART grease-pencil overlay: CAD-style contour + crease outlines so every
+    # vessel/box reads as itself. Fully guarded — a line-art failure must NEVER break the
+    # render (falls back to the AO-only flat look).
+    scene = bpy.context.scene
+    try:
+        scene.render.use_freestyle = True  # harmless on EEVEE-Next; helps under Cycles
+    except (AttributeError, TypeError):
+        pass
+    if "ForgeLineArt" not in bpy.data.objects:
+        try:
+            before = set(bpy.data.objects.keys())
+            bpy.ops.object.grease_pencil_add(type='LINEART_SCENE')
+            gp = next((bpy.data.objects[k] for k in bpy.data.objects.keys() if k not in before), None)
+            if gp is not None:
+                gp.name = "ForgeLineArt"
+                for mo in gp.modifiers:
+                    if 'LINEART' in getattr(mo, 'type', ''):
+                        for attr, val in (("use_contour", True), ("use_crease", True),
+                                          ("use_material", True), ("use_intersection", True),
+                                          ("thickness", 3), ("crease_threshold", math.radians(50)),
+                                          ("use_edge_mark", False)):
+                            try:
+                                setattr(mo, attr, val)
+                            except (AttributeError, TypeError):
+                                pass
+                print(f"[scene] line art overlay added ({gp.name})")
+        except Exception as _le:
+            print(f"[scene] line art skipped: {_le}")
 
 
 def build_skid_frame(bbox_mm, frame_height_mm, MAT, MO):
@@ -10314,6 +10632,11 @@ def main():
     contract = state.get("orchestratorContract", {}) or {}
     topology = contract.get("topology", []) or []
     quantities = contract.get("quantities", {}) or {}
+    # AUGMENT: add the FLUID cross-module process lines the topology omits (the
+    # inter-module recirculation/service legs that live only in the module-grammar
+    # links). Universal + pair-deduped — a no-op on a plant whose topology already
+    # spans its modules. Appended so every extra edge routes via the same path.
+    topology = list(topology) + augment_topology_cross_module(state, topology, parts)
     regions, region_edges = order_regions(parts, topology)
     print(f"[univ] region order (L->R): {regions}")
 
