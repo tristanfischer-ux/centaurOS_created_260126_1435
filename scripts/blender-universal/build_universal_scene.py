@@ -281,21 +281,24 @@ SUBDIST_BOX_MM = (1400.0, 1000.0, 1800.0)   # W(along) × D(cross) × H
 # Sub-distribution marker colour (a distinct yellow-amber kiosk so it reads as the
 # inserted step-down, separate from the orange electrical runs).
 SUBDIST_COLOUR = (0.92, 0.74, 0.18)
-MECH_COLOUR = {             # sRGB; make_mat handles linear conversion
-    "fluid_loop":    (0.42, 0.52, 0.62),   # steel blue-grey (generic process pipe)
+MECH_COLOUR = {             # sRGB; make_mat handles linear conversion.
+    # SERVICE-COLOUR CONVENTION (Tristan 2026-06-13: "water pipes as blue and
+    # electricity wires as red would help to see what is going on"). WATER/process
+    # fluid = BLUE family, ELECTRICITY = RED, thermal/steam = ORANGE (moved off red so
+    # red is unambiguously electrical), signal/data = green, control = yellow. Universal
+    # — keyed on the routed edge's mechanism class, no per-archetype code.
+    "fluid_loop":    (0.10, 0.45, 0.90),   # BLUE — process water / fluid (generic line)
     # DIRECTIONAL fluid mechanisms (derived flows): a SUPPLY feed and its RETURN must
-    # read as TWO visually distinct lines (Tristan 2026-06-11 — "supply + return must
-    # be two clearly distinct lines"). Supply = bright blue (hub → consumer); return =
-    # teal/dark-blue (consumer → collector → back to the hub).
-    "fluid_supply":  (0.12, 0.45, 0.95),   # bright blue — supply/feed fan-out
-    "fluid_return":  (0.00, 0.62, 0.62),   # teal/dark-blue — closed-loop return
-    "thermal":       (0.85, 0.25, 0.20),   # red (hot/steam) — thermal SUPPLY
-    "thermal_return":(0.55, 0.20, 0.42),   # magenta-red — coolant RETURN (distinct from
-                                           # the red thermal supply so the loop reads)
-    "electrical_bus":(1.00, 0.45, 0.00),   # copper/orange
-    "mechanical":    (0.55, 0.56, 0.60),   # grey
-    "data":          (0.30, 0.65, 0.45),   # green
-    "control":       (0.55, 0.50, 0.35),   # muted
+    # read as TWO visually distinct lines (Tristan 2026-06-11) — both stay in the BLUE
+    # family (water) but at clearly different shades so direction reads.
+    "fluid_supply":  (0.12, 0.45, 0.95),   # bright blue — water SUPPLY / feed fan-out
+    "fluid_return":  (0.00, 0.72, 0.90),   # cyan-blue — water RETURN (blue family, distinct)
+    "thermal":       (1.00, 0.50, 0.05),   # ORANGE — hot/steam thermal SUPPLY
+    "thermal_return":(0.78, 0.30, 0.05),   # dark orange — thermal / coolant RETURN
+    "electrical_bus":(0.90, 0.10, 0.10),   # RED — electricity / power
+    "mechanical":    (0.55, 0.56, 0.60),   # grey — mechanical / drive
+    "data":          (0.20, 0.70, 0.40),   # green — signal / data
+    "control":       (0.92, 0.80, 0.15),   # yellow — control / instrument air
 }
 MECH_DEFAULT_COLOUR = (0.50, 0.52, 0.56)
 
@@ -1296,9 +1299,49 @@ def token_overlap(a_tokens, b_tokens):
 # Geometry construction per part
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _mat_for(shape, MAT):
+# Equipment colour-coded by MODULE for identification (Tristan 2026-06-13: "color
+# coding things will help with identification"). DISTINCT but MUTED earthy/cool tones
+# that deliberately AVOID the saturated service hues (blue=water, red=electrical,
+# orange=thermal) so the coloured service pipes POP and stay traceable against the
+# equipment. Cycled by module — universal across archetypes, no per-class code.
+MODULE_EQUIP_COLOURS = [
+    (0.62, 0.64, 0.68),   # 0 — cool steel grey
+    (0.58, 0.70, 0.60),   # 1 — sage green
+    (0.80, 0.72, 0.54),   # 2 — sand / tan
+    (0.64, 0.58, 0.76),   # 3 — muted violet
+    (0.48, 0.66, 0.72),   # 4 — slate teal
+    (0.82, 0.66, 0.52),   # 5 — clay
+    (0.56, 0.62, 0.48),   # 6 — olive
+    (0.74, 0.60, 0.66),   # 7 — mauve
+    (0.60, 0.66, 0.76),   # 8 — periwinkle grey
+    (0.76, 0.70, 0.46),   # 9 — ochre grey
+    (0.50, 0.58, 0.62),   # 10 — blue grey
+    (0.72, 0.60, 0.54),   # 11 — taupe
+]
+_MODULE_COLOUR_ORDER = []  # module_ids in deterministic first-seen order
+
+
+def _module_hue(module_id):
+    """Stable, distinct equipment colour per MODULE (Tristan 2026-06-13: colour-code
+    for identification). First-seen order → MODULE_EQUIP_COLOURS. Deterministic because
+    part placement order is deterministic. Universal across archetypes."""
+    if module_id and module_id not in _MODULE_COLOUR_ORDER:
+        _MODULE_COLOUR_ORDER.append(module_id)
+    idx = (_MODULE_COLOUR_ORDER.index(module_id) if module_id in _MODULE_COLOUR_ORDER
+           else 0)
+    return MODULE_EQUIP_COLOURS[idx % len(MODULE_EQUIP_COLOURS)]
+
+
+def _mat_for(shape, MAT, module_id=None):
     key, rgb, met, rough = SHAPE_MAT.get(shape, SHAPE_MAT["box"])
-    mkey = f"u_{key}"
+    # COLOUR-CODE principal equipment by MODULE (each subsystem = one colour group);
+    # keep the SHAPE's metallic/roughness for the material feel. Cache per (module,
+    # shape) so the feel still varies by shape within a module. No module → shape colour.
+    if module_id:
+        rgb = _module_hue(module_id)
+        mkey = f"u_mod__{module_id}__{key}"
+    else:
+        mkey = f"u_{key}"
     if mkey not in MAT:
         MAT[mkey] = fl.make_mat(f"m_{mkey}", rgb, metallic=met, roughness=rough)
     return MAT[mkey], key
@@ -1754,8 +1797,8 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
     edges from its BOTTOM (nozzle-accurate routing). Multi-quantity small parts
     repeat in a tight cluster."""
     shape = part.shape
-    mat, _ = _mat_for(shape, MAT)
     mod = part.module_id
+    mat, _ = _mat_for(shape, MAT, mod)
     rd = resolved_dims_mm(part)
     nm = "u_" + re.sub(r"[^a-z0-9]+", "_", part.name.lower()).strip("_")[:40]
 
@@ -5133,7 +5176,8 @@ def _draw_cable_tray(nm, waypoints_mm, MAT, MO, dia_mm=None):
     connection_sizing; the tray width tracks it so a 1562 A DC busway reads VISIBLY
     FATTER than a signal/control tray. None ⇒ the old nominal width (back-compat)."""
     if "u_cable_tray" not in MAT:
-        MAT["u_cable_tray"] = fl.make_mat("m_u_cable_tray", (1.00, 0.45, 0.00),
+        # RED electrical tray/conductor (Tristan 2026-06-13: "electricity wires as red").
+        MAT["u_cable_tray"] = fl.make_mat("m_u_cable_tray", (0.90, 0.10, 0.10),
                                           metallic=0.45, roughness=0.40)
     tray = MAT["u_cable_tray"]
     if dia_mm is not None and dia_mm > 0:
@@ -9705,8 +9749,8 @@ def add_flat_lights(bbox_mm):
     # under AgX. A flat bright world washed the wide spatial/hero passes to a
     # pale, low-contrast grey; a darker world + strong directional fills (below)
     # keeps the geometry crisp and CLEARLY VISIBLE — the legibility goal.
-    bg.inputs["Color"].default_value = (*fl._to_linear((0.62, 0.63, 0.66)), 1.0)
-    bg.inputs["Strength"].default_value = 1.0
+    bg.inputs["Color"].default_value = (*fl._to_linear((0.42, 0.43, 0.47)), 1.0)
+    bg.inputs["Strength"].default_value = 0.85
 
     # Four soft AREA fills (big) — above + 3 sides — the PRIMARY shadowless
     # modelling light. Strong so the equipment is brightly + evenly lit against
@@ -9744,47 +9788,6 @@ def add_flat_lights(bbox_mm):
                 setattr(eevee, attr, attr == "use_gtao")  # keep AO, drop cast shadows
             except (AttributeError, TypeError):
                 continue
-        # Stronger ambient occlusion = contact shading + depth WITHOUT cast shadows
-        # (Tristan 2026-06-13 "the images need lines and shading"): crevices/contacts
-        # darken so the form reads — the flat green stops looking like a blob.
-        for attr, val in (("gtao_distance", max(0.5, span * 0.12)),
-                          ("gtao_factor", 1.0), ("gtao_quality", 0.5)):
-            try:
-                setattr(eevee, attr, val)
-            except (AttributeError, TypeError):
-                pass
-
-    # EDGE LINES (Tristan 2026-06-13 "the images need lines and shading"). Blender 5.1
-    # EEVEE-Next DROPPED Freestyle (it silently no-ops), so a smooth-shaded cylinder has
-    # no silhouette/crease line and reads as a featureless green BLOB. The replacement is
-    # a scene LINE ART grease-pencil overlay: CAD-style contour + crease outlines so every
-    # vessel/box reads as itself. Fully guarded — a line-art failure must NEVER break the
-    # render (falls back to the AO-only flat look).
-    scene = bpy.context.scene
-    try:
-        scene.render.use_freestyle = True  # harmless on EEVEE-Next; helps under Cycles
-    except (AttributeError, TypeError):
-        pass
-    if "ForgeLineArt" not in bpy.data.objects:
-        try:
-            before = set(bpy.data.objects.keys())
-            bpy.ops.object.grease_pencil_add(type='LINEART_SCENE')
-            gp = next((bpy.data.objects[k] for k in bpy.data.objects.keys() if k not in before), None)
-            if gp is not None:
-                gp.name = "ForgeLineArt"
-                for mo in gp.modifiers:
-                    if 'LINEART' in getattr(mo, 'type', ''):
-                        for attr, val in (("use_contour", True), ("use_crease", True),
-                                          ("use_material", True), ("use_intersection", True),
-                                          ("thickness", 3), ("crease_threshold", math.radians(50)),
-                                          ("use_edge_mark", False)):
-                            try:
-                                setattr(mo, attr, val)
-                            except (AttributeError, TypeError):
-                                pass
-                print(f"[scene] line art overlay added ({gp.name})")
-        except Exception as _le:
-            print(f"[scene] line art skipped: {_le}")
 
 
 def build_skid_frame(bbox_mm, frame_height_mm, MAT, MO):
@@ -10736,13 +10739,26 @@ def main():
               "inspect-iso/top/front/side.png in " + out_dir)
         _inspect_summary = skin
     else:
-        # 7. FLAT, EVEN lighting for LEGIBILITY (Tristan 2026-06-10, priority 1):
-        #    a single harsh sun threw long diagonal shadows that obscured the CAD.
-        #    Replace with strong world ambient + soft fills from several directions,
-        #    shadows OFF, so the geometry reads clearly from every camera. NOT for
-        #    aesthetics — purely so the visual judge can see the shapes.
-        add_flat_lights(bbox)
-        # 8. render the production PDF set (dark navy deck, hero + per-module).
+        # 7. STUDIO lighting — the EXACT visual treatment the bespoke <class>-9shot.py
+        #    templates use (Tristan 2026-06-13: "it is just a choice of colour and
+        #    lighting and shading and crispness ... nothing to do with the layout").
+        #    The bespoke recipe (co2-mineralisation-9shot.py:593-594) is:
+        #        fl.add_lights(target_centre=..., fill_energy=240, fill_size=14)
+        #        fl.make_world_white()
+        #        fl.run_render_pipeline(...)
+        #    = a KEY SUN (soft cast shadow, grounds the form) + AREA fills + a
+        #    shadow-catcher ground plane + a bright studio world. The old
+        #    add_flat_lights (2026-06-10 dark 0.42 shadowless rig) is what made the
+        #    universal render dark/muddy vs the bespoke one — the SHAPE_MAT colours are
+        #    already saturated, they just rendered dark under the flat rig. Swap in the
+        #    bespoke studio rig, sized to THIS scene's bbox. UNIVERSAL — no per-class.
+        cx = (bbox["x0"] + bbox["x1"]) / 2 * fl.MM
+        cy = (bbox["y0"] + bbox["y1"]) / 2 * fl.MM
+        span = max(bbox["x1"] - bbox["x0"], bbox["y1"] - bbox["y0"]) * fl.MM
+        fl.add_lights(target_centre=(cx, cy, span * 0.28),
+                      fill_energy=240, fill_size=max(14.0, span * 0.6))
+        fl.make_world_white()
+        # 8. render the production PDF set (hero + per-module), bespoke visual bar.
         fl.run_render_pipeline(out_dir, MO,
                                structure_module_id=STRUCTURE_MODULE_ID,
                                hero_open_frame=True)
