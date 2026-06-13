@@ -17423,9 +17423,20 @@ async function main() {
       }))
     || (productClass ? humanise(productClass) : 'Engineering Report')
   ) as string
+  // Strip a DANGLING unclosed parenthetical left by title truncation (UNIVERSAL): the
+  // last-resort first-line truncation above can cut "… (£5,000,000 capex ceiling)" to
+  // "… (£5,000,000", leaving an unmatched "(" dangling on the cover (RAS L… 2026-06-13).
+  // If the derived subject has more "(" than ")", trim back to before the final "(" — the
+  // budget/ceiling already renders in the cost stack, so dropping the fragment reads cleaner
+  // than a half-open parenthesis. Fires only on a genuine imbalance, so a complete "(…)"
+  // title is untouched.
+  let cleanSubject = rawSubject
+  if (cleanSubject && (cleanSubject.match(/\(/g) || []).length > (cleanSubject.match(/\)/g) || []).length) {
+    cleanSubject = cleanSubject.replace(/\s*\([^)]*$/, '').trim()
+  }
   // Title case using the shared toTitleCaseEng helper (defined near the top
   // of this file, also used to capitalise BoM part names).
-  const subject = toTitleCaseEng(rawSubject)
+  const subject = toTitleCaseEng(cleanSubject)
 
   console.error(`[render-minimal-pdf] state: ${statePath}`)
   console.error(`[render-minimal-pdf] modules: ${(state.moduleDecomposition?.modules ?? []).length}`)
