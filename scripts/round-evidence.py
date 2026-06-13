@@ -18,6 +18,11 @@ Usage: python3 round-evidence.py <out_dir> <round_num> <archetype_label> [score_
 from __future__ import annotations
 import base64, json, sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from requirements_bom import assemble as _assemble_reqs
+except Exception:
+    _assemble_reqs = None
 
 
 def _img_data_uri(p: Path) -> str | None:
@@ -105,6 +110,19 @@ def build(out_dir: str, rnd: str, label: str, score: dict) -> str:
     state = json.loads((d / "state.json").read_text()) if (d / "state.json").exists() else {}
     cs = state.get("costStack") or {}
     rows, bom_total = extract_bom(state)
+    try:
+        req = _assemble_reqs(out_dir) if _assemble_reqs else []
+    except Exception:
+        req = []
+    req_total = sum(r.get("line_gbp", 0) for r in req)
+    _sc = {"IDENTIFIED": "id", "BESPOKE": "bs", "NOT FOUND": "nf"}
+    req_rows = "".join(
+        f'<tr><td class="tag">{r["tag"]}</td><td>{r["requirement"][:86]}</td>'
+        f'<td class="st {_sc.get(r["status"],"")}">{r["status"]}</td>'
+        f'<td class="sm">{r["part"][:30]}</td><td class="n">×{r["qty"]}</td>'
+        f'<td class="n">{_gbp(r["line_gbp"])}</td><td class="sm">{r["basis"][:50]}</td></tr>'
+        for r in req
+    )
 
     blender = _find_blender(d)
     blender_uri = _img_data_uri(blender) if blender else None
@@ -150,6 +168,8 @@ def build(out_dir: str, rnd: str, label: str, score: dict) -> str:
  figure img{{width:100%;border:1px solid #e3e8ee;border-radius:6px;background:#fff}}
  figure.missing .ph{{height:140px;display:flex;align-items:center;justify-content:center;color:#c0392b;background:#fff5f5;border:1px dashed #f0b0b0;border-radius:6px;font-size:13px}}
  .bomtot{{font-weight:700}} .note{{color:#777;font-size:11px}}
+ .tag{{font-weight:700;color:#1257b0;font-variant-numeric:tabular-nums}}
+ .st{{font-weight:700;font-size:10.5px}} .st.id{{color:#0a7a33}} .st.bs{{color:#1257b0}} .st.nf{{color:#a60}}
 </style></head><body>
 <h1>Round {rnd} — {label}</h1>
 <p class="sub">Deterministic engine → Blender → bill of materials · {present}/8 drawings · generated from <code>{out_dir}</code></p>
@@ -170,7 +190,14 @@ def build(out_dir: str, rnd: str, label: str, score: dict) -> str:
 <h2>The 8 engineering drawings</h2>
 <div class="grid">{draw_html}</div>
 
-<h2>Full bill of materials ({len(rows)} lines · Σ {_gbp(bom_total)})</h2>
+<h2>Requirements-driven Bill of Materials ({len(req)} lines · Σ {_gbp(req_total)})</h2>
+<p class="note">Each line: the computed REQUIREMENT (duty + size + measured connections) → the FULFILMENT (<span style="color:#0a7a33">identified</span> catalogue part / <span style="color:#1257b0">bespoke</span> made-to-spec / <span style="color:#a60">not-found</span>) → the COST and its BASIS (catalogue quote / materials take-off from mass × rate / bottom-up parametric). The deliverable an EPC tenders against — universal across archetypes.</p>
+<table>
+<tr><th>Tag</th><th>Requirement (what it must do)</th><th>Status</th><th>Part</th><th>Qty</th><th>Line £</th><th>Cost basis</th></tr>
+{req_rows}
+</table>
+
+<h2>Full component bill of materials ({len(rows)} lines · Σ {_gbp(bom_total)})</h2>
 <table>
 <tr><th>Module</th><th>Item</th><th>Mfr / part</th><th>Qty</th><th>Unit</th><th>Line</th></tr>
 {bom_rows}
