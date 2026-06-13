@@ -1386,8 +1386,12 @@ def _add_vessel_nozzles(nm, anchors, dia_mm, kind, MAT, mod, MO):
         nz = z_bot + span * frac
         _spawn_nozzle_stub(f"{nm}_{tag}", (x_mm, y_mm + dia_mm * 0.5, nz),
                            (0.0, 1.0, 0.0), 150.0, MAT, mod, MO, length_mm=260.0)
-    # MANWAY: a fat short flanged disc at ~mid height on the +Y face
-    mw_r = max(r * 0.55, MANWAY_DIA_MM * fl.MM / 2)
+    # MANWAY: a fat short flanged disc at ~mid height on the +Y face. A real manway
+    # is a FIXED ~0.6 m hatch regardless of vessel size — the old `max(r*0.55, …)`
+    # scaled it to 55% of the radius, ballooning to a 2-3 m disc on big tanks (the
+    # "weird circles on the sides of the tanks", Tristan 2026-06-13). Fixed standard
+    # size, capped down only on a genuinely tiny vessel. Universal.
+    mw_r = min(MANWAY_DIA_MM * fl.MM / 2, r * 0.4)
     fl.add_cyl(f"{nm}_manway",
                ((x_mm) * fl.MM, (y_mm + dia_mm * 0.5) * fl.MM, z_ctr * fl.MM),
                mw_r, 120.0 * fl.MM, nz_mat, module=mod, module_objects=MO,
