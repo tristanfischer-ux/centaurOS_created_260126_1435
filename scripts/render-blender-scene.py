@@ -161,6 +161,73 @@ def resolve_template(product_class: str) -> Path | None:
     return None
 
 
+def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
+    """No bespoke per-class template for this product_class → render with the
+    UNIVERSAL deterministic builder build_universal_scene.py. It places the real
+    equipment (tanks/vessels/pumps as their classified SHAPES, not cubes),
+    colour-codes by module and routes the pipework — the SAME engine that drives
+    the 2D drawings — so the cover + module pages show the ACTUAL plant, never
+    the legacy translucent cube-grid. Maps its inspect-*.png onto the 00-hero /
+    blender-cover / module-<id>.png names the chain consumes.
+
+    Tristan 2026-06-14: the good universal model had been ORPHANED — the hero +
+    module generators dispatched here, hit return-5, and silently fell through to
+    the ghost-box legacy pass (runBlenderCoverPass / runBlenderModulePass). This
+    re-wires the no-template path to the real universal builder.
+    """
+    universal = REPO_ROOT / "scripts" / "blender-universal" / "build_universal_scene.py"
+    if not universal.exists():
+        print(f"[render-scene] universal builder missing at {universal}; caller falls back", file=sys.stderr)
+        return 5
+    if not Path(BLENDER_BIN).exists():
+        print(f"[render-scene] FATAL: Blender binary missing at {BLENDER_BIN}", file=sys.stderr)
+        return 1
+    env = os.environ.copy()
+    env["BLENDER_OUT_DIR"] = str(out_dir)
+    env["INSPECT"] = "1"  # produce the inspect-*.png whole-plant renders
+    print(f"[render-scene] no per-class template → UNIVERSAL builder {universal.name}", flush=True)
+    try:
+        subprocess.run(
+            [BLENDER_BIN, "--background", "--python", str(universal), "--", str(state_path)],
+            env=env,
+            check=True,
+            timeout=900,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"[render-scene] FATAL: universal builder exited {e.returncode}", file=sys.stderr)
+        return 6
+    except subprocess.TimeoutExpired:
+        print("[render-scene] FATAL: universal builder timed out", file=sys.stderr)
+        return 6
+
+    iso = out_dir / "inspect-iso.png"
+    hero = out_dir / "inspect-hero.png"
+    cover_src = hero if hero.exists() else iso
+    if not cover_src.exists():
+        print("[render-scene] FATAL: universal builder produced no inspect render", file=sys.stderr)
+        return 6
+    # Cover + hero ← the hero framing of the real, recognisable plant.
+    (out_dir / "00-hero.png").write_bytes(cover_src.read_bytes())
+    (out_dir / "blender-cover.png").write_bytes(cover_src.read_bytes())
+    # Module pages ← the colour-coded whole-plant iso (every module visible and
+    # colour-keyed) so each page shows the real plant instead of a ghost box.
+    # Per-module HIGHLIGHTED views are a follow-up; this removes the cube grid.
+    module_src = iso if iso.exists() else cover_src
+    modules = (state.get("moduleDecomposition", {}) or {}).get("modules", []) or []
+    written = 0
+    for m in modules:
+        mid = m.get("module") or m.get("id") or m.get("module_id")
+        if not mid:
+            continue
+        (out_dir / f"module-{mid}.png").write_bytes(module_src.read_bytes())
+        written += 1
+    if written == 0:
+        (out_dir / "module-overview.png").write_bytes(module_src.read_bytes())
+        written = 1
+    print(f"[render-scene] UNIVERSAL OK — cover + {written} module page(s) from {cover_src.name}", flush=True)
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--state", required=True, help="absolute path to state.json")
@@ -214,10 +281,10 @@ def main() -> int:
         if template is None:
             print(
                 f"[render-scene] no template for product_class={product_class!r}; "
-                f"caller should fall back to the universal renderer",
+                f"rendering with the UNIVERSAL deterministic builder",
                 file=sys.stderr,
             )
-            return 5
+            return run_universal_fallback(state_path, out_dir, state)
         print(f"[render-scene] using unmodified template {template.name}", flush=True)
         # FAIL LOUD (2026-05-29): no blender-scene.py means the LLM geometry
         # step failed or was absent, so these renders will be a GENERIC stock
