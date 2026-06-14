@@ -117,6 +117,17 @@ class Valve:
 
 
 @dataclass
+class TieIn:
+    """A per-unit utility/service nozzle stub on an equipment item (drain, vent, O2 feed,
+    inert purge …) enumerated by the interconnect census. Drawn as a short stub to a shared
+    service header so the P&ID shows HOW each unit connects, not just the main process line."""
+    role: str                    # 'drain' | 'vent/relief' | 'oxygen feed' | 'inert purge' …
+    mechanism: str = "fluid_loop"  # fluid_loop | thermal | electrical_bus
+    size: str = ""               # DN / mm² label
+    n_per_unit: int = 1          # how many of this tie-in per single unit
+
+
+@dataclass
 class Node:
     """A piece of process equipment (one per resolved topology endpoint)."""
     key: str                     # the topology node key (character_id-ish)
@@ -127,6 +138,14 @@ class Node:
     instruments: list[Instr] = field(default_factory=list)
     valves: list[Valve] = field(default_factory=list)
     column: int = 0              # process-flow column index (0 = feed end)
+    # ARRAY EXPANSION (universal qty-N fix): when the topology collapses N identical
+    # parallel units into ONE node (e.g. RAS `rearing_tanks` = 10 tanks), array_n carries
+    # the real count from the parts-manifest (the GA's source) so the P&ID draws a BANK of
+    # N symbols + a per-unit tie-in fan — the recurring "show all 10 tanks + how they
+    # connect" request. array_tags carries the per-unit equipment tags (TK-101…TK-110).
+    array_n: int = 1
+    array_tags: list[str] = field(default_factory=list)
+    tie_ins: list[TieIn] = field(default_factory=list)
 
 
 @dataclass
@@ -184,6 +203,129 @@ def load_inputs(out_dir: str, state_path: Optional[str]):
         with open(sched_path) as fh:
             schedule = json.load(fh)
     return schedule, state
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ARRAY EXPANSION — read the qty-N reality the topology collapses
+# ═══════════════════════════════════════════════════════════════════════════
+# The topology spine collapses N identical parallel units into ONE node (RAS
+# `rearing_tanks` = 10 tanks). The GENERAL ARRANGEMENT already shows all N because it
+# reads the qty-EXPANDED parts-manifest.json (one row per physical unit). The P&ID /
+# BFD / SLD read only the collapsed spine — so they showed ONE tank. These helpers
+# read the SAME parts-manifest the GA uses + the interconnect census, so the system
+# drawings can expand the array + draw its per-unit tie-ins. Universal: keyed purely
+# on the manifest's repeated equipment names + the census shapes (no per-class table).
+
+def _load_parts_manifest(out_dir: str) -> dict:
+    p = Path(out_dir) / "parts-manifest.json"
+    if p.is_file():
+        try:
+            return json.load(open(p))
+        except Exception:
+            return {}
+    return {}
+
+
+def _load_interconnect_census(out_dir: str) -> dict:
+    p = Path(out_dir) / "interconnect-census.json"
+    if p.is_file():
+        try:
+            return json.load(open(p))
+        except Exception:
+            return {}
+    return {}
+
+
+def _name_tokens(s: str) -> set:
+    return {t for t in re.split(r"[^a-z0-9]+", (s or "").lower()) if len(t) > 2}
+
+
+def _array_groups_from_manifest(manifest: dict) -> list[dict]:
+    """Group the parts-manifest into ARRAYS of identical units. A group = ≥2 manifest
+    rows that share the SAME equipment NAME (e.g. 10 rows 'Rearing Tank') OR the same
+    equipment-tag LETTER family + name. Returns [{name, shape, module, n, tags,
+    name_tokens}]. Universal — any class's parallel units (tanks, reactors, racks)."""
+    rows = manifest.get("parts") or []
+    by_name: dict[str, list] = {}
+    for r in rows:
+        nm = (r.get("name") or "").strip()
+        if not nm:
+            continue
+        by_name.setdefault(nm.lower(), []).append(r)
+    groups = []
+    for _k, rs in by_name.items():
+        if len(rs) < 2:
+            continue
+        tags = sorted((r.get("equipment_tag") or "") for r in rs)
+        groups.append({
+            "name": rs[0].get("name") or "",
+            "shape": rs[0].get("shape") or "",
+            "module": rs[0].get("module") or "",
+            "n": len(rs),
+            "tags": [t for t in tags if t],
+            "name_tokens": _name_tokens(rs[0].get("name") or ""),
+        })
+    return groups
+
+
+def _match_array_group(node_key: str, node_label: str, groups: list[dict]):
+    """Find the manifest array group a collapsed topology node maps onto, by token
+    overlap between the node (key + resolved label) and the group's unit name. Returns
+    the group dict or None. 'rearing_tanks' / 'Rearing Tank' → the 10-tank group."""
+    ntoks = _name_tokens(node_key) | _name_tokens(node_label)
+    # singularise trailing-s tokens so 'tanks' matches 'tank'
+    ntoks |= {t[:-1] for t in list(ntoks) if t.endswith("s") and len(t) > 3}
+    best, best_score = None, 0
+    for g in groups:
+        gtoks = set(g["name_tokens"])
+        gtoks |= {t[:-1] for t in list(gtoks) if t.endswith("s") and len(t) > 3}
+        score = len(ntoks & gtoks)
+        if score > best_score:
+            best_score, best = score, g
+    return best if best_score >= 1 else None
+
+
+# Census role → a short P&ID service label + the header it ties into. Universal shapes
+# (the census enumerates these per physical unit, keyed on equipment SHAPE).
+_TIEIN_LABEL = {
+    "drain": "drain", "vent/relief": "vent", "inert purge": "O2/purge",
+    "signal": "signal", "power feed": "power", "instrument air": "air",
+    "CW supply": "CW", "CW return": "CWR",
+}
+
+
+def _tieins_for_array(group: dict, census: dict) -> list[TieIn]:
+    """The per-UNIT tie-ins the interconnect census enumerated for this array's unit name
+    (each physical unit gets a drain + vent + inert/O2 purge etc.). Collapsed to one TieIn
+    per role with its per-unit count, so the bank draws a clean nozzle fan rather than 10×
+    the same stub. Universal — reads the census rows whose to_part is this array's name."""
+    if not group or not census:
+        return []
+    gtoks = set(group["name_tokens"])
+    gtoks |= {t[:-1] for t in list(gtoks) if t.endswith("s") and len(t) > 3}
+    by_role: dict[str, dict] = {}
+    for r in (census.get("rows") or []):
+        to = r.get("to_part") or ""
+        rtoks = _name_tokens(to)
+        rtoks |= {t[:-1] for t in list(rtoks) if t.endswith("s") and len(t) > 3}
+        if not (gtoks & rtoks):
+            continue
+        role = r.get("role") or ""
+        if role in ("cable tray/ladder", "pipe supports"):
+            continue
+        slot = by_role.setdefault(role, {"role": role, "mechanism": r.get("mechanism")
+                                         or "fluid_loop", "size": r.get("size") or "",
+                                         "n": 0})
+        slot["n"] += 1
+    out = []
+    for role, s in by_role.items():
+        out.append(TieIn(role=role, mechanism=s["mechanism"], size=s["size"],
+                         n_per_unit=max(1, round(s["n"] / max(1, group["n"])))))
+    # stable, readable order: process drains/vents first, then services, then electrical
+    order = {"drain": 0, "vent/relief": 1, "inert purge": 2, "CW supply": 3,
+             "CW return": 4, "instrument air": 5, "power feed": 6, "signal": 7}
+    out.sort(key=lambda t: order.get(t.role, 9))
+    return out
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -575,7 +717,15 @@ def _flow_layers(nodes_keys, proc_edges):
 # RECONSTRUCTION
 # ═══════════════════════════════════════════════════════════════════════════
 
-def reconstruct_process(schedule: dict, state: dict) -> Process:
+def reconstruct_process(schedule: dict, state: dict,
+                        out_dir: Optional[str] = None) -> Process:
+    """Reconstruct the process for the P&ID/BFD/iso. When `out_dir` is given, also reads
+    the qty-EXPANDED parts-manifest.json + interconnect-census.json (the same sources the
+    GA uses) and ANNOTATES each node that the topology collapsed an N-unit array into, with
+    its real count + per-unit tie-ins — so the P&ID can draw all N units + how they connect.
+    out_dir is OPTIONAL + purely ADDITIVE: line numbers / tags / layering are unchanged
+    when it is absent, so the isometric/process-schedule callers (which rely on identical
+    line numbers) are unaffected."""
     arch = _archetype_name(state)
     topo = _topology(state)
     eq_idx = _equipment_index(state)
@@ -616,6 +766,28 @@ def reconstruct_process(schedule: dict, state: dict) -> Process:
         nd = Node(key=k, tag=_next_tag(letter),
                   label=name, sym=sym, column=col_of.get(k, 0))
         nodes[k] = nd
+
+    # ---- ARRAY ANNOTATION (universal qty-N): a node the topology collapsed an N-unit
+    #      array into (RAS 'rearing_tanks' → 10 tanks) gets its real count + per-unit
+    #      tie-ins from the parts-manifest + interconnect census, so the P&ID draws ALL
+    #      N units + their connections. Additive; no-op when out_dir/manifest is absent.
+    if out_dir:
+        manifest = _load_parts_manifest(out_dir)
+        census = _load_interconnect_census(out_dir)
+        groups = _array_groups_from_manifest(manifest)
+        used_groups = set()
+        if groups:
+            for nd in nodes.values():
+                g = _match_array_group(nd.key, nd.label, groups)
+                if not g or g["n"] < 2 or id(g) in used_groups:
+                    continue
+                used_groups.add(id(g))
+                nd.array_n = g["n"]
+                nd.array_tags = g["tags"]
+                # adopt the array's FIRST per-unit equipment tag as the node tag (TK-101…)
+                if g["tags"]:
+                    nd.tag = g["tags"][0]
+                nd.tie_ins = _tieins_for_array(g, census)
 
     # ---- attach instruments per equipment by convention + available functions ----
     _attach_instruments(nodes, instr_funcs)
@@ -1055,16 +1227,21 @@ def build_pid_svg(proc: Process) -> str:
     max_stack = max(len(by_col[c]) for c in cols)
 
     # ----- geometry -----
-    col_pitch = 210
+    # An array node draws a ghost-stack ABOVE its symbol (parallel units) + a tie-in fan
+    # BELOW it; widen the column pitch + add top/bottom headroom so neither collides with
+    # the neighbouring column or the title block. Universal — only grows when N-arrays
+    # exist, otherwise byte-identical to the prior layout.
+    has_array = any(nd.array_n > 1 for nd in nodes)
+    col_pitch = 246 if has_array else 210
     row_pitch = 168
     margin_l = 70
-    margin_top = 150          # header band (title + sheet id top strip)
+    margin_top = (150 + 70) if has_array else 150   # +headroom for the parallel ghost stack
     title_h = 150
     legend_w = 250
 
     diagram_w = margin_l * 2 + (ncol - 1) * col_pitch + EQ_W
     width = max(diagram_w + legend_w, 1180)
-    body_h = margin_top + (max_stack - 1) * row_pitch + 220
+    body_h = margin_top + (max_stack - 1) * row_pitch + (340 if has_array else 220)
     height = body_h + title_h
     width = int(math.ceil(width))
     height = int(math.ceil(height))
@@ -1157,11 +1334,18 @@ def build_pid_svg(proc: Process) -> str:
     for nd in nodes:
         cx, cy = centre[nd.key]
         _SYM_DRAW.get(nd.sym, _sym_generic)(svg, cx, cy)
+        # ARRAY BANK: a collapsed qty-N node draws the FULL bank of N parallel units
+        # (TK-101…TK-110) behind/around the primary symbol + a per-unit tie-in fan, so
+        # the P&ID honestly shows all N units + how each connects. Universal (any class).
+        if nd.array_n > 1:
+            _draw_array_bank(svg, nd, cx, cy, ports[nd.key])
         # tag (bold) above, name (wrapped) below
-        svg.text(cx, cy - _sym_caption_top(nd.sym), nd.tag, size=11, anchor="middle",
+        tag_txt = nd.tag if nd.array_n <= 1 else _array_tag_label(nd)
+        svg.text(cx, cy - _sym_caption_top(nd.sym), tag_txt, size=11, anchor="middle",
                  weight="bold", fill=EQ_INK)
         cap_y = cy + _sym_caption_bot(nd.sym)
-        for li, line in enumerate(_wrap(nd.label, 20)):
+        label = nd.label if nd.array_n <= 1 else f"{nd.label}  (×{nd.array_n} parallel)"
+        for li, line in enumerate(_wrap(label, 20)):
             svg.text(cx, cap_y + li * 12, line, size=9, anchor="middle", fill=MUTED)
         # instruments — bubbles above the symbol, connected by a dashed lead
         instr_right = _draw_node_instruments(svg, nd, cx, cy, ports[nd.key])
@@ -1186,6 +1370,116 @@ def build_pid_svg(proc: Process) -> str:
     # ----- TITLE BLOCK -----
     _draw_title_block(svg, proc, width, height, title_h)
     return svg.render()
+
+
+def _array_tag_label(nd: Node) -> str:
+    """A tag RANGE for an array node: 'TK-101…TK-110' (first…last per-unit tag), else the
+    node tag + '×N'."""
+    tags = nd.array_tags or []
+    if len(tags) >= 2:
+        return f"{tags[0]}…{tags[-1]}"
+    return f"{nd.tag} ×{nd.array_n}"
+
+
+def _draw_array_bank(svg, nd: Node, cx, cy, port):
+    """Draw a collapsed qty-N node as a BANK of N parallel units + a per-unit tie-in fan.
+
+    Layout (standard P&ID 'parallel-train' depiction): the primary symbol (already drawn
+    at cx,cy) is the FIRST unit on the main process line; behind it we draw a compact stack
+    of (N-1) GHOSTED unit glyphs offset up-and-right to read as 'N identical units in
+    parallel', joined to a COMMON SUPPLY + COMMON RETURN header rail (the manifold every
+    rearing tank taps). Below the bank we draw the per-unit TIE-IN nozzles the interconnect
+    census enumerated (drain, vent/relief, O2/inert purge, …) dropping to a labelled
+    service header, each annotated '×N' (one per unit). Universal: shapes + counts come
+    from the manifest + census, no per-class geometry."""
+    n = nd.array_n
+    # ghost stack — up to 4 visible offset copies (the rest implied by the ×N label), so
+    # the bank reads as a parallel set without 10 full symbols crushing the column.
+    n_ghost = min(n - 1, 4)
+    dx, dy = 13, -11
+    for i in range(n_ghost, 0, -1):
+        gx, gy = cx + i * dx, cy + i * dy
+        # a small ghosted vessel outline (lighter ink) so depth reads
+        _mini_unit_glyph(svg, gx, gy, nd.sym, ghost=True)
+    # a brace + count over the stack
+    bxr = cx + (n_ghost + 0.5) * dx + 8
+    byr = cy + (n_ghost + 0.5) * dy
+    svg.text(bxr, byr, f"×{n}", size=10, anchor="start", weight="bold", fill=ACCENT)
+
+    # COMMON HEADERS — a supply rail entering the bank top, a return rail leaving the
+    # bottom, both spanning the ghost stack (the manifold all N units share).
+    top_x, top_y = port["top"]
+    bot_x, bot_y = port["bottom"]
+    hdr_x0, hdr_x1 = cx - 8, cx + (n_ghost + 1) * dx
+    svg.line(hdr_x0, top_y - 6, hdr_x1, top_y - 6, stroke=PROC_INK, width=2.0)
+    svg.text(hdr_x1 + 3, top_y - 8, "common supply header", size=6.6, anchor="start",
+             fill=MUTED)
+    # tie each ghost + the primary up to the supply header
+    for i in range(0, n_ghost + 1):
+        ux = cx + i * dx
+        uy = (cy + i * dy) - 16
+        svg.line(ux, uy, ux, top_y - 6, stroke=PROC_INK, width=1.0)
+
+    # PER-UNIT TIE-IN FAN — the census nozzles drop below the primary unit to a labelled
+    # service header; each carries its '×N' (one per physical unit).
+    if nd.tie_ins:
+        _draw_tiein_fan(svg, nd, cx, cy, bot_x, bot_y)
+
+
+def _mini_unit_glyph(svg, cx, cy, sym, ghost=False):
+    """A small single-unit glyph used for the ghosted parallel copies in an array bank."""
+    ink = "#9fb0c4" if ghost else EQ_INK
+    fill = "#f3f6fa" if ghost else EQ_FILL
+    if sym == SYM_TANK:
+        svg.rect(cx - 11, cy - 7, 22, 22, stroke=ink, width=1.2, fill=fill, rx=1)
+        svg.path(f"M {cx-11:.1f} {cy-7:.1f} Q {cx:.1f} {cy-13:.1f} {cx+11:.1f} {cy-7:.1f}",
+                 stroke=ink, width=1.2, fill=fill)
+    elif sym in (SYM_COLUMN, SYM_VESSEL):
+        svg.path(f"M {cx-7:.1f} {cy-9:.1f} A 7 7 0 0 1 {cx+7:.1f} {cy-9:.1f} "
+                 f"L {cx+7:.1f} {cy+11:.1f} A 7 7 0 0 1 {cx-7:.1f} {cy+11:.1f} Z",
+                 stroke=ink, width=1.2, fill=fill)
+    else:
+        svg.rect(cx - 10, cy - 9, 20, 20, stroke=ink, width=1.2, fill=fill, rx=2)
+
+
+def _draw_tiein_fan(svg, nd: Node, cx, cy, bot_x, bot_y):
+    """Drop the per-unit census tie-ins (drain / vent / O2-inert / CW / power / signal)
+    from the bank's bottom to a shared SERVICE HEADER below it, each as a short nozzle stub
+    with its role label + '×N' count. The mechanism sets the stub colour (process / thermal
+    / electrical), so the reader sees the full per-tank service set, not just the main
+    line."""
+    ties = nd.tie_ins[:6]
+    if not ties:
+        return
+    n_units = nd.array_n
+    # Drop the fan well BELOW the 2-line equipment caption so the role labels never
+    # collide with it (caption sits ~cy+48..+72; the fan header goes lower still), and
+    # shift it slightly right of the symbol centre so the trunk clears the caption text.
+    base_y = bot_y + 86
+    pitch = 30
+    span = pitch * max(1, len(ties) - 1)
+    x0 = cx + 6 - span / 2.0
+    # the service header rail
+    svg.line(x0 - 12, base_y, x0 + span + 12, base_y, stroke=UTIL_INK, width=1.8,
+             dash="1,0")
+    svg.text(x0 + span + 16, base_y + 3, "to shared service headers", size=6.8,
+             anchor="start", fill=MUTED)
+    # a trunk from the bank bottom down to the header (offset right of the caption)
+    trunk_x = cx + 6
+    svg.line(trunk_x, bot_y + 2, trunk_x, base_y - 0.5, stroke=UTIL_INK, width=1.0,
+             dash="3,2")
+    for i, t in enumerate(ties):
+        tx = x0 + i * pitch
+        col = {"thermal": THERMAL_INK, "electrical_bus": ACCENT}.get(t.mechanism,
+                                                                     PROC_INK)
+        # short nozzle stub up from the header
+        svg.line(tx, base_y, tx, base_y - 13, stroke=col, width=1.4)
+        _sym_valve(svg, tx, base_y - 13, kind="manual")
+        lbl = _TIEIN_LABEL.get(t.role, t.role)
+        cnt = t.n_per_unit * n_units
+        svg.text(tx, base_y + 13, lbl, size=6.8, anchor="middle", fill=MUTED)
+        svg.text(tx, base_y + 22, f"×{cnt}" + (f" {t.size}" if t.size else ""),
+                 size=6.2, anchor="middle", fill=MUTED)
 
 
 def _sym_caption_top(sym):
@@ -1545,7 +1839,9 @@ def generate_pid(out_dir: str, state_path: Optional[str] = None,
                  rasterise_png: bool = True):
     """Full pipeline: load → reconstruct → draw → write SVG (+ PNG)."""
     schedule, state = load_inputs(out_dir, state_path)
-    proc = reconstruct_process(schedule, state)
+    # pass out_dir so array nodes (qty-N collapsed) get expanded from the parts-manifest +
+    # interconnect census the GA already uses (all N units + their per-unit tie-ins).
+    proc = reconstruct_process(schedule, state, out_dir=out_dir)
     svg_text = build_pid_svg(proc)
 
     draw_dir = Path(out_dir) / "drawings"

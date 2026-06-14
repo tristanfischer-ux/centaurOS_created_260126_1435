@@ -95,6 +95,11 @@ class Block:
     sym: str                     # the P&ID symbol class (drives the role/colour accent)
     col: int = 0                 # process-flow column (0 = feed end), left→right
     role_rank: int = 5           # process-role rank (feed=0 … disposal=9) for ordering
+    # qty-N array (universal): when the topology collapsed N identical parallel units into
+    # this block (RAS rearing tanks = 10), array_n is the real count from the parts-manifest
+    # so the BFD box reads 'Rearing Tank ×10' + shows a stacked-array motif.
+    array_n: int = 1
+    array_tags: list = field(default_factory=list)
 
 
 @dataclass
@@ -461,7 +466,9 @@ def reconstruct_blockflow(out_dir: str, state: dict) -> BlockFlow:
             sched_for_pid = json.loads(sp.read_text())
         except Exception:
             sched_for_pid = {}
-    proc = PID.reconstruct_process(sched_for_pid, state)
+    # out_dir → the P&ID reconstruction also expands qty-N array nodes from the
+    # parts-manifest (RAS 'rearing_tanks' → 10 tanks), so the BFD block reflects the array.
+    proc = PID.reconstruct_process(sched_for_pid, state, out_dir=out_dir)
 
     quantities = _quantities(state)
     route_idx = _route_index(out_dir)
@@ -472,7 +479,11 @@ def reconstruct_blockflow(out_dir: str, state: dict) -> BlockFlow:
         if nd.sym == PID.SYM_OFFPAGE and re.search(
                 r"electrical|power_supply|^supply$", nd.key, re.I):
             continue
-        blocks.append(Block(key=nd.key, tag=nd.tag, label=nd.label, sym=nd.sym))
+        b = Block(key=nd.key, tag=nd.tag, label=nd.label, sym=nd.sym)
+        # carry the array reality onto the BFD block so it reads '×N' (e.g. 10-tank farm)
+        b.array_n = getattr(nd, "array_n", 1)
+        b.array_tags = list(getattr(nd, "array_tags", []) or [])
+        blocks.append(b)
     block_keys = {b.key for b in blocks}
 
     # ---- streams from the process lines (skip electrical; those become a note) ----
@@ -914,21 +925,40 @@ def _block_ports(cx, cy):
 
 def _draw_block(svg, b, cx, cy):
     """A clean rounded block: navy outline, faint fill, a role-accent top stripe, the
-    equipment tag (bold) + the wrapped human name."""
+    equipment tag (bold) + the wrapped human name. A qty-N array block (RAS rearing tanks
+    = 10) draws a STACKED-ARRAY motif (offset ghost rectangles behind the box) + a '×N'
+    badge so the executive sees the parallel set, not a single unit."""
     x = cx - BLOCK_W / 2
     y = cy - BLOCK_H / 2
     accent = _role_accent(b.role_rank)
+    array_n = getattr(b, "array_n", 1)
+    # STACKED-ARRAY ghost rectangles behind the main box (offset up-right), so the box
+    # reads as N identical parallel units. Drawn first ⇒ they sit behind the front box.
+    if array_n > 1:
+        for i in range(min(array_n - 1, 3), 0, -1):
+            ox, oy = i * 7, -i * 6
+            svg.rect(x + ox, y + oy, BLOCK_W, BLOCK_H, stroke="#9fb0c4", width=1.3,
+                     fill="#f3f6fa", rx=7)
     svg.rect(x, y, BLOCK_W, BLOCK_H, stroke=EQ_INK, width=1.8, fill=EQ_FILL, rx=7)
     # role-accent stripe along the top edge
     svg.path(f"M {x + 7:.1f} {y + 1.2:.1f} L {x + BLOCK_W - 7:.1f} {y + 1.2:.1f}",
              stroke=accent, width=3.2)
     # tag (bold, accent) then the wrapped name
-    svg.text(cx, y + 20, b.tag, size=12, anchor="middle", weight="bold", fill=accent)
-    name_lines = _wrap(b.label, maxlen=20, maxlines=3)
+    tag_txt = b.tag
+    if array_n > 1 and len(getattr(b, "array_tags", []) or []) >= 2:
+        tag_txt = f"{b.array_tags[0]}…{b.array_tags[-1]}"
+    svg.text(cx, y + 20, tag_txt, size=12, anchor="middle", weight="bold", fill=accent)
+    label = b.label if array_n <= 1 else f"{b.label} ×{array_n}"
+    name_lines = _wrap(label, maxlen=20, maxlines=3)
     n = len(name_lines)
     start = cy - (n - 1) * 7 + 6
     for i, line in enumerate(name_lines):
         svg.text(cx, start + i * 13, line, size=10, anchor="middle", fill=EQ_INK)
+    # a '×N' badge top-right of the stack (the parallel-count marker)
+    if array_n > 1:
+        bx = x + BLOCK_W + min(array_n - 1, 3) * 7
+        svg.text(bx + 4, y - min(array_n - 1, 3) * 6 + 6, f"×{array_n}", size=11,
+                 anchor="start", weight="bold", fill=accent)
 
 
 def _draw_stream(svg, pf, pt, cf, ct, s, lane):

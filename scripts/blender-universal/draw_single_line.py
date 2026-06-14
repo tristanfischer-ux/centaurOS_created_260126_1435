@@ -175,6 +175,17 @@ def load_inputs(out_dir: str, state_path: Optional[str]):
             with open(c) as fh:
                 state = json.load(fh)
             break
+    # Stash the qty-EXPANDED parts-manifest (the GA's source) so the feeder synthesis can
+    # build a WAY PER electrically-driven equipment item (pumps / O2 / heat-pumps / control
+    # panel) instead of ~7 module-name stubs — the "not enough electrical wiring" fix.
+    # Carried on a private state key so the existing (schedule, state) signatures are
+    # unchanged. Absent ⇒ the per-module split still applies.
+    pm = Path(out_dir) / "parts-manifest.json"
+    if pm.is_file():
+        try:
+            state["_parts_manifest"] = json.loads(pm.read_text())
+        except Exception:
+            pass
     return schedule, state
 
 
@@ -754,14 +765,31 @@ def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
         if not main.tag or main.tag in ("MAIN SWITCHBOARD",):
             main.tag = "MAIN LV BOARD"
 
-    # --- Replace the lumped feeder(s) with per-module feeders. ----------------
+    # --- Replace the lumped feeder(s) with per-EQUIPMENT feeders (preferred) or, if no
+    #     parts-manifest is available, per-MODULE feeders. --------------------------------
     if not lumped:
         return
     md = state.get("moduleDecomposition") or {}
-    feeders = edm.synthesise_module_feeders(
-        plan.board_current_a, plan.board_voltage_v, md.get("modules") or [],
-        total_load_kw=plan.connected_load_kw,
-        per_module_load_kw=_known_module_loads(state))
+    # PREFER one way per electrically-driven equipment item (pump / blower / O2 / heat-pump
+    # / control panel) from the qty-expanded parts-manifest — the real single-line a plant
+    # has. Falls back to the per-module split when the manifest is absent or yields nothing.
+    parts = ((state.get("_parts_manifest") or {}).get("parts")) or []
+    quantities = {}
+    for ck in ("orchestratorContract", "engineeringContract"):
+        q = (state.get(ck) or {}).get("quantities")
+        if isinstance(q, dict) and q:
+            quantities = q
+            break
+    feeders = []
+    if parts:
+        feeders = edm.synthesise_equipment_feeders(
+            plan.board_current_a, plan.board_voltage_v, parts,
+            total_load_kw=plan.connected_load_kw, quantities=quantities)
+    if not feeders:
+        feeders = edm.synthesise_module_feeders(
+            plan.board_current_a, plan.board_voltage_v, md.get("modules") or [],
+            total_load_kw=plan.connected_load_kw,
+            per_module_load_kw=_known_module_loads(state))
     if not feeders:
         return
     # Drop the lumped branches, append the synthesised per-module feeders.

@@ -386,3 +386,151 @@ def synthesise_module_feeders(total_current_a: float,
             current_a=round(i_a, 1), size_label=lbl, voltage_v=voltage_v,
             is_busbar=isb, note=note))
     return feeders
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 3. PER-EQUIPMENT FEEDER SYNTHESIS  (universal — one way per electrically-driven item)
+# ═══════════════════════════════════════════════════════════════════════════
+# The per-MODULE split (above) gives a board with ~7 module-name ways — better than one
+# lumped feeder but still not what a real single-line shows: a WAY PER DRIVEN ITEM (each
+# pump, each blower/compressor, the O2 system, the heat-pump set, the control/instrument
+# panel). This reads the qty-EXPANDED parts-manifest (the GA's source of truth) so the SLD
+# shows the actual electrical loads — the recurring "not enough electrical wiring" fix.
+# Universal: keyed on equipment SHAPE + name, with per-item kW from the contract quantities
+# where the engine published them (pump/compressor/heat-pump motor powers).
+
+# Shapes that are electrically DRIVEN (take a motor feeder).
+_DRIVEN_SHAPES = {"pump", "compressor", "blower", "fan"}
+# Cabinet/box shapes that are a CONTROL / DISTRIBUTION panel (a small dedicated way).
+_PANEL_SHAPES = {"cabinet", "cabinet_small"}
+# Names that mark a powered SYSTEM even when drawn as a box/skid (oxygen/ozone/UV/heat-pump
+# packages carry significant motor/process load and deserve their own way).
+_POWERED_SYSTEM_RE = re.compile(
+    r"oxygen|\bo2\b|ozone|\buv\b|disinfect|heat.?pump|chiller|refriger|"
+    r"blower|aeration|degas|protein.?skim|circulation|recirc", re.I)
+
+
+# Quantity-key markers: a quantity is an ELECTRICAL motor/drive load (a real feeder) when
+# it names motor/power/drive; it is a THERMAL DUTY / heat-rejection figure (NOT an
+# electrical feeder) when it names duty/capacity/cooling/heating/thermal/load-kw — those
+# must NOT be read as a motor feeder (a 'Cooling Fan' is a ~kW motor, not the 1617 kW
+# cooling DUTY). Compressor electrical input IS a feeder ('compressor_power_kw').
+_ELEC_KW_RE = re.compile(r"motor|power|drive|electrical|fan_kw|pump_kw|blower", re.I)
+_THERMAL_KW_RE = re.compile(
+    r"duty|capacity|cooling|heating|thermal|dissipation|rejection|"
+    r"makeup_heating|process_loss|sensible|load_kw", re.I)
+
+
+def _equip_kw_from_quantities(name: str, quantities: dict) -> Optional[float]:
+    """A known per-item ELECTRICAL motor/drive kW for this equipment from the contract
+    quantities, matched on the item NAME tokens (universal — no per-class table). E.g. a
+    'Circulation Pump' matches `recirc_pump_motor_kw`. CRITICALLY excludes thermal DUTY /
+    capacity quantities (a 'Cooling Fan' must not read the 1617 kW cooling DUTY as its motor
+    feeder). Returns the electrical kW, or None when only a thermal figure matches."""
+    if not quantities:
+        return None
+    toks = {t for t in re.split(r"[^a-z0-9]+", (name or "").lower()) if len(t) > 2}
+    if not toks:
+        return None
+    best = None
+    for k, v in quantities.items():
+        kl = k.lower()
+        if not kl.endswith("_kw"):
+            continue
+        if not any(t in kl for t in toks):
+            continue
+        # a thermal DUTY / capacity figure is NOT an electrical feeder — skip it.
+        if _THERMAL_KW_RE.search(kl) and not _ELEC_KW_RE.search(kl):
+            continue
+        # only accept a key that reads as an ELECTRICAL motor/drive/power load.
+        if not _ELEC_KW_RE.search(kl):
+            continue
+        val = v.get("value") if isinstance(v, dict) else v
+        try:
+            val = float(val)
+        except (TypeError, ValueError):
+            continue
+        score = (2 if ("motor" in kl or "drive" in kl) else 1)  # prefer a motor figure
+        if best is None or score > best[0]:
+            best = (score, val)
+    return best[1] if best else None
+
+
+def synthesise_equipment_feeders(total_current_a: float,
+                                 voltage_v: float,
+                                 parts: list[dict],
+                                 total_load_kw: Optional[float] = None,
+                                 quantities: Optional[dict] = None,
+                                 ) -> list[Feeder]:
+    """One outgoing feeder PER electrically-driven equipment item (or grouped array), from
+    the qty-expanded parts-manifest — the real single-line a process plant has.
+
+    Driven items (pumps / compressors / blowers / fans) each take a motor feeder; powered
+    packages (O2 / ozone / UV / heat-pump / degasser systems) take a system feeder; the
+    control/instrument cabinets collapse to ONE control-panel way. Identical repeated items
+    (e.g. 3 circulation pumps) collapse to one way annotated '×N'. Per-item kW comes from
+    the contract quantities where published, else an even split of the load not otherwise
+    allocated. Σ feeders reconciles to the board. Universal; deterministic.
+
+    Returns a list[Feeder]; empty when there are no driven/powered items (caller then falls
+    back to the per-module split)."""
+    quantities = quantities or {}
+    # ---- collect the electrically-relevant items, collapsing identical repeats ----
+    groups: dict[str, dict] = {}     # name → {n, shape, kw_each(optional)}
+    control_n = 0
+    for p in (parts or []):
+        shape = (p.get("shape") or "").lower()
+        name = (p.get("name") or "").strip()
+        if not name:
+            continue
+        is_driven = shape in _DRIVEN_SHAPES
+        is_panel = shape in _PANEL_SHAPES
+        is_powered = bool(_POWERED_SYSTEM_RE.search(name))
+        if is_panel and not is_driven:
+            control_n += 1
+            continue
+        if not (is_driven or is_powered):
+            continue
+        g = groups.setdefault(name.lower(), {"name": name, "n": 0, "shape": shape})
+        g["n"] += 1
+    if not groups and control_n == 0:
+        return []
+
+    # ---- assign kW per group: known per-item value × N, else share the remainder ----
+    if total_load_kw is None or total_load_kw <= 0:
+        total_load_kw = _3ph_power_kw(total_current_a, voltage_v)
+    known_kw: dict[str, float] = {}
+    for key, g in groups.items():
+        kw_each = _equip_kw_from_quantities(g["name"], quantities)
+        if kw_each:
+            known_kw[key] = kw_each * g["n"]
+    known_sum = sum(known_kw.values())
+    remaining = max(0.0, (total_load_kw or 0.0) - known_sum)
+    unknown = [k for k in groups if k not in known_kw]
+    # the control panel takes a modest fixed share too (counts as one unknown way)
+    n_unknown_ways = len(unknown) + (1 if control_n else 0)
+    share = (remaining / n_unknown_ways) if n_unknown_ways else 0.0
+
+    feeders: list[Feeder] = []
+    # stable order: driven motors first (by name), then powered systems, panel last
+    for key in sorted(groups, key=lambda k: (groups[k]["shape"] not in _DRIVEN_SHAPES,
+                                             groups[k]["name"].lower())):
+        g = groups[key]
+        kw = known_kw.get(key, share)
+        i_a = _3ph_current_a(kw, voltage_v) if kw > 0 else 0.0
+        lbl, isb = _cable_or_busbar_label(i_a)
+        nm = g["name"] + (f" ×{g['n']}" if g["n"] > 1 else "")
+        note = "" if key in known_kw else "even split of unallocated load"
+        feeders.append(Feeder(name=nm, load_kw=round(kw, 1) if kw else None,
+                              current_a=round(i_a, 1), size_label=lbl,
+                              voltage_v=voltage_v, is_busbar=isb, note=note))
+    if control_n:
+        kw = share
+        i_a = _3ph_current_a(kw, voltage_v) if kw > 0 else 0.0
+        lbl, isb = _cable_or_busbar_label(i_a)
+        feeders.append(Feeder(name=f"Control & instrument panel ×{control_n}",
+                              load_kw=round(kw, 1) if kw else None,
+                              current_a=round(i_a, 1), size_label=lbl,
+                              voltage_v=voltage_v, is_busbar=isb,
+                              note="control/instrument distribution"))
+    return feeders

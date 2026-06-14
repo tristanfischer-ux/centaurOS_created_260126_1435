@@ -156,6 +156,7 @@ class AirSystem:
     zones_derived: bool          # True when zones were derived (not placed individually)
     notes: list[str] = field(default_factory=list)
     schedule_present: bool = False
+    duty_word: str = "cooling"   # 'heating' | 'cooling' — honest air-side duty label
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -468,7 +469,8 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
     return AirSystem(
         archetype=arch, hubs=hubs, zones=zones, ducts=ducts, diffusers=diffusers,
         bbox=bbox, medium=medium, airflow_cms=airflow_cms, cooling_kw=cooling_kw,
-        zones_derived=zones_derived, notes=notes, schedule_present=schedule_present)
+        zones_derived=zones_derived, notes=notes, schedule_present=schedule_present,
+        duty_word=_duty_word(state))
 
 
 def _hub_tag(role: str, idx: int) -> str:
@@ -494,8 +496,17 @@ def _read_design_airflow(state: dict, fallback_n: int = 0) -> float:
     if cfm:
         n = _read_zone_count(state) or fallback_n or 1
         return (float(cfm) * n) / CFM_PER_CMS
-    # last resort: derive from the sensible cooling duty (Q = ρ·cp·ΔT·V).
-    duty = _quantity(state, "hvac_sensible_load_kw", "chassis_cooling_capacity_kw")
+    # last resort: derive the supply airflow from the design AIR-SIDE THERMAL DUTY
+    # (Q = ρ·cp·ΔT·V). Covers BOTH a cooling AND a HEATING air system (RAS warm-water
+    # BUILDING load): the air system that holds the building condition must move the air to
+    # carry that duty (was 0 → an EMPTY duct drawing for RAS, whose duty is HEATING not
+    # cooling). DELIBERATELY EXCLUDES `system_thermal_dissipation_kw` / chiller-capacity —
+    # those are a LIQUID-COOLED system's heat-REJECTION (BESS glycol loop), NOT an air duty;
+    # reading them would mis-derive an air airflow for a liquid plant (flipping its medium
+    # off 'liquid'). A liquid-cooled design is handled by the coolant-loop path, not here.
+    duty = _quantity(state, "hvac_sensible_load_kw", "hvac_cooling_capacity_kw",
+                     "hvac_cooling_kw", "heating_duty_kw", "makeup_heating_kw",
+                     "building_process_loss_kw")
     if duty:
         return (float(duty) * 1000.0) / (CP_AIR * DEFAULT_SUPPLY_DT_K) / RHO_AIR
     return 0.0
@@ -506,7 +517,11 @@ def _read_cooling_kw(state: dict, fallback_n: int = 0) -> float:
     capacity (the only figure a server CRAC publishes) is multiplied by the rack count
     so the headline is the whole-room load, not one chassis."""
     for k in ("hvac_total_load_kw", "hvac_cooling_kw", "hvac_chiller_capacity_kw",
-              "system_thermal_dissipation_kw", "thermal_rejection_capacity_kw"):
+              "hvac_cooling_capacity_kw", "system_thermal_dissipation_kw",
+              "thermal_rejection_capacity_kw",
+              # HEATING systems (RAS warm-water building load) publish a heating duty, not
+              # a cooling figure — read it so the drawing carries a real duty (not 0/empty).
+              "heating_duty_kw", "makeup_heating_kw", "building_process_loss_kw"):
         v = _quantity(state, k)
         if v:
             return float(v)
@@ -516,6 +531,25 @@ def _read_cooling_kw(state: dict, fallback_n: int = 0) -> float:
         n = _read_zone_count(state) or fallback_n or 1
         return float(v) * n
     return 0.0
+
+
+def _duty_word(state: dict) -> str:
+    """'heating' when the design's dominant air-side duty is HEATING (a heating_duty figure
+    that exceeds any explicit cooling figure — RAS warm-water building load), else
+    'cooling'. So the drawing doesn't mislabel a warm-water fish-farm duct as 'cooling'.
+    Universal: reads the published duty quantities, no per-class assumption."""
+    heat = 0.0
+    for k in ("heating_duty_kw", "makeup_heating_kw"):
+        v = _quantity(state, k)
+        if v:
+            heat = max(heat, float(v))
+    cool = 0.0
+    for k in ("hvac_cooling_kw", "hvac_chiller_capacity_kw",
+              "system_thermal_dissipation_kw", "thermal_rejection_capacity_kw"):
+        v = _quantity(state, k)
+        if v:
+            cool = max(cool, float(v))
+    return "heating" if heat > cool else "cooling"
 
 
 def _read_zone_count(state: dict) -> int:
@@ -1469,8 +1503,8 @@ def _draw_title_block(svg, sysm, meta, scale_S, width, height, title_h):
                 f"{len(sysm.zones)} served rack(s).")
     else:
         head = (f"Supply airflow {sysm.airflow_cms:.2f} m³/s "
-                f"({_cfm(sysm.airflow_cms):,} cfm) · cooling {sysm.cooling_kw:.0f} kW · "
-                f"{len(sysm.zones)} served zone(s).")
+                f"({_cfm(sysm.airflow_cms):,} cfm) · {sysm.duty_word} "
+                f"{sysm.cooling_kw:.0f} kW · {len(sysm.zones)} served zone(s).")
     svg.text(x0, y0 + 61, head, size=9.5, fill=MUTED)
     svg.text(x0, y0 + 78,
              "Plan + section · ducts sized from airflow ÷ velocity (≤9 m/s) · "

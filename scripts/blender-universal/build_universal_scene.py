@@ -1702,12 +1702,49 @@ def compute_undim_tall_cap(parts):
     return _UNDIM_TALL_CAP_MM
 
 
+# Replication grid geometry — the SINGLE source of truth shared by build_part (which
+# draws the N instances) and footprint_mm (which must RESERVE the grid's full extent so
+# the placer never lands another part on top of a qty-N array). Keeping both keyed on this
+# helper is what stops the 10-tank rearing farm overlapping its neighbours: build_part lays
+# N vessels in a cols×rows grid at pitch≈dia×1.4, so the reserved footprint MUST be that
+# whole grid, not one unit. Universal — any replicated _VESSEL_KIND shape (tanks, reactors).
+_VESSEL_GRID_PITCH_FACTOR = 1.4     # centre-to-centre pitch = unit dia × this (matches build_part)
+_VESSEL_GRID_MAX_N = 12             # build_part caps replication at 12 instances
+
+
+def _vessel_grid_dims(n: int):
+    """(cols, rows) of the compact near-square grid build_part lays N replicated vessels
+    into — IDENTICAL to build_part's `cols = ceil(sqrt(N)); rows = ceil(N/cols)`."""
+    n = max(1, min(int(n or 1), _VESSEL_GRID_MAX_N))
+    cols = int(math.ceil(math.sqrt(n)))
+    rows = int(math.ceil(n / cols))
+    return cols, rows
+
+
+def _vessel_grid_span_mm(unit_dia_mm: float, n: int):
+    """The full PLAN span (span_x_mm, span_y_mm) the replicated-vessel grid occupies on the
+    deck, so the placer reserves the grid's real footprint (not one unit). Mirrors
+    build_part's layout exactly: a cols×rows grid at pitch = unit_dia × pitch-factor, the
+    overall span being (n_axis-1)×pitch + one unit dia (the half-unit margin each end)."""
+    cols, rows = _vessel_grid_dims(n)
+    pitch = unit_dia_mm * _VESSEL_GRID_PITCH_FACTOR
+    span_x = (cols - 1) * pitch + unit_dia_mm
+    span_y = (rows - 1) * pitch + unit_dia_mm
+    return span_x, span_y
+
+
 def resolved_dims_mm(part):
     """Return a concrete (kind, geometry-dict) in MM, from explicit dim if
     present else the type default for the shape. Footprint is used by the
-    placer to space parts."""
+    placer to space parts.
+
+    The returned dict carries `_qty` (the part's replication count) so footprint_mm can
+    reserve a qty-N vessel array's FULL grid extent — without it the placer reserves a
+    single unit's footprint and a 10-tank farm lands on top of its neighbours (the
+    recurring RAS overlap). Universal: zero effect for qty-1 parts."""
     shape = part.shape
     d = part.dim
+    qty = int(getattr(part, "qty", 1) or 1)
     # cylinder-like dim available
     if d and d["kind"] == "cyl":
         dia = d.get("dia_mm", TYPE_DEFAULTS_MM.get(shape, {}).get("dia", 800))
@@ -1716,24 +1753,30 @@ def resolved_dims_mm(part):
         # height — CAP it so it can't spike past the real dimensioned vessels.
         if ln is None and shape in _CAPPABLE_TALL_SHAPES:
             ln = _capped_default_height(shape)
-        return {"shape": shape, "dia_mm": dia, "len_mm": ln,
-                "explicit": d.get("len_mm") is not None}
-    if d and d["kind"] == "box":
-        return {"shape": shape, "w_mm": d["w_mm"], "d_mm": d["d_mm"],
-                "h_mm": d["h_mm"], "explicit": True}
-    if d and d["kind"] == "area":
+        rd = {"shape": shape, "dia_mm": dia, "len_mm": ln,
+              "explicit": d.get("len_mm") is not None}
+    elif d and d["kind"] == "box":
+        rd = {"shape": shape, "w_mm": d["w_mm"], "d_mm": d["d_mm"],
+              "h_mm": d["h_mm"], "explicit": True}
+    elif d and d["kind"] == "area":
         # area → derive a square package footprint (sqrt), height ~ 0.4× side
         side = max(1000.0, math.sqrt(d["area_m2"]) * 1000)
-        return {"shape": shape, "w_mm": side, "d_mm": side, "h_mm": side * 0.45,
-                "explicit": True}
-    # no explicit dim → type default
-    td = dict(TYPE_DEFAULTS_MM.get(shape, TYPE_DEFAULTS_MM["box"]))
-    # Fix 4: clamp an undimensioned column/tower/stack's default height.
-    if shape in _CAPPABLE_TALL_SHAPES and "height" in td:
-        td["height"] = _capped_default_height(shape)
-    td["shape"] = shape
-    td["explicit"] = False
-    return td
+        rd = {"shape": shape, "w_mm": side, "d_mm": side, "h_mm": side * 0.45,
+              "explicit": True}
+    else:
+        # no explicit dim → type default
+        td = dict(TYPE_DEFAULTS_MM.get(shape, TYPE_DEFAULTS_MM["box"]))
+        # Fix 4: clamp an undimensioned column/tower/stack's default height.
+        if shape in _CAPPABLE_TALL_SHAPES and "height" in td:
+            td["height"] = _capped_default_height(shape)
+        td["shape"] = shape
+        td["explicit"] = False
+        rd = td
+    # Carry the replication count so footprint_mm can reserve the qty-N grid extent
+    # (build_part replicates _VESSEL_KIND shapes into a cols×rows grid). Harmless for
+    # all other shapes / qty-1 parts (footprint_mm only consumes it for vessels).
+    rd["_qty"] = qty
+    return rd
 
 
 def _capped_default_height(shape):
@@ -1745,15 +1788,32 @@ def _capped_default_height(shape):
 
 
 def footprint_mm(rd):
-    """(footprint_x_mm, footprint_y_mm, top_z_mm-ish height) for spacing."""
+    """(footprint_x_mm, footprint_y_mm, top_z_mm-ish height) for spacing.
+
+    A qty-N vessel (any _VESSEL_KIND shape, 2..12 units) is replicated by build_part into
+    a compact cols×rows grid on the deck — so its RESERVED footprint here is that whole
+    GRID span, not a single unit. Without this the placer reserves one unit and the array
+    overlaps its neighbours (the recurring RAS 10-tank-on-top-of-everything overlap).
+    `rd["_qty"]` is stamped by resolved_dims_mm; absent/1 ⇒ identical to a single unit."""
     shape = rd["shape"]
+    n = int(rd.get("_qty", 1) or 1)
+    replicate = shape in _VESSEL_KIND and 2 <= n <= _VESSEL_GRID_MAX_N
     if shape in ("tall_column", "tall_vessel", "vertical_vessel", "tank", "stack"):
         dia = rd.get("dia_mm", 800)
         h = rd.get("len_mm") or rd.get("height", TYPE_DEFAULTS_MM[shape].get("height", 3000))
+        if replicate:                       # reserve the full N-vessel grid footprint
+            span_x, span_y = _vessel_grid_span_mm(dia, n)
+            return span_x, span_y, h
         return dia, dia, h
     if shape == "horizontal_vessel":
         dia = rd.get("dia_mm", 700)
         ln = rd.get("len_mm") or TYPE_DEFAULTS_MM[shape]["length"]
+        if replicate:
+            # build_part grids horizontal vessels on a dia-pitch too; a unit's plan
+            # footprint is ln (X) × dia*1.8 (Y), so scale each axis by the grid count.
+            cols, rows = _vessel_grid_dims(n)
+            pitch = dia * _VESSEL_GRID_PITCH_FACTOR
+            return (cols - 1) * pitch + ln, (rows - 1) * pitch + dia * 1.8, dia
         return ln, dia * 1.8, dia
     if shape in ("compressor", "pump", "package_box", "skid_box",
                  "transformer_box", "cabinet", "cabinet_small", "box"):
@@ -2165,12 +2225,38 @@ def _place_region(rparts, x_left, y_base, MAT, MO):
     big_y = y_base + BIG_BLOCK_DY_MM       # back of the bay
     med_y = y_base + MED_BLOCK_DY_MM       # middle
     small_y = y_base + SMALL_BLOCK_DY_MM   # front
+    # MEGA-GRID GUARD: if the big band holds a qty-N replicated MEGA-GRID (a 10-tank hall,
+    # ~40 m deep), it would otherwise swallow the medium + small bands (centred only a few
+    # metres in front of it) — the tanks-on-top-of-the-pumps overlap. Detect the grid's true
+    # half-depth and push the medium + small bands BEHIND the grid's back edge (a clear gap)
+    # so the ancillary kit (pumps / degasser / instruments) sits in its OWN strip behind the
+    # tank hall, never inside it. Universal: only triggers for a hall-sized replicated grid;
+    # a normal region keeps the original front→back band offsets.
+    grid_half_depth = 0.0
+    for p in big:
+        q = int(getattr(p, "qty", 1) or 1)
+        if p.shape in _VESSEL_KIND and 2 <= q <= _VESSEL_GRID_MAX_N:
+            _gx, gy, _gz = footprint_mm(resolved_dims_mm(p))
+            if _gx * gy > 150e6:               # hall-sized replicated grid
+                grid_half_depth = max(grid_half_depth, gy / 2.0)
+    if grid_half_depth > 0.0:
+        MEGA_GRID_BACK_GAP_MM = 4000
+        behind = big_y + grid_half_depth + MEGA_GRID_BACK_GAP_MM
+        med_y = behind
+        small_y = behind + _band_depth_for(medium) + MEGA_GRID_BACK_GAP_MM
     big_dx, _ = _shelf_pack(big, x_left, big_y, target_width, DECK_Z_MM,
                             PART_GAP_MM, MAT, MO, y_dir=+1)
     med_dx, _ = _shelf_pack(medium, x_left, med_y, target_width, DECK_Z_MM,
                             PART_GAP_MM, MAT, MO, y_dir=+1)
     _place_grid(small, x_left, target_width, small_y, DECK_Z_MM, MAT, MO)
     return max(big_dx, med_dx, target_width, MIN_REGION_WIDTH_MM)
+
+
+def _band_depth_for(plist):
+    """Deepest single-part Y footprint in a band (headroom needed for one shelf)."""
+    if not plist:
+        return 0.0
+    return max(footprint_mm(resolved_dims_mm(p))[1] for p in plist)
 
 
 def _estimate_region_width(rparts):
@@ -2334,6 +2420,57 @@ def place_all(parts, regions, MAT, MO):
         # ── LEGACY width-balanced RANK banking (every other family) ───────────
         banks = _balanced_bank_split(region_list,
                                      [region_w[rk] for rk in region_list], n_banks)
+
+    # ── MEGA-ARRAY ISOLATION (universal qty-N overlap fix) ────────────────────────
+    # A region that holds a qty-N replicated MEGA-ARRAY (RAS 10×10 m rearing tanks ≈ a
+    # 50×40 m hall) is an order of magnitude bigger than the rest. Left sharing a serpentine
+    # lane, its huge footprint engulfs the regions placed beside it in X AND the lane behind
+    # it in Y (the recurring RAS overlap: tanks on top of the biofilter / instrument grid).
+    # Pull every such region into its OWN SOLO lane so (a) nothing shares its X-lane and
+    # (b) the post-placement Y-compaction (which measures real placed extents) separates it
+    # from the other lanes by its true depth. Universal + deterministic: a region qualifies
+    # only when it contains a 2..12-qty replicated vessel whose grid footprint dominates
+    # (≥ MEGA_REGION_AREA_FACTOR × the median region area) — zero effect on plants without
+    # a big parallel array (CO2/SAF single-train: no region qualifies, banks unchanged).
+    def _region_area_mm2(rk):
+        a = 0.0
+        for p in region_parts[rk]:
+            fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+            a += fx * fy
+        return a
+
+    def _has_mega_array(rk):
+        for p in region_parts[rk]:
+            q = int(getattr(p, "qty", 1) or 1)
+            if p.shape in _VESSEL_KIND and 2 <= q <= _VESSEL_GRID_MAX_N:
+                fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+                # the replicated grid alone is a hall-sized footprint (> ~150 m²)
+                if fx * fy > 150e6:
+                    return True
+        return False
+
+    if len(region_list) > 1:
+        areas = sorted(_region_area_mm2(rk) for rk in region_list)
+        median_area = areas[len(areas) // 2] or 1.0
+        MEGA_REGION_AREA_FACTOR = 4.0
+        mega = {rk for rk in region_list
+                if _has_mega_array(rk)
+                and _region_area_mm2(rk) >= MEGA_REGION_AREA_FACTOR * median_area}
+        if mega:
+            # rebuild banks: drop the mega regions from their shared lanes, then append
+            # each as its OWN solo lane (kept in flow order, after the lanes they led).
+            new_banks = []
+            for b in banks:
+                kept = [rk for rk in b if rk not in mega]
+                if kept:
+                    new_banks.append(kept)
+            for rk in region_list:               # deterministic order
+                if rk in mega:
+                    new_banks.append([rk])        # solo lane
+            banks = [b for b in new_banks if b]
+            n_banks = max(1, len(banks))
+            print(f"[univ][flow] mega-array isolation: {sorted(mega)} → own solo lane(s); "
+                  f"banks now {len(banks)}")
 
     # Common centreline = the widest bank's total span; shorter banks centre to it
     # (no lopsided empty corner). Each bank's span = Σ widths + gaps between them.
