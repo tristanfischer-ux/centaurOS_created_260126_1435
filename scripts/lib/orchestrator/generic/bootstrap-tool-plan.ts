@@ -220,7 +220,7 @@ export interface ToolCatalogueEntry {
   output_fields: string[]
 }
 
-interface RawManifestEntry { input_keys?: string[]; output_keys?: string[] }
+interface RawManifestEntry { input_keys?: string[]; output_keys?: string[]; io_source?: string }
 type RawManifest = Record<string, RawManifestEntry>
 
 let _catalogueCache: ToolCatalogueEntry[] | null = null
@@ -295,7 +295,29 @@ export function buildToolIoMap(): Map<string, { inputs: Set<string>; outputs: Se
     const r = raw[id]
     const m = merged[id]
     const outputs = (r?.output_keys && r.output_keys.length > 0) ? r.output_keys : (m?.output_keys ?? [])
-    const inputs = new Set<string>([...(r?.input_keys ?? []), ...(m?.input_keys ?? [])])
+
+    // INPUT AUTHORITY (2026-06-14, catalogue-de-pollution fix):
+    // When the tool was harvested by RUNNING its python (`io_source === 'run'`),
+    // its raw `input_keys` are the COMPLETE, authoritative set of fields the
+    // executing code actually reads (every `payload.get(...)`). The MERGED
+    // manifest's input_keys are a UNION of hand-plan contract reads across EVERY
+    // class that ever routed through this tool id — so for a shared tool id it
+    // CARRIES FOREIGN-CLASS FIELD NAMES the running tool silently ignores
+    // (e.g. water-treatment-ro:sizing gains `water_recovery_pct` /
+    // `dialysate_flow_rate_ml_per_min` from the dialysis-machine hand plan;
+    // hvac:load-sizing gains `canopy_area_m2` / `led_installed_power_kw` /
+    // `rated_spindle_power_kw` from the VF/CNC hand plans). Unioning those let the
+    // generator wire a param the tool DROPS → it silently falls back to a wrong
+    // default (RAS RO wired `water_recovery_pct=99.6`, tool read its own
+    // `recovery_target_pct` default 70 → 70% make-up). So for a run-harvested
+    // tool, the raw input set is AUTHORITATIVE — do NOT pollute it with the
+    // cross-class merged union. This is the H1 "validate against the tool's REAL
+    // runtime schema" principle applied to INPUTS, and it makes V2a reject a
+    // foreign-class field name so the LLM must wire a field the tool truly reads.
+    const runHarvested = r?.io_source === 'run' && Array.isArray(r.input_keys)
+    const inputs = runHarvested
+      ? new Set<string>(r!.input_keys)
+      : new Set<string>([...(r?.input_keys ?? []), ...(m?.input_keys ?? [])])
     // ALWAYS union the live TS-source-parsed `input.<field>` reads (2026-06-14).
     // tsInputFieldsFor returns ∅ for any tool whose id literal isn't found in a
     // tools/*.ts file (e.g. python-wrapped tools), so this is a SUPERSET-safe
@@ -303,7 +325,10 @@ export function buildToolIoMap(): Map<string, { inputs: Set<string>; outputs: Se
     // newly-added TS input field (e.g. mass-aggregator's `component_masses_kg`)
     // is picked up WITHOUT regenerating tool-io-raw.json. V2 only rejects a
     // param present in NEITHER source, so a superset never false-accepts a
-    // hallucinated field that the tool can't read.
+    // hallucinated field that the tool can't read. (A run-harvested python tool
+    // has no matching tools/*.ts `input.<field>` reads — the wrapper passes the
+    // payload straight through — so this adds nothing for them, preserving the
+    // authoritative raw set above.)
     for (const f of tsInputFieldsFor(id)) inputs.add(f)
     map.set(id, { inputs, outputs: new Set(outputs) })
   }
@@ -349,6 +374,38 @@ function describeTool(tool: { id: string; name?: string; domain?: string }): str
   const sub = tool.id.includes(':') ? tool.id.split(':')[1].replace(/-/g, ' ') : tool.id
   const name = tool.name ?? tool.id
   return `${name} — ${sub} (${tool.domain ?? 'unknown'} domain)`
+}
+
+/**
+ * Unit family inferred from a tool OUTPUT FIELD NAME, for the V2c dimensional-
+ * mismatch guard. Unlike `unitFamilyFromName` (which only reads a TERMINAL unit
+ * token, for the auto-wire param matcher), this scans the WHOLE name for an
+ * embedded unit token so `biomass_final_kg_total` resolves to `mass` (the `_total`
+ * suffix would hide the `kg` from a terminal-only match). FLOW families are
+ * tested BEFORE their static counterparts so `production_t_yr` → massflow (not
+ * mass) and `flow_m3_h` → volflow (not volume). Returns 'other' when no token is
+ * found (the guard treats 'other' as indeterminate → never blocks). Vocabulary
+ * matches `unitFamilyOf` so the two are directly comparable.
+ */
+function fieldNameUnitFamily(name: string): string {
+  const n = name.toLowerCase()
+  // flow first (a flow token contains a mass/volume token)
+  if (/(kg_h|kg_day|kg_s|kg_yr|t_yr|t_day|t_h|tpy|tph)(_|$)/.test(n)) return 'massflow'
+  if (/(m3_h|m3h|m3_s|l_h|lph|l_s|l_min|lpm|l_day|l_per_day)(_|$)/.test(n)) return 'volflow'
+  if (/(kwh|mwh|gwh|wh)(_|$)/.test(n)) return 'energy'
+  if (/(kw|mw|gw)(_|$)/.test(n)) return 'power'
+  if (/(kva|mva)(_|$)/.test(n)) return 'power'
+  if (/(kg|tonne|tonnes)(_|$)/.test(n) || /biomass_kg/.test(n)) return 'mass'
+  if (/(m3|litre|litres)(_|$)/.test(n)) return 'volume'
+  if (/(m2)(_|$)/.test(n)) return 'area'
+  if (/(gbp|usd|eur)(_|$)/.test(n) || /(cost|capex|opex|npv|price)/.test(n)) return 'currency'
+  if (/(pct|percent)(_|$)/.test(n)) return 'dimensionless'
+  if (/(deg_?c|temp_c)(_|$)/.test(n)) return 'temperature'
+  if (/(_v|kv)(_|$)/.test(n) || /voltage/.test(n)) return 'voltage'
+  if (/(_a|ka|ma)(_|$)/.test(n)) return 'current'
+  if (/(pa|kpa|bar|barg|mpa)(_|$)/.test(n)) return 'pressure'
+  if (/(ppt|ppm|mg_l|g_l)(_|$)/.test(n)) return 'concentration'
+  return 'other'
 }
 
 // ── (c) DETERMINISTIC validation — pure, decides (no LLM) ───────────────────
@@ -447,6 +504,34 @@ export function validateToolPlanSpec(
       const toolField = typeof o?.tool_output_field === 'string' ? o.tool_output_field.trim() : ''
       if (!contractKey) { errors.push(`step[${i}] "${toolId}" outputs[${j}] contract_key missing`); continue }
       if (!toolField) { errors.push(`step[${i}] "${toolId}" outputs[${j}] tool_output_field missing`); continue }
+      // V2c — DIMENSIONAL CONSISTENCY of the declared output unit vs the tool
+      // field it reads (2026-06-14). The renderer/headline displays the tool's
+      // raw numeric value with the LLM-DECLARED `unit` string — so a wrong unit
+      // SILENTLY MIS-SCALES the number by orders of magnitude even though the
+      // field is real and the value is computed. RAS monod mapped
+      // `biomass_final_kg_total` (a standing-biomass MASS in kg) to a
+      // `production_capacity_tpy` output declared `unit:"t/yr"` (a mass-FLOW): the
+      // 24,716 kg standing biomass rendered as "24,716 t/yr" (≈121× the 204 t/yr
+      // brief — a kg↦t/yr family swap). GUARD: when BOTH the tool field NAME's
+      // unit family AND the declared unit's family are DETERMINATE (neither
+      // 'other'/'dimensionless'/unknown) and they DISAGREE, reject — the LLM is
+      // relabelling the quantity across dimensions. Conservative on purpose:
+      // an 'other'/unknown on either side (e.g. `velocity_m_s`, `kla_per_hour`)
+      // never blocks, so only a true cross-family mislabel trips. Universal — it
+      // reads the field-name suffix + the unit string, no per-class table.
+      const fieldFam = fieldNameUnitFamily(toolField)
+      const declUnitFam = unitFamilyOf(typeof o?.unit === 'string' ? o.unit : '')
+      const determinate = (f: string) => f !== 'other' && f !== 'dimensionless' && f !== ''
+      if (determinate(fieldFam) && determinate(declUnitFam) && fieldFam !== declUnitFam) {
+        errors.push(
+          `step[${i}] "${toolId}" outputs[${j}] DIMENSIONAL MISMATCH: tool field "${toolField}" is a ${fieldFam} quantity ` +
+          `but you declared unit "${o?.unit}" (${declUnitFam}). The renderer prints the tool's value with YOUR unit, so this ` +
+          `mis-scales the number across dimensions. Either declare a ${fieldFam} unit, or — if you need a ${declUnitFam} quantity ` +
+          `(e.g. annual production t/yr vs standing biomass kg) — that tool field does NOT compute it: wire from a contract key ` +
+          `that already carries the ${declUnitFam} value, or pick a tool whose output field is genuinely ${declUnitFam} (V2c)`,
+        )
+        continue
+      }
       // THE safeguard: the tool_output_field MUST be a real invoke() output field.
       if (realOutputs.size > 0 && !realOutputs.has(toolField)) {
         errors.push(`step[${i}] "${toolId}" outputs[${j}] tool_output_field "${toolField}" is not a real output field of the tool (V2 — hallucinated field)`)
@@ -584,11 +669,20 @@ function buildHarvestPrompt(
     .map(q => `${q.key} (${q.value} ${q.unit})`)
     .join(', ')
 
+  // Annotate each OUTPUT field with the DIMENSION its name implies (kg = mass,
+  // t/yr = mass-flow, kW = power, % = ratio, …). The generator must declare an
+  // output `unit` in THAT dimension — the V2c guard rejects a cross-dimension
+  // relabel (e.g. tagging a `*_kg_total` mass as `t/yr`). Showing the dimension
+  // inline stops the mislabel at authoring time instead of via a repair round.
+  const annotateOut = (f: string): string => {
+    const fam = fieldNameUnitFamily(f)
+    return fam === 'other' ? f : `${f} [${fam}]`
+  }
   const catalogueLines = catalogue
     .map(c =>
       `- ${c.tool_id} [${c.domain}] ${c.description}\n` +
       `    inputs: ${c.input_fields.join(', ') || '(none)'}\n` +
-      `    outputs: ${c.output_fields.join(', ') || '(none)'}`,
+      `    outputs: ${c.output_fields.map(annotateOut).join(', ') || '(none)'}`,
     )
     .join('\n')
 
@@ -630,6 +724,9 @@ function buildHarvestPrompt(
     `1. Pick the SMALLEST set of tools that computes the brief's duties — typically 6-14. Each tool_id MUST be one from the catalogue. PREFER tools whose inputs you can WIRE from the AVAILABLE CONTRACT KEYS or an upstream tool's output, over tools that would force many hard-coded constants.\n` +
     `2. For each step, wire inputs[].param to a REAL input field of that tool, sourced per the WIRING priority above. For a from_contract_key input add a numeric fallback. For a constant input give the literal in "constant".\n` +
     `3. For each step, wire outputs[]: contract_key is the NEW quantity name you write (CHOOSE a clear name a downstream tool can read by from_contract_key); tool_output_field MUST be a REAL output field of that tool (exactly as spelled in the catalogue). Give unit + family.\n` +
+    `3a. DIMENSION DISCIPLINE (validated — a cross-dimension relabel is REJECTED). The catalogue tags each output field with the DIMENSION its name implies, e.g. "biomass_final_kg_total [mass]", "permeate_flow_m3_h [volflow]", "recovery_pct [dimensionless]". The "unit" you declare MUST be in that SAME dimension. NEVER relabel a quantity into a different dimension to make it "look like" a metric you want. Worked examples of the trap: a "*_kg_total" field is a STANDING MASS in kg — it is NOT annual production in t/yr (a mass-FLOW); a membrane "recovery_pct" (fraction of feed that becomes permeate) is NOT a make-up-water percentage; a "required_chiller_capacity_kw" is a COOLING duty, NOT a heating duty. If the brief needs a quantity in a dimension/meaning the available tool fields do NOT compute, prefer to ECHO the matching AVAILABLE CONTRACT KEY (rule 3b) rather than force-fit a wrong field.\n` +
+    `3b. ALREADY-SUPPLIED METRICS — do NOT recompute a brief metric via a mismatched tool field when the AVAILABLE CONTRACT KEYS already carry it. The contract keys above are authoritative engineering values. If the brief target (e.g. annual production, make-up-water rate, building heating duty) is already an available contract key, you do NOT need a tool to produce it — it is satisfied by the contract. Only add a tool output for a quantity the contract does NOT already supply, and only with a tool field that genuinely computes THAT quantity in THAT dimension.\n` +
+    `3c. PICK THE DOMAIN-CORRECT TOOL FOR THE DUTY. Match the tool's PHYSICS to the duty, not just an output-key name. Heating duty → a heat-pump/heating tool (a "cop_heating"/"heating_capacity_kw"/"recommended_heat_pump_kw"/"design_heat_loss_kw" output), NEVER a cooling-chiller tool's "required_chiller_capacity_kw". Cooling duty → the chiller/HVAC cooling tool. A recirculating-system make-up rate is a tiny top-up (make-up flow ÷ recirculation flow), not a reverse-osmosis recovery fraction. A standing inventory is a MASS; an annual throughput is a mass-FLOW — different tools, different fields.\n` +
     `4. You MUST include the tool "${UNIVERSAL_MASS_PRODUCER}" and wire its "${UNIVERSAL_MASS_KEY}" output field to a contract_key "${UNIVERSAL_MASS_KEY}" (the whole-system mass + envelope check every design needs). FEED IT the principal-equipment masses: give it ONE "*_mass_kg" input per major component (e.g. the tanks, the filtration vessels, the pumps/skids, the electrical gear), each wired with from_contract_key from an upstream sizing tool's mass output OR an available contract mass key — every "*_mass_kg" input you give is summed. Wire AS MANY component masses as you have sources for (≥2 where possible); do NOT leave it with no mass inputs (its total would be 0). Do NOT wire its OWN total back into it — never feed "total_system_mass_kg" or any "total_*_mass_kg" as an INPUT (that is the value it COMPUTES, not a component). Also wire its "max_mass_kg_envelope" input from the brief's mass cap if one exists.\n` +
     `5. You MUST produce at least one cost/capex key (wire a cost-bearing tool output, e.g. regulatory-cert-cost:lookup → total_cost_gbp, or a tool's estimated_capex_gbp).\n` +
     `6. Do NOT worry about run ORDER — it is computed deterministically from your wiring. Wire data dependencies via matching contract_key → from_contract_key across steps.\n` +
@@ -1196,6 +1293,82 @@ function briefMetricKeysFrom(brief: ParsedConstraints): string[] {
   return [...out]
 }
 
+/** Brief metrics WITH their value + unit (the same source as briefMetricKeysFrom,
+ *  but retaining value/unit so the caller can resolve which are already supplied
+ *  by an authoritative contract quantity under a different KEY NAME). */
+function briefMetricsFrom(brief: ParsedConstraints): Array<{ key: string; value: number | null; unit: string }> {
+  const seen = new Set<string>()
+  const out: Array<{ key: string; value: number | null; unit: string }> = []
+  const extra = (brief as any)?.extra ?? brief
+  const constraints = (extra?.constraints ?? (brief as any)?.constraints) as any
+  const tp = constraints?.target_performance ?? (brief as any)?.target_performance
+  const push = (k: unknown, v: unknown, u: unknown) => {
+    if (typeof k !== 'string' || !/^[a-z0-9_]+$/.test(k) || seen.has(k)) return
+    seen.add(k)
+    out.push({ key: k, value: typeof v === 'number' && Number.isFinite(v) ? v : null, unit: typeof u === 'string' ? u : '' })
+  }
+  if (tp) {
+    push(tp.key_metric, tp.value, tp.unit)
+    if (Array.isArray(tp.metrics)) for (const mm of tp.metrics) push(mm?.key_metric, mm?.value, mm?.unit)
+  }
+  return out
+}
+
+/**
+ * Resolve which brief metrics are ALREADY satisfied by an authoritative contract
+ * quantity carried under a DIFFERENT key name. The parsed-brief metric keys are
+ * the user's names (e.g. `production_capacity_tpy`, `water_recirculation_rate_percent`),
+ * which often differ from the engineering-contract's computed keys (e.g.
+ * `annual_production_t_yr`, `recirc_fraction_recycled`). When they NAME-mismatch,
+ * the V3 coverage gate would otherwise FORCE the generator to produce the metric
+ * via SOME tool field — and the only field that "fits" is frequently a WRONG-
+ * dimension stand-in (RAS forced monod's standing-biomass kg into a `t/yr`
+ * production slot, and RO's recovery-% into a recirculation-rate slot — the exact
+ * grossly-wrong numbers this fix prevents). A brief metric counts as supplied if
+ * a contract quantity matches by (a) coarse NAME overlap, OR (b) compatible UNIT
+ * FAMILY *and* VALUE within 2% (same physical quantity, renamed). Returns the
+ * supplying contract keys (to add to contractSuppliedKeys so coverage passes) and
+ * the brief keys deemed satisfied (to drop from the REQUIRED metric set). Pure.
+ */
+function briefMetricsSatisfiedByContract(
+  briefMetrics: ReadonlyArray<{ key: string; value: number | null; unit: string }>,
+  contractQuantities: ReadonlyArray<{ key: string; value: number; unit: string }>,
+): { satisfiedBriefKeys: Set<string>; supplyingContractKeys: Set<string> } {
+  const satisfiedBriefKeys = new Set<string>()
+  const supplyingContractKeys = new Set<string>()
+  for (const bm of briefMetrics) {
+    const bmFam = unitFamilyOf(bm.unit) // declared brief unit family
+    for (const cq of contractQuantities) {
+      // Name match, stem-tolerant: keyCoarseMatch is exact-token, so a plural/
+      // qualifier difference (`turnovers_per_hour` vs `water_turnover_rate_per_hour`)
+      // misses. Retry on singularised tokens so the same physical quantity under a
+      // renamed key still resolves (no per-class synonym table).
+      const stem = (k: string) => k.toLowerCase().replace(/s(_|$)/g, '$1')
+      const nameMatch = keyCoarseMatch(cq.key, bm.key) || keyCoarseMatch(stem(cq.key), stem(bm.key))
+      let valueMatch = false
+      if (!nameMatch && bm.value != null && Number.isFinite(cq.value)) {
+        const cqFam = unitFamilyOf(cq.unit)
+        const famOk = bmFam !== 'other' && bmFam !== '' && (bmFam === cqFam ||
+          // a fraction (0.996) and a percent (99.6) are the same quantity ×100
+          (bmFam === 'dimensionless' && cqFam === 'dimensionless'))
+        if (famOk) {
+          const a = Math.abs(bm.value)
+          const b = Math.abs(cq.value)
+          const within = (x: number, y: number) => y !== 0 && Math.abs(x - y) / Math.abs(y) <= 0.02
+          // direct, or fraction↔percent (×100) for dimensionless ratios
+          valueMatch = within(a, b) ||
+            (bmFam === 'dimensionless' && (within(a, b * 100) || within(a * 100, b)))
+        }
+      }
+      if (nameMatch || valueMatch) {
+        satisfiedBriefKeys.add(bm.key)
+        supplyingContractKeys.add(cq.key)
+      }
+    }
+  }
+  return { satisfiedBriefKeys, supplyingContractKeys }
+}
+
 /**
  * Bootstrap a tool plan for a NOVEL slug. The returned plan is an in-memory
  * pass-through for THIS run; the stored row stays status 'candidate' (promotion
@@ -1218,8 +1391,24 @@ export async function bootstrapToolPlan(
     return { ok: false, slug, attempts: 0, stage: 'invalid-slug', validation_errors: [], error: `slug "${rawSlug}" does not sanitise to /^[a-z0-9_]{1,64}$/` }
   }
 
-  const briefMetricKeys = briefMetricKeysFrom(brief)
-  const contractSuppliedKeys = contractQuantities.map(q2 => q2.key)
+  // Brief metric keys, MINUS the ones an authoritative contract quantity already
+  // supplies under a different name (value+family match) — see
+  // briefMetricsSatisfiedByContract. Dropping the satisfied keys from the REQUIRED
+  // set stops the V3 coverage gate forcing the generator to recompute an
+  // already-known metric via a wrong-dimension tool field (the RAS monod-t/yr +
+  // RO-recovery mislabels). The supplying contract keys are added to
+  // contractSuppliedKeys so coverage still passes for any that slip through.
+  const allBriefMetricKeys = briefMetricKeysFrom(brief)
+  const { satisfiedBriefKeys, supplyingContractKeys } = briefMetricsSatisfiedByContract(
+    briefMetricsFrom(brief),
+    contractQuantities,
+  )
+  const briefMetricKeys = allBriefMetricKeys.filter(k => !satisfiedBriefKeys.has(k))
+  const contractSuppliedKeys = [
+    ...contractQuantities.map(q2 => q2.key),
+    ...satisfiedBriefKeys, // the brief's own name, now treated as supplied
+    ...supplyingContractKeys,
+  ]
 
   // (0) DB-FIRST REUSE: a previously stored candidate makes re-runs free +
   // deterministic. Re-validate against the CURRENT registry (a registry change

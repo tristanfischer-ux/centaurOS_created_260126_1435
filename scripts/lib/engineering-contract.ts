@@ -11884,6 +11884,12 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     turnovers_per_hour: q(turnoversPerHour, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '~4 tank turnovers per hour (15-min hydraulic retention time)' }),
     makeup_water_m3_h: q(makeupWaterM3H, 'm³/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~0.4% make-up of the recirculation flow (99.6% recirculated)' }),
     recirc_fraction_recycled: q(recircFractionRecycled, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '99.6% of the water recirculated (~0.4% new-water make-up)' }),
+    // Make-up % as an AUTHORITATIVE quantity (the brief metric `make_up_water_percentage`/
+    // `water_recirculation_rate_percent` complement). Emitting it here means the orchestrator
+    // does NOT force a tool (e.g. RO recovery-%) to "produce" it via a wrong-dimension stand-in
+    // — the brief-metric-supply resolver matches this 0.4% directly. RAS is a near-zero-exchange
+    // recirculating loop: make-up % = (1 − recirc_fraction) × 100, NOT an RO recovery fraction.
+    make_up_water_percentage: q(Math.round(makeupFraction * 1000) / 10, '%', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: '(1 − recirc_fraction) × 100 — fresh-water make-up as a % of recirculation flow (~0.4%, near-zero-exchange RAS)' }),
 
     // ── Solids removal (rotary drum microscreens) ──
     drum_filter_throughput_m3_h: q(recirculationFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'rotary drum microscreen filters take the full recirculation flow on tank exit (40-60 µm screen)' }),
