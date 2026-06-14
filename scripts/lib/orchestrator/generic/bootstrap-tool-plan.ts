@@ -112,7 +112,12 @@ import { composeToolGraph, type ToolIOSchema } from '../auto-planner'
 // ── Constants ───────────────────────────────────────────────────────────────
 
 const FORGE_TRUTH_DB = resolve(homedir(), '.forge-truth', 'forge-truth.db')
-const HARVEST_MODEL = 'google/gemini-3.5-flash'
+// Strong reasoner for the ONCE-per-class (cached) tool-plan generation — the same
+// calibre that hand-wrote the curated class-plans, so the on-the-fly selection matches
+// hand quality (the minimal RIGHT tool set, not a noisy superset). Cached in
+// class_tool_plan_candidates, so the Pro cost (~$0.02) is paid once per class, never per
+// run. Gemini 3.5 Flash picked a noisier set (Tristan 2026-06-14: "you did it by hand").
+const HARVEST_MODEL = 'google/gemini-3.1-pro-preview'
 const MAX_OUTPUT_TOKENS = 150_000 // repo rule: 150_000 everywhere in pdf-engine-v2
 const BOOTSTRAP_SOURCE = `tool-plan-bootstrap@v1:${HARVEST_MODEL}+catalogue`
 export const BOOTSTRAP_PROVENANCE = 'tool-plan-bootstrap-candidate@v1'
