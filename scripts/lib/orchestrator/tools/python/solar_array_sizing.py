@@ -47,6 +47,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -79,7 +80,7 @@ ORBIT_PROPS = {
 
 def compute(payload: dict) -> dict:
     p_required_w = float(payload.get("required_orbital_avg_power_w", 500.0))
-    orbit = str(payload.get("orbit", "LEO_SSO"))
+    orbit = safe_choice(str(payload.get("orbit", "LEO_SSO")), ORBIT_PROPS, default="LEO_SSO", label="orbit")
     eclipse_in = payload.get("eclipse_fraction_pct", None)
     eta_cell = float(payload.get("cell_efficiency_pct", 32.0)) / 100.0
     packing = float(payload.get("packing_factor_pct", 80.0)) / 100.0

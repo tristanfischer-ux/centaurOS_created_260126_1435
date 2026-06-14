@@ -45,6 +45,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -95,9 +96,9 @@ CONTAINERS = {
 
 
 def compute(payload: dict) -> dict:
-    pcm_name = str(payload.get("pcm_material", "paraffin_n_octadecane"))
+    pcm_name = safe_choice(str(payload.get("pcm_material", "paraffin_n_octadecane")), PCMS, default="paraffin_n_octadecane", label="pcm_material")
     mass_g = float(payload.get("pcm_mass_g", 1000.0))
-    container = str(payload.get("container_material", "aluminium"))
+    container = safe_choice(str(payload.get("container_material", "aluminium")), CONTAINERS, default="aluminium", label="container_material")
     q_target_w = float(payload.get("target_absorption_w", 1000.0))
     duration_min = float(payload.get("peak_duration_minutes", 5.0))
 

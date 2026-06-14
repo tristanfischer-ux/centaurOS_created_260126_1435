@@ -54,6 +54,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 PROVENANCE = {
@@ -104,7 +105,7 @@ def compute(payload: dict) -> dict:
         raise ValueError("wet_solids_kg_h must be > 0")
     m_in_pct = float(payload.get("moisture_in_pct", 30.0))
     m_out_pct = float(payload.get("moisture_out_pct", 1.0))
-    basis = str(payload.get("moisture_basis", "wet")).strip().lower()
+    basis = safe_choice(str(payload.get("moisture_basis", "wet")).strip().lower(), ("wet", "dry"), default="wet", label="moisture_basis")
     if basis not in ("wet", "dry"):
         raise ValueError("moisture_basis must be 'wet' or 'dry'")
     if m_in_pct <= m_out_pct:

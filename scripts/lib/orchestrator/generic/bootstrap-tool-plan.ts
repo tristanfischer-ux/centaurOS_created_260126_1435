@@ -108,6 +108,7 @@ import type {
 } from '../types'
 import { getTool, listTools } from '../registry'
 import { composeToolGraph, type ToolIOSchema } from '../auto-planner'
+import { sweepToolRelevance, checkUnitCoverage } from './relevance-sweep'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -140,6 +141,14 @@ const COST_KEY_TOKENS = ['cost', 'capex', 'price', 'gbp']
 
 // Few-shot exemplar plans (rendered to the spec JSON below).
 const FEWSHOT_PLAN_FILES = ['co2-mineralisation', 'e-fuel-synthesis'] as const
+
+// The universal whole-system aggregators the V3 coverage gate REQUIRES (mass +
+// cost) MUST always survive the relevance sweep, even if the reasoner judges them
+// NO for a given plant — without them the plan cannot validate. So the swept-
+// relevant subset is UNIONed with these before the wiring harvest. A tool id is
+// force-kept if it equals the mass producer OR its id carries a cost/economics
+// token (so whichever cost tool the catalogue offers is retained).
+const FORCE_KEEP_COST_TOKENS = ['cert-cost', 'yield-economics', 'npv', 'capex', 'cost', 'economic']
 
 // ── Serialisable plan spec (the LLM's output schema) ────────────────────────
 
@@ -196,6 +205,25 @@ export interface ToolPlanBootstrapSuccess {
   attempts: number
   selected_tool_ids: string[]
   llm_cost_usd: number | null
+  /** RELEVANCE SWEEP outcome (Part A). null when the sweep was disabled or failed
+   *  (→ the harvest saw the full catalogue, the prior free-pick behaviour). When
+   *  present, `relevant_tool_ids` is the deterministic swept subset the wiring
+   *  harvest was restricted to. */
+  relevance?: {
+    swept: boolean
+    from_cache: boolean
+    relevant_count: number
+    catalogue_count: number
+    relevant_tool_ids: string[]
+    cache_key: string | null
+  } | null
+  /** COVERAGE GATE outcome (Part C): every brief-NAMED unit → its covering tool
+   *  (or null = unsized, logged loudly). null on the reuse path when not recomputed. */
+  coverage?: {
+    named_units: string[]
+    coverage: Array<{ unit: string; covered_by: string | null }>
+    uncovered: string[]
+  } | null
 }
 
 export interface ToolPlanBootstrapFailure {
@@ -225,6 +253,45 @@ type RawManifest = Record<string, RawManifestEntry>
 
 let _catalogueCache: ToolCatalogueEntry[] | null = null
 let _ioByToolCache: Map<string, { inputs: Set<string>; outputs: Set<string> }> | null = null
+
+// ── IN-MEMORY RAW-IO OVERRIDE (runtime-generated tools) ─────────────────────
+//
+// TOOL-CREATION-ON-THE-FLY (2026-06-14): a tool GENERATED mid-chain (dynamic-
+// tool.ts → tool-generator.ts) is registered via registerTool() at runtime, but
+// it is absent from the on-disk tool-io-raw.json (that file is harvested out-of-
+// band). Without its I/O, buildToolIoMap() would offer it ZERO output fields, the
+// catalogue would skip it, and the planner could not wire it. So a generated tool
+// injects its REAL invoke() field names here via registerDynamicToolIo(); the map
+// builder MERGES this override with the disk manifest, treating it as the
+// authoritative run-harvested source (io_source 'run'). The override survives a
+// cache reset (it is the durable in-memory record), so re-validation on reuse
+// still sees the generated tool's fields. Persisted to disk separately by the
+// candidate store so a FUTURE process also sees it (DB-first reuse).
+const _dynamicIoOverride = new Map<string, RawManifestEntry>()
+
+/**
+ * Register (or replace) the RAW invoke() I/O of a runtime-generated tool so the
+ * catalogue + the V1/V2 validators accept + wire it WITHOUT rewriting
+ * tool-io-raw.json on disk. Resets the catalogue/IO caches so the next
+ * buildToolCatalogue()/buildToolIoMap() includes it. io_source is forced to 'run'
+ * (these ARE the executing tool's real field names — same authority as the python
+ * runtime harvester).
+ */
+export function registerDynamicToolIo(toolId: string, inputKeys: string[], outputKeys: string[]): void {
+  _dynamicIoOverride.set(toolId, {
+    input_keys: [...new Set(inputKeys)],
+    output_keys: [...new Set(outputKeys)],
+    io_source: 'run',
+  })
+  // Invalidate caches so the freshly-registered tool's I/O is picked up.
+  _catalogueCache = null
+  _ioByToolCache = null
+}
+
+/** Test seam / introspection: the current in-memory dynamic IO overrides. */
+export function _dynamicToolIoOverrides(): ReadonlyMap<string, RawManifestEntry> {
+  return _dynamicIoOverride
+}
 
 function readJsonManifest(filename: string): RawManifest {
   try {
@@ -287,12 +354,14 @@ function tsInputFieldsFor(toolId: string): Set<string> {
  */
 export function buildToolIoMap(): Map<string, { inputs: Set<string>; outputs: Set<string> }> {
   if (_ioByToolCache) return _ioByToolCache
-  const raw = readJsonManifest('tool-io-raw.json')
+  const rawDisk = readJsonManifest('tool-io-raw.json')
   const merged = readJsonManifest('tool-io-manifest.json')
   const map = new Map<string, { inputs: Set<string>; outputs: Set<string> }>()
   for (const [id, tool] of listTools()) {
     void tool
-    const r = raw[id]
+    // A runtime-generated tool's in-memory override is the AUTHORITATIVE raw-IO
+    // (io_source 'run') — it wins over the on-disk manifest (which never lists it).
+    const r = _dynamicIoOverride.get(id) ?? rawDisk[id]
     const m = merged[id]
     const outputs = (r?.output_keys && r.output_keys.length > 0) ? r.output_keys : (m?.output_keys ?? [])
 
@@ -651,6 +720,7 @@ function buildHarvestPrompt(
   catalogue: ToolCatalogueEntry[],
   briefMetricKeys: string[],
   priorErrors: string[],
+  processText: string = '',
 ): string {
   const desc = String(brief.product_description ?? '').slice(0, 5000)
 
@@ -704,6 +774,9 @@ function buildHarvestPrompt(
     `PRODUCT CLASS SLUG: "${slug}"\n` +
     `ENVELOPE: class=${envelope.class}, scale_tier=${envelope.scale_tier}, voltage_tier=${envelope.voltage_tier}, form_factor=${envelope.form_factor}, application=${envelope.application}\n\n` +
     `BRIEF:\n${desc}\n\n` +
+    (processText
+      ? `STATED PROCESS (the named unit operations the plant MUST contain — EVERY unit named here needs a sizing tool in your plan; the catalogue below has been pre-filtered to the tools relevant to THIS plant):\n${processText.slice(0, 4000)}\n\n`
+      : '') +
     (dutyLines
       ? `ENGINEERING DUTIES THE SYSTEM MUST PERFORM (the parsed engineering-contract quantities — pick tools that COMPUTE or CONSUME these):\n${dutyLines}\n\n`
       : '') +
@@ -721,7 +794,7 @@ function buildHarvestPrompt(
     `  (c) ONLY if the value exists NEITHER in (a) NOR (b): a literal constant — and ONLY for a genuine physical assumption/coefficient (e.g. a de-rating factor, a power factor, a material density), NEVER for a duty/scale quantity that the contract already carries.\n` +
     `A constant where a contract key existed is a WIRING FAILURE. Aim: most inputs wired from (a)/(b); few constants; tools chained so outputs feed downstream inputs.\n\n` +
     `OUTPUT RULES (validated DETERMINISTICALLY — violations are rejected):\n` +
-    `1. Pick the SMALLEST set of tools that computes the brief's duties — typically 6-14. Each tool_id MUST be one from the catalogue. PREFER tools whose inputs you can WIRE from the AVAILABLE CONTRACT KEYS or an upstream tool's output, over tools that would force many hard-coded constants.\n` +
+    `1. COVERAGE IS COMPREHENSIVE — the failure mode is UNDER-selection. Select a tool for EVERY engineering duty listed above AND for EVERY principal equipment item the plant must have designed: each PUMP, each VESSEL/TANK, each FILTER/SEPARATOR, each REACTOR/biological stage, each HEAT-exchange/heat-pump/thermal duty, each GAS-TRANSFER/degasser/aeration stage, each DISINFECTION/UV stage — PLUS the full ELECTRICAL distribution chain (cable/ampacity sizing, transformer sizing, the load/feeder schedule) and the control/instrumentation. Use as many tools as the job genuinely needs — there is NO upper cap; a complex multi-subsystem plant routinely needs 30, 60, 100+ tools, one per duty + per equipment item + per electrical feeder + per control loop. A handful is WRONG; UNDER-selection is the only failure mode here. Every duty above MUST be CONSUMED by at least one tool that SIZES the equipment meeting it (an oxygen-demand duty → a dissolved-oxygen/aeration sizing tool; a heating duty → a heat-pump/heat-loss tool; an electrical load → cable + transformer + load-schedule tools; a flow duty → a pump/pipe sizing tool). Do NOT minimise the set. Each tool_id MUST be one from the catalogue. PREFER tools whose inputs you can WIRE from the AVAILABLE CONTRACT KEYS (which now INCLUDE the brief's quantified duties) or an upstream tool's output, over tools that would force many hard-coded constants.\n` +
     `2. For each step, wire inputs[].param to a REAL input field of that tool, sourced per the WIRING priority above. For a from_contract_key input add a numeric fallback. For a constant input give the literal in "constant".\n` +
     `3. For each step, wire outputs[]: contract_key is the NEW quantity name you write (CHOOSE a clear name a downstream tool can read by from_contract_key); tool_output_field MUST be a REAL output field of that tool (exactly as spelled in the catalogue). Give unit + family.\n` +
     `3a. DIMENSION DISCIPLINE (validated — a cross-dimension relabel is REJECTED). The catalogue tags each output field with the DIMENSION its name implies, e.g. "biomass_final_kg_total [mass]", "permeate_flow_m3_h [volflow]", "recovery_pct [dimensionless]". The "unit" you declare MUST be in that SAME dimension. NEVER relabel a quantity into a different dimension to make it "look like" a metric you want. Worked examples of the trap: a "*_kg_total" field is a STANDING MASS in kg — it is NOT annual production in t/yr (a mass-FLOW); a membrane "recovery_pct" (fraction of feed that becomes permeate) is NOT a make-up-water percentage; a "required_chiller_capacity_kw" is a COOLING duty, NOT a heating duty. If the brief needs a quantity in a dimension/meaning the available tool fields do NOT compute, prefer to ECHO the matching AVAILABLE CONTRACT KEY (rule 3b) rather than force-fit a wrong field.\n` +
@@ -731,7 +804,10 @@ function buildHarvestPrompt(
     `5. You MUST produce at least one cost/capex key (wire a cost-bearing tool output, e.g. regulatory-cert-cost:lookup → total_cost_gbp, or a tool's estimated_capex_gbp).\n` +
     `6. Do NOT worry about run ORDER — it is computed deterministically from your wiring. Wire data dependencies via matching contract_key → from_contract_key across steps.\n` +
     (priorErrors.length > 0
-      ? `\nYOUR PREVIOUS ATTEMPT FAILED DETERMINISTIC VALIDATION. Fix EVERY error (do NOT invent field names — use ONLY the catalogue's exact spellings):\n${priorErrors.map(e => `- ${e}`).join('\n')}\n`
+      ? `\nYOUR PREVIOUS ATTEMPT FAILED DETERMINISTIC VALIDATION. Fix EVERY error (do NOT invent field names — use ONLY the catalogue's exact spellings):\n${priorErrors.map(e => `- ${e}`).join('\n')}\n` +
+        (priorErrors.some(e => /DIMENSIONAL MISMATCH/.test(e))
+          ? `\nHOW TO FIX A "DIMENSIONAL MISMATCH" (do this EXACTLY — do not oscillate): the output field's name implies a dimension (shown as a [tag] in the catalogue, e.g. "daily_feed_kg [mass]"). You MUST declare the "unit" in THAT SAME dimension — for a [mass] field declare a mass unit like "kg" (NOT "kg/day"); for a [massflow] field declare "kg/day" or "t/yr"; for a [power] field declare "kW". Do NOT relabel the field to the dimension you WISH it were. If you genuinely need a different-dimension quantity (e.g. a per-DAY rate but the field is a static mass), then either (a) drop that output and ECHO the matching AVAILABLE CONTRACT KEY instead, or (b) pick a DIFFERENT tool output field whose [tag] already matches the dimension you need. The fastest clean fix is almost always: declare the unit that matches the field's [tag].\n`
+          : '')
       : '') +
     `\nReturn STRICT JSON only (no markdown fence, no commentary):\n` +
     `{"display_name": "<class display name>", "steps": [{"tool_id": "...", "purpose": "<one line>", ` +
@@ -746,7 +822,28 @@ interface HarvestOutcome {
   error: string | null
 }
 
-async function harvestPlanViaLLM(prompt: string): Promise<HarvestOutcome> {
+/** Default harvest-call abort timeout (ms). The orchestrator may pass a LONGER
+ *  one on a retry after a transient timeout (FIX 2a). */
+const DEFAULT_HARVEST_TIMEOUT_MS = 180_000
+
+/** Is a harvest error TRANSIENT (timeout / 5xx / transport drop / empty
+ *  completion)? A transient failure is retried WITHOUT consuming a validation
+ *  attempt. A genuine validation/parse error is NOT transient (it is the model's
+ *  answer, just wrong) and proceeds through the normal error-feedback loop. The
+ *  empty-completion case (`finish_reason=?`) is treated transient: it is an
+ *  OpenRouter hiccup, not a considered answer. */
+function isTransientHarvestError(error: string): boolean {
+  const e = (error || '').toLowerCase()
+  return (
+    e.includes('timeout') || e.includes('aborted') ||
+    e.includes('http 5') ||
+    e.includes('econnreset') || e.includes('socket hang up') ||
+    e.includes('network') || e.includes('fetch failed') || e.includes('etimedout') ||
+    e.includes('empty completion')
+  )
+}
+
+async function harvestPlanViaLLM(prompt: string, timeoutMs: number = DEFAULT_HARVEST_TIMEOUT_MS): Promise<HarvestOutcome> {
   const apiKey = process.env.OPENROUTER_API_KEY ?? ''
   if (!apiKey) return { parsed: null, costUsd: null, error: 'OPENROUTER_API_KEY not set' }
   try {
@@ -765,7 +862,7 @@ async function harvestPlanViaLLM(prompt: string): Promise<HarvestOutcome> {
         max_tokens: MAX_OUTPUT_TOKENS,
         usage: { include: true },
       }),
-      signal: AbortSignal.timeout(180_000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) return { parsed: null, costUsd: null, error: `OpenRouter HTTP ${res.status}: ${(await res.text()).slice(0, 300)}` }
     const j: any = await res.json()
@@ -1278,6 +1375,48 @@ export function orderSpec(spec: ToolPlanSpec): string[] {
 
 // ── (a–f) Main entry ────────────────────────────────────────────────────────
 
+/** Extract the brief's STATED PROCESS text (the named unit operations). The brief
+ *  may be flattened (chain spreads constraints up) OR nested — read both. The
+ *  field is `{value: string|null, source}` in StructuredBriefJSON; also tolerate a
+ *  bare string. Returns '' when absent. Used by the relevance sweep + coverage
+ *  gate to key off the brief-named units. */
+function targetProcessText(brief: ParsedConstraints): string {
+  const b = brief as any
+  const c = (b?.constraints ?? {}) as any
+  const pick = (tp: any): string =>
+    typeof tp === 'string' ? tp : (tp && typeof tp.value === 'string' ? tp.value : '')
+  return (pick(b?.target_process) || pick(c?.target_process) || '').trim()
+}
+
+/** A FULLER brief text for the COVERAGE GATE's named-unit detection only (NOT the
+ *  relevance cache key — this never affects determinism). The parsed `target_process`
+ *  is often condensed by the brief parser (it dropped the heat-pump/electrical/
+ *  control mentions on the RAS brief), so the gate must also scan the
+ *  product_description, mission_statement, and the additional_constraints +
+ *  derived_requirement labels where those named units actually surface. Read both
+ *  the flattened (chain-spread) and nested shapes. */
+function coverageText(brief: ParsedConstraints): string {
+  const b = brief as any
+  const c = (b?.constraints ?? {}) as any
+  const parts: string[] = [
+    String(b?.product_description ?? ''),
+    targetProcessText(brief),
+    String(b?.mission_statement ?? ''),
+    String(b?.why_now ?? ''),
+  ]
+  const addl = [
+    ...(Array.isArray(c?.additional_constraints) ? c.additional_constraints : []),
+    ...(Array.isArray(b?.additional_constraints) ? b.additional_constraints : []),
+  ]
+  for (const a of addl) parts.push(typeof a === 'string' ? a : String(a?.description ?? ''))
+  const dreqs = [
+    ...(Array.isArray(c?.derived_requirements) ? c.derived_requirements : []),
+    ...(Array.isArray(b?.derived_requirements) ? b.derived_requirements : []),
+  ]
+  for (const r of dreqs) parts.push(`${String(r?.label ?? '')} ${String(r?.key ?? '')}`)
+  return parts.filter(Boolean).join('\n')
+}
+
 /** Extract the brief's demanded metric keys (contract_key targets the plan should
  *  cover) from parsedBrief.constraints.target_performance.metrics[].key_metric. */
 function briefMetricKeysFrom(brief: ParsedConstraints): string[] {
@@ -1383,6 +1522,7 @@ export async function bootstrapToolPlan(
   brief: ParsedConstraints,
   envelope: BriefEnvelope,
   contractQuantities: ReadonlyArray<{ key: string; value: number; unit: string; condition?: string | null }> = [],
+  opts: { harvestTimeoutMs?: number } = {},
 ): Promise<ToolPlanBootstrapResult> {
   // Normalise hyphens (genericEnvelope hyphenates non-minted novel slugs) to the
   // candidate-store alphabet, then validate at the boundary.
@@ -1413,24 +1553,52 @@ export async function bootstrapToolPlan(
   // (0) DB-FIRST REUSE: a previously stored candidate makes re-runs free +
   // deterministic. Re-validate against the CURRENT registry (a registry change
   // that breaks the wiring → regenerate).
+  //
+  // DETERMINISM FIX (2026-06-14): re-validate STRUCTURALLY ONLY — pass EMPTY brief-
+  // metric arrays, NOT the run-varying briefMetricKeys/contractSuppliedKeys. The
+  // brief-metric coverage (V3) depends on the engineering-contract quantities,
+  // which JITTER run-to-run (the brief-expansion + contract emission are not byte-
+  // stable). Re-imposing the jittery metric set on reuse made a stored, perfectly-
+  // good plan FAIL re-validation on the next run → re-harvest → a DIFFERENT plan
+  // (the run1=60-tools vs run2=47-tools divergence). The brief-metric coverage was
+  // already satisfied when the plan was STORED; on reuse we only need to confirm
+  // the plan is still STRUCTURALLY valid (V1 tool ids exist, V2 every wired field
+  // is real, V3 the UNIVERSAL mass+cost producers are present) — those are
+  // properties of the PLAN, stable across runs. A genuine registry drift (a tool
+  // removed / a field renamed) still fails V1/V2 → regenerate. This is what makes
+  // reuse byte-deterministic: same stored plan → re-validates → reused identically.
   const prior = latestCandidate(slug)
   if (prior) {
     try {
-      const v = validateToolPlanSpec(JSON.parse(prior.plan_json), briefMetricKeys, contractSuppliedKeys)
+      const v = validateToolPlanSpec(JSON.parse(prior.plan_json), [], [])
       if (v.ok && v.spec) {
         // Re-apply the deterministic auto-wire (idempotent) so a candidate stored
         // before auto-wire existed still gets the wiring floor on reuse.
         const finalSpec = autoWireSpecInputs(v.spec, contractQuantities).spec
         const order = orderSpec(finalSpec)
         const plan = materialisePlan(slug, finalSpec, order)
+        // PART C coverage gate on the REUSE path too — the cached plan encodes the
+        // sweep-derived selection; re-report the brief-named-unit coverage so a
+        // re-run still surfaces (and loudly logs) any unsized unit.
+        const coverage = checkUnitCoverage(coverageText(brief), '', order)
+        if (coverage.named_units.length > 0) {
+          const lines = coverage.coverage
+            .map(c => `    ${c.covered_by ? '✓' : '✗ UNSIZED'} ${c.unit}${c.covered_by ? ` → ${c.covered_by}` : ''}`)
+            .join('\n')
+          console.error(`[bootstrap-tool-plan] COVERAGE GATE (brief-named units, reuse) for slug=${slug}:\n${lines}`)
+          for (const u of coverage.uncovered) {
+            console.error(`[bootstrap-tool-plan] COVERAGE GAP: checklist unit "${u}" unsized — no selected/created tool covers it for slug=${slug}.`)
+          }
+        }
         console.error(
           `[bootstrap-tool-plan] REUSING stored candidate slug=${slug} version=${prior.version} status=${prior.status} ` +
-          `(no LLM call; ${finalSpec.steps.length} steps, ${new Set(order).size} tool_ids)`,
+          `(no LLM call; ${finalSpec.steps.length} steps, ${new Set(order).size} tool_ids, coverage_gaps=${coverage.uncovered.length})`,
         )
         return {
           ok: true, plan, spec: finalSpec, provenance: BOOTSTRAP_PROVENANCE,
           candidate: { id: prior.id, slug, version: prior.version, status: prior.status, reused: true },
           attempts: 0, selected_tool_ids: order, llm_cost_usd: null,
+          relevance: null, coverage,
         }
       }
       console.warn(`[bootstrap-tool-plan] stored candidate v${prior.version} for ${slug} fails current validation (${v.errors.length} errors) — re-harvesting`)
@@ -1441,27 +1609,116 @@ export async function bootstrapToolPlan(
     return { ok: false, slug, attempts: 0, stage: 'no-api-key', validation_errors: [], error: 'OPENROUTER_API_KEY not set — cannot harvest' }
   }
 
-  const catalogue = buildToolCatalogue()
-  if (catalogue.length === 0) {
+  const fullCatalogue = buildToolCatalogue()
+  if (fullCatalogue.length === 0) {
     return { ok: false, slug, attempts: 0, stage: 'empty-catalogue', validation_errors: [], error: 'tool catalogue empty — register-all must be imported before bootstrapToolPlan so listTools() is populated' }
   }
+
+  const processText = targetProcessText(brief)
+  // Relevance-sweep LLM cost (folded into the reported llm_cost_usd below).
+  let totalCostSweep = 0
+
+  // ── PART A: DETERMINISTIC RELEVANCE SWEEP (Tristan 2026-06-14) ─────────────
+  // REPLACE the free-pick selection. Instead of letting the harvest pick tools
+  // from the full 182-tool catalogue in one shot (which drifted 12↔22 run-to-run
+  // and silently forgot brief-named units), run a deterministic YES/NO relevance
+  // sweep over EVERY tool (batched, temp 0, cached by brief+catalogue hash). The
+  // harvest's catalogue is then RESTRICTED to the swept-relevant subset — it only
+  // WIRES the chosen tools, it no longer SELECTS them. Fail-safe: a disabled/
+  // failed sweep falls back to the FULL catalogue (the prior behaviour) so the
+  // chain still runs.
+  let catalogue = fullCatalogue
+  let relevanceMeta: ToolPlanBootstrapSuccess['relevance'] = null
+  const sweep = await sweepToolRelevance({
+    slug, brief, envelope,
+    duties: contractQuantities.map(q2 => ({ key: q2.key, value: q2.value, unit: q2.unit })),
+    catalogue: fullCatalogue,
+    targetProcess: processText,
+  })
+  if (sweep.ok) {
+    // UNION the swept-relevant set with the universal aggregators V3 requires (mass
+    // producer + a cost tool), so a sweep that omits them can never break validation.
+    const relevant = new Set(sweep.relevant_tool_ids)
+    for (const e of fullCatalogue) {
+      const id = e.tool_id
+      if (id === UNIVERSAL_MASS_PRODUCER) relevant.add(id)
+      else { const il = id.toLowerCase(); if (FORCE_KEEP_COST_TOKENS.some(t => il.includes(t))) relevant.add(id) }
+    }
+    catalogue = fullCatalogue.filter(e => relevant.has(e.tool_id))
+    relevanceMeta = {
+      swept: true,
+      from_cache: sweep.from_cache,
+      relevant_count: sweep.relevant_tool_ids.length,
+      catalogue_count: fullCatalogue.length,
+      relevant_tool_ids: [...relevant].sort(),
+      cache_key: sweep.cache_key,
+    }
+    if (sweep.llm_cost_usd) totalCostSweep += sweep.llm_cost_usd
+    console.error(
+      `[bootstrap-tool-plan] RELEVANCE SWEEP narrowed catalogue ${fullCatalogue.length} → ${catalogue.length} tools ` +
+      `(${sweep.relevant_tool_ids.length} judged relevant + universal aggregators; from_cache=${sweep.from_cache}) for slug=${slug}. ` +
+      `The wiring harvest now only WIRES this deterministic subset.`,
+    )
+  } else {
+    console.error(
+      `[bootstrap-tool-plan] RELEVANCE SWEEP unavailable (stage=${sweep.stage}: ${sweep.error}) for slug=${slug} — ` +
+      `FALLING BACK to the full ${fullCatalogue.length}-tool catalogue (the prior free-pick selection). The chain still runs.`,
+    )
+  }
+
   console.error(
     `[bootstrap-tool-plan] composing tool plan for novel slug=${slug} ` +
-    `(catalogue=${catalogue.length} tools, brief_metric_keys=${briefMetricKeys.length}, contract_duties=${contractQuantities.length})`,
+    `(catalogue=${catalogue.length}${catalogue.length !== fullCatalogue.length ? `/${fullCatalogue.length} swept` : ''} tools, ` +
+    `brief_metric_keys=${briefMetricKeys.length}, contract_duties=${contractQuantities.length})`,
   )
 
-  // (b)+(c) Harvest → validate, one retry with the errors fed back.
+  // (b)+(c) Harvest → validate, with TWO validation-repair attempts (errors fed
+  // back). A TRANSIENT harvest failure (OpenRouter timeout / 5xx / transport drop)
+  // does NOT consume one of those two attempts — it is retried IN PLACE with a
+  // longer timeout, bounded by MAX_TRANSIENT_RETRIES. This was the RAS-regression
+  // cascade: attempt 1 timed out (transient) and STOLE a validation turn, leaving
+  // only one real validation attempt whose first-shot output had a V2c dimensional
+  // mislabel → bootstrap failed → loud exit. Giving the model its full 2
+  // error-feedback validation turns (and not letting a timeout burn one) is what
+  // makes the harvest reliably reach a valid plan. FIX 2a applied at the source.
+  // H5 (council) — multi-stage generate→validate→REPAIR. Each attempt feeds the
+  // prior deterministic-validation errors back so the model fixes them. Two turns
+  // is too few to converge a rich multi-tool plan: the RAS cold run reached the
+  // RIGHT plan on the THIRD turn (turn 1 missed total_system_mass_kg; turn 2 hit a
+  // V2c dimensional relabel on a generated tool's mass-named-but-rate field; turn 3
+  // declares the field's true unit + wires the mass producer). 4 gives the repair
+  // loop room to converge without burning many calls (most plans land by turn 2-3;
+  // a transient retry does NOT consume a turn). A targeted "HOW TO FIX A DIMENSIONAL
+  // MISMATCH" directive (buildHarvestPrompt) is injected when that error recurs, so
+  // the model stops oscillating between the V2c relabel and the V3 coverage gaps.
+  const MAX_VALIDATION_ATTEMPTS = 5
+  const MAX_TRANSIENT_RETRIES = 4
   let attempts = 0
   let totalCost = 0
   let lastErrors: string[] = []
   let lastError = ''
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  let transientRetries = 0
+  let attempt = 0
+  while (attempt < MAX_VALIDATION_ATTEMPTS) {
+    attempt++
     attempts = attempt
-    const prompt = buildHarvestPrompt(slug, brief, envelope, contractQuantities, catalogue, briefMetricKeys, lastErrors)
-    const outcome = await harvestPlanViaLLM(prompt)
+    const prompt = buildHarvestPrompt(slug, brief, envelope, contractQuantities, catalogue, briefMetricKeys, lastErrors, processText)
+    // Lengthen the timeout as transient retries accrue (a slow-but-alive model
+    // gets more room), capped at 300s.
+    const baseTimeout = opts.harvestTimeoutMs ?? DEFAULT_HARVEST_TIMEOUT_MS
+    const thisTimeout = Math.min(300_000, baseTimeout + transientRetries * 60_000)
+    const outcome = await harvestPlanViaLLM(prompt, thisTimeout)
     if (outcome.costUsd) totalCost += outcome.costUsd
     if (!outcome.parsed) {
       lastError = outcome.error ?? 'unknown harvest failure'
+      // TRANSIENT (timeout/5xx/transport) → retry the SAME attempt index, do NOT
+      // consume a validation turn, up to MAX_TRANSIENT_RETRIES total.
+      if (isTransientHarvestError(lastError) && transientRetries < MAX_TRANSIENT_RETRIES) {
+        transientRetries++
+        attempt-- // refund this turn — the model never actually answered
+        console.warn(`[bootstrap-tool-plan] attempt ${attempt + 1} TRANSIENT harvest failure (${lastError}) — retry ${transientRetries}/${MAX_TRANSIENT_RETRIES} in place (validation budget NOT consumed), next timeout ${Math.min(300_000, baseTimeout + transientRetries * 60_000) / 1000}s.`)
+        continue
+      }
       console.warn(`[bootstrap-tool-plan] attempt ${attempt} LLM harvest failed: ${lastError}`)
       lastErrors = []
       continue
@@ -1490,6 +1747,21 @@ export async function bootstrapToolPlan(
     const order = orderSpec(finalSpec)
     const plan = materialisePlan(slug, finalSpec, order)
 
+    // ── PART C: COVERAGE GATE — every brief-NAMED unit must map to a selected
+    // tool; LOG any uncovered unit LOUDLY (never silently drop). Diagnostic, not
+    // fatal: the plan still runs, but the operator sees exactly which named unit
+    // is unsized. The drum/microscreen filter (missing before) is one such unit.
+    const coverage = checkUnitCoverage(coverageText(brief), '', order)
+    if (coverage.named_units.length > 0) {
+      const lines = coverage.coverage
+        .map(c => `    ${c.covered_by ? '✓' : '✗ UNSIZED'} ${c.unit}${c.covered_by ? ` → ${c.covered_by}` : ''}`)
+        .join('\n')
+      console.error(`[bootstrap-tool-plan] COVERAGE GATE (brief-named units) for slug=${slug}:\n${lines}`)
+      for (const u of coverage.uncovered) {
+        console.error(`[bootstrap-tool-plan] COVERAGE GAP: checklist unit "${u}" unsized — no selected/created tool covers it for slug=${slug}.`)
+      }
+    }
+
     // (f) Candidate store — row stays 'candidate'; the run consumes in-memory.
     let candidate: { id: number; version: number; status: string }
     try {
@@ -1500,16 +1772,21 @@ export async function bootstrapToolPlan(
         error: `plan validated but candidate-store insert failed: ${(err as Error).message}`,
       }
     }
+    const reportedCost = totalCost + totalCostSweep
     console.error(
       `[bootstrap-tool-plan] BOOTSTRAPPED slug=${slug} steps=${finalSpec.steps.length} tool_ids=${new Set(order).size} ` +
       `candidate_id=${candidate.id} version=${candidate.version} status=${candidate.status} ` +
-      `attempts=${attempts} cost_usd=${totalCost.toFixed(4)} auto_wired=${wired.rewired.length} (stored as CANDIDATE only — NO auto-promotion). ` +
+      `attempts=${attempts} cost_usd=${reportedCost.toFixed(4)} auto_wired=${wired.rewired.length} ` +
+      `relevance_swept=${relevanceMeta ? `${relevanceMeta.relevant_count}/${relevanceMeta.catalogue_count}` : 'no'} ` +
+      `coverage_gaps=${coverage.uncovered.length} (stored as CANDIDATE only — NO auto-promotion). ` +
       `Selected: ${order.join(', ')}`,
     )
     return {
       ok: true, plan, spec: finalSpec, provenance: BOOTSTRAP_PROVENANCE,
       candidate: { id: candidate.id, slug, version: candidate.version, status: candidate.status, reused: false },
-      attempts, selected_tool_ids: order, llm_cost_usd: totalCost > 0 ? totalCost : null,
+      attempts, selected_tool_ids: order, llm_cost_usd: reportedCost > 0 ? reportedCost : null,
+      relevance: relevanceMeta,
+      coverage,
     }
   }
 

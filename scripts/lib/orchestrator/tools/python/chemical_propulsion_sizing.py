@@ -46,6 +46,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -80,9 +81,9 @@ REDUNDANCY_COUNT = {"single": 1, "dual": 2, "quad": 4}
 def compute(payload: dict) -> dict:
     dv_target = float(payload.get("delta_v_target_ms", 200.0))
     dry_kg = float(payload.get("dry_mass_kg", 500.0))
-    ptype = str(payload.get("propulsion_type", "biprop_MMH_NTO"))
+    ptype = safe_choice(str(payload.get("propulsion_type", "biprop_MMH_NTO")), PROP_TYPES, default="biprop_MMH_NTO", label="propulsion_type")
     thrust_n = float(payload.get("thrust_n", 22.0))
-    redundancy = str(payload.get("redundancy", "dual"))
+    redundancy = safe_choice(str(payload.get("redundancy", "dual")), REDUNDANCY_COUNT, default="dual", label="redundancy")
 
     if ptype not in PROP_TYPES:
         raise ValueError(f"unknown propulsion_type {ptype!r}; known: {list(PROP_TYPES)}")

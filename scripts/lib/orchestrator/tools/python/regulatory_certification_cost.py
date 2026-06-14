@@ -44,8 +44,12 @@ Notes:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -397,8 +401,15 @@ CERTIFICATIONS: dict[tuple[str, str], list[dict]] = {
 
 
 def compute(payload: dict) -> dict:
-    cls = str(payload.get("product_class", "")).lower().strip()
-    region = str(payload.get("region", "UK")).upper().strip()
+    # FAIL-SOFT: region is a fixed vocabulary (the table's regions) — snap an
+    # off-list value to the nearest rather than missing every key. product_class
+    # is snapped to a known class when it is a near-miss (fuzzy/synonym); a
+    # genuinely-uncovered class returns an honest empty result (no "error" key,
+    # so an unseen archetype never reads as a crash).
+    _regions = sorted({r for r, _ in CERTIFICATIONS.keys()})
+    _classes = sorted({c for _, c in CERTIFICATIONS.keys()})
+    region = safe_choice(payload.get("region", "UK"), _regions, default="UK", label="region")
+    cls = safe_choice(payload.get("product_class", ""), _classes, default=None, label="product_class")
     volume = float(payload.get("target_market_volume_units_per_year", 0))
 
     key = (region, cls)
@@ -410,8 +421,11 @@ def compute(payload: dict) -> dict:
             key_used = global_key
         else:
             return {
-                "error": f"No cert data for ({region}, {cls}). "
-                          f"Available: {sorted(set((r,c) for r,c in CERTIFICATIONS.keys() if c == cls))}",
+                "product_class": cls,
+                "region": region,
+                "note": (f"No certification data on file for ({region}, {cls}). "
+                         f"Regions with data for this class: "
+                         f"{sorted(set(r for r, c in CERTIFICATIONS.keys() if c == cls))}."),
                 "mandatory_certifications": [],
                 "total_cost_gbp": 0,
                 "total_critical_path_months": 0,

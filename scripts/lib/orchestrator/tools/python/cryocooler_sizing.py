@@ -52,6 +52,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -98,7 +99,7 @@ def compute(payload: dict) -> dict:
     t_cold = float(payload.get("target_temp_k", 80.0))
     q_load = float(payload.get("cooling_load_w", 1.0))
     t_hot = float(payload.get("sink_temp_k", 300.0))
-    cooler_type = str(payload.get("cooler_type", "Stirling"))
+    cooler_type = safe_choice(str(payload.get("cooler_type", "Stirling")), COOLER_PROPS, default="Stirling", label="cooler_type")
 
     if cooler_type not in COOLER_PROPS:
         raise ValueError(f"unknown cooler_type {cooler_type!r}; known: {list(COOLER_PROPS)}")

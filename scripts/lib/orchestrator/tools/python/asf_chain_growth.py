@@ -66,6 +66,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 
 PROVENANCE = {
     "tool_name": "asf_chain_growth (custom)",
@@ -201,7 +202,9 @@ def _peak_carbon_number(w: list[float]) -> int:
 def compute(payload: dict) -> dict:
     # ---- Inputs ----
     reactor_temp_c: float = float(payload.get("reactor_temp_c", 300.0))
-    catalyst: str = str(payload.get("catalyst", "iron")).strip().lower()
+    # FAIL-SOFT: unknown catalyst normalises to the nearest known or 'iron'
+    # (the default LTFT catalyst), never a raise.
+    catalyst: str = safe_choice(payload.get("catalyst", "iron"), ("iron", "cobalt"), default="iron", label="catalyst")
     n_max: int = int(payload.get("n_max", 50))
     wax_to_jet_conversion: float = float(payload.get("wax_to_jet_conversion", 0.80))
     diesel_to_jet_fraction: float = float(payload.get("diesel_to_jet_fraction", 0.0))

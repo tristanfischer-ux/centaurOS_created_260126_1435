@@ -43,6 +43,9 @@ from __future__ import annotations
 import json
 import sys
 import time
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -122,7 +125,7 @@ SEA_STATE_TABLE = {
 
 
 def compute(payload: dict) -> dict:
-    method = str(payload.get("recovery_method", "crane_off_ship")).lower()
+    method = safe_choice(str(payload.get("recovery_method", "crane_off_ship")).lower(), RECOVERY_METHODS, default="crane_off_ship", label="recovery_method")
     if method not in RECOVERY_METHODS:
         return {"error": f"Unknown method. Available: {list(RECOVERY_METHODS.keys())}"}
 

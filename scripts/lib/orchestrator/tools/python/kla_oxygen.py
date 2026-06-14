@@ -46,6 +46,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -86,7 +87,7 @@ DO_SAT_AT_25C_KG_M3 = 0.0080
 def compute(payload: dict) -> dict:
     p_over_v = float(payload.get("power_volumetric_w_m3", 1000.0))
     u_g = float(payload.get("superficial_velocity_m_s", 0.05))
-    impeller_type = str(payload.get("impeller_type", "rushton")).lower()
+    impeller_type = safe_choice(str(payload.get("impeller_type", "rushton")).lower(), IMPELLER_SCALING, default="rushton", label="impeller_type")
     viscosity = float(payload.get("fluid_viscosity_pa_s", 0.001))
     do_current_pct = float(payload.get("do_concentration_pct", 30.0))
 

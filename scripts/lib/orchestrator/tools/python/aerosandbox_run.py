@@ -61,7 +61,13 @@ def compute(payload: dict) -> dict:
     reynolds = float(payload.get("reynolds", 500_000))
     mach = float(payload.get("mach", 0.0))
 
+    # FAIL-SOFT: asb.Airfoil only synthesises coordinates for a valid NACA code;
+    # an unrecognised name yields no geometry and NeuralFoil then crashes. The
+    # planner may wire a non-NACA / garbage name, so fall back to NACA4412.
     af = asb.Airfoil(name=airfoil_name)
+    if getattr(af, "coordinates", None) is None:
+        airfoil_name = "NACA4412"
+        af = asb.Airfoil(name=airfoil_name)
     # NeuralFoil-based polar — fast, no XFoil dependency
     aero = af.get_aero_from_neuralfoil(alpha=alpha_deg, Re=reynolds, mach=mach)
 

@@ -43,6 +43,10 @@
  */
 
 import type { StructuredBriefJSON } from './types'
+import { createHash } from 'crypto'
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { homedir } from 'os'
+import { resolve } from 'path'
 
 // Best-reasoning model, run ONCE per chain (the result is written to disk +
 // reused). Mirrors bootstrap-tool-plan's HARVEST_MODEL deliberately — the brief
@@ -359,6 +363,19 @@ export async function expandBrief(
   rawBriefText: string,
 ): Promise<BriefExpansionResult> {
   const prompt = buildExpansionPrompt(brief, productClass, rawBriefText)
+  // CACHE for DETERMINISM: a given brief always yields the IDENTICAL detailed
+  // brief on re-run (the prompt deterministically encodes the brief+class+text),
+  // so scorecard comparisons are apples-to-apples and the run-to-run duty drift
+  // is gone. Skip via CHAIN_NO_BRIEF_CACHE=1.
+  const cacheKey = createHash('sha1').update(prompt).digest('hex').slice(0, 16)
+  const cacheDir = resolve(homedir(), '.forge-truth', 'brief-expansion-cache')
+  const cachePath = resolve(cacheDir, `${cacheKey}.json`)
+  if (process.env.CHAIN_NO_BRIEF_CACHE !== '1' && existsSync(cachePath)) {
+    try {
+      const cachedExpansion = sanitiseExpansion(JSON.parse(readFileSync(cachePath, 'utf-8')))
+      if (cachedExpansion) return { expansion: cachedExpansion, costUsd: 0, error: null, model: `${EXPAND_MODEL}+cache` }
+    } catch { /* corrupt cache → regenerate */ }
+  }
   const { parsed, costUsd, error } = await callReasoner(prompt)
   if (error || parsed == null) {
     return { expansion: null, costUsd, error: error ?? 'no completion', model: EXPAND_MODEL }
@@ -367,5 +384,6 @@ export async function expandBrief(
   if (!expansion) {
     return { expansion: null, costUsd, error: 'expansion failed validation (<2 valid duties)', model: EXPAND_MODEL }
   }
+  try { mkdirSync(cacheDir, { recursive: true }); writeFileSync(cachePath, JSON.stringify(expansion, null, 2)) } catch { /* non-fatal */ }
   return { expansion, costUsd, error: null, model: EXPAND_MODEL }
 }

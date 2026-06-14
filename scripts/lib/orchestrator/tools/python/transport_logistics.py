@@ -71,6 +71,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -240,7 +241,7 @@ def compute(payload: dict) -> dict:
     prod_h = float(dims.get("h", 0))
     prod_kg = float(payload.get("product_mass_kg", 0))
     qty = int(payload.get("quantity_per_shipment", 1))
-    mode = str(payload.get("mode", "sea_40ft_container")).lower()
+    mode = safe_choice(str(payload.get("mode", "sea_40ft_container")).lower(), CONTAINERS, default="sea_40ft_container", label="mode")
     origin = str(payload.get("origin_country", "UK")).upper()
     dest = str(payload.get("destination_country", "US")).upper()
 

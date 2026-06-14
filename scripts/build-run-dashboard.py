@@ -210,7 +210,9 @@ if isinstance(req_bom, list) and req_bom:
         if isinstance(r, dict):
             for k in r.keys():
                 if k not in cols: cols.append(k)
-    cols = [c for c in cols if c in ('requirement','fulfilment','fulfilment_name','part','component','quantity','qty','unit','unit_cost_gbp','total_gbp','cost_gbp','basis','classification')] or cols[:7]
+    PREFERRED = ['tag','requirement','status','part','component','qty','quantity','unit_gbp','line_gbp','unit_cost_gbp','total_gbp','cost_gbp','price_gbp','basis']
+    priced_extra = [c for c in cols if ('gbp' in c.lower() or 'cost' in c.lower() or 'price' in c.lower()) and c not in PREFERRED]
+    cols = [c for c in PREFERRED if c in cols] + priced_extra or cols[:8]
     S.append(f'<div class="card"><h3>Requirements-driven BoM ({len(req_bom)} rows)</h3><table><tr>')
     for c in cols: S.append(f"<th>{esc(c.replace('_',' '))}</th>")
     S.append('</tr>')

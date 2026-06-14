@@ -56,6 +56,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -123,8 +124,8 @@ def compute(payload: dict) -> dict:
     q = float(payload.get("heat_load_w", 100.0))
     length_m = float(payload.get("pipe_length_m", 1.0))
     dt_k = float(payload.get("evap_cond_dt_k", 5.0))
-    fluid_name = str(payload.get("working_fluid", "ammonia")).lower()
-    pipe_type = str(payload.get("pipe_type", "CCHP")).upper()
+    fluid_name = safe_choice(str(payload.get("working_fluid", "ammonia")).lower(), FLUIDS, default="ammonia", label="working_fluid")
+    pipe_type = safe_choice(str(payload.get("pipe_type", "CCHP")).upper(), PIPE_TYPES, default="CCHP", label="pipe_type")
     orientation = str(payload.get("orientation", "micro_g"))
     t_op = float(payload.get("operating_temp_k", 300.0))
 

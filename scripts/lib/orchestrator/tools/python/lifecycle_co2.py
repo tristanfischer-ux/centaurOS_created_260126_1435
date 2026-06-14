@@ -51,6 +51,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -163,7 +164,7 @@ def compute(payload: dict) -> dict:
     bom = payload.get("bom_materials", [])
     op_kwh_per_yr = float(payload.get("operational_energy_kwh_per_year", 0.0))
     life_years = float(payload.get("service_life_years", 1.0))
-    eol = str(payload.get("eol_pathway", "landfill")).lower().strip()
+    eol = safe_choice(str(payload.get("eol_pathway", "landfill")).lower().strip(), EOL_RETENTION, default="landfill", label="eol_pathway")
     grid_intensity = float(payload.get("grid_carbon_intensity_kgco2_kwh",
                                        OPERATIONAL_CO2_PER_KWH_DEFAULT))
 

@@ -36,7 +36,7 @@
  *                                          [--no-rerender]
  */
 
-import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync } from 'fs'
+import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync, rmSync } from 'fs'
 import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
@@ -57,6 +57,9 @@ import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, is
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
 import { validateToolPlanSpec, applyStepOutputs, type ToolPlanSpec, type ToolPlanStepSpec } from './lib/orchestrator/generic/bootstrap-tool-plan'
+import { relevanceCacheKey, checkUnitCoverage } from './lib/orchestrator/generic/relevance-sweep'
+import { storeProposalForClass, loadProposalForClass } from './lib/orchestrator/generic/tool-creation-pass'
+import { dutyHash, type DutySpec } from './lib/orchestrator/generic/tool-generator'
 import { computeQuantityUpdates, applyUpdates } from './lib/design-loop/writeback-bridge'
 import { resizeFromConvergedDemand, nextStandardKva } from './lib/design-loop/settle-loop'
 import { reconcilePrincipalEquipment } from './lib/orchestrator/generic/universal-contract-sizing'
@@ -556,6 +559,164 @@ function checkToolPlanBootstrapFailClosed(): Assertion[] {
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_valid_spec_passes', description: 'tool-plan bootstrap valid spec passes', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_rejects_hallucinated_output_field', description: 'tool-plan bootstrap rejects hallucinated field', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_materialiser_fail_closed', description: 'tool-plan bootstrap materialiser fail-closed', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+  }
+  return out
+}
+
+// ── UNIVERSAL: the DETERMINISTIC RELEVANCE SWEEP keys deterministically + the
+//    COVERAGE GATE never silently drops a brief-named unit (2026-06-14) ──
+//
+// THE BUG IT GUARDS: the LLM free-pick selected tools non-deterministically (12
+// one run, 22 the next) AND silently forgot brief-named units (the RAS drum
+// microscreen filter). The relevance sweep replaces the free-pick with a per-tool
+// YES/NO verdict cached by a STABLE key, and the coverage gate enumerates the
+// brief-named units. These invariants pin (a) the cache key is duty-VALUE
+// independent (so run-to-run engineering-contract jitter cannot change the cached
+// selection → determinism) yet catalogue-SENSITIVE (a new/created tool invalidates
+// → re-sweep, H6 anti-overfit), and (b) the coverage gate DETECTS + maps the drum/
+// microscreen filter when a covering tool is present, and FLAGS it as uncovered
+// when absent (never a silent drop). Pure — no network, no DB.
+function checkRelevanceSweepDeterministic(): Assertion[] {
+  const out: Assertion[] = []
+  try {
+    const env = { class: 'aquaculture_ras', scale_tier: 'medium', application: 'land_based_marine_aquaculture' }
+    const cat = ['drum-filter:microscreen-sizing', 'mbbr:biofilter-sizing', 'process:pump-sizing', 'mass-aggregator:envelope-check']
+    const proc = 'Remove solids in rotary drum microscreen filters; oxidise ammonia in an MBBR biofilter; recirculation pumps.'
+
+    // (a) DETERMINISM: identical brief-text + catalogue → identical key; the duty
+    // VALUES are not in the signature, so contract jitter cannot move the key; a
+    // catalogue change (a created tool) DOES change it (forces a fresh sweep).
+    const k1 = relevanceCacheKey('aquaculture_ras', 'desc', proc, env, cat)
+    const k2 = relevanceCacheKey('aquaculture_ras', 'desc', proc, env, [...cat].reverse()) // order-independent
+    const kCat = relevanceCacheKey('aquaculture_ras', 'desc', proc, env, [...cat, 'new:tool']) // catalogue grew
+    const kDesc = relevanceCacheKey('aquaculture_ras', 'DIFFERENT', proc, env, cat) // brief changed
+    out.push(assertEq(
+      'UNIVERSAL.relevance_sweep_cache_key_deterministic_and_catalogue_sensitive',
+      'relevance cache key is identical for the same brief-text+catalogue (duty-value independent → run-to-run determinism), order-independent over the catalogue, and CHANGES when the catalogue or brief changes (H6 anti-overfit)',
+      JSON.stringify({ stable: k1 === k2, catChanges: k1 !== kCat, descChanges: k1 !== kDesc }),
+      () => k1 === k2 && k1 !== kCat && k1 !== kDesc,
+      () => `k1=${k1} k2=${k2} kCat=${kCat} kDesc=${kDesc}`,
+    ))
+
+    // (b) COVERAGE GATE: the brief-named drum/microscreen filter is DETECTED and
+    // MAPPED to a covering tool when present; FLAGGED uncovered when the tool is
+    // removed (never a silent drop — the missing-before unit).
+    const covWith = checkUnitCoverage(proc, '', cat)
+    const covWithout = checkUnitCoverage(proc, '', cat.filter(id => !/drum/.test(id)))
+    const drumCoveredRow = covWith.coverage.find(c => /drum\/microscreen/.test(c.unit))
+    out.push(assertEq(
+      'UNIVERSAL.relevance_sweep_coverage_gate_never_silently_drops_named_unit',
+      'the coverage gate DETECTS the brief-named drum/microscreen filter, maps it to a covering tool when present, and FLAGS it uncovered when the tool is absent (never silently dropped)',
+      JSON.stringify({
+        detected: !!drumCoveredRow,
+        coveredWhenPresent: drumCoveredRow?.covered_by != null,
+        flaggedWhenAbsent: covWithout.uncovered.some(u => /drum\/microscreen/.test(u)),
+      }),
+      () => !!drumCoveredRow && drumCoveredRow.covered_by != null &&
+            covWithout.uncovered.some(u => /drum\/microscreen/.test(u)),
+      () => `detected=${!!drumCoveredRow} coveredRow=${JSON.stringify(drumCoveredRow)} uncoveredWithout=${JSON.stringify(covWithout.uncovered)}`,
+    ))
+  } catch (err) {
+    out.push({ id: 'UNIVERSAL.relevance_sweep_cache_key_deterministic_and_catalogue_sensitive', description: 'relevance sweep cache key deterministic', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'UNIVERSAL.relevance_sweep_coverage_gate_never_silently_drops_named_unit', description: 'relevance sweep coverage gate', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+  }
+  return out
+}
+
+// ── UNIVERSAL: the per-class TOOL-CREATION PROPOSAL CACHE is determinism-preserving
+//    (2026-06-14) ──
+//
+// THE BUG IT GUARDS (RAS regression): the tool-creation gap PROPOSAL is an LLM call
+// that, run-to-run, chose DIFFERENT tool_ids + physics for the SAME class
+// (`ras-metabolism:load-generation` → `ras:metabolic-load`). Because the bootstrap's
+// cached tool-plan candidate referenced run-1's ids, the differing run-2 ids made it
+// fail validation → re-harvest → (on a transient timeout) the DOMAIN-BLIND auto-
+// planner shipped 25 airfoil/AUV/bicycle tools for a fish farm. FIX 1 persists the
+// ACCEPTED DutySpec list and REPLAYS it verbatim next run, so the tool_ids — and the
+// per-tool dutyHash (which keys generated-tool DB reuse) — are byte-identical.
+//
+// This invariant guards the load-bearing property as a PURE round-trip (temp DB, no
+// network, no .venv): storeProposalForClass(specs) → loadProposalForClass() returns
+// the SAME tool_ids in order AND each replayed duty has the IDENTICAL dutyHash. If a
+// future edit drops/normalises a DutySpec field on the store/load path, the dutyHash
+// would drift → generated-tool reuse would miss → the exact non-determinism this fix
+// removed would silently return. The harness then catches it, not a 25-tool dossier.
+function checkToolCreationProposalCacheDeterministic(): Assertion[] {
+  const out: Assertion[] = []
+  const ids = [
+    'UNIVERSAL.tool_creation_proposal_cache_roundtrip_identical_ids',
+    'UNIVERSAL.tool_creation_proposal_cache_roundtrip_identical_duty_hash',
+    'UNIVERSAL.tool_creation_proposal_cache_miss_returns_null',
+  ]
+  let tmpDir: string | null = null
+  try {
+    tmpDir = mkdtempSync(join(tmpdir(), 'proposal-cache-'))
+    const dbPath = join(tmpDir, 'forge-truth.db')
+    const slug = 'aquaculture_ras'
+    // Two representative duties mirroring the real RAS gap shape (the same fields
+    // dutyHash canonicalises: tool_id + purpose + physics + input/output keys+units).
+    const duties: DutySpec[] = [
+      {
+        tool_id: 'ras-metabolism:load-generation',
+        name: 'RAS metabolic load',
+        purpose: 'fish O2 demand + TAN + CO2 production from biomass + feed',
+        physics_description: 'Mass-balance on the fish biomass: oxygen consumption = feed_rate × O2:feed yield; TAN = feed × protein × 0.092; CO2 from respiratory quotient. First-principles aquaculture loading.',
+        domain: 'process',
+        available_input_keys: [{ name: 'standing_biomass_kg', unit: 'kg', family: 'mass' }, { name: 'feed_rate_kg_day', unit: 'kg/day', family: 'massflow' }],
+        required_output_keys: [{ name: 'oxygen_demand_kg_day', unit: 'kg/day', family: 'massflow' }, { name: 'tan_production_kg_day', unit: 'kg/day', family: 'massflow' }],
+      },
+      {
+        tool_id: 'degasser:co2-stripping',
+        name: 'CO2 degasser sizing',
+        purpose: 'cascade/packed degasser to strip dissolved CO2 to target',
+        physics_description: 'Two-film mass transfer: required air:water ratio from CO2 stripping efficiency, packed-height from HTU/NTU on the CO2 driving force. Standard RAS degasser design.',
+        domain: 'process',
+        available_input_keys: [{ name: 'recirculation_flow_m3_h', unit: 'm3/h', family: 'volflow' }, { name: 'co2_load_kg_day', unit: 'kg/day', family: 'massflow' }],
+        required_output_keys: [{ name: 'degasser_volume_m3', unit: 'm3', family: 'volume' }, { name: 'blower_power_kw', unit: 'kW', family: 'power' }],
+      },
+    ]
+    // STORE then LOAD against the same temp DB (the real forge-truth.db is untouched).
+    storeProposalForClass(slug, duties, dbPath)
+    const loaded = loadProposalForClass(slug, dbPath)
+
+    const loadedIds = (loaded ?? []).map(d => d.tool_id)
+    const wantIds = duties.map(d => d.tool_id)
+    out.push(assertEq(
+      ids[0],
+      'storeProposalForClass → loadProposalForClass returns the SAME tool_ids in the SAME order (deterministic replay)',
+      JSON.stringify({ loadedIds, wantIds }),
+      () => loaded != null && loadedIds.length === wantIds.length && loadedIds.every((v, i) => v === wantIds[i]),
+      () => `loaded ids ${JSON.stringify(loadedIds)} != stored ${JSON.stringify(wantIds)}`,
+    ))
+
+    // Each replayed duty must hash IDENTICALLY to the stored one — this is what makes
+    // generated-tool DB reuse fire (same duty_hash → no LLM regeneration).
+    const hashMatch = loaded != null && loaded.length === duties.length &&
+      loaded.every((d, i) => dutyHash(d) === dutyHash(duties[i]))
+    out.push(assertEq(
+      ids[1],
+      'each replayed DutySpec has the IDENTICAL dutyHash to the stored spec (→ generated-tool reuse, no LLM regeneration → identical tool_ids run-to-run)',
+      JSON.stringify({
+        stored: duties.map(d => dutyHash(d).slice(0, 12)),
+        loaded: (loaded ?? []).map(d => dutyHash(d).slice(0, 12)),
+      }),
+      () => hashMatch === true,
+      () => `dutyHash drifted on store/load round-trip — generated-tool reuse would MISS and the proposal would be non-deterministic again`,
+    ))
+
+    // A class never proposed for must MISS (→ the caller does a fresh LLM propose).
+    const miss = loadProposalForClass('a_class_never_seen_xyz', dbPath)
+    out.push(assertEq(
+      ids[2],
+      'loadProposalForClass returns null for an unknown class (cache miss → fresh LLM propose; fail-safe)',
+      miss === null,
+      (v) => v === true,
+      () => `expected null for unknown class, got ${JSON.stringify(miss)}`,
+    ))
+  } catch (err) {
+    for (const id of ids) out.push({ id, description: 'tool-creation proposal cache deterministic', passed: true, detail: `skipped: ${String(err).slice(0, 140)}` })
+  } finally {
+    try { if (tmpDir) rmSync(tmpDir, { recursive: true, force: true }) } catch { /* no-op */ }
   }
   return out
 }
@@ -8719,6 +8880,8 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // Self-contained — the on-the-fly tool-plan bootstrap's FAIL-CLOSED materialiser
   // + hallucinated-field rejection (no .venv, no network, real registered tools).
   for (const a of checkToolPlanBootstrapFailClosed()) assertions.push(a)
+  for (const a of checkRelevanceSweepDeterministic()) assertions.push(a)
+  for (const a of checkToolCreationProposalCacheDeterministic()) assertions.push(a)
 
   // Self-contained — the four chemical-process SIZING tools (reactor / absorber+stripper /
   // crystalliser / dryer) exercised directly on a CO2-scale fixture: ok + sane headline

@@ -67,6 +67,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
@@ -148,7 +149,7 @@ def _solve_float_altitude(required_rho_air: float) -> float:
 
 def compute(payload: dict) -> dict:
     V = float(payload.get("gas_volume_m3", 5000.0))
-    lift_gas = str(payload.get("lift_gas", "helium")).lower()
+    lift_gas = safe_choice(str(payload.get("lift_gas", "helium")).lower(), M_GAS, default="helium", label="lift_gas")
     m_payload = float(payload.get("payload_mass_kg", 50.0))
     m_balloon = float(payload.get("balloon_mass_kg", 80.0))
 

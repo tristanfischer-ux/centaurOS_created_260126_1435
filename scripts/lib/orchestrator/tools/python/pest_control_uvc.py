@@ -48,6 +48,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -83,7 +84,7 @@ PATHOGEN_DOSE: dict[str, dict] = {
 
 def compute(payload: dict) -> dict:
     room_volume_m3 = float(payload.get("room_volume_m3", 100))
-    contaminant = str(payload.get("contaminant_type", "botrytis")).lower()
+    contaminant = safe_choice(str(payload.get("contaminant_type", "botrytis")).lower(), PATHOGEN_DOSE, default="botrytis", label="contaminant_type")
     target_log_reduction = float(payload.get("target_kill_log_reduction", 4.0))
     exposure_time_s = float(payload.get("exposure_time_s", 600))   # 10 min
     lamp_uvc_w = float(payload.get("lamp_uvc_w", 30))

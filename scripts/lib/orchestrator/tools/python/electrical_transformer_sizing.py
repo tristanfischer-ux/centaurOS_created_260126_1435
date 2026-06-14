@@ -133,7 +133,18 @@ def compute(payload: dict) -> dict:
     # list of floats; STANDARD_KVA_LADDER is still the default when absent.
     if isinstance(ladder, (int, float)):
         ladder = [ladder]
-    ladder = [float(x) for x in ladder]
+    elif isinstance(ladder, str):
+        # FAIL-SOFT (2026-06-14): the bootstrap may wire "500,800,1000" as a
+        # comma/space/semicolon-separated STRING rather than a JSON array.
+        # Split it instead of float()-ing the raw string (which crashed on ',').
+        ladder = ladder.replace(";", ",").replace(" ", ",").split(",")
+    _parsed = []
+    for _x in ladder:
+        try:
+            _parsed.append(float(_x))
+        except (TypeError, ValueError):
+            pass
+    ladder = _parsed or [float(x) for x in STANDARD_KVA_LADDER]
 
     # ---- Apparent power demand + required (with headroom) ----
     s_load_kva = p_kw / pf                       # kVA = kW / pf

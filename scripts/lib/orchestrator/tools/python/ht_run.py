@@ -54,6 +54,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 
 PROVENANCE = {
     "tool_name": "ht",
@@ -108,11 +109,11 @@ def compute(payload: dict) -> dict:
 
     # Accept multiple input keys for hx_type for backward compatibility with
     # ntu_heat_exchanger.py callers
-    hx_type_raw = str(
-        payload.get("hx_type")
-        or payload.get("configuration")
-        or "counterflow"
-    ).strip().lower()
+    # FAIL-SOFT: an unknown hx_type normalises to the nearest known (fuzzy) or
+    # 'counterflow' (the default configuration), never a raise.
+    hx_type_raw = safe_choice(
+        (payload.get("hx_type") or payload.get("configuration") or "counterflow"),
+        HX_TYPE_MAP, default="counterflow", label="hx_type")
 
     c_ratio = float(payload.get("c_ratio", 0.8))
     ntu = float(payload.get("ntu", 2.0))

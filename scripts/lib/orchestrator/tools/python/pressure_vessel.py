@@ -90,6 +90,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _worked import worked_calc  # noqa: E402
+from _fail_soft import safe_choice  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -123,11 +124,15 @@ def compute(payload: dict) -> dict:
     """Dispatch on `mode`: 'internal' (process column/reactor/tank under internal
     design pressure) or 'external' (AUV/submersible housing under external
     hydrostatic pressure — the default, unchanged historical behaviour)."""
-    mode = str(payload.get("mode", "external")).strip().lower()
+    # FAIL-SOFT (2026-06-14): never crash on an off-vocabulary mode (the planner
+    # may wire a garbage value, e.g. '1.0'). Missing → 'external' (historical
+    # default, preserves AUV); a provided-but-unrecognised value → 'internal'
+    # (the common process-vessel case), never a raise.
+    raw_mode = payload.get("mode")
+    mode = ("external" if raw_mode in (None, "")
+            else safe_choice(raw_mode, ("internal", "external"), default="internal", label="mode"))
     if mode == "internal":
         return compute_internal(payload)
-    if mode not in ("external", ""):
-        raise ValueError(f"mode must be 'internal' or 'external', got {mode!r}")
     return compute_external(payload)
 
 
@@ -138,10 +143,10 @@ def compute_internal(payload: dict) -> dict:
     external-hydrostatic maths. Mirrors reactor_cstr_pfr_sizing.py's shell calc."""
     diameter_mm = float(payload.get("diameter_mm", 900.0))
     length_mm = float(payload.get("length_mm", diameter_mm * 3.0))
-    material = str(payload.get("material", "steel_316L"))
+    # FAIL-SOFT: an unknown material normalises to the nearest known (fuzzy) or
+    # 316L stainless, never a raise.
+    material = safe_choice(payload.get("material", "steel_316L"), MATERIALS.keys(), default="steel_316L", label="material")
     sf_required = float(payload.get("safety_factor_required", 2.0))
-    if material not in MATERIALS:
-        raise ValueError(f"unknown material {material!r}; known: {list(MATERIALS.keys())}")
     mat = MATERIALS[material]
 
     # Internal design gauge pressure (barg preferred; MPa accepted as override).
@@ -320,11 +325,10 @@ def compute_external(payload: dict) -> dict:
     diameter_mm = float(payload.get("diameter_mm", 200.0))
     wall_t_mm = float(payload.get("wall_thickness_mm", 8.0))
     length_mm = float(payload.get("length_mm", diameter_mm * 3.0))
-    material = str(payload.get("material", "Ti_grade5"))
+    # FAIL-SOFT: an unknown material normalises to the nearest known (fuzzy) or
+    # Ti_grade5 (the AUV-housing default), never a raise.
+    material = safe_choice(payload.get("material", "Ti_grade5"), MATERIALS.keys(), default="Ti_grade5", label="material")
     sf_required = float(payload.get("safety_factor_required", 2.0))
-
-    if material not in MATERIALS:
-        raise ValueError(f"unknown material {material!r}; known: {list(MATERIALS.keys())}")
     mat = MATERIALS[material]
 
     rho_water = 1025.0  # kg/m³, seawater

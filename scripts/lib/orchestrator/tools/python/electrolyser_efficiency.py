@@ -48,6 +48,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 
@@ -122,7 +123,7 @@ def compute(payload: dict) -> dict:
     j = float(payload.get("cell_current_density_a_cm2", 1.5))
     t_c = float(payload.get("temperature_c", 70.0))
     p_bar = float(payload.get("pressure_bar", 30.0))
-    membrane_in = str(payload.get("membrane_type", "PEM")).strip().upper()
+    membrane_in = safe_choice(str(payload.get("membrane_type", "PEM")).strip().upper(), ("PEM", "alkaline", "AEM", "SOEC"), default="PEM", label="membrane_type")
     if membrane_in in {"PEM"}:
         params = MEMBRANE_PARAMS["PEM"]
     elif membrane_in in {"AEM"}:

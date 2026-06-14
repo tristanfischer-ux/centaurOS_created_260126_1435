@@ -41,6 +41,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -77,7 +78,7 @@ EFFICACY_UMOL_PER_J = {
 
 
 def compute(payload: dict) -> dict:
-    led_type = str(payload.get("led_type", "mixed_full_spectrum")).lower()
+    led_type = safe_choice(str(payload.get("led_type", "mixed_full_spectrum")).lower(), EFFICACY_UMOL_PER_J, default="mixed_full_spectrum", label="led_type")
     input_watts = float(payload.get("input_watts", 100.0))
     photoperiod_hours = float(payload.get("photoperiod_hours", 16.0))
     growing_area_m2 = float(payload.get("growing_area_m2", 5.0))

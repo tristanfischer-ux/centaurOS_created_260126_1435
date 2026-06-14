@@ -57,6 +57,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
@@ -131,7 +132,7 @@ def thermo_density_check(fluid_code: str, T_k: float, P_pa: float) -> dict:
 def compute(payload: dict) -> dict:
     import CoolProp.CoolProp as CP
 
-    fluid_in = str(payload.get("refrigerant", "R290")).strip().lower()
+    fluid_in = safe_choice(str(payload.get("refrigerant", "R290")).strip().lower(), FLUID_MAP_COOLPROP, default="r290", label="refrigerant")
     fluid = FLUID_MAP_COOLPROP.get(fluid_in)
     if not fluid:
         raise ValueError(f"unknown refrigerant {fluid_in!r}; known: {list(FLUID_MAP_COOLPROP.keys())}")

@@ -52,8 +52,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice, safe_float_list  # noqa: E402  (FAIL-SOFT: off-vocab categorical / string-wired list)
 
 PROVENANCE = {
     "tool_name": "python-control",
@@ -207,9 +211,10 @@ def compute(payload: dict) -> dict:
     import numpy as np
     import control as ct
 
-    num = list(payload.get("plant_numerator", [1.0]))
-    den = list(payload.get("plant_denominator", [1.0, 2.0, 1.0]))
-    method = str(payload.get("tuning_method", "imc")).lower()
+    # FAIL-SOFT: the planner may wire these as "1" / "1, 1" STRINGS, not arrays.
+    num = safe_float_list(payload.get("plant_numerator"), default=[1.0], label="plant_numerator")
+    den = safe_float_list(payload.get("plant_denominator"), default=[1.0, 2.0, 1.0], label="plant_denominator")
+    method = safe_choice(str(payload.get("tuning_method", "imc")).lower(), ("ziegler_nichols", "cohen_coon", "amigo", "imc", "lambda"), default="imc", label="tuning_method")
     target_resp = str(payload.get("target_response", "settling_time")).lower()
     target_val = float(payload.get("target_value", 4.0))
     lambda_imc = float(payload.get("lambda_imc_s", 1.0))

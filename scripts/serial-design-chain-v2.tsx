@@ -7768,6 +7768,14 @@ async function main() {
     console.error(`[chain] render-and-flag: ${residualIssues.length} gate(s) flagged but the dossier SHIPPED (set CHAIN_GATE_ENFORCE=1 to hard-block instead). See RESIDUAL-ISSUES.md.`)
   }
   console.error(`\n[chain] === FINAL ===  state: ${statePath}  pdf: ${pdfPath}  status=${acceptanceStatus}  gates_passed=${allPassed}  design_decisions=${designDecisions.length}`)
+
+  // Per-round HTML dashboard (Tristan 2026-06-14: a fresh dashboard EVERY round —
+  // brief inputs / tools / Blender / 8 engineering docs / BoM for THIS run).
+  // Best-effort: never fail the run over the convenience view.
+  try {
+    execFileSync('.venv/bin/python', ['scripts/build-run-dashboard.py', outDir], { stdio: 'ignore' })
+    console.error(`[chain] dashboard: ${resolve(outDir, 'dashboard.html')}`)
+  } catch { /* dashboard is best-effort */ }
 }
 
 main().catch(err => {

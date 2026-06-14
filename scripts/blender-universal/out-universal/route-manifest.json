@@ -1,0 +1,319 @@
+{
+  "schema": "route-manifest/1",
+  "count": 4,
+  "note": "One entry per routed connection (the drawn orthogonal polyline + an elbow at each bend). line_number mirrors draw_pid; the isometric re-matches via reconstruct_process for the exact P&ID/line-list number.",
+  "lines": [
+    {
+      "line_number": "201-PR-DN300",
+      "run_name": "u_route_0_fluid_loop",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "rearing_tanks",
+      "to_tag": "rotary_drum_filter",
+      "service": "dual_Cornell_drain_tank_exit_solids_rich_bottom_draw_plus_clean_sidewall_draw_to_40_60um_microscreen",
+      "size_label": "DN300",
+      "outer_dia_mm": 323.9,
+      "length_m": 44.88,
+      "waypoints_mm": [
+        [
+          4748.4,
+          -10100.0,
+          6975.0
+        ],
+        [
+          4748.4,
+          -10100.0,
+          6760.0
+        ],
+        [
+          4748.4,
+          -1125.0,
+          6760.0
+        ],
+        [
+          21248.4,
+          -1125.0,
+          6760.0
+        ],
+        [
+          21248.4,
+          13050.0,
+          6760.0
+        ],
+        [
+          21248.4,
+          13050.0,
+          1745.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            4748.4,
+            -10100.0,
+            6760.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            4748.4,
+            -1125.0,
+            6760.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            21248.4,
+            -1125.0,
+            6760.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            21248.4,
+            13050.0,
+            6760.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "202-PR-DN300",
+      "run_name": "u_route_1_fluid_loop",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "rotary_drum_filter",
+      "to_tag": "mbbr_biofilter",
+      "service": "solids_removed_to_protect_the_biofilter_from_organic_overload_then_TAN_oxidation_in_the_MBBR",
+      "size_label": "DN300",
+      "outer_dia_mm": 323.9,
+      "length_m": 33.92,
+      "waypoints_mm": [
+        [
+          21248.4,
+          13050.0,
+          1745.0
+        ],
+        [
+          21248.4,
+          13050.0,
+          7720.0
+        ],
+        [
+          21248.4,
+          -765.0,
+          7720.0
+        ],
+        [
+          26795.4,
+          -765.0,
+          7720.0
+        ],
+        [
+          26795.4,
+          1500.0,
+          7720.0
+        ],
+        [
+          26795.4,
+          1500.0,
+          1400.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            21248.4,
+            13050.0,
+            7720.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            21248.4,
+            -765.0,
+            7720.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            26795.4,
+            -765.0,
+            7720.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            26795.4,
+            1500.0,
+            7720.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "203-VT-DN250",
+      "run_name": "u_route_5_thermal",
+      "mechanism": "thermal",
+      "role": null,
+      "from_tag": "heat_pumps",
+      "to_tag": "rearing_tanks",
+      "service": "water_source_heat_pumps_hold_the_recirculating_inventory_at_26.4C_with_heat_recovery_from_the_warm_loop",
+      "size_label": "DN250",
+      "outer_dia_mm": 273.0,
+      "length_m": 45.84,
+      "waypoints_mm": [
+        [
+          31848.4,
+          3200.0,
+          1745.0
+        ],
+        [
+          31848.4,
+          3200.0,
+          7080.0
+        ],
+        [
+          31848.4,
+          -405.0,
+          7080.0
+        ],
+        [
+          4748.4,
+          -405.0,
+          7080.0
+        ],
+        [
+          4748.4,
+          -10100.0,
+          7080.0
+        ],
+        [
+          4748.4,
+          -10100.0,
+          6975.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            31848.4,
+            3200.0,
+            7080.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            31848.4,
+            -405.0,
+            7080.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            4748.4,
+            -405.0,
+            7080.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            4748.4,
+            -10100.0,
+            7080.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "204-PR",
+      "run_name": "u_route_7_electrical_bus",
+      "mechanism": "electrical_bus",
+      "role": null,
+      "from_tag": "electrical_supply",
+      "to_tag": "recirc_pumps_and_heat_pumps",
+      "service": "400_415V_three_phase_LV_behind_an_11kV_MV_transformer_planned_5MVA_micro_grid_with_backup_generator",
+      "size_label": "2×300 mm²",
+      "outer_dia_mm": 66.3,
+      "length_m": 94.27,
+      "waypoints_mm": [
+        [
+          9950.0,
+          62630.0,
+          2160.0
+        ],
+        [
+          9950.0,
+          62630.0,
+          7400.0
+        ],
+        [
+          9950.0,
+          -45.0,
+          7400.0
+        ],
+        [
+          27994.4,
+          -45.0,
+          7400.0
+        ],
+        [
+          27994.4,
+          3505.0,
+          7400.0
+        ],
+        [
+          27994.4,
+          3505.0,
+          2642.6
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            9950.0,
+            62630.0,
+            7400.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            9950.0,
+            -45.0,
+            7400.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            27994.4,
+            -45.0,
+            7400.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            27994.4,
+            3505.0,
+            7400.0
+          ]
+        }
+      ]
+    }
+  ]
+}

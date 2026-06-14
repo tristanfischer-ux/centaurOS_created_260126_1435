@@ -43,6 +43,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -82,8 +83,8 @@ ACCEL_GRADES: dict[str, dict] = {
 
 
 def compute(payload: dict) -> dict:
-    gyro_grade = str(payload.get("gyro_grade", "tactical")).lower()
-    accel_grade = str(payload.get("accelerometer_grade", "tactical")).lower()
+    gyro_grade = safe_choice(str(payload.get("gyro_grade", "tactical")).lower(), GYRO_GRADES, default="tactical", label="gyro_grade")
+    accel_grade = safe_choice(str(payload.get("accelerometer_grade", "tactical")).lower(), ACCEL_GRADES, default="tactical", label="accelerometer_grade")
     dvl_present = bool(payload.get("dvl_present", True))
     mission_hours = float(payload.get("mission_duration_hours", 24))
     dvl_accuracy_pct = float(payload.get("dvl_accuracy_pct", 0.2))   # 0.2% of speed

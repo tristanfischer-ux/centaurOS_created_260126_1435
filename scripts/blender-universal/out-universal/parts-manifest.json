@@ -1,0 +1,752 @@
+{
+  "schema": "parts-manifest/1",
+  "count": 41,
+  "bbox_mm": {
+    "x_min_mm": -381.6,
+    "x_max_mm": 62500.0,
+    "y_min_mm": -21880.0,
+    "y_max_mm": 61130.0,
+    "z_min_mm": -510.2,
+    "z_max_mm": 8000.0,
+    "length_mm": 62881.6,
+    "width_mm": 83010.0,
+    "height_mm": 8000.0
+  },
+  "parts": [
+    {
+      "tag": "u_flow_control_valve",
+      "equipment_tag": "I-101",
+      "name": "Flow Control Valve",
+      "module": "mass_fluid_transport_process",
+      "shape": "instrument",
+      "qty": 1,
+      "pos_mm": [
+        20117.1,
+        0.0,
+        500.0
+      ],
+      "dims_mm": {
+        "w": 250.0,
+        "d": 250.0,
+        "h": 400.0
+      }
+    },
+    {
+      "tag": "u_circulation_pump",
+      "equipment_tag": "P-101",
+      "name": "Circulation Pump",
+      "module": "mass_fluid_transport_process",
+      "shape": "pump",
+      "qty": 1,
+      "pos_mm": [
+        20954.6,
+        1500.0,
+        1499.5
+      ],
+      "dims_mm": {
+        "w": 2109.8,
+        "d": 1949.2,
+        "h": 2399.0
+      }
+    },
+    {
+      "tag": "u_pipework_run",
+      "equipment_tag": "X-101",
+      "name": "Pipework Run",
+      "module": "mass_fluid_transport_process",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        22745.4,
+        1500.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_distribution_manifold",
+      "equipment_tag": "X-102",
+      "name": "Distribution Manifold",
+      "module": "mass_fluid_transport_process",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        24095.4,
+        1500.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_expansion_reservoir",
+      "equipment_tag": "TK-101",
+      "name": "Expansion Reservoir",
+      "module": "mass_fluid_transport_process",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        25445.4,
+        1500.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_biofilter",
+      "equipment_tag": "X-103",
+      "name": "Biofilter",
+      "module": "mass_fluid_transport_process",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        26795.4,
+        1500.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_protein_skimming",
+      "equipment_tag": "X-104",
+      "name": "Protein Skimming",
+      "module": "water_treatment_system",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        35848.4,
+        1500.0,
+        1900.0
+      ],
+      "dims_mm": {
+        "w": 2400.0,
+        "d": 1800.0,
+        "h": 3200.0
+      }
+    },
+    {
+      "tag": "u_uv_sterilization",
+      "equipment_tag": "X-105",
+      "name": "UV Sterilization",
+      "module": "water_treatment_system",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        37898.4,
+        1500.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_rearing_tank",
+      "equipment_tag": "TK-102",
+      "name": "Rearing Tank",
+      "module": "mass_fluid_transport_process",
+      "shape": "tank",
+      "qty": 10,
+      "pos_mm": [
+        24698.4,
+        3200.0,
+        3457.5
+      ],
+      "dims_mm": {
+        "dia": 50160.0,
+        "len": 6315.0
+      }
+    },
+    {
+      "tag": "u_degasser",
+      "equipment_tag": "X-106",
+      "name": "Degasser",
+      "module": "mass_fluid_transport_process",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        23448.4,
+        3505.0,
+        4150.0
+      ],
+      "dims_mm": {
+        "w": 7000.0,
+        "d": 5950.0,
+        "h": 7700.0
+      }
+    },
+    {
+      "tag": "u_recirc_pump",
+      "equipment_tag": "P-102",
+      "name": "Recirc Pump",
+      "module": "mass_fluid_transport_process",
+      "shape": "pump",
+      "qty": 1,
+      "pos_mm": [
+        28017.7,
+        3505.0,
+        1157.4
+      ],
+      "dims_mm": {
+        "w": 1508.3,
+        "d": 1393.2,
+        "h": 1714.7
+      }
+    },
+    {
+      "tag": "u_oxygenation_system",
+      "equipment_tag": "X-107",
+      "name": "Oxygenation System",
+      "module": "water_treatment_system",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        35548.4,
+        3650.0,
+        1500.0
+      ],
+      "dims_mm": {
+        "w": 1800.0,
+        "d": 1200.0,
+        "h": 2400.0
+      }
+    },
+    {
+      "tag": "u_drum_filter",
+      "equipment_tag": "D-101",
+      "name": "Drum Filter",
+      "module": "mass_fluid_transport_process",
+      "shape": "horizontal_vessel",
+      "qty": 1,
+      "pos_mm": [
+        21248.4,
+        13050.0,
+        842.5
+      ],
+      "dims_mm": {
+        "dia": 700.0,
+        "len": 2705.3
+      }
+    },
+    {
+      "tag": "u_vlt_aqua_drive_fc_202",
+      "equipment_tag": "EP-101",
+      "name": "VLT AQUA Drive FC 202",
+      "module": "actuation_kinematics",
+      "shape": "cabinet_small",
+      "qty": 1,
+      "pos_mm": [
+        12772.5,
+        29780.0,
+        1200.0
+      ],
+      "dims_mm": {
+        "w": 700.0,
+        "d": 500.0,
+        "h": 1800.0
+      }
+    },
+    {
+      "tag": "u_compression_latch",
+      "equipment_tag": "X-108",
+      "name": "Compression Latch",
+      "module": "maintenance_serviceability",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        16900.0,
+        31280.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_structural_frame",
+      "equipment_tag": "X-109",
+      "name": "Structural Frame",
+      "module": "structure_containment",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        41500.0,
+        31280.0,
+        3550.0
+      ],
+      "dims_mm": {
+        "w": 42000.0,
+        "d": 28000.0,
+        "h": 6500.0
+      }
+    },
+    {
+      "tag": "u_enclosure_panel",
+      "equipment_tag": "X-110",
+      "name": "Enclosure Panel",
+      "module": "structure_containment",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        21100.0,
+        59630.0,
+        350.0
+      ],
+      "dims_mm": {
+        "w": 1200.0,
+        "d": 3000.0,
+        "h": 100.0
+      }
+    },
+    {
+      "tag": "u_temperature_sensor",
+      "equipment_tag": "I-102",
+      "name": "Temperature Sensor",
+      "module": "environmental_interface",
+      "shape": "instrument",
+      "qty": 1,
+      "pos_mm": [
+        30717.1,
+        0.0,
+        500.0
+      ],
+      "dims_mm": {
+        "w": 250.0,
+        "d": 250.0,
+        "h": 400.0
+      }
+    },
+    {
+      "tag": "u_cooling_fan",
+      "equipment_tag": "K-101",
+      "name": "Cooling Fan",
+      "module": "environmental_interface",
+      "shape": "pump",
+      "qty": 1,
+      "pos_mm": [
+        30998.4,
+        1500.0,
+        692.0
+      ],
+      "dims_mm": {
+        "w": 945.0,
+        "d": 637.0,
+        "h": 784.0
+      }
+    },
+    {
+      "tag": "u_chiller_unit",
+      "equipment_tag": "E-101",
+      "name": "Chiller Unit",
+      "module": "environmental_interface",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        32298.4,
+        1500.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_air_damper",
+      "equipment_tag": "X-111",
+      "name": "Air Damper",
+      "module": "environmental_interface",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        31048.4,
+        2750.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_heat_exchanger",
+      "equipment_tag": "E-102",
+      "name": "Heat Exchanger",
+      "module": "environmental_interface",
+      "shape": "horizontal_vessel",
+      "qty": 1,
+      "pos_mm": [
+        31848.4,
+        3200.0,
+        842.5
+      ],
+      "dims_mm": {
+        "dia": 700.0,
+        "len": 2705.3
+      }
+    },
+    {
+      "tag": "u_main_breaker",
+      "equipment_tag": "X-112",
+      "name": "Main Breaker",
+      "module": "power_distribution",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        8700.0,
+        31280.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_distribution_busbar",
+      "equipment_tag": "X-113",
+      "name": "Distribution Busbar",
+      "module": "power_distribution",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        10050.0,
+        31280.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_fuse_holder",
+      "equipment_tag": "X-114",
+      "name": "Fuse Holder",
+      "module": "power_distribution",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        8700.0,
+        32530.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_surge_protector",
+      "equipment_tag": "X-115",
+      "name": "Surge Protector",
+      "module": "power_distribution",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        10050.0,
+        32530.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_main_controller",
+      "equipment_tag": "X-116",
+      "name": "Main Controller",
+      "module": "control_compute_communication",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        39848.4,
+        1500.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_communication_gateway",
+      "equipment_tag": "X-117",
+      "name": "Communication Gateway",
+      "module": "control_compute_communication",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        41198.4,
+        1500.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_i_o_module",
+      "equipment_tag": "X-118",
+      "name": "I/O Module",
+      "module": "control_compute_communication",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        39848.4,
+        2750.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_network_switch",
+      "equipment_tag": "X-119",
+      "name": "Network Switch",
+      "module": "control_compute_communication",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        41198.4,
+        2750.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_controller_power_supply",
+      "equipment_tag": "X-120",
+      "name": "Controller Power Supply",
+      "module": "control_compute_communication",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        39848.4,
+        4000.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_fire_detector",
+      "equipment_tag": "I-103",
+      "name": "Fire Detector",
+      "module": "safety_protection",
+      "shape": "instrument",
+      "qty": 1,
+      "pos_mm": [
+        168.7,
+        29780.0,
+        500.0
+      ],
+      "dims_mm": {
+        "w": 250.0,
+        "d": 250.0,
+        "h": 400.0
+      }
+    },
+    {
+      "tag": "u_voltage_sensor",
+      "equipment_tag": "I-104",
+      "name": "Voltage Sensor",
+      "module": "sensing_instrumentation",
+      "shape": "instrument",
+      "qty": 1,
+      "pos_mm": [
+        4268.8,
+        29780.0,
+        500.0
+      ],
+      "dims_mm": {
+        "w": 250.0,
+        "d": 250.0,
+        "h": 400.0
+      }
+    },
+    {
+      "tag": "u_current_sensor",
+      "equipment_tag": "I-105",
+      "name": "Current Sensor",
+      "module": "sensing_instrumentation",
+      "shape": "instrument",
+      "qty": 1,
+      "pos_mm": [
+        4606.2,
+        29780.0,
+        500.0
+      ],
+      "dims_mm": {
+        "w": 250.0,
+        "d": 250.0,
+        "h": 400.0
+      }
+    },
+    {
+      "tag": "u_temperature_probe",
+      "equipment_tag": "I-106",
+      "name": "Temperature Probe",
+      "module": "sensing_instrumentation",
+      "shape": "instrument",
+      "qty": 1,
+      "pos_mm": [
+        4943.7,
+        29780.0,
+        500.0
+      ],
+      "dims_mm": {
+        "w": 250.0,
+        "d": 250.0,
+        "h": 400.0
+      }
+    },
+    {
+      "tag": "u_pressure_sensor",
+      "equipment_tag": "I-107",
+      "name": "Pressure Sensor",
+      "module": "sensing_instrumentation",
+      "shape": "instrument",
+      "qty": 1,
+      "pos_mm": [
+        5281.2,
+        29780.0,
+        500.0
+      ],
+      "dims_mm": {
+        "w": 250.0,
+        "d": 250.0,
+        "h": 400.0
+      }
+    },
+    {
+      "tag": "u_protective_relay",
+      "equipment_tag": "X-121",
+      "name": "Protective Relay",
+      "module": "safety_protection",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        500.0,
+        31280.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_emergency_stop_button",
+      "equipment_tag": "X-122",
+      "name": "Emergency Stop Button",
+      "module": "safety_protection",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        1850.0,
+        31280.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_signal_conditioner",
+      "equipment_tag": "X-123",
+      "name": "Signal Conditioner",
+      "module": "sensing_instrumentation",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        4600.0,
+        31280.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_isolation_device",
+      "equipment_tag": "X-124",
+      "name": "Isolation Device",
+      "module": "safety_protection",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        500.0,
+        32530.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    },
+    {
+      "tag": "u_interlock_switch",
+      "equipment_tag": "X-125",
+      "name": "Interlock Switch",
+      "module": "safety_protection",
+      "shape": "box",
+      "qty": 1,
+      "pos_mm": [
+        1850.0,
+        32530.0,
+        850.0
+      ],
+      "dims_mm": {
+        "w": 1000.0,
+        "d": 900.0,
+        "h": 1100.0
+      }
+    }
+  ]
+}

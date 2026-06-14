@@ -56,6 +56,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -97,8 +98,8 @@ LV_INJECTION_BIAS = {
 
 def compute(payload: dict) -> dict:
     maneuvers = payload.get("maneuvers", []) or []
-    lv = str(payload.get("launch_vehicle", "Falcon_9"))
-    orbit_target = str(payload.get("orbit_target", "LEO_SSO"))
+    lv = safe_choice(str(payload.get("launch_vehicle", "Falcon_9")), LV_INJECTION_BIAS, default="Falcon_9", label="launch_vehicle")
+    orbit_target = safe_choice(str(payload.get("orbit_target", "LEO_SSO")), ORBIT_SK_DEFAULTS, default="LEO_SSO", label="orbit_target")
     mission_years = float(payload.get("mission_years", 5.0))
     isp_s = float(payload.get("isp_assumed_s", 220.0))
     dry_kg = float(payload.get("dry_mass_kg", 500.0))

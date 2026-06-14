@@ -29,6 +29,7 @@ import { checkClassFit, mintProvisionalSlug, type ClassFitResult } from './class
 import { selectPlan } from './planner'
 import { composeFallbackPlan } from './auto-plan-fallback'
 import { bootstrapToolPlan } from './generic/bootstrap-tool-plan'
+import { runToolCreationPass } from './generic/tool-creation-pass'
 import { runToolPlan } from './executor'
 import { runConsistencyVerifier } from './verifier'
 import { finaliseContract } from './aggregator'
@@ -46,6 +47,57 @@ export interface OrchestrateOptions {
    *  If false, return partial result with failures for diagnostic use. */
   fallback_on_failure?: boolean
 }
+
+// ── FIX 2: bootstrap-failure hardening ───────────────────────────────────────
+//
+// (a) TRANSIENT-failure retry: the RAS regression's proximate cause was a
+// one-off OpenRouter timeout on the re-harvest. A timeout / HTTP 5xx / transport
+// drop is transient — retry it with backoff + a longer timeout before giving up.
+// A DETERMINISTIC failure (validation errors, empty catalogue, bad slug, no API
+// key) is NOT retried — re-running it just burns time + tokens for the same
+// result.
+//
+// (b) GATED fallback: if the bootstrap still fails, DO NOT silently ship the
+// domain-blind auto-planner's garbage (airfoil/spacecraft/bicycle for a fish
+// farm). The auto-planner fallback for the bootstrap-MISS case is now gated
+// behind UNIVERSAL_AUTO_PLAN_FALLBACK (default OFF) so the orchestrator emits a
+// LOUD, honest failure instead — "a thin correct result beats a confident wrong
+// one." (UNIVERSAL_AUTO_PLAN still governs whether composeFallbackPlan can build
+// a graph at all; this new flag governs whether a bootstrap-MISS is allowed to
+// USE it.)
+
+/** Max bootstrap attempts on a TRANSIENT failure (1 initial + up to 2 retries). */
+const BOOTSTRAP_MAX_ATTEMPTS = 3
+/** Harvest abort timeout per attempt (ms) — increases so a slow-but-alive model
+ *  gets more room on each retry. */
+const BOOTSTRAP_HARVEST_TIMEOUTS_MS = [180_000, 240_000, 300_000]
+/** Backoff before each retry (ms). */
+const BOOTSTRAP_RETRY_BACKOFF_MS = [0, 4_000, 12_000]
+
+/** Is a bootstrap failure TRANSIENT (worth retrying)? Only an LLM-call-stage
+ *  failure whose error names a timeout / HTTP 5xx / transport drop. A validation /
+ *  empty-catalogue / no-api-key / bad-slug failure is deterministic → never retry. */
+function isTransientBootstrapFailure(stage: string, error: string): boolean {
+  if (stage !== 'llm-call') return false
+  const e = (error || '').toLowerCase()
+  return (
+    e.includes('timeout') || e.includes('aborted') ||
+    e.includes('http 5') || // 500/502/503/504
+    e.includes('econnreset') || e.includes('socket hang up') ||
+    e.includes('network') || e.includes('fetch failed') || e.includes('etimedout')
+  )
+}
+
+/** Whether a bootstrap-MISS is permitted to fall through to the domain-blind
+ *  auto-planner fallback. Default OFF — a bootstrap miss returns a LOUD honest
+ *  failure rather than a garbage domain-blind plan. Set =1 to restore the old
+ *  silent-fallthrough behaviour. */
+function autoPlanFallbackOnBootstrapMissEnabled(): boolean {
+  const v = process.env.UNIVERSAL_AUTO_PLAN_FALLBACK
+  return v === '1' || v === 'true'
+}
+
+const sleep = (ms: number): Promise<void> => (ms > 0 ? new Promise(r => setTimeout(r, ms)) : Promise.resolve())
 
 /**
  * Top-level orchestrator entry. Returns the final Contract +
@@ -169,7 +221,59 @@ export async function orchestrateDesign(
           dutyKeys.add(r.key)
           duties.push({ key: r.key, value: r.value, unit: typeof r.unit === 'string' ? r.unit : '', condition: null })
         }
-        const boot = await bootstrapToolPlan(envelope.class, parsedConstraints, envelope, duties)
+
+        // TOOL-CREATION-ON-THE-FLY (2026-06-14, the AGREED ENGINE-FIX PLAN): BEFORE
+        // the planner picks + wires tools, fill GAPS in the catalogue. For each
+        // engineering duty this brief needs that NO catalogue tool covers, generate
+        // a new python sizing tool that SELF-TESTS and is registered ONLY if it
+        // passes ("assume every generated tool is broken until its own self-test
+        // proves otherwise"). The created tools enter the in-memory registry + raw-
+        // IO map, so bootstrapToolPlan's catalogue (built below) can WIRE them. The
+        // candidate is stored status 'candidate' — NEVER auto-promoted. Universal
+        // (LLM proposes gaps, the deterministic self-test gate disposes) + fail-safe
+        // (a failed creation just means that duty has no tool this run; the chain
+        // proceeds). Gated UNIVERSAL_TOOL_CREATION (default ON; =0 disables).
+        if (process.env.UNIVERSAL_TOOL_CREATION !== '0') {
+          try {
+            const creation = await runToolCreationPass(envelope, parsedConstraints, duties)
+            if (creation.created.length > 0 || creation.rejected.length > 0) {
+              console.error(
+                `[orchestrator] UNIVERSAL_TOOL_CREATION (${creation.stage}) for ${envelope.class}: ` +
+                `created+registered ${creation.created.length} self-test-passed tool(s) ` +
+                `[${creation.created.map(c => c.tool_id).join(', ') || 'none'}]; ` +
+                `rejected ${creation.rejected.length} [${creation.rejected.map(r => `${r.tool_id}(${r.stage})`).join(', ') || 'none'}]; ` +
+                `cost_usd=${creation.llm_cost_usd ?? 'n/a'}. The bootstrap planner can now wire the created tools.`,
+              )
+            }
+          } catch (err) {
+            console.error(`[orchestrator] UNIVERSAL_TOOL_CREATION threw for ${envelope.class}: ${(err as Error).message} — proceeding to the bootstrap planner with the existing catalogue (fail-safe).`)
+          }
+        }
+
+        // FIX 2a — retry the bootstrap harvest on a TRANSIENT failure (timeout /
+        // 5xx) with backoff + a longer timeout each attempt. A deterministic
+        // failure (validation / empty-catalogue / no-api-key) breaks out
+        // immediately (retrying it is wasted time + tokens). On the DB-first reuse
+        // path (the common case once a candidate exists) the first attempt makes no
+        // LLM call and returns instantly, so the retry loop is a no-op there.
+        let boot = await bootstrapToolPlan(envelope.class, parsedConstraints, envelope, duties, {
+          harvestTimeoutMs: BOOTSTRAP_HARVEST_TIMEOUTS_MS[0],
+        })
+        for (
+          let attempt = 2;
+          attempt <= BOOTSTRAP_MAX_ATTEMPTS && !boot.ok && isTransientBootstrapFailure(boot.stage, boot.error);
+          attempt++
+        ) {
+          const backoff = BOOTSTRAP_RETRY_BACKOFF_MS[attempt - 1] ?? 12_000
+          console.error(
+            `[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP TRANSIENT failure (stage=${boot.stage}) for ${envelope.class}: ${boot.error} ` +
+            `— retry ${attempt}/${BOOTSTRAP_MAX_ATTEMPTS} after ${backoff}ms with a ${(BOOTSTRAP_HARVEST_TIMEOUTS_MS[attempt - 1] ?? 300_000) / 1000}s timeout.`,
+          )
+          await sleep(backoff)
+          boot = await bootstrapToolPlan(envelope.class, parsedConstraints, envelope, duties, {
+            harvestTimeoutMs: BOOTSTRAP_HARVEST_TIMEOUTS_MS[attempt - 1] ?? 300_000,
+          })
+        }
         if (boot.ok) {
           console.error(
             `[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for ${envelope.class}/${envelope.scale_tier} — ` +
@@ -183,33 +287,47 @@ export async function orchestrateDesign(
           console.error(
             `[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP failed (stage=${boot.stage}) for ${envelope.class}: ${boot.error}` +
             (boot.validation_errors.length > 0 ? ` | validation: ${boot.validation_errors.slice(0, 5).join('; ')}` : '') +
-            ` — falling through to the auto-planner fallback.`,
+            (autoPlanFallbackOnBootstrapMissEnabled()
+              ? ` — UNIVERSAL_AUTO_PLAN_FALLBACK=1, falling through to the (domain-blind) auto-planner fallback.`
+              : ` — NOT falling through to the domain-blind auto-planner (UNIVERSAL_AUTO_PLAN_FALLBACK off). Returning a LOUD honest failure instead of a garbage plan.`),
           )
         }
       } catch (err) {
-        console.error(`[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP threw for ${envelope.class}: ${(err as Error).message} — falling through to the auto-planner fallback.`)
+        console.error(`[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP threw for ${envelope.class}: ${(err as Error).message} — bootstrap produced no plan (the gated auto-planner fallback decides next).`)
       }
     }
 
     // TIER 2 — WALL-2 AUTO-PLANNER FALLBACK (2026-06-01, LAST RESORT): only if
     // the bootstrap returned no plan. Composes a tool graph from declared tool
-    // I/O by backward-chaining (domain-blind — kept solely so a novel class
-    // still advances past wall-2 when the bootstrap is unavailable, e.g. no API
-    // key). Gated behind UNIVERSAL_AUTO_PLAN. Returns null when the flag is off
-    // or no graph composes → we keep the loud failure below verbatim.
+    // I/O by backward-chaining (DOMAIN-BLIND — it picked airfoil/AUV/bicycle
+    // tools for a fish farm). FIX 2b: this is now gated behind a SECOND flag,
+    // UNIVERSAL_AUTO_PLAN_FALLBACK (default OFF). A bootstrap MISS is no longer
+    // allowed to silently ship a domain-blind garbage plan — by default we emit a
+    // LOUD honest failure ("a thin correct result beats a confident wrong one").
+    // Set UNIVERSAL_AUTO_PLAN_FALLBACK=1 to restore the old fallthrough (and
+    // composeFallbackPlan itself still honours UNIVERSAL_AUTO_PLAN).
     if (!plan) {
+      if (!autoPlanFallbackOnBootstrapMissEnabled()) {
+        const prefix = loud_failures ? '[LOUD] ' : ''
+        return failResult(
+          initialContract,
+          [`${prefix}tool-plan bootstrap failed for envelope ${envelope.class}/${envelope.scale_tier} and the domain-blind auto-planner fallback is DISABLED (UNIVERSAL_AUTO_PLAN_FALLBACK off) — refusing to ship a domain-blind tool plan (airfoil/spacecraft/bicycle for an unrelated class). FIX the bootstrap (it is usually a transient OpenRouter timeout — re-run; the per-class proposal + plan candidates are cached so the re-run is deterministic and near-instant), or register a ClassToolPlan in scripts/lib/orchestrator/class-plans/<class>.ts, or set UNIVERSAL_AUTO_PLAN_FALLBACK=1 to accept the (lower-quality) auto-planner output`],
+          fallback_on_failure,
+        )
+      }
       const composed = composeFallbackPlan(envelope, parsedConstraints)
       if (composed) {
         console.error(
           `[orchestrator] UNIVERSAL_AUTO_PLAN (fallback): no registered plan AND bootstrap unavailable for ${envelope.class}/${envelope.scale_tier} — composed a ${composed.plan.tools.length}-tool fallback graph ` +
-          `(coupled_pairs=${composed.graph.coupled_pairs.length}, unmet_outputs=${composed.graph.unmet_outputs.length}). All steps non-fatal; proceeding past wall-2.`,
+          `(coupled_pairs=${composed.graph.coupled_pairs.length}, unmet_outputs=${composed.graph.unmet_outputs.length}). All steps non-fatal; proceeding past wall-2. ` +
+          `WARNING: this is the DOMAIN-BLIND planner (UNIVERSAL_AUTO_PLAN_FALLBACK=1) — the selected tools may not match the product domain.`,
         )
         plan = composed.plan
       } else {
         const prefix = loud_failures ? '[LOUD] ' : ''
         return failResult(
           initialContract,
-          [`${prefix}no tool plan registered for envelope ${envelope.class}/${envelope.scale_tier} — class needs a ClassToolPlan in scripts/lib/orchestrator/class-plans/<class>.ts with envelope_predicate matching this envelope (or set UNIVERSAL_TOOL_PLAN_BOOTSTRAP=1 / UNIVERSAL_AUTO_PLAN=1 to compose one)`],
+          [`${prefix}no tool plan registered for envelope ${envelope.class}/${envelope.scale_tier} — class needs a ClassToolPlan in scripts/lib/orchestrator/class-plans/<class>.ts with envelope_predicate matching this envelope (or set UNIVERSAL_TOOL_PLAN_BOOTSTRAP=1 / UNIVERSAL_AUTO_PLAN=1 / UNIVERSAL_AUTO_PLAN_FALLBACK=1 to compose one)`],
           fallback_on_failure,
         )
       }

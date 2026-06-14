@@ -60,6 +60,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 
@@ -96,11 +97,11 @@ RANDOM_TEST_DURATION_S = 60.0
 
 
 def compute(payload: dict) -> dict:
-    lv = str(payload.get("launch_vehicle", "Falcon_9"))
+    lv = safe_choice(str(payload.get("launch_vehicle", "Falcon_9")), LV_PROFILES, default="Falcon_9", label="launch_vehicle")
     mass_kg = float(payload.get("payload_mass_kg", 100.0))
     fn_hz = float(payload.get("first_natural_frequency_hz", 80.0))
     damping = float(payload.get("damping_ratio", 0.03))
-    axis = str(payload.get("axis", "lateral"))
+    axis = safe_choice(str(payload.get("axis", "lateral")), ("lateral", "axial", "thrust"), default="lateral", label="axis")
 
     if lv not in LV_PROFILES:
         raise ValueError(f"unknown launch_vehicle {lv!r}; known: {list(LV_PROFILES)}")

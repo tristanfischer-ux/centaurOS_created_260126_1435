@@ -64,6 +64,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 PROVENANCE = {
@@ -105,7 +106,7 @@ MATERIALS = {
 
 def compute(payload: dict) -> dict:
     reactor_name = str(payload.get("reactor_name", "reactor"))
-    reactor_type = str(payload.get("reactor_type", "cstr")).strip().lower()
+    reactor_type = safe_choice(str(payload.get("reactor_type", "cstr")).strip().lower(), ("cstr", "pfr"), default="cstr", label="reactor_type")
     if reactor_type not in ("cstr", "pfr"):
         raise ValueError(f"reactor_type must be 'cstr' or 'pfr', got {reactor_type!r}")
 
@@ -172,7 +173,7 @@ def compute(payload: dict) -> dict:
     height_m = l_to_d * diameter_m
 
     # ---- Shell wall thickness (hoop stress, internal pressure) ----
-    material = str(payload.get("material", "steel_316L"))
+    material = safe_choice(str(payload.get("material", "steel_316L")), MATERIALS, default="steel_316L", label="material")
     if material not in MATERIALS:
         raise ValueError(f"unknown material {material!r}; known: {list(MATERIALS)}")
     mat = MATERIALS[material]

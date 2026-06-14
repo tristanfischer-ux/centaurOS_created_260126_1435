@@ -40,6 +40,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -82,8 +83,8 @@ LANDING_GEAR_STROKE = {
 def compute(payload: dict) -> dict:
     mass_kg = float(payload.get("drone_mass_kg", 5.0))
     v_descent = float(payload.get("descent_velocity_ms", 3.0))
-    gear_type = str(payload.get("landing_gear", "sprung")).lower()
-    material = str(payload.get("frame_material", "cfrp_woven")).lower()
+    gear_type = safe_choice(str(payload.get("landing_gear", "sprung")).lower(), LANDING_GEAR_STROKE, default="sprung", label="landing_gear")
+    material = safe_choice(str(payload.get("frame_material", "cfrp_woven")).lower(), MATERIALS, default="cfrp_woven", label="frame_material")
     frame_csa_mm2 = float(payload.get("frame_csa_mm2", 50))   # cross-section area
     arm_length_m = float(payload.get("arm_length_m", 0.3))    # for cantilever deflection
 

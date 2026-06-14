@@ -17,14 +17,18 @@ License: BSD. Source: github.com/Cantera/cantera
 """
 from __future__ import annotations
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 
 
 def compute(payload: dict) -> dict:
     import cantera as ct
 
-    mode = str(payload.get("mode", "equilibrium")).lower()
+    mode = safe_choice(str(payload.get("mode", "equilibrium")).lower(), ("equilibrium", "ideal_gas_thermo"), default="equilibrium", label="mode")
 
     if mode == "equilibrium":
         # Default: stoichiometric H2/O2/N2 combustion at 1 atm

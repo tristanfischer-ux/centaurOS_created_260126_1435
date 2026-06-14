@@ -55,6 +55,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -88,16 +89,13 @@ ATTACH_H_W_M2K = {
 
 
 def compute(payload: dict) -> dict:
-    material = str(payload.get("material", "OFHC_copper"))
+    material = safe_choice(str(payload.get("material", "OFHC_copper")), MATERIALS, default="OFHC_copper", label="material")
     length_mm = float(payload.get("length_mm", 100.0))
     area_mm2 = float(payload.get("cross_section_mm2", 25.0))
-    attach = str(payload.get("end_attachment", "bolted"))
+    # FAIL-SOFT: unknown end_attachment normalises to the nearest known or
+    # 'bolted' (the default interface), never a raise.
+    attach = safe_choice(payload.get("end_attachment", "bolted"), ATTACH_H_W_M2K, default="bolted", label="end_attachment")
     r_bend_mm = float(payload.get("bending_radius_mm", 20.0))
-
-    if material not in MATERIALS:
-        raise ValueError(f"unknown material {material!r}; known: {list(MATERIALS)}")
-    if attach not in ATTACH_H_W_M2K:
-        raise ValueError(f"unknown attachment {attach!r}; known: {list(ATTACH_H_W_M2K)}")
 
     mat = MATERIALS[material]
     h_contact = ATTACH_H_W_M2K[attach]

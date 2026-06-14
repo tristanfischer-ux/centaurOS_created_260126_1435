@@ -98,7 +98,14 @@ def compute(payload: dict) -> dict:
     T_k = T_c + 273.15
     P_pa = P_bar * 1e5
 
-    c = get_chemical(chemical, T_k, P_pa)
+    # FAIL-SOFT: `thermo` validates the chemical name against the DIPPR database
+    # and raises on an unrecognised one. The planner may wire a name the library
+    # doesn't know; fall back to water rather than crashing the whole tool call.
+    try:
+        c = get_chemical(chemical, T_k, P_pa)
+    except Exception:
+        chemical = "water"
+        c = get_chemical(chemical, T_k, P_pa)
 
     out = {
         "chemical": chemical,

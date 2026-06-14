@@ -45,6 +45,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -119,7 +120,7 @@ SOIL_DURATIONS: dict[str, dict] = {
 def compute(payload: dict) -> dict:
     volume_l = float(payload.get("vessel_volume_l", 1000))
     surface_area_m2 = float(payload.get("vessel_surface_area_m2", 25))
-    soil = str(payload.get("soil_type", "cell_debris")).lower()
+    soil = safe_choice(str(payload.get("soil_type", "cell_debris")).lower(), SOIL_DURATIONS, default="cell_debris", label="soil_type")
     cleaning_temp_c_user = payload.get("cleaning_temp_c")
 
     if soil not in SOIL_DURATIONS:

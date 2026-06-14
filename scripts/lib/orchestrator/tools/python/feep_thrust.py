@@ -55,6 +55,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
@@ -82,7 +83,7 @@ PROPELLANTS = {
 def compute(payload: dict) -> dict:
     i_b = float(payload.get("beam_current_a", 1.0e-3))
     v_b = float(payload.get("beam_voltage_v", 6000.0))
-    propellant = str(payload.get("propellant", "indium")).lower()
+    propellant = safe_choice(str(payload.get("propellant", "indium")).lower(), PROPELLANTS, default="indium", label="propellant")
 
     if propellant not in PROPELLANTS:
         raise ValueError(f"unknown propellant {propellant!r}; known: {list(PROPELLANTS)}")

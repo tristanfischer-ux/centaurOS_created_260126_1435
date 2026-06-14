@@ -61,6 +61,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -107,11 +108,11 @@ FEED_ULLAGE_PCT = {
 
 
 def compute(payload: dict) -> dict:
-    prop = str(payload.get("propellant_type", "MMH"))
+    prop = safe_choice(str(payload.get("propellant_type", "MMH")), PROP_DENSITIES, default="MMH", label="propellant_type")
     mass_kg = float(payload.get("propellant_mass_kg", 30.0))
     p_max_bar = float(payload.get("max_pressure_bar", 22.0))
-    feed = str(payload.get("feed_type", "regulated_He_press"))
-    material = str(payload.get("material", "Ti_6Al_4V"))
+    feed = safe_choice(str(payload.get("feed_type", "regulated_He_press")), FEED_ULLAGE_PCT, default="regulated_He_press", label="feed_type")
+    material = safe_choice(str(payload.get("material", "Ti_6Al_4V")), MATERIALS, default="Ti_6Al_4V", label="material")
     sf = float(payload.get("safety_factor", 1.5))
 
     if prop not in PROP_DENSITIES:

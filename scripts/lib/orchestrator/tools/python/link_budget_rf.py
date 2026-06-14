@@ -57,6 +57,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 
@@ -109,7 +110,7 @@ def compute(payload: dict) -> dict:
     # Build #20-cleanup (2026-05-22): normalise to uppercase to accept
     # lowercase + mixed-case modulation strings. HAPS class plan passes
     # 'qpsk' which previously raised ValueError + exit 3.
-    modulation = str(payload.get("modulation", "QPSK")).upper()
+    modulation = safe_choice(str(payload.get("modulation", "QPSK")).upper(), MOD_BITS_PER_SYMBOL, default="QPSK", label="modulation")
 
     if modulation not in MOD_BITS_PER_SYMBOL:
         raise ValueError(f"unknown modulation {modulation!r}; known: {list(MOD_BITS_PER_SYMBOL)}")

@@ -54,6 +54,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -89,7 +90,7 @@ def compute(payload: dict) -> dict:
     dry_kg = float(payload.get("dry_mass_kg", 500.0))
     available_power_w = float(payload.get("available_power_w", 4000.0))
     duration_days = float(payload.get("mission_duration_days", 90.0))
-    ep_type = str(payload.get("ep_type", "Hall_SPT-100"))
+    ep_type = safe_choice(str(payload.get("ep_type", "Hall_SPT-100")), EP_TYPES, default="Hall_SPT-100", label="ep_type")
 
     if ep_type not in EP_TYPES:
         raise ValueError(f"unknown ep_type {ep_type!r}; known: {list(EP_TYPES)}")

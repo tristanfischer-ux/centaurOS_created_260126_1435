@@ -65,6 +65,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 PROVENANCE = {
@@ -141,7 +142,7 @@ def propagate_sgp4(tle1: str, tle2: str, prop_time_days: float) -> dict:
 
 
 def compute(payload: dict) -> dict:
-    central_body = str(payload.get("central_body", "Earth"))
+    central_body = safe_choice(str(payload.get("central_body", "Earth")), ("Earth", "Mars", "Moon"), default="Earth", label="central_body")
     body = get_body_constants(central_body)
     mu = body["mu_km3s2"]
     r_body = body["R_km"]

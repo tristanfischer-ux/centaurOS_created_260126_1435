@@ -24,7 +24,11 @@ License: MIT (CoolProp itself is MIT). https://coolprop.org
 from __future__ import annotations
 
 import json
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 
 # Map orchestrator fluid codes to CoolProp fluid names
 FLUID_MAP = {
@@ -42,7 +46,7 @@ FLUID_MAP = {
 def compute(payload: dict) -> dict:
     import CoolProp.CoolProp as CP
 
-    fluid_in = str(payload.get("fluid", "")).strip().lower()
+    fluid_in = safe_choice(str(payload.get("fluid", "")).strip().lower(), FLUID_MAP, default="r290", label="fluid")
     fluid = FLUID_MAP.get(fluid_in)
     if not fluid:
         raise ValueError(f"unknown fluid code: {fluid_in!r} (supported: {list(FLUID_MAP.keys())})")

@@ -54,6 +54,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -91,7 +92,7 @@ def compute(payload: dict) -> dict:
     altitude_km = float(payload.get("altitude_km", 500.0))
     latitude_deg = float(payload.get("latitude_deg", 45.0))
     desired_torque_nm = float(payload.get("desired_torque_nm", 1e-3))
-    coil_type = str(payload.get("coil_type", "air_core"))
+    coil_type = safe_choice(str(payload.get("coil_type", "air_core")), ("air_core", "iron_core_rod"), default="air_core", label="coil_type")
     voltage_v = float(payload.get("voltage_v", 12.0))
     power_budget_w = float(payload.get("power_budget_w", 5.0))
 

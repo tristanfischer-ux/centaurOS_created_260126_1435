@@ -40,6 +40,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -122,7 +123,7 @@ CROP_PARAMS = {
 
 
 def compute(payload: dict) -> dict:
-    crop = str(payload.get("crop", "lettuce")).lower()
+    crop = safe_choice(str(payload.get("crop", "lettuce")).lower(), CROP_PARAMS, default="lettuce", label="crop")
     dli_provided = float(payload.get("dli_mol_m2_day", 17.0))
     growing_area = float(payload.get("growing_area_m2", 1.0))
     temp_c = float(payload.get("temperature_c", 22.0))

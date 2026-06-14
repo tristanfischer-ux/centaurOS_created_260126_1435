@@ -32,6 +32,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -91,7 +92,7 @@ def compute(payload: dict) -> dict:
     cell_count = int(payload.get("cell_count", 100))
     cell_capacity_ah = float(payload.get("cell_capacity_ah", 100))
     initial_imbalance_pct = float(payload.get("cell_imbalance_pct_initial", 5.0))
-    bal_type = str(payload.get("balancing_type", "passive_shunt")).lower()
+    bal_type = safe_choice(str(payload.get("balancing_type", "passive_shunt")).lower(), BALANCING_PROPS, default="passive_shunt", label="balancing_type")
     bal_current_ma = float(payload.get("balancing_current_ma", 0))   # 0 = use default
     chemistry = str(payload.get("chemistry", "lfp")).lower()
 

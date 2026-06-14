@@ -47,6 +47,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -80,7 +81,7 @@ def compute(payload: dict) -> dict:
     slew_rate_deg_s = float(payload.get("max_slew_rate_deg_s", 1.0))
     slew_amp_deg = float(payload.get("slew_amplitude_deg", 30.0))
     disturbance_nm = float(payload.get("disturbance_torque_nm", 1e-5))
-    wheel_geom = str(payload.get("wheel_count", "3_pyramid"))
+    wheel_geom = safe_choice(str(payload.get("wheel_count", "3_pyramid")), WHEEL_GEOMETRIES, default="3_pyramid", label="wheel_count")
 
     if wheel_geom not in WHEEL_GEOMETRIES:
         raise ValueError(f"unknown wheel_count {wheel_geom!r}; known: {list(WHEEL_GEOMETRIES)}")

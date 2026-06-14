@@ -42,6 +42,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -111,7 +112,7 @@ SALTS: dict[str, dict] = {
 
 
 def compute(payload: dict) -> dict:
-    crop = str(payload.get("target_crop", "lettuce")).lower()
+    crop = safe_choice(str(payload.get("target_crop", "lettuce")).lower(), CROP_RECIPES, default="lettuce", label="target_crop")
     water_tds = float(payload.get("water_source_ppm_dissolved", 100))
     target_ec = float(payload.get("target_ec_ms_cm", 0))
     target_ph = float(payload.get("target_ph", 0))

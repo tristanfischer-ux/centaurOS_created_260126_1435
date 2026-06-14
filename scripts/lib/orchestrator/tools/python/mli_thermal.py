@@ -49,6 +49,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -94,9 +95,9 @@ EDGES = {
 
 def compute(payload: dict) -> dict:
     n = int(payload.get("num_layers", 20))
-    layer_mat = str(payload.get("layer_material", "mylar_aluminised"))
-    spacer = str(payload.get("spacer_type", "dacron_net"))
-    edge = str(payload.get("edge_treatment", "taped"))
+    layer_mat = safe_choice(str(payload.get("layer_material", "mylar_aluminised")), LAYERS, default="mylar_aluminised", label="layer_material")
+    spacer = safe_choice(str(payload.get("spacer_type", "dacron_net")), SPACERS, default="dacron_net", label="spacer_type")
+    edge = safe_choice(str(payload.get("edge_treatment", "taped")), EDGES, default="taped", label="edge_treatment")
     t_hot = float(payload.get("temperature_hot_k", 300.0))
     t_cold = float(payload.get("temperature_cold_k", 100.0))
 

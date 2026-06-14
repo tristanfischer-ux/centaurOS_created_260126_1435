@@ -43,6 +43,9 @@ from __future__ import annotations
 import json
 import sys
 import time
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -62,7 +65,7 @@ PROVENANCE = {
 def compute(payload: dict) -> dict:
     country = str(payload.get("country", "UK")).upper()
     mass_kg = float(payload.get("mass_kg", 2.0))
-    operation = str(payload.get("operation", "VLOS")).upper()
+    operation = safe_choice(str(payload.get("operation", "VLOS")).upper(), ("VLOS", "EVLOS", "BVLOS"), default="VLOS", label="operation")
     urban_or_rural = str(payload.get("urban_or_rural", "urban")).lower()
 
     valid_ops = {"VLOS", "BVLOS", "EVLOS"}

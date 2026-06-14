@@ -45,6 +45,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -91,12 +92,12 @@ ANODE_EFFICIENCY: dict[str, float] = {
 
 
 def compute(payload: dict) -> dict:
-    hull_material = str(payload.get("hull_material", "aluminium_5083")).lower()
+    hull_material = safe_choice(str(payload.get("hull_material", "aluminium_5083")).lower(), PROTECTION_CURRENT_MA_M2, default="aluminium_5083", label="hull_material")
     hull_area_m2 = float(payload.get("hull_area_m2", 5.0))
     salinity = float(payload.get("salinity_ppt", 35))
     water_temp = float(payload.get("water_temp_c", 10))
     mission_life_years = float(payload.get("mission_life_years", 5))
-    anode_material = str(payload.get("anode_material", "aluminium_zinc_indium")).lower()
+    anode_material = safe_choice(str(payload.get("anode_material", "aluminium_zinc_indium")).lower(), ANODE_MATERIAL, default="aluminium_zinc_indium", label="anode_material")
 
     if hull_material not in PROTECTION_CURRENT_MA_M2:
         return {"error": f"Unknown hull_material. Available: {list(PROTECTION_CURRENT_MA_M2.keys())}"}

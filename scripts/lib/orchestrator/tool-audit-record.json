@@ -1,0 +1,13 @@
+[
+  {
+    "tool_id": "gear-ratio:bicycle",
+    "verdict": "FAIL",
+    "cases_run": 2,
+    "cases_passed": 1,
+    "failure_type": "out-of-range",
+    "failure_reason": "1/2 case(s) failed; first: \"range_km_at_250w\" = 162.1 is OUT OF RANGE [80, 150] [case: High-performance electric mountain bike]",
+    "py_file": "gear_ratio.py",
+    "llm_cost_usd": 0.057328,
+    "audited_at_note": "audit-tools.ts@v1 — realistic-input correctness audit (not a smoke test)"
+  }
+]

@@ -49,6 +49,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -129,7 +130,7 @@ RESIN_PROPS: dict[str, dict] = {
 def compute(payload: dict) -> dict:
     feedstock_volume_l = float(payload.get("feedstock_volume_l", 100))
     target_protein_mass_g = float(payload.get("target_protein_mass_g", 5.0))
-    resin_type = str(payload.get("resin_type", "protein_a")).lower()
+    resin_type = safe_choice(str(payload.get("resin_type", "protein_a")).lower(), RESIN_PROPS, default="protein_a", label="resin_type")
     dbc_user = payload.get("dbc_mg_per_ml_resin")
     column_diameter_cm = float(payload.get("column_diameter_cm", 14))
 

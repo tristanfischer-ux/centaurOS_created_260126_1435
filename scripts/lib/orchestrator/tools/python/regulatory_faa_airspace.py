@@ -44,6 +44,9 @@ from __future__ import annotations
 import json
 import sys
 import time
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -137,7 +140,7 @@ COUNTRY_RULES: dict[str, dict] = {
 
 
 def compute(payload: dict) -> dict:
-    country = str(payload.get("country", "US")).upper()
+    country = safe_choice(str(payload.get("country", "US")).upper(), COUNTRY_RULES, default="US", label="country")
     altitude_ceiling_ft = float(payload.get("altitude_ceiling_ft", 65000))
     mission_duration_hours = float(payload.get("mission_duration_hours", 24))
     area_polygon_km2 = float(payload.get("area_polygon_km2", 1000))

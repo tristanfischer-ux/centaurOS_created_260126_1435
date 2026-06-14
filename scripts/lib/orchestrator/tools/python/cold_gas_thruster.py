@@ -48,6 +48,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -78,7 +79,7 @@ G0 = 9.80665
 
 def compute(payload: dict) -> dict:
     total_impulse_ns = float(payload.get("total_impulse_required_ns", 500.0))
-    propellant = str(payload.get("propellant", "N2"))
+    propellant = safe_choice(str(payload.get("propellant", "N2")), PROPELLANTS, default="N2", label="propellant")
     thrust_per = float(payload.get("thrust_n_per_thruster", 1.0))
     p_reg_bar = float(payload.get("regulator_pressure_bar", 5.0))
     p_tank_bar = float(payload.get("tank_pressure_bar", 200.0))

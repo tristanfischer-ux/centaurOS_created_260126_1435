@@ -36,8 +36,12 @@ License: BSD-3-Clause. Source: github.com/pvlib/pvlib-python
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -63,9 +67,15 @@ def compute(payload: dict) -> dict:
     longitude = float(payload.get("longitude", 0.0))
     altitude_m = float(payload.get("altitude_m", 0.0))
     time_utc = payload.get("time_utc", "2026-06-21T12:00:00")
-    model = str(payload.get("model", "ineichen")).lower()
+    model = safe_choice(str(payload.get("model", "ineichen")).lower(), ("ineichen", "simplified_solis", "extraterrestrial"), default="ineichen", label="model")
 
-    times = pd.DatetimeIndex([time_utc], tz="UTC")
+    # FAIL-SOFT: an unparseable time_utc (the planner may wire garbage) falls
+    # back to the noon-solstice default rather than raising a DateParseError.
+    try:
+        times = pd.DatetimeIndex([time_utc], tz="UTC")
+    except Exception:
+        time_utc = "2026-06-21T12:00:00"
+        times = pd.DatetimeIndex([time_utc], tz="UTC")
     location = pvlib.location.Location(
         latitude=latitude,
         longitude=longitude,

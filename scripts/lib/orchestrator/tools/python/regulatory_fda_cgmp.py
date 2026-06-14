@@ -45,6 +45,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -195,8 +196,8 @@ MARKET_OVERLAYS: dict[str, dict] = {
 
 
 def compute(payload: dict) -> dict:
-    product_type = str(payload.get("product_type", "monoclonal_antibody")).lower()
-    market = str(payload.get("market", "US")).upper()
+    product_type = safe_choice(str(payload.get("product_type", "monoclonal_antibody")).lower(), PRODUCT_TYPE_REQS, default="monoclonal_antibody", label="product_type")
+    market = safe_choice(str(payload.get("market", "US")).upper(), MARKET_OVERLAYS, default="US", label="market")
     batch_size_l = float(payload.get("batch_size_l", 500))
 
     if product_type not in PRODUCT_TYPE_REQS:

@@ -47,6 +47,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
 from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
 
 
@@ -105,7 +106,7 @@ def pick_filter_class(coil_type: str) -> str:
 def compute(payload: dict) -> dict:
     Q_air_cms = float(payload.get("airflow_cms", 1.0))
     coil_load_kw = float(payload.get("coil_load_kw", 1.0))
-    coil_type = str(payload.get("coil_type", "chilled_water")).strip().lower()
+    coil_type = safe_choice(str(payload.get("coil_type", "chilled_water")).strip().lower(), U_COIL, default="chilled_water", label="coil_type")
     p_ext_pa = float(payload.get("static_pressure_pa", 250.0))
     v_face = float(payload.get("face_velocity_m_s", 2.5))
     filter_class = payload.get("filter_required_class") or pick_filter_class(coil_type)

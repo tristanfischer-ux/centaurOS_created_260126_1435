@@ -1,0 +1,8 @@
+# Runtime-generated python sizing tools (TOOL-CREATION-ON-THE-FLY).
+# These are written here at chain time by tool-generator.ts after a generated
+# tool PASSES its self-test, then registered for the run. The durable source of
+# truth is the `generated_tools` candidate table in ~/.forge-truth/forge-truth.db
+# (DB-first reuse re-writes the .py on demand) — so the .py files themselves are
+# scratch and MUST NOT be committed. Keep the directory, ignore its contents.
+*.py
+!.gitignore
