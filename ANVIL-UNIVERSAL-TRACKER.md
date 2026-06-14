@@ -28,6 +28,20 @@
 | HOLDOUT mushroom_farm_automated | not yet run | |
 | HAPS-cold (payload-led brief) | known exit 7 (envelope) | |
 
+## ⭐ TRISTAN LIVE CONCERNS — 2026-06-14 (PRIORITY; ⟳ = raised before + still open, he flagged this)
+
+Raised in one message after the render colour/lighting fix landed (commit 581f5b02e, universal render now wears the bespoke studio lighting + module/service colour-coding). Tristan: "make sure these concerns go into the tracker as I have raised some of them before and they have not been fixed yet."
+
+- **C1 — TOOL PLAN must self-generate ON THE FLY then register for reuse (the growing-DB pattern).** Tristan's decision on the wrong-tool bug (RAS got airfoil/AUV/bicycle physics): "the auto planner should be able to create new types on the fly. there is no fundamental difference between you creating code for a bespoke ras dossier and creating a ras dossier on the fly and then registering it so it can be used again. it should be the same concept that we use for the databases. look at database first … use that if available or then search and create a new category, add to database and then pull from database." → DB-first class-tool-plan lookup → on-miss GENERATE a domain-appropriate plan (LLM+corpus, same way a human would hand-wire it) → VERIFY → write back to a class_tool_plan store (class-tagged) → pull from store next time. **This EXTENDS the existing E6a bootstrap-on-miss (item #22, already does class-GRAPHS + B2/B3 does Blender-SCENES) to the TOOL PLAN (item #11 E4, still blocked).** ROOT of the wrong-tools: aquaculture_ras is half-registered (classifier+envelope+contract, NO tool plan/emitter) → auto-planner picks by loose output-key keysMatch with no working domain gate (applicability hook inert in fallback path; domain tags too coarse/mis-tagged — auv-hydro='thermal', bicycle='mechanical'). Refs drawer d2be3b3ce8d9958f.
+
+- **C2 ⟳ — Blender: equipment OVERLAPPING (a big tank sitting ON TOP OF another fish tank).** The `place_all` core layout packs items into the same footprint. RAISED BEFORE ("how can all this equipment be sitting on top of the tanks"). Still open. High-risk file (drives CO2/SAF too) — fix the tank-grid footprint reservation so no vessel lands on another.
+
+- **C3 ⟳ — Blender: pipe runs still don't look correct.** Routing legibility/correctness. RAISED BEFORE. Colour-coding now applied (water=blue/elec=red) but the ROUTES themselves still read wrong.
+
+- **C4 ⟳ — 8 engineering drawings: the P&ID / pipe system is STILL not showing all 10 tanks.** RAISED BEFORE ("where are all the 10 tanks"). The drawing shows 1 rearing tank not the 10-tank array. Dense-topology / drawing gap.
+
+- **C5 — Module/sub-module NARRATIVE may be the OLD word-engine, not the new physics/Blender/BoM.** Tristan: "I suspect that the document is using the old engine of words and it is not basing it off the new engine and blender loop plus new bom … this needs checking." **CHECKED 2026-06-14: suspicion CONFIRMED (high confidence).** The narrative is `buildNaturalLanguageLayer` from `src/lib/pdf-engine-v2/radical/sentence-generator` (chain :101) — the old "radical" word-engine (`overview_paragraph_en`/`module_brief`/RAD-syntax + LLM prose), a SEPARATE system from the new physics contract + Blender layout + requirements/component BoM. It splices SOME real numbers but is not driven by the new engine. NEEDS: a coherence pass so the prose is generated FROM (or reconciled against) the physics-derived equipment + Blender placement + new BoM, not an independent word tree.
+
 ## MISSING-ONLY RECAP (priority order — pick top ❌ when drift_flag=yes)
 | # | Item | Increment | Status |
 |---|---|---|---|
