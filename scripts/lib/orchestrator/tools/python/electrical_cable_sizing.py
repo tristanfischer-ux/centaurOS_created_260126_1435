@@ -171,15 +171,32 @@ def compute(payload: dict) -> dict:
     if not 0.1 <= ca <= 1.0 or not 0.1 <= cg <= 1.0:
         raise ValueError("ambient_derate_ca and grouping_derate_cg must be in [0.1, 1.0]")
 
-    n_parallel = max(1, int(payload.get("n_parallel", 1)))
+    n_parallel_requested = max(1, int(payload.get("n_parallel", 1)))
+    n_parallel = n_parallel_requested
+    # Hard ceiling on parallel runs so a pathological input can't loop forever.
+    # 12 parallel runs of the largest conductor is already an extreme LV feeder.
+    MAX_PARALLEL = 12
     max_vd_pct = float(payload.get("max_voltdrop_pct", 5.0))
 
     # ---- De-rated tabulated-current target ----
     derate = ca * cg
     i_t = i_b / derate                         # required tabulated current (single run)
-    i_t_per_run = i_t / n_parallel             # per parallel conductor
 
     # ---- Select smallest standard CSA whose ampacity (x parallel) carries I_t ----
+    # If even the LARGEST standard CSA at the requested n_parallel cannot carry
+    # the de-rated target, AUTO-ESCALATE the number of parallel conductor runs
+    # (standard LV-feeder practice: split a high-current feeder into 2+ runs of
+    # the same CSA) rather than crash. We grow n_parallel to the smallest count
+    # at which a standard CSA carries I_t, capped at MAX_PARALLEL. This makes the
+    # tool robust for HIGH-CURRENT classes (e.g. a 674 kW @ 415 V load ≈ 1103 A,
+    # which no single 400 mm² run @ 728 A can carry).
+    largest_csa = max(table.keys())
+    largest_ampacity = table[largest_csa][0]
+    parallel_escalated = False
+    while (largest_ampacity * n_parallel < i_t - 1e-9) and (n_parallel < MAX_PARALLEL):
+        n_parallel += 1
+        parallel_escalated = True
+
     selected_csa = None
     selected_ampacity = None
     selected_mv = None
@@ -191,12 +208,14 @@ def compute(payload: dict) -> dict:
             selected_mv = mv
             break
     if selected_csa is None:
-        largest = max(table.keys())
-        amp_largest = table[largest][0] * n_parallel
+        # Only unreachable now if even MAX_PARALLEL runs of the largest CSA fall
+        # short — a genuinely out-of-range feeder (raise rather than fabricate).
+        amp_largest = largest_ampacity * n_parallel
         raise ValueError(
             f"no standard {conductor} CSA carries the de-rated target {round(i_t, 1)} A "
-            f"with {n_parallel} parallel run(s) (largest tabulated = {largest} mm2 -> "
-            f"{round(amp_largest, 1)} A); increase n_parallel or improve de-rating"
+            f"even with {n_parallel} parallel run(s) (largest tabulated = {largest_csa} mm2 -> "
+            f"{round(amp_largest, 1)} A at {n_parallel}x); supply is beyond LV-feeder range "
+            f"(use MV distribution or a busbar trunking system)"
         )
 
     # ---- Volt drop ----
@@ -228,7 +247,12 @@ def compute(payload: dict) -> dict:
                 f"{conductor}, 90 C thermosetting, Reference Method C (clipped direct)",
                 f"selected CSA tabulated ampacity = {selected_ampacity} A "
                 f"({'x ' + str(n_parallel) + ' parallel = ' + str(selected_ampacity * n_parallel) + ' A' if n_parallel > 1 else 'single run'})",
-            ],
+            ] + (
+                [f"parallel runs auto-escalated from {n_parallel_requested} to {n_parallel} "
+                 f"(no single standard CSA carries {i_t_r} A; high-current LV feeder split into "
+                 f"{n_parallel} parallel runs of {selected_csa} mm2)"]
+                if parallel_escalated else []
+            ),
         ),
         worked_calc(
             label="Volt drop",
@@ -257,6 +281,8 @@ def compute(payload: dict) -> dict:
         "ambient_derate_ca": ca,
         "grouping_derate_cg": cg,
         "n_parallel": n_parallel,
+        "n_parallel_requested": n_parallel_requested,
+        "parallel_auto_escalated": bool(parallel_escalated),
         "tabulated_current_target_a": round(i_t, 2),
         "selected_ampacity_a": selected_ampacity,
         "selected_ampacity_total_a": selected_ampacity * n_parallel,

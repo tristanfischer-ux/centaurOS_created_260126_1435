@@ -64,6 +64,11 @@ export interface CableSizingOutput {
   ambient_derate_ca: number
   grouping_derate_cg: number
   n_parallel: number
+  /** Parallel runs the CALLER requested (before any auto-escalation). */
+  n_parallel_requested: number
+  /** True when the tool grew n_parallel because no single standard CSA could
+   *  carry the de-rated target current (high-current LV feeder split). */
+  parallel_auto_escalated: boolean
   tabulated_current_target_a: number
   selected_ampacity_a: number
   selected_ampacity_total_a: number

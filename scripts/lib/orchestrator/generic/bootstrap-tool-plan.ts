@@ -291,9 +291,15 @@ export function buildToolIoMap(): Map<string, { inputs: Set<string>; outputs: Se
     const m = merged[id]
     const outputs = (r?.output_keys && r.output_keys.length > 0) ? r.output_keys : (m?.output_keys ?? [])
     const inputs = new Set<string>([...(r?.input_keys ?? []), ...(m?.input_keys ?? [])])
-    // Pure-TS tools the python harvester never ran: add their real TS input
-    // fields so V2 does not false-reject a legitimate wiring.
-    if (!r) for (const f of tsInputFieldsFor(id)) inputs.add(f)
+    // ALWAYS union the live TS-source-parsed `input.<field>` reads (2026-06-14).
+    // tsInputFieldsFor returns ∅ for any tool whose id literal isn't found in a
+    // tools/*.ts file (e.g. python-wrapped tools), so this is a SUPERSET-safe
+    // no-op for them. For pure-TS tools it closes the manifest-staleness gap: a
+    // newly-added TS input field (e.g. mass-aggregator's `component_masses_kg`)
+    // is picked up WITHOUT regenerating tool-io-raw.json. V2 only rejects a
+    // param present in NEITHER source, so a superset never false-accepts a
+    // hallucinated field that the tool can't read.
+    for (const f of tsInputFieldsFor(id)) inputs.add(f)
     map.set(id, { inputs, outputs: new Set(outputs) })
   }
   _ioByToolCache = map
@@ -394,12 +400,23 @@ export function validateToolPlanSpec(
     const realOutputs = fields?.outputs ?? new Set<string>()
 
     // V2a — every wired input param is a real input field of the tool.
+    // CAPABILITY EXCEPTION (2026-06-14): a tool that declares the universal
+    // `component_masses_kg` input opts INTO generic component-mass summing — its
+    // invoke() adds ANY `*_mass_kg`/`*_mass_g` input to the total (see
+    // mass-aggregator.ts). So for such a tool, accept a mass-named param even if
+    // it isn't in the explicit (grab-bag, class-harvested) input list. This is
+    // capability-driven, NOT a per-class table: it lets the generator wire each
+    // principal-equipment mass into the mass producer by a meaningful name.
+    const acceptsGenericMass = realInputs.has('component_masses_kg')
     const rawInputs: any[] = Array.isArray(s?.inputs) ? s.inputs : []
     const inputs: ToolPlanInputSpec[] = []
     for (const [j, inp] of rawInputs.entries()) {
       const param = typeof inp?.param === 'string' ? inp.param.trim() : ''
       if (!param) { errors.push(`step[${i}] "${toolId}" inputs[${j}] param missing`); continue }
-      if (realInputs.size > 0 && !realInputs.has(param)) {
+      // Same suffix set mass-aggregator.ts sums (incl. biomass_kg, e.g.
+      // standing_biomass_kg) so an injected/wired mass param re-validates on reuse.
+      const isGenericMassParam = acceptsGenericMass && /(_mass_(kg|g)|biomass_kg)$/.test(param)
+      if (realInputs.size > 0 && !realInputs.has(param) && !isGenericMassParam) {
         errors.push(`step[${i}] "${toolId}" inputs[${j}] param "${param}" is not a real input field of the tool (V2)`)
         continue
       }
@@ -552,6 +569,16 @@ function buildHarvestPrompt(
     .map(q => `- ${q.key} = ${q.value} ${q.unit}${q.condition ? ` (${q.condition})` : ''}`)
     .join('\n')
 
+  // The SAME list, framed as the WIRABLE KEYS — every key here ALREADY EXISTS on
+  // the engineering contract with a real value. A tool input that means one of
+  // these quantities MUST be wired with from_contract_key to that key; it MUST
+  // NOT be hard-coded as a constant. This is the heart of FIX A: the generator
+  // wires from real available data instead of inventing literals.
+  const wirableKeyList = contractQuantities
+    .slice(0, 120)
+    .map(q => `${q.key} (${q.value} ${q.unit})`)
+    .join(', ')
+
   const catalogueLines = catalogue
     .map(c =>
       `- ${c.tool_id} [${c.domain}] ${c.description}\n` +
@@ -581,16 +608,24 @@ function buildHarvestPrompt(
     (dutyLines
       ? `ENGINEERING DUTIES THE SYSTEM MUST PERFORM (the parsed engineering-contract quantities — pick tools that COMPUTE or CONSUME these):\n${dutyLines}\n\n`
       : '') +
+    (wirableKeyList
+      ? `AVAILABLE CONTRACT KEYS — these quantities ALREADY EXIST on the engineering contract with real values. Whenever a tool input MEANS the same quantity as one of these, you MUST wire it: set from_contract_key to that EXACT key. Do NOT hard-code a constant for a value that exists here. (key (value unit), …):\n${wirableKeyList}\n\n`
+      : '') +
     (briefMetricKeys.length > 0
       ? `BRIEF TARGET METRIC KEYS (your plan must produce these as contract_key, OR they are already supplied above):\n- ${briefMetricKeys.join('\n- ')}\n\n`
       : '') +
-    `TOOL CATALOGUE (the ONLY tools you may use; the inputs/outputs are the ONLY field names you may wire — any other name is REJECTED):\n${catalogueLines}\n\n` +
+    `TOOL CATALOGUE (the ONLY tools you may use; the inputs/outputs are the ONLY field names you may wire — any other name is REJECTED). Each tool's "outputs" are contract_keys you can WRITE and then FEED into a LATER tool's input via from_contract_key — chain tools into a connected graph, do not leave a flat list of isolated calcs:\n${catalogueLines}\n\n` +
     (fewShots ? `${fewShots}\n\n` : '') +
+    `WIRING IS THE WHOLE JOB. For EVERY input, choose its source in THIS PRIORITY ORDER:\n` +
+    `  (a) an AVAILABLE CONTRACT KEY above whose meaning matches → from_contract_key = that key;\n` +
+    `  (b) the OUTPUT (contract_key) of ANOTHER tool you selected, when the value is computed upstream → from_contract_key = that upstream output's contract_key (this is how you build the DAG: pick output names that downstream tools then read);\n` +
+    `  (c) ONLY if the value exists NEITHER in (a) NOR (b): a literal constant — and ONLY for a genuine physical assumption/coefficient (e.g. a de-rating factor, a power factor, a material density), NEVER for a duty/scale quantity that the contract already carries.\n` +
+    `A constant where a contract key existed is a WIRING FAILURE. Aim: most inputs wired from (a)/(b); few constants; tools chained so outputs feed downstream inputs.\n\n` +
     `OUTPUT RULES (validated DETERMINISTICALLY — violations are rejected):\n` +
-    `1. Pick the SMALLEST set of tools that computes the brief's duties — typically 6-20. Each tool_id MUST be one from the catalogue.\n` +
-    `2. For each step, wire inputs[].param to a REAL input field of that tool. Read a value from an upstream/brief quantity with from_contract_key (a contract key); else give a literal constant. Add a numeric fallback for from_contract_key inputs.\n` +
-    `3. For each step, wire outputs[]: contract_key is the NEW quantity name you write; tool_output_field MUST be a REAL output field of that tool (exactly as spelled in the catalogue). Give unit + family.\n` +
-    `4. You MUST include the tool "${UNIVERSAL_MASS_PRODUCER}" and wire its "${UNIVERSAL_MASS_KEY}" output field to a contract_key "${UNIVERSAL_MASS_KEY}" (the whole-system mass + envelope check every design needs). Feed it the principal equipment mass buckets via its input fields.\n` +
+    `1. Pick the SMALLEST set of tools that computes the brief's duties — typically 6-14. Each tool_id MUST be one from the catalogue. PREFER tools whose inputs you can WIRE from the AVAILABLE CONTRACT KEYS or an upstream tool's output, over tools that would force many hard-coded constants.\n` +
+    `2. For each step, wire inputs[].param to a REAL input field of that tool, sourced per the WIRING priority above. For a from_contract_key input add a numeric fallback. For a constant input give the literal in "constant".\n` +
+    `3. For each step, wire outputs[]: contract_key is the NEW quantity name you write (CHOOSE a clear name a downstream tool can read by from_contract_key); tool_output_field MUST be a REAL output field of that tool (exactly as spelled in the catalogue). Give unit + family.\n` +
+    `4. You MUST include the tool "${UNIVERSAL_MASS_PRODUCER}" and wire its "${UNIVERSAL_MASS_KEY}" output field to a contract_key "${UNIVERSAL_MASS_KEY}" (the whole-system mass + envelope check every design needs). FEED IT the principal-equipment masses: give it ONE "*_mass_kg" input per major component (e.g. the tanks, the filtration vessels, the pumps/skids, the electrical gear), each wired with from_contract_key from an upstream sizing tool's mass output OR an available contract mass key — every "*_mass_kg" input you give is summed. Wire AS MANY component masses as you have sources for (≥2 where possible); do NOT leave it with no mass inputs (its total would be 0). Do NOT wire its OWN total back into it — never feed "total_system_mass_kg" or any "total_*_mass_kg" as an INPUT (that is the value it COMPUTES, not a component). Also wire its "max_mass_kg_envelope" input from the brief's mass cap if one exists.\n` +
     `5. You MUST produce at least one cost/capex key (wire a cost-bearing tool output, e.g. regulatory-cert-cost:lookup → total_cost_gbp, or a tool's estimated_capex_gbp).\n` +
     `6. Do NOT worry about run ORDER — it is computed deterministically from your wiring. Wire data dependencies via matching contract_key → from_contract_key across steps.\n` +
     (priorErrors.length > 0
@@ -739,6 +774,226 @@ export function storeCandidate(
   } finally {
     try { db?.close() } catch { /* no-op */ }
   }
+}
+
+// ── (c.5) DETERMINISTIC AUTO-WIRE — close the wire-vs-constant gap ──────────
+//
+// FIX A floor (2026-06-14): the LLM is INSTRUCTED to wire from available
+// contract keys / upstream outputs, but at temp 0 it still hard-codes some
+// inputs as constants run-to-run (variance). This PURE, deterministic pass
+// enforces the floor: for every `constant` input, if a HIGH-CONFIDENCE
+// same-quantity source exists (an available contract key OR a contract_key an
+// upstream step writes), rewrite the input to wire from it (keeping the LLM's
+// literal as the numeric fallback). High precision — it only rewrites when the
+// match is unambiguous, so it never INVENTS a wrong wire; a genuine physical
+// coefficient (a de-rating factor, an efficiency, a material string) is left as
+// a constant. NOT a per-class table: matching is by quantity NAME + UNIT FAMILY
+// against whatever keys this run actually carries.
+
+/** Canonical unit family for a unit string (coarse — enough to gate a wire). */
+function unitFamilyOf(unit: string): string {
+  const u = unit.trim().toLowerCase()
+  if (!u || u === '-' || u === 'dimensionless') return 'dimensionless'
+  if (/^(kw|w|mw|gw|kwe|kwth)$/.test(u)) return 'power'
+  if (/^(kwh|wh|mwh|gwh|j|kj|mj|gj)$/.test(u)) return 'energy'
+  if (/(m3\/h|m³\/h|l\/h|l\/s|l\/min|lpm|m3\/s|m³\/s)/.test(u)) return 'volflow'
+  if (/(kg\/h|kg\/day|kg\/s|t\/h|t\/day|t\/yr|tpy|kg\/yr)/.test(u)) return 'massflow'
+  if (/^(kg|g|t|tonne|tonnes|kg\b)$/.test(u)) return 'mass'
+  if (/^(m3|m³|l|litre|litres|m3\b)$/.test(u)) return 'volume'
+  if (/^(m2|m²|m2\b)$/.test(u)) return 'area'
+  if (/^(m|mm|cm|km)$/.test(u)) return 'length'
+  if (/^(°c|c|k|degc|deg_c|celsius)$/.test(u)) return 'temperature'
+  if (/^(v|kv|mv)$/.test(u)) return 'voltage'
+  if (/^(a|ka|ma)$/.test(u)) return 'current'
+  if (/^(gbp|usd|eur|£|\$|€)$/.test(u)) return 'currency'
+  if (/^(ppt|ppm|mg\/l|g\/l)$/.test(u)) return 'concentration'
+  if (/^(pa|kpa|bar|barg|mpa)$/.test(u)) return 'pressure'
+  return 'other'
+}
+
+/** Family inferred from a PARAM/KEY NAME's trailing unit token (when the source
+ *  has no declared unit, e.g. an upstream contract_key the LLM named). */
+function unitFamilyFromName(name: string): string {
+  const n = name.toLowerCase()
+  if (/_(kw|mw|w)$/.test(n)) return 'power'
+  if (/_(kwh|mwh|wh|gj|mj|kj)(_|$)/.test(n)) return 'energy'
+  if (/_(m3_h|m3h|lpm|l_day|l_per_day|m3_s)$/.test(n)) return 'volflow'
+  if (/_(kg_h|kg_day|kg_s|t_yr|tpy|kg_yr|t_day)$/.test(n)) return 'massflow'
+  if (/_(kg|g|t|tonne|tonnes)$/.test(n)) return 'mass'
+  if (/_(m3|l|litres?)$/.test(n)) return 'volume'
+  if (/_(m2)$/.test(n)) return 'area'
+  if (/_(mm|cm|km|_m)$/.test(n) || /_m$/.test(n)) return 'length'
+  if (/_(c|degc|temp_c)$/.test(n) || /temp/.test(n)) return 'temperature'
+  if (/_(v|kv)$/.test(n) || /voltage/.test(n)) return 'voltage'
+  if (/_(a|ka|ma)$/.test(n) || /current/.test(n)) return 'current'
+  if (/_(gbp|usd|eur)$/.test(n) || /(cost|capex|price|opex|npv)/.test(n)) return 'currency'
+  if (/_(ppt|ppm|mg_l|g_l)$/.test(n)) return 'concentration'
+  if (/_(pa|kpa|bar|barg|mpa)$/.test(n)) return 'pressure'
+  return 'other'
+}
+
+// Mass-NAMED contract keys that are NOT a single component to sum (totals,
+// caps, envelopes). Mirrors mass-aggregator.ts's NON_COMPONENT_MASS_KEYS so the
+// mass-producer completion never injects a pre-summed total or a cap as a
+// component (which would double-count or corrupt the sum).
+const MASS_NON_COMPONENT_KEYS = new Set<string>([
+  'max_mass_kg_envelope', 'max_mass_kg', 'brief_mass_cap_kg', 'road_transport_limit_kg',
+  'total_mass_kg', 'total_system_mass_kg', 'total_estimated_mass_kg',
+  'system_mass_with_external_kg', 'in_container_mass_kg',
+])
+
+// Trailing unit tokens stripped to compare the DISTINCTIVE name tokens.
+const UNIT_TOKENS = new Set<string>([
+  'kw', 'mw', 'w', 'kwh', 'mwh', 'wh', 'gj', 'mj', 'kj', 'kg', 'g', 't', 'tonne', 'tonnes',
+  'm3', 'm2', 'm', 'mm', 'cm', 'km', 'l', 'litre', 'litres', 'lpm', 'h', 'hr', 'hour', 's',
+  'day', 'yr', 'year', 'pct', 'percent', 'c', 'degc', 'k', 'v', 'kv', 'mv', 'a', 'ka', 'ma',
+  'gbp', 'usd', 'eur', 'ppt', 'ppm', 'pa', 'kpa', 'bar', 'barg', 'mpa', 'per', 'each',
+])
+
+// Param-name tokens that mark a DIMENSIONLESS physical coefficient/assumption —
+// these are genuine constants and must NEVER be auto-wired (the false-match
+// guard that stopped `power_factor`→`recirc_pump_power_kw`).
+const COEFFICIENT_TOKENS = new Set<string>([
+  'factor', 'efficiency', 'fraction', 'ratio', 'coefficient', 'derate', 'derating',
+  'headroom', 'setpoint', 'margin', 'tolerance', 'conversion', 'utilisation',
+])
+
+function distinctiveTokens(name: string): string[] {
+  return name.toLowerCase().split(/[_\s]+/).filter(t => t.length >= 3 && !UNIT_TOKENS.has(t))
+}
+
+/**
+ * Find a high-confidence contract-key source for a tool input `param`, given the
+ * set of candidate keys (available contract keys + upstream-produced keys), each
+ * with a known unit (or '' when unknown). Returns the key, or null.
+ *
+ * MATCH (precise): the param's distinctive tokens are a NON-EMPTY SUBSET of the
+ * key's distinctive tokens (so `inlet_water_temp_c` matches `water_setpoint_temp_c`
+ * only if {water,temp}⊆{water,setpoint,temp} — yes; `power_factor` won't match
+ * `recirc_pump_power_kw` because {power,factor}⊄{recirc,pump,power}), AND the
+ * unit families are compatible (same family, or one side dimensionless/unknown).
+ * Among ties, the key with the FEWEST extra tokens (closest) wins; deterministic.
+ */
+function findContractKeyForParam(
+  param: string,
+  candidates: ReadonlyArray<{ key: string; unitFamily: string }>,
+): string | null {
+  const pTokens = distinctiveTokens(param)
+  if (pTokens.length === 0) return null
+  // Never auto-wire a dimensionless physical coefficient/assumption.
+  if (pTokens.some(t => COEFFICIENT_TOKENS.has(t))) return null
+  const pFam = unitFamilyFromName(param)
+  const pSet = new Set(pTokens)
+
+  let best: { key: string; extra: number } | null = null
+  for (const c of candidates) {
+    const kTokens = distinctiveTokens(c.key)
+    if (kTokens.length === 0) continue
+    const kSet = new Set(kTokens)
+    // param tokens ⊆ key tokens (every distinctive param token present in key)
+    if (!pTokens.every(t => kSet.has(t))) continue
+    // unit-family compatibility: same family, or either side dimensionless/other/unknown
+    const kFam = c.unitFamily || unitFamilyFromName(c.key)
+    const famOk =
+      pFam === kFam ||
+      pFam === 'dimensionless' || pFam === 'other' ||
+      kFam === 'dimensionless' || kFam === 'other' || kFam === ''
+    if (!famOk) continue
+    const extra = kSet.size - pSet.size
+    if (!best || extra < best.extra || (extra === best.extra && c.key < best.key)) {
+      best = { key: c.key, extra }
+    }
+  }
+  return best?.key ?? null
+}
+
+export interface AutoWireResult {
+  spec: ToolPlanSpec
+  rewired: Array<{ tool_id: string; param: string; from_contract_key: string; was_constant: unknown }>
+}
+
+/**
+ * Deterministically rewrite `constant` inputs → `from_contract_key` wherever a
+ * high-confidence same-quantity source exists. `contractKeyUnits` are the
+ * available contract keys (key + unit). Upstream-produced contract_keys (a step
+ * earlier in the spec wrote them) are ALSO candidates, so this also raises
+ * cross-tool CONNECTIONS, not just brief-key wiring. Pure; preserves the LLM's
+ * literal as the numeric `fallback`. Returns the new spec + a rewire log.
+ */
+export function autoWireSpecInputs(
+  spec: ToolPlanSpec,
+  contractKeyUnits: ReadonlyArray<{ key: string; unit: string }>,
+): AutoWireResult {
+  const rewired: AutoWireResult['rewired'] = []
+  const availCandidates = contractKeyUnits.map(c => ({ key: c.key, unitFamily: unitFamilyOf(c.unit) }))
+  const io = buildToolIoMap()
+
+  // Available + upstream COMPONENT-MASS keys (a real component's kg) that should
+  // be summed by the universal mass producer. Excludes totals/caps/envelopes so
+  // we never double-count a pre-summed figure. A key counts if it ends in a
+  // component-mass suffix and is not a NON_COMPONENT mass key.
+  const isComponentMassKey = (k: string): boolean => {
+    const kl = k.toLowerCase()
+    if (MASS_NON_COMPONENT_KEYS.has(kl)) return false
+    // Mirror mass-aggregator.ts isGenericComponentMassKey (exclude _weight_kg —
+    // usually a per-unit weight, not a system mass).
+    return /(_mass_kg|biomass_kg)$/.test(kl)
+  }
+  const availMassKeys = contractKeyUnits.map(c => c.key).filter(isComponentMassKey)
+
+  // Keys produced by steps BEFORE the current one (built as we sweep in order).
+  const upstreamProduced: Array<{ key: string; unitFamily: string }> = []
+
+  const newSteps: ToolPlanStepSpec[] = spec.steps.map(step => {
+    const candidates = [...availCandidates, ...upstreamProduced]
+    const newInputs = step.inputs.map(inp => {
+      // Only rewrite a genuine constant (no existing wire) with a NUMERIC literal
+      // (a string/bool constant is a mode/material/name, never a wirable quantity).
+      if (inp.from_contract_key || typeof inp.constant !== 'number') return inp
+      const key = findContractKeyForParam(inp.param, candidates)
+      if (!key) return inp
+      rewired.push({ tool_id: step.tool_id, param: inp.param, from_contract_key: key, was_constant: inp.constant })
+      return {
+        param: inp.param,
+        from_contract_key: key,
+        // keep the LLM's literal as the fallback so an absent key still computes
+        fallback: typeof inp.constant === 'number' ? inp.constant : inp.fallback,
+      } as ToolPlanInputSpec
+    })
+
+    // MASS-PRODUCER COMPLETION (2026-06-14): for a tool that opts into generic
+    // component-mass summing (declares `component_masses_kg`), GUARANTEE the
+    // dominant masses are summed by injecting every available + upstream
+    // component-mass key not already wired as a `<key>` input. This stops the
+    // headline mass collapsing to a couple of small LLM-guessed buckets (e.g. a
+    // RAS farm whose 200 t biomass + sized tanks were omitted → 4 t total). The
+    // cost stack reads this mass, so under-counting craters the £/output. Each
+    // wired here is summed by mass-aggregator's universal path (FIX B); a `kg`
+    // input is passed through, a `g` suffix is the tool's own /1000.
+    if (io.get(step.tool_id)?.inputs.has('component_masses_kg')) {
+      const alreadyWired = new Set(
+        newInputs.map(i => i.from_contract_key).filter(Boolean) as string[],
+      )
+      // upstream component-mass outputs (a sizing tool that wrote a *_mass_kg)
+      const upstreamMassKeys = upstreamProduced.map(u => u.key).filter(isComponentMassKey)
+      const massKeysToAdd = [...new Set([...availMassKeys, ...upstreamMassKeys])]
+        .filter(k => !alreadyWired.has(k))
+      for (const k of massKeysToAdd) {
+        // param name = the contract key itself (a real *_mass_kg name → accepted
+        // by the generic-mass V2 exception + summed by the tool).
+        newInputs.push({ param: k, from_contract_key: k, fallback: 0 })
+        rewired.push({ tool_id: step.tool_id, param: k, from_contract_key: k, was_constant: '(injected component mass)' })
+      }
+    }
+
+    // Now this step's OUTPUT contract_keys become upstream candidates for later steps.
+    for (const o of step.outputs) {
+      upstreamProduced.push({ key: o.contract_key, unitFamily: unitFamilyOf(o.unit) })
+    }
+    return { ...step, inputs: newInputs }
+  })
+
+  return { spec: { ...spec, steps: newSteps }, rewired }
 }
 
 // ── (e) MATERIALISE the spec into a runnable ClassToolPlan ──────────────────
@@ -969,14 +1224,17 @@ export async function bootstrapToolPlan(
     try {
       const v = validateToolPlanSpec(JSON.parse(prior.plan_json), briefMetricKeys, contractSuppliedKeys)
       if (v.ok && v.spec) {
-        const order = orderSpec(v.spec)
-        const plan = materialisePlan(slug, v.spec, order)
+        // Re-apply the deterministic auto-wire (idempotent) so a candidate stored
+        // before auto-wire existed still gets the wiring floor on reuse.
+        const finalSpec = autoWireSpecInputs(v.spec, contractQuantities).spec
+        const order = orderSpec(finalSpec)
+        const plan = materialisePlan(slug, finalSpec, order)
         console.error(
           `[bootstrap-tool-plan] REUSING stored candidate slug=${slug} version=${prior.version} status=${prior.status} ` +
-          `(no LLM call; ${v.spec.steps.length} steps, ${new Set(order).size} tool_ids)`,
+          `(no LLM call; ${finalSpec.steps.length} steps, ${new Set(order).size} tool_ids)`,
         )
         return {
-          ok: true, plan, spec: v.spec, provenance: BOOTSTRAP_PROVENANCE,
+          ok: true, plan, spec: finalSpec, provenance: BOOTSTRAP_PROVENANCE,
           candidate: { id: prior.id, slug, version: prior.version, status: prior.status, reused: true },
           attempts: 0, selected_tool_ids: order, llm_cost_usd: null,
         }
@@ -1022,14 +1280,26 @@ export async function bootstrapToolPlan(
       continue
     }
 
+    // (c.5) DETERMINISTIC AUTO-WIRE — rewrite constants→from_contract_key where a
+    // high-confidence same-quantity source exists (FIX A floor; LLM-variance-
+    // proof). Store the auto-wired spec so the cache reflects the final wiring.
+    const wired = autoWireSpecInputs(v.spec, contractQuantities)
+    const finalSpec = wired.spec
+    if (wired.rewired.length > 0) {
+      console.error(
+        `[bootstrap-tool-plan] AUTO-WIRE: rewired ${wired.rewired.length} constant input(s) to contract keys — ` +
+        wired.rewired.map(r => `${r.tool_id}.${r.param}←${r.from_contract_key}`).slice(0, 24).join(', '),
+      )
+    }
+
     // (d) ORDER + (e) MATERIALISE.
-    const order = orderSpec(v.spec)
-    const plan = materialisePlan(slug, v.spec, order)
+    const order = orderSpec(finalSpec)
+    const plan = materialisePlan(slug, finalSpec, order)
 
     // (f) Candidate store — row stays 'candidate'; the run consumes in-memory.
     let candidate: { id: number; version: number; status: string }
     try {
-      candidate = storeCandidate(slug, v.spec, { selected_tool_ids: order, attempts })
+      candidate = storeCandidate(slug, finalSpec, { selected_tool_ids: order, attempts })
     } catch (err) {
       return {
         ok: false, slug, attempts, stage: 'candidate-store', validation_errors: [],
@@ -1037,13 +1307,13 @@ export async function bootstrapToolPlan(
       }
     }
     console.error(
-      `[bootstrap-tool-plan] BOOTSTRAPPED slug=${slug} steps=${v.spec.steps.length} tool_ids=${new Set(order).size} ` +
+      `[bootstrap-tool-plan] BOOTSTRAPPED slug=${slug} steps=${finalSpec.steps.length} tool_ids=${new Set(order).size} ` +
       `candidate_id=${candidate.id} version=${candidate.version} status=${candidate.status} ` +
-      `attempts=${attempts} cost_usd=${totalCost.toFixed(4)} (stored as CANDIDATE only — NO auto-promotion). ` +
+      `attempts=${attempts} cost_usd=${totalCost.toFixed(4)} auto_wired=${wired.rewired.length} (stored as CANDIDATE only — NO auto-promotion). ` +
       `Selected: ${order.join(', ')}`,
     )
     return {
-      ok: true, plan, spec: v.spec, provenance: BOOTSTRAP_PROVENANCE,
+      ok: true, plan, spec: finalSpec, provenance: BOOTSTRAP_PROVENANCE,
       candidate: { id: candidate.id, slug, version: candidate.version, status: candidate.status, reused: false },
       attempts, selected_tool_ids: order, llm_cost_usd: totalCost > 0 ? totalCost : null,
     }

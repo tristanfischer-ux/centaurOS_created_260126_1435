@@ -22,16 +22,33 @@ import { registerTool } from '../registry'
 import type { Tool, ToolResult } from '../types'
 
 export interface MassAggregatorInput {
-  total_cell_mass_kg: number
-  transformer_mass_kg: number | null
-  rack_count: number
+  /** BESS-path cell mass. OPTIONAL for non-BESS classes (defaults to 0); a
+   *  novel class with no battery cells simply omits it and feeds its own
+   *  principal-equipment masses via the generic `*_mass_kg` inputs /
+   *  `component_masses_kg[]` below. */
+  total_cell_mass_kg?: number
+  transformer_mass_kg?: number | null
+  /** BESS rack count. OPTIONAL (defaults to 0 → no rack-mass contribution). */
+  rack_count?: number
   max_mass_kg_envelope: number  // brief constraint
-  /** Estimated PCS mass — Sungrow SC1000UD-MV ≈ 1800 kg for 1 MVA class. */
-  pcs_mass_kg_estimate: number
-  /** 40-ft ISO container tare weight per ISO 668 — 3700-4200 kg empirical. */
-  container_tare_kg_estimate: number
-  /** Steel battery rack typical 130-180 kg per rack (depends on cell qty). */
-  rack_mass_kg_each_estimate: number
+  /** Estimated PCS mass — Sungrow SC1000UD-MV ≈ 1800 kg for 1 MVA class.
+   *  OPTIONAL (defaults to 0 for non-BESS classes). */
+  pcs_mass_kg_estimate?: number
+  /** 40-ft ISO container tare weight per ISO 668 — 3700-4200 kg empirical.
+   *  OPTIONAL (defaults to 0 for non-containerised classes). */
+  container_tare_kg_estimate?: number
+  /** Steel battery rack typical 130-180 kg per rack (depends on cell qty).
+   *  OPTIONAL (defaults to 0). */
+  rack_mass_kg_each_estimate?: number
+  /**
+   * UNIVERSAL component-mass list (2026-06-14). Any class — registered or
+   * bootstrapped on-the-fly — can sum its principal-equipment masses here
+   * WITHOUT the BESS cell/rack/container schema. Each entry is a component mass
+   * in kg; they are ADDED to the total. This is what lets the on-the-fly
+   * tool-plan bootstrap wire each sizing tool's mass output (e.g. a tank shell
+   * mass, a pump skid mass) straight into the whole-system mass producer.
+   */
+  component_masses_kg?: number[]
   /**
    * BESS L4 (2026-05-24): authoritative container count from the
    * engineering contract. When present (>0), the aggregator's split
@@ -102,6 +119,72 @@ export interface MassAggregatorOutput {
   all_skids_road_transportable?: boolean
 }
 
+/** Coerce a possibly-undefined/null/NaN numeric input to a finite number (0
+ *  otherwise). Lets the BESS-path buckets default to 0 for non-BESS classes
+ *  without producing NaN. */
+function num(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0
+}
+
+// Input keys ALREADY summed on the BESS path (do NOT double-count them in the
+// generic sweep). rack_count + rack_mass_kg_each_estimate combine into the rack
+// total, so both are excluded here.
+const BESS_PATH_MASS_KEYS = new Set<string>([
+  'total_cell_mass_kg',
+  'transformer_mass_kg',
+  'pcs_mass_kg_estimate',
+  'container_tare_kg_estimate',
+  'rack_mass_kg_each_estimate',
+])
+
+// Mass-NAMED keys that are NOT components to add — they are envelopes/caps or
+// pre-summed TOTALS. Adding any of these would double-count or corrupt the sum.
+// (e.g. a class plan that passes `total_mass_kg`/`system_mass_with_external_kg`
+// as an already-aggregated figure, or `max_mass_kg`/`brief_mass_cap_kg` caps.)
+const NON_COMPONENT_MASS_KEYS = new Set<string>([
+  'max_mass_kg_envelope',
+  'max_mass_kg',
+  'brief_mass_cap_kg',
+  'road_transport_limit_kg',
+  'total_mass_kg',
+  'total_system_mass_kg',
+  'total_estimated_mass_kg',
+  'system_mass_with_external_kg',
+  'in_container_mass_kg',
+])
+
+/** True when `key` is a per-COMPONENT mass input that is neither a BESS-path
+ *  bucket nor a total/envelope. Recognised suffixes: `_mass_kg`, `_mass_g`, and
+ *  `biomass_kg` (e.g. standing_biomass_kg — the live fish, the dominant mass in
+ *  a RAS farm). `_weight_kg` is deliberately NOT recognised: it usually denotes
+ *  a per-UNIT weight (e.g. harvest_weight_kg = 3.4 kg/fish), not a system mass. */
+function isGenericComponentMassKey(key: string): boolean {
+  if (BESS_PATH_MASS_KEYS.has(key) || NON_COMPONENT_MASS_KEYS.has(key)) return false
+  return key.endsWith('_mass_kg') || key.endsWith('_mass_g') || key.endsWith('biomass_kg')
+}
+
+/** The generic component buckets {label,kg} a class (esp. an on-the-fly
+ *  bootstrapped plan) wired as component-mass inputs, PLUS each entry of the
+ *  explicit `component_masses_kg[]` array. Only a `_mass_g` suffix is grams. */
+function genericComponentBuckets(input: MassAggregatorInput): Array<{ label: string; kg: number }> {
+  const buckets: Array<{ label: string; kg: number }> = []
+  for (const [key, value] of Object.entries(input as unknown as Record<string, unknown>)) {
+    if (!isGenericComponentMassKey(key)) continue
+    const kg = key.endsWith('_mass_g') ? num(value) / 1000 : num(value)
+    if (kg > 0) buckets.push({ label: key.replace(/_mass_(kg|g)$|biomass_kg$/, '').replace(/_/g, ' ') || key, kg })
+  }
+  const list = Array.isArray(input.component_masses_kg) ? input.component_masses_kg : []
+  list.forEach((m, i) => { const kg = num(m); if (kg > 0) buckets.push({ label: `component ${i + 1}`, kg }) })
+  return buckets
+}
+
+/** Sum of every generic component mass (the universal path). 0 for a BESS plan
+ *  (it passes only the named BESS-path fields), so the registered path is
+ *  byte-identical to the pre-2026-06-14 behaviour. */
+function sumGenericComponentMasses(input: MassAggregatorInput): number {
+  return genericComponentBuckets(input).reduce((acc, b) => acc + b.kg, 0)
+}
+
 export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
   id: 'mass-aggregator:envelope-check',
   name: 'Mass Budget Aggregator',
@@ -115,14 +198,31 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
   },
   async invoke(input: MassAggregatorInput): Promise<ToolResult<MassAggregatorOutput>> {
     const t0 = Date.now()
-    const transformer_mass_kg = input.transformer_mass_kg ?? 0
-    const rack_total_mass_kg = input.rack_count * input.rack_mass_kg_each_estimate
+    // BESS-path buckets — DEFAULTING TO 0 so a non-BESS class can omit them.
+    // For a registered BESS plan every one is supplied (cells/rack/PCS/tare),
+    // so the sum below is byte-identical to the pre-2026-06-14 behaviour; the
+    // `?? 0` only changes the result for classes that never passed these fields
+    // (which previously produced NaN — undefined + number).
+    const total_cell_mass_kg = num(input.total_cell_mass_kg)
+    const transformer_mass_kg = num(input.transformer_mass_kg)
+    const pcs_mass_kg_estimate = num(input.pcs_mass_kg_estimate)
+    const container_tare_kg_estimate = num(input.container_tare_kg_estimate)
+    const rack_total_mass_kg = num(input.rack_count) * num(input.rack_mass_kg_each_estimate)
+    // UNIVERSAL generic component-mass sum (2026-06-14): any OTHER `*_mass_kg` /
+    // `*_mass_g` input key NOT already counted on the BESS path, plus the
+    // explicit `component_masses_kg[]` list. This makes the tool produce a real
+    // `total_system_mass_kg` for ANY class — the bootstrap wires each sizing
+    // tool's mass output into one of these buckets. For a BESS plan this is 0
+    // (it passes only the named BESS-path fields), so the registered path is
+    // unaffected.
+    const extra_component_mass_kg = sumGenericComponentMasses(input)
     const total_system_mass_kg = (
-      input.total_cell_mass_kg
+      total_cell_mass_kg
       + transformer_mass_kg
-      + input.pcs_mass_kg_estimate
+      + pcs_mass_kg_estimate
       + rack_total_mass_kg
-      + input.container_tare_kg_estimate
+      + container_tare_kg_estimate
+      + extra_component_mass_kg
     )
 
     // FIELD-ERECTED PLANT (2026-06-05): a fixed installation, not a containerised
@@ -140,11 +240,14 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
       // single shell mass is approximated by rack_mass_kg_each (per-vessel saddle
       // + shell). We check the buckets that represent transportable single items.
       const skidBuckets: Array<{ label: string; kg: number }> = [
-        { label: 'process equipment skid', kg: input.total_cell_mass_kg },
-        { label: 'compressors / pumps / drives skid', kg: input.pcs_mass_kg_estimate },
+        { label: 'process equipment skid', kg: total_cell_mass_kg },
+        { label: 'compressors / pumps / drives skid', kg: pcs_mass_kg_estimate },
         { label: 'transformer', kg: transformer_mass_kg },
-        { label: 'skid frame + bunding', kg: input.container_tare_kg_estimate },
-        { label: 'largest vessel + saddle', kg: input.rack_mass_kg_each_estimate },
+        { label: 'skid frame + bunding', kg: container_tare_kg_estimate },
+        { label: 'largest vessel + saddle', kg: num(input.rack_mass_kg_each_estimate) },
+        // UNIVERSAL: each generically-wired principal-equipment mass is also a
+        // candidate single field-erected item to road-transport-check.
+        ...genericComponentBuckets(input),
       ]
       const overweight = skidBuckets.filter((b) => b.kg > roadLimit)
       const all_skids_road_transportable = overweight.length === 0
@@ -160,11 +263,11 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
 
       const out: MassAggregatorOutput = {
         total_system_mass_kg: Math.round(total_system_mass_kg * 10) / 10,
-        cell_mass_kg: Math.round(input.total_cell_mass_kg * 10) / 10,
+        cell_mass_kg: Math.round(total_cell_mass_kg * 10) / 10,
         transformer_mass_kg: Math.round(transformer_mass_kg * 10) / 10,
-        pcs_mass_kg: Math.round(input.pcs_mass_kg_estimate * 10) / 10,
+        pcs_mass_kg: Math.round(pcs_mass_kg_estimate * 10) / 10,
         rack_total_mass_kg: Math.round(rack_total_mass_kg * 10) / 10,
-        container_tare_kg: Math.round(input.container_tare_kg_estimate * 10) / 10,
+        container_tare_kg: Math.round(container_tare_kg_estimate * 10) / 10,
         mass_budget_breach_kg: 0,
         mass_budget_utilisation_pct: 0,
         recommended_container_count: null,
@@ -222,11 +325,11 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
 
     const out: MassAggregatorOutput = {
       total_system_mass_kg: Math.round(total_system_mass_kg * 10) / 10,
-      cell_mass_kg: Math.round(input.total_cell_mass_kg * 10) / 10,
+      cell_mass_kg: Math.round(total_cell_mass_kg * 10) / 10,
       transformer_mass_kg: Math.round(transformer_mass_kg * 10) / 10,
-      pcs_mass_kg: Math.round(input.pcs_mass_kg_estimate * 10) / 10,
+      pcs_mass_kg: Math.round(pcs_mass_kg_estimate * 10) / 10,
       rack_total_mass_kg: Math.round(rack_total_mass_kg * 10) / 10,
-      container_tare_kg: Math.round(input.container_tare_kg_estimate * 10) / 10,
+      container_tare_kg: Math.round(container_tare_kg_estimate * 10) / 10,
       mass_budget_breach_kg: Math.round(mass_budget_breach_kg * 10) / 10,
       mass_budget_utilisation_pct: Math.round(mass_budget_utilisation_pct * 10) / 10,
       recommended_container_count,

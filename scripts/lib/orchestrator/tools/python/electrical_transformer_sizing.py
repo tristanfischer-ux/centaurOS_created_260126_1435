@@ -126,6 +126,13 @@ def compute(payload: dict) -> dict:
         raise ValueError("phases must be 1 or 3")
 
     ladder = payload.get("standard_ratings_kva") or STANDARD_KVA_LADDER
+    # ROBUSTNESS (2026-06-14): tolerate a SCALAR `standard_ratings_kva` (a caller
+    # — e.g. the on-the-fly tool-plan bootstrap — that passes a single rating
+    # rather than a list). Wrap it so the ladder selection still works instead of
+    # raising "'int' object is not iterable". A scalar/iterable both end up as a
+    # list of floats; STANDARD_KVA_LADDER is still the default when absent.
+    if isinstance(ladder, (int, float)):
+        ladder = [ladder]
     ladder = [float(x) for x in ladder]
 
     # ---- Apparent power demand + required (with headroom) ----
