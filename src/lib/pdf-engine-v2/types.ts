@@ -7,6 +7,10 @@
  */
 export type BriefSourceTag = 'user' | 'inferred' | 'missing'
 
+// U6 brief-expansion types (reasoner-derived detailed brief). Type-only import —
+// the cross-edge with brief-expander is erased at compile (no runtime cycle).
+import type { BriefExpansion, DerivedRequirement } from './brief-expander'
+
 export interface StructuredBriefConstraintValue<T = number | null> {
   value: T
   currency?: 'GBP' | 'USD' | 'EUR'
@@ -137,9 +141,13 @@ export interface StructuredBriefJSON {
     operating_environment: StructuredBriefOperatingEnvironment
     safety_standards: StructuredBriefSafetyStandard[]
     additional_constraints: StructuredBriefAdditionalConstraint[]
+    /** U6: reasoner-derived quantified engineering duties (the detailed brief). */
+    derived_requirements?: DerivedRequirement[]
   }
   missing_mandatory_fields: string[]
   confidence: 'HIGH' | 'MEDIUM' | 'LOW'
+  /** U6: the full brief-expansion record (product identity, materials, duties). */
+  brief_expansion?: BriefExpansion
 }
 
 // ── PA Stage 3 — Research Synthesis types ────────────────────────────────────

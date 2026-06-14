@@ -152,6 +152,23 @@ export async function orchestrateDesign(
           unit: (qv as TypedQuantity)?.unit ?? '',
           condition: (qv as TypedQuantity)?.condition ?? null,
         })).filter(d => typeof d.value === 'number' && Number.isFinite(d.value))
+        // U6: seed the duties with the brief's reasoner-derived requirements so
+        // the tool-planner sees the FULL demand set the detailed brief implies —
+        // not only what the contract already happened to compute. Contract-
+        // computed duties WIN on a key collision (the engine's own maths trumps
+        // the brief's first-pass estimate). Brief duties carry the demand a tool
+        // may not yet exist for → drives a richer (and missing-tool) selection.
+        const briefDuties: any[] = Array.isArray((parsedConstraints as any).derived_requirements)
+          ? (parsedConstraints as any).derived_requirements
+          : []
+        const dutyKeys = new Set(duties.map(d => d.key))
+        for (const r of briefDuties) {
+          if (!r || typeof r.key !== 'string') continue
+          if (typeof r.value !== 'number' || !Number.isFinite(r.value)) continue
+          if (dutyKeys.has(r.key)) continue
+          dutyKeys.add(r.key)
+          duties.push({ key: r.key, value: r.value, unit: typeof r.unit === 'string' ? r.unit : '', condition: null })
+        }
         const boot = await bootstrapToolPlan(envelope.class, parsedConstraints, envelope, duties)
         if (boot.ok) {
           console.error(

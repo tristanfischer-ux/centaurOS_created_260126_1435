@@ -41,6 +41,7 @@ for (const envPath of [
 
 import { runBriefParsing } from '../src/lib/pdf-engine-v2/stages/0-brief-generation'
 import { augmentBrief } from '../src/lib/pdf-engine-v2/brief-augment'
+import { expandBrief } from '../src/lib/pdf-engine-v2/brief-expander'
 import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research'
 import { LLM_CONFIG } from '../src/lib/pdf-engine-v2/llm-config'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
@@ -2441,6 +2442,55 @@ async function main() {
     still_missing: augResult.still_missing,
     summary: augResult.summary,
   })
+
+  // ── U6: Universal brief EXPANSION (thin brief → detailed engineering brief) ──
+  // Reasoner-driven, NO curation. Turns the stated targets into the QUANTIFIED
+  // duty set the design must meet (recirc flow, O₂ demand, biofilter/TAN duty,
+  // CO₂-strip duty, thermal duty …) for ANY archetype, and corrects the product
+  // identity + construction materials (fixes the regex path framing a fish farm
+  // as a stainless chemical plant whose "products" are its waste). Fail-safe: on
+  // ANY failure the U5 result stands and the chain proceeds. Skip via
+  // CHAIN_SKIP_BRIEF_EXPANSION=1.
+  if (process.env.CHAIN_SKIP_BRIEF_EXPANSION !== '1') {
+    try {
+      const exp = await expandBrief(parsedResult.data, productClass, currentBriefText)
+      if (exp.expansion) {
+        const x = exp.expansion
+        parsedResult.data.brief_expansion = x
+        parsedResult.data.constraints.derived_requirements = x.derived_requirements
+        // Correct an AUTO-INFERRED (never user-stated) target_material that the
+        // regex path mis-framed. Never overwrite a founder-stated material.
+        const tm = parsedResult.data.constraints.target_material
+        if (tm && tm.source !== 'user' && x.construction_materials) {
+          tm.value = x.primary_product
+            ? `${x.construction_materials}; product: ${x.primary_product}`
+            : x.construction_materials
+          tm.source = 'inferred'
+        }
+        console.error(
+          `[chain] U6 brief expansion: ${x.derived_requirements.length} duties derived; ` +
+          `product="${x.primary_product}" (model=${exp.model}, cost_usd=${exp.costUsd ?? 'n/a'})`,
+        )
+        for (const r of x.derived_requirements.slice(0, 24)) {
+          console.error(`  [U6] ${r.key} = ${r.value ?? 'n/a'} ${r.unit} [${r.provenance}/${r.confidence}] — ${r.basis.slice(0, 90)}`)
+        }
+        writeFileSync(resolve(outDir, '1-brief-expanded.json'), JSON.stringify(x, null, 2))
+        logAction({
+          step: 'brief_expansion_u6',
+          product_class: productClass,
+          duties_derived: x.derived_requirements.length,
+          primary_product: x.primary_product,
+          model: exp.model,
+          cost_usd: exp.costUsd,
+        })
+      } else {
+        console.error(`[chain] U6 brief expansion SKIPPED (fail-safe): ${exp.error}`)
+        logAction({ step: 'brief_expansion_u6_skipped', product_class: productClass, error: exp.error })
+      }
+    } catch (err) {
+      console.error(`[chain] U6 brief expansion threw (fail-safe, continuing): ${(err as Error).message}`)
+    }
+  }
 
   // ── U5b: Field-erected mass-constraint normalisation (2026-06-05) ─────────
   // A field-erected process plant (Power-to-Liquid / FT SAF, CO₂ mineralisation,
@@ -5485,6 +5535,50 @@ async function main() {
   // silent no-op for the entire history of this chain. Renderer was relying
   // on the pre-orchestrator strip at line 2189 + a Generator-side cleanup.
   try { stripWordSuffixFromDesign(state.moduleDecomposition) } catch {}
+
+  // ── PRINCIPAL-EQUIPMENT RECONCILE (Stage F core — Tristan 2026-06-14) ──────────
+  // Re-assert the DETERMINISTIC contract as the source of the principal-equipment SET,
+  // AFTER the LLM stages and BEFORE state is saved — so the drawings, Blender and bill
+  // of materials (all read from this saved moduleDecomposition) consume the contract's
+  // equipment + counts, not whatever the reviewers/Phase-2 left. Fixes two verified RAS
+  // residuals: (1) the rearing-tank count collapsing ×10→×1 + the tank's identity being
+  // overwritten by a sibling (the emitter-identity-lock can't heal a both-keys-collide
+  // rewrite); (2) the equipment SET drifting run-to-run because it came from the non-
+  // deterministic word-tree. Only `_synthesized` words (the generic emitter's contract-
+  // derived equipment) are touched, so the 35 registered hand-emitters are byte-
+  // untouched. Universal — keyed on the contract's self-describing quantities, no class
+  // branch. Generic-emitter path only (registered designs carry no `_synthesized` words,
+  // so this is a guaranteed no-op for them, but we gate on the marker to be explicit).
+  try {
+    const isGeneric = /Generic emitter/i.test(String((state.moduleDecomposition as any)?.rationale_excluded ?? ''))
+    if (isGeneric && engineeringContract) {
+      const { reconcilePrincipalEquipment } = await import('./lib/orchestrator/generic/universal-contract-sizing')
+      const rec = reconcilePrincipalEquipment(
+        (state.moduleDecomposition?.modules ?? []) as any,
+        { quantities: engineeringContract.quantities } as any,
+      )
+      console.error(
+        `[chain] principal-equipment reconcile (deterministic, contract-keyed): ` +
+          `${rec.groups} principal group(s); ${rec.repaired} identity repaired; ` +
+          `${rec.removedDuplicates} LLM duplicate(s) + ${rec.removedInvented} invented principal(s) dropped ` +
+          `(+${rec.removedOrphanChildren} orphan sub-parts); ${rec.synthesizedMissing} deleted principal(s) re-created.`,
+      )
+      logAction({
+        step: 'principal_equipment_reconcile',
+        groups: rec.groups,
+        repaired: rec.repaired,
+        removed_duplicates: rec.removedDuplicates,
+        removed_invented: rec.removedInvented,
+        removed_orphan_children: rec.removedOrphanChildren,
+        resynthesised_missing: rec.synthesizedMissing,
+        details: rec.details.slice(0, 20),
+      })
+    }
+  } catch (err) {
+    console.error(`[chain] principal-equipment reconcile failed (non-fatal): ${(err as Error).message}`)
+    logAction({ step: 'principal_equipment_reconcile', ok: false, error: String(err).slice(0, 200) })
+  }
+
   const statePath = resolve(outDir, 'state.json')
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })
