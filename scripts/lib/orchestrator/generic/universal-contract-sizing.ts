@@ -512,6 +512,318 @@ export interface UniversalSizingResult {
   synthesizedPhrases: string[]
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// PRINCIPAL-EQUIPMENT RECONCILE (Stage F core — Tristan 2026-06-14).
+//
+// THE WALL it removes (verified on out/ras-converged2): the emitter SYNTHESISES the
+// principal equipment deterministically from the contract (4-generator.json: a
+// "Rearing Tank" word, id=rearing_tank_synth_word, qty=×10, 9.5 m dia × 4.7 m), but
+// the THREE post-emission LLM stages that follow (R1 reviewer, R4 reviewer, Phase-2
+// repair) can rewrite a synthesised word's identity wholesale — in the converged run
+// the rearing tank's id AND content_character were both overwritten to a SIBLING's
+// (biofilter_synth_word) and its count collapsed ×10 → ×1. The emitter-identity-lock
+// (which keys on word-id + char-id) cannot heal that: when BOTH keys are rewritten to
+// collide with another real word, the snapshot entry is simply "missing" and the
+// corrupted word silently matches the wrong entry. Result: the drawings + Blender +
+// bill of materials (all read from the final moduleDecomposition) render 1 tank where
+// the contract says 10, and the count VARIES run-to-run because it is whatever the LLM
+// left, not what the contract computed.
+//
+// This pass makes the PRINCIPAL-EQUIPMENT SET authoritative from the DETERMINISTIC
+// contract again, AFTER the LLM stages, just before state is saved (so geometry, BoM
+// and cost all consume it). For every synthesisable contract group it guarantees
+// EXACTLY ONE canonical equipment word with the contract-derived identity (id, char-id,
+// name) + count + dimension + rating, repairing a corrupted/renamed survivor in place
+// and dropping LLM duplicate/collided copies (and their orphaned sub-components). The
+// LLM may still DECORATE (prose, narrative) but it can no longer DEFINE or mutate the
+// principal-equipment set or its counts. Universal — consumes whatever the contract
+// computed, any archetype, no `if class`. Only `_synthesized` words are touched, so a
+// registered hand-emitter (which never sets `_synthesized`) is byte-untouched.
+// ──────────────────────────────────────────────────────────────────────────────
+
+interface CanonEquip {
+  group: EquipGroup
+  id: string
+  charId: string
+  name: string
+}
+
+function canonFor(g: EquipGroup): CanonEquip {
+  return {
+    group: g,
+    id: `${g.phrase}_synth_word`,
+    charId: `${g.phrase}_synth`,
+    name: titleCase(g.phrase),
+  }
+}
+
+// Deterministic modifier set for a canonical equipment word, identical to synthWord's
+// (count + dimension + rating), but used to OVERWRITE a survivor's locked spec mods so
+// the count/size the contract computed always wins over an LLM edit.
+function canonMods(g: EquipGroup): ModifierCharacter[] {
+  const out: ModifierCharacter[] = []
+  if (g.count !== undefined && g.count >= 2) out.push(mod('quantity', `×${Math.round(g.count)}`))
+  else out.push(mod('quantity', '×1'))
+  out.push(...dimAndRatingFor(g))
+  return out
+}
+
+function isSynth(w: WordLike): boolean {
+  return (w as { _synthesized?: boolean })._synthesized === true
+}
+function isSubcomponent(w: WordLike): boolean {
+  return (w as { _subcomponent?: boolean })._subcomponent === true
+}
+
+/** Overwrite a word's identity + deterministic spec mods with the canonical truth,
+ *  preserving any NON-spec modifiers (form/part_number/lifecycle/installation prose)
+ *  and preserving the order of the spec kinds it already had. Returns true if anything
+ *  changed. */
+function forceCanonIdentity(w: WordLike, canon: CanonEquip): boolean {
+  let changed = false
+  const oldId = w.id
+  if (w.id !== canon.id) { w.id = canon.id; changed = true }
+  if ((w.name_human ?? '') !== canon.name) { w.name_human = canon.name; changed = true }
+  if (!w.content_character || typeof w.content_character !== 'object') w.content_character = {}
+  if (w.content_character.character_id !== canon.charId) { w.content_character.character_id = canon.charId; changed = true }
+  if (w.content_character.name_human !== canon.name) { w.content_character.name_human = canon.name; changed = true }
+
+  // Replace the deterministic spec kinds (quantity / dimension / capacity / rating_primary)
+  // with the contract truth at their existing positions; keep everything else verbatim.
+  const SPEC = new Set(['quantity', 'dimension', 'capacity', 'rating_primary'])
+  const truth = canonMods(canon.group)
+  const existing = Array.isArray(w.modifier_characters) ? w.modifier_characters : []
+  const rebuilt: ModifierCharacter[] = []
+  const placed = new Set<string>()
+  for (const mc of existing) {
+    const k = String(mc.kind ?? '')
+    if (SPEC.has(k)) {
+      if (!placed.has(k)) {
+        for (const t of truth) if (String(t.kind) === k) rebuilt.push({ ...t })
+        placed.add(k)
+      }
+      // drop duplicate / LLM-added same-kind entries
+    } else {
+      rebuilt.push(mc)
+    }
+  }
+  for (const t of truth) {
+    const k = String(t.kind)
+    if (!placed.has(k)) { rebuilt.push({ ...t }); placed.add(k) }
+  }
+  // Detect a real change in the spec mods (cheap signature compare).
+  const sig = (ms: ModifierCharacter[]) => ms.filter((m) => SPEC.has(String(m.kind)))
+    .map((m) => `${m.kind}=${String(m.value ?? '')}${m.unit ?? ''}`).sort().join('|')
+  if (sig(existing) !== sig(rebuilt)) changed = true
+  w.modifier_characters = rebuilt
+  ;(w as { _synthesized?: boolean })._synthesized = true
+  return changed || oldId !== canon.id
+}
+
+/** Re-key a survivor's exploded sub-components onto the canonical parent id (their ids
+ *  are `<parentId>__<suffix>`). Keeps Blender/BoM parent↔child grouping coherent after
+ *  an identity repair. */
+function rekeyChildren(words: WordLike[], oldParentId: string | undefined, canonId: string): void {
+  if (!oldParentId || oldParentId === canonId) return
+  const prefix = `${oldParentId}__`
+  for (const w of words) {
+    if (!isSubcomponent(w)) continue
+    const id = w.id ?? ''
+    if (id.startsWith(prefix)) {
+      const suffix = id.slice(prefix.length)
+      w.id = `${canonId}__${suffix}`
+      if (w.content_character && typeof w.content_character === 'object') {
+        w.content_character.character_id = `${canonId}__${suffix}`
+      }
+    }
+  }
+}
+
+export interface PrincipalReconcileResult {
+  groups: number
+  repaired: number // survivors whose identity/spec was corrected to contract truth
+  removedDuplicates: number // extra synth copies of a contract group (LLM collisions/renames) dropped
+  removedInvented: number // _synthesized principals backed by NO contract group (LLM inventions) dropped
+  removedOrphanChildren: number // sub-components of removed duplicates/inventions dropped
+  synthesizedMissing: number // principal groups with NO surviving synth word, re-created
+  details: string[]
+}
+
+/**
+ * Make the principal-equipment SET deterministic from the contract, AFTER the LLM
+ * stages. For each synthesisable contract group, guarantee exactly one canonical
+ * `_synthesized` equipment word with the contract identity + count + size, repair a
+ * corrupted survivor in place, drop LLM duplicate/collided copies, and re-create a
+ * principal item the LLM deleted entirely. Mutates `modules` in place. Idempotent.
+ *
+ * Scope: touches ONLY `_synthesized` words (registered hand-emitters never set the
+ * flag → byte-untouched). Universal: keyed entirely on the contract's self-describing
+ * quantities, no class branch.
+ */
+export function reconcilePrincipalEquipment(
+  modules: ModuleLike[],
+  contract: ContractInProgress,
+): PrincipalReconcileResult {
+  const res: PrincipalReconcileResult = {
+    groups: 0, repaired: 0, removedDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, details: [],
+  }
+
+  const quantities: Record<string, number> = {}
+  const q = (contract?.quantities ?? {}) as Record<string, { value?: unknown } | undefined>
+  for (const [k, v] of Object.entries(q)) {
+    const val = v?.value
+    if (typeof val === 'number' && Number.isFinite(val)) quantities[k] = val
+  }
+  const principalGroups = buildGroups(quantities).filter(isSynthesisable)
+  res.groups = principalGroups.length
+  if (principalGroups.length === 0) return res
+
+  // Map each synthesisable group to its canonical identity.
+  const canons = principalGroups.map(canonFor)
+  const freshlySynthesised: WordLike[] = [] // re-created principals → explode their sub-assemblies
+
+  // Assign every surviving top-level _synthesized word to its owning canon. The
+  // principal-equipment SET is the contract's — exactly one word per synthesisable
+  // group — so the LLM may DECORATE the prose but may NOT add, rename, or duplicate a
+  // principal. A synth word claims a canon when it (a) EXACT-matches the canon id/char
+  // (a verbatim survivor, or an LLM rename that COLLIDED onto a sibling's id), OR (b)
+  // its name fully COVERS the canon's group stems (canon stems ⊆ word stems) — which
+  // catches an LLM that re-titled the synth equipment ("Calculated Heat Pump",
+  // "Working Biofilter") while keeping its synthesised identity. Each canon keeps ONE
+  // survivor (repaired to contract truth); the rest are LLM duplicates → dropped. A
+  // synth word that claims NO canon is an LLM-INVENTED principal not backed by any
+  // contract quantity → also dropped (it must not enter the deterministic set). Sub-
+  // components (`_subcomponent`) are NOT principals and are left to follow their parent.
+  type Owned = { word: WordLike; sm: { words?: WordLike[] } }
+  const byCanon = new Map<string, Owned[]>() // canon.id → survivors claiming it
+  for (const c of canons) byCanon.set(c.id, [])
+  const unclaimed: Owned[] = [] // _synthesized principals backed by no contract group
+
+  const canonClaimedBy = (w: WordLike): CanonEquip | undefined => {
+    const exact = canons.find((c) => w.id === c.id || w.content_character?.character_id === c.charId)
+    if (exact) return exact
+    const wStems = wordStems(w)
+    if (wStems.length === 0) return undefined
+    // Full-subset: the canon's group stems must ALL be present in the word — so the word
+    // genuinely names that equipment. Prefer the canon with the most stems (the most
+    // specific) to avoid a 1-stem group stealing a more-specific word.
+    let best: CanonEquip | undefined
+    let bestStems = 0
+    for (const c of canons) {
+      const gs = c.group.stems
+      if (gs.length > 0 && gs.every((s) => wStems.includes(s)) && gs.length > bestStems) {
+        best = c
+        bestStems = gs.length
+      }
+    }
+    return best
+  }
+
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        if (!isSynth(w) || isSubcomponent(w)) continue
+        const pick = canonClaimedBy(w)
+        if (pick) byCanon.get(pick.id)!.push({ word: w, sm })
+        else unclaimed.push({ word: w, sm })
+      }
+    }
+  }
+
+  // Reconcile each group: ONE survivor → repair to canonical; the rest → remove.
+  for (const c of canons) {
+    const owned = byCanon.get(c.id)!
+    if (owned.length === 0) {
+      // The LLM deleted/renamed this principal item's top word but may have LEFT its
+      // exploded children behind (keyed `<canonId>__…`) — sweep those orphans first so
+      // re-synthesising doesn't duplicate them. Then re-create the principal + explode.
+      const childPrefix = `${c.id}__`
+      for (const m of modules ?? []) {
+        for (const sm of m.sub_modules ?? []) {
+          if (!Array.isArray(sm.words)) continue
+          sm.words = sm.words.filter((w) => {
+            if (isSubcomponent(w) && (w.id ?? '').startsWith(childPrefix)) { res.removedOrphanChildren += 1; return false }
+            return true
+          })
+        }
+      }
+      const target = pickModule(modules, c.group.phrase)
+      const sm = target?.sub_modules?.[0]
+      if (sm) {
+        const wNew = synthWord(c.group)
+        ;(sm.words ??= []).push(wNew)
+        freshlySynthesised.push(wNew)
+        res.synthesizedMissing += 1
+        res.details.push(`re-synthesised missing principal '${c.name}' (${c.id})`)
+      }
+      continue
+    }
+    // Survivor preference: one already carrying the canonical id, else the first.
+    owned.sort((a, b) => (a.word.id === c.id ? -1 : 0) - (b.word.id === c.id ? -1 : 0))
+    const survivor = owned[0]
+    const oldId = survivor.word.id
+    if (forceCanonIdentity(survivor.word, c)) {
+      res.repaired += 1
+      res.details.push(`repaired '${c.name}' identity → ${c.id} (was ${oldId ?? '∅'})`)
+    }
+    rekeyChildren(survivor.sm.words ?? [], oldId, c.id)
+    // Drop the rest (LLM duplicates/collisions) + their exploded children.
+    for (let i = 1; i < owned.length; i++) {
+      const dup = owned[i]
+      const dupId = dup.word.id
+      const words = dup.sm.words ?? []
+      const before = words.length
+      dup.sm.words = words.filter((w) => {
+        if (w === dup.word) return false
+        if (isSubcomponent(w) && dupId && (w.id ?? '').startsWith(`${dupId}__`)) { res.removedOrphanChildren += 1; return false }
+        return true
+      })
+      res.removedDuplicates += 1
+      res.details.push(`dropped duplicate '${dup.word.name_human ?? dupId}' colliding onto ${c.id} (${(dup.sm.words?.length ?? 0) - (before - 1 - 0)} child cleanup)`)
+    }
+  }
+
+  // Drop LLM-INVENTED principals (a _synthesized top word backed by no contract group)
+  // + their exploded children. The principal-equipment set is the contract's; an item
+  // the contract never computed must not enter it (run-to-run stability + no-invention).
+  for (const inv of unclaimed) {
+    const invId = inv.word.id
+    const words = inv.sm.words ?? []
+    inv.sm.words = words.filter((w) => {
+      if (w === inv.word) return false
+      if (isSubcomponent(w) && invId && (w.id ?? '').startsWith(`${invId}__`)) { res.removedOrphanChildren += 1; return false }
+      return true
+    })
+    res.removedInvented += 1
+    res.details.push(`dropped LLM-invented principal '${inv.word.name_human ?? invId}' (no contract group backs it)`)
+  }
+
+  // Explode the sub-assemblies of any PRINCIPAL we just re-created (a repaired survivor
+  // already carries its children; a freshly-synthesised one does not). Insert each
+  // parent's physics-sized children immediately after it, matching the synthesis path.
+  if (freshlySynthesised.length > 0) {
+    const fresh = new Set(freshlySynthesised)
+    for (const m of modules ?? []) {
+      for (const sm of m.sub_modules ?? []) {
+        if (!Array.isArray(sm.words)) continue
+        const out: WordLike[] = []
+        for (const w of sm.words) {
+          out.push(w)
+          if (!fresh.has(w)) continue
+          const nm = w.name_human ?? ''
+          const rule = SUB_ASSEMBLY.find((r) => r.re.test(nm))
+          if (!rule) continue
+          const physics = readParentPhysics(w)
+          for (const spec of rule.parts) out.push(subWord(spec, w.id ?? sanitizeId(nm), physics.qty, physics))
+        }
+        sm.words = out
+      }
+    }
+  }
+
+  return res
+}
+
 /**
  * Stamp the contract's self-describing quantities onto BoM words AND synthesise the
  * principal equipment the emitter omitted — universally. Mutates `modules` in place.

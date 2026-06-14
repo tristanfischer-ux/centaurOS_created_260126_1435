@@ -72,6 +72,62 @@ const TIER_C_FLOOR: Record<string, string[]> = {
 }
 const GENERIC_FLOOR = ['primary_assembly', 'secondary_assembly', 'mounting_hardware', 'wiring_harness', 'fastener_set', 'protective_cover']
 
+// ── DUTY-AWARE THERMAL FLOOR (Stage F core — Tristan 2026-06-14) ────────────────
+// The default `environmental_interface` floor is a fixed COOLING kit (chiller +
+// cooling-fan + air-damper). That is wrong for a plant whose contract carries a
+// HEATING duty and NO cooling duty — verified on RAS, a warm-water recirculating
+// aquaculture system: contract heating_duty_kw≈1493 + heat_pump_cop 3.5, zero cooling
+// keys, yet the dossier rendered a "Chiller Unit" + "Cooling Fan". The thermal
+// equipment TYPE must follow the contract's duty SIGN, not a fixed list.
+//
+// Universal (no class table): we read the contract's thermal-duty quantity keys and
+// classify the plant as heating-only / cooling-only / both / unknown, then pick the
+// matching floor. A heating duty yields a HEAT PUMP (the contract's own thermal
+// engine), never a chiller. `heat_exchanger` is duty-neutral and stays in every set.
+const THERMAL_COOLING_FLOOR = ['heat_exchanger', 'cooling_fan', 'chiller_unit', 'temperature_sensor', 'air_damper', 'condensate_drain']
+const THERMAL_HEATING_FLOOR = ['heat_pump', 'heat_exchanger', 'circulation_pump', 'temperature_sensor', 'expansion_vessel', 'insulation_jacket']
+const THERMAL_BOTH_FLOOR    = ['heat_exchanger', 'heat_pump', 'chiller_unit', 'cooling_fan', 'temperature_sensor', 'air_damper']
+
+// Cooling-duty markers: a key that DEMANDS heat rejection (a chiller/condenser/cooler
+// duty or a cooling-water/refrigeration load). `heat_exchanger`/`cross_exchanger` is
+// excluded — it is duty-neutral (recovers heat in either direction).
+const COOLING_DUTY_RE = /(^|_)(cooling|chiller|chilled|refriger|condenser|condensing|cooler|cold)(_|$)|cooling_(load|duty|capacity|water)|condenser_duty|hvac_cooling/i
+// Heating-duty markers: a key that DEMANDS heat addition (a heating/reboiler/preheat
+// duty, a heat-pump heating load, a boiler/steam duty).
+const HEATING_DUTY_RE = /(^|_)(heating|reboiler|preheat|boiler|steam)(_|$)|heat_pump|heating_(load|duty|kw)|makeup_heating|process_heat/i
+
+type ThermalMode = 'heating' | 'cooling' | 'both' | 'unknown'
+
+/** Classify the plant's thermal mode from the contract's duty-bearing quantity keys.
+ *  Only keys whose VALUE is a positive number count (a 0/absent duty is no demand). */
+function thermalModeFromContract(contract: ContractInProgress): ThermalMode {
+  let heating = false
+  let cooling = false
+  const quantities = contract?.quantities ?? {}
+  for (const [key, tq] of Object.entries(quantities)) {
+    const v = (tq as { value?: unknown })?.value
+    if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) continue
+    if (COOLING_DUTY_RE.test(key)) cooling = true
+    if (HEATING_DUTY_RE.test(key)) heating = true
+  }
+  if (heating && cooling) return 'both'
+  if (heating) return 'heating'
+  if (cooling) return 'cooling'
+  return 'unknown'
+}
+
+/** The environmental_interface floor that matches the contract's thermal duty sign. */
+function thermalFloorFor(contract: ContractInProgress): string[] {
+  switch (thermalModeFromContract(contract)) {
+    case 'heating': return THERMAL_HEATING_FLOOR
+    case 'both': return THERMAL_BOTH_FLOOR
+    case 'cooling': return THERMAL_COOLING_FLOOR
+    // unknown: keep the historical cooling-led default (no regression for classes that
+    // never declared a thermal duty — they previously got this exact list).
+    default: return THERMAL_COOLING_FLOOR
+  }
+}
+
 const ACRONYMS: Record<string, string> = {
   lfp: 'LFP', nmc: 'NMC', pcs: 'PCS', dc: 'DC', ac: 'AC', ems: 'EMS', bms: 'BMS',
   hvac: 'HVAC', led: 'LED', igbt: 'IGBT', sic: 'SiC', io: 'I/O', hmi: 'HMI',
@@ -123,15 +179,26 @@ function contractCountFor(component: string, contract: ContractInProgress): numb
   return 1
 }
 
-/** Build the 5-7 component name list for a module: corpus union first, Tier-C floor to top up. */
+// A component name that is intrinsically a COOLING device — must NOT appear in the
+// thermal set of a heating-only plant (the RAS chiller-in-a-heating-plant residual).
+const COOLING_COMPONENT_RE = /chill|cooling|\bcooler\b|refriger|condenser|air[_\s-]?damper|cold[_\s-]?plate|cooling[_\s-]?fan/i
+
+/** Build the 5-7 component name list for a module: corpus union first, floor to top up.
+ *  For `environmental_interface` the floor + a cooling-component filter are driven by the
+ *  contract's thermal DUTY SIGN, so a heating-only plant never ships a chiller. */
 function componentsForModule(
   moduleKey: string,
   componentsByModule: Map<string, string[]>,
+  contract: ContractInProgress,
 ): string[] {
+  const isThermal = moduleKey === 'environmental_interface'
+  const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
   const out: string[] = []
   const seen = new Set<string>()
   const push = (c: string) => {
+    // Heating-only plant: never admit a cooling component (from corpus OR floor).
+    if (isThermal && thermalMode === 'heating' && COOLING_COMPONENT_RE.test(c)) return
     const id = sanitizeId(c)
     if (id && !seen.has(id)) {
       seen.add(id)
@@ -140,7 +207,9 @@ function componentsForModule(
   }
   for (const c of fromCorpus) push(c)
   if (out.length < MIN_WORDS) {
-    const floor = TIER_C_FLOOR[moduleKey] ?? GENERIC_FLOOR
+    // Duty-aware thermal floor (heating ⇒ heat-pump set, cooling ⇒ chiller set, etc.);
+    // every other module keeps its static Tier-C floor.
+    const floor = isThermal ? thermalFloorFor(contract) : (TIER_C_FLOOR[moduleKey] ?? GENERIC_FLOOR)
     for (const c of floor) {
       if (out.length >= MIN_WORDS) break
       push(c)
@@ -237,7 +306,7 @@ export function deriveGenericSkeleton(
   return graph.nodes.map((node: GraphNode): DesignModule => {
     const moduleName = String(node.class)
     const display = node.display ?? humanize(moduleName)
-    const components = componentsForModule(moduleName, componentsByModule)
+    const components = componentsForModule(moduleName, componentsByModule, contract)
     const groups = splitIntoSubModuleGroups(components)
 
     const sub_modules: SubModule[] = groups.map((group, gi) => {

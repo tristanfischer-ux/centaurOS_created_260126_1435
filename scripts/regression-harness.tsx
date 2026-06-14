@@ -59,6 +59,8 @@ import { composeToolGraph } from './lib/orchestrator/auto-planner'
 import { validateToolPlanSpec, applyStepOutputs, type ToolPlanSpec, type ToolPlanStepSpec } from './lib/orchestrator/generic/bootstrap-tool-plan'
 import { computeQuantityUpdates, applyUpdates } from './lib/design-loop/writeback-bridge'
 import { resizeFromConvergedDemand, nextStandardKva } from './lib/design-loop/settle-loop'
+import { reconcilePrincipalEquipment } from './lib/orchestrator/generic/universal-contract-sizing'
+import { deriveGenericSkeleton } from './lib/orchestrator/generic/derive-skeleton'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildAuthorDigest, buildCheckSpec } from './author-blender-scene'
@@ -344,6 +346,122 @@ function checkDesignLoopClosesEarly(): Assertion[] {
       return o.resizedNoLoop === null && o.briefStillThere === 87.25 && o.supplyAbsent === true
     },
     () => `resizedNoLoop=${JSON.stringify(resizedNoLoop)}`,
+  ))
+
+  return out
+}
+
+// ── UNIVERSAL: PRINCIPAL EQUIPMENT comes from the DETERMINISTIC contract, not the
+//    non-deterministic LLM word-tree (Stage F core, 2026-06-14) ──
+//
+// Two verified RAS residuals motivated this:
+//   (1) the LLM reviewers overwrote the synthesised "Rearing Tank" word's identity with
+//       a sibling's (biofilter_synth_word) and its count collapsed ×10 → ×1, so the
+//       drawings/Blender/BoM rendered 1 tank where the contract says 10 — and the count
+//       VARIED run-to-run because it came from the word-tree, not the contract;
+//   (2) the generic skeleton's environmental_interface floor is a fixed COOLING kit
+//       (chiller + cooling-fan + air-damper), wrong for a plant whose contract carries a
+//       HEATING duty and no cooling — RAS rendered a chiller in a warm-water heating plant.
+//
+// This invariant guards BOTH fixes as pure functions (no snapshot, no .venv):
+//   A. reconcilePrincipalEquipment, fed a SYNTHETICALLY CORRUPTED tree (the exact failure:
+//      the rearing tank renamed onto the biofilter id with qty ×1), restores the contract
+//      truth — ONE rearing-tank principal, id rearing_tank_synth_word, qty ×10 — and the
+//      result is IDEMPOTENT (a second pass changes nothing). It is keyed on the contract's
+//      self-describing quantities, so it is UNIVERSAL (no class branch).
+//   B. deriveGenericSkeleton's environmental_interface set follows the contract duty SIGN:
+//      a heating-only contract yields a HEAT PUMP and NO chiller/cooling-fan; a cooling
+//      contract yields the chiller set. Same code path for CO2/e-fuel/RAS — only the
+//      contract duty keys differ.
+// Would have caught: a regression that lets a downstream stage re-define the principal set,
+// the tank-count collapse, or a chiller leaking into a heating plant's thermal module.
+function checkPrincipalEquipmentFromContract(): Assertion[] {
+  const out: Assertion[] = []
+
+  // ── A. reconcile repairs the corrupted tank to the contract's ×10, idempotently ──
+  // A contract with rearing_tank_count=10 + a per-each volume (the RAS shape).
+  const contract: any = {
+    quantities: {
+      rearing_tank_count: { value: 10, unit: '' },
+      rearing_tank_volume_each_m3: { value: 334, unit: 'm³' },
+      biofilter_tank_volume_m3: { value: 515, unit: 'm³' },
+      biofilter_air_flow_m3_h: { value: 3709, unit: 'm³/h' },
+    },
+  }
+  // TWO verified LLM corruptions, in one tree (both seen on the real RAS runs):
+  //  (i)  out/ras-converged2/state.json: the rearing tank survived but with the biofilter's
+  //       id + char + a collapsed ×1 count, alongside the real biofilter (both share an id).
+  //  (ii) out/ras-stageF-run2/state.json: the LLM re-titled the synthesised heat-pump as a
+  //       "Calculated Heat Pump" with a NEW synth id — a renamed duplicate that exact-id
+  //       matching alone would miss (broke run-to-run identity until the full-subset-stem
+  //       match was added). The reconcile must collapse BOTH to the single contract canon.
+  const corruptedModules: any = [
+    { module: 'mass_fluid_transport_process', sub_modules: [ { id: 'sm', words: [
+      { id: 'biofilter_synth_word', name_human: 'Rearing Tank',
+        content_character: { character_id: 'biofilter_synth', name_human: 'Rearing Tank' },
+        modifier_characters: [ { kind: 'quantity', value: '×1' }, { kind: 'dimension', value: '7.3 m dia x 7.3 m' }, { kind: 'rating_primary', value: '3709', unit: 'm³/h' } ],
+        _synthesized: true },
+      { id: 'biofilter_synth_word', name_human: 'Biofilter',
+        content_character: { character_id: 'biofilter_synth', name_human: 'Biofilter' },
+        modifier_characters: [ { kind: 'quantity', value: '×1' }, { kind: 'dimension', value: '7.3 m dia x 7.3 m' }, { kind: 'rating_primary', value: '3709', unit: 'm³/h' } ],
+        _synthesized: true },
+    ] } ] },
+    { module: 'environmental_interface', sub_modules: [ { id: 'sm3', words: [
+      // the legit synthesised heat-pump + an LLM rename-duplicate of it.
+      { id: 'heat_pump_synth_word', name_human: 'Heat Pump',
+        content_character: { character_id: 'heat_pump_synth', name_human: 'Heat Pump' },
+        modifier_characters: [ { kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '427', unit: 'kW' } ], _synthesized: true },
+      { id: 'calculated_heat_pump_synth_word', name_human: 'Calculated Heat Pump',
+        content_character: { character_id: 'calculated_heat_pump_synth', name_human: 'Calculated Heat Pump' },
+        modifier_characters: [ { kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '427', unit: 'kW' } ], _synthesized: true },
+    ] } ] },
+    { module: 'structure_containment', sub_modules: [ { id: 'sm2', words: [
+      { id: 'frame_word', name_human: 'Structural Frame', content_character: { character_id: 'structural_frame' }, modifier_characters: [ { kind: 'quantity', value: '×1' } ] },
+    ] } ] },
+  ]
+  // Heat-pump is a contract group here, so the canon set includes it.
+  const contractHP: any = { quantities: { ...contract.quantities, heat_pump_electrical_kw: { value: 427, unit: 'kW' }, heat_pump_cop: { value: 3.5 } } }
+  const rec = reconcilePrincipalEquipment(corruptedModules, contractHP)
+  const topSynth = () => corruptedModules.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._synthesized && !w._subcomponent)))
+  const rears = topSynth().filter((w: any) => w.name_human === 'Rearing Tank')
+  const rear = rears[0]
+  const rearQty = rear ? String((rear.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value ?? '') : ''
+  const heatPumps = topSynth().filter((w: any) => /heat pump/i.test(String(w.name_human)))
+  // idempotency
+  const rec2 = reconcilePrincipalEquipment(corruptedModules, contractHP)
+  out.push(assertEq(
+    'UNIVERSAL.principal_equipment_deterministic_from_contract',
+    'principal-equipment reconcile restores the contract truth from a corrupted word-tree: EXACTLY ONE "Rearing Tank" (id=rearing_tank_synth_word, qty ×10, not the LLM-collapsed ×1) AND exactly ONE heat-pump (the LLM rename-duplicate "Calculated Heat Pump" collapsed away) — idempotent (a 2nd pass changes nothing)',
+    JSON.stringify({ rearCount: rears.length, rearId: rear?.id, rearQty, heatPumpCount: heatPumps.length, idempotent: rec2.repaired === 0 && rec2.removedDuplicates === 0 && rec2.removedInvented === 0 && rec2.synthesizedMissing === 0 }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.rearCount === 1 && o.rearId === 'rearing_tank_synth_word' && o.rearQty === '×10' && o.heatPumpCount === 1 && o.idempotent === true
+    },
+    () => `rears=${rears.length} id=${rear?.id} qty=${rearQty} heatPumps=${heatPumps.length} rec=${JSON.stringify({ r: rec.repaired, d: rec.removedDuplicates, inv: rec.removedInvented, s: rec.synthesizedMissing })} idempotent=${JSON.stringify({ r: rec2.repaired, d: rec2.removedDuplicates, inv: rec2.removedInvented, s: rec2.synthesizedMissing })}`,
+  ))
+
+  // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──
+  const graph: any = { product_class: 'test', nodes: [{ class: 'environmental_interface', display: 'Environmental Interface', role: 'principal', required: true }], edges: [] }
+  const heatingContract: any = { quantities: { heating_duty_kw: { value: 1493 }, heat_pump_cop: { value: 3.5 }, heat_pump_electrical_kw: { value: 427 } } }
+  const coolingContract: any = { quantities: { cooling_load_kw: { value: 1200 }, chiller_duty_kw: { value: 1200 } } }
+  const namesOf = (c: any): string[] => {
+    const mods = deriveGenericSkeleton(graph, {} as any, { class: 'test' } as any, c, new Map()) as any[]
+    return ((mods[0]?.sub_modules?.[0]?.words) || []).map((w: any) => String(w.name_human || ''))
+  }
+  const heatNames = namesOf(heatingContract)
+  const coolNames = namesOf(coolingContract)
+  const heatHasPump = heatNames.some((n) => /heat pump/i.test(n))
+  const heatHasChiller = heatNames.some((n) => /chiller|cooling fan|air damper/i.test(n))
+  const coolHasChiller = coolNames.some((n) => /chiller/i.test(n))
+  out.push(assertEq(
+    'UNIVERSAL.thermal_equipment_type_matches_contract_duty_sign',
+    'generic environmental_interface follows the contract duty SIGN: heating-only ⇒ a HEAT PUMP and NO chiller/cooling-fan; a cooling contract ⇒ the chiller set. Kills the chiller-in-a-heating-plant residual (RAS), universal (no class table)',
+    JSON.stringify({ heatHasPump, heatHasChiller, coolHasChiller, heatNames, coolNames }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.heatHasPump === true && o.heatHasChiller === false && o.coolHasChiller === true
+    },
+    () => `heating=${JSON.stringify(heatNames)} cooling=${JSON.stringify(coolNames)}`,
   ))
 
   return out
@@ -8596,6 +8714,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   for (const a of checkReactionToolsWorkedSound()) assertions.push(a)
   for (const a of checkDesignLoopWritebackAdditive()) assertions.push(a)
   for (const a of checkDesignLoopClosesEarly()) assertions.push(a)
+  for (const a of checkPrincipalEquipmentFromContract()) assertions.push(a)
 
   // Self-contained — the on-the-fly tool-plan bootstrap's FAIL-CLOSED materialiser
   // + hallucinated-field rejection (no .venv, no network, real registered tools).
