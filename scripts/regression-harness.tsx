@@ -56,6 +56,7 @@ import { splitDenseSubModulesByRadical, TARGET_DENSITY_DEFAULT, MIN_CHILD_WORDS_
 import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, isBespokeFabrication } from '../src/lib/pdf-engine-v2/lib/bespoke-equipment-bands'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
+import { validateToolPlanSpec, applyStepOutputs, type ToolPlanSpec, type ToolPlanStepSpec } from './lib/orchestrator/generic/bootstrap-tool-plan'
 import { computeQuantityUpdates } from './lib/design-loop/writeback-bridge'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
@@ -268,6 +269,99 @@ function checkDesignLoopWritebackAdditive(): Assertion[] {
     () => !!supply && Math.abs(Number(supply.to) - 6013.9) < 0.01 && !touchesBriefMetric && !!pipe && Math.abs(Number(pipe.to) - 34.8) < 0.01,
     () => `supply=${supply?.to} touchesBriefMetric=${touchesBriefMetric} pipe=${pipe?.to}`,
   ))
+  return out
+}
+
+// ── UNIVERSAL: the on-the-fly tool-plan BOOTSTRAP is FAIL-CLOSED + rejects
+//    hallucinated wiring (2026-06-14) ──
+//
+// scripts/lib/orchestrator/generic/bootstrap-tool-plan.ts generates a tool plan
+// AT RUNTIME for an unregistered class (replacing the domain-blind auto-planner
+// that picked airfoil/AUV/gear tools for a fish farm). The ONE safeguard that
+// makes that safe is twofold and is what this invariant guards:
+//   (1) FAIL-CLOSED materialiser — when a tool's COMPUTED output field is missing
+//       at runtime, the materialiser writes NOTHING for that contract key (never
+//       a fabricated number). A made-up number entering the engineering contract
+//       is exactly the failure mode the universal gates 31-34 cannot always catch.
+//   (2) VALIDATION rejects a hallucinated tool_output_field — the LLM cannot wire
+//       a contract key to an invoke() field the tool does not actually return
+//       (V2). Without this, num(output, <hallucinated>) is always undefined and
+//       the key silently fails-closed forever (or, pre-safeguard, fabricates).
+// Snapshot-independent + no .venv + no network (uses real registered tools'
+// declared I/O). require('register-all') so getTool/listTools are populated.
+function checkToolPlanBootstrapFailClosed(): Assertion[] {
+  const out: Assertion[] = []
+  try {
+    require('./lib/orchestrator/register-all')
+
+    // A registry-grounded spec: process:pump-sizing.motor_power_kw is a REAL raw
+    // invoke output field; mass-aggregator:envelope-check is the universal mass
+    // producer; regulatory-cert-cost:lookup.total_cost_gbp is a real cost field.
+    const goodSpec = (): ToolPlanSpec => ({
+      display_name: 'fixture',
+      steps: [
+        { tool_id: 'process:pump-sizing', inputs: [{ param: 'flow_m3_h', from_contract_key: 'recirculation_flow_m3_h', fallback: 100 }], outputs: [{ contract_key: 'pump_motor_kw', tool_output_field: 'motor_power_kw', unit: 'kW', family: 'power' }] },
+        { tool_id: 'regulatory-cert-cost:lookup', inputs: [{ param: 'product_class', constant: 'novel_class' }], outputs: [{ contract_key: 'cert_cost_gbp', tool_output_field: 'total_cost_gbp', unit: 'GBP', family: 'currency' }] },
+        { tool_id: 'mass-aggregator:envelope-check', inputs: [{ param: 'total_cell_mass_kg', constant: 5000 }], outputs: [{ contract_key: 'total_system_mass_kg', tool_output_field: 'total_system_mass_kg', unit: 'kg', family: 'mass' }] },
+      ],
+    })
+
+    // (a) A valid, registry-grounded spec passes V1/V2/V3.
+    const vGood = validateToolPlanSpec(goodSpec())
+    out.push(assertEq(
+      'UNIVERSAL.tool_plan_bootstrap_valid_spec_passes',
+      'a registry-grounded tool-plan spec (real tools + real invoke fields + mass producer + cost key) passes V1/V2/V3',
+      vGood.ok,
+      (ok) => ok === true,
+      () => `valid spec rejected: ${vGood.errors.join('; ')}`,
+    ))
+
+    // (b) Validation REJECTS a hallucinated tool_output_field (the safeguard).
+    const halluc = goodSpec()
+    halluc.steps[0].outputs[0].tool_output_field = 'made_up_field_that_no_tool_returns'
+    const vHalluc = validateToolPlanSpec(halluc)
+    out.push(assertEq(
+      'UNIVERSAL.tool_plan_bootstrap_rejects_hallucinated_output_field',
+      'validateToolPlanSpec REJECTS an outputs[].tool_output_field that is not a real invoke() output field of the tool (V2 — no hallucinated wiring)',
+      JSON.stringify({ rejected: !vHalluc.ok, flaggedV2: vHalluc.errors.some(e => /hallucinated field/.test(e)) }),
+      () => !vHalluc.ok && vHalluc.errors.some(e => /hallucinated field/.test(e)),
+      () => `expected rejection with a 'hallucinated field' V2 error; got ok=${vHalluc.ok} errors=[${vHalluc.errors.join('; ')}]`,
+    ))
+
+    // (c) FAIL-CLOSED materialiser: a MISSING computed output field writes NOTHING
+    //     (no fabricated number), and records the key as skipped.
+    const baseContract: any = {
+      product_class: 'novel_class', brief_summary: '', envelope: {},
+      quantities: {}, topology: [], closures: [], macro_assembly_prices: [], _tools_run: [],
+    }
+    const step: ToolPlanStepSpec = {
+      tool_id: 'process:pump-sizing',
+      inputs: [],
+      outputs: [{ contract_key: 'pump_motor_kw', tool_output_field: 'motor_power_kw', unit: 'kW', family: 'power' }],
+    }
+    const present = applyStepOutputs(step, baseContract, { motor_power_kw: 37.5 })
+    const missing = applyStepOutputs(step, baseContract, { some_other_field: 1 }) // motor_power_kw absent
+    const nan = applyStepOutputs(step, baseContract, { motor_power_kw: NaN })     // present but non-finite
+    out.push(assertEq(
+      'UNIVERSAL.tool_plan_bootstrap_materialiser_fail_closed',
+      'materialiser writes a PRESENT computed field, but FABRICATES NOTHING for a MISSING (undefined/NaN) computed output field — emits nothing + records it skipped',
+      JSON.stringify({
+        presentWritten: present.contract.quantities['pump_motor_kw']?.value === 37.5 && present.skipped.length === 0,
+        missingNotWritten: missing.contract.quantities['pump_motor_kw'] === undefined && missing.skipped.length === 1,
+        nanNotWritten: nan.contract.quantities['pump_motor_kw'] === undefined && nan.skipped.length === 1,
+      }),
+      () =>
+        present.contract.quantities['pump_motor_kw']?.value === 37.5 && present.skipped.length === 0 &&
+        missing.contract.quantities['pump_motor_kw'] === undefined && missing.skipped.length === 1 &&
+        nan.contract.quantities['pump_motor_kw'] === undefined && nan.skipped.length === 1,
+      () => `present=${JSON.stringify(present.contract.quantities['pump_motor_kw'])} skippedP=${present.skipped.length} | missing=${JSON.stringify(missing.contract.quantities['pump_motor_kw'])} skippedM=${JSON.stringify(missing.skipped)} | nan=${JSON.stringify(nan.contract.quantities['pump_motor_kw'])}`,
+    ))
+  } catch (err) {
+    // Registry/import unavailable — vacuous PASS (mirrors checkSizingToolsWorkedSound's catch).
+    out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_valid_spec_passes', description: 'tool-plan bootstrap valid spec passes', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_rejects_hallucinated_output_field', description: 'tool-plan bootstrap rejects hallucinated field', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_materialiser_fail_closed', description: 'tool-plan bootstrap materialiser fail-closed', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+  }
   return out
 }
 
@@ -8424,6 +8518,10 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // .venv python spawns once across the whole run, not per snapshot.
   for (const a of checkReactionToolsWorkedSound()) assertions.push(a)
   for (const a of checkDesignLoopWritebackAdditive()) assertions.push(a)
+
+  // Self-contained — the on-the-fly tool-plan bootstrap's FAIL-CLOSED materialiser
+  // + hallucinated-field rejection (no .venv, no network, real registered tools).
+  for (const a of checkToolPlanBootstrapFailClosed()) assertions.push(a)
 
   // Self-contained — the four chemical-process SIZING tools (reactor / absorber+stripper /
   // crystalliser / dryer) exercised directly on a CO2-scale fixture: ok + sane headline

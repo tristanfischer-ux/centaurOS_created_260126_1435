@@ -28,6 +28,7 @@ import { buildEnvelopeVector } from './envelope-vector'
 import { checkClassFit, mintProvisionalSlug, type ClassFitResult } from './class-fit-check'
 import { selectPlan } from './planner'
 import { composeFallbackPlan } from './auto-plan-fallback'
+import { bootstrapToolPlan } from './generic/bootstrap-tool-plan'
 import { runToolPlan } from './executor'
 import { runConsistencyVerifier } from './verifier'
 import { finaliseContract } from './aggregator'
@@ -125,27 +126,76 @@ export async function orchestrateDesign(
   // ── Step 2: Select tool plan ──────────────────────────────────────────
   let plan = selectPlan(envelope)
   if (!plan) {
-    // WALL-2 SAFE FALLBACK (2026-06-01): no hand-written ClassToolPlan matched.
-    // For a NOVEL (unregistered) class, try the schema-driven auto-planner —
-    // compose a tool graph from declared tool I/O instead of dying here.
-    // Gated behind UNIVERSAL_AUTO_PLAN=1 (default OFF) + scoped strictly to
-    // this selectPlan-MISS path, so all 35 registered classes (which match a
-    // plan above) are UNAFFECTED. Returns null when the flag is off or no
-    // graph composes → we keep the loud failure below verbatim.
-    const composed = composeFallbackPlan(envelope, parsedConstraints)
-    if (composed) {
-      console.error(
-        `[orchestrator] UNIVERSAL_AUTO_PLAN: no registered plan for ${envelope.class}/${envelope.scale_tier} — composed a ${composed.plan.tools.length}-tool fallback graph ` +
-        `(coupled_pairs=${composed.graph.coupled_pairs.length}, unmet_outputs=${composed.graph.unmet_outputs.length}). All steps non-fatal; proceeding past wall-2.`,
-      )
-      plan = composed.plan
-    } else {
-      const prefix = loud_failures ? '[LOUD] ' : ''
-      return failResult(
-        initialContract,
-        [`${prefix}no tool plan registered for envelope ${envelope.class}/${envelope.scale_tier} — class needs a ClassToolPlan in scripts/lib/orchestrator/class-plans/<class>.ts with envelope_predicate matching this envelope (or set UNIVERSAL_AUTO_PLAN=1 to compose one from tool I/O)`],
-        fallback_on_failure,
-      )
+    // NO hand-written ClassToolPlan matched (a NOVEL/unregistered class). Two
+    // tiers, best-first:
+    //
+    //   TIER 1 — ON-THE-FLY TOOL-PLAN BOOTSTRAP (2026-06-14, removes the
+    //   curation crutch): the engine does AT RUNTIME exactly what a human does
+    //   when hand-writing a class plan — read the detailed brief + the tool
+    //   catalogue, PICK the tools whose physics the brief needs, WIRE each to
+    //   the tools' REAL I/O field names (validated; a hallucinated field is
+    //   REJECTED, and a missing computed output is fail-closed at runtime), then
+    //   topo-ORDER + run them — and CACHE the plan so re-runs are instant. This
+    //   replaces the domain-blind auto-planner's nonsense selections (it picked
+    //   aircraft-airfoil + AUV-hydrostatics + bicycle-gear for a fish farm).
+    //   Gated behind UNIVERSAL_TOOL_PLAN_BOOTSTRAP (default ON; =0 disables),
+    //   mirroring CLASS_GRAPH_BOOTSTRAP. The candidate is stored status
+    //   'candidate' — NEVER auto-promoted. register-all is imported before
+    //   orchestrateDesign so listTools()/getTool() are populated.
+    if (process.env.UNIVERSAL_TOOL_PLAN_BOOTSTRAP !== '0') {
+      try {
+        // The duties = the engineering-contract quantities already on the
+        // contract (key/value/unit), which describe what the system must DO.
+        const duties = Object.entries(initialContract.quantities ?? {}).map(([key, qv]) => ({
+          key,
+          value: (qv as TypedQuantity)?.value,
+          unit: (qv as TypedQuantity)?.unit ?? '',
+          condition: (qv as TypedQuantity)?.condition ?? null,
+        })).filter(d => typeof d.value === 'number' && Number.isFinite(d.value))
+        const boot = await bootstrapToolPlan(envelope.class, parsedConstraints, envelope, duties)
+        if (boot.ok) {
+          console.error(
+            `[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for ${envelope.class}/${envelope.scale_tier} — ` +
+            `bootstrapped a ${boot.plan.tools.length}-step tool plan ` +
+            `(candidate id=${boot.candidate.id} version=${boot.candidate.version} status=${boot.candidate.status} ` +
+            `reused=${boot.candidate.reused} attempts=${boot.attempts} cost_usd=${boot.llm_cost_usd ?? 'n/a'}). ` +
+            `Stored as CANDIDATE only — NOT auto-promoted. Selected: ${boot.selected_tool_ids.join(', ')}`,
+          )
+          plan = boot.plan
+        } else {
+          console.error(
+            `[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP failed (stage=${boot.stage}) for ${envelope.class}: ${boot.error}` +
+            (boot.validation_errors.length > 0 ? ` | validation: ${boot.validation_errors.slice(0, 5).join('; ')}` : '') +
+            ` — falling through to the auto-planner fallback.`,
+          )
+        }
+      } catch (err) {
+        console.error(`[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP threw for ${envelope.class}: ${(err as Error).message} — falling through to the auto-planner fallback.`)
+      }
+    }
+
+    // TIER 2 — WALL-2 AUTO-PLANNER FALLBACK (2026-06-01, LAST RESORT): only if
+    // the bootstrap returned no plan. Composes a tool graph from declared tool
+    // I/O by backward-chaining (domain-blind — kept solely so a novel class
+    // still advances past wall-2 when the bootstrap is unavailable, e.g. no API
+    // key). Gated behind UNIVERSAL_AUTO_PLAN. Returns null when the flag is off
+    // or no graph composes → we keep the loud failure below verbatim.
+    if (!plan) {
+      const composed = composeFallbackPlan(envelope, parsedConstraints)
+      if (composed) {
+        console.error(
+          `[orchestrator] UNIVERSAL_AUTO_PLAN (fallback): no registered plan AND bootstrap unavailable for ${envelope.class}/${envelope.scale_tier} — composed a ${composed.plan.tools.length}-tool fallback graph ` +
+          `(coupled_pairs=${composed.graph.coupled_pairs.length}, unmet_outputs=${composed.graph.unmet_outputs.length}). All steps non-fatal; proceeding past wall-2.`,
+        )
+        plan = composed.plan
+      } else {
+        const prefix = loud_failures ? '[LOUD] ' : ''
+        return failResult(
+          initialContract,
+          [`${prefix}no tool plan registered for envelope ${envelope.class}/${envelope.scale_tier} — class needs a ClassToolPlan in scripts/lib/orchestrator/class-plans/<class>.ts with envelope_predicate matching this envelope (or set UNIVERSAL_TOOL_PLAN_BOOTSTRAP=1 / UNIVERSAL_AUTO_PLAN=1 to compose one)`],
+          fallback_on_failure,
+        )
+      }
     }
   }
 
