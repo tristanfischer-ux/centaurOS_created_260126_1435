@@ -17,8 +17,8 @@
  * mechanism runs >=4 and records the settle ledger regardless. UNIVERSAL — no class logic.
  */
 import { execFileSync } from 'child_process'
-import { rmSync } from 'fs'
-import { resolve } from 'path'
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'fs'
+import { join, resolve } from 'path'
 import { runWritebackPass } from './writeback-bridge'
 
 // The routed-CAD artifacts generate_drawing_set reuses-if-present (mirror of its
@@ -88,4 +88,141 @@ export function runSettleLoop(
     if (settleShouldStop(pass, wb.settled, minPasses)) break   // honour the floor, then stop once settled
   }
   return { passes, settledAt, totalPasses: passes.length, forcedRenders }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════
+// EARLY design-loop closure (Increment 2 + 3) — the C→D→E round trip, BEFORE the cost stack.
+// ════════════════════════════════════════════════════════════════════════════════════════
+// Distinct from runSettleLoop (which is the LATE drawing-generation loop) in two ways:
+//  1. It drives generate_drawing_set in CAD_ARTIFACTS_ONLY mode — only the routed artifacts +
+//     convergence-report (fast), NOT the heavy drawings (those are produced once, late).
+//  2. After the writeback settles, it runs the E PASS (re-size): re-derive the incomer /
+//     distribution transformer kVA from the CONVERGED supply demand and write it into the
+//     contract, so the BoM line + the single-line drawing reflect the as-routed demand.
+// The loop body B→C→D is runSettleLoop; the E pass is applied once on the settled state.
+
+const IEC_KVA_LADDER = [
+  25, 50, 100, 160, 200, 250, 315, 400, 500, 630, 800,
+  1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000,
+]
+
+/** Smallest IEC-60076 standard kVA ≥ s_req (mirrors electrical_transformer_sizing._next_standard_kva:
+ *  above the top of the ladder, round UP to the next 100 kVA — never under-size). */
+export function nextStandardKva(sReqKva: number): number {
+  for (const r of IEC_KVA_LADDER) if (r >= sReqKva - 1e-9) return r
+  return Math.ceil(sReqKva / 100) * 100
+}
+
+/**
+ * E PASS (pure): re-size the incomer transformer from the CONVERGED supply demand. Reads
+ * quantities.total_supply_demand_kw (written by the writeback); returns the updated quantities
+ * with an ADDITIVE total_supply_demand_kva (S = P/pf × (1+headroom) → next IEC standard) so the
+ * BoM + drawings reflect the as-routed demand. Returns null (no change) when there is no converged
+ * demand to size from. Never touches the brief plant-load metric. UNIVERSAL — no class logic.
+ */
+export function resizeFromConvergedDemand(
+  quantities: Record<string, any>,
+  opts: { powerFactor?: number; headroom?: number } = {},
+): { quantities: Record<string, any>; kva: number; kw: number } | null {
+  const q = quantities || {}
+  const sup = q.total_supply_demand_kw
+  const kw = (sup && typeof sup === 'object') ? Number(sup.value) : Number(sup)
+  if (!Number.isFinite(kw) || kw <= 0) return null
+  const pf = opts.powerFactor ?? 0.9
+  const headroom = opts.headroom ?? 0.25
+  const sReq = (kw / pf) * (1 + headroom)
+  const kva = nextStandardKva(sReq)
+  const next = { ...q }
+  const prev = next.total_supply_demand_kva
+  if (prev != null && typeof prev === 'object') next.total_supply_demand_kva = { ...prev, value: kva }
+  else next.total_supply_demand_kva = {
+    value: kva, unit: 'kVA', family: 'power',
+    basis: `incomer re-sized from the as-routed supply demand ${kw} kW (S=P/pf×(1+headroom), pf ${pf}, ${Math.round(headroom * 100)}% headroom → next IEC-60076 standard); converged-loop E pass`,
+    source: 'design-loop',
+  }
+  return { quantities: next, kva, kw }
+}
+
+export interface EarlyLoopResult extends SettleResult {
+  basePreLoopKw: number | null
+  converged: number | null
+  parasiticKw: number | null
+  resizedTransformerKva: number | null
+}
+
+/**
+ * Run the EARLY design loop: B→C→D to a settled fixed point (runSettleLoop in CAD_ARTIFACTS_ONLY
+ * mode, against `loopDir`), then the E pass (resize) applied to the shared state. Reads the
+ * convergence-report the loop produced to report the pre-loop → converged demand for the ledger
+ * (honest BEFORE→AFTER). When `resizeOutDir` is given, ALSO copies the routed artifacts the late
+ * drawing pass reuses into it, so the late pass reuses (no second Blender scene-build).
+ */
+export function runEarlyDesignLoop(
+  statePath: string,
+  loopDir: string,
+  opts: {
+    pyBin: string; drawScript: string; cwd: string
+    minPasses?: number; maxPasses?: number; tol?: number; resizeOutDir?: string
+  },
+): EarlyLoopResult {
+  // C+D: settle the writeback. CAD_ARTIFACTS_ONLY ⇒ only the routed artifacts + convergence-report
+  // (fast: the heavy drawings are produced once, LATE, just before render). runSettleLoop spreads
+  // process.env into the Blender child, so we set the flag on process.env for the loop's duration
+  // and restore it after (so we never leak the fast-path flag into the late full drawing pass).
+  const prevFlag = process.env.CAD_ARTIFACTS_ONLY
+  process.env.CAD_ARTIFACTS_ONLY = '1'
+  let settle: SettleResult
+  try {
+    settle = runSettleLoop(statePath, loopDir, {
+      pyBin: opts.pyBin, drawScript: opts.drawScript, cwd: opts.cwd,
+      minPasses: opts.minPasses, maxPasses: opts.maxPasses, tol: opts.tol,
+    })
+  } finally {
+    if (prevFlag === undefined) delete process.env.CAD_ARTIFACTS_ONLY
+    else process.env.CAD_ARTIFACTS_ONLY = prevFlag
+  }
+
+  // Pull the BEFORE→AFTER demand from the convergence the loop just wrote (honest ledger figures).
+  let basePreLoopKw: number | null = null
+  let converged: number | null = null
+  let parasiticKw: number | null = null
+  try {
+    const cr = join(loopDir, 'convergence-report.json')
+    if (existsSync(cr)) {
+      const rep = JSON.parse(readFileSync(cr, 'utf-8'))
+      basePreLoopKw = Number.isFinite(Number(rep.base_demand_kw)) ? Number(rep.base_demand_kw) : null
+      parasiticKw = Number.isFinite(Number(rep.parasitic_kw)) ? Number(rep.parasitic_kw) : null
+      const traj = Array.isArray(rep.trajectory) ? rep.trajectory : []
+      const last = traj[traj.length - 1]
+      if (last && Number.isFinite(Number(last.total_demand_kw))) converged = Number(last.total_demand_kw)
+    }
+  } catch { /* honest null on any miss */ }
+
+  // E PASS: re-size the incomer from the converged supply demand the writeback wrote into state.
+  let resizedTransformerKva: number | null = null
+  try {
+    if (existsSync(statePath)) {
+      const state = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const oc = state.orchestratorContract || {}
+      const resized = resizeFromConvergedDemand(oc.quantities || {})
+      if (resized) {
+        oc.quantities = resized.quantities
+        state.orchestratorContract = oc
+        writeFileSync(statePath, JSON.stringify(state))
+        resizedTransformerKva = resized.kva
+      }
+    }
+  } catch { /* non-fatal: E pass is additive */ }
+
+  // Hand the routed artifacts to the late drawing pass so it REUSES them (no 2nd scene-build).
+  if (opts.resizeOutDir) {
+    for (const a of ['connection-schedule.json', 'route-manifest.json', 'parts-manifest.json', 'convergence-report.json']) {
+      try {
+        const src = join(loopDir, a)
+        if (existsSync(src)) writeFileSync(join(opts.resizeOutDir, a), readFileSync(src))
+      } catch { /* ignore — late pass rebuilds if absent */ }
+    }
+  }
+
+  return { ...settle, basePreLoopKw, converged, parasiticKw, resizedTransformerKva }
 }

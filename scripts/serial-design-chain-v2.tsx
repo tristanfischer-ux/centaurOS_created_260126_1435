@@ -122,7 +122,7 @@ import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/
 import { resolvePriceBand, targetPerformanceValueAs } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { resolveCostStack, computeCostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
-import { runSettleLoop, settlePassesFromEnv } from './lib/design-loop/settle-loop'
+import { settlePassesFromEnv, runEarlyDesignLoop } from './lib/design-loop/settle-loop'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
 import { verifyAllParts, stripUnverifiedParts, inheritPartNumberFromDeterministicSibling, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
@@ -5489,6 +5489,60 @@ async function main() {
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })
 
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // EARLY DESIGN-LOOP CLOSURE (Increments 2+3 — UNIVERSAL-DESIGN-LOOP-DESIGN.md §3, §7.2/§7.3)
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // THE STRUCTURAL FIX. Geometry used to run AFTER the cost stack locked (the loop was OPEN:
+  // converged demand + measured run-lengths computed-then-ignored). Here we close ONE round trip
+  // (B→C→D→E) — and iterate it to a settled fixed point — BEFORE anything in the cost chain reads
+  // the state, so the cost-reality gate + cost stack + interconnect BoM + the engineering drawings
+  // all consume the CONVERGED numbers, not the pre-loop ones.
+  //   C (Blender pass)  : lay out for shortest runs → route every connection → measure lengths →
+  //                       run the physics<->CAD convergence (parasitic loads → as-routed demand).
+  //                       Runs CAD_ARTIFACTS_ONLY (artifacts + convergence-report, NOT the heavy
+  //                       drawings — those are produced once, late, just before render) into an
+  //                       ISOLATED `_loop` sub-dir so it never collides with the detached Blender
+  //                       hero pipeline writing into outDir.
+  //   D (writeback)     : feed the converged supply demand + measured pipe/cable lengths back into
+  //                       state.orchestratorContract.quantities (runWritebackPass — ADDITIVE:
+  //                       total_supply_demand_kw / interconnect_*_length_m; NEVER overwrites the
+  //                       brief plant-load metric, per the invariant).
+  //   E (re-size)       : re-derive the incomer / distribution transformer from the converged
+  //                       supply demand so the BoM line + the single-line drawing reflect it.
+  //   Loop B→C→D→E      : runSettleLoop — MIN 4 passes, hard cap 8, DAMPED, busts the layout cache
+  //                       only after a non-settled pass. The ledger (design-loop-ledger.json)
+  //                       records every pass + the settle test; "settled in N passes" is READ from
+  //                       it, never asserted. If it hits the cap WITHOUT settling we SAY SO (honest
+  //                       — never a fake fixed point).
+  // UNIVERSAL: no `if co2` / `if efuel` — the mapping is by quantity MEANING. Non-fatal: any miss
+  // (Blender absent, a render flake) leaves the pre-loop numbers and the chain proceeds. Skip with
+  // CHAIN_SKIP_DESIGN_LOOP=1.
+  if (process.env.CHAIN_SKIP_DESIGN_LOOP !== '1') {
+    const tLoop = Date.now()
+    try {
+      const loopDir = resolve(outDir, '_loop')
+      mkdirSync(loopDir, { recursive: true })
+      const venvPyLoop = resolve(__dirname, '..', '.venv', 'bin', 'python')
+      const pyBinLoop = existsSync(venvPyLoop) ? venvPyLoop : 'python3'
+      const drawScriptLoop = resolve(__dirname, 'blender-universal', 'generate_drawing_set.py')
+      const minPassesLoop = settlePassesFromEnv(process.env.UNIVERSAL_SETTLE_PASSES, 4)
+      const settle = runEarlyDesignLoop(statePath, loopDir, {
+        pyBin: pyBinLoop, drawScript: drawScriptLoop, cwd: resolve(__dirname, '..'),
+        minPasses: minPassesLoop, maxPasses: 8, resizeOutDir: outDir,
+      })
+      const settledMsg = settle.settledAt != null
+        ? `settled at pass ${settle.settledAt}`
+        : `DID NOT settle within ${settle.totalPasses} passes (cap) — ledger records the residual, no fixed point asserted`
+      console.error(`[chain] ✦ design loop CLOSED EARLY (before cost stack): ${settle.totalPasses} pass${settle.totalPasses === 1 ? '' : 'es'}, ${settledMsg}; ${settle.converged != null ? `as-routed supply demand ${settle.basePreLoopKw ?? '?'} → ${settle.converged} kW (Δ ${settle.parasiticKw ?? '?'} kW parasitic)` : 'no convergence report (single-pass topology)'}`)
+      logAction({ step: 'design_loop_early', ok: true, passes: settle.totalPasses, settled_at: settle.settledAt, min_passes: minPassesLoop, base_pre_loop_kw: settle.basePreLoopKw, converged_kw: settle.converged, resized_transformer_kva: settle.resizedTransformerKva, latency_ms: Date.now() - tLoop })
+    } catch (err) {
+      console.error(`[chain] design loop (early) failed — non-fatal, proceeding with pre-loop numbers: ${(err as Error).message.slice(0, 200)}`)
+      logAction({ step: 'design_loop_early', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tLoop })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_DESIGN_LOOP=1 — design loop NOT closed early (cost stack reads pre-loop numbers)')
+  }
+
   // Blender bg-pipeline spawn (BESS L25 fix — moved here from after Stage 8.5
   // because the original location referenced statePath + state before they
   // existed, hitting JS temporal-dead-zone on every run and silently falling
@@ -6802,20 +6856,23 @@ async function main() {
     const venvPy = resolve(__dirname, '..', '.venv', 'bin', 'python')
     const pyBin = existsSync(venvPy) ? venvPy : 'python3'
     const drawScript = resolve(__dirname, 'blender-universal', 'generate_drawing_set.py')
-    // ── Multi-pass physics↔Blender settle loop (Tristan 2026-06-13: "4 loops minimum") ──
-    // Iterate {re-lay-out + re-measure → feed the converged loads + measured run-lengths back
-    // into the engine state} to a settled fixed point: MIN 4 passes, capped at 8. Each genuine
-    // pass is one local deterministic Blender render (~75 s, no LLM, £0 API); a settled design
-    // reuses artifacts for free so later passes are cheap. On today's sparse topology it settles
-    // fast (the loop's numeric value scales with topology density — the long pole); the mechanism
-    // runs ≥4 and records the settle ledger regardless. Replaces the former single-pass
-    // generate_drawing_set + the standalone Increment-2 writeback (now once per pass, inside).
-    const minPasses = settlePassesFromEnv(process.env.UNIVERSAL_SETTLE_PASSES, 4)
-    const settle = runSettleLoop(statePath, outDir, {
-      pyBin, drawScript, cwd: resolve(__dirname, '..'), minPasses, maxPasses: 8,
-    })
-    console.log(`[chain] physics↔Blender settle loop: ${settle.totalPasses} pass${settle.totalPasses === 1 ? '' : 'es'}, ${settle.forcedRenders} forced re-render${settle.forcedRenders === 1 ? '' : 's'} (rest reused free), settled at pass ${settle.settledAt ?? 'n/a'} (min ${minPasses})`)
-    logAction({ step: 'settle_loop', ok: true, passes: settle.totalPasses, forced_renders: settle.forcedRenders, settled_at: settle.settledAt, min_passes: minPasses })
+    // ── Drawing generation (the settle loop now runs EARLY, before the cost stack). ──
+    // The physics↔Blender settle loop (B→C→D→E to a fixed point, MIN 4 passes / cap 8, ledger)
+    // already ran above — right after state-save, BEFORE the cost stack — so the cost stack + BoM
+    // read the converged numbers (the structural fix). That early loop ran CAD_ARTIFACTS_ONLY in a
+    // `_loop` sub-dir and copied the routed artifacts into outDir, so THIS late call REUSES them
+    // (ensure_cad_artifacts: present ⇒ reuse — no second Blender scene-build) and only PRODUCES the
+    // drawings + the universal-CAD hero on the settled model. A single pass: the state is settled,
+    // so re-running the writeback loop here would be redundant AND would mutate state AFTER the cost
+    // stack locked (re-opening the loop). UNIVERSAL, non-fatal. The design-loop ledger from the
+    // early loop lives at outDir/_loop/design-loop-ledger.json ("settled in N passes" is read there).
+    try {
+      execFileSync(pyBin, [drawScript, statePath, outDir], { stdio: 'inherit', cwd: resolve(__dirname, '..'), env: { ...process.env } })
+      console.log('[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)')
+    } catch (drawErr) {
+      console.error(`[chain] drawing-set generation miss (non-fatal): ${(drawErr as Error).message.slice(0, 160)}`)
+    }
+    logAction({ step: 'drawing_set_render', ok: true })
     const manifestPath = resolve(outDir, 'drawing-manifest.json')
     if (existsSync(manifestPath)) {
       const dm = JSON.parse(readFileSync(manifestPath, 'utf-8'))
@@ -6849,10 +6906,11 @@ async function main() {
     logAction({ step: 'interconnect_census', ok: false, error: String(err).slice(0, 200) })
   }
 
-  // (The design-loop writeback — feeding the settled geometry's converged loads + measured
-  // run-lengths back into state.orchestratorContract.quantities + the design-loop ledger —
-  // now runs INSIDE the settle loop above, once per pass, so the quantities settle across the
-  // ≥4 passes instead of a single one-shot trip. UNIVERSAL, additive, non-fatal as before.)
+  // (The design-loop writeback — feeding the converged loads + measured run-lengths back into
+  // state.orchestratorContract.quantities + the design-loop ledger — now runs EARLY, before the
+  // cost stack (the structural fix at ~line 5492), iterated to a settled fixed point across ≥4
+  // passes. So by the time the cost stack, BoM and these drawings run, the state already carries
+  // the CONVERGED numbers. UNIVERSAL, additive, non-fatal. Ledger: outDir/_loop/design-loop-ledger.json.)
 
   // Requirements-driven bill of materials (Tristan 2026-06-13): the "requirement is
   // the durable IP" variant BoM. Assembled deterministically from the SETTLED state
@@ -6894,6 +6952,13 @@ async function main() {
   // chain opens the nicely-named deliverable copy ("<YYMMDDHHMM> <Subject>.pdf")
   // instead (created after the integrity check below).
   renderEnv.RENDER_NO_OPEN = '1'
+  // TEMP DEBUG GUARD (revert before commit): stop before the react-pdf render so
+  // the converged design+drawings+BoM can be inspected without producing the PDF.
+  if (process.env.CHAIN_SKIP_RENDER === '1') {
+    console.error('[chain] CHAIN_SKIP_RENDER=1 — stopping before react-pdf render (converged state + drawings + BoM are on disk)')
+    logAction({ step: 'render_skipped', ok: true })
+    process.exit(0)
+  }
   // 2026-05-23 P2-5: wrap render subprocess in try/catch → exit 5 (render
   // failed) so worker can distinguish renderer crashes from integrity failures
   // (exit 6) or chain logic failures (exit 1). All non-zero exits stamp the

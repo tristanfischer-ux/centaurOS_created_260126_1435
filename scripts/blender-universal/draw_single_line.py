@@ -697,7 +697,12 @@ def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
         return
 
     # Connected load [kW] from state; else the lumped electrical run's design current.
-    load_kw = _q(state, "connected_electrical_load_kw")
+    # Design-loop closure: PREFER the converged as-routed supply demand (total_supply_demand_kw,
+    # = plant load + distribution parasitic, written back by the physics<->CAD loop) so the incomer
+    # / distribution board is sized for the demand it ACTUALLY sees; fall back to the brief
+    # plant-load metric when the loop has not run. UNIVERSAL — the brief metric is preserved in
+    # state + prose; only this engineering figure adopts the converged value.
+    load_kw = _q(state, "total_supply_demand_kw") or _q(state, "connected_electrical_load_kw")
     lumped = _process_electrical_branches(main)
     lv_current = None
     for br in lumped:
@@ -900,7 +905,8 @@ def _build_source(state, schedule, devices, main_bus, arch):
                                       detail=(swgr["detail"] or swgr["name"])))
         xfmr_d = _pick_device(devices, "mv_transformer", "distribution_transformer",
                               "transformer")
-        load_kw = _q(state, "connected_electrical_load_kw")
+        # Design-loop closure: prefer the converged as-routed supply demand (see above).
+        load_kw = _q(state, "total_supply_demand_kw") or _q(state, "connected_electrical_load_kw")
         inc_xfmr = Transformer(
             tag="TX1", kva=(f"{load_kw/0.8:,.0f} kVA (≈)" if load_kw else ""),
             ratio="11000/400 V",

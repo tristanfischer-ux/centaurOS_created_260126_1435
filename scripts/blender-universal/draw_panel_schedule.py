@@ -482,7 +482,10 @@ def _synthesise_main_board(schedule: dict, state: dict, rows, devices) -> Option
     """Build the MAIN incomer board + per-module outgoing circuits from the
     connection schedule + connected load, at the auto-selected distribution voltage.
     Returns a Panel, or None when there is no electrical load to model. UNIVERSAL."""
-    load_kw = _q(state, "connected_electrical_load_kw")
+    # Design-loop closure: prefer the converged as-routed supply demand (total_supply_demand_kw,
+    # plant load + distribution parasitic, written back by the physics<->CAD loop) to size the
+    # incomer board for the demand it actually sees; fall back to the brief plant-load metric.
+    load_kw = _q(state, "total_supply_demand_kw") or _q(state, "connected_electrical_load_kw")
     lumped_a = _lumped_electrical_current_a(rows)
     # LV reference voltage: prefer an explicit LV figure in the electrical
     # material_context; ignore a leaked ≥1000 V DC-bus default; else 415 V.

@@ -57,7 +57,8 @@ import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, is
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
 import { validateToolPlanSpec, applyStepOutputs, type ToolPlanSpec, type ToolPlanStepSpec } from './lib/orchestrator/generic/bootstrap-tool-plan'
-import { computeQuantityUpdates } from './lib/design-loop/writeback-bridge'
+import { computeQuantityUpdates, applyUpdates } from './lib/design-loop/writeback-bridge'
+import { resizeFromConvergedDemand, nextStandardKva } from './lib/design-loop/settle-loop'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildAuthorDigest, buildCheckSpec } from './author-blender-scene'
@@ -269,6 +270,82 @@ function checkDesignLoopWritebackAdditive(): Assertion[] {
     () => !!supply && Math.abs(Number(supply.to) - 6013.9) < 0.01 && !touchesBriefMetric && !!pipe && Math.abs(Number(pipe.to) - 34.8) < 0.01,
     () => `supply=${supply?.to} touchesBriefMetric=${touchesBriefMetric} pipe=${pipe?.to}`,
   ))
+  return out
+}
+
+// ── UNIVERSAL: the design loop CLOSES (Increment 2+3, 2026-06-14) ──
+//
+// The structural fix: the physics<->CAD loop now runs EARLY (before the cost stack), so the
+// converged supply demand actually REACHES the engineering output instead of being computed-then-
+// ignored. This invariant guards the full D→E→render closure as a pure chain (no snapshot, no
+// .venv), reproducing the CO2 signal 87.25 → 87.39 kW:
+//   D (writeback) : computeQuantityUpdates + applyUpdates writes total_supply_demand_kw = 87.39
+//                   (the converged demand), brief metric connected_electrical_load_kw stays 87.25.
+//   E (re-size)   : resizeFromConvergedDemand derives the incomer kVA from the CONVERGED 87.39
+//                   (NOT the pre-loop 87.25) → next IEC-60076 standard.
+//   render        : the single-line / panel-schedule load read PREFERS total_supply_demand_kw, so
+//                   the rendered engineering load is the CONVERGED value, not the pre-loop value.
+// Would have caught a regression that re-opens the loop (drawings reading the pre-loop metric, or
+// the resize sizing from the stale brief load). UNIVERSAL — no class logic; the same code path runs
+// for CO2 / e-fuel / RAS (only the numbers differ).
+function checkDesignLoopClosesEarly(): Assertion[] {
+  const out: Assertion[] = []
+
+  // D — the writeback (CO2 trajectory: base 87.25 → converged 87.39).
+  const conv = { iterations: 2, trajectory: [{ total_demand_kw: 87.25 }, { total_demand_kw: 87.39 }] }
+  const rm = { lines: [{ length_m: 106.9, mechanism: 'fluid_loop' }, { length_m: 29.4, mechanism: 'electrical_bus' }] }
+  const quantities: Record<string, any> = { connected_electrical_load_kw: { value: 87.25, unit: 'kW', source: 'brief' } }
+  const updates = computeQuantityUpdates(conv as any, rm as any, quantities)
+  const afterD = applyUpdates(quantities, updates)
+
+  // The rendered-engineering-load PRECEDENCE the drawings use (draw_single_line / draw_panel_schedule):
+  // total_supply_demand_kw if present, else connected_electrical_load_kw. This is the closure: the
+  // rendered figure is the CONVERGED demand, not the pre-loop brief metric.
+  const renderedLoadKw = (afterD.total_supply_demand_kw?.value) ?? (afterD.connected_electrical_load_kw?.value)
+  const preLoopKw = quantities.connected_electrical_load_kw.value
+
+  out.push(assertEq(
+    'UNIVERSAL.design_loop_closes_rendered_load_is_converged',
+    'design loop CLOSES: the rendered engineering load (single-line/panel) adopts the CONVERGED supply demand 87.39 kW (≠ the pre-loop 87.25), while the brief plant-load metric is preserved at 87.25',
+    JSON.stringify({ renderedLoadKw, preLoopKw, briefPreserved: afterD.connected_electrical_load_kw?.value }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return Math.abs(o.renderedLoadKw - 87.39) < 0.01           // rendered = converged
+        && Math.abs(o.renderedLoadKw - o.preLoopKw) > 0.1        // and it MOVED off the pre-loop value
+        && Math.abs(o.briefPreserved - 87.25) < 0.01            // brief metric untouched
+    },
+    () => `renderedLoadKw=${renderedLoadKw} preLoopKw=${preLoopKw} brief=${afterD.connected_electrical_load_kw?.value}`,
+  ))
+
+  // E — the incomer re-size is driven by the CONVERGED demand, not the pre-loop one.
+  const resized = resizeFromConvergedDemand(afterD)
+  const expectKva = nextStandardKva((87.39 / 0.9) * 1.25)        // S=P/pf×(1+headroom) → next IEC standard
+  out.push(assertEq(
+    'UNIVERSAL.design_loop_resize_from_converged',
+    'E pass re-sizes the incomer transformer from the CONVERGED supply demand (87.39 kW → next IEC-60076 standard kVA), additive total_supply_demand_kva, never from the stale brief load',
+    JSON.stringify({ kw: resized?.kw, kva: resized?.kva, expectKva }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.kw != null && Math.abs(o.kw - 87.39) < 0.01 && o.kva === o.expectKva && o.kva > 0
+    },
+    () => `resized=${JSON.stringify(resized)} expectKva=${expectKva}`,
+  ))
+
+  // Honesty backstop: with NO converged demand (loop never ran), the resize is a safe no-op (null)
+  // and the rendered load falls back to the brief metric — the loop is OPEN but nothing is corrupted.
+  const noLoop: Record<string, any> = { connected_electrical_load_kw: { value: 87.25 } }
+  const resizedNoLoop = resizeFromConvergedDemand(noLoop)
+  out.push(assertEq(
+    'UNIVERSAL.design_loop_resize_noop_without_convergence',
+    'E pass is a safe no-op when the loop did not run (no total_supply_demand_kw) — returns null, never sizes from or mutates the brief metric',
+    JSON.stringify({ resizedNoLoop, briefStillThere: noLoop.connected_electrical_load_kw?.value, supplyAbsent: !('total_supply_demand_kva' in noLoop) }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.resizedNoLoop === null && o.briefStillThere === 87.25 && o.supplyAbsent === true
+    },
+    () => `resizedNoLoop=${JSON.stringify(resizedNoLoop)}`,
+  ))
+
   return out
 }
 
@@ -8518,6 +8595,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // .venv python spawns once across the whole run, not per snapshot.
   for (const a of checkReactionToolsWorkedSound()) assertions.push(a)
   for (const a of checkDesignLoopWritebackAdditive()) assertions.push(a)
+  for (const a of checkDesignLoopClosesEarly()) assertions.push(a)
 
   // Self-contained — the on-the-fly tool-plan bootstrap's FAIL-CLOSED materialiser
   // + hallucinated-field rejection (no .venv, no network, real registered tools).
