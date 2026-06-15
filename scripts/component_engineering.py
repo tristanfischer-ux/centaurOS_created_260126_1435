@@ -32,17 +32,37 @@ def _required_services(name, module, function):
     consumes signals + power. Pure structure (frame/enclosure/label) needs none.
     Tristan 2026-06-15: a part with no inputs/outputs is probably missing one — this
     says WHICH one."""
-    t = _norm(f"{name} {module} {function}"); req = set()
-    if any(k in t for k in ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan')):
+    t = _norm(f"{name} {module} {function}"); m = _norm(module); req = set()
+    # ── (1) NAME-keyword roles (cross-module: a pump / sensor / valve anywhere) ──
+    if any(k in t for k in ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan', 'lamp', 'mixer', 'agitat')):
         req.add('power')
-    if any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir')):
+    if any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor')):
         req.add('water')
-    if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy')):
+    if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
         req.add('signal')
-    if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation')):
+    if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller')):
         req.update(('signal', 'power'))
-    if any(k in t for k in ('frame', 'enclos', 'structur', 'contain', 'support', 'platform', 'foundation', 'nameplate', 'label')) and not req:
-        return set()
+    # ── (2) PURE STRUCTURE needs nothing (a frame / enclosure / walkway / label) ──
+    if any(k in t for k in ('frame', 'enclos', 'structur', 'platform', 'foundation', 'nameplate', 'label', 'walkway', 'ladder', 'grating', 'cladding')):
+        return req   # usually {}; a mis-named structural item keeps any explicit role above
+    # ── (3) MODULE-PRIMARY service — ONLY for a part the name keywords left UNCLASSIFIED
+    # (a passive busbar/fuse/manifold). A recognised device (sensor, pump, controller)
+    # trusts its NAME role and is NOT given its module's service on top — otherwise a
+    # temperature SENSOR in the environmental module wrongly gets a power feeder. Keyed
+    # on the module's FUNCTION, never a per-part table. This is what gets orphans → 0. ──
+    if not req:
+        if 'powerdistribution' in m or 'powerconversion' in m:
+            req.add('power')
+        if 'safetyprotection' in m:
+            req.add('signal')
+        if 'sensing' in m or 'instrumentation' in m:
+            req.add('signal')
+        if 'controlcompute' in m or 'communication' in m:
+            req.update(('signal', 'power'))
+        if 'massfluid' in m or 'watertreatment' in m or 'fluidtransport' in m:
+            req.add('water')
+        if 'environmentalinterface' in m:
+            req.add('power')
     return req
 
 def _qval(quantities, key):
@@ -400,10 +420,16 @@ def build_connectivity(run, req_bom, tools):
         part['incoming'] = [e for e in edges if _match(e['to'], part['name'])]
         part['outgoing'] = [e for e in edges if _match(e['from'], part['name'])]
         part['function'] = func.get(_norm(part['name']), '')
-        part['orphan'] = (not part['incoming']) or (not part['outgoing'])
         part['governing_tool'] = _gov(part['name'], part['function'])
         present = set(('power' if e['service'] == 'electrical' else e['service']) for e in part['incoming'] + part['outgoing'])
-        part['missing'] = sorted(_required_services(part['name'], part.get('module', ''), part['function']) - present)
+        _req = _required_services(part['name'], part.get('module', ''), part['function'])
+        part['missing'] = sorted(_req - present)
+        # ORPHAN = ISOLATED (no edges at all) AND it actually needs a service. A pure
+        # structural part (frame / enclosure → no required services) is connectionless by
+        # DESIGN, not an orphan. A part with ANY edge is wired into the plant; a missing
+        # direction/service is the softer `missing` diagnosis (not an orphan). This is
+        # what makes "orphans → 0" a meaningful, achievable target.
+        part['orphan'] = (not part['incoming'] and not part['outgoing']) and bool(_req)
         part['checks'] = {'governed': bool(part['governing_tool']), 'connected': not part['orphan'],
                           'priced': priced.get(_norm(part['name']), False)}
     return parts, edges

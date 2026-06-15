@@ -5480,46 +5480,152 @@ def _device_current_a(name, quantities):
     return round(kw * 1000.0 / (1.732 * 400.0 * 0.9), 1)
 
 
-def augment_topology_power_signal(state, topology, parts):
-    """EXTRA electrical_bus edges that connect the orphans the FLUID grammar cannot:
-    a POWER feeder from the power-distribution hub to every powered device, and a
-    SIGNAL link from every sensor to the control hub. Each is sized by the SAME
-    cable-sizing path (current_rating A -> CSA -> cost), so the connections get real
-    sizes + cost. Tristan 2026-06-15: every powered device needs a power feed, every
-    sensor a signal link — connect the orphans so the loop's part/connection count
-    grows. UNIVERSAL: hubs resolved by MODULE, devices/sensors by role keyword. Pure."""
+# UNIVERSAL role → required-services classifier, imported from the SHARED module
+# (component_engineering._required_services) so the Blender topology connector and the
+# dashboard's missing-connection DIAGNOSIS agree on what every part needs — ONE source
+# of truth. Falls back to a byte-identical local replica if the import fails under
+# Blender's interpreter (keep the two in sync if you ever edit _required_services).
+def _load_required_services():
+    try:
+        import sys as _sys
+        _scripts = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        if _scripts not in _sys.path:
+            _sys.path.insert(0, _scripts)
+        from component_engineering import _required_services as _rs
+        return _rs
+    except Exception:
+        def _rs(name, module, function):   # replica of component_engineering._required_services
+            t = re.sub(r'[^a-z0-9]', '', f"{name} {module} {function}".lower())
+            m = re.sub(r'[^a-z0-9]', '', str(module or '').lower()); req = set()
+            if any(k in t for k in ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan', 'lamp', 'mixer', 'agitat')):
+                req.add('power')
+            if any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor')):
+                req.add('water')
+            if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
+                req.add('signal')
+            if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller')):
+                req.update(('signal', 'power'))
+            if any(k in t for k in ('frame', 'enclos', 'structur', 'platform', 'foundation', 'nameplate', 'label', 'walkway', 'ladder', 'grating', 'cladding')):
+                return req
+            if not req:   # module-primary ONLY for name-unclassified passive kit (see component_engineering)
+                if 'powerdistribution' in m or 'powerconversion' in m:
+                    req.add('power')
+                if 'safetyprotection' in m:
+                    req.add('signal')
+                if 'sensing' in m or 'instrumentation' in m:
+                    req.add('signal')
+                if 'controlcompute' in m or 'communication' in m:
+                    req.update(('signal', 'power'))
+                if 'massfluid' in m or 'watertreatment' in m or 'fluidtransport' in m:
+                    req.add('water')
+                if 'environmentalinterface' in m:
+                    req.add('power')
+            return req
+        return _rs
+
+
+_REQUIRED_SERVICES = _load_required_services()
+
+
+def _edge_service(mech):
+    """Map a topology edge mechanism → the SERVICE it provides (power / signal / water)
+    so a part's existing edges can be credited against its required services."""
+    m = str(mech or '').lower()
+    if 'electrical' in m or m in ('ac_busbar', 'dc_bus'):
+        return 'power'
+    if m in ('signal', 'data_link', 'control_signal', 'sensor_feedback', 'modbus_tcp',
+             'alarm_interlock', 'contactor_command'):
+        return 'signal'
+    if 'fluid' in m or m in ('water', 'slurry', 'liquid', 'thermal', 'process_flow', 'process_fluid'):
+        return 'water'
+    return None
+
+
+def augment_topology_connect_orphans(state, topology, parts):
+    """UNIVERSAL orphan connector — give EVERY part each connection SERVICE its ROLE
+    requires, mirroring component_engineering._required_services (the SAME classifier
+    the dashboard uses to NAME the missing connection — ONE source of truth). For each
+    part, for each required service it does NOT already have an edge for, ADD the edge:
+        power  → the power-distribution hub feeds it (LV feeder, sized by device kW)
+        signal → it links to the control hub (instrument signal cable, sized small)
+        water  → it ties into the fluid loop at its MODULE's principal fluid vessel,
+                 sized to the LOOP flow (a DN300 loop gets a DN300 tie, not DN15)
+    Tristan 2026-06-15: "a part with no inputs/outputs is probably missing one" — this
+    adds exactly the missing one, so orphans → 0 and the connection + BoM count GROWS.
+    A purely-STRUCTURAL part (frame/enclosure → no required services) stays unconnected,
+    correctly. Existing edges are credited via resolve_endpoint, so a process-ID
+    endpoint (uv_ozone_disinfection) counts for its equipment-name part (UV Sterilization)
+    — no double-wiring. Subsumes the old power/signal pass. Universal + deterministic."""
     contract = state.get('orchestratorContract', {}) or {}
     quantities = contract.get('quantities', {}) or {}
     pwr_hub = _module_repr_part_name('power_distribution', parts)
     ctrl_hub = _module_repr_part_name('control_compute_communication', parts)
-    if not pwr_hub and not ctrl_hub:
-        return []
+
+    # the water tie carries the loop flow (largest flow_capacity already on the topology)
+    loop_flow = 0.0
+    for e in topology:
+        if str(e.get('constraint_kind')) == 'flow_capacity':
+            try:
+                loop_flow = max(loop_flow, float(e.get('required_value') or 0.0))
+            except (TypeError, ValueError):
+                pass
+
+    # SERVICES each part already HAS — resolve BOTH endpoints to a real part so a
+    # process-ID endpoint credits its equipment-name part (the identity bridge).
+    have = {}
+    for e in topology:
+        svc = _edge_service(e.get('mechanism'))
+        if not svc:
+            continue
+        for endp in (e.get('from_part'), e.get('to_part')):
+            pp = resolve_endpoint(str(endp or ''), parts)
+            if pp is not None:
+                have.setdefault(pp.name, set()).add(svc)
+
+    fluid_sink = {}
+    def _sink_for(module_id):
+        if module_id not in fluid_sink:
+            fluid_sink[module_id] = _module_repr_part_name(module_id, parts, fluid_only=True)
+        return fluid_sink[module_id]
+
     existing = {(str(e.get('from_part')), str(e.get('to_part'))) for e in topology}
+    seen = set()
     extra = []
+    n_pwr = n_sig = n_wtr = 0
     for p in parts:
-        nm = p.name
-        low = re.sub(r'[^a-z0-9 ]', '', f'{nm} {p.module_id}'.lower())
-        if pwr_hub and nm != pwr_hub and any(k in low for k in _POWERED_KW) and (pwr_hub, nm) not in existing:
-            extra.append({'from_part': pwr_hub, 'to_part': nm, 'mechanism': 'electrical_bus',
-                          'constraint_kind': 'current_rating', 'required_value': _device_current_a(nm, quantities),
-                          'required_unit': 'A', 'required_margin_factor': 1.25,
-                          'material_context': 'LV power feeder 400/415V 3ph', '_augmented': True})
-        is_sensor = (p.module_id == 'sensing_instrumentation') or any(k in low for k in _SENSOR_KW)
-        if ctrl_hub and nm != ctrl_hub and is_sensor and (nm, ctrl_hub) not in existing:
-            # mechanism='signal' (NOT electrical_bus) — a sensor→controller link is an
-            # instrument SIGNAL cable, not a power feeder. The single-line filters on
-            # "electrical" in mechanism (draw_single_line.py), so 'signal' correctly
-            # drops OFF the power SLD (no more "Main Controller ×7" phantom feeders)
-            # while connection_sizing still sizes + costs it by constraint_kind
-            # current_rating (0.5 A → smallest instrument cable) on the connection
-            # schedule. Universal: every sensor gets ONE signal link to the control hub.
-            extra.append({'from_part': nm, 'to_part': ctrl_hub, 'mechanism': 'signal',
-                          'constraint_kind': 'current_rating', 'required_value': 0.5,
-                          'required_unit': 'A', 'required_margin_factor': 1.0,
-                          'material_context': 'instrument signal cable 4-20mA', '_augmented': True})
+        needed = _REQUIRED_SERVICES(p.name, p.module_id or '', getattr(p, 'function', '') or '')
+        got = have.get(p.name, set())
+        for svc in sorted(needed - got):
+            if svc == 'power' and pwr_hub and p.name != pwr_hub \
+                    and (pwr_hub, p.name) not in existing and (pwr_hub, p.name) not in seen:
+                seen.add((pwr_hub, p.name)); n_pwr += 1
+                extra.append({'from_part': pwr_hub, 'to_part': p.name, 'mechanism': 'electrical_bus',
+                              'constraint_kind': 'current_rating', 'required_value': _device_current_a(p.name, quantities),
+                              'required_unit': 'A', 'required_margin_factor': 1.25,
+                              'material_context': 'LV power feeder 400/415V 3ph', '_augmented': True})
+            elif svc == 'signal' and ctrl_hub and p.name != ctrl_hub \
+                    and (p.name, ctrl_hub) not in existing and (p.name, ctrl_hub) not in seen:
+                seen.add((p.name, ctrl_hub)); n_sig += 1
+                extra.append({'from_part': p.name, 'to_part': ctrl_hub, 'mechanism': 'signal',
+                              'constraint_kind': 'current_rating', 'required_value': 0.5,
+                              'required_unit': 'A', 'required_margin_factor': 1.0,
+                              'material_context': 'instrument signal cable 4-20mA', '_augmented': True})
+            elif svc == 'water':
+                sink = _sink_for(p.module_id)
+                if sink and sink != p.name and (p.name, sink) not in existing \
+                        and (sink, p.name) not in existing \
+                        and (p.name, sink) not in seen and (sink, p.name) not in seen:
+                    seen.add((p.name, sink)); n_wtr += 1
+                    edge = {'from_part': p.name, 'to_part': sink, 'mechanism': 'fluid_loop',
+                            'constraint_kind': 'flow_capacity',
+                            'material_context': 'process water tie-in (recirculation loop)', '_augmented': True}
+                    if loop_flow > 0:
+                        edge['required_value'] = loop_flow
+                        edge['required_unit'] = 'm³/s'
+                    extra.append(edge)
     if extra:
-        print(f"[univ] power/signal augmentation: +{len(extra)} electrical edge(s) "
-              f"(power hub={pwr_hub}, control hub={ctrl_hub})")
+        print(f"[univ] orphan connector: +{len(extra)} edge(s) — {n_pwr} power, {n_sig} signal, "
+              f"{n_wtr} water (power hub={pwr_hub}, control hub={ctrl_hub})")
     return extra
 
 
@@ -10914,7 +11020,7 @@ def main():
     # links). Universal + pair-deduped — a no-op on a plant whose topology already
     # spans its modules. Appended so every extra edge routes via the same path.
     topology = list(topology) + augment_topology_cross_module(state, topology, parts)
-    topology = topology + augment_topology_power_signal(state, topology, parts)
+    topology = topology + augment_topology_connect_orphans(state, topology, parts)
     regions, region_edges = order_regions(parts, topology)
     print(f"[univ] region order (L->R): {regions}")
 

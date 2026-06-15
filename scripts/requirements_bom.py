@@ -18,10 +18,15 @@ evidence.py) renders them; the dossier renderer will consume the same structure.
 from __future__ import annotations
 import json, math, os, re
 
-# Materials take-off rates (rough UK fabricated, order-of-magnitude; the POINT is the
-# method — mass × rate — which updates with commodity prices, not the exact figure).
+# Materials take-off rates — UK 2026 fabricated supply (ex-works, not installed).
+# Sources: SGS Engineering, Enduramaxx, process-vessel fabricator quotes, CECA data.
+#   FRP/GRP laminate fabricated (winding/hand lay-up + QC, ex-works): £8–14/kg; mid = £12/kg
+#   Carbon steel fabricated vessel (plate purchase + cutting/rolling/welding): £3–6/kg; mid = £4.5/kg
+#   316L stainless fabricated (SS plate + orbital welding + pickling): £12–18/kg; mid = £14/kg
+#   Reinforced concrete: £0.45/kg (plant-mixed, formed in situ — rate is already installed)
+# These are SUPPLY costs; site erection is added separately via _install_factor().
 STEEL_RHO, FRP_RHO = 7850.0, 1850.0          # kg/m³
-STEEL_RATE, FRP_RATE = 2.4, 9.0              # £/kg fabricated (incl. forming + weld/lay-up)
+STEEL_RATE, FRP_RATE = 4.5, 12.0             # £/kg fabricated supply, ex-works
 
 # SIMPLE bespoke = shell-dominated fabrications (a materials take-off — mass of steel/
 # FRP — is the right cost basis: the price IS mostly the shell).
@@ -70,11 +75,38 @@ def _material(name, mods):
     if re.search(r"concrete|reinforced", blob):
         return ("reinforced concrete", 2400.0, 0.45)
     if re.search(r"316|stainless|\bss\b|duplex|cres", blob):
-        return ("316L stainless", 8000.0, 7.5)
+        return ("316L stainless", 8000.0, 14.0)
     if re.search(r"\btank\b|basin|reservoir|\bsump\b|pond|raceway|lagoon", blob) \
             and not re.search(r"pressure|reactor|column|stripper", blob):
         return ("FRP/GRP", FRP_RHO, FRP_RATE)                  # open (atmospheric) tank
     return ("carbon steel", STEEL_RHO, STEEL_RATE)
+
+
+def _install_factor(vol_m3: float) -> float:
+    """Site-erection multiplier on the fabricated-supply shell cost.
+
+    A vessel's installed cost = supply cost × install_factor.  The factor covers
+    crane hire, riggers, site bolting/sealing, pressure-test, and (for large tanks)
+    the concrete ring-beam foundation.  It is PARAMETRIC by volume only — no
+    per-class or per-material table — so it generalises to any archetype.
+
+    UK-2026 benchmarks (Costain / CECA / process-plant cost guides):
+      < 5 m³   — small skid-mounted vessel, workshop-tested, fork-lift in:   1.20×
+      5–50 m³  — medium vessel, small crane/telehandler, half-day erect:     1.35×
+      50–500 m³ — large field-erected tank, 50–100 t crane, ring-beam,
+                   multi-day labour:                                          1.55×
+      ≥ 500 m³ — very large field-construction (e.g. 1 ML fish-farm ring):  1.70×
+
+    Reinforced concrete vessels are already an in-situ unit rate so no extra
+    factor is applied (caller should pass vol=0 or handle separately).
+    """
+    if vol_m3 < 5.0:
+        return 1.20
+    if vol_m3 < 50.0:
+        return 1.35
+    if vol_m3 < 500.0:
+        return 1.55
+    return 1.70
 
 
 def _wall_physics(matlabel):
@@ -90,14 +122,29 @@ def _wall_physics(matlabel):
 
 
 def _materials_takeoff(name, mods, geom=None):
-    """Bespoke cost from a real materials take-off: surface area × wall × density × rate +
-    fittings. Handles a cylinder dim, a box dim, or a bare volume. Returns (gbp, basis) or
-    None if no geometry to take off."""
+    """Bespoke cost from a real materials take-off.
+
+    Cost model (UNIVERSAL — parametric by material + physical size only):
+
+      1. Shell area (cylinder: πDH + 2 × πD²/4; box: 6 faces)
+      2. Wall thickness from hoop-stress physics: t = P·r/(σ·E) + corrosion_allowance,
+         floored at the fabrication minimum for the material.
+      3. Shell mass = area × wall × material density.
+      4. Supply cost = mass × fabricated-supply £/kg (ex-works rate, UK 2026).
+      5. Installed cost = supply × _install_factor(vessel_volume) — covers crane hire,
+         riggers, site bolting/sealing, pressure test, and ring-beam foundation for
+         large tanks.  Factor is 1.20–1.70× parametric on volume (no per-class table).
+      6. Fittings allowance = 20% of installed cost + £1,800 fixed (nozzles, manway,
+         vents, supports, anti-corrosion coating, site testing).
+
+    Returns (gbp, basis_str, spec_dict) or None if no geometry is available.
+    """
     if geom:
         # AS-BUILT geometry (the Blender parts-manifest ⌀,H in m) — the SAME source the
         # drawings + the dashboard read, so the BoM costs the vessel that is actually
         # placed (one geometry source, not the word's re-derived working volume).
         d_v, h_v = geom
+        vol = math.pi * (d_v / 2.0) ** 2 * h_v
         area = math.pi * d_v * h_v + 2 * (math.pi * d_v * d_v / 4.0)
     else:
         dim = mods.get("dimension") or ""
@@ -105,28 +152,34 @@ def _materials_takeoff(name, mods, geom=None):
         if not cyl and not box and cap:                       # derive a cylinder from V
             d = (4 * cap / (1.3 * math.pi)) ** (1 / 3.0); cyl = (d, 1.3 * d)
         if cyl:
-            d_v, h_v = cyl; area = math.pi * d_v * h_v + 2 * (math.pi * d_v * d_v / 4.0)   # shell + 2 heads
+            d_v, h_v = cyl
+            vol = math.pi * (d_v / 2.0) ** 2 * h_v
+            area = math.pi * d_v * h_v + 2 * (math.pi * d_v * d_v / 4.0)   # shell + 2 heads
         elif box:
-            w, dp, h_v = box; d_v = max(w, dp); area = 2 * (w * dp + dp * h_v + w * h_v)   # 6 faces
+            w, dp, h_v = box; d_v = max(w, dp)
+            vol = w * dp * h_v
+            area = 2 * (w * dp + dp * h_v + w * h_v)                        # 6 faces
         else:
             return None
     matlabel, rho, rate = _material(name, mods)
-    # wall from PHYSICS — hoop stress at the hydrostatic head (was a 10 mm constant). t = P·r/(σ·E)
-    # + corrosion, floored at the fabrication minimum. Tristan 2026-06-15: thickness from the
-    # vessel's own diameter/height so the mass — hence the cost — is component-accurate.
+    # wall from PHYSICS — hoop stress at the hydrostatic head. t = P·r/(σ·E) + corrosion,
+    # floored at the fabrication minimum.
     sigma_mpa, corr_mm, floor_mm = _wall_physics(matlabel)
     P = 1000.0 * 9.81 * h_v
     t_hoop = P * (d_v / 2.0) / (sigma_mpa * 1e6 * 0.85)
     wall = max(t_hoop + corr_mm / 1000.0, floor_mm / 1000.0)
     mass = area * wall * rho
-    shell = mass * rate
-    fittings = 0.18 * shell + 1800                            # nozzles, manway, supports, rail
+    # Concrete is an in-situ unit rate (already includes placement) — no extra erection factor.
+    ifac = 1.0 if "concrete" in matlabel else _install_factor(vol)
+    supply = mass * rate                                       # ex-works fabricated shell
+    installed = supply * ifac                                  # × site-erection multiplier
+    fittings = 0.20 * installed + 1800                        # nozzles, manway, supports, coating
     basis = (f"hoop wall {wall*1000:.0f} mm = P·r/(σ·E)+c · ⌀{d_v:.1f}×{h_v:.1f} m · "
              f"P={P/1000:.0f} kPa head · σ={sigma_mpa:.0f} MPa → {area:.0f} m² × {mass:.0f} kg "
-             f"{matlabel} × £{rate}/kg + fittings")
+             f"{matlabel} @ £{rate}/kg supply × {ifac:.2f} erection + fittings")
     spec = {"material": matlabel, "wall_mm": round(wall * 1000, 1), "mass_kg": round(mass),
             "diameter_m": round(d_v, 2), "height_m": round(h_v, 2)}
-    return shell + fittings, basis, spec
+    return installed + fittings, basis, spec
 
 
 def _bespoke_class(name: str) -> str:

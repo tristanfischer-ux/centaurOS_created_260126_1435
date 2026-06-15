@@ -205,6 +205,18 @@ def load_inputs(out_dir: str, state_path: Optional[str]):
     return schedule, state
 
 
+def _load_route_manifest(out_dir: str) -> list:
+    """Return the raw route-manifest line list, or [] if absent / unreadable."""
+    p = Path(out_dir) / "route-manifest.json"
+    if p.is_file():
+        try:
+            d = json.load(open(p))
+            return d.get("lines") or []
+        except Exception:
+            return []
+    return []
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # ARRAY EXPANSION — read the qty-N reality the topology collapses
 # ═══════════════════════════════════════════════════════════════════════════
@@ -714,6 +726,170 @@ def _flow_layers(nodes_keys, proc_edges):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# RETURN-LOOP INFERENCE  (universal — keyed on graph shape, NOT class name)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Signals in a topology edge's material_context that indicate the plant is a
+# CLOSED RECIRCULATING LOOP — the fluid cycles rather than flowing once through.
+_RECIRC_KEYWORDS = re.compile(
+    r"recirculat|recirc|closed.?loop|closed.?circuit|return.*tank|"
+    r"loop.*back|back.*to.*tank|return.*feed|return.*reactor",
+    re.I,
+)
+
+
+def _infer_return_loops(
+    proc_topo: list,
+    col_of: dict,
+    back_edges: set,
+    loop_seq_start: int,
+    route_manifest_lines: list,
+) -> list:
+    """Detect and synthesise RETURN / RECIRCULATION legs not explicit in the topology.
+
+    Two universal detection paths (no class-name checks anywhere):
+
+    Path A — route-manifest back-edge injection:
+        The route-manifest sometimes carries inter-module fluid connections (e.g.
+        'Protein Skimming → Rearing Tank') that the engineeringContract topology omits.
+        For each fluid_loop / thermal edge in the manifest, fuzzy-match its from_tag /
+        to_tag against the known topology node keys (token overlap ≥1).  If the matched
+        'to' node sits at a LOWER or EQUAL flow-column than the matched 'from' node,
+        it is a back-edge: manufacture a synthetic Line with is_return=True.
+
+    Path B — closed-loop terminal-to-source synthesis:
+        If ANY topology edge's material_context contains a recirculation keyword AND the
+        forward chain has a clear TERMINAL node (the rightmost node with no outgoing
+        forward edge among the main-chain nodes with the highest column) AND a clear
+        SOURCE node (the node on the main chain with the lowest non-zero column that has
+        at least one outgoing forward edge AND is not a pure feed / supply pseudo-node),
+        synthesise a single return Line: terminal → source, labelled 'RECIRC RETURN'.
+
+    Returns a list of synthetic Line objects (may be empty — once-through plants produce
+    no return legs).  Existing back_edges already detected by _flow_layers are skipped
+    to avoid duplication.
+    """
+    from collections import defaultdict
+
+    if not col_of:
+        return []
+
+    node_keys = list(col_of.keys())
+    n_toks = {k: _name_tokens(k) for k in node_keys}
+
+    def _best_match(tag: str) -> Optional[str]:
+        """Fuzzy-match a route-manifest tag to a topology node key by token overlap."""
+        t_toks = _name_tokens(tag)
+        # singularise trailing-s
+        t_toks |= {t[:-1] for t in list(t_toks) if t.endswith("s") and len(t) > 3}
+        best, best_score = None, 0
+        for k in node_keys:
+            kt = n_toks[k] | {t[:-1] for t in list(n_toks[k])
+                               if t.endswith("s") and len(t) > 3}
+            score = len(t_toks & kt)
+            if score > best_score:
+                best_score, best = score, k
+        return best if best_score >= 1 else None
+
+    synthetic: list[Line] = []
+    seen_pairs: set = set(back_edges)   # don't duplicate what DFS already found
+
+    # ---- forward-edge adjacency (for Path B terminal detection) ----
+    fwd_succ: dict = defaultdict(list)
+    for e in proc_topo:
+        frm, to = e.get("from_part"), e.get("to_part")
+        if frm and to and frm in col_of and to in col_of:
+            if (frm, to) not in seen_pairs:
+                if col_of[to] > col_of[frm]:   # only genuinely forward edges
+                    fwd_succ[frm].append(to)
+
+    # ──────────────────────────────────────────────
+    # Path A: route-manifest back-edges
+    # ──────────────────────────────────────────────
+    rm_return_count = [0]   # mutable counter for line-number sequencing
+
+    for rm_ln in route_manifest_lines:
+        mech = rm_ln.get("mechanism") or ""
+        if mech == "electrical_bus":
+            continue                               # skip power feeders
+        frm_tag = rm_ln.get("from_tag") or ""
+        to_tag = rm_ln.get("to_tag") or ""
+        frm_key = _best_match(frm_tag)
+        to_key = _best_match(to_tag)
+        if not frm_key or not to_key or frm_key == to_key:
+            continue
+        if (frm_key, to_key) in seen_pairs:
+            continue                               # already have this edge
+        frm_col = col_of.get(frm_key, 0)
+        to_col = col_of.get(to_key, 0)
+        if to_col < frm_col:                      # to-node is UPSTREAM ⇒ back-edge
+            seen_pairs.add((frm_key, to_key))
+            rm_return_count[0] += 1
+            svc = _service_text(rm_ln.get("service") or "")
+            dn = rm_ln.get("line_number", "")
+            # extract DN from line_number if present (e.g. '201-PR-DN300')
+            dn_m = re.search(r"DN\d+", dn or "", re.I)
+            dn_str = dn_m.group(0).upper() if dn_m else ""
+            svc_code = _service_code(frm_key, to_key, rm_ln.get("service") or "")
+            number = f'{loop_seq_start + 900 + rm_return_count[0]}-{svc_code}-RETURN' + (
+                f'-{dn_str}' if dn_str else '')
+            synthetic.append(Line(
+                from_key=frm_key, to_key=to_key,
+                number=number, dn=dn_str,
+                service=svc or "Recirculation return",
+                detail="RECIRC RETURN",
+                style=_line_style(mech, ""),
+                is_return=True,
+            ))
+
+    # ──────────────────────────────────────────────
+    # Path B: closed-loop terminal→source synthesis
+    # ──────────────────────────────────────────────
+    # Check if any topology edge announces the plant is a closed recirculating loop.
+    is_recirc_plant = any(
+        _RECIRC_KEYWORDS.search(e.get("material_context") or "")
+        for e in proc_topo
+    )
+    if is_recirc_plant and not synthetic:
+        # Find the TERMINAL node on the main forward chain: the node with the highest
+        # column AND no outgoing forward edge.  (Pure side-feeds / pseudo-nodes at col=0
+        # are excluded by requiring col > 0.)
+        max_col = max((col_of[k] for k in node_keys if col_of[k] > 0), default=0)
+        terminals = [k for k in node_keys
+                     if col_of.get(k, 0) == max_col and not fwd_succ.get(k)]
+        # Find the SOURCE node: the main-chain entry point (lowest col > 0, has fwd
+        # successors, not a pure feed pseudo-node by name).
+        main_chain_cols = sorted(set(
+            col_of[k] for k in node_keys
+            if col_of[k] > 0 and fwd_succ.get(k)
+        ))
+        sources = []
+        if main_chain_cols:
+            min_main_col = main_chain_cols[0]
+            sources = [k for k in node_keys
+                       if col_of.get(k, 0) == min_main_col and fwd_succ.get(k)
+                       and not re.search(r"supply|feed|source", k, re.I)]
+        if terminals and sources:
+            terminal = terminals[0]
+            source = sources[0]
+            pair = (terminal, source)
+            if pair not in seen_pairs:
+                seen_pairs.add(pair)
+                svc_code = _service_code(terminal, source, "recirculation return")
+                number = f'{loop_seq_start + 990}-{svc_code}-RETURN'
+                synthetic.append(Line(
+                    from_key=terminal, to_key=source,
+                    number=number, dn="",
+                    service="Recirculation return",
+                    detail="RECIRC RETURN",
+                    style=LINE_PROCESS,
+                    is_return=True,
+                ))
+
+    return synthetic
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # RECONSTRUCTION
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -804,6 +980,11 @@ def reconstruct_process(schedule: dict, state: dict,
                 nd.valves.append(Valve(kind="relief", tag="PSV"))
                 break
 
+    # ---- load route-manifest for return-loop inference (optional, additive) ----
+    route_manifest_lines: list = []
+    if out_dir:
+        route_manifest_lines = _load_route_manifest(out_dir)
+
     # ---- build Line objects from the process edges ----
     lines: list[Line] = []
     loop_seq = 200
@@ -847,6 +1028,24 @@ def reconstruct_process(schedule: dict, state: dict,
                 v.kind == "esd" for L in lines for v in L.valves):
             ln.valves.append(Valve(kind="esd", tag="XV"))
         lines.append(ln)
+
+    # ---- RETURN / RECIRCULATION LEGS (universal — graph-shape driven) ----
+    # Detect back-edges that the topology omits (common when the engineering contract
+    # models a once-through chain even though the physical plant is a closed loop) and
+    # inject them as is_return=True Lines so the P&ID draws the return loop over the top.
+    return_lines = _infer_return_loops(
+        proc_topo=proc_topo,
+        col_of=col_of,
+        back_edges=back_edges,
+        loop_seq_start=loop_seq,
+        route_manifest_lines=route_manifest_lines,
+    )
+    # Only add a synthetic return line for nodes that actually exist in this P&ID so the
+    # renderer never references a dangling key.
+    node_key_set = set(nodes.keys())
+    for rl in return_lines:
+        if rl.from_key in node_key_set and rl.to_key in node_key_set:
+            lines.append(rl)
 
     # ---- power note from the electrical edge ----
     power_note = ""
@@ -1232,10 +1431,16 @@ def build_pid_svg(proc: Process) -> str:
     # the neighbouring column or the title block. Universal — only grows when N-arrays
     # exist, otherwise byte-identical to the prior layout.
     has_array = any(nd.array_n > 1 for nd in nodes)
+    has_return = any(getattr(ln, 'is_return', False) for ln in proc.lines)
     col_pitch = 246 if has_array else 210
     row_pitch = 168
     margin_l = 70
-    margin_top = (150 + 70) if has_array else 150   # +headroom for the parallel ghost stack
+    # headroom for parallel ghost stacks (+70) and/or return-leg banner above (+60)
+    margin_top = 150
+    if has_array:
+        margin_top += 70
+    if has_return:
+        margin_top = max(margin_top, 230)   # return loop needs clearance above equipment
     title_h = 150
     legend_w = 250
 
@@ -1515,13 +1720,24 @@ def _draw_pipe(svg, pf, pt, fx, fy, tx, ty, forward, stroke, lw, dash, marker, l
         _line_tag(svg, ln, (x0 + run_end) / 2, y0, stroke, terse=terse)
         _decorate_line(svg, ln, x0, y0, run_end, y0, stroke)
     else:
-        # recycle: leave 'top', go up, across, down into 'top' of target
+        # recycle / return: leave 'top', go UP above the equipment row, across, down into
+        # 'top' of target — so the return loop is routed ABOVE the main equipment band and
+        # reads unmistakably as a closing loop, not a forward pipe.
         x0, y0 = pf["top"]
         x1, y1 = pt["top"]
-        up = min(y0, y1) - 56
+        # Use a larger clearance for inferred recirc-return legs (detail="RECIRC RETURN")
+        # so they sit well above any array ghost stacks or instrument bubbles.
+        clearance = 90 if ln.detail == "RECIRC RETURN" else 56
+        up = min(y0, y1) - clearance
         pts = [(x0, y0), (x0, up), (x1, up), (x1, y1)]
         _polyline(svg, pts, stroke, lw, dash, marker)
-        _line_tag(svg, ln, (x0 + x1) / 2, up, stroke, above=True)
+        mid_x = (x0 + x1) / 2
+        _line_tag(svg, ln, mid_x, up, stroke, above=True)
+        # For inferred recirc-return legs draw a bold "RECIRC RETURN" banner above the
+        # line number so the return loop is visually unmistakable.
+        if ln.detail == "RECIRC RETURN":
+            banner_y = up - 22
+            _draw_recirc_banner(svg, mid_x, banner_y, ln)
         _decorate_line(svg, ln, x0, up, x1, up, stroke)
 
 
@@ -1577,6 +1793,28 @@ def _decorate_line(svg, ln, x0, y, x1, y2, stroke):
             # field instrument bubble dropped below the line on a lead
             svg.line(px, y, px, y + 18, stroke=ACCENT, width=1.0, dash="2,2")
             _sym_instrument(svg, px, y + 30, obj.tag, where="line")
+
+
+def _draw_recirc_banner(svg, cx, cy, ln: "Line"):
+    """Draw a visually prominent 'RECIRC RETURN' banner above the return-leg line number.
+    A filled pill badge with the label + the line's service hint, so the reader immediately
+    sees that this upper route is a recirculation / return leg, not a forward process line.
+    Deterministic position: centred at (cx, cy), above the horizontal run."""
+    # Pill badge background
+    label = "RECIRC RETURN"
+    pill_w = 104
+    pill_h = 16
+    px = cx - pill_w / 2
+    py = cy - pill_h / 2
+    svg.rect(px, py, pill_w, pill_h, stroke=PROC_INK, width=1.2,
+             fill="#dde8f5", rx=pill_h / 2)
+    svg.text(cx, cy + 4, label, size=8.0, anchor="middle",
+             weight="bold", fill=EQ_INK)
+    # Service hint below badge (if available)
+    if ln.service and ln.service.lower() not in ("recirculation return",):
+        svc = _short_service(ln.service)
+        if svc:
+            svg.text(cx, cy + pill_h + 4, svc, size=7.0, anchor="middle", fill=MUTED)
 
 
 def _draw_node_instruments(svg, nd, cx, cy, port):
