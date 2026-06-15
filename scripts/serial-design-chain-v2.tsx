@@ -7769,6 +7769,15 @@ async function main() {
   }
   console.error(`\n[chain] === FINAL ===  state: ${statePath}  pdf: ${pdfPath}  status=${acceptanceStatus}  gates_passed=${allPassed}  design_decisions=${designDecisions.length}`)
 
+  // #138 (Tristan 2026-06-15): write componentEngineering — per-part physics + governance +
+  // connectivity + holistic system balances — into state via the SHARED component_engineering
+  // module (the SAME code the dashboard renders), so the dossier carries one source of truth.
+  // Best-effort; the dossier-page renderer that reads state.componentEngineering is the follow-up.
+  try {
+    execFileSync('.venv/bin/python', ['scripts/enrich-component-engineering.py', outDir], { stdio: 'inherit' })
+    console.error('[chain] componentEngineering → state (per-component physics + governance + balances)')
+  } catch { /* enrichment is best-effort */ }
+
   // Per-round HTML dashboard (Tristan 2026-06-14: a fresh dashboard EVERY round —
   // brief inputs / tools / Blender / 8 engineering docs / BoM for THIS run).
   // Best-effort: never fail the run over the convenience view.
