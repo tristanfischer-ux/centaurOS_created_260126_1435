@@ -1901,6 +1901,60 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
                                           dia, MAT, mod, MO)
             if first is None:
                 first = (asm, anchors)
+        # ── qty-N MANIFOLD: EVERY tank gets an inlet + drain + power tie-in, not just
+        # instance 0 (Tristan 2026-06-15: "each tank min has inputs and outputs for
+        # pipes and power"). A SUPPLY main (up one side) feeds a per-row BRANCH header
+        # that DROPS into each tank; a DRAIN per-row header at floor collects each tank;
+        # a POWER header drops to each. The supply/drain main ENDS become the array's
+        # routing anchors so the plant loop connects to the manifold, which distributes
+        # to all N. Universal — fires for ANY replicated vessel array, any class. ──
+        if N >= 2:
+            MM = fl.MM
+            blue = _mech_pipe_mat("fluid_loop", MAT)
+            pwr = _mech_pipe_mat("electrical_bus", MAT)
+            r_main = max(0.09, dia * MM * 0.05)
+            r_br = max(0.06, dia * MM * 0.04)
+            r_drop = max(0.05, dia * MM * 0.03)
+            r_pwr = 0.035
+            ttop = base_z_mm + (ln or 3000)
+            sup_z = ttop + 1300.0                       # supply header above the tanks
+            drn_z = base_z_mm + 250.0                   # drain header just off the floor
+            pwr_z = base_z_mm + 600.0                   # power header low on the side
+            cxs = [x_mm + (c - (cols - 1) / 2.0) * pitch for c in range(cols)]
+            rys = [y_mm + (r - (rows - 1) / 2.0) * pitch for r in range(rows)]
+            x_l, x_r = cxs[0] - pitch * 0.5, cxs[-1] + pitch * 0.5
+            y_f, y_b = rys[0] - pitch * 0.55, rys[-1] + pitch * 0.55
+            sup_x, drn_x = x_l - pitch * 0.3, x_r + pitch * 0.3
+
+            def _vp(n, x, y, z0, z1, rr, mt):     # vertical pipe
+                fl.add_cyl(n, (x * MM, y * MM, (z0 + z1) / 2 * MM), rr, abs(z1 - z0) * MM,
+                           mt, module=mod, module_objects=MO)
+
+            def _xp(n, x0, x1, y, z, rr, mt):     # horizontal pipe along X
+                fl.add_cyl(n, ((x0 + x1) / 2 * MM, y * MM, z * MM), rr, abs(x1 - x0) * MM,
+                           mt, module=mod, module_objects=MO, rotation=(0, math.radians(90), 0))
+
+            def _yp(n, x, y0, y1, z, rr, mt):     # horizontal pipe along Y
+                fl.add_cyl(n, (x * MM, (y0 + y1) / 2 * MM, z * MM), rr, abs(y1 - y0) * MM,
+                           mt, module=mod, module_objects=MO, rotation=(math.radians(90), 0, 0))
+
+            _yp(f"{nm}_supmain", sup_x, y_f, y_b, sup_z, r_main, blue)     # supply main (left)
+            _yp(f"{nm}_drnmain", drn_x, y_f, y_b, drn_z, r_main, blue)     # drain main (right)
+            _yp(f"{nm}_pwrmain", sup_x, y_f, y_b, pwr_z, r_pwr * 1.4, pwr)  # power main (left)
+            for r in range(rows):
+                _xp(f"{nm}_supbr{r}", sup_x, cxs[-1], rys[r], sup_z, r_br, blue)
+                _xp(f"{nm}_drnbr{r}", drn_x, cxs[0], rys[r], drn_z, r_br, blue)
+                _xp(f"{nm}_pwrbr{r}", sup_x, cxs[-1], rys[r], pwr_z, r_pwr, pwr)
+                for c in range(cols):
+                    idx = r * cols + c
+                    if idx >= N:
+                        continue
+                    _vp(f"{nm}_inlet{idx}", cxs[c], rys[r], sup_z, ttop + 250, r_drop, blue)
+                    _vp(f"{nm}_drain{idx}", cxs[c], rys[r], base_z_mm + 100, drn_z, r_drop, blue)
+                    _vp(f"{nm}_pdrop{idx}", cxs[c], rys[r], pwr_z, base_z_mm + (ln or 3000) * 0.5, r_pwr, pwr)
+            man_anchors = {"top": (sup_x, y_f, sup_z), "bottom": (drn_x, y_f, drn_z),
+                           "centre": (x_mm, y_mm, ttop * 0.5)}
+            return (first[0], man_anchors)
         return first
 
     if shape == "stack":
