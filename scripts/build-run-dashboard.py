@@ -245,8 +245,7 @@ if parts_conn:
         gov = f"<code>{esc(p['governing_tool'])}</code>" if p.get('governing_tool') else "<span class='warn'>✗ none</span>"
         miss = f"<br><span class='warn'>missing: {esc(', '.join(p['missing']))}</span>" if p.get('missing') else ''
         sp = p.get('spec')
-        specstr = (f"<br><span class='prov'>⚙ {esc(sp['material'])} · ⌀{sp['diameter_m']}×{sp['height_m']} m · "
-                   f"wall {sp['wall_mm']} mm · {sp['mass_kg']:,} kg</span>") if sp else ''
+        specstr = (f"<br><span class='prov'>⚙ <b>{esc(sp.get('type'))}</b> · {esc(sp.get('material'))} · {esc(sp.get('summary'))}</span>") if sp else ''
         S.append(f"<tr><td><b>{esc(p['name'])}</b> <span class='prov'>{esc(p.get('tag'))} · {esc(p.get('module'))}</span></td>"
                  f"<td>{esc(p.get('function') or '')}{specstr}</td><td>{gov}</td>"
                  f"<td>{_cells(p['incoming'], True)}</td><td>{_cells(p['outgoing'], False)}</td>"
