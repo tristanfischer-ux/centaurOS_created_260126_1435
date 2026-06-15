@@ -211,22 +211,38 @@ if cost:
     S.append('</table></div>')
 
 if isinstance(req_bom, list) and req_bom:
-    COLS = ['tag','requirement','part','qty','unit_gbp','line_gbp','status','basis']
-    have = [c for c in COLS if any(isinstance(r, dict) and c in r for r in req_bom)]
-    total = sum(float(r.get('line_gbp') or 0) for r in req_bom if isinstance(r, dict))
-    S.append(f'<div class="card"><h3>Requirements-driven BoM ({len(req_bom)} rows · Σ £{total:,.0f})</h3><table><tr>')
-    for c in have: S.append(f"<th>{esc(c.replace('_',' '))}</th>")
-    S.append('</tr>')
-    for r in req_bom:
-        if not isinstance(r, dict): continue
-        S.append('<tr>')
-        for c in have:
-            v = r.get(c)
-            cls = " class='n'" if (c in ('qty','unit_gbp','line_gbp') or isinstance(v,(int,float))) else ''
-            disp = f"£{fmtnum(v)}" if c in ('unit_gbp','line_gbp') and v not in (None,'') else (fmtnum(v) if isinstance(v,(int,float)) else esc(v))
-            S.append(f"<td{cls}>{disp}</td>")
+    equip = [r for r in req_bom if isinstance(r, dict) and not r.get('connection')]
+    conns = [r for r in req_bom if isinstance(r, dict) and r.get('connection')]
+    if equip:
+        COLS = ['tag','requirement','part','qty','unit_gbp','line_gbp','status','basis']
+        have = [c for c in COLS if any(c in r for r in equip)]
+        tot = sum(float(r.get('line_gbp') or 0) for r in equip)
+        S.append(f'<div class="card"><h3>Equipment ({len(equip)} rows · Σ £{tot:,.0f})</h3><table><tr>')
+        for c in have: S.append(f"<th>{esc(c.replace('_',' '))}</th>")
         S.append('</tr>')
-    S.append('</table></div>')
+        for r in equip:
+            S.append('<tr>')
+            for c in have:
+                v = r.get(c)
+                cls = " class='n'" if (c in ('qty','unit_gbp','line_gbp') or isinstance(v,(int,float))) else ''
+                disp = f"£{fmtnum(v)}" if c in ('unit_gbp','line_gbp') and v not in (None,'') else (fmtnum(v) if isinstance(v,(int,float)) else esc(v))
+                S.append(f"<td{cls}>{disp}</td>")
+            S.append('</tr>')
+        S.append('</table></div>')
+    if conns:
+        tot = sum(float(r.get('line_gbp') or 0) for r in conns)
+        flagged = sum(1 for r in conns if not r.get('within_spec'))
+        head = (f'Connections — every input/output link, sized + measured ({len(conns)} runs · Σ £{tot:,.0f}'
+                + (f' · <span class="warn">{flagged} out-of-spec → loop re-sizes</span>' if flagged else '') + ')')
+        S.append(f'<div class="card"><h3>{head}</h3>')
+        S.append('<table><tr><th>Tag</th><th>Service</th><th>From → To</th><th>Size</th><th>Length</th><th>Spec</th><th>£</th></tr>')
+        for r in conns:
+            spec = "<span class='ok'>✓</span>" if r.get('within_spec') else "<span class='warn'>⚠ review</span>"
+            frm_to = esc(str(r.get('requirement','')).split(': ', 1)[-1])
+            S.append(f"<tr><td>{esc(r.get('tag'))}</td><td>{esc(r.get('service'))}</td><td>{frm_to}</td>"
+                     f"<td>{esc(r.get('size'))}</td><td class='n'>{esc(r.get('length_m'))} m</td>"
+                     f"<td>{spec}</td><td class='n'>£{fmtnum(r.get('line_gbp'))}</td></tr>")
+        S.append('</table></div>')
 else:
     S.append('<div class="note">No requirementsBom rows in state.json.</div>')
 

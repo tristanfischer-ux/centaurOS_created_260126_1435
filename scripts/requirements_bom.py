@@ -141,6 +141,58 @@ def _selftest() -> int:
     return 1 if bad else 0
 
 
+def _connection_rows(out_dir: str):
+    """Each routed connection (pipe / cable / duct run from the Blender layout)
+    becomes its OWN bill-of-materials line — service-classified (electrical /
+    water / air), carrying its as-built LENGTH and SIZE — so every input/output
+    connection is an IDENTIFIED part, not just decoration on an equipment row
+    (Tristan 2026-06-15: "pay attention to all of the input output connections
+    plus the length and sizing eg electric water and air"). Universal: reads the
+    deterministic connection-schedule the universal Blender builder writes for
+    any archetype. An out-of-spec run is flagged ROUTED·REVIEW so the convergence
+    loop can re-size it."""
+    p = os.path.join(out_dir, "connection-schedule.json")
+    if not os.path.exists(p):
+        return []
+    try:
+        cs = json.load(open(p))
+    except Exception:
+        return []
+    out = []
+    for i, r in enumerate(cs.get("rows") or []):
+        size = str(r.get("size") or "").strip()
+        mech = str(r.get("mechanism") or "").lower()
+        if "mm²" in size or "mm2" in size.lower() or any(k in mech for k in ("cable", "power", "electr", "supply", "feeder")):
+            service, kind = "electrical", "cable"
+        elif "duct" in size.lower() or any(k in mech for k in ("hvac", "vent", "exhaust", "air", "aeration")):
+            service, kind = "air", "duct"
+        else:
+            service, kind = "water", "pipe"
+        frm = str(r.get("from") or "").replace("_", " ").strip()
+        to = str(r.get("to") or "").replace("_", " ").strip()
+        length = r.get("length_m")
+        within = bool(r.get("within_spec"))
+        rating = str(r.get("rating") or "").strip()
+        line = float(r.get("line_total_gbp") or 0.0)
+        req = f"{service} connection: {frm} → {to}" + (f" · {rating}" if rating else "")
+        part = str(r.get("qty") or f"{size} {kind}")   # human desc incl. length, e.g. "DN300 pipe, 65.1 m"
+        out.append({
+            "tag": f"C{i + 1:02d}",
+            "requirement": req,
+            "status": "ROUTED" if within else "ROUTED·REVIEW",
+            "part": part,
+            "qty": 1,
+            "unit_gbp": round(line),
+            "line_gbp": round(line),
+            "basis": str(r.get("cost_basis") or "model:uk-2026 supply+install"),
+            # extras (length + sizing focus) — consumed by the run dashboard:
+            "connection": True, "service": service, "size": size,
+            "length_m": round(float(length), 1) if isinstance(length, (int, float)) else None,
+            "within_spec": within,
+        })
+    return out
+
+
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
     def _load(n):
@@ -222,6 +274,7 @@ def assemble(out_dir: str):
                 rows.append({"tag": tag, "requirement": requirement, "status": status,
                              "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),
                              "basis": basis})
+    rows += _connection_rows(out_dir)   # pipe/cable/duct runs as their own service-classified BoM lines
     return rows
 
 
