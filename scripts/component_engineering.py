@@ -324,7 +324,19 @@ def system_balances(quantities):
     bal.append(('Water', rows(water),
                 f"make-up {val('makeup_water_m3_h'):,.0f} m³/h in ≈ discharge out · recirc loop {val('recirculation_flow_m3_h'):,.0f} m³/h internal"))
     air = [k for k in q if 'air_flow' in k]
-    bal.append(('Air handling', rows(air), f"Σ {sum(val(k) for k in air):,.0f} m³/h (degasser strip air dominates) · humidity load = NOT yet computed"))
+    # building moisture / dehumidification load from the OPEN WATER SURFACE (Tristan: "all the
+    # air handling including humidity"). Surface from tank volume (⌀ assuming H≈0.6·⌀), +20% for
+    # sumps/channels; indoor RAS evaporation ~0.15 kg/m²/h; latent of vaporisation ~0.68 kWh/kg.
+    tankV = val('total_tank_volume_m3'); ntank = val('rearing_tank_count') or 1
+    v_each = (tankV / ntank) if ntank else tankV
+    d_each = (v_each / 0.471) ** (1 / 3.0) if v_each > 0 else 0.0
+    water_area = ntank * 3.14159 * (d_each / 2.0) ** 2 * 1.2
+    moisture_kg_h = water_area * 0.15
+    dehum_kw = moisture_kg_h * 0.68
+    bal.append(('Air handling', rows(air),
+                f"Σ {sum(val(k) for k in air):,.0f} m³/h strip+vent air · water surface ≈ {water_area:,.0f} m² "
+                f"→ moisture {moisture_kg_h:,.0f} kg/h → dehumidification ≈ {dehum_kw:,.0f} kW "
+                f"(evap 0.15 kg/m²/h, latent 0.68 kWh/kg)"))
     thermal = [k for k in q if k.endswith('_kw') and any(t in k for t in ('heating', 'loss', 'thermal')) and 'electrical' not in k]
     bal.append(('Thermal / heat', rows(thermal), f"heating duty {val('heating_duty_kw'):,.0f} kW vs losses + make-up"))
     o2d = val('oxygen_demand_kg_day'); o2s = val('oxygen_supply_kg_h') * 24
