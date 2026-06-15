@@ -85,6 +85,55 @@ def _required_services(name, module, function):
         return set()
     return req
 
+def _component_spec(part):
+    """Per-component engineering spec, DETERMINISTIC from the part's OWN geometry + role
+    (Tristan 2026-06-15: a tank should compute its material, the material physics, and the
+    wall THICKNESS from its volume / diameter / height — not a constant). For a vessel:
+    select material by service, derive the hoop-stress wall from the hydrostatic head at
+    its depth, and the shell mass. Returns None for non-vessels (pumps/pipes need their
+    own physics — next). No LLM."""
+    name = str(part.get('name') or ''); shape = str(part.get('shape') or '').lower()
+    dims = part.get('dims_mm') or {}
+    n = _norm(f"{name} {part.get('module', '')}")
+    if isinstance(dims, dict):
+        if 'dia' in dims:
+            D = float(dims['dia']) / 1000.0
+            H = float(dims.get('len') or dims.get('h') or dims.get('height') or 0) / 1000.0
+        elif 'w' in dims or 'd' in dims:
+            D = max(float(dims.get('w') or 0), float(dims.get('d') or 0)) / 1000.0
+            H = float(dims.get('h') or 0) / 1000.0
+        else:
+            vals = sorted((float(v) / 1000.0 for v in dims.values() if isinstance(v, (int, float))), reverse=True)
+            if len(vals) < 2:
+                return None
+            D, H = vals[0], vals[-1]
+    elif isinstance(dims, (list, tuple)) and len(dims) >= 2:
+        vals = [float(x) / 1000.0 for x in dims]
+        D = max(vals[0], vals[1]); H = vals[2] if len(vals) >= 3 else vals[-1]
+    else:
+        return None
+    is_vessel = ('cyl' in shape or 'vessel' in shape or any(k in n for k in ('tank', 'vessel', 'reservoir',
+                 'sump', 'basin', 'degas', 'column', 'skim', 'clarifier', 'cone', 'filter', 'drum')))
+    if not is_vessel or D <= 0 or H <= 0:
+        return None
+    if any(k in n for k in ('frp', 'grp', 'hdpe', 'plastic')) or (
+            any(k in n for k in ('tank', 'rear', 'basin', 'reservoir', 'sump'))
+            and not any(k in n for k in ('pressure', 'reactor', 'column', 'degas', 'steril', 'uv'))):
+        mat, rho, sigma, corr, floor = 'FRP/GRP', 1800.0, 18.0, 0.0, 6.0
+    elif any(k in n for k in ('316', 'stainless', 'steril', 'uv', 'degas', 'skim', 'oxygen')):
+        mat, rho, sigma, corr, floor = '316L stainless', 8000.0, 138.0, 0.5, 4.0
+    else:
+        mat, rho, sigma, corr, floor = 'carbon steel', 7850.0, 120.0, 2.0, 5.0
+    P = 1000.0 * 9.81 * H                                  # hydrostatic at base, Pa
+    t_hoop = P * (D / 2.0) / (sigma * 1e6 * 0.85)          # hoop stress, weld eff 0.85, m
+    wall = max(t_hoop + corr / 1000.0, floor / 1000.0)
+    area = 3.14159 * D * H + 2 * (3.14159 * D * D / 4.0)   # shell + 2 ends
+    mass = area * wall * rho
+    return {'material': mat, 'diameter_m': round(D, 2), 'height_m': round(H, 2),
+            'wall_mm': round(wall * 1000, 1), 'mass_kg': round(mass),
+            'basis': f"hoop t=P·r/(σ·E)+c · P={P / 1000:.0f} kPa head · σ={sigma:.0f} MPa · ⌀{D:.1f}×{H:.1f} m → {wall * 1000:.1f} mm"}
+
+
 def build_connectivity(run, req_bom, tools):
     """DETERMINISTIC per-part connectivity + GOVERNANCE from the Blender route/parts
     manifests + the connection-schedule. For every part: incoming + outgoing routed
@@ -123,7 +172,10 @@ def build_connectivity(run, req_bom, tools):
         return None
     parts, seen = [], set()
     for p in (pm.get('parts') or []):
-        nm = p.get('name'); parts.append({'name': nm, 'tag': p.get('equipment_tag') or p.get('tag'), 'module': p.get('module')}); seen.add(_norm(nm))
+        nm = p.get('name')
+        parts.append({'name': nm, 'tag': p.get('equipment_tag') or p.get('tag'), 'module': p.get('module'),
+                      'spec': _component_spec(p)})
+        seen.add(_norm(nm))
     for e in edges:
         for ep in (e['from'], e['to']):
             if _norm(ep) not in seen:
@@ -327,8 +379,11 @@ if parts_conn:
     for p in sorted(parts_conn, key=lambda x: (not x.get('missing'), x['checks']['governed'], str(x.get('module') or ''))):
         gov = f"<code>{esc(p['governing_tool'])}</code>" if p.get('governing_tool') else "<span class='warn'>✗ none</span>"
         miss = f"<br><span class='warn'>missing: {esc(', '.join(p['missing']))}</span>" if p.get('missing') else ''
+        sp = p.get('spec')
+        specstr = (f"<br><span class='prov'>⚙ {esc(sp['material'])} · ⌀{sp['diameter_m']}×{sp['height_m']} m · "
+                   f"wall {sp['wall_mm']} mm · {sp['mass_kg']:,} kg</span>") if sp else ''
         S.append(f"<tr><td><b>{esc(p['name'])}</b> <span class='prov'>{esc(p.get('tag'))} · {esc(p.get('module'))}</span></td>"
-                 f"<td>{esc(p.get('function') or '')}</td><td>{gov}</td>"
+                 f"<td>{esc(p.get('function') or '')}{specstr}</td><td>{gov}</td>"
                  f"<td>{_cells(p['incoming'], True)}</td><td>{_cells(p['outgoing'], False)}</td>"
                  f"<td>{_chk(p['checks'])}{miss}</td></tr>")
     S.append('</table></div>')
