@@ -6,6 +6,17 @@ _Last updated 2026-06-15. Run under inspection: `out/ras-converged` → `dashboa
 
 ---
 
+## ▶ RESUME POINT (post-compaction, 2026-06-15)
+
+**Sequence Tristan set:** physics tools → Blender → 8 drawings → loops → BoM. Get each EXCELLENT *before* the PDFs. **Every change universal (no per-class logic).**
+
+- ✅ **PHYSICS TOOLS — DONE + PROVEN.** Every component type computes its own physics in the shared module `scripts/component_engineering.py` (vessel · pump · blower/fan · heat-exchanger/heat-pump · transformer · panel/switchgear · valve · motor + the humidity/dehumidification load). **Proof:** `.venv/bin/python scripts/prove-physics.py` → COVERAGE PASS (47/47 parts spec'd-or-structural) · 5/5 formulas re-derive exactly · DETERMINISM PASS. Commits `f2e6605e8` + `0db8f5313`.
+- ▶ **RESUME HERE — Blender (#136): tank ASPECT/freeboard.** The rearing tanks render ⌀10.3 × 6.3 m (too TALL; kingfish RAS tanks are shallow + wide, ~1.5–3 m deep). This inflates the envelope (521 m³ for 334 m³ working) AND the BoM tank cost (~£1.5M). Fix the vessel sizing in `scripts/blender-universal/build_universal_scene.py` to a shallow/wide aspect — it cascades: geometry → drawings → BoM cost move together. The BoM already reads the as-built geometry (`d2f88de79`), so fixing the Blender source fixes the BoM too.
+- THEN: **8 drawings** (open + scrutinise — NOT looked at properly this session) → **loop 4×** (#135) → **BoM reconcile + RAS cost band** (#137).
+- Honest caveat: the physics TOOLS are done; physics RESULTS are only as good as the inputs — the tank-aspect is an INPUT issue (the next step), not a physics-tool bug.
+
+---
+
 ## ✅ DONE (committed to main)
 
 ### Tools — selection + creation + robustness
