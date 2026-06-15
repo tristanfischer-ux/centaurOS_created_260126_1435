@@ -5478,7 +5478,14 @@ def augment_topology_power_signal(state, topology, parts):
                           'material_context': 'LV power feeder 400/415V 3ph', '_augmented': True})
         is_sensor = (p.module_id == 'sensing_instrumentation') or any(k in low for k in _SENSOR_KW)
         if ctrl_hub and nm != ctrl_hub and is_sensor and (nm, ctrl_hub) not in existing:
-            extra.append({'from_part': nm, 'to_part': ctrl_hub, 'mechanism': 'electrical_bus',
+            # mechanism='signal' (NOT electrical_bus) — a sensor→controller link is an
+            # instrument SIGNAL cable, not a power feeder. The single-line filters on
+            # "electrical" in mechanism (draw_single_line.py), so 'signal' correctly
+            # drops OFF the power SLD (no more "Main Controller ×7" phantom feeders)
+            # while connection_sizing still sizes + costs it by constraint_kind
+            # current_rating (0.5 A → smallest instrument cable) on the connection
+            # schedule. Universal: every sensor gets ONE signal link to the control hub.
+            extra.append({'from_part': nm, 'to_part': ctrl_hub, 'mechanism': 'signal',
                           'constraint_kind': 'current_rating', 'required_value': 0.5,
                           'required_unit': 'A', 'required_margin_factor': 1.0,
                           'material_context': 'instrument signal cable 4-20mA', '_augmented': True})

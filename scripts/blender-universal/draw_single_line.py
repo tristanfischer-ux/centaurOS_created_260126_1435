@@ -395,7 +395,12 @@ def _bus_voltage_label(state, schedule, default=""):
         return f"{ac:,.0f} V AC"
     for s in (schedule.get("specs") or []):
         v = s.get("system_voltage_v")
-        if v:
+        # ONLY a real LV value [100, 1000] V. `_infer_system_voltage` leaks a 1500 V
+        # DC-bus DEFAULT onto AC process edges (documented in
+        # _apply_distribution_voltage_model, which guards lv_v the same way) — taking
+        # it here mislabelled a 400 V RAS LV board as "1,500 V". Skipping it lets the
+        # distribution-voltage model set the correct board voltage from the load.
+        if v and 100.0 <= float(v) <= 1000.0:
             return f"{v:,.0f} V"
     return default
 
