@@ -5412,6 +5412,69 @@ def _module_repr_part_name(module_id, parts):
     return in_mod[0].name
 
 
+_POWERED_KW = ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat',
+               'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan', 'lamp', 'mixer', 'agitat')
+_SENSOR_KW = ('sensor', 'probe', 'transmit', 'gauge', 'meter', 'analy', 'detector')
+
+
+def _device_current_a(name, quantities):
+    """Per-device feeder current (A) at 400/415 V 3-phase. Match the device to a *_kw
+    quantity in the contract by keyword; else a modest default share of the connected
+    load. UNIVERSAL — no class table."""
+    nm = re.sub(r'[^a-z0-9]', '', str(name).lower())
+    kw = None
+    for k, v in (quantities or {}).items():
+        kl = k.lower()
+        if not (kl.endswith('_kw') or 'power_kw' in kl):
+            continue
+        key = re.sub(r'[^a-z0-9]', '', kl.replace('_kw', '').replace('electrical', '').replace('power', ''))
+        val = v.get('value') if isinstance(v, dict) else v
+        if key and key in nm and isinstance(val, (int, float)) and val > 0:
+            kw = float(val)
+            break
+    if kw is None:
+        tot = quantities.get('connected_electrical_load_kw') if isinstance(quantities, dict) else None
+        totv = (tot.get('value') if isinstance(tot, dict) else tot) or 0
+        kw = max(2.0, float(totv) / 25) if totv else 7.5
+    return round(kw * 1000.0 / (1.732 * 400.0 * 0.9), 1)
+
+
+def augment_topology_power_signal(state, topology, parts):
+    """EXTRA electrical_bus edges that connect the orphans the FLUID grammar cannot:
+    a POWER feeder from the power-distribution hub to every powered device, and a
+    SIGNAL link from every sensor to the control hub. Each is sized by the SAME
+    cable-sizing path (current_rating A -> CSA -> cost), so the connections get real
+    sizes + cost. Tristan 2026-06-15: every powered device needs a power feed, every
+    sensor a signal link — connect the orphans so the loop's part/connection count
+    grows. UNIVERSAL: hubs resolved by MODULE, devices/sensors by role keyword. Pure."""
+    contract = state.get('orchestratorContract', {}) or {}
+    quantities = contract.get('quantities', {}) or {}
+    pwr_hub = _module_repr_part_name('power_distribution', parts)
+    ctrl_hub = _module_repr_part_name('control_compute_communication', parts)
+    if not pwr_hub and not ctrl_hub:
+        return []
+    existing = {(str(e.get('from_part')), str(e.get('to_part'))) for e in topology}
+    extra = []
+    for p in parts:
+        nm = p.name
+        low = re.sub(r'[^a-z0-9 ]', '', f'{nm} {p.module_id}'.lower())
+        if pwr_hub and nm != pwr_hub and any(k in low for k in _POWERED_KW) and (pwr_hub, nm) not in existing:
+            extra.append({'from_part': pwr_hub, 'to_part': nm, 'mechanism': 'electrical_bus',
+                          'constraint_kind': 'current_rating', 'required_value': _device_current_a(nm, quantities),
+                          'required_unit': 'A', 'required_margin_factor': 1.25,
+                          'material_context': 'LV power feeder 400/415V 3ph', '_augmented': True})
+        is_sensor = (p.module_id == 'sensing_instrumentation') or any(k in low for k in _SENSOR_KW)
+        if ctrl_hub and nm != ctrl_hub and is_sensor and (nm, ctrl_hub) not in existing:
+            extra.append({'from_part': nm, 'to_part': ctrl_hub, 'mechanism': 'electrical_bus',
+                          'constraint_kind': 'current_rating', 'required_value': 0.5,
+                          'required_unit': 'A', 'required_margin_factor': 1.0,
+                          'material_context': 'instrument signal cable 4-20mA', '_augmented': True})
+    if extra:
+        print(f"[univ] power/signal augmentation: +{len(extra)} electrical edge(s) "
+              f"(power hub={pwr_hub}, control hub={ctrl_hub})")
+    return extra
+
+
 def augment_topology_cross_module(state, topology, parts):
     """Return EXTRA topology-shaped edges for the FLUID cross-module grammar links the
     primary `topology` does not already route (see the block comment above). Each extra
@@ -10781,6 +10844,7 @@ def main():
     # links). Universal + pair-deduped — a no-op on a plant whose topology already
     # spans its modules. Appended so every extra edge routes via the same path.
     topology = list(topology) + augment_topology_cross_module(state, topology, parts)
+    topology = topology + augment_topology_power_signal(state, topology, parts)
     regions, region_edges = order_regions(parts, topology)
     print(f"[univ] region order (L->R): {regions}")
 
