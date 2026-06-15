@@ -89,20 +89,27 @@ def _wall_physics(matlabel):
     return (120.0, 2.0, 5.0)   # carbon steel
 
 
-def _materials_takeoff(name, mods):
+def _materials_takeoff(name, mods, geom=None):
     """Bespoke cost from a real materials take-off: surface area × wall × density × rate +
     fittings. Handles a cylinder dim, a box dim, or a bare volume. Returns (gbp, basis) or
     None if no geometry to take off."""
-    dim = mods.get("dimension") or ""
-    cyl = _cyl_from_dim(dim); box = _box_from_dim(dim); cap = _num(mods.get("capacity"))
-    if not cyl and not box and cap:                           # derive a cylinder from V
-        d = (4 * cap / (1.3 * math.pi)) ** (1 / 3.0); cyl = (d, 1.3 * d)
-    if cyl:
-        d_v, h_v = cyl; area = math.pi * d_v * h_v + 2 * (math.pi * d_v * d_v / 4.0)   # shell + 2 heads
-    elif box:
-        w, dp, h_v = box; d_v = max(w, dp); area = 2 * (w * dp + dp * h_v + w * h_v)   # 6 faces
+    if geom:
+        # AS-BUILT geometry (the Blender parts-manifest ⌀,H in m) — the SAME source the
+        # drawings + the dashboard read, so the BoM costs the vessel that is actually
+        # placed (one geometry source, not the word's re-derived working volume).
+        d_v, h_v = geom
+        area = math.pi * d_v * h_v + 2 * (math.pi * d_v * d_v / 4.0)
     else:
-        return None
+        dim = mods.get("dimension") or ""
+        cyl = _cyl_from_dim(dim); box = _box_from_dim(dim); cap = _num(mods.get("capacity"))
+        if not cyl and not box and cap:                       # derive a cylinder from V
+            d = (4 * cap / (1.3 * math.pi)) ** (1 / 3.0); cyl = (d, 1.3 * d)
+        if cyl:
+            d_v, h_v = cyl; area = math.pi * d_v * h_v + 2 * (math.pi * d_v * d_v / 4.0)   # shell + 2 heads
+        elif box:
+            w, dp, h_v = box; d_v = max(w, dp); area = 2 * (w * dp + dp * h_v + w * h_v)   # 6 faces
+        else:
+            return None
     matlabel, rho, rate = _material(name, mods)
     # wall from PHYSICS — hoop stress at the hydrostatic head (was a 10 mm constant). t = P·r/(σ·E)
     # + corrosion, floored at the fabrication minimum. Tristan 2026-06-15: thickness from the
@@ -222,10 +229,22 @@ def assemble(out_dir: str):
         return json.load(open(p)) if os.path.exists(p) else {}
     rm = _load("route-manifest.json"); pm = _load("parts-manifest.json")
 
-    # tag + as-built connection sizes from the Blender layout
+    # tag + as-built geometry from the Blender layout (ONE geometry source for the BoM cost,
+    # the drawings and the 3D — not the word's re-derived working volume; kills the 9.5-vs-10.26 split)
     tag_by_name = {}
+    geom_by_name = {}
     for p in (pm.get("parts") or []):
-        tag_by_name.setdefault(re.sub(r"\s+\d+$", "", str(p.get("name") or "")), p.get("equipment_tag"))
+        nm0 = re.sub(r"\s+\d+$", "", str(p.get("name") or ""))
+        tag_by_name.setdefault(nm0, p.get("equipment_tag"))
+        dm = p.get("dims_mm") or {}
+        g = None
+        if isinstance(dm, dict):
+            if "dia" in dm:
+                g = (float(dm["dia"]) / 1000.0, float(dm.get("len") or dm.get("h") or 0) / 1000.0)
+            elif "w" in dm or "d" in dm:
+                g = (max(float(dm.get("w") or 0), float(dm.get("d") or 0)) / 1000.0, float(dm.get("h") or 0) / 1000.0)
+        if g and g[0] > 0 and g[1] > 0:
+            geom_by_name.setdefault(nm0.strip().lower(), g)
     conns_by_tag = {}
     for l in (rm.get("lines") or []):
         for t in (l.get("from_tag"), l.get("to_tag")):
@@ -273,6 +292,7 @@ def assemble(out_dir: str):
                 qy = int((re.search(r"\d+", str(md.get("quantity") or "1")) or re.search(r"(1)", "1")).group(0))
                 bc = _bespoke_class(name)   # 'strong' (process vessel) | 'simple' (shell) | 'none'
                 mt_spec = None
+                g_lookup = geom_by_name.get(re.sub(r"\s+\d+$", "", name).strip().lower())
                 if bc == "strong":
                     # complex fabricated process vessel — bespoke regardless of any pinned
                     # PN; cost is the engineering budget estimate, NOT a shell take-off
@@ -282,14 +302,14 @@ def assemble(out_dir: str):
                     if pv > 0:
                         gbp, basis = pv, "made-to-spec · engineering budget estimate"
                     else:
-                        mt = _materials_takeoff(name, md)
+                        mt = _materials_takeoff(name, md, g_lookup)
                         gbp, basis = (mt[0], mt[1]) if mt else (0.0, "bottom-up parametric")
                         mt_spec = mt[2] if mt and len(mt) > 2 else None
                 elif pn and not _TBD_RE.search(pn):
                     status, part = "IDENTIFIED", f"{mfr} {pn}".strip()
                     gbp, basis = price.get(wid, 0.0), "catalogue"
                 elif bc == "simple":
-                    mt = _materials_takeoff(name, md)
+                    mt = _materials_takeoff(name, md, g_lookup)
                     status, part = "BESPOKE", "made to spec"
                     gbp, basis = (mt[0], mt[1]) if mt else (price.get(wid, 0.0), "bottom-up parametric")
                     mt_spec = mt[2] if mt and len(mt) > 2 else None
