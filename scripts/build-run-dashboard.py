@@ -54,29 +54,53 @@ def _svc(service, size, mech):
     if 'duct' in sz or any(k in s for k in ('hvac', 'vent', 'exhaust', 'air', 'aeration', 'pneumatic')): return 'air'
     return 'water'
 
-def build_connectivity(run, req_bom):
-    """DETERMINISTIC per-part connectivity from the Blender route-manifest +
-    parts-manifest. For every part: its incoming + outgoing routed connections
-    (service · size · length · in/out-of-spec) and what it does. A part with no
-    inputs OR no outputs is flagged — "probably missing a connection" (Tristan
-    2026-06-15). No LLM: pure read of the deterministic layout artifacts."""
+_GOV = [(('pump', 'circulation'), 'pump-sizing'), (('drum', 'microscreen', 'screen'), 'drum-filter'),
+        (('uv', 'steril', 'ozone', 'disinfect'), 'uv-reactor'), (('mbbr', 'biofilter', 'biolog', 'nitrif'), 'mbbr'),
+        (('oxygen', 'speece', 'cone', 'aerat'), 'oxygenation'), (('degas', 'strip', 'column'), 'ras-degasser'),
+        (('tank', 'vessel', 'skim', 'sump', 'reservoir', 'clarifier'), 'pressure-vessel'),
+        (('heat', 'chiller', 'thermal', 'hvac', 'temper'), 'load-sizing'),
+        (('cable', 'feeder', 'wire', 'electric', 'power', 'busbar'), 'cable-sizing'),
+        (('transformer', 'incomer', 'switchgear'), 'transformer-sizing'),
+        (('sensor', 'probe', 'instrument', 'control', 'signal', 'monitor', 'plc'), 'control-systems'),
+        (('feed', 'biomass', 'metabol', 'stock', 'fish', 'rear'), 'ras-metabolism'),
+        (('enclos', 'frame', 'structur', 'panel', 'contain'), 'envelope-check')]
+
+def build_connectivity(run, req_bom, tools):
+    """DETERMINISTIC per-part connectivity + GOVERNANCE from the Blender route/parts
+    manifests + the connection-schedule. For every part: incoming + outgoing routed
+    connections (service · size · length · CALCULATED rating · in/out-of-spec), what
+    it does, the TOOL that governs it (sizes/calculates it), and a CHECKER (governed /
+    connected / priced). A part with no inputs OR no outputs, OR no governing tool, is
+    flagged — the loop must call a tool in to govern/connect it (Tristan 2026-06-15:
+    every part + connection needs a tool governing it; the calc sets the connector
+    type + cost; orphans are probably missing a connection). No LLM."""
     def _L(n):
         try:
             with open(os.path.join(run, n)) as f: return json.load(f)
         except Exception: return {}
     pm = _L('parts-manifest.json'); rmf = _L('route-manifest.json'); cs = _L('connection-schedule.json')
-    spec = {(_norm(r.get('from')), _norm(r.get('to'))): bool(r.get('within_spec')) for r in (cs.get('rows') or [])}
+    meta = {(_norm(r.get('from')), _norm(r.get('to'))): {'within_spec': bool(r.get('within_spec')),
+            'rating': r.get('rating'), 'drop': r.get('drop')} for r in (cs.get('rows') or [])}
     edges = []
     for l in (rmf.get('lines') or []):
-        ft, tt = l.get('from_tag'), l.get('to_tag')
+        ft, tt = l.get('from_tag'), l.get('to_tag'); m = meta.get((_norm(ft), _norm(tt)), {})
         edges.append({'from': ft, 'to': tt, 'service': _svc(l.get('service'), l.get('size_label'), l.get('mechanism')),
                       'size': l.get('size_label'), 'length_m': l.get('length_m'),
-                      'within_spec': spec.get((_norm(ft), _norm(tt)), True)})
-    func = {}
+                      'within_spec': m.get('within_spec', True), 'rating': m.get('rating'), 'drop': m.get('drop')})
+    func, priced = {}, {}
     for r in (req_bom or []):
         if isinstance(r, dict) and not r.get('connection'):
-            func[_norm(r.get('part') or r.get('requirement'))] = r.get('requirement')
-            func[_norm(str(r.get('requirement', '')).split('·')[0])] = r.get('requirement')
+            nm = _norm(r.get('part') or r.get('requirement'))
+            func[nm] = r.get('requirement'); func[_norm(str(r.get('requirement', '')).split('·')[0])] = r.get('requirement')
+            priced[nm] = bool((r.get('line_gbp') or 0) > 0)
+    tool_ids = [t.get('tool_id', '') for t in (tools or [])]
+    def _gov(name, function):
+        text = _norm(f"{name} {function}")
+        for keys, sub in _GOV:
+            if any(k in text for k in keys):
+                m = next((i for i in tool_ids if sub in i), None)
+                if m: return m
+        return None
     parts, seen = [], set()
     for p in (pm.get('parts') or []):
         nm = p.get('name'); parts.append({'name': nm, 'tag': p.get('equipment_tag') or p.get('tag'), 'module': p.get('module')}); seen.add(_norm(nm))
@@ -92,6 +116,9 @@ def build_connectivity(run, req_bom):
         part['outgoing'] = [e for e in edges if _match(e['from'], part['name'])]
         part['function'] = func.get(_norm(part['name']), '')
         part['orphan'] = (not part['incoming']) or (not part['outgoing'])
+        part['governing_tool'] = _gov(part['name'], part['function'])
+        part['checks'] = {'governed': bool(part['governing_tool']), 'connected': not part['orphan'],
+                          'priced': priced.get(_norm(part['name']), False)}
     return parts, edges
 
 state    = load('state.json', {}) or {}
@@ -250,10 +277,11 @@ if isos:
 
 # ── 6. BILL OF MATERIALS ─────────────────────────────────────────────────────
 S.append('<h2>6 · Parts, connectivity + bill of materials</h2>')
-# ── per-part connectivity (DETERMINISTIC: route-manifest + parts-manifest) ──
-parts_conn, _edges = build_connectivity(run, req_bom)
+# ── per-part connectivity + GOVERNANCE (DETERMINISTIC) ──
+parts_conn, _edges = build_connectivity(run, req_bom, tools)
 if parts_conn:
     orphans = [p for p in parts_conn if p['orphan']]
+    ungov = [p for p in parts_conn if not p['checks']['governed']]
     def _cells(es, src):
         if not es: return "<span class='warn'>— none —</span>"
         rows = []
@@ -261,17 +289,24 @@ if parts_conn:
             other = str(e['from'] if src else e['to']).replace('_', ' ')
             arr = '←' if src else '→'
             ln = f"{fmtnum(e['length_m'])} m" if e.get('length_m') is not None else ''
-            warn = '' if e.get('within_spec', True) else " <span class='warn'>⚠</span>"
-            rows.append(f"{arr} {esc(other)} <span class='prov'>[{esc(e['service'])} · {esc(e['size'])} · {ln}]</span>{warn}")
+            rate = f" · {esc(e['rating'])}" if e.get('rating') else ''
+            warn = '' if e.get('within_spec', True) else " <span class='warn'>⚠ out-of-spec</span>"
+            rows.append(f"{arr} {esc(other)} <span class='prov'>[{esc(e['service'])} · {esc(e['size'])} · {ln}{rate}]</span>{warn}")
         return '<br>'.join(rows)
-    S.append(f'<div class="card"><h3>Parts &amp; connectivity ({len(parts_conn)} parts · '
-             f'<span class="warn">{len(orphans)} missing an input or output → probably missing a connection</span>)</h3>')
-    S.append('<table><tr><th>Part</th><th>Module</th><th>What it does</th><th>Incoming</th><th>Outgoing</th><th>?</th></tr>')
-    for p in sorted(parts_conn, key=lambda x: (not x['orphan'], str(x.get('module') or ''))):
-        flag = "<span class='warn'>⚠ missing</span>" if p['orphan'] else "<span class='ok'>✓</span>"
-        S.append(f"<tr><td><b>{esc(p['name'])}</b> <span class='prov'>{esc(p.get('tag'))}</span></td>"
-                 f"<td class='prov'>{esc(p.get('module'))}</td><td>{esc(p.get('function') or '')}</td>"
-                 f"<td>{_cells(p['incoming'], True)}</td><td>{_cells(p['outgoing'], False)}</td><td>{flag}</td></tr>")
+    def _chk(c):
+        def m(ok, lbl): return f"<span class='{'ok' if ok else 'warn'}'>{lbl}{'✓' if ok else '✗'}</span>"
+        return f"{m(c['governed'], 'tool')} {m(c['connected'], 'conn')} {m(c['priced'], '£')}"
+    S.append(f'<div class="card"><h3>Parts · connectivity · governance ({len(parts_conn)} parts · '
+             f'<span class="warn">{len(orphans)} missing a connection</span> · '
+             f'<span class="warn">{len(ungov)} with no governing tool</span>)</h3>'
+             f'<p class="sub">Every part needs a tool that governs it AND ≥1 input + ≥1 output; every connection carries a CALCULATED rating (flow / velocity / current / volt-drop) that sets its size, type and cost. ✗ = the loop must call a tool in.</p>')
+    S.append('<table><tr><th>Part</th><th>What it does</th><th>Governed by</th><th>Incoming</th><th>Outgoing</th><th>Checks</th></tr>')
+    for p in sorted(parts_conn, key=lambda x: (x['checks']['governed'] and not x['orphan'], str(x.get('module') or ''))):
+        gov = f"<code>{esc(p['governing_tool'])}</code>" if p.get('governing_tool') else "<span class='warn'>✗ none</span>"
+        S.append(f"<tr><td><b>{esc(p['name'])}</b> <span class='prov'>{esc(p.get('tag'))} · {esc(p.get('module'))}</span></td>"
+                 f"<td>{esc(p.get('function') or '')}</td><td>{gov}</td>"
+                 f"<td>{_cells(p['incoming'], True)}</td><td>{_cells(p['outgoing'], False)}</td>"
+                 f"<td>{_chk(p['checks'])}</td></tr>")
     S.append('</table></div>')
 if cost:
     S.append('<div class="card"><h3>Cost stack</h3><table><tr><th>Stage</th><th>£</th></tr>')
