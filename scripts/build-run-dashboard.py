@@ -134,6 +134,36 @@ def _component_spec(part):
             'basis': f"hoop t=P·r/(σ·E)+c · P={P / 1000:.0f} kPa head · σ={sigma:.0f} MPa · ⌀{D:.1f}×{H:.1f} m → {wall * 1000:.1f} mm"}
 
 
+def system_balances(quantities):
+    """Holistic SYSTEM-WIDE resource accounting (Tristan 2026-06-15: see water use, power
+    in vs consumption, air, heat, oxygen, feed across the WHOLE system — and keep track of
+    it). Groups the contract quantities by resource and computes a headline in-vs-out
+    closure where derivable. Deterministic — pure read of the contract."""
+    q = quantities or {}
+    def val(k):
+        v = q.get(k)
+        return float(v.get('value') if isinstance(v, dict) else v) if v not in (None, '') else 0.0
+    def unit(k):
+        v = q.get(k); return v.get('unit', '') if isinstance(v, dict) else ''
+    def rows(keys): return [(k, val(k), unit(k)) for k in keys if k in q]
+    bal = []
+    elec = [k for k in q if (k.endswith('_electrical_kw') or k.endswith('_power_kw')) and 'connected' not in k]
+    bal.append(('Electrical power', rows(elec + (['connected_electrical_load_kw'] if 'connected_electrical_load_kw' in q else [])),
+                f"consumers Σ {sum(val(k) for k in elec):,.0f} kW vs connected load {val('connected_electrical_load_kw'):,.0f} kW"))
+    water = [k for k in q if unit(k) == 'm³/h' and any(t in k for t in ('water', 'recirc', 'makeup'))]
+    bal.append(('Water', rows(water),
+                f"make-up {val('makeup_water_m3_h'):,.0f} m³/h in ≈ discharge out · recirc loop {val('recirculation_flow_m3_h'):,.0f} m³/h internal"))
+    air = [k for k in q if 'air_flow' in k]
+    bal.append(('Air handling', rows(air), f"Σ {sum(val(k) for k in air):,.0f} m³/h (degasser strip air dominates) · humidity load = NOT yet computed"))
+    thermal = [k for k in q if k.endswith('_kw') and any(t in k for t in ('heating', 'loss', 'thermal')) and 'electrical' not in k]
+    bal.append(('Thermal / heat', rows(thermal), f"heating duty {val('heating_duty_kw'):,.0f} kW vs losses + make-up"))
+    o2d = val('oxygen_demand_kg_day'); o2s = val('oxygen_supply_kg_h') * 24
+    bal.append(('Oxygen', rows(['oxygen_demand_kg_day', 'oxygen_supply_kg_h']), f"supply {o2s:,.0f} kg/day vs demand {o2d:,.0f} kg/day → {'BALANCED' if o2d and abs(o2s - o2d) / o2d < 0.1 else 'CHECK'}"))
+    feed = [k for k in q if k.endswith('_kg_day')]
+    bal.append(('Feed + waste loads', rows(feed), f"feed {val('daily_feed_kg'):,.0f} kg/day in → solids {val('solids_load_kg_day'):,.0f} + TAN {val('tan_load_kg_day'):,.0f} kg/day removed"))
+    return [(name, items, note) for name, items, note in bal if items]
+
+
 def build_connectivity(run, req_bom, tools):
     """DETERMINISTIC per-part connectivity + GOVERNANCE from the Blender route/parts
     manifests + the connection-schedule. For every part: incoming + outgoing routed
@@ -324,6 +354,20 @@ else:
     S.append('<div class="note">No 0.5-engineering-contract.json quantities found.</div>')
 
 # ── 4. BLENDER (universal CAD — no Gemini cover, no per-module) ───────────────
+S.append('<h2>System balances · holistic resource accounting</h2>')
+bals = system_balances(contract.get('quantities') if isinstance(contract, dict) else {})
+if bals:
+    S.append('<p class="sub">Across the WHOLE system — what goes in vs what is consumed / out, with the closure where derivable. This is how the plant is tracked as one system, not a pile of parts.</p>')
+    S.append('<div class="grid">')
+    for nm, items, note in bals:
+        S.append(f'<div class="card"><h3>{esc(nm)}</h3><table><tr><th>Quantity</th><th>Value</th><th>Unit</th></tr>')
+        for k, v, u in items:
+            S.append(f"<tr><td>{esc(k.replace('_', ' '))}</td><td class='n'>{fmtnum(v)}</td><td>{esc(u)}</td></tr>")
+        S.append(f"</table><p class='prov'><b>Closure:</b> {esc(note)}</p></div>")
+    S.append('</div>')
+else:
+    S.append('<div class="note">No contract quantities for system balances.</div>')
+
 S.append('<h2>4 · Blender model (universal CAD)</h2>')
 blender = [os.path.join(run, n) for n in
            ['inspect-hero.png', 'inspect-iso.png', 'inspect-top.png', 'inspect-front.png', 'inspect-side.png']
