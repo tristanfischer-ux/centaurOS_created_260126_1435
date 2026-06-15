@@ -170,13 +170,29 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
 
 // ── dimension synthesis (Blender- + renderer-parseable strings) ─────────────
 function cylinderFromVolumeM3(v: number, phrase = ''): string {
-  // Aspect by phrase: SQUAT for open tanks/basins (wide & shallow — a RAS rearing
-  // tank is h/d ~0.2-0.5, NOT a silo); TALL for mass-transfer columns/towers;
-  // neutral otherwise. h = a·d ⇒ d = (4V / (a·π))^(1/3).
+  // Open process tanks/basins are WIDE + SHALLOW (a RAS rearing tank, a clarifier,
+  // an aeration basin, a buffer sump) — NOT silos. Universal, scale-aware depth
+  // BAND: target water depth grows gently with volume (≈0.4·V^⅓) but clamps to
+  // [1.5, 4] m — real open-tank practice across small sumps → large basins — and
+  // the diameter FOLLOWS from the volume (d = √(4V/(π·depth))). At 334 m³ that is
+  // ⌀12.4 × 2.8 m (h/d 0.22), a proper shallow rearing tank, not a ⌀9.5 × 4.7 m
+  // tower. Mass-transfer COLUMNS/TOWERS stay TALL (h ≈ 2.2·d); everything else is
+  // neutral (h ≈ d). Keyed on the device NOUN, so it is universal across classes.
   const p = phrase.toLowerCase()
-  let a = 1.0
-  if (/tank|basin|sump|pond|reservoir|clarifier|settl|lagoon|\bpit\b|\bcell\b|raceway|trough/.test(p)) a = 0.5
-  else if (/column|tower|stripper|scrubber|absorber|contactor|degasser/.test(p)) a = 2.2
+  const isOpenTank = /tank|basin|sump|pond|reservoir|clarifier|settl|lagoon|\bpit\b|\bcell\b|raceway|trough/.test(p)
+  const isTower = /column|tower|stripper|scrubber|absorber|contactor|degasser/.test(p)
+  if (isOpenTank) {
+    // WATER depth follows the scale-aware band; the diameter holds the WORKING
+    // volume v at that depth; the SHELL stands +15 % above the liquid line
+    // (freeboard — a tank never fills to the brim). The emitted dimension is the
+    // SHELL ⌀×height the BoM costs; the capacity modifier stays the working v. At
+    // 334 m³ → ⌀12.4 × 3.2 m (water 2.8 m + freeboard), h/d 0.26 — a shallow tank.
+    const waterDepth = Math.min(4.0, Math.max(1.5, 0.4 * Math.cbrt(v)))
+    const d = Math.sqrt((4 * v) / (Math.PI * waterDepth))
+    const shellHeight = waterDepth * 1.15
+    return `${d.toFixed(1)} m dia x ${shellHeight.toFixed(1)} m`
+  }
+  const a = isTower ? 2.2 : 1.0
   const d = Math.cbrt((4 * v) / (a * Math.PI))
   return `${d.toFixed(1)} m dia x ${(a * d).toFixed(1)} m`
 }

@@ -62,7 +62,7 @@ import { storeProposalForClass, loadProposalForClass } from './lib/orchestrator/
 import { dutyHash, type DutySpec } from './lib/orchestrator/generic/tool-generator'
 import { computeQuantityUpdates, applyUpdates } from './lib/design-loop/writeback-bridge'
 import { resizeFromConvergedDemand, nextStandardKva } from './lib/design-loop/settle-loop'
-import { reconcilePrincipalEquipment } from './lib/orchestrator/generic/universal-contract-sizing'
+import { reconcilePrincipalEquipment, applyUniversalContractSizing } from './lib/orchestrator/generic/universal-contract-sizing'
 import { deriveGenericSkeleton } from './lib/orchestrator/generic/derive-skeleton'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
@@ -441,6 +441,31 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
       return o.rearCount === 1 && o.rearId === 'rearing_tank_synth_word' && o.rearQty === '×10' && o.heatPumpCount === 1 && o.idempotent === true
     },
     () => `rears=${rears.length} id=${rear?.id} qty=${rearQty} heatPumps=${heatPumps.length} rec=${JSON.stringify({ r: rec.repaired, d: rec.removedDuplicates, inv: rec.removedInvented, s: rec.synthesizedMissing })} idempotent=${JSON.stringify({ r: rec2.repaired, d: rec2.removedDuplicates, inv: rec2.removedInvented, s: rec2.synthesizedMissing })}`,
+  ))
+
+  // ── A2. open process tanks size SHALLOW + WIDE with freeboard (not silos) ──
+  // Tristan 2026-06-15: a 334 m³ rearing tank must synthesise as a WIDE SHALLOW
+  // cylinder — water depth in [1.5,4] m via the scale-aware band, +15 % freeboard,
+  // h/d < 0.6 — NOT the old ⌀9.5×4.7 m (h/d 0.49, zero freeboard) that rendered as
+  // a silo + over-read the BoM. Universal: keyed on the tank NOUN + depth band, no
+  // per-class logic; the SAME synthesis the chain emits (applyUniversalContractSizing).
+  const tankMods: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
+  applyUniversalContractSizing(tankMods, contract, { synthesizeMissing: true, onlyUnsized: false, dedupeAndStrip: false })
+  const tankWords = tankMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => sm.words || []))
+  const rtWord = tankWords.find((w: any) => /rearing tank/i.test(String(w.name_human)))
+  const rtDim = rtWord ? String((rtWord.modifier_characters || []).find((mc: any) => mc.kind === 'dimension')?.value ?? '') : ''
+  const rtm = /([\d.]+)\s*m\s*dia\s*x\s*([\d.]+)\s*m/i.exec(rtDim)
+  const rtD = rtm ? parseFloat(rtm[1]) : 0
+  const rtH = rtm ? parseFloat(rtm[2]) : 0
+  out.push(assertEq(
+    'UNIVERSAL.open_tank_shallow_wide_with_freeboard',
+    'a synthesised open process tank (334 m³ rearing tank) sizes SHALLOW + WIDE — diameter > height, water depth (shell/1.15) in [1.5,4] m, +15% freeboard, h/d < 0.6 — not a silo; this is the exact dimension the chain emits + the Blender/BoM read',
+    JSON.stringify({ rtDim, rtD, rtH, waterDepth: rtH ? +(rtH / 1.15).toFixed(2) : 0, hd: rtD ? +(rtH / rtD).toFixed(3) : 0 }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.rtD > 10 && o.rtH > 0 && o.waterDepth >= 1.5 && o.waterDepth <= 4.0 && (o.rtH / o.rtD) < 0.6
+    },
+    () => `dim=${rtDim} D=${rtD} H=${rtH} h/d=${rtD ? (rtH / rtD).toFixed(3) : 0}`,
   ))
 
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──

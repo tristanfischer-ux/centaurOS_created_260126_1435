@@ -4107,7 +4107,20 @@ def build_parts_manifest(parts):
                                   "tank", "stack", "horizontal_vessel",
                                   "inline_spool")
         if round_shape:
-            if p.shape in ("horizontal_vessel", "inline_spool"):
+            # CANONICAL SHELL over drawn BBOX. A placed vessel's bounding box also
+            # contains non-structural FURNITURE — a foundation plinth (≈8% wider than
+            # the shell), a top guardrail/handrail standing ≈1 m above the rim, a
+            # support skirt — which inflates a SHALLOW tank's apparent ⌀ and height
+            # (a ⌀12.4×3.2 m rearing-tank shell draws a ≈⌀13.4×4.6 m bbox → a 1.9×
+            # phantom-volume over-read in the BoM material take-off + a silo look in
+            # the GA). Report the ⌀×height the vessel was SIZED to (parse_dimension's
+            # two-figure cylinder) so BoM, GA footprint and 3D agree on ONE tank.
+            sd = getattr(p, "dim", None)
+            if isinstance(sd, dict) and sd.get("kind") == "cyl" \
+                    and sd.get("dia_mm") and sd.get("len_mm"):
+                dia = round(sd["dia_mm"], 1)       # sized shell diameter
+                length = round(sd["len_mm"], 1)    # sized shell height / axial length
+            elif p.shape in ("horizontal_vessel", "inline_spool"):
                 # lies on its side: diameter = the smaller of footprint depth/height,
                 # length = the long axis (the larger of width/depth footprint).
                 dia = round(min(dep, h) if min(dep, h) > 1 else max(dep, h), 1)
