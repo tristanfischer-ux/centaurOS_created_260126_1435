@@ -77,6 +77,18 @@ def _material(name, mods):
     return ("carbon steel", STEEL_RHO, STEEL_RATE)
 
 
+def _wall_physics(matlabel):
+    """(allowable stress MPa, corrosion allowance mm, fabrication-minimum wall mm) for the
+    hoop-stress wall, by material. UNIVERSAL — keyed off _material()'s label."""
+    if "FRP" in matlabel or "GRP" in matlabel:
+        return (18.0, 0.0, 6.0)
+    if "concrete" in matlabel:
+        return (9.0, 0.0, 120.0)
+    if "316" in matlabel or "stainless" in matlabel:
+        return (138.0, 0.5, 4.0)
+    return (120.0, 2.0, 5.0)   # carbon steel
+
+
 def _materials_takeoff(name, mods):
     """Bespoke cost from a real materials take-off: surface area × wall × density × rate +
     fittings. Handles a cylinder dim, a box dim, or a bare volume. Returns (gbp, basis) or
@@ -86,18 +98,28 @@ def _materials_takeoff(name, mods):
     if not cyl and not box and cap:                           # derive a cylinder from V
         d = (4 * cap / (1.3 * math.pi)) ** (1 / 3.0); cyl = (d, 1.3 * d)
     if cyl:
-        d, h = cyl; area = math.pi * d * h + 2 * (math.pi * d * d / 4.0)   # shell + 2 heads
+        d_v, h_v = cyl; area = math.pi * d_v * h_v + 2 * (math.pi * d_v * d_v / 4.0)   # shell + 2 heads
     elif box:
-        w, dp, h = box; area = 2 * (w * dp + dp * h + w * h)              # 6 faces
+        w, dp, h_v = box; d_v = max(w, dp); area = 2 * (w * dp + dp * h_v + w * h_v)   # 6 faces
     else:
         return None
     matlabel, rho, rate = _material(name, mods)
-    wall = 0.012 if "FRP" in matlabel else (0.10 if "concrete" in matlabel else 0.010)
+    # wall from PHYSICS — hoop stress at the hydrostatic head (was a 10 mm constant). t = P·r/(σ·E)
+    # + corrosion, floored at the fabrication minimum. Tristan 2026-06-15: thickness from the
+    # vessel's own diameter/height so the mass — hence the cost — is component-accurate.
+    sigma_mpa, corr_mm, floor_mm = _wall_physics(matlabel)
+    P = 1000.0 * 9.81 * h_v
+    t_hoop = P * (d_v / 2.0) / (sigma_mpa * 1e6 * 0.85)
+    wall = max(t_hoop + corr_mm / 1000.0, floor_mm / 1000.0)
     mass = area * wall * rho
     shell = mass * rate
     fittings = 0.18 * shell + 1800                            # nozzles, manway, supports, rail
-    return shell + fittings, (f"materials take-off: {area:.0f} m² × {wall*1000:.0f} mm "
-                              f"{matlabel} = {mass:.0f} kg × £{rate}/kg + fittings")
+    basis = (f"hoop wall {wall*1000:.0f} mm = P·r/(σ·E)+c · ⌀{d_v:.1f}×{h_v:.1f} m · "
+             f"P={P/1000:.0f} kPa head · σ={sigma_mpa:.0f} MPa → {area:.0f} m² × {mass:.0f} kg "
+             f"{matlabel} × £{rate}/kg + fittings")
+    spec = {"material": matlabel, "wall_mm": round(wall * 1000, 1), "mass_kg": round(mass),
+            "diameter_m": round(d_v, 2), "height_m": round(h_v, 2)}
+    return shell + fittings, basis, spec
 
 
 def _bespoke_class(name: str) -> str:
@@ -250,6 +272,7 @@ def assemble(out_dir: str):
                 mfr = str(md.get("manufacturer") or "")
                 qy = int((re.search(r"\d+", str(md.get("quantity") or "1")) or re.search(r"(1)", "1")).group(0))
                 bc = _bespoke_class(name)   # 'strong' (process vessel) | 'simple' (shell) | 'none'
+                mt_spec = None
                 if bc == "strong":
                     # complex fabricated process vessel — bespoke regardless of any pinned
                     # PN; cost is the engineering budget estimate, NOT a shell take-off
@@ -261,6 +284,7 @@ def assemble(out_dir: str):
                     else:
                         mt = _materials_takeoff(name, md)
                         gbp, basis = (mt[0], mt[1]) if mt else (0.0, "bottom-up parametric")
+                        mt_spec = mt[2] if mt and len(mt) > 2 else None
                 elif pn and not _TBD_RE.search(pn):
                     status, part = "IDENTIFIED", f"{mfr} {pn}".strip()
                     gbp, basis = price.get(wid, 0.0), "catalogue"
@@ -268,12 +292,16 @@ def assemble(out_dir: str):
                     mt = _materials_takeoff(name, md)
                     status, part = "BESPOKE", "made to spec"
                     gbp, basis = (mt[0], mt[1]) if mt else (price.get(wid, 0.0), "bottom-up parametric")
+                    mt_spec = mt[2] if mt and len(mt) > 2 else None
                 else:
                     status, part = "NOT FOUND", "requirement stated"
                     gbp, basis = price.get(wid, 0.0), "bottom-up parametric"
-                rows.append({"tag": tag, "requirement": requirement, "status": status,
-                             "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),
-                             "basis": basis})
+                row = {"tag": tag, "requirement": requirement, "status": status,
+                       "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),
+                       "basis": basis}
+                if mt_spec:
+                    row.update(mt_spec)   # material · wall_mm · mass_kg · diameter_m · height_m
+                rows.append(row)
     rows += _connection_rows(out_dir)   # pipe/cable/duct runs as their own service-classified BoM lines
     return rows
 

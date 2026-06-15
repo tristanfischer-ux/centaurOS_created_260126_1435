@@ -400,18 +400,30 @@ if isinstance(req_bom, list) and req_bom:
     equip = [r for r in req_bom if isinstance(r, dict) and not r.get('connection')]
     conns = [r for r in req_bom if isinstance(r, dict) and r.get('connection')]
     if equip:
-        COLS = ['tag','requirement','part','qty','unit_gbp','line_gbp','status','basis']
+        COLS = ['tag', 'requirement', 'material', 'diameter_m', 'height_m', 'wall_mm', 'mass_kg',
+                'part', 'qty', 'unit_gbp', 'line_gbp', 'status', 'basis']
         have = [c for c in COLS if any(c in r for r in equip)]
+        UNIT = {'diameter_m': ' m', 'height_m': ' m', 'wall_mm': ' mm', 'mass_kg': ' kg'}
+        NUMC = ('qty', 'unit_gbp', 'line_gbp', 'wall_mm', 'mass_kg', 'diameter_m', 'height_m')
         tot = sum(float(r.get('line_gbp') or 0) for r in equip)
-        S.append(f'<div class="card"><h3>Equipment ({len(equip)} rows · Σ £{tot:,.0f})</h3><table><tr>')
-        for c in have: S.append(f"<th>{esc(c.replace('_',' '))}</th>")
+        S.append(f'<div class="card"><h3>Equipment ({len(equip)} rows · Σ £{tot:,.0f}) — material · dimensions · wall · mass + the calculation per line</h3><table><tr>')
+        for c in have:
+            _hdr = {'diameter_m': '⌀ (m)', 'height_m': 'height (m)', 'wall_mm': 'wall (mm)', 'mass_kg': 'mass (kg)'}
+            S.append(f"<th>{esc(_hdr.get(c, c.replace('_', ' ')))}</th>")
         S.append('</tr>')
         for r in equip:
             S.append('<tr>')
             for c in have:
                 v = r.get(c)
-                cls = " class='n'" if (c in ('qty','unit_gbp','line_gbp') or isinstance(v,(int,float))) else ''
-                disp = f"£{fmtnum(v)}" if c in ('unit_gbp','line_gbp') and v not in (None,'') else (fmtnum(v) if isinstance(v,(int,float)) else esc(v))
+                cls = " class='n'" if (c in NUMC or isinstance(v, (int, float))) else ''
+                if c in ('unit_gbp', 'line_gbp') and v not in (None, ''):
+                    disp = f"£{fmtnum(v)}"
+                elif c in UNIT and isinstance(v, (int, float)):
+                    disp = f"{fmtnum(v)}{UNIT[c]}"
+                elif isinstance(v, (int, float)):
+                    disp = fmtnum(v)
+                else:
+                    disp = esc(v)
                 S.append(f"<td{cls}>{disp}</td>")
             S.append('</tr>')
         S.append('</table></div>')
