@@ -65,6 +65,26 @@ _GOV = [(('pump', 'circulation'), 'pump-sizing'), (('drum', 'microscreen', 'scre
         (('feed', 'biomass', 'metabol', 'stock', 'fish', 'rear'), 'ras-metabolism'),
         (('enclos', 'frame', 'structur', 'panel', 'contain'), 'envelope-check')]
 
+def _required_services(name, module, function):
+    """DETERMINISTIC: which connection SERVICES a part of this type MUST have, so a
+    missing one is named (the loop then creates it). Powered kit needs power; process
+    units sit in the water flow; sensors emit a signal to control; the control system
+    consumes signals + power. Pure structure (frame/enclosure/label) needs none.
+    Tristan 2026-06-15: a part with no inputs/outputs is probably missing one — this
+    says WHICH one."""
+    t = _norm(f"{name} {module} {function}"); req = set()
+    if any(k in t for k in ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan')):
+        req.add('power')
+    if any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir')):
+        req.add('water')
+    if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy')):
+        req.add('signal')
+    if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation')):
+        req.update(('signal', 'power'))
+    if any(k in t for k in ('frame', 'enclos', 'structur', 'contain', 'support', 'platform', 'foundation', 'nameplate', 'label')) and not req:
+        return set()
+    return req
+
 def build_connectivity(run, req_bom, tools):
     """DETERMINISTIC per-part connectivity + GOVERNANCE from the Blender route/parts
     manifests + the connection-schedule. For every part: incoming + outgoing routed
@@ -117,6 +137,8 @@ def build_connectivity(run, req_bom, tools):
         part['function'] = func.get(_norm(part['name']), '')
         part['orphan'] = (not part['incoming']) or (not part['outgoing'])
         part['governing_tool'] = _gov(part['name'], part['function'])
+        present = set(('power' if e['service'] == 'electrical' else e['service']) for e in part['incoming'] + part['outgoing'])
+        part['missing'] = sorted(_required_services(part['name'], part.get('module', ''), part['function']) - present)
         part['checks'] = {'governed': bool(part['governing_tool']), 'connected': not part['orphan'],
                           'priced': priced.get(_norm(part['name']), False)}
     return parts, edges
@@ -296,17 +318,19 @@ if parts_conn:
     def _chk(c):
         def m(ok, lbl): return f"<span class='{'ok' if ok else 'warn'}'>{lbl}{'✓' if ok else '✗'}</span>"
         return f"{m(c['governed'], 'tool')} {m(c['connected'], 'conn')} {m(c['priced'], '£')}"
+    incomplete = [p for p in parts_conn if p.get('missing')]
     S.append(f'<div class="card"><h3>Parts · connectivity · governance ({len(parts_conn)} parts · '
-             f'<span class="warn">{len(orphans)} missing a connection</span> · '
+             f'<span class="warn">{len(incomplete)} missing a required connection</span> · '
              f'<span class="warn">{len(ungov)} with no governing tool</span>)</h3>'
-             f'<p class="sub">Every part needs a tool that governs it AND ≥1 input + ≥1 output; every connection carries a CALCULATED rating (flow / velocity / current / volt-drop) that sets its size, type and cost. ✗ = the loop must call a tool in.</p>')
+             f'<p class="sub">Every part needs a tool that governs it and the connections its type requires; every connection carries a CALCULATED rating (flow / velocity / current / volt-drop) that sets its size, type and cost. ✗ / "missing" = the loop must call a tool in + route the connection.</p>')
     S.append('<table><tr><th>Part</th><th>What it does</th><th>Governed by</th><th>Incoming</th><th>Outgoing</th><th>Checks</th></tr>')
-    for p in sorted(parts_conn, key=lambda x: (x['checks']['governed'] and not x['orphan'], str(x.get('module') or ''))):
+    for p in sorted(parts_conn, key=lambda x: (not x.get('missing'), x['checks']['governed'], str(x.get('module') or ''))):
         gov = f"<code>{esc(p['governing_tool'])}</code>" if p.get('governing_tool') else "<span class='warn'>✗ none</span>"
+        miss = f"<br><span class='warn'>missing: {esc(', '.join(p['missing']))}</span>" if p.get('missing') else ''
         S.append(f"<tr><td><b>{esc(p['name'])}</b> <span class='prov'>{esc(p.get('tag'))} · {esc(p.get('module'))}</span></td>"
                  f"<td>{esc(p.get('function') or '')}</td><td>{gov}</td>"
                  f"<td>{_cells(p['incoming'], True)}</td><td>{_cells(p['outgoing'], False)}</td>"
-                 f"<td>{_chk(p['checks'])}</td></tr>")
+                 f"<td>{_chk(p['checks'])}{miss}</td></tr>")
     S.append('</table></div>')
 if cost:
     S.append('<div class="card"><h3>Cost stack</h3><table><tr><th>Stage</th><th>£</th></tr>')
