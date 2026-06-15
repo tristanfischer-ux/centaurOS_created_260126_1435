@@ -5400,22 +5400,50 @@ _AUG_FLUID_MECHANISMS = {
 }
 
 
-def _module_repr_part_name(module_id, parts):
+# Structural / electrical / control nouns whose part CANNOT carry process fluid — a
+# fluid line must never terminate on one (a "Rearing Tank → Structural Frame" pipe is
+# non-physical). Used ONLY when picking a representative for a FLUID link; the power /
+# signal augmentation still legitimately routes to a frame/cabinet/switchgear.
+_NON_FLUID_REPR_RE = re.compile(
+    r"frame|panel|enclosure|structur|\brack\b|cabinet|\bwall\b|floor|roof|building|"
+    r"skid|foundation|plinth|busbar|switchgear|breaker|controller|transformer|"
+    r"gateway|\bi/?o\b|conduit|walkway|platform|ladder|grating", re.I)
+
+
+def _module_repr_part_name(module_id, parts, fluid_only=False):
     """Pick a representative placed-equipment NAME for `module_id` so a module→module
     link can route to a real part. Prefers the LARGEST primary vessel/machine in the
     module (by footprint when dimensioned), else the first non-detail part. Returns
-    None when the module has no placeable equipment (then the link is skipped)."""
+    None when the module has no placeable equipment (then the link is skipped).
+
+    fluid_only=True (used by the FLUID cross-module augmentation): consider only parts
+    that can actually CARRY process fluid — exclude structural/electrical items
+    (frame, panel, enclosure, switchgear…) so a fluid line never terminates on a
+    structural frame. Returns None when the module has no fluid-capable part (then the
+    fluid link is skipped, which is correct — e.g. structure_containment is not a
+    fluid node)."""
     in_mod = [p for p in parts if p.module_id == module_id]
+    if fluid_only:
+        in_mod = [p for p in in_mod if not _NON_FLUID_REPR_RE.search(p.name or "")]
     if not in_mod:
         return None
 
     def _vol(p):
+        # p.dim is a parse_dimension DICT ({kind:'cyl',dia_mm,len_mm} or
+        # {kind:'box',w_mm,d_mm,h_mm}), NOT a list — the old (list,tuple) test was
+        # ALWAYS False so this returned 0 for every part and the "largest principal
+        # vessel" pick silently degraded to "first part in the module". Reading the
+        # dict makes the representative the real principal item (the rearing TANK for
+        # the fluid module, the transformer for power), which is what a module→module
+        # process line should route to.
         d = getattr(p, "dim", None)
-        if isinstance(d, (list, tuple)) and len(d) >= 3:
-            try:
-                return float(d[0]) * float(d[1]) * float(d[2])
-            except (TypeError, ValueError):
-                return 0.0
+        if isinstance(d, dict):
+            if d.get("kind") == "cyl" and d.get("dia_mm"):
+                r = float(d["dia_mm"]) / 2.0
+                return math.pi * r * r * float(d.get("len_mm") or d["dia_mm"])
+            if d.get("kind") == "box":
+                return (float(d.get("w_mm") or 0.0) * float(d.get("d_mm") or 0.0)
+                        * float(d.get("h_mm") or 0.0))
         return 0.0
 
     # Prefer a dimensioned MAJOR item (largest footprint); fall back to the first.
@@ -5508,15 +5536,32 @@ def augment_topology_cross_module(state, topology, parts):
 
     present_modules = {p.module_id for p in parts}
 
+    # The recirc/service leg carries the LOOP's flow — inherit the largest
+    # flow_capacity already on the fluid topology so the return is sized like the
+    # forward process line (a DN300 forward must NOT get a DN15 return). m³/s.
+    loop_flow = 0.0
+    for e in topology:
+        if str(e.get("constraint_kind")) == "flow_capacity":
+            try:
+                loop_flow = max(loop_flow, float(e.get("required_value") or 0.0))
+            except (TypeError, ValueError):
+                pass
+
     # (1) module-pairs the PRIMARY topology already connects — so we never duplicate a
-    #     drawn line. Resolve each topology endpoint to its part's module via the same
-    #     resolver the router uses; an abstract/utility endpoint contributes no module.
+    #     drawn line. DIRECTED ((from_module, to_module)) — a forward supply leg
+    #     A→B must NOT suppress a RETURN leg B→A: on a RECIRCULATING plant (RAS:
+    #     tanks→treatment forward + treatment→tanks return) the grammar authors both
+    #     directions and they are PHYSICALLY DISTINCT lines (supply vs return). The old
+    #     UNDIRECTED frozenset deduped the return against the forward leg, so the
+    #     recirc loop never closed (0 fluid edges returned to the tanks). Directed
+    #     dedup adds the return; a once-through plant authors no return grammar link,
+    #     so it stays a no-op there. Resolve each endpoint via the router's resolver.
     covered_pairs = set()
     for e in topology:
         pa = resolve_endpoint(e.get("from_part", ""), parts)
         pb = resolve_endpoint(e.get("to_part", ""), parts)
         if pa is not None and pb is not None and pa.module_id != pb.module_id:
-            covered_pairs.add(frozenset((pa.module_id, pb.module_id)))
+            covered_pairs.add((pa.module_id, pb.module_id))
 
     extra = []
     seen = set()
@@ -5532,22 +5577,27 @@ def augment_topology_cross_module(state, topology, parts):
             continue
         if fm not in present_modules or tm not in present_modules:
             continue
-        pair = frozenset((fm, tm))
+        pair = (fm, tm)   # DIRECTED — see covered_pairs note: a return leg B→A is
+                          # distinct from the forward A→B and must close the loop.
         if pair in covered_pairs or pair in seen:
             continue
-        a_name = _module_repr_part_name(fm, parts)
-        b_name = _module_repr_part_name(tm, parts)
+        a_name = _module_repr_part_name(fm, parts, fluid_only=True)
+        b_name = _module_repr_part_name(tm, parts, fluid_only=True)
         if not a_name or not b_name or a_name == b_name:
             continue
         seen.add(pair)
-        extra.append({
+        edge = {
             "from_part": a_name,
             "to_part": b_name,
             "mechanism": "fluid_loop",
             "constraint_kind": "flow_capacity",
             "material_context": "process water (inter-module recirculation/service)",
             "_augmented": True,
-        })
+        }
+        if loop_flow > 0:                          # size the leg like the loop it closes
+            edge["required_value"] = loop_flow
+            edge["required_unit"] = "m³/s"
+        extra.append(edge)
     if extra:
         print(f"[univ] cross-module augmentation: +{len(extra)} FLUID process line(s) "
               f"from grammar links not covered by topology "
