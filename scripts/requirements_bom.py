@@ -444,7 +444,8 @@ def assemble(out_dir: str):
                     nlow = name.lower()
                     ptag = ("DOS" if "dosing" in nlow else "FD" if "feed" in nlow
                             else "LOX" if ("oxygen" in nlow or "lox" in nlow) else "SLU" if "sludge" in nlow
-                            else "SCADA" if "scada" in nlow else "GR" if ("grading" in nlow or "harvest" in nlow) else "SYS")
+                            else "SCADA" if "scada" in nlow else "GR" if ("grading" in nlow or "harvest" in nlow)
+                            else "MED" if ("media" in nlow or "carrier" in nlow) else "SYS")
                     rows.append({"tag": ptag, "requirement": requirement, "status": "SYSTEM",
                                  "part": "process-support system (catalogue class)", "qty": qy,
                                  "unit_gbp": round(pgbp), "line_gbp": round(pgbp * qy),

@@ -480,7 +480,7 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     oxygen_demand_kg_day: { value: 1235, unit: 'kg/day' }, salinity_ppt: { value: 33, unit: 'ppt' },
     recirculation_flow_m3_h: { value: 13360, unit: 'm³/h' }, degasser_air_flow_m3_h: { value: 40000, unit: 'm³/h' },
     connected_electrical_load_kw: { value: 674, unit: 'kW' }, makeup_water_m3_h: { value: 53.44, unit: 'm³/h' }, building_process_loss_kw: { value: 182.58, unit: 'kW' },
-    bicarbonate_dose_kg_day: { value: 1291, unit: 'kg/day' }, daily_feed_kg: { value: 2745, unit: 'kg' }, oxygen_supply_kg_h: { value: 54, unit: 'kg/h' }, solids_load_kg_day: { value: 686, unit: 'kg/day' }, standing_biomass_kg: { value: 200400, unit: 'kg' } } }
+    bicarbonate_dose_kg_day: { value: 1291, unit: 'kg/day' }, daily_feed_kg: { value: 2745, unit: 'kg' }, oxygen_supply_kg_h: { value: 54, unit: 'kg/h' }, solids_load_kg_day: { value: 686, unit: 'kg/day' }, standing_biomass_kg: { value: 200400, unit: 'kg' }, biofilter_media_volume_m3: { value: 404, unit: 'm³' } } }
   const instrMods: any = [
     { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
     { module: 'sensing_instrumentation', sub_modules: [{ id: 'sensing_instrumentation__x', words: [] }] },
@@ -563,11 +563,11 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
   const hasP = (re: RegExp) => proc1.some((w: any) => re.test(String(w.name_human)))
   out.push(assertEq(
     'UNIVERSAL.process_support_systems_synthesised_from_duties',
-    'the contract consumable + waste duties synthesise the process-support plant: DOSING (pH/alkalinity), FEED, OXYGEN/LOX, SLUDGE handling, SCADA, and GRADING — six systems, universal, driven by declared duties',
-    JSON.stringify({ dosing: hasP(/dosing/i), feed: hasP(/feed/i), lox: hasP(/oxygen|lox/i), sludge: hasP(/sludge/i), scada: hasP(/scada/i), grading: hasP(/grading|harvest/i), n: proc1.length }),
+    'the contract consumable + waste duties synthesise the process-support plant: DOSING (pH/alkalinity), FEED, OXYGEN/LOX, SLUDGE handling, SCADA, GRADING, and the MBBR biofilm-carrier MEDIA (the ~£283k working heart of the biofilter a shell-only take-off misses) — seven systems, universal, driven by declared duties',
+    JSON.stringify({ dosing: hasP(/dosing/i), feed: hasP(/feed/i), lox: hasP(/oxygen|lox/i), sludge: hasP(/sludge/i), scada: hasP(/scada/i), grading: hasP(/grading|harvest/i), media: hasP(/media|carrier/i), n: proc1.length }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
-      return o.dosing && o.feed && o.lox && o.sludge && o.scada && o.grading && o.n === 6
+      return o.dosing && o.feed && o.lox && o.sludge && o.scada && o.grading && o.media && o.n === 7
     },
     () => `process-systems=${JSON.stringify(proc1.map((w: any) => w.name_human))} n=${proc1.length}`,
   ))
