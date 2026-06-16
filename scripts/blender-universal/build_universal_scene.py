@@ -1711,7 +1711,7 @@ def compute_undim_tall_cap(parts):
 # helper is what stops the 10-tank rearing farm overlapping its neighbours: build_part lays
 # N vessels in a cols×rows grid at pitch≈dia×1.4, so the reserved footprint MUST be that
 # whole grid, not one unit. Universal — any replicated _VESSEL_KIND shape (tanks, reactors).
-_VESSEL_GRID_PITCH_FACTOR = 1.4     # centre-to-centre pitch = unit dia × this (matches build_part)
+_VESSEL_GRID_PITCH_FACTOR = 1.12    # centre-to-centre pitch = unit dia × this (council 2026-06-16: 1.4 spread the farm 4× too wide; 1.12 ≈ dia + 1.5 m walkway)
 _VESSEL_GRID_MAX_N = 12             # build_part caps replication at 12 instances
 
 
@@ -1886,7 +1886,7 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
         N = max(1, min(int(getattr(part, "qty", 1) or 1), 12))
         cols = int(math.ceil(math.sqrt(N)))
         rows = int(math.ceil(N / cols))
-        pitch = dia * 1.4
+        pitch = dia * _VESSEL_GRID_PITCH_FACTOR
         first = None
         for idx in range(N):
             r, c = divmod(idx, cols)
@@ -5904,8 +5904,12 @@ def _render_dia_floor(od_mm, mech):
     (Tristan 2026-06-11). Cable-tray (electrical_bus) is excluded — its rendered
     width is a TRAY, already legible, and lifting it would bloat the busway."""
     od = max(od_mm, CONN_MIN_RENDER_DIA_MM)
-    if _INSPECT_MODE and mech != "electrical_bus":
-        od = max(od, INSPECT_MIN_PIPE_DIA_MM)
+    if _INSPECT_MODE:
+        # legibility floor — EVERY run must read as a LINE, not a hair-thread (council
+        # 2026-06-16: 34 electrical/signal runs rendered at 3-7 mm). Cables floored a
+        # touch thinner than process pipe so a cable still reads as a cable.
+        _floor = 60.0 if mech in ("electrical_bus", "signal", "data_link", "control_signal") else INSPECT_MIN_PIPE_DIA_MM
+        od = max(od, _floor)
     return od
 
 

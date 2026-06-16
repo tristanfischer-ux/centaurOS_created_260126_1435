@@ -338,7 +338,7 @@ const SUB_ASSEMBLY: { re: RegExp; parts: SubSpec[] }[] = [
       { name: 'Earthing Boss', derive: () => ({ gbp: 120 }) },
       { name: 'Nameplate', derive: () => ({ gbp: 60 }) },
     ] },
-  { re: /\bpump\b|blower|compressor|\bfan\b/i,
+  { re: /(?<!heat[\s-])\bpump\b|blower|(?<!scroll\s)compressor|\bfan\b/i,  // NOT 'heat pump' (its own rule below)
     parts: [
       { name: 'Casing', derive: (p) => ({ gbp: 1500 + (p.kw || 30) * 14 }) },
       { name: 'Impeller / Rotor', derive: (p) => ({ gbp: 600 + (p.kw || 30) * 5 }) },
@@ -427,7 +427,25 @@ function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPh
 /** Append each principal equipment's PHYSICS-SIZED sub-components (qty inherited), each
  *  priced bottom-up from the parent's computed physics. Mutates modules in place; returns
  *  the number of sub-component lines added. Universal by equipment type. */
-export function explodeEquipmentSubAssemblies(modules: ModuleLike[]): number {
+export function explodeEquipmentSubAssemblies(modules: ModuleLike[], maxDepth = 3): number {
+  // IDEMPOTENT + RECURSIVE: explode ONE level of the un-exploded frontier per call. A
+  // part already carrying children is skipped (so re-running never duplicates — the
+  // bug that gave a pump 39 children); a sub-component that itself matches a rule (a
+  // heat-pump's Scroll Compressor → pump parts, an Evaporator Coil → exchanger parts,
+  // a filter's Backwash Pump) explodes on the NEXT call, so the iteration LOOP deepens
+  // the BoM a level at a time and settles when nothing un-exploded matches (capped at
+  // maxDepth '__' levels). Returns the number of sub-component lines added THIS call.
+  const hasChildren = new Set<string>()
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      if (!Array.isArray(sm.words)) continue
+      for (const w of sm.words) {
+        const id = String(w.id ?? '')
+        const cut = id.lastIndexOf('__')
+        if (cut > 0) hasChildren.add(id.slice(0, cut))
+      }
+    }
+  }
   let added = 0
   for (const m of modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
@@ -435,13 +453,16 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[]): number {
       const out: WordLike[] = []
       for (const w of sm.words) {
         out.push(w)
-        if ((w as { _subcomponent?: boolean })._subcomponent) continue
+        const id = String(w.id ?? '')
+        const depth = (id.match(/__/g) ?? []).length
+        if (depth >= maxDepth) continue          // too deep — stop the recursion
+        if (hasChildren.has(id)) continue         // already exploded — idempotent
         const nm = w.name_human ?? ''
         const rule = SUB_ASSEMBLY.find((r) => r.re.test(nm))
         if (!rule) continue
         const physics = readParentPhysics(w)
         for (const spec of rule.parts) {
-          out.push(subWord(spec, w.id ?? sanitizeId(nm), physics.qty, physics))
+          out.push(subWord(spec, id || sanitizeId(nm), physics.qty, physics))
           added += 1
         }
       }
