@@ -42,6 +42,18 @@ def _required_services(name, module, function):
         req.add('signal')
     if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller')):
         req.update(('signal', 'power'))
+    # ── (1b) A FIELD INSTRUMENT measures the process; it ties in by signal (+ power if
+    # active), NEVER by its own process-water main. The water-keyword list above
+    # (oxygen / uv / filter …) otherwise hands a "dissolved-oxygen analyser" or a
+    # "UV transmittance sensor" a full DN350 pipe — the council's £166k "Temperature
+    # Sensor → Protein Skimming" defect (2026-06-16). Exclude ONLY pure sensors: a
+    # process vessel or an inline VALVE legitimately sits in the flow and keeps 'water'.
+    _is_sensor = any(k in t for k in ('sensor', 'probe', 'transmit', 'gauge', 'analy', 'detector'))
+    _is_inline = ('valve' in t) or any(k in t for k in (
+        'tank', 'vessel', 'filter', 'mbbr', 'degas', 'skim', 'clarifier', 'reactor',
+        'column', 'tower', 'cone', 'exchanger', 'separator', 'contactor', 'sump', 'reservoir', 'drum'))
+    if _is_sensor and not _is_inline:
+        req.discard('water')
     # ── (2) PURE STRUCTURE needs nothing (a frame / enclosure / walkway / label) ──
     if any(k in t for k in ('frame', 'enclos', 'structur', 'platform', 'foundation', 'nameplate', 'label', 'walkway', 'ladder', 'grating', 'cladding')):
         return req   # usually {}; a mis-named structural item keeps any explicit role above

@@ -5607,6 +5607,14 @@ def _load_required_services():
                 req.add('signal')
             if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller')):
                 req.update(('signal', 'power'))
+            # (1b) field instrument → signal only, never its own water main (see
+            # component_engineering._required_services — keep in sync).
+            _is_sensor = any(k in t for k in ('sensor', 'probe', 'transmit', 'gauge', 'analy', 'detector'))
+            _is_inline = ('valve' in t) or any(k in t for k in (
+                'tank', 'vessel', 'filter', 'mbbr', 'degas', 'skim', 'clarifier', 'reactor',
+                'column', 'tower', 'cone', 'exchanger', 'separator', 'contactor', 'sump', 'reservoir', 'drum'))
+            if _is_sensor and not _is_inline:
+                req.discard('water')
             if any(k in t for k in ('frame', 'enclos', 'structur', 'platform', 'foundation', 'nameplate', 'label', 'walkway', 'ladder', 'grating', 'cladding')):
                 return req
             if not req:   # module-primary ONLY for name-unclassified passive kit (see component_engineering)
