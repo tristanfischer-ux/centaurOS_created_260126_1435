@@ -66,6 +66,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # DATA MODEL — the reconstructed process
@@ -196,6 +199,27 @@ class ControlLoop:
 
 
 @dataclass
+class Ancillary:
+    """A PRINCIPAL plant item that is NOT on the topology spine but IS in the BoM — every
+    synthesised packaged / ancillary life-support system (feed, LOX, dosing, sludge,
+    chilling, mortality, biosecurity, standby genset, UPS, SCADA, ventilation, …), the
+    per-tank emergency-O₂ solenoid (the life-safety final element), and any field
+    instrument not already mounted on a node. The P&ID MUST show what the BoM contains, so
+    these are projected onto the sheet as a tagged register with each item's tie-in line
+    reference (read from the connection schedule / route manifest), exactly as a real P&ID
+    carries packaged-skid + utility tie-in tables. Universal — derived from the BoM, never
+    a per-class list."""
+    tag: str                     # equipment tag (e.g. 'X-111', 'Y', 'SCADA')
+    name: str                    # the BoM requirement head noun
+    kind: str                    # 'system' | 'utility' | 'safety' | 'instrument' | 'rotating'
+    sym: str = ""                # ISA symbol when drawn as a block (else "")
+    duty: str = ""               # the duty/rating clause from the requirement
+    tie_line: str = ""           # the line number tying it into the process loop
+    tie_to: str = ""             # the equipment tag/name it ties into
+    qty: int = 1                 # placed quantity (e.g. 10 emergency-O₂ solenoids)
+
+
+@dataclass
 class Process:
     archetype: str
     nodes: list[Node]
@@ -204,6 +228,10 @@ class Process:
     notes: list[str] = field(default_factory=list)
     schedule_present: bool = False
     control_loops: list[ControlLoop] = field(default_factory=list)
+    ancillaries: list[Ancillary] = field(default_factory=list)
+    # the fail-open per-tank emergency-O₂ solenoid life-safety final element, as
+    # (tag, qty), or None when the design carries none. Drawn on the DO culture-tank.
+    emergency_o2: Optional[tuple] = None
     rev: str = "P1"              # preliminary revision (deterministic, not a live clock)
     date: str = ""               # issue date derived from the run's own artifact mtime
 
@@ -422,31 +450,10 @@ def _archetype_name(state: dict):
 
 
 def _run_issue_date(out_dir: Optional[str]) -> str:
-    """A DETERMINISTIC issue date (YYYY-MM-DD) for the title block, derived from the run's
-    OWN artifacts (state.json / convergence report / connection schedule mtime) — NOT a live
-    clock — so re-rendering the same run gives the same date. Returns '' when out_dir is
-    absent or nothing is readable (the block then shows '—', not the literal placeholder)."""
-    import datetime
-    if not out_dir:
-        return ""
-    best = None
-    for name in ("state.json", "convergence-report.json", "connection-schedule.json"):
-        p = Path(out_dir) / name
-        try:
-            if p.is_file():
-                m = p.stat().st_mtime
-                best = m if best is None else max(best, m)
-        except OSError:
-            pass
-    if best is None:
-        try:
-            best = Path(out_dir).stat().st_mtime
-        except OSError:
-            return ""
-    try:
-        return datetime.date.fromtimestamp(best).isoformat()
-    except (OverflowError, OSError, ValueError):
-        return ""
+    """Deterministic title-block issue date (YYYY-MM-DD) from the run's OWN artifacts —
+    now delegated to the shared `drawing_titleblock.issue_date` so all eight drawings use
+    ONE implementation (see drawing_titleblock.py for the full contract)."""
+    return _tb.issue_date(out_dir)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -784,6 +791,227 @@ def _synthesise_control_loops(nodes: dict, lines: list, placed_instr: set):
                                              for i in main_line.instruments):
             main_line.instruments.append(Instr(tag="FT", func="flow", where="line"))
     return loops
+
+
+# ── BoM → P&ID ancillary / packaged-system + field-device projection ─────────
+# Statuses the engine stamps on a SYNTHESISED principal item (a packaged life-support
+# system / actuator / utility) vs a sub-component or a routed connection.
+_ANCILLARY_STATUS = {"SYSTEM", "UTILITY", "ACTUATOR", "INSTRUMENT", "BESPOKE",
+                     "IDENTIFIED", "NOT FOUND"}
+# Equipment-FAMILY nouns that do NOT, on their own, distinguish two machines: a
+# 'Circulation Pump' (P-102) and a 'Heat Pump' (P-101 node) share only "pump"; a
+# 'Heat Exchanger' (E-101) and a 'Heat Pump' node share only "heat". These must NOT
+# let the duplicate-suppressor drop a distinct BoM item just because ONE generic family
+# word collides with a node label. The duplicate skip therefore requires that the node
+# overlap include at least one NON-generic (distinguishing) token. Universal — the same
+# family nouns recur across every class's parallel trains; no per-class list.
+_GENERIC_EQUIP_TOKENS = {
+    "pump", "valve", "blower", "fan", "compressor", "exchanger", "heat", "tank",
+    "vessel", "reservoir", "system", "unit", "filter", "skimmer", "skid", "module",
+    "control", "reactor", "media", "cone", "column", "separator", "sump", "hopper",
+    "silo", "plant", "package", "set",
+}
+# Map a BoM status / name to the register KIND + ISA symbol when drawn as a block.
+_SAFETY_RE = re.compile(r"emergency|solenoid|fail.?open|esd|life.?saf|shutdown|fire", re.I)
+_INSTR_NAME_RE = re.compile(
+    r"transmitter|analy[sz]er|\bprobe\b|sensor|\bgauge\b|switch\b|detector|monitor|"
+    r"meter\b", re.I)
+
+
+def _ancillary_kind(name: str, status: str, typ: str) -> str:
+    if _SAFETY_RE.search(name):
+        return "safety"
+    if typ == "instrument" or _INSTR_NAME_RE.search(name):
+        return "instrument"
+    if status == "UTILITY":
+        return "utility"
+    if typ in ("rotating", "exchanger", "separator", "vessel"):
+        return typ
+    return "system"
+
+
+def _ancillary_sym(kind: str, typ: str) -> str:
+    """The ISA symbol to draw an ancillary block with (only the principal equipment kinds
+    get a real symbol; packaged systems/utilities draw as a generic block)."""
+    if typ == "rotating":
+        return SYM_PUMP
+    if typ == "exchanger":
+        return SYM_HX
+    if typ == "separator":
+        return SYM_DRUM
+    if typ == "vessel":
+        return SYM_VESSEL
+    return SYM_GENERIC
+
+
+def _tie_line_for(tag: str, name: str, route_lines: list, node_tags: set):
+    """Find the route-manifest line that ties this BoM item into the process loop: a line
+    whose from/to tag equals the item's tag, OR whose humanised from/to name matches the
+    item name. Returns (line_number, other_endpoint_tag) or ('', '')."""
+    nlow = _norm_tokens(name)
+    for l in route_lines:
+        ft = str(l.get("from_tag") or "")
+        tt = str(l.get("to_tag") or "")
+        ln = str(l.get("line_number") or "")
+        if not ln:
+            continue
+        if tag and tag not in ("Y", "—", "SYS") and (ft == tag or tt == tag):
+            other = tt if ft == tag else ft
+            return ln, other
+        # name match (the manifest often carries the humanised system name as the tag)
+        if nlow and (_norm_tokens(ft) & nlow or _norm_tokens(tt) & nlow):
+            other = tt if (_norm_tokens(ft) & nlow) else ft
+            return ln, other
+    return "", ""
+
+
+def _norm_tokens(s: str) -> set:
+    return {t for t in re.split(r"[^a-z0-9]+", (s or "").lower())
+            if len(t) >= 3 and t not in ("the", "and", "for", "system", "unit", "plus",
+                                         "with", "tank", "water")}
+
+
+def _project_bom_ancillaries(state: dict, nodes: dict, out_dir) -> list:
+    """Project every PRINCIPAL BoM item the topology spine omitted onto the P&ID as a
+    register entry: the synthesised packaged life-support systems, the per-tank
+    emergency-O₂ solenoid (life-safety final element), and field instruments not already
+    mounted on a node. Each entry carries its tie-in line number (from the route manifest)
+    so the connection is shown + checked off. Universal: reads the engine's OWN BoM rows,
+    never a per-class list. Returns list[Ancillary], empty when state carries none."""
+    rb = state.get("requirementsBom")
+    if not isinstance(rb, list) or not rb:
+        return []
+    # tags + name-tokens already on the P&ID (topology nodes + their array tags + instruments)
+    on_pid_tags: set = set()
+    on_pid_name_toks: set = set()
+    for nd in nodes.values():
+        on_pid_tags.add(nd.tag)
+        for t in (nd.array_tags or []):
+            on_pid_tags.add(t)
+        on_pid_name_toks |= _norm_tokens(nd.label)
+    route_lines = _load_route_manifest(out_dir) if out_dir else []
+
+    # The P&ID register shows the items a P&ID conventionally carries: process equipment
+    # (vessel / rotating / exchanger / separator), the packaged ANCILLARY/UTILITY life-
+    # support systems (feed / LOX / dosing / sludge / chilling / …, with their tie-in line),
+    # in-line valves + the life-safety solenoid, and field instruments. Pure electrical
+    # board kit (breaker / busbar / fuse / relay / SPD / contactor) belongs on the single-
+    # line, and bulk structural / pipework items on the GA — so those are excluded here
+    # (keeps the register authentic). Universal — keyed on the derived type, not the class.
+    _EXCLUDE_NAME = re.compile(
+        r"\bpipework\b|distribution manifold|support frame|structural frame|enclosure panel|"
+        r"htu|ntu tool|signal conditioner|isolation device|interlock switch|main breaker|"
+        r"distribution busbar|fuse holder|surge protect|power contactor|protective relay|"
+        r"emergency stop|\bcontroller\b|communication gateway|i/o module|network switch|"
+        r"controller power supply|local control panel", re.I)
+
+    out: list = []
+    seen_keys: set = set()
+    for r in rb:
+        if not isinstance(r, dict):
+            continue
+        status = str(r.get("status") or "")
+        if status not in _ANCILLARY_STATUS:
+            continue                       # SUB-COMPONENT / ROUTED — not a principal item
+        tag = str(r.get("tag") or "").strip()
+        req = str(r.get("requirement") or "")
+        name = req.split("·")[0].strip()
+        if not name or _EXCLUDE_NAME.search(name):
+            continue
+        typ = _classify_ancillary(name, tag)
+        kind = _ancillary_kind(name, status, typ)
+        # drop pure electrical board kit (it belongs on the single-line, not the P&ID).
+        if typ == "electrical":
+            continue
+        # skip items already drawn on the P&ID spine (by tag or strong name overlap)
+        if tag and tag in on_pid_tags:
+            continue
+        ntoks = _norm_tokens(name)
+        overlap = ntoks & on_pid_name_toks
+        # the principal equipment is already shown (same name on a node) ⇒ skip the
+        # duplicate — but ONLY when (a) nearly all the item's tokens match a node AND
+        # (b) the overlap carries a DISTINGUISHING (non-family-generic) token, so a lone
+        # generic word ("pump", "heat") shared with an UNRELATED node never suppresses a
+        # genuinely-distinct item (e.g. Circulation Pump vs the Heat Pump node). ALWAYS
+        # keep the safety solenoid + field instruments regardless.
+        if ntoks and len(overlap) >= max(1, len(ntoks) - 1) and \
+                (overlap - _GENERIC_EQUIP_TOKENS) and \
+                kind not in ("safety", "instrument"):
+            continue
+        key = (tag, name)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        duty = ""
+        parts = [p.strip() for p in req.split("·")[1:] if p.strip()]
+        if parts:
+            duty = parts[0]
+        tie_line, tie_to = _tie_line_for(tag, name, route_lines, on_pid_tags)
+        try:
+            qty = int(r.get("qty") or 1)
+        except (TypeError, ValueError):
+            qty = 1
+        out.append(Ancillary(tag=tag or "—", name=name, kind=kind,
+                             sym=_ancillary_sym(kind, typ), duty=duty,
+                             tie_line=tie_line, tie_to=tie_to, qty=max(1, qty)))
+    return out
+
+
+# A per-culture-tank EMERGENCY-O₂ solenoid + diffuser: the LIFE-SAFETY final element that
+# floods oxygen on a low-dissolved-oxygen trip and FAILS OPEN on power/air loss. Recognised
+# from the BoM by a fail-open emergency-O₂ / emergency-aeration solenoid line.
+_EMERG_O2_RE = re.compile(
+    r"(emergency|backup|back.?up).{0,24}(o₂|o2|oxygen|aerat).{0,24}(solenoid|valve|diffuser)|"
+    r"(solenoid|valve|diffuser).{0,24}(emergency|backup).{0,24}(o₂|o2|oxygen|aerat)", re.I)
+
+
+def _emergency_o2_final_element(state: dict):
+    """Return (tag, qty) for the fail-open per-tank emergency-O₂ solenoid in the BoM, or None.
+    Data-driven: reads the engine's OWN requirementsBom — never a per-class assumption. Used
+    to project the life-safety final element onto every culture tank's low-DO loop."""
+    rb = state.get("requirementsBom")
+    if not isinstance(rb, list):
+        return None
+    for r in rb:
+        if not isinstance(r, dict):
+            continue
+        if str(r.get("status") or "") not in _ANCILLARY_STATUS:
+            continue
+        name = str(r.get("requirement") or "").split("·")[0].strip()
+        if not name or not _EMERG_O2_RE.search(name):
+            continue
+        try:
+            qty = max(1, int(r.get("qty") or 1))
+        except (TypeError, ValueError):
+            qty = 1
+        return (str(r.get("tag") or "Y").strip() or "Y", qty)
+    return None
+
+
+def _classify_ancillary(name: str, tag: str) -> str:
+    """A light classifier for an ancillary BoM item (mirrors the parts-ledger TYPE_RULES so
+    the register's type column matches the ledger)."""
+    blob = f"{name} {tag}".lower()
+    if re.search(r"transmitter|analy[sz]er|\bprobe\b|sensor|\bgauge\b|switch\b|detector|"
+                 r"monitor|meter\b", blob):
+        return "instrument"
+    if re.search(r"\bvalve\b|solenoid|actuator|damper", blob):
+        return "valve"
+    if re.search(r"transformer|switchgear|\bmcc\b|busbar|generator|genset|breaker|relay|"
+                 r"\bups\b|surge|fuse", blob):
+        return "electrical"
+    if re.search(r"\bpump\b|blower|\bfan\b|compressor|skimmer|aerat", blob):
+        return "rotating"
+    if re.search(r"heat exchanger|heat pump|\bhex\b|chiller|\buv\b|ozone|steril|oxygenat|"
+                 r"degas|makeup hex", blob):
+        return "exchanger"
+    if re.search(r"drum filter|screen|filter|clarifi|settl|cyclone|membrane|biofilter|"
+                 r"\bmbbr\b|media", blob):
+        return "separator"
+    if re.search(r"\btank\b|vessel|reservoir|\bsump\b|column|reactor|silo|hopper|\blox\b|"
+                 r"storage", blob):
+        return "vessel"
+    return "other"
 
 
 def _discover_valves(state: dict):
@@ -1309,6 +1537,11 @@ def reconstruct_process(schedule: dict, state: dict,
     #      FT from the projected instruments to their final control elements. ----
     control_loops = _synthesise_control_loops(nodes, lines, placed_instr)
 
+    # ---- ANCILLARY / PACKAGED-SYSTEM + FIELD-DEVICE register: project every principal BoM
+    #      item the topology spine omitted (synthesised life-support systems, the per-tank
+    #      emergency-O₂ solenoid, field instruments) so the P&ID shows what the BoM holds. ---
+    ancillaries = _project_bom_ancillaries(state, nodes, out_dir)
+
     notes = []
     if not schedule.get("rows"):
         notes.append("Line sizes inferred from process duties (connection schedule not "
@@ -1322,7 +1555,8 @@ def reconstruct_process(schedule: dict, state: dict,
     return Process(archetype=arch, nodes=list(nodes.values()), lines=lines,
                    power_note=power_note, notes=notes,
                    schedule_present=bool(schedule.get("rows")),
-                   control_loops=control_loops)
+                   control_loops=control_loops, ancillaries=ancillaries,
+                   emergency_o2=_emergency_o2_final_element(state))
 
 
 def _attach_instruments(nodes: dict, instr_funcs: set):
@@ -1631,6 +1865,13 @@ def _sym_valve(svg, cx, cy, kind="manual"):
         # solenoid box
         svg.rect(cx - 5, cy - s - 11, 10, 8, stroke=INK, width=1.2, fill=FILL_BG)
         svg.text(cx, cy - s - 5, "S", size=7, anchor="middle", fill=INK)
+    elif kind == "failopen":
+        # solenoid-actuated, fail-OPEN (life-safety emergency-O₂): solenoid box marked 'S'
+        # with the fail-action arrow (FO) so the reader sees it drives open on power/air loss.
+        svg.line(cx, cy - s, cx, cy - s - 3, stroke=INK, width=1.3)
+        svg.rect(cx - 5, cy - s - 11, 10, 8, stroke=INK, width=1.2, fill=FILL_BG)
+        svg.text(cx, cy - s - 5, "S", size=7, anchor="middle", fill=INK)
+        svg.text(cx + 8, cy - s - 4, "FO", size=6, anchor="start", weight="bold", fill=INK)
     return s
 
 
@@ -1655,6 +1896,75 @@ def _wrap(label: str, maxlen=18):
     if len(lines) == 2 and (len(" ".join(words)) > len(" ".join(lines))):
         lines[1] = lines[1][:maxlen - 1] + "…"
     return lines[:2]
+
+
+def _ancillary_register_height(proc: Process, ncols: int) -> float:
+    """Height (px) the ancillary/field-device register block needs, or 0 when empty."""
+    anc = proc.ancillaries
+    if not anc:
+        return 0.0
+    systems = [a for a in anc if a.kind in ("system", "utility", "vessel", "rotating",
+                                            "exchanger", "separator")]
+    devices = [a for a in anc if a.kind in ("instrument", "safety", "valve")]
+    rows = 0
+    for grp in (systems, devices):
+        if grp:
+            rows += math.ceil(len(grp) / ncols)
+    header = 26 + (18 if systems else 0) + (18 if devices else 0)  # block + sub heads
+    return header + rows * 15 + 22
+
+
+def _draw_ancillary_register(svg, proc: Process, x: float, y: float, w: float,
+                             ncols: int) -> float:
+    """Draw the PACKAGED / ANCILLARY SYSTEMS + FIELD DEVICES register: every principal BoM
+    item the topology spine omitted, as a tagged table with each item's tie-in line — so the
+    P&ID shows what the BoM contains + every connection is cross-referenced. Returns the
+    bottom y. Universal, deterministic; nothing drawn when the design carries no ancillaries."""
+    anc = proc.ancillaries
+    if not anc:
+        return y
+    systems = [a for a in anc if a.kind in ("system", "utility", "vessel", "rotating",
+                                            "exchanger", "separator")]
+    devices = [a for a in anc if a.kind in ("instrument", "safety", "valve")]
+
+    # panel frame
+    h = _ancillary_register_height(proc, ncols)
+    svg.rect(x, y, w, h, stroke=GRID_FAINT, width=1.2, fill=PANEL_BG, rx=4)
+    svg.text(x + 12, y + 18, "ANCILLARY / PACKAGED SYSTEMS · FIELD DEVICES "
+             "(projected from the bill of materials — tie-in line shown)",
+             size=10.5, weight="bold", fill=EQ_INK)
+    col_w = (w - 24) / max(1, ncols)
+    cy = y + 30
+
+    def _draw_group(title: str, items: list, cy: float) -> float:
+        if not items:
+            return cy
+        cy += 16
+        svg.text(x + 12, cy, title, size=9.5, weight="bold", fill=ACCENT)
+        cy += 4
+        per_col = math.ceil(len(items) / ncols)
+        for i, a in enumerate(items):
+            col = i // per_col
+            row = i % per_col
+            ix = x + 12 + col * col_w
+            iy = cy + 12 + row * 15
+            qn = f" ×{a.qty}" if a.qty > 1 else ""
+            tie = f"  → {a.tie_line}" if a.tie_line else ""
+            label = f"{a.tag}  {_short_anc_name(a.name)}{qn}"
+            duty = (f" · {a.duty}" if a.duty else "")
+            txt = (label + duty)[:46] + tie
+            svg.text(ix, iy, txt, size=8.0, anchor="start", fill=INK, mono=True)
+        return cy + 12 + per_col * 15
+
+    cy = _draw_group("Packaged & ancillary systems", systems, cy)
+    cy = _draw_group("Field instruments & safety devices", devices, cy)
+    return y + h
+
+
+def _short_anc_name(name: str, maxlen: int = 26) -> str:
+    """Trim a register item's name to fit the table cell (keeps the head)."""
+    n = re.sub(r"\s*\([^)]*\)\s*$", "", name or "").strip()   # drop a trailing (...) note
+    return n if len(n) <= maxlen else n[:maxlen - 1] + "…"
 
 
 def build_pid_svg(proc: Process) -> str:
@@ -1699,7 +2009,12 @@ def build_pid_svg(proc: Process) -> str:
     diagram_w = margin_l * 2 + (ncol - 1) * col_pitch + EQ_W
     width = max(diagram_w + legend_w, 1180)
     body_h = margin_top + (max_stack - 1) * row_pitch + (340 if has_array else 220)
-    height = body_h + title_h
+    # the ancillary / field-device register sits in a full-width band below the equipment,
+    # above the title block; size it to the page width (3 columns on a standard sheet).
+    reg_cols = 3
+    reg_h = _ancillary_register_height(proc, reg_cols)
+    reg_gap = 24 if reg_h else 0
+    height = body_h + reg_h + reg_gap + title_h
     width = int(math.ceil(width))
     height = int(math.ceil(height))
 
@@ -1820,8 +2135,17 @@ def build_pid_svg(proc: Process) -> str:
     # ----- CONTROL LOOPS (life-safety DO→O2 + level→make-up) — drawn AFTER the equipment
     #       so the controller bubble + dashed signal lines sit on top, routed in the band
     #       BELOW the equipment row so they read clearly as control (not process) lines. ---
-    band_bottom = height - title_h - 30
+    band_bottom = height - title_h - reg_h - reg_gap - 30
     _draw_control_loops(svg, proc, centre, ports, band_bottom)
+
+    # ----- LIFE-SAFETY EMERGENCY-O₂ FINAL ELEMENT on the culture tank (low-DO → fail-open
+    #       solenoid → O₂ diffuser) — the per-tank element the BoM carries on all N tanks. ---
+    _draw_emergency_o2_final_element(svg, proc, centre, ports)
+
+    # ----- ANCILLARY / FIELD-DEVICE REGISTER (projected from the BoM) -----
+    if reg_h:
+        reg_y = height - title_h - reg_h - reg_gap + reg_gap / 2
+        _draw_ancillary_register(svg, proc, 40, reg_y, width - 80, reg_cols)
 
     # ----- LEGEND + power note -----
     legend_x = width - legend_w + 10
@@ -1882,6 +2206,41 @@ def _draw_control_loops(svg, proc, centre, ports, band_y):
         if lp.dst_valve_tag:
             svg.text(riser_x + 11, dbot + 10, lp.dst_valve_tag, size=7.5, anchor="start",
                      fill=MUTED)
+
+
+def _draw_emergency_o2_final_element(svg, proc, centre, ports):
+    """Project the fail-open per-tank EMERGENCY-O₂ SOLENOID + DIFFUSER — the LIFE-SAFETY
+    final element on the low-dissolved-oxygen loop — onto the culture tank as a drawn ISA
+    final element (low-DO switch → fail-open solenoid → O₂ diffuser into the tank), annotated
+    with its per-tank quantity so every one of the N tanks is shown to carry it. Drawn on the
+    RIGHT face of the DO tank, clear of the make-up control loop (which drops below it).
+    Deterministic; no-op when the design carries no emergency-O₂ element or no DO tank."""
+    eo = getattr(proc, "emergency_o2", None)
+    if not eo:
+        return
+    tag, qty = eo
+    # the culture tank carrying the dissolved-oxygen measurement (the array node).
+    tank = next((nd for nd in proc.nodes if _node_has_func(nd, "dissolved-oxygen")), None)
+    if tank is None or tank.key not in ports:
+        tank = next((nd for nd in proc.nodes if nd.sym == SYM_TANK), None)
+    if tank is None or tank.key not in ports:
+        return
+    rightx, ry = ports[tank.key]["right"]
+    # low-DO switch bubble (ASL), a short trip lead to the fail-open solenoid, then a stub
+    # diffuser arrow back into the tank — the standard emergency-oxygen final-element group.
+    sx = rightx + 30
+    sw_y = ry - 26
+    _sym_instrument(svg, sx, sw_y, "AS", where="equipment")     # low-DO (AS = analysis switch)
+    svg.text(sx, sw_y - 17, "low-DO", size=6.6, anchor="middle", fill=MUTED)
+    vx, vy = sx, ry
+    svg.line(sx, sw_y + 13, vx, vy - 8, stroke=INK, width=1.1, dash="4,3")  # trip signal
+    _sym_valve(svg, vx, vy, kind="failopen")
+    # O₂ diffuser stub from the solenoid back into the tank (the bubble diffuser in the tank).
+    svg.add(f'<line x1="{vx - 8:.1f}" y1="{vy:.1f}" x2="{rightx + 4:.1f}" y2="{vy:.1f}" '
+            f'stroke="{PROC_INK}" stroke-width="1.6" marker-end="url(#flow)"/>')
+    qn = f" ×{qty}" if qty > 1 else ""
+    svg.text(vx + 11, vy + 3, f"{tag}{qn}", size=7.6, anchor="start", weight="bold", fill=INK)
+    svg.text(vx + 11, vy + 13, "emergency O₂ (fail-open)", size=6.6, anchor="start", fill=MUTED)
 
 
 def _sym_controller(svg, cx, cy, tag):
@@ -2287,7 +2646,7 @@ def _draw_title_block(svg, proc, width, height, title_h):
     bx0 = x1 - bw
     by0 = y0 + 14
     rows = [("DRAWING No.", "FF-PID-001"),
-            ("REV", proc.rev or "P1"),
+            ("REV", _tb.REV),
             ("DATE", proc.date or "—  "),
             ("SCALE", "NTS")]
     rh = 22

@@ -285,6 +285,30 @@ def generate_drawing_set(state_path: str | Path,
             hero_abs = str(p)
             break
 
+    # ── DETERMINISTIC SELF-EXAMINATION (the loop's drawing feedback signal) ──
+    # The LEDGER (parts_ledger.py — BoM + inputs/outputs/transformations + the
+    # coverage matrix over the 8 drawings + Blender) and the drawing INSPECTOR
+    # (inspect_drawings.py — title-block / domain-leak / zero-load / flat-render
+    # quality checks) run on the freshly-generated SVG/PNG views + state. They are
+    # the engine examining its OWN drawings deterministically so the loop can self-
+    # correct (Tristan 2026-06-16). Sandboxed + non-fatal: a crash is logged, never
+    # propagated; each writes a JSON artefact the next fix round reads.
+    self_exam = {}
+    for _mod, _art in (("parts_ledger.py", "parts-ledger.json"),
+                       ("render_ledger_html.py", "parts-ledger.html"),
+                       ("inspect_drawings.py", "drawings-inspection.json")):
+        try:
+            _r = subprocess.run([_venv_python(), str(_THIS / _mod), str(out_dir), str(state_path)],
+                                capture_output=True, text=True, timeout=120)
+            _ok = (out_dir / _art).exists()
+            _tail = next((ln.strip() for ln in reversed((_r.stdout or "").splitlines())
+                          if ln.strip()), "")
+            log.append(f"self-exam {_mod}: {'ok' if _ok else 'NO ARTEFACT'} — {_tail[:130]}")
+            self_exam[_art] = str(out_dir / _art) if _ok else None
+        except Exception as _e:  # noqa: BLE001
+            log.append(f"self-exam {_mod}: FAILED: {_e}")
+            self_exam[_art] = None
+
     manifest = {
         "schema": "drawing-set/v1",
         "placement": "lead-and-weave",
@@ -299,6 +323,9 @@ def generate_drawing_set(state_path: str | Path,
         "hero": hero_abs,
         # the Part-1 process-flow Block-Flow Diagram (D1 fix) → EngineeringBasisPage.
         "block_flow_diagram": bfd_path,
+        # deterministic self-examination — the loop's drawing feedback signal.
+        "parts_ledger": self_exam.get("parts-ledger.json"),
+        "drawings_inspection": self_exam.get("drawings-inspection.json"),
         # W3.1/W3.2 physics<->CAD convergence (rounds-to-converge) → renderer surfaces it.
         "convergence_report": ("convergence-report.json"
                                if (out_dir / "convergence-report.json").exists() else None),

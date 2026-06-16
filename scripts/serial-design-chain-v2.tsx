@@ -5553,15 +5553,23 @@ async function main() {
     const isGeneric = /Generic emitter/i.test(String((state.moduleDecomposition as any)?.rationale_excluded ?? ''))
     if (isGeneric && engineeringContract) {
       const { reconcilePrincipalEquipment } = await import('./lib/orchestrator/generic/universal-contract-sizing')
+      // Pass the contract the RENDERER + GA read (state.orchestratorContract) so the building
+      // take-off's re-derived footprint write-back (synthesizeBuildingStructure, run inside the
+      // reconcile against the FINAL equipment set) persists where it is consumed; fall back to
+      // the engineering-contract quantities object when the orchestrator slot is absent.
+      const reconcileContract: any = (state.orchestratorContract && (state.orchestratorContract as any).quantities)
+        ? state.orchestratorContract
+        : { quantities: engineeringContract.quantities }
       const rec = reconcilePrincipalEquipment(
         (state.moduleDecomposition?.modules ?? []) as any,
-        { quantities: engineeringContract.quantities } as any,
+        reconcileContract,
       )
       console.error(
         `[chain] principal-equipment reconcile (deterministic, contract-keyed): ` +
           `${rec.groups} principal group(s); ${rec.repaired} identity repaired; ` +
           `${rec.removedDuplicates} LLM duplicate(s) + ${rec.removedInvented} invented principal(s) dropped ` +
-          `(+${rec.removedOrphanChildren} orphan sub-parts); ${rec.synthesizedMissing} deleted principal(s) re-created.`,
+          `(+${rec.removedOrphanChildren} orphan sub-parts); ${rec.synthesizedMissing} deleted principal(s) re-created; ` +
+          `${rec.buildingResynthesised} building take-off line(s) re-derived to the final footprint.`,
       )
       logAction({
         step: 'principal_equipment_reconcile',
@@ -5571,6 +5579,7 @@ async function main() {
         removed_invented: rec.removedInvented,
         removed_orphan_children: rec.removedOrphanChildren,
         resynthesised_missing: rec.synthesizedMissing,
+        building_resynthesised: rec.buildingResynthesised,
         details: rec.details.slice(0, 20),
       })
     }
@@ -6778,6 +6787,31 @@ async function main() {
     const tTA = Date.now()
     try {
       const taState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      // PER-TOOL AUTHOR-SCOPE STAMP (the universal discriminator for gate 34). Stamp
+      // each tools-used entry with `applicable_to_class` — the tool's OWN
+      // applicable_to(envelope) verdict for THIS class — so the gate suppresses a
+      // domain marker (chiller/cooling, hydroponic, marine) whenever the tool is
+      // genuinely IN-DOMAIN (a chiller calc on a BESS / data-centre / electrolyser is
+      // legitimate, not a leak), WITHOUT hand-listing every heat-rejecting class. The
+      // gate falls back to its class-token lists when the stamp is absent, so this is
+      // a pure refinement (fail-safe: any error → no stamp → prior behaviour).
+      try {
+        const env = taState?.orchestratorContract?.envelope
+        const toolsArr = taState?.toolsUsedPage?.tools
+        if (env && typeof env.class === 'string' && Array.isArray(toolsArr) && toolsArr.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { listTools } = require('./lib/orchestrator/registry') as typeof import('./lib/orchestrator/registry')
+          const scopeContract = { product_class: env.class, brief_summary: '', envelope: env, quantities: {}, topology: [], closures: [], macro_assembly_prices: [], _tools_run: [] } as any
+          const reg = listTools()
+          for (const t of toolsArr) {
+            const tool = (t && typeof t.tool_id === 'string') ? reg.get(t.tool_id) : undefined
+            if (!tool) continue
+            try { t.applicable_to_class = tool.applicable_to(env, scopeContract) === true } catch { /* predicate needs fuller contract → leave unstamped (no signal) */ }
+          }
+        }
+      } catch (e) {
+        console.error(`[chain] tool-archetype stamp skipped (${(e as Error).message}); gate-34 uses class-token suppression`)
+      }
       const ta = computeToolArchetypeCoherence(taState)
       taState.toolArchetypeCoherence = ta
       writeFileSync(statePath, JSON.stringify(taState, null, 2))
@@ -7023,9 +7057,22 @@ async function main() {
     if (Array.isArray(reqRows) && reqRows.length > 0) {
       const st = JSON.parse(readFileSync(statePath, 'utf8'))
       st.requirementsBom = reqRows
-      writeFileSync(statePath, JSON.stringify(st))
       const reqTotal = reqRows.reduce((a: number, r: any) => a + (Number(r?.line_gbp) || 0), 0)
-      console.log(`[chain] requirements-driven BoM: ${reqRows.length} requirement lines (Σ £${Math.round(reqTotal).toLocaleString('en-GB')}) → state.requirementsBom`)
+      // Reconcile the cost cascade + cover to the AUTHORITATIVE requirements-driven BoM
+      // total — the SINGLE figure the dossier BoM table + the parts-ledger render. The
+      // costStack/cover was built earlier on the partVerifications subtotal (a DIFFERENT,
+      // smaller aggregation), so the cover £ and the rendered-BoM £ disagreed (council
+      // 2026-06-16: "three mutually inconsistent headline totals for the same run"). Scale
+      // the whole cascade proportionally so raw_materials == reqTotal; cost_reality follows.
+      if (reqTotal > 0 && st.costStack && Number(st.costStack.raw_materials_bom_gbp) > 0) {
+        const scale = reqTotal / Number(st.costStack.raw_materials_bom_gbp)
+        for (const k of Object.keys(st.costStack)) {
+          if (typeof st.costStack[k] === 'number') st.costStack[k] = Math.round(st.costStack[k] * scale)
+        }
+        if (st.cost_reality && typeof st.cost_reality === 'object') st.cost_reality.bom_total_gbp = Math.round(reqTotal)
+      }
+      writeFileSync(statePath, JSON.stringify(st))
+      console.log(`[chain] requirements-driven BoM: ${reqRows.length} requirement lines (Σ £${Math.round(reqTotal).toLocaleString('en-GB')}) → state.requirementsBom; cost cascade reconciled to this total`)
       logAction({ step: 'requirements_bom', ok: true, lines: reqRows.length, total_gbp: Math.round(reqTotal) })
     } else {
       logAction({ step: 'requirements_bom', ok: true, lines: 0 })

@@ -71,6 +71,24 @@ export type CostStackRatios = {
   channel_markup_factor: number
   /** Installation cost as a fraction of channel_list_price. 0 = no install service. */
   installation_cost_factor: number
+  // ── Build-type discriminator (added 2026-06-16) ──────────────────────────
+  // A MANUFACTURED product is built in a factory and sold through a channel:
+  // its installed price = raw -> labour -> overhead -> factory COGS -> margin
+  // -> channel markup -> installation (the cascade above). A FIELD-ERECTED
+  // process plant (RAS / e-fuel / CO2-mineralisation / any large built-on-site
+  // EPC plant) has NO factory, NO manufacturer margin and NO distribution
+  // channel — it is fabricated and assembled on site under an EPC contract, so
+  // its CAPEX = raw materials (purchased equipment) + field installation +
+  // FOAK/contingency + EPC/engineering. The two build types use DIFFERENT
+  // arithmetic in computeCostStack(); the discriminator keys it universally.
+  /** 'field_erected' = built on site (EPC plant, no factory/channel); 'manufactured' = factory product + channel. Absent => 'manufactured'. */
+  build_type?: 'field_erected' | 'manufactured'
+  /** FIELD-ERECTED ONLY — field installation/erection cost as a fraction of raw_materials (~0.4-0.8 for a process plant). Ignored for manufactured. */
+  install_factor?: number
+  /** FIELD-ERECTED ONLY — first-of-a-kind / contingency as a fraction of raw_materials (~0.15-0.25). Ignored for manufactured. */
+  foak_contingency_factor?: number
+  /** FIELD-ERECTED ONLY — EPC / engineering / project-management as a fraction of raw_materials (~0.10-0.15). Ignored for manufactured. */
+  epc_engineering_factor?: number
   /** Short note on the archetype + calibration confidence. */
   notes: string
 }
@@ -132,25 +150,74 @@ const ARCH_INDUSTRIAL_HEAVY_EPC: CostStackRatios = {
   notes: 'Industrial-heavy EPC archetype (direct, civils + install).',
 }
 
+// ---------------------------------------------------------------------------
+// FIELD-ERECTED PROCESS-PLANT archetype (added 2026-06-16).
+//
+// A field-erected plant — recirculating aquaculture (RAS), power-to-liquid
+// e-fuel, CO2 capture/mineralisation, direct-air-capture, electrolyser,
+// desalination, any large process plant BUILT ON SITE under an EPC contract —
+// is NOT a manufactured product. There is no factory churning out units, no
+// manufacturer margin, no distribution channel. The equipment (vessels, pumps,
+// tanks, blowers, filters, instruments) is the raw-materials BoM; it is then
+// shipped to site and ERECTED, with first-of-a-kind contingency and the EPC
+// contractor's engineering/PM on top. Applying the manufactured factory ->
+// margin -> channel cascade to such a plant roughly DOUBLES a realistic CAPEX
+// (RAS: £4.99M raw materials cascaded to £12.9M installed = £63k/t.yr, ~2x a
+// real land-based RAS at £25-40k/t.yr) — the bug this archetype fixes.
+//
+// computeCostStack() branches on build_type === 'field_erected' and computes:
+//   installed_CAPEX = raw_materials
+//                   + install_factor          x raw_materials  (field erection)
+//                   + foak_contingency_factor x raw_materials  (FOAK/contingency)
+//                   + epc_engineering_factor  x raw_materials  (EPC/engineering)
+// with NO factory overhead, NO manufacturer margin, NO channel markup. The
+// legacy CostStack fields are still populated (oem_transfer_price = raw + minor
+// labour = the ex-works equipment proxy that feasibility-assessment + the
+// cost-sanity gate read) so downstream consumers keep working unchanged.
+//
+// Default factors (RAS-anchored, AACE Class-4 ±30%): install 0.40, FOAK 0.18,
+// EPC 0.12 -> 1.70x raw. RAS £4.99M -> £8.49M installed = £41.6k/t.yr, inside
+// the £25-44k/t.yr land-based-RAS band. Universal — every field-erected class
+// inherits these and may tighten them per class (SMR/DAC carry heavier civils).
+const ARCH_FIELD_ERECTED_PLANT: CostStackRatios = {
+  build_type: 'field_erected',
+  // Manufactured-cascade factors are IGNORED for field_erected (computeCostStack
+  // takes the field-erected branch). Kept at neutral/zero so any code that reads
+  // them directly sees no spurious factory/channel markup.
+  assembly_labour_factor: 0,      // no factory assembly line — labour is the install factor
+  factory_overhead_factor: 0,     // no factory overhead for an on-site EPC build
+  manufacturer_margin_factor: 0,  // no manufacturer — direct EPC, margin sits inside the EPC factor
+  channel_markup_factor: 0,       // no distributor/dealer channel
+  installation_cost_factor: 0,    // superseded by install_factor in the field-erected branch
+  // Field-erected build-up (fractions of the raw-materials BoM):
+  install_factor: 0.40,           // field erection / installation of a process plant
+  foak_contingency_factor: 0.18,  // first-of-a-kind + project contingency
+  epc_engineering_factor: 0.12,   // EPC engineering / project management
+  notes: 'Field-erected process-plant archetype (built on site under EPC — NO factory, NO manufacturer margin, NO channel). Installed CAPEX = raw materials + field installation (0.40x) + FOAK/contingency (0.18x) + EPC/engineering (0.12x) = 1.70x raw. AACE Class-4 (±30%).',
+}
+
 const ARCH_BESPOKE_ENGINEERED_PLANT: CostStackRatios = {
   // Bespoke, engineered-to-order PROCESS / CHEMICAL / POWER plant sold DIRECT to
   // the operator under an EPC (engineer-procure-construct) contract — CO2
   // mineralisation/capture, direct-air-capture, hydrogen electrolyser plant,
   // small modular reactor, fluid-processing/desalination skid-trains. These are
-  // first-of-a-kind, low-volume (1-handful/yr), integrated on site. There is NO
-  // distributor/dealer channel, so channel markup is 0 (the consumer-product
-  // "channel list price" step does not exist for a direct EPC sale). The margin
-  // is the integrator/EPC margin on COGS; installation captures civils + field
-  // erection + piping + commissioning, which dominate a process-plant CAPEX.
-  // Stack reads: raw materials -> assembly labour -> engineering/overhead ->
-  // factory COGS -> EPC margin -> (channel = 0, direct) -> civils/erection/
-  // commissioning -> installed (CAPEX) price.
-  assembly_labour_factor: 0.25,   // industrial-heavy, hand-built fabrication + integration
-  factory_overhead_factor: 0.18,  // industrial/regulated facility overhead
-  manufacturer_margin_factor: 0.13, // integrator/EPC margin on COGS (thin vs consumer)
+  // first-of-a-kind, low-volume (1-handful/yr), integrated on site. FIELD-ERECTED
+  // (2026-06-16): a process plant is BUILT ON SITE, so it now uses the
+  // field-erected build-up (raw + install + FOAK + EPC) rather than the
+  // manufactured factory->margin->channel cascade. There is no factory, no
+  // manufacturer margin and no distributor channel — applying those layers
+  // roughly doubled the CAPEX. install_factor 0.55 (heavier civils + piping than
+  // a RAS), FOAK 0.20, EPC 0.13 -> 1.88x raw.
+  build_type: 'field_erected',
+  assembly_labour_factor: 0,
+  factory_overhead_factor: 0,
+  manufacturer_margin_factor: 0,
   channel_markup_factor: 0,       // direct EPC/B2B sale — no distributor channel
-  installation_cost_factor: 0.55, // civils + field erection + piping + commissioning
-  notes: 'Bespoke engineered-to-order plant archetype (direct EPC/B2B — process/chemical/power plant, NO distributor channel, civils + field erection + commissioning).',
+  installation_cost_factor: 0,
+  install_factor: 0.55,           // civils + field erection + piping + commissioning (heavier than RAS)
+  foak_contingency_factor: 0.20,  // first-of-a-kind + contingency on a novel process plant
+  epc_engineering_factor: 0.13,   // EPC engineering / PM
+  notes: 'Bespoke engineered-to-order plant archetype (direct EPC/B2B — process/chemical/power plant, FIELD-ERECTED: NO factory, NO manufacturer margin, NO distributor channel). Installed CAPEX = raw materials + field erection/piping (0.55x) + FOAK/contingency (0.20x) + EPC/engineering (0.13x) = 1.88x raw.',
 }
 
 const ARCH_BESPOKE_LOW_VOLUME: CostStackRatios = {
@@ -562,6 +629,18 @@ export const COST_STACK: Record<string, CostStackRatios> = {
   autonomous_surface_vessel: { ...ARCH_BESPOKE_LOW_VOLUME, manufacturer_margin_factor: 0.38, notes: 'Autonomous surface vessel — bespoke marine.' },
 
   // Cleantech / agriculture
+  // Recirculating aquaculture (RAS) + related built-on-site process plants —
+  // FIELD-ERECTED (2026-06-16). A land-based RAS plant is fabricated and erected
+  // on site (rearing tanks, biofilters, degassers, pumps, blowers, oxygenation,
+  // RO/UV, instrumentation), NOT a factory product with a margin + channel. It
+  // previously fell through resolveCostStack to the manufactured DEFAULT and the
+  // £4.99M raw-materials BoM cascaded to £12.9M installed (£63k/t.yr, ~2x a real
+  // land-based RAS at £25-40k/t.yr). With the field-erected build-up the same
+  // £4.99M raw lands at £8.49M installed (£41.6k/t.yr, in band).
+  aquaculture_ras: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'Recirculating aquaculture (RAS) plant — FIELD-ERECTED (built on site, NO factory/margin/channel). Installed CAPEX = raw materials + field installation (0.40x) + FOAK/contingency (0.18x) + EPC/engineering (0.12x) = 1.70x raw. RAS £4.99M raw -> £8.49M installed (£41.6k/t.yr, in the £25-44k/t.yr land-based-RAS band).' },
+  ras: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'RAS — alias of aquaculture_ras; field-erected process plant (no factory/margin/channel).' },
+  recirculating_aquaculture: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'Recirculating aquaculture — alias of aquaculture_ras; field-erected.' },
+  aquaponics: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'Aquaponics plant — field-erected process plant (no factory/margin/channel).' },
   vertical_farm_module: {
     assembly_labour_factor: 0.18,
     factory_overhead_factor: 0.18,
@@ -685,12 +764,25 @@ export type CostStack = {
 function archetypeForUnknownClass(slug: string | undefined): { ratios: CostStackRatios; class_key: string } | null {
   if (!slug) return null
   const s = slug.toLowerCase()
-  // Bespoke engineered-to-order plant: a process/chemical/power PLANT, capture /
-  // electrolyser / reactor / desalination / mineralisation, sold direct EPC.
-  const looksLikePlant =
-    /(?:^|_)(?:plant|reactor|electroly[sz]er|capture|mineralis|mineraliz|desalinat|smr|dac|carbonat|gasif|pyroly|digest|biogas|ammonia|methanol|refiner)/.test(s) ||
-    /(?:capture|electroly[sz]er|mineralis|mineraliz|desalinat|carbonat|gasif|pyroly|refiner)/.test(s)
-  if (looksLikePlant) return { ratios: ARCH_BESPOKE_ENGINEERED_PLANT, class_key: 'bespoke_plant_default' }
+  // FIELD-ERECTED process plants (2026-06-16) — built on site under EPC, NO
+  // factory / margin / channel. Two tiers, both field-erected:
+  //
+  // (1) Chemical / power / heavy process plant (capture / electrolyser /
+  //     reactor / desalination / mineralisation / FT / SMR / DAC / refinery) ->
+  //     ARCH_BESPOKE_ENGINEERED_PLANT (heavier civils & piping, 1.88x raw).
+  const looksLikeChemPlant =
+    /(?:^|_)(?:plant|reactor|electroly[sz]er|capture|mineralis|mineraliz|desalinat|smr|dac|carbonat|gasif|pyroly|digest|biogas|ammonia|methanol|refiner|synfuel|synthesis|fischer|e_?fuel|power_?to_?(?:liquid|gas|x)|hydrogen|hydro_?treat)/.test(s) ||
+    /(?:capture|electroly[sz]er|mineralis|mineraliz|desalinat|carbonat|gasif|pyroly|refiner|synthesis)/.test(s)
+  if (looksLikeChemPlant) return { ratios: ARCH_BESPOKE_ENGINEERED_PLANT, class_key: 'bespoke_plant_default' }
+  // (2) Other large built-on-site process plant — recirculating aquaculture
+  //     (RAS), water/wastewater treatment, anaerobic-digestion / brewery /
+  //     hatchery-style plants -> ARCH_FIELD_ERECTED_PLANT (lighter civils than a
+  //     chemical plant, 1.70x raw). This is the class family the RAS dossier
+  //     used to mis-cost: `aquaculture_ras` fell through to the manufactured
+  //     DEFAULT (25% channel + 30% margin) and landed at ~£63k/t.yr (~2x real).
+  const looksLikeProcessPlant =
+    /(?:^|_)(?:aquaculture|ras|recirculating|aquaponic|hatchery|fish_?farm|wastewater|waste_?water|water_?treatment|effluent|brewery|brewing|fermentation|anaerobic|bioprocess|food_?process|processing_?plant|treatment_?plant)(?:$|_)/.test(s)
+  if (looksLikeProcessPlant) return { ratios: ARCH_FIELD_ERECTED_PLANT, class_key: 'field_erected_plant_default' }
   return null
 }
 
@@ -718,8 +810,63 @@ function roundToPence(n: number): number {
 
 // Compute the full cost stack from a raw-materials grand total. Each layer
 // rounded to pence so the printed numbers add up exactly.
+//
+// TWO build types (2026-06-16):
+//   • 'manufactured' (default) — factory product sold through a channel:
+//        raw -> labour -> overhead -> factory COGS -> manufacturer margin
+//        -> channel markup -> installation -> installed ASP.
+//   • 'field_erected' — process plant built on site under an EPC contract
+//        (RAS, e-fuel, CO2-mineralisation, electrolyser, desalination, any
+//        large built-on-site plant): there is NO factory, NO manufacturer
+//        margin and NO distribution channel, so the manufactured cascade is
+//        wrong (it ~doubles a real plant CAPEX). Instead:
+//        installed CAPEX = raw materials (purchased equipment)
+//                        + install_factor          x raw  (field erection)
+//                        + foak_contingency_factor x raw  (FOAK/contingency)
+//                        + epc_engineering_factor  x raw  (EPC/engineering)
+//        The legacy CostStack fields are still populated so downstream
+//        consumers (feasibility-assessment, cost-sanity gate, harness) keep
+//        working: oem_transfer_price = raw + minor field labour = the ex-works
+//        equipment proxy they read; channel/margin/overhead layers are 0.
 export function computeCostStack(rawMaterialsBomGbp: number, ratios: CostStackRatios, class_key: string = 'unknown'): CostStack {
   const raw = roundToPence(rawMaterialsBomGbp)
+
+  if (ratios.build_type === 'field_erected') {
+    // Field-erected process plant — NO factory overhead, NO manufacturer
+    // margin, NO channel markup. Every layer is a fraction of the raw-materials
+    // BoM (the purchased-equipment cost), summed additively.
+    const installFactor = ratios.install_factor ?? 0
+    const foakFactor = ratios.foak_contingency_factor ?? 0
+    const epcFactor = ratios.epc_engineering_factor ?? 0
+    const field_install = roundToPence(raw * installFactor)        // erection / installation
+    const foak_contingency = roundToPence(raw * foakFactor)        // first-of-a-kind + contingency
+    const epc_engineering = roundToPence(raw * epcFactor)          // EPC / engineering / PM
+    // Map onto the legacy CostStack shape so existing consumers keep working:
+    //  - assembly_labour carries the field-installation/erection cost
+    //  - factory_overhead = 0 (no factory)
+    //  - factory_cogs / oem_transfer = raw materials = the ex-works equipment
+    //    proxy that feasibility-assessment + the cost-sanity gate read
+    //  - manufacturer_margin = 0, channel = 0 (no margin, no channel)
+    //  - installation carries FOAK/contingency + EPC/engineering
+    const installation = roundToPence(foak_contingency + epc_engineering)
+    const installed_asp = roundToPence(raw + field_install + installation)
+    return {
+      raw_materials_bom_gbp: raw,
+      assembly_labour_gbp: field_install,
+      factory_overhead_gbp: 0,
+      factory_cogs_gbp: raw,
+      manufacturer_margin_gbp: 0,
+      oem_transfer_price_gbp: raw,
+      channel_markup_gbp: 0,
+      channel_list_price_gbp: raw,
+      installation_cost_gbp: installation,
+      installed_asp_gbp: installed_asp,
+      ratios_applied: ratios,
+      class_key,
+    }
+  }
+
+  // Manufactured product — factory -> margin -> channel -> install cascade.
   const labour = roundToPence(raw * ratios.assembly_labour_factor)
   const overhead = roundToPence((raw + labour) * ratios.factory_overhead_factor)
   const factory_cogs = roundToPence(raw + labour + overhead)

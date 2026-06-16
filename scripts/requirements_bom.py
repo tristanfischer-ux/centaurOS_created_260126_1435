@@ -482,12 +482,17 @@ _SIGNAL_NODE_RE = re.compile(
     re.I)
 
 # Aggressive-service edges that genuinely warrant 316L (or special) pipe rather
-# than the HDPE default: liquid-oxygen / ozone delivery / seawater-intake / brine /
-# effluent. (Applied only to BRANCH water edges — a main-loop edge is process water
-# in HDPE even if its disinfection unit's NAME mentions ozone.)
+# than the HDPE default: liquid-oxygen / ozone delivery ONLY. (Applied only to
+# BRANCH water edges — a main-loop edge is process water in HDPE even if its
+# disinfection unit's NAME mentions ozone.)
+# NB: seawater / brine / effluent are deliberately NOT here — 316L PITS in seawater
+# (chloride stress-corrosion), so marine RAS + seawater-intake + treated effluent
+# pipework is HDPE / PVC-U / GRP throughout (cheaper AND the correct material); only
+# cryogenic-O₂ and oxidising-ozone delivery genuinely need stainless. (2026-06-16:
+# tagging the seawater/effluent lines 316L mis-priced them ~4× — a £300k effluent
+# pipe that is really ~£78k of HDPE.)
 _STAINLESS_SERVICE_RE = re.compile(
-    r"\blox\b|liquid[_ ]?oxygen|oxygen[_ ]?supply|ozone[_ ]?(?:supply|generat|inject|line)|"
-    r"seawater[_ ]?intake|sea[_ ]?water|\bbrine\b|\beffluent\b|saline[_ ]?intake",
+    r"\blox\b|liquid[_ ]?oxygen|oxygen[_ ]?supply|ozone[_ ]?(?:supply|generat|inject|line)",
     re.I)
 
 # GAS / cryogenic-liquid DELIVERY lines (oxygen / ozone / CO₂ / nitrogen / air feed)
@@ -926,6 +931,24 @@ def assemble(out_dir: str):
                                  "part": "process-support system (catalogue class)", "qty": qy,
                                  "unit_gbp": round(pgbp), "line_gbp": round(pgbp * qy),
                                  "basis": "installed process system — catalogue-class budget"})
+                    continue
+                # ── BUILDING-STRUCTURE take-off (synthesizeBuildingStructure #145): the hall
+                # that houses the plant — reinforced floor slab, steel portal frame, insulated
+                # wall + roof cladding, foundations, doors. Priced PARAMETRICALLY from the
+                # derived building footprint / wall / roof areas (the price_estimate_gbp the
+                # synthesis stamped, £/m² UK 2026). Its own CIVIL line, like the BoP / process
+                # systems above — NOT a bespoke process vessel or a NOT-FOUND catalogue part. ──
+                if w.get("_structure"):
+                    bgbp = _child_price(w)
+                    nlow = name.lower()
+                    btag = ("SLB" if "slab" in nlow else "FRM" if ("frame" in nlow or "portal" in nlow)
+                            else "WAL" if "wall" in nlow else "ROF" if "roof" in nlow
+                            else "FND" if ("foundation" in nlow or "ground" in nlow)
+                            else "DR" if "door" in nlow else "BLD")
+                    rows.append({"tag": btag, "requirement": requirement, "status": "BUILDING",
+                                 "part": "building / civil works (parametric take-off)", "qty": qy,
+                                 "unit_gbp": round(bgbp), "line_gbp": round(bgbp * qy),
+                                 "basis": "building element — parametric £/m² take-off from the housed-equipment footprint"})
                     continue
                 bc = _bespoke_class(name)   # 'strong' (process vessel) | 'simple' (shell) | 'none'
                 mt_spec = None

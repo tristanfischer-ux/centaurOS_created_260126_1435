@@ -2307,16 +2307,30 @@ def _place_region(rparts, x_left, y_base, MAT, MO):
             _gx, gy, _gz = footprint_mm(resolved_dims_mm(p))
             if _gx * gy > 150e6:               # hall-sized replicated grid
                 grid_half_depth = max(grid_half_depth, gy / 2.0)
+    # Width the ancillary (medium + small) bands shelf-pack at. Normally the region
+    # target_width (capped at MAX_REGION_WIDTH_MM = 10 m). BUT when a hall-sized
+    # mega-grid is present, the grid is far WIDER than 10 m (a 10-tank farm ≈ 45 m),
+    # so packing the 27 ancillary parts at only 10 m strings them ~13 m DEEP in a
+    # narrow strip behind the tanks (council 2026-06-16: the 95 m RAS Y-extent). Pack
+    # them across the GRID'S width instead → the same parts read as a 1-2 row service
+    # alley spanning the hall, not a deep tail. Y shrinks, the strip reads correctly.
+    ancillary_width = target_width
     if grid_half_depth > 0.0:
-        MEGA_GRID_BACK_GAP_MM = 4000
+        # The mega-grid's plan width (the widest big part's footprint = the grid span).
+        grid_width = max((footprint_mm(resolved_dims_mm(p))[0] for p in big), default=target_width)
+        ancillary_width = max(target_width, grid_width)
+        # Back-gap between the tank grid and the ancillary alley behind it. 4.0 m was a
+        # generous double aisle; 2.5 m is still a walkable maintenance gap and trims the
+        # Y-tail (applied to BOTH the medium and the small band offsets, so ×2).
+        MEGA_GRID_BACK_GAP_MM = 2500
         behind = big_y + grid_half_depth + MEGA_GRID_BACK_GAP_MM
         med_y = behind
         small_y = behind + _band_depth_for(medium) + MEGA_GRID_BACK_GAP_MM
     big_dx, _ = _shelf_pack(big, x_left, big_y, target_width, DECK_Z_MM,
                             PART_GAP_MM, MAT, MO, y_dir=+1)
-    med_dx, _ = _shelf_pack(medium, x_left, med_y, target_width, DECK_Z_MM,
+    med_dx, _ = _shelf_pack(medium, x_left, med_y, ancillary_width, DECK_Z_MM,
                             PART_GAP_MM, MAT, MO, y_dir=+1)
-    _place_grid(small, x_left, target_width, small_y, DECK_Z_MM, MAT, MO)
+    _place_grid(small, x_left, ancillary_width, small_y, DECK_Z_MM, MAT, MO)
     return max(big_dx, med_dx, target_width, MIN_REGION_WIDTH_MM)
 
 
@@ -2447,6 +2461,22 @@ def place_all(parts, regions, MAT, MO):
                     for rk in region_list}
     region_w = {rk: _estimate_region_width(region_parts[rk]) for rk in region_list}
 
+    # Detect mega-array regions UP FRONT (a hall-sized qty-N replicated vessel grid,
+    # e.g. the RAS 10-tank farm). They are pulled into their OWN solo lane below, so
+    # they must ALSO be excluded from the train fold-width decision — otherwise the
+    # giant tank region inflates train_w, forces the thin remaining train to fold into
+    # 2 lanes, and THEN gets removed, leaving two near-empty Y lanes where one would do
+    # (council 2026-06-16: a chunk of the 95 m RAS Y-extent was this spurious fold).
+    def _region_holds_mega_array(rk):
+        for p in region_parts[rk]:
+            q = int(getattr(p, "qty", 1) or 1)
+            if p.shape in _VESSEL_KIND and 2 <= q <= _VESSEL_GRID_MAX_N:
+                fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+                if fx * fy > 150e6:           # hall-sized replicated grid
+                    return True
+        return False
+    _mega_regions_pre = {rk for rk in region_list if _region_holds_mega_array(rk)}
+
     if _PLANT_FLOW_PLAN is not None:
         # ── GRAPH-DRIVEN FLOW LAYOUT ──────────────────────────────────────────
         # banks = [flow lane(s) … , periphery lane]. The flow train is folded
@@ -2469,8 +2499,12 @@ def place_all(parts, regions, MAT, MO):
         # (serpentined, so the fold-boundary stages still sit adjacent across the
         # aisle). Keeping the typical 5-6 region plant a single lane is what makes
         # the pipe runs short; the periphery lane behind it keeps the footprint sane.
-        train_w = sum(region_w[rk] for rk in flow_regions) \
-            + REGION_GAP_MM * max(0, len(flow_regions) - 1)
+        # Width that decides the fold uses only the regions that STAY in the train —
+        # mega-array regions (pulled solo below) are excluded so they don't trigger a
+        # spurious 2-lane fold of the thin remaining train.
+        fold_regions = [rk for rk in flow_regions if rk not in _mega_regions_pre]
+        train_w = sum(region_w[rk] for rk in fold_regions) \
+            + REGION_GAP_MM * max(0, len(fold_regions) - 1)
         train_lanes = 1 if train_w <= FLOW_TRAIN_SINGLE_LANE_MAX_MM \
             else min(N_BANKS, max(1, len(flow_regions)))
         banks = _flow_fold_banks(flow_regions, region_w, train_lanes) if flow_regions else []

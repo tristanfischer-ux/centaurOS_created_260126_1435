@@ -61,13 +61,27 @@ PROVENANCE = {
 
 
 def compute(payload: dict) -> dict:
-    wall_area_m2 = float(payload.get("wall_area_m2", 80))
+    # Universal building-footprint fallback: when an explicit per-element area is not
+    # supplied, read the contract's DERIVED footprint (synthesizeBuildingStructure writes
+    # building_footprint_m2 / building_gross_floor_area_m2 / building_wall_area_m2 from the
+    # housed-equipment plan area) so the heat-loss sizes against the REAL hall, not the
+    # 50 m² / 80 m² type-defaults. A caller that passes the per-element areas directly
+    # (e.g. the heat-pump class plan) is unaffected.
+    contract_footprint = payload.get(
+        "building_footprint_m2", payload.get("building_gross_floor_area_m2")
+    )
+    contract_wall_area = payload.get("building_wall_area_m2")
+    default_floor = float(contract_footprint) if contract_footprint else 50.0
+    default_roof = float(contract_footprint) if contract_footprint else 50.0
+    default_wall = float(contract_wall_area) if contract_wall_area else 80.0
+
+    wall_area_m2 = float(payload.get("wall_area_m2", default_wall))
     wall_u_value = float(payload.get("wall_u_value", 0.30))
     window_area_m2 = float(payload.get("window_area_m2", 15))
     window_u_value = float(payload.get("window_u_value", 1.4))
-    roof_area_m2 = float(payload.get("roof_area_m2", 50))
+    roof_area_m2 = float(payload.get("roof_area_m2", default_roof))
     roof_u_value = float(payload.get("roof_u_value", 0.16))
-    floor_area_m2 = float(payload.get("floor_area_m2", 50))
+    floor_area_m2 = float(payload.get("floor_area_m2", default_floor))
     floor_u_value = float(payload.get("floor_u_value", 0.20))
     door_area_m2 = float(payload.get("door_area_m2", 2.0))
     door_u_value = float(payload.get("door_u_value", 1.6))

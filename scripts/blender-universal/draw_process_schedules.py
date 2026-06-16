@@ -47,6 +47,7 @@ Pure Python stdlib + (optional) a rasteriser on PATH.  No Blender import.
 from __future__ import annotations
 
 import html
+import json
 import math
 import os
 import re
@@ -58,6 +59,11 @@ from typing import Optional
 # ── reuse the P&ID's canonical reconstruction so line numbers + tags are IDENTICAL ──
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import draw_pid as PID  # noqa: E402  (the P&ID generator — single source of truth)
+import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+
+# Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
+# generate_process_schedules() from the run's own artifacts; '' until set ('—').
+_ISSUE_DATE = ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -162,6 +168,55 @@ def _row_for(schedule: dict, frm: str, to: str) -> dict:
         if r.get("from") == frm and r.get("to") == to:
             return r
     return {}
+
+
+# ── route-manifest process lines (the FULL set the Blender model routed) ─────
+# The P&ID topology spine carries only the principal flow edges (≈7), but the
+# route-manifest written by build_universal_scene.py enumerates EVERY routed run
+# (≈100) — including the tie-in line into the loop for every synthesised
+# life-support system (make-up, dosing, sludge, chilling, mortality, …). The
+# line list must show ALL of these PROCESS lines, and the valve list must be able
+# to cite each valve's OWN line. We read the manifest here (additive, no-op when
+# absent) and keep the FLUID / thermal lines (power feeders + signal cables
+# belong on the single-line + instrument index, not the process line list).
+_NON_PROCESS_MECH = {"electrical_bus", "signal", "power", "control"}
+
+
+def _load_route_lines(out_dir: Optional[str]) -> list[dict]:
+    """The de-duplicated route-manifest lines (by line number). Empty when no
+    out_dir / no manifest. Each dict carries line_number / mechanism / from_tag /
+    to_tag / service / size_label."""
+    if not out_dir:
+        return []
+    try:
+        man = json.loads((Path(out_dir) / "route-manifest.json").read_text())
+    except Exception:
+        return []
+    seen: set = set()
+    out: list[dict] = []
+    for l in (man.get("lines") or []):
+        if not isinstance(l, dict):
+            continue
+        ln = l.get("line_number")
+        if not ln or ln in seen:
+            continue
+        seen.add(ln)
+        out.append(l)
+    return out
+
+
+def _is_process_route(l: dict) -> bool:
+    """A route is a PROCESS (pipe) line — drawn on the line list — when it is a
+    fluid / thermal / gas run, not a power feeder or an instrument signal cable.
+    Keyed on mechanism + a power/signal service tell, never a class."""
+    mech = (l.get("mechanism") or "").lower()
+    if mech in _NON_PROCESS_MECH:
+        return False
+    svc = (l.get("service") or "").lower()
+    if re.search(r"power feeder|lv power|signal cable|4-20\s*ma|instrument signal|"
+                 r"\bfeeder 400|ring.?main|switchboard", svc):
+        return False
+    return True
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -308,15 +363,25 @@ def _insulation_for(phase: str, mechanism: str, service_blob: str) -> str:
     return "N"
 
 
-def build_line_list(proc, schedule: dict, state: dict) -> list[LineRow]:
+def build_line_list(proc, schedule: dict, state: dict,
+                    out_dir: Optional[str] = None) -> list[LineRow]:
     """One row per process / thermal line, with the P&ID's line number + equipment tags
-    (read straight off the reconstructed Process) and enriched process columns."""
+    (read straight off the reconstructed Process) and enriched process columns.
+
+    The principal spine lines come from the reconstructed Process (≈7); when an out_dir
+    is supplied, EVERY further routed PROCESS run in route-manifest.json (the synthesised
+    life-support tie-ins: make-up, dosing, sludge, chilling, …) is appended too, so the
+    line list is the COMPLETE process line schedule — not just the topology spine. Power
+    feeders + instrument signal cables are excluded (they belong on the single-line +
+    instrument index). Additive + deterministic; byte-identical to the prior 7-row list
+    when out_dir is absent."""
     topo = PID._topology(state)
     proc_topo = [e for e in topo if e.get("mechanism") != "electrical_bus"]
     tag_of = {n.key: n.tag for n in proc.nodes}
     pid_sheet = "FF-PID-001"
 
     rows: list[LineRow] = []
+    seen_numbers: set = set()
     # proc.lines is in the SAME order as proc_topo (draw_pid builds it 1:1), so we can pair.
     for ln, edge in zip(proc.lines, proc_topo):
         mc = edge.get("material_context") or ""
@@ -331,6 +396,7 @@ def build_line_list(proc, schedule: dict, state: dict) -> list[LineRow]:
         material = _material_for(spec, svc_blob, mc)
         rating = _rating_for(spec, srow, edge)
         insulation = _insulation_for(phase, edge.get("mechanism") or "", svc_blob)
+        seen_numbers.add(ln.number)
         rows.append(LineRow(
             number=ln.number,
             frm_tag=tag_of.get(ln.from_key, "—"),
@@ -344,7 +410,70 @@ def build_line_list(proc, schedule: dict, state: dict) -> list[LineRow]:
             insulation=insulation,
             pid_ref=pid_sheet,
         ))
+
+    # ── append the remaining ROUTED process lines from the manifest ──
+    for l in _load_route_lines(out_dir):
+        num = l.get("line_number")
+        if not num or num in seen_numbers or not _is_process_route(l):
+            continue
+        seen_numbers.add(num)
+        frm = l.get("from_tag") or ""
+        to = l.get("to_tag") or ""
+        svc_raw = l.get("service") or ""
+        svc_blob = f"{frm} {to} {svc_raw}"
+        code_m = re.search(r"-([A-Z]{2})\b", str(num))
+        code = code_m.group(1) if code_m else ""
+        dn = _dn_of_size(l.get("size_label")) or (f"DN{_dn_in(num)}" if _dn_in(num) else "—")
+        mech = l.get("mechanism") or ""
+        phase = _phase_from({}, mech, svc_blob)
+        rows.append(LineRow(
+            number=str(num),
+            frm_tag=frm if _looks_like_tag(frm) else _short_tag(frm),
+            to_tag=to if _looks_like_tag(to) else _short_tag(to),
+            service=_humanise_route_service(svc_raw) or PID._humanise(code) or "Process line",
+            fluid=_fluid_name(frm, svc_raw, code),
+            phase=phase,
+            dn=dn,
+            material=_material_for({}, svc_blob, svc_raw),
+            rating="as-routed",
+            insulation=_insulation_for(phase, mech, svc_blob),
+            pid_ref=pid_sheet,
+        ))
     return rows
+
+
+def _dn_of_size(size_label) -> str:
+    m = re.search(r"\bDN\s?(\d+)\b", str(size_label or ""), re.I)
+    return "DN" + m.group(1) if m else ""
+
+
+def _dn_in(line_number) -> str:
+    m = re.search(r"-DN(\d+)\b", str(line_number or ""), re.I)
+    return m.group(1) if m else ""
+
+
+def _looks_like_tag(s: str) -> bool:
+    """A short ISA-style equipment tag (e.g. 'TK-101', 'P-103', 'X-110') rather than a
+    long humanised name."""
+    return bool(re.fullmatch(r"[A-Z]{1,4}-?\d{1,4}", str(s or "").strip()))
+
+
+def _short_tag(key: str) -> str:
+    """A readable short tag for an endpoint with no resolved equipment tag (a header /
+    abstract supply): the key's initials, e.g. electrical_supply → 'ES'."""
+    toks = [t for t in re.split(r"[_\s]+", str(key or "")) if t]
+    return ("".join(t[0] for t in toks[:3]) or (str(key or "")[:3])).upper() or "—"
+
+
+def _humanise_route_service(svc: str) -> str:
+    """A route-manifest service string is often a long snake_case clause; take a short,
+    readable head for the line-list service column."""
+    if not svc:
+        return ""
+    s = re.split(r"[._]", svc)
+    head = " ".join(s[:8]).strip()
+    head = re.sub(r"\s+", " ", head)
+    return head[:1].upper() + head[1:] if head else ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -408,14 +537,69 @@ def _parse_cv(mods: dict) -> str:
     return "modulating"
 
 
-def _valve_location_and_ref(vtype: str, cid: str, name: str, proc, line_rows):
-    """Which line / equipment this valve sits on + its P&ID ref — re-using the P&ID's OWN
-    placement logic so the cross-reference is consistent:
-      • relief (PSV)  → the P&ID drops a PSV on the first pressure vessel (column / drum /
-        vessel / fired) and on the main reactor/column — so locate to that equipment tag.
-      • control (PCV) → the P&ID decorates a purge / control / recycle / dosing line.
-      • ESD (XV)      → the P&ID decorates the primary feed line.
-    Returns (location, pid_ref)."""
+# Stop-words ignored when scoring a valve's service text against a line's service.
+_VALVE_MATCH_STOP = frozenset((
+    "valve", "control", "modulating", "isolation", "isolating", "manual", "assembly",
+    "representative", "the", "and", "for", "with", "from", "into", "onto", "per",
+    "on", "of", "to", "a", "an", "in", "or", "line", "process", "tie", "tie-in",
+    "water", "system", "unit", "skid", "package", "duty", "service", "main", "branch",
+    "dn", "mm", "esd", "shutdown", "emergency", "suction", "discharge", "inlet",
+    "outlet", "pressure", "relief", "tank", "vent", "fail", "open", "closed",
+))
+
+
+def _valve_service_tokens(blob: str) -> set:
+    """The MEANINGFUL service tokens of a valve's name/cid (drops generic valve words),
+    used to score which line it sits on. Adds a couple of synonym anchors so an 'O₂'
+    valve matches an 'oxygen' line and a 'flow' valve matches a 'recirculation' line."""
+    toks = {t for t in re.split(r"[^a-z0-9₂]+", (blob or "").lower())
+            if len(t) >= 2 and t not in _VALVE_MATCH_STOP}
+    syn = set()
+    b = (blob or "").lower()
+    if re.search(r"o₂|\bo2\b|oxygen|do |dissolved", b):
+        syn |= {"oxygen", "o2", "lox", "reoxygenated", "cones"}
+    if re.search(r"flow|recirc|circulat|make.?up|makeup|level", b):
+        syn |= {"recirculation", "recirc", "make", "up", "drain"}
+    if re.search(r"degas|co2|carbon", b):
+        syn |= {"co2", "degasser", "strip"}
+    if re.search(r"feed|dosing|dose|chemical|alkalin", b):
+        syn |= {"dosing", "feed", "chemical"}
+    return toks | syn
+
+
+def _best_line_for_valve(blob: str, line_rows, used: dict):
+    """Score every line in the list against the valve's service tokens and return the
+    BEST-matching line row (highest token overlap; ties broken toward an as-yet-unused
+    line so successive valves spread across distinct lines rather than stacking on one).
+    Returns a LineRow or None when there is no overlap at all."""
+    vtoks = _valve_service_tokens(blob)
+    if not vtoks or not line_rows:
+        return None
+    best = None
+    best_score = 0
+    for lr in line_rows:
+        ltoks = {t for t in re.split(r"[^a-z0-9₂]+", f"{lr.service} {lr.fluid}".lower())
+                 if len(t) >= 2}
+        score = len(vtoks & ltoks)
+        if score <= 0:
+            continue
+        # small tie-break bonus for a line not yet carrying a valve of this kind
+        adj = score * 10 - used.get(lr.number, 0)
+        if adj > best_score:
+            best_score = adj
+            best = lr
+    return best
+
+
+def _valve_location_and_ref(vtype: str, cid: str, name: str, proc, line_rows, used: dict,
+                            seq_idx: int = 0):
+    """Which line / equipment this valve sits on + its P&ID ref. Each valve is matched to
+    its OWN line by SERVICE (so a flow-control valve cites the recirculation line, an O₂
+    dosing valve cites the oxygen line, a degasser valve cites the CO₂ line) — never a
+    single shared default. Falls back to a service-class line, then to a round-robin over
+    the remaining lines so a block of un-typed valves still spreads across distinct lines
+    instead of all citing line 0. Equipment-mounted bodies (PSV / blanketing) locate to
+    their vessel. Returns (location, pid_ref)."""
     pid_sheet = "FF-PID-001"
     blob = f"{cid} {name}".lower()
     if vtype == "PSV":
@@ -427,21 +611,6 @@ def _valve_location_and_ref(vtype: str, cid: str, name: str, proc, line_rows):
         for nd in proc.nodes:
             if nd.sym in (PID.SYM_COLUMN, PID.SYM_DRUM, PID.SYM_VESSEL, PID.SYM_FIRED):
                 return nd.tag, pid_sheet
-    if vtype in ("PCV",):
-        for lr in line_rows:
-            if re.search(r"purge|recycle|tail", lr.service, re.I) or lr.number.split("-")[1:2] == ["PG"]:
-                return lr.number, pid_sheet
-        # the P&ID puts the purge PCV on a purge/recycle/dosing line — pick the first such.
-        for lr in line_rows:
-            if re.search(r"PG|TG|RC", lr.number):
-                return lr.number, pid_sheet
-    if vtype == "XV":
-        # the P&ID's ESD valve lands on the primary FEED line (first feed/supply line).
-        for lr in line_rows:
-            if re.search(r"feed|supply|blower", lr.service, re.I) or lr.frm_tag.startswith("K"):
-                return lr.number, pid_sheet
-        if line_rows:
-            return line_rows[0].number, pid_sheet
     if vtype == "PV":
         # blanketing protects a STORAGE / SURGE TANK — locate to the first tank, else a
         # named storage/surge vessel, else a generic vessel/drum.  NEVER a feed line.
@@ -455,9 +624,33 @@ def _valve_location_and_ref(vtype: str, cid: str, name: str, proc, line_rows):
             if nd.sym in (PID.SYM_VESSEL, PID.SYM_DRUM):
                 return f"{nd.tag} (storage)", pid_sheet
         return "MEA storage tanks", pid_sheet
-    # manual isolation / fallback: the feed end.
+
+    # ── in-line valves (PCV / XV / manual) — match to the OWN line by service ──
+    match = _best_line_for_valve(blob, line_rows, used)
+    if match is not None:
+        used[match.number] = used.get(match.number, 0) + 1
+        return match.number, pid_sheet
+
+    # service-class fallbacks (the original P&ID placement intent)
+    if vtype == "PCV":
+        for lr in line_rows:
+            if re.search(r"purge|recycle|tail|dos", lr.service, re.I) \
+                    or lr.number.split("-")[1:2] == ["PG"] or re.search(r"PG|TG|RC", lr.number):
+                used[lr.number] = used.get(lr.number, 0) + 1
+                return lr.number, pid_sheet
+    if vtype == "XV":
+        for lr in line_rows:
+            if re.search(r"feed|supply|blower|inlet", lr.service, re.I) or lr.frm_tag.startswith("K"):
+                used[lr.number] = used.get(lr.number, 0) + 1
+                return lr.number, pid_sheet
+
+    # final fallback: ROUND-ROBIN over the lines (least-used first, then by index) so a
+    # block of un-typed isolation valves never all cite line 0.
     if line_rows:
-        return line_rows[0].number, pid_sheet
+        lr = min(line_rows, key=lambda r: (used.get(r.number, 0),
+                                           line_rows.index(r)))
+        used[lr.number] = used.get(lr.number, 0) + 1
+        return lr.number, pid_sheet
     return "—", pid_sheet
 
 
@@ -473,6 +666,8 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
     rows: list[ValveRow] = []
     tag_seq: dict[str, int] = {}
     seen = set()
+    used_lines: dict[str, int] = {}     # line number → how many valves already cite it
+    vseq = 0
     # walk in module order so PSV-201, PSV-202 … read top-to-bottom.
     for w, name, cid in _iter_words(state):
         blob = f"{cid} {name}"
@@ -487,7 +682,11 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
             seen.add(key)
             mods = _mods(w)
             qty = _qty(mods)
-            location, pid_ref = _valve_location_and_ref(prefix, cid, name, proc, line_rows)
+            form_for_match = mods.get("form", "") or ""
+            vseq += 1
+            location, pid_ref = _valve_location_and_ref(
+                prefix, cid, f"{name} {form_for_match}", proc, line_rows,
+                used_lines, vseq)
             # one ISA tag per valve TYPE, numbered in the 200 loop range like the P&ID lines
             tag_seq[prefix] = tag_seq.get(prefix, 200) + 1
             tag = f"{prefix}-{tag_seq[prefix]}"
@@ -673,10 +872,13 @@ def _short(s, n):
 # ASSEMBLY
 # ═══════════════════════════════════════════════════════════════════════════
 
-def reconstruct_schedules(schedule: dict, state: dict) -> Schedules:
-    """Build the three schedules from the P&ID's canonical Process reconstruction."""
-    proc = PID.reconstruct_process(schedule, state)
-    line_rows = build_line_list(proc, schedule, state)
+def reconstruct_schedules(schedule: dict, state: dict,
+                          out_dir: Optional[str] = None) -> Schedules:
+    """Build the three schedules from the P&ID's canonical Process reconstruction.
+    out_dir (optional) lets the line list pull the full routed process-line set from
+    route-manifest.json so the synthesised life-support tie-ins all appear."""
+    proc = PID.reconstruct_process(schedule, state, out_dir)
+    line_rows = build_line_list(proc, schedule, state, out_dir)
     valve_rows = build_valve_list(proc, schedule, state, line_rows)
     instr_rows = build_instrument_index(proc, state, line_rows)
     return Schedules(
@@ -937,8 +1139,8 @@ def _draw_title_block(svg, archetype, width, height, sc: Schedules):
     bw = 300
     bx0 = width - 30 - bw
     by0 = y0 + 10
-    rows = [("DRAWING No.", "FF-PROC-SCH-001"), ("REV", "—   (placeholder)"),
-            ("PAIRS WITH", sc.pid_sheet + " (P&ID)"), ("DATE", "YYYY-MM-DD")]
+    rows = [("DRAWING No.", "FF-PROC-SCH-001"), ("REV", _tb.REV),
+            ("PAIRS WITH", sc.pid_sheet + " (P&ID)"), ("DATE", _ISSUE_DATE or "—  ")]
     rh = 12
     svg.rect(bx0, by0, bw, rh * len(rows), stroke=INK, width=1.1, fill=FILL_BG)
     for i, (k, v) in enumerate(rows):
@@ -965,8 +1167,11 @@ def _draw_title_block(svg, archetype, width, height, sc: Schedules):
 def generate_process_schedules(out_dir: str, state_path: Optional[str] = None,
                                rasterise_png: bool = True):
     """Full pipeline: load (via the P&ID's loader) → reconstruct → render MD + SVG (+ PNG)."""
+    global _ISSUE_DATE
+    # deterministic title-block issue date from the run's own artifacts (set before draw).
+    _ISSUE_DATE = _tb.issue_date(out_dir)
     schedule, state = PID.load_inputs(out_dir, state_path)
-    sc = reconstruct_schedules(schedule, state)
+    sc = reconstruct_schedules(schedule, state, out_dir)
 
     md = render_markdown(sc)
     svg_text = build_table_svg(sc)

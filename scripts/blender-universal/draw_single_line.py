@@ -58,6 +58,7 @@ from typing import Optional
 # schedule). Keyed on load magnitude + the connection model — never product class.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import electrical_distribution_model as edm  # noqa: E402
+import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -348,30 +349,10 @@ def _archetype_name(state: dict, schedule: dict):
 
 
 def _run_issue_date(out_dir: str) -> str:
-    """A DETERMINISTIC issue date (YYYY-MM-DD) for the title block, derived from the run's
-    OWN artifacts — NOT a live clock — so re-rendering the same run gives the same date.
-    Prefers the newest of the chain's authoritative outputs (state.json, the convergence
-    report, the connection schedule); falls back to the out_dir mtime. Returns '' only if
-    nothing is readable (the block then shows '—' rather than the literal placeholder)."""
-    import datetime
-    best = None
-    for name in ("state.json", "convergence-report.json", "connection-schedule.json"):
-        p = Path(out_dir) / name
-        try:
-            if p.is_file():
-                m = p.stat().st_mtime
-                best = m if best is None else max(best, m)
-        except OSError:
-            pass
-    if best is None:
-        try:
-            best = Path(out_dir).stat().st_mtime
-        except OSError:
-            return ""
-    try:
-        return datetime.date.fromtimestamp(best).isoformat()
-    except (OverflowError, OSError, ValueError):
-        return ""
+    """Deterministic title-block issue date (YYYY-MM-DD) from the run's OWN artifacts —
+    now delegated to the shared `drawing_titleblock.issue_date` so all eight drawings use
+    ONE implementation (see drawing_titleblock.py for the full contract)."""
+    return _tb.issue_date(out_dir)
 
 
 # Standard moulded-case / air circuit-breaker frame sizes [A] (BS EN 60947-2 ladder).
@@ -774,6 +755,380 @@ def _group_control_loads(tree: Tree, devices: list):
     main.branches = keep + [feeder]
 
 
+# ── powered-load real-current sizing ─────────────────────────────────────────
+# A powered process LOAD on the board must never read 0.0 A (a placeholder) nor sit at a
+# wholesale fallback default shared across many feeders (the schedule emits ~27 A for
+# every unsized way). Each consuming feeder is sized from its OWN derived electrical kW,
+# resolved deterministically and universally (NO per-class table) by this cascade:
+#   (1) the equipment's published kW in state.requirementsBom — its requirement string
+#       carries '· NN kW ·' for many items (pumps, heat-pump, HEX);
+#   (2) a SPECIFIC electrical *_kw quantity in the contract matched on the load's name
+#       (e.g. a UV unit → uv_lamp_power_kw);
+#   (3) a TYPE-BASED estimate — a powered process unit (UV / oxygenation / degasser /
+#       skimmer / blower / filter drive) always draws power, taken as a duty-weighted
+#       fraction of the plant's principal motor load (the largest pump/driven-motor kW in
+#       the contract, else a share of the connected electrical load). The basis is
+#       surfaced on the feeder so the figure is honest, not a silent guess.
+# A way that is genuinely NON-electrical (a passive vessel / valve body with no drive)
+# is EXCLUDED from the feeder list rather than drawn at 0.0 A.
+
+# Duty-type → fraction of the plant's principal motor load, for a powered unit with no
+# published kW. Universal: keyed on generic equipment tokens, never a product class. The
+# first matching token wins (ordered most-specific first). Values are engineering
+# order-of-magnitude shares of the main recirculation/transfer pump (a degasser blower
+# draws more than a UV bank, which draws more than a metering pump).
+_DUTY_LOAD_FRACTION = [
+    (re.compile(r"degas|de-?gas|co2.?strip|stripp?er|scrubber", re.I),      0.10),
+    (re.compile(r"oxygen|\bo2\b|aeration|aerat|oxygenat", re.I),            0.10),
+    (re.compile(r"ventilat|\bahu\b|\bhrv\b|air.?handl", re.I),              0.14),
+    (re.compile(r"blower|\bfan\b|compressor|extract", re.I),               0.12),
+    (re.compile(r"ozone|\buv\b|disinfect|sterilis|steriliz|reactor", re.I), 0.08),
+    (re.compile(r"protein.?skim|skimmer|foam.?fraction|flotation", re.I),   0.06),
+    (re.compile(r"drum.?filter|screen|strainer|backwash|\bfilter\b", re.I), 0.05),
+    (re.compile(r"chiller|refriger|chilling|\bice\b", re.I),                0.20),
+    (re.compile(r"heat.?exchang|\bhex\b", re.I),                            0.18),
+    # packaged ancillary life-support systems (sludge/grading/mortality/effluent/intake/
+    # biosecurity/feed) — modest mechanical handling loads, each distinct from the next.
+    (re.compile(r"sludge|solids|thicken|dewater|centrifuge", re.I),         0.07),
+    (re.compile(r"grading|harvest|live.?fish|fish.?handl|transfer", re.I),  0.05),
+    (re.compile(r"mortalit|morts", re.I),                                   0.04),
+    (re.compile(r"effluent|discharge|outfall", re.I),                       0.06),
+    (re.compile(r"intake|make.?up.?treat|inlet.?treat", re.I),              0.06),
+    (re.compile(r"biosecurit|quarantine|disinfection.?bath", re.I),         0.03),
+    (re.compile(r"feed\b|feeder|feeding|silo", re.I),                       0.04),
+    (re.compile(r"pump|circulat|recirc", re.I),                             0.30),
+    (re.compile(r"dosing|metering|chemical|alkalin", re.I),                 0.03),
+    (re.compile(r"mixer|agitator|stirrer|conveyor|auger|screw", re.I),      0.08),
+    (re.compile(r"heater|element|immersion", re.I),                         0.15),
+    # control / instrument distribution — a small parasitic load, NOT a process duty. Split
+    # by sub-type with DISTINCT small fractions so a controls block isn't one flat value (a
+    # UPS carries the standby load, SCADA/PLC the compute, a network switch barely anything).
+    (re.compile(r"\bups\b|uninterruptible", re.I),                         0.030),
+    (re.compile(r"scada|\bplc\b|main.?controller|control.?system", re.I),  0.020),
+    (re.compile(r"control.?panel|\bmcc\b|distribution.?panel|local.?control", re.I), 0.025),
+    (re.compile(r"controller.?power|power.?supply|\bpsu\b", re.I),         0.015),
+    (re.compile(r"gateway|\bi/o\b|io.?module|signal.?condition", re.I),    0.012),
+    (re.compile(r"network|switch|comms?\b|ethernet", re.I),                0.008),
+    (re.compile(r"control|instrument|monitor", re.I),                      0.018),
+    (re.compile(r"valve|actuat|damper|gate|solenoid", re.I),                0.01),
+]
+# A way whose name reads as a passive/non-electrical item (a tank/vessel/pipe with no
+# drive or powered package) — never invent a feeder current for it; drop it from the bus.
+_NON_ELECTRICAL_LOAD_RE = re.compile(
+    r"\btank\b|vessel|sump|basin|column\b|cone\b|pipe|duct\b|manifold|header|"
+    r"weir|sieve\s*plate|baffle|gasket|flange|nozzle|bund|plinth|gantry|walkway|"
+    r"hand\s*rail|ladder|grating|\bbund\b|\bskid\b", re.I)
+# Tokens that PROVE a way IS electrically driven even if its name also brushes a passive
+# token (e.g. an 'oxygenation cone' is the powered O2 SYSTEM; a 'filter' has a drive).
+_POWERED_LOAD_RE = re.compile(
+    r"pump|compressor|blower|\bfan\b|motor|drive|\buv\b|ozone|oxygen|\bo2\b|aeration|"
+    r"degas|skim|disinfect|sterilis|steriliz|chiller|refriger|heat.?pump|exchanger|"
+    r"filter|drum|mixer|agitator|conveyor|heater|reactor|system|unit|package|plant", re.I)
+
+
+def _req_bom_kw(name: str, state: dict):
+    """The equipment's published electrical kW from state.requirementsBom, matched on the
+    requirement string's HEAD noun (the text before its first '·'). Universal — the
+    requirement rows carry '· NN kW ·' for many items. Returns kW (float) or None."""
+    rb = state.get("requirementsBom")
+    if not isinstance(rb, list) or not rb:
+        return None
+    target = _norm_load_name(name)
+    if not target:
+        return None
+    best = None       # (overlap, kw) — most token overlap with the head noun wins
+    t_toks = set(target.split())
+    for row in rb:
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or "")
+        head = req.split("·", 1)[0]
+        # reject a WHOLE-PLANT figure (e.g. SCADA '· 342 kW plant') — that is the connected
+        # plant load, NOT this item's own draw; reading it as a feeder vastly over-sizes it.
+        if re.search(r"·\s*[\d.,]+\s*kW\s*(plant|site|total|connected|aggregate|whole)",
+                     req, re.I):
+            continue
+        m = re.search(r"·\s*([\d.,]+)\s*kW\b", req)
+        if not m:
+            continue
+        h_toks = set(_norm_load_name(head).split())
+        if not h_toks:
+            continue
+        # require the load name's tokens to be a subset/equal of the head (so 'Heat Pump'
+        # matches 'Heat Pump · 96 kW' but not 'Heat Exchanger · 96 kW').
+        overlap = len(t_toks & h_toks)
+        if overlap == 0 or overlap < len(t_toks):
+            continue
+        try:
+            kw = float(m.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if kw <= 0:
+            continue
+        if best is None or overlap > best[0]:
+            best = (overlap, kw)
+    return best[1] if best else None
+
+
+def _principal_motor_kw(state: dict, quantities: dict):
+    """The plant's principal motor load [kW] — the anchor for type-based estimates. The
+    largest electrical motor/drive/pump *_kw quantity, else a share of the connected load.
+    Universal — read from the contract, never hard-coded per class."""
+    best = 0.0
+    for k, v in (quantities or {}).items():
+        kl = k.lower()
+        if not kl.endswith("_kw"):
+            continue
+        if _FEEDER_THERMAL_KW_RE.search(kl) and not _FEEDER_ELEC_KW_RE.search(kl):
+            continue
+        if not re.search(r"pump|motor|drive|fan|blower|compressor", kl):
+            continue
+        val = v.get("value") if isinstance(v, dict) else v
+        try:
+            val = float(val)
+        except (TypeError, ValueError):
+            continue
+        best = max(best, val)
+    if best > 0:
+        return best
+    # no motor quantity: fall back to a quarter of the connected electrical load.
+    load = _q(state, "connected_electrical_load_kw") or _q(state, "total_supply_demand_kw")
+    return (load * 0.25) if load else 0.0
+
+
+def _type_based_load_kw(name: str, state: dict, quantities: dict):
+    """A deterministic, plausible electrical kW for a powered process unit with no
+    published figure — its duty-type fraction × the plant's principal motor load.
+    Universal (duty-keyed, not class-keyed). Returns (kw, basis) or (None, '')."""
+    anchor = _principal_motor_kw(state, quantities)
+    if anchor <= 0:
+        return None, ""
+    low = (name or "").lower()
+    for rx, frac in _DUTY_LOAD_FRACTION:
+        if rx.search(low):
+            kw = round(anchor * frac, 1)
+            if kw <= 0:
+                continue
+            return kw, f"≈{int(frac * 100)}% of principal motor load (type estimate)"
+    # an unrecognised powered way: a modest 5% of the principal motor load.
+    kw = round(anchor * 0.05, 1)
+    return (kw if kw > 0 else None), ("≈5% of principal motor load (type estimate)"
+                                      if kw > 0 else "")
+
+
+def _derive_load_kw(name: str, state: dict, quantities: dict):
+    """Resolve ONE powered load's electrical kW deterministically: requirementsBom →
+    contract *_kw quantity → type-based estimate. Returns (kw, basis) or (None, '')."""
+    base = re.sub(r"\s*[×x]\s*\d+\s*$", "", name or "").strip()
+    kw = _req_bom_kw(base, state)
+    if kw and kw > 0:
+        return kw, "requirementsBom"
+    kw = _feeder_specific_kw(base, quantities)
+    if kw and kw > 0:
+        return kw, "contract quantity"
+    return _type_based_load_kw(base, state, quantities)
+
+
+def _is_non_electrical_load(name: str) -> bool:
+    """True when a way reads as a PASSIVE / non-electrical item (a tank / vessel / pipe /
+    valve body with no drive or powered package) — it must be excluded from the feeder
+    list, not drawn at 0.0 A. A name that ALSO carries a powered token (pump / UV /
+    oxygenation system / filter drive) is electrical and kept."""
+    if _POWERED_LOAD_RE.search(name or ""):
+        return False
+    return bool(_NON_ELECTRICAL_LOAD_RE.search(name or ""))
+
+
+def _size_powered_load_feeders(tree: Tree, state: dict):
+    """UNIVERSAL: guarantee every powered LOAD feeder carries a real, per-load current.
+
+    A consuming feeder must never render 0.0 A (a placeholder) nor sit at the wholesale
+    schedule default (the unsized ~27 A every way inherits). Walks each load branch on the
+    main bus + every sub-board and, where the branch is a powered load whose current is
+    zero OR pinned to the dominant default value, re-derives the current from the load's
+    OWN electrical kW (requirementsBom → contract quantity → duty-type estimate) and
+    re-picks its cable. A genuinely non-electrical way (a passive tank/vessel/valve with no
+    drive) is removed from the bus instead. Deterministic; archetype-agnostic.
+
+    The board/incomer current is set separately from the converged headline (see
+    _apply_converged_incomer) and is left untouched here — this only sizes the OUTGOING
+    consuming feeders."""
+    quantities = {}
+    for ck in ("orchestratorContract", "engineeringContract"):
+        q = (state.get(ck) or {}).get("quantities")
+        if isinstance(q, dict) and q:
+            quantities = q
+            break
+    voltage_v = _board_voltage_v(tree, state)
+
+    # gather every consuming LOAD branch (main bus + sub-board branches), excluding
+    # transformer / sub-distribution carriers (those are structural, not loads).
+    def _load_branches(bus: "Bus"):
+        out = []
+        for br in bus.branches:
+            if br.sub_bus is not None or br.target_sym == SYM_TRANSFORMER:
+                if br.sub_bus is not None:
+                    out.extend(_load_branches(br.sub_bus))
+                continue
+            out.append((bus, br))
+        return out
+
+    pairs = _load_branches(tree.main_bus)
+
+    # The "default" current to break up = the value shared by the most load feeders (the
+    # schedule's wholesale fallback, e.g. 27.4 A on every unsized way). A feeder pinned to
+    # it is treated as unsized and re-derived from its own kW.
+    from collections import Counter
+    amps = [round(_rating_amps(br), 1) for _b, br in pairs if _rating_amps(br) > 0]
+    default_val = None
+    if amps:
+        val, n = Counter(amps).most_common(1)[0]
+        if n >= 3 and n / len(amps) > 0.30:
+            default_val = val
+
+    drop: list[tuple] = []      # (bus, branch) to remove (non-electrical)
+    for bus, br in pairs:
+        cur = _rating_amps(br)
+        name = br.label or br.to_node or ""
+        is_zero = cur <= 0.0
+        is_default = (default_val is not None
+                      and abs(round(cur, 1) - default_val) < 0.05
+                      and not getattr(br, "_kw_derived", False))
+        if not (is_zero or is_default):
+            continue
+        # a passive / non-electrical way at 0.0 A must be dropped, not invented.
+        if is_zero and _is_non_electrical_load(name):
+            drop.append((bus, br))
+            continue
+        kw, basis = _derive_load_kw(name, state, quantities)
+        if not kw or kw <= 0:
+            # could not derive ANY load and the way reads non-electrical → drop it;
+            # otherwise leave it (a real but unsized way keeps its schedule rating).
+            if is_zero and not _POWERED_LOAD_RE.search(name):
+                drop.append((bus, br))
+            continue
+        i_a = edm._3ph_current_a(kw, voltage_v)
+        lbl, _isb = edm._cable_or_busbar_label(i_a)
+        br.rating = _fmt_a(i_a)
+        br.cable = lbl
+        br._kw_derived = True            # type: ignore[attr-defined]
+        br._load_basis = basis           # type: ignore[attr-defined]
+    if drop:
+        ids = {id(br) for _b, br in drop}
+        tree.main_bus.branches = [b for b in tree.main_bus.branches if id(b) not in ids]
+        for br in tree.main_bus.branches:
+            if br.sub_bus is not None:
+                br.sub_bus.branches = [b for b in br.sub_bus.branches
+                                       if id(b) not in ids]
+
+    # ── add a feeder for each SYNTHESISED powered SYSTEM/UTILITY the bus is missing ──
+    # The engine routes process water to every packaged life-support system (feed / sludge /
+    # chilling / mortality / effluent / intake / biosecurity / grading / standby genset / …)
+    # but does NOT always emit a power edge for it, so it never reaches the single-line.
+    # Each such system DOES draw power, so project a feeder for it from its OWN derived kW
+    # (requirementsBom → contract → duty-type) — so the single-line shows the real load list,
+    # each at its own current, not a block sharing one default. Universal — keyed on the
+    # BoM status + a powered-package name, never a class.
+    _add_synthesised_system_feeders(tree, state, quantities, voltage_v)
+
+
+def _add_synthesised_system_feeders(tree: "Tree", state: dict, quantities: dict,
+                                    voltage_v: float):
+    """Append a main-board feeder for each SYNTHESISED powered SYSTEM/UTILITY equipment item
+    (status SYSTEM / UTILITY in requirementsBom) that is a powered package and is not already
+    a feeder on the bus. Sized from the item's OWN derived kW. Deterministic + universal."""
+    rb = state.get("requirementsBom")
+    if not isinstance(rb, list) or not rb:
+        return
+    main = tree.main_bus
+    # names already represented anywhere on the bus (so we don't duplicate a feeder).
+    present: set = set()
+
+    def _collect_names(bus):
+        for br in bus.branches:
+            present.add(_norm_load_name(br.label or br.to_node or ""))
+            if br.sub_bus is not None:
+                _collect_names(br.sub_bus)
+    _collect_names(main)
+
+    # a packaged system that genuinely draws power (excludes pure storage media / structural)
+    powered = re.compile(
+        r"system|skid|package|plant|unit|treatment|handling|ventilation|generator|genset|"
+        r"\bups\b|chilling|grading|harvest|mortalit|effluent|intake|biosecurit|sludge|"
+        r"dosing|make.?up|feed|pump|blower|compressor", re.I)
+    # things that are NOT a discrete LOAD feeder: passive media / structural / piping, AND
+    # a standby generator (it is a SOURCE drawn on the incomer side, not an outgoing load).
+    not_feeder = re.compile(
+        r"\bmedia\b|carrier|biofilm|structural|support frame|enclosure|reservoir|"
+        r"expansion|frame|pipework|manifold|bund|gantry|walkway|"
+        r"generator|genset|\bgenerating\b|standby diesel", re.I)
+
+    devices = extract_devices(state)
+    added = 0
+    seen_names: set = set()
+    for row in rb:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("status") or "") not in ("SYSTEM", "UTILITY"):
+            continue
+        req = str(row.get("requirement") or "")
+        name = req.split("·")[0].strip()
+        if not name or not powered.search(name) or not_feeder.search(name):
+            continue
+        nkey = _norm_load_name(name)
+        if not nkey or nkey in seen_names:
+            continue
+        # already a feeder (by strong token overlap with an existing branch)?
+        ntoks = set(nkey.split())
+        if any(ntoks and len(ntoks & set(p.split())) >= max(1, len(ntoks) - 1)
+               for p in present):
+            continue
+        kw, basis = _derive_load_kw(name, state, quantities)
+        if not kw or kw <= 0:
+            continue
+        seen_names.add(nkey)
+        i_a = edm._3ph_current_a(kw, voltage_v)
+        lbl, _isb = edm._cable_or_busbar_label(i_a)
+        # a standby genset is a SOURCE, not a load feeder — show it as a feeder labelled so,
+        # since the single-line's standby branch is drawn elsewhere; skip if already shown.
+        br = Branch(from_node=main.tag, to_node=name, label=_short_system_label(name),
+                    rating=_fmt_a(i_a), cable=lbl, voltdrop="", count=1, role="branch")
+        br._kw_derived = True            # type: ignore[attr-defined]
+        br._load_basis = basis           # type: ignore[attr-defined]
+        cb = _pick_device(devices, kind="breaker")
+        if cb:
+            br.devices.append(_as_device(cb, "breaker", "CB"))
+        main.branches.append(br)
+        present.add(nkey)
+        added += 1
+        if added >= 24:                  # safety cap — never explode the diagram
+            break
+
+
+def _short_system_label(name: str, maxlen: int = 30) -> str:
+    """Trim a packaged-system name for the feeder label (drop a trailing parenthetical)."""
+    n = re.sub(r"\s*\([^)]*\)\s*$", "", name or "").strip()
+    return n if len(n) <= maxlen else n[:maxlen - 1] + "…"
+
+
+def _board_voltage_v(tree: Tree, state: dict) -> float:
+    """The MAIN board's L-L voltage [V] for kW↔A on the outgoing feeders. Prefer an
+    explicit AC/DC system voltage in state; else parse the bus voltage label; else the
+    standard 415 V LV board. Deterministic."""
+    v = _q(state, "ac_output_voltage_v") or _q(state, "ac_voltage_v")
+    if v and 100.0 <= v <= 1000.0:
+        return v
+    m = re.search(r"([\d,]+)\s*V", str(tree.main_bus.voltage or ""))
+    if m:
+        try:
+            cand = float(m.group(1).replace(",", ""))
+            if 100.0 <= cand <= 50000.0:
+                return cand
+        except ValueError:
+            pass
+    return 415.0
+
+
 def _apply_converged_incomer(tree: Tree, state: dict):
     """UNIVERSAL: drive the MAIN board current + the INCOMER feeder/breaker from the ONE
     authoritative source — the physics<->CAD convergence report (feeder_current_a /
@@ -1096,6 +1451,12 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # load feeder. Strip those before grouping so the main breaker stays the incomer
     # device, the SPD a bus shunt, and the busbar the bus (not a 54 A load tap).
     _strip_board_element_feeders(tree)
+    # UNIVERSAL: a powered process LOAD must never render 0.0 A nor sit at the wholesale
+    # schedule default — size each consuming feeder from its OWN derived electrical kW
+    # (requirementsBom → contract quantity → duty-type estimate); drop a genuinely
+    # non-electrical way rather than draw it at 0.0 A. Done after board elements are
+    # stripped (so only real loads remain) and before the converged-incomer pass.
+    _size_powered_load_feeders(tree, state)
     # UNIVERSAL: drive the board current + incomer feeder/breaker from the ONE converged
     # source (convergence-report feeder_current_a / feeder_size) so the whole set reads a
     # single headline current, with a real incomer cable + a sized breaker frame.
@@ -2122,7 +2483,7 @@ def _draw_title_block(svg: SVG, tree: Tree, width, height, title_h):
     bx0 = x1 - bw
     by0 = y0 + 14
     rows = [("DRAWING No.", "FF-SLD-001"),
-            ("REV", tree.rev or "P1"),
+            ("REV", _tb.REV),
             ("DATE", tree.date or "—  "),
             ("SCALE", "NTS")]
     rh = 22

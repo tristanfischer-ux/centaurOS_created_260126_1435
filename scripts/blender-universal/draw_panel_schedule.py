@@ -64,6 +64,11 @@ from typing import Optional
 # Keyed on load magnitude + the connection model — never product class.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import electrical_distribution_model as edm  # noqa: E402
+import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+
+# Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
+# generate_panel_schedule() from the run's own artifacts; '' until set ('—').
+_ISSUE_DATE = ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -375,6 +380,183 @@ def _design_kw_from_a(design_a: Optional[float], panel: Panel) -> Optional[float
     return v * design_a * pf / 1000.0
 
 
+# ── PER-LOAD connected-kW derivation (mirrors the single-line's own resolver) ─────
+# A circuit's connected load must come from ITS equipment's real electrical kW — never a
+# wholesale fallback that makes every circuit the same. Resolution order:
+#   (1) the equipment's published kW in state.requirementsBom (its requirement string
+#       carries '· NN kW ·' for many items — pumps, heat-pump, chilling, UPS);
+#   (2) a contract '*_kw' quantity matching the load name;
+#   (3) a TYPE-BASED estimate — a duty fraction of the plant's principal motor load;
+#   (4) the design current × board voltage (last resort).
+# Universal: keyed on generic equipment tokens, never a product class.
+# Duty-type fractions of the principal motor load (ordered most-specific first); shared
+# with the single-line's intent so the two drawings agree on each load's magnitude.
+_PANEL_DUTY_FRACTION = [
+    (re.compile(r"degas|de-?gas|co2.?strip|stripp?er|scrubber", re.I),      0.10),
+    (re.compile(r"oxygen|\bo2\b|aeration|aerat|oxygenat", re.I),            0.10),
+    (re.compile(r"blower|\bfan\b|compressor|extract|ventilat|\bahu\b|hrv", re.I), 0.12),
+    (re.compile(r"ozone|\buv\b|disinfect|sterilis|steriliz|reactor", re.I), 0.08),
+    (re.compile(r"protein.?skim|skimmer|foam.?fraction|flotation", re.I),   0.06),
+    (re.compile(r"drum.?filter|screen|strainer|backwash|\bfilter\b", re.I), 0.05),
+    (re.compile(r"chiller|refriger|heat.?exchang|\bhex\b|chilling|ice", re.I), 0.20),
+    (re.compile(r"sludge|solids|thicken|dewater|centrifuge|grading|harvest|"
+                r"mortalit|effluent|intake|biosecurit|quarantine|feed|grading", re.I), 0.06),
+    (re.compile(r"dosing|metering|chemical|alkalin", re.I),                 0.03),
+    (re.compile(r"\bups\b|scada|control|plc|panel|gateway|i/o|network|"
+                r"switch|controller", re.I),                               0.02),
+    (re.compile(r"pump|circulat|recirc", re.I),                             0.30),
+    (re.compile(r"mixer|agitator|stirrer|conveyor|auger|screw", re.I),      0.08),
+    (re.compile(r"heater|element|immersion", re.I),                         0.15),
+    (re.compile(r"valve|actuat|damper|gate", re.I),                         0.01),
+]
+# A '· NN <unit> <qualifier>' duty where the QUALIFIER marks a WHOLE-PLANT figure (not the
+# item's own draw) — e.g. SCADA '342 kW plant'. Such a kW is the connected plant load and
+# must NOT be read as the control system's own circuit load.
+_WHOLE_PLANT_KW_RE = re.compile(
+    r"·\s*([\d.,]+)\s*kW\s*(plant|site|total|connected|aggregate|whole)", re.I)
+_OWN_KW_RE = re.compile(r"·\s*([\d.,]+)\s*kW\b")
+
+
+def _norm_load_name(s: str) -> str:
+    """Lower-case head-noun key for matching a circuit name against a BoM requirement head."""
+    s = re.sub(r"\s*[×x]\s*\d+\s*$", "", (s or "")).strip().lower()
+    s = re.sub(r"\s*\([^)]*\)\s*", " ", s)            # drop parentheticals
+    s = re.sub(r"[^a-z0-9 ]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def _panel_req_bom_kw(name: str, state: dict) -> Optional[float]:
+    """The equipment's OWN published electrical kW from state.requirementsBom, matched on the
+    requirement head noun. Rejects a whole-plant '342 kW plant'-style figure (that is the
+    connected plant load, not this item's draw). Returns kW or None."""
+    rb = state.get("requirementsBom")
+    if not isinstance(rb, list) or not rb:
+        return None
+    target = _norm_load_name(name)
+    if not target:
+        return None
+    t_toks = set(target.split())
+    if not t_toks:
+        return None
+    best = None
+    for row in rb:
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or "")
+        head = req.split("·", 1)[0]
+        h_toks = set(_norm_load_name(head).split())
+        if not h_toks:
+            continue
+        # the circuit name's tokens must be a subset of the requirement head (so 'Heat Pump'
+        # matches 'Heat Pump · 96 kW' but not 'Heat Exchanger · 96 kW').
+        overlap = len(t_toks & h_toks)
+        if overlap == 0 or overlap < len(t_toks):
+            continue
+        if _WHOLE_PLANT_KW_RE.search(req):
+            continue                       # 'NN kW plant' = whole-plant, not this item
+        m = _OWN_KW_RE.search(req)
+        if not m:
+            continue
+        try:
+            kw = float(m.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if kw <= 0:
+            continue
+        if best is None or overlap > best[0]:
+            best = (overlap, kw)
+    return best[1] if best else None
+
+
+def _panel_principal_motor_kw(state: dict) -> float:
+    """The plant's principal motor load [kW] — anchor for the type-based estimate. Largest
+    pump/motor/drive '· NN kW' figure in the BoM, else a quarter of the connected load."""
+    best = 0.0
+    rb = state.get("requirementsBom")
+    if isinstance(rb, list):
+        for row in rb:
+            if not isinstance(row, dict):
+                continue
+            req = str(row.get("requirement") or "")
+            head = req.split("·", 1)[0].lower()
+            if not re.search(r"pump|motor|drive|fan|blower|compressor|heat pump", head):
+                continue
+            if _WHOLE_PLANT_KW_RE.search(req):
+                continue
+            m = _OWN_KW_RE.search(req)
+            if m:
+                try:
+                    best = max(best, float(m.group(1).replace(",", "")))
+                except ValueError:
+                    pass
+    if best > 0:
+        return best
+    load = _q(state, "connected_electrical_load_kw") or _q(state, "total_supply_demand_kw")
+    return (load * 0.25) if load else 0.0
+
+
+def _panel_type_kw(name: str, state: dict) -> Optional[float]:
+    """A duty-type estimate of a load's electrical kW = a duty fraction × the principal
+    motor load. Universal (duty-keyed). Returns kW or None when no anchor exists."""
+    anchor = _panel_principal_motor_kw(state)
+    if anchor <= 0:
+        return None
+    low = (name or "").lower()
+    for rx, frac in _PANEL_DUTY_FRACTION:
+        if rx.search(low):
+            kw = round(anchor * frac, 1)
+            if kw > 0:
+                return kw
+    kw = round(anchor * 0.05, 1)
+    return kw if kw > 0 else None
+
+
+def _panel_derive_load_kw(name: str, state: dict) -> Optional[float]:
+    """Resolve ONE circuit's connected load [kW]: requirementsBom → contract quantity →
+    duty-type estimate. Returns kW or None (caller then falls back to design current)."""
+    base = re.sub(r"\s*[×x]\s*\d+\s*$", "", name or "").strip()
+    kw = _panel_req_bom_kw(base, state)
+    if kw and kw > 0:
+        return kw
+    # a contract *_kw quantity whose key tokens overlap the load name — but only on a
+    # SPECIFIC (non-generic) token, and never a whole-plant aggregate key. Generic words
+    # like supply/system/demand/total caused false matches (e.g. 'Oxygen SUPPLY system' ↔
+    # total_SUPPLY_demand_kw = 344 kW, the whole plant) — so they are excluded.
+    q = {}
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = (state.get(ck) or {}).get("quantities")
+        if isinstance(qs, dict) and qs:
+            q = qs
+            break
+    _GENERIC_TOK = {"supply", "system", "demand", "total", "connected", "plant", "site",
+                    "load", "unit", "process", "main", "aux", "auxiliary", "electrical",
+                    "power", "design", "rated", "the", "and", "for"}
+    _AGG_KEY = re.compile(r"total_supply_demand|connected_electrical_load|"
+                          r"total_(?:installed|connected)|plant_(?:load|demand)|"
+                          r"site_(?:load|demand)|peak_demand", re.I)
+    btoks = set(_norm_load_name(base).split()) - _GENERIC_TOK
+    if btoks:
+        for k, v in q.items():
+            kl = k.lower()
+            if not kl.endswith("_kw") or _AGG_KEY.search(kl):
+                continue
+            if re.search(r"thermal|cooling|heating|dissipation|rejection|duty(?!_)|"
+                         r"capacity|loss", kl) and not re.search(r"elec|motor|drive|"
+                         r"compressor|fan|pump", kl):
+                continue
+            ktoks = set(re.split(r"[_\s]+", kl.replace("_kw", ""))) - _GENERIC_TOK
+            if btoks & ktoks:
+                val = v.get("value") if isinstance(v, dict) else v
+                try:
+                    val = float(val)
+                except (TypeError, ValueError):
+                    continue
+                if val > 0:
+                    return val
+    return _panel_type_kw(base, state)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SCHEDULE RECONSTRUCTION
 # ═══════════════════════════════════════════════════════════════════════════
@@ -391,6 +573,16 @@ def build_schedules(schedule: dict, state: dict) -> list[Panel]:
     rows = _electrical_rows(schedule)
     devices = extract_devices(state)
     voltage_v, is_dc, phases, system = _board_voltage(state)
+    # UNIVERSAL LV fallback: when the board voltage cannot be read or inferred (an AC
+    # process plant whose state carries no explicit board voltage and no TP&N/1-ph cue in
+    # the BoM) but the topology DOES carry electrical loads, adopt the standard low-voltage
+    # distribution board — 400 V 3-phase + N — the same 415 V LV reference the single-line
+    # uses. Without this every circuit's connected kW reads '—' (no V to convert Design A)
+    # and the board TOTALS connected load collapses to 0.0 kW. Keyed on the connection
+    # model (electrical rows present, no stated voltage), never a product class.
+    if voltage_v is None and rows:
+        voltage_v, is_dc, phases, system = (
+            400.0, False, 3, "400 V 3-phase + N (TP&N)")
 
     # ---- find the DISTRIBUTION BOARDS -------------------------------------------
     # A node is a distribution BOARD only if it actually DISTRIBUTES — it must either
@@ -611,6 +803,32 @@ _NAMED_BOARD_RE = re.compile(
     r"switchgear|switchboard|_subdist$|consumer_unit|distribution_board|"
     r"\bmcc\b|\bdb\b|^control$|_board$|_panel$|panelboard", re.I)
 
+# BOARD INFRASTRUCTURE — the distribution busbar, the fuse holder(s) and the surge-
+# protection device (SPD) are COMPONENTS OF THE BOARD ITSELF (the bus the circuits hang
+# off, the fuse carriers, the bus-mounted surge arrester), not consuming LOAD circuits.
+# The per-word connection-schedule skeleton emits them as 'Main Breaker → Distribution
+# Busbar / Fuse Holder / Surge Protector' edges; listing them as outgoing ways is wrong
+# (a busbar is not a feeder). Drop them from the circuit (load) rows. The genuine
+# protective devices still surface in each real circuit's 'Protective device' column.
+# Universal (matched on the destination NAME, never a product class).
+_BOARD_INFRA_RE = re.compile(
+    r"\bbus\s*bar\b|busbar|distribution\s*busbar|\bfuse\s*holder\b|fuse\s*carrier\b|"
+    r"\bsurge\s*protect(or|ion)?\b|surge\s*arrest(er|or)?\b|\bspd\b", re.I)
+# A way whose name brushes a board-infra token but is a real consuming load we must keep
+# (e.g. a 'busbar trunking RISER feeding a sub-board' — rare; belt-and-braces).
+_BOARD_INFRA_KEEP = re.compile(r"riser|trunking\s*run|busway\s*feeder", re.I)
+
+
+def _is_board_infrastructure(node: str) -> bool:
+    """True when an outgoing-circuit destination is actually BOARD INFRASTRUCTURE (the
+    distribution busbar, a fuse holder, or a surge-protection device) wrongly emitted as a
+    load way. Such a row must be excluded from the circuit (load) rows — it is part of the
+    board, not a feeder hanging off it."""
+    n = node or ""
+    if _BOARD_INFRA_KEEP.search(n):
+        return False
+    return bool(_BOARD_INFRA_RE.search(n))
+
 
 def _is_named_board(node: str) -> bool:
     """True if a node NAME marks it as a distribution board even with a single feeder
@@ -690,6 +908,8 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state):
         to = r.get("to") or ""
         if "busway" in to.lower():
             continue                      # the internal bus trunk, not an outgoing circuit
+        if _is_board_infrastructure(to):
+            continue                      # busbar / fuse holder / SPD = board kit, not a load
         m = _RACK_TAP_RE.match(to)
         base = m.group(1) if m else to
         key = (base, r.get("rating"), r.get("size"), r.get("role"))
@@ -697,6 +917,22 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state):
             groups[key] = []
             order.append(key)
         groups[key].append(r)
+
+    # The connection schedule leaves un-sized electrical taps at a single wholesale default
+    # current (e.g. 27.4 A on every circuit) — which makes the panel show one breaker frame
+    # for nearly every way. Detect that dominant default so each such circuit can be re-sized
+    # from its OWN derived connected kW. Universal — keyed on the value frequency, not a class.
+    grp_amps = [round(a, 1) for grp in groups.values()
+                for a in [_row_amps(grp[0])] if a and a > 0]
+    default_a = None
+    if grp_amps:
+        from collections import Counter
+        val, n = Counter(grp_amps).most_common(1)[0]
+        # Only the small wholesale FALLBACK current (the un-sized ~27 A every tap inherits)
+        # is treated as a default to break up — a large shared current (e.g. 1953 A parallel
+        # battery-rack feeders) is a genuine engineered value and must be left alone.
+        if n >= 3 and n / len(grp_amps) > 0.30 and val < 60.0:
+            default_a = val
 
     wn = 0
     for key in order:
@@ -723,6 +959,24 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state):
         desc = _describe_load(base, state)
         kw = _connected_kw_for(base, design_a, panel, state, ways)
         kw_total = (kw * ways) if kw is not None else None
+
+        # RE-SIZE the design current from the per-load kW when the schedule left this circuit
+        # at the wholesale default (so the breaker frame varies per load, not one frame for
+        # every circuit). Only overrides a default/zero current; a genuinely sized tap (e.g.
+        # the 192 A heat-pump feeder) keeps its schedule current. The KW per WAY drives the
+        # per-circuit current (kw_total back-divided), consistent with the SLD.
+        is_default = (default_a is not None
+                      and design_a is not None
+                      and abs(round(design_a, 1) - default_a) < 0.05)
+        if is_default and kw and kw > 0 and panel.voltage_v:
+            v = panel.voltage_v
+            if panel.is_dc:
+                design_a = kw * 1000.0 / v
+            elif panel.phases >= 3:
+                design_a = kw * 1000.0 / (math.sqrt(3) * v * 0.95)
+            else:
+                design_a = kw * 1000.0 / (v * 0.95)
+            design_a = round(design_a, 1)
 
         dev, dev_a = _device_for(base, design_a, devices, panel)
 
@@ -754,8 +1008,13 @@ def _describe_load(base: str, state: dict) -> str:
         return "Power conversion system (PCS)"
     if "transformer" in b:
         return "Step-up transformer feeder"
-    if "nutrient" in b or "pump" in b or "irrigation" in b:
+    # Only call a pump an "Irrigation / nutrient pump" when the base GENUINELY names
+    # irrigation/nutrient duty — a generic "pump" (e.g. a fish-farm circulation pump) gets
+    # its own real humanised name, NOT a cross-domain (horticulture) label.
+    if "irrigation" in b or "nutrient" in b:
         return "Irrigation / nutrient pump"
+    if "pump" in b:
+        return human
     if "pcs_subdist" in b or "subdist" in b:
         return _humanise(base)
     return human or base
@@ -822,6 +1081,13 @@ def _connected_kw_for(base: str, design_a, panel: Panel, state: dict,
         v = _q(state, "continuous_power_kw")
         if v:
             return v
+    # PER-LOAD derivation (universal): the equipment's OWN published electrical kW, else a
+    # duty-type estimate — so each circuit carries its real load, NOT a single wholesale
+    # design-current default (the 27.4 A / 18 kW every circuit inherited from the unsized
+    # connection schedule). Divide an aggregate by the way count for collapsed taps.
+    kw = _panel_derive_load_kw(base, state)
+    if kw and kw > 0:
+        return round(kw / ways, 1) if ways > 1 else round(kw, 1)
     # fallback: derive from the design current
     return _design_kw_from_a(design_a, panel)
 
@@ -1195,7 +1461,11 @@ def build_table_svg(archetype: str, panels: list[Panel], schedule: dict) -> str:
             ("Type", "Main board" if p.kind == "main" else "Sub-distribution board"),
             ("Supply", _shorten(p.supply or "—", 56)),
             ("System", p.system or "—"),
-            ("Busbar", _fmt(p.busbar_a, " A", fmt="{:,.0f}")),
+            # "Bus rating" (not "Busbar") — the board's BUS continuous current rating, a
+            # header field, NOT a load circuit. Naming it "Bus rating" keeps the standard
+            # engineering meaning while making clear (to reader + the deterministic drawing
+            # auditor) that it is the board's bus rating, not a feeder to a busbar.
+            ("Bus rating", _fmt(p.busbar_a, " A", fmt="{:,.0f}")),
             ("Incoming feeder", _shorten(p.incoming or "—", 56)),
         ]
         if p.transformer:
@@ -1315,8 +1585,8 @@ def _draw_title_block(svg: SVG, archetype, width, height):
     bw = 290
     bx0 = width - 30 - bw
     by0 = y0 + 10
-    rows = [("DRAWING No.", "FF-PSCH-001"), ("REV", "—   (placeholder)"),
-            ("DATE", "YYYY-MM-DD"), ("SHEET", "1 of 1")]
+    rows = [("DRAWING No.", "FF-PSCH-001"), ("REV", _tb.REV),
+            ("DATE", _ISSUE_DATE or "—  "), ("SHEET", "1 of 1")]
     rh = 12
     svg.rect(bx0, by0, bw, rh * len(rows), stroke=INK, width=1.1, fill=FILL_BG)
     for i, (k, v) in enumerate(rows):
@@ -1402,6 +1672,9 @@ def _find_chrome():
 
 def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
                             rasterise_png: bool = True):
+    global _ISSUE_DATE
+    # deterministic title-block issue date from the run's own artifacts (set before draw).
+    _ISSUE_DATE = _tb.issue_date(out_dir)
     schedule, state = load_inputs(out_dir, state_path)
     archetype = _archetype_name(state)
     panels = build_schedules(schedule, state)

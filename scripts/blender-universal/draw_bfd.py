@@ -69,6 +69,11 @@ from typing import Optional
 # ── reuse the P&ID's canonical reconstruction + rasteriser (single source of truth) ──
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import draw_pid as PID  # noqa: E402
+import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+
+# Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
+# generate_bfd() from the run's own artifacts; '' until set (block shows '—').
+_ISSUE_DATE = ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1238,8 +1243,8 @@ def _draw_title_block(svg, bf, width, height, title_h):
     bx0 = x1 - bw
     by0 = y0 + 14
     rows = [("DRAWING No.", "FF-BFD-001"),
-            ("REV", "—   (placeholder)"),
-            ("DATE", "YYYY-MM-DD"),
+            ("REV", _tb.REV),
+            ("DATE", _ISSUE_DATE or "—  "),
             ("SCALE", "NTS")]
     rh = 22
     box_h = rh * len(rows)
@@ -1277,6 +1282,9 @@ def _draw_title_block(svg, bf, width, height, title_h):
 def generate_bfd(out_dir: str, state_path: Optional[str] = None,
                  rasterise_png: bool = True):
     """Full pipeline: load → reconstruct → draw → write SVG (+ PNG)."""
+    global _ISSUE_DATE
+    # deterministic title-block issue date from the run's own artifacts (set before draw).
+    _ISSUE_DATE = _tb.issue_date(out_dir)
     _schedule, state = PID.load_inputs(out_dir, state_path)
     bf = reconstruct_blockflow(out_dir, state)
     svg_text = build_bfd_svg(bf)

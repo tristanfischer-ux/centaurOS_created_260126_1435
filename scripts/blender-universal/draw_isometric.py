@@ -76,6 +76,7 @@ from typing import Optional
 # and the shared rasterise cascade / chrome finder. Same directory.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import draw_pid  # noqa: E402
+import drawing_titleblock as _tb  # noqa: E402  (shared REV — iso has no DATE row)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -885,7 +886,7 @@ def _draw_title_block(svg, archetype, width, height, title_h, line: Optional[Iso
     sheet_txt = "INDEX" if is_index else (f"{sheet[0]} of {sheet[1]}" if sheet else "—")
     rows = [("DRAWING No.", dno),
             ("SHEET", sheet_txt),
-            ("REV", "—   (placeholder)"),
+            ("REV", _tb.REV),
             ("SCALE", "NTS  (iso 30°/30°)")]
     rh = 22
     box_h = rh * len(rows)

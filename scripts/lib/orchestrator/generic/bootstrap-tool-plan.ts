@@ -1656,11 +1656,54 @@ export async function bootstrapToolPlan(
   // chain still runs.
   let catalogue = fullCatalogue
   let relevanceMeta: ToolPlanBootstrapSuccess['relevance'] = null
+
+  // AUTHOR-SCOPE SIGNAL for the sweep (the C1 applicable_to decision, surfaced as a
+  // SIGNAL — never a veto). For each catalogue tool, evaluate the tool's OWN
+  // applicable_to(envelope, contract) predicate for THIS class. The sweep prints it
+  // per tool so a keyword-only YES against a tool the author scoped to a DIFFERENT
+  // product domain (the RAS chiller-COP / comfort-HVAC / hydroponic-nutrient leak)
+  // must be justified on genuine physics. NOT used to FILTER the catalogue — a
+  // too-narrow author scope must never starve an unseen archetype of a physically-
+  // fitting tool (that is the whitelist the capability sweep deliberately replaced).
+  // A minimal partial contract (envelope + class + empty quantities) is enough for
+  // the class-keyed predicates (the overwhelming majority read only envelope.class);
+  // a predicate that inspects a contract field we have not populated simply THROWS
+  // → recorded as null (no signal), which the prompt treats as "no advice".
+  const applicableToThisClass = new Map<string, boolean | null>()
+  {
+    const scopeContract = {
+      product_class: envelope.class,
+      brief_summary: String(brief.product_description ?? '').slice(0, 400),
+      envelope,
+      quantities: {},
+      topology: [],
+      closures: [],
+      macro_assembly_prices: [],
+      _tools_run: [],
+    } as ContractInProgress
+    for (const entry of fullCatalogue) {
+      const tool = getTool(entry.tool_id)
+      if (!tool) { applicableToThisClass.set(entry.tool_id, null); continue }
+      try {
+        applicableToThisClass.set(entry.tool_id, tool.applicable_to(envelope, scopeContract) === true)
+      } catch {
+        applicableToThisClass.set(entry.tool_id, null) // predicate needs a fuller contract → no signal
+      }
+    }
+    const incl = [...applicableToThisClass.values()].filter(v => v === true).length
+    const excl = [...applicableToThisClass.values()].filter(v => v === false).length
+    console.error(
+      `[bootstrap-tool-plan] author-scope signal for slug=${slug}: ${incl} tool(s) INCLUDE this class, ${excl} EXCLUDE, ` +
+      `${fullCatalogue.length - incl - excl} no-signal — surfaced to the relevance sweep (signal, not veto).`,
+    )
+  }
+
   const sweep = await sweepToolRelevance({
     slug, brief, envelope,
     duties: contractQuantities.map(q2 => ({ key: q2.key, value: q2.value, unit: q2.unit })),
     catalogue: fullCatalogue,
     targetProcess: processText,
+    applicableToThisClass,
   })
   if (sweep.ok) {
     // UNION the swept-relevant set with the universal aggregators V3 requires (mass

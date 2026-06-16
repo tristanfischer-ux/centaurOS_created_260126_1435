@@ -56,6 +56,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+
+# Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
+# generate_ga() from the run's own artifacts so the title block is not a live
+# clock; '' until set (the block then shows '—', never a placeholder literal).
+_ISSUE_DATE = ""
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # DATA MODEL — a projected piece of equipment
@@ -788,8 +796,8 @@ def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, 
     bx0 = x1 - bw
     by0 = y0 + 14
     rows = [("DRAWING No.", "FF-GA-001"),
-            ("REV", "—   (placeholder)"),
-            ("DATE", "YYYY-MM-DD"),
+            ("REV", _tb.REV),
+            ("DATE", _ISSUE_DATE or "—  "),
             ("SCALE", f"1:{int(scale_S)}  (@ A3)")]
     rh = 22
     box_h = rh * len(rows)
@@ -894,6 +902,9 @@ def _find_chrome():
 def generate_ga(out_dir: str, state_path: Optional[str] = None,
                 manifest_path: Optional[str] = None, rasterise_png: bool = True):
     """Full pipeline: load manifest → project → draw → write SVG (+ PNG)."""
+    global _ISSUE_DATE
+    # deterministic title-block issue date from the run's own artifacts (set before draw).
+    _ISSUE_DATE = _tb.issue_date(out_dir)
     parts, bbox, meta = load_manifest(out_dir, manifest_path)
     archetype = _archetype_name(out_dir, state_path)
     svg_text = build_ga_svg(parts, bbox, archetype, meta)

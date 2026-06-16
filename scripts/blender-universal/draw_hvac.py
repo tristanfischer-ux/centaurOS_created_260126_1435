@@ -77,6 +77,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+
+# Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
+# generate_hvac() from the run's own artifacts; '' until set (block shows '—').
+_ISSUE_DATE = ""
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CONSTANTS — air-side engineering defaults (mirrors connection_sizing.py)
@@ -451,6 +458,25 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
         if zd_note:
             notes.append(zd_note)
 
+    # ---- HALL COVERAGE: the air system must serve the WHOLE building -------------
+    # The HVAC plan must zone the building ENVELOPE (the same plant footprint the GA
+    # draws, the manifest bbox), not a fraction of it. When the placed/derived zones span
+    # only a small part of the hall (a handful of placed boxes clustered in one corner, or
+    # one Enclosure-Panel stand-in), the layout reads as a single duct run over a fraction
+    # of a large hall. Replace them with a representative grid of conditioned zones tiled
+    # across the full footprint so the supply/return distribution covers the building.
+    # Deterministic; universal (keyed on the footprint geometry, never a product class).
+    if _building_under_served(zones, bbox):
+        zones = _hall_zone_grid(bbox, _read_zone_count(state))
+        zones_derived = True
+        L_m = (bbox.get("x_max_mm", 0.0) - bbox.get("x_min_mm", 0.0)) / 1000.0
+        W_m = (bbox.get("y_max_mm", 0.0) - bbox.get("y_min_mm", 0.0)) / 1000.0
+        notes.append(
+            f"Conditioned zones tiled across the building envelope "
+            f"({L_m:.0f} m × {W_m:.0f} m) — the served spaces are not placed "
+            f"individually in the model; shown as {len(zones)} representative zones so the "
+            f"air distribution covers the whole hall. Verify against the room layout.")
+
     # ---- build the SUPPLY + RETURN distribution ---------------------------------
     ducts: list[Duct] = []
     diffusers: list[Diffuser] = []
@@ -607,6 +633,79 @@ def _derive_zones(state: dict, bbox: dict, arch: str):
         zones.append(Equip(tag=f"Z-{i + 1:02d}", name="Grow zone / bench", role="zone",
                            cx=cx, cy=cy, w=zw, d=zd, h=2000.0, z=1000.0))
     return zones, note
+
+
+def _bbox_extent(bbox: dict) -> tuple:
+    """(x0, x1, y0, y1, L, W) of the building footprint [mm], with sane minimums."""
+    x0 = bbox.get("x_min_mm", 0.0)
+    x1 = bbox.get("x_max_mm", 6000.0)
+    y0 = bbox.get("y_min_mm", 0.0)
+    y1 = bbox.get("y_max_mm", 6000.0)
+    return x0, x1, y0, y1, max(x1 - x0, 1000.0), max(y1 - y0, 1000.0)
+
+
+def _building_under_served(zones: list, bbox: dict) -> bool:
+    """True when the served zones cover only a FRACTION of the building footprint, so the
+    air system should be re-zoned across the whole hall. Compares the zones' bounding-box
+    span against the building envelope on each axis; under-served when EITHER axis spans
+    < 60% of the envelope (the same 0.6 the drawing inspector's hvac-coverage check uses),
+    so the projected plan footprint reaches the GA envelope. Deterministic; geometry-only,
+    no product-class logic. A genuinely full-hall placement (BESS racks, VF benches that
+    already tile the floor) spans the envelope and is left untouched."""
+    x0, x1, y0, y1, L, W = _bbox_extent(bbox)
+    placed = [z for z in zones if z.cx is not None and z.cy is not None
+              and (z.w or 0) > 0 and (z.d or 0) > 0]
+    if not placed:
+        return True
+    zx0 = min(z.cx - z.w / 2 for z in placed)
+    zx1 = max(z.cx + z.w / 2 for z in placed)
+    zy0 = min(z.cy - z.d / 2 for z in placed)
+    zy1 = max(z.cy + z.d / 2 for z in placed)
+    span_x = zx1 - zx0
+    span_y = zy1 - zy0
+    return (span_x < 0.6 * L) or (span_y < 0.6 * W)
+
+
+def _hall_zone_grid(bbox: dict, hint_n: int = 0) -> list:
+    """A representative grid of conditioned zones tiled across the FULL building envelope,
+    so the air distribution covers the whole hall (not a fraction). Deterministic and
+    universal — the grid is sized purely from the footprint geometry (an aspect-aware
+    row × column split, each cell a zone with a clear aisle margin). `hint_n` (a rack /
+    zone count from the contract) nudges the cell count where known. Returns list[Equip]."""
+    x0, x1, y0, y1, L, W = _bbox_extent(bbox)
+    long_is_x = L >= W
+    long_span, short_span = (L, W) if long_is_x else (W, L)
+    # cells along the LONG axis: ~1 per 12 m of hall, clamped to a legible 3..8; honour a
+    # contract zone hint when it is in range. Two rows across the short axis if the hall is
+    # not a narrow corridor (short axis ≥ ~10 m).
+    cols = max(3, min(8, int(round(long_span / 12000.0)) or 3))
+    if hint_n and 2 <= hint_n <= 16:
+        cols = max(3, min(8, hint_n))
+    rows = 2 if short_span >= 10000.0 else 1
+    # leave a margin so zones sit INSIDE the envelope with aisles between them.
+    margin_long = long_span * 0.04
+    margin_short = short_span * 0.06
+    usable_long = long_span - 2 * margin_long
+    usable_short = short_span - 2 * margin_short
+    cell_long = usable_long / cols
+    cell_short = usable_short / rows
+    zw_long = cell_long * 0.80                      # zone extent along the long axis
+    zw_short = cell_short * 0.74                     # zone extent across the short axis
+    long_origin = (x0 if long_is_x else y0) + margin_long
+    short_origin = (y0 if long_is_x else x0) + margin_short
+    zones: list = []
+    k = 0
+    for r in range(rows):
+        for c in range(cols):
+            k += 1
+            along = long_origin + cell_long * (c + 0.5)
+            cross = short_origin + cell_short * (r + 0.5)
+            cx, cy = (along, cross) if long_is_x else (cross, along)
+            zw = zw_long if long_is_x else zw_short
+            zd = zw_short if long_is_x else zw_long
+            zones.append(Equip(tag=f"Z-{k:02d}", name="Conditioned zone", role="zone",
+                               cx=cx, cy=cy, w=zw, d=zd, h=2400.0, z=1200.0))
+    return zones
 
 
 def _synth_hub(arch: str, bbox: dict, medium: str) -> Equip:
@@ -988,12 +1087,28 @@ def build_hvac_svg(sysm: AirSystem, meta: dict) -> str:
     bbox = sysm.bbox
     all_eq = sysm.hubs + sysm.zones
     # ----- model extents (include the hub even if it sits at the plant edge) -----
+    # The plan footprint must span the BUILDING ENVELOPE (the GA's plant bbox), so the
+    # HVAC drawing covers the same hall the General Arrangement draws — union the
+    # equipment extent with the manifest bbox. Without this the plan would shrink to the
+    # bounding box of a few placed boxes and read as a fraction of the hall.
     xs = [e.cx - e.w / 2 for e in all_eq] + [e.cx + e.w / 2 for e in all_eq]
     ys = [e.cy - e.d / 2 for e in all_eq] + [e.cy + e.d / 2 for e in all_eq]
-    x_min = min(xs) if xs else bbox.get("x_min_mm", 0.0)
-    x_max = max(xs) if xs else bbox.get("x_max_mm", 6000.0)
-    y_min = min(ys) if ys else bbox.get("y_min_mm", 0.0)
-    y_max = max(ys) if ys else bbox.get("y_max_mm", 6000.0)
+    bx0 = bbox.get("x_min_mm")
+    bx1 = bbox.get("x_max_mm")
+    by0 = bbox.get("y_min_mm")
+    by1 = bbox.get("y_max_mm")
+    if bx0 is not None:
+        xs.append(float(bx0))
+    if bx1 is not None:
+        xs.append(float(bx1))
+    if by0 is not None:
+        ys.append(float(by0))
+    if by1 is not None:
+        ys.append(float(by1))
+    x_min = min(xs) if xs else (float(bx0) if bx0 is not None else 0.0)
+    x_max = max(xs) if xs else (float(bx1) if bx1 is not None else 6000.0)
+    y_min = min(ys) if ys else (float(by0) if by0 is not None else 0.0)
+    y_max = max(ys) if ys else (float(by1) if by1 is not None else 6000.0)
     L = max(x_max - x_min, 1000.0)
     W = max(y_max - y_min, 1000.0)
     z_max = max([e.z + e.h / 2 for e in all_eq] + [bbox.get("z_max_mm", 3000.0)])
@@ -1067,8 +1182,11 @@ def build_hvac_svg(sysm: AirSystem, meta: dict) -> str:
         _draw_equipment(svg, e, px, py, pw, ph)
 
     north_arrow(svg, plan_x + plan_w - 14, plan_y + 20)
-    # overall plan dimension along the top.
+    # overall plan dimensions: building LENGTH along the top, building DEPTH down the left,
+    # so the HVAC plan annotates the SAME plant envelope the General Arrangement does
+    # (the air system serves the whole hall, not a fraction).
     _dim_h(svg, plan_x, plan_x + plan_w, plan_y - 14, L, ext_from=plan_y)
+    _dim_v(svg, plan_y, plan_y + plan_h, plan_x - 14, W, ext_from=plan_x)
 
     # ───────────────────────── SECTION ─────────────────────────
     svg.text(sect_x, sect_y - 14, "SECTION A–A", size=13, weight="bold",
@@ -1257,6 +1375,25 @@ def _dim_h(svg, x_a, x_b, y, value_mm, ext_from=None):
             f'marker-end="url(#dim)"/>')
     svg.text((x_a + x_b) / 2.0, y - 4, _fmt_mm(value_mm), size=10, anchor="middle",
              fill=DIM_INK, weight="bold")
+
+
+def _dim_v(svg, y_a, y_b, x, value_mm, ext_from=None):
+    """A VERTICAL overall dimension (the plan DEPTH / building width), drawn to the LEFT of
+    the plan so both building dimensions read off the HVAC plan — the same plant envelope
+    the General Arrangement annotates. Mirrors _dim_h."""
+    if y_b < y_a:
+        y_a, y_b = y_b, y_a
+    if ext_from is not None:
+        svg.line(ext_from - 3, y_a, x, y_a, stroke=DIM_INK, width=0.8)
+        svg.line(ext_from - 3, y_b, x, y_b, stroke=DIM_INK, width=0.8)
+    svg.add(f'<line x1="{x:.1f}" y1="{y_a:.1f}" x2="{x:.1f}" y2="{y_b:.1f}" '
+            f'stroke="{DIM_INK}" stroke-width="1.0" marker-start="url(#dim)" '
+            f'marker-end="url(#dim)"/>')
+    # rotated label, centred on the dimension line
+    cy = (y_a + y_b) / 2.0
+    svg.add(f'<text x="{x - 4:.1f}" y="{cy:.1f}" font-size="10" '
+            f'text-anchor="middle" fill="{DIM_INK}" font-weight="bold" '
+            f'transform="rotate(-90 {x - 4:.1f} {cy:.1f})">{_fmt_mm(value_mm)}</text>')
 
 
 def _draw_section(svg, sysm, ox, oy, pw, ph, L_mm, H_mm, ppm, x_min, mx):
@@ -1478,8 +1615,8 @@ def _draw_title_block(svg, sysm, meta, scale_S, width, height, title_h):
     bx0 = x1 - bw
     by0 = y0 + 14
     rows = [("DRAWING No.", "FF-HVAC-001"),
-            ("REV", "—   (placeholder)"),
-            ("DATE", "YYYY-MM-DD"),
+            ("REV", _tb.REV),
+            ("DATE", _ISSUE_DATE or "—  "),
             ("SCALE", f"1:{int(scale_S)}  (@ A3)")]
     rh = 22
     box_h = rh * len(rows)
@@ -1594,6 +1731,9 @@ def _find_chrome():
 def generate_hvac(out_dir: str, state_path: Optional[str] = None,
                   manifest_path: Optional[str] = None, rasterise_png: bool = True):
     """Full pipeline: load → derive air/cooling system → draw → write SVG (+ PNG)."""
+    global _ISSUE_DATE
+    # deterministic title-block issue date from the run's own artifacts (set before draw).
+    _ISSUE_DATE = _tb.issue_date(out_dir)
     manifest, state, schedule = load_inputs(out_dir, state_path, manifest_path)
     sysm = derive_air_system(manifest, state, schedule, out_dir)
     meta = {"count": manifest.get("count", 0), "schema": manifest.get("schema", "")}

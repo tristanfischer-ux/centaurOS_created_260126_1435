@@ -47,7 +47,7 @@ import { computeNetInfeasibilityFlag } from './lib/brief-infeasibility-net'
 import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constraint-normaliser'
 import { massAggregator } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
-import { computeToolArchetypeCoherence, isMarineClass } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
 import { co2MineralisationEmitter } from './lib/orchestrator/emitters/co2-mineralisation'
 import { E_FUEL_SYNTHESIS_PLAN } from './lib/orchestrator/class-plans/e-fuel-synthesis'
@@ -62,7 +62,7 @@ import { storeProposalForClass, loadProposalForClass } from './lib/orchestrator/
 import { dutyHash, type DutySpec } from './lib/orchestrator/generic/tool-generator'
 import { computeQuantityUpdates, applyUpdates } from './lib/design-loop/writeback-bridge'
 import { resizeFromConvergedDemand, nextStandardKva } from './lib/design-loop/settle-loop'
-import { reconcilePrincipalEquipment, applyUniversalContractSizing } from './lib/orchestrator/generic/universal-contract-sizing'
+import { reconcilePrincipalEquipment, applyUniversalContractSizing, synthesizeBuildingStructure } from './lib/orchestrator/generic/universal-contract-sizing'
 import { deriveGenericSkeleton } from './lib/orchestrator/generic/derive-skeleton'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
@@ -591,6 +591,60 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => `rearing-tank children=${JSON.stringify(rtKids)}`,
   ))
 
+  // ── A8. BUILDING-STRUCTURE take-off (#145) ──
+  // A housed process plant is fundamentally a BUILDING: the hall that houses the equipment
+  // is typically 15-30 % of capex and was ABSENT (only a skeleton "Structural Frame" token,
+  // envelope mis-sized at 216 m²). synthesizeBuildingStructure DERIVES the footprint from
+  // the housed principal equipment's plan area (× a ~2.2 aisle factor — ten ⌀12.4 m rearing
+  // tanks alone = ~1,200 m² → ~2,400 m² hall), emits a 6-line take-off (slab / portal frame /
+  // wall + roof cladding / foundations / doors), and WRITES the footprint back to the contract
+  // quantities so the GA + the heat-loss tool size against the real hall (fixes the 216 m²
+  // default). Universal — a manufactured product with a negligible housed footprint gets NO
+  // hall (no-op guard). Run on a FRESH module set (the A3-A5 passes mutate instrMods above).
+  const bldgMods: any = [
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
+    { module: 'structure_containment', sub_modules: [{ id: 'structure_containment__shell', words: [] }] },
+    { module: 'sensing_instrumentation', sub_modules: [{ id: 'sensing_instrumentation__x', words: [] }] },
+    { module: 'power_distribution', sub_modules: [{ id: 'power_distribution__main', words: [] }] },
+    { module: 'environmental_interface', sub_modules: [{ id: 'environmental_interface__hvac', words: [] }] },
+  ]
+  const bldgContract: any = { quantities: { ...contractInstr.quantities } }
+  const bldgQ: Record<string, number> = {}
+  for (const [k, v] of Object.entries<any>(bldgContract.quantities)) { if (typeof v?.value === 'number' && Number.isFinite(v.value)) bldgQ[k] = v.value }
+  applyUniversalContractSizing(bldgMods, bldgContract, { synthesizeMissing: true, onlyUnsized: false, dedupeAndStrip: false, instrument: true })
+  // re-derive the building pass directly against bldgQ + the contract so we can read the
+  // written-back footprint from BOTH the local map AND the persisted contract.quantities
+  const bldgWordsAdded = synthesizeBuildingStructure(bldgMods, bldgQ, bldgContract)
+  const contractFootprint = bldgContract.quantities?.building_footprint_m2?.value
+  const bldgWords = bldgMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._structure)))
+  const priceOf = (w: any) => Number((w.modifier_characters || []).find((mc: any) => mc.kind === 'price_estimate_gbp')?.value ?? 0)
+  const bldgTotal = bldgWords.reduce((s: number, w: any) => s + priceOf(w), 0)
+  const hasB = (re: RegExp) => bldgWords.some((w: any) => re.test(String(w.name_human)))
+  // idempotency: a 2nd pass re-derives the SAME 6 building words (no duplication)
+  const bldgAdded2 = synthesizeBuildingStructure(bldgMods, bldgQ)
+  const bldgCount2 = bldgMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._structure))).length
+  // universal no-op: a manufactured product with a tiny housed footprint gets NO building
+  const droneMods: any = [{ module: 'structure_containment', sub_modules: [{ id: 's', words: [{ id: 'avionics_box_word', name_human: 'Avionics Box', content_character: { character_id: 'avionics', name_human: 'Avionics Box' }, modifier_characters: [{ kind: 'dimension', value: '300x200x120 mm' }, { kind: 'quantity', value: '×1' }] }] }] }]
+  const droneAdded = synthesizeBuildingStructure(droneMods, {})
+  out.push(assertEq(
+    'UNIVERSAL.building_structure_synthesised_and_sized_to_footprint',
+    'the housed equipment synthesises the BUILDING the plant lives in: a 6-line take-off (reinforced floor slab + steel portal frame + insulated wall + roof cladding + foundations + doors) sized from the principal equipment plan footprint × ~2.2 aisle factor (ten ⌀12.4 m tanks → footprint ~2,000-2,800 m², not the 216 m² default), totalling ~£0.8-1.5M; the footprint is written back to the contract quantities (building_footprint_m2 / _gross_floor_area_m2 / _height_m / _wall_area_m2); idempotent; and a product with a negligible housed footprint (a drone) gets NO hall',
+    JSON.stringify({ n: bldgWordsAdded, slab: hasB(/floor slab/i), frame: hasB(/portal frame/i), wall: hasB(/wall cladding/i), roof: hasB(/roof cladding/i), found: hasB(/foundation/i), doors: hasB(/door/i), footprint: bldgQ.building_footprint_m2, gross: bldgQ.building_gross_floor_area_m2, height: bldgQ.building_height_m, wallArea: bldgQ.building_wall_area_m2, contractFootprint, total: Math.round(bldgTotal), idem: bldgAdded2 === 6 && bldgCount2 === 6, drone: droneAdded }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      // Footprint band 2,000-3,000 m²: the ten ⌀12.4 m rearing tanks (~1,208 m²) dominate; the
+      // biofilter/degasser/filters/HEX + the ~2.2 aisle factor land it ~2,800-3,000 (the RAS
+      // contract emits twin biofilter volume keys so the biofilter is represented twice — a
+      // contract redundancy that nudges it to the top of the band). Anything ≥ 2,000 is the
+      // real hall vs the 216 m² type-default this fixes.
+      return o.n === 6 && o.slab && o.frame && o.wall && o.roof && o.found && o.doors
+        && o.footprint >= 2000 && o.footprint <= 3000 && o.gross === o.footprint && o.height >= 6 && o.wallArea > 0
+        && o.contractFootprint === o.footprint  // the footprint PERSISTS to contract.quantities (not just the local map)
+        && o.total >= 800000 && o.total <= 1600000 && o.idem && o.drone === 0
+    },
+    () => `bldg=${JSON.stringify(bldgWords.map((w: any) => `${w.name_human}/£${priceOf(w)}`))} footprint=${bldgQ.building_footprint_m2} contractFootprint=${contractFootprint} total=£${Math.round(bldgTotal)} drone=${droneAdded}`,
+  ))
+
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──
   const graph: any = { product_class: 'test', nodes: [{ class: 'environmental_interface', display: 'Environmental Interface', role: 'principal', required: true }], edges: [] }
   const heatingContract: any = { quantities: { heating_duty_kw: { value: 1493 }, heat_pump_cop: { value: 3.5 }, heat_pump_electrical_kw: { value: 427 } } }
@@ -744,10 +798,74 @@ function checkRasFeedAndPumpReconciled(): Assertion[] {
         c?.quantities?.hydraulic_retention_time_mins?.unit === 'min',
       () => `uv=${uv} hrt=${hrt} unit=${c?.quantities?.hydraulic_retention_time_mins?.unit}`,
     ))
+
+    // PARALLEL-TRAIN SPLIT (council #DOM): the recirc pump / drum filter / degasser must be
+    // split into N parallel units so NO principal recirc unit carries more than the single-
+    // unit flow limit (~1,800 m³/h). Was: each a single unit at the full 13,360 m³/h (~52 m/s
+    // at DN300, a single drum ~6-13× any real unit). Invariant: qty>1 + per-unit flow ≤ 2,000
+    // for all three, count consistent, and the system total preserved (per-unit × N = loop flow).
+    const loop = v('recirculation_flow_m3_h')
+    const pumpN = v('recirc_pump_count'), drumN = v('drum_filter_count'), degN = v('degasser_count')
+    const drumEach = v('drum_filter_throughput_m3_h'), degWaterEach = v('degasser_water_flow_m3_h')
+    const SINGLE_UNIT_LIMIT = 2000
+    out.push(assertEq(
+      'RAS.recirc_loop_split_into_parallel_trains',
+      'the recirc pump + rotary drum filter + CO₂ degasser are split into N>1 parallel trains, each ≤ ~2,000 m³/h per unit (no single unit carries the full 13,360 m³/h loop); counts agree and per-unit×N ≈ loop total',
+      JSON.stringify({ loop, pumpN, drumN, degN, drumEach, degWaterEach }),
+      () =>
+        Number.isFinite(loop) && loop > SINGLE_UNIT_LIMIT &&                   // only split when needed
+        pumpN >= 2 && drumN >= 2 && degN >= 2 &&                              // all three split
+        pumpN === drumN && drumN === degN &&                                  // one train count for the loop
+        Number.isFinite(drumEach) && drumEach <= SINGLE_UNIT_LIMIT &&         // per-unit drum ≤ limit
+        Number.isFinite(degWaterEach) && degWaterEach <= SINGLE_UNIT_LIMIT && // per-unit degasser ≤ limit
+        Math.abs(drumEach * drumN - loop) / loop <= 0.02 &&                   // per-unit × N ≈ loop total
+        Math.abs(degWaterEach * degN - loop) / loop <= 0.02,
+      () => `loop=${loop} counts(p/d/g)=${pumpN}/${drumN}/${degN} drumEach=${drumEach} degWaterEach=${degWaterEach}`,
+    ))
+
+    // DEGASSER PRIMARY = WATER, not AIR (council #4): the degasser's primary rating is the
+    // (per-train) WATER throughput; the 10× air flow lives under a separate co2_stripping_air_*
+    // key (no device noun → not minted as a duplicate blower, out of the degasser group) so it
+    // does not read as a 10× error. Invariant: air key decoupled, water flow is the smaller
+    // (per-train) value, air ≈ 10× the loop water flow (G:L ratio preserved), old key gone.
+    const degAir = v('co2_stripping_air_flow_m3_h'), oldAirKey = c?.quantities?.degasser_air_flow_m3_h
+    out.push(assertEq(
+      'RAS.degasser_primary_is_water_not_air',
+      'degasser PRIMARY rating is the per-train WATER throughput (≤ single-unit limit), the 10:1 stripping AIR is a separate secondary co2_stripping_air_flow_m3_h key (not the old degasser_air_flow_m3_h that read as a 10× error); air ≈ 10× loop water',
+      JSON.stringify({ degWaterEach, degAir, oldAirKeyPresent: oldAirKey !== undefined }),
+      () =>
+        oldAirKey === undefined &&                                            // old colliding key gone
+        Number.isFinite(degAir) && Number.isFinite(degWaterEach) &&
+        degAir > degWaterEach &&                                              // air is the bigger number...
+        degWaterEach <= SINGLE_UNIT_LIMIT &&                                  // ...but is NOT the column rating
+        Math.abs(degAir - loop * 10) / (loop * 10) <= 0.02,                  // air ≈ 10× loop water (G:L preserved)
+      () => `degWaterEach=${degWaterEach} degAir=${degAir} loop=${loop} oldAirKey=${oldAirKey !== undefined}`,
+    ))
+
+    // MARINE SALT BALANCE (council #6): total_salt_mass is the seawater salt charge
+    // (~33 g/L × system volume ≈ 110 t), NOT the hydroponic nutrient-solution Ca/P output
+    // (~4.49 t). Invariant: total_salt_mass_kg ~ 33 × system_volume, in the 90-140 t band
+    // (NOT ~4.5 t), salt_makeup present, salinity still 33 ppt.
+    const saltKg = v('total_salt_mass_kg'), saltMakeup = v('salt_makeup_kg_day')
+    const sysVol = v('system_water_volume_m3'), salin = v('salinity_ppt')
+    out.push(assertEq(
+      'RAS.salt_is_marine_seawater_balance_not_hydroponic',
+      'total_salt_mass is the MARINE seawater salt inventory (~33 g/L × system volume ≈ 110 t, in the 90-140 t band), NOT the ~4.49 t hydroponic nutrient-solution Ca/P artefact; salt_makeup_kg_day present; salinity 33 ppt',
+      JSON.stringify({ saltKg, saltMakeup, sysVol, salin }),
+      () =>
+        Number.isFinite(saltKg) && saltKg >= 90_000 && saltKg <= 145_000 &&   // ~110-125 t, NOT 4.49 t
+        Number.isFinite(sysVol) && Math.abs(saltKg - salin * sysVol) / saltKg <= 0.02 && // = salinity × volume
+        Number.isFinite(saltMakeup) && saltMakeup > 0 &&                      // daily make-up emitted
+        Math.abs(salin - 33) <= 1,                                            // 33 ppt kingfish seawater
+      () => `saltKg=${saltKg} (${(saltKg/1000).toFixed(0)} t) makeup=${saltMakeup} sysVol=${sysVol} salinity=${salin}`,
+    ))
   } catch (err) {
     out.push({ id: 'RAS.feed_is_production_throughput_single_source', description: 'RAS feed reconciliation', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     out.push({ id: 'RAS.recirc_pump_motor_ge_power', description: 'RAS pump motor≥power', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     out.push({ id: 'RAS.uv_power_in_realistic_band_and_hrt_minutes', description: 'RAS UV + HRT', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'RAS.recirc_loop_split_into_parallel_trains', description: 'RAS parallel-train split', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'RAS.degasser_primary_is_water_not_air', description: 'RAS degasser primary water', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'RAS.salt_is_marine_seawater_balance_not_hydroponic', description: 'RAS marine salt', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
   }
   return out
 }
@@ -897,6 +1015,29 @@ function checkRelevanceSweepDeterministic(): Assertion[] {
       JSON.stringify({ stable: k1 === k2, catChanges: k1 !== kCat, descChanges: k1 !== kDesc }),
       () => k1 === k2 && k1 !== kCat && k1 !== kDesc,
       () => `k1=${k1} k2=${k2} kCat=${kCat} kDesc=${kDesc}`,
+    ))
+
+    // (a2) AUTHOR-SCOPE SIGNAL keys the cache (the C1 applicable_to verdict is a
+    // PROMPT INPUT): a no-signal call equals the v1 key (backward-compatible); a
+    // change in the per-tool scope verdict CHANGES the key (a registry edit that
+    // flips a tool's applicable_to must force a fresh sweep, not replay a stale one);
+    // the scope signature is order/Map-insertion independent.
+    const kNoScope = relevanceCacheKey('aquaculture_ras', 'desc', proc, env, cat)
+    const scopeA = new Map<string, boolean | null>([['process:pump-sizing', true], ['mbbr:biofilter-sizing', false], ['mass-aggregator:envelope-check', null]])
+    const scopeAreorder = new Map<string, boolean | null>([['mbbr:biofilter-sizing', false], ['process:pump-sizing', true]])
+    const scopeB = new Map<string, boolean | null>([['process:pump-sizing', false], ['mbbr:biofilter-sizing', false]]) // pump flipped INCLUDE→EXCLUDE
+    const kScopeA = relevanceCacheKey('aquaculture_ras', 'desc', proc, env, cat, scopeA)
+    const kScopeAreorder = relevanceCacheKey('aquaculture_ras', 'desc', proc, env, cat, scopeAreorder)
+    const kScopeB = relevanceCacheKey('aquaculture_ras', 'desc', proc, env, cat, scopeB)
+    out.push(assertEq(
+      'UNIVERSAL.relevance_sweep_cache_key_includes_author_scope_signal',
+      'the per-tool applicable_to author-scope SIGNAL keys the cache: a no-signal/all-null call equals the v1 key (backward-compatible), a flipped scope verdict CHANGES the key (registry edit forces a fresh sweep), and the scope signature is Map-order independent',
+      JSON.stringify({ noSignalEqualsV1: kNoScope === kScopeAreorder /* placeholder, see fields */ }),
+      () => kNoScope === relevanceCacheKey('aquaculture_ras', 'desc', proc, env, cat, new Map([['x', null]]))
+            && kScopeA === kScopeAreorder
+            && kScopeA !== kScopeB
+            && kScopeA !== kNoScope,
+      () => `kNoScope=${kNoScope} kScopeA=${kScopeA} kScopeAreorder=${kScopeAreorder} kScopeB=${kScopeB}`,
     ))
 
     // (b) COVERAGE GATE: the brief-named drum/microscreen filter is DETECTED and
@@ -2005,10 +2146,105 @@ function checkCo2FixInvariants(): Assertion[] {
       want('(j) empty state does not throw', !threw)
       want('(j) empty state unavailable', r?.verdict === 'unavailable')
     }
+    // ── The marine yellowtail-kingfish RAS leak (2026-06-16): a HYDROPONIC
+    //    nutrient-dosing tool + a chiller-COOLING tool selected for a fish farm
+    //    (aquaculture_ras) that needs HEATING. Both must flag on aquaculture_ras
+    //    (which is neither a hydroponic grower nor a cooling product) and both must
+    //    be SUPPRESSED on the class where they are legitimate. ───────────────────
+    // (k) REFRIGERATION marker (chiller "Total cooling load") on aquaculture_ras → high
+    {
+      const r = computeToolArchetypeCoherence(mkState('aquaculture_ras', [
+        mkTool('hvac:load-sizing', 'Total cooling load Q_total = Q_sens + Q_lat ; Chiller capacity = Q_total x safety_factor'),
+      ]))
+      want('(k) refrigeration finding on hvac:load-sizing for aquaculture_ras', hasFinding(r, 'hvac:load-sizing', 'refrigeration'))
+    }
+    // (k2) refrigeration-cycle:cop (condenser duty / cooling COP) on aquaculture_ras → high
+    {
+      const r = computeToolArchetypeCoherence(mkState('aquaculture_ras', [
+        mkTool('refrigeration-cycle:cop', '800 kW chiller capacity ; condenser duty Q_condenser ; cooling COP'),
+      ]))
+      want('(k2) refrigeration finding on refrigeration-cycle:cop for aquaculture_ras', hasFinding(r, 'refrigeration-cycle:cop', 'refrigeration'))
+    }
+    // (l) HYDROPONIC marker (calcium nitrate / monopotassium phosphate nutrient solution) on aquaculture_ras → high
+    {
+      const r = computeToolArchetypeCoherence(mkState('aquaculture_ras', [
+        mkTool('nutrient-solution:chemistry', 'Nutrient solution: calcium nitrate + monopotassium phosphate dosing to target EC ; Ca_target P_target'),
+      ]))
+      want('(l) hydroponic finding on nutrient-solution:chemistry for aquaculture_ras', hasFinding(r, 'nutrient-solution:chemistry', 'hydroponic'))
+    }
+    // (m) the SAME refrigeration calc on a COOLING product (cold_store) → suppressed (legitimate)
+    {
+      const r = computeToolArchetypeCoherence(mkState('cold_store', [
+        mkTool('refrigeration-cycle:cop', '800 kW chiller capacity ; condenser duty Q_condenser ; cooling COP'),
+      ]))
+      want('(m) cooling class suppresses refrigeration findings', r.findings.filter((f) => f.family === 'refrigeration').length === 0)
+    }
+    // (m2) refrigeration calc on a heat_pump (cooling-token class) → suppressed
+    {
+      const r = computeToolArchetypeCoherence(mkState('heat_pump_residential', [
+        mkTool('refrigeration-cycle:cop', 'condenser duty ; cooling COP ; evaporator temperature'),
+      ]))
+      want('(m2) heat_pump suppresses refrigeration findings', r.findings.filter((f) => f.family === 'refrigeration').length === 0)
+    }
+    // (n) the SAME hydroponic calc on a vertical_farm → suppressed (legitimate)
+    {
+      const r = computeToolArchetypeCoherence(mkState('vertical_farm', [
+        mkTool('nutrient-solution:chemistry', 'Nutrient solution: calcium nitrate + monopotassium phosphate dosing to target EC'),
+      ]))
+      want('(n) vertical_farm suppresses hydroponic findings', r.findings.filter((f) => f.family === 'hydroponic').length === 0)
+    }
+    // (o) NO false positive: a clean RAS process tool (heat-loss / heating duty, no chiller/cooling words) does NOT flag
+    {
+      const r = computeToolArchetypeCoherence(mkState('aquaculture_ras', [
+        mkTool('building-envelope:heat-loss', 'Make-up water heating duty Q_heat = m_dot x Cp x dT to hold 26.4 C ; fabric heat loss'),
+      ]))
+      want('(o) clean heating tool not flagged on aquaculture_ras', noFindingFor(r, 'building-envelope:heat-loss'))
+    }
+    // ── BESS / heat-rejecting plant NO-REGRESSION: a chiller-cooling calc on a class
+    //    that LEGITIMATELY rejects heat must NOT be flagged. The per-tool author-scope
+    //    stamp (applicable_to_class) is the universal discriminator; the broadened
+    //    COOLING_CLASS_TOKENS are the stamp-less fallback. ─────────────────────────
+    const mkToolStamped = (tool_id: string, workedText: string, applicable: boolean) => ({
+      tool_id, applicable_to_class: applicable,
+      worked: [{ label: tool_id, formula: workedText, substitution: `${tool_id} = ${workedText}`, assumptions: [] }],
+    })
+    // (r) BESS chiller calc, NO stamp → suppressed by the COOLING token fallback (no BESS regression)
+    {
+      const r = computeToolArchetypeCoherence(mkState('bess', [mkTool('refrigeration-cycle:cop', '800 kW chiller capacity ; condenser duty ; cooling COP')]))
+      want('(r) bess chiller calc not flagged (token fallback)', r.findings.filter((f) => f.family === 'refrigeration').length === 0)
+    }
+    // (s) the per-tool stamp is authoritative: applicable_to_class=false STILL flags the RAS leak…
+    {
+      const r = computeToolArchetypeCoherence(mkState('aquaculture_ras', [mkToolStamped('refrigeration-cycle:cop', '800 kW chiller capacity ; condenser duty', false)]))
+      want('(s) stamp=false still flags the RAS leak', hasFinding(r, 'refrigeration-cycle:cop', 'refrigeration'))
+    }
+    // …and applicable_to_class=true SUPPRESSES even on an unlisted class (the universal discriminator)
+    {
+      const r = computeToolArchetypeCoherence(mkState('some_novel_cooling_product_zzz', [mkToolStamped('refrigeration-cycle:cop', '800 kW chiller capacity ; condenser duty', true)]))
+      want('(s2) stamp=true suppresses on an unlisted class', r.findings.filter((f) => f.family === 'refrigeration').length === 0)
+    }
+    // (p) NO false positive: a "cooling water" process pipe loop (rejects process heat) without
+    //     the refrigeration-CYCLE words is NOT flagged (markers require chiller/condenser/cycle).
+    {
+      const r = computeToolArchetypeCoherence(mkState('co2_mineralisation', [
+        mkTool('fluids:pipe-sizing', 'cooling water loop pipe sizing ; flow velocity ; pressure drop'),
+      ]))
+      want('(p) plain cooling-water pipe loop not flagged', noFindingFor(r, 'fluids:pipe-sizing'))
+    }
+    // (q) class-predicate coverage
+    {
+      want('(q) isHydroponicClass vertical_farm true', isHydroponicClass('vertical_farm') === true)
+      want('(q) isHydroponicClass hydroponic true', isHydroponicClass('hydroponic') === true)
+      want('(q) isHydroponicClass aquaculture_ras false', isHydroponicClass('aquaculture_ras') === false)
+      want('(q) isCoolingClass cold_store true', isCoolingClass('cold_store') === true)
+      want('(q) isCoolingClass heat_pump_residential true', isCoolingClass('heat_pump_residential') === true)
+      want('(q) isCoolingClass aquaculture_ras false', isCoolingClass('aquaculture_ras') === false)
+      want('(q) isCoolingClass co2_mineralisation false', isCoolingClass('co2_mineralisation') === false)
+    }
 
     out.push(assertEq(
       'UNIVERSAL.tool_archetype_coherence_flags_marine_tools_on_nonmarine_class',
-      'gate 34: marine/irrigation tools on a non-marine class flag HIGH (worked-calc + cathodic quantity); clean process tool + light-emitter never flag; marine class suppresses marine markers; isMarineClass + empty-state behaviours hold',
+      'gate 34: marine/irrigation/hydroponic/refrigeration tools on a class that does not own that domain flag HIGH (the RAS chiller-COOLING + hydroponic-nutrient leak), each suppressed only on its legitimate class (cold_store/heat_pump for refrigeration, vertical_farm for hydroponic, auv for marine); clean heating/cooling-water/light-emitter tools never flag; isMarine/isHydroponic/isCooling + empty-state behaviours hold',
       failed.length, (n) => n === 0,
       () => `gate-34 cases failed: ${failed.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit.ts.`,
     ))

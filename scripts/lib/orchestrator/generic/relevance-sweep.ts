@@ -149,15 +149,31 @@ export function relevanceCacheKey(
   targetProcess: string,
   envelope: Pick<BriefEnvelope, 'class' | 'scale_tier' | 'application'>,
   catalogueToolIds: ReadonlyArray<string>,
+  applicableToThisClass?: ReadonlyMap<string, boolean | null>,
 ): string {
   const catSig = [...catalogueToolIds].sort().join(',')
+  // AUTHOR-SCOPE SIGNAL in the key (v2): the per-tool applicable_to verdict is a
+  // PROMPT INPUT, so it must key the cache — otherwise a registry edit that flips
+  // a tool's scope (e.g. adding aquaculture_ras to a tool's applicable_to list)
+  // would replay a stale sweep that never saw the new signal (H6 anti-overfit:
+  // never freeze the first realisation when an INPUT changed). Compact, sorted,
+  // deterministic: `id:1` (incl) / `id:0` (excl) / omit when null (no-signal, so a
+  // missing-signal run keys identically to a v1 run for the same brief+catalogue).
+  const scopeSig = applicableToThisClass
+    ? [...applicableToThisClass.entries()]
+        .filter(([, v]) => v === true || v === false)
+        .map(([id, v]) => `${id}:${v ? 1 : 0}`)
+        .sort()
+        .join(',')
+    : ''
   const payload = [
-    `v1`,
+    scopeSig ? `v2` : `v1`,
     `slug=${slug}`,
     `class=${envelope.class}/${envelope.scale_tier}/${envelope.application}`,
     `desc=${(productDescription ?? '').slice(0, 6000)}`,
     `process=${(targetProcess ?? '').slice(0, 4000)}`,
     `catalogue=${catSig}`,
+    ...(scopeSig ? [`scope=${scopeSig}`] : []),
   ].join('\n')
   return createHash('sha1').update(payload).digest('hex').slice(0, 16)
 }
@@ -198,12 +214,24 @@ function writeCache(cacheKey: string, slug: string, verdicts: ToolRelevanceVerdi
 // ── Prompt (one batch) ──────────────────────────────────────────────────────
 
 /** One catalogue line for the sweep: tool_id + domain + purpose + key OUTPUT
- *  fields (what the tool COMPUTES — the relevance signal). Inputs are omitted to
- *  keep the batch compact; the wiring harvest (downstream) shows full I/O. */
-function toolLine(entry: ToolCatalogueEntry): string {
+ *  fields (what the tool COMPUTES — the relevance signal) + the AUTHOR-SCOPE
+ *  SIGNAL (the tool's own applicable_to verdict for THIS class — a SIGNAL the
+ *  model weighs, never a veto). Inputs are omitted to keep the batch compact;
+ *  the wiring harvest (downstream) shows full I/O. */
+function toolLine(entry: ToolCatalogueEntry, applicableToThisClass?: ReadonlyMap<string, boolean | null>): string {
   const outs = entry.output_fields.slice(0, 8).join(', ')
   const more = entry.output_fields.length > 8 ? ', …' : ''
-  return `- ${entry.tool_id} [${entry.domain}] — ${entry.description}\n    computes: ${outs || '(none)'}${more}`
+  // AUTHOR-SCOPE SIGNAL: surface the tool author's own applicable_to verdict so a
+  // keyword-only YES against a tool scoped to a DIFFERENT product domain must be
+  // justified on real physics. Omitted when there is no signal (null/absent).
+  const scope = applicableToThisClass?.get(entry.tool_id)
+  const scopeTag =
+    scope === true
+      ? `\n    author-scope: INCLUDES this class (the tool author scoped it to cover this product — corroborating)`
+      : scope === false
+        ? `\n    author-scope: EXCLUDES this class (the tool author wrote it for OTHER products — a YES needs genuine physics, not a shared keyword)`
+        : ''
+  return `- ${entry.tool_id} [${entry.domain}] — ${entry.description}\n    computes: ${outs || '(none)'}${more}${scopeTag}`
 }
 
 function buildSweepPrompt(
@@ -215,9 +243,10 @@ function buildSweepPrompt(
   batch: ToolCatalogueEntry[],
   batchIndex: number,
   batchCount: number,
+  applicableToThisClass?: ReadonlyMap<string, boolean | null>,
 ): string {
   const desc = String(brief.product_description ?? '').slice(0, 5000)
-  const lines = batch.map(toolLine).join('\n')
+  const lines = batch.map(e => toolLine(e, applicableToThisClass)).join('\n')
   return (
     `You are a CHARTERED PRINCIPAL ENGINEER deciding which engineering TOOLS are ` +
     `RELEVANT to designing ONE specific plant. You will be shown the detailed brief ` +
@@ -238,6 +267,49 @@ function buildSweepPrompt(
     `farm: aircraft/airfoil aerodynamics, submarine/AUV hydrostatics, spacecraft/orbit, ` +
     `bicycle/vehicle dynamics, battery-cell electrochemistry, photovoltaic/LED photonics ` +
     `— UNLESS the brief genuinely describes that subsystem).\n\n` +
+    // ── DOMAIN-DISCRIMINATION (the C1 leak fix) ───────────────────────────────
+    // The failure this guards: a tool gets a YES on a SHARED KEYWORD while its
+    // physics DOMAIN differs from the plant's process. A heating water-source
+    // heat-pump shares the word "thermal" with a chiller-COP tool, but a chiller
+    // tool computes the WRONG thing (cooling/condenser duty) for a heating duty.
+    `CRITICAL — JUDGE THE PHYSICS DOMAIN, NOT A SHARED KEYWORD. A tool that shares ` +
+    `a word with one of this plant's duties is NOT automatically relevant; its ` +
+    `actual COMPUTATION must answer a question THIS plant asks. Reject these concrete ` +
+    `keyword-only mismatches (they are exactly how the wrong tool leaks in):\n` +
+    `  • A REFRIGERATION / CHILLER tool that computes a coefficient-of-performance for ` +
+    `COOLING, a "total cooling load", "chiller capacity", "condenser duty", or an ` +
+    `evaporator/condenser cycle is NOT a HEATING tool. If this plant's thermal duty is ` +
+    `to ADD heat / HOLD a warm setpoint / raise make-up-water temperature (a heating ` +
+    `heat-pump, a process heater, a boiler), a cooling-cycle COP/chiller tool is the ` +
+    `WRONG domain — say NO (use the heating / heat-loss / heat-recovery / heat-balance ` +
+    `tool instead). Only say YES to a refrigeration/chiller tool when the plant genuinely ` +
+    `REJECTS heat (a cold store, a process chiller, a data-centre/battery cooling loop).\n` +
+    `  • A COMFORT-HVAC building-load tool (sensible+latent room load, supply airflow, ` +
+    `occupant ventilation) is NOT a PROCESS-HEAT or process-water tool. A plant whose ` +
+    `thermal duty is on its PROCESS FLUID (heating/cooling a recirculating water or ` +
+    `chemical inventory) is not sized by a room-comfort HVAC load — say NO unless the ` +
+    `brief explicitly needs habitable-space air-conditioning.\n` +
+    `  • A HYDROPONIC NUTRIENT-SOLUTION tool (calcium nitrate / monopotassium phosphate / ` +
+    `Ca and P dosing, target EC/conductivity of a plant-feed solution, N-P-K make-up) is ` +
+    `a CROP-FEED chemistry tool for SOILLESS PLANT GROWING. It is NOT a fish-farm, ` +
+    `aquaculture, potable-water, or general process-water tool. A fish-rearing or ` +
+    `water-treatment plant dosing for ALKALINITY / pH / salinity / disinfection is NOT ` +
+    `fed by a hydroponic nutrient formula — say NO (the salt/alkalinity inventory of ` +
+    `seawater or process water is a DIFFERENT calculation).\n` +
+    `  • A MARINE / submarine tool (seawater hull hydrostatics, cathodic / sacrificial-` +
+    `anode protection, DNV-RP-B401, dive depth) belongs to a vessel that operates IN the ` +
+    `sea. A LAND-BASED plant — even one that handles seawater or is called "marine" — has ` +
+    `no submerged pressure hull and no ship-hull anode scheme; say NO to hull/anode/dive ` +
+    `tools unless the product is itself an underwater vehicle.\n` +
+    `The rule is symmetric and UNIVERSAL across any class: a cooling tool is not a heating ` +
+    `tool; a crop-feed tool is not a process-water tool; a comfort tool is not a process ` +
+    `tool; a vehicle tool is not a fixed-plant tool. Weigh the AUTHOR-SCOPE SIGNAL printed ` +
+    `on each tool (the author's own applicable_to verdict for this class): an EXCLUDES ` +
+    `signal means a YES must rest on genuine shared PHYSICS, not a shared word — if the ` +
+    `only thing connecting the tool to this plant is a keyword, the EXCLUDES signal ` +
+    `confirms it is the wrong domain. (The signal is advice, NOT a hard rule: an unseen ` +
+    `archetype can still legitimately need a tool the author scoped narrowly — say YES ` +
+    `when the COMPUTATION genuinely fits, EXCLUDES notwithstanding.)\n\n` +
     `PRODUCT CLASS SLUG: "${slug}"\n` +
     `ENVELOPE: class=${envelope.class}, scale_tier=${envelope.scale_tier}, application=${envelope.application}\n\n` +
     `BRIEF (what the plant is + what it produces):\n${desc}\n\n` +
@@ -382,6 +454,26 @@ export interface RelevanceSweepInput {
   /** The brief's stated process text (constraints.target_process). Used in the
    *  prompt + the cache key so the sweep keys off the named unit operations. */
   targetProcess?: string
+  /**
+   * Per-tool AUTHOR-SCOPE SIGNAL (NOT a veto). For each tool_id, the result of
+   * the tool's OWN `applicable_to(envelope, contract)` predicate evaluated for
+   * THIS plant's class:
+   *   true  — the tool author scoped this tool to INCLUDE this class.
+   *   false — the tool author scoped it to EXCLUDE this class (it was written
+   *           for OTHER products).
+   *   null / absent — the predicate could not be evaluated (no signal).
+   *
+   * This is the C1 `applicable_to` decision surfaced as a SIGNAL the model
+   * WEIGHS — it is deliberately NOT used to filter the catalogue (a too-narrow
+   * author scope must never starve an unseen archetype of a physically-fitting
+   * tool — that is exactly the whitelist the capability sweep replaced). It only
+   * sharpens the YES/NO judgement so a KEYWORD-ONLY match against a tool whose
+   * author scoped it to a DIFFERENT product domain is rejected (the RAS chiller-
+   * COP / comfort-HVAC / hydroponic-nutrient leak). When the author INCLUDED the
+   * class the model is told so (a corroborating signal); when EXCLUDED, the model
+   * must justify a YES on genuine physics, not a shared keyword.
+   */
+  applicableToThisClass?: ReadonlyMap<string, boolean | null>
 }
 
 /**
@@ -408,12 +500,14 @@ export async function sweepToolRelevance(input: RelevanceSweepInput): Promise<Re
   }
 
   const catalogueToolIds = catalogue.map(c => c.tool_id)
+  const applicableToThisClass = input.applicableToThisClass
   const cacheKey = relevanceCacheKey(
     slug,
     String(brief.product_description ?? ''),
     targetProcess,
     envelope,
     catalogueToolIds,
+    applicableToThisClass,
   )
 
   // (0) CACHE REPLAY — deterministic, free. Only verdicts whose tool_id is STILL in
@@ -465,7 +559,7 @@ export async function sweepToolRelevance(input: RelevanceSweepInput): Promise<Re
   for (let bi = 0; bi < batches.length; bi++) {
     const batch = batches[bi]
     const batchIds = new Set(batch.map(b => b.tool_id))
-    const prompt = buildSweepPrompt(slug, brief, targetProcess, envelope, dutyLines, batch, bi, batches.length)
+    const prompt = buildSweepPrompt(slug, brief, targetProcess, envelope, dutyLines, batch, bi, batches.length, applicableToThisClass)
 
     let outcome = await sweepBatchViaLLM(prompt, batchIds)
     batchCalls++

@@ -11816,6 +11816,32 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // `peak_overshoot_pct` (15.6%) — also wrong-domain; seed it authoritatively.
   const waterRecirculationRatePercent = Math.round(recircFractionRecycled * 1000) / 10  // ~99.6%
 
+  // ── PARALLEL-TRAIN SPLIT of the recirculation loop (2026-06-16, council RAS fix #DOM) ──
+  // The recirculation pump, rotary drum filter and CO₂ degasser CANNOT each be a single
+  // unit carrying the WHOLE 13,360 m³/h (= 3.71 m³/s): at DN300 that is ~52 m/s and at any
+  // buildable single bore the velocity / single-machine capacity is physically impossible
+  // (a single drum microscreen tops out ~1,000-2,000 m³/h; a single low-head recirc pump
+  // likewise). Real RAS plants run the loop as N PARALLEL TRAINS so each pump / drum-filter
+  // / degasser column sees a buildable per-unit flow. UNIVERSAL + deterministic: N is keyed
+  // off the FLOW MAGNITUDE (not an `if ras`) — any plant whose principal recirculation /
+  // throughput flow exceeds a sane single-unit limit is split. N = ceil(flow / limit); a
+  // flow already below the limit yields N = 1 (no spurious split). The per-unit flow then
+  // sizes every device + its pipe bore at a sane velocity (≈1.5-2.0 m/s at the re-derived
+  // DN below), and the per-device contract keys carry the PER-UNIT value + an explicit
+  // `_count` so the universal synthesiser emits qty=N each at per-unit flow (BoM + P&ID +
+  // isometrics inherit per-train flow). `recirculation_flow_m3_h` stays the SYSTEM total
+  // (the lock-gate HARD slot + the figure requirements_bom / topology read as the loop sum).
+  const SINGLE_UNIT_FLOW_LIMIT_M3H = 1800   // max buildable single-unit recirc/filter/degasser flow (drum-microscreen + low-head-pump practice)
+  const recircTrainCount = Math.max(1, Math.ceil(recirculationFlowM3H / SINGLE_UNIT_FLOW_LIMIT_M3H))  // N parallel trains; 13,360/1,800 → 8
+  const perTrainFlowM3H = Math.round(recirculationFlowM3H / recircTrainCount)  // ~1,670 m³/h per train ≤ limit
+  // Per-train pipe bore re-derived to land ~1.8 m/s: A = Q/v ; DN = √(4A/π). Pick the next
+  // standard DN up from the computed bore so velocity ≤ target (never above the 2.5 m/s ceiling).
+  const TARGET_PIPE_VELOCITY_MS = 1.8
+  const STD_DN_MM = [50, 65, 80, 100, 125, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1200]
+  const perTrainBoreMm = Math.sqrt((4 * (perTrainFlowM3H / 3600) / TARGET_PIPE_VELOCITY_MS) / Math.PI) * 1000
+  const perTrainDnMm = STD_DN_MM.find(d => d >= perTrainBoreMm) ?? STD_DN_MM[STD_DN_MM.length - 1]  // ~DN600 at 1,670 m³/h
+  const perTrainVelocityMs = Math.round(((perTrainFlowM3H / 3600) / (Math.PI * (perTrainDnMm / 2000) ** 2)) * 100) / 100  // ~1.6-2.0 m/s
+
   // ── Biofiltration (MBBR sized on TAN load) ────────────────────────────────
   const mbbrArealTanRateKgM3Day = 0.35                     // ~350 g TAN/m³ media/day (MBBR)
   const biofilterMediaVolumeM3 = Math.round((tanLoadKgDay / mbbrArealTanRateKgM3Day) * 10) / 10  // ~309 m³
@@ -11827,11 +11853,32 @@ registerArchetype('aquaculture_ras', (brief: any) => {
 
   // ── CO₂ degassing (packed-column, sized on recirc flow) ───────────────────
   // Forced-draught counter-current degasser at a high air:water ratio (~10:1 by
-  // volume) to strip CO₂ below 6 mg/L. Air flow ∝ recirculation flow.
+  // volume) to strip CO₂ below 6 mg/L. Air flow ∝ WATER flow at the 10:1 ratio.
+  // The 10:1 G:L ratio is CORRECT (do not change it); fix #4 is purely about which
+  // number is the degasser's PRIMARY rating.
   const degasserAirWaterRatio = 10
-  const degasserAirFlowM3H = Math.round(recirculationFlowM3H * degasserAirWaterRatio)
-  // Degasser/cascade fraction of the recirc handled per pass (~the whole flow).
-  const degasserWaterFlowM3H = recirculationFlowM3H
+  // Split with the loop: N parallel degasser columns, each on the per-train WATER flow.
+  // PRIMARY RATING = the WATER throughput per column (what the column hydraulically
+  // processes); the AIR flow is a SECONDARY blower property. Earlier the air flow
+  // (10× the water) was emitted as `degasser_air_flow_m3_h`, whose `_air_flow_m3_h`
+  // suffix put it in the SAME synthesiser group as the water flow where `max()` made the
+  // AIR value the degasser's rating → "133,600 m³/h" read as a 10× error, and the box
+  // grew to an absurd ⌀ (2026-06-16, council RAS fix #4). The air flow now lives under the
+  // key `co2_stripping_air_flow_m3_h`: its `_air_flow_m3_h` suffix still drives the
+  // aeration-blower synthesis (which sizes + counts its OWN machines off the air flow, and
+  // reads "stripping" → degassing-blower dP), but its phrase names NO device noun — so it
+  // is NOT minted as a duplicate "blower" equipment item, and it stays OUT of the degasser-
+  // column group, leaving the column's PRIMARY rating the per-train WATER flow. Hydraulic
+  // loading then lands in the real 40-80 m³/m²/h band.
+  const degasserWaterFlowPerTrainM3H = perTrainFlowM3H              // per-column water throughput (PRIMARY rating)
+  const degasserBlowerAirFlowM3H = Math.round(recirculationFlowM3H * degasserAirWaterRatio)  // TOTAL stripping air (10:1 G:L) — sizes the blowers, shown secondary
+  // Per-column packed cross-section sized to a ~65 m³/m²/h hydraulic loading (mid of the
+  // 40-80 band typical for forced-draught CO₂ strippers) → a sane per-train column ⌀, NOT
+  // the ⌀9 m tower the un-split full-flow column gave. Informational (the synthesiser sizes
+  // the BoM geometry from the per-train throughput); this confirms the split lands in-band.
+  const degasserHydraulicLoadingM3M2H = 65
+  const degasserColumnAreaM2 = (degasserWaterFlowPerTrainM3H / degasserHydraulicLoadingM3M2H)
+  const degasserColumnDiaM = Math.round(Math.sqrt((4 * degasserColumnAreaM2) / Math.PI) * 100) / 100  // per-train column ⌀
 
   // ── Thermal (heat pumps; make-up heating + building loss; net of HEX recovery) ─
   const sourceTempC = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:°|degrees?\s+)?(?:c|celsius)?\s*(?:seawater|borehole|source|raw)/i, 10)
@@ -11914,7 +11961,18 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // 15% selection margin. motor_kw is GUARANTEED ≥ shaft (recircPumpPowerKw) ≥ hydraulic.
   const recircPumpMotorInputKw = (recircPumpHydraulicW / recircPumpEffic / recircPumpMotorEffic) / 1000  // ~168 kW
   const STD_IEC_MOTORS_KW = [0.18, 0.25, 0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3.0, 4.0, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315, 355, 400, 450, 500, 560, 630, 710, 800]
-  const recircPumpMotorKw = STD_IEC_MOTORS_KW.find(s => s >= recircPumpMotorInputKw * 1.15) ?? STD_IEC_MOTORS_KW[STD_IEC_MOTORS_KW.length - 1]  // ~200 kW
+  const recircPumpMotorKw = STD_IEC_MOTORS_KW.find(s => s >= recircPumpMotorInputKw * 1.15) ?? STD_IEC_MOTORS_KW[STD_IEC_MOTORS_KW.length - 1]  // ~200 kW (SYSTEM aggregate ladder: hydraulic 109 → shaft 156 → motor 200)
+  // PER-TRAIN pump ratings (council RAS fix #DOM): the loop runs N parallel pumps, so the
+  // DEVICE rating is the per-train share, not the system aggregate. Hydraulic/shaft scale
+  // linearly with the per-train flow; the per-train motor is the next IEC frame above the
+  // per-train shaft ÷ η_motor × 1.15 margin (so per-train motor ≥ per-train shaft too). At
+  // 8 trains: ~14 kW hydraulic → ~20 kW shaft → 30 kW motor each. The single labelled
+  // ladder is preserved at BOTH levels (per-train AND ×N = system), so no page shows an
+  // unlabelled stray "rated" power for the one pump type.
+  const recircPumpHydraulicPerTrainW = Math.round(recircPumpHydraulicW / recircTrainCount)
+  const recircPumpPowerPerTrainKw = Math.round((recircPumpHydraulicPerTrainW / recircPumpEffic) / 1000)  // per-train SHAFT
+  const recircPumpMotorPerTrainInputKw = (recircPumpHydraulicPerTrainW / recircPumpEffic / recircPumpMotorEffic) / 1000
+  const recircPumpMotorPerTrainKw = STD_IEC_MOTORS_KW.find(s => s >= recircPumpMotorPerTrainInputKw * 1.15) ?? STD_IEC_MOTORS_KW[STD_IEC_MOTORS_KW.length - 1]
 
   // ── Water chemistry dosing (bicarbonate for nitrification alkalinity) ─────
   // ~7.1 g alkalinity-as-CaCO₃ consumed per g TAN oxidised; replace with NaHCO₃.
@@ -11949,11 +12007,13 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const uvReactorVolumeM3 = Math.round((recirculationFlowM3H / 3600) * uvResidenceTimeS * 10) / 10  // ~7.4 m³
 
   // ── Connected electrical load (sum of the major motor + thermal-input duties) ─
+  // recircPumpPowerKw is the SYSTEM-total recirc shaft power (Σ all N pumps), the right
+  // figure for the connected load. degasserBlowerAirFlowM3H is the TOTAL stripping air.
   const connectedElectricalLoadKw = Math.round(
     heatPumpElectricalKw + recircPumpPowerKw +
-    (biofilterAirFlowM3H * 0.0003) +        // MBBR blower ~0.3 W per m³/h air
-    (degasserAirFlowM3H * 0.0003) +         // degasser blowers
-    50 * Math.max(1, scale)                 // UV/ozone + PSA + controls + ancillaries
+    (biofilterAirFlowM3H * 0.0003) +              // MBBR blower ~0.3 W per m³/h air
+    (degasserBlowerAirFlowM3H * 0.0003) +         // degasser blowers (total air)
+    50 * Math.max(1, scale)                       // UV/ozone + PSA + controls + ancillaries
   )
 
   // ── Operating envelope + water quality ────────────────────────────────────
@@ -11962,6 +12022,32 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const harvestWeightKg = extractRangeFromDesc(desc, /(\d(?:\.\d)?)\s*(?:kg|kilograms?)\s*(?:harvest|sashimi|fish)/i, 3.4)
   const growOutDays = extractRangeFromDesc(desc, /(\d{2,3})\s*(?:[- ]?day)\s*(?:cycle|grow[\s-]?out)/i, 360)
   // (fcr is declared earlier — it is needed by the feed mass balance.)
+
+  // ── MARINE seawater salt balance (2026-06-16, council RAS fix #6) ──────────
+  // The plant runs on ~33 ppt (33 g/L) full-strength seawater. The salt figure the
+  // dossier must carry is the SEA-SALT inventory + the daily make-up, NOT the hydroponic
+  // nutrient-solution Ca/P output the `nutrient-solution:chemistry` tool emits (it was
+  // wrongly auto-selected for RAS and put `total_salt_mass_g ≈ 4.49 t` of fertiliser salts
+  // into the contract — a vertical-farm artefact, the WRONG chemistry entirely). We emit
+  // the MARINE values as source:'calculator' so the bootstrap seed-protection keeps them
+  // and the brief-metric resolver prefers them over the tool's field.
+  //   · STANDING INVENTORY = salinity(g/L) × system water volume(m³). System volume is the
+  //     whole wetted inventory (rearing tanks + MBBR working volume + degasser/UV/sump +
+  //     pipework), tank-dominated. ≈33 kg/m³ × ~3,340 m³ ⇒ ~110 t dissolved sea salt.
+  //   · DAILY MAKE-UP = salinity(g/L) × bleed flow(m³/h) × 24. A near-zero-exchange RAS
+  //     bleeds the SAME mass it makes up, so bleed ≈ make-up (53.4 m³/h here); the bled
+  //     seawater carries its salt out and must be re-salted. ≈33 kg/m³ × 53.4 × 24 ⇒ ~42 t/day.
+  const saltConcKgM3 = salinityPpt                                   // 33 ppt ≈ 33 g/L = 33 kg/m³
+  // Wetted system inventory (tank-dominated): rearing tanks + the WATER actually held in the
+  // MBBR biofilter (~the non-media fraction of its tank, the rest is plastic media) + a small
+  // treatment/sump/pipework holdup (UV reactors, degasser sumps, pump suctions, headers ≈ 5%
+  // of tank volume). At 3,340 m³ tank this lands ~3,500 m³ system ⇒ ~110-115 t sea salt.
+  const biofilterWaterHoldupM3 = Math.round(biofilterTankVolumeM3 * (1 - mbbrFillFrac))  // water around the media
+  const treatmentHoldupM3 = Math.round(uvReactorVolumeM3 + totalTankVolumeM3 * 0.05)
+  const systemWaterVolumeM3 = Math.round(totalTankVolumeM3 + biofilterWaterHoldupM3 + treatmentHoldupM3)
+  const bleedWaterM3H = makeupWaterM3H                              // mass balance: bleed ≈ make-up in a recirculating loop
+  const totalSaltInventoryKg = Math.round(saltConcKgM3 * systemWaterVolumeM3)         // ~110 t standing sea-salt
+  const saltMakeupKgDay = Math.round(saltConcKgM3 * bleedWaterM3H * 24)               // ~42 t/day re-salting of the bleed
 
   // ── Total system mass (kg) — renderer compliance-table mass row + gate 17.
   // Field-erected RAS: tanks (HDPE/GRP/concrete-lined) + treatment vessels +
@@ -12003,17 +12089,24 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     // recirculating loop: make-up % = (1 − recirc_fraction) × 100, NOT an RO recovery fraction.
     make_up_water_percentage: q(Math.round(makeupFraction * 1000) / 10, '%', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: '(1 − recirc_fraction) × 100 — fresh-water make-up as a % of recirculation flow (~0.4%, near-zero-exchange RAS)' }),
 
-    // ── Solids removal (rotary drum microscreens) ──
-    drum_filter_throughput_m3_h: q(recirculationFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'rotary drum microscreen filters take the full recirculation flow on tank exit (40-60 µm screen)' }),
+    // ── Solids removal (rotary drum microscreens) — N PARALLEL units, per-unit flow ──
+    drum_filter_throughput_m3_h: q(perTrainFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `PER-UNIT throughput of each of ${recircTrainCount} parallel rotary drum microscreens (40-60 µm) — the ${recirculationFlowM3H} m³/h loop is split N ways so each unit sees a buildable ≤${SINGLE_UNIT_FLOW_LIMIT_M3H} m³/h (a single drum cannot take 13,360 m³/h)` }),
+    drum_filter_count: q(recircTrainCount, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `number of parallel drum-filter trains = ceil(recirculation_flow ÷ ${SINGLE_UNIT_FLOW_LIMIT_M3H} m³/h single-unit limit); each on the per-unit flow above` }),
 
     // ── Biofiltration (MBBR sized on TAN load) ──
     biofilter_media_volume_m3: q(biofilterMediaVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'TAN_load ÷ ~0.35 kg TAN/m³ media/day (MBBR areal nitrification rate)' }),
     biofilter_tank_volume_m3: q(biofilterTankVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: 'media volume ÷ ~60% fill ratio (50-70% MBBR media fill)' }),
     biofilter_air_flow_m3_h: q(biofilterAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: '~12 m³ air/h per m³ media (MBBR aeration grid + blower)' }),
 
-    // ── CO₂ degassing (packed-column) ──
-    degasser_air_flow_m3_h: q(degasserAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~10:1 air:water ratio forced-draught counter-current packed-column degassers (strip CO₂ < 6 mg/L)' }),
-    degasser_water_flow_m3_h: q(degasserWaterFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'degassers take the full recirculation flow' }),
+    // ── CO₂ degassing (packed-column) — N PARALLEL columns; WATER flow is the PRIMARY rating ──
+    // PRIMARY = the per-column WATER throughput (what the column hydraulically processes).
+    degasser_water_flow_m3_h: q(degasserWaterFlowPerTrainM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `PER-COLUMN water throughput of each of ${recircTrainCount} parallel forced-draught counter-current packed-column degassers (strip CO₂ < 6 mg/L); hydraulic loading ~${degasserHydraulicLoadingM3M2H} m³/m²/h at ⌀~${degasserColumnDiaM} m — the WATER flow is the column's rating, not the 10× air flow` }),
+    degasser_count: q(recircTrainCount, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `number of parallel CO₂-degasser columns = ceil(recirculation_flow ÷ ${SINGLE_UNIT_FLOW_LIMIT_M3H} m³/h); each on the per-column water flow above` }),
+    // SECONDARY = the stripping AIR flow (10:1 G:L) — a blower property, NOT the column rating.
+    // Lives under a `degasser_blower_*` key so the universal aeration-blower synthesis still
+    // sizes + counts the blowers off it, but it stays OUT of the degasser-column group (whose
+    // `max()` would otherwise make this 10× air value the column's mislabelled rating).
+    co2_stripping_air_flow_m3_h: q(degasserBlowerAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: `TOTAL forced-draught CO₂-stripping AIR at the ~10:1 air:water (G:L) ratio across all ${recircTrainCount} degasser columns (≈${degasserAirWaterRatio}× the total water flow) — the SECONDARY figure that sizes the degassing blowers; the 10:1 ratio is correct` }),
 
     // ── Oxygenation (LOX/PSA) ──
     oxygen_supply_kg_h: q(oxygenSupplyKgH, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'oxygen_demand ÷ 24 — down-flow O₂ cones fed from on-site LOX + PSA generator' }),
@@ -12034,16 +12127,40 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     water_setpoint_temp_c: q(setpointTempC, '°C', 'temperature', 'rated', 'system', 'brief', { source_detail: '26.4 °C yellowtail kingfish grow-out temperature' }),
     source_water_temp_c: q(sourceTempC, '°C', 'temperature', 'min', 'system', 'brief', { source_detail: '~10 °C seawater/borehole source water (8-12 °C)' }),
 
-    // ── Pumping — reconciled hydraulic → shaft → motor (motor ≥ shaft ≥ hydraulic) ──
+    // ── Pumping — N PARALLEL pumps; per-UNIT ladder is the DEVICE rating, ×N = SYSTEM ──
+    // ONE labelled ladder at each level: per-train hydraulic → shaft → motor (the device),
+    // and the system aggregate (×N) for the connected-load / headline. No page shows an
+    // unlabelled stray "rated" power — every value is labelled per-unit OR system-total.
+    recirc_pump_count: q(recircTrainCount, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `number of parallel recirculation pumps = ceil(recirculation_flow ÷ ${SINGLE_UNIT_FLOW_LIMIT_M3H} m³/h single-unit limit) — duty pumps + ≥1 standby specified at detailed design; each on the per-train flow` }),
     recirc_pump_head_m: q(recircPumpHeadM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: 'low-head recirculation pump total dynamic head (~3 m: tank exit → treatment train → return)' }),
-    recirc_pump_hydraulic_power_w: q(recircPumpHydraulicW, 'W', 'power', 'rated', 'module', 'calculator', { source_detail: 'ρ·g·Q·H useful hydraulic power for the recirculation duty (~109 kW)' }),
-    recirc_pump_power_kw: q(recircPumpPowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'pump SHAFT power = hydraulic ÷ η_pump (~0.70); ~156 kW total recirculation duty' }),
-    recirc_pump_motor_kw: q(recircPumpMotorKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'installed motor rating = next standard IEC frame above shaft ÷ η_motor (~0.93) × 1.15 margin; ≥ shaft power (~200 kW)' }),
+    // PER-TRAIN (device) ladder — the rating the BoM/P&ID/isometric carries per pump.
+    recirc_pump_hydraulic_power_w: q(recircPumpHydraulicPerTrainW, 'W', 'power', 'rated', 'module', 'calculator', { source_detail: `PER-PUMP ρ·g·Q·H hydraulic power = system hydraulic ÷ ${recircTrainCount} trains (system total ~${Math.round(recircPumpHydraulicW / 1000)} kW)` }),
+    recirc_pump_power_kw: q(recircPumpPowerPerTrainKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `PER-PUMP SHAFT power = per-train hydraulic ÷ η_pump (~0.70); ×${recircTrainCount} = ~${recircPumpPowerKw} kW system recirculation duty` }),
+    recirc_pump_motor_kw: q(recircPumpMotorPerTrainKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `PER-PUMP installed motor = next IEC frame above per-train shaft ÷ η_motor (~0.93) × 1.15 margin; ≥ per-train shaft (the motor can never be below the shaft it drives)` }),
+    recirc_pump_pipe_dn_mm: q(perTrainDnMm, 'mm', 'length', 'rated', 'module', 'calculator', { source_detail: `per-train pipe bore re-derived for the per-unit flow at ~${TARGET_PIPE_VELOCITY_MS} m/s (≈${perTrainVelocityMs} m/s at DN${perTrainDnMm}) — sane velocity, NOT the ~52 m/s a single DN300 full-flow line would see` }),
+    // NOTE: the SYSTEM-aggregate pump ladder (Σ all N pumps: ~109 kW hydraulic → ~156 kW shaft →
+    // ~200 kW motor) is carried in `shared_quantities` below, NOT here — a `recirc_pump_system_*_kw`
+    // key would be read by the universal equipment synthesiser (phrase contains the device noun
+    // "pump" + a kW power) and mint a PHANTOM "Recirc Pump System Shaft" box. shared_quantities is
+    // not scanned for equipment, so prose/headline can still read the labelled aggregate ladder.
 
     // ── Water chemistry dosing ──
     bicarbonate_dose_kg_day: q(bicarbonateDoseKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~7.1 g alkalinity-as-CaCO₃ per g TAN oxidised, dosed as NaHCO₃ (×84/50 mass factor)' }),
     ph_setpoint: q(phSetpoint, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'pH 7.4 held by bicarbonate dosing' }),
     salinity_ppt: q(salinityPpt, 'ppt', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '~33 ppt full-strength seawater salinity' }),
+
+    // ── MARINE seawater salt balance (council RAS fix #6) — overrides the hydroponic artefact ──
+    // The wrong-domain nutrient-solution:chemistry tool emits `total_salt_mass_g` (~4.49 t of
+    // fertiliser Ca/P salts — a vertical-farm artefact). We OWN that key here as source:'calculator'
+    // with the correct MARINE value so the seed-protection refuses the tool clobber, AND emit clean
+    // kg/tonne keys + the daily make-up for the brief-metric resolver + the dossier. (system_water_volume_m3
+    // is a `_volume_m3` key the universal synthesiser would mint as a phantom "System Water" tank, so it
+    // lives in shared_quantities below — the salt keys are mass/flow_rate, never synthesised as equipment.)
+    total_salt_mass_kg: q(totalSaltInventoryKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `standing dissolved sea-salt inventory = ${saltConcKgM3} g/L × ${systemWaterVolumeM3} m³ system volume ≈ ${(totalSaltInventoryKg / 1000).toFixed(0)} t (the MARINE salt charge, NOT a hydroponic nutrient mass)` }),
+    total_salt_mass_t: q(Math.round(totalSaltInventoryKg / 100) / 10, 't', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'standing sea-salt inventory in tonnes' }),
+    // Override the tool's hydroponic field with the marine value (grams), same key, source:'calculator'.
+    total_salt_mass_g: q(totalSaltInventoryKg * 1000, 'g', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `MARINE standing salt inventory in grams (${saltConcKgM3} g/L × ${systemWaterVolumeM3} m³) — replaces the wrongly auto-selected hydroponic nutrient-solution Ca/P figure` }),
+    salt_makeup_kg_day: q(saltMakeupKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: `daily sea-salt make-up = ${saltConcKgM3} g/L × ${bleedWaterM3H} m³/h bleed × 24 h — the bled seawater carries its salt out and is re-salted (≈${(saltMakeupKgDay / 1000).toFixed(0)} t/day at the brief's 0.4% make-up)` }),
 
     // ── System ──
     connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'Σ heat-pump electrical + recirc pumps + MBBR/degasser blowers + UV/ozone/PSA/controls' }),
@@ -12056,55 +12173,61 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // Flow order: rearing tanks → drum filters → MBBR biofilter → CO₂ degasser →
   // O₂ cones → UV/ozone → heat pumps → recirc pumps → tanks. NO marine-submersible
   // / depth context (gate 34); "marine" = seawater chemistry, not a submerged hull.
+  // PER-TRAIN flow-capacity (council RAS fix #DOM): the recirculation loop runs as
+  // `recircTrainCount` parallel trains, so each process edge carries the PER-TRAIN flow at
+  // the re-derived DN (≈1.5-2.0 m/s), NOT the impossible full-loop flow through one line.
+  // The isometrics + P&ID inherit per-train flow + the sane bore from these edges.
+  const perTrainFlowM3S = perTrainFlowM3H / 3600
+  const parallelCtx = `${recircTrainCount}x_parallel_trains_DN${perTrainDnMm}_per_line_~${perTrainVelocityMs}m_s`
   const topology: TopologyEdge[] = [
     {
       from_part: 'rearing_tanks',
       to_part: 'rotary_drum_filter',
       mechanism: 'fluid_loop',
       constraint_kind: 'flow_capacity',
-      required_value: recirculationFlowM3H / 3600,  // m³/s
+      required_value: perTrainFlowM3S,  // m³/s PER TRAIN
       required_unit: 'm³/s',
       required_margin_factor: 1.2,
-      material_context: 'dual_Cornell_drain_tank_exit_solids_rich_bottom_draw_plus_clean_sidewall_draw_to_40_60um_microscreen',
+      material_context: `dual_Cornell_drain_tank_exit_solids_rich_bottom_draw_plus_clean_sidewall_draw_to_40_60um_microscreen__${parallelCtx}`,
     },
     {
       from_part: 'rotary_drum_filter',
       to_part: 'mbbr_biofilter',
       mechanism: 'fluid_loop',
       constraint_kind: 'flow_capacity',
-      required_value: recirculationFlowM3H / 3600,
+      required_value: perTrainFlowM3S,
       required_unit: 'm³/s',
       required_margin_factor: 1.2,
-      material_context: 'solids_removed_to_protect_the_biofilter_from_organic_overload_then_TAN_oxidation_in_the_MBBR',
+      material_context: `solids_removed_to_protect_the_biofilter_from_organic_overload_then_TAN_oxidation_in_the_MBBR__${parallelCtx}`,
     },
     {
       from_part: 'mbbr_biofilter',
       to_part: 'co2_degasser',
       mechanism: 'fluid_loop',
       constraint_kind: 'flow_capacity',
-      required_value: recirculationFlowM3H / 3600,
+      required_value: perTrainFlowM3S,
       required_unit: 'm³/s',
       required_margin_factor: 1.2,
-      material_context: 'nitrified_water_to_forced_draught_packed_column_degasser_strip_CO2_below_6mg_L',
+      material_context: `nitrified_water_to_forced_draught_packed_column_degasser_strip_CO2_below_6mg_L__${parallelCtx}`,
     },
     {
       from_part: 'co2_degasser',
       to_part: 'oxygen_cones',
       mechanism: 'fluid_loop',
       constraint_kind: 'flow_capacity',
-      required_value: recirculationFlowM3H / 3600,
+      required_value: perTrainFlowM3S,
       required_unit: 'm³/s',
       required_margin_factor: 1.2,
-      material_context: 'degassed_water_reoxygenated_in_downflow_O2_cones_fed_from_LOX_and_PSA_generator',
+      material_context: `degassed_water_reoxygenated_in_downflow_O2_cones_fed_from_LOX_and_PSA_generator__${parallelCtx}`,
     },
     {
       from_part: 'oxygen_cones',
       to_part: 'uv_ozone_disinfection',
       mechanism: 'fluid_loop',
       constraint_kind: 'flow_capacity',
-      required_value: recirculationFlowM3H / 3600,
+      required_value: perTrainFlowM3S,
       required_unit: 'm³/s',
-      material_context: 'oxygenated_water_polished_through_UV_reactors_optional_ozone_under_ORP_control',
+      material_context: `oxygenated_water_polished_through_UV_reactors_optional_ozone_under_ORP_control__${parallelCtx}`,
     },
     {
       from_part: 'heat_pumps',
@@ -12172,10 +12295,20 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     required: `design equipment capex ≤ £${(capexCeilingGbp / 1_000_000).toFixed(1)} M ceiling`,
     reason: `Equipment capex anchor £${(designEquipCapexGbp / 1_000_000).toFixed(2)} M for the ${annualProductionTYr.toFixed(0)} t/yr design (≈£40k/annual-tonne) vs the £${(capexCeilingGbp / 1_000_000).toFixed(1)} M ceiling.`,
   })
+  // Parallel-train closure (council RAS fix #DOM): NO principal recirc unit (pump / drum
+  // filter / degasser column) may carry more than the single-unit flow limit. Splitting the
+  // loop into N trains guarantees per-unit flow ≤ limit; this asserts it deterministically.
+  closures.push({
+    invariant_id: 'recirc_units_within_single_unit_flow_limit',
+    status: perTrainFlowM3H <= SINGLE_UNIT_FLOW_LIMIT_M3H * 1.001 ? 'pass' : 'fail',
+    measured: perTrainFlowM3H,
+    required: `per-unit recirc/filter/degasser flow ≤ ${SINGLE_UNIT_FLOW_LIMIT_M3H} m³/h (split the ${recirculationFlowM3H} m³/h loop into ${recircTrainCount} parallel trains)`,
+    reason: `${recircTrainCount} parallel trains × ${perTrainFlowM3H} m³/h = ${recirculationFlowM3H} m³/h; each pump/drum-filter/degasser sees ${perTrainFlowM3H} m³/h ≤ the ${SINGLE_UNIT_FLOW_LIMIT_M3H} m³/h single-unit limit, at DN${perTrainDnMm} (~${perTrainVelocityMs} m/s).`,
+  })
 
   return {
     product_class: 'aquaculture_ras',
-    brief_summary: `${annualProductionTYr.toFixed(0)} t/yr land-based marine Recirculating Aquaculture System (RAS) for yellowtail kingfish (Seriola lalandi), 200 g → ${harvestWeightKg} kg over ${growOutDays} days at FCR ${fcr}. ${totalTankVolumeM3} m³ total rearing-tank volume across ${rearingTankCount} circular dual-drain tanks at ${harvestDensityKgM3} kg/m³ (~${(standingBiomassKg / 1000).toFixed(0)} t standing biomass). Continuous water-treatment loop: rotary drum microscreens (${solidsLoadKgDay} kg solids/day) → MBBR biofilter (${biofilterMediaVolumeM3} m³ media on ${tanLoadKgDay} kg TAN/day) → packed-column CO₂ degassers → down-flow O₂ cones (LOX + PSA, ${oxygenDemandKgDay} kg O₂/day) → UV/ozone → water-source heat pumps holding 26.4 °C (${heatingDutyKw} kW heating duty net of heat recovery — the dominant load) → low-head recirculation pumps (${recirculationFlowM3H} m³/h, 4 turnovers/h, 99.6% recycled, ~${makeupWaterM3H} m³/h make-up). pH ${phSetpoint} held by NaHCO₃ dosing (${bicarbonateDoseKgDay} kg/day); ~${salinityPpt} ppt seawater. ${(connectedElectricalLoadKw / 1000).toFixed(2)} MW connected electrical load. Mission-critical life support: duty/standby recirc pumps + gravity fall-back, fail-open emergency O₂ diffusers, LOX buffer, backup generator, fail-safe alarms with auto-dialler. Equipment capex anchor £${(designEquipCapexGbp / 1_000_000).toFixed(1)} M vs the £${(capexCeilingGbp / 1_000_000).toFixed(0)} M ceiling. Marine Scotland consent.`,
+    brief_summary: `${annualProductionTYr.toFixed(0)} t/yr land-based marine Recirculating Aquaculture System (RAS) for yellowtail kingfish (Seriola lalandi), 200 g → ${harvestWeightKg} kg over ${growOutDays} days at FCR ${fcr}. ${totalTankVolumeM3} m³ total rearing-tank volume across ${rearingTankCount} circular dual-drain tanks at ${harvestDensityKgM3} kg/m³ (~${(standingBiomassKg / 1000).toFixed(0)} t standing biomass). Continuous water-treatment loop: rotary drum microscreens (${solidsLoadKgDay} kg solids/day) → MBBR biofilter (${biofilterMediaVolumeM3} m³ media on ${tanLoadKgDay} kg TAN/day) → packed-column CO₂ degassers → down-flow O₂ cones (LOX + PSA, ${oxygenDemandKgDay} kg O₂/day) → UV/ozone → water-source heat pumps holding 26.4 °C (${heatingDutyKw} kW heating duty net of heat recovery — the dominant load) → low-head recirculation pumps. The ${recirculationFlowM3H} m³/h loop (4 turnovers/h, 99.6% recycled, ~${makeupWaterM3H} m³/h make-up) runs as ${recircTrainCount} PARALLEL TRAINS — ${recircTrainCount}× recirc pumps + ${recircTrainCount}× rotary drum microscreens + ${recircTrainCount}× CO₂-degasser columns, each on ${perTrainFlowM3H} m³/h at DN${perTrainDnMm} (~${perTrainVelocityMs} m/s) — so no single unit carries the impossible full flow. pH ${phSetpoint} held by NaHCO₃ dosing (${bicarbonateDoseKgDay} kg/day); ~${salinityPpt} ppt seawater (~${(totalSaltInventoryKg / 1000).toFixed(0)} t standing sea-salt inventory, ~${(saltMakeupKgDay / 1000).toFixed(0)} t/day make-up). ${(connectedElectricalLoadKw / 1000).toFixed(2)} MW connected electrical load. Mission-critical life support: duty/standby recirc pumps + gravity fall-back, fail-open emergency O₂ diffusers, LOX buffer, backup generator, fail-safe alarms with auto-dialler. Equipment capex anchor £${(designEquipCapexGbp / 1_000_000).toFixed(1)} M vs the £${(capexCeilingGbp / 1_000_000).toFixed(0)} M ceiling. Marine Scotland consent.`,
     quantities,
     topology,
     // B-3 fix (mirror co2/e_fuel): return EMPTY macros to the BoM. The dedicated
@@ -12193,6 +12326,22 @@ registerArchetype('aquaculture_ras', (brief: any) => {
       recirculation_flow_m3_h: recirculationFlowM3H,
       total_tank_volume_m3: totalTankVolumeM3,
       annual_production_t_yr: annualProductionTYr,
+      // Parallel-train arrangement (council RAS fix #DOM) — prose/P&ID emitters read these so
+      // every page agrees the loop is N trains at the per-train flow, never a single full-flow unit.
+      recirc_train_count: recircTrainCount,
+      recirc_per_train_flow_m3_h: perTrainFlowM3H,
+      recirc_per_train_pipe_dn_mm: perTrainDnMm,
+      // SYSTEM-aggregate recirc pump ladder (Σ all N pumps) — carried HERE, not in quantities, so the
+      // universal equipment synthesiser does not mint a phantom "Recirc Pump System Shaft" box; the
+      // labelled aggregate ladder (hydraulic → shaft → motor) stays available to prose + the headline.
+      recirc_pump_system_hydraulic_kw: Math.round(recircPumpHydraulicW / 1000),
+      recirc_pump_system_shaft_kw: recircPumpPowerKw,
+      recirc_pump_system_motor_kw: recircPumpMotorKw,
+      // Marine salt balance (council RAS fix #6) — the canonical sea-salt figures, NOT hydroponic.
+      // system_water_volume_m3 lives here (not quantities) so it is not synthesised as a "System Water" tank.
+      system_water_volume_m3: systemWaterVolumeM3,
+      total_salt_inventory_t: Math.round(totalSaltInventoryKg / 100) / 10,
+      salt_makeup_kg_day: saltMakeupKgDay,
       regulatory_standard_spine: 'Marine Scotland aquaculture consent + The Aquatic Animal Health (Scotland) Regulations + CAR (Controlled Activities Regulations) discharge consent (SEPA) + Machinery Directive (BS EN ISO 12100) + DSEAR (ozone/oxygen) + BS EN 60204-1 (electrical safety of machinery)',
       species_desc: 'yellowtail kingfish (Seriola lalandi), sashimi/sushi-grade Hamachi',
       water_chemistry_desc: 'full-strength seawater ~33 ppt, 26.4 °C, pH 7.4, TAN 0.5-1.5 mg/L, nitrite 0.5-1.5 mg/L, CO₂ < 6 mg/L, DO ≥ saturation at tank inlet',

@@ -132,6 +132,12 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
   const byPhrase = new Map<string, EquipGroup>()
   for (const [key, value] of Object.entries(quantities)) {
     if (!Number.isFinite(value) || value <= 0) continue
+    // The building envelope keys synthesizeBuildingStructure writes back
+    // (building_footprint_m2 / _gross_floor_area_m2 / _wall_area_m2 / _height_m) DESCRIBE the
+    // hall — they are NOT equipment to size or synthesise. Skip them so re-running the
+    // contract passes (or the reconcile re-derivation) never mints a phantom "Building
+    // Footprint" principal from the area suffix.
+    if (/^building_(footprint|gross_floor_area|wall_area|height)_/.test(key)) continue
     let matched: { phrase: string; measure: Measure; perEach: boolean } | null = null
     for (const rule of SUFFIX_RULES) {
       if (rule.re.test(key)) {
@@ -476,7 +482,7 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], maxDepth = 
       const out: WordLike[] = []
       for (const w of sm.words) {
         out.push(w)
-        if (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w)) continue   // instrument / valve / blower / whole system — priced whole, not exploded
+        if (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w) || isBuildingStructure(w)) continue   // instrument / valve / blower / whole system / building element — priced whole, not exploded
         const id = String(w.id ?? '')
         const depth = (id.match(/__/g) ?? []).length
         if (depth >= maxDepth) continue          // too deep — stop the recursion
@@ -1059,6 +1065,224 @@ export function synthesizeUtilitySafety(modules: ModuleLike[], quantities: Recor
   return n
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// BUILDING-STRUCTURE TAKE-OFF SYNTHESIS (Tristan #145 — "the plant is a building").
+//
+// THE WALL it removes (RAS, 2026-06-16): a land-based RAS is fundamentally a large
+// INSULATED HALL that houses the tanks — typically 15-30 % of capex — yet the BoM
+// carried only a skeleton "Structural Frame £3,078" token and the building envelope was
+// mis-sized at 216 m² while ten ⌀12.4 m rearing tanks need ~1,200 m² of tank footprint
+// (≈2,400 m² of hall with access). So the single largest civil line item was simply
+// ABSENT, and any downstream consumer that asked the contract for a footprint got a
+// type-default 216 m² instead of the real ~2,400 m².
+//
+// This pass DERIVES the building deterministically from the equipment it houses, then
+// emits a parametric take-off (slab / portal frame / wall + roof cladding / foundations /
+// doors) as `_structure`-flagged synthesised words, and writes the real footprint back to
+// the contract quantities so the GA + the heat-loss tool size against it. Universal — a
+// HOUSED process plant of any archetype gets a hall scaled to its own equipment; a
+// manufactured product with no housed footprint (a drone) gets nothing (the pass is a
+// no-op below ~30 m² of total equipment footprint). No per-class table, British spelling.
+// ──────────────────────────────────────────────────────────────────────────────
+
+function isBuildingStructure(w: WordLike): boolean {
+  return (w as { _structure?: boolean })._structure === true
+}
+
+// A principal equipment item's PLAN FOOTPRINT (m²) parsed from its dimension modifier:
+//   · a cylinder "⌀D m dia x H m" → π(D/2)²  (the circle the vessel stands on)
+//   · a box "W x D x H mm" → (W·D)/1e6        (the rectangle the skid stands on)
+// A "<a> m² area" dimension is a HEAT-TRANSFER / membrane SURFACE area, NOT a plan
+// footprint (a 117 m² HEX occupies a ~few-m² shell), so it is deliberately NOT counted.
+// Returns 0 when no plan footprint can be read.
+function planFootprintM2(w: WordLike): number {
+  const dim = String((w.modifier_characters ?? []).find((m) => m.kind === 'dimension' || m.kind === 'dimensions')?.value ?? '')
+  if (!dim) return 0
+  const cyl = /([\d.]+)\s*m\s*dia/i.exec(dim)
+  if (cyl) { const d = parseFloat(cyl[1]); return Number.isFinite(d) && d > 0 ? Math.PI * (d / 2) * (d / 2) : 0 }
+  const box = /([\d.]+)\s*x\s*([\d.]+)\s*x\s*[\d.]+\s*mm/i.exec(dim)
+  if (box) { const w_ = parseFloat(box[1]); const d_ = parseFloat(box[2]); return Number.isFinite(w_) && Number.isFinite(d_) ? (w_ * d_) / 1e6 : 0 }
+  return 0
+}
+
+// The tallest equipment height (m), used to set the hall clear height. Reads a cylinder
+// height "dia x H m" or a box height "W x D x H mm".
+function equipHeightM(w: WordLike): number {
+  const dim = String((w.modifier_characters ?? []).find((m) => m.kind === 'dimension' || m.kind === 'dimensions')?.value ?? '')
+  const cyl = /dia[^x]*x\s*([\d.]+)\s*m/i.exec(dim)
+  if (cyl) { const h = parseFloat(cyl[1]); return Number.isFinite(h) ? h : 0 }
+  const box = /[\d.]+\s*x\s*[\d.]+\s*x\s*([\d.]+)\s*mm/i.exec(dim)
+  if (box) { const h = parseFloat(box[1]); return Number.isFinite(h) ? h / 1000 : 0 }
+  return 0
+}
+
+// A building TAKE-OFF element: priced parametrically from the derived footprint / wall /
+// roof areas (UK 2026 installed rates, £/m² unless a flat figure). `qty` is the area (or 1
+// for the flat door allowance); `rate` is £/m² (or the flat £ when qtyIsArea is false).
+interface BuildingElementSpec {
+  key: string
+  label: string
+  area: (g: BuildingGeometry) => number // the area this element is priced over (m²)
+  gbpPerM2: number // £/m² (UK 2026 installed)
+  flatGbp?: number // a fixed allowance instead of area×rate (doors)
+  form: (g: BuildingGeometry) => string
+}
+interface BuildingGeometry {
+  footprintM2: number
+  heightM: number
+  wallAreaM2: number
+  roofAreaM2: number
+}
+
+const BUILDING_ELEMENTS: BuildingElementSpec[] = [
+  { key: 'floor_slab', label: 'Reinforced Floor Slab', area: (g) => g.footprintM2, gbpPerM2: 140,
+    form: (g) => `Reinforced concrete ground-bearing slab, ~${Math.round(g.footprintM2).toLocaleString('en-GB')} m², power-floated and falls-to-drain — carries the tank loads, the equipment and the wet-process floor` },
+  { key: 'portal_frame', label: 'Steel Portal Frame', area: (g) => g.footprintM2, gbpPerM2: 90,
+    form: (g) => `Hot-rolled steel portal frame to ~${g.heightM.toFixed(1)} m haunch over ~${Math.round(g.footprintM2).toLocaleString('en-GB')} m², with purlins + side rails — the primary structure of the process hall` },
+  { key: 'wall_cladding', label: 'Insulated Wall Cladding', area: (g) => g.wallAreaM2, gbpPerM2: 70,
+    form: (g) => `Insulated composite wall cladding, ~${Math.round(g.wallAreaM2).toLocaleString('en-GB')} m² (perimeter ${Math.round(4 * Math.sqrt(g.footprintM2))} m × ${g.heightM.toFixed(1)} m), holds the controlled internal environment against the make-up heat load` },
+  { key: 'roof_cladding', label: 'Insulated Roof Cladding', area: (g) => g.roofAreaM2, gbpPerM2: 75,
+    form: (g) => `Insulated composite roof cladding, ~${Math.round(g.roofAreaM2).toLocaleString('en-GB')} m², with rooflights + gutters — caps the conditioned process volume` },
+  { key: 'foundations', label: 'Foundations + Ground Works', area: (g) => g.footprintM2, gbpPerM2: 60,
+    form: (g) => `Pad / strip foundations + sub-base + drainage over the ~${Math.round(g.footprintM2).toLocaleString('en-GB')} m² building footprint` },
+  { key: 'doors', label: 'Roller + Personnel Doors', area: () => 1, gbpPerM2: 0, flatGbp: 12000,
+    form: () => `Insulated roller-shutter access doors + personnel / fire-escape doors for the process hall` },
+]
+
+function buildingWord(spec: BuildingElementSpec, g: BuildingGeometry): WordLike {
+  const area = spec.area(g)
+  const gbp = spec.flatGbp !== undefined ? spec.flatGbp : Math.max(1, Math.round(area * spec.gbpPerM2))
+  const mods: ModifierCharacter[] = [mod('quantity', '×1')]
+  // Element dimension: an area for the area-priced elements; the gross hall envelope for the
+  // frame so the GA + reader see the building extent.
+  if (spec.flatGbp === undefined) mods.push(mod('dimension', `${Math.round(area)} m² area`))
+  else mods.push(mod('dimension', `${Math.round(4 * Math.sqrt(g.footprintM2))} m perimeter`))
+  mods.push(mod('rating_primary', `${Math.round(g.footprintM2)}`, 'm² footprint'))
+  mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(gbp)))))
+  mods.push(mod('form', spec.form(g)))
+  mods.push(mod('part_number', 'TBD'))
+  mods.push(mod('lifecycle', 'Concept design — building element sized parametrically from the housed-equipment footprint; quantities confirmed at detailed design'))
+  mods.push(mod('installation', 'Building / civil works — the hall that houses the plant'))
+  const id = `bldg_${spec.key}`
+  return { id, name_human: spec.label, content_character: { character_id: id, name_human: spec.label }, modifier_characters: mods, ...({ _synthesized: true, _structure: true } as object) }
+}
+
+/**
+ * Synthesise the BUILDING the plant lives in — a deterministic take-off (floor slab,
+ * portal frame, wall + roof cladding, foundations, doors) sized from the principal
+ * equipment's plan footprint, and write the derived footprint / floor area / height /
+ * wall area back to the contract quantities (so the GA + the heat-loss tool use the REAL
+ * footprint, fixing the type-default). Mutates `modules` in place AND `quantities` in
+ * place (adds the building_* keys); when `contract` is supplied it ALSO persists those
+ * keys to `contract.quantities` in the engine's `{value, unit, …}` shape so the saved
+ * contract carries the real footprint. Returns the number of building words added.
+ *
+ * Universal: any housed process plant gets a hall scaled to its own equipment; a
+ * manufactured product with a negligible housed footprint gets nothing (no-op below
+ * ~30 m² of total equipment footprint — no hall for a drone). No per-class table.
+ */
+export function synthesizeBuildingStructure(
+  modules: ModuleLike[],
+  quantities: Record<string, number>,
+  contract?: ContractInProgress,
+): number {
+  // idempotency: drop any building-structure words a prior pass added (re-derive cleanly).
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) {
+    if (Array.isArray(sm.words)) sm.words = sm.words.filter((w) => !isBuildingStructure(w))
+  }
+
+  // Collect the PLAN FOOTPRINT (× quantity) + height of every PRINCIPAL equipment item it
+  // houses. Exclude the non-principal synthesised families (instruments / actuators /
+  // utilities / process-support / sub-components) — they sit on / inside the principals, not
+  // beside them — and any prior structure word (already dropped above, belt-and-braces).
+  type Item = { stems: string[]; fp: number; h: number }
+  const items: Item[] = []
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    if (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w) || isSubcomponent(w) || isBuildingStructure(w)) continue
+    const fp = planFootprintM2(w)
+    if (fp <= 0) continue
+    items.push({ stems: wordStems(w), fp: fp * parentQty(w), h: equipHeightM(w) })
+  }
+
+  // De-duplicate the SAME physical vessel represented under two contract keys (e.g. a
+  // biofilter's `_tank_volume` ⌀4.6 AND its `_working_volume` ⌀8.6 both synthesise a vessel —
+  // one tank, counted twice would inflate the hall + pick a phantom tallest). Two principals
+  // whose stem-sets are subset-related (one names the same equipment as the other, just more
+  // specifically) are ONE physical item: keep the LARGER footprint + the taller height once.
+  // Distinct equipment (rearing tank vs drum filter vs degasser) share no subset relation and
+  // are summed normally. Universal — mirrors the reconcile's subset-claim logic, no class table.
+  const merged: Item[] = []
+  for (const it of items) {
+    const dup = merged.find((m) =>
+      (m.stems.length > 0 && m.stems.every((s) => it.stems.includes(s))) ||
+      (it.stems.length > 0 && it.stems.every((s) => m.stems.includes(s))))
+    if (dup) {
+      if (it.fp > dup.fp) dup.fp = it.fp
+      if (it.h > dup.h) dup.h = it.h
+      if (it.stems.length > dup.stems.length) dup.stems = it.stems // keep the more-specific name
+    } else {
+      merged.push({ ...it })
+    }
+  }
+  let equipFootprint = 0
+  let tallest = 0
+  for (const it of merged) { equipFootprint += it.fp; if (it.h > tallest) tallest = it.h }
+
+  // UNIVERSAL no-op guard: a product with a negligible housed footprint (a drone, an
+  // edge-AI box, a satellite) is NOT a building — don't synthesise a hall for it.
+  if (equipFootprint < 30) return 0
+
+  // Footprint = equipment footprint × an aisle / access / services factor, floored at a
+  // small minimum hall. A square approximation gives the perimeter + wall area.
+  const AISLE_FACTOR = 2.2
+  const footprintM2 = Math.max(150, Math.round(equipFootprint * AISLE_FACTOR))
+  const heightM = Math.max(6, Math.round((tallest + 2.5) * 10) / 10) // tallest equipment + ~2.5 m clearance, floored ~6 m
+  const side = Math.sqrt(footprintM2) // square hall approximation
+  const wallAreaM2 = Math.round(4 * side * heightM)
+  const roofAreaM2 = footprintM2
+  const g: BuildingGeometry = { footprintM2, heightM, wallAreaM2, roofAreaM2 }
+
+  // Write the derived envelope back to the contract quantities so the GA + the heat-loss
+  // tool size against the REAL footprint (fixes the 216 m² type-default). The local
+  // number-map (read by same-call consumers) AND — when the contract is supplied — the
+  // persisted `contract.quantities` (in the engine's `{value, unit, …}` shape) both get
+  // the keys, so the saved contract carries the real footprint downstream.
+  const envelope: { key: string; value: number; unit: string }[] = [
+    { key: 'building_footprint_m2', value: footprintM2, unit: 'm²' },
+    { key: 'building_gross_floor_area_m2', value: footprintM2, unit: 'm²' },
+    { key: 'building_height_m', value: heightM, unit: 'm' },
+    { key: 'building_wall_area_m2', value: wallAreaM2, unit: 'm²' },
+  ]
+  for (const e of envelope) quantities[e.key] = e.value
+  if (contract) {
+    const cq = ((contract as { quantities?: Record<string, unknown> }).quantities ??= {}) as Record<string, unknown>
+    for (const e of envelope) {
+      cq[e.key] = {
+        value: e.value,
+        unit: e.unit,
+        family: 'geometry',
+        basis: 'derived',
+        scope: 'system',
+        source: 'calculator',
+        source_detail: 'building take-off — equipment plan footprint × ~2.2 aisle/access factor (synthesizeBuildingStructure)',
+      }
+    }
+  }
+
+  // Place the take-off in the structure / containment module (fallback: first module with
+  // a sub-module), matching the /structure|contain|building|civil/ intent.
+  const target = findSubModuleByRe(modules, /structure|contain|building|civil/i)
+    ?? (modules?.[0]?.sub_modules ?? [])[0] as SubLike | undefined
+  if (!target) return 0
+
+  let n = 0
+  for (const spec of BUILDING_ELEMENTS) {
+    ;((target.words ??= []) as WordLike[]).push(buildingWord(spec, g))
+    n += 1
+  }
+  return n
+}
+
 export interface UniversalSizingResult {
   sized: number
   synthesized: number
@@ -1068,6 +1292,7 @@ export interface UniversalSizingResult {
   actuated: number
   utilities: number
   processSystems: number
+  buildingStructure: number
   groups: number
   matchedPhrases: string[]
   synthesizedPhrases: string[]
@@ -1207,6 +1432,7 @@ export interface PrincipalReconcileResult {
   removedInvented: number // _synthesized principals backed by NO contract group (LLM inventions) dropped
   removedOrphanChildren: number // sub-components of removed duplicates/inventions dropped
   synthesizedMissing: number // principal groups with NO surviving synth word, re-created
+  buildingResynthesised: number // building take-off lines re-derived against the FINAL equipment set
   details: string[]
 }
 
@@ -1226,7 +1452,7 @@ export function reconcilePrincipalEquipment(
   contract: ContractInProgress,
 ): PrincipalReconcileResult {
   const res: PrincipalReconcileResult = {
-    groups: 0, repaired: 0, removedDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, details: [],
+    groups: 0, repaired: 0, removedDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, buildingResynthesised: 0, details: [],
   }
 
   const quantities: Record<string, number> = {}
@@ -1284,6 +1510,21 @@ export function reconcilePrincipalEquipment(
     for (const sm of m.sub_modules ?? []) {
       for (const w of sm.words ?? []) {
         if (!isSynth(w) || isSubcomponent(w)) continue
+        // PRINCIPAL-ONLY: instruments / actuators / utility-safety / process-support
+        // words are ALSO deterministically synthesised from the contract (they carry
+        // `_synthesized` so geometry/cost treat them as engine-derived), but they are
+        // NOT principal equipment — they have their own contract-driven passes
+        // (synthesizeInstrumentation / Actuation / UtilitySafety / ProcessSystems) and
+        // their own id namespaces (instr_ / actr_ / util_ / proc_ / bldg_). The principal-set
+        // reconcile must NOT see them: a "Level Transmitter" full-stem-subset-matches a
+        // tank canon → dropped as a duplicate; a "Standby Diesel Generator" / "SCADA" /
+        // "Feed Storage" / "Steel Portal Frame" matches no principal group → dropped as an
+        // LLM-invented principal. Both are FALSE drops — these systems are exactly as
+        // contract-derived as the tanks, and dropping them is why a RAS rendered "not
+        // buildable" (the genset, LOX, feed, sludge, instrumentation, and the BUILDING ITSELF
+        // never reached the costed BoM). Leave them in place; the reconcile only governs the
+        // principal-equipment SET. (The building take-off carries `_structure`.)
+        if (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w) || isBuildingStructure(w)) continue
         const pick = canonClaimedBy(w)
         if (pick) byCanon.get(pick.id)!.push({ word: w, sm })
         else unclaimed.push({ word: w, sm })
@@ -1381,6 +1622,18 @@ export function reconcilePrincipalEquipment(
       }
     }
   }
+
+  // RE-DERIVE THE BUILDING against the FINAL principal-equipment set. The building take-off
+  // is first emitted at generator time (in applyUniversalContractSizing), but the SET it
+  // measured can change here — a duplicate principal dropped, a deleted one re-created — so
+  // the emit-time footprint can drift from the equipment that actually survives (verified on
+  // RAS: an LLM "Biofilter Working" duplicate at ⌀8.6 × 8.6 m inflated the hall to 2,942 m² /
+  // 11.1 m before the reconcile dropped it, leaving the real 6-vessel set at ~2,794 m²). The
+  // pass is idempotent (it drops the prior `_structure` words and re-derives), so running it
+  // again here makes the building + the written-back footprint reflect the canonical set, and
+  // persists the corrected footprint to `contract.quantities`. Universal — no-op for an
+  // unhoused product (negligible footprint). Reuses the number-map built at the top.
+  res.buildingResynthesised = synthesizeBuildingStructure(modules, quantities, contract)
 
   return res
 }
@@ -1566,6 +1819,15 @@ export function applyUniversalContractSizing(
   // contract's consumable + waste duties imply. ──
   const processSystems = (opts.instrument ?? true) ? synthesizeProcessSystems(modules, quantities) : 0
 
+  // ── C7. BUILDING-STRUCTURE take-off: the HALL that houses the plant — slab / portal
+  // frame / wall + roof cladding / foundations / doors — sized from the principal
+  // equipment's plan footprint, with the derived footprint written back to `quantities`
+  // (so the GA + the heat-loss tool size against the real footprint). Runs AFTER the
+  // principal + process passes (it needs the synthesised equipment in place to measure)
+  // and is a no-op for a product with a negligible housed footprint. Passes the contract
+  // so the derived footprint persists to `contract.quantities` (GA + heat-loss read it). ──
+  const buildingStructure = (opts.instrument ?? true) ? synthesizeBuildingStructure(modules, quantities, contract) : 0
+
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
   const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules) : 0
 
@@ -1578,6 +1840,7 @@ export function applyUniversalContractSizing(
     actuated,
     utilities,
     processSystems,
+    buildingStructure,
     groups: groups.length,
     matchedPhrases: [...matched],
     synthesizedPhrases,

@@ -58,6 +58,24 @@ contract = load('0.5-engineering-contract.json', {}) or {}
 req_bom  = state.get('requirementsBom')
 cost     = state.get('costStack') or {}
 
+# ── gate-34 (tool-archetype coherence) flagged tools ─────────────────────────
+# The deterministic backstop: if the universal sweep slipped and selected a tool
+# whose physics DOMAIN is wrong for this class (a chiller-cooling tool on a heating
+# heat-pump, a hydroponic nutrient tool on a fish farm, a marine hull/anode tool on
+# a land plant), gate-34 records it in state.toolArchetypeCoherence. We SUPPRESS the
+# worked-calcs + computed results of every flagged tool here so the wrong-domain
+# prose never renders as if it were real engineering — instead the tool is shown
+# clearly labelled "stand-in — NOT used (wrong domain for this class)". Keyed by
+# tool_id (the same id the tools-used JSON carries). Universal across all classes.
+_ta = state.get('toolArchetypeCoherence') or {}
+_ta_findings = _ta.get('findings') if isinstance(_ta.get('findings'), list) else []
+flagged_tools = {}  # tool_id -> [ "family:marker", ... ]
+for _f in _ta_findings:
+    if not isinstance(_f, dict): continue
+    _tid = _f.get('tool_id')
+    if not _tid: continue
+    flagged_tools.setdefault(_tid, []).append(f"{_f.get('family')}:{_f.get('marker')}")
+
 run_name = os.path.basename(run)
 pclass = contract.get('product_class') or (state.get('parsedBrief') or {}).get('product_class') or parsed.get('product_class') or 'unknown'
 
@@ -113,6 +131,7 @@ S.append("""<nav class="toc">
 <li><a href="#sec-blender">4 &middot; Blender model</a></li>
 <li><a href="#sec-drawings">5 &middot; The 8 engineering documents</a></li>
 <li><a href="#sec-bom">6 &middot; Parts, connectivity + bill of materials</a></li>
+<li><a href="parts-ledger.html" target="_blank"><b>&#9656; Full parts ledger &mdash; every part + cost + coverage</b></a></li>
 </ol>
 </nav>""")
 
@@ -176,9 +195,23 @@ if tools:
         r = res_by_id.get(tid) or {}
         ran_ok = r.get('ok')
         status = "<span class='ok'>✓ ran</span>" if ran_ok else ("<span class='warn'>✕ failed</span>" if ran_ok is False else "")
+        wrong_domain = flagged_tools.get(tid)
+        if wrong_domain:
+            status = "<span class='warn'>⚠ stand-in — NOT used</span>"
         S.append('<div class="card">')
         S.append(f"<div class='toolhead'><b>{esc(t.get('tool_name') or tid)}</b> <code>{esc(tid)}</code> {status}"
                  f"<span class='pill'>{esc(t.get('tool_license'))}</span></div>")
+        # gate-34 wrong-domain backstop: SUPPRESS this tool's worked-calcs + results so
+        # the wrong-domain prose (e.g. a chiller "total cooling load" on a heating plant,
+        # a hydroponic Ca/P dose on a fish farm) never renders as real engineering.
+        if wrong_domain:
+            S.append(
+                "<div class='prov warn'>Suppressed by gate-34 (tool-archetype coherence): this tool's physics "
+                f"domain is WRONG for a <b>{esc(pclass)}</b> plant (markers: {esc(', '.join(wrong_domain))}). "
+                "Its worked-calculations and results are a mis-applied stand-in for a missing in-domain process "
+                "tool and are NOT used in this design — they are omitted to avoid presenting wrong-domain prose.</div>")
+            S.append('</div>')
+            continue
         claims = t.get('claims')
         if isinstance(claims, str):
             try:
@@ -239,15 +272,52 @@ else:
     S.append('<div class="note">No contract quantities for system balances.</div>')
 
 S.append('<h2 id="sec-blender">4 · Blender model (universal CAD)</h2>')
-blender = [os.path.join(run, n) for n in
-           ['inspect-hero.png', 'inspect-iso.png', 'inspect-top.png', 'inspect-front.png', 'inspect-side.png']
-           if os.path.exists(os.path.join(run, n))]
-if not blender and os.path.exists(os.path.join(run, 'blender-cover.png')):
-    blender = [os.path.join(run, 'blender-cover.png')]
-if blender:
-    S.append(imgcards(blender, three=True))
+# PRIMARY image = the SHADED studio render (00-hero.png, INSPECT=0 key-sun + soft
+# shadow + white world) — solid 3-D vessels with depth, NOT the flat even-fill
+# orthographic inspection pass. The council scored the dossier 4/10 "blobby" because
+# the dashboard previously embedded inspect-hero.png (the flat 2D-drawing input),
+# which renders a shallow open RAS tank as a flat green disc with no wall shading.
+# Order of preference for the hero: 00-hero.png → blender-cover.png (mirror of it).
+# (Tristan 2026-06-16 render-quality council fix.)
+def _firstof(*names):
+    for n in names:
+        p = os.path.join(run, n)
+        if os.path.exists(p):
+            return p
+    return None
+
+shaded_hero = _firstof('00-hero.png', 'blender-cover.png')
+# additional SHADED studio views (written by the same INSPECT=0 pass)
+shaded_extra = [os.path.join(run, n) for n in ('01-top.png', '02-corner-FR.png', '03-corner-BL.png')
+                if os.path.exists(os.path.join(run, n))]
+# the FLAT orthographic inspection pass — kept ONLY as labelled secondary CAD views
+flat_inspect = [os.path.join(run, n) for n in
+                ('inspect-hero.png', 'inspect-iso.png', 'inspect-top.png',
+                 'inspect-front.png', 'inspect-side.png')
+                if os.path.exists(os.path.join(run, n))]
+
+if shaded_hero:
+    rel = os.path.relpath(shaded_hero, run)
+    S.append('<div class="drawing-block">'
+             '<h3>Shaded studio render — the as-built plant</h3>'
+             f'<img src="{esc(rel)}" alt="shaded plant render">'
+             f'<p class="cap">{esc(os.path.basename(shaded_hero))} — solid 3-D vessels, '
+             'studio key-light + soft shadow (the primary engineering view)</p></div>')
+    if shaded_extra:
+        S.append('<h3>Further shaded views</h3>')
+        S.append(imgcards(shaded_extra, three=True))
+    if flat_inspect:
+        S.append('<details><summary>Flat orthographic inspection views '
+                 f'({len(flat_inspect)} — even-fill CAD pass used to draw the 2D documents)</summary>')
+        S.append(imgcards(flat_inspect, three=True))
+        S.append('</details>')
+elif flat_inspect:
+    # No shaded render produced → fall back to the flat inspection pass (labelled).
+    S.append('<div class="note">No shaded studio render (00-hero.png) found — '
+             'showing the flat orthographic inspection pass only.</div>')
+    S.append(imgcards(flat_inspect, three=True))
 else:
-    S.append('<div class="note">No universal Blender renders (inspect-*.png) found.</div>')
+    S.append('<div class="note">No universal Blender renders found.</div>')
 
 # ── 5. THE 8 ENGINEERING DOCUMENTS ───────────────────────────────────────────
 S.append('<h2 id="sec-drawings">5 · The 8 engineering documents</h2>')
@@ -307,6 +377,16 @@ if isos:
 
 # ── 6. BILL OF MATERIALS ─────────────────────────────────────────────────────
 S.append('<h2 id="sec-bom">6 · Parts, connectivity + bill of materials</h2>')
+# ── prominent link to the FULL standalone ledger (every part) ──
+S.append('<div class="card" style="border:2px solid #2563a6;background:#eef4fb;">'
+         '<h3 style="margin-top:0;">📋 The full parts ledger — every part in the plant</h3>'
+         '<p class="sub">The complete deterministic ledger: every principal item, its sub-components, '
+         'and every pipe / cable / sensor connection — with cost, status, basis, inputs &amp; outputs '
+         '(named connected part + via-element) and the coverage matrix across the 3-D model + 8 drawings. '
+         'This single object IS the bill of materials.</p>'
+         '<p><a href="parts-ledger.html" target="_blank" style="display:inline-block;background:#2563a6;'
+         'color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-weight:700;">'
+         'Open the full ledger — every part &rarr;</a></p></div>')
 # ── per-part connectivity + GOVERNANCE (DETERMINISTIC) ──
 parts_conn, _edges = build_connectivity(run, req_bom, tools)
 if parts_conn:
