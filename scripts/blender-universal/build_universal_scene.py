@@ -1561,23 +1561,21 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
                    MAT["u_water"], module=mod, module_objects=MO)
         fl.add_torus(f"{nm}_rim", (x_mm * fl.MM, y_mm * fl.MM, rim_z),
                      r, max(0.06, r * 0.03), steel, module=mod, module_objects=MO)
-        fl.add_cyl(f"{nm}_centredrain", (x_mm * fl.MM, y_mm * fl.MM, water_z + 0.20),
-                   max(0.11, r * 0.045), body_h * 0.55, steel, module=mod, module_objects=MO)
-        post_r = max(0.06, r * 0.022)
-        for ang in (0, 45, 90, 135, 180, 225, 270, 315):
-            px = x_mm * fl.MM + math.cos(math.radians(ang)) * (r + 0.06)
-            py = y_mm * fl.MM + math.sin(math.radians(ang)) * (r + 0.06)
-            fl.add_box(f"{nm}_post_{int(ang)}", (px, py, rim_z + 0.55),
-                       (post_r, post_r, 1.1), steel, module=mod, module_objects=MO)
-        fl.add_torus(f"{nm}_handrail", (x_mm * fl.MM, y_mm * fl.MM, rim_z + 1.05),
-                     r + 0.06, max(0.05, r * 0.025), steel, module=mod, module_objects=MO)
-        fl.add_torus(f"{nm}_windgirder", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h * 0.55),
-                     r + 0.02, max(0.04, r * 0.04), steel, module=mod, module_objects=MO)
+        # a LOW centre dual-drain standpipe — just proud of the water (the RAS signature),
+        # NOT a tall column. Tristan 2026-06-16: the #139 rim furniture (8 posts + handrail
+        # + wind-girder per tank, ×10) read as a SCALLOPED BLOB silhouette — "blobby again".
+        # mempalace (render-regression 2026-06-13): the decent renders are CLEAN cylinders
+        # with shading, not busy furniture. Stripped the posts/handrail/wind-girder; a tank
+        # now reads as a clean shallow cylinder + dark water + a thin rim + a low centre drain.
+        fl.add_cyl(f"{nm}_centredrain", (x_mm * fl.MM, y_mm * fl.MM, water_z + 0.18),
+                   max(0.10, r * 0.04), 0.45, steel, module=mod, module_objects=MO)
         anchors = {"top": (x_mm, y_mm, (z_bot + body_h) / fl.MM),
                    "bottom": (x_mm, y_mm, z_bot / fl.MM),
                    "centre": (x_mm, y_mm, (z_bot + body_h / 2) / fl.MM)}
-        # Fix 1: a manway + low/high side nozzles read the squat tank as a vessel.
-        _add_vessel_nozzles(nm, anchors, dia_mm, "tank", MAT, mod, MO)
+        # NO bolted side manway / nozzles on an OPEN tank (mempalace render-regression
+        # 2026-06-13: "_add_vessel_nozzles … reads as random grey circles stuck on the
+        # tanks" — WRONG for an open RAS tank, whose tie-ins come from the per-instance
+        # MANIFOLD, not a pressure-vessel manway). Closed vessels below keep their nozzles.
         return {"root": shell, "name": nm}, anchors
 
     # ── VERTICAL families: column / reactor / vertical / bed ──
