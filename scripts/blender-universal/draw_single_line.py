@@ -125,6 +125,19 @@ class Source:
 
 
 @dataclass
+class StandbySource:
+    """A second supply (standby generator) that backs up the utility incomer through an
+    Automatic Transfer Switch (ATS).  Drawn as a generating source (circle 'G') feeding
+    the ATS in parallel with the utility, so on a mains failure the genset carries the
+    board.  Discovered from a `_utility` BoM word whose name/form reads as a genset; its
+    rating is the word's rating_primary (kVA).  None ⇒ no standby supply is drawn."""
+    tag: str = "STANDBY GENERATOR"
+    kva: str = ""           # e.g. '630 kVA'
+    detail: str = ""        # one-line description (covered load etc.)
+    ats_tag: str = "ATS"    # the automatic-transfer-switch label
+
+
+@dataclass
 class Converter:
     """A power-conversion stage (PCS / inverter / rectifier) drawn as a labelled box
     with the standard DC/AC converter glyph, in-line on the incomer between the
@@ -145,6 +158,7 @@ class Tree:
     incomer_transformer: Optional[Transformer]   # step-up / step-down at the incomer
     main_bus: Bus
     incomer_converter: Optional[Converter] = None  # PCS / inverter in the incomer stack
+    standby_source: Optional[StandbySource] = None  # genset on an ATS (2nd source)
     notes: list[str] = field(default_factory=list)
     schedule_totals: dict = field(default_factory=dict)
 
@@ -405,6 +419,178 @@ def _bus_voltage_label(state, schedule, default=""):
     return default
 
 
+def _norm_load_name(s: str) -> str:
+    """Normalise a feeder/load label for de-duplication: lower-case, strip a trailing
+    '× N' fan-out annotation, and collapse all non-alphanumerics to single spaces so
+    'I/O Module' == 'i o module' and 'Heat Pump ×2' == 'heat pump'."""
+    s = (s or "").lower()
+    s = re.sub(r"\s*[×x]\s*\d+\b", "", s)          # strip '× N'
+    s = re.sub(r"[^a-z0-9]+", " ", s).strip()
+    return s
+
+
+def _rating_amps(br: "Branch") -> float:
+    """Leading numeric of a branch rating string ('166 A' → 166.0); 0 when absent."""
+    m = re.match(r"\s*([\d.,]+)", str(br.rating or ""))
+    if not m:
+        return 0.0
+    try:
+        return float(m.group(1).replace(",", ""))
+    except ValueError:
+        return 0.0
+
+
+def _dedup_branches(branches: list["Branch"]) -> list["Branch"]:
+    """Collapse feeders that are the SAME distinct load appearing twice on the bus.
+
+    UNIVERSAL: a load can reach the board both as a synthesised principal feeder
+    (kW-derived, from synthesise_equipment_feeders) AND as a per-word skeleton edge
+    from the connection schedule — e.g. a RAS Circulation Pump / Heat Pump / Degasser /
+    Oxygenation / Protein-skimming / UV way each emitted twice. Collapse by normalised
+    name, keeping ONE: prefer the kW-DERIVED feeder (it carries the equipment's real
+    rating); on a tie prefer the higher current rating; then preserve first-seen order.
+    Sub-distribution / transformer branches are never collapsed (each is structurally
+    distinct). Deterministic — order-stable, no randomness."""
+    best: dict[str, int] = {}     # normalised name → index into `out`
+    out: list["Branch"] = []
+    for br in branches:
+        # never fold a sub-distribution / transformer branch into a plain load.
+        if br.sub_bus is not None or br.target_sym == SYM_TRANSFORMER:
+            out.append(br)
+            continue
+        key = _norm_load_name(br.label or br.to_node or "")
+        if not key:
+            out.append(br)
+            continue
+        if key not in best:
+            best[key] = len(out)
+            out.append(br)
+            continue
+        # already have one with this name — decide which to keep.
+        keep_idx = best[key]
+        cur = out[keep_idx]
+        cur_kw = bool(getattr(cur, "_kw_derived", False))
+        new_kw = bool(getattr(br, "_kw_derived", False))
+        replace = False
+        if new_kw and not cur_kw:
+            replace = True
+        elif new_kw == cur_kw and _rating_amps(br) > _rating_amps(cur):
+            replace = True
+        if replace:
+            out[keep_idx] = br
+    return out
+
+
+# Words a `_utility` BoM word's name/form must mention to be read as a standby genset.
+_GENSET_RE = re.compile(r"generator|genset|\bgenerating\s+set\b|diesel\s+gen", re.I)
+# An ATS is implied by a genset; the form text usually says so explicitly.
+_ATS_RE = re.compile(r"automatic\s+transfer\s+switch|\bats\b|changeover|"
+                     r"transfer\s+switch", re.I)
+
+
+def _word_modifier(word: dict, kind: str):
+    for mc in (word.get("modifier_characters") or []):
+        if mc.get("kind") == kind:
+            return mc.get("value")
+    return None
+
+
+def _find_standby_generator(state: dict) -> Optional[StandbySource]:
+    """UNIVERSAL second-source discovery: scan the BoM for a `_utility` word that reads
+    as a standby generator (name/form matches _GENSET_RE) and lift it into a
+    StandbySource carrying its kVA (rating_primary) so the SLD can draw it as a second
+    supply on an ATS. Returns None when the plant has no genset word (a plant without a
+    standby supply gets none — never an `if ras` branch)."""
+    for w, name, cid in _iter_words(state):
+        if not (w.get("_utility") is True):
+            continue
+        form = str(_word_modifier(w, "form") or "")
+        blob = f"{name} {cid} {form}"
+        if not _GENSET_RE.search(blob):
+            continue
+        # kVA from rating_primary (the genset's apparent-power rating).
+        kva = ""
+        rp = _word_modifier(w, "rating_primary")
+        if rp is not None:
+            m = re.match(r"\s*([\d.,]+)", str(rp))
+            if m:
+                try:
+                    kva = f"{float(m.group(1).replace(',', '')):,.0f} kVA"
+                except ValueError:
+                    kva = ""
+        # a short detail: prefer the covered-load clause from the form text.
+        detail = ""
+        cov = re.search(r"covers?\s+the\s+([^;.]+?(?:load)[^;.]*)", form, re.I)
+        if cov:
+            detail = cov.group(1).strip()
+        elif form:
+            detail = form.split(";")[0].strip()[:64]
+        ats = "ATS" if _ATS_RE.search(form) else "ATS"   # always an ATS for a genset
+        return StandbySource(tag=(name or "STANDBY GENERATOR").upper(),
+                             kva=kva, detail=detail, ats_tag=ats)
+    return None
+
+
+# A small control / SCADA / instrumentation / networking load — UPS-backed, grouped off
+# the main board onto a control sub-board rather than drawn as its own main-bus way.
+_CONTROL_LOAD_RE = re.compile(
+    r"controller|\bplc\b|\bscada\b|\bhmi\b|\bi/?o\b|\bio\s*module\b|gateway|"
+    r"network\s*switch|\bswitch\b|router|\bups\b|control\s+power|power\s+supply|"
+    r"instrument|telemetry|comms?\b|communication|server|workstation|monitor", re.I)
+# Things that look like a control word but are POWER kit / loads we must NOT bury.
+_CONTROL_LOAD_EXCLUDE = re.compile(
+    r"pump|compressor|blower|fan|heat|pump|motor|skim|oxygen|\buv\b|ozone|"
+    r"transformer|busbar|breaker|fuse|surge|valve|filter|degas|exchanger|drum", re.I)
+
+
+def _is_control_load(br: "Branch") -> bool:
+    if br.sub_bus is not None or br.target_sym == SYM_TRANSFORMER:
+        return False
+    if getattr(br, "_kw_derived", False):
+        return False     # a kW-derived motor/system feeder is never a control stub
+    name = f"{br.label} {br.to_node}"
+    if _CONTROL_LOAD_EXCLUDE.search(name):
+        return False
+    return bool(_CONTROL_LOAD_RE.search(name))
+
+
+def _group_control_loads(tree: Tree, devices: list):
+    """UNIVERSAL legibility pass: move the small control / SCADA / instrument / network
+    loads off the flat main bus onto a UPS-backed CONTROL & INSTRUMENT sub-board (an
+    MCC-style sub-distribution), reusing the existing sub-bus rendering.
+
+    Fires only when grouping genuinely helps (≥ MIN_GROUP such loads) so a plant with
+    one or two control ways keeps them on the main bus (no clutter / no spurious board).
+    Deterministic; archetype-agnostic (keyed on the load NAME, never a product class)."""
+    MIN_GROUP = 3
+    main = tree.main_bus
+    ctrl = [br for br in main.branches if _is_control_load(br)]
+    if len(ctrl) < MIN_GROUP:
+        return
+    keep = [br for br in main.branches if br not in ctrl]
+    # build the control sub-board, fed via a UPS, carrying the grouped control ways.
+    sub = Bus(tag="CONTROL & INSTRUMENT BOARD", is_sub=True)
+    for br in ctrl:
+        br.from_node = sub.tag
+        br.devices = []                 # drop the in-line CB — the UPS + sub-board guard it
+        sub.branches.append(br)
+    feeder = Branch(
+        from_node=main.tag,
+        to_node=sub.tag,
+        label="Control & instrument distribution",
+        rating="",
+        cable="",
+        role="branch",
+        target_sym=SYM_LOAD,   # not a transformer — a UPS feeds it (drawn in the sub fn)
+    )
+    feeder.sub_bus = sub
+    feeder.is_ups = True   # type: ignore[attr-defined]  — draw a UPS in the drop, not a TX
+    cb = _pick_device(devices, kind="breaker")
+    if cb:
+        feeder.devices.append(_as_device(cb, "breaker", "CB"))
+    main.branches = keep + [feeder]
+
+
 def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     """Rebuild the electrical distribution tree from the schedule rows + state.
 
@@ -662,6 +848,25 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # case), re-base the board onto the load-appropriate voltage (MV above ~1.5 MW)
     # and split the aggregate into a feeder per module. Keyed on load magnitude.
     _apply_distribution_voltage_model(tree, schedule, state)
+    # UNIVERSAL de-duplication: a load can reach the board both as a kW-derived
+    # synthesised feeder AND as a per-word skeleton edge — collapse those to one way
+    # each (keeps the kW-derived feeder). Done AFTER the voltage model so synthesised
+    # feeders exist to win the tie-break.
+    main_bus.branches = _dedup_branches(main_bus.branches)
+    # UNIVERSAL second source: if the plant has a standby genset (_utility word), draw
+    # it on an ATS alongside the utility incomer. Absent ⇒ utility incomer only.
+    tree.standby_source = _find_standby_generator(state)
+    if tree.standby_source is not None:
+        kva = tree.standby_source.kva
+        tree.notes = list(tree.notes or []) + [
+            f"Standby {kva} diesel generator on an automatic transfer switch (ATS) "
+            f"backs the utility incomer — carries the life-safety load on mains failure."
+            if kva else
+            "Standby diesel generator on an automatic transfer switch (ATS) backs the "
+            "utility incomer — carries the life-safety load on mains failure."]
+    # UNIVERSAL legibility: collapse the small control / SCADA / instrument loads onto a
+    # UPS-backed control sub-board so the main bus isn't a flat row of low-power stubs.
+    _group_control_loads(tree, devices)
     return tree
 
 
@@ -817,6 +1022,10 @@ def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
             count=1,
             role="branch",
         )
+        # mark this as a kW-DERIVED feeder (current came from the equipment's real load,
+        # not a flat per-word skeleton stub) so the de-dup pass prefers it when the same
+        # load also appears as a schedule skeleton edge.
+        br._kw_derived = True   # type: ignore[attr-defined]
         # a sized standard breaker per feeder (named device if one matches the group)
         cb = _pick_device(devices, kind="breaker")
         if cb:
@@ -1038,6 +1247,72 @@ def sym_utility(svg: SVG, cx, cy):
     return (cx, cy + r + 18)   # the exit point
 
 
+def sym_generator(svg: SVG, cx, cy, r=16):
+    """Generating source — the standard circle with a 'G' (a standby genset / PV feed).
+    Feed line exits the BOTTOM. Returns the exit point."""
+    svg.circle(cx, cy, r, stroke=INK, width=1.8)
+    svg.text(cx, cy + 5, "G", size=15, anchor="middle", weight="bold", fill=INK)
+    svg.line(cx, cy + r, cx, cy + r + 18, width=2.0)
+    return (cx, cy + r + 18)
+
+
+def sym_ats(svg: SVG, cx, cy, in_left, in_right, size=15):
+    """Automatic Transfer Switch (changeover) — a common output pole that selects ONE of
+    two incoming supplies (left = utility, right = standby). Drawn as two upper contacts
+    with a single wiper to a common lower terminal. `in_left` / `in_right` are the X of
+    the two incoming conductors that arrive at this ATS; the box spans them. Returns the
+    bottom (common) terminal point (cx, y)."""
+    half = max(28.0, abs(in_right - in_left) / 2 + 16)
+    x0, x1 = cx - half, cx + half
+    top = cy - size
+    bot = cy + size
+    # enclosure
+    svg.rect(x0, top - 6, x1 - x0, (bot - top) + 12, stroke=DEV_INK, width=1.5,
+             fill=FILL_BG, rx=3)
+    # two upper contact dots (where the two supplies land) + the common lower terminal
+    lcx = cx - half * 0.55
+    rcx = cx + half * 0.55
+    svg.circle(lcx, top, 2.2, fill=FILL_BG, stroke=DEV_INK, width=1.4)
+    svg.circle(rcx, top, 2.2, fill=FILL_BG, stroke=DEV_INK, width=1.4)
+    svg.circle(cx, bot, 2.4, fill=DEV_INK, stroke=DEV_INK, width=1.2)
+    # the wiper currently selecting the LEFT (utility) supply — solid; the alternate to
+    # the right shown dashed (the standby path, energised on changeover).
+    svg.line(cx, bot, lcx, top, stroke=DEV_INK, width=1.9)
+    svg.line(cx, bot, rcx, top, stroke=MUTED, width=1.4, dash="3,3")
+    svg.text(cx, bot + 14, "ATS", size=9.5, anchor="middle", weight="bold", fill=DEV_INK)
+    # incoming stubs from the two supply X positions down to the contacts
+    svg.line(in_left, top - 6, lcx, top, stroke=INK, width=1.6)
+    svg.line(in_right, top - 6, rcx, top, stroke=INK, width=1.6)
+    return (cx, bot)
+
+
+def sym_ups(svg: SVG, cx, cy_top, label_side="right", kva="", detail=""):
+    """Uninterruptible power supply — a labelled box with the double-conversion glyph
+    (AC→DC→AC: a sine, a rectifier arrow, a sine). Drawn in-line on a feeder drop.
+    Returns the bottom terminal y."""
+    s = 18
+    top = cy_top
+    box_top = top + 12
+    x0 = cx - s
+    y0 = box_top
+    svg.line(cx, top, cx, box_top, width=1.8)
+    svg.rect(x0, y0, 2 * s, 2 * s, stroke=INK, width=1.7, fill=FILL_BG, rx=2)
+    # battery cell mark inside (a long + short pair) — the UPS energy store
+    svg.line(cx - 6, y0 + 13, cx - 6, y0 + 23, stroke=INK, width=2.0)
+    svg.line(cx - 1, y0 + 16, cx - 1, y0 + 20, stroke=INK, width=1.4)
+    svg.line(cx + 4, y0 + 13, cx + 4, y0 + 23, stroke=INK, width=2.0)
+    svg.line(cx + 9, y0 + 16, cx + 9, y0 + 20, stroke=INK, width=1.4)
+    bot = y0 + 2 * s
+    svg.line(cx, bot, cx, bot + 12, width=1.8)
+    lx = cx + s + 10 if label_side == "right" else cx - s - 10
+    anc = "start" if label_side == "right" else "end"
+    svg.text(lx, y0 + 6, "UPS", size=11, anchor=anc, weight="bold")
+    lines = [x for x in (kva, detail) if x]
+    for k, ln in enumerate(lines):
+        svg.text(lx, y0 + 20 + k * 12, ln, size=9, anchor=anc, fill=MUTED)
+    return bot + 12
+
+
 def sym_breaker(svg: SVG, cx, cy, size=11):
     """Circuit breaker — IEC: a square drawn on the conductor (open contact in a box).
     We use the common drawn-box-with-diagonal that engineers read as a moulded-case CB."""
@@ -1125,6 +1400,17 @@ def sym_transformer(svg: SVG, cx, cy, label_side="right", ratio="", kva="",
     return (cx, top_c[1] - r - 14), (cx, bot_c[1] + r + 14)
 
 
+def _fit_font(text: str, box_w: float, base: float, floor: float,
+              char_factor: float = 0.56) -> float:
+    """Deterministic font-size that keeps `text` inside `box_w` (with a small inset),
+    shrinking from `base` to `floor`. Avg glyph width ≈ char_factor × font-size for a
+    Helvetica-ish face; good enough to stop labels overflowing narrow load boxes."""
+    n = max(1, len(text or ""))
+    avail = max(1.0, box_w - 8.0)
+    size = avail / (n * char_factor)
+    return max(floor, min(base, size))
+
+
 def sym_load(svg: SVG, cx, cy_top, w=150, label="", rating="", cable="", vd="",
              count=1, sub=False):
     """A final load / equipment block — labelled rectangle hanging below its drop
@@ -1136,10 +1422,13 @@ def sym_load(svg: SVG, cx, cy_top, w=150, label="", rating="", cable="", vd="",
     svg.line(cx, cy_top, cx, y, width=1.8)
     fill = PANEL_BG
     svg.rect(x, y, w, h, stroke=INK, width=1.5, fill=fill, rx=3)
-    svg.text(cx, y + 18, label, size=11.5, anchor="middle", weight="bold")
+    # shrink the label to fit a narrow box (sub-board loads can be tightly pitched).
+    lbl_size = _fit_font(label, w, base=11.5, floor=7.0)
+    svg.text(cx, y + 18, label, size=lbl_size, anchor="middle", weight="bold")
     sub_bits = " · ".join(b for b in (rating, cable) if b)
     if sub_bits:
-        svg.text(cx, y + 33, sub_bits, size=9.5, anchor="middle", fill=MUTED)
+        sb_size = _fit_font(sub_bits, w, base=9.5, floor=6.5)
+        svg.text(cx, y + 33, sub_bits, size=sb_size, anchor="middle", fill=MUTED)
     if vd:
         svg.text(cx, y + 44, f"ΔU {vd}", size=8.8, anchor="middle", fill=MUTED)
     return y + h
@@ -1207,7 +1496,11 @@ def build_sld_svg(tree: Tree) -> str:
     main = tree.main_bus
 
     # ----- size the canvas from branch counts -----
-    main_branches = list(main.branches)
+    # Keep sub-distribution branches LAST so they sit at the right end of the bus, away
+    # from the left bus label; their wider sub-busbar then has clear room before the
+    # legend gutter. Order is otherwise preserved (stable). Deterministic.
+    main_branches = sorted(main.branches,
+                           key=lambda b: (1 if b.sub_bus is not None else 0))
     n_main = max(1, len(main_branches))
     col_w = 210
     margin_l = 60
@@ -1217,9 +1510,18 @@ def build_sld_svg(tree: Tree) -> str:
     # sub-distribution branches need extra vertical space below their parent slot.
     has_sub = any(br.sub_bus for br in main_branches)
 
-    # ----- canvas WIDTH: room for the branches + a guaranteed-clear legend gutter on
+    # ----- each branch claims a horizontal SPAN: a plain load needs one column; a
+    #       sub-distribution needs room for its fanned sub-busbar (≈ its load count).
+    def _branch_span(br):
+        if br.sub_bus is not None:
+            return max(2.0, 0.9 * len(br.sub_bus.branches))
+        return 1.0
+    spans = [_branch_span(br) for br in main_branches]
+    total_span = sum(spans) or 1.0
+
+    # ----- canvas WIDTH: room for the spans + a guaranteed-clear legend gutter on
     #       the right (no floating whitespace, no legend/branch collision in any case).
-    diagram_w = max(margin_l + n_main * col_w, 780)
+    diagram_w = max(margin_l + total_span * col_w, 780)
     width = diagram_w + legend_gutter + margin_r
     width = max(width, 1060)
     bus_x0 = margin_l
@@ -1228,7 +1530,9 @@ def build_sld_svg(tree: Tree) -> str:
 
     # ----- height is finalised after we know the incomer stack depth; draw the
     #       incomer onto a scratch SVG first to measure, then assemble for real. ----
-    def _draw_incomer(svg, src_cx, src_cy):
+    def _draw_utility_stack(svg, src_cx, src_cy):
+        """The utility incomer column: source symbol + incomer devices + step-down TX +
+        any PCS converter. Returns the bottom y where the conductor continues."""
         svg.text(src_cx, src_cy - 30, tree.source.tag, size=13, anchor="middle",
                  weight="bold")
         if tree.source.detail:
@@ -1254,6 +1558,40 @@ def build_sld_svg(tree: Tree) -> str:
             y = sym_converter(svg, src_cx, y + 10, tree.incomer_converter,
                               label_side="right")
         return y
+
+    def _draw_genset_stack(svg, gen_cx, gen_cy, stby: StandbySource):
+        """The standby-generator column (a 'G' source + rating label). Returns the
+        bottom y where its conductor continues down to the ATS."""
+        svg.text(gen_cx, gen_cy - 30, stby.tag, size=12.5, anchor="middle",
+                 weight="bold")
+        lab = " · ".join(b for b in (stby.kva, "standby") if b)
+        if lab:
+            svg.text(gen_cx, gen_cy - 16, lab, size=10, anchor="middle", fill=MUTED)
+        return sym_generator(svg, gen_cx, gen_cy)[1]
+
+    def _draw_incomer(svg, src_cx, src_cy):
+        """Draw the incomer above the main bus and return the bottom y of the conductor
+        that drops onto the bus. With a standby source, draws utility (left) + genset
+        (right) into an ATS; otherwise the single utility stack down the centre."""
+        stby = tree.standby_source
+        if stby is None:
+            return _draw_utility_stack(svg, src_cx, src_cy)
+        # dual source: utility left, genset right, both into a central ATS.
+        spread = min(max(col_w * 1.05, 230), (width - margin_l - margin_r) / 2 - 20)
+        util_cx = src_cx - spread / 2
+        gen_cx = src_cx + spread / 2
+        util_bot = _draw_utility_stack(svg, util_cx, src_cy)
+        gen_bot = _draw_genset_stack(svg, gen_cx, src_cy, stby)
+        # bring both conductors down to a common ATS level, then the ATS box.
+        ats_in_y = max(util_bot, gen_bot) + 16
+        svg.line(util_cx, util_bot, util_cx, ats_in_y - 6, width=2.0)
+        svg.line(gen_cx, gen_bot, gen_cx, ats_in_y - 6, width=2.0)
+        _cx, ats_bot = sym_ats(svg, src_cx, ats_in_y + 9, util_cx, gen_cx)
+        if stby.detail:
+            svg.text(src_cx, ats_bot + 26, "Standby: " + stby.detail, size=8.8,
+                     anchor="middle", fill=MUTED)
+            return ats_bot + 30
+        return ats_bot
 
     src_cx = width / 2
     src_cy = 70
@@ -1288,20 +1626,23 @@ def build_sld_svg(tree: Tree) -> str:
              fill=MUTED)
 
     # ===== BRANCHES off the main bus =====
-    # distribute branch X positions evenly across the bus
-    slots = n_main
-    inner_x0 = bus_x0 + col_w * 0.5
-    inner_x1 = bus_x1 - col_w * 0.5
-    if slots == 1:
-        xs = [(bus_x0 + bus_x1) / 2]
-    else:
-        xs = [inner_x0 + (inner_x1 - inner_x0) * i / (slots - 1) for i in range(slots)]
+    # distribute branch X positions by SPAN (a sub-distribution claims a wider band so
+    # its fanned sub-busbar fits without colliding with its neighbours or the legend).
+    usable = (bus_x1 - bus_x0)
+    xs = []
+    band_w = []
+    cursor = bus_x0
+    for sp in spans:
+        w_band = usable * sp / total_span
+        xs.append(cursor + w_band / 2.0)
+        band_w.append(w_band)
+        cursor += w_band
 
     drop_top = bus_y
     base_y = bus_y + 70
     content_bottom = base_y
 
-    for bx, br in zip(xs, main_branches):
+    for bx, br, bw in zip(xs, main_branches, band_w):
         # tap line down from bus
         svg.line(bx, drop_top, bx, base_y - 30, width=1.8)
         # branch header label (rating/cable) beside the tap
@@ -1310,7 +1651,7 @@ def build_sld_svg(tree: Tree) -> str:
             svg.text(bx + 10, drop_top + 26, hdr, size=9.3, anchor="start", fill=MUTED)
 
         if br.sub_bus is not None:
-            bot = _draw_sub_distribution(svg, bx, base_y - 30, br, col_w)
+            bot = _draw_sub_distribution(svg, bx, base_y - 30, br, bw)
         else:
             # in-line protective device(s)
             dev_end = base_y - 8
@@ -1334,35 +1675,50 @@ def build_sld_svg(tree: Tree) -> str:
 
 
 def _draw_sub_distribution(svg: SVG, bx, y_from, br: Branch, col_w):
-    """Draw: parent-bus tap → two-winding transformer → SUB-BUSBAR → its load branches."""
-    xfmr = getattr(br, "transformer", None)
-    # transformer
-    svg.line(bx, y_from, bx, y_from + 12, width=1.8)
-    tag = xfmr.tag if xfmr else "TX"
-    kva = xfmr.kva if xfmr else ""
-    ratio = xfmr.ratio if xfmr else ""
-    currents = xfmr.currents if xfmr else ""
-    detail = xfmr.detail if xfmr else ""
-    top_t, bot_t = sym_transformer(svg, bx, y_from + 12 + 30, label_side="right",
-                                   tag=tag, kva=kva, ratio=ratio, currents=currents,
-                                   detail=detail)
+    """Draw: parent-bus tap → two-winding transformer (or a UPS for a control board) →
+    SUB-BUSBAR → its load branches."""
     sub = br.sub_bus
-    sub_bus_y = bot_t[1] + 26
-    # sub busbar
+    svg.line(bx, y_from, bx, y_from + 12, width=1.8)
+    if getattr(br, "is_ups", False):
+        # control / instrument sub-board fed via a UPS (no step-down transformer).
+        ups_bot = sym_ups(svg, bx, y_from + 12, label_side="right",
+                          kva="", detail="back-up supply")
+        sub_bus_y = ups_bot + 22
+        bot_anchor = ups_bot
+    else:
+        xfmr = getattr(br, "transformer", None)
+        tag = xfmr.tag if xfmr else "TX"
+        kva = xfmr.kva if xfmr else ""
+        ratio = xfmr.ratio if xfmr else ""
+        currents = xfmr.currents if xfmr else ""
+        detail = xfmr.detail if xfmr else ""
+        top_t, bot_t = sym_transformer(svg, bx, y_from + 12 + 30, label_side="right",
+                                       tag=tag, kva=kva, ratio=ratio, currents=currents,
+                                       detail=detail)
+        sub_bus_y = bot_t[1] + 26
+        bot_anchor = bot_t[1]
+    # sub busbar — fit within the allocated band (`col_w` is this branch's band width),
+    # leaving a margin so neighbouring branches / the legend never collide.
     sb = sub.branches
     sn = max(1, len(sb))
-    sb_w = min(col_w * 1.7, 90 + sn * 70)
+    band = max(160.0, col_w)
+    sb_w = min(band - 40.0, 70.0 + sn * 96.0)
     sbx0 = bx - sb_w / 2
     sbx1 = bx + sb_w / 2
-    svg.line(bx, bot_t[1], bx, sub_bus_y, width=2.0, stroke=ACCENT)
+    svg.line(bx, bot_anchor, bx, sub_bus_y, width=2.0, stroke=ACCENT)
     svg.line(sbx0, sub_bus_y, sbx1, sub_bus_y, stroke=BUS_INK, width=5.5, cap="butt")
     svg.text(sbx0, sub_bus_y - 9, sub.tag, size=10.5, anchor="start", weight="bold",
              fill=BUS_INK)
-    # sub branches
+    # sub branches — evenly pitched; each load box is sized to its pitch so labels in
+    # adjacent boxes cannot overlap (the cramped-control-board smear fix).
     if sn == 1:
         sxs = [bx]
+        pitch = sb_w
     else:
-        sxs = [sbx0 + 40 + (sb_w - 80) * i / (sn - 1) for i in range(sn)]
+        edge = 36.0
+        pitch = (sb_w - 2 * edge) / (sn - 1)
+        sxs = [sbx0 + edge + pitch * i for i in range(sn)]
+    load_w = max(78.0, min(120.0, (pitch if sn > 1 else sb_w) - 12.0))
     sbase = sub_bus_y + 54
     bottom = sbase
     for sx, sbr in zip(sxs, sb):
@@ -1372,7 +1728,7 @@ def _draw_sub_distribution(svg: SVG, bx, y_from, br: Branch, col_w):
             _device_chain(svg, sx, sbase - 26, dev_end, sbr.devices)
         else:
             svg.line(sx, sbase - 26, sx, dev_end, width=1.6)
-        b = sym_load(svg, sx, dev_end, w=120, label=sbr.label, rating=sbr.rating,
+        b = sym_load(svg, sx, dev_end, w=load_w, label=sbr.label, rating=sbr.rating,
                      cable=sbr.cable, vd=sbr.voltdrop, count=sbr.count, sub=True)
         bottom = max(bottom, b or sbase)
     return bottom
@@ -1431,6 +1787,9 @@ def _draw_legend(svg: SVG, x_right, y_top):
         ("fuse", "Fuse"),
         ("rcd", "Protection relay"),
         (SYM_TRANSFORMER, "Two-winding transformer"),
+        (SYM_SOURCE_GEN, "Standby generator"),
+        ("ats", "Automatic transfer switch"),
+        ("ups", "Uninterruptible power supply"),
         (SYM_LOAD, "Load / equipment"),
     ]
     bw, rowh = 188, 21
@@ -1447,6 +1806,22 @@ def _draw_legend(svg: SVG, x_right, y_top):
             # mini two-circle glyph
             svg.circle(gx, yy - 3, 5, stroke=INK, width=1.4)
             svg.circle(gx, yy + 3, 5, stroke=INK, width=1.4)
+        elif kind == SYM_SOURCE_GEN:
+            # mini 'G' source circle
+            svg.circle(gx, yy, 7, stroke=INK, width=1.4)
+            svg.text(gx, yy + 3, "G", size=8.5, anchor="middle", weight="bold", fill=INK)
+        elif kind == "ats":
+            # mini changeover: two upper dots, one wiper to a common lower terminal
+            svg.circle(gx - 5, yy - 5, 1.6, fill=FILL_BG, stroke=DEV_INK, width=1.2)
+            svg.circle(gx + 5, yy - 5, 1.6, fill=FILL_BG, stroke=DEV_INK, width=1.2)
+            svg.circle(gx, yy + 5, 1.8, fill=DEV_INK, stroke=DEV_INK, width=1.0)
+            svg.line(gx, yy + 5, gx - 5, yy - 5, stroke=DEV_INK, width=1.5)
+            svg.line(gx, yy + 5, gx + 5, yy - 5, stroke=MUTED, width=1.1, dash="2,2")
+        elif kind == "ups":
+            # mini battery-box
+            svg.rect(gx - 6, yy - 5, 12, 10, stroke=INK, width=1.3, fill=FILL_BG)
+            svg.line(gx - 2, yy - 2, gx - 2, yy + 2, stroke=INK, width=1.6)
+            svg.line(gx + 2, yy - 3, gx + 2, yy + 3, stroke=INK, width=1.6)
         elif kind == SYM_LOAD:
             svg.rect(gx - 6, yy - 5, 12, 10, stroke=INK, width=1.3, fill=FILL_BG)
         svg.text(gx + 16, yy + 3.5, lbl, size=8.8, fill=MUTED)
