@@ -65,7 +65,7 @@ S = []
 S.append(f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <title>{esc(run_name)} — engine run</title><style>
 :root{{color-scheme:light}}
-body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0;padding:24px 34px 90px;background:#f6f7f9;color:#1a1d22;line-height:1.5}}
+body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0;padding:24px 34px 90px 34px;background:#f6f7f9;color:#1a1d22;line-height:1.5}}
 h1{{font-size:24px;font-weight:660;margin:0 0 2px}} .sub{{color:#5b6470;font-size:14px;margin:0 0 8px}}
 h2{{font-size:19px;font-weight:640;margin:32px 0 8px;padding-top:10px;border-top:2px solid #e3e6ea}}
 h3{{font-size:14px;font-weight:640;margin:16px 0 6px;color:#2c333c}}
@@ -83,13 +83,61 @@ th{{background:#f0f2f5;font-weight:620}} td.n{{text-align:right;white-space:nowr
 details{{margin-top:6px}} summary{{cursor:pointer;font-size:12.5px;color:#48505a}}
 .note{{font-size:12px;color:#8a3a0f;background:#fdf3ec;border:1px solid #f0d8c4;border-radius:8px;padding:8px 12px;margin:8px 0}}
 .toolhead{{font-size:13.5px}}
+/* ── Table of Contents ── */
+.toc{{position:sticky;top:12px;background:#fff;border:1px solid #d8dce2;border-radius:11px;padding:12px 18px;box-shadow:0 2px 8px rgba(20,25,35,.07);margin:16px 0 28px;z-index:100;display:inline-block;min-width:340px;max-width:100%}}
+.toc h3{{margin:0 0 8px;font-size:13px;font-weight:640;color:#48505a;text-transform:uppercase;letter-spacing:.04em}}
+.toc ol{{margin:0;padding:0 0 0 18px;list-style:decimal}}
+.toc li{{margin:3px 0;font-size:13px;line-height:1.4}}
+.toc a{{color:#1a5fc8;text-decoration:none}}
+.toc a:hover{{text-decoration:underline}}
+/* ── Full-width drawing blocks ── */
+.drawing-block{{margin:24px 0}}
+.drawing-block h3{{font-size:15px;font-weight:640;margin:0 0 8px;color:#2c333c}}
+.drawing-block img{{width:100%;max-width:1100px;display:block;border:1px solid #d8dce2;border-radius:8px;background:#eceef1}}
+.drawing-block .cap{{font-size:12px;color:#7a828d;margin:5px 0 0}}
 </style></head><body>
 <h1>{esc(run_name)}</h1>
 <p class="sub">Class <b>{esc(pclass)}</b> &nbsp;·&nbsp; brief · tools + results · contract · Blender · 8 engineering documents · bill of materials</p>
 """)
 
+# ── TABLE OF CONTENTS (sticky) ───────────────────────────────────────────────
+loop_history = load('loop-history.json')
+S.append("""<nav class="toc">
+<h3>Contents</h3>
+<ol>
+<li><a href="#sec-loops">Loops / iteration history</a></li>
+<li><a href="#sec-brief">1 &middot; Expanded brief</a></li>
+<li><a href="#sec-tools">2 &middot; Tools used + their results</a></li>
+<li><a href="#sec-contract">3 &middot; Engineering contract</a></li>
+<li><a href="#sec-blender">4 &middot; Blender model</a></li>
+<li><a href="#sec-drawings">5 &middot; The 8 engineering documents</a></li>
+<li><a href="#sec-bom">6 &middot; Parts, connectivity + bill of materials</a></li>
+</ol>
+</nav>""")
+
+# ── LOOPS / ITERATION HISTORY ─────────────────────────────────────────────────
+S.append('<h2 id="sec-loops">Loops / iteration history</h2>')
+if loop_history and isinstance(loop_history, list) and loop_history:
+    S.append('<div class="card">')
+    S.append('<table><tr><th>Loop</th><th>Parts</th><th>Connections</th><th>BoM rows</th><th>Orphans</th><th>BoM £</th><th>Note</th></tr>')
+    for row in loop_history:
+        if not isinstance(row, dict): continue
+        bom_gbp = row.get('bom_gbp')
+        gbp_str = f"£{fmtnum(bom_gbp)}" if bom_gbp not in (None, '') else '—'
+        S.append(f"<tr>"
+                 f"<td class='n'>{esc(row.get('loop', ''))}</td>"
+                 f"<td class='n'>{esc(row.get('parts', ''))}</td>"
+                 f"<td class='n'>{esc(row.get('connections', ''))}</td>"
+                 f"<td class='n'>{esc(row.get('bom_rows', ''))}</td>"
+                 f"<td class='n'>{esc(row.get('orphans', ''))}</td>"
+                 f"<td class='n'>{gbp_str}</td>"
+                 f"<td>{esc(row.get('note', ''))}</td></tr>")
+    S.append('</table></div>')
+else:
+    S.append('<div class="note">No loop history recorded yet.</div>')
+
 # ── 1. EXPANDED BRIEF ────────────────────────────────────────────────────────
-S.append('<h2>1 · Expanded brief</h2>')
+S.append('<h2 id="sec-brief">1 · Expanded brief</h2>')
 if expanded:
     S.append('<div class="card">')
     S.append(f"<p><b>Product:</b> <span class='g'>{esc(expanded.get('primary_product'))}</span><br>")
@@ -119,7 +167,7 @@ else:
     S.append('<div class="note">No 1-brief-expanded.json — the brief-expander did not run for this run.</div>')
 
 # ── 2. TOOLS + RESULTS ───────────────────────────────────────────────────────
-S.append('<h2>2 · Tools used + their results</h2>')
+S.append('<h2 id="sec-tools">2 · Tools used + their results</h2>')
 if tools:
     S.append(f'<p class="sub">{len(tools)} engineering sizing tools selected, wired and run for this design.</p>')
     for t in tools:
@@ -157,7 +205,7 @@ else:
     S.append('<div class="note">No 4-orchestrator-tools-used.json found.</div>')
 
 # ── 3. ENGINEERING CONTRACT ──────────────────────────────────────────────────
-S.append('<h2>3 · Engineering contract</h2>')
+S.append('<h2 id="sec-contract">3 · Engineering contract</h2>')
 q = contract.get('quantities') if isinstance(contract, dict) else None
 topo = contract.get('topology') or []
 if isinstance(q, dict) and q:
@@ -189,7 +237,7 @@ if bals:
 else:
     S.append('<div class="note">No contract quantities for system balances.</div>')
 
-S.append('<h2>4 · Blender model (universal CAD)</h2>')
+S.append('<h2 id="sec-blender">4 · Blender model (universal CAD)</h2>')
 blender = [os.path.join(run, n) for n in
            ['inspect-hero.png', 'inspect-iso.png', 'inspect-top.png', 'inspect-front.png', 'inspect-side.png']
            if os.path.exists(os.path.join(run, n))]
@@ -201,21 +249,63 @@ else:
     S.append('<div class="note">No universal Blender renders (inspect-*.png) found.</div>')
 
 # ── 5. THE 8 ENGINEERING DOCUMENTS ───────────────────────────────────────────
-S.append('<h2>5 · The 8 engineering documents</h2>')
+S.append('<h2 id="sec-drawings">5 · The 8 engineering documents</h2>')
 ddir = os.path.join(run, 'drawings')
-MAIN = ['pid', 'block-flow-diagram', 'single-line-diagram', 'general-arrangement',
-        'hvac-layout', 'process-schedules', 'panel-schedule', 'isometric-index']
-main_paths = [os.path.join(ddir, m + '.png') for m in MAIN if os.path.exists(os.path.join(ddir, m + '.png'))]
-if main_paths:
-    S.append(imgcards(main_paths, three=False))
-else:
+
+# Load manifest for titles; fall back to filename-derived titles
+manifest_entries = {}
+manifest = load('drawing-manifest.json')
+if manifest and isinstance(manifest, dict):
+    for group in ('system_drawings', 'schedule_drawings'):
+        for entry in (manifest.get(group) or []):
+            if isinstance(entry, dict) and entry.get('key'):
+                manifest_entries[entry['key']] = entry.get('title') or entry['key'].replace('-', ' ').title()
+    # block-flow-diagram lives at top level in the manifest
+    if manifest.get('block_flow_diagram'):
+        manifest_entries.setdefault('block-flow-diagram', 'Block Flow Diagram')
+
+# Ordered main drawings with human-readable fallback titles
+MAIN_ORDER = [
+    ('pid',                 'Piping & Instrumentation Diagram'),
+    ('block-flow-diagram',  'Block Flow Diagram'),
+    ('single-line-diagram', 'Single-Line Electrical Diagram'),
+    ('general-arrangement', 'General Arrangement'),
+    ('hvac-layout',         'HVAC Duct Layout'),
+    ('process-schedules',   'Process Schedules — line / valve / instrument'),
+    ('panel-schedule',      'Panel / Load Schedule'),
+    ('isometric-index',     'Piping Isometrics — index sheet'),
+]
+found_any = False
+for key, fallback_title in MAIN_ORDER:
+    png_path = os.path.join(ddir, key + '.png')
+    if not os.path.exists(png_path):
+        continue
+    found_any = True
+    title = manifest_entries.get(key) or fallback_title
+    rel = os.path.relpath(png_path, run)
+    S.append(f'<div class="drawing-block">'
+             f'<h3>{esc(title)}</h3>'
+             f'<img src="{esc(rel)}" alt="{esc(title)}">'
+             f'<p class="cap">{esc(key)}.png</p>'
+             f'</div>')
+if not found_any:
     S.append('<div class="note">No drawings/ PNGs found.</div>')
+
 isos = sorted(glob.glob(os.path.join(ddir, 'isometric-2*.png')))
 if isos:
-    S.append(f'<details><summary>Piping isometrics ({len(isos)} sheets)</summary>{imgcards(isos, three=True)}</details>')
+    S.append(f'<details><summary>Piping isometrics ({len(isos)} sheets)</summary>')
+    for iso_path in isos:
+        iso_name = os.path.basename(iso_path).replace('.png', '')
+        rel = os.path.relpath(iso_path, run)
+        S.append(f'<div class="drawing-block">'
+                 f'<h3>{esc(iso_name)}</h3>'
+                 f'<img src="{esc(rel)}" alt="{esc(iso_name)}">'
+                 f'<p class="cap">{esc(os.path.basename(iso_path))}</p>'
+                 f'</div>')
+    S.append('</details>')
 
 # ── 6. BILL OF MATERIALS ─────────────────────────────────────────────────────
-S.append('<h2>6 · Parts, connectivity + bill of materials</h2>')
+S.append('<h2 id="sec-bom">6 · Parts, connectivity + bill of materials</h2>')
 # ── per-part connectivity + GOVERNANCE (DETERMINISTIC) ──
 parts_conn, _edges = build_connectivity(run, req_bom, tools)
 if parts_conn:

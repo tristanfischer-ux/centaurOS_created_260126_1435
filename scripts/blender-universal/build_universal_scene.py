@@ -381,7 +381,10 @@ INSPECT_ACCESS_STEEL_COLOUR = (0.58, 0.60, 0.63)
 INSPECT_ACCESS_STEEL_RE = re.compile(
     r"u_ladhoop_|u_ladstr_|u_stub_|"          # caged-ladder + routing nozzle stubs
     r"_platform_|_platrail_|"                  # access platform ring + its handrail
-    r"_neck\b|_flange\b|_manway\b|_ntop\b|_nbot\b",  # vessel nozzle stubs + manway
+    r"_neck\b|_flange\b|_manway\b|_ntop\b|_nbot\b|"  # vessel nozzle stubs + manway
+    r"_cover\b|_handrail\b|_windgirder\b|_post_|_plinth\b",  # tank roof + handrail +
+    # wind-girder + posts + plinth → steel, so a tank reads as engineered (grey roof
+    # rim + rail on the green shell) instead of a featureless green blob. Universal.
 )
 
 
@@ -1912,10 +1915,12 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
             MM = fl.MM
             blue = _mech_pipe_mat("fluid_loop", MAT)
             pwr = _mech_pipe_mat("electrical_bus", MAT)
-            r_main = max(0.09, dia * MM * 0.05)
-            r_br = max(0.06, dia * MM * 0.04)
-            r_drop = max(0.05, dia * MM * 0.03)
-            r_pwr = 0.035
+            # REALISTIC pipe radii (a header is sized by FLOW, not by the tank ⌀ — the
+            # old dia·0.05 gave a 1.24 m-thick "pipe" that rendered as a fat blob).
+            r_main = 0.16    # ~DN300 supply/drain header
+            r_br = 0.11      # ~DN200 per-row branch
+            r_drop = 0.07    # ~DN125 drop into each tank
+            r_pwr = 0.035    # cable run
             ttop = base_z_mm + (ln or 3000)
             sup_z = ttop + 1300.0                       # supply header above the tanks
             drn_z = base_z_mm + 250.0                   # drain header just off the floor
@@ -1927,15 +1932,15 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
             sup_x, drn_x = x_l - pitch * 0.3, x_r + pitch * 0.3
 
             def _vp(n, x, y, z0, z1, rr, mt):     # vertical pipe
-                fl.add_cyl(n, (x * MM, y * MM, (z0 + z1) / 2 * MM), rr, abs(z1 - z0) * MM,
+                fl.add_cyl("u_pipe_" + n, (x * MM, y * MM, (z0 + z1) / 2 * MM), rr, abs(z1 - z0) * MM,
                            mt, module=mod, module_objects=MO)
 
             def _xp(n, x0, x1, y, z, rr, mt):     # horizontal pipe along X
-                fl.add_cyl(n, ((x0 + x1) / 2 * MM, y * MM, z * MM), rr, abs(x1 - x0) * MM,
+                fl.add_cyl("u_pipe_" + n, ((x0 + x1) / 2 * MM, y * MM, z * MM), rr, abs(x1 - x0) * MM,
                            mt, module=mod, module_objects=MO, rotation=(0, math.radians(90), 0))
 
             def _yp(n, x, y0, y1, z, rr, mt):     # horizontal pipe along Y
-                fl.add_cyl(n, (x * MM, (y0 + y1) / 2 * MM, z * MM), rr, abs(y1 - y0) * MM,
+                fl.add_cyl("u_pipe_" + n, (x * MM, (y0 + y1) / 2 * MM, z * MM), rr, abs(y1 - y0) * MM,
                            mt, module=mod, module_objects=MO, rotation=(math.radians(90), 0, 0))
 
             _yp(f"{nm}_supmain", sup_x, y_f, y_b, sup_z, r_main, blue)     # supply main (left)
@@ -10657,7 +10662,7 @@ def apply_inspection_materials(parts):
         #    exactly like u_route_* — we keep that colour and only kill the gloss
         #    (NOT recolour them neutral-grey via the unmatched fallback). ──
         if nm.startswith("u_route_") or nm.startswith("u_trunk_") \
-                or nm.startswith("u_tap_"):
+                or nm.startswith("u_tap_") or nm.startswith("u_pipe_"):
             for m in obj.data.materials:
                 if m is None:
                     continue
