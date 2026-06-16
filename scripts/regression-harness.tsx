@@ -468,6 +468,39 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => `dim=${rtDim} D=${rtD} H=${rtH} h/d=${rtD ? (rtH / rtD).toFixed(3) : 0}`,
   ))
 
+  // ── A3. PROCESS INSTRUMENTATION synthesised from the contract's control variables ──
+  // Tristan #140 (life-safety): every control variable the contract declares a setpoint/
+  // target for must get its field instrument on the vessel that holds it. A RAS rearing
+  // tank (qty ×10) with a temperature setpoint + dissolved-O₂ demand gets a LEVEL +
+  // TEMPERATURE + DISSOLVED-O₂ instrument PER TANK (qty ×10); pH + salinity get ONE loop
+  // analyser; an OPEN tank (no design pressure) gets NO pressure transmitter. Universal —
+  // driven by which control-variable keys the contract computed, no `if class`.
+  const contractInstr: any = { quantities: { ...contract.quantities,
+    water_setpoint_temp_c: { value: 26.4, unit: '°C' }, ph_setpoint: { value: 7.4, unit: '' },
+    oxygen_demand_kg_day: { value: 1235, unit: 'kg/day' }, salinity_ppt: { value: 33, unit: 'ppt' } } }
+  const instrMods: any = [
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
+    { module: 'sensing_instrumentation', sub_modules: [{ id: 'sensing_instrumentation__x', words: [] }] },
+  ]
+  applyUniversalContractSizing(instrMods, contractInstr, { synthesizeMissing: true, onlyUnsized: false, dedupeAndStrip: false, instrument: true })
+  const allInstr = () => instrMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._instrument)))
+  const instr1 = allInstr()
+  const hasI = (re: RegExp) => instr1.some((w: any) => re.test(String(w.name_human)))
+  const rearQtyOf = (re: RegExp) => { const w = instr1.find((x: any) => re.test(String(x.name_human)) && String(x._instrument_of || '').includes('rearing')); return w ? String((w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value ?? '') : '' }
+  // idempotency: a 2nd pass re-derives the SAME instrument set (no duplication)
+  applyUniversalContractSizing(instrMods, contractInstr, { synthesizeMissing: false, onlyUnsized: true, dedupeAndStrip: false, instrument: true })
+  const instr2n = allInstr().length
+  out.push(assertEq(
+    'UNIVERSAL.process_instrumentation_synthesised_from_control_variables',
+    'the contract control variables (temp setpoint, dissolved-O₂ demand, pH, salinity) synthesise field instruments: LEVEL + TEMPERATURE + DISSOLVED-O₂ PER rearing tank (qty ×10), pH + conductivity once on the loop, and NO pressure transmitter on an open tank; idempotent (2nd pass = same count)',
+    JSON.stringify({ level: hasI(/level/i), temp: hasI(/temperature/i), doA: hasI(/dissolved.?oxygen/i), ph: hasI(/\bph analyser/i), sal: hasI(/conductiv|salinity/i), pressure: hasI(/pressure transmitter/i), rearLevelQty: rearQtyOf(/level/i), rearDoQty: rearQtyOf(/dissolved.?oxygen/i), n1: instr1.length, n2: instr2n }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.level && o.temp && o.doA && o.ph && o.sal && !o.pressure && o.rearLevelQty === '×10' && o.rearDoQty === '×10' && o.n1 >= 6 && o.n2 === o.n1
+    },
+    () => `instruments=${JSON.stringify(instr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}`))} n1=${instr1.length} n2=${instr2n}`,
+  ))
+
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──
   const graph: any = { product_class: 'test', nodes: [{ class: 'environmental_interface', display: 'Environmental Interface', role: 'principal', required: true }], edges: [] }
   const heatingContract: any = { quantities: { heating_duty_kw: { value: 1493 }, heat_pump_cop: { value: 3.5 }, heat_pump_electrical_kw: { value: 427 } } }

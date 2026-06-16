@@ -354,7 +354,7 @@ def assemble(out_dir: str):
                 conns = ", ".join(sorted(conns_by_tag.get(tag, []))) or None
                 parts_req = [name]
                 if duty:
-                    parts_req.append(f"{duty} {duty_u}".strip())
+                    parts_req.append(f"{duty} {duty_u or ''}".strip())
                 if size:
                     parts_req.append(size)
                 if conns:
@@ -364,6 +364,21 @@ def assemble(out_dir: str):
                 pn = str(md.get("part_number") or "")
                 mfr = str(md.get("manufacturer") or "")
                 qy = int((re.search(r"\d+", str(md.get("quantity") or "1")) or re.search(r"(1)", "1")).group(0))
+                # ── FIELD INSTRUMENT (synthesizeInstrumentation #140): a level / temp /
+                # pressure / DO / pH / conductivity transmitter measuring a contract-declared
+                # control variable. Catalogue-class budget; priced from its installed-cost
+                # estimate, qty = per-vessel count. Its own clean line — not bespoke/NOT-FOUND.
+                if w.get("_instrument"):
+                    igbp = _child_price(w)
+                    nlow = name.lower()
+                    itag = ("LT" if "level" in nlow else "TT" if "temperature" in nlow
+                            else "PT" if "pressure" in nlow else "FT" if "flow" in nlow
+                            else "AT")   # ISA-5.1 instrument tag (analysers → AT)
+                    rows.append({"tag": itag, "requirement": requirement, "status": "INSTRUMENT",
+                                 "part": "field instrument (catalogue class)", "qty": qy,
+                                 "unit_gbp": round(igbp), "line_gbp": round(igbp * qy),
+                                 "basis": "installed instrument — catalogue-class budget"})
+                    continue
                 bc = _bespoke_class(name)   # 'strong' (process vessel) | 'simple' (shell) | 'none'
                 mt_spec = None
                 g_lookup = geom_by_name.get(re.sub(r"\s+\d+$", "", name).strip().lower())

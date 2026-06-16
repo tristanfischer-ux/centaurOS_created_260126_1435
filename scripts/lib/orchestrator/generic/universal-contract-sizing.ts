@@ -329,10 +329,13 @@ const SUB_ASSEMBLY: { re: RegExp; parts: SubSpec[] }[] = [
       { name: 'Drain Nozzle', derive: () => ({ gbp: 450 }) },
       { name: 'Overflow / Weir', derive: () => ({ gbp: 700 }) },
       { name: 'Internal Distribution', derive: (p) => ({ gbp: 800 + (p.m3 || 50) * 6 }) },
-      { name: 'Level Transmitter', derive: () => ({ gbp: 1200 }) },
-      { name: 'Pressure Gauge', derive: () => ({ gbp: 160 }) },
-      { name: 'Temperature Element', derive: () => ({ gbp: 380 }) },
-      { name: 'Pressure / Vacuum Relief', derive: () => ({ gbp: 900 }) },
+      // Process instrumentation (level / temperature / pressure / dissolved-O₂ / pH) is
+      // synthesised PROPERLY by synthesizeInstrumentation() — driven by the contract's
+      // declared control variables, wired as signal, priced as catalogue-class field
+      // instruments — so it is no longer buried here as a generic vessel fitting. What
+      // stays is the MECHANICAL safety fitting (a vent / relief, correct for an open
+      // tank's atmospheric breather AND a pressurised vessel's PVRV).
+      { name: 'Tank Vent / Pressure Relief', derive: () => ({ gbp: 700 }) },
       { name: 'Access Ladder & Platform', derive: (p) => ({ gbp: 1800 + (p.htM || 4) * 320 }) },
       { name: 'Internal Lining / Coating', derive: (p) => { const a = vesselArea(p); return { gbp: (a.shell + a.head) * 55 } } },
       { name: 'Earthing Boss', derive: () => ({ gbp: 120 }) },
@@ -453,6 +456,7 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], maxDepth = 
       const out: WordLike[] = []
       for (const w of sm.words) {
         out.push(w)
+        if (isInstrument(w)) continue            // a field instrument is a leaf — never an assembly
         const id = String(w.id ?? '')
         const depth = (id.match(/__/g) ?? []).length
         if (depth >= maxDepth) continue          // too deep — stop the recursion
@@ -539,11 +543,167 @@ function synthWord(g: EquipGroup): WordLike & { _synthesized?: boolean } {
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// PROCESS INSTRUMENTATION SYNTHESIS (Tristan #140 — life-safety per-vessel).
+//
+// Universal principle: "you cannot control what you do not measure." Every PROCESS
+// CONTROL VARIABLE the contract declares a setpoint / target / load for demands a
+// field instrument, placed where that variable physically lives:
+//   · FAST, inventory-specific VITAL SIGNS (level + temperature + dissolved O₂) are
+//     measured PER fluid-vessel instance — a tank's dissolved O₂ is drawn down by its
+//     OWN stock and cannot be inferred from a neighbour; a level / temperature excursion
+//     in one tank is invisible to a probe in another.
+//   · SLOW, loop-homogeneous CHEMISTRY (pH, salinity / conductivity) is measured ONCE on
+//     the common recirculation loop (it is dosed / controlled centrally).
+//   · PRESSURE is added only where a vessel is PRESSURISED (the contract declares a design
+//     pressure above atmospheric); an open tank correctly receives none.
+// The set of variables is read from the contract's own quantity KEYS — a pharma reactor
+// with a pH setpoint, an anaerobic digester with a temperature band and a RAS rearing
+// tank with a dissolved-O₂ target all light up the same way. No per-class table.
+//
+// Each instrument is a first-class word in the sensing / instrumentation module (so the
+// single-line + P&ID wire it as SIGNAL via the module-primary service classifier), at
+// the right per-vessel quantity, carrying its engineering range (from the setpoint) and
+// an installed cost the BoM prices directly. The generic vessel-explosion no longer
+// buries a duplicate level / temperature / pressure fitting — instrumentation is owned
+// HERE, once, properly.
+// ──────────────────────────────────────────────────────────────────────────────
+
+function isInstrument(w: WordLike): boolean {
+  return (w as { _instrument?: boolean })._instrument === true
+}
+function anyKey(q: Record<string, number>, re: RegExp): boolean {
+  return Object.keys(q).some((k) => re.test(k))
+}
+function pickQ(q: Record<string, number>, re: RegExp): number | undefined {
+  for (const [k, v] of Object.entries(q)) if (re.test(k) && Number.isFinite(v) && v > 0) return v
+  return undefined
+}
+
+// A fluid-HOLDING vessel: a synthesised principal with a real m³ capacity (the level /
+// temperature / quality variables live in its inventory). Pumps / filters / blowers
+// (sized from kW / throughput, no capacity) are not vessels.
+function isFluidVessel(w: WordLike): boolean {
+  if (!isSynth(w) || isSubcomponent(w) || isInstrument(w)) return false
+  const mods = w.modifier_characters ?? []
+  const cap = mods.find((m) => m.kind === 'capacity' && /m³|m3/.test(String(m.unit ?? '')))
+  if (cap && (parseFloat(String(cap.value)) || 0) >= 1) return true
+  const dim = String(mods.find((m) => m.kind === 'dimension')?.value ?? '')
+  return /m\s*dia/i.test(dim) && /tank|vessel|basin|sump|reactor|column|tower|biofilter|degass|clarifier|digester|reservoir|pond|cone|contactor/i.test(w.name_human ?? '')
+}
+
+// Vessels holding LIVE / aerobic-biological inventory need a dissolved-O₂ analyser —
+// universal bioprocess vocabulary (aquaculture / fermentation / digestion / activated
+// sludge), not an `if ras`. The primary (largest-holdup) process vessel always qualifies.
+const BIO_VESSEL_RE = /rear|grow|culture|nursery|broodstock|biofilter|\bbio\b|mbbr|moving.?bed|aeration|raceway|\bpond\b|ferment|bioreactor|digester|activated.?sludge|lagoon/i
+
+interface InstrumentSpec {
+  key: string
+  present: (q: Record<string, number>) => boolean
+  label: string
+  range: (q: Record<string, number>, p: ParentPhysics) => string
+  gbp: number // installed cost (UK budget, catalogue class)
+  scope: 'level' | 'vessel-temp' | 'bio-do' | 'loop-ph' | 'loop-salinity' | 'vessel-pressure'
+  form: (host: string) => string
+}
+
+const INSTRUMENT_FAMILIES: InstrumentSpec[] = [
+  { key: 'level', scope: 'level', present: () => true, label: 'Level Transmitter', gbp: 900,
+    range: (_q, p) => (p.htM > 0 ? `0–${p.htM.toFixed(1)} m` : '0–100 %'),
+    form: (h) => `Guided-radar level transmitter, ${h}-mounted; 4–20 mA to PLC with high / low-level alarm` },
+  { key: 'temperature', scope: 'vessel-temp', present: (q) => anyKey(q, /setpoint_temp|temp_c$|_temp_/), label: 'Temperature Transmitter', gbp: 350,
+    range: (q) => { const t = pickQ(q, /water.*temp|setpoint_temp|temp_c$/); return t !== undefined ? `0–40 °C (control ${t.toFixed(1)} °C)` : '0–40 °C' },
+    form: (h) => `Pt100 RTD + head transmitter in ${h} thermowell; 4–20 mA to PLC` },
+  { key: 'dissolved_oxygen', scope: 'bio-do', present: (q) => anyKey(q, /oxygen|dissolved|(^|_)do(_|$)/), label: 'Dissolved-Oxygen Analyser', gbp: 1600,
+    range: () => '0–20 mg/L', form: (h) => `Optical dissolved-oxygen probe + transmitter in ${h}; 4–20 mA with low-DO trip to standby oxygenation` },
+  { key: 'ph', scope: 'loop-ph', present: (q) => anyKey(q, /(^|_)ph_|_ph$|ph_setpoint/), label: 'pH Analyser', gbp: 1300,
+    range: (q) => { const v = pickQ(q, /ph_setpoint|(^|_)ph_/); return v !== undefined ? `pH 0–14 (control ${v.toFixed(1)})` : 'pH 0–14' },
+    form: () => 'Differential pH electrode + transmitter on the common loop; 4–20 mA to acid / base dosing control' },
+  { key: 'salinity', scope: 'loop-salinity', present: (q) => anyKey(q, /salinity|conductiv/), label: 'Conductivity / Salinity Analyser', gbp: 1200,
+    range: (q) => { const v = pickQ(q, /salinity_ppt|salinity/); return v !== undefined ? `0–50 ppt (design ${v.toFixed(0)} ppt)` : '0–50 ppt' },
+    form: () => 'Toroidal conductivity sensor + transmitter on the common loop; 4–20 mA to make-up / bleed control' },
+  { key: 'pressure', scope: 'vessel-pressure', present: (q) => (pickQ(q, /design_pressure|operating_pressure|pressure_bar/) ?? 0) > 1.3, label: 'Pressure Transmitter', gbp: 700,
+    range: (q) => { const v = pickQ(q, /design_pressure|operating_pressure|pressure_bar/) ?? 10; return `0–${Math.ceil(v * 1.5)} bar` },
+    form: (h) => `Piezoresistive pressure transmitter on ${h}; 4–20 mA to PLC` },
+]
+
+function instrumentWord(spec: InstrumentSpec, host: WordLike | undefined, qty: number, range: string): WordLike {
+  const hostName = host?.name_human ?? 'Recirculation Loop'
+  const hostId = String(host?.id ?? 'recirc_loop')
+  const mods: ModifierCharacter[] = []
+  mods.push(mod('quantity', `×${Math.max(1, Math.round(qty))}`))
+  mods.push(mod('rating_primary', range))
+  mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(spec.gbp)))))
+  mods.push(mod('form', spec.form(hostName)))
+  mods.push(mod('part_number', 'TBD (field instrument — catalogue class)'))
+  mods.push(mod('lifecycle', 'Concept design — measures a contract-declared control variable; exact MPN at detailed design'))
+  mods.push(mod('installation', `Field-mounted on ${hostName}; signal wired to the control system`))
+  // single-underscore separator ONLY — a '__' would collide with the sub-component id
+  // convention (parent__suffix) and the BoM would file the instrument as an assembly child.
+  const id = `instr_${spec.key}_on_${sanitizeId(hostId)}`.replace(/__+/g, '_')
+  return {
+    id,
+    name_human: spec.label,
+    content_character: { character_id: id, name_human: spec.label },
+    modifier_characters: mods,
+    ...({ _synthesized: true, _instrument: true, _instrument_of: hostId } as object),
+  }
+}
+
+type SubLike = { id?: string; words?: WordLike[] }
+function findInstrumentSubModule(modules: ModuleLike[]): SubLike | undefined {
+  for (const re of [/sensing|instrument|monitor/i, /control|compute|scada|plc/i]) {
+    for (const m of modules ?? []) for (const sm of (m.sub_modules ?? []) as SubLike[]) {
+      if (re.test(String(sm.id ?? ''))) return sm
+    }
+  }
+  const sm = (modules?.[0]?.sub_modules ?? [])[0] as SubLike | undefined
+  return sm
+}
+
+/** Synthesise the PROCESS instrumentation the contract's control variables demand and
+ *  place each instrument in the sensing module at the right per-vessel quantity. Mutates
+ *  modules in place; returns the number of instrument words added. Universal — driven by
+ *  which control-variable keys the contract computed, no `if class`. */
+export function synthesizeInstrumentation(modules: ModuleLike[], quantities: Record<string, number>): number {
+  const target = findInstrumentSubModule(modules)
+  if (!target) return 0
+  const vessels: { w: WordLike; cap: number; count: number; p: ParentPhysics }[] = []
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    if (!isFluidVessel(w)) continue
+    const p = readParentPhysics(w)
+    vessels.push({ w, cap: p.m3 || 0, count: p.qty, p })
+  }
+  if (vessels.length === 0) return 0
+  const primary = vessels.slice().sort((a, b) => b.cap * b.count - a.cap * a.count)[0]
+
+  // idempotency: drop any instruments a prior pass added (re-derive cleanly)
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) {
+    if (Array.isArray(sm.words)) sm.words = sm.words.filter((w) => !isInstrument(w))
+  }
+
+  const toAdd: WordLike[] = []
+  for (const spec of INSTRUMENT_FAMILIES) {
+    if (!spec.present(quantities)) continue
+    if (spec.scope === 'loop-ph' || spec.scope === 'loop-salinity') {
+      toAdd.push(instrumentWord(spec, primary.w, 1, spec.range(quantities, primary.p)))
+      continue
+    }
+    for (const v of vessels) {
+      if (spec.scope === 'bio-do' && !(v === primary || BIO_VESSEL_RE.test(v.w.name_human ?? ''))) continue
+      toAdd.push(instrumentWord(spec, v.w, v.count, spec.range(quantities, v.p)))
+    }
+  }
+  ;((target.words ??= []) as WordLike[]).push(...toAdd)
+  return toAdd.length
+}
+
 export interface UniversalSizingResult {
   sized: number
   synthesized: number
   dropped: number
   exploded: number
+  instrumented: number
   groups: number
   matchedPhrases: string[]
   synthesizedPhrases: string[]
@@ -923,7 +1083,7 @@ export function dedupePrincipalWords(modules: ModuleLike[]): number {
 export function applyUniversalContractSizing(
   modules: ModuleLike[],
   contract: ContractInProgress,
-  opts: { onlyUnsized?: boolean; synthesizeMissing?: boolean; dedupeAndStrip?: boolean; explode?: boolean; minScore?: number } = {},
+  opts: { onlyUnsized?: boolean; synthesizeMissing?: boolean; dedupeAndStrip?: boolean; explode?: boolean; instrument?: boolean; minScore?: number } = {},
 ): UniversalSizingResult {
   const onlyUnsized = opts.onlyUnsized ?? true
   const synthesizeMissing = opts.synthesizeMissing ?? true
@@ -1023,6 +1183,12 @@ export function applyUniversalContractSizing(
   // multiplies into N× the same sub-components — see dedupePrincipalWords). ──
   const dedupedPrincipals = dedupeAndStrip ? dedupePrincipalWords(modules) : 0
 
+  // ── C3. PROCESS INSTRUMENTATION: every contract-declared control variable gets its
+  // measuring instrument on the vessel that holds it (level / temp / DO per fluid vessel;
+  // pH / salinity once on the loop; pressure only on a pressurised vessel). Runs on the
+  // CANONICAL vessel set (post-dedupe), before the explosion (instruments are leaves). ──
+  const instrumented = (opts.instrument ?? true) ? synthesizeInstrumentation(modules, quantities) : 0
+
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
   const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules) : 0
 
@@ -1031,6 +1197,7 @@ export function applyUniversalContractSizing(
     synthesized: synthesizedPhrases.length,
     dropped,
     exploded,
+    instrumented,
     groups: groups.length,
     matchedPhrases: [...matched],
     synthesizedPhrases,
