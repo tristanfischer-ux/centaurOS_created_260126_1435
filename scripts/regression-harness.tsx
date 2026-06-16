@@ -480,7 +480,7 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     oxygen_demand_kg_day: { value: 1235, unit: 'kg/day' }, salinity_ppt: { value: 33, unit: 'ppt' },
     recirculation_flow_m3_h: { value: 13360, unit: 'm³/h' }, degasser_air_flow_m3_h: { value: 40000, unit: 'm³/h' },
     connected_electrical_load_kw: { value: 674, unit: 'kW' }, makeup_water_m3_h: { value: 53.44, unit: 'm³/h' }, building_process_loss_kw: { value: 182.58, unit: 'kW' },
-    bicarbonate_dose_kg_day: { value: 1291, unit: 'kg/day' }, daily_feed_kg: { value: 2745, unit: 'kg' }, oxygen_supply_kg_h: { value: 54, unit: 'kg/h' }, solids_load_kg_day: { value: 686, unit: 'kg/day' }, standing_biomass_kg: { value: 200400, unit: 'kg' }, biofilter_media_volume_m3: { value: 404, unit: 'm³' } } }
+    bicarbonate_dose_kg_day: { value: 1291, unit: 'kg/day' }, daily_feed_kg: { value: 2745, unit: 'kg' }, oxygen_supply_kg_h: { value: 54, unit: 'kg/h' }, solids_load_kg_day: { value: 686, unit: 'kg/day' }, standing_biomass_kg: { value: 200400, unit: 'kg' }, biofilter_media_volume_m3: { value: 404, unit: 'm³' }, annual_production_t_yr: { value: 204, unit: 't/yr' } } }
   const instrMods: any = [
     { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
     { module: 'sensing_instrumentation', sub_modules: [{ id: 'sensing_instrumentation__x', words: [] }] },
@@ -563,11 +563,11 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
   const hasP = (re: RegExp) => proc1.some((w: any) => re.test(String(w.name_human)))
   out.push(assertEq(
     'UNIVERSAL.process_support_systems_synthesised_from_duties',
-    'the contract consumable + waste duties synthesise the process-support plant: DOSING (pH/alkalinity), FEED, OXYGEN/LOX, SLUDGE handling, SCADA, GRADING, and the MBBR biofilm-carrier MEDIA (the ~£283k working heart of the biofilter a shell-only take-off misses) — seven systems, universal, driven by declared duties',
-    JSON.stringify({ dosing: hasP(/dosing/i), feed: hasP(/feed/i), lox: hasP(/oxygen|lox/i), sludge: hasP(/sludge/i), scada: hasP(/scada/i), grading: hasP(/grading|harvest/i), media: hasP(/media|carrier/i), n: proc1.length }),
+    'the contract consumable + waste duties synthesise the FULL fish life-cycle process-support plant: DOSING (pH/alkalinity), FEED, OXYGEN/LOX, SLUDGE handling, SCADA, GRADING/harvest, the MBBR biofilm-carrier MEDIA (the ~£283k working heart of the biofilter), and harvest CHILLING (flake-ice + RSW chiller — how the fish get chilled, Tristan 2026-06-16) — eight systems, universal, driven by declared duties',
+    JSON.stringify({ dosing: hasP(/dosing/i), feed: hasP(/feed/i), lox: hasP(/oxygen|lox/i), sludge: hasP(/sludge/i), scada: hasP(/scada/i), grading: hasP(/grading|harvest/i), media: hasP(/media|carrier/i), chilling: hasP(/chilling|ice/i), n: proc1.length }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
-      return o.dosing && o.feed && o.lox && o.sludge && o.scada && o.grading && o.media && o.n === 7
+      return o.dosing && o.feed && o.lox && o.sludge && o.scada && o.grading && o.media && o.chilling && o.n === 8
     },
     () => `process-systems=${JSON.stringify(proc1.map((w: any) => w.name_human))} n=${proc1.length}`,
   ))
@@ -633,6 +633,46 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
 //       a contract key to an invoke() field the tool does not actually return
 //       (V2). Without this, num(output, <hallucinated>) is always undefined and
 //       the key silently fails-closed forever (or, pre-safeguard, fabricates).
+// ── RAS heat-pump net sizing (make-up/bleed HEX) ────────────────────────────
+// Would have caught: the RAS heat-pump 8× undersizing — sized off building loss
+// alone (~145 kW thermal) while the ~1,019 kW make-up water heating was absent.
+// The fix sizes the pump for the NET duty after an 85%-effectiveness make-up/bleed
+// HEX: net = building_fabric_loss + 0.15×makeup_heating ≈ 336 kW thermal → ~96 kW
+// electrical. UNIVERSAL: driven entirely off the contract make-up/temperature/
+// building keys (no `if ras`). Builds the real contract; brief phrased so the
+// setpoint regex resolves 26.4 °C (the converged-run value).
+function checkRasHeatPumpNetSizing(): Assertion[] {
+  const out: Assertion[] = []
+  try {
+    const brief = {
+      product_description: 'Recirculating aquaculture system held at 26.4 °C grow-out temperature for 204 tonnes per year yellowtail kingfish, 3340 m³ total rearing-tank volume, 33 ppt salinity, drawing 10 °C seawater source water, 4 turnovers per hour, 99.6% of its water recirculated, capex ceiling £5,000,000.',
+      constraints: { target_performance: { value: 204, unit: 't/yr' } },
+    }
+    const c = buildContract('aquaculture_ras', brief) as any
+    const v = (k: string) => c?.quantities?.[k]?.value
+    const makeup = v('makeup_heating_kw'), rec = v('makeup_hex_recovery_kw'), res = v('residual_makeup_heating_kw')
+    const bld = v('building_process_loss_kw'), net = v('heating_duty_kw'), hp = v('heat_pump_electrical_kw')
+    const area = v('makeup_hex_area_m2'), cop = v('heat_pump_cop')
+    out.push(assertEq(
+      'RAS.heat_pump_sized_for_net_duty_after_makeup_hex',
+      'RAS heat-pump sized for NET duty (building loss + 15% residual make-up after an 85% make-up/bleed HEX), NOT building loss alone — fixes the 8× undersizing',
+      JSON.stringify({ makeup, rec, res, bld, net, hp, area, cop }),
+      () =>
+        Number.isFinite(makeup) && makeup > 900 &&                         // raw make-up duty ~1019 kW present
+        Math.abs(rec - 0.85 * makeup) <= 2 &&                              // HEX recovers ~85%
+        Math.abs(res - 0.15 * makeup) <= 2 &&                              // residual ~15%
+        net === bld + res &&                                               // net = building loss + residual (consistent)
+        Math.abs(hp - Math.round(net / cop)) <= 1 &&                       // heat-pump electrical = net / COP
+        hp >= 80 && hp <= 115 &&                                           // ~96 kW (was ~41)
+        Number.isFinite(area) && area > 0,                                 // HEX is a real BoM item with an area
+      () => `makeup=${makeup} rec=${rec} res=${res} bld=${bld} net=${net} hp=${hp} area=${area} cop=${cop}`,
+    ))
+  } catch (err) {
+    out.push({ id: 'RAS.heat_pump_sized_for_net_duty_after_makeup_hex', description: 'RAS heat-pump net sizing', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+  }
+  return out
+}
+
 // Snapshot-independent + no .venv + no network (uses real registered tools'
 // declared I/O). require('register-all') so getTool/listTools are populated.
 function checkToolPlanBootstrapFailClosed(): Assertion[] {
@@ -702,11 +742,45 @@ function checkToolPlanBootstrapFailClosed(): Assertion[] {
         nan.contract.quantities['pump_motor_kw'] === undefined && nan.skipped.length === 1,
       () => `present=${JSON.stringify(present.contract.quantities['pump_motor_kw'])} skippedP=${present.skipped.length} | missing=${JSON.stringify(missing.contract.quantities['pump_motor_kw'])} skippedM=${JSON.stringify(missing.skipped)} | nan=${JSON.stringify(nan.contract.quantities['pump_motor_kw'])}`,
     ))
+
+    // (d) AUTHORITATIVE-SEED PROTECTION: a bootstrapped stand-in tool must NOT
+    //     overwrite a contract quantity the archetype builder COMPUTED
+    //     (source:'calculator') — that was the RAS heat-pump 8× undersizing
+    //     (a COOLING chiller stand-in + a dwelling-default building-envelope calc
+    //     clobbered the contract's net heating_duty_kw / heat_pump_electrical_kw).
+    //     A NON-calculator quantity (e.g. a design-loop / brief value) is still
+    //     writable, so genuine tool refinement still flows.
+    const seedC: any = {
+      product_class: 'novel_class', quantities: {
+        heat_pump_electrical_kw: { value: 96, unit: 'kW', family: 'power', source: 'calculator' },
+        main_transformer_kva: { value: 0, unit: 'kVA', family: 'power', source: 'design-loop' },
+      }, _tools_run: [],
+    }
+    const clobberCalc: ToolPlanStepSpec = { tool_id: 'hvac:load-sizing', inputs: [],
+      outputs: [{ contract_key: 'heat_pump_electrical_kw', tool_output_field: 'compressor_power_kw', unit: 'kW', family: 'power' }] }
+    const writeNonCalc: ToolPlanStepSpec = { tool_id: 'electrical:transformer-sizing', inputs: [],
+      outputs: [{ contract_key: 'main_transformer_kva', tool_output_field: 'transformer_kva', unit: 'kVA', family: 'power' }] }
+    const protCalc = applyStepOutputs(clobberCalc, seedC, { compressor_power_kw: 41.4 })  // under-counted stand-in value
+    const wroteTx = applyStepOutputs(writeNonCalc, seedC, { transformer_kva: 500 })
+    out.push(assertEq(
+      'UNIVERSAL.tool_plan_bootstrap_seed_protected_from_stand_in_overwrite',
+      'a bootstrapped stand-in tool CANNOT overwrite a source:calculator contract value (RAS heat-pump fix), but CAN still write a non-calculator (design-loop) quantity',
+      JSON.stringify({
+        calcProtected: protCalc.contract.quantities['heat_pump_electrical_kw']?.value === 96 && (protCalc.protected_keys?.length ?? 0) === 1,
+        nonCalcWritable: wroteTx.contract.quantities['main_transformer_kva']?.value === 500,
+      }),
+      () =>
+        protCalc.contract.quantities['heat_pump_electrical_kw']?.value === 96 &&
+        (protCalc.protected_keys?.length ?? 0) === 1 &&
+        wroteTx.contract.quantities['main_transformer_kva']?.value === 500,
+      () => `calc=${JSON.stringify(protCalc.contract.quantities['heat_pump_electrical_kw'])} prot=${JSON.stringify(protCalc.protected_keys)} | tx=${JSON.stringify(wroteTx.contract.quantities['main_transformer_kva'])}`,
+    ))
   } catch (err) {
     // Registry/import unavailable — vacuous PASS (mirrors checkSizingToolsWorkedSound's catch).
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_valid_spec_passes', description: 'tool-plan bootstrap valid spec passes', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_rejects_hallucinated_output_field', description: 'tool-plan bootstrap rejects hallucinated field', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_materialiser_fail_closed', description: 'tool-plan bootstrap materialiser fail-closed', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_seed_protected_from_stand_in_overwrite', description: 'tool-plan bootstrap seed protection', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
   }
   return out
 }
@@ -9024,6 +9098,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   for (const a of checkDesignLoopWritebackAdditive()) assertions.push(a)
   for (const a of checkDesignLoopClosesEarly()) assertions.push(a)
   for (const a of checkPrincipalEquipmentFromContract()) assertions.push(a)
+  for (const a of checkRasHeatPumpNetSizing()) assertions.push(a)
 
   // Self-contained — the on-the-fly tool-plan bootstrap's FAIL-CLOSED materialiser
   // + hallucinated-field rejection (no .venv, no network, real registered tools).

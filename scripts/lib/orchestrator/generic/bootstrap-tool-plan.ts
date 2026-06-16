@@ -1249,10 +1249,11 @@ export function applyStepOutputs(
   step: ToolPlanStepSpec,
   c: ContractInProgress,
   output: any,
-): { contract: ContractInProgress; skipped: string[] } {
+): { contract: ContractInProgress; skipped: string[]; protected_keys?: string[] } {
   const p = provFor(step.tool_id)
   const quantities = { ...c.quantities }
   const skipped: string[] = []
+  const protectedKeys: string[] = []
   for (const o of step.outputs) {
     const v = num(output, o.tool_output_field)
     if (v === undefined) {
@@ -1260,9 +1261,29 @@ export function applyStepOutputs(
       skipped.push(`${o.contract_key}(${step.tool_id}.${o.tool_output_field})`)
       continue
     }
+    // AUTHORITATIVE-SEED PROTECTION (universal, bootstrap-only): the engineering
+    // contract seeds a quantity with `source: 'calculator'` when the archetype
+    // builder COMPUTED it deterministically from first principles (e.g. a RAS
+    // makeup/bleed HEX net heating_duty_kw + heat_pump_electrical_kw). A
+    // BOOTSTRAPPED stand-in tool — picked by the on-the-fly planner from a generic
+    // catalogue and frequently wired with hard-coded constants or a wrong-domain
+    // proxy (the RAS plan fed a COOLING chiller tool only the building loss, and a
+    // dwelling-default building-envelope calc) — must NOT silently OVERWRITE that
+    // authoritative value with an under-counted one. So: if the contract already
+    // carries this key with source 'calculator', KEEP the seed and skip the tool
+    // write. The tool still runs (its worked-calcs + any NEW keys it produces are
+    // kept); only a clobber of a first-principles contract value is refused. This
+    // applies ONLY to bootstrap plans (applyStepOutputs is bootstrap-only); the 35
+    // hand-written class-plans use their own contract_update closures and are
+    // unaffected, so their intended tool-refinement of seeded geometry still flows.
+    const existing = (c.quantities as Record<string, any>)?.[o.contract_key]
+    if (existing && existing.source === 'calculator' && Number.isFinite(existing.value)) {
+      protectedKeys.push(`${o.contract_key}(seed=${existing.value} vs tool=${v})`)
+      continue
+    }
     quantities[o.contract_key] = mkQty(v, o.unit, o.family, p(o.tool_output_field), o.condition ?? 'rated')
   }
-  return { contract: { ...c, quantities }, skipped }
+  return { contract: { ...c, quantities }, skipped, protected_keys: protectedKeys }
 }
 
 /** Turn a validated + ordered spec into the runnable ClassToolPlan. One ToolStep
@@ -1296,11 +1317,17 @@ export function materialisePlan(slug: string, spec: ToolPlanSpec, orderedToolIds
       feeds_into: [...downstream],
       input_from_contract: (c: ContractInProgress) => buildStepInput(step, c),
       contract_update: (c: ContractInProgress, output: unknown) => {
-        const { contract, skipped } = applyStepOutputs(step, c, output)
+        const { contract, skipped, protected_keys } = applyStepOutputs(step, c, output)
         if (skipped.length > 0) {
           console.warn(
             `[bootstrap-tool-plan] FAIL-CLOSED ${step.tool_id}: missing computed output field(s) → ` +
             `emitted nothing for [${skipped.join(', ')}] (no fabricated number written)`,
+          )
+        }
+        if (protected_keys && protected_keys.length > 0) {
+          console.warn(
+            `[bootstrap-tool-plan] SEED-PROTECTED ${step.tool_id}: kept the first-principles contract ` +
+            `value(s) for [${protected_keys.join(', ')}] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)`,
           )
         }
         return contract

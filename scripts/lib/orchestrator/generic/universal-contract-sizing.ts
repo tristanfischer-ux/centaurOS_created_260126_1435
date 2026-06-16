@@ -950,6 +950,13 @@ const PROCESS_SYSTEMS: UtilitySpec[] = [
   { key: 'grading_harvest', driver: (q) => pickQ(q, /standing_biomass_kg|harvest_biomass_kg/), label: 'Grading / Harvest System', module: /mass_fluid|process|actuation|harvest/,
     size: (bio) => ({ dim: '', rating: [String(Math.round(bio / 1000)), 't biomass'], gbp: Math.round(40000 + (bio / 1000) * 100) }),
     form: (bio) => `Fish pump + grader + counter + crowding screens; handles the ~${Math.round(bio / 1000)} t standing biomass for routine grading + harvest without manual netting` },
+  // Tristan 2026-06-16: "how do they get harvested AND chilled?" — the grading/harvest
+  // system above lands the fish, but a harvested batch must be CHILLED immediately (from
+  // the culture temperature to ~1 °C) for product quality + shelf life. Driven by the
+  // annual throughput; universal — any plant declaring a harvest/production rate gets it.
+  { key: 'harvest_chilling', driver: (q) => pickQ(q, /annual_production_t_yr|harvest_throughput_t_yr|production_capacity_t_yr/), label: 'Product Chilling + Ice System', module: /mass_fluid|process|harvest|environmental|water/,
+    size: (tyr) => { const weeklyKg = (tyr * 1000) / 52; const dutyKw = Math.max(8, (weeklyKg * 3.6 * 25) / (8 * 3600)); return { dim: boxFromRatingKw(dutyKw), rating: [String(Math.round(dutyKw)), 'kW chill'], gbp: Math.round(25000 + tyr * 250) } },
+    form: (tyr) => `Flake-ice machine + refrigerated-seawater (RSW) chiller + insulated harvest holding; chills the graded harvest (~${Math.round((tyr * 1000) / 52)} kg/week) from culture temperature to ~1 °C on ice immediately after harvest for product quality + shelf life` },
 ]
 
 /** Synthesise the process-support systems the contract's consumable + waste duties imply —

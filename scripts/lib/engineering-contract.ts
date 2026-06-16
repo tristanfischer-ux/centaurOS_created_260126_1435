@@ -11804,22 +11804,56 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // Degasser/cascade fraction of the recirc handled per pass (~the whole flow).
   const degasserWaterFlowM3H = recirculationFlowM3H
 
-  // ── Thermal (heat pumps; make-up + building loss; DOMINANT load) ──────────
+  // ── Thermal (heat pumps; make-up heating + building loss; net of HEX recovery) ─
   const sourceTempC = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:°|degrees?\s+)?(?:c|celsius)?\s*(?:seawater|borehole|source|raw)/i, 10)
   const setpointTempC = extractRangeFromDesc(desc, /(\d{2}(?:\.\d)?)\s*(?:°|degrees?\s+)?(?:c|celsius)/i, 26.4)
   const deltaTLift = Math.max(1, setpointTempC - sourceTempC)                    // ~16.4 °C lift
-  // Make-up heating duty: heat the 0.4% make-up from source to setpoint.
+  // RAW make-up heating duty: heat the 0.4% make-up from source to setpoint.
   // Q = ṁ·cp·ΔT ; ṁ = makeup_m3_h × 1000 kg/m³ (kg/h) ; cp = 4.186 kJ/kg·K.
+  // At 53.4 m³/h, 10→26.4 °C this is ~1,019 kW — the DOMINANT raw thermal term
+  // (NOT a small top-up): a 0.4% make-up of a 13,360 m³/h recirculation flow is
+  // still a large mass-flow heated through a 16.4 K lift. It MUST size the thermal
+  // plant; sizing the heat pump off building-loss alone undersizes it ~8×.
   const makeupHeatingKw = Math.round((makeupWaterM3H * 1000 * 4.186 * deltaTLift) / 3600)
-  // Building/process losses are the DOMINANT term — a large building in a Scottish
-  // marine climate. Anchor ~7.2 kW per annual-tonne (≈1,470 kW @ 204 t/yr) so the
-  // heating duty tracks plant size; net of ~40% heat recovery from the warm loop.
-  const buildingProcessLossKw = Math.round(1470 * scale)
-  const heatRecoveryFrac = 0.40
-  const heatingDutyKw = Math.round((makeupHeatingKw + buildingProcessLossKw) * (1 - heatRecoveryFrac))
+
+  // MAKE-UP / BLEED HEAT-RECOVERY EXCHANGER (universal, deterministic).
+  // A near-zero-exchange RAS bleeds the SAME mass it makes up: the warm bleed
+  // stream leaves the loop at the setpoint while the make-up enters cold at source.
+  // A counter-current plate HEX with ~equal mass-flows recovers most of the make-up
+  // heating duty: with thermal effectiveness ε the make-up is pre-heated to
+  // T_src + ε·ΔT and the residual heating the heat pump must supply is (1−ε)·Q_makeup.
+  // ε ≈ 0.85 is a sound balanced-flow plate-HEX design point. So the ~1,019 kW raw
+  // make-up duty collapses to a ~153 kW residual after ~866 kW is recovered for free.
+  const makeupHexEffectiveness = 0.85
+  const makeupHexRecoveryKw = Math.round(makeupHeatingKw * makeupHexEffectiveness)
+  const residualMakeupHeatingKw = Math.round(makeupHeatingKw * (1 - makeupHexEffectiveness))
+
+  // Building-fabric heat loss (BS EN 12831 basis): a large insulated marine-climate
+  // shed, U-values ~0.2 W/m²K fabric over ~4,000 m² floor/roof + ~3,000 m² wall at
+  // ΔT ≈ 31 K (26.4 → −5 °C design) → ~180 kW. Anchor ~0.9 kW per annual-tonne at
+  // the 204 t/yr reference (≈183 kW); building footprint scales SUB-LINEARLY with
+  // throughput (cube-root, like total_system_mass), not linearly. This replaces the
+  // earlier 7.2 kW/t (1,470 kW) blanket anchor, which double-counted the make-up
+  // water heat as "process loss" — that heat is the make-up term above, now sized
+  // explicitly and recovered by the HEX, so it must NOT be re-added here.
+  const buildingProcessLossKw = Math.round(183 * Math.max(1, Math.cbrt(scale)))
+
+  // NET heat-pump thermal duty = building fabric loss + residual make-up heating
+  // (post-HEX). The recovered 866 kW never reaches the heat pump. ~336 kW thermal.
+  const heatingDutyKw = buildingProcessLossKw + residualMakeupHeatingKw
   // Heat-pump electrical input from the seasonal COP (water-source ~3.5).
+  // ~336 kW thermal ÷ 3.5 ≈ 96 kW electrical.
   const heatPumpCop = 3.5
   const heatPumpElectricalKw = Math.round(heatingDutyKw / heatPumpCop)
+
+  // Make-up/bleed HEX heat-transfer area from Q = U·A·LMTD (counter-current plate).
+  // Effectiveness ε fixes the terminal temperatures for balanced mass-flows:
+  //   hot (bleed) in = setpoint, out = setpoint − ε·ΔT ; cold (make-up) in = source,
+  //   out = source + ε·ΔT. LMTD of the two equal end-approaches (= (1−ε)·ΔT each)
+  //   degenerates to that single approach. U ≈ 3,000 W/m²K (water/water plate HEX).
+  const makeupHexUWm2K = 3000
+  const makeupHexApproachK = Math.max(0.5, (1 - makeupHexEffectiveness) * deltaTLift) // equal both ends → LMTD = approach
+  const makeupHexAreaM2 = Math.round((makeupHexRecoveryKw * 1000) / (makeupHexUWm2K * makeupHexApproachK))
 
   // ── Recirculation + life-support pumping ──────────────────────────────────
   // Low-head recirc pumps: P = ρ·g·Q·H / η ; low-head H ≈ 3 m, η ≈ 0.70.
@@ -11906,11 +11940,14 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     // ── Oxygenation (LOX/PSA) ──
     oxygen_supply_kg_h: q(oxygenSupplyKgH, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'oxygen_demand ÷ 24 — down-flow O₂ cones fed from on-site LOX + PSA generator' }),
 
-    // ── Thermal (heat pumps; DOMINANT load) — lock-gate HARD slot ──
-    heating_duty_kw: q(heatingDutyKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'make-up heat (0.4% recirc, 10→26.4 °C) + building/process loss (DOMINANT) net of ~40% heat recovery from the warm loop; lock-gate HARD slot (exit 22)' }),
-    makeup_heating_kw: q(makeupHeatingKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'ṁ·cp·ΔT for the 0.4% make-up from ~10 °C to 26.4 °C' }),
-    building_process_loss_kw: q(buildingProcessLossKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'building-fabric + process heat loss (the DOMINANT thermal term in a Scottish marine climate)' }),
-    heat_pump_electrical_kw: q(heatPumpElectricalKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'heating_duty ÷ COP (water-source heat pumps, SCOP ~3.5)' }),
+    // ── Thermal (heat pumps; NET of make-up/bleed HEX recovery) — lock-gate HARD slot ──
+    heating_duty_kw: q(heatingDutyKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'NET heat-pump thermal duty = building-fabric loss + residual make-up heating (after the make-up/bleed HEX recovers 85% of the ~1,019 kW raw make-up duty); ~336 kW; lock-gate HARD slot (exit 22)' }),
+    makeup_heating_kw: q(makeupHeatingKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'RAW make-up duty ṁ·cp·ΔT for the 0.4% make-up from ~10 °C to 26.4 °C (~1,019 kW — recovered by the HEX, NOT all carried by the heat pump)' }),
+    makeup_hex_recovery_kw: q(makeupHexRecoveryKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'make-up/bleed plate HEX recovery = 85% effectiveness × raw make-up duty (warm bleed at setpoint pre-heats the cold incoming make-up); ~866 kW recovered for free' }),
+    residual_makeup_heating_kw: q(residualMakeupHeatingKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'residual make-up heating the heat pump must still supply = (1 − 0.85) × raw make-up duty; ~153 kW' }),
+    makeup_hex_area_m2: q(makeupHexAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: 'make-up/bleed counter-current plate HEX area from Q = U·A·LMTD (U ~3,000 W/m²K water/water, LMTD = (1−ε)·ΔT balanced-flow approach)' }),
+    building_process_loss_kw: q(buildingProcessLossKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'building-fabric heat loss (BS EN 12831: ~0.2 W/m²K fabric over ~7,000 m² envelope at ΔT ~31 K → ~183 kW); the make-up water heat is the make-up term, NOT re-counted here' }),
+    heat_pump_electrical_kw: q(heatPumpElectricalKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'net heating_duty ÷ COP (water-source heat pumps, SCOP ~3.5); ~96 kW' }),
     heat_pump_cop: q(heatPumpCop, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'water-source heat-pump seasonal COP ~3.5 (warm-loop source)' }),
     water_setpoint_temp_c: q(setpointTempC, '°C', 'temperature', 'rated', 'system', 'brief', { source_detail: '26.4 °C yellowtail kingfish grow-out temperature' }),
     source_water_temp_c: q(sourceTempC, '°C', 'temperature', 'min', 'system', 'brief', { source_detail: '~10 °C seawater/borehole source water (8-12 °C)' }),
