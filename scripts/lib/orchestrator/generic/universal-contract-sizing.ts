@@ -412,7 +412,7 @@ function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPh
   if (d.size) mods.push(mod('dimension', d.size))
   if (d.rating) mods.push(mod('rating_primary', String(R2(d.rating.v)), d.rating.u))
   mods.push(mod('price_estimate_gbp', String(Math.max(1, R2(d.gbp)))))   // BOTTOM-UP physics price
-  mods.push(mod('form', `${spec.name} — physics-sized sub-component of the parent assembly`))
+  mods.push(mod('form', `${spec.name} (assembly component)`))
   mods.push(mod('part_number', 'TBD (detailed design)'))
   mods.push(mod('lifecycle', 'Concept design — sized from parent physics; exact MPN at detailed design'))
   return {
@@ -841,6 +841,55 @@ export function reconcilePrincipalEquipment(
 }
 
 /**
+ * Collapse DUPLICATE principal words BEFORE the sub-assembly explosion. Two duplication
+ * modes seen on RAS: (a) the SAME id emitted into >1 module (`circulation_pump_word` in
+ * both mass_fluid + environmental) and (b) a synthesised duplicate of a real word with
+ * the SAME human name (`heat_pump_synth_word` vs `heat_pump_word`). If a duplicate is
+ * left in, the explosion runs on EACH copy and — because the children inherit
+ * `<parentId>__<suffix>` — N copies sharing an id collide into N× the same sub-components
+ * (a pump showed 39 children = 3×13). This MUST run before explode(). Identity = id
+ * first (a shared id is unambiguously one word), then normalised name. Keeps the RICHER
+ * modifier set (non-synthesised as the tiebreak) and removes the rest from their
+ * sub_modules. Skips sub-components (`__` ids). Universal + deterministic. Returns the
+ * count removed.
+ */
+export function dedupePrincipalWords(modules: ModuleLike[]): number {
+  const collapse = (keyOf: (w: WordLike) => string): number => {
+    const groups = new Map<string, Array<{ w: WordLike; sm: { words?: WordLike[] } }>>()
+    for (const m of modules ?? []) {
+      for (const sm of m.sub_modules ?? []) {
+        if (!Array.isArray(sm.words)) continue
+        for (const w of sm.words) {
+          if (String(w.id ?? '').includes('__')) continue
+          const k = keyOf(w)
+          if (!k) continue
+          if (!groups.has(k)) groups.set(k, [])
+          groups.get(k)!.push({ w, sm })
+        }
+      }
+    }
+    const score = (w: WordLike) =>
+      (w.modifier_characters?.length ?? 0) * 2 + ((w as { _synthesized?: boolean })._synthesized ? 0 : 1)
+    let removed = 0
+    for (const items of groups.values()) {
+      if (items.length < 2) continue
+      items.sort((a, b) => score(b.w) - score(a.w))
+      const keep = items[0].w
+      for (const { w, sm } of items.slice(1)) {
+        if (w === keep || !Array.isArray(sm.words)) continue
+        sm.words = sm.words.filter((x) => x !== w)
+        removed += 1
+      }
+    }
+    return removed
+  }
+  const norm = (s: string) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  let total = collapse((w) => String(w.id ?? ''))                 // (a) shared id
+  total += collapse((w) => norm(w.name_human ?? w.id ?? ''))      // (b) same human name
+  return total
+}
+
+/**
  * Stamp the contract's self-describing quantities onto BoM words AND synthesise the
  * principal equipment the emitter omitted — universally. Mutates `modules` in place.
  *
@@ -948,6 +997,10 @@ export function applyUniversalContractSizing(
       }
     }
   }
+
+  // ── C2. collapse duplicate principals BEFORE the explosion (else a duplicate
+  // multiplies into N× the same sub-components — see dedupePrincipalWords). ──
+  const dedupedPrincipals = dedupeAndStrip ? dedupePrincipalWords(modules) : 0
 
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
   const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules) : 0

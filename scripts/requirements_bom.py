@@ -312,12 +312,33 @@ def assemble(out_dir: str):
         if wid and isinstance(p, (int, float)) and p > 0 and not v.get("cost_repair_excluded_from_subtotal"):
             price[wid] = float(p)
 
+    # Sub-components (explodeEquipmentSubAssemblies, id 'parent__suffix') = the ASSEMBLY
+    # BREAKDOWN of their principal. Collect per parent → itemise beneath each principal
+    # row (a pump → casing/impeller/motor/VSD/seal…; a tank → shell/heads/nozzles…),
+    # scaled to SUM to the parent's calibrated cost. DEPTH without double-counting: the
+    # child line_gbp stays 0 (grand total unchanged); the scaled £ rides in breakdown_gbp.
+    def _child_price(cw):
+        for mc in (cw.get("modifier_characters") or []):
+            if mc.get("kind") == "price_estimate_gbp":
+                try:
+                    return max(0.0, float(mc.get("value")))
+                except (TypeError, ValueError):
+                    return 0.0
+        return 0.0
+    kids_by_parent = {}
+    for _m in ((st.get("moduleDecomposition") or {}).get("modules") or []):
+        for _sm in (_m.get("sub_modules") or []):
+            for _w in (_sm.get("words") or []):
+                _wid = str(_w.get("id") or "")
+                if "__" in _wid:
+                    kids_by_parent.setdefault(_wid.split("__")[0], []).append(_w)
+
     rows = []
     for m in ((st.get("moduleDecomposition") or {}).get("modules") or []):
         for sm in (m.get("sub_modules") or []):
             for w in (sm.get("words") or []):
                 wid = str(w.get("id") or "")
-                if "__" in wid:                       # sub-component → detail, fold into parent later
+                if "__" in wid:                       # sub-component → itemised under its parent below
                     continue
                 name = w.get("name_human") or ""
                 if re.search(r"\bfastener|gasket seal|\bbracket\b|wiring harness|labelling|"
@@ -375,6 +396,24 @@ def assemble(out_dir: str):
                 if mt_spec:
                     row.update(mt_spec)   # material · wall_mm · mass_kg · diameter_m · height_m
                 rows.append(row)
+                # ── itemise the ASSEMBLY BREAKDOWN beneath the parent: one row per
+                # physics-sized sub-component, scaled to SUM to the parent's line cost.
+                # line_gbp stays 0 (grand total unchanged); breakdown_gbp carries the £. ──
+                kids = kids_by_parent.get(wid, [])
+                if kids:
+                    raws = [_child_price(k) for k in kids]
+                    tot = sum(raws)
+                    pl = row["line_gbp"]
+                    for i, (k, rp) in enumerate(zip(kids, raws), 1):
+                        scaled = round(pl * rp / tot) if (pl > 0 and tot > 0) else round(rp)
+                        kn = k.get("name_human") or "sub-component"
+                        krat = next((f"{x.get('value')} {x.get('unit', '')}".strip()
+                                     for x in (k.get("modifier_characters") or [])
+                                     if x.get("kind") == "rating_primary"), "")
+                        rows.append({"tag": f"{tag}.{i}", "requirement": f"↳ {kn}" + (f" · {krat}" if krat else ""),
+                                     "status": "SUB-COMPONENT", "part": "assembly detail", "qty": 1,
+                                     "unit_gbp": scaled, "line_gbp": 0, "breakdown_gbp": scaled, "sub_of": tag,
+                                     "basis": f"physics-sized component of {name}; scaled to parent cost"})
     rows += _connection_rows(out_dir)   # pipe/cable/duct runs as their own service-classified BoM lines
     return rows
 
