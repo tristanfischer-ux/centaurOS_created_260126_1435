@@ -93,6 +93,24 @@ INSTR_TEMP = ("TT", "temperature")
 INSTR_FLOW = ("FT", "flow")
 INSTR_ANALYSE = ("AT", "analyser")
 INSTR_PH = ("AT", "pH")
+INSTR_LSL = ("LSL", "level-low")        # low-level switch / trip (life-safety)
+INSTR_DO = ("AT", "dissolved-oxygen")   # dissolved-oxygen analyser (DO control)
+INSTR_COND = ("AT", "conductivity")     # conductivity / salinity analyser
+
+# A synthesised per-equipment instrument word's tag-letter prefix, keyed on the FUNCTION
+# token in its character_id / name (the engine tags one word per instrument per unit —
+# 'instr_level_on_rearing_tank…', 'Dissolved-Oxygen Analyser'). Order matters: the first
+# match wins (dissolved-oxygen before a bare 'oxygen', pH before a generic analyser).
+_INSTR_WORD_FUNC = [
+    (re.compile(r"dissolved.?oxygen|dissolved_o2|\bdo\b|_do_|do_anal", re.I), INSTR_DO),
+    (re.compile(r"\bph\b|_ph_|ph_anal", re.I), INSTR_PH),
+    (re.compile(r"conductiv|salin", re.I), INSTR_COND),
+    (re.compile(r"\blevel\b|_level_|level_transmit|level_switch", re.I), INSTR_LEVEL),
+    (re.compile(r"temperatur|_temp_|\btemp\b", re.I), INSTR_TEMP),
+    (re.compile(r"\bflow\b|_flow_|flow_transmit", re.I), INSTR_FLOW),
+    (re.compile(r"pressure|_press_", re.I), INSTR_PRESSURE),
+    (re.compile(r"analys|analyz", re.I), INSTR_ANALYSE),
+]
 
 # Line (pipe) style kinds.
 LINE_PROCESS = "process"         # main process fluid (heavy solid)
@@ -164,6 +182,20 @@ class Line:
 
 
 @dataclass
+class ControlLoop:
+    """A CONTROL LOOP drawn as an ISA controller bubble + a dashed SIGNAL line from a
+    measurement on one node to a final control element on another (e.g. a dissolved-oxygen
+    analyser on the tank modulating the oxygenation system; a level transmitter on the tank
+    opening the make-up-water valve). The life-safety interlocks a RAS P&ID must show."""
+    src_key: str                 # node carrying the measurement (e.g. the rearing tank)
+    dst_key: str                 # node with the final control element (O2 system / make-up)
+    measure_tag: str             # the measurement bubble, e.g. 'AT' (DO) / 'LT'
+    controller_tag: str          # the controller bubble, e.g. 'AC' / 'LC'
+    label: str = ""              # short loop label, e.g. 'DO control' / 'level → make-up'
+    dst_valve_tag: str = ""      # final control element tag at the destination, e.g. 'FCV'
+
+
+@dataclass
 class Process:
     archetype: str
     nodes: list[Node]
@@ -171,6 +203,9 @@ class Process:
     power_note: str = ""         # the electrical_bus edge, summarised as a note
     notes: list[str] = field(default_factory=list)
     schedule_present: bool = False
+    control_loops: list[ControlLoop] = field(default_factory=list)
+    rev: str = "P1"              # preliminary revision (deterministic, not a live clock)
+    date: str = ""               # issue date derived from the run's own artifact mtime
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -386,6 +421,34 @@ def _archetype_name(state: dict):
     return str(pid) or "process_plant"
 
 
+def _run_issue_date(out_dir: Optional[str]) -> str:
+    """A DETERMINISTIC issue date (YYYY-MM-DD) for the title block, derived from the run's
+    OWN artifacts (state.json / convergence report / connection schedule mtime) — NOT a live
+    clock — so re-rendering the same run gives the same date. Returns '' when out_dir is
+    absent or nothing is readable (the block then shows '—', not the literal placeholder)."""
+    import datetime
+    if not out_dir:
+        return ""
+    best = None
+    for name in ("state.json", "convergence-report.json", "connection-schedule.json"):
+        p = Path(out_dir) / name
+        try:
+            if p.is_file():
+                m = p.stat().st_mtime
+                best = m if best is None else max(best, m)
+        except OSError:
+            pass
+    if best is None:
+        try:
+            best = Path(out_dir).stat().st_mtime
+        except OSError:
+            return ""
+    try:
+        return datetime.date.fromtimestamp(best).isoformat()
+    except (OverflowError, OSError, ValueError):
+        return ""
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SYMBOL CLASSIFICATION  (node key + resolved name → P&ID symbol + tag letter)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -552,6 +615,175 @@ def _discover_instrument_types(state: dict):
     if re.search(r"\bph\b|ph_probe|ph_sensor|liquiline", joined):
         funcs.add(INSTR_PH)
     return funcs
+
+
+# ── SYNTHESISED PER-EQUIPMENT INSTRUMENTS ────────────────────────────────────────────
+# The engine SYNTHESISES one instrument WORD per instrument per unit (tagged `_instrument`
+# with `_instrument_of` naming the parent equipment word) — e.g. Level / Temperature /
+# Dissolved-Oxygen / pH / Conductivity on each rearing tank, Level / Temperature / DO on
+# the biofilter. These are the design's REAL instruments; the P&ID must PROJECT them onto
+# the matching equipment node as ISA bubbles (the conventional `_discover_instrument_types`
+# guesser is only a fallback for designs that don't synthesise explicit instrument words).
+
+def _instr_words(state: dict):
+    """Yield (parent_key, instr_tuple) for every synthesised `_instrument` word, resolving
+    its FUNCTION from the word's character_id / name. `parent_key` is the equipment word id
+    it instruments (`_instrument_of`)."""
+    for w, name, cid, _mid in _iter_words(state):
+        if w.get("_instrument") is not True:
+            continue
+        parent = w.get("_instrument_of") or ""
+        blob = f"{cid} {name}"
+        instr = None
+        for rx, tup in _INSTR_WORD_FUNC:
+            if rx.search(blob):
+                instr = tup
+                break
+        if instr is not None and parent:
+            yield str(parent), instr
+
+
+def _node_for_parent(parent_key: str, nodes: dict):
+    """Map a synthesised instrument's parent equipment word id (e.g. 'rearing_tank_synth_
+    word') onto the P&ID node it belongs to (e.g. the 'rearing_tanks' tank node), by token
+    overlap (singularising trailing -s). Returns the Node or None. Universal — no per-class
+    table; the same matcher the array-expansion uses."""
+    ptoks = _name_tokens(parent_key)
+    # drop generic suffix tokens so 'rearing_tank_synth_word' keys on 'rearing'/'tank'.
+    ptoks -= {"synth", "word", "synthesized", "synthesised", "unit", "system"}
+    ptoks |= {t[:-1] for t in list(ptoks) if t.endswith("s") and len(t) > 3}
+    best, best_score = None, 0
+    for nd in nodes.values():
+        ntoks = _name_tokens(nd.key) | _name_tokens(nd.label)
+        ntoks |= {t[:-1] for t in list(ntoks) if t.endswith("s") and len(t) > 3}
+        score = len(ptoks & ntoks)
+        if score > best_score:
+            best_score, best = score, nd
+    return best if best_score >= 1 else None
+
+
+def _project_synth_instruments(nodes: dict, state: dict):
+    """Place an ISA bubble on each equipment node for every synthesised `_instrument` word
+    that instruments it (Level / Temperature / Dissolved-Oxygen / pH / Conductivity on the
+    rearing tank; Level / Temperature / DO on the biofilter). De-duplicates by function so a
+    node never carries two of the same bubble, and adds a low-level trip switch (LSL)
+    alongside a tank LEVEL transmitter (the life-safety low-level interlock a RAS tank
+    needs). Universal: reads the engine's own per-unit instrument words; keyed on the word
+    tags, not a product class. Returns the set of (node_key, func) pairs placed (so the
+    control-loop synthesis can find the DO / level instruments to wire)."""
+    placed: set = set()
+    by_node: dict[str, set] = {}
+    # collect functions per node first (so we can add LSL only where a tank has LT).
+    node_funcs: dict[str, list] = {}
+    for parent_key, (tag, func) in _instr_words(state):
+        nd = _node_for_parent(parent_key, nodes)
+        if nd is None:
+            continue
+        node_funcs.setdefault(nd.key, [])
+        if func not in by_node.setdefault(nd.key, set()):
+            by_node[nd.key].add(func)
+            node_funcs[nd.key].append((tag, func))
+    for nkey, funcs in node_funcs.items():
+        nd = nodes[nkey]
+        existing = {i.func for i in nd.instruments}
+        for tag, func in funcs:
+            if func in existing:
+                continue
+            nd.instruments.append(Instr(tag=tag, func=func))
+            existing.add(func)
+            placed.add((nkey, func))
+        # a tank/vessel carrying a LEVEL transmitter gets a low-level TRIP switch (LSL) —
+        # the life-safety interlock (loss of level shuts the tank's make-up / trips alarms).
+        if "level" in existing and nd.sym in (SYM_TANK, SYM_VESSEL, SYM_DRUM,
+                                              SYM_COLUMN) and "level-low" not in existing:
+            nd.instruments.append(Instr(tag=INSTR_LSL[0], func=INSTR_LSL[1]))
+            existing.add("level-low")
+            placed.add((nkey, "level-low"))
+    return placed
+
+
+# Destination patterns for the two life-safety control loops (universal, name-keyed): the
+# DISSOLVED-OXYGEN loop modulates the oxygenation kit; the LEVEL loop opens the make-up /
+# inlet feed. Matched against a node's key + label so the loop wires to the real equipment.
+_O2_DEST_RE = re.compile(r"oxygen|\bo2\b|oxygenation|\blox\b|aeration", re.I)
+_MAKEUP_DEST_RE = re.compile(
+    r"make.?up|makeup|inlet|feed|new\s*water|top.?up|fresh\s*water|water\s*supply|"
+    r"intake|reservoir|sump|head\s*tank", re.I)
+
+
+def _find_node(nodes: dict, rx, exclude_keys=()):
+    """First node whose key+label matches `rx` (not in exclude_keys), preferring the lowest
+    flow column so the loop's destination is an upstream/early item where sensible."""
+    cands = [nd for nd in nodes.values()
+             if nd.key not in exclude_keys and rx.search(f"{nd.key} {nd.label}")]
+    if not cands:
+        return None
+    return sorted(cands, key=lambda nd: nd.column)[0]
+
+
+def _node_has_func(nd, func):
+    return any(i.func == func for i in nd.instruments)
+
+
+def _synthesise_control_loops(nodes: dict, lines: list, placed_instr: set):
+    """Wire the two life-safety RAS control loops from the projected instruments to their
+    final control elements, and put a flow transmitter (FT) on the MAIN recirculation line:
+
+      • DISSOLVED-OXYGEN loop  — the DO analyser on the rearing tank modulates the
+        OXYGENATION system (AC controller, dashed signal to an O2 feed control valve).
+      • LEVEL loop             — the level transmitter on the tank opens the MAKE-UP /
+        inlet water feed (LC controller, dashed signal to a make-up control valve).
+      • FT on the main recirc line — a flow transmitter on the principal recirculation pipe.
+
+    Universal: keyed on the instruments the engine actually synthesised (DO / level) + the
+    destination equipment NAME, never a product class. Returns a list[ControlLoop]; empty
+    when the design carries neither a DO nor a level instrument."""
+    loops: list[ControlLoop] = []
+    # the node(s) carrying the DO / level measurement (a tank / vessel with that bubble).
+    do_node = next((nd for nd in nodes.values()
+                    if _node_has_func(nd, "dissolved-oxygen")), None)
+    lvl_node = next((nd for nd in nodes.values() if _node_has_func(nd, "level")), None)
+
+    # --- DO → oxygenation loop ---
+    if do_node is not None:
+        o2_dest = _find_node(nodes, _O2_DEST_RE, exclude_keys={do_node.key})
+        if o2_dest is not None:
+            loops.append(ControlLoop(
+                src_key=do_node.key, dst_key=o2_dest.key,
+                measure_tag="AT", controller_tag="AC",
+                label="DO control", dst_valve_tag="FCV"))
+
+    # --- level → make-up-water loop ---
+    if lvl_node is not None:
+        mu_dest = _find_node(nodes, _MAKEUP_DEST_RE,
+                             exclude_keys={lvl_node.key})
+        # if no explicit make-up node exists, the loop still reads correctly pointing back
+        # at the tank's own inlet — draw it as a self-loop on the level node's make-up valve.
+        dst = mu_dest.key if mu_dest is not None else lvl_node.key
+        loops.append(ControlLoop(
+            src_key=lvl_node.key, dst_key=dst,
+            measure_tag="LT", controller_tag="LC",
+            label="level → make-up", dst_valve_tag="FCV"))
+
+    # --- FT on the MAIN recirculation line ---
+    # pick the principal forward process line out of the tank (the recirc draw) — the
+    # longest/earliest process line touching the level/DO tank, else the first process line.
+    if lines:
+        tank_key = (lvl_node or do_node).key if (lvl_node or do_node) else None
+        main_line = None
+        if tank_key is not None:
+            for ln in lines:
+                if ln.style == LINE_PROCESS and not ln.is_return and (
+                        ln.from_key == tank_key or ln.to_key == tank_key):
+                    main_line = ln
+                    break
+        if main_line is None:
+            main_line = next((ln for ln in lines
+                              if ln.style == LINE_PROCESS and not ln.is_return), None)
+        if main_line is not None and not any(i.func == "flow"
+                                             for i in main_line.instruments):
+            main_line.instruments.append(Instr(tag="FT", func="flow", where="line"))
+    return loops
 
 
 def _discover_valves(state: dict):
@@ -967,6 +1199,15 @@ def reconstruct_process(schedule: dict, state: dict,
 
     # ---- attach instruments per equipment by convention + available functions ----
     _attach_instruments(nodes, instr_funcs)
+    # ---- PROJECT the engine's SYNTHESISED per-equipment instruments (the design's real
+    #      LT / TT / DO / pH / conductivity on the tank + biofilter) onto the matching
+    #      nodes as ISA bubbles + a tank low-level trip (LSL). This is the authoritative
+    #      instrument set; the conventional pass above is only the fallback. ----
+    placed_instr = _project_synth_instruments(nodes, state)
+    # cap each node to a legible instrument fan (the real per-tank set is LT/LSL/TT/DO/pH +
+    # conductivity — keep up to 6 so the life-safety + water-quality instruments all show).
+    for nd in nodes.values():
+        nd.instruments = nd.instruments[:6]
     # ---- attach equipment-mounted valves (relief on pressure vessels) ----
     if valve_has["relief"]:
         for nd in nodes.values():
@@ -1064,16 +1305,24 @@ def reconstruct_process(schedule: dict, state: dict,
         if svc:
             power_note = power_note  # service folded into the SLD; keep the P&ID note short
 
+    # ---- CONTROL LOOPS: wire the life-safety DO→O2 + level→make-up loops + a main-line
+    #      FT from the projected instruments to their final control elements. ----
+    control_loops = _synthesise_control_loops(nodes, lines, placed_instr)
+
     notes = []
     if not schedule.get("rows"):
         notes.append("Line sizes inferred from process duties (connection schedule not "
                      "supplied); DN shown is indicative.")
     notes.append("Instrument bubbles + valves shown where the design schedule carries "
                  "them; loop numbers are auto-allocated placeholders.")
+    if control_loops:
+        notes.append("Control loops shown dashed: dissolved-oxygen → oxygenation and tank "
+                     "level → make-up water (life-safety interlocks).")
 
     return Process(archetype=arch, nodes=list(nodes.values()), lines=lines,
                    power_note=power_note, notes=notes,
-                   schedule_present=bool(schedule.get("rows")))
+                   schedule_present=bool(schedule.get("rows")),
+                   control_loops=control_loops)
 
 
 def _attach_instruments(nodes: dict, instr_funcs: set):
@@ -1176,6 +1425,9 @@ class SVG:
             f'<marker id="flowT" markerWidth="11" markerHeight="11" refX="8" refY="4" '
             f'orient="auto" markerUnits="userSpaceOnUse">'
             f'<path d="M0,0 L9,4 L0,8 Z" fill="{THERMAL_INK}"/></marker>'
+            f'<marker id="sig" markerWidth="9" markerHeight="9" refX="6" refY="3" '
+            f'orient="auto" markerUnits="userSpaceOnUse">'
+            f'<path d="M0,0 L7,3 L0,6 Z" fill="{ACCENT}"/></marker>'
             '</defs>')
         body = "\n".join(self.parts)
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.w}" '
@@ -1565,6 +1817,12 @@ def build_pid_svg(proc: Process) -> str:
                 _sym_valve(svg, nx, topy - 20, kind="relief")
                 svg.text(nx + 11, topy - 18, v.tag, size=8, anchor="start", fill=MUTED)
 
+    # ----- CONTROL LOOPS (life-safety DO→O2 + level→make-up) — drawn AFTER the equipment
+    #       so the controller bubble + dashed signal lines sit on top, routed in the band
+    #       BELOW the equipment row so they read clearly as control (not process) lines. ---
+    band_bottom = height - title_h - 30
+    _draw_control_loops(svg, proc, centre, ports, band_bottom)
+
     # ----- LEGEND + power note -----
     legend_x = width - legend_w + 10
     legend_bottom = _draw_legend(svg, legend_x, margin_top + 6, legend_w - 30)
@@ -1575,6 +1833,65 @@ def build_pid_svg(proc: Process) -> str:
     # ----- TITLE BLOCK -----
     _draw_title_block(svg, proc, width, height, title_h)
     return svg.render()
+
+
+def _draw_control_loops(svg, proc, centre, ports, band_y):
+    """Draw each control loop as: a measurement bubble on the SOURCE node, a dashed SIGNAL
+    line down to a controller bubble on a routing rail at `band_y`, across to the
+    DESTINATION node, up to a final control valve (FCV) on the destination, with arrows so
+    the loop reads measurement → controller → final element. Dashed thin lines (ISA signal)
+    distinguish them unmistakably from the solid process pipes. Routed below the equipment
+    band so they never overlap the process train. Deterministic; geometry from the node
+    centres + ports already computed."""
+    loops = getattr(proc, "control_loops", None) or []
+    if not loops:
+        return
+    # stagger each loop's routing rail so two loops don't share a line, and OFFSET the
+    # measurement drop to the LEFT of the source node so it clears the centred array
+    # tie-in fan that drops straight below an N-array tank.
+    for li, lp in enumerate(loops):
+        if lp.src_key not in centre or lp.dst_key not in centre:
+            continue
+        rail_y = band_y - li * 34
+        sp = ports[lp.src_key]
+        dp = ports[lp.dst_key]
+        sleft_x, sy = sp["left"]
+        sx, sbot = sp["bottom"]
+        dx, dbot = dp["bottom"]
+        # measurement bubble below-LEFT of the source node (clear of the tie-in fan trunk).
+        m_x = sx - 28
+        m_y = sbot + 26
+        svg.line(sx - 10, sbot, m_x, m_y - 13, stroke=ACCENT, width=1.0, dash="2,2")
+        _sym_instrument(svg, m_x, m_y, lp.measure_tag, where="equipment")
+        # signal from measurement down to the rail
+        svg.line(m_x, m_y + 13, m_x, rail_y, stroke=ACCENT, width=1.1, dash="4,3")
+        # controller bubble on the rail, midway between the measurement and destination
+        cx_ctrl = (m_x + dx) / 2
+        svg.line(m_x, rail_y, cx_ctrl - 13, rail_y, stroke=ACCENT, width=1.1, dash="4,3")
+        _sym_controller(svg, cx_ctrl, rail_y, lp.controller_tag)
+        svg.text(cx_ctrl, rail_y + 26, lp.label, size=7.6, anchor="middle", fill=MUTED)
+        # controller out to under the destination, then up to the final control valve.
+        # offset the riser slightly when the destination IS the source (self-loop on the
+        # tank's own make-up inlet) so it doesn't sit on the measurement drop.
+        riser_x = dx + (20 if lp.dst_key == lp.src_key else 0)
+        svg.add(f'<path d="M {cx_ctrl + 13:.1f} {rail_y:.1f} L {riser_x:.1f} {rail_y:.1f} '
+                f'L {riser_x:.1f} {dbot + 18:.1f}" fill="none" stroke="{ACCENT}" '
+                f'stroke-width="1.1" stroke-dasharray="4,3" marker-end="url(#sig)"/>')
+        # final control valve on the destination's feed
+        _sym_valve(svg, riser_x, dbot + 12, kind="control")
+        if lp.dst_valve_tag:
+            svg.text(riser_x + 11, dbot + 10, lp.dst_valve_tag, size=7.5, anchor="start",
+                     fill=MUTED)
+
+
+def _sym_controller(svg, cx, cy, tag):
+    """An ISA CONTROLLER bubble — a circle with a square box around it (the standard
+    'shared display / DCS controller' tag), carrying the loop function letters."""
+    r = 13
+    svg.rect(cx - r, cy - r, 2 * r, 2 * r, stroke=ACCENT, width=1.3, fill=FILL_BG)
+    svg.circle(cx, cy, r, stroke=ACCENT, width=1.6, fill=FILL_BG)
+    svg.text(cx, cy + 3, tag[:2], size=8.5, anchor="middle", weight="bold", fill=ACCENT)
+    return r
 
 
 def _array_tag_label(nd: Node) -> str:
@@ -1970,8 +2287,8 @@ def _draw_title_block(svg, proc, width, height, title_h):
     bx0 = x1 - bw
     by0 = y0 + 14
     rows = [("DRAWING No.", "FF-PID-001"),
-            ("REV", "—   (placeholder)"),
-            ("DATE", "YYYY-MM-DD"),
+            ("REV", proc.rev or "P1"),
+            ("DATE", proc.date or "—  "),
             ("SCALE", "NTS")]
     rh = 22
     box_h = rh * len(rows)
@@ -2080,6 +2397,8 @@ def generate_pid(out_dir: str, state_path: Optional[str] = None,
     # pass out_dir so array nodes (qty-N collapsed) get expanded from the parts-manifest +
     # interconnect census the GA already uses (all N units + their per-unit tie-ins).
     proc = reconstruct_process(schedule, state, out_dir=out_dir)
+    # populate the title-block issue date deterministically from the run's artifacts.
+    proc.date = _run_issue_date(out_dir)
     svg_text = build_pid_svg(proc)
 
     draw_dir = Path(out_dir) / "drawings"

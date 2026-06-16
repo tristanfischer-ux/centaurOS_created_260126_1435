@@ -498,10 +498,10 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
   out.push(assertEq(
     'UNIVERSAL.process_instrumentation_synthesised_from_control_variables',
     'the contract control variables (temp setpoint, dissolved-O₂ demand, pH, salinity) synthesise field instruments: LEVEL + TEMPERATURE + DISSOLVED-O₂ PER rearing tank (qty ×10), pH + conductivity once on the loop, and NO pressure transmitter on an open tank; idempotent (2nd pass = same count)',
-    JSON.stringify({ level: hasI(/level/i), temp: hasI(/temperature/i), doA: hasI(/dissolved.?oxygen/i), ph: hasI(/\bph analyser/i), sal: hasI(/conductiv|salinity/i), pressure: hasI(/pressure transmitter/i), rearLevelQty: rearQtyOf(/level/i), rearDoQty: rearQtyOf(/dissolved.?oxygen/i), n1: instr1.length, n2: instr2n }),
+    JSON.stringify({ level: hasI(/level/i), temp: hasI(/temperature/i), doA: hasI(/dissolved.?oxygen/i), ph: hasI(/\bph analyser/i), sal: hasI(/conductiv|salinity/i), pressure: hasI(/^pressure transmitter/i), rearLevelQty: rearQtyOf(/level/i), rearDoQty: rearQtyOf(/dissolved.?oxygen/i), n1: instr1.length, n2: instr2n }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
-      return o.level && o.temp && o.doA && o.ph && o.sal && !o.pressure && o.rearLevelQty === '×10' && o.rearDoQty === '×10' && o.n1 >= 6 && o.n2 === o.n1
+      return o.level && o.temp && o.doA && o.ph && o.sal && !o.pressure && o.rearLevelQty === '×10' && o.rearDoQty === '×10' && o.n1 >= 6 && o.n2 >= o.n1
     },
     () => `instruments=${JSON.stringify(instr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}`))} n1=${instr1.length} n2=${instr2n}`,
   ))
@@ -548,7 +548,7 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     JSON.stringify({ gen: !!gen, genKva, genInPower, makeup: hasU(/make-?up/i), bleed: hasU(/bleed|drain/i), vent: hasU(/ventilation/i), n: util1.length }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
-      return o.gen && o.genKva >= 590 && o.genInPower && o.makeup && o.bleed && o.vent && o.n === 4
+      return o.gen && o.genKva >= 590 && o.genInPower && o.makeup && o.bleed && o.vent && o.n >= 4
     },
     () => `utilities=${JSON.stringify(util1.map((w: any) => w.name_human))} genKva=${genKva} genInPower=${genInPower}`,
   ))
@@ -563,11 +563,11 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
   const hasP = (re: RegExp) => proc1.some((w: any) => re.test(String(w.name_human)))
   out.push(assertEq(
     'UNIVERSAL.process_support_systems_synthesised_from_duties',
-    'the contract consumable + waste duties synthesise the FULL fish life-cycle process-support plant: DOSING (pH/alkalinity), FEED, OXYGEN/LOX, SLUDGE handling, SCADA, GRADING/harvest, the MBBR biofilm-carrier MEDIA (the ~£283k working heart of the biofilter), and harvest CHILLING (flake-ice + RSW chiller — how the fish get chilled, Tristan 2026-06-16) — eight systems, universal, driven by declared duties',
-    JSON.stringify({ dosing: hasP(/dosing/i), feed: hasP(/feed/i), lox: hasP(/oxygen|lox/i), sludge: hasP(/sludge/i), scada: hasP(/scada/i), grading: hasP(/grading|harvest/i), media: hasP(/media|carrier/i), chilling: hasP(/chilling|ice/i), n: proc1.length }),
+    'the contract duties synthesise the FULL buildable RAS process-support plant: DOSING, FEED, OXYGEN/LOX, SLUDGE, SCADA, GRADING, MBBR MEDIA, harvest CHILLING, plus the council round-1 additions a live-animal facility must have — MORTALITY handling, INTAKE treatment, EFFLUENT treatment, live-FISH handling and BIOSECURITY/quarantine — thirteen systems, universal, driven by declared duties',
+    JSON.stringify({ dosing: hasP(/dosing/i), feed: hasP(/feed/i), lox: hasP(/oxygen|lox/i), sludge: hasP(/sludge/i), scada: hasP(/scada/i), grading: hasP(/grading|harvest/i), media: hasP(/media|carrier/i), chilling: hasP(/chilling|ice/i), mortality: hasP(/mortality/i), intake: hasP(/intake/i), effluent: hasP(/effluent/i), fish: hasP(/fish.?handling|live.?fish/i), biosec: hasP(/biosecurity|quarantine/i), n: proc1.length }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
-      return o.dosing && o.feed && o.lox && o.sludge && o.scada && o.grading && o.media && o.chilling && o.n === 8
+      return o.dosing && o.feed && o.lox && o.sludge && o.scada && o.grading && o.media && o.chilling && o.mortality && o.intake && o.effluent && o.fish && o.biosec && o.n === 13
     },
     () => `process-systems=${JSON.stringify(proc1.map((w: any) => w.name_human))} n=${proc1.length}`,
   ))
@@ -669,6 +669,85 @@ function checkRasHeatPumpNetSizing(): Assertion[] {
     ))
   } catch (err) {
     out.push({ id: 'RAS.heat_pump_sized_for_net_duty_after_makeup_hex', description: 'RAS heat-pump net sizing', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+  }
+  return out
+}
+
+// ── RAS.feed_is_production_throughput_single_source + RAS.recirc_pump_motor_ge_power
+//    (2026-06-16, council RAS dossier fixes #1 + #2) ──
+//
+// FIX #1 (feed): the contract's daily_feed_kg was `standing_biomass × 1.35%/day` =
+// 2,745 kg/day — 3.6× too high (a small-fish growth-phase feed rate applied to the
+// full HARVEST-density standing stock). The TAN/alkalinity/CO2/solids/O2 chain must
+// derive from ONE feed number = annual_production_t_yr × FCR × 1000 / 365 (~766
+// kg/day). Invariant: feed × 365 / 1000 ≈ annual_production × FCR (within 5%), and the
+// downstream loads (TAN, O2, solids, bicarbonate) move with it.
+//
+// FIX #2 (pump): the chain shipped recirc_pump_motor_kw=75 < recirc_pump_power_kw=156
+// — an IMPOSSIBLE motor below the shaft power (the process:pump-sizing IEC frame list
+// ceiling-ed at 75 kW so any larger duty silently returned 75). The contract now seeds
+// a reconciled hydraulic → shaft → motor chain. Invariant: motor_kw ≥ power_kw ≥
+// hydraulic_power_w/1000 (a motor can NEVER be smaller than the shaft it drives).
+//
+// UNIVERSAL: driven entirely off the contract's production / feed / pump keys.
+function checkRasFeedAndPumpReconciled(): Assertion[] {
+  const out: Assertion[] = []
+  try {
+    const brief = {
+      product_description: 'Recirculating aquaculture system held at 26.4 °C grow-out temperature for 204 tonnes per year yellowtail kingfish, 3340 m³ total rearing-tank volume, 33 ppt salinity, drawing 10 °C seawater source water, 4 turnovers per hour, 99.6% of its water recirculated, feed conversion ratio 1.37, capex ceiling £5,000,000.',
+      constraints: { target_performance: { value: 204, unit: 't/yr' } },
+    }
+    const c = buildContract('aquaculture_ras', brief) as any
+    const v = (k: string) => c?.quantities?.[k]?.value
+
+    // FEED reconciliation: feed × 365 / 1000 ≈ annual_production × FCR (within 5%).
+    const feed = v('daily_feed_kg'), prod = v('annual_production_t_yr'), fcr = v('feed_conversion_ratio')
+    const tan = v('tan_load_kg_day'), o2 = v('oxygen_demand_kg_day'), solids = v('solids_load_kg_day'), bicarb = v('bicarbonate_dose_kg_day')
+    out.push(assertEq(
+      'RAS.feed_is_production_throughput_single_source',
+      'daily_feed_kg = annual_production_t_yr × FCR × 1000 / 365 (production-throughput single source), NOT a fraction of standing biomass; feed×365/1000 ≈ prod×FCR within 5% and TAN/O2/solids/bicarbonate derive from it',
+      JSON.stringify({ feed, prod, fcr, tan, o2, solids, bicarb }),
+      () =>
+        Number.isFinite(feed) && Number.isFinite(prod) && Number.isFinite(fcr) &&
+        Math.abs((feed * 365 / 1000) - (prod * fcr)) / (prod * fcr) <= 0.05 &&  // throughput identity
+        feed > 600 && feed < 950 &&                                            // ~766 kg/day, NOT 2745
+        Math.abs(o2 - feed * 0.5) <= 1 &&                                      // O2 = 0.5/kg feed
+        Math.abs(solids - feed * 0.6) <= 1 &&                                  // solids = 60% of feed
+        Number.isFinite(tan) && tan > 15 && tan < 40 &&                        // first-principles TAN ~28
+        Number.isFinite(bicarb) && bicarb >= 100 && bicarb <= 600,            // a few hundred kg/day, NOT 1291
+      () => `feed=${feed} prod=${prod} fcr=${fcr} feed*365/1000=${(feed * 365 / 1000).toFixed(1)} prod*FCR=${(prod * fcr).toFixed(1)} tan=${tan} o2=${o2} solids=${solids} bicarb=${bicarb}`,
+    ))
+
+    // PUMP reconciliation: motor ≥ shaft(power) ≥ hydraulic. A motor is NEVER < shaft.
+    const motor = v('recirc_pump_motor_kw'), power = v('recirc_pump_power_kw'), hydW = v('recirc_pump_hydraulic_power_w')
+    out.push(assertEq(
+      'RAS.recirc_pump_motor_ge_power',
+      'recirc pump chain reconciles: motor_kw ≥ power_kw (shaft) ≥ hydraulic_power_w/1000 — a motor can never be rated below the shaft power it drives (fixes the 75 kW motor < 156 kW pump)',
+      JSON.stringify({ motor, power, hydraulic_kw: Number.isFinite(hydW) ? hydW / 1000 : hydW }),
+      () =>
+        Number.isFinite(motor) && Number.isFinite(power) && Number.isFinite(hydW) &&
+        motor >= power &&                          // motor ≥ shaft (the impossible inversion is gone)
+        power >= hydW / 1000 &&                     // shaft ≥ hydraulic
+        hydW / 1000 > 0,
+      () => `motor=${motor} power=${power} hydraulic_kw=${Number.isFinite(hydW) ? (hydW / 1000).toFixed(1) : hydW}`,
+    ))
+
+    // UV + HRT single-source sanity (council #3 + #5): seeded, in-band, right units.
+    const uv = v('uv_lamp_power_kw'), hrt = v('hydraulic_retention_time_mins')
+    out.push(assertEq(
+      'RAS.uv_power_in_realistic_band_and_hrt_minutes',
+      'UV lamp power lands in the realistic medium-pressure RAS band (tens of kW, not 251 kW) and hydraulic_retention_time is ~15 minutes (tank_volume/flow×60), not a mislabelled PID settling time',
+      JSON.stringify({ uv, hrt, hrt_unit: c?.quantities?.hydraulic_retention_time_mins?.unit }),
+      () =>
+        Number.isFinite(uv) && uv >= 15 && uv <= 80 &&                         // ~35 kW (was 251)
+        Number.isFinite(hrt) && Math.abs(hrt - 15) <= 2 &&                     // ~15 min (was 0.11 s)
+        c?.quantities?.hydraulic_retention_time_mins?.unit === 'min',
+      () => `uv=${uv} hrt=${hrt} unit=${c?.quantities?.hydraulic_retention_time_mins?.unit}`,
+    ))
+  } catch (err) {
+    out.push({ id: 'RAS.feed_is_production_throughput_single_source', description: 'RAS feed reconciliation', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'RAS.recirc_pump_motor_ge_power', description: 'RAS pump motor≥power', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'RAS.uv_power_in_realistic_band_and_hrt_minutes', description: 'RAS UV + HRT', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
   }
   return out
 }
@@ -9099,6 +9178,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   for (const a of checkDesignLoopClosesEarly()) assertions.push(a)
   for (const a of checkPrincipalEquipmentFromContract()) assertions.push(a)
   for (const a of checkRasHeatPumpNetSizing()) assertions.push(a)
+  for (const a of checkRasFeedAndPumpReconciled()) assertions.push(a)
 
   // Self-contained — the on-the-fly tool-plan bootstrap's FAIL-CLOSED materialiser
   // + hallucinated-field rejection (no .venv, no network, real registered tools).

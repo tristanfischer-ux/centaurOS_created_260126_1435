@@ -623,7 +623,7 @@ interface InstrumentSpec {
   label: string
   range: (q: Record<string, number>, p: ParentPhysics) => string
   gbp: number // installed cost (UK budget, catalogue class)
-  scope: 'level' | 'vessel-temp' | 'bio-do' | 'loop-ph' | 'loop-salinity' | 'vessel-pressure'
+  scope: 'level' | 'vessel-temp' | 'bio-do' | 'loop-ph' | 'loop-salinity' | 'loop-o2p' | 'loop-lox' | 'vessel-pressure'
   form: (host: string) => string
 }
 
@@ -642,6 +642,16 @@ const INSTRUMENT_FAMILIES: InstrumentSpec[] = [
   { key: 'salinity', scope: 'loop-salinity', present: (q) => anyKey(q, /salinity|conductiv/), label: 'Conductivity / Salinity Analyser', gbp: 1200,
     range: (q) => { const v = pickQ(q, /salinity_ppt|salinity/); return v !== undefined ? `0–50 ppt (design ${v.toFixed(0)} ppt)` : '0–50 ppt' },
     form: () => 'Toroidal conductivity sensor + transmitter on the common loop; 4–20 mA to make-up / bleed control' },
+  // council round-1 2026-06-16: the OXYGEN SUPPLY — the thing keeping the fish alive — was
+  // unmonitored. An O₂ header pressure transmitter (low-pressure → auto LOX↔PSA changeover +
+  // trip to the emergency diffusers) and a LOX tank level + low-level alarm, both present
+  // when the contract declares an oxygen supply duty.
+  { key: 'o2_pressure', scope: 'loop-o2p', present: (q) => anyKey(q, /oxygen_supply|oxygen_demand|(^|_)lox/), label: 'O₂ Header Pressure Transmitter', gbp: 850,
+    range: () => '0–16 bar (low-pressure alarm + trip)',
+    form: () => 'Pressure transmitter on the gaseous-O₂ header; low-pressure alarm auto-changes over LOX↔PSA and trips the fail-open emergency diffusers — the guaranteed-O₂ supervision' },
+  { key: 'lox_level', scope: 'loop-lox', present: (q) => anyKey(q, /oxygen_supply|oxygen_demand|(^|_)lox/), label: 'LOX Tank Level + Low Alarm', gbp: 1100,
+    range: () => '0–100 % (low-level auto-dialler)',
+    form: () => 'Cryogenic level gauge on the bulk LOX tank with a low-level alarm to the auto-dialler, so a depleting oxygen buffer is flagged hours before it runs out' },
   { key: 'pressure', scope: 'vessel-pressure', present: (q) => (pickQ(q, /design_pressure|operating_pressure|pressure_bar/) ?? 0) > 1.3, label: 'Pressure Transmitter', gbp: 700,
     range: (q) => { const v = pickQ(q, /design_pressure|operating_pressure|pressure_bar/) ?? 10; return `0–${Math.ceil(v * 1.5)} bar` },
     form: (h) => `Piezoresistive pressure transmitter on ${h}; 4–20 mA to PLC` },
@@ -705,7 +715,7 @@ export function synthesizeInstrumentation(modules: ModuleLike[], quantities: Rec
   const toAdd: WordLike[] = []
   for (const spec of INSTRUMENT_FAMILIES) {
     if (!spec.present(quantities)) continue
-    if (spec.scope === 'loop-ph' || spec.scope === 'loop-salinity') {
+    if (spec.scope.startsWith('loop')) {
       toAdd.push(instrumentWord(spec, primary.w, 1, spec.range(quantities, primary.p)))
       continue
     }
@@ -765,7 +775,7 @@ function blowerFromAirFlow(m3hEach: number, dPkPa: number): { kw: number; gbp: n
   return { kw, gbp: Math.round(2000 + 1200 * Math.pow(kw, 0.8)) }
 }
 
-function actuatorWord(kind: 'valve' | 'blower', label: string, host: WordLike | undefined, qty: number, spec: ModifierCharacter[], gbp: number, form: string): WordLike {
+function actuatorWord(kind: string, label: string, host: WordLike | undefined, qty: number, spec: ModifierCharacter[], gbp: number, form: string): WordLike {
   const hostName = host?.name_human ?? 'Process Loop'
   const hostId = String(host?.id ?? 'process_loop')
   const mods: ModifierCharacter[] = [mod('quantity', `×${Math.max(1, Math.round(qty))}`), ...spec]
@@ -827,6 +837,32 @@ export function synthesizeActuation(modules: ModuleLike[], quantities: Record<st
     toAdd.push({ sm: dest, w: actuatorWord('blower', 'Aeration Blower', host, n,
       [mod('dimension', boxFromRatingKw(b.kw)), mod('rating_primary', `${Math.round(b.kw)}`, 'kW')], b.gbp,
       `Centrifugal ${isDegas ? 'degassing' : 'aeration'} blower, ${Math.round(each).toLocaleString('en-GB')} m³/h @ ~${Math.round(dPkPa)} kPa each${host ? `, serving ${host.name_human}` : ''}; ${n}× duty/assist`) })
+  }
+
+  // C. LIFE-SAFETY O₂ final elements (council round-1 2026-06-16): the dissolved-O₂ loop was
+  // OPEN — DO is measured per tank (#140) but had NO final control element, and the brief's
+  // explicit fail-open emergency-O₂ requirement was absent. For each CULTURE vessel instance,
+  // add (i) an EMERGENCY O₂ SOLENOID + diffuser that FAILS OPEN on power loss (energise-to-
+  // close, fed from the LOX buffer — the device that keeps the stock alive through a power /
+  // SCADA failure) and (ii) a normal-duty DISSOLVED-O₂ CONTROL VALVE modulated by the DO
+  // analyser (closes the DO loop). Only when the contract declares an oxygen demand (a live
+  // aerobic culture). Universal — distinct id kinds so they don't collide with the inlet valve.
+  const o2Declared = (pickQ(quantities, /oxygen_demand|oxygen_supply|dissolved/) ?? 0) > 0
+  if (o2Declared && vessels.length) {
+    const culture = vessels.filter((v) => BIO_VESSEL_RE.test(v.name_human ?? ''))
+    const cultureVessels = culture.length ? culture
+      : [vessels.slice().sort((a, b) => (readParentPhysics(b).m3 * parentQty(b)) - (readParentPhysics(a).m3 * parentQty(a)))[0]]
+    for (const v of cultureVessels) {
+      const count = parentQty(v)
+      const dest = findWordSubModule(modules, v) || target || findActuationSubModule(modules)
+      if (!dest) continue
+      toAdd.push({ sm: dest, w: actuatorWord('emergency_o2', 'Emergency O₂ Solenoid + Diffuser (fail-open)', v, count,
+        [mod('rating_primary', 'fail-open on power loss')], 680,
+        `Normally-open (energise-to-close) pure-O₂ solenoid + fine-bubble diffuser in ${v.name_human}, fed from the LOX buffer on a guaranteed-O₂ header UPSTREAM of any controlled valve; loss of power ADMITS oxygen — the brief-mandated device that keeps the stock alive through a power / SCADA failure`) })
+      toAdd.push({ sm: dest, w: actuatorWord('do_valve', 'Dissolved-O₂ Control Valve', v, count,
+        [mod('rating_primary', 'DO-modulated')], 900,
+        `Modulating O₂ dosing valve on ${v.name_human} — the FINAL CONTROL ELEMENT closed-loop on the dissolved-O₂ analyser (DO → O₂ valve); its low-DO trip target is the fail-open emergency solenoid above`) })
+    }
   }
 
   for (const { sm, w } of toAdd) ((sm.words ??= []) as WordLike[]).push(w)
@@ -896,6 +932,13 @@ const UTILITY_SYSTEMS: UtilitySpec[] = [
   { key: 'ventilation', driver: (q) => pickQ(q, /building_process_loss_kw|building_heat|building.*_kw/), label: 'Building Ventilation (HRV)', module: /environmental|hvac|climate|ventil/,
     size: (kw) => { const m3h = (kw / (1.2 * 1.005 * 15)) * 3600; return { dim: boxFromThroughputM3h(m3h), rating: [String(Math.round(m3h)), 'm³/h'], gbp: Math.round(20000 + m3h * 4) } },
     form: (kw) => `Heat-recovery ventilation: ~${Math.round((kw / (1.2 * 1.005 * 15)) * 3600).toLocaleString('en-GB')} m³/h supply + extract with a thermal wheel; clears building moisture / CO₂ off the water surface while retaining process heat` },
+  // council round-1 (2026-06-16): a single genset+ATS leaves the PLC/DO-analysers/auto-dialler
+  // dead for the ~10-15 s genset start after a mains failure — the plant is blind exactly when
+  // it must alarm. A UPS / DC bus rides the controls + life-safety instrumentation through the
+  // changeover. Sized to the CONTROL load (~8 % of the connected load), 30-min autonomy.
+  { key: 'control_ups', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'Control + Instrument UPS', module: /control|compute|scada|power|electric|distribution/,
+    size: (kw) => { const ctrlKw = Math.max(5, kw * 0.08); return { dim: boxFromRatingKw(ctrlKw), rating: [String(Math.round(ctrlKw)), 'kW (30 min)'], gbp: Math.round(18000 + ctrlKw * 700) } },
+    form: (kw) => `On-line double-conversion UPS + battery (~30 min autonomy) sized to the ~${Math.round(kw * 0.08)} kW control + instrument + alarm load; rides the PLC, dissolved-oxygen analysers and auto-dialler through the genset start so the plant alarms even while mains is lost` },
 ]
 
 function utilityWord(spec: UtilitySpec, d: number, category: 'utility' | 'process' = 'utility'): WordLike {
@@ -957,6 +1000,24 @@ const PROCESS_SYSTEMS: UtilitySpec[] = [
   { key: 'harvest_chilling', driver: (q) => pickQ(q, /annual_production_t_yr|harvest_throughput_t_yr|production_capacity_t_yr/), label: 'Product Chilling + Ice System', module: /mass_fluid|process|harvest|environmental|water/,
     size: (tyr) => { const weeklyKg = (tyr * 1000) / 52; const dutyKw = Math.max(8, (weeklyKg * 3.6 * 25) / (8 * 3600)); return { dim: boxFromRatingKw(dutyKw), rating: [String(Math.round(dutyKw)), 'kW chill'], gbp: Math.round(25000 + tyr * 250) } },
     form: (tyr) => `Flake-ice machine + refrigerated-seawater (RSW) chiller + insulated harvest holding; chills the graded harvest (~${Math.round((tyr * 1000) / 52)} kg/week) from culture temperature to ~1 °C on ice immediately after harvest for product quality + shelf life` },
+  // ── council round-1 (2026-06-16): the systems a BUILDABLE live-animal RAS must have but
+  // were absent. Each driven by an existing contract duty, universal (any plant declaring a
+  // live biomass / make-up / waste duty gets them) — no if-ras. ──
+  { key: 'mortality_handling', driver: (q) => pickQ(q, /standing_biomass_kg|harvest_biomass_kg/), label: 'Mortality Handling System', module: /mass_fluid|process|waste|water/,
+    size: (bio) => { const mortsKgDay = (bio * 0.002); return { dim: '', rating: [String(Math.round(mortsKgDay)), 'kg/day morts'], gbp: Math.round(20000 + (bio / 1000) * 120) } },
+    form: (bio) => `Per-tank mort collection on the dual-drain + transfer airlift/pump + macerator + acid-dosed ensiling tank (or refrigerated mort store), sized for ~0.2 %/day of the ${Math.round(bio / 1000)} t standing biomass (~${Math.round(bio * 0.002)} kg/day); dead fish are removed before they crash the biofilter` },
+  { key: 'intake_treatment', driver: (q) => pickQ(q, /makeup_water_m3_h|make_up_water_m3_h/), label: 'Intake + Make-up Treatment Skid', module: /mass_fluid|process|water|intake/,
+    size: (mu) => ({ dim: boxFromThroughputM3h(mu), rating: [String(Math.round(mu)), 'm³/h'], gbp: Math.round(40000 + mu * 900) }),
+    form: (mu) => `Make-up intake train: coarse screen → drum/sand pre-filter → aeration + iron/manganese removal (borehole) → UV/ozone disinfection → buffer, sized to the ${Math.round(mu)} m³/h make-up; treats incoming well/seawater before it enters the closed loop` },
+  { key: 'effluent_treatment', driver: (q) => { const mu = pickQ(q, /makeup_water_m3_h|make_up_water_m3_h/); return mu ? mu * 0.9 : undefined }, label: 'Effluent Treatment + Discharge System', module: /mass_fluid|process|waste|water|effluent/,
+    size: (bl) => ({ dim: boxFromThroughputM3h(bl), rating: [String(Math.round(bl)), 'm³/h'], gbp: Math.round(45000 + bl * 1100) }),
+    form: (bl) => `Combined sludge+bleed effluent train: settlement/lamella → belt/geotube dewatering → final screening + UV/de-gas before the consented outfall, sized to the ~${Math.round(bl)} m³/h bleed; carries a sampling/monitoring point for the discharge consent` },
+  { key: 'fish_handling', driver: (q) => pickQ(q, /standing_biomass_kg|harvest_biomass_kg/), label: 'Live-Fish Handling + Transfer System', module: /mass_fluid|process|actuation|harvest/,
+    size: (bio) => ({ dim: '', rating: [String(Math.round(bio / 1000)), 't biomass'], gbp: Math.round(35000 + (bio / 1000) * 120) }),
+    form: (bio) => `Vacuum/centrifugal fish pump + dewatering tower + fish-transfer pipework + crowding screens for moving the ${Math.round(bio / 1000)} t live biomass between tanks, to grading and to harvest — the live-handling train the grading/harvest step needs but a single catalogue line omits` },
+  { key: 'biosecurity', driver: (q) => pickQ(q, /standing_biomass_kg|harvest_biomass_kg/), label: 'Biosecurity / Quarantine System', module: /mass_fluid|process|water|biosecurity/,
+    size: (bio) => ({ dim: '', rating: [String(Math.round(bio / 1000)), 't biomass'], gbp: Math.round(60000 + (bio / 1000) * 150) }),
+    form: (bio) => `Dedicated quarantine/nursery RAS skid (separate tanks + own filtration/UV/ozone, hydraulically isolated from the production loop) + disinfection-barrier line items (foot-baths, wheel-wash, equipment dip) + influent/effluent boundary disinfection — the containment a live-animal import facility (${Math.round(bio / 1000)} t) must have to meet veterinary/consent requirements` },
 ]
 
 /** Synthesise the process-support systems the contract's consumable + waste duties imply —

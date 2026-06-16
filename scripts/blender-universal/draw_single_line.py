@@ -161,6 +161,8 @@ class Tree:
     standby_source: Optional[StandbySource] = None  # genset on an ATS (2nd source)
     notes: list[str] = field(default_factory=list)
     schedule_totals: dict = field(default_factory=dict)
+    rev: str = "P1"          # preliminary revision (deterministic, not a live clock)
+    date: str = ""           # issue date derived from the run's own artifact mtime
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -198,6 +200,16 @@ def load_inputs(out_dir: str, state_path: Optional[str]):
     if pm.is_file():
         try:
             state["_parts_manifest"] = json.loads(pm.read_text())
+        except Exception:
+            pass
+    # Stash the convergence-report so the board/incomer current reads ONE authoritative
+    # value (the physics<->CAD fixed-point feeder_current_a / feeder_size) rather than the
+    # SLD, the P&ID note and the convergence report each quoting a different headline
+    # current. Carried on a private key so the (schedule, state) signatures are unchanged.
+    cr = Path(out_dir) / "convergence-report.json"
+    if cr.is_file():
+        try:
+            state["_convergence"] = json.loads(cr.read_text())
         except Exception:
             pass
     return schedule, state
@@ -333,6 +345,81 @@ def _archetype_name(state: dict, schedule: dict):
             return str(pc)
     pid = state.get("projectId") or ""
     return str(pid) or "universal_archetype"
+
+
+def _run_issue_date(out_dir: str) -> str:
+    """A DETERMINISTIC issue date (YYYY-MM-DD) for the title block, derived from the run's
+    OWN artifacts — NOT a live clock — so re-rendering the same run gives the same date.
+    Prefers the newest of the chain's authoritative outputs (state.json, the convergence
+    report, the connection schedule); falls back to the out_dir mtime. Returns '' only if
+    nothing is readable (the block then shows '—' rather than the literal placeholder)."""
+    import datetime
+    best = None
+    for name in ("state.json", "convergence-report.json", "connection-schedule.json"):
+        p = Path(out_dir) / name
+        try:
+            if p.is_file():
+                m = p.stat().st_mtime
+                best = m if best is None else max(best, m)
+        except OSError:
+            pass
+    if best is None:
+        try:
+            best = Path(out_dir).stat().st_mtime
+        except OSError:
+            return ""
+    try:
+        return datetime.date.fromtimestamp(best).isoformat()
+    except (OverflowError, OSError, ValueError):
+        return ""
+
+
+# Standard moulded-case / air circuit-breaker frame sizes [A] (BS EN 60947-2 ladder).
+# Used to size the INCOMER breaker to the next frame above the actual feeder current
+# instead of leaving it 'CB TBD'.
+_CB_FRAME_A = [16, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500,
+               630, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6300]
+
+
+def _next_frame_a(current_a: float):
+    """The next standard breaker frame at or above `current_a` (so the incomer breaker is
+    rated to carry the feeder), or None when no current is known."""
+    if not current_a or current_a <= 0:
+        return None
+    for f in _CB_FRAME_A:
+        if f >= current_a:
+            return f
+    return _CB_FRAME_A[-1]
+
+
+def _converged_feeder(state: dict):
+    """The ONE authoritative main-incomer feeder current + cable size from the
+    physics<->CAD convergence report (the fixed-point as-routed supply feeder). Reads the
+    LAST trajectory point's feeder_current_a / feeder_size (the converged value). Returns
+    (current_a: float|None, size_label: str|None). None when no report is present — the
+    caller then falls back to the contract main-transformer secondary current."""
+    cr = state.get("_convergence") or {}
+    traj = cr.get("trajectory") or []
+    cur = size = None
+    if traj:
+        last = traj[-1]
+        try:
+            cur = float(last.get("feeder_current_a")) if last.get(
+                "feeder_current_a") is not None else None
+        except (TypeError, ValueError):
+            cur = None
+        sz = last.get("feeder_size")
+        if sz:
+            size = str(sz).strip()
+    # report may also carry top-level fields in a future schema; honour them as a fallback.
+    if cur is None and cr.get("feeder_current_a") is not None:
+        try:
+            cur = float(cr["feeder_current_a"])
+        except (TypeError, ValueError):
+            cur = None
+    if size is None and cr.get("feeder_size"):
+        size = str(cr["feeder_size"]).strip()
+    return cur, size
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -554,6 +641,102 @@ def _is_control_load(br: "Branch") -> bool:
     return bool(_CONTROL_LOAD_RE.search(name))
 
 
+# BOARD INFRASTRUCTURE — a main breaker / busbar / distribution board / fuse / isolator /
+# surge protector / SPD / protective relay / UPS / ATS / generator IS the switchboard
+# itself, NOT a load that hangs off it as a feeder tap. The per-word skeleton edges in the
+# connection schedule (e.g. 'Standby Diesel Generator → Main Breaker') leak these board
+# elements in as 54 A load feeders with a phantom cable. A main breaker cannot be a load on
+# the board it protects. Such a branch must be DROPPED from the main-bus feeder list — the
+# main breaker is already drawn as the incomer device, the SPD as a shunt on the bus, the
+# busbar AS the bus. Universal (matched on the destination NAME, never a product class).
+_BOARD_ELEMENT_RE = re.compile(
+    r"main\s*breaker|incom(er|ing)\s*breaker|distribution\s*(board|busbar|panel)|"
+    r"\bbusbar\b|bus\s*bar|fuse\s*holder|\bfuse\b|isolat(or|ion)|disconnect(or)?|"
+    r"surge\s*protect(or|ion)?|\bspd\b|protect(ive|ion)\s*relay|\brelay\b|\bups\b|"
+    r"uninterruptible|automatic\s*transfer\s*switch|\bats\b|change\s*over|"
+    r"\bgenset\b|generator|generating\s*set|switchgear|switchboard|"
+    r"earth(ing)?\s*(bar|terminal)|\brcd\b|\brcbo\b|\bmccb\b|\bmcb\b|\bacb\b", re.I)
+# Words that READ like a board element but are genuine consuming loads we must NOT drop
+# (a 'circulation pump' has no board token; these are belt-and-braces so a real load whose
+# name happens to brush a token — e.g. a 'relay-controlled valve' — is preserved).
+_BOARD_ELEMENT_KEEP = re.compile(
+    r"pump|compressor|blower|\bfan\b|motor|valve|skim|oxygen|\buv\b|ozone|filter|"
+    r"degas|exchanger|drum|reactor|biofilter|tank|lamp|heater|chiller|aerat|"
+    r"sterilis|steriliz|disinfect|mixer|agitator|conveyor|dryer|column", re.I)
+
+
+def _is_board_element_feeder(br: "Branch") -> bool:
+    """True when this main-bus branch is actually a piece of the SWITCHBOARD (main
+    breaker / busbar / fuse holder / isolator / SPD / protective relay / UPS / ATS /
+    genset) wrongly emitted as a consuming load feeder, so it should be removed from the
+    feeder list. A kW-derived synthesised feeder is a real motor/system load and is never
+    a board element; a sub-distribution / transformer branch is structural, not a load."""
+    if br.sub_bus is not None or br.target_sym == SYM_TRANSFORMER:
+        return False
+    if getattr(br, "_kw_derived", False):
+        return False     # a kW-derived feeder is the equipment's real load, not board kit
+    name = f"{br.label} {br.to_node}"
+    if _BOARD_ELEMENT_KEEP.search(name):
+        return False
+    return bool(_BOARD_ELEMENT_RE.search(name))
+
+
+def _branch_vd_pct(br: "Branch"):
+    """The branch's voltage-drop magnitude as a float percent, or None when absent.
+    Accepts '4.924%' / '4.924% Vd' / '4.924'."""
+    m = re.search(r"([\d.]+)\s*%?", str(br.voltdrop or ""))
+    if not m:
+        return None
+    try:
+        return float(m.group(1))
+    except ValueError:
+        return None
+
+
+def _flag_voltdrop(tree: Tree, schedule: dict):
+    """UNIVERSAL: flag any feeder whose voltage drop is at/above the design limit (or the
+    council's 4% advisory). BS 7671 power-circuit limit is 5%; a branch at/over it (or
+    within the last 1% advisory band) is marked so the renderer shows it in a WARNING
+    colour rather than letting a 4.9% drop sit silently next to a compliant 1%. Reads the
+    schedule's voltdrop_limit_pct (default 5%) and an advisory threshold of 4%. Sets a
+    private _vd_flag on each branch (None / 'advisory' / 'over'). Deterministic."""
+    try:
+        limit = float(schedule.get("voltdrop_limit_pct") or 5.0)
+    except (TypeError, ValueError):
+        limit = 5.0
+    advisory = min(4.0, limit - 1.0) if limit > 1.0 else limit
+    for br in tree.main_bus.branches:
+        for b in [br] + (list(br.sub_bus.branches) if br.sub_bus else []):
+            vd = _branch_vd_pct(b)
+            if vd is None:
+                continue
+            if vd >= limit - 1e-9:
+                b._vd_flag = "over"      # type: ignore[attr-defined]
+            elif vd >= advisory - 1e-9:
+                b._vd_flag = "advisory"  # type: ignore[attr-defined]
+
+
+def _strip_board_element_feeders(tree: Tree):
+    """UNIVERSAL: drop any main-bus branch that is a board element drawn as a load tap
+    (main breaker, busbar, fuse holder, isolator, surge protector, protective relay, UPS,
+    ATS, generator). These reach the board only as per-word connection-schedule skeleton
+    edges; the main breaker is already the incomer device and the SPD a shunt on the bus,
+    so they must not also appear as 54 A consuming feeders. Records which were removed so
+    the bus can note the SPD/main-breaker placement. Deterministic; name-keyed."""
+    main = tree.main_bus
+    removed = [br for br in main.branches if _is_board_element_feeder(br)]
+    if not removed:
+        return
+    main.branches = [br for br in main.branches if br not in removed]
+    # carry the dropped board elements so the renderer can show the SPD as a bus shunt.
+    names = []
+    for br in removed:
+        nm = _norm_load_name(br.label or br.to_node or "")
+        if nm:
+            names.append(nm)
+    tree._board_shunts = names   # type: ignore[attr-defined]
+
+
 def _group_control_loads(tree: Tree, devices: list):
     """UNIVERSAL legibility pass: move the small control / SCADA / instrument / network
     loads off the flat main bus onto a UPS-backed CONTROL & INSTRUMENT sub-board (an
@@ -589,6 +772,49 @@ def _group_control_loads(tree: Tree, devices: list):
     if cb:
         feeder.devices.append(_as_device(cb, "breaker", "CB"))
     main.branches = keep + [feeder]
+
+
+def _apply_converged_incomer(tree: Tree, state: dict):
+    """UNIVERSAL: drive the MAIN board current + the INCOMER feeder/breaker from the ONE
+    authoritative source — the physics<->CAD convergence report (feeder_current_a /
+    feeder_size), else the contract main_transformer_secondary_current_a. This stops the
+    set quoting three different headline currents (SLD board, P&ID note, convergence
+    report). Mutates the tree's main-bus rating, incomer feeder size, and sizes the
+    incomer breaker to the next standard frame above the current (not 'CB TBD').
+    Deterministic; no-op when neither source is present."""
+    cur, size = _converged_feeder(state)
+    if cur is None:
+        # fall back to the contract main-transformer secondary current (the LV board
+        # incomer current) so the board still reads a real, single figure.
+        cur = _q(state, "main_transformer_secondary_current_a")
+    if cur is None or cur <= 0:
+        return
+    main = tree.main_bus
+    # Re-base the main-board rating onto the converged current, preserving the connected-kW
+    # prefix the voltage model wrote (so the board reads e.g. '680 kW connected · 1,034 A').
+    load_kw = _q(state, "total_supply_demand_kw") or _q(state,
+                                                        "connected_electrical_load_kw")
+    if load_kw:
+        main.rating = f"{load_kw:,.0f} kW connected · {cur:,.0f} A"
+    else:
+        main.rating = _fmt_a(cur)
+    main._incomer_current_a = cur   # type: ignore[attr-defined]
+    main._incomer_cable = size or ""  # type: ignore[attr-defined]
+    # Size + label the INCOMER breaker to the next standard frame above the current.
+    frame = _next_frame_a(cur)
+    if frame is not None:
+        det = f"{frame:,.0f} A frame (≥ {cur:,.0f} A incomer)"
+        if tree.incomer_devices:
+            for d in tree.incomer_devices:
+                if d.kind == "breaker":
+                    # replace a 'CB TBD'-style placeholder with the sized frame.
+                    if not d.detail or "tbd" in d.detail.lower():
+                        d.detail = det
+                    break
+            else:
+                tree.incomer_devices.append(Device(kind="breaker", tag="CB", detail=det))
+        else:
+            tree.incomer_devices.append(Device(kind="breaker", tag="CB", detail=det))
 
 
 def reconstruct_tree(schedule: dict, state: dict) -> Tree:
@@ -864,10 +1090,97 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
             if kva else
             "Standby diesel generator on an automatic transfer switch (ATS) backs the "
             "utility incomer — carries the life-safety load on mains failure."]
+    # UNIVERSAL: a board element (main breaker / busbar / fuse holder / isolator / surge
+    # protector / protective relay / UPS / ATS / genset) reaches the board only as a
+    # per-word connection-schedule skeleton edge — it must NOT be drawn as a consuming
+    # load feeder. Strip those before grouping so the main breaker stays the incomer
+    # device, the SPD a bus shunt, and the busbar the bus (not a 54 A load tap).
+    _strip_board_element_feeders(tree)
+    # UNIVERSAL: drive the board current + incomer feeder/breaker from the ONE converged
+    # source (convergence-report feeder_current_a / feeder_size) so the whole set reads a
+    # single headline current, with a real incomer cable + a sized breaker frame.
+    _apply_converged_incomer(tree, state)
+    # UNIVERSAL: flag any feeder at/above the volt-drop limit (or the 4% advisory) so a
+    # 4.9% drop is not shown silently next to a compliant 1% feeder.
+    _flag_voltdrop(tree, schedule)
     # UNIVERSAL legibility: collapse the small control / SCADA / instrument loads onto a
     # UPS-backed control sub-board so the main bus isn't a flat row of low-power stubs.
     _group_control_loads(tree, devices)
     return tree
+
+
+# A published quantity is a SPECIFIC per-item ELECTRICAL load (a real feeder figure) when
+# it names electrical/motor/drive/lamp/power; it is a thermal DUTY (NOT an electrical
+# feeder) when it names duty/capacity/cooling/heating/thermal/loss/dissipation. Mirrors the
+# distribution model's intent but is applied here to refine an INDIVIDUAL named feeder.
+_FEEDER_ELEC_KW_RE = re.compile(r"electrical|motor|drive|lamp|_power_kw$|_kw_power$", re.I)
+_FEEDER_THERMAL_KW_RE = re.compile(
+    r"duty|capacity|cooling|heating|thermal|dissipation|rejection|loss|"
+    r"makeup|sensible|connected_electrical_load|supply_demand", re.I)
+
+
+def _feeder_specific_kw(name: str, quantities: dict):
+    """The SPECIFIC published electrical kW for one feeder's equipment, matched on the
+    feeder NAME tokens against the contract quantities (universal — no per-class table).
+    Disambiguates 'heat pump' (→ heat_pump_electrical_kw) from a generic 'pump'
+    (→ recirc_pump_motor_kw) by requiring ALL the name's significant tokens to appear in
+    the quantity key, and handles 2-letter equipment acronyms (UV → uv_lamp_power_kw).
+    Returns the kW (float) or None when no specific electrical figure exists (the feeder
+    then keeps its synthesised even-split — an honest, disclosed fallback)."""
+    if not quantities:
+        return None
+    raw = (name or "").lower()
+    # significant name tokens; keep 2-char tokens too (uv, o2) so short equipment matches.
+    toks = [t for t in re.split(r"[^a-z0-9]+", raw) if len(t) >= 2 and t not in (
+        "system", "supply", "unit", "set", "the", "and")]
+    if not toks:
+        return None
+    best = None       # (specificity, value): more matched tokens = more specific
+    for k, v in quantities.items():
+        kl = k.lower()
+        if not kl.endswith("_kw"):
+            continue
+        if _FEEDER_THERMAL_KW_RE.search(kl) and not _FEEDER_ELEC_KW_RE.search(kl):
+            continue
+        if not _FEEDER_ELEC_KW_RE.search(kl):
+            continue
+        # require EVERY significant token of the equipment name to be in the key, so
+        # 'Heat Pump' won't grab 'recirc_pump_motor_kw' (missing 'heat') and a bare
+        # 'Circulation Pump' won't grab 'heat_pump_electrical_kw' (missing 'circulation').
+        matched = [t for t in toks if t in kl]
+        if len(matched) < len(toks):
+            # allow a single-token equipment (e.g. 'UV') to match on that one token.
+            if not (len(toks) == 1 and matched):
+                continue
+        val = v.get("value") if isinstance(v, dict) else v
+        try:
+            val = float(val)
+        except (TypeError, ValueError):
+            continue
+        spec = len(matched) + (1 if ("motor" in kl or "electrical" in kl) else 0)
+        if best is None or spec > best[0]:
+            best = (spec, val)
+    return best[1] if best else None
+
+
+def _refine_feeder_currents(feeders, quantities, voltage_v):
+    """Re-size each synthesised feeder from its equipment's OWN published electrical kW
+    where one exists, so feeders aren't quantised to a handful of even-split buckets. The
+    current is P/(√3·V·pf) (the model's own 3-phase relation) and the cable is re-picked to
+    suit. Leaves a feeder untouched when no specific kW is published. Strips a trailing
+    '×N' count from the name before matching. Deterministic; mutates the Feeder list."""
+    for f in feeders:
+        base = re.sub(r"\s*[×x]\s*\d+\s*$", "", f.name or "").strip()
+        kw = _feeder_specific_kw(base, quantities)
+        if kw is None or kw <= 0:
+            continue
+        i_a = edm._3ph_current_a(kw, voltage_v)
+        lbl, isb = edm._cable_or_busbar_label(i_a)
+        f.load_kw = round(kw, 1)
+        f.current_a = round(i_a, 1)
+        f.size_label = lbl
+        f.is_busbar = isb
+        f.note = ""   # now a real per-item figure, not an even split
 
 
 def _process_electrical_branches(bus: Bus):
@@ -1007,6 +1320,14 @@ def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
             per_module_load_kw=_known_module_loads(state))
     if not feeders:
         return
+    # PER-FEEDER SIZING (universal): the synthesis assigns a published kW where the
+    # equipment NAME maps to a specific kW quantity, else an EVEN SPLIT — which buckets
+    # many feeders to the same current (every blower/UV at 83 A, every pump at 110 A).
+    # Refine each feeder from the equipment's OWN published electrical kW (e.g. a heat pump
+    # at 41 kW ≠ a circulation pump at 75 kW ≠ UV at 251 kW) so each feeder is sized from
+    # its real load, not a wholesale bucket. Only OVERRIDES where a specific figure exists;
+    # leaves the disclosed even-split where the engine published no per-item load.
+    _refine_feeder_currents(feeders, quantities, plan.board_voltage_v)
     # Drop the lumped branches, append the synthesised per-module feeders.
     keep = [br for br in main.branches if br not in lumped]
     new_branches = []
@@ -1185,6 +1506,8 @@ PANEL_BG = "#f4f6f9"       # title-block / load fill
 GRID_FAINT = "#e4e8ee"     # very faint guide
 DEV_INK = "#1a1a1a"
 MUTED = "#5b6470"
+WARN_ADVISE = "#b7791f"    # amber — volt-drop in the last advisory band (≥4%, <limit)
+WARN_OVER = "#b42318"      # red — volt-drop at/above the design limit (≥5%)
 
 
 def _esc(s) -> str:
@@ -1369,6 +1692,29 @@ def sym_rcd(svg: SVG, cx, cy, size=12):
     return cy + s
 
 
+def _draw_spd_shunt(svg: SVG, cx, bus_y):
+    """Surge-protection device (SPD) drawn as a SHUNT off the busbar: a short stub down to
+    a varistor box and an earth symbol. An SPD sits in PARALLEL across the bus to earth — it
+    is NOT a series load tap. Drawn directly under the bus so it reads as bus-mounted
+    protection, separate from the outgoing feeders."""
+    top = bus_y + 4
+    box_top = top + 16
+    svg.line(cx, top, cx, box_top, width=1.6, stroke=DEV_INK)
+    # varistor / MOV box
+    svg.rect(cx - 9, box_top, 18, 20, stroke=DEV_INK, width=1.5, fill=FILL_BG)
+    # diagonal varistor stroke + the SPD arrows
+    svg.line(cx - 6, box_top + 16, cx + 6, box_top + 4, stroke=DEV_INK, width=1.5)
+    bot = box_top + 20
+    svg.line(cx, bot, cx, bot + 8, width=1.6, stroke=DEV_INK)
+    # earth symbol (three shortening bars)
+    ey = bot + 8
+    svg.line(cx - 8, ey, cx + 8, ey, stroke=DEV_INK, width=1.6)
+    svg.line(cx - 5, ey + 3, cx + 5, ey + 3, stroke=DEV_INK, width=1.4)
+    svg.line(cx - 2, ey + 6, cx + 2, ey + 6, stroke=DEV_INK, width=1.2)
+    svg.text(cx + 13, box_top + 13, "SPD", size=8.5, anchor="start", weight="bold",
+             fill=MUTED)
+
+
 _DEVICE_GLYPH = {
     "breaker": sym_breaker, "isolator": sym_isolator, "contactor": sym_contactor,
     "fuse": sym_fuse, "rcd": sym_rcd,
@@ -1412,16 +1758,25 @@ def _fit_font(text: str, box_w: float, base: float, floor: float,
 
 
 def sym_load(svg: SVG, cx, cy_top, w=150, label="", rating="", cable="", vd="",
-             count=1, sub=False):
+             count=1, sub=False, vd_flag=None):
     """A final load / equipment block — labelled rectangle hanging below its drop
-    point cy_top.  Returns the block bottom y."""
+    point cy_top.  Returns the block bottom y.
+
+    vd_flag ∈ {None, 'advisory', 'over'} marks a feeder whose volt-drop is in the last
+    advisory band ('advisory', amber) or at/above the design limit ('over', red): the box
+    outline + the ΔU text switch to a warning colour and a ⚠ marker is shown, so an
+    out-of-limit drop is conspicuous rather than buried."""
     h = 46
     x = cx - w / 2
     y = cy_top + 16
     # drop into the block
     svg.line(cx, cy_top, cx, y, width=1.8)
     fill = PANEL_BG
-    svg.rect(x, y, w, h, stroke=INK, width=1.5, fill=fill, rx=3)
+    warn_col = WARN_OVER if vd_flag == "over" else (WARN_ADVISE if vd_flag == "advisory"
+                                                    else None)
+    box_stroke = warn_col or INK
+    box_w = 2.2 if warn_col else 1.5
+    svg.rect(x, y, w, h, stroke=box_stroke, width=box_w, fill=fill, rx=3)
     # shrink the label to fit a narrow box (sub-board loads can be tightly pitched).
     lbl_size = _fit_font(label, w, base=11.5, floor=7.0)
     svg.text(cx, y + 18, label, size=lbl_size, anchor="middle", weight="bold")
@@ -1430,7 +1785,11 @@ def sym_load(svg: SVG, cx, cy_top, w=150, label="", rating="", cable="", vd="",
         sb_size = _fit_font(sub_bits, w, base=9.5, floor=6.5)
         svg.text(cx, y + 33, sub_bits, size=sb_size, anchor="middle", fill=MUTED)
     if vd:
-        svg.text(cx, y + 44, f"ΔU {vd}", size=8.8, anchor="middle", fill=MUTED)
+        vd_col = warn_col or MUTED
+        vd_txt = (f"⚠ ΔU {vd}" if warn_col else f"ΔU {vd}")
+        vd_weight = "bold" if warn_col else "normal"
+        svg.text(cx, y + 44, vd_txt, size=8.8, anchor="middle", fill=vd_col,
+                 weight=vd_weight)
     return y + h
 
 
@@ -1610,6 +1969,14 @@ def build_sld_svg(tree: Tree) -> str:
     y = _draw_incomer(svg, src_cx, src_cy)
     # drop onto the main bus
     svg.line(src_cx, y, src_cx, bus_y, width=2.2, stroke=ACCENT)
+    # label the INCOMER feeder (the real as-routed cable + its current) on the drop, so the
+    # board's incoming way carries the converged size (e.g. '1,034 A · 240 mm²'), not blank.
+    inc_a = getattr(main, "_incomer_current_a", None)
+    inc_cable = getattr(main, "_incomer_cable", "")
+    inc_bits = " · ".join(b for b in (_fmt_a(inc_a) if inc_a else "", inc_cable) if b)
+    if inc_bits:
+        svg.text(src_cx + 12, (y + bus_y) / 2, inc_bits, size=9.5, anchor="start",
+                 fill=MUTED)
 
     # ===== MAIN BUSBAR =====
     svg.line(bus_x0, bus_y, bus_x1, bus_y, stroke=BUS_INK, width=7.0, cap="butt")
@@ -1624,6 +1991,12 @@ def build_sld_svg(tree: Tree) -> str:
     # tiny rating tag at the right end
     svg.text(bus_x1, bus_y - 14, "Σ " + (main.rating or ""), size=10, anchor="end",
              fill=MUTED)
+    # SURGE-PROTECTION DEVICE (SPD) drawn as a SHUNT on the bus (a stub to earth), NOT a
+    # load tap — the board element stripped from the feeder list reappears here correctly.
+    shunts = getattr(tree, "_board_shunts", []) or []
+    if any("surge" in s or "spd" in s for s in shunts):
+        spdx = bus_x0 + 150
+        _draw_spd_shunt(svg, spdx, bus_y)
 
     # ===== BRANCHES off the main bus =====
     # distribute branch X positions by SPAN (a sub-distribution claims a wider band so
@@ -1661,7 +2034,8 @@ def build_sld_svg(tree: Tree) -> str:
                 svg.line(bx, base_y - 30, bx, dev_end, width=1.8)  # plain conductor
             bot = sym_load(svg, bx, dev_end, w=min(178, col_w - 24),
                            label=br.label, rating=br.rating, cable=br.cable,
-                           vd=br.voltdrop, count=br.count)
+                           vd=br.voltdrop, count=br.count,
+                           vd_flag=getattr(br, "_vd_flag", None))
         content_bottom = max(content_bottom, bot or base_y)
 
     # ===== LEGEND (lower-right of the body, above the title block) =====
@@ -1729,7 +2103,8 @@ def _draw_sub_distribution(svg: SVG, bx, y_from, br: Branch, col_w):
         else:
             svg.line(sx, sbase - 26, sx, dev_end, width=1.6)
         b = sym_load(svg, sx, dev_end, w=load_w, label=sbr.label, rating=sbr.rating,
-                     cable=sbr.cable, vd=sbr.voltdrop, count=sbr.count, sub=True)
+                     cable=sbr.cable, vd=sbr.voltdrop, count=sbr.count, sub=True,
+                     vd_flag=getattr(sbr, "_vd_flag", None))
         bottom = max(bottom, b or sbase)
     return bottom
 
@@ -1747,8 +2122,8 @@ def _draw_title_block(svg: SVG, tree: Tree, width, height, title_h):
     bx0 = x1 - bw
     by0 = y0 + 14
     rows = [("DRAWING No.", "FF-SLD-001"),
-            ("REV", "—   (placeholder)"),
-            ("DATE", "YYYY-MM-DD"),
+            ("REV", tree.rev or "P1"),
+            ("DATE", tree.date or "—  "),
             ("SCALE", "NTS")]
     rh = 22
     box_h = rh * len(rows)
@@ -1915,6 +2290,8 @@ def generate_sld(out_dir: str, state_path: Optional[str] = None,
     summary (paths + node/symbol counts)."""
     schedule, state = load_inputs(out_dir, state_path)
     tree = reconstruct_tree(schedule, state)
+    # populate the title-block issue date deterministically from the run's artifacts.
+    tree.date = _run_issue_date(out_dir)
     svg_text = build_sld_svg(tree)
 
     draw_dir = Path(out_dir) / "drawings"

@@ -11741,6 +11741,9 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   })()
   // Linear scale factor off the 204 t/yr reference design.
   const scale = annualProductionTYr / 204
+  // Feed conversion ratio (brief) — needed early for the production-throughput feed
+  // mass balance below (daily_feed = annual_production × FCR × 1000/365).
+  const fcr = extractRangeFromDesc(desc, /(?:feed\s+conversion\s+ratio|fcr)\s*(?:of\s+)?(\d(?:\.\d{1,2})?)/i, 1.37)
 
   // ── Capex ceiling (brief: £5,000,000) + design-to-budget tonnage ──────────
   // The reference 204 t/yr unit is ~£8.15 M equipment. The brief caps installed
@@ -11771,14 +11774,28 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const rearingTankCount = Math.max(4, Math.round(totalTankVolumeM3 / tankVolumeEachM3))
 
   // ── Feed + waste loads (size-by-feed) ─────────────────────────────────────
-  const feedRateFracBiomass = 0.0135                       // 1.35% of biomass/day (1.2-1.5% band)
-  const dailyFeedKg = Math.round(standingBiomassKg * feedRateFracBiomass)        // ~2,700 kg/day @ 200 t standing
-  const tanFracFeed = 0.04                                 // TAN ≈ 4% of feed (3-5% band)
-  const tanLoadKgDay = Math.round(dailyFeedKg * tanFracFeed * 10) / 10           // ~108 kg/day
+  // SINGLE-SOURCE FEED (2026-06-16, council RAS fix #1): daily feed is a PRODUCTION-
+  // THROUGHPUT mass balance — the fish eat their annual harvest × FCR spread over the
+  // year — NOT a fraction of the STANDING biomass. The old `standing_biomass × 1.35%/day`
+  // gave 2,745 kg/day (3.6× too high): a "1.35%/day of biomass" feed rate is a
+  // small-fish growth-phase figure, but the STANDING biomass here is already at HARVEST
+  // density, so applying it to the full standing stock massively over-feeds. The
+  // throughput identity is exact and ties every downstream load (TAN, O₂, CO₂, solids,
+  // bicarbonate, biofilter, degasser) to ONE number:
+  //   daily_feed_kg = annual_production_t_yr × FCR × 1000 / 365.
+  // The metabolism stand-in tool's biomass×SGR recompute is refused by the bootstrap
+  // AUTHORITATIVE-SEED PROTECTION (these are all source:'calculator'), so this seed
+  // is what the chain ships.
+  const dailyFeedKg = Math.round((annualProductionTYr * fcr * 1000 / 365) * 10) / 10  // 204 t/yr × 1.37 → ~766 kg/day
+  // TAN excreted from feed via the nitrogen mass balance (Timmons & Ebeling):
+  //   feed × protein(0.45) × N-in-protein(0.16) × TAN-excretion(0.50). ~0.036 of feed
+  //   (≈4% band), first-principles so the alkalinity → bicarbonate dose ties to it.
+  const tanProteinFrac = 0.45, tanNFrac = 0.16, tanExcretionFrac = 0.50
+  const tanLoadKgDay = Math.round(dailyFeedKg * tanProteinFrac * tanNFrac * tanExcretionFrac * 10) / 10  // ~27.6 kg/day
   const o2PerKgFeed = 0.5                                   // 0.5 kg O₂/kg feed (brief)
-  const oxygenDemandKgDay = Math.round(dailyFeedKg * o2PerKgFeed)                // ~1,350 kg/day
+  const oxygenDemandKgDay = Math.round(dailyFeedKg * o2PerKgFeed)                // ~383 kg/day
   const solidsFracFeed = 0.60                               // solids ≈ 60% of feed
-  const solidsLoadKgDay = Math.round(dailyFeedKg * solidsFracFeed)               // ~1,620 kg/day
+  const solidsLoadKgDay = Math.round(dailyFeedKg * solidsFracFeed)               // ~459 kg/day
 
   // ── Recirculation hydraulics ──────────────────────────────────────────────
   const turnoversPerHour = extractRangeFromDesc(desc, /(?:about\s+)?(\d(?:\.\d)?)\s*(?:times\s+)?(?:turnover[s]?\s+)?(?:per\s+hour|\/\s*h|turnovers?\s*(?:\/|per)\s*h)/i, 4)
@@ -11786,6 +11803,18 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const recircFractionRecycled = extractRangeFromDesc(desc, /(\d{2}(?:\.\d)?)\s*(?:percent|%)\s*(?:of\s+its\s+water|recirc)/i, 99.6) / 100
   const makeupFraction = Math.max(0.001, 1 - recircFractionRecycled)             // ~0.4% make-up
   const makeupWaterM3H = Math.round(recirculationFlowM3H * makeupFraction * 100) / 100  // ~0.4% of recirc
+  // Hydraulic retention time of the rearing volume = tank_volume ÷ flow (× 60 → min).
+  // At 4 turnovers/h this is exactly 15 min. SEEDED authoritatively (2026-06-16, council
+  // RAS fix #5): the brief metric `hydraulic_retention_time_mins` was otherwise wired by
+  // the orchestrator to a control-systems PID `settling_time_s` (0.11 s mislabelled as
+  // 0.11 min) — a wrong-domain stand-in. Seeding it (source 'calculator') makes the
+  // brief-metric resolver match this value directly and the seed-protection refuse the
+  // PID clobber. Unit is MINUTES (the metric name), value ~15.
+  const hydraulicRetentionTimeMins = Math.round((totalTankVolumeM3 / recirculationFlowM3H) * 60 * 100) / 100  // ~15 min
+  // Water recirculation rate as a PERCENT (the brief metric complement): the fraction of
+  // the loop recycled, = recirc_fraction × 100 (~99.6%). Otherwise wired to a control PID
+  // `peak_overshoot_pct` (15.6%) — also wrong-domain; seed it authoritatively.
+  const waterRecirculationRatePercent = Math.round(recircFractionRecycled * 1000) / 10  // ~99.6%
 
   // ── Biofiltration (MBBR sized on TAN load) ────────────────────────────────
   const mbbrArealTanRateKgM3Day = 0.35                     // ~350 g TAN/m³ media/day (MBBR)
@@ -11806,7 +11835,18 @@ registerArchetype('aquaculture_ras', (brief: any) => {
 
   // ── Thermal (heat pumps; make-up heating + building loss; net of HEX recovery) ─
   const sourceTempC = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:°|degrees?\s+)?(?:c|celsius)?\s*(?:seawater|borehole|source|raw)/i, 10)
-  const setpointTempC = extractRangeFromDesc(desc, /(\d{2}(?:\.\d)?)\s*(?:°|degrees?\s+)?(?:c|celsius)/i, 26.4)
+  // SETPOINT = the GROW-OUT temperature (the warm loop), which the make-up must be
+  // heated TO. The brief states it AFTER the cold source ("~10 °C seawater … 26.4 °C
+  // grow-out"), so a bare "first NN °C" regex wrongly latched onto the 10 °C source →
+  // ΔT≈0 → make-up heating collapsed to ~62 kW (vs the correct ~1,019 kW raw) and the
+  // whole thermal plant under-sized (2026-06-16, council RAS fix #6). Prefer an explicit
+  // grow-out / setpoint / rearing-temperature context; require setpoint > source; else
+  // fall back to the class default 26.4 °C. This keeps source_water_temp_c=10 as the
+  // single thermal truth and the make-up duty single-sourced.
+  const setpointCtx = extractRangeFromDesc(desc, /(\d{2}(?:\.\d)?)\s*(?:°|degrees?\s+)?(?:c|celsius)?\s*(?:grow[\s-]?out|rearing|set[\s-]?point|culture|kingfish|target)/i, 0)
+  const setpointBare = extractRangeFromDesc(desc, /(\d{2}(?:\.\d)?)\s*(?:°|degrees?\s+)?(?:c|celsius)/i, 26.4)
+  const setpointCandidate = setpointCtx > sourceTempC ? setpointCtx : (setpointBare > sourceTempC ? setpointBare : 26.4)
+  const setpointTempC = setpointCandidate
   const deltaTLift = Math.max(1, setpointTempC - sourceTempC)                    // ~16.4 °C lift
   // RAW make-up heating duty: heat the 0.4% make-up from source to setpoint.
   // Q = ṁ·cp·ΔT ; ṁ = makeup_m3_h × 1000 kg/m³ (kg/h) ; cp = 4.186 kJ/kg·K.
@@ -11857,9 +11897,24 @@ registerArchetype('aquaculture_ras', (brief: any) => {
 
   // ── Recirculation + life-support pumping ──────────────────────────────────
   // Low-head recirc pumps: P = ρ·g·Q·H / η ; low-head H ≈ 3 m, η ≈ 0.70.
+  // RECONCILED HYDRAULIC → SHAFT → MOTOR CHAIN (2026-06-16, council RAS fix #2):
+  // the chain MUST satisfy motor_kw ≥ shaft_kw ≥ hydraulic_kw. The old contract emitted
+  // ONLY recirc_pump_power_kw (=shaft) while the generic process:pump-sizing stand-in
+  // produced an unreconciled hydraulic_power_w (571 kW, from a wrong 50 mm bore →
+  // 1,890 m/s velocity) and a recommended_motor_kw=75 that was merely the tool's IEC
+  // list CEILING (the true motor exceeded 75 kW so next() fell through to the last list
+  // element) — an impossible motor < power. Seeding all three as 'calculator' makes the
+  // bootstrap seed-protection keep this self-consistent set and refuse the stand-in.
   const recircPumpHeadM = 3.0
-  const recircPumpEffic = 0.70
-  const recircPumpPowerKw = Math.round(((1000 * 9.81 * (recirculationFlowM3H / 3600) * recircPumpHeadM) / recircPumpEffic) / 1000)
+  const recircPumpEffic = 0.70                              // pump hydraulic efficiency at duty
+  const recircPumpMotorEffic = 0.93                         // IE3 motor electrical efficiency (large frame)
+  const recircPumpHydraulicW = Math.round(1000 * 9.81 * (recirculationFlowM3H / 3600) * recircPumpHeadM)  // ρ·g·Q·H [W] ~109 kW
+  const recircPumpPowerKw = Math.round((recircPumpHydraulicW / recircPumpEffic) / 1000)  // SHAFT = hydraulic ÷ η_pump; ~156 kW
+  // Motor electrical input = shaft ÷ η_motor, then the next standard IEC frame above a
+  // 15% selection margin. motor_kw is GUARANTEED ≥ shaft (recircPumpPowerKw) ≥ hydraulic.
+  const recircPumpMotorInputKw = (recircPumpHydraulicW / recircPumpEffic / recircPumpMotorEffic) / 1000  // ~168 kW
+  const STD_IEC_MOTORS_KW = [0.18, 0.25, 0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3.0, 4.0, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315, 355, 400, 450, 500, 560, 630, 710, 800]
+  const recircPumpMotorKw = STD_IEC_MOTORS_KW.find(s => s >= recircPumpMotorInputKw * 1.15) ?? STD_IEC_MOTORS_KW[STD_IEC_MOTORS_KW.length - 1]  // ~200 kW
 
   // ── Water chemistry dosing (bicarbonate for nitrification alkalinity) ─────
   // ~7.1 g alkalinity-as-CaCO₃ consumed per g TAN oxidised; replace with NaHCO₃.
@@ -11871,6 +11926,27 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // ── Oxygenation supply (LOX/PSA) ──────────────────────────────────────────
   // LOX/PSA must meet the daily O₂ demand + emergency buffer; express as kg/h.
   const oxygenSupplyKgH = Math.round((oxygenDemandKgDay / 24) * 10) / 10
+
+  // ── UV disinfection (medium-pressure UV-C on the full recirculation flow) ──
+  // SPECIFIC-ELECTRICAL-ENERGY sizing (2026-06-16, council RAS fix #3): the generic
+  // uv-reactor:disinfection-sizing stand-in modelled the WHOLE 13,360 m³/h through a
+  // single 5 cm annular tube (r₂=0.075 m), forcing ~1,000 m/s through it and giving
+  // 251 kW (18.8 W per m³/h — 5-10× reality). Real medium-pressure RAS UV at 40 mJ/cm²
+  // is ~2-4 W per m³/h. Use the validated geometry-free Electrical-Energy-Dose method
+  // (Bolton & Cotton, "The Ultraviolet Disinfection Handbook"; USEPA UVDGM):
+  //   EED [Wh/m³] = EED₀ × (Dose/Dose₀) × (η₀/η) / UVT_penalty,
+  //   reference point EED₀ = 2.6 Wh/m³ at Dose₀ 40 mJ/cm², 90 % UVT, η₀ 0.30 wall-plug.
+  //   P_elec [kW] = flow [m³/h] × EED / 1000.  → ~35 kW for 13,360 m³/h @ 40 mJ/cm².
+  const uvDoseMjCm2 = 40                                    // RAS pathogen target dose
+  const uvtPercent = 90                                     // UV transmittance of treated RAS water
+  const uvLampEff = 0.30                                    // medium-pressure wall-plug → germicidal UV-C
+  const uvEed0 = 2.6, uvDose0 = 40, uvt0 = 90, uvEta0 = 0.30
+  const uvtPenalty = Math.log(uvt0 / 100) / Math.log(Math.max(0.5, uvtPercent / 100))  // >1 when UVT < ref
+  const uvEedWhM3 = uvEed0 * (uvDoseMjCm2 / uvDose0) * (uvEta0 / uvLampEff) / uvtPenalty
+  const uvLampPowerKw = Math.round(recirculationFlowM3H * uvEedWhM3 / 1000)            // ~35 kW
+  // Reactor volume from a short hydraulic residence (~2 s) at the design flow.
+  const uvResidenceTimeS = 2.0
+  const uvReactorVolumeM3 = Math.round((recirculationFlowM3H / 3600) * uvResidenceTimeS * 10) / 10  // ~7.4 m³
 
   // ── Connected electrical load (sum of the major motor + thermal-input duties) ─
   const connectedElectricalLoadKw = Math.round(
@@ -11885,7 +11961,7 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const salinityPpt = extractRangeFromDesc(desc, /(\d{2})\s*(?:parts\s+per\s+thousand|ppt|‰)/i, 33)
   const harvestWeightKg = extractRangeFromDesc(desc, /(\d(?:\.\d)?)\s*(?:kg|kilograms?)\s*(?:harvest|sashimi|fish)/i, 3.4)
   const growOutDays = extractRangeFromDesc(desc, /(\d{2,3})\s*(?:[- ]?day)\s*(?:cycle|grow[\s-]?out)/i, 360)
-  const fcr = extractRangeFromDesc(desc, /(?:feed\s+conversion\s+ratio|fcr)\s*(?:of\s+)?(\d(?:\.\d{1,2})?)/i, 1.37)
+  // (fcr is declared earlier — it is needed by the feed mass balance.)
 
   // ── Total system mass (kg) — renderer compliance-table mass row + gate 17.
   // Field-erected RAS: tanks (HDPE/GRP/concrete-lined) + treatment vessels +
@@ -11908,14 +11984,16 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     rearing_tank_volume_each_m3: q(tankVolumeEachM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: 'per-tank working volume (~334 m³ circular dual-drain tank)' }),
 
     // ── Feed + waste loads (size-by-feed) ──
-    daily_feed_kg: q(dailyFeedKg, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~1.35% of standing biomass/day (1.2-1.5% grow-out band)' }),
-    tan_load_kg_day: q(tanLoadKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'TAN ≈ 4% of feed (3-5% band); sizes the MBBR biofilter' }),
+    daily_feed_kg: q(dailyFeedKg, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'annual_production_t_yr × FCR × 1000 / 365 — production-throughput mass balance, the SINGLE feed source all waste loads derive from (~766 kg/day at 204 t/yr, FCR 1.37)' }),
+    tan_load_kg_day: q(tanLoadKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'feed × protein 0.45 × N-in-protein 0.16 × TAN-excretion 0.50 (Timmons & Ebeling N mass balance); sizes the MBBR biofilter + the bicarbonate alkalinity dose' }),
     oxygen_demand_kg_day: q(oxygenDemandKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~0.5 kg O₂/kg feed; sizes the oxygenation + LOX/PSA' }),
     solids_load_kg_day: q(solidsLoadKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~60% of feed; sizes the drum filters + sludge handling' }),
 
     // ── Recirculation hydraulics — lock-gate HARD slot ──
     recirculation_flow_m3_h: q(recirculationFlowM3H, 'm³/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '4 turnovers/h × total_tank_volume (15-min HRT); lock-gate HARD slot (exit 22)' }),
     turnovers_per_hour: q(turnoversPerHour, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '~4 tank turnovers per hour (15-min hydraulic retention time)' }),
+    hydraulic_retention_time_mins: q(hydraulicRetentionTimeMins, 'min', 'time', 'rated', 'system', 'calculator', { source_detail: 'total_tank_volume ÷ recirculation_flow × 60 — rearing-loop hydraulic retention time (~15 min at 4 turnovers/h)' }),
+    water_recirculation_rate_percent: q(waterRecirculationRatePercent, '%', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'recirc_fraction × 100 — share of the loop recycled (~99.6%, near-zero-exchange RAS)' }),
     makeup_water_m3_h: q(makeupWaterM3H, 'm³/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~0.4% make-up of the recirculation flow (99.6% recirculated)' }),
     recirc_fraction_recycled: q(recircFractionRecycled, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '99.6% of the water recirculated (~0.4% new-water make-up)' }),
     // Make-up % as an AUTHORITATIVE quantity (the brief metric `make_up_water_percentage`/
@@ -11940,6 +12018,10 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     // ── Oxygenation (LOX/PSA) ──
     oxygen_supply_kg_h: q(oxygenSupplyKgH, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'oxygen_demand ÷ 24 — down-flow O₂ cones fed from on-site LOX + PSA generator' }),
 
+    // ── UV disinfection (medium-pressure UV-C, full recirculation flow) ──
+    uv_lamp_power_kw: q(uvLampPowerKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'medium-pressure UV-C: flow × electrical-energy-dose (Bolton/USEPA EED ~2.6 Wh/m³ at 40 mJ/cm², 90% UVT, η 0.30); ~35 kW (≈2.6 W per m³/h)' }),
+    uv_reactor_volume_m3: q(uvReactorVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'flow × ~2 s hydraulic residence in the in-line UV reactor train' }),
+
     // ── Thermal (heat pumps; NET of make-up/bleed HEX recovery) — lock-gate HARD slot ──
     heating_duty_kw: q(heatingDutyKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'NET heat-pump thermal duty = building-fabric loss + residual make-up heating (after the make-up/bleed HEX recovers 85% of the ~1,019 kW raw make-up duty); ~336 kW; lock-gate HARD slot (exit 22)' }),
     makeup_heating_kw: q(makeupHeatingKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'RAW make-up duty ṁ·cp·ΔT for the 0.4% make-up from ~10 °C to 26.4 °C (~1,019 kW — recovered by the HEX, NOT all carried by the heat pump)' }),
@@ -11952,8 +12034,11 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     water_setpoint_temp_c: q(setpointTempC, '°C', 'temperature', 'rated', 'system', 'brief', { source_detail: '26.4 °C yellowtail kingfish grow-out temperature' }),
     source_water_temp_c: q(sourceTempC, '°C', 'temperature', 'min', 'system', 'brief', { source_detail: '~10 °C seawater/borehole source water (8-12 °C)' }),
 
-    // ── Pumping ──
-    recirc_pump_power_kw: q(recircPumpPowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'low-head recirculation pumps: ρ·g·Q·H/η at ~3 m head, η ~0.70' }),
+    // ── Pumping — reconciled hydraulic → shaft → motor (motor ≥ shaft ≥ hydraulic) ──
+    recirc_pump_head_m: q(recircPumpHeadM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: 'low-head recirculation pump total dynamic head (~3 m: tank exit → treatment train → return)' }),
+    recirc_pump_hydraulic_power_w: q(recircPumpHydraulicW, 'W', 'power', 'rated', 'module', 'calculator', { source_detail: 'ρ·g·Q·H useful hydraulic power for the recirculation duty (~109 kW)' }),
+    recirc_pump_power_kw: q(recircPumpPowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'pump SHAFT power = hydraulic ÷ η_pump (~0.70); ~156 kW total recirculation duty' }),
+    recirc_pump_motor_kw: q(recircPumpMotorKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'installed motor rating = next standard IEC frame above shaft ÷ η_motor (~0.93) × 1.15 margin; ≥ shaft power (~200 kW)' }),
 
     // ── Water chemistry dosing ──
     bicarbonate_dose_kg_day: q(bicarbonateDoseKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~7.1 g alkalinity-as-CaCO₃ per g TAN oxidised, dosed as NaHCO₃ (×84/50 mass factor)' }),

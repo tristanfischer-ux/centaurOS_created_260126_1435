@@ -200,26 +200,51 @@ def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
         print("[render-scene] FATAL: universal builder timed out", file=sys.stderr)
         return 6
 
+    # SHADED HERO PASS (council 2026-06-16, render scored 3/10 "blobby"): the INSPECT=1
+    # pass above produced the FLAT even-fill inspect-*.png — the fast input for the 2D
+    # drawings, but a shallow open RAS tank rendered flat reads as a flat green DISC. The
+    # dossier COVER + module pages must be SHADED. Run a SECOND pass with INSPECT=0 → the
+    # studio KEY-SUN + soft-shadow + white-world rig (build_universal_scene's else-branch
+    # + run_render_pipeline) writes a shaded 00-hero.png + module-<id>.png DIRECTLY. In
+    # INSPECT=0 the pipe-diameter legibility FLOOR is also off, so the pipework renders at
+    # its true (thinner) gauge — fixing the "fat tangle" at the same time. ~2× render, correct.
+    env_shaded = os.environ.copy()
+    env_shaded["BLENDER_OUT_DIR"] = str(out_dir)
+    env_shaded["INSPECT"] = "0"
+    shaded_ok = False
+    try:
+        subprocess.run(
+            [BLENDER_BIN, "--background", "--python", str(universal), "--", str(state_path)],
+            env=env_shaded, check=True, timeout=900,
+        )
+        shaded_ok = (out_dir / "00-hero.png").exists()
+        print(f"[render-scene] shaded hero pass: 00-hero={'shaded OK' if shaded_ok else 'MISSING'}", flush=True)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        print(f"[render-scene] shaded hero pass failed ({e}) — falling back to the flat inspect hero", file=sys.stderr)
+
     iso = out_dir / "inspect-iso.png"
     hero = out_dir / "inspect-hero.png"
     cover_src = hero if hero.exists() else iso
-    if not cover_src.exists():
-        print("[render-scene] FATAL: universal builder produced no inspect render", file=sys.stderr)
+    if not (shaded_ok or cover_src.exists()):
+        print("[render-scene] FATAL: no hero render produced", file=sys.stderr)
         return 6
-    # Cover + hero ← the hero framing of the real, recognisable plant.
-    (out_dir / "00-hero.png").write_bytes(cover_src.read_bytes())
-    (out_dir / "blender-cover.png").write_bytes(cover_src.read_bytes())
-    # Module pages ← the colour-coded whole-plant iso (every module visible and
-    # colour-keyed) so each page shows the real plant instead of a ghost box.
-    # Per-module HIGHLIGHTED views are a follow-up; this removes the cube grid.
-    module_src = iso if iso.exists() else cover_src
+    if not shaded_ok:
+        # shaded pass unavailable → map the flat inspect hero onto the cover (old behaviour)
+        (out_dir / "00-hero.png").write_bytes(cover_src.read_bytes())
+    # blender-cover mirrors whatever 00-hero is (shaded if the pass ran, else flat)
+    (out_dir / "blender-cover.png").write_bytes((out_dir / "00-hero.png").read_bytes())
+    # Module pages: the INSPECT=0 pass already wrote shaded module-<id>.png; only fill a
+    # gap from the colour-coded whole-plant iso when the shaded pass did not produce one.
+    module_src = iso if iso.exists() else (out_dir / "00-hero.png")
     modules = (state.get("moduleDecomposition", {}) or {}).get("modules", []) or []
     written = 0
     for m in modules:
         mid = m.get("module") or m.get("id") or m.get("module_id")
         if not mid:
             continue
-        (out_dir / f"module-{mid}.png").write_bytes(module_src.read_bytes())
+        mp = out_dir / f"module-{mid}.png"
+        if not mp.exists():
+            mp.write_bytes(module_src.read_bytes())
         written += 1
     if written == 0:
         (out_dir / "module-overview.png").write_bytes(module_src.read_bytes())

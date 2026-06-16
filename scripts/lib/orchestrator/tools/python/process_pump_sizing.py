@@ -86,9 +86,16 @@ PROVENANCE = {
 }
 
 G = 9.80665
-# Standard IEC motor frame sizes (kW).
+# Standard IEC motor frame sizes (kW) — the FULL IEC 60072 / IEC 60034 range.
+# (2026-06-16) The list previously ceiling-ed at 75 kW, so any duty above ~65 kW
+# shaft silently returned recommended_motor_kw = 75 (the next() fallback to the last
+# element) — an IMPOSSIBLE motor < shaft power (a 156 kW RAS recirc pump reported a
+# 75 kW motor). Large process / recirculation pumps routinely need 90-630 kW motors;
+# extend the list so recommended_motor_kw is ALWAYS ≥ the true shaft power.
 STD_MOTORS_KW = [0.18, 0.25, 0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3.0, 4.0, 5.5,
-                 7.5, 11.0, 15.0, 18.5, 22.0, 30.0, 37.0, 45.0, 55.0, 75.0]
+                 7.5, 11.0, 15.0, 18.5, 22.0, 30.0, 37.0, 45.0, 55.0, 75.0,
+                 90.0, 110.0, 132.0, 160.0, 200.0, 250.0, 315.0, 355.0, 400.0,
+                 450.0, 500.0, 560.0, 630.0, 710.0, 800.0, 900.0, 1000.0]
 
 
 def compute(payload: dict) -> dict:
