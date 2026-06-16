@@ -22,7 +22,7 @@ for (const m of modules) {
     if (!Array.isArray(sm.words)) continue
     const before = sm.words.length
     sm.words = sm.words.filter((w: any) => {
-      if (w._instrument) { strippedInstr++; return false }
+      if (w._instrument || w._actuator) { strippedInstr++; return false }
       if (String(w.id ?? '').includes('__')) { strippedChildren++; return false }
       return true
     })

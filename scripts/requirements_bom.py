@@ -379,6 +379,18 @@ def assemble(out_dir: str):
                                  "unit_gbp": round(igbp), "line_gbp": round(igbp * qy),
                                  "basis": "installed instrument — catalogue-class budget"})
                     continue
+                # ── FINAL CONTROL ELEMENT (synthesizeActuation #141): a flow control valve
+                # or aeration blower sized from the contract. Catalogue-class budget. ──
+                if w.get("_actuator"):
+                    agbp = _child_price(w)
+                    nlow = name.lower()
+                    atag = ("FCV" if "valve" in nlow else "B" if "blower" in nlow
+                            else "FE" if "fan" in nlow else "Y")   # ISA: control valve / blower
+                    rows.append({"tag": atag, "requirement": requirement, "status": "ACTUATOR",
+                                 "part": "final control element (catalogue class)", "qty": qy,
+                                 "unit_gbp": round(agbp), "line_gbp": round(agbp * qy),
+                                 "basis": "installed actuator — catalogue-class budget"})
+                    continue
                 bc = _bespoke_class(name)   # 'strong' (process vessel) | 'simple' (shell) | 'none'
                 mt_spec = None
                 g_lookup = geom_by_name.get(re.sub(r"\s+\d+$", "", name).strip().lower())

@@ -477,7 +477,8 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
   // driven by which control-variable keys the contract computed, no `if class`.
   const contractInstr: any = { quantities: { ...contract.quantities,
     water_setpoint_temp_c: { value: 26.4, unit: '°C' }, ph_setpoint: { value: 7.4, unit: '' },
-    oxygen_demand_kg_day: { value: 1235, unit: 'kg/day' }, salinity_ppt: { value: 33, unit: 'ppt' } } }
+    oxygen_demand_kg_day: { value: 1235, unit: 'kg/day' }, salinity_ppt: { value: 33, unit: 'ppt' },
+    recirculation_flow_m3_h: { value: 13360, unit: 'm³/h' }, degasser_air_flow_m3_h: { value: 40000, unit: 'm³/h' } } }
   const instrMods: any = [
     { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
     { module: 'sensing_instrumentation', sub_modules: [{ id: 'sensing_instrumentation__x', words: [] }] },
@@ -499,6 +500,30 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
       return o.level && o.temp && o.doA && o.ph && o.sal && !o.pressure && o.rearLevelQty === '×10' && o.rearDoQty === '×10' && o.n1 >= 6 && o.n2 === o.n1
     },
     () => `instruments=${JSON.stringify(instr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}`))} n1=${instr1.length} n2=${instr2n}`,
+  ))
+
+  // ── A4. PROCESS ACTUATION: the final control elements the contract implies (#141) ──
+  // An inlet flow control valve PER fluid vessel (closing the level loop, qty matches the
+  // vessel count) + an aeration blower per air-flow duty (split into N units, sized with a
+  // SERVICE-CORRECT pressure so a degassing blower stays bounded — not the 309 kW / £375k
+  // machine the flat 25 kPa + linear £/kW produced). Universal; idempotent.
+  const actrOf = () => instrMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._actuator)))
+  const actr1 = actrOf()
+  const rearFcv = actr1.find((w: any) => /flow control valve/i.test(String(w.name_human)) && String(w._actuator_of || '').includes('rearing'))
+  const rearFcvQty = rearFcv ? String((rearFcv.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value ?? '') : ''
+  const blowers = actr1.filter((w: any) => /blower/i.test(String(w.name_human)))
+  const maxBlowerKw = Math.max(0, ...blowers.map((w: any) => parseFloat(String((w.modifier_characters || []).find((mc: any) => mc.kind === 'rating_primary')?.value ?? '0'))))
+  applyUniversalContractSizing(instrMods, contractInstr, { synthesizeMissing: false, onlyUnsized: true, dedupeAndStrip: false, instrument: true })
+  const actr2n = actrOf().length
+  out.push(assertEq(
+    'UNIVERSAL.process_actuation_synthesised_from_control_flows',
+    'the contract flow + air duties synthesise final control elements: an inlet FLOW CONTROL VALVE per fluid vessel (rearing tank qty ×10, DN-sized), ≥1 AERATION BLOWER from an air-flow duty with SERVICE-CORRECT pressure (degassing blower bounded ≤ 80 kW, not the 309 kW the flat-25-kPa bug gave); idempotent',
+    JSON.stringify({ valveOnRearing: !!rearFcv, rearFcvQty, blowerCount: blowers.length, maxBlowerKw: Math.round(maxBlowerKw), n1: actr1.length, n2: actr2n }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.valveOnRearing && o.rearFcvQty === '×10' && o.blowerCount >= 1 && o.maxBlowerKw > 0 && o.maxBlowerKw <= 80 && o.n1 >= 2 && o.n2 === o.n1
+    },
+    () => `actuators=${JSON.stringify(actr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}`))} maxBlowerKw=${Math.round(maxBlowerKw)} n1=${actr1.length} n2=${actr2n}`,
   ))
 
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──

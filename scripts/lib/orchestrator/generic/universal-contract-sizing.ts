@@ -456,7 +456,7 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], maxDepth = 
       const out: WordLike[] = []
       for (const w of sm.words) {
         out.push(w)
-        if (isInstrument(w)) continue            // a field instrument is a leaf — never an assembly
+        if (isInstrument(w) || isActuator(w)) continue   // a field instrument / valve / blower is a leaf — never an assembly
         const id = String(w.id ?? '')
         const depth = (id.match(/__/g) ?? []).length
         if (depth >= maxDepth) continue          // too deep — stop the recursion
@@ -698,12 +698,143 @@ export function synthesizeInstrumentation(modules: ModuleLike[], quantities: Rec
   return toAdd.length
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// PROCESS ACTUATION SYNTHESIS (Tristan #141 — the actuator sibling of #140).
+//
+// Every measured variable needs a FINAL CONTROL ELEMENT to act on it — a level
+// transmitter (#140) is only half a control loop; the other half is the valve that
+// admits flow. And every process AIR/GAS duty the contract declares needs a BLOWER to
+// move it. Both are derived from the contract, universal, no per-class table:
+//   · INLET FLOW CONTROL VALVE — one per fluid-vessel instance, DN-sized from the vessel's
+//     share of the recirculation/process flow (loop flow ÷ instance count). Pairs 1:1 with
+//     the level transmitter to close the level loop.
+//   · AERATION / PROCESS BLOWER — one set per `*_air_flow_m3_h` duty, sized for that air
+//     flow (split into N units above a single-machine cap), placed on the served vessel.
+//     Auto-corrects if the upstream air-flow quantity is later refined (no hardcoding).
+// Tagged `_actuator` so the BoM prices them from their installed-cost estimate and the
+// single-line / P&ID can wire them as actuated final elements.
+// ──────────────────────────────────────────────────────────────────────────────
+
+function isActuator(w: WordLike): boolean {
+  return (w as { _actuator?: boolean })._actuator === true
+}
+
+// DN from a volumetric flow at a target line velocity (2.0 m/s — standard pumped water),
+// rounded to the nearest preferred DN. Returns { dn, label, gbp } for a modulating control
+// valve (body + electric/pneumatic actuator), installed-cost budget (£ grows with DN).
+const PREFERRED_DN = [15, 20, 25, 32, 40, 50, 65, 80, 100, 125, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1200, 1400]
+function valveFromFlow(m3h: number): { dn: number; label: string; gbp: number } {
+  const v = 2.0
+  const dMm = Math.sqrt((4 * (m3h / 3600)) / (Math.PI * v)) * 1000
+  const dn = PREFERRED_DN.find((d) => d >= dMm) ?? PREFERRED_DN[PREFERRED_DN.length - 1]
+  // installed cost grows super-linearly with bore; £ ≈ 10·DN^1.2 fits real modulating
+  // butterfly-control-valve prices (DN100 ≈ £3.3k, DN500 ≈ £15k, DN1400 ≈ £55k) — far
+  // better than the linear £·DN that under-prices large valves.
+  return { dn, label: `DN${dn} modulating control valve (${Math.round(m3h)} m³/h @ ${v} m/s)`, gbp: Math.round(800 + 10 * Math.pow(dn, 1.2)) }
+}
+
+// Blower power (kW) from air flow × the process pressure rise / efficiency; cost from the
+// duty with a SIZE TAPER (£/kW falls with machine size). dP is service-dependent: a
+// degassing/stripping blower only overcomes packing + ducting (~4 kPa), a SUBMERGED
+// aeration blower must overcome the diffuser depth (ρg·h). £ ≈ 2000 + 1200·kW^0.8 fits
+// real blower prices (10 kW ≈ £10k, 50 kW ≈ £30k, 200 kW ≈ £85k) — not the linear £/kW
+// that priced a 309 kW machine at £375k.
+function blowerFromAirFlow(m3hEach: number, dPkPa: number): { kw: number; gbp: number } {
+  const eff = 0.6
+  const kw = Math.max(1.5, (m3hEach / 3600) * (dPkPa * 1000) / (eff * 1000))
+  return { kw, gbp: Math.round(2000 + 1200 * Math.pow(kw, 0.8)) }
+}
+
+function actuatorWord(kind: 'valve' | 'blower', label: string, host: WordLike | undefined, qty: number, spec: ModifierCharacter[], gbp: number, form: string): WordLike {
+  const hostName = host?.name_human ?? 'Process Loop'
+  const hostId = String(host?.id ?? 'process_loop')
+  const mods: ModifierCharacter[] = [mod('quantity', `×${Math.max(1, Math.round(qty))}`), ...spec]
+  mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(gbp)))))
+  mods.push(mod('form', form))
+  mods.push(mod('part_number', 'TBD (catalogue class)'))
+  mods.push(mod('lifecycle', 'Concept design — final control element sized from the contract; exact MPN at detailed design'))
+  mods.push(mod('installation', `Field-mounted on ${hostName}; actuator wired to the control system`))
+  const id = `actr_${kind}_on_${sanitizeId(hostId)}`.replace(/__+/g, '_')
+  return { id, name_human: label, content_character: { character_id: id, name_human: label }, modifier_characters: mods, ...({ _synthesized: true, _actuator: true, _actuator_of: hostId } as object) }
+}
+
+/** Synthesise the final control elements the contract implies — an inlet flow control valve
+ *  per fluid vessel (closing the level loop) and an aeration/process blower per air-flow
+ *  duty. Mutates modules in place; returns the number of actuator words added. Universal. */
+export function synthesizeActuation(modules: ModuleLike[], quantities: Record<string, number>): number {
+  // idempotency: drop any actuators a prior pass added
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) {
+    if (Array.isArray(sm.words)) sm.words = sm.words.filter((w) => !isActuator(w))
+  }
+  const vessels: WordLike[] = []
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    if (isFluidVessel(w)) vessels.push(w)
+  }
+  // the dominant process/recirculation flow that feeds the vessels
+  const loopFlow = pickQ(quantities, /recircul.*flow_m3_h|recirculation_flow_m3_h/) ?? pickQ(quantities, /throughput_m3_h|water_flow_m3_h/) ?? 0
+  const target = findActuationSubModule(modules)
+  const toAdd: { sm: SubLike; w: WordLike }[] = []
+
+  // A. inlet flow control valve per fluid vessel instance
+  if (loopFlow > 0 && target) {
+    for (const v of vessels) {
+      const count = parentQty(v)
+      const perInst = loopFlow / Math.max(1, count) // this vessel's share of the loop flow
+      const valve = valveFromFlow(perInst)
+      toAdd.push({ sm: target, w: actuatorWord('valve', 'Inlet Flow Control Valve', v, count,
+        [mod('dimension', valve.label), mod('rating_primary', `${Math.round(perInst)}`, 'm³/h')], valve.gbp,
+        `${valve.label}, on the inlet of ${v.name_human}; modulated against the tank level transmitter to balance the recirculation flow`) })
+    }
+  }
+
+  // B. aeration / process blower per air-flow duty (split into N units above a single-unit cap)
+  const SINGLE_BLOWER_CAP = 30000 // m³/h per machine
+  for (const [key, val] of Object.entries(quantities)) {
+    if (!/_air_flow_m3_h$/.test(key) || !(val > 0)) continue
+    const stemKey = significantStems(key.replace(/_air_flow_m3_h$/, ''))
+    const host = vessels.find((v) => { const vs = wordStems(v); return stemKey.some((s) => vs.includes(s)) })
+    const n = Math.max(1, Math.ceil(val / SINGLE_BLOWER_CAP))
+    const each = val / n
+    // dP by service: a degassing / stripping blower overcomes only packing + ducting
+    // (~4 kPa); a submerged-aeration blower overcomes the diffuser depth (ρg·h, capped to
+    // a sane 8–25 kPa band). Read the service from the air-flow KEY (the degasser is box-
+    // modelled, so it has no host vessel to read a depth from).
+    const isDegas = /degas|strip|scrub|\bvent|tower|column|contactor/.test(key)
+    const dPkPa = isDegas ? 4 : Math.min(25, Math.max(8, (readParentPhysics(host ?? ({} as WordLike)).htM || 1.2) * 9.81))
+    const b = blowerFromAirFlow(each, dPkPa)
+    const dest = (host && findWordSubModule(modules, host)) || target
+    if (!dest) continue
+    toAdd.push({ sm: dest, w: actuatorWord('blower', 'Aeration Blower', host, n,
+      [mod('dimension', boxFromRatingKw(b.kw)), mod('rating_primary', `${Math.round(b.kw)}`, 'kW')], b.gbp,
+      `Centrifugal ${isDegas ? 'degassing' : 'aeration'} blower, ${Math.round(each).toLocaleString('en-GB')} m³/h @ ~${Math.round(dPkPa)} kPa each${host ? `, serving ${host.name_human}` : ''}; ${n}× duty/assist`) })
+  }
+
+  for (const { sm, w } of toAdd) ((sm.words ??= []) as WordLike[]).push(w)
+  return toAdd.length
+}
+
+function findActuationSubModule(modules: ModuleLike[]): SubLike | undefined {
+  for (const re of [/actuation|valve|kinematic/i, /mass_fluid|fluid|process|circulation/i]) {
+    for (const m of modules ?? []) for (const sm of (m.sub_modules ?? []) as SubLike[]) {
+      if (re.test(String(sm.id ?? ''))) return sm
+    }
+  }
+  return (modules?.[0]?.sub_modules ?? [])[0] as SubLike | undefined
+}
+function findWordSubModule(modules: ModuleLike[], target: WordLike): SubLike | undefined {
+  for (const m of modules ?? []) for (const sm of (m.sub_modules ?? []) as SubLike[]) {
+    if ((sm.words ?? []).some((w) => w.id === target.id)) return sm
+  }
+  return undefined
+}
+
 export interface UniversalSizingResult {
   sized: number
   synthesized: number
   dropped: number
   exploded: number
   instrumented: number
+  actuated: number
   groups: number
   matchedPhrases: string[]
   synthesizedPhrases: string[]
@@ -1189,6 +1320,11 @@ export function applyUniversalContractSizing(
   // CANONICAL vessel set (post-dedupe), before the explosion (instruments are leaves). ──
   const instrumented = (opts.instrument ?? true) ? synthesizeInstrumentation(modules, quantities) : 0
 
+  // ── C4. PROCESS ACTUATION: the final control elements the contract implies — an inlet
+  // flow control valve per fluid vessel (closing the level loop) + an aeration/process
+  // blower per air-flow duty. Runs after instrumentation, before the explosion (leaves). ──
+  const actuated = (opts.instrument ?? true) ? synthesizeActuation(modules, quantities) : 0
+
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
   const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules) : 0
 
@@ -1198,6 +1334,7 @@ export function applyUniversalContractSizing(
     dropped,
     exploded,
     instrumented,
+    actuated,
     groups: groups.length,
     matchedPhrases: [...matched],
     synthesizedPhrases,
