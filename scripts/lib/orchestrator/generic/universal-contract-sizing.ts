@@ -128,6 +128,37 @@ function significantStems(phrase: string): string[] {
   return out
 }
 
+// ── "computed" twin-collapse (universal, deterministic) ──────────────────────
+// The engineering contract sometimes carries TWO parallel quantity families for the
+// SAME physical unit: the grounded `uv_reactor_volume_m3` AND a recomputed alias
+// `computed_uv_reactor_volume_m3` (likewise `computed_biofilter_*`, `computed_degasser_*`,
+// `computed_heat_pump_*`). Left alone, each family yields its OWN equipment group → its own
+// synthesised word ("Uv Reactor" AND "Computed Uv Reactor") → its own BoM line, geometry node
+// and routed connection. That is the RAS phantom-cost duplication (incl. a self-pipe
+// "Computed Uv Reactor → Uv Reactor" and a mis-priced £1M twin). Normalise the group key by
+// STRIPPING a leading or embedded `computed` token so both families fold into the SAME logical
+// unit — exactly ONE word is ever synthesised/reconciled, under the real (de-prefixed) name.
+//   · Strip ONLY a whole `computed` token (`computed_uv_reactor` → `uv_reactor`, `recomputed`
+//     is NOT a token so it is untouched), then collapse the freed separators.
+//   · NEVER strip to empty: a key named purely `computed_*` with no base noun keeps its phrase
+//     (defensive — no such key exists today).
+// A `computed_*` key with NO real twin (`computed_degasser_column`, `computed_building_process`)
+// still forms its OWN group, just titled by the cleaner de-prefixed phrase — which is correct,
+// not an over-merge: it collapses onto a real group ONLY when one shares the same base noun.
+function stripComputedToken(phrase: string): string {
+  const cleaned = phrase
+    .replace(/(^|[_\s])computed([_\s]|$)/gi, '$1$2') // drop a whole "computed" token, keep the boundary
+    .replace(/[_\s]{2,}/g, '_') // collapse the gap the removal left
+    .replace(/^[_\s]+|[_\s]+$/g, '') // trim leading/trailing separators
+  return cleaned.length > 0 ? cleaned : phrase
+}
+// id-level twin-collapse: drop a leading/embedded `computed_` segment from a word/host id so
+// `computed_uv_reactor_synth_word` ↔ `uv_reactor_synth_word`. Mirrors stripComputedToken.
+function stripComputedId(id: string): string {
+  const cleaned = String(id ?? '').replace(/(^|_)computed_/i, '$1')
+  return cleaned.length > 0 ? cleaned : id
+}
+
 function buildGroups(quantities: Record<string, number>): EquipGroup[] {
   const byPhrase = new Map<string, EquipGroup>()
   for (const [key, value] of Object.entries(quantities)) {
@@ -141,7 +172,9 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
     let matched: { phrase: string; measure: Measure; perEach: boolean } | null = null
     for (const rule of SUFFIX_RULES) {
       if (rule.re.test(key)) {
-        matched = { phrase: key.replace(rule.re, ''), measure: rule.measure, perEach: !!rule.each }
+        // Strip the "computed" twin token so a recomputed alias folds into the real unit's
+        // group (one logical unit, one synthesised word) — see stripComputedToken.
+        matched = { phrase: stripComputedToken(key.replace(rule.re, '')), measure: rule.measure, perEach: !!rule.each }
         break
       }
     }
@@ -1433,6 +1466,8 @@ export interface PrincipalReconcileResult {
   removedOrphanChildren: number // sub-components of removed duplicates/inventions dropped
   synthesizedMissing: number // principal groups with NO surviving synth word, re-created
   buildingResynthesised: number // building take-off lines re-derived against the FINAL equipment set
+  rehostedDependents: number // instruments/actuators whose dropped "computed_*" host was re-pointed to the real host
+  removedDuplicateDependents: number // those that then collided with an identical sibling on the real host → dropped
   details: string[]
 }
 
@@ -1452,7 +1487,7 @@ export function reconcilePrincipalEquipment(
   contract: ContractInProgress,
 ): PrincipalReconcileResult {
   const res: PrincipalReconcileResult = {
-    groups: 0, repaired: 0, removedDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, buildingResynthesised: 0, details: [],
+    groups: 0, repaired: 0, removedDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, buildingResynthesised: 0, rehostedDependents: 0, removedDuplicateDependents: 0, details: [],
   }
 
   const quantities: Record<string, number> = {}
@@ -1486,8 +1521,14 @@ export function reconcilePrincipalEquipment(
   for (const c of canons) byCanon.set(c.id, [])
   const unclaimed: Owned[] = [] // _synthesized principals backed by no contract group
 
+  // Compare an id/charId after collapsing the "computed" twin token (module-scope
+  // stripComputedId), so a stray `computed_uv_reactor_synth_word` already in the tree (a
+  // prior-state re-run, or an LLM copy) folds onto the real `uv_reactor` canon and is merged —
+  // never treated as a separate invented principal.
   const canonClaimedBy = (w: WordLike): CanonEquip | undefined => {
-    const exact = canons.find((c) => w.id === c.id || w.content_character?.character_id === c.charId)
+    const wid = stripComputedId(String(w.id ?? ''))
+    const wcid = stripComputedId(String(w.content_character?.character_id ?? ''))
+    const exact = canons.find((c) => wid === c.id || (wcid !== '' && wcid === c.charId))
     if (exact) return exact
     const wStems = wordStems(w)
     if (wStems.length === 0) return undefined
@@ -1560,8 +1601,17 @@ export function reconcilePrincipalEquipment(
       }
       continue
     }
-    // Survivor preference: one already carrying the canonical id, else the first.
-    owned.sort((a, b) => (a.word.id === c.id ? -1 : 0) - (b.word.id === c.id ? -1 : 0))
+    // Survivor preference: keep the REAL (non-"computed") word, ideally one already carrying
+    // the canonical id, then anything not prefixed `computed_*`, then the first. When a real
+    // emitter word and its `computed_*` twin both claim the canon, the real word survives (its
+    // identity/spec is the grounded one) and the twin is dropped below — never the reverse.
+    const rank = (w: WordLike): number => {
+      const id = String(w.id ?? '')
+      if (id === c.id) return 0
+      if (!/(^|_)computed_/i.test(id)) return 1
+      return 2
+    }
+    owned.sort((a, b) => rank(a.word) - rank(b.word))
     const survivor = owned[0]
     const oldId = survivor.word.id
     if (forceCanonIdentity(survivor.word, c)) {
@@ -1620,6 +1670,81 @@ export function reconcilePrincipalEquipment(
         }
         sm.words = out
       }
+    }
+  }
+
+  // RE-HOST + DE-DUP DEPENDENTS OF A COLLAPSED "computed_*" TWIN. The instrument / actuator
+  // passes synthesise their words ONTO a host vessel (`_instrument_of` / `_actuator_of` + an
+  // `…_on_<hostId>` id). On already-emitted state where the OLD sizing minted both a real and
+  // a `computed_*` twin vessel, those passes instrumented BOTH — so a dropped/renamed twin host
+  // leaves dependents pointing at a host that no longer exists (e.g. `instr_level_on_computed_
+  // biofilter_synth_word` after the `Computed Biofilter` principal collapsed into `Biofilter`).
+  // A FRESH run never hits this (no twin vessel is ever synthesised), but the reconcile must be
+  // idempotent on prior state: re-point each such dependent's host to the surviving canonical
+  // host, then drop it if an identical-kind sibling already sits on that host (so the cleanup
+  // also removes the routed connection the dropped twin carried, via its now-absent node).
+  // Universal + deterministic — keyed on the "computed" token + the surviving host-id set.
+  {
+    const hostIdOf = (w: WordLike): string =>
+      String((w as { _instrument_of?: string; _actuator_of?: string })._instrument_of
+        ?? (w as { _actuator_of?: string })._actuator_of ?? '')
+    // Surviving top-level principal host ids (what a dependent is allowed to hang off).
+    const survivingHosts = new Set<string>()
+    for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+      const id = String(w.id ?? '')
+      if (!id || id.includes('__')) continue
+      if (isInstrument(w) || isActuator(w)) continue
+      survivingHosts.add(id)
+    }
+    const seen = new Set<string>() // `${kind-key}|${canonicalHost}` already kept → later collisions dropped
+    for (const m of modules ?? []) {
+      for (const sm of m.sub_modules ?? []) {
+        if (!Array.isArray(sm.words)) continue
+        const out: WordLike[] = []
+        for (const w of sm.words) {
+          if (!isInstrument(w) && !isActuator(w)) { out.push(w); continue }
+          const host = hostIdOf(w)
+          const hostIsComputed = host !== '' && /(^|_)computed_/i.test(host)
+          const strippedHost = stripComputedId(host)
+          // ORPHAN DROP: a dependent whose host carried a "computed" token and whose host is now
+          // gone with NO surviving real equivalent (neither the computed id nor its stripped
+          // form is a live principal) hung off a twin that was itself dropped as invented (e.g.
+          // the duty-only "Computed Building Process", never a real principal). Remove it — it
+          // measures/actuates a unit that does not exist. A loop-scope host (e.g. `process_loop`,
+          // no "computed" token) is never touched.
+          if (hostIsComputed && !survivingHosts.has(host) && !survivingHosts.has(strippedHost)) {
+            res.removedDuplicateDependents += 1
+            continue
+          }
+          // Re-point ONLY when the host carries a "computed" token, is now absent, and its
+          // stripped form is a surviving real host (so we never invent a host).
+          const needsRehost = hostIsComputed && !survivingHosts.has(host) && survivingHosts.has(strippedHost)
+          if (needsRehost) {
+            if ((w as { _instrument_of?: string })._instrument_of !== undefined) (w as { _instrument_of?: string })._instrument_of = strippedHost
+            if ((w as { _actuator_of?: string })._actuator_of !== undefined) (w as { _actuator_of?: string })._actuator_of = strippedHost
+            const oldId = String(w.id ?? '')
+            const newId = oldId.replace(`_on_${host}`, `_on_${strippedHost}`)
+            if (newId !== oldId) {
+              w.id = newId
+              if (w.content_character && typeof w.content_character === 'object') w.content_character.character_id = newId
+            }
+            res.rehostedDependents += 1
+          }
+          // De-dup identical-kind dependents on the same (now-canonical) host. The kind key is
+          // the dependent's id with the host segment removed (so `instr_level_on_X` keys on
+          // `instr_level_on_`), keeping the first and dropping later collisions.
+          const finalHost = hostIdOf(w)
+          const kindKey = String(w.id ?? '').replace(`_on_${finalHost}`, '_on_') || (w.name_human ?? '')
+          const dedupKey = `${kindKey}|${finalHost}`
+          if (seen.has(dedupKey)) { res.removedDuplicateDependents += 1; continue }
+          seen.add(dedupKey)
+          out.push(w)
+        }
+        sm.words = out
+      }
+    }
+    if (res.rehostedDependents > 0 || res.removedDuplicateDependents > 0) {
+      res.details.push(`re-hosted ${res.rehostedDependents} dependent(s) off collapsed computed-twin host(s); dropped ${res.removedDuplicateDependents} duplicate dependent(s)`)
     }
   }
 
