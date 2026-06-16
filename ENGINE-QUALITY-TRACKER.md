@@ -6,6 +6,28 @@ _Last updated 2026-06-15. Run under inspection: `out/ras-converged` → `dashboa
 
 ---
 
+## ▶ SESSION 2026-06-16 — completed the plant: instruments → actuators → BoP → process systems → cost (7 commits, all on main)
+
+Worked the tracked list #139–148 in order. **The BoM is now a COMPLETE, correctly-costed plant** — the highest-leverage move (BoM data coverage is THE AIM's long pole). Every change is universal (driven by contract keys/duties, no `if class`), each with a regression invariant + `requirements_bom --selftest` + `prove-physics` PASS, and verified by LOOKING at the dashboard BoM.
+
+- ✅ **#139 Blender open-tank** (`cf535d97f`) — tanks read as open fish tanks (dark water surface + centre dual-drain standpipe + rim/handrail), not green blobs.
+- ✅ **#140 per-tank INSTRUMENTATION** (`cb4815063`) — universal `synthesizeInstrumentation()`: every contract control variable → its field instrument on the vessel that holds it. Level/temp/DO per tank (×10), pH/salinity on the loop, NO pressure on open tanks. 35 instruments, ~£34k I&C (was ZERO analysers — life-safety). Removed the buried duplicate fittings.
+- ✅ **#141 ACTUATORS** (`c225b8b7c`) — `synthesizeActuation()`: inlet flow control valve per vessel (closes the level loop) + aeration blowers per air-flow duty. Service-correct dP (degas 4 kPa, submerged ≤25) + tapered costs (caught a £1.875M blower → £146k). ~£405k.
+- ✅ **#142 BALANCE-OF-PLANT** (`5d845c051`) — `synthesizeUtilitySafety()`: standby generator (life-safety, load×0.7), make-up water, bleed/drain, HRV ventilation. ~£432k.
+- ✅ **#143 PROCESS-SUPPORT** (`2e17bf9ed`) — `synthesizeProcessSystems()`: dosing, feed, LOX, sludge, SCADA, grading. ~£463k.
+- ✅ **#144 OPEN-TANK COST** (`75b61478d`) — `_materials_takeoff` open vs closed: no top head, tapered hydrostatic wall, FRP delivery factor → rearing tank £194k→£77k each (−£1.19M phantom steel). Open-tank explosion variant (no top-head/skirt). Cost + breakdown share one noun set.
+- ✅ **#145 MBBR MEDIA** (`18f2506ae`) — `*_media_volume_m3` → biofilm-carrier media line (404 m³ × £700 = £283k, the missing heart of the biofilter). Degasser 10:1 air:water CONFIRMED CORRECT (textbook); £12,300 stubs + zero-cost E&I → #129.
+- **BoM arc:** £2.80M → instruments → actuators → BoP → process → £4.10M → open-tank cost −£1.19M → +media → **£3.19M (£15.6k/t·yr, in the RAS band)**. 256 requirement lines.
+- **Invariants added (all PASS):** `process_instrumentation_synthesised_from_control_variables`, `process_actuation_synthesised_from_control_flows`, `utility_safety_systems_synthesised_from_duties`, `process_support_systems_synthesised_from_duties` (7 systems incl. media), `open_tank_explodes_without_pressure_vessel_parts`.
+- **Tooling:** `scripts/test-instrumentation.tsx` re-applies the sizing+synthesis passes to a state in isolation (strips children/instruments/actuators/utilities/process, re-derives, refreshes `state.requirementsBom`) — the offline harness for these passes.
+
+### ▶ REMAINING (need Tristan — visual judgment / risky cascade), precisely diagnosed:
+- **#148 heat-pump 8× UNDERSIZED** — 145 kW thermal vs ~1202 kW duty (makeup heating 1019 kW dominates, absent from sizing). Fix = make-up/bleed heat-recovery HEX + resize heat-pump (~336 kW thermal) — but `heat_pump_electrical` 41→96 kW CASCADES (load→transformer→genset→SLD). Do WITH Tristan. (`ras_thermal__heat_balance.py` already computes 1045 kW but it doesn't size the pump.)
+- **#146 single-line** — no standby generator/ATS drawn (generator exists in state); DUPLICATE feeders (synth + skeleton both have electrical edges); no UPS/MCC. Visual-iteration.
+- **#147 Blender polish** — frame subordination, hero framing, signal trunk, pipe taper. Pure visual judgment.
+
+---
+
 ## ▶ RESUME POINT (post-compaction, 2026-06-15)
 
 **Sequence Tristan set:** physics tools → Blender → 8 drawings → loops → BoM. Get each EXCELLENT *before* the PDFs. **Every change universal (no per-class logic).**
