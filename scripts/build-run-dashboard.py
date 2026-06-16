@@ -73,6 +73,7 @@ h3{{font-size:14px;font-weight:640;margin:16px 0 6px;color:#2c333c}}
 table{{border-collapse:collapse;font-size:12.5px;width:100%;margin-top:4px}}
 td,th{{border:1px solid #e7eaee;padding:4px 9px;text-align:left;vertical-align:top}}
 th{{background:#f0f2f5;font-weight:620}} td.n{{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}}
+tr.sub td{{color:#7a8089;background:#fbfcfd;font-size:0.93em}}
 .grid{{display:grid;grid-template-columns:1fr 1fr;gap:14px}}
 .grid3{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}}
 .imgcard{{background:#fff;border:1px solid #e3e6ea;border-radius:10px;overflow:hidden}}
@@ -366,11 +367,16 @@ if isinstance(req_bom, list) and req_bom:
             S.append(f"<th>{esc(_hdr.get(c, c.replace('_', ' ')))}</th>")
         S.append('</tr>')
         for r in equip:
-            S.append('<tr>')
+            is_sub = r.get('status') == 'SUB-COMPONENT' or r.get('sub_of')
+            S.append("<tr class='sub'>" if is_sub else '<tr>')
             for c in have:
                 v = r.get(c)
                 cls = " class='n'" if (c in NUMC or isinstance(v, (int, float))) else ''
-                if c in ('unit_gbp', 'line_gbp') and v not in (None, ''):
+                if c in ('unit_gbp', 'line_gbp') and is_sub and r.get('breakdown_gbp') not in (None, ''):
+                    # sub-component: show its £ as a BREAKDOWN (already inside the parent
+                    # total — parenthesised so it's clear it is not added again)
+                    disp = f"(£{fmtnum(r.get('breakdown_gbp'))})" if c == 'line_gbp' else f"£{fmtnum(v)}"
+                elif c in ('unit_gbp', 'line_gbp') and v not in (None, ''):
                     disp = f"£{fmtnum(v)}"
                 elif c in UNIT and isinstance(v, (int, float)):
                     disp = f"{fmtnum(v)}{UNIT[c]}"
