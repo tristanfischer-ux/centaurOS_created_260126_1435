@@ -3713,6 +3713,114 @@ def audit_routes(parts, out_dir):
     return metrics
 
 
+# ── ROUTE → COSTED-SPEC RECONCILIATION (council 2026-06-16, two routing-cost fixes) ──
+# Runs ONCE after audit_routes, BEFORE write_connection_schedule + write_route_manifest.
+# Both of those read _CONN_SPECS, so reconciling the specs in place repairs the COST
+# (connection-schedule + requirements_bom) AND the DRAWINGS (route-manifest → isometric)
+# together — ONE source. Universal + deterministic: no class table, no `if ras`.
+#
+#  DEFECT 1 — a FLUID edge whose source OR target resolves to a PURE INSTRUMENT is
+#    nonsense (a £167k DN350 process main to a Temperature Sensor). The primary
+#    topology / cross-module grammar routes these even though the AUGMENT path's
+#    _required_services guard already discards 'water' for an instrument — they bypass
+#    that. DROP them from the costed schedule + the drawn manifest. The instrument is
+#    still wired by its own signal cable elsewhere, so nothing is orphaned.
+#
+#  DEFECT 2 — a routed run that DETOURS (perimeter spine, or a giant riser for a 2.5 m
+#    hop) inflates length_m → £ AND pump friction-head (dP over fake length). CAP the
+#    COSTED length at min(actual, straight_line_endpoint_distance × 2.5 + 5 m): real
+#    routing has bends/risers (~1.5-2.5× straight-line is normal) but never ~20×. The
+#    straight-line is the Euclidean XYZ distance between the two routed endpoints (the
+#    polyline ends — includes a legitimate riser between endpoints at different
+#    heights, so a tall genuine drop is NOT over-cut). The DRAWN geometry (waypoints)
+#    is left as-is; only the costed/scheduled length_m is capped (the manifest reports
+#    BOTH so the isometric is honest about geometry while the BoM is honest about £).
+ROUTE_LENGTH_DETOUR_FACTOR = 2.5    # routed length may exceed straight-line by ≤ this…
+ROUTE_LENGTH_DETOUR_PAD_M = 5.0     # …plus this pad (terminal stubs / short hops)
+
+
+def _spec_pipe_rate_gbp_per_m(spec):
+    """The £/m this spec's length costs at, for the saved-£ log (PIPE only — DEFECT 2
+    bites overwhelmingly on fluid pipes; a coarse rate is fine for a one-line summary,
+    the authoritative re-cost is cs.connection_schedule_costed on the capped specs)."""
+    if spec.get("kind") != "pipe":
+        return 0.0
+    return float(cs.PIPE_COST_GBP_PER_M_BY_DN.get(spec.get("size_label"), 0.0))
+
+
+def reconcile_route_specs(parts):
+    """Apply the two routing-cost fixes to _CONN_SPECS in place (see block comment).
+    Returns a small summary dict. Pure over the module globals — no I/O."""
+    if not _CONN_SPECS:
+        return {"instrument_edges_dropped": 0, "routes_capped": 0,
+                "length_saved_m": 0.0, "gbp_saved": 0.0}
+
+    # straight-line XYZ endpoint distance per run (from the polyline ends the router
+    # already recorded), keyed by run name — the cap's denominator.
+    straight_m_by_name = {}
+    for r in _ROUTE_LOG:
+        wp = r.get("waypoints") or []
+        if len(wp) >= 2:
+            a, b = wp[0], wp[-1]
+            straight_m_by_name[r["name"]] = math.dist(a, b) * fl.MM   # mm → m
+
+    cost_before = cs.connection_schedule_costed(_CONN_SPECS)["totals"]["grand_total_gbp"]
+
+    # DEFECT 1 — drop fluid specs that tie a pure instrument into the process loop.
+    kept = []
+    dropped_instr = []
+    for s in _CONN_SPECS:
+        if _mech_is_fluid(s.get("mechanism")):
+            pa = resolve_endpoint(str(s.get("from_part") or ''), parts)
+            pb = resolve_endpoint(str(s.get("to_part") or ''), parts)
+            from_instr = _endpoint_is_pure_instrument(
+                pa.name if pa is not None else s.get("from_part"))
+            to_instr = _endpoint_is_pure_instrument(
+                pb.name if pb is not None else s.get("to_part"))
+            if from_instr or to_instr:
+                dropped_instr.append((s.get("from_part"), s.get("to_part"),
+                                      s.get("size_label"), float(s.get("length_m") or 0.0)))
+                continue
+        kept.append(s)
+    if dropped_instr:
+        _CONN_SPECS[:] = kept
+
+    # DEFECT 2 — cap the COSTED length of any detour at straight-line × factor + pad.
+    n_capped = 0
+    saved_m = 0.0
+    for s in _CONN_SPECS:
+        L = float(s.get("length_m") or 0.0)
+        sl = straight_m_by_name.get(s.get("run_name"))
+        if sl is None or sl <= 0.0 or L <= 0.0:
+            continue
+        cap = sl * ROUTE_LENGTH_DETOUR_FACTOR + ROUTE_LENGTH_DETOUR_PAD_M
+        if L > cap + 0.01:
+            s["length_capped_from_m"] = round(L, 2)         # disclose the original
+            s["length_straight_m"] = round(sl, 2)
+            s["length_m"] = round(cap, 2)
+            n_capped += 1
+            saved_m += (L - cap)
+
+    cost_after = cs.connection_schedule_costed(_CONN_SPECS)["totals"]["grand_total_gbp"]
+    gbp_saved = cost_before - cost_after
+
+    instr_m = sum(d[3] for d in dropped_instr)
+    print(f"[univ][route-reconcile] DEFECT 1: dropped {len(dropped_instr)} fluid "
+          f"edge(s) routed onto a pure instrument ({instr_m:.0f} m of phantom pipe)"
+          + ("".join(f"\n[univ][route-reconcile]   drop  {a!r}→{b!r}  {sz} {L:.0f} m"
+                     for a, b, sz, L in dropped_instr) if dropped_instr else ""))
+    print(f"[univ][route-reconcile] DEFECT 2: capped {n_capped} detour route(s) at "
+          f"{ROUTE_LENGTH_DETOUR_FACTOR:g}× straight-line + {ROUTE_LENGTH_DETOUR_PAD_M:g} m "
+          f"({saved_m:.0f} m of routed length removed)")
+    print(f"[univ][route-reconcile] costed £ {cost_before:,.0f} → {cost_after:,.0f} "
+          f"(saved £{gbp_saved:,.0f})")
+    return {"instrument_edges_dropped": len(dropped_instr),
+            "instrument_drop_detail": dropped_instr,
+            "routes_capped": n_capped,
+            "length_saved_m": round(saved_m, 1),
+            "gbp_saved": round(gbp_saved, 2)}
+
+
 def _write_connection_bom_md(out_dir, rows, totals):
     """Write a readable COSTED distribution BoM table to connection-bom.md:
     mechanism | from→to | size | length m | qty | £, grouped by mechanism with
@@ -4440,7 +4548,10 @@ def write_route_manifest(out_dir):
             "service": mc or None,
             "size_label": size_label,
             "outer_dia_mm": outer_dia,
-            "length_m": spec.get("length_m"),
+            "length_m": spec.get("length_m"),   # COSTED length (detour-capped — see reconcile)
+            # If reconcile_route_specs capped this run, disclose the as-routed length so
+            # the drawn polyline (waypoints) stays honest while the BoM uses the cap.
+            "length_routed_m": spec.get("length_capped_from_m"),
             "waypoints_mm": wp,
             "fittings": _rm_fittings(r.get("waypoints", []), is_tap=is_tap),
         })
@@ -5649,6 +5760,33 @@ def _edge_service(mech):
     if 'fluid' in m or m in ('water', 'slurry', 'liquid', 'thermal', 'process_flow', 'process_fluid'):
         return 'water'
     return None
+
+
+# A FLUID-carrying mechanism (the ones whose routed run is a process pipe, not a cable
+# or a signal lead). Mirrors _edge_service's 'water' branch — a pipe to a pure
+# instrument (DEFECT 1) is only ever wrong on a FLUID edge. Kept as its own predicate
+# so the routing-level reconciliation reads as intent.
+def _mech_is_fluid(mech):
+    return _edge_service(mech) == 'water'
+
+
+# A pure FIELD INSTRUMENT measures the process; it never carries the process fluid in
+# its own main (a temperature sensor on a DN350 water pipe is nonsense — it is wired by
+# its signal lead, not a pipe). This is the EXACT predicate the _required_services
+# replica uses to discard 'water' for an instrument (lines ~5612-5616 above — KEEP IN
+# SYNC): an endpoint is a pure instrument if its name matches a sensing word AND NOT a
+# vessel/inline word (a control valve / an analyser BUILT INTO a degasser is inline and
+# legitimately on the loop). Used at the ROUTING level to drop fluid edges the PRIMARY
+# topology / cross-module grammar routed straight onto an instrument (those bypass the
+# AUGMENT path's _required_services guard). Universal + deterministic — name-only, no
+# class table.
+def _endpoint_is_pure_instrument(name):
+    t = re.sub(r'[^a-z0-9]', '', str(name or '').lower())
+    _is_sensor = any(k in t for k in ('sensor', 'probe', 'transmit', 'gauge', 'analy', 'detector'))
+    _is_inline = ('valve' in t) or any(k in t for k in (
+        'tank', 'vessel', 'filter', 'mbbr', 'degas', 'skim', 'clarifier', 'reactor',
+        'column', 'tower', 'cone', 'exchanger', 'separator', 'contactor', 'sump', 'reservoir', 'drum'))
+    return _is_sensor and not _is_inline
 
 
 def augment_topology_connect_orphans(state, topology, parts):
@@ -11196,6 +11334,14 @@ def main():
     # from the emitted polylines + equipment footprints; writes route-audit.json.
     route_metrics = audit_routes(parts, out_dir)
 
+    # ── ROUTE → COSTED-SPEC RECONCILIATION (council 2026-06-16) — two routing-cost
+    # fixes applied to _CONN_SPECS in place BEFORE the schedule + manifest read them,
+    # so the COST and the DRAWINGS are repaired from ONE source: (1) drop fluid pipes
+    # routed onto a pure instrument; (2) cap a detour's COSTED length at 2.5× the
+    # straight-line endpoint distance + 5 m. Universal + deterministic; a no-op on a
+    # plant with no instrument pipes + sane short routes.
+    route_reconcile = reconcile_route_specs(parts)
+
     # ── CONNECTION SCHEDULE (Phase C) — the BoM feedback. Every run was sized at its
     # REAL diameter from its rating; collect the ConnectionSpecs into the distribution
     # schedule (cable-m by CSA, pipe-m by DN, duct-m by size) + flag out-of-spec runs.
@@ -11272,6 +11418,9 @@ def main():
               "topology_unresolved": [u[:3] for u in unresolved],
               "regions": regions,
               "route_audit": route_metrics,
+              "route_reconcile": {k: route_reconcile[k] for k in
+                                  ("instrument_edges_dropped", "routes_capped",
+                                   "length_saved_m", "gbp_saved")},
               "connection_schedule_totals": conn_schedule.get("totals"),
               "parts_manifest_count": parts_manifest.get("count"),
               "route_manifest_count": route_manifest.get("count"),
