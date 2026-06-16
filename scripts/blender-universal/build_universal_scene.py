@@ -382,7 +382,7 @@ INSPECT_ACCESS_STEEL_RE = re.compile(
     r"u_ladhoop_|u_ladstr_|u_stub_|"          # caged-ladder + routing nozzle stubs
     r"_platform_|_platrail_|"                  # access platform ring + its handrail
     r"_neck\b|_flange\b|_manway\b|_ntop\b|_nbot\b|"  # vessel nozzle stubs + manway
-    r"_cover\b|_handrail\b|_windgirder\b|_post_|_plinth\b",  # tank roof + handrail +
+    r"_cover\b|_handrail\b|_windgirder\b|_post_|_plinth\b|_rim\b|_centredrain\b",  # tank roof + handrail +
     # wind-girder + posts + plinth → steel, so a tank reads as engineered (grey roof
     # rim + rail on the green shell) instead of a featureless green blob. Universal.
 )
@@ -1548,20 +1548,31 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
                    r * 1.08, plinth_h, steel, module=mod, module_objects=MO)
         shell = fl.add_cyl(f"{nm}_shell", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h / 2),
                            r, body_h, mat, module=mod, module_objects=MO)
-        # FLAT cover + perimeter HANDRAIL on posts — reads as a real cylindrical process
-        # tank with a top walkway, NOT a green dome (the cone roof was the blob culprit).
-        fl.add_cyl(f"{nm}_cover", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h + 0.07),
-                   r, 0.14, steel, module=mod, module_objects=MO)
-        for ang in (0, 60, 120, 180, 240, 300):
-            px = x_mm * fl.MM + math.cos(math.radians(ang)) * (r + 0.05)
-            py = y_mm * fl.MM + math.sin(math.radians(ang)) * (r + 0.05)
-            fl.add_box(f"{nm}_post_{int(ang)}", (px, py, z_bot + body_h + 0.55),
-                       (0.05, 0.05, 1.0), steel, module=mod, module_objects=MO)
-        fl.add_torus(f"{nm}_handrail", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h + 1.05),
-                     r + 0.05, max(0.025, r * 0.018), steel, module=mod, module_objects=MO)
-        # wind-girder mid-ring (shell stiffener cue)
-        fl.add_torus(f"{nm}_windgirder", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h * 0.6),
-                     r + 0.02, max(0.02, r * 0.035), steel, module=mod, module_objects=MO)
+        # OPEN-TOP RAS tank (council 2026-06-16: the solid lid read as a featureless
+        # green blob). Now: a recessed DARK WATER SURFACE so top-down reads "open tank
+        # with water"; a steel RIM ring at the open edge; a CENTRE dual-drain STANDPIPE
+        # (the signature RAS fitting); a scale-aware perimeter handrail that survives the
+        # plant zoom. Universal for kind=="tank".
+        rim_z = z_bot + body_h
+        water_z = z_bot + body_h * 0.90                       # ~10% freeboard below the rim
+        if "u_water" not in MAT:
+            MAT["u_water"] = fl.make_mat("m_u_water", (0.10, 0.34, 0.42), metallic=0.0, roughness=0.30)
+        fl.add_cyl(f"{nm}_watersurf", (x_mm * fl.MM, y_mm * fl.MM, water_z), r * 0.965, 0.05,
+                   MAT["u_water"], module=mod, module_objects=MO)
+        fl.add_torus(f"{nm}_rim", (x_mm * fl.MM, y_mm * fl.MM, rim_z),
+                     r, max(0.06, r * 0.03), steel, module=mod, module_objects=MO)
+        fl.add_cyl(f"{nm}_centredrain", (x_mm * fl.MM, y_mm * fl.MM, water_z + 0.20),
+                   max(0.11, r * 0.045), body_h * 0.55, steel, module=mod, module_objects=MO)
+        post_r = max(0.06, r * 0.022)
+        for ang in (0, 45, 90, 135, 180, 225, 270, 315):
+            px = x_mm * fl.MM + math.cos(math.radians(ang)) * (r + 0.06)
+            py = y_mm * fl.MM + math.sin(math.radians(ang)) * (r + 0.06)
+            fl.add_box(f"{nm}_post_{int(ang)}", (px, py, rim_z + 0.55),
+                       (post_r, post_r, 1.1), steel, module=mod, module_objects=MO)
+        fl.add_torus(f"{nm}_handrail", (x_mm * fl.MM, y_mm * fl.MM, rim_z + 1.05),
+                     r + 0.06, max(0.05, r * 0.025), steel, module=mod, module_objects=MO)
+        fl.add_torus(f"{nm}_windgirder", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h * 0.55),
+                     r + 0.02, max(0.04, r * 0.04), steel, module=mod, module_objects=MO)
         anchors = {"top": (x_mm, y_mm, (z_bot + body_h) / fl.MM),
                    "bottom": (x_mm, y_mm, z_bot / fl.MM),
                    "centre": (x_mm, y_mm, (z_bot + body_h / 2) / fl.MM)}
@@ -10753,6 +10764,11 @@ def apply_inspection_materials(parts):
         #    u_stub_, which would fall to the neutral-grey unmatched bucket). Both
         #    are intentional steelwork — colour them explicitly BEFORE the part
         #    fallback so they read as steel and leave the unmatched count. ──
+        if "watersurf" in nm:                    # open-tank water surface → dark teal
+            obj.data.materials.clear()
+            obj.data.materials.append(_matte((0.10, 0.34, 0.42)))
+            n_equip += 1
+            continue
         if INSPECT_ACCESS_STEEL_RE.search(nm):
             obj.data.materials.clear()
             obj.data.materials.append(_matte(INSPECT_ACCESS_STEEL_COLOUR))
