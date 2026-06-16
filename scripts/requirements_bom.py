@@ -167,14 +167,35 @@ def _materials_takeoff(name, mods, geom=None):
     sigma_mpa, corr_mm, floor_mm = _wall_physics(matlabel)
     P = 1000.0 * 9.81 * h_v
     t_hoop = P * (d_v / 2.0) / (sigma_mpa * 1e6 * 0.85)
-    wall = max(t_hoop + corr_mm / 1000.0, floor_mm / 1000.0)
-    mass = area * wall * rho
-    # Concrete is an in-situ unit rate (already includes placement) — no extra erection factor.
-    ifac = 1.0 if "concrete" in matlabel else _install_factor(vol)
+    # OPEN atmospheric process tank (FRP / GRP or concrete rearing tank, basin, MBBR
+    # biofilter, sump) vs CLOSED / PRESSURE vessel — decided by the same NOUN test the
+    # geometry uses. An open tank is NOT a pressure vessel: it has NO top head (it is open
+    # to atmosphere), its shell wall TAPERS with the hydrostatic head (full at the base,
+    # fabrication-minimum at the rim → average (t_hoop+floor)/2), it has a flat structural
+    # floor, and it is delivered / panel-assembled (a lighter erection multiplier than a
+    # field-fabricated steel pressure vessel). Universal — no per-class table.
+    # OPEN/CLOSED noun set MATCHES universal-contract-sizing.ts::SUB_ASSEMBLY so the cost
+    # basis (here) and the explosion breakdown (there) agree on every vessel.
+    is_open = bool(re.search(r"\btank\b|\bbasin\b|\bsump\b|\bpond\b|biofilter|clarifier|raceway|lagoon", name, re.I)) \
+        and not re.search(r"pressure|reactor|\bcolumn\b|\btower\b|strip|scrub|absorber|degass|contactor|\bsilo\b|hopper", name, re.I)
+    if is_open:
+        shell_area = math.pi * d_v * h_v
+        floor_area = math.pi * d_v * d_v / 4.0
+        area = shell_area + floor_area                        # shell + ONE floor (no top head)
+        wall = max((t_hoop + floor_mm / 1000.0) / 2.0, floor_mm / 1000.0)   # tapered shell average
+        floor_wall = (floor_mm / 1000.0) * 1.5                # flat structural floor
+        mass = shell_area * wall * rho + floor_area * floor_wall * rho
+        ifac = 1.0 if "concrete" in matlabel else 1.25        # delivered / panel-assembled, not field-fabricated
+        head_note = "open top (no head)"
+    else:
+        wall = max(t_hoop + corr_mm / 1000.0, floor_mm / 1000.0)
+        mass = area * wall * rho
+        ifac = 1.0 if "concrete" in matlabel else _install_factor(vol)
+        head_note = "2 heads"
     supply = mass * rate                                       # ex-works fabricated shell
     installed = supply * ifac                                  # × site-erection multiplier
     fittings = 0.20 * installed + 1800                        # nozzles, manway, supports, coating
-    basis = (f"hoop wall {wall*1000:.0f} mm = P·r/(σ·E)+c · ⌀{d_v:.1f}×{h_v:.1f} m · "
+    basis = (f"{'tapered ' if is_open else 'hoop '}wall {wall*1000:.0f} mm = P·r/(σ·E)+c · ⌀{d_v:.1f}×{h_v:.1f} m ({head_note}) · "
              f"P={P/1000:.0f} kPa head · σ={sigma_mpa:.0f} MPa → {area:.0f} m² × {mass:.0f} kg "
              f"{matlabel} @ £{rate}/kg supply × {ifac:.2f} erection + fittings")
     spec = {"material": matlabel, "wall_mm": round(wall * 1000, 1), "mass_kg": round(mass),
@@ -219,6 +240,18 @@ def _selftest() -> int:
             got = _bespoke_class(name.split("·")[0].strip())
         if got != want:
             print(f"  FAIL  '{name}' → {got} (want {want})"); bad += 1
+    # OPEN-TANK cost discount (#144): an open atmospheric tank (FRP, no top head, tapered
+    # wall, delivered) must cost materially LESS than a closed steel pressure vessel of the
+    # same size, and land in a sane FRP fish-tank band — not the old £194k/tank over-count.
+    dim = {"dimension": "12.4 m dia x 3.2 m"}
+    ot = _materials_takeoff("Rearing Tank", dim)      # open → FRP, 1 head, tapered, 1.25×
+    ct = _materials_takeoff("Buffer Vessel", dim)     # closed → carbon steel, 2 heads
+    if ot and ct:
+        oc, cc = ot[0], ct[0]
+        if not (oc < 0.75 * cc and 20000 < oc < 150000):
+            print(f"  FAIL open-tank cost £{oc:.0f} vs closed £{cc:.0f} (want open < 0.75×closed, £20–150k)"); bad += 1
+    else:
+        print("  FAIL open-tank cost — no geometry parsed"); bad += 1
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 

@@ -572,6 +572,25 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => `process-systems=${JSON.stringify(proc1.map((w: any) => w.name_human))} n=${proc1.length}`,
   ))
 
+  // ── A7. OPEN-TANK sub-assembly (#144) ──
+  // An OPEN atmospheric tank (rearing tank / basin / MBBR biofilter) explodes into OPEN-TANK
+  // parts (wall + graded floor + dual-drain + walkway) — it must NOT carry the pressure-
+  // vessel parts (top head, support skirt, manway, PVRV) that don't exist on a tank open to
+  // atmosphere. A closed vessel (degasser column) keeps the steel pressure-vessel parts.
+  const childNames = (parentId: string) => instrMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []))).filter((w: any) => String(w.id || '').startsWith(parentId + '__')).map((w: any) => String(w.name_human))
+  const rtKids = childNames('rearing_tank_synth_word')
+  const bfKids = childNames('biofilter_synth_word')
+  out.push(assertEq(
+    'UNIVERSAL.open_tank_explodes_without_pressure_vessel_parts',
+    'an OPEN atmospheric tank (rearing tank / MBBR biofilter) explodes into open-tank parts (Tank Wall + graded Floor + Dual Drain + walkway) and carries NO Top Head / Support Skirt / Manway — the pressure-vessel parts that do not exist on a tank open to atmosphere; matches the FRP open-tank cost basis (no top head, tapered wall)',
+    JSON.stringify({ rtKids: rtKids.length, rtTopHead: rtKids.some((n: string) => /top head|support skirt|manway/i.test(n)), rtOpen: rtKids.some((n: string) => /tank wall|dual drain/i.test(n)), bfOpen: bfKids.some((n: string) => /tank wall|dual drain/i.test(n)) }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.rtKids >= 5 && !o.rtTopHead && o.rtOpen && o.bfOpen
+    },
+    () => `rearing-tank children=${JSON.stringify(rtKids)}`,
+  ))
+
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──
   const graph: any = { product_class: 'test', nodes: [{ class: 'environmental_interface', display: 'Environmental Interface', role: 'principal', required: true }], edges: [] }
   const heatingContract: any = { quantities: { heating_duty_kw: { value: 1493 }, heat_pump_cop: { value: 3.5 }, heat_pump_electrical_kw: { value: 427 } } }

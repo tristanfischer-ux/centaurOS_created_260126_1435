@@ -317,7 +317,27 @@ const vesselArea = (p: ParentPhysics) => { const d = p.diaM || Math.cbrt(((p.m3 
 // Each entry: parts SIZED + PRICED from the parent's physics. Cost factors are
 // engineering order-of-magnitude (UK, installed-equipment basis), universal by type.
 const SUB_ASSEMBLY: { re: RegExp; parts: SubSpec[] }[] = [
-  { re: /\btank\b|vessel|reservoir|basin|\bsump\b|reactor|\bcolumn\b|tower|degass|biofilter|clarifier|digester|scrubber/i,
+  // OPEN ATMOSPHERIC TANK (#144) — checked FIRST so a rearing tank / basin / MBBR biofilter
+  // explodes into OPEN-TANK parts (wall + graded floor + dual-drain + walkway), NOT the
+  // pressure-vessel parts below (top head, support skirt, manway, PVRV) that don't exist on
+  // a tank open to atmosphere. Closed vessels (degasser column, reactor, pressure vessel)
+  // don't match this noun set and fall through to the steel pressure-vessel list. Matches
+  // the OPEN/CLOSED split in requirements_bom.py::_materials_takeoff so cost + breakdown agree.
+  { re: /\btank\b|\bbasin\b|\bsump\b|\bpond\b|biofilter|clarifier|raceway|lagoon/i,
+    parts: [
+      { name: 'Tank Wall (laminate)', derive: (p) => { const a = vesselArea(p); return { size: `${a.d.toFixed(1)} m dia × ${a.h.toFixed(1)} m`, gbp: a.shell * 240 } } },
+      { name: 'Tank Floor (graded to centre)', derive: (p) => ({ gbp: vesselArea(p).head * 220 }) },
+      { name: 'Dual Drain / Centre Standpipe', derive: () => ({ gbp: 1800 }) },
+      { name: 'Side Drain & Overflow', derive: () => ({ gbp: 900 }) },
+      { name: 'Inlet Distribution Ring', derive: (p) => ({ gbp: 600 + (p.m3 || 50) * 4 }) },
+      { name: 'Internal Flow Baffles', derive: (p) => ({ gbp: 500 + (p.m3 || 50) * 3 }) },
+      { name: 'Rim Stiffener', derive: (p) => ({ gbp: 400 + vesselArea(p).d * 120 }) },
+      { name: 'Access Walkway & Handrail', derive: (p) => ({ gbp: 1800 + (p.htM || 3) * 300 }) },
+      { name: 'Internal Gelcoat / Lining', derive: (p) => { const a = vesselArea(p); return { gbp: (a.shell + a.head) * 45 } } },
+      { name: 'Earthing Boss', derive: () => ({ gbp: 120 }) },
+      { name: 'Nameplate', derive: () => ({ gbp: 60 }) },
+    ] },
+  { re: /vessel|reservoir|reactor|\bcolumn\b|tower|degass|digester|scrubber|\btank\b|basin|\bsump\b/i,
     parts: [
       { name: 'Shell Course', derive: (p) => { const a = vesselArea(p); return { size: `${a.d.toFixed(1)} m dia × ${a.h.toFixed(1)} m`, gbp: a.shell * 430 } } },
       { name: 'Top Head / Roof', derive: (p) => ({ gbp: vesselArea(p).head * 380 }) },
