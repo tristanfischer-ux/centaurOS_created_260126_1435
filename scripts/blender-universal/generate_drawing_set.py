@@ -101,7 +101,12 @@ def ensure_cad_artifacts(state_path: Path, out_dir: Path,
         proc = subprocess.run(
             [blender, "--background", "--python",
              str(_THIS / "build_universal_scene.py"), "--", str(state_path)],
-            env=env, capture_output=True, text=True, timeout=600)
+            # 1500 s: a heavy scene (e.g. a RAS with 8 parallel treatment trains × 24
+            # units + the building take-off + 90+ routed connections) exceeds the old
+            # 600 s here — the build then returns "artifacts=MISSING" and the whole BoM +
+            # drawing set silently vanish. The render step already allows 900 s; the CAD
+            # build (geometry + orthogonal routing + manifest export) is heavier. (2026-06-16)
+            env=env, capture_output=True, text=True, timeout=1500)
     except Exception as exc:  # noqa: BLE001
         log.append(f"SKIP: Blender build failed to launch: {type(exc).__name__}: {exc}")
         return False
