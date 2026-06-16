@@ -456,7 +456,7 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], maxDepth = 
       const out: WordLike[] = []
       for (const w of sm.words) {
         out.push(w)
-        if (isInstrument(w) || isActuator(w)) continue   // a field instrument / valve / blower is a leaf — never an assembly
+        if (isInstrument(w) || isActuator(w) || isUtility(w)) continue   // instrument / valve / blower / utility system — priced whole, not exploded
         const id = String(w.id ?? '')
         const depth = (id.match(/__/g) ?? []).length
         if (depth >= maxDepth) continue          // too deep — stop the recursion
@@ -827,6 +827,90 @@ function findWordSubModule(modules: ModuleLike[], target: WordLike): SubLike | u
   }
   return undefined
 }
+function findSubModuleByRe(modules: ModuleLike[], re: RegExp): SubLike | undefined {
+  for (const m of modules ?? []) for (const sm of (m.sub_modules ?? []) as SubLike[]) {
+    if (re.test(String(sm.id ?? ''))) return sm
+  }
+  return undefined
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// UTILITY + SAFETY SYSTEMS SYNTHESIS (Tristan #142).
+//
+// Every process plant needs the BALANCE-OF-PLANT systems the principal equipment can't run
+// without — and they were ENTIRELY absent (the power module had a breaker but no standby
+// generator; the fluid module had pumps but no make-up or bleed/drain; no building
+// ventilation). Each is derived from a contract DUTY it depends on, universal, no per-class
+// table — a declared electrical load implies a standby generator sized to the life-safety
+// fraction; a declared make-up flow implies a make-up skid + its bleed/drain complement; a
+// declared building heat load implies heat-recovery ventilation. A plant that doesn't
+// declare the duty doesn't get the system.
+// ──────────────────────────────────────────────────────────────────────────────
+
+function isUtility(w: WordLike): boolean {
+  return (w as { _utility?: boolean })._utility === true
+}
+const STD_GENSET_KVA = [40, 60, 100, 150, 200, 250, 300, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500]
+function stdGenset(kva: number): number {
+  return STD_GENSET_KVA.find((k) => k >= kva) ?? STD_GENSET_KVA[STD_GENSET_KVA.length - 1]
+}
+
+interface UtilitySpec {
+  key: string
+  driver: (q: Record<string, number>) => number | undefined // the contract duty that sizes it
+  label: string
+  module: RegExp
+  size: (d: number) => { dim: string; rating: [string, string]; gbp: number }
+  form: (d: number) => string
+}
+const UTILITY_SYSTEMS: UtilitySpec[] = [
+  { key: 'standby_generator', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'Standby Diesel Generator', module: /power|electric|distribution/,
+    size: (load) => { const crit = load * 0.7; return { dim: boxFromRatingKw(crit), rating: [String(stdGenset(crit / 0.8)), 'kVA'], gbp: Math.round(crit * 400 + 30000) } },
+    form: (load) => `Containerised standby diesel genset + automatic transfer switch + day tank; covers the ~${Math.round(load * 0.7)} kW life-safety load (recirculation + oxygenation + controls) on a mains failure — a RAS loses its stock within minutes without it` },
+  { key: 'makeup_water', driver: (q) => pickQ(q, /makeup_water_m3_h|make_up_water_m3_h/), label: 'Make-up Water System', module: /mass_fluid|fluid|process|water|circulation/,
+    size: (mu) => { const buf = Math.max(5, mu * 0.5); return { dim: cylinderFromVolumeM3(buf, 'make-up tank'), rating: [String(Math.round(mu)), 'm³/h'], gbp: Math.round(25000 + mu * 200) } },
+    form: (mu) => `Make-up water skid: ~${Math.round(Math.max(5, mu * 0.5))} m³ break tank + level control + ${Math.round(mu)} m³/h control valve + meter; replaces evaporation + bleed losses` },
+  { key: 'bleed_drain', driver: (q) => { const mu = pickQ(q, /makeup_water_m3_h|make_up_water_m3_h/); return mu ? mu * 0.9 : undefined }, label: 'Bleed / Drain System', module: /mass_fluid|fluid|process|water|circulation/,
+    size: (bl) => ({ dim: '', rating: [String(Math.round(bl * 10) / 10), 'm³/h'], gbp: Math.round(8000 + bl * 80) }),
+    form: (bl) => `Continuous bleed + drain header: ~${Math.round(bl * 10) / 10} m³/h blowdown to hold water quality + an emergency drain-down route to the site discharge` },
+  { key: 'ventilation', driver: (q) => pickQ(q, /building_process_loss_kw|building_heat|building.*_kw/), label: 'Building Ventilation (HRV)', module: /environmental|hvac|climate|ventil/,
+    size: (kw) => { const m3h = (kw / (1.2 * 1.005 * 15)) * 3600; return { dim: boxFromThroughputM3h(m3h), rating: [String(Math.round(m3h)), 'm³/h'], gbp: Math.round(20000 + m3h * 4) } },
+    form: (kw) => `Heat-recovery ventilation: ~${Math.round((kw / (1.2 * 1.005 * 15)) * 3600).toLocaleString('en-GB')} m³/h supply + extract with a thermal wheel; clears building moisture / CO₂ off the water surface while retaining process heat` },
+]
+
+function utilityWord(spec: UtilitySpec, d: number): WordLike {
+  const s = spec.size(d)
+  const mods: ModifierCharacter[] = [mod('quantity', '×1')]
+  if (s.dim) mods.push(mod('dimension', s.dim))
+  mods.push(mod('rating_primary', s.rating[0], s.rating[1]))
+  mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(s.gbp)))))
+  mods.push(mod('form', spec.form(d)))
+  mods.push(mod('part_number', 'TBD (catalogue class)'))
+  mods.push(mod('lifecycle', 'Concept design — balance-of-plant system sized from the contract duty; exact MPN at detailed design'))
+  mods.push(mod('installation', 'Plant-level utility / safety system; placement confirmed at layout'))
+  const id = `util_${spec.key}`
+  return { id, name_human: spec.label, content_character: { character_id: id, name_human: spec.label }, modifier_characters: mods, ...({ _synthesized: true, _utility: true } as object) }
+}
+
+/** Synthesise the balance-of-plant utility + safety systems the contract's duties imply —
+ *  standby generator, make-up water, bleed/drain, building ventilation. Mutates modules in
+ *  place; returns the number of systems added. Universal — driven by declared duties. */
+export function synthesizeUtilitySafety(modules: ModuleLike[], quantities: Record<string, number>): number {
+  // idempotency: drop any utility systems a prior pass added
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) {
+    if (Array.isArray(sm.words)) sm.words = sm.words.filter((w) => !isUtility(w))
+  }
+  let n = 0
+  for (const spec of UTILITY_SYSTEMS) {
+    const d = spec.driver(quantities)
+    if (!d || !(d > 0)) continue
+    const sm = findSubModuleByRe(modules, spec.module) ?? (modules?.[0]?.sub_modules ?? [])[0] as SubLike | undefined
+    if (!sm) continue
+    ;((sm.words ??= []) as WordLike[]).push(utilityWord(spec, d))
+    n += 1
+  }
+  return n
+}
 
 export interface UniversalSizingResult {
   sized: number
@@ -835,6 +919,7 @@ export interface UniversalSizingResult {
   exploded: number
   instrumented: number
   actuated: number
+  utilities: number
   groups: number
   matchedPhrases: string[]
   synthesizedPhrases: string[]
@@ -1325,6 +1410,10 @@ export function applyUniversalContractSizing(
   // blower per air-flow duty. Runs after instrumentation, before the explosion (leaves). ──
   const actuated = (opts.instrument ?? true) ? synthesizeActuation(modules, quantities) : 0
 
+  // ── C5. BALANCE-OF-PLANT utility + safety systems (standby generator, make-up water,
+  // bleed/drain, ventilation) the contract's duties imply. ──
+  const utilities = (opts.instrument ?? true) ? synthesizeUtilitySafety(modules, quantities) : 0
+
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
   const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules) : 0
 
@@ -1335,6 +1424,7 @@ export function applyUniversalContractSizing(
     exploded,
     instrumented,
     actuated,
+    utilities,
     groups: groups.length,
     matchedPhrases: [...matched],
     synthesizedPhrases,

@@ -391,6 +391,19 @@ def assemble(out_dir: str):
                                  "unit_gbp": round(agbp), "line_gbp": round(agbp * qy),
                                  "basis": "installed actuator — catalogue-class budget"})
                     continue
+                # ── BALANCE-OF-PLANT utility / safety system (synthesizeUtilitySafety #142):
+                # standby generator, make-up water, bleed/drain, ventilation. Priced as a
+                # whole skid from its contract-duty estimate. ──
+                if w.get("_utility"):
+                    ugbp = _child_price(w)
+                    nlow = name.lower()
+                    utag = ("G" if "generator" in nlow else "P" if ("make-up" in nlow or "make up" in nlow)
+                            else "DV" if ("bleed" in nlow or "drain" in nlow) else "AHU" if "ventil" in nlow else "U")
+                    rows.append({"tag": utag, "requirement": requirement, "status": "UTILITY",
+                                 "part": "balance-of-plant system (catalogue class)", "qty": qy,
+                                 "unit_gbp": round(ugbp), "line_gbp": round(ugbp * qy),
+                                 "basis": "installed BoP system — catalogue-class budget"})
+                    continue
                 bc = _bespoke_class(name)   # 'strong' (process vessel) | 'simple' (shell) | 'none'
                 mt_spec = None
                 g_lookup = geom_by_name.get(re.sub(r"\s+\d+$", "", name).strip().lower())

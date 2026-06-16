@@ -478,10 +478,13 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
   const contractInstr: any = { quantities: { ...contract.quantities,
     water_setpoint_temp_c: { value: 26.4, unit: '°C' }, ph_setpoint: { value: 7.4, unit: '' },
     oxygen_demand_kg_day: { value: 1235, unit: 'kg/day' }, salinity_ppt: { value: 33, unit: 'ppt' },
-    recirculation_flow_m3_h: { value: 13360, unit: 'm³/h' }, degasser_air_flow_m3_h: { value: 40000, unit: 'm³/h' } } }
+    recirculation_flow_m3_h: { value: 13360, unit: 'm³/h' }, degasser_air_flow_m3_h: { value: 40000, unit: 'm³/h' },
+    connected_electrical_load_kw: { value: 674, unit: 'kW' }, makeup_water_m3_h: { value: 53.44, unit: 'm³/h' }, building_process_loss_kw: { value: 182.58, unit: 'kW' } } }
   const instrMods: any = [
     { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
     { module: 'sensing_instrumentation', sub_modules: [{ id: 'sensing_instrumentation__x', words: [] }] },
+    { module: 'power_distribution', sub_modules: [{ id: 'power_distribution__main', words: [] }] },
+    { module: 'environmental_interface', sub_modules: [{ id: 'environmental_interface__hvac', words: [] }] },
   ]
   applyUniversalContractSizing(instrMods, contractInstr, { synthesizeMissing: true, onlyUnsized: false, dedupeAndStrip: false, instrument: true })
   const allInstr = () => instrMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._instrument)))
@@ -524,6 +527,29 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
       return o.valveOnRearing && o.rearFcvQty === '×10' && o.blowerCount >= 1 && o.maxBlowerKw > 0 && o.maxBlowerKw <= 80 && o.n1 >= 2 && o.n2 === o.n1
     },
     () => `actuators=${JSON.stringify(actr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}`))} maxBlowerKw=${Math.round(maxBlowerKw)} n1=${actr1.length} n2=${actr2n}`,
+  ))
+
+  // ── A5. BALANCE-OF-PLANT utility + safety systems (#142) ──
+  // The contract duties imply the BoP the principal equipment can't run without: a STANDBY
+  // GENERATOR sized to the life-safety fraction of the electrical load (placed in the power
+  // module), a MAKE-UP WATER system + its BLEED/DRAIN complement (fluid module), building
+  // VENTILATION (environmental module). Universal — a duty not declared yields no system.
+  const utilOf = () => instrMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._utility)))
+  const util1 = utilOf()
+  const hasU = (re: RegExp) => util1.some((w: any) => re.test(String(w.name_human)))
+  const gen = util1.find((w: any) => /generator/i.test(String(w.name_human)))
+  const genKva = gen ? parseFloat(String((gen.modifier_characters || []).find((mc: any) => mc.kind === 'rating_primary')?.value ?? '0')) : 0
+  // generator placed in the POWER module (not dumped in fluid)?
+  const genInPower = instrMods.some((m: any) => /power/.test(String(m.module)) && (m.sub_modules || []).some((sm: any) => (sm.words || []).some((w: any) => w._utility && /generator/i.test(String(w.name_human)))))
+  out.push(assertEq(
+    'UNIVERSAL.utility_safety_systems_synthesised_from_duties',
+    'the contract duties synthesise the balance-of-plant: a STANDBY GENERATOR sized to the life-safety load fraction (≥ 674·0.7/0.8 ≈ 590 kVA) in the POWER module, a MAKE-UP WATER system + BLEED/DRAIN, and building VENTILATION — universal, driven by declared duties',
+    JSON.stringify({ gen: !!gen, genKva, genInPower, makeup: hasU(/make-?up/i), bleed: hasU(/bleed|drain/i), vent: hasU(/ventilation/i), n: util1.length }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.gen && o.genKva >= 590 && o.genInPower && o.makeup && o.bleed && o.vent && o.n === 4
+    },
+    () => `utilities=${JSON.stringify(util1.map((w: any) => w.name_human))} genKva=${genKva} genInPower=${genInPower}`,
   ))
 
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──
