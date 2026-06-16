@@ -479,7 +479,8 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     water_setpoint_temp_c: { value: 26.4, unit: '°C' }, ph_setpoint: { value: 7.4, unit: '' },
     oxygen_demand_kg_day: { value: 1235, unit: 'kg/day' }, salinity_ppt: { value: 33, unit: 'ppt' },
     recirculation_flow_m3_h: { value: 13360, unit: 'm³/h' }, degasser_air_flow_m3_h: { value: 40000, unit: 'm³/h' },
-    connected_electrical_load_kw: { value: 674, unit: 'kW' }, makeup_water_m3_h: { value: 53.44, unit: 'm³/h' }, building_process_loss_kw: { value: 182.58, unit: 'kW' } } }
+    connected_electrical_load_kw: { value: 674, unit: 'kW' }, makeup_water_m3_h: { value: 53.44, unit: 'm³/h' }, building_process_loss_kw: { value: 182.58, unit: 'kW' },
+    bicarbonate_dose_kg_day: { value: 1291, unit: 'kg/day' }, daily_feed_kg: { value: 2745, unit: 'kg' }, oxygen_supply_kg_h: { value: 54, unit: 'kg/h' }, solids_load_kg_day: { value: 686, unit: 'kg/day' }, standing_biomass_kg: { value: 200400, unit: 'kg' } } }
   const instrMods: any = [
     { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
     { module: 'sensing_instrumentation', sub_modules: [{ id: 'sensing_instrumentation__x', words: [] }] },
@@ -550,6 +551,25 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
       return o.gen && o.genKva >= 590 && o.genInPower && o.makeup && o.bleed && o.vent && o.n === 4
     },
     () => `utilities=${JSON.stringify(util1.map((w: any) => w.name_human))} genKva=${genKva} genInPower=${genInPower}`,
+  ))
+
+  // ── A6. PROCESS-SUPPORT systems (#143) ──
+  // The contract's consumable + waste duties synthesise the process-support plant: chemical
+  // dosing (from a dose duty), feed (from a feed rate), oxygen/LOX (from O₂ supply), sludge
+  // handling (from a solids load), SCADA (from the plant load), grading (from biomass).
+  // Universal — a duty not declared yields no system.
+  const procOf = () => instrMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._process)))
+  const proc1 = procOf()
+  const hasP = (re: RegExp) => proc1.some((w: any) => re.test(String(w.name_human)))
+  out.push(assertEq(
+    'UNIVERSAL.process_support_systems_synthesised_from_duties',
+    'the contract consumable + waste duties synthesise the process-support plant: DOSING (pH/alkalinity), FEED, OXYGEN/LOX, SLUDGE handling, SCADA, and GRADING — six systems, universal, driven by declared duties',
+    JSON.stringify({ dosing: hasP(/dosing/i), feed: hasP(/feed/i), lox: hasP(/oxygen|lox/i), sludge: hasP(/sludge/i), scada: hasP(/scada/i), grading: hasP(/grading|harvest/i), n: proc1.length }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.dosing && o.feed && o.lox && o.sludge && o.scada && o.grading && o.n === 6
+    },
+    () => `process-systems=${JSON.stringify(proc1.map((w: any) => w.name_human))} n=${proc1.length}`,
   ))
 
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──

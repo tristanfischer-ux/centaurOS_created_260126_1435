@@ -456,7 +456,7 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], maxDepth = 
       const out: WordLike[] = []
       for (const w of sm.words) {
         out.push(w)
-        if (isInstrument(w) || isActuator(w) || isUtility(w)) continue   // instrument / valve / blower / utility system — priced whole, not exploded
+        if (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w)) continue   // instrument / valve / blower / whole system — priced whole, not exploded
         const id = String(w.id ?? '')
         const depth = (id.match(/__/g) ?? []).length
         if (depth >= maxDepth) continue          // too deep — stop the recursion
@@ -878,7 +878,7 @@ const UTILITY_SYSTEMS: UtilitySpec[] = [
     form: (kw) => `Heat-recovery ventilation: ~${Math.round((kw / (1.2 * 1.005 * 15)) * 3600).toLocaleString('en-GB')} m³/h supply + extract with a thermal wheel; clears building moisture / CO₂ off the water surface while retaining process heat` },
 ]
 
-function utilityWord(spec: UtilitySpec, d: number): WordLike {
+function utilityWord(spec: UtilitySpec, d: number, category: 'utility' | 'process' = 'utility'): WordLike {
   const s = spec.size(d)
   const mods: ModifierCharacter[] = [mod('quantity', '×1')]
   if (s.dim) mods.push(mod('dimension', s.dim))
@@ -886,10 +886,66 @@ function utilityWord(spec: UtilitySpec, d: number): WordLike {
   mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(s.gbp)))))
   mods.push(mod('form', spec.form(d)))
   mods.push(mod('part_number', 'TBD (catalogue class)'))
-  mods.push(mod('lifecycle', 'Concept design — balance-of-plant system sized from the contract duty; exact MPN at detailed design'))
-  mods.push(mod('installation', 'Plant-level utility / safety system; placement confirmed at layout'))
-  const id = `util_${spec.key}`
-  return { id, name_human: spec.label, content_character: { character_id: id, name_human: spec.label }, modifier_characters: mods, ...({ _synthesized: true, _utility: true } as object) }
+  mods.push(mod('lifecycle', `Concept design — ${category === 'process' ? 'process-support' : 'balance-of-plant'} system sized from the contract duty; exact MPN at detailed design`))
+  mods.push(mod('installation', `Plant-level ${category === 'process' ? 'process' : 'utility / safety'} system; placement confirmed at layout`))
+  const id = `${category === 'process' ? 'proc' : 'util'}_${spec.key}`
+  const flags = category === 'process' ? { _synthesized: true, _process: true } : { _synthesized: true, _utility: true }
+  return { id, name_human: spec.label, content_character: { character_id: id, name_human: spec.label }, modifier_characters: mods, ...(flags as object) }
+}
+
+function isProcessSystem(w: WordLike): boolean {
+  return (w as { _process?: boolean })._process === true
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// PROCESS-SUPPORT SYSTEMS SYNTHESIS (Tristan #143).
+//
+// The plant systems that handle the CONSUMABLES + WASTE the process produces — each absent
+// from the BoM though the contract sizes its duty: chemical (pH / alkalinity) dosing, feed,
+// oxygen (LOX) supply, solids / sludge handling, the SCADA that runs it all, and biomass
+// grading / harvest. Each is derived from the contract DUTY it serves, universal: a declared
+// chemical dose implies a dosing skid, a declared feed rate implies a feed system, a declared
+// oxygen demand implies LOX storage + vaporiser, a declared solids load implies dewatering.
+// Same machinery as the utility systems (#142), priced whole from the duty.
+// ──────────────────────────────────────────────────────────────────────────────
+const PROCESS_SYSTEMS: UtilitySpec[] = [
+  { key: 'chemical_dosing', driver: (q) => pickQ(q, /_dose_kg_day$|dosing_kg|alkalinity_dose/), label: 'Chemical Dosing System (pH / Alkalinity)', module: /mass_fluid|process|chemical|dosing|water/,
+    size: (kgd) => { const store = Math.max(2, (kgd * 7) / 1000); return { dim: cylinderFromVolumeM3(store, 'dosing tank'), rating: [String(Math.round(kgd)), 'kg/day'], gbp: Math.round(30000 + kgd * 20) } },
+    form: (kgd) => `Bulk + day storage (~${Math.round((kgd * 7) / 1000)} m³, 7-day) + duty/standby dosing pumps + in-line mixer; doses ~${Math.round(kgd)} kg/day to hold pH / alkalinity against nitrification` },
+  { key: 'feed_system', driver: (q) => pickQ(q, /daily_feed_kg|feed_kg_day|_feed_kg$/), label: 'Feed Storage + Distribution System', module: /mass_fluid|process|feed/,
+    size: (kgd) => { const silo = Math.max(10, (kgd * 14) / 650); return { dim: cylinderFromVolumeM3(silo, 'feed silo'), rating: [String(Math.round(kgd)), 'kg/day'], gbp: Math.round(40000 + kgd * 30) } },
+    form: (kgd) => `Bulk feed silos (~${Math.round((kgd * 14) / 650)} m³, ~2-week) + pneumatic conveying + per-tank automatic feeders + load cells; delivers ~${Math.round(kgd)} kg/day on a controlled ration` },
+  { key: 'oxygen_lox', driver: (q) => pickQ(q, /oxygen_supply_kg_h|oxygen_demand_kg_h/) ?? ((pickQ(q, /oxygen_demand_kg_day/) ?? 0) / 24 || undefined), label: 'Oxygen Supply (LOX) System', module: /environmental|oxygen|process|mass_fluid/,
+    size: (kgh) => { const tank = Math.max(3, (kgh * 24 * 5) / 1140); return { dim: cylinderFromVolumeM3(tank, 'lox tank'), rating: [String(Math.round(kgh)), 'kg/h'], gbp: Math.round(35000 + kgh * 800) } },
+    form: (kgh) => `Vacuum-insulated bulk LOX tank (~${Math.round((kgh * 24 * 5) / 1140)} m³, 5-day) + ambient vaporiser + pressure-control panel; supplies ~${Math.round(kgh)} kg/h gaseous O₂ to the oxygenation cones` },
+  { key: 'sludge_handling', driver: (q) => pickQ(q, /solids_load_kg_day|sludge_kg_day|tss_load/), label: 'Solids / Sludge Handling System', module: /mass_fluid|process|waste|water/,
+    size: (kgd) => ({ dim: '', rating: [String(Math.round(kgd)), 'kg/day'], gbp: Math.round(25000 + kgd * 40) }),
+    form: (kgd) => `Gravity thickener + rotary-screen / belt dewatering + skip; concentrates ~${Math.round(kgd)} kg/day captured solids to a haulable cake for off-site disposal` },
+  { key: 'scada', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'SCADA / Plant Control System', module: /control|compute|scada|sensing|instrument/,
+    size: (kw) => ({ dim: '', rating: [String(Math.round(kw)), 'kW plant'], gbp: Math.round(60000 + kw * 50) }),
+    form: (kw) => `Redundant PLC racks + SCADA servers + operator HMIs + plant network + auto-dialler alarms; closes every measured loop (level / temperature / DO / pH) and alarms the ~${Math.round(kw)} kW plant 24/7` },
+  { key: 'grading_harvest', driver: (q) => pickQ(q, /standing_biomass_kg|harvest_biomass_kg/), label: 'Grading / Harvest System', module: /mass_fluid|process|actuation|harvest/,
+    size: (bio) => ({ dim: '', rating: [String(Math.round(bio / 1000)), 't biomass'], gbp: Math.round(40000 + (bio / 1000) * 100) }),
+    form: (bio) => `Fish pump + grader + counter + crowding screens; handles the ~${Math.round(bio / 1000)} t standing biomass for routine grading + harvest without manual netting` },
+]
+
+/** Synthesise the process-support systems the contract's consumable + waste duties imply —
+ *  dosing, feed, oxygen (LOX), sludge handling, SCADA, grading. Mutates modules in place;
+ *  returns the number of systems added. Universal — driven by declared duties. */
+export function synthesizeProcessSystems(modules: ModuleLike[], quantities: Record<string, number>): number {
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) {
+    if (Array.isArray(sm.words)) sm.words = sm.words.filter((w) => !isProcessSystem(w))
+  }
+  let n = 0
+  for (const spec of PROCESS_SYSTEMS) {
+    const d = spec.driver(quantities)
+    if (!d || !(d > 0)) continue
+    const sm = findSubModuleByRe(modules, spec.module) ?? (modules?.[0]?.sub_modules ?? [])[0] as SubLike | undefined
+    if (!sm) continue
+    ;((sm.words ??= []) as WordLike[]).push(utilityWord(spec, d, 'process'))
+    n += 1
+  }
+  return n
 }
 
 /** Synthesise the balance-of-plant utility + safety systems the contract's duties imply —
@@ -920,6 +976,7 @@ export interface UniversalSizingResult {
   instrumented: number
   actuated: number
   utilities: number
+  processSystems: number
   groups: number
   matchedPhrases: string[]
   synthesizedPhrases: string[]
@@ -1414,6 +1471,10 @@ export function applyUniversalContractSizing(
   // bleed/drain, ventilation) the contract's duties imply. ──
   const utilities = (opts.instrument ?? true) ? synthesizeUtilitySafety(modules, quantities) : 0
 
+  // ── C6. PROCESS-SUPPORT systems (dosing, feed, LOX, sludge, SCADA, grading) the
+  // contract's consumable + waste duties imply. ──
+  const processSystems = (opts.instrument ?? true) ? synthesizeProcessSystems(modules, quantities) : 0
+
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
   const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules) : 0
 
@@ -1425,6 +1486,7 @@ export function applyUniversalContractSizing(
     instrumented,
     actuated,
     utilities,
+    processSystems,
     groups: groups.length,
     matchedPhrases: [...matched],
     synthesizedPhrases,

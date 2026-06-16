@@ -404,6 +404,19 @@ def assemble(out_dir: str):
                                  "unit_gbp": round(ugbp), "line_gbp": round(ugbp * qy),
                                  "basis": "installed BoP system — catalogue-class budget"})
                     continue
+                # ── PROCESS-SUPPORT system (synthesizeProcessSystems #143): dosing, feed,
+                # LOX, sludge handling, SCADA, grading. Priced whole from its contract duty. ──
+                if w.get("_process"):
+                    pgbp = _child_price(w)
+                    nlow = name.lower()
+                    ptag = ("DOS" if "dosing" in nlow else "FD" if "feed" in nlow
+                            else "LOX" if ("oxygen" in nlow or "lox" in nlow) else "SLU" if "sludge" in nlow
+                            else "SCADA" if "scada" in nlow else "GR" if ("grading" in nlow or "harvest" in nlow) else "SYS")
+                    rows.append({"tag": ptag, "requirement": requirement, "status": "SYSTEM",
+                                 "part": "process-support system (catalogue class)", "qty": qy,
+                                 "unit_gbp": round(pgbp), "line_gbp": round(pgbp * qy),
+                                 "basis": "installed process system — catalogue-class budget"})
+                    continue
                 bc = _bespoke_class(name)   # 'strong' (process vessel) | 'simple' (shell) | 'none'
                 mt_spec = None
                 g_lookup = geom_by_name.get(re.sub(r"\s+\d+$", "", name).strip().lower())
