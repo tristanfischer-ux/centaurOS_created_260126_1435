@@ -11952,7 +11952,15 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // list CEILING (the true motor exceeded 75 kW so next() fell through to the last list
   // element) — an impossible motor < power. Seeding all three as 'calculator' makes the
   // bootstrap seed-protection keep this self-consistent set and refuse the stand-in.
-  const recircPumpHeadM = 3.0
+  // Recirc TDH derived from the treatment train, NOT a flat 3 m (council RAS fix,
+  // 2026-06-16). The old 3 m ignored the in-line drum-filter / biofilter / degasser-lift /
+  // O2-cone / UV stage losses + loop friction, so it under-stated pump power ~5× and the
+  // per-component pump-sizing tool's 14.85 m read as a 23× contradiction. TDH = static
+  // return lift + Σ(in-line treatment-stage losses) + 15% friction. A RAS recirc loop
+  // pumps through ~6 in-line stages (drum → biofilter → degasser → O2 cone → UV → return);
+  // each ≈ 1.6 m. ⇒ (3.0 + 6×1.6) × 1.15 ≈ 14.4 m, agreeing with the tool's 14.85 m.
+  const RECIRC_TREATMENT_STAGES = 6
+  const recircPumpHeadM = Math.round((3.0 + RECIRC_TREATMENT_STAGES * 1.6) * 1.15 * 10) / 10  // ≈ 14.4 m
   const recircPumpEffic = 0.70                              // pump hydraulic efficiency at duty
   const recircPumpMotorEffic = 0.93                         // IE3 motor electrical efficiency (large frame)
   const recircPumpHydraulicW = Math.round(1000 * 9.81 * (recirculationFlowM3H / 3600) * recircPumpHeadM)  // ρ·g·Q·H [W] ~109 kW
@@ -12047,7 +12055,13 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const systemWaterVolumeM3 = Math.round(totalTankVolumeM3 + biofilterWaterHoldupM3 + treatmentHoldupM3)
   const bleedWaterM3H = makeupWaterM3H                              // mass balance: bleed ≈ make-up in a recirculating loop
   const totalSaltInventoryKg = Math.round(saltConcKgM3 * systemWaterVolumeM3)         // ~110 t standing sea-salt
-  const saltMakeupKgDay = Math.round(saltConcKgM3 * bleedWaterM3H * 24)               // ~42 t/day re-salting of the bleed
+  // Daily salt DOSING (council RAS fix, 2026-06-16). The naive "re-salt the whole bleed"
+  // figure (~42 t/day ≈ 76 HGV loads — seat-6 flagged it as absurd) assumes FRESHWATER
+  // make-up. But the brief makes up from BEACH-WELL SEAWATER, which carries its own salt:
+  // seawater make-up replaces the bled salt 1-for-1, so only the small fresh-borehole
+  // blend fraction (used for temperature/hardness trim) actually needs dosing.
+  const MAKEUP_SEAWATER_FRACTION = 0.95   // coastal marine RAS: ~95% beach-well seawater (self-salting) + ~5% fresh borehole blend
+  const saltMakeupKgDay = Math.round(saltConcKgM3 * bleedWaterM3H * 24 * (1 - MAKEUP_SEAWATER_FRACTION))  // ~2.1 t/day — dose only the fresh-blend fraction
 
   // ── Total system mass (kg) — renderer compliance-table mass row + gate 17.
   // Field-erected RAS: tanks (HDPE/GRP/concrete-lined) + treatment vessels +
@@ -12160,7 +12174,7 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     total_salt_mass_t: q(Math.round(totalSaltInventoryKg / 100) / 10, 't', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'standing sea-salt inventory in tonnes' }),
     // Override the tool's hydroponic field with the marine value (grams), same key, source:'calculator'.
     total_salt_mass_g: q(totalSaltInventoryKg * 1000, 'g', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `MARINE standing salt inventory in grams (${saltConcKgM3} g/L × ${systemWaterVolumeM3} m³) — replaces the wrongly auto-selected hydroponic nutrient-solution Ca/P figure` }),
-    salt_makeup_kg_day: q(saltMakeupKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: `daily sea-salt make-up = ${saltConcKgM3} g/L × ${bleedWaterM3H} m³/h bleed × 24 h — the bled seawater carries its salt out and is re-salted (≈${(saltMakeupKgDay / 1000).toFixed(0)} t/day at the brief's 0.4% make-up)` }),
+    salt_makeup_kg_day: q(saltMakeupKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: `net sea-salt dosing = ${saltConcKgM3} g/L × ${bleedWaterM3H} m³/h bleed × 24 h × ${Math.round((1 - MAKEUP_SEAWATER_FRACTION) * 100)}% fresh-blend fraction — beach-well SEAWATER make-up carries its own salt, so only the ~5% fresh-borehole blend is dosed (≈${(saltMakeupKgDay / 1000).toFixed(1)} t/day, not the ~42 t/day a freshwater make-up would need)` }),
 
     // ── System ──
     connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'Σ heat-pump electrical + recirc pumps + MBBR/degasser blowers + UV/ozone/PSA/controls' }),
