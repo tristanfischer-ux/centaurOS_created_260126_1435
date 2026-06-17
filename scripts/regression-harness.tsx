@@ -48,6 +48,7 @@ import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constrai
 import { massAggregator } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
 import { co2MineralisationEmitter } from './lib/orchestrator/emitters/co2-mineralisation'
 import { E_FUEL_SYNTHESIS_PLAN } from './lib/orchestrator/class-plans/e-fuel-synthesis'
@@ -498,6 +499,56 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
         o.survivors.length === 1 && o.survivors[0] === 'computed_degasser_air_flow_m3_h' &&
         o.phantomWordsDropped === 1 && o.realWordKept && o.pvPruned && o.reqBomPhantomGone &&
         o.noop && o.idempotent
+    },
+    (v) => `result=${v}`,
+  ))
+
+  // ── cost-sanity reads the AUTHORITATIVE BoM + a recognised class gets its own band
+  // (ledger Phase 1c, 2026-06-17). Two coupled fixes this guards: (1) the gate's headline
+  // cost MUST track costStack.ex_works (the chain re-runs computeCostSanity AFTER the
+  // requirements-driven BoM reconcile, so the recorded £/output reflects the SAME total the
+  // cover shows — not the stale partVerifications subtotal that read £4.79M when the truth
+  // was £10.67M); (2) aquaculture_ras now has its own ex-works £/(t·yr) band so a plausible
+  // small-RAS cost (£52,297/(t·yr)) reads PASS instead of being false-flagged HIGH by the
+  // CO₂-calibrated throughput family band. Goodhart guards: an ABSURD RAS (£500k/(t·yr))
+  // still flags HIGH (the band is honest, not a blanket pass), and the known CO₂ undercount
+  // (£150/(t·yr)) still flags HIGH (the new RAS band did NOT shadow the CO₂ band). Universal.
+  const rasCostState: any = {
+    keyMetrics: { product_class: 'aquaculture_ras' },
+    parsedBrief: { constraints: { target_performance: { metrics: [{ key_metric: 'production_capacity_tpy', value: 204, unit: 'tpy', category: 'scale' }] } } },
+    costStack: { oem_transfer_price_gbp: 10_668_668, raw_materials_bom_gbp: 10_668_668 },
+    requirementsBom: [{ requirement: 'authoritative BoM', line_gbp: 10_668_668 }],
+  }
+  const rasCS = computeCostSanity(rasCostState)
+  const rasBand = resolveClassOutputBand(rasCostState, 'throughput')
+  const rasAbsurd: any = JSON.parse(JSON.stringify(rasCostState))
+  rasAbsurd.costStack.oem_transfer_price_gbp = 102_000_000   // ~£500k/(t·yr) — a real magnitude error
+  const rasAbsurdCS = computeCostSanity(rasAbsurd)
+  const co2State: any = {
+    keyMetrics: { product_class: 'co2_mineralisation' },
+    parsedBrief: { constraints: { target_performance: { metrics: [{ key_metric: 'co2_capture_tpd', value: 1, unit: 'tpd', category: 'scale' }] } } },
+    costStack: { oem_transfer_price_gbp: 54_750 },            // £150/(t·yr) at 365 t/yr — the known undercount
+  }
+  const co2CS = computeCostSanity(co2State)
+  const co2Band = resolveClassOutputBand(co2State, 'throughput')
+  out.push(assertEq(
+    'UNIVERSAL.cost_sanity_reads_authoritative_bom_and_class_band',
+    'computeCostSanity reads costStack.ex_works as the headline cost (so the chain re-run on the reconciled BoM makes the recorded £/output authoritative), aquaculture_ras resolves its own ex-works £10k-55k/(t·yr) band → a plausible £52,297/(t·yr) RAS reads PASS, an absurd £500k/(t·yr) RAS still reads HIGH, and the CO₂ £150/(t·yr) undercount still reads HIGH (the RAS band did not shadow the CO₂ band)',
+    JSON.stringify({
+      rasHeadline: rasCS.headline_cost_gbp,
+      rasOutput: rasCS.output_value,
+      rasVerdict: rasCS.verdict,
+      rasBandBasis: rasCS.band_basis,
+      rasBandLow: rasBand?.low, rasBandHigh: rasBand?.high,
+      absurdVerdict: rasAbsurdCS.verdict,
+      co2Verdict: co2CS.verdict,
+      co2BandLow: co2Band?.low,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.rasHeadline === 10_668_668 && o.rasOutput === 204 && o.rasVerdict === 'pass' &&
+        o.rasBandBasis === 'class:aquaculture_ras' && o.rasBandLow === 10_000 && o.rasBandHigh === 55_000 &&
+        o.absurdVerdict === 'high' && o.co2Verdict === 'high' && o.co2BandLow === 1_500
     },
     (v) => `result=${v}`,
   ))

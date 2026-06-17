@@ -7121,6 +7121,28 @@ async function main() {
         }
         if (st.cost_reality && typeof st.cost_reality === 'object') st.cost_reality.bom_total_gbp = Math.round(reqTotal)
       }
+      // RE-DERIVE the independent cost-sanity gate (gate 32) on the AUTHORITATIVE BoM
+      // (ledger Phase 1c, 2026-06-17). The early shadow stage ran BEFORE this
+      // requirements-driven BoM existed, so it recorded state.costSanity against the
+      // partVerifications subtotal — a smaller, STALE number (RAS v13: £4.79M ex-works
+      // vs the reconciled £10.67M, a 2.2× under-report that flipped the verdict MED when
+      // the truth is HIGH). render-minimal-pdf's exec-summary renders
+      // state.costSanity.cost_per_output_unit, so the stale figure leaked into the
+      // dossier and contradicted the reconciled cover total. Re-compute here, on the same
+      // settled costStack the cover + BoM table read, so the gate verdict + the rendered
+      // £/output-unit are the SAME authoritative number — no stale fork. SHADOW (record
+      // only): honest reporting; the cost ceiling is deferred for the full-size scenario
+      // (the cheaper variant is the design-to-budget sweep, #97). Universal — every class
+      // re-derives its own cost-sanity on its settled BoM. Non-fatal on any throw.
+      try {
+        const csAuthoritative = computeCostSanity(st)
+        st.costSanity = csAuthoritative
+        console.log(`[chain] cost-sanity re-derived on authoritative BoM (Σ £${Math.round(reqTotal).toLocaleString('en-GB')}): verdict ${csAuthoritative.verdict} — £${Math.round(csAuthoritative.cost_per_output_unit).toLocaleString('en-GB')}/${csAuthoritative.output_unit_label}`)
+        logAction({ step: 'cost_sanity_reconciled', ok: true, verdict: csAuthoritative.verdict, cost_per_output_unit: csAuthoritative.cost_per_output_unit, headline_cost_gbp: csAuthoritative.headline_cost_gbp })
+      } catch (csErr) {
+        console.error(`[chain] cost-sanity re-derive on authoritative BoM threw (non-fatal): ${(csErr as Error).message}`)
+        logAction({ step: 'cost_sanity_reconciled', ok: false, error: String(csErr).slice(0, 200) })
+      }
       writeFileSync(statePath, JSON.stringify(st))
       console.log(`[chain] requirements-driven BoM: ${reqRows.length} requirement lines (Σ £${Math.round(reqTotal).toLocaleString('en-GB')}) → state.requirementsBom; cost cascade reconciled to this total`)
       logAction({ step: 'requirements_bom', ok: true, lines: reqRows.length, total_gbp: Math.round(reqTotal) })

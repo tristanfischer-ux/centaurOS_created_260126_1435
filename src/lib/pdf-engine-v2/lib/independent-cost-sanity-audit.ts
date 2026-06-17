@@ -210,6 +210,20 @@ export const CLASS_OUTPUT_BANDS: Record<string, IndustryCostBand & { aliases?: s
     aliases: ['power_to_liquid', 'fischer_tropsch', 'ptl', 'saf', 'e_kerosene'],
     notes: 'FOAK e-SAF capex per t/yr SAF capacity; design-council est Gemini £18k/Grok £38k/MiMo £40-80k',
   },
+  aquaculture_ras: {
+    family: 'throughput', low: 10_000, high: 55_000, per_unit_label: '£/(t·yr)',
+    aliases: ['ras', 'recirculating_aquaculture', 'recirculating_aquaculture_system',
+              'aquaculture', 'land_based_aquaculture', 'fish_farm', 'marine_ras'],
+    notes: 'Land-based marine RAS (recirculating aquaculture), EX-WORKS equipment capex per tonne ' +
+      'annual harvest capacity. Spans ~5× by scale: at-scale leaders (Kingfish Zeeland yellowtail ' +
+      '~€15-20k/(t·yr) installed) down to ~£10k/(t·yr) ex-works; small first-of-kind premium-species ' +
+      'UK facilities (<300 t/yr) reach ~£50-90k/(t·yr) installed → ~£30-55k/(t·yr) ex-works. The wide ' +
+      'band reflects the genuine scale-dependence (cf. e-SAF £12-60k); a per-(t·yr) figure ABOVE this ' +
+      'is a magnitude error, WITHIN it is plausible — a total capex over the brief cost CEILING is a ' +
+      'separate, honestly-disclosed brief-compliance matter (the design-to-budget variant), not a ' +
+      'per-unit-cost-plausibility failure. Moderate confidence (Kingfish Co/Atlantic Sapphire/Nordic ' +
+      'Aquafarms disclosures, 2023-2025; UK FOAK premium pulls the high edge up).',
+  },
 }
 
 /** Wire up class-band aliases so an alias slug resolves to its canonical band. */
