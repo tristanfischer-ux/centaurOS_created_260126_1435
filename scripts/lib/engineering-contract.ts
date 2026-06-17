@@ -12063,6 +12063,116 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const MAKEUP_SEAWATER_FRACTION = 0.95   // coastal marine RAS: ~95% beach-well seawater (self-salting) + ~5% fresh borehole blend
   const saltMakeupKgDay = Math.round(saltConcKgM3 * bleedWaterM3H * 24 * (1 - MAKEUP_SEAWATER_FRACTION))  // ~2.1 t/day — dose only the fresh-blend fraction
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // FOUR UNIVERSAL PHYSICS ELEMENTS (council-flagged on this marine RAS, but each
+  // gated on a PHYSICAL PRECONDITION — a property the plant has — NOT on the class
+  // name. A plant lacking the precondition emits nothing: a BESS has no open heated
+  // water, no high-recycle contaminant loop, no life-critical single-point heat
+  // source, no life-critical gas dosing, so all four are silent no-ops there.)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // ── (1) EVAPORATIVE LATENT / DEHUMIDIFICATION DUTY ───────────────────────────
+  // PRECONDITION: the plant has OPEN HEATED LIQUID SURFACE — warm open-top vessels
+  // held ABOVE the indoor air temperature. Open water continuously evaporates into
+  // the hall; that latent load must be removed (dehumidifier / DX cool+reheat) or
+  // the building rains internally and the fabric rots. UNIVERSAL: any plant with a
+  // warm open liquid surface above ambient has this duty (RAS rearing tanks, an
+  // open aeration basin, a warm process sump, a heated pool) — a SEALED-vessel or
+  // dry plant (BESS, a pressurised reactor) has zero open heated surface → no duty.
+  // Open-surface area = Σ open-top vessel plan areas. For the RAS the open tops are
+  // the rearing tanks (the treatment train is largely closed/covered): the rearing
+  // tanks are wide-shallow (Σ ≈ count × π/4 × dia²; ⌀ from the same shallow-tank
+  // geometry the synthesiser uses). ~1,200 m² of 26.4 °C water in an ~18 °C hall.
+  const rearingTankDiaM = Math.sqrt((4 * tankVolumeEachM3) / (Math.PI * Math.min(4.0, Math.max(1.5, 0.4 * Math.cbrt(tankVolumeEachM3)))))
+  const openHeatedSurfaceM2 = Math.round(rearingTankCount * (Math.PI / 4) * rearingTankDiaM * rearingTankDiaM)  // ~1,200 m²
+  // Indoor air design point of a heated marine-RAS hall: ~18 °C, ~70% RH (the HRV
+  // holds it here — warmer/wetter than outdoor, cooler than the water). Saturation
+  // vapour pressure via Antoine/Magnus (kPa): Psat(T) = 0.61094·exp(17.625·T/(T+243.04)).
+  const indoorAirTempC = 18
+  const indoorAirRhFrac = 0.70
+  const psatKpa = (tC: number) => 0.61094 * Math.exp((17.625 * tC) / (tC + 243.04))
+  const pSatWaterKpa = psatKpa(setpointTempC)              // vapour pressure at the WARM water surface (saturated film)
+  const pVapAirKpa = indoorAirRhFrac * psatKpa(indoorAirTempC)  // partial vapour pressure of the hall air
+  // ASHRAE open-water evaporation (Carrier/Shah pool model), still-to-low-activity
+  // surface: evap_kg_h ≈ A[m²] × C_evap[kg/(m²·h·kPa)] × (Psat_water − Pvap_air)[kPa].
+  // C_evap ≈ 0.10 kg/(m²·h·kPa) is a defensible low-turbulence still-water coefficient.
+  const evapCoeffKgM2hKpa = 0.10
+  const evapMoistureLoadKgH = (setpointTempC > indoorAirTempC && openHeatedSurfaceM2 > 0)
+    ? Math.round(openHeatedSurfaceM2 * evapCoeffKgM2hKpa * Math.max(0, pSatWaterKpa - pVapAirKpa))
+    : 0                                                    // ~266 kg/h
+  const latentHeatVapKjKg = 2450                           // latent heat of vaporisation of water (~26 °C)
+  // Dehumidification DUTY = latent heat to condense that moisture back out of the
+  // hall air. kW = kg/h × kJ/kg / 3600. ~181 kW for ~266 kg/h.
+  const dehumidifierPowerKw = Math.round((evapMoistureLoadKgH * latentHeatVapKjKg) / 3600)  // ~180 kW
+
+  // ── (2) RECIRCULATION-LOOP ACCUMULATING-CONTAMINANT MANAGEMENT (nitrate) ──────
+  // PRECONDITION: HIGH internal recirculation (recycle fraction high, small bleed)
+  // AND a process that PRODUCES a soluble contaminant the bleed must carry away. In
+  // a near-zero-exchange loop a species generated inside the loop accumulates until
+  // [removal by bleed] = [production]; if the bleed alone cannot hold it below a
+  // safe limit, a dedicated removal stage is required. UNIVERSAL: any high-recycle
+  // loop with an internally-produced soluble species (RAS nitrate from nitrification,
+  // a closed cooling loop concentrating dissolved solids, a recycle reactor building
+  // up a by-product). A once-through / low-recycle plant, or one with no production
+  // term, has nothing to accumulate → no steady-state concern, no stage.
+  const isHighRecycleLoop = recircFractionRecycled >= 0.90               // small bleed → species can accumulate
+  // PRODUCTION: nitrification oxidises TAN-N → nitrate-N at ~1:1 on the nitrogen
+  // basis; ~95% of the TAN load is nitrified through the MBBR. (As nitrate-N.)
+  const nitrateProducedFracOfTan = 0.95
+  const nitrateLoadKgDay = Math.round(tanLoadKgDay * nitrateProducedFracOfTan * 10) / 10  // ~26 kg NO₃-N/day
+  // REMOVAL by bleed: the steady-state concentration is production ÷ bleed volume.
+  // bleed ≈ make-up (mass balance, near-zero-exchange) → bleedWaterM3H × 24 m³/day.
+  const bleedVolumeM3Day = bleedWaterM3H * 24                            // ~1,282 m³/day
+  const steadyStateNo3MgL = (isHighRecycleLoop && nitrateLoadKgDay > 0 && bleedVolumeM3Day > 0)
+    ? Math.round((nitrateLoadKgDay * 1_000_000) / bleedVolumeM3Day / 1000 * 10) / 10  // (kg/day → mg/day) ÷ (m³/day) ÷ 1000 = mg/L ; ~20 mg/L
+    : 0
+  // SAFE LIMIT for the cultured species (kingfish NO₃-N ~ < 100-150 mg/L chronic).
+  // If the bleed alone holds the species BELOW the limit, the bleed SUFFICES and no
+  // denitrification stage is added (the honest deterministic outcome here: ~20 mg/L
+  // ≪ 100). Only when steady-state > limit is an anoxic MBBR denitrification reactor
+  // sized — volume from the NO₃ that must be REMOVED above the limit ÷ an anoxic
+  // areal denitrification rate (~0.3 kg NO₃-N/m³ media/day). Universal both ways.
+  const no3SafeLimitMgL = 100
+  const anoxicDenitRateKgM3Day = 0.3
+  const no3RemovalNeededKgDay = (steadyStateNo3MgL > no3SafeLimitMgL && bleedVolumeM3Day > 0)
+    ? ((steadyStateNo3MgL - no3SafeLimitMgL) * bleedVolumeM3Day) / 1000  // mg/L × m³/day ÷ 1000 = kg/day above the limit
+    : 0
+  const denitrificationReactorVolumeM3 = no3RemovalNeededKgDay > 0
+    ? Math.round((no3RemovalNeededKgDay / anoxicDenitRateKgM3Day) * 10) / 10
+    : 0                                                                  // 0 here — the bleed suffices
+
+  // ── (3) CRITICAL-EQUIPMENT REDUNDANCY (sole heat source) ─────────────────────
+  // PRECONDITION: a SINGLE item whose loss is CATASTROPHIC to the process. Here the
+  // heat plant holds 26.4 °C over ~200 t of biomass — a thermal collapse kills the
+  // stock. A life-critical single-point must carry an N+1 / duty-standby provision
+  // or an independent backup. UNIVERSAL: any plant with a life-critical single-point
+  // (a sole heat source on a temperature-critical live/process inventory, a sole
+  // pump on a flooded-suction-critical loop) gets a standby; a plant whose duties
+  // are all non-critical or already redundant gets nothing. Provision here: a BACKUP
+  // ELECTRIC IMMERSION HEATER sized to the residual (net) heating duty, on a separate
+  // supply, so a heat-pump trip cannot let the loop cool. The gate fires when the
+  // contract declares a positive heating duty on a live/temperature-critical loop.
+  const heatSourceIsLifeCritical = heatingDutyKw > 0 && standingBiomassKg > 0   // sole heat source over a live inventory
+  const backupImmersionHeaterPowerKw = heatSourceIsLifeCritical ? Math.round(heatingDutyKw) : 0  // ~336 kW electric backup
+  const criticalEquipmentRedundancy = heatSourceIsLifeCritical ? 1 : 0          // N+1 flag on the life-critical heat source
+
+  // ── (4) LIFE-CRITICAL GAS-DOSING FAIL-SAFE STATE (oxygen to the fish) ─────────
+  // PRECONDITION: a gas dosing that is LIFE-CRITICAL — its loss kills the inventory
+  // in minutes. The dosing valves must FAIL-OPEN on power loss (energise-to-close):
+  // a fail-CLOSED valve would cut O₂ the instant mains drops and the stock would die
+  // in the ~10-15 s before the genset picks up. Plus an INDEPENDENT emergency O₂ path
+  // (UPS/accumulator/LOX-buffer-backed) sized for a short bridge across the changeover.
+  // UNIVERSAL: any life-critical gas dosing (O₂ to an aerobic culture, an inerting
+  // blanket on a flammable inventory) → fail-OPEN final elements + an emergency bridge;
+  // a plant with no life-critical dosing emits neither. The fail-state is declared as a
+  // flag (1 = fail-open) the actuation synthesiser already honours on every culture
+  // vessel; the bridge is sized to hold the FULL O₂ demand for a short autonomy.
+  const o2DosingIsLifeCritical = oxygenDemandKgDay > 0                   // a live aerobic culture depends on dosed O₂
+  const o2DosingValveFailOpen = o2DosingIsLifeCritical ? 1 : 0           // 1 = fail-OPEN (energise-to-close) — NEVER fail-closed
+  const emergencyO2BridgeMinutes = 30                                    // short bridge across genset start / changeover
+  const emergencyO2SupplyKgH = o2DosingIsLifeCritical ? Math.round(oxygenSupplyKgH * 10) / 10 : 0  // full O₂ rate, held from the LOX buffer
+  const emergencyO2BufferKg = o2DosingIsLifeCritical ? Math.round(oxygenSupplyKgH * (emergencyO2BridgeMinutes / 60) * 10) / 10 : 0  // ~8 kg LOX bridge inventory
+
   // ── Total system mass (kg) — renderer compliance-table mass row + gate 17.
   // Field-erected RAS: tanks (HDPE/GRP/concrete-lined) + treatment vessels +
   // pumps/blowers + heat pumps + pipework + structure. Bottom-up; scales
@@ -12181,6 +12291,60 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     design_equipment_capex_gbp: q(designEquipCapexGbp, 'GBP', 'currency', 'gross', 'system', 'calculator', { source_detail: 'equipment capex anchor for this tonnage (≈£40k/annual-tonne off the £8.15 M / 204 t/yr reference)' }),
     capex_ceiling_gbp: q(capexCeilingGbp, 'GBP', 'currency', 'gross', 'system', 'brief', { source_detail: '£5,000,000 installed-capex ceiling for the RAS equipment, shipping and installation' }),
     total_system_mass_kg: q(totalSystemMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'bottom-up field-erected estimate: rearing tanks ~40 t + treatment vessels ~18 t + pumps/blowers ~9 t + heat pumps ~12 t + pipework/structure ~15 t' }),
+
+    // ════ FOUR UNIVERSAL PHYSICS ELEMENTS — each key emitted ONLY when its physical
+    // precondition holds (conditional spread), so a plant without the precondition has
+    // no key at all and the universal synthesiser mints no equipment for it. ════
+
+    // (1) EVAPORATIVE LATENT / DEHUMIDIFICATION — precondition: open heated liquid
+    // surface above ambient. `dehumidifier_power_kw` ends `_power_kw` (a DEVICE power)
+    // and the phrase NAMES a device ("dehumidifier", an -er agent noun), so the
+    // universal synthesiser mints a sized Dehumidifier; `evaporative_moisture_load_kg_h`
+    // ends `_kg_h` (a mass RATE) → a rating only, never an extra device.
+    ...(dehumidifierPowerKw > 0 ? {
+      dehumidifier_power_kw: q(dehumidifierPowerKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `latent dehumidification duty over ~${openHeatedSurfaceM2} m² of ${setpointTempC} °C open rearing-tank surface in an ~${indoorAirTempC} °C/${Math.round(indoorAirRhFrac * 100)}% RH hall: ASHRAE open-water evaporation ≈ area × ${evapCoeffKgM2hKpa} kg/(m²·h·kPa) × (Psat_water − Pvap_air) = ~${evapMoistureLoadKgH} kg/h moisture × ${latentHeatVapKjKg} kJ/kg ÷ 3600 → ~${dehumidifierPowerKw} kW (DX dehumidifier / cool+reheat); a closed/dry plant has no open heated surface → no duty` }),
+      evaporative_moisture_load_kg_h: q(evapMoistureLoadKgH, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: `moisture evaporated off the warm open water surface = ${openHeatedSurfaceM2} m² × ${evapCoeffKgM2hKpa} kg/(m²·h·kPa) × (${pSatWaterKpa.toFixed(2)} − ${pVapAirKpa.toFixed(2)}) kPa vapour-pressure deficit; the latent load the dehumidifier must remove` }),
+      // NOTE: open_heated_surface_area_m2 (the PRECONDITION property) lives in
+      // shared_quantities, NOT here — an `_area_m2` key would be read by the universal
+      // synthesiser as a footprint and mint a phantom "Open Heated Surface" box (same
+      // guard the file uses for system_water_volume_m3 → no "System Water" tank).
+    } : {}),
+
+    // (2) RECIRCULATION-LOOP ACCUMULATING CONTAMINANT (nitrate) — precondition: high
+    // recycle + an internally-produced soluble species. `nitrate_load_kg_day` /
+    // `steady_state_no3_mg_l` end in suffixes the equipment synthesiser ignores (a
+    // load + a concentration, never a device). A denitrification reactor volume is
+    // emitted ONLY if the bleed cannot hold NO₃ below the safe limit — here it can
+    // (~20 mg/L ≪ 100), so NO reactor key is emitted (no phantom vessel).
+    ...(isHighRecycleLoop && nitrateLoadKgDay > 0 ? {
+      nitrate_load_kg_day: q(nitrateLoadKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: `nitrate-N PRODUCED by nitrification = TAN_load ${tanLoadKgDay} kg/day × ${nitrateProducedFracOfTan} (TAN-N → NO₃-N, ~1:1 on N, ~95% nitrified through the MBBR); accumulates in the ${Math.round(recircFractionRecycled * 1000) / 10}% recycle loop unless bled/denitrified` }),
+      steady_state_no3_mg_l: q(steadyStateNo3MgL, 'mg/L', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `steady-state NO₃-N where bleed removal = production: ${nitrateLoadKgDay} kg/day ÷ ${Math.round(bleedVolumeM3Day)} m³/day bleed ≈ ${steadyStateNo3MgL} mg/L — BELOW the kingfish chronic limit ~${no3SafeLimitMgL} mg/L, so the ~0.4% bleed alone suffices (no denitrification stage required); a denitrification reactor is sized only when this exceeds the limit` }),
+    } : {}),
+    // Anoxic-MBBR denitrification reactor — synthesised as a vessel ONLY when the bleed
+    // is insufficient (volume > 0). A `_volume_m3` key at 0 is skipped by the synthesiser,
+    // but we emit it conditionally for cleanliness — here it is omitted entirely.
+    ...(denitrificationReactorVolumeM3 > 0 ? {
+      denitrification_reactor_volume_m3: q(denitrificationReactorVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: `anoxic-MBBR denitrification reactor: NO₃-N to remove above the ${no3SafeLimitMgL} mg/L limit (${Math.round(no3RemovalNeededKgDay * 10) / 10} kg/day) ÷ ~${anoxicDenitRateKgM3Day} kg NO₃-N/m³ media/day anoxic rate — sized because the bleed alone cannot hold NO₃ below the safe limit` }),
+    } : {}),
+
+    // (3) CRITICAL-EQUIPMENT REDUNDANCY — precondition: a life-critical single-point
+    // (the sole heat source over a live inventory). `backup_immersion_heater_power_kw`
+    // ends `_power_kw` and "heater" is an -er device noun → the synthesiser mints a
+    // Backup Immersion Heater in the BoM; the flag records the N+1 provision.
+    ...(heatSourceIsLifeCritical ? {
+      backup_immersion_heater_power_kw: q(backupImmersionHeaterPowerKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `N+1 backup electric immersion heater sized to the full net heating duty (~${backupImmersionHeaterPowerKw} kW), on a separate supply — an independent standby for the sole water-source heat pump, whose loss would let the loop cool and kill ~${(standingBiomassKg / 1000).toFixed(0)} t of biomass; any life-critical single-point heat source gets this, a non-critical/already-redundant duty gets nothing` }),
+      critical_equipment_redundancy: q(criticalEquipmentRedundancy, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'N+1 / duty-standby flag (=1) on the life-critical single-point heat source — its loss is catastrophic (thermal collapse over a live biomass inventory), so an independent backup heat source is mandated' }),
+    } : {}),
+
+    // (4) LIFE-CRITICAL GAS-DOSING FAIL-SAFE STATE (oxygen) — precondition: a dosing
+    // whose loss kills the inventory in minutes. The fail-state flag (=1, fail-OPEN)
+    // is consumed by the actuation synthesiser, which already mints a fail-open
+    // emergency-O₂ solenoid per culture vessel; the emergency bridge sizes that path.
+    ...(o2DosingIsLifeCritical ? {
+      o2_dosing_valve_fail_state: q(o2DosingValveFailOpen, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'O₂ dosing-valve fail-state = 1 (FAIL-OPEN / energise-to-close): on power loss the valves ADMIT oxygen — fail-CLOSED would cut O₂ before the genset starts and kill the stock in minutes. Universal for any life-critical gas dosing' }),
+      emergency_o2_supply_kg_h: q(emergencyO2SupplyKgH, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: `independent emergency O₂ path sized to the FULL ${emergencyO2SupplyKgH} kg/h demand, UPS/accumulator/LOX-buffer-backed, bridging the ~${emergencyO2BridgeMinutes} min across genset start / SCADA changeover; ends \`_supply_kg_h\` (a rate) so it is a duty, not a duplicated device — the fail-open solenoid is the actual final element` }),
+      emergency_o2_buffer_kg: q(emergencyO2BufferKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `LOX bridge inventory = ${emergencyO2SupplyKgH} kg/h × ${emergencyO2BridgeMinutes} min ≈ ${emergencyO2BufferKg} kg held upstream of any controlled valve, guaranteeing O₂ to the fish through the power/control changeover` }),
+    } : {}),
   }
 
   // ── Topology constraints — typed edges (the continuous recirculating loop) ──
@@ -12359,6 +12523,19 @@ registerArchetype('aquaculture_ras', (brief: any) => {
       regulatory_standard_spine: 'Marine Scotland aquaculture consent + The Aquatic Animal Health (Scotland) Regulations + CAR (Controlled Activities Regulations) discharge consent (SEPA) + Machinery Directive (BS EN ISO 12100) + DSEAR (ozone/oxygen) + BS EN 60204-1 (electrical safety of machinery)',
       species_desc: 'yellowtail kingfish (Seriola lalandi), sashimi/sushi-grade Hamachi',
       water_chemistry_desc: 'full-strength seawater ~33 ppt, 26.4 °C, pH 7.4, TAN 0.5-1.5 mg/L, nitrite 0.5-1.5 mg/L, CO₂ < 6 mg/L, DO ≥ saturation at tank inlet',
+      // Four universal physics elements — headline facts carried here (NOT quantities) so
+      // prose / P&ID / single-line / compliance emitters read ONE consistent value each
+      // (gate-24 anchor) without minting a phantom device. Each is included unconditionally
+      // (a scalar fact, harmless when the duty is 0) but the EQUIPMENT only exists when the
+      // precondition fired above.
+      open_heated_surface_area_m2: openHeatedSurfaceM2,                // (1) PRECONDITION property — kept HERE so it is NOT minted as a phantom footprint
+      dehumidification_duty_kw: dehumidifierPowerKw,                    // (1) latent load removed off the open warm water
+      evaporative_moisture_load_kg_h: evapMoistureLoadKgH,             // (1) moisture evaporated into the hall
+      steady_state_no3_mg_l: steadyStateNo3MgL,                        // (2) accumulating-nitrate steady state (bleed-limited)
+      denitrification_required: denitrificationReactorVolumeM3 > 0 ? 1 : 0,  // (2) 0 here — the bleed holds NO₃ below the safe limit
+      backup_heat_source: heatSourceIsLifeCritical ? `N+1 backup electric immersion heater (~${backupImmersionHeaterPowerKw} kW) on a separate supply — independent standby for the sole heat pump` : 'none required',  // (3) life-critical single-point redundancy
+      o2_dosing_fail_state: o2DosingIsLifeCritical ? 'fail-open (energise-to-close): power loss ADMITS O₂' : 'n/a',  // (4) life-critical gas-dosing fail-safe
+      emergency_o2_bridge_desc: o2DosingIsLifeCritical ? `independent emergency O₂ path: ~${emergencyO2SupplyKgH} kg/h for ~${emergencyO2BridgeMinutes} min (~${emergencyO2BufferKg} kg LOX bridge), UPS/accumulator-backed` : 'n/a',  // (4) emergency bridge across changeover
     },
   }
 })
