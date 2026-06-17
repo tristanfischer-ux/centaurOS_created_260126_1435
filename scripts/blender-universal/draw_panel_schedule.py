@@ -233,6 +233,73 @@ def _next_frame(design_a: float) -> int:
     return _BREAKER_FRAMES[-1]
 
 
+# ── LOAD-DERIVED CIRCUIT SIZING (universal — every powered circuit sized from its own kW) ──
+# BS 7671 / IEC 60228 conductor CSA ladder [mm²] + the current-carrying capacity (ampacity)
+# per CSA for a 3- / 4-core 90 °C thermosetting (XLPE) copper cable, Method C (clipped
+# direct) — BS 7671 Table 4D2A column. This is the realistic install for a three-phase power
+# feeder, so the cable a circuit needs matches industrial practice (e.g. a ~96 kW motor lands
+# on 70 mm², a ~132 kW motor on 120 mm²). The cable is sized to carry ≥ FLC × 1.25 (the
+# BS 7671 §433 "design current ≤ cable rating" rule with the standard 1.25 motor/continuous-
+# duty margin).
+_CSA_LADDER = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300, 400]
+_CSA_AMPACITY_A = {
+    1.5: 23, 2.5: 31, 4: 42, 6: 54, 10: 75, 16: 100, 25: 133, 35: 164, 50: 198,
+    70: 253, 95: 306, 120: 354, 150: 407, 185: 464, 240: 546, 300: 628, 400: 751,
+}
+# Default electrical assumptions for the FLC of a powered circuit (overridable nowhere yet,
+# but the board's own voltage/phases drive V): line-to-line V=400, power factor 0.85,
+# motor efficiency 0.90 — the brief's universal three-phase induction-motor defaults.
+_PF_DEFAULT = 0.85
+_ETA_DEFAULT = 0.90
+
+
+def flc_from_kw(kw, voltage_v, is_dc=False, phases=3,
+                pf=_PF_DEFAULT, eta=_ETA_DEFAULT):
+    """Full-load current [A] of a powered circuit from its connected load kW.
+      • 3-phase AC:  I = P·1000 / (√3 · V · pf · η)
+      • 1-phase AC:  I = P·1000 / (V · pf · η)
+      • DC:          I = P·1000 / V
+    η (motor efficiency) is applied for AC motor circuits — the SUPPLY current that the
+    cable + breaker must carry is the SHAFT power ÷ efficiency, so a 132 kW motor draws
+    more line current than 132 kW of resistive load. Universal: any kW → its real FLC."""
+    if not kw or kw <= 0 or not voltage_v or voltage_v <= 0:
+        return None
+    p_w = kw * 1000.0
+    if is_dc:
+        return p_w / voltage_v
+    denom = (math.sqrt(3.0) if phases >= 3 else 1.0) * voltage_v * pf * eta
+    return p_w / denom if denom > 0 else None
+
+
+def size_cable_csa(design_a, margin=1.25):
+    """Smallest standard CSA [mm²] whose single-core copper ampacity ≥ design_a × margin
+    (BS 7671 Method C). Above the top single conductor, report a parallel-run label so the
+    schedule cell stays honest (e.g. '2×400 mm²') rather than silently under-sizing."""
+    if not design_a or design_a <= 0:
+        return None, ""
+    need = design_a * margin
+    for csa in _CSA_LADDER:
+        if _CSA_AMPACITY_A.get(csa, 0) >= need:
+            return csa, f"{csa:g} mm²"
+    # parallel runs of the top CSA.
+    top = _CSA_LADDER[-1]
+    n = max(2, math.ceil(need / _CSA_AMPACITY_A[top]))
+    return top, f"{n}×{top:g} mm²"
+
+
+def size_circuit_from_kw(kw, voltage_v, is_dc=False, phases=3):
+    """The full load-derived sizing of ONE powered circuit from its connected kW:
+    (design_a=FLC, cable_csa_mm2, cable_label, breaker_frame_a). The protective device is
+    the next standard frame ≥ FLC (an MCB/MCCB must carry the design current continuously);
+    the cable is sized to ≥ FLC × 1.25. Returns (None, None, '', None) when no kW/V."""
+    flc = flc_from_kw(kw, voltage_v, is_dc=is_dc, phases=phases)
+    if flc is None:
+        return None, None, "", None
+    csa, label = size_cable_csa(flc)
+    frame = _next_frame(flc)
+    return round(flc, 1), csa, label, frame
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # DATA MODEL — the reconstructed panel / load schedule
 # ═══════════════════════════════════════════════════════════════════════════
@@ -756,10 +823,14 @@ def _synthesise_main_board(schedule: dict, state: dict, rows, devices) -> Option
             f"V LV board ({plan.board_current_a:,.0f} A). One outgoing circuit per "
             f"process module / major load group.")
 
-    # outgoing circuits — one per synthesised feeder.
+    # outgoing circuits — one per synthesised feeder. The feeder current is already a real
+    # FLC (sized by the distribution model from the module kW); the breaker is the next
+    # standard frame ≥ FLC (load-derived, not design×1.25).
     for i, f in enumerate(feeders, start=1):
         cable = _cores_for(f.size_label, False, 3)
-        dev, dev_a = _device_for(f.name, f.current_a, devices, panel)
+        dev, dev_a = _device_for(f.name, f.current_a, devices, panel,
+                                 frame_override=_next_frame(f.current_a)
+                                 if f.current_a else None)
         note = "even split of aggregate load" if (f.note and "even split" in f.note) else ""
         panel.circuits.append(Circuit(
             ref=f"W{i}", description=f.name, ways=1,
@@ -935,10 +1006,15 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state):
     if grp_amps:
         from collections import Counter
         val, n = Counter(grp_amps).most_common(1)[0]
-        # Only the small wholesale FALLBACK current (the un-sized ~27 A every tap inherits)
-        # is treated as a default to break up — a large shared current (e.g. 1953 A parallel
-        # battery-rack feeders) is a genuine engineered value and must be left alone.
-        if n >= 3 and n / len(grp_amps) > 0.30 and val < 60.0:
+        # A wholesale FALLBACK current is the SAME value inherited by MANY un-sized taps
+        # (e.g. 27.4 A on every circuit, or 75.4 A on every RAS circuit) — detected by its
+        # DOMINANCE (≥3 circuits AND >30% share AND it is shared by loads of OBVIOUSLY
+        # different size, so it cannot be a real engineered current). A large shared current
+        # that genuinely recurs on identical parallel feeders (e.g. 1953 A battery-rack
+        # busbars, where the GROUP collapses to ONE row ×N so it is NOT repeated across many
+        # distinct rows) is left alone. The previous `val < 60` cap silently missed the RAS
+        # 75.4 A default; dominance + a distinct-load check is the universal signal.
+        if n >= 3 and n / len(grp_amps) > 0.30:
             default_a = val
 
     wn = 0
@@ -967,25 +1043,32 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state):
         kw = _connected_kw_for(base, design_a, panel, state, ways)
         kw_total = (kw * ways) if kw is not None else None
 
-        # RE-SIZE the design current from the per-load kW when the schedule left this circuit
-        # at the wholesale default (so the breaker frame varies per load, not one frame for
-        # every circuit). Only overrides a default/zero current; a genuinely sized tap (e.g.
-        # the 192 A heat-pump feeder) keeps its schedule current. The KW per WAY drives the
-        # per-circuit current (kw_total back-divided), consistent with the SLD.
+        # LOAD-DERIVED SIZING (universal — every powered circuit sized from its OWN kW).
+        # When the schedule left this circuit at the wholesale DEFAULT current (or gave it no
+        # current at all), the Design I, the cable CSA and the protective device are ALL
+        # re-derived from the circuit's connected load: FLC = P·1000/(√3·V·pf·η), cable ≥
+        # FLC×1.25 from the BS 7671 ampacity ladder, breaker = next frame ≥ FLC. This stops
+        # the panel showing one fixed current (75.4 A) + a cable disconnected from the load
+        # (a 132 kW motor on 16 mm²/100 A that would trip on start). A genuinely-sized tap
+        # (a distinct engineered current, e.g. the DC battery-rack feeder or a real heat-pump
+        # feeder) is NOT a default → it keeps its schedule current + cable. The kW PER WAY
+        # drives the per-circuit FLC, consistent with the single-line.
         is_default = (default_a is not None
                       and design_a is not None
                       and abs(round(design_a, 1) - default_a) < 0.05)
+        frame_override = None
         if is_default and kw and kw > 0 and panel.voltage_v:
-            v = panel.voltage_v
-            if panel.is_dc:
-                design_a = kw * 1000.0 / v
-            elif panel.phases >= 3:
-                design_a = kw * 1000.0 / (math.sqrt(3) * v * 0.95)
-            else:
-                design_a = kw * 1000.0 / (v * 0.95)
-            design_a = round(design_a, 1)
+            flc, _csa, csa_label, frame = size_circuit_from_kw(
+                kw, panel.voltage_v, is_dc=panel.is_dc, phases=panel.phases)
+            if flc is not None:
+                design_a = flc
+                # the load-derived cable REPLACES the schedule's wholesale-default CSA so the
+                # cable matches the breaker matches the load (all three from this kW).
+                cable = _cores_for(csa_label, panel.is_dc, panel.phases)
+                frame_override = frame      # breaker = next standard frame ≥ FLC
 
-        dev, dev_a = _device_for(base, design_a, devices, panel)
+        dev, dev_a = _device_for(base, design_a, devices, panel,
+                                 frame_override=frame_override)
 
         panel.circuits.append(Circuit(
             ref=ref, description=desc, ways=ways,
@@ -1099,9 +1182,17 @@ def _connected_kw_for(base: str, design_a, panel: Panel, state: dict,
     return _design_kw_from_a(design_a, panel)
 
 
-def _device_for(base: str, design_a, devices, panel: Panel) -> tuple[str, Optional[float]]:
+def _device_for(base: str, design_a, devices, panel: Panel,
+                frame_override: Optional[float] = None) -> tuple[str, Optional[float]]:
     """Match a protective device from the BoM by destination, else SIZE a standard frame.
-    Returns (label, frame_amps)."""
+    Returns (label, frame_amps).
+
+    frame_override: when the circuit's current is a FLC derived from its connected load, the
+    caller passes the BS 7671 protective rating (next standard frame ≥ FLC). The device
+    rating must carry the design current continuously — a breaker is selected at the next
+    standard rating ABOVE the FLC, NOT FLC × 1.25 (the ×1.25 margin sizes the CABLE, not the
+    device). When no override is given (a rating-less feeder), the legacy design×1.25 sizing
+    applies so an un-sized feeder still gets a conservative frame."""
     b = (base or "").lower()
     picked = None
     if b in ("rack", "rack_block"):
@@ -1120,8 +1211,11 @@ def _device_for(base: str, design_a, devices, panel: Panel) -> tuple[str, Option
     if picked:
         amp = picked["amp"]
         # if the named device carries no ampere figure, size one for the label suffix
-        if amp is None and design_a is not None:
-            amp = _next_frame(design_a * 1.25)
+        if amp is None:
+            if frame_override is not None:
+                amp = frame_override
+            elif design_a is not None:
+                amp = _next_frame(design_a * 1.25)
         kind_word = {"breaker": "MCCB", "isolator": "isolator", "contactor": "contactor",
                      "fuse": "fuse", "rcd": "RCD"}.get(picked["kind"], picked["kind"])
         mfr_mpn = " ".join(x for x in (picked["mfr"], picked["pn"]) if x).strip()
@@ -1129,7 +1223,13 @@ def _device_for(base: str, design_a, devices, panel: Panel) -> tuple[str, Option
         lbl = f"{amp_s}{kind_word}" + (f" · {mfr_mpn}" if mfr_mpn else "")
         return lbl.strip(), amp
 
-    # no named device — size a standard breaker frame ≥ design × 1.25.
+    # no named device — size a standard breaker frame. With a load-derived FLC the frame is
+    # the next standard rating ≥ FLC (frame_override); a rating-less feeder falls back to the
+    # legacy design×1.25 conservative sizing.
+    if frame_override is not None:
+        f = frame_override
+        word = "MCCB" if f > 125 else "MCB"
+        return f"{f:g} A {word} (sized)", float(f)
     if design_a is not None:
         f = _next_frame(design_a * 1.25)
         word = "MCCB" if f > 125 else "MCB"

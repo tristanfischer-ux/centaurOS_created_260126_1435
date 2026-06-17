@@ -112,6 +112,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 from typing import Any, Optional
@@ -359,15 +360,82 @@ FALLBACK_GBP_PER_M = 12.0
 COST_SOURCE_MODEL = "model:uk-2026-supply+install"
 
 # Material multipliers for pipe cost, parsed from material_context (carbon = 1.0).
+# NB the stainless row matches a STANDALONE "ss" token (\bss\b, not the substring "ss " —
+# that fired inside "proce**ss** water" and mis-tagged plain water lines as stainless).
 PIPE_MATERIAL_FACTORS = (
     # (substring tuple, factor, label)
     (("hastelloy", "inconel", "incoloy", "monel", "titanium", "duplex",
       "super duplex", "c-276", "c276"), 3.5, "exotic alloy"),
-    (("316", "304", "stainless", "ss ", "cres", "1.4404", "1.4301"), 1.9, "stainless steel"),
+    (("316", "304", "stainless", r"\bss\b", "cres", "1.4404", "1.4301"), 1.9,
+     "stainless steel"),
     (("copper", "cu ", "cupronickel", "cuni"), 1.4, "copper"),
-    (("pvc", "upvc", "cpvc", "hdpe", "mdpe", "pp ", "polyprop", "plastic",
-      "grp", "frp", "abs "), 0.6, "plastic/composite"),
+    (("pvc", "upvc", "cpvc", "hdpe", "mdpe", "pe100", "pp ", "polyprop", "polyeth",
+      "plastic", "grp", "frp", "abs "), 0.6, "plastic/composite"),
 )
+
+# ── CORROSIVE-SERVICE → CORROSION-RESISTANT MATERIAL (universal, keyed on the FLUID) ──
+# A pipe carrying a CORROSIVE fluid (seawater / saline / brackish / brine / effluent /
+# wastewater / sewage / leachate) corrodes carbon steel to failure in 2-5 years and PITS
+# 316 stainless (chloride stress-corrosion). The correct default for such water service is
+# a corrosion-resistant non-metal — HDPE / PE100 (or PVC-U / GRP) — which is cheaper AND
+# chloride-proof. This is decided from the route's FLUID/service tag, NOT the product class,
+# so it is a no-op for any plant with no corrosive line. (Mirrors requirements_bom.py's
+# `_STAINLESS_SERVICE_RE` reservation so the line-list material + the BoM column agree.)
+# Treat _ / - / whitespace as token separators (service tags are often snake_case).
+_SEP = r"[\s_\-]"
+_CORROSIVE_SERVICE_RE = re.compile(
+    rf"sea{_SEP}?water|saline|brackish|brine|chlorinat|"
+    rf"effluent|waste{_SEP}?water|black{_SEP}?water|grey{_SEP}?water|sewage|"
+    rf"leachate|reject{_SEP}?(?:water|brine)|(?:^|{_SEP})ro{_SEP}?reject", re.I)
+# A WATER service of ANY kind (process / recirculation / cooling / make-up / treated) — a
+# water main is HDPE / PVC-U / ductile iron in practice, NEVER bare carbon steel. Defaulting
+# water to HDPE/PE100 makes the line-list material agree with requirements_bom.py (whose
+# water-main default is also HDPE/PVC-U). Excludes a closed steam/condensate loop (those tags
+# say "steam"/"condensate" + hit neither the water nor the oxidiser pattern).
+_WATER_SERVICE_RE = re.compile(
+    rf"(?:^|{_SEP})water(?:$|{_SEP})|water{_SEP}?(?:loop|main|line|supply|return|"
+    rf"recirc|tie|service|source)|recirculat|process{_SEP}?water|"
+    rf"make{_SEP}?up|cooling{_SEP}?water|chilled{_SEP}?water|degass?ed|oxygenat|nitrif|"
+    rf"reoxygenat|drain{_SEP}?tank|"
+    # aqueous process streams / wetted vessels — unambiguously water-bearing in any plant
+    rf"biofilt|biofilm|(?:^|{_SEP})mbbr(?:$|{_SEP})|moving{_SEP}?bed|clarifier|settler|"
+    rf"(?:^|{_SEP})sump|solids{_SEP}?(?:remov|rich|laden|draw)|sludge|tan{_SEP}?oxidation",
+    re.I)
+# The genuine 316L-reserve services — strongly OXIDISING / cryogenic-oxygen / ozone delivery
+# — where a corrosion-resistant PLASTIC is NOT acceptable and stainless is correct. Kept
+# narrow (oxygen / LOX / ozone / peroxide / oxidiser). _ counts as a boundary so a snake_case
+# 'LOX_plus_PSA' / 'kg_O2_per' tag still matches.
+_OXIDISER_SERVICE_RE = re.compile(
+    rf"(?:^|{_SEP})lox(?:$|{_SEP})|liquid{_SEP}?oxygen|"
+    rf"oxygen{_SEP}?(?:supply|delivery|line|gas|service|generat)|psa|"
+    rf"(?:^|{_SEP})o2(?:$|{_SEP})|(?:^|{_SEP})gox(?:$|{_SEP})|ozone|(?:^|{_SEP})o3(?:$|{_SEP})|"
+    rf"peroxide|oxidis|oxidiz|hypochlorite|chlorine{_SEP}?gas", re.I)
+
+
+def corrosive_service_material(material_context: Optional[str]) -> Optional[tuple]:
+    """If `material_context` describes a fluid service that warrants a NON-carbon-steel
+    default pipe material, return (factor, label); else None.
+
+    Universal + fluid-keyed (NOT class-keyed), in priority order:
+      • an OXIDISER / LOX / ozone / oxygen-supply service → 316L stainless (factor 1.9) —
+        a corrosion-resistant PLASTIC is unsafe in an oxidising/cryogenic-O₂ duty;
+      • a corrosive WATER service (seawater / saline / brine / effluent / wastewater) OR a
+        generic WATER main (process / recirculation / cooling / make-up) → HDPE / PE100
+        (factor 0.6) — chloride-proof AND the correct material for water service (a water
+        main is HDPE/PVC-U/ductile iron, never bare carbon steel that rusts through).
+    Returns None for a non-water, non-oxidiser service (air / inert / oil / process gas),
+    so the caller keeps the normal carbon-steel default — a strict no-op there."""
+    if not material_context:
+        return None
+    s = material_context.lower()
+    # Oxidiser / LOX / ozone takes precedence: stainless is genuinely required there.
+    if _OXIDISER_SERVICE_RE.search(s):
+        return (1.9, "316L stainless (oxidiser service)")
+    if _CORROSIVE_SERVICE_RE.search(s):
+        return (0.6, "HDPE/PE100 (corrosive service)")
+    if _WATER_SERVICE_RE.search(s):
+        return (0.6, "HDPE/PE100 (water service)")
+    return None
 
 
 def _voltdrop_limit_pct() -> float:
@@ -2221,12 +2289,46 @@ def _parse_csa_from_label(size_label: Optional[str]) -> Optional[float]:
 
 
 def _pipe_material_factor(material_context: Optional[str]) -> tuple[float, str]:
-    """Material multiplier on the carbon-steel pipe rate (carbon = 1.0)."""
+    """Material multiplier + label on the carbon-steel pipe rate (carbon = 1.0).
+
+    Resolution order (universal, keyed on the SERVICE / fluid in material_context):
+      1. An EXPLICIT plastic / copper / exotic-alloy material named in the context wins
+         (e.g. the context literally says "HDPE" or "Hastelloy").
+      2. Else a CORROSIVE-FLUID service forces a corrosion-resistant default — HDPE/PE100
+         for corrosive water (seawater / saline / brine / effluent / wastewater), 316L for
+         an oxidiser / LOX / ozone line — OVERRIDING the carbon/stainless the substring
+         table would otherwise pick (a seawater main is HDPE, never carbon steel and never
+         plain 316L which pits in chloride).
+      3. Else the generic substring table (a stated 316/stainless, copper, etc.).
+      4. Else carbon steel.
+    No-op for a non-corrosive service with no stated material → carbon steel as before."""
     if not material_context:
         return 1.0, "carbon steel (assumed)"
     s = material_context.lower()
+
+    def _match(subs):
+        for sub in subs:
+            if sub.startswith("\\b"):                # a regex word-boundary token
+                if re.search(sub, s):
+                    return True
+            elif sub in s:
+                return True
+        return False
+
+    # (1) an explicitly-named corrosion-resistant / special material wins outright.
     for subs, factor, label in PIPE_MATERIAL_FACTORS:
-        if any(k in s for k in subs):
+        if label in ("plastic/composite", "copper", "exotic alloy") and _match(subs):
+            return factor, label
+
+    # (2) corrosive-fluid service → corrosion-resistant default (HDPE water / 316L oxidiser),
+    #     overriding the carbon-vs-stainless substring guess.
+    corr = corrosive_service_material(material_context)
+    if corr is not None:
+        return corr
+
+    # (3) a stated stainless (or any remaining table entry), then (4) carbon steel.
+    for subs, factor, label in PIPE_MATERIAL_FACTORS:
+        if _match(subs):
             return factor, label
     return 1.0, "carbon steel"
 

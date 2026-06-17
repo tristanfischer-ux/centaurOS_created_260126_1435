@@ -132,6 +132,7 @@ def _run_fitting_unit():
     from draw_isometric import IsoLine, IsoFitting, _line_bom
     L = IsoLine(number="900-PR", mechanism="fluid_loop", dn="DN50",
                 size_label="DN50", outer_dia_mm=60.0, service="test",
+                material="HDPE/PE100 (water service)",
                 from_tag="A-1", to_tag="B-1", from_name="a", to_name="b",
                 waypoints_mm=[[0, 0, 0], [3000, 0, 0], [3000, 0, 2000]],
                 fittings=[IsoFitting("elbow", (3000, 0, 0))],

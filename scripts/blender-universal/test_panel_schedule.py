@@ -261,6 +261,38 @@ def test_breaker_sizing():
     check("MCCB" in label or "MCB" in label, f"frame labelled (got {label!r})")
 
 
+def test_load_derived_sizing():
+    """DEFECT 2 (council, marine RAS): the cable / breaker / Design-I must be DERIVED from
+    each circuit's connected kW — never a single fixed current for every circuit. A 132 kW
+    motor on 16 mm²/100 A and a 96 kW pump on 25 mm²/100 A would both trip on start.
+    Universal: FLC = P·1000/(√3·V·pf·η); cable ≥ FLC×1.25 (BS 7671 4D2A); breaker = next
+    standard frame ≥ FLC."""
+    print("\n[load-derived sizing] every powered circuit sized from its own kW (Defect 2)")
+    # FLC of a 132 kW and a 96 kW 3-phase 400 V motor.
+    f132, _csa, l132, b132 = ps.size_circuit_from_kw(132, 400.0)
+    f96, _csa2, l96, b96 = ps.size_circuit_from_kw(96, 400.0)
+    check(230 <= f132 <= 255, f"132 kW FLC ≈ 236-249 A (got {f132:.0f} A)")
+    check(168 <= f96 <= 185, f"96 kW FLC ≈ 172-181 A (got {f96:.0f} A)")
+    # cable carries ≥ FLC × 1.25 (NOT a fixed 16/25 mm²).
+    check(ps._CSA_AMPACITY_A[float(l132.split()[0])] >= f132 * 1.25,
+          f"132 kW cable {l132} ampacity ≥ FLC×1.25 = {f132*1.25:.0f} A")
+    check(ps._CSA_AMPACITY_A[float(l96.split()[0])] >= f96 * 1.25,
+          f"96 kW cable {l96} ampacity ≥ FLC×1.25 = {f96*1.25:.0f} A")
+    check("120" in l132 and "70" in l96,
+          f"132 kW → 120 mm², 96 kW → 70 mm² (got {l132} / {l96})")
+    # breaker = next standard frame ≥ FLC (carries the design current), NOT FLC × 1.25.
+    check(b132 == 250 and b132 >= f132, f"132 kW breaker = 250 A ≥ FLC (got {b132})")
+    check(b96 == 200 and b96 >= f96, f"96 kW breaker = 200 A ≥ FLC (got {b96})")
+    # a higher-kW circuit must get a HIGHER current than a lower-kW one (not all equal).
+    f35 = ps.flc_from_kw(35, 400.0)
+    f23 = ps.flc_from_kw(23.5, 400.0)
+    check(f132 > f96 > f35 > f23 > 0,
+          f"FLC monotonic with kW: 132→{f132:.0f} > 96→{f96:.0f} > 35→{f35:.0f} > 23.5→{f23:.0f}")
+    # DC sizing: P = V·I (no √3, no pf).
+    fdc = ps.flc_from_kw(100, 500.0, is_dc=True)
+    check(abs(fdc - 200.0) < 0.5, f"DC FLC = P/V = 100kW/500V = 200 A (got {fdc:.1f})")
+
+
 def test_render_smoke():
     print("\n[render] markdown + SVG produce non-trivial output with the key sections")
     for name, fx in (("plain", fixture_plain), ("d2", fixture_d2), ("vf", fixture_vf)):
@@ -315,6 +347,7 @@ def main():
     test_d2()
     test_vf()
     test_breaker_sizing()
+    test_load_derived_sizing()
     test_render_smoke()
     test_real_dirs()
     print("\n" + "=" * 76)

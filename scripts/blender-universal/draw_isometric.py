@@ -99,6 +99,7 @@ class IsoLine:
     size_label: str           # full size text, e.g. 'DN200' or '8×400 mm²'
     outer_dia_mm: Optional[float]
     service: str              # humanised service description
+    material: str             # pipe material (HDPE/PE100 · 316L · carbon steel) from manifest
     from_tag: str             # equipment tag at the source end, e.g. 'R-102'
     to_tag: str               # equipment tag at the target end, e.g. 'H-102'
     from_name: str            # source equipment human name
@@ -208,7 +209,8 @@ def reconcile_lines(man: dict, state: dict,
             number=number, mechanism=r.get("mechanism") or "",
             dn=dn, size_label=r.get("size_label") or dn or "",
             outer_dia_mm=r.get("outer_dia_mm"),
-            service=service, from_tag=from_tag, to_tag=to_tag,
+            service=service, material=r.get("material") or "",
+            from_tag=from_tag, to_tag=to_tag,
             from_name=from_name, to_name=to_name,
             waypoints_mm=wp, fittings=fittings,
             length_m=round(total_mm / 1000.0, 2),
@@ -765,8 +767,10 @@ def _draw_line_facts(svg, ln: IsoLine, x, y, w):
         ("To", f"{ln.to_tag}  {_short(ln.to_name, 24)}"),
         ("Service", _short(ln.service or "process", 30)),
         ("Mechanism", ln.mechanism or "—"),
-        ("Run length", f"{ln.length_m:.2f} m  ({len(ln.waypoints_mm)} pts)"),
     ]
+    if ln.material:                                 # pipe material (line-list spec)
+        rows.append(("Material", _short(ln.material, 30)))
+    rows.append(("Run length", f"{ln.length_m:.2f} m  ({len(ln.waypoints_mm)} pts)"))
     header_h = 20
     rh = 15.0
     bh = header_h + len(rows) * rh + 8
@@ -841,8 +845,9 @@ def _draw_line_register(svg, lines, x, y, w):
     bh = header_h + len(shown) * rh + 10
     svg.rect(x, y, w, bh, stroke=GRID_FAINT, width=1.1, fill=FILL_BG)
     svg.rect(x, y, w, header_h, stroke=GRID_FAINT, width=1.1, fill=PANEL_BG)
-    cols = [("LINE No.", 0.0), ("SIZE", 0.14), ("FROM", 0.27),
-            ("TO", 0.45), ("SERVICE", 0.63), ("CUT L.", 0.86), ("ELB.", 0.95)]
+    cols = [("LINE No.", 0.0), ("SIZE", 0.13), ("FROM", 0.24),
+            ("TO", 0.39), ("SERVICE", 0.54), ("MATERIAL", 0.74), ("CUT L.", 0.89),
+            ("ELB.", 0.965)]
     for label, frac in cols:
         svg.text(x + 8 + frac * (w - 16), y + 15, label, size=8.2, weight="bold",
                  fill=MUTED)
@@ -850,11 +855,12 @@ def _draw_line_register(svg, lines, x, y, w):
     for ln in shown:
         bom = _line_bom(ln)
         cells = [
-            (ln.number, 0.0, True), (ln.size_label or ln.dn, 0.14, False),
-            (ln.from_tag, 0.27, False), (ln.to_tag, 0.45, False),
-            (_short(ln.service or "process", 22), 0.63, False),
-            (f"{bom['pipe_length_m']:.1f} m", 0.86, False),
-            (str(bom["elbows"]), 0.95, False),
+            (ln.number, 0.0, True), (ln.size_label or ln.dn, 0.13, False),
+            (ln.from_tag, 0.24, False), (ln.to_tag, 0.39, False),
+            (_short(ln.service or "process", 20), 0.54, False),
+            (_short(ln.material or "—", 20), 0.74, False),
+            (f"{bom['pipe_length_m']:.1f} m", 0.89, False),
+            (str(bom["elbows"]), 0.965, False),
         ]
         for txt, frac, bold in cells:
             svg.text(x + 8 + frac * (w - 16), yy, _short(txt, 26), size=7.8,

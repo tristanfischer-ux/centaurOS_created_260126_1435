@@ -651,6 +651,41 @@ def main() -> int:
           and act1["branches"][0]["within_spec"] is True
           and act1["feeder"]["within_spec"] is True)
 
+    # ---- DEFECT 1 (council, marine RAS): corrosive-service → corrosion-resistant pipe ----
+    # A corrosive / water service must NOT default to carbon steel (rusts through) or plain
+    # 316L (pits in chloride). Keyed on the FLUID in material_context, NOT the product class,
+    # so it is a strict NO-OP on a non-corrosive plant (air / inert / oil → carbon steel).
+    def _mat(mc):
+        return cs._pipe_material_factor(mc)[1]
+    print("\nDEFECT-1 corrosive-service material resolution:")
+    check("seawater service → HDPE/PE100 (was carbon/316L)",
+          "HDPE" in _mat("seawater intake to drum filter"))
+    check("effluent service → HDPE/PE100",
+          "HDPE" in _mat("treated effluent to outfall"))
+    check("brine / RO-reject → HDPE/PE100",
+          "HDPE" in _mat("RO reject brine to discharge"))
+    check("generic process-water main → HDPE (agrees with requirements_bom water default)",
+          "HDPE" in _mat("process water tie-in (recirculation loop)"))
+    check("'process water' no longer falsely matches 'ss' → NOT stainless",
+          "stainless" not in _mat("process water (inter-module recirculation/service)"))
+    check("LOX / oxygen-supply service → 316L stainless (oxidiser reserve, plastic unsafe)",
+          "316L" in _mat("LOX_plus_PSA_supply_~0.5kg_O2_per_kg_feed"))
+    check("ozone delivery → 316L stainless",
+          "316L" in _mat("ozone delivery under ORP control"))
+    # NO-OP on a non-corrosive plant: air / nitrogen / oil / steam stay carbon steel.
+    check("NO-OP: instrument air stays carbon steel",
+          "carbon steel" in _mat("instrument air ring main"))
+    check("NO-OP: inert nitrogen stays carbon steel",
+          "carbon steel" in _mat("nitrogen blanket supply"))
+    check("NO-OP: hydraulic oil stays carbon steel",
+          "carbon steel" in _mat("hydraulic oil return"))
+    check("NO-OP: no material_context → carbon steel (assumed)",
+          "carbon steel" in _mat(None))
+    # an EXPLICIT material in the context still wins (HDPE stays HDPE, 316L stays 316L).
+    check("explicit HDPE preserved", "plastic" in _mat("HDPE process water"))
+    check("explicit 316L preserved (non-oxidiser)",
+          "stainless" in _mat("316L stainless process line"))
+
     # ---- Verdict ----
     print()
     if failures:

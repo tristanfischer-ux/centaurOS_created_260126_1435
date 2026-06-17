@@ -4538,6 +4538,17 @@ def write_route_manifest(out_dir):
         svc = _rm_service_code(frm, to, mc)
         dn = _rm_dn_label(size_label)
         line_number = f"{seq + i}-{svc}" + (f"-{dn}" if dn else "")
+        # PIPE-LINE MATERIAL (universal, fluid-keyed): the corrosion-appropriate material
+        # the line list + the BoM both quote — a corrosive-fluid run (seawater / saline /
+        # brine / effluent) defaults to HDPE/PE100 (chloride-proof), an oxidiser/LOX/ozone
+        # line to 316L, everything else to the substring-or-carbon default. Same resolver
+        # cost uses, so the drawn line list agrees with the costed BoM. Only fluid/pipe runs
+        # carry a pipe material; an electrical bus / duct leaves it null.
+        pipe_material = None
+        if dn or any(k in (mech or "").lower()
+                     for k in ("fluid", "pipe", "thermal", "process", "water",
+                               "steam", "gas", "coolant")):
+            _mf, pipe_material = cs._pipe_material_factor(mc or None)
         rows.append({
             "line_number": line_number,
             "run_name": nm,
@@ -4546,6 +4557,7 @@ def write_route_manifest(out_dir):
             "from_tag": frm,
             "to_tag": to,
             "service": mc or None,
+            "material": pipe_material,
             "size_label": size_label,
             "outer_dia_mm": outer_dia,
             "length_m": spec.get("length_m"),   # COSTED length (detour-capped — see reconcile)
