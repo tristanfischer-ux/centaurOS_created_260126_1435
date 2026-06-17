@@ -2362,33 +2362,6 @@ def _place_region(rparts, x_left, y_base, MAT, MO):
     BACK (highest Y), medium vessels in the MIDDLE, small instruments/cabinets
     in a grid at the FRONT (lowest Y). Each block 2D-shelf-packs so the bay
     grows in both X and Y. Returns the bay's used X-width (mm)."""
-    # ENVELOPE / SHELL parts — a floor slab, structural / portal frame, enclosure panel: a part
-    # whose plan footprint is BUILDING-SCALE (far larger in area or span than any process vessel).
-    # Shelf-packing them wraps each to its OWN row (each exceeds target_width), so a region of ~10
-    # shells strings into a ~400 m Y-column that shoves every following lane hundreds of metres
-    # back (the RAS structure_containment spread that drove every cross-plant run to ~500 m and the
-    # £3.1 M routed-connection cost). They physically OVERLAP — the slab is the floor the frame
-    # stands on, the roof spans the same plan — so CO-LOCATE them as ONE stacked envelope rather
-    # than shelf-packing. Universal — keyed on the plant-scale footprint, never a product class.
-    def _fp(p):
-        fx, fy, _ = footprint_mm(resolved_dims_mm(p))
-        return fx, fy
-    # A SHELL is plant-scale by AREA (a floor slab / full enclosure ≥ 200 m²) OR is BOTH long
-    # AND wide (≥ 25 m × ≥ 6 m — a building frame / portal). The wide-AND-long test deliberately
-    # spares a long THIN process unit (a 25 m conveyor ~1-2 m wide) so it is never co-located.
-    envelope = [p for p in rparts
-                if p.shape not in _VESSEL_KIND                       # a mega-grid vessel is handled separately
-                and (_fp(p)[0] * _fp(p)[1] >= 200e6
-                     or (max(_fp(p)) >= 25000 and min(_fp(p)) >= 6000))]
-    if envelope:
-        env_w = max(_fp(p)[0] for p in envelope)
-        for p in envelope:
-            asm, anchors = build_part(p, x_left + env_w / 2.0, y_base, DECK_Z_MM, MAT, MO)
-            p.obj_anchor, p.anchors = asm, anchors
-            p.placed_xyz_mm = anchors["centre"]
-        rparts = [p for p in rparts if p not in envelope]
-        if not rparts:
-            return max(env_w, MIN_REGION_WIDTH_MM)
     big = [p for p in rparts if p.shape in BIG_SHAPES]
     small = [p for p in rparts if p.shape in FRONT_ROW_SHAPES]
     medium = [p for p in rparts if p not in big and p not in small]
@@ -2568,6 +2541,25 @@ def place_all(parts, regions, MAT, MO):
     # Pre-estimate each region's width (needed by every banking path below).
     region_parts = {rk: [p for p in parts if p.region_key == rk]
                     for rk in region_list}
+    # ENVELOPE / BUILDING-SHELL parts (floor slab / structural / portal frame / enclosure — a part
+    # whose plan footprint is BUILDING-SCALE, far larger than any process vessel) are pulled OUT of
+    # region placement here and placed LAST, CENTRED on the finished plant so they ENCLOSE it (the
+    # slab under everything, the frame around it). Shelf-packing them strings each oversized shell
+    # into its own row → a ~400 m Y-column that shoved every lane hundreds of metres back (the
+    # ~500 m RAS spread + £3.1 M routed cost). A shell is plant-scale by AREA (≥ 200 m²) OR both
+    # long AND wide (≥ 25 m × ≥ 6 m — the wide-AND-long test spares a long THIN conveyor); a
+    # mega-grid vessel is excluded (handled by the mega-array guard). Universal, footprint-keyed.
+    def _is_envelope_part(p):
+        fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+        return (p.shape not in _VESSEL_KIND
+                and (fx * fy >= 200e6 or (max(fx, fy) >= 25000 and min(fx, fy) >= 6000)))
+    _envelope_parts = [p for p in parts if _is_envelope_part(p)]
+    if _envelope_parts:
+        _env_ids = {id(p) for p in _envelope_parts}
+        region_parts = {rk: [p for p in region_parts[rk] if id(p) not in _env_ids]
+                        for rk in region_list}
+        region_list = [rk for rk in region_list if region_parts[rk]]
+        n_banks = max(1, min(N_BANKS, len(region_list)))
     region_w = {rk: _estimate_region_width(region_parts[rk]) for rk in region_list}
 
     # Detect mega-array regions UP FRONT (a hall-sized qty-N replicated vessel grid,
@@ -2733,6 +2725,21 @@ def place_all(parts, regions, MAT, MO):
         fx, fy, _ = footprint_mm(resolved_dims_mm(p))
         min_x = min(min_x, cx - fx / 2); max_x = max(max_x, cx + fx / 2)
         min_y = min(min_y, cy - fy / 2); max_y = max(max_y, cy + fy / 2)
+    # Place the ENVELOPE shells CENTRED on the finished equipment bbox so they ENCLOSE the plant
+    # (slab under everything, frame + enclosure around it), then extend the bbox to the building
+    # boundary so the skid frame + framing hug the building rather than only the equipment.
+    if _envelope_parts and max_x > -1e11:
+        _ecx = (min_x + max_x) / 2.0
+        _ecy = (min_y + max_y) / 2.0
+        for p in _envelope_parts:
+            # The building SHELL (floor slab / frame / portal / enclosure) is ALREADY represented
+            # by the SKID-FRAME wireframe that encloses the whole plant; drawing its solid mesh
+            # (a 2,980 m² opaque slab) just obscures the equipment in every view. Record its
+            # CENTRED position (for the BoM + the enclosing bbox) WITHOUT a solid mesh.
+            p.placed_xyz_mm = (_ecx, _ecy, 0.0)
+            fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+            min_x = min(min_x, _ecx - fx / 2); max_x = max(max_x, _ecx + fx / 2)
+            min_y = min(min_y, _ecy - fy / 2); max_y = max(max_y, _ecy + fy / 2)
     bbox = {"x0": min_x - 800, "x1": max_x + 800,
             "y0": min_y - 800, "y1": max_y + 800}
     return bbox, region_centres
