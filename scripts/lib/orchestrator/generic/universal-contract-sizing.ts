@@ -556,7 +556,7 @@ function completeness(g: EquipGroup): number {
 const PLACEMENT: { re: RegExp; module: RegExp }[] = [
   { re: /filter|biofil|degas|skim|clarif|\buv\b|ozone|treat|media|membran|aerat|settl|disinfe|steril/i, module: /water_treatment|treatment|process/i },
   { re: /pump|blower|compress|\bfan\b|manifold|\bpipe|flow|valve|duct/i, module: /mass_fluid|fluid|transport|process/i },
-  { re: /heat|chill|boiler|thermal|hvac|cool|refrig|exchang/i, module: /environment|thermal|interface/i },
+  { re: /heat|chill|boiler|thermal|hvac|cool|refrig|exchang|dehumid|latent/i, module: /environment|thermal|interface/i },
   { re: /tank|vessel|reservoir|sump|basin|silo|hopper|column|tower|cone|enclos|frame|contain/i, module: /structure|contain|process/i },
 ]
 
@@ -656,42 +656,93 @@ function isFluidVessel(w: WordLike): boolean {
 // sludge), not an `if ras`. The primary (largest-holdup) process vessel always qualifies.
 const BIO_VESSEL_RE = /rear|grow|culture|nursery|broodstock|biofilter|\bbio\b|mbbr|moving.?bed|aeration|raceway|\bpond\b|ferment|bioreactor|digester|activated.?sludge|lagoon/i
 
+// SENSING PRINCIPLE = f(measured property, phase) — a UNIVERSAL physics fact, NOT a class
+// choice (Tristan council round-1 2026-06-16). The sensing technology is dictated by WHAT is
+// measured and in WHICH phase, so it is declared here, once, per instrument family and emitted
+// as an authoritative `sensing_principle` modifier the drawings read — rather than left to a
+// downstream name-regex that defaulted a "…Analyser" to NDIR (NDIR measures GAS-PHASE CO₂; it
+// cannot measure dissolved-O₂ in WATER — that is an OPTICAL/luminescent or galvanic probe):
+//   · dissolved-gas-in-liquid (DO)            → optical / luminescent (or galvanic / electrochemical)
+//   · gas-phase CO₂ / composition             → NDIR (non-dispersive infra-red)
+//   · pH                                      → glass / Memosens electrode
+//   · conductivity / salinity                 → toroidal (or contacting) conductivity
+//   · level (liquid)                          → guided-radar (or hydrostatic)
+//   · temperature                             → Pt100 RTD
+//   · pressure                                → piezoresistive
+// The token chosen is one the schedule's sensing-type reader recognises, so the engine's
+// medium-correct principle always wins over the name default.
+type SensingPrinciple =
+  | 'optical' | 'NDIR' | 'electrode' | 'toroidal' | 'guided-radar' | 'Pt100' | 'piezoresistive'
+
 interface InstrumentSpec {
   key: string
   present: (q: Record<string, number>) => boolean
   label: string
   range: (q: Record<string, number>, p: ParentPhysics) => string
   gbp: number // installed cost (UK budget, catalogue class)
-  scope: 'level' | 'vessel-temp' | 'bio-do' | 'loop-ph' | 'loop-salinity' | 'loop-o2p' | 'loop-lox' | 'vessel-pressure'
+  scope: 'level' | 'vessel-temp' | 'bio-do' | 'unit-analyser' | 'loop-ph' | 'loop-salinity' | 'loop-o2p' | 'loop-lox' | 'vessel-pressure'
+  // sensing technology, dictated by the MEASURED MEDIUM + PHASE (see table above) — universal,
+  // never a function of the product class.
+  principle: SensingPrinciple
+  // OPTIONAL host-name predicate (for a per-unit-operation analyser): only mount on a vessel
+  // whose name names the unit that controls this parameter (e.g. the biofilter for TAN).
+  hostMatch?: RegExp
   form: (host: string) => string
 }
 
 const INSTRUMENT_FAMILIES: InstrumentSpec[] = [
-  { key: 'level', scope: 'level', present: () => true, label: 'Level Transmitter', gbp: 900,
+  { key: 'level', scope: 'level', principle: 'guided-radar', present: () => true, label: 'Level Transmitter', gbp: 900,
     range: (_q, p) => (p.htM > 0 ? `0–${p.htM.toFixed(1)} m` : '0–100 %'),
     form: (h) => `Guided-radar level transmitter, ${h}-mounted; 4–20 mA to PLC with high / low-level alarm` },
-  { key: 'temperature', scope: 'vessel-temp', present: (q) => anyKey(q, /setpoint_temp|temp_c$|_temp_/), label: 'Temperature Transmitter', gbp: 350,
+  { key: 'temperature', scope: 'vessel-temp', principle: 'Pt100', present: (q) => anyKey(q, /setpoint_temp|temp_c$|_temp_/), label: 'Temperature Transmitter', gbp: 350,
     range: (q) => { const t = pickQ(q, /water.*temp|setpoint_temp|temp_c$/); return t !== undefined ? `0–40 °C (control ${t.toFixed(1)} °C)` : '0–40 °C' },
     form: (h) => `Pt100 RTD + head transmitter in ${h} thermowell; 4–20 mA to PLC` },
-  { key: 'dissolved_oxygen', scope: 'bio-do', present: (q) => anyKey(q, /oxygen|dissolved|(^|_)do(_|$)/), label: 'Dissolved-Oxygen Analyser', gbp: 1600,
-    range: () => '0–20 mg/L', form: (h) => `Optical dissolved-oxygen probe + transmitter in ${h}; 4–20 mA with low-DO trip to standby oxygenation` },
-  { key: 'ph', scope: 'loop-ph', present: (q) => anyKey(q, /(^|_)ph_|_ph$|ph_setpoint/), label: 'pH Analyser', gbp: 1300,
+  // DISSOLVED O₂ is a gas dissolved in WATER → an OPTICAL/luminescent probe (NOT NDIR, which
+  // is a gas-phase infra-red method). principle:'optical' makes that explicit + drawing-correct.
+  { key: 'dissolved_oxygen', scope: 'bio-do', principle: 'optical', present: (q) => anyKey(q, /oxygen|dissolved|(^|_)do(_|$)/), label: 'Dissolved-Oxygen Analyser', gbp: 1600,
+    range: () => '0–20 mg/L', form: (h) => `Optical (luminescent) dissolved-oxygen probe + transmitter in ${h}; 4–20 mA with low-DO trip to standby oxygenation` },
+  // PRIMARY-CONTROL ANALYSER PER UNIT OPERATION (council round-1 2026-06-16): a treatment unit
+  // whose FUNCTION is to control a specific water-quality parameter must carry the analyser for
+  // that parameter on the unit itself — the biofilter governs nitrification, so it needs a
+  // TAN/ammonia analyser (+ nitrate), the only direct read of whether the biofilter is working.
+  // Mounted on the vessel whose NAME names the controlling unit (hostMatch), present only when
+  // the contract declares the parameter's load. Universal — a unit operation gets the analyser
+  // for the parameter it controls, no `if ras`, no class table.
+  { key: 'tan', scope: 'unit-analyser', principle: 'electrode', present: (q) => anyKey(q, /tan_load|ammonia|_tan_|tan_setpoint/), label: 'TAN / Ammonia Analyser', gbp: 2200,
+    hostMatch: /biofil|nitrif|moving.?bed|mbbr|trickl|raceway/i,
+    range: (q) => { const v = pickQ(q, /tan_setpoint|tan_target/); return v !== undefined ? `0–5 mg/L TAN (control ${v.toFixed(2)})` : '0–5 mg/L TAN' },
+    form: (h) => `Ion-selective ammonium (TAN) analyser on ${h} — the primary nitrification-control measurement; 4–20 mA to the make-up / feed-rate and biofilter supervision` },
+  { key: 'nitrate', scope: 'unit-analyser', principle: 'optical', present: (q) => anyKey(q, /nitrate_load|nitrate|no3/), label: 'Nitrate Analyser', gbp: 2400,
+    hostMatch: /biofil|nitrif|denitr|moving.?bed|mbbr|raceway/i,
+    range: () => '0–200 mg/L NO₃-N',
+    form: (h) => `UV nitrate analyser on ${h}; tracks the nitrate accumulation that sets the make-up / bleed rate; 4–20 mA to the water-exchange control` },
+  // DEGASSER controls dissolved CO₂ → an in-liquid dissolved-CO₂ analyser on the degasser.
+  { key: 'dissolved_co2', scope: 'unit-analyser', principle: 'optical', present: (q) => anyKey(q, /co2_stripping|dissolved_co2|degas.*air_flow|co2_load/), label: 'Dissolved-CO₂ Analyser', gbp: 2300,
+    hostMatch: /degas|stripp|co2|aerat.*column|contactor/i,
+    range: () => '0–30 mg/L CO₂',
+    form: (h) => `Dissolved-CO₂ analyser on ${h}; controls the stripping-air rate to hold the culture CO₂ below the welfare limit; 4–20 mA to the degasser blower` },
+  // UV disinfection controls UV transmittance / dose → a UV-transmittance / intensity monitor.
+  { key: 'uv_transmittance', scope: 'unit-analyser', principle: 'optical', present: (q) => anyKey(q, /uv_lamp|uv_dose|uv_reactor|uvt|transmittance/), label: 'UV Transmittance / Intensity Monitor', gbp: 1500,
+    hostMatch: /\buv\b|ultraviolet|disinfe|steril/i,
+    range: () => '0–100 %UVT (intensity-validated)',
+    form: (h) => `In-line UV-transmittance sensor + reactor UV-intensity monitor on ${h}; validates delivered dose and trims lamp power; 4–20 mA to the UV controller` },
+  { key: 'ph', scope: 'loop-ph', principle: 'electrode', present: (q) => anyKey(q, /(^|_)ph_|_ph$|ph_setpoint/), label: 'pH Analyser', gbp: 1300,
     range: (q) => { const v = pickQ(q, /ph_setpoint|(^|_)ph_/); return v !== undefined ? `pH 0–14 (control ${v.toFixed(1)})` : 'pH 0–14' },
     form: () => 'Differential pH electrode + transmitter on the common loop; 4–20 mA to acid / base dosing control' },
-  { key: 'salinity', scope: 'loop-salinity', present: (q) => anyKey(q, /salinity|conductiv/), label: 'Conductivity / Salinity Analyser', gbp: 1200,
+  { key: 'salinity', scope: 'loop-salinity', principle: 'toroidal', present: (q) => anyKey(q, /salinity|conductiv/), label: 'Conductivity / Salinity Analyser', gbp: 1200,
     range: (q) => { const v = pickQ(q, /salinity_ppt|salinity/); return v !== undefined ? `0–50 ppt (design ${v.toFixed(0)} ppt)` : '0–50 ppt' },
     form: () => 'Toroidal conductivity sensor + transmitter on the common loop; 4–20 mA to make-up / bleed control' },
   // council round-1 2026-06-16: the OXYGEN SUPPLY — the thing keeping the fish alive — was
   // unmonitored. An O₂ header pressure transmitter (low-pressure → auto LOX↔PSA changeover +
   // trip to the emergency diffusers) and a LOX tank level + low-level alarm, both present
   // when the contract declares an oxygen supply duty.
-  { key: 'o2_pressure', scope: 'loop-o2p', present: (q) => anyKey(q, /oxygen_supply|oxygen_demand|(^|_)lox/), label: 'O₂ Header Pressure Transmitter', gbp: 850,
+  { key: 'o2_pressure', scope: 'loop-o2p', principle: 'piezoresistive', present: (q) => anyKey(q, /oxygen_supply|oxygen_demand|(^|_)lox/), label: 'O₂ Header Pressure Transmitter', gbp: 850,
     range: () => '0–16 bar (low-pressure alarm + trip)',
     form: () => 'Pressure transmitter on the gaseous-O₂ header; low-pressure alarm auto-changes over LOX↔PSA and trips the fail-open emergency diffusers — the guaranteed-O₂ supervision' },
-  { key: 'lox_level', scope: 'loop-lox', present: (q) => anyKey(q, /oxygen_supply|oxygen_demand|(^|_)lox/), label: 'LOX Tank Level + Low Alarm', gbp: 1100,
+  { key: 'lox_level', scope: 'loop-lox', principle: 'guided-radar', present: (q) => anyKey(q, /oxygen_supply|oxygen_demand|(^|_)lox/), label: 'LOX Tank Level + Low Alarm', gbp: 1100,
     range: () => '0–100 % (low-level auto-dialler)',
     form: () => 'Cryogenic level gauge on the bulk LOX tank with a low-level alarm to the auto-dialler, so a depleting oxygen buffer is flagged hours before it runs out' },
-  { key: 'pressure', scope: 'vessel-pressure', present: (q) => (pickQ(q, /design_pressure|operating_pressure|pressure_bar/) ?? 0) > 1.3, label: 'Pressure Transmitter', gbp: 700,
+  { key: 'pressure', scope: 'vessel-pressure', principle: 'piezoresistive', present: (q) => (pickQ(q, /design_pressure|operating_pressure|pressure_bar/) ?? 0) > 1.3, label: 'Pressure Transmitter', gbp: 700,
     range: (q) => { const v = pickQ(q, /design_pressure|operating_pressure|pressure_bar/) ?? 10; return `0–${Math.ceil(v * 1.5)} bar` },
     form: (h) => `Piezoresistive pressure transmitter on ${h}; 4–20 mA to PLC` },
 ]
@@ -702,6 +753,10 @@ function instrumentWord(spec: InstrumentSpec, host: WordLike | undefined, qty: n
   const mods: ModifierCharacter[] = []
   mods.push(mod('quantity', `×${Math.max(1, Math.round(qty))}`))
   mods.push(mod('rating_primary', range))
+  // Sensing principle = f(measured medium, phase) — emitted as authoritative engine data so a
+  // downstream schedule reads the medium-correct type (DO = optical, NOT NDIR) instead of a
+  // name-regex default. Universal, never class-keyed.
+  mods.push(mod('sensing_principle', spec.principle))
   mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(spec.gbp)))))
   mods.push(mod('form', spec.form(hostName)))
   mods.push(mod('part_number', 'TBD (field instrument — catalogue class)'))
@@ -756,6 +811,18 @@ export function synthesizeInstrumentation(modules: ModuleLike[], quantities: Rec
     if (!spec.present(quantities)) continue
     if (spec.scope.startsWith('loop')) {
       toAdd.push(instrumentWord(spec, primary.w, 1, spec.range(quantities, primary.p)))
+      continue
+    }
+    // PER-UNIT-OPERATION ANALYSER: mount the parameter's analyser ONLY on the vessel(s) whose
+    // name names the controlling unit (biofilter→TAN/nitrate, degasser→CO₂, UV→UVT), one per
+    // matching unit (×1 — a single analyser on the treatment unit, not per rearing-tank). When
+    // the unit isn't a discrete vessel in the BoM, fall back to the primary vessel so a declared
+    // control parameter is never left unmeasured. Universal — the unit gets the parameter it
+    // controls, no class table.
+    if (spec.scope === 'unit-analyser') {
+      const hosts = spec.hostMatch ? vessels.filter((v) => spec.hostMatch!.test(v.w.name_human ?? '')) : []
+      const targets = hosts.length ? hosts : [primary]
+      for (const v of targets) toAdd.push(instrumentWord(spec, v.w, 1, spec.range(quantities, v.p)))
       continue
     }
     for (const v of vessels) {

@@ -743,6 +743,19 @@ _INSTR_NOISE = re.compile(
     r"catalyst|barrier|sil_barrier|launder|label|relief_valve|control_valve|"
     r"blanket|breather|filter_cloth|gasket", re.I)
 
+# Engine `sensing_principle` token → schedule display label. The engine declares the principle
+# as f(measured medium, phase) (universal-contract-sizing.ts), so it overrides the name-default
+# (which would mis-type a dissolved-O₂ analyser as NDIR — a gas-phase method). Universal.
+_SENSING_PRINCIPLE_LABEL = {
+    "optical": "Optical / luminescent",
+    "ndir": "NDIR analyser",
+    "electrode": "ISE / glass electrode",
+    "toroidal": "Toroidal conductivity",
+    "guided-radar": "Guided-radar",
+    "pt100": "Pt100 + thermowell",
+    "piezoresistive": "Piezoresistive",
+}
+
 
 def _range_from_form(form: str, measured: str) -> str:
     """Pull a measurement range from the BoM form string, e.g. 'process range to 250 bar',
@@ -830,12 +843,20 @@ def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
             tag_seq[isa] = tag_seq.get(isa, 200) + 1
             base_tag = f"{isa}-{tag_seq[isa]}"
             tag = f"{base_tag} (×{qty})" if qty > 1 else base_tag
-            # sensing type: prefer a specific tell in the form, else the kind default
+            # sensing type. PRIORITY: the engine's explicit `sensing_principle` modifier — that
+            # principle is f(measured medium, phase), so it is medium-correct by construction (a
+            # dissolved-O₂ analyser carries 'optical', NOT the NDIR the name-default would assign:
+            # NDIR is a GAS-PHASE infra-red method, useless for O₂ dissolved in water). Then a
+            # specific tell in the form; then the kind default.
             itype = itype_default
-            mt = re.search(r"\b(80 GHz radar|coplanar|Pt100|electromagnetic|NDIR|"
-                           r"Memosens|multipoint|displacer|Coriolis)\b", form, re.I)
-            if mt:
-                itype = mt.group(1)
+            principle = (mods.get("sensing_principle", "") or "").strip()
+            if principle:
+                itype = _SENSING_PRINCIPLE_LABEL.get(principle.lower(), principle)
+            else:
+                mt = re.search(r"\b(80 GHz radar|coplanar|Pt100|electromagnetic|NDIR|"
+                               r"Memosens|multipoint|displacer|Coriolis)\b", form, re.I)
+                if mt:
+                    itype = mt.group(1)
             isa_label = isa
             if measured.startswith("pH"):
                 isa_label = "AT (pH)"
