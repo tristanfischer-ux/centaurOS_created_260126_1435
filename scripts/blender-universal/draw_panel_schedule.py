@@ -646,6 +646,42 @@ def _panel_req_bom_kw(name: str, state: dict) -> Optional[float]:
     return best[1] if best else None
 
 
+def _panel_motor_nameplate_kw(name: str, state: dict) -> Optional[float]:
+    """The motor NAMEPLATE rating [kW] for a motor circuit — the '· NN kW [motor]' frame figure
+    (the first '· NN kW'), NOT the parenthesised absorbed shaft power. Used to size a motor's
+    protective device + cable to the motor full-load current (IEC 60947-4-1). Returns None when no
+    matching ledger row carries a nameplate kW. Universal — keyed on the requirement head noun."""
+    rb = state.get("requirementsBom")
+    if not isinstance(rb, list) or not rb:
+        return None
+    t_toks = set(_norm_load_name(name).split())
+    if not t_toks:
+        return None
+    best = None
+    for row in rb:
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or "")
+        h_toks = set(_norm_load_name(req.split("·", 1)[0]).split())
+        if not h_toks or len(t_toks & h_toks) < len(t_toks):
+            continue
+        if _WHOLE_PLANT_KW_RE.search(req):
+            continue
+        m = _OWN_KW_RE.search(req)        # the NAMEPLATE (first '· NN kW'), never the shaft
+        if not m:
+            continue
+        try:
+            kw = float(m.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if kw <= 0:
+            continue
+        ov = len(t_toks & h_toks)
+        if best is None or ov > best[0]:
+            best = (ov, kw)
+    return best[1] if best else None
+
+
 def _panel_principal_motor_kw(state: dict) -> float:
     """The plant's principal motor load [kW] — anchor for the type-based estimate. Largest
     pump/motor/drive '· NN kW' figure in the BoM, else a quarter of the connected load."""
@@ -1263,14 +1299,25 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
         # three reconcile. A circuit the ledger can't price (kW is None) keeps the schedule's own
         # current + cable (the prior behaviour) — there is no kW to derive from. Universal: any
         # kW → its real FLC, keyed on the connection model, never a product class.
+        # A MOTOR's protective device + cable carry the motor NAMEPLATE full-load current
+        # (IEC 60947-4-1 — the frame the motor is built on can draw its rated FLC), NOT the
+        # shaft/absorbed power that feeds the connected-load TOTAL. So a 132 kW motor on a 94 kW
+        # shaft duty sizes its breaker + cable from 132 kW (~222 A → 250 A frame) while its
+        # connected-load column stays the 94 kW absorbed. A non-motor load (heater/UPS/transformer)
+        # has no shaft figure → nameplate == connected, so nothing changes. Universal.
+        sizing_kw = kw
+        if kw and _MOTOR_LOAD_RE.search(base):
+            nameplate = _panel_motor_nameplate_kw(base, state)
+            if nameplate and nameplate > kw:
+                sizing_kw = nameplate
         frame_override = None
-        if kw and kw > 0 and panel.voltage_v:
+        if sizing_kw and sizing_kw > 0 and panel.voltage_v:
             flc, _csa, csa_label, frame = size_circuit_from_kw(
-                kw, panel.voltage_v, is_dc=panel.is_dc, phases=panel.phases)
+                sizing_kw, panel.voltage_v, is_dc=panel.is_dc, phases=panel.phases)
             if flc is not None:
-                design_a = flc              # amps column = amps (from this circuit's kW), not kW
+                design_a = flc              # amps column = motor-nameplate FLC (for sizing)
                 cable = _cores_for(csa_label, panel.is_dc, panel.phases)
-                frame_override = frame       # breaker = next standard frame ≥ FLC
+                frame_override = frame       # breaker = next standard frame ≥ nameplate FLC
 
         dev, dev_a = _device_for(base, design_a, devices, panel,
                                  frame_override=frame_override)
@@ -1369,6 +1416,19 @@ def _connected_kw_for(base: str, design_a, panel: Panel, state: dict,
         cp = _q(state, "continuous_power_kw")
         if cp and rc:
             return cp / rc
+    if "dehumidif" in b:
+        # a dehumidifier is a vapour-compression REFRIGERATION unit: its ELECTRICAL draw is the
+        # latent/thermal duty ÷ the dehumidification COP, NOT the latent duty itself (the heat it
+        # must remove — e.g. 240 kg/h × 2450 kJ/kg ≈ 163 kW thermal, but ~54 kW electrical at
+        # COP 3). Prefer a published electrical figure; else duty ÷ COP. Universal — a dehumidifier
+        # is a refrigeration unit in any plant, never a product-class branch.
+        v = _q(state, "dehumidifier_electrical_kw")
+        if v:
+            return v
+        duty = _q(state, "dehumidifier_power_kw") or _q(state, "dehumidifier_duty_kw")
+        if duty:
+            cop = _q(state, "dehumidifier_cop") or _q(state, "dehumidification_cop") or 3.0
+            return round(duty / cop, 1)
     if "chiller" in b or "cooling" in b:
         # the chiller's ELECTRICAL input (compressor) — prefer a power figure; only fall
         # back to thermal duty ÷ a nominal COP (≈3.5) so we don't quote the heat rejected
@@ -2185,10 +2245,24 @@ def _selftest() -> int:
     chk("I11.main_breaker_is_board_infra", _is_board_infrastructure("Main Breaker"))
     chk("I11.pump_not_board_infra", not _is_board_infrastructure("Recirc Pump"))
 
+    # I12 — a DEHUMIDIFIER's ELECTRICAL draw is the latent/thermal duty ÷ COP, not the duty (the
+    # heat it must remove). dehumidifier_power_kw = 163 (latent) → ~54 kW electrical at COP 3.
+    st_dh = {"orchestratorContract": {"quantities": {"dehumidifier_power_kw": {"value": 163.0}}}}
+    chk("I12.dehumidifier_electrical_is_duty_over_cop",
+        abs(_connected_kw_for("Dehumidifier", 100.0, _P(), st_dh, 1) - 163.0 / 3.0) < 0.5)
+    # I13 — a MOTOR's breaker/cable size from the NAMEPLATE kW (132), while the connected-load
+    # column keeps the absorbed SHAFT power (94).
+    st_np = {"requirementsBom": [
+        {"requirement": "Recirc Pump · 132 kW motor (94 kW shaft) · 1176x1000x1294 mm"}]}
+    chk("I13.motor_nameplate_for_sizing",
+        _panel_motor_nameplate_kw("Recirc Pump", st_np) == 132.0)
+    chk("I13.motor_connected_is_shaft",
+        _panel_req_bom_kw("Recirc Pump", st_np) == 94.0)
+
     if fails:
         print("[panel-sched] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[panel-sched] selftest OK (11 connected-load reconciliation invariants)")
+    print("[panel-sched] selftest OK (13 connected-load reconciliation invariants)")
     return 0
 
 
