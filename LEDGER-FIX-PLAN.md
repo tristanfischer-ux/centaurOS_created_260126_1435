@@ -13,6 +13,33 @@ STRENGTHENING that feedback is the universal fix (the self-correcting pillar of 
 
 ---
 
+# ════════ SESSION-2 COMPACTION CHECKPOINT (2026-06-17 pm) — READ FIRST ON RESUME ════════
+**Git:** HEAD == origin/main == `ea0cd7e62`. Tree clean.
+
+**Committed + pushed this session (all RAS except the model-update task Tristan asked for):**
+- `222f43004` Phase 1c — cost-sanity re-derives on the AUTHORITATIVE BoM after the requirements_bom reconcile + honest `aquaculture_ras` £10k-55k/(t·yr) ex-works band (killed the stale £23,501 banner; now £46k/t·yr PASS). Invariant `UNIVERSAL.cost_sanity_reads_authoritative_bom_and_class_band`.
+- `6341f001f` OpenRouter model slugs → current (GLM 5.1→5.2, deepseek-chat[V3]→deepseek-v4-flash ×12 adapters, qwen3.6→3.7-max, minimax-m2.7→m3, anthropic hyphen→dot). Audit: `docs/openrouter-model-audit-2026-06-17.md`. Anthropic-free gen rule VERIFIED holds.
+- `4f3ad7c58` Blender router robustness (CABLE_TRAY_MAX_RUNGS=40 + per-edge 8s budget) + RAS contract physics (biofilter 0.35→0.30 kg TAN/m³·day; emergency-O2 30→120 min) + `scripts/build-council-facts.py` (NEW: deterministic neutral-facts-pack generator).
+- `13f1f9249` Blender geometry O(scene_objects)→O(1) — THE real router-hang root: `add_pipe`/`add_box` used `bpy.ops` (select_all+convert / transform_apply) scanning the whole scene per call; `_add_pipe_fast`/`_add_box_fast` fix it. **The hang that blocked ALL fresh RAS runs is FIXED** (v14: hanging→60 s; v13: no regression, 113 routes).
+- `ea0cd7e62` facts pack surfaces each quantity's DESIGN BASIS (stops the council over-flagging correct values).
+
+**v15 = the current complete RAS dossier** (`out/ras-v15`): 108 routes, 77 drawings, BoM £9.47M, cost-sanity PASS £46k/t·yr, contract physics propagated (biofilter media 92 m³, emergency-O2 32 kg). The Blender fix HELD live.
+
+**Council ROUND 1** (`out/ras-v13/COUNCIL-SCORES-ROUND1.md`): Electrical **3 (floor)** · Process/Mechanical/HVAC 5 · Cost/Buildability 6 · **avg 5.0**. NOT formally re-scored since (no round-2 numbers — don't claim one).
+
+**VERIFY-BEFORE-OVERSTATING — the RAS physics is SOUND** (5 round-1 "defects" were OVER-FLAGS; DO NOT "fix" them; drawer `7d78258eddc51e7a`): O2 demand already includes nitrification (o2TotalPerKgFeed=1.0); degasser is 10:1 PER-COLUMN (133,600 = total air ÷ 8); recirc motor 132 kW = next IEC frame above 94 kW shaft÷0.93×1.15 (defensible); salt make-up 2,116 kg/day correctly doses only the 5% fresh-blend (MAKEUP_SEAWATER_FRACTION=0.95); O2 balance is feed-based (no DO-saturation constant). The seats mis-scored because the facts hid the basis (now fixed in build-council-facts.py).
+
+**THE TWO REAL REMAINING GAPS (deeper; NOT contract physics):**
+1. **PLACEMENT band-spread → cost inflation (the highest-leverage fix).** The plant footprint is 485 m in **Y** — NOT from the train fold (the foldable train is <52 m so `FLOW_TRAIN_SINGLE_LANE` never folds; a SESSION-2 deterministic-lane-count attempt was a NO-OP, reverted) — but because `place_process_plant` (build_universal_scene) puts the environmental_interface/HVAC band at **Y≈0** while the main process cluster sits at **Y≈394-471 m**. The main cluster (~56×77 m) + the tank grid (4 cols×3 rows, 42×28 m) are ALREADY compact — ONE mis-placed band drags the footprint to 485 m, which makes the £380k generator→dehumidifier/heater feeders (485 m runs) + the £1M pipe lump. FIX (universal+deterministic, in the band Y-placement): place the periphery/support band ADJACENT to the main cluster (small aisle), not ~390 m away.
+2. **Electrical drawings (drawing-stage, re-render on v15/v13 — no Blender):** the panel still lists passive kit (Biofilter / MBBR Media) as powered circuits (v15 panel 1,762 kW vs real ~1,500; was 4,256 at v13). FIX = skip passive loads at circuit-creation in `draw_panel_schedule.py` (passive items get a kW via BOTH `_panel_type_kw` estimate AND `_panel_resolve_ledger_kw` ledger lookup — the skip must precede BOTH). Single-line wants ATS/MCC/RCD. ⚠ `test_panel_schedule.py` has **4 PRE-EXISTING failures at HEAD** (a rack reads 84.2 A default not its stated 130.2 A) — a SEPARATE pre-existing universal bug, NOT a regression; gate on "no NEW failures vs the 4-baseline", and verify on the RAS panel render, NOT the BESS fixture.
+
+**DEFERRED (real, queued):** material single-source (BLOCKED on `connection_sizing.corrosive_service_material` false-positives — matches "thermal_oxidiser" unit-name + water-loop-through-O2; drawer `39aa987ce9f4641a`); self-audit stale-read (gate 31 runs ~chain 5536 before requirements_bom reconcile ~7101 → false BoM=2 "zero-price lines"; fix = re-run after reconcile, Phase 1c pattern; drawer `8b0f7e3a8e648f68`).
+
+**DISCIPLINE (Tristan, session-2, BINDING):** ALL engine decisions UNIVERSAL + DETERMINISTIC — no per-class tables, no manual hand-holding/intervention; the engine self-corrects. Verify EACH council finding against the engine source before fixing (the seats over-flag). Verify the TEST BASELINE before calling something a regression (I mis-reverted a good electrical fix off the BESS test's pre-existing failures). `draw_panel_schedule`/`draw_single_line` are UNIVERSAL code whose regression test uses a BESS FIXTURE — that is NOT "the BESS project". Don't thrash deep layout code while depleted (this session drifted twice; Tristan caught both).
+
+**NEXT:** (a) `place_process_plant` band compaction → re-run → confirm the £380k cables + £1M pipe drop (the highest-leverage cost fix, universal); (b) formal ROUND-2 re-score on a fresh run (facts pack now accurate); (c) electrical drawing polish.
+# ═══════════════════════════════════════════════════════════════════════════════════════
+
 # LEDGER FIX PLAN — one canonical part-ledger as the single source of truth
 
 > Tristan (2026-06-17): "solve problems at the source, not band-aids that make things brittle. Fix the ledger."
