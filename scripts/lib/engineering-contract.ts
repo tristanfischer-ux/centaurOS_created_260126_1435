@@ -12613,16 +12613,17 @@ registerArchetype('aquaculture_ras', (brief: any) => {
       required_margin_factor: 1.5,
       material_context: 'LOX_plus_PSA_supply_~0.5kg_O2_per_kg_feed_cone_supplementation_aeration_carries_the_balance_with_emergency_fail_open_solenoid_diffusers_in_every_tank',
     },
-    {
-      from_part: 'electrical_supply',
-      to_part: 'recirc_pumps_and_heat_pumps',
-      mechanism: 'electrical_bus',
-      constraint_kind: 'current_rating',
-      required_value: (connectedElectricalLoadKw * 1000) / (3 ** 0.5 * 415),  // A, 415 V three-phase
-      required_unit: 'A',
-      required_margin_factor: 1.25,
-      material_context: '400_415V_three_phase_LV_behind_an_11kV_MV_transformer_planned_5MVA_micro_grid_with_backup_generator',
-    },
+    // No hand-authored electrical-bus interface here. The UNIVERSAL orphan connector
+    // (build_universal_scene.augment_topology_connect_orphans) wires ONE
+    // 'Standby Diesel Generator → <load>' feeder per powered part (pumps, blowers, heat
+    // pumps, O₂/UV systems, controls) from the parts manifest — verified covering all 35
+    // loads in this design. A bundled 'electrical_supply → recirc_pumps_and_heat_pumps'
+    // edge was previously hand-authored here; resolve_endpoint credited ONE of its two
+    // constituents (the recirc pumps) with the power service, so the orphan connector left
+    // the plant's single largest motor load (the 8 parallel recirc pumps) without a feeder
+    // AND double-priced the bus. Removed so the universal synthesis covers it like every
+    // other load. connectedElectricalLoadKw is still the incomer's connected-load figure
+    // (used in the brief summary + voltage selection), so it remains referenced below.
   ]
 
   // ── Closures — design-rule gates ──────────────────────────────────────────
