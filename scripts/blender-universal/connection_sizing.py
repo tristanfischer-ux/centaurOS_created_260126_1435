@@ -411,6 +411,20 @@ _OXIDISER_SERVICE_RE = re.compile(
     rf"(?:^|{_SEP})o2(?:$|{_SEP})|(?:^|{_SEP})gox(?:$|{_SEP})|ozone|(?:^|{_SEP})o3(?:$|{_SEP})|"
     rf"peroxide|oxidis|oxidiz|hypochlorite|chlorine{_SEP}?gas", re.I)
 
+# Plant-level salinity [ppt], set once by the caller (build_universal_scene reads salinity_ppt
+# from the contract before sizing connections). None / < ~10 ppt ⇒ fresh-water plant ⇒ the
+# oxidiser default stays plain 316L (so a non-marine plant — SAF / CO₂ — is unchanged). ≥ 10 ppt
+# ⇒ marine ⇒ the oxidiser/stainless lines upgrade to duplex 2205 (316L pits in warm oxygenated
+# chloride). Universal, keyed on the salinity, never a product class.
+_PLANT_SALINITY_PPT: Optional[float] = None
+# A COMBUSTION oxidiser (thermal oxidiser / RTO / incinerator) is NOT an oxygen/oxidant SERVICE —
+# its lines carry hot flue/air on carbon steel, not stainless. Used to veto the bare 'oxidis'
+# match so a thermal_oxidiser unit name never forces 316L (the SAF false-positive that blocked
+# this fix for weeks).
+_COMBUSTION_OXIDISER_RE = re.compile(
+    rf"thermal{_SEP}?oxidi[sz]|\brto\b|incinerat|enclosed{_SEP}?flare|regenerative{_SEP}?therm",
+    re.I)
+
 
 def corrosive_service_material(material_context: Optional[str]) -> Optional[tuple]:
     """If `material_context` describes a fluid service that warrants a NON-carbon-steel
@@ -428,8 +442,14 @@ def corrosive_service_material(material_context: Optional[str]) -> Optional[tupl
     if not material_context:
         return None
     s = material_context.lower()
-    # Oxidiser / LOX / ozone takes precedence: stainless is genuinely required there.
-    if _OXIDISER_SERVICE_RE.search(s):
+    # Oxidiser / LOX / ozone takes precedence: stainless is genuinely required there — UNLESS the
+    # match is a COMBUSTION oxidiser unit (thermal oxidiser / RTO / incinerator), whose lines are
+    # hot flue/air on carbon steel, not an oxygen service.
+    if _OXIDISER_SERVICE_RE.search(s) and not _COMBUSTION_OXIDISER_RE.search(s):
+        # MARINE plant (salinity ≥ ~10 ppt): plain 316L pits in a warm oxygenated chloride duty —
+        # specify DUPLEX 2205 instead. Fresh-water / unset salinity keeps plain 316L (no-op).
+        if _PLANT_SALINITY_PPT is not None and _PLANT_SALINITY_PPT >= 10:
+            return (2.5, "duplex 2205 (oxidiser + marine service)")
         return (1.9, "316L stainless (oxidiser service)")
     if _CORROSIVE_SERVICE_RE.search(s):
         return (0.6, "HDPE/PE100 (corrosive service)")

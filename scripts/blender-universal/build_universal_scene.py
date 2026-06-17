@@ -11425,6 +11425,17 @@ def main():
     print(f"[univ] out  ={out_dir}")
     state = load_state(state_path)
 
+    # Tell connection_sizing the plant SALINITY (for the marine→duplex pipe-material rule). Read
+    # from the contract; absent / fresh-water leaves it None so a non-marine plant is unchanged.
+    try:
+        _csq = ((state.get("orchestratorContract") or state.get("engineeringContract") or {})
+                .get("quantities") or {})
+        _sal = _csq.get("salinity_ppt")
+        _sal = _sal.get("value") if isinstance(_sal, dict) else _sal
+        cs._PLANT_SALINITY_PPT = float(_sal) if _sal is not None else None
+    except (TypeError, ValueError):
+        cs._PLANT_SALINITY_PPT = None
+
     # Default the HERO-framing hint to None so a non-aero family always uses the
     # standard deck-equipment hero (only the aero placer opts into a custom frame).
     # Guards against a stale hint if the interpreter is ever reused across runs.
