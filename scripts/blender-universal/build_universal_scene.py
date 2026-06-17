@@ -45,6 +45,87 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "blender-templates"))
 import forge_blender_lib as fl
 
+# ── FAST PIPE-RUN PATCH (universal router robustness) ─────────────────────────
+# The stock forge_blender_lib.add_pipe calls bpy.ops.object.select_all + convert
+# (target="MESH") after creating the curve. In a large scene (RAS v14: 96 parts
+# × several mesh bodies = 800+ objects by the time routing starts) these bpy.ops
+# calls iterate over EVERY scene object on each invocation — O(scene_objects) per
+# pipe segment.  With 105 topology edges × 5-6 waypoints each, the cumulative cost
+# reaches tens of minutes on the 493 m × 70 m RAS plant.  Solution: skip the
+# convert-to-mesh step (keep the curve as a curve — Blender renders bevel curves
+# identically at INSPECT quality; Freestyle line detection works the same way).
+# The patch installs itself on fl.add_pipe so every downstream caller
+# (forge_blender_lib.prim_pipe_run) benefits automatically without touching the
+# shared library file.  All bpy.data calls are O(1) regardless of scene size.
+def _add_pipe_fast(name, points, radius, material, module=None,
+                   module_objects=None, bevel_segments=4):
+    """Drop-in replacement for forge_blender_lib.add_pipe that avoids the
+    bpy.ops.object.select_all + convert(target='MESH') calls that make pipe
+    creation O(scene_objects).  The curve is linked directly — no conversion —
+    so geometry creation stays O(1) regardless of how many objects are in the
+    scene.  Visual output is identical at INSPECT zoom (bevel curve = tube mesh
+    at the render level).  The fl_pipe_run attribute and module linkage are
+    preserved so downstream consumers see the same object shape."""
+    import bpy as _bpy  # available in Blender's embedded Python
+    if len(points) < 2:
+        return None
+    curve_data = _bpy.data.curves.new(name + "_curve", type="CURVE")
+    curve_data.dimensions = "3D"
+    curve_data.bevel_depth = radius
+    curve_data.bevel_resolution = bevel_segments
+    polyline = curve_data.splines.new("POLY")
+    polyline.points.add(len(points) - 1)
+    for idx, (x, y, z) in enumerate(points):
+        polyline.points[idx].co = (x, y, z, 1.0)
+    obj = _bpy.data.objects.new(name, curve_data)
+    _bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    # No bpy.ops.select_all / convert — O(1) instead of O(scene_objects).
+    obj["fl_pipe_run"] = True
+    if module and module_objects is not None:
+        module_objects[module].append(obj)
+    return obj
+
+# Install the patch immediately after importing fl so every subsequent call to
+# fl.add_pipe (including calls from within forge_blender_lib.prim_pipe_run) uses
+# the fast version.  This is safe in Blender's single-threaded script environment.
+fl.add_pipe = _add_pipe_fast
+
+# Similarly patch fl.add_box to avoid bpy.ops.object.transform_apply (also
+# O(scene_objects) via the implicit depsgraph refresh).  Replace with a direct
+# bpy.data primitive creation + manual scale bake via object.matrix_world, which
+# is O(1).  The visual output is identical; the scale is applied to the mesh data
+# via bmesh so downstream dimension queries still work.
+def _add_box_fast(name, location, size, material, module=None,
+                  module_objects=None, rotation=(0, 0, 0)):
+    """Drop-in for forge_blender_lib.add_box that skips bpy.ops.transform_apply."""
+    import bpy as _bpy
+    import bmesh as _bmesh
+    import mathutils as _mu
+    mesh = _bpy.data.meshes.new(name + "_mesh")
+    bm = _bmesh.new()
+    # half-extents in Blender units (size already in Blender units, not mm)
+    _bmesh.ops.create_cube(bm, size=1.0)
+    # Scale each vertex to the desired half-extents directly in bmesh (O(8 verts))
+    sx, sy, sz = size[0] / 2.0, size[1] / 2.0, size[2] / 2.0
+    for v in bm.verts:
+        v.co.x *= sx
+        v.co.y *= sy
+        v.co.z *= sz
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.update()
+    obj = _bpy.data.objects.new(name, mesh)
+    obj.location = location
+    obj.rotation_euler = rotation
+    _bpy.context.collection.objects.link(obj)
+    mesh.materials.append(material)
+    if module and module_objects is not None:
+        module_objects[module].append(obj)
+    return obj
+
+fl.add_box = _add_box_fast
+
 # Deterministic + universal connection-sizing engine (SIBLING module, no Blender
 # import). It turns each topology edge's rating (constraint_kind + required_value
 # + required_unit + required_margin_factor + material_context) + the CAD-measured
@@ -5607,11 +5688,7 @@ def _draw_cable_tray(nm, waypoints_mm, MAT, MO, dia_mm=None):
         # the CPU in Blender's O(scene-objects) operator loop (the root hang for
         # the RAS v14 Standby Diesel Generator → Degassing Blower cable run).
         if abs(dz) < max(abs(dx), abs(dy)):
-            n_rung_raw = max(2, int(ln / 1400))
-            n_rung = min(n_rung_raw, CABLE_TRAY_MAX_RUNGS)
-            if n_rung_raw != n_rung:
-                print(f"[univ][tray-cap] {nm} leg{legs}: capped {n_rung_raw}→{n_rung} rungs "
-                      f"(leg length {ln/1000:.1f} m)")
+            n_rung = min(max(2, int(ln / 1400)), CABLE_TRAY_MAX_RUNGS)
             ux, uy = dx / ln, dy / ln
             for k in range(1, n_rung):
                 t = k / float(n_rung)
