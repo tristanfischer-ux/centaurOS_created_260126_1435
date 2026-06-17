@@ -1,3 +1,18 @@
+# CORE ENGINE LOOP (Tristan 2026-06-17 — hold this when fixing ANY council finding)
+The engine is a CLOSED loop, not a one-shot pipeline:
+  brief → expanded brief → tools → contract → ledger → blender → engineering drawings → BACK TO tools
+The engineering drawings are a FEEDBACK STAGE (they re-inform tool selection/sizing on the next pass),
+NOT a terminal artefact to patch. So every council/loop finding must be ROUTED TO ITS STAGE and fixed at
+source — NEVER band-aided in the drawing renderer:
+  - wrong NUMBER / sizing            → fix the TOOL (re-derives down through contract→ledger→blender→drawings)
+  - wrong QUANTITY / material / fail-state / cost → fix the CONTRACT / LEDGER (the single source)
+  - wrong GEOMETRY / placement        → fix BLENDER (build_universal_scene)
+  - genuine PROJECTION error (drawing mis-reads CORRECT ledger data) → fix the DRAWING + feed the signal back to TOOLS
+Where a drawing exposes a gap the engine's OWN drawings→tools feedback SHOULD have caught + corrected,
+STRENGTHENING that feedback is the universal fix (the self-correcting pillar of THE AIM; task #128).
+
+---
+
 # LEDGER FIX PLAN — one canonical part-ledger as the single source of truth
 
 > Tristan (2026-06-17): "solve problems at the source, not band-aids that make things brittle. Fix the ledger."

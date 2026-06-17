@@ -39,6 +39,7 @@ import re
 import sys
 import json
 import math
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "blender-templates"))
@@ -3011,6 +3012,23 @@ LOCAL_JUMPER_CLEAR_MM = 450.0  # how far a low jumper's horizontal sits ABOVE th
                                # a deliberate run, never grazing the shell top).
 LOCAL_JUMPER_TIER_MM  = 260.0  # Z stagger between successive low jumpers so two that share
                                # an area never co-incide / cross at the same elevation.
+# ── PER-EDGE ROUTER BUDGET ─────────────────────────────────────────────────
+# Hard wall-clock limit (seconds) per routed edge, covering both waypoint
+# computation AND Blender geometry creation. On a healthy plant every edge
+# completes in well under a second; pathological edges (e.g. a cross-plant
+# electrical run that produces 300+ cable-tray rungs on a large RAS scene)
+# peg the CPU indefinitely. When the budget is exceeded the edge falls back to
+# a direct two-point straight-line route and logs a WARN so the problem is
+# traceable. The budget must be large enough that NO healthy edge ever hits it
+# (set conservatively at 8 s, ≈8× the slowest observed healthy edge); it is a
+# safety net, not a tuning knob.
+EDGE_ROUTER_BUDGET_S  = 8.0   # wall-clock seconds before straight-line fallback
+# Rung density cap for cable-tray legs: limits the number of Blender mesh
+# objects created per cable-tray leg. Very long legs (a 424 m cross-lateral on
+# a 500 m RAS farm) would otherwise produce 300+ boxes whose cumulative
+# bpy.ops calls block in a 1 000+ object scene. The cap keeps it below 40
+# rungs/leg — still visually dense and legible at normal inspect zoom.
+CABLE_TRAY_MAX_RUNGS  = 40    # max rungs per cable-tray leg (density cap)
 # Inter-bank aisle bands [(centre_y, width), …] published by _compact_banks_in_y so
 # place_process_plant sites the rack spine in the REAL aisle between the equipment
 # banks (not over equipment). Reset every run; empty for a single-bank plant.
@@ -5583,9 +5601,17 @@ def _draw_cable_tray(nm, waypoints_mm, MAT, MO, dia_mm=None):
         fl.add_box(f"{nm}_leg{legs}", (cx * fl.MM, cy * fl.MM, cz * fl.MM),
                    (size[0] * fl.MM, size[1] * fl.MM, size[2] * fl.MM),
                    tray, module=ELEC_MODULE_ID, module_objects=MO)
-        # ladder rungs along the leg (skip risers — rungs read on the horizontals)
+        # ladder rungs along the leg (skip risers — rungs read on the horizontals).
+        # Cap at CABLE_TRAY_MAX_RUNGS: very long legs (cross-plant runs on a large
+        # scene) would otherwise spawn hundreds of bpy.ops mesh objects, pegging
+        # the CPU in Blender's O(scene-objects) operator loop (the root hang for
+        # the RAS v14 Standby Diesel Generator → Degassing Blower cable run).
         if abs(dz) < max(abs(dx), abs(dy)):
-            n_rung = max(2, int(ln / 1400))
+            n_rung_raw = max(2, int(ln / 1400))
+            n_rung = min(n_rung_raw, CABLE_TRAY_MAX_RUNGS)
+            if n_rung_raw != n_rung:
+                print(f"[univ][tray-cap] {nm} leg{legs}: capped {n_rung_raw}→{n_rung} rungs "
+                      f"(leg length {ln/1000:.1f} m)")
             ux, uy = dx / ln, dy / ln
             for k in range(1, n_rung):
                 t = k / float(n_rung)
@@ -6745,6 +6771,13 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
         i, mech = r["i"], r["mech"]
         a_xyz, b_xyz = r["a_xyz"], r["b_xyz"]
         pa, pb = r.get("pa"), r.get("pb")
+        # PER-EDGE WALL-CLOCK BUDGET: record the start time so the try-block below
+        # can detect if waypoint computation + Blender geometry creation exceeds
+        # EDGE_ROUTER_BUDGET_S. Checked at the first draw call; if overrun the edge
+        # falls back to a minimal straight-line route instead of hanging. This is the
+        # universal guard against pathological edges (e.g. very long cross-plant runs
+        # that generate hundreds of cable-tray rung objects on a large scene).
+        _edge_t0 = time.monotonic()
         if rack_plan is not None:
             own_bb = [bb for bb in (part_xy_bbox_mm(pa) if pa else None,
                                     part_xy_bbox_mm(pb) if pb else None)
@@ -6764,6 +6797,18 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
         else:   # no layout to thread a spine through → legacy per-pipe route
             waypoints = route_rack(a_xyz, b_xyz,
                                    rack_base_z + RACK_TIER_PITCH_MM * (slot % 4))
+        # Check budget after waypoint computation (before any Blender mesh ops).
+        # If the routing itself already took too long, replace with a minimal
+        # two-point fallback so the drawing step runs fast.
+        if time.monotonic() - _edge_t0 > EDGE_ROUTER_BUDGET_S:
+            print(f"[univ] WARN edge {tag}{i} fell back to straight-line "
+                  f"(router budget exceeded in waypoint computation — "
+                  f"{time.monotonic() - _edge_t0:.1f}s > {EDGE_ROUTER_BUDGET_S}s): "
+                  f"{r.get('a_nm')} -> {r.get('b_nm')}")
+            tz_fb = rack_plan.tier_z(slot) if rack_plan is not None else \
+                (rack_base_z + RACK_TIER_PITCH_MM * (slot % 4))
+            waypoints = [a_xyz, (a_xyz[0], a_xyz[1], tz_fb),
+                         (b_xyz[0], b_xyz[1], tz_fb), b_xyz]
         nm = f"u_route_{tag}{i}_{mech}"
         try:
             # ── PHASE D2 ACTUATION on a PASSTHROUGH electrical run (gated, default OFF).
@@ -6786,6 +6831,22 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
             # raw topology edge carried on the resolved dict). One size for the whole
             # run; the cable tray / pipe both honour it.
             dia_mm = _sized_dia_mm(nm, mech, waypoints, r.get("edge"))
+            # BUDGET CHECK before the Blender geometry draw (the geometry creation can
+            # itself hang on a large scene with a very long cable-tray leg producing
+            # hundreds of bpy.ops rung objects). If the edge has already consumed its
+            # budget (routing + sizing), replace waypoints with a minimal fallback NOW
+            # so the draw step is always fast. This is the outer guard; CABLE_TRAY_MAX_RUNGS
+            # is the inner guard that caps each individual leg's rung count.
+            _elapsed = time.monotonic() - _edge_t0
+            if _elapsed > EDGE_ROUTER_BUDGET_S:
+                print(f"[univ] WARN edge {tag}{i} fell back to straight-line "
+                      f"(router budget exceeded before draw — "
+                      f"{_elapsed:.1f}s > {EDGE_ROUTER_BUDGET_S}s): "
+                      f"{r.get('a_nm')} -> {r.get('b_nm')}")
+                tz_fb = rack_plan.tier_z(slot) if rack_plan is not None else \
+                    (rack_base_z + RACK_TIER_PITCH_MM * (slot % 4))
+                waypoints = [a_xyz, (a_xyz[0], a_xyz[1], tz_fb),
+                             (b_xyz[0], b_xyz[1], tz_fb), b_xyz]
             if mech == "electrical_bus":
                 _draw_cable_tray(nm, waypoints, MAT, MO, dia_mm=dia_mm)
                 # branch drops to the top matched loads — TAP off the spine at the

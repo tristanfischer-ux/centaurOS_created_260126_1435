@@ -11870,7 +11870,12 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const perTrainVelocityMs = Math.round(((perTrainFlowM3H / 3600) / (Math.PI * (perTrainDnMm / 2000) ** 2)) * 100) / 100  // ~1.6-2.0 m/s
 
   // ── Biofiltration (MBBR sized on TAN load) ────────────────────────────────
-  const mbbrArealTanRateKgM3Day = 0.35                     // ~350 g TAN/m³ media/day (MBBR)
+  // Conservative MBBR volumetric nitrification rate. 0.30 kg TAN/m³ media·day corresponds to
+  // ~0.6 g TAN/m²·day on K-type media (~480 m²/m³ effective at 60% fill) at 26 °C marine —
+  // the mid-conservative end of Rusten/Ødegaard MBBR practice. (Was 0.35 = ~350 g/m³·day,
+  // which a council review flagged as ~17% optimistic vs the areal-rate cross-check; 0.30
+  // gives a ~1.2× design margin on the stated TAN load — 2026-06-17.)
+  const mbbrArealTanRateKgM3Day = 0.30                     // ~300 g TAN/m³ media/day (conservative MBBR, 26°C marine)
   const biofilterMediaVolumeM3 = Math.round((tanLoadKgDay / mbbrArealTanRateKgM3Day) * 10) / 10  // ~309 m³
   const mbbrFillFrac = 0.60                                 // 50-70% media fill → tank vol = media / fill
   const biofilterTankVolumeM3 = Math.round(biofilterMediaVolumeM3 / mbbrFillFrac)
@@ -12321,7 +12326,12 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // vessel; the bridge is sized to hold the FULL O₂ demand for a short autonomy.
   const o2DosingIsLifeCritical = oxygenDemandKgDay > 0                   // a live aerobic culture depends on dosed O₂
   const o2DosingValveFailOpen = o2DosingIsLifeCritical ? 1 : 0           // 1 = fail-OPEN (energise-to-close) — NEVER fail-closed
-  const emergencyO2BridgeMinutes = 30                                    // short bridge across genset start / changeover
+  // Emergency O₂ autonomy. Warm-water marine finfish (kingfish at 26 °C) hit critical hypoxia
+  // within minutes of O₂ loss, so the standby LOX bridge must cover far more than a genset start:
+  // ≥2 h autonomy is the warm-water-RAS norm (covers genset-start + ATS changeover + an operator
+  // response window for a deeper fault). 120 min × ~16 kg/h ⇒ ~32 kg LOX bridge inventory.
+  // (Was 30 min / ~8 kg — a council review flagged that as inadequate for life-support, 2026-06-17.)
+  const emergencyO2BridgeMinutes = 120                                   // ≥2 h life-support autonomy (warm-water RAS norm)
   const emergencyO2SupplyKgH = o2DosingIsLifeCritical ? Math.round(oxygenSupplyKgH * 10) / 10 : 0  // full O₂ rate, held from the LOX buffer
   const emergencyO2BufferKg = o2DosingIsLifeCritical ? Math.round(oxygenSupplyKgH * (emergencyO2BridgeMinutes / 60) * 10) / 10 : 0  // ~8 kg LOX bridge inventory
 
