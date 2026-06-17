@@ -62,7 +62,7 @@ import { storeProposalForClass, loadProposalForClass } from './lib/orchestrator/
 import { dutyHash, type DutySpec } from './lib/orchestrator/generic/tool-generator'
 import { computeQuantityUpdates, applyUpdates } from './lib/design-loop/writeback-bridge'
 import { resizeFromConvergedDemand, nextStandardKva } from './lib/design-loop/settle-loop'
-import { reconcilePrincipalEquipment, applyUniversalContractSizing, synthesizeBuildingStructure } from './lib/orchestrator/generic/universal-contract-sizing'
+import { reconcilePrincipalEquipment, applyUniversalContractSizing, synthesizeBuildingStructure, reconcileComputedTwins } from './lib/orchestrator/generic/universal-contract-sizing'
 import { deriveGenericSkeleton } from './lib/orchestrator/generic/derive-skeleton'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
@@ -441,6 +441,65 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
       return o.rearCount === 1 && o.rearId === 'rearing_tank_synth_word' && o.rearQty === '×10' && o.heatPumpCount === 1 && o.idempotent === true
     },
     () => `rears=${rears.length} id=${rear?.id} qty=${rearQty} heatPumps=${heatPumps.length} rec=${JSON.stringify({ r: rec.repaired, d: rec.removedDuplicates, inv: rec.removedInvented, s: rec.synthesizedMissing })} idempotent=${JSON.stringify({ r: rec2.repaired, d: rec2.removedDuplicates, inv: rec2.removedInvented, s: rec2.synthesizedMissing })}`,
+  ))
+
+  // ── A1b. COMPUTED-TWIN quantity reconciliation (keystone defect, RAS council 2026-06-16) ──
+  // The contract carries a calculator `<base>` AND a divergent per-component-physics-tool twin
+  // `computed_<base>` (recirc_pump_motor_kw 132 vs computed_ 1217). The calculator is authoritative;
+  // the computed twin is a wrong-basis diagnostic that leaks into the panel-schedule (a phantom
+  // "Computed Recirc Pump Motor Power · 1217 kW" BoM line) and contradicts the summary's connected
+  // load. reconcileComputedTwins must: DROP every computed_<base> that has a real <base> twin (the
+  // calculator value survives, unchanged), KEEP a twin-less computed_* (the sole source), DROP the
+  // loose phantom `computed_*_word` from moduleDecomposition + its word_id-referencing dependents +
+  // the cached requirementsBom rows — and be a STRICT NO-OP when no computed_*-with-twin exists
+  // (BESS / CO₂ / e-fuel), and idempotent. This invariant would have caught the 1217-vs-940 leak.
+  const twinState: any = {
+    orchestratorContract: { quantities: {
+      recirc_pump_motor_kw: { value: 132, unit: 'kW' },          // calculator — AUTHORITATIVE, must survive
+      computed_recirc_pump_motor_kw: { value: 1217, unit: 'kW' }, // tool twin — must be DROPPED
+      daily_feed_kg: { value: 765.7, unit: 'kg' },
+      computed_daily_feed_kg: { value: 2745, unit: 'kg' },        // dropped
+      computed_degasser_air_flow_m3_h: { value: 16700, unit: 'm³/h' }, // twin-less → KEPT (sole source)
+    } },
+    engineeringContract: { quantities: { recirc_pump_motor_kw: { value: 132, unit: 'kW' } } },
+    moduleDecomposition: { modules: [ { module_id: 'mass_fluid_transport_process', sub_modules: [ { sub_module_id: 'sm', words: [
+      { id: 'recirc_pump_synth_word', name_human: 'Recirc Pump', content_character: { character_id: 'recirc_pump' }, modifier_characters: [] }, // REAL — must survive
+      { id: 'computed_recirc_pump_motor_kw_word', name_human: 'Computed Recirc Pump Motor Power', content_character: { character_id: 'computed_recirc_pump_motor_kw' }, modifier_characters: [{ kind: 'rating_primary', value: 1217 }] }, // phantom — must be DROPPED
+    ] } ] } ] },
+    partVerifications: [ { word_id: 'computed_recirc_pump_motor_kw_word', id: 'pv1' }, { word_id: 'recirc_pump_synth_word', id: 'pv2' } ],
+    requirementsBom: [ { requirement: 'Computed Recirc Pump Motor Power · 1217 kW', line_gbp: 4326 }, { requirement: 'Recirc Pump · 94 kW', line_gbp: 19031 } ],
+  }
+  const ctw = reconcileComputedTwins(twinState) // (no outDir → manifest step is a no-op; covered e2e on real state)
+  const ctw2 = reconcileComputedTwins(JSON.parse(JSON.stringify(twinState))) // idempotency on the post-state
+  const twQ = twinState.orchestratorContract.quantities
+  const survivingWords = twinState.moduleDecomposition.modules[0].sub_modules[0].words.map((w: any) => w.id)
+  // NO-OP check on a class with no computed_* twins (BESS-shaped): nothing dropped.
+  const noopState: any = { orchestratorContract: { quantities: { continuous_power_kw: { value: 1000 }, dc_bus_voltage_v: { value: 800 } } } }
+  const ctwNoop = reconcileComputedTwins(noopState)
+  out.push(assertEq(
+    'UNIVERSAL.computed_twin_quantities_reconciled',
+    'reconcileComputedTwins drops every computed_<base> with a real <base> twin (calculator value survives unchanged: recirc_pump_motor_kw stays 132), KEEPS a twin-less computed_* (computed_degasser_air_flow_m3_h), DROPS the phantom computed_*_word + its partVerifications + cached requirementsBom rows, leaves the REAL word, is a STRICT NO-OP for a class with no twins (BESS-shaped), and is idempotent',
+    JSON.stringify({
+      droppedQ: ctw.twinQuantitiesDropped,
+      computedTwinGone: !('computed_recirc_pump_motor_kw' in twQ) && !('computed_daily_feed_kg' in twQ),
+      calculatorKept: (twQ.recirc_pump_motor_kw?.value === 132) && (twQ.daily_feed_kg?.value === 765.7),
+      orphanKept: twQ.computed_degasser_air_flow_m3_h?.value === 16700,
+      survivors: ctw.survivingComputedKeys,
+      phantomWordsDropped: ctw.phantomWordsDropped,
+      realWordKept: survivingWords.includes('recirc_pump_synth_word') && !survivingWords.includes('computed_recirc_pump_motor_kw_word'),
+      pvPruned: twinState.partVerifications.length === 1 && twinState.partVerifications[0].id === 'pv2',
+      reqBomPhantomGone: !twinState.requirementsBom.some((r: any) => /omputed/.test(String(r.requirement))),
+      noop: ctwNoop.twinQuantitiesDropped === 0 && ctwNoop.phantomWordsDropped === 0,
+      idempotent: ctw2.twinQuantitiesDropped === 0 && ctw2.phantomWordsDropped === 0 && ctw2.dependentRefsPruned === 0,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.droppedQ === 2 && o.computedTwinGone && o.calculatorKept && o.orphanKept &&
+        o.survivors.length === 1 && o.survivors[0] === 'computed_degasser_air_flow_m3_h' &&
+        o.phantomWordsDropped === 1 && o.realWordKept && o.pvPruned && o.reqBomPhantomGone &&
+        o.noop && o.idempotent
+    },
+    (v) => `result=${v}`,
   ))
 
   // ── A2. open process tanks size SHALLOW + WIDE with freeboard (not silos) ──

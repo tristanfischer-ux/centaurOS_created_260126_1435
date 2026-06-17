@@ -480,6 +480,13 @@ def _panel_principal_motor_kw(state: dict) -> float:
                 continue
             req = str(row.get("requirement") or "")
             head = req.split("·", 1)[0].lower()
+            # A routed CONNECTION row ('<medium> connection: A → B · NN kW') carries a TRANSFER
+            # duty (e.g. 'water connection: heat pumps → rearing tanks · 386.4 kW' = a thermal
+            # heat-transfer duty), NOT an equipment's own motor rating — and its head can match
+            # 'heat pump'/'pump'. Never read it as the principal-motor anchor (it would inflate
+            # every duty-fraction circuit). Keyed on the connection shape, universal.
+            if re.match(r"\s*\w[\w /-]*\bconnection\b\s*:", head) or "→" in head or "->" in head:
+                continue
             if not re.search(r"pump|motor|drive|fan|blower|compressor|heat pump", head):
                 continue
             if _WHOLE_PLANT_KW_RE.search(req):

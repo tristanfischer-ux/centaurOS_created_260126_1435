@@ -5646,6 +5646,54 @@ async function main() {
     console.error('[chain] CHAIN_SKIP_DESIGN_LOOP=1 — design loop NOT closed early (cost stack reads pre-loop numbers)')
   }
 
+  // ── COMPUTED-TWIN RECONCILE (keystone defect — Tristan + 6-seat RAS council 2026-06-16) ──────
+  // The contract carries, for ~12-18 quantities, BOTH a calculator value `<base>` AND a
+  // per-component-physics-tool twin `computed_<base>` that diverge badly (daily_feed_kg 765.7 vs
+  // computed_ 2745; recirc_pump_motor_kw 132 vs computed_ 1217). The calculator `<base>` is
+  // AUTHORITATIVE; the `computed_*` twin is a DIAGNOSTIC byproduct of the design-loop/sizing tools
+  // and is often wrong-basis. Unreconciled, it LEAKS into the dossier (the synthesised "Computed
+  // Recirc Pump Motor Power · 1217 kW" BoM line becomes the panel-schedule's principal-motor anchor
+  // while the summary reads connected_electrical_load_kw = 940 kW → the document contradicts itself
+  // and a chartered engineer rejects it). reconcileComputedTwins drops every `computed_<base>`
+  // quantity that has a real `<base>` twin (keeping a twin-less `computed_*` as the sole source),
+  // plus the loose phantom `computed_*` words an earlier synthesis pass already minted (so the
+  // requirements-driven BoM never re-mints the phantom lines/connections). It runs HERE — AFTER the
+  // design loop (which legitimately writes `computed_*` for convergence; this pass is downstream of
+  // it) and BEFORE the requirements-driven BoM consumes the quantities. UNIVERSAL + deterministic
+  // (no class branch) + a STRICT NO-OP for classes with no computed_*-with-twin pairs (BESS / CO₂ /
+  // e-fuel). Non-fatal: a failure leaves the state untouched and the chain proceeds.
+  try {
+    const { reconcileComputedTwins } = await import('./lib/orchestrator/generic/universal-contract-sizing')
+    const twinState = JSON.parse(readFileSync(statePath, 'utf8'))
+    // Pass outDir + an fs shim so the pass also prunes the EARLY-loop CAD manifests (connection-
+    // schedule / route-manifest / parts-manifest) of the phantom-word edges those files baked in
+    // before this pass ran (the later generate_drawing_set REUSES them, so they must be cleaned).
+    const ct = reconcileComputedTwins(twinState, outDir, { readFileSync, writeFileSync, existsSync })
+    if (ct.twinQuantitiesDropped > 0 || ct.phantomWordsDropped > 0 || ct.dependentRefsPruned > 0) {
+      writeFileSync(statePath, JSON.stringify(twinState, null, 2))
+    }
+    console.error(
+      `[chain] computed-twin reconcile: ${ct.twinQuantitiesDropped} computed_<base> quantit${ct.twinQuantitiesDropped === 1 ? 'y' : 'ies'} dropped ` +
+        `(${ct.droppedQuantityKeys.join(', ') || 'none'}); ${ct.phantomWordsDropped} phantom word(s) + ${ct.dependentRefsPruned} dependent ref(s) + ${ct.manifestEntriesPruned} CAD-manifest entr${ct.manifestEntriesPruned === 1 ? 'y' : 'ies'} pruned; ` +
+        `${ct.survivingComputedKeys.length} twin-less computed_* kept (${ct.survivingComputedKeys.join(', ') || 'none'}).`,
+    )
+    logAction({
+      step: 'computed_twin_reconcile',
+      ok: true,
+      twin_quantities_dropped: ct.twinQuantitiesDropped,
+      dropped_quantity_keys: ct.droppedQuantityKeys,
+      surviving_computed_keys: ct.survivingComputedKeys,
+      phantom_words_dropped: ct.phantomWordsDropped,
+      dropped_word_ids: ct.droppedWordIds,
+      dropped_word_names: ct.droppedWordNames,
+      dependent_refs_pruned: ct.dependentRefsPruned,
+      manifest_entries_pruned: ct.manifestEntriesPruned,
+    })
+  } catch (err) {
+    console.error(`[chain] computed-twin reconcile failed (non-fatal): ${(err as Error).message.slice(0, 200)}`)
+    logAction({ step: 'computed_twin_reconcile', ok: false, error: String(err).slice(0, 200) })
+  }
+
   // Blender bg-pipeline spawn (BESS L25 fix — moved here from after Stage 8.5
   // because the original location referenced statePath + state before they
   // existed, hitting JS temporal-dead-zone on every run and silently falling

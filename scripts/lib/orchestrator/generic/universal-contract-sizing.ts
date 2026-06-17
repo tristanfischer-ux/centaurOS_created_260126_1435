@@ -1971,3 +1971,265 @@ export function applyUniversalContractSizing(
     synthesizedPhrases,
   }
 }
+
+// ── COMPUTED-TWIN QUANTITY RECONCILIATION (keystone defect — Tristan 2026-06-16) ───────────
+// The engineering contract carries, for ~12-18 quantities, BOTH a calculator value `<base>`
+// (e.g. `daily_feed_kg = 765.7`, source 'calculator') AND a per-component-physics-tool twin
+// `computed_<base>` (e.g. `computed_daily_feed_kg = 2745`, a wrong-basis standing-biomass figure
+// — `recirc_pump_motor_kw = 132` vs `computed_recirc_pump_motor_kw = 1217`, the head inflated by
+// uncapped routing friction). NOTHING reconciles them, so the contradiction LEAKS into the
+// dossier: the panel-schedule's principal-motor anchor reads the synthesised `computed_*` BoM
+// line (1217 kW) while the summary reads the calculator's connected load (940 kW) — a chartered
+// engineer spots the clash instantly and rejects the document. The 6-seat RAS council scored 3.7
+// and all six seats independently flagged THIS as the root cause.
+//
+// THE RESOLUTION (council-established): the CALCULATOR `<base>` is AUTHORITATIVE. The `computed_*`
+// twin is a DIAGNOSTIC byproduct of a convergence/sizing tool and is often wrong-basis — it must
+// never appear as a competing DISPLAYED value. So:
+//   · For every quantity key matching `computed_<base>` where a non-computed `<base>` key ALSO
+//     exists in the contract → DELETE the `computed_<base>` entry (the calculator `<base>` stays,
+//     untouched, as the single source every consumer reads).
+//   · A `computed_<base>` with NO `<base>` twin (e.g. `computed_degasser_air_flow_m3_h`,
+//     `computed_degasser_column_volume_m3`) is the SOLE source for that quantity — KEEP it (never
+//     orphan a real value). [Its de-prefixed display is handled by buildGroups/stripComputedToken
+//     on the synthesis side; this pass leaves the orphan quantity in place.]
+//
+// Beyond the quantities, EARLIER pipeline passes have, by this point, already SYNTHESISED a
+// `computed_<base>` quantity into a loose phantom WORD in moduleDecomposition (e.g. the
+// un-parented `computed_recirc_pump_motor_kw_word` "Computed Recirc Pump Motor Power · 1217 kW"
+// — a duty-only scalar that the host-keyed reconcilePrincipalEquipment did not catch because it
+// has no vessel volume + no host). Left in the tree it mints phantom requirementsBom rows +
+// phantom routed connections (water/electrical connection "Computed Recirc … → Rearing Tank").
+// So this pass ALSO drops those phantom words + their downstream word_id references
+// (partVerifications / costBasis) when the word's `computed_` identity has a surviving `<base>`
+// twin quantity. It is the QUANTITIES + their already-rendered phantom-word echoes; it COMPLEMENTS
+// (does not undo) the buildGroups stripComputedToken dedup that handles the principal-equipment
+// PARTS on a fresh emit.
+//
+// UNIVERSAL + deterministic — keyed purely on the `computed_<base>` ↔ `<base>` twin relationship,
+// no class branch. STRICT NO-OP for any class with no `computed_*`-with-twin pairs (verified:
+// BESS / CO₂ / e-fuel state carries zero `computed_*` keys). Idempotent: a second run finds no
+// twin to drop. Operates IN PLACE on a loosely-typed chain state object (read from state.json
+// AFTER the design loop, BEFORE requirementsBom). British spelling throughout.
+
+export interface ComputedTwinReconcileResult {
+  twinQuantitiesDropped: number          // computed_<base> quantity entries removed (had a <base> twin)
+  droppedQuantityKeys: string[]          // the keys removed
+  survivingComputedKeys: string[]        // computed_<base> kept (NO <base> twin — the sole source)
+  phantomWordsDropped: number            // loose computed_* synthesised words removed from moduleDecomposition
+  droppedWordIds: string[]               // their word ids (used to prune dependents)
+  droppedWordNames: string[]             // their name_human (used to prune the CAD manifests by endpoint)
+  dependentRefsPruned: number            // partVerifications / costBasis lines whose word_id referenced a dropped word
+  manifestEntriesPruned: number          // CAD-manifest rows/specs/lines/parts referencing a dropped phantom endpoint
+}
+
+/** Normalise an endpoint display string for matching a CAD-manifest `from`/`to`/`name` against a
+ *  dropped phantom word's `name_human` (the manifest writes the word's name_human verbatim; the
+ *  schedule reader also does a `_`→' ' swap, so we compare on a lower-cased, separator-folded form). */
+function normEndpoint(s: string): string {
+  return String(s ?? '').replace(/[_\s]+/g, ' ').trim().toLowerCase()
+}
+
+/** Is `k` of the form `computed_<base>` (carries a leading/embedded `computed_` segment that,
+ *  when stripped, yields a DIFFERENT, non-empty key)? */
+function isComputedTwinKey(k: string): boolean {
+  const base = stripComputedId(k)
+  return base !== k && base.length > 0
+}
+
+/** Reconcile the computed_<base> ↔ <base> quantity twins on a chain state object, in place.
+ *  When `outDir` is given, ALSO prune the routed-CAD manifests in that directory
+ *  (connection-schedule.json / route-manifest.json / parts-manifest.json) of any entry that
+ *  references a dropped phantom word as an endpoint — those manifests were baked by the EARLY
+ *  design loop (before this pass) so they still carry the phantom edges the requirements-driven
+ *  BoM + the isometric/single-line drawings consume. Returns counts for logging. Pure of
+ *  side-effects beyond the in-place state mutation + the manifest rewrites in `outDir`. */
+export function reconcileComputedTwins(
+  state: any,
+  outDir?: string,
+  // Loosely typed so the node `fs` exports (with their overloaded signatures) assign cleanly.
+  fs?: { readFileSync: (p: string, enc: any) => any; writeFileSync: (p: string, d: any) => void; existsSync: (p: string) => boolean },
+): ComputedTwinReconcileResult {
+  const res: ComputedTwinReconcileResult = {
+    twinQuantitiesDropped: 0,
+    droppedQuantityKeys: [],
+    survivingComputedKeys: [],
+    phantomWordsDropped: 0,
+    droppedWordIds: [],
+    droppedWordNames: [],
+    dependentRefsPruned: 0,
+    manifestEntriesPruned: 0,
+  }
+  if (!state || typeof state !== 'object') return res
+
+  // (1) Determine, from the orchestrator contract (the canonical quantity map every consumer
+  //     reads), the set of `computed_<base>` keys whose de-prefixed `<base>` twin ALSO exists.
+  //     Use a UNION of both contracts' keys to decide "twin exists" (a base may live in either),
+  //     then DELETE the computed_<base> from BOTH contracts so neither can leak it downstream.
+  const orchQ: Record<string, unknown> =
+    (state.orchestratorContract && typeof state.orchestratorContract === 'object'
+      ? (state.orchestratorContract.quantities as Record<string, unknown>)
+      : undefined) ?? {}
+  const engQ: Record<string, unknown> =
+    (state.engineeringContract && typeof state.engineeringContract === 'object'
+      ? (state.engineeringContract.quantities as Record<string, unknown>)
+      : undefined) ?? {}
+  const baseKeyExists = new Set<string>([...Object.keys(orchQ), ...Object.keys(engQ)])
+
+  const dropBaseSet = new Set<string>() // the surviving <base> names whose computed twin we drop
+  for (const k of new Set<string>([...Object.keys(orchQ), ...Object.keys(engQ)])) {
+    if (!isComputedTwinKey(k)) continue
+    const base = stripComputedId(k)
+    if (baseKeyExists.has(base)) {
+      // a real twin exists → the computed_* is redundant + often wrong-basis → drop it.
+      if (Object.prototype.hasOwnProperty.call(orchQ, k)) delete orchQ[k]
+      if (Object.prototype.hasOwnProperty.call(engQ, k)) delete engQ[k]
+      res.twinQuantitiesDropped++
+      res.droppedQuantityKeys.push(k)
+      dropBaseSet.add(base)
+    } else {
+      // no twin → this computed_* is the SOLE source for the quantity → keep it untouched.
+      res.survivingComputedKeys.push(k)
+    }
+  }
+  res.droppedQuantityKeys.sort()
+  res.survivingComputedKeys.sort()
+
+  // (2) Drop loose phantom WORDS that an earlier synthesis pass minted from a now-dropped
+  //     `computed_<base>` quantity. A word qualifies when its id OR content_character.character_id
+  //     carries a `computed_` segment whose stripped form maps to a `<base>` we dropped in (1)
+  //     (i.e. the canonical twin survives). This removes ONLY the duplicate "Computed X" echo;
+  //     the real "X" word is untouched. Collect the dropped ids to prune dependents.
+  const droppedWordIds = new Set<string>()
+  const droppedWordNames = new Set<string>() // name_human of each dropped phantom (manifest endpoint key)
+  const computedHostMatchesDroppedTwin = (w: any): boolean => {
+    if (!w || typeof w !== 'object') return false
+    const id = String(w.id ?? '')
+    const cid = String((w.content_character && w.content_character.character_id) ?? '')
+    for (const ident of [id, cid]) {
+      if (!ident) continue
+      const stripped = stripComputedId(ident)
+      if (stripped === ident) continue // no computed_ segment → real word, leave it
+      // The word's de-prefixed base (drop a trailing _word / _synth_word suffix to compare with
+      // the quantity base) must correspond to a twin we dropped. Match on the quantity base being
+      // a prefix of the stripped word base — `recirc_pump_motor_kw` ⊂ `recirc_pump_motor_kw_word`.
+      const strippedBase = stripped.replace(/_(synth_)?word$/i, '')
+      for (const b of dropBaseSet) {
+        if (strippedBase === b || strippedBase.startsWith(b + '_') || b.startsWith(strippedBase + '_')) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+  const md = state.moduleDecomposition
+  if (md && Array.isArray(md.modules)) {
+    for (const m of md.modules) {
+      if (!m || !Array.isArray(m.sub_modules)) continue
+      for (const sm of m.sub_modules) {
+        if (!sm || !Array.isArray(sm.words)) continue
+        const kept: any[] = []
+        for (const w of sm.words) {
+          if (computedHostMatchesDroppedTwin(w)) {
+            const wid = String(w?.id ?? '')
+            if (wid) droppedWordIds.add(wid)
+            const nm = String(w?.name_human ?? '').trim()
+            if (nm) droppedWordNames.add(nm)
+            res.phantomWordsDropped++
+          } else {
+            kept.push(w)
+          }
+        }
+        if (kept.length !== sm.words.length) sm.words = kept
+      }
+    }
+  }
+  res.droppedWordIds = [...droppedWordIds].sort()
+  res.droppedWordNames = [...droppedWordNames].sort()
+
+  // (3) Prune downstream records that reference a dropped phantom word by word_id, so the BoM /
+  //     cost ledger never re-surface it (partVerifications[].word_id + costBasis.lines[].word_id).
+  if (droppedWordIds.size > 0) {
+    const pruneByWordId = (arr: unknown): unknown => {
+      if (!Array.isArray(arr)) return arr
+      const out = arr.filter((row: any) => !(row && droppedWordIds.has(String(row.word_id ?? ''))))
+      res.dependentRefsPruned += arr.length - out.length
+      return out
+    }
+    if (Array.isArray(state.partVerifications)) state.partVerifications = pruneByWordId(state.partVerifications)
+    if (state.costBasis && Array.isArray(state.costBasis.lines)) state.costBasis.lines = pruneByWordId(state.costBasis.lines)
+  }
+
+  // (3b) Prune the CACHED state.requirementsBom of any row naming a dropped phantom word. The
+  //      requirements-driven BoM is REBUILT later in the chain (after the drawings), but the field
+  //      on disk is a CACHE from the prior run — and the panel-schedule / single-line drawings
+  //      (drawn from state.requirementsBom BEFORE that rebuild) would otherwise read the phantom
+  //      "Computed … · 1217 kW" row as the plant's principal-motor anchor, inflating every circuit.
+  //      A phantom row's `requirement` string embeds the dropped word's name_human verbatim (both
+  //      the principal row "Computed Recirc Pump Motor Power · 1217 kW" and the connection rows
+  //      "… connection: Computed Recirc Pump Motor Power → Rearing Tank · …").
+  if (droppedWordNames.size > 0 && Array.isArray(state.requirementsBom)) {
+    const before = state.requirementsBom.length
+    state.requirementsBom = state.requirementsBom.filter((row: any) => {
+      const req = normEndpoint(String(row?.requirement ?? ''))
+      for (const nm of droppedWordNames) {
+        if (req.includes(normEndpoint(nm))) return false
+      }
+      return true
+    })
+    res.dependentRefsPruned += before - state.requirementsBom.length
+  }
+
+  // (4) Prune the routed-CAD manifests of any entry that names a dropped phantom word as an
+  //     endpoint. These manifests (connection-schedule.json / route-manifest.json /
+  //     parts-manifest.json) were written by the EARLY design loop — BEFORE this pass — so they
+  //     still carry the phantom edges (e.g. "Computed Recirc Pump Motor Power → Rearing Tank")
+  //     that requirements_bom.py turns into phantom connection BoM lines + the isometric/single-
+  //     line drawings render. The later generate_drawing_set call REUSES these artifacts (it does
+  //     not rebuild the Blender scene), so the phantom would survive into the dossier unless we
+  //     prune the files here. Match endpoints on the dropped words' name_human (the manifest
+  //     writes that string verbatim). No-op when no phantom word was dropped, or no outDir / fs.
+  if (droppedWordNames.size > 0 && outDir && fs) {
+    const dropNorm = new Set<string>([...droppedWordNames].map(normEndpoint))
+    const refsADroppedEndpoint = (obj: any): boolean => {
+      if (!obj || typeof obj !== 'object') return false
+      for (const k of ['from', 'to', 'from_part', 'to_part', 'from_name', 'to_name', 'name', 'label', 'a', 'b']) {
+        const val = obj[k]
+        if (typeof val === 'string' && dropNorm.has(normEndpoint(val))) return true
+      }
+      return false
+    }
+    const pruneArrayInPlace = (arr: unknown): number => {
+      if (!Array.isArray(arr)) return 0
+      let removed = 0
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (refsADroppedEndpoint(arr[i])) { arr.splice(i, 1); removed++ }
+      }
+      return removed
+    }
+    // join without importing 'path' — outDir is an absolute dir, simple separator append is safe.
+    const sep = outDir.endsWith('/') ? '' : '/'
+    for (const file of ['connection-schedule.json', 'route-manifest.json', 'parts-manifest.json']) {
+      const p = `${outDir}${sep}${file}`
+      try {
+        if (!fs.existsSync(p)) continue
+        const doc = JSON.parse(fs.readFileSync(p, 'utf8'))
+        let removed = 0
+        // every array-valued container the manifests use: rows/specs/out_of_spec/upsized
+        // (connection-schedule), lines (route-manifest), parts (parts-manifest).
+        for (const key of ['rows', 'specs', 'out_of_spec', 'upsized', 'lines', 'parts']) {
+          if (doc && Array.isArray(doc[key])) removed += pruneArrayInPlace(doc[key])
+        }
+        if (removed > 0) {
+          res.manifestEntriesPruned += removed
+          fs.writeFileSync(p, JSON.stringify(doc))
+        }
+      } catch {
+        // non-fatal: a malformed/absent manifest must never break the reconcile — the in-state
+        // word + quantity drops above already removed the primary leak surface.
+      }
+    }
+  }
+
+  return res
+}
