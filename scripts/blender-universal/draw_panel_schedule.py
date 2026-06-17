@@ -576,6 +576,14 @@ _AUX_LOAD_RE = re.compile(
 # A bounded aux circuit load [kW]: an instrument loop / actuated valve / small control device.
 # Conservative single value — enough to size a 6–10 A final circuit, never a process driver.
 _AUX_CIRCUIT_KW = 0.5
+# A PURE SENSING INSTRUMENT (analyser / monitor / sensor / transmitter / probe / gauge / meter /
+# transmittance / intensity / turbidity loop) is ALWAYS a tens-of-watts loop load — it must never
+# inherit a process unit's kW via a shared name token (e.g. a 'UV Transmittance Monitor' borrowing
+# the UV reactor's kW because both contain 'uv'). It is bounded to the aux load BEFORE the ledger
+# resolution runs. Universal — keyed on the sensing-instrument noun, never a product class.
+_INSTRUMENT_LOAD_RE = re.compile(
+    r"analy[sz]|\bmonitor\b|\bsensor\b|transmitter|transmittance|\bprobe\b|gauge|"
+    r"\bmeter\b|intensity|turbidity|\binstrument\b", re.I)
 
 
 def _norm_load_name(s: str) -> str:
@@ -722,9 +730,10 @@ def _panel_resolve_ledger_kw(name: str, state: dict) -> Optional[float]:
             if not kl.endswith("_kw") or _AGG_KEY.search(kl):
                 continue
             if re.search(r"thermal|cooling|heating|dissipation|rejection|duty(?!_)|"
-                         r"capacity|loss", kl) and not re.search(r"elec|motor|drive|"
+                         r"recover|capacity|loss", kl) and not re.search(r"elec|motor|drive|"
                          r"compressor|fan|pump", kl):
-                continue
+                continue                       # a *_recovery_kw / heat-recovery duty is THERMAL,
+                #                                not the fan's electrical draw (HRV 941 kW bug)
             ktoks = set(re.split(r"[_\s]+", kl.replace("_kw", ""))) - _GENERIC_TOK
             if btoks & ktoks:
                 val = v.get("value") if isinstance(v, dict) else v
@@ -1043,10 +1052,35 @@ _NAMED_BOARD_RE = re.compile(
 # Universal (matched on the destination NAME, never a product class).
 _BOARD_INFRA_RE = re.compile(
     r"\bbus\s*bar\b|busbar|distribution\s*busbar|\bfuse\s*holder\b|fuse\s*carrier\b|"
-    r"\bsurge\s*protect(or|ion)?\b|surge\s*arrest(er|or)?\b|\bspd\b", re.I)
+    r"\bsurge\s*protect(or|ion)?\b|surge\s*arrest(er|or)?\b|\bspd\b|"
+    r"main\s*breaker|main\s*incomer|\bincomer\b|main\s*isolator", re.I)
 # A way whose name brushes a board-infra token but is a real consuming load we must keep
 # (e.g. a 'busbar trunking RISER feeding a sub-board' — rare; belt-and-braces).
 _BOARD_INFRA_KEEP = re.compile(r"riser|trunking\s*run|busway\s*feeder", re.I)
+
+
+# A PASSIVE process internal — filter / column MEDIA, biofilm CARRIER, random/structured PACKING,
+# tower FILL, MESH panels, a SUBSTRATE — has no motor and draws no power: it must never appear as
+# an electrical load way (the MBBR 'Biofilm Carrier Media' + the 'Media / Mesh Panels' sub-component
+# each picking up a default duty kW). The ACTIVE duty that fluidises / aerates the media is a
+# SEPARATE blower / pump circuit that is itself a real load. Universal — keyed on the passive-
+# internal noun, never a product class.
+_PASSIVE_NONELECTRICAL_RE = re.compile(
+    r"\bmedia\b|\bcarrier\b|\bpacking\b|\bfill\b|random\s*pack|structured\s*pack|"
+    r"\bmesh\b|\bsubstrate\b|biofilm\s*carrier", re.I)
+
+
+def _is_passive_nonelectrical(node: str) -> bool:
+    """True when an outgoing-circuit destination is a PASSIVE process internal (media / packing /
+    fill / mesh / substrate) that draws no power — it must be excluded from the load (circuit)
+    rows. A node that names a passive internal BUT also a real driven device ('media transfer
+    pump', 'fill blower') is NOT passive and is kept."""
+    n = node or ""
+    if not _PASSIVE_NONELECTRICAL_RE.search(n):
+        return False
+    if _MOTOR_LOAD_RE.search(n):            # 'media transfer pump' / 'fill blower' = a real driver
+        return False
+    return True
 
 
 def _is_board_infrastructure(node: str) -> bool:
@@ -1147,6 +1181,8 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
             continue                      # the internal bus trunk, not an outgoing circuit
         if _is_board_infrastructure(to):
             continue                      # busbar / fuse holder / SPD = board kit, not a load
+        if _is_passive_nonelectrical(to):
+            continue                      # filter/column media, packing, fill — passive, no motor
         m = _RACK_TAP_RE.match(to)
         base = m.group(1) if m else to
         key = (base, r.get("rating"), r.get("size"), r.get("role"))
@@ -1366,6 +1402,12 @@ def _connected_kw_for(base: str, design_a, panel: Panel, state: dict,
         v = _q(state, "continuous_power_kw")
         if v:
             return v
+    # A PURE SENSING INSTRUMENT is a tens-of-watts loop load — bound it BEFORE the ledger
+    # resolution so it can never borrow a process unit's kW on a shared name token (the
+    # 'UV Transmittance Monitor' inheriting the 35 kW UV reactor). Universal — keyed on the
+    # sensing-instrument noun, never a product class.
+    if _INSTRUMENT_LOAD_RE.search(b):
+        return _AUX_CIRCUIT_KW
     # PER-LOAD derivation (universal): the equipment's OWN published electrical kW (ledger
     # requirementsBom / a contract *_kw quantity), so each circuit carries its real load, NOT a
     # single wholesale design-current default. Divide an aggregate by the way count for collapsed
@@ -2115,10 +2157,38 @@ def _selftest() -> int:
     # standby current stays in Σ-current (100 + 1451), the duplicate's 100 is dropped.
     chk("I8.amps_keep_standby_drop_dup", abs(rec["sum_a"] - 1551.0) < 0.01)
 
+    # I9 — a THERMAL-RECOVERY quantity (*_recovery_kw / heat-recovery duty) is NOT read as the
+    # item's electrical draw (the HRV 941 kW thermal-recovery duty landing in the panel as a
+    # 941 kW electrical load). Universal — any class with a heat-recovery duty.
+    st_hrv = {"orchestratorContract": {"quantities": {
+                  "ventilation_hrv_recovery_kw": {"value": 941.0},
+                  "recirc_pump_motor_kw": {"value": 132.0}}},
+              "requirementsBom": [{"requirement":
+                  "Building Ventilation (HRV) · 100200 m³/h · 6503x5528x7153 mm"}]}
+    chk("I9.thermal_recovery_not_electrical",
+        _panel_resolve_ledger_kw("Building Ventilation (HRV)", st_hrv) is None)
+    # I10 — a PURE SENSING INSTRUMENT never inherits a process unit's kW via a shared name token
+    # (a 'UV Transmittance / Intensity Monitor' borrowing the 35 kW UV reactor on the 'uv' token).
+    st_uv = {"orchestratorContract": {"quantities": {"uv_reactor_kw": {"value": 35.0}}},
+             "requirementsBom": [{"requirement":
+                 "UV Transmittance / Intensity Monitor · 0–100 %UVT"}]}
+    chk("I10.instrument_never_inherits_process_kw",
+        _connected_kw_for("UV Transmittance / Intensity Monitor", 87.1, _P(), st_uv, 1)
+        == _AUX_CIRCUIT_KW)
+    # I11 — a PASSIVE process internal (filter/column media, packing, fill, mesh) is excluded from
+    # the load list (no motor); a board incomer ('Main Breaker') is board kit, not a load; a real
+    # driven device that merely names a passive noun ('Media Transfer Pump') is KEPT.
+    chk("I11.passive_media_excluded", _is_passive_nonelectrical("Biofilm Carrier Media (MBBR)"))
+    chk("I11.passive_mesh_excluded", _is_passive_nonelectrical("Media / Mesh Panels"))
+    chk("I11.media_pump_kept", not _is_passive_nonelectrical("Media Transfer Pump"))
+    chk("I11.real_blower_kept", not _is_passive_nonelectrical("Aeration Blower"))
+    chk("I11.main_breaker_is_board_infra", _is_board_infrastructure("Main Breaker"))
+    chk("I11.pump_not_board_infra", not _is_board_infrastructure("Recirc Pump"))
+
     if fails:
         print("[panel-sched] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[panel-sched] selftest OK (8 connected-load reconciliation invariants)")
+    print("[panel-sched] selftest OK (11 connected-load reconciliation invariants)")
     return 0
 
 
