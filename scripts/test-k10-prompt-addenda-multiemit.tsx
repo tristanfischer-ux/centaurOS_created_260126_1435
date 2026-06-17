@@ -81,7 +81,7 @@ const EMITTERS: ReadonlyArray<string> = [
   'google/gemini-3.1-pro-preview',
   'x-ai/grok-4.3',
   'anthropic/claude-opus-4-7',
-  'qwen/qwen3.6-max-preview',
+  'qwen/qwen3.7-max',
   'xiaomi/mimo-v2.5-pro',
   'moonshotai/kimi-k2.6',
 ] as const

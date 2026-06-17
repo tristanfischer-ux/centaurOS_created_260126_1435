@@ -55,7 +55,7 @@ const INPUT = {
 const STAGES = [
   { name: 'STAGE 1: Generator (Gemini 3.1 Pro)', model: 'google/gemini-3.1-pro-preview' },
   { name: 'STAGE 2: R1 (Grok 4.3)',              model: 'x-ai/grok-4.3' },
-  { name: 'STAGE 3: R2 (GLM-5.1)',               model: 'z-ai/glm-5.1' },
+  { name: 'STAGE 3: R2 (GLM-5.1)',               model: 'z-ai/glm-5.2' },
   { name: 'STAGE 4: R3 (Haiku 4.5)',             model: 'anthropic/claude-haiku-4.5' },
   { name: 'STAGE 5: R4 (Flash-Lite)',            model: 'google/gemini-3.1-flash-lite' },
 ]

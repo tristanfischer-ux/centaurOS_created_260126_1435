@@ -193,7 +193,7 @@ export async function sendToSpecialist(
     const PRIMARY_TARGETS: Record<SpecialistModelTier, { providerId: AIProviderId; modelId: string }> = {
         // claude tier: was anthropic/claude-opus-4-7, now together/DeepSeek-V4-Pro (mirrors failover.ts)
         claude: { providerId: 'together', modelId: 'deepseek-ai/DeepSeek-V4-Pro' },
-        // sonnet tier: was anthropic/claude-sonnet-4-6, now deepseek/deepseek-chat (mirrors failover.ts)
+        // sonnet tier: was anthropic/claude-sonnet-4-6, now deepseek/deepseek-v4-flash (mirrors failover.ts)
         sonnet: { providerId: 'deepseek', modelId: 'deepseek-chat' },
         deepseek: { providerId: 'deepseek', modelId: 'deepseek-chat' },
         google: { providerId: 'google', modelId: 'gemini-3.1-pro-preview' },

@@ -17,7 +17,7 @@ export const GPT_5_5_XHIGH = 'openai/gpt-5.5'
 export const GEMINI_3_1_PRO = 'google/gemini-3.1-pro-preview'
 
 /** Claude Opus 4.7 — #2 Omniscience (+26), 36% hallucination, best agentic intelligence. */
-export const CLAUDE_OPUS_4_7 = 'anthropic/claude-opus-4-7'
+export const CLAUDE_OPUS_4_7 = 'anthropic/claude-opus-4.7'
 
 /** Grok 4.3 — joint-lowest hallucination (25%), IFBench #1, +18 Omniscience. Honest workhorse. */
 export const GROK_4_3 = 'x-ai/grok-4.3'
@@ -34,12 +34,12 @@ export const QWEN_3_6_MAX = 'qwen/qwen3.7-max'
 export const KIMI_K2_6 = 'moonshotai/kimi-k2.6'
 
 /** GLM-5.1 (Zhipu / Tsinghua) — 29% hallucination, IFBench top, schema-strict. Good judge. */
-export const GLM_5_1 = 'z-ai/glm-5.1'
+export const GLM_5_2 = 'z-ai/glm-5.2'
 
 // ─── Mid-tier / efficient models ────────────────────────────────────────────
 
 /** Claude Sonnet 4.6 — 51 intelligence, IFBench mid. Independent vendor breadth check. */
-export const CLAUDE_SONNET_4_6 = 'anthropic/claude-sonnet-4-6'
+export const CLAUDE_SONNET_4_6 = 'anthropic/claude-sonnet-4.6'
 
 /** Claude Haiku 4.5 — 26% hallucination (surprisingly honest), 106 tok/s, £0.66/M.
  *  Best cheap option for plausibility / fact-check tasks where honesty matters. */

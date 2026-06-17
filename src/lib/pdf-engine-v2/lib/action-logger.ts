@@ -73,11 +73,11 @@ const PRICING_USD_PER_M_TOKENS: Record<string, [number, number]> = {
   // x-ai
   'x-ai/grok-4.3':                         [3.00, 12.00],
   // Zhipu
-  'z-ai/glm-5.1':                          [0.60, 2.20],
+  'z-ai/glm-5.2':                          [0.60, 2.20],
   // Moonshot
   'moonshotai/kimi-k2.6':                  [0.40, 1.60],
   // Qwen / Alibaba
-  'qwen/qwen3.6-max-preview':              [1.20, 4.80],
+  'qwen/qwen3.7-max':              [1.20, 4.80],
   'qwen/qwen3.5-405b':                     [1.50, 5.00],
   // DeepSeek
   'deepseek/deepseek-v4-pro':              [0.40, 1.20],
@@ -85,7 +85,7 @@ const PRICING_USD_PER_M_TOKENS: Record<string, [number, number]> = {
   // Xiaomi
   'xiaomi/mimo-v2.5-pro':                  [0.50, 2.00],
   // Minimax
-  'minimax/minimax-m2.7':                  [0.40, 1.60],
+  'minimax/minimax-m3':                  [0.40, 1.60],
 }
 
 /**

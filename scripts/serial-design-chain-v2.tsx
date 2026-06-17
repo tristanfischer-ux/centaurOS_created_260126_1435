@@ -149,7 +149,7 @@ const FLASH_LITE = 'google/gemini-3.1-flash-lite'
 // physics critic (src/lib/pdf-engine-v2/radical/physics-critic.ts:46).
 const FLASH_3_5 = 'google/gemini-3.5-flash'
 const GROK_4_3 = 'x-ai/grok-4.3'
-const GLM_5_1 = 'z-ai/glm-5.1'
+const GLM_5_2 = 'z-ai/glm-5.2'
 const HAIKU_4_5 = 'anthropic/claude-haiku-4.5'
 // R3 model — swapped from Haiku 4.5 to Qwen 3.6 Max (2026-05-15). Haiku's
 // 200K TOTAL-context cap was the squeeze: by the time R1+R2 had enriched the
@@ -168,7 +168,7 @@ const MAX_TOKENS_BY_MODEL: Record<string, number> = {
   [GEMINI_3_1_PRO]:  80_000,   // iter-24: Gemini Pro truncated mid-string at 205KB (~50K tok). Cap output budget to keep it tighter.
   [FLASH_LITE]:      65_000,   // iter-18 R4 truncated at 30K; design after R3 needs ~60K output
   [GROK_4_3]:       150_000,
-  [GLM_5_1]:         60_000,   // iter-17 GLM truncated >64K (provider-side cap)
+  [GLM_5_2]:         60_000,   // iter-17 GLM truncated >64K (provider-side cap)
   [HAIKU_4_5]:       80_000,   // iter-38 HP hit 200K total-context cap (53K input + 150K requested out = 203K). With ~70K input after R1+R2 enrichment, 80K out keeps total ≤ 150K (well under cap).
   [QWEN_3_7_MAX]:   32_000,   // Qwen 3.6 Max output cap is ~32K; that's plenty for an R3 reviewer (which emits a delta, not a full design). 1M context window absorbs upstream R1+R2 enrichment without the Haiku total-context squeeze.
 }
@@ -3575,7 +3575,7 @@ async function main() {
         const r45 = await runReviewerStep({
           label: `STEP 8.5: R4.5 ${specialist.key} specialist`,
           model: GROK_4_3,
-          fallbackModel: GLM_5_1,
+          fallbackModel: GLM_5_2,
           systemAppend: specialist.prompt,
           thinkingLevel: 'high',
           brief: currentBriefText,

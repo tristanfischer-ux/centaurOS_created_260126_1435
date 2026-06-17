@@ -254,7 +254,7 @@ describe('CouncilDiffResult interface', () => {
       seatFindings: [
         { model: 'x-ai/grok-4.3', blocker: true, reasons: ['schema broken'] },
         { model: 'openai/gpt-5.4', blocker: true, reasons: ['invention risk'] },
-        { model: 'z-ai/glm-5.1', blocker: false, reasons: [] },
+        { model: 'z-ai/glm-5.2', blocker: false, reasons: [] },
       ],
       fired: true,
     }
@@ -459,7 +459,7 @@ describe('reviewPromptDiffWithCouncil — council seat models', () => {
       'google/gemini-3.1-pro-preview',
       'openai/gpt-5.5',
       'x-ai/grok-4.3',
-      'z-ai/glm-5.1',
+      'z-ai/glm-5.2',
       'moonshotai/kimi-k2.6',
       'xiaomi/mimo-v2.5-pro',
     ]

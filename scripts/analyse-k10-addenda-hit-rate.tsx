@@ -32,7 +32,7 @@ const EMITTERS = [
   'google_gemini-3_1-pro-preview',
   'x-ai_grok-4_3',
   'anthropic_claude-opus-4-7',
-  'qwen_qwen3_6-max-preview',
+  'qwen_qwen3.7-max',
   'xiaomi_mimo-v2_5-pro',
   'moonshotai_kimi-k2_6',
 ]

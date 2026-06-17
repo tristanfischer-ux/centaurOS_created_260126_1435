@@ -331,7 +331,7 @@ Output JSON ONLY:
         try {
             const prompt = supplierMatchAdapter.buildCouncilPrompt(input, output)
             const result = await callOpenRouter({
-                model: "deepseek/deepseek-chat",
+                model: "deepseek/deepseek-v4-flash",
                 system:
                     "You are a chartered UK engineer scoring AI-generated supplier shortlists. Output JSON only.",
                 prompt,

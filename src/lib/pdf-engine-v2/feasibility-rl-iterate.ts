@@ -204,7 +204,7 @@ async function scoreFeasibility(feasText: string): Promise<any> {
 
 Return ONLY JSON: {"score": N, "criteria": [{"name":"...","score":N,"reason":"..."}], "reasons":["..."], "missing":["..."]}`
 
-  const judges = ['x-ai/grok-4.3', 'xiaomi/mimo-v2.5-pro', 'z-ai/glm-5.1']
+  const judges = ['x-ai/grok-4.3', 'xiaomi/mimo-v2.5-pro', 'z-ai/glm-5.2']
   const votes: any[] = []
   
   for (const model of judges) {

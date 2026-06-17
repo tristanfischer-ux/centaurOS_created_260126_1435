@@ -100,7 +100,7 @@ export const OPENROUTER_MODELS = {
   // Honest review / adversarial / schema enforcement (low hallucination)
   grok:              "x-ai/grok-4.3",
   mimo:              "xiaomi/mimo-v2.5-pro",
-  glm:               "z-ai/glm-5.1",
+  glm:               "z-ai/glm-5.2",
   // Structured reasoning + prose
   deepseek_pro:      "deepseek/deepseek-v4-pro",
   deepseek_flash:    "deepseek/deepseek-v4-flash",

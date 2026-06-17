@@ -216,7 +216,7 @@ Output JSON ONLY:
         try {
             const prompt = bomMasterAdapter.buildCouncilPrompt(input, output)
             const result = await callOpenRouter({
-                model: "deepseek/deepseek-chat",
+                model: "deepseek/deepseek-v4-flash",
                 system:
                     "You are a chartered UK hardware engineer scoring AI-generated BOM masters. Output JSON only.",
                 prompt,

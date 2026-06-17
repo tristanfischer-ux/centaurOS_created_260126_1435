@@ -59,7 +59,7 @@ Return ONLY valid JSON:
   const judges = [
     'x-ai/grok-4.3',
     'xiaomi/mimo-v2.5-pro',
-    'z-ai/glm-5.1',
+    'z-ai/glm-5.2',
   ]
   
   console.log(`[score-brief] Scoring with ${judges.length} judges...`)

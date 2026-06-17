@@ -260,7 +260,7 @@ If the recommendation can't be reduced to a single numeric target adjustment (e.
 Output JSON only. No prose, no markdown fences.`
 
     const result = await callOpenRouter({
-        model: "deepseek/deepseek-chat",
+        model: "deepseek/deepseek-v4-flash",
         prompt,
         temperature: 0,
         maxTokens: 256,

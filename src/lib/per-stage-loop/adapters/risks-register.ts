@@ -162,7 +162,7 @@ Output JSON ONLY:
         const prompt = risksRegisterAdapter.buildCouncilPrompt(input, output)
         try {
             const result = await callOpenRouter({
-                model: "deepseek/deepseek-chat",
+                model: "deepseek/deepseek-v4-flash",
                 system:
                     "You are a chartered UK engineer scoring AI-generated risk registers. Output JSON only.",
                 prompt,

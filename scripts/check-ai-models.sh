@@ -101,7 +101,7 @@ check_model "gemini-3.1-flash-lite-preview" "gemini-3.1-flash-lite" "GA id is li
 check_model "claude-opus-4-5" "claude-opus-4-7" "Opus 4.7 is current"
 check_model "claude-sonnet-4-7" "claude-sonnet-4-6" "No Sonnet 4-7 exists; latest Sonnet is 4.6"
 check_model "deepseek-r1" "deepseek-v4-pro" "DeepSeek V4 era; R1 superseded"
-check_model "qwen3.6-max-preview" "qwen3.7-max" "Qwen3.7 Max replaced 3.6 Max on 2026-05-24"
+check_model "qwen3.7-max" "qwen3.7-max" "Qwen3.7 Max replaced 3.6 Max on 2026-05-24"
 check_model "qwen3.5-405b" "qwen3.7-max" "Qwen3.7 Max is current"
 
 # ── Retired audio/TTS models ──────────────────────────────────────

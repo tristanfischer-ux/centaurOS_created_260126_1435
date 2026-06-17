@@ -390,7 +390,7 @@ Return ONLY valid JSON:
   // Verified available on OpenRouter 2026-05-08. Alternates if gpt-5.5 is
   // unavailable: moonshotai/kimi-k2.6 or meta-llama/llama-4-maverick.
   //
-  // B5 (2026-05-10): removed z-ai/glm-5.1 — frequent attempt-1 failures
+  // B5 (2026-05-10): removed z-ai/glm-5.2 — frequent attempt-1 failures
   // caused the retry loop to accumulate across 11 sections and time out the
   // entire pipeline before the PDF was written (vfarm, BESS, all 3 recent runs
   // killed at this stage). GLM-5.1 was also a recurring parse-miss source on

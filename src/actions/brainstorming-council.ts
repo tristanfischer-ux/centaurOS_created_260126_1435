@@ -32,7 +32,7 @@
  *   Sal   (sales-lead)      → deepseek/deepseek-v4-flash
  *   Jian  (vp-engineering)  → deepseek/deepseek-v4-flash
  *   Harper (hiring-team)    → moonshotai/kimi-k2.6
- *   Leo   (legal-counsel)   → z-ai/glm-5.1
+ *   Leo   (legal-counsel)   → z-ai/glm-5.2
  *
  * W51 fix: specialist maxTokens raised from 800 → 4096 so Gemini 3.1 Pro
  * (a reasoning model) has enough budget for its internal reasoning trace
@@ -60,7 +60,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 //   China Moonshot → moonshotai/kimi-k2.6     (Intelligence 54, different RLHF lineage)
 //   China DeepSeek → deepseek/deepseek-v4-pro (structured reasoning, Intelligence 52)
 //   China Alibaba  → qwen/qwen3.7-max (IFBench ~79%, Intelligence 57)
-//   China Zhipu    → z-ai/glm-5.1            (tool-use 98%, non-hallucination 74%)
+//   China Zhipu    → z-ai/glm-5.2            (tool-use 98%, non-hallucination 74%)
 //
 // NOTE 2026-05-02: xiaomi/mimo-v2.5-pro was blocked on OpenRouter provider
 // allow-list, causing Cal and 4 other specialists to 404. Replaced with
@@ -125,7 +125,7 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
     // China Zhipu (Tsinghua-derived) — GLM-5.1: Intelligence 51, non-hallucination
     // 74%, tool-use 98% (#1 tied). Best model for precise legal reasoning — won't
     // invent statutes or fabricate case law.
-    "legal-counsel":       "z-ai/glm-5.1",
+    "legal-counsel":       "z-ai/glm-5.2",
 
     // vp-supply-chain retains Gemini 3.1 Pro (same strategic-reasoning lineage
     // as Sage; supply-chain decisions are reasoning-heavy).

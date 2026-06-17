@@ -651,7 +651,7 @@ export async function callDeepSeek(
   const openRouterKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!openRouterKey) throw new Error("OPENROUTER_API_KEY not configured")
 
-  // Map bare model names to OpenRouter IDs: "deepseek-chat" → "deepseek/deepseek-chat"
+  // Map bare model names to OpenRouter IDs: "deepseek-chat" → "deepseek/deepseek-v4-flash"
   const orModelId = modelId.startsWith('deepseek/') ? modelId : `deepseek/${modelId}`
   const cappedMaxTokens = Math.min(maxTokens, 8192) // DeepSeek hard cap
 
