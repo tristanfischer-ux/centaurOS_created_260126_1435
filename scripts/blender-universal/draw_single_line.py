@@ -611,15 +611,29 @@ _CONTROL_LOAD_EXCLUDE = re.compile(
     r"transformer|busbar|breaker|fuse|surge|valve|filter|degas|exchanger|drum", re.I)
 
 
+# A control / SCADA / instrument / network load is SMALL (a parasitic compute/comms draw),
+# so it groups onto the control sub-board only when its current is genuinely small. This is
+# the magnitude gate that REPLACES the old blanket `_kw_derived` reject: the synthesised
+# control feeders (Main Controller / SCADA / Gateway / I-O / Network / Controller PSU) ALL
+# carry `_kw_derived=True` because they were sized from a duty-type kW — rejecting on that
+# flag meant the control board NEVER formed. A control-named way drawing tens of amps is a
+# mis-named power load and is excluded by the magnitude cap instead.
+_CONTROL_LOAD_MAX_A = 25.0
+
+
 def _is_control_load(br: "Branch") -> bool:
     if br.sub_bus is not None or br.target_sym == SYM_TRANSFORMER:
         return False
-    if getattr(br, "_kw_derived", False):
-        return False     # a kW-derived motor/system feeder is never a control stub
     name = f"{br.label} {br.to_node}"
     if _CONTROL_LOAD_EXCLUDE.search(name):
         return False
-    return bool(_CONTROL_LOAD_RE.search(name))
+    if not _CONTROL_LOAD_RE.search(name):
+        return False
+    # magnitude gate: a genuine control/instrument way is small. A control-named feeder
+    # drawing > ~25 A is really a power load (don't bury it on the control board). An
+    # unsized way (0 A) that matches the name pattern is treated as a control stub.
+    amps = _rating_amps(br)
+    return amps <= _CONTROL_LOAD_MAX_A
 
 
 # BOARD INFRASTRUCTURE — a main breaker / busbar / distribution board / fuse / isolator /
@@ -753,6 +767,94 @@ def _group_control_loads(tree: Tree, devices: list):
     if cb:
         feeder.devices.append(_as_device(cb, "breaker", "CB"))
     main.branches = keep + [feeder]
+
+
+# LIFE-SAFETY / CRITICAL loads — the ways that MUST stay powered for the living process to
+# survive a mains failure (the genset + UPS carry these on the critical board). For a
+# recirculating-life-support plant: the recirculation / circulation pumps that keep water
+# moving, the oxygenation / dissolved-oxygen system + its control valve, and the SCADA /
+# controls that run them. Universal — keyed on the LOAD NAME's life-support function, never a
+# product class; a plant whose ledger carries no critical-redundancy marker gets no such board.
+_CRITICAL_LOAD_RE = re.compile(
+    r"recirc|circulat(ion|ing)?\s*pump|\boxygenat|dissolved.?o|\bdo\b\s*control|"
+    r"\bo2\b\s*(control|dosing|supply)|life.?support|emergency\s*o|aeration|"
+    r"\bscada\b|main\s*controller|plant\s*control", re.I)
+# A critical-named way that is really NOT a life-support load (a passive / bulk item that
+# merely brushes a token) is kept off the critical board.
+_CRITICAL_LOAD_EXCLUDE = re.compile(
+    r"\btank\b|vessel|reservoir|media\b|frame|structural|pipework|busbar|breaker|"
+    r"fuse|surge|generator|genset", re.I)
+
+
+def _has_critical_redundancy(state: dict) -> bool:
+    """True when the ledger marks the design as carrying CRITICAL / life-safety redundancy —
+    the cue to draw a dedicated critical sub-board. Reads the contract's
+    critical_equipment_redundancy / N+1 markers. Universal; absent ⇒ no critical board."""
+    for k in ("critical_equipment_redundancy", "critical_load_redundancy",
+              "life_support_redundancy", "n_plus_1_critical"):
+        v = _q(state, k)
+        if v is not None:
+            try:
+                if float(v) >= 1:
+                    return True
+            except (TypeError, ValueError):
+                if str(v).strip().lower() in ("1", "true", "yes", "n+1", "n+2"):
+                    return True
+    return False
+
+
+def _is_critical_load(br: "Branch") -> bool:
+    if br.sub_bus is not None or br.target_sym == SYM_TRANSFORMER:
+        return False
+    name = f"{br.label} {br.to_node}"
+    if _CRITICAL_LOAD_EXCLUDE.search(name):
+        return False
+    return bool(_CRITICAL_LOAD_RE.search(name))
+
+
+def _group_critical_life_support(tree: Tree, state: dict, devices: list):
+    """UNIVERSAL: group the LIFE-SAFETY loads (recirculation pumps, oxygenation / dissolved-
+    oxygen + its control valve, SCADA / controls) onto a dedicated CRITICAL LIFE-SUPPORT
+    sub-board fed via a UPS — the board the standby generator + ATS hold on a mains failure.
+    Fires only when the plant has BOTH a standby source (genset on the ATS, already on the
+    tree) AND the ledger marks critical redundancy, so a plant with no standby supply / no
+    critical marker is untouched (never an `if ras` branch).
+
+    Runs BEFORE _group_control_loads and claims its loads first: it pulls the critical POWER
+    loads (recirc / oxygenation / DO) AND the small life-safety control loads (SCADA / main
+    controller / instruments) onto ONE flat sub-board (single nesting level so it renders
+    cleanly via _draw_sub_distribution). Deterministic; keyed on the load NAME + the ledger
+    redundancy marker."""
+    if tree.standby_source is None or not _has_critical_redundancy(state):
+        return
+    main = tree.main_bus
+    # the critical power loads + the small control/instrument loads that run them.
+    claimed = [br for br in main.branches
+               if _is_critical_load(br) or _is_control_load(br)]
+    if len(claimed) < 2:
+        return     # nothing meaningful to group
+    keep = [br for br in main.branches if br not in claimed]
+    sub = Bus(tag="CRITICAL LIFE-SUPPORT BOARD", is_sub=True)
+    for br in claimed:
+        br.from_node = sub.tag
+        br.devices = []        # the UPS + sub-board breakers guard these
+        sub.branches.append(br)
+    feeder = Branch(
+        from_node=main.tag,
+        to_node=sub.tag,
+        label="Critical life-support distribution (UPS + standby-backed)",
+        rating="", cable="", role="branch", target_sym=SYM_LOAD)
+    feeder.sub_bus = sub
+    feeder.is_ups = True            # type: ignore[attr-defined]  — UPS in the drop
+    feeder.is_critical = True       # type: ignore[attr-defined]  — drives the critical label
+    cb = _pick_device(devices, kind="breaker")
+    if cb:
+        feeder.devices.append(_as_device(cb, "breaker", "CB"))
+    main.branches = keep + [feeder]
+    tree.notes = list(tree.notes or []) + [
+        "Critical life-support loads (recirculation, oxygenation / dissolved-oxygen control, "
+        "SCADA) grouped on a UPS-backed sub-board that the standby generator + ATS hold on a "
+        "mains failure — the life-safety supply a recirculating-life-support plant needs."]
 
 
 # ── powered-load real-current sizing ─────────────────────────────────────────
@@ -1464,8 +1566,15 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # UNIVERSAL: flag any feeder at/above the volt-drop limit (or the 4% advisory) so a
     # 4.9% drop is not shown silently next to a compliant 1% feeder.
     _flag_voltdrop(tree, schedule)
-    # UNIVERSAL legibility: collapse the small control / SCADA / instrument loads onto a
-    # UPS-backed control sub-board so the main bus isn't a flat row of low-power stubs.
+    # UNIVERSAL life-safety: group the critical loads (recirc pumps / oxygenation / DO control
+    # / SCADA + the controls that run them) onto a UPS-backed CRITICAL LIFE-SUPPORT sub-board
+    # the standby genset + ATS hold on a mains failure — when the ledger carries a standby
+    # source + a critical-redundancy marker. Runs FIRST so it claims the life-safety controls.
+    _group_critical_life_support(tree, state, devices)
+    # UNIVERSAL legibility: collapse any REMAINING small control / SCADA / instrument loads
+    # onto a UPS-backed control sub-board so the main bus isn't a flat row of low-power stubs
+    # (a plant without a critical board still gets this; a critical board already took its
+    # controls, so this handles the residue / the non-critical-redundancy case).
     _group_control_loads(tree, devices)
     return tree
 

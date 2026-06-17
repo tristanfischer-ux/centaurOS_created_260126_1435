@@ -79,6 +79,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+import drawing_building_envelope as _be  # noqa: E402  (ledger-slab building footprint)
 
 # Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
 # generate_hvac() from the run's own artifacts; '' until set (block shows '—').
@@ -150,6 +151,18 @@ class Diffuser:
 
 
 @dataclass
+class Dehumidifier:
+    """A DEHUMIDIFICATION unit / AHU dehumidification coil the ledger carries (the latent
+    side of the air system). Drawn on the supply hub as a coil + a standalone unit, with the
+    latent duty + the moisture load it removes — the part of the air-side duty the sensible
+    heating drawing was missing. Data-driven from the ledger; None when the design has none."""
+    tag: str                     # equipment tag, e.g. 'X-104'
+    name: str                    # 'Dehumidifier'
+    power_kw: float = 0.0        # electrical/cooling power (kW)
+    moisture_load_kg_h: float = 0.0  # the latent moisture load it removes (kg/h)
+
+
+@dataclass
 class AirSystem:
     archetype: str
     hubs: list[Equip]
@@ -164,6 +177,7 @@ class AirSystem:
     notes: list[str] = field(default_factory=list)
     schedule_present: bool = False
     duty_word: str = "cooling"   # 'heating' | 'cooling' — honest air-side duty label
+    dehumidifier: Optional["Dehumidifier"] = None   # the ledger's dehumidification unit
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -410,6 +424,18 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
     bbox = manifest.get("bbox_mm") or {}
     notes: list[str] = []
 
+    # ---- BUILDING ENVELOPE from the LEDGER slab (the #122 one-source rule) -------
+    # The HVAC plan must zone the SAME building the GA draws, and that building is the
+    # LEDGER floor slab — not the equipment-placement bbox (a long placement ribbon would
+    # make the air system span a 372 m strip that the slab BoM never costs). When the ledger
+    # carries a slab/floor area, swap the bbox for the slab-sized building rectangle + fit the
+    # placed equipment into it. No-op for a design with no building slab (untouched).
+    _build_bb, _fit = _be.building_bbox(state, bbox)
+    if _build_bb is not None:
+        bbox = _build_bb
+    else:
+        _fit = (lambda x, y: (x, y))
+
     # ---- partition placed kit into hubs / zones / neutral -----------------------
     hubs: list[Equip] = []
     zones: list[Equip] = []
@@ -420,10 +446,12 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
         role, sub = _classify_role(name, module)
         if role == "hub":
             cx, cy, w, d, h, z = _equip_from_row(r)
+            cx, cy = _fit(cx, cy)
             hubs.append(Equip(tag=_hub_tag(sub, len(hubs)), name=name, role=sub,
                               cx=cx, cy=cy, w=w, d=d, h=h, z=z, is_hub=True))
         elif role == "zone" and not _NEUTRAL_RE.search(f"{name} {module}"):
             cx, cy, w, d, h, z = _equip_from_row(r)
+            cx, cy = _fit(cx, cy)
             zones.append(Equip(tag=tag, name=name, role="zone",
                                cx=cx, cy=cy, w=w, d=d, h=h, z=z))
 
@@ -492,11 +520,29 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
         _build_air_ducts(main_hub, zones, airflow_cms, cooling_kw, schedule,
                          ducts, diffusers, notes, medium == "mixed", state)
 
+    # ---- DEHUMIDIFICATION (the latent side of the air system the ledger carries) ----
+    # The sensible heating/cooling drawing alone under-renders the air-side duty: a humid
+    # process building (a RAS hall over open tanks) also needs latent removal. Enumerate the
+    # ledger's dehumidifier + the moisture load it removes, draw it on the supply hub, and
+    # note the latent duty. Universal: surfaces only when the ledger carries it.
+    dehum = _read_dehumidifier(state)
+    if dehum is not None:
+        bits = []
+        if dehum.power_kw:
+            bits.append(f"{dehum.power_kw:.0f} kW")
+        if dehum.moisture_load_kg_h:
+            bits.append(f"{dehum.moisture_load_kg_h:.0f} kg/h latent load")
+        notes.append(
+            f"Dehumidification ({dehum.tag}): {' · '.join(bits)} — a dehumidification "
+            f"coil/unit on the air handler removes the building moisture (latent duty), "
+            f"separate from the {_duty_word(state)} above." if bits else
+            f"Dehumidification unit ({dehum.tag}) on the air handler — latent duty.")
+
     return AirSystem(
         archetype=arch, hubs=hubs, zones=zones, ducts=ducts, diffusers=diffusers,
         bbox=bbox, medium=medium, airflow_cms=airflow_cms, cooling_kw=cooling_kw,
         zones_derived=zones_derived, notes=notes, schedule_present=schedule_present,
-        duty_word=_duty_word(state))
+        duty_word=_duty_word(state), dehumidifier=dehum)
 
 
 def _hub_tag(role: str, idx: int) -> str:
@@ -585,6 +631,59 @@ def _read_zone_count(state: dict) -> int:
         if v:
             return int(v)
     return 0
+
+
+# A DEHUMIDIFIER / dehumidification unit the BoM carries (the latent side of the air system).
+_DEHUMID_RE = re.compile(r"dehumidif|moisture\s*remov|latent\s*(load|cool)|desiccant", re.I)
+
+
+def _read_dehumidifier(state: dict) -> Optional["Dehumidifier"]:
+    """The DEHUMIDIFICATION unit the ledger carries (a real environmental-control item the
+    sensible-heating HVAC drawing omitted), or None. Reads the requirementsBom for a
+    dehumidifier row (name + duty + tag) and the latent-load quantities for the moisture it
+    removes. Universal — reads the engine's OWN BoM + the canonical latent-duty quantities
+    (dehumidifier_power_kw / evaporative_moisture_load_kg_h), never a per-class assumption."""
+    power = _quantity(state, "dehumidifier_power_kw", "dehumidification_power_kw",
+                      "dehumidifier_capacity_kw")
+    moisture = _quantity(state, "evaporative_moisture_load_kg_h",
+                         "latent_moisture_load_kg_h", "moisture_load_kg_h",
+                         "dehumidification_load_kg_h")
+    tag, name = "", "Dehumidifier"
+    rb = state.get("requirementsBom")
+    if isinstance(rb, list):
+        for r in rb:
+            if not isinstance(r, dict):
+                continue
+            req = str(r.get("requirement") or "")
+            head = req.split("·")[0].strip()
+            if not _DEHUMID_RE.search(head):
+                continue
+            tag = str(r.get("tag") or "").strip() or tag
+            name = head or name
+            if not power:
+                m = re.search(r"·\s*([\d.,]+)\s*kW\b", req)
+                if m:
+                    try:
+                        power = float(m.group(1).replace(",", ""))
+                    except ValueError:
+                        pass
+            break
+        else:
+            # no BoM row → only synthesise a unit if the latent-duty quantities exist.
+            if not (power or moisture):
+                return None
+    if not (power or moisture):
+        return None
+    try:
+        power = float(power) if power else 0.0
+    except (TypeError, ValueError):
+        power = 0.0
+    try:
+        moisture = float(moisture) if moisture else 0.0
+    except (TypeError, ValueError):
+        moisture = 0.0
+    return Dehumidifier(tag=tag or "DH-1", name=name or "Dehumidifier",
+                        power_kw=power, moisture_load_kg_h=moisture)
 
 
 def _derive_zones(state: dict, bbox: dict, arch: str):
@@ -1076,6 +1175,44 @@ def _draw_diffuser(svg, cx, cy, service):
         svg.line(cx, cy - s, cx, cy + s, stroke=ink, width=0.7)
 
 
+# Dehumidifier glyph colours — a distinct cool-cyan so the latent kit reads apart from the
+# navy supply ducts / heating hub.
+DEHUM_INK = "#0a6e8a"
+DEHUM_FILL = "#d6eef5"
+
+
+def _draw_dehumidifier_glyph(svg, dh, hub_px, hub_py, hub_w_px, hub_d_px):
+    """Draw the DEHUMIDIFICATION unit beside the supply hub + a coil glyph ON the hub face,
+    tagged with the unit tag + its latent duty/moisture-load. A standard cooling-coil symbol
+    (a box of vertical fins with the condensate drip) so it reads as the latent-removal kit
+    the air handler carries — the part the sensible-heating drawing omitted."""
+    # standalone unit just to the RIGHT of the hub.
+    uw, ud = max(hub_w_px * 0.8, 22), max(hub_d_px * 0.8, 16)
+    ux = hub_px + hub_w_px / 2 + 12
+    uy = hub_py - ud / 2
+    svg.rect(ux, uy, uw, ud, stroke=DEHUM_INK, width=1.6, fill=DEHUM_FILL, rx=2)
+    # cooling-coil fins inside the unit (vertical ticks)
+    nf = max(3, int(uw / 6))
+    for i in range(1, nf):
+        fx = ux + uw * i / nf
+        svg.line(fx, uy + 2, fx, uy + ud - 2, stroke=DEHUM_INK, width=0.8)
+    # condensate drip below the coil (the latent-removal cue)
+    svg.line(ux + uw / 2, uy + ud, ux + uw / 2, uy + ud + 6, stroke=DEHUM_INK, width=1.0)
+    svg.path(f"M {ux + uw/2 - 2:.1f} {uy + ud + 6:.1f} q 2 4 4 0 z",
+             stroke=DEHUM_INK, width=0.8, fill=DEHUM_FILL)
+    # tag + duty caption above the unit.
+    bits = [dh.tag]
+    if dh.power_kw:
+        bits.append(f"{dh.power_kw:.0f} kW")
+    svg.text(ux + uw / 2, uy - 4, "  ".join(bits), size=7.4, anchor="middle",
+             weight="bold", fill=DEHUM_INK)
+    if dh.moisture_load_kg_h:
+        svg.text(ux + uw / 2, uy + ud + 16, f"{dh.moisture_load_kg_h:.0f} kg/h",
+                 size=6.8, anchor="middle", fill=DEHUM_INK)
+    svg.text(ux + uw / 2, uy + ud + (25 if dh.moisture_load_kg_h else 16),
+             "dehumidifier (latent)", size=6.4, anchor="middle", fill=MUTED)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN LAYOUT
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1180,6 +1317,16 @@ def build_hvac_svg(sysm: AirSystem, meta: dict) -> str:
         px = plan_x + mx(e.cx - e.w / 2)
         py = plan_y + my(e.cy + e.d / 2)
         _draw_equipment(svg, e, px, py, pw, ph)
+
+    # ----- DEHUMIDIFICATION unit + coil on the supply hub (the ledger's latent kit) -----
+    # The air system's latent side: a dehumidification coil drawn ON the supply hub + a
+    # standalone unit beside it, tagged with its duty + the moisture load it removes. Drawn
+    # from the ledger; nothing drawn when the design carries no dehumidifier.
+    if sysm.dehumidifier is not None and pc:
+        hub0 = sysm.hubs[0]
+        hpx, hpy = pc.get(hub0.tag, (plan_x + plan_w * 0.5, plan_y + plan_h * 0.5))
+        _draw_dehumidifier_glyph(svg, sysm.dehumidifier, hpx, hpy,
+                                 max(hub0.w * ppm, 18), max(hub0.d * ppm, 14))
 
     north_arrow(svg, plan_x + plan_w - 14, plan_y + 20)
     # overall plan dimensions: building LENGTH along the top, building DEPTH down the left,
@@ -1516,6 +1663,9 @@ def _draw_legend(svg, sysm, x, y, w):
                 ("zone", None, "Served rack")]
     elif sysm.medium == "air":
         rows = [r for r in rows if r[0] != "liquid"]
+    # the dehumidification unit (latent side) gets its own key row when the ledger has one.
+    if sysm.dehumidifier is not None:
+        rows = rows + [("dehumidifier", None, "Dehumidification unit (latent)")]
 
     rowh = 26
     header_h = 22
@@ -1550,6 +1700,11 @@ def _mini_glyph(svg, cx, cy, kind, service):
     elif kind == "ahu":
         svg.rect(cx - 9, cy - 6, 18, 12, stroke=EQ_INK, width=1.5, fill=EQ_FILL, rx=1)
         svg.circle(cx - 4, cy - 1, 3, stroke=EQ_INK, width=0.8)
+    elif kind == "dehumidifier":
+        svg.rect(cx - 9, cy - 6, 18, 12, stroke=DEHUM_INK, width=1.5, fill=DEHUM_FILL,
+                 rx=1)
+        for k in (-4, 0, 4):
+            svg.line(cx + k, cy - 4, cx + k, cy + 4, stroke=DEHUM_INK, width=0.7)
     else:  # zone
         svg.rect(cx - 9, cy - 5, 18, 10, stroke=EQ_INK, width=1.1, fill="#f0f3f7", rx=1)
 
@@ -1639,9 +1794,19 @@ def _draw_title_block(svg, sysm, meta, scale_S, width, height, title_h):
         head = (f"Liquid-cooled · chiller {sysm.cooling_kw:.0f} kW heat rejection · "
                 f"{len(sysm.zones)} served rack(s).")
     else:
+        latent = ""
+        if sysm.dehumidifier is not None:
+            dh = sysm.dehumidifier
+            lat_bits = []
+            if dh.power_kw:
+                lat_bits.append(f"{dh.power_kw:.0f} kW")
+            if dh.moisture_load_kg_h:
+                lat_bits.append(f"{dh.moisture_load_kg_h:.0f} kg/h")
+            latent = (f" · dehumidification {' / '.join(lat_bits)}"
+                      if lat_bits else " · dehumidification")
         head = (f"Supply airflow {sysm.airflow_cms:.2f} m³/s "
                 f"({_cfm(sysm.airflow_cms):,} cfm) · {sysm.duty_word} "
-                f"{sysm.cooling_kw:.0f} kW · {len(sysm.zones)} served zone(s).")
+                f"{sysm.cooling_kw:.0f} kW{latent} · {len(sysm.zones)} served zone(s).")
     svg.text(x0, y0 + 61, head, size=9.5, fill=MUTED)
     svg.text(x0, y0 + 78,
              "Plan + section · ducts sized from airflow ÷ velocity (≤9 m/s) · "

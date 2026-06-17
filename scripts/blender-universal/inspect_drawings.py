@@ -362,6 +362,106 @@ def _state_instrument_count(state: dict, conn: dict) -> int:
     return n
 
 
+# ─── LEDGER → DISCIPLINE-DRAWING ENUMERATION (#122 one-source regression net) ───
+# The universal rule: each drawing must RENDER every ledger item belonging to its
+# discipline (environmental/latent → HVAC; life-safety valves + emergency paths → P&ID;
+# critical electrical loads + boards → single-line; the building slab → GA/HVAC footprint).
+# An item present in the ledger but absent from its discipline's drawing IS the bug — these
+# checks fire it so iter-N catches iter-(N+1) regressions. Universal: every probe is GUARDED
+# by the ledger carrying the item, so a class without it is never flagged.
+
+def _q(state: dict, *keys):
+    for ck in ("orchestratorContract", "engineeringContract"):
+        q = (state.get(ck) or {}).get("quantities")
+        if isinstance(q, dict):
+            for k in keys:
+                if k in q:
+                    v = q[k]
+                    return v.get("value") if isinstance(v, dict) else v
+    return None
+
+
+def _bom_has(state: dict, rx: re.Pattern) -> bool:
+    rb = state.get("requirementsBom")
+    if not isinstance(rb, list):
+        return False
+    for r in rb:
+        if isinstance(r, dict) and rx.search(str(r.get("requirement") or "")):
+            return True
+    return False
+
+
+def check_ledger_discipline_enumeration(per_svg_texts: dict[str, list[str]],
+                                        state: dict) -> list[dict]:
+    """Each ledger item must render in its discipline's drawing (the #122 one-source rule)."""
+    out: list[dict] = []
+    hv = " \n ".join(per_svg_texts.get("hvac-layout", []))
+    pid = " \n ".join(per_svg_texts.get("pid", []))
+    sld = " \n ".join(per_svg_texts.get("single-line-diagram", []))
+
+    # 1. HVAC must render the dehumidifier when the ledger carries one (latent side).
+    if (_q(state, "dehumidifier_power_kw", "evaporative_moisture_load_kg_h")
+            or _bom_has(state, re.compile(r"dehumidif", re.I))):
+        if not re.search(r"dehumidif", hv, re.I):
+            out.append(dict(severity="major", check="hvac_dehumidifier_missing",
+                            drawing="hvac-layout",
+                            detail="the ledger carries a dehumidifier / latent-load duty but "
+                                   "the HVAC drawing renders no dehumidification unit/coil",
+                            fix_hint="draw_hvac.py must enumerate the ledger dehumidifier "
+                                     "(_read_dehumidifier) + draw the coil/unit + latent note"))
+
+    # 2. P&ID must tag the O₂ dosing valve FAIL-OPEN when the ledger marks it so.
+    fs = _q(state, "o2_dosing_valve_fail_state")
+    fail_open = str(fs).strip().lower() in ("1", "fail_open", "open", "fo", "true") or (
+        isinstance(fs, (int, float)) and fs >= 1)
+    if fail_open and not re.search(r"\bFO\b|fail-open|fail open", pid, re.I):
+        out.append(dict(severity="major", check="pid_o2_failopen_missing", drawing="pid",
+                        detail="the ledger marks the O₂ dosing valve fail-open but the P&ID "
+                               "shows no FO / fail-open tag on the dosing valve",
+                        fix_hint="draw_pid.py must draw the DO-loop final valve as fail-open "
+                                 "(kind=failopen + 'FO' tag) per o2_dosing_valve_fail_state"))
+
+    # 3. single-line must group a CRITICAL LIFE-SUPPORT board when the ledger has the
+    #    critical-redundancy marker AND a standby source.
+    crit_red = _q(state, "critical_equipment_redundancy", "life_support_redundancy")
+    has_crit = (str(crit_red).strip() not in ("", "None", "0")
+                and crit_red is not None)
+    if has_crit and _state_has_generator(state):
+        if not re.search(r"critical\s*life-?support", sld, re.I):
+            out.append(dict(severity="major", check="sld_critical_board_missing",
+                            drawing="single-line-diagram",
+                            detail="the ledger has critical-equipment redundancy + a standby "
+                                   "generator but the single-line draws no critical life-support "
+                                   "sub-board grouping the life-safety loads",
+                            fix_hint="draw_single_line.py _group_critical_life_support must "
+                                     "build a UPS-backed CRITICAL LIFE-SUPPORT board"))
+
+    # 4. the drawn building footprint must match the ledger slab area (not a placement
+    #    ribbon). Compare the GA envelope area against the slab; flag a >2× divergence.
+    slab = _q(state, "building_footprint_m2", "building_gross_floor_area_m2",
+              "floor_area_m2")
+    if slab:
+        ga_txt = per_svg_texts.get("general-arrangement", [])
+        m = next((re.search(r"envelope\s*([\d.]+)\s*m.*?×\s*([\d.]+)\s*m", t)
+                  for t in ga_txt if "envelope" in t.lower()
+                  and re.search(r"envelope\s*[\d.]+\s*m.*?×", t)), None)
+        if m:
+            drawn_area = float(m.group(1)) * float(m.group(2))
+            try:
+                slab_f = float(slab)
+            except (TypeError, ValueError):
+                slab_f = 0.0
+            if slab_f > 0 and (drawn_area / slab_f > 2.0 or drawn_area / slab_f < 0.5):
+                out.append(dict(severity="major", check="building_footprint_vs_slab",
+                                drawing="general-arrangement",
+                                detail=f"the drawn building envelope ≈{drawn_area:.0f} m² "
+                                       f"diverges from the ledger slab {slab_f:.0f} m² (>2×) — "
+                                       "the GA footprint must match the slab the BoM costs",
+                                fix_hint="drawing_building_envelope.building_bbox must derive "
+                                         "the GA/HVAC footprint from the ledger slab area"))
+    return out
+
+
 # ───────────────────────────────── main ────────────────────────────────────
 
 DRAWINGS = ["general-arrangement", "single-line-diagram", "pid", "hvac-layout",
@@ -392,7 +492,8 @@ def main() -> int:
     # cross-drawing checks (computed once, attributed to a home drawing)
     cross = (check_naming_consistency(per_svg_texts)
              + check_instrument_density(per_svg_texts, state, conn)
-             + check_hvac_coverage(per_svg_texts))
+             + check_hvac_coverage(per_svg_texts)
+             + check_ledger_discipline_enumeration(per_svg_texts, state))
 
     per_drawing = []
     for key in DRAWINGS:

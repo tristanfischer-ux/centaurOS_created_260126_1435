@@ -196,6 +196,8 @@ class ControlLoop:
     controller_tag: str          # the controller bubble, e.g. 'AC' / 'LC'
     label: str = ""              # short loop label, e.g. 'DO control' / 'level → make-up'
     dst_valve_tag: str = ""      # final control element tag at the destination, e.g. 'FCV'
+    dst_fail_open: bool = False   # the final valve fails OPEN on power/air loss (life-safety
+                                  # O₂ dosing valve, from the ledger o2_dosing_valve_fail_state)
 
 
 @dataclass
@@ -232,6 +234,10 @@ class Process:
     # the fail-open per-tank emergency-O₂ solenoid life-safety final element, as
     # (tag, qty), or None when the design carries none. Drawn on the DO culture-tank.
     emergency_o2: Optional[tuple] = None
+    # the dedicated emergency-O₂ supply rate (kg/h) + buffer (kg) from the ledger, annotated
+    # on the emergency-O₂ supply line so the life-safety O₂ path carries its real figures.
+    emergency_o2_supply_kg_h: float = 0.0
+    emergency_o2_buffer_kg: float = 0.0
     rev: str = "P1"              # preliminary revision (deterministic, not a live clock)
     date: str = ""               # issue date derived from the run's own artifact mtime
 
@@ -414,6 +420,23 @@ def _topology(state: dict):
         if isinstance(topo, list) and topo:
             return topo
     return []
+
+
+def _pid_quantity(state: dict, *keys):
+    """First matching contract-quantity VALUE (dict OR list form) across both contracts —
+    the same reader idiom the other generators use, for the life-safety O₂ figures."""
+    for ck in ("orchestratorContract", "engineeringContract"):
+        q = (state.get(ck) or {}).get("quantities")
+        if isinstance(q, dict):
+            for k in keys:
+                if k in q:
+                    v = q[k]
+                    return v.get("value") if isinstance(v, dict) else v
+        elif isinstance(q, list):
+            for item in q:
+                if item.get("key") in keys:
+                    return item.get("value")
+    return None
 
 
 def _iter_words(state: dict):
@@ -732,7 +755,36 @@ def _node_has_func(nd, func):
     return any(i.func == func for i in nd.instruments)
 
 
-def _synthesise_control_loops(nodes: dict, lines: list, placed_instr: set):
+def _o2_dosing_fail_open(state: dict) -> bool:
+    """True when the ledger marks the O₂ DOSING VALVE fail-state as FAIL-OPEN (the life-safety
+    final element drives open on power/air loss so the fish never lose oxygen). Reads the
+    contract o2_dosing_valve_fail_state (1 / 'fail_open' / 'open' = fail-open). Universal —
+    keyed on the canonical fail-state quantity, never a class. Default False (fail-closed)."""
+    for ck in ("orchestratorContract", "engineeringContract"):
+        q = (state.get(ck) or {}).get("quantities")
+        v = None
+        if isinstance(q, dict):
+            for k in ("o2_dosing_valve_fail_state", "oxygen_dosing_valve_fail_state",
+                      "o2_valve_fail_state", "do_control_valve_fail_state"):
+                if k in q:
+                    vv = q[k]
+                    v = vv.get("value") if isinstance(vv, dict) else vv
+                    break
+        if v is None:
+            continue
+        s = str(v).strip().lower()
+        if s in ("1", "fail_open", "fail-open", "failopen", "open", "fo", "true", "normally_open"):
+            return True
+        try:
+            if float(v) >= 1:
+                return True
+        except (TypeError, ValueError):
+            pass
+    return False
+
+
+def _synthesise_control_loops(nodes: dict, lines: list, placed_instr: set,
+                              o2_fail_open: bool = False):
     """Wire the two life-safety RAS control loops from the projected instruments to their
     final control elements, and put a flow transmitter (FT) on the MAIN recirculation line:
 
@@ -755,10 +807,13 @@ def _synthesise_control_loops(nodes: dict, lines: list, placed_instr: set):
     if do_node is not None:
         o2_dest = _find_node(nodes, _O2_DEST_RE, exclude_keys={do_node.key})
         if o2_dest is not None:
+            # the O₂ dosing final valve fails OPEN when the ledger says so (life-safety: the
+            # valve drives open on power/air loss so dissolved oxygen is never starved).
             loops.append(ControlLoop(
                 src_key=do_node.key, dst_key=o2_dest.key,
                 measure_tag="AT", controller_tag="AC",
-                label="DO control", dst_valve_tag="FCV"))
+                label="DO control", dst_valve_tag=("FCV (FO)" if o2_fail_open else "FCV"),
+                dst_fail_open=o2_fail_open))
 
     # --- level → make-up-water loop ---
     if lvl_node is not None:
@@ -1534,8 +1589,10 @@ def reconstruct_process(schedule: dict, state: dict,
             power_note = power_note  # service folded into the SLD; keep the P&ID note short
 
     # ---- CONTROL LOOPS: wire the life-safety DO→O2 + level→make-up loops + a main-line
-    #      FT from the projected instruments to their final control elements. ----
-    control_loops = _synthesise_control_loops(nodes, lines, placed_instr)
+    #      FT from the projected instruments to their final control elements. The O₂ dosing
+    #      final valve is drawn FAIL-OPEN when the ledger marks it so (life-safety). ----
+    control_loops = _synthesise_control_loops(nodes, lines, placed_instr,
+                                              o2_fail_open=_o2_dosing_fail_open(state))
 
     # ---- ANCILLARY / PACKAGED-SYSTEM + FIELD-DEVICE register: project every principal BoM
     #      item the topology spine omitted (synthesised life-support systems, the per-tank
@@ -1556,7 +1613,13 @@ def reconstruct_process(schedule: dict, state: dict,
                    power_note=power_note, notes=notes,
                    schedule_present=bool(schedule.get("rows")),
                    control_loops=control_loops, ancillaries=ancillaries,
-                   emergency_o2=_emergency_o2_final_element(state))
+                   emergency_o2=_emergency_o2_final_element(state),
+                   emergency_o2_supply_kg_h=float(
+                       _pid_quantity(state, "emergency_o2_supply_kg_h",
+                                     "emergency_oxygen_supply_kg_h") or 0.0),
+                   emergency_o2_buffer_kg=float(
+                       _pid_quantity(state, "emergency_o2_buffer_kg",
+                                     "emergency_oxygen_buffer_kg") or 0.0))
 
 
 def _attach_instruments(nodes: dict, instr_funcs: set):
@@ -2201,8 +2264,11 @@ def _draw_control_loops(svg, proc, centre, ports, band_y):
         svg.add(f'<path d="M {cx_ctrl + 13:.1f} {rail_y:.1f} L {riser_x:.1f} {rail_y:.1f} '
                 f'L {riser_x:.1f} {dbot + 18:.1f}" fill="none" stroke="{ACCENT}" '
                 f'stroke-width="1.1" stroke-dasharray="4,3" marker-end="url(#sig)"/>')
-        # final control valve on the destination's feed
-        _sym_valve(svg, riser_x, dbot + 12, kind="control")
+        # final control valve on the destination's feed — drawn FAIL-OPEN (solenoid + FO
+        # action) when the ledger marks this dosing valve fail-open (life-safety), else a
+        # plain modulating control valve.
+        _sym_valve(svg, riser_x, dbot + 12,
+                   kind="failopen" if getattr(lp, "dst_fail_open", False) else "control")
         if lp.dst_valve_tag:
             svg.text(riser_x + 11, dbot + 10, lp.dst_valve_tag, size=7.5, anchor="start",
                      fill=MUTED)
@@ -2235,6 +2301,24 @@ def _draw_emergency_o2_final_element(svg, proc, centre, ports):
     vx, vy = sx, ry
     svg.line(sx, sw_y + 13, vx, vy - 8, stroke=INK, width=1.1, dash="4,3")  # trip signal
     _sym_valve(svg, vx, vy, kind="failopen")
+    # DEDICATED EMERGENCY-O₂ SUPPLY LINE feeding the fail-open solenoid from the RIGHT (a
+    # separate buffered O₂ supply, distinct from the routine LOX dosing) — drawn as an
+    # incoming process line with an off-page supply connector + the supply rate / buffer the
+    # ledger carries, so the life-safety O₂ path is explicit on the sheet.
+    sup_x = vx + 64
+    svg.add(f'<line x1="{sup_x:.1f}" y1="{vy:.1f}" x2="{vx + 8:.1f}" y2="{vy:.1f}" '
+            f'stroke="{PROC_INK}" stroke-width="1.6" marker-end="url(#flow)"/>')
+    _sym_offpage(svg, sup_x + 12, vy)
+    sup_bits = []
+    if getattr(proc, "emergency_o2_supply_kg_h", 0):
+        sup_bits.append(f"{proc.emergency_o2_supply_kg_h:g} kg/h")
+    if getattr(proc, "emergency_o2_buffer_kg", 0):
+        sup_bits.append(f"{proc.emergency_o2_buffer_kg:g} kg buffer")
+    if sup_bits:
+        svg.text(sup_x + 2, vy - 6, "emergency O₂ supply", size=6.4, anchor="middle",
+                 fill=MUTED)
+        svg.text(sup_x + 2, vy + 16, " · ".join(sup_bits), size=6.4, anchor="middle",
+                 fill=MUTED)
     # O₂ diffuser stub from the solenoid back into the tank (the bubble diffuser in the tank).
     svg.add(f'<line x1="{vx - 8:.1f}" y1="{vy:.1f}" x2="{rightx + 4:.1f}" y2="{vy:.1f}" '
             f'stroke="{PROC_INK}" stroke-width="1.6" marker-end="url(#flow)"/>')

@@ -58,6 +58,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+import drawing_building_envelope as _be  # noqa: E402  (ledger-slab building footprint)
 
 # Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
 # generate_ga() from the run's own artifacts so the title block is not a live
@@ -899,6 +900,39 @@ def _find_chrome():
 # ENTRY
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _load_state(out_dir: str, state_path: Optional[str]) -> dict:
+    """Load the archetype state.json (for the ledger slab area), or {} if absent."""
+    for c in ([Path(state_path)] if state_path else []) + [Path(out_dir) / "state.json"]:
+        if c and c.is_file():
+            try:
+                with open(c) as fh:
+                    return json.load(fh)
+            except Exception:
+                return {}
+    return {}
+
+
+def _apply_building_envelope(parts: list, bbox: dict, state: dict):
+    """Make the DRAWN building footprint match the LEDGER slab area (the #122 one-source
+    rule): when the ledger carries a floor-slab / building-footprint area, draw the building
+    at THAT area (not the equipment-placement bbox, which can be a long ribbon) and uniformly
+    scale every part INTO that envelope so the kit sits within walls that match the slab the
+    BoM costs. No-op (returns the inputs unchanged) for a design with no building slab — a
+    skid / turbine / satellite is untouched. Deterministic; universal."""
+    build_bb, tf = _be.building_bbox(state, bbox)
+    if build_bb is None:
+        return parts, bbox
+    for p in parts:
+        p.x0, p.y0 = tf(p.x0, p.y0)
+        p.x1, p.y1 = tf(p.x1, p.y1)
+        p.cx, p.cy = tf(p.cx, p.cy)
+        if p.x1 < p.x0:
+            p.x0, p.x1 = p.x1, p.x0
+        if p.y1 < p.y0:
+            p.y0, p.y1 = p.y1, p.y0
+    return parts, build_bb
+
+
 def generate_ga(out_dir: str, state_path: Optional[str] = None,
                 manifest_path: Optional[str] = None, rasterise_png: bool = True):
     """Full pipeline: load manifest → project → draw → write SVG (+ PNG)."""
@@ -906,6 +940,9 @@ def generate_ga(out_dir: str, state_path: Optional[str] = None,
     # deterministic title-block issue date from the run's own artifacts (set before draw).
     _ISSUE_DATE = _tb.issue_date(out_dir)
     parts, bbox, meta = load_manifest(out_dir, manifest_path)
+    # the building rectangle is derived from the LEDGER slab area, with equipment fitted
+    # inside it — so the GA envelope matches the slab the BoM costs (not the placement spread).
+    parts, bbox = _apply_building_envelope(parts, bbox, _load_state(out_dir, state_path))
     archetype = _archetype_name(out_dir, state_path)
     svg_text = build_ga_svg(parts, bbox, archetype, meta)
 
