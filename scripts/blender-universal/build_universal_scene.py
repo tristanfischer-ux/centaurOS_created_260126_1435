@@ -2362,6 +2362,33 @@ def _place_region(rparts, x_left, y_base, MAT, MO):
     BACK (highest Y), medium vessels in the MIDDLE, small instruments/cabinets
     in a grid at the FRONT (lowest Y). Each block 2D-shelf-packs so the bay
     grows in both X and Y. Returns the bay's used X-width (mm)."""
+    # ENVELOPE / SHELL parts — a floor slab, structural / portal frame, enclosure panel: a part
+    # whose plan footprint is BUILDING-SCALE (far larger in area or span than any process vessel).
+    # Shelf-packing them wraps each to its OWN row (each exceeds target_width), so a region of ~10
+    # shells strings into a ~400 m Y-column that shoves every following lane hundreds of metres
+    # back (the RAS structure_containment spread that drove every cross-plant run to ~500 m and the
+    # £3.1 M routed-connection cost). They physically OVERLAP — the slab is the floor the frame
+    # stands on, the roof spans the same plan — so CO-LOCATE them as ONE stacked envelope rather
+    # than shelf-packing. Universal — keyed on the plant-scale footprint, never a product class.
+    def _fp(p):
+        fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+        return fx, fy
+    # A SHELL is plant-scale by AREA (a floor slab / full enclosure ≥ 200 m²) OR is BOTH long
+    # AND wide (≥ 25 m × ≥ 6 m — a building frame / portal). The wide-AND-long test deliberately
+    # spares a long THIN process unit (a 25 m conveyor ~1-2 m wide) so it is never co-located.
+    envelope = [p for p in rparts
+                if p.shape not in _VESSEL_KIND                       # a mega-grid vessel is handled separately
+                and (_fp(p)[0] * _fp(p)[1] >= 200e6
+                     or (max(_fp(p)) >= 25000 and min(_fp(p)) >= 6000))]
+    if envelope:
+        env_w = max(_fp(p)[0] for p in envelope)
+        for p in envelope:
+            asm, anchors = build_part(p, x_left + env_w / 2.0, y_base, DECK_Z_MM, MAT, MO)
+            p.obj_anchor, p.anchors = asm, anchors
+            p.placed_xyz_mm = anchors["centre"]
+        rparts = [p for p in rparts if p not in envelope]
+        if not rparts:
+            return max(env_w, MIN_REGION_WIDTH_MM)
     big = [p for p in rparts if p.shape in BIG_SHAPES]
     small = [p for p in rparts if p.shape in FRONT_ROW_SHAPES]
     medium = [p for p in rparts if p not in big and p not in small]
