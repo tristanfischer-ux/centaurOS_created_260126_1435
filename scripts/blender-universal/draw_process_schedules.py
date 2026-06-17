@@ -294,9 +294,38 @@ def _phase_from(spec: dict, mechanism: str, service_blob: str) -> str:
     return "—"
 
 
-def _material_for(spec: dict, service_blob: str, mc: str) -> str:
-    """Pipe material / schedule.  Prefer a material called out in the mc / spec text, else
-    a sensible default by fluid (hydrogen / amine / slurry → stainless; steam → CS)."""
+def _normalise_material(raw: str) -> str:
+    """Humanise a route-manifest `material` value into a short line-list display token,
+    preserving the grade. 'HDPE/PE100 (water service)' → 'HDPE/PE100', '316L stainless
+    (oxidiser service)' → '316L', 'carbon steel (assumed)' → 'CS'. Returns '' when nothing
+    recognisable is present (caller then falls back to the fluid-based default)."""
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    head = re.split(r"\s*\(", s, maxsplit=1)[0].strip()  # drop the '(… service)' qualifier
+    m = re.search(r"\b(316L|316|304L|304|321|Duplex|2205|Inconel|Hastelloy|GRP|FRP|"
+                  r"HDPE(?:/PE\s?100)?|PE\s?100|MDPE|PVC-?U?|CPVC|PP|PVDF|PTFE.?lined|"
+                  r"GRE|rubber.?lined|titanium|cupronickel|copper.?nickel)\b", head, re.I)
+    if m:
+        return m.group(1).upper().replace(" ", "")
+    if re.search(r"carbon\s*steel|\bcs\b|a106|a53", head, re.I):
+        return "CS (A106 Gr.B)" if re.search(r"a106", head, re.I) else "CS"
+    if re.search(r"stainless", head, re.I):
+        return "316L"
+    return head[:18]
+
+
+def _material_for(spec: dict, service_blob: str, mc: str,
+                  manifest_material: str = "") -> str:
+    """Pipe material / schedule. PRIORITY: the route-manifest `material` field — that is the
+    LEDGER value (connection_sizing.corrosive_service_material set it: HDPE for water mains,
+    316L for LOX/ozone/oxidiser service, CS for air/inert). The drawing must print the ledger
+    material, never a fixed CS default. Only when the manifest carries no material (e.g. a
+    topology-spine line the manifest didn't enumerate) do we fall back to a material called
+    out in the mc/spec text, then a sensible default by fluid."""
+    led = _normalise_material(manifest_material)
+    if led:
+        return led
     blob = f"{spec.get('material_qty_desc') or ''} {mc} {service_blob}"
     m = re.search(r"\b(316L|316|304L|304|321|Duplex|2205|Inconel|Hastelloy|GRP|FRP|"
                   r"HDPE|MDPE|PVC|PTFE.?lined|rubber.?lined)\b", blob, re.I)
@@ -380,6 +409,13 @@ def build_line_list(proc, schedule: dict, state: dict,
     tag_of = {n.key: n.tag for n in proc.nodes}
     pid_sheet = "FF-PID-001"
 
+    # LEDGER material per line number, read from the route-manifest (the authoritative source —
+    # connection_sizing.corrosive_service_material wrote it). The line list MUST print this, not
+    # a fixed CS default, so HDPE water mains / 316L oxidiser lines render their real material.
+    mat_by_line = {l.get("line_number"): l.get("material")
+                   for l in _load_route_lines(out_dir)
+                   if l.get("line_number")}
+
     rows: list[LineRow] = []
     seen_numbers: set = set()
     # proc.lines is in the SAME order as proc_topo (draw_pid builds it 1:1), so we can pair.
@@ -393,7 +429,7 @@ def build_line_list(proc, schedule: dict, state: dict,
         code = code_m.group(1) if code_m else ""
         fluid = _fluid_name(ln.from_key, mc, code)
         phase = _phase_from(spec, edge.get("mechanism") or "", svc_blob)
-        material = _material_for(spec, svc_blob, mc)
+        material = _material_for(spec, svc_blob, mc, mat_by_line.get(ln.number, ""))
         rating = _rating_for(spec, srow, edge)
         insulation = _insulation_for(phase, edge.get("mechanism") or "", svc_blob)
         seen_numbers.add(ln.number)
@@ -434,7 +470,7 @@ def build_line_list(proc, schedule: dict, state: dict,
             fluid=_fluid_name(frm, svc_raw, code),
             phase=phase,
             dn=dn,
-            material=_material_for({}, svc_blob, svc_raw),
+            material=_material_for({}, svc_blob, svc_raw, l.get("material", "")),
             rating="as-routed",
             insulation=_insulation_for(phase, mech, svc_blob),
             pid_ref=pid_sheet,
@@ -498,6 +534,11 @@ _VALVE_KINDS = [
     (re.compile(r"blanket(?:ing)?_valve|breather|blanketing.{0,20}(?:valve|regulator)|"
                 r"(?:valve|regulator).{0,20}breather|n2_blanket", re.I),
      "PV", "Blanketing / breather", "FO"),
+    # Solenoid on/off shut-off valve (e.g. the emergency-O₂ solenoid). A powered isolating
+    # device — its fail-action is read FROM the ledger (the emergency-O₂ solenoid is fail-open
+    # per its own text + o2_dosing_valve_fail_state=1); the FC here is only a default.
+    (re.compile(r"solenoid_valve|\bsolenoid\b|sov\b|on.?off_valve|shut.?off_solenoid", re.I),
+     "XV", "Solenoid shut-off", "FC"),
     (re.compile(r"isolation_valve|\bhv\b|hand_valve|ball_valve|gate_valve|manual_valve|"
                 r"isolat.{0,12}valve|valve.{0,12}isolat", re.I),
      "HV", "Manual isolation", "—"),
@@ -511,6 +552,99 @@ _VALVE_NOISE = re.compile(
     r"controller|logic_solver|\bplc\b|\bcpu\b|panel|detection|detector|monitor|"
     r"inerting_skid|n2_inerting|psa|membrane|generation|annunciator|"
     r"emergency_stop|e_stop|push.?button|\bhmi\b", re.I)
+
+
+# ── FAIL-ACTION from the LEDGER (universal — never a fixed default) ──────────────────
+# A valve's drawn fail-action is its LEDGER fail-state, not the kind's default. Two ledger
+# sources, in priority order:
+#   (1) the valve word's OWN text — the synthesiser states the safe failure mode in the
+#       form / rating_primary ('fail-open', 'energise-to-close', 'loss of power admits O₂';
+#       or 'fail-closed', 'spring-return closed', 'de-energise to close / isolate');
+#   (2) a contract '*_fail_state' quantity matched to the valve by SERVICE tokens — e.g.
+#       o2_dosing_valve_fail_state=1 (1 = fail-open). The O₂ dosing valves + the emergency-O₂
+#       solenoid are life-critical FAIL-OPEN; a fixed FC default is the divergence this fixes.
+# Universal across classes: the fail-state is read from the ledger, never hard-coded.
+_FAIL_OPEN_TEXT_RE = re.compile(
+    r"fail.?open|energise.?to.?close|energize.?to.?close|normally.?open|"
+    r"admits? (?:o₂|o2|oxygen)|power loss admits|loss of power admits", re.I)
+_FAIL_CLOSED_TEXT_RE = re.compile(
+    r"fail.?closed|fail.?close|energise.?to.?open|energize.?to.?open|normally.?closed|"
+    r"spring.?return closed|de.?energise.?to.?close|tight.?shutoff on trip", re.I)
+# Contract fail-state quantity keys → which valve SERVICE tokens they govern. Universal:
+# the key name carries the service ('o2_dosing_valve_fail_state' → an O₂ dosing valve).
+_FAIL_STATE_KEY_RE = re.compile(r"_fail_state$|_failsafe$|_fail_action$", re.I)
+
+
+def _fail_action_from_text(blob: str) -> str:
+    """'FO' / 'FC' from a valve's OWN ledger text, '' when it states neither. Fail-open is
+    checked first (it is the safety-critical, explicitly-stated mode)."""
+    if _FAIL_OPEN_TEXT_RE.search(blob or ""):
+        return "FO"
+    if _FAIL_CLOSED_TEXT_RE.search(blob or ""):
+        return "FC"
+    return ""
+
+
+def _collect_fail_state_quantities(state: dict) -> dict:
+    """{normalised_key: 'FO'|'FC'} for every contract '*_fail_state' quantity. A value of 1 /
+    'fail-open' / 'open' → FO; 0 / 'fail-closed' / 'closed' → FC. Read once per run."""
+    out = {}
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = ((state.get(ck) or {}).get("quantities") or {})
+        for k, v in qs.items():
+            if not _FAIL_STATE_KEY_RE.search(k):
+                continue
+            val = v.get("value") if isinstance(v, dict) else v
+            detail = (v.get("source_detail") or v.get("condition") or "") \
+                if isinstance(v, dict) else ""
+            verdict = ""
+            sval = str(val).strip().lower()
+            if _FAIL_OPEN_TEXT_RE.search(detail) or sval in ("1", "1.0", "open", "fail-open",
+                                                             "fo", "true"):
+                verdict = "FO"
+            elif _FAIL_CLOSED_TEXT_RE.search(detail) or sval in ("0", "0.0", "closed",
+                                                                 "fail-closed", "fc", "false"):
+                verdict = "FC"
+            if verdict:
+                out[k.lower()] = verdict
+        if out:
+            break
+    return out
+
+
+def _fail_action_from_contract(blob: str, fail_states: dict) -> str:
+    """Match a valve (by its service tokens) to a contract '*_fail_state' quantity and return
+    its FO/FC verdict, '' when none applies. The key's leading tokens (minus the trailing
+    'valve_fail_state') must all appear in the valve text — so o2_dosing_valve_fail_state
+    matches an 'O₂ dosing valve' but not an unrelated isolation valve."""
+    if not fail_states:
+        return ""
+    b = (blob or "").lower()
+    # normalise unicode O₂ → o2 so 'o2_dosing' matches 'O₂ dosing'.
+    b = b.replace("o₂", "o2").replace("₂", "2")
+    best = ("", 0)
+    for key, verdict in fail_states.items():
+        stem = re.sub(r"_(?:valve_)?(?:fail_state|failsafe|fail_action)$", "", key)
+        toks = [t for t in re.split(r"[_\s]+", stem) if len(t) >= 2
+                and t not in ("the", "valve", "on", "of", "system")]
+        if not toks:
+            continue
+        hits = sum(1 for t in toks if t in b)
+        if hits == len(toks) and hits > best[1]:
+            best = (verdict, hits)
+    return best[0]
+
+
+def _valve_fail_action(prefix: str, default_fail: str, cid: str, name: str,
+                       form: str, rating: str, fail_states: dict) -> str:
+    """The valve's fail-action read FROM the ledger (word text → contract fail-state), with
+    the kind's default only as the last resort. PSV/HV keep '—' (a relief / manual-isolation
+    valve has no powered fail-action). Universal: the drawn fail-action is the ledger value."""
+    if prefix in ("PSV", "HV"):
+        return "—"
+    blob = f"{cid} {name} {form} {rating}"
+    verdict = _fail_action_from_text(blob) or _fail_action_from_contract(blob, fail_states)
+    return verdict or default_fail
 
 
 def _parse_set_pressure(mods: dict, mc_text: str) -> str:
@@ -668,6 +802,8 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
     seen = set()
     used_lines: dict[str, int] = {}     # line number → how many valves already cite it
     vseq = 0
+    # LEDGER fail-states: every contract '*_fail_state' quantity → FO/FC (read once).
+    fail_states = _collect_fail_state_quantities(state)
     # walk in module order so PSV-201, PSV-202 … read top-to-bottom.
     for w, name, cid in _iter_words(state):
         blob = f"{cid} {name}"
@@ -704,6 +840,12 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
                 set_or_cv = "reg. + breather"
             else:
                 set_or_cv = "—"
+            # FAIL-ACTION FROM THE LEDGER (universal): the valve's OWN fail-state text, then a
+            # contract '*_fail_state' quantity, then the kind default. This is what makes the
+            # O₂ dosing valves (o2_dosing_valve_fail_state=1) + the emergency-O₂ solenoid print
+            # FO instead of the fixed FC default.
+            fail = _valve_fail_action(prefix, fail, cid, name, form,
+                                      mods.get("rating_primary", "") or "", fail_states)
             size = _valve_size_from(location, line_rows)
             rows.append(ValveRow(
                 tag=tag, vtype=vtype,
@@ -726,17 +868,19 @@ _INSTR_KINDS = [
      "AT", "Redox (ORP)", "Pt ORP electrode"),
     (re.compile(r"analy[sz]er|ndir|gas_analys|co2_analys|composition|chromatograph", re.I),
      "AT", "Composition", "NDIR analyser"),
-    (re.compile(r"level_transmitter|radar_level|level_sensor|level_gauge|displacer_level|"
-                r"\bradar\b", re.I),
+    (re.compile(r"instr_level|level_transmitter|level[_\s]?transmitter|radar_level|"
+                r"level_sensor|level_gauge|displacer_level|\bradar\b", re.I),
      "LT", "Level", "80 GHz radar"),
-    (re.compile(r"flow_transmitter|flow_?meter|coriolis|mag_flow|electromagnetic_flow|"
-                r"\bpromag\b|orifice", re.I),
+    (re.compile(r"instr_flow|flow_transmitter|flow[_\s]?transmitter|flow_?meter|"
+                r"flow[_\s]?meter|coriolis|mag_flow|electromagnetic_flow|\bpromag\b|orifice",
+                re.I),
      "FT", "Flow", "Electromagnetic"),
-    (re.compile(r"pressure_transmitter|rosemount.*pressure|pressure_sensor|"
-                r"pressure_gauge|coplanar|\b3051\b", re.I),
+    (re.compile(r"instr_pressure|pressure_transmitter|pressure[_\s]?transmitter|"
+                r"rosemount.*pressure|pressure_sensor|pressure_gauge|coplanar|\b3051\b", re.I),
      "PT", "Pressure", "Coplanar gauge / DP"),
-    (re.compile(r"temperature_transmitter|temp_transmitter|temp_probe|thermowell|"
-                r"thermocouple|itherm|\brtd\b|pt100|temperature_sensor|temperature_profile", re.I),
+    (re.compile(r"instr_temperature|temperature_transmitter|temperature[_\s]?transmitter|"
+                r"temp_transmitter|temp_probe|thermowell|thermocouple|itherm|\brtd\b|pt100|"
+                r"temperature_sensor|temperature_profile", re.I),
      "TT", "Temperature", "Pt100 + thermowell"),
 ]
 _INSTR_NOISE = re.compile(
@@ -821,6 +965,17 @@ def _instr_location(isa: str, cid: str, name: str, proc, line_rows) -> str:
     return "process-wide"
 
 
+def _instr_host_vessel(cid: str) -> str:
+    """The host vessel a per-vessel synth instrument sits on, from its cid
+    ('instr_level_on_rearing_tank_synth_word' → 'Rearing Tank'). '' when the cid carries no
+    'on_<vessel>' tell (then the per-instance location falls back to the ISA-convention one)."""
+    m = re.search(r"_on_([a-z0-9_]+?)(?:_synth)?(?:_word)?$", cid or "", re.I)
+    if not m:
+        return ""
+    host = re.sub(r"_+", " ", m.group(1)).strip()
+    return PID._humanise(host)
+
+
 def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
     rows: list[InstrRow] = []
     tag_seq: dict[str, int] = {}
@@ -839,10 +994,6 @@ def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
             mods = _mods(w)
             qty = _qty(mods)
             form = mods.get("form", "") or ""
-            # ISA tag in the 200 loop range to align with the line numbers
-            tag_seq[isa] = tag_seq.get(isa, 200) + 1
-            base_tag = f"{isa}-{tag_seq[isa]}"
-            tag = f"{base_tag} (×{qty})" if qty > 1 else base_tag
             # sensing type. PRIORITY: the engine's explicit `sensing_principle` modifier — that
             # principle is f(measured medium, phase), so it is medium-correct by construction (a
             # dissolved-O₂ analyser carries 'optical', NOT the NDIR the name-default would assign:
@@ -870,12 +1021,30 @@ def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
             service = (name or PID._humanise(cid))
             if mfr_pn:
                 service = f"{service} — {mfr_pn}"
-            rows.append(InstrRow(
-                tag=tag, isa=isa_label, service=_short(service, 56),
-                measured=measured, itype=_short(itype, 22),
-                location=_instr_location(isa, cid, name, proc, line_rows),
-                rng=rng, signal=_signal_from_form(form),
-                loop_ref="FF-PID-001"))
+            base_location = _instr_location(isa, cid, name, proc, line_rows)
+            host = _instr_host_vessel(cid)
+            # ENUMERATE the ledger's per-vessel instances (universal): a qty-N synthesised
+            # instrument is N physical transmitters, so it gets N consecutive ISA tags
+            # (LT-201..LT-210, TT-201..TT-210) — not one row carrying '(×N)'. Each instance
+            # locates to its own vessel (Rearing Tank-01..-10) when the cid names the host
+            # array; otherwise it inherits the ISA-convention location. ISA tags run in the
+            # 200 loop range to align with the line numbers.
+            n = qty if qty and qty > 0 else 1
+            sig = _signal_from_form(form)
+            for inst in range(1, n + 1):
+                tag_seq[isa] = tag_seq.get(isa, 200) + 1
+                tag = f"{isa}-{tag_seq[isa]}"
+                if n > 1 and host:
+                    loc = f"{host}-{inst:02d}"
+                elif n > 1:
+                    loc = f"{base_location} (#{inst} of {n})"
+                else:
+                    loc = base_location
+                rows.append(InstrRow(
+                    tag=tag, isa=isa_label, service=_short(service, 56),
+                    measured=measured, itype=_short(itype, 22),
+                    location=loc, rng=rng, signal=sig,
+                    loop_ref="FF-PID-001"))
             break
     return rows
 

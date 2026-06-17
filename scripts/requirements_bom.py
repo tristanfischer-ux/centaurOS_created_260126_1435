@@ -314,6 +314,97 @@ def _commodity_catalogue_cap(name: str, pn: str, gbp: float, cat_price):
     return (gbp, None)
 
 
+# ── BARE-COMMODITY HARD CEILING (council 2026-06-17, the marine-RAS mis-PIN) ──
+# The catalogue cap above needs a resolved catalogue price. But a mis-PINNED
+# commodity often has NONE — the structured PN lives only in partVerifications, or
+# the price came back £0, or the wrong-part-class label hides the real SKU (a TI
+# TMP451 temp IC labelled "Network Switch"; an MSP430 microcontroller at £752). For
+# those, a wrong-part-class label IS the signal: a bare IC / sensor IC / micro-
+# controller / connector / cable / I/O / small comms device CANNOT cost more than a
+# few hundred pounds unless it is a real field INSTRUMENT carrying a kW/duty rating.
+# This is a deterministic upper sanity bound by commodity sub-class, applied when a
+# commodity line has NO rating — so a mis-pin can never reach £752 / £9,406 even
+# when its catalogue price never resolves. Universal: keyed off the commodity NOUN,
+# no per-archetype table; a genuine rated instrument (carries kW/duty) is exempt.
+#
+# The ceiling targets the MICROELECTRONIC / bare-catalogue-component class ONLY —
+# NOT a genuine field INSTRUMENT (a process pH/ORP/RTD probe, an in-line analyser),
+# NOT mechanical process kit whose name merely contains a commodity token (a screw
+# CONVEYOR, a cable-TRANSIT frame, a feed HOPPER). It is a deliberately NARROW net
+# so it catches the mis-PIN (a TMP451 IC / MSP430 micro / MEMS DP-switch labelled as
+# a "Local Sensor" / "Network Switch" / "DP Switch") without ever re-pricing a real
+# instrument. Sub-class ceilings (UK 2026 generous upper bound):
+#   bare IC / microcontroller / sensor-IC / LED / diode / resistor / capacitor: £150
+#   connector / patch-lead / gland / fuse / push-button / indicator:           £300
+#   bare switch-IC / DP-switch / network-comms / I/O / gateway / signal cond.:  £500
+_COMMODITY_CEILING_TIERS = [
+    (re.compile(r"\bic\b|microcontroller|\bmcu\b|sensor[_ -]?ic|local[_ -]?sensor|"
+                r"\bled\b|\bdiode\b|\bresistor\b|\bcapacitor\b", re.I), 150.0),
+    (re.compile(r"\bconnector\b|\bplug\b|\bsocket\b|patch[_ -]?(?:cable|lead|cord)|"
+                r"\bjumper\b|cable[_ -]?gland|fuse[_ -]?holder|\bfuse\b|"
+                r"push[_ -]?button|indicator[_ -]?light", re.I), 300.0),
+    (re.compile(r"differential[_ -]?pressure[_ -]?switch|\bdp[_ -]?switch\b|"
+                r"network[_ -]?switch|ethernet[_ -]?switch|\bgateway\b|i/?o[_ -]?module|"
+                r"signal[_ -]?conditioner", re.I), 500.0),
+]
+# A BARE generic instrument noun ("Temperature Sensor", "Voltage Sensor") with NO
+# process/context qualifier is a catalogue commodity too (the mis-pinned RAS
+# Mitsubishi/TI sensor lines). But a QUALIFIED instrument ("reactor temperature
+# sensor", "in-line pH probe") is a genuine sized field instrument → NOT capped.
+_BARE_SENSOR_RE = re.compile(
+    r"^(?:temperature|voltage|current|level|flow|pressure)?[_ -]?sensor$", re.I)
+# Process / field-instrument context that EXEMPTS a line from the bare-commodity
+# ceiling — a real instrument (probe / analyser / transmitter) or mechanical process
+# kit whose name merely contains a commodity token (conveyor / transit / hopper /
+# screw-feeder / valve / pump). These are never bare micro-parts.
+_INSTRUMENT_OR_MECH_EXEMPT_RE = re.compile(
+    r"\bprobe\b|analy[sz]er|transmitter|\bgauge\b|\bmeter\b|"
+    r"conveyor|transit|hopper|feeder|\bscrew\b|\bvalve\b|\bpump\b|\bblower\b|"
+    r"\bframe\b|\bskid\b|\bpanel\b|\bcabinet\b|\bactuator\b|"
+    r"reactor|column|vessel|in[_ -]?line|process[_ -]?", re.I)
+
+
+def _commodity_ceiling(name: str):
+    """Hard upper-bound £ for a bare MICROELECTRONIC / catalogue-component line of
+    this NOUN, else None. A genuine field instrument (probe/analyser/transmitter) or
+    mechanical process kit whose name merely contains a commodity token (screw
+    conveyor, cable-transit frame, feed hopper) is EXEMPT. Deterministic, no class
+    table."""
+    nm = name or ""
+    if _INSTRUMENT_OR_MECH_EXEMPT_RE.search(nm):
+        return None
+    for rx, cap in _COMMODITY_CEILING_TIERS:
+        if rx.search(nm):
+            return cap
+    if _BARE_SENSOR_RE.match(nm.strip()):
+        return 500.0   # a bare unqualified sensor noun — a catalogue commodity
+    return None        # not a recognised bare micro-part → leave to other paths
+
+
+def _is_rated_instrument(md: dict, name: str = "", requirement: str = "") -> bool:
+    """True if the line carries a real kW/kVA power/duty rating — a genuine sized
+    instrument/equipment, NOT a bare catalogue commodity. Such a line is EXEMPT
+    from the bare-commodity ceiling (its price is rating-driven, not catalogue)."""
+    kw, _ = _rating_kw(md if isinstance(md, dict) else {}, name, requirement)
+    return kw is not None and kw > 0
+
+
+def _apply_commodity_ceiling(name: str, md: dict, gbp: float, requirement: str = ""):
+    """Bound a bare-commodity line's price by its sub-class ceiling. Returns
+    (gbp, basis_suffix_or_None). No-op for a non-commodity noun, a rated
+    instrument (carries kW/duty), or a price already under the ceiling."""
+    if gbp is None or gbp <= 0:
+        return (gbp, None)
+    if _is_rated_instrument(md, name, requirement):
+        return (gbp, None)
+    cap = _commodity_ceiling(name)
+    if cap is not None and gbp > cap:
+        return (cap, f"commodity ceiling · capped at £{cap:,.0f} for a bare "
+                     f"{name.strip().lower()} (was £{gbp:,.0f}; no kW/duty rating — "
+                     f"a catalogue part, not a bespoke instrument)")
+    return (gbp, None)
+
+
 def _unit_operation_price(name: str, md: dict, q):
     """Per-UNIT-OPERATION parametric for a process unit the catalogue couldn't pin
     (council 2026-06-16, the £12,300 copy-paste-stub fix). The old code gave Protein
@@ -451,6 +542,90 @@ def _rating_kw(md: dict, name: str = "", requirement: str = ""):
     is_kva = bool(_KVA_NOUN_RE.search(name)) or unit.lower() == "kva" \
         or bool(re.search(r"\bkVA\b", blob))
     return (val, is_kva)
+
+
+# ── MOTOR-NAMEPLATE DISPLAY RULE (council 2026-06-17, marine RAS) ──
+# A motor-driven rotating-equipment line (pump / blower / compressor / fan) must
+# show its MOTOR NAMEPLATE kW — the procurable IEC frame an engineer orders — NOT
+# the hydraulic / shaft power. The RAS recirc pump rendered "Circulation Pump · 94
+# kW" (= recirc_pump_power_kw, the hydraulic/shaft duty) while the motor nameplate
+# is recirc_pump_motor_kw = 132 kW; procurement would buy the wrong frame. The
+# contract carries the nameplate as a `*_motor_kw` quantity paired with the shaft
+# `*_power_kw` (or `*_shaft_kw` / `*_hydraulic_power_kw`). Universal + deterministic:
+# the nameplate is adopted ONLY when (a) the line is a motor-driven noun, (b) it
+# already DISPLAYS a shaft rating, and (c) a `*_motor_kw` key exists whose paired
+# shaft sibling matches that displayed rating (the physics pairing) OR whose stem
+# matches the line's noun. Both (b)+(c) FAIL on an archetype whose pumps carry no
+# shaft rating and no shaft sibling (CO₂ / SAF) → those BoMs are byte-unchanged.
+_MOTOR_DRIVEN_NOUN_RE = re.compile(r"\bpump\b|\bblower\b|\bcompressor\b|\bfan\b", re.I)
+_SHAFT_SIBLING_SUFFIXES = ("_power_kw", "_shaft_power_kw", "_shaft_kw",
+                           "_hydraulic_power_kw", "_brake_power_kw")
+
+
+def _qnum(q, key):
+    """Numeric value of a contract quantity (handles the {value: N} wrapper), else None."""
+    if not isinstance(q, dict):
+        return None
+    v = q.get(key)
+    if isinstance(v, dict):
+        v = v.get("value")
+    return _num(v) if v is not None else None
+
+
+def _motor_nameplate_kw(name: str, shaft_kw, q):
+    """(nameplate_kw, shaft_kw) for a motor-driven line whose displayed rating is a
+    SHAFT/hydraulic kW that the contract pairs with a larger `*_motor_kw` nameplate,
+    else (None, None). Deterministic pairing, no per-class table:
+
+      1. PHYSICS PAIRING (primary) — find a `<stem>_motor_kw` key whose paired shaft
+         sibling (`<stem>_power_kw` / `_shaft_kw` / `_hydraulic_power_kw` …) equals the
+         line's displayed shaft rating (within 1%). This binds the nameplate to the
+         line by the engineering numbers, independent of wording.
+      2. NOUN-STEM fallback — if no sibling pairs, match a `*_motor_kw` stem token-wise
+         to the line's noun (e.g. 'Circulation Pump' / 'Recirc Pump' → recirc_pump).
+
+    Only returns a nameplate that is ≥ the shaft duty (a motor is never smaller than
+    the shaft power it drives) and actually LARGER (≥1% over), so an equal value is a
+    no-op (nothing to correct)."""
+    if not isinstance(q, dict) or shaft_kw is None or shaft_kw <= 0:
+        return (None, None)
+    if not _MOTOR_DRIVEN_NOUN_RE.search(name or ""):
+        return (None, None)
+    motor_keys = [k for k in q if k.endswith("_motor_kw")]
+    if not motor_keys:
+        return (None, None)
+
+    # 1) physics pairing — a motor key whose shaft sibling == this line's shaft rating
+    best = None
+    for mk in motor_keys:
+        stem = mk[: -len("_motor_kw")]
+        for suf in _SHAFT_SIBLING_SUFFIXES:
+            sib = _qnum(q, stem + suf)
+            if sib is not None and sib > 0 and abs(sib - shaft_kw) <= 0.01 * shaft_kw:
+                nameplate = _qnum(q, mk)
+                if nameplate and nameplate >= shaft_kw:
+                    best = nameplate if best is None else max(best, nameplate)
+    if best is not None and best > shaft_kw * 1.01:
+        return (best, shaft_kw)
+
+    # 2) noun-stem fallback — match the motor key's stem tokens to the line's noun
+    name_toks = set(re.findall(r"[a-z]+", (name or "").lower()))
+    # normalise a couple of common synonyms so 'circulation' matches 'recirc'
+    if "circulation" in name_toks or "circulating" in name_toks:
+        name_toks.add("recirc")
+    for mk in motor_keys:
+        stem = mk[: -len("_motor_kw")]
+        stem_toks = [t for t in re.split(r"[_\d]+", stem) if t]
+        # require the equipment-type token (pump/blower/compressor/fan) to coincide
+        type_tok = next((t for t in stem_toks if _MOTOR_DRIVEN_NOUN_RE.search(t)), None)
+        if not type_tok or type_tok not in name_toks:
+            continue
+        # and at least one descriptive stem token present in the line's noun
+        if any(t in name_toks for t in stem_toks if t != type_tok) or len(stem_toks) == 1:
+            nameplate = _qnum(q, mk)
+            if nameplate and nameplate > shaft_kw * 1.01:
+                return (nameplate, shaft_kw)
+    return (None, None)
 
 
 def _rated_equipment_cost(name: str, kw: float, is_kva: bool):
@@ -688,6 +863,62 @@ def _selftest() -> int:
     g, b = _commodity_catalogue_cap("Circulation Pump", "GRUNDFOS-NB-100", 65000.0, 1.40)  # not a commodity noun
     if not (abs(g - 65000.0) < 0.01 and b is None):
         print(f"  FAIL rated kit wrongly treated as commodity: £{g} ({b})"); bad += 1
+
+    # ── MOTOR-NAMEPLATE DISPLAY (council 2026-06-17, marine RAS) — a motor-driven
+    # line shows its MOTOR nameplate kW, not the shaft/hydraulic duty. Fires only
+    # when the line already shows a shaft rating AND the contract pairs it (by the
+    # shaft sibling OR the noun stem) with a larger `*_motor_kw`. No-op otherwise —
+    # the CO₂/SAF byte-identical guarantee depends on this.
+    _qm = {"recirc_pump_power_kw": {"value": 94}, "recirc_pump_motor_kw": {"value": 132}}
+    np, sh = _motor_nameplate_kw("Circulation Pump", 94.0, _qm)        # physics pairing
+    if not (np == 132 and sh == 94):
+        print(f"  FAIL pump motor nameplate not adopted: nameplate={np} shaft={sh}"); bad += 1
+    np2, _ = _motor_nameplate_kw("Recirc Pump", 94.0, _qm)            # noun-stem path
+    if np2 != 132:
+        print(f"  FAIL recirc-pump nameplate (noun stem) not adopted: {np2}"); bad += 1
+    # a NON-motor noun (a tank) never adopts a motor nameplate
+    if _motor_nameplate_kw("Buffer Tank", 94.0, _qm)[0] is not None:
+        print("  FAIL non-rotating noun wrongly took a motor nameplate"); bad += 1
+    # a pump with NO shaft sibling + NO matching stem (CO₂/SAF shape) is a NO-OP
+    if _motor_nameplate_kw("Slurry Pump", 5.0, {"mea_pump_motor_kw": {"value": 0.75}})[0] is not None:
+        print("  FAIL unmatched motor key wrongly adopted (would break CO₂/SAF identity)"); bad += 1
+    # a motor nameplate that is NOT larger than the shaft (equal) is a no-op
+    if _motor_nameplate_kw("Feed Pump", 5.0,
+                           {"feed_pump_power_kw": {"value": 5}, "feed_pump_motor_kw": {"value": 5}})[0] is not None:
+        print("  FAIL equal motor==shaft wrongly substituted"); bad += 1
+
+    # ── BARE-COMMODITY HARD CEILING (council 2026-06-17, the marine-RAS mis-PIN) —
+    # a bare IC / sensor-IC / microcontroller / comms / I/O line with NO kW/duty
+    # rating can't exceed its sub-class ceiling, EVEN when its catalogue price never
+    # resolves (the TMP451 labelled "Network Switch", the MSP430 at £752, the MEMS
+    # DP-switch at £9,406). A genuine process instrument (probe/analyser) or
+    # mechanical kit whose name merely contains a commodity token (screw conveyor,
+    # cable-transit frame) is EXEMPT — that exemption preserves the CO₂ archetype.
+    g, b = _apply_commodity_ceiling("Network Switch", {}, 752.0)       # MSP430 mis-pin → £500
+    if not (g == 500.0 and b):
+        print(f"  FAIL Network-Switch mis-pin not ceiling-capped: £{g} ({b})"); bad += 1
+    g, b = _apply_commodity_ceiling("Local Sensor", {}, 4390.0)        # TMP451 mis-pin → £150
+    if not (g == 150.0 and b):
+        print(f"  FAIL Local-Sensor mis-pin not ceiling-capped: £{g} ({b})"); bad += 1
+    g, b = _apply_commodity_ceiling("Differential-Pressure Switch", {}, 9406.0)  # Honeywell → £500
+    if not (g == 500.0 and b):
+        print(f"  FAIL DP-switch mis-pin not ceiling-capped: £{g} ({b})"); bad += 1
+    # EXEMPTIONS (these MUST stay uncapped — they are the CO₂ byte-identical cases):
+    if _apply_commodity_ceiling("reactor pH probe", {}, 4400.0)[1] is not None:
+        print("  FAIL real process probe wrongly ceiling-capped"); bad += 1
+    if _apply_commodity_ceiling("reactor temperature sensor", {}, 2200.0)[1] is not None:
+        print("  FAIL qualified process sensor wrongly ceiling-capped"); bad += 1
+    if _apply_commodity_ceiling("gypsum feed hopper + screw", {}, 9800.0)[1] is not None:
+        print("  FAIL screw-conveyor wrongly ceiling-capped (commodity-token false positive)"); bad += 1
+    if _apply_commodity_ceiling("cable transit frames", {}, 1920.0)[1] is not None:
+        print("  FAIL cable-transit frame wrongly ceiling-capped"); bad += 1
+    # a RATED instrument (carries kW/duty) is exempt — its price is rating-driven
+    if _apply_commodity_ceiling("Aeration Blower", {"rating_primary": "11"}, 10000.0)[1] is not None:
+        print("  FAIL rated blower wrongly ceiling-capped"); bad += 1
+    # a bare unqualified sensor noun (the mis-pinned Mitsubishi/TI sensor lines) IS capped
+    g, b = _apply_commodity_ceiling("Temperature Sensor", {}, 752.0)
+    if not (g == 500.0 and b):
+        print(f"  FAIL bare Temperature-Sensor mis-pin not capped: £{g}"); bad += 1
 
     # ── CLOSED-VESSEL CEILING — a small closed-vessel take-off can never reach the
     # absurd £1M-class value the prior council flagged on a ~7 m³ "UV reactor".
@@ -1096,6 +1327,7 @@ def assemble(out_dir: str):
     # real distributor price for the gate-21 >5× divergence preference below.
     price = {}
     dist_price = {}
+    pv_pn = {}        # the partVerification's OWN MPN (may differ from the word modifier)
     for v in (st.get("partVerifications") or []):
         wid = str(v.get("word_id") or "")
         if not wid:
@@ -1103,6 +1335,9 @@ def assemble(out_dir: str):
         dp = v.get("distributor_price_gbp")
         if isinstance(dp, (int, float)) and dp > 0:
             dist_price[wid] = float(dp)
+        vpn = str(v.get("part_number") or "").strip()
+        if vpn:
+            pv_pn[wid] = vpn
         p = (v.get("cost_repair_corrected_price_gbp")
              or v.get("price_estimate_gbp")
              or v.get("distributor_price_gbp"))   # bridge: keep the verified distributor price
@@ -1150,8 +1385,23 @@ def assemble(out_dir: str):
                 size = md.get("dimension") or (f"{md.get('capacity')} m³" if md.get("capacity") else None)
                 conns = ", ".join(sorted(conns_by_tag.get(tag, []))) or None
                 parts_req = [name]
+                # MOTOR-NAMEPLATE DISPLAY (council 2026-06-17): a motor-driven line
+                # (pump/blower/compressor/fan) shows its MOTOR nameplate kW (the
+                # procurable IEC frame), not the hydraulic/shaft duty — so the recirc
+                # pump reads 132 kW (recirc_pump_motor_kw) not 94 kW (shaft). The shaft
+                # duty is kept as a secondary note. Fires ONLY when the line already
+                # shows a shaft rating AND the contract pairs it with a larger motor
+                # nameplate; a no-op (byte-identical) where neither holds.
+                shaft_note = None
+                if duty and (duty_u or "").lower() in ("kw", ""):
+                    nameplate, shaft = _motor_nameplate_kw(name, _num(duty), qcontract)
+                    if nameplate is not None:
+                        duty = f"{nameplate:g}"
+                        duty_u = "kW"
+                        shaft_note = f"{shaft:g} kW shaft"
                 if duty:
-                    parts_req.append(f"{duty} {duty_u or ''}".strip())
+                    parts_req.append(f"{duty} {duty_u or ''}".strip()
+                                     + (f" motor ({shaft_note})" if shaft_note else ""))
                 if size:
                     parts_req.append(size)
                 if conns:
@@ -1314,10 +1564,25 @@ def assemble(out_dir: str):
                 # (TMP451 £692→£1.40·3, MSP430, StarTech patch cable, Honeywell DP
                 # switch). Only fires on a commodity NOUN + structured PN + a known
                 # catalogue price — a bare descriptor with no catalogue match is left
-                # to the rating model / floor, never a fixed inflated number. ──
-                capped_gbp, cap_basis = _commodity_catalogue_cap(name, pn, gbp, dist_price.get(wid))
+                # to the rating model / floor, never a fixed inflated number.
+                # The structured PN is taken from the word modifier, OR (when that is
+                # absent/TBD) from the partVerification's OWN MPN — a mis-PINNED line
+                # (e.g. "Network Switch" whose partVerif MPN is the MSP430 micro-
+                # controller) often carries the real SKU only in partVerifications. ──
+                cap_pn = pn if _is_structured_pn(pn) else (pv_pn.get(wid) or pn)
+                capped_gbp, cap_basis = _commodity_catalogue_cap(name, cap_pn, gbp, dist_price.get(wid))
                 if cap_basis is not None:
                     gbp, basis = capped_gbp, basis + " · " + cap_basis
+                # ── BARE-COMMODITY HARD CEILING (council 2026-06-17): a commodity
+                # IC / sensor IC / microcontroller / connector / cable / I/O / small
+                # comms line with NO kW/duty rating cannot exceed its sub-class ceiling
+                # — the safety net for a mis-PIN whose catalogue price never resolved
+                # (a temp IC labelled "Network Switch" can't reach £752; a Honeywell
+                # MEMS DP-switch can't reach £9,406). A genuine rated instrument is
+                # exempt. Universal: keyed off the commodity NOUN, no per-class table. ──
+                ceil_gbp, ceil_basis = _apply_commodity_ceiling(name, md, gbp, requirement)
+                if ceil_basis is not None:
+                    gbp, basis = ceil_gbp, basis + " · " + ceil_basis
                 # ── UNIVERSAL RATING-BASED RECONCILIATION (council 2026-06-16/17):
                 # any power-rated equipment line (pump/motor/VSD/blower/heat-pump/
                 # compressor/chiller/fan/genset/UPS …) whose price is absent, £0, or
@@ -1371,13 +1636,29 @@ def assemble(out_dir: str):
                     for i, (k, rp) in enumerate(zip(kids, raws), 1):
                         scaled = round(pl * rp / tot) if (pl > 0 and tot > 0) else round(rp)
                         kn = k.get("name_human") or "sub-component"
+                        kwid = str(k.get("id") or "")
+                        kmd = {m.get("kind"): m.get("value") for m in (k.get("modifier_characters") or [])}
+                        kpn = str(kmd.get("part_number") or "")
                         krat = next((f"{x.get('value')} {x.get('unit', '')}".strip()
                                      for x in (k.get("modifier_characters") or [])
                                      if x.get("kind") == "rating_primary"), "")
+                        kbasis = f"physics-sized component of {name}; scaled to parent cost"
+                        # BOUND the DISPLAYED commodity sub-component (the proportional
+                        # split re-inflates a capped weight back up to the parent share —
+                        # a TMP451 "Local Sensor" rescaled to £4,390). Cap the displayed
+                        # breakdown at ≤3× catalogue (partVerif MPN fallback) then at the
+                        # bare-commodity ceiling. line_gbp stays 0 → grand total unchanged.
+                        kcap_pn = kpn if _is_structured_pn(kpn) else (pv_pn.get(kwid) or kpn)
+                        kc, kcb = _commodity_catalogue_cap(kn, kcap_pn, float(scaled), dist_price.get(kwid))
+                        if kcb is not None:
+                            scaled, kbasis = round(kc), kbasis + " · " + kcb
+                        kce, kceb = _apply_commodity_ceiling(kn, kmd, float(scaled), krat)
+                        if kceb is not None:
+                            scaled, kbasis = round(kce), kbasis + " · " + kceb
                         rows.append({"tag": f"{tag}.{i}", "requirement": f"↳ {kn}" + (f" · {krat}" if krat else ""),
                                      "status": "SUB-COMPONENT", "part": "assembly detail", "qty": 1,
                                      "unit_gbp": scaled, "line_gbp": 0, "breakdown_gbp": scaled, "sub_of": tag,
-                                     "basis": f"physics-sized component of {name}; scaled to parent cost"})
+                                     "basis": kbasis})
     rows += _connection_rows(out_dir, qcontract)   # pipe/cable/duct runs as their own service-classified BoM lines (re-priced from contract duties)
     return rows
 

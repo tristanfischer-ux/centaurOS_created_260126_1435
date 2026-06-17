@@ -208,32 +208,52 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
 }
 
 // ── dimension synthesis (Blender- + renderer-parseable strings) ─────────────
-function cylinderFromVolumeM3(v: number, phrase = ''): string {
-  // Open process tanks/basins are WIDE + SHALLOW (a RAS rearing tank, a clarifier,
-  // an aeration basin, a buffer sump) — NOT silos. Universal, scale-aware depth
-  // BAND: target water depth grows gently with volume (≈0.4·V^⅓) but clamps to
-  // [1.5, 4] m — real open-tank practice across small sumps → large basins — and
-  // the diameter FOLLOWS from the volume (d = √(4V/(π·depth))). At 334 m³ that is
-  // ⌀12.4 × 2.8 m (h/d 0.22), a proper shallow rearing tank, not a ⌀9.5 × 4.7 m
-  // tower. Mass-transfer COLUMNS/TOWERS stay TALL (h ≈ 2.2·d); everything else is
-  // neutral (h ≈ d). Keyed on the device NOUN, so it is universal across classes.
+// CONTRACT-CANONICAL ⌀×H (#136, council 2026-06-16): the PRINTED diameter and height MUST
+// reproduce the vessel's contract volume — a reader (or the GA, or Blender) computing
+// π/4·⌀²·H has to get the stated capacity back. The old open-tank path sized ⌀ at the WATER
+// depth but printed the +15 % freeboard SHELL height, so the printed pair over-stated the
+// volume by the freeboard factor (⌀12.4 × 3.2 m → 386 m³ vs the contract's 334 m³, 15.6 %
+// off). We now choose a target aspect, ROUND the diameter to the printed 1-dp value, then
+// SOLVE the height from that printed diameter so π/4·⌀²·H = V (rounded to 1 dp it reproduces
+// V to within one rounding step). The freeboard story lives in the form prose, not in the
+// geometry triple — the (⌀, H, V) the BoM/GA/Blender read is now internally exact.
+//   · OPEN process tanks/basins (RAS rearing tank, clarifier, aeration basin, buffer sump)
+//     are WIDE + SHALLOW — target water depth grows gently with volume (≈0.4·V^⅓, clamped
+//     [1.5, 4] m), the diameter follows, then H is solved back from the rounded diameter.
+//   · Mass-transfer COLUMNS/TOWERS stay TALL (target h ≈ 2.2·⌀); everything else neutral
+//     (h ≈ ⌀). Keyed on the device NOUN, universal across classes, no `if class`.
+
+/** The single self-consistent (⌀, H) producer for a vessel of working volume V (m³): the
+ *  PRINTED, 1-dp-rounded pair reproduces V (π/4·⌀²·H ≈ V). Returns the rounded diameter +
+ *  height in metres so EVERY surface (dimension string, plan footprint, Blender) reads ONE
+ *  canonical triple. Universal — the aspect is chosen by the device noun, not the class. */
+function cylinderDimsForVolume(v: number, phrase = ''): { dia: number; ht: number } {
   const p = phrase.toLowerCase()
   const isOpenTank = /tank|basin|sump|pond|reservoir|clarifier|settl|lagoon|\bpit\b|\bcell\b|raceway|trough/.test(p)
   const isTower = /column|tower|stripper|scrubber|absorber|contactor|degasser/.test(p)
+  // Target diameter for the chosen aspect (before printing-rounding).
+  let dTarget: number
   if (isOpenTank) {
-    // WATER depth follows the scale-aware band; the diameter holds the WORKING
-    // volume v at that depth; the SHELL stands +15 % above the liquid line
-    // (freeboard — a tank never fills to the brim). The emitted dimension is the
-    // SHELL ⌀×height the BoM costs; the capacity modifier stays the working v. At
-    // 334 m³ → ⌀12.4 × 3.2 m (water 2.8 m + freeboard), h/d 0.26 — a shallow tank.
     const waterDepth = Math.min(4.0, Math.max(1.5, 0.4 * Math.cbrt(v)))
-    const d = Math.sqrt((4 * v) / (Math.PI * waterDepth))
-    const shellHeight = waterDepth * 1.15
-    return `${d.toFixed(1)} m dia x ${shellHeight.toFixed(1)} m`
+    dTarget = Math.sqrt((4 * v) / (Math.PI * waterDepth))
+  } else {
+    const a = isTower ? 2.2 : 1.0 // h ≈ a·d
+    dTarget = Math.cbrt((4 * v) / (a * Math.PI))
   }
-  const a = isTower ? 2.2 : 1.0
-  const d = Math.cbrt((4 * v) / (a * Math.PI))
-  return `${d.toFixed(1)} m dia x ${(a * d).toFixed(1)} m`
+  // Print the diameter at 1 dp, then SOLVE the height from that PRINTED diameter so the
+  // emitted pair reproduces V. Choose the 1-dp height that best reproduces V (floor / round
+  // / ceil), with a 1.0 m floor (a printed height never collapses below a metre).
+  const dia = Math.max(0.1, Math.round(dTarget * 10) / 10)
+  const hExact = v / ((Math.PI / 4) * dia * dia)
+  const candidates = [Math.floor(hExact * 10) / 10, Math.round(hExact * 10) / 10, Math.ceil(hExact * 10) / 10]
+    .map((h) => Math.max(1.0, h))
+  const ht = candidates.reduce((best, h) =>
+    Math.abs((Math.PI / 4) * dia * dia * h - v) < Math.abs((Math.PI / 4) * dia * dia * best - v) ? h : best)
+  return { dia, ht }
+}
+function cylinderFromVolumeM3(v: number, phrase = ''): string {
+  const { dia, ht } = cylinderDimsForVolume(v, phrase)
+  return `${dia.toFixed(1)} m dia x ${ht.toFixed(1)} m`
 }
 function boxFromRatingKw(kw: number): string {
   const side = Math.min(6, Math.max(0.6, 1.2 * Math.cbrt(kw / 100)))
@@ -246,11 +266,19 @@ function boxFromThroughputM3h(q: number): string {
   return `${mm}x${Math.round(mm * 0.85)}x${Math.round(mm * 1.1)} mm`
 }
 
+// Display a working volume so the printed CAPACITY stays consistent with the printed ⌀×H even
+// at small scale: integer truncation of a 1.3 m³ vessel to "1" would read 24 % off its own
+// ⌀1.2×1.1 ≈ 1.2 m³ dimension. Keep 1 dp below 100 m³ (where the rounding granularity bites),
+// integer at/above (a 334 m³ tank stays "334"). The contract value is the authoritative anchor;
+// this only governs its DISPLAY precision so the (⌀, H, V) triple reconciles at every scale.
+function formatCapacityM3(v: number): string {
+  return v < 100 ? String(Math.round(v * 10) / 10) : String(Math.round(v))
+}
 function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
   const add: ModifierCharacter[] = []
   if (g.volume !== undefined) {
     add.push(mod('dimension', cylinderFromVolumeM3(g.volume, g.phrase)))
-    add.push(mod('capacity', `${Math.round(g.volume)}`, 'm³'))
+    add.push(mod('capacity', formatCapacityM3(g.volume), 'm³'))
   } else if (g.area !== undefined) {
     add.push(mod('dimension', `${Math.round(g.area)} m² area`))
   } else if (g.power !== undefined) {
@@ -937,10 +965,35 @@ export function synthesizeActuation(modules: ModuleLike[], quantities: Record<st
     // modelled, so it has no host vessel to read a depth from).
     const isDegas = /degas|strip|scrub|\bvent|tower|column|contactor/.test(key)
     const dPkPa = isDegas ? 4 : Math.min(25, Math.max(8, (readParentPhysics(host ?? ({} as WordLike)).htM || 1.2) * 9.81))
-    const b = blowerFromAirFlow(each, dPkPa)
+    // ONE RATED VALUE PER DEVICE (council RAS fix, blower): if the contract declares a CANONICAL
+    // per-device rating for this service (`<service>_blower_kw`), USE it verbatim so every page
+    // reads the same kW — never re-derive a per-page value from the air flow × a host-depth-
+    // dependent dP (the cause of the 6/11/31 kW cross-page contradiction). The canonical key is
+    // matched by stem to this air-flow duty (degasser→degasser_blower_kw, biofilter aeration→
+    // aeration_blower_kw); fall back to the computed kW only when no canonical rating exists.
+    const canonicalBlowerKw = (() => {
+      for (const [bk, bv] of Object.entries(quantities)) {
+        if (!/_blower_kw$/.test(bk) || !(bv > 0)) continue
+        const bkStems = significantStems(bk.replace(/_blower_kw$/, ''))
+        const serviceMatch = isDegas
+          ? /degas|strip/.test(bk)
+          : (bkStems.some((s) => stemKey.includes(s)) || /aeration|aerator/.test(bk))
+        if (serviceMatch) return bv
+      }
+      return undefined
+    })()
+    const b = canonicalBlowerKw !== undefined
+      ? { kw: canonicalBlowerKw, gbp: blowerFromAirFlow(each, dPkPa).gbp }   // canonical rating, cost still from the duty
+      : blowerFromAirFlow(each, dPkPa)
     const dest = (host && findWordSubModule(modules, host)) || target
     if (!dest) continue
-    toAdd.push({ sm: dest, w: actuatorWord('blower', 'Aeration Blower', host, n,
+    // DISTINCT device name per service (council RAS fix, blower): a degassing blower and an
+    // aeration blower are DIFFERENT machines with different ratings — give them different names
+    // so two services with different (single) kW are not read as one device with conflicting
+    // values (the cross-page consistency audit clusters by noun phrase). Each service still
+    // carries ONE canonical kW; the names keep the two services apart.
+    const blowerName = isDegas ? 'Degassing Blower' : 'Aeration Blower'
+    toAdd.push({ sm: dest, w: actuatorWord('blower', blowerName, host, n,
       [mod('dimension', boxFromRatingKw(b.kw)), mod('rating_primary', `${Math.round(b.kw)}`, 'kW')], b.gbp,
       `Centrifugal ${isDegas ? 'degassing' : 'aeration'} blower, ${Math.round(each).toLocaleString('en-GB')} m³/h @ ~${Math.round(dPkPa)} kPa each${host ? `, serving ${host.name_human}` : ''}; ${n}× duty/assist`) })
   }
@@ -1035,9 +1088,18 @@ const UTILITY_SYSTEMS: UtilitySpec[] = [
   { key: 'bleed_drain', driver: (q) => { const mu = pickQ(q, /makeup_water_m3_h|make_up_water_m3_h/); return mu ? mu * 0.9 : undefined }, label: 'Bleed / Drain System', module: /mass_fluid|fluid|process|water|circulation/,
     size: (bl) => ({ dim: '', rating: [String(Math.round(bl * 10) / 10), 'm³/h'], gbp: Math.round(8000 + bl * 80) }),
     form: (bl) => `Continuous bleed + drain header: ~${Math.round(bl * 10) / 10} m³/h blowdown to hold water quality + an emergency drain-down route to the site discharge` },
-  { key: 'ventilation', driver: (q) => pickQ(q, /building_process_loss_kw|building_heat|building.*_kw/), label: 'Building Ventilation (HRV)', module: /environmental|hvac|climate|ventil/,
-    size: (kw) => { const m3h = (kw / (1.2 * 1.005 * 15)) * 3600; return { dim: boxFromThroughputM3h(m3h), rating: [String(Math.round(m3h)), 'm³/h'], gbp: Math.round(20000 + m3h * 4) } },
-    form: (kw) => `Heat-recovery ventilation: ~${Math.round((kw / (1.2 * 1.005 * 15)) * 3600).toLocaleString('en-GB')} m³/h supply + extract with a thermal wheel; clears building moisture / CO₂ off the water surface while retaining process heat` },
+  // The HRV is sized to the FULL ventilation SUPPLY FLOW the contract declares
+  // (`ventilation_supply_air_m3_h` — the air-change requirement of the hall), NOT to a flow
+  // back-inferred from the building-fabric loss (which undersized it to ~36% of the supply and
+  // left the ventilation make-up heating term un-honoured). The driver is therefore the supply
+  // airflow directly; it falls back to the old building-load→flow derivation for any class that
+  // declares a building heat load but no explicit supply airflow. Universal — keyed on the
+  // declared duty, not the class. `m3h` is already a flow, so size/form consume it as-is.
+  { key: 'ventilation',
+    driver: (q) => pickQ(q, /ventilation_supply_air_m3_h/) ?? (() => { const kw = pickQ(q, /building_process_loss_kw|building_heat|building.*_kw/); return kw ? (kw / (1.2 * 1.005 * 15)) * 3600 : undefined })(),
+    label: 'Building Ventilation (HRV)', module: /environmental|hvac|climate|ventil/,
+    size: (m3h) => ({ dim: boxFromThroughputM3h(m3h), rating: [String(Math.round(m3h)), 'm³/h'], gbp: Math.round(20000 + m3h * 4) }),
+    form: (m3h) => `Heat-recovery ventilation sized to the full ~${Math.round(m3h).toLocaleString('en-GB')} m³/h supply + extract (a parallel HRV bank where one unit cannot take the flow); clears building moisture / CO₂ off the warm open-water surface while recovering sensible heat from the extract` },
   // council round-1 (2026-06-16): a single genset+ATS leaves the PLC/DO-analysers/auto-dialler
   // dead for the ~10-15 s genset start after a mains failure — the plant is blind exactly when
   // it must alarm. A UPS / DC bus rides the controls + life-safety instrumentation through the
@@ -1443,6 +1505,226 @@ function canonFor(g: EquipGroup): CanonEquip {
   }
 }
 
+// ── SYNONYM-AWARE PRINCIPAL DEDUP (Tristan #136 "ONE part identity", council 2026-06-16) ────
+// THE WALL it removes (verified on out/ras-v10): the contract computes ONE recirculation pump
+// (`recirc_pump_power_kw = 94`, `recirc_pump_count = 8`) but the BoM carried it TWICE under
+// synonym names — a grounded emitter word "Circulation Pump" (94 kW × 8) AND the synthesised
+// "Recirc Pump" (94 kW × 8) — the SAME physical pump in the SAME recirc loop, doubling its
+// £526k. The principal reconcile's exact-id + stem-subset dedup misses this: "circulation"
+// (stem `circul`) and "recirc"/"recirculation" (stem `recir`) are DIFFERENT stems, so neither
+// claims the other, and one of the two isn't `_synthesized` so the reconcile skips it entirely.
+//
+// THE RULE (universal, no class table): two PRINCIPAL words collapse to one when they (a)
+// resolve to the SAME canonical ROLE (a general role-synonym map keyed on the device kind +
+// its function qualifier — circulation ≡ recirculation ≡ recirc for a PUMP; drum ≡ microscreen
+// for a FILTER) AND (b) carry a COMPATIBLE rating (within tolerance) AND a COMPATIBLE count.
+// All three must hold, so a make-up pump, a feed pump, a backwash pump (DIFFERENT role
+// qualifiers) or a differently-rated/​differently-counted pump are NEVER merged. The survivor
+// is the better-IDENTIFIED word (real catalogue MPN > priced > grounded-emitter > richer
+// modifier set); exactly ONE cost remains. BESS/SAF: a no-op when no two principals share a
+// role+rating. British spelling.
+
+// Canonical ROLE qualifiers: each maps a family of synonym tokens onto ONE canonical token, so
+// "circulation"/"recirc"/"recirculation" all key the SAME role while "makeup"/"feed"/"backwash"
+// stay distinct. ONLY synonyms of the SAME function belong in a set — never merge distinct duties.
+const ROLE_SYNONYMS: { canonical: string; tokens: string[] }[] = [
+  { canonical: 'recirc', tokens: ['recirc', 'recirculation', 'recirculating', 'circulation', 'circulating', 'circ'] },
+  { canonical: 'microscreen', tokens: ['microscreen', 'micro-screen', 'drumfilter', 'drum'] },
+  { canonical: 'transfer', tokens: ['transfer', 'conveyance'] },
+  { canonical: 'makeup', tokens: ['makeup', 'make-up', 'topup', 'top-up'] },
+  { canonical: 'booster', tokens: ['booster', 'boost'] },
+]
+// The DEVICE KIND nouns a role attaches to — the second half of the role key. A role only
+// collapses two words of the SAME kind (a recirc PUMP never merges with a recirc FAN). Shared
+// with DEVICE_NOUNS conceptually but kept explicit here so the role key is stable.
+const ROLE_DEVICE_KINDS = ['pump', 'filter', 'screen', 'blower', 'fan', 'compressor', 'mixer', 'separator', 'clarifier', 'exchanger']
+function normTok(t: string): string {
+  return t.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+function canonicalRoleToken(tok: string): string {
+  const n = normTok(tok)
+  for (const r of ROLE_SYNONYMS) if (r.tokens.some((s) => normTok(s) === n)) return r.canonical
+  return n
+}
+/** A word's ROLE SIGNATURE: `<canonical-role-qualifier>|<device-kind>` (e.g. recirc|pump),
+ *  or undefined when the name carries no device kind OR no recognised role qualifier — those
+ *  words are never synonym-merged (they fall to the normal id/stem reconcile). The qualifier
+ *  must be a KNOWN synonym (present in a ROLE_SYNONYMS set); a bare "Pump" with no qualifier,
+ *  or a unique qualifier (make-up, feed, backwash) that is its OWN role, yields its own key —
+ *  so only true synonyms ever collide. */
+function wordRoleTokens(w: WordLike): string[] {
+  const name = `${w.name_human ?? ''} ${w.content_character?.name_human ?? ''}`
+  return name.split(/[_\s]+/).map(normTok).filter(Boolean)
+}
+// Parse a word's role parts: the device KIND (the FIRST recognised device-kind token — that is
+// THE noun the role attaches to) + the canonical ROLE qualifier (the first KNOWN role-synonym
+// token). Returns undefined for either when absent. A SECOND device-kind token (e.g. "screen"
+// in "Drum Filter Screen", where "filter" is the kind) is NOT the kind — it stays a
+// distinguishing residual token, so it can't be stripped away into a false synonym.
+function roleParts(w: WordLike): { kind?: string; role?: string } {
+  const toks = wordRoleTokens(w)
+  const kind = ROLE_DEVICE_KINDS.find((k) => toks.includes(k))
+  let role: string | undefined
+  for (const t of toks) {
+    if (t === kind) continue
+    const c = canonicalRoleToken(t)
+    if (ROLE_SYNONYMS.some((r) => r.canonical === c)) { role = c; break }
+  }
+  return { kind, role }
+}
+function roleSignature(w: WordLike): string | undefined {
+  const { kind, role } = roleParts(w)
+  if (!kind || !role) return undefined
+  return `${role}|${kind}`
+}
+// The DISTINGUISHING residual: a word's significant tokens MINUS the ONE selected device-kind
+// token and MINUS every role-synonym token (the qualifiers a synonym is allowed to differ on).
+// Two words are the SAME physical item ONLY when they differ purely in the role-synonym word —
+// i.e. their residuals are EQUAL. This stops the OVER-MERGE of a "Drum Filter" (1670 m³/h ×8 —
+// the screen filters) with its "Drum Filter Backwash" (the low-flow backwash sub-system) and
+// "Drum Filter Screen" (the screen media): they share the `microscreen|filter` signature but the
+// distinguishing tokens "backwash" / "screen" survive in the residual (only the selected kind
+// "filter" is stripped, not the second-noun "screen"), so their residuals differ and they stay
+// separate. A genuine synonym pair (circulation pump ↔ recirc pump) has an EMPTY residual on both.
+function roleResidual(w: WordLike): string {
+  // DEDUPE first — the name_human + content_character.name_human pair usually repeats every
+  // token, so a single "Circulation Pump" contributes [circulation, pump] (not the doubled set
+  // that would leave a stray second "pump" in the residual). Then drop the selected device-kind
+  // token + every role-synonym token; what remains DISTINGUISHES the item.
+  const { kind } = roleParts(w)
+  const uniq = [...new Set(wordRoleTokens(w))]
+  const isRoleSyn = (t: string) => ROLE_SYNONYMS.some((r) => r.tokens.some((s) => normTok(s) === t))
+  const residual = uniq
+    .filter((t) => t !== kind && !isRoleSyn(t))
+    .filter((t) => t.length >= 3 && !STOP_STEMS.has(t.slice(0, 5)))
+    .map((t) => t.slice(0, 5))
+  return [...new Set(residual)].sort().join('|')
+}
+// Compatible rating: the principal duty matches within tolerance, comparing BOTH kW and the
+// volumetric throughput (so a 1670 m³/h filter never reads "compatible" with a 12 m³/h backwash
+// just because neither carries kW). Same kW within 12 % AND same throughput within 12 %; a duty
+// one side simply omits is compatible on THAT axis only (an emitter word may carry just one
+// rating), PROVIDED the role+kind already matched and the residual is equal.
+function ratingCompatible(a: WordLike, b: WordLike): boolean {
+  const pa = readParentPhysics(a)
+  const pb = readParentPhysics(b)
+  const within = (x: number, y: number) => { if (x <= 0 || y <= 0) return true; return Math.abs(x - y) / Math.max(x, y) <= 0.12 }
+  return within(pa.kw, pb.kw) && within(pa.m3h, pb.m3h)
+}
+// Compatible count: identical quantity (×8 vs ×8) — or one is ×1/absent (a single-line emitter
+// stand-in collapsing into the counted synthesised set). Differing real counts (×8 vs ×3) are
+// two DIFFERENT pump banks and must NOT merge.
+function countCompatible(a: WordLike, b: WordLike): boolean {
+  const qa = parentQty(a)
+  const qb = parentQty(b)
+  if (qa === qb) return true
+  return qa === 1 || qb === 1
+}
+// Better-identified survivor: a real catalogue MPN beats a placeholder; a priced line beats an
+// unpriced one; a grounded (non-_synthesized) emitter word beats a synthesised one; richer
+// modifier set breaks the final tie. Higher score wins.
+function identityScore(w: WordLike): number {
+  const mods = w.modifier_characters ?? []
+  const hasRealPn = !isPlaceholder(w)
+  const hasPrice = mods.some((m) => m.kind === 'price_estimate_gbp' && (parseFloat(String(m.value)) || 0) > 0)
+  const grounded = !isSynth(w)
+  return (hasRealPn ? 1000 : 0) + (hasPrice ? 100 : 0) + (grounded ? 10 : 0) + mods.length
+}
+
+/** Collapse same-role + same-rating + same-count PRINCIPAL synonyms to ONE word (keeping the
+ *  better-identified survivor + its children, dropping the rest + their orphaned sub-components).
+ *  Considers BOTH grounded emitter words and `_synthesized` principals (the duplicate spans the
+ *  two), but NEVER touches instruments / actuators / utilities / process / building / sub-
+ *  components. Mutates `modules` in place; returns the number of duplicate principals removed.
+ *
+ *  CANON RE-IDENTIFY: when a cluster's role matches a contract canon (e.g. the `recirc|pump`
+ *  signature ↔ the `recirc_pump` contract group), the survivor is RE-IDENTIFIED onto that
+ *  canon's id/name (keeping its richer modifiers — including a real catalogue MPN — but taking
+ *  the canonical identity + contract count/size). This is essential: it lets the downstream
+ *  principal reconcile CLAIM the survivor (exact-id match) instead of finding the canon
+ *  unowned and re-synthesising a fresh twin — which would re-introduce the duplicate. A
+ *  cluster whose role matches NO canon (an LLM pair the contract never sized) just keeps the
+ *  better-identified survivor verbatim. Universal + deterministic — role-synonym map, no class. */
+function collapseRoleSynonyms(modules: ModuleLike[], canons: CanonEquip[] = []): { removed: number; removedOrphanChildren: number; details: string[] } {
+  const out = { removed: 0, removedOrphanChildren: 0, details: [] as string[] }
+  // Map each contract canon to its (signature + residual) so a synonym cluster adopts the canon
+  // ONLY when it is the SAME item (same residual) — a backwash sub-item that shares the signature
+  // but has a different residual never adopts the principal canon.
+  const canonByKey = new Map<string, CanonEquip>()
+  for (const c of canons) {
+    const cw = { name_human: c.name, content_character: { name_human: c.name } }
+    const sig = roleSignature(cw)
+    if (sig && !canonByKey.has(`${sig}::${roleResidual(cw)}`)) canonByKey.set(`${sig}::${roleResidual(cw)}`, c)
+  }
+  type Owned = { word: WordLike; sm: { words?: WordLike[] } }
+  const bySig = new Map<string, Owned[]>()
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        if (isSubcomponent(w)) continue
+        if (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w) || isBuildingStructure(w)) continue
+        const sig = roleSignature(w)
+        if (!sig) continue
+        if (!bySig.has(sig)) bySig.set(sig, [])
+        bySig.get(sig)!.push({ word: w, sm })
+      }
+    }
+  }
+  for (const owned of bySig.values()) {
+    if (owned.length < 2) continue
+    // Within a role+kind signature, group into clusters that are the SAME physical item: an
+    // EQUAL distinguishing residual (differ only in the role-synonym word) AND a compatible
+    // rating AND a compatible count. Two words that share the role but carry a different
+    // residual (Drum Filter vs Drum Filter Backwash), a different duty, or a different real
+    // count are distinct machines and seed their OWN cluster — kept, never merged.
+    const clusters: Owned[][] = []
+    for (const o of owned) {
+      const c = clusters.find((cl) =>
+        roleResidual(cl[0].word) === roleResidual(o.word) &&
+        ratingCompatible(cl[0].word, o.word) &&
+        countCompatible(cl[0].word, o.word))
+      if (c) c.push(o)
+      else clusters.push([o])
+    }
+    for (const cl of clusters) {
+      if (cl.length < 2) continue
+      cl.sort((a, b) => identityScore(b.word) - identityScore(a.word))
+      const keep = cl[0]
+      const sigKey = `${roleSignature(keep.word)}::${roleResidual(keep.word)}`
+      // If the survivor lacks a real count but a dropped twin carried the contract count, lift
+      // that count onto the survivor so the merged line keeps the ×N the contract computed.
+      const keepQty = parentQty(keep.word)
+      const maxDupQty = Math.max(...cl.slice(1).map((o) => parentQty(o.word)))
+      if (keepQty <= 1 && maxDupQty > 1) {
+        mergeMods(keep.word, [mod('quantity', `×${maxDupQty}`)])
+      }
+      for (const dup of cl.slice(1)) {
+        const dupId = dup.word.id
+        const words = dup.sm.words ?? []
+        dup.sm.words = words.filter((w) => {
+          if (w === dup.word) return false
+          if (isSubcomponent(w) && dupId && (w.id ?? '').startsWith(`${dupId}__`)) { out.removedOrphanChildren += 1; return false }
+          return true
+        })
+        out.removed += 1
+        out.details.push(`collapsed synonym '${dup.word.name_human ?? dupId}' → '${keep.word.name_human ?? keep.word.id}' (role ${sigKey}, same residual+rating+count)`)
+      }
+      // Re-identify the survivor onto the matching contract canon (SAME signature AND residual)
+      // so the principal reconcile claims it (no re-synthesis). forceCanonIdentity keeps the
+      // survivor's non-spec mods (incl. its real MPN/manufacturer) and stamps the contract
+      // count/dimension/rating. No matching canon → keep the survivor's own identity verbatim.
+      const canon = canonByKey.get(sigKey)
+      if (canon) {
+        const oldId = keep.word.id
+        if (forceCanonIdentity(keep.word, canon)) {
+          rekeyChildren(keep.sm.words ?? [], oldId, canon.id)
+        }
+      }
+    }
+  }
+  return out
+}
+
 // Deterministic modifier set for a canonical equipment word, identical to synthWord's
 // (count + dimension + rating), but used to OVERWRITE a survivor's locked spec mods so
 // the count/size the contract computed always wins over an LLM edit.
@@ -1529,6 +1811,7 @@ export interface PrincipalReconcileResult {
   groups: number
   repaired: number // survivors whose identity/spec was corrected to contract truth
   removedDuplicates: number // extra synth copies of a contract group (LLM collisions/renames) dropped
+  removedSynonymDuplicates: number // same-role+rating+count synonyms collapsed to one (circulation≡recirc pump)
   removedInvented: number // _synthesized principals backed by NO contract group (LLM inventions) dropped
   removedOrphanChildren: number // sub-components of removed duplicates/inventions dropped
   synthesizedMissing: number // principal groups with NO surviving synth word, re-created
@@ -1554,7 +1837,7 @@ export function reconcilePrincipalEquipment(
   contract: ContractInProgress,
 ): PrincipalReconcileResult {
   const res: PrincipalReconcileResult = {
-    groups: 0, repaired: 0, removedDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, buildingResynthesised: 0, rehostedDependents: 0, removedDuplicateDependents: 0, details: [],
+    groups: 0, repaired: 0, removedDuplicates: 0, removedSynonymDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, buildingResynthesised: 0, rehostedDependents: 0, removedDuplicateDependents: 0, details: [],
   }
 
   const quantities: Record<string, number> = {}
@@ -1570,6 +1853,22 @@ export function reconcilePrincipalEquipment(
   // Map each synthesisable group to its canonical identity.
   const canons = principalGroups.map(canonFor)
   const freshlySynthesised: WordLike[] = [] // re-created principals → explode their sub-assemblies
+
+  // SYNONYM COLLAPSE (FIRST — #136 "ONE part identity"): collapse same-role + same-rating +
+  // same-count principal SYNONYMS to one BEFORE the canon-claim, so the SAME physical machine
+  // emitted under two synonym names (a grounded "Circulation Pump" + the synthesised "Recirc
+  // Pump", both 94 kW × 8 — the recirculation pump twice, doubling its £526k) is a single line.
+  // It re-identifies the better-identified survivor onto the matching contract canon (here
+  // `recirc_pump`) so the canon-claim below treats it as the verbatim survivor rather than
+  // finding the canon unowned and re-synthesising a fresh twin. A no-op when no two principals
+  // share a role+rating+count (BESS / SAF). The exact-id/stem reconcile that follows handles
+  // the `computed_*`-twin + LLM-rename duplicates as before.
+  {
+    const syn = collapseRoleSynonyms(modules, canons)
+    res.removedSynonymDuplicates += syn.removed
+    res.removedOrphanChildren += syn.removedOrphanChildren
+    res.details.push(...syn.details)
+  }
 
   // Assign every surviving top-level _synthesized word to its owning canon. The
   // principal-equipment SET is the contract's — exactly one word per synthesisable

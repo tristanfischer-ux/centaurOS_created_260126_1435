@@ -159,6 +159,57 @@ def _iter_words(state: dict):
                 yield w, (w.get("name_human") or ""), (cid or "")
 
 
+# ── LEDGER equipment quantities (the parts-manifest — same qty source the GA + P&ID use) ──
+# A powered load can carry a ledger QTY > 1 (e.g. recirc_pump_count = 8 → 8 pump feeders),
+# but the connection schedule emits ONE aggregate electrical edge per load name. The panel
+# must enumerate the ledger qty so the connected load + the breaker count reflect the real
+# plant — the divergence this fixes (one recirc-pump circuit shown for 8 × 132 kW motors).
+# Universal: keyed on the parts-manifest qty by equipment NAME, never a per-class table.
+def _load_equipment_qty(out_dir: Optional[str]) -> dict:
+    """{equipment_name_lower: qty} from <out>/parts-manifest.json for items with qty > 1.
+    Empty when no out_dir / no manifest (the panel then shows one way per electrical edge,
+    the prior behaviour)."""
+    if not out_dir:
+        return {}
+    try:
+        pm = json.loads((Path(out_dir) / "parts-manifest.json").read_text())
+    except Exception:
+        return {}
+    out: dict = {}
+    for p in (pm.get("parts") or []):
+        if not isinstance(p, dict):
+            continue
+        nm = (p.get("name") or "").strip().lower()
+        q = p.get("qty")
+        if nm and isinstance(q, (int, float)) and q > 1:
+            out[nm] = max(out.get(nm, 0), int(q))
+    return out
+
+
+def _ledger_qty_for(base: str, equip_qty: dict) -> int:
+    """The ledger qty for a circuit's destination load, matched on the equipment name. Tries
+    an exact name match, then a tokens-subset match (so 'Recirc Pump' matches a manifest
+    'Recirc Pump'); returns 1 when the ledger names no multiple. Universal — name-keyed."""
+    if not equip_qty:
+        return 1
+    b = re.sub(r"\s*[×x]\s*\d+\s*$", "", (base or "")).strip().lower()
+    if not b:
+        return 1
+    if b in equip_qty:
+        return equip_qty[b]
+    btoks = {t for t in re.split(r"[^a-z0-9]+", b) if len(t) >= 3}
+    if not btoks:
+        return 1
+    best = 1
+    for nm, q in equip_qty.items():
+        ntoks = {t for t in re.split(r"[^a-z0-9]+", nm) if len(t) >= 3}
+        # the circuit-name tokens must all be in the manifest name (so 'Recirc Pump' ⊆
+        # 'Recirc Pump', but a bare 'Pump' does not greedily grab the 8-off recirc pumps).
+        if btoks and btoks <= ntoks:
+            best = max(best, q)
+    return best
+
+
 def _word_fields(word: dict):
     """(manufacturer, part_number, rating_value) from modifier_characters."""
     mfr = pn = rating = ""
@@ -635,7 +686,8 @@ def _panel_derive_load_kw(name: str, state: dict) -> Optional[float]:
 # SCHEDULE RECONSTRUCTION
 # ═══════════════════════════════════════════════════════════════════════════
 
-def build_schedules(schedule: dict, state: dict) -> list[Panel]:
+def build_schedules(schedule: dict, state: dict,
+                    out_dir: Optional[str] = None) -> list[Panel]:
     """Group the electrical circuits into per-board panel schedules.
 
     Boards:
@@ -646,6 +698,9 @@ def build_schedules(schedule: dict, state: dict) -> list[Panel]:
     """
     rows = _electrical_rows(schedule)
     devices = extract_devices(state)
+    # LEDGER equipment quantities (parts-manifest) — so a circuit to an N-off load enumerates
+    # N feeders (8 recirc pumps), not one. Empty when no out_dir / manifest (prior behaviour).
+    equip_qty = _load_equipment_qty(out_dir)
     voltage_v, is_dc, phases, system = _board_voltage(state)
     # UNIVERSAL LV fallback: when the board voltage cannot be read or inferred (an AC
     # process plant whose state carries no explicit board voltage and no TP&N/1-ph cue in
@@ -695,7 +750,7 @@ def build_schedules(schedule: dict, state: dict) -> list[Panel]:
         main = _new_panel(main_hub, "main", state, voltage_v, is_dc, phases, system)
         main.supply = _supply_label(state, is_dc)
         main.busbar_a = _q(state, "bus_continuous_current_a")
-        _fill_circuits(main, main_hub, rows, devices, state)
+        _fill_circuits(main, main_hub, rows, devices, state, equip_qty)
         _set_incoming(main, main_hub, rows, schedule, state)
         panels.append(main)
 
@@ -711,7 +766,7 @@ def build_schedules(schedule: dict, state: dict) -> list[Panel]:
                                 else f"{sec_v:,.0f} V 1-phase + N"))
             sub.phases = 3 if (not is_dc and sec_v >= 380) else 1
         sub.supply = "Local sub-distribution (MV feeder → local step-down transformer)"
-        _fill_circuits(sub, sd, rows, devices, state)
+        _fill_circuits(sub, sd, rows, devices, state, equip_qty)
         _set_sub_incoming(sub, sd, rows, schedule, state)
         panels.append(sub)
 
@@ -973,10 +1028,17 @@ def _transformer_for(board_id: str, rows):
 
 # --- circuit grouping --------------------------------------------------------
 
-def _fill_circuits(panel: Panel, board_id: str, rows, devices, state):
+def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
+                   equip_qty: Optional[dict] = None):
     """Build the outgoing-circuit rows for a board: every row whose `from` is this board
     (excluding the internal '(busway)'/'(local busway)' pseudo-trunk and the transformer
-    rows).  Identical rack fan-out ways collapse to ONE row annotated '× N ways'."""
+    rows).  Identical rack fan-out ways collapse to ONE row annotated '× N ways'.
+
+    `equip_qty` ({equipment_name_lower: qty}, from the parts-manifest) lets a circuit to an
+    N-off load ENUMERATE its N feeders even when the connection schedule emitted one lumped
+    electrical edge for it — so 8 recirc pumps show as a ×8 way (per-way + total load), the
+    panel total reflecting the real connected load. Universal: the qty is the LEDGER qty."""
+    equip_qty = equip_qty or {}
     own = [r for r in rows
            if (r.get("from") == board_id) and r.get("role") != "transformer"]
     # group by (target_base, rating, size, role) so identical taps collapse.
@@ -1021,8 +1083,14 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state):
     for key in order:
         grp = groups[key]
         rep = grp[0]
-        ways = len(grp)
         base = key[0]
+        # WAYS = the larger of (a) the schedule's own fan-out rows and (b) the LEDGER qty for
+        # this load (parts-manifest). The connection schedule emits one lumped electrical edge
+        # per load name, so an 8-off pump set arrives as a single row; the ledger qty enumerates
+        # the real 8 feeders. Universal — the qty is read from the ledger, never assumed 1.
+        sched_ways = len(grp)
+        led_qty = _ledger_qty_for(base, equip_qty)
+        ways = max(sched_ways, led_qty)
         # circuit reference(s)
         if ways == 1:
             wn += 1
@@ -1040,7 +1108,12 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state):
         within = all((r.get("within_spec") is not False) for r in grp)
 
         desc = _describe_load(base, state)
-        kw = _connected_kw_for(base, design_a, panel, state, ways)
+        # PER-WAY connected kW. An AGGREGATE quantity (continuous_power_kw split across rack
+        # taps) is divided by the SCHEDULE fan-out (sched_ways) as before; a PER-UNIT figure
+        # (e.g. the requirementsBom 'Recirc Pump · 94 kW' read per pump) is already per-way and
+        # must NOT be divided again when the LEDGER qty expanded the ways. So the kW split uses
+        # sched_ways (the schedule's own duplication), and the total = per-way × the full ways.
+        kw = _connected_kw_for(base, design_a, panel, state, sched_ways)
         kw_total = (kw * ways) if kw is not None else None
 
         # LOAD-DERIVED SIZING (universal — every powered circuit sized from its OWN kW).
@@ -1784,7 +1857,7 @@ def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
     _ISSUE_DATE = _tb.issue_date(out_dir)
     schedule, state = load_inputs(out_dir, state_path)
     archetype = _archetype_name(state)
-    panels = build_schedules(schedule, state)
+    panels = build_schedules(schedule, state, out_dir)
 
     md = render_markdown(archetype, panels, schedule)
     # Always render the schedule sheet — even with zero recognised distribution boards

@@ -502,29 +502,86 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     (v) => `result=${v}`,
   ))
 
-  // ── A2. open process tanks size SHALLOW + WIDE with freeboard (not silos) ──
-  // Tristan 2026-06-15: a 334 m³ rearing tank must synthesise as a WIDE SHALLOW
-  // cylinder — water depth in [1.5,4] m via the scale-aware band, +15 % freeboard,
-  // h/d < 0.6 — NOT the old ⌀9.5×4.7 m (h/d 0.49, zero freeboard) that rendered as
-  // a silo + over-read the BoM. Universal: keyed on the tank NOUN + depth band, no
-  // per-class logic; the SAME synthesis the chain emits (applyUniversalContractSizing).
+  // ── A2. open process tanks size SHALLOW + WIDE, and the printed ⌀×H REPRODUCES the
+  // contract volume (contract-canonical (⌀,H,V) triple — #136, council 2026-06-16). A
+  // 334 m³ rearing tank must synthesise as a WIDE SHALLOW cylinder (diameter > height,
+  // depth in the [1.5,4] m band, h/d < 0.6 — NOT the old silo) AND, critically, the
+  // printed ⌀ and H must reproduce its 334 m³ capacity: π/4·⌀²·H ≈ V within one 1-dp
+  // rounding step (≤2 %). The OLD path printed the +15 % freeboard SHELL height while
+  // sizing the diameter for the water depth, so ⌀12.4×3.2 m read 386 m³ — 15.6 % above
+  // its own stated 334 m³ capacity, an inconsistency a chartered engineer rejects.
+  // Universal: keyed on the tank NOUN + depth band, no per-class logic; the SAME synthesis
+  // the chain emits + the Blender/BoM/footprint all read.
   const tankMods: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
   applyUniversalContractSizing(tankMods, contract, { synthesizeMissing: true, onlyUnsized: false, dedupeAndStrip: false })
   const tankWords = tankMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => sm.words || []))
   const rtWord = tankWords.find((w: any) => /rearing tank/i.test(String(w.name_human)))
   const rtDim = rtWord ? String((rtWord.modifier_characters || []).find((mc: any) => mc.kind === 'dimension')?.value ?? '') : ''
+  const rtCap = rtWord ? parseFloat(String((rtWord.modifier_characters || []).find((mc: any) => mc.kind === 'capacity')?.value ?? '0')) : 0
   const rtm = /([\d.]+)\s*m\s*dia\s*x\s*([\d.]+)\s*m/i.exec(rtDim)
   const rtD = rtm ? parseFloat(rtm[1]) : 0
   const rtH = rtm ? parseFloat(rtm[2]) : 0
+  const rtPrintedVol = (Math.PI / 4) * rtD * rtD * rtH
+  const rtConsErrPct = rtCap > 0 ? Math.abs(rtPrintedVol - rtCap) / rtCap * 100 : 999
   out.push(assertEq(
-    'UNIVERSAL.open_tank_shallow_wide_with_freeboard',
-    'a synthesised open process tank (334 m³ rearing tank) sizes SHALLOW + WIDE — diameter > height, water depth (shell/1.15) in [1.5,4] m, +15% freeboard, h/d < 0.6 — not a silo; this is the exact dimension the chain emits + the Blender/BoM read',
-    JSON.stringify({ rtDim, rtD, rtH, waterDepth: rtH ? +(rtH / 1.15).toFixed(2) : 0, hd: rtD ? +(rtH / rtD).toFixed(3) : 0 }),
+    'UNIVERSAL.open_tank_shallow_wide_and_dims_reproduce_volume',
+    'a synthesised open process tank (334 m³ rearing tank) sizes SHALLOW + WIDE (⌀ > H, depth in [1.5,4] m, h/d < 0.6) AND its printed ⌀×H reproduces its stated capacity: π/4·⌀²·H ≈ V within ≤2% (contract-canonical (⌀,H,V) triple) — not the old ⌀12.4×3.2 m that read 386 m³ vs 334',
+    JSON.stringify({ rtDim, rtCap, rtD, rtH, hd: rtD ? +(rtH / rtD).toFixed(3) : 0, printedVol: +rtPrintedVol.toFixed(1), consErrPct: +rtConsErrPct.toFixed(2) }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
-      return o.rtD > 10 && o.rtH > 0 && o.waterDepth >= 1.5 && o.waterDepth <= 4.0 && (o.rtH / o.rtD) < 0.6
+      return o.rtD > 10 && o.rtH >= 1.5 && (o.rtH / o.rtD) < 0.6 && o.rtCap > 0 && o.consErrPct <= 2.0
     },
-    () => `dim=${rtDim} D=${rtD} H=${rtH} h/d=${rtD ? (rtH / rtD).toFixed(3) : 0}`,
+    () => `dim=${rtDim} cap=${rtCap} h/d=${rtD ? (rtH / rtD).toFixed(3) : 0} printedVol=${rtPrintedVol.toFixed(1)} err=${rtConsErrPct.toFixed(2)}%`,
+  ))
+
+  // ── A2b. SYNONYM-AWARE principal dedup — ONE part identity (#136, council 2026-06-16). The
+  // SAME physical machine emitted under two synonym names (a grounded "Circulation Pump" + the
+  // synthesised "Recirc Pump", both 94 kW × 8 — the recirculation pump twice, doubling its
+  // £526k) must collapse to ONE principal, keeping the better-identified survivor (the real
+  // catalogue MPN) at the contract count. Genuinely-distinct items must NOT merge: a "Make-up
+  // Pump" (different role), and a "Drum Filter" vs its "Drum Filter Backwash"/"Drum Filter
+  // Screen" (same role-kind but distinct residual + duty) all survive. Universal — a general
+  // role-synonym map keyed on role+rating+count, no class table; reconcilePrincipalEquipment.
+  const synContract: any = { quantities: {
+    recirc_pump_power_kw: { value: 94, unit: 'kW' }, recirc_pump_count: { value: 8, unit: '' },
+    drum_filter_throughput_m3_h: { value: 1670, unit: 'm³/h' }, drum_filter_count: { value: 8, unit: '' },
+    drum_filter_backwash_flow_m3_h: { value: 12, unit: 'm³/h' },
+    makeup_pump_power_kw: { value: 15, unit: 'kW' },
+  } }
+  const synModules: any = [
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [
+      // the SAME recirc pump under two synonym names (one grounded w/ a real MPN, one synth)
+      { id: 'circulation_pump_word', name_human: 'Circulation Pump', content_character: { character_id: 'circulation_pump', name_human: 'Circulation Pump' }, modifier_characters: [ { kind: 'quantity', value: '×8' }, { kind: 'rating_primary', value: '94', unit: 'kW' }, { kind: 'manufacturer', value: 'Grundfos' }, { kind: 'part_number', value: 'NB-80' } ], _synthesized: true },
+      { id: 'recirc_pump_synth_word', name_human: 'Recirc Pump', content_character: { character_id: 'recirc_pump_synth', name_human: 'Recirc Pump' }, modifier_characters: [ { kind: 'quantity', value: '×8' }, { kind: 'rating_primary', value: '94', unit: 'kW' }, { kind: 'part_number', value: 'TBD (detailed design)' } ], _synthesized: true },
+      // a genuinely-DISTINCT pump (different role) — must NOT merge into the recirc pump
+      { id: 'makeup_pump_synth_word', name_human: 'Make-up Pump', content_character: { character_id: 'makeup_pump_synth', name_human: 'Make-up Pump' }, modifier_characters: [ { kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '15', unit: 'kW' }, { kind: 'part_number', value: 'TBD' } ], _synthesized: true },
+    ] } ] },
+    { module: 'water_treatment_system', sub_modules: [{ id: 'wt', words: [
+      // the drum filter + its distinct backwash + screen — same role-kind, distinct residual → all kept
+      { id: 'drum_filter_synth_word', name_human: 'Drum Filter', content_character: { character_id: 'drum_filter_synth', name_human: 'Drum Filter' }, modifier_characters: [ { kind: 'quantity', value: '×8' }, { kind: 'rating_primary', value: '1670', unit: 'm³/h' }, { kind: 'part_number', value: 'TBD' } ], _synthesized: true },
+      { id: 'drum_filter_backwash_synth_word', name_human: 'Drum Filter Backwash', content_character: { character_id: 'drum_filter_backwash_synth', name_human: 'Drum Filter Backwash' }, modifier_characters: [ { kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '12', unit: 'm³/h' }, { kind: 'part_number', value: 'TBD' } ], _synthesized: true },
+    ] } ] },
+  ]
+  const synRec = reconcilePrincipalEquipment(synModules, synContract)
+  const synTop = () => synModules.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._synthesized && !w._subcomponent)))
+  const recircPumps = synTop().filter((w: any) => /recirc|circulation/i.test(String(w.name_human)) && /pump/i.test(String(w.name_human)))
+  const recircSurv = recircPumps[0]
+  const recircQty = recircSurv ? String((recircSurv.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value ?? '') : ''
+  const recircMpn = recircSurv ? String((recircSurv.modifier_characters || []).find((mc: any) => mc.kind === 'manufacturer')?.value ?? '') : ''
+  const makeupPumps = synTop().filter((w: any) => /make-?up pump/i.test(String(w.name_human)))
+  const drumFilters = synTop().filter((w: any) => /^drum filter$/i.test(String(w.name_human)))
+  const drumBackwash = synTop().filter((w: any) => /drum filter backwash/i.test(String(w.name_human)))
+  const synRec2 = reconcilePrincipalEquipment(synModules, synContract) // idempotency
+  out.push(assertEq(
+    'UNIVERSAL.principal_synonym_dedup_one_identity',
+    'role-synonym principal dedup collapses the SAME machine under two synonym names (circulation pump ≡ recirc pump, 94 kW × 8) to ONE — keeping the better-identified (real-MPN) survivor at ×8 — while NOT merging a distinct-role make-up pump or a distinct-residual drum-filter backwash; idempotent',
+    JSON.stringify({ synonymRemoved: synRec.removedSynonymDuplicates, recircCount: recircPumps.length, recircQty, recircHasMpn: !!recircMpn, makeupCount: makeupPumps.length, drumCount: drumFilters.length, backwashCount: drumBackwash.length, idempotent: (synRec2.removedSynonymDuplicates ?? 0) === 0 }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.synonymRemoved >= 1 && o.recircCount === 1 && /×\s*8/.test(o.recircQty) && o.recircHasMpn &&
+        o.makeupCount === 1 && o.drumCount === 1 && o.backwashCount === 1 && o.idempotent
+    },
+    (v) => `result=${v}`,
   ))
 
   // ── A3. PROCESS INSTRUMENTATION synthesised from the contract's control variables ──
@@ -766,19 +823,22 @@ function checkRasHeatPumpNetSizing(): Assertion[] {
     const makeup = v('makeup_heating_kw'), rec = v('makeup_hex_recovery_kw'), res = v('residual_makeup_heating_kw')
     const bld = v('building_process_loss_kw'), net = v('heating_duty_kw'), hp = v('heat_pump_electrical_kw')
     const area = v('makeup_hex_area_m2'), cop = v('heat_pump_cop')
+    const vent = v('ventilation_heating_kw'), ventGross = v('ventilation_heating_gross_kw'), ventRec = v('ventilation_hrv_recovery_kw')
     out.push(assertEq(
       'RAS.heat_pump_sized_for_net_duty_after_makeup_hex',
-      'RAS heat-pump sized for NET duty (building loss + 15% residual make-up after an 85% make-up/bleed HEX), NOT building loss alone — fixes the 8× undersizing',
-      JSON.stringify({ makeup, rec, res, bld, net, hp, area, cop }),
+      'RAS heat-pump sized for NET duty = building loss + 15% residual make-up (post-85% HEX) + NET ventilation make-up heating (gross supply-air heating minus HRV recovery), NOT building loss alone — fixes the 8× undersizing AND the absent ventilation term',
+      JSON.stringify({ makeup, rec, res, bld, vent, ventGross, ventRec, net, hp, area, cop }),
       () =>
         Number.isFinite(makeup) && makeup > 900 &&                         // raw make-up duty ~1019 kW present
         Math.abs(rec - 0.85 * makeup) <= 2 &&                              // HEX recovers ~85%
         Math.abs(res - 0.15 * makeup) <= 2 &&                              // residual ~15%
-        net === bld + res &&                                               // net = building loss + residual (consistent)
+        Number.isFinite(vent) && vent >= 350 && vent <= 550 &&             // ventilation make-up heating now present (~435 kW)
+        Number.isFinite(ventGross) && Number.isFinite(ventRec) && vent === Math.max(0, ventGross - ventRec) && // net = gross − HRV recovery
+        net === bld + res + vent &&                                        // net = building loss + residual + ventilation (consistent)
         Math.abs(hp - Math.round(net / cop)) <= 1 &&                       // heat-pump electrical = net / COP
-        hp >= 80 && hp <= 115 &&                                           // ~96 kW (was ~41)
+        hp >= 190 && hp <= 240 &&                                          // ~220 kW (was ~96 before the ventilation term)
         Number.isFinite(area) && area > 0,                                 // HEX is a real BoM item with an area
-      () => `makeup=${makeup} rec=${rec} res=${res} bld=${bld} net=${net} hp=${hp} area=${area} cop=${cop}`,
+      () => `makeup=${makeup} rec=${rec} res=${res} bld=${bld} vent=${vent} (gross=${ventGross} hrv=${ventRec}) net=${net} hp=${hp} area=${area} cop=${cop}`,
     ))
   } catch (err) {
     out.push({ id: 'RAS.heat_pump_sized_for_net_duty_after_makeup_hex', description: 'RAS heat-pump net sizing', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
@@ -816,19 +876,38 @@ function checkRasFeedAndPumpReconciled(): Assertion[] {
     // FEED reconciliation: feed × 365 / 1000 ≈ annual_production × FCR (within 5%).
     const feed = v('daily_feed_kg'), prod = v('annual_production_t_yr'), fcr = v('feed_conversion_ratio')
     const tan = v('tan_load_kg_day'), o2 = v('oxygen_demand_kg_day'), solids = v('solids_load_kg_day'), bicarb = v('bicarbonate_dose_kg_day')
+    const o2Cone = v('oxygen_cone_supply_kg_day'), o2Aer = v('aeration_o2_transfer_kg_day'), o2SupplyKgH = v('oxygen_supply_kg_h')
     out.push(assertEq(
       'RAS.feed_is_production_throughput_single_source',
-      'daily_feed_kg = annual_production_t_yr × FCR × 1000 / 365 (production-throughput single source), NOT a fraction of standing biomass; feed×365/1000 ≈ prod×FCR within 5% and TAN/O2/solids/bicarbonate derive from it',
+      'daily_feed_kg = annual_production_t_yr × FCR × 1000 / 365 (production-throughput single source), NOT a fraction of standing biomass; feed×365/1000 ≈ prod×FCR within 5% and TAN/solids/bicarbonate + the TOTAL aerobic O2 demand (~1.0 kg/kg) derive from it',
       JSON.stringify({ feed, prod, fcr, tan, o2, solids, bicarb }),
       () =>
         Number.isFinite(feed) && Number.isFinite(prod) && Number.isFinite(fcr) &&
         Math.abs((feed * 365 / 1000) - (prod * fcr)) / (prod * fcr) <= 0.05 &&  // throughput identity
         feed > 600 && feed < 950 &&                                            // ~766 kg/day, NOT 2745
-        Math.abs(o2 - feed * 0.5) <= 1 &&                                      // O2 = 0.5/kg feed
+        Math.abs(o2 - feed * 1.0) <= 1 &&                                      // TOTAL aerobic O2 = ~1.0 kg/kg feed (fish + nitrification + heterotrophic)
         Math.abs(solids - feed * 0.6) <= 1 &&                                  // solids = 60% of feed
         Number.isFinite(tan) && tan > 15 && tan < 40 &&                        // first-principles TAN ~28
         Number.isFinite(bicarb) && bicarb >= 100 && bicarb <= 600,            // a few hundred kg/day, NOT 1291
       () => `feed=${feed} prod=${prod} fcr=${fcr} feed*365/1000=${(feed * 365 / 1000).toFixed(1)} prod*FCR=${(prod * fcr).toFixed(1)} tan=${tan} o2=${o2} solids=${solids} bicarb=${bicarb}`,
+    ))
+
+    // O2 MASS BALANCE CLOSES (council RAS fix, O2): the total aerobic demand is met across BOTH
+    // supply paths — cone/LOX supplementation + aeration/surface transfer — and supply ≥ demand.
+    // The LOX (oxygen_supply_kg_h) is sized to the CONE path only (not the total). Before this fix
+    // the contract used 0.5 kg/kg as the WHOLE demand and the LOX covered only ~50% of the true
+    // aerobic load.
+    out.push(assertEq(
+      'RAS.o2_balance_closes_across_supply_paths',
+      'total aerobic O2 demand = cone/LOX supplementation + aeration/surface transfer (supply paths sum ≥ demand); the LOX/PSA (oxygen_supply_kg_h × 24) is sized to the CONE path, NOT the total — the balance is explicitly closed',
+      JSON.stringify({ o2, o2Cone, o2Aer, o2SupplyKgH }),
+      () =>
+        Number.isFinite(o2) && Number.isFinite(o2Cone) && Number.isFinite(o2Aer) &&
+        (o2Cone + o2Aer) >= o2 - 1 &&                                          // supply paths cover the demand (balance closes)
+        Math.abs((o2Cone + o2Aer) - o2) <= 2 &&                               // the split is exhaustive (no unaccounted O2)
+        o2Cone > 0 && o2Aer > 0 &&                                            // BOTH paths carry real load
+        Number.isFinite(o2SupplyKgH) && Math.abs(o2SupplyKgH * 24 - o2Cone) <= 2, // LOX sized to the cone path, not the total
+      () => `total=${o2} cone=${o2Cone} aeration=${o2Aer} sum=${o2Cone + o2Aer} loxKgH=${o2SupplyKgH} (×24=${(o2SupplyKgH * 24).toFixed(0)})`,
     ))
 
     // PUMP reconciliation: motor ≥ shaft(power) ≥ hydraulic. A motor is NEVER < shaft.
@@ -917,6 +996,42 @@ function checkRasFeedAndPumpReconciled(): Assertion[] {
         Number.isFinite(saltMakeup) && saltMakeup > 0 &&                      // daily make-up emitted
         Math.abs(salin - 33) <= 1,                                            // 33 ppt kingfish seawater
       () => `saltKg=${saltKg} (${(saltKg/1000).toFixed(0)} t) makeup=${saltMakeup} sysVol=${sysVol} salinity=${salin}`,
+    ))
+
+    // CANONICAL BLOWER kW — ONE rated value per service (council RAS fix, blower): the aeration
+    // and degasser blowers each carry ONE deterministic kW in the contract so every downstream
+    // surface reads the same value (was 6/11/31 kW for the same device across pages, because the
+    // synthesiser re-derived kW from a host-depth-dependent dP). Invariant: both keys present,
+    // positive, DISTINCT (two different devices), and in a sane band.
+    const aerKw = v('aeration_blower_kw'), degKw = v('degasser_blower_kw')
+    out.push(assertEq(
+      'RAS.one_canonical_blower_kw_per_service',
+      'the contract emits ONE canonical rated kW per blower SERVICE — aeration_blower_kw (biofilter MBBR) and degasser_blower_kw (forced-draught) are distinct devices each with a single rating, so downstream surfaces cannot print 6/11/31 kW for the same blower',
+      JSON.stringify({ aerKw, degKw }),
+      () =>
+        Number.isFinite(aerKw) && aerKw > 0 && aerKw < 200 &&                  // aeration blower has a single sane rating
+        Number.isFinite(degKw) && degKw > 0 && degKw < 200 &&                  // degasser blower has a single sane rating
+        Math.abs(aerKw - degKw) > 0.5,                                         // two DIFFERENT devices, two different ratings
+      () => `aeration_blower_kw=${aerKw} degasser_blower_kw=${degKw}`,
+    ))
+
+    // VENTILATION MAKE-UP HEATING + HRV-to-supply (council RAS fix, ventilation + HRV): the
+    // contract declares the full mechanical-ventilation supply airflow (air-change requirement of
+    // the hall, ~100,000 m³/h) so the HRV is sized to the FULL flow (gap-4), and the net
+    // ventilation heating (gross − HRV recovery) is a real term folded into heating_duty (gap-2).
+    const ventAir = v('ventilation_supply_air_m3_h'), ventNet = v('ventilation_heating_kw')
+    const ventGross2 = v('ventilation_heating_gross_kw'), ventRec2 = v('ventilation_hrv_recovery_kw')
+    out.push(assertEq(
+      'RAS.ventilation_supply_airflow_and_makeup_heating_present',
+      'the contract declares the full ventilation SUPPLY airflow (~100,000 m³/h, the air-change requirement — the HRV is sized to THIS, not a building-loss-derived ~36% flow) and a NET ventilation make-up heating term (gross supply-air heating − HRV recovery) in the 350-550 kW band',
+      JSON.stringify({ ventAir, ventGross2, ventRec2, ventNet }),
+      () =>
+        Number.isFinite(ventAir) && ventAir >= 60_000 && ventAir <= 160_000 &&  // realistic full supply flow (~100k m³/h)
+        Number.isFinite(ventGross2) && ventGross2 >= 450 && ventGross2 <= 800 && // gross outdoor-air heating ~620 kW
+        Number.isFinite(ventRec2) && ventRec2 > 0 && ventRec2 < ventGross2 &&    // HRV recovers a positive fraction
+        Number.isFinite(ventNet) && ventNet >= 350 && ventNet <= 550 &&          // NET term ~435 kW, folded into heating_duty
+        ventNet === Math.max(0, ventGross2 - ventRec2),                          // net = gross − recovery
+      () => `ventAir=${ventAir} gross=${ventGross2} hrvRecovery=${ventRec2} net=${ventNet}`,
     ))
   } catch (err) {
     out.push({ id: 'RAS.feed_is_production_throughput_single_source', description: 'RAS feed reconciliation', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })

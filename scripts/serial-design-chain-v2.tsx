@@ -5567,6 +5567,7 @@ async function main() {
       console.error(
         `[chain] principal-equipment reconcile (deterministic, contract-keyed): ` +
           `${rec.groups} principal group(s); ${rec.repaired} identity repaired; ` +
+          `${rec.removedSynonymDuplicates} synonym duplicate(s) collapsed; ` +
           `${rec.removedDuplicates} LLM duplicate(s) + ${rec.removedInvented} invented principal(s) dropped ` +
           `(+${rec.removedOrphanChildren} orphan sub-parts); ${rec.synthesizedMissing} deleted principal(s) re-created; ` +
           `${rec.buildingResynthesised} building take-off line(s) re-derived to the final footprint.`,
@@ -5575,6 +5576,7 @@ async function main() {
         step: 'principal_equipment_reconcile',
         groups: rec.groups,
         repaired: rec.repaired,
+        removed_synonym_duplicates: rec.removedSynonymDuplicates,
         removed_duplicates: rec.removedDuplicates,
         removed_invented: rec.removedInvented,
         removed_orphan_children: rec.removedOrphanChildren,

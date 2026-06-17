@@ -106,6 +106,28 @@ def _distinct_instr_words(state):
     return seen
 
 
+def _expanded_instr_count(state):
+    """The qty-ENUMERATED instrument-instance count: Σ of each distinct instrument-family
+    word's ledger quantity. The instrument index enumerates per-vessel instances (a qty-10
+    level word → LT-201..LT-210), so the row count = Σ qty, not the distinct-word count."""
+    seen = set()
+    total = 0
+    for w, name, cid in PS._iter_words(state):
+        blob = f"{cid} {name}"
+        if PS._INSTR_NOISE.search(blob):
+            continue
+        for rx, isa, measured, _ty in PS._INSTR_KINDS:
+            if rx.search(blob):
+                key = (isa, measured, cid or name)
+                if key in seen:
+                    break
+                seen.add(key)
+                q = PS._qty(PS._mods(w))
+                total += q if q and q > 0 else 1
+                break
+    return total
+
+
 def _run_case(label, state_path, sched_candidates):
     import json
     state = json.load(open(state_path))
@@ -172,15 +194,20 @@ def _run_case(label, state_path, sched_candidates):
                f"{label}: line {r.number} tag mismatch "
                f"({r.frm_tag}->{r.to_tag} vs {exp_from}->{exp_to})")
 
-    # ── (4) VALVE / INSTRUMENT counts MATCH THE STATE (1 row per distinct word) ─
+    # ── (4) VALVE / INSTRUMENT counts MATCH THE STATE ─
+    # Valves collapse to one row per distinct valve-family word (qty shown as '(×N)' in the
+    # tag). Instruments ENUMERATE the ledger's per-vessel instances: a qty-N instrument word
+    # yields N consecutive ISA tags (LT-201..LT-210), so the row count = Σ qty over the
+    # distinct instrument words — the render-from-ledger enumeration rule.
     exp_valves = _distinct_valve_words(state)
     exp_instr = _distinct_instr_words(state)
+    exp_instr_rows = _expanded_instr_count(state)
     _check(len(sc.valves) == len(exp_valves),
            f"{label}: valve-list rows ({len(sc.valves)}) ≠ distinct valve-family "
            f"words in state ({len(exp_valves)})")
-    _check(len(sc.instruments) == len(exp_instr),
-           f"{label}: instrument-index rows ({len(sc.instruments)}) ≠ distinct "
-           f"instrument-family words in state ({len(exp_instr)})")
+    _check(len(sc.instruments) == exp_instr_rows,
+           f"{label}: instrument-index rows ({len(sc.instruments)}) ≠ Σ ledger-qty over "
+           f"distinct instrument-family words ({exp_instr_rows}; {len(exp_instr)} distinct)")
 
     # real ISA families used.
     vtags = {v.tag.split("-")[0] for v in sc.valves}
@@ -250,8 +277,9 @@ def _run_case(label, state_path, sched_candidates):
     _check(svg.count("<text") >= 40, f"{label}: implausibly few SVG cells")
 
     print(f"  PASS  (lines match P&ID exactly; valves {len(sc.valves)}={len(exp_valves)} "
-          f"words; instruments {len(sc.instruments)}={len(exp_instr)} words; "
-          f"valve fams {sorted(vtags)}; instr fams {sorted(itags)})")
+          f"words; instruments {len(sc.instruments)}=Σqty {exp_instr_rows} "
+          f"({len(exp_instr)} words); valve fams {sorted(vtags)}; "
+          f"instr fams {sorted(itags)})")
     if RASTER and summary.get("png"):
         print(f"  PNG  -> {summary['png']}")
     return summary

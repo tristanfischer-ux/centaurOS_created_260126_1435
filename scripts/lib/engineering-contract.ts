@@ -11696,8 +11696,9 @@ registerArchetype('e_fuel_synthesis', (brief: any) => {
 //     (≈ 5/8.15 × 204 ≈ 125 t/yr; ≈ 2,050 m³).
 //   - standing_biomass = total_tank_volume × 60 kg/m³ harvest density.
 //   - daily_feed ≈ 1.35% of standing biomass (1.2-1.5% band for grow-out kingfish).
-//   - TAN load ≈ 4% of feed (3-5% band); O2 demand ≈ 0.5 kg O₂/kg feed; solids ≈ 60%
-//     of feed.
+//   - TAN load ≈ 4% of feed (3-5% band); TOTAL aerobic O2 demand ≈ 1.0 kg O₂/kg feed
+//     (fish + nitrification + heterotrophic), met across cone/LOX supplementation (~0.5
+//     kg/kg) + aeration/surface transfer (the balance); solids ≈ 60% of feed.
 //   - recirculation_flow = 4 turnovers/h × total_tank_volume.
 //   - biofilter media volume = TAN_load ÷ ~0.35 kg TAN/m³/day (MBBR areal rate).
 //   - heating_duty = make-up heat (0.4% of recirc, 10→26.4 °C) + building/process
@@ -11792,8 +11793,34 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   //   (≈4% band), first-principles so the alkalinity → bicarbonate dose ties to it.
   const tanProteinFrac = 0.45, tanNFrac = 0.16, tanExcretionFrac = 0.50
   const tanLoadKgDay = Math.round(dailyFeedKg * tanProteinFrac * tanNFrac * tanExcretionFrac * 10) / 10  // ~27.6 kg/day
-  const o2PerKgFeed = 0.5                                   // 0.5 kg O₂/kg feed (brief)
-  const oxygenDemandKgDay = Math.round(dailyFeedKg * o2PerKgFeed)                // ~383 kg/day
+
+  // ── AEROBIC O₂ MASS BALANCE — close it across EVERY supply path (council RAS fix, O₂) ──
+  // PRECONDITION: a LIVE AEROBIC CULTURE (oxygen demand > 0). The TOTAL aerobic O₂ demand of
+  // a fed RAS is the sum of fish respiration + the MBBR's nitrification + heterotrophic
+  // oxidation — ~1.0 kg O₂/kg feed for a high-performance marine finfish system (Timmons &
+  // Ebeling give ~0.4-0.5 kg/kg for fish respiration ALONE; the biofilter + heterotrophs add
+  // roughly as much again). The OLD contract used 0.5 kg/kg as the WHOLE demand, but 0.5 is
+  // only the CONE/LOX SUPPLEMENTATION duty — the pure-O₂ the down-flow cones inject to lift DO
+  // above saturation at the tank inlet — so the balance was UNCLOSED: supply (16 kg/h cones ≈
+  // 384 kg/day) covered only ~50% of the true ~766 kg/day demand. We now state the SPLIT
+  // explicitly and make supply ≥ demand:
+  //   total_o2_demand = cone/LOX supplementation  +  aeration/surface transfer.
+  // UNIVERSAL: an aerobic culture's O₂ balance must close across ALL supply paths (high-purity
+  // oxygenation + atmospheric aeration/surface transfer); a plant with no aerobic culture
+  // (no oxygen demand) emits none of this. The two specific rates below are a justified split
+  // of the ~1.0 kg/kg total, not an arbitrary single rate.
+  const o2TotalPerKgFeed = 1.0                             // TOTAL aerobic demand: fish + nitrification + heterotrophic (marine finfish)
+  const o2ConePerKgFeed = 0.5                              // pure-O₂ cone/LOX SUPPLEMENTATION duty (DO lift above saturation) — sizes the LOX/PSA
+  const oxygenDemandKgDay = Math.round(dailyFeedKg * o2TotalPerKgFeed)           // TRUE total aerobic O₂ demand ~766 kg/day
+  // SUPPLY PATH 1 — high-purity oxygenation (down-flow O₂ cones fed from LOX + PSA). This is
+  // the demand ABOVE what atmospheric aeration can transfer (kingfish run DO at/above
+  // saturation, only achievable with injected pure O₂). It sizes the LOX/PSA system.
+  const oxygenConeSupplyKgDay = Math.round(dailyFeedKg * o2ConePerKgFeed)        // ~383 kg/day pure-O₂ from cones/LOX
+  // SUPPLY PATH 2 — atmospheric aeration + surface transfer (the balance): O₂ dissolved by the
+  // MBBR aeration grid, the counter-current packed-column air contact (the degasser re-aerates
+  // as it strips CO₂) and the open tank surface. This is what the aeration BLOWER must transfer,
+  // so the blower below is sized for it (gap: the aeration term must have a machine behind it).
+  const aerationO2TransferKgDay = Math.max(0, oxygenDemandKgDay - oxygenConeSupplyKgDay)  // ~383 kg/day via aeration/surface
   const solidsFracFeed = 0.60                               // solids ≈ 60% of feed
   const solidsLoadKgDay = Math.round(dailyFeedKg * solidsFracFeed)               // ~459 kg/day
 
@@ -11847,9 +11874,17 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const biofilterMediaVolumeM3 = Math.round((tanLoadKgDay / mbbrArealTanRateKgM3Day) * 10) / 10  // ~309 m³
   const mbbrFillFrac = 0.60                                 // 50-70% media fill → tank vol = media / fill
   const biofilterTankVolumeM3 = Math.round(biofilterMediaVolumeM3 / mbbrFillFrac)
-  // MBBR aeration blower air flow: ~scale with media volume (oxygen + mixing for
-  // the biofilm). ~12 m³ air/h per m³ media is a sound MBBR aeration anchor.
-  const biofilterAirFlowM3H = Math.round(biofilterMediaVolumeM3 * 12)
+  // MBBR aeration blower air flow: the GREATER of (a) media mixing/aeration (~12 m³ air/h
+  // per m³ media, a sound MBBR mixing anchor) and (b) the AERATION O₂-TRANSFER demand the
+  // atmospheric path must dissolve (gap-1 supply path 2). For (b): fine-bubble diffusers at
+  // ~1.5 m submergence transfer ~SAE 1.2 kg O₂/kWh ≈ a Standard-O₂-Transfer of ~0.012 kg O₂
+  // per m³ of air supplied (≈21% O₂ at 1.2 kg/m³ × ~5% fractional uptake). Air to dissolve
+  // the aeration O₂ = aeration_O₂_transfer ÷ that per-m³ transfer. The blower below is sized
+  // for whichever governs, so the aeration O₂ term genuinely has a machine behind it.
+  const mbbrMixingAirM3H = biofilterMediaVolumeM3 * 12                        // mixing/aeration anchor
+  const o2TransferPerM3Air = 0.012                                           // kg O₂ dissolved per m³ air (fine-bubble, ~1.5 m)
+  const aerationO2AirM3H = (aerationO2TransferKgDay / 24) / o2TransferPerM3Air  // air to transfer the aeration O₂ path
+  const biofilterAirFlowM3H = Math.round(Math.max(mbbrMixingAirM3H, aerationO2AirM3H))
 
   // ── CO₂ degassing (packed-column, sized on recirc flow) ───────────────────
   // Forced-draught counter-current degasser at a high air:water ratio (~10:1 by
@@ -11879,6 +11914,34 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const degasserHydraulicLoadingM3M2H = 65
   const degasserColumnAreaM2 = (degasserWaterFlowPerTrainM3H / degasserHydraulicLoadingM3M2H)
   const degasserColumnDiaM = Math.round(Math.sqrt((4 * degasserColumnAreaM2) / Math.PI) * 100) / 100  // per-train column ⌀
+
+  // ── ONE CANONICAL RATED kW PER BLOWER SERVICE (council RAS fix, blower) ────────
+  // The aeration BLOWER appeared at 6 / 11 / 31 kW on different pages: the downstream
+  // equipment synthesiser RE-DERIVED each blower's power from the air flow ÷ an inferred dP
+  // that varied with whichever host vessel's depth it read (8-25 kPa band) and the split
+  // count, so the SAME device printed three powers. UNIVERSAL RULE: one rated value per
+  // device — compute each blower's kW ONCE here, deterministically, and let every surface
+  // read this single figure. The biofilter MBBR aeration blower and the degasser forced-
+  // draught blower are DIFFERENT devices, so each gets its OWN canonical kW.
+  // Blower shaft power = Q[m³/s] · ΔP[Pa] / η (same identity the synthesiser uses), at a
+  // FIXED service dP and split count (no host-depth read → no per-page drift).
+  const BLOWER_EFFIC = 0.6
+  const blowerKw = (m3hEach: number, dPkPa: number) => Math.max(1.5, (m3hEach / 3600) * (dPkPa * 1000) / (BLOWER_EFFIC * 1000))
+  // The downstream synthesiser splits each air duty into machines of ≤30,000 m³/h, then stamps
+  // the canonical rating below on EACH. So the canonical rating is the PER-MACHINE duty at that
+  // SAME cap — guaranteeing the contract's rated kW equals the machine the synthesiser mints.
+  const BLOWER_SINGLE_UNIT_CAP_M3H = 30000
+  const perBlowerAir = (totalAirM3H: number) => totalAirM3H / Math.max(1, Math.ceil(totalAirM3H / BLOWER_SINGLE_UNIT_CAP_M3H))
+  // (a) BIOFILTER MBBR AERATION BLOWER — submerged fine-bubble diffusers at ~1.5 m → ~18 kPa
+  // (ρg·h + diffuser + ducting). The biofilter air flow is below the cap → one machine.
+  const AERATION_BLOWER_DP_KPA = 18
+  const aerationBlowerKw = Math.round(blowerKw(perBlowerAir(biofilterAirFlowM3H), AERATION_BLOWER_DP_KPA) * 10) / 10  // ~rated kW per machine
+  // (b) DEGASSER FORCED-DRAUGHT BLOWER — counter-current packed column, only packing + ducting
+  // backpressure (~4 kPa), NOT submerged. The total stripping air is split into ≤30,000 m³/h
+  // machines, so the DEVICE rating is the per-machine air flow (matches the synthesiser's split).
+  const DEGASSER_BLOWER_DP_KPA = 4
+  const degasserAirPerColumnM3H = perBlowerAir(degasserBlowerAirFlowM3H)            // per-machine stripping air at the synthesiser cap
+  const degasserBlowerKw = Math.round(blowerKw(degasserAirPerColumnM3H, DEGASSER_BLOWER_DP_KPA) * 10) / 10  // ~rated kW per column
 
   // ── Thermal (heat pumps; make-up heating + building loss; net of HEX recovery) ─
   const sourceTempC = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:°|degrees?\s+)?(?:c|celsius)?\s*(?:seawater|borehole|source|raw)/i, 10)
@@ -11925,11 +11988,55 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // explicitly and recovered by the HEX, so it must NOT be re-added here.
   const buildingProcessLossKw = Math.round(183 * Math.max(1, Math.cbrt(scale)))
 
-  // NET heat-pump thermal duty = building fabric loss + residual make-up heating
-  // (post-HEX). The recovered 866 kW never reaches the heat pump. ~336 kW thermal.
-  const heatingDutyKw = buildingProcessLossKw + residualMakeupHeatingKw
+  // ── VENTILATION MAKE-UP HEATING (council RAS fix, ventilation) ─────────────────
+  // PRECONDITION: a HEATED BUILDING with MECHANICAL VENTILATION in a climate BELOW the
+  // setpoint. The thermal chain (make-up + HEX + building-fabric loss) omitted the largest
+  // remaining heating term: the OUTDOOR AIR a moisture-laden fish hall must continuously
+  // supply (to clear the evaporation + CO₂ off ~1,200 m² of open 26.4 °C water) has to be
+  // HEATED from the cold Scottish ambient (~8 °C) up to the hall setpoint. UNIVERSAL: any
+  // heated building with mechanical ventilation in an ambient below setpoint carries a
+  // ventilation heating load = ṁ_air·cp·(setpoint − ambient) less whatever the HRV recovers;
+  // a plant with no heated building, or in a climate at/above setpoint, has none.
+  //   Supply airflow is the AIR-CHANGE requirement of the hall (NOT a figure inferred from
+  //   the building-fabric loss): hall floor ≈ tank plan area ÷ tank floor-coverage; hall
+  //   volume = floor × clear height; supply = hall volume × air-changes/hour.
+  const ambientTempC = (() => {
+    const t = Number(brief?.constraints?.operating_environment?.temp_min_c)
+    return Number.isFinite(t) ? t : 8   // cold-design ambient for the ventilation lift (Scottish ~8 °C)
+  })()
+  const TANK_WATER_DEPTH_M = 3.0                                  // shallow circular rearing tank
+  const TANK_FLOOR_COVERAGE = 0.40                               // tanks occupy ~40% of the hall floor (walkways, plant, access)
+  const HALL_CLEAR_HEIGHT_M = 6.0                               // clear internal height of the process hall
+  const HALL_AIR_CHANGES_PER_H = 6                              // moisture/CO₂-laden open-water hall (4-8 ACH band)
+  const hallFloorAreaM2 = (totalTankVolumeM3 / TANK_WATER_DEPTH_M) / TANK_FLOOR_COVERAGE   // ~2,780 m²
+  const hallVolumeM3 = hallFloorAreaM2 * HALL_CLEAR_HEIGHT_M                                 // ~16,700 m³
+  const ventilationSupplyAirM3H = Math.round(hallVolumeM3 * HALL_AIR_CHANGES_PER_H)         // ~100,000 m³/h
+  // GROSS ventilation heating = heat the whole supply air from ambient to setpoint.
+  // Q = ṁ·cp·ΔT ; ṁ = ρ_air·V̇ (ρ ≈ 1.2 kg/m³) ; cp ≈ 1.005 kJ/kg·K.
+  const AIR_DENSITY_KG_M3 = 1.2, AIR_CP_KJ_KG_K = 1.005
+  const ventDeltaTLift = Math.max(0, setpointTempC - ambientTempC)                          // ~18.4 K
+  const ventilationHeatingGrossKw = Math.round((ventilationSupplyAirM3H * AIR_DENSITY_KG_M3 * AIR_CP_KJ_KG_K * ventDeltaTLift) / 3600)  // ~620 kW gross
+  // HRV recovery — the supply/extract heat exchanger pre-heats incoming outdoor air from the
+  // warm exhaust. The HRV (gap-4) is sized to the FULL supply flow, but the recoverable
+  // FRACTION is deliberately MODEST for a fish hall: the extract is warm and near-SATURATED
+  // (it carries the evaporated moisture this ventilation exists to remove), so a high-recovery
+  // enthalpy/thermal wheel would frost and carry condensate/odour back into the supply. A
+  // sensible-only run-around coil / plate exchanger on a full-flow but moisture-limited duty
+  // recovers ~ε = 0.30 of the gross. (A dry-air plant could run a 0.75 wheel; the wet extract
+  // here caps it — universal: recovery is bounded by the extract's state, not just the area.)
+  const hrvEffectiveness = 0.30
+  const ventilationHrvRecoveryKw = Math.round(ventilationHeatingGrossKw * hrvEffectiveness)        // ~185 kW recovered
+  // NET ventilation make-up heating the heat plant must still supply = gross − HRV recovery.
+  const ventilationHeatingKw = (setpointTempC > ambientTempC && ventilationSupplyAirM3H > 0)
+    ? Math.max(0, ventilationHeatingGrossKw - ventilationHrvRecoveryKw)
+    : 0                                                                                            // ~435 kW net (≈620 − 185)
+
+  // NET heat-pump thermal duty = building fabric loss + residual make-up heating (post-HEX)
+  // + NET ventilation make-up heating (post-HRV). The recovered make-up (866 kW) + recovered
+  // ventilation (~185 kW) never reach the heat pump. ~770 kW thermal (was ~336 kW — the
+  // ventilation make-up heating term, the single largest omission, was entirely absent).
+  const heatingDutyKw = buildingProcessLossKw + residualMakeupHeatingKw + ventilationHeatingKw
   // Heat-pump electrical input from the seasonal COP (water-source ~3.5).
-  // ~336 kW thermal ÷ 3.5 ≈ 96 kW electrical.
   const heatPumpCop = 3.5
   const heatPumpElectricalKw = Math.round(heatingDutyKw / heatPumpCop)
 
@@ -11990,8 +12097,10 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const bicarbonateDoseKgDay = Math.round(tanLoadKgDay * alkPerTanG * (84 / 50) / 1000 * 1000)  // kg/day NaHCO₃
 
   // ── Oxygenation supply (LOX/PSA) ──────────────────────────────────────────
-  // LOX/PSA must meet the daily O₂ demand + emergency buffer; express as kg/h.
-  const oxygenSupplyKgH = Math.round((oxygenDemandKgDay / 24) * 10) / 10
+  // LOX/PSA is sized to the CONE SUPPLEMENTATION duty (the high-purity-O₂ gap above what
+  // atmospheric aeration transfers), NOT the total aerobic demand — the aeration/surface path
+  // (sized into the blower below) carries the rest. Express as kg/h.
+  const oxygenSupplyKgH = Math.round((oxygenConeSupplyKgDay / 24) * 10) / 10
 
   // ── UV disinfection (medium-pressure UV-C on the full recirculation flow) ──
   // SPECIFIC-ELECTRICAL-ENERGY sizing (2026-06-16, council RAS fix #3): the generic
@@ -12153,7 +12262,7 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // supply, so a heat-pump trip cannot let the loop cool. The gate fires when the
   // contract declares a positive heating duty on a live/temperature-critical loop.
   const heatSourceIsLifeCritical = heatingDutyKw > 0 && standingBiomassKg > 0   // sole heat source over a live inventory
-  const backupImmersionHeaterPowerKw = heatSourceIsLifeCritical ? Math.round(heatingDutyKw) : 0  // ~336 kW electric backup
+  const backupImmersionHeaterPowerKw = heatSourceIsLifeCritical ? Math.round(heatingDutyKw) : 0  // backup = full net heating duty (~771 kW, now incl. ventilation)
   const criticalEquipmentRedundancy = heatSourceIsLifeCritical ? 1 : 0          // N+1 flag on the life-critical heat source
 
   // ── (4) LIFE-CRITICAL GAS-DOSING FAIL-SAFE STATE (oxygen to the fish) ─────────
@@ -12196,7 +12305,12 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     // ── Feed + waste loads (size-by-feed) ──
     daily_feed_kg: q(dailyFeedKg, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'annual_production_t_yr × FCR × 1000 / 365 — production-throughput mass balance, the SINGLE feed source all waste loads derive from (~766 kg/day at 204 t/yr, FCR 1.37)' }),
     tan_load_kg_day: q(tanLoadKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'feed × protein 0.45 × N-in-protein 0.16 × TAN-excretion 0.50 (Timmons & Ebeling N mass balance); sizes the MBBR biofilter + the bicarbonate alkalinity dose' }),
-    oxygen_demand_kg_day: q(oxygenDemandKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~0.5 kg O₂/kg feed; sizes the oxygenation + LOX/PSA' }),
+    // TRUE TOTAL aerobic O₂ demand (council RAS fix): ~1.0 kg O₂/kg feed = fish respiration +
+    // MBBR nitrification + heterotrophic oxidation. The balance CLOSES across both supply paths
+    // below: cone/LOX supplementation + aeration/surface transfer ≥ demand.
+    oxygen_demand_kg_day: q(oxygenDemandKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: `TRUE total aerobic O₂ demand = ${o2TotalPerKgFeed} kg O₂/kg feed × ${dailyFeedKg} kg/day feed (fish respiration + MBBR nitrification + heterotrophic) ≈ ${oxygenDemandKgDay} kg/day — met across TWO supply paths: pure-O₂ cone/LOX supplementation (${oxygenConeSupplyKgDay} kg/day) + aeration/surface transfer (${aerationO2TransferKgDay} kg/day); supply ≥ demand` }),
+    oxygen_cone_supply_kg_day: q(oxygenConeSupplyKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: `O₂ SUPPLY PATH 1 — pure-O₂ cone/LOX supplementation = ${o2ConePerKgFeed} kg O₂/kg feed (the DO lift above saturation only injected pure O₂ can give); sizes the LOX/PSA system (≈${oxygenSupplyKgH} kg/h)` }),
+    aeration_o2_transfer_kg_day: q(aerationO2TransferKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: `O₂ SUPPLY PATH 2 — atmospheric aeration + surface transfer = total demand − cone supply = ${aerationO2TransferKgDay} kg/day, dissolved by the MBBR aeration grid + counter-current degasser air contact + open tank surface; this is the O₂ the AERATION BLOWER transfers (the blower below is sized to move enough air for it)` }),
     solids_load_kg_day: q(solidsLoadKgDay, 'kg/day', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '~60% of feed; sizes the drum filters + sludge handling' }),
 
     // ── Recirculation hydraulics — lock-gate HARD slot ──
@@ -12220,7 +12334,12 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     // ── Biofiltration (MBBR sized on TAN load) ──
     biofilter_media_volume_m3: q(biofilterMediaVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'TAN_load ÷ ~0.35 kg TAN/m³ media/day (MBBR areal nitrification rate)' }),
     biofilter_tank_volume_m3: q(biofilterTankVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: 'media volume ÷ ~60% fill ratio (50-70% MBBR media fill)' }),
-    biofilter_air_flow_m3_h: q(biofilterAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: '~12 m³ air/h per m³ media (MBBR aeration grid + blower)' }),
+    biofilter_air_flow_m3_h: q(biofilterAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `MBBR aeration air = GREATER of media mixing (${biofilterMediaVolumeM3} m³ × 12 m³/h/m³) and the aeration O₂-transfer demand (${aerationO2TransferKgDay} kg/day ÷ ${o2TransferPerM3Air} kg O₂/m³ air) — so the blower genuinely transfers the gap-1 aeration O₂ path` }),
+    // ONE canonical rated kW for the BIOFILTER AERATION BLOWER (council RAS fix, blower):
+    // computed ONCE here so every page reads the same value (not the synthesiser's per-page
+    // 6/11/31 kW from a host-depth-dependent dP). `_kw` + "blower" → the synthesiser sizes the
+    // device to THIS rating instead of re-deriving it.
+    aeration_blower_kw: q(aerationBlowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `CANONICAL biofilter MBBR aeration blower rating = ${biofilterAirFlowM3H} m³/h ÷ 3600 × ${AERATION_BLOWER_DP_KPA} kPa ÷ 0.6 efficiency (submerged fine-bubble ~1.5 m); ONE rated value for this device — distinct from the degasser blower` }),
 
     // ── CO₂ degassing (packed-column) — N PARALLEL columns; WATER flow is the PRIMARY rating ──
     // PRIMARY = the per-column WATER throughput (what the column hydraulically processes).
@@ -12230,23 +12349,32 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     // Lives under a `degasser_blower_*` key so the universal aeration-blower synthesis still
     // sizes + counts the blowers off it, but it stays OUT of the degasser-column group (whose
     // `max()` would otherwise make this 10× air value the column's mislabelled rating).
-    co2_stripping_air_flow_m3_h: q(degasserBlowerAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: `TOTAL forced-draught CO₂-stripping AIR at the ~10:1 air:water (G:L) ratio across all ${recircTrainCount} degasser columns (≈${degasserAirWaterRatio}× the total water flow) — the SECONDARY figure that sizes the degassing blowers; the 10:1 ratio is correct` }),
+    co2_stripping_air_flow_m3_h: q(degasserBlowerAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: `TOTAL forced-draught CO₂-stripping AIR at the ~10:1 air:water (G:L) ratio across all ${recircTrainCount} degasser columns (≈${degasserAirWaterRatio}× the total water flow) — the SECONDARY figure; the per-column blower rating is the canonical degasser_blower_kw below; the 10:1 ratio is correct` }),
+    // ONE canonical rated kW for the DEGASSER forced-draught blower (council RAS fix, blower):
+    // a DIFFERENT device from the aeration blower, computed ONCE here. One blower per column on
+    // the per-column air flow at the packing/ducting dP (~4 kPa, NOT submerged).
+    degasser_blower_kw: q(degasserBlowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `CANONICAL degasser forced-draught blower rating (per column) = ${Math.round(degasserAirPerColumnM3H)} m³/h ÷ 3600 × ${DEGASSER_BLOWER_DP_KPA} kPa ÷ 0.6 efficiency (packing + ducting backpressure only); ONE rated value per degasser blower — distinct from the biofilter aeration blower` }),
 
     // ── Oxygenation (LOX/PSA) ──
-    oxygen_supply_kg_h: q(oxygenSupplyKgH, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'oxygen_demand ÷ 24 — down-flow O₂ cones fed from on-site LOX + PSA generator' }),
+    oxygen_supply_kg_h: q(oxygenSupplyKgH, 'kg/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'cone/LOX supplementation duty ÷ 24 — down-flow O₂ cones fed from on-site LOX + PSA generator (the pure-O₂ path; the aeration/surface path carries the balance of the total aerobic demand)' }),
 
     // ── UV disinfection (medium-pressure UV-C, full recirculation flow) ──
     uv_lamp_power_kw: q(uvLampPowerKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'medium-pressure UV-C: flow × electrical-energy-dose (Bolton/USEPA EED ~2.6 Wh/m³ at 40 mJ/cm², 90% UVT, η 0.30); ~35 kW (≈2.6 W per m³/h)' }),
     uv_reactor_volume_m3: q(uvReactorVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'flow × ~2 s hydraulic residence in the in-line UV reactor train' }),
 
     // ── Thermal (heat pumps; NET of make-up/bleed HEX recovery) — lock-gate HARD slot ──
-    heating_duty_kw: q(heatingDutyKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'NET heat-pump thermal duty = building-fabric loss + residual make-up heating (after the make-up/bleed HEX recovers 85% of the ~1,019 kW raw make-up duty); ~336 kW; lock-gate HARD slot (exit 22)' }),
+    heating_duty_kw: q(heatingDutyKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `NET heat-pump thermal duty = building-fabric loss (${buildingProcessLossKw} kW) + residual make-up heating (${residualMakeupHeatingKw} kW, post-85%-HEX) + NET ventilation make-up heating (${ventilationHeatingKw} kW, post-HRV) ≈ ${heatingDutyKw} kW; the ventilation term (the largest prior omission) is now included; lock-gate HARD slot (exit 22)` }),
     makeup_heating_kw: q(makeupHeatingKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'RAW make-up duty ṁ·cp·ΔT for the 0.4% make-up from ~10 °C to 26.4 °C (~1,019 kW — recovered by the HEX, NOT all carried by the heat pump)' }),
     makeup_hex_recovery_kw: q(makeupHexRecoveryKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'make-up/bleed plate HEX recovery = 85% effectiveness × raw make-up duty (warm bleed at setpoint pre-heats the cold incoming make-up); ~866 kW recovered for free' }),
     residual_makeup_heating_kw: q(residualMakeupHeatingKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'residual make-up heating the heat pump must still supply = (1 − 0.85) × raw make-up duty; ~153 kW' }),
     makeup_hex_area_m2: q(makeupHexAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: 'make-up/bleed counter-current plate HEX area from Q = U·A·LMTD (U ~3,000 W/m²K water/water, LMTD = (1−ε)·ΔT balanced-flow approach)' }),
     building_process_loss_kw: q(buildingProcessLossKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'building-fabric heat loss (BS EN 12831: ~0.2 W/m²K fabric over ~7,000 m² envelope at ΔT ~31 K → ~183 kW); the make-up water heat is the make-up term, NOT re-counted here' }),
-    heat_pump_electrical_kw: q(heatPumpElectricalKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'net heating_duty ÷ COP (water-source heat pumps, SCOP ~3.5); ~96 kW' }),
+    // ── VENTILATION MAKE-UP HEATING (council RAS fix, ventilation) — folded into heating_duty above ──
+    ventilation_supply_air_m3_h: q(ventilationSupplyAirM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: `mechanical ventilation supply airflow = hall volume (${Math.round(hallFloorAreaM2)} m² floor × ${HALL_CLEAR_HEIGHT_M} m) × ${HALL_AIR_CHANGES_PER_H} air-changes/h ≈ ${ventilationSupplyAirM3H.toLocaleString('en-GB')} m³/h — the air the moisture/CO₂-laden fish hall must continuously exchange; the HRV is sized to THIS full flow (gap-4)` }),
+    ventilation_heating_gross_kw: q(ventilationHeatingGrossKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `GROSS ventilation heating = heat ${ventilationSupplyAirM3H.toLocaleString('en-GB')} m³/h supply air from ${ambientTempC} °C ambient to ${setpointTempC} °C setpoint (ṁ·cp·ΔT, ρ 1.2 kg/m³, cp 1.005 kJ/kg·K, ΔT ${ventDeltaTLift} K) ≈ ${ventilationHeatingGrossKw} kW` }),
+    ventilation_hrv_recovery_kw: q(ventilationHrvRecoveryKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `HRV recovery on the full supply flow = ε ${hrvEffectiveness} × gross (sensible-only, capped low because the warm fish-hall extract is near-saturated — a high-recovery enthalpy wheel would frost/carry moisture back); ≈ ${ventilationHrvRecoveryKw} kW recovered` }),
+    ventilation_heating_kw: q(ventilationHeatingKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `NET ventilation make-up heating the heat plant must supply = gross ${ventilationHeatingGrossKw} kW − HRV recovery ${ventilationHrvRecoveryKw} kW ≈ ${ventilationHeatingKw} kW; ADDED to heating_duty_kw (precondition: a heated building with mechanical ventilation below setpoint — absent for a sealed/unheated plant)` }),
+    heat_pump_electrical_kw: q(heatPumpElectricalKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `net heating_duty (${heatingDutyKw} kW, incl. ventilation) ÷ COP (water-source heat pumps, SCOP ~3.5) ≈ ${heatPumpElectricalKw} kW` }),
     heat_pump_cop: q(heatPumpCop, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'water-source heat-pump seasonal COP ~3.5 (warm-loop source)' }),
     water_setpoint_temp_c: q(setpointTempC, '°C', 'temperature', 'rated', 'system', 'brief', { source_detail: '26.4 °C yellowtail kingfish grow-out temperature' }),
     source_water_temp_c: q(sourceTempC, '°C', 'temperature', 'min', 'system', 'brief', { source_detail: '~10 °C seawater/borehole source water (8-12 °C)' }),
@@ -12422,10 +12550,10 @@ registerArchetype('aquaculture_ras', (brief: any) => {
       to_part: 'oxygen_cones',
       mechanism: 'fluid_loop',
       constraint_kind: 'flow_capacity',
-      required_value: oxygenDemandKgDay / 86400,  // kg/s O₂
+      required_value: oxygenConeSupplyKgDay / 86400,  // kg/s pure-O₂ via cones (path 1 of the closed O₂ balance; the aeration path carries the rest)
       required_unit: 'kg/s',
       required_margin_factor: 1.5,
-      material_context: 'LOX_plus_PSA_supply_~0.5kg_O2_per_kg_feed_with_emergency_fail_open_solenoid_diffusers_in_every_tank',
+      material_context: 'LOX_plus_PSA_supply_~0.5kg_O2_per_kg_feed_cone_supplementation_aeration_carries_the_balance_with_emergency_fail_open_solenoid_diffusers_in_every_tank',
     },
     {
       from_part: 'electrical_supply',
@@ -12536,6 +12664,20 @@ registerArchetype('aquaculture_ras', (brief: any) => {
       backup_heat_source: heatSourceIsLifeCritical ? `N+1 backup electric immersion heater (~${backupImmersionHeaterPowerKw} kW) on a separate supply — independent standby for the sole heat pump` : 'none required',  // (3) life-critical single-point redundancy
       o2_dosing_fail_state: o2DosingIsLifeCritical ? 'fail-open (energise-to-close): power loss ADMITS O₂' : 'n/a',  // (4) life-critical gas-dosing fail-safe
       emergency_o2_bridge_desc: o2DosingIsLifeCritical ? `independent emergency O₂ path: ~${emergencyO2SupplyKgH} kg/h for ~${emergencyO2BridgeMinutes} min (~${emergencyO2BufferKg} kg LOX bridge), UPS/accumulator-backed` : 'n/a',  // (4) emergency bridge across changeover
+      // ── CLOSED AEROBIC O₂ BALANCE (council RAS fix, O₂) — canonical split, supply ≥ demand ──
+      o2_total_demand_kg_day: oxygenDemandKgDay,                        // total aerobic demand (~1.0 kg/kg feed)
+      o2_cone_supply_kg_day: oxygenConeSupplyKgDay,                     // supply path 1 — pure-O₂ cone/LOX
+      o2_aeration_transfer_kg_day: aerationO2TransferKgDay,             // supply path 2 — aeration/surface
+      o2_balance_desc: `total aerobic O₂ demand ${oxygenDemandKgDay} kg/day = cone/LOX supplementation ${oxygenConeSupplyKgDay} kg/day + aeration/surface transfer ${aerationO2TransferKgDay} kg/day (supply ≥ demand; the aeration path is moved by the ${aerationBlowerKw} kW MBBR aeration blower)`,
+      // ── CANONICAL BLOWER RATINGS (council RAS fix, blower) — ONE kW per device, gate-24 anchor ──
+      aeration_blower_kw: aerationBlowerKw,                             // biofilter MBBR aeration blower (one rated value)
+      degasser_blower_kw: degasserBlowerKw,                            // degasser forced-draught blower per column (one rated value)
+      // ── VENTILATION MAKE-UP HEATING (council RAS fix, ventilation) — folded into heating_duty ──
+      ventilation_supply_air_m3_h: ventilationSupplyAirM3H,            // full mechanical-ventilation supply flow (the HRV is sized to THIS)
+      ventilation_heating_gross_kw: ventilationHeatingGrossKw,         // gross outdoor-air heating
+      ventilation_hrv_recovery_kw: ventilationHrvRecoveryKw,           // HRV recovery on the full flow
+      ventilation_heating_kw: ventilationHeatingKw,                    // NET ventilation heating added to heating_duty_kw
+      heating_duty_breakdown_desc: `heating_duty ${heatingDutyKw} kW = building-fabric ${buildingProcessLossKw} kW + residual make-up ${residualMakeupHeatingKw} kW + net ventilation ${ventilationHeatingKw} kW`,
     },
   }
 })

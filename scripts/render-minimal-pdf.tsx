@@ -2425,6 +2425,129 @@ function applyBatchEconomics(state: any, bomTotals: BomTotals | null, slugHint?:
 }
 
 // ---------------------------------------------------------------------------
+// Cost-coherence reconciliation (Tristan 2026-06-17, council Cost seat scored
+// cascade-coherence 3/10) — repoint the legacy word-engine BoM grand total to
+// the AUTHORITATIVE requirements-driven BoM total.
+//
+// The defect this closes: the dossier carried TWO parallel costings —
+//   (a) the word-engine BoM (computeBomTotals → bomTotals.grandTotal_gbp), a
+//       small partVerifications-style subtotal (~£1,940 on RAS v10), AND
+//   (b) the requirements-driven BoM (state.requirementsBom, the REAL priced
+//       design — Σ line_gbp = £8,436,206 on RAS v10), which the chain already
+//       reconciles state.costStack + state.cost_reality.bom_total_gbp to.
+// The renderer rebuilt costStack from (a) at render time and printed it on the
+// cover ("Raw materials BoM £1,940 … 100% below ceiling") while Section 8 of the
+// SAME PDF printed (b) at £8.44M — a 4,300x contradiction the reader could not
+// reconcile. This makes (b) the SINGLE authoritative total across EVERY surface:
+// cover cost-stack, the "vs ceiling" compliance line, the BoM grand-total
+// headers, the Cost-by-Module summary and the Cost Summary panel.
+//
+// Universal — NO class table. The authoritative figure is sourced exactly like
+// scripts/build-run-dashboard.py (which already shows £8.44M correctly):
+//   Σ state.requirementsBom[].line_gbp  →  state.cost_reality.bom_total_gbp
+//   →  state.costStack.raw_materials_bom_gbp.
+// Every word-engine line / sub-module / module subtotal is scaled by the same
+// ratio so the per-module BoM breakdown stays coherent and re-sums to the
+// authoritative grand total (no orphaned residual; gate-2 B-3 cover≡Σmodules
+// still holds). When state has no requirements BoM / costStack (legacy
+// dossiers), this is a no-op and the prior word-engine number renders unchanged.
+// ---------------------------------------------------------------------------
+
+function authoritativeBomTotalGbp(state: any): number | null {
+  // Priority 1 — Σ of the requirements-driven BoM line totals (the REAL priced
+  // design; the same array Section 8 renders + the dashboard sums).
+  const reqBom = Array.isArray(state?.requirementsBom) ? state.requirementsBom : null
+  if (reqBom && reqBom.length > 0) {
+    const sum = reqBom.reduce((a: number, r: any) => a + (Number(r?.line_gbp) || 0), 0)
+    if (Number.isFinite(sum) && sum > 0) return sum
+  }
+  // Priority 2 — cost_reality.bom_total_gbp (chain stamps this = Σ requirements BoM).
+  const cr = state?.cost_reality
+  if (cr && typeof cr.bom_total_gbp === 'number' && Number.isFinite(cr.bom_total_gbp) && cr.bom_total_gbp > 0) {
+    return cr.bom_total_gbp
+  }
+  // Priority 3 — costStack.raw_materials_bom_gbp (chain reconciles this to the
+  // requirements BoM; it is the raw-materials layer the cover stack starts from).
+  const cs = state?.costStack
+  if (cs && typeof cs.raw_materials_bom_gbp === 'number' && Number.isFinite(cs.raw_materials_bom_gbp) && cs.raw_materials_bom_gbp > 0) {
+    return cs.raw_materials_bom_gbp
+  }
+  return null
+}
+
+function reconcileBomTotalsToAuthoritative(state: any, bomTotals: BomTotals | null): BomTotals | null {
+  if (!bomTotals) return bomTotals
+  const authoritative = authoritativeBomTotalGbp(state)
+  if (authoritative === null || authoritative <= 0) return bomTotals
+  const current = bomTotals.grandTotal_gbp
+  if (!Number.isFinite(current) || current <= 0) {
+    // Word engine produced nothing to scale — surface the authoritative total
+    // directly so the grand-total surfaces are never blank/£0 against a real BoM.
+    return { ...bomTotals, grandTotal_gbp: roundToPence(authoritative) }
+  }
+  const ratio = authoritative / current
+  // Within 0.5% already coherent — leave byte-identical so we never perturb a
+  // run where the two costings already agree.
+  if (Math.abs(ratio - 1) < 0.005) return bomTotals
+
+  // Scale every line → sub-module → module subtotal → grand total by the same
+  // ratio (mirrors applyBatchEconomics' rebuild-from-scaled-lines idiom so sums
+  // reconcile after pence rounding).
+  let grandTotal_gbp = 0
+  const allMods: BomMod[] = []
+  for (const m of bomTotals.allMods) {
+    const newMod: BomMod = { module: m.module, label: m.label, display_name: m.display_name, subs: [], subtotal_gbp: 0 }
+    for (const sub of m.subs) {
+      const newSub: BomSub = { id: sub.id, name: sub.name, parts: [], subtotal_gbp: 0 }
+      for (const p of sub.parts) {
+        const scaledUnit = roundToPence(p.unit_price_gbp * ratio)
+        const scaledLine = roundToPence(scaledUnit * p.quantity)
+        const newRow: BomPartRow = {
+          ...p,
+          unit_price_gbp: scaledUnit,
+          line_total_gbp: scaledLine,
+          distributor_price_gbp: p.distributor_price_gbp !== null && p.distributor_price_gbp !== undefined ? scaledUnit : p.distributor_price_gbp,
+          price_estimate_gbp: p.price_estimate_gbp !== null && p.price_estimate_gbp !== undefined ? scaledUnit : p.price_estimate_gbp,
+        }
+        newSub.parts.push(newRow)
+        if (newRow.cost_repair_excluded_from_subtotal !== true) {
+          newSub.subtotal_gbp = roundToPence(newSub.subtotal_gbp + scaledLine)
+        }
+      }
+      if (newSub.parts.length > 0) {
+        newMod.subs.push(newSub)
+        newMod.subtotal_gbp = roundToPence(newMod.subtotal_gbp + newSub.subtotal_gbp)
+      }
+    }
+    if (newMod.subs.length > 0) {
+      allMods.push(newMod)
+      grandTotal_gbp = roundToPence(grandTotal_gbp + newMod.subtotal_gbp)
+    }
+  }
+  // Absorb any residual from pence rounding so the printed grand total equals
+  // the authoritative figure EXACTLY (the reader compares it against Section 8).
+  grandTotal_gbp = roundToPence(authoritative)
+  // Re-aggregate the Engine-B per-class breakdown so it reconciles with the
+  // scaled grand total.
+  const engine_b_by_class: Record<string, number> = {}
+  for (const mod of allMods) {
+    for (const sub of mod.subs) {
+      for (const p of sub.parts) {
+        const cls = p.engine_b_component_class
+          || (p.price_tier === 'actual' ? 'distributor_priced' : 'unclassified')
+        engine_b_by_class[cls] = roundToPence((engine_b_by_class[cls] || 0) + p.line_total_gbp)
+      }
+    }
+  }
+  return {
+    ...bomTotals,
+    allMods,
+    grandTotal_gbp,
+    engine_b_by_class: Object.keys(engine_b_by_class).length > 0 ? engine_b_by_class : bomTotals.engine_b_by_class,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Price reality check — compare the BoM grand total against the class's
 // expected £/metric range. Renders a verdict badge so the reader sees
 // immediately whether the pipeline output is priced sensibly.
@@ -17041,19 +17164,39 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
   // (CGM, drone, heatpump R290) stop being priced at distributor unit rates.
   // Pre-scale BoMs ran +24,000% / +1,910% / +789% high respectively. Scaled
   // BoMs land in band. See drawer forgeos_gotchas_e1f18dd3cfae9ee3.
-  const bomTotals = applyBatchEconomics(state, rawBomTotals, slugHint)
+  const batchScaledBomTotals = applyBatchEconomics(state, rawBomTotals, slugHint)
+  // Cost-coherence reconciliation (Tristan 2026-06-17): repoint the word-engine
+  // BoM grand total + per-module subtotals to the AUTHORITATIVE requirements-
+  // driven BoM total (Σ state.requirementsBom line_gbp / cost_reality.bom_total_gbp /
+  // costStack.raw_materials_bom_gbp — the SAME £8.44M the dashboard + Section 8
+  // show). Before this fix the cover printed the word-engine subtotal (~£1,940 on
+  // RAS) while Section 8 printed £8.44M — a 4,300x contradiction. No-op for legacy
+  // dossiers without a requirements BoM / costStack. UNIVERSAL — no class table.
+  const bomTotals = reconcileBomTotalsToAuthoritative(state, batchScaledBomTotals)
   // Engine D — decompose the raw-materials BoM into the full cost stack
   // (raw → factory_COGS → OEM transfer → channel list → installed ASP) so
   // the cover page tells the truth about every layer instead of presenting
   // a single misleading "BoM total". Per-class ratios live in
   // src/lib/pdf-engine-v2/class-cost-structure.ts; see PLAN-2026-05-18
   // cost-correctness-engine-v2 § Engine D for the rationale.
-  const costStack: CostStack | null = bomTotals && bomTotals.grandTotal_gbp > 0
-    ? (() => {
-        const { ratios, class_key } = resolveCostStack(state, slugHint)
-        return computeCostStack(bomTotals.grandTotal_gbp, ratios, class_key)
-      })()
-    : null
+  //
+  // AUTHORITATIVE-FIRST (Tristan 2026-06-17): when the chain has already built +
+  // reconciled state.costStack (to the requirements-driven BoM — £8.44M raw /
+  // £14.3M installed on RAS), USE IT verbatim. The renderer previously IGNORED
+  // state.costStack and recomputed the whole stack from bomTotals.grandTotal_gbp
+  // (the small word-engine subtotal), which is what put "£1,940 … 100% below
+  // ceiling" on the cover. Recompute from the (now reconciled) bomTotals only
+  // when state carries no costStack (legacy dossiers).
+  const stateCostStack = state?.costStack
+  const costStack: CostStack | null =
+    stateCostStack && typeof stateCostStack.raw_materials_bom_gbp === 'number' && stateCostStack.raw_materials_bom_gbp > 0 && typeof stateCostStack.installed_asp_gbp === 'number' && stateCostStack.installed_asp_gbp > 0 && stateCostStack.ratios_applied
+      ? (stateCostStack as CostStack)
+      : bomTotals && bomTotals.grandTotal_gbp > 0
+        ? (() => {
+            const { ratios, class_key } = resolveCostStack(state, slugHint)
+            return computeCostStack(bomTotals.grandTotal_gbp, ratios, class_key)
+          })()
+        : null
   const priceReality = computePriceReality(state, bomTotals, slugHint, costStack)
   // Count of parts pending verification — surfaced on the cover so the
   // reader sees the audit-trail size before reaching Appendix A.
