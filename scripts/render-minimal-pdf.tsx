@@ -2475,6 +2475,87 @@ function authoritativeBomTotalGbp(state: any): number | null {
   return null
 }
 
+// ---------------------------------------------------------------------------
+// Levelised (per-output-unit) capital cost — SINGLE SOURCE OF TRUTH.
+//
+// The defect this closes (2026-06-17): the Executive Summary, the Engineering-
+// Basis headline economics card, and the Cost Summary panel all read
+// `state.costSanity.cost_per_output_unit` for the levelised "£/(unit·yr)"
+// figure. That value is computed by the in-chain independent-cost-sanity gate
+// (src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit.ts) which runs as a
+// SHADOW stage and can carry a STALE numerator from an earlier leg of a
+// design-to-budget / six-tenths re-run (RAS v11: costSanity.headline_cost_gbp =
+// £4,794,118 ÷ 204 t/yr = £23,501, while the AUTHORITATIVE BoM the cover prints
+// is £8,810,035 ÷ 204 = £43,186). A reader saw £23,501 in three panels and
+// £8.81M / £43,186 everywhere else — a ~1.84x contradiction.
+//
+// Fix: compute the levelised cost FRESH here from the SAME authoritative
+// numerator the cover BoM total uses (`authoritativeBomTotalGbp`) ÷ the brief's
+// PRIMARY output capacity — NEVER trust the shadow audit's cached ratio. The
+// denominator (value + unit) is taken from costSanity.output_value /
+// output_unit_label when present (those ARE correctly annualised — only the
+// audit's numerator goes stale), else parsed from keyMetrics.headline_output,
+// else the parsed brief target. Universal — NO class table; returns null (figure
+// gracefully omitted) when there is no authoritative cost OR no scalable output
+// metric, so a whole-system-price dossier never divides by a bad basis.
+// ---------------------------------------------------------------------------
+
+function levelisedOutputCost(state: any): { value: number; unit_label: string } | null {
+  const numerator = authoritativeBomTotalGbp(state)
+  if (numerator === null || !Number.isFinite(numerator) || numerator <= 0) return null
+
+  // toNum: tolerant numeric parse ("3,340" / " 204 " → number).
+  const toNum = (v: unknown): number | null => {
+    if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : null
+    const n = Number(String(v ?? '').replace(/[, ]/g, ''))
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  // Normalise an output-unit label to "£/<unit>" for display, ASCII-safe.
+  const labelFor = (unitRaw: string): string => {
+    const u = normalise_unicode(String(unitRaw ?? '')).trim()
+    if (!u) return ''
+    // costSanity.band.per_unit_label already carries the "£/" prefix.
+    if (u.startsWith('£/')) return u
+    // costSanity.output_unit_label is the bare denominator ("t/yr"); the brief's
+    // headline unit may be "tpy" / "t/yr" / "kg/yr" — strip a leading "£/" if any
+    // then prefix once. "tpy" reads as "t·yr"-equivalent; leave the brief unit
+    // verbatim so the figure matches the headline-output card's own unit.
+    return `£/${u.replace(/^£\//, '')}`
+  }
+
+  // 1. The independent-cost-sanity gate's DENOMINATOR is authoritative (it
+  //    annualises throughput correctly, e.g. "204 tpy" → 204 t/yr). Reuse the
+  //    value + label; recompute ONLY the ratio against the fresh numerator.
+  const cs = state?.costSanity
+  if (cs) {
+    const denom = toNum(cs.output_value)
+    if (denom !== null) {
+      const unit = labelFor(cs?.band?.per_unit_label ?? cs?.output_unit_label ?? '')
+      return { value: numerator / denom, unit_label: unit }
+    }
+  }
+
+  // 2. keyMetrics.headline_output — the brief's primary deliverable (value +
+  //    unit), surfaced for every class even when no per-class deriver exists.
+  const ho = state?.keyMetrics?.headline_output
+  if (ho && typeof ho === 'object') {
+    const denom = toNum(ho.value)
+    if (denom !== null) return { value: numerator / denom, unit_label: labelFor(ho.unit) }
+  }
+
+  // 3. Parsed-brief target_performance (single-metric or metrics[0] shape).
+  const tp = state?.parsedBrief?.constraints?.target_performance
+  if (tp) {
+    const m = Array.isArray(tp.metrics) && tp.metrics.length > 0 ? tp.metrics[0] : tp
+    const denom = toNum(m?.value)
+    if (denom !== null) return { value: numerator / denom, unit_label: labelFor(m?.unit) }
+  }
+
+  // No scalable output metric — the levelised figure is omitted (the caller
+  // shows the whole-system price instead). Never divide by a bad basis.
+  return null
+}
+
 function reconcileBomTotalsToAuthoritative(state: any, bomTotals: BomTotals | null): BomTotals | null {
   if (!bomTotals) return bomTotals
   const authoritative = authoritativeBomTotalGbp(state)
@@ -5166,19 +5247,18 @@ function ExecutiveSummaryPage({ state, project, bomTotals, costStack, priceReali
   )
   const article = /^[aeiou]/i.test(classReadable) ? 'an' : 'a'
   const productName = (pdName && pdName.length <= 90 ? pdName : `${article} ${classReadable} system`).replace(/\.$/, '')
-  // Levelised capital cost (item 8): reuse the independent cost-sanity gate's
-  // EXACT £/output-unit figure + its unit label (the same number the Engineering
-  // Basis economics card shows), so the exec summary surfaces BOTH the headline
-  // ex-works cost and the levelised cost. null → omitted gracefully.
-  const _cs = state?.costSanity ?? {}
-  // The per_unit_label is the UNIT only (e.g. "£/(t·yr CO2)"). It already carries
-  // the "£/" so the value is rendered as the bare number + the unit label; when
-  // only a plain output-unit label is available, fall back to "£<n>/<unit>".
-  const _levUnit = normalise_unicode(String(_cs?.band?.per_unit_label ?? '')).trim()
-  const levelisedCost = (typeof _cs?.cost_per_output_unit === 'number' && isFinite(_cs.cost_per_output_unit) && _cs.cost_per_output_unit > 0)
-    ? (_levUnit
-        ? `${Math.round(_cs.cost_per_output_unit).toLocaleString('en-GB')} ${_levUnit}`
-        : `£${Math.round(_cs.cost_per_output_unit).toLocaleString('en-GB')}${_cs?.output_unit_label ? '/' + normalise_unicode(String(_cs.output_unit_label)).trim() : ''}`)
+  // Levelised capital cost (item 8): the authoritative BoM total ÷ the brief's
+  // primary output capacity, computed FRESH (the same number the Engineering
+  // Basis economics card + Cost Summary panel show), so the exec summary
+  // surfaces BOTH the headline ex-works cost and a consistent levelised cost.
+  // Computed via levelisedOutputCost (NOT state.costSanity.cost_per_output_unit,
+  // which can carry a stale numerator from an earlier re-run leg). null →
+  // omitted gracefully. The unit label already carries "£/" (e.g. "£/t·yr").
+  const _lev = levelisedOutputCost(state)
+  const levelisedCost = _lev
+    ? (_lev.unit_label
+        ? `${Math.round(_lev.value).toLocaleString('en-GB')} ${_lev.unit_label}`
+        : `£${Math.round(_lev.value).toLocaleString('en-GB')}`)
     : null
   // Open high-severity engineering defect (item 8): the single highest-severity
   // OPEN physics-critic finding the design still carries — surfaced so the
@@ -16407,15 +16487,19 @@ function EngineeringBasisPage({ state, project, statePath }: { state: any; proje
       }
     } catch { /* leave as — */ }
 
-    // Headline economics. Levelised cost: the independent cost-sanity gate
-    // already computes £/output-unit — reuse its EXACT figure (no recompute).
-    const lev = (costSanity && typeof costSanity.cost_per_output_unit === 'number' && isFinite(costSanity.cost_per_output_unit))
-      ? costSanity.cost_per_output_unit
+    // Headline economics. Levelised cost: the authoritative BoM total ÷ the
+    // brief's primary output capacity, computed FRESH via levelisedOutputCost
+    // (NOT state.costSanity.cost_per_output_unit — the shadow audit can cache a
+    // stale numerator from an earlier design-to-budget leg, e.g. RAS £23,501
+    // vs the authoritative £43,186; 2026-06-17 fix). unit_label already carries
+    // "£/" (e.g. "£/t·yr"); render as "<value> <unit_label>" — no leading £, so
+    // never the old double-£ "£43,186 £/t·yr".
+    const _lev = levelisedOutputCost(state)
+    const levStr = _lev
+      ? (_lev.unit_label
+          ? `${Math.round(_lev.value).toLocaleString('en-GB')} ${_lev.unit_label}`
+          : `£${Math.round(_lev.value).toLocaleString('en-GB')}`)
       : null
-    // per_unit_label carries "£/(t·yr CO₂)" — normalise the subscript to ASCII
-    // (the bundled Helvetica renders ₂ as a comma-like glyph that collides with
-    // the adjacent ")"; caught by audit-pdf-layout V-1).
-    const levUnit = normalise_unicode(String(costSanity?.band?.per_unit_label ?? (costSanity?.output_unit_label ? `£/${costSanity.output_unit_label}` : '')))
     const exWorks = (typeof costStack.oem_transfer_price_gbp === 'number')
       ? costStack.oem_transfer_price_gbp
       : (typeof costReality.bom_total_gbp === 'number' ? costReality.bom_total_gbp : null)
@@ -16429,7 +16513,7 @@ function EngineeringBasisPage({ state, project, statePath }: { state: any; proje
     const economics: Array<{ label: string; value: string }> = [
       {
         label: 'Levelised capital cost',
-        value: lev != null ? `£${Math.round(lev).toLocaleString('en-GB')}${levUnit ? ' ' + levUnit : ''}` : '—',
+        value: levStr ?? '—',
       },
       {
         label: 'Ex-works plant cost',
@@ -16696,7 +16780,6 @@ function EngineeringBasisPage({ state, project, statePath }: { state: any; proje
 // PDF. ASCII-safe text; £ is WinAnsi.
 function CostSummaryPanel({ state, project, bomTotals, costStack }: { state: any; project: string; bomTotals: BomTotals | null; costStack?: CostStack | null }) {
   try {
-    const cs: any = state?.costSanity ?? {}
     const cr: any = state?.cost_reality ?? {}
     // Headline figures, all optional.
     const exWorks = (costStack && typeof costStack.oem_transfer_price_gbp === 'number' && costStack.oem_transfer_price_gbp > 0)
@@ -16707,11 +16790,14 @@ function CostSummaryPanel({ state, project, bomTotals, costStack }: { state: any
       : (bomTotals?.grandTotal_gbp ?? null)
     const installed = (costStack && typeof costStack.installed_asp_gbp === 'number' && costStack.installed_asp_gbp > 0)
       ? costStack.installed_asp_gbp : null
-    const levVal = (typeof cs?.cost_per_output_unit === 'number' && isFinite(cs.cost_per_output_unit) && cs.cost_per_output_unit > 0)
-      ? cs.cost_per_output_unit : null
-    const levUnit = normalise_unicode(String(cs?.band?.per_unit_label ?? '')).trim()
-    const levStr = levVal != null
-      ? (levUnit ? `${Math.round(levVal).toLocaleString('en-GB')} ${levUnit}` : `£${Math.round(levVal).toLocaleString('en-GB')}${cs?.output_unit_label ? '/' + normalise_unicode(String(cs.output_unit_label)).trim() : ''}`)
+    // Levelised cost: authoritative BoM total ÷ brief output capacity, computed
+    // FRESH via levelisedOutputCost — NOT state.costSanity.cost_per_output_unit
+    // (the shadow audit can carry a stale numerator; RAS £23,501 vs the
+    // authoritative £43,186; 2026-06-17 fix). One consistent figure across the
+    // exec summary, the Engineering-Basis card, and this panel.
+    const _lev = levelisedOutputCost(state)
+    const levStr = _lev
+      ? (_lev.unit_label ? `${Math.round(_lev.value).toLocaleString('en-GB')} ${_lev.unit_label}` : `£${Math.round(_lev.value).toLocaleString('en-GB')}`)
       : null
 
     // Nothing to show → render nothing (graceful).

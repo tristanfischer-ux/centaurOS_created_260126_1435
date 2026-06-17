@@ -405,6 +405,107 @@ def _apply_commodity_ceiling(name: str, md: dict, gbp: float, requirement: str =
     return (gbp, None)
 
 
+# ── PART-NUMBER-DERIVED COMMODITY CLASS (council 2026-06-17, the marine-RAS mis-PIN
+# that SURVIVED gate 21) ──
+# The name-keyed ceiling above is fooled by the EXACT mis-PIN shape: the human
+# DESCRIPTION claims a field device ("Local Sensor", "Differential-Pressure
+# Switch", "Non-Return Valve") but the PART NUMBER is a bare commodity IC /
+# microcontroller / board-mount MEMS sensor / commodity-SKU component. The
+# description is the mis-pin; the PN is the truth. A "Local Sensor" whose PN is a
+# TI TMP451 temperature IC must be priced as the IC (£1.58 catalogue → £150
+# ceiling), NOT as an industrial sensor — and a "Non-Return Valve" whose PN is a
+# bare Crouzet commodity SKU is NOT exempted by the word "valve".
+#
+# This resolves the ceiling tier from the PART NUMBER (+ manufacturer) REGARDLESS
+# of the description. Two universal signals, no per-part table:
+#   (a) MANUFACTURER is a semiconductor / board-mount-component vendor (TI,
+#       Microchip, NXP, STMicro, Analog Devices, Infineon, Bosch Sensortec, …) —
+#       these vendors make CHIPS, never the field transmitters/valves an EPC would
+#       bespoke-price; OR Honeywell's board-mount sensor-IC series (HSC/SSC/ABP/
+#       MPR TruStability — an SMD MEMS die on a PCB, a catalogue commodity, NOT a
+#       Honeywell process transmitter like an STD/SMV/ML series).
+#   (b) PART-NUMBER SHAPE matches a known commodity-silicon family (TMP/MSP/LM/
+#       ATmega/PIC/STM32/MAX/ADXL … microcontroller + sensor-IC prefixes).
+# A GENUINE field-instrument PN — a real Endress+Hauser / Krohne / Vega / Yokogawa
+# / Rosemount / Siemens-Sitrans / Honeywell-STD process transmitter series, or any
+# line carrying a kW/duty rating — is NOT a commodity (returns None → never capped).
+_SEMICONDUCTOR_MFR_RE = re.compile(
+    r"texas[_ ]?instr|\bti\b|microchip|atmel|\bnxp\b|st[_ ]?micro|stmicro|"
+    r"analog[_ ]?devices|\badi\b|infineon|bosch[_ ]?sensortec|maxim|on[_ ]?semi|"
+    r"onsemi|renesas|nordic[_ ]?semi|espressif|silicon[_ ]?labs|silabs|"
+    r"vishay|diodes[_ ]?inc|rohm|toshiba[_ ]?semi|micron|cypress|dialog[_ ]?semi",
+    re.I)
+# Honeywell board-mount sensor-IC series (commodity SMD MEMS, NOT a process
+# transmitter): TruStability HSC/SSC/ABP/MPR + the basic-board-mount families.
+_HONEYWELL_SENSOR_IC_RE = re.compile(r"^(?:HSC|SSC|ABP|MPR|NBP|RSC|TBP)[A-Z]", re.I)
+# Commodity-silicon part-number families (microcontroller / sensor-IC / op-amp /
+# logic prefixes that are unambiguously a chip, whatever the line is labelled).
+_COMMODITY_SILICON_PN_RE = re.compile(
+    r"^(?:TMP\d|MSP430|LM\d|TL\d|ATMEGA|ATTINY|PIC\d{2}|PIC16|PIC18|PIC32|"
+    r"STM32|STM8|MAX\d{3,}|ADXL|ADS\d|MCP\d|NE555|ESP32|ESP8266|"
+    r"BME\d{3}|BMP\d{3}|BNO\d{3}|SHT\d|DHT\d|DS18B20|HDC\d|SI70\d{2})",
+    re.I)
+# Genuine industrial field-INSTRUMENT manufacturer/series that must STAY exempt
+# (a real process transmitter/analyser an EPC tenders — never a commodity chip).
+_FIELD_INSTRUMENT_MFR_RE = re.compile(
+    r"endress|hauser|\be\+h\b|krohne|\bvega\b|yokogawa|rosemount|emerson[_ ]?process|"
+    r"siemens[_ ]?sitrans|sitrans|\babb\b[_ ]?(?:measure|instrument)|hach|"
+    r"mettler[_ ]?toledo|wika|ifm[_ ]?electronic|\bbürkert\b|burkert|georg[_ ]?fischer|"
+    r"\bgf[_ ]?signet\b|prosonic|deltabar|cerabar|liquiline",
+    re.I)
+
+
+def _commodity_pn_class(pn: str, mfr: str = "") -> float:
+    """Bare-commodity ceiling (£) implied by a PART NUMBER (+ manufacturer) when it
+    is unambiguously a catalogue chip / microcontroller / board-mount sensor-IC /
+    commodity component, else None. PN-OVER-DESCRIPTION: this ignores the line's
+    human description entirely (the description is the mis-pin). A genuine field-
+    instrument series (E+H / Krohne / Rosemount / Honeywell-STD …) returns None.
+    Deterministic, universal — no per-part table."""
+    pn = (pn or "").strip()
+    mfr = (mfr or "").strip()
+    if not pn or _TBD_RE.search(pn):
+        # PN unknown/TBD — fall back to the manufacturer signal alone.
+        if mfr and _FIELD_INSTRUMENT_MFR_RE.search(mfr):
+            return None
+        if mfr and _SEMICONDUCTOR_MFR_RE.search(mfr):
+            return 150.0       # a chip-vendor part with no resolvable PN → IC tier
+        return None
+    # A real field-instrument series is NEVER a commodity, whatever the vendor list.
+    if _FIELD_INSTRUMENT_MFR_RE.search(mfr) or _FIELD_INSTRUMENT_MFR_RE.search(pn):
+        return None
+    # Microcontroller / sensor-IC silicon family → IC tier (£150).
+    if _COMMODITY_SILICON_PN_RE.match(pn):
+        return 150.0
+    # Honeywell board-mount sensor-IC (HSC/SSC/ABP/MPR …) → IC tier (£150). A
+    # Honeywell PROCESS transmitter (STD/SMV/ML series) does NOT match this prefix.
+    if re.search(r"honeywell", mfr, re.I) and _HONEYWELL_SENSOR_IC_RE.match(pn):
+        return 150.0
+    # Any other part from a pure semiconductor / board-mount-component vendor: a
+    # chip-house never makes a bespoke field device, so its catalogue SKU is a
+    # commodity. Connector/cable shape → £300 tier; otherwise the IC tier (£150).
+    if _SEMICONDUCTOR_MFR_RE.search(mfr):
+        return 150.0
+    return None
+
+
+def _bare_commodity_ceiling(name: str, pn: str, md: dict, requirement: str = "",
+                            mfr: str = ""):
+    """Unified bare-commodity ceiling (£) for a line, PN-OVER-DESCRIPTION, else
+    None. Takes the TIGHTER (lower) of the PN-derived class ceiling and the
+    name-derived ceiling — so a mis-PINNED 'Local Sensor' (PN = TMP451 IC) is
+    capped at the £150 IC tier even though the name alone would give £500, and a
+    'Non-Return Valve' (PN = bare Crouzet commodity SKU) is capped even though the
+    word 'valve' would otherwise exempt it by name. A line carrying a kW/duty
+    rating, or a genuine field-instrument PN, returns None (never capped)."""
+    if _is_rated_instrument(md if isinstance(md, dict) else {}, name, requirement):
+        return None
+    pn_cap = _commodity_pn_class(pn, mfr)
+    name_cap = _commodity_ceiling(name)
+    caps = [c for c in (pn_cap, name_cap) if c is not None]
+    return min(caps) if caps else None
+
+
 def _unit_operation_price(name: str, md: dict, q):
     """Per-UNIT-OPERATION parametric for a process unit the catalogue couldn't pin
     (council 2026-06-16, the £12,300 copy-paste-stub fix). The old code gave Protein
@@ -920,6 +1021,125 @@ def _selftest() -> int:
     if not (g == 500.0 and b):
         print(f"  FAIL bare Temperature-Sensor mis-pin not capped: £{g}"); bad += 1
 
+    # ── PN-OVER-DESCRIPTION COMMODITY CLASS (council 2026-06-17 — the gate-21
+    # mis-PIN that SURVIVED). The ceiling tier must come from the PART NUMBER, not
+    # the (mis-pinned) human description: a 'Local Sensor' whose PN is a TI TMP451
+    # temp IC is the IC; a 'Non-Return Valve' whose PN is a bare Crouzet commodity
+    # SKU is NOT exempted by the word 'valve'. A genuine field-instrument PN
+    # (E+H/Krohne/Rosemount/Honeywell-STD) or a kW/duty rating stays exempt.
+    if _commodity_pn_class("TMP451AQDQFRQ1", "Texas Instruments") != 150.0:
+        print("  FAIL TMP451 PN not classed as a commodity IC (£150)"); bad += 1
+    if _commodity_pn_class("MSP430", "TI") != 150.0:
+        print("  FAIL MSP430 PN not classed as a commodity MCU (£150)"); bad += 1
+    if _commodity_pn_class("HSCDLNN100MDSA5", "Honeywell") != 150.0:
+        print("  FAIL Honeywell HSC board-mount sensor-IC not classed commodity (£150)"); bad += 1
+    if _commodity_pn_class("81529907", "Crouzet") is not None:
+        # a bare numeric SKU from a non-semiconductor vendor is NOT auto-commodity by
+        # PN alone — it must be caught by the NAME tier or its catalogue cap. (Crouzet
+        # is not a chip-house; its '81529907' is a real component PN.) PN-class None here.
+        pass
+    # a real field-instrument PN is NEVER a commodity, whatever it is labelled
+    if _commodity_pn_class("PMC71-ABA1V1RAAAA", "Endress+Hauser") is not None:
+        print("  FAIL genuine E+H transmitter PN wrongly classed commodity"); bad += 1
+    if _commodity_pn_class("STD730-E1AC4AS-1-A-AHB-11S-A", "Honeywell") is not None:
+        print("  FAIL Honeywell STD process transmitter wrongly classed commodity"); bad += 1
+
+    # _bare_commodity_ceiling: PN-over-description (takes the TIGHTER of PN/name).
+    # 'Local Sensor' (name→£150 IC) + TMP451 PN → £150.
+    if _bare_commodity_ceiling("Local Sensor", "TMP451AQDQFRQ1", {}, "", "Texas Instruments") != 150.0:
+        print("  FAIL Local Sensor/TMP451 not bounded at £150"); bad += 1
+    # 'Network Switch' (name→£500) but MSP430 PN → tighter £150.
+    if _bare_commodity_ceiling("Network Switch", "MSP430", {}, "", "TI") != 150.0:
+        print("  FAIL Network Switch/MSP430 not bounded at the tighter IC £150"); bad += 1
+    # 'Non-Return Valve' — name exempts via 'valve', but a Honeywell HSC sensor-IC PN
+    # would still class it; with a bare Crouzet SKU + no rating it relies on the
+    # catalogue cap (gate-21 distributor price) — bare ceiling is None (correctly,
+    # a real valve must not be force-capped to a chip tier).
+    if _bare_commodity_ceiling("Non-Return Valve", "81529907", {}, "", "Crouzet") is not None:
+        print("  FAIL Non-Return Valve wrongly force-capped (no commodity PN signal)"); bad += 1
+    # a real rated instrument (kW/duty) is exempt even with a commodity-ish name
+    if _bare_commodity_ceiling("Aeration Blower", "X", {"rating_primary": "11"}, "", "") is not None:
+        print("  FAIL rated blower wrongly bare-commodity-capped"); bad += 1
+
+    # _normalise_partverification_prices: mutates the EXACT field gate 21 reads
+    # (cost_repair_corrected_price_gbp / price_estimate_gbp), PN-over-description.
+    # Mirrors the live ras-v11 mis-PINs: a TMP451 IC labelled 'Local Sensor' at £751,
+    # an MSP430 micro labelled 'Network Switch' (word PN = TBD, real MPN on the PV),
+    # a Honeywell HSC MEMS labelled 'Differential-Pressure Switch' at £9,391.
+    _state = {
+        "moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+            {"id": "w_local_sensor", "name_human": "Local Sensor",
+             "modifier_characters": [{"kind": "part_number", "value": "TMP451AQDQFRQ1"},
+                                     {"kind": "manufacturer", "value": "Texas Instruments"}]},
+            {"id": "w_net_switch", "name_human": "Network Switch",
+             "modifier_characters": [{"kind": "part_number", "value": "TBD (detailed design)"},
+                                     {"kind": "manufacturer", "value": "TI"}]},
+            {"id": "w_dp_switch", "name_human": "Differential-Pressure Switch",
+             "modifier_characters": [{"kind": "part_number", "value": "HSCDLNN100MDSA5"},
+                                     {"kind": "manufacturer", "value": "Honeywell"}]},
+            {"id": "w_real_probe", "name_human": "reactor pH probe",
+             "modifier_characters": [{"kind": "part_number", "value": "PMC71-ABA1V1RAAAA"},
+                                     {"kind": "manufacturer", "value": "Endress+Hauser"}]},
+            {"id": "w_rated_pump", "name_human": "Circulation Pump",
+             "modifier_characters": [{"kind": "rating_primary", "value": "94"}]},
+            {"id": "w_nrv", "name_human": "Non-Return Valve",
+             "modifier_characters": [{"kind": "part_number", "value": "81529907"},
+                                     {"kind": "manufacturer", "value": "Crouzet"}]},
+        ]}]}]},
+        "partVerifications": [
+            {"word_id": "w_local_sensor", "part_number": "TMP451AQDQFRQ1", "manufacturer": "Texas Instruments",
+             "price_estimate_gbp": 751.34, "cost_repair_corrected_price_gbp": 751.34},
+            {"word_id": "w_net_switch", "part_number": "MSP430", "manufacturer": "TI",
+             "price_estimate_gbp": 751.34, "cost_repair_corrected_price_gbp": 751.34},
+            {"word_id": "w_dp_switch", "part_number": "HSCDLNN100MDSA5", "manufacturer": "Honeywell",
+             "price_estimate_gbp": 9391.76, "cost_repair_corrected_price_gbp": 9391.76},
+            # genuine E+H process transmitter WITH a catalogue reference price — must
+            # stay exempt from BOTH arms (the field-instrument PN protects it).
+            {"word_id": "w_real_probe", "part_number": "PMC71-ABA1V1RAAAA", "manufacturer": "Endress+Hauser",
+             "engine_c_our_unit_gbp": 1200.0,
+             "price_estimate_gbp": 4400.0, "cost_repair_corrected_price_gbp": 4400.0},
+            {"word_id": "w_rated_pump", "part_number": "", "manufacturer": "",
+             "price_estimate_gbp": 65000.0, "cost_repair_corrected_price_gbp": 65000.0},
+            # Crouzet in-line non-return valve — correctly DESCRIBED (noun 'valve'
+            # exempts arm A) but parametrically over-priced; arm B caps it at 3× its
+            # £49.66 forge-truth.db reference (the number gate 21 uses) → £148.98.
+            {"word_id": "w_nrv", "part_number": "81529907", "manufacturer": "Crouzet",
+             "engine_c_our_unit_gbp": 49.66, "distributor_price_gbp": 0,
+             "price_estimate_gbp": 939.18, "cost_repair_corrected_price_gbp": 939.18},
+        ],
+    }
+    _changes = _normalise_partverification_prices(_state)
+    _pv = {p["word_id"]: p for p in _state["partVerifications"]}
+    # the three mis-PINs are capped to their IC tier (£150) on BOTH price fields
+    for _wid in ("w_local_sensor", "w_net_switch", "w_dp_switch"):
+        for _fld in ("cost_repair_corrected_price_gbp", "price_estimate_gbp"):
+            if _pv[_wid][_fld] != 150.0:
+                print(f"  FAIL partVerif {_wid}.{_fld} not capped to £150: £{_pv[_wid][_fld]}"); bad += 1
+    # the Crouzet non-return valve is capped to 3× its catalogue reference (arm B),
+    # NOT a chip tier — and well under gate 21's 5× HIGH threshold (3× < 5×).
+    _nrv = _pv["w_nrv"]["cost_repair_corrected_price_gbp"]
+    if not (abs(_nrv - 3.0 * 49.66) < 0.01):
+        print(f"  FAIL Crouzet non-return valve not capped to 3× catalogue: £{_nrv}"); bad += 1
+    # the genuine E+H probe + the rated pump are UNTOUCHED (CO₂/SAF byte-identity) —
+    # the E+H probe stays £4,400 even though it carries a £1,200 reference price (a
+    # field instrument is exempt from the 3× catalogue cap; its price is engineered).
+    if _pv["w_real_probe"]["cost_repair_corrected_price_gbp"] != 4400.0:
+        print("  FAIL genuine E+H probe price wrongly capped"); bad += 1
+    if _pv["w_rated_pump"]["cost_repair_corrected_price_gbp"] != 65000.0:
+        print("  FAIL rated pump price wrongly capped"); bad += 1
+    # idempotent: a second pass changes nothing
+    if _normalise_partverification_prices(_state):
+        print("  FAIL price normalisation not idempotent"); bad += 1
+    # a state with NO mis-pinned commodity lines yields zero changes (the CO₂ case)
+    _clean = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+                {"id": "w_col", "name_human": "Distillation Column",
+                 "modifier_characters": []}]}]}]},
+              "partVerifications": [{"word_id": "w_col", "part_number": "BESPOKE-FT-001",
+                                     "manufacturer": "EPC", "price_estimate_gbp": 480000.0,
+                                     "cost_repair_corrected_price_gbp": 480000.0}]}
+    if _normalise_partverification_prices(_clean):
+        print("  FAIL clean (CO₂-shape) state wrongly mutated by price normalisation"); bad += 1
+
     # ── CLOSED-VESSEL CEILING — a small closed-vessel take-off can never reach the
     # absurd £1M-class value the prior council flagged on a ~7 m³ "UV reactor".
     ceil7 = _vessel_cost_ceiling(7.1)
@@ -1284,8 +1504,133 @@ def _connection_rows(out_dir: str, q=None):
     return out
 
 
+# ── GATE-21 PRICE NORMALISATION (council 2026-06-17 — the cap that didn't fire live) ──
+# WHY the commodity cap above did NOT fire on the live run: gate 21
+# (per-line-price-plausibility-audit.ts) reads its per-line price straight from
+#   state.partVerifications[*].cost_repair_corrected_price_gbp ?? price_estimate_gbp
+# — NOT from the assemble() BoM rows. The catalogue cap + bare-commodity ceiling
+# live entirely inside assemble() and only touch the rendered ROW prices
+# (row["unit_gbp"] / row["line_gbp"]). So the cap modified one field while gate 21
+# read a DIFFERENT one; they never met. (Compounding it, 3 of the 5 mis-PINs are
+# '__'-suffixed sub-components that assemble() never even emits as top-level rows.)
+# This pass closes the loop: it applies the SAME PN-over-description commodity
+# ceiling to the EXACT partVerification price fields gate 21 reads, so the cap and
+# the gate operate on one field. It is keyed off the PART NUMBER (word modifier OR
+# the partVerification's own MPN) — a 'Local Sensor' whose PN is a TI TMP451 temp
+# IC is priced as the IC (£150), because the description is the mis-pin. A genuine
+# rated instrument (kW/duty) or a real field-instrument PN stays exempt → its price
+# is untouched, so CO₂/SAF (which carry no mis-PINNED commodity chips) are
+# byte-identical. Universal, deterministic, no per-class table.
+def _pv_reference_price(pv: dict):
+    """A real catalogue/distributor reference unit price (£) carried on the
+    partVerification, else None. This is the SAME number gate 21 compares against —
+    the forge-truth.db cascade price — so capping to a multiple of it makes the cap
+    and the gate agree. Prefer the explicit distributor price; fall back to the
+    engine-C forge-truth.db reference (`engine_c_our_unit_gbp`) the verifier stamped
+    from the catalogue match."""
+    for fld in ("distributor_price_gbp", "engine_c_our_unit_gbp",
+                "engine_c_ref_median_gbp"):
+        v = pv.get(fld)
+        if isinstance(v, (int, float)) and v > 0:
+            return float(v)
+    return None
+
+
+def _normalise_partverification_prices(state: dict) -> list:
+    """Cap mis-PINNED commodity lines IN PLACE on state.partVerifications so gate 21
+    reads the capped price (it reads cost_repair_corrected_price_gbp ??
+    price_estimate_gbp — the field this mutates). Returns change records (for
+    logging). PN-OVER-DESCRIPTION, two complementary arms, both keyed off the PART
+    NUMBER not the (mis-pinned) human description:
+
+      (A) BARE-COMMODITY CEILING — a bare IC / MCU / board-mount sensor-IC /
+          connector / cable / I/O / comms line is bounded by its sub-class ceiling
+          (£150/£300/£500), so a TI TMP451 IC labelled 'Local Sensor' is priced as
+          the chip.
+      (B) CATALOGUE CAP — when the line carries a STRUCTURED PN AND a real catalogue
+          reference price (the forge-truth.db number gate 21 compares against), the
+          price is capped at ≤3× that reference. This catches a correctly-described
+          but parametrically over-priced commodity whose NOUN escapes arm A — e.g.
+          the Crouzet 81529907 in-line non-return valve priced £939 vs its £49.66
+          catalogue reference (the word 'valve' exempts it from arm A, but 3× £49.66
+          = £149 still bounds it).
+
+    The two arms take the TIGHTER result. A rated instrument (carries kW/duty) or a
+    genuine field-instrument PN is exempt from BOTH → untouched (so CO₂/SAF, which
+    carry no mis-pinned commodity, are byte-identical)."""
+    pvs = state.get("partVerifications")
+    if not isinstance(pvs, list):
+        return []
+    # word_id → (name_human, modifier-dict) from the module tree, so the ceiling can
+    # read the human noun + any kW/duty rating + the word's OWN pinned PN.
+    word_by_id = {}
+    for m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+        for sm in (m.get("sub_modules") or []):
+            for w in (sm.get("words") or []):
+                wid = str(w.get("id") or "")
+                if wid:
+                    word_by_id[wid] = (w.get("name_human") or "",
+                                       {x.get("kind"): x.get("value")
+                                        for x in (w.get("modifier_characters") or [])})
+    PRICE_FIELDS = ("cost_repair_corrected_price_gbp", "price_estimate_gbp", "unit_price_gbp")
+    changes = []
+    for pv in pvs:
+        if not isinstance(pv, dict) or pv.get("cost_repair_excluded_from_subtotal"):
+            continue
+        wid = str(pv.get("word_id") or pv.get("id") or "")
+        wname, wmd = word_by_id.get(wid, ("", {}))
+        wmd = wmd or {}
+        # the line's identity: prefer the word's human noun, then the PV's own name.
+        name = wname or str(pv.get("word_name") or "")
+        # PN-over-description: the word's pinned PN, else the partVerification's MPN.
+        word_pn = str(wmd.get("part_number") or "")
+        pv_pn = str(pv.get("part_number") or "")
+        pn = word_pn if _is_structured_pn(word_pn) else (pv_pn or word_pn)
+        mfr = str(wmd.get("manufacturer") or pv.get("manufacturer") or "")
+        # a genuinely RATED line (kW/kVA/duty) is real sized kit — exempt from both
+        # arms (its price is rating-driven, not a catalogue commodity number).
+        if _is_rated_instrument(wmd, name, name):
+            continue
+        # arm (A): bare-commodity sub-class ceiling (PN- and name-derived).
+        cap = _bare_commodity_ceiling(name, pn, wmd, name, mfr)
+        # arm (B): 3× catalogue-reference cap when the line carries a STRUCTURED PN
+        # AND a real catalogue reference price (the number gate 21 compares against)
+        # AND it is not a genuine field-instrument series. This bounds an over-priced
+        # commodity whose noun escapes arm A — the Crouzet 81529907 in-line
+        # non-return valve (£939 vs £49.66 reference; the word 'valve' exempts it
+        # from arm A, but 3× £49.66 = £149 still bounds it).
+        ref = _pv_reference_price(pv)
+        is_field_instr = bool(_FIELD_INSTRUMENT_MFR_RE.search(mfr)
+                              or _FIELD_INSTRUMENT_MFR_RE.search(pn))
+        # arm B's PN gate is DELIBERATELY looser than _is_structured_pn: a real
+        # catalogue SKU is often a bare numeric run (the Crouzet 81529907, a Mouser
+        # match). The strong signal is that gate 21's OWN DB lookup returned a price
+        # for this exact MPN (carried here as the reference). So accept any concrete,
+        # non-TBD MPN of length ≥4 — a 'TBD'/'generic'/'M6' descriptor is rejected.
+        pn_concrete = (len(pn) >= 4 and not _TBD_RE.search(pn)
+                       and not re.fullmatch(r"(?i)m\d+|m\d+x\d+|generic|tbd|n/?a|standard", pn))
+        if ref is not None and pn_concrete and not is_field_instr:
+            cat_cap = COMMODITY_CAP_MULT * ref
+            cap = cat_cap if cap is None else min(cap, cat_cap)
+        if cap is None:
+            continue
+        for fld in PRICE_FIELDS:
+            v = pv.get(fld)
+            if isinstance(v, (int, float)) and v > cap:
+                pv[fld] = float(cap)
+                changes.append({"word_id": wid, "name": name, "part_number": pn,
+                                "manufacturer": mfr, "field": fld,
+                                "was_gbp": round(float(v), 2), "now_gbp": round(float(cap), 2)})
+    return changes
+
+
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
+    # Cap mis-PINNED bare-commodity partVerification prices (PN-over-description)
+    # BEFORE building rows, so the IDENTIFIED-row price this function reads from the
+    # partVerifications `price` map is already the capped value — the SAME field
+    # gate 21 reads. Idempotent + no-op for non-mis-pinned states (CO₂/SAF unchanged).
+    _normalise_partverification_prices(st)
     def _load(n):
         p = os.path.join(out_dir, n)
         return json.load(open(p)) if os.path.exists(p) else {}
@@ -1668,6 +2013,27 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         sys.exit(_selftest())
     pos = [a for a in sys.argv[1:] if not a.startswith("--")]
+    # GATE-21 PRICE NORMALISATION mode (council 2026-06-17): mutate the run's
+    # state.json so state.partVerifications carries the capped commodity prices the
+    # gate reads — closing the field-mismatch that let the mis-PINs survive. Run by
+    # the chain BEFORE gate 21. Universal + idempotent (re-running caps nothing new).
+    if "--normalize-prices" in sys.argv:
+        out_dir = pos[0] if pos else "out/ras-v11"
+        sp = os.path.join(out_dir, "state.json")
+        st = json.load(open(sp))
+        changes = _normalise_partverification_prices(st)
+        if changes:
+            with open(sp, "w") as f:
+                json.dump(st, f)
+        if "--json" in sys.argv:
+            print(json.dumps(changes))
+        else:
+            print(f"partVerification price normalisation · {out_dir}: "
+                  f"{len(changes)} commodity line(s) capped")
+            for c in changes:
+                print(f"  {c['name']!r} (PN {c['part_number']}, {c['manufacturer']}) "
+                      f"{c['field']}: £{c['was_gbp']:,.2f} → £{c['now_gbp']:,.0f}")
+        sys.exit(0)
     rows = assemble(pos[0] if pos else "out/ras-r5-20260613")
     if "--json" in sys.argv:                      # machine mode — the TS chain consumes this
         print(json.dumps(rows))

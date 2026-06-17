@@ -7765,6 +7765,35 @@ async function main() {
   // Distinct from gate 10 B-7: B-7 checks AGGREGATE total vs industry band;
   // gate 21 checks each INDIVIDUAL line — the two are orthogonal.
   // Gate 10 B-7 (total cost) remains running; gate 21 adds per-line coverage.
+  //
+  // PRE-GATE COMMODITY PRICE NORMALISATION (council 2026-06-17 — the cap that did
+  // NOT fire live): the requirements_bom.py commodity cap modified the rendered BoM
+  // ROW prices, but gate 21 reads state.partVerifications[*].cost_repair_corrected_
+  // price_gbp ?? price_estimate_gbp — a DIFFERENT field, so a mis-PINNED commodity
+  // (a TI TMP451 IC billed as a "Local Sensor" at £751; a Honeywell HSC MEMS billed
+  // as a "Differential-Pressure Switch" at £9,391) survived gate 21. This pass caps
+  // those partVerification price fields IN PLACE using the SAME PN-over-description
+  // commodity ceiling — so the cap and the gate read one field. PN-keyed: a bare
+  // commodity IC/MCU/board-mount-sensor is priced as the chip regardless of its
+  // (mis-pinned) description; a genuine field-instrument PN or a kW/duty-rated line
+  // is untouched (CO₂/SAF byte-identical). Universal, idempotent, non-fatal.
+  try {
+    const reqPy = resolve(__dirname, 'requirements_bom.py')
+    const reqVenv = resolve(__dirname, '..', '.venv', 'bin', 'python')
+    const reqBin = existsSync(reqVenv) ? reqVenv : 'python3'
+    const normOut = execFileSync(reqBin, [reqPy, outDir, '--normalize-prices', '--json'],
+      { encoding: 'utf8', cwd: resolve(__dirname, '..'), maxBuffer: 16 * 1024 * 1024 })
+    const normChanges = JSON.parse(normOut || '[]')
+    if (Array.isArray(normChanges) && normChanges.length > 0) {
+      console.log(`[chain] gate-21 price normalisation: capped ${normChanges.length} mis-pinned commodity partVerification price(s) before per-line audit`)
+      logAction({ step: 'gate21_price_normalisation', ok: true, capped: normChanges.length })
+    } else {
+      logAction({ step: 'gate21_price_normalisation', ok: true, capped: 0 })
+    }
+  } catch (err) {
+    console.error(`[chain] gate-21 price normalisation failed (non-fatal): ${(err as Error).message.slice(0, 120)}`)
+    logAction({ step: 'gate21_price_normalisation', ok: false, error: String(err).slice(0, 200) })
+  }
   try {
     execFileSync(
       'npx',

@@ -584,6 +584,57 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     (v) => `result=${v}`,
   ))
 
+  // ── A2c. LONE-SYNONYM ADOPTION — the SOURCE fix for the live RAS twin (#136, 2026-06-17). The
+  // A2b fixture above has BOTH synonym words PRESENT (the backstop path). But the live defect was
+  // subtler: at the moment reconcile runs, ONLY the grounded "Circulation Pump" exists (a real
+  // skeleton/emitter word, `_synthesized` UNSET) — the `recirc_pump_synth` twin does NOT exist yet.
+  // The pair-collapse then no-ops (one word), and the canon-claim phase (which inspects only
+  // `_synthesized` words and matches by exact-id / stem-subset — `circul` ⊄ `recir`) finds the
+  // `recirc_pump` canon UNOWNED and RE-SYNTHESISES a fresh twin (×8, 94 kW, £526k) — born AFTER the
+  // collapse could catch it. The fix folds the lone grounded role-synonym onto its canon up-front,
+  // so the canon-claim then EXACT-matches it (synthesizedMissing does NOT mint a recirc twin). This
+  // fixture reproduces that exact tree: ONE grounded circulation pump (no synth flag, no twin) + a
+  // distinct make-up pump + a heat pump (must NOT be adopted onto the recirc canon). Universal.
+  const loneContract: any = { quantities: {
+    recirc_pump_power_kw: { value: 94, unit: 'kW' }, recirc_pump_count: { value: 8, unit: '' },
+    makeup_pump_power_kw: { value: 15, unit: 'kW' },
+    heat_pump_electrical_kw: { value: 220, unit: 'kW' },
+  } }
+  const loneModules: any = [
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [
+      // GROUNDED circulation pump — _synthesized UNSET, the live pre-reconcile state. No recirc twin.
+      { id: 'circulation_pump_word', name_human: 'Circulation Pump', content_character: { character_id: 'circulation_pump', name_human: 'Circulation Pump' }, modifier_characters: [ { kind: 'quantity', value: '×8' }, { kind: 'rating_primary', value: '94', unit: 'kW' }, { kind: 'manufacturer', value: 'Grundfos' }, { kind: 'part_number', value: 'NB-80' } ] },
+      // a child of the grounded pump — must be re-keyed onto the canon id (not orphaned/duplicated)
+      { id: 'circulation_pump_word__casing', name_human: 'Casing', content_character: { character_id: 'circulation_pump_word__casing' }, modifier_characters: [ { kind: 'quantity', value: '×8' } ], _subcomponent: true },
+      // a genuinely-distinct make-up pump (different role) — must NOT be adopted onto the recirc canon
+      { id: 'makeup_pump_synth_word', name_human: 'Make-up Pump', content_character: { character_id: 'makeup_pump_synth', name_human: 'Make-up Pump' }, modifier_characters: [ { kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '15', unit: 'kW' } ], _synthesized: true },
+    ] } ] },
+  ]
+  const loneRec = reconcilePrincipalEquipment(loneModules, loneContract)
+  const loneRec2 = reconcilePrincipalEquipment(loneModules, loneContract) // idempotency
+  const loneTop = () => loneModules.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => !w._subcomponent)))
+  const lonePumps = loneTop().filter((w: any) => /recirc|circulation/i.test(String(w.name_human)) && /pump/i.test(String(w.name_human)))
+  const loneSurv = lonePumps[0]
+  const loneSurvId = loneSurv ? String(loneSurv.id ?? '') : ''
+  const loneSurvQty = loneSurv ? String((loneSurv.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value ?? '') : ''
+  const loneSurvMpn = loneSurv ? String((loneSurv.modifier_characters || []).find((mc: any) => mc.kind === 'manufacturer')?.value ?? '') : ''
+  const loneMakeup = loneTop().filter((w: any) => /make-?up pump/i.test(String(w.name_human)))
+  const loneCasings = loneModules.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => /casing/i.test(String(w.name_human)))))
+  out.push(assertEq(
+    'UNIVERSAL.principal_lone_synonym_adopts_canon_no_twin',
+    'a LONE grounded role-synonym principal (a "Circulation Pump", no synth twin present) is ADOPTED onto its contract canon (recirc_pump_synth_word, ×8, MPN preserved, child re-keyed) so the canon-claim does NOT re-synthesise a duplicate twin — exactly ONE recirc/circ pump remains, the distinct make-up pump survives, and re-running mints no twin (idempotent). This is the SOURCE fix for the live RAS £526k double-count.',
+    JSON.stringify({ pumpCount: lonePumps.length, survId: loneSurvId, survQty: loneSurvQty, survHasMpn: !!loneSurvMpn, makeupCount: loneMakeup.length, casingCount: loneCasings.length, recircResynthesised: loneRec.synthesizedMissing, idempotentResynth: loneRec2.synthesizedMissing }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      // exactly ONE recirc/circ pump, re-identified onto the canon id at ×8 keeping its real MPN;
+      // its single casing child re-keyed (not duplicated); make-up pump preserved; NO recirc twin
+      // was re-synthesised on either pass (the adopt pre-empted it).
+      return o.pumpCount === 1 && o.survId === 'recirc_pump_synth_word' && /×\s*8/.test(o.survQty) && o.survHasMpn &&
+        o.makeupCount === 1 && o.casingCount === 1 && o.idempotentResynth === 0
+    },
+    (v) => `result=${v}`,
+  ))
+
   // ── A3. PROCESS INSTRUMENTATION synthesised from the contract's control variables ──
   // Tristan #140 (life-safety): every control variable the contract declares a setpoint/
   // target for must get its field instrument on the vessel that holds it. A RAS rearing

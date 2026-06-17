@@ -1671,7 +1671,34 @@ function collapseRoleSynonyms(modules: ModuleLike[], canons: CanonEquip[] = []):
     }
   }
   for (const owned of bySig.values()) {
-    if (owned.length < 2) continue
+    // LONE ROLE-SYNONYM → ADOPT THE CANON (THE SOURCE FIX, #136 council 2026-06-17). A single
+    // principal carrying a role-synonym name (a grounded "Circulation Pump", stem `circul`) whose
+    // role SIGNATURE+residual matches a contract canon (the `recirc_pump` group, stem `recir`) must
+    // be RE-IDENTIFIED onto that canon NOW — before the canon-claim phase below runs. Without this,
+    // the canon-claim (which only inspects `_synthesized` words AND matches by exact-id / stem-
+    // subset) cannot see that the grounded `circulation` word already IS the `recirc` pump: the
+    // stems differ, so it finds the canon UNOWNED and re-synthesises a fresh `recirc_pump_synth`
+    // TWIN — the SAME pump a second time (×8, 94 kW, £526k). The pair-collapse loop below can't
+    // catch that twin because it is born AFTER this whole pass. Folding the lone grounded synonym
+    // onto its canon up-front means the canon-claim then EXACT-matches it (no re-synth, no twin).
+    // Strictly scoped: fires ONLY when there is exactly ONE such word (no pair to collapse) AND it
+    // is NOT already the canon id AND its signature+residual hits a contract canon — so a make-up /
+    // feed / backwash pump (distinct role qualifier → distinct signature → no canon match) and a
+    // genuinely-paired set (handled by the cluster loop) are untouched. Universal — role-synonym
+    // map keyed on role+kind, no class branch.
+    if (owned.length === 1) {
+      const only = owned[0]
+      const sigKey = `${roleSignature(only.word)}::${roleResidual(only.word)}`
+      const canon = canonByKey.get(sigKey)
+      if (canon && String(only.word.id ?? '') !== canon.id) {
+        const oldId = only.word.id
+        if (forceCanonIdentity(only.word, canon)) {
+          rekeyChildren(only.sm.words ?? [], oldId, canon.id)
+          out.details.push(`adopted lone synonym '${only.word.name_human ?? oldId}' → canon ${canon.id} (role ${sigKey}; pre-empts a re-synthesised twin)`)
+        }
+      }
+      continue
+    }
     // Within a role+kind signature, group into clusters that are the SAME physical item: an
     // EQUAL distinguishing residual (differ only in the role-synonym word) AND a compatible
     // rating AND a compatible count. Two words that share the role but carry a different

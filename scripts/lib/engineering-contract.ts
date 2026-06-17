@@ -11988,21 +11988,41 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // explicitly and recovered by the HEX, so it must NOT be re-added here.
   const buildingProcessLossKw = Math.round(183 * Math.max(1, Math.cbrt(scale)))
 
-  // ── VENTILATION MAKE-UP HEATING (council RAS fix, ventilation) ─────────────────
+  // ── VENTILATION MAKE-UP HEATING (council RAS fix, ventilation; HVAC-seat regression fix) ──
   // PRECONDITION: a HEATED BUILDING with MECHANICAL VENTILATION in a climate BELOW the
   // setpoint. The thermal chain (make-up + HEX + building-fabric loss) omitted the largest
   // remaining heating term: the OUTDOOR AIR a moisture-laden fish hall must continuously
   // supply (to clear the evaporation + CO₂ off ~1,200 m² of open 26.4 °C water) has to be
-  // HEATED from the cold Scottish ambient (~8 °C) up to the hall setpoint. UNIVERSAL: any
-  // heated building with mechanical ventilation in an ambient below setpoint carries a
-  // ventilation heating load = ṁ_air·cp·(setpoint − ambient) less whatever the HRV recovers;
-  // a plant with no heated building, or in a climate at/above setpoint, has none.
+  // HEATED from the cold winter ambient up to the hall setpoint. UNIVERSAL: any heated
+  // building with mechanical ventilation in an ambient below setpoint carries a ventilation
+  // heating load = ṁ_air·cp·(setpoint − DESIGN ambient) less whatever the HRV recovers; a
+  // plant with no heated building, or in a climate at/above setpoint, has none.
   //   Supply airflow is the AIR-CHANGE requirement of the hall (NOT a figure inferred from
   //   the building-fabric loss): hall floor ≈ tank plan area ÷ tank floor-coverage; hall
   //   volume = floor × clear height; supply = hall volume × air-changes/hour.
-  const ambientTempC = (() => {
-    const t = Number(brief?.constraints?.operating_environment?.temp_min_c)
-    return Number.isFinite(t) ? t : 8   // cold-design ambient for the ventilation lift (Scottish ~8 °C)
+  //
+  // CORRECTION #1 — DESIGN OUTDOOR TEMPERATURE, not the annual MEAN (HVAC seat, regression).
+  //   Ventilation + fabric DESIGN heating loads MUST use the heating DESIGN outdoor
+  //   temperature (the CIBSE 99th-percentile winter design day), NEVER the annual-mean
+  //   ambient. The prior fix used temp_min_c (≈8 °C — the annual mean for the Scottish
+  //   marine site) and so under-sized the lift by ~11 K. The brief's temp_min_c is the
+  //   ANNUAL MEAN, not a 99th-percentile design value, so it must be mapped DOWN to a
+  //   design day: for Tayinloan/Campbeltown (west-coast Scotland, mild marine) the CIBSE
+  //   heating design outdoor temperature is ≈ −3 °C. UNIVERSAL: take an explicit design
+  //   outdoor temperature if the brief supplies one (operating_environment.heating_design_temp_c
+  //   / design_outdoor_temp_c), else derive a 99th-percentile design day from the stated
+  //   ambient by subtracting a marine-climate design margin (≈11 K below the annual mean),
+  //   clamped to the canonical −3 °C west-Scotland value when no climate data is present.
+  const designOutdoorTempC = (() => {
+    const oe = brief?.constraints?.operating_environment ?? {}
+    const explicit = Number(oe.heating_design_temp_c ?? oe.design_outdoor_temp_c ?? oe.winter_design_temp_c)
+    if (Number.isFinite(explicit)) return explicit                  // brief-stated 99th-percentile design day wins
+    const annualMean = Number(oe.temp_min_c)
+    // temp_min_c here is the ANNUAL MEAN (≈8 °C), not a design-day minimum → map it DOWN to
+    // a 99th-percentile heating design day (≈ annual mean − 11 K marine margin), bounded so a
+    // genuinely cold continental site is not warmed up nor a mild marine site over-cooled.
+    if (Number.isFinite(annualMean)) return Math.min(annualMean - 11, -3)
+    return -3                                                        // canonical west-Scotland CIBSE design day
   })()
   const TANK_WATER_DEPTH_M = 3.0                                  // shallow circular rearing tank
   const TANK_FLOOR_COVERAGE = 0.40                               // tanks occupy ~40% of the hall floor (walkways, plant, access)
@@ -12011,34 +12031,57 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const hallFloorAreaM2 = (totalTankVolumeM3 / TANK_WATER_DEPTH_M) / TANK_FLOOR_COVERAGE   // ~2,780 m²
   const hallVolumeM3 = hallFloorAreaM2 * HALL_CLEAR_HEIGHT_M                                 // ~16,700 m³
   const ventilationSupplyAirM3H = Math.round(hallVolumeM3 * HALL_AIR_CHANGES_PER_H)         // ~100,000 m³/h
-  // GROSS ventilation heating = heat the whole supply air from ambient to setpoint.
+  // GROSS ventilation heating = heat the whole supply air from the DESIGN outdoor temp to setpoint.
   // Q = ṁ·cp·ΔT ; ṁ = ρ_air·V̇ (ρ ≈ 1.2 kg/m³) ; cp ≈ 1.005 kJ/kg·K.
   const AIR_DENSITY_KG_M3 = 1.2, AIR_CP_KJ_KG_K = 1.005
-  const ventDeltaTLift = Math.max(0, setpointTempC - ambientTempC)                          // ~18.4 K
-  const ventilationHeatingGrossKw = Math.round((ventilationSupplyAirM3H * AIR_DENSITY_KG_M3 * AIR_CP_KJ_KG_K * ventDeltaTLift) / 3600)  // ~620 kW gross
-  // HRV recovery — the supply/extract heat exchanger pre-heats incoming outdoor air from the
-  // warm exhaust. The HRV (gap-4) is sized to the FULL supply flow, but the recoverable
-  // FRACTION is deliberately MODEST for a fish hall: the extract is warm and near-SATURATED
-  // (it carries the evaporated moisture this ventilation exists to remove), so a high-recovery
-  // enthalpy/thermal wheel would frost and carry condensate/odour back into the supply. A
-  // sensible-only run-around coil / plate exchanger on a full-flow but moisture-limited duty
-  // recovers ~ε = 0.30 of the gross. (A dry-air plant could run a 0.75 wheel; the wet extract
-  // here caps it — universal: recovery is bounded by the extract's state, not just the area.)
-  const hrvEffectiveness = 0.30
-  const ventilationHrvRecoveryKw = Math.round(ventilationHeatingGrossKw * hrvEffectiveness)        // ~185 kW recovered
-  // NET ventilation make-up heating the heat plant must still supply = gross − HRV recovery.
-  const ventilationHeatingKw = (setpointTempC > ambientTempC && ventilationSupplyAirM3H > 0)
+  const ventDeltaTLift = Math.max(0, setpointTempC - designOutdoorTempC)                    // ~29.4 K at −3 °C design (was ~18.4 K at 8 °C mean)
+  const ventilationHeatingGrossKw = Math.round((ventilationSupplyAirM3H * AIR_DENSITY_KG_M3 * AIR_CP_KJ_KG_K * ventDeltaTLift) / 3600)  // ~987 kW gross at design temp
+  // CORRECTION #2 — HRV at a REAL recovery effectiveness (HVAC seat, regression).
+  //   The prior 0.30 was an order below any real heat-recovery device. A rotary thermal
+  //   wheel / counterflow plate exchanger achieves 70-85 % SENSIBLE effectiveness. RATE the
+  //   unit at ε = 0.75 (mid-band) — the device the BoM buys and the figure the dossier
+  //   advertises. ≈ 740 kW recovered at the rated point.
+  const hrvEffectiveness = 0.75
+  const ventilationHrvRecoveryKw = Math.round(ventilationHeatingGrossKw * hrvEffectiveness)        // ~740 kW recovered (rated)
+  // STEADY (annual-typical) net ventilation heating at the RATED recovery — the figure the
+  // plant supplies on a normal day with the wheel fully effective. ≈ 247 kW.
+  const ventilationHeatingKw = (setpointTempC > designOutdoorTempC && ventilationSupplyAirM3H > 0)
     ? Math.max(0, ventilationHeatingGrossKw - ventilationHrvRecoveryKw)
-    : 0                                                                                            // ~435 kW net (≈620 − 185)
+    : 0                                                                                            // ~247 kW net (≈987 − 740)
+  // CORRECTION #2b — FROST/CONDENSATION DESIGN-DAY DERATE (humid RAS extract).
+  //   The warm fish-hall extract is near-SATURATED (it carries the evaporated moisture the
+  //   ventilation exists to remove). On the −3 °C design day that wet extract FROSTS the
+  //   wheel; defrost cycling + frost-protection bypass collapse the AVAILABLE recovery far
+  //   below the dry rated 0.75. Chartered practice SIZES the life-support heat plant to the
+  //   frost-limited design point, NOT to the best-case dry recovery on the worst frost day.
+  //   Apply a design-day availability factor to the rated wheel; the EFFECTIVE design-day
+  //   recovery is ε_rated × availability. The plant (heat pump + backup) is sized to the
+  //   ventilation make-up the wheel CANNOT recover on that day. (A DRY-extract plant sets
+  //   availability ≈ 1.0 and steady == design; only a humid/condensing extract derates.)
+  const hrvExtractIsHumid = standingBiomassKg > 0                                                  // open warm-water culture → near-saturated extract
+  const HRV_FROST_DESIGN_AVAILABILITY = hrvExtractIsHumid ? 0.40 : 1.0                             // 40 % of rated recovery survives the design-day frost duty
+  const hrvDesignEffectiveRecoveryEff = hrvEffectiveness * HRV_FROST_DESIGN_AVAILABILITY           // ≈ 0.30 effective on the design day
+  const ventilationHrvRecoveryDesignKw = Math.round(ventilationHeatingGrossKw * hrvDesignEffectiveRecoveryEff)  // ~296 kW available on the design day
+  const ventilationHeatingDesignKw = (setpointTempC > designOutdoorTempC && ventilationSupplyAirM3H > 0)
+    ? Math.max(0, ventilationHeatingGrossKw - ventilationHrvRecoveryDesignKw)
+    : 0                                                                                            // ~691 kW the plant must supply on the design day
 
-  // NET heat-pump thermal duty = building fabric loss + residual make-up heating (post-HEX)
-  // + NET ventilation make-up heating (post-HRV). The recovered make-up (866 kW) + recovered
-  // ventilation (~185 kW) never reach the heat pump. ~770 kW thermal (was ~336 kW — the
-  // ventilation make-up heating term, the single largest omission, was entirely absent).
-  const heatingDutyKw = buildingProcessLossKw + residualMakeupHeatingKw + ventilationHeatingKw
-  // Heat-pump electrical input from the seasonal COP (water-source ~3.5).
-  const heatPumpCop = 3.5
-  const heatPumpElectricalKw = Math.round(heatingDutyKw / heatPumpCop)
+  // CORRECTION #3 — heating_duty sized to the DESIGN-DAY peak, and the heat pump is a
+  //   SEAWATER-SOURCE unit with a COP from THAT source (HVAC seat, regression).
+  // NET heat-pump thermal DESIGN duty = building fabric loss (at design temp) + residual
+  // make-up heating (post-HEX) + DESIGN-DAY ventilation make-up heating (post frost-limited
+  // HRV). ≈ 1,027 kW — the seat's peak. The recovered make-up (866 kW) + the recovered
+  // ventilation never reach the heat pump.
+  const heatingDutyKw = buildingProcessLossKw + residualMakeupHeatingKw + ventilationHeatingDesignKw
+  // SEAWATER-SOURCE heat pump: Tayinloan sits on a sea loch with seawater ≈ 8-12 °C year-round,
+  // a far warmer and steadier source than −3 °C design-day AIR (an air-source unit would
+  // collapse exactly when the load peaks). Lifting that 8-12 °C source to the 26.4 °C loop is a
+  // ~14-18 K lift, at which a modern water-source (R290/ammonia) heat pump achieves COP ≈ 4.5-5.5;
+  // take 5.0 (mid). This is BOTH the source spec and a defensible seasonal COP for the duty.
+  const heatPumpSource = 'seawater (sea-loch intake, ~8-12 °C year-round)'
+  const heatPumpCop = 5.0
+  // elec × COP MUST cover the duty → round the electrical input UP (ceil), never down.
+  const heatPumpElectricalKw = Math.ceil(heatingDutyKw / heatPumpCop)
 
   // Make-up/bleed HEX heat-transfer area from Q = U·A·LMTD (counter-current plate).
   // Effectiveness ε fixes the terminal temperatures for balanced mass-flows:
@@ -12262,7 +12305,7 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // supply, so a heat-pump trip cannot let the loop cool. The gate fires when the
   // contract declares a positive heating duty on a live/temperature-critical loop.
   const heatSourceIsLifeCritical = heatingDutyKw > 0 && standingBiomassKg > 0   // sole heat source over a live inventory
-  const backupImmersionHeaterPowerKw = heatSourceIsLifeCritical ? Math.round(heatingDutyKw) : 0  // backup = full net heating duty (~771 kW, now incl. ventilation)
+  const backupImmersionHeaterPowerKw = heatSourceIsLifeCritical ? Math.round(heatingDutyKw) : 0  // backup ≥ full DESIGN heating duty (~1,027 kW, design-day incl. frost-limited ventilation) — guaranteed ≥ heating_duty_kw
   const criticalEquipmentRedundancy = heatSourceIsLifeCritical ? 1 : 0          // N+1 flag on the life-critical heat source
 
   // ── (4) LIFE-CRITICAL GAS-DOSING FAIL-SAFE STATE (oxygen to the fish) ─────────
@@ -12363,19 +12406,24 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     uv_reactor_volume_m3: q(uvReactorVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'flow × ~2 s hydraulic residence in the in-line UV reactor train' }),
 
     // ── Thermal (heat pumps; NET of make-up/bleed HEX recovery) — lock-gate HARD slot ──
-    heating_duty_kw: q(heatingDutyKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `NET heat-pump thermal duty = building-fabric loss (${buildingProcessLossKw} kW) + residual make-up heating (${residualMakeupHeatingKw} kW, post-85%-HEX) + NET ventilation make-up heating (${ventilationHeatingKw} kW, post-HRV) ≈ ${heatingDutyKw} kW; the ventilation term (the largest prior omission) is now included; lock-gate HARD slot (exit 22)` }),
+    heating_duty_kw: q(heatingDutyKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `NET heat-pump thermal DESIGN duty = building-fabric loss (${buildingProcessLossKw} kW, at the ${designOutdoorTempC} °C heating design temp) + residual make-up heating (${residualMakeupHeatingKw} kW, post-85%-HEX) + DESIGN-DAY ventilation make-up heating (${ventilationHeatingDesignKw} kW, gross ${ventilationHeatingGrossKw} kW − frost-limited HRV ${ventilationHrvRecoveryDesignKw} kW) ≈ ${heatingDutyKw} kW; sized to the CIBSE heating design day (NOT the annual mean) with the humid extract's design-day HRV frost-derate, so the plant covers the peak; lock-gate HARD slot (exit 22)` }),
     makeup_heating_kw: q(makeupHeatingKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'RAW make-up duty ṁ·cp·ΔT for the 0.4% make-up from ~10 °C to 26.4 °C (~1,019 kW — recovered by the HEX, NOT all carried by the heat pump)' }),
     makeup_hex_recovery_kw: q(makeupHexRecoveryKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'make-up/bleed plate HEX recovery = 85% effectiveness × raw make-up duty (warm bleed at setpoint pre-heats the cold incoming make-up); ~866 kW recovered for free' }),
     residual_makeup_heating_kw: q(residualMakeupHeatingKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'residual make-up heating the heat pump must still supply = (1 − 0.85) × raw make-up duty; ~153 kW' }),
     makeup_hex_area_m2: q(makeupHexAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: 'make-up/bleed counter-current plate HEX area from Q = U·A·LMTD (U ~3,000 W/m²K water/water, LMTD = (1−ε)·ΔT balanced-flow approach)' }),
-    building_process_loss_kw: q(buildingProcessLossKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'building-fabric heat loss (BS EN 12831: ~0.2 W/m²K fabric over ~7,000 m² envelope at ΔT ~31 K → ~183 kW); the make-up water heat is the make-up term, NOT re-counted here' }),
-    // ── VENTILATION MAKE-UP HEATING (council RAS fix, ventilation) — folded into heating_duty above ──
+    building_process_loss_kw: q(buildingProcessLossKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `building-fabric heat loss (BS EN 12831: ~0.2 W/m²K fabric over ~7,000 m² envelope at the ${designOutdoorTempC} °C heating design temp, ΔT ${Math.round(setpointTempC - designOutdoorTempC)} K → ~${buildingProcessLossKw} kW); the make-up water heat is the make-up term, NOT re-counted here` }),
+    // ── HEATING DESIGN TEMPERATURE basis (auditable) — ventilation + fabric design loads use THIS, not the annual mean ──
+    heating_design_outdoor_temp_c: q(designOutdoorTempC, '°C', 'temperature', 'min', 'system', 'calculator', { source_detail: `CIBSE 99th-percentile heating DESIGN outdoor temperature (NOT the annual-mean ${Number(brief?.constraints?.operating_environment?.temp_min_c ?? 'n/a')} °C): ventilation + fabric design heating loads MUST be sized to the design day; ≈ −3 °C for the Tayinloan/Campbeltown west-Scotland marine site (brief override via operating_environment.heating_design_temp_c)` }),
+    // ── VENTILATION MAKE-UP HEATING (council RAS fix, ventilation; HVAC-seat regression) — folded into heating_duty above ──
     ventilation_supply_air_m3_h: q(ventilationSupplyAirM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: `mechanical ventilation supply airflow = hall volume (${Math.round(hallFloorAreaM2)} m² floor × ${HALL_CLEAR_HEIGHT_M} m) × ${HALL_AIR_CHANGES_PER_H} air-changes/h ≈ ${ventilationSupplyAirM3H.toLocaleString('en-GB')} m³/h — the air the moisture/CO₂-laden fish hall must continuously exchange; the HRV is sized to THIS full flow (gap-4)` }),
-    ventilation_heating_gross_kw: q(ventilationHeatingGrossKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `GROSS ventilation heating = heat ${ventilationSupplyAirM3H.toLocaleString('en-GB')} m³/h supply air from ${ambientTempC} °C ambient to ${setpointTempC} °C setpoint (ṁ·cp·ΔT, ρ 1.2 kg/m³, cp 1.005 kJ/kg·K, ΔT ${ventDeltaTLift} K) ≈ ${ventilationHeatingGrossKw} kW` }),
-    ventilation_hrv_recovery_kw: q(ventilationHrvRecoveryKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `HRV recovery on the full supply flow = ε ${hrvEffectiveness} × gross (sensible-only, capped low because the warm fish-hall extract is near-saturated — a high-recovery enthalpy wheel would frost/carry moisture back); ≈ ${ventilationHrvRecoveryKw} kW recovered` }),
-    ventilation_heating_kw: q(ventilationHeatingKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `NET ventilation make-up heating the heat plant must supply = gross ${ventilationHeatingGrossKw} kW − HRV recovery ${ventilationHrvRecoveryKw} kW ≈ ${ventilationHeatingKw} kW; ADDED to heating_duty_kw (precondition: a heated building with mechanical ventilation below setpoint — absent for a sealed/unheated plant)` }),
-    heat_pump_electrical_kw: q(heatPumpElectricalKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `net heating_duty (${heatingDutyKw} kW, incl. ventilation) ÷ COP (water-source heat pumps, SCOP ~3.5) ≈ ${heatPumpElectricalKw} kW` }),
-    heat_pump_cop: q(heatPumpCop, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'water-source heat-pump seasonal COP ~3.5 (warm-loop source)' }),
+    ventilation_heating_gross_kw: q(ventilationHeatingGrossKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `GROSS ventilation heating = heat ${ventilationSupplyAirM3H.toLocaleString('en-GB')} m³/h supply air from the ${designOutdoorTempC} °C heating DESIGN outdoor temp to ${setpointTempC} °C setpoint (ṁ·cp·ΔT, ρ 1.2 kg/m³, cp 1.005 kJ/kg·K, ΔT ${ventDeltaTLift} K) ≈ ${ventilationHeatingGrossKw} kW — sized to the CIBSE design day, NOT the annual mean` }),
+    ventilation_hrv_recovery_kw: q(ventilationHrvRecoveryKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `RATED HRV recovery on the full supply flow = ε ${hrvEffectiveness} (rotary thermal wheel / counterflow plate, 70-85 % sensible band) × gross ≈ ${ventilationHrvRecoveryKw} kW recovered at the dry rated point` }),
+    ventilation_hrv_recovery_design_kw: q(ventilationHrvRecoveryDesignKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `FROST-LIMITED HRV recovery available on the −3 °C design day = ε_rated ${hrvEffectiveness} × ${HRV_FROST_DESIGN_AVAILABILITY} frost/condensation availability (the warm fish-hall extract is near-saturated → frosts the wheel → defrost-cycle/bypass collapses recovery) = effective ε ${hrvDesignEffectiveRecoveryEff.toFixed(2)} × gross ≈ ${ventilationHrvRecoveryDesignKw} kW; this — NOT the dry rated ${ventilationHrvRecoveryKw} kW — sizes the heat plant` }),
+    ventilation_heating_kw: q(ventilationHeatingKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `STEADY (annual-typical) net ventilation make-up heating at the RATED recovery = gross ${ventilationHeatingGrossKw} kW − rated HRV ${ventilationHrvRecoveryKw} kW ≈ ${ventilationHeatingKw} kW (precondition: a heated building with mechanical ventilation below setpoint — absent for a sealed/unheated plant)` }),
+    ventilation_heating_design_kw: q(ventilationHeatingDesignKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `DESIGN-DAY net ventilation make-up heating the heat plant must supply = gross ${ventilationHeatingGrossKw} kW − frost-limited HRV ${ventilationHrvRecoveryDesignKw} kW ≈ ${ventilationHeatingDesignKw} kW; this is the term ADDED to heating_duty_kw so the plant covers the peak` }),
+    heat_pump_source: q(0, '', 'dimensionless', 'rated', 'system', 'calculator', { condition: heatPumpSource, source_detail: `heat-pump SOURCE = ${heatPumpSource}; a sea-loch intake is ~8-12 °C year-round — a warmer, steadier source than the −3 °C design-day AIR (an air-source unit would lose capacity exactly when the load peaks), giving the high seasonal COP below` }),
+    heat_pump_electrical_kw: q(heatPumpElectricalKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `heating_duty (${heatingDutyKw} kW design peak, incl. ventilation) ÷ COP ${heatPumpCop} (seawater-source) ≈ ${heatPumpElectricalKw} kW electrical (ceil, so elec × COP ≥ duty)` }),
+    heat_pump_cop: q(heatPumpCop, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: `seawater-source heat-pump seasonal COP ~${heatPumpCop} (8-12 °C sea-loch source → 26.4 °C loop, ~14-18 K lift; modern R290/ammonia water-source unit, 4.5-5.5 band)` }),
     water_setpoint_temp_c: q(setpointTempC, '°C', 'temperature', 'rated', 'system', 'brief', { source_detail: '26.4 °C yellowtail kingfish grow-out temperature' }),
     source_water_temp_c: q(sourceTempC, '°C', 'temperature', 'min', 'system', 'brief', { source_detail: '~10 °C seawater/borehole source water (8-12 °C)' }),
 
@@ -12460,7 +12508,7 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     // ends `_power_kw` and "heater" is an -er device noun → the synthesiser mints a
     // Backup Immersion Heater in the BoM; the flag records the N+1 provision.
     ...(heatSourceIsLifeCritical ? {
-      backup_immersion_heater_power_kw: q(backupImmersionHeaterPowerKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `N+1 backup electric immersion heater sized to the full net heating duty (~${backupImmersionHeaterPowerKw} kW), on a separate supply — an independent standby for the sole water-source heat pump, whose loss would let the loop cool and kill ~${(standingBiomassKg / 1000).toFixed(0)} t of biomass; any life-critical single-point heat source gets this, a non-critical/already-redundant duty gets nothing` }),
+      backup_immersion_heater_power_kw: q(backupImmersionHeaterPowerKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `N+1 backup electric immersion heater sized to the full DESIGN heating duty (~${backupImmersionHeaterPowerKw} kW ≥ heating_duty_kw), on a separate supply — an independent standby for the sole ${heatPumpSource} heat pump, whose loss would let the loop cool and kill ~${(standingBiomassKg / 1000).toFixed(0)} t of biomass; any life-critical single-point heat source gets this, a non-critical/already-redundant duty gets nothing` }),
       critical_equipment_redundancy: q(criticalEquipmentRedundancy, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'N+1 / duty-standby flag (=1) on the life-critical single-point heat source — its loss is catastrophic (thermal collapse over a live biomass inventory), so an independent backup heat source is mandated' }),
     } : {}),
 
@@ -12673,11 +12721,15 @@ registerArchetype('aquaculture_ras', (brief: any) => {
       aeration_blower_kw: aerationBlowerKw,                             // biofilter MBBR aeration blower (one rated value)
       degasser_blower_kw: degasserBlowerKw,                            // degasser forced-draught blower per column (one rated value)
       // ── VENTILATION MAKE-UP HEATING (council RAS fix, ventilation) — folded into heating_duty ──
+      heating_design_outdoor_temp_c: designOutdoorTempC,               // CIBSE 99th-percentile heating design day (NOT the annual mean) — sizes ventilation + fabric loads
       ventilation_supply_air_m3_h: ventilationSupplyAirM3H,            // full mechanical-ventilation supply flow (the HRV is sized to THIS)
-      ventilation_heating_gross_kw: ventilationHeatingGrossKw,         // gross outdoor-air heating
-      ventilation_hrv_recovery_kw: ventilationHrvRecoveryKw,           // HRV recovery on the full flow
-      ventilation_heating_kw: ventilationHeatingKw,                    // NET ventilation heating added to heating_duty_kw
-      heating_duty_breakdown_desc: `heating_duty ${heatingDutyKw} kW = building-fabric ${buildingProcessLossKw} kW + residual make-up ${residualMakeupHeatingKw} kW + net ventilation ${ventilationHeatingKw} kW`,
+      ventilation_heating_gross_kw: ventilationHeatingGrossKw,         // gross outdoor-air heating at the design temp
+      ventilation_hrv_recovery_kw: ventilationHrvRecoveryKw,           // RATED HRV recovery (ε 0.75) on the full flow
+      ventilation_hrv_recovery_design_kw: ventilationHrvRecoveryDesignKw, // frost-limited design-day HRV recovery (sizes the plant)
+      ventilation_heating_kw: ventilationHeatingKw,                    // STEADY net ventilation heating at the rated recovery
+      ventilation_heating_design_kw: ventilationHeatingDesignKw,       // DESIGN-DAY net ventilation heating added to heating_duty_kw
+      heat_pump_source: heatPumpSource,                                // seawater (sea-loch) source — warm, steady, gives the high COP
+      heating_duty_breakdown_desc: `heating_duty ${heatingDutyKw} kW (design peak) = building-fabric ${buildingProcessLossKw} kW (at ${designOutdoorTempC} °C) + residual make-up ${residualMakeupHeatingKw} kW + design-day net ventilation ${ventilationHeatingDesignKw} kW (gross ${ventilationHeatingGrossKw} kW − frost-limited HRV ${ventilationHrvRecoveryDesignKw} kW); ${heatPumpSource}, COP ${heatPumpCop}`,
     },
   }
 })

@@ -370,6 +370,14 @@ class Circuit:
     voltdrop_pct: Optional[float] = None
     within_spec: Optional[bool] = None
     note: str = ""          # 'control / aux feeder' etc. for rating-less runs
+    coincident: bool = True  # False ⇒ a standby/backup load OR a duplicate of an already-counted
+    #                          item: SHOWN as a circuit (bus + breaker must carry it) but NOT
+    #                          added to the RUNNING connected-load total (reconciles to physics
+    #                          connected_electrical_load_kw, which is the coincident running load).
+    duplicate: bool = False  # True ⇒ the SAME physical equipment emitted under another name —
+    #                          excluded from BOTH the kW total AND the Σ-current (not really
+    #                          installed twice). A standby load (coincident=False, duplicate=False)
+    #                          keeps its current in Σ-current (the bus must carry it on a fault).
 
 
 @dataclass
@@ -533,6 +541,41 @@ _PANEL_DUTY_FRACTION = [
 _WHOLE_PLANT_KW_RE = re.compile(
     r"·\s*([\d.,]+)\s*kW\s*(plant|site|total|connected|aggregate|whole)", re.I)
 _OWN_KW_RE = re.compile(r"·\s*([\d.,]+)\s*kW\b")
+# A motor circuit's CONNECTED (absorbed) electrical load is the SHAFT power, not the motor
+# NAMEPLATE rating. The requirementsBom states both for a sized drive, e.g. 'Circulation Pump
+# · 132 kW motor (94 kW shaft)' — the 132 is the frame the motor is BUILT on (the next standard
+# size up from the duty), the 94 is what the pump actually absorbs and therefore the connected
+# load the board sees. Reading the first '· NN kW' (132) over-states every motor circuit by the
+# motor-sizing margin (here 1.4×). Prefer the parenthesised shaft/absorbed/input figure — but
+# ONLY for a genuine MOTOR-driven load (a heater / transformer / UPS has no shaft power and its
+# first '· NN kW' IS its connected load). Universal — keyed on the equipment NOUN, not a class.
+_SHAFT_KW_RE = re.compile(r"\(\s*([\d.,]+)\s*kW\s*(?:shaft|absorbed|input|abs)\b", re.I)
+_MOTOR_LOAD_RE = re.compile(
+    r"pump|fan\b|blower|compressor|\bmotor\b|mixer|agitator|stirrer|conveyor|auger|"
+    r"screw\b|centrifuge|\bdrive\b|extract|ventilat", re.I)
+# A STANDBY / BACKUP / EMERGENCY load is NOT coincident with the running plant: a backup
+# immersion heater, a standby pump, an emergency element only energises on a fault / cold-start,
+# so it must NOT be added to the RUNNING connected-load total (which reconciles to the physics
+# connected_electrical_load_kw). It is still SHOWN as a circuit (the board bus + its own breaker
+# must be rated for it) but flagged non-coincident and excluded from the totals sum. Universal —
+# keyed on the standby/backup NAMING, never a product class.
+_STANDBY_LOAD_RE = re.compile(
+    r"\bback-?up\b|\bstand-?by\b|\bemergency\b|\bspare\b|\bredundant\b", re.I)
+# An AUXILIARY load is an instrument / control / monitoring loop or a small actuated device
+# (analyser, transmitter, probe, gauge, flow/level meter, PLC, SCADA, gateway, network switch,
+# I/O, controller PSU, a solenoid / actuated control valve). Its real draw is a loop load of
+# tens of watts, NOT a duty-fraction of the plant's principal motor. When such a circuit has NO
+# published kW in the ledger, the duty-type ESTIMATE (_panel_type_kw) wrongly scales it off the
+# principal motor (e.g. a 'Dissolved-Oxygen Analyser' hitting the oxygen/aeration 0.10 fraction
+# of a 220 kW anchor → an absurd 22 kW). Bound such an aux circuit to a small fixed load instead.
+# Universal — keyed on the instrument/control NOUN, never a product class.
+_AUX_LOAD_RE = re.compile(
+    r"analy[sz]|monitor|sensor|transmitter|\bprobe\b|gauge|flow\s*meter|level\s*meter|"
+    r"\bmeter\b|instrument|controller|\bplc\b|scada|gateway|\bnetwork\b|switch\b|\bi/?o\b|"
+    r"\bups\b|control\s*system|power\s*supply|\bvalve\b|actuat|solenoid|damper", re.I)
+# A bounded aux circuit load [kW]: an instrument loop / actuated valve / small control device.
+# Conservative single value — enough to size a 6–10 A final circuit, never a process driver.
+_AUX_CIRCUIT_KW = 0.5
 
 
 def _norm_load_name(s: str) -> str:
@@ -573,7 +616,15 @@ def _panel_req_bom_kw(name: str, state: dict) -> Optional[float]:
             continue
         if _WHOLE_PLANT_KW_RE.search(req):
             continue                       # 'NN kW plant' = whole-plant, not this item
-        m = _OWN_KW_RE.search(req)
+        # CONNECTED load = the SHAFT/absorbed power for a motor-driven load (the pump/fan/etc.
+        # actually draws its shaft power ÷ η, NOT the next-frame-up motor NAMEPLATE). Prefer the
+        # parenthesised '(NN kW shaft)' for a motor load; otherwise (heater/UPS/transformer, or a
+        # motor with no stated shaft figure) take the item's own first '· NN kW'.
+        shaft = _SHAFT_KW_RE.search(req)
+        if shaft is not None and _MOTOR_LOAD_RE.search(name):
+            m = shaft
+        else:
+            m = _OWN_KW_RE.search(req)
         if not m:
             continue
         try:
@@ -637,9 +688,13 @@ def _panel_type_kw(name: str, state: dict) -> Optional[float]:
     return kw if kw > 0 else None
 
 
-def _panel_derive_load_kw(name: str, state: dict) -> Optional[float]:
-    """Resolve ONE circuit's connected load [kW]: requirementsBom → contract quantity →
-    duty-type estimate. Returns kW or None (caller then falls back to design current)."""
+def _panel_resolve_ledger_kw(name: str, state: dict) -> Optional[float]:
+    """Resolve ONE circuit's connected load [kW] from the LEDGER ONLY: the equipment's own
+    published electrical kW in requirementsBom (shaft-preferred for motors), else a matching
+    contract '*_kw' quantity. Returns the kW, or None when the ledger does not price this item
+    (the caller then applies the aux bound for an instrument, or the duty-type estimate for
+    process equipment). Deliberately does NOT fall through to the duty-type estimate so an aux
+    instrument circuit is not scaled off the principal motor."""
     base = re.sub(r"\s*[×x]\s*\d+\s*$", "", name or "").strip()
     kw = _panel_req_bom_kw(base, state)
     if kw and kw > 0:
@@ -679,7 +734,49 @@ def _panel_derive_load_kw(name: str, state: dict) -> Optional[float]:
                     continue
                 if val > 0:
                     return val
-    return _panel_type_kw(base, state)
+    return None       # ledger does not price this item — caller decides aux bound vs estimate
+
+
+def _equipment_dup_sig(name: str, kw: Optional[float], ways: int,
+                       state: dict) -> Optional[str]:
+    """A de-duplication signature for a circuit's destination equipment, so the SAME physical
+    plant emitted under two circuit names is counted once. The signature is the requirementsBom
+    requirement TAIL (everything after the head noun — the rating + dimensions string, which is
+    byte-identical for the same physical item, e.g. '132 kW motor (94 kW shaft) · 1176x1000x1294
+    mm' shared by both 'Circulation Pump' and 'Recirc Pump') combined with the per-way kW + the
+    way count. Returns None when the equipment carries no substantial, ledger-priced spec (a
+    small aux instrument or an un-priced load is never deduped — only real equipment with an
+    identical engineering spec). Universal — keyed on the ledger spec, never a product class."""
+    # only dedup substantial, ledger-priced equipment (an aux/instrument or a tiny load is left
+    # alone — two genuinely-separate small loops must each be counted).
+    if not kw or kw <= _AUX_CIRCUIT_KW:
+        return None
+    base = re.sub(r"\s*[×x]\s*\d+\s*$", "", name or "").strip()
+    target = set(_norm_load_name(base).split())
+    if not target:
+        return None
+    rb = state.get("requirementsBom")
+    if not isinstance(rb, list):
+        return None
+    best = None       # (overlap, tail)
+    for row in rb:
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or "")
+        if "·" not in req:
+            continue
+        head, tail = req.split("·", 1)
+        h = set(_norm_load_name(head).split())
+        if not h or len(target & h) < len(target):
+            continue                     # circuit-name tokens must all be in the requirement head
+        if _WHOLE_PLANT_KW_RE.search(req) or "→" in head or "connection" in head.lower():
+            continue                     # a routed connection row is a transfer duty, not equipment
+        ov = len(target & h)
+        if best is None or ov > best[0]:
+            best = (ov, " ".join(tail.split()).lower())
+    if best is None:
+        return None
+    return f"{best[1]}|{round(kw, 1)}|{ways}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1079,6 +1176,9 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
         if n >= 3 and n / len(grp_amps) > 0.30:
             default_a = val
 
+    # Identical-equipment de-duplication set: a signature per circuit (ledger spec tail +
+    # per-way kW + ways) so the SAME physical equipment emitted under two names is counted once.
+    seen_equip: set = set()
     wn = 0
     for key in order:
         grp = groups[key]
@@ -1116,39 +1216,61 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
         kw = _connected_kw_for(base, design_a, panel, state, sched_ways)
         kw_total = (kw * ways) if kw is not None else None
 
-        # LOAD-DERIVED SIZING (universal — every powered circuit sized from its OWN kW).
-        # When the schedule left this circuit at the wholesale DEFAULT current (or gave it no
-        # current at all), the Design I, the cable CSA and the protective device are ALL
-        # re-derived from the circuit's connected load: FLC = P·1000/(√3·V·pf·η), cable ≥
-        # FLC×1.25 from the BS 7671 ampacity ladder, breaker = next frame ≥ FLC. This stops
-        # the panel showing one fixed current (75.4 A) + a cable disconnected from the load
-        # (a 132 kW motor on 16 mm²/100 A that would trip on start). A genuinely-sized tap
-        # (a distinct engineered current, e.g. the DC battery-rack feeder or a real heat-pump
-        # feeder) is NOT a default → it keeps its schedule current + cable. The kW PER WAY
-        # drives the per-circuit FLC, consistent with the single-line.
-        is_default = (default_a is not None
-                      and design_a is not None
-                      and abs(round(design_a, 1) - default_a) < 0.05)
+        # AMPS-FROM-kW (universal — the Design current is DERIVED from the circuit's OWN connected
+        # kW, never inherited from the connection schedule's per-row current). The connection
+        # schedule's electrical-edge currents were computed upstream with an inconsistent pf/η
+        # convention (e.g. the 769 kW backup heater arrived as 1541.6 A, which is its kW pushed
+        # through a different pf — a kW-magnitude value landing in the AMPS column), so reading
+        # `rating` straight makes the amps column lie. Recompute every powered circuit's Design I
+        # = P·1000/(√3·V·pf·η) from its connected kW (the SAME flc model the cable + breaker use),
+        # and SIZE the cable (≥ FLC×1.25) + the breaker (next frame ≥ FLC) from that kW so all
+        # three reconcile. A circuit the ledger can't price (kW is None) keeps the schedule's own
+        # current + cable (the prior behaviour) — there is no kW to derive from. Universal: any
+        # kW → its real FLC, keyed on the connection model, never a product class.
         frame_override = None
-        if is_default and kw and kw > 0 and panel.voltage_v:
+        if kw and kw > 0 and panel.voltage_v:
             flc, _csa, csa_label, frame = size_circuit_from_kw(
                 kw, panel.voltage_v, is_dc=panel.is_dc, phases=panel.phases)
             if flc is not None:
-                design_a = flc
-                # the load-derived cable REPLACES the schedule's wholesale-default CSA so the
-                # cable matches the breaker matches the load (all three from this kW).
+                design_a = flc              # amps column = amps (from this circuit's kW), not kW
                 cable = _cores_for(csa_label, panel.is_dc, panel.phases)
-                frame_override = frame      # breaker = next standard frame ≥ FLC
+                frame_override = frame       # breaker = next standard frame ≥ FLC
 
         dev, dev_a = _device_for(base, design_a, devices, panel,
                                  frame_override=frame_override)
+
+        # COINCIDENCE: a STANDBY / BACKUP / EMERGENCY load (a backup immersion heater, a standby
+        # pump) is NOT part of the running plant — it energises only on a fault / cold-start — so
+        # it is SHOWN (the bus + its breaker must carry it) but excluded from the RUNNING
+        # connected-load total (which reconciles to the physics connected_electrical_load_kw, the
+        # coincident running load). A DUPLICATE of an already-counted item (the SAME physical
+        # equipment emitted under two names — e.g. 'Circulation Pump' and 'Recirc Pump', the same
+        # 8×94 kW pumps with a byte-identical ledger spec) is likewise shown once but counted once:
+        # the second occurrence is non-coincident so the panel total does not double-count it.
+        standby = bool(_STANDBY_LOAD_RE.search(desc))
+        sig = _equipment_dup_sig(base, kw, ways, state)
+        is_dup = (sig is not None and sig in seen_equip)
+        if sig is not None and not is_dup:
+            seen_equip.add(sig)
+        # A DUPLICATE is the same physical equipment emitted twice — not really installed a second
+        # time — so neither its kW NOR its current is summed in the board totals (the row is still
+        # SHOWN with its own figures, flagged as a duplicate). A STANDBY load IS installed (the
+        # bus + breaker carry it on a fault) — its current stays in Σ-current; only its kW is left
+        # out of the RUNNING connected-load total.
+        coincident = not (standby or is_dup)
+        cnote = note
+        if standby:
+            cnote = (cnote + "; " if cnote else "") + "standby — not in running total"
+        elif is_dup:
+            cnote = (cnote + "; " if cnote else "") + "duplicate of an earlier circuit — counted once"
 
         panel.circuits.append(Circuit(
             ref=ref, description=desc, ways=ways,
             connected_kw=kw, connected_kw_total=kw_total,
             design_a=design_a, device=dev, device_a=dev_a,
             cable=cable, length_m=(length_m or None),
-            voltdrop_pct=vd, within_spec=within, note=note))
+            voltdrop_pct=vd, within_spec=within, note=cnote,
+            coincident=coincident, duplicate=is_dup))
 
 
 def _describe_load(base: str, state: dict) -> str:
@@ -1244,14 +1366,27 @@ def _connected_kw_for(base: str, design_a, panel: Panel, state: dict,
         v = _q(state, "continuous_power_kw")
         if v:
             return v
-    # PER-LOAD derivation (universal): the equipment's OWN published electrical kW, else a
-    # duty-type estimate — so each circuit carries its real load, NOT a single wholesale
-    # design-current default (the 27.4 A / 18 kW every circuit inherited from the unsized
-    # connection schedule). Divide an aggregate by the way count for collapsed taps.
-    kw = _panel_derive_load_kw(base, state)
+    # PER-LOAD derivation (universal): the equipment's OWN published electrical kW (ledger
+    # requirementsBom / a contract *_kw quantity), so each circuit carries its real load, NOT a
+    # single wholesale design-current default. Divide an aggregate by the way count for collapsed
+    # taps. NOTE we do NOT take the duty-type ESTIMATE here for an AUXILIARY (instrument/control/
+    # valve) load — see the aux bound below.
+    kw = _panel_resolve_ledger_kw(base, state)
     if kw and kw > 0:
         return round(kw / ways, 1) if ways > 1 else round(kw, 1)
-    # fallback: derive from the design current
+    # AUX circuits (analyser / transmitter / PLC / SCADA / network / actuated valve) with no
+    # published kW are a small loop load — NOT a duty-fraction of the principal motor. Bound them
+    # so an instrument can never read as a major load (the 22 kW 'analyser' over-count). This is
+    # the universal correction for the duty-type estimate scaling an instrument off a mis-read
+    # principal-motor anchor; process equipment (filters/UV/skimmer) still gets the duty estimate.
+    if _AUX_LOAD_RE.search(b):
+        return _AUX_CIRCUIT_KW
+    # process equipment with no ledger kW: the duty-type estimate (a duty fraction of the
+    # principal motor) — the realistic stand-in when the ledger doesn't price the item.
+    kw = _panel_type_kw(base, state)
+    if kw and kw > 0:
+        return round(kw / ways, 1) if ways > 1 else round(kw, 1)
+    # last resort: derive from the design current.
     return _design_kw_from_a(design_a, panel)
 
 
@@ -1402,9 +1537,20 @@ def _set_sub_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: 
 
 def reconcile(panel: Panel) -> dict:
     """Σ connected load (kW) and Σ design current (A) over the board's circuits, vs the
-    board demand (busbar / incoming).  Returns the totals + a sanity verdict."""
-    sum_kw = sum((c.connected_kw_total or 0) for c in panel.circuits)
-    sum_a = sum(((c.design_a or 0) * c.ways) for c in panel.circuits)
+    board demand (busbar / incoming).  Returns the totals + a sanity verdict.
+
+    The headline `sum_kw` is the RUNNING (coincident) connected load — it sums only the
+    coincident circuits (a standby/backup load + a duplicate of an already-counted item are
+    EXCLUDED), so it reconciles to the physics connected_electrical_load_kw (the running load).
+    `noncoincident_kw` is the standby + duplicate kW shown-but-not-summed (reported in the note).
+    `sum_a` keeps EVERY circuit's current — the busbar + breakers must carry the standby load
+    when it energises — so the Σ-current-vs-busbar check still sees the full installed current."""
+    sum_kw = sum((c.connected_kw_total or 0) for c in panel.circuits if c.coincident)
+    noncoincident_kw = sum((c.connected_kw_total or 0)
+                           for c in panel.circuits if not c.coincident)
+    # Σ-current keeps every INSTALLED circuit (standby included — the bus carries it on a fault)
+    # but drops a DUPLICATE (the same equipment's current is already counted under its first name).
+    sum_a = sum(((c.design_a or 0) * c.ways) for c in panel.circuits if not c.duplicate)
     # board demand current = the incoming feeder (single transformer/bus run carrying all)
     demand_a = panel.incoming_a or panel.busbar_a
     # demand kW from the board's own continuous rating (incoming current × V)
@@ -1431,7 +1577,8 @@ def reconcile(panel: Panel) -> dict:
     if panel.transformer_kva and sum_kw:
         tx_headroom = sum_kw / (panel.transformer_kva * 0.95)   # <1 = within rating
 
-    return {"sum_kw": sum_kw, "sum_a": sum_a, "demand_a": demand_a,
+    return {"sum_kw": sum_kw, "noncoincident_kw": noncoincident_kw,
+            "sum_a": sum_a, "demand_a": demand_a,
             "demand_kw": demand_kw, "ratio": ratio, "verdict": verdict,
             "tx_kva": panel.transformer_kva, "tx_headroom": tx_headroom}
 
@@ -1475,8 +1622,12 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
         ]
         if p.transformer:
             hdr.append(("Step-down transformer", p.transformer))
+        nc = rec.get("noncoincident_kw") or 0
+        conn_val = _fmt(rec["sum_kw"], " kW", fmt="{:,.1f}")
+        if nc > 0:
+            conn_val += f"  (running; + {nc:,.0f} kW standby/duplicate not summed)"
         hdr += [
-            ("Total connected load", _fmt(rec["sum_kw"], " kW", fmt="{:,.1f}")),
+            ("Total connected load", conn_val),
             ("Board demand (busbar)", _fmt(rec["demand_a"], " A", fmt="{:,.0f}")),
         ]
         out.append("| Field | Value |\n|---|---|")
@@ -1492,6 +1643,8 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
             kw_cell = _fmt(c.connected_kw, fmt="{:,.2f}")
             if c.ways > 1 and c.connected_kw is not None:
                 kw_cell = f"{c.connected_kw:,.2f} (×{c.ways}={c.connected_kw_total:,.1f})"
+            if not c.coincident and c.connected_kw is not None:
+                kw_cell = f"({kw_cell})"        # parenthesised = shown but NOT in the running total
             spec = "—" if c.within_spec is None else ("✓" if c.within_spec else "✗")
             desc = c.description + (f"  *({c.note})*" if c.note else "")
             out.append(
@@ -1520,10 +1673,13 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
                          f"of rating ({tv}).")
             out.append(line + "\n")
         else:
+            nc_note = (f" Standby/duplicate loads shown but not summed: "
+                       f"{rec['noncoincident_kw']:,.0f} kW."
+                       if (rec.get('noncoincident_kw') or 0) > 0 else "")
             out.append(
                 f"**Reconciliation:** Σ circuit design current = {rec['sum_a']:,.0f} A; "
-                f"Σ connected load = {rec['sum_kw']:,.1f} kW "
-                "(board busbar demand not modelled — single-board layout).\n")
+                f"Σ RUNNING connected load = {rec['sum_kw']:,.1f} kW "
+                "(board busbar demand not modelled — single-board layout)." + nc_note + "\n")
         for n in (p.notes or []):
             out.append(f"> Note: {n}\n")
 
@@ -1650,8 +1806,12 @@ def build_table_svg(archetype: str, panels: list[Panel], schedule: dict) -> str:
         ]
         if p.transformer:
             fields.append(("Step-down TX", p.transformer))
+        nc = rec.get("noncoincident_kw") or 0
+        conn_v = _fmt(rec["sum_kw"], " kW", fmt="{:,.1f}")
+        if nc > 0:
+            conn_v += f"  (+{nc:,.0f} standby/dup)"
         fields += [
-            ("Σ connected load", _fmt(rec["sum_kw"], " kW", fmt="{:,.1f}")),
+            ("Σ running load", conn_v),
             ("Board demand", _fmt(rec["demand_a"], " A", fmt="{:,.0f}")),
         ]
         colx = [_MARGIN + 12, _MARGIN + _TABLE_W / 2 + 6]
@@ -1685,19 +1845,26 @@ def build_table_svg(archetype: str, panels: list[Panel], schedule: dict) -> str:
         for ridx, c in enumerate(p.circuits):
             if ridx % 2 == 1:
                 svg.rect(_MARGIN, ry, _TABLE_W, _ROW_H, fill=PANEL_BG)
+            # a standby/backup OR duplicate circuit is rendered MUTED and tagged so the reader sees
+            # it is SHOWN but excluded from the running total (the bus must still carry a standby).
+            row_ink = MUTED if not c.coincident else INK
+            tag = (" [standby]" if (not c.coincident and not c.duplicate)
+                   else (" [dup]" if c.duplicate else ""))
             kw_cell = (f"{c.connected_kw:,.2f}" if c.connected_kw is not None else "—")
             if c.ways > 1 and c.connected_kw is not None:
                 kw_cell = f"{c.connected_kw:,.1f}→{c.connected_kw_total:,.0f}"
+            if not c.coincident:
+                kw_cell = f"({kw_cell})"        # parenthesised = not summed into the total
             cells = [
-                (c.ref, "l", INK, False),
-                (_shorten(c.description, 30), "l", INK, False),
-                (str(c.ways), "r", INK, False),
-                (kw_cell, "r", INK, True),
-                (_fmt(c.design_a, fmt="{:,.1f}"), "r", INK, True),
-                (_shorten(c.device or "—", 38), "l", INK, False),
-                (c.cable or "—", "l", INK, True),
-                (_fmt(c.length_m, fmt="{:,.1f}"), "r", INK, True),
-                (_fmt(c.voltdrop_pct, fmt="{:g}"), "r", INK, True),
+                (c.ref, "l", row_ink, False),
+                (_shorten(c.description + tag, 30), "l", row_ink, False),
+                (str(c.ways), "r", row_ink, False),
+                (kw_cell, "r", row_ink, True),
+                (_fmt(c.design_a, fmt="{:,.1f}"), "r", row_ink, True),
+                (_shorten(c.device or "—", 38), "l", row_ink, False),
+                (c.cable or "—", "l", row_ink, True),
+                (_fmt(c.length_m, fmt="{:,.1f}"), "r", row_ink, True),
+                (_fmt(c.voltdrop_pct, fmt="{:g}"), "r", row_ink, True),
                 ("—" if c.within_spec is None else ("✓" if c.within_spec else "✗"),
                  "c", (GOOD if c.within_spec else BAD) if c.within_spec is not None
                  else MUTED, False),
@@ -1890,10 +2057,77 @@ def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
     return summary, panels, md
 
 
+def _selftest() -> int:
+    """Universal connected-load reconciliation invariants (regression-harness for the RAS
+    panel-total regression: motor shaft-vs-nameplate, kW-in-amps leak, qty-N N² double-sum,
+    duplicate equipment, standby coincidence). Pure — no external files. Returns 0 on pass."""
+    fails = []
+
+    def chk(name, cond):
+        if not cond:
+            fails.append(name)
+
+    # I1 — a MOTOR circuit reads its SHAFT/absorbed kW, not the motor NAMEPLATE.
+    st = {"requirementsBom": [
+        {"requirement": "Circulation Pump · 132 kW motor (94 kW shaft) · 1176x1000x1294 mm"},
+        {"requirement": "Backup Immersion Heater · 769 kW · 2369x2014x2606 mm"}]}
+    chk("I1.motor_shaft_preferred",
+        _panel_req_bom_kw("Circulation Pump", st) == 94.0)
+    # I2 — a NON-motor load (heater) keeps its own first '· NN kW' (no shaft figure exists).
+    chk("I2.heater_keeps_nameplate",
+        _panel_req_bom_kw("Backup Immersion Heater", st) == 769.0)
+    # I3 — amps DERIVED from kW = P·1000/(√3·V·pf·η); 769 kW @ 400 V → ~1451 A, NEVER the kW.
+    a = flc_from_kw(769.0, 400.0, phases=3)
+    chk("I3.amps_from_kw_not_kw", a is not None and 1400 <= a <= 1500)
+    chk("I3.amps_not_kw_magnitude", a is not None and abs(a - 769.0) > 100)
+    # I4 — an AUX instrument circuit with no ledger kW is BOUNDED, not a duty-fraction estimate.
+    class _P:  # minimal panel stub
+        is_dc = False; phases = 3; voltage_v = 400.0
+    chk("I4.aux_instrument_bounded",
+        _connected_kw_for("Dissolved-Oxygen Analyser", 41.5, _P(), st, 1) == _AUX_CIRCUIT_KW)
+    chk("I4.valve_bounded",
+        _connected_kw_for("Flow Control Valve", 27.4, _P(), st, 1) == _AUX_CIRCUIT_KW)
+    # I5 — a STANDBY/BACKUP load is detected (excluded from the running total downstream).
+    chk("I5.standby_detected", bool(_STANDBY_LOAD_RE.search("Backup Immersion Heater")))
+    chk("I5.running_not_standby", not _STANDBY_LOAD_RE.search("Circulation Pump"))
+    # I6 — identical equipment under two names shares a dedup signature (counted once).
+    st2 = {"requirementsBom": [
+        {"requirement": "Circulation Pump · 132 kW motor (94 kW shaft) · 1176x1000x1294 mm"},
+        {"requirement": "Recirc Pump · 132 kW motor (94 kW shaft) · 1176x1000x1294 mm"}]}
+    s_a = _equipment_dup_sig("Circulation Pump", 94.0, 8, st2)
+    s_b = _equipment_dup_sig("Recirc Pump", 94.0, 8, st2)
+    chk("I6.duplicate_equipment_same_sig", s_a is not None and s_a == s_b)
+    # I7 — a small AUX load is NEVER deduped (two separate instruments each count).
+    chk("I7.aux_not_deduped",
+        _equipment_dup_sig("Dissolved-Oxygen Analyser", _AUX_CIRCUIT_KW, 1, st2) is None)
+    # I8 — reconcile() excludes non-coincident kW from the running total but keeps standby amps.
+    pnl = Panel(board_id="b", name="B", voltage_v=400.0, phases=3)
+    pnl.circuits = [
+        Circuit(ref="W1", description="Pump", connected_kw=94.0, connected_kw_total=94.0,
+                design_a=100.0, coincident=True),
+        Circuit(ref="W2", description="Backup Heater", connected_kw=769.0,
+                connected_kw_total=769.0, design_a=1451.0, coincident=False, duplicate=False),
+        Circuit(ref="W3", description="Recirc Pump", connected_kw=94.0, connected_kw_total=94.0,
+                design_a=100.0, coincident=False, duplicate=True)]
+    rec = reconcile(pnl)
+    chk("I8.running_total_excludes_noncoincident", abs(rec["sum_kw"] - 94.0) < 0.01)
+    chk("I8.noncoincident_reported", abs(rec["noncoincident_kw"] - 863.0) < 0.01)
+    # standby current stays in Σ-current (100 + 1451), the duplicate's 100 is dropped.
+    chk("I8.amps_keep_standby_drop_dup", abs(rec["sum_a"] - 1551.0) < 0.01)
+
+    if fails:
+        print("[panel-sched] SELFTEST FAIL: " + ", ".join(fails))
+        return 1
+    print("[panel-sched] selftest OK (8 connected-load reconciliation invariants)")
+    return 0
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
+    if argv[0] in ("--selftest", "--self-test", "selftest"):
+        return _selftest()
     out_dir = argv[0]
     state_path = argv[1] if len(argv) > 1 else None
     try:
