@@ -92,18 +92,31 @@ def main() -> int:
             L.append(f"  - {gbp(r.get('line_gbp')):>13} [{r.get('status', '?')}] {(r.get('requirement') or '')[:62]}")
         L.append("")
 
-    # ── PHYSICS / SIZING (canonical, single value per quantity) ──
+    # ── PHYSICS / SIZING (canonical, single value per quantity, WITH design basis) ──
+    # Each value carries its source_detail/condition — the engineering BASIS — so a reviewer
+    # reads WHY a number is what it is before flagging it. (Round-1 over-flagged 5 correct values
+    # because the basis was hidden: O2 demand ALREADY includes nitrification; the degasser is
+    # 10:1 PER-COLUMN; the salt make-up doses only the ~5% fresh-blend fraction as the other ~95%
+    # is self-salting seawater; the recirc motor is the next IEC frame above shaft÷η×1.15; etc.)
     q = ((state.get("orchestratorContract") or {}).get("quantities")) or {}
     if q:
-        L.append("## PHYSICS / SIZING (canonical quantities — no computed_X twins)")
+        L.append("## PHYSICS / SIZING — canonical quantities + DESIGN BASIS")
+        L.append("(Read the basis before flagging a value. A value with a stated, sound basis is NOT a defect;")
+        L.append(" a defect is a value whose basis is absent, internally contradictory, or physically wrong.)")
         for k in sorted(q.keys()):
             if k.startswith("computed_"):
                 continue
             v = q[k]
             val = v.get("value") if isinstance(v, dict) else v
             unit = (v.get("unit") if isinstance(v, dict) else "") or ""
-            if isinstance(val, (int, float)):
-                L.append(f"  - {k}: {val} {unit}".rstrip())
+            if not isinstance(val, (int, float)):
+                continue
+            basis = ""
+            if isinstance(v, dict):
+                sd = str(v.get("source_detail") or v.get("condition") or "").strip()
+                if sd:
+                    basis = f"  — {sd[:200]}"
+            L.append(f"  - {k}: {val} {unit}{basis}".rstrip())
         L.append("")
 
     # ── DRAWINGS available for the seats to OPEN ──
