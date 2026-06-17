@@ -1321,6 +1321,12 @@ function buildingWord(spec: BuildingElementSpec, g: BuildingGeometry): WordLike 
   else mods.push(mod('dimension', `${Math.round(4 * Math.sqrt(g.footprintM2))} m perimeter`))
   mods.push(mod('rating_primary', `${Math.round(g.footprintM2)}`, 'm² footprint'))
   mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(gbp)))))
+  // TYPED SERVICE (Phase 0 — council 2026-06-17): a building element is dry, at
+  // atmospheric pressure, and priced as a CIVIL take-off (£/m²), never a vessel. The
+  // descriptor is emitted HERE at synthesis from the element's own civil identity (the
+  // take-off already carries a footprint/area driver, no fluid), so the cost
+  // characteriser keys off this TYPED field — never a downstream noun re-parse.
+  mods.push(mod('service', serviceJson({ fluid: 'none', phase: 'solid', pressure_bar: 0, fabrication_family: 'building_element', criticality: 'standard' })))
   mods.push(mod('form', spec.form(g)))
   mods.push(mod('part_number', 'TBD'))
   mods.push(mod('lifecycle', 'Concept design — building element sized parametrically from the housed-equipment footprint; quantities confirmed at detailed design'))
@@ -1431,6 +1437,40 @@ export function synthesizeBuildingStructure(
     }
   }
 
+  // ── PHASE 0: GROUND THE LEGACY SKELETON STRUCTURE WORD IN THE FOOTPRINT PHYSICS ──
+  // The generic skeleton emits a bare representative "Structural Frame" word
+  // (structure_containment floor) that carries NO size driver — and downstream the
+  // cost characteriser, finding no driver on the word, reached for the whole-plant
+  // bounding-box geometry and priced it as a 57,000 m³ closed pressure vessel (the
+  // £42.36M bug). The building take-off has JUST computed the real hall footprint, so
+  // stamp THAT footprint onto the bare structural word as a genuine AREA DRIVER + the
+  // TYPED structural service. The part is now driven by the physics that created it (the
+  // building plan area), not its noun — so deriveService + the cost characteriser price
+  // it as structural tonnage / £-per-m², never a vessel. Universal: any unhoused product
+  // never reaches here (the no-op guard above), and a structural word that already
+  // carries a real driver (a synthesised building element, a sized member) is left
+  // untouched. No per-class table.
+  const STRUCTURAL_SKELETON_RE = /structural[_ ]?frame|structure[_ ]?frame|\bframe\b|enclosure|structural[_ ]?member|space[_ ]?frame|chassis|skid[_ ]?frame|support[_ ]?structure/i
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    if (isBuildingStructure(w) || isSubcomponent(w) || isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w)) continue
+    const charId = String(w.content_character?.character_id ?? w.id ?? '')
+    const nm = String(w.name_human ?? '')
+    if (!STRUCTURAL_SKELETON_RE.test(charId) && !STRUCTURAL_SKELETON_RE.test(nm)) continue
+    // only a TRULY un-driven structural placeholder: no fluid capacity, no kW/kVA
+    // rating, no 3-D vessel geometry, no area dimension yet. (A frame that already
+    // carries a real driver — or a vessel/machine that merely contains "frame" in its
+    // name — is skipped.)
+    if (deriveService(w, quantities) !== null) continue
+    const existing = w.modifier_characters ?? []
+    const hasDim = existing.some((mc) => (mc.kind === 'dimension' || mc.kind === 'dimensions') && String(mc.value ?? '').trim() !== '')
+    if (hasDim) continue
+    mergeMods(w, [
+      mod('dimension', `${footprintM2} m² footprint, ${heightM.toFixed(1)} m haunch height`),
+      mod('rating_primary', `${footprintM2}`, 'm² footprint'),
+      mod('service', serviceJson({ fluid: 'none', phase: 'solid', pressure_bar: 0, fabrication_family: 'structural', criticality: 'standard' })),
+    ])
+  }
+
   // Place the take-off in the structure / containment module (fallback: first module with
   // a sub-module), matching the /structure|contain|building|civil/ intent.
   const target = findSubModuleByRe(modules, /structure|contain|building|civil/i)
@@ -1445,6 +1485,182 @@ export function synthesizeBuildingStructure(
   return n
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// TYPED SERVICE AT SYNTHESIS (Phase 0 — council 2026-06-17, the £42.36M Structural
+// Frame bug). THE ROOT FIX.
+//
+// THE BUG it removes: the cost characteriser (requirements_bom.py) decided a part's
+// FABRICATION KIND from a noun-regex on its NAME. "Structural Frame" matched the
+// `frame|structure` shell-fabrication branch → a CLOSED pressure-vessel hoop-stress
+// take-off → a 66 mm steel wall over the whole-plant 54.5×54.5×24.5 m bounding box →
+// 4.6 M kg × £4.5/kg × 1.70 = £42.36 M. A noun decided physics it had no business
+// deciding, and there was no second value to contradict it.
+//
+// THE FIX (council-mandated, NOT another noun-check): every word carries a TYPED
+// `service{}` descriptor, EMITTED HERE at synthesis, DERIVED FROM ITS DRIVER QUANTITY
+// — not re-parsed from its name downstream:
+//   · a part whose only size driver is a FOOTPRINT/PLAN AREA (m² / m² footprint /
+//     m² area), with NO fluid capacity and NO pressure  → structural, dry, 0 bar.
+//   · a part with a real m³ FLUID capacity or a m³/h FLOW driver               → a
+//     fluid vessel; its pressure_bar is read from the contract (a reactor_pressure_bar
+//     / column_pressure_bar quantity), else 0 (an open / atmospheric tank).
+//   · a part whose only driver is a kW / kVA POWER rating, with no fluid         → a
+//     rotating / electrical machine, dry, 0 bar.
+// The characteriser reads `service.fabrication_family` and prices STRUCTURAL by
+// tonnage / £-per-m² (never hoop-stress), a FLUID vessel by a shell take-off only when
+// it truly has fluid + pressure, an open tank by the open take-off. The legacy
+// noun-heuristic survives ONLY as the fallback when a word has no typed service
+// (legacy archetypes), so nothing else moves. Universal, deterministic, no per-class
+// table; the descriptor is a single JSON `service` modifier so requirements_bom.py
+// reads it per part.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type FluidKind = 'process_water' | 'seawater' | 'gas' | 'process_liquid' | 'none'
+type FabricationFamily = 'fluid_vessel' | 'structural' | 'rotating_electrical' | 'building_element' | 'commodity' | 'unknown'
+interface ServiceDescriptor {
+  fluid: FluidKind
+  phase: 'liquid' | 'gas' | 'solid' | 'multiphase' | 'none'
+  pressure_bar: number
+  fabrication_family: FabricationFamily
+  criticality: 'standard' | 'high'
+}
+
+/** Serialise a typed service descriptor to the compact JSON the `service` modifier
+ *  carries (read verbatim by requirements_bom.py). */
+function serviceJson(s: ServiceDescriptor): string {
+  return JSON.stringify({
+    fluid: s.fluid,
+    phase: s.phase,
+    pressure_bar: Math.round(s.pressure_bar * 100) / 100,
+    fabrication_family: s.fabrication_family,
+    criticality: s.criticality,
+  })
+}
+
+/** True if a dimension string is an AREA driver (a footprint / plan / membrane area)
+ *  rather than a 3-D vessel geometry. `… m² footprint`, `… m² area`, a bare `… m²`. */
+function dimIsAreaDriver(dim: string): boolean {
+  if (!dim) return false
+  if (/m\s*dia/i.test(dim)) return false // a cylinder — a vessel, not an area
+  if (/\d\s*x\s*\d.*mm/i.test(dim)) return false // a W×D×H box — a 3-D part
+  return /m²|m2\b|sq\s*m|square\s*met/i.test(dim) && /footprint|area|plan|floor|slab|roof|wall|membrane/i.test(dim)
+}
+
+/** The vessel design pressure (bar gauge) for a fluid part, read from the CONTRACT
+ *  quantities by the part's stem — a `*_pressure_bar` / `*_design_pressure_bar` /
+ *  `*_pressure_barg` key whose stem token-overlaps the word, else the single global
+ *  `reactor_pressure_bar` / `operating_pressure_bar` when present, else 0
+ *  (atmospheric). A kPa pressure-DROP key is NOT a design pressure and is ignored.
+ *  This is DRIVER physics, not a name read. */
+function vesselPressureBar(w: WordLike, quantities: Record<string, number>): number {
+  const stems = new Set(wordStems(w))
+  const pressureKeys = Object.keys(quantities).filter((k) => /(_|^)(design_)?pressure_bar(g)?$/i.test(k) || /(_|^)operating_pressure_bar$/i.test(k))
+  // 1) a pressure key whose stem token-overlaps this part's stems (its OWN pressure).
+  let best = 0
+  for (const k of pressureKeys) {
+    const v = quantities[k]
+    if (!Number.isFinite(v) || v <= 0) continue
+    const keyToks = k.replace(/(_|^)(design_|operating_)?pressure_bar(g)?$/i, '').split(/[_\d]+/).filter(Boolean)
+    if (keyToks.some((t) => stems.has(t))) best = Math.max(best, v)
+  }
+  if (best > 0) return best
+  // 2) a vessel that is plainly a pressurised PROCESS vessel adopts the NOUN-MATCHING
+  //    global process-pressure key the contract declares — a reactor reads
+  //    `reactor_pressure_bar`, a column/absorber/stripper reads `column_pressure_bar`
+  //    (NOT a reactor's pressure: an absorber is not at the reactor's pressure). It only
+  //    falls back to a single generic `operating_/system_pressure_bar` when no
+  //    noun-specific key exists. Either way the FABRICATION FAMILY is fluid_vessel; this
+  //    only sharpens the design pressure (and thus the wall), never the branch.
+  const nm = w.name_human ?? ''
+  const nounKeys: string[] = []
+  if (/reactor|autoclave|digester/i.test(nm)) nounKeys.push('reactor_pressure_bar')
+  if (/column|tower|absorber|stripper|scrubber|contactor|distillation|fractionation/i.test(nm)) nounKeys.push('column_pressure_bar', 'absorber_pressure_bar', 'stripper_pressure_bar')
+  if (/separator|knock.?out|flash|drum|crystalli/i.test(nm)) nounKeys.push('separator_pressure_bar')
+  for (const k of [...nounKeys, 'operating_pressure_bar', 'system_pressure_bar']) {
+    const v = quantities[k]
+    if (Number.isFinite(v) && v > 0) return v
+  }
+  return 0
+}
+
+/** Derive the TYPED service descriptor for a word FROM ITS DRIVER QUANTITY (never its
+ *  noun). Returns null when the word has no characterising driver (a pure commodity /
+ *  sub-component / instrument is left for the catalogue path). */
+function deriveService(w: WordLike, quantities: Record<string, number>): ServiceDescriptor | null {
+  const mods = w.modifier_characters ?? []
+  const dim = String(mods.find((m) => m.kind === 'dimension' || m.kind === 'dimensions')?.value ?? '')
+  const capMod = mods.find((m) => m.kind === 'capacity')
+  const capM3 = capMod && /m³|m3/.test(String(capMod.unit ?? '') + ' ' + String(capMod.value ?? '')) ? (parseFloat(String(capMod.value)) || 0) : 0
+  const rating = mods.find((m) => m.kind === 'rating_primary')
+  const ratingUnit = String(rating?.unit ?? '').toLowerCase()
+  const ratingVal = rating ? parseFloat(String(rating.value)) || 0 : 0
+
+  // 1) FOOTPRINT / PLAN-AREA driver + NO fluid capacity + NO 3-D vessel dimension →
+  //    a STRUCTURAL, dry, atmospheric part (the £42M Structural Frame case: its driver
+  //    is a `… m² footprint`, never a vessel). Decided by the DRIVER, not the name.
+  const areaDriver = dimIsAreaDriver(dim) || /m²|m2\b/.test(ratingUnit)
+  const hasVesselGeom = /m\s*dia/i.test(dim) || /\d\s*x\s*\d.*mm/i.test(dim)
+  if (areaDriver && capM3 <= 0 && !hasVesselGeom) {
+    return { fluid: 'none', phase: 'solid', pressure_bar: 0, fabrication_family: 'structural', criticality: 'standard' }
+  }
+
+  // 2) FLUID driver — a real m³ capacity OR a 3-D vessel geometry on a vessel-noun
+  //    holdup (reuse the existing physics-based isFluidVessel detector). Its pressure
+  //    comes from the CONTRACT; an atmospheric tank reads 0 bar (an OPEN tank).
+  if (isFluidVessel(w) || capM3 >= 1) {
+    const pbar = vesselPressureBar(w, quantities)
+    const seawater = /seawater|brine|marine|sea.?water|saline/i.test(w.name_human ?? '')
+    const gas = /gas|vapour|vapor|\bco2\b|oxygen|nitrogen|flue|stack/i.test(w.name_human ?? '') && !/water|tank|basin/i.test(w.name_human ?? '')
+    return {
+      fluid: gas ? 'gas' : seawater ? 'seawater' : 'process_water',
+      phase: gas ? 'gas' : 'liquid',
+      pressure_bar: pbar,
+      fabrication_family: 'fluid_vessel',
+      criticality: pbar > 0 ? 'high' : 'standard',
+    }
+  }
+
+  // 3) kW / kVA POWER driver with NO fluid → a ROTATING / ELECTRICAL machine, dry.
+  if ((ratingUnit.includes('kw') || ratingUnit.includes('kva')) && ratingVal > 0) {
+    return { fluid: 'none', phase: 'none', pressure_bar: 0, fabrication_family: 'rotating_electrical', criticality: 'standard' }
+  }
+
+  return null
+}
+
+/**
+ * Stamp a TYPED `service` modifier on every characterisable word in the design,
+ * DERIVED FROM ITS DRIVER QUANTITY (Phase 0 root fix). Runs as the FINAL synthesis
+ * pass — after the principal-equipment sizing, the instrument / actuator / utility /
+ * process / building synthesis AND the legacy skeleton words are all in place — so a
+ * footprint-driven "Structural Frame" carries `fabrication_family:'structural'` and
+ * the cost characteriser never reaches its hoop-stress branch.
+ *
+ * Idempotent (re-derives + replaces a prior `service` via mergeMods). Skips
+ * sub-components (their parent carries the service) and any word with no driver
+ * (a pure commodity / instrument is a catalogue line). Mutates `modules` in place;
+ * returns the count of words annotated. Universal — no per-class table.
+ */
+export function annotateServiceFamilies(modules: ModuleLike[], quantities: Record<string, number>): number {
+  let n = 0
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        if (isSubcomponent(w)) continue // the parent carries the service descriptor
+        // building words already carry their typed service from buildingWord(); leave
+        // them (deriveService would re-confirm building_element via the area driver,
+        // but buildingWord set it authoritatively — don't churn it).
+        if (isBuildingStructure(w)) continue
+        const svc = deriveService(w, quantities)
+        if (!svc) continue
+        mergeMods(w, [mod('service', serviceJson(svc))])
+        n += 1
+      }
+    }
+  }
+  return n
+}
+
 export interface UniversalSizingResult {
   sized: number
   synthesized: number
@@ -1455,6 +1671,7 @@ export interface UniversalSizingResult {
   utilities: number
   processSystems: number
   buildingStructure: number
+  serviceFamilies: number
   groups: number
   matchedPhrases: string[]
   synthesizedPhrases: string[]
@@ -2153,6 +2370,15 @@ export function reconcilePrincipalEquipment(
   // unhoused product (negligible footprint). Reuses the number-map built at the top.
   res.buildingResynthesised = synthesizeBuildingStructure(modules, quantities, contract)
 
+  // RE-STAMP the typed service descriptors against the FINAL tree (Phase 0). This pass
+  // runs AFTER the emit-time annotateServiceFamilies (in applyUniversalContractSizing),
+  // so a principal that survived a drop / re-host already carries its service; this
+  // re-derives any word the reconcile re-created (the re-synthesised building words
+  // carry service from buildingWord; a re-created principal gets re-annotated from its
+  // driver) and is idempotent via mergeMods. Guarantees the cost characteriser sees a
+  // typed service on every characterisable word of the final design. Universal.
+  annotateServiceFamilies(modules, quantities)
+
   return res
 }
 
@@ -2349,6 +2575,14 @@ export function applyUniversalContractSizing(
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
   const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules) : 0
 
+  // ── E. TYPED SERVICE (Phase 0 root fix): stamp every characterisable word with a
+  // `service{fabrication_family,…}` descriptor DERIVED FROM ITS DRIVER QUANTITY (a
+  // footprint-area driver → structural; a m³/flow driver → fluid_vessel; a kW driver →
+  // rotating_electrical) — so the cost characteriser keys off the typed field, never a
+  // downstream noun re-parse (the £42M "Structural Frame" hoop-stress bug). Runs LAST so
+  // it sees the principals + the synthesised + the legacy skeleton words all in place. ──
+  const serviceFamilies = annotateServiceFamilies(modules, quantities)
+
   return {
     sized,
     synthesized: synthesizedPhrases.length,
@@ -2359,6 +2593,7 @@ export function applyUniversalContractSizing(
     utilities,
     processSystems,
     buildingStructure,
+    serviceFamilies,
     groups: groups.length,
     matchedPhrases: [...matched],
     synthesizedPhrases,

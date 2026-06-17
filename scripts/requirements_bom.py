@@ -109,6 +109,103 @@ def _install_factor(vol_m3: float) -> float:
     return 1.70
 
 
+# ── TYPED SERVICE (Phase 0 — council 2026-06-17, the £42.36M Structural Frame bug) ──
+# universal-contract-sizing.ts emits a TYPED `service` modifier on every synthesised
+# part AT SYNTHESIS, derived from the part's DRIVER quantity (a footprint-area driver →
+# structural; a m³/flow driver → fluid_vessel; a kW driver → rotating_electrical). The
+# cost characteriser reads THIS typed field to decide the fabrication kind — it must
+# NEVER re-infer the fabrication branch from the part's noun (that noun-regex is exactly
+# what mis-priced a footprint-driven "Structural Frame" as a 57,000 m³ closed pressure
+# vessel → £42.36M). The legacy noun-heuristic survives ONLY as the fallback when a part
+# carries no typed service (legacy archetypes), so nothing else moves.
+_STRUCTURAL_FAMILIES = {"structural", "building_element"}
+# A single fabricated pressure vessel never exceeds a few thousand m³ (the largest
+# field-erected process vessels are ~3,000-5,000 m³; a 57,000 m³ "vessel" is the
+# whole-plant bounding box). Above this, a closed-shell hoop-stress take-off is
+# physically impossible → reject it (the plausibility invariant). A large OPEN tank
+# (a 1 ML fish-farm ring) is priced by the open-tank branch, not this shell path.
+_MAX_SHELL_VOL_M3 = 5000.0
+
+
+def _read_service(md: dict):
+    """Parse the typed `service` modifier (a JSON dict) → dict, else None. The shape is
+    {fluid, phase, pressure_bar, fabrication_family, criticality} emitted by
+    universal-contract-sizing.ts::serviceJson. Tolerant of an already-parsed dict."""
+    if not isinstance(md, dict):
+        return None
+    raw = md.get("service")
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        svc = raw
+    else:
+        try:
+            svc = json.loads(str(raw))
+        except (ValueError, TypeError):
+            return None
+    if not isinstance(svc, dict):
+        return None
+    fam = str(svc.get("fabrication_family") or "").strip().lower()
+    fluid = str(svc.get("fluid") or "none").strip().lower()
+    try:
+        pbar = float(svc.get("pressure_bar") or 0.0)
+    except (ValueError, TypeError):
+        pbar = 0.0
+    return {
+        "fabrication_family": fam,
+        "fluid": fluid,
+        "pressure_bar": pbar,
+        "phase": str(svc.get("phase") or "none").strip().lower(),
+        "criticality": str(svc.get("criticality") or "standard").strip().lower(),
+    }
+
+
+# UK-2026 structural steelwork supply+erect rate (fabricated, painted, erected on a
+# prepared base) — the SAME £/m² basis the synthesised "Steel Portal Frame" building
+# element uses (BUILDING_ELEMENTS portal_frame = £90/m²). A bare structural FRAME /
+# space-frame / support structure is priced on its plan footprint at this rate, NOT by a
+# hoop-stress shell take-off. (Hot-rolled portal-frame steelwork ≈ £85-110/m² of covered
+# area, UK 2026 — Costain / SCI / CECA.) Plus a modest fixed allowance for connections /
+# baseplates / holding-down bolts.
+_STRUCTURAL_GBP_PER_M2 = 90.0
+
+
+def _structural_takeoff(name, md, geom=None):
+    """Cost a STRUCTURAL part (a frame / space-frame / support structure / enclosure
+    skeleton) from its PLAN FOOTPRINT at the structural-steel £/m² rate — the SAME basis
+    as the synthesised Steel Portal Frame, NEVER a hoop-stress pressure-vessel shell.
+
+    The footprint (m²) is read, in order, from: a `… m² footprint` / `… m² area`
+    dimension modifier; a `rating_primary` carrying m² footprint; else (last resort) the
+    plan area of the as-built Blender geometry (π·(d/2)² for a cylinder footprint, w×d for
+    a box) — a FLOOR AREA, never wrapped into a pressure shell. Returns (gbp, basis,
+    spec) or None when no footprint can be read. Universal, deterministic, no per-class
+    table."""
+    area_m2 = None
+    dim = str(md.get("dimension") or md.get("dimensions") or "")
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*m(?:²|2)\b", dim, re.I)
+    if m:
+        area_m2 = float(m.group(1).replace(",", ""))
+    if area_m2 is None:
+        rp = md.get("rating_primary")
+        rpu = next((x.get("unit") for x in []), "")  # rating unit not in flat md; parse value
+        rv = _num(rp)
+        # a rating_primary value tagged as an m² footprint (the building/structural hook)
+        if rv and re.search(r"footprint|m²|m2|area", str(md.get("rating_primary_unit") or "") + " " + dim, re.I):
+            area_m2 = rv
+    if area_m2 is None and geom:
+        d_v, h_v = geom
+        area_m2 = math.pi * (d_v / 2.0) ** 2          # PLAN footprint (a circle), not a shell
+    if area_m2 is None or area_m2 <= 0:
+        return None
+    gbp = area_m2 * _STRUCTURAL_GBP_PER_M2 + 8000.0   # + connections/baseplates/HD bolts
+    basis = (f"structural steelwork take-off: {area_m2:,.0f} m² plan × £{_STRUCTURAL_GBP_PER_M2:.0f}/m² "
+             f"(UK-2026 fabricated + erected; service=structural, dry, 0 bar — NOT a pressure shell) "
+             f"+ £8k connections")
+    spec = {"material": "structural steel", "footprint_m2": round(area_m2)}
+    return gbp, basis, spec
+
+
 def _wall_physics(matlabel):
     """(allowable stress MPa, corrosion allowance mm, fabrication-minimum wall mm) for the
     hoop-stress wall, by material. UNIVERSAL — keyed off _material()'s label."""
@@ -121,7 +218,7 @@ def _wall_physics(matlabel):
     return (120.0, 2.0, 5.0)   # carbon steel
 
 
-def _materials_takeoff(name, mods, geom=None):
+def _materials_takeoff(name, mods, geom=None, service=None):
     """Bespoke cost from a real materials take-off.
 
     Cost model (UNIVERSAL — parametric by material + physical size only):
@@ -136,6 +233,15 @@ def _materials_takeoff(name, mods, geom=None):
          large tanks.  Factor is 1.20–1.70× parametric on volume (no per-class table).
       6. Fittings allowance = 20% of installed cost + £1,800 fixed (nozzles, manway,
          vents, supports, anti-corrosion coating, site testing).
+
+    `service` (the typed service descriptor, when present) gates the CLOSED
+    pressure-vessel branch via the PLAUSIBILITY INVARIANT (Phase 0, council
+    2026-06-17): a part may be costed as a closed PRESSURE vessel ONLY IF it has a
+    fluid service AND pressure_bar>0 AND a sane vessel volume. A structural / dry /
+    no-pressure part, or an impossibly large (≥ a few thousand m³) "vessel", is NOT a
+    pressure shell — the hoop-stress shell take-off is rejected and the cost falls to a
+    structural / parametric basis. This is what stops a footprint-driven "Structural
+    Frame" being priced as a 57,000 m³ steel pressure vessel (£42.36M).
 
     Returns (gbp, basis_str, spec_dict) or None if no geometry is available.
     """
@@ -161,6 +267,46 @@ def _materials_takeoff(name, mods, geom=None):
             area = 2 * (w * dp + dp * h_v + w * h_v)                        # 6 faces
         else:
             return None
+    # ── PLAUSIBILITY INVARIANT (Phase 0, council 2026-06-17) — an ABSOLUTE check, not a
+    # cross-surface one. A closed PRESSURE-vessel shell take-off (hoop stress on the full
+    # wrapped surface) is PHYSICALLY VALID only for a real fluid vessel of sane size. So
+    # the closed-shell path is FORBIDDEN, and the cost falls to a STRUCTURAL footprint
+    # take-off, whenever EITHER:
+    #   (a) the typed service says this part is NOT a pressurised fluid vessel — a
+    #       structural / building / dry-no-pressure / no-fluid part (the footprint-driven
+    #       "Structural Frame": service.fabrication_family ∈ {structural, building_element}
+    #       OR fluid='none' OR pressure_bar≤0); OR
+    #   (b) the implied "vessel" volume is impossibly large for a single fabricated shell
+    #       (≥ _MAX_SHELL_VOL_M3 — a 57,000 m³ "vessel" is the whole-plant bounding box,
+    #       never one pressure vessel).
+    # This is the typed-service-FIRST decision the council mandated: it reads the service
+    # the synthesis emitted from the part's PHYSICS, never the part's noun. (A genuine
+    # open atmospheric TANK is handled below by the is_open branch, which is not a
+    # pressure shell either.)
+    svc = service if isinstance(service, dict) else None
+    svc_says_not_pressure = bool(svc) and (
+        svc.get("fabrication_family") in _STRUCTURAL_FAMILIES
+        or svc.get("fluid") in (None, "", "none")
+        or float(svc.get("pressure_bar") or 0.0) <= 0.0)
+    # an open atmospheric tank is legitimately NOT a pressure vessel, but it IS still a
+    # fluid-holding shell costed by the open-tank branch below — so the structural
+    # redirect applies only to a part the service marks STRUCTURAL/building/dry, or to an
+    # impossibly large shell. (fluid='process_water' with pressure 0 = an OPEN TANK, kept.)
+    svc_structural = bool(svc) and svc.get("fabrication_family") in _STRUCTURAL_FAMILIES
+    impossible_shell = vol >= _MAX_SHELL_VOL_M3
+    if svc_structural or impossible_shell:
+        st = _structural_takeoff(name, mods, geom)
+        if st:
+            why = ("typed service = structural/building (dry, no pressure) — a hoop-stress "
+                   "shell take-off is physically wrong for a structure"
+                   if svc_structural else
+                   f"implied shell volume {vol:,.0f} m³ ≥ {_MAX_SHELL_VOL_M3:,.0f} m³ is impossible "
+                   f"for a single pressure vessel (whole-plant envelope, not a vessel)")
+            gbp_s, basis_s, spec_s = st
+            return gbp_s, f"{basis_s} · PLAUSIBILITY: {why}; rejected the closed-shell take-off", spec_s
+        # no footprint to price structurally → fall through, but the closed-shell branch
+        # is still forbidden below by `force_open` (never a pressure shell).
+    force_open = svc_says_not_pressure or impossible_shell
     matlabel, rho, rate = _material(name, mods)
     # wall from PHYSICS — hoop stress at the hydrostatic head. t = P·r/(σ·E) + corrosion,
     # floored at the fabrication minimum.
@@ -178,6 +324,15 @@ def _materials_takeoff(name, mods, geom=None):
     # basis (here) and the explosion breakdown (there) agree on every vessel.
     is_open = bool(re.search(r"\btank\b|\bbasin\b|\bsump\b|\bpond\b|biofilter|clarifier|raceway|lagoon", name, re.I)) \
         and not re.search(r"pressure|reactor|\bcolumn\b|\btower\b|strip|scrub|absorber|degass|contactor|\bsilo\b|hopper", name, re.I)
+    # PLAUSIBILITY INVARIANT continuation: a part the typed service says is NOT a
+    # pressurised fluid vessel (no fluid / 0 bar / structural) — or one whose implied
+    # shell volume is impossible — must NEVER take the CLOSED pressure-vessel branch
+    # (the hoop-stress wall over a wrapped shell). If it reached here it had no footprint
+    # to price structurally, so cost it as the lighter OPEN-shell (no top head, tapered
+    # wall, panel-assembled) — never a sealed pressure vessel. The typed-service decision
+    # OVERRIDES the noun; the noun heuristic only runs when there is no typed service.
+    if force_open:
+        is_open = True
     if is_open:
         shell_area = math.pi * d_v * h_v
         floor_area = math.pi * d_v * d_v / 4.0
@@ -1149,6 +1304,58 @@ def _selftest() -> int:
     if mt and mt[0] > ceil7:
         print(f"  FAIL small vessel take-off £{mt[0]:.0f} exceeds its own ceiling £{ceil7:.0f}"); bad += 1
 
+    # ── PHASE 0: TYPED SERVICE → FABRICATION KIND + PLAUSIBILITY INVARIANT (council
+    # 2026-06-17, the £42.36M Structural Frame). The cost characteriser must decide the
+    # fabrication branch from the TYPED service the synthesis emitted, NEVER the noun;
+    # and a part may be priced as a closed PRESSURE vessel ONLY IF it has a fluid service
+    # AND pressure_bar>0 AND a sane volume. The exact live bug: a footprint-driven
+    # "Structural Frame" + the whole-plant 54.5×24.5 m bounding-box geometry → £42.36M.
+    WHOLE_PLANT_GEOM = (54.5069, 24.5281)   # the bbox that produced the £42M shell
+    svc_struct = json.dumps({"fluid": "none", "phase": "solid", "pressure_bar": 0,
+                             "fabrication_family": "structural", "criticality": "standard"})
+    # _read_service round-trips the JSON descriptor
+    rs = _read_service({"service": svc_struct})
+    if not (rs and rs["fabrication_family"] == "structural" and rs["fluid"] == "none" and rs["pressure_bar"] == 0):
+        print(f"  FAIL _read_service did not parse the typed service: {rs}"); bad += 1
+    # a structural part is priced on its FOOTPRINT (£/m²), NOT a hoop-stress shell — even
+    # with the whole-plant bounding-box geometry that previously gave £42.36M.
+    frame_md = {"dimensions": "2971 m² footprint, 8 m haunch height", "service": svc_struct}
+    fmt = _materials_takeoff("Structural Frame", frame_md, WHOLE_PLANT_GEOM, _read_service(frame_md))
+    # priced structurally (£/m² footprint), NOT a hoop-stress shell wall computation.
+    # (the basis MENTIONS hoop-stress only to say it was REJECTED — so check the actual
+    # wall-physics formula token "= P·r/" is absent, i.e. no shell take-off was computed.)
+    fmt_basis = fmt[1] if fmt else ""
+    if not (fmt and 50000 < fmt[0] < 1500000 and "structural steelwork" in fmt_basis and "= P·r/" not in fmt_basis):
+        print(f"  FAIL structural frame not priced structurally: £{fmt[0] if fmt else 0:,.0f} ({fmt_basis[:60]})"); bad += 1
+    if fmt and fmt[0] > 2000000:
+        print(f"  FAIL structural frame STILL in the £M-class pressure-shell range: £{fmt[0]:,.0f}"); bad += 1
+    # PLAUSIBILITY by VOLUME (defence-in-depth): even with NO typed service, an impossible
+    # 57,000 m³ "vessel" (the whole-plant bbox) must NOT be priced as a closed shell.
+    fmt_ns = _materials_takeoff("Structural Frame", {"dimensions": "2971 m² footprint"}, WHOLE_PLANT_GEOM, None)
+    if not (fmt_ns and fmt_ns[0] < 2000000):
+        print(f"  FAIL 57,000 m³ no-service shell not rejected by the volume guard: £{fmt_ns and fmt_ns[0]:,.0f}"); bad += 1
+    # a GENUINE pressure vessel (fluid service + pressure_bar>0 + sane volume) STILL takes
+    # the closed hoop-stress shell branch — the CO₂/SAF/BESS byte-identity depends on this.
+    svc_ves = json.dumps({"fluid": "process_water", "phase": "liquid", "pressure_bar": 25,
+                          "fabrication_family": "fluid_vessel", "criticality": "high"})
+    vmt = _materials_takeoff("Buffer Vessel", {"dimension": "2.5 m dia x 8 m", "service": svc_ves},
+                             (2.5, 8.0), _read_service({"service": svc_ves}))
+    if not (vmt and "hoop" in vmt[1]):
+        print(f"  FAIL genuine pressure vessel did NOT take the shell branch: {vmt and vmt[1][:60]}"); bad += 1
+    # an OPEN atmospheric tank (fluid='process_water', pressure 0) is NOT redirected to
+    # structural — it stays a fluid-holding OPEN-tank take-off (no top head, tapered).
+    svc_open = json.dumps({"fluid": "process_water", "phase": "liquid", "pressure_bar": 0,
+                           "fabrication_family": "fluid_vessel", "criticality": "standard"})
+    omt = _materials_takeoff("Rearing Tank", {"dimension": "12.4 m dia x 3.2 m", "service": svc_open},
+                             (12.4, 3.2), _read_service({"service": svc_open}))
+    if not (omt and "tapered" in omt[1] and "structural steelwork" not in omt[1]):
+        print(f"  FAIL open tank wrongly redirected away from the open take-off: {omt and omt[1][:60]}"); bad += 1
+    # a part with NO typed service + a SANE geometry behaves EXACTLY as before (legacy
+    # fallback path unchanged — the noun heuristic still decides).
+    leg_open = _materials_takeoff("Rearing Tank", {"dimension": "12.4 m dia x 3.2 m"}, (12.4, 3.2), None)
+    if not (leg_open and "tapered" in leg_open[1]):
+        print(f"  FAIL legacy no-service open tank changed behaviour: {leg_open and leg_open[1][:60]}"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -1846,7 +2053,32 @@ def assemble(out_dir: str):
                 bc = _bespoke_class(name)   # 'strong' (process vessel) | 'simple' (shell) | 'none'
                 mt_spec = None
                 g_lookup = geom_by_name.get(re.sub(r"\s+\d+$", "", name).strip().lower())
-                if bc == "strong":
+                # ── TYPED SERVICE FIRST (Phase 0 — council 2026-06-17, the £42.36M bug) ──
+                # Read the TYPED `service` the synthesis emitted from the part's DRIVER
+                # PHYSICS, and let it decide the fabrication kind BEFORE the noun heuristic.
+                # A STRUCTURAL / building part is priced as structural tonnage / £-per-m² of
+                # footprint (the SAME basis as the Steel Portal Frame) — NEVER a hoop-stress
+                # pressure shell. The noun-regex (_bespoke_class / is_open) survives only as
+                # the FALLBACK when no typed service is present (legacy archetypes), so CO₂ /
+                # SAF / BESS — whose fluid vessels carry fluid+pressure service → still take
+                # the shell branch — are unchanged. The typed `service` is ALSO threaded into
+                # every _materials_takeoff() call so its plausibility invariant always fires.
+                svc = _read_service(md)
+                svc_fam = svc.get("fabrication_family") if svc else None
+                if svc_fam in _STRUCTURAL_FAMILIES:
+                    # structural / building frame — price on footprint, not a pressure shell.
+                    pv = price.get(wid, 0.0)
+                    st = _structural_takeoff(name, md, g_lookup)
+                    if st:
+                        status, part = "BESPOKE", "made to spec (structural)"
+                        gbp, basis, mt_spec = st[0], st[1], (st[2] if len(st) > 2 else None)
+                    elif pv > 0:
+                        status, part = "BESPOKE", "made to spec (structural)"
+                        gbp, basis = pv, "made-to-spec · structural budget estimate"
+                    else:
+                        status, part = "NOT FOUND", "requirement stated — structural"
+                        gbp, basis = 0.0, "structural element — footprint take-off (no footprint driver; confidence low)"
+                elif bc == "strong":
                     # complex fabricated process vessel — bespoke regardless of any pinned
                     # PN; cost is the engineering budget estimate, NOT a shell take-off
                     # (which would undercount a reactor/column by orders of magnitude).
@@ -1855,7 +2087,7 @@ def assemble(out_dir: str):
                     if pv > 0:
                         gbp, basis = pv, "made-to-spec · engineering budget estimate"
                     else:
-                        mt = _materials_takeoff(name, md, g_lookup)
+                        mt = _materials_takeoff(name, md, g_lookup, svc)
                         gbp, basis = (mt[0], mt[1]) if mt else (0.0, "bottom-up parametric")
                         mt_spec = mt[2] if mt and len(mt) > 2 else None
                 elif pn and not _TBD_RE.search(pn):
@@ -1868,7 +2100,7 @@ def assemble(out_dir: str):
                     if dpv and gbp > 0 and (gbp / dpv > 5.0 or dpv / gbp > 5.0):
                         gbp, basis = dpv, "catalogue · cheapest distributor (gate-21 >5× correction)"
                 elif bc == "simple":
-                    mt = _materials_takeoff(name, md, g_lookup)
+                    mt = _materials_takeoff(name, md, g_lookup, svc)
                     status, part = "BESPOKE", "made to spec"
                     gbp, basis = (mt[0], mt[1]) if mt else (price.get(wid, 0.0), "bottom-up parametric")
                     mt_spec = mt[2] if mt and len(mt) > 2 else None

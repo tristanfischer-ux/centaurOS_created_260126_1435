@@ -812,6 +812,94 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => `bldg=${JSON.stringify(bldgWords.map((w: any) => `${w.name_human}/£${priceOf(w)}`))} footprint=${bldgQ.building_footprint_m2} contractFootprint=${contractFootprint} total=£${Math.round(bldgTotal)} drone=${droneAdded}`,
   ))
 
+  // ── A8b. TYPED SERVICE AT SYNTHESIS + the no-pressure-vessel-without-fluid invariant ──
+  // (Phase 0 — council 2026-06-17, the £42.36M Structural Frame). The synthesis emits a
+  // TYPED `service{fabrication_family,fluid,pressure_bar,…}` on every part FROM ITS DRIVER
+  // QUANTITY (not its noun): a FOOTPRINT-area-driven part → structural/dry/0-bar; a m³/flow
+  // FLUID part → fluid_vessel (pressure from the contract); a kW part → rotating_electrical.
+  // The cost characteriser reads this typed field and prices STRUCTURAL by £/m² (never a
+  // hoop-stress pressure shell). THE invariant: a part may carry a CLOSED pressure-vessel
+  // service ONLY IF it has a fluid service AND pressure_bar>0 — a footprint-driven
+  // "Structural Frame" must be structural/dry/0-bar, NEVER a pressurised fluid vessel (the
+  // bug priced it as a 57,000 m³ steel shell). Builds a fresh tree (frame skeleton + fluid
+  // tank + pump + pressurised reactor) and asserts the emitted service per part.
+  const svcMods: any = [
+    { module: 'structure_containment', sub_modules: [{ id: 'structure_containment__structural_frame', words: [
+      { id: 'structural_frame_word', name_human: 'Structural Frame', content_character: { character_id: 'structural_frame', name_human: 'Structural Frame' },
+        modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'part_number', value: 'TBD (detailed design)' }] } ] }] },
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'mfp', words: [
+      { id: 'rearing_tank_word', name_human: 'Rearing Tank', content_character: { character_id: 'rearing_tank', name_human: 'Rearing Tank' },
+        modifier_characters: [{ kind: 'quantity', value: '×10' }, { kind: 'capacity', value: '334', unit: 'm³' }, { kind: 'dimension', value: '12.4 m dia x 2.8 m' }] },
+      { id: 'circ_pump_word', name_human: 'Circulation Pump', content_character: { character_id: 'circ_pump', name_human: 'Circulation Pump' },
+        modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '132', unit: 'kW' }] } ] }] },
+    { module: 'energy_conversion_transduction', sub_modules: [{ id: 'react', words: [
+      { id: 'ft_reactor_word', name_human: 'Fischer-Tropsch synthesis reactor', content_character: { character_id: 'ft_reactor', name_human: 'Fischer-Tropsch synthesis reactor' },
+        modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'capacity', value: '40', unit: 'm³' }, { kind: 'dimension', value: '2.5 m dia x 8 m' }] } ] }] },
+  ]
+  const svcContract: any = { product_class: 'aquaculture_ras', quantities: {
+    rearing_tank_volume_each_m3: { value: 334 }, total_tank_volume_m3: { value: 3340 },
+    recirculation_flow_m3_h: { value: 13360 }, reactor_pressure_bar: { value: 25 },
+  } }
+  applyUniversalContractSizing(svcMods, svcContract, { synthesizeMissing: true, onlyUnsized: true })
+  const svcOf = (id: string): any => {
+    for (const m of svcMods) for (const sm of m.sub_modules) for (const w of (sm.words || [])) {
+      if (w.id === id) { const s = (w.modifier_characters || []).find((mc: any) => mc.kind === 'service'); return s ? JSON.parse(String(s.value)) : null }
+    }
+    return null
+  }
+  const sFrame = svcOf('structural_frame_word')
+  const sTank = svcOf('rearing_tank_word')
+  const sPump = svcOf('circ_pump_word')
+  const sReactor = svcOf('ft_reactor_word')
+  // collect EVERY emitted service and check the invariant holds across the whole tree:
+  // no part is a closed pressure vessel (fluid_vessel + pressure_bar>0) UNLESS it has a fluid.
+  const allSvc: any[] = []
+  for (const m of svcMods) for (const sm of m.sub_modules) for (const w of (sm.words || [])) {
+    const s = (w.modifier_characters || []).find((mc: any) => mc.kind === 'service'); if (s) allSvc.push({ id: w.id, ...JSON.parse(String(s.value)) })
+  }
+  const noPressureWithoutFluid = allSvc.every((s) => !(s.pressure_bar > 0) || (s.fluid && s.fluid !== 'none'))
+  const noStructuralPressure = allSvc.every((s) => !(s.fabrication_family === 'structural' || s.fabrication_family === 'building_element') || (s.pressure_bar === 0 && (!s.fluid || s.fluid === 'none')))
+  out.push(assertEq(
+    'UNIVERSAL.no_pressure_vessel_without_fluid_service',
+    'typed service is emitted at synthesis FROM THE DRIVER (the £42M Structural Frame root fix): a footprint-driven "Structural Frame" → fabrication_family=structural, fluid=none, 0 bar (NEVER a pressure shell — the no_57000m3_shell case); an open m³ tank → fluid_vessel/0 bar; a kW pump → rotating_electrical; a reactor with reactor_pressure_bar=25 → fluid_vessel/25 bar/high. INVARIANT: no part carries pressure_bar>0 without a fluid service, and no structural/building part is ever pressurised',
+    JSON.stringify({ sFrame, sTank, sPump, sReactor, noPressureWithoutFluid, noStructuralPressure }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.sFrame && o.sFrame.fabrication_family === 'structural' && o.sFrame.fluid === 'none' && o.sFrame.pressure_bar === 0
+        && o.sTank && o.sTank.fabrication_family === 'fluid_vessel' && o.sTank.pressure_bar === 0
+        && o.sPump && o.sPump.fabrication_family === 'rotating_electrical'
+        && o.sReactor && o.sReactor.fabrication_family === 'fluid_vessel' && o.sReactor.pressure_bar === 25 && o.sReactor.criticality === 'high'
+        && o.noPressureWithoutFluid === true && o.noStructuralPressure === true
+    },
+    () => `frame=${JSON.stringify(sFrame)} tank=${JSON.stringify(sTank)} pump=${JSON.stringify(sPump)} reactor=${JSON.stringify(sReactor)} noPwoF=${noPressureWithoutFluid} noStructP=${noStructuralPressure}`,
+  ))
+
+  // ── A8c. the £42M characterisation is gone — requirements_bom.py --selftest (which now
+  // carries the Phase-0 plausibility cases: a footprint-driven Structural Frame + the
+  // whole-plant 57,000 m³ bbox is priced as structural £/m² ~£275k, NEVER the £42.36M
+  // hoop-stress shell; a genuine fluid+pressure vessel STILL takes the shell branch) is the
+  // deterministic guard on the COST half. Run it as a child process so the harness fails if
+  // the Python plausibility invariant ever regresses. ──
+  let pySelftestOk = false
+  let pyDetail = ''
+  try {
+    const reqPy = resolve(__dirname, 'requirements_bom.py')
+    const reqVenv = resolve(__dirname, '..', '.venv', 'bin', 'python')
+    const reqBin = existsSync(reqVenv) ? reqVenv : 'python3'
+    const o = execFileSync(reqBin, [reqPy, '--selftest'], { encoding: 'utf8', timeout: 30000 })
+    pySelftestOk = /selftest:\s*OK/.test(o)
+    pyDetail = o.trim().split('\n').slice(-3).join(' | ')
+  } catch (err) {
+    pyDetail = `requirements_bom.py --selftest failed to run: ${String(err).slice(0, 160)}`
+  }
+  out.push(assertEq(
+    'UNIVERSAL.no_57000m3_shell',
+    'requirements_bom.py --selftest passes, including the Phase-0 plausibility invariant: a footprint-driven Structural Frame (typed service = structural) OR an impossible 57,000 m³ "vessel" (the whole-plant bounding box) is priced as structural steelwork £/m² (~£275k), NEVER the £42.36M hoop-stress pressure shell; a genuine fluid+pressure vessel still takes the closed-shell branch (CO₂/SAF/BESS byte-identity)',
+    JSON.stringify({ pySelftestOk, pyDetail }),
+    (v) => { const o = JSON.parse(v as unknown as string); return o.pySelftestOk === true },
+    () => pyDetail,
+  ))
+
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──
   const graph: any = { product_class: 'test', nodes: [{ class: 'environmental_interface', display: 'Environmental Interface', role: 'principal', required: true }], edges: [] }
   const heatingContract: any = { quantities: { heating_duty_kw: { value: 1493 }, heat_pump_cop: { value: 3.5 }, heat_pump_electrical_kw: { value: 427 } } }
