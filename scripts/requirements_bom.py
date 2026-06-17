@@ -198,9 +198,21 @@ def _materials_takeoff(name, mods, geom=None):
     basis = (f"{'tapered ' if is_open else 'hoop '}wall {wall*1000:.0f} mm = P·r/(σ·E)+c · ⌀{d_v:.1f}×{h_v:.1f} m ({head_note}) · "
              f"P={P/1000:.0f} kPa head · σ={sigma_mpa:.0f} MPa → {area:.0f} m² × {mass:.0f} kg "
              f"{matlabel} @ £{rate}/kg supply × {ifac:.2f} erection + fittings")
+    total = installed + fittings
+    # CLOSED-vessel sanity CEILING (council 2026-06-16/17): the shell-area × £/kg +
+    # install + fittings path must NEVER reach the absurd £1M-class value the prior
+    # council flagged on a ~7 m³ "UV reactor". Cap a closed vessel at a loose
+    # volume-tied ceiling (a genuine vessel is well under it; only a runaway trips).
+    # The open-tank branch has its own discounted band (guarded by the selftest).
+    if not is_open:
+        ceiling = _vessel_cost_ceiling(vol)
+        if total > ceiling:
+            basis = (basis + f" · CAPPED at vessel ceiling £{ceiling:,.0f} for {vol:.1f} m³ "
+                     f"(take-off £{total:,.0f} implausible)")
+            total = ceiling
     spec = {"material": matlabel, "wall_mm": round(wall * 1000, 1), "mass_kg": round(mass),
             "diameter_m": round(d_v, 2), "height_m": round(h_v, 2)}
-    return installed + fittings, basis, spec
+    return total, basis, spec
 
 
 # ── Minimum-credible-price floor for power / control catalogue components ──
@@ -239,6 +251,67 @@ def _price_floor_for(name: str):
         if rx.search(name or ""):
             return floor
     return None
+
+
+# ── COMMODITY CATALOGUE SANITY CAP (council 2026-06-16/17) ──
+# A line carrying a STRUCTURED catalogue part number for a commodity electronic /
+# IC / cable / fastener / small instrument must be priced from its catalogue list
+# price, and must NEVER exceed a sane multiple of it. The council found a TI
+# TMP451 temperature-sensor IC at £692 vs £1.40 catalogue (494×), an MSP430 at
+# £692 vs £6.43 (108×), a StarTech patch cable at £1,298 vs £6.14 (211×), a
+# Honeywell DP switch at £8,652 vs £39 (219×). Those are bespoke-priced commodity
+# parts. When a real distributor/catalogue price is known, cap the rendered price
+# at ≤ COMMODITY_CAP_MULT × it. Universal: keyed off the commodity NOUN, no
+# per-archetype table.
+COMMODITY_CAP_MULT = 3.0
+# Commodity nouns: small electronics / ICs / cables / connectors / fasteners /
+# small instruments — kit whose unit price is a catalogue number, never a bespoke
+# fabrication. (A power transformer / switchgear / motor is NOT here — those are
+# rating-priced.) A line is commodity ONLY if it ALSO carries a structured PN.
+_COMMODITY_NOUN_RE = re.compile(
+    r"\bsensor\b|\bic\b|microcontroller|\bmcu\b|temperature[_ -]?sensor|"
+    r"voltage[_ -]?sensor|current[_ -]?sensor|thermistor|thermocouple|\brtd\b|"
+    r"transducer|\bprobe\b|patch[_ -]?(?:cable|lead|cord)|ethernet[_ -]?cable|"
+    r"\bcable\b|\bcord\b|\bjumper\b|\bconnector\b|\bplug\b|\bsocket\b|terminal[_ -]?block|"
+    r"\bfastener|\bbolt\b|\bscrew\b|\bnut\b|\bwasher\b|\bgland\b|cable[_ -]?gland|"
+    r"\bfuse\b|fuse[_ -]?holder|\bled\b|\bdiode\b|\bresistor\b|\bcapacitor\b|"
+    r"pressure[_ -]?switch|differential[_ -]?pressure|\bdp[_ -]?switch\b|limit[_ -]?switch|"
+    r"push[_ -]?button|indicator[_ -]?light|\brelay\b|\bgateway\b|network[_ -]?switch|"
+    r"signal[_ -]?conditioner|i/?o[_ -]?module|terminal\b",
+    re.I)
+# A structured part number: alphanumeric with a separator OR a long alphanumeric
+# run (looks like a real SKU), ≥5 chars — the same shape gate-20 uses. A bare
+# descriptive token ("M6 bolt", "generic", "TBD") is NOT structured → falls back
+# to the rating model / floor, not a catalogue cap.
+_STRUCTURED_PN_RE = re.compile(r"^(?=.*\d)(?=.*[A-Za-z])[A-Za-z0-9][A-Za-z0-9\-_/.]{4,}$")
+
+
+def _is_structured_pn(pn: str) -> bool:
+    pn = (pn or "").strip()
+    if len(pn) < 5 or _TBD_RE.search(pn):
+        return False
+    if re.fullmatch(r"(?i)m\d+|m\d+x\d+|generic|tbd|n/?a|standard", pn):
+        return False
+    return bool(_STRUCTURED_PN_RE.match(pn))
+
+
+def _commodity_catalogue_cap(name: str, pn: str, gbp: float, cat_price):
+    """Cap a commodity catalogue line at ≤ COMMODITY_CAP_MULT × its catalogue/list
+    price. Applies ONLY when (a) the noun is a commodity, (b) the line carries a
+    structured PN, and (c) a real catalogue/distributor price is known. Returns
+    (gbp, basis_suffix_or_None). A commodity with NO catalogue price is left for
+    the rating model / floor — never a fixed inflated number."""
+    if cat_price is None or cat_price <= 0:
+        return (gbp, None)
+    if not (_COMMODITY_NOUN_RE.search(name or "") and _is_structured_pn(pn)):
+        return (gbp, None)
+    ceiling = COMMODITY_CAP_MULT * float(cat_price)
+    if gbp is None or gbp <= 0:
+        return (float(cat_price), f"catalogue · list £{float(cat_price):,.2f} (commodity, no estimate)")
+    if gbp > ceiling:
+        return (ceiling, f"catalogue · capped at {COMMODITY_CAP_MULT:.0f}× list £{float(cat_price):,.2f} "
+                         f"(was £{gbp:,.0f}, {gbp/float(cat_price):.0f}× list)")
+    return (gbp, None)
 
 
 def _unit_operation_price(name: str, md: dict, q):
@@ -298,6 +371,164 @@ def _unit_operation_price(name: str, md: dict, q):
         return 14000.0, "heat-exchanger budget: process plate exchanger (duty unstated)"
 
     return None
+
+
+# ── UNIVERSAL RATING-BASED EQUIPMENT COST MODEL (council 2026-06-16/17) ──
+# The BoM was untrustworthy in BOTH directions: the same 94 kW circulation pump
+# rendered at £35 (an LLM under-estimate stamped on price_estimate_gbp) while a
+# 1000 kVA genset rendered at £293k (£293/kVA, ~2× the market mid) and an 11 kW
+# blower at £923/kW. Equipment with a real RATING must price from a deterministic
+# £/kW (or £/kVA) curve grounded to UK-2026 installed-cost market mid-points —
+# NOT from whatever number an upstream LLM stamped, which swings either way.
+#
+# Each entry: noun regex → (lo £/kW, mid £/kW, hi £/kW, min installed £, label).
+# Bands are INSTALLED cost (supply + erect + connect), UK 2026, from process-plant
+# cost guides + the council's own stated bands (genset £150-400/kVA; aeration
+# blower £300-800/kW; heat pump £400-900/kW thermal). The `min` floor stops a
+# very small unit (e.g. a 1 kW gearmotor) collapsing to a few pounds — small kit
+# has a higher effective £/kW. Universal: keyed off the equipment NOUN only, no
+# per-archetype / per-class table. ORDER MATTERS — most specific noun first.
+_RATING_COST_MODELS = [
+    # ── rotating / power-rated process kit (£/kW) ──
+    (re.compile(r"variable[_ -]?speed[_ -]?drive|\bvsd\b|\bvfd\b|inverter[_ -]?drive|soft[_ -]?start", re.I),
+     (60.0, 110.0, 200.0, 350.0, "variable-speed drive @ £/kW")),
+    (re.compile(r"gear[_ -]?motor|gearmotor|geared[_ -]?motor", re.I),
+     (120.0, 220.0, 420.0, 600.0, "gearmotor @ £/kW")),
+    (re.compile(r"\bmotor\b|drive[_ -]?motor|electric[_ -]?motor", re.I),
+     (80.0, 150.0, 280.0, 450.0, "electric motor @ £/kW")),
+    (re.compile(r"\bblower\b|aerat\w*[_ -]?blower|air[_ -]?blower|roots[_ -]?blower|lobe[_ -]?blower", re.I),
+     (300.0, 550.0, 900.0, 6000.0, "aeration/process blower @ £/kW")),
+    (re.compile(r"\bcompressor\b|scroll[_ -]?compressor|screw[_ -]?compressor", re.I),
+     (250.0, 500.0, 950.0, 4000.0, "compressor @ £/kW")),
+    (re.compile(r"heat[_ -]?pump", re.I),
+     (400.0, 650.0, 1000.0, 9000.0, "heat pump @ £/kW thermal")),
+    (re.compile(r"chiller|refrigerat\w+[_ -]?(?:unit|skid|plant)", re.I),
+     (350.0, 600.0, 1100.0, 8000.0, "chiller @ £/kW thermal")),
+    (re.compile(r"heat[_ -]?exchang\w*|\bhx\b|plate[_ -]?exchang|shell[_ -]?and[_ -]?tube|economiser", re.I),
+     (120.0, 220.0, 420.0, 3000.0, "heat exchanger @ £/kW duty")),
+    (re.compile(r"\bfan\b|extract[_ -]?fan|supply[_ -]?fan|axial[_ -]?fan|centrifugal[_ -]?fan", re.I),
+     (150.0, 320.0, 650.0, 1200.0, "fan @ £/kW")),
+    (re.compile(r"\bmixer\b|agitator|stirrer", re.I),
+     (200.0, 400.0, 800.0, 1500.0, "mixer/agitator @ £/kW")),
+    # pump LAST among rotating kit (a "backwash pump"/"dosing pump" should still hit
+    # this; the noun is broad so it must not pre-empt a more specific match above)
+    (re.compile(r"\bpump\b", re.I),
+     (350.0, 700.0, 1300.0, 2500.0, "process pump (skid: casing+motor+VSD) @ £/kW")),
+    # ── electrical-supply kit rated in kVA (£/kVA) ──
+    # genset band grounded to UK market 2025: 1000 kVA bare unit ~£90k, installed
+    # £100-200k ≈ £360-440/kVA (≈ £450-550/kW @ 0.8 pf). Small sets carry a higher
+    # £/kVA, so the band spans £200-440/kVA, mid £320.
+    (re.compile(r"diesel[_ -]?generat\w*|standby[_ -]?generat\w*|\bgenset\b|generator[_ -]?set", re.I),
+     (200.0, 320.0, 440.0, 12000.0, "standby diesel genset @ £/kVA")),
+    (re.compile(r"\bups\b|uninterruptible|battery[_ -]?backup", re.I),
+     (300.0, 550.0, 950.0, 4000.0, "UPS @ £/kVA")),
+    (re.compile(r"transformer", re.I),
+     (15.0, 28.0, 55.0, 3000.0, "transformer @ £/kVA")),
+]
+# kit whose rating is a kVA quantity (so the curve is £/kVA, and a stray "kW" on the
+# word is treated as kVA-equivalent rather than mis-scaling the price).
+_KVA_NOUN_RE = re.compile(r"generat|\bups\b|uninterruptible|transformer", re.I)
+
+
+def _rating_kw(md: dict, name: str = "", requirement: str = ""):
+    """(value, is_kva) for a power-rated line, else (None, False). Reads the
+    machine-readable `rating_primary` modifier first (the universal hook every
+    sized equipment carries), then falls back to a kW/kVA token in the name or
+    requirement text. Universal — no per-class logic."""
+    val = None
+    unit = ""
+    rp = md.get("rating_primary") if isinstance(md, dict) else None
+    if rp is not None:
+        val = _num(rp)
+    # explicit unit from the modifier list if the caller passed one through name/req
+    blob = f"{name} {requirement}"
+    if val is None:
+        m = re.search(r"([\d.]+)\s*(kVA|kW)\b", blob, re.I)
+        if m:
+            val = float(m.group(1)); unit = m.group(2)
+    if val is None or val <= 0:
+        return (None, False)
+    is_kva = bool(_KVA_NOUN_RE.search(name)) or unit.lower() == "kva" \
+        or bool(re.search(r"\bkVA\b", blob))
+    return (val, is_kva)
+
+
+def _rated_equipment_cost(name: str, kw: float, is_kva: bool):
+    """Installed cost (£) for a power-rated equipment line from a UNIVERSAL £/kW
+    (or £/kVA) market curve keyed off the equipment NOUN, plus the plausibility
+    BAND. Returns (mid_gbp, basis, lo_gbp, hi_gbp) or None if the noun matches no
+    rating model. The band lets the caller both FILL a £0/absent line AND clamp an
+    over- or under-priced LLM estimate back in-band — the same model in both
+    directions. Universal: no per-class table."""
+    if not kw or kw <= 0:
+        return None
+    for rx, (lo, mid, hi, minimum, label) in _RATING_COST_MODELS:
+        if rx.search(name or ""):
+            unit = "kVA" if is_kva else "kW"
+            mid_gbp = max(mid * kw, minimum)
+            lo_gbp = max(lo * kw, minimum * 0.6)
+            hi_gbp = max(hi * kw, minimum)
+            basis = (f"rating-based: {kw:.0f} {unit} × £{mid:.0f}/{unit} "
+                     f"(UK-2026 installed mid; band £{lo:.0f}-{hi:.0f}/{unit}) — {label}")
+            return (round(mid_gbp), basis, round(lo_gbp), round(hi_gbp))
+    return None
+
+
+def _reconcile_rated_price(name: str, md: dict, gbp: float, basis: str,
+                           requirement: str = ""):
+    """Universal price-reality reconciliation for a power-rated line. If the line
+    carries a real rating AND a rating-model exists for its noun, ANY existing
+    price that is absent / ≤0 / outside the model's plausibility band is REPLACED
+    by the rating-model mid. This is the both-directions fix: it lifts a £35 94-kW
+    pump up and pulls a £293/kVA genset / £923/kW blower down to the market curve.
+
+    Tolerance: the in-band window is [0.4 × lo, 2.5 × hi] of the rating-implied
+    band — generous enough that a defensible vendor quote inside the market range
+    is KEPT (we only correct values that are clearly wrong), but tight enough that
+    a 5-30× error (either way) is pulled to the mid. Returns (gbp, basis)."""
+    kw, is_kva = _rating_kw(md, name, requirement)
+    if kw is None:
+        return (gbp, basis)
+    model = _rated_equipment_cost(name, kw, is_kva)
+    if not model:
+        return (gbp, basis)
+    mid_gbp, model_basis, lo_gbp, hi_gbp = model
+    # keep a price that is within the market band (with a modest slack so a
+    # defensible vendor quote near an edge is not needlessly overwritten); ground
+    # anything clearly outside it (a 5-30× error in either direction) to the mid.
+    window_lo = 0.6 * lo_gbp
+    window_hi = 1.5 * hi_gbp
+    if gbp is None or gbp <= 0 or gbp < window_lo or gbp > window_hi:
+        why = ("no price" if (gbp is None or gbp <= 0)
+               else f"£{gbp:,.0f} below band" if gbp < window_lo
+               else f"£{gbp:,.0f} above band")
+        return (float(mid_gbp), f"{model_basis} [{why} → grounded to market]")
+    return (gbp, basis)
+
+
+# Hard ceiling for a CLOSED-vessel materials take-off, tied to volume, so the
+# shell-area × £/m² + install path can NEVER reach the absurd £1M-class value the
+# prior council flagged on a ~7 m³ "UV reactor". A closed steel pressure vessel's
+# installed cost scales ~ £/m³ that FALLS with size; this caps the small end. The
+# ceiling is deliberately loose (a genuine large field-erected vessel is well
+# under it) — it only catches a runaway. Universal: a pure function of volume.
+def _vessel_cost_ceiling(vol_m3: float) -> float:
+    """Maximum credible installed cost (£) for a fabricated closed vessel of the
+    given volume — an upper sanity bound, not a price. A 7 m³ vessel caps ~£90k,
+    a 50 m³ ~£420k, a 500 m³ ~£3M; a genuine vessel costs far less, so this only
+    ever trips a mispricer. £/m³ falls with scale (economy of size)."""
+    v = max(float(vol_m3), 0.1)
+    # piecewise £/m³ ceiling: small vessels can be ~£13k/m³ at the very low end
+    # (a 1 m³ skid-mounted 316L vessel + fittings), falling to ~£6k/m³ by 500 m³.
+    if v < 10.0:
+        per_m3 = 13000.0
+    elif v < 50.0:
+        per_m3 = 9000.0
+    elif v < 200.0:
+        per_m3 = 7500.0
+    else:
+        per_m3 = 6000.0
+    return per_m3 * v + 20000.0   # + fixed allowance so a sub-1 m³ vessel isn't over-tight
 
 
 def _bespoke_class(name: str) -> str:
@@ -414,6 +645,58 @@ def _selftest() -> int:
         for r in _connection_rows(_d, _q):
             if r.get("service") == "water" and _dn(r) == 300 and "316" in r["basis"] and "3.7111" in r["requirement"]:
                 print(f"  FAIL edge still priced DN300/316L at full recirc: {r['tag']} {r['requirement'][:40]}"); bad += 1
+
+    # ── UNIVERSAL RATING-BASED COST MODEL (council 2026-06-16/17) ──
+    # invariant: power-rated kit is priced from the £/kW(/kVA) market curve in BOTH
+    # directions — a £0/under-priced line is lifted UP, an over-priced one pulled
+    # DOWN, both to the band; the model NEVER returns £0 for a real rating.
+    md94 = {"rating_primary": "94"}
+    # (a) under-priced 94 kW pump (£35 LLM stamp) → grounded UP into the pump band
+    g, b = _reconcile_rated_price("Circulation Pump", md94, 35.0, "catalogue")
+    if not (45000 <= g <= 130000 and "grounded to market" in b):
+        print(f"  FAIL under-priced pump not lifted to band: £{g:.0f} ({b[:40]})"); bad += 1
+    # (b) absent price on a 96 kW heat pump → grounded (never £0)
+    g, b = _reconcile_rated_price("Heat Pump", {"rating_primary": "96"}, 0.0, "x")
+    if not (g >= 38000):
+        print(f"  FAIL heat-pump £0 not grounded: £{g:.0f}"); bad += 1
+    # (c) over-priced 11 kW blower stamped at £80k (>1.5×hi) → pulled DOWN to band
+    g, b = _reconcile_rated_price("Aeration Blower", {"rating_primary": "11"}, 80000.0, "x")
+    if not (g < 20000 and "grounded to market" in b):
+        print(f"  FAIL over-priced blower not pulled to band: £{g:.0f}"); bad += 1
+    # (d) a defensible in-band genset quote (£293/kVA, band 200-440) is KEPT, not churned
+    g, b = _reconcile_rated_price("Standby Diesel Generator", {"rating_primary": "1000"}, 293200.0, "vendor")
+    if not (abs(g - 293200) < 1):
+        print(f"  FAIL in-band genset needlessly overwritten: £{g:.0f}"); bad += 1
+    # (e) a non-rated noun (a vessel/instrument) is untouched (no spurious rating match)
+    g, b = _reconcile_rated_price("Buffer Vessel", {"rating_primary": "50"}, 7500.0, "take-off")
+    if not (abs(g - 7500) < 1):
+        print(f"  FAIL vessel wrongly rating-grounded: £{g:.0f}"); bad += 1
+
+    # ── COMMODITY CATALOGUE CAP — a commodity electronic/IC/cable with a structured
+    # PN + a known catalogue price must never exceed 3× that price (the TMP451 494×
+    # / Honeywell DP-switch 219× class). A bare descriptor (no catalogue) is NOT
+    # capped/inflated — it falls through to the rating model / floor.
+    g, b = _commodity_catalogue_cap("Temperature Sensor", "TMP451AQDQFRQ1", 692.0, 1.40)
+    if not (g and abs(g - 4.20) < 0.01 and b):
+        print(f"  FAIL TMP451 commodity not capped to 3× catalogue: £{g} ({b})"); bad += 1
+    g, b = _commodity_catalogue_cap("Differential-Pressure Switch", "HSCDLNN100MDSA5", 8652.0, 39.43)
+    if not (g and g <= 3.0 * 39.43 + 0.01 and b):
+        print(f"  FAIL DP-switch commodity not capped: £{g}"); bad += 1
+    g, b = _commodity_catalogue_cap("M6 Bolt", "M6", 50.0, None)          # no catalogue price
+    if not (abs(g - 50.0) < 0.01 and b is None):
+        print(f"  FAIL bare descriptor wrongly capped: £{g} ({b})"); bad += 1
+    g, b = _commodity_catalogue_cap("Circulation Pump", "GRUNDFOS-NB-100", 65000.0, 1.40)  # not a commodity noun
+    if not (abs(g - 65000.0) < 0.01 and b is None):
+        print(f"  FAIL rated kit wrongly treated as commodity: £{g} ({b})"); bad += 1
+
+    # ── CLOSED-VESSEL CEILING — a small closed-vessel take-off can never reach the
+    # absurd £1M-class value the prior council flagged on a ~7 m³ "UV reactor".
+    ceil7 = _vessel_cost_ceiling(7.1)
+    if not (ceil7 < 200000):
+        print(f"  FAIL 7 m³ vessel ceiling too high: £{ceil7:.0f}"); bad += 1
+    mt = _materials_takeoff("UV Reactor", {"dimension": "1.8 m dia x 2.8 m"})
+    if mt and mt[0] > ceil7:
+        print(f"  FAIL small vessel take-off £{mt[0]:.0f} exceeds its own ceiling £{ceil7:.0f}"); bad += 1
 
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
@@ -897,31 +1180,46 @@ def assemble(out_dir: str):
                 # or aeration blower sized from the contract. Catalogue-class budget. ──
                 if w.get("_actuator"):
                     agbp = _child_price(w)
+                    abasis = "installed actuator — catalogue-class budget"
+                    # rated kit (aeration blower / fan) → ground to the market £/kW
+                    # curve in BOTH directions (the £923/kW 11 kW blower over-count
+                    # and any £0 stamp). No-op for an unrated valve.
+                    agbp, abasis = _reconcile_rated_price(name, md, agbp, abasis, requirement)
                     nlow = name.lower()
                     atag = ("FCV" if "valve" in nlow else "B" if "blower" in nlow
                             else "FE" if "fan" in nlow else "Y")   # ISA: control valve / blower
                     rows.append({"tag": atag, "requirement": requirement, "status": "ACTUATOR",
                                  "part": "final control element (catalogue class)", "qty": qy,
                                  "unit_gbp": round(agbp), "line_gbp": round(agbp * qy),
-                                 "basis": "installed actuator — catalogue-class budget"})
+                                 "basis": abasis})
                     continue
                 # ── BALANCE-OF-PLANT utility / safety system (synthesizeUtilitySafety #142):
                 # standby generator, make-up water, bleed/drain, ventilation. Priced as a
                 # whole skid from its contract-duty estimate. ──
                 if w.get("_utility"):
                     ugbp = _child_price(w)
+                    ubasis = "installed BoP system — catalogue-class budget"
+                    # rated kit (standby genset @ kVA, UPS @ kVA) → ground to the
+                    # market £/kVA curve (the £293/kVA genset over-count). No-op for
+                    # an unrated make-up/bleed skid.
+                    ugbp, ubasis = _reconcile_rated_price(name, md, ugbp, ubasis, requirement)
                     nlow = name.lower()
                     utag = ("G" if "generator" in nlow else "P" if ("make-up" in nlow or "make up" in nlow)
                             else "DV" if ("bleed" in nlow or "drain" in nlow) else "AHU" if "ventil" in nlow else "U")
                     rows.append({"tag": utag, "requirement": requirement, "status": "UTILITY",
                                  "part": "balance-of-plant system (catalogue class)", "qty": qy,
                                  "unit_gbp": round(ugbp), "line_gbp": round(ugbp * qy),
-                                 "basis": "installed BoP system — catalogue-class budget"})
+                                 "basis": ubasis})
                     continue
                 # ── PROCESS-SUPPORT system (synthesizeProcessSystems #143): dosing, feed,
                 # LOX, sludge handling, SCADA, grading. Priced whole from its contract duty. ──
                 if w.get("_process"):
                     pgbp = _child_price(w)
+                    pbasis = "installed process system — catalogue-class budget"
+                    # a process-support skid with a kW/kVA rating (e.g. a pumped LOX
+                    # vaporiser, a chilled-water skid) → ground to the market curve.
+                    # No-op for an unrated dosing/feed/SCADA system.
+                    pgbp, pbasis = _reconcile_rated_price(name, md, pgbp, pbasis, requirement)
                     nlow = name.lower()
                     ptag = ("DOS" if "dosing" in nlow else "FD" if "feed" in nlow
                             else "LOX" if ("oxygen" in nlow or "lox" in nlow) else "SLU" if "sludge" in nlow
@@ -930,7 +1228,7 @@ def assemble(out_dir: str):
                     rows.append({"tag": ptag, "requirement": requirement, "status": "SYSTEM",
                                  "part": "process-support system (catalogue class)", "qty": qy,
                                  "unit_gbp": round(pgbp), "line_gbp": round(pgbp * qy),
-                                 "basis": "installed process system — catalogue-class budget"})
+                                 "basis": pbasis})
                     continue
                 # ── BUILDING-STRUCTURE take-off (synthesizeBuildingStructure #145): the hall
                 # that houses the plant — reinforced floor slab, steel portal frame, insulated
@@ -1010,6 +1308,26 @@ def assemble(out_dir: str):
                         status, part = "NOT FOUND", "requirement stated"
                     basis = (basis + " · floored to min credible price"
                              if "floored" not in basis else basis)
+                # ── COMMODITY CATALOGUE CAP (council 2026-06-16/17): a commodity
+                # electronic/IC/cable/fastener/small-instrument line with a structured
+                # catalogue PN must never exceed 3× its catalogue/distributor price
+                # (TMP451 £692→£1.40·3, MSP430, StarTech patch cable, Honeywell DP
+                # switch). Only fires on a commodity NOUN + structured PN + a known
+                # catalogue price — a bare descriptor with no catalogue match is left
+                # to the rating model / floor, never a fixed inflated number. ──
+                capped_gbp, cap_basis = _commodity_catalogue_cap(name, pn, gbp, dist_price.get(wid))
+                if cap_basis is not None:
+                    gbp, basis = capped_gbp, basis + " · " + cap_basis
+                # ── UNIVERSAL RATING-BASED RECONCILIATION (council 2026-06-16/17):
+                # any power-rated equipment line (pump/motor/VSD/blower/heat-pump/
+                # compressor/chiller/fan/genset/UPS …) whose price is absent, £0, or
+                # outside the market £/kW(/kVA) band is grounded to the rating-model
+                # mid — the both-directions fix (a £35 94-kW pump UP, a £293/kVA genset
+                # DOWN). No-op for a line whose noun matches no rating model, so a
+                # vessel/instrument/cable is untouched. Skip a strong-bespoke process
+                # vessel (engineering-budget basis, not £/kW kit). ──
+                if bc != "strong":
+                    gbp, basis = _reconcile_rated_price(name, md, gbp, basis, requirement)
                 row = {"tag": tag, "requirement": requirement, "status": status,
                        "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),
                        "basis": basis}
@@ -1021,7 +1339,33 @@ def assemble(out_dir: str):
                 # line_gbp stays 0 (grand total unchanged); breakdown_gbp carries the £. ──
                 kids = kids_by_parent.get(wid, [])
                 if kids:
-                    raws = [_child_price(k) for k in kids]
+                    # raw child weight = its stamped price_estimate_gbp, BUT if that is
+                    # £0 and the child is itself rated kit (a 107 kW drive motor, a VSD,
+                    # a compressor), use the rating-model mid as its weight so the
+                    # proportional split has a real basis and the displayed breakdown
+                    # isn't £0 for a major rated sub-component (council 'motors at £0').
+                    def _child_weight(ck):
+                        ckn = ck.get("name_human") or ""
+                        ckwid = str(ck.get("id") or "")
+                        ckpn = next((x.get("value") for x in (ck.get("modifier_characters") or [])
+                                     if x.get("kind") == "part_number"), "")
+                        rp0 = _child_price(ck)
+                        # COMMODITY sub-component (IC / cable / small instrument with a
+                        # structured PN + a known catalogue price): cap its displayed
+                        # breakdown at ≤3× catalogue so a TMP451 doesn't show £900 in
+                        # the breakdown when catalogue is £1.40 (council 494× finding).
+                        capped, cb = _commodity_catalogue_cap(ckn, str(ckpn), rp0, dist_price.get(ckwid))
+                        if cb is not None:
+                            return capped
+                        if rp0 > 0:
+                            return rp0
+                        ckmd = {"rating_primary": next(
+                            (x.get("value") for x in (ck.get("modifier_characters") or [])
+                             if x.get("kind") == "rating_primary"), None)}
+                        ckw, ck_kva = _rating_kw(ckmd, ckn)
+                        rm = _rated_equipment_cost(ckn, ckw, ck_kva) if ckw else None
+                        return rm[0] if rm else rp0
+                    raws = [_child_weight(k) for k in kids]
                     tot = sum(raws)
                     pl = row["line_gbp"]
                     for i, (k, rp) in enumerate(zip(kids, raws), 1):
