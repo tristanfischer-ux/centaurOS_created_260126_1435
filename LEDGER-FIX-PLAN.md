@@ -1,7 +1,7 @@
 # ═══ SESSION-4 CHECKPOINT (2026-06-18 pm) — READ FIRST ═══
 
-STATE: `HEAD == origin/main == ec12f5f26`, tree clean. v23 verification run IN FLIGHT
-(`out/ras-v23`, the clean full run for ALL this turn's fixes). Brief `/tmp/ras-final-brief.md`.
+STATE: `HEAD == origin/main == 1cd043a09`, tree clean, 0 bg procs. Brief `/tmp/ras-final-brief.md`.
+v23 = the latest full run (`out/ras-v23`, completed exit 0, crash guard HELD).
 
 ⭐ **THE BIG CORRECTION:** `scripts/blender-universal/parts_ledger.py` ALREADY IS the ledger +
 the ✓/✗ per-drawing coverage check-off Tristan designed — wired + run every dossier
@@ -18,22 +18,38 @@ THIS TURN — committed + pushed (grep `git log` for SHAs):
    bae98f345 (recirc MOTOR nameplate not shaft → contract 1454→1719/1758; panel ~1872 → 0.92-0.94,
    inside load_reconcile ±15%) · jurisdiction-filter crash guard ec12f5f26 (sparse modifier_characters).
 
-VERIFIED: v21 full run held the 2 drawing fixes (recirc 8, single-line 1.6:1). Connected-load
-confirmed at v22 contract level (1719 motor-nameplate). v22 CRASHED at jurisdiction-filter
-(now guarded) → v23 re-run is the clean ALL-PASS confirmation.
+VERIFIED on v23 (drawing-gates 13/14 PASS, FATAL=0): pump replication (8 recirc), single-line
+1.6:1, panel-enum, ISO coverage, crash-guard all HOLD end-to-end. Contract connected-load = 1719
+(motor-nameplate, my fix applied). The 2 drawing fixes also held on the earlier v21 full run.
 
-⭐ **THE ONE REMAINING ROOT (both open threads collapse to it): NO SINGLE PART IDENTITY.**
-Every divergence — panel-vs-contract load, P&ID coverage 31/54, tag-scheme mismatches — is the
-SAME: each surface assigns its own tag+name+figure. The connected-load fix passes load_reconcile
-WITHIN tolerance but the FULL fix (and the ledger coverage) needs the structural single ledger:
-ONE canonical identity (tag+name) + ONE connected-load list that build_universal_scene,
-requirements_bom, the drawings + the BoM ALL read (task #122 + this plan). On v21 the P&ID gap is
-~16 equipment drawn under a DIFFERENT name than the ledger (identity-mismatch, not real absence) +
-the P&ID-connection rendering (11/104). Enforcing parts_ledger's verdict is PREMATURE until the
-identity is unified (else it flags false identity-mismatch gaps). NEXT INCREMENT: one canonical
-part identity shared by the parts-manifest + requirementsBom (collapses the coverage mismatches),
-then the connected-load list, then enforce. Do it carefully (touches the core generators) — NOT
-while a verification run is using those files.
+⛔ **load_reconcile STILL RED on v23 — and I proved surface-patching is a DEAD END.** Across 3 runs
+it went green(v20, BY LUCK) → red-low 966(v21) → red-high 2865(v23). v23 panel = 2865 vs contract
+1719 (1.67). ROOT of the v23 over-count: the PANEL re-resolves each load's kW via its OWN fragile
+name→quantity matcher and gets the recirc pump WRONG — `_panel_type_kw`/`_panel_principal_motor_kw`
+(draw_panel_schedule.py ~708-758) falls to a generic "principal motor anchor" = 206 kW (the recirc
+SYSTEM-aggregate motor, the single-giant-pump figure) ×8 = 1648, instead of the emitted
+recirc_pump_motor_kw=132 (per-train) ×8 = 1056. The panel also sums LOADS the contract's 6-term
+formula omits. So the panel total and the contract total are TWO INDEPENDENT computations of the
+same number → cannot be reconciled by patching either (the band-aid trap). v20 was green only
+because the panel UNDER-counted to match; making the pumps faithful exposed that neither surface
+had a correct, consistent connected load. My fixes are each individually correct + KEPT (faithful 8
+pumps; contract motor-nameplate) — do NOT revert them; the red gate is the HONEST state.
+
+⭐ **THE ONE REMAINING ROOT (BOTH open threads collapse to it): NO SINGLE SOURCE / SINGLE IDENTITY.**
+load_reconcile (panel vs contract kW) AND parts_ledger coverage (P&ID 31/54 — ~16 equipment drawn
+under a DIFFERENT name than the ledger, identity-mismatch NOT real absence) are the SAME root.
+THE ONLY correct fix (NOT another surface patch):
+  (A) the contract emits ONE authoritative per-equipment ELECTRICAL-LOAD LIST {name, motor_kw, count};
+      connected_electrical_load_kw = Σ of it; AND draw_panel_schedule DRAWS ITS CIRCUITS FROM THAT
+      LIST instead of re-resolving kW → panel total == contract BY CONSTRUCTION, green AND correct.
+  (B) ONE canonical part IDENTITY (tag+name) shared by parts-manifest + requirementsBom + drawings
+      → collapses the coverage identity-mismatches. Then enforce parts_ledger's verdict (PREMATURE
+      until identity unified, else it flags false identity-mismatch gaps).
+Both = the structural single ledger (task #122 + this plan). Touches the CORE generators
+(engineering-contract.ts, draw_panel_schedule.py, build_universal_scene.py, requirements_bom.py) —
+do it as a DELIBERATE, scorecard-gated, ideally design-councilled pass; do NOT free-hand while
+depleted (I hit 4 panel-resolver layers tonight). Also latent: the recirc pump motor sizing is
+INCONSISTENT (per-train 132 vs system-aggregate 206) — the single load-list must pick one.
 
 # ═══════════════════════════════════════════════════════════════════════════════════════
 
