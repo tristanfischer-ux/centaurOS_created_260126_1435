@@ -7067,6 +7067,35 @@ async function main() {
     logAction({ step: 'drawing_set', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // ── DRAWING GATES — the self-correcting design loop's DETERMINISTIC ≥8 condition ──────
+  // Score every engineering drawing against deterministic gates (legibility aspect-ratio /
+  // panel↔contract load reconcile / principal-part electrical coverage / pipe-material diversity /
+  // qty-N coverage) — no LLM, £0, instant. Records the scorecard (drawing-gates.json +
+  // state.drawingGates) so the ≥8 DRAWING condition is PROGRAMMED into every run, not a manual
+  // council pass (Tristan 2026-06-18: "the loop order is not deterministically programmed").
+  // Each failing gate names the engine STAGE that fixes it (GATE_STAGE) so the loop can route the
+  // defect back. Non-fatal + records-only here; enforcing + auto-re-run layer on top. Universal.
+  try {
+    const gatesPy = existsSync(resolve(__dirname, '..', '.venv', 'bin', 'python'))
+      ? resolve(__dirname, '..', '.venv', 'bin', 'python') : 'python3'
+    try {
+      execFileSync(gatesPy, [resolve(__dirname, 'blender-universal', 'drawing_gates.py'), outDir],
+        { stdio: 'inherit', cwd: resolve(__dirname, '..'), env: { ...process.env } })
+    } catch { /* drawing_gates.py exits 1 when a gate fails — that IS the ≥8 verdict, not an error */ }
+    const gatesPath = resolve(outDir, 'drawing-gates.json')
+    if (existsSync(gatesPath)) {
+      const card = JSON.parse(readFileSync(gatesPath, 'utf-8'))
+      const onDisk = JSON.parse(readFileSync(statePath, 'utf-8'))
+      onDisk.drawingGates = card
+      writeFileSync(statePath, JSON.stringify(onDisk))
+      console.log(`[chain] drawing-gates: ${card.n_failing}/${card.n_gates} failing — DRAWING >=8 ${card.all_pass ? 'PASS' : 'FAIL (drawing-gates.json — each failing gate names its fix stage)'}`)
+    }
+    logAction({ step: 'drawing_gates', ok: true })
+  } catch (gateErr) {
+    console.error(`[chain] drawing-gates stage miss (non-fatal): ${(gateErr as Error).message.slice(0, 160)}`)
+    logAction({ step: 'drawing_gates', ok: false })
+  }
+
   // ── Interconnect census (Increment 6): full-density utility/electrical/instrument tie-in take-off ──
   // generate_drawing_set just produced parts-manifest.json. Enumerate, per equipment item, the standard
   // tie-ins a real plant has (motor feeds, vessel drain/vent/purge, heat-item cooling water, a signal
