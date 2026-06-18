@@ -128,13 +128,23 @@ def main() -> int:
             subs.setdefault(str(r["sub_of"]), []).append(r)
 
     # rendered text per view (deterministic, no OCR)
+    def _svg_text(f: Path) -> str:
+        return " " + " ".join(re.findall(r">([^<>]+)<", f.read_text(errors="ignore"))) + " " \
+            if f.exists() else ""
+
     rep_text = {"blender": ""}
     for key in REPS:
         if key == "blender":
             continue
-        f = ddir / f"{key}.svg"
-        rep_text[key] = (" " + " ".join(re.findall(r">([^<>]+)<", f.read_text(errors="ignore"))) + " ") \
-            if f.exists() else ""
+        if key == "isometric-index":
+            # the isometrics are PER-LINE spool files (isometric-201-PR-DN300.svg …), NOT a
+            # single index sheet — `isometric-index.svg` never exists, so the old single-file
+            # read gave EVERY part ISO=absent (false 0/N). A part is on the ISO set if it is
+            # named on ANY spool, so AGGREGATE every spool's text. (Connection ISO coverage
+            # already keys on the per-line spool file; this fixes the PART side.)
+            rep_text[key] = " ".join(_svg_text(f) for f in sorted(ddir.glob("isometric-*.svg")))
+            continue
+        rep_text[key] = _svg_text(ddir / f"{key}.svg")
     placed_norms = {_norm(str(p.get("name", ""))) for p in placed.values()}
 
     def covered(tag: str, name: str, key: str) -> bool:
