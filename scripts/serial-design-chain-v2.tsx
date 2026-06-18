@@ -7089,6 +7089,43 @@ async function main() {
       onDisk.drawingGates = card
       writeFileSync(statePath, JSON.stringify(onDisk))
       console.log(`[chain] drawing-gates: ${card.n_failing}/${card.n_gates} failing — DRAWING >=8 ${card.all_pass ? 'PASS' : 'FAIL (drawing-gates.json — each failing gate names its fix stage)'}`)
+
+      // ── PUNCH-LIST + ENFORCING — the drawings→tools feedback as a first-class loud signal ──
+      // Every drawing gate is DETERMINISTIC, so a re-run of its (deterministic) fix STAGE is a
+      // no-op — the fix is a CODE change at the routed stage, and the NEXT run passes. So the
+      // honest loop is: detect → ROUTE each defect to its stage (a punch-list) → fix at source →
+      // re-run → pass. We surface that punch-list (grouped by fix-stage) to disk + console so the
+      // route is actionable, never a silently-recorded JSON. SHADOW by default (records + prints,
+      // never exits — an in-flight run is never blocked); enforcing via DRAWING_GATES_ENFORCING
+      // exits 35 (opt-in, mirrors the gates 31-34 shadow/enforcing philosophy). Universal.
+      if (!card.all_pass) {
+        const byStage = new Map<string, Array<{ drawing: string; gate: string; severity: string; detail: string }>>()
+        let nFail = 0
+        for (const [dwg, dc] of Object.entries(card.drawings || {})) {
+          for (const g of ((dc as { failing_gates?: Array<{ gate: string; severity: string; stage: string; detail: string }> }).failing_gates || [])) {
+            const arr = byStage.get(g.stage) || []
+            arr.push({ drawing: dwg, gate: g.gate, severity: g.severity, detail: g.detail })
+            byStage.set(g.stage, arr)
+            nFail++
+          }
+        }
+        const md: string[] = ['# Drawing-gates punch-list — route each defect to its fix STAGE', '',
+          `${nFail} deterministic drawing defect(s) across ${byStage.size} fix-stage(s). Fix at the named`,
+          'STAGE (a code change at source — re-running a deterministic stage is a no-op), then re-run.', '']
+        for (const [stage, fs] of byStage) {
+          md.push(`## STAGE → ${stage}`)
+          for (const f of fs) md.push(`- [${f.severity}] **${f.drawing}** · ${f.gate} — ${f.detail}`)
+          md.push('')
+        }
+        writeFileSync(resolve(outDir, 'drawing-gates-punchlist.md'), md.join('\n'))
+        console.log(`[chain] drawing-gates PUNCH-LIST (${nFail} defect(s) → ${byStage.size} stage(s)) → drawing-gates-punchlist.md`)
+        for (const [stage, fs] of byStage) console.log(`[chain]   → ${stage}: ${fs.map((f) => `${f.gate}/${f.drawing}`).join(', ')}`)
+        const dgEnforce = !['', '0', 'false', 'no', 'off', 'shadow'].includes((process.env.DRAWING_GATES_ENFORCING || '').toLowerCase())
+        if (dgEnforce) {
+          console.error('[chain] === DRAWING_GATES_ENFORCING: a drawing defect remains — exit 35 (punch-list above) ===')
+          process.exit(35)
+        }
+      }
     }
     logAction({ step: 'drawing_gates', ok: true })
   } catch (gateErr) {
