@@ -26,14 +26,32 @@ Blender geometry, the 8 drawing generators (`draw_*.py`), the 35 gates, `parts_l
 | Multimodal / vision scoring | `qwen/qwen3-vl-235b` | image stages | ✅ MMMU-Pro near-top |
 | ~~DeepSeek V4 pro/flash~~ | `*_DO_NOT_USE` constants | registry | ✅ correctly retired in the chain (94-96% hallucination) |
 
-## The premise check (high confidence)
-**The chain is already on the current model generation.** The May-2026 leaderboard's top models *are* what the registry uses — Gemini 3.1 Pro, Grok 4.3, GPT-5.5/5.4, MiMo-V2.5-Pro, GLM-5.1/5.2, Kimi K2.6, Qwen3.7-Max. There is **no newer tier to jump to** in the benchmark data. So the wins are **role-fit fixes, not version bumps.**
+## Live model landscape — checked 2026-06-18 against OpenRouter `/models` (NOT the stale May benchmark)
+> **Method (do this, don't trust a dated benchmark doc — new models ship weekly):** `GET https://openrouter.ai/api/v1/models`, sort by `created`. The May-2026 benchmark above is a quality *reference* only; for *availability* always re-query live.
 
-## Recommended changes (grounded, not yet applied — need a chain run to validate per the scorecard-gate rule)
+Newer models now available that postdate the May benchmark AND the registry's current choices:
 
-1. **Physics critic: `gemini-3.5-flash` → `gemini-3.1-pro-preview` (or `gpt-5.5` with cross-check).** *(confidence: high on the tier argument)* — Physics first-principles reasoning (CritPt) is dominated by reasoners (GPT-5.5 31%, Gemini 3.1 Pro 27%, GPT-5.4 23%); a *flash* tier is structurally the wrong tool for "never ship a part the engine KNOWS will fail" (gate 33), regardless of the exact flash version. Gemini 3.1 Pro is already the chain's reasoner, has the **lowest hallucination** of the frontier (+33 Omniscience), and costs ~$1.74/M — a few calls/dossier, so accuracy ≫ the 4× cost. Edit `radical/physics-critic.ts:58` AND promote it to a named registry constant (it's currently a hardcoded string not in `openrouter-models.ts`).
-2. **Council seats: ensure ≥3 lineages, all >70% non-hallucination.** *(confidence: moderate)* — Ideal Anthropic-free panel: Grok 4.3 + Gemini 3.1 Pro + GLM-5.1 + MiMo-V2.5-Pro (routing-doc rule: mix lineages, prefer non-hallucination >70%). Verify the live `advisor-engagement.ts` seats.
-3. **Keep Gemini 3.1 Pro for brief + reasoning, Grok 4.3 for judge/emit/audit, MiMo for honest review** — these are already optimal per the benchmark; do NOT change them.
+| Model | Released | Newer than (chain uses) | ctx | $in/$out /M | Note |
+|---|---|---|---|---|---|
+| `z-ai/glm-5.2` | 2026-06-16 | glm-5.1 | **1M** (↑ from 202K) | 1.40 / 4.40 | Same lineage, newer, 5× context — natural upgrade for the schema/tool-use role. Already partly referenced in the registry (`GLM_5_2`) |
+| `moonshotai/kimi-k2.7-code` | 2026-06-12 | kimi-k2.6 | 262K | 0.74 / 3.50 | **CODE-specialised — no general `kimi-k2.7` exists.** Evaluate vs k2.6 on the emission task; don't blind-swap a general role onto a code model |
+| `qwen/qwen3.7-plus` | 2026-06-03 | qwen3.7-max | 1M | 0.32 / 1.28 | Newer + ~4× cheaper, but "plus" ≠ "max" tier — evaluate, don't assume stronger |
+| `minimax/minimax-m3` | 2026-05-31 | m2.7 (benchmark) | 1M | 0.30 / 1.20 | New generation, very cheap — candidate for high-volume extraction roles |
+| `x-ai/grok-build-0.1` | 2026-05-20 | — | 256K | 1.00 / 2.00 | New agentic "build" model; specialised, NOT a grok-4.3 replacement |
+| `google/gemini-3.5-flash` | 2026-05-19 | gemini-3-flash | 1M | 1.50 / 9.00 | Current-gen flash (already the physics-critic model) |
+
+**No `gemini-3.5-pro`, `grok-4.4`, `gpt-5.6`, or `deepseek-v5`.** The brief/reasoner role (`gemini-3.1-pro-preview`) and judge role (`grok-4.3`) are still the newest in their tiers.
+
+⚠️ **Availability ≠ quality.** The catalogue confirms these exist + their date/price/context. It does NOT prove they're *better* — there is no published benchmark for glm-5.2 / kimi-k2.7 / qwen3.7-plus / minimax-m3 in our data yet (all postdate the May AA run). **Before swapping any into the chain: get fresh Artificial Analysis numbers OR A/B on the real chain task + scorecard-gate. Never swap on recency alone.**
+
+## Recommended changes (grounded, NOT yet applied — each needs an A/B + scorecard-gate to validate)
+
+1. **GLM-5.1 → `z-ai/glm-5.2` for the schema/tool-use + glm ensemble seat.** *(confidence: moderate-high)* — Same Zhipu lineage, 2-days-newer, **5× context (202K→1M)**, modest price bump. Lowest-risk adoption (same family). The registry already declares `GLM_5_2`; finish the migration of the `glm-5.1` references. Validate tool-use/JSON discipline didn't regress.
+2. **Physics critic: benchmark `gemini-3.5-flash` vs `gemini-3.1-pro-preview`.** *(confidence: moderate — softened after live check)* — `gemini-3.5-flash` is a *current-gen* flash (2026-05-19), not the old "Gemini 3 Flash", so it's better than I first assumed. But it's still a flash tier on a first-principles-physics gate ("never ship a part the engine KNOWS will fail", gate 33) where pro-tier reasoners lead CritPt. A/B the two on real physics critiques; if `3.1-pro` wins, switch (cost is trivial — few calls/dossier). Either way, promote the hardcoded string at `radical/physics-critic.ts:58` into a named registry constant.
+3. **Kimi: A/B `kimi-k2.7-code` vs `kimi-k2.6` on the emission task only.** *(confidence: low — needs testing)* — 2.7 is code-specialised; the emitter produces structured engineering specs (code-like), so it *might* help, but it's not a clean general upgrade. Don't swap blind.
+4. **Evaluate `minimax-m3` / `qwen3.7-plus` for high-volume cheap roles** (fast-extract, classification) — both new, 1M context, ~$0.30/M. Could cut extraction cost; needs a quality check vs `gemini-3.1-flash-lite`.
+5. **Council seats: ≥3 lineages, all >70% non-hallucination, Anthropic-free.** Ideal panel: Grok 4.3 + Gemini 3.1 Pro + **GLM-5.2** + MiMo-V2.5-Pro. Verify the live `advisor-engagement.ts` seats.
+6. **Keep `gemini-3.1-pro-preview` (brief+reasoner) and `grok-4.3` (judge/emit/audit) — still the newest in their tiers.** No `gemini-3.5-pro`/`grok-4.4` exists. MiMo-V2.5-Pro stays the honest-review anchor (also the cheapest output at $0.87/M).
 
 ### Separate (app-side, NOT the dossier chain)
 Several `src/actions/cad-lab-*.ts` + `brainstorming-council.ts` calls still use `deepseek/deepseek-v4-pro`/`-flash` for verdict/cost/report/advisor roles. The benchmark flags these at **94-96% hallucination** — fine for prose/structured-only, risky for any judgement acted on. Migrate the judgement ones to `mimo-v2.5-pro` (honest) or `grok-4.3`. This is the CAD-lab product, separate from the engineering-dossier chain the rest of this doc covers.
