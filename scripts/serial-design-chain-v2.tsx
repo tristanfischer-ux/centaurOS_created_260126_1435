@@ -2507,6 +2507,304 @@ function extractLedgerFixDirectives(outDir: string): FixDirective[] {
   return directives
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CODE-FIX LOOP (Tristan 2026-06-18)
+// When the data-iteration loop can't fix a defect (same section <8 for 3 iters,
+// or the ledger contradicts the scorecard), the code-fix loop fires:
+//   1. classifyDefect() — deterministic DATA vs CODE classification
+//   2. callGlmCodeFix() — GLM-5.2 reads defect + ledger + source, writes patch
+//   3. reviewPatch() — MiMo V2.5-Pro + GLM-5.1 dual review (parallel, diff lineages)
+//   4. applyCodeFix() — write patch to source file, restart chain from iteration 0
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type DefectType = 'DATA' | 'CODE'
+
+interface ClassifiedDefect {
+  directive: FixDirective
+  type: DefectType
+  reason: string
+}
+
+/**
+ * Classify a defect as DATA (re-running the chain with better directives will fix it)
+ * or CODE (the chain code itself has a bug — re-running won't help).
+ *
+ * Deterministic rules — no LLM. The classification is based on whether the ledger
+ * (source of truth) contradicts the scorecard (what the stages reported).
+ */
+function classifyDefect(
+  directive: FixDirective,
+  ledger: any,
+  iterationHistory: { iteration: number; section: string; score: number }[]
+): DefectType {
+  const section = directive.section
+
+  // RULE 1: If the ledger shows the data is CORRECT but a stage reports it wrong,
+  // it's a CODE bug in the reporting stage.
+  // Example: ledger shows 0 zero-price parts, but self-audit says "263 zero-price lines"
+  // → the self-audit code reads from the wrong field.
+  if (section === 'bill_of_materials') {
+    const zeroPriceInLedger = (ledger.equipment || []).filter(
+      (e: any) => !e.line_gbp || e.line_gbp === 0
+    ).length
+    const defectsText = directive.defects.join(' ').toLowerCase()
+    if (zeroPriceInLedger === 0 && defectsText.includes('zero')) {
+      return 'CODE'  // ledger says no zeros, but a stage reports zeros → code bug
+    }
+  }
+
+  // RULE 2: If the same section has scored <8 for 3+ consecutive data iterations,
+  // re-running won't help — escalate to CODE fix.
+  const recentScores = iterationHistory
+    .filter(h => h.section === section)
+    .slice(-3)
+  if (recentScores.length >= 3 && recentScores.every(h => h.score < 8)) {
+    return 'CODE'
+  }
+
+  // RULE 3: Ambiguous tags that persist across iterations → CODE bug in the emitter
+  // (the emitter should assign unique tags but doesn't)
+  if (section === 'identity' && (ledger.n_ambiguous_tags || 0) > 0) {
+    const prevIdentity = iterationHistory.filter(h => h.section === 'identity')
+    if (prevIdentity.length >= 2) return 'CODE'
+  }
+
+  // RULE 4: tool_archetype defects where the tool's domain is wrong for the class
+  // → CODE bug in the orchestrator's relevance sweep (not a data issue)
+  if (section === 'tool_archetype' && directive.defects.length > 0) {
+    return 'CODE'
+  }
+
+  // Default: DATA fix — re-running with specific directives should help
+  return 'DATA'
+}
+
+/**
+ * Call GLM-5.2 to diagnose a code-level defect and write a universal patch.
+ * GLM-5.2 has 1M context — it reads the defect, the full ledger, and the
+ * relevant source files in a single call, then outputs a diagnosis + patch.
+ */
+async function callGlmCodeFix(
+  directive: FixDirective,
+  ledger: any,
+  sourceFiles: { path: string; content: string }[]
+): Promise<{ diagnosis: string; patch: string; targetFile: string; targetStartLine?: number }> {
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
+  if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not set')
+
+  const defectContext = `
+DEFECT: Section "${directive.section}" scored ${directive.score}/10
+Defects:
+${directive.defects.map(d => `  - ${d}`).join('\n')}
+
+LEDGER SUMMARY (the source of truth):
+- ${ledger.n_equipment} equipment, ${ledger.n_connections} connections
+- ${ledger.n_gapped} parts with coverage gaps
+- ${ledger.n_connections_off_pid} connections off P&ID
+- ${ledger.n_ambiguous_tags} ambiguous tags: ${(ledger.ambiguous_tags || []).join(', ')}
+- ${ledger.n_parts_without_tools}/${ledger.n_equipment} parts have NO tool provenance
+- Coverage by drawing: ${JSON.stringify(ledger.coverage_by_drawing)}
+- NOT FOUND parts: ${(ledger.not_found || []).slice(0, 15).join(', ')}
+
+SOURCE FILES:
+${sourceFiles.map(f => `\n=== ${f.path} ===\n${f.content.slice(0, 30000)}`).join('\n')}
+`.trim()
+
+  const prompt = `${defectContext}
+
+TASK:
+1. Diagnose the ROOT CAUSE of why section "${directive.section}" scored ${directive.score}/10.
+   Identify which file, which function, which line is wrong.
+2. Write a UNIVERSAL code patch (must work for ANY product class, not just the current one).
+   The patch must be minimal — change only what's necessary to fix the defect.
+3. Return JSON:
+   {
+     "diagnosis": "<root cause explanation>",
+     "targetFile": "<relative path to the file to patch>",
+     "targetStartLine": <line number where the replacement starts, or null>,
+     "patch": "<the replacement code — a complete function or block, not a diff>"
+   }
+
+Constraints:
+- The fix must be UNIVERSAL — no per-class logic, no hardcoded product names
+- The fix must be DEFENSIVE — handle missing fields, null values, absent data
+- Do NOT change field names — follow the existing naming conventions
+- Do NOT add comments unless the WHY is non-obvious
+- The patch replaces the identified function/block entirely`
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'z-ai/glm-5.2',
+      max_tokens: 16000,
+      messages: [
+        { role: 'system', content: 'You are a senior TypeScript/Python engineer specialising in design automation. You diagnose defects across multiple files and write UNIVERSAL code fixes that work for any product class. You are precise, minimal, and defensive. Return valid JSON only.' },
+        { role: 'user', content: prompt },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`GLM-5.2 API error: ${response.status} ${response.statusText}`)
+  }
+
+  const data = await response.json()
+  const content = data.choices?.[0]?.message?.content || ''
+
+  // Extract JSON from the response (GLM may wrap in markdown code fences)
+  const jsonMatch = content.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error(`GLM-5.2 did not return valid JSON: ${content.slice(0, 200)}`)
+  }
+
+  const result = JSON.parse(jsonMatch[0])
+  return {
+    diagnosis: String(result.diagnosis || ''),
+    patch: String(result.patch || ''),
+    targetFile: String(result.targetFile || ''),
+    targetStartLine: result.targetStartLine ?? undefined,
+  }
+}
+
+/**
+ * Review a GLM-5.2 patch using TWO models from different lineages in parallel.
+ * MiMo V2.5-Pro (honest generalist, catches logic gaps) + GLM-5.1 (schema enforcer,
+ * catches type/structure violations). Both agree on a finding = BLOCKER.
+ */
+async function reviewPatch(
+  patch: string,
+  targetFile: string,
+  diagnosis: string,
+  directive: FixDirective
+): Promise<{ verdict: 'PASS' | 'WARNING' | 'BLOCK'; findings: string[] }> {
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
+  if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not set')
+
+  const reviewPrompt = `You are reviewing a code patch generated by GLM-5.2 for a design automation chain.
+
+DEFECT BEING FIXED: Section "${directive.section}" scored ${directive.score}/10
+Defects: ${directive.defects.slice(0, 3).join('; ')}
+
+DIAGNOSIS: ${diagnosis}
+
+TARGET FILE: ${targetFile}
+
+PATCH:
+\`\`\`
+${patch}
+\`\`\`
+
+Review for:
+1. Correctness — does the patch actually fix the defect?
+2. Universality — does it work for ANY product class, not just one?
+3. Safety — does it handle missing fields, null values, absent data?
+4. Naming consistency — does it use the same field names as the surrounding code?
+5. No regressions — could it break existing functionality?
+
+Return JSON: { "findings": [{ "severity": "blocker"|"warning"|"info", "description": "..." }], "verdict": "PASS"|"WARNING"|"BLOCK" }`
+
+  const [mimoResult, glmResult] = await Promise.all([
+    fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'xiaomi/mimo-v2.5-pro',
+        max_tokens: 8000,
+        messages: [
+          { role: 'system', content: 'You are a code reviewer. Be honest — do not fabricate findings. If the patch is correct, say PASS.' },
+          { role: 'user', content: reviewPrompt },
+        ],
+      }),
+    }).then(r => r.json()),
+    fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'z-ai/glm-5.1',
+        max_tokens: 8000,
+        messages: [
+          { role: 'system', content: 'You are a code reviewer specialising in schema and type safety. Be precise — do not fabricate findings.' },
+          { role: 'user', content: reviewPrompt },
+        ],
+      }),
+    }).then(r => r.json()),
+  ])
+
+  const parseReview = (data: any): { findings: string[]; blockers: number } => {
+    const content = data.choices?.[0]?.message?.content || ''
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return { findings: ['reviewer returned non-JSON'], blockers: 1 }
+    try {
+      const parsed = JSON.parse(jsonMatch[0])
+      const findings = (parsed.findings || []).map((f: any) =>
+        typeof f === 'string' ? f : `${f.severity}: ${f.description}`
+      )
+      const blockers = (parsed.findings || []).filter((f: any) =>
+        (typeof f === 'object' && f.severity === 'blocker') ||
+        (typeof f === 'string' && f.toLowerCase().includes('blocker'))
+      ).length
+      return { findings, blockers }
+    } catch {
+      return { findings: ['reviewer JSON parse failed'], blockers: 1 }
+    }
+  }
+
+  const mimo = parseReview(mimoResult)
+  const glm = parseReview(glmResult)
+  const allFindings = [...mimo.findings, ...glm.findings]
+  const totalBlockers = mimo.blockers + glm.blockers
+
+  // Both agree on a blocker = BLOCK. One flags = WARNING.
+  if (mimo.blockers >= 1 && glm.blockers >= 1) {
+    return { verdict: 'BLOCK', findings: allFindings }
+  }
+  if (totalBlockers >= 1) {
+    return { verdict: 'WARNING', findings: allFindings }
+  }
+  return { verdict: 'PASS', findings: allFindings }
+}
+
+/**
+ * Apply a reviewed code patch to the target file. Writes the patch to a backup
+ * first, then replaces the target. Does NOT restart the chain — the caller
+ * decides whether to restart.
+ */
+function applyCodeFix(
+  targetFile: string,
+  patch: string,
+  outDir: string
+): { applied: boolean; backupPath: string; error?: string } {
+  const fullPath = resolve(process.cwd(), targetFile)
+  const backupPath = resolve(outDir, `code-fix-backup-${Date.now()}-${targetFile.replace(/[/\\]/g, '-')}`)
+
+  try {
+    // Backup the original
+    const original = readFileSync(fullPath, 'utf-8')
+    writeFileSync(backupPath, original)
+
+    // Write the patched file
+    // For now, we append the patch as a replacement — the GLM-5.2 patch should
+    // be a complete function/block that replaces the identified section.
+    // A more sophisticated approach would use diff/patch, but for safety we
+    // write the full patched content when GLM-5.2 provides it.
+    writeFileSync(fullPath, patch)
+
+    return { applied: true, backupPath }
+  } catch (err) {
+    return { applied: false, backupPath, error: String(err) }
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2)
   if (args.length < 2) {
@@ -8440,18 +8738,127 @@ async function main() {
       console.error(`[chain] dashboard updated: ${resolve(outDir, 'dashboard.html')}`)
     } catch { /* best-effort */ }
 
-    // 5. Loop decision
+    // 5. Loop decision — DATA fix (re-run) or CODE fix (GLM-5.2 patch)
     if (!scorecard.allPass && iter + 1 < MAX_QUALITY_LOOPS) {
+      // Load ledger for classification
+      const ledger = existsSync(ledgerPath)
+        ? JSON.parse(readFileSync(ledgerPath, 'utf-8'))
+        : {}
+
+      // Build iteration history for stall detection
+      const historyPath = resolve(outDir, 'quality-loop-history.json')
+      let iterationHistory: { iteration: number; section: string; score: number }[] = []
+      try {
+        iterationHistory = JSON.parse(readFileSync(historyPath, 'utf-8'))
+      } catch { /* first iteration */ }
+      // Add current iteration scores to history
+      for (const s of scorecard.sections) {
+        iterationHistory.push({ iteration: iter, section: s.name, score: s.score })
+      }
+      writeFileSync(historyPath, JSON.stringify(iterationHistory, null, 2))
+
+      // Classify each directive: DATA fix or CODE fix
+      const classified: ClassifiedDefect[] = directives.map(d => ({
+        directive: d,
+        type: classifyDefect(d, ledger, iterationHistory),
+        reason: '',
+      }))
+
+      const codeFixDefects = classified.filter(c => c.type === 'CODE')
+      const dataFixDefects = classified.filter(c => c.type === 'DATA')
+
+      console.error(`\n[chain] quality loop: ${directives.length} directive(s) — ${dataFixDefects.length} DATA fix, ${codeFixDefects.length} CODE fix`)
+
+      // If there are CODE-fix defects AND the code-fix loop hasn't run yet this
+      // session, fire GLM-5.2 to diagnose + patch. Code-fix runs ONCE per session
+      // (tracked via QUALITY_LOOP_CODE_FIX_APPLIED env) — after a code fix, the
+      // chain restarts from iteration 0 with the patched code.
+      const codeFixAlreadyApplied = process.env.QUALITY_LOOP_CODE_FIX_APPLIED === '1'
+      if (codeFixDefects.length > 0 && !codeFixAlreadyApplied) {
+        console.error(`[chain] 🔧 CODE-FIX LOOP: ${codeFixDefects.length} defect(s) need code changes — invoking GLM-5.2`)
+
+        // Load relevant source files for the highest-priority code-fix defect
+        const topDefect = codeFixDefects[0]
+        const sourceFiles: { path: string; content: string }[] = []
+
+        // Determine which source files are relevant based on the section
+        const filesBySection: Record<string, string[]> = {
+          bill_of_materials: ['scripts/lib/semantic-self-audit.ts', 'scripts/serial-design-chain-v2.tsx'],
+          tool_archetype: ['scripts/lib/tool-archetype-coherence-audit.ts', 'scripts/serial-design-chain-v2.tsx'],
+          physics_fidelity: ['scripts/lib/physics-critic-enforcement.ts', 'scripts/serial-design-chain-v2.tsx'],
+          drawing_gates: ['scripts/blender-universal/drawing_gates.py', 'scripts/blender-universal/parts_ledger.py'],
+          identity: ['scripts/serial-design-chain-v2.tsx', 'scripts/blender-universal/parts_ledger.py'],
+          cost_sanity: ['scripts/lib/independent-cost-sanity-audit.ts'],
+        }
+        const relevantFiles = filesBySection[topDefect.directive.section] || ['scripts/serial-design-chain-v2.tsx']
+        for (const f of relevantFiles) {
+          const fp = resolve(process.cwd(), f)
+          if (existsSync(fp)) {
+            sourceFiles.push({ path: f, content: readFileSync(fp, 'utf-8').slice(0, 50000) })
+          }
+        }
+
+        try {
+          // 1. GLM-5.2 diagnoses + writes patch
+          console.error(`[chain] GLM-5.2 diagnosing [${topDefect.directive.section}]...`)
+          const fixResult = await callGlmCodeFix(topDefect.directive, ledger, sourceFiles)
+          console.error(`[chain] GLM-5.2 diagnosis: ${fixResult.diagnosis.slice(0, 200)}`)
+          console.error(`[chain] GLM-5.2 target: ${fixResult.targetFile}`)
+
+          // 2. Dual-model review (MiMo + GLM-5.1)
+          console.error(`[chain] reviewing patch (MiMo V2.5-Pro + GLM-5.1)...`)
+          const review = await reviewPatch(fixResult.patch, fixResult.targetFile, fixResult.diagnosis, topDefect.directive)
+          console.error(`[chain] review verdict: ${review.verdict} (${review.findings.length} findings)`)
+
+          // 3. Apply if not BLOCKED
+          if (review.verdict === 'BLOCK') {
+            console.error(`[chain] ✗ CODE-FIX BLOCKED by reviewers — skipping patch`)
+            for (const f of review.findings.slice(0, 5)) {
+              console.error(`  ⚠ ${f.slice(0, 120)}`)
+            }
+          } else {
+            const applyResult = applyCodeFix(fixResult.targetFile, fixResult.patch, outDir)
+            if (applyResult.applied) {
+              console.error(`[chain] ✓ CODE-FIX APPLIED to ${fixResult.targetFile} (backup: ${applyResult.backupPath})`)
+              logAction({
+                step: 'code_fix_applied',
+                section: topDefect.directive.section,
+                target_file: fixResult.targetFile,
+                diagnosis: fixResult.diagnosis.slice(0, 500),
+                review_verdict: review.verdict,
+                backup_path: applyResult.backupPath,
+              })
+
+              // Restart the chain from iteration 0 with the patched code
+              console.error(`[chain] restarting chain with patched code (iteration 1/${MAX_QUALITY_LOOPS})`)
+              execFileSync('npx', ['tsx', __filename, briefPath, outDir], {
+                env: {
+                  ...process.env,
+                  QUALITY_LOOP_ITER: '0',
+                  QUALITY_LOOP_CODE_FIX_APPLIED: '1',
+                },
+                stdio: 'inherit',
+              })
+              return  // the restarted chain handles the rest
+            } else {
+              console.error(`[chain] ✗ CODE-FIX APPLY FAILED: ${applyResult.error}`)
+            }
+          }
+        } catch (codeFixErr) {
+          console.error(`[chain] CODE-FIX LOOP error (non-fatal): ${(codeFixErr as Error).message.slice(0, 200)}`)
+        }
+      }
+
+      // DATA-FIX PATH: re-invoke the chain with directives injected into prompts
       const directivesPath = resolve(outDir, 'quality-loop-fix-directives.json')
       writeFileSync(directivesPath, JSON.stringify({ iteration: iter + 1, scorecard, directives }, null, 2))
-      console.error(`\n[chain] quality loop: ${directives.length} fix directive(s) → re-running (iteration ${iter + 2}/${MAX_QUALITY_LOOPS})`)
+      console.error(`\n[chain] DATA-FIX: re-running with ${directives.length} directive(s) (iteration ${iter + 2}/${MAX_QUALITY_LOOPS})`)
       for (const d of directives) {
         console.error(`  ✗ [${d.section}] score=${d.score}/10 → fix at ${d.fixStage}: ${d.defects.length} defect(s)`)
         for (const def of d.defects.slice(0, 3)) {
           console.error(`      · ${def.slice(0, 120)}`)
         }
       }
-      // Re-invoke the chain with the fix directives fed into the next iteration's prompts
       execFileSync('npx', ['tsx', __filename, briefPath, outDir], {
         env: {
           ...process.env,
