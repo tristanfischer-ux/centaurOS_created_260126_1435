@@ -156,6 +156,47 @@ if loop_history and isinstance(loop_history, list) and loop_history:
 else:
     S.append('<div class="note">No loop history recorded yet.</div>')
 
+# ── QUALITY SCORECARD PROGRESSION (Tristan 2026-06-18) ────────────────────────
+# Shows how each section's score changed across iterations — the visible
+# progress signal Tristan watches during a loop run.
+quality_history = load('quality-loop-history.json')
+scorecard = load('quality-scorecard.json')
+if quality_history and isinstance(quality_history, list) and len(quality_history) > 0:
+    S.append('<h3 id="sec-quality">Quality scorecard progression</h3>')
+    # Group by section
+    sections: dict = {}
+    iters = sorted(set(h.get('iteration', 0) for h in quality_history if isinstance(h, dict)))
+    for h in quality_history:
+        if not isinstance(h, dict): continue
+        sec = h.get('section', '?')
+        sections.setdefault(sec, {})[h.get('iteration', 0)] = h.get('score', 0)
+    S.append('<div class="card">')
+    S.append('<table><tr><th>Section</th>' + ''.join(f'<th class="n">Iter {i+1}</th>' for i in iters) + '</tr>')
+    for sec in sorted(sections.keys()):
+        scores = sections[sec]
+        cells = ''
+        for i in iters:
+            sc = scores.get(i)
+            if sc is None:
+                cells += '<td class="n">—</td>'
+            else:
+                color = '#e8f5e9' if sc >= 8 else ('#fff3e0' if sc >= 5 else '#ffebee')
+                cells += f'<td class="n" style="background:{color}">{sc}</td>'
+        S.append(f'<tr><td>{esc(sec)}</td>{cells}</tr>')
+    # Floor row
+    floors = {}
+    for i in iters:
+        iter_scores = [sections[s].get(i) for s in sections if sections[s].get(i) is not None]
+        if iter_scores:
+            floors[i] = min(iter_scores)
+    S.append('<tr style="font-weight:bold;border-top:2px solid #ccc"><td>FLOOR</td>' +
+             ''.join(f'<td class="n" style="background:{"#e8f5e9" if floors.get(i,0)>=8 else "#ffebee"}">{floors.get(i,"—")}</td>' for i in iters) +
+             '</tr>')
+    S.append('</table>')
+    if scorecard and isinstance(scorecard, dict):
+        S.append(f'<p class="note">Current: floor={scorecard.get("floor","?")}/10, mean={scorecard.get("mean","?")}/10, allPass={scorecard.get("allPass","?")}</p>')
+    S.append('</div>')
+
 # ── 1. EXPANDED BRIEF ────────────────────────────────────────────────────────
 S.append('<h2 id="sec-brief">1 · Expanded brief</h2>')
 if expanded:

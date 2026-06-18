@@ -176,20 +176,39 @@ def main() -> int:
                 elif tag_l and len(tag_l) >= 2 and tag_l in txt:
                     matched_calcs.append(w)
 
-            # Strategy 2: claim output_field appears in the part's basis text
+            # Strategy 2: claim output_field appears in the part's basis text.
+            # Tightened: require the field to be ≥6 chars (avoids false matches
+            # like 'ki' in 'rating-based' or 'pi' in 'pipe') AND require a
+            # word-boundary match (not a substring).
+            import re as _re
             for c in claims:
                 for fld in (c.get("output_field"), c.get("field")):
-                    if fld and str(fld).lower() in basis_l:
+                    if not fld: continue
+                    fld_s = str(fld)
+                    if len(fld_s) < 6: continue  # skip short fields (ki, pi, etc.)
+                    if _re.search(r'\b' + _re.escape(fld_s.lower()) + r'\b', basis_l):
                         matched_claims.append(c)
                         break
 
-            # Strategy 3: tool-name type-match (pump-sizing → Recirc Pump)
+            # Strategy 3: tool-name type-match (pump-sizing → Recirc Pump).
+            # Tightened: require the keyword to be the PRIMARY noun in the equipment
+            # name (first word or immediately after a qualifier like 'recirc').
+            # This prevents 'control-systems:pid-tuning' matching every part with
+            # 'control' anywhere in the name.
             type_match = False
             tid_l = tid.lower()
             for _, keywords in TYPE_KW.items():
-                if any(kw in tid_l for kw in keywords) and any(kw in nm_l for kw in keywords):
-                    type_match = True
-                    break
+                if any(kw in tid_l for kw in keywords):
+                    # Check if the keyword appears as a significant word in the name
+                    # (not just a substring). Split the name into words and check.
+                    nm_words = nm_l.split()
+                    for kw in keywords:
+                        for nw in nm_words:
+                            if kw in nw and len(nw) >= 3:
+                                type_match = True
+                                break
+                        if type_match: break
+                    if type_match: break
 
             if matched_calcs or matched_claims or type_match:
                 # When type-matching (e.g. pump-sizing → Recirc Pump), include ALL

@@ -2219,6 +2219,10 @@ function canonicalSectionName(name: string): string {
  * Validate that the ledger JSON conforms to the expected schema.
  * Returns a list of violations (empty = valid). Each violation names the
  * expected field and the actual fields available, so the error is actionable.
+ *
+ * Checks ALL rows (not just a sample) — a field missing on row 47 is as
+ * dangerous as one missing on row 1. Reports only the FIRST violation per
+ * field per row-type to avoid log spam.
  */
 function validateLedgerSchema(ledger: any): string[] {
   const violations: string[] = []
@@ -2234,40 +2238,83 @@ function validateLedgerSchema(ledger: any): string[] {
     }
   }
 
-  // Check equipment fields (sample first 3)
+  // Check ALL equipment fields
   const eqs = ledger.equipment || []
-  for (let i = 0; i < Math.min(eqs.length, 3); i++) {
+  const eqMissingReported = new Set<string>()  // one violation per missing field
+  for (let i = 0; i < eqs.length; i++) {
     const eq = eqs[i]
     const actualEq = new Set(Object.keys(eq || {}))
     for (const field of LEDGER_SCHEMA.equipment) {
-      if (!actualEq.has(field)) {
+      if (!actualEq.has(field) && !eqMissingReported.has(field)) {
         violations.push(`ledger.equipment[${i}] missing field "${field}". Available: ${[...actualEq].sort().join(', ')}`)
-        break  // one violation per equipment row is enough
+        eqMissingReported.add(field)
       }
     }
-    // Check tool sub-fields
+    // Check tool sub-fields on ALL tools
     const tools = (eq || {}).tools || []
-    for (let j = 0; j < Math.min(tools.length, 2); j++) {
+    const toolMissingReported = new Set<string>()
+    for (let j = 0; j < tools.length; j++) {
       const t = tools[j]
       const actualT = new Set(Object.keys(t || {}))
       for (const field of LEDGER_SCHEMA.tool) {
-        if (!actualT.has(field)) {
+        if (!actualT.has(field) && !toolMissingReported.has(field)) {
           violations.push(`ledger.equipment[${i}].tools[${j}] missing field "${field}". Available: ${[...actualT].sort().join(', ')}`)
-          break
+          toolMissingReported.add(field)
+        }
+      }
+      // Check calculation sub-fields
+      const calcs = (t || {}).calculations || []
+      const calcMissingReported = new Set<string>()
+      for (let k = 0; k < calcs.length; k++) {
+        const calc = calcs[k]
+        const actualCalc = new Set(Object.keys(calc || {}))
+        for (const field of LEDGER_SCHEMA.toolCalc) {
+          if (!actualCalc.has(field) && !calcMissingReported.has(field)) {
+            violations.push(`ledger.equipment[${i}].tools[${j}].calculations[${k}] missing field "${field}"`)
+            calcMissingReported.add(field)
+          }
+        }
+      }
+      // Check claim sub-fields
+      const claims = (t || {}).claims || []
+      const claimMissingReported = new Set<string>()
+      for (let k = 0; k < claims.length; k++) {
+        const claim = claims[k]
+        const actualClaim = new Set(Object.keys(claim || {}))
+        for (const field of LEDGER_SCHEMA.toolClaim) {
+          if (!actualClaim.has(field) && !claimMissingReported.has(field)) {
+            violations.push(`ledger.equipment[${i}].tools[${j}].claims[${k}] missing field "${field}"`)
+            claimMissingReported.add(field)
+          }
         }
       }
     }
   }
 
-  // Check connection fields (sample first 3)
+  // Check ALL connection fields
   const conns = ledger.connections || []
-  for (let i = 0; i < Math.min(conns.length, 3); i++) {
+  const connMissingReported = new Set<string>()
+  for (let i = 0; i < conns.length; i++) {
     const c = conns[i]
     const actualC = new Set(Object.keys(c || {}))
     for (const field of LEDGER_SCHEMA.connection) {
-      if (!actualC.has(field)) {
+      if (!actualC.has(field) && !connMissingReported.has(field)) {
         violations.push(`ledger.connections[${i}] missing field "${field}". Available: ${[...actualC].sort().join(', ')}`)
-        break
+        connMissingReported.add(field)
+      }
+    }
+  }
+
+  // Check tool_summary fields (ALL rows)
+  const ts = ledger.tool_summary || []
+  const tsMissingReported = new Set<string>()
+  for (let i = 0; i < ts.length; i++) {
+    const t = ts[i]
+    const actualT = new Set(Object.keys(t || {}))
+    for (const field of LEDGER_SCHEMA.toolSummary) {
+      if (!actualT.has(field) && !tsMissingReported.has(field)) {
+        violations.push(`ledger.tool_summary[${i}] missing field "${field}". Available: ${[...actualT].sort().join(', ')}`)
+        tsMissingReported.add(field)
       }
     }
   }
@@ -2539,6 +2586,16 @@ function classifyDefect(
 ): DefectType {
   const section = directive.section
 
+  // RULE 0: On iteration 0, always return DATA — we need a baseline before
+  // escalating to code fixes. The code-fix loop also checks this, but classifying
+  // as DATA on iter 0 keeps the classification honest.
+  const currentIter = iterationHistory.length > 0
+    ? Math.max(...iterationHistory.map(h => h.iteration))
+    : 0
+  if (currentIter === 0) {
+    return 'DATA'
+  }
+
   // RULE 1: If the ledger shows the data is CORRECT but a stage reports it wrong,
   // it's a CODE bug in the reporting stage.
   // Example: ledger shows 0 zero-price parts, but self-audit says "263 zero-price lines"
@@ -2583,12 +2640,17 @@ function classifyDefect(
  * Call GLM-5.2 to diagnose a code-level defect and write a universal patch.
  * GLM-5.2 has 1M context — it reads the defect, the full ledger, and the
  * relevant source files in a single call, then outputs a diagnosis + patch.
+ *
+ * The patch contract: GLM-5.2 returns the NAME of the function/block to
+ * replace and the FULL replacement code for that function. applyCodeFix()
+ * then finds that function by name in the target file and replaces ONLY
+ * that span — never the whole file.
  */
 async function callGlmCodeFix(
   directive: FixDirective,
   ledger: any,
   sourceFiles: { path: string; content: string }[]
-): Promise<{ diagnosis: string; patch: string; targetFile: string; targetStartLine?: number }> {
+): Promise<{ diagnosis: string; targetFile: string; targetFunction: string; patch: string }> {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not set')
 
@@ -2621,8 +2683,8 @@ TASK:
    {
      "diagnosis": "<root cause explanation>",
      "targetFile": "<relative path to the file to patch>",
-     "targetStartLine": <line number where the replacement starts, or null>,
-     "patch": "<the replacement code — a complete function or block, not a diff>"
+     "targetFunction": "<the EXACT name of the function or method to replace, e.g. computeQualityScorecard or _find_tools_for_equipment>",
+     "patch": "<the COMPLETE replacement code for that function — including the full function signature and body. This replaces the existing function of that name in the file. Do NOT include any other code.>"
    }
 
 Constraints:
@@ -2630,7 +2692,9 @@ Constraints:
 - The fix must be DEFENSIVE — handle missing fields, null values, absent data
 - Do NOT change field names — follow the existing naming conventions
 - Do NOT add comments unless the WHY is non-obvious
-- The patch replaces the identified function/block entirely`
+- targetFunction MUST be the exact function name as it appears in the source
+- patch MUST be a complete function (signature + body), not a diff, not a fragment
+- The patched function must have the SAME signature as the original (same params, same return type)`
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -2666,7 +2730,7 @@ Constraints:
     diagnosis: String(result.diagnosis || ''),
     patch: String(result.patch || ''),
     targetFile: String(result.targetFile || ''),
-    targetStartLine: result.targetStartLine ?? undefined,
+    targetFunction: String(result.targetFunction || ''),
   }
 }
 
@@ -2678,6 +2742,7 @@ Constraints:
 async function reviewPatch(
   patch: string,
   targetFile: string,
+  targetFunction: string,
   diagnosis: string,
   directive: FixDirective
 ): Promise<{ verdict: 'PASS' | 'WARNING' | 'BLOCK'; findings: string[] }> {
@@ -2692,8 +2757,9 @@ Defects: ${directive.defects.slice(0, 3).join('; ')}
 DIAGNOSIS: ${diagnosis}
 
 TARGET FILE: ${targetFile}
+TARGET FUNCTION TO REPLACE: ${targetFunction}
 
-PATCH:
+PATCH (this is the COMPLETE replacement function):
 \`\`\`
 ${patch}
 \`\`\`
@@ -2703,7 +2769,8 @@ Review for:
 2. Universality — does it work for ANY product class, not just one?
 3. Safety — does it handle missing fields, null values, absent data?
 4. Naming consistency — does it use the same field names as the surrounding code?
-5. No regressions — could it break existing functionality?
+5. Signature match — does the replacement function have the same signature as the original?
+6. No regressions — could it break existing functionality?
 
 Return JSON: { "findings": [{ "severity": "blocker"|"warning"|"info", "description": "..." }], "verdict": "PASS"|"WARNING"|"BLOCK" }`
 
@@ -2775,34 +2842,113 @@ Return JSON: { "findings": [{ "severity": "blocker"|"warning"|"info", "descripti
 }
 
 /**
- * Apply a reviewed code patch to the target file. Writes the patch to a backup
- * first, then replaces the target. Does NOT restart the chain — the caller
- * decides whether to restart.
+ * Apply a reviewed code patch to the target file by replacing a SINGLE named
+ * function. The patch is the complete replacement function code. We find the
+ * existing function by name in the source file and replace ONLY that span —
+ * never the whole file.
+ *
+ * Function-finding strategy:
+ *   1. Match `function <name>` or `async function <name>` (TypeScript)
+ *   2. Match `def <name>` (Python)
+ *   3. Match `const <name> = ` (arrow functions)
+ * The span runs from the function declaration to the matching closing brace
+ * (for TS) or dedent (for Python). We use brace-matching for TS.
+ *
+ * If the function cannot be found, the patch is NOT applied (safe fail).
  */
 function applyCodeFix(
   targetFile: string,
+  targetFunction: string,
   patch: string,
   outDir: string
-): { applied: boolean; backupPath: string; error?: string } {
+): { applied: boolean; backupPath: string; error?: string; oldSpan?: { start: number; end: number } } {
   const fullPath = resolve(process.cwd(), targetFile)
   const backupPath = resolve(outDir, `code-fix-backup-${Date.now()}-${targetFile.replace(/[/\\]/g, '-')}`)
 
   try {
-    // Backup the original
     const original = readFileSync(fullPath, 'utf-8')
     writeFileSync(backupPath, original)
 
-    // Write the patched file
-    // For now, we append the patch as a replacement — the GLM-5.2 patch should
-    // be a complete function/block that replaces the identified section.
-    // A more sophisticated approach would use diff/patch, but for safety we
-    // write the full patched content when GLM-5.2 provides it.
-    writeFileSync(fullPath, patch)
+    if (!targetFunction || targetFunction === 'undefined') {
+      return { applied: false, backupPath, error: 'no targetFunction specified by GLM-5.2' }
+    }
 
-    return { applied: true, backupPath }
+    // Find the function declaration in the source
+    // Try: function name, async function name, def name, const name =
+    const patterns = [
+      new RegExp(`(async\\s+)?function\\s+${escapeRegex(targetFunction)}\\s*[(<]`, 'g'),
+      new RegExp(`def\\s+${escapeRegex(targetFunction)}\\s*\\(`, 'g'),
+      new RegExp(`const\\s+${escapeRegex(targetFunction)}\\s*=`, 'g'),
+    ]
+
+    let matchStart = -1
+    let matchPattern = ''
+    for (const p of patterns) {
+      const m = p.exec(original)
+      if (m && m.index >= 0) {
+        matchStart = m.index
+        matchPattern = m[0]
+        break
+      }
+    }
+
+    if (matchStart < 0) {
+      return { applied: false, backupPath, error: `function "${targetFunction}" not found in ${targetFile}` }
+    }
+
+    // Find the end of the function by brace-matching (TS) or dedent (Python)
+    let matchEnd = -1
+    if (targetFile.endsWith('.py')) {
+      // Python: find the end by dedent — next line at same or lesser indent
+      // that isn't blank, starting from the line AFTER the def
+      const lines = original.slice(matchStart).split('\n')
+      let defIndent = 0
+      if (lines[0]) {
+        const m = lines[0].match(/^(\s*)/)
+        defIndent = m ? m[1].length : 0
+      }
+      let endLine = 1
+      while (endLine < lines.length) {
+        const line = lines[endLine]
+        if (line.trim() === '') { endLine++; continue }
+        const indent = (line.match(/^(\s*)/) || ['', ''])[1].length
+        if (indent <= defIndent && line.trim().length > 0) break
+        endLine++
+      }
+      matchEnd = matchStart + lines.slice(0, endLine).join('\n').length
+    } else {
+      // TypeScript: brace-matching from the first { after the function decl
+      let braceStart = original.indexOf('{', matchStart)
+      if (braceStart < 0) {
+        return { applied: false, backupPath, error: `no opening brace found for function "${targetFunction}"` }
+      }
+      let depth = 0
+      let i = braceStart
+      while (i < original.length) {
+        if (original[i] === '{') depth++
+        else if (original[i] === '}') {
+          depth--
+          if (depth === 0) { matchEnd = i + 1; break }
+        }
+        i++
+      }
+      if (matchEnd < 0) {
+        return { applied: false, backupPath, error: `unmatched braces for function "${targetFunction}"` }
+      }
+    }
+
+    // Replace ONLY the function span with the patch
+    const patched = original.slice(0, matchStart) + patch + original.slice(matchEnd)
+    writeFileSync(fullPath, patched)
+
+    return { applied: true, backupPath, oldSpan: { start: matchStart, end: matchEnd } }
   } catch (err) {
     return { applied: false, backupPath, error: String(err) }
   }
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 async function main() {
@@ -2862,6 +3008,33 @@ async function main() {
         `- [${d.section}] (score ${d.score}/10) — fix at ${d.fixStage}:\n${d.defects.map(def => `  · ${def}`).join('\n')}`
       ).join('\n')}\n\nApply these fixes in your patches. Prioritise the lowest-scoring sections.\n`
     : ''
+
+  // Stage-specific directive blocks — only the directives relevant to each stage.
+  // The emitter needs "P-101 zero price", the drawing generator needs "P&ID missing 5 parts",
+  // the reviewer needs the LLM-judged defects. Routing ALL directives to the reviewer (old
+  // behaviour) was inert — reviewers can flag problems but cannot emit BoM rows or draw symbols.
+  const directivesForStage = (stage: string): string => {
+    const stageDirectives = fixDirectives.filter(d => d.fixStage === stage)
+    if (stageDirectives.length === 0) return ''
+    return `\n\nQUALITY LOOP FIX DIRECTIVES for ${stage.toUpperCase()} (from prior iteration — fix these in your output):\n${stageDirectives.map(d =>
+      `- [${d.section}] (score ${d.score}/10):\n${d.defects.map(def => `  · ${def}`).join('\n')}`
+    ).join('\n')}\n\n`
+  }
+  const emitterDirectivesBlock = directivesForStage('emitter')
+  const drawingGeneratorDirectivesBlock = directivesForStage('drawing_generator')
+  const toolsDirectivesBlock = directivesForStage('tools')
+  const costStackDirectivesBlock = directivesForStage('cost_stack')
+
+  // Write ALL directives to a JSON file that Python stages (drawing generator,
+  // emitter if Python-based) can read via QUALITY_LOOP_DIRECTIVES_FILE env var.
+  if (fixDirectives.length > 0) {
+    const directivesJsonPath = resolve(outDir, 'quality-loop-directives.json')
+    writeFileSync(directivesJsonPath, JSON.stringify({
+      iteration: parseInt(process.env.QUALITY_LOOP_ITER || '0', 10),
+      directives: fixDirectives,
+    }, null, 2))
+    process.env.QUALITY_LOOP_DIRECTIVES_FILE = directivesJsonPath
+  }
 
   // Parse + classify the original
   const t0 = Date.now()
@@ -3987,7 +4160,7 @@ async function main() {
   // and only adds 1-2 score points over a single strong reviewer. Replaced
   // with one Grok 4.3 pass (fallback Qwen 3.6 Max). Loops 22-28 evidence:
   // the cascade's value-add was marginal. Saving the time/cost.
-  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_7_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics,     toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend + fixDirectivesBlock, libraryCandidatesBlock })
+  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_7_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics,     toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend + fixDirectivesBlock + emitterDirectivesBlock, libraryCandidatesBlock })
   design = r1.design
   writeFileSync(resolve(outDir, '5-r1-grok.json'), JSON.stringify(design, null, 2))
 
@@ -4190,7 +4363,7 @@ async function main() {
     brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design,
     rawDumpPath: resolve(outDir, '8-r4-flashlite.raw.txt'),
     keyMetrics,
-    toolOutputsBlock: toolOutputsBlock + fixDirectivesBlock,
+    toolOutputsBlock: toolOutputsBlock + fixDirectivesBlock + emitterDirectivesBlock,
     libraryCandidatesBlock,
     fidelityFlaggedModules: r4FidelityFlags,
     emitterIdentitySnapshot,
@@ -4260,7 +4433,7 @@ async function main() {
           currentDesign: design,
           rawDumpPath: resolve(outDir, '8-5-specialist.raw.txt'),
           keyMetrics,
-          toolOutputsBlock: toolOutputsBlock + fixDirectivesBlock,
+          toolOutputsBlock: toolOutputsBlock + fixDirectivesBlock + emitterDirectivesBlock,
           libraryCandidatesBlock,
           // Task #41 (2026-06-03): carry fidelity flags + snapshot through to R4.5
           // so the specialist can also add brief-fidelity sub_modules if the Critic
@@ -7721,7 +7894,14 @@ async function main() {
     // stack locked (re-opening the loop). UNIVERSAL, non-fatal. The design-loop ledger from the
     // early loop lives at outDir/_loop/design-loop-ledger.json ("settled in N passes" is read there).
     try {
-      execFileSync(pyBin, [drawScript, statePath, outDir], { stdio: 'inherit', cwd: resolve(__dirname, '..'), env: { ...process.env } })
+      execFileSync(pyBin, [drawScript, statePath, outDir], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+        env: {
+          ...process.env,
+          QUALITY_LOOP_DRAWING_DIRECTIVES: drawingGeneratorDirectivesBlock || '',
+        },
+      })
       console.log('[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)')
     } catch (drawErr) {
       console.error(`[chain] drawing-set generation miss (non-fatal): ${(drawErr as Error).message.slice(0, 160)}`)
@@ -8769,16 +8949,40 @@ async function main() {
 
       console.error(`\n[chain] quality loop: ${directives.length} directive(s) — ${dataFixDefects.length} DATA fix, ${codeFixDefects.length} CODE fix`)
 
-      // If there are CODE-fix defects AND the code-fix loop hasn't run yet this
-      // session, fire GLM-5.2 to diagnose + patch. Code-fix runs ONCE per session
-      // (tracked via QUALITY_LOOP_CODE_FIX_APPLIED env) — after a code fix, the
-      // chain restarts from iteration 0 with the patched code.
-      const codeFixAlreadyApplied = process.env.QUALITY_LOOP_CODE_FIX_APPLIED === '1'
-      if (codeFixDefects.length > 0 && !codeFixAlreadyApplied) {
-        console.error(`[chain] 🔧 CODE-FIX LOOP: ${codeFixDefects.length} defect(s) need code changes — invoking GLM-5.2`)
+      // ── Code-fix loop trigger (#3 + #4 fixes) ────────────────────────────────
+      // RULE 4: Code-fix only fires after ≥1 data iteration has completed. The
+      // first iteration establishes a baseline — without it, we'd escalate to a
+      // code fix before the data loop even gets a chance.
+      //
+      // RULE 3: Per-section tracking via a counter file (NOT a global env var).
+      // A section that's already had a code-fix attempt won't trigger again.
+      // Cap at 3 total code-fix cycles per session (cost bound, #9).
+      const codeFixCounterPath = resolve(outDir, 'quality-loop-code-fix-counter.json')
+      let codeFixCounter: { totalAttempts: number; sectionsAttempted: string[] } = { totalAttempts: 0, sectionsAttempted: [] }
+      try {
+        codeFixCounter = JSON.parse(readFileSync(codeFixCounterPath, 'utf-8'))
+      } catch { /* first time */ }
+
+      const MAX_CODE_FIX_CYCLES = 3
+      const dataIterationsCompleted = iterationHistory.filter(h => h.iteration === iter).length > 0
+        ? iter  // current iteration has been recorded, so we've done iter+1 iterations (0-indexed)
+        : iter
+
+      const canTriggerCodeFix =
+        dataIterationsCompleted >= 1 &&                              // #4: after ≥1 data iteration
+        codeFixCounter.totalAttempts < MAX_CODE_FIX_CYCLES &&        // #9: cost bound
+        codeFixDefects.length > 0
+
+      // Filter out sections already attempted
+      const unattemptedCodeFixDefects = canTriggerCodeFix
+        ? codeFixDefects.filter(c => !codeFixCounter.sectionsAttempted.includes(c.directive.section))
+        : []
+
+      if (unattemptedCodeFixDefects.length > 0) {
+        console.error(`[chain] 🔧 CODE-FIX LOOP: ${unattemptedCodeFixDefects.length} unattempted code defect(s) — invoking GLM-5.2 (attempt ${codeFixCounter.totalAttempts + 1}/${MAX_CODE_FIX_CYCLES})`)
 
         // Load relevant source files for the highest-priority code-fix defect
-        const topDefect = codeFixDefects[0]
+        const topDefect = unattemptedCodeFixDefects[0]
         const sourceFiles: { path: string; content: string }[] = []
 
         // Determine which source files are relevant based on the section
@@ -8803,11 +9007,11 @@ async function main() {
           console.error(`[chain] GLM-5.2 diagnosing [${topDefect.directive.section}]...`)
           const fixResult = await callGlmCodeFix(topDefect.directive, ledger, sourceFiles)
           console.error(`[chain] GLM-5.2 diagnosis: ${fixResult.diagnosis.slice(0, 200)}`)
-          console.error(`[chain] GLM-5.2 target: ${fixResult.targetFile}`)
+          console.error(`[chain] GLM-5.2 target: ${fixResult.targetFile} :: ${fixResult.targetFunction}`)
 
           // 2. Dual-model review (MiMo + GLM-5.1)
           console.error(`[chain] reviewing patch (MiMo V2.5-Pro + GLM-5.1)...`)
-          const review = await reviewPatch(fixResult.patch, fixResult.targetFile, fixResult.diagnosis, topDefect.directive)
+          const review = await reviewPatch(fixResult.patch, fixResult.targetFile, fixResult.targetFunction, fixResult.diagnosis, topDefect.directive)
           console.error(`[chain] review verdict: ${review.verdict} (${review.findings.length} findings)`)
 
           // 3. Apply if not BLOCKED
@@ -8817,17 +9021,23 @@ async function main() {
               console.error(`  ⚠ ${f.slice(0, 120)}`)
             }
           } else {
-            const applyResult = applyCodeFix(fixResult.targetFile, fixResult.patch, outDir)
+            const applyResult = applyCodeFix(fixResult.targetFile, fixResult.targetFunction, fixResult.patch, outDir)
             if (applyResult.applied) {
-              console.error(`[chain] ✓ CODE-FIX APPLIED to ${fixResult.targetFile} (backup: ${applyResult.backupPath})`)
+              console.error(`[chain] ✓ CODE-FIX APPLIED to ${fixResult.targetFile}::${fixResult.targetFunction} (backup: ${applyResult.backupPath})`)
               logAction({
                 step: 'code_fix_applied',
                 section: topDefect.directive.section,
                 target_file: fixResult.targetFile,
+                target_function: fixResult.targetFunction,
                 diagnosis: fixResult.diagnosis.slice(0, 500),
                 review_verdict: review.verdict,
                 backup_path: applyResult.backupPath,
               })
+
+              // Update the counter file BEFORE restarting
+              codeFixCounter.totalAttempts += 1
+              codeFixCounter.sectionsAttempted.push(topDefect.directive.section)
+              writeFileSync(codeFixCounterPath, JSON.stringify(codeFixCounter, null, 2))
 
               // Restart the chain from iteration 0 with the patched code
               console.error(`[chain] restarting chain with patched code (iteration 1/${MAX_QUALITY_LOOPS})`)
@@ -8835,7 +9045,6 @@ async function main() {
                 env: {
                   ...process.env,
                   QUALITY_LOOP_ITER: '0',
-                  QUALITY_LOOP_CODE_FIX_APPLIED: '1',
                 },
                 stdio: 'inherit',
               })
@@ -8847,6 +9056,11 @@ async function main() {
         } catch (codeFixErr) {
           console.error(`[chain] CODE-FIX LOOP error (non-fatal): ${(codeFixErr as Error).message.slice(0, 200)}`)
         }
+      } else if (codeFixDefects.length > 0 && !canTriggerCodeFix) {
+        console.error(`[chain] CODE-FIX skipped: ${codeFixDefects.length} code defect(s) remain but ` +
+          (codeFixCounter.totalAttempts >= MAX_CODE_FIX_CYCLES
+            ? `max code-fix cycles (${MAX_CODE_FIX_CYCLES}) reached`
+            : `need ≥1 data iteration first (at ${dataIterationsCompleted})`))
       }
 
       // DATA-FIX PATH: re-invoke the chain with directives injected into prompts
