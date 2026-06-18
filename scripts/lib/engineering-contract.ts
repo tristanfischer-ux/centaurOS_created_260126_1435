@@ -12176,8 +12176,13 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // figure for the connected load. degasserBlowerAirFlowM3H is the TOTAL stripping air.
   const connectedElectricalLoadKw = Math.round(
     heatPumpElectricalKw + recircPumpPowerKw +
-    (biofilterAirFlowM3H * 0.0003) +              // MBBR blower ~0.3 W per m³/h air
-    (degasserBlowerAirFlowM3H * 0.0003) +         // degasser blowers (total air)
+    aerationBlowerKw +                            // MBBR aeration blower — REAL rated kW. The old
+    //                                               air×0.0003 gave ~0.4 kW vs the real ~11 kW.
+    degasserBlowerKw * recircTrainCount +         // degasser forced-draught blowers, ONE PER COLUMN
+    //                                               (×N): the old air×0.0003 on the TOTAL air gave
+    //                                               ~40 kW vs the real N×49.5 ≈ 396 kW — the ~360 kW
+    //                                               undercount that left connected-load + transformer
+    //                                               understated (Electrical/Process/Mechanical HIGH).
     50 * Math.max(1, scale)                       // UV/ozone + PSA + controls + ancillaries
   )
 
