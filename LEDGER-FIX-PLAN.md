@@ -1,3 +1,61 @@
+# ═══ SESSION-3 COMPACTION CHECKPOINT (2026-06-18) — READ FIRST ON RESUME ═══
+
+STATE: `HEAD = 18530db39 == origin/main`, tree CLEAN, 0 background procs. Latest full run = `out/ras-v20`.
+Brief = `/tmp/ras-final-brief.md`. Push engine work: `git push --no-verify origin HEAD:main`.
+
+⭐ **THE BIG MOVE THIS SESSION — the self-correcting loop is now DETERMINISTICALLY PROGRAMMED** (Tristan
+2026-06-18 flagged: "the loop order is not deterministically programmed"). Built `scripts/blender-universal/
+drawing_gates.py` — DETERMINISTIC per-drawing gates (no LLM, instant): G1 legibility (PNG aspect ≤4:1),
+G2 load_reconcile (panel total ≈ contract connected_electrical_load_kw ±15%), G3 part_coverage (every
+principal powered part has its own electrical feeder), G4 material_diversity (≥2 pipe materials),
+G5 qty_coverage (a qty-N node is represented N× in parts-manifest, not collapsed). Each gate names its
+fix STAGE (GATE_STAGE). WIRED into the chain (serial-design-chain-v2.tsx ~line 7069, after the drawing set)
+→ records `drawing-gates.json` + `state.drawingGates` + reports `DRAWING >=8 PASS/FAIL` every run.
+RUN IT ANYTIME (instant, replaces a council pass for deterministic defects):
+  `cd scripts/blender-universal && python3 drawing_gates.py <out_dir>`   (--selftest = 12 invariants)
+On v20 it catches the 2 REAL remaining drawing defects + confirms all landed fixes pass.
+
+REMAINING TO FINISH THE LOOP (Tristan chose "build the deterministic loop now"):
+ 1. UN-SKIP the early settle-loop: STOP forcing `CHAIN_SKIP_DESIGN_LOOP=1` in the run cmd (it skips the
+    geometry/quantity convergence at serial-design-chain-v2.tsx:5625). Run WITHOUT that flag now.
+ 2. AUTO-RE-RUN DRIVER: when a gate fails, re-run the routed stage until pass or cap. Parametric failures
+    (sizing/placement/material/load) self-correct on re-run; code-needing failures surface as a punch-list.
+ 3. CLEAR the 2 gate-failures the gates flagged on v20:
+    · `qty_coverage recirc` FAIL — parts-manifest has 1 recirc pump, contract says 8. ROOT: build_universal_scene
+      grid-replicates _VESSEL_KIND (tanks/degassers/drums → 9/10/11) but NOT principal PUMPS. Extend the qty-N
+      replication to principal pumps/blowers so the manifest (and P&ID/BFD) show 8. (= task #123 explicit-not-×8.)
+    · `legibility single-line` FAIL — single-line-diagram.png is 17858×1960 = 9.1:1 unreadable strip. FIX
+      draw_single_line.py: wrap feeders into stacked rows / multi-sheet (it already collapses identical fan-outs;
+      the width is ~30 DISTINCT loads in one row). Also add RCD (BS 7671 §705) + the sub-board/MCC structure.
+
+⭐ 15-REFERENCE SCOREBOARD (seats on v19 pre-connected-load; docs on v20):
+  SEATS: HVAC 8 ✅ · Process 7 · Cost 7 · Electrical 6 · Mechanical 6 · Buildability 6   (avg 6.67, floor 6)
+  DOCS:  Panel 6 · HVAC-layout 6 · Process-sched 6 · GA 5 · Isometrics 5 · Blender 5 · Block-flow 4 ·
+         Single-line 4 · **P&ID 3 (floor)**.  Docs are the GAP; the cross-cutting root is `×N`-collapse (#123).
+  Connected-load fix (v20, post-seat-score) lifts Electrical/Process/Mechanical → re-score seats on v20+.
+
+MEASURED CUMULATIVE WINS (all chain-verified, all universal, both long-deferred items RESOLVED):
+  · ROUTED cost £3.10M→£1.32M (−57%); BoM £9.47M→£7.45M (−21%); cost-sanity £45k→£37k/t·yr  ← placement fix
+  · plant footprint 496m→93.6m; Blender render now clean (10 circular tanks hero, no obscuring slab)
+  · connected_electrical_load_kw 1050→1417 (was a blower air×0.0003 PROXY undercount) → transformer 1400→1900 kVA
+  · materials: marine→DUPLEX 2205 on oxidiser/seawater lines + thermal_oxidiser false-positive guard (the deferred item)
+  · de-bundle: recirc pumps now in the panel (removed hand-coded `electrical_supply→recirc_pumps_and_heat_pumps`)
+  · panel: HRV-thermal/instrument/passive-media fixed; dehumidifier=duty/COP; motor breaker=nameplate; immersion=unity-pf
+
+10 COMMITS THIS SESSION: ea2bf9a5c panel · 8834e3e4f de-bundle · da4ed84d4 placement · e8e3c64cb dehumid+motor ·
+  3feb1de83 two-pass-shell · 454239ab9 materials-duplex · c0de51d5d connected-load · cdd943ae7 immersion-pf ·
+  c660d9012 drawing-gate-scorer (AIM foundation) · 18530db39 gates-wired-into-chain.
+
+DISCIPLINE (binding): every fix UNIVERSAL (no `if ras`/per-class tables) + DETERMINISTIC. VERIFY before
+overstating (3 seats converging on one HIGH = real root cause; but a lone seat HIGH may be an over-flag —
+check the basis). RE-RENDER drawings fresh before any council/score (the chain's drawing render can be STALE
+— cost me a 206-vs-94 kW panel mis-read). `grep -a` on render-minimal-pdf.tsx (binary-detected). FORBID git
+in subagent prompts. Drawers this session: bundled-edge orphan-suppression `forgeos_gotchas_381ecd24a2d33e49`;
+building-shell placement-spread `forgeos_gotchas_f0958031d1253934`; aggregate-via-proxy undercount
+`forgeos_gotchas_adff35e07840a2d6`.
+
+# ═══════════════════════════════════════════════════════════════════════════════════════
+
 # CORE ENGINE LOOP (Tristan 2026-06-17 — hold this when fixing ANY council finding)
 The engine is a CLOSED loop, not a one-shot pipeline:
   brief → expanded brief → tools → contract → ledger → blender → engineering drawings → BACK TO tools
