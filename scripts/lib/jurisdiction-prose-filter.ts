@@ -166,8 +166,12 @@ export function applyJurisdictionFilterToModules(modules: ModuleSpec[]): ModuleS
       if (sub.paragraph_en) sub.paragraph_en = substituteJurisdictionCodes(sub.paragraph_en)
       if (sub.sentence_en) sub.sentence_en = substituteJurisdictionCodes(sub.sentence_en)
       for (const w of sub.words ?? []) {
+        // NB modifier_characters can be a SPARSE array after Phase-2 applyPatches (an
+        // out-of-range index assignment leaves undefined holes — the chain logs "coerce
+        // … to array" / "skip out-of-range [N]"), so `for…of` yields `undefined` for a
+        // hole → guard `mc` before reading `.kind` (FATAL crash, jurisdiction-filter, v22).
         for (const mc of w.modifier_characters ?? []) {
-          if (mc.kind === 'regulatory' && mc.value) {
+          if (mc && mc.kind === 'regulatory' && mc.value) {
             mc.value = substituteJurisdictionCodes(mc.value)
           }
         }
