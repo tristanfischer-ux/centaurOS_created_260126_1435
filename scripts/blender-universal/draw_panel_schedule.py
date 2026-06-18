@@ -166,9 +166,16 @@ def _iter_words(state: dict):
 # plant — the divergence this fixes (one recirc-pump circuit shown for 8 × 132 kW motors).
 # Universal: keyed on the parts-manifest qty by equipment NAME, never a per-class table.
 def _load_equipment_qty(out_dir: Optional[str]) -> dict:
-    """{equipment_name_lower: qty} from <out>/parts-manifest.json for items with qty > 1.
-    Empty when no out_dir / no manifest (the panel then shows one way per electrical edge,
-    the prior behaviour)."""
+    """{equipment_name_lower: TOTAL count} from <out>/parts-manifest.json, SUMMED across all
+    rows sharing a name. Robust to BOTH manifest representations of a multi-count load — a
+    single qty-N row (1 row × qty 8) AND N replicated qty-1 instance rows (8 rows × qty 1).
+    The parts-manifest now replicates principal MACHINES (recirc pumps / blowers) into N
+    instance rows (so the qty_coverage gate + the GA/P&ID/3D show all N); a name-keyed COUNT
+    is therefore correct where the old `qty > 1` filter silently dropped the qty-1 instance
+    rows → the recirc-pump panel under-count (load_reconcile regression, 2026-06-18: panel
+    966 vs 1454 kW). Backward-compatible: a 1-row qty-N load still sums to N; a genuine single
+    sums to 1 (which _ledger_qty_for treats as 'no multiple'). Empty when no out_dir / no
+    manifest (the panel then shows one way per electrical edge, the prior behaviour)."""
     if not out_dir:
         return {}
     try:
@@ -180,9 +187,11 @@ def _load_equipment_qty(out_dir: Optional[str]) -> dict:
         if not isinstance(p, dict):
             continue
         nm = (p.get("name") or "").strip().lower()
+        if not nm:
+            continue
         q = p.get("qty")
-        if nm and isinstance(q, (int, float)) and q > 1:
-            out[nm] = max(out.get(nm, 0), int(q))
+        q = int(q) if isinstance(q, (int, float)) and q >= 1 else 1
+        out[nm] = out.get(nm, 0) + q
     return out
 
 
