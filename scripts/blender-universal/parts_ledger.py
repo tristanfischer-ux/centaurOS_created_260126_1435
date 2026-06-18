@@ -251,7 +251,13 @@ def main() -> int:
     conn_cov = {}
     for key in ("pid", "process_schedules", "isometric", "route"):
         vals = [c["coverage"][key] for c in connections if c["coverage"][key] is not None]
-        applic = [c for c in connections if not (key == "isometric" and "pipe" not in c["kind"])]
+        # P&ID shows process pipes (+ instruments/valves), NOT electrical power
+        # cables or signal wires — those belong on the SLD / network drawing.
+        # Excluding non-pipe connections from the P&ID applicable set corrects
+        # the denominator so the coverage % is honest (universal — keyed by kind).
+        applic = [c for c in connections
+                  if not (key == "isometric" and "pipe" not in c["kind"])
+                  and not (key == "pid" and "pipe" not in c["kind"])]
         pres = sum(1 for c in applic if c["coverage"][key])
         conn_cov[key] = dict(present=pres, applicable=len(applic),
                              pct=round(100 * pres / len(applic), 1) if applic else None)
@@ -260,7 +266,7 @@ def main() -> int:
     orphans = [e["tag"] for e in equipment if not e["inputs"] and not e["outputs"]
                and e["type"] in ("vessel", "rotating", "exchanger", "separator")]
     uncov_conn = [f"{c['from_part']}→{c['to_part']}" for c in connections
-                  if not c["coverage"]["pid"]]
+                  if "pipe" in c["kind"] and not c["coverage"]["pid"]]
 
     for e in equipment:
         e.pop("ikey", None)
