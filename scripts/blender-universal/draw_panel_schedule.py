@@ -338,12 +338,18 @@ def size_cable_csa(design_a, margin=1.25):
     return top, f"{n}×{top:g} mm²"
 
 
-def size_circuit_from_kw(kw, voltage_v, is_dc=False, phases=3):
+def size_circuit_from_kw(kw, voltage_v, is_dc=False, phases=3, resistive=False):
     """The full load-derived sizing of ONE powered circuit from its connected kW:
     (design_a=FLC, cable_csa_mm2, cable_label, breaker_frame_a). The protective device is
     the next standard frame ≥ FLC (an MCB/MCCB must carry the design current continuously);
-    the cable is sized to ≥ FLC × 1.25. Returns (None, None, '', None) when no kW/V."""
-    flc = flc_from_kw(kw, voltage_v, is_dc=is_dc, phases=phases)
+    the cable is sized to ≥ FLC × 1.25. Returns (None, None, '', None) when no kW/V.
+
+    resistive=True (an immersion / resistance heater, heating element, heat-trace): the FLC is
+    drawn at UNITY power factor and no motor-efficiency penalty (I = P/(√3·V)). Sizing a
+    resistive load with the induction-motor pf/η defaults over-states its current ~31% (a
+    1,027 kW immersion heater is 1,482 A at unity, not 1,938 A) → an oversized breaker + cable."""
+    flc = flc_from_kw(kw, voltage_v, is_dc=is_dc, phases=phases,
+                      **({"pf": 1.0, "eta": 1.0} if resistive else {}))
     if flc is None:
         return None, None, "", None
     csa, label = size_cable_csa(flc)
@@ -584,6 +590,14 @@ _AUX_CIRCUIT_KW = 0.5
 _INSTRUMENT_LOAD_RE = re.compile(
     r"analy[sz]|\bmonitor\b|\bsensor\b|transmitter|transmittance|\bprobe\b|gauge|"
     r"\bmeter\b|intensity|turbidity|\binstrument\b", re.I)
+# A RESISTIVE-HEATING load (immersion / resistance heater, heating element, heat-trace,
+# electrode boiler) draws its full-load current at UNITY power factor and no motor-efficiency
+# penalty. It must be sized at pf=1.0/η=1.0, NOT the induction-motor defaults (which over-state
+# a 1 MW immersion heater's current ~31%). Universal — keyed on the resistive-heating noun.
+# Excludes a HEAT PUMP (a motor-driven refrigeration unit, not a resistive element).
+_RESISTIVE_LOAD_RE = re.compile(
+    r"immersion|resistance\s*heat|heating\s*element|\belement\b|heat[\s-]?trace|"
+    r"electrode\s*boiler|resistive|trace\s*heat", re.I)
 
 
 def _norm_load_name(s: str) -> str:
@@ -1313,7 +1327,8 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
         frame_override = None
         if sizing_kw and sizing_kw > 0 and panel.voltage_v:
             flc, _csa, csa_label, frame = size_circuit_from_kw(
-                sizing_kw, panel.voltage_v, is_dc=panel.is_dc, phases=panel.phases)
+                sizing_kw, panel.voltage_v, is_dc=panel.is_dc, phases=panel.phases,
+                resistive=bool(_RESISTIVE_LOAD_RE.search(base)))
             if flc is not None:
                 design_a = flc              # amps column = motor-nameplate FLC (for sizing)
                 cable = _cores_for(csa_label, panel.is_dc, panel.phases)
