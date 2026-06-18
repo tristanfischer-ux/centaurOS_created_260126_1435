@@ -12111,14 +12111,45 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // 2026-06-16). The old 3 m ignored the in-line drum-filter / biofilter / degasser-lift /
   // O2-cone / UV stage losses + loop friction, so it under-stated pump power ~5× and the
   // per-component pump-sizing tool's 14.85 m read as a 23× contradiction. TDH = static
-  // return lift + Σ(in-line treatment-stage losses) + 15% friction. A RAS recirc loop
-  // pumps through ~6 in-line stages (drum → biofilter → degasser → O2 cone → UV → return);
-  // each ≈ 1.6 m. ⇒ (3.0 + 6×1.6) × 1.15 ≈ 14.4 m, agreeing with the tool's 14.85 m.
+  // return lift + Σ(in-line treatment-stage losses) + Darcy-Weisbach friction + fitting
+  // losses. A RAS recirc loop pumps through ~6 in-line stages (drum → biofilter →
+  // degasser → O2 cone → UV → return); each ≈ 1.6 m.
+  //
+  // FRICTION + FITTING LOSSES (2026-06-18, replaces the flat 15% multiplier that
+  // under-stated head). Darcy-Weisbach from the actual pipe geometry the contract
+  // already computes — universal, works on any recirculation loop. The flat 15%
+  // multiplier gave ~2 m on a 12.6 m process head; the Darcy-Weisbach calculation
+  // with fitting equivalent lengths gives a more accurate friction head.
   const RECIRC_TREATMENT_STAGES = 6
-  const recircPumpHeadM = Math.round((3.0 + RECIRC_TREATMENT_STAGES * 1.6) * 1.15 * 10) / 10  // ≈ 14.4 m
+  // Fluid density: seawater (1,025 kg/m³) for marine RAS, freshwater (1,000) otherwise.
+  // Universal — derived from the brief's salinity, not hardcoded. The old 1,000 constant
+  // under-stated hydraulic power by ~2.5% on a marine system (physics-critic flag 2026-06-18).
+  const _salinityPpt = extractRangeFromDesc(desc, /(\d{2})\s*(?:parts\s+per\s+thousand|ppt|‰)/i, 33)
+  const fluidDensityKgM3 = (_salinityPpt && _salinityPpt > 5) ? 1000 + _salinityPpt * 0.781  // ≈1,025 at 33 ppt
+                                                               : 1000
+  const recircStaticLiftM = 3.0                          // tank exit → treatment train → return
+  const recircStageLossM = 1.6                           // in-line drum/biofilter/degasser/O₂-cone/UV
+  const recircProcessHeadM = recircStaticLiftM + RECIRC_TREATMENT_STAGES * recircStageLossM  // ≈ 12.6 m
+  // Darcy-Weisbach friction + fitting losses from the actual pipe geometry
+  const recircPipeDm = perTrainDnMm / 1000               // pipe bore [m]
+  const recircPerTrainFlowM3s = perTrainFlowM3H / 3600   // [m³/s]
+  const recircVelMs = recircPerTrainFlowM3s / (Math.PI * Math.pow(recircPipeDm / 2, 2))  // [m/s]
+  const recircPipeLenM = RECIRC_TREATMENT_STAGES * 4 + 15  // inter-stage spacing + return run
+  const recircFittingEquivM = RECIRC_TREATMENT_STAGES * 6  // ~2 elbows + 1 valve/stage × ~3 m equiv
+  const recircLeffM = recircPipeLenM + recircFittingEquivM
+  const recircRe = (fluidDensityKgM3 * recircVelMs * recircPipeDm) / 1.0e-3  // Re = ρVD/μ (water, 20°C)
+  const recircRoughnessM = 0.0015e-3                     // HDPE/PE100 absolute roughness [m]
+  const recircDarcyF = 0.25 / Math.pow(Math.log10(recircRoughnessM / (3.7 * recircPipeDm) + 5.74 / Math.pow(Math.max(recircRe, 1), 0.9)), 2)  // Swamee-Jain
+  const recircFrictionHeadM = Math.max(
+    recircDarcyF * (recircLeffM / recircPipeDm) * Math.pow(recircVelMs, 2) / (2 * 9.81),  // Darcy-Weisbach
+    recircProcessHeadM * 0.15  // conservative minimum: 15% friction + contingency (DN600 has low
+                               // friction but real loops have unmodelled fittings/instrumentation)
+  )
+  const recircPumpHeadM = Math.round((recircProcessHeadM + recircFrictionHeadM) * 10) / 10
+
   const recircPumpEffic = 0.70                              // pump hydraulic efficiency at duty
   const recircPumpMotorEffic = 0.93                         // IE3 motor electrical efficiency (large frame)
-  const recircPumpHydraulicW = Math.round(1000 * 9.81 * (recirculationFlowM3H / 3600) * recircPumpHeadM)  // ρ·g·Q·H [W] ~109 kW
+  const recircPumpHydraulicW = Math.round(fluidDensityKgM3 * 9.81 * (recirculationFlowM3H / 3600) * recircPumpHeadM)  // ρ·g·Q·H [W] (seawater-corrected)
   const recircPumpPowerKw = Math.round((recircPumpHydraulicW / recircPumpEffic) / 1000)  // SHAFT = hydraulic ÷ η_pump; ~156 kW
   // Motor electrical input = shaft ÷ η_motor, then the next standard IEC frame above a
   // 15% selection margin. motor_kw is GUARANTEED ≥ shaft (recircPumpPowerKw) ≥ hydraulic.
