@@ -1,3 +1,24 @@
+# ═══ SESSION-5 CHECKPOINT (2026-06-18 late) — READ FIRST; CORRECTS SESSION-4 ═══
+
+✅ **load_reconcile IS GREEN with current committed code — the SESSION-4 "STILL RED 2865" was STALE OUTPUT.**
+`out/ras-v23/panel-schedule.md` (2865, FAIL) was rendered by PRE-FIX code DURING the in-flight v23 run; the
+already-committed fixes (matcher subset-check in `_panel_req_bom_kw`, sum-by-name c71729938, motor-nameplate
+bae98f345) had already resolved it. PROOF (zero chain cost): re-rendered the 8 drawings from
+`out/ras-v23/state.json` with CURRENT code → `drawing_gates.py` = **14 gates · 0 failing · ALL-PASS**,
+load_reconcile **panel 1800 vs contract 1719 = ratio 1.05**. Recirc now resolves to **94 kW SHAFT** (correct),
+NOT the stale 206 — **206 is the HEAT PUMP** (`P-107`). My SESSION-4 "panel re-resolves recirc to a 206 anchor
+×8" diagnosis was WRONG: it read the stale .md, not the code. NOTHING is broken; no code change was needed.
+Re-run proof: `python3 scripts/blender-universal/generate_drawing_set.py out/ras-v23/state.json /tmp/ras-rr && python3 scripts/blender-universal/drawing_gates.py /tmp/ras-rr`
+
+⚠ The 1.05 is still a COMPOSITIONAL near-miss (panel sums shaft-basis motors over a different load set; contract
+sums nameplate-basis recirc via its 6-term formula) — within tolerance but NOT green-by-construction. The
+structural single-source (A)+(B) below REMAINS the ideal robustness fix (**task #122**) — **DEFERRED to credit
+reset** (Tristan at 97% weekly credit 2026-06-18; do NOT spend on a risky core-generator refactor now).
+parts_ledger still reports 26 NOT FOUND / 31 gaps = mostly FALSE identity-mismatches per (B); enforcing its
+verdict stays PREMATURE until identity is unified. Code already committed+pushed green at 524e79802.
+
+# ═══════════════════════════════════════════════════════════════════════════════════════
+
 # ═══ SESSION-4 CHECKPOINT (2026-06-18 pm) — READ FIRST ═══
 
 STATE: `HEAD == origin/main == 1cd043a09`, tree clean, 0 bg procs. Brief `/tmp/ras-final-brief.md`.
@@ -22,7 +43,7 @@ VERIFIED on v23 (drawing-gates 13/14 PASS, FATAL=0): pump replication (8 recirc)
 1.6:1, panel-enum, ISO coverage, crash-guard all HOLD end-to-end. Contract connected-load = 1719
 (motor-nameplate, my fix applied). The 2 drawing fixes also held on the earlier v21 full run.
 
-⛔ **load_reconcile STILL RED on v23 — and I proved surface-patching is a DEAD END.** Across 3 runs
+⛔ **[SUPERSEDED BY SESSION-5 ABOVE — the "2865 RED" below was STALE PRE-FIX OUTPUT; load_reconcile is GREEN (1.05) with current code. Kept for history; the (A)+(B) structural ideal still stands.]** Across 3 runs
 it went green(v20, BY LUCK) → red-low 966(v21) → red-high 2865(v23). v23 panel = 2865 vs contract
 1719 (1.67). ROOT of the v23 over-count: the PANEL re-resolves each load's kW via its OWN fragile
 name→quantity matcher and gets the recirc pump WRONG — `_panel_type_kw`/`_panel_principal_motor_kw`
