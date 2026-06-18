@@ -120,6 +120,100 @@ def main() -> int:
     route = _load(out_dir / "route-manifest.json") or {}
     rb = state.get("requirementsBom") or []
 
+    # ── tool invocations + calculations (Tristan 2026-06-18) ──────────────────────
+    # The ledger shows which tools were invoked for each part and the calculations
+    # resulting from the tools. Tools live in 4-orchestrator-tools-used.json; each
+    # tool has claims[] (output fields → values) and worked[] (label, formula,
+    # substitution, inputs, result, assumptions). We join tools → equipment by
+    # three strategies: (1) contract-quantity key in the part's basis text,
+    # (2) equipment name/tag in the tool's worked-calculation text, (3) tool-name
+    # type-match (pump-sizing → Recirc Pump). Universal — no per-class logic.
+    tools_used = _load(out_dir / "4-orchestrator-tools-used.json") or {}
+    tools_list = tools_used.get("tools", []) if isinstance(tools_used, dict) else []
+    contract = state.get("engineeringContract") or {}
+    contract_qty = contract.get("quantities", {}) if isinstance(contract, dict) else {}
+
+    # Build: contract_quantity_key → tool_id (from claims[].output_field)
+    qty_to_tool: dict[str, str] = {}
+    for tool in tools_list:
+        tid = str(tool.get("tool_id", ""))
+        for c in (tool.get("claims") or []):
+            for fld in (c.get("output_field"), c.get("field")):
+                if fld:
+                    qty_to_tool[str(fld)] = tid
+
+    # Build: normalised equipment name tokens → set of tool_ids (type-match)
+    TYPE_KW = {
+        "pump": ["pump"], "vessel": ["vessel", "tank", "reactor", "silo"],
+        "exchanger": ["heat exchanger", "hex", "chiller", "oxygenat", "degas"],
+        "separator": ["filter", "screen", "clarifi", "cyclone", "membrane", "biofilter", "mbbr"],
+        "rotating": ["blower", "fan", "compressor", "skimmer", "aerat"],
+        "electrical": ["cable", "transformer", "switchgear", "panel", "breaker", "mcc"],
+        "instrument": ["sensor", "gauge", "meter", "transmitter", "analy", "probe"],
+        "valve": ["valve", "solenoid", "actuator"],
+        "control": ["controller", "plc", "scada", "ups", "gateway", "switch"],
+    }
+
+    def _find_tools_for_equipment(eq_tag: str, eq_name: str, eq_basis: str) -> list:
+        relevant: dict[str, dict] = {}
+        nm_l = (eq_name or "").lower()
+        tag_l = (eq_tag or "").lower()
+        basis_l = (eq_basis or "").lower()
+
+        for tool in tools_list:
+            tid = str(tool.get("tool_id", ""))
+            tname = str(tool.get("tool_name", ""))
+            worked = tool.get("worked") or []
+            claims = tool.get("claims") or []
+            matched_calcs = []
+            matched_claims = []
+
+            # Strategy 1: equipment name/tag appears in worked-calc text
+            for w in worked:
+                txt = f"{w.get('label','')} {w.get('formula','')} {w.get('substitution','')}".lower()
+                if nm_l and len(nm_l) >= 4 and nm_l in txt:
+                    matched_calcs.append(w)
+                elif tag_l and len(tag_l) >= 2 and tag_l in txt:
+                    matched_calcs.append(w)
+
+            # Strategy 2: claim output_field appears in the part's basis text
+            for c in claims:
+                for fld in (c.get("output_field"), c.get("field")):
+                    if fld and str(fld).lower() in basis_l:
+                        matched_claims.append(c)
+                        break
+
+            # Strategy 3: tool-name type-match (pump-sizing → Recirc Pump)
+            type_match = False
+            tid_l = tid.lower()
+            for _, keywords in TYPE_KW.items():
+                if any(kw in tid_l for kw in keywords) and any(kw in nm_l for kw in keywords):
+                    type_match = True
+                    break
+
+            if matched_calcs or matched_claims or type_match:
+                # When type-matching (e.g. pump-sizing → Recirc Pump), include ALL
+                # the tool's calculations — the tool was invoked FOR this type of
+                # equipment, so its worked calcs are relevant even if the label
+                # doesn't name the specific part.
+                calcs_to_include = matched_calcs if matched_calcs else worked[:5]
+                claims_to_include = matched_claims if matched_claims else claims[:5]
+                relevant[tid] = dict(
+                    tool_id=tid, tool_name=tname,
+                    calculations=[
+                        dict(label=w.get("label"), formula=w.get("formula"),
+                             substitution=w.get("substitution"),
+                             result=w.get("result"),
+                             assumptions=w.get("assumptions", []))
+                        for w in calcs_to_include[:5]],
+                    claims=[
+                        dict(field=c.get("output_field") or c.get("field"),
+                             value=c.get("value"), unit=c.get("unit"))
+                        for c in claims_to_include[:5]],
+                    type_match=type_match and not matched_calcs and not matched_claims)
+
+        return list(relevant.values())
+
     placed = {str(p.get("equipment_tag") or p.get("tag")): p
               for p in (manifest.get("parts", []) if isinstance(manifest, dict) else [])}
     subs: dict[str, list] = {}
@@ -198,16 +292,19 @@ def main() -> int:
         sublist = subs.get(tag, [])
         cov = {key: covered(tag, name, key) for key in REPS}
         expected = TYPE_EXPECTED.get(typ, set())
+        basis_full = str(r.get("basis", ""))
+        eq_tools = _find_tools_for_equipment(tag, name, basis_full)
         equipment.append(dict(
             tag=tag, name=name, type=typ, module=pm.get("module"), ikey=_norm(name),
             requirement=req, part=r.get("part"), status=r.get("status"),
             qty=r.get("qty"), unit_gbp=r.get("unit_gbp"), line_gbp=r.get("line_gbp"),
-            basis=str(r.get("basis", ""))[:90], subcomponents=len(sublist),
+            basis=basis_full[:90], subcomponents=len(sublist),
             subcomponent_gbp=round(sum(s.get("breakdown_gbp", 0) or 0 for s in sublist)),
             modelled_qty=(pm.get("qty") if pm else 0), dims_mm=pm.get("dims_mm"),
             transformation=TRANSFORM.get(typ, "—"),
             coverage=cov, expected=sorted(expected),
             gaps=sorted(k for k in expected if not cov.get(k)),
+            tools=eq_tools,
             inputs=[], outputs=[]))
 
     # resolver: a connection-schedule internal key → the equipment row (by norm name)
@@ -296,6 +393,30 @@ def main() -> int:
 
     for e in equipment:
         e.pop("ikey", None)
+
+    # ── tool summary: which tools computed what, how many parts they cover ──────
+    tool_summary: dict[str, dict] = {}
+    for e in equipment:
+        for t in (e.get("tools") or []):
+            tid = t["tool_id"]
+            if tid not in tool_summary:
+                tool_summary[tid] = dict(
+                    tool_id=tid, tool_name=t["tool_name"],
+                    n_parts=0, n_calculations=0, n_claims=0,
+                    sample_calculations=[])
+            ts = tool_summary[tid]
+            ts["n_parts"] += 1
+            ts["n_calculations"] += len(t.get("calculations") or [])
+            ts["n_claims"] += len(t.get("claims") or [])
+            for calc in (t.get("calculations") or [])[:1]:
+                if len(ts["sample_calculations"]) < 3:
+                    ts["sample_calculations"].append(dict(
+                        part=f"{e['tag']} {e['name'][:20]}",
+                        label=calc.get("label"),
+                        substitution=calc.get("substitution")))
+    # parts with NO tool provenance
+    parts_without_tools = [e["tag"] for e in equipment if not e.get("tools")]
+
     report = dict(out_dir=str(out_dir), grand_total_gbp=round(grand), n_equipment=len(equipment),
                   n_connections=len(connections),
                   connections_gbp=round(sum(c["line_gbp"] or 0 for c in connections)),
@@ -304,13 +425,18 @@ def main() -> int:
                   n_connections_off_pid=len(uncov_conn),
                   n_ambiguous_tags=len(ambiguous_tags),
                   ambiguous_tags=sorted(ambiguous_tags),
+                  n_tools=len(tool_summary),
+                  n_parts_without_tools=len(parts_without_tools),
+                  parts_without_tools=parts_without_tools[:30],
+                  tool_summary=list(tool_summary.values()),
                   equipment=equipment, connections=connections)
     (out_dir / "parts-ledger.json").write_text(json.dumps(report, indent=1))
 
     # ── printed ledger + coverage ──
-    print(f"\n  LEDGER (BoM + connectivity + coverage) — {out_dir.name}   "
-          f"£{round(grand):,} raw materials   {len(equipment)} parts + {len(connections)} connections")
-    hdr = ("  " + f"{'tag':7}{'type':10}{'name':22}{'£ line':>9} {'in/out':>6} {'status':9}"
+    print(f"\n  LEDGER (BoM + connectivity + coverage + tools) — {out_dir.name}   "
+          f"£{round(grand):,} raw materials   {len(equipment)} parts + {len(connections)} connections   "
+          f"{len(tool_summary)} tools invoked")
+    hdr = ("  " + f"{'tag':7}{'type':10}{'name':22}{'£ line':>9} {'in/out':>6} {'status':9}{'tool':>16}"
            + "".join(f"{SHORT[k]:>5}" for k in REPS))
     print(hdr); print("  " + "-" * (len(hdr) - 2))
     for e in equipment:
@@ -318,8 +444,12 @@ def main() -> int:
                         (f"{'  ✗':>5}" if k in e["expected"] else f"{'  ·':>5}") for k in REPS)
         lg = f"{e['line_gbp']:>8,.0f}" if e.get("line_gbp") is not None else "       —"
         io = f"{len(e['inputs'])}/{len(e['outputs'])}"
+        etools = (e.get("tools") or [])
+        tshort = etools[0]["tool_id"].split(":")[-1][:15] if etools else "—"
+        if len(etools) > 1:
+            tshort += f" +{len(etools)-1}"
         print(f"  {e['tag']:7}{e['type']:10}{e['name'][:21]:22}{lg} {io:>6} "
-              f"{str(e['status'] or '')[:8]:9}{cells}")
+              f"{str(e['status'] or '')[:8]:9}{tshort:>16}{cells}")
     print("  " + "-" * (len(hdr) - 2))
     part_cov = "   ".join(f"{SHORT[k]} {by_drawing[k]['present']}/{by_drawing[k]['expected']}"
                           for k in REPS if by_drawing[k]['expected'])
@@ -330,9 +460,18 @@ def main() -> int:
         pct = "" if d["pct"] is None else f" ({d['pct']}%)"
         cc.append(f"{k} {d['present']}/{d['applicable']}{pct}")
     print("  CONNECTION coverage (pipes/wires/sensors vs the views):   " + "   ".join(cc))
+    # tool summary
+    if tool_summary:
+        print(f"  TOOLS invoked ({len(tool_summary)}):")
+        for ts in sorted(tool_summary.values(), key=lambda x: -x["n_parts"]):
+            print(f"    {ts['tool_id']:40} → {ts['n_parts']:3} parts  {ts['n_calculations']:3} calcs  {ts['n_claims']:3} claims")
+            for s in ts.get("sample_calculations", [])[:1]:
+                print(f"      └ {s.get('part','?')[:24]:24} {str(s.get('label',''))[:40]}")
     print(f"  → {len(not_found)} NOT FOUND · {len(gapped)} parts w/ coverage gap · "
           f"{len(orphans)} orphan · {len(uncov_conn)} connections off the P&ID.  "
-          f"{len(ambiguous_tags)} ambiguous tag(s) (name-corroborated).  wrote parts-ledger.json\n")
+          f"{len(ambiguous_tags)} ambiguous tag(s) (name-corroborated).  "
+          f"{len(parts_without_tools)}/{len(equipment)} parts have NO tool provenance.  "
+          f"wrote parts-ledger.json\n")
     return 0
 
 

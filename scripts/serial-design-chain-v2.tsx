@@ -2149,10 +2149,144 @@ function dedupeSingularModifiers(modules: any[]): number {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// NAMING CONVENTION GUARD (Tristan 2026-06-18)
+// The codebase has a frequent bug class: the same concept is named differently
+// across the Python→JSON→TypeScript boundary (snake_case in Python, camelCase
+// in TS state), and within TS itself (selfAudit.sections[].name vs SECTION_TO_STAGE
+// keys vs scorecard.sections[].name). This guard validates field names at the
+// boundary and normalises section name aliases to canonical names.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Canonical schema for the parts-ledger.json produced by parts_ledger.py.
+ * Every field the TS code reads MUST be listed here. If the Python script
+ * renames a field, this schema check catches it immediately — no silent
+ * undefined reads.
+ */
+const LEDGER_SCHEMA = {
+  topLevel: [
+    'equipment', 'connections', 'coverage_by_drawing', 'connection_coverage',
+    'not_found', 'n_gapped', 'n_connections_off_pid', 'n_ambiguous_tags',
+    'ambiguous_tags', 'grand_total_gbp', 'n_equipment', 'n_connections',
+    'tool_summary', 'n_tools', 'n_parts_without_tools', 'parts_without_tools',
+  ],
+  equipment: [
+    'tag', 'name', 'type', 'line_gbp', 'unit_gbp', 'qty', 'status', 'basis',
+    'coverage', 'expected', 'gaps', 'inputs', 'outputs', 'tools',
+    'module', 'requirement', 'part', 'subcomponents', 'subcomponent_gbp',
+    'modelled_qty', 'dims_mm', 'transformation',
+  ],
+  connection: [
+    'idx', 'line_number', 'from_part', 'from_tag', 'to_part', 'to_tag',
+    'mechanism', 'kind', 'via', 'size', 'rating', 'length_m', 'line_gbp',
+    'coverage', 'within_spec',
+  ],
+  tool: [
+    'tool_id', 'tool_name', 'calculations', 'claims', 'type_match',
+  ],
+  toolCalc: ['label', 'formula', 'substitution', 'result', 'assumptions'],
+  toolClaim: ['field', 'value', 'unit'],
+  toolSummary: ['tool_id', 'tool_name', 'n_parts', 'n_calculations', 'n_claims', 'sample_calculations'],
+} as const
+
+/**
+ * Canonical section names + known aliases. The scorecard, the fix-directive
+ * extractor, and the SECTION_TO_STAGE map all use these canonical names.
+ * If the self-audit emits an alias, it's normalised to canonical before use.
+ */
+const SECTION_ALIASES: Record<string, string> = {
+  // canonical: itself
+  bill_of_materials: 'bill_of_materials',
+  bom: 'bill_of_materials',
+  physics_fidelity: 'physics_fidelity',
+  brief_compliance: 'brief_compliance',
+  design_narrative: 'design_narrative',
+  narrative: 'design_narrative',
+  headline: 'headline',
+  performance_card: 'performance_card',
+  drawing_gates: 'drawing_gates',
+  cost_sanity: 'cost_sanity',
+  tool_archetype: 'tool_archetype',
+  identity: 'identity',
+  self_audit: 'self_audit',
+}
+
+function canonicalSectionName(name: string): string {
+  return SECTION_ALIASES[name] || SECTION_ALIASES[name.toLowerCase()] || name
+}
+
+/**
+ * Validate that the ledger JSON conforms to the expected schema.
+ * Returns a list of violations (empty = valid). Each violation names the
+ * expected field and the actual fields available, so the error is actionable.
+ */
+function validateLedgerSchema(ledger: any): string[] {
+  const violations: string[] = []
+  if (!ledger || typeof ledger !== 'object') {
+    return ['ledger is not an object']
+  }
+
+  // Check top-level fields
+  const actualTop = new Set(Object.keys(ledger))
+  for (const field of LEDGER_SCHEMA.topLevel) {
+    if (!actualTop.has(field)) {
+      violations.push(`ledger missing top-level field "${field}". Available: ${[...actualTop].sort().join(', ')}`)
+    }
+  }
+
+  // Check equipment fields (sample first 3)
+  const eqs = ledger.equipment || []
+  for (let i = 0; i < Math.min(eqs.length, 3); i++) {
+    const eq = eqs[i]
+    const actualEq = new Set(Object.keys(eq || {}))
+    for (const field of LEDGER_SCHEMA.equipment) {
+      if (!actualEq.has(field)) {
+        violations.push(`ledger.equipment[${i}] missing field "${field}". Available: ${[...actualEq].sort().join(', ')}`)
+        break  // one violation per equipment row is enough
+      }
+    }
+    // Check tool sub-fields
+    const tools = (eq || {}).tools || []
+    for (let j = 0; j < Math.min(tools.length, 2); j++) {
+      const t = tools[j]
+      const actualT = new Set(Object.keys(t || {}))
+      for (const field of LEDGER_SCHEMA.tool) {
+        if (!actualT.has(field)) {
+          violations.push(`ledger.equipment[${i}].tools[${j}] missing field "${field}". Available: ${[...actualT].sort().join(', ')}`)
+          break
+        }
+      }
+    }
+  }
+
+  // Check connection fields (sample first 3)
+  const conns = ledger.connections || []
+  for (let i = 0; i < Math.min(conns.length, 3); i++) {
+    const c = conns[i]
+    const actualC = new Set(Object.keys(c || {}))
+    for (const field of LEDGER_SCHEMA.connection) {
+      if (!actualC.has(field)) {
+        violations.push(`ledger.connections[${i}] missing field "${field}". Available: ${[...actualC].sort().join(', ')}`)
+        break
+      }
+    }
+  }
+
+  return violations
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SELF-CORRECTING QUALITY LOOP (Tristan 2026-06-18)
 // The chain loops: brief → tools → contract → Blender → 8 drawings → SCORE →
 // if any section <8, extract fix directives → back to tools → repeat until ≥8.
-// Max 3 iterations (configurable via QUALITY_LOOP_MAX_ITERS env).
+// Max 8 iterations (configurable via QUALITY_LOOP_MAX_ITERS env).
+//
+// FIX DIRECTIVES ARE LEDGER-DRIVEN: after each iteration, parts_ledger.py runs
+// and its JSON output (coverage gaps, zero-price lines, tag collisions, off-P&ID
+// connections) is parsed into SPECIFIC fix directives — not vague text. The
+// reviewer/emitter prompts receive "tag P-101 Recirc Pump has zero price" and
+// "connection 212-WT-DN300 Recirc Pump → Rearing Tank is off the P&ID", not
+// "bill_of_materials scored 3/10".
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface QualityScorecard {
@@ -2178,7 +2312,7 @@ function computeQualityScorecard(state: any): QualityScorecard {
   if (sa && Array.isArray(sa.sections)) {
     for (const s of sa.sections) {
       sections.push({
-        name: String(s.name || 'unknown'),
+        name: canonicalSectionName(String(s.name || 'unknown')),
         score: Number(s.score ?? 0),
         defects: Array.isArray(s.defects) ? s.defects.map((d: any) => String(d).slice(0, 200)) : [],
       })
@@ -2229,10 +2363,18 @@ function computeQualityScorecard(state: any): QualityScorecard {
   const ta = state.toolArchetypeCoherence
   if (ta) {
     const v = String(ta.verdict || 'pass')
+    // findings can be an array of objects — stringify each properly
+    const taDefects: string[] = []
+    if (Array.isArray(ta.findings)) {
+      for (const f of ta.findings) {
+        if (typeof f === 'string') taDefects.push(f.slice(0, 200))
+        else if (f && typeof f === 'object') taDefects.push(JSON.stringify(f).slice(0, 200))
+      }
+    }
     sections.push({
       name: 'tool_archetype',
       score: v === 'pass' ? 10 : v === 'med' ? 5 : 2,
-      defects: Array.isArray(ta.findings) ? ta.findings.map((f: any) => String(f).slice(0, 200)) : [],
+      defects: taDefects,
     })
   }
 
@@ -2245,28 +2387,123 @@ function computeQualityScorecard(state: any): QualityScorecard {
 }
 
 function extractFixDirectives(state: any, scorecard: QualityScorecard): FixDirective[] {
+  // Canonical section → fix stage mapping. Section names are normalised via
+  // canonicalSectionName() so aliases (bom → bill_of_materials, narrative →
+  // design_narrative) route correctly.
   const SECTION_TO_STAGE: Record<string, string> = {
     physics_fidelity: 'reviewer',
-    bom: 'emitter',
+    bill_of_materials: 'emitter',
     brief_compliance: 'reviewer',
-    narrative: 'reviewer',
+    design_narrative: 'reviewer',
     headline: 'reviewer',
     performance_card: 'reviewer',
     drawing_gates: 'drawing_generator',
     cost_sanity: 'cost_stack',
     tool_archetype: 'tools',
+    identity: 'emitter',
+    self_audit: 'reviewer',
   }
   const directives: FixDirective[] = []
   for (const s of scorecard.sections) {
     if (s.score < 8) {
+      const canonical = canonicalSectionName(s.name)
       directives.push({
-        section: s.name,
+        section: canonical,
         score: s.score,
         defects: s.defects,
-        fixStage: SECTION_TO_STAGE[s.name] || 'reviewer',
+        fixStage: SECTION_TO_STAGE[canonical] || 'reviewer',
       })
     }
   }
+  return directives
+}
+
+/**
+ * Run parts_ledger.py against the output directory and parse its JSON into
+ * SPECIFIC, ledger-driven fix directives. This is the key feedback mechanism:
+ * instead of telling the reviewer "bill_of_materials scored 3/10", we tell it
+ * "tag P-101 Recirc Pump has zero price" and "connection 212-WT-DN300 is off
+ * the P&ID". The ledger is the source of truth — the loop uses it.
+ */
+function extractLedgerFixDirectives(outDir: string): FixDirective[] {
+  const directives: FixDirective[] = []
+  try {
+    const ledgerPath = resolve(outDir, 'parts-ledger.json')
+    if (!existsSync(ledgerPath)) return directives
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf-8'))
+
+    // 1. Zero-price lines → emitter/cost_stack fix
+    const zeroPrice: string[] = []
+    for (const eq of (ledger.equipment || [])) {
+      if (!eq.line_gbp || eq.line_gbp === 0) {
+        zeroPrice.push(`${eq.tag} ${eq.name} — zero price`)
+      }
+    }
+    if (zeroPrice.length > 0) {
+      directives.push({
+        section: 'bill_of_materials',
+        score: 0,
+        defects: zeroPrice.slice(0, 30),  // cap at 30 to keep prompt manageable
+        fixStage: 'emitter',
+      })
+    }
+
+    // 2. Drawing coverage gaps → drawing_generator fix
+    const drawingGaps: string[] = []
+    for (const [drawing, cov] of Object.entries(ledger.coverage_by_drawing || {})) {
+      const c = cov as any
+      if (c.expected && c.present < c.expected) {
+        const missing = (ledger.equipment || []).filter((e: any) =>
+          drawing in (e.expected || []) && !e.coverage?.[drawing]).map((e: any) => `${e.tag} ${e.name}`)
+        drawingGaps.push(`${drawing}: ${c.present}/${c.expected} — missing: ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? '...' : ''}`)
+      }
+    }
+    if (drawingGaps.length > 0) {
+      directives.push({
+        section: 'drawing_gates',
+        score: 0,
+        defects: drawingGaps,
+        fixStage: 'drawing_generator',
+      })
+    }
+
+    // 3. Connections off P&ID → drawing_generator fix
+    const offPid = ledger.n_connections_off_pid || 0
+    if (offPid > 0) {
+      const offConns = (ledger.connections || [])
+        .filter((c: any) => 'pipe' in (c.kind || '') && !c.coverage?.pid)
+        .map((c: any) => `${c.line_number || '?'} ${c.from_part} → ${c.to_part}`)
+        .slice(0, 15)
+      directives.push({
+        section: 'drawing_gates',
+        score: 0,
+        defects: [`${offPid} pipe connections not drawn on P&ID: ${offConns.join('; ')}`],
+        fixStage: 'drawing_generator',
+      })
+    }
+
+    // 4. Ambiguous tags → emitter fix (identity resolution)
+    const ambTags = ledger.ambiguous_tags || []
+    if (ambTags.length > 0) {
+      directives.push({
+        section: 'identity',
+        score: 0,
+        defects: [`${ambTags.length} ambiguous tag(s) (same tag → different equipment): ${ambTags.join(', ')}. Each tag MUST uniquely identify one piece of equipment — assign distinct tags.`],
+        fixStage: 'emitter',
+      })
+    }
+
+    // 5. NOT FOUND parts → emitter fix
+    const notFound = ledger.not_found || []
+    if (notFound.length > 0) {
+      directives.push({
+        section: 'bill_of_materials',
+        score: 0,
+        defects: [`${notFound.length} part(s) NOT FOUND in catalogue: ${notFound.slice(0, 10).join(', ')}${notFound.length > 10 ? '...' : ''}. Assign real manufacturer + MPN.`],
+        fixStage: 'emitter',
+      })
+    }
+  } catch { /* best-effort */ }
   return directives
 }
 
@@ -8143,28 +8380,82 @@ async function main() {
 
   // ── SELF-CORRECTING QUALITY LOOP (Tristan 2026-06-18) ──────────────────────
   // The chain loops: brief → tools → contract → Blender → 8 drawings → SCORE →
-  // if any section <8, extract fix directives → back to tools → repeat until ≥8.
-  // Max 3 iterations (configurable via QUALITY_LOOP_MAX_ITERS env, default 3).
+  // if any section <8, extract fix directives (LEDGER-DRIVEN) → back to tools →
+  // repeat until ≥8. Max 8 iterations (configurable via QUALITY_LOOP_MAX_ITERS).
+  //
+  // Each iteration:
+  //   1. Run parts_ledger.py → parse parts-ledger.json (the source of truth)
+  //   2. Compute scorecard from state (selfAudit, drawingGates, costSanity, etc.)
+  //   3. Extract fix directives: scorecard defects + LEDGER defects (zero-price
+  //      lines, drawing coverage gaps, off-P&ID connections, ambiguous tags)
+  //   4. Update dashboard.html + parts-ledger.html (visible per-iteration progress)
+  //   5. If floor <8 AND iteration < max: re-invoke chain with directives injected
   try {
+    const iter = parseInt(process.env.QUALITY_LOOP_ITER || '0', 10)
+    const MAX_QUALITY_LOOPS = parseInt(process.env.QUALITY_LOOP_MAX_ITERS || '8', 10)
+
+    // 1. Run the ledger (the source of truth) against the current output
+    try {
+      execFileSync('python3', [
+        resolve(__dirname, 'blender-universal', 'parts_ledger.py'), outDir, statePath,
+      ], { stdio: 'inherit' })
+      console.error(`[chain] ledger updated: ${resolve(outDir, 'parts-ledger.json')}`)
+    } catch { /* best-effort */ }
+
+    // 1b. Validate ledger schema — catches naming drift between Python and TS
+    const ledgerPath = resolve(outDir, 'parts-ledger.json')
+    if (existsSync(ledgerPath)) {
+      const ledgerForValidation = JSON.parse(readFileSync(ledgerPath, 'utf-8'))
+      const violations = validateLedgerSchema(ledgerForValidation)
+      if (violations.length > 0) {
+        console.error(`[chain] ⚠ LEDGER SCHEMA VIOLATIONS (${violations.length}):`)
+        for (const v of violations.slice(0, 5)) {
+          console.error(`  ✗ ${v}`)
+        }
+        logAction({ step: 'ledger_schema_violation', violations: violations.slice(0, 10) })
+      }
+    }
+
+    // 2. Compute scorecard
     const finalStateForScore = JSON.parse(readFileSync(statePath, 'utf-8'))
     const scorecard = computeQualityScorecard(finalStateForScore)
     writeFileSync(resolve(outDir, 'quality-scorecard.json'), JSON.stringify(scorecard, null, 2))
-    console.error(`[chain] quality scorecard: floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10 allPass=${scorecard.allPass} (iteration ${scorecard.iteration + 1})`)
+    console.error(`[chain] quality scorecard (iteration ${iter + 1}/${MAX_QUALITY_LOOPS}): floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10 allPass=${scorecard.allPass}`)
+    for (const s of scorecard.sections) {
+      const flag = s.score < 8 ? ' ✗ BELOW 8' : ' ✓'
+      console.error(`  ${s.name}: ${s.score}/10${flag}`)
+    }
 
-    const MAX_QUALITY_LOOPS = parseInt(process.env.QUALITY_LOOP_MAX_ITERS || '3', 10)
-    if (!scorecard.allPass && scorecard.iteration + 1 < MAX_QUALITY_LOOPS) {
-      const directives = extractFixDirectives(finalStateForScore, scorecard)
+    // 3. Extract fix directives: scorecard + LEDGER-driven
+    let directives = extractFixDirectives(finalStateForScore, scorecard)
+    const ledgerDirectives = extractLedgerFixDirectives(outDir)
+    // Merge: ledger directives are MORE SPECIFIC, so they take priority.
+    // Dedup by section (ledger version replaces scorecard version for the same section).
+    const ledgerSections = new Set(ledgerDirectives.map(d => d.section))
+    directives = directives.filter(d => !ledgerSections.has(d.section)).concat(ledgerDirectives)
+
+    // 4. Update dashboard HTML + parts-ledger HTML (visible per-iteration progress)
+    try {
+      execFileSync('.venv/bin/python', ['scripts/build-run-dashboard.py', outDir], { stdio: 'ignore' })
+      console.error(`[chain] dashboard updated: ${resolve(outDir, 'dashboard.html')}`)
+    } catch { /* best-effort */ }
+
+    // 5. Loop decision
+    if (!scorecard.allPass && iter + 1 < MAX_QUALITY_LOOPS) {
       const directivesPath = resolve(outDir, 'quality-loop-fix-directives.json')
-      writeFileSync(directivesPath, JSON.stringify({ iteration: scorecard.iteration + 1, scorecard, directives }, null, 2))
-      console.error(`[chain] quality loop: ${directives.length} fix directive(s) → re-running (iteration ${scorecard.iteration + 2}/${MAX_QUALITY_LOOPS})`)
+      writeFileSync(directivesPath, JSON.stringify({ iteration: iter + 1, scorecard, directives }, null, 2))
+      console.error(`\n[chain] quality loop: ${directives.length} fix directive(s) → re-running (iteration ${iter + 2}/${MAX_QUALITY_LOOPS})`)
       for (const d of directives) {
         console.error(`  ✗ [${d.section}] score=${d.score}/10 → fix at ${d.fixStage}: ${d.defects.length} defect(s)`)
+        for (const def of d.defects.slice(0, 3)) {
+          console.error(`      · ${def.slice(0, 120)}`)
+        }
       }
       // Re-invoke the chain with the fix directives fed into the next iteration's prompts
       execFileSync('npx', ['tsx', __filename, briefPath, outDir], {
         env: {
           ...process.env,
-          QUALITY_LOOP_ITER: String(scorecard.iteration + 1),
+          QUALITY_LOOP_ITER: String(iter + 1),
           QUALITY_LOOP_FIX_DIRECTIVES: directivesPath,
         },
         stdio: 'inherit',
@@ -8172,9 +8463,9 @@ async function main() {
       return  // the child run handles the rest (including further loops + FINAL output)
     }
     if (scorecard.allPass) {
-      console.error(`[chain] ✦ quality loop COMPLETE — all sections ≥8/10 (iteration ${scorecard.iteration + 1})`)
+      console.error(`\n[chain] ✦ quality loop COMPLETE — all sections ≥8/10 (iteration ${iter + 1}/${MAX_QUALITY_LOOPS})`)
     } else {
-      console.error(`[chain] quality loop: max iterations (${MAX_QUALITY_LOOPS}) reached — floor=${scorecard.floor}/10`)
+      console.error(`\n[chain] quality loop: max iterations (${MAX_QUALITY_LOOPS}) reached — floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10`)
     }
   } catch (loopErr) {
     console.error(`[chain] quality loop stage miss (non-fatal): ${(loopErr as Error).message.slice(0, 200)}`)
