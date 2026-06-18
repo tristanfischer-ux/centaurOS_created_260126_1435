@@ -12171,11 +12171,16 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   const uvResidenceTimeS = 2.0
   const uvReactorVolumeM3 = Math.round((recirculationFlowM3H / 3600) * uvResidenceTimeS * 10) / 10  // ~7.4 m³
 
-  // ── Connected electrical load (sum of the major motor + thermal-input duties) ─
-  // recircPumpPowerKw is the SYSTEM-total recirc shaft power (Σ all N pumps), the right
-  // figure for the connected load. degasserBlowerAirFlowM3H is the TOTAL stripping air.
+  // ── Connected electrical load (Σ major motor NAMEPLATE + thermal-input duties) ─
+  // The recirc term is the MOTOR NAMEPLATE (Σ all N pumps = per-train IEC frame × N), NOT shaft.
+  // The connected load the supply/transformer must carry is the installed motor RATING, and it
+  // must agree with the panel-schedule — which sums the emitted recirc_pump_motor_kw (= the
+  // per-train frame) × count. Using shaft power (recircPumpPowerKw ≈ N×94) understated it by
+  // N×(132−94) ≈ 304 kW and put the panel-schedule's bottom-up sum 29% OVER this figure →
+  // load_reconcile drawing-gate divergence (2026-06-18). Motor nameplate for the pumps; the
+  // blower + heat-pump terms below are already rated (nameplate) kW.
   const connectedElectricalLoadKw = Math.round(
-    heatPumpElectricalKw + recircPumpPowerKw +
+    heatPumpElectricalKw + recircPumpMotorPerTrainKw * recircTrainCount +
     aerationBlowerKw +                            // MBBR aeration blower — REAL rated kW. The old
     //                                               air×0.0003 gave ~0.4 kW vs the real ~11 kW.
     degasserBlowerKw * recircTrainCount +         // degasser forced-draught blowers, ONE PER COLUMN
