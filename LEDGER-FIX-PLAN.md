@@ -1,3 +1,42 @@
+# ═══ SESSION-4 CHECKPOINT (2026-06-18 pm) — READ FIRST ═══
+
+STATE: `HEAD == origin/main == ec12f5f26`, tree clean. v23 verification run IN FLIGHT
+(`out/ras-v23`, the clean full run for ALL this turn's fixes). Brief `/tmp/ras-final-brief.md`.
+
+⭐ **THE BIG CORRECTION:** `scripts/blender-universal/parts_ledger.py` ALREADY IS the ledger +
+the ✓/✗ per-drawing coverage check-off Tristan designed — wired + run every dossier
+(parts-ledger.json/.html). I wrongly said "the ledger was never finished" (truncated `grep
+| head` hid it) + built a weaker duplicate `ledger_coverage.py` → REVERTED (a356c952d). Drawer
+`forgeos_gotchas_33ee126db3a771b5` + memory `forgeos_parts_ledger_exists`. NEVER duplicate it.
+
+THIS TURN — committed + pushed (grep `git log` for SHAs):
+ · pump replication 732982612 (8 recirc, qty_coverage✓) · single-line fold 8d3861399 (9.1→1.6:1✓)
+ · drawing-gates punch-list/enforcing 66b153dae (exit 35 opt-in; CLAUDE.md table) · revert dup a356c952d
+ · panel-enum regression fix c71729938 (qty>1 filter dropped the qty-1 instance rows → recirc
+   under-count; now sum-by-name; tests 7/7) · ISO coverage fix 2e2717f78 (parts_ledger read a
+   non-existent isometric-index.svg → aggregate per-line spools; 0/11→9/11) · connected-load fix
+   bae98f345 (recirc MOTOR nameplate not shaft → contract 1454→1719/1758; panel ~1872 → 0.92-0.94,
+   inside load_reconcile ±15%) · jurisdiction-filter crash guard ec12f5f26 (sparse modifier_characters).
+
+VERIFIED: v21 full run held the 2 drawing fixes (recirc 8, single-line 1.6:1). Connected-load
+confirmed at v22 contract level (1719 motor-nameplate). v22 CRASHED at jurisdiction-filter
+(now guarded) → v23 re-run is the clean ALL-PASS confirmation.
+
+⭐ **THE ONE REMAINING ROOT (both open threads collapse to it): NO SINGLE PART IDENTITY.**
+Every divergence — panel-vs-contract load, P&ID coverage 31/54, tag-scheme mismatches — is the
+SAME: each surface assigns its own tag+name+figure. The connected-load fix passes load_reconcile
+WITHIN tolerance but the FULL fix (and the ledger coverage) needs the structural single ledger:
+ONE canonical identity (tag+name) + ONE connected-load list that build_universal_scene,
+requirements_bom, the drawings + the BoM ALL read (task #122 + this plan). On v21 the P&ID gap is
+~16 equipment drawn under a DIFFERENT name than the ledger (identity-mismatch, not real absence) +
+the P&ID-connection rendering (11/104). Enforcing parts_ledger's verdict is PREMATURE until the
+identity is unified (else it flags false identity-mismatch gaps). NEXT INCREMENT: one canonical
+part identity shared by the parts-manifest + requirementsBom (collapses the coverage mismatches),
+then the connected-load list, then enforce. Do it carefully (touches the core generators) — NOT
+while a verification run is using those files.
+
+# ═══════════════════════════════════════════════════════════════════════════════════════
+
 # ═══ SESSION-3 COMPACTION CHECKPOINT (2026-06-18) — READ FIRST ON RESUME ═══
 
 STATE: `HEAD = 18530db39 == origin/main`, tree CLEAN, 0 background procs. Latest full run = `out/ras-v20`.
