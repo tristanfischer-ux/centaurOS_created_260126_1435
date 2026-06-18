@@ -69,11 +69,14 @@ def _load(out_dir: str, name: str):
 
 # ── ledger part classification (universal — tag-prefix + name keywords, no per-class) ──
 _EQUIP_TAG = re.compile(r"^(TK|V|P|D|R|B|HX|E|F|K|COL|RO|UV|GEN|DR|SK|HP|CH)(?=[-\d]|$)", re.I)
+# leading word-boundary only — the alternatives are STEMS (dehumidif→dehumidifier,
+# skimm→skimmer/skimming, degass→degasser/degassing), so a trailing \b would wrongly
+# block the stem; explicit \b…\b stays inside the few short ambiguous terms (uv/ro/bed/hex).
 _EQUIP_WORD = re.compile(
     r"\b(pump|tank|vessel|blower|fan|exchanger|\bhex\b|heat\s*pump|chiller|filter|"
-    r"skimm|reactor|drum|column|tower|skid|dryer|\bbed\b|biofilter|degasser|degassing|"
-    r"dehumidif|clarifier|sump|generator|genset|silo|hopper|mixer|aerator|ozone|uv\b|"
-    r"membrane|\bro\b|separator|cyclone|sieve|press|conveyor|screen|cooler|boiler|economiser)\b",
+    r"skimm|reactor|drum|column|tower|skid|dryer|\bbed\b|biofilter|degass|"
+    r"dehumidif|clarifier|sump|generator|genset|silo|hopper|mixer|aerator|ozone|\buv\b|"
+    r"membrane|\bro\b|separator|cyclone|sieve|press|conveyor|screen|cooler|boiler|economiser)",
     re.I)
 _ELEC_WORD = re.compile(
     r"\b(kw|kva|motor|heater|immersion|board|panel|switchgear|mcc|drive|vsd|vfd|"
@@ -99,9 +102,10 @@ def classify(tag: str, name: str) -> str:
         # a BoM breakdown line of a parent assembly (a pump's casing/impeller/motor) —
         # it is DRAWN as part of its parent, never as an independent symbol/mesh.
         return "subcomponent"
-    if re.search(r"\bconnection\b|\bpipework\s+run\b", n, re.I) or _CABLE_TAG.match(t):
-        # a routed CONNECTION (pipe or cable) — it lives in the connection-schedule /
-        # route-manifest / isometrics by construction, not as a placed equipment symbol.
+    if re.search(r"\bconnection\b", n, re.I) or _CABLE_TAG.match(t):
+        # a routed CONNECTION (the C-… "water/power connection: A → B" rows) — it lives in
+        # the connection-schedule by construction, not as a placed equipment symbol. NB a
+        # 'Pipework Run' is a LINE (handled below), not a connection.
         return "connection"
     if _INSTR_TAG.match(t) or _INSTR_WORD.search(n):
         # an instrument may still be motor-driven (a control valve actuator) — P&ID is its home
@@ -248,9 +252,52 @@ def _print(card: dict):
             print(f"        missing: {ex}{' …' if len(v['missing']) > 6 else ''}")
 
 
+def _selftest() -> int:
+    """Pin the fragile parts: the part-type classifier + the name-membership matcher
+    (including the regressions fixed at build time — sub-component '↳' rows, the generic
+    'X' tag NOT being a pipe, hex/dehumidifier as equipment). Pure, no file IO."""
+    fails = []
+
+    def chk(name, got, want):
+        if got != want:
+            fails.append(f"{name}: got {got!r} want {want!r}")
+
+    chk("equip-name", classify("P-101", "Recirc Pump"), "equipment")
+    chk("equip-tag", classify("TK-205", "Rearing Tank"), "equipment")
+    chk("equip-hex", classify("X-9", "Makeup Hex"), "equipment")          # was mis-read as line
+    chk("equip-dehumid", classify("X-7", "Dehumidifier"), "equipment")
+    chk("instrument", classify("AT-1", "DO Analyser Transmitter"), "instrument")
+    chk("subcomponent", classify("X-3", "↳ Drive Motor"), "subcomponent")  # parent breakdown
+    chk("connection", classify("C-12", "water connection: tanks → filter"), "connection")
+    chk("line-dn", classify("LN-2", "DN300 Pipework Run"), "line")
+    chk("electrical", classify("X-4", "Main Breaker"), "electrical")       # was mis-read as line
+    chk("aux", classify("SYS-1", "Token control allowance"), "aux")
+    # required-drawings routing
+    chk("equip-required", REQUIRED_DRAWINGS["equipment"], ["blender", "pid"])
+    chk("subcomp-required", REQUIRED_DRAWINGS["subcomponent"], [])
+    # head-name + norm
+    chk("head", _head_name("Recirc Pump · 132 kW motor · 1176×1000 mm"), "Recirc Pump")
+    chk("norm", _norm("Recirc Pump × 8"), "recirc pump")
+    # token-subset membership (an LLM-free fuzzy match)
+    pool = {"recirc pump no 3"}
+    nn = _norm("Recirc Pump")
+    hit = nn in pool or any(set(nn.split()) <= set(d.split()) for d in pool)
+    chk("token-subset", hit, True)
+
+    if fails:
+        print("[ledger-coverage] SELFTEST FAIL:")
+        for f in fails:
+            print("  ✗", f)
+        return 1
+    print("[ledger-coverage] SELFTEST OK (16 invariants)")
+    return 0
+
+
 def main(argv):
+    if argv and argv[0] in ("--selftest", "-t"):
+        return _selftest()
     if not argv:
-        print("usage: ledger_coverage.py <out_dir>", file=sys.stderr)
+        print("usage: ledger_coverage.py <out_dir>  |  --selftest", file=sys.stderr)
         return 2
     out_dir = argv[0]
     card = coverage(out_dir)

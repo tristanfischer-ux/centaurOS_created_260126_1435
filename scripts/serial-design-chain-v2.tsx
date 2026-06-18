@@ -7133,6 +7133,36 @@ async function main() {
     logAction({ step: 'drawing_gates', ok: false })
   }
 
+  // ── LEDGER COVERAGE — the deterministic confirmation that EVERY ledger part is present in
+  // the relevant Blender scene + engineering drawing (Tristan 2026-06-18: "have in the ledger
+  // every part and then have a confirmation check that all the parts were in the relevant
+  // blender and engineering drawing … deterministically not needing an unreliable LLM check").
+  // No LLM, £0, instant. LEDGER = state.requirementsBom; each part is classified + cross-checked
+  // against the drawn-entity sets (parts-manifest / connection-schedule). Records
+  // ledger-coverage.json + state.ledgerCoverage. Non-fatal (the structural single-`state.ledger`
+  // refactor will make this EXACT — type + draw-targets stamped per part — rather than the
+  // current heuristic tag/name classification). Universal across archetypes.
+  try {
+    const covPy = existsSync(resolve(__dirname, '..', '.venv', 'bin', 'python'))
+      ? resolve(__dirname, '..', '.venv', 'bin', 'python') : 'python3'
+    try {
+      execFileSync(covPy, [resolve(__dirname, 'blender-universal', 'ledger_coverage.py'), outDir],
+        { stdio: 'inherit', cwd: resolve(__dirname, '..'), env: { ...process.env } })
+    } catch { /* ledger_coverage.py exits 1 when a part is missing — that IS the verdict, not an error */ }
+    const covPath = resolve(outDir, 'ledger-coverage.json')
+    if (existsSync(covPath)) {
+      const cov = JSON.parse(readFileSync(covPath, 'utf-8'))
+      const onDisk = JSON.parse(readFileSync(statePath, 'utf-8'))
+      onDisk.ledgerCoverage = cov
+      writeFileSync(statePath, JSON.stringify(onDisk))
+      console.log(`[chain] ledger-coverage: ${cov.n_defects} ledger part(s) missing from a required drawing — ${cov.all_covered ? 'ALL PARTS COVERED' : 'GAPS (ledger-coverage.json)'}`)
+    }
+    logAction({ step: 'ledger_coverage', ok: true })
+  } catch (covErr) {
+    console.error(`[chain] ledger-coverage stage miss (non-fatal): ${(covErr as Error).message.slice(0, 160)}`)
+    logAction({ step: 'ledger_coverage', ok: false })
+  }
+
   // ── Interconnect census (Increment 6): full-density utility/electrical/instrument tie-in take-off ──
   // generate_drawing_set just produced parts-manifest.json. Enumerate, per equipment item, the standard
   // tie-ins a real plant has (motor feeds, vessel drain/vent/purge, heat-item cooling water, a signal
