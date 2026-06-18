@@ -6,6 +6,9 @@
  * touch one file.
  *
  * Pricing + benchmark data: see ~/.claude/docs/benchmark-data-2026-05.md
+ *
+ * PER-STAGE MODEL MAP + upgrade audit: see docs/MODELS.md (which LLM runs each
+ * non-deterministic chain stage — brief, emission, judge, physics critic, self-audit).
  */
 
 // ─── Frontier models (high intelligence, high cost) ─────────────────────────
