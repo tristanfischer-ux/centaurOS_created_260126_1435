@@ -86,6 +86,11 @@ STREAM_THERMAL = "thermal"       # heating / cooling / steam (warm, dashed arrow
 STREAM_RECYCLE = "recycle"       # recycle / return loop (dashed, routed over the top)
 STREAM_INFERRED = "inferred"     # a process-continues link the topology omits (light dashed)
 
+# A block that exists in the BoM (the ledger) but has no topology edge — principal
+# equipment the executive must see is present even though it isn't on a process line
+# (standby generator, dosing skid, feed silo). Drawn in a distinct supporting band.
+SYM_SUPPORTING = "supporting"
+
 # Boundary kinds (a feed entering or a product leaving the battery limit).
 BND_FEED = "feed"
 BND_PRODUCT = "product"
@@ -458,6 +463,56 @@ def _service_noun(service: str) -> str:
 # RECONSTRUCTION  (Process → BlockFlow, in true process order)
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _supporting_equipment(state: dict, topology_blocks: list) -> list:
+    """Principal equipment present in the BoM (the ledger spine) but NOT in the topology.
+
+    The ledger is the single source of truth for what the BFD must show. The topology
+    carries the process-train blocks; the BoM additionally carries major units that
+    support the process but have no routed process line (standby generator, dosing skid,
+    feed storage, expansion vessel, make-up hex). These must appear on the BFD so the
+    executive sees every principal unit operation the ledger checks off.
+
+    UNIVERSAL — reuses the ledger's own classification + connection filter (imported from
+    parts_ledger) so the BFD and ledger agree on what counts as principal equipment.
+    Returns a list of SYM_SUPPORTING Block objects (no streams; placed in the supporting
+    band by the renderer).
+    """
+    try:
+        import parts_ledger as PL
+    except Exception:
+        return []
+    rb = state.get("requirementsBom") or []
+    # normalised names already represented by a topology block (the identity key).
+    # We dedup by NAME, not tag: a tag collision (same tag, different equipment)
+    # means the BoM entry is a DIFFERENT unit that must still appear. Only a NAME
+    # match means it's the same equipment already drawn.
+    have_norms = {PL._norm(b.label) for b in topology_blocks if b.label}
+    supporting: list[Block] = []
+    seen = set()
+    for r in rb:
+        if r.get("status") == "SUB-COMPONENT" or PL._is_connection(r):
+            continue
+        tag = str(r.get("tag", "")).strip()
+        req = str(r.get("requirement", ""))
+        name = (req.split("·")[0].strip() or str(r.get("part", "")) or tag)
+        typ = PL._classify(name, tag)
+        if typ not in ("vessel", "rotating", "exchanger", "separator"):
+            continue
+        nm = PL._norm(name)
+        if nm in have_norms or nm in seen:    # same equipment (by name) already present
+            continue
+        seen.add(nm)
+        supporting.append(Block(
+            key=f"supporting_{tag or nm[:12]}",
+            tag=tag or "—",
+            label=name,
+            sym=SYM_SUPPORTING,
+            col=0,                         # placed in the supporting band, not a process column
+            role_rank=9,
+        ))
+    return supporting
+
+
 def reconstruct_blockflow(out_dir: str, state: dict) -> BlockFlow:
     """Build the BlockFlow from the P&ID's canonical Process (single source of truth) +
     the routed artifacts, laid out in TRUE process order."""
@@ -530,6 +585,14 @@ def reconstruct_blockflow(out_dir: str, state: dict) -> BlockFlow:
     has_recycle = any(s.style == STREAM_RECYCLE for s in streams)
     has_inferred = any(s.style == STREAM_INFERRED for s in streams)
 
+    # ---- supporting equipment: principal BoM items with no topology node -------------
+    # The ledger is the source of truth — every principal equipment it expects on the
+    # BFD must appear. The topology gives us the process-train blocks; the BoM carries
+    # additional major units (standby generator, dosing skid, feed silo, expansion vessel)
+    # that have no process-line edge but ARE principal equipment the executive must see.
+    # Add them as SYM_SUPPORTING blocks; the renderer places them in a distinct band.
+    supporting = _supporting_equipment(state, blocks)
+
     # ---- boundaries: feeds in (left), products out (right) ----------------------------
     boundaries = _derive_boundaries(blocks, streams, col_of, role_of, quantities, state)
 
@@ -548,9 +611,14 @@ def reconstruct_blockflow(out_dir: str, state: dict) -> BlockFlow:
     if not quantities:
         notes.append("Stream labels show the carried fluid; headline flows were not "
                      "available in the engineering contract for this run.")
+    if supporting:
+        notes.append("The lower 'Supporting services' band shows principal equipment from "
+                     "the bill of materials that supports the process train but carries no "
+                     "routed process line (standby generation, dosing, feed storage, etc.).")
 
+    all_blocks = blocks + supporting
     return BlockFlow(
-        archetype=proc.archetype, blocks=blocks, streams=streams, boundaries=boundaries,
+        archetype=proc.archetype, blocks=all_blocks, streams=streams, boundaries=boundaries,
         power_note=power_note, notes=notes,
         has_recycle=has_recycle, has_inferred=has_inferred)
 
@@ -682,6 +750,8 @@ PRODUCT_INK = "#8a5a00"     # boundary product (amber/brown)
 FILL_BG = "#ffffff"
 PANEL_BG = "#f4f6f9"
 EQ_FILL = "#eef2f7"
+SUPPORT_FILL = "#f7f5ef"     # supporting-equipment band (muted warm tint, distinct from main train)
+SUPPORT_INK = "#6b6357"      # supporting-equipment outline (softer than the main navy)
 FEED_FILL = "#e7f3ec"
 PRODUCT_FILL = "#f6efe0"
 GRID_FAINT = "#e4e8ee"
@@ -801,12 +871,16 @@ def build_bfd_svg(bf: BlockFlow) -> str:
         return svg.render()
 
     # group blocks by process column; lay columns left→right, stack same-column items.
+    # Supporting blocks (SYM_SUPPORTING) are excluded from the process-train columns and
+    # rendered in a distinct band below.
+    topo_blocks = [b for b in blocks if b.sym != SYM_SUPPORTING]
+    support_blocks = [b for b in blocks if b.sym == SYM_SUPPORTING]
     by_col: dict[int, list[Block]] = defaultdict(list)
-    for b in blocks:
+    for b in topo_blocks:
         by_col[b.col].append(b)
     cols = sorted(by_col)
     ncol = len(cols)
-    max_stack = max(len(by_col[c]) for c in cols)
+    max_stack = max(len(by_col[c]) for c in cols) if cols else 1
 
     # ----- geometry -----
     col_pitch = 250
@@ -819,13 +893,22 @@ def build_bfd_svg(bf: BlockFlow) -> str:
     # reserve extra vertical room when any product / waste sink exits DOWNWARD (a sink in
     # an earlier column) so its arrow + label clear the band before the legend.
     has_down_product = any(
-        b.kind == BND_PRODUCT and _bcol(b.block_key, blocks) < max(x.col for x in blocks)
+        b.kind == BND_PRODUCT and _bcol(b.block_key, topo_blocks) < max(x.col for x in topo_blocks)
         for b in bf.boundaries)
     bottom_pad = 210 if has_down_product else 130
 
     diagram_w = margin_l + margin_r + (ncol - 1) * col_pitch + BLOCK_W
     width = int(math.ceil(max(diagram_w, 1180)))
-    body_h = header_h + (max_stack - 1) * row_pitch + BLOCK_H + bottom_pad
+
+    # supporting-equipment band geometry: a grid of smaller blocks below the main train.
+    # 5 per row, BLOCK_W spacing; reserves vertical room only when supporting blocks exist.
+    support_cell_w = BLOCK_W + 24
+    support_cell_h = BLOCK_H + 28
+    support_per_row = max(1, int((width - margin_l - margin_r + 24) // support_cell_w)) if support_blocks else 0
+    support_rows = math.ceil(len(support_blocks) / support_per_row) if support_blocks else 0
+    support_band_h = (support_rows * support_cell_h + 48) if support_blocks else 0
+
+    body_h = header_h + (max_stack - 1) * row_pitch + BLOCK_H + bottom_pad + support_band_h
     height = int(math.ceil(body_h + title_h))
 
     svg = SVG(width, height)
@@ -853,7 +936,7 @@ def build_bfd_svg(bf: BlockFlow) -> str:
         for si, b in enumerate(stack):
             centre[b.key] = (cx, y0 + si * row_pitch)
 
-    ports = {b.key: _block_ports(*centre[b.key]) for b in blocks}
+    ports = {b.key: _block_ports(*centre[b.key]) for b in topo_blocks}
 
     # ----- draw STREAMS first (so the blocks sit on top of stream ends) -----
     # spread converging inlets / diverging outlets across a block face into lanes.
@@ -872,7 +955,7 @@ def build_bfd_svg(bf: BlockFlow) -> str:
             out_seen[s.from_key] += 1
             in_seen[s.to_key] += 1
 
-    block_col = {b.key: b.col for b in blocks}
+    block_col = {b.key: b.col for b in topo_blocks}
     band_bottom = base_y + band_h + BLOCK_H / 2
     # a lower bus level for long cross-component bridges (inferred links / any forward
     # stream that skips ≥2 columns) so they route UNDER the intervening blocks instead of
@@ -902,8 +985,25 @@ def build_bfd_svg(bf: BlockFlow) -> str:
                      band_bottom=band_bottom)
 
     # ----- draw the BLOCKS on top -----
-    for b in blocks:
+    for b in topo_blocks:
         _draw_block(svg, b, *centre[b.key])
+
+    # ----- SUPPORTING EQUIPMENT BAND (principal BoM items with no topology edge) -----
+    if support_blocks:
+        support_y0 = band_bottom + bottom_pad - 20
+        svg.text(margin_l, support_y0 - 14, "Supporting services",
+                 size=11, weight="bold", fill=SUPPORT_INK)
+        svg.text(margin_l + 150, support_y0 - 14,
+                 "— principal equipment from the bill of materials (no routed process line)",
+                 size=9, fill=MUTED)
+        svg.line(40, support_y0 - 6, width - 40, support_y0 - 6,
+                 stroke=GRID_FAINT, width=1.0)
+        for i, b in enumerate(support_blocks):
+            row = i // support_per_row
+            col = i % support_per_row
+            cx = margin_l + col * support_cell_w + BLOCK_W / 2
+            cy = support_y0 + 16 + row * support_cell_h + BLOCK_H / 2
+            _draw_supporting_block(svg, b, cx, cy)
 
     # ----- LEGEND + power note -----
     _draw_legend(svg, bf, 40, height - title_h - 96, width)
@@ -964,6 +1064,23 @@ def _draw_block(svg, b, cx, cy):
         bx = x + BLOCK_W + min(array_n - 1, 3) * 7
         svg.text(bx + 4, y - min(array_n - 1, 3) * 6 + 6, f"×{array_n}", size=11,
                  anchor="start", weight="bold", fill=accent)
+
+
+def _draw_supporting_block(svg, b, cx, cy):
+    """A muted block for supporting equipment (principal BoM items with no topology edge).
+    Distinct from the main process-train blocks: warmer fill, softer outline, no role
+    stripe — so the executive reads them as context, not process stages."""
+    x = cx - BLOCK_W / 2
+    y = cy - BLOCK_H / 2
+    svg.rect(x, y, BLOCK_W, BLOCK_H, stroke=SUPPORT_INK, width=1.4,
+             fill=SUPPORT_FILL, rx=6)
+    svg.text(cx, y + 18, b.tag, size=11, anchor="middle", weight="bold",
+             fill=SUPPORT_INK)
+    name_lines = _wrap(b.label, maxlen=22, maxlines=3)
+    n = len(name_lines)
+    start = cy - (n - 1) * 7 + 5
+    for i, line in enumerate(name_lines):
+        svg.text(cx, start + i * 12, line, size=9, anchor="middle", fill=SUPPORT_INK)
 
 
 def _draw_stream(svg, pf, pt, cf, ct, s, lane):

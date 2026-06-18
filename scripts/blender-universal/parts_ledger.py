@@ -127,6 +127,24 @@ def main() -> int:
         if r.get("status") == "SUB-COMPONENT" and r.get("sub_of"):
             subs.setdefault(str(r["sub_of"]), []).append(r)
 
+    # ── tag-collision detection (universal identity resolution) ──────────────────
+    # A tag is AMBIGUOUS when the same tag maps to >1 distinct normalised equipment
+    # name in the BoM (e.g. tag 'B' → 'aeration blower' AND 'degassing blower'; tag
+    # 'AT' → 7 different analysers). For ambiguous tags, tag-only matching would
+    # credit coverage for equipment that isn't drawn — a different unit shares the
+    # tag. The covered() function requires NAME corroboration for ambiguous tags.
+    _tag_names: dict[str, set] = {}
+    for r in rb:
+        if r.get("status") == "SUB-COMPONENT" or _is_connection(r):
+            continue
+        tag = str(r.get("tag", "")).strip()
+        if not tag or tag == "—":
+            continue
+        req = str(r.get("requirement", ""))
+        nm = _norm(req.split("·")[0].strip() or str(r.get("part", "")) or tag)
+        _tag_names.setdefault(tag, set()).add(nm)
+    ambiguous_tags = {t for t, names in _tag_names.items() if len(names) > 1}
+
     # rendered text per view (deterministic, no OCR)
     def _svg_text(f: Path) -> str:
         return " " + " ".join(re.findall(r">([^<>]+)<", f.read_text(errors="ignore"))) + " " \
@@ -153,10 +171,18 @@ def main() -> int:
         txt = rep_text.get(key, "")
         if not txt:
             return False
-        if tag and (f" {tag} " in txt or f">{tag}<" in txt):
-            return True
         nm = (name or "").strip()
-        return bool(nm and len(nm) >= 4 and nm.lower() in txt.lower())
+        name_present = bool(nm and len(nm) >= 4 and nm.lower() in txt.lower())
+        if tag and (f" {tag} " in txt or f">{tag}<" in txt):
+            # Tag is present in the drawing. If the tag is UNAMBIGUOUS (unique
+            # identity — one equipment per tag), credit on tag alone. If the tag
+            # is AMBIGUOUS (collision: same tag → different equipment), require
+            # the NAME to also be present — otherwise we'd credit coverage for a
+            # different unit that happens to share the tag.
+            if tag not in ambiguous_tags:
+                return True
+            return name_present
+        return name_present
 
     # ── 1. PARTS (equipment) — identity + BoM/cost + coverage (I/O attached below) ──
     equipment = []
@@ -276,6 +302,8 @@ def main() -> int:
                   coverage_by_drawing=by_drawing, connection_coverage=conn_cov,
                   not_found=not_found, n_gapped=len(gapped), orphan_equipment=orphans,
                   n_connections_off_pid=len(uncov_conn),
+                  n_ambiguous_tags=len(ambiguous_tags),
+                  ambiguous_tags=sorted(ambiguous_tags),
                   equipment=equipment, connections=connections)
     (out_dir / "parts-ledger.json").write_text(json.dumps(report, indent=1))
 
@@ -303,7 +331,8 @@ def main() -> int:
         cc.append(f"{k} {d['present']}/{d['applicable']}{pct}")
     print("  CONNECTION coverage (pipes/wires/sensors vs the views):   " + "   ".join(cc))
     print(f"  → {len(not_found)} NOT FOUND · {len(gapped)} parts w/ coverage gap · "
-          f"{len(orphans)} orphan · {len(uncov_conn)} connections off the P&ID.  wrote parts-ledger.json\n")
+          f"{len(orphans)} orphan · {len(uncov_conn)} connections off the P&ID.  "
+          f"{len(ambiguous_tags)} ambiguous tag(s) (name-corroborated).  wrote parts-ledger.json\n")
     return 0
 
 
