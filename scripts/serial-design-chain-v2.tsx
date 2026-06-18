@@ -2148,6 +2148,128 @@ function dedupeSingularModifiers(modules: any[]): number {
   return removed
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// SELF-CORRECTING QUALITY LOOP (Tristan 2026-06-18)
+// The chain loops: brief → tools → contract → Blender → 8 drawings → SCORE →
+// if any section <8, extract fix directives → back to tools → repeat until ≥8.
+// Max 3 iterations (configurable via QUALITY_LOOP_MAX_ITERS env).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface QualityScorecard {
+  floor: number
+  mean: number
+  sections: Array<{ name: string; score: number; defects: string[] }>
+  allPass: boolean
+  iteration: number
+}
+
+interface FixDirective {
+  section: string
+  score: number
+  defects: string[]
+  fixStage: string
+}
+
+function computeQualityScorecard(state: any): QualityScorecard {
+  const sections: Array<{ name: string; score: number; defects: string[] }> = []
+
+  // Self-audit sections (gate 31) — the LLM-judged ≥8 floor
+  const sa = state.selfAudit
+  if (sa && Array.isArray(sa.sections)) {
+    for (const s of sa.sections) {
+      sections.push({
+        name: String(s.name || 'unknown'),
+        score: Number(s.score ?? 0),
+        defects: Array.isArray(s.defects) ? s.defects.map((d: any) => String(d).slice(0, 200)) : [],
+      })
+    }
+  } else if (sa && typeof sa.min_score === 'number') {
+    // fallback: no per-section breakdown, use the aggregate
+    sections.push({ name: 'self_audit', score: Number(sa.min_score), defects: [] })
+  }
+
+  // Drawing gates (gate 35) — deterministic ≥8 drawing condition
+  const dg = state.drawingGates
+  if (dg) {
+    const nFail = Number(dg.n_failing ?? 0)
+    sections.push({
+      name: 'drawing_gates',
+      score: Math.max(0, 10 - nFail * 2),
+      defects: Array.isArray(dg.gates)
+        ? dg.gates.filter((g: any) => !g.pass).map((g: any) => `${g.name}: ${g.detail || ''}`.slice(0, 200))
+        : [],
+    })
+  }
+
+  // Cost sanity (gate 32)
+  const cs = state.costSanity
+  if (cs) {
+    const v = String(cs.verdict || 'pass')
+    sections.push({
+      name: 'cost_sanity',
+      score: v === 'pass' ? 10 : v === 'med' ? 5 : 2,
+      defects: cs.reason ? [String(cs.reason).slice(0, 200)] : [],
+    })
+  }
+
+  // Physics critic enforcement (gate 33)
+  const pc = state.physicsCriticEnforcement
+  if (pc) {
+    const nBlock = Array.isArray(pc.blockingFaults) ? pc.blockingFaults.length : 0
+    sections.push({
+      name: 'physics_fidelity',
+      score: Math.max(0, 10 - nBlock * 3),
+      defects: Array.isArray(pc.blockingFaults)
+        ? pc.blockingFaults.map((f: any) => `${f.issue || f.failure_mode || ''}`.slice(0, 200))
+        : [],
+    })
+  }
+
+  // Tool archetype coherence (gate 34)
+  const ta = state.toolArchetypeCoherence
+  if (ta) {
+    const v = String(ta.verdict || 'pass')
+    sections.push({
+      name: 'tool_archetype',
+      score: v === 'pass' ? 10 : v === 'med' ? 5 : 2,
+      defects: Array.isArray(ta.findings) ? ta.findings.map((f: any) => String(f).slice(0, 200)) : [],
+    })
+  }
+
+  const scores = sections.map(s => s.score)
+  const floor = scores.length ? Math.min(...scores) : 0
+  const mean = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+  const allPass = floor >= 8
+  const iteration = parseInt(process.env.QUALITY_LOOP_ITER || '0', 10)
+  return { floor, mean: Math.round(mean * 10) / 10, sections, allPass, iteration }
+}
+
+function extractFixDirectives(state: any, scorecard: QualityScorecard): FixDirective[] {
+  const SECTION_TO_STAGE: Record<string, string> = {
+    physics_fidelity: 'reviewer',
+    bom: 'emitter',
+    brief_compliance: 'reviewer',
+    narrative: 'reviewer',
+    headline: 'reviewer',
+    performance_card: 'reviewer',
+    drawing_gates: 'drawing_generator',
+    cost_sanity: 'cost_stack',
+    tool_archetype: 'tools',
+  }
+  const directives: FixDirective[] = []
+  for (const s of scorecard.sections) {
+    if (s.score < 8) {
+      directives.push({
+        section: s.name,
+        score: s.score,
+        defects: s.defects,
+        fixStage: SECTION_TO_STAGE[s.name] || 'reviewer',
+      })
+    }
+  }
+  return directives
+}
+
 async function main() {
   const args = process.argv.slice(2)
   if (args.length < 2) {
@@ -2186,6 +2308,25 @@ async function main() {
 
   // ── Save the original brief (Phase 0 refinement loop, Tristan 2026-05-15)
   writeFileSync(resolve(outDir, '0-original-brief.md'), brief)
+
+  // ── Quality loop: load fix directives from prior iteration (if any) ──────────
+  const fixDirectivesPath = process.env.QUALITY_LOOP_FIX_DIRECTIVES
+  let fixDirectives: FixDirective[] = []
+  if (fixDirectivesPath && existsSync(fixDirectivesPath)) {
+    try {
+      const fd = JSON.parse(readFileSync(fixDirectivesPath, 'utf-8'))
+      fixDirectives = fd.directives || []
+      console.error(`[chain] quality loop: loaded ${fixDirectives.length} fix directive(s) from iteration ${fd.iteration}`)
+      for (const d of fixDirectives) {
+        console.error(`  → [${d.section}] score=${d.score}/10 fix at ${d.fixStage}: ${d.defects.slice(0, 2).join('; ')}${d.defects.length > 2 ? '...' : ''}`)
+      }
+    } catch { /* best-effort */ }
+  }
+  const fixDirectivesBlock = fixDirectives.length > 0
+    ? `\n\nQUALITY LOOP FIX DIRECTIVES (from prior iteration's scorecard — these sections scored <8/10 and MUST be fixed):\n${fixDirectives.map(d =>
+        `- [${d.section}] (score ${d.score}/10) — fix at ${d.fixStage}:\n${d.defects.map(def => `  · ${def}`).join('\n')}`
+      ).join('\n')}\n\nApply these fixes in your patches. Prioritise the lowest-scoring sections.\n`
+    : ''
 
   // Parse + classify the original
   const t0 = Date.now()
@@ -3311,7 +3452,7 @@ async function main() {
   // and only adds 1-2 score points over a single strong reviewer. Replaced
   // with one Grok 4.3 pass (fallback Qwen 3.6 Max). Loops 22-28 evidence:
   // the cascade's value-add was marginal. Saving the time/cost.
-  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_7_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics, toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend, libraryCandidatesBlock })
+  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_7_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics,     toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend + fixDirectivesBlock, libraryCandidatesBlock })
   design = r1.design
   writeFileSync(resolve(outDir, '5-r1-grok.json'), JSON.stringify(design, null, 2))
 
@@ -3514,7 +3655,7 @@ async function main() {
     brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design,
     rawDumpPath: resolve(outDir, '8-r4-flashlite.raw.txt'),
     keyMetrics,
-    toolOutputsBlock,
+    toolOutputsBlock: toolOutputsBlock + fixDirectivesBlock,
     libraryCandidatesBlock,
     fidelityFlaggedModules: r4FidelityFlags,
     emitterIdentitySnapshot,
@@ -3584,7 +3725,7 @@ async function main() {
           currentDesign: design,
           rawDumpPath: resolve(outDir, '8-5-specialist.raw.txt'),
           keyMetrics,
-          toolOutputsBlock,
+          toolOutputsBlock: toolOutputsBlock + fixDirectivesBlock,
           libraryCandidatesBlock,
           // Task #41 (2026-06-03): carry fidelity flags + snapshot through to R4.5
           // so the specialist can also add brief-fidelity sub_modules if the Critic
@@ -7999,6 +8140,45 @@ async function main() {
     execFileSync('.venv/bin/python', ['scripts/build-run-dashboard.py', outDir], { stdio: 'ignore' })
     console.error(`[chain] dashboard: ${resolve(outDir, 'dashboard.html')}`)
   } catch { /* dashboard is best-effort */ }
+
+  // ── SELF-CORRECTING QUALITY LOOP (Tristan 2026-06-18) ──────────────────────
+  // The chain loops: brief → tools → contract → Blender → 8 drawings → SCORE →
+  // if any section <8, extract fix directives → back to tools → repeat until ≥8.
+  // Max 3 iterations (configurable via QUALITY_LOOP_MAX_ITERS env, default 3).
+  try {
+    const finalStateForScore = JSON.parse(readFileSync(statePath, 'utf-8'))
+    const scorecard = computeQualityScorecard(finalStateForScore)
+    writeFileSync(resolve(outDir, 'quality-scorecard.json'), JSON.stringify(scorecard, null, 2))
+    console.error(`[chain] quality scorecard: floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10 allPass=${scorecard.allPass} (iteration ${scorecard.iteration + 1})`)
+
+    const MAX_QUALITY_LOOPS = parseInt(process.env.QUALITY_LOOP_MAX_ITERS || '3', 10)
+    if (!scorecard.allPass && scorecard.iteration + 1 < MAX_QUALITY_LOOPS) {
+      const directives = extractFixDirectives(finalStateForScore, scorecard)
+      const directivesPath = resolve(outDir, 'quality-loop-fix-directives.json')
+      writeFileSync(directivesPath, JSON.stringify({ iteration: scorecard.iteration + 1, scorecard, directives }, null, 2))
+      console.error(`[chain] quality loop: ${directives.length} fix directive(s) → re-running (iteration ${scorecard.iteration + 2}/${MAX_QUALITY_LOOPS})`)
+      for (const d of directives) {
+        console.error(`  ✗ [${d.section}] score=${d.score}/10 → fix at ${d.fixStage}: ${d.defects.length} defect(s)`)
+      }
+      // Re-invoke the chain with the fix directives fed into the next iteration's prompts
+      execFileSync('npx', ['tsx', __filename, briefPath, outDir], {
+        env: {
+          ...process.env,
+          QUALITY_LOOP_ITER: String(scorecard.iteration + 1),
+          QUALITY_LOOP_FIX_DIRECTIVES: directivesPath,
+        },
+        stdio: 'inherit',
+      })
+      return  // the child run handles the rest (including further loops + FINAL output)
+    }
+    if (scorecard.allPass) {
+      console.error(`[chain] ✦ quality loop COMPLETE — all sections ≥8/10 (iteration ${scorecard.iteration + 1})`)
+    } else {
+      console.error(`[chain] quality loop: max iterations (${MAX_QUALITY_LOOPS}) reached — floor=${scorecard.floor}/10`)
+    }
+  } catch (loopErr) {
+    console.error(`[chain] quality loop stage miss (non-fatal): ${(loopErr as Error).message.slice(0, 200)}`)
+  }
 }
 
 main().catch(err => {
