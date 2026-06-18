@@ -2320,6 +2320,24 @@ def _device_chain(svg: SVG, cx, y_start, y_end, devices):
         svg.text(cx + 18, cy + 3.5, lbl, size=9.5, anchor="start", fill=MUTED)
 
 
+def _balance_rows(items, spans, n_rows):
+    """Greedily split an ORDERED list of branches into ≤ n_rows rows of ~equal total span,
+    so a folded multi-section busbar reads evenly. Never splits a branch; preserves order.
+    Returns list[list[(branch, span)]] (non-empty rows only). Deterministic + universal."""
+    total = sum(spans) or 1.0
+    target = total / max(1, n_rows)
+    rows, cur, cur_span = [], [], 0.0
+    for br, sp in zip(items, spans):
+        if cur and cur_span + sp > target * 1.15 and len(rows) < n_rows - 1:
+            rows.append(cur)
+            cur, cur_span = [], 0.0
+        cur.append((br, sp))
+        cur_span += sp
+    if cur:
+        rows.append(cur)
+    return rows or [[]]
+
+
 def build_sld_svg(tree: Tree) -> str:
     """Render the reconstructed tree as a standard single-line diagram SVG."""
     main = tree.main_bus
@@ -2347,15 +2365,11 @@ def build_sld_svg(tree: Tree) -> str:
         return 1.0
     spans = [_branch_span(br) for br in main_branches]
     total_span = sum(spans) or 1.0
-
-    # ----- canvas WIDTH: room for the spans + a guaranteed-clear legend gutter on
-    #       the right (no floating whitespace, no legend/branch collision in any case).
-    diagram_w = max(margin_l + total_span * col_w, 780)
-    width = diagram_w + legend_gutter + margin_r
-    width = max(width, 1060)
+    # provisional canvas width for the incomer measurement only (its vertical depth is
+    # width-independent); the REAL width + height are set after the folded-busbar row
+    # count R is chosen below, so the page clears the ≤4:1 legibility gate with margin.
+    width = 1400
     bus_x0 = margin_l
-    bus_x1 = diagram_w                      # busbar stops before the legend gutter
-    legend_x_right = width - margin_r       # legend right edge
 
     # ----- height is finalised after we know the incomer stack depth; draw the
     #       incomer onto a scratch SVG first to measure, then assemble for real. ----
@@ -2424,12 +2438,38 @@ def build_sld_svg(tree: Tree) -> str:
 
     src_cx = width / 2
     src_cy = 70
-    scratch = SVG(width, 1000)
+    scratch = SVG(width, 1200)
     incomer_bottom = _draw_incomer(scratch, src_cx, src_cy)
     # leave headroom above the busbar for the 2-line bus label (tag + voltage/rating).
     bus_y = incomer_bottom + 44
-    body_h = 340 + (260 if has_sub else 0)
-    height = bus_y + body_h + title_h
+
+    # ----- FOLD the feeders into R left-risered busbar sections so the page clears the
+    #       ≤4:1 legibility gate with margin. A 30-feeder single bus renders as an
+    #       unreadable 9:1 strip; folding collapses the width and grows the height.
+    #       Universal + deterministic — keyed only on the feeder spans + measured incomer.
+    ROW_PITCH = 340          # one feeder row's vertical pitch (the proven single-row body)
+    SUB_ROW_EXTRA = 260      # a row carrying a sub-distribution fans a sub-busbar below it
+
+    def _row_heights(rws):
+        return [ROW_PITCH + (SUB_ROW_EXTRA if any(b.sub_bus for b, _ in r) else 0)
+                for r in rws]
+
+    def _dims_for(n_rows):
+        rws = _balance_rows(main_branches, spans, n_rows)
+        max_rs = max((sum(sp for _, sp in r) for r in rws), default=1.0) or 1.0
+        dia_w = margin_l + max_rs * col_w
+        w = max(dia_w + legend_gutter + margin_r, 1060)
+        h = bus_y + sum(_row_heights(rws)) + title_h
+        return w, h, rws, dia_w
+
+    rows = [list(zip(main_branches, spans))]
+    width = height = diagram_w = 0
+    for _cand in range(1, 9):                # smallest R giving aspect ≤ 2.6 (margin < 4:1)
+        width, height, rows, diagram_w = _dims_for(_cand)
+        if width / max(1.0, height) <= 2.6:
+            break
+    bus_x1 = diagram_w
+    src_cx = (bus_x0 + bus_x1) / 2.0         # incomer centred over the folded bus
 
     svg = SVG(width, height)
     # faint border
@@ -2448,65 +2488,72 @@ def build_sld_svg(tree: Tree) -> str:
         svg.text(src_cx + 12, (y + bus_y) / 2, inc_bits, size=9.5, anchor="start",
                  fill=MUTED)
 
-    # ===== MAIN BUSBAR =====
-    svg.line(bus_x0, bus_y, bus_x1, bus_y, stroke=BUS_INK, width=7.0, cap="butt")
-    # bus label (left) — kept clear ABOVE the heavy busbar line so nothing is occluded.
-    btag = main.tag
-    binfo = " · ".join(b for b in (main.voltage, main.rating) if b)
-    svg.text(bus_x0, bus_y - 28, btag, size=13, anchor="start", weight="bold",
-             fill=BUS_INK)
-    if binfo:
-        svg.text(bus_x0, bus_y - 14, binfo, size=10.5, anchor="start", fill=MUTED,
-                 spacing="0.2")
-    # tiny rating tag at the right end
-    svg.text(bus_x1, bus_y - 14, "Σ " + (main.rating or ""), size=10, anchor="end",
-             fill=MUTED)
-    # SURGE-PROTECTION DEVICE (SPD) drawn as a SHUNT on the bus (a stub to earth), NOT a
-    # load tap — the board element stripped from the feeder list reappears here correctly.
-    shunts = getattr(tree, "_board_shunts", []) or []
-    if any("surge" in s or "spd" in s for s in shunts):
-        spdx = bus_x0 + 150
-        _draw_spd_shunt(svg, spdx, bus_y)
-
-    # ===== BRANCHES off the main bus =====
-    # distribute branch X positions by SPAN (a sub-distribution claims a wider band so
-    # its fanned sub-busbar fits without colliding with its neighbours or the legend).
-    usable = (bus_x1 - bus_x0)
-    xs = []
-    band_w = []
-    cursor = bus_x0
-    for sp in spans:
-        w_band = usable * sp / total_span
-        xs.append(cursor + w_band / 2.0)
-        band_w.append(w_band)
-        cursor += w_band
-
-    drop_top = bus_y
-    base_y = bus_y + 70
-    content_bottom = base_y
-
-    for bx, br, bw in zip(xs, main_branches, band_w):
-        # tap line down from bus
-        svg.line(bx, drop_top, bx, base_y - 30, width=1.8)
-        # branch header label (rating/cable) beside the tap
-        hdr = " · ".join(b for b in (br.rating, br.cable) if b)
-        if hdr:
-            svg.text(bx + 10, drop_top + 26, hdr, size=9.3, anchor="start", fill=MUTED)
-
-        if br.sub_bus is not None:
-            bot = _draw_sub_distribution(svg, bx, base_y - 30, br, bw)
+    # ===== FOLDED MAIN BUSBAR + BRANCHES =====
+    # The switchboard bus is ONE bus drawn as R left-risered sections (a 30-feeder single
+    # row is an unreadable strip). Per-feeder horizontal geometry is IDENTICAL to a single
+    # row (band = span × col_w); only the rows are stacked + linked by a left riser.
+    row_h = _row_heights(rows)
+    row_y = []
+    yy = bus_y
+    for h_r in row_h:
+        row_y.append(yy)
+        yy += h_r
+    content_bottom = bus_y
+    spd_done = False
+    for ri, row in enumerate(rows):
+        by = row_y[ri]
+        row_span = sum(sp for _, sp in row) or 1.0
+        seg_x1 = bus_x0 + row_span * col_w
+        # heavy bus segment for this section
+        svg.line(bus_x0, by, seg_x1, by, stroke=BUS_INK, width=7.0, cap="butt")
+        if ri == 0:
+            # bus label (left) + Σ rating (right end), kept clear ABOVE the heavy line.
+            svg.text(bus_x0, by - 28, main.tag, size=13, anchor="start", weight="bold",
+                     fill=BUS_INK)
+            binfo = " · ".join(b for b in (main.voltage, main.rating) if b)
+            if binfo:
+                svg.text(bus_x0, by - 14, binfo, size=10.5, anchor="start", fill=MUTED,
+                         spacing="0.2")
+            svg.text(seg_x1, by - 14, "Σ " + (main.rating or ""), size=10, anchor="end",
+                     fill=MUTED)
         else:
-            # in-line protective device(s)
-            dev_end = base_y - 8
-            if br.devices:
-                _device_chain(svg, bx, base_y - 30, dev_end, br.devices)
+            # left riser — the SAME switchboard bus, continued onto the next section.
+            svg.line(bus_x0, row_y[ri - 1], bus_x0, by, stroke=BUS_INK, width=7.0,
+                     cap="butt")
+            svg.text(bus_x0 + 12, by - 12, "bus continued", size=8.5, anchor="start",
+                     fill=MUTED)
+        # SPD shunt once (a stub to earth on the bus, not a load tap).
+        if not spd_done:
+            shunts = getattr(tree, "_board_shunts", []) or []
+            if any("surge" in s or "spd" in s for s in shunts):
+                _draw_spd_shunt(svg, bus_x0 + 150, by)
+            spd_done = True
+        # feeders along this section — band = span × col_w (identical to a single row).
+        cursor = bus_x0
+        base_y = by + 70
+        for br, sp in row:
+            w_band = col_w * sp
+            bx = cursor + w_band / 2.0
+            cursor += w_band
+            # tap line down from bus
+            svg.line(bx, by, bx, base_y - 30, width=1.8)
+            hdr = " · ".join(b for b in (br.rating, br.cable) if b)
+            if hdr:
+                svg.text(bx + 10, by + 26, hdr, size=9.3, anchor="start", fill=MUTED)
+            if br.sub_bus is not None:
+                bot = _draw_sub_distribution(svg, bx, base_y - 30, br, w_band)
             else:
-                svg.line(bx, base_y - 30, bx, dev_end, width=1.8)  # plain conductor
-            bot = sym_load(svg, bx, dev_end, w=min(178, col_w - 24),
-                           label=br.label, rating=br.rating, cable=br.cable,
-                           vd=br.voltdrop, count=br.count,
-                           vd_flag=getattr(br, "_vd_flag", None))
-        content_bottom = max(content_bottom, bot or base_y)
+                # in-line protective device(s)
+                dev_end = base_y - 8
+                if br.devices:
+                    _device_chain(svg, bx, base_y - 30, dev_end, br.devices)
+                else:
+                    svg.line(bx, base_y - 30, bx, dev_end, width=1.8)  # plain conductor
+                bot = sym_load(svg, bx, dev_end, w=min(178, col_w - 24),
+                               label=br.label, rating=br.rating, cable=br.cable,
+                               vd=br.voltdrop, count=br.count,
+                               vd_flag=getattr(br, "_vd_flag", None))
+            content_bottom = max(content_bottom, bot or base_y)
 
     # ===== LEGEND (lower-right of the body, above the title block) =====
     legend_y = min(content_bottom + 24, height - title_h - 170)
