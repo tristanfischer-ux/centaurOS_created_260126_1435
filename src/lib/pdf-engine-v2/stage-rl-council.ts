@@ -128,7 +128,7 @@ export async function reviewPromptDiffWithCouncil(
     'openai/gpt-5.5',
     'x-ai/grok-4.3',
     'z-ai/glm-5.2',
-    'moonshotai/kimi-k2.6',
+    'moonshotai/kimi-k2.7-code',
     'xiaomi/mimo-v2.5-pro',
   ]
 

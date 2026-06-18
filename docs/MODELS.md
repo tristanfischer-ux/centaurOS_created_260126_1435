@@ -44,7 +44,14 @@ Newer models now available that postdate the May benchmark AND the registry's cu
 
 ⚠️ **Availability ≠ quality.** The catalogue confirms these exist + their date/price/context. It does NOT prove they're *better* — there is no published benchmark for glm-5.2 / kimi-k2.7 / qwen3.7-plus / minimax-m3 in our data yet (all postdate the May AA run). **Before swapping any into the chain: get fresh Artificial Analysis numbers OR A/B on the real chain task + scorecard-gate. Never swap on recency alone.**
 
-## Recommended changes (grounded, NOT yet applied — each needs an A/B + scorecard-gate to validate)
+## ✅ APPLIED 2026-06-18 (Tristan-directed)
+- **Kimi K2.6 → `moonshotai/kimi-k2.7-code`** across the chain: registry constant `KIMI_K2_7`, the emitter ensemble (`stage-rl-council.ts:131`), pricing map (`action-logger.ts`), tests + harness scripts. (No general K2.7 exists — the code variant fits the structured-output ensemble.)
+- **GLM was already on `z-ai/glm-5.2`** in the chain (`GLM_5_2` constant); only the stale "GLM-5.1" comment was corrected. The 22 `glm-5.1` refs are app-side `cad-lab`, NOT the chain.
+- **Smoke-validated** (direct OpenRouter probe — BoM extraction + JSON + the 94/0.93=101.1 arithmetic step): glm-5.2, kimi-k2.7-code, minimax-m3, qwen3.7-plus, gemini-3.1-flash-lite — **all 5 PASS**, byte-identical clean JSON.
+- **Cheap-model quality check:** `minimax-m3` ($0.30/$1.20) and `qwen3.7-plus` ($0.32/$1.28) are **quality-competent** on structured extraction — identical to the incumbent `gemini-3.1-flash-lite`. BUT not cheaper than flash-lite for that role; their edge is 1M context. No reason to swap the extract role — consider them only for long-context jobs. (One task — does NOT test hard reasoning/physics.)
+- **STILL PENDING:** a full chain A/B + scorecard-gate to confirm the Kimi swap doesn't regress dossier quality (smoke ≠ end-to-end). Flag for the next chain run.
+
+## Recommended changes (remaining — each needs an A/B + scorecard-gate to validate)
 
 1. **GLM-5.1 → `z-ai/glm-5.2` for the schema/tool-use + glm ensemble seat.** *(confidence: moderate-high)* — Same Zhipu lineage, 2-days-newer, **5× context (202K→1M)**, modest price bump. Lowest-risk adoption (same family). The registry already declares `GLM_5_2`; finish the migration of the `glm-5.1` references. Validate tool-use/JSON discipline didn't regress.
 2. **Physics critic: benchmark `gemini-3.5-flash` vs `gemini-3.1-pro-preview`.** *(confidence: moderate — softened after live check)* — `gemini-3.5-flash` is a *current-gen* flash (2026-05-19), not the old "Gemini 3 Flash", so it's better than I first assumed. But it's still a flash tier on a first-principles-physics gate ("never ship a part the engine KNOWS will fail", gate 33) where pro-tier reasoners lead CritPt. A/B the two on real physics critiques; if `3.1-pro` wins, switch (cost is trivial — few calls/dossier). Either way, promote the hardcoded string at `radical/physics-critic.ts:58` into a named registry constant.

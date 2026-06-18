@@ -50,7 +50,7 @@ const LLM_SEATS = [
   { id: 'xiaomi/mimo-v2.5-pro', label: 'MiMo-V2.5-Pro', nonHallucinationPct: 75, maxTokens: 32768, timeoutMs: 600_000 },
   { id: 'x-ai/grok-4.3', label: 'Grok-4.3', nonHallucinationPct: 75, maxTokens: 8192, timeoutMs: 600_000 },
   { id: 'z-ai/glm-5.2', label: 'GLM-5.1', nonHallucinationPct: 74, maxTokens: 32768, timeoutMs: 600_000 },
-  { id: 'moonshotai/kimi-k2.6', label: 'Kimi-K2.6', nonHallucinationPct: 61, maxTokens: 32768, timeoutMs: 600_000 },
+  { id: 'moonshotai/kimi-k2.7-code', label: 'Kimi-K2.6', nonHallucinationPct: 61, maxTokens: 32768, timeoutMs: 600_000 },
 ]
 
 // ─── OpenRouter call ─────────────────────────────────────────────────────────

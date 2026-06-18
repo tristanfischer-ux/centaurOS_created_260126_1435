@@ -83,7 +83,7 @@ const EMITTERS: ReadonlyArray<string> = [
   'anthropic/claude-opus-4-7',
   'qwen/qwen3.7-max',
   'xiaomi/mimo-v2.5-pro',
-  'moonshotai/kimi-k2.6',
+  'moonshotai/kimi-k2.7-code',
 ] as const
 
 const OUT_DIR = resolve(process.cwd(), '/tmp/k10-multiemit-out')

@@ -76,6 +76,7 @@ const PRICING_USD_PER_M_TOKENS: Record<string, [number, number]> = {
   'z-ai/glm-5.2':                          [0.60, 2.20],
   // Moonshot
   'moonshotai/kimi-k2.6':                  [0.40, 1.60],
+  'moonshotai/kimi-k2.7-code':             [0.74, 3.50],
   // Qwen / Alibaba
   'qwen/qwen3.7-max':              [1.20, 4.80],
   'qwen/qwen3.5-405b':                     [1.50, 5.00],

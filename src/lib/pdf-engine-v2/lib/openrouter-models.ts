@@ -33,10 +33,14 @@ export const MIMO_V2_5_PRO = 'xiaomi/mimo-v2.5-pro'
 /** Qwen 3.7 Max (Alibaba) — 46% hallucination, +4 Omniscience, B2B supply chain prior. NOTE: intermittent OpenRouter HTTP 400 — drawer forgeos_gotchas_a19eb8ce377fa87d. */
 export const QWEN_3_6_MAX = 'qwen/qwen3.7-max'
 
-/** Kimi K2.6 (Moonshot) — 44% hallucination, long-context lineage. NOTE: intermittent OpenRouter unavailability — drawer forgeos_gotchas_a19eb8ce377fa87d. */
-export const KIMI_K2_6 = 'moonshotai/kimi-k2.6'
+/** Kimi K2.7-code (Moonshot, 2026-06-12) — UPGRADED from K2.6 (Tristan 2026-06-18). The 2.7 release is
+ *  code-specialised (no general K2.7 exists); fits the emitter ensemble where output is structured/code-like.
+ *  NOTE: intermittent OpenRouter unavailability — drawer forgeos_gotchas_a19eb8ce377fa87d. Quality A/B vs the
+ *  rest of the ensemble pending a full chain run. */
+export const KIMI_K2_7 = 'moonshotai/kimi-k2.7-code'
 
-/** GLM-5.1 (Zhipu / Tsinghua) — 29% hallucination, IFBench top, schema-strict. Good judge. */
+/** GLM-5.2 (Zhipu / Tsinghua, 2026-06-16) — schema-strict / JSON enforcer, 1M context. Upgraded from 5.1
+ *  (the constant already pointed at 5.2). 29% hallucination class, IFBench top. Good judge. */
 export const GLM_5_2 = 'z-ai/glm-5.2'
 
 // ─── Mid-tier / efficient models ────────────────────────────────────────────

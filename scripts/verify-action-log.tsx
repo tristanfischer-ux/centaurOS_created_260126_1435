@@ -47,7 +47,7 @@ async function main() {
 
   // Stage: module decomposition (audit Gap #2 — 6 emitters)
   logger.logStage({ step_name: 'module_decomposition', action_type: 'stage_start', multi_emitter: true })
-  for (const m of ['x-ai/grok-4.3', 'google/gemini-3.1-pro-preview', 'z-ai/glm-5.2', 'xiaomi/mimo-v2.5-pro', 'moonshotai/kimi-k2.6', 'qwen/qwen3.7-max']) {
+  for (const m of ['x-ai/grok-4.3', 'google/gemini-3.1-pro-preview', 'z-ai/glm-5.2', 'xiaomi/mimo-v2.5-pro', 'moonshotai/kimi-k2.7-code', 'qwen/qwen3.7-max']) {
     logger.logLlm({
       step_name: 'module_decomposition:emitter',
       model: m,
