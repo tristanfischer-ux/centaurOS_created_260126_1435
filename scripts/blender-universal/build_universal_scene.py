@@ -1827,6 +1827,32 @@ def _vessel_grid_span_mm(unit_dia_mm: float, n: int):
     return span_x, span_y
 
 
+# Principal MACHINES (pumps/blowers/compressors) replicate into N DISTINCT instances when
+# qty 2..12 — the same faithful "show every unit" rule as the _VESSEL_KIND grid above, so a
+# qty-8 recirc-pump array draws 8 pump bodies + 8 parts-manifest rows (P-101…P-108) and the
+# P&ID / BFD / GA show every pump, not one collapsed unit. Without this, principal pumps were
+# the lone qty-N node that stayed at 1 (drawing-gate `qty_coverage` FAIL: recirc qty 8, manifest
+# 1). N==1 is byte-identical to the old single machine (inm==nm, xo==yo==0). Universal — any
+# pump/blower/compressor array, any class. Like the vessel grid, this is the SINGLE source of
+# truth shared by build_part (draws the N instances) and footprint_mm (reserves the grid span).
+_REPLICATED_MACHINE_KIND = {"pump", "compressor"}
+_MACHINE_GRID_PITCH_X_FACTOR = 1.7    # centre-to-centre X pitch = unit footprint width × this
+_MACHINE_GRID_PITCH_Y_FACTOR = 1.9    # centre-to-centre Y pitch = unit footprint depth × this
+
+
+def _machine_grid_span_mm(unit_w_mm: float, unit_dep_mm: float, n: int):
+    """The full PLAN span (span_x_mm, span_y_mm) the replicated-MACHINE cluster occupies, so
+    the placer reserves the cluster (not one machine). Mirrors build_part's machine layout: a
+    cols×rows grid (the same near-square `_vessel_grid_dims`) at pitch = unit footprint ×
+    pitch-factor, span = (n_axis-1)×pitch + one unit footprint (half-unit margin each end)."""
+    cols, rows = _vessel_grid_dims(n)
+    px = unit_w_mm * _MACHINE_GRID_PITCH_X_FACTOR
+    py = unit_dep_mm * _MACHINE_GRID_PITCH_Y_FACTOR
+    span_x = (cols - 1) * px + unit_w_mm
+    span_y = (rows - 1) * py + unit_dep_mm
+    return span_x, span_y
+
+
 def resolved_dims_mm(part):
     """Return a concrete (kind, geometry-dict) in MM, from explicit dim if
     present else the type default for the shape. Footprint is used by the
@@ -1909,7 +1935,16 @@ def footprint_mm(rd):
             pitch = dia * _VESSEL_GRID_PITCH_FACTOR
             return (cols - 1) * pitch + ln, (rows - 1) * pitch + dia * 1.8, dia
         return ln, dia * 1.8, dia
-    if shape in ("compressor", "pump", "package_box", "skid_box",
+    if shape in _REPLICATED_MACHINE_KIND:
+        w = rd.get("w_mm", TYPE_DEFAULTS_MM[shape].get("w", 1000))
+        dep = rd.get("d_mm", TYPE_DEFAULTS_MM[shape].get("d", 900))
+        h = rd.get("h_mm", TYPE_DEFAULTS_MM[shape].get("h", 1100))
+        n = int(rd.get("_qty", 1) or 1)
+        if 2 <= n <= _VESSEL_GRID_MAX_N:       # reserve the full N-machine cluster footprint
+            sx, sy = _machine_grid_span_mm(w, dep, n)
+            return sx, sy, h
+        return w, dep, h
+    if shape in ("package_box", "skid_box",
                  "transformer_box", "cabinet", "cabinet_small", "box"):
         w = rd.get("w_mm", TYPE_DEFAULTS_MM[shape].get("w", 1000))
         dep = rd.get("d_mm", TYPE_DEFAULTS_MM[shape].get("d", 900))
@@ -2072,13 +2107,30 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
                                   dia, MAT, mod, MO)
         return asm, anchors
 
-    if shape in ("compressor", "pump"):
+    if shape in _REPLICATED_MACHINE_KIND:
         w = rd.get("w_mm", TYPE_DEFAULTS_MM[shape]["w"])
+        dep = rd.get("d_mm", TYPE_DEFAULTS_MM[shape].get("d", 600))
         h = rd.get("h_mm", TYPE_DEFAULTS_MM[shape]["h"])
         body_d = max(400, h * 0.7)
-        asm, anchors = build_machine(nm, body_d, w, x_mm, y_mm, base_z_mm, mat,
-                                     mod, MO, MAT)
-        return asm, anchors
+        # qty-N principal machines (8 recirc pumps, 3 degasser blowers …) render as N DISTINCT
+        # instances {nm}_inst{idx} in a compact cluster — so build_parts_manifest emits N rows
+        # (P-101…P-108) and the P&ID / BFD / GA show every pump, not one collapsed unit. N==1
+        # is byte-identical to the old single machine (inm==nm, xo==yo==0). Universal — any
+        # pump/blower/compressor array, any class (mirrors the _VESSEL_KIND tank grid above).
+        N = max(1, min(int(getattr(part, "qty", 1) or 1), _VESSEL_GRID_MAX_N))
+        cols, rows_n = _vessel_grid_dims(N)
+        px, py = w * _MACHINE_GRID_PITCH_X_FACTOR, dep * _MACHINE_GRID_PITCH_Y_FACTOR
+        first = None
+        for idx in range(N):
+            r, c = divmod(idx, cols)
+            xo = (c - (cols - 1) / 2.0) * px
+            yo = (r - (rows_n - 1) / 2.0) * py
+            inm = nm if N == 1 else f"{nm}_inst{idx}"
+            asm, anchors = build_machine(inm, body_d, w, x_mm + xo, y_mm + yo,
+                                         base_z_mm, mat, mod, MO, MAT)
+            if first is None:
+                first = (asm, anchors)
+        return first
 
     if shape in ("package_box", "skid_box", "transformer_box", "cabinet",
                  "cabinet_small", "box"):
@@ -4406,7 +4458,7 @@ def build_parts_manifest(parts):
         # each with its OWN world bbox — so 10 rearing tanks become 10 rows (TK-101…
         # TK-110) at distinct compact-grid positions, not one unioned mega-tank.
         qty = int(getattr(p, "qty", 1) or 1)
-        if p.shape in _VESSEL_KIND and 2 <= qty <= 12:
+        if (p.shape in _VESSEL_KIND or p.shape in _REPLICATED_MACHINE_KIND) and 2 <= qty <= 12:
             n_inst = min(qty, 12)
             added = 0
             for idx in range(n_inst):
