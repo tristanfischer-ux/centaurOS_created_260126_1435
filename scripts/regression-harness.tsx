@@ -9980,6 +9980,16 @@ function main() {
   const snapshots = loadSnapshots()
   console.log(`[regression-harness] checking ${snapshots.length} snapshot(s)`)
   const results: SnapshotResult[] = []
+
+  // Quality-loop invariants run UNCONDITIONALLY (pure functions, no snapshot needed)
+  const qlAssertions = checkQualityLoopInvariants()
+  const qlPassed = qlAssertions.filter(a => a.passed).length
+  console.log(`\n[regression-harness] quality-loop invariants: ${qlPassed}/${qlAssertions.length} passed`)
+  for (const a of qlAssertions) {
+    const mark = a.passed ? 'PASS' : 'FAIL'
+    console.log(`  [${mark}] ${a.id}: ${a.description}${a.detail ? ` — ${a.detail}` : ''}`)
+  }
+
   for (const s of snapshots) {
     const r = checkSnapshot(s)
     results.push(r)
@@ -9991,10 +10001,11 @@ function main() {
       console.log(`  [${mark}] ${a.id}: ${a.description}${a.detail ? ` — ${a.detail}` : ''}`)
     }
   }
-  const allPassed = results.every((r) => r.assertions.every((a) => a.passed))
-  const totalAsserts = results.reduce((s, r) => s + r.assertions.length, 0)
-  const totalPassed = results.reduce((s, r) => s + r.assertions.filter((a) => a.passed).length, 0)
-  console.log(`\n[regression-harness] OVERALL: ${totalPassed}/${totalAsserts} passed across ${results.length} snapshot(s)`)
+  const snapshotAssertions = results.flatMap(r => r.assertions)
+  const allAssertions = [...qlAssertions, ...snapshotAssertions]
+  const allPassed = allAssertions.every((a) => a.passed)
+  const totalPassed = allAssertions.filter(a => a.passed).length
+  console.log(`\n[regression-harness] OVERALL: ${totalPassed}/${allAssertions.length} passed (${qlAssertions.length} quality-loop + ${snapshotAssertions.length} snapshot)`)
   process.exit(allPassed ? 0 : 1)
 }
 

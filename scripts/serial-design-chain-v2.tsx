@@ -2500,8 +2500,10 @@ function extractLedgerFixDirectives(outDir: string): FixDirective[] {
     for (const [drawing, cov] of Object.entries(ledger.coverage_by_drawing || {})) {
       const c = cov as any
       if (c.expected && c.present < c.expected) {
+        // e.expected is an array of strings; use .includes() not `in` (which checks object keys)
         const missing = (ledger.equipment || []).filter((e: any) =>
-          drawing in (e.expected || []) && !e.coverage?.[drawing]).map((e: any) => `${e.tag} ${e.name}`)
+          Array.isArray(e.expected) && e.expected.includes(drawing) && !e.coverage?.[drawing]
+        ).map((e: any) => `${e.tag} ${e.name}`)
         drawingGaps.push(`${drawing}: ${c.present}/${c.expected} — missing: ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? '...' : ''}`)
       }
     }
