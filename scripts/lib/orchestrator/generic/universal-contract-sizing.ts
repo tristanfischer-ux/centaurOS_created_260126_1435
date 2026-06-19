@@ -62,6 +62,14 @@ interface EquipGroup {
   stems: string[]
   volume?: number
   volumeIsEach: boolean
+  // PHYSICAL-VESSEL precedence when one device declares MULTIPLE volume keys (universal,
+  // Tristan 2026-06-19): the SYNTHESISED vessel must be sized to its CONTAINMENT — the
+  // tank / shell / vessel volume — NOT to the internal FILL (MBBR media, packing, resin,
+  // sludge bed, working/liquid volume). 2 = containment (tank/shell/vessel), 1 = neutral
+  // (a bare `_volume_m3`), 0 = fill (media/working/active/bed/packing/liquid). A higher
+  // role overwrites a lower one (so biofilter_tank_volume_m3=153 wins over
+  // biofilter_media_volume_m3=92, the 60 %-fill the emitter wrongly read as the vessel).
+  volumeRole?: number
   area?: number
   count?: number
   power?: number // device power (kW) — synthesisable
@@ -71,14 +79,28 @@ interface EquipGroup {
   rateUnit?: string
   mass?: number
   current?: number
+  // Per-unit FLOW (m³/h) of a counted flow-machine, derived from the plant loop flow ÷ count,
+  // surfaced as a SECONDARY rating beside the machine's primary (power) rating so the recirc
+  // pump reads "97 kW · 1,670 m³/h each". Set in buildGroups for pumps/filters/degassers only.
+  perUnitFlow?: number
+  // A SUB-ASPECT of a larger principal (its stems strictly CONTAIN another synthesisable
+  // group's stems in the same device family) — e.g. `degasser_column`(⊃ `degasser`),
+  // `drum_filter_backwash` / `drum_filter_screen`(⊃ `drum_filter`). It is an ATTRIBUTE /
+  // sub-system of the parent vessel/machine, NOT a second principal, so it must not mint a
+  // duplicate top-level BoM item (which double-counts the same machine on the panel schedule
+  // → the load_reconcile divergence). Universal, set in buildGroups; suppresses synthesis.
+  subAspect?: boolean
 }
 
 // Ordered longest-suffix-first. [regex on key tail, measure, unit, perEach?]
-const SUFFIX_RULES: { re: RegExp; measure: Measure; unit: string; each?: boolean }[] = [
+// volRole on a VOLUME rule (universal vessel-vs-fill precedence): 2 = CONTAINMENT
+// (tank/shell/vessel — the physical envelope to synthesise), 0 = FILL (media/working/
+// active/bed/packing/liquid — the inventory INSIDE the vessel), undefined = neutral.
+const SUFFIX_RULES: { re: RegExp; measure: Measure; unit: string; each?: boolean; volRole?: number }[] = [
   { re: /_volume_each_m3$/, measure: 'volume', unit: 'm³', each: true },
   { re: /_each_m3$/, measure: 'volume', unit: 'm³', each: true },
-  { re: /_media_volume_m3$/, measure: 'volume', unit: 'm³' },
-  { re: /_tank_volume_m3$/, measure: 'volume', unit: 'm³' },
+  { re: /_(media|working|active|bed|packing|liquid|fill|resin)_volume_m3$/, measure: 'volume', unit: 'm³', volRole: 0 },
+  { re: /_(tank|shell|vessel|reactor|column|chamber)_volume_m3$/, measure: 'volume', unit: 'm³', volRole: 2 },
   { re: /_volume_m3$/, measure: 'volume', unit: 'm³' },
   { re: /_throughput_m3_h$/, measure: 'throughput', unit: 'm³/h' },
   { re: /_air_flow_m3_h$/, measure: 'throughput', unit: 'm³/h' },
@@ -169,12 +191,12 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
     // contract passes (or the reconcile re-derivation) never mints a phantom "Building
     // Footprint" principal from the area suffix.
     if (/^building_(footprint|gross_floor_area|wall_area|height)_/.test(key)) continue
-    let matched: { phrase: string; measure: Measure; perEach: boolean } | null = null
+    let matched: { phrase: string; measure: Measure; perEach: boolean; volRole?: number } | null = null
     for (const rule of SUFFIX_RULES) {
       if (rule.re.test(key)) {
         // Strip the "computed" twin token so a recomputed alias folds into the real unit's
         // group (one logical unit, one synthesised word) — see stripComputedToken.
-        matched = { phrase: stripComputedToken(key.replace(rule.re, '')), measure: rule.measure, perEach: !!rule.each }
+        matched = { phrase: stripComputedToken(key.replace(rule.re, '')), measure: rule.measure, perEach: !!rule.each, volRole: rule.volRole }
         break
       }
     }
@@ -188,12 +210,23 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
       byPhrase.set(id, g)
     }
     switch (matched.measure) {
-      case 'volume':
-        if (g.volume === undefined || (matched.perEach && !g.volumeIsEach)) {
+      case 'volume': {
+        // Pick the vessel's CONTAINMENT volume over its internal FILL when a device declares
+        // both (tank 153 wins over media 92), and a per-EACH key over a lumped one. Precedence:
+        // (1) higher volumeRole — containment(2) > neutral(1) > fill(0); (2) on a tie, a per-each
+        // value over a lumped one. First value seen when neither key carries a role/each signal.
+        const role = matched.volRole ?? 1
+        const curRole = g.volumeRole ?? (g.volume === undefined ? -1 : 1)
+        const take = g.volume === undefined
+          || role > curRole
+          || (role === curRole && matched.perEach && !g.volumeIsEach)
+        if (take) {
           g.volume = value
           g.volumeIsEach = matched.perEach
+          g.volumeRole = role
         }
         break
+      }
       case 'area': g.area = Math.max(g.area ?? 0, value); break
       case 'count': g.count = Math.max(g.count ?? 0, value); break
       case 'power': g.power = Math.max(g.power ?? 0, value); break
@@ -228,7 +261,56 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
       }
     }
   }
-  return [...byPhrase.values()]
+  // ── PER-UNIT FLOW ON A COUNTED FLOW-MACHINE (universal, Tristan 2026-06-19) ──────
+  // A counted PUMP / FILTER / DEGASSER is sized from its POWER (kW) so its word shows only kW —
+  // the reader cannot see its per-unit FLOW, and the physics critic mis-reads the only visible
+  // recirc flow (a per-tank inlet valve at loop÷tanks) as "the pumps deliver X". Surface the
+  // per-unit flow ON the machine = (the plant loop flow) ÷ (its own count), so the recirc pump
+  // unambiguously reads "1,670 m³/h each" beside its 97 kW. Only a flow-handling machine
+  // (pump/filter/screen/degasser/separator by noun) with a count ≥2 and NO own throughput key
+  // gets it; a heater/fan/compressor never does. Deterministic, no class table.
+  const loopFlow = plantTotals.length > 0 ? Math.max(...plantTotals) : 0
+  if (loopFlow > 0) {
+    const FLOW_MACHINE = /pump|filter|screen|degass|separator|clarifier|microscreen|strainer/i
+    for (const g of byPhrase.values()) {
+      if (g.throughput !== undefined) continue
+      if ((g.count ?? 1) < 2) continue
+      if (g.power === undefined && g.area === undefined) continue
+      if (!FLOW_MACHINE.test(g.phrase)) continue
+      g.perUnitFlow = loopFlow / Math.round(g.count!)
+    }
+  }
+  // ── REDUNDANT-SHELL SUB-ASPECT SUPPRESSION (universal, Tristan 2026-06-19) ─────────
+  // A group whose ONLY physical extent is a VOLUME and whose stems STRICTLY CONTAIN an existing
+  // device group that already has its OWN duty (throughput/power) is a REDUNDANT NAME for that
+  // device's shell, not a second machine: `degasser_column_volume_m3`(⊃ the `degasser` group
+  // sized from its water flow) mints a phantom "Degasser Column" beside the real "Degasser".
+  // Mark it a sub-aspect so it does not synthesise a duplicate vessel. SCOPE IS DELIBERATELY
+  // NARROW — a distinct sub-MACHINE with its OWN duty (`drum_filter_backwash` pump at 12 m³/h,
+  // `drum_filter_screen`) is NOT folded: it is real separate equipment (a panel that
+  // double-counts those at the parent's load is a panel load-attribution issue, fixed there, NOT
+  // by deleting the part — the synonym/dedup harness invariant requires they survive).
+  // Deterministic, no class table; a genuinely distinct vessel shares no superset relation.
+  const all = [...byPhrase.values()]
+  const parentHasOwnDuty = (p: EquipGroup): boolean =>
+    ((p.throughput !== undefined && p.throughput >= 10) || (p.power !== undefined && p.power >= 15))
+    && phraseLooksLikeDevice(p.phrase)
+  for (const g of all) {
+    // Only a VOLUME-ONLY superset is a redundant shell name (never a sub-machine with a duty).
+    const gVolumeOnly = g.volume !== undefined
+      && g.throughput === undefined && g.power === undefined && g.area === undefined
+      && g.rate === undefined && g.current === undefined && g.duty === undefined && g.mass === undefined
+    if (!gVolumeOnly) continue
+    for (const parent of all) {
+      if (parent === g) continue
+      if (parent.stems.length === 0 || g.stems.length <= parent.stems.length) continue
+      if (parent.stems.every((s) => g.stems.includes(s)) && parentHasOwnDuty(parent)) {
+        g.subAspect = true
+        break
+      }
+    }
+  }
+  return all
 }
 
 // ── dimension synthesis (Blender- + renderer-parseable strings) ─────────────
@@ -315,6 +397,11 @@ function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
   else if (g.duty !== undefined) add.push(mod('rating_primary', `${Math.round(g.duty)}`, 'kW'))
   else if (g.rate !== undefined) add.push(mod('rating_primary', `${Math.round(g.rate)}`, g.rateUnit || 'kg/h'))
   else if (g.current !== undefined) add.push(mod('rating_primary', `${Math.round(g.current)}`, 'A'))
+  // Per-unit FLOW as a secondary rating on a counted flow-machine (the recirc pump's 1,670 m³/h
+  // beside its 97 kW) — so the machine itself states its duty, not only the inlet valve.
+  if (g.perUnitFlow !== undefined && g.throughput === undefined) {
+    add.push(mod('rating_secondary', `${Math.round(g.perUnitFlow)}`, 'm³/h'))
+  }
   return add
 }
 
@@ -344,6 +431,8 @@ function phraseLooksLikeDevice(phrase: string): boolean {
 // device power whose phrase actually names a device. A load/duty/rate/mass/current,
 // or a system flow with a process-noun phrase, is NOT equipment.
 function isSynthesisable(g: EquipGroup): boolean {
+  // A sub-aspect of a larger principal (degasser_column ⊂ a degasser) is not a second machine.
+  if (g.subAspect) return false
   if (g.volume !== undefined && g.volume >= 1) return true
   if (g.area !== undefined && g.area >= 2) return true
   if ((g.throughput !== undefined && g.throughput >= 10) || (g.power !== undefined && g.power >= 15)) {
@@ -1153,6 +1242,104 @@ function isProcessSystem(w: WordLike): boolean {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// MAIN-INCOMER BREAKER SIZING (universal, Tristan 2026-06-19).
+//
+// THE WALL it removes (RAS physics_fidelity=2, verified out/ras-inc3): the generic skeleton's
+// power_distribution floor emits a bare "Main Breaker" word with NO rating; Phase-2 then PINS a
+// rating by reading whatever current is nearest in the contract — on RAS it grabbed the
+// transformer PRIMARY current (120.72 A, the 11 kV HV side) and stamped 121 A onto the LV main
+// breaker of a ~1.7 MW plant (the physics critic: "undersized by 25×, will trip instantly").
+//
+// THE RULE: the main incomer / service breaker is sized from the CONNECTED ELECTRICAL LOAD, not
+// from a stray current. I_main = P_kW·1000 / (√3 · V_line · PF) · margin. Universal — ANY class
+// that declares a connected electrical load gets a correctly-sized incomer; a product with no
+// connected-load quantity (a passive part, a vehicle on its own battery) is a strict no-op.
+// V_line is taken from the LV side: the transformer SECONDARY voltage when known, else the
+// standard 400 V 3-phase LV. The breaker FRAME is the next standard ACB/MCCB rating ≥ I_main.
+// PF 0.9, margin 1.25 (matches the standby-genset + transformer-resize convention in this file).
+
+const STD_BREAKER_FRAME_A = [
+  16, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 320, 400, 500, 630, 800,
+  1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6300, 8000,
+]
+function nextBreakerFrameA(iReq: number): number {
+  for (const f of STD_BREAKER_FRAME_A) if (f >= iReq - 1e-9) return f
+  return Math.ceil(iReq / 1000) * 1000 // above the ladder, round up to the next 1 kA
+}
+// Words that ARE the main service incomer (universal naming; never a sub-circuit breaker, a
+// branch MCB, a DC breaker, or a motor protector — those are sized to their own circuit, not
+// the plant incomer). Keyed on the incomer NOUN, no class table.
+const MAIN_INCOMER_RE = /\b(main(\s|_)?(breaker|incomer|switch|acb|isolator|disconnect|switchboard|panel|distribution\s?board|lv\s?panel)|incoming(\s|_)?(breaker|supply|feeder|acb)|service(\s|_)?(entrance|breaker)|main(\s|_)?lv|incomer)\b/i
+const NON_INCOMER_RE = /\b(sub|branch|final|feeder\s?to|motor|mcb|rcbo|fuse|surge|contactor|busbar|terminal|dc\b|battery|pv|string|outgoing)\b/i
+
+function isMainIncomerWord(w: WordLike): boolean {
+  const name = `${w.name_human ?? ''} ${w.content_character?.name_human ?? ''} ${w.content_character?.character_id ?? ''} ${w.id ?? ''}`
+  if (!MAIN_INCOMER_RE.test(name)) return false
+  if (NON_INCOMER_RE.test(name)) return false
+  return true
+}
+
+/** Universal: size the MAIN service incomer breaker from the connected electrical load and
+ *  stamp its frame rating onto every main-incomer word; write `main_incomer_breaker_a` +
+ *  `main_incomer_breaker_frame_a` back to the contract quantities (the BoM / single-line /
+ *  panel / drawing_gates read it). Returns the number of words stamped. Strict no-op when the
+ *  contract declares no connected load OR there is no main-incomer word to stamp. */
+function sizeMainIncomer(
+  modules: ModuleLike[],
+  quantities: Record<string, number>,
+  contract?: ContractInProgress,
+): number {
+  // The LV connected (coincident running) load the incomer must carry: the contract's
+  // connected_electrical_load_kw. Fall back to the as-routed supply demand only when the
+  // connected load is not declared (the supply demand also carries distribution parasitics, so
+  // it is NOT the right incomer basis when the running connected load is known — the breaker
+  // protects the load, the transformer covers the demand).
+  const connectedKw = pickQ(quantities, /^connected_electrical_load_kw$/)
+    ?? pickQ(quantities, /^total_supply_demand_kw$/)
+    ?? 0
+  if (!(connectedKw > 0)) return 0
+  // LV line voltage: the transformer secondary when known (kVA ÷ √3·secondary_A gives V), else
+  // the standard 400 V 3-phase. We read an explicit secondary-current pair when present.
+  const txKva = pickQ(quantities, /^(main_)?transformer_(rating_)?kva$/) ?? pickQ(quantities, /transformer.*kva/)
+  const txSecA = pickQ(quantities, /transformer_secondary_current_a/)
+  let vLine = 400
+  if (txKva && txSecA && txSecA > 0) {
+    const v = (txKva * 1000) / (Math.sqrt(3) * txSecA) // V_line = kVA·1000 / (√3·I_secondary)
+    if (Number.isFinite(v) && v >= 200 && v <= 1000) vLine = Math.round(v)
+  }
+  const PF = 0.9
+  const MARGIN = 1.25
+  const iReq = (connectedKw * 1000) / (Math.sqrt(3) * vLine * PF) * MARGIN
+  const frameA = nextBreakerFrameA(iReq)
+
+  // Stamp the frame onto every main-incomer word (overwrite a mispinned rating). Mark it
+  // _synthesized so the post-Phase-2 reconcile + cost characteriser treat it as engine-derived.
+  let stamped = 0
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    if (!isMainIncomerWord(w)) continue
+    if (isSubcomponent(w)) continue
+    mergeMods(w, [
+      mod('rating_primary', String(frameA), 'A'),
+      mod('dimension', `${vLine} V 3-phase LV incomer · ${frameA} A ACB frame (sized to ${Math.round(connectedKw)} kW connected load, PF ${PF}, ${Math.round((MARGIN - 1) * 100)}% margin)`),
+    ])
+    ;(w as { _synthesized?: boolean })._synthesized = true
+    stamped += 1
+  }
+
+  // Write the sizing back to the contract quantities so the BoM / single-line / panel /
+  // drawing_gates load-reconcile all read ONE authoritative incomer rating.
+  quantities['main_incomer_breaker_a'] = Math.round(iReq)
+  quantities['main_incomer_breaker_frame_a'] = frameA
+  if (contract) {
+    const cq = ((contract as { quantities?: Record<string, unknown> }).quantities ??= {}) as Record<string, unknown>
+    const basis = `main incomer sized from the connected electrical load ${Math.round(connectedKw)} kW: I = P·1000/(√3·${vLine}·${PF})·${MARGIN} = ${Math.round(iReq)} A → next standard ${frameA} A ACB frame`
+    cq['main_incomer_breaker_a'] = { value: Math.round(iReq), unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis }
+    cq['main_incomer_breaker_frame_a'] = { value: frameA, unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis }
+  }
+  return stamped
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // PROCESS-SUPPORT SYSTEMS SYNTHESIS (Tristan #143).
 //
 // The plant systems that handle the CONSUMABLES + WASTE the process produces — each absent
@@ -1695,6 +1882,7 @@ export interface UniversalSizingResult {
   utilities: number
   processSystems: number
   buildingStructure: number
+  mainIncomer: number
   serviceFamilies: number
   groups: number
   matchedPhrases: string[]
@@ -2026,7 +2214,7 @@ function forceCanonIdentity(w: WordLike, canon: CanonEquip): boolean {
 
   // Replace the deterministic spec kinds (quantity / dimension / capacity / rating_primary)
   // with the contract truth at their existing positions; keep everything else verbatim.
-  const SPEC = new Set(['quantity', 'dimension', 'capacity', 'rating_primary'])
+  const SPEC = new Set(['quantity', 'dimension', 'capacity', 'rating_primary', 'rating_secondary'])
   const truth = canonMods(canon.group)
   const existing = Array.isArray(w.modifier_characters) ? w.modifier_characters : []
   const rebuilt: ModifierCharacter[] = []
@@ -2199,7 +2387,10 @@ export function reconcilePrincipalEquipment(
         // buildable" (the genset, LOX, feed, sludge, instrumentation, and the BUILDING ITSELF
         // never reached the costed BoM). Leave them in place; the reconcile only governs the
         // principal-equipment SET. (The building take-off carries `_structure`.)
-        if (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w) || isBuildingStructure(w)) continue
+        // The main-incomer breaker is contract-SIZED (sizeMainIncomer) but is NOT a synthesisable
+        // principal GROUP — it claims no canon, so the principal-set logic would drop it as
+        // "invented". Skip it exactly like the instrument / utility families it sits beside.
+        if (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w) || isBuildingStructure(w) || isMainIncomerWord(w)) continue
         const pick = canonClaimedBy(w)
         if (pick) byCanon.get(pick.id)!.push({ word: w, sm })
         else unclaimed.push({ word: w, sm })
@@ -2393,6 +2584,15 @@ export function reconcilePrincipalEquipment(
   // persists the corrected footprint to `contract.quantities`. Universal — no-op for an
   // unhoused product (negligible footprint). Reuses the number-map built at the top.
   res.buildingResynthesised = synthesizeBuildingStructure(modules, quantities, contract)
+
+  // RE-ASSERT THE MAIN-INCOMER BREAKER against the contract connected load (Tristan 2026-06-19).
+  // The bare "Main Breaker" skeleton word is NOT a synthesisable contract GROUP (no `_volume`/
+  // `_power` driver), so the principal-set re-assert above never touches it — but Phase-2 may
+  // have mispinned its rating (the 121 A on a 1.7 MW RAS). This idempotent pass re-stamps the
+  // contract-derived frame onto every main-incomer word so the shipped breaker matches the load.
+  // Universal — strict no-op for a class with no connected-load quantity. (No new res field —
+  // the count is logged at emit time; here it is a stability re-assert.)
+  sizeMainIncomer(modules, quantities, contract)
 
   // RE-STAMP the typed service descriptors against the FINAL tree (Phase 0). This pass
   // runs AFTER the emit-time annotateServiceFamilies (in applyUniversalContractSizing),
@@ -2596,6 +2796,14 @@ export function applyUniversalContractSizing(
   // so the derived footprint persists to `contract.quantities` (GA + heat-loss read it). ──
   const buildingStructure = (opts.instrument ?? true) ? synthesizeBuildingStructure(modules, quantities, contract) : 0
 
+  // ── C8. MAIN-INCOMER BREAKER: size the service incomer from the connected electrical load
+  // and stamp its frame onto the skeleton's bare "Main Breaker" word (which Phase-2 otherwise
+  // mispins — RAS stamped 121 A on a 1.7 MW plant by grabbing the transformer PRIMARY current).
+  // Writes `main_incomer_breaker_a/_frame_a` back to the contract so the single-line + panel +
+  // drawing_gates load-reconcile read ONE authoritative incomer. No-op for a class with no
+  // connected-load quantity. Runs after the building take-off (the connected load is final). ──
+  const mainIncomer = (opts.instrument ?? true) ? sizeMainIncomer(modules, quantities, contract) : 0
+
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
   const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules) : 0
 
@@ -2617,6 +2825,7 @@ export function applyUniversalContractSizing(
     utilities,
     processSystems,
     buildingStructure,
+    mainIncomer,
     serviceFamilies,
     groups: groups.length,
     matchedPhrases: [...matched],

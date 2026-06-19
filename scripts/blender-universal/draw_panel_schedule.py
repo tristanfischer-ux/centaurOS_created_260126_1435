@@ -755,6 +755,14 @@ def _panel_type_kw(name: str, state: dict) -> Optional[float]:
     return kw if kw > 0 else None
 
 
+# Generic head-noun tokens shared by many loads — stripped before any token-set match so two
+# genuinely-distinct machines never collide on a shared word (pump/tank/unit/system…). Module-
+# level so both the ledger-kW resolver and the panel coincidence parent-subsumed check use it.
+_GENERIC_TOK = {"supply", "system", "demand", "total", "connected", "plant", "site",
+                "load", "unit", "process", "main", "aux", "auxiliary", "electrical",
+                "power", "design", "rated", "the", "and", "for"}
+
+
 def _panel_resolve_ledger_kw(name: str, state: dict) -> Optional[float]:
     """Resolve ONE circuit's connected load [kW] from the LEDGER ONLY: the equipment's own
     published electrical kW in requirementsBom (shaft-preferred for motors), else a matching
@@ -776,9 +784,6 @@ def _panel_resolve_ledger_kw(name: str, state: dict) -> Optional[float]:
         if isinstance(qs, dict) and qs:
             q = qs
             break
-    _GENERIC_TOK = {"supply", "system", "demand", "total", "connected", "plant", "site",
-                    "load", "unit", "process", "main", "aux", "auxiliary", "electrical",
-                    "power", "design", "rated", "the", "and", "for"}
     _AGG_KEY = re.compile(r"total_supply_demand|connected_electrical_load|"
                           r"total_(?:installed|connected)|plant_(?:load|demand)|"
                           r"site_(?:load|demand)|peak_demand", re.I)
@@ -1274,6 +1279,14 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
     # Identical-equipment de-duplication set: a signature per circuit (ledger spec tail +
     # per-way kW + ways) so the SAME physical equipment emitted under two names is counted once.
     seen_equip: set = set()
+    # Head-noun token-sets of the coincident PRINCIPAL machines already counted, so a SUB-COMPONENT
+    # circuit whose tokens STRICTLY SUPERSET a counted principal (a "Drum Filter Backwash" / "Drum
+    # Filter Screen" of an already-counted "Drum Filter") is SHOWN (its breaker carries it) but its
+    # kW is NOT added to the RUNNING connected-load total — the parent already carries it. This is
+    # the panel analogue of the contract's redundant-shell suppression, and it reconciles the
+    # bottom-up running total to the contract connected_electrical_load_kw (the engine's
+    # coincident running figure). Universal — keyed on the head-noun superset relation, no class.
+    counted_toks: list = []
     wn = 0
     for key in order:
         grp = groups[key]
@@ -1359,17 +1372,38 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
         is_dup = (sig is not None and sig in seen_equip)
         if sig is not None and not is_dup:
             seen_equip.add(sig)
+        # PARENT-SUBSUMED SUB-COMPONENT: a circuit whose head-noun tokens STRICTLY SUPERSET an
+        # already-counted principal (drum-filter-backwash/screen ⊃ drum filter) is a sub-system of
+        # that machine — its load is part of the parent's connected load already counted. Shown
+        # (the breaker carries it) but excluded from the RUNNING total so the panel reconciles to
+        # the contract connected_electrical_load_kw. Only real, ledger-priced equipment is judged
+        # (a tiny aux/instrument is never subsumed); a generic shared head-noun (pump/tank/unit) is
+        # stripped so two genuinely-distinct machines never collide.
+        my_toks = (set(_norm_load_name(base).split()) - _GENERIC_TOK)
+        is_sub = False
+        if kw and kw > _AUX_CIRCUIT_KW and len(my_toks) >= 2:
+            for ptoks in counted_toks:
+                if ptoks and ptoks < my_toks:  # parent's tokens are a STRICT subset of mine
+                    is_sub = True
+                    break
         # A DUPLICATE is the same physical equipment emitted twice — not really installed a second
         # time — so neither its kW NOR its current is summed in the board totals (the row is still
         # SHOWN with its own figures, flagged as a duplicate). A STANDBY load IS installed (the
         # bus + breaker carry it on a fault) — its current stays in Σ-current; only its kW is left
-        # out of the RUNNING connected-load total.
-        coincident = not (standby or is_dup)
+        # out of the RUNNING connected-load total. A PARENT-SUBSUMED sub-component (is_sub) is also
+        # shown but its kW is in the parent's already-counted load.
+        coincident = not (standby or is_dup or is_sub)
+        # Register a COINCIDENT principal's head-noun tokens so a later sub-component circuit can be
+        # recognised as subsumed by it (only the running, non-subsumed machines are parents).
+        if coincident and len(my_toks) >= 1 and kw and kw > _AUX_CIRCUIT_KW:
+            counted_toks.append(my_toks)
         cnote = note
         if standby:
             cnote = (cnote + "; " if cnote else "") + "standby — not in running total"
         elif is_dup:
             cnote = (cnote + "; " if cnote else "") + "duplicate of an earlier circuit — counted once"
+        elif is_sub:
+            cnote = (cnote + "; " if cnote else "") + "sub-component of a counted machine — load in parent"
 
         panel.circuits.append(Circuit(
             ref=ref, description=desc, ways=ways,
@@ -2283,10 +2317,29 @@ def _selftest() -> int:
     chk("I13.motor_connected_is_shaft",
         _panel_req_bom_kw("Recirc Pump", st_np) == 94.0)
 
+    # I14 — a PARENT-SUBSUMED sub-component (its head-noun tokens STRICTLY SUPERSET a counted
+    # principal's) is excluded from the RUNNING total — its load is part of the parent's already
+    # counted. "Drum Filter Backwash"/"Drum Filter Screen" ⊃ "Drum Filter"; a distinct machine
+    # ("Recirc Pump") shares no superset relation with "Drum Filter". Generic words are stripped so
+    # two distinct machines never collide. This reconciles the panel running total to the contract
+    # connected_electrical_load_kw (the RAS 2,865→1,754 kW load_reconcile fix, 2026-06-19).
+    def _ntok(s):
+        return set(_norm_load_name(s).split()) - _GENERIC_TOK
+    drum = _ntok("Drum Filter")
+    chk("I14.subcomponent_supersets_parent", drum < _ntok("Drum Filter Backwash") and drum < _ntok("Drum Filter Screen"))
+    chk("I14.distinct_machine_not_subsumed", not (drum < _ntok("Recirc Pump")) and not (_ntok("Recirc Pump") < drum))
+    # the reconcile excludes a non-coincident (subsumed) circuit's kW but keeps its current.
+    pnl2 = Panel(board_id="b2", name="B2", voltage_v=400.0, phases=3)
+    pnl2.circuits = [
+        Circuit(ref="W1", description="Drum Filter", connected_kw=21.5, connected_kw_total=21.5, design_a=40.0, coincident=True),
+        Circuit(ref="W2", description="Drum Filter Backwash", connected_kw=21.5, connected_kw_total=21.5, design_a=40.0, coincident=False)]
+    rec2 = reconcile(pnl2)
+    chk("I14.subsumed_kw_excluded_from_running", abs(rec2["sum_kw"] - 21.5) < 0.01)
+
     if fails:
         print("[panel-sched] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[panel-sched] selftest OK (13 connected-load reconciliation invariants)")
+    print("[panel-sched] selftest OK (14 connected-load reconciliation invariants)")
     return 0
 
 

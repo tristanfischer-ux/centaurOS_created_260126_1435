@@ -1023,6 +1023,107 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => `filterRating=${filterRating} (want ~1670; ×8=${filterRating !== null ? filterRating * 8 : 'n/a'}) pumpRating=${pumpRating} (want 900 unchanged)`,
   ))
 
+  // ── A1c. VESSEL CONTAINMENT volume wins over internal FILL + PER-UNIT FLOW on the pump
+  // (RAS physics_fidelity=2, 2026-06-19). When a vessel declares BOTH a tank/shell volume AND a
+  // media/working fill volume, the SYNTHESISED vessel must be the CONTAINMENT (the biofilter
+  // emitted 92 m³ = the MEDIA, implying a 100% MBBR fill; the tank is 153). And a counted
+  // flow-machine surfaces its PER-UNIT flow as a secondary rating so the recirc pump reads
+  // "1,670 m³/h each" beside its kW (not only on the inlet valve the critic mis-reads). Both via
+  // buildGroups; universal, no class table.
+  {
+    const vfContract: any = { quantities: {
+      biofilter_media_volume_m3: { value: 92, unit: 'm³' },   // FILL — must NOT win
+      biofilter_tank_volume_m3:  { value: 153, unit: 'm³' },  // CONTAINMENT — the vessel size
+      recirc_pump_power_kw: { value: 97, unit: 'kW' }, recirc_pump_count: { value: 8, unit: '' },
+      recirculation_flow_m3_h: { value: 13360, unit: 'm³/h' }, // the loop the per-pump flow derives from
+    } }
+    const vfMods: any = [
+      { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'mfp', words: [
+        // a pre-existing biofilter word carrying the WRONG (media) volume — must be re-asserted to 153
+        { id: 'biofilter_synth_word', name_human: 'Biofilter', content_character: { character_id: 'biofilter_synth', name_human: 'Biofilter' }, modifier_characters: [ { kind: 'quantity', value: '×1' }, { kind: 'capacity', value: '92', unit: 'm³' }, { kind: 'dimension', value: '4.9 m dia x 4.9 m' } ], _synthesized: true },
+      ] } ] },
+    ]
+    applyUniversalContractSizing(vfMods, vfContract, { synthesizeMissing: true, onlyUnsized: false, dedupeAndStrip: true, explode: false, instrument: false })
+    reconcilePrincipalEquipment(vfMods, vfContract)
+    const allVf = vfMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => sm.words || []))
+    const bio = allVf.find((w: any) => /biofilter/.test(String(w.id)) && w._synthesized && !String(w.id).includes('__'))
+    const bioCap = bio ? String((bio.modifier_characters || []).find((mc: any) => mc.kind === 'capacity')?.value ?? '') : ''
+    const pump = allVf.find((w: any) => /recirc_pump_synth/.test(String(w.id)))
+    const pumpFlow = pump ? Number((pump.modifier_characters || []).find((mc: any) => mc.kind === 'rating_secondary')?.value ?? NaN) : NaN
+    out.push(assertEq(
+      'UNIVERSAL.vessel_containment_volume_and_pump_per_unit_flow',
+      'a vessel that declares BOTH a tank/shell AND a media/working/fill volume synthesises to its CONTAINMENT (biofilter tank 153 m³, NOT the 92 m³ media that implies a 100% MBBR fill); and a counted flow-machine carries its PER-UNIT flow as a secondary rating (recirc pump 13,360 ÷ 8 = 1,670 m³/h each). Universal — buildGroups vessel-vs-fill precedence + per-unit-flow, no class table',
+      JSON.stringify({ bioCap, pumpFlow }),
+      (v) => { const o = JSON.parse(v as unknown as string); return o.bioCap === '153' && Math.abs(o.pumpFlow - 1670) <= 5 },
+      () => `biofilter capacity=${bioCap} (want 153, not the 92 media) · pump per-unit flow=${pumpFlow} (want ~1670)`,
+    ))
+  }
+
+  // ── A1d. MAIN-INCOMER BREAKER sized from the connected load, ≥ the load, NOT a stray current
+  // (RAS physics_fidelity=2, 2026-06-19). The bare "Main Breaker" skeleton word was Phase-2-pinned
+  // at 121 A (the 11 kV transformer PRIMARY current) on a ~1.7 MW LV plant. sizeMainIncomer must
+  // size it from connected_electrical_load_kw: I = P·1000/(√3·V·PF)·1.25, next standard ACB frame,
+  // and the frame must comfortably exceed the load's base current. NO-OP for a class with no
+  // connected-load quantity. Universal.
+  {
+    const brkContract: any = { quantities: {
+      connected_electrical_load_kw: { value: 1719, unit: 'kW' },
+      main_transformer_kva: { value: 2300, unit: 'kVA' }, main_transformer_secondary_current_a: { value: 3319.76, unit: 'A' },
+    } }
+    const brkMods: any = [ { module: 'power_distribution', sub_modules: [{ id: 'pd', words: [
+      { id: 'main_breaker_word', name_human: 'Main Breaker', content_character: { character_id: 'main_breaker', name_human: 'Main Breaker' }, modifier_characters: [ { kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '121', unit: 'A' } ] }, // Phase-2 mispin 121 A
+      { id: 'distribution_busbar_word', name_human: 'Distribution Busbar', content_character: { character_id: 'distribution_busbar', name_human: 'Distribution Busbar' }, modifier_characters: [ { kind: 'quantity', value: '×1' } ] },
+    ] } ] } ]
+    applyUniversalContractSizing(brkMods, brkContract, { synthesizeMissing: false, onlyUnsized: false, dedupeAndStrip: false, explode: false, instrument: true })
+    reconcilePrincipalEquipment(brkMods, brkContract)
+    const allBrk = brkMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => sm.words || []))
+    const brk = allBrk.find((w: any) => /breaker|incomer/i.test(String(w.name_human)))
+    const brkA = brk ? Number((brk.modifier_characters || []).find((mc: any) => mc.kind === 'rating_primary')?.value ?? NaN) : NaN
+    const contractA = Number(brkContract.quantities.main_incomer_breaker_a?.value ?? NaN)
+    const bus = allBrk.find((w: any) => /busbar/i.test(String(w.name_human)))
+    const busHasRating = !!(bus && (bus.modifier_characters || []).some((mc: any) => mc.kind === 'rating_primary'))
+    // I_base = 1719000/(√3·400·0.9) ≈ 2757 A; ×1.25 ≈ 3446 A → 4000 A frame. The breaker must
+    // comfortably exceed the load's BASE current (2757 A) and the old mispin (121 A).
+    out.push(assertEq(
+      'UNIVERSAL.main_incomer_breaker_sized_from_connected_load',
+      'the main-incomer breaker is sized from connected_electrical_load_kw (I = P·1000/(√3·V·PF)·1.25 → next ACB frame) so a 1,719 kW plant gets a ~4,000 A frame (≥ its ~2,757 A base current), NOT the 121 A transformer-primary mispin; the breaker word survives the reconcile; the busbar (not the incomer) is untouched. Universal — sizeMainIncomer, no class table',
+      JSON.stringify({ brkA, contractA, busHasRating }),
+      (v) => { const o = JSON.parse(v as unknown as string); return o.brkA >= 2757 && o.brkA <= 6300 && o.contractA >= 3000 && o.contractA <= 4000 && o.busHasRating === false },
+      () => `breaker frame=${brkA} A (want ≥2757, a 4000 frame; was the 121 mispin) · contract main_incomer_breaker_a=${contractA} (want ~3446) · busbar stamped=${busHasRating} (want false)`,
+    ))
+  }
+
+  // ── A1e. REDUNDANT-SHELL sub-aspect is NOT a second principal, but a distinct sub-MACHINE IS
+  // (RAS load_reconcile, 2026-06-19). A volume-only superset of a device that already has its own
+  // duty (degasser_column_volume_m3 ⊃ the degasser sized from its water flow) must NOT mint a
+  // phantom "Degasser Column" — but a distinct sub-machine with its OWN duty (drum_filter_backwash
+  // at 12 m³/h, drum_filter_screen with an area) MUST survive as real equipment (the synonym/dedup
+  // invariant). Universal — buildGroups redundant-shell suppression, narrowly scoped to volume-only.
+  {
+    const saContract: any = { quantities: {
+      degasser_water_flow_m3_h: { value: 1670, unit: 'm³/h' }, degasser_count: { value: 8, unit: '' },
+      computed_degasser_column_volume_m3: { value: 24.7, unit: 'm³' }, // redundant shell name → MUST be suppressed
+      drum_filter_throughput_m3_h: { value: 1670, unit: 'm³/h' }, drum_filter_count: { value: 8, unit: '' },
+      drum_filter_backwash_flow_m3_h: { value: 12, unit: 'm³/h' },     // distinct sub-machine → MUST survive
+      drum_filter_screen_area_m2: { value: 49.7, unit: 'm²' },         // distinct sub-machine → MUST survive
+    } }
+    const saMods: any = [ { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'mfp', words: [] }] } ]
+    applyUniversalContractSizing(saMods, saContract, { synthesizeMissing: true, onlyUnsized: false, dedupeAndStrip: true, explode: false, instrument: false })
+    reconcilePrincipalEquipment(saMods, saContract)
+    const namesSa = saMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._synthesized && !w._subcomponent).map((w: any) => String(w.name_human))))
+    const hasDegasser = namesSa.some((n: string) => /^degasser$/i.test(n))
+    const hasDegasserColumn = namesSa.some((n: string) => /degasser column/i.test(n))
+    const hasBackwash = namesSa.some((n: string) => /backwash/i.test(n))
+    const hasScreen = namesSa.some((n: string) => /screen/i.test(n))
+    out.push(assertEq(
+      'UNIVERSAL.redundant_shell_suppressed_distinct_submachine_survives',
+      'a VOLUME-ONLY redundant shell name (degasser_column_volume_m3, a superset of the degasser already sized from its water flow) does NOT synthesise a phantom "Degasser Column" beside the real "Degasser" — while a distinct sub-MACHINE with its OWN duty (drum_filter_backwash 12 m³/h, drum_filter_screen area) DOES survive as real equipment. Universal — buildGroups redundant-shell suppression (volume-only), no class table; protects the panel load_reconcile without deleting real parts',
+      JSON.stringify({ hasDegasser, hasDegasserColumn, hasBackwash, hasScreen }),
+      (v) => { const o = JSON.parse(v as unknown as string); return o.hasDegasser && !o.hasDegasserColumn && o.hasBackwash && o.hasScreen },
+      () => `degasser=${hasDegasser}(want T) degasserColumn=${hasDegasserColumn}(want F) backwash=${hasBackwash}(want T) screen=${hasScreen}(want T)`,
+    ))
+  }
+
   return out
 }
 
