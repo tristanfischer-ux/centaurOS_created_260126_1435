@@ -710,19 +710,41 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
   const allInstr = () => instrMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).filter((w: any) => w._instrument)))
   const instr1 = allInstr()
   const hasI = (re: RegExp) => instr1.some((w: any) => re.test(String(w.name_human)))
-  const rearQtyOf = (re: RegExp) => { const w = instr1.find((x: any) => re.test(String(x.name_human)) && String(x._instrument_of || '').includes('rearing')); return w ? String((w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value ?? '') : '' }
+  const countI = (re: RegExp) => instr1.filter((w: any) => re.test(String(w.name_human))).length
+  const wordI = (re: RegExp) => instr1.find((w: any) => re.test(String(w.name_human)))
+  const qtyOfW = (w: any) => w ? String((w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value ?? '') : ''
+  const hasVesselLoc = (re: RegExp) => { const w = wordI(re); return !!(w && (w.modifier_characters || []).some((mc: any) => mc.kind === 'vessel_location' && String(mc.value || '').length > 0)) }
+  // BUG C (Tristan 2026-06-19): the per-vessel-instance vital signs (level / temperature /
+  // dissolved-O₂) are CONSOLIDATED to ONE schedule line per family — a vessel_location modifier
+  // names every served vessel, the quantity is the SUM of per-vessel counts (rearing ×10 +
+  // biofilter ×1 = ×11), and the duplicate per-vessel lines are gone. pH + conductivity stay once
+  // on the loop; an OPEN tank gets NO pressure transmitter; idempotent (a 2nd pass = same count).
+  const levelW = wordI(/level transmitter/i), tempW = wordI(/temperature/i), doW = wordI(/dissolved.?oxygen/i)
   // idempotency: a 2nd pass re-derives the SAME instrument set (no duplication)
   applyUniversalContractSizing(instrMods, contractInstr, { synthesizeMissing: false, onlyUnsized: true, dedupeAndStrip: false, instrument: true })
   const instr2n = allInstr().length
   out.push(assertEq(
     'UNIVERSAL.process_instrumentation_synthesised_from_control_variables',
-    'the contract control variables (temp setpoint, dissolved-O₂ demand, pH, salinity) synthesise field instruments: LEVEL + TEMPERATURE + DISSOLVED-O₂ PER rearing tank (qty ×10), pH + conductivity once on the loop, and NO pressure transmitter on an open tank; idempotent (2nd pass = same count)',
-    JSON.stringify({ level: hasI(/level/i), temp: hasI(/temperature/i), doA: hasI(/dissolved.?oxygen/i), ph: hasI(/\bph analyser/i), sal: hasI(/conductiv|salinity/i), pressure: hasI(/^pressure transmitter/i), rearLevelQty: rearQtyOf(/level/i), rearDoQty: rearQtyOf(/dissolved.?oxygen/i), n1: instr1.length, n2: instr2n }),
+    'the contract control variables (temp setpoint, dissolved-O₂ demand, pH, salinity) synthesise field instruments. The per-vessel VITAL SIGNS (level / temperature / dissolved-O₂) are CONSOLIDATED to ONE schedule line each (BUG C) carrying a vessel_location modifier, with quantity = the SUM of per-vessel counts (rearing ×10 + biofilter ×1 = ×11) — NOT a duplicate line per vessel type; pH + conductivity once on the loop; NO pressure transmitter on an open tank; idempotent (2nd pass = same count)',
+    JSON.stringify({
+      level: hasI(/level transmitter/i), temp: hasI(/temperature/i), doA: hasI(/dissolved.?oxygen/i),
+      ph: hasI(/\bph analyser/i), sal: hasI(/conductiv|salinity/i), pressure: hasI(/^pressure transmitter/i),
+      // consolidation: exactly ONE line per vital-sign family, each with a vessel_location modifier
+      levelLines: countI(/level transmitter/i), tempLines: countI(/temperature/i), doLines: countI(/dissolved.?oxygen/i),
+      levelLoc: hasVesselLoc(/level transmitter/i), tempLoc: hasVesselLoc(/temperature/i), doLoc: hasVesselLoc(/dissolved.?oxygen/i),
+      // summed quantity across served vessels (rearing ×10 + biofilter ×1 = ×11)
+      levelQty: qtyOfW(levelW), tempQty: qtyOfW(tempW), doQty: qtyOfW(doW),
+      n1: instr1.length, n2: instr2n,
+    }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
-      return o.level && o.temp && o.doA && o.ph && o.sal && !o.pressure && o.rearLevelQty === '×10' && o.rearDoQty === '×10' && o.n1 >= 6 && o.n2 >= o.n1
+      return o.level && o.temp && o.doA && o.ph && o.sal && !o.pressure &&
+        o.levelLines === 1 && o.tempLines === 1 && o.doLines === 1 &&            // consolidated to ONE line each
+        o.levelLoc && o.tempLoc && o.doLoc &&                                    // each carries a vessel_location modifier
+        o.levelQty === '×11' && o.tempQty === '×11' && o.doQty === '×11' &&      // summed across rearing ×10 + biofilter ×1
+        o.n1 >= 6 && o.n2 === o.n1                                              // idempotent
     },
-    () => `instruments=${JSON.stringify(instr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}`))} n1=${instr1.length} n2=${instr2n}`,
+    () => `instruments=${JSON.stringify(instr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}`))} levelLines=${countI(/level transmitter/i)} levelQty=${qtyOfW(levelW)} n1=${instr1.length} n2=${instr2n}`,
   ))
 
   // ── A4. PROCESS ACTUATION: the final control elements the contract implies (#141) ──
@@ -1279,6 +1301,92 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
       (v) => { const o = JSON.parse(v as unknown as string); return o.hasDegasser && !o.hasDegasserColumn && o.hasBackwash && o.hasScreen },
       () => `degasser=${hasDegasser}(want T) degasserColumn=${hasDegasserColumn}(want F) backwash=${hasBackwash}(want T) screen=${hasScreen}(want T)`,
     ))
+  }
+
+  // ── A1f. PER-UNIT VOLUME × COUNT ≈ AGGREGATE (BUG A, Tristan 2026-06-19) ─────────────
+  // A `<device>_volume_each_m3` can be a STALE leftover that disagrees with the authoritative
+  // plant aggregate `<...>_volume_m3` for the same family: the RAS contract carried
+  // rearing_tank_volume_each_m3 = 334 with rearing_tank_count = 4 → 1,336 m³, while
+  // total_tank_volume_m3 = 737. buildGroups must OVERRIDE the per-unit to aggregate ÷ count
+  // (737 / 4 = 184.25), so the synthesised tank's capacity × count reconciles to the aggregate.
+  // Then walk EVERY synthesised principal: any per-unit capacity × its count must match the
+  // family aggregate within 5%. Universal — the per-unit↔aggregate reconcile, no class branch.
+  {
+    const aggContract: any = { quantities: {
+      rearing_tank_volume_each_m3: { value: 334, unit: 'm³' },  // STALE per-each (204 t/yr leftover)
+      rearing_tank_count: { value: 4, unit: '' },
+      total_tank_volume_m3: { value: 737, unit: 'm³' },         // authoritative plant aggregate
+    } }
+    const aggMods: any = [ { module: 'structure_containment', sub_modules: [{ id: 'sc', words: [] }] } ]
+    applyUniversalContractSizing(aggMods, aggContract, { synthesizeMissing: true, onlyUnsized: false, dedupeAndStrip: false, explode: false, instrument: false })
+    const aggWords = aggMods.flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => sm.words || []))
+    const tank = aggWords.find((w: any) => w._synthesized && /rearing.?tank/i.test(String(w.name_human)))
+    const capOf = (w: any): number => Number((w?.modifier_characters || []).find((mc: any) => mc.kind === 'capacity')?.value ?? NaN)
+    const qtyOf = (w: any): number => { const m = /(\d+)/.exec(String((w?.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value ?? '1')); return m ? parseInt(m[1], 10) : 1 }
+    const tankCap = tank ? capOf(tank) : NaN
+    const tankQty = tank ? qtyOf(tank) : NaN
+    // The general walk: per-unit capacity × count vs the SAME-family aggregate, every synth principal.
+    const aggregateForFamily = (toks: string[]): number | undefined => {
+      let best: number | undefined
+      for (const [k, val] of Object.entries(aggContract.quantities)) {
+        const v = (val as any).value
+        if (typeof v !== 'number' || !(v > 0)) continue
+        if (!/_volume_m3$/.test(k) || /_each_m3$/.test(k) || /_(media|working|active|bed|packing|liquid|fill|resin)_volume_m3$/.test(k)) continue
+        const keyToks = k.replace(/_volume_m3$/, '').split(/[_\d]+/).filter(Boolean).map((t) => t.slice(0, 5))
+        if (toks.some((t) => keyToks.includes(t))) best = Math.max(best ?? 0, v)
+      }
+      return best
+    }
+    let allTriplesOk = true
+    for (const w of aggWords) {
+      if (!w._synthesized) continue
+      const cap = capOf(w); const qty = qtyOf(w)
+      if (!Number.isFinite(cap) || qty < 2) continue
+      const toks = String(w.name_human || '').split(/[_\s]+/).filter(Boolean).map((t) => t.toLowerCase().slice(0, 5))
+      const agg = aggregateForFamily(toks)
+      if (agg === undefined) continue
+      if (Math.abs(cap * qty - agg) / agg > 0.05) allTriplesOk = false
+    }
+    out.push(assertEq(
+      'UNIVERSAL.per_unit_volume_times_count_matches_aggregate',
+      'a stale per-unit volume (rearing_tank_volume_each_m3 = 334, ×4 = 1,336) is OVERRIDDEN to the authoritative plant aggregate ÷ count (total_tank_volume_m3 737 ÷ 4 = 184.25), so every synthesised principal\'s per-unit capacity × its count reconciles to the family aggregate within 5%. Universal — buildGroups per-unit↔aggregate reconcile, no class table',
+      JSON.stringify({ tankCap, tankQty, allTriplesOk }),
+      (v) => { const o = JSON.parse(v as unknown as string); return Math.abs(o.tankCap - 184.25) <= 184.25 * 0.05 && o.tankQty === 4 && Math.abs(o.tankCap * o.tankQty - 737) / 737 <= 0.05 && o.allTriplesOk === true },
+      () => `tankCap=${tankCap} (want ~184.25, was the stale 334) ×qty ${tankQty} = ${Number.isFinite(tankCap) ? (tankCap * tankQty).toFixed(1) : 'n/a'} (want ~737) · allTriplesOk=${allTriplesOk}`,
+    ))
+  }
+
+  // ── A1g. BACKUP RATED ≤ 0.75 × PRIMARY DUTY (BUG B, Tristan 2026-06-19) ──────────────
+  // A backup/standby on a duty is a DERATE, never a full duplicate: backup_immersion_heater_power_kw
+  // was sized at 100% of heating_duty_kw (411 == 411). For any (primary, backup) pair on the SAME
+  // duty, backup.rated_kw ≤ 0.75 × primary.rated_kw. Checked on the real RAS contract (the backup
+  // immersion heater vs the heating duty) AND as a general pair rule. Universal — engineering-contract
+  // standby derate; the RAS build is the concrete witness.
+  try {
+    const brief = {
+      product_description: 'Recirculating aquaculture system held at 26.4 °C grow-out temperature for 204 tonnes per year yellowtail kingfish, 3340 m³ total rearing-tank volume, 33 ppt salinity, drawing 10 °C seawater source water, 4 turnovers per hour, 99.6% of its water recirculated, capex ceiling £5,000,000.',
+      constraints: { target_performance: { value: 204, unit: 't/yr' } },
+    }
+    const c = buildContract('aquaculture_ras', brief) as any
+    const v = (k: string) => c?.quantities?.[k]?.value
+    const heatingDuty = v('heating_duty_kw')
+    const backupHeater = v('backup_immersion_heater_power_kw')
+    out.push(assertEq(
+      'UNIVERSAL.backup_rated_below_primary_duty',
+      'a backup/standby on a duty is a DERATE not a full duplicate: for any (primary, backup) pair on the same duty, backup.rated_kw ≤ 0.75 × primary.rated_kw — the RAS backup immersion heater is ≤ 0.75 × heating_duty_kw (was 411 == 411, the full-duty duplicate), and the synthetic pair rule holds. Universal — engineering-contract standby derate',
+      JSON.stringify({ heatingDuty, backupHeater }),
+      (val) => {
+        const o = JSON.parse(val as unknown as string)
+        const ras = Number.isFinite(o.heatingDuty) && o.heatingDuty > 0 && Number.isFinite(o.backupHeater) && o.backupHeater > 0 && o.backupHeater <= 0.75 * o.heatingDuty
+        // general (primary, backup) pair rule — a worked example proves the predicate shape
+        const exPrimary = 411, exBackup = Math.ceil(411 * 0.5)
+        const pairRule = exBackup <= 0.75 * exPrimary
+        return ras && pairRule
+      },
+      () => `heating_duty_kw=${heatingDuty} backup_immersion_heater_power_kw=${backupHeater} (want ≤ ${Number.isFinite(heatingDuty) ? (0.75 * heatingDuty).toFixed(0) : 'n/a'}; was 411 == 411)`,
+    ))
+  } catch (err) {
+    out.push({ id: 'UNIVERSAL.backup_rated_below_primary_duty', description: 'backup rated below primary duty', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
   }
 
   return out

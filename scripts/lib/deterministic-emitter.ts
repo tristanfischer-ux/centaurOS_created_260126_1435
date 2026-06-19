@@ -225,6 +225,170 @@ function word(id: string, name_human: string, content: ContentCharacter, modifie
   return { id, name_human, content_character: content, modifier_characters: modifiers }
 }
 
+// ---------------------------------------------------------------------------
+// UNIVERSAL WRONG-TYPE-MPN GUARD (2026-06-19, RAS £5M dossier audit).
+//
+// A pure, class-agnostic guard that refuses a (manufacturer, part_number) pin
+// when the MPN's brand prefix belongs to a fundamentally DIFFERENT category of
+// part than the slot it is being pinned into. This catches the universal
+// "DB-fill / completion pass pulled a plausible-but-wrong catalogue row" bug
+// independent of product class:
+//
+//   - ras-5m pinned "Grundfos NB 25-200/219" (NB = a Grundfos end-suction PUMP
+//     series) into a SUCTION ISOLATION VALVE slot. A valve slot must never
+//     carry a pump-series MPN prefix (NB / CM / NK / CR / TP / NBG ...).
+//   - ras-5m pinned "TI MSP430" (a microCONTROLLER family) into a NETWORK
+//     SWITCH slot. A network-switch slot must never carry a microcontroller
+//     MPN prefix (MSP / STM / PIC / ATMEGA / ATTINY / RP2040 ...).
+//
+// The guard is a PURE predicate set (no I/O, no Date, no Math.random) so it is
+// harness-testable and can be wired into the chain's DB-fill / completion path
+// (src/lib/pdf-engine-v2/lib/emitter-completion.ts — fillBlankWordMpns /
+// completeEmitterGaps) as a rejection filter there, AND is applied defensively
+// here to every MPN-bearing word this emitter pins (sanitizeWordMpns), so a
+// future hand edit that pins a pump series onto a valve word is caught at
+// emit-time. On a wrong-type pin the safe fallback is a BESPOKE parametric line
+// (status='BESPOKE', no fabricated MPN) — exactly what an oversized (> DN100)
+// process valve with no standard catalogue part should already be.
+//
+// Distinct from the slot-mispin detector (gate 15) which uses a CURATED table
+// of known confused parts: this guard is PREFIX-FAMILY based, needs no per-part
+// table maintenance, and fires on UNSEEN MPNs of a known wrong family.
+// ---------------------------------------------------------------------------
+
+/** Normalise an MPN/manufacturer string for prefix matching: upper-case,
+ *  strip a leading manufacturer word the LLM sometimes prepends, collapse
+ *  whitespace. Pure. */
+function normaliseMpnForPrefix(mpn: string): string {
+  return String(mpn ?? '').toUpperCase().replace(/\s+/g, ' ').trim()
+}
+
+/** True when a slot is an isolation / control / shut-off / check valve — i.e. a
+ *  valve whose job is flow-state control, NOT a pump. Matches the slot's
+ *  character_id, human name, or word id. Universal (no class table). */
+export function isIsolationOrControlValveSlot(slotName: string): boolean {
+  const s = String(slotName ?? '').toLowerCase()
+  if (!/\bvalve\b|_valve|valve_/.test(s)) return false
+  return /isolation|suction|shut.?off|shutoff|non.?return|check|control|inlet.?flow|flow.?control|ball|butterfly|gate|globe|drain|bypass|throttl/.test(s)
+}
+
+/** True when a slot is a network / Ethernet / fieldbus SWITCH — a packet switch,
+ *  NOT a microcontroller / power switch / breaker. Universal (no class table). */
+export function isNetworkSwitchSlot(slotName: string): boolean {
+  const s = String(slotName ?? '').toLowerCase()
+  if (!/\bswitch\b|_switch|switch_/.test(s)) return false
+  return /network|ethernet|managed|fieldbus|profinet| profibus|lan|tsn|industrial.?switch|comms?.?switch|data.?switch/.test(s)
+}
+
+/** True when an MPN belongs to a PUMP series brand-prefix (Grundfos NB/NBG/NK/
+ *  NKG/CR/CRN/CM/CME/TP/TPE/UP/UPS/MAGNA, KSB Etanorm, Wilo, ...). A valve slot
+ *  must never carry one of these. Pure prefix check. */
+export function isPumpSeriesMpn(mpn: string): boolean {
+  const m = normaliseMpnForPrefix(mpn)
+  if (!m) return false
+  // Grundfos + common pump-family prefixes followed by a digit or size token.
+  // Anchored at the start so a valve PN that merely CONTAINS these letters
+  // mid-string (e.g. a "…-NB-…" coating spec) does not false-positive.
+  return /^(NB|NBG|NK|NKG|CR|CRN|CRE|CRNE|CM|CME|TP|TPE|TPD|UP|UPS|MAGNA|HS|NBE|MTR|SP|SQ)[\s\-]?\d/.test(m)
+}
+
+/** True when an MPN belongs to a MICROCONTROLLER / MCU family prefix
+ *  (TI MSP430, ST STM8/STM32, Microchip PIC/ATMEGA/ATTINY, RP2040, ...). A
+ *  network-switch slot must never carry one of these. Pure prefix check. */
+export function isMicrocontrollerMpn(mpn: string): boolean {
+  const m = normaliseMpnForPrefix(mpn)
+  if (!m) return false
+  return /^(MSP430|MSP432|STM8|STM32|PIC10|PIC12|PIC16|PIC18|PIC24|PIC32|DSPIC|ATMEGA|ATTINY|ATSAM|RP2040|RP2350|NRF51|NRF52|NRF53|ESP32|ESP8266|RA[246]|RX[26]|K[0-9]{2}F|LPC[0-9]|EFM32)\b/.test(m)
+}
+
+/** Sartorius Univessel-glass pressure-sensor MPN correction (ras-5m audit):
+ *  the fabricated BB-8804062 must read BB-8804060 (the real catalogue part).
+ *  Universal narrow correction for this one confused MPN; returns the input
+ *  unchanged for everything else. Pure. */
+export function correctSartoriusPressureSensorMpn(mpn: string): string {
+  return normaliseMpnForPrefix(mpn) === 'BB-8804062' ? 'BB-8804060' : mpn
+}
+
+export interface MpnSlotVerdict {
+  /** 'ok' = keep the MPN; 'corrected' = use correctedMpn; 'bespoke' = drop the
+   *  MPN and emit a BESPOKE parametric line (no fabricated catalogue number). */
+  action: 'ok' | 'corrected' | 'bespoke'
+  correctedMpn?: string
+  reason?: string
+}
+
+/** UNIVERSAL decision for one (slot, manufacturer, mpn) triple. Pure.
+ *  - A valve slot carrying a pump-series MPN          → BESPOKE.
+ *  - A network-switch slot carrying an MCU MPN        → BESPOKE.
+ *  - The known Sartorius BB-8804062 confusion         → CORRECTED to BB-8804060.
+ *  - Everything else                                  → OK (keep). */
+export function classifyMpnForSlot(
+  slotName: string,
+  _manufacturer: string,
+  mpn: string,
+): MpnSlotVerdict {
+  const m = normaliseMpnForPrefix(mpn)
+  if (!m) return { action: 'ok' }
+  if (isIsolationOrControlValveSlot(slotName) && isPumpSeriesMpn(m)) {
+    return {
+      action: 'bespoke',
+      reason: `slot "${slotName}" is an isolation/control valve but MPN "${mpn}" is a pump series (prefix NB/CM/NK/…); refusing the wrong-type pin`,
+    }
+  }
+  if (isNetworkSwitchSlot(slotName) && isMicrocontrollerMpn(m)) {
+    return {
+      action: 'bespoke',
+      reason: `slot "${slotName}" is a network switch but MPN "${mpn}" is a microcontroller (prefix MSP/STM/PIC/…); refusing the wrong-type pin`,
+    }
+  }
+  const corrected = correctSartoriusPressureSensorMpn(m)
+  if (corrected !== m) {
+    return { action: 'corrected', correctedMpn: corrected, reason: `Sartorius pressure-sensor MPN ${mpn} → ${corrected}` }
+  }
+  return { action: 'ok' }
+}
+
+/** Apply classifyMpnForSlot() to a Word in-place (defensive emit-time guard).
+ *  - 'corrected'  → rewrite the part_number modifier.
+ *  - 'bespoke'    → strip the (wrong-type) part_number + manufacturer modifiers,
+ *                   stamp status=BESPOKE + a parametric basis note, so no
+ *                   fabricated/ wrong-type MPN ever ships. Any valve sized
+ *                   > DN100 (no standard catalogue part) lands here too via the
+ *                   pump-series check OR an explicit caller decision.
+ *  Returns the same Word for chaining. Pure w.r.t. globals. */
+function sanitizeWordMpn(w: Word): Word {
+  const mods = w.modifier_characters
+  const pnIdx = mods.findIndex((mc) => mc.kind === 'part_number')
+  if (pnIdx < 0) return w
+  const mpn = mods[pnIdx].value
+  const mfr = mods.find((mc) => mc.kind === 'manufacturer')?.value ?? ''
+  const slotName = `${w.id} ${w.content_character.character_id} ${w.content_character.name_human} ${w.name_human}`
+  const verdict = classifyMpnForSlot(slotName, mfr, mpn)
+  if (verdict.action === 'ok') return w
+  if (verdict.action === 'corrected' && verdict.correctedMpn) {
+    mods[pnIdx] = mod('part_number', verdict.correctedMpn)
+    return w
+  }
+  // bespoke: remove the wrong-type MPN + its brand, mark BESPOKE parametric.
+  w.modifier_characters = mods.filter((mc) => mc.kind !== 'part_number' && mc.kind !== 'manufacturer')
+  w.modifier_characters.push(mod('status', 'BESPOKE'))
+  w.modifier_characters.push(mod('lifecycle', 'Bespoke / made-to-order — no standard catalogue part; parametric cost from size + material at detailed design'))
+  return w
+}
+
+/** Walk a finished DeterministicDesign and sanitize every MPN-bearing word.
+ *  Universal backstop applied at the end of emitBessDesign(); a no-op when all
+ *  pins are correctly typed (the BESS template's own valve/switch words pass
+ *  clean). Pure w.r.t. globals — mutates + returns the design. */
+function sanitizeAllWordMpns(design: DeterministicDesign): DeterministicDesign {
+  for (const mdl of design.modules) {
+    for (const sm of mdl.sub_modules) {
+      for (const w of sm.words) sanitizeWordMpn(w)
+    }
+  }
+  return design
+}
+
 /**
  * Synthesize a §4.5 RAD-syntax line from a sub-module's words[].
  * Format: "<character_id> (<mod1>, <mod2>) ⊙ <next_character_id> (<mod1>)"
@@ -4700,11 +4864,17 @@ export function emitBessDesign(contract: ContractShape, brief: unknown): Determi
     emitOperatorInterface(p),
     emitInterconnect(p),
   ]
-  return {
+  // Universal wrong-type-MPN backstop (2026-06-19): refuse any pump-series MPN
+  // on a valve slot / microcontroller MPN on a network-switch slot, and correct
+  // the known Sartorius BB-8804062 → BB-8804060. No-op for the BESS template's
+  // own correctly-typed pins; guards against a future hand edit + documents the
+  // universal invariant the chain's DB-fill path must also enforce.
+  const design: DeterministicDesign = {
     modules,
     cross_module_grammar_links: emitCrossModuleGrammarLinks(p),
     excluded_modules: [],
     rationale_excluded: 'All 10 canonical modules apply to utility-scale containerised BESS.',
     brief_overview_prose: emitBriefOverviewProse(p, brief),
   }
+  return sanitizeAllWordMpns(design)
 }

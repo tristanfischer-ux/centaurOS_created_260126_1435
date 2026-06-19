@@ -983,13 +983,19 @@ def _project_bom_ancillaries(state: dict, nodes: dict, out_dir) -> list:
             continue
         ntoks = _norm_tokens(name)
         overlap = ntoks & on_pid_name_toks
+        # the item carries a DISTINGUISHING word no node has (a non-generic token absent from
+        # every node label) ⇒ it is a genuinely DISTINCT unit, never suppress it — e.g.
+        # 'Drum Filter Screen' (the screen element) vs the 'Drum Filter' node: 'screen' is
+        # the distinguishing token, so the screen is a real extra part that must appear.
+        item_distinct_toks = (ntoks - on_pid_name_toks) - _GENERIC_EQUIP_TOKENS
         # the principal equipment is already shown (same name on a node) ⇒ skip the
-        # duplicate — but ONLY when (a) nearly all the item's tokens match a node AND
-        # (b) the overlap carries a DISTINGUISHING (non-family-generic) token, so a lone
-        # generic word ("pump", "heat") shared with an UNRELATED node never suppresses a
-        # genuinely-distinct item (e.g. Circulation Pump vs the Heat Pump node). ALWAYS
-        # keep the safety solenoid + field instruments regardless.
-        if ntoks and len(overlap) >= max(1, len(ntoks) - 1) and \
+        # duplicate — but ONLY when (a) the item adds NO distinguishing word beyond a node,
+        # (b) nearly all the item's tokens match a node AND (c) the overlap carries a
+        # DISTINGUISHING (non-family-generic) token, so a lone generic word ("pump", "heat")
+        # shared with an UNRELATED node never suppresses a genuinely-distinct item (e.g.
+        # Circulation Pump vs the Heat Pump node). ALWAYS keep safety + field instruments.
+        if ntoks and not item_distinct_toks and \
+                len(overlap) >= max(1, len(ntoks) - 1) and \
                 (overlap - _GENERIC_EQUIP_TOKENS) and \
                 kind not in ("safety", "instrument"):
             continue
@@ -2006,6 +2012,8 @@ def _draw_ancillary_register(svg, proc: Process, x: float, y: float, w: float,
         svg.text(x + 12, cy, title, size=9.5, weight="bold", fill=ACCENT)
         cy += 4
         per_col = math.ceil(len(items) / ncols)
+        # character budget for one column cell (mono 8 px ≈ 4.9 px/char), reserve a margin.
+        cell_chars = max(40, int(col_w / 4.9) - 2)
         for i, a in enumerate(items):
             col = i // per_col
             row = i % per_col
@@ -2013,9 +2021,14 @@ def _draw_ancillary_register(svg, proc: Process, x: float, y: float, w: float,
             iy = cy + 12 + row * 15
             qn = f" ×{a.qty}" if a.qty > 1 else ""
             tie = f"  → {a.tie_line}" if a.tie_line else ""
-            label = f"{a.tag}  {_short_anc_name(a.name)}{qn}"
+            # the item's FULL name is the matchable identity (the ledger checks the BoM name
+            # against the rendered text) — keep it intact and only trim the trailing duty
+            # blurb to fit the cell, never the name. Tie-line is appended last (cross-ref).
+            head = f"{a.tag}  {a.name}{qn}"
             duty = (f" · {a.duty}" if a.duty else "")
-            txt = (label + duty)[:46] + tie
+            budget = max(0, cell_chars - len(tie))
+            body = head if len(head) >= budget else (head + duty)
+            txt = (body if len(body) <= budget else body[:max(0, budget - 1)] + "…") + tie
             svg.text(ix, iy, txt, size=8.0, anchor="start", fill=INK, mono=True)
         return cy + 12 + per_col * 15
 
@@ -2180,8 +2193,15 @@ def build_pid_svg(proc: Process) -> str:
                  weight="bold", fill=EQ_INK)
         cap_y = cy + _sym_caption_bot(nd.sym)
         label = nd.label if nd.array_n <= 1 else f"{nd.label}  (×{nd.array_n} parallel)"
-        for li, line in enumerate(_wrap(label, 20)):
+        nlines = _wrap(label, 20)
+        for li, line in enumerate(nlines):
             svg.text(cx, cap_y + li * 12, line, size=9, anchor="middle", fill=MUTED)
+        # every per-unit tag of an array (P-101 P-102 / TK-101 … TK-110), so each parallel
+        # unit's identity is a findable token on the sheet — not just the 'first…last' range.
+        tag_lines = _array_member_tag_lines(nd)
+        for ti, tline in enumerate(tag_lines):
+            svg.text(cx, cap_y + (len(nlines) + ti) * 12, tline, size=7.4, anchor="middle",
+                     fill=MUTED, mono=True)
         # instruments — bubbles above the symbol, connected by a dashed lead
         instr_right = _draw_node_instruments(svg, nd, cx, cy, ports[nd.key])
         # equipment-mounted relief valve (PSV) — nozzle placed clear to the RIGHT of the
@@ -2344,6 +2364,22 @@ def _array_tag_label(nd: Node) -> str:
     if len(tags) >= 2:
         return f"{tags[0]}…{tags[-1]}"
     return f"{nd.tag} ×{nd.array_n}"
+
+
+def _array_member_tag_lines(nd: Node, per_line: int = 6) -> list:
+    """EVERY per-unit equipment tag of an array node, as standalone space-separated tokens
+    wrapped to <=per_line tags/line. A real P&ID labels each parallel unit; the compact
+    'first…last' range caption is not a matchable identity for the per-unit tags, so the
+    array's constituent tags (P-101 P-102, C-101 C-102, TK-101 … TK-110) otherwise never
+    appear as findable tokens — the per-unit drum-screen / parallel-pump / parallel-degasser
+    are then absent from the sheet's tag set even though the bank is drawn. Universal: reads
+    the node's OWN array_tags, no per-class logic. Empty for a non-array / single-tag node."""
+    tags = [t for t in (nd.array_tags or []) if t] if nd.array_n > 1 else []
+    if len(tags) < 2:
+        return []
+    # pad each row's join so EVERY tag is space-delimited (the ledger matches ' TAG ' or
+    # '>TAG<'); a leading + trailing space guarantees the first/last tag are bounded too.
+    return [" " + "  ".join(tags[i:i + per_line]) + " " for i in range(0, len(tags), per_line)]
 
 
 def _draw_array_bank(svg, nd: Node, cx, cy, port):

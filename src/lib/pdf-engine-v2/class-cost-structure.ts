@@ -826,8 +826,10 @@ function roundToPence(n: number): number {
 //                        + epc_engineering_factor  x raw  (EPC/engineering)
 //        The legacy CostStack fields are still populated so downstream
 //        consumers (feasibility-assessment, cost-sanity gate, harness) keep
-//        working: oem_transfer_price = raw + minor field labour = the ex-works
-//        equipment proxy they read; channel/margin/overhead layers are 0.
+//        working: factory_cogs = oem_transfer_price = channel_list_price =
+//        raw + field-erection labour = the ex-works hard cost they read
+//        (field installation IS an ex-works hard cost for a field-erected
+//        plant); channel/margin/overhead layers are 0.
 export function computeCostStack(rawMaterialsBomGbp: number, ratios: CostStackRatios, class_key: string = 'unknown'): CostStack {
   const raw = roundToPence(rawMaterialsBomGbp)
 
@@ -844,21 +846,35 @@ export function computeCostStack(rawMaterialsBomGbp: number, ratios: CostStackRa
     // Map onto the legacy CostStack shape so existing consumers keep working:
     //  - assembly_labour carries the field-installation/erection cost
     //  - factory_overhead = 0 (no factory)
-    //  - factory_cogs / oem_transfer = raw materials = the ex-works equipment
-    //    proxy that feasibility-assessment + the cost-sanity gate read
+    //  - factory_cogs / oem_transfer / channel_list = raw equipment + field
+    //    erection = the ex-works hard cost (field-erection labour IS included —
+    //    it is a hard cost of building the plant, not a downstream markup) =
+    //    the proxy that feasibility-assessment + the cost-sanity gate read
     //  - manufacturer_margin = 0, channel = 0 (no margin, no channel)
     //  - installation carries FOAK/contingency + EPC/engineering
     const installation = roundToPence(foak_contingency + epc_engineering)
+    // Ex-works hard cost for a field-erected process plant = purchased equipment
+    // (raw) + field erection/installation labour (field_install). Field
+    // installation is NOT a downstream distribution cost (there is no channel) —
+    // it is part of building the plant, so it belongs in the intermediate cost
+    // anchors (factory_cogs / oem_transfer / channel_list), not only in the
+    // final installed ASP. Omitting it understated those anchors by the full
+    // erection cost (£1,185,496 on ras-5m).
+    const ex_works_hard_cost = roundToPence(raw + field_install)
     const installed_asp = roundToPence(raw + field_install + installation)
     return {
       raw_materials_bom_gbp: raw,
       assembly_labour_gbp: field_install,
       factory_overhead_gbp: 0,
-      factory_cogs_gbp: raw,
+      // factory_cogs / oem_transfer / channel_list = raw equipment + field-erection
+      // labour = the ex-works hard cost (field-erection labour IS included).
+      // manufacturer_margin = 0, channel = 0 (no factory margin, no channel).
+      // installation carries FOAK/contingency + EPC/engineering.
+      factory_cogs_gbp: ex_works_hard_cost,
       manufacturer_margin_gbp: 0,
-      oem_transfer_price_gbp: raw,
+      oem_transfer_price_gbp: ex_works_hard_cost,
       channel_markup_gbp: 0,
-      channel_list_price_gbp: raw,
+      channel_list_price_gbp: ex_works_hard_cost,
       installation_cost_gbp: installation,
       installed_asp_gbp: installed_asp,
       ratios_applied: ratios,

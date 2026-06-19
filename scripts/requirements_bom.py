@@ -399,12 +399,184 @@ _MIN_PRICE_FLOORS = [
 ]
 
 
-def _price_floor_for(name: str):
-    """Minimum credible installed unit price (£) for a power/control component by its
-    NOUN, else None. Conservative trade-supply lower bound — a real quote is higher."""
-    for rx, floor in _MIN_PRICE_FLOORS:
-        if rx.search(name or ""):
+# ── PROCESS-SYSTEM minimum-credible-price floors (council 2026-06-19, the RAS £5M
+# BoM audit: the customer was rightly suspicious because the ELECTRICAL floor above
+# only caught breakers/relays/busbars — PROCESS systems were token-priced. The live
+# RAS run shipped 10+ process systems near a token value, blowers at £25 (class
+# median ~£8k), a DO control valve at £9, and a DN400 modulating valve at £0). These
+# are MINIMUM credible installed-supply prices for the WHOLE skid/system — a real
+# vendor quote is higher, never lower. Universal: keyed off the system NOUN, no
+# per-archetype table. A class whose lines match NONE of these is untouched (the
+# CO₂/SAF byte-identity guarantee: their process kit is strong-bespoke reactors/
+# columns priced on the engineering-budget basis, which never reaches this floor).
+#
+# A floor entry is either a flat £ OR the sentinel _DUTY for a duty-scaled floor
+# (computed by _duty_scaled_floor from the line's kW rating). ORDER MATTERS — the
+# most specific noun first; the blower/immersion-heater rows carry their own duty
+# logic in _price_floor_for so they appear here only as the no-rating fallback floor.
+# A floor entry value is a flat £, the sentinel _BLOWER_DUTY (max(£5,000, duty_kw ×
+# £500/kW)), or _DUTY (the generic _duty_scaled_floor). ORDER MATTERS — most specific
+# noun first.
+_DUTY = "__duty_scaled__"
+_BLOWER_DUTY = "__blower_duty__"
+_PROCESS_SYSTEM_FLOORS = [
+    (re.compile(r"chemical[_ ]?dos|\bdosing\b|alkalin|\bph[_ ]?dos|caustic[_ ]?dos|acid[_ ]?dos", re.I), 3000.0),
+    (re.compile(r"\bfeed\b[_ ]?(?:stor|system|distribution|silo|hopper|handling)|feed[_ ]?stor|"
+                r"feed[_ ]?distribution|pellet[_ ]?(?:stor|silo|system)", re.I), 5000.0),
+    (re.compile(r"sludge|biosolids|\bsolids\b[_ ]?handling|solids[_ ]?(?:dewater|thicken|handling)|"
+                r"thicken|dewater", re.I), 8000.0),
+    (re.compile(r"effluent|discharge[_ ]?(?:treat|system)|wastewater[_ ]?treat", re.I), 8000.0),
+    (re.compile(r"grading|harvest|sorting|grader|\bgrade\b[_ ]?system|crowd", re.I), 6000.0),
+    (re.compile(r"mortali|cull[_ ]?(?:handling|system)|carcass", re.I), 5000.0),
+    # blower / aeration / degassing — max(£5,000, duty_kw × £500/kW), NOT the steep
+    # generic _duty_scaled_floor (£3,000/kW above 50 kW would mis-price a 55 kW
+    # blower at £165k vs the ~£30k market). A blower is light rotating kit.
+    (re.compile(r"\bblower\b|aerat\w*[_ ]?(?:blower|system)|degass\w*[_ ]?blower|air[_ ]?blower|"
+                r"roots[_ ]?blower|lobe[_ ]?blower|degassing[_ ]?blower", re.I), _BLOWER_DUTY),
+    (re.compile(r"\bo2\b|oxygen|\blox\b|solenoid|oxygen[_ ]?(?:supply|system|dos|inject)", re.I), 1500.0),
+]
+
+
+def _duty_scaled_floor(kw):
+    """Minimum credible installed £ for any component carrying a kW rating, scaled by
+    that duty (council 2026-06-19). A duty-rated skid is never a token price: a small
+    unit still carries a base cost, a large one scales with its power. Universal — a
+    pure function of kW, no noun or class table:
+
+      < 5 kW   → £1,500 base (a small skid's irreducible cost)
+      5–50 kW  → £500/kW
+      > 50 kW  → £3,000/kW
+
+    Returns None when there is no usable kW rating (so a non-rated line is unaffected
+    and the caller falls back to its flat category floor)."""
+    if kw is None or kw <= 0:
+        return None
+    if kw < 5.0:
+        return 1500.0
+    if kw <= 50.0:
+        return 500.0 * kw
+    return 3000.0 * kw
+
+
+def _price_floor_for(name: str, md=None):
+    """Minimum credible installed unit price (£) for a power/control/PROCESS component
+    by its NOUN (+ its kW rating where one is carried), else None. Conservative
+    trade-supply lower bound — a real quote is higher, never lower. Universal: keyed
+    off the noun, no per-class table; a line matching nothing returns None (untouched).
+
+    Extended 2026-06-19 (the RAS £5M audit) beyond the ELECTRICAL floors to cover:
+      • PROCESS systems  — chemical/dosing → £3,000; feed/storage/distribution →
+        £5,000; sludge/solids → £8,000; grading/harvest/sorting → £6,000;
+        blower/aeration/degassing → max(£5,000, duty_kw × £500/kW);
+        O₂/oxygen/solenoid → £1,500.
+      • BACKUP IMMERSION HEATER > 100 kW → £6,000 + duty_kw × £3,000/kW.
+    The duty terms read the line's `rating_primary` kW via `md` (optional — a None
+    `md`, or a rating that is not kW, falls back to the flat floor)."""
+    nm = name or ""
+    kw = None
+    if isinstance(md, dict):
+        kw_val, is_kva = _rating_kw(md, nm)
+        if kw_val and not is_kva:
+            kw = kw_val
+    # backup immersion heater > 100 kW — a sane MINIMUM only kicks in above 100 kW
+    # (a small backup heater is covered by the duty-scaled / electrical paths). Base
+    # + a per-kW term so a large backup heater is never a token price. £200/kW: an
+    # industrial electric immersion-heater package is ~£80-200/kW installed — a
+    # resistive heater is NOT a rotating/process skid, so it must NOT use the generic
+    # £3,000/kW heavy-equipment tier (that mis-priced a 411 kW heater at £1.24M).
+    if re.search(r"immersion[_ ]?heat|backup[_ ]?heat|electric[_ ]?(?:resistance[_ ]?)?heat", nm, re.I):
+        if kw is not None and kw > 100.0:
+            return 6000.0 + kw * 200.0
+    # PROCESS-SYSTEM floors (the new RAS-audit categories)
+    for rx, floor in _PROCESS_SYSTEM_FLOORS:
+        if rx.search(nm):
+            if floor == _BLOWER_DUTY:
+                # blower / aeration / degassing: max(£5,000, duty_kw × £500/kW)
+                return max(5000.0, kw * 500.0) if (kw and kw > 0) else 5000.0
+            if floor == _DUTY:
+                ds = _duty_scaled_floor(kw)
+                return max(1500.0, ds) if ds is not None else 1500.0
             return floor
+    # ELECTRICAL / control floors (the original council-2026-06-16 set)
+    for rx, floor in _MIN_PRICE_FLOORS:
+        if rx.search(nm):
+            return floor
+    return None
+
+
+# ── CONTROL-ELEMENT CLASS BUDGETS (council 2026-06-19, the RAS £0 DN400 valve) ──
+# A FINAL CONTROL ELEMENT (a modulating / on-off process valve or actuator) must
+# NEVER render at £0. The live RAS run shipped a DN400 modulating control valve at
+# £0 (status=ACTUATOR, the synthesis stamped no price_estimate_gbp). These are
+# catalogue-class minimum budgets by the NORMALISED control-element kind — a sane
+# floor applied as the LAST resort BEFORE any code path would emit £0 for a control
+# element. Universal: keyed off the control-element kind, no per-class table.
+CONTROL_ELEMENT_CLASS_BUDGETS = {
+    "final_control_element": 1200.0,   # a generic control valve / on-off actuator
+    "proportional_valve": 1800.0,      # a modulating / characterised control valve
+    "motorised_actuator": 2500.0,      # an electric/motorised valve actuator
+}
+
+
+def _control_element_kind(name: str) -> str:
+    """Normalised control-element kind for CONTROL_ELEMENT_CLASS_BUDGETS, else ''.
+    A motorised/electric ACTUATOR > a modulating/proportional valve > a generic
+    control element. Universal — keyed off the noun, no class table."""
+    nm = name or ""
+    if re.search(r"motoris\w*[_ ]?actuat|electric[_ ]?actuat|\bactuator\b", nm, re.I):
+        return "motorised_actuator"
+    if re.search(r"modulat\w*|proportional|control[_ ]?valve|characteris\w*[_ ]?valve|"
+                 r"\bfcv\b|throttl\w*[_ ]?valve|globe[_ ]?valve", nm, re.I):
+        return "proportional_valve"
+    if re.search(r"\bvalve\b|solenoid|control[_ ]?element|damper", nm, re.I):
+        return "final_control_element"
+    return ""
+
+
+def _control_element_budget(name: str):
+    """Minimum credible installed £ for a final control element of this NOUN, else
+    None. Used as the last-resort fallback so a control valve / actuator can never
+    cost £0. Universal, deterministic, no per-class table."""
+    kind = _control_element_kind(name)
+    return CONTROL_ELEMENT_CLASS_BUDGETS.get(kind)
+
+
+# ── DUTY-SCALED CLASS-REFERENCE BUDGET (council 2026-06-19) ──
+# A large mechanical-equipment price should be EXPLICIT and auditable, not an
+# unexplained outlier. A heat pump / compressor / chiller / blower scales its cost
+# from a class-reference base price by (duty_kw / reference_duty_kw)^0.6 (the
+# standard six-tenths cost-capacity rule for process equipment). So e.g. a 1,493 kW
+# heat pump = £6,000 × (1493 / 5)^0.6 ≈ £28,617 reads as a derivation, not a magic
+# number. Universal: keyed off the equipment NOUN, no per-class table; a noun that
+# is not in this reference set returns None (untouched). This sits ALONGSIDE the
+# £/kW band in _RATING_COST_MODELS — it is the auditable basis string, and is only
+# ever used to EXPLAIN/raise a price, never to lower one.
+# Each entry: noun regex → (reference_base_gbp, reference_duty_kw, label).
+_CLASS_REFERENCE_EQUIPMENT = [
+    (re.compile(r"heat[_ -]?pump", re.I), (6000.0, 5.0, "heat pump")),
+    (re.compile(r"\bcompressor\b|scroll[_ -]?compressor|screw[_ -]?compressor", re.I),
+     (5000.0, 5.0, "compressor")),
+    (re.compile(r"chiller|refrigerat\w+[_ -]?(?:unit|skid|plant)", re.I), (8000.0, 10.0, "chiller")),
+    (re.compile(r"\bblower\b|aerat\w*[_ -]?blower|air[_ -]?blower|roots[_ -]?blower|"
+                r"lobe[_ -]?blower|degass\w*[_ -]?blower", re.I), (6000.0, 5.0, "blower")),
+]
+
+
+def _duty_scaled_class_budget(name: str, kw):
+    """Auditable class-reference budget (£, basis) for a mechanical-equipment line —
+    heat pump / compressor / chiller / blower — scaled from a reference base price by
+    (duty_kw / reference_duty_kw)^0.6 (the six-tenths cost-capacity rule). Returns
+    (gbp, basis) or None when the noun is not a referenced mechanical class or no kW
+    is available. Universal, deterministic, no per-class table. The basis string
+    makes the number explicit, e.g. '£6,000 × (1493/5)^0.6 = £28,617 (heat pump)'."""
+    if kw is None or kw <= 0:
+        return None
+    for rx, (base, ref_kw, label) in _CLASS_REFERENCE_EQUIPMENT:
+        if rx.search(name or "") and ref_kw > 0:
+            gbp = base * (kw / ref_kw) ** 0.6
+            basis = (f"class-reference budget: £{base:,.0f} × ({kw:g}/{ref_kw:g})^0.6 "
+                     f"= £{gbp:,.0f} ({label}; six-tenths cost-capacity rule)")
+            return (gbp, basis)
     return None
 
 
@@ -1377,6 +1549,64 @@ def _selftest() -> int:
     if not (leg_open and "tapered" in leg_open[1]):
         print(f"  FAIL legacy no-service open tank changed behaviour: {leg_open and leg_open[1][:60]}"); bad += 1
 
+    # ── PROCESS-SYSTEM + CONTROL-ELEMENT FLOORS (RAS £5M audit 2026-06-19) — process
+    # systems, blowers, the DN400 control valve and the >100 kW immersion heater must
+    # never be token-priced, while a process VESSEL (CO₂/SAF byte-identity) is untouched.
+    # (a) process-system category floors
+    for nm, want_min in [("Chemical Dosing System (pH / Alkalinity)", 3000.0),
+                         ("Feed Storage + Distribution System", 5000.0),
+                         ("Solids / Sludge Handling System", 8000.0),
+                         ("Grading / Harvest System", 6000.0),
+                         ("Effluent Treatment + Discharge System", 8000.0),
+                         ("Mortality Handling System", 5000.0),
+                         ("Oxygen Supply (LOX) System", 1500.0)]:
+        f = _price_floor_for(nm, {})
+        if f != want_min:
+            print(f"  FAIL process floor {nm!r}: £{f} (want £{want_min})"); bad += 1
+    # (b) blower floor = max(£5,000, duty_kw × £500/kW) — a 55 kW blower is £27,500,
+    # NOT the steep £3,000/kW generic tier (which would mis-price it at £165k)
+    if _price_floor_for("Degassing Blower", {"rating_primary": "55"}) != 27500.0:
+        print(f"  FAIL blower duty floor: £{_price_floor_for('Degassing Blower', {'rating_primary':'55'})} (want £27,500)"); bad += 1
+    if _price_floor_for("Aeration Blower", {}) != 5000.0:
+        print("  FAIL unrated blower floor not £5,000"); bad += 1
+    # (c) >100 kW backup immersion heater = £6,000 + duty_kw × £3,000/kW (≤100 kW: no
+    # immersion floor — covered by the duty/electrical paths)
+    if _price_floor_for("Backup Immersion Heater", {"rating_primary": "411"}) != 6000.0 + 411 * 200.0:
+        print("  FAIL immersion-heater floor formula"); bad += 1
+    if _price_floor_for("Backup Immersion Heater", {"rating_primary": "40"}) is not None:
+        print("  FAIL immersion heater ≤100 kW wrongly floored"); bad += 1
+    # (d) a process VESSEL / tank / reactor matches NO process-system floor → None
+    # (the CO₂/SAF byte-identity guarantee — their strong-bespoke kit is untouched)
+    for nm in ("Distillation Column", "Buffer Vessel", "Rearing Tank", "Fischer-Tropsch Reactor"):
+        if _price_floor_for(nm, {}) is not None:
+            print(f"  FAIL process-vessel {nm!r} wrongly floored (£{_price_floor_for(nm, {})})"); bad += 1
+    # (e) duty-scaled floor tiers
+    if not (_duty_scaled_floor(3) == 1500.0 and _duty_scaled_floor(30) == 15000.0
+            and _duty_scaled_floor(100) == 300000.0 and _duty_scaled_floor(None) is None):
+        print("  FAIL _duty_scaled_floor tiers"); bad += 1
+    # (f) CONTROL-ELEMENT class budgets — a final control element NEVER costs £0
+    if _control_element_budget("Inlet Flow Control Valve") != 1800.0:   # modulating → proportional
+        print("  FAIL DN400 modulating valve not bounded at £1,800"); bad += 1
+    if _control_element_budget("Dissolved-O₂ Control Valve") != 1800.0:
+        print("  FAIL DO control valve not bounded at £1,800"); bad += 1
+    if _control_element_budget("Emergency O₂ Solenoid + Diffuser (fail-open)") != 1200.0:
+        print("  FAIL O₂ solenoid not bounded at the £1,200 final-control-element budget"); bad += 1
+    if _control_element_budget("Motorised Actuator") != 2500.0:
+        print("  FAIL motorised actuator not bounded at £2,500"); bad += 1
+    if _control_element_budget("Buffer Vessel") is not None or _control_element_budget("Recirc Pump") is not None:
+        print("  FAIL a non-control-element wrongly given a control-element budget"); bad += 1
+    # (g) DUTY-SCALED CLASS-REFERENCE BUDGET — auditable, basis string explicit, never
+    # lowers; a non-referenced noun or no-kW returns None
+    hp = _duty_scaled_class_budget("Heat Pump", 1493)
+    if not (hp and abs(hp[0] - 6000.0 * (1493 / 5.0) ** 0.6) < 1 and "(1493/5)^0.6" in hp[1]):
+        print(f"  FAIL heat-pump class-reference budget: {hp}"); bad += 1
+    if _duty_scaled_class_budget("Heat Pump", 5)[0] != 6000.0:   # reference duty → base
+        print("  FAIL heat-pump at reference duty not £6,000"); bad += 1
+    if _duty_scaled_class_budget("Centrifugal Pump", 94) is not None:   # pump is not in the set
+        print("  FAIL a pump wrongly given a class-reference budget"); bad += 1
+    if _duty_scaled_class_budget("Heat Pump", None) is not None:
+        print("  FAIL class-reference budget without a kW wrongly returned"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -2039,6 +2269,22 @@ def assemble(out_dir: str):
                     # curve in BOTH directions (the £923/kW 11 kW blower over-count
                     # and any £0 stamp). No-op for an unrated valve.
                     agbp, abasis = _reconcile_rated_price(name, md, agbp, abasis, requirement)
+                    # PROCESS-SYSTEM / blower floor (RAS audit 2026-06-19) — a token
+                    # blower (£25) is lifted to its duty-scaled class floor. No-op once
+                    # the rating reconciliation above already set a band price.
+                    pf = _price_floor_for(name, md)
+                    if pf and agbp < pf:
+                        agbp = pf
+                        abasis = abasis + " · floored to min credible process price"
+                    # CONTROL-ELEMENT class budget (RAS audit 2026-06-19) — a final
+                    # control element (a modulating / DN400 / on-off valve or actuator)
+                    # must NEVER cost £0: the synthesis stamped no price on the DN400
+                    # modulating control valve → £0. Apply the catalogue-class budget as
+                    # the last resort BEFORE a £0 actuator line is emitted.
+                    ceb = _control_element_budget(name)
+                    if ceb and agbp < ceb:
+                        agbp = ceb
+                        abasis = abasis + " · control-element catalogue-class budget (no stamped price)"
                     nlow = name.lower()
                     atag = ("FCV" if "valve" in nlow else "B" if "blower" in nlow
                             else "FE" if "fan" in nlow else "Y")   # ISA: control valve / blower
@@ -2074,6 +2320,15 @@ def assemble(out_dir: str):
                     # vaporiser, a chilled-water skid) → ground to the market curve.
                     # No-op for an unrated dosing/feed/SCADA system.
                     pgbp, pbasis = _reconcile_rated_price(name, md, pgbp, pbasis, requirement)
+                    # PROCESS-SYSTEM minimum-credible floor (RAS audit 2026-06-19) — a
+                    # token-priced dosing / feed-storage / sludge / grading / O₂ system
+                    # is lifted to its category floor (chemical-dosing £3k, feed/storage
+                    # £5k, sludge/solids £8k, grading/harvest £6k, O₂ £1.5k). No-op when
+                    # the synthesis already stamped a credible installed-cost estimate.
+                    pf = _price_floor_for(name, md)
+                    if pf and pgbp < pf:
+                        pgbp = pf
+                        pbasis = pbasis + " · floored to min credible process price"
                     nlow = name.lower()
                     ptag = ("DOS" if "dosing" in nlow else "FD" if "feed" in nlow
                             else "LOX" if ("oxygen" in nlow or "lox" in nlow) else "SLU" if "sludge" in nlow
@@ -2172,21 +2427,34 @@ def assemble(out_dir: str):
                         # VISIBLE budget allowance rather than a silent £0/identical stub.
                         if gbp <= 0:
                             basis = "budget allowance — vendor TBD (no parametric model; confidence low)"
-                # MINIMUM-CREDIBLE-PRICE FLOOR (council 2026-06-16): a power/control
-                # catalogue component must not render at £1-£3 from a stray estimate.
-                # Apply the floor only when there is no real distributor price for it.
-                # `_price_floor_for` only matches genuine electrical-component nouns
-                # (breaker / busbar / SPD / relay / contactor / isolator …), so it is
-                # safe to apply even when such a part was mis-labelled BESPOKE (a "power
-                # contactor" wrongly classed as a process 'contactor' vessel) — it never
-                # touches a real fabricated process vessel.
-                floor = _price_floor_for(name)
+                # MINIMUM-CREDIBLE-PRICE FLOOR (council 2026-06-16; PROCESS systems +
+                # duty scaling added 2026-06-19, the RAS £5M audit): a power/control
+                # catalogue component must not render at £1-£3 from a stray estimate,
+                # and (RAS audit) a PROCESS system / blower / immersion heater must not
+                # render at a token price either. Apply the floor only when there is no
+                # real distributor price for it. `_price_floor_for(name, md)` matches
+                # electrical-component nouns AND the new process-system categories AND a
+                # >100 kW backup immersion heater (its kW comes from `md`); a real
+                # fabricated process vessel matches none of these, so it is untouched.
+                floor = _price_floor_for(name, md)
                 if floor and wid not in dist_price and 0 <= gbp < floor:
                     gbp = floor
-                    if status == "BESPOKE":   # it was an electrical part, not a vessel
+                    if status == "BESPOKE":   # it was an electrical/process part, not a vessel
                         status, part = "NOT FOUND", "requirement stated"
                     basis = (basis + " · floored to min credible price"
                              if "floored" not in basis else basis)
+                # CONTROL-ELEMENT class budget (RAS audit 2026-06-19) — a final control
+                # element (a modulating / DN400 / on-off process valve or actuator)
+                # reaching this point with £0 (the synthesis stamped no price and it is
+                # not on the _actuator fast-path) is given its catalogue-class budget so
+                # it NEVER costs £0. Last resort, only when still ≤ £0 after the floor.
+                if gbp <= 0 and wid not in dist_price:
+                    ceb = _control_element_budget(name)
+                    if ceb:
+                        gbp = ceb
+                        if status == "BESPOKE":
+                            status, part = "NOT FOUND", "requirement stated"
+                        basis = "control-element catalogue-class budget (no stamped price)"
                 # ── COMMODITY CATALOGUE CAP (council 2026-06-16/17): a commodity
                 # electronic/IC/cable/fastener/small-instrument line with a structured
                 # catalogue PN must never exceed 3× its catalogue/distributor price
@@ -2229,6 +2497,19 @@ def assemble(out_dir: str):
                     # estimate vs the £67,900 rating-based price = 33.5×).
                     pre_gbp, pre_status = gbp, status
                     gbp, basis = _reconcile_rated_price(name, md, gbp, basis, requirement)
+                    # AUDITABLE CLASS-REFERENCE BUDGET (RAS audit 2026-06-19): for a
+                    # mechanical-equipment line (heat pump / compressor / chiller /
+                    # blower), make a large price EXPLICIT — scaled from a class-
+                    # reference base by (duty_kw/ref_kw)^0.6 (the six-tenths rule) — so
+                    # e.g. a 1,493 kW heat pump reads '£6,000 × (1493/5)^0.6 = £28,617',
+                    # not an unexplained outlier. Only ever RAISES + re-bases the price
+                    # (never lowers it): adopt when the class-reference budget ≥ the
+                    # current price. No-op for a noun outside the reference set.
+                    _kw_cb, _is_kva_cb = _rating_kw(md, name, requirement)
+                    if _kw_cb and not _is_kva_cb:
+                        csb = _duty_scaled_class_budget(name, _kw_cb)
+                        if csb and csb[0] > gbp:   # LIFT-only (never lower a price)
+                            gbp, basis = csb[0], csb[1]
                     # UNIVERSAL UNDERSIZED-MPN REJECTION: when a power-rated rotating-
                     # equipment line was grounded UP from a far-lower named-part price,
                     # the named catalogue part cannot meet the duty — presenting it

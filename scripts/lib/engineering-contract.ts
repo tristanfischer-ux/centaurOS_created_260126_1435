@@ -11769,10 +11769,15 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     return Math.round(3340 * scale)
   })()
   const standingBiomassKg = Math.round(totalTankVolumeM3 * harvestDensityKgM3)   // tank_vol × 60 kg/m³
-  // Circular dual-drain tank count: ~334 m³ per tank at the reference (10 tanks @
-  // 3,340 m³); scales with total volume, floored at 4 for redundancy.
-  const tankVolumeEachM3 = 334
-  const rearingTankCount = Math.max(4, Math.round(totalTankVolumeM3 / tankVolumeEachM3))
+  // Circular dual-drain tank count: target ~334 m³ per tank at the reference (10 tanks
+  // @ 3,340 m³); scales with total volume, floored at 4 for redundancy. The ACTUAL
+  // per-tank volume MUST be total ÷ count so per-tank × count == total — hardcoding 334
+  // broke the 204t→45t rescale (a small plant where the min-4 floor binds kept a stale
+  // 334 that no longer divides the 737 m³ total: 334×4 = 1,336 ≠ 737). Deriving per-tank
+  // from the count keeps 204t byte-stable (3,340 ÷ 10 = 334) AND fixes 45t (737 ÷ 4 = 184).
+  const tankVolumeTargetEachM3 = 334
+  const rearingTankCount = Math.max(4, Math.ceil(totalTankVolumeM3 / tankVolumeTargetEachM3))
+  const tankVolumeEachM3 = Math.round(totalTankVolumeM3 / rearingTankCount)
 
   // ── Feed + waste loads (size-by-feed) ─────────────────────────────────────
   // SINGLE-SOURCE FEED (2026-06-16, council RAS fix #1): daily feed is a PRODUCTION-
@@ -12351,7 +12356,14 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // supply, so a heat-pump trip cannot let the loop cool. The gate fires when the
   // contract declares a positive heating duty on a live/temperature-critical loop.
   const heatSourceIsLifeCritical = heatingDutyKw > 0 && standingBiomassKg > 0   // sole heat source over a live inventory
-  const backupImmersionHeaterPowerKw = heatSourceIsLifeCritical ? Math.round(heatingDutyKw) : 0  // backup ≥ full DESIGN heating duty (~1,027 kW, design-day incl. frost-limited ventilation) — guaranteed ≥ heating_duty_kw
+  // A BACKUP heat source is a STANDBY DERATE, not a full duplicate of the primary duty (Tristan
+  // 2026-06-19). Sizing it at 100 % of heating_duty_kw made the backup immersion heater read 411 kW
+  // == the heat pump's full design duty — an electrically-enormous, mis-sized full duplicate. A
+  // standby covers a partial / ride-through fraction of the design duty (here 50 %): enough to hold
+  // the loop above the welfare floor while the primary is repaired, NOT to carry the full design-day
+  // load on resistive electric. Universal — any life-critical single-point gets a fractional standby.
+  const BACKUP_HEATER_STANDBY_FRACTION = 0.5
+  const backupImmersionHeaterPowerKw = heatSourceIsLifeCritical ? Math.ceil(heatingDutyKw * BACKUP_HEATER_STANDBY_FRACTION) : 0  // 50 % standby derate of the design heating duty (NOT a full duplicate)
   const criticalEquipmentRedundancy = heatSourceIsLifeCritical ? 1 : 0          // N+1 flag on the life-critical heat source
 
   // ── (4) LIFE-CRITICAL GAS-DOSING FAIL-SAFE STATE (oxygen to the fish) ─────────
@@ -12559,7 +12571,7 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     // ends `_power_kw` and "heater" is an -er device noun → the synthesiser mints a
     // Backup Immersion Heater in the BoM; the flag records the N+1 provision.
     ...(heatSourceIsLifeCritical ? {
-      backup_immersion_heater_power_kw: q(backupImmersionHeaterPowerKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `N+1 backup electric immersion heater sized to the full DESIGN heating duty (~${backupImmersionHeaterPowerKw} kW ≥ heating_duty_kw), on a separate supply — an independent standby for the sole ${heatPumpSource} heat pump, whose loss would let the loop cool and kill ~${(standingBiomassKg / 1000).toFixed(0)} t of biomass; any life-critical single-point heat source gets this, a non-critical/already-redundant duty gets nothing` }),
+      backup_immersion_heater_power_kw: q(backupImmersionHeaterPowerKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `STANDBY backup electric immersion heater sized to ${Math.round(BACKUP_HEATER_STANDBY_FRACTION * 100)} % of the DESIGN heating duty (~${backupImmersionHeaterPowerKw} kW = ⌈${Math.round(heatingDutyKw)} kW × ${BACKUP_HEATER_STANDBY_FRACTION}⌉), on a separate supply — a fractional ride-through standby for the sole ${heatPumpSource} heat pump (holds the loop above the welfare floor while the primary is repaired, NOT a full resistive duplicate of the design-day load), whose total loss would let the loop cool and kill ~${(standingBiomassKg / 1000).toFixed(0)} t of biomass; any life-critical single-point heat source gets this standby derate, a non-critical/already-redundant duty gets nothing` }),
       critical_equipment_redundancy: q(criticalEquipmentRedundancy, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'N+1 / duty-standby flag (=1) on the life-critical single-point heat source — its loss is catastrophic (thermal collapse over a live biomass inventory), so an independent backup heat source is mandated' }),
     } : {}),
 

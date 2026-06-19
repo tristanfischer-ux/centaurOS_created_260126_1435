@@ -62,6 +62,10 @@ interface EquipGroup {
   stems: string[]
   volume?: number
   volumeIsEach: boolean
+  // Provenance note when `volume` was OVERRIDDEN from the plant aggregate ÷ count (a stale
+  // per-each value reconciled to the authoritative aggregate) — see the per-unit↔aggregate
+  // reconcile in buildGroups. Undefined when the contract's per-each value was taken verbatim.
+  volumeProvenance?: 'per-unit-derived-from-aggregate'
   // PHYSICAL-VESSEL precedence when one device declares MULTIPLE volume keys (universal,
   // Tristan 2026-06-19): the SYNTHESISED vessel must be sized to its CONTAINMENT — the
   // tank / shell / vessel volume — NOT to the internal FILL (MBBR media, packing, resin,
@@ -292,6 +296,61 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
   // by deleting the part — the synonym/dedup harness invariant requires they survive).
   // Deterministic, no class table; a genuinely distinct vessel shares no superset relation.
   const all = [...byPhrase.values()]
+  // ── PER-UNIT VOLUME ↔ AGGREGATE RECONCILE (universal, Tristan 2026-06-19) ───────────
+  // A `<device>_volume_each_m3` (per-unit) key is sometimes a STALE leftover of an earlier
+  // sizing pass while the plant-AGGREGATE `<...>_volume_m3` for the SAME equipment family was
+  // correctly rescaled — on RAS the contract carried rearing_tank_volume_each_m3 = 334 (a 204
+  // t/yr leftover) with rearing_tank_count = 4 → 1,336 m³, yet total_tank_volume_m3 = 737. Left
+  // alone the synthesised tank renders 334 m³ each (1,336 m³ of tankage the plant does not have),
+  // diverging from the authoritative aggregate. The AGGREGATE ÷ COUNT is the authoritative
+  // per-unit, so when a group carries a per-EACH volume AND a count ≥2 AND a sibling aggregate
+  // `_volume_m3` exists for the SAME device family (sharing the group's device-kind noun, e.g.
+  // `tank`; a containment/neutral aggregate, NEVER an internal media/working/fill key), OVERRIDE
+  // per_unit = aggregate / count. Universal — any family with the _each_m3 / _volume_m3 / _count
+  // triple; deterministic, no class branch. A per-each value with no aggregate twin, or a count <2,
+  // is left exactly as the contract computed it.
+  // The aggregate for a `<device>_volume_each_m3` group must be a genuine PLANT-AGGREGATE of the
+  // SAME named family — NOT another specifically-named vessel that merely shares the generic device
+  // noun (e.g. a `rearing_tank` per-each must NOT borrow a `biofilter_tank`'s 515 m³ just because
+  // both contain "tank"). Precision: share the group's device-kind noun (tank/vessel/column…) AND,
+  // after removing those device nouns, the aggregate's remaining SPECIFIC tokens must be a SUBSET of
+  // the group's specific tokens — so `total_tank` (specific tokens ∅ after `total` is a stop-stem →
+  // a pure total, ⊆ anything) and a same-family `rearing_tank` aggregate qualify, while
+  // `biofilter_tank` (specific token `biofil` ⊄ the rearing group's `rear`) is rejected. Universal.
+  const aggregateVolumeForGroup = (g: EquipGroup, deviceToks: string[]): number | undefined => {
+    if (deviceToks.length === 0) return undefined
+    const groupSpecific = new Set(g.stems.filter((s) => !DEVICE_NOUNS_STEMS.has(s)))
+    let best: number | undefined
+    for (const [k, v] of Object.entries(quantities)) {
+      if (!Number.isFinite(v) || v <= 0) continue
+      if (!/_volume_m3$/.test(k)) continue          // a lumped/aggregate volume key …
+      if (/_each_m3$/.test(k)) continue             // … NOT a per-each one
+      if (/_(media|working|active|bed|packing|liquid|fill|resin)_volume_m3$/.test(k)) continue // NOT an internal fill
+      const keyToks = significantStems(k.replace(/_volume_m3$/, ''))
+      if (!deviceToks.some((t) => keyToks.includes(t))) continue                 // must share the device-kind noun
+      const keySpecific = keyToks.filter((t) => !DEVICE_NOUNS_STEMS.has(t))       // the aggregate's specific tokens
+      if (!keySpecific.every((t) => groupSpecific.has(t))) continue              // ⊆ the group's specifics (∅ = a pure total)
+      best = Math.max(best ?? 0, v)
+    }
+    return best
+  }
+  for (const g of all) {
+    if (!g.volumeIsEach || g.volume === undefined || (g.count ?? 0) < 2) continue
+    // The device-kind noun(s) the aggregate must share (tank / vessel / column …) — a generic,
+    // universal join key, NOT a class table. With no device noun in the name, fall back to the
+    // group's own stems so a bare per-each still anchors on its specific name.
+    const deviceToks = g.stems.filter((s) => DEVICE_NOUNS_STEMS.has(s))
+    const join = deviceToks.length > 0 ? deviceToks : g.stems
+    const aggregate = aggregateVolumeForGroup(g, join)
+    if (aggregate === undefined) continue
+    const perUnit = aggregate / Math.round(g.count!)
+    // Only override a genuine divergence (a stale per-each that disagrees with aggregate÷count by
+    // >1 %); a per-each that already reconciles with the aggregate is left byte-untouched.
+    if (Math.abs(perUnit - g.volume) / Math.max(perUnit, g.volume) > 0.01) {
+      g.volume = perUnit
+      g.volumeProvenance = 'per-unit-derived-from-aggregate'
+    }
+  }
   const parentHasOwnDuty = (p: EquipGroup): boolean =>
     ((p.throughput !== undefined && p.throughput >= 10) || (p.power !== undefined && p.power >= 15))
     && phraseLooksLikeDevice(p.phrase)
@@ -380,6 +439,14 @@ function boxFromThroughputM3h(q: number): string {
 function formatCapacityM3(v: number): string {
   return v < 100 ? String(Math.round(v * 10) / 10) : String(Math.round(v))
 }
+// Emit a kW RATING faithfully to the contract value rather than integer-truncating it: a 2.5 kW
+// aeration blower or a 54.6 kW degasser blower must read its CONTRACT value verbatim, never
+// `Math.round` (2.5 → 3, 54.6 → 55) — the audit caught the emitted blower rating (3 kW) diverging
+// from the contract quantity (2.5 kW). Keep 1 dp below 100 kW (where the rounding granularity
+// bites), integer at/above; strip a trailing `.0` so a whole number stays clean. Universal.
+function formatRatingKw(kw: number): string {
+  return kw < 100 ? String(Math.round(kw * 10) / 10) : String(Math.round(kw))
+}
 function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
   const add: ModifierCharacter[] = []
   if (g.volume !== undefined) {
@@ -417,6 +484,11 @@ const DEVICE_NOUNS = new Set([
   'clarifier', 'separator', 'stripper', 'mixer', 'press', 'membrane', 'sump',
   'basin', 'cone', 'scrubber', 'cyclone', 'centrifuge', 'hopper', 'silo', 'drum',
 ])
+// The same device nouns reduced to the 5-char STEM form (matching significantStems), used as the
+// universal join key for the per-unit↔aggregate volume reconcile in buildGroups: a `_each_m3`
+// group and its plant-aggregate `_volume_m3` are the SAME family when they share a device-kind
+// stem (rearing_tank `tank` ↔ total_tank `tank`). Referenced only at call-time, never at load.
+const DEVICE_NOUNS_STEMS = new Set<string>([...DEVICE_NOUNS].map((n) => stem(n)))
 function phraseLooksLikeDevice(phrase: string): boolean {
   for (const raw of phrase.split(/[_\s]+/)) {
     const t = raw.toLowerCase()
@@ -888,7 +960,16 @@ const INSTRUMENT_FAMILIES: InstrumentSpec[] = [
     form: (h) => `Piezoresistive pressure transmitter on ${h}; 4–20 mA to PLC` },
 ]
 
-function instrumentWord(spec: InstrumentSpec, host: WordLike | undefined, qty: number, range: string): WordLike {
+// Optional consolidation payload (BUG C, Tristan 2026-06-19): when ONE instrument family is
+// measured across SEVERAL vessel types (a level transmitter on the rearing tank AND the biofilter
+// AND the degasser), the schedule should carry ONE consolidated line, not a duplicate per vessel —
+// so the word takes a `vessel_location` modifier (the vessel types it serves) and a combined
+// requirement string spanning their per-vessel ranges. Universal: any multi-vessel control variable.
+interface InstrumentConsolidation {
+  vesselLocation: string // e.g. "rearing tank ×4 (0–2.8 m), biofilter ×1 (0–3.5 m), degasser ×2 (0–2.7 m)"
+  combinedForm: string // the merged requirement string covering every served vessel
+}
+function instrumentWord(spec: InstrumentSpec, host: WordLike | undefined, qty: number, range: string, consolidation?: InstrumentConsolidation): WordLike {
   const hostName = host?.name_human ?? 'Recirculation Loop'
   const hostId = String(host?.id ?? 'recirc_loop')
   const mods: ModifierCharacter[] = []
@@ -898,14 +979,19 @@ function instrumentWord(spec: InstrumentSpec, host: WordLike | undefined, qty: n
   // downstream schedule reads the medium-correct type (DO = optical, NOT NDIR) instead of a
   // name-regex default. Universal, never class-keyed.
   mods.push(mod('sensing_principle', spec.principle))
+  // ONE consolidated line across vessel types (BUG C): a `vessel_location` modifier names the
+  // vessels (with their per-vessel count + range) so the single line is unambiguous despite the
+  // per-vessel range differences. Only present when the instrument was consolidated.
+  if (consolidation) mods.push(mod('vessel_location', consolidation.vesselLocation))
   mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(spec.gbp)))))
-  mods.push(mod('form', spec.form(hostName)))
+  mods.push(mod('form', consolidation ? consolidation.combinedForm : spec.form(hostName)))
   mods.push(mod('part_number', 'TBD (field instrument — catalogue class)'))
   mods.push(mod('lifecycle', 'Concept design — measures a contract-declared control variable; exact MPN at detailed design'))
-  mods.push(mod('installation', `Field-mounted on ${hostName}; signal wired to the control system`))
+  mods.push(mod('installation', consolidation ? `Field-mounted across ${consolidation.vesselLocation}; signal wired to the control system` : `Field-mounted on ${hostName}; signal wired to the control system`))
   // single-underscore separator ONLY — a '__' would collide with the sub-component id
-  // convention (parent__suffix) and the BoM would file the instrument as an assembly child.
-  const id = `instr_${spec.key}_on_${sanitizeId(hostId)}`.replace(/__+/g, '_')
+  // convention (parent__suffix) and the BoM would file the instrument as an assembly child. A
+  // CONSOLIDATED instrument is keyed by its spec (not a host) so it is one stable id, never per host.
+  const id = (consolidation ? `instr_${spec.key}_consolidated` : `instr_${spec.key}_on_${sanitizeId(hostId)}`).replace(/__+/g, '_')
   return {
     id,
     name_human: spec.label,
@@ -966,10 +1052,30 @@ export function synthesizeInstrumentation(modules: ModuleLike[], quantities: Rec
       for (const v of targets) toAdd.push(instrumentWord(spec, v.w, 1, spec.range(quantities, v.p)))
       continue
     }
-    for (const v of vessels) {
-      if (spec.scope === 'bio-do' && !(v === primary || BIO_VESSEL_RE.test(v.w.name_human ?? ''))) continue
+    // PER-VESSEL-INSTANCE VITAL SIGN (level / temperature / dissolved-O₂): measured on EACH served
+    // fluid vessel. BUG C (Tristan 2026-06-19): emitting one word PER vessel TYPE duplicated the base
+    // instrument name across the schedule (three "Level Transmitter" lines for the rearing tank /
+    // biofilter / degasser, differing only by range). CONSOLIDATE to ONE line per instrument family:
+    // sum the per-vessel quantities, attach a `vessel_location` modifier naming each served vessel
+    // (with its count + range), and a combined requirement string. A single served vessel keeps its
+    // verbatim per-vessel word (no consolidation needed). Universal — any archetype, any vessel set.
+    const served = vessels.filter((v) => !(spec.scope === 'bio-do' && !(v === primary || BIO_VESSEL_RE.test(v.w.name_human ?? ''))))
+    if (served.length === 0) continue
+    if (served.length === 1) {
+      const v = served[0]
       toAdd.push(instrumentWord(spec, v.w, v.count, spec.range(quantities, v.p)))
+      continue
     }
+    // ≥2 vessel types → one consolidated line. Host it on the largest served vessel (the primary
+    // when it is served), sum the counts, build the location + combined-requirement strings.
+    const hostV = served.includes(primary) ? primary : served.slice().sort((a, b) => b.cap * b.count - a.cap * a.count)[0]
+    const totalQty = served.reduce((s, v) => s + Math.max(1, Math.round(v.count)), 0)
+    const perVessel = served.map((v) => ({ name: v.w.name_human ?? 'vessel', qty: Math.max(1, Math.round(v.count)), range: spec.range(quantities, v.p) }))
+    const vesselLocation = perVessel.map((p) => `${p.name.toLowerCase()} ×${p.qty} (${p.range})`).join(', ')
+    // The combined requirement: the family's own form on the host, then the per-vessel breakdown so
+    // every served vessel's range is explicit on the single line.
+    const combinedForm = `${spec.form(hostV.w.name_human ?? 'the served vessels')} Consolidated across ${perVessel.map((p) => `${p.name.toLowerCase()} ×${p.qty} (${p.range})`).join(', ')} — one schedule line for the ${spec.label.toLowerCase()} on every served vessel.`
+    toAdd.push(instrumentWord(spec, hostV.w, totalQty, spec.range(quantities, hostV.p), { vesselLocation, combinedForm }))
   }
   ;((target.words ??= []) as WordLike[]).push(...toAdd)
   return toAdd.length
@@ -1107,7 +1213,10 @@ export function synthesizeActuation(modules: ModuleLike[], quantities: Record<st
     // carries ONE canonical kW; the names keep the two services apart.
     const blowerName = isDegas ? 'Degassing Blower' : 'Aeration Blower'
     toAdd.push({ sm: dest, w: actuatorWord('blower', blowerName, host, n,
-      [mod('dimension', boxFromRatingKw(b.kw)), mod('rating_primary', `${Math.round(b.kw)}`, 'kW')], b.gbp,
+      // rating_primary reads the contract blower kW VERBATIM (2.5 / 54.6 kW), not Math.round (which
+      // emitted 3 / 55 kW — the audit's emitted-rating≠contract mismatch). formatRatingKw keeps the
+      // contract precision so the BoM line equals the canonical degasser_blower_kw / aeration_blower_kw.
+      [mod('dimension', boxFromRatingKw(b.kw)), mod('rating_primary', formatRatingKw(b.kw), 'kW')], b.gbp,
       `Centrifugal ${isDegas ? 'degassing' : 'aeration'} blower, ${Math.round(each).toLocaleString('en-GB')} m³/h @ ~${Math.round(dPkPa)} kPa each${host ? `, serving ${host.name_human}` : ''}; ${n}× duty/assist`) })
   }
 

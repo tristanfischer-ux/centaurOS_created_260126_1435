@@ -1076,11 +1076,21 @@ def _draw_supporting_block(svg, b, cx, cy):
              fill=SUPPORT_FILL, rx=6)
     svg.text(cx, y + 18, b.tag, size=11, anchor="middle", weight="bold",
              fill=SUPPORT_INK)
-    name_lines = _wrap(b.label, maxlen=22, maxlines=3)
-    n = len(name_lines)
-    start = cy - (n - 1) * 7 + 5
-    for i, line in enumerate(name_lines):
-        svg.text(cx, start + i * 12, line, size=9, anchor="middle", fill=SUPPORT_INK)
+    # Keep the full name MATCHABLE: a wrap that breaks the name across two <text> lines
+    # puts a newline between the words, so the ledger's contiguous full-name check (and a
+    # human read) fails for a name like 'LOX Tank Level + Low Alarm'. Render a moderately
+    # long name on ONE line at a slightly smaller font (still legible) so it stays intact;
+    # only genuinely long names wrap. Universal — keyed on length, not class.
+    full = str(b.label or "")
+    if len(full) <= 30:
+        fs = 9.0 if len(full) <= 22 else (8.0 if len(full) <= 26 else 7.2)
+        svg.text(cx, cy + 5, full, size=fs, anchor="middle", fill=SUPPORT_INK)
+    else:
+        name_lines = _wrap(full, maxlen=22, maxlines=3)
+        n = len(name_lines)
+        start = cy - (n - 1) * 7 + 5
+        for i, line in enumerate(name_lines):
+            svg.text(cx, start + i * 12, line, size=9, anchor="middle", fill=SUPPORT_INK)
 
 
 def _draw_stream(svg, pf, pt, cf, ct, s, lane):

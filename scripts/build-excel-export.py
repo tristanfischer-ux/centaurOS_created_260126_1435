@@ -1816,6 +1816,14 @@ def tab_economics(wb: Workbook, state: dict) -> bool:
     line("ebitda", "EBITDA",
          f"=B{rows_addr['revenue']}-B{rows_addr['opex']}",
          "revenue − total opex", fill=FILL_CONST)
+    # Red-flag a loss-making base case (negative EBITDA) — the honest headline when
+    # the plant is sub-scale (the £5M / 45 t/yr point runs at or below break-even).
+    from openpyxl.formatting.rule import CellIsRule as _CIR
+    _eb_cell = f"B{rows_addr['ebitda']}"
+    ws.conditional_formatting.add(
+        f"{_eb_cell}:{_eb_cell}",
+        _CIR(operator="lessThan", formula=["0"], fill=FILL_FAIL, font=FONT_FAIL),
+    )
     r += 1
 
     # ---- headline ratios ----------------------------------------------------
@@ -2043,6 +2051,13 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
         ic.number_format = "0.0%"
         r += 1
     sweep_last = r - 1
+    # Red-flag every loss-making sweep row (EBITDA < 0) so the sub-scale plants are
+    # visually obvious and the sweet-spot crossing reads at a glance.
+    from openpyxl.formatting.rule import CellIsRule as _CIR
+    ws.conditional_formatting.add(
+        f"E{sweep_first}:E{sweep_last}",
+        _CIR(operator="lessThan", formula=["0"], fill=FILL_FAIL, font=FONT_FAIL),
+    )
     r += 1
 
     # a numeric payback column the line-chart can plot (text "n/a" breaks a chart
