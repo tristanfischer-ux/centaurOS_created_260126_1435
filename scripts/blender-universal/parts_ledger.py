@@ -436,9 +436,20 @@ def main() -> int:
 
     ORIGIN_KEYWORDS = {"grid", "mains", "water supply", "water intake", "make-up water",
                        "feed", "food", "fuel", "air intake", "seawater", "freshwater",
-                       "oxygen supply", "chemical supply", "intake"}
+                       "oxygen supply", "chemical supply", "intake",
+                       # a stored-medium SUPPLY tank (LOX / bulk chemical / fuel storage)
+                       # is a battery-limit FEED — it legitimately has an OUTPUT only (it
+                       # is filled by tanker, not piped from the process). Type-keyed.
+                       "lox", "liquid oxygen", "bulk storage", "supply tank", "storage tank",
+                       "day tank", "bulk tank", "buffer tank", "dosing tank"}
     SINK_KEYWORDS = {"drain", "effluent", "discharge", "waste", "sludge", "exhaust",
                      "heat rejection", "mortality", "overflow", "reject"}
+    # a BUFFER / SURGE / EXPANSION vessel is a DEAD-LEG on the loop: it tees off at a
+    # single point to absorb thermal expansion / pressure surge / level swing, so it
+    # legitimately has ONE process connection (not a flow-through in + out). Universal —
+    # keyed on the vessel ROLE word, no per-part table.
+    BUFFER_KEYWORDS = {"expansion", "surge", "buffer", "accumulator", "balance tank",
+                       "break tank", "header tank", "expansion vessel", "expansion reservoir"}
 
     PROCESS_TYPES = {"vessel", "rotating", "exchanger", "separator", "valve"}
     ELECTRICAL_TYPES = {"electrical"}
@@ -456,9 +467,35 @@ def main() -> int:
     n_electrical_total = 0
     n_electrical_connected = 0
 
+    # ── identity folding (universal — fixes the duplicate-line false orphan) ─────
+    # The SAME physical part appears as several BoM lines (e.g. "Level Transmitter"
+    # at 10 tanks + 1 sump + 8 lines = three rows, one IDENTITY; "Inlet Flow Control
+    # Valve" ×3). The connection schedule wires ONE edge per identity (LT → Main
+    # Controller), and resolve() attaches it to ONE row — so the other rows read 0/0
+    # and were counted as separate orphans, deflating the %. Connectivity is a
+    # property of the part IDENTITY (tag + normalised name), NOT of each duplicate
+    # line: if ANY row of an identity carries the connection, the identity is wired,
+    # and the identity counts ONCE. Keyed on (tag, norm-name) — no per-part table.
+    ident_io: dict[tuple, dict] = {}
     for e in equipment:
-        has_in = bool(e["inputs"])
-        has_out = bool(e["outputs"])
+        key = (str(e["tag"] or "—"), _norm(e["name"]))
+        agg = ident_io.setdefault(key, {"has_in": False, "has_out": False})
+        if e["inputs"]:
+            agg["has_in"] = True
+        if e["outputs"]:
+            agg["has_out"] = True
+
+    seen_idents: set = set()
+    for e in equipment:
+        ident = (str(e["tag"] or "—"), _norm(e["name"]))
+        # evaluate each IDENTITY exactly once (the first row carries the verdict);
+        # later duplicate rows of the same identity are skipped for the tally.
+        if ident in seen_idents:
+            continue
+        seen_idents.add(ident)
+        agg = ident_io.get(ident, {"has_in": bool(e["inputs"]), "has_out": bool(e["outputs"])})
+        has_in = agg["has_in"]
+        has_out = agg["has_out"]
         has_any = has_in or has_out
         name_l = (e["name"] or "").lower()
         tag = e["tag"] or "—"
@@ -474,8 +511,22 @@ def main() -> int:
         if etype in PASSIVE_TYPES:
             continue  # structural elements — never a connectivity concern
 
+        is_buffer = any(kw in name_l for kw in BUFFER_KEYWORDS)
+
         if etype in PROCESS_TYPES:
             n_process_total += 1
+            # a BUFFER / surge / expansion vessel is a DEAD-LEG — one tie is correct, so
+            # it only needs ≥1 connection (in OR out), like an instrument's association.
+            if is_buffer:
+                if has_in or has_out:
+                    n_process_connected += 1
+                else:
+                    connectivity_concerns.append({
+                        "tag": tag, "name": e["name"], "type": etype,
+                        "issue": "missing_connection",
+                        "detail": "Buffer/surge/expansion vessel not tied to the loop — "
+                                  "a dead-leg vessel still needs its single tee connection."})
+                continue
             needs_in = not is_origin
             needs_out = not is_sink
             ok = True
@@ -509,8 +560,20 @@ def main() -> int:
 
         elif etype in ELECTRICAL_TYPES:
             n_electrical_total += 1
-            needs_in = not is_origin
-            needs_out = not is_sink
+            # A TERMINAL / PASSIVE electrical device legitimately has no downstream
+            # LOAD edge — it is the END of a circuit, not a distributor: a fuse / surge
+            # protector (SPD) / protective relay protects the bus it taps; a cable tray
+            # / terminal block / enclosure panel is passive containment. These need a
+            # power feed IN (where present) but NOT an OUT — the electrical analogue of
+            # a process SINK. Universal, name-only (no class table). A part with NO
+            # required electrical role at all (a pure enclosure with no power feed) is
+            # not a concern in either direction.
+            is_terminal_elec = bool(re.search(
+                r"\bfuse\b|surge|\bSPD\b|protective relay|protection relay|"
+                r"cable tray|terminal block|enclosure|junction box|\bgland\b",
+                name_l, re.I))
+            needs_in = not is_origin and not (is_terminal_elec and not has_any)
+            needs_out = not is_sink and not is_terminal_elec
             ok = True
             if needs_in and not has_in:
                 connectivity_concerns.append({
@@ -535,9 +598,21 @@ def main() -> int:
                     "detail": "Controller with no signal connections — not wired "
                               "to anything it controls."})
 
-    orphans = [e["tag"] for e in equipment
-               if not e["inputs"] and not e["outputs"]
-               and e["type"] in PROCESS_TYPES]
+    # orphan = a PROCESS-type IDENTITY with no edge on ANY of its rows (identity-
+    # folded, same as the connectivity tally — a duplicate line whose sibling row
+    # carries the edge is not an orphan).
+    orphans = []
+    _orph_seen: set = set()
+    for e in equipment:
+        if e["type"] not in PROCESS_TYPES:
+            continue
+        ident = (str(e["tag"] or "—"), _norm(e["name"]))
+        if ident in _orph_seen:
+            continue
+        _orph_seen.add(ident)
+        agg = ident_io.get(ident, {})
+        if not agg.get("has_in") and not agg.get("has_out"):
+            orphans.append(e["tag"])
 
     uncov_conn = [f"{c['from_part']}→{c['to_part']}" for c in connections
                   if "pipe" in c["kind"] and not c["coverage"]["pid"]]

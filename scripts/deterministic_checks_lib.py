@@ -686,6 +686,51 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
 # ============================================================================
 def _checks_connectivity(state: dict, run_dir: str) -> List[Check]:
     out: List[Check] = []
+
+    # --- CONN0. CONNECTION-GRAPH COVERAGE (the deterministic complement to the LLM
+    # connectivity judge): every PROCESS part must have BOTH a fluid in and out (it sits
+    # in a flow path), every INSTRUMENT must have an association (it is wired to what it
+    # measures / to control). The parts-ledger connectivity audit computes these per the
+    # part TYPE (process / instrument / electrical / buffer / origin / sink). We assert
+    # the two coverage fractions clear 0.8 — the SAME ≥80% gate the scorecard's
+    # connectivity score uses (round(min(procPct,instPct)*10) ≥ 8). Universal, no class
+    # table; reads the derived ledger so it tracks whatever the run actually built. ---
+    pl = _load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
+    conn = pl.get("connectivity") if isinstance(pl, dict) else None
+    if isinstance(conn, dict):
+        n_proc = num(conn.get("n_process_total")) or 0.0
+        n_proc_ok = num(conn.get("n_process_connected")) or 0.0
+        n_inst = num(conn.get("n_instrument_total")) or 0.0
+        n_inst_ok = num(conn.get("n_instrument_associated")) or 0.0
+        if n_proc > 0:
+            frac = n_proc_ok / n_proc
+            out.append(Check(
+                name="Process parts with both fluid in+out (coverage >= 80%)",
+                category="CONNECTIVITY", relation="ge",
+                status=PASS if frac >= 0.8 - 1e-9 else FAIL,
+                actual=round(frac, 4), expected=0.8, tol=0.0, unit="fraction",
+                a_factors=(1.0 / n_proc, n_proc_ok),
+                producer="conn:process_coverage",
+                detail=(f"{int(n_proc_ok)} of {int(n_proc)} process parts are fully "
+                        f"connected (fluid in AND out). The connection graph is "
+                        f"incomplete below 80% — a vessel/pump/valve with a missing "
+                        f"feed or discharge is a topology gap. "
+                        f"{int(conn.get('n_concerns', 0) or 0)} concern(s) total."),
+            ))
+        if n_inst > 0:
+            frac = n_inst_ok / n_inst
+            out.append(Check(
+                name="Instruments associated to what they measure (coverage >= 80%)",
+                category="CONNECTIVITY", relation="ge",
+                status=PASS if frac >= 0.8 - 1e-9 else FAIL,
+                actual=round(frac, 4), expected=0.8, tol=0.0, unit="fraction",
+                a_factors=(1.0 / n_inst, n_inst_ok),
+                producer="conn:instrument_coverage",
+                detail=(f"{int(n_inst_ok)} of {int(n_inst)} instruments are wired "
+                        f"(>=1 signal/sense association). Below 80% leaves orphan "
+                        f"sensors not tied to the process or the control system."),
+            ))
+
     cs = _load_json(os.path.join(run_dir, "connection-schedule.json"))
     if not cs:
         return out
@@ -922,6 +967,13 @@ def _selftest() -> int:
             {"tag": "P-1", "qty": 4, "unit_gbp": 5000, "line_gbp": 20000,
              "subcomponents": 2, "subcomponent_gbp": 20000},
         ],
+        # a COMPLETE connection graph: every process part wired in+out, every
+        # instrument associated -> both coverage checks PASS (>= 0.8).
+        "connectivity": {
+            "n_process_total": 20, "n_process_connected": 20,
+            "n_instrument_total": 16, "n_instrument_associated": 16,
+            "n_concerns": 0,
+        },
     }
     clean_conns = {
         "rows": [
@@ -945,6 +997,10 @@ def _selftest() -> int:
         check(_has(checks, "incomer kVA", PASS), "CLEAN incomer kVA should PASS")
         check(_has(checks, "tank volume > media", PASS),
               "CLEAN tank>media should PASS")
+        check(_has(checks, "Process parts with both fluid in+out", PASS),
+              "CLEAN process-coverage should PASS (20/20)")
+        check(_has(checks, "Instruments associated", PASS),
+              "CLEAN instrument-coverage should PASS (16/16)")
 
     # ---- DEFECTIVE run: each family must trip exactly its own FAIL ----
     bad_state = {
@@ -982,6 +1038,13 @@ def _selftest() -> int:
             {"tag": "P-1", "qty": 4, "unit_gbp": 50000, "line_gbp": 200000,
              "subcomponents": 2, "subcomponent_gbp": 150000},  # Σsub != line -> CONSISTENCY
         ],
+        # an INCOMPLETE connection graph: process 17/28 (61%) + instruments 16/21
+        # (76%) both below 80% -> both coverage checks FAIL (the gap this work fixes).
+        "connectivity": {
+            "n_process_total": 28, "n_process_connected": 17,
+            "n_instrument_total": 21, "n_instrument_associated": 16,
+            "n_concerns": 29,
+        },
     }
     bad_conns = {
         "rows": [
@@ -1019,6 +1082,10 @@ def _selftest() -> int:
               "BAD connectivity tally should FAIL")
         check(_has(checks, "velocity <= spec limit", FAIL),
               "BAD velocity-vs-limit should FAIL (7.6 > 3)")
+        check(_has(checks, "Process parts with both fluid in+out", FAIL),
+              "BAD process-coverage should FAIL (17/28 = 61% < 80%)")
+        check(_has(checks, "Instruments associated", FAIL),
+              "BAD instrument-coverage should FAIL (16/21 = 76% < 80%)")
 
     # ---- UNIVERSALITY: a minimal class with none of these inputs -> all N/A,
     #      zero FAIL (the suite must never invent a failure on a sparse class) ----

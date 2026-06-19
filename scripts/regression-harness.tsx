@@ -1042,6 +1042,71 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => detSrcDetail,
   ))
 
+  // ── A8f. CONNECTION-GRAPH COMPLETION (2026-06-19) — the deterministic CONNECTIVITY
+  // coverage check + the universal electrical-distribution HIERARCHY at the source.
+  // Pure shell-out probe (no LLM/network/snapshot); skips if .venv absent. Guards:
+  //   (1) the new CONNECTIVITY-coverage check in deterministic_checks_lib FAILs a graph
+  //       below the ≥80% gate (process 17/28 + instruments 16/21 = the ras-inc5 gap) and
+  //       PASSes a complete graph (the same gate the scorecard's connectivity score uses);
+  //   (2) build_universal_scene._distribution_spine builds a 3-stage series spine
+  //       (source → main breaker → busbar) with the BUSBAR as the load hub + the
+  //       protective devices as bus taps for a RAS-shaped distribution set — but stays
+  //       EMPTY for a lone-busbar set (so a once-through plant with ≤1 chain part keeps
+  //       its historical single-hub behaviour BYTE-IDENTICALLY: no spurious spine);
+  //   (3) a STEAM/waste-heat generator is NOT mis-read as an electrical source.
+  let connGraphOk = false
+  let connGraphDetail = ''
+  try {
+    const venv = resolve(__dirname, '..', '.venv', 'bin', 'python')
+    const pyBin = existsSync(venv) ? venv : 'python3'
+    const probe = [
+      'import json,sys,os,tempfile,types',
+      // stub bpy so build_universal_scene imports headless
+      'b=types.ModuleType("bpy");b.data=types.SimpleNamespace();b.ops=types.SimpleNamespace();b.context=types.SimpleNamespace()',
+      'sys.modules.setdefault("bpy",b);sys.modules.setdefault("mathutils",types.ModuleType("mathutils"))',
+      'fl=types.ModuleType("forge_blender_lib");fl.MM=0.001;sys.modules.setdefault("forge_blender_lib",fl)',
+      'sys.path.insert(0,"scripts");sys.path.insert(0,"scripts/blender-universal")',
+      'import deterministic_checks_lib as dcl, build_universal_scene as B',
+      'r={}',
+      // (1) coverage check: incomplete graph FAILs, complete graph PASSes
+      'def cov(np_,npc,ni,nia):',
+      '    d=tempfile.mkdtemp()',
+      '    json.dump({"connectivity":{"n_process_total":np_,"n_process_connected":npc,"n_instrument_total":ni,"n_instrument_associated":nia,"n_concerns":0}},open(os.path.join(d,"parts-ledger.json"),"w"))',
+      '    cs=dcl._checks_connectivity({},d)',
+      '    pc=[c for c in cs if "both fluid in+out" in c.name][0]',
+      '    ic=[c for c in cs if "Instruments associated" in c.name][0]',
+      '    return pc.status,ic.status',
+      'r["cov_gap_fails"]=cov(28,17,21,16)==("FAIL","FAIL")',
+      'r["cov_full_pass"]=cov(23,23,16,16)==("PASS","PASS")',
+      // (2) distribution spine: RAS-shaped chain → 3-stage spine + busbar hub + taps
+      'def P(n):',
+      '    return B.Part(n,"power_distribution","reg",10,"box",None,1,"")',
+      'ras=[P("Standby Diesel Generator"),P("Main Breaker"),P("Distribution Busbar"),P("Fuse Holder"),P("Surge Protector")]',
+      'sp,hub,prot=B._distribution_spine(ras)',
+      'r["spine_3stage"]=sp==["Standby Diesel Generator","Main Breaker","Distribution Busbar"] and hub=="Distribution Busbar" and set(prot)=={"Fuse Holder","Surge Protector"}',
+      // a lone busbar (no source/breaker) → empty spine (byte-stable single-hub fallback)
+      'sp2,hub2,prot2=B._distribution_spine([P("busbar + distribution board")])',
+      'r["lone_busbar_no_spine"]=len(sp2)<2',
+      // (3) a steam / waste-heat generator is NOT an electrical source
+      'sp3,_,_=B._distribution_spine([P("waste-heat steam generator"),P("Distribution Busbar")])',
+      'r["steam_gen_not_source"]="waste-heat steam generator" not in sp3',
+      'print(json.dumps(r))',
+    ].join('\n')
+    const o = execFileSync(pyBin, ['-c', probe], { encoding: 'utf8', cwd: resolve(__dirname, '..'), timeout: 30000 })
+    const r = JSON.parse(o.trim().split('\n').pop() as string)
+    connGraphOk = r.cov_gap_fails && r.cov_full_pass && r.spine_3stage && r.lone_busbar_no_spine && r.steam_gen_not_source
+    connGraphDetail = JSON.stringify(r)
+  } catch (err) {
+    connGraphDetail = `connection-graph probe failed to run: ${String(err).slice(0, 200)}`
+  }
+  out.push(assertEq(
+    'UNIVERSAL.connection_graph_coverage_and_distribution_hierarchy',
+    'the CONNECTION-GRAPH completion holds (universal, no class table): (1) the deterministic CONNECTIVITY-coverage check FAILs a graph below the ≥80% gate (process 17/28 + instruments 16/21 = the ras-inc5 gap) and PASSes a complete one (the SAME gate the scorecard connectivity score uses); (2) _distribution_spine builds the source→main-breaker→busbar series spine with the busbar as load hub + fuses/surge as bus taps for a RAS-shaped set, but stays EMPTY for a lone-busbar set so a once-through plant keeps its historical single-hub behaviour byte-identically (no spurious spine); (3) a steam/waste-heat generator is never mis-classified as an electrical source.',
+    connGraphDetail,
+    () => connGraphOk === true,
+    () => connGraphDetail,
+  ))
+
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──
   const graph: any = { product_class: 'test', nodes: [{ class: 'environmental_interface', display: 'Environmental Interface', role: 'principal', required: true }], edges: [] }
   const heatingContract: any = { quantities: { heating_duty_kw: { value: 1493 }, heat_pump_cop: { value: 3.5 }, heat_pump_electrical_kw: { value: 427 } } }

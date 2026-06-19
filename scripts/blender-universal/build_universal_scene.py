@@ -5913,7 +5913,7 @@ def _load_required_services():
             m = re.sub(r'[^a-z0-9]', '', str(module or '').lower()); req = set()
             if any(k in t for k in ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan', 'lamp', 'mixer', 'agitat')):
                 req.add('power')
-            if any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor')):
+            if any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'fan', 'compress')):
                 req.add('water')
             if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
                 req.add('signal')
@@ -5990,13 +5990,78 @@ def _endpoint_is_pure_instrument(name):
     return _is_sensor and not _is_inline
 
 
+# ── ELECTRICAL DISTRIBUTION HIERARCHY (universal, role-keyed — no class table) ────
+# A real power net is not a flat star off one part: utility/source → MAIN BREAKER →
+# BUSBAR/BOARD → protective devices (fuses / surge / relays) → each powered LOAD. The
+# orphan connector previously fed EVERY load from ONE representative part (the largest
+# in power_distribution → the standby generator), so the breaker / busbar / fuse /
+# surge each got a feed IN but nothing OUT (they read as just-another-load), and the
+# source had no input. We classify the distribution-chain parts present BY ROLE and
+# order them into a SERIES SPINE; the BUSBAR (last common bus) becomes the LOAD HUB so
+# loads tap the bus, and a synthesised utility incomer (an ORIGIN) feeds the source so
+# nothing upstream is input-less. Keyed only on role words — a class with no such
+# chain (e.g. e-fuel) yields an empty spine and the single-hub fallback is byte-stable.
+# The incomer/source is a true upstream ELECTRICAL supply — a power generator / genset /
+# utility grid / mains / incoming transformer. A UPS / inverter is NOT the series source:
+# it is fed FROM the board and backs up the control loads, so it is wired as an ordinary
+# load. CRITICAL false-positive guard: a STEAM / waste-heat / fired / process generator
+# (a boiler-class heat source — common on a CO₂ / e-fuel plant) is NOT an electrical
+# source; the negative lookahead drops "steam generator", "waste-heat steam generator",
+# "fired heater generator" etc. so a process plant never grows a spurious power spine.
+_DIST_SOURCE_RE     = re.compile(
+    r"(?:\b(?:diesel|standby|backup|emergency|power|electrical|engine)\s+)?\bgenerator\b(?!\s*set\s+for\s+steam)"
+    r"|\bgenset\b|\bincomer\b|utility\s*(?:supply|incomer|connection)|\bgrid\b|\bmains\b"
+    r"|incoming\s*transformer|step[- ]?down\s*transformer",
+    re.IGNORECASE)
+# a bare "generator" qualified by steam/heat/process words is a HEAT source, not power.
+_NOT_POWER_GENERATOR_RE = re.compile(
+    r"steam|waste[- ]?heat|fired|furnace|boiler|process|heat[- ]?recovery|hrsg|reformer|syngas",
+    re.IGNORECASE)
+_DIST_MAINBRK_RE    = re.compile(r"main\s*breaker|main\s*switch|main\s*isolat|incoming\s*breaker|\bACB\b|\bMCCB\b|main\s*circuit\s*breaker", re.IGNORECASE)
+_DIST_BUSBAR_RE     = re.compile(r"busbar|bus\s*bar|distribution\s*board|switchboard|main\s*board|\bMCC\b|consumer\s*unit|\bpanelboard\b|distribution\s*panel", re.IGNORECASE)
+_DIST_PROTECT_RE    = re.compile(r"\bfuse\b|surge|\bSPD\b|protective\s*relay|protection\s*relay|earth\s*leakage|\bRCD\b|\bRCBO\b|\bMCB\b", re.IGNORECASE)
+
+
+def _distribution_spine(parts):
+    """Order the distribution-chain parts present into a SERIES electrical spine.
+    Returns (spine, load_hub, protects) where spine is an ordered list of part NAMES
+    [source, main_breaker, busbar] (only the stages actually present) and load_hub is
+    the bus the loads should tap (the busbar/board if present, else the last spine
+    stage, else None). Protective devices (fuse / surge / relay) are returned
+    separately as bus TAPS — they sit ON the bus, not in the series path. Each role is
+    filled by the FIRST matching part, most-specific role first so a 'main breaker'
+    never falls through to the broad source test. Pure, name-only, archetype-agnostic
+    — a class with none of these roles yields an empty spine (caller falls back)."""
+    src = brk = bus = None
+    protects = []
+    for p in parts:
+        nm = p.name or ""
+        # most-specific first (a 'main breaker'/'busbar' must not also match source)
+        if _DIST_MAINBRK_RE.search(nm) and brk is None:
+            brk = nm
+        elif _DIST_BUSBAR_RE.search(nm) and bus is None:
+            bus = nm
+        elif _DIST_PROTECT_RE.search(nm):
+            protects.append(nm)
+        elif _DIST_SOURCE_RE.search(nm) and not _NOT_POWER_GENERATOR_RE.search(nm) \
+                and src is None:
+            src = nm   # a STEAM/waste-heat/process generator is excluded — it's a heat source
+    spine = [s for s in (src, brk, bus) if s]
+    load_hub = bus or (spine[-1] if spine else None)
+    return spine, load_hub, protects
+
+
 def augment_topology_connect_orphans(state, topology, parts):
     """UNIVERSAL orphan connector — give EVERY part each connection SERVICE its ROLE
     requires, mirroring component_engineering._required_services (the SAME classifier
     the dashboard uses to NAME the missing connection — ONE source of truth). For each
     part, for each required service it does NOT already have an edge for, ADD the edge:
-        power  → the power-distribution hub feeds it (LV feeder, sized by device kW)
-        signal → it links to the control hub (instrument signal cable, sized small)
+        power  → fed from the LOAD HUB of the electrical distribution hierarchy (the
+                 busbar/board), which is itself fed via the series spine
+                 utility-incomer → main-breaker → busbar → load (sized by device kW)
+        signal → it links to the control hub (instrument signal cable, sized small);
+                 a FINAL CONTROL ELEMENT (valve/solenoid/damper) ALWAYS gets a signal
+                 association (it is actuated), even when its role only asked for water
         water  → it ties into the fluid loop at its MODULE's principal fluid vessel,
                  sized to the LOOP flow (a DN300 loop gets a DN300 tie, not DN15)
     Tristan 2026-06-15: "a part with no inputs/outputs is probably missing one" — this
@@ -6007,8 +6072,25 @@ def augment_topology_connect_orphans(state, topology, parts):
     — no double-wiring. Subsumes the old power/signal pass. Universal + deterministic."""
     contract = state.get('orchestratorContract', {}) or {}
     quantities = contract.get('quantities', {}) or {}
-    pwr_hub = _module_repr_part_name('power_distribution', parts)
     ctrl_hub = _module_repr_part_name('control_compute_communication', parts)
+
+    # ── the electrical distribution hierarchy (role-keyed series spine + load hub) ──
+    # Activate the hierarchy ONLY when a genuine MULTI-STAGE chain is present (≥2 of
+    # source / main-breaker / busbar), e.g. RAS: generator → main breaker → busbar. A
+    # class with just a lone busbar (or none) keeps the EXISTING single-hub behaviour
+    # (pwr_hub = the module-representative part) BYTE-IDENTICALLY — so CO₂/SAF/VF, which
+    # have at most one distribution-chain part, are untouched. The hierarchy is purely
+    # additive where it activates: the spine edges + busbar→protective taps are new, and
+    # loads tap the busbar instead of the lone repr-part.
+    dist_spine, dist_load_hub, dist_protects = _distribution_spine(parts)
+    _hierarchy_active = len(dist_spine) >= 2
+    if _hierarchy_active:
+        pwr_hub = dist_load_hub
+    else:
+        # no real chain → fall back to the historical hub pick (unchanged behaviour),
+        # and emit NO spine / protective taps (so nothing new is added on these classes).
+        pwr_hub = _module_repr_part_name('power_distribution', parts)
+        dist_spine, dist_protects = [], []
 
     # the water tie carries the loop flow (largest flow_capacity already on the topology)
     loop_flow = 0.0
@@ -6020,7 +6102,12 @@ def augment_topology_connect_orphans(state, topology, parts):
                 pass
 
     # SERVICES each part already HAS — resolve BOTH endpoints to a real part so a
-    # process-ID endpoint credits its equipment-name part (the identity bridge).
+    # process-ID endpoint credits its equipment-name part (the identity bridge). Also
+    # track fluid DIRECTION per part (does it already have an inbound / outbound process
+    # line?) so the water tie can close the MISSING direction: a process vessel on a
+    # recirculation loop needs BOTH a feed IN and a return OUT, and the loop only ever
+    # authored one of them (e.g. Expansion Reservoir → Rearing Tank gives an OUT but no
+    # IN). Universal — keyed on edge direction, no per-part table.
     have = {}
     for e in topology:
         svc = _edge_service(e.get('mechanism'))
@@ -6040,18 +6127,83 @@ def augment_topology_connect_orphans(state, topology, parts):
     existing = {(str(e.get('from_part')), str(e.get('to_part'))) for e in topology}
     seen = set()
     extra = []
-    n_pwr = n_sig = n_wtr = 0
+    n_pwr = n_sig = n_wtr = n_chain = 0
+
+    def _add_pwr_edge(a, b, ctx, current=None):
+        """Add an electrical_bus feeder a→b once (dedup against topology + this pass)."""
+        if not a or not b or a == b:
+            return False
+        if (a, b) in existing or (a, b) in seen:
+            return False
+        seen.add((a, b))
+        e = {'from_part': a, 'to_part': b, 'mechanism': 'electrical_bus',
+             'constraint_kind': 'current_rating',
+             'required_value': current if current is not None else _device_current_a(b, quantities),
+             'required_unit': 'A', 'required_margin_factor': 1.25,
+             'material_context': ctx, '_augmented': True}
+        extra.append(e)
+        return True
+
+    def _add_fluid_edge(a, b):
+        """Add a fluid_loop process line a→b once, sized to the loop flow. Returns 1 if
+        added else 0. A 2-cycle is rejected (an a→b suppresses a later b→a — two process
+        lines between the same pair read as a tangle)."""
+        if not a or not b or a == b:
+            return 0
+        if (a, b) in existing or (b, a) in existing or (a, b) in seen or (b, a) in seen:
+            return 0
+        seen.add((a, b))
+        edge = {'from_part': a, 'to_part': b, 'mechanism': 'fluid_loop',
+                'constraint_kind': 'flow_capacity',
+                'material_context': 'process water tie-in (recirculation loop)', '_augmented': True}
+        if loop_flow > 0:
+            edge['required_value'] = loop_flow
+            edge['required_unit'] = 'm³/s'
+        extra.append(edge)
+        return 1
+
+    # ── (0) ELECTRICAL DISTRIBUTION SPINE — energise the chain itself so every node
+    #    on it has power IN and OUT, then loads tap the busbar (done in the loop). The
+    #    series path is utility-incomer → source → main-breaker → busbar; each
+    #    protective device (fuse/surge/relay) TEES off the busbar. A synthesised
+    #    "Utility Incomer" ORIGIN feeds the first stage so the source is not input-less.
+    #    Skipped wholesale when no chain is recognised (dist_spine empty) — byte-stable.
+    chain_parts = set(dist_spine) | set(dist_protects)
+    if dist_spine:
+        prev = 'Utility Incomer'   # abstract battery-limit origin (an ORIGIN_KEYWORD)
+        for stage in dist_spine:
+            if _add_pwr_edge(prev, stage, 'utility incomer / main distribution feeder'):
+                n_chain += 1
+            prev = stage
+        # protective devices sit ON the bus (busbar → fuse / surge / relay)
+        bus = dist_load_hub
+        for prot in dist_protects:
+            if _add_pwr_edge(bus, prot, 'busbar protective tap (fuse / surge / relay)'):
+                n_chain += 1
+
     for p in parts:
         needed = _REQUIRED_SERVICES(p.name, p.module_id or '', getattr(p, 'function', '') or '')
         got = have.get(p.name, set())
+        # a FINAL CONTROL ELEMENT that is ACTUATED (a control valve / solenoid / motorised
+        # / actuated damper) takes a command signal, even when its role only asked for
+        # water. Narrow to genuinely-actuated elements: a manual / relief / check / safety
+        # valve is mechanical and gets NO signal (so a relief valve never grows a spurious
+        # signal tie on any class). Keyed on actuation words, no class table.
+        _nl_fe = (p.name or '').lower()
+        _is_actuated_fe = (
+            ('solenoid' in _nl_fe or 'actuat' in _nl_fe or 'motoris' in _nl_fe or 'motoriz' in _nl_fe)
+            or (('control valve' in _nl_fe or 'control-valve' in _nl_fe)
+                or ('valve' in _nl_fe and any(k in _nl_fe for k in ('control', 'modulat', 'throttl', 'dosing', 'metering')))))
+        if _is_actuated_fe and not any(k in _nl_fe for k in ('relief', 'check', 'non-return', 'manual', 'safety', 'isolation', 'isolat')):
+            needed = set(needed) | {'signal'}
         for svc in sorted(needed - got):
+            # a part that IS on the distribution spine/taps is already energised by (0)
+            if svc == 'power' and p.name in chain_parts:
+                continue
             if svc == 'power' and pwr_hub and p.name != pwr_hub \
                     and (pwr_hub, p.name) not in existing and (pwr_hub, p.name) not in seen:
-                seen.add((pwr_hub, p.name)); n_pwr += 1
-                extra.append({'from_part': pwr_hub, 'to_part': p.name, 'mechanism': 'electrical_bus',
-                              'constraint_kind': 'current_rating', 'required_value': _device_current_a(p.name, quantities),
-                              'required_unit': 'A', 'required_margin_factor': 1.25,
-                              'material_context': 'LV power feeder 400/415V 3ph', '_augmented': True})
+                if _add_pwr_edge(pwr_hub, p.name, 'LV power feeder 400/415V 3ph'):
+                    n_pwr += 1
             elif svc == 'signal' and ctrl_hub and p.name != ctrl_hub \
                     and (p.name, ctrl_hub) not in existing and (p.name, ctrl_hub) not in seen:
                 seen.add((p.name, ctrl_hub)); n_sig += 1
@@ -6060,21 +6212,18 @@ def augment_topology_connect_orphans(state, topology, parts):
                               'required_unit': 'A', 'required_margin_factor': 1.0,
                               'material_context': 'instrument signal cable 4-20mA', '_augmented': True})
             elif svc == 'water':
+                # ORIGINAL behaviour (byte-stable): tie the part to its MODULE's fluid
+                # repr, giving it an OUTPUT. The direction-closer below ADDS the missing
+                # opposite direction on top (purely additive — it never redirects this
+                # edge), so existing classes' fluid ties are unchanged.
                 sink = _sink_for(p.module_id)
-                if sink and sink != p.name and (p.name, sink) not in existing \
-                        and (sink, p.name) not in existing \
-                        and (p.name, sink) not in seen and (sink, p.name) not in seen:
-                    seen.add((p.name, sink)); n_wtr += 1
-                    edge = {'from_part': p.name, 'to_part': sink, 'mechanism': 'fluid_loop',
-                            'constraint_kind': 'flow_capacity',
-                            'material_context': 'process water tie-in (recirculation loop)', '_augmented': True}
-                    if loop_flow > 0:
-                        edge['required_value'] = loop_flow
-                        edge['required_unit'] = 'm³/s'
-                    extra.append(edge)
+                if not (sink and sink != p.name):
+                    continue
+                n_wtr += _add_fluid_edge(p.name, sink)
     if extra:
-        print(f"[univ] orphan connector: +{len(extra)} edge(s) — {n_pwr} power, {n_sig} signal, "
-              f"{n_wtr} water (power hub={pwr_hub}, control hub={ctrl_hub})")
+        print(f"[univ] orphan connector: +{len(extra)} edge(s) — {n_chain} distribution-spine, "
+              f"{n_pwr} power, {n_sig} signal, {n_wtr} water "
+              f"(load hub={pwr_hub}, spine={'→'.join(dist_spine) or '—'}, control hub={ctrl_hub})")
     return extra
 
 
