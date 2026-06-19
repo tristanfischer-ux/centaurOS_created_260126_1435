@@ -186,7 +186,7 @@ def header(ws: Worksheet, row: int, cols: List[str]) -> None:
 
 def sub_banner(ws: Worksheet, row: int, text: str, span: int) -> None:
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=span)
-    c = ws.cell(row, 1, text)
+    c = ws.cell(row, 1, clean_cell(text))
     c.font = FONT_SUB
     c.fill = FILL_SUB
     c.alignment = LEFT_TOP
@@ -227,12 +227,26 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
 # md tables occasionally carry stray control bytes; strip them so .save never throws.
 _CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
+# Formula-injection defang (CWE-1236): a worksheet cell whose visible text starts with
+# one of these is interpreted as a FORMULA by Excel/LibreOffice when the file is opened.
+# Display text from the brief / LLM / md-tables is externally-sourced, so a stray
+# "=cmd|..." / "+.." / "-.." / "@.." could execute on the customer's machine. We prefix
+# such display strings with a zero-width space — they render identically but are inert
+# text. Deliberate live formulas are written directly via cell.value = "=..." and NEVER
+# pass through clean_cell (verified: no formula write routes through it).
+_FORMULA_TRIGGERS = ("=", "+", "-", "@")
+
 
 def clean_cell(v: Any) -> Any:
-    """Make any value safe + tidy for a worksheet cell. Strings get control chars
-    stripped; everything else passes through untouched."""
+    """Make any value safe + tidy for a worksheet DISPLAY cell. Strings get control
+    chars stripped, are trimmed, and any leading formula-trigger is defanged with a
+    zero-width space (CWE-1236). Non-strings pass through untouched (numbers stay
+    numbers). NEVER call this on a deliberate "=..." live-formula string."""
     if isinstance(v, str):
-        return _CTRL.sub("", v).strip()
+        s = _CTRL.sub("", v).strip()
+        if s and s[0] in _FORMULA_TRIGGERS:
+            s = "​" + s
+        return s
     return v
 
 
@@ -665,13 +679,13 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
             source, detail = v.get("source", ""), v.get("source_detail", "")
         else:
             value, unit, family, basis, source, detail = v, "", "", "", "", ""
-        ws.cell(r, 1, name).border = BORDER
+        ws.cell(r, 1, clean_cell(name)).border = BORDER
         ws.cell(r, 2, value).border = BORDER
-        ws.cell(r, 3, unit).border = BORDER
-        ws.cell(r, 4, family).border = BORDER
-        ws.cell(r, 5, basis).border = BORDER
-        ws.cell(r, 6, source).border = BORDER
-        cd = ws.cell(r, 7, detail)
+        ws.cell(r, 3, clean_cell(unit)).border = BORDER
+        ws.cell(r, 4, clean_cell(family)).border = BORDER
+        ws.cell(r, 5, clean_cell(basis)).border = BORDER
+        ws.cell(r, 6, clean_cell(source)).border = BORDER
+        cd = ws.cell(r, 7, clean_cell(detail))
         cd.alignment = WRAP_TOP
         cd.font = FONT_NOTE
         cd.border = BORDER
@@ -891,16 +905,16 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     r = 5
     first_line_row = r
     for row in bom:
-        ws.cell(r, 1, row.get("tag", "")).border = BORDER
-        rq = ws.cell(r, 2, row.get("requirement", ""))
+        ws.cell(r, 1, clean_cell(row.get("tag", ""))).border = BORDER
+        rq = ws.cell(r, 2, clean_cell(row.get("requirement", "")))
         rq.alignment = WRAP_TOP
         rq.border = BORDER
         ws.cell(r, 3, row.get("qty")).border = BORDER
-        ws.cell(r, 4, row.get("part", "")).border = BORDER
-        ws.cell(r, 5, row.get("status", "")).border = BORDER
+        ws.cell(r, 4, clean_cell(row.get("part", ""))).border = BORDER
+        ws.cell(r, 5, clean_cell(row.get("status", ""))).border = BORDER
         ws.cell(r, 6, num(row.get("unit_gbp"))).border = BORDER
         ws.cell(r, 7, num(row.get("line_gbp"))).border = BORDER
-        bs = ws.cell(r, 8, row.get("basis", ""))
+        bs = ws.cell(r, 8, clean_cell(row.get("basis", "")))
         bs.alignment = WRAP_TOP
         bs.font = FONT_NOTE
         bs.border = BORDER
@@ -979,15 +993,15 @@ def tab_cost(wb: Workbook, state: dict) -> bool:
     first = r
     for ln in cb["lines"]:
         basis = ln.get("basis") or {}
-        ws.cell(r, 1, ln.get("label", "")).border = BORDER
-        ws.cell(r, 2, ln.get("module", "")).border = BORDER
+        ws.cell(r, 1, clean_cell(ln.get("label", ""))).border = BORDER
+        ws.cell(r, 2, clean_cell(ln.get("module", ""))).border = BORDER
         ws.cell(r, 3, num(ln.get("cost_gbp"))).border = BORDER
         ws.cell(r, 4, "yes" if ln.get("defensible") else "no").border = BORDER
-        ws.cell(r, 5, basis.get("method", "")).border = BORDER
+        ws.cell(r, 5, clean_cell(basis.get("method", ""))).border = BORDER
         inp = basis.get("inputs")
-        ws.cell(r, 6, ", ".join(map(str, inp)) if isinstance(inp, list) else str(inp or "")).border = BORDER
-        ws.cell(r, 7, basis.get("estimate_class", "")).border = BORDER
-        nt = ws.cell(r, 8, basis.get("notes", ""))
+        ws.cell(r, 6, clean_cell(", ".join(map(str, inp)) if isinstance(inp, list) else str(inp or ""))).border = BORDER
+        ws.cell(r, 7, clean_cell(basis.get("estimate_class", ""))).border = BORDER
+        nt = ws.cell(r, 8, clean_cell(basis.get("notes", "")))
         nt.alignment = WRAP_TOP
         nt.font = FONT_NOTE
         nt.border = BORDER
@@ -1390,7 +1404,7 @@ def tab_spec_sheets(wb: Workbook, state: dict) -> bool:
         # the single data row for this principal
         ws.cell(r, 1, "spec").font = FONT_SUB
         ws.cell(r, 1).border = BORDER
-        ws.cell(r, 2, status).border = BORDER
+        ws.cell(r, 2, clean_cell(status)).border = BORDER
         qc = ws.cell(r, 3, qty)
         qc.fill = FILL_INPUT
         qc.border = BORDER
@@ -1405,7 +1419,7 @@ def tab_spec_sheets(wb: Workbook, state: dict) -> bool:
         lc.fill = FILL_RESULT
         lc.border = BORDER
         line_total_rows.append(r)
-        ws.cell(r, 6, material).border = BORDER
+        ws.cell(r, 6, clean_cell(material)).border = BORDER
         pc = ws.cell(r, 7, clean_cell(mpn) or (part or "—"))
         pc.border = BORDER
         pc.alignment = WRAP_TOP
