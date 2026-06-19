@@ -951,6 +951,33 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => pyDetail,
   ))
 
+  // ── A8d. the DETERMINISTIC CHECK SUITE (the instant arithmetic verifier that
+  // replaces the slow LLM physics critic) — deterministic_checks_lib.py --selftest.
+  // Guards that every pure-arithmetic check family stays correct AND universal: a
+  // CLEAN synthetic run produces zero FAIL; a DEFECTIVE run trips exactly its own
+  // family (per-unit×count, Σsub==line, incomer-kVA≥load, tank>media, cable-CSA,
+  // price-band >5×, Σlines==cover, out-of-spec tally, velocity≤limit); a SPARSE
+  // class with none of those inputs produces zero FAIL (never invent a failure). ──
+  let detSelftestOk = false
+  let detDetail = ''
+  try {
+    const detPy = resolve(__dirname, 'deterministic_checks_lib.py')
+    const detVenv = resolve(__dirname, '..', '.venv', 'bin', 'python')
+    const detBin = existsSync(detVenv) ? detVenv : 'python3'
+    const o = execFileSync(detBin, [detPy, '--selftest'], { encoding: 'utf8', timeout: 30000 })
+    detSelftestOk = /selftest: all invariants hold/.test(o)
+    detDetail = o.trim().split('\n').slice(-3).join(' | ')
+  } catch (err) {
+    detDetail = `deterministic_checks_lib.py --selftest failed to run: ${String(err).slice(0, 160)}`
+  }
+  out.push(assertEq(
+    'UNIVERSAL.deterministic_check_suite',
+    'deterministic_checks_lib.py --selftest passes: the instant, pure-arithmetic verifier (no LLM, no network) is correct + universal — clean run = all-pass, each defect family trips its own FAIL (incl. the Grundfos >5× price-band and the DN300 over-velocity tally), and a sparse class invents no failure. Shared by the standalone CLI (scripts/deterministic-checks.py) and the Excel exporter ⚠Checks tab so they cannot diverge.',
+    JSON.stringify({ detSelftestOk, detDetail }),
+    (v) => { const o = JSON.parse(v as unknown as string); return o.detSelftestOk === true },
+    () => detDetail,
+  ))
+
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──
   const graph: any = { product_class: 'test', nodes: [{ class: 'environmental_interface', display: 'Environmental Interface', role: 'principal', required: true }], edges: [] }
   const heatingContract: any = { quantities: { heating_duty_kw: { value: 1493 }, heat_pump_cop: { value: 3.5 }, heat_pump_electrical_kw: { value: 427 } } }

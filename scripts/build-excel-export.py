@@ -60,6 +60,13 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+# The SHARED deterministic-check library — the SAME pure-arithmetic checks the
+# standalone CLI (scripts/deterministic-checks.py) runs, so the workbook's Checks
+# tab and the instant CLI can never diverge. Imported by absolute path so the
+# exporter works regardless of the caller's cwd.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import deterministic_checks_lib as dcl  # noqa: E402
+
 # ----------------------------------------------------------------------------
 # STYLES — light theme only (Tristan: light mode, never dark)
 # ----------------------------------------------------------------------------
@@ -252,6 +259,18 @@ def rhs_of(formula: str) -> str:
     return (formula or "").strip()
 
 
+def lhs_symbol(formula: str) -> str:
+    """Return the OUTPUT symbol a calc produces — the left-hand side of 'lhs = rhs',
+    normalised to the bare identifier. Used to key within-tool chaining by IDENTITY
+    (bug #19: chaining by numeric value grabbed the wrong producing cell when two
+    calcs produced the same number, e.g. q_wall and q_roof both = 4920)."""
+    if not formula or "=" not in formula:
+        return ""
+    lhs = formula.split("=", 1)[0].strip()
+    m = re.match(r"[A-Za-z_][A-Za-z0-9_]*", lhs)
+    return m.group(0) if m else ""
+
+
 # ============================================================================
 # TAB 1 — OVERVIEW (quality scorecard + headline metrics + provenance)
 # ============================================================================
@@ -368,6 +387,89 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
 # ============================================================================
 # TAB 2 — "⚠ Checks"  (THE ERROR-SURFACING TAB — the point of the exercise)
 # ============================================================================
+def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
+                       data_r: int, data_col_a: str,
+                       fail_labels: List[str]) -> Tuple[int, int, int]:
+    """Render every deterministic_checks_lib.Check as a LIVE Excel row, grouped by
+    family. Returns (next_row, next_data_row, fail_count).
+
+    Layout per check (mirrors the existing `emit` so the whole tab stays live):
+      * hidden data cells: K=actual-base (or per-unit), L=expected, M=count
+      * visible: B=ACTUAL formula, C=EXPECTED ref, D=Δ, E=Tol, F=STATUS, G=detail
+      * for >= / <= / tally relations the STATUS formula uses the right operator so
+        editing a data cell re-decides PASS/FAIL on the correct comparison.
+    """
+    checks = dcl.run_all_checks(run_dir, state)
+    fail_count = 0
+    if not checks:
+        return r, data_r, fail_count
+
+    fam_titles = {
+        "CONSISTENCY": "E1 · CONSISTENCY — per-unit×count, Σsub==line, rating==quantity",
+        "ADEQUACY": "E2 · ADEQUACY — rating ≥ duty (motor, breaker, cable, vessel, chiller)",
+        "BALANCE": "E3 · BALANCE — mass/energy/flow closures & continuity",
+        "COST": "E4 · COST — per-line price band & Σ lines == cover total",
+        "CONNECTIVITY": "E5 · CONNECTIVITY/SPEC — out-of-spec tally & velocity limit",
+    }
+    for fam in ("CONSISTENCY", "ADEQUACY", "BALANCE", "COST", "CONNECTIVITY"):
+        fam_checks = [c for c in checks if c.category == fam]
+        if not fam_checks:
+            continue
+        sub_banner(ws, r, fam_titles[fam], 7)
+        r += 1
+        for c in fam_checks:
+            if c.actual is None or c.expected is None:
+                continue  # N/A — nothing live to render
+            data_r += 1
+            # --- hidden editable data cells ---
+            ws.cell(data_r, 10, c.name)
+            if c.a_factors is not None:
+                per_unit, count = c.a_factors
+                ws.cell(data_r, 11, per_unit).fill = FILL_INPUT      # K = per-unit
+                ws.cell(data_r, 13, count).fill = FILL_INPUT         # M = count
+                actual_formula = f"=${data_col_a}${data_r}*$M${data_r}"
+            else:
+                ws.cell(data_r, 11, c.actual).fill = FILL_INPUT      # K = actual
+                actual_formula = f"=${data_col_a}${data_r}"
+            ws.cell(data_r, 12, c.expected).fill = FILL_INPUT        # L = expected
+
+            # --- visible live row ---
+            ws.cell(r, 1, c.name).border = BORDER
+            ws.cell(r, 1).alignment = WRAP_TOP
+            ws.cell(r, 2, actual_formula).border = BORDER
+            ws.cell(r, 3, f"=$L${data_r}").border = BORDER
+            ws.cell(r, 4, f"=B{r}-C{r}").border = BORDER
+            ws.cell(r, 5, c.tol).border = BORDER
+            # STATUS formula chosen by relation so the comparison stays correct live
+            if c.relation == "ge":          # actual must be >= expected
+                status_f = f'=IF(B{r}>=C{r}-E{r},"PASS","FAIL")'
+            elif c.relation == "le":        # actual must be <= expected
+                status_f = f'=IF(B{r}<=C{r}+E{r},"PASS","FAIL")'
+            elif c.relation == "tally":     # actual count must be 0
+                status_f = f'=IF(B{r}<=C{r},"PASS","FAIL")'
+            else:                            # equality within tolerance
+                status_f = f'=IF(ABS(D{r})<E{r},"PASS","FAIL")'
+            cs = ws.cell(r, 6, status_f)
+            cs.border = BORDER
+            cs.font = Font(bold=True)
+            cdet = ws.cell(r, 7, c.detail)
+            cdet.alignment = WRAP_TOP
+            cdet.font = FONT_NOTE
+            cdet.border = BORDER
+
+            # pre-evaluate now so we can colour + count FAILs (and so the CLI and
+            # the tab agree before Excel recomputes on open)
+            if c.status == dcl.FAIL:
+                fail_count += 1
+                fail_labels.append(f"[{fam}] {c.name}")
+                for col in range(1, 8):
+                    cc = ws.cell(r, col)
+                    cc.fill = FILL_FAIL
+            r += 1
+        r += 1  # spacer between families
+    return r, data_r, fail_count
+
+
 def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
     """
     Live-formula invariants. Each row:
@@ -406,6 +508,16 @@ def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
 
     fail_count = 0
     fail_labels: List[str] = []
+
+    # ---- E. the SHARED deterministic check suite (rendered live first) --------
+    # Every check from deterministic_checks_lib — the SAME arithmetic the standalone
+    # CLI runs — rendered as live Excel rows. ACTUAL/EXPECTED/Δ/STATUS are formulas
+    # over editable yellow data cells; per-unit×count checks make the product live.
+    # This is the canonical universal suite; sections A–D below add RAS-flavoured
+    # cross-surface detail on top.
+    r, data_r, fc = _render_lib_checks(
+        ws, state, run_dir, r, data_r, DATA_COL_A, fail_labels)
+    fail_count += fc
 
     def emit(label: str, a_val: Optional[float], expected: Optional[float],
              tol: float, detail: str,
@@ -812,8 +924,13 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
                        "Formula (text)", "Engine value", "Δ", "Unit", "Assumptions"])
         r += 1
 
-        # produced[value] -> producing result cell, for within-tool chaining
-        produced: Dict[float, str] = {}
+        # produced[output_symbol] -> (producing result cell, its value), for
+        # within-tool chaining. BUG #19 FIX: key by the producing calc's OUTPUT
+        # SYMBOL (formula LHS), not by numeric value — two calcs producing the same
+        # number (q_wall and q_roof both 4920) must not collapse to one cell, and a
+        # later input must chain to the result with the MATCHING symbol+label, not
+        # whichever happened to register last at that value.
+        produced: Dict[str, Tuple[str, float]] = {}
 
         for w in worked:
             label = w.get("label", "")
@@ -861,13 +978,15 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
                 iunit = inp.get("unit", "") or ""
                 ws.cell(r, 1, f"  {sym}").font = FONT_MONO
                 cell = ws.cell(r, 2)
-                # chain: if this input's value was produced by a prior calc, REFERENCE it
+                # chain by IDENTITY (bug #19): reference a prior result ONLY when
+                # this input's SYMBOL matches that result's producing output symbol
+                # AND the values agree. Symbol-keying means q_wall and q_roof (both
+                # 4920) each chain to their OWN producing cell, never the other's.
                 ref = None
-                if ival is not None:
-                    for pv, pcell in produced.items():
-                        if abs(pv - ival) <= max(1e-9, abs(pv) * 1e-6):
-                            ref = pcell
-                            break
+                if sym and sym in produced:
+                    pcell, pval = produced[sym]
+                    if ival is None or abs(pval - ival) <= max(1e-9, abs(pval) * 1e-6):
+                        ref = pcell
                 # also reference a shared constant if the symbol is one
                 if ref is None and sym in const_cell and ival is not None:
                     cval = CONSTANTS[sym][0]
@@ -914,9 +1033,11 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
                 ac.font = FONT_NOTE
                 ac.alignment = WRAP_TOP
 
-            # register this result's VALUE so later inputs can chain to it
-            if isinstance(res_val, (int, float)):
-                produced[float(res_val)] = f"$B${r}"
+            # register this result under its OUTPUT SYMBOL so later inputs chain by
+            # symbol+label identity (bug #19), not by a numeric-value collision.
+            out_sym = lhs_symbol(formula)
+            if out_sym and isinstance(res_val, (int, float)):
+                produced[out_sym] = (f"$B${r}", float(res_val))
             r += 2  # spacer between calcs
 
         r += 1  # spacer between tools
