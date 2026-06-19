@@ -522,7 +522,31 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
         r += 1
         for c in fam_checks:
             if c.actual is None or c.expected is None:
-                continue  # N/A — nothing live to render
+                # No numeric target → no LIVE formula possible. But a check the ENGINE
+                # itself flagged FAIL (e.g. a closure with status=warn/fail such as
+                # capex_within_ceiling: £8.15 M design vs the £5.0 M brief ceiling) must
+                # still surface — otherwise the tab silently disagrees with the CLI and
+                # hides a real breach. Render it as a STATIC red row (no recompute).
+                if c.status == dcl.FAIL:
+                    ws.cell(r, 1, clean_cell(c.name)).border = BORDER
+                    ws.cell(r, 1).alignment = WRAP_TOP
+                    ws.cell(r, 2, num(c.actual) if c.actual is not None else "—").border = BORDER
+                    ws.cell(r, 3, "(engine verdict)").border = BORDER
+                    ws.cell(r, 4, "—").border = BORDER
+                    ws.cell(r, 5, "—").border = BORDER
+                    cs = ws.cell(r, 6, "FAIL")
+                    cs.border = BORDER
+                    cs.font = Font(bold=True)
+                    cdet = ws.cell(r, 7, clean_cell(c.detail))
+                    cdet.alignment = WRAP_TOP
+                    cdet.font = FONT_NOTE
+                    cdet.border = BORDER
+                    fail_count += 1
+                    fail_labels.append(f"[{fam}] {c.name}")
+                    for col in range(1, 8):
+                        ws.cell(r, col).fill = FILL_FAIL
+                    r += 1
+                continue  # N/A, or static-fail already rendered — nothing live
             data_r += 1
             # --- hidden editable data cells ---
             ws.cell(data_r, 10, c.name)

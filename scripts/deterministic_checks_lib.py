@@ -581,9 +581,16 @@ def _checks_balance(state: dict, run_dir: str) -> List[Check]:
                 detail=str(cl.get("reason", required))[:200],
             ))
         else:
-            # engine's own verdict only surfaces as a FAIL (never fabricate one)
+            # The engine's OWN verdict on a required closure it could not satisfy is
+            # surfaced as a deterministic FAIL — we never fabricate one, we just stop
+            # DROPPING the ones the engine already flagged. "warn" is included: e.g.
+            # capex_within_ceiling status=warn means the £5.0 M brief ceiling is
+            # breached by the £8.15 M 204 t/yr design — the single most important
+            # customer constraint. A breach the engine recorded must NOT hide behind an
+            # all-green book (the deterministic-verification contract: flag every
+            # discrepancy). A closure the engine marked pass/ok stays silent.
             status = str(cl.get("status", "")).lower()
-            if status in ("fail", "error"):
+            if status in ("warn", "fail", "error"):
                 out.append(Check(
                     name=f"closure: {inv}",
                     category="BALANCE", relation="eq", status=FAIL,
@@ -1086,6 +1093,26 @@ def _selftest() -> int:
               "BAD process-coverage should FAIL (17/28 = 61% < 80%)")
         check(_has(checks, "Instruments associated", FAIL),
               "BAD instrument-coverage should FAIL (16/21 = 76% < 80%)")
+
+    # ---- the engine's OWN non-pass closure verdict must SURFACE, not be dropped ----
+    #      capex_within_ceiling status=warn (£8.15M design vs the £5.0M brief ceiling)
+    #      is the single most important customer constraint; a breach the engine
+    #      recorded must not hide behind an all-green book. A PASS closure stays silent.
+    with tempfile.TemporaryDirectory() as tmp:
+        d = _write_run(tmp, {
+            "orchestratorContract": {"quantities": {}, "closures": [
+                {"invariant_id": "capex_within_ceiling", "status": "warn",
+                 "measured": 8150000, "required": "equipment capex <= GBP 5.0M ceiling",
+                 "reason": "Equipment capex anchor GBP 8.15M vs the GBP 5.0M ceiling."},
+                {"invariant_id": "ceiling_satisfied_elsewhere", "status": "pass",
+                 "measured": 4000000, "required": "capex <= GBP 5.0M ceiling"},
+            ]},
+            "requirementsBom": [], "partVerifications": []}, {}, {})
+        checks = run_all_checks(d)
+        check(_has(checks, "capex_within_ceiling", FAIL),
+              "WARN closure (capex over ceiling) must surface as a deterministic FAIL")
+        check(not any("ceiling_satisfied_elsewhere" in c.name for c in checks),
+              "PASS inequality closure must stay silent (never fabricate a FAIL)")
 
     # ---- UNIVERSALITY: a minimal class with none of these inputs -> all N/A,
     #      zero FAIL (the suite must never invent a failure on a sparse class) ----
