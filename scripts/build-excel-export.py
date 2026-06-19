@@ -215,6 +215,10 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Cost": "Cost basis — per-line cost build-up with method, inputs & factors.",
     "Brief compliance": "Every brief target metric vs the achieved quantity vs a live PASS/FAIL.",
     "Cost waterfall": "BoM → assembly → factory COGS → install → installed ASP (live running totals).",
+    "Inputs & Assumptions": "Editable yellow drivers (price/feed/energy/labour/capex) — the economics model inputs.",
+    "Economics": "Live revenue / opex / EBITDA / margin / payback / NPV / IRR — all formulas off the Inputs tab. Opex pie + revenue-vs-EBITDA bar.",
+    "Scenarios": "Live FINE scale sweep (0.2x-5x, six-tenths capex law) with per-row payback/NPV/IRR + Low/Central/High price sensitivity. Capex/payback line charts + EBITDA bar.",
+    "Investment Analysis": "THE SWEET-SPOT FINDER. Live break-even / viability / investable / NPV-max / £5M-anchor over the sweep + a recommended-deployment callout. IRR-vs-capex (with hurdle lines), NPV, payback & EBITDA-margin curves.",
     "Spec sheets": "One block per principal item: duty, rating, qty, £, driving calc & part/MPN.",
     "Panel schedule": "Electrical panel / load schedule as a real sortable table.",
     "Process line list": "Process line list — sortable rows cross-referenced to the P&ID.",
@@ -1363,6 +1367,1259 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
 
 
 # ============================================================================
+# TABS — ECONOMICS MODEL  (Inputs & Assumptions / Economics / Scenarios + charts)
+# ============================================================================
+# A LIVE, defensible revenue/opex/EBITDA/NPV model. Universal shape:
+#     revenue = output_qty × unit_price ;  opex = Σ drivers ;  EBITDA = rev − opex
+# RAS is populated with grounded, cited market defaults (£/kg fish + feed/energy/
+# labour); a non-RAS class still gets an Economics tab off its own output metric.
+#
+# Every derived number is a LIVE Excel formula referencing the yellow input cells
+# on the "Inputs & Assumptions" tab (stable $-anchored addresses, also exposed as
+# WORKBOOK-LEVEL DEFINED NAMES). Edit an input -> the whole chain + every chart
+# recomputes. clean_cell() wraps every string; numbers are written directly.
+# ----------------------------------------------------------------------------
+INPUTS_SHEET = "Inputs & Assumptions"
+
+# Defined-name keys -> the driver each maps to. The actual cell address is filled
+# in when the Inputs tab is built, then read by Economics/Scenarios so the two
+# tabs stay wired even if the Inputs layout shifts.
+_ECON_INPUT_ADDR: Dict[str, str] = {}
+
+# The economics-model input DEFAULTS (mirrored exactly from tab_inputs_assumptions
+# so the Python-side sweet-spot pre-compute reproduces what the LIVE formulas show
+# at the as-built inputs). These drive ONLY the colouring + the recommended-row pick
+# + the few values too awkward to do as a live INDEX/MATCH; the workbook cells
+# themselves are all live formulas, so editing an input still re-drives everything.
+_ECON_DEFAULTS = {
+    "sale_price_ras": 22.0, "feed_price_ras": 2.1, "fcr_ras": 1.37,
+    "sale_price_generic": 1.0, "feed_price_generic": 0.0, "fcr_generic": 0.0,
+    "energy_price": 0.15, "load_factor": 0.65, "hours": 8760.0,
+    "labour": 300000.0, "maint_pct": 3.0, "other_opex": 120000.0,
+    "discount_rate": 10.0, "hurdle_rate": 15.0, "project_life": 20.0,
+}
+
+# Number of rows in the scale sweep, and its span as a multiple of the as-built
+# output. Log-spaced 0.2x .. 5x is a genuine "scale up and down from the current
+# plant" curve (Tristan: "best size plant and to scale up and down from £5M capex").
+SWEEP_ROWS = 16
+SWEEP_LO_MULT = 0.2
+SWEEP_HI_MULT = 5.0
+# Six-tenths cost-capacity scaling exponent (Williams / Chilton). capex follows
+# capex_ref × (q/q_ref)^0.6 — the universal plant-scaling law.
+SIXTENTHS = 0.6
+
+
+def _sweep_outputs(base_q: float) -> List[float]:
+    """The log-spaced output points for the scale sweep, base_q×0.2 .. base_q×5.0
+    (SWEEP_ROWS points). Log spacing puts equal resolution per doubling — the
+    natural axis for a cost-capacity curve."""
+    import math
+    base = base_q if base_q and base_q > 0 else 1.0
+    lo = math.log(base * SWEEP_LO_MULT)
+    hi = math.log(base * SWEEP_HI_MULT)
+    n = SWEEP_ROWS
+    return [math.exp(lo + (hi - lo) * i / (n - 1)) for i in range(n)]
+
+
+def _annuity_irr(ebitda: float, capex: float, n: float) -> Optional[float]:
+    """IRR of a level annuity: capex out at t0, EBITDA in for n years. Same value
+    Excel RATE(n, EBITDA, -capex) returns. Bisection (robust, no numpy). Returns
+    None for a non-positive-EBITDA row (no real positive IRR)."""
+    if ebitda is None or capex is None or ebitda <= 0 or capex <= 0 or n <= 0:
+        return None
+    lo, hi = 1e-7, 5.0  # 0 .. 500% — wide enough for any sane plant
+    # PV(i) = EBITDA*(1-(1+i)^-n)/i is monotone decreasing in i; solve PV==capex
+    for _ in range(200):
+        mid = (lo + hi) / 2.0
+        pv = ebitda * (1 - (1 + mid) ** -n) / mid
+        if pv > capex:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0
+
+
+def _econ_at(out: float, base_q: float, base_capex: float,
+             is_ras: bool) -> Dict[str, Optional[float]]:
+    """Pure-Python mirror of one sweep row's economics at output ``out`` — the SAME
+    arithmetic the live Excel formulas compute, used to colour cells + pick the
+    recommended row. Holds labour fixed (small plants don't shed fixed staff), scales
+    energy pro-rata with output, capex via the six-tenths law."""
+    d = _ECON_DEFAULTS
+    sale = d["sale_price_ras"] if is_ras else d["sale_price_generic"]
+    feed_p = d["feed_price_ras"] if is_ras else d["feed_price_generic"]
+    fcr = d["fcr_ras"] if is_ras else d["fcr_generic"]
+    sale_mult = 1000.0 if is_ras else 1.0
+    ratio = (out / base_q) if base_q else 1.0
+    capex = base_capex * (ratio ** SIXTENTHS)
+    revenue = out * sale_mult * sale
+    feed = out * sale_mult * fcr * feed_p
+    # connected load scaled pro-rata with output (mirrors the sweep's energy formula)
+    energy = _ECON_LOAD_KW * ratio * d["hours"] * d["load_factor"] * d["energy_price"]
+    maint = capex * d["maint_pct"] / 100.0
+    opex = feed + energy + d["labour"] + maint + d["other_opex"]
+    ebitda = revenue - opex
+    r = d["discount_rate"] / 100.0
+    n = d["project_life"]
+    npv = -capex + ebitda * (1 - (1 + r) ** -n) / r
+    payback = (capex / ebitda) if ebitda > 0 else None
+    irr = _annuity_irr(ebitda, capex, n)
+    margin = (ebitda / revenue) if revenue else None
+    return {"out": out, "capex": capex, "revenue": revenue, "opex": opex,
+            "ebitda": ebitda, "payback": payback, "npv": npv, "irr": irr,
+            "margin": margin}
+
+
+# the connected load (kW) at the as-built plant — set when the Inputs tab resolves
+# it (mirrors tab_inputs_assumptions' load_kw), so the Python sweep mirror scales
+# energy correctly. Defaults to a safe placeholder until the Inputs tab runs.
+_ECON_LOAD_KW = 500.0
+
+
+def _sweet_spot(state: dict) -> Optional[Dict[str, Any]]:
+    """Compute the sweet-spot findings in Python (the SAME maths the workbook shows
+    live), for the recommended-deployment callout + threshold colouring. Returns a
+    dict of scale findings, or None if no usable output metric. The workbook STILL
+    renders these live via INDEX/MATCH over the sweep; this mirror just lets us write
+    a human callout + colour the headline cells before Excel recomputes on open."""
+    out_qty, _unit, price_unit, _noun = _econ_output_metric(state)
+    if not out_qty or out_qty <= 0:
+        return None
+    is_ras = price_unit == "£/kg"
+    cs = state.get("costStack") or {}
+    base_capex = (num(cs.get("installed_asp_gbp")) or num(cs.get("factory_cogs_gbp"))
+                  or num(cs.get("raw_materials_bom_gbp")) or 1_000_000.0)
+    rows = [_econ_at(o, out_qty, base_capex, is_ras) for o in _sweep_outputs(out_qty)]
+    d = _ECON_DEFAULTS
+
+    def first(pred):
+        for row in rows:
+            if pred(row):
+                return row
+        return None
+
+    break_even = first(lambda x: x["ebitda"] is not None and x["ebitda"] >= 0)
+    viability = first(lambda x: x["irr"] is not None and x["irr"] >= d["discount_rate"] / 100.0)
+    investable = first(lambda x: x["irr"] is not None and x["irr"] >= d["hurdle_rate"] / 100.0)
+    npv_max = max(rows, key=lambda x: (x["npv"] if x["npv"] is not None else -1e18))
+    # is NPV monotone increasing to the top of the range? (RAS: usually yes)
+    npv_monotonic = npv_max["out"] >= rows[-1]["out"] - 1e-6
+
+    # the £5M-affordable output and its economics
+    five_out = out_qty * (5_000_000.0 / base_capex) ** (1.0 / SIXTENTHS)
+    five = _econ_at(five_out, out_qty, base_capex, is_ras)
+
+    # recommended deployment = the investable scale if it exists, else NPV-max
+    recommend = investable or npv_max
+    return {
+        "is_ras": is_ras, "base_q": out_qty, "base_capex": base_capex,
+        "rows": rows, "break_even": break_even, "viability": viability,
+        "investable": investable, "npv_max": npv_max, "npv_monotonic": npv_monotonic,
+        "five": five, "recommend": recommend,
+    }
+
+
+def _econ_output_metric(state: dict) -> Tuple[float, str, str, str]:
+    """Resolve the headline OUTPUT the economics model sells, universally.
+
+    Returns (qty, unit, price_unit_label, output_noun). RAS -> (204, 't/yr',
+    '£/kg', 'fish'). For a non-RAS class we read the primary brief metric /
+    largest production-family contract quantity so the tab still renders a
+    generic £/output-unit model. Always returns a positive qty (fallback 1.0)."""
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    pclass = ((state.get("orchestratorContract") or {}).get("product_class")
+              or "").lower()
+
+    # 1) RAS / aquaculture: annual tonnage of fish, sold £/kg
+    if "aquaculture" in pclass or "ras" in pclass or "annual_production_t_yr" in q:
+        t = qval(q, "annual_production_t_yr")
+        if t:
+            return float(t), "t/yr", "£/kg", "fish"
+
+    # 2) generic: take the brief's primary target_performance metric value+unit
+    pb = state.get("parsedBrief") or {}
+    tp = (pb.get("constraints") or {}).get("target_performance") or {}
+    metrics = tp.get("metrics") or ([tp] if tp.get("value") is not None else [])
+    if metrics:
+        m0 = metrics[0]
+        v = num(m0.get("value"))
+        if v:
+            unit = (m0.get("unit") or "unit").strip()
+            return float(v), unit, "£/unit", "output"
+
+    # 3) last resort: the largest production/flow-family contract quantity
+    best = None
+    for name, qv in q.items():
+        if not isinstance(qv, dict):
+            continue
+        fam = (qv.get("family") or "").lower()
+        if fam in ("flow_rate", "production", "throughput", "mass"):
+            v = num(qv.get("value"))
+            if v and (best is None or v > best[0]):
+                best = (float(v), qv.get("unit", "unit"), name)
+    if best:
+        return best[0], best[1], "£/unit", "output"
+
+    return 1.0, "unit", "£/unit", "output"
+
+
+def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
+    """TAB 1 — editable yellow input cells, one per row, driving the whole model.
+    Engine-derived values (tonnage, capex, connected load) are pulled from state
+    and labelled 'from engine'; market defaults are grounded + cited in the Basis
+    column. Every value cell is registered as a workbook DEFINED NAME and its
+    address cached in _ECON_INPUT_ADDR for the Economics/Scenarios tabs."""
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    cs = state.get("costStack") or {}
+
+    # ---- engine-grounded values (fall back + label as assumption if absent) ----
+    out_qty, out_unit, price_unit, out_noun = _econ_output_metric(state)
+
+    capex = num(cs.get("installed_asp_gbp"))
+    capex_basis = "from engine · costStack.installed_asp_gbp (BoM + assembly + install)"
+    if capex is None:
+        capex = num(cs.get("factory_cogs_gbp")) or num(cs.get("raw_materials_bom_gbp"))
+        capex_basis = "from engine · costStack (installed ASP absent — COGS proxy)"
+    if capex is None:
+        capex = 1_000_000.0
+        capex_basis = "ASSUMPTION · no costStack — placeholder £1.0M, replace"
+
+    # connected electrical load: engine field, else derive from transformer kVA,
+    # else a labelled default.
+    load_kw = qval(q, "connected_electrical_load_kw")
+    load_basis = "from engine · connected_electrical_load_kw"
+    if load_kw is None:
+        load_kw = qval(q, "total_supply_demand_kw")
+        load_basis = "from engine · total_supply_demand_kw (connected load absent)"
+    if load_kw is None:
+        kva = qval(q, "main_transformer_kva")
+        if kva is not None:
+            load_kw = round(kva * 0.9, 1)
+            load_basis = "ASSUMPTION · main_transformer_kva × 0.9 power-factor (no load field)"
+    if load_kw is None:
+        load_kw = 500.0
+        load_basis = "ASSUMPTION · no electrical field in state — placeholder 500 kW"
+
+    # publish the resolved connected load to the Python sweet-spot mirror so its
+    # energy term scales correctly (the workbook is live regardless; this only
+    # affects pre-render colouring + the recommended-deployment callout text).
+    global _ECON_LOAD_KW
+    _ECON_LOAD_KW = float(load_kw)
+
+    # FCR (feed conversion ratio) — only meaningful for a feed-driven biological
+    # class; from engine where present.
+    fcr = qval(q, "feed_conversion_ratio")
+    fcr_basis = "from engine · feed_conversion_ratio"
+    if fcr is None:
+        fcr = 1.37
+        fcr_basis = "ASSUMPTION · from brief (engine field absent)"
+
+    is_ras = price_unit == "£/kg"
+
+    ws = wb.create_sheet(INPUTS_SHEET)
+    set_widths(ws, {"A": 34, "B": 14, "C": 12, "D": 74})
+    title_row(
+        ws, "Inputs & Assumptions — the economics model drivers", 4,
+        "EVERY yellow cell is editable. Engine-derived values are labelled "
+        "'from engine'; market defaults are grounded + cited in Basis. The "
+        "Economics & Scenarios tabs reference these cells with LIVE formulas — "
+        "edit one driver and the whole model + every chart recomputes.",
+    )
+    header(ws, 4, ["Driver", "Value", "Unit", "Basis / source"])
+    r = 5
+
+    # rows: (defined_name, label, value, unit, basis, number_format)
+    # The fish-price / feed rows are RAS-specific; for a non-RAS class they are
+    # still emitted (generic £/unit sale price; feed driver zeroed) so the model
+    # shape is universal and the formulas never reference a missing cell.
+    rows: List[Tuple[str, str, float, str, str, str]] = []
+    rows.append(("out_qty", f"Output volume ({out_noun})", round(out_qty, 4),
+                 out_unit, "from engine · primary output metric", FMT_DEC2))
+    if is_ras:
+        rows.append(("sale_price", "Fish sale price", 22.0, "£/kg",
+                     "sashimi-grade yellowtail kingfish (Hamachi), UK food-service "
+                     "wholesale; range £18–28/kg", FMT_GBP2))
+        rows.append(("feed_price", "Feed price", 2.1, "£/kg",
+                     "high-protein marine carnivore aquafeed; range £1.8–2.4/kg",
+                     FMT_GBP2))
+        rows.append(("fcr", "Feed conversion ratio (FCR)", round(fcr, 3), "kg/kg",
+                     fcr_basis, FMT_DEC2))
+    else:
+        rows.append(("sale_price", "Sale price (per output unit)", 1.0,
+                     f"£/{out_unit}",
+                     "ASSUMPTION · generic unit price — set to the market value "
+                     "for this product (no RAS £/kg default applies)", FMT_GBP2))
+        rows.append(("feed_price", "Feedstock price", 0.0, "£/unit",
+                     "ASSUMPTION · feedstock cost driver (0 if not feed-driven)",
+                     FMT_GBP2))
+        rows.append(("fcr", "Feedstock conversion ratio", 0.0, "ratio",
+                     "ASSUMPTION · feed-to-output ratio (0 disables the feed term)",
+                     FMT_DEC2))
+    rows.append(("energy_price", "Energy price", 0.15, "£/kWh",
+                 "UK industrial net of the planned on-site renewable micro-grid; "
+                 "grid alone ~£0.22/kWh", FMT_GBP2))
+    rows.append(("load_kw", "Connected electrical load", round(load_kw, 1), "kW",
+                 load_basis, FMT_DEC1))
+    rows.append(("load_factor", "Electrical load factor", 0.65, "avg/peak",
+                 "continuous RAS duty, average/peak", FMT_DEC2))
+    rows.append(("hours", "Operating hours", 8760.0, "h/yr", "continuous",
+                 FMT_INT))
+    rows.append(("labour", "Labour", 300000.0, "£/yr",
+                 "≈8 FTE loaded for a small RAS; scale with tonnage", FMT_GBP))
+    rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
+                 "process-plant norm", FMT_DEC1))
+    rows.append(("other_opex", "Other opex", 120000.0, "£/yr",
+                 "LOX, chemicals, juveniles, insurance, overhead", FMT_GBP))
+    rows.append(("capex", "Installed capex", round(capex, 0), "£", capex_basis,
+                 FMT_GBP))
+    rows.append(("discount_rate", "Discount rate", 10.0, "%",
+                 "real WACC for a small infrastructure project", FMT_DEC1))
+    rows.append(("hurdle_rate", "Investor hurdle rate (IRR)", 15.0, "%",
+                 "the minimum IRR an investor demands before deploying capital — "
+                 "the 'investable' bar on the Investment Analysis tab; edit to your "
+                 "fund's threshold", FMT_DEC1))
+    rows.append(("project_life", "Project life", 20.0, "yr",
+                 "asset economic life for the NPV horizon", FMT_DEC1))
+
+    for name, label, value, unit, basis, fmt in rows:
+        ws.cell(r, 1, clean_cell(label)).font = FONT_SUB
+        vc = ws.cell(r, 2, value)
+        vc.fill = FILL_INPUT
+        vc.border = BORDER
+        vc.number_format = fmt
+        addr = f"${get_column_letter(2)}${r}"     # e.g. $B$5 — stable absolute ref
+        _ECON_INPUT_ADDR[name] = f"'{INPUTS_SHEET}'!{addr}"
+        # workbook-level defined name so a human can also use it in any formula
+        try:
+            from openpyxl.workbook.defined_name import DefinedName
+            dn = f"in_{name}"
+            if dn not in wb.defined_names:
+                wb.defined_names[dn] = DefinedName(
+                    dn, attr_text=f"'{INPUTS_SHEET}'!{addr}")
+        except Exception:  # noqa: BLE001 — defined names are a nicety, never fatal
+            pass
+        ws.cell(r, 3, clean_cell(unit)).border = BORDER
+        bs = ws.cell(r, 4, clean_cell(basis))
+        bs.alignment = WRAP_TOP
+        bs.font = FONT_NOTE
+        bs.border = BORDER
+        r += 1
+
+    # cross-reference: the engine's own bootstrap economics (for comparison only —
+    # the Economics tab REPLACES these hidden-assumption stubs with a transparent
+    # live model).
+    r += 1
+    sub_banner(ws, r, "Engine bootstrap economics (for comparison — NOT used by the "
+                      "live model below)", 4)
+    r += 1
+    for name, lbl, fmt in [("project_npv_gbp", "Engine bootstrap NPV", FMT_GBP),
+                           ("project_irr_pct", "Engine bootstrap IRR", FMT_DEC1),
+                           ("project_payback_years", "Engine bootstrap payback",
+                            FMT_DEC1)]:
+        v = qval(q, name)
+        ws.cell(r, 1, clean_cell(lbl)).font = FONT_NOTE
+        c = ws.cell(r, 2, v if v is not None else "—")
+        c.font = FONT_NOTE
+        if isinstance(v, (int, float)):
+            c.number_format = fmt
+        ws.cell(r, 3, clean_cell("GBP" if "npv" in name else
+                                 ("%" if "irr" in name else "yr"))).font = FONT_NOTE
+        ws.cell(r, 4, clean_cell("engine stub — its hidden assumptions are "
+                                 "replaced by the transparent model on the "
+                                 "Economics tab")).font = FONT_NOTE
+        r += 1
+
+    ws.freeze_panes = "A5"
+    back_link(ws, 4)
+    return True
+
+
+def _ref(name: str) -> str:
+    """The cross-sheet reference to a registered input cell (e.g.
+    "'Inputs & Assumptions'!$B$6"). Raises if the input wasn't built — callers
+    only run after tab_inputs_assumptions succeeded."""
+    return _ECON_INPUT_ADDR[name]
+
+
+def tab_economics(wb: Workbook, state: dict) -> bool:
+    """TAB 2 — every cell a LIVE formula over the Inputs cells. Computes revenue,
+    the opex stack, EBITDA + margin, simple payback, a discounted-cashflow NPV
+    column (years 0..life) and a live IRR. Plus an opex breakdown sub-table that
+    feeds the pie chart."""
+    if not _ECON_INPUT_ADDR:
+        return False  # Inputs tab didn't build -> nothing to reference
+
+    out_qty, out_unit, price_unit, out_noun = _econ_output_metric(state)
+    is_ras = price_unit == "£/kg"
+    # output is sold per-kg for RAS (tonnes×1000), else per the metric's own unit
+    sale_mult = "*1000" if is_ras else ""
+
+    R = _ref  # local alias
+    ws = wb.create_sheet("Economics")
+    set_widths(ws, {"A": 34, "B": 18, "C": 12, "D": 60})
+    title_row(
+        ws, "Economics — live revenue / opex / EBITDA / NPV", 4,
+        "Every value is a LIVE formula referencing the yellow cells on the "
+        "'Inputs & Assumptions' tab. Edit any input there and every number here "
+        "(and the charts) recompute. Money £#,##0; margins 0.0%; years 0.0.",
+    )
+    r = 4
+
+    # ---- revenue + opex stack ----------------------------------------------
+    sub_banner(ws, r, "Annual profit & loss", 4)
+    r += 1
+    header(ws, r, ["Line", "£ / yr (live)", "Unit", "Formula"])
+    r += 1
+
+    # remember key rows so later cells reference them
+    rows_addr: Dict[str, int] = {}
+
+    def line(key: str, label: str, formula: str, note: str,
+             fmt: str = FMT_GBP, fill=FILL_RESULT) -> None:
+        nonlocal r
+        ws.cell(r, 1, clean_cell(label)).font = FONT_SUB
+        c = ws.cell(r, 2, formula)        # LIVE formula (string starting with '=')
+        c.fill = fill
+        c.border = BORDER
+        c.number_format = fmt
+        ws.cell(r, 3, clean_cell("£/yr"))
+        nt = ws.cell(r, 4, clean_cell(note))
+        nt.alignment = WRAP_TOP
+        nt.font = FONT_NOTE
+        rows_addr[key] = r
+        r += 1
+
+    # revenue = output × (×1000 for tonnes) × sale price
+    line("revenue", "Annual revenue",
+         f"={R('out_qty')}{sale_mult}*{R('sale_price')}",
+         f"output × {'1000 ×' if is_ras else ''} sale price ({price_unit})")
+    # feed cost = output × FCR × feed price (RAS: ×1000 kg)
+    line("feed", "Feed / feedstock cost",
+         f"={R('out_qty')}{sale_mult}*{R('fcr')}*{R('feed_price')}",
+         "output × FCR × feed price")
+    # energy = connected load × hours × load factor × energy price
+    line("energy", "Energy cost",
+         f"={R('load_kw')}*{R('hours')}*{R('load_factor')}*{R('energy_price')}",
+         "connected load (kW) × hours × load factor × £/kWh")
+    line("labour", "Labour", f"={R('labour')}", "from inputs")
+    line("maint", "Maintenance",
+         f"={R('capex')}*{R('maint_pct')}/100", "capex × maint% / 100")
+    line("other", "Other opex", f"={R('other_opex')}", "from inputs")
+    # total opex = Σ of the four+ driver rows
+    line("opex", "Total opex",
+         f"=B{rows_addr['feed']}+B{rows_addr['energy']}+B{rows_addr['labour']}"
+         f"+B{rows_addr['maint']}+B{rows_addr['other']}",
+         "Σ feed + energy + labour + maintenance + other",
+         fill=FILL_CONST)
+    # EBITDA = revenue − opex
+    line("ebitda", "EBITDA",
+         f"=B{rows_addr['revenue']}-B{rows_addr['opex']}",
+         "revenue − total opex", fill=FILL_CONST)
+    r += 1
+
+    # ---- headline ratios ----------------------------------------------------
+    sub_banner(ws, r, "Headline metrics (live)", 4)
+    r += 1
+    margin_row = r
+    ws.cell(r, 1, "EBITDA margin").font = FONT_SUB
+    mc = ws.cell(r, 2, f"=B{rows_addr['ebitda']}/B{rows_addr['revenue']}")
+    mc.fill = FILL_RESULT
+    mc.border = BORDER
+    mc.number_format = "0.0%"
+    ws.cell(r, 4, clean_cell("EBITDA ÷ revenue")).font = FONT_NOTE
+    r += 1
+
+    payback_row = r
+    ws.cell(r, 1, "Simple payback").font = FONT_SUB
+    # guard divide-by-zero / negative EBITDA -> blank (no payback)
+    pc = ws.cell(r, 2,
+                 f"=IF(B{rows_addr['ebitda']}>0,{R('capex')}/B{rows_addr['ebitda']},"
+                 f'"n/a (EBITDA≤0)")')
+    pc.fill = FILL_RESULT
+    pc.border = BORDER
+    pc.number_format = FMT_DEC1
+    ws.cell(r, 3, clean_cell("yr"))
+    ws.cell(r, 4, clean_cell("capex ÷ EBITDA (only if EBITDA > 0)")).font = FONT_NOTE
+    r += 2
+
+    # ---- NPV / IRR via a discounted cashflow column -------------------------
+    sub_banner(ws, r, "Discounted cashflow — NPV & IRR (live)", 4)
+    r += 1
+    header(ws, r, ["Year", "Cashflow £ (live)", "Discounted £ (live)",
+                   "Note"])
+    r += 1
+    cf_first = r
+    life_int = 20
+    pl = qval((state.get("orchestratorContract") or {}).get("quantities") or {},
+              "project_life_years")
+    # life is an editable input; for the static column count we use a fixed 20-row
+    # horizon (the model's editable life caps the discount via an IF guard below).
+    for y in range(0, life_int + 1):
+        ws.cell(r, 1, y).border = BORDER
+        if y == 0:
+            cf = f"=-{R('capex')}"                       # capex outflow at year 0
+            note = "capex outflow"
+        else:
+            # EBITDA inflow each year, but only while year ≤ editable project life
+            cf = f"=IF({y}<={R('project_life')},B{rows_addr['ebitda']},0)"
+            note = "EBITDA inflow (within project life)"
+        cc = ws.cell(r, 2, cf)
+        cc.border = BORDER
+        cc.number_format = FMT_GBP
+        # discounted = cashflow / (1+rate)^year
+        dc = ws.cell(r, 3,
+                     f"=B{r}/((1+{R('discount_rate')}/100)^A{r})")
+        dc.border = BORDER
+        dc.number_format = FMT_GBP
+        ws.cell(r, 4, clean_cell(note)).font = FONT_NOTE
+        r += 1
+    cf_last = r - 1
+
+    # NPV = Σ discounted column ; IRR = live IRR over the (undiscounted) cashflow
+    ws.cell(r, 1, "NPV").font = FONT_SUB
+    npv_c = ws.cell(r, 3, f"=SUM(C{cf_first}:C{cf_last})")
+    npv_c.fill = FILL_RESULT
+    npv_c.border = BORDER
+    npv_c.number_format = FMT_GBP
+    ws.cell(r, 4, clean_cell("Σ discounted cashflow (capex at yr 0 + discounted "
+                             "EBITDA)")).font = FONT_NOTE
+    npv_row = r
+    r += 1
+    ws.cell(r, 1, "IRR").font = FONT_SUB
+    irr_c = ws.cell(r, 3, f"=IRR(B{cf_first}:B{cf_last})")
+    irr_c.fill = FILL_RESULT
+    irr_c.border = BORDER
+    irr_c.number_format = "0.0%"
+    ws.cell(r, 4, clean_cell("live =IRR over the year-0..N cashflow row")).font = FONT_NOTE
+    r += 2
+
+    # ---- opex breakdown sub-table (feeds the pie chart) ---------------------
+    sub_banner(ws, r, "Opex breakdown (feeds the pie chart)", 4)
+    r += 1
+    header(ws, r, ["Driver", "£ / yr (live)", "% of opex (live)", ""])
+    r += 1
+    brk_first = r
+    for key, lbl in [("feed", "Feed / feedstock"), ("energy", "Energy"),
+                     ("labour", "Labour"), ("maint", "Maintenance"),
+                     ("other", "Other")]:
+        ws.cell(r, 1, clean_cell(lbl)).border = BORDER
+        c = ws.cell(r, 2, f"=B{rows_addr[key]}")
+        c.border = BORDER
+        c.number_format = FMT_GBP
+        pcc = ws.cell(r, 3, f"=B{r}/B{rows_addr['opex']}")
+        pcc.border = BORDER
+        pcc.number_format = "0.0%"
+        r += 1
+    brk_last = r - 1
+
+    # ---- charts: opex pie + revenue/opex/EBITDA bar -------------------------
+    from openpyxl.chart import PieChart, BarChart, Reference
+    # Pie: opex breakdown
+    pie = PieChart()
+    pie.title = "Opex breakdown"
+    pie.height, pie.width = 8, 13
+    pdata = Reference(ws, min_col=2, min_row=brk_first, max_row=brk_last)
+    plabs = Reference(ws, min_col=1, min_row=brk_first, max_row=brk_last)
+    pie.add_data(pdata, titles_from_data=False)
+    pie.set_categories(plabs)
+    ws.add_chart(pie, f"F{cf_first}")
+
+    # Bar: revenue vs total opex vs EBITDA — build a tiny 3-row helper block so
+    # the chart has clean contiguous categories+values.
+    bar_first = r + 1
+    ws.cell(bar_first, 1, clean_cell("Revenue")).font = FONT_NOTE
+    ws.cell(bar_first, 2, f"=B{rows_addr['revenue']}").number_format = FMT_GBP
+    ws.cell(bar_first + 1, 1, clean_cell("Total opex")).font = FONT_NOTE
+    ws.cell(bar_first + 1, 2, f"=B{rows_addr['opex']}").number_format = FMT_GBP
+    ws.cell(bar_first + 2, 1, clean_cell("EBITDA")).font = FONT_NOTE
+    ws.cell(bar_first + 2, 2, f"=B{rows_addr['ebitda']}").number_format = FMT_GBP
+    bar = BarChart()
+    bar.title = "Revenue vs Opex vs EBITDA"
+    bar.type = "col"
+    bar.height, bar.width = 8, 13
+    bdata = Reference(ws, min_col=2, min_row=bar_first, max_row=bar_first + 2)
+    blabs = Reference(ws, min_col=1, min_row=bar_first, max_row=bar_first + 2)
+    bar.add_data(bdata, titles_from_data=False)
+    bar.set_categories(blabs)
+    bar.legend = None
+    ws.add_chart(bar, f"F{cf_first + 16}")
+
+    ws.freeze_panes = "A5"
+    back_link(ws, 4)
+    return True
+
+
+def tab_scenarios(wb: Workbook, state: dict) -> bool:
+    """TAB 3 — a live scenario explorer: a FINE log-spaced scale sweep (six-tenths
+    capex law, 0.2x..5x of the as-built output, ~16 rows) carrying capex / revenue /
+    opex / EBITDA / payback / NPV (live annuity DCF) / IRR (live RATE), plus a
+    Low/Central/High price-driver block — all LIVE formulas referencing the Inputs
+    cells. The sweep's cell ranges are stashed on the worksheet object so the
+    Investment Analysis tab can drive its sweet-spot INDEX/MATCH + curves off them.
+    Adds capex-vs-scale + payback-vs-scale line charts and a L/C/H EBITDA bar."""
+    if not _ECON_INPUT_ADDR:
+        return False
+
+    out_qty, out_unit, price_unit, out_noun = _econ_output_metric(state)
+    is_ras = price_unit == "£/kg"
+    sale_mult = "*1000" if is_ras else ""
+    R = _ref
+
+    ws = wb.create_sheet("Scenarios")
+    set_widths(ws, {"A": 16, "B": 16, "C": 16, "D": 16, "E": 16, "F": 12,
+                    "G": 14, "H": 12, "I": 4, "J": 16, "K": 16, "L": 16, "M": 16})
+    title_row(
+        ws, "Scenarios — live scale sweep & price sensitivity", 8,
+        "LEFT: a FINE log-spaced output sweep (0.2x to 5x the as-built plant; capex "
+        "follows the six-tenths cost-capacity law capex_ref × (q/q_ref)^0.6), with "
+        "LIVE payback, annuity-DCF NPV and RATE-based IRR per row. RIGHT: Low/Central/"
+        "High on the key price drivers. Every cell is a LIVE formula off the Inputs "
+        "tab — edit a driver and the whole curve, the Investment Analysis tab and the "
+        "charts all move.",
+    )
+    r = 4
+
+    # ---- FINE scale sweep ---------------------------------------------------
+    base_q = round(out_qty, 6) or 204.0
+    sweep = [round(o, 4) for o in _sweep_outputs(base_q)]
+
+    sub_banner(ws, r, f"Output sweep ({out_noun}, {out_unit}) — capex via the "
+                      f"six-tenths law; payback / NPV / IRR live per row", 8)
+    r += 1
+    header(ws, r, [f"Output ({out_unit})", "Capex £ (live)", "Revenue £ (live)",
+                   "Total opex £ (live)", "EBITDA £ (live)", "Payback yr",
+                   "NPV £ (live)", "IRR (live)"])
+    r += 1
+    sweep_first = r
+    qref = R("out_qty")
+    for qv in sweep:
+        # A-relative: this row's output qty drives every other cell on the row.
+        ws.cell(r, 1, qv).border = BORDER
+        ws.cell(r, 1).number_format = FMT_DEC1
+        ws.cell(r, 1).fill = FILL_INPUT     # the sweep point is editable too
+        # capex = capex_ref × (q / q_ref)^0.6
+        cc = ws.cell(r, 2, f"={R('capex')}*(A{r}/{qref})^{SIXTENTHS}")
+        cc.border = BORDER
+        cc.number_format = FMT_GBP
+        # revenue = q × (×1000 for tonnes) × sale price
+        rc = ws.cell(r, 3, f"=A{r}{sale_mult}*{R('sale_price')}")
+        rc.border = BORDER
+        rc.number_format = FMT_GBP
+        # opex = feed(q) + energy(load scaled q/q_ref) + labour(FIXED) + maint(capex(q)) + other
+        feed = f"A{r}{sale_mult}*{R('fcr')}*{R('feed_price')}"
+        energy = (f"{R('load_kw')}*(A{r}/{qref})*{R('hours')}*"
+                  f"{R('load_factor')}*{R('energy_price')}")
+        maint = f"B{r}*{R('maint_pct')}/100"
+        oc = ws.cell(r, 4, f"={feed}+{energy}+{R('labour')}+{maint}+{R('other_opex')}")
+        oc.border = BORDER
+        oc.number_format = FMT_GBP
+        # EBITDA = revenue − opex
+        ec = ws.cell(r, 5, f"=C{r}-D{r}")
+        ec.border = BORDER
+        ec.number_format = FMT_GBP
+        # payback = capex / EBITDA (n/a if EBITDA ≤ 0 — small plant is sub-break-even)
+        pc = ws.cell(r, 6, f'=IF(E{r}>0,B{r}/E{r},"n/a")')
+        pc.border = BORDER
+        pc.number_format = FMT_DEC1
+        # NPV = live annuity DCF: -capex + EBITDA × (1-(1+r)^-n)/r ; one compact cell
+        rr = f"({R('discount_rate')}/100)"
+        nn = R("project_life")
+        npv = (f"=-B{r}+E{r}*(1-(1+{rr})^-{nn})/{rr}")
+        nc = ws.cell(r, 7, npv)
+        nc.border = BORDER
+        nc.number_format = FMT_GBP
+        # IRR = live RATE of the level annuity (capex out t0, EBITDA in for n yrs).
+        # RATE() is Newton-solved and DIVERGES from its default 10% guess on steep
+        # annuities (a £33M/£10.8M-a-yr row -> IRR ≈ 33% returned -190% with the
+        # default seed). We pass a DATA-DERIVED guess = EBITDA/capex (the cash-on-cash
+        # return — always a hair above the true annuity IRR, an ideal Newton seed) so
+        # it converges across the whole 0.2x-5x sweep. Guard ≤0 EBITDA -> "n/a";
+        # IFERROR + MAX(-0.99,…) keep a pathological row from ever rendering absurd.
+        irr = (f'=IF(E{r}>0,IFERROR(MAX(-0.99,RATE({nn},E{r},-B{r},0,0,E{r}/B{r})),'
+               f'-1),"n/a")')
+        ic = ws.cell(r, 8, irr)
+        ic.border = BORDER
+        ic.number_format = "0.0%"
+        r += 1
+    sweep_last = r - 1
+    r += 1
+
+    # a numeric payback column the line-chart can plot (text "n/a" breaks a chart
+    # series), capped so a near-break-even point doesn't blow the axis.
+    sub_banner(ws, r, "Chart helper — payback capped at 40 yr (text 'n/a' breaks a "
+                      "chart series)", 8)
+    r += 1
+    header(ws, r, [f"Output ({out_unit})", "Payback yr (chart)", "", "", "", "",
+                   "", ""])
+    r += 1
+    pay_first = r
+    for i, qv in enumerate(sweep):
+        src = sweep_first + i
+        ws.cell(r, 1, f"=A{src}").number_format = FMT_DEC1
+        ws.cell(r, 1).border = BORDER
+        # capped numeric payback: ≤0 EBITDA or >40yr -> 40 (off-the-chart marker)
+        ws.cell(r, 2,
+                f"=IF(E{src}>0,MIN(40,B{src}/E{src}),40)").number_format = FMT_DEC1
+        ws.cell(r, 2).border = BORDER
+        r += 1
+    pay_last = r - 1
+    r += 1
+
+    # Stash the sweep geometry so tab_investment_analysis can build live INDEX/MATCH
+    # sweet-spot cells + the curves directly off these columns (cols A..H).
+    ws._forge_sweep = {                                   # type: ignore[attr-defined]
+        "sheet": ws.title, "first": sweep_first, "last": sweep_last,
+        "col_out": "A", "col_capex": "B", "col_rev": "C", "col_opex": "D",
+        "col_ebitda": "E", "col_payback": "F", "col_npv": "G", "col_irr": "H",
+    }
+
+    # ---- Low / Central / High price-driver block ---------------------------
+    price_label = "fish price" if is_ras else "sale price"
+    sub_banner(ws, r, f"Low / Central / High — {price_label} ±25%, energy ±25%, "
+                      "capex ±15% (at the base output)", 8)
+    r += 1
+    header(ws, r, ["Driver / metric", "Low", "Central", "High", "", "", "", ""])
+    r += 1
+    # rows: sale price, energy price, capex (the swung inputs), then EBITDA+payback
+    # recomputed for each column. Columns: B=Low, C=Central, D=High.
+    lo, ce, hi = "B", "C", "D"
+    # sale price row
+    sp_row = r
+    ws.cell(r, 1, clean_cell("Sale price (±25%)")).font = FONT_SUB
+    ws.cell(r, 2, f"={R('sale_price')}*0.75").number_format = FMT_GBP2
+    ws.cell(r, 3, f"={R('sale_price')}").number_format = FMT_GBP2
+    ws.cell(r, 4, f"={R('sale_price')}*1.25").number_format = FMT_GBP2
+    for col in (2, 3, 4):
+        ws.cell(r, col).border = BORDER
+    r += 1
+    # energy price row
+    ep_row = r
+    ws.cell(r, 1, clean_cell("Energy price (±25%)")).font = FONT_SUB
+    ws.cell(r, 2, f"={R('energy_price')}*0.75").number_format = FMT_GBP2
+    ws.cell(r, 3, f"={R('energy_price')}").number_format = FMT_GBP2
+    ws.cell(r, 4, f"={R('energy_price')}*1.25").number_format = FMT_GBP2
+    for col in (2, 3, 4):
+        ws.cell(r, col).border = BORDER
+    r += 1
+    # capex row
+    cx_row = r
+    ws.cell(r, 1, clean_cell("Capex (±15%)")).font = FONT_SUB
+    ws.cell(r, 2, f"={R('capex')}*0.85").number_format = FMT_GBP
+    ws.cell(r, 3, f"={R('capex')}").number_format = FMT_GBP
+    ws.cell(r, 4, f"={R('capex')}*1.15").number_format = FMT_GBP
+    for col in (2, 3, 4):
+        ws.cell(r, col).border = BORDER
+    r += 1
+    # NOTE on the sensitivity direction: Low = worst case (low price, HIGH energy,
+    # HIGH capex); High = best case. We build EBITDA accordingly per column.
+    # revenue per column uses that column's sale price; energy uses the OPPOSITE
+    # extreme so 'Low' is genuinely the pessimistic corner.
+    rev_row = r
+    ws.cell(r, 1, clean_cell("Revenue £ (live)")).font = FONT_SUB
+    for col, spcol in ((2, lo), (3, ce), (4, hi)):
+        ws.cell(r, col,
+                f"={R('out_qty')}{sale_mult}*{spcol}{sp_row}").number_format = FMT_GBP
+        ws.cell(r, col).border = BORDER
+    r += 1
+    # opex per column: energy at the column's energy price, capex-driven maint at
+    # the column's capex, feed/labour/other fixed.
+    op_row = r
+    ws.cell(r, 1, clean_cell("Total opex £ (live)")).font = FONT_SUB
+    feed_t = f"{R('out_qty')}{sale_mult}*{R('fcr')}*{R('feed_price')}"
+    for col, ecol, ccol in ((2, lo, lo), (3, ce, ce), (4, hi, hi)):
+        energy_t = (f"{R('load_kw')}*{R('hours')}*{R('load_factor')}*{ecol}{ep_row}")
+        maint_t = f"{ccol}{cx_row}*{R('maint_pct')}/100"
+        ws.cell(r, col,
+                f"={feed_t}+{energy_t}+{R('labour')}+{maint_t}+{R('other_opex')}"
+                ).number_format = FMT_GBP
+        ws.cell(r, col).border = BORDER
+    r += 1
+    # EBITDA per column. WORST corner (Low) = low sale price + HIGH energy + HIGH
+    # capex; so for the 'Low' EBITDA use Low revenue but High-energy/High-capex
+    # opex. We assemble each corner explicitly for an honest sensitivity.
+    eb_row = r
+    ws.cell(r, 1, clean_cell("EBITDA £ (live)")).font = FONT_SUB
+    # Low corner: rev=Low, opex=High-energy+High-capex
+    low_energy = f"{R('load_kw')}*{R('hours')}*{R('load_factor')}*{hi}{ep_row}"
+    low_maint = f"{hi}{cx_row}*{R('maint_pct')}/100"
+    ws.cell(r, 2,
+            f"=B{rev_row}-({feed_t}+{low_energy}+{R('labour')}+{low_maint}+"
+            f"{R('other_opex')})").number_format = FMT_GBP
+    # Central
+    ws.cell(r, 3, f"=C{rev_row}-C{op_row}").number_format = FMT_GBP
+    # High corner: rev=High, opex=Low-energy+Low-capex
+    hi_energy = f"{R('load_kw')}*{R('hours')}*{R('load_factor')}*{lo}{ep_row}"
+    hi_maint = f"{lo}{cx_row}*{R('maint_pct')}/100"
+    ws.cell(r, 4,
+            f"=D{rev_row}-({feed_t}+{hi_energy}+{R('labour')}+{hi_maint}+"
+            f"{R('other_opex')})").number_format = FMT_GBP
+    for col in (2, 3, 4):
+        ws.cell(r, col).border = BORDER
+    r += 1
+    # payback per column
+    pb_row = r
+    ws.cell(r, 1, clean_cell("Payback yr (live)")).font = FONT_SUB
+    ws.cell(r, 2, f'=IF(B{eb_row}>0,D{cx_row}/B{eb_row},"n/a")'
+            ).number_format = FMT_DEC1      # Low corner used High capex (D col)
+    ws.cell(r, 3, f'=IF(C{eb_row}>0,C{cx_row}/C{eb_row},"n/a")'
+            ).number_format = FMT_DEC1
+    ws.cell(r, 4, f'=IF(D{eb_row}>0,B{cx_row}/D{eb_row},"n/a")'
+            ).number_format = FMT_DEC1      # High corner used Low capex (B col)
+    for col in (2, 3, 4):
+        ws.cell(r, col).border = BORDER
+    r += 1
+
+    # an EBITDA-only contiguous block for the L/C/H bar chart (categories must be
+    # the labels Low/Central/High in a column for a clean chart).
+    lch_first = r + 1
+    ws.cell(lch_first, 1, clean_cell("Low")).font = FONT_NOTE
+    ws.cell(lch_first, 2, f"=B{eb_row}").number_format = FMT_GBP
+    ws.cell(lch_first + 1, 1, clean_cell("Central")).font = FONT_NOTE
+    ws.cell(lch_first + 1, 2, f"=C{eb_row}").number_format = FMT_GBP
+    ws.cell(lch_first + 2, 1, clean_cell("High")).font = FONT_NOTE
+    ws.cell(lch_first + 2, 2, f"=D{eb_row}").number_format = FMT_GBP
+
+    # ---- charts (anchored right of the 8-col sweep, in cols J+) -------------
+    from openpyxl.chart import LineChart, BarChart, Reference
+    # 1) capex vs output (line)
+    c1 = LineChart()
+    c1.title = "Capex vs output"
+    c1.height, c1.width = 8, 14
+    c1.y_axis.title = "Capex £"
+    c1.x_axis.title = f"Output ({out_unit})"
+    d1 = Reference(ws, min_col=2, min_row=sweep_first, max_row=sweep_last)
+    cats = Reference(ws, min_col=1, min_row=sweep_first, max_row=sweep_last)
+    c1.add_data(d1, titles_from_data=False)
+    c1.set_categories(cats)
+    c1.legend = None
+    ws.add_chart(c1, "J4")
+
+    # 2) payback vs output (line) — uses the capped numeric column
+    c2 = LineChart()
+    c2.title = "Payback vs output"
+    c2.height, c2.width = 8, 14
+    c2.y_axis.title = "Payback (yr, capped 40)"
+    c2.x_axis.title = f"Output ({out_unit})"
+    d2 = Reference(ws, min_col=2, min_row=pay_first, max_row=pay_last)
+    cats2 = Reference(ws, min_col=1, min_row=pay_first, max_row=pay_last)
+    c2.add_data(d2, titles_from_data=False)
+    c2.set_categories(cats2)
+    c2.legend = None
+    ws.add_chart(c2, "J21")
+
+    # 3) Low/Central/High EBITDA (bar)
+    c3 = BarChart()
+    c3.title = "Scenario EBITDA — Low / Central / High"
+    c3.type = "col"
+    c3.height, c3.width = 8, 14
+    d3 = Reference(ws, min_col=2, min_row=lch_first, max_row=lch_first + 2)
+    cats3 = Reference(ws, min_col=1, min_row=lch_first, max_row=lch_first + 2)
+    c3.add_data(d3, titles_from_data=False)
+    c3.set_categories(cats3)
+    c3.legend = None
+    ws.add_chart(c3, "J38")
+
+    ws.freeze_panes = "A5"
+    back_link(ws, 8)
+    return True
+
+
+# ============================================================================
+# TAB — INVESTMENT ANALYSIS  (the SWEET-SPOT FINDER — the headline)
+# ============================================================================
+# Drives off the FINE scale sweep on the Scenarios tab (stashed cell ranges) to
+# answer "what plant size should we build, and where does it become investable?".
+# Break-even / viability / investable / NPV-max / £5M-anchor are LIVE INDEX/MATCH
+# over the sweep columns (they re-resolve when any Input changes). Four curves
+# (IRR-vs-capex with threshold lines, NPV-vs-capex, payback-vs-capex, EBITDA-margin-
+# vs-scale) let an investor SEE the crossings. A recommended-deployment callout
+# (Python-mirrored prose + live value cells) sits at the top.
+# ----------------------------------------------------------------------------
+def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
+    if not _ECON_INPUT_ADDR:
+        return False
+    scen = wb["Scenarios"] if "Scenarios" in wb.sheetnames else None
+    sw = getattr(scen, "_forge_sweep", None) if scen is not None else None
+    if not sw:
+        return False  # Scenarios sweep didn't build -> nothing to analyse
+
+    out_qty, out_unit, price_unit, out_noun = _econ_output_metric(state)
+    is_ras = price_unit == "£/kg"
+    R = _ref
+    ss = _sweet_spot(state)  # Python mirror for the prose callout + colouring
+
+    # sweep cell ranges (on the Scenarios tab) — cross-sheet quoted refs
+    sh = f"'{sw['sheet']}'"
+    f, l = sw["first"], sw["last"]
+    OUT = f"{sh}!${sw['col_out']}${f}:${sw['col_out']}${l}"
+    CAP = f"{sh}!${sw['col_capex']}${f}:${sw['col_capex']}${l}"
+    EBI = f"{sh}!${sw['col_ebitda']}${f}:${sw['col_ebitda']}${l}"
+    NPV = f"{sh}!${sw['col_npv']}${f}:${sw['col_npv']}${l}"
+    IRRr = f"{sh}!${sw['col_irr']}${f}:${sw['col_irr']}${l}"
+    PAY = f"{sh}!${sw['col_payback']}${f}:${sw['col_payback']}${l}"
+
+    ws = wb.create_sheet("Investment Analysis")
+    set_widths(ws, {"A": 34, "B": 18, "C": 16, "D": 16, "E": 14, "F": 12,
+                    "G": 4, "H": 16, "I": 16, "J": 16, "K": 16, "L": 16})
+    title_row(
+        ws, "Investment Analysis — the sweet-spot finder", 6,
+        "Where does this plant become INVESTABLE, and what size should management "
+        "build? Every result below is a LIVE formula over the scale sweep on the "
+        "Scenarios tab — edit any Input and the recommended size, the thresholds and "
+        "the curves all move. Output unit: " + out_unit + ".",
+    )
+    r = 4
+
+    # ----------------------------------------------------------------------
+    # RECOMMENDED DEPLOYMENT callout (big band) — prose from the Python mirror,
+    # live value cells beneath so it stays correct if inputs change.
+    # ----------------------------------------------------------------------
+    def _fmt_q(v):  # output qty with unit — keep 2 dp for small/fractional outputs
+        if v is None:
+            return "—"
+        prec = 0 if abs(v) >= 10 else 2  # 0.5 t/day must not round to "0"
+        return f"{v:,.{prec}f} {out_unit}"
+
+    def _fmt_gbp(v):
+        return f"£{v:,.0f}" if v is not None else "—"
+
+    def _fmt_pct(v):
+        return f"{v*100:.1f}%" if v is not None else "—"
+
+    def _fmt_yr(v):  # payback years — None/≤0 -> honest text, never "nan"
+        return f"{v:.1f} yr" if (v is not None and v > 0) else "n/a (EBITDA ≤ 0)"
+
+    rec = ss["recommend"] if ss else None
+    inv = ss["investable"] if ss else None
+    five = ss["five"] if ss else None
+    npvmax = ss["npv_max"] if ss else None
+    callout_lines: List[str] = []
+    if ss and rec:
+        if inv:
+            callout_lines.append(
+                f"DEPLOY {_fmt_gbp(rec['capex'])} for {_fmt_q(rec['out'])} "
+                f"→ IRR {_fmt_pct(rec['irr'])}, payback "
+                f"{_fmt_yr(rec['payback'])} — the sweet spot (first scale clearing the "
+                f"{_ECON_DEFAULTS['hurdle_rate']:.0f}% investor hurdle).")
+        else:
+            callout_lines.append(
+                f"DEPLOY {_fmt_gbp(rec['capex'])} for {_fmt_q(rec['out'])} "
+                f"→ IRR {_fmt_pct(rec['irr'])}, payback "
+                f"{_fmt_yr(rec['payback'])} — the best NPV in range. The "
+                f"{_ECON_DEFAULTS['hurdle_rate']:.0f}% investor hurdle is not reached "
+                f"anywhere in the 0.2x-5x sweep at the current inputs"
+                + (" (set a real sale price on the Inputs tab — the generic £1/unit "
+                   "default makes every scale sub-viable)." if not is_ras
+                   else ".") )
+        # £5M ceiling line
+        if five:
+            if five["irr"] is None or five["irr"] <= 0.005:
+                callout_lines.append(
+                    f"At the £5.0M capex ceiling the plant makes only "
+                    f"{_fmt_q(five['out'])} and is ~break-even (IRR ≈ 0) — economics "
+                    f"turn investable only at larger scale.")
+            else:
+                callout_lines.append(
+                    f"At the £5.0M capex ceiling the plant makes {_fmt_q(five['out'])} "
+                    f"at IRR {_fmt_pct(five['irr'])} — "
+                    + (f"already above the hurdle." if five['irr'] >= _ECON_DEFAULTS['hurdle_rate']/100
+                       else f"below the {_ECON_DEFAULTS['hurdle_rate']:.0f}% hurdle."))
+        if inv:
+            callout_lines.append(
+                f"Economics turn investable above {_fmt_gbp(inv['capex'])} / "
+                f"{_fmt_q(inv['out'])}.")
+        if ss["npv_monotonic"]:
+            callout_lines.append(
+                "NOTE: NPV improves monotonically with scale to the top of the "
+                "range — the binding constraint here is capital/site, not economics. "
+                "Build as large as the site and balance sheet allow.")
+    else:
+        callout_lines.append("No usable output metric to analyse — sweet-spot "
+                             "finder unavailable for this run.")
+
+    # render the callout band
+    callout_text = "  ".join(callout_lines)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r + 2, end_column=6)
+    cc = ws.cell(r, 1, clean_cell("★ RECOMMENDED DEPLOYMENT"))
+    cc.font = Font(name="Calibri", size=13, bold=True, color="FFFFFF")
+    cc.fill = FILL_TITLE
+    cc.alignment = Alignment(vertical="top", wrap_text=True, indent=1)
+    r += 3
+    ws.merge_cells(start_row=r, start_column=1, end_row=r + 3, end_column=6)
+    bc = ws.cell(r, 1, clean_cell(callout_text))
+    bc.fill = FILL_RESULT
+    bc.alignment = Alignment(vertical="top", wrap_text=True, indent=1)
+    bc.font = Font(name="Calibri", size=11, bold=True, color="1F3A5F")
+    for rr in range(r, r + 4):
+        ws.row_dimensions[rr].height = 22
+    r += 5
+
+    # ----------------------------------------------------------------------
+    # SWEET-SPOT THRESHOLDS — LIVE over the sweep (INDEX/MATCH).
+    # IRR & EBITDA increase monotonically with output, so the "smallest output
+    # meeting a threshold" = the first row above where the threshold is crossed:
+    #   MATCH(threshold, ascending_range, 1) returns the LAST row ≤ threshold;
+    #   +1 indexes the first row ABOVE it. Guard the edge cases with IFERROR.
+    # ----------------------------------------------------------------------
+    sub_banner(ws, r, "Sweet-spot thresholds — live over the scale sweep "
+                      "(Scenarios tab)", 6)
+    r += 1
+    header(ws, r, ["What", f"Output ({out_unit})", "Capex £", "IRR", "Payback yr",
+                   "How it's found"])
+    r += 1
+    HURDLE = R("hurdle_rate")
+    DISC = R("discount_rate")
+
+    def thr_row(label: str, out_formula: str, how: str, pyrow) -> None:
+        """One threshold row: live output cell + capex/IRR/payback looked up at
+        that same output via INDEX/MATCH-exact, coloured from the Python mirror."""
+        nonlocal r
+        ws.cell(r, 1, clean_cell(label)).font = FONT_SUB
+        ws.cell(r, 1).border = BORDER
+        oc = ws.cell(r, 2, out_formula)
+        oc.fill = FILL_RESULT
+        oc.border = BORDER
+        oc.number_format = FMT_DEC1
+        # capex / IRR / payback AT that output: INDEX(col, MATCH(thisOutput, OUT, 0)).
+        # The matched output is exactly a sweep value (we INDEX the sweep's own out),
+        # so an exact MATCH always resolves.
+        mref = f"MATCH(B{r},{OUT},0)"
+        cap = ws.cell(r, 3, f"=IFERROR(INDEX({CAP},{mref}),\"—\")")
+        cap.border = BORDER
+        cap.number_format = FMT_GBP
+        ic = ws.cell(r, 4, f"=IFERROR(INDEX({IRRr},{mref}),\"—\")")
+        ic.border = BORDER
+        ic.number_format = "0.0%"
+        pc = ws.cell(r, 5, f"=IFERROR(INDEX({PAY},{mref}),\"—\")")
+        pc.border = BORDER
+        pc.number_format = FMT_DEC1
+        nt = ws.cell(r, 6, clean_cell(how))
+        nt.font = FONT_NOTE
+        nt.alignment = WRAP_TOP
+        nt.border = BORDER
+        # colour the output cell green if the Python mirror found a real point
+        if pyrow is not None:
+            oc.fill = FILL_RESULT
+        else:
+            oc.fill = FILL_CONST
+        r += 1
+
+    # break-even scale: smallest output where EBITDA ≥ 0 (EBITDA ascending)
+    be_out = (f"=IFERROR(INDEX({OUT},MATCH(0,{EBI},1)+1),"
+              f"INDEX({OUT},1))")
+    thr_row("Break-even scale (EBITDA ≥ 0)", be_out,
+            "first sweep row with EBITDA ≥ 0 (EBITDA rises with scale)",
+            ss["break_even"] if ss else None)
+    # viability: smallest output where IRR ≥ discount rate
+    via_out = (f"=IFERROR(INDEX({OUT},MATCH({DISC}/100,{IRRr},1)+1),\"> range\")")
+    thr_row("Viability threshold (IRR ≥ discount rate)", via_out,
+            "first row whose IRR clears the discount rate — capital just covers its "
+            "cost", ss["viability"] if ss else None)
+    # investable: smallest output where IRR ≥ hurdle
+    invv_out = (f"=IFERROR(INDEX({OUT},MATCH({HURDLE}/100,{IRRr},1)+1),\"> range\")")
+    thr_row("Investable scale (IRR ≥ hurdle)", invv_out,
+            "first row whose IRR clears the editable investor hurdle "
+            "(Inputs tab) — the SWEET SPOT", ss["investable"] if ss else None)
+    # NPV-max scale in range: output at MAX(NPV)
+    npvmax_out = f"=INDEX({OUT},MATCH(MAX({NPV}),{NPV},0))"
+    thr_row("NPV-max scale (in range)", npvmax_out,
+            "output that maximises NPV across the sweep (trends to the top of the "
+            "range when economics improve with scale)", ss["npv_max"] if ss else None)
+    r += 1
+
+    # ----------------------------------------------------------------------
+    # THE £5M ANCHOR — output affordable at £5M (inverse six-tenths) + its metrics.
+    # out_5M = out_ref × (5e6 / capex_ref)^(1/0.6). Live off the Inputs capex cell.
+    # ----------------------------------------------------------------------
+    sub_banner(ws, r, "The £5M capex anchor — what £5.0M buys & how far below "
+                      "investable it sits", 6)
+    r += 1
+    header(ws, r, ["Metric", "Value", "", "", "", ""])
+    r += 1
+    five_out_row = r
+    inv_exp = 1.0 / SIXTENTHS
+    # output at £5M (live, inverse six-tenths off the as-built capex+output)
+    ws.cell(r, 1, clean_cell(f"Output affordable at £5.0M ({out_unit})")).font = FONT_SUB
+    fo = ws.cell(r, 2, f"={R('out_qty')}*(5000000/{R('capex')})^{inv_exp:.6f}")
+    fo.fill = FILL_RESULT
+    fo.border = BORDER
+    fo.number_format = FMT_DEC1
+    ws.cell(r, 1).border = BORDER
+    r += 1
+    # the £5M EBITDA / IRR / payback — computed directly (not via the sweep, since
+    # the £5M output isn't one of the sweep grid points). All live off Inputs.
+    five_q = f"B{five_out_row}"
+    qref = R("out_qty")
+    sale_mult = "*1000" if is_ras else ""
+    feed5 = f"{five_q}{sale_mult}*{R('fcr')}*{R('feed_price')}"
+    energy5 = f"{R('load_kw')}*({five_q}/{qref})*{R('hours')}*{R('load_factor')}*{R('energy_price')}"
+    maint5 = f"5000000*{R('maint_pct')}/100"
+    rev5 = f"{five_q}{sale_mult}*{R('sale_price')}"
+    eb5 = f"({rev5})-({feed5}+{energy5}+{R('labour')}+{maint5}+{R('other_opex')})"
+    eb5_row = r
+    ws.cell(r, 1, clean_cell("EBITDA at £5.0M")).font = FONT_SUB
+    ec5 = ws.cell(r, 2, f"={eb5}")
+    ec5.fill = FILL_RESULT
+    ec5.border = BORDER
+    ec5.number_format = FMT_GBP
+    ws.cell(r, 1).border = BORDER
+    r += 1
+    ws.cell(r, 1, clean_cell("IRR at £5.0M")).font = FONT_SUB
+    irr5 = ws.cell(r, 2,
+                   f'=IF(B{eb5_row}>0,IFERROR(MAX(-0.99,RATE({R("project_life")},'
+                   f'B{eb5_row},-5000000,0,0,B{eb5_row}/5000000)),-1),"n/a")')
+    irr5.fill = FILL_RESULT
+    irr5.border = BORDER
+    irr5.number_format = "0.0%"
+    ws.cell(r, 1).border = BORDER
+    r += 1
+    ws.cell(r, 1, clean_cell("Payback at £5.0M")).font = FONT_SUB
+    pay5 = ws.cell(r, 2, f'=IF(B{eb5_row}>0,5000000/B{eb5_row},"n/a (EBITDA≤0)")')
+    pay5.fill = FILL_RESULT
+    pay5.border = BORDER
+    pay5.number_format = FMT_DEC1
+    ws.cell(r, 1).border = BORDER
+    r += 1
+    # gap below investable scale (live: investable output − £5M output)
+    ws.cell(r, 1, clean_cell(f"Shortfall vs investable scale ({out_unit})")).font = FONT_SUB
+    gap = ws.cell(r, 2,
+                  f'=IFERROR(INDEX({OUT},MATCH({HURDLE}/100,{IRRr},1)+1)-B{five_out_row},"—")')
+    gap.fill = FILL_CONST
+    gap.border = BORDER
+    gap.number_format = FMT_DEC1
+    ws.cell(r, 3, clean_cell("how far the £5M plant sits below the investable size")
+            ).font = FONT_NOTE
+    ws.cell(r, 1).border = BORDER
+    r += 2
+
+    # ----------------------------------------------------------------------
+    # "What moves the sweet spot" note — the 2-3 most sensitive inputs.
+    # ----------------------------------------------------------------------
+    sub_banner(ws, r, "What moves the sweet spot", 6)
+    r += 1
+    movers = (
+        "Revenue scales linearly with the sale price and 1:1 with output, so the "
+        "SALE PRICE is the dominant lever — a 25% lift pulls the investable scale "
+        "sharply DOWN (smaller plant clears the hurdle). ENERGY price + connected "
+        "load set the largest variable-opex line and bite hardest at small scale "
+        "where fixed labour dominates margin. CAPEX (and its six-tenths exponent) "
+        "sets the absolute investment and the maintenance line. Flex these three on "
+        "the Inputs tab and watch every threshold + curve below move."
+    ) if is_ras else (
+        "The SALE PRICE per output unit is the dominant lever (revenue is linear in "
+        "it and in output). ENERGY price + connected load set the largest variable-"
+        "opex line. CAPEX and its six-tenths exponent set the absolute investment "
+        "and the maintenance line. Flex these on the Inputs tab — every threshold + "
+        "curve moves live."
+    )
+    ws.merge_cells(start_row=r, start_column=1, end_row=r + 2, end_column=6)
+    mc = ws.cell(r, 1, clean_cell(movers))
+    mc.alignment = Alignment(vertical="top", wrap_text=True, indent=1)
+    mc.font = FONT_NOTE
+    r += 4
+
+    # ----------------------------------------------------------------------
+    # CHART HELPER BLOCK (cols H..L) — a contiguous live mirror of the sweep plus
+    # two constant threshold series (discount-rate line + hurdle line) so the
+    # IRR-vs-capex chart shows the crossings AS the viability + investable points.
+    # Built on THIS tab (cols H+) so every chart series is contiguous & live.
+    # ----------------------------------------------------------------------
+    hh = r  # helper header row
+    ws.cell(hh, 8, clean_cell("Capex £")).font = FONT_SUB
+    ws.cell(hh, 9, clean_cell(f"Output {out_unit}")).font = FONT_SUB
+    ws.cell(hh, 10, clean_cell("IRR")).font = FONT_SUB
+    ws.cell(hh, 11, clean_cell("Discount-rate line")).font = FONT_SUB
+    ws.cell(hh, 12, clean_cell("Hurdle line")).font = FONT_SUB
+    ws.cell(hh, 13, clean_cell("NPV £")).font = FONT_SUB
+    ws.cell(hh, 14, clean_cell("Payback yr (cap 40)")).font = FONT_SUB
+    ws.cell(hh, 15, clean_cell("EBITDA margin")).font = FONT_SUB
+    hfirst = hh + 1
+    n_rows = l - f + 1
+    for i in range(n_rows):
+        src = f + i  # the sweep source row on the Scenarios tab
+        rr = hfirst + i
+        # capex (x-axis) + output, mirrored live from the sweep
+        ws.cell(rr, 8, f"={sh}!{sw['col_capex']}{src}").number_format = FMT_GBP
+        ws.cell(rr, 9, f"={sh}!{sw['col_out']}{src}").number_format = FMT_DEC1
+        # IRR — coerce a non-numeric ("n/a") to a plottable NA() so the line breaks
+        ws.cell(rr, 10,
+                f'=IFERROR(N({sh}!{sw["col_irr"]}{src})+0,NA())').number_format = "0.0%"
+        # threshold constant series across the same x-range
+        ws.cell(rr, 11, f"={DISC}/100").number_format = "0.0%"
+        ws.cell(rr, 12, f"={HURDLE}/100").number_format = "0.0%"
+        # NPV mirror
+        ws.cell(rr, 13, f"={sh}!{sw['col_npv']}{src}").number_format = FMT_GBP
+        # payback capped (text n/a -> 40 so the series plots)
+        ws.cell(rr, 14,
+                f'=IF({sh}!{sw["col_ebitda"]}{src}>0,'
+                f'MIN(40,{sh}!{sw["col_capex"]}{src}/{sh}!{sw["col_ebitda"]}{src}),40)'
+                ).number_format = FMT_DEC1
+        # EBITDA margin = EBITDA / revenue
+        ws.cell(rr, 15,
+                f'=IFERROR({sh}!{sw["col_ebitda"]}{src}/{sh}!{sw["col_rev"]}{src},0)'
+                ).number_format = "0.0%"
+    hlast = hfirst + n_rows - 1
+
+    # ----------------------------------------------------------------------
+    # THE CURVES — ScatterChart on a capex / scale x-axis. Threshold lines are
+    # constant-value series; their crossing with the IRR curve IS the viability
+    # + investable point.
+    # ----------------------------------------------------------------------
+    from openpyxl.chart import ScatterChart, LineChart, Reference, Series
+
+    def _scatter(title, x_title, y_title, x_col, y_cols_fills, num_fmt="0.0%"):
+        ch = ScatterChart()
+        ch.title = title
+        ch.height, ch.width = 8.5, 15
+        ch.x_axis.title = x_title
+        ch.y_axis.title = y_title
+        ch.x_axis.delete = False
+        ch.y_axis.delete = False
+        xref = Reference(ws, min_col=x_col, min_row=hfirst, max_row=hlast)
+        for (ycol, name) in y_cols_fills:
+            yref = Reference(ws, min_col=ycol, min_row=hfirst, max_row=hlast)
+            s = Series(yref, xref, title=name)
+            ch.series.append(s)
+        return ch
+
+    # 1) IRR vs capex with the two threshold lines (the crossings)
+    c1 = _scatter("IRR vs capex — crossings = viability & investable points",
+                  "Capex £", "IRR",
+                  8, [(10, "IRR"), (11, "Discount rate"), (12, "Investor hurdle")])
+    # straight-line connectors so the threshold series read as horizontal lines
+    for s in c1.series:
+        s.smooth = False
+        s.marker.symbol = "none"
+    ws.add_chart(c1, f"A{hh}")
+
+    # 2) NPV vs capex (marks the NPV-max)
+    c2 = _scatter("NPV vs capex — peak = NPV-max scale", "Capex £", "NPV £",
+                  8, [(13, "NPV")], num_fmt=FMT_GBP)
+    for s in c2.series:
+        s.smooth = False
+    ws.add_chart(c2, f"A{hh+18}")
+
+    # 3) Payback vs capex
+    c3 = _scatter("Payback vs capex", "Capex £", "Payback (yr, cap 40)",
+                  8, [(14, "Payback")], num_fmt=FMT_DEC1)
+    for s in c3.series:
+        s.smooth = False
+    ws.add_chart(c3, f"A{hh+36}")
+
+    # 4) EBITDA margin vs scale (output on x)
+    c4 = _scatter("EBITDA margin vs scale", f"Output ({out_unit})", "EBITDA margin",
+                  9, [(15, "EBITDA margin")])
+    for s in c4.series:
+        s.smooth = False
+    ws.add_chart(c4, f"A{hh+54}")
+
+    ws.freeze_panes = "A4"
+    back_link(ws, 6)
+    return True
+
+
+# ============================================================================
 # TAB — SPEC-SHEET-PER-PRINCIPAL (#43)
 # ============================================================================
 # One compact block per principal BoM item: tag, duty, rating, qty, unit £,
@@ -2018,6 +3275,15 @@ def build(run_dir: str, out_path: str) -> dict:
 
     add_tab("Brief compliance", lambda: tab_brief_compliance(wb, state))
     add_tab("Cost waterfall", lambda: tab_cost_waterfall(wb, state))
+    # ---- ECONOMICS MODEL: Inputs -> Economics -> Scenarios (live + charts).
+    # Built in this order so Economics/Scenarios can reference the Inputs cells.
+    # Each self-guards (skips cleanly on a class with no usable output metric).
+    add_tab(INPUTS_SHEET, lambda: tab_inputs_assumptions(wb, state))
+    add_tab("Economics", lambda: tab_economics(wb, state))
+    add_tab("Scenarios", lambda: tab_scenarios(wb, state))
+    # Investment Analysis depends on the Scenarios sweep (stashed cell ranges) —
+    # built immediately after so the sweet-spot INDEX/MATCH + curves can reference it.
+    add_tab("Investment Analysis", lambda: tab_investment_analysis(wb, state))
     add_tab("Spec sheets", lambda: tab_spec_sheets(wb, state))
     add_tab("Panel schedule", lambda: tab_panel_schedule(wb, run_dir))
     # process schedules creates 0..3 sheets; treat >0 as success
