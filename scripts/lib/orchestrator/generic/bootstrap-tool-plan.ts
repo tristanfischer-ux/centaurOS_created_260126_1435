@@ -1221,8 +1221,80 @@ const num = (o: any, field: string): number | undefined => {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined
 }
 
+// ── PER-PUMP BASIS NORMALISER (universal, Tristan 2026-06-19 — the RAS recirc-pump
+// three-bases bug) ───────────────────────────────────────────────────────────────
+// process:pump-sizing is a generic stand-in the planner wires with the SYSTEM-total
+// flow (e.g. `recirculation_flow_m3_h` = 13,360) and, often, a contract head key it
+// matches semantically into `static_head_m`. Both are WRONG for the worked-calc:
+//   (1) the loop runs N PARALLEL pumps, so the device duty is the loop ÷ N, not the
+//       whole loop through one impossible giant pump (13,360 m³/h at DN600 → 13 m/s,
+//       983 kW). The honest per-pump flow is total ÷ count.
+//   (2) the contract head key (e.g. `recirc_pump_head_m` = 14.5 m) is the FULL total
+//       dynamic head (static + in-line process losses + friction already summed). The
+//       tool would treat it as STATIC and re-add its own friction → 26.35 m (double-
+//       counted), and report full-loop 1,217 kW motor instead of the per-pump 132 kW.
+// This deterministic pass closes BOTH at the single payload-build point, for ANY
+// archetype: when a pump-sizing step's flow is wired from a `<device>` contract key,
+// it finds that device's sibling `<device>_count` and `<device>_head_m` quantities and
+// injects `parallel_pumps` + `total_dynamic_head_m`. No `if class`, no per-class table
+// — it keys purely on the contract's self-describing `<device>_count` / `<device>_head_m`
+// naming convention. A single pump (no `_count` ≥ 2) and a tool the contract gives no
+// head key are left exactly as before (parallel_pumps=1, head from static+friction).
+const _PUMP_SIZING_TOOL_RE = /(^|[:_-])pump[_-]?sizing$/i
+/** Significant stems of a contract key, minus the trailing measure/unit suffix tokens
+ *  (count / head / m / flow / m3 / h …) so `recirculation_flow_m3_h`, `recirc_pump_count`
+ *  and `recirc_pump_head_m` all share the `recirc` device stem. The recirculation/circulation
+ *  family is NORMALISED to `recirc` (not dropped) so the loop-flow key still names the device
+ *  whose count/head it must read. */
+function _deviceStems(key: string): string[] {
+  return key.toLowerCase().split(/[_\s]+/)
+    .map((t) => (/^(recirc|recirculation|recirculating|circulation|circulating)$/.test(t) ? 'recirc' : t))
+    .filter((t) => t.length >= 3 && !UNIT_TOKENS.has(t) &&
+      !['count', 'head', 'flow', 'rate', 'throughput', 'total', 'system'].includes(t))
+}
+/** First contract quantity value whose key ends with `suffixRe` AND whose device stems
+ *  overlap `stems`, else undefined. Deterministic (keys sorted). */
+function _siblingQty(c: ContractInProgress, stems: string[], suffixRe: RegExp): number | undefined {
+  const want = new Set(stems)
+  let best: { key: string; v: number } | undefined
+  for (const key of Object.keys(c.quantities ?? {}).sort()) {
+    if (!suffixRe.test(key)) continue
+    const ks = _deviceStems(key)
+    if (!ks.some((t) => want.has(t))) continue
+    const v = (c.quantities as Record<string, any>)[key]?.value
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) { best = { key, v }; break }
+  }
+  return best?.v
+}
+/** Inject `parallel_pumps` (from `<device>_count`) + `total_dynamic_head_m` (from
+ *  `<device>_head_m`) into a pump-sizing payload, derived from the SAME device the
+ *  flow was wired from. Mutates + returns `payload`. Never overwrites a value the plan
+ *  already set explicitly. */
+function _normalisePumpSizingInput(
+  step: ToolPlanStepSpec, c: ContractInProgress, payload: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!_PUMP_SIZING_TOOL_RE.test(step.tool_id)) return payload
+  // The device family = stems of the contract key the flow was wired from (preferred),
+  // else stems of any flow-bearing input key.
+  const flowInp = step.inputs.find((i) => i.param === 'flow_m3_h' && i.from_contract_key)
+  const stems = flowInp?.from_contract_key ? _deviceStems(flowInp.from_contract_key) : []
+  if (stems.length === 0) return payload
+  // (1) parallel_pumps ← <device>_count (only when the plan didn't already set it).
+  if (payload['parallel_pumps'] === undefined) {
+    const cnt = _siblingQty(c, stems, /_count$/)
+    if (cnt !== undefined && cnt >= 2) payload['parallel_pumps'] = Math.round(cnt)
+  }
+  // (2) total_dynamic_head_m ← <device>_head_m (authoritative TDH; stops the double-count).
+  if (payload['total_dynamic_head_m'] === undefined) {
+    const headM = _siblingQty(c, stems, /_head_m$/)
+    if (headM !== undefined && headM > 0) payload['total_dynamic_head_m'] = headM
+  }
+  return payload
+}
+
 /** Build the input payload for a step from its inputs[] spec. from_contract_key
- *  → q(c, key, fallback); else the literal constant. */
+ *  → q(c, key, fallback); else the literal constant. A pump-sizing step is then
+ *  normalised onto the PER-PUMP basis (parallel_pumps + authoritative TDH). */
 function buildStepInput(step: ToolPlanStepSpec, c: ContractInProgress): Record<string, unknown> {
   const payload: Record<string, unknown> = {}
   for (const inp of step.inputs) {
@@ -1232,7 +1304,7 @@ function buildStepInput(step: ToolPlanStepSpec, c: ContractInProgress): Record<s
       payload[inp.param] = inp.constant
     }
   }
-  return payload
+  return _normalisePumpSizingInput(step, c, payload)
 }
 
 /**

@@ -1596,15 +1596,29 @@ def _connection_rows(out_dir: str, q=None):
     # that legitimately carry it are the main-loop edges.
     recirc_m3h = _qval("recirculation_flow_m3_h", "degasser_water_flow_m3_h",
                        "drum_filter_throughput_m3_h", default=13360.0)
-    # PARALLEL PROCESS TRAINS — the plant flow is split across N parallel headers
-    # (e.g. the rearing-tank count), so a single represented loop edge carries one
-    # train's share, not the whole plant flow through one impossible giant main.
-    # Derived from total ÷ per-unit tank volume (universal), floored at 1.
-    tot_vol = _qval("total_tank_volume_m3")
-    each_vol = _qval("rearing_tank_volume_each_m3")
+    # PARALLEL PROCESS TRAINS — the recirculation LOOP flow is split across N parallel
+    # treatment trains (the recirc PUMPS / drum-filters / degassers that actually carry
+    # the loop), so a single represented loop edge carries one train's share. The split
+    # count is the EQUIPMENT-train count the contract authoritatively declares
+    # (`recirc_pump_count` / `drum_filter_count` / `degasser_count`) — NOT the rearing-
+    # TANK count. Those differ (8 pump trains vs 10 tanks at 13,360 m³/h): dividing the
+    # loop by the tank count (÷10 → 1,336 m³/h) gives a per-unit flow that, ×8 trains,
+    # is 10,688 ≠ the 13,360 loop — the exact per-tank-vs-per-pump basis bug. The pump-
+    # train count gives 13,360 ÷ 8 = 1,670, which closes. Falls back to the tank count
+    # only when no train count is declared. Universal, floored at 1.
+    train_count_keys = ("recirc_pump_count", "drum_filter_count", "degasser_count",
+                        "recirc_train_count", "biofilter_count")
     trains = 1
-    if tot_vol and each_vol and each_vol > 0:
-        trains = max(1, round(tot_vol / each_vol))
+    for _tk in train_count_keys:
+        _tc = _qval(_tk)
+        if _tc and _tc >= 1:
+            trains = max(1, round(_tc))
+            break
+    else:
+        tot_vol = _qval("total_tank_volume_m3")
+        each_vol = _qval("rearing_tank_volume_each_m3")
+        if tot_vol and each_vol and each_vol > 0:
+            trains = max(1, round(tot_vol / each_vol))
     out = []
     for i, r in enumerate(cs.get("rows") or []):
         size = str(r.get("size") or "").strip()

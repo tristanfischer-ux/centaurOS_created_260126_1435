@@ -27,9 +27,16 @@ import { resolve } from 'path'
 export interface ProcessPumpSizingInput {
   pump_name?: string
   flow_m3_h: number
+  /** N parallel pump trains sharing flow_m3_h — sizes ONE pump on its share
+   *  (flow_m3_h / parallel_pumps) so the worked-calc is PER-PUMP. Default 1. */
+  parallel_pumps?: number
   fluid_density_kg_m3?: number
   fluid_viscosity_pa_s?: number
   static_head_m?: number
+  /** Authoritative total dynamic head [m]. When given, OVERRIDES the
+   *  static+friction+process sum so the pump head equals the caller's pre-computed
+   *  TDH (avoids double-counting friction the caller already included). */
+  total_dynamic_head_m?: number
   pipe_length_m?: number
   pipe_diameter_mm?: number
   roughness_mm?: number
@@ -42,23 +49,30 @@ export interface ProcessPumpSizingInput {
 export interface ProcessPumpSizingOutput {
   pump_name: string
   pump_type: string
-  flow_m3_h: number
+  parallel_pumps: number
+  flow_m3_h: number              // PER-PUMP duty flow
+  flow_m3_h_total: number        // loop total (sum of all parallel trains)
   pump_flow_lpm: number
   fluid_density_kg_m3: number
   pipe_velocity_m_s: number
   reynolds: number
   darcy_friction_factor: number
+  head_basis: string
+  head_override_applied: boolean
   head_breakdown: {
     static_head_m: number
     friction_head_m: number
     process_backpressure_head_m: number
   }
   pump_head_m: number
-  hydraulic_power_w: number
-  shaft_power_w: number
-  motor_power_w: number
-  motor_power_kw: number
-  recommended_motor_kw: number
+  hydraulic_power_w: number      // PER-PUMP
+  shaft_power_w: number          // PER-PUMP
+  motor_power_w: number          // PER-PUMP
+  motor_power_kw: number         // PER-PUMP
+  recommended_motor_kw: number   // PER-PUMP IEC frame
+  system_hydraulic_power_w: number  // all N trains
+  system_shaft_power_w: number      // all N trains
+  system_motor_kw: number           // all N trains
   pump_efficiency: number
   motor_efficiency: number
   worked: unknown[]

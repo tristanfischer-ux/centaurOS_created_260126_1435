@@ -3545,28 +3545,35 @@
       "fluid_density_kg_m3",
       "fluid_viscosity_pa_s",
       "motor_efficiency",
+      "parallel_pumps",
       "pipe_diameter_mm",
       "pipe_length_m",
       "process_backpressure_kpa",
       "pump_efficiency",
       "pump_name",
       "roughness_mm",
-      "static_head_m"
+      "static_head_m",
+      "total_dynamic_head_m"
     ],
     "output_keys": [
       "darcy_friction_factor",
       "data_sources",
+      "flow_m3_h_total",
       "head_breakdown",
       "hydraulic_power_w",
       "motor_power_kw",
       "motor_power_w",
+      "parallel_pumps",
       "pipe_velocity_m_s",
       "pump_flow_lpm",
       "pump_head_m",
       "pump_type",
       "recommended_motor_kw",
       "reynolds",
-      "shaft_power_w"
+      "shaft_power_w",
+      "system_hydraulic_power_w",
+      "system_motor_kw",
+      "system_shaft_power_w"
     ],
     "py_file": "process_pump_sizing.py",
     "io_source": "run"

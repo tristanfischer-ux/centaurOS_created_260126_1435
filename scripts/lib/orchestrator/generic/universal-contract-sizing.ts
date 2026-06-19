@@ -204,6 +204,30 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
       case 'current': g.current = Math.max(g.current ?? 0, value); break
     }
   }
+  // ── PER-UNIT DUTY GUARD (universal, Tristan 2026-06-19) ───────────────────────
+  // A principal's PER-UNIT throughput must equal (authoritative TOTAL ÷ its OWN count).
+  // The contract convention is that a `<device>_throughput_m3_h` key is ALREADY per-unit,
+  // but a generic/aggregate flow key can leak a PLANT-TOTAL flow into a COUNTED device
+  // group (the RAS shape the drawer warns of: a whole-loop 13,360 m³/h landing on a ×8
+  // pump/filter group). When a group carries a count ≥2 AND its throughput equals a
+  // separately-declared plant-total flow (within tolerance) — i.e. it is the TOTAL, not a
+  // per-unit value — divide it by the count so the rating + scaled box are PER-UNIT. This
+  // never touches a genuinely per-unit throughput (which does NOT equal the loop total),
+  // and never fires for a single unit (count < 2). Deterministic, no class branch.
+  const plantTotals: number[] = []
+  for (const [key, value] of Object.entries(quantities)) {
+    if (!Number.isFinite(value) || value <= 0) continue
+    if (/(recircul\w*|total|system|loop)_flow_m3_h$|_flow_m3_h_total$/.test(key)) plantTotals.push(value)
+  }
+  if (plantTotals.length > 0) {
+    for (const g of byPhrase.values()) {
+      if (g.throughput === undefined || (g.count ?? 1) < 2) continue
+      const near = plantTotals.find((t) => Math.abs(g.throughput! - t) / t <= 0.02)
+      if (near !== undefined) {
+        g.throughput = g.throughput / Math.round(g.count!)   // total ÷ own count → per-unit
+      }
+    }
+  }
   return [...byPhrase.values()]
 }
 

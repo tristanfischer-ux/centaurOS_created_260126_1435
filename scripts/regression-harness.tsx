@@ -57,7 +57,7 @@ import { splitDenseSubModulesByRadical, TARGET_DENSITY_DEFAULT, MIN_CHILD_WORDS_
 import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, isBespokeFabrication } from '../src/lib/pdf-engine-v2/lib/bespoke-equipment-bands'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
-import { validateToolPlanSpec, applyStepOutputs, type ToolPlanSpec, type ToolPlanStepSpec } from './lib/orchestrator/generic/bootstrap-tool-plan'
+import { validateToolPlanSpec, applyStepOutputs, materialisePlan, type ToolPlanSpec, type ToolPlanStepSpec } from './lib/orchestrator/generic/bootstrap-tool-plan'
 import { relevanceCacheKey, checkUnitCoverage } from './lib/orchestrator/generic/relevance-sweep'
 import { storeProposalForClass, loadProposalForClass } from './lib/orchestrator/generic/tool-creation-pass'
 import { dutyHash, type DutySpec } from './lib/orchestrator/generic/tool-generator'
@@ -975,6 +975,54 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => `heating=${JSON.stringify(heatNames)} cooling=${JSON.stringify(coolNames)}`,
   ))
 
+  // ── PER-UNIT DUTY = AUTHORITATIVE TOTAL ÷ OWN COUNT (Tristan 2026-06-19, the RAS
+  // recirc-pump three-bases bug) ──
+  // A qty-N principal's PER-UNIT throughput must equal (the loop TOTAL ÷ its OWN count).
+  // The contract convention is per-unit `<device>_throughput_m3_h` keys, but a PLANT-TOTAL
+  // flow can leak onto a COUNTED device group (a whole 13,360 m³/h loop landing on a ×8
+  // filter group). The buildGroups per-unit guard must then divide it by the count so the
+  // synthesised device's rating + scaled box read the PER-UNIT value (1,670 m³/h), not the
+  // total (13,360). A genuinely per-unit throughput (≠ the loop total) is left untouched.
+  // Universal, no `if class` — fed a synthetic 'widget' device so the test never depends on RAS.
+  const totalLeakModules: any = [
+    { module: 'm', sub_modules: [{ id: 'sm', words: [] }] },
+  ]
+  const totalLeakContract: any = {
+    quantities: {
+      recirculation_flow_m3_h: { value: 13360, unit: 'm³/h' }, // authoritative loop total
+      widget_filter_flow_m3_h: { value: 13360, unit: 'm³/h' },  // a TOTAL flow LEAKED onto the ×8 device key
+      widget_filter_count: { value: 8, unit: '' },              // ×8 parallel filters
+      // a SECOND device (a pump) carrying a GENUINE per-unit flow that must NOT be divided
+      // (it does NOT equal the loop total): 900 m³/h each is already a per-unit value.
+      side_pump_flow_m3_h: { value: 900, unit: 'm³/h' },
+      side_pump_count: { value: 4, unit: '' },
+    },
+  }
+  applyUniversalContractSizing(totalLeakModules, totalLeakContract, { synthesizeMissing: true, onlyUnsized: false, dedupeAndStrip: false })
+  const synthWords: any[] = (totalLeakModules[0].sub_modules[0].words || [])
+  // Read the PRINCIPAL synthesised word (id ends `_synth_word`, not a sub-component like
+  // "Backwash Pump" that the filter assembly explodes) by its exact canonical name.
+  const ratingOf = (name: string): number | null => {
+    const w = synthWords.find((x: any) => x._synthesized && String(x.name_human || '') === name)
+    if (!w) return null
+    const r = (w.modifier_characters || []).find((mc: any) => mc.kind === 'rating_primary')
+    return r ? Number(r.value) : null
+  }
+  const filterRating = ratingOf('Widget Filter')  // expect 13360/8 = 1670 (per-unit, leaked total divided)
+  const pumpRating = ratingOf('Side Pump')        // expect 900 unchanged (genuine per-unit ≠ loop total)
+  out.push(assertEq(
+    'UNIVERSAL.principal_per_unit_duty_equals_total_over_count',
+    'a qty-N principal whose throughput equals the authoritative plant total is divided by its OWN count so the rating is PER-UNIT (a leaked 13,360 m³/h loop on a ×8 device → 1,670 m³/h each, per-unit×N=loop), while a genuine per-unit throughput (≠ the loop total) is left unchanged. Universal — the buildGroups per-unit guard, no class branch',
+    JSON.stringify({ filterRating, pumpRating }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.filterRating !== null && Math.abs(o.filterRating - 1670) <= 5 &&   // total ÷ 8 = per-unit
+        o.filterRating * 8 >= 13360 - 50 && o.filterRating * 8 <= 13360 + 50 &&   // per-unit × N ≈ loop total
+        o.pumpRating !== null && Math.abs(o.pumpRating - 900) <= 5                // genuine per-unit untouched
+    },
+    () => `filterRating=${filterRating} (want ~1670; ×8=${filterRating !== null ? filterRating * 8 : 'n/a'}) pumpRating=${pumpRating} (want 900 unchanged)`,
+  ))
+
   return out
 }
 
@@ -1336,12 +1384,68 @@ function checkToolPlanBootstrapFailClosed(): Assertion[] {
         wroteTx.contract.quantities['main_transformer_kva']?.value === 500,
       () => `calc=${JSON.stringify(protCalc.contract.quantities['heat_pump_electrical_kw'])} prot=${JSON.stringify(protCalc.protected_keys)} | tx=${JSON.stringify(wroteTx.contract.quantities['main_transformer_kva'])}`,
     ))
+
+    // ── PUMP-SIZING PER-PUMP NORMALISER (Tristan 2026-06-19, the RAS three-bases bug) ──
+    // A process:pump-sizing step whose flow is wired from the loop-total key must, at
+    // payload-build time, be deterministically given parallel_pumps (← the device's
+    // <device>_count) + total_dynamic_head_m (← <device>_head_m) so the worked-calc is
+    // PER-PUMP on the authoritative TDH (1,670 m³/h on 14.5 m, NOT 13,360 m³/h on a double-
+    // counted 26.35 m). A single pump (no _count≥2) + a tool with no contract head key is
+    // left exactly as before. Universal — keyed on the <device>_count / <device>_head_m
+    // naming convention, no class branch.
+    const rasPumpSpec: ToolPlanSpec = {
+      display_name: 'ras-pump-fixture',
+      steps: [{
+        tool_id: 'process:pump-sizing',
+        inputs: [
+          { param: 'flow_m3_h', from_contract_key: 'recirculation_flow_m3_h', fallback: 100 },
+          { param: 'static_head_m', from_contract_key: 'recirc_pump_head_m', fallback: 10 },
+        ],
+        outputs: [{ contract_key: 'pmotor', tool_output_field: 'motor_power_kw', unit: 'kW', family: 'power' }],
+      }],
+    }
+    const rasPumpContract: any = { quantities: {
+      recirculation_flow_m3_h: { value: 13360, unit: 'm³/h' },
+      recirc_pump_count: { value: 8, unit: '' },
+      recirc_pump_head_m: { value: 14.5, unit: 'm' },
+    } }
+    const rasPumpPlan = materialisePlan('ras-pump-fixture', rasPumpSpec, ['process:pump-sizing'])
+    const rasPumpPayload: any = rasPumpPlan.tools[0].input_from_contract(rasPumpContract)
+    // negative control — a single-pump SAF reflux step (no _count≥2, no _head_m) is untouched.
+    const safPumpSpec: ToolPlanSpec = {
+      display_name: 'saf-pump-fixture',
+      steps: [{
+        tool_id: 'process:pump-sizing',
+        inputs: [
+          { param: 'flow_m3_h', from_contract_key: 'reflux_flow_m3_h', fallback: 5 },
+          { param: 'static_head_m', constant: 15 },
+        ],
+        outputs: [{ contract_key: 'p2', tool_output_field: 'motor_power_kw', unit: 'kW', family: 'power' }],
+      }],
+    }
+    const safPumpPlan = materialisePlan('saf-pump-fixture', safPumpSpec, ['process:pump-sizing'])
+    const safPumpPayload: any = safPumpPlan.tools[0].input_from_contract({ quantities: { reflux_flow_m3_h: { value: 5, unit: 'm³/h' } } } as any)
+    out.push(assertEq(
+      'UNIVERSAL.pump_sizing_normalised_to_per_pump_basis',
+      'a process:pump-sizing step wired from the loop-total flow is given parallel_pumps (← <device>_count) + total_dynamic_head_m (← <device>_head_m) at payload build, so the worked-calc sizes ONE pump on the authoritative TDH (per-pump×N=loop, NOT the full loop on a double-counted head); a single-pump step with no _count/_head_m is left untouched',
+      JSON.stringify({
+        rasParallel: rasPumpPayload.parallel_pumps, rasTdh: rasPumpPayload.total_dynamic_head_m,
+        safParallel: safPumpPayload.parallel_pumps, safTdh: safPumpPayload.total_dynamic_head_m,
+      }),
+      (v) => {
+        const o = JSON.parse(v as unknown as string)
+        return o.rasParallel === 8 && Math.abs(o.rasTdh - 14.5) < 0.01 &&        // RAS gets per-pump count + TDH
+          o.safParallel === undefined && o.safTdh === undefined                  // single-pump untouched
+      },
+      () => `rasParallel=${rasPumpPayload.parallel_pumps} rasTdh=${rasPumpPayload.total_dynamic_head_m} | safParallel=${safPumpPayload.parallel_pumps} safTdh=${safPumpPayload.total_dynamic_head_m}`,
+    ))
   } catch (err) {
     // Registry/import unavailable — vacuous PASS (mirrors checkSizingToolsWorkedSound's catch).
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_valid_spec_passes', description: 'tool-plan bootstrap valid spec passes', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_rejects_hallucinated_output_field', description: 'tool-plan bootstrap rejects hallucinated field', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_materialiser_fail_closed', description: 'tool-plan bootstrap materialiser fail-closed', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
     out.push({ id: 'UNIVERSAL.tool_plan_bootstrap_seed_protected_from_stand_in_overwrite', description: 'tool-plan bootstrap seed protection', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+    out.push({ id: 'UNIVERSAL.pump_sizing_normalised_to_per_pump_basis', description: 'pump-sizing per-pump normaliser', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
   }
   return out
 }

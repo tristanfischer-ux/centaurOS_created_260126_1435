@@ -28,9 +28,23 @@ INPUT (JSON on stdin)
     {
       "pump_name": "MEA circulation pump",     # optional label
       "flow_m3_h": 3.0,                          # duty volumetric flow [m3/h]
+      "parallel_pumps": 1,                       # PER-UNIT BASIS: N parallel pump
+                                                 #   trains sharing flow_m3_h. The tool
+                                                 #   sizes ONE pump on its share
+                                                 #   (flow_m3_h / parallel_pumps), so
+                                                 #   the worked-calc, velocity, head and
+                                                 #   power are all PER-PUMP. Default 1.
       "fluid_density_kg_m3": 1000.0,            # 30 wt% aqueous MEA ~ water
       "fluid_viscosity_pa_s": 0.0013,           # dynamic viscosity (water ~1.0e-3)
       "static_head_m": 12.0,                    # elevation lift (suction -> delivery)
+      "total_dynamic_head_m": null,             # OPTIONAL authoritative total dynamic
+                                                 #   head [m]. When given, it OVERRIDES
+                                                 #   the static+friction+process sum so
+                                                 #   the pump head EQUALS the caller's
+                                                 #   pre-computed TDH (avoids DOUBLE-
+                                                 #   COUNTING friction the caller already
+                                                 #   included). The friction/process
+                                                 #   terms are still reported for context.
       "pipe_length_m": 40.0,                    # straight pipe run [m]
       "pipe_diameter_mm": 50.0,                 # internal bore [mm]
       "roughness_mm": 0.015,                    # absolute roughness (drawn ss ~0.015)
@@ -100,9 +114,20 @@ STD_MOTORS_KW = [0.18, 0.25, 0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3.0, 4.0, 5.5,
 
 def compute(payload: dict) -> dict:
     pump_name = str(payload.get("pump_name", "process pump"))
-    flow_m3_h = float(payload.get("flow_m3_h", 3.0))
-    if flow_m3_h <= 0:
+    flow_m3_h_total = float(payload.get("flow_m3_h", 3.0))
+    if flow_m3_h_total <= 0:
         raise ValueError("flow_m3_h must be > 0")
+    # PER-UNIT BASIS (universal): N parallel pump trains share the supplied duty flow.
+    # Sizing ONE pump on its share (total / N) is the ONLY honest basis — velocity,
+    # friction, hydraulic, shaft and motor are then all PER-PUMP, and per-pump × N
+    # closes back to the loop total. parallel_pumps defaults to 1 (a single pump),
+    # so legacy single-pump callers are byte-unchanged. Never < 1.
+    parallel_pumps = int(payload.get("parallel_pumps", 1) or 1)
+    if parallel_pumps < 1:
+        parallel_pumps = 1
+    flow_m3_h = flow_m3_h_total / parallel_pumps     # PER-PUMP duty flow
+    if flow_m3_h <= 0:
+        raise ValueError("per-pump flow (flow_m3_h / parallel_pumps) must be > 0")
     rho = float(payload.get("fluid_density_kg_m3", 1000.0))
     if rho <= 0:
         raise ValueError("fluid_density_kg_m3 must be > 0")
@@ -144,7 +169,19 @@ def compute(payload: dict) -> dict:
     h_friction_m = f_darcy * (l_eff_m / d_m) * velocity_m_s ** 2 / (2.0 * G)
     # Process backpressure (column packing + exchangers + filter dP) as head.
     h_process_m = process_backpressure_kpa * 1000.0 / (rho * G)
-    h_total_m = static_head_m + h_friction_m + h_process_m
+    # AUTHORITATIVE-HEAD OVERRIDE (universal): when the caller supplies a pre-computed
+    # total dynamic head (it already summed static lift + in-line process losses +
+    # friction for the WHOLE loop), USE IT directly as the pump head. Re-summing
+    # static_head + friction + process here would DOUBLE-COUNT the friction the caller
+    # already rolled in (the 14.5 m contract TDH read as 26.35 m). The component terms
+    # stay computed + reported for context; only the TOTAL is taken from the override.
+    tdh_override = payload.get("total_dynamic_head_m", None)
+    if tdh_override is not None and float(tdh_override) > 0:
+        h_total_m = float(tdh_override)
+        head_basis = "caller-supplied total dynamic head (static+process+friction pre-summed upstream)"
+    else:
+        h_total_m = static_head_m + h_friction_m + h_process_m
+        head_basis = "static lift + Darcy-Weisbach friction + process backpressure"
 
     # ---- Power ----
     p_hydraulic_w = rho * G * q_m3_s * h_total_m
@@ -165,14 +202,25 @@ def compute(payload: dict) -> dict:
     p_shaft_r = round(p_shaft_w, 1)
     p_motor_r = round(p_motor_w, 1)
 
-    worked = [
+    worked = []
+    if parallel_pumps > 1:
+        worked.append(worked_calc(
+            label="Per-pump duty flow",
+            formula="Q_pump = Q_total / N_parallel",
+            values={"Q_total": (round(flow_m3_h_total, 1), "m3/h"),
+                    "N_parallel": (parallel_pumps, "")},
+            result=round(flow_m3_h, 1), result_unit="m3/h",
+            assumptions=[f"{parallel_pumps} parallel pump trains share the duty; ONE pump is "
+                         f"sized on its share (per-pump x {parallel_pumps} = the loop total)"],
+        ))
+    worked += [
         worked_calc(
             label="Pipe velocity",
             formula="V = (Q_m3h / 3600) / (pi/4 x D^2)",
             values={"Q_m3h": (round(flow_m3_h, 4), "m3/h"), "D": (round(d_m, 4), "m")},
             result=velocity_r, result_unit="m/s",
             assumptions=["Q_m3h / 3600 converts m3/h to m3/s",
-                         "keep 1-3 m/s for a process liquid line"],
+                         "per-pump duty flow; keep 1-3 m/s for a process liquid line"],
         ),
         worked_calc(
             label="Reynolds number",
@@ -209,12 +257,20 @@ def compute(payload: dict) -> dict:
         ),
         worked_calc(
             label="Pump total dynamic head",
-            formula="H_total = static_head + H_friction + H_process",
-            values={"static_head": (static_head_m, "m"),
-                    "H_friction": (h_friction_r, "m"),
-                    "H_process": (h_process_r, "m")},
+            formula=("H_total = authoritative TDH (override)"
+                     if (tdh_override is not None and float(tdh_override) > 0)
+                     else "H_total = static_head + H_friction + H_process"),
+            values=({"H_total_override": (h_total_r, "m")}
+                    if (tdh_override is not None and float(tdh_override) > 0)
+                    else {"static_head": (static_head_m, "m"),
+                          "H_friction": (h_friction_r, "m"),
+                          "H_process": (h_process_r, "m")}),
             result=h_total_r, result_unit="m",
-            assumptions=["static lift = delivery elevation - suction elevation"],
+            assumptions=[head_basis]
+                        + (["static lift = delivery elevation - suction elevation"]
+                           if not (tdh_override is not None and float(tdh_override) > 0)
+                           else [f"friction {h_friction_r} m + process {h_process_r} m shown for "
+                                 f"context; the authoritative TDH already includes loop losses"]),
         ),
         worked_calc(
             label="Pump hydraulic power",
@@ -244,23 +300,34 @@ def compute(payload: dict) -> dict:
     return {
         "pump_name": pump_name,
         "pump_type": "centrifugal",
-        "flow_m3_h": round(flow_m3_h, 4),
+        # PER-PUMP basis (the duty ONE pump train delivers). flow_m3_h / power are
+        # PER-UNIT; the *_total / *_system fields below carry the loop aggregate so
+        # any consumer can reconcile per-unit x N == total without re-deriving.
+        "parallel_pumps": parallel_pumps,
+        "flow_m3_h": round(flow_m3_h, 4),                       # PER-PUMP duty flow
+        "flow_m3_h_total": round(flow_m3_h_total, 4),           # loop total (sum of all trains)
         "pump_flow_lpm": round(flow_m3_h * 1000.0 / 60.0, 2),
         "fluid_density_kg_m3": rho,
         "pipe_velocity_m_s": round(velocity_m_s, 3),
         "reynolds": round(reynolds, 1),
         "darcy_friction_factor": round(f_darcy, 5),
+        "head_basis": head_basis,
+        "head_override_applied": bool(tdh_override is not None and float(tdh_override) > 0),
         "head_breakdown": {
             "static_head_m": static_head_m,
             "friction_head_m": round(h_friction_m, 3),
             "process_backpressure_head_m": round(h_process_m, 3),
         },
         "pump_head_m": round(h_total_m, 3),
-        "hydraulic_power_w": round(p_hydraulic_w, 1),
-        "shaft_power_w": round(p_shaft_w, 1),
-        "motor_power_w": round(p_motor_w, 1),
-        "motor_power_kw": round(p_motor_kw, 3),
-        "recommended_motor_kw": recommended_motor_kw,
+        "hydraulic_power_w": round(p_hydraulic_w, 1),          # PER-PUMP
+        "shaft_power_w": round(p_shaft_w, 1),                  # PER-PUMP
+        "motor_power_w": round(p_motor_w, 1),                  # PER-PUMP
+        "motor_power_kw": round(p_motor_kw, 3),               # PER-PUMP
+        "recommended_motor_kw": recommended_motor_kw,         # PER-PUMP IEC frame
+        # System aggregate (all N trains) — the connected-load / panel-schedule figure.
+        "system_hydraulic_power_w": round(p_hydraulic_w * parallel_pumps, 1),
+        "system_shaft_power_w": round(p_shaft_w * parallel_pumps, 1),
+        "system_motor_kw": round(recommended_motor_kw * parallel_pumps, 3),
         "pump_efficiency": pump_eff,
         "motor_efficiency": motor_eff,
         "worked": worked,
@@ -272,7 +339,63 @@ def compute(payload: dict) -> dict:
     }
 
 
+def _selftest() -> int:
+    """Off-budget self-check: the RAS recirc pump must size PER-PUMP on the contract
+    head, reconciling to the engineering-contract.ts calculator (count=8, head=14.5,
+    motor=132 kW each). Reproduces the exact bug the Excel Checks tab flagged."""
+    ok = True
+
+    def chk(name, got, want, tol):
+        nonlocal ok
+        good = abs(got - want) <= tol
+        ok = ok and good
+        print(f"  [{'PASS' if good else 'FAIL'}] {name}: got {got:g}, want {want:g} (±{tol:g})")
+
+    # RAS recirc pump: 13,360 m³/h loop, 8 parallel trains, contract TDH 14.5 m,
+    # seawater 1025 kg/m³, η_pump 0.70, η_motor 0.93, DN600 / 70 m run.
+    res = compute({
+        "pump_name": "RAS recirc pump", "flow_m3_h": 13360.0, "parallel_pumps": 8,
+        "total_dynamic_head_m": 14.5, "fluid_density_kg_m3": 1025.0,
+        "fluid_viscosity_pa_s": 0.001, "static_head_m": 3.0, "pipe_length_m": 70.0,
+        "pipe_diameter_mm": 600.0, "process_backpressure_kpa": 20.0,
+        "pump_efficiency": 0.70, "motor_efficiency": 0.93,
+    })
+    print("RAS recirc pump (8 parallel trains, TDH override 14.5 m):")
+    chk("per-pump flow m3/h", res["flow_m3_h"], 1670.0, 1.0)
+    chk("loop total m3/h", res["flow_m3_h_total"], 13360.0, 1.0)
+    chk("per-pump flow x count == loop total",
+        res["flow_m3_h"] * res["parallel_pumps"], 13360.0, 1.0)
+    chk("pump head m (override, NOT 26.35)", res["pump_head_m"], 14.5, 0.01)
+    chk("per-pump velocity DN600 m/s (sane, NOT 13)", res["pipe_velocity_m_s"], 1.64, 0.1)
+    chk("per-pump hydraulic kW", res["hydraulic_power_w"] / 1000.0, 67.6, 1.0)
+    chk("per-pump shaft kW", res["shaft_power_w"] / 1000.0, 96.6, 1.5)
+    chk("per-pump motor frame kW", res["recommended_motor_kw"], 132.0, 0.01)
+    chk("system motor kW (8 x 132 == 1056, NOT 1217)",
+        res["system_motor_kw"], 1056.0, 0.01)
+    if not res.get("head_override_applied"):
+        print("  [FAIL] head_override_applied flag not set"); ok = False
+    else:
+        print("  [PASS] head_override_applied flag set")
+
+    # Legacy single-pump path must be byte-unchanged in BEHAVIOUR (parallel_pumps=1,
+    # no override → head = static+friction+process as before).
+    res1 = compute({"flow_m3_h": 3.0, "static_head_m": 12.0,
+                    "process_backpressure_kpa": 250.0})
+    print("Legacy single-pump (no parallel_pumps, no override):")
+    chk("single-pump flow unchanged", res1["flow_m3_h"], 3.0, 0.001)
+    chk("parallel_pumps defaults to 1", res1["parallel_pumps"], 1, 0.001)
+    if res1.get("head_override_applied"):
+        print("  [FAIL] override flag should be False on legacy path"); ok = False
+    else:
+        print("  [PASS] no override on legacy path")
+
+    print("\nSELFTEST:", "PASS" if ok else "FAIL")
+    return 0 if ok else 1
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] in ("--selftest", "selftest", "-t"):
+        return _selftest()
     t_start = time.time()
     try:
         payload = json.load(sys.stdin)
