@@ -393,11 +393,20 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
     """Render every deterministic_checks_lib.Check as a LIVE Excel row, grouped by
     family. Returns (next_row, next_data_row, fail_count).
 
-    Layout per check (mirrors the existing `emit` so the whole tab stays live):
+    Layout per check (one visible row per lib Check; STATUS recomputes live):
       * hidden data cells: K=actual-base (or per-unit), L=expected, M=count
-      * visible: B=ACTUAL formula, C=EXPECTED ref, D=Δ, E=Tol, F=STATUS, G=detail
-      * for >= / <= / tally relations the STATUS formula uses the right operator so
-        editing a data cell re-decides PASS/FAIL on the correct comparison.
+      * visible: B=ACTUAL formula, C=EXPECTED ref, D=Δ, E=Tol/band, F=STATUS, G=detail
+      * the STATUS formula is chosen to MIRROR the lib's own decision for that check
+        so the live recompute can never disagree with the CLI:
+          ge    -> =IF(B>=C-E,"PASS","FAIL")        (rating must clear duty)
+          le    -> =IF(B<=C+E,"PASS","FAIL")        (within a ceiling)
+          tally -> =IF(B<=C,"PASS","FAIL")          (out-of-spec count must be 0)
+          band  -> =IF(OR(B/C>E,B/C<1/E),"FAIL","PASS")  (COST ×N price band; the lib
+                   tags these relation="eq" but decides by a RATIO band with tol==0 —
+                   here E holds the band factor so the column stays meaningful)
+          eq    -> =IF(ABS(D)<E,"PASS","FAIL")      (equality within tolerance)
+    A COST check with relation "eq" and tol 0 IS a ratio-band check (the lib's COST1
+    `unit price within xN of <ref>`); every other eq check carries a non-zero tol.
     """
     checks = dcl.run_all_checks(run_dir, state)
     fail_count = 0
@@ -433,15 +442,24 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
                 actual_formula = f"=${data_col_a}${data_r}"
             ws.cell(data_r, 12, c.expected).fill = FILL_INPUT        # L = expected
 
+            # A COST check tagged relation="eq" with tol==0 is decided by the lib as a
+            # RATIO BAND (unit price within xN of its reference), NOT an equality —
+            # render it as a live band test so the recompute matches the CLI exactly.
+            is_band = (c.category == "COST" and c.relation == "eq" and not c.tol)
+            tol_cell_val = dcl.COST_BAND_FACTOR if is_band else c.tol
+
             # --- visible live row ---
             ws.cell(r, 1, c.name).border = BORDER
             ws.cell(r, 1).alignment = WRAP_TOP
             ws.cell(r, 2, actual_formula).border = BORDER
             ws.cell(r, 3, f"=$L${data_r}").border = BORDER
             ws.cell(r, 4, f"=B{r}-C{r}").border = BORDER
-            ws.cell(r, 5, c.tol).border = BORDER
-            # STATUS formula chosen by relation so the comparison stays correct live
-            if c.relation == "ge":          # actual must be >= expected
+            ws.cell(r, 5, tol_cell_val).border = BORDER
+            # STATUS formula chosen to MIRROR the lib's own decision (see docstring)
+            if is_band:                     # COST ratio band: flag >xN or <1/N of ref
+                status_f = (f'=IF(OR(C{r}=0,AND(B{r}/C{r}<=E{r},'
+                            f'B{r}/C{r}>=1/E{r})),"PASS","FAIL")')
+            elif c.relation == "ge":        # actual must be >= expected
                 status_f = f'=IF(B{r}>=C{r}-E{r},"PASS","FAIL")'
             elif c.relation == "le":        # actual must be <= expected
                 status_f = f'=IF(B{r}<=C{r}+E{r},"PASS","FAIL")'
@@ -472,287 +490,61 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
 
 def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
     """
-    Live-formula invariants. Each row:
-        label | ACTUAL (live =formula over cells) | EXPECTED | Δ (=ACTUAL-EXPECTED)
-              | TOL | STATUS (=IF(ABS(Δ)<TOL,"PASS","FAIL"))
-    Returns the number of FAIL rows (for the final report).
+    Live-formula invariants — ONE SOURCE OF TRUTH with the CLI verifier.
 
-    Coverage (all data-driven, no per-class hardcoding):
-      A. per-unit × count == contract total flows  (recirc / degasser / drum-filter)
-      B. Σ module BoM sub-totals == cover / grand total (requirementsBom)
-      C. emitter-rendered principal values == the contract quantity
-      D. any mass/energy/flow balance closure present in the contract
-    The numbers feeding these checks live in a hidden DATA block to the right so
-    the visible ACTUAL/EXPECTED columns are genuine cell references (live).
+    This tab renders EXACTLY the checks ``deterministic_checks_lib.run_all_checks``
+    produces — the SAME pure-arithmetic suite the standalone CLI
+    (``scripts/deterministic-checks.py``) prints — one visible row per applicable
+    check, in the SAME five families (CONSISTENCY / ADEQUACY / BALANCE / COST /
+    CONNECTIVITY), with the SAME PASS/FAIL verdict. There is NO exporter-side check
+    machinery any more: previously this tab ALSO carried four hand-rolled sections
+    (A per-unit×count, B Σ-lines==cover, C emitter-render-vs-contract, D closures)
+    that DUPLICATED the lib (B, D) or emitted FALSE POSITIVES the lib does not (the
+    stale "BoM per-unit flow 1336 m³/h × train count 8" — 1,336 is the correct
+    per-TANK inlet flow ÷10 tanks, not a per-pump flow ÷8 trains — and the
+    "Pump motor power: worked-calc render vs contract" full-loop-vs-per-pump basis
+    comparison). Both have been removed so the tab can never disagree with the CLI.
+
+    Each row:
+        Check | ACTUAL (live =formula over the data cells) | EXPECTED
+              | Δ (=ACTUAL-EXPECTED) | Tol | STATUS (=IF(...)) | Detail
+    The numbers live in a hidden, editable DATA block (cols J+) so the visible
+    ACTUAL/EXPECTED are genuine cell references: edit a yellow input and STATUS
+    recomputes live. Conditional formatting colours STATUS on open.
+
+    Returns the number of FAIL rows (for the final report) — identical to the
+    CLI's fail count on the same run.
     """
     ws = wb.create_sheet("⚠ Checks")
     set_widths(ws, {"A": 46, "B": 16, "C": 16, "D": 14, "E": 10, "F": 12, "G": 52})
     title_row(
-        ws, "⚠ Computational checks — live invariants", 7,
-        "ACTUAL and Δ are LIVE Excel formulas over the data cells (cols J+). Edit a "
-        "data cell and STATUS recomputes. RED = the engine's numbers do not reconcile.",
+        ws, "⚠ Computational checks — live invariants (== the CLI verifier)", 7,
+        "EXACTLY the checks scripts/deterministic-checks.py reports, rendered as "
+        "LIVE Excel formulas over the data cells (cols J+). Edit a data cell and "
+        "STATUS recomputes. RED = the engine's numbers do not reconcile.",
     )
     hdr = 4
     header(ws, hdr, ["Check", "ACTUAL", "EXPECTED", "Δ (actual-exp)",
                      "Tol", "STATUS", "Detail / why"])
     r = hdr + 1
 
-    oc = state.get("orchestratorContract") or {}
-    quantities: Dict[str, Any] = oc.get("quantities") or {}
-    bom: List[dict] = state.get("requirementsBom") or []
-
-    # Hidden data columns: J (label), K (a-value), L (b-value/expected)
-    DATA_COL_LABEL, DATA_COL_A, DATA_COL_B = "J", "K", "L"
+    # Hidden data columns: J (label), K (a-value), L (b-value/expected), M (count)
+    DATA_COL_A = "K"
     data_r = hdr  # parallel pointer into the data block
     ws.cell(hdr, 10, "DATA (live inputs — editable)").font = FONT_SUB
 
     fail_count = 0
     fail_labels: List[str] = []
 
-    # ---- E. the SHARED deterministic check suite (rendered live first) --------
-    # Every check from deterministic_checks_lib — the SAME arithmetic the standalone
-    # CLI runs — rendered as live Excel rows. ACTUAL/EXPECTED/Δ/STATUS are formulas
-    # over editable yellow data cells; per-unit×count checks make the product live.
-    # This is the canonical universal suite; sections A–D below add RAS-flavoured
-    # cross-surface detail on top.
+    # ---- THE SHARED deterministic check suite — the ONLY source of checks --------
+    # Every check from deterministic_checks_lib.run_all_checks — the SAME arithmetic
+    # the standalone CLI runs — rendered as live Excel rows, grouped by family.
+    # ACTUAL/EXPECTED/Δ/STATUS are formulas over editable yellow data cells;
+    # per-unit×count checks make the product itself live (=K*M). This is the WHOLE
+    # tab: identical set + identical PASS/FAIL to the CLI, no exporter-side extras.
     r, data_r, fc = _render_lib_checks(
         ws, state, run_dir, r, data_r, DATA_COL_A, fail_labels)
     fail_count += fc
-
-    def emit(label: str, a_val: Optional[float], expected: Optional[float],
-             tol: float, detail: str,
-             a_is_product: Optional[Tuple[float, float]] = None) -> None:
-        """
-        Write one check row with LIVE formulas.
-          a_is_product=(per_unit, count) -> ACTUAL becomes '=K* * count' so the
-            per-unit × count relationship is itself live and editable.
-          else ACTUAL just references the A data cell.
-        EXPECTED references the B data cell. Δ and STATUS are live over those.
-        """
-        nonlocal r, data_r, fail_count
-        if a_val is None or expected is None:
-            return
-        data_r += 1
-        # write the editable data values
-        ws.cell(data_r, 10, label)
-        if a_is_product is not None:
-            per_unit, count = a_is_product
-            ws.cell(data_r, 11, per_unit).fill = FILL_INPUT       # K = per-unit
-            ws.cell(data_r, 13, count).fill = FILL_INPUT          # M = count
-            actual_formula = f"=${DATA_COL_A}${data_r}*$M${data_r}"
-        else:
-            ws.cell(data_r, 11, a_val).fill = FILL_INPUT
-            actual_formula = f"=${DATA_COL_A}${data_r}"
-        ws.cell(data_r, 12, expected).fill = FILL_INPUT          # L = expected
-
-        # visible row
-        ws.cell(r, 1, label).border = BORDER
-        ws.cell(r, 1).alignment = WRAP_TOP
-        ca = ws.cell(r, 2, actual_formula)
-        ca.border = BORDER
-        ce = ws.cell(r, 3, f"=$L${data_r}")
-        ce.border = BORDER
-        cd = ws.cell(r, 4, f"=B{r}-C{r}")
-        cd.border = BORDER
-        ct = ws.cell(r, 5, tol)
-        ct.border = BORDER
-        cs = ws.cell(r, 6, f'=IF(ABS(D{r})<E{r},"PASS","FAIL")')
-        cs.border = BORDER
-        cs.font = Font(bold=True)
-        cdet = ws.cell(r, 7, detail)
-        cdet.alignment = WRAP_TOP
-        cdet.font = FONT_NOTE
-        cdet.border = BORDER
-
-        # static pre-evaluation so we can colour + count FAILs now (formulas lib
-        # re-verifies on validation; conditional formatting also colours on open)
-        actual_now = (a_is_product[0] * a_is_product[1]) if a_is_product else a_val
-        is_fail = abs(actual_now - expected) >= tol
-        if is_fail:
-            fail_count += 1
-            fail_labels.append(f"{label} (Δ={actual_now - expected:g})")
-        r += 1
-
-    # ---- A. per-unit × count == total (the headline error class) ----
-    sub_banner(ws, r, "A · Per-unit × count must equal the contract loop total", 7)
-    r += 1
-
-    total_flow = qval(quantities, "recirculation_flow_m3_h")
-    flow_unit = qunit(quantities, "recirculation_flow_m3_h") or "m³/h"
-
-    # Discover every '<x>_count' quantity and pair it with the matching per-unit flow.
-    # Universal rule: count of N parallel trains splitting the recirculation loop
-    # implies per_unit = total / N. We surface BOTH the engine's own per-unit
-    # quantity (if present) AND any divergent per-unit value found on other surfaces.
-    count_keys = [k for k in quantities if k.endswith("_count")]
-    PERUNIT_HINTS = {
-        "recirc_pump_count": ["recirc_pump_flow_m3_h", "per_pump_flow_m3_h"],
-        "degasser_count": ["degasser_water_flow_m3_h", "degasser_flow_m3_h"],
-        "drum_filter_count": ["drum_filter_throughput_m3_h", "drum_filter_flow_m3_h"],
-    }
-    for ck in count_keys:
-        cnt = qval(quantities, ck)
-        if not cnt or total_flow is None:
-            continue
-        base = ck[:-6]  # strip '_count'
-        # engine's stated per-unit flow, if any
-        per_unit = None
-        for hint in PERUNIT_HINTS.get(ck, []):
-            per_unit = qval(quantities, hint)
-            if per_unit is not None:
-                break
-        if per_unit is None:
-            # fall back to the implied even split (this is the engine's intent)
-            per_unit = total_flow / cnt
-        emit(
-            f"{base.replace('_', ' ')}: per-unit flow × {ck} = recirculation_flow",
-            per_unit * cnt, total_flow, tol=1.0,
-            detail=(f"{per_unit:g} {flow_unit} × {cnt:g} units must equal the "
-                    f"{total_flow:g} {flow_unit} loop total."),
-            a_is_product=(per_unit, cnt),
-        )
-
-    # Cross-surface per-unit flow values that appear in the BoM but use a DIFFERENT
-    # count basis than the parallel-train count -> the classic mismatch (e.g. a
-    # per-TANK inlet flow of 1336 m³/h that, multiplied by the 8 pump/degasser
-    # TRAINS, gives 10688 ≠ the 13360 m³/h loop). We scan BoM requirement strings
-    # for '<N> m³/h' tokens, keep only values that PLAUSIBLY represent one share of
-    # the recirculation loop (band: a value strictly between the even per-train
-    # split and the whole loop), and test each against the train count.
-    #
-    # Band rationale (keeps the noise out without any per-class hardcoding):
-    #   * exclude >= loop total      -> air flows / aggregates (16700, 100200 m³/h)
-    #   * exclude <= total / Nmax    -> backwash trims / sub-flows (53 m³/h)
-    #   * a per-unit flow legitimately splitting the loop equals total/N for the
-    #     SAME N as its unit count; if it instead matches total/(some other count)
-    #     it will NOT reconcile against the train count -> we surface it RED.
-    train_count = qval(quantities, "recirc_pump_count") or qval(quantities, "degasser_count")
-    max_count = max([c for c in
-                     (qval(quantities, k) for k in count_keys) if c] or [1.0])
-    seen_flow_tokens: Dict[float, str] = {}
-    for row_bom in bom:
-        req = str(row_bom.get("requirement", ""))
-        for m in re.finditer(r"(\d[\d,]*(?:\.\d+)?)\s*m³/h", req):
-            fv = num(m.group(1))
-            if fv is None or fv <= 0 or total_flow is None:
-                continue
-            # must look like ONE share of the loop: below the loop total but above
-            # the finest even split (total / largest unit count).
-            if fv >= total_flow - 1:
-                continue
-            if fv <= (total_flow / max_count) - 1:
-                continue
-            seen_flow_tokens.setdefault(fv, req[:80])
-    if train_count and total_flow:
-        implied = total_flow / train_count  # the value that WOULD reconcile
-        for fv, ctx in sorted(seen_flow_tokens.items()):
-            if abs(fv - implied) < 1:
-                continue  # this one already splits the loop evenly across trains (A)
-            k = total_flow / fv  # the count basis this per-unit value implies
-            emit(
-                f"BoM per-unit flow {fv:g} m³/h × train count {train_count:g}",
-                fv * train_count, total_flow, tol=1.0,
-                detail=(f"A '{fv:g} m³/h' per-unit flow appears in the BoM "
-                        f"(\"{ctx}…\"). It implies a count basis of ÷{k:.3g} "
-                        f"(≈{int(round(k))} units) but the parallel-train count is "
-                        f"{train_count:g}; {fv:g} × {train_count:g} = "
-                        f"{fv*train_count:g} ≠ the {total_flow:g} m³/h loop. RED = "
-                        f"this surface uses a per-TANK basis (÷{int(round(k))}) while "
-                        f"the pump/degasser trains are ÷{int(train_count)}."),
-                a_is_product=(fv, train_count),
-            )
-
-    # ---- B. Σ module BoM sub-totals == grand/cover total ----
-    sub_banner(ws, r, "B · Σ BoM line totals must equal the cover / grand total", 7)
-    r += 1
-    bom_line_sum = sum(num(rw.get("line_gbp")) or 0.0 for rw in bom)
-    # cover total: prefer parts-ledger grand_total, else costBasis rollup installed
-    pl = load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
-    cover_total = num(pl.get("grand_total_gbp"))
-    cover_src = "parts-ledger.grand_total_gbp"
-    if cover_total is None:
-        roll = (state.get("costBasis") or {}).get("rollup") or {}
-        cover_total = num(roll.get("purchased_gbp"))
-        cover_src = "costBasis.rollup.purchased_gbp"
-    if bom_line_sum and cover_total is not None:
-        # tolerance: BoM (equipment+actuators+instruments) vs ledger grand total can
-        # legitimately differ in scope, so use a 1% band and explain.
-        tol = max(1.0, 0.01 * cover_total)
-        emit(
-            "Σ requirementsBom.line_gbp == cover grand total",
-            bom_line_sum, cover_total, tol=tol,
-            detail=(f"Sum of {len(bom)} BoM line_gbp values vs {cover_src}. "
-                    f"Δ within 1% tolerance passes (scope differences expected)."),
-        )
-
-    # ---- C. emitter-rendered principal values == contract quantity ----
-    sub_banner(ws, r, "C · Emitter-rendered principal values must match the contract", 7)
-    r += 1
-    # The pump-sizing worked calc renders hydraulic/motor power for the *whole loop*
-    # flow; the contract carries a per-pump figure. Surface the divergence so the
-    # reviewer sees the emitter and the contract disagree on basis.
-    pump_calcs = _tool_worked(state, "process:pump-sizing")
-    rendered_hyd_w = _calc_result(pump_calcs, "hydraulic power")
-    contract_hyd_w = qval(quantities, "recirc_pump_hydraulic_power_w")
-    if rendered_hyd_w is not None and contract_hyd_w is not None:
-        emit(
-            "Pump hydraulic power: worked-calc render vs contract quantity",
-            rendered_hyd_w, contract_hyd_w, tol=max(1.0, 0.05 * contract_hyd_w),
-            detail=(f"Worked-calc renders {rendered_hyd_w:g} W (computed on the FULL "
-                    f"{total_flow:g} m³/h loop) but the contract quantity "
-                    f"recirc_pump_hydraulic_power_w is {contract_hyd_w:g} W (per-pump). "
-                    f"RED = emitter and contract disagree on the per-unit basis."),
-        )
-    rendered_motor_w = _calc_result(pump_calcs, "motor input power")
-    contract_motor_kw = qval(quantities, "recirc_pump_motor_kw")
-    if rendered_motor_w is not None and contract_motor_kw is not None:
-        emit(
-            "Pump motor power: worked-calc render (kW) vs contract recirc_pump_motor_kw",
-            rendered_motor_w / 1000.0, contract_motor_kw,
-            tol=max(0.5, 0.05 * contract_motor_kw),
-            detail=(f"Worked-calc motor input {rendered_motor_w/1000:g} kW vs contract "
-                    f"recirc_pump_motor_kw {contract_motor_kw:g} kW. Divergence here is "
-                    f"the same full-loop-vs-per-pump basis issue."),
-        )
-
-    # ---- D. engine's own balance closures ----
-    sub_banner(ws, r, "D · Engine-declared balance closures (mass / energy / flow)", 7)
-    r += 1
-    for cl in (oc.get("closures") or []):
-        measured = num(cl.get("measured"))
-        required = cl.get("required", "")
-        status = str(cl.get("status", "")).lower()
-        # Many closures state 'required' as prose; where we can extract a target
-        # number we make it a live check, otherwise we surface the engine's own
-        # pass/warn verdict as a static status row.
-        target = _extract_target_number(required, measured)
-        if measured is not None and target is not None and abs(target) > 0:
-            emit(
-                f"closure · {cl.get('invariant_id', '')}",
-                measured, target, tol=max(1.0, 0.02 * abs(target)),
-                detail=str(cl.get("reason", required))[:240],
-            )
-        else:
-            # static status row (no parseable target) — show engine verdict
-            ws.cell(r, 1, f"closure · {cl.get('invariant_id', '')}").border = BORDER
-            ws.cell(r, 1).alignment = WRAP_TOP
-            ws.cell(r, 2, measured if measured is not None else "—").border = BORDER
-            ws.cell(r, 3, "(prose target)").border = BORDER
-            ws.cell(r, 4, "—").border = BORDER
-            ws.cell(r, 5, "—").border = BORDER
-            verdict = "PASS" if status == "pass" else ("FAIL" if status in ("fail", "error") else "WARN")
-            cs = ws.cell(r, 6, verdict)
-            cs.fill = FILL_PASS if verdict == "PASS" else (FILL_FAIL if verdict == "FAIL" else FILL_CONST)
-            cs.font = FONT_PASS if verdict == "PASS" else (FONT_FAIL if verdict == "FAIL" else Font(bold=True))
-            cs.border = BORDER
-            det = ws.cell(r, 7, str(cl.get("reason", required))[:240])
-            det.alignment = WRAP_TOP
-            det.font = FONT_NOTE
-            det.border = BORDER
-            if verdict == "FAIL":
-                fail_count += 1
-                fail_labels.append(f"closure {cl.get('invariant_id','')}")
-            r += 1
 
     # conditional formatting so STATUS cells colour live on open / recompute
     from openpyxl.formatting.rule import CellIsRule
@@ -772,56 +564,6 @@ def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
     ws._forge_fail_count = fail_count       # type: ignore[attr-defined]
     ws._forge_fail_labels = fail_labels     # type: ignore[attr-defined]
     return fail_count
-
-
-def _tool_worked(state: dict, tool_id: str) -> List[dict]:
-    for t in (state.get("toolsUsedPage") or {}).get("tools", []):
-        if t.get("tool_id") == tool_id:
-            return t.get("worked") or []
-    return []
-
-
-def _calc_result(worked: List[dict], label_substr: str) -> Optional[float]:
-    for w in worked:
-        if label_substr.lower() in str(w.get("label", "")).lower():
-            res = w.get("result")
-            return num(res.get("value") if isinstance(res, dict) else res)
-    return None
-
-
-_INEQUALITY_PROSE = re.compile(
-    r"≤|≥|<=|>=|<|>|ceiling|limit|within|at most|at least|no more than|"
-    r"max(?:imum)?|min(?:imum)?|under|below|above|not exceed|cap\b",
-    re.IGNORECASE,
-)
-
-
-def _extract_target_number(required: str, measured: Optional[float]) -> Optional[float]:
-    """
-    Best-effort numeric EQUALITY target out of a closure's 'required' prose. We only
-    return a number when the closure asserts an equality we can resolve, e.g.
-    '4 turnovers/h × 3340 m³ tank volume' -> 13360.
-
-    Returns None (so the row renders as a STATUS row showing the engine's own
-    pass/warn) when the prose is a one-sided INEQUALITY — e.g. 'design capex ≤ £5.0 M
-    ceiling' or 'media ≥ TAN load'. An inequality is NOT an equality target: turning
-    '≤ £5.0 M' into 'expected = 5.0 M' would fabricate a hard FAIL where the engine
-    itself only warns. Such closures keep their declared status verbatim.
-    """
-    if not required:
-        return None
-    if _INEQUALITY_PROSE.search(required):
-        return None  # one-sided constraint -> show the engine's verdict, not an equality
-    s = required.replace(",", "")
-    nums = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", s)]
-    # 'A × B' product of the two leading numbers (an equality decomposition)
-    if "×" in required or " x " in required.lower():
-        if len(nums) >= 2:
-            return nums[0] * nums[1]
-    # a single explicit equality target close to measured
-    if len(nums) == 1 and measured is not None:
-        return nums[0]
-    return None
 
 
 # ============================================================================
