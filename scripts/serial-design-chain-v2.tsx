@@ -6548,9 +6548,16 @@ async function main() {
   // Phase-aware env var injection: set CHAIN_SKIP_* flags so ALL existing
   // guards throughout the chain pick them up — no need to add a phase check
   // at every Blender/image-gen call site.
-  // Phase 1 (<2): no Blender at all, no image gen, no drawings, no PDF
-  // Phase 2 (<3): Blender runs (bg + settle), but no image gen, no drawings, no PDF
+  // Phase 1 (<2): settle loop + 2D drawings + inspect renders (geometry
+  //   convergence + engineering drawings visible), but no detached bg
+  //   pipeline, no Gemini i2i image gen, no PDF
+  // Phase 2 (<3): + detached bg pipeline + Gemini i2i, but no PDF
   // Phase 3:      full pipeline (default)
+  // The settle loop MUST run in all phases — it's what makes Blender output
+  // good (iterates physics↔geometry to a fixed point). Skipping it produces
+  // un-settled state → blobby renders, wrong pipe routing, bad equipment placement.
+  // 2D drawings (P&ID/BFD/iso/GA) are cheap (~30s, no LLM) and are what the
+  // HTML dashboard shows — keep them in all phases.
   if (QUALITY_LOOP_PHASE < 2) {
     process.env.CHAIN_SKIP_BLENDER_BG = '1'
     process.env.CHAIN_SKIP_IMAGE_GEN = '1'
@@ -6558,7 +6565,7 @@ async function main() {
   if (QUALITY_LOOP_PHASE < 3) {
     process.env.CHAIN_SKIP_IMAGE_GEN = '1'
   }
-  const skipDesignLoop = process.env.CHAIN_SKIP_DESIGN_LOOP === '1' || QUALITY_LOOP_PHASE < 2
+  const skipDesignLoop = process.env.CHAIN_SKIP_DESIGN_LOOP === '1'
   if (!skipDesignLoop) {
     const tLoop = Date.now()
     try {
@@ -7972,21 +7979,6 @@ async function main() {
   const venvPyDraw = resolve(__dirname, '..', '.venv', 'bin', 'python')
   const pyBinDraw = existsSync(venvPyDraw) ? venvPyDraw : 'python3'
   const drawScriptMain = resolve(__dirname, 'blender-universal', 'generate_drawing_set.py')
-  if (QUALITY_LOOP_PHASE < 3) {
-    // Phase 1/2: run CAD_ARTIFACTS_ONLY (routing → connection-schedule.json +
-    // route-manifest.json) so the ledger + connectivity audit have data, but
-    // skip the 2D drawing rendering (P&ID/BFD/iso SVGs) — that's Phase 3 only.
-    try {
-      execFileSync(pyBinDraw, [drawScriptMain, statePath, outDir], {
-        stdio: 'inherit',
-        cwd: resolve(__dirname, '..'),
-        env: { ...process.env, CAD_ARTIFACTS_ONLY: '1' },
-      })
-      console.error(`[chain] QUALITY_LOOP_PHASE=${QUALITY_LOOP_PHASE} — CAD artifacts (routing) generated, skipping 2D drawing rendering`)
-    } catch (artErr) {
-      console.error(`[chain] CAD_ARTIFACTS_ONLY routing failed (non-fatal): ${(artErr as Error).message.slice(0, 160)}`)
-    }
-  } else
   try {
     const tDraw = Date.now()
     // ── Drawing generation (the settle loop now runs EARLY, before the cost stack). ──
@@ -8007,6 +7999,7 @@ async function main() {
           ...process.env,
           QUALITY_LOOP_DRAWING_DIRECTIVES: drawingGeneratorDirectivesBlock || '',
           QUALITY_LOOP_TOPOLOGY_DIRECTIVES: topologyDirectivesBlock || '',
+          INSPECT: '0',
         },
       })
       console.log('[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)')

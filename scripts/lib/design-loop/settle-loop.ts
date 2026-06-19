@@ -216,7 +216,8 @@ export function runEarlyDesignLoop(
 
   // Hand the routed artifacts to the late drawing pass so it REUSES them (no 2nd scene-build).
   if (opts.resizeOutDir) {
-    for (const a of ['connection-schedule.json', 'route-manifest.json', 'parts-manifest.json', 'convergence-report.json']) {
+    for (const a of ['connection-schedule.json', 'route-manifest.json', 'parts-manifest.json', 'convergence-report.json',
+                     'inspect-hero.png', 'inspect-iso.png', 'inspect-top.png', 'inspect-front.png', 'inspect-side.png']) {
       try {
         const src = join(loopDir, a)
         if (existsSync(src)) writeFileSync(join(opts.resizeOutDir, a), readFileSync(src))
