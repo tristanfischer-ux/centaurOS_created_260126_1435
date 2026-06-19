@@ -192,6 +192,84 @@ def sub_banner(ws: Worksheet, row: int, text: str, span: int) -> None:
     c.alignment = LEFT_TOP
 
 
+# Number formats (#37) — kill General/scientific. Excel display masks only;
+# they never change the stored value, so they are safe on live-formula cells.
+FMT_GBP = "£#,##0"          # money, no decimals
+FMT_GBP2 = "£#,##0.00"      # money with pence (small unit prices)
+FMT_INT = "#,##0"           # counts / integers with thousands separators
+FMT_DEC1 = "#,##0.0"        # one decimal (velocities, %drop, ratings)
+FMT_DEC2 = "#,##0.00"       # two decimals (ratios, m/s, areas)
+
+# CONTENTS hyperlink target / back-link constant.
+CONTENTS_SHEET = "Contents"
+FONT_LINK = Font(name="Calibri", size=11, color="1F3A5F", underline="single", bold=True)
+
+# One-line descriptions for the Contents index (#26). Image/module tabs fall
+# back to _default_desc(); these cover the data tabs by their exact sheet name.
+_TAB_DESCRIPTIONS: Dict[str, str] = {
+    "Overview": "Quality scorecard, headline metrics & run provenance.",
+    "⚠ Checks": "Live arithmetic invariants (== the CLI verifier). RED = numbers don't reconcile.",
+    "Quantities": "Every sized contract quantity with family, basis & source.",
+    "Calculations": "Worked calcs grouped by tool — live Excel formulas where structured.",
+    "BoM": "Bill of materials — every line, with a live Σ line £ total.",
+    "Cost": "Cost basis — per-line cost build-up with method, inputs & factors.",
+    "Brief compliance": "Every brief target metric vs the achieved quantity vs a live PASS/FAIL.",
+    "Cost waterfall": "BoM → assembly → factory COGS → install → installed ASP (live running totals).",
+    "Spec sheets": "One block per principal item: duty, rating, qty, £, driving calc & part/MPN.",
+    "Panel schedule": "Electrical panel / load schedule as a real sortable table.",
+    "Process line list": "Process line list — sortable rows cross-referenced to the P&ID.",
+    "Process valve list": "Process valve list — tag, type, service, size, fail action.",
+    "Process instruments": "Instrument index — tag, ISA, measured variable, range, signal.",
+    "Line & velocity": "Every sized run with velocity / volt-drop & within-spec flagging.",
+}
+
+# A whitelist of CONTROL-CHARS Excel rejects inside a worksheet cell string —
+# md tables occasionally carry stray control bytes; strip them so .save never throws.
+_CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def clean_cell(v: Any) -> Any:
+    """Make any value safe + tidy for a worksheet cell. Strings get control chars
+    stripped; everything else passes through untouched."""
+    if isinstance(v, str):
+        return _CTRL.sub("", v).strip()
+    return v
+
+
+def back_link(ws: Worksheet, span: int) -> None:
+    """Write a '↑ Contents' internal hyperlink at the top-right of a data tab —
+    column ``span+1`` (immediately right of the merged title band, so it never
+    collides with the title merge). UNIVERSAL: called on every non-image tab."""
+    col = span + 1
+    c = ws.cell(1, col, "↑ Contents")
+    # quote the sheet name so spaces/symbols in CONTENTS_SHEET are always valid
+    c.hyperlink = f"#'{CONTENTS_SHEET}'!A1"
+    c.font = FONT_LINK
+    c.alignment = Alignment(horizontal="right", vertical="center")
+    ws.column_dimensions[get_column_letter(col)].width = 13
+
+
+def apply_col_formats(ws: Worksheet, first_row: int, fmt_by_col: Dict[int, str],
+                      last_row: Optional[int] = None) -> None:
+    """Apply a number format to numeric cells in the given columns from
+    ``first_row`` down. Only touches cells whose stored value is a number OR a
+    live formula string (formulas resolve to numbers, so a money/decimal mask is
+    correct + kills the General default). Text cells are left alone. ROBUST:
+    a missing/empty column is silently skipped."""
+    lr = last_row if last_row is not None else ws.max_row
+    for col, fmt in fmt_by_col.items():
+        letter = get_column_letter(col)
+        for row in range(first_row, lr + 1):
+            cell = ws[f"{letter}{row}"]
+            v = cell.value
+            if v is None:
+                continue
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                cell.number_format = fmt
+            elif isinstance(v, str) and v.startswith("="):
+                cell.number_format = fmt
+
+
 # ============================================================================
 # FORMULA TRANSLATION:  engine symbolic ASCII  ->  live Excel formula
 # ============================================================================
@@ -382,6 +460,8 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
             metric_row(km["headline_constraint"])
         for m in (km.get("supporting_metrics") or [])[:12]:
             metric_row(m)
+
+    back_link(ws, 4)
 
 
 # ============================================================================
@@ -596,7 +676,11 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         cd.font = FONT_NOTE
         cd.border = BORDER
         r += 1
+    # number formats (#37) on the Value column — kill General/scientific
+    apply_col_formats(ws, 5, {2: FMT_DEC2}, r - 1)
+    ws.auto_filter.ref = f"A4:G{r - 1}"
     ws.freeze_panes = "A5"
+    back_link(ws, 7)
 
 
 # ============================================================================
@@ -784,7 +868,12 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
 
         r += 1  # spacer between tools
 
+    # number formats (#37): value (B) + engine-value (E) + Δ (F) columns. These
+    # carry per-calc results in mixed units, so a thousands-separated 2-dp mask
+    # (not £, not General/scientific) is the safe universal display.
+    apply_col_formats(ws, 5, {2: FMT_DEC2, 5: FMT_DEC2, 6: FMT_DEC2}, r)
     ws.freeze_panes = "A4"
+    back_link(ws, 8)
     return live_count, static_count
 
 
@@ -849,10 +938,16 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     grand = num(pl.get("grand_total_gbp"))
     if grand is not None:
         ws.cell(r, 1, "parts-ledger grand_total_gbp").font = FONT_SUB
-        ws.cell(r, 7, grand)
+        gc = ws.cell(r, 7, grand)
+        gc.number_format = FMT_GBP
         ws.cell(r, 8, f"Compare against the LIVE Σ line £ at row {sum_row}. "
                       f"See the ⚠ Checks tab for the reconciliation row.").font = FONT_NOTE
+    # number formats (#37) on the BoM line block: Qty (#,##0) + Unit/Line £ (£#,##0)
+    apply_col_formats(ws, first_line_row, {3: FMT_INT}, last_line_row)
+    apply_col_formats(ws, first_line_row, {6: FMT_GBP, 7: FMT_GBP}, sum_row)
+    ws.auto_filter.ref = f"A4:H{last_line_row}"
     ws.freeze_panes = "A5"
+    back_link(ws, 8)
 
 
 # ============================================================================
@@ -903,7 +998,750 @@ def tab_cost(wb: Workbook, state: dict) -> bool:
     ts.font = Font(bold=True)
     ts.fill = FILL_RESULT
     ws.freeze_panes = f"A{start+1}"
+    back_link(ws, 8)
     return True
+
+
+# ============================================================================
+# TAB — BRIEF-COMPLIANCE MATRIX (#45)
+# ============================================================================
+# Every parsedBrief.constraints.target_performance.metrics[] target vs the
+# ACHIEVED contract quantity vs a LIVE =IF PASS/FAIL. Names differ between the
+# brief metric (e.g. production_capacity_tpy) and the contract quantity
+# (annual_production_t_yr) — so matching is by VALUE + UNIT-FAMILY, never name.
+# ----------------------------------------------------------------------------
+
+# Canonical unit-family map so 204 tpy (brief) reconciles with 204 t/yr
+# (contract) and 60 kg/m3 reconciles with 60 kg/m³. Each family maps a raw
+# unit string (lower-cased, whitespace-stripped) to a (family, to_canonical)
+# pair; the value is converted to the family's canonical unit before compare.
+def _unit_family(unit: str) -> Tuple[str, float]:
+    """Return (family_key, multiplier_to_canonical) for a unit string.
+    Unknown units fall back to family='?'+the raw token so two identical raw
+    units still match each other."""
+    u = (unit or "").strip().lower().replace(" ", "")
+    u = u.replace("³", "3").replace("²", "2").replace("·", ".").replace("μ", "u")
+    table = {
+        # throughput / production per year -> canonical tonnes/yr
+        "tpy": ("t_per_yr", 1.0), "t/yr": ("t_per_yr", 1.0),
+        "t/y": ("t_per_yr", 1.0), "tonnes/yr": ("t_per_yr", 1.0),
+        "tonne/yr": ("t_per_yr", 1.0), "te/yr": ("t_per_yr", 1.0),
+        "kg/yr": ("t_per_yr", 0.001),
+        # volume -> canonical m3
+        "m3": ("volume_m3", 1.0), "litre": ("volume_m3", 0.001),
+        "l": ("volume_m3", 0.001), "litres": ("volume_m3", 0.001),
+        # density -> canonical kg/m3
+        "kg/m3": ("density", 1.0), "g/l": ("density", 1.0),
+        # time / cycle -> canonical days
+        "days": ("time_days", 1.0), "day": ("time_days", 1.0),
+        "d": ("time_days", 1.0), "hr": ("time_days", 1 / 24.0),
+        "hours": ("time_days", 1 / 24.0), "h": ("time_days", 1 / 24.0),
+        # mass -> canonical kg
+        "kg": ("mass_kg", 1.0), "g": ("mass_kg", 0.001), "t": ("mass_kg", 1000.0),
+        "tonne": ("mass_kg", 1000.0), "tonnes": ("mass_kg", 1000.0),
+        # power -> canonical kW
+        "kw": ("power_kw", 1.0), "mw": ("power_kw", 1000.0), "w": ("power_kw", 0.001),
+        # dimensionless / ratio
+        "ratio": ("ratio", 1.0), "": ("ratio", 1.0), "-": ("ratio", 1.0),
+    }
+    return table.get(u, ("?" + u, 1.0))
+
+
+def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[str, float, str]]:
+    """Find the contract quantity that fulfils a brief metric, by VALUE + UNIT
+    FAMILY (names differ). Returns (qty_name, achieved_value, qty_unit) or None.
+    Strategy: same family as the brief metric, then prefer the quantity whose
+    canonical value is closest to the brief's canonical target (a faithful
+    'we hit the same number' match), tie-broken by a name-token overlap so e.g.
+    total_tank_volume_m3 (3340) is preferred over rearing_tank_volume_each_m3
+    (334) for the 3,340 m³ target."""
+    b_val = num(metric.get("value"))
+    if b_val is None:
+        return None
+    b_fam, b_mul = _unit_family(metric.get("unit", ""))
+    b_canon = b_val * b_mul
+    # name tokens of the brief metric, for the tie-break
+    b_key = (metric.get("key_metric") or metric.get("metric") or "").lower()
+    b_tokens = set(re.findall(r"[a-z]+", b_key))
+
+    best = None  # (closeness, -overlap, name, achieved_value, unit)
+    for qname, qv in quantities.items():
+        if not isinstance(qv, dict):
+            continue
+        a_val = num(qv.get("value"))
+        if a_val is None:
+            continue
+        a_fam, a_mul = _unit_family(qv.get("unit", ""))
+        if a_fam != b_fam:
+            continue
+        a_canon = a_val * a_mul
+        # relative closeness to the brief target (0 == exact hit)
+        denom = max(abs(b_canon), 1e-9)
+        closeness = abs(a_canon - b_canon) / denom
+        # only treat as a fulfilment candidate within a sane window (±50% of
+        # target) so an unrelated same-family quantity is never grabbed
+        if closeness > 0.5:
+            continue
+        overlap = len(b_tokens & set(re.findall(r"[a-z]+", qname.lower())))
+        cand = (round(closeness, 6), -overlap, qname, a_val, qv.get("unit", ""))
+        if best is None or cand < best:
+            best = cand
+    if best is None:
+        return None
+    return best[2], best[3], best[4]
+
+
+def tab_brief_compliance(wb: Workbook, state: dict) -> bool:
+    pb = state.get("parsedBrief") or {}
+    con = pb.get("constraints") or {}
+    tp = con.get("target_performance") or {}
+    metrics = tp.get("metrics") or []
+    # if the brief carries only the headline (no metrics[]), synthesise one row
+    if not metrics and tp.get("value") is not None:
+        metrics = [tp]
+    if not metrics:
+        return False
+    quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
+
+    ws = wb.create_sheet("Brief compliance")
+    set_widths(ws, {"A": 36, "B": 14, "C": 12, "D": 32, "E": 14, "F": 12,
+                    "G": 10, "H": 40})
+    title_row(
+        ws, "Brief-compliance matrix", 8,
+        "Every brief target_performance metric vs the ACHIEVED contract quantity "
+        "vs a LIVE PASS/FAIL. Target & achieved are matched by value + unit family "
+        "(brief & contract use different names). Yellow = editable; STATUS recomputes.",
+    )
+    header(ws, 4, ["Brief metric", "Target", "Unit", "Matched contract quantity",
+                   "Achieved", "Direction", "STATUS", "Note"])
+    r = 5
+    first = r
+    for m in metrics:
+        key = (m.get("key_metric") or m.get("metric") or m.get("name") or "").strip()
+        tgt = num(m.get("value"))
+        unit = m.get("unit", "") or ""
+        category = (m.get("category") or "").lower()
+        matched = _match_quantity(m, quantities)
+
+        ws.cell(r, 1, clean_cell(key) or "(unnamed metric)").border = BORDER
+        tc = ws.cell(r, 2, tgt)
+        tc.fill = FILL_INPUT
+        tc.border = BORDER
+        ws.cell(r, 3, clean_cell(unit)).border = BORDER
+
+        if matched is None:
+            ws.cell(r, 4, "— no matching quantity —").border = BORDER
+            ac = ws.cell(r, 5, "—")
+            ac.border = BORDER
+            ws.cell(r, 6, "—").border = BORDER
+            sc = ws.cell(r, 7, "UNVERIFIED")
+            sc.fill = FILL_CONST
+            sc.font = Font(bold=True, color="7F5B00")
+            sc.border = BORDER
+            nt = ws.cell(r, 8, "No contract quantity in the same unit family within "
+                              "±50% of target — cannot auto-verify.")
+            nt.alignment = WRAP_TOP
+            nt.font = FONT_NOTE
+            nt.border = BORDER
+            r += 1
+            continue
+
+        qname, ach, qunit_s = matched
+        ws.cell(r, 4, clean_cell(qname)).border = BORDER
+        ac = ws.cell(r, 5, ach)
+        ac.fill = FILL_RESULT
+        ac.border = BORDER
+
+        # Direction of the PASS test, inferred from the metric category/name:
+        #  - efficiency ratios (FCR) & cycle-time: lower-is-better -> achieved <= target
+        #  - everything else (scale, density, throughput): meet-or-exceed -> >= target
+        lower_better = (
+            category == "efficiency"
+            or "fcr" in key.lower()
+            or "conversion_ratio" in key.lower()
+            or "cycle" in key.lower()
+            or "_days" in key.lower()
+        )
+        # tolerance band: ±2% of target (display rounding + sizing granularity)
+        tol = abs(tgt) * 0.02 if tgt else 0.0
+        if lower_better:
+            ws.cell(r, 6, "≤ target (lower better)").border = BORDER
+            status_f = f'=IF(E{r}<=B{r}+{tol:.6g},"PASS","FAIL")'
+        else:
+            ws.cell(r, 6, "≥ target (meet/exceed)").border = BORDER
+            status_f = f'=IF(E{r}>=B{r}-{tol:.6g},"PASS","FAIL")'
+        sc = ws.cell(r, 7, status_f)
+        sc.font = Font(bold=True)
+        sc.border = BORDER
+
+        # pre-evaluate so the cell colours on open (before Excel recomputes)
+        if tgt is not None and ach is not None:
+            passed = (ach <= tgt + tol) if lower_better else (ach >= tgt - tol)
+            sc_fill = FILL_PASS if passed else FILL_FAIL
+            for col in range(1, 9):
+                if not isinstance(ws.cell(r, col).fill, PatternFill) or \
+                        ws.cell(r, col).fill.fgColor.rgb in (None, "00000000"):
+                    pass
+            sc.fill = sc_fill
+            sc.font = FONT_PASS if passed else FONT_FAIL
+        nt = ws.cell(r, 8, f"family={_unit_family(unit)[0]}")
+        nt.alignment = WRAP_TOP
+        nt.font = FONT_NOTE
+        nt.border = BORDER
+        r += 1
+
+    # live conditional formatting on STATUS
+    from openpyxl.formatting.rule import CellIsRule
+    rng = f"G{first}:G{r-1}"
+    ws.conditional_formatting.add(rng, CellIsRule(
+        operator="equal", formula=['"FAIL"'], fill=FILL_FAIL, font=FONT_FAIL))
+    ws.conditional_formatting.add(rng, CellIsRule(
+        operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS))
+
+    apply_col_formats(ws, first, {2: FMT_DEC2, 5: FMT_DEC2}, r - 1)
+    ws.auto_filter.ref = f"A4:H{r-1}"
+    ws.freeze_panes = "A5"
+    back_link(ws, 8)
+    return True
+
+
+# ============================================================================
+# TAB — COST WATERFALL (#44)
+# ============================================================================
+# BoM -> +assembly -> factory COGS -> +install -> installed ASP, from
+# state.costStack, as LIVE running formulas (each running total references the
+# prior running total + the step delta, so editing any step recomputes the ASP).
+# ----------------------------------------------------------------------------
+def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
+    cs = state.get("costStack")
+    if not cs or not isinstance(cs, dict):
+        return False
+
+    # Ordered build-up: (label, base-key for the additive STEP value, is_running_anchor).
+    # We render successive steps; each running total = previous running + this step.
+    # The anchors (raw BoM, factory COGS, OEM transfer, channel list, installed ASP)
+    # are taken from costStack directly and shown beside the running total so any
+    # divergence is visible.
+    raw = num(cs.get("raw_materials_bom_gbp"))
+    if raw is None:
+        return False
+
+    ws = wb.create_sheet("Cost waterfall")
+    set_widths(ws, {"A": 38, "B": 18, "C": 18, "D": 56})
+    title_row(
+        ws, "Cost waterfall — BoM → installed ASP", 4,
+        "Running build-up from state.costStack. Yellow = editable step £; the "
+        "Running total column is LIVE (each = previous running + this step), so "
+        "editing any step recomputes the installed price. 'costStack anchor' shows "
+        "the engine's stored figure at that milestone for cross-check.",
+    )
+    header(ws, 4, ["Step", "Step £ (editable)", "Running total £ (live)",
+                   "costStack anchor / note"])
+    r = 5
+
+    # Build the additive ladder. Each entry: (label, step_amount, anchor_value_or_None, note)
+    steps: List[Tuple[str, Optional[float], Optional[float], str]] = []
+    steps.append(("Raw materials (BoM)", raw, raw,
+                  "raw_materials_bom_gbp — start of the build-up"))
+    asm = num(cs.get("assembly_labour_gbp")) or 0.0
+    steps.append(("+ Assembly / erection labour", asm, None, "assembly_labour_gbp"))
+    ovh = num(cs.get("factory_overhead_gbp")) or 0.0
+    if ovh:
+        steps.append(("+ Factory overhead", ovh, None, "factory_overhead_gbp"))
+    steps.append(("= Factory COGS", None,
+                  num(cs.get("factory_cogs_gbp")),
+                  "factory_cogs_gbp (anchor — compare running total)"))
+    margin = num(cs.get("manufacturer_margin_gbp")) or 0.0
+    if margin:
+        steps.append(("+ Manufacturer margin", margin, None, "manufacturer_margin_gbp"))
+    steps.append(("= OEM transfer price", None,
+                  num(cs.get("oem_transfer_price_gbp")),
+                  "oem_transfer_price_gbp (anchor)"))
+    chan = num(cs.get("channel_markup_gbp")) or 0.0
+    if chan:
+        steps.append(("+ Channel markup", chan, None, "channel_markup_gbp"))
+        steps.append(("= Channel list price", None,
+                      num(cs.get("channel_list_price_gbp")),
+                      "channel_list_price_gbp (anchor)"))
+    install = num(cs.get("installation_cost_gbp")) or 0.0
+    steps.append(("+ Installation / field erection", install, None,
+                  "installation_cost_gbp"))
+    steps.append(("= Installed ASP", None,
+                  num(cs.get("installed_asp_gbp")),
+                  "installed_asp_gbp (anchor — final installed price)"))
+
+    first = r
+    running_row: Optional[int] = None  # row holding the last LIVE running total
+    for label, step_amt, anchor, note in steps:
+        ws.cell(r, 1, label).border = BORDER
+        ws.cell(r, 1).font = FONT_SUB if label.startswith(("=", "Raw")) else Font()
+        if step_amt is not None and not label.startswith("="):
+            sc = ws.cell(r, 2, step_amt)
+            sc.fill = FILL_INPUT
+            sc.border = BORDER
+            if running_row is None:          # first anchor = the running seed
+                rt = ws.cell(r, 3, f"=B{r}")
+            else:
+                rt = ws.cell(r, 3, f"=C{running_row}+B{r}")
+            rt.fill = FILL_RESULT
+            rt.border = BORDER
+            running_row = r
+        else:
+            # milestone anchor row: running total carries forward unchanged; show
+            # the engine's stored anchor in the running column for direct compare
+            ws.cell(r, 2, "").border = BORDER
+            if running_row is not None:
+                rt = ws.cell(r, 3, f"=C{running_row}")
+            else:
+                rt = ws.cell(r, 3, anchor)
+            rt.fill = FILL_RESULT
+            rt.border = BORDER
+            running_row = r
+            ws.cell(r, 1).font = FONT_SUB
+        nt = ws.cell(r, 4, (note + (f"  ·  engine anchor £{anchor:,.0f}"
+                                    if anchor is not None else "")))
+        nt.alignment = WRAP_TOP
+        nt.font = FONT_NOTE
+        nt.border = BORDER
+        r += 1
+
+    apply_col_formats(ws, first, {2: FMT_GBP, 3: FMT_GBP}, r - 1)
+    ws.freeze_panes = "A5"
+    back_link(ws, 4)
+    return True
+
+
+# ============================================================================
+# TAB — SPEC-SHEET-PER-PRINCIPAL (#43)
+# ============================================================================
+# One compact block per principal BoM item: tag, duty, rating, qty, unit £,
+# line £, driving worked-calc label (the 'basis'), and the part/MPN.
+# ----------------------------------------------------------------------------
+def tab_spec_sheets(wb: Workbook, state: dict) -> bool:
+    bom = state.get("requirementsBom") or []
+    if not bom:
+        return False
+    # PRINCIPAL items = top-level lines (no sub_of parent) that carry a real line
+    # cost. Sub-components (sub_of set) fold into their parent and are excluded.
+    principals = [
+        b for b in bom
+        if isinstance(b, dict) and not b.get("sub_of")
+        and num(b.get("line_gbp"))
+    ]
+    if not principals:
+        # fall back to anything with a line cost so the tab still renders
+        principals = [b for b in bom if isinstance(b, dict) and num(b.get("line_gbp"))]
+    if not principals:
+        return False
+    principals.sort(key=lambda b: num(b.get("line_gbp")) or 0.0, reverse=True)
+
+    # part-verification lookup: tag/word -> best MPN string, for the part column
+    pv_by_word: Dict[str, str] = {}
+    for pv in (state.get("partVerifications") or []):
+        if not isinstance(pv, dict):
+            continue
+        mfr = (pv.get("manufacturer") or "").strip()
+        mpn = (pv.get("part_number") or "").strip()
+        if not mpn:
+            continue
+        label = (f"{mfr} {mpn}".strip())
+        for k in (pv.get("word_name"), pv.get("word_id")):
+            if k:
+                pv_by_word.setdefault(str(k).strip().lower(), label)
+
+    ws = wb.create_sheet("Spec sheets")
+    set_widths(ws, {"A": 22, "B": 18, "C": 12, "D": 14, "E": 14, "F": 14,
+                    "G": 14, "H": 58})
+    title_row(
+        ws, "Spec sheet — per principal item", 8,
+        "One block per principal BoM line: tag · duty/rating (from the requirement) "
+        "· qty · unit £ · line £ · the driving worked-calc (basis) · the part/MPN. "
+        "Line £ is a LIVE =qty×unit; the foot Σ totals the principals.",
+    )
+    r = 4
+    first_line_row = None
+    line_total_rows: List[int] = []
+
+    for b in principals:
+        tag = clean_cell(b.get("tag", "")) or "(no tag)"
+        req = clean_cell(b.get("requirement", ""))
+        status = clean_cell(b.get("status", ""))
+        part = clean_cell(b.get("part", ""))
+        qty = num(b.get("qty"))
+        unit_gbp = num(b.get("unit_gbp"))
+        line_gbp = num(b.get("line_gbp"))
+        basis = clean_cell(b.get("basis", ""))
+        material = clean_cell(b.get("material", ""))
+        # duty/rating: prefer the structured rating in the requirement text after
+        # the tag noun; we surface the WHOLE requirement as 'duty' (it carries the
+        # sizing, e.g. '132 kW motor (97 kW shaft)') — universal, no class parsing.
+        mpn = pv_by_word.get(str(b.get("tag", "")).strip().lower()) or ""
+        if not mpn and req:
+            # try to match by the leading noun of the requirement against pv words
+            head = re.split(r"[·\-(]", req)[0].strip().lower()
+            mpn = pv_by_word.get(head, "")
+
+        # ---- block header (the tag band) ----
+        sub_banner(ws, r, f"{tag}    ·    {req}", 8)
+        r += 1
+        header(ws, r, ["Field", "Status", "Qty", "Unit £", "Line £",
+                       "Material", "Part / MPN", "Driving worked-calc (basis)"])
+        r += 1
+        # the single data row for this principal
+        ws.cell(r, 1, "spec").font = FONT_SUB
+        ws.cell(r, 1).border = BORDER
+        ws.cell(r, 2, status).border = BORDER
+        qc = ws.cell(r, 3, qty)
+        qc.fill = FILL_INPUT
+        qc.border = BORDER
+        uc = ws.cell(r, 4, unit_gbp)
+        uc.fill = FILL_INPUT
+        uc.border = BORDER
+        # Line £ LIVE = qty × unit £ where both are present; else the stored value
+        if qty is not None and unit_gbp is not None:
+            lc = ws.cell(r, 5, f"=C{r}*D{r}")
+        else:
+            lc = ws.cell(r, 5, line_gbp)
+        lc.fill = FILL_RESULT
+        lc.border = BORDER
+        line_total_rows.append(r)
+        ws.cell(r, 6, material).border = BORDER
+        pc = ws.cell(r, 7, clean_cell(mpn) or (part or "—"))
+        pc.border = BORDER
+        pc.alignment = WRAP_TOP
+        bc = ws.cell(r, 8, basis)
+        bc.alignment = WRAP_TOP
+        bc.font = FONT_NOTE
+        bc.border = BORDER
+        if first_line_row is None:
+            first_line_row = r
+        apply_col_formats(ws, r, {4: FMT_GBP, 5: FMT_GBP}, r)
+        r += 2  # spacer between blocks
+
+    # foot Σ over all principal line totals (live, sums the discrete cells)
+    if line_total_rows:
+        ws.cell(r, 1, "Σ PRINCIPALS").font = FONT_SUB
+        sum_expr = "=" + "+".join(f"E{rr}" for rr in line_total_rows)
+        tot = ws.cell(r, 5, sum_expr)
+        tot.font = Font(bold=True)
+        tot.fill = FILL_RESULT
+        tot.number_format = FMT_GBP
+    ws.freeze_panes = "A4"
+    back_link(ws, 8)
+    return True
+
+
+# ============================================================================
+# MARKDOWN-TABLE PARSER (shared by the schedule tabs #20–22)
+# ============================================================================
+_MD_SEP = re.compile(r"^\s*\|?[\s:|-]+\|?\s*$")
+
+
+def parse_md_tables(text: str) -> List[Tuple[str, List[str], List[List[str]]]]:
+    """Parse every GitHub-flavoured markdown table in ``text``.
+    Returns a list of (preceding_heading, header_cells, [row_cells, ...]).
+    A table = a pipe row immediately followed by a |---|---| separator row, then
+    consecutive pipe rows. The nearest preceding '#'-heading is attached."""
+    lines = text.splitlines()
+    tables: List[Tuple[str, List[str], List[List[str]]]] = []
+    heading = ""
+    i, n = 0, len(lines)
+
+    def cells(s: str) -> List[str]:
+        s = s.strip()
+        if s.startswith("|"):
+            s = s[1:]
+        if s.endswith("|"):
+            s = s[:-1]
+        return [c.strip() for c in s.split("|")]
+
+    while i < n:
+        st = lines[i].strip()
+        if st.startswith("#"):
+            heading = st.lstrip("#").strip()
+        if (st.startswith("|") and i + 1 < n
+                and _MD_SEP.match(lines[i + 1].strip())
+                and "-" in lines[i + 1]):
+            hdr = cells(st)
+            rows: List[List[str]] = []
+            j = i + 2
+            while j < n and lines[j].strip().startswith("|"):
+                rows.append(cells(lines[j].strip()))
+                j += 1
+            tables.append((heading, hdr, rows))
+            i = j
+            continue
+        i += 1
+    return tables
+
+
+def _render_md_table(ws: Worksheet, start_row: int, heading: str,
+                     hdr: List[str], rows: List[List[str]],
+                     spec_col: Optional[int] = None) -> int:
+    """Render one parsed md table as a real sortable sheet table starting at
+    ``start_row``. Returns (next_free_row, first_body_row). Numeric-looking cells
+    are coerced to numbers (so they sort + format correctly); the rest stay as
+    text. If ``spec_col`` is given, an 'In spec' ✓/✗ column is coloured."""
+    ncol = max(len(hdr), max((len(rw) for rw in rows), default=0))
+    if heading:
+        sub_banner(ws, start_row, heading, max(ncol, 2))
+        start_row += 1
+    header(ws, start_row, hdr + [""] * (ncol - len(hdr)))
+    r = start_row + 1
+    body_first = r
+    for rw in rows:
+        for ci in range(ncol):
+            raw = rw[ci] if ci < len(rw) else ""
+            txt = clean_cell(raw)
+            cell = ws.cell(r, ci + 1)
+            # coerce a clean numeric token (no stray units/parentheses) to a number
+            n_only = re.fullmatch(r"-?[\d,]+(?:\.\d+)?", str(txt).replace("£", "").strip())
+            if n_only:
+                cell.value = num(txt)
+            else:
+                cell.value = txt
+            cell.border = BORDER
+            cell.alignment = WRAP_TOP
+            # colour an in-spec ✓/✗ cell
+            if spec_col is not None and ci + 1 == spec_col:
+                s = str(txt)
+                if "✗" in s or s.lower() in ("no", "false", "fail"):
+                    cell.fill = FILL_FAIL
+                    cell.font = FONT_FAIL
+                elif "✓" in s or s.lower() in ("yes", "true", "pass"):
+                    cell.fill = FILL_PASS
+                    cell.font = FONT_PASS
+        r += 1
+    return r, body_first
+
+
+def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
+    """#20 — Panel / load schedule as a real table (from panel-schedule.md)."""
+    path = os.path.join(run_dir, "drawings", "panel-schedule.md")
+    if not os.path.exists(path):
+        return False
+    try:
+        text = open(path, "r").read()
+    except Exception:  # noqa: BLE001
+        return False
+    tables = parse_md_tables(text)
+    if not tables:
+        return False
+    ws = wb.create_sheet("Panel schedule")
+    set_widths(ws, {"A": 14, "B": 40, "C": 8, "D": 18, "E": 12, "F": 22,
+                    "G": 22, "H": 12, "I": 10, "J": 8})
+    title_row(
+        ws, "Electrical panel / load schedule", 10,
+        "Parsed from panel-schedule.md — real sortable rows (circuit / load / "
+        "device / cable / volt-drop). 'In spec' ✓ green / ✗ red. Auto-generated; "
+        "not for construction.",
+    )
+    r = 4
+    last_circuit_first = None
+    for heading, hdr, rows in tables:
+        # locate an 'in spec' column for conditional colour
+        spec_col = None
+        for idx, h in enumerate(hdr, start=1):
+            if "spec" in h.lower():
+                spec_col = idx
+        r, body_first = _render_md_table(ws, r, heading, hdr, rows, spec_col)
+        # autofilter + format the wide circuit table (the one with many columns)
+        if len(hdr) >= 6:
+            last_circuit_first = (body_first, r - 1, len(hdr))
+        r += 1
+    if last_circuit_first:
+        bf, bl, nc = last_circuit_first
+        ws.auto_filter.ref = f"A{bf - 1}:{get_column_letter(nc)}{bl}"
+    ws.freeze_panes = "A5"
+    back_link(ws, 10)
+    return True
+
+
+def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
+    """#21 — Process line list / valve list / instrument index as real tabs
+    (from process-schedules.md). Each md table becomes its OWN sheet so each is
+    independently sortable. Returns the number of sheets created."""
+    path = os.path.join(run_dir, "drawings", "process-schedules.md")
+    if not os.path.exists(path):
+        return 0
+    try:
+        text = open(path, "r").read()
+    except Exception:  # noqa: BLE001
+        return 0
+    tables = parse_md_tables(text)
+    if not tables:
+        return 0
+
+    # map each section heading to a short, unique sheet name
+    name_for = {
+        "line": "Process line list",
+        "valve": "Process valve list",
+        "instrument": "Process instruments",
+    }
+    made = 0
+    for heading, hdr, rows in tables:
+        if not rows:
+            continue
+        hl = heading.lower()
+        sheet = next((v for k, v in name_for.items() if k in hl), None)
+        if sheet is None:
+            sheet = "Process " + re.sub(r"[^a-z0-9 ]", "", hl)[:20].strip()
+        sheet = sheet[:31]
+        if sheet in wb.sheetnames:
+            sheet = (sheet[:28] + f"-{made}")
+        ws = wb.create_sheet(sheet)
+        ncol = max(len(hdr), max((len(rw) for rw in rows), default=0))
+        widths = {get_column_letter(i): (14 if i > 1 else 16) for i in range(1, ncol + 1)}
+        # widen a likely 'service' / description column
+        for idx, h in enumerate(hdr, start=1):
+            if h.lower() in ("service", "description", "measured"):
+                widths[get_column_letter(idx)] = 40
+        set_widths(ws, widths)
+        title_row(ws, heading.split("·")[-1].strip() or sheet, max(ncol, 2),
+                  "Parsed from process-schedules.md — real sortable rows.")
+        nxt, body_first = _render_md_table(ws, 4, "", hdr, rows)
+        ws.auto_filter.ref = f"A4:{get_column_letter(ncol)}{nxt - 1}"
+        ws.freeze_panes = "A5"
+        back_link(ws, max(ncol, 2))
+        made += 1
+    return made
+
+
+def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
+    """#22 — Line & velocity table from connection-schedule.json (from/to/size/
+    velocity), with within_spec conditional-formatted RED. Real sortable rows."""
+    cs = load_json(os.path.join(run_dir, "connection-schedule.json"))
+    if not cs or not isinstance(cs, dict):
+        return False
+    rows = cs.get("rows")
+    if not rows or not isinstance(rows, list):
+        return False
+    specs = cs.get("specs") or []  # parallel, carries the spec_limit text
+
+    ws = wb.create_sheet("Line & velocity")
+    set_widths(ws, {"A": 6, "B": 22, "C": 22, "D": 14, "E": 18, "F": 12,
+                    "G": 16, "H": 10, "I": 22, "J": 16})
+    title_row(
+        ws, "Line & velocity schedule", 10,
+        "Every sized run from connection-schedule.json — from · to · DN/CSA · "
+        "rating · velocity-or-ΔU · within-spec (✗ = RED) · spec limit · line £. "
+        "Sortable; the within-spec column flags any run outside its limit.",
+    )
+    header(ws, 4, ["#", "From", "To", "Size", "Rating", "Velocity / ΔU",
+                   "Length (m)", "In spec", "Spec limit", "Line £"])
+    r = 5
+    first = r
+    fail_rows = 0
+    for idx, row in enumerate(rows):
+        if not isinstance(row, dict):
+            continue
+        spec = specs[idx] if idx < len(specs) and isinstance(specs[idx], dict) else {}
+        in_spec = row.get("within_spec")
+        ws.cell(r, 1, idx + 1).border = BORDER
+        ws.cell(r, 2, clean_cell(row.get("from", ""))).border = BORDER
+        ws.cell(r, 3, clean_cell(row.get("to", ""))).border = BORDER
+        ws.cell(r, 4, clean_cell(row.get("size", ""))).border = BORDER
+        ws.cell(r, 5, clean_cell(row.get("rating", ""))).border = BORDER
+        # velocity / volt-drop: prefer the numeric drop_pct_or_velocity from specs
+        velnum = num(spec.get("drop_pct_or_velocity"))
+        if velnum is not None:
+            vc = ws.cell(r, 6, velnum)
+            vc.number_format = FMT_DEC2
+        else:
+            vc = ws.cell(r, 6, clean_cell(row.get("drop", "")))
+        vc.border = BORDER
+        lc = ws.cell(r, 7, num(row.get("length_m")))
+        lc.number_format = FMT_DEC1
+        lc.border = BORDER
+        sc = ws.cell(r, 8, "✓" if in_spec else "✗")
+        sc.border = BORDER
+        sc.alignment = Alignment(horizontal="center")
+        if in_spec is False:
+            sc.fill = FILL_FAIL
+            sc.font = FONT_FAIL
+            fail_rows += 1
+            for col in range(1, 11):
+                ws.cell(r, col).fill = FILL_FAIL
+        else:
+            sc.fill = FILL_PASS
+            sc.font = FONT_PASS
+        ws.cell(r, 9, clean_cell(spec.get("spec_limit", ""))).border = BORDER
+        lt = ws.cell(r, 10, num(row.get("line_total_gbp")))
+        lt.number_format = FMT_GBP
+        lt.border = BORDER
+        r += 1
+    last = r - 1
+
+    # foot: out-of-spec tally + Σ line £
+    ws.cell(r, 2, "Runs out-of-spec").font = FONT_SUB
+    tc = ws.cell(r, 8, fail_rows)
+    tc.font = FONT_FAIL if fail_rows else FONT_PASS
+    tc.fill = FILL_FAIL if fail_rows else FILL_PASS
+    sct = ws.cell(r, 10, f"=SUM(J{first}:J{last})")
+    sct.font = Font(bold=True)
+    sct.fill = FILL_RESULT
+    sct.number_format = FMT_GBP
+
+    # conditional formatting: any '✗' in the In-spec column goes red live
+    from openpyxl.formatting.rule import CellIsRule
+    ws.conditional_formatting.add(
+        f"H{first}:H{last}",
+        CellIsRule(operator="equal", formula=['"✗"'], fill=FILL_FAIL, font=FONT_FAIL))
+    ws.auto_filter.ref = f"A4:J{last}"
+    ws.freeze_panes = "A5"
+    back_link(ws, 10)
+    return True
+
+
+# ============================================================================
+# TAB — CONTENTS / INDEX (#26)  — built LAST, moved to sheet #1
+# ============================================================================
+def tab_contents(wb: Workbook, descriptions: Dict[str, str]) -> None:
+    """Create the Contents sheet (a hyperlink index to every other tab + a
+    one-line description) and MOVE it to position #1. Called after all other
+    sheets exist so the full ordered sheet list is known."""
+    ws = wb.create_sheet(CONTENTS_SHEET)
+    set_widths(ws, {"A": 4, "B": 34, "C": 78})
+    title_row(
+        ws, "Contents", 3,
+        "Click any tab name to jump to it. Each data tab has a '↑ Contents' "
+        "link at its top-right to come back. Yellow cells anywhere are editable "
+        "inputs; green cells are live formulas.",
+    )
+    header(ws, 4, ["#", "Tab", "What's on it"])
+    r = 5
+    n = 1
+    for name in wb.sheetnames:
+        if name == CONTENTS_SHEET:
+            continue
+        ws.cell(r, 1, n).border = BORDER
+        c = ws.cell(r, 2, name)
+        c.hyperlink = f"#'{name}'!A1"
+        c.font = FONT_LINK
+        c.border = BORDER
+        d = ws.cell(r, 3, descriptions.get(name, _default_desc(name)))
+        d.alignment = WRAP_TOP
+        d.font = FONT_NOTE
+        d.border = BORDER
+        r += 1
+        n += 1
+    ws.freeze_panes = "A5"
+    # move to the very front
+    idx = wb.sheetnames.index(CONTENTS_SHEET)
+    if idx != 0:
+        wb.move_sheet(CONTENTS_SHEET, -idx)
+
+
+def _default_desc(name: str) -> str:
+    """Fallback one-line description for image / module tabs not in the static map."""
+    low = name.lower()
+    if low.startswith("module —"):
+        return "Per-module Blender render."
+    if low.startswith("isometric"):
+        return "Representative pipe isometric drawing."
+    if low.startswith("render"):
+        return "Photoreal Blender render."
+    return "Engineering drawing / view."
 
 
 # ============================================================================
@@ -1108,6 +1946,33 @@ def build(run_dir: str, out_path: str) -> dict:
     print("  · Cost")
     has_cost = tab_cost(wb, state)
 
+    # ---- NEW high-value engineering + schedule tabs (each self-guards: a tab
+    # whose source data is absent is SKIPPED cleanly so any class still builds) --
+    skipped: List[str] = []
+
+    def add_tab(name: str, fn) -> None:
+        """Run a guarded tab builder; record what it did. Never let one tab kill
+        the build — a builder exception is caught + logged as a skip."""
+        try:
+            ok = fn()
+        except Exception as exc:  # noqa: BLE001 — robustness: skip, don't crash
+            print(f"  ! {name} raised, skipping: {exc}")
+            skipped.append(f"{name} (error: {exc})")
+            return
+        if ok:
+            print(f"  · {name}")
+        else:
+            print(f"  · {name} — skipped (no source data)")
+            skipped.append(f"{name} (no source data)")
+
+    add_tab("Brief compliance", lambda: tab_brief_compliance(wb, state))
+    add_tab("Cost waterfall", lambda: tab_cost_waterfall(wb, state))
+    add_tab("Spec sheets", lambda: tab_spec_sheets(wb, state))
+    add_tab("Panel schedule", lambda: tab_panel_schedule(wb, run_dir))
+    # process schedules creates 0..3 sheets; treat >0 as success
+    add_tab("Process schedules", lambda: tab_process_schedules(wb, run_dir) > 0)
+    add_tab("Line & velocity", lambda: tab_line_velocity(wb, run_dir))
+
     print("  · Image tabs")
     used_titles = {t.lower() for t in wb.sheetnames}
     specs = collect_image_specs(run_dir)
@@ -1117,6 +1982,11 @@ def build(run_dir: str, out_path: str) -> dict:
         if png and add_image_tab(wb, run_dir, png, ttl, cap, used_titles):
             img_ok += 1
             print(f"      + {ttl}")
+
+    # ---- CONTENTS (#26): built LAST so the full ordered tab list is known,
+    # then moved to sheet #1 with a one-line description + hyperlink per tab ----
+    print("  · Contents (sheet #1)")
+    tab_contents(wb, _TAB_DESCRIPTIONS)
 
     wb.save(out_path)
 
@@ -1131,6 +2001,7 @@ def build(run_dir: str, out_path: str) -> dict:
         "fail_labels": fail_labels,
         "image_tabs": img_ok,
         "has_cost": has_cost,
+        "skipped_tabs": skipped,
         "sha": sha,
     }
 
@@ -1150,6 +2021,8 @@ def main() -> None:
     print(f"  live calcs  : {res['live_calcs']}")
     print(f"  static calcs: {res['static_calcs']}")
     print(f"  image tabs  : {res['image_tabs']}")
+    if res.get("skipped_tabs"):
+        print(f"  skipped     : {res['skipped_tabs']}")
     print(f"  CHECKS FAIL : {res['fail_count']}")
     for fl in res["fail_labels"]:
         print(f"      FAIL -> {fl}")
