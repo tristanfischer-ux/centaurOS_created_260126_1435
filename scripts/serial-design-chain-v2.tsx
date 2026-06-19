@@ -2402,7 +2402,10 @@ function computeQualityScorecard(state: any): QualityScorecard {
   if (pc) {
     const nBlock = Array.isArray(pc.blockingFaults) ? pc.blockingFaults.length : 0
     sections.push({
-      name: 'physics_fidelity',
+      // INC-0 de-dup: gate-33 enforcement was colliding with the self-audit's own
+      // semantic 'physics_fidelity' section (same key pushed twice → inflated mean,
+      // duplicate floor entry). Rename so each section appears exactly once.
+      name: 'physics_gates',
       score: Math.max(0, 10 - nBlock * 3),
       defects: Array.isArray(pc.blockingFaults)
         ? pc.blockingFaults.map((f: any) => `${f.issue || f.failure_mode || ''}`.slice(0, 200))
@@ -9080,7 +9083,11 @@ async function main() {
         codeFixCounter = JSON.parse(readFileSync(codeFixCounterPath, 'utf-8'))
       } catch { /* first time */ }
 
-      const MAX_CODE_FIX_CYCLES = 3
+      // INC-0: the self-rewriting code-fix loop is gated OFF by default during the
+      // floor-8 build (it can patch live source incl. this file, applies on a single-
+      // reviewer WARNING, and has no test/rollback). Set MAX_CODE_FIX_CYCLES env to
+      // re-enable once it is harnessed (Horizon B). Default 0 = data-fix path only.
+      const MAX_CODE_FIX_CYCLES = parseInt(process.env.MAX_CODE_FIX_CYCLES || '0', 10)
       const dataIterationsCompleted = iterationHistory.filter(h => h.iteration === iter).length > 0
         ? iter  // current iteration has been recorded, so we've done iter+1 iterations (0-indexed)
         : iter
