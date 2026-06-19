@@ -45,8 +45,9 @@ OUTPUT (JSON on stdout)
     target current — the caller must add parallel runs.
 
 LICENCE: tool wrapper internal. Tabulated ampacity + mV/A/m values are the
-published BS 7671 Appendix 4 / IEC 60364-5-52 reference-method figures (90 C
-thermosetting, multi-core, Reference Method C — clipped direct). British spelling.
+published BS 7671 Appendix 4 / IEC 60364-5-52 reference-method figures (70 C
+thermoplastic / PVC, multi-core, Reference Method C — clipped direct; the
+conservative ampacity column, safe on XLPE too). British spelling.
 """
 from __future__ import annotations
 
@@ -76,37 +77,47 @@ PROVENANCE = {
         "conductor CSA whose Reference-Method-C tabulated ampacity (x parallel "
         "runs) >= I_t. Volt-drop Vd = (mV/A/m) x I_b x L / 1000; Vd% = 100 Vd / "
         "U_nom. Ampacity + mV/A/m are the published BS 7671 Appendix 4 figures "
-        "(90 C thermosetting, multi-core, Method C); no fabricated constants."
+        "(70 C thermoplastic / PVC, multi-core, Method C — the conservative "
+        "ampacity column, safe on XLPE too); no fabricated constants."
     ),
     "confidence_class": "standard",
     "last_reviewed_date": "2026-06-04",
 }
 
-# BS 7671 Appendix 4 reference data — 90 C thermosetting (XLPE) multi-core,
-# Reference Method C (clipped direct). Per standard conductor CSA [mm2]:
+# BS 7671 Appendix 4 reference data — 70 C THERMOPLASTIC (PVC) multi-core,
+# Reference Method C (clipped direct), single circuit.
+# Per standard conductor CSA [mm2]:
 #   ampacity_a   : tabulated 3-phase current-carrying capacity [A]
 #   mv_per_a_m   : voltage drop per ampere per metre [mV/A/m] (3-phase, line value)
-# Copper (Cu) and aluminium (Al) reference tables.
+# CONSERVATIVE FLOOR: these ampacities are the 70 C-thermoplastic (PVC) clipped-
+# direct column (BS 7671 Table 4D1A flavour), NOT the more generous 90 C-
+# thermosetting (XLPE) column. A conductor sized to this column is safe on EITHER
+# insulation, so the sizing never under-rates a cable for ampacity. This is the
+# SAME ladder the deterministic verifier (deterministic_checks_lib._CU_AMPACITY)
+# enforces — the engine and the off-budget check are one authority by construction,
+# so a sized cable can never be flagged ampacity-undersized. (Previously these were
+# XLPE-flavoured, e.g. 50 mm2 -> 198 A; a 194.5 A load then "fitted" 50 mm2 while
+# the PVC floor needs 70 mm2 / 168 A — the recurring under-size.)
 CABLE_TABLES = {
     "copper": {
-        # csa : (ampacity_a, mv_per_a_m)
-        1.5:   (23, 25.0),
-        2.5:   (31, 15.0),
-        4:     (42, 9.5),
-        6:     (54, 6.4),
-        10:    (75, 3.8),
-        16:    (100, 2.4),
-        25:    (133, 1.5),
-        35:    (164, 1.1),
-        50:    (198, 0.81),
-        70:    (253, 0.57),
-        95:    (306, 0.42),
-        120:   (354, 0.33),
-        150:   (407, 0.27),
-        185:   (464, 0.22),
-        240:   (546, 0.18),
-        300:   (628, 0.145),
-        400:   (728, 0.115),
+        # csa : (ampacity_a, mv_per_a_m)  ampacity = BS 7671 Method C, 70 C PVC
+        1.5:   (19.5, 25.0),
+        2.5:   (27, 15.0),
+        4:     (36, 9.5),
+        6:     (46, 6.4),
+        10:    (63, 3.8),
+        16:    (85, 2.4),
+        25:    (112, 1.5),
+        35:    (138, 1.1),
+        50:    (168, 0.81),
+        70:    (213, 0.57),
+        95:    (258, 0.42),
+        120:   (299, 0.33),
+        150:   (344, 0.27),
+        185:   (392, 0.22),
+        240:   (461, 0.18),
+        300:   (530, 0.145),
+        400:   (634, 0.115),
     },
     "aluminium": {
         16:    (78, 4.0),

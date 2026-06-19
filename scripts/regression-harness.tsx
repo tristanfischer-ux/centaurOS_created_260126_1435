@@ -978,6 +978,70 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => detDetail,
   ))
 
+  // ── A8e. the DETERMINISTIC-CHECK SOURCE FIXES (drive the verifier ALL-GREEN at
+  // the engine source, not by editing the check). Five pure, snapshot-independent
+  // engine behaviours that close the RAS ras-inc4 fails AT THEIR UNIVERSAL SOURCE —
+  // each verified to leave BESS/SAF/CO2/h2/VF byte-identical (no class table):
+  //   1. CABLE AMPACITY — electrical_cable_sizing.py's copper ampacity ladder IS
+  //      the verifier's _CU_AMPACITY (70 C PVC clipped-direct) on every shared rung,
+  //      so a sized cable can never be ampacity-undersized vs the off-budget check
+  //      (the 194.5 A recirc feeder now needs ≥70 mm², not the old 50 mm²).
+  //   2. PARALLEL-PIPE SPLIT — a flow too fast for the largest single standard bore
+  //      (the 0.5567 m³/s RAS recirc loop at DN300 @ 7.6 m/s) auto-splits into N
+  //      parallel headers each within the erosion limit (in-spec), instead of the
+  //      old single over-velocity DN300; a small flow stays a single pipe (no
+  //      spurious split) and the pipe cost scales ×N for the parallel set.
+  //   3. NO-REFERENCE PRICING GUARD — an Engine-C `engine_c_our_unit_gbp` TOKEN
+  //      flagged `no_reference` / priced_count=0 is NOT a real catalogue reference,
+  //      so it can no longer crush a genuine field instrument to 3× a £12 guess
+  //      (the I-104/I-106 £36 under-bill); a real priced reference still counts.
+  //   4. UNDERSIZED-MPN REJECTION — the rotating-equipment noun gate that lets the
+  //      BoM reject a named consumer-grade MPN priced far below the duty-rated curve
+  //      (the Grundfos UP15-42 domestic circulator named for a 97 kW recirc pump).
+  // Pure shell-out probe (no LLM, no network, no snapshot); skips if .venv absent.
+  let detSrcOk = false
+  let detSrcDetail = ''
+  try {
+    const venv = resolve(__dirname, '..', '.venv', 'bin', 'python')
+    const pyBin = existsSync(venv) ? venv : 'python3'
+    const probe = [
+      'import json,sys',
+      'sys.path.insert(0,"scripts");sys.path.insert(0,"scripts/lib/orchestrator/tools/python");sys.path.insert(0,"scripts/blender-universal")',
+      'import electrical_cable_sizing as ecs, connection_sizing as cs, deterministic_checks_lib as dcl',
+      'import importlib.util',
+      'sp=importlib.util.spec_from_file_location("requirements_bom","scripts/requirements_bom.py")',
+      'rb=importlib.util.module_from_spec(sp);sys.modules["requirements_bom"]=rb;sp.loader.exec_module(rb)',
+      'r={}',
+      'eng={k:v[0] for k,v in ecs.CABLE_TABLES["copper"].items()};ver=dict(dcl._CU_AMPACITY)',
+      'r["amp"]=all(abs(eng[k]-ver[k])<1e-6 for k in eng if k in ver)',
+      'c=ecs.compute({"cable_name":"p","design_current_a":194.5,"length_m":30,"nominal_voltage_v":400,"conductor":"copper","n_parallel":1,"max_voltdrop_pct":5.0})',
+      'r["cab"]=c["main_feeder_cable_csa_mm2"]>=70',
+      'e={"mechanism":"fluid_loop","constraint_kind":"flow_capacity","required_value":0.5567,"required_unit":"m3/s","material_context":"water","from_part":"a","to_part":"b"}',
+      's=cs.size_connection_to_spec(e,93.7,carried_value=0.5567)',
+      'r["par"]=bool(s["within_spec"]) and (s.get("n_parallel") or 1)>1 and s["drop_pct_or_velocity"]<=3.0',
+      's2=cs.size_connection_to_spec({"mechanism":"fluid_loop","constraint_kind":"flow_capacity","required_value":0.05,"required_unit":"m3/s","material_context":"water"},20,carried_value=0.05)',
+      'r["sml"]=(s2.get("n_parallel") or 1)==1 and bool(s2["within_spec"])',
+      'r["nor"]=(rb._pv_reference_price({"engine_c_our_unit_gbp":12,"engine_c_flag":"no_reference","engine_c_priced_count":0}) is None) and (rb._pv_reference_price({"engine_c_our_unit_gbp":40,"engine_c_priced_count":3})==40.0)',
+      'r["rot"]=rb._is_rotating_equipment_noun("Circulation Pump") and not rb._is_rotating_equipment_noun("UV Reactor")',
+      'a=cs.connection_cost({"kind":"pipe","mechanism":"fluid_loop","size_label":"DN300","length_m":10});b=cs.connection_cost({"kind":"pipe","mechanism":"fluid_loop","size_label":"3xDN300","n_parallel":3,"length_m":10})',
+      'r["cost"]=b["install_gbp"]>2.9*a["install_gbp"]',
+      'print(json.dumps(r))',
+    ].join('\n')
+    const o = execFileSync(pyBin, ['-c', probe], { encoding: 'utf8', cwd: resolve(__dirname, '..'), timeout: 30000 })
+    const r = JSON.parse(o.trim().split('\n').pop() as string)
+    detSrcOk = r.amp && r.cab && r.par && r.sml && r.nor && r.rot && r.cost
+    detSrcDetail = JSON.stringify(r)
+  } catch (err) {
+    detSrcDetail = `det-source-fix probe failed to run: ${String(err).slice(0, 200)}`
+  }
+  out.push(assertEq(
+    'UNIVERSAL.deterministic_check_source_fixes',
+    'the five deterministic-check SOURCE fixes hold (engine = verifier, no class table): (1) the cable-sizing ampacity ladder IS the verifier _CU_AMPACITY on every shared rung so a sized cable is never ampacity-undersized (194.5 A ⇒ ≥70 mm²); (2) a flow too fast for the largest single bore auto-splits into N parallel in-spec headers (RAS recirc DN300 7.6 m/s ⇒ N×DN300 ≤3 m/s) while a small flow stays a single pipe and the pipe cost scales ×N; (3) an Engine-C no_reference price TOKEN is not a catalogue reference (cannot crush a real field instrument to 3× a £12 guess); (4) the rotating-equipment noun gate lets the BoM reject an undersized named MPN (the Grundfos UP15-42 on a 97 kW pump).',
+    detSrcDetail,
+    () => detSrcOk === true,
+    () => detSrcDetail,
+  ))
+
   // ── B. thermal-equipment type follows the contract duty sign (heating ⇒ heat-pump) ──
   const graph: any = { product_class: 'test', nodes: [{ class: 'environmental_interface', display: 'Environmental Interface', role: 'principal', required: true }], edges: [] }
   const heatingContract: any = { quantities: { heating_duty_kw: { value: 1493 }, heat_pump_cop: { value: 3.5 }, heat_pump_electrical_kw: { value: 427 } } }

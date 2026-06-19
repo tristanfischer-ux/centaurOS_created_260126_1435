@@ -419,6 +419,11 @@ def _price_floor_for(name: str):
 # at ≤ COMMODITY_CAP_MULT × it. Universal: keyed off the commodity NOUN, no
 # per-archetype table.
 COMMODITY_CAP_MULT = 3.0
+# Cost-band multiplier mirroring the deterministic verifier (gate-21 ">5× = wrong"):
+# a named catalogue MPN whose own reference price is > this factor BELOW the duty-
+# rated price is undersized for the duty and must be rejected. One number, shared
+# meaning across the engine and the off-budget check.
+COST_BAND_FACTOR = 5.0
 # Commodity nouns: small electronics / ICs / cables / connectors / fasteners /
 # small instruments — kit whose unit price is a catalogue number, never a bespoke
 # fabrication. (A power transformer / switchgear / motor is NOT here — those are
@@ -814,6 +819,22 @@ def _rating_kw(md: dict, name: str = "", requirement: str = ""):
 # matches the line's noun. Both (b)+(c) FAIL on an archetype whose pumps carry no
 # shaft rating and no shaft sibling (CO₂ / SAF) → those BoMs are byte-unchanged.
 _MOTOR_DRIVEN_NOUN_RE = re.compile(r"\bpump\b|\bblower\b|\bcompressor\b|\bfan\b", re.I)
+
+# Rotating / power-rated kit where a NAMED consumer-grade catalogue MPN can be
+# grossly undersized for the engineering duty (a domestic circulator named for a
+# process recirculation pump). Used by the undersized-MPN rejection: if such a
+# line's named part is priced far below the duty-rated curve, the MPN is wrong.
+# Broader than _MOTOR_DRIVEN_NOUN_RE (adds gensets / motors / mixers) but excludes
+# a passive vessel / instrument noun (those are not £/kW rotating kit).
+_ROTATING_EQUIP_NOUN_RE = re.compile(
+    r"\bpump\b|\bblower\b|\bcompressor\b|\bfan\b|\bmotor\b|\bmixer\b|agitator|"
+    r"\bvsd\b|\bvfd\b|variable[_ -]?speed[_ -]?drive|generat\w*|\bgenset\b", re.I)
+
+
+def _is_rotating_equipment_noun(name: str) -> bool:
+    """True when the line's noun is rotating / power-rated kit for which a named
+    consumer-grade MPN can be undersized for the duty. Universal, no class table."""
+    return bool(_ROTATING_EQUIP_NOUN_RE.search(name or ""))
 _SHAFT_SIBLING_SUFFIXES = ("_power_kw", "_shaft_power_kw", "_shaft_kw",
                            "_hydraulic_power_kw", "_brake_power_kw")
 
@@ -1743,17 +1764,34 @@ def _connection_rows(out_dir: str, q=None):
 # is untouched, so CO₂/SAF (which carry no mis-PINNED commodity chips) are
 # byte-identical. Universal, deterministic, no per-class table.
 def _pv_reference_price(pv: dict):
-    """A real catalogue/distributor reference unit price (£) carried on the
+    """A REAL catalogue/distributor reference unit price (£) carried on the
     partVerification, else None. This is the SAME number gate 21 compares against —
     the forge-truth.db cascade price — so capping to a multiple of it makes the cap
     and the gate agree. Prefer the explicit distributor price; fall back to the
     engine-C forge-truth.db reference (`engine_c_our_unit_gbp`) the verifier stamped
-    from the catalogue match."""
-    for fld in ("distributor_price_gbp", "engine_c_our_unit_gbp",
-                "engine_c_ref_median_gbp"):
-        v = pv.get(fld)
-        if isinstance(v, (int, float)) and v > 0:
-            return float(v)
+    from the catalogue match.
+
+    CRITICAL GUARD (no-reference token): Engine C stamps `engine_c_our_unit_gbp`
+    even when it found NO priced catalogue reference — a curve-derived TOKEN (e.g.
+    £12) flagged `engine_c_flag == 'no_reference'` / `engine_c_priced_count == 0`.
+    That token is NOT a real catalogue price and must NEVER be used to cap a line
+    (it would crush a genuine Mitsubishi heat-pump thermistor / ABB combi-sensor
+    from ~£800 to 3×£12 = £36 — the I-104/I-106 under-bill). Only `engine_c_our_
+    unit_gbp` backed by ≥1 priced reference (`engine_c_priced_count > 0` and the
+    flag is not 'no_reference') counts as a real reference here. The distributor
+    price is always real. Universal — keyed on the provenance flag, no class table."""
+    dp = pv.get("distributor_price_gbp")
+    if isinstance(dp, (int, float)) and dp > 0:
+        return float(dp)
+    flag = str(pv.get("engine_c_flag") or "")
+    priced = pv.get("engine_c_priced_count")
+    engine_c_has_real_ref = (flag != "no_reference"
+                             and (priced is None or (isinstance(priced, (int, float)) and priced > 0)))
+    if engine_c_has_real_ref:
+        for fld in ("engine_c_our_unit_gbp", "engine_c_ref_median_gbp"):
+            v = pv.get(fld)
+            if isinstance(v, (int, float)) and v > 0:
+                return float(v)
     return None
 
 
@@ -2183,7 +2221,32 @@ def assemble(out_dir: str):
                 # vessel/instrument/cable is untouched. Skip a strong-bespoke process
                 # vessel (engineering-budget basis, not £/kW kit). ──
                 if bc != "strong":
+                    # Capture the NAMED part's own price + identity BEFORE the rating
+                    # reconciliation grounds it, so we can detect an UNDERSIZED named
+                    # MPN: a catalogue part whose own reference price is grossly below
+                    # the duty-rated price (the Grundfos UP15-42 domestic circulator
+                    # named for a 97 kW / 1,670 m³/h recirculation pump → its £2,024
+                    # estimate vs the £67,900 rating-based price = 33.5×).
+                    pre_gbp, pre_status = gbp, status
                     gbp, basis = _reconcile_rated_price(name, md, gbp, basis, requirement)
+                    # UNIVERSAL UNDERSIZED-MPN REJECTION: when a power-rated rotating-
+                    # equipment line was grounded UP from a far-lower named-part price,
+                    # the named catalogue part cannot meet the duty — presenting it
+                    # would make the BoM contradict itself (a 50 W circulator priced as
+                    # a 97 kW pump). Strip the wrong MPN and relabel the line as the
+                    # duty-rated parametric the engine already correctly priced; the
+                    # named part no longer lies about the duty. Deterministic + class-
+                    # agnostic: keyed off the rating mismatch, not any class table.
+                    if (pre_status == "IDENTIFIED"
+                            and _is_rotating_equipment_noun(name)
+                            and pre_gbp and pre_gbp > 0
+                            and gbp >= pre_gbp * COST_BAND_FACTOR):
+                        status = "NOT FOUND"
+                        part = "requirement stated — rating-based parametric"
+                        basis = (basis + f" · named part {pn!r} rejected: catalogue "
+                                 f"reference £{pre_gbp:,.0f} is "
+                                 f"{gbp / pre_gbp:.0f}× below the duty-rated price "
+                                 f"(undersized for the duty)")
                 row = {"tag": tag, "requirement": requirement, "status": status,
                        "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),
                        "basis": basis}
@@ -2224,6 +2287,14 @@ def assemble(out_dir: str):
                     raws = [_child_weight(k) for k in kids]
                     tot = sum(raws)
                     pl = row["line_gbp"]
+                    # PASS 1 — proportional split + commodity caps. Track which kids
+                    # were CAPPED (their displayed £ pinned below their proportional
+                    # share) vs UNCAPPED (bespoke / rated kit free to absorb the
+                    # residual). The cap stops a cheap commodity showing an inflated
+                    # share; but capping alone makes Σ(breakdown) < parent line — the
+                    # vessel reconciliation gap. Pass 2 redistributes the freed-up
+                    # residual onto the uncapped kids so Σ(breakdown) == parent line.
+                    kid_rows = []
                     for i, (k, rp) in enumerate(zip(kids, raws), 1):
                         scaled = round(pl * rp / tot) if (pl > 0 and tot > 0) else round(rp)
                         kn = k.get("name_human") or "sub-component"
@@ -2240,16 +2311,45 @@ def assemble(out_dir: str):
                         # breakdown at ≤3× catalogue (partVerif MPN fallback) then at the
                         # bare-commodity ceiling. line_gbp stays 0 → grand total unchanged.
                         kcap_pn = kpn if _is_structured_pn(kpn) else (pv_pn.get(kwid) or kpn)
+                        was_capped = False
                         kc, kcb = _commodity_catalogue_cap(kn, kcap_pn, float(scaled), dist_price.get(kwid))
                         if kcb is not None:
-                            scaled, kbasis = round(kc), kbasis + " · " + kcb
+                            scaled, kbasis, was_capped = round(kc), kbasis + " · " + kcb, True
                         kce, kceb = _apply_commodity_ceiling(kn, kmd, float(scaled), krat)
                         if kceb is not None:
-                            scaled, kbasis = round(kce), kbasis + " · " + kceb
-                        rows.append({"tag": f"{tag}.{i}", "requirement": f"↳ {kn}" + (f" · {krat}" if krat else ""),
-                                     "status": "SUB-COMPONENT", "part": "assembly detail", "qty": 1,
-                                     "unit_gbp": scaled, "line_gbp": 0, "breakdown_gbp": scaled, "sub_of": tag,
-                                     "basis": kbasis})
+                            scaled, kbasis, was_capped = round(kce), kbasis + " · " + kceb, True
+                        kid_rows.append({"tag": f"{tag}.{i}",
+                                         "requirement": f"↳ {kn}" + (f" · {krat}" if krat else ""),
+                                         "status": "SUB-COMPONENT", "part": "assembly detail", "qty": 1,
+                                         "unit_gbp": scaled, "line_gbp": 0, "breakdown_gbp": scaled,
+                                         "sub_of": tag, "basis": kbasis, "_capped": was_capped})
+                    # PASS 2 — reconcile Σ(breakdown) to the parent line. Apportion the
+                    # residual (parent line − Σ capped&uncapped) across the UNCAPPED kids
+                    # in proportion to their current share (they are the bespoke shell /
+                    # internals / rated kit that legitimately carry the balance). Falls
+                    # back to ALL kids if none are uncapped, so the invariant always holds.
+                    if pl > 0:
+                        cur = sum(kr["breakdown_gbp"] for kr in kid_rows)
+                        resid = pl - cur
+                        if resid != 0:
+                            absorbers = [kr for kr in kid_rows if not kr["_capped"]] or kid_rows
+                            base = sum(kr["breakdown_gbp"] for kr in absorbers)
+                            if base > 0:
+                                acc = 0
+                                for j, kr in enumerate(absorbers):
+                                    share = (round(resid * kr["breakdown_gbp"] / base)
+                                             if j < len(absorbers) - 1 else resid - acc)
+                                    acc += share
+                                    kr["breakdown_gbp"] = max(0, kr["breakdown_gbp"] + share)
+                                    kr["unit_gbp"] = kr["breakdown_gbp"]
+                            else:
+                                # all absorbers at £0 — drop the whole residual on the last
+                                absorbers[-1]["breakdown_gbp"] = max(0, absorbers[-1]["breakdown_gbp"] + resid)
+                                absorbers[-1]["unit_gbp"] = absorbers[-1]["breakdown_gbp"]
+                            absorbers[-1]["basis"] += " · reconciled to parent line"
+                    for kr in kid_rows:
+                        kr.pop("_capped", None)
+                        rows.append(kr)
     rows += _connection_rows(out_dir, qcontract)   # pipe/cable/duct runs as their own service-classified BoM lines (re-priced from contract duties)
     return rows
 

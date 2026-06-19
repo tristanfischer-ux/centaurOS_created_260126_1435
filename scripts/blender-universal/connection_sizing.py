@@ -495,6 +495,14 @@ LV_REACH_VOLTAGE_CEILING_V = 1000.0
 # Liquid-pipe ΔP practical ceiling [kPa] over a single run before a fatter pipe is
 # the wrong answer (pump the fluid / relocate / boost locally instead).
 PRACTICAL_MAX_PIPE_DP_KPA = 500.0
+# Max PARALLEL pipe runs (manifolded header lines) before splitting the duty is
+# itself the wrong answer (relocate / local boost). The fluid analogue of
+# PRACTICAL_MAX_PARALLEL for conductors: when even the largest standard bore (the
+# top of PIPE_DN_LADDER) carries a flow too fast for the erosion limit, the
+# correct real response is N parallel headers each carrying Q/N — NOT a single
+# over-velocity line. Standard practice on large recirculation loops (a fish-farm
+# main loop, a district-cooling header) is exactly this manifolded-parallel set.
+PRACTICAL_MAX_PIPE_PARALLEL = 6
 
 # --- D2 ACTUATION (auto-insert a sub-distribution + re-route) thresholds -------
 # When D2 fires on an LV fan-out that's infeasible over the distance, the ACTUATION
@@ -1802,27 +1810,81 @@ def _climb_fluid(spec: dict, length_m: float) -> dict:
                          f"velocity {orig_v:g} m/s under {v_limit:g} m/s")
         return spec
 
-    # ---- D2 for a pipe: ladder exhausted still out of spec ----
-    label, bore = PIPE_DN_LADDER[-1]
-    area = math.pi * (bore / 1000.0 / 2.0) ** 2
-    v = q_m3s / max(1e-12, area)
-    spec["size_label"] = label
-    spec["final_size_label"] = label
-    spec["outer_dia_mm"] = PIPE_DN_OD.get(label, bore * 1.15)
-    spec["drop_pct_or_velocity"] = round(v, 3)
-    spec["within_spec"] = v <= v_limit
+    # ---- D1b for a pipe: single-bore ladder exhausted → SPLIT across parallel
+    #      header lines (the fluid analogue of parallel conductors). The largest
+    #      standard bore carrying the WHOLE Q is over-velocity; N parallel lines of
+    #      that bore each carry Q/N, so velocity falls ∝ 1/N. Pick the SMALLEST N
+    #      (fewest headers) whose per-line velocity is within the erosion limit AND
+    #      whose per-line ΔP is under the practical ceiling. This is standard real
+    #      practice for a large recirculation loop (manifolded parallel headers), so
+    #      it is a legitimate in-spec answer — not a deferred recommendation. ----
+    top_label, top_bore = PIPE_DN_LADDER[-1]
+    top_area = math.pi * (top_bore / 1000.0 / 2.0) ** 2
+    chosen_par = None  # (n, v_line, dp_line)
+    for n in range(2, PRACTICAL_MAX_PIPE_PARALLEL + 1):
+        v_line = (q_m3s / n) / max(1e-12, top_area)
+        # ΔP per line ∝ v_line² (same bore, friction ~ constant); scale the recorded
+        # base ΔP by (v_line / orig_v)² × (base_bore / top_bore).
+        if base_dp > 0 and orig_v > 0:
+            dp_line = base_dp * (v_line / orig_v) ** 2 * (base_bore / top_bore)
+        else:
+            dp_line = None
+        if v_line <= v_limit and (dp_line is None or dp_line <= PRACTICAL_MAX_PIPE_DP_KPA):
+            chosen_par = (n, v_line, dp_line)
+            break
+
+    if chosen_par is not None:
+        n, v_line, dp_line = chosen_par
+        # Render ONE pipe representing the parallel set, widened ∝ sqrt(N) so the
+        # group reads heavier in the CAD (the same convention as a parallel-cable
+        # bundle); the schedule carries n_parallel so cost/BoM multiply correctly.
+        spec["size_label"] = f"{n}×{top_label}"
+        spec["final_size_label"] = spec["size_label"]
+        spec["n_parallel"] = n
+        spec["outer_dia_mm"] = round(PIPE_DN_OD.get(top_label, top_bore * 1.15)
+                                     * math.sqrt(n), 1)
+        spec["drop_pct_or_velocity"] = round(v_line, 3)
+        if dp_line is not None:
+            spec["dp_kpa"] = round(dp_line, 2)
+        spec["within_spec"] = True
+        spec["upsized"] = True
+        spec["driver"] = (f"velocity {orig_v:g} m/s > {v_limit:g} m/s at single "
+                          f"{top_label}; split across {n} parallel headers")
+        spec["material_qty_desc"] = (
+            f"{n} × {top_label} pipe (parallel headers), {length_m:.1f} m each"
+            + (f", ΔP≈{dp_line:.1f} kPa/line" if dp_line is not None else ""))
+        spec["assumptions"] = list(spec.get("assumptions", [])) + [
+            f"D1 auto-split: single {top_label} carried {orig_v:g} m/s (> "
+            f"{v_limit:g} m/s); {n} parallel {top_label} headers each carry "
+            f"Q/{n} → {v_line:.2f} m/s (≤ {v_limit:g} m/s)"]
+        spec["notes"] = (f"D1 auto-split single {top_label} → {n}×{top_label} "
+                         f"parallel headers to bring per-line velocity "
+                         f"{v_line:.2f} m/s under {v_limit:g} m/s")
+        return spec
+
+    # ---- D2 for a pipe: even N parallel top-bore headers can't hold it ----
+    n = PRACTICAL_MAX_PIPE_PARALLEL
+    v_line = (q_m3s / n) / max(1e-12, top_area)
+    spec["size_label"] = f"{n}×{top_label}"
+    spec["final_size_label"] = spec["size_label"]
+    spec["n_parallel"] = n
+    spec["outer_dia_mm"] = round(PIPE_DN_OD.get(top_label, top_bore * 1.15)
+                                 * math.sqrt(n), 1)
+    spec["drop_pct_or_velocity"] = round(v_line, 3)
+    spec["within_spec"] = v_line <= v_limit
     spec["upsized"] = True
-    reason = (f"flow {q_m3s * 1000:.1f} L/s stays > {v_limit:g} m/s even at the "
-              f"largest standard bore ({label}) over {length_m:.0f} m")
+    reason = (f"flow {q_m3s * 1000:.1f} L/s stays > {v_limit:g} m/s even at "
+              f"{n}×{top_label} parallel headers over {length_m:.0f} m")
     rec = (f"Run {spec.get('from_part') or '?'}→{spec.get('to_part') or '?'}: "
-           f"{reason} — recommend splitting the duty across parallel lines, a "
-           f"local boost, or relocating the consumer nearer the source. A single "
-           f"line past {label} is the wrong response.")
+           f"{reason} — recommend a local boost, staged pumping, or relocating the "
+           f"consumer nearer the source. More than {n} parallel headers past "
+           f"{top_label} is the wrong response.")
     spec["driver"] = reason
     spec["design_recommendation"] = rec
     spec["assumptions"] = list(spec.get("assumptions", [])) + [
-        f"D2 design feedback: {reason}; pipe ladder exhausted → split/boost/relocate"]
-    spec["notes"] = ("D2 DESIGN RECOMMENDATION — pipe ladder exhausted "
+        f"D2 design feedback: {reason}; parallel-header ladder exhausted → "
+        f"boost/stage/relocate"]
+    spec["notes"] = ("D2 DESIGN RECOMMENDATION — parallel-header ladder exhausted "
                      "(see design_recommendation)")
     return spec
 
@@ -2490,13 +2552,20 @@ def connection_cost(spec: dict,
             dn = dn or "DN50?"
         mat_factor, mat_label = _pipe_material_factor(spec.get("material_context")
                                                       or _spec_material_ctx(spec))
-        unit_rate = per_m * mat_factor
+        # Parallel headers (a "3×DN300" auto-split) cost N× the single line: N
+        # parallel runs each of `length_m`, each flanged at both ends. The cable
+        # branch already does this via `conductors`; mirror it for pipes so the
+        # distribution BoM reflects the real material a split header set needs.
+        n_lines = max(1, int(_f(spec.get("n_parallel"), 1) or 1))
+        unit_rate = per_m * mat_factor * n_lines
         install = unit_rate * L
         term_1 = (TERMINATION_GBP_FLUID_BY_DN.get(dn)
                   or TERMINATION_GBP_FLUID_BY_DN["DN50"]) * mat_factor
-        term = term_1 * ends
-        basis = (f"pipe £{per_m:g}/m @ {dn} × {mat_factor:g} ({mat_label}) + "
-                 f"£{term_1:.0f}/flanged-end × {ends} ends")
+        term = term_1 * ends * n_lines
+        basis = (f"pipe £{per_m:g}/m @ {dn} × {mat_factor:g} ({mat_label})"
+                 + (f" × {n_lines} parallel headers" if n_lines > 1 else "")
+                 + f" + £{term_1:.0f}/flanged-end × {ends} ends"
+                 + (f" × {n_lines}" if n_lines > 1 else ""))
         return _result(unit_rate, install, term, basis)
 
     # ---- DUCT: £/m by the larger standard side ----
