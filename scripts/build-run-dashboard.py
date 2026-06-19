@@ -38,11 +38,10 @@ def fmtnum(v):
         return esc(v)
 
 def imgcards(paths, three=True):
-    out = [f'<div class="{"grid3" if three else "grid"}">']
+    out = []
     for p in paths:
         rel = os.path.relpath(p, run)
-        out.append(f'<div class="imgcard"><img src="{esc(rel)}"><div class="cap">{esc(os.path.basename(p).replace(".png",""))}</div></div>')
-    out.append('</div>')
+        out.append(f'<div class="imgcard-full"><img src="{esc(rel)}"><div class="cap">{esc(os.path.basename(p).replace(".png",""))}</div></div>')
     return ''.join(out)
 
 from component_engineering import build_connectivity, system_balances
@@ -111,6 +110,9 @@ tr.sub td{{color:#7a8089;background:#fbfcfd;font-size:0.93em}}
 .grid3{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}}
 .imgcard{{background:#fff;border:1px solid #e3e6ea;border-radius:10px;overflow:hidden}}
 .imgcard img{{width:100%;display:block;background:#eceef1}} .imgcard .cap{{padding:7px 11px;font-size:12.5px;color:#2c333c;font-weight:560}}
+.imgcard-full{{background:#fff;border:1px solid #e3e6ea;border-radius:10px;overflow:hidden;margin:0 0 16px 0}}
+.imgcard-full img{{width:100%;display:block;background:#eceef1}}
+.imgcard-full .cap{{padding:7px 11px;font-size:12.5px;color:#2c333c;font-weight:560}}
 .prov{{font-size:10.5px;color:#7a828d}} code{{background:#eef0f3;padding:1px 5px;border-radius:4px;font-size:11.5px}}
 .pill{{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:#eef0f3;color:#48505a;margin-left:6px}}
 .ok{{color:#1d6b3c}} .warn{{color:#8a3a0f}} .g{{color:#1d6b3c}}

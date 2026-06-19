@@ -117,6 +117,41 @@ def ensure_cad_artifacts(state_path: Path, out_dir: Path,
     return ok
 
 
+def _run_shaded_hero_pass(out_dir: Path, state_path: Path,
+                          log: list[str]) -> bool:
+    """Run a second Blender pass with INSPECT=0 to produce the SHADED studio
+    hero (00-hero.png + blender-cover.png). The settle loop ran INSPECT=1
+    (flat color-coded inspect-*.png); this pass re-renders with studio key-sun
+    + soft shadows. Skipped if 00-hero.png already exists. Non-fatal."""
+    hero = out_dir / "00-hero.png"
+    if hero.exists() and hero.stat().st_size > 1000:
+        log.append("shaded-hero: 00-hero.png already present — skip")
+        return True
+    blender = _blender_bin()
+    if not blender:
+        log.append("shaded-hero: SKIP — blender not on PATH")
+        return False
+    env = dict(os.environ, BLENDER_OUT_DIR=str(out_dir),
+               STATE_JSON=str(state_path), INSPECT="0")
+    log.append("shaded-hero: running INSPECT=0 Blender pass → 00-hero.png")
+    try:
+        proc = subprocess.run(
+            [blender, "--background", "--python",
+             str(_THIS / "build_universal_scene.py"), "--", str(state_path)],
+            env=env, capture_output=True, text=True, timeout=1500)
+    except Exception as exc:  # noqa: BLE001
+        log.append(f"shaded-hero: Blender launch failed: {exc}")
+        return False
+    ok = hero.exists() and hero.stat().st_size > 1000
+    if not ok:
+        tail = (proc.stderr or proc.stdout or "")[-300:]
+        log.append(f"shaded-hero: Blender ran (rc={proc.returncode}) but 00-hero.png absent: …{tail}")
+    else:
+        shutil.copy2(hero, out_dir / "blender-cover.png")
+        log.append("shaded-hero: 00-hero.png + blender-cover.png written")
+    return ok
+
+
 def _run_generator(script: str, out_dir: Path, state_path: Path,
                    png_name: str, log: list[str]) -> bool:
     """Run one draw_*.py as an isolated subprocess; return whether its PNG landed."""
@@ -279,12 +314,20 @@ def generate_drawing_set(state_path: str | Path,
                             "block-flow-diagram.png", log)
     bfd_path = str(out_dir / "drawings" / "block-flow-diagram.png") if bfd_ok else None
 
+    # SHADED STUDIO HERO PASS (INSPECT=0): the settle loop produced flat
+    # inspect-*.png renders. The late drawing-set call passes INSPECT=0 to
+    # trigger a second Blender pass with studio lighting (key-sun + soft
+    # shadows) → 00-hero.png + blender-cover.png. Non-fatal.
+    inspect_mode = os.environ.get("INSPECT", "1").strip()
+    if inspect_mode == "0":
+        _run_shaded_hero_pass(out_dir, state_path, log)
+
     # The universal-CAD HERO render for the dossier cover + per-module fallback
     # (build_universal_scene.py writes inspect-iso.png to out_dir). The chain reads
     # manifest["hero"] → state.cad_hero_image_path so the new Blender image lands in
     # the PDF where a class has no template (e.g. e-fuel). Prefer the iso view.
     hero_abs = None
-    for cand in ("inspect-iso.png", "inspect-hero.png", "cad-hero.png"):
+    for cand in ("00-hero.png", "blender-cover.png", "inspect-iso.png", "inspect-hero.png", "cad-hero.png"):
         p = out_dir / cand
         if p.exists() and p.stat().st_size > 1000:
             hero_abs = str(p)
