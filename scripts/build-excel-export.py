@@ -912,8 +912,21 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         ws.cell(r, 3, row.get("qty")).border = BORDER
         ws.cell(r, 4, clean_cell(row.get("part", ""))).border = BORDER
         ws.cell(r, 5, clean_cell(row.get("status", ""))).border = BORDER
-        ws.cell(r, 6, num(row.get("unit_gbp"))).border = BORDER
-        ws.cell(r, 7, num(row.get("line_gbp"))).border = BORDER
+        # A sub-component row (requirement marked "↳") whose cost is rolled into its
+        # parent (line_gbp == 0) must NOT show a standalone unit price: the parametric
+        # intermediate is often larger than the parent itself (e.g. a £137k "110 kW
+        # drive motor" sub-line under a £67.9k pump) and reads to a customer as a wrong
+        # number. Show "incl. in parent" instead. Totals are unaffected — the LIVE
+        # Σ(line_gbp) ignores the text cell exactly as it ignored the 0.
+        _line_raw = row.get("line_gbp")
+        _line_num = _line_raw if isinstance(_line_raw, (int, float)) else 0
+        _is_subcomp = str(row.get("requirement", "") or "").strip().startswith("↳")
+        if _is_subcomp and not _line_num:
+            ws.cell(r, 6, "incl. in parent").border = BORDER
+            ws.cell(r, 7, "—").border = BORDER
+        else:
+            ws.cell(r, 6, num(row.get("unit_gbp"))).border = BORDER
+            ws.cell(r, 7, num(row.get("line_gbp"))).border = BORDER
         bs = ws.cell(r, 8, clean_cell(row.get("basis", "")))
         bs.alignment = WRAP_TOP
         bs.font = FONT_NOTE
