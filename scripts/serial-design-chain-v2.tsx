@@ -49,6 +49,7 @@ import { buildContractForChain, type EngineeringContract } from './lib/engineeri
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
+import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
@@ -2340,7 +2341,7 @@ function validateLedgerSchema(ledger: any): string[] {
 interface QualityScorecard {
   floor: number
   mean: number
-  sections: Array<{ name: string; score: number; defects: string[] }>
+  sections: Array<{ name: string; score: number; defects: string[]; advisory?: boolean }>
   allPass: boolean
   iteration: number
 }
@@ -2353,9 +2354,16 @@ interface FixDirective {
 }
 
 function computeQualityScorecard(state: any): QualityScorecard {
-  const sections: Array<{ name: string; score: number; defects: string[] }> = []
+  const sections: Array<{ name: string; score: number; defects: string[]; advisory?: boolean }> = []
 
-  // Self-audit sections (gate 31) — the LLM-judged ≥8 floor
+  // Self-audit sections (gate 31) — the LLM-judged sections. CAGED (B3, Tristan
+  // 2026-06-19): these are ADVISORY ONLY. The LLM critic demonstrably misreads
+  // correct deterministic designs (it read a per-tank 1,336 m³/h branch flow as the
+  // pump total, and invented a "missing heat pump" that the adequacy check PASSES)
+  // and its scores wobble run-to-run with no number change. A number is trustworthy
+  // only when you can WATCH it be computed — so the FLOOR is set by the DETERMINISTIC
+  // sections below; the LLM may surface a concern for a human to read but may NEVER
+  // turn a green deterministic check red or set the floor on its own.
   const sa = state.selfAudit
   if (sa && Array.isArray(sa.sections)) {
     for (const s of sa.sections) {
@@ -2363,11 +2371,12 @@ function computeQualityScorecard(state: any): QualityScorecard {
         name: canonicalSectionName(String(s.name || 'unknown')),
         score: Number(s.score ?? 0),
         defects: Array.isArray(s.defects) ? s.defects.map((d: any) => String(d).slice(0, 200)) : [],
+        advisory: true,
       })
     }
   } else if (sa && typeof sa.min_score === 'number') {
-    // fallback: no per-section breakdown, use the aggregate
-    sections.push({ name: 'self_audit', score: Number(sa.min_score), defects: [] })
+    // fallback: no per-section breakdown, use the aggregate (still advisory)
+    sections.push({ name: 'self_audit', score: Number(sa.min_score), defects: [], advisory: true })
   }
 
   // Drawing gates (gate 35) — deterministic ≥8 drawing condition
@@ -2468,12 +2477,14 @@ function computeQualityScorecard(state: any): QualityScorecard {
     }
   } catch { /* best-effort */ }
 
-  const scores = sections.map(s => s.score)
-  const floor = scores.length ? Math.min(...scores) : 0
-  const mean = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+  // B3: floor + mean from the DETERMINISTIC (non-advisory) sections only — the
+  // deterministic checks ARE the quality bar; advisory LLM sections stay visible in
+  // `sections` but cannot drag the floor down. Logic + the universal only-advisory
+  // fallback live in the importable, harness-tested computeScorecardFloor().
+  const { floor, mean } = computeScorecardFloor(sections)
   const allPass = floor >= 8
   const iteration = parseInt(process.env.QUALITY_LOOP_ITER || '0', 10)
-  return { floor, mean: Math.round(mean * 10) / 10, sections, allPass, iteration }
+  return { floor, mean, sections, allPass, iteration }
 }
 
 function extractFixDirectives(state: any, scorecard: QualityScorecard): FixDirective[] {
@@ -2496,7 +2507,10 @@ function extractFixDirectives(state: any, scorecard: QualityScorecard): FixDirec
   }
   const directives: FixDirective[] = []
   for (const s of scorecard.sections) {
-    if (s.score < 8) {
+    // B3: advisory (LLM self-audit) sections never drive automated fix iterations —
+    // the loop chasing the critic's misreads is exactly the churn B3 removes. Only a
+    // failing DETERMINISTIC section routes to a fix stage.
+    if (s.score < 8 && !s.advisory) {
       const canonical = canonicalSectionName(s.name)
       directives.push({
         section: canonical,

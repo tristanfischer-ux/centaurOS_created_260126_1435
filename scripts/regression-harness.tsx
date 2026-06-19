@@ -49,6 +49,7 @@ import { massAggregator } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
+import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
 import { co2MineralisationEmitter } from './lib/orchestrator/emitters/co2-mineralisation'
 import { E_FUEL_SYNTHESIS_PLAN } from './lib/orchestrator/class-plans/e-fuel-synthesis'
@@ -10357,6 +10358,50 @@ function checkQualityLoopInvariants(): Assertion[] {
     description: 'classifyDefect returns DATA for bill_of_materials with <3 iterations (no stall)',
     passed: classifyDefectLogic('bill_of_materials', [{ iteration: 1, section: 'bill_of_materials', score: 5 }]) === 'DATA',
   })
+
+  // QL6 (B3, Tristan 2026-06-19): the FLOOR is set by DETERMINISTIC sections only —
+  // an advisory LLM self-audit section may NEVER drag the floor below the
+  // deterministic minimum. Tests the REAL importable computeScorecardFloor() (not an
+  // inline copy). Guards the cage that stopped a critic misread scoring 6 from
+  // gating a design whose every deterministic gate is ≥8 (proven on ras-inc5: 6→8).
+  {
+    // a) advisory 6 + 7 must NOT drag the floor below the deterministic min (8)
+    const advisoryDrags = computeScorecardFloor([
+      { name: 'physics_fidelity', score: 6, advisory: true },
+      { name: 'brief_compliance', score: 7, advisory: true },
+      { name: 'connectivity', score: 9 },
+      { name: 'cost_sanity', score: 10 },
+      { name: 'drawing_gates', score: 8 },
+    ])
+    out.push({
+      id: 'QL6.advisory_llm_section_never_sets_floor',
+      description: 'B3: advisory LLM sections (6,7) do not drag the floor below the deterministic min (8)',
+      passed: advisoryDrags.floor === 8,
+      detail: advisoryDrags.floor !== 8 ? `got floor ${advisoryDrags.floor}` : undefined,
+    })
+    // b) a failing DETERMINISTIC section (5) still sets the floor; advisory 9 can't lift it
+    const deterministicLow = computeScorecardFloor([
+      { name: 'connectivity', score: 5 },
+      { name: 'headline', score: 9, advisory: true },
+    ])
+    out.push({
+      id: 'QL6.deterministic_below_8_still_gates',
+      description: 'B3: a failing deterministic section (5) still sets the floor (advisory 9 cannot lift it)',
+      passed: deterministicLow.floor === 5,
+      detail: deterministicLow.floor !== 5 ? `got floor ${deterministicLow.floor}` : undefined,
+    })
+    // c) a class with ONLY advisory sections falls back to all so the score is never blank
+    const onlyAdvisory = computeScorecardFloor([
+      { name: 'physics_fidelity', score: 6, advisory: true },
+      { name: 'brief_compliance', score: 7, advisory: true },
+    ])
+    out.push({
+      id: 'QL6.only_advisory_falls_back_to_all',
+      description: 'B3: a class with ONLY advisory sections falls back to all (floor 6, never blank)',
+      passed: onlyAdvisory.floor === 6,
+      detail: onlyAdvisory.floor !== 6 ? `got floor ${onlyAdvisory.floor}` : undefined,
+    })
+  }
 
   return out
 }
