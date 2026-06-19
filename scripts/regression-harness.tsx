@@ -47,7 +47,7 @@ import { computeNetInfeasibilityFlag } from './lib/brief-infeasibility-net'
 import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constraint-normaliser'
 import { massAggregator } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
-import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
 import { co2MineralisationEmitter } from './lib/orchestrator/emitters/co2-mineralisation'
@@ -2604,6 +2604,30 @@ function checkCo2FixInvariants(): Assertion[] {
       want('(q) isCoolingClass heat_pump_residential true', isCoolingClass('heat_pump_residential') === true)
       want('(q) isCoolingClass aquaculture_ras false', isCoolingClass('aquaculture_ras') === false)
       want('(q) isCoolingClass co2_mineralisation false', isCoolingClass('co2_mineralisation') === false)
+    }
+    // (t) INC-1 seawater-source carve-out: seawater as a SOURCE/process fluid is in-domain
+    //     for a seawater-using class (a sea-loch RAS draws seawater) → NOT flagged…
+    {
+      const r = computeToolArchetypeCoherence(mkState('aquaculture_ras', [
+        mkTool('process:pump-sizing', 'Seawater intake pumping ; seawater density 1025 kg/m3 make-up'),
+      ]))
+      want('(t) seawater-source marker not flagged on aquaculture_ras', r.findings.filter((f) => f.family === 'marine').length === 0)
+    }
+    // (t2) …but a submersible-HULL marker still flags on the same class (carve-out is
+    //      water-source only — a land RAS has no hull to collapse).
+    {
+      const r = computeToolArchetypeCoherence(mkState('aquaculture_ras', [
+        mkTool('pressure-vessel:design', 'External hydrostatic collapse ; hull buckling ; sacrificial anode mass'),
+      ]))
+      want('(t2) hull/anode marker still flags on aquaculture_ras', r.findings.filter((f) => f.family === 'marine').length > 0)
+    }
+    // (u) INC-1 drop-filter helper: a refrigeration tool leaks on RAS; a clean heating tool does not.
+    {
+      want('(u) isSeawaterSourceClass aquaculture_ras true', isSeawaterSourceClass('aquaculture_ras') === true)
+      want('(u) toolLeaksWrongDomain refrigeration on RAS true',
+        toolLeaksWrongDomain({ worked: [{ formula: '800 kW chiller capacity ; condenser duty ; cooling COP' }] }, 'aquaculture_ras') === true)
+      want('(u) toolLeaksWrongDomain clean heating tool on RAS false',
+        toolLeaksWrongDomain({ worked: [{ formula: 'make-up water heating duty ; fabric heat loss' }] }, 'aquaculture_ras') === false)
     }
 
     out.push(assertEq(

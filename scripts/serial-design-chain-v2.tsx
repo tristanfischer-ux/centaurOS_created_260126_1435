@@ -50,7 +50,7 @@ import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
-import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -7811,6 +7811,27 @@ async function main() {
         }
       } catch (e) {
         console.error(`[chain] tool-archetype stamp skipped (${(e as Error).message}); gate-34 uses class-token suppression`)
+      }
+      // INC-1 (universal): DROP a self-inapplicable + wrong-domain stand-in tool from the
+      // page BEFORE scoring/rendering. A tool that BOTH declares applicable_to_class===false
+      // AND trips a gate-34 domain marker wrong for this class is a leak (RAS grabbed
+      // refrigeration-cycle:cop — a COOLING tool emitting a nonsense COP 157 — for a HEATING
+      // heat-pump duty the contract already sizes). Domain-NEUTRAL applicable_to=false tools
+      // are KEPT (legit stand-ins for unseen archetypes); only the actively-wrong one is cut.
+      try {
+        const pcDrop = inferProductClass(taState)
+        const toolsForDrop = taState?.toolsUsedPage?.tools
+        if (Array.isArray(toolsForDrop) && toolsForDrop.length > 0) {
+          const kept = toolsForDrop.filter((t: any) => !(t?.applicable_to_class === false && toolLeaksWrongDomain(t, pcDrop)))
+          if (kept.length < toolsForDrop.length) {
+            const dropped = toolsForDrop.filter((t: any) => !kept.includes(t)).map((t: any) => String(t?.tool_id ?? '?'))
+            taState.toolsUsedPage.tools = kept   // persisted by the writeFileSync at the coherence step below
+            console.error(`[chain] tool-archetype: dropped ${toolsForDrop.length - kept.length} self-inapplicable wrong-domain tool(s): ${dropped.join(', ')}`)
+            logAction({ step: 'tool_archetype_drop_wrong_domain', ok: true, dropped })
+          }
+        }
+      } catch (e2) {
+        console.error(`[chain] tool-archetype drop-filter skipped (${(e2 as Error).message})`)
       }
       const ta = computeToolArchetypeCoherence(taState)
       taState.toolArchetypeCoherence = ta

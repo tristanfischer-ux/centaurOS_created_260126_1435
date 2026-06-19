@@ -265,6 +265,54 @@ export function isCoolingClass(productClass: string): boolean {
   return classMatchesTokens(productClass, COOLING_CLASS_TOKENS)
 }
 
+/** SEAWATER-SOURCE class tokens — classes that legitimately HANDLE seawater as a
+ *  process / source / make-up fluid (marine aquaculture / RAS, desalination, offshore
+ *  or coastal intake). For these, the WATER-SOURCE marine markers (seawater, seawater
+ *  density) are in-domain and suppressed — but the SUBMERSIBLE-HULL markers (hull,
+ *  external hydrostatic, cathodic, sacrificial anode, DNV-RP-B401, depth) still fire:
+ *  a land plant has no hull to collapse even when it pumps seawater. This is the
+ *  surgical fix for the sea-loch RAS false-positive (a marine fish farm draws seawater
+ *  but is not a submarine). PURE. */
+const SEAWATER_SOURCE_CLASS_TOKENS = [
+  'aquaculture', 'aquaculture_ras', 'ras', 'mariculture', 'fish_farm', 'fishfarm', 'hatchery',
+  'desalination', 'desal', 'seawater_ro', 'offshore', 'coastal', 'tidal',
+]
+
+/** Marine marker ids that describe seawater as a SOURCE / process fluid (legitimate
+ *  for a seawater-using class) — as opposed to submersible-hull physics. PURE. */
+const SEAWATER_SOURCE_MARKER_IDS = new Set<string>(['seawater', 'seawater density 1025'])
+
+/** Is this product class a SEAWATER-USING plant (seawater-source markers legitimate)? PURE. */
+export function isSeawaterSourceClass(productClass: string): boolean {
+  return classMatchesTokens(productClass, SEAWATER_SOURCE_CLASS_TOKENS)
+}
+
+/** Does ONE tools-used entry present a domain marker WRONG for this class? The per-tool
+ *  version of the worked-calc scan in computeToolArchetypeCoherence, honouring the same
+ *  suppression rules (marine on a submersible, hydroponic on a grower, refrigeration on
+ *  a cooling product, seawater-source on a seawater-using plant). The chain pairs this
+ *  with the tool's OWN applicable_to_class===false to DROP a self-inapplicable, actively-
+ *  wrong-domain stand-in from the page before scoring/rendering (e.g. RAS's leaked
+ *  refrigeration-cycle:cop). A domain-NEUTRAL tool (no marker) returns false and is kept,
+ *  so this never starves an unseen archetype of a legitimate stand-in. PURE. */
+export function toolLeaksWrongDomain(tool: any, productClass: string): boolean {
+  const marine = isMarineClass(productClass)
+  const hydroponic = isHydroponicClass(productClass)
+  const cooling = isCoolingClass(productClass)
+  const seawaterSource = isSeawaterSourceClass(productClass)
+  const worked: any[] = Array.isArray(tool?.worked) ? tool.worked : []
+  for (const w of worked) {
+    for (const hit of scanTextForMarkers(workedCalcText(w))) {
+      if (hit.family === 'marine' && marine) continue
+      if (hit.family === 'hydroponic' && hydroponic) continue
+      if (hit.family === 'refrigeration' && cooling) continue
+      if (hit.family === 'marine' && seawaterSource && SEAWATER_SOURCE_MARKER_IDS.has(hit.marker)) continue
+      return true
+    }
+  }
+  return false
+}
+
 // ---------------------------------------------------------------------------
 // Marker scanning over arbitrary text
 // ---------------------------------------------------------------------------
@@ -396,6 +444,7 @@ export function computeToolArchetypeCoherence(state: any): ToolArchetypeCoherenc
   const marine = isMarineClass(productClass)
   const hydroponic = isHydroponicClass(productClass)
   const cooling = isCoolingClass(productClass)
+  const seawaterSource = isSeawaterSourceClass(productClass)
   const base: ToolArchetypeCoherenceResult = {
     verdict: 'pass',
     product_class: productClass,
@@ -467,6 +516,10 @@ export function computeToolArchetypeCoherence(state: any): ToolArchetypeCoherenc
       const hits = scanTextForMarkers(text)
       for (const hit of hits) {
         if (!familyFires(hit.family, toolId)) continue
+        // seawater as a SOURCE/process fluid is legitimate for a seawater-using class
+        // (marine aquaculture/RAS, desalination, offshore) — only submersible-HULL
+        // markers remain wrong for a land plant.
+        if (hit.family === 'marine' && seawaterSource && SEAWATER_SOURCE_MARKER_IDS.has(hit.marker)) continue
         const dedupeKey = `tool::${toolId}::${hit.family}`
         if (seen.has(dedupeKey)) continue
         seen.add(dedupeKey)
@@ -494,6 +547,8 @@ export function computeToolArchetypeCoherence(state: any): ToolArchetypeCoherenc
     const hits = scanTextForMarkers(text)
     for (const hit of hits) {
       if (!familyFires(hit.family, provToolForStamp)) continue
+      // seawater-as-source is legitimate for a seawater-using class (see worked-calc loop).
+      if (hit.family === 'marine' && seawaterSource && SEAWATER_SOURCE_MARKER_IDS.has(hit.marker)) continue
       // attribute to the SOURCE tool when provenance names one, else the quantity key
       const provTool = String(value?.provenance?.tool_id ?? '').trim()
       const source = provTool || `contract:${key}`
@@ -519,6 +574,7 @@ export function computeToolArchetypeCoherence(state: any): ToolArchetypeCoherenc
     marine ? 'marine' : null,
     hydroponic ? 'hydroponic' : null,
     cooling ? 'refrigeration' : null,
+    seawaterSource ? 'seawater-source' : null,
   ].filter(Boolean)
   const verdict: ToolArchetypeVerdict = findings.length > 0 ? 'high' : 'pass'
   const message =
