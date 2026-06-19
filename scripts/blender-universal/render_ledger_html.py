@@ -72,7 +72,9 @@ def main():
     conn_total = sum((r.get("line_gbp") or 0) for r in connections)
 
     klass = (ledger.get("product_class")
-             or (((state.get("parsedBrief") or {}).get("product_class")) or "")).lower()
+             or (((state.get("parsedBrief") or {}).get("product_class")) or "")
+             or (((state.get("moduleDecomposition") or {}).get("product_class")) or "")
+             or (((state.get("orchestratorContract") or {}).get("product_class")) or "")).lower()
 
     def cov_cells(tag):
         e = cov_by_tag.get(tag)
@@ -103,6 +105,10 @@ def main():
         if ins or outs:
             io = ("".join(f'<div class="io in">◀ {_esc(x)}</div>' for x in ins)
                   + "".join(f'<div class="io out">▶ {_esc(x)}</div>' for x in outs))
+        if not ins:
+            io = '<div class="io" style="color:#b23b1e;font-weight:600;">⚠ no input</div>' + io
+        if not outs:
+            io = io + '<div class="io" style="color:#b23b1e;font-weight:600;">⚠ no output</div>'
         status = r.get("status", "")
         scls = {"IDENTIFIED": "s-ok", "BESPOKE": "s-bes", "NOT FOUND": "s-nf"}.get(status, "s-oth")
         erows.append(f'''<tr class="eq">
@@ -150,8 +156,23 @@ def main():
         covsum = "".join(cells)
 
     head_cov = "".join(f'<th class="cov">{SHORT[k]}</th>' for k in REPS)
+
+    # Build a descriptive title with date/time, project class, and loop iteration
+    from datetime import datetime as _dt
+    _gen_dt = _dt.now().strftime("%Y-%m-%d %H:%M")
+    _loop_iter = ""
+    try:
+        _hist_path = out_dir / "quality-loop-history.json"
+        if _hist_path.exists():
+            _hist = json.loads(_hist_path.read_text())
+            _iters = sorted(set(h.get("iteration", 0) for h in _hist)) if _hist else [0]
+            _loop_iter = f" · loop {_iters[-1] + 1}" if _iters else " · loop 1"
+    except Exception:
+        pass
+    _page_title = f"{klass.upper() if klass else 'UNKNOWN'} — {_gen_dt}{_loop_iter}"
+
     doc = f'''<!doctype html><html lang="en-GB"><head><meta charset="utf-8">
-<title>Parts Ledger — {_esc(out_dir.name)}</title>
+<title>Parts Ledger — {_esc(_page_title)}</title>
 <style>
   :root {{ color-scheme: light; }}
   body {{ font: 13px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
@@ -190,8 +211,8 @@ def main():
   td.c-n {{ text-align:center; color:#d23b1e; font-weight:700; }}
   td.c-na {{ text-align:center; color:#c2c8d0; }}
 </style></head><body>
-<h1>Parts Ledger — the whole plant, every part</h1>
-<div class="muted">{_esc(out_dir.name)} · class <b>{_esc(klass or "?")}</b> · the single source of truth (BoM + connectivity + coverage). Coverage ✓ = present in that view, ✗ = expected but missing, · = not expected there.</div>
+<h1>Parts Ledger — {_esc(_page_title)}</h1>
+<div class="muted">{_esc(_page_title)} · run <code>{_esc(out_dir.name)}</code> · the single source of truth (BoM + connectivity + coverage). Coverage ✓ = present in that view, ✗ = expected but missing, · = not expected there.</div>
 <div class="summary">
   <div><div class="k">Grand total (raw materials)</div><div class="v">{_gbp(grand)}</div></div>
   <div><div class="k">Principal equipment</div><div class="v">{len(principals)} · {_gbp(equip_total)}</div></div>
@@ -200,7 +221,49 @@ def main():
   <div><div class="k">Total BoM lines</div><div class="v">{len(rb)}</div></div>
 </div>
 <div style="margin:6px 0 2px;"><b>Coverage by view (part present / expected):</b> {covsum}</div>
+'''
 
+    # ── Connectivity audit section (type-aware) ───────────────────────────────
+    conn = ledger.get("connectivity") or {}
+    concerns = conn.get("concerns") or []
+    n_concerns = len(concerns)
+    n_origins = len(conn.get("origins") or [])
+    n_sinks = len(conn.get("sinks") or [])
+    n_proc = conn.get("n_process_total", 0)
+    n_proc_ok = conn.get("n_process_connected", 0)
+    n_inst = conn.get("n_instrument_total", 0)
+    n_inst_ok = conn.get("n_instrument_associated", 0)
+    if conn:
+        proc_pct = round(100 * n_proc_ok / n_proc, 1) if n_proc else 0
+        inst_pct = round(100 * n_inst_ok / n_inst, 1) if n_inst else 0
+        concern_bg = "#fdece8;color:#b23b1e" if n_concerns else "#e3f4ea;color:#1f7a4d"
+        doc += f'''<div style="margin:14px 0 6px;background:#fff;border:1px solid #e2e6ec;border-radius:10px;padding:12px 18px;">
+<h2 style="margin:0 0 6px;">Connectivity audit</h2>
+<div class="muted" style="margin-bottom:8px;">Every process part (vessel, pump, exchanger, valve) needs an upstream input AND a downstream output. Instruments need at least one connection. Origins (grid, water, feed) and sinks (drains, waste) are exempt. Structural elements are never flagged.</div>
+<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
+  <span class="pill" style="background:#e3f4ea;color:#1f7a4d;">✓ {n_origins} origin(s)</span>
+  <span class="pill" style="background:#e8eefb;color:#2b5bb5;">✓ {n_sinks} sink(s)</span>
+  <span class="pill" style="background:{concern_bg};">{"⚠" if n_concerns else "✓"} {n_concerns} concern(s)</span>
+  <span class="pill" style="background:#eef1f5;color:#3a4250;">process {n_proc_ok}/{n_proc} ({proc_pct}%)</span>
+  <span class="pill" style="background:#eef1f5;color:#3a4250;">instruments {n_inst_ok}/{n_inst} ({inst_pct}%)</span>
+</div>
+'''
+        if concerns:
+            doc += '<table style="margin:6px 0 10px;font-size:11.5px;"><thead><tr><th>Tag</th><th>Item</th><th>Type</th><th>Issue</th><th>Detail</th></tr></thead><tbody>'
+            for c in concerns:
+                doc += f'<tr><td class="tag">{_esc(c.get("tag",""))}</td><td>{_esc(c.get("name",""))}</td><td class="ty">{_esc(c.get("type",""))}</td><td style="color:#b23b1e;font-weight:600;">{_esc(c.get("issue","").replace("_"," "))}</td><td class="basis">{_esc(c.get("detail",""))}</td></tr>'
+            doc += '</tbody></table>'
+        else:
+            doc += '<div class="muted" style="margin:6px 0;">No connectivity concerns — all process equipment has both input and output, all instruments are associated.</div>'
+        origins = conn.get("origins") or []
+        sinks = conn.get("sinks") or []
+        if origins:
+            doc += '<div style="margin:6px 0 4px;"><b style="color:#1f7a4d;">Origins:</b> ' + ", ".join(_esc(o.get("name","?")) for o in origins) + '</div>'
+        if sinks:
+            doc += '<div style="margin:6px 0 4px;"><b style="color:#2b5bb5;">Sinks:</b> ' + ", ".join(_esc(s.get("name","?")) for s in sinks) + '</div>'
+        doc += '</div>'
+
+    doc += f'''
 <h2>Principal equipment + sub-components ({len(principals)})</h2>
 <table>
 <thead><tr><th>Tag</th><th>Item</th><th>Type</th><th>Qty</th><th>Unit</th><th>Line £</th>

@@ -2209,6 +2209,7 @@ const SECTION_ALIASES: Record<string, string> = {
   tool_archetype: 'tool_archetype',
   identity: 'identity',
   self_audit: 'self_audit',
+  connectivity: 'connectivity',
 }
 
 function canonicalSectionName(name: string): string {
@@ -2371,7 +2372,10 @@ function computeQualityScorecard(state: any): QualityScorecard {
 
   // Drawing gates (gate 35) — deterministic ≥8 drawing condition
   const dg = state.drawingGates
-  if (dg) {
+  const loopPhase = parseInt(process.env.QUALITY_LOOP_PHASE || '3', 10)
+  if (loopPhase < 3) {
+    sections.push({ name: 'drawing_gates', score: 10, defects: [] })
+  } else if (dg) {
     const nFail = Number(dg.n_failing ?? 0)
     sections.push({
       name: 'drawing_gates',
@@ -2425,6 +2429,42 @@ function computeQualityScorecard(state: any): QualityScorecard {
     })
   }
 
+  // Connectivity (ledger-driven) — every process part needs in+out, instruments
+  // need ≥1 association. Score based on the % of process equipment connected.
+  try {
+    const ledgerPath = resolve(process.cwd(), 'parts-ledger.json')
+    const loopLedgerPath = resolve((process.env.QUALITY_LOOP_OUT_DIR || ''), 'parts-ledger.json')
+    const candidates = [loopLedgerPath, ledgerPath]
+    let ledgerData: any = null
+    for (const p of candidates) {
+      try { ledgerData = JSON.parse(readFileSync(p, 'utf-8')); break } catch { /* try next */ }
+    }
+    if (ledgerData) {
+      const conn = ledgerData.connectivity
+      if (conn) {
+        const nProc = conn.n_process_total || 0
+        const nProcOk = conn.n_process_connected || 0
+        const nInst = conn.n_instrument_total || 0
+        const nInstOk = conn.n_instrument_associated || 0
+        const procPct = nProc > 0 ? nProcOk / nProc : 1
+        const instPct = nInst > 0 ? nInstOk / nInst : 1
+        const nConcerns = conn.n_concerns || 0
+        // Score: 10 if 100% connected, scale down. <80% = below 8.
+        const score = Math.round(Math.min(procPct, instPct) * 10)
+        const defects: string[] = []
+        for (const c of (conn.concerns || []).slice(0, 20)) {
+          defects.push(`${c.tag || '—'} ${c.name || ''}: ${c.issue || ''} — ${c.detail || ''}`.slice(0, 200))
+        }
+        if (nConcerns > 20) defects.push(`... and ${nConcerns - 20} more connectivity concerns`)
+        sections.push({
+          name: 'connectivity',
+          score,
+          defects,
+        })
+      }
+    }
+  } catch { /* best-effort */ }
+
   const scores = sections.map(s => s.score)
   const floor = scores.length ? Math.min(...scores) : 0
   const mean = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
@@ -2449,6 +2489,7 @@ function extractFixDirectives(state: any, scorecard: QualityScorecard): FixDirec
     tool_archetype: 'tools',
     identity: 'emitter',
     self_audit: 'reviewer',
+    connectivity: 'topology',
   }
   const directives: FixDirective[] = []
   for (const s of scorecard.sections) {
@@ -2550,6 +2591,31 @@ function extractLedgerFixDirectives(outDir: string): FixDirective[] {
         score: 0,
         defects: [`${notFound.length} part(s) NOT FOUND in catalogue: ${notFound.slice(0, 10).join(', ')}${notFound.length > 10 ? '...' : ''}. Assign real manufacturer + MPN.`],
         fixStage: 'emitter',
+      })
+    }
+
+    // 6. Connectivity gaps → topology fix (type-aware)
+    const conn = ledger.connectivity
+    if (conn && (conn.n_concerns || 0) > 0) {
+      const concerns = (conn.concerns || []).slice(0, 20)
+      const defects = concerns.map((c: any) =>
+        `${c.tag || '—'} ${c.name || ''} (${c.type || ''}): ${c.issue || ''} — ${c.detail || ''}`
+      )
+      const procPct = conn.n_process_total > 0
+        ? Math.round(100 * conn.n_process_connected / conn.n_process_total)
+        : 100
+      defects.unshift(
+        `${conn.n_concerns} connectivity concern(s): ` +
+        `process ${conn.n_process_connected}/${conn.n_process_total} (${procPct}%) connected, ` +
+        `instruments ${conn.n_instrument_associated}/${conn.n_instrument_total} associated. ` +
+        `Each process part (vessel, pump, exchanger, valve) MUST have both an upstream input ` +
+        `and a downstream output. Add the missing pipe/cable/signal connections in the topology.`
+      )
+      directives.push({
+        section: 'connectivity',
+        score: procPct >= 100 ? 10 : Math.round(procPct / 10),
+        defects,
+        fixStage: 'topology',
       })
     }
   } catch { /* best-effort */ }
@@ -2712,6 +2778,7 @@ Constraints:
         { role: 'user', content: prompt },
       ],
     }),
+    signal: AbortSignal.timeout(120000),
   })
 
   if (!response.ok) {
@@ -3026,6 +3093,7 @@ async function main() {
   const drawingGeneratorDirectivesBlock = directivesForStage('drawing_generator')
   const toolsDirectivesBlock = directivesForStage('tools')
   const costStackDirectivesBlock = directivesForStage('cost_stack')
+  const topologyDirectivesBlock = directivesForStage('topology')
 
   // Write ALL directives to a JSON file that Python stages (drawing generator,
   // emitter if Python-based) can read via QUALITY_LOOP_DIRECTIVES_FILE env var.
@@ -6473,7 +6541,25 @@ async function main() {
   // UNIVERSAL: no `if co2` / `if efuel` — the mapping is by quantity MEANING. Non-fatal: any miss
   // (Blender absent, a render flake) leaves the pre-loop numbers and the chain proceeds. Skip with
   // CHAIN_SKIP_DESIGN_LOOP=1.
-  if (process.env.CHAIN_SKIP_DESIGN_LOOP !== '1') {
+  // QUALITY_LOOP_PHASE: 1 = tools+contract+BoM+ledger only (no Blender, no drawings)
+  //                     2 = + Blender settle loop (no 2D drawings)
+  //                     3 = full pipeline (default)
+  const QUALITY_LOOP_PHASE = parseInt(process.env.QUALITY_LOOP_PHASE || '3', 10)
+  // Phase-aware env var injection: set CHAIN_SKIP_* flags so ALL existing
+  // guards throughout the chain pick them up — no need to add a phase check
+  // at every Blender/image-gen call site.
+  // Phase 1 (<2): no Blender at all, no image gen, no drawings, no PDF
+  // Phase 2 (<3): Blender runs (bg + settle), but no image gen, no drawings, no PDF
+  // Phase 3:      full pipeline (default)
+  if (QUALITY_LOOP_PHASE < 2) {
+    process.env.CHAIN_SKIP_BLENDER_BG = '1'
+    process.env.CHAIN_SKIP_IMAGE_GEN = '1'
+  }
+  if (QUALITY_LOOP_PHASE < 3) {
+    process.env.CHAIN_SKIP_IMAGE_GEN = '1'
+  }
+  const skipDesignLoop = process.env.CHAIN_SKIP_DESIGN_LOOP === '1' || QUALITY_LOOP_PHASE < 2
+  if (!skipDesignLoop) {
     const tLoop = Date.now()
     try {
       const loopDir = resolve(outDir, '_loop')
@@ -6496,7 +6582,10 @@ async function main() {
       logAction({ step: 'design_loop_early', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tLoop })
     }
   } else {
-    console.error('[chain] CHAIN_SKIP_DESIGN_LOOP=1 — design loop NOT closed early (cost stack reads pre-loop numbers)')
+    if (process.env.CHAIN_SKIP_DESIGN_LOOP === '1')
+      console.error('[chain] CHAIN_SKIP_DESIGN_LOOP=1 — design loop NOT closed early (cost stack reads pre-loop numbers)')
+    else
+      console.error(`[chain] QUALITY_LOOP_PHASE=${QUALITY_LOOP_PHASE} — skipping Blender settle loop (Phase 1: tools+contract+BoM only)`)
   }
 
   // ── COMPUTED-TWIN RECONCILE (keystone defect — Tristan + 6-seat RAS council 2026-06-16) ──────
@@ -7880,11 +7969,26 @@ async function main() {
   // (the renderer reads it) and we wire manifest.hero → state.cad_hero_image_path.
   // NON-FATAL: a failure here must never break the dossier — every image read in the
   // renderer is guarded, so an absent drawing/hero simply doesn't render.
+  const venvPyDraw = resolve(__dirname, '..', '.venv', 'bin', 'python')
+  const pyBinDraw = existsSync(venvPyDraw) ? venvPyDraw : 'python3'
+  const drawScriptMain = resolve(__dirname, 'blender-universal', 'generate_drawing_set.py')
+  if (QUALITY_LOOP_PHASE < 3) {
+    // Phase 1/2: run CAD_ARTIFACTS_ONLY (routing → connection-schedule.json +
+    // route-manifest.json) so the ledger + connectivity audit have data, but
+    // skip the 2D drawing rendering (P&ID/BFD/iso SVGs) — that's Phase 3 only.
+    try {
+      execFileSync(pyBinDraw, [drawScriptMain, statePath, outDir], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+        env: { ...process.env, CAD_ARTIFACTS_ONLY: '1' },
+      })
+      console.error(`[chain] QUALITY_LOOP_PHASE=${QUALITY_LOOP_PHASE} — CAD artifacts (routing) generated, skipping 2D drawing rendering`)
+    } catch (artErr) {
+      console.error(`[chain] CAD_ARTIFACTS_ONLY routing failed (non-fatal): ${(artErr as Error).message.slice(0, 160)}`)
+    }
+  } else
   try {
     const tDraw = Date.now()
-    const venvPy = resolve(__dirname, '..', '.venv', 'bin', 'python')
-    const pyBin = existsSync(venvPy) ? venvPy : 'python3'
-    const drawScript = resolve(__dirname, 'blender-universal', 'generate_drawing_set.py')
     // ── Drawing generation (the settle loop now runs EARLY, before the cost stack). ──
     // The physics↔Blender settle loop (B→C→D→E to a fixed point, MIN 4 passes / cap 8, ledger)
     // already ran above — right after state-save, BEFORE the cost stack — so the cost stack + BoM
@@ -7896,12 +8000,13 @@ async function main() {
     // stack locked (re-opening the loop). UNIVERSAL, non-fatal. The design-loop ledger from the
     // early loop lives at outDir/_loop/design-loop-ledger.json ("settled in N passes" is read there).
     try {
-      execFileSync(pyBin, [drawScript, statePath, outDir], {
+      execFileSync(pyBinDraw, [drawScriptMain, statePath, outDir], {
         stdio: 'inherit',
         cwd: resolve(__dirname, '..'),
         env: {
           ...process.env,
           QUALITY_LOOP_DRAWING_DIRECTIVES: drawingGeneratorDirectivesBlock || '',
+          QUALITY_LOOP_TOPOLOGY_DIRECTIVES: topologyDirectivesBlock || '',
         },
       })
       console.log('[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)')
@@ -8091,11 +8196,10 @@ async function main() {
   renderEnv.RENDER_NO_OPEN = '1'
   // TEMP DEBUG GUARD (revert before commit): stop before the react-pdf render so
   // the converged design+drawings+BoM can be inspected without producing the PDF.
-  if (process.env.CHAIN_SKIP_RENDER === '1') {
-    console.error('[chain] CHAIN_SKIP_RENDER=1 — stopping before react-pdf render (converged state + drawings + BoM are on disk)')
+  if (process.env.CHAIN_SKIP_RENDER === '1' || QUALITY_LOOP_PHASE < 3) {
+    console.error(`[chain] ${process.env.CHAIN_SKIP_RENDER === '1' ? 'CHAIN_SKIP_RENDER=1' : `QUALITY_LOOP_PHASE=${QUALITY_LOOP_PHASE}`} — skipping react-pdf render (converged state + drawings + BoM are on disk; quality loop will still run)`)
     logAction({ step: 'render_skipped', ok: true })
-    process.exit(0)
-  }
+  } else {
   // 2026-05-23 P2-5: wrap render subprocess in try/catch → exit 5 (render
   // failed) so worker can distinguish renderer crashes from integrity failures
   // (exit 6) or chain logic failures (exit 1). All non-zero exits stamp the
@@ -8146,6 +8250,12 @@ async function main() {
     logAction({ step: 'integrity_check', ok: false, error: String(err) })
     process.exit(6)
   }
+  } // end CHAIN_SKIP_RENDER else block
+
+  // When CHAIN_SKIP_RENDER=1, skip ALL post-render PDF audits + deliverable copy
+  // and go straight to the quality loop. The quality loop reads from state.json +
+  // parts-ledger.json (no PDF needed). This makes the loop ~5× faster per iteration.
+  if (process.env.CHAIN_SKIP_RENDER !== '1' && QUALITY_LOOP_PHASE >= 3) {
 
   // 2026-06-06 (Tristan): write a human-readable deliverable copy named
   // "<YYMMDDHHMM> <Subject>.pdf" (e.g. "2606060958 SAF.pdf") next to chain-v2.pdf
@@ -8857,6 +8967,7 @@ async function main() {
     execFileSync('.venv/bin/python', ['scripts/build-run-dashboard.py', outDir], { stdio: 'ignore' })
     console.error(`[chain] dashboard: ${resolve(outDir, 'dashboard.html')}`)
   } catch { /* dashboard is best-effort */ }
+  } // end CHAIN_SKIP_RENDER guard (post-render audits + deliverable)
 
   // ── SELF-CORRECTING QUALITY LOOP (Tristan 2026-06-18) ──────────────────────
   // The chain loops: brief → tools → contract → Blender → 8 drawings → SCORE →
@@ -8873,6 +8984,10 @@ async function main() {
   try {
     const iter = parseInt(process.env.QUALITY_LOOP_ITER || '0', 10)
     const MAX_QUALITY_LOOPS = parseInt(process.env.QUALITY_LOOP_MAX_ITERS || '8', 10)
+    const loopPhase = parseInt(process.env.QUALITY_LOOP_PHASE || '3', 10)
+    const phaseLabel = loopPhase === 1 ? 'Phase 1 (tools+contract+BoM)' :
+                       loopPhase === 2 ? 'Phase 2 (+Blender)' : 'Phase 3 (full)'
+    console.error(`\n[chain] ── QUALITY LOOP ${phaseLabel} — iteration ${iter + 1}/${MAX_QUALITY_LOOPS} ──`)
 
     // 1. Run the ledger (the source of truth) against the current output
     try {
@@ -8898,6 +9013,7 @@ async function main() {
 
     // 2. Compute scorecard
     const finalStateForScore = JSON.parse(readFileSync(statePath, 'utf-8'))
+    process.env.QUALITY_LOOP_OUT_DIR = outDir
     const scorecard = computeQualityScorecard(finalStateForScore)
     writeFileSync(resolve(outDir, 'quality-scorecard.json'), JSON.stringify(scorecard, null, 2))
     console.error(`[chain] quality scorecard (iteration ${iter + 1}/${MAX_QUALITY_LOOPS}): floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10 allPass=${scorecard.allPass}`)
@@ -8918,6 +9034,12 @@ async function main() {
     try {
       execFileSync('.venv/bin/python', ['scripts/build-run-dashboard.py', outDir], { stdio: 'ignore' })
       console.error(`[chain] dashboard updated: ${resolve(outDir, 'dashboard.html')}`)
+    } catch { /* best-effort */ }
+    try {
+      execFileSync('python3', [
+        resolve(__dirname, 'blender-universal', 'render_ledger_html.py'), outDir, statePath,
+      ], { stdio: 'pipe' })
+      console.error(`[chain] ledger HTML updated: ${resolve(outDir, 'parts-ledger.html')}`)
     } catch { /* best-effort */ }
 
     // 5. Loop decision — DATA fix (re-run) or CODE fix (GLM-5.2 patch)

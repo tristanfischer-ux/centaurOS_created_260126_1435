@@ -120,8 +120,10 @@ def pump_load_kw_from_fluid_spec(spec: dict, *, pump_eff: float = DEFAULT_PUMP_E
     # pump) is PROCESS demand, not a CAD-routing friction adder, so skip it here.
     _FLOW_UNITS = {"kg/s", "kgs", "kg s-1", "kg/h", "kgh", "l/s", "lps",
                    "l/min", "lpm", "l min-1", "l/h", "lph", "l hr-1", "l/hr",
-                   "m3/s", "m3s", "m^3/s", "m3/h", "m3h", "m^3/h"}
-    if (unit or "").strip().lower() not in _FLOW_UNITS:
+                   "m3/s", "m3s", "m^3/s", "m3/h", "m3h", "m^3/h",
+                   "m³/s", "m³/h", "l³/s", "l³/h"}
+    _u = (unit or "").strip().lower().replace("³", "3")
+    if _u not in _FLOW_UNITS and (unit or "").strip().lower() not in _FLOW_UNITS:
         return 0.0
     density = cs._f(spec.get("density_kg_m3"), cs.RHO_WATER) or cs.RHO_WATER
     q_m3s = cs.flow_to_m3s(rating, unit, density)

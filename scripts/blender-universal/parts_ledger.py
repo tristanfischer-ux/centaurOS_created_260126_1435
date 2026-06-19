@@ -405,8 +405,140 @@ def main() -> int:
                              pct=round(100 * pres / len(applic), 1) if applic else None)
     not_found = [e["tag"] for e in equipment if e["status"] == "NOT FOUND"]
     gapped = [e for e in equipment if e["gaps"]]
-    orphans = [e["tag"] for e in equipment if not e["inputs"] and not e["outputs"]
-               and e["type"] in ("vessel", "rotating", "exchanger", "separator")]
+
+    # ── connectivity audit (type-aware) ────────────────────────────────────────
+    # What "connected" means depends on the part TYPE:
+    #
+    # PROCESS EQUIPMENT (vessel, rotating, exchanger, separator, valve):
+    #   Must have ≥1 input AND ≥1 output — something flows in, something flows out.
+    #   Missing either = genuine topology gap.
+    #
+    # INSTRUMENTS (sensor, analyser, gauge):
+    #   Must have ≥1 connection (input OR output) — it's associated with what it
+    #   measures. Two connections is normal (sense + signal), one is minimum.
+    #   Zero connections = orphan sensor, not wired to anything.
+    #
+    # ELECTRICAL (breaker, busbar, contactor, transformer):
+    #   Must have ≥1 input AND ≥1 output — power flows through.
+    #   Missing = wiring gap.
+    #
+    # CONTROL (PLC, controller, HMI):
+    #   Must have ≥1 connection — at least a signal connection.
+    #
+    # STRUCTURAL/PASSIVE (frames, panels, doors, cladding, foundations):
+    #   No process connections expected. Never flagged.
+    #
+    # ORIGINS (grid, water supply, feed, fuel, air intake):
+    #   Legitimate start points — no input required, but SHOULD have output.
+    #
+    # SINKS (drains, effluent, waste, exhaust):
+    #   Legitimate end points — no output required, but SHOULD have input.
+
+    ORIGIN_KEYWORDS = {"grid", "mains", "water supply", "water intake", "make-up water",
+                       "feed", "food", "fuel", "air intake", "seawater", "freshwater",
+                       "oxygen supply", "chemical supply", "intake"}
+    SINK_KEYWORDS = {"drain", "effluent", "discharge", "waste", "sludge", "exhaust",
+                     "heat rejection", "mortality", "overflow", "reject"}
+
+    PROCESS_TYPES = {"vessel", "rotating", "exchanger", "separator", "valve"}
+    ELECTRICAL_TYPES = {"electrical"}
+    INSTRUMENT_TYPES = {"instrument"}
+    CONTROL_TYPES = {"control"}
+    PASSIVE_TYPES = {"structural", "other"}
+
+    connectivity_concerns = []
+    origin_parts = []
+    sink_parts = []
+    n_process_total = 0
+    n_process_connected = 0
+    n_instrument_total = 0
+    n_instrument_associated = 0
+    n_electrical_total = 0
+    n_electrical_connected = 0
+
+    for e in equipment:
+        has_in = bool(e["inputs"])
+        has_out = bool(e["outputs"])
+        has_any = has_in or has_out
+        name_l = (e["name"] or "").lower()
+        tag = e["tag"] or "—"
+        etype = e.get("type", "other")
+        is_origin = any(kw in name_l for kw in ORIGIN_KEYWORDS)
+        is_sink = any(kw in name_l for kw in SINK_KEYWORDS)
+
+        if is_origin and not has_in:
+            origin_parts.append({"tag": tag, "name": e["name"], "type": etype})
+        if is_sink and not has_out:
+            sink_parts.append({"tag": tag, "name": e["name"], "type": etype})
+
+        if etype in PASSIVE_TYPES:
+            continue  # structural elements — never a connectivity concern
+
+        if etype in PROCESS_TYPES:
+            n_process_total += 1
+            needs_in = not is_origin
+            needs_out = not is_sink
+            ok = True
+            if needs_in and not has_in:
+                connectivity_concerns.append({
+                    "tag": tag, "name": e["name"], "type": etype,
+                    "issue": "missing_input",
+                    "detail": f"Process equipment with no upstream connection — "
+                              f"nothing feeds into this {etype}. The topology is incomplete."})
+                ok = False
+            if needs_out and not has_out:
+                connectivity_concerns.append({
+                    "tag": tag, "name": e["name"], "type": etype,
+                    "issue": "missing_output",
+                    "detail": f"Process equipment with no downstream connection — "
+                              f"nothing leaves this {etype}. Where does the flow go?"})
+                ok = False
+            if ok:
+                n_process_connected += 1
+
+        elif etype in INSTRUMENT_TYPES:
+            n_instrument_total += 1
+            if not has_any:
+                connectivity_concerns.append({
+                    "tag": tag, "name": e["name"], "type": etype,
+                    "issue": "orphan_instrument",
+                    "detail": "Sensor/analyser with no connection — not wired to "
+                              "what it measures or to the control system."})
+            else:
+                n_instrument_associated += 1
+
+        elif etype in ELECTRICAL_TYPES:
+            n_electrical_total += 1
+            needs_in = not is_origin
+            needs_out = not is_sink
+            ok = True
+            if needs_in and not has_in:
+                connectivity_concerns.append({
+                    "tag": tag, "name": e["name"], "type": etype,
+                    "issue": "missing_input",
+                    "detail": f"Electrical component with no upstream power supply."})
+                ok = False
+            if needs_out and not has_out:
+                connectivity_concerns.append({
+                    "tag": tag, "name": e["name"], "type": etype,
+                    "issue": "missing_output",
+                    "detail": f"Electrical component with no downstream load."})
+                ok = False
+            if ok:
+                n_electrical_connected += 1
+
+        elif etype in CONTROL_TYPES:
+            if not has_any:
+                connectivity_concerns.append({
+                    "tag": tag, "name": e["name"], "type": etype,
+                    "issue": "orphan_controller",
+                    "detail": "Controller with no signal connections — not wired "
+                              "to anything it controls."})
+
+    orphans = [e["tag"] for e in equipment
+               if not e["inputs"] and not e["outputs"]
+               and e["type"] in PROCESS_TYPES]
+
     uncov_conn = [f"{c['from_part']}→{c['to_part']}" for c in connections
                   if "pipe" in c["kind"] and not c["coverage"]["pid"]]
 
@@ -448,7 +580,19 @@ def main() -> int:
                   n_parts_without_tools=len(parts_without_tools),
                   parts_without_tools=parts_without_tools[:30],
                   tool_summary=list(tool_summary.values()),
-                  equipment=equipment, connections=connections)
+                  equipment=equipment, connections=connections,
+                  connectivity=dict(
+                      n_concerns=len(connectivity_concerns),
+                      concerns=connectivity_concerns,
+                      n_origins=len(origin_parts), origins=origin_parts,
+                      n_sinks=len(sink_parts), sinks=sink_parts,
+                      n_process_total=n_process_total,
+                      n_process_connected=n_process_connected,
+                      n_instrument_total=n_instrument_total,
+                      n_instrument_associated=n_instrument_associated,
+                      n_electrical_total=n_electrical_total,
+                      n_electrical_connected=n_electrical_connected,
+                      n_orphans=len(orphans)))
     (out_dir / "parts-ledger.json").write_text(json.dumps(report, indent=1))
 
     # ── printed ledger + coverage ──
@@ -490,7 +634,13 @@ def main() -> int:
           f"{len(orphans)} orphan · {len(uncov_conn)} connections off the P&ID.  "
           f"{len(ambiguous_tags)} ambiguous tag(s) (name-corroborated).  "
           f"{len(parts_without_tools)}/{len(equipment)} parts have NO tool provenance.  "
-          f"wrote parts-ledger.json\n")
+          f"wrote parts-ledger.json")
+    proc_pct = round(100 * n_process_connected / n_process_total, 1) if n_process_total else 0
+    inst_pct = round(100 * n_instrument_associated / n_instrument_total, 1) if n_instrument_total else 0
+    print(f"  → CONNECTIVITY: {len(connectivity_concerns)} concern(s) — "
+          f"process {n_process_connected}/{n_process_total} connected ({proc_pct}%) · "
+          f"instruments {n_instrument_associated}/{n_instrument_total} associated ({inst_pct}%) · "
+          f"{len(origin_parts)} origin(s) · {len(sink_parts)} sink(s)\n")
     return 0
 
 

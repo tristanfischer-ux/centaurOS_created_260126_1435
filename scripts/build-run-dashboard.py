@@ -79,9 +79,24 @@ for _f in _ta_findings:
 run_name = os.path.basename(run)
 pclass = contract.get('product_class') or (state.get('parsedBrief') or {}).get('product_class') or parsed.get('product_class') or 'unknown'
 
+# Build a descriptive title with date/time, project class, and loop iteration
+from datetime import datetime
+_gen_dt = datetime.now().strftime('%Y-%m-%d %H:%M')
+_loop_iter = ''
+try:
+    _hist_path = os.path.join(run, 'quality-loop-history.json')
+    if os.path.exists(_hist_path):
+        import json as _json
+        _hist = _json.load(open(_hist_path))
+        _iters = sorted(set(h.get('iteration', 0) for h in _hist)) if _hist else [0]
+        _loop_iter = f' · loop {_iters[-1] + 1}' if _iters else ' · loop 1'
+except Exception:
+    pass
+_page_title = f'{pclass.upper()} — {_gen_dt}{_loop_iter}'
+
 S = []
 S.append(f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<title>{esc(run_name)} — engine run</title><style>
+<title>{esc(_page_title)} — engine dashboard</title><style>
 :root{{color-scheme:light}}
 body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0;padding:24px 34px 90px 34px;background:#f6f7f9;color:#1a1d22;line-height:1.5}}
 h1{{font-size:24px;font-weight:660;margin:0 0 2px}} .sub{{color:#5b6470;font-size:14px;margin:0 0 8px}}
@@ -115,8 +130,8 @@ details{{margin-top:6px}} summary{{cursor:pointer;font-size:12.5px;color:#48505a
 .drawing-block img{{width:100%;max-width:1100px;display:block;border:1px solid #d8dce2;border-radius:8px;background:#eceef1}}
 .drawing-block .cap{{font-size:12px;color:#7a828d;margin:5px 0 0}}
 </style></head><body>
-<h1>{esc(run_name)}</h1>
-<p class="sub">Class <b>{esc(pclass)}</b> &nbsp;·&nbsp; brief · tools + results · contract · Blender · 8 engineering documents · bill of materials</p>
+<h1>{esc(_page_title)}</h1>
+<p class="sub">Class <b>{esc(pclass)}</b> &nbsp;·&nbsp; run <code>{esc(run_name)}</code> &nbsp;·&nbsp; brief · tools + results · contract · Blender · 8 engineering documents · bill of materials</p>
 """)
 
 # ── TABLE OF CONTENTS (sticky) ───────────────────────────────────────────────

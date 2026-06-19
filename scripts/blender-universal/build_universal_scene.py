@@ -6326,6 +6326,10 @@ def _sized_dia_mm(nm, mech, waypoints, edge, carried_value=None, role=None):
     length_m = _polyline_len_m(waypoints)
     e = dict(edge) if isinstance(edge, dict) else {}
     e.setdefault("mechanism", mech)
+    
+    if waypoints and len(waypoints) >= 2:
+        e["static_head_m"] = max(0.0, (waypoints[-1][2] - waypoints[0][2]) / 1000.0)
+
     # The edge must carry a rating to be sized. If it has neither an explicit
     # required_value nor an override carried_value, fall back to a small default.
     has_rating = (carried_value is not None) or (e.get("required_value") is not None)
@@ -6335,7 +6339,8 @@ def _sized_dia_mm(nm, mech, waypoints, edge, carried_value=None, role=None):
     # rack taps hit the cache → the physics tool runs once, not once per rack.
     sig = (mech, e.get("constraint_kind"), e.get("required_value"),
            e.get("required_unit"), e.get("required_margin_factor"),
-           e.get("material_context"), carried_value, round(length_m * 2) / 2.0)
+           e.get("material_context"), carried_value, round(length_m * 2) / 2.0,
+           round(e.get("static_head_m", 0.0), 1))
     cached = _SIZING_CACHE.get(sig)
     if cached is not None:
         spec = copy.deepcopy(cached)

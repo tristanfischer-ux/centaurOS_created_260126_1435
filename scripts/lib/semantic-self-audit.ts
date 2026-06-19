@@ -84,7 +84,7 @@ const gbp = (v: number | null): string =>
 function coalescePrice(p: any): number | null {
   for (const k of ['distributor_price_gbp', 'cost_repair_corrected_price_gbp', 'price_estimate_gbp', 'list_price_gbp', 'unit_price_gbp']) {
     const v = num(p?.[k])
-    if (v != null) return v
+    if (v != null && v > 0) return v
   }
   return null
 }

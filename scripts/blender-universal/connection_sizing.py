@@ -793,9 +793,9 @@ def flow_to_m3s(value: float, unit: Optional[str], density_kg_m3: float) -> floa
         return value / 1000.0 / 60.0
     if u in ("l/h", "lph", "l hr-1", "l/hr"):
         return value / 1000.0 / 3600.0
-    if u in ("m3/s", "m3s", "m^3/s"):
+    if u in ("m3/s", "m3s", "m^3/s", "m³/s"):
         return value
-    if u in ("m3/h", "m3h", "m^3/h"):
+    if u in ("m3/h", "m3h", "m^3/h", "m³/h"):
         return value / 3600.0
     # Unknown unit: assume already m³/s (best-effort; flagged by caller's notes).
     return value
@@ -1223,7 +1223,7 @@ def size_fluid(edge: dict, length_m: float, flow_value: float,
         "flow_m3_h": q_m3s * 3600.0,
         "fluid_density_kg_m3": density,
         "fluid_viscosity_pa_s": 0.001 if density >= 500 else 1.5e-5,
-        "static_head_m": 0.0,
+        "static_head_m": edge.get("static_head_m", 0.0),
         "pipe_length_m": max(0.1, length_m),
         "pipe_diameter_mm": dn_bore_mm,
         "roughness_mm": 0.015,
@@ -1233,6 +1233,11 @@ def size_fluid(edge: dict, length_m: float, flow_value: float,
         f_darcy = _f(pump.get("darcy_friction_factor"))
         v_tool = _f(pump.get("pipe_velocity_m_s"), v_actual)
         # Darcy–Weisbach head -> pressure: dP = f (L/D) (ρ v²/2)
+        # dp_kpa is FRICTION ONLY — the marginal parasitic load of the routed
+        # run length. Static head is a process requirement (already in the base
+        # electrical demand via the contract's pump motor sizing), not a routing
+        # parasitic, so it is NOT included here. The convergence loop sums
+        # dp_kpa across lines to get the marginal friction cost.
         d_m = dn_bore_mm / 1000.0
         dp_pa = f_darcy * (max(0.1, length_m) / d_m) * (density * v_tool ** 2 / 2.0)
         dp_kpa = dp_pa / 1000.0
