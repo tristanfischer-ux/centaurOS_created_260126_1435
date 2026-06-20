@@ -1328,7 +1328,10 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
     first = r
     running_row: Optional[int] = None  # row holding the last LIVE running total
     for label, step_amt, anchor, note in steps:
-        ws.cell(r, 1, label).border = BORDER
+        # clean_cell defangs the leading "=" sentinel on the anchor rows ("= Factory
+        # COGS" etc.) so Excel doesn't read them as formulas (the #NAME? bug Tristan
+        # caught). The startswith() logic below still tests the raw Python `label`.
+        ws.cell(r, 1, clean_cell(label)).border = BORDER
         ws.cell(r, 1).font = FONT_SUB if label.startswith(("=", "Raw")) else Font()
         if step_amt is not None and not label.startswith("="):
             sc = ws.cell(r, 2, step_amt)
@@ -3196,14 +3199,11 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
                           os.path.join(run_dir, "blender-cover.png"))
     if hero:
         specs.append((hero, "Render — Hero",
-                      "Blender photoreal hero render of the plant."))
+                      "Blender 3D render of the plant (geometry + layout; indicative, not photoreal)."))
 
-    # 2. module renders (root-level, exclude -top-front)
-    for fn in sorted(os.listdir(run_dir)):
-        if fn.startswith("module-") and fn.endswith(".png") and "top-front" not in fn:
-            mod = fn[len("module-"):-len(".png")].replace("_", " ")
-            specs.append((os.path.join(run_dir, fn), f"Module — {mod}",
-                          f"Per-module render: {mod}."))
+    # 2. module renders — REMOVED (Tristan 2026-06-20): the per-module Blender
+    # highlight renders (module-*.png) read as poor quality and their provenance was
+    # unclear, so they no longer get their own tabs. Universal across all classes.
 
     # 3. the 8 engineering drawings (canonical names + aliases)
     eng = [
