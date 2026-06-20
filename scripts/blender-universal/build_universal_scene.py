@@ -378,7 +378,10 @@ MECH_COLOUR = {             # sRGB; make_mat handles linear conversion.
     # fluid = BLUE family, ELECTRICITY = RED, thermal/steam = ORANGE (moved off red so
     # red is unambiguously electrical), signal/data = green, control = yellow. Universal
     # — keyed on the routed edge's mechanism class, no per-archetype code.
-    "fluid_loop":    (0.10, 0.45, 0.90),   # BLUE — process water / fluid (generic line)
+    "fluid_loop":    (0.13, 0.40, 0.74),   # STEEL-BLUE — process water (muted off the electric
+                                            # 0.10/0.45/0.90 so the pipework reads as subordinate
+                                            # to the equipment in the value hierarchy (#147) while
+                                            # staying unambiguously the WATER service colour)
     # DIRECTIONAL fluid mechanisms (derived flows): a SUPPLY feed and its RETURN must
     # read as TWO visually distinct lines (Tristan 2026-06-11) — both stay in the BLUE
     # family (water) but at clearly different shades so direction reads.
@@ -3060,8 +3063,10 @@ def build_pipe_rack(bbox_mm, frame_top_mm, MAT, MO):
     (thin, light grey) so the equipment + pipes still dominate. Deterministic +
     universal — geometry only, derived from the plant bbox + rack elevation."""
     if "u_rack_steel" not in MAT:
-        MAT["u_rack_steel"] = fl.make_mat("m_u_rack_steel", (0.62, 0.64, 0.67),
-                                          metallic=0.55, roughness=0.50)
+        # matte (low metallic) so the thin rack members don't reflect-pop as bright
+        # sketch-lines — they recede as subordinate structure (see m_skid_steel note).
+        MAT["u_rack_steel"] = fl.make_mat("m_u_rack_steel", (0.60, 0.62, 0.65),
+                                          metallic=0.10, roughness=0.70)
     steel = MAT["u_rack_steel"]
     sid = STRUCTURE_MODULE_ID
     m = RACK_BEAM_MM
@@ -11004,7 +11009,13 @@ def build_skid_frame(bbox_mm, frame_height_mm, MAT, MO):
     cx = (x0 + x1) / 2
     cy = (y0 + y1) / 2
     H = max(SKID_FRAME_MIN_HEIGHT_MM, frame_height_mm)   # frame top height (mm)
-    steel = fl.make_mat("m_skid_steel", (0.40, 0.42, 0.46), metallic=0.85, roughness=0.42)
+    # MATTE light-grey, NOT polished steel: a metallic 0.85 frame made every thin beam
+    # catch the world + the area fills and POP as a bright sketch-line (the "weird lines"
+    # Tristan flagged), and a wireframe enclosure of bright reflective edges competed
+    # with the equipment. Low metallic + high roughness + a lighter near-world grey lets
+    # the structure READ as subordinate steelwork that recedes, so the tanks + pipes lead
+    # the value hierarchy (#147 frame subordination). (2026-06-20.)
+    steel = fl.make_mat("m_skid_steel", (0.47, 0.48, 0.51), metallic=0.08, roughness=0.78)
     deck = fl.make_mat("m_skid_deck", (0.22, 0.26, 0.32), metallic=0.55, roughness=0.40)
     # Thin posts/rails (SKID_POST_MM is sized for the dark-deck PDF where the frame
     # is solid steel; in the light INSPECT pass it is a faint subordinate outline,
