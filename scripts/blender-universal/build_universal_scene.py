@@ -285,8 +285,11 @@ BANK_LANE_PITCH_MM = 8000   # initial Y pitch between bank lanes (a generous fir
 # their MEASURED depth + this small gap, so there is no dead empty band between the
 # two lanes (the old fixed 8 m pitch left a deep empty middle/front bay — the frame
 # was far deeper than the equipment). A walkway-width gap keeps them readable.
-BANK_COMPACT_GAP_MM = 3600  # clear gap between adjacent compacted bank lanes — a REAL
-                            # pipe-rack maintenance AISLE (was 1.6 m, too tight for the
+BANK_COMPACT_GAP_MM = 2400  # clear gap between adjacent compacted bank lanes — a REAL
+                            # pipe-rack maintenance AISLE (2026-06-20: 3600→2400 to compact
+                            # the Y-spread — Tristan; 2.4 m is still a walkable aisle but
+                            # trims ~1.2 m per inter-bank gap, packing the plant toward its
+                            # building footprint. was 1.6 m, too tight for the
                             # overhead rack spine + lanes; 3.6 m gives the spine a
                             # genuine corridor so cross-laterals only span one bank)
 # FLOW-LAYOUT (2026-06-11): the process train stays a SINGLE left→right lane while
