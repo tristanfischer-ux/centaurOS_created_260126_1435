@@ -738,6 +738,36 @@ def _checks_connectivity(state: dict, run_dir: str) -> List[Check]:
                         f"sensors not tied to the process or the control system."),
             ))
 
+    # --- CONN0. STRICT LEDGER COMPLETENESS (Tristan 2026-06-20: "the ledger must have a
+    # deterministic check so every part shows an input AND output of all required
+    # connections — this should have flagged the issue"). Reads the ledger's own
+    # completeness audit (connection-ledger.json :: completeness.concerns), where a
+    # concern = a part missing a required fluid-input / fluid-output / power / signal
+    # connection. This is STRICT (any concern FAILS) — it replaces the old 80%-coverage
+    # check that absorbed real gaps (2 missing in 23 parts = 91% silently passed).
+    cledger = _load_json(os.path.join(run_dir, "connection-ledger.json"))
+    if isinstance(cledger, dict) and isinstance(cledger.get("completeness"), dict):
+        comp = cledger["completeness"]
+        concerns = comp.get("concerns") or []
+        n = int(comp.get("n_concerns") or len(concerns))
+        sample = "; ".join(
+            f"{c.get('part','?')} missing [{', '.join(c.get('missing', []))}]"
+            for c in concerns[:6])
+        out.append(Check(
+            name="Ledger completeness: every part shows its required input + output",
+            category="CONNECTIVITY", relation="le",
+            status=PASS if n == 0 else FAIL,
+            actual=float(n), expected=0.0, tol=0.0, unit="parts",
+            producer="conn:ledger_completeness",
+            detail=(f"{n} part(s) are missing a required connection in the authored "
+                    f"ledger — the design is not fully connected. Each process part must "
+                    f"show a fluid INPUT and OUTPUT (naming what it connects to/from); a "
+                    f"powered part a power feed; an instrument a signal tie. "
+                    + (f"e.g. {sample}." if sample else "All parts fully connected.")
+                    + " Fix at the ledger completion (close every part's missing "
+                      "direction), not by inventing a render pipe."),
+        ))
+
     cs = _load_json(os.path.join(run_dir, "connection-schedule.json"))
     if not cs:
         return out

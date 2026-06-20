@@ -136,6 +136,7 @@ fl.add_box = _add_box_fast
 # the orchestrator first-principles tools, so it runs fine under Blender's python.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import connection_sizing as cs
+import connection_ledger as cl   # the LEDGER authority — validates + owns the connection graph
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -4712,6 +4713,7 @@ def write_route_manifest(out_dir):
 
     rows = []
     seq = 200            # mirrors draw_pid's loop base (200 + i) for the line number.
+    _skipped_degenerate = 0
     for i, r in enumerate(_ROUTE_LOG, start=1):
         nm = r.get("name")
         wp = [[round(float(c), 1) for c in p] for p in r.get("waypoints", [])]
@@ -4719,6 +4721,14 @@ def write_route_manifest(out_dir):
         mech = r.get("mech") or spec.get("mechanism") or ""
         frm = spec.get("from_part")
         to = spec.get("to_part")
+        # LEDGER INTEGRITY (Tristan 2026-06-20): never emit a DEGENERATE route — one
+        # whose spec carries NO resolvable endpoints (the 'pipe from nothing to nothing'
+        # he flagged). The ledger authors only endpoint-valid connections; a route that
+        # reached here with both tags empty is a fan-out / fallback artefact, not a real
+        # connection, and must not pollute the manifest, the drawings, or the BoM.
+        if not frm and not to:
+            _skipped_degenerate += 1
+            continue
         size_label = spec.get("size_label")
         outer_dia = spec.get("outer_dia_mm")
         mc = spec.get("material_context") or ""
@@ -4768,8 +4778,9 @@ def write_route_manifest(out_dir):
     n_fit = sum(len(r["fittings"]) for r in rows)
     n_wp = sum(len(r["waypoints_mm"]) for r in rows)
     print(f"[route-manifest] wrote {len(rows)} routed lines "
-          f"({n_wp} waypoints, {n_fit} fittings) → "
-          f"{os.path.join(out_dir, 'route-manifest.json')}")
+          f"({n_wp} waypoints, {n_fit} fittings"
+          + (f"; {_skipped_degenerate} degenerate no-endpoint route(s) skipped" if _skipped_degenerate else "")
+          + f") → {os.path.join(out_dir, 'route-manifest.json')}")
     return manifest
 
 
@@ -11690,14 +11701,42 @@ def main():
 
     # 2. order regions in process flow
     contract = state.get("orchestratorContract", {}) or {}
-    topology = contract.get("topology", []) or []
+    base_topology = contract.get("topology", []) or []
     quantities = contract.get("quantities", {}) or {}
-    # AUGMENT: add the FLUID cross-module process lines the topology omits (the
-    # inter-module recirculation/service legs that live only in the module-grammar
-    # links). Universal + pair-deduped — a no-op on a plant whose topology already
-    # spans its modules. Appended so every extra edge routes via the same path.
-    topology = list(topology) + augment_topology_cross_module(state, topology, parts)
-    topology = topology + augment_topology_connect_orphans(state, topology, parts)
+    # ── LEDGER DRIVES THE CONNECTIONS (Tristan 2026-06-20) ───────────────────────────
+    # The contract authors the process topology; the universal completion closes the
+    # graph (the recirc loop's return leg, every part's required power/signal/service
+    # ties). Then connection_ledger.finalize_ledger is the AUTHORITY: it validates that
+    # EVERY edge resolves to a real placed part (no nothing-to-nothing pipes), drops
+    # spurious dry-ancillary water/thermal ties to a tank, and dedupes per (from,to,svc).
+    # Blender renders EXACTLY this authored list and measures its lengths — it never
+    # invents a connection the ledger did not author. The authoritative graph is written
+    # to connection-ledger.json (which part → what → with what); the BoM costs THAT.
+    _candidate = list(base_topology) + augment_topology_cross_module(state, base_topology, parts)
+    _candidate = _candidate + augment_topology_connect_orphans(state, _candidate, parts)
+    topology, _ledger_dropped = cl.finalize_ledger(_candidate, parts, resolve_endpoint,
+                                                   log=lambda m: print(m))
+    # STRICT completeness gate — every part must SHOW its required input + output (Tristan
+    # 2026-06-20). A concern = a part not fully connected; it is written to the ledger
+    # artifact so the deterministic suite can FAIL on it (no 80%-coverage absorption).
+    _ledger_concerns = cl.audit_completeness(parts, topology, _REQUIRED_SERVICES,
+                                             log=lambda m: print(m))
+    try:
+        _ledger_path = os.path.join(out_dir, "connection-ledger.json")
+        with open(_ledger_path, "w") as _lf:
+            json.dump({"schema": "connection-ledger/1", "count": len(topology),
+                       "note": "Ledger-authored connections (part→part→service). Blender "
+                               "measures the lengths; the BoM costs these.",
+                       "rows": cl.ledger_rows(topology),
+                       "dropped": [{"from": d[0], "to": d[1], "mechanism": d[2], "reason": d[3]}
+                                   for d in _ledger_dropped],
+                       "completeness": {"n_concerns": len(_ledger_concerns),
+                                        "concerns": _ledger_concerns}}, _lf, indent=1)
+        print(f"[ledger] wrote connection-ledger.json — {len(topology)} authored "
+              f"connection(s), {len(_ledger_dropped)} dropped, "
+              f"{len(_ledger_concerns)} completeness concern(s) → {_ledger_path}")
+    except Exception as _le:
+        print(f"[ledger] WARN could not write connection-ledger.json: {_le}")
     regions, region_edges = order_regions(parts, topology)
     print(f"[univ] region order (L->R): {regions}")
 

@@ -90,3 +90,13 @@
 
 ## Status log
 - 2026-06-19 created (captures the full recent discussion). A1/A2 DONE+pushed; A3 in-progress (sub-agent).
+
+## G · LEDGER-DRIVES-CONNECTIONS RE-ARCHITECTURE (Tristan 2026-06-20, "this is a big issue") ⭐🔴
+> Tristan: "the ledger should be driving ALL connections — which part connects to what with what. Blender should ONLY do the distance calc from where parts sit. Random pipes nothing→nothing + parts not connecting means the ledger is wrong." CHOSE "Full re-architecture now" (over staged/defer).
+> ROOT (proven on out/ras-5m): contract.topology authors **7 edges** (open loop — no recirc pump, UV→nothing); Blender INVENTS the other **99** via augment_topology_connect_orphans + augment_topology_cross_module → the None→None dangling route + dry-ancillary→tank ties. Cost reads Blender's invented schedule. parts-ledger.json already flags n_concerns=2 (UV missing_output, solenoid missing_input) — the ledger KNOWS it's incomplete but Blender papers over it.
+- G1 🔨 Build `connection_ledger.py` (shared, position-free) — authors the COMPLETE, endpoint-valid, SIZED graph (every part→what→with-what). Moves augment_* logic out of build_universal_scene. Fix bugs: never emit unresolved-endpoint edge (kill dangling); connect each part to the RIGHT thing (dry feed/mortality/biosecurity ancillaries NOT water-tied to the tank); close the process loop (UV→pump→tanks, incl. recirc pump).
+- G2 🔨 Blender consumes the ledger READ-ONLY — remove the 2 augment calls (build_universal_scene 11699-11700), read ledger, resolve endpoints → FAIL-LOUD if unresolved, measure routed length, render. Write authoritative connection-ledger.json.
+- G3 🔨 BoM reads the ledger directly — requirements_bom._connection_rows reads connection-ledger.json (+ measured lengths), not Blender's connection-schedule.json.
+- G4 🔨 Extend class-connections.ts required-connection registry where the universal completion is too thin.
+- G5 🔨 VERIFY no-regression on CO2/SAF/BESS (+ RAS): connectivity n_concerns→0, 0 dangling routes, every part connected, cost sane.
+> Builds on G-pre: A/B/C connection SIZING fixes already landed (fb34031e9, e3c6b24d0): branch ties sized to own duty, render ties thinned, CONN3 length-plausibility gate. Those stay (the ledger will author the right sizes; CONN3 still guards geometry).
