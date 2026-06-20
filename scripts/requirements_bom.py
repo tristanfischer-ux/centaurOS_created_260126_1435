@@ -504,6 +504,60 @@ def _price_floor_for(name: str, md=None):
     return None
 
 
+# ── CORPUS-MEDIAN LIFT (RAS £5M audit 2026-06-20) ──
+# A principal that has NO rating/take-off basis (so neither _reconcile_rated_price
+# nor the take-off path corrected it) keeps the engine's flat parametric estimate —
+# which can sit FAR below the price the engine ITSELF computed from its forge-truth
+# corpus (Engine C): a Degasser at £4,946 vs a £65k corpus median (n=5); a Drum
+# Filter at £6,851 vs £28k. The corpus verdict was recorded (engine_c_flag='under',
+# engine_c_ref_median_gbp, engine_c_ref_count) but never APPLIED to the price. This
+# lifts such a line to the corpus's CONSERVATIVE lower edge (p25, falling back to a
+# damped fraction of the median) — never to the median itself, so a noisy corpus
+# can't over-bill. Universal: keyed off the engine's own recorded corpus verdict, no
+# per-class table, no noun list. LIFT-ONLY (never lowers a price); fires ONLY when the
+# corpus is TRUSTED (≥ MIN hits) and the line is MATERIALLY under it.
+_CORPUS_MIN_HITS = 3          # ignore a thin corpus (< this many priced reference hits)
+_CORPUS_UNDER_FRAC = 0.5      # only lift a line priced below this × the median
+_CORPUS_MEDIAN_DAMP = 0.6     # p25 fallback = this × median (a conservative lower edge)
+
+
+def _corpus_median_lift(unit_gbp: float, pv: dict):
+    """Conservative corpus-median lift for ONE principal line. Returns (new_unit_gbp,
+    basis_suffix) when the engine's own forge-truth corpus says this line is materially
+    under-priced and the corpus is trusted, else None. Lift target = p25 (the corpus
+    lower quartile) if present, else _CORPUS_MEDIAN_DAMP × median — a LOWER edge, never
+    the median, so a noisy corpus cannot over-bill. Deterministic, class-agnostic."""
+    if not isinstance(pv, dict):
+        return None
+    flag = str(pv.get("engine_c_flag") or "").lower()
+    if flag != "under":
+        return None
+    try:
+        median = float(pv.get("engine_c_ref_median_gbp") or 0)
+        count = int(pv.get("engine_c_ref_count") or 0)
+    except (TypeError, ValueError):
+        return None
+    if median <= 0 or count < _CORPUS_MIN_HITS:
+        return None
+    if not (unit_gbp < _CORPUS_UNDER_FRAC * median):
+        return None
+    p25 = pv.get("engine_c_ref_p25_gbp")
+    try:
+        target = float(p25) if p25 not in (None, "") and float(p25) > 0 else _CORPUS_MEDIAN_DAMP * median
+    except (TypeError, ValueError):
+        target = _CORPUS_MEDIAN_DAMP * median
+    # never LOWER a price, and never lift ABOVE the median (the conservative ceiling)
+    target = min(max(target, unit_gbp), median)
+    if target <= unit_gbp * 1.0001:
+        return None
+    edge = "p25" if (p25 not in (None, "") and target < median) else "0.6×median"
+    basis = (f" · lifted £{round(unit_gbp):,}→£{round(target):,} to the engine corpus "
+             f"{edge} (median £{round(median):,}, n={count}; line was "
+             f"{unit_gbp/median:.0%} of median — under-priced vs the engine's own "
+             f"forge-truth reference)")
+    return round(target), basis
+
+
 # ── CONTROL-ELEMENT CLASS BUDGETS (council 2026-06-19, the RAS £0 DN400 valve) ──
 # A FINAL CONTROL ELEMENT (a modulating / on-off process valve or actuator) must
 # NEVER render at £0. The live RAS run shipped a DN400 modulating control valve at
@@ -1204,6 +1258,37 @@ def _selftest() -> int:
             print(f"  FAIL open-tank cost £{oc:.0f} vs closed £{cc:.0f} (want open < 0.75×closed, £20–150k)"); bad += 1
     else:
         print("  FAIL open-tank cost — no geometry parsed"); bad += 1
+
+    # ── CORPUS-MEDIAN LIFT (#172, 2026-06-20): a principal the engine's own forge-truth
+    # corpus flagged 'under' (price ≪ a TRUSTED median) is lifted to the conservative
+    # lower edge (p25 / 0.6×median, never the median); a thin / no_reference / in_range
+    # corpus, or an already-in-band price, is left untouched (false-positive discipline).
+    _lift_cases = [
+        # (unit_gbp, pv, expect_lift_to_or_None)
+        (4946, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 65000,
+                "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 65000}, 65000),   # Degasser → p25
+        (54, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 540,
+              "engine_c_ref_count": 5}, 324),                                       # no p25 → 0.6×median (£324), the conservative damp
+        (40, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 218,
+              "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 110}, 110),          # junction box → p25 (NOT the median)
+        (2000, {"engine_c_flag": "no_reference", "engine_c_ref_median_gbp": 0,
+                "engine_c_ref_count": 0}, None),                                    # no corpus → untouched
+        (2000, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 9000,
+                "engine_c_ref_count": 2}, None),                                    # thin corpus (<3) → untouched
+        (8000, {"engine_c_flag": "in_range", "engine_c_ref_median_gbp": 9000,
+                "engine_c_ref_count": 5}, None),                                    # already in range → untouched
+        (8000, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 9000,
+                "engine_c_ref_count": 5}, None),                                    # 89% of median (≥0.5×) → not materially under
+    ]
+    for u, pv, want in _lift_cases:
+        res = _corpus_median_lift(float(u), pv)
+        got = res[0] if res else None
+        if want is None and got is not None:
+            print(f"  FAIL corpus-lift fired on £{u} {pv.get('engine_c_flag')} → £{got} (want untouched)"); bad += 1
+        elif want is not None and got != want:
+            print(f"  FAIL corpus-lift £{u} → {got} (want £{want})"); bad += 1
+        elif res and got is not None and got < u:
+            print(f"  FAIL corpus-lift LOWERED £{u} → £{got}"); bad += 1
 
     # ── PHANTOM-PIPEWORK GUARD (council 2026-06-16) — a make-up / bleed / chemical-
     # dosing branch and an instrument-SIGNAL tie must NOT be priced at the whole-plant
@@ -2132,6 +2217,9 @@ def _normalise_partverification_prices(state: dict) -> list:
 
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
+    _pv_state = st          # stable handle to the STATE dict — the loop below rebinds
+                            # local `st` to a take-off tuple (~line 2449); the corpus-
+                            # median-lift post-pass reads partVerifications from here.
     # Cap mis-PINNED bare-commodity partVerification prices (PN-over-description)
     # BEFORE building rows, so the IDENTIFIED-row price this function reads from the
     # partVerifications `price` map is already the capped value — the SAME field
@@ -2648,6 +2736,57 @@ def assemble(out_dir: str):
                     for kr in kid_rows:
                         kr.pop("_capped", None)
                         rows.append(kr)
+    # ── CORPUS-MEDIAN LIFT post-pass (RAS £5M audit 2026-06-20). A principal that no
+    # rating/take-off path corrected keeps a flat parametric estimate that can sit far
+    # below the engine's OWN forge-truth corpus median (Degasser £4,946 vs £65k median;
+    # Drum Filter £6,851 vs £28k). The corpus verdict was recorded per partVerification
+    # but never applied. Lift each such line to the corpus's CONSERVATIVE lower edge
+    # (p25 / 0.6×median, never the median) — universal, lift-only, keyed off the engine's
+    # own recorded verdict. Matches a row to its pv by word_id (sub-of rows excluded:
+    # line_gbp 0) then by normalised leading name. Re-derives line_gbp = unit × qty. ──
+    # NB: read partVerifications from the ORIGINAL state dict — the loop above rebinds
+    # the local `st` to a structural-takeoff tuple (line ~2449), so `st` is no longer
+    # the state here. `_pv_state` is the untouched state dict captured at load time.
+    pv_by_name = {}
+    for v in (_pv_state.get("partVerifications") or []):
+        nmk = re.sub(r"\s+\d+$", "", str(v.get("word_name") or "")).strip().lower()
+        if nmk:
+            pv_by_name.setdefault(nmk, v)
+    # A LENGTH-priced run (pipework / piping / cabling / ducting) is owned by the
+    # _connection_rows mechanism (£/m × route-manifest length) — a per-UNIT corpus
+    # median is meaningless for it, and a generic "Pipework Run" placeholder lifted to
+    # a £20k median would DOUBLE-COUNT the itemised ROUTED pipe lines. Exclude those
+    # nouns from the corpus-median lift. (False-positive guard, Tristan 2026-06-20.)
+    _CORPUS_LIFT_SKIP_RE = re.compile(
+        r"pipework|piping|\bpipe[_ -]?run|cable[_ -]?run|cabling|duct(?:ing|[_ -]?run)|"
+        r"\bwiring\b|trunking|conduit", re.I)
+    _lift_n, _lift_gbp = 0, 0.0
+    for row in rows:
+        if row.get("line_gbp", 0) <= 0 or row.get("status") == "SUB-COMPONENT":
+            continue          # sub-components ride in breakdown_gbp; never lift those
+        if str(row.get("status")) == "ROUTED":
+            continue          # routed connections are length-priced, not unit-priced
+        u = float(row.get("unit_gbp") or 0)
+        if u <= 0:
+            continue
+        req_lead = str(row.get("requirement", "")).split("·")[0]
+        if _CORPUS_LIFT_SKIP_RE.search(req_lead):
+            continue          # length-priced run — owned by _connection_rows, never lift
+        nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
+        pv = pv_by_name.get(nmk)
+        res = _corpus_median_lift(u, pv) if pv else None
+        if res:
+            new_u, suffix = res
+            qy = row.get("qty") or 1
+            _lift_n += 1
+            _lift_gbp += (new_u - u) * qy
+            row["unit_gbp"] = new_u
+            row["line_gbp"] = round(new_u * qy)
+            row["basis"] = str(row.get("basis", "")) + suffix
+    if _lift_n:
+        print(f"  [corpus-median-lift] raised {_lift_n} under-priced principal line(s) "
+              f"to their engine corpus lower edge (+£{_lift_gbp:,.0f})")
+
     rows += _connection_rows(out_dir, qcontract)   # pipe/cable/duct runs as their own service-classified BoM lines (re-priced from contract duties)
     return rows
 
