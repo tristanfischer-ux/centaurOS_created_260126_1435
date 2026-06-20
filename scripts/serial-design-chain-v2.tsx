@@ -8229,6 +8229,35 @@ async function main() {
     logAction({ step: 'requirements_bom', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // ── EXCEL DELIVERABLE (Tristan standing constraint: "the Excel dossier.xlsx is the
+  //    review surface; NO PDFs; open the new Excel"). Build dossier.xlsx from the settled
+  //    state (BoM reconciled above), copy a timestamped snapshot to ~/Downloads, and OPEN
+  //    it. Runs on EVERY chain (the Excel is the deliverable regardless of render mode).
+  //    build-excel-export exits non-zero when the ⚠Checks tab carries a FAIL — that is the
+  //    honest gate signal, NOT a build failure (the .xlsx is written first), so a throw is
+  //    caught and the file still opened. Open is best-effort + worker/RENDER_NO_OPEN-guarded.
+  try {
+    const xlsxPath = resolve(outDir, 'dossier.xlsx')
+    try {
+      execFileSync('python3', [resolve(__dirname, 'build-excel-export.py'), outDir, xlsxPath],
+        { stdio: 'inherit', timeout: 300_000 })
+    } catch { /* non-zero exit = ⚠Checks FAIL surfaced; the .xlsx is still written */ }
+    const xlsxBytes = readFileSync(xlsxPath)   // throws if the build genuinely produced nothing
+    const home = process.env.HOME || ''
+    const dt = new Date()
+    const ts = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}_${String(dt.getHours()).padStart(2, '0')}${String(dt.getMinutes()).padStart(2, '0')}`
+    const runName = outDir.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'run'
+    const dlPath = home ? resolve(home, 'Downloads', `${runName}_dossier_${ts}.xlsx`) : ''
+    if (dlPath) { try { writeFileSync(dlPath, xlsxBytes); console.error(`[chain] Excel deliverable → ${dlPath}`) } catch { /* Downloads copy best-effort */ } }
+    logAction({ step: 'excel_deliverable', ok: true, name: dlPath || xlsxPath })
+    if (!process.env.PDF_ENGINE_WORKER && !process.env.RENDER_NO_OPEN) {
+      try { execFileSync('open', [dlPath || xlsxPath]) } catch { /* open is best-effort */ }
+    }
+  } catch (xerr) {
+    console.error(`[chain] Excel deliverable step failed (non-fatal): ${(xerr as Error).message.slice(0, 120)}`)
+    logAction({ step: 'excel_deliverable', ok: false, error: String(xerr).slice(0, 160) })
+  }
+
   const pdfPath = resolve(outDir, 'chain-v2.pdf')
   // 2026-05-19 fix C2: pass RENDER_NO_OPEN=1 to renderer in worker context so
   // the renderer doesn't try to open Preview (LaunchAgent has no GUI session).
