@@ -294,6 +294,10 @@ BANK_COMPACT_GAP_MM = 3600  # clear gap between adjacent compacted bank lanes �
 # folds along the flow into ≤ N_BANKS lanes. Generous (~52 m) so the typical 5-6
 # region plant reads as one clean process row; folding only kicks in for a genuinely
 # long train (8+ wide regions) where one row would be an unreadable ribbon.
+# NB (2026-06-20): this governs the X flow-DIRECTION width, NOT the Y bank-depth. The
+# RAS 53.9 m spread is Y bank-stacking (region rows + the tank mega-array), not the
+# flow train — lowering this to 34 m had no effect (RAS flow-X is only 26.8 m). The
+# Y-compaction is the placement-polish job (task #147).
 FLOW_TRAIN_SINGLE_LANE_MAX_MM = 52000
 # Within a region bay, the three sub-blocks are offset in Y from the bay base.
 # Fix 2 DENSITY (Tristan 2026-06-10): offsets pulled in so big/medium/small NEST
@@ -6172,7 +6176,7 @@ def augment_topology_connect_orphans(state, topology, parts):
                 'material_context': 'process-water service tie-in (make-up / fill / drain)',
                 '_augmented': True, '_service_tie': True}
         if loop_flow > 0:
-            edge['required_value'] = loop_flow * 0.05   # service branch, NOT the main loop
+            edge['required_value'] = loop_flow * 0.015  # service branch (~DN65-80), NOT the main loop
             edge['required_unit'] = 'm³/s'
         extra.append(edge)
         return 1
