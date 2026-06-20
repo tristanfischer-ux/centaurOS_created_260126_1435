@@ -2760,6 +2760,12 @@ def assemble(out_dir: str):
     _CORPUS_LIFT_SKIP_RE = re.compile(
         r"pipework|piping|\bpipe[_ -]?run|cable[_ -]?run|cabling|duct(?:ing|[_ -]?run)|"
         r"\bwiring\b|trunking|conduit", re.I)
+    # Index the sub-component children by their parent tag so a lift can RE-SCALE the
+    # breakdown to keep Σ(children) == parent line (the ⚠ Checks parent↔children invariant).
+    kids_by_tag = {}
+    for kr in rows:
+        if kr.get("status") == "SUB-COMPONENT" and kr.get("sub_of"):
+            kids_by_tag.setdefault(kr["sub_of"], []).append(kr)
     _lift_n, _lift_gbp = 0, 0.0
     for row in rows:
         if row.get("line_gbp", 0) <= 0 or row.get("status") == "SUB-COMPONENT":
@@ -2780,6 +2786,26 @@ def assemble(out_dir: str):
             qy = row.get("qty") or 1
             _lift_n += 1
             _lift_gbp += (new_u - u) * qy
+            # RE-SCALE the assembly breakdown so the children still SUM to the lifted
+            # parent line (else the ⚠ Checks parent-vs-sub-component invariant FAILs — the
+            # swarm-caught Degasser £115k parent / £9,693 children mismatch, 2026-06-20).
+            # The children are an apportionment of the parent, not independent prices, so a
+            # proportional scale by the SAME factor the parent moved keeps the split honest.
+            kids = kids_by_tag.get(row.get("tag"))
+            if kids and u > 0:
+                k_factor = new_u / u
+                for kr in kids:
+                    kr["breakdown_gbp"] = round(float(kr.get("breakdown_gbp") or 0) * k_factor)
+                    kr["unit_gbp"] = kr["breakdown_gbp"]
+                # drop the rounding residual on the largest child so Σ(children) == the
+                # new parent line EXACTLY (robust to any tolerance the checks tab uses).
+                new_line = round(new_u * (row.get("qty") or 1))
+                ksum = sum(kr["breakdown_gbp"] for kr in kids)
+                resid = new_line - ksum
+                if resid:
+                    big = max(kids, key=lambda kr: kr["breakdown_gbp"])
+                    big["breakdown_gbp"] = max(0, big["breakdown_gbp"] + resid)
+                    big["unit_gbp"] = big["breakdown_gbp"]
             row["unit_gbp"] = new_u
             row["line_gbp"] = round(new_u * qy)
             row["basis"] = str(row.get("basis", "")) + suffix
