@@ -11726,6 +11726,9 @@ def main():
     # to the tank; sub-components (screen/backwash/media) tie to their PARENT, not the tank.
     _candidate = _candidate + cl.close_air_directions(parts, _candidate, log=lambda m: print(m))
     _candidate = _candidate + cl.close_subcomponents(parts, _candidate, log=lambda m: print(m))
+    # final boundary connector: sinks fed from their producer + discharged to disposal;
+    # feed-stage/product units with no in-plant neighbour tied to the battery limit.
+    _candidate = _candidate + cl.close_boundaries(parts, _candidate, log=lambda m: print(m))
     topology, _ledger_dropped = cl.finalize_ledger(_candidate, parts, resolve_endpoint,
                                                    log=lambda m: print(m))
     # STRICT completeness gate — every part must SHOW its required input + output (Tristan

@@ -119,6 +119,13 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print):
             if (_SUBCOMPONENT_RE.search(a_name) or _SUBCOMPONENT_RE.search(b_name)) and _TANK_RE.search(both):
                 dropped.append((a_name, b_name, mech, "sub-component water tie to tank (belongs to its parent)"))
                 continue
+            # a SINK (drain / sludge / effluent / waste) DISCHARGES to disposal — it does NOT
+            # feed the tank. An orphan→tank OUTPUT from a sink is spurious (its input comes
+            # from the process, its output goes to the battery-limit disposal via the
+            # boundary closer). Only the FROM-sink→TO-tank direction is dropped.
+            if _FLUID_SINK_RE.search(a_name) and _TANK_RE.search(b_name):
+                dropped.append((a_name, b_name, mech, "sink output to tank (a sink discharges to disposal)"))
+                continue
 
         # 3) DEDUPE per directed pair + service.
         key = (a_name, b_name, svc)
@@ -467,6 +474,86 @@ def close_subcomponents(parts, topology, log=print):
                       "_augmented": True, "_assembly_closed": True})
     if extra:
         log(f"[ledger] sub-component closer: +{len(extra)} assembly edge(s) — sub-parts tied to their parent")
+    return extra
+
+
+_BL_FEED = "Plant feed — battery limit"
+_BL_DISPOSAL = "Effluent / disposal — battery limit"
+_BL_EXPORT = "Product export — battery limit"
+
+
+def close_boundaries(parts, topology, log=print):
+    """Final boundary connector — make EVERY real part fully connected after the in-plant
+    closers. A SINK still missing an input is fed from its nearest in-plant PRODUCER (any
+    rank) and discharges to the battery-limit DISPOSAL; a FEED-stage unit with no in-plant
+    upstream is fed from the battery-limit PLANT FEED; a product / storage unit with no
+    downstream discharges to the battery-limit EXPORT. The battery-limit nodes are abstract
+    system boundaries (the referential-integrity check exempts them, via 'battery limit').
+    A sink's spurious output-to-tank is NOT counted as a real output here (finalize drops
+    it), so the sink correctly gets a disposal output. Pure + position-free."""
+    by_name = {getattr(p, "name", None): p for p in parts if getattr(p, "name", None)}
+
+    def _rank(nm):
+        p = by_name.get(nm)
+        v = getattr(p, "region_rank", None) if p is not None else None
+        return v if isinstance(v, (int, float)) else 999
+
+    def _mod(nm):
+        p = by_name.get(nm)
+        return (getattr(p, "module_id", "") if p is not None else "") or ""
+
+    has_in, has_out, sources, fwd = set(), set(), set(), set()
+    for e in topology:
+        if _service_of(e.get("mechanism")) not in ("water", "thermal"):
+            continue
+        f, t = e.get("from_part"), e.get("to_part")
+        if t:
+            has_in.add(t)
+        # a sink's output to a tank is spurious — don't count it as a real output/source.
+        if f and not (_FLUID_SINK_RE.search(f) and t and _TANK_RE.search(t)):
+            has_out.add(f); sources.add(f)
+        if f and t:
+            fwd.add((f, t))
+
+    def _exempt(nm):
+        return bool(_INJECTOR_RE.search(nm) or _INLINE_TAP_RE.search(nm) or
+                    _DRY_ANCILLARY_RE.search(nm) or _SUBCOMPONENT_RE.search(nm) or
+                    _AIR_MOVER_RE.search(nm) or _FLUID_ORIGIN_RE.search(nm))
+
+    extra, seen = [], set()
+
+    def _add(a, b, ctx):
+        if a == b or (a, b) in seen:
+            return
+        seen.add((a, b))
+        extra.append({"from_part": a, "to_part": b, "mechanism": "fluid_loop",
+                      "constraint_kind": "flow_capacity", "material_context": ctx,
+                      "_augmented": True, "_boundary": True})
+
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm or _exempt(nm):
+            continue
+        is_sink = bool(_FLUID_SINK_RE.search(nm))
+        r, m = _rank(nm), _mod(nm)
+        # INPUT — a sink or flow-through with no input: from its nearest in-plant producer,
+        # else the battery-limit plant feed.
+        if nm not in has_in and (is_sink or nm in has_out):
+            cands = [s for s in sources if s != nm and (nm, s) not in fwd]
+            pool = [s for s in cands if _mod(s) == m] or cands
+            pick = min(pool, key=lambda s: abs(_rank(s) - r)) if pool else _BL_FEED
+            _add(pick, nm, "process input (boundary closer: nearest producer)"
+                 if pick != _BL_FEED else "plant feed (battery limit)")
+            has_in.add(nm)
+        # OUTPUT — a sink discharges to disposal; a flow-through with no downstream exports.
+        if nm not in has_out and (is_sink or nm in has_in):
+            tgt = _BL_DISPOSAL if is_sink else _BL_EXPORT
+            _add(nm, tgt, "discharge to disposal (battery limit)" if is_sink
+                 else "product export (battery limit)")
+            has_out.add(nm)
+    if extra:
+        log(f"[ledger] boundary closer: +{len(extra)} edge(s) — sinks fed from their producer "
+            f"+ discharged to disposal; feed/product stages tied to the battery limit")
     return extra
 
 
