@@ -16,7 +16,7 @@ manifest + parts-manifest from a run dir; returns the rows. A preview consumer (
 evidence.py) renders them; the dossier renderer will consume the same structure.
 """
 from __future__ import annotations
-import json, math, os, re
+import json, math, os, re, sys
 
 # Materials take-off rates — UK 2026 fabricated supply (ex-works, not installed).
 # Sources: SGS Engineering, Enduramaxx, process-vessel fabricator quotes, CECA data.
@@ -2784,8 +2784,11 @@ def assemble(out_dir: str):
             row["line_gbp"] = round(new_u * qy)
             row["basis"] = str(row.get("basis", "")) + suffix
     if _lift_n:
+        # stderr ONLY — the chain (serial-design-chain-v2.tsx ~8166) does JSON.parse on
+        # this script's STDOUT in --json mode; any stdout chatter breaks the BoM step and
+        # the chain silently falls back to the lower R1 anchor (the £2.08M-not-£5M bug).
         print(f"  [corpus-median-lift] raised {_lift_n} under-priced principal line(s) "
-              f"to their engine corpus lower edge (+£{_lift_gbp:,.0f})")
+              f"to their engine corpus lower edge (+£{_lift_gbp:,.0f})", file=sys.stderr)
 
     rows += _connection_rows(out_dir, qcontract)   # pipe/cable/duct runs as their own service-classified BoM lines (re-priced from contract duties)
     return rows
