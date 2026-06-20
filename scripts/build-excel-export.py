@@ -728,6 +728,201 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
 # ============================================================================
 # TAB 4 — CALCULATIONS (worked-calcs grouped by tool; live where structured)
 # ============================================================================
+# ============================================================================
+# UNIVERSAL HELPERS — chart styling + worked-calc verification (class-agnostic;
+# NO per-archetype logic — these run for every dossier the engine produces)
+# ============================================================================
+import math as _math
+import ast as _ast
+import operator as _op
+
+_CHART_PALETTE = ["2F5496", "C0392B", "548235", "7F4FC9", "1F9BD6",
+                  "E67E22", "16A085", "8E44AD"]
+
+
+def style_chart(ch, *, legend="auto", data_labels=False, gridlines=False):
+    """Universal chart hygiene. Excel/openpyxl default to varying colour PER
+    DATA POINT on a single-series chart — which renders a line as rainbow
+    segments AND dumps every category into the legend (the 12-entry "£2.0M…"
+    legends Tristan flagged). Force ONE solid colour per series, drop the heavy
+    black gridlines, keep axis values, and show a legend only for genuine
+    multi-series charts. Applies to every class."""
+    try:
+        ch.varyColors = False
+    except Exception:  # noqa: BLE001
+        pass
+    series = list(getattr(ch, "series", []) or [])
+    for i, s in enumerate(series):
+        col = _CHART_PALETTE[i % len(_CHART_PALETTE)]
+        try:
+            s.graphicalProperties.line.solidFill = col
+            s.graphicalProperties.line.width = 28000  # EMU ≈ 2.2 pt
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            s.graphicalProperties.solidFill = col  # bar/area fill (line series ignore)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            s.smooth = False
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            if getattr(s, "marker", None) is not None:
+                s.marker.symbol = "none"
+        except Exception:  # noqa: BLE001
+            pass
+    for ax_name in ("x_axis", "y_axis"):
+        ax = getattr(ch, ax_name, None)
+        if ax is None:
+            continue
+        try:
+            ax.delete = False
+            if not gridlines:
+                ax.majorGridlines = None
+        except Exception:  # noqa: BLE001
+            pass
+    want = (legend is True) or (legend == "auto" and len(series) > 1)
+    try:
+        if want:
+            from openpyxl.chart.legend import Legend
+            if ch.legend is None:
+                ch.legend = Legend()
+            ch.legend.position = "r"
+            ch.legend.overlay = False
+        else:
+            ch.legend = None
+    except Exception:  # noqa: BLE001
+        pass
+    if data_labels:
+        try:
+            from openpyxl.chart.label import DataLabelList
+            ch.dataLabels = DataLabelList()
+            ch.dataLabels.showVal = True
+        except Exception:  # noqa: BLE001
+            pass
+    return ch
+
+
+# --- worked-calc verification: turn "static" legacy calcs into LIVE, checked ---
+_ARITH_OPS = {_ast.Add: _op.add, _ast.Sub: _op.sub, _ast.Mult: _op.mul,
+              _ast.Div: _op.truediv, _ast.Pow: _op.pow, _ast.Mod: _op.mod,
+              _ast.USub: _op.neg, _ast.UAdd: _op.pos}
+_ARITH_FUNCS = {"sqrt": _math.sqrt, "abs": abs, "exp": _math.exp,
+                "log": _math.log, "ln": _math.log, "log10": _math.log10,
+                "sin": _math.sin, "cos": _math.cos, "tan": _math.tan,
+                "min": min, "max": max, "pow": pow}
+_EXCEL_FUNCS = {"sqrt": "SQRT", "abs": "ABS", "exp": "EXP", "log": "LN",
+                "ln": "LN", "log10": "LOG10", "sin": "SIN", "cos": "COS",
+                "tan": "TAN", "min": "MIN", "max": "MAX", "pow": "POWER"}
+
+
+def _eval_arith(node):
+    if isinstance(node, _ast.Constant):
+        if isinstance(node.value, (int, float)):
+            return node.value
+        raise ValueError("non-numeric constant")
+    if isinstance(node, _ast.BinOp):
+        return _ARITH_OPS[type(node.op)](_eval_arith(node.left), _eval_arith(node.right))
+    if isinstance(node, _ast.UnaryOp):
+        return _ARITH_OPS[type(node.op)](_eval_arith(node.operand))
+    if isinstance(node, _ast.Call):
+        fn = getattr(node.func, "id", "")
+        if fn.lower() in _ARITH_FUNCS and not node.keywords:
+            return _ARITH_FUNCS[fn.lower()](*[_eval_arith(a) for a in node.args])
+        raise ValueError("unsupported call")
+    if isinstance(node, _ast.Name) and node.id.lower() == "pi":
+        return _math.pi
+    raise ValueError("unsupported node")
+
+
+def _clean_substitution(sub):
+    """Normalise a worked-calc substitution to a bare arithmetic expression.
+    Handles BOTH engine formats universally: pure '(a*b)/c' AND the structured
+    'lhs = a x b x c = result UNIT' form (keep the middle expression; × / spaced-x
+    → *). No class-specific parsing."""
+    s = re.sub(r"^=\s*", "", str(sub or "").strip())
+    if s.count("=") >= 2:                       # 'lhs = EXPR = result UNIT'
+        s = s.split("=")[1]
+    elif "=" in s:                              # 'lhs = expr' OR 'expr = result'
+        a, b = s.split("=", 1)
+        s = b if re.search(r"[-+*/x^()]", b) else a
+    s = s.replace("×", "*").replace(",", "")
+    s = re.sub(r"(?<=[\d\)\s])x(?=[\s\d(])", "*", s)   # spaced 'x' = multiply, never max()/exp()
+    return s.strip()
+
+
+def safe_eval_substitution(sub):
+    """Evaluate a worked-calc expression (numbers + - * / ^, sqrt/abs/exp/log/trig,
+    pi). Returns float, or None when it isn't pure arithmetic. Universal."""
+    s = _clean_substitution(sub).replace("^", "**")
+    if not s:
+        return None
+    try:
+        return float(_eval_arith(_ast.parse(s, mode="eval").body))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def substitution_to_excel(sub):
+    """Convert a worked-calc substitution to a LIVE Excel formula ('=…'), or None
+    when it isn't pure arithmetic. Lets a 'static' calc recompute itself in the
+    sheet so the value is verifiable + editable. Universal."""
+    if safe_eval_substitution(sub) is None:
+        return None
+    s = _clean_substitution(sub)
+    s = re.sub(r"\bpi\b", "PI()", s, flags=re.I)
+    for fn, xl in _EXCEL_FUNCS.items():
+        s = re.sub(r"\b" + fn + r"\s*\(", xl + "(", s, flags=re.I)
+    return "=" + s
+
+
+def _qty_tokens(s):
+    STOP = {"the", "a", "of", "per", "and", "to", "for", "at", "in", "kg", "day",
+            "hr", "h", "m", "m2", "m3", "mm", "cm", "kw", "kwh", "gbp", "pct",
+            "ratio", "yr", "year", "rate", "total", "design", "value", "load"}
+    return {t for t in re.split(r"[^a-z0-9]+", str(s).lower())
+            if t and t not in STOP and not t.isdigit()}
+
+
+def index_design_quantities(state):
+    """Flat (key, tokens, value, unit) list from the engineering contract — the
+    authoritative design quantities a worked-calc result can be cross-checked
+    against. Universal (reads orchestratorContract.quantities for any class)."""
+    out = []
+    q = ((state.get("orchestratorContract") or {}).get("quantities")) or {}
+    if isinstance(q, dict):
+        items = list(q.items())
+    elif isinstance(q, list):
+        items = [(e.get("key"), e) for e in q if isinstance(e, dict)]
+    else:
+        items = []
+    for key, e in items:
+        if not isinstance(e, dict):
+            continue
+        v = e.get("value")
+        if isinstance(v, (int, float)):
+            out.append((key, _qty_tokens(key), float(v), e.get("unit") or ""))
+    return out
+
+
+def match_design_quantity(label, res_val, qindex):
+    """SAFE positive-only cross-check: returns (key, value) ONLY when EVERY label
+    token appears in the quantity key AND the values agree within 10% — an
+    unambiguous confirmation. Never claims a divergence (a similarly-named but
+    DIFFERENT quantity, e.g. MBBR 'Tank Volume' 205 m³ vs rearing
+    total_tank_volume 851 m³, must not raise a false alarm). Universal."""
+    if not isinstance(res_val, (int, float)):
+        return None
+    lt = _qty_tokens(label)
+    if not lt:
+        return None
+    for (key, ktoks, val, _unit) in qindex:
+        if lt.issubset(ktoks) and val and abs(res_val - val) / abs(val) <= 0.10:
+            return (key, val)
+    return None
+
+
 def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
     """
     Returns (live_calc_count, static_calc_count).
@@ -744,12 +939,13 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
     are referenced by absolute address.
     """
     ws = wb.create_sheet("Calculations")
-    set_widths(ws, {"A": 30, "B": 18, "C": 12, "D": 46, "E": 16, "F": 12, "G": 10, "H": 40})
+    set_widths(ws, {"A": 30, "B": 18, "C": 12, "D": 46, "E": 16, "F": 12, "G": 10, "H": 64})
     title_row(
-        ws, "Worked calculations — live where structured", 8,
+        ws, "Worked calculations — every value recomputed live + checked", 8,
         "Yellow = editable input. Green col B = LIVE formula. 'Engine value' = the "
         "value the engine stored; Δ should be ~0 (inputs are display-rounded to 4 s.f.). "
-        "Legacy calcs (no input map) are shown as static text.",
+        "Legacy calcs (no input map) are RECOMPUTED LIVE from their substitution and "
+        "cross-checked against the engine value (col H verdict).",
     )
     r = 4
 
@@ -777,6 +973,7 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
     r += 1
 
     tools = (state.get("toolsUsedPage") or {}).get("tools", [])
+    qindex = index_design_quantities(state)   # authoritative design quantities to cross-check against
     live_count = 0
     static_count = 0
 
@@ -814,26 +1011,61 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
             tc = ws.cell(r, 1, label)
             tc.font = FONT_SUB
             ws.cell(r, 4, formula).font = FONT_MONO
+            sub_text = str(w.get("substitution", "") or "")
+            xl_formula = substitution_to_excel(sub_text) if not structured else None
+            ev_val = safe_eval_substitution(sub_text) if not structured else None
             if not structured:
-                ws.cell(r, 1, label + "  [static — no input map]").font = Font(bold=True, italic=True, color="7F7F7F")
+                marker = "  [recomputed live]" if xl_formula else "  [static — no auto-check]"
+                ws.cell(r, 1, label + marker).font = Font(bold=True, italic=True, color="7F7F7F")
             calc_title_row = r
             r += 1
 
             if not structured:
-                # LEGACY: formula + substitution + result as static text
-                static_count += 1
+                # LEGACY calc: show formula + substitution as transparent text, then
+                # RECOMPUTE the substitution as a LIVE Excel formula and check it
+                # against the engine's stored result. This turns an unchecked
+                # printed number ("these values have not been checked") into a
+                # self-verifying, editable cell. Universal — works for any tool's
+                # worked-calc with a numeric substitution.
                 ws.cell(r, 1, "formula").font = FONT_NOTE
                 ws.cell(r, 4, str(formula)).font = FONT_MONO
                 ws.cell(r, 4).fill = FILL_LEGACY
                 r += 1
                 ws.cell(r, 1, "substitution").font = FONT_NOTE
-                sc = ws.cell(r, 4, str(w.get("substitution", "")))
+                sc = ws.cell(r, 4, sub_text)
                 sc.font = FONT_MONO
                 sc.fill = FILL_LEGACY
                 r += 1
                 ws.cell(r, 1, "result").font = FONT_NOTE
-                ws.cell(r, 5, res_val)
-                ws.cell(r, 7, res_unit)
+                if xl_formula is not None and isinstance(res_val, (int, float)):
+                    lc = ws.cell(r, 2, xl_formula)        # LIVE recomputation
+                    lc.fill = FILL_RESULT
+                    lc.number_format = "#,##0.0000"
+                    ws.cell(r, 5, res_val)                # engine value
+                    ws.cell(r, 6, f"=B{r}-E{r}").number_format = "#,##0.0000"
+                    ws.cell(r, 7, res_unit)
+                    drift = (abs(ev_val - res_val) / abs(res_val)
+                             if (ev_val is not None and res_val) else 0.0)
+                    if drift <= 0.02:
+                        verdict, vfont = "✓ recomputed live — maths checks out", FONT_PASS
+                        live_count += 1
+                    else:
+                        verdict = (f"⚠ engine result ≠ its own substitution "
+                                   f"({ev_val:.4g} vs {res_val:.4g})")
+                        vfont = FONT_FAIL
+                        static_count += 1
+                    dq = match_design_quantity(label, res_val, qindex)
+                    if dq:
+                        verdict += f"   ·   confirmed = design {dq[0]}"
+                    vc = ws.cell(r, 8, verdict)
+                    vc.font = vfont
+                    vc.alignment = WRAP_TOP
+                else:
+                    # non-arithmetic substitution (rare) — keep honest static text
+                    static_count += 1
+                    ws.cell(r, 5, res_val)
+                    ws.cell(r, 7, res_unit)
+                    ws.cell(r, 8, "— not auto-checkable (non-numeric substitution)").font = FONT_NOTE
                 r += 1
                 r += 1  # spacer
                 continue
@@ -882,11 +1114,29 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
                 live_count += 1
                 produced_ok = True
             else:
-                # could not bind every symbol -> show engine value, mark static
-                live_cell.value = res_val
-                ws.cell(r, 1, "  = result  [static — unbound symbol]").font = Font(bold=True, italic=True, color="7F7F7F")
-                static_count += 1
-                live_count -= 0
+                # could not bind every symbol -> fall back to recomputing the
+                # SUBSTITUTION as a live Excel formula (same universal check as the
+                # legacy path) so the value is still live + verified, not a bare
+                # static number. Universal across classes.
+                sub_s = str(w.get("substitution", "") or "")
+                xl_s = substitution_to_excel(sub_s)
+                if xl_s is not None and isinstance(res_val, (int, float)):
+                    live_cell.value = xl_s
+                    live_cell.fill = FILL_RESULT
+                    ws.cell(r, 1, "  = result  [recomputed from substitution]").font = FONT_SUB
+                    ev_s = safe_eval_substitution(sub_s)
+                    drift_s = (abs(ev_s - res_val) / abs(res_val)
+                               if (ev_s is not None and res_val) else 0.0)
+                    if drift_s <= 0.02:
+                        live_count += 1
+                    else:
+                        ws.cell(r, 8, f"⚠ engine result ≠ substitution "
+                                f"({ev_s:.4g} vs {res_val:.4g})").font = FONT_FAIL
+                        static_count += 1
+                else:
+                    live_cell.value = res_val
+                    ws.cell(r, 1, "  = result  [static — unbound symbol]").font = Font(bold=True, italic=True, color="7F7F7F")
+                    static_count += 1
                 produced_ok = False
             ws.cell(r, 3, res_unit)
             ws.cell(r, 4, rhs).font = FONT_MONO
@@ -1986,6 +2236,9 @@ def tab_economics(wb: Workbook, state: dict) -> bool:
     plabs = Reference(ws, min_col=1, min_row=brk_first, max_row=brk_last)
     pie.add_data(pdata, titles_from_data=False)
     pie.set_categories(plabs)
+    from openpyxl.chart.label import DataLabelList
+    pie.dataLabels = DataLabelList()
+    pie.dataLabels.showPercent = True   # slices stay multi-colour (correct for a pie)
     ws.add_chart(pie, f"F{cf_first}")
 
     # Bar: revenue vs total opex vs EBITDA — build a tiny 3-row helper block so
@@ -2005,7 +2258,7 @@ def tab_economics(wb: Workbook, state: dict) -> bool:
     blabs = Reference(ws, min_col=1, min_row=bar_first, max_row=bar_first + 2)
     bar.add_data(bdata, titles_from_data=False)
     bar.set_categories(blabs)
-    bar.legend = None
+    style_chart(bar, legend=None, data_labels=True)  # solid bars + £ labels (EBITDA stays visible even when near break-even)
     ws.add_chart(bar, f"F{cf_first + 16}")
 
     ws.freeze_panes = "A5"
@@ -2262,7 +2515,7 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
     cats = Reference(ws, min_col=1, min_row=sweep_first, max_row=sweep_last)
     c1.add_data(d1, titles_from_data=False)
     c1.set_categories(cats)
-    c1.legend = None
+    style_chart(c1, legend=None)  # single solid line, no rainbow, no heavy gridlines
     ws.add_chart(c1, "J4")
 
     # 2) payback vs output (line) — uses the capped numeric column
@@ -2275,7 +2528,7 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
     cats2 = Reference(ws, min_col=1, min_row=pay_first, max_row=pay_last)
     c2.add_data(d2, titles_from_data=False)
     c2.set_categories(cats2)
-    c2.legend = None
+    style_chart(c2, legend=None)
     ws.add_chart(c2, "J21")
 
     # 3) Low/Central/High EBITDA (bar)
@@ -2287,7 +2540,7 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
     cats3 = Reference(ws, min_col=1, min_row=lch_first, max_row=lch_first + 2)
     c3.add_data(d3, titles_from_data=False)
     c3.set_categories(cats3)
-    c3.legend = None
+    style_chart(c3, legend=None, data_labels=True)  # Low/Central/High £ labels on each bar
     ws.add_chart(c3, "J38")
 
     ws.freeze_panes = "A5"
@@ -2715,6 +2968,7 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
     for s in c1.series:
         s.smooth = False
         s.marker.symbol = "none"
+    style_chart(c1, legend=True)  # 3 genuine series (IRR / discount / hurdle) — keep legend, kill per-point colours
     ws.add_chart(c1, f"A{hh}")
 
     # 2) NPV vs capex (marks the NPV-max)
@@ -2722,6 +2976,7 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
                   8, [(13, "NPV")], num_fmt=FMT_GBP)
     for s in c2.series:
         s.smooth = False
+    style_chart(c2, legend=None)  # single NPV curve — no per-point legend (was dumping every capex value)
     ws.add_chart(c2, f"A{hh+18}")
 
     # 3) Payback vs capex
@@ -2729,6 +2984,7 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
                   8, [(14, "Payback")], num_fmt=FMT_DEC1)
     for s in c3.series:
         s.smooth = False
+    style_chart(c3, legend=None)
     ws.add_chart(c3, f"A{hh+36}")
 
     # 4) EBITDA margin vs scale (output on x)
@@ -2736,6 +2992,7 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
                   9, [(15, "EBITDA margin")])
     for s in c4.series:
         s.smooth = False
+    style_chart(c4, legend=None)
     ws.add_chart(c4, f"A{hh+54}")
 
     ws.freeze_panes = "A4"
@@ -2944,6 +3201,24 @@ def _render_md_table(ws: Worksheet, start_row: int, heading: str,
                     cell.fill = FILL_PASS
                     cell.font = FONT_PASS
         r += 1
+    # auto-fit row heights so long wrapped text (Service / Description) is not
+    # clipped — cells already carry wrap_text (WRAP_TOP) but openpyxl never grows
+    # the row to fit it, which read as truncation ("Dual Cornell drain tank…").
+    # Estimate wrapped lines per cell from the column width. Universal — keys off
+    # column width + content length, no class-specific assumptions.
+    for rr in range(body_first, r):
+        max_lines = 1
+        for ci in range(ncol):
+            v = ws.cell(rr, ci + 1).value
+            if v is None:
+                continue
+            cw = ws.column_dimensions[get_column_letter(ci + 1)].width or 12
+            approx = max(6, int((cw - 1) * 1.05))   # ~chars per line at this width
+            lines = max(1 + str(v).count("\n"), -(-len(str(v)) // approx))
+            if lines > max_lines:
+                max_lines = lines
+        if max_lines > 1:
+            ws.row_dimensions[rr].height = min(max_lines, 6) * 14.5
     return r, body_first
 
 
@@ -3026,8 +3301,8 @@ def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
         widths = {get_column_letter(i): (14 if i > 1 else 16) for i in range(1, ncol + 1)}
         # widen a likely 'service' / description column
         for idx, h in enumerate(hdr, start=1):
-            if h.lower() in ("service", "description", "measured"):
-                widths[get_column_letter(idx)] = 40
+            if h.lower() in ("service", "description", "measured", "notes", "remarks"):
+                widths[get_column_letter(idx)] = 54
         set_widths(ws, widths)
         title_row(ws, heading.split("·")[-1].strip() or sheet, max(ncol, 2),
                   "Parsed from process-schedules.md — real sortable rows.")
@@ -3213,9 +3488,14 @@ def ensure_png(src_path: str, run_dir: str) -> Optional[str]:
     return None
 
 
-def downscale_png(src_png: str, run_dir: str, max_px: int = 1400) -> str:
+def downscale_png(src_png: str, run_dir: str, max_px: int = 2600) -> str:
     """
-    Downscale a PNG so the whole workbook stays small (module renders are ~4 MB).
+    Downscale a PNG so the whole workbook stays manageable. Raised 1400→2600
+    (Tristan 2026-06-20: "make all of the diagrams higher resolution — hard to
+    see when made bigger"): native drawings are 2160–6560 px and were being
+    crushed to 1400 (single-line lost ~4.7×). 2600 keeps the dense P&ID / single-
+    line / process-schedule legible on zoom while bounding workbook size; smaller
+    renders (hero, isometrics ~2360 px) pass through untouched. Universal.
     Returns a path to the (possibly) downscaled PNG. Keeps aspect ratio. JPEG-quality
     PNG compression via Pillow optimisation.
     """
@@ -3269,8 +3549,10 @@ def add_image_tab(wb: Workbook, run_dir: str, png_path: str, title: str,
         cap.font = FONT_NOTE
         cap.alignment = LEFT_TOP
         img = XLImage(ds)
-        # cap on-sheet display size (keep aspect) so the tab is readable
-        max_w = 1100
+        # cap on-sheet display size (keep aspect) so the tab is readable. Raised
+        # 1100→1700 to match the higher-res embed: the underlying PNG is up to
+        # 2600 px so zooming stays sharp. Universal.
+        max_w = 1700
         if img.width and img.width > max_w:
             ratio = max_w / float(img.width)
             img.width = int(img.width * ratio)
@@ -3320,10 +3602,12 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
          "Block flow diagram of the process."),
         ("single-line-diagram", "Single-line",
          "Electrical single-line diagram."),
-        ("panel-schedule", "Panel schedule", "Electrical panel schedule."),
         ("hvac-layout", "HVAC", "HVAC / ventilation layout."),
-        ("process-schedules", "Process schedules",
-         "Process equipment & line schedules."),
+        # NOTE: panel-schedule + process-schedules are deliberately NOT embedded
+        # as PDF-page images — they are rendered as NATIVE, sortable Excel rows by
+        # tab_panel_schedule + tab_process_schedules (Tristan 2026-06-20: "panel /
+        # process schedule should be in excel, not a pdf"). Universal for any class
+        # that emits those schedules.
     ]
     for stem, ttl, cap in eng:
         # try drawings/<stem>.png, drawings/<stem>.svg, then run-root variants
