@@ -246,6 +246,67 @@ def audit_completeness(parts, final_topology, required_services, log=print):
     return concerns
 
 
+def close_flow_directions(parts, topology, log=print):
+    """UNIVERSAL direction-closer (the fix for "every part output-only" — RAS 15/80, SAF
+    49/63). Give every FLOW-THROUGH part that has a fluid OUTPUT but no fluid INPUT a real
+    input from its nearest PROCESS-UPSTREAM source — a part that ALREADY has a fluid
+    output, earlier in process order (region_rank), same module preferred. This completes
+    the graph with a SERIAL topology (predecessor → part → successor), NOT a star and NOT
+    a guess: the input always comes from a genuine fluid source that exists, and a part
+    with no resolvable upstream is LEFT for the gate to flag (never invented). Excludes
+    injector/origin/sink/inline-tap/dry parts (correctly single-direction). Skips a pair
+    that would merely REVERSE an existing edge (no 2-cycle). Pure + position-free."""
+    by_name = {getattr(p, "name", None): p for p in parts if getattr(p, "name", None)}
+
+    def _rank(nm):
+        p = by_name.get(nm)
+        v = getattr(p, "region_rank", None) if p is not None else None
+        return v if isinstance(v, (int, float)) else 999
+
+    def _mod(nm):
+        p = by_name.get(nm)
+        return (getattr(p, "module_id", "") if p is not None else "") or ""
+
+    has_in, has_out, sources = set(), set(), set()
+    fwd_pairs = set()
+    for e in topology:
+        if _service_of(e.get("mechanism")) not in ("water", "thermal"):
+            continue
+        f, t = e.get("from_part"), e.get("to_part")
+        if f:
+            has_out.add(f); sources.add(f)
+        if t:
+            has_in.add(t)
+        if f and t:
+            fwd_pairs.add((f, t))
+
+    extra, seen = [], set()
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm or nm not in has_out or nm in has_in:
+            continue  # only a part that outputs but has no input
+        if (_INJECTOR_RE.search(nm) or _FLUID_ORIGIN_RE.search(nm) or
+                _FLUID_SINK_RE.search(nm) or _INLINE_TAP_RE.search(nm) or
+                _DRY_ANCILLARY_RE.search(nm)):
+            continue  # correctly single-direction — not a flow-through gap
+        r, m = _rank(nm), _mod(nm)
+        cands = [s for s in sources if s != nm and _rank(s) < r and (nm, s) not in fwd_pairs]
+        same = [s for s in cands if _mod(s) == m]
+        pick = (max(same, key=_rank) if same else (max(cands, key=_rank) if cands else None))
+        if pick is None or (pick, nm) in seen:
+            continue  # no genuine upstream → leave it for the gate (never guess)
+        seen.add((pick, nm))
+        extra.append({"from_part": pick, "to_part": nm, "mechanism": "fluid_loop",
+                      "constraint_kind": "flow_capacity",
+                      "material_context": "process-flow input (direction-closer: nearest upstream)",
+                      "_augmented": True, "_direction_closed": True})
+        has_in.add(nm)
+    if extra:
+        log(f"[ledger] direction-closer: +{len(extra)} input edge(s) — flow-through parts "
+            f"fed from their nearest process-upstream source")
+    return extra
+
+
 def build_adjacency(final_topology):
     """Per-part connection trace (Tristan 2026-06-20: "if line 1 connects to line 3, line
     3 should say its input is from line 1 — in Excel we should trace whole systems this
@@ -384,6 +445,20 @@ def _selftest():
     # still be flagged for missing-OUTPUT if it supplies nothing (correct).
     assert "fluid-input" not in by.get("Make-up Water System", []), \
         "make-up origin must be exempt from missing-input (hyphen regex)"
+
+    # close_flow_directions: a flow-through part with an output but no input gets fed from
+    # its nearest process-upstream source (lower region_rank), never guessed.
+    class _PR:
+        def __init__(self, name, rank, mod="m"):
+            self.name, self.region_rank, self.module_id, self.function = name, rank, mod, ""
+    cparts = [_PR("Drum Filter", 0), _PR("Biofilter", 1), _PR("Degasser", 2)]
+    ctopo = [{"from_part": "Drum Filter", "to_part": "Biofilter", "mechanism": "fluid_loop"},
+             {"from_part": "Biofilter", "to_part": "Sump", "mechanism": "fluid_loop"},
+             {"from_part": "Degasser", "to_part": "Sump", "mechanism": "fluid_loop"}]  # Degasser output-only
+    closed = close_flow_directions(cparts, ctopo, log=lambda *a: None)
+    assert any(e["to_part"] == "Degasser" and e["from_part"] in ("Biofilter", "Drum Filter")
+               for e in closed), f"degasser (output-only) must be fed from upstream; got {closed}"
+    print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "
           f"completeness flags {len(concerns)} incomplete part(s) incl. pump-missing-input)")
 

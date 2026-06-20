@@ -11714,6 +11714,10 @@ def main():
     # to connection-ledger.json (which part → what → with what); the BoM costs THAT.
     _candidate = list(base_topology) + augment_topology_cross_module(state, base_topology, parts)
     _candidate = _candidate + augment_topology_connect_orphans(state, _candidate, parts)
+    # UNIVERSAL direction-closer: the orphan connector gives each part an OUTPUT only; this
+    # adds the missing INPUT to every flow-through part from its nearest process-upstream
+    # source, so the graph is complete (serial, not a star, not a guess).
+    _candidate = _candidate + cl.close_flow_directions(parts, _candidate, log=lambda m: print(m))
     topology, _ledger_dropped = cl.finalize_ledger(_candidate, parts, resolve_endpoint,
                                                    log=lambda m: print(m))
     # STRICT completeness gate — every part must SHOW its required input + output (Tristan
