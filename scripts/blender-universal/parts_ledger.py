@@ -456,6 +456,17 @@ def main() -> int:
     INSTRUMENT_TYPES = {"instrument"}
     CONTROL_TYPES = {"control"}
     PASSIVE_TYPES = {"structural", "other"}
+    # AIR-SERVICE / SUB-COMPONENT parts that get a PROCESS etype ("rotating" blower,
+    # "exchanger" HVAC unit, an MBBR media fill) but carry AIR or belong to a PARENT —
+    # NOT a process-WATER flow-through node. Their correct tie is an air line / a parent
+    # edge, so requiring a water in+out is wrong (it deflated the coverage to 74 %). This
+    # mirrors the connection_ledger completeness audit's air-mover + sub-component
+    # exemptions, so the two connectivity gates agree. (Tristan 2026-06-20.)
+    AIR_OR_SUBCOMPONENT_KEYWORDS = {
+        "blower", "fan", "ventilation", "dehumidifier", "hrv", "air handling",
+        "air handler", "ahu", "hvac", "extract air", "supply air", "ducting",
+        "media", "carrier", "biofilm carrier", "screen panel", "mesh panel",
+        "filter element", "backwash"}
 
     connectivity_concerns = []
     origin_parts = []
@@ -510,6 +521,14 @@ def main() -> int:
 
         if etype in PASSIVE_TYPES:
             continue  # structural elements — never a connectivity concern
+
+        # AIR-mover / HVAC / sub-component: carries AIR or belongs to a parent, NOT a
+        # process-WATER flow-through node — its air/parent tie is the correct connection,
+        # so it must not be counted in the process-WATER both-fluid coverage (else a
+        # blower/ventilation unit wrongly drags the % down). Aligns with the
+        # connection_ledger audit's exemptions. (Tristan 2026-06-20 connectivity fix.)
+        if etype in PROCESS_TYPES and any(kw in name_l for kw in AIR_OR_SUBCOMPONENT_KEYWORDS):
+            continue
 
         is_buffer = any(kw in name_l for kw in BUFFER_KEYWORDS)
 

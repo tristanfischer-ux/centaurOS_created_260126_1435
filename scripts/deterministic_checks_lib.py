@@ -908,6 +908,22 @@ def _checks_connectivity(state: dict, run_dir: str) -> List[Check]:
                 diag_basis = "routed bbox (no building footprint — circular fallback)"
         if diag_m > 0.5:
             def _runlen(ln: dict) -> float:
+                # PLAN (2-D, x-y) length, NOT the 3-D routed length. A loose LAYOUT is a
+                # HORIZONTAL property; the run's vertical travel up to the overhead pipe-
+                # rack and back (≈2×rack height ≈ 30-40 m on EVERY run) is a fixed routing
+                # overhead, not layout looseness, and the diagonal it's compared against is
+                # itself 2-D — so counting the 3-D rise made the gate apples-to-oranges
+                # (a well-placed pair read 109 m / 81 m-plan). Sum the x-y segments from the
+                # waypoints; fall back to the stored routed length only when absent.
+                wp = ln.get("waypoints_mm")
+                if isinstance(wp, list) and len(wp) >= 2:
+                    tot = 0.0
+                    for a, b in zip(wp[:-1], wp[1:]):
+                        try:
+                            tot += ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+                        except (TypeError, IndexError):
+                            return 0.0
+                    return tot / 1000.0
                 v = ln.get("length_routed_m")
                 if not isinstance(v, (int, float)):
                     v = ln.get("length_m")
