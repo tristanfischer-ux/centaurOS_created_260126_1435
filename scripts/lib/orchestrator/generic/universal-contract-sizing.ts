@@ -1318,6 +1318,13 @@ interface UtilitySpec {
   module: RegExp
   size: (d: number) => { dim: string; rating: [string, string]; gbp: number }
   form: (d: number) => string
+  // OPTIONAL supersedes: the physics-derived system REPLACES any generic word-engine
+  // PLACEHOLDER for the same function (e.g. the LOX system supersedes the bare
+  // "Oxygenation System" word). When this fires, the matching non-flagged principal
+  // word is removed so the design carries ONE fully-wired part, not a wired system +
+  // an orphan duplicate (the connectivity-completeness gap). Instruments / actuators /
+  // utilities / other synthesised systems are NEVER matched (flag-guarded below).
+  supersedes?: RegExp
 }
 const UTILITY_SYSTEMS: UtilitySpec[] = [
   { key: 'standby_generator', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'Standby Diesel Generator', module: /power|electric|distribution/,
@@ -1485,7 +1492,7 @@ const PROCESS_SYSTEMS: UtilitySpec[] = [
   { key: 'feed_system', driver: (q) => pickQ(q, /daily_feed_kg|feed_kg_day|_feed_kg$/), label: 'Feed Storage + Distribution System', module: /mass_fluid|process|feed/,
     size: (kgd) => { const silo = Math.max(10, (kgd * 14) / 650); return { dim: cylinderFromVolumeM3(silo, 'feed silo'), rating: [String(Math.round(kgd)), 'kg/day'], gbp: Math.round(40000 + kgd * 30) } },
     form: (kgd) => `Bulk feed silos (~${Math.round((kgd * 14) / 650)} m³, ~2-week) + pneumatic conveying + per-tank automatic feeders + load cells; delivers ~${Math.round(kgd)} kg/day on a controlled ration` },
-  { key: 'oxygen_lox', driver: (q) => pickQ(q, /oxygen_supply_kg_h|oxygen_demand_kg_h/) ?? ((pickQ(q, /oxygen_demand_kg_day/) ?? 0) / 24 || undefined), label: 'Oxygen Supply (LOX) System', module: /environmental|oxygen|process|mass_fluid/,
+  { key: 'oxygen_lox', driver: (q) => pickQ(q, /oxygen_supply_kg_h|oxygen_demand_kg_h/) ?? ((pickQ(q, /oxygen_demand_kg_day/) ?? 0) / 24 || undefined), label: 'Oxygen Supply (LOX) System', module: /environmental|oxygen|process|mass_fluid/, supersedes: /\boxygenation\b/i,
     size: (kgh) => { const tank = Math.max(3, (kgh * 24 * 5) / 1140); return { dim: cylinderFromVolumeM3(tank, 'lox tank'), rating: [String(Math.round(kgh)), 'kg/h'], gbp: Math.round(35000 + kgh * 800) } },
     form: (kgh) => `Vacuum-insulated bulk LOX tank (~${Math.round((kgh * 24 * 5) / 1140)} m³, 5-day) + ambient vaporiser + pressure-control panel; supplies ~${Math.round(kgh)} kg/h gaseous O₂ to the oxygenation cones` },
   { key: 'sludge_handling', driver: (q) => pickQ(q, /solids_load_kg_day|sludge_kg_day|tss_load/), label: 'Solids / Sludge Handling System', module: /mass_fluid|process|waste|water/,
@@ -1540,6 +1547,22 @@ export function synthesizeProcessSystems(modules: ModuleLike[], quantities: Reco
     if (!d || !(d > 0)) continue
     const sm = findSubModuleByRe(modules, spec.module) ?? (modules?.[0]?.sub_modules ?? [])[0] as SubLike | undefined
     if (!sm) continue
+    // SUPERSEDE the generic word-engine placeholder for this function (e.g. the LOX
+    // system replaces the bare "Oxygenation System" word) so the design carries ONE
+    // fully-wired part, not a wired system + an orphan duplicate (the connectivity-
+    // completeness gap, 2026-06-20). Flag-guarded: only a NON-synthesised PRINCIPAL word
+    // is removed — instruments / actuators / utilities / other systems are kept (so the
+    // Dissolved-Oxygen Analyser + DO control valve survive). Universal, opt-in per spec.
+    if (spec.supersedes) {
+      for (const m of modules ?? []) for (const s of m.sub_modules ?? []) {
+        if (!Array.isArray(s.words)) continue
+        s.words = s.words.filter((w) => {
+          const isPrincipalPlaceholder = !isInstrument(w) && !isActuator(w) && !isUtility(w)
+            && !isProcessSystem(w) && !String(w.id ?? '').includes('__')
+          return !(isPrincipalPlaceholder && spec.supersedes!.test(String(w.name_human ?? '')))
+        })
+      }
+    }
     ;((sm.words ??= []) as WordLike[]).push(utilityWord(spec, d, 'process'))
     n += 1
   }

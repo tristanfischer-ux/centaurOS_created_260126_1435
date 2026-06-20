@@ -11870,6 +11870,12 @@ def main():
     # air-movers (blower/fan) feed their aeration consumer by an AIR line, not a water tie
     # to the tank; sub-components (screen/backwash/media) tie to their PARENT, not the tank.
     _candidate = _candidate + cl.close_air_directions(parts, _candidate, log=lambda m: print(m))
+    # every part that REQUIRES power but shows no supply gets a feed from the distribution
+    # hub — closes the completeness audit's 'missing [power]' concern (e.g. a blower with
+    # no power feed). Uses the SAME _REQUIRED_SERVICES the audit reads, so it fills exactly
+    # the gaps the audit flags.
+    _candidate = _candidate + cl.close_power_directions(parts, _candidate, _REQUIRED_SERVICES,
+                                                        log=lambda m: print(m))
     _candidate = _candidate + cl.close_subcomponents(parts, _candidate, log=lambda m: print(m))
     # final boundary connector: sinks fed from their producer + discharged to disposal;
     # feed-stage/product units with no in-plant neighbour tied to the battery limit.

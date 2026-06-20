@@ -439,6 +439,63 @@ def close_air_directions(parts, topology, log=print):
     return extra
 
 
+_POWER_HUB_RE = re.compile(
+    r"distribution\s*busbar|\bbusbar\b|switchgear|motor[\s_-]*control|\bmcc\b|"
+    r"\blv\s*(?:board|panel|switchboard)\b|power\s*distribution|\bpdu\b|\bmsb\b|"
+    r"main\s*switchboard|distribution\s*(?:board|panel)", re.I)
+
+
+def close_power_directions(parts, topology, required_services, log=print):
+    """Give every part that REQUIRES power but has no incoming power edge a feed from the
+    plant's power-distribution hub — the deterministic close of the completeness audit's
+    'missing [power]' concern (Tristan 2026-06-20: a Degassing Blower with no power feed
+    left the ledger incomplete). Universal: the required-power set comes from the SAME
+    required_services() the audit uses, so the closer fills EXACTLY the gaps the audit
+    flags — any powered orphan (blower / pump / motor / UV / heater / actuator), not a
+    hand list. Hub = the part matching _POWER_HUB_RE (busbar / switchgear / MCC / LV board),
+    else the first part whose module is a power module. Pure + position-free; no-op when no
+    hub exists or nothing needs power."""
+    by_name = {getattr(p, "name", None): p for p in parts if getattr(p, "name", None)}
+    # parts that ALREADY have an incoming power edge
+    has_power = set()
+    for e in topology:
+        svc = e.get("_ledger_service") or _service_of(e.get("mechanism"))
+        if svc == "power" and e.get("to_part"):
+            has_power.add(e.get("to_part"))
+    # the power-distribution hub (the source of every feed)
+    hub = next((nm for nm in by_name if _POWER_HUB_RE.search(nm)), None)
+    if hub is None:
+        for p in parts:
+            nm = getattr(p, "name", None)
+            if nm and "power" in str(getattr(p, "module_id", "") or "").lower():
+                hub = nm
+                break
+    if hub is None:
+        return []
+    extra, seen = [], set()
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm or nm == hub or nm in has_power or _SUBCOMPONENT_RE.search(nm):
+            continue
+        mod = getattr(p, "module_id", "") or ""
+        fn = getattr(p, "function", "") or ""
+        try:
+            req = set(required_services(nm, mod, fn) or set())
+        except Exception:
+            req = set()
+        if "power" not in req or (hub, nm) in seen:
+            continue
+        seen.add((hub, nm))
+        extra.append({"from_part": hub, "to_part": nm, "mechanism": "electrical_bus",
+                      "constraint_kind": "power_feed", "_ledger_service": "power",
+                      "material_context": "power feed (distribution hub -> powered part)",
+                      "_augmented": True, "_power_closed": True})
+    if extra:
+        log(f"[ledger] power-closer: +{len(extra)} power feed(s) from {hub!r} "
+            f"— every powered part now shows its supply")
+    return extra
+
+
 def close_subcomponents(parts, topology, log=print):
     """Connect every SUB-COMPONENT (a filter screen/backwash, MBBR media/carrier, vessel
     internals) to its PARENT equipment by an assembly edge — it is PART OF that unit, not a
