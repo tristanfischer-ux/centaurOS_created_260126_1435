@@ -142,6 +142,21 @@ _FLUID_SINK_RE = re.compile(
     r"atmosphere|\bvent\b|product[_ -]?out|harvest[_ -]?out|to[_ -]?sea|sump[_ -]?out|"
     r"bleed[_ -]?(?:/|\s)?drain|mortalit", re.I)
 
+# INJECTOR — a part that ADDS a reagent / gas / heat to the loop. Its process input is
+# the REAGENT (chemical / O₂ / heat), NOT a bulk-water inlet; it has ONE fluid tie (the
+# injection point into the loop). Like an origin: exempt from the fluid-INPUT requirement.
+_INJECTOR_RE = re.compile(
+    r"dos(?:e|ing|er)|chemical|alkalin|bicarb|caustic|\bacid\b|nutrient|"
+    r"oxygen[_ -]?(?:supply|cone|inject|diffus|solenoid)|\blox\b|liquid[_ -]?oxygen|"
+    r"ozone[_ -]?(?:supply|generat|inject)|\bco2[_ -]?(?:supply|inject)|heat[_ -]?pump", re.I)
+
+# INLINE TAP — a valve / meter / manifold / instrument that sits ON a line. It needs ≥1
+# fluid tie (it is on the pipe) but not necessarily a distinct in AND out modelled as
+# separate edges (the line passes through it). Requiring both over-flags an inline valve.
+_INLINE_TAP_RE = re.compile(
+    r"\bvalve\b|flow[_ -]?meter|\bmeter\b|manifold|distribution[_ -]?manifold|"
+    r"pipework|\bheader\b|sight[_ -]?glass|sampl|strainer|\btee\b|\bspool\b", re.I)
+
 
 def audit_completeness(parts, final_topology, required_services, log=print):
     """STRICT ledger-completeness audit (Tristan 2026-06-20: "the ledger was supposed to
@@ -189,12 +204,22 @@ def audit_completeness(parts, final_topology, required_services, log=print):
             if s not in has:
                 missing.append(s)
         if "water" in req and not _DRY_ANCILLARY_RE.search(nm):
-            is_origin = bool(_FLUID_ORIGIN_RE.search(nm))
+            has_in = nm in fluid_in
+            has_out = nm in fluid_out
+            # an origin OR an injector supplies the loop (output only, no bulk-water inlet);
+            # a sink receives it (input only); an inline tap (valve/meter) sits ON the line.
+            is_origin = bool(_FLUID_ORIGIN_RE.search(nm)) or bool(_INJECTOR_RE.search(nm))
             is_sink = bool(_FLUID_SINK_RE.search(nm))
-            if nm not in fluid_in and not is_origin:
-                missing.append("fluid-input")
-            if nm not in fluid_out and not is_sink:
-                missing.append("fluid-output")
+            is_inline_tap = bool(_INLINE_TAP_RE.search(nm))
+            if is_inline_tap:
+                if not has_in and not has_out:
+                    missing.append("fluid-connection")   # on a line, needs ≥1 tie
+            else:
+                # a FLOW-THROUGH unit (vessel / pump / filter / treatment) needs BOTH.
+                if not has_in and not is_origin:
+                    missing.append("fluid-input")
+                if not has_out and not is_sink:
+                    missing.append("fluid-output")
         if missing:
             concerns.append({
                 "part": nm,

@@ -100,3 +100,8 @@
 - G4 🔨 Extend class-connections.ts required-connection registry where the universal completion is too thin.
 - G5 🔨 VERIFY no-regression on CO2/SAF/BESS (+ RAS): connectivity n_concerns→0, 0 dangling routes, every part connected, cost sane.
 > Builds on G-pre: A/B/C connection SIZING fixes already landed (fb34031e9, e3c6b24d0): branch ties sized to own duty, render ties thinned, CONN3 length-plausibility gate. Those stay (the ledger will author the right sizes; CONN3 still guards geometry).
+
+### G1 progress (2026-06-20): ledger AUTHORITY + strict COMPLETENESS gate landed (commit b4299a164)
+- ✓ connection_ledger.py authority: kills nothing→nothing dangling route + 5 dry-ancillary→tank ties; BoM £535k→£480k.
+- ✓ STRICT completeness gate (deterministic CONN0): role-aware (flow-through needs in+out; injector/origin out-only; sink in-only; inline-tap ≥1). Now FAILS on real gaps (was 80%-coverage silent-pass).
+- 🔨 15 GENUINE gaps the gate now isolates (the closure = next): (a) OPEN LOOP — UV no output + Recirc Pump no input (the recirc cycle isn't closed: needs UV→pump→tanks + pump in the contract); (b) SINK inputs — Bleed/Drain, Solids/Sludge, Effluent need a bleed line FROM the loop; (c) classifier — Aeration Blower=air not water, Biofilm Carrier Media=internal to MBBR, O₂ Solenoid=injector (regex). CLOSURE PLAN: (1) close the main process loop in engineering-contract.ts RAS block (pump + return legs); (2) completion direction-closer wires each sink's input from the loop; (3) classifier: air-movers→'air', internal media→no service (component_engineering._required_services). Then CONN0 → 0 legitimately.
