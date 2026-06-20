@@ -2341,6 +2341,60 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
     )
     r = 4
 
+    # ── ★ CAPEX → MAX OUTPUT SOLVER (Tristan 2026-06-20: "how do you get as much fish
+    #    production out for a specific amount of capex?"). The six-tenths cost-capacity
+    #    law INVERTED: for a capex budget B, the largest internally-consistent plant
+    #    produces out_realised × (B / capex_realised)^(1/0.6). Type a budget in the yellow
+    #    cell → read the max tonnage + its LIVE economics. Revenue is exact (qty×price);
+    #    operating cost is read off the Scenarios sweep (near-linear in output) so EBITDA /
+    #    payback / IRR stay consistent with the rest of the model. Universal.
+    CAPX = _ECON_INPUT_ADDR.get("capex")
+    OUTQ = _ECON_INPUT_ADDR.get("out_qty")
+    SALE = _ECON_INPUT_ADDR.get("sale_price")
+    if CAPX and OUTQ and SALE:
+        OPX = f"{sh}!${sw['col_opex']}${f}:${sw['col_opex']}${l}"
+        OUTr = f"{sh}!${sw['col_out']}${f}:${sw['col_out']}${l}"
+        sub_banner(ws, r, "★ CAPEX → MAX OUTPUT — type a capex budget in the yellow cell; "
+                          "read the biggest plant it buys + its economics (six-tenths law)", 6)
+        r += 1
+        b_row = r
+        ws.cell(r, 1, "Capex budget (EDIT me) £").font = FONT_SUB
+        bc = ws.cell(r, 2, f"={CAPX}")
+        bc.fill = FILL_INPUT; bc.number_format = FMT_GBP; bc.border = BORDER
+        r += 1
+        o_row = r
+        ws.cell(r, 1, f"→ Max production ({out_unit})").font = FONT_SUB
+        oc = ws.cell(r, 2, f"={OUTQ}*(B{b_row}/{CAPX})^(1/{SIXTENTHS})")
+        oc.fill = FILL_RESULT; oc.font = Font(bold=True, size=12)
+        oc.number_format = FMT_DEC1; oc.border = BORDER
+        r += 1
+        rev_row = r
+        ws.cell(r, 1, "→ Revenue / yr £").border = BORDER
+        rc = ws.cell(r, 2, f"=B{o_row}*1000*{SALE}")
+        rc.number_format = FMT_GBP; rc.border = BORDER
+        r += 1
+        opx_row = r
+        ws.cell(r, 1, "→ Operating cost / yr £ (interp. from sweep)").border = BORDER
+        oxc = ws.cell(r, 2, f"=FORECAST(B{o_row},{OPX},{OUTr})")
+        oxc.number_format = FMT_GBP; oxc.border = BORDER
+        r += 1
+        ebt_row = r
+        ws.cell(r, 1, "→ EBITDA / yr £").font = FONT_SUB
+        ebc = ws.cell(r, 2, f"=B{rev_row}-B{opx_row}")
+        ebc.fill = FILL_RESULT; ebc.number_format = FMT_GBP; ebc.border = BORDER
+        r += 1
+        ws.cell(r, 1, "→ Simple payback (yr)").border = BORDER
+        pbc = ws.cell(r, 2, f'=IF(B{ebt_row}>0,B{b_row}/B{ebt_row},"n/a (EBITDA ≤ 0)")')
+        pbc.number_format = FMT_DEC1; pbc.border = BORDER
+        r += 1
+        _nn = R("project_life")
+        ws.cell(r, 1, "→ IRR (annuity)").border = BORDER
+        irc = ws.cell(r, 2,
+                      f'=IF(B{ebt_row}>0,IFERROR(MAX(-0.99,'
+                      f'RATE({_nn},B{ebt_row},-B{b_row},0,0,B{ebt_row}/B{b_row})),-1),"n/a")')
+        irc.number_format = "0.0%"; irc.border = BORDER
+        r += 2
+
     # ----------------------------------------------------------------------
     # RECOMMENDED DEPLOYMENT callout (big band) — prose from the Python mirror,
     # live value cells beneath so it stays correct if inputs change.
