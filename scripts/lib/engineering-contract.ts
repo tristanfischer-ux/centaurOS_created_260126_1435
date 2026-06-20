@@ -12666,6 +12666,33 @@ registerArchetype('aquaculture_ras', (brief: any) => {
       required_margin_factor: 1.5,
       material_context: 'LOX_plus_PSA_supply_~0.5kg_O2_per_kg_feed_cone_supplementation_aeration_carries_the_balance_with_emergency_fail_open_solenoid_diffusers_in_every_tank',
     },
+    // CLOSE THE RECIRCULATION LOOP (Tristan 2026-06-20): the treatment train must RETURN
+    // to the tanks via the recirculation pumps — UV → recirc pumps → rearing tanks.
+    // Without these two legs the loop was OPEN (UV had no downstream, the pumps no
+    // upstream), which the new ledger-completeness gate correctly flagged. The ledger,
+    // not Blender, must author the closed cycle: tanks → drum → biofilter → degasser →
+    // O₂ cones → UV → recirc pumps → tanks. Per-train loop flow; the return is the
+    // supply header back to the tangential tank inlets.
+    {
+      from_part: 'uv_ozone_disinfection',
+      to_part: 'recirc_pumps',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: perTrainFlowM3S,
+      required_unit: 'm³/s',
+      required_margin_factor: 1.2,
+      material_context: `polished_disinfected_water_drawn_by_the_recirculation_pumps__${parallelCtx}`,
+    },
+    {
+      from_part: 'recirc_pumps',
+      to_part: 'rearing_tanks',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: perTrainFlowM3S,
+      required_unit: 'm³/s',
+      required_margin_factor: 1.2,
+      material_context: `recirculation_pumps_return_treated_oxygenated_water_to_the_tangential_tank_inlets_closing_the_loop__${parallelCtx}`,
+    },
     // No hand-authored electrical-bus interface here. The UNIVERSAL orphan connector
     // (build_universal_scene.augment_topology_connect_orphans) wires ONE
     // 'Standby Diesel Generator → <load>' feeder per powered part (pumps, blowers, heat

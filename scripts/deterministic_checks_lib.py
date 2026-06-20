@@ -768,6 +768,29 @@ def _checks_connectivity(state: dict, run_dir: str) -> List[Check]:
                       "direction), not by inventing a render pipe."),
         ))
 
+        # --- CONN0b. REFERENTIAL INTEGRITY — every connection names a real part on both
+        # ends with the EXACT name (Tristan 2026-06-20: "if line 1 connects to line 3,
+        # line 3 should say its input is from line 1 — in Excel we should trace whole
+        # systems this way"). A broken reference = a connection the trace cannot follow.
+        ri = cledger.get("referential_integrity") or {}
+        if isinstance(ri, dict):
+            nv = int(ri.get("n_violations") or len(ri.get("violations") or []))
+            vs = ri.get("violations") or []
+            vsample = "; ".join(f"{v.get('edge')} [{v.get('end')}={v.get('name')!r}]"
+                                for v in vs[:4])
+            out.append(Check(
+                name="Ledger referential integrity: every connection names a real part",
+                category="CONNECTIVITY", relation="le",
+                status=PASS if nv == 0 else FAIL,
+                actual=float(nv), expected=0.0, tol=0.0, unit="refs",
+                producer="conn:ledger_referential_integrity",
+                detail=(f"{nv} connection reference(s) point to a name that is not an "
+                        f"authored part — the graph is not fully traceable. Every edge "
+                        f"A→B must name B by its exact part name AND appear in B's inputs. "
+                        + (f"e.g. {vsample}." if vsample else "All references resolve; "
+                           "the whole system is traceable part-to-part.")),
+            ))
+
     cs = _load_json(os.path.join(run_dir, "connection-schedule.json"))
     if not cs:
         return out

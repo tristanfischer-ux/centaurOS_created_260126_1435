@@ -11721,20 +11721,31 @@ def main():
     # artifact so the deterministic suite can FAIL on it (no 80%-coverage absorption).
     _ledger_concerns = cl.audit_completeness(parts, topology, _REQUIRED_SERVICES,
                                              log=lambda m: print(m))
+    # Per-part adjacency (the traceable "which part connects to what") + referential
+    # integrity (every reference names a real part on both ends) — Tristan 2026-06-20.
+    _ledger_adj = cl.build_adjacency(topology)
+    _ledger_integrity = cl.audit_referential_integrity(
+        topology, {p.name for p in parts}, log=lambda m: print(m))
     try:
         _ledger_path = os.path.join(out_dir, "connection-ledger.json")
         with open(_ledger_path, "w") as _lf:
             json.dump({"schema": "connection-ledger/1", "count": len(topology),
                        "note": "Ledger-authored connections (part→part→service). Blender "
-                               "measures the lengths; the BoM costs these.",
+                               "measures the lengths; the BoM costs these. `adjacency` is "
+                               "the per-part trace (inputs/outputs by name).",
                        "rows": cl.ledger_rows(topology),
                        "dropped": [{"from": d[0], "to": d[1], "mechanism": d[2], "reason": d[3]}
                                    for d in _ledger_dropped],
                        "completeness": {"n_concerns": len(_ledger_concerns),
-                                        "concerns": _ledger_concerns}}, _lf, indent=1)
+                                        "concerns": _ledger_concerns},
+                       "adjacency": _ledger_adj,
+                       "referential_integrity": {"n_violations": len(_ledger_integrity),
+                                                  "violations": _ledger_integrity}},
+                      _lf, indent=1)
         print(f"[ledger] wrote connection-ledger.json — {len(topology)} authored "
               f"connection(s), {len(_ledger_dropped)} dropped, "
-              f"{len(_ledger_concerns)} completeness concern(s) → {_ledger_path}")
+              f"{len(_ledger_concerns)} completeness concern(s), "
+              f"{len(_ledger_integrity)} integrity violation(s) → {_ledger_path}")
     except Exception as _le:
         print(f"[ledger] WARN could not write connection-ledger.json: {_le}")
     regions, region_edges = order_regions(parts, topology)

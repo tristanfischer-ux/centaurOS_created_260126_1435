@@ -157,6 +157,13 @@ _INLINE_TAP_RE = re.compile(
     r"\bvalve\b|flow[_ -]?meter|\bmeter\b|manifold|distribution[_ -]?manifold|"
     r"pipework|\bheader\b|sight[_ -]?glass|sampl|strainer|\btee\b|\bspool\b", re.I)
 
+# ABSTRACT BATTERY-LIMIT boundary nodes — the grid connection, the atmosphere, the sea/
+# sewer. Intentional system edges with no physical part; a legitimate trace terminus, so
+# they are NOT 'broken references' in the referential-integrity check.
+_ABSTRACT_BOUNDARY_RE = re.compile(
+    r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|"
+    r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site", re.I)
+
 
 def audit_completeness(parts, final_topology, required_services, log=print):
     """STRICT ledger-completeness audit (Tristan 2026-06-20: "the ledger was supposed to
@@ -237,6 +244,64 @@ def audit_completeness(parts, final_topology, required_services, log=print):
     else:
         log(f"[ledger] COMPLETENESS: ✓ all {len(parts)} parts show their required inputs + outputs")
     return concerns
+
+
+def build_adjacency(final_topology):
+    """Per-part connection trace (Tristan 2026-06-20: "if line 1 connects to line 3, line
+    3 should say its input is from line 1 — in Excel we should trace whole systems this
+    way"). Returns {part_name: {"inputs": [{from, mechanism, service}],
+    "outputs": [{to, mechanism, service}]}}. Built FROM the authored edges, so it is
+    bidirectionally consistent BY CONSTRUCTION: every edge A→B puts B in A.outputs AND A
+    in B.inputs, using the SAME (resolved, normalised) part names on both sides — you can
+    follow any part to the parts it feeds, and each of those names back to it."""
+    adj = {}
+
+    def _slot(name):
+        return adj.setdefault(name, {"inputs": [], "outputs": []})
+
+    for e in final_topology:
+        f, t = e.get("from_part"), e.get("to_part")
+        if not f or not t:
+            continue
+        mech = e.get("mechanism")
+        svc = e.get("_ledger_service") or _service_of(mech)
+        _slot(f)["outputs"].append({"to": t, "mechanism": mech, "service": svc})
+        _slot(t)["inputs"].append({"from": f, "mechanism": mech, "service": svc})
+    return adj
+
+
+def audit_referential_integrity(final_topology, part_names, log=print):
+    """Deterministic REFERENTIAL-INTEGRITY check (Tristan 2026-06-20): every connection
+    must name a part that actually EXISTS, with the EXACT name, on both ends — so the
+    graph is traceable with no broken references. Returns a list of violations
+    {edge, end, name, reason}. By construction finalize_ledger normalises both endpoints
+    to a resolved part's own name, so a clean ledger has zero violations; this verifies
+    that invariant explicitly (a name not in the parts set = a broken reference the Excel
+    trace could not follow)."""
+    names = set(part_names or [])
+    violations = []
+    for e in final_topology:
+        for end_key in ("from_part", "to_part"):
+            nm = e.get(end_key)
+            if not nm:
+                violations.append({"edge": f"{e.get('from_part')}→{e.get('to_part')}",
+                                   "end": end_key, "name": nm, "reason": "empty endpoint"})
+            elif names and nm not in names and not _ABSTRACT_BOUNDARY_RE.search(nm):
+                # an abstract BATTERY-LIMIT boundary (utility incomer / grid / atmosphere /
+                # drain-to-sea) is an intentional system edge, not a physical part — a
+                # legitimate trace terminus, not a broken reference.
+                violations.append({"edge": f"{e.get('from_part')}→{e.get('to_part')}",
+                                   "end": end_key, "name": nm,
+                                   "reason": "endpoint name is not an authored part (broken reference)"})
+    if violations:
+        log(f"[ledger] REFERENTIAL INTEGRITY: ✗ {len(violations)} broken reference(s) — "
+            f"a connection names a part that does not exist:")
+        for v in violations[:10]:
+            log(f"[ledger]   ✗ {v['edge']} [{v['end']}={v['name']!r}]: {v['reason']}")
+    else:
+        log(f"[ledger] REFERENTIAL INTEGRITY: ✓ every connection names a real part on both "
+            f"ends (graph is fully traceable)")
+    return violations
 
 
 def ledger_rows(final_topology):

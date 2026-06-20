@@ -922,6 +922,58 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
 # ============================================================================
 # TAB 5 — BoM (requirementsBom + coverage_by_drawing + Σ check)
 # ============================================================================
+def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """Connection Trace — the ledger's per-part adjacency (Tristan 2026-06-20: "if line 1
+    connects to line 3, line 3 should say its input is from line 1; in Excel we should
+    trace whole systems this way"). One row per part: what feeds INTO it (by name) and
+    what it feeds OUT to (by name), bidirectionally consistent. Ctrl-F any part name to
+    follow the chain. Reads connection-ledger.json (authored by connection_ledger.py).
+    Returns False (tab skipped) when no ledger is present."""
+    led = load_json(os.path.join(run_dir, "connection-ledger.json"))
+    if not isinstance(led, dict) or not led.get("adjacency"):
+        return False
+    adj = led["adjacency"]
+    comp = led.get("completeness") or {}
+    ri = led.get("referential_integrity") or {}
+    incomplete = {c.get("part"): c.get("missing", []) for c in (comp.get("concerns") or [])}
+
+    ws = wb.create_sheet("Connection trace")
+    set_widths(ws, {"A": 38, "B": 10, "C": 46, "D": 46, "E": 22})
+    title_row(ws, "Connection trace — which part connects to what", 5,
+              "The ledger authors every connection; each part lists its INPUTS (from) and "
+              "OUTPUTS (to) by exact name. Trace a system: follow a part's outputs to the "
+              "next part, then read that part's inputs back. Bidirectionally consistent.")
+    # health banner
+    sub_banner(ws, 4,
+               f"{led.get('count', len(adj))} authored connections   ·   "
+               f"completeness: {comp.get('n_concerns', 0)} part(s) missing a required tie   ·   "
+               f"referential integrity: {ri.get('n_violations', 0)} broken reference(s)", 5)
+    header(ws, 5, ["Part", "Status", "Inputs ← (from)", "Outputs → (to)", "Services"])
+    r = 6
+    for name in sorted(adj.keys(), key=lambda s: str(s).lower()):
+        a = adj[name] or {}
+        ins = a.get("inputs") or []
+        outs = a.get("outputs") or []
+        in_names = ", ".join(dict.fromkeys(str(i.get("from")) for i in ins)) or "—"
+        out_names = ", ".join(dict.fromkeys(str(o.get("to")) for o in outs)) or "—"
+        svcs = ", ".join(sorted({(i.get("service") or "") for i in ins} |
+                                {(o.get("service") or "") for o in outs} - {""})) or "—"
+        miss = incomplete.get(name)
+        status = "OK" if not miss else "missing: " + ", ".join(miss)
+        ws.cell(r, 1, clean_cell(name)).border = BORDER
+        sc = ws.cell(r, 2, clean_cell(status))
+        sc.border = BORDER
+        if miss:
+            sc.font = Font(color="C00000", bold=True)
+        ci = ws.cell(r, 3, clean_cell(in_names)); ci.alignment = WRAP_TOP; ci.border = BORDER
+        co = ws.cell(r, 4, clean_cell(out_names)); co.alignment = WRAP_TOP; co.border = BORDER
+        ws.cell(r, 5, clean_cell(svcs)).border = BORDER
+        r += 1
+    ws.freeze_panes = "A6"
+    ws.auto_filter.ref = f"A5:E{max(6, r - 1)}"
+    return True
+
+
 def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     ws = wb.create_sheet("BoM")
     set_widths(ws, {"A": 12, "B": 50, "C": 8, "D": 28, "E": 8, "F": 12, "G": 12, "H": 50})
@@ -3289,6 +3341,7 @@ def build(run_dir: str, out_path: str) -> dict:
             skipped.append(f"{name} (no source data)")
 
     add_tab("Brief compliance", lambda: tab_brief_compliance(wb, state))
+    add_tab("Connection trace", lambda: tab_connection_trace(wb, state, run_dir))
     add_tab("Cost waterfall", lambda: tab_cost_waterfall(wb, state))
     # ---- ECONOMICS MODEL: Inputs -> Economics -> Scenarios (live + charts).
     # Built in this order so Economics/Scenarios can reference the Inputs cells.
