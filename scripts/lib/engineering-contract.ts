@@ -11936,7 +11936,16 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // Blower shaft power = Q[m³/s] · ΔP[Pa] / η (same identity the synthesiser uses), at a
   // FIXED service dP and split count (no host-depth read → no per-page drift).
   const BLOWER_EFFIC = 0.6
-  const blowerKw = (m3hEach: number, dPkPa: number) => Math.max(1.5, (m3hEach / 3600) * (dPkPa * 1000) / (BLOWER_EFFIC * 1000))
+  const STD_MOTOR_KW = [1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315]
+  const blowerKw = (m3hEach: number, dPkPa: number) => {
+    const shaftKw = Math.max(1.5, (m3hEach / 3600) * (dPkPa * 1000) / (BLOWER_EFFIC * 1000))
+    // INSTALLED MOTOR rating = shaft ÷ motor-η(0.9) × service-factor(1.15), snapped UP to a standard
+    // IEC frame. A blower motor stamped at bare SHAFT power trips on thermal overload (physics critic
+    // #182, 2026-06-20: 337 m³/h aeration motor was 2.8 kW shaft → real motor ≥4 kW). Universal —
+    // every air-duty blower gets a real installed motor, not its bare gas duty.
+    const motorKw = (shaftKw / 0.9) * 1.15
+    return STD_MOTOR_KW.find((s) => s >= motorKw) ?? Math.ceil(motorKw)
+  }
   // The downstream synthesiser splits each air duty into machines of ≤30,000 m³/h, then stamps
   // the canonical rating below on EACH. So the canonical rating is the PER-MACHINE duty at that
   // SAME cap — guaranteeing the contract's rated kW equals the machine the synthesiser mints.

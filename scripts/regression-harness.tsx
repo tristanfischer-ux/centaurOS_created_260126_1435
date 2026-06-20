@@ -504,6 +504,49 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     (v) => `result=${v}`,
   ))
 
+  // ── `calc_*` COLLISION-SHADOW reconciliation (2026-06-20): the auto-planner/aggregator
+  // prefixes a tool's re-emitted quantity with `calc_` when the contract already owns that key.
+  // These shadows were NOT reconciled (only `computed_` was) → phantom "Calc Biofilter / Calc
+  // Degasser / Calc Uv" vessels + a duplicate blower → biofilter asymmetry, the degasser power
+  // orphan, and 87m runs. The reconciler now treats `calc_` like `computed_` AND drops a
+  // twin-LESS `calc_` (always a shadow; the canonical lives under a different name e.g.
+  // co2_stripping_air_flow) while still KEEPING a twin-less `computed_` (AUV sole source).
+  const calcState: any = {
+    orchestratorContract: { quantities: {
+      biofilter_air_flow_m3_h: { value: 514 },
+      calc_biofilter_air_flow_m3_h: { value: 99 },       // twin exists → drop
+      calc_degasser_air_flow_m3_h: { value: 17020 },     // twin-LESS calc_ → drop (NEW behaviour)
+      computed_endurance_min: { value: 45 },             // twin-less computed_ → KEEP (AUV sole source)
+      co2_stripping_air_flow_m3_h: { value: 34040 },
+    } },
+    moduleDecomposition: { modules: [ { sub_modules: [ { words: [
+      { id: 'calc_biofilter_synth_word', name_human: 'Calc Biofilter', content_character: { character_id: 'calc_biofilter_synth_word' } },
+      { id: 'biofilter_synth_word', name_human: 'Biofilter', content_character: { character_id: 'biofilter_synth_word' } },
+    ] } ] } ] },
+  }
+  const calcRes = reconcileComputedTwins(calcState)
+  const cq = calcState.orchestratorContract.quantities
+  const calcWords = calcState.moduleDecomposition.modules[0].sub_modules[0].words.map((w: any) => w.id)
+  out.push(assertEq(
+    'UNIVERSAL.calc_collision_shadow_always_dropped',
+    'reconcileComputedTwins drops a calc_<base> with a real <base> twin AND a twin-LESS calc_* (collision-shadow, never a legit sole source), keeps the canonical <base> + a differently-named canonical (co2_stripping_air_flow) + a twin-less computed_* (AUV endurance), and prunes the phantom "Calc X" word while keeping the real word',
+    JSON.stringify({
+      calcTwinGone: !('calc_biofilter_air_flow_m3_h' in cq),
+      calcOrphanGone: !('calc_degasser_air_flow_m3_h' in cq),
+      canonicalKept: cq.biofilter_air_flow_m3_h?.value === 514 && cq.co2_stripping_air_flow_m3_h?.value === 34040,
+      computedOrphanKept: cq.computed_endurance_min?.value === 45,
+      phantomWordGone: !calcWords.includes('calc_biofilter_synth_word'),
+      realWordKept: calcWords.includes('biofilter_synth_word'),
+      dropped: calcRes.twinQuantitiesDropped,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.calcTwinGone && o.calcOrphanGone && o.canonicalKept && o.computedOrphanKept &&
+        o.phantomWordGone && o.realWordKept && o.dropped === 2
+    },
+    (v) => `result=${v}`,
+  ))
+
   // ── cost-sanity reads the AUTHORITATIVE BoM + a recognised class gets its own band
   // (ledger Phase 1c, 2026-06-17). Two coupled fixes this guards: (1) the gate's headline
   // cost MUST track costStack.ex_works (the chain re-runs computeCostSanity AFTER the

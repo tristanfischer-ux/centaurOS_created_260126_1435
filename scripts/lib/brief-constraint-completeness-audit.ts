@@ -110,6 +110,11 @@ const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   rated_power: { qtyKey: 'continuous_power_kw', label: 'Rated power' },
   rated_power_kw: { qtyKey: 'continuous_power_kw', label: 'Rated power' },
   annual_energy_mwh: { qtyKey: 'annual_energy_yield_mwh', label: 'Annual energy yield' },
+  // Aquaculture RAS headline targets — mirror of render-minimal-pdf.tsx::METRIC_MAP (I12b parity).
+  production_capacity_tpy: { qtyKey: 'annual_production_t_yr', label: 'Production capacity' },
+  production_capacity_t_yr: { qtyKey: 'annual_production_t_yr', label: 'Production capacity' },
+  annual_production_t_yr: { qtyKey: 'annual_production_t_yr', label: 'Production capacity' },
+  rearing_tank_volume_m3: { qtyKey: 'total_tank_volume_m3', label: 'Total rearing-tank volume' },
   thermal_output_kw: { qtyKey: 'thermal_output_kw', label: 'Thermal output' },
   cop: { qtyKey: 'cop_seasonal', label: 'COP (seasonal)' },
   yield_kg_per_year: { qtyKey: 'yield_kg_per_year', label: 'Annual yield' },

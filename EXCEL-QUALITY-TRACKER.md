@@ -1,28 +1,27 @@
 # Excel Dossier Quality Tracker — RAS £5M review (2026-06-20)
 
-> Source: Tristan's review pass of `ras-5m-v24/dossier.xlsx`. **Every fix UNIVERSAL** (exporter + drawing generators run for all archetypes — no RAS-specific hardcoding). Fix in order; commit after each.
+> Source: Tristan's review pass of `ras-5m-v24/dossier.xlsx`. **Every fix UNIVERSAL** (exporter + drawing generators + engine run for all archetypes — no RAS-specific hardcoding, no metric-gaming). Fix in order; commit after each.
 
-## Bucket A — Exporter (`scripts/build-excel-export.py`), no chain re-run, rebuild+reopen
+## ✅ Bucket A — Exporter (`scripts/build-excel-export.py`) — DONE, committed 9eed8cadf, Excel reopened
 | # | Issue | Status |
 |---|-------|--------|
-| 175 | Charts: rainbow lines + per-point legends (varyColors), heavy gridlines, no axis values, EBITDA invisible → `_clean_chart` helper | ☐ |
-| 176 | Schedule tabs (Line/Valve/Instrument) Service column truncated (width 40, no wrap) → wrap_text + widths | ☐ |
-| 177 | Panel schedule + Process schedules embedded as PDF IMAGES not native rows → drop from image list (native sheets exist) | ☐ |
-| 178 | Diagrams blurry — exporter crushes 2160–6560px → 1400px (`downscale_png max_px` + display cap) → raise caps | ☐ |
-| 179 | Calc tab "[static — no input map]" values unchecked (generic tool examples) → verify vs contract + ✓/⚠ | ☐ |
+| 175 | Charts: varyColors rainbow + per-point legends + heavy gridlines → `style_chart()` (varyColors=0, solid colours, no gridlines, data labels). Verified in chart XML. | ✅ |
+| 176 | Schedule Service column truncated → auto-fit row heights + widen 40→54. | ✅ |
+| 177 | Panel/Process embedded as PDF images → dropped; native sortable sheets only. | ✅ |
+| 178 | Diagrams crushed 2160–6560px → 1400 → raised downscale 2600 + display 1700 (P&ID/single-line/BFD now ~1.9× sharper). | ✅ |
+| 179 | Calc "[static]" values unchecked → recomputed LIVE from substitution + ✓/⚠ vs engine (72 live / 2 static; safe positive-only design cross-ref). | ✅ |
 
-## Bucket B — Drawing renderer (`scripts/blender-universal/draw_*.py`)
-| # | Issue | Status |
-|---|-------|--------|
-| 180 | 3 isometrics look wrong — `_draw_one_iso` over-compresses long runs into fixed panel; iso-index missing | ☐ |
-| 184 | Drawing coverage thin (P&ID 19.6%, BFD 33.3%) — render ALL BoM parts | ☐ |
+## Bucket B/C — diagnosed; need engine fix + ONE chain re-run (2 background agents mapping)
+| # | Issue | Diagnosis | Status |
+|---|-------|-----------|--------|
+| 181 | cost_sanity=5 → re-budget to £5M | 52 t/yr → £5.37M (7.4% over). design-to-budget mechanism overshot the ceiling. Agent mapping the sizing trigger. | ⏳ map |
+| 182 | physics_fidelity=7 → blower motors + biofilter | Aeration blower motor under-rated vs duty; MBBR biofilter twin asymmetry. Agent mapping universal-contract-sizing.ts. | ⏳ map |
+| 183 | brief_compliance=6 → 5 unverified constraints | gate-9 family: 5 brief constraints don't render PASS/FAIL rows. Agent identifying the 5 + METRIC_MAP/alias fix. | ⏳ map |
+| 185 | Connectivity: blower power orphan + 87m run | `u_degassing_blower_inst0/inst1` DUP (computed-twin, #174) → power orphan. 87m run = PLACEMENT spreads equipment far/tall. Agent mapping. | ⏳ map |
+| 180 | Isometrics look wrong | NOT a drawing bug — routes are geometrically real (41.7m spans, degasser at 14.4m). Root = PLACEMENT (long runs/tall stacks), SAME as #185. Fold into placement fix + re-render. | ⏳ placement |
+| 184 | Coverage P&ID 19.6% / BFD 33.3% | (a) BFD correctly shows blocks not instruments — metric over-expects; (b) P&ID matcher false-neg: parts drawn with ISA tags (PCV-208) not credited vs manifest names. REAL fix = denser P&ID (#123) + correct per-drawing-type expectation, NOT metric relaxation. | ⏳ |
 
-## Bucket C — Chain re-run (engine)
-| # | Issue | Status |
-|---|-------|--------|
-| 181 | Scorecard cost_sanity=5 → re-budget to £5M (52→~46 t/yr) | ☐ |
-| 182 | Scorecard physics_fidelity=7 → undersized blower motors + biofilter asymmetry | ☐ |
-| 183 | Scorecard brief_compliance=6 → 5 unverified constraints render as rows | ☐ |
-| 185 | Connectivity: Degassing Blower power orphan (#174) + 87m periphery run | ☐ |
+**Plan:** implement engine fixes (181/182/183/185) + placement fix (185/180) + P&ID density (184) → ONE chain re-run (re-renders all drawings, re-budgets) → rebuild + reopen Excel → verify scorecard fails clear + coverage genuine.
 
-**Constraint (Tristan, 2026-06-20):** all fixes universal, no cheating for RAS only.
+**Constraint (Tristan, 2026-06-20):** all fixes universal; no RAS-only cheating; no metric-gaming.
+**Branch note:** worktree on `oxccu-efuel`; reconcile to `main` (one-engine rule) at push/deploy time.

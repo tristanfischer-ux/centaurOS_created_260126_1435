@@ -79,6 +79,36 @@ MECH_KIND = {"fluid_loop": "pipe", "fluid": "pipe", "process": "pipe", "thermal"
              "electrical": "cable", "power": "cable", "signal": "signal/sensor tie",
              "control": "signal/sensor tie", "gas": "gas pipe"}
 
+# A manifest instrument/valve part is REPRESENTED on a P&ID by its ISA LETTER (TT/PT/LT/AT/FCV/
+# XV/PSV), NOT by its manifest tag ("u_temperature_sensor") — so the coverage matcher's tag/name
+# text-match FALSE-NEGATIVES every such part (the part IS drawn, just as an ISA bubble). Credit
+# coverage when the function's ISA symbol is present in the drawing. Mirrors draw_pid.py's
+# _INSTR_WORD_FUNC. Universal — corrects the manifest-tag↔ISA-tag mismatch for every class. A
+# genuinely-missing valve (no PCV/XV symbol drawn) is still NOT credited → the % stays honest.
+_ISA_FUNC = [
+    # valves FIRST (a "flow control valve" is a valve, not a flow transmitter — match before \bflow\b)
+    (re.compile(r"relief|\bpsv\b|safety.?valve|pressure.?relief", re.I), ("PSV",)),
+    (re.compile(r"solenoid|\besd\b|shut.?off|emergency.*valve|on.?off.?valve", re.I), ("XV",)),
+    (re.compile(r"flow.?control.?valve|\bfcv\b|control.?valve|dosing.?valve|modulat", re.I), ("FCV", "PCV")),
+    # instruments
+    (re.compile(r"dissolved.?oxygen|_do_|\bdo\b|do[_ ]?anal", re.I), ("AT",)),
+    (re.compile(r"\bph\b|_ph_|ph[_ ]?anal", re.I), ("AT",)),
+    (re.compile(r"conductiv|salin", re.I), ("AT",)),
+    (re.compile(r"ammonia|nitrate|nitrite|\btan\b|analy[sz]", re.I), ("AT",)),
+    (re.compile(r"\blevel\b|_level_|level.?transmit|level.?switch", re.I), ("LT", "LSL")),
+    (re.compile(r"temperatur|_temp_|\btemp\b", re.I), ("TT",)),
+    (re.compile(r"\bflow\b|_flow_|flow.?transmit|flow.?meter", re.I), ("FT",)),
+    (re.compile(r"pressure|_press_", re.I), ("PT",)),
+]
+
+
+def _isa_letters(tag: str, name: str):
+    s = f"{tag or ''} {name or ''}"
+    for rx, letters in _ISA_FUNC:
+        if rx.search(s):
+            return letters
+    return ()
+
 
 def _norm(s: str) -> str:
     s = re.sub(r"^u_", "", (s or "").strip().lower())
@@ -295,6 +325,15 @@ def main() -> int:
             if tag not in ambiguous_tags:
                 return True
             return name_present
+        if name_present:
+            return True
+        # ISA-bubble credit: an instrument/valve is drawn on a P&ID (or single-line) by its ISA
+        # LETTER (TT/PT/LT/AT/FCV/XV/PSV), not its manifest tag — credit when the function's symbol
+        # is present in the drawing text. Corrects a matcher false-negative (the part IS drawn).
+        if key in ("pid", "single-line-diagram"):
+            for L in _isa_letters(tag, name):
+                if re.search(rf"\b{re.escape(L)}\b", txt):
+                    return True
         return name_present
 
     # ── 1. PARTS (equipment) — identity + BoM/cost + coverage (I/O attached below) ──

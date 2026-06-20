@@ -173,7 +173,7 @@ function significantStems(phrase: string): string[] {
 // not an over-merge: it collapses onto a real group ONLY when one shares the same base noun.
 function stripComputedToken(phrase: string): string {
   const cleaned = phrase
-    .replace(/(^|[_\s])computed([_\s]|$)/gi, '$1$2') // drop a whole "computed" token, keep the boundary
+    .replace(/(^|[_\s])(?:computed|calc)([_\s]|$)/gi, '$1$2') // drop a whole "computed"/"calc" collision-shadow token, keep the boundary
     .replace(/[_\s]{2,}/g, '_') // collapse the gap the removal left
     .replace(/^[_\s]+|[_\s]+$/g, '') // trim leading/trailing separators
   return cleaned.length > 0 ? cleaned : phrase
@@ -181,7 +181,7 @@ function stripComputedToken(phrase: string): string {
 // id-level twin-collapse: drop a leading/embedded `computed_` segment from a word/host id so
 // `computed_uv_reactor_synth_word` ↔ `uv_reactor_synth_word`. Mirrors stripComputedToken.
 function stripComputedId(id: string): string {
-  const cleaned = String(id ?? '').replace(/(^|_)computed_/i, '$1')
+  const cleaned = String(id ?? '').replace(/(^|_)(?:computed|calc)_/i, '$1')
   return cleaned.length > 0 ? cleaned : id
 }
 
@@ -195,6 +195,13 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
     // contract passes (or the reconcile re-derivation) never mints a phantom "Building
     // Footprint" principal from the area suffix.
     if (/^building_(footprint|gross_floor_area|wall_area|height)_/.test(key)) continue
+    // A `calc_*` key is a tool COLLISION-SHADOW: the auto-planner re-emitted a quantity the
+    // contract already owns under another name, so the aggregator prefixed it `calc_`. It must
+    // NEVER mint its own equipment group — that is the phantom "Calc Biofilter / Calc Degasser /
+    // Calc Uv" vessel bug (the real unit is sized from its canonical, non-prefixed key). Universal:
+    // no archetype carries a legitimate `calc_*` quantity (BESS/CO2/e-fuel = 0). Same family as the
+    // computed_* twin reconciliation — see reconcileComputedTwins + stripComputedToken.
+    if (/(^|_)calc_/i.test(key)) continue
     let matched: { phrase: string; measure: Measure; perEach: boolean; volRole?: number } | null = null
     for (const rule of SUFFIX_RULES) {
       if (rule.re.test(key)) {
@@ -1122,10 +1129,19 @@ function valveFromFlow(m3h: number): { dn: number; label: string; gbp: number } 
 // aeration blower must overcome the diffuser depth (ρg·h). £ ≈ 2000 + 1200·kW^0.8 fits
 // real blower prices (10 kW ≈ £10k, 50 kW ≈ £30k, 200 kW ≈ £85k) — not the linear £/kW
 // that priced a 309 kW machine at £375k.
+const STD_BLOWER_MOTOR_KW = [1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315]
+/** Installed motor rating for a blower: shaft ÷ motor-η(0.9) × service-factor(1.15), snapped to a
+ *  standard IEC frame. A motor stamped at bare shaft power trips on thermal overload (physics
+ *  critic #182). Universal — mirrors engineering-contract.ts::blowerKw for the no-canonical path. */
+function installedMotorKw(shaftKw: number): number {
+  const m = (shaftKw / 0.9) * 1.15
+  return STD_BLOWER_MOTOR_KW.find((s) => s >= m) ?? Math.ceil(m)
+}
 function blowerFromAirFlow(m3hEach: number, dPkPa: number): { kw: number; gbp: number } {
   const eff = 0.6
-  const kw = Math.max(1.5, (m3hEach / 3600) * (dPkPa * 1000) / (eff * 1000))
-  return { kw, gbp: Math.round(2000 + 1200 * Math.pow(kw, 0.8)) }
+  const shaftKw = Math.max(1.5, (m3hEach / 3600) * (dPkPa * 1000) / (eff * 1000))
+  // rating = installed MOTOR (won't trip), cost = the air-duty shaft (the blower package price)
+  return { kw: installedMotorKw(shaftKw), gbp: Math.round(2000 + 1200 * Math.pow(shaftKw, 0.8)) }
 }
 
 function actuatorWord(kind: string, label: string, host: WordLike | undefined, qty: number, spec: ModifierCharacter[], gbp: number, form: string): WordLike {
@@ -1175,8 +1191,9 @@ export function synthesizeActuation(modules: ModuleLike[], quantities: Record<st
   const blowerNamesUsed = new Set<string>()   // anti-collision (see blowerName below)
   for (const [key, val] of Object.entries(quantities)) {
     if (!/_air_flow_m3_h$/.test(key) || !(val > 0)) continue
+    if (/(^|_)calc_/i.test(key)) continue   // collision-shadow air-flow → never mint a phantom blower (see buildGroups)
     const stemKey = significantStems(key.replace(/_air_flow_m3_h$/, ''))
-    const host = vessels.find((v) => { const vs = wordStems(v); return stemKey.some((s) => vs.includes(s)) })
+    let host = vessels.find((v) => { const vs = wordStems(v); return stemKey.some((s) => vs.includes(s)) })
     const n = Math.max(1, Math.ceil(val / SINGLE_BLOWER_CAP))
     const each = val / n
     // dP by service: a degassing / stripping blower overcomes only packing + ducting
@@ -1184,6 +1201,14 @@ export function synthesizeActuation(modules: ModuleLike[], quantities: Record<st
     // a sane 8–25 kPa band). Read the service from the air-flow KEY (the degasser is box-
     // modelled, so it has no host vessel to read a depth from).
     const isDegas = /degas|strip|scrub|\bvent|tower|column|contactor/.test(key)
+    if (!host && isDegas) {
+      // a degassing/stripping duty whose KEY stem names no vessel (e.g. co2_stripping_air_flow →
+      // stems co2/stripping, but the vessel is "Degasser") → attach the blower to the degasser/
+      // stripper/scrubber vessel by NOUN so it gets a real host (power + process edge) instead of
+      // orphaning on process_loop (connectivity #185). Universal — any air-mover whose duty key
+      // doesn't stem-match a vessel falls back to its served process vessel.
+      host = vessels.find((v) => /degas|strip|scrub|column|contactor|tower/i.test(String(v.name_human ?? '')))
+    }
     const dPkPa = isDegas ? 4 : Math.min(25, Math.max(8, (readParentPhysics(host ?? ({} as WordLike)).htM || 1.2) * 9.81))
     // ONE RATED VALUE PER DEVICE (council RAS fix, blower): if the contract declares a CANONICAL
     // per-device rating for this service (`<service>_blower_kw`), USE it verbatim so every page
@@ -3099,8 +3124,20 @@ export function reconcileComputedTwins(
       res.twinQuantitiesDropped++
       res.droppedQuantityKeys.push(k)
       dropBaseSet.add(base)
+    } else if (/(^|_)calc_/i.test(k)) {
+      // no de-prefixed <base> twin, but this is a `calc_*` COLLISION-SHADOW — it exists only
+      // because a tool re-emitted a key the contract already owns under a DIFFERENT name (e.g.
+      // calc_degasser_air_flow vs the canonical co2_stripping_air_flow). It is NEVER a legitimate
+      // sole source, so drop it so it can't survive as a phantom vessel/blower source. Universal:
+      // no archetype carries a legitimate `calc_*` key (BESS/CO2/e-fuel = 0).
+      if (Object.prototype.hasOwnProperty.call(orchQ, k)) delete orchQ[k]
+      if (Object.prototype.hasOwnProperty.call(engQ, k)) delete engQ[k]
+      res.twinQuantitiesDropped++
+      res.droppedQuantityKeys.push(k)
+      dropBaseSet.add(stripComputedId(k))
     } else {
       // no twin → this computed_* is the SOLE source for the quantity → keep it untouched.
+      // (AUV computed_endurance_min, drone computed_peak_flow_lpm — consumed by the verifier.)
       res.survivingComputedKeys.push(k)
     }
   }

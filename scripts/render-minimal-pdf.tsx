@@ -7304,6 +7304,16 @@ export function _buildComplianceRows(state: any, bomTotals: BomTotals | null, co
       rated_power:                 { qtyKey: 'continuous_power_kw',       label: 'Rated power',            unit: 'kW',  tolerancePct: 5, kind: 'floor' },
       rated_power_kw:              { qtyKey: 'continuous_power_kw',       label: 'Rated power',            unit: 'kW',  tolerancePct: 5, kind: 'floor' },
       annual_energy_mwh:           { qtyKey: 'annual_energy_yield_mwh',   label: 'Annual energy yield',    unit: 'MWh', tolerancePct: 10, kind: 'floor' },
+      // Aquaculture RAS (FLOORS). The brief emits 'production_capacity_tpy' /
+      // 'rearing_tank_volume_m3'; the contract owns the same quantities under
+      // 'annual_production_t_yr' / 'total_tank_volume_m3'. Without these the HEADLINE production
+      // target + the culture volume rendered "—" in the Brief Compliance table (gate-9 renderer
+      // gap, 2026-06-20). Registering the brief keys is the same per-class pattern as every entry
+      // above (BESS/wind/heat-pump) — the map is the universal brief-key→contract-key registry.
+      production_capacity_tpy:     { qtyKey: 'annual_production_t_yr',    label: 'Production capacity',       unit: 't/yr', tolerancePct: 5, kind: 'floor' },
+      production_capacity_t_yr:    { qtyKey: 'annual_production_t_yr',    label: 'Production capacity',       unit: 't/yr', tolerancePct: 5, kind: 'floor' },
+      annual_production_t_yr:      { qtyKey: 'annual_production_t_yr',    label: 'Production capacity',       unit: 't/yr', tolerancePct: 5, kind: 'floor' },
+      rearing_tank_volume_m3:      { qtyKey: 'total_tank_volume_m3',     label: 'Total rearing-tank volume', unit: 'm³',   tolerancePct: 8, kind: 'floor' },
       // Heat pump (FLOORS — thermal output ≥ brief, COP ≥ brief)
       thermal_output_kw:           { qtyKey: 'thermal_output_kw',         label: 'Thermal output',         unit: 'kW',  tolerancePct: 5, kind: 'floor' },
       cop:                         { qtyKey: 'cop_seasonal',              label: 'COP (seasonal)',         unit: '',    tolerancePct: 5, kind: 'floor' },
