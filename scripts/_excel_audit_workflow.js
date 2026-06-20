@@ -8,10 +8,12 @@ export const meta = {
 }
 
 // args = { cellsDir, truthFile, tabs: [{file,name,cells}] }  (the data tabs to audit)
-const A = args || {}
+let A = args || {}
+if (typeof A === 'string') { try { A = JSON.parse(A) } catch (e) { A = {} } }
 const cellsDir = A.cellsDir
 const truthFile = A.truthFile
 const tabs = (A.tabs || []).filter((t) => t.cells >= 8)   // skip image/near-empty tabs
+if (!tabs.length) throw new Error(`no tabs to audit — args.tabs empty (got args type ${typeof args}); cellsDir=${cellsDir}`)
 
 const IMMUNITIES = `
 FALSE-POSITIVE DISCIPLINE — these are DESIGN INTENT, NOT errors. Do NOT flag any of them:
@@ -21,7 +23,8 @@ FALSE-POSITIVE DISCIPLINE — these are DESIGN INTENT, NOT errors. Do NOT flag a
 - A part priced from a "component-class reference"/corpus band is a CATEGORY price, not a specific vendor SKU — that is correct for bespoke/RFQ equipment, NOT an error.
 - "TBD (catalogue class)" / "TBD (detailed design)" part numbers on a concept-stage dossier are intended placeholders, not errors.
 - A yellow cell is an EDITABLE input; a green cell is a LIVE formula. Editable/assumption values are not "wrong" just because you'd pick a different number.
-- Rounding to whole £ or a different displayed precision is not an error.
+- Rounding to whole £ or a different displayed precision is not an error. A £1 difference between a rounded unit×qty and the line total, or between a total and its rounded components, is rounding — NOT an error.
+- The SCENARIOS / sensitivity tab builds a WORST-case and BEST-case corner ON PURPOSE: the "Low" column = low sale price BUT HIGH energy + HIGH capex (the pessimistic corner), and "High" = high price + LOW energy + LOW capex. So a Low-column EBITDA/payback formula that references the High-column (D) energy/capex inputs — and vice-versa — is INTENTIONAL cross-wiring, NOT a swapped reference. Do NOT flag scenario formulas for referencing the "opposite" column's energy/capex/maintenance inputs.
 
 ONLY report a cell as an ERROR if it is CONCRETELY, PROVABLY wrong — one of:
   (1) a spreadsheet error literal in the cell: #REF!, #NAME?, #DIV/0!, #VALUE!, #N/A, #NULL!, #NUM!
