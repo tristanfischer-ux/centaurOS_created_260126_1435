@@ -602,7 +602,13 @@ def _humanise(tag: str) -> str:
         return tag
     ACR = {"co2", "h2", "ft", "saf", "mv", "lv", "hv", "dc", "ac", "psv", "prv",
            "esd", "voc", "co", "n2", "o2", "caco3", "k2so4", "koh", "mea", "zno",
-           "vfd", "vsd", "api", "hp", "lp", "ko", "i&c"}
+           "vfd", "vsd", "api", "hp", "lp", "ko", "i&c",
+           # aquaculture / water-treatment / E&I acronyms (so 'aquaculture_ras' →
+           # 'Aquaculture RAS', not 'Aquaculture ras'; universal across drawings).
+           # Only unambiguous equipment/system tokens — NOT process params like do/ph/tan
+           # (common words / special-cased as pH) which would false-uppercase in names.
+           "ras", "uv", "mbbr", "lox", "hvac", "orp", "sbr", "daf", "ro", "uf",
+           "gac", "cip", "hmi", "plc", "scada", "ups", "mcc", "ats", "led", "psa"}
     parts = re.split(r"[_\s]+", tag.strip())
     words = []
     for p in parts:

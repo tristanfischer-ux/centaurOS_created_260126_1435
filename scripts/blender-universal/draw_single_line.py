@@ -433,7 +433,9 @@ def _humanise(tag: str) -> str:
         return tag
     t = tag.strip()
     ACR = {"pcs", "ft", "mv", "lv", "hv", "dc", "ac", "bms", "saf", "co2", "h2",
-           "ups", "pdu", "crac", "mcc", "rmu", "hvac"}
+           "ups", "pdu", "crac", "mcc", "rmu", "hvac",
+           "ras", "uv", "mbbr", "lox", "orp", "sbr", "daf", "ro", "uf", "gac",
+           "cip", "hmi", "plc", "scada", "ats", "led", "psa"}
     parts = re.split(r"[_\s]+", t)
     words = []
     for p in parts:
@@ -711,15 +713,30 @@ def _flag_voltdrop(tree: Tree, schedule: dict):
                 b._vd_flag = "advisory"  # type: ignore[attr-defined]
 
 
+# PASSIVE SUB-COMPONENTS — a part that is INSIDE / PART OF a parent equipment item: an
+# MBBR's plastic media/carrier (inert — draws NO power), a filter's screen/backwash, a
+# vessel's internals/packing/fill, a pump's impeller. Its power (if any) is the PARENT's
+# motor feeder, so it must NOT appear as a standalone feeder on the board (a reviewer
+# rightly asks why inert biofilm media has a 400 V breaker). Mirrors connection_ledger's
+# _SUBCOMPONENT_RE so the single-line, the ledger and the Blender agree. Universal.
+_PASSIVE_SUBCOMPONENT_RE = re.compile(
+    r"\bmedia\b|carrier|biofilm[_ ]?carrier|\bscreen\b|backwash|\belement\b|cartridge|"
+    r"membrane|\bpacking\b|\bfill\b|internals|impeller|standpipe|\bsparger\b", re.I)
+
+
 def _strip_board_element_feeders(tree: Tree):
     """UNIVERSAL: drop any main-bus branch that is a board element drawn as a load tap
     (main breaker, busbar, fuse holder, isolator, surge protector, protective relay, UPS,
-    ATS, generator). These reach the board only as per-word connection-schedule skeleton
-    edges; the main breaker is already the incomer device and the SPD a shunt on the bus,
-    so they must not also appear as 54 A consuming feeders. Records which were removed so
+    ATS, generator) OR a PASSIVE SUB-COMPONENT (MBBR media, filter screen/backwash, vessel
+    internals — part of a parent, not a standalone powered load). These reach the board
+    only as per-word connection-schedule skeleton edges; the main breaker is already the
+    incomer device, the SPD a shunt on the bus, and a sub-component's power is its parent's
+    feeder — so none must also appear as a consuming feeder. Records which were removed so
     the bus can note the SPD/main-breaker placement. Deterministic; name-keyed."""
     main = tree.main_bus
-    removed = [br for br in main.branches if _is_board_element_feeder(br)]
+    removed = [br for br in main.branches
+               if _is_board_element_feeder(br)
+               or _PASSIVE_SUBCOMPONENT_RE.search(f"{br.label or ''} {br.to_node or ''}")]
     if not removed:
         return
     main.branches = [br for br in main.branches if br not in removed]
