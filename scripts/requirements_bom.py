@@ -2817,6 +2817,22 @@ def assemble(out_dir: str):
               f"to their engine corpus lower edge (+£{_lift_gbp:,.0f})", file=sys.stderr)
 
     rows += _connection_rows(out_dir, qcontract)   # pipe/cable/duct runs as their own service-classified BoM lines (re-priced from contract duties)
+
+    # ── DISPLAY-ARITHMETIC CONSISTENCY (swarm-flagged £1 nits, 2026-06-20). A line built
+    # as unit_gbp=round(x), line_gbp=round(x·qty) can show unit×qty ≠ line by up to £1
+    # (4 × £47,867 = £191,468 but the line read £191,469, because the unit was rounded
+    # AFTER multiplying). A reader checks unit×qty == line, so the DISPLAYED line must be
+    # the DISPLAYED unit × qty exactly. Re-derive every priced parent line from its rounded
+    # unit; sub-components (line_gbp 0, ride in breakdown_gbp) are untouched. Negligible
+    # effect on the total; makes every BoM row self-consistent + passes the C2 gate exactly.
+    for row in rows:
+        if row.get("status") == "SUB-COMPONENT":
+            continue
+        u = row.get("unit_gbp")
+        qy = row.get("qty")
+        if isinstance(u, (int, float)) and isinstance(qy, (int, float)) and float(row.get("line_gbp") or 0) > 0:
+            row["unit_gbp"] = round(u)
+            row["line_gbp"] = round(u) * int(qy)
     return rows
 
 

@@ -8179,6 +8179,21 @@ async function main() {
         for (const k of Object.keys(st.costStack)) {
           if (typeof st.costStack[k] === 'number') st.costStack[k] = Math.round(st.costStack[k] * scale)
         }
+        // CASCADE DISPLAY CONSISTENCY (swarm-flagged £1 nit, 2026-06-20): each field was
+        // rounded INDEPENDENTLY after scaling, so a SUM field could differ from its rounded
+        // components by ±£1 (installed_asp £5,037,731 vs oem £4,148,719 + install £889,011
+        // = £5,037,730). Re-derive the running totals from their now-rounded parts so the
+        // cost waterfall adds up exactly as displayed. Each guarded to the fields present.
+        const cs = st.costStack as Record<string, number>
+        const sum = (...ks: string[]) => ks.reduce((a, k) => a + (Number(cs[k]) || 0), 0)
+        if (cs.factory_cogs_gbp != null)
+          cs.factory_cogs_gbp = sum('raw_materials_bom_gbp', 'assembly_labour_gbp', 'factory_overhead_gbp')
+        if (cs.oem_transfer_price_gbp != null)
+          cs.oem_transfer_price_gbp = sum('factory_cogs_gbp', 'manufacturer_margin_gbp')
+        if (cs.channel_list_price_gbp != null)
+          cs.channel_list_price_gbp = sum('oem_transfer_price_gbp', 'channel_markup_gbp')
+        if (cs.installed_asp_gbp != null)
+          cs.installed_asp_gbp = sum('channel_list_price_gbp', 'installation_cost_gbp')
         if (st.cost_reality && typeof st.cost_reality === 'object') st.cost_reality.bom_total_gbp = Math.round(reqTotal)
       }
       // RE-DERIVE the independent cost-sanity gate (gate 32) on the AUTHORITATIVE BoM
