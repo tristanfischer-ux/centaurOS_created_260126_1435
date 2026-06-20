@@ -6033,7 +6033,7 @@ _NOT_POWER_GENERATOR_RE = re.compile(
     r"steam|waste[- ]?heat|fired|furnace|boiler|process|heat[- ]?recovery|hrsg|reformer|syngas",
     re.IGNORECASE)
 _DIST_MAINBRK_RE    = re.compile(r"main\s*breaker|main\s*switch|main\s*isolat|incoming\s*breaker|\bACB\b|\bMCCB\b|main\s*circuit\s*breaker", re.IGNORECASE)
-_DIST_BUSBAR_RE     = re.compile(r"busbar|bus\s*bar|distribution\s*board|switchboard|main\s*board|\bMCC\b|consumer\s*unit|\bpanelboard\b|distribution\s*panel", re.IGNORECASE)
+_DIST_BUSBAR_RE     = re.compile(r"busbar|bus\s*bar|distribution\s*board|switchboard|main\s*board|\bMCC\b|consumer\s*unit|\bpanelboard\b|distribution\s*panel|switchgear|switch[- ]?gear|motor\s*control\s*cent|\bLV\s*board\b|\bMV\s*board\b|low[- ]?voltage\s*board|\bLV\s*panel\b|\bLV\s*switchboard\b|power\s*distribution\s*unit|\bPDU\b", re.IGNORECASE)
 _DIST_PROTECT_RE    = re.compile(r"\bfuse\b|surge|\bSPD\b|protective\s*relay|protection\s*relay|earth\s*leakage|\bRCD\b|\bRCBO\b|\bMCB\b", re.IGNORECASE)
 
 
@@ -6102,9 +6102,13 @@ def augment_topology_connect_orphans(state, topology, parts):
     if _hierarchy_active:
         pwr_hub = dist_load_hub
     else:
-        # no real chain → fall back to the historical hub pick (unchanged behaviour),
-        # and emit NO spine / protective taps (so nothing new is added on these classes).
-        pwr_hub = _module_repr_part_name('power_distribution', parts)
+        # no multi-stage chain → still use the LONE distribution part (busbar / switchgear /
+        # board / MCC) as the power hub if one exists, so every load taps a real
+        # distribution point; else the module-representative part. (2026-06-20 universal
+        # fix: previously this IGNORED a lone busbar and used only the module repr — a class
+        # with just a switchgear, like SAF, got pwr_hub=None and wired ZERO power feeds, so
+        # 30 powered parts were left unpowered. dist_load_hub is the lone bus when present.)
+        pwr_hub = dist_load_hub or _module_repr_part_name('power_distribution', parts)
         dist_spine, dist_protects = [], []
 
     # the water tie carries the loop flow (largest flow_capacity already on the topology)

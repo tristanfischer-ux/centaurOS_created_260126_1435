@@ -147,8 +147,24 @@ _FLUID_SINK_RE = re.compile(
 # injection point into the loop). Like an origin: exempt from the fluid-INPUT requirement.
 _INJECTOR_RE = re.compile(
     r"dos(?:e|ing|er)|chemical|alkalin|bicarb|caustic|\bacid\b|nutrient|"
-    r"oxygen[_ -]?(?:supply|cone|inject|diffus|solenoid)|\blox\b|liquid[_ -]?oxygen|"
-    r"ozone[_ -]?(?:supply|generat|inject)|\bco2[_ -]?(?:supply|inject)|heat[_ -]?pump", re.I)
+    r"(?:oxygen|o₂|o2)[_ -]?(?:supply|cone|inject|diffus|solenoid)|\bsolenoid\b|"
+    r"\blox\b|liquid[_ -]?oxygen|ozone[_ -]?(?:supply|generat|inject)|"
+    r"(?:co2|co₂)[_ -]?(?:supply|inject)|heat[_ -]?pump", re.I)
+
+# SUB-COMPONENTS — a part that is INSIDE / PART OF a parent equipment item (a filter's
+# screen / backwash, an MBBR's media / carrier, a vessel's internals / packing / fill, a
+# pump's impeller). It does NOT carry its own bulk-fluid in+out — the PARENT does. So it
+# is not a standalone process-fluid node and is exempt from the flow-through in+out rule.
+_SUBCOMPONENT_RE = re.compile(
+    r"\bscreen\b|backwash|\bmedia\b|carrier|\belement\b|cartridge|membrane|packing|"
+    r"\bfill\b|internals|impeller|\brotor\b|standpipe|\bsparger\b|sight[_ -]?glass", re.I)
+
+# AIR-MOVERS — a blower / fan / forced-draught unit moves AIR (aeration / ventilation /
+# CO₂-stripping draught), not bulk process WATER. Its connection is an air duct, so it has
+# no process-water in+out and is exempt from the water flow-through rule.
+_AIR_MOVER_RE = re.compile(
+    r"blower|\bfan\b|aeration|ventilat|exhaust[_ -]?fan|forced[_ -]?draught|"
+    r"forced[_ -]?draft|\bFD\b|air[_ -]?handl", re.I)
 
 # INLINE TAP — a valve / meter / manifold / instrument that sits ON a line. It needs ≥1
 # fluid tie (it is on the pipe) but not necessarily a distinct in AND out modelled as
@@ -210,7 +226,10 @@ def audit_completeness(parts, final_topology, required_services, log=print):
                 continue   # fluid handled by the in/out rule below
             if s not in has:
                 missing.append(s)
-        if "water" in req and not _DRY_ANCILLARY_RE.search(nm):
+        if ("water" in req and not _DRY_ANCILLARY_RE.search(nm)
+                and not _SUBCOMPONENT_RE.search(nm) and not _AIR_MOVER_RE.search(nm)):
+            # (sub-components are part of a parent; air-movers carry air — neither is a
+            #  standalone process-water node, so neither needs its own water in+out)
             has_in = nm in fluid_in
             has_out = nm in fluid_out
             # an origin OR an injector supplies the loop (output only, no bulk-water inlet);
@@ -283,12 +302,19 @@ def close_flow_directions(parts, topology, log=print):
     extra, seen = [], set()
     for p in parts:
         nm = getattr(p, "name", None)
-        if not nm or nm not in has_out or nm in has_in:
-            continue  # only a part that outputs but has no input
+        if not nm or nm in has_in:
+            continue  # already has an input
+        is_sink = bool(_FLUID_SINK_RE.search(nm))     # a sink RECEIVES — it needs an input
+        is_flowthrough = nm in has_out                # a flow-through has an output, needs input
+        # exempt parts that legitimately need NO input: an injector/origin (it supplies),
+        # an inline tap (sits on the line), a dry ancillary, a sub-component (part of a
+        # parent), an air-mover (carries air).
         if (_INJECTOR_RE.search(nm) or _FLUID_ORIGIN_RE.search(nm) or
-                _FLUID_SINK_RE.search(nm) or _INLINE_TAP_RE.search(nm) or
-                _DRY_ANCILLARY_RE.search(nm)):
-            continue  # correctly single-direction — not a flow-through gap
+                _INLINE_TAP_RE.search(nm) or _DRY_ANCILLARY_RE.search(nm) or
+                _SUBCOMPONENT_RE.search(nm) or _AIR_MOVER_RE.search(nm)):
+            continue
+        if not (is_flowthrough or is_sink):
+            continue  # neither flow-through nor sink → no input to close here
         r, m = _rank(nm), _mod(nm)
         cands = [s for s in sources if s != nm and _rank(s) < r and (nm, s) not in fwd_pairs]
         same = [s for s in cands if _mod(s) == m]
