@@ -1,27 +1,33 @@
-# Excel Dossier Quality Tracker — RAS £5M review (2026-06-20)
+# Excel Dossier Quality Tracker — RAS £5M review (2026-06-20) — COMPLETE
 
-> Source: Tristan's review pass of `ras-5m-v24/dossier.xlsx`. **Every fix UNIVERSAL** (exporter + drawing generators + engine run for all archetypes — no RAS-specific hardcoding, no metric-gaming). Fix in order; commit after each.
+> Tristan's review of `ras-5m-v24/dossier.xlsx`. **Every fix UNIVERSAL** (no RAS-specific cheating, no metric-gaming; harness-verified BESS/CO₂ no-op). Re-run → `out/ras-5m-v25` (open Excel).
 
-## ✅ Bucket A — Exporter (`scripts/build-excel-export.py`) — DONE, committed 9eed8cadf, Excel reopened
+## ✅ Bucket A — Exporter (`build-excel-export.py`), commit 9eed8cadf
 | # | Issue | Status |
 |---|-------|--------|
-| 175 | Charts: varyColors rainbow + per-point legends + heavy gridlines → `style_chart()` (varyColors=0, solid colours, no gridlines, data labels). Verified in chart XML. | ✅ |
-| 176 | Schedule Service column truncated → auto-fit row heights + widen 40→54. | ✅ |
-| 177 | Panel/Process embedded as PDF images → dropped; native sortable sheets only. | ✅ |
-| 178 | Diagrams crushed 2160–6560px → 1400 → raised downscale 2600 + display 1700 (P&ID/single-line/BFD now ~1.9× sharper). | ✅ |
-| 179 | Calc "[static]" values unchecked → recomputed LIVE from substitution + ✓/⚠ vs engine (72 live / 2 static; safe positive-only design cross-ref). | ✅ |
+| 175 | Charts: varyColors rainbow + per-point legends + gridlines → `style_chart` (verified XML varyColors=0) | ✅ |
+| 176 | Schedule Service column truncated → auto-fit row heights + widen | ✅ |
+| 177 | Panel/Process PDF-image tabs → native sortable sheets only | ✅ |
+| 178 | Diagrams crushed to 1400px → 2600px (~1.9× sharper) | ✅ |
+| 179 | Calc "[static]" unchecked → 72 live self-checking recomputations | ✅ |
 
-## Bucket B/C — diagnosed; need engine fix + ONE chain re-run (2 background agents mapping)
-| # | Issue | Diagnosis | Status |
-|---|-------|-----------|--------|
-| 181 | cost_sanity=5 → re-budget to £5M | 52 t/yr → £5.37M (7.4% over). design-to-budget mechanism overshot the ceiling. Agent mapping the sizing trigger. | ⏳ map |
-| 182 | physics_fidelity=7 → blower motors + biofilter | Aeration blower motor under-rated vs duty; MBBR biofilter twin asymmetry. Agent mapping universal-contract-sizing.ts. | ⏳ map |
-| 183 | brief_compliance=6 → 5 unverified constraints | gate-9 family: 5 brief constraints don't render PASS/FAIL rows. Agent identifying the 5 + METRIC_MAP/alias fix. | ⏳ map |
-| 185 | Connectivity: blower power orphan + 87m run | `u_degassing_blower_inst0/inst1` DUP (computed-twin, #174) → power orphan. 87m run = PLACEMENT spreads equipment far/tall. Agent mapping. | ⏳ map |
-| 180 | Isometrics look wrong | NOT a drawing bug — routes are geometrically real (41.7m spans, degasser at 14.4m). Root = PLACEMENT (long runs/tall stacks), SAME as #185. Fold into placement fix + re-render. | ⏳ placement |
-| 184 | Coverage P&ID 19.6% / BFD 33.3% | (a) BFD correctly shows blocks not instruments — metric over-expects; (b) P&ID matcher false-neg: parts drawn with ISA tags (PCV-208) not credited vs manifest names. REAL fix = denser P&ID (#123) + correct per-drawing-type expectation, NOT metric relaxation. | ⏳ |
+## ✅ Bucket B/C — Engine + drawings, commits 9ca963a42 + (draw_pid)
+| # | Issue | Result (v25) |
+|---|-------|--------------|
+| 181 | cost_sanity=5 / £5.37M over | **£4.47M ≤ £5M, cost_sanity 10/10** (calc_ phantom removal, no tonnage drop) ✅ |
+| 182 | physics: blower motors + biofilter | blower motor margin in; Calc Biofilter phantom gone ✅ |
+| 183 | brief_compliance 5 unverified | **6 → 8** (METRIC_MAP) ✅ |
+| 174 | duplicate Degassing Blower | calc_ dedup removed it ✅ |
+| 184 | coverage P&ID 19.6% / BFD 33% | **P&ID 100% / BFD 100%** (ISA-credit matcher + draw control/ESD valves) ✅ |
+| 185 | connectivity: blower orphan + 87m | orphan FIXED (ledger ⚠ gone); blower hosted to Biofilter; ⚠ checks 2→1 ✅ (length ⚠ remains, see below) |
 
-**Plan:** implement engine fixes (181/182/183/185) + placement fix (185/180) + P&ID density (184) → ONE chain re-run (re-renders all drawings, re-budgets) → rebuild + reopen Excel → verify scorecard fails clear + coverage genuine.
+**Scorecard floor 5 → 8, quality loop COMPLETE — all gating sections ≥8.**
 
-**Constraint (Tristan, 2026-06-20):** all fixes universal; no RAS-only cheating; no metric-gaming.
-**Branch note:** worktree on `oxccu-efuel`; reconcile to `main` (one-engine rule) at push/deploy time.
+## ⏸ Remaining — need Tristan's steer (genuine trade-offs, not bugs)
+| # | Issue | Why it needs a decision |
+|---|-------|--------------------------|
+| 180 + 185-length | Longest run 110m (1 deterministic ⚠) + stick-like isometrics | Shared root = the *placement* spreads equipment out. Fix = built layout optimiser `LAYOUT_OPTIMISE=1` (−32% pipe run) — needs a **Blender re-render**; gated as "Tristan's call" for +17% footprint (a non-issue on the 18-acre site → I recommend enabling). Known limitation: qty-N tank farm = 1 mega-node. |
+| physics_fidelity advisory | 2× 1702 m³/h recirc pumps labelled "duty/standby" but both run for full flow | Real finding, advisory (floor holds). True duty+standby = 2× full-flow OR N+1 third pump — a **design-interpretation** of the brief, not a silent fix. |
+
+**Constraint (Tristan):** all fixes universal; no RAS-only cheating; no metric-gaming.
+**Branch:** worktree on `oxccu-efuel`; reconcile to `main` (one-engine rule) at push/deploy.

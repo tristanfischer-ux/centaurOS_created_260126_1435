@@ -1091,7 +1091,9 @@ def _discover_valves(state: dict):
             has["relief"] = True
         if re.search(r"control_valve|\bcv\b|purge_control|modulat", b):
             has["control"] = True
-        if re.search(r"esd_valve|emergency_shutdown|\bxv\b|shutoff|sdv", b):
+        if re.search(r"esd_valve|emergency_shutdown|\bxv\b|shutoff|sdv|"
+                     r"emergency.*solenoid|solenoid.*(?:o2|oxygen|fail)|fail.?open|"
+                     r"energise.?to.?close", b):
             has["esd"] = True
         if re.search(r"blanket|n2_blanket|inert", b):
             has["blanket"] = True
@@ -1555,13 +1557,18 @@ def reconstruct_process(schedule: dict, state: dict,
         if INSTR_FLOW in instr_funcs and re.search(r"feed|compressor|supply", frm, re.I):
             ln.instruments.append(Instr(tag="FT", func="flow",
                                         loop=str(loop_seq + i), where="line"))
-        # control valve on a purge / control line
-        if valve_has["control"] and re.search(r"purge|control|recycle|dos", f"{frm} {to}",
-                                               re.I):
+        # control valve on a control / dosing / modulating / aeration line (the design's
+        # modulating PCVs — O₂ dosing, bicarb dosing, aeration, degasser). Universal: any line
+        # whose endpoints name a modulated duty gets its control valve symbol drawn.
+        if valve_has["control"] and re.search(
+                r"purge|control|recycle|dos|modulat|aeration|biofilter|degas|o2|oxygen",
+                f"{frm} {to}", re.I):
             ln.valves.append(Valve(kind="control", tag="PCV"))
-        # ESD valve on a primary feed line
-        if valve_has["esd"] and re.search(r"feed|supply", frm, re.I) and not any(
-                v.kind == "esd" for L in lines for v in L.valves):
+        # ESD / emergency shut-off on a feed / supply / oxygen / emergency / solenoid line — draw
+        # one per qualifying line (NOT just the first) so the P&ID shows EVERY safety-critical
+        # shut-off (the brief's fail-open O₂ solenoids + feed isolation). Universal.
+        if valve_has["esd"] and re.search(r"feed|supply|\bo2\b|oxygen|emergency|solenoid|lox",
+                                          f"{frm} {to}", re.I):
             ln.valves.append(Valve(kind="esd", tag="XV"))
         lines.append(ln)
 
