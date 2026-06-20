@@ -57,6 +57,8 @@ def _service_of(mech):
         return "thermal"
     if "air" in m or "vent" in m or "hvac" in m or "duct" in m or "gas" in m:
         return "air"
+    if "assembly" in m or "mechanical" in m or "part_of" in m or "mount" in m:
+        return "assembly"
     return "water"
 
 
@@ -99,11 +101,23 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print):
             dropped.append((a_name, b_name, mech, "self-loop"))
             continue
 
-        # 2) NO SPURIOUS DRY-ANCILLARY WATER/THERMAL TIE TO A TANK.
+        # 2) NO SPURIOUS WATER/THERMAL TIE for parts that don't carry process water.
         if svc in ("water", "thermal"):
             both = f"{a_name} {b_name}"
             if _DRY_ANCILLARY_RE.search(both) and _TANK_RE.search(both):
                 dropped.append((a_name, b_name, mech, "dry-ancillary water/thermal tie to tank"))
+                continue
+            # an AIR-MOVER (blower/fan) carries AIR, not water — its spurious orphan→TANK
+            # water tie is dropped (its real tie is the air line the air-closer adds). Only
+            # the tie to a TANK is dropped: a tie to another part (e.g. an inlet valve on its
+            # line) is left so that part keeps its connection (narrow — don't orphan it).
+            if (_AIR_MOVER_RE.search(a_name) or _AIR_MOVER_RE.search(b_name)) and _TANK_RE.search(both):
+                dropped.append((a_name, b_name, mech, "air-mover water tie to tank (belongs on an air line)"))
+                continue
+            # a SUB-COMPONENT (filter screen/backwash, MBBR media) is PART OF a parent unit;
+            # its water tie to a tank is spurious — it connects to its parent (assembly edge).
+            if (_SUBCOMPONENT_RE.search(a_name) or _SUBCOMPONENT_RE.search(b_name)) and _TANK_RE.search(both):
+                dropped.append((a_name, b_name, mech, "sub-component water tie to tank (belongs to its parent)"))
                 continue
 
         # 3) DEDUPE per directed pair + service.
@@ -165,6 +179,15 @@ _SUBCOMPONENT_RE = re.compile(
 _AIR_MOVER_RE = re.compile(
     r"blower|\bfan\b|aeration|ventilat|exhaust[_ -]?fan|forced[_ -]?draught|"
     r"forced[_ -]?draft|\bFD\b|air[_ -]?handl", re.I)
+
+# AIR CONSUMERS — process units that an air-mover (blower/fan) feeds with an AIR line: a
+# CO₂ degasser / stripper (forced-draught air), a biofilter / MBBR / aeration basin
+# (process air), an oxygenation cone / DAF / scrubber. The air-closer connects each
+# air-mover to its nearest such consumer. Universal — class-agnostic process vocabulary.
+_AIR_CONSUMER_RE = re.compile(
+    r"degass|co2[_ -]?strip|co₂[_ -]?strip|stripp|biofilter|\bmbbr\b|moving[_ -]?bed|"
+    r"trickl|aeration|aerobic|oxygenat|\bcone\b|scrubber|flotation|dissolved[_ -]?air|"
+    r"\bDAF\b|packed[_ -]?column|degasser", re.I)
 
 # INLINE TAP — a valve / meter / manifold / instrument that sits ON a line. It needs ≥1
 # fluid tie (it is on the pipe) but not necessarily a distinct in AND out modelled as
@@ -327,9 +350,123 @@ def close_flow_directions(parts, topology, log=print):
                       "material_context": "process-flow input (direction-closer: nearest upstream)",
                       "_augmented": True, "_direction_closed": True})
         has_in.add(nm)
+
+    # OUTPUT pass (symmetric) — a flow-through part with an INPUT but no OUTPUT produces
+    # but feeds nothing; connect it to its nearest DOWNSTREAM consumer (a part with an
+    # input, higher region_rank). Closes storage/recycle/intermediate units. A sink
+    # legitimately has no output and is skipped; never reverse an existing edge.
+    consumers = sorted(has_in, key=_rank)
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm or nm in has_out or nm not in has_in:
+            continue  # already feeds something, OR has no input (handled by the input pass)
+        if (_FLUID_SINK_RE.search(nm) or _INJECTOR_RE.search(nm) or
+                _INLINE_TAP_RE.search(nm) or _DRY_ANCILLARY_RE.search(nm) or
+                _SUBCOMPONENT_RE.search(nm) or _AIR_MOVER_RE.search(nm) or
+                _FLUID_ORIGIN_RE.search(nm)):
+            continue  # legitimately no successor (a sink/terminus) or not a flow node
+        r, m = _rank(nm), _mod(nm)
+        cands = [c for c in consumers if c != nm and _rank(c) > r and (c, nm) not in fwd_pairs]
+        same = [c for c in cands if _mod(c) == m]
+        pick = (min(same, key=_rank) if same else (min(cands, key=_rank) if cands else None))
+        if pick is None or (nm, pick) in seen:
+            continue
+        seen.add((nm, pick))
+        extra.append({"from_part": nm, "to_part": pick, "mechanism": "fluid_loop",
+                      "constraint_kind": "flow_capacity",
+                      "material_context": "process-flow output (direction-closer: nearest downstream)",
+                      "_augmented": True, "_direction_closed": True})
+        has_out.add(nm)
+
     if extra:
-        log(f"[ledger] direction-closer: +{len(extra)} input edge(s) — flow-through parts "
-            f"fed from their nearest process-upstream source")
+        n_in = sum(1 for e in extra if "input" in e["material_context"])
+        log(f"[ledger] direction-closer: +{len(extra)} edge(s) ({n_in} input from upstream, "
+            f"{len(extra) - n_in} output to downstream) — flow-through parts connected both ways")
+    return extra
+
+
+def close_air_directions(parts, topology, log=print):
+    """Connect every AIR-MOVER (blower/fan) to the process unit it aerates by an AIR line —
+    the physically-correct tie (a degasser's forced draught, an MBBR's/biofilter's process
+    air, an oxygenation cone), NOT the spurious water tie to a tank the orphan connector
+    gave it. Universal: feeds the nearest air-consumer in the same module, else the nearest
+    by process order; if none, the air-mover is left. Pure + position-free."""
+    by_name = {getattr(p, "name", None): p for p in parts if getattr(p, "name", None)}
+
+    def _rank(nm):
+        p = by_name.get(nm)
+        v = getattr(p, "region_rank", None) if p is not None else None
+        return v if isinstance(v, (int, float)) else 999
+
+    def _mod(nm):
+        p = by_name.get(nm)
+        return (getattr(p, "module_id", "") if p is not None else "") or ""
+
+    has_air = set()
+    for e in topology:
+        if _service_of(e.get("mechanism")) == "air":
+            f = e.get("from_part")
+            if f:
+                has_air.add(f)
+    consumers = [getattr(p, "name", None) for p in parts
+                 if getattr(p, "name", None) and _AIR_CONSUMER_RE.search(p.name)
+                 and not _AIR_MOVER_RE.search(p.name)]
+    extra, seen = [], set()
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm or not _AIR_MOVER_RE.search(nm) or nm in has_air:
+            continue
+        r, m = _rank(nm), _mod(nm)
+        cands = [c for c in consumers if c != nm]
+        pool = [c for c in cands if _mod(c) == m] or cands
+        pick = min(pool, key=lambda c: abs(_rank(c) - r)) if pool else None
+        if pick is None or (nm, pick) in seen:
+            continue
+        seen.add((nm, pick))
+        extra.append({"from_part": nm, "to_part": pick, "mechanism": "air",
+                      "constraint_kind": "air_flow",
+                      "material_context": "aeration / process-air line (air-mover -> consumer)",
+                      "_augmented": True, "_air_closed": True})
+    if extra:
+        log(f"[ledger] air-closer: +{len(extra)} air line(s) — air-movers feed their aeration consumer")
+    return extra
+
+
+def close_subcomponents(parts, topology, log=print):
+    """Connect every SUB-COMPONENT (a filter screen/backwash, MBBR media/carrier, vessel
+    internals) to its PARENT equipment by an assembly edge — it is PART OF that unit, not a
+    standalone process node, so it must show its parent, not a spurious pipe to a tank.
+    Universal: the parent is the non-sub-component part sharing the most NAME tokens (e.g.
+    'Drum Filter Screen' -> 'Drum Filter'; 'Biofilm Carrier Media (MBBR)' -> the MBBR
+    biofilter). If no parent shares a token, the sub-component is left. Pure."""
+    def _toks(s):
+        return {t for t in re.split(r"[^a-z0-9]+", str(s).lower())
+                if len(t) > 2 and t not in ("the", "and", "system", "unit", "for", "with", "ras")}
+    cand_toks = {getattr(p, "name", None): _toks(getattr(p, "name", ""))
+                 for p in parts
+                 if getattr(p, "name", None) and not _SUBCOMPONENT_RE.search(p.name)}
+    extra, seen = [], set()
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm or not _SUBCOMPONENT_RE.search(nm):
+            continue
+        nt = _toks(nm)
+        best, best_ov = None, 0
+        for c, ct in cand_toks.items():
+            if c == nm:
+                continue
+            ov = len(nt & ct)
+            if ov > best_ov:
+                best, best_ov = c, ov
+        if best is None or best_ov < 1 or (best, nm) in seen:
+            continue
+        seen.add((best, nm))
+        extra.append({"from_part": best, "to_part": nm, "mechanism": "assembly",
+                      "constraint_kind": "mechanical_assembly",
+                      "material_context": "sub-component of parent (assembly: part-of)",
+                      "_augmented": True, "_assembly_closed": True})
+    if extra:
+        log(f"[ledger] sub-component closer: +{len(extra)} assembly edge(s) — sub-parts tied to their parent")
     return extra
 
 

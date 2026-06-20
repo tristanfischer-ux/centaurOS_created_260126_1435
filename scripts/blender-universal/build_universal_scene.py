@@ -11722,6 +11722,10 @@ def main():
     # adds the missing INPUT to every flow-through part from its nearest process-upstream
     # source, so the graph is complete (serial, not a star, not a guess).
     _candidate = _candidate + cl.close_flow_directions(parts, _candidate, log=lambda m: print(m))
+    # air-movers (blower/fan) feed their aeration consumer by an AIR line, not a water tie
+    # to the tank; sub-components (screen/backwash/media) tie to their PARENT, not the tank.
+    _candidate = _candidate + cl.close_air_directions(parts, _candidate, log=lambda m: print(m))
+    _candidate = _candidate + cl.close_subcomponents(parts, _candidate, log=lambda m: print(m))
     topology, _ledger_dropped = cl.finalize_ledger(_candidate, parts, resolve_endpoint,
                                                    log=lambda m: print(m))
     # STRICT completeness gate — every part must SHOW its required input + output (Tristan
