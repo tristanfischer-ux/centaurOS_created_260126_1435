@@ -77,11 +77,20 @@ def edge_weight(e):
 
 
 def _footprint_mm(node):
-    """(w, d) plan footprint in mm from dims_mm, with a sane floor for tiny/again-less kit."""
+    """(w, d) plan footprint in mm from dims_mm, with a sane floor for tiny/again-less kit.
+    Accepts dims_mm as a LIST [w, d, ...] OR the parts-manifest DICT {w,d,h} / {dia,len}
+    (a cylinder's plan footprint is dia × dia). Reading the dict was the ab_report bug that
+    silently treated every part as a 1.5 m box → a falsely-optimistic footprint A/B."""
     dm = node.get("dims_mm")
+    w = d = None
     if isinstance(dm, (list, tuple)) and len(dm) >= 2 and all(isinstance(x, (int, float)) for x in dm[:2]):
         w, d = float(dm[0]), float(dm[1])
-    else:
+    elif isinstance(dm, dict):
+        if dm.get("w") and dm.get("d"):
+            w, d = float(dm["w"]), float(dm["d"])
+        elif dm.get("dia"):
+            w = d = float(dm["dia"])
+    if w is None or d is None:
         w = d = 1500.0
     return max(800.0, w), max(800.0, d)
 

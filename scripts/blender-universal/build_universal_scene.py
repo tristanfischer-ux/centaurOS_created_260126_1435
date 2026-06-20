@@ -137,6 +137,7 @@ fl.add_box = _add_box_fast
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import connection_sizing as cs
 import connection_ledger as cl   # the LEDGER authority — validates + owns the connection graph
+import layout_optimiser as lo    # deterministic CRAFT plant-layout optimiser (opt-in)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -4533,7 +4534,19 @@ def build_parts_manifest(parts):
                 length = round(h, 1)               # standing height
             dims = {"dia": dia, "len": length}
         else:
-            dims = {"w": round(w, 1), "d": round(dep, 1), "h": round(h, 1)}
+            # SIZED FOOTPRINT over drawn BBOX (mirrors the round-shape branch above): the drawn
+            # prefix-bbox can be POLLUTED — by attached furniture, OR by a NAME COLLISION (two
+            # distinct words sharing a name_human slug to the same object prefix, so the bbox
+            # unions their geometry ACROSS regions into a phantom mega-part — the 32 m "Degassing
+            # Blower" spanning the gap between two real blowers). When the part carries an explicit
+            # box dim, report THAT footprint so the GA + BoM see the real device size, not the union.
+            sd = getattr(p, "dim", None)
+            if isinstance(sd, dict) and sd.get("kind") == "box" \
+                    and sd.get("w_mm") and sd.get("d_mm"):
+                dims = {"w": round(sd["w_mm"], 1), "d": round(sd["d_mm"], 1),
+                        "h": round(sd.get("h_mm") or h, 1)}
+            else:
+                dims = {"w": round(w, 1), "d": round(dep, 1), "h": round(h, 1)}
         rows.append({
             "tag": pref,
             "equipment_tag": equip_tag,
@@ -7257,6 +7270,124 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
 # of battery racks in a container + a balance-of-plant lineup + coolant/bus runs).
 # ═══════════════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════════════════
+# UNIVERSAL LAYOUT OPTIMISER hook (opt-in: LAYOUT_OPTIMISE=1) — re-flow the placed
+# equipment to layout_optimiser.py's deterministic CRAFT minimum-weighted-pipe-run
+# layout AFTER place_all, then let the skid frame + pipe rack + routing re-derive on
+# the tighter layout. The connection LEDGER is the weighted input; Blender only
+# measures. Class-agnostic; any failure leaves the original placement untouched.
+# ═══════════════════════════════════════════════════════════════════════════
+def _shift_part_xy(p, dx_mm, dy_mm, moved):
+    """Translate ONE already-placed part in plan by (dx,dy) mm: its Blender meshes
+    (matched by build_part's name PREFIX), its anchors, and placed_xyz_mm — the
+    2-D, per-part analogue of the bank-compaction Y-shift (_shift_objects_by_prefix).
+    `moved` is shared across the whole re-flow so a SHORTER-prefix part can never
+    re-grab a LONGER-prefix part's already-shifted objects (callers process the
+    longest prefix first → every object is claimed by its true owner). obj_anchor is
+    a Blender-object handle and rides the mesh move; nothing else to update."""
+    dxb, dyb = dx_mm * fl.MM, dy_mm * fl.MM
+    pref = _part_prefix(p.name)
+    for obj in bpy.data.objects:
+        if not obj.name.startswith(pref):
+            continue
+        try:
+            oid = obj.as_pointer()
+        except (AttributeError, ReferenceError):
+            oid = id(obj)
+        if oid in moved:
+            continue
+        moved.add(oid)
+        try:
+            obj.location[0] += dxb
+            obj.location[1] += dyb
+        except (AttributeError, TypeError, IndexError):
+            pass
+    x, y, z = p.placed_xyz_mm
+    p.placed_xyz_mm = (x + dx_mm, y + dy_mm, z)
+    if p.anchors:
+        p.anchors = {k: (v[0] + dx_mm, v[1] + dy_mm, v[2]) for k, v in p.anchors.items()}
+
+
+def _layout_is_envelope(p):
+    """The building-SHELL test, identical to place_all's _is_envelope_part: a
+    plant-scale shell (≥200 m² OR ≥25 m × ≥6 m) that is NOT a vessel. These enclose
+    the plant (slab/frame) and are re-centred on the equipment bbox, never re-flowed."""
+    fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+    return (p.shape not in _VESSEL_KIND
+            and (fx * fy >= 200e6 or (max(fx, fy) >= 25000 and min(fx, fy) >= 6000)))
+
+
+def _apply_layout_optimiser(parts, topology, bbox):
+    """Re-flow the placed EQUIPMENT to layout_optimiser's deterministic CRAFT
+    minimum-weighted-pipe-run layout, shifting each part's meshes + anchors in place;
+    re-centre the building shell on the new equipment bbox. Routing re-derives on the
+    new positions (route_topology reads part.anchors), so the result is shorter runs +
+    a tighter footprint. Returns the recomputed bbox dict."""
+    equip = [p for p in parts
+             if getattr(p, "placed_xyz_mm", None) is not None
+             and not _layout_is_envelope(p)]
+    if len(equip) < 3:
+        return bbox
+    nodes = [{"name": p.name,
+              "dims_mm": list(footprint_mm(resolved_dims_mm(p))[:2])} for p in equip]
+    nameset = {p.name for p in equip}
+
+    def _resolve(s):
+        s = str(s or "")
+        if s in nameset:
+            return s
+        st = set(re.split(r"[^a-z0-9]+", s.lower()))
+        best, bov = None, 0
+        for nm in nameset:
+            ov = len(st & set(re.split(r"[^a-z0-9]+", nm.lower())))
+            if ov > bov:
+                best, bov = nm, ov
+        return best if bov >= 1 else s
+
+    opt, _fp = lo.optimise(nodes, topology, name_resolve=_resolve, log=lambda *a: None)
+    common = [p for p in equip if p.name in opt]
+    if len(common) < 3:
+        return bbox
+    # Align the optimiser's own positive-quadrant frame to the CURRENT plant centroid
+    # so the plant stays where the camera frames it (only the RELATIVE layout changed).
+    cxo = sum(opt[p.name][0] for p in common) / len(common)
+    cyo = sum(opt[p.name][1] for p in common) / len(common)
+    cxc = sum(p.placed_xyz_mm[0] for p in common) / len(common)
+    cyc = sum(p.placed_xyz_mm[1] for p in common) / len(common)
+    # LONGEST prefix first → collision-safe with the shared moved-set (see _shift_part_xy).
+    common.sort(key=lambda q: len(_part_prefix(q.name)), reverse=True)
+    moved, n_moved = set(), 0
+    for p in common:
+        nx = opt[p.name][0] - cxo + cxc
+        ny = opt[p.name][1] - cyo + cyc
+        dx, dy = nx - p.placed_xyz_mm[0], ny - p.placed_xyz_mm[1]
+        if abs(dx) < 1.0 and abs(dy) < 1.0:
+            continue
+        _shift_part_xy(p, dx, dy, moved)
+        n_moved += 1
+
+    # Recompute equipment extents, then re-centre the building shell on them (mirrors
+    # place_all's envelope handling) so the skid frame + bbox still enclose the plant.
+    def _fp_half(p):
+        fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+        return fx / 2.0, fy / 2.0
+    xs0 = min(p.placed_xyz_mm[0] - _fp_half(p)[0] for p in equip)
+    xs1 = max(p.placed_xyz_mm[0] + _fp_half(p)[0] for p in equip)
+    ys0 = min(p.placed_xyz_mm[1] - _fp_half(p)[1] for p in equip)
+    ys1 = max(p.placed_xyz_mm[1] + _fp_half(p)[1] for p in equip)
+    ecx, ecy = (xs0 + xs1) / 2.0, (ys0 + ys1) / 2.0
+    for p in parts:
+        if _layout_is_envelope(p) and getattr(p, "placed_xyz_mm", None) is not None:
+            z = p.placed_xyz_mm[2]
+            p.placed_xyz_mm = (ecx, ecy, z)
+            hx, hy = _fp_half(p)
+            xs0 = min(xs0, ecx - hx); xs1 = max(xs1, ecx + hx)
+            ys0 = min(ys0, ecy - hy); ys1 = max(ys1, ecy + hy)
+    print(f"[univ][layout] CRAFT re-flow: moved {n_moved}/{len(common)} equipment parts; "
+          f"footprint {(xs1 - xs0) / 1000.0:.1f}×{(ys1 - ys0) / 1000.0:.1f} m")
+    return {"x0": xs0 - 800, "x1": xs1 + 800, "y0": ys0 - 800, "y1": ys1 + 800}
+
+
 def place_process_plant(parts, regions, topology, MAT, MO):
     """PROCESS-PLANT strategy (the original, e-fuel-tuned pipeline). Lay the
     physical parts out as a process TRAIN driven by the CONNECTIVITY GRAPH (the
@@ -7281,6 +7412,17 @@ def place_process_plant(parts, regions, topology, MAT, MO):
     finally:
         _PLANT_FLOW_PLAN = None
     print(f"[univ] plant bbox (mm): {bbox}")
+
+    # 4b. UNIVERSAL LAYOUT OPTIMISER (opt-in: LAYOUT_OPTIMISE=1). Re-flow the placed
+    #     equipment to the deterministic CRAFT minimum-weighted-pipe-run layout
+    #     (the connection ledger is the weighted input). The skid frame + pipe rack +
+    #     routing below all re-derive from the (now tighter) bbox + part anchors.
+    if os.environ.get("LAYOUT_OPTIMISE", "") not in ("", "0", "false", "no"):
+        try:
+            bbox = _apply_layout_optimiser(parts, topology, bbox)
+            print(f"[univ] plant bbox after layout-optimise (mm): {bbox}")
+        except Exception as _e:
+            print(f"[univ][layout] optimiser skipped (error): {_e}")
 
     # 5. TALL braced skid frame that HUGS THE EQUIPMENT BULK (Fix 1, FRAME FIT).
     #    BOTH the footprint AND the height target come from the NON-tall equipment

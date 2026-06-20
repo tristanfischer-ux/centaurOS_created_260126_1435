@@ -1172,6 +1172,7 @@ export function synthesizeActuation(modules: ModuleLike[], quantities: Record<st
 
   // B. aeration / process blower per air-flow duty (split into N units above a single-unit cap)
   const SINGLE_BLOWER_CAP = 30000 // m³/h per machine
+  const blowerNamesUsed = new Set<string>()   // anti-collision (see blowerName below)
   for (const [key, val] of Object.entries(quantities)) {
     if (!/_air_flow_m3_h$/.test(key) || !(val > 0)) continue
     const stemKey = significantStems(key.replace(/_air_flow_m3_h$/, ''))
@@ -1211,7 +1212,25 @@ export function synthesizeActuation(modules: ModuleLike[], quantities: Record<st
     // so two services with different (single) kW are not read as one device with conflicting
     // values (the cross-page consistency audit clusters by noun phrase). Each service still
     // carries ONE canonical kW; the names keep the two services apart.
-    const blowerName = isDegas ? 'Degassing Blower' : 'Aeration Blower'
+    // ANTI-COLLISION (Tristan 2026-06-20): TWO different air-flow duties can BOTH be `isDegas`
+    // (e.g. `degasser_air_flow_m3_h` + a process-loop stripping duty), minting TWO words both
+    // named "Degassing Blower". Same name_human → same render object-prefix → the parts-manifest
+    // unions their geometry ACROSS regions into a PHANTOM mega-part (a 32 m "blower" spanning the
+    // gap — wrong size in the GA + BoM, and it breaks the layout optimiser which legitimately
+    // separates them). The id is already host-unique; bring the NAME into line: suffix the SECOND+
+    // same-named blower with its serving host (or its duty stem) so each renders as its own part.
+    const blowerBase = isDegas ? 'Degassing Blower' : 'Aeration Blower'
+    let blowerName = blowerBase
+    if (blowerNamesUsed.has(blowerName)) {
+      const stemLabel = (host?.name_human
+        ? host.name_human
+        : stemKey.join(' ')).replace(/[_]+/g, ' ').trim()
+      const titled = stemLabel.replace(/\b\w/g, (c) => c.toUpperCase())
+      blowerName = titled ? `${blowerBase} — ${titled}` : `${blowerBase} ${blowerNamesUsed.size + 1}`
+      let k = 2
+      while (blowerNamesUsed.has(blowerName)) blowerName = `${blowerBase} ${k++}`
+    }
+    blowerNamesUsed.add(blowerName)
     toAdd.push({ sm: dest, w: actuatorWord('blower', blowerName, host, n,
       // rating_primary reads the contract blower kW VERBATIM (2.5 / 54.6 kW), not Math.round (which
       // emitted 3 / 55 kW — the audit's emitted-rating≠contract mismatch). formatRatingKw keeps the
