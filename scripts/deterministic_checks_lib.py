@@ -786,6 +786,114 @@ def _checks_connectivity(state: dict, run_dir: str) -> List[Check]:
                     f"({len([1 for s in (cs.get('specs') or []) if s.get('kind')=='pipe' and (num(s.get('drop_pct_or_velocity')) or 0) > (_parse_velocity_limit(s.get('spec_limit')) or 1e9)])} pipe specs over limit)."),
         ))
 
+    # --- CONN3. ROUTE-LENGTH PLAUSIBILITY (the geometry blind-spot closer) ---------
+    # A connection's BoM cost = length x GBP/m, and the LENGTH comes from the Blender
+    # layout. So a LOOSE layout silently inflates cost: the suite checks the length x
+    # rate ARITHMETIC but never whether the length itself is PHYSICAL. Tristan caught a
+    # 88 m run inside a ~27 m building from the render alone (a 'web' of over-long
+    # mains). This check makes the blind-spot permanent and universal: derive the plant
+    # bounding-box DIAGONAL from the as-routed waypoints (route-manifest.json), then no
+    # single routed run may exceed diagonal x 1.8 (1.8 = generous orthogonal up-along-
+    # down routing overhead over a straight line), and the TOTAL routed length may not
+    # exceed diagonal x n_runs x 1.25. Either breach = an inflated layout. Self-contained
+    # (needs only the manifests), class-agnostic (no building-dims lookup, no per-class
+    # constant). Skips silently when there are no routed waypoints.
+    rm = _load_json(os.path.join(run_dir, "route-manifest.json")) or {}
+    rm_lines = rm.get("lines") if isinstance(rm, dict) else None
+    if isinstance(rm_lines, list) and rm_lines:
+        # INDEPENDENT plant scale — must NOT be derived from the routed extent itself
+        # (a loose layout inflates its own bounding box, so its long runs would always
+        # look 'plausible' against it — circular). Prefer the engine-emitted BUILDING
+        # footprint (the hall the equipment must physically fit inside); else derive a
+        # minimum hall from the summed equipment plan area x a circulation factor; only
+        # as a last resort fall back to the routed bbox (noted as circular). Universal:
+        # building_footprint key names are class-agnostic; the equipment-area fallback
+        # works for any archetype.
+        diag_m = 0.0
+        diag_basis = ""
+        _state = _load_json(os.path.join(run_dir, "state.json")) or {}
+        _q = ((_state.get("orchestratorContract") or {}).get("quantities") or {}) if isinstance(_state, dict) else {}
+        def _qnum(*keys):
+            for k in keys:
+                v = _q.get(k)
+                if isinstance(v, dict):
+                    v = v.get("value")
+                if isinstance(v, (int, float)) and v > 0:
+                    return float(v)
+            return None
+        footprint_m2 = _qnum("building_footprint_m2", "building_gross_floor_area_m2",
+                             "plan_area_m2", "floor_area_m2", "hall_area_m2", "gross_floor_area_m2")
+        if footprint_m2:
+            # diagonal of a hall of this area, allowing a modest 1.5:1 aspect (factor 2.17).
+            diag_m = (footprint_m2 * 2.17) ** 0.5
+            diag_basis = f"building footprint {footprint_m2:.0f} m²"
+        else:
+            # fallback A — minimum hall from the summed equipment plan area x circulation.
+            pm = _load_json(os.path.join(run_dir, "parts-manifest.json")) or {}
+            _parts = pm.get("parts") if isinstance(pm, dict) else (pm if isinstance(pm, list) else [])
+            equip_area = 0.0
+            for p in (_parts or []):
+                dm = p.get("dims_mm") if isinstance(p, dict) else None
+                if isinstance(dm, (list, tuple)) and len(dm) >= 2 and all(isinstance(x, (int, float)) for x in dm[:2]):
+                    equip_area += (dm[0] * dm[1]) / 1e6 * max(1, int(p.get("qty") or 1))
+            if equip_area > 1.0:
+                hall = equip_area * 2.5   # circulation / aisles / clearance
+                diag_m = (hall * 2.17) ** 0.5
+                diag_basis = f"min hall {hall:.0f} m² from equipment area {equip_area:.0f} m²"
+        if diag_m <= 0.5:
+            # last resort — routed bbox (CIRCULAR; only when no footprint/equipment data).
+            xs: List[float] = []; ys: List[float] = []
+            for ln in rm_lines:
+                for wp in (ln.get("waypoints_mm") or []):
+                    if isinstance(wp, (list, tuple)) and len(wp) >= 2:
+                        try:
+                            xs.append(float(wp[0])); ys.append(float(wp[1]))
+                        except (TypeError, ValueError):
+                            pass
+            if xs and ys:
+                diag_m = (((max(xs) - min(xs)) ** 2 + (max(ys) - min(ys)) ** 2) ** 0.5) / 1000.0
+                diag_basis = "routed bbox (no building footprint — circular fallback)"
+        if diag_m > 0.5:
+            def _runlen(ln: dict) -> float:
+                v = ln.get("length_routed_m")
+                if not isinstance(v, (int, float)):
+                    v = ln.get("length_m")
+                return float(v) if isinstance(v, (int, float)) else 0.0
+            run_lengths = [(_runlen(ln), ln) for ln in rm_lines]
+            run_lengths = [(L, ln) for (L, ln) in run_lengths if L > 0]
+            if diag_m > 0.5 and run_lengths:
+                max_single = max(run_lengths, key=lambda t: t[0])
+                plausible_single = diag_m * 1.8
+                worst_ln = max_single[1]
+                out.append(Check(
+                    name="Longest connection run <= plant diagonal x 1.8 (length plausibility)",
+                    category="CONNECTIVITY", relation="le",
+                    status=PASS if max_single[0] <= plausible_single + 1e-9 else FAIL,
+                    actual=round(max_single[0], 1), expected=round(plausible_single, 1),
+                    tol=0.0, unit="m", producer="conn:run_length_plausibility",
+                    detail=(f"Longest routed run {max_single[0]:.0f} m "
+                            f"({worst_ln.get('from_tag','?')} -> {worst_ln.get('to_tag','?')}) "
+                            f"vs plant footprint diagonal {diag_m:.0f} m. A run beyond "
+                            f"~1.8x the diagonal is not physical inside the plant envelope "
+                            f"-> the layout is loose and its length x GBP/m cost is inflated. "
+                            f"Fix at the placement source (cluster connected equipment), "
+                            f"not the cost rate."),
+                ))
+                total_routed = sum(L for L, _ in run_lengths)
+                plausible_total = diag_m * len(run_lengths) * 1.25
+                out.append(Check(
+                    name="Total connection length <= diagonal x n_runs x 1.25",
+                    category="CONNECTIVITY", relation="le",
+                    status=PASS if total_routed <= plausible_total + 1e-9 else FAIL,
+                    actual=round(total_routed, 0), expected=round(plausible_total, 0),
+                    tol=0.0, unit="m", producer="conn:total_length_plausibility",
+                    detail=(f"Total routed connection length {total_routed:.0f} m over "
+                            f"{len(run_lengths)} runs vs a plausible {plausible_total:.0f} m "
+                            f"(diagonal {diag_m:.0f} m x {len(run_lengths)} runs x 1.25). "
+                            f"A systemic overshoot means the layout strings equipment wider "
+                            f"than the building -> inflated pipe/cable take-off."),
+                ))
+
     return out
 
 

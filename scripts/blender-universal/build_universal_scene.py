@@ -6145,9 +6145,23 @@ def augment_topology_connect_orphans(state, topology, parts):
         return True
 
     def _add_fluid_edge(a, b):
-        """Add a fluid_loop process line a→b once, sized to the loop flow. Returns 1 if
-        added else 0. A 2-cycle is rejected (an a→b suppresses a later b→a — two process
-        lines between the same pair read as a tangle)."""
+        """Add a fluid_loop SERVICE tie-in a→b once. Returns 1 if added else 0. A 2-cycle
+        is rejected (an a→b suppresses a later b→a — two process lines between the same
+        pair read as a tangle).
+
+        SERVICE SIZING (2026-06-20 fix — Tristan caught the fat-pipe 'web' in the render):
+        this tie exists because part `a` lacked ANY water connection — it is therefore a
+        SERVICE tie-in (make-up / fill / drain / wash-down / utility), NOT a leg of the
+        main recirculation loop. It must NOT inherit the plant's largest `loop_flow`:
+        doing so sized 26 ancillary ties (feed store, mortality, biosecurity, dosing,
+        grading…) at the full recirc 3×DN300 main, which (a) DREW a web of fat mains
+        radiating to the tanks and (b) fed the cost ledger an inflated length×bore. A
+        service tie carries a small fraction of the loop — size it to ~5% of loop_flow
+        (the same conservative branch default the BoM's `_edge_water_flow_m3h` uses for
+        an off-loop branch), so the render shows a THIN service tap and the schedule bore
+        agrees with the re-priced BoM. Universal: an orphan service tie on ANY archetype
+        is a service line, never the process main. The genuine main-loop legs are authored
+        by the primary topology / cross-module grammar and keep their full flow."""
         if not a or not b or a == b:
             return 0
         if (a, b) in existing or (b, a) in existing or (a, b) in seen or (b, a) in seen:
@@ -6155,9 +6169,10 @@ def augment_topology_connect_orphans(state, topology, parts):
         seen.add((a, b))
         edge = {'from_part': a, 'to_part': b, 'mechanism': 'fluid_loop',
                 'constraint_kind': 'flow_capacity',
-                'material_context': 'process water tie-in (recirculation loop)', '_augmented': True}
+                'material_context': 'process-water service tie-in (make-up / fill / drain)',
+                '_augmented': True, '_service_tie': True}
         if loop_flow > 0:
-            edge['required_value'] = loop_flow
+            edge['required_value'] = loop_flow * 0.05   # service branch, NOT the main loop
             edge['required_unit'] = 'm³/s'
         extra.append(edge)
         return 1

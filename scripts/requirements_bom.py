@@ -1723,11 +1723,28 @@ def _edge_water_flow_m3h(frm: str, to: str, recirc_m3h: float, q, trains: int = 
                 return float(v)
         return default
 
-    # 1) MAIN LOOP — both ends are recirculation-loop process units. The plant flow
-    # is carried by `trains` parallel headers; one represented edge = one train.
+    # A loop unit's NAME can carry a BRANCH qualifier — "Drum Filter BACKWASH",
+    # "Degassing BLOWER", "Biofilm Carrier MEDIA charge", "… SAMPLE / OVERFLOW /
+    # REJECT" — whose base noun ("drum filter", "degass", "biofilm") matches a
+    # main-loop unit, but whose edge is the small BRANCH service of that unit (a
+    # reject / utility / charge stream), NOT the full process loop. Such a qualifier
+    # VETOES loop-membership so the per-branch duty rules below size the edge to its
+    # own (much smaller) duty. Without this veto a backwash reject was mis-sized as a
+    # full DN600 recirculation header — the root of the £700k phantom connection cost
+    # + the fat-pipe "web" in the render (26 ancillary ties at the plant-max DN).
+    # Universal: branch qualifiers are class-agnostic service words, no per-class table.
+    _branch_veto = bool(re.search(
+        r"backwash|\bblower\b|\bmedia\b|carrier|dos(?:e|ing)|chemical|\bfeed\b|feeding|"
+        r"sludge|solids|thicken|chill|grad|harvest|crowd|skim|foam|make[_ -]?up|makeup|"
+        r"\bbleed\b|\bdrain\b|blow[_ -]?down|purge|sample|overflow|reject|waste|effluent|"
+        r"expansion|buffer|reservoir|mortality|biosecurity|quarant|grading", blob))
+
+    # 1) MAIN LOOP — both ends are recirculation-loop process units AND neither end is
+    # a branch-qualified service. The plant flow is carried by `trains` parallel
+    # headers; one represented edge = one train.
     frm_loop = bool(_LOOP_NODE_RE.search(frm))
     to_loop = bool(_LOOP_NODE_RE.search(to))
-    if frm_loop and to_loop:
+    if frm_loop and to_loop and not _branch_veto:
         n = max(int(trains), 1)
         return (recirc_m3h / n,
                 f"main recirculation loop — per-train header ({recirc_m3h:,.0f} m³/h ÷ {n} parallel trains)"
