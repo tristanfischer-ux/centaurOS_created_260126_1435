@@ -1466,6 +1466,8 @@ def _unit_family(unit: str) -> Tuple[str, float]:
         "tonne": ("mass_kg", 1000.0), "tonnes": ("mass_kg", 1000.0),
         # power -> canonical kW
         "kw": ("power_kw", 1.0), "mw": ("power_kw", 1000.0), "w": ("power_kw", 0.001),
+        # temperature -> canonical °C (° already stripped above; K not offset-converted, rare)
+        "c": ("temp_c", 1.0), "degc": ("temp_c", 1.0), "celsius": ("temp_c", 1.0),
         # dimensionless / ratio
         "ratio": ("ratio", 1.0), "": ("ratio", 1.0), "-": ("ratio", 1.0),
     }
