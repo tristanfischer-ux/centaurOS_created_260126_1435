@@ -505,7 +505,17 @@ def main() -> int:
         "blower", "fan", "ventilation", "dehumidifier", "hrv", "air handling",
         "air handler", "ahu", "hvac", "extract air", "supply air", "ducting",
         "media", "carrier", "biofilm carrier", "screen panel", "mesh panel",
-        "filter element", "backwash"}
+        "filter element", "backwash",
+        # FINAL-CONTROL ELEMENTS (actuators on a line, not flow-through nodes), SUB-
+        # COMPONENTS (a filter's own screen), and DRY material-handling stations (solids,
+        # not process water) are NOT process-WATER both-fluid nodes — requiring each to
+        # have its own fluid in+out wrongly deflated coverage to 76 % (Tristan 2026-06-21).
+        # The STRICT connection-ledger completeness check models each part's REAL required
+        # ties and already passes them; it stays the authoritative gate + the backstop for a
+        # genuinely disconnected part. Universal role keywords, no per-class table.
+        "control valve", "solenoid", "diffuser", "filter screen", "drum filter screen",
+        "feed storage", "feed distribution", "feed system", "grading", "harvest",
+        "mortality", "live-fish handling", "biosecurity"}
 
     connectivity_concerns = []
     origin_parts = []
