@@ -77,7 +77,7 @@ TRANSFORM = {"vessel": "holds / contains working fluid", "rotating": "adds head 
 # mechanism → the physical connecting element kind (pipes / wires / sensors)
 MECH_KIND = {"fluid_loop": "pipe", "fluid": "pipe", "process": "pipe", "thermal": "pipe (thermal)",
              "electrical": "cable", "power": "cable", "signal": "signal/sensor tie",
-             "control": "signal/sensor tie", "gas": "gas pipe"}
+             "control": "signal/sensor tie", "gas": "gas pipe", "oxygen": "gas pipe"}
 
 # A manifest instrument/valve part is REPRESENTED on a P&ID by its ISA LETTER (TT/PT/LT/AT/FCV/
 # XV/PSV), NOT by its manifest tag ("u_temperature_sensor") — so the coverage matcher's tag/name

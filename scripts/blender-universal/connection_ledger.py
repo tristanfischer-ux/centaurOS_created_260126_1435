@@ -55,6 +55,14 @@ def _service_of(mech):
         return "signal"
     if "thermal" in m or "heat" in m or "steam" in m or "refriger" in m:
         return "thermal"
+    # OXYGEN (or any oxidant gas-supply) is its OWN process service — the O₂ header that
+    # feeds the oxygenation cones / DO valves / emergency-O₂ solenoids. It is NOT bulk
+    # process WATER (so the water flow-through in+out rule must not drag an O₂ injector
+    # into a "needs a water input" verdict) and NOT ventilation AIR (so the air-mover
+    # closer must not treat the O₂ header as a blower duct). Folding it to its own
+    # service keeps the dedupe key + the audits coherent. (RAS connectivity fix.)
+    if ("oxygen" in m or m.startswith("o2") or m == "lox" or "ozone" in m):
+        return "oxygen"
     if "air" in m or "vent" in m or "hvac" in m or "duct" in m or "gas" in m:
         return "air"
     if "assembly" in m or "mechanical" in m or "part_of" in m or "mount" in m:
@@ -195,6 +203,31 @@ _AIR_CONSUMER_RE = re.compile(
     r"degass|co2[_ -]?strip|co₂[_ -]?strip|stripp|biofilter|\bmbbr\b|moving[_ -]?bed|"
     r"trickl|aeration|aerobic|oxygenat|\bcone\b|scrubber|flotation|dissolved[_ -]?air|"
     r"\bDAF\b|packed[_ -]?column|degasser", re.I)
+
+# OXYGEN SOURCES — the parts that SUPPLY oxidant gas: a LOX / liquid-oxygen vessel, an
+# oxygen-supply / oxygenation skid, an O₂ header, a PSA / VSA oxygen generator, an ozone
+# generator. The oxygen-closer feeds each O₂ consumer from the nearest of these. Universal
+# — class-agnostic O₂-supply vocabulary, no per-class table.
+_O2_SOURCE_RE = re.compile(
+    r"oxygen\s*supply|\blox\b|liquid[_ -]?oxygen|o₂?\s*header|oxygen\s*header|"
+    r"\bpsa\b|\bvsa\b|oxygen\s*generat|oxygenation\s*(?:system|skid|unit)|"
+    r"ozone\s*(?:supply|generat)", re.I)
+
+# OXYGEN CONSUMERS — a part that injects / regulates oxidant gas and therefore NEEDS an
+# O₂-supply feed: an O₂/oxygen solenoid + diffuser, a dissolved-O₂ (DO) control valve, an
+# oxygenation cone / Speece cone, an O₂ injection point. Keyed on the oxygen vocabulary so
+# any O₂ actuator on any plant is covered; the SOURCES above are excluded by the closer.
+_O2_CONSUMER_RE = re.compile(
+    r"oxygen|\bo₂\b|\bo2\b|do[\s_-]*valve|dissolved[\s_-]*o(?:xygen)?|"
+    r"speece|oxygenation\s*cone|\bo₂?\s*(?:diffus|inject|solenoid|cone)", re.I)
+
+# A SENSOR / instrument that merely MEASURES O₂ (a dissolved-O₂ analyser, an O₂ header
+# pressure transmitter, a LOX level alarm) is NOT supplied by the O₂ header — it samples /
+# monitors. It must be excluded from the O₂-consumer set so the closer feeds only ACTUATORS
+# (solenoid / diffuser / control valve / cone). Mirrors _required_services' sensor rule.
+_O2_SENSOR_RE = re.compile(
+    r"analy|transmit|\bsensor\b|\bprobe\b|\bgauge\b|detector|\bmeter\b|"
+    r"\blevel\b|\balarm\b|monitor", re.I)
 
 # INLINE TAP — a valve / meter / manifold / instrument that sits ON a line. It needs ≥1
 # fluid tie (it is on the pipe) but not necessarily a distinct in AND out modelled as
@@ -436,6 +469,71 @@ def close_air_directions(parts, topology, log=print):
                       "_augmented": True, "_air_closed": True})
     if extra:
         log(f"[ledger] air-closer: +{len(extra)} air line(s) — air-movers feed their aeration consumer")
+    return extra
+
+
+def close_oxygen_directions(parts, topology, log=print):
+    """Connect every O₂-CONSUMING actuator (an O₂ solenoid + diffuser, a dissolved-O₂
+    control valve, an oxygenation cone) that has NO process feed to its nearest O₂ SOURCE
+    (a LOX vessel / oxygen-supply skid / O₂ header / PSA generator) by an OXYGEN line —
+    the physically-correct supply (the emergency-O₂ solenoid IS fed by the O₂ header), NOT
+    a guess. Universal: any plant with an O₂/oxidant-gas supply + O₂ actuators benefits; a
+    plant with no O₂ parts gets an empty result (no-op). Mirrors close_air_directions.
+
+    A consumer NEEDS an O₂ feed when it is an O₂ part that currently has NO PROCESS input
+    (water OR oxygen — power/signal ties do NOT count as the process feed) in the topology.
+    The O₂ SOURCES themselves are excluded (a source supplies, it is not fed). If no O₂
+    source exists, the consumer is LEFT for the gate (never invent a source — same
+    discipline as close_flow_directions). Pure + position-free + deterministic."""
+    by_name = {getattr(p, "name", None): p for p in parts if getattr(p, "name", None)}
+
+    def _rank(nm):
+        p = by_name.get(nm)
+        v = getattr(p, "region_rank", None) if p is not None else None
+        return v if isinstance(v, (int, float)) else 999
+
+    def _mod(nm):
+        p = by_name.get(nm)
+        return (getattr(p, "module_id", "") if p is not None else "") or ""
+
+    # parts that ALREADY have a PROCESS input (water or oxygen) — power/signal don't count.
+    has_proc_in = set()
+    for e in topology:
+        if _service_of(e.get("mechanism")) in ("water", "thermal", "oxygen"):
+            t = e.get("to_part")
+            if t:
+                has_proc_in.add(t)
+
+    sources = [getattr(p, "name", None) for p in parts
+               if getattr(p, "name", None) and _O2_SOURCE_RE.search(p.name)]
+    if not sources:
+        return []   # no O₂ supply on this plant → nothing to close (never invent one)
+
+    extra, seen = [], set()
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm or nm in has_proc_in:
+            continue  # already has a process feed
+        # an O₂ CONSUMER (actuator) that is not itself an O₂ SOURCE and not a mere O₂
+        # SENSOR (an analyser/transmitter samples the line, it is not supplied by it).
+        if (not _O2_CONSUMER_RE.search(nm) or _O2_SOURCE_RE.search(nm)
+                or _O2_SENSOR_RE.search(nm)):
+            continue
+        r, m = _rank(nm), _mod(nm)
+        cands = [s for s in sources if s != nm]
+        pool = [s for s in cands if _mod(s) == m] or cands   # same module preferred
+        pick = min(pool, key=lambda s: abs(_rank(s) - r)) if pool else None
+        if pick is None or (pick, nm) in seen:
+            continue
+        seen.add((pick, nm))
+        extra.append({"from_part": pick, "to_part": nm, "mechanism": "oxygen",
+                      "constraint_kind": "flow_capacity",
+                      "material_context": "O₂ supply (direction-closer: oxygen header → consumer)",
+                      "_augmented": True, "_direction_closed": True})
+        has_proc_in.add(nm)
+    if extra:
+        log(f"[ledger] oxygen-closer: +{len(extra)} O₂ supply line(s) — O₂ actuators fed "
+            f"from their oxygen header/source")
     return extra
 
 
@@ -765,6 +863,31 @@ def _selftest():
     closed = close_flow_directions(cparts, ctopo, log=lambda *a: None)
     assert any(e["to_part"] == "Degasser" and e["from_part"] in ("Biofilter", "Drum Filter")
                for e in closed), f"degasser (output-only) must be fed from upstream; got {closed}"
+
+    # close_oxygen_directions: an O₂ consumer (solenoid+diffuser / DO valve) with NO
+    # process feed (only a power tie) is supplied from its nearest O₂ SOURCE by an oxygen
+    # line; the source itself is not fed; a flow-through with NO O₂ vocabulary is untouched;
+    # and with NO source present the consumer is left (never invented). Pure + position-free.
+    oparts = [_PR("Oxygen Supply (LOX) System", 0), _PR("Emergency O₂ Solenoid + Diffuser", 1),
+              _PR("Dissolved-O₂ Control Valve", 1), _PR("Recirc Pump", 2)]
+    otopo = [{"from_part": "Distribution Busbar", "to_part": "Dissolved-O₂ Control Valve",
+              "mechanism": "electrical_bus"}]   # the valve has only a POWER tie, no process feed
+    oclosed = close_oxygen_directions(oparts, otopo, log=lambda *a: None)
+    o_to = {(e["from_part"], e["to_part"]) for e in oclosed}
+    assert ("Oxygen Supply (LOX) System", "Emergency O₂ Solenoid + Diffuser") in o_to, \
+        f"emergency-O₂ solenoid must be fed from the LOX source; got {oclosed}"
+    assert ("Oxygen Supply (LOX) System", "Dissolved-O₂ Control Valve") in o_to, \
+        f"DO control valve (power-only) must get an O₂ supply input; got {oclosed}"
+    assert all(e["mechanism"] == "oxygen" for e in oclosed), "O₂ closer edges carry the oxygen mechanism"
+    assert not any(e["to_part"] == "Oxygen Supply (LOX) System" for e in oclosed), \
+        "an O₂ SOURCE is never fed by the oxygen closer"
+    assert not any(e["to_part"] == "Recirc Pump" for e in oclosed), \
+        "a non-O₂ flow-through must not be touched by the oxygen closer"
+    # no O₂ source present → no-op (never invent a source), same discipline as flow-closer
+    assert close_oxygen_directions([_PR("Emergency O₂ Solenoid + Diffuser", 1)], [],
+                                   log=lambda *a: None) == [], \
+        "with no O₂ source the consumer is left for the gate (no invented source)"
+
     print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "
           f"completeness flags {len(concerns)} incomplete part(s) incl. pump-missing-input)")

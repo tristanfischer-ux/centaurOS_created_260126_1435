@@ -11881,6 +11881,10 @@ def main():
     # air-movers (blower/fan) feed their aeration consumer by an AIR line, not a water tie
     # to the tank; sub-components (screen/backwash/media) tie to their PARENT, not the tank.
     _candidate = _candidate + cl.close_air_directions(parts, _candidate, log=lambda m: print(m))
+    # O₂ actuators (emergency-O₂ solenoid + diffuser, dissolved-O₂ control valve) that have
+    # no process feed are supplied from their nearest O₂ source (LOX/oxygen-supply/header)
+    # by an OXYGEN line — the physically-correct tie, so they stop reading as missing_input.
+    _candidate = _candidate + cl.close_oxygen_directions(parts, _candidate, log=lambda m: print(m))
     # every part that REQUIRES power but shows no supply gets a feed from the distribution
     # hub — closes the completeness audit's 'missing [power]' concern (e.g. a blower with
     # no power feed). Uses the SAME _REQUIRED_SERVICES the audit reads, so it fills exactly
