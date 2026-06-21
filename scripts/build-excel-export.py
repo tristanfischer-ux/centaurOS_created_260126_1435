@@ -1284,40 +1284,91 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
     ri = led.get("referential_integrity") or {}
     incomplete = {c.get("part"): c.get("missing", []) for c in (comp.get("concerns") or [])}
 
+    # tag lookup: part name -> BoM tag (so the trace carries the same tag as the
+    # BoM / drawings). Exact name first, then a loose contains-match.
+    tag_by_name: Dict[str, str] = {}
+    for b in (state.get("requirementsBom") or []):
+        if not isinstance(b, dict):
+            continue
+        tg = clean_cell(b.get("tag", ""))
+        if not tg:
+            continue
+        for key in (b.get("name_human"), b.get("requirement")):
+            if key:
+                tag_by_name.setdefault(str(key).strip().lower(), tg)
+
+    def _tag_for(nm: str) -> str:
+        n = str(nm).strip().lower()
+        if n in tag_by_name:
+            return tag_by_name[n]
+        for k, t in tag_by_name.items():
+            if k and (k in n or n in k):
+                return t
+        return ""
+
     ws = wb.create_sheet("Connection trace")
-    set_widths(ws, {"A": 38, "B": 10, "C": 46, "D": 46, "E": 22})
-    title_row(ws, "Connection trace — which part connects to what", 5,
-              "The ledger authors every connection; each part lists its INPUTS (from) and "
-              "OUTPUTS (to) by exact name. Trace a system: follow a part's outputs to the "
-              "next part, then read that part's inputs back. Bidirectionally consistent.")
+    set_widths(ws, {"A": 38, "B": 12, "C": 10, "D": 46, "E": 46, "F": 22})
+    title_row(ws, "Connection trace — which part connects to what", 6,
+              "The ledger authors every connection. INPUTS / OUTPUTS are LIVE cell-references "
+              "to the connected part's own row (col A): select a cell and use Formulas ▸ Trace "
+              "Precedents / Trace Dependents to draw the arrows, or click through to navigate. "
+              "Each part also carries its Tag. Bidirectionally consistent.")
     # health banner
     sub_banner(ws, 4,
                f"{led.get('count', len(adj))} authored connections   ·   "
                f"completeness: {comp.get('n_concerns', 0)} part(s) missing a required tie   ·   "
-               f"referential integrity: {ri.get('n_violations', 0)} broken reference(s)", 5)
-    header(ws, 5, ["Part", "Status", "Inputs ← (from)", "Outputs → (to)", "Services"])
-    r = 6
-    for name in sorted(adj.keys(), key=lambda s: str(s).lower()):
+               f"referential integrity: {ri.get('n_violations', 0)} broken reference(s)", 6)
+    header(ws, 5, ["Part", "Tag", "Status", "Inputs ← (from)", "Outputs → (to)", "Services"])
+
+    # PASS 1 — assign every part a row so inputs/outputs can reference it by cell.
+    names_sorted = sorted(adj.keys(), key=lambda s: str(s).lower())
+    first_row = 6
+    name_to_row = {nm: first_row + i for i, nm in enumerate(names_sorted)}
+
+    def _ref_formula(conn_names) -> Optional[str]:
+        """A formula referencing each connected part's A-cell (so Excel can trace it)
+        — unknown / boundary endpoints fall back to a quoted literal."""
+        parts = []
+        for nm in dict.fromkeys(conn_names):
+            row = name_to_row.get(nm)
+            if row:
+                parts.append(f"A{row}")
+            else:
+                parts.append('"' + str(nm).replace('"', "'") + '"')
+        if not parts:
+            return None
+        return "=" + '&", "&'.join(parts)
+
+    # PASS 2 — write the rows.
+    r = first_row
+    for name in names_sorted:
         a = adj[name] or {}
         ins = a.get("inputs") or []
         outs = a.get("outputs") or []
-        in_names = ", ".join(dict.fromkeys(str(i.get("from")) for i in ins)) or "—"
-        out_names = ", ".join(dict.fromkeys(str(o.get("to")) for o in outs)) or "—"
+        in_list = [str(i.get("from")) for i in ins]
+        out_list = [str(o.get("to")) for o in outs]
         svcs = ", ".join(sorted({(i.get("service") or "") for i in ins} |
                                 {(o.get("service") or "") for o in outs} - {""})) or "—"
         miss = incomplete.get(name)
         status = "OK" if not miss else "missing: " + ", ".join(miss)
         ws.cell(r, 1, clean_cell(name)).border = BORDER
-        sc = ws.cell(r, 2, clean_cell(status))
+        ws.cell(r, 2, clean_cell(_tag_for(name))).border = BORDER
+        sc = ws.cell(r, 3, clean_cell(status))
         sc.border = BORDER
         if miss:
             sc.font = Font(color="C00000", bold=True)
-        ci = ws.cell(r, 3, clean_cell(in_names)); ci.alignment = WRAP_TOP; ci.border = BORDER
-        co = ws.cell(r, 4, clean_cell(out_names)); co.alignment = WRAP_TOP; co.border = BORDER
-        ws.cell(r, 5, clean_cell(svcs)).border = BORDER
+        in_f = _ref_formula(in_list)
+        ci = ws.cell(r, 4, in_f if in_f else "—")
+        ci.alignment = WRAP_TOP
+        ci.border = BORDER
+        out_f = _ref_formula(out_list)
+        co = ws.cell(r, 5, out_f if out_f else "—")
+        co.alignment = WRAP_TOP
+        co.border = BORDER
+        ws.cell(r, 6, clean_cell(svcs)).border = BORDER
         r += 1
     ws.freeze_panes = "A6"
-    ws.auto_filter.ref = f"A5:E{max(6, r - 1)}"
+    ws.auto_filter.ref = f"A5:F{max(6, r - 1)}"
     return True
 
 
