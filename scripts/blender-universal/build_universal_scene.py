@@ -490,6 +490,7 @@ INSPECT_ACCESS_STEEL_RE = re.compile(
     r"u_ladhoop_|u_ladstr_|u_stub_|"          # caged-ladder + routing nozzle stubs
     r"_platform_|_platrail_|"                  # access platform ring + its handrail
     r"_neck\b|_flange\b|_manway\b|_ntop\b|_nbot\b|"  # vessel nozzle stubs + manway
+    r"_port_|_term_|"                          # STAGE-2 connection-port stubs + terminal markers
     r"_cover\b|_handrail\b|_windgirder\b|_post_|_plinth\b|_rim\b|_centredrain\b",  # tank roof + handrail +
     # wind-girder + posts + plinth → steel, so a tank reads as engineered (grey roof
     # rim + rail on the green shell) instead of a featureless green blob. Universal.
@@ -575,7 +576,7 @@ class Part:
     """A physical, renderable part resolved from a word."""
     __slots__ = ("name", "module_id", "region_key", "region_rank",
                  "shape", "dim", "qty", "form", "match_tokens",
-                 "obj_anchor", "placed_xyz_mm", "anchors")
+                 "obj_anchor", "placed_xyz_mm", "anchors", "ports")
 
     def __init__(self, name, module_id, region_key, region_rank, shape, dim, qty, form):
         self.name = name
@@ -590,6 +591,10 @@ class Part:
         self.obj_anchor = None        # (assembly dict) once placed
         self.placed_xyz_mm = None     # CENTRE anchor (mm) for legacy bbox/routing
         self.anchors = None           # {"top","bottom","centre"} (mm) for nozzle routing
+        self.ports = None             # {"<service>_<dir>": (x,y,z) mm} — STAGE 2 named
+        #                               connection ports (set by add_connection_ports);
+        #                               the stub-TIP for a fluid port, the terminal face
+        #                               for a power/signal port. Stage 3 reads these.
 
 
 STOPWORDS = {"the", "a", "an", "and", "or", "of", "for", "to", "with", "on",
@@ -7405,6 +7410,218 @@ def place_all_linear(parts, MAT, MO):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# STAGE 2 — NAMED IN/OUT CONNECTION PORTS (4-stage connection-points plan)
+# ───────────────────────────────────────────────────────────────────────────
+# Stage 1 laid every part in process order; Stage 2 (this) gives EACH placed part
+# its named connection PORTS — one per distinct (service, direction) the LEDGER says
+# the part has — positioned on the part's SURFACE from its placed centre + footprint,
+# and STORED as durable coordinates on the part (`p.ports`) so Stage 3 can wire the
+# line port-to-port and Stage 4 can fold it. It does NOT route any pipe (Stage 3) or
+# move any part (Stage 4) — it only ADDS short stubs / small terminal markers + records
+# their tip/face coordinates.
+#
+# UNIVERSAL + LAYOUT-AGNOSTIC: ports derive ONLY from (a) the ledger adjacency for the
+# part's NAME (its inputs[]/outputs[] services) and (b) the part's placed centre + dims.
+# It therefore works under BOTH place_all_linear AND the production family placers, and
+# on ANY archetype — a part with only a power tie gets only a power terminal, a
+# flow-through process part gets water in + out, a gas source gets an O₂/air nozzle, etc.
+# No RAS-only / per-class hardcoding.
+#
+# PORT GEOMETRY by service + direction (so an IN and an OUT never share a face):
+#   • water / process  — IN on the −X wall, OUT on the +X wall, at the shell (opposite
+#     faces, the natural left→right process through-flow). For a TANK/vertical vessel the
+#     OUT drops to a bottom-draw elevation and the IN sits high (top-return), per a real
+#     recirc tank. Fluid ports use _spawn_nozzle_stub → the flanged look + the stub TIP.
+#   • thermal          — like water but on the ±Y faces (so a thermal loop's ports never
+#     collide with the ±X process water ports on the same vessel).
+#   • oxygen / air     — an UPPER side nozzle on the +Y face near the top head (a gas
+#     header tie-in), IN vs OUT offset along +Y so two gas ports don't overlap.
+#   • power            — a SMALL terminal box LOW on the −Y face (a clearly-small marker,
+#     never a generic cube). IN vs OUT (rare) split low/high.
+#   • signal           — a SMALL terminal box LOW on the +Y face (opposite power so the
+#     instrument gland and the power gland read separately).
+#   • assembly         — a mount/part-of relation, NOT a routable connection → no port.
+#
+# Object NAMING rides the part's own build_part prefix (`u_<slug>`) so (1) the Stage-4
+# bank/CRAFT shifts move the ports WITH the part (they match the part prefix), and (2)
+# the INSPECT recolour keys `_port_`/`_term_`/`_neck`/`_flange` to access-steel grey, so
+# a port reads as deliberate steelwork, not an unmatched blob.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# How far a port stub / terminal sits PROUD of the part's footprint wall [mm], so the
+# stub clearly stands off the shell rather than buried in it.
+PORT_STANDOFF_MM = 120.0
+# Nominal bore [mm] a fluid port stub is drawn at when the ledger edge carries no size
+# (Stage 3 re-sizes the real run; this is only the geometric stub neck). Deliberately
+# modest so it reads as a tie-in point, not a fat process main.
+PORT_FLUID_DIA_MM = 200.0
+# Terminal marker box size [mm] — a SMALL junction/terminal box (≤0.3 m per the brief),
+# clearly a terminal, never a generic equipment cube.
+PORT_TERMINAL_MM = (260.0, 200.0, 240.0)
+# Shapes whose default (edge-less) port is electrical (a small terminal), not fluid.
+_PORT_ELECTRICAL_SHAPES = {"cabinet", "cabinet_small", "transformer_box", "box",
+                           "instrument"}
+
+
+def _terminal_marker(nm, face_xyz_mm, MAT, mod, MO, kind="power"):
+    """A SMALL terminal/junction box marking a power or signal tie-in. The box is
+    drawn CENTRED on `face_xyz_mm` (a point already stood a standoff proud of the
+    part's wall) and that point is RETURNED as the cable-land coordinate Stage 3 uses.
+    Universal: a fixed-small box (≤0.3 m) so it is unmistakably a terminal, never a
+    generic equipment cube; coloured access-steel-grey by the INSPECT `_term_` rule."""
+    w, d, h = PORT_TERMINAL_MM
+    fx, fy, fz = (float(c) for c in face_xyz_mm)
+    term_mat = _nozzle_mat(MAT)
+    fl.add_box(f"{nm}_term_{kind}",
+               (fx * fl.MM, fy * fl.MM, fz * fl.MM),
+               (w * fl.MM, d * fl.MM, h * fl.MM),
+               term_mat, module=mod, module_objects=MO)
+    return (fx, fy, fz)
+
+
+def _required_ports_for(part, adj_entry):
+    """The set of (service, direction) ports a part needs, from its ledger adjacency.
+    direction ∈ {"in","out"}. `adj_entry` = ledger adjacency[name] or None.
+    Universal fallback when the part has NO ledger edges: a flow-through PROCESS part
+    gets water in+out; a pure electrical/control part gets a single power_in."""
+    wanted = []
+    seen = set()
+
+    def _add(svc, direction):
+        if not svc or svc == "assembly":
+            return                                    # assembly = mount, not a port
+        key = (svc, direction)
+        if key not in seen:
+            seen.add(key)
+            wanted.append(key)
+
+    if adj_entry:
+        for i in adj_entry.get("inputs", []) or []:
+            _add(i.get("service"), "in")
+        for o in adj_entry.get("outputs", []) or []:
+            _add(o.get("service"), "out")
+    if wanted:
+        return wanted
+    # ── no ledger edges → a sensible UNIVERSAL default by part character ──
+    if part.shape in _PORT_ELECTRICAL_SHAPES:
+        _add("power", "in")                           # cabinet/instrument → power feed
+    else:
+        _add("water", "in"); _add("water", "out")     # flow-through process default
+    return wanted
+
+
+def add_connection_ports(parts, MAT, MO, ledger_adj):
+    """STAGE 2. Give EVERY placed part its named in/out connection ports + store each
+    as a durable coordinate on the part (`p.ports`). Keys off the part's PLACED centre +
+    footprint + the LEDGER adjacency only — so it is layout-agnostic (works under the
+    Stage-1 linear row AND the production placers) and universal (no per-class logic).
+
+    `ledger_adj` = the connection ledger's per-part adjacency dict (build_adjacency):
+    {part_name: {"inputs":[{from,mechanism,service}], "outputs":[{to,...}]}}. The dict is
+    keyed by the SAME resolved part names as Part.name, so the lookup is exact.
+
+    For each part it computes the required (service, direction) ports, positions each on
+    the part's surface by service+direction, draws a flanged stub (fluid) or a small
+    terminal box (power/signal), and records the stub-TIP / terminal-face point in
+    p.ports[f"{service}_{dir}"]. Returns (n_parts_with_ports, n_ports_total)."""
+    adj = ledger_adj or {}
+    n_with, n_ports = 0, 0
+    for p in parts:
+        if not getattr(p, "placed_xyz_mm", None):
+            continue                                  # never placed → nothing to port
+        # building-shell envelope parts carry no mesh in the layout (placed centred, no
+        # solid) → they are not a connectable process item; skip (no port, no record).
+        if _layout_is_envelope(p):
+            continue
+        wanted = _required_ports_for(p, adj.get(p.name))
+        if not wanted:
+            continue
+        # placed footprint extents (mm) → port positions on the walls. footprint_mm
+        # already reserves a qty-N grid; for ports we want the SINGLE-unit shell, so
+        # take the per-unit footprint (the representative instance the routing uses).
+        rd = resolved_dims_mm(p)
+        rd_unit = dict(rd); rd_unit["_qty"] = 1
+        fx, fy, h = footprint_mm(rd_unit)
+        cx, cy, _cz = p.placed_xyz_mm
+        anc = p.anchors or _box_anchors(cx, cy, DECK_Z_MM, h)
+        z_top = anc.get("top", (cx, cy, DECK_Z_MM + h))[2]
+        z_bot = anc.get("bottom", (cx, cy, DECK_Z_MM))[2]
+        z_ctr = anc.get("centre", (cx, cy, DECK_Z_MM + h * 0.5))[2]
+        hx, hy = fx / 2.0, fy / 2.0
+        is_vessel = p.shape in _VESSEL_KIND
+        nm = _part_prefix(p.name)
+        prt = {}
+        # offsets so two ports of the SAME service+face (e.g. a gas in AND out, or a
+        # power in AND out) don't land on top of each other.
+        gas_seen = 0
+        pwr_seen = 0
+        sig_seen = 0
+        for svc, direction in wanted:
+            pkey = f"{svc}_{direction}"
+            if pkey in prt:                           # already placed this exact port
+                continue
+            if svc in ("water", "thermal"):
+                # process fluid: IN/OUT on OPPOSITE faces. water on ±X, thermal on ±Y so
+                # the two services never collide on the same vessel.
+                if svc == "water":
+                    sign = -1.0 if direction == "in" else 1.0
+                    base_x = cx + sign * (hx + PORT_STANDOFF_MM)
+                    if is_vessel:
+                        # tank/vessel: bottom-DRAW out, top-RETURN in (a real recirc tank)
+                        z = (z_bot + (z_ctr - z_bot) * 0.30) if direction == "out" \
+                            else (z_ctr + (z_top - z_ctr) * 0.55)
+                    else:
+                        z = z_ctr
+                    tip = _spawn_nozzle_stub(f"{nm}_port_{pkey}", (base_x, cy, z),
+                                             (sign, 0.0, 0.0), PORT_FLUID_DIA_MM,
+                                             MAT, mod=p.module_id, MO=MO)
+                else:  # thermal on ±Y
+                    sign = -1.0 if direction == "in" else 1.0
+                    base_y = cy + sign * (hy + PORT_STANDOFF_MM)
+                    tip = _spawn_nozzle_stub(f"{nm}_port_{pkey}", (cx, base_y, z_ctr),
+                                             (0.0, sign, 0.0), PORT_FLUID_DIA_MM,
+                                             MAT, mod=p.module_id, MO=MO)
+                prt[pkey] = tuple(float(c) for c in tip)
+            elif svc in ("oxygen", "air"):
+                # gas header tie-in: an UPPER nozzle on the +Y face near the top head.
+                # stagger successive gas ports along +Y so in/out (or O₂+air) separate.
+                off = gas_seen * (PORT_FLUID_DIA_MM * 2.2)
+                gas_seen += 1
+                base_y = cy + hy + PORT_STANDOFF_MM
+                z = z_ctr + (z_top - z_ctr) * 0.60
+                tip = _spawn_nozzle_stub(
+                    f"{nm}_port_{pkey}", (cx + off, base_y, z),
+                    (0.0, 1.0, 0.0), PORT_FLUID_DIA_MM * 0.8,
+                    MAT, mod=p.module_id, MO=MO)
+                prt[pkey] = tuple(float(c) for c in tip)
+            elif svc == "power":
+                # SMALL terminal box low on the −Y face. in low / out (rare) a touch higher.
+                z = z_bot + (z_ctr - z_bot) * (0.25 + 0.30 * pwr_seen)
+                pwr_seen += 1
+                # land the terminal low on the −Y wall, a standoff proud of the shell.
+                face = (cx - hx * 0.45, cy - (hy + PORT_STANDOFF_MM * 0.5), z)
+                pt = _terminal_marker(f"{nm}_port_{pkey}", face,
+                                      MAT, mod=p.module_id, MO=MO, kind="power")
+                prt[pkey] = pt
+            elif svc == "signal":
+                # SMALL terminal box low on the +Y face (opposite the power gland).
+                z = z_bot + (z_ctr - z_bot) * (0.25 + 0.30 * sig_seen)
+                sig_seen += 1
+                face = (cx + hx * 0.45, cy + (hy + PORT_STANDOFF_MM * 0.5), z)
+                pt = _terminal_marker(f"{nm}_port_{pkey}", face,
+                                      MAT, mod=p.module_id, MO=MO, kind="signal")
+                prt[pkey] = pt
+        if prt:
+            p.ports = prt
+            n_with += 1
+            n_ports += len(prt)
+    print(f"[univ][ports] STAGE 2 connection ports — {n_with}/{len(parts)} parts "
+          f"ported, {n_ports} ports total (fluid stubs + small terminals; "
+          f"stored on part.ports for Stage-3 wiring)")
+    return n_with, n_ports
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # UNIVERSAL LAYOUT OPTIMISER hook (opt-in: LAYOUT_OPTIMISE=1) — re-flow the placed
 # equipment to layout_optimiser.py's deterministic CRAFT minimum-weighted-pipe-run
 # layout AFTER place_all, then let the skid frame + pipe rack + routing re-derive on
@@ -12137,6 +12354,43 @@ def main():
     else:
         bbox, region_centres, frame_h, routed, unresolved = place_process_plant(
             parts, regions, topology, MAT, MO)
+
+    # ── STAGE 2 (4-stage connection-points plan) — NAMED IN/OUT CONNECTION PORTS ──
+    # Now that every part is PLACED (placed_xyz_mm + anchors set above by whichever
+    # placer ran — the Stage-1 linear row OR a production family placer), give each
+    # part its named connection ports from the LEDGER adjacency + its placed centre +
+    # dims, and store the tip/face coordinates on part.ports for Stage-3 wiring. This is
+    # layout-agnostic (fires for ANY placer) and universal (ports derive from the ledger
+    # services, not per-class). It only ADDS short stubs / small terminals + records
+    # their coordinates — it routes NO pipe (Stage 3) and moves NO part (Stage 4).
+    # Default ON (ports are always wanted); set BLENDER_CONNECTION_PORTS=0 to suppress.
+    _ports_on = os.environ.get("BLENDER_CONNECTION_PORTS", "1").strip().lower() \
+        not in ("0", "false", "no", "off")
+    if _ports_on:
+        try:
+            add_connection_ports(parts, MAT, MO, _ledger_adj)
+        except Exception as _pe:    # ports are additive — never fail the whole render
+            print(f"[univ][ports] WARN add_connection_ports skipped: {_pe}")
+        # OPT-IN verification dump (BLENDER_DUMP_PORTS=1): write every part's ports dict
+        # to ports-debug.json so Stage 2 can be inspected without a Blender session. Pure
+        # diagnostic — never written in production. The KEY deliverable (part.ports) is the
+        # in-memory record Stage 3 consumes; this just serialises it for review.
+        if os.environ.get("BLENDER_DUMP_PORTS", "").strip().lower() in ("1", "true", "yes", "on"):
+            try:
+                _dump = {p.name: {k: [round(float(c), 1) for c in v]
+                                  for k, v in (p.ports or {}).items()}
+                         for p in parts if getattr(p, "ports", None)}
+                with open(os.path.join(out_dir, "ports-debug.json"), "w") as _pf:
+                    json.dump({"schema": "ports-debug/1",
+                               "n_parts_with_ports": len(_dump),
+                               "n_ports_total": sum(len(v) for v in _dump.values()),
+                               "ports": _dump}, _pf, indent=1)
+                print(f"[univ][ports] BLENDER_DUMP_PORTS=1 → wrote ports-debug.json "
+                      f"({len(_dump)} parts)")
+            except Exception as _de:
+                print(f"[univ][ports] WARN ports-debug dump failed: {_de}")
+    else:
+        print("[univ][ports] BLENDER_CONNECTION_PORTS=0 — Stage-2 ports suppressed")
 
     # ── ROUTE AUDIT — the harsh self-check on the pipe routing (Tristan 2026-06-11).
     # Computes over-equipment segments / max detour ratio / same-elevation crossings
