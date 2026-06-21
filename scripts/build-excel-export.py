@@ -347,6 +347,13 @@ def formula_to_excel(rhs: str, symbol_cell: Dict[str, str]) -> Optional[str]:
     tokens = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expr))
     # which tokens are immediately followed by '(' -> they are function calls
     func_tokens = set(re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", expr))
+    # A function token Excel does NOT have (e.g. ceil_to_standard — a tool-internal
+    # helper that snaps a value to the next IEC standard rating) cannot become a live
+    # Excel formula. Emit None so the caller renders the STATIC computed value, never a
+    # broken "=ceil_to_standard(...)" that shows #NAME?. (PI/LOG10/SQRT/... stay live.)
+    _excel_funcs = _FUNC_OK | {"pi", "ceiling", "floor", "round", "power", "sum"}
+    if any(fn.lower() not in _excel_funcs for fn in func_tokens):
+        return None
 
     replacements: List[Tuple[str, str]] = []
     for tok in tokens:
