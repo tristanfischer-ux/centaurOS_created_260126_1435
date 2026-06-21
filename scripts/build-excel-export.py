@@ -236,7 +236,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Cost waterfall": "BoM → assembly → factory COGS → install → installed ASP (live running totals).",
     "Inputs & Assumptions": "Editable yellow drivers (price/feed/energy/labour/capex) — the economics model inputs.",
     "Economics": "Live revenue / opex / EBITDA / margin / payback / NPV / IRR — all formulas off the Inputs tab. Opex pie + revenue-vs-EBITDA bar.",
-    "Scenarios": "Live FINE scale sweep (0.2x-5x, six-tenths capex law) with per-row payback/NPV/IRR + Low/Central/High price sensitivity. Capex/payback line charts + EBITDA bar.",
+    "Scenarios": "Live FINE scale sweep (0.2x-5x, capex via the tunable scaling exponent — default LINEAR/modular) with per-row payback/NPV/IRR + Low/Central/High price sensitivity. Capex/payback line charts + EBITDA bar.",
     "Investment Analysis": "THE SWEET-SPOT FINDER. Live break-even / viability / investable / NPV-max / £5M-anchor over the sweep + a recommended-deployment callout. IRR-vs-capex (with hurdle lines), NPV, payback & EBITDA-margin curves.",
     "Spec sheets": "SIZING RATIONALE — why each principal is this size: duty, rating, driving calc.",
     "Panel schedule": "Electrical panel / load schedule as a real sortable table.",
@@ -1869,9 +1869,18 @@ _ECON_DEFAULTS = {
 SWEEP_ROWS = 16
 SWEEP_LO_MULT = 0.2
 SWEEP_HI_MULT = 5.0
-# Six-tenths cost-capacity scaling exponent (Williams / Chilton). capex follows
-# capex_ref × (q/q_ref)^0.6 — the universal plant-scaling law.
-SIXTENTHS = 0.6
+# Capex-vs-output scaling exponent n: capex ∝ output^n.
+#   n = 1.0  → LINEAR. A MODULAR plant that scales by REPLICATING identical units
+#              (more tanks / pumps / treatment skids) — capex per unit of output is
+#              constant. This is the DEFAULT: ForgeOS process plants are modular, and
+#              the empirical 52 t→72 t RAS data scales ~linearly (exponent ≈1, not 0.6).
+#              Modular/linear is the IDEAL (Tristan 2026-06-21): de-risked, testable at
+#              small scale, predictable scale-up.
+#   n ≈ 0.6  → the Williams/Chilton "six-tenths" law, valid ONLY for MONOLITHIC
+#              equipment that scales by getting BIGGER (a single larger vessel/column).
+# Exposed as a TUNABLE Inputs cell ('scale_exp') so the investor model shows the capex
+# + economics live under either regime — set it to 0.6 to model a monolithic build.
+SCALE_EXPONENT = 1.0
 
 
 def _sweep_outputs(base_q: float) -> List[float]:
@@ -1916,7 +1925,7 @@ def _econ_at(out: float, base_q: float, base_capex: float,
     fcr = d["fcr_ras"] if is_ras else d["fcr_generic"]
     sale_mult = 1000.0 if is_ras else 1.0
     ratio = (out / base_q) if base_q else 1.0
-    capex = base_capex * (ratio ** SIXTENTHS)
+    capex = base_capex * (ratio ** SCALE_EXPONENT)
     revenue = out * sale_mult * sale
     feed = out * sale_mult * fcr * feed_p
     # connected load scaled pro-rata with output (mirrors the sweep's energy formula)
@@ -1971,7 +1980,7 @@ def _sweet_spot(state: dict) -> Optional[Dict[str, Any]]:
     npv_monotonic = npv_max["out"] >= rows[-1]["out"] - 1e-6
 
     # the £5M-affordable output and its economics
-    five_out = out_qty * (5_000_000.0 / base_capex) ** (1.0 / SIXTENTHS)
+    five_out = out_qty * (5_000_000.0 / base_capex) ** (1.0 / SCALE_EXPONENT)
     five = _econ_at(five_out, out_qty, base_capex, is_ras)
 
     # recommended deployment = the investable scale if it exists, else NPV-max
@@ -2137,6 +2146,15 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
                  "LOX, chemicals, juveniles, insurance, overhead", FMT_GBP))
     rows.append(("capex", "Installed capex", round(capex, 0), "£", capex_basis,
                  FMT_GBP))
+    rows.append(("scale_exp", "Scaling exponent n  (capex ∝ output^n)",
+                 SCALE_EXPONENT, "n",
+                 "1.0 = LINEAR — a MODULAR plant scaled by replicating identical units "
+                 "(more tanks/pumps/skids); capex per tonne is constant, de-risked + "
+                 "testable at small scale (the ForgeOS default; the empirical RAS data "
+                 "scales ~linearly). 0.6 = the six-tenths law for MONOLITHIC equipment "
+                 "that scales by getting bigger. Edit to model either regime — every "
+                 "capex/economics cell on the sweep, solver and £5M anchor is live off "
+                 "this.", FMT_DEC2))
     rows.append(("discount_rate", "Discount rate", 10.0, "%",
                  "real WACC for a small infrastructure project", FMT_DEC1))
     rows.append(("hurdle_rate", "Investor hurdle rate (IRR)", 15.0, "%",
@@ -2440,11 +2458,11 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
     title_row(
         ws, "Scenarios — live scale sweep & price sensitivity", 8,
         "LEFT: a FINE log-spaced output sweep (0.2x to 5x the as-built plant; capex "
-        "follows the six-tenths cost-capacity law capex_ref × (q/q_ref)^0.6), with "
-        "LIVE payback, annuity-DCF NPV and RATE-based IRR per row. RIGHT: Low/Central/"
-        "High on the key price drivers. Every cell is a LIVE formula off the Inputs "
-        "tab — edit a driver and the whole curve, the Investment Analysis tab and the "
-        "charts all move.",
+        "follows capex_ref × (q/q_ref)^n where n = the 'Scaling exponent' Inputs cell, "
+        "default 1.0 = LINEAR/modular), with LIVE payback, annuity-DCF NPV and RATE-"
+        "based IRR per row. RIGHT: Low/Central/High on the key price drivers. Every cell "
+        "is a LIVE formula off the Inputs tab — edit a driver (or the scaling exponent) "
+        "and the whole curve, the Investment Analysis tab and the charts all move.",
     )
     r = 4
 
@@ -2452,8 +2470,8 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
     base_q = round(out_qty, 6) or 204.0
     sweep = [round(o, 4) for o in _sweep_outputs(base_q)]
 
-    sub_banner(ws, r, f"Output sweep ({out_noun}, {out_unit}) — capex via the "
-                      f"six-tenths law; payback / NPV / IRR live per row", 8)
+    sub_banner(ws, r, f"Output sweep ({out_noun}, {out_unit}) — capex via the tunable "
+                      f"scaling exponent (default linear/modular); payback / NPV / IRR live per row", 8)
     r += 1
     header(ws, r, [f"Output ({out_unit})", "Capex £ (live)", "Revenue £ (live)",
                    "Total opex £ (live)", "EBITDA £ (live)", "Payback yr",
@@ -2466,8 +2484,8 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
         ws.cell(r, 1, qv).border = BORDER
         ws.cell(r, 1).number_format = FMT_DEC1
         ws.cell(r, 1).fill = FILL_INPUT     # the sweep point is editable too
-        # capex = capex_ref × (q / q_ref)^0.6
-        cc = ws.cell(r, 2, f"={R('capex')}*(A{r}/{qref})^{SIXTENTHS}")
+        # capex = capex_ref × (q / q_ref)^n  (n = the tunable scale_exp cell; 1.0 = linear)
+        cc = ws.cell(r, 2, f"={R('capex')}*(A{r}/{qref})^{R('scale_exp')}")
         cc.border = BORDER
         cc.number_format = FMT_GBP
         # revenue = q × (×1000 for tonnes) × sale price
@@ -2824,7 +2842,7 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
         OPX = f"{sh}!${sw['col_opex']}${f}:${sw['col_opex']}${l}"
         OUTr = f"{sh}!${sw['col_out']}${f}:${sw['col_out']}${l}"
         sub_banner(ws, r, "★ CAPEX → MAX OUTPUT — type a capex budget in the yellow cell; "
-                          "read the biggest plant it buys + its economics (six-tenths law)", 6)
+                          "read the biggest plant it buys + its economics (via the tunable scaling exponent)", 6)
         r += 1
         b_row = r
         ws.cell(r, 1, "Capex budget (EDIT me) £").font = FONT_SUB
@@ -2833,7 +2851,7 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
         r += 1
         o_row = r
         ws.cell(r, 1, f"→ Max production ({out_unit})").font = FONT_SUB
-        oc = ws.cell(r, 2, f"={OUTQ}*(B{b_row}/{CAPX})^(1/{SIXTENTHS})")
+        oc = ws.cell(r, 2, f"={OUTQ}*(B{b_row}/{CAPX})^(1/{R('scale_exp')})")
         oc.fill = FILL_RESULT; oc.font = Font(bold=True, size=12)
         oc.number_format = FMT_DEC1; oc.border = BORDER
         r += 1
@@ -3031,10 +3049,10 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
     header(ws, r, ["Metric", "Value", "", "", "", ""])
     r += 1
     five_out_row = r
-    inv_exp = 1.0 / SIXTENTHS
-    # output at £5M (live, inverse six-tenths off the as-built capex+output)
+    # output at £5M (live, inverse scaling off the as-built capex+output; exponent is
+    # the tunable scale_exp cell — at n=1.0 this is simply out_ref × 5M / capex_ref)
     ws.cell(r, 1, clean_cell(f"Output affordable at £5.0M ({out_unit})")).font = FONT_SUB
-    fo = ws.cell(r, 2, f"={R('out_qty')}*(5000000/{R('capex')})^{inv_exp:.6f}")
+    fo = ws.cell(r, 2, f"={R('out_qty')}*(5000000/{R('capex')})^(1/{R('scale_exp')})")
     fo.fill = FILL_RESULT
     fo.border = BORDER
     fo.number_format = FMT_DEC1

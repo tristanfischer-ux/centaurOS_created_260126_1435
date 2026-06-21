@@ -4,12 +4,16 @@
 Plan (c), Tristan 2026-06-12 reframe: the budget SETS THE SCALE; the OUTPUT is the
 dependent variable — "with the original budget ~1,000 units; at HALF the budget maybe
 ~300", and that is the answer, not a failure. This is tractable now that the cost scales
-bottom-up with capacity (the cost-scale work): plant cost ~ capacity^0.6 (the six-tenths
-rule), so the inverse is near-closed-form:
+bottom-up with capacity (the cost-scale work): plant cost ~ capacity^n, so the inverse is
+near-closed-form:
 
-    affordable_output = current_output × (budget / current_cost)^(1 / 0.6)
+    affordable_output = current_output × (budget / current_cost)^(1 / n)
 
-(½ budget → 0.5^(1/0.6) = 0.315 → ~31% output, i.e. ~300 of 1,000 — matching the ask.)
+DEFAULT n = 1.0 — LINEAR. A MODULAR plant scaled by replicating identical units has a
+constant cost per unit of output (½ budget → ½ output). This is the ideal and the measured
+RAS behaviour. Override n with --exponent (or env BUDGET_SCALE_EXPONENT): use 0.6 (the
+Williams/Chilton six-tenths law) ONLY for a genuinely MONOLITHIC plant that scales by
+getting bigger.
 
 Emits budget-report.json with the budget→output flex. The actual re-design at the solved
 output is one chain run at that target (not an N-iteration loop).
@@ -21,7 +25,16 @@ import json
 import sys
 from pathlib import Path
 
-SIX_TENTHS = 0.6   # cost ~ capacity^0.6 (process-equipment economy of scale)
+# Capex-vs-output scaling exponent n: cost ~ capacity^n; affordable = output × (budget/cost)^(1/n).
+#   n = 1.0 → LINEAR (the DEFAULT). A MODULAR plant scaled by REPLICATING identical units
+#             (more tanks/pumps/skids) — cost per unit of output is constant. This is the
+#             ideal (Tristan 2026-06-21): de-risked, testable at small scale, predictable.
+#             The empirical RAS data (52 t £4.11M → 72 t £5.91M) scales ~linearly, NOT 0.6 —
+#             which is why the old 0.6 default predicted 72 t for £5M but it came in £5.91M.
+#   n ≈ 0.6 → the Williams/Chilton "six-tenths" law, valid ONLY for MONOLITHIC equipment
+#             that scales by getting bigger. Override with --exponent 0.6 (or env
+#             BUDGET_SCALE_EXPONENT) for a genuinely monolithic build.
+SCALE_EXPONENT_DEFAULT = 1.0
 MIN_SCALE = 0.05   # below ~5% of the reference scale there is no sensible plant
 
 
@@ -30,7 +43,11 @@ def _state_path(arg: str) -> Path:
     return (p / "state.json") if p.is_dir() else p
 
 
-def solve(state_path: Path, budget_gbp: float | None = None) -> dict:
+def solve(state_path: Path, budget_gbp: float | None = None,
+          exponent: float | None = None) -> dict:
+    import os
+    n = exponent if exponent is not None else float(
+        os.environ.get("BUDGET_SCALE_EXPONENT", SCALE_EXPONENT_DEFAULT))
     s = json.loads(Path(state_path).read_text())
     cs = s.get("costStack") or {}
     cr = s.get("cost_reality") or {}
@@ -52,7 +69,7 @@ def solve(state_path: Path, budget_gbp: float | None = None) -> dict:
                 "cost_gbp": cost, "output": out}
 
     def output_for(b: float) -> float:
-        frac = max(MIN_SCALE, (b / cost)) ** (1.0 / SIX_TENTHS)
+        frac = max(MIN_SCALE, (b / cost)) ** (1.0 / n)
         return float(f"{out * frac:.3g}")   # 3 sig figs — no false '621.746' precision
 
     flex = {}
@@ -63,7 +80,9 @@ def solve(state_path: Path, budget_gbp: float | None = None) -> dict:
         "schema": "budget-report/v1",
         "current_cost_gbp": round(cost),
         "current_output": out, "unit": unit, "metric": metric,
-        "scaling": "six-tenths (plant cost ~ capacity^0.6); output = current × (budget/cost)^(1/0.6)",
+        "scaling": (f"exponent n={n:g} ({'LINEAR/modular' if abs(n-1.0) < 1e-6 else 'six-tenths/monolithic' if abs(n-0.6) < 0.05 else 'custom'}); "
+                    f"cost ~ capacity^{n:g}; output = current × (budget/cost)^(1/{n:g})"),
+        "scale_exponent": n,
         "note": ("the budget sets the scale — output is the dependent variable. "
                  "Below ~5% of the reference scale there is no sensible plant (floor)."),
         "budget_flex": flex,
@@ -81,7 +100,10 @@ def main(argv: list[str]) -> int:
     budget = None
     if "--budget" in argv:
         budget = float(argv[argv.index("--budget") + 1])
-    rep = solve(_state_path(argv[0]), budget)
+    exponent = None
+    if "--exponent" in argv:
+        exponent = float(argv[argv.index("--exponent") + 1])
+    rep = solve(_state_path(argv[0]), budget, exponent)
     out_dir = Path(argv[0]) if Path(argv[0]).is_dir() else Path(argv[0]).parent
     (out_dir / "budget-report.json").write_text(json.dumps(rep, indent=1))
     if "--json" in argv:
