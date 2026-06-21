@@ -4235,13 +4235,13 @@ def ensure_png(src_path: str, run_dir: str) -> Optional[str]:
         # try cairosvg
         try:
             import cairosvg  # noqa: WPS433
-            cairosvg.svg2png(url=src_path, write_to=out_png, output_width=1600)
+            cairosvg.svg2png(url=src_path, write_to=out_png, output_width=3000)
             return out_png
         except Exception:  # noqa: BLE001
             pass
         # try rsvg-convert
         try:
-            subprocess.run(["rsvg-convert", "-w", "1600", "-o", out_png, src_path],
+            subprocess.run(["rsvg-convert", "-w", "3000", "-o", out_png, src_path],
                            check=True, capture_output=True, timeout=60)
             if os.path.exists(out_png):
                 return out_png
@@ -4250,14 +4250,15 @@ def ensure_png(src_path: str, run_dir: str) -> Optional[str]:
     return None
 
 
-def downscale_png(src_png: str, run_dir: str, max_px: int = 2600) -> str:
+def downscale_png(src_png: str, run_dir: str, max_px: int = 3400) -> str:
     """
-    Downscale a PNG so the whole workbook stays manageable. Raised 1400→2600
-    (Tristan 2026-06-20: "make all of the diagrams higher resolution — hard to
-    see when made bigger"): native drawings are 2160–6560 px and were being
-    crushed to 1400 (single-line lost ~4.7×). 2600 keeps the dense P&ID / single-
-    line / process-schedule legible on zoom while bounding workbook size; smaller
-    renders (hero, isometrics ~2360 px) pass through untouched. Universal.
+    Downscale a PNG so the whole workbook stays manageable. Raised 1400→2600→3400
+    (Tristan: "make all of the diagrams higher resolution" + "A2 minimum"): native
+    drawings are 2160–6560 px and the densest (single-line 6140, P&ID 4380, block-
+    flow 4526, process-schedule 4356) were still being crushed to 2600. 3400 keeps
+    the dense P&ID / single-line / process-schedule legible on zoom (≈ A2 at ~150 dpi)
+    while bounding workbook size; smaller renders (hero, isometrics ~2360 px) pass
+    through untouched. Universal.
     Returns a path to the (possibly) downscaled PNG. Keeps aspect ratio. JPEG-quality
     PNG compression via Pillow optimisation.
     """
