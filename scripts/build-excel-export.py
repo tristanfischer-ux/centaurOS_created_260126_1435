@@ -1380,7 +1380,36 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
     return True
 
 
+# ── CANONICAL PART REGISTRY (the BoM tab IS the single source) ────────────────
+# tab_bom populates this {tag: {field: "'BoM'!$X$n"}} map as it renders each line,
+# so every OTHER part-listing tab (Spec sheets, Panel schedule, Process line/valve/
+# instrument lists) can REFERENCE the part's name / tag / unit £ / qty BY CELL rather
+# than repeating the string — one canonical identity, fully traceable, and a price
+# edit on the BoM propagates everywhere (Tristan 2026-06-21: "referenced parts rather
+# than repeated again and again"). Tags that do not resolve fall back to the literal,
+# so a tab never breaks. Cleared at the start of each build so a re-run is never stale.
+_BOM_REGISTRY: Dict[str, Dict[str, str]] = {}
+
+
+def _norm_tag(tag) -> str:
+    """Normalise a tag for registry lookup — trim + lowercase so 'P-101' / 'p-101 '
+    resolve identically across the BoM and the consumer tabs."""
+    return str(tag or "").strip().lower()
+
+
+def bom_ref(tag, field: str = "name") -> Optional[str]:
+    """The cross-sheet cell-reference FORMULA (e.g. "='BoM'!$B$7") for a part's field
+    on the canonical BoM registry, or None if the tag is not a BoM line. field ∈
+    {tag, name, qty, part, unit, line}. Callers write the returned string straight into
+    a cell (it carries the leading '='); on None they keep their own literal."""
+    rec = _BOM_REGISTRY.get(_norm_tag(tag))
+    if not rec or field not in rec:
+        return None
+    return "=" + rec[field]
+
+
 def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
+    _BOM_REGISTRY.clear()
     ws = wb.create_sheet("BoM")
     set_widths(ws, {"A": 12, "B": 50, "C": 8, "D": 28, "E": 8, "F": 12, "G": 12, "H": 50})
     title_row(ws, "Bill of materials", 8,
@@ -1421,6 +1450,17 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         bs.alignment = WRAP_TOP
         bs.font = FONT_NOTE
         bs.border = BORDER
+        # Register this part's canonical cells so other tabs reference (not repeat) it.
+        _rtag = str(row.get("tag", "") or "").strip()
+        if _rtag:
+            _BOM_REGISTRY.setdefault(_norm_tag(_rtag), {
+                "tag":  f"'BoM'!$A${r}",
+                "name": f"'BoM'!$B${r}",
+                "qty":  f"'BoM'!$C${r}",
+                "part": f"'BoM'!$D${r}",
+                "unit": f"'BoM'!$F${r}",
+                "line": f"'BoM'!$G${r}",
+            })
         r += 1
     last_line_row = r - 1
 
@@ -3313,24 +3353,33 @@ def tab_spec_sheets(wb: Workbook, state: dict) -> bool:
             head = re.split(r"[·\-(]", req)[0].strip().lower()
             mpn = pv_by_word.get(head, "")
 
-        # ---- block header (the tag band) ----
-        sub_banner(ws, r, f"{tag}    ·    {req}", 8)
+        # ---- block header (the canonical TAG band — the stable identity) ----
+        sub_banner(ws, r, f"{tag}", 8)
         r += 1
-        header(ws, r, ["Field", "Status", "Qty", "Unit £", "Line £",
+        header(ws, r, ["Name (→ BoM)", "Status", "Qty", "Unit £", "Line £",
                        "Material", "Part / MPN", "Driving worked-calc (basis)"])
         r += 1
-        # the single data row for this principal
-        ws.cell(r, 1, "spec").font = FONT_SUB
-        ws.cell(r, 1).border = BORDER
+        # The single data row for this principal. Name / Qty / Unit £ REFERENCE the
+        # canonical BoM registry by cell where the tag resolves (one identity across
+        # the dossier; a BoM price/qty edit propagates here) — literal fallback if the
+        # tag isn't a BoM line, so the tab never breaks.
+        _name_ref = bom_ref(tag, "name")
+        nc = ws.cell(r, 1, _name_ref if _name_ref else (req or "spec"))
+        nc.font = FONT_SUB
+        nc.border = BORDER
         ws.cell(r, 2, clean_cell(status)).border = BORDER
-        qc = ws.cell(r, 3, qty)
-        qc.fill = FILL_INPUT
+        _qty_ref = bom_ref(tag, "qty")
+        qc = ws.cell(r, 3, _qty_ref if _qty_ref else qty)
+        qc.fill = FILL_RESULT if _qty_ref else FILL_INPUT
         qc.border = BORDER
-        uc = ws.cell(r, 4, unit_gbp)
-        uc.fill = FILL_INPUT
+        _unit_ref = bom_ref(tag, "unit")
+        uc = ws.cell(r, 4, _unit_ref if _unit_ref else unit_gbp)
+        uc.fill = FILL_RESULT if _unit_ref else FILL_INPUT
         uc.border = BORDER
-        # Line £ LIVE = qty × unit £ where both are present; else the stored value
-        if qty is not None and unit_gbp is not None:
+        # Line £ LIVE = qty × unit £ when both cells carry a value/ref; else the stored value
+        _have_q = bool(_qty_ref) or qty is not None
+        _have_u = bool(_unit_ref) or unit_gbp is not None
+        if _have_q and _have_u:
             lc = ws.cell(r, 5, f"=C{r}*D{r}")
         else:
             lc = ws.cell(r, 5, line_gbp)
