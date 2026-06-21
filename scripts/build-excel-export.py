@@ -247,7 +247,7 @@ def clean_cell(v: Any) -> Any:
     zero-width space (CWE-1236). Non-strings pass through untouched (numbers stay
     numbers). NEVER call this on a deliberate "=..." live-formula string."""
     if isinstance(v, str):
-        s = _CTRL.sub("", v).strip()
+        s = _CTRL.sub("", v).strip().replace("`", "")   # strip markdown code-ticks (Tristan: `201-PR` → 201-PR)
         if s and s[0] in _FORMULA_TRIGGERS:
             s = "​" + s
         return s
@@ -778,6 +778,10 @@ def style_chart(ch, *, legend="auto", data_labels=False, gridlines=False):
             continue
         try:
             ax.delete = False
+            # openpyxl writes an axis TITLE that Excel renders OVERLAPPING the tick labels
+            # (no layout reserve) — drop it; the chart title + the formatted tick labels carry
+            # the meaning. (Tristan: "Output (t/yr)" / "Capex £" overwriting the tick labels.)
+            ax.title = None
             if not gridlines:
                 ax.majorGridlines = None
         except Exception:  # noqa: BLE001
@@ -797,8 +801,14 @@ def style_chart(ch, *, legend="auto", data_labels=False, gridlines=False):
     if data_labels:
         try:
             from openpyxl.chart.label import DataLabelList
-            ch.dataLabels = DataLabelList()
-            ch.dataLabels.showVal = True
+            dl = DataLabelList()
+            dl.showVal = True            # the value ONLY
+            dl.showSerName = False       # NEVER "Series1" (Tristan: ugly + overwrites the title)
+            dl.showCatName = False       # the category axis already names each bar
+            dl.showLegendKey = False
+            dl.showPercent = False
+            dl.showBubbleSize = False
+            ch.dataLabels = dl
         except Exception:  # noqa: BLE001
             pass
     return ch
@@ -923,6 +933,57 @@ def match_design_quantity(label, res_val, qindex):
     return None
 
 
+def _unit_from_symbol(sym: str) -> str:
+    """Best-effort unit from a snake_case symbol's trailing unit token (solids_load_kg_day →
+    kg/day, throughput_m3_h → m³/h). Empty when none recognised. Universal."""
+    table = [
+        ("kg_day", "kg/day"), ("kg_d", "kg/day"), ("mg_l", "mg/L"), ("g_kg", "g/kg"),
+        ("m3_h", "m³/h"), ("m3h", "m³/h"), ("l_day", "L/day"), ("l_s", "L/s"),
+        ("kwh", "kWh"), ("kw", "kW"), ("kpa", "kPa"), ("mpa", "MPa"), ("bar", "bar"),
+        ("mm", "mm"), ("m2", "m²"), ("m3", "m³"), ("deg_c", "°C"), ("ppt", "ppt"),
+        ("pct", "%"), ("hz", "Hz"), ("rpm", "rpm"),
+    ]
+    s = str(sym or "").lower()
+    for suf, u in table:
+        if s.endswith("_" + suf) or s == suf:
+            return u
+    return ""
+
+
+def _infer_inputs_from_formula(formula, substitution):
+    """Recover a legacy worked-calc's named inputs by aligning its FORMULA symbol tokens with
+    its SUBSTITUTION number tokens (same expression structure) — so a calc that ships only
+    formula+substitution text renders in the SAME yellow-input + live-result style as a
+    structured calc (not a divergent 'recomputed live' text block). Returns
+    [{symbol, value, unit}] or None when the two don't align 1:1. Universal — no class logic."""
+    f = re.sub(r"^\s*[A-Za-z_]\w*\s*=\s*", "", str(formula or "").strip())   # drop a leading 'lhs ='
+    s = re.sub(r"^\s*[A-Za-z_]\w*\s*=\s*", "", str(substitution or "").strip())
+    s = re.split(r"=", s)[0].strip()                                          # drop a trailing '= result unit'
+    if not f or not s:
+        return None
+    tokre = r"[A-Za-z_]\w*|\d+\.?\d*(?:[eE][-+]?\d+)?|[-+*/^()]|×|x(?=[\s\d(])"
+    ft, st = re.findall(tokre, f), re.findall(tokre, s)
+    if not ft or len(ft) != len(st):
+        return None
+    SYM, NUM = re.compile(r"^[A-Za-z_]\w*$"), re.compile(r"^-?\d+\.?\d*(?:[eE][-+]?\d+)?$")
+    inputs: Dict[str, Dict] = {}
+    for a, b in zip(ft, st):
+        a_sym, b_num = bool(SYM.match(a)), bool(NUM.match(b))
+        if a_sym and b_num:
+            if a not in inputs:
+                inputs[a] = {"symbol": a, "value": float(b), "unit": _unit_from_symbol(a)}
+        elif a_sym and not b_num:
+            if a.lower() != str(b).lower():     # a function name etc. must match verbatim
+                return None
+        elif not a_sym and a != b:              # operator/constant must be identical in both
+            try:
+                if float(a) != float(b):
+                    return None
+            except Exception:
+                return None
+    return list(inputs.values()) or None
+
+
 def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
     """
     Returns (live_calc_count, static_calc_count).
@@ -1001,6 +1062,13 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
             label = w.get("label", "")
             formula = w.get("formula", "")
             inputs = w.get("inputs") or []
+            if not inputs:
+                # recover named inputs from formula+substitution so a LEGACY calc renders in the
+                # SAME yellow-input + live-result style as a structured one (not a divergent
+                # 'recomputed live' text block). Falls through to the legacy text only if it can't.
+                inferred = _infer_inputs_from_formula(formula, w.get("substitution", ""))
+                if inferred:
+                    inputs = inferred
             res = w.get("result")
             res_val = res.get("value") if isinstance(res, dict) else res
             res_unit = (res.get("unit") if isinstance(res, dict) else w.get("result_unit", "")) or ""
@@ -1377,7 +1445,7 @@ def _unit_family(unit: str) -> Tuple[str, float]:
     Unknown units fall back to family='?'+the raw token so two identical raw
     units still match each other."""
     u = (unit or "").strip().lower().replace(" ", "")
-    u = u.replace("³", "3").replace("²", "2").replace("·", ".").replace("μ", "u")
+    u = u.replace("³", "3").replace("²", "2").replace("·", ".").replace("μ", "u").replace("°", "")
     table = {
         # throughput / production per year -> canonical tonnes/yr
         "tpy": ("t_per_yr", 1.0), "t/yr": ("t_per_yr", 1.0),
@@ -2011,29 +2079,9 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
         bs.border = BORDER
         r += 1
 
-    # cross-reference: the engine's own bootstrap economics (for comparison only —
-    # the Economics tab REPLACES these hidden-assumption stubs with a transparent
-    # live model).
-    r += 1
-    sub_banner(ws, r, "Engine bootstrap economics (for comparison — NOT used by the "
-                      "live model below)", 4)
-    r += 1
-    for name, lbl, fmt in [("project_npv_gbp", "Engine bootstrap NPV", FMT_GBP),
-                           ("project_irr_pct", "Engine bootstrap IRR", FMT_DEC1),
-                           ("project_payback_years", "Engine bootstrap payback",
-                            FMT_DEC1)]:
-        v = qval(q, name)
-        ws.cell(r, 1, clean_cell(lbl)).font = FONT_NOTE
-        c = ws.cell(r, 2, v if v is not None else "—")
-        c.font = FONT_NOTE
-        if isinstance(v, (int, float)):
-            c.number_format = fmt
-        ws.cell(r, 3, clean_cell("GBP" if "npv" in name else
-                                 ("%" if "irr" in name else "yr"))).font = FONT_NOTE
-        ws.cell(r, 4, clean_cell("engine stub — its hidden assumptions are "
-                                 "replaced by the transparent model on the "
-                                 "Economics tab")).font = FONT_NOTE
-        r += 1
+    # (Removed the 'Engine bootstrap economics' stub — Tristan 2026-06-21: it only ever showed
+    # '—' placeholders; the transparent live model on the Economics tab is the authoritative
+    # figure, so an empty engine-stub block is noise. Don't ship a stub.)
 
     ws.freeze_panes = "A5"
     back_link(ws, 4)
