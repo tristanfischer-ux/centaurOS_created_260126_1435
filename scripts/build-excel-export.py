@@ -2591,6 +2591,70 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
         ws.cell(r, col).border = BORDER
     r += 1
 
+    # ---- Additional what-if scenarios: single-driver sensitivity (tornado),
+    #      breakeven price + combined best/worst corners. Every cell is a LIVE
+    #      formula off the Inputs tab (Tristan: "a whole series of additional
+    #      scenario set-ups... more scenarios done"). Universal — uses the same
+    #      driver refs as the sweep, no class-specific logic. -------------------
+    q = R('out_qty')
+
+    def _ebitda(sale="", fcr="", feed="", energy="", capex="", labour=""):
+        """A LIVE EBITDA formula with an optional ×factor on ONE driver (the rest
+        held at the Inputs base): revenue − (feed + energy + labour + capex-maint +
+        other)."""
+        rev = f"{q}{sale_mult}*{R('sale_price')}{sale}"
+        feed_t = f"{q}{sale_mult}*{R('fcr')}{fcr}*{R('feed_price')}{feed}"
+        energy_t = f"{R('load_kw')}*{R('hours')}*{R('load_factor')}*{R('energy_price')}{energy}"
+        maint_t = f"{R('capex')}{capex}*{R('maint_pct')}/100"
+        opex = (f"({feed_t}+{energy_t}+{R('labour')}{labour}+{maint_t}"
+                f"+{R('other_opex')})")
+        return f"={rev}-{opex}"
+
+    sub_banner(ws, r, "What-if sensitivity — one driver at a time (±20%), with the "
+                      "EBITDA swing (tornado magnitude); held at the base output", 8)
+    r += 1
+    header(ws, r, ["Driver (±20%)", "EBITDA @ −20%", "EBITDA @ base",
+                   "EBITDA @ +20%", "Swing £ (|+20 − −20|)", "", "", ""])
+    r += 1
+    DRIVERS = [
+        ("Sale price", "sale"), ("Feed price", "feed"), ("Energy price", "energy"),
+        ("Feed-conversion ratio (FCR)", "fcr"), ("Capex (→ maintenance)", "capex"),
+        ("Labour", "labour"),
+    ]
+    for label, key in DRIVERS:
+        ws.cell(r, 1, clean_cell(label)).font = FONT_SUB
+        ws.cell(r, 2, _ebitda(**{key: "*0.8"})).number_format = FMT_GBP
+        ws.cell(r, 3, _ebitda()).number_format = FMT_GBP
+        ws.cell(r, 4, _ebitda(**{key: "*1.2"})).number_format = FMT_GBP
+        ws.cell(r, 5, f"=ABS(D{r}-B{r})").number_format = FMT_GBP
+        for col in range(1, 6):
+            ws.cell(r, col).border = BORDER
+        r += 1
+    r += 1
+
+    sub_banner(ws, r, "Breakeven & combined corners (live)", 8)
+    r += 1
+    base_opex = (f"({q}{sale_mult}*{R('fcr')}*{R('feed_price')}"
+                 f"+{R('load_kw')}*{R('hours')}*{R('load_factor')}*{R('energy_price')}"
+                 f"+{R('labour')}+{R('capex')}*{R('maint_pct')}/100+{R('other_opex')})")
+    ws.cell(r, 1, clean_cell(f"Breakeven {price_label} ({price_unit})")).font = FONT_SUB
+    ws.cell(r, 2, f"={base_opex}/({q}{sale_mult})").number_format = FMT_GBP2
+    ws.cell(r, 3, clean_cell("EBITDA = 0 at this price (vs the Inputs price)")).font = FONT_NOTE
+    r += 1
+    ws.cell(r, 1, clean_cell("Combined corners → EBITDA £")).font = FONT_SUB
+    for col, lbl in ((2, "Worst"), (3, "Base"), (4, "Best")):
+        ws.cell(r, col, clean_cell(lbl)).font = FONT_NOTE
+    r += 1
+    worst = _ebitda(sale="*0.8", feed="*1.2", energy="*1.2", capex="*1.15", fcr="*1.1")
+    best = _ebitda(sale="*1.2", feed="*0.8", energy="*0.8", capex="*0.85", fcr="*0.9")
+    ws.cell(r, 1, clean_cell("EBITDA (all drivers swung together)")).font = FONT_SUB
+    ws.cell(r, 2, worst).number_format = FMT_GBP
+    ws.cell(r, 3, _ebitda()).number_format = FMT_GBP
+    ws.cell(r, 4, best).number_format = FMT_GBP
+    for col in range(1, 5):
+        ws.cell(r, col).border = BORDER
+    r += 2
+
     # an EBITDA-only contiguous block for the L/C/H bar chart (categories must be
     # the labels Low/Central/High in a column for a clean chart).
     lch_first = r + 1
