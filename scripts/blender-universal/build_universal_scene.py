@@ -6518,6 +6518,7 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
     _defer = _spine_defers_to_wire_ports()
     _by_name = {p.name: p for p in parts}
     _deferred = 0
+    _skipped_assembly = 0
 
     # ── PASS 1: resolve every edge to concrete 3D endpoints (collect, don't draw) ─
     resolved = []   # per drawable edge: dict of endpoints/metadata
@@ -6526,6 +6527,14 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
         # Stage 4 deferral: leave the port-wirable part-to-part edges to wire_ports.
         if _defer and _edge_is_port_wirable(e, _by_name):
             _deferred += 1
+            continue
+        # ASSEMBLY edges are a MOUNT / part-of relation (a part and its own sub-component,
+        # e.g. Drum Filter ↔ Drum Filter Screen), NEVER a routable pipe. wire_ports already
+        # skips them (svc=="assembly", line ~8066) — the spine router MUST too, else the
+        # sub-component edge draws as a long stray pipe up to the overhead deck and back
+        # (the u_route_*_assembly 8.7× detour). Symmetric skip; universal, not RAS-keyed.
+        if (e.get("_ledger_service") or cl._service_of(e.get("mechanism"))) == "assembly":
+            _skipped_assembly += 1
             continue
         frm = e.get("from_part", "")
         to = e.get("to_part", "")
@@ -6617,7 +6626,9 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
     if _defer:
         print(f"[univ][wire] STAGE 4: spine router drew {len(resolved)} abstract-boundary "
               f"edge(s); DEFERRED {_deferred} part-to-part edge(s) to wire_ports "
-              f"(each edge drawn once)")
+              f"(each edge drawn once)"
+              + (f"; SKIPPED {_skipped_assembly} assembly mount edge(s) (not pipes)"
+                 if _skipped_assembly else ""))
 
     routed, emit_unresolved = _emit_routes_on_plan(
         resolved, rack_plan, rack_base_z, MAT, MO,
