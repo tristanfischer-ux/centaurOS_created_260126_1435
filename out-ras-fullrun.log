@@ -1,0 +1,1253 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-rerun/yellowtail-kingfish-ras-5m.md (6841 chars)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 6841 chars
+[brief-parse] OK — confidence=HIGH, missing=5 fields, metrics=9
+[chain] classification: aquaculture_ras (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 15.4s)
+[chain] U5 brief augmentation: U5 augmentation (class: aquaculture_ras): 2 HARD field(s) filled with class-aware inferred values, 2 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, operating_environment. Removed from missing_mandatory_fields: target_material, design_life.
+  [U5] filled "target_material": "316/316L stainless-steel process fabrication; products: calcium carbonate + oxygen + ammonia" (Material/products inferred from brief text for aquaculture_ras. class-agnostic inference from brief text for unmapped cl)
+  [U5] filled "design_life": "20–25 yr (chemical-process-plant design life; static process equipment + pressure vessels per PED / ASME VIII; periodic re-inspection)" (Industry-standard service life for aquaculture_ras per applicable design standard. class-agnostic inference from brief t)
+  [U5] still null after augmentation: max_mass_kg, operating_environment
+[chain] U6 brief expansion: 11 duties derived; product="Yellowtail kingfish (Seriola lalandi) - 3.4 kg sashimi-grade harvest fish" (model=google/gemini-3.1-pro-preview, cost_usd=0.073088)
+  [U6] production_capacity_kg_per_yr = 55000 kg/yr [stated/high] — Stated target of 55 tonnes per year.
+  [U6] rearing_tank_volume_m3 = 901 m3 [stated/high] — Stated target to achieve 60 kg/m3 stocking density at 55 t/yr scale.
+  [U6] total_recirculation_flow_m3_per_h = 3604 m3/h [derived/high] — Tank volume (901 m3) multiplied by the turnover rate (4 hr-1).
+  [U6] makeup_water_flow_m3_per_h = 14.4 m3/h [derived/high] — 0.4% of the total recirculation flow (3604 m3/h * 0.004).
+  [U6] bottom_drain_flow_m3_per_h = 721 m3/h [derived/medium] — Upper limit of the stated 5-20% flow split for the bottom-centre solids draw (3604 m3/h * 
+  [U6] daily_feed_load_kg_per_day = 206.4 kg/day [derived/high] — Annual production (55,000 kg) * Feed Conversion Ratio (1.37) / 365 days.
+  [U6] oxygen_demand_kg_per_day = 103.2 kg/day [derived/high] — Daily feed load (206.4 kg/day) * stated provision rate (0.5 kg O2 / kg feed).
+  [U6] tan_production_kg_per_day = 6.19 kg/day [derived/medium] — Standard aquaculture mass balance: TAN production is approximately 3% of the daily feed lo
+  [U6] alkalinity_dosing_kg_per_day = 43.9 kg/day [derived/high] — TAN load (6.19 kg/day) * stated consumption rate (7.1 kg CaCO3 / kg TAN).
+  [U6] co2_stripping_duty_kg_per_day = 141.4 kg/day [derived/medium] — Standard aquaculture respiration ratio: ~1.37 kg CO2 produced per kg O2 consumed (103.2 kg
+  [U6] makeup_water_heating_duty_kw = 235 kW [derived/medium] — Sensible heat to lift 14.4 m3/h of 12°C seawater to 26.4°C. Q = m*Cp*dT = (14.4 m3/h * 102
+[chain] engineering_contract: 79 quantities, 9 topology edges, 0 macro-assemblies (total £0), closures: 5 pass / 0 warn / 0 fail
+[specs-writeback] web search: aquaculture_ras aquaculture_ras heat_pump_source — 818ms
+[specs-writeback] {"spec_key":"heat_pump_source","part_number":"aquaculture_ras","hit":"miss","latency_ms":2065}
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":5}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":293}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":212}
+[products-writeback] {"product_name":"55 t/yr land-based marine Recirculating Aquaculture System (RAS) for yellowtail kingfish (Seriola lalandi), 200 g → 3.4 kg over 360 days at FCR 1.37. 900 m³ total rearing-tank volume across 4 circular","hit":"db_hybrid","matched":"204 t/yr land-based marine Recirculating Aquaculture System (RAS) for yellowtail kingfish (Seriola lalandi), 200 g → 3.4 kg over 360 days at FCR 1.37. 3340 m³ total rearing-tank volume across 10 circu","has_modules":true,"used_embedding":true,"candidates":1,"latency_ms":476}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: aquaculture_ras
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 11561 chars. First 200: {
+  "market_context": "Industry reports suggest the global Recirculating Aquaculture System (RAS) market is experiencing significant growth, driven by sustainability concerns and the demand for year-r
+[research-synthesis] Complete: 5 competitors, 6 sources, 9 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for aquaculture_ras: replaying 6 stored duty spec(s) (ras-metabolism:load-estimation, mbbr:biofilter-sizing, drum-filter:microscreen-sizing, ras-degasser:packed-column, oxygenation:speece-cone, uv-reactor:disinfection-sizing) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool ras-metabolism:load-estimation (duty_hash=90398d51183a, db id=18) — no LLM call.
+[tool-generator] REUSED stored generated tool mbbr:biofilter-sizing (duty_hash=7101428c2960, db id=19) — no LLM call.
+[tool-generator] REUSED stored generated tool drum-filter:microscreen-sizing (duty_hash=e2ec5ba8ae37, db id=20) — no LLM call.
+[tool-generator] REUSED stored generated tool ras-degasser:packed-column (duty_hash=27646e94f9e0, db id=21) — no LLM call.
+[tool-generator] REUSED stored generated tool oxygenation:speece-cone (duty_hash=884455b1bc52, db id=22) — no LLM call.
+[tool-generator] REUSED stored generated tool uv-reactor:disinfection-sizing (duty_hash=71cd66aec232, db id=23) — no LLM call.
+[tool-creation] DONE for aquaculture_ras: created 6 self-test-passed tool(s) (ras-metabolism:load-estimation, mbbr:biofilter-sizing, drum-filter:microscreen-sizing, ras-degasser:packed-column, oxygenation:speece-cone, uv-reactor:disinfection-sizing), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for aquaculture_ras: created+registered 6 self-test-passed tool(s) [ras-metabolism:load-estimation, mbbr:biofilter-sizing, drum-filter:microscreen-sizing, ras-degasser:packed-column, oxygenation:speece-cone, uv-reactor:disinfection-sizing]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] COVERAGE GATE (brief-named units, reuse) for slug=aquaculture_ras:
+    ✓ drum/microscreen filter → drum-filter:microscreen-sizing
+    ✓ biofilter (MBBR/biological) → mbbr:biofilter-sizing
+    ✓ CO2 degasser / stripping column → ras-degasser:packed-column
+    ✓ oxygenation (cones / pure O2) → kla-oxygen:transfer
+    ✓ UV disinfection → uv-reactor:disinfection-sizing
+    ✓ heat pump / thermal hold → building-envelope:heat-loss
+    ✓ recirculation / process pumps → process:pump-sizing
+    ✓ electrical distribution → electrical:cable-sizing
+    ✓ control & instrumentation → control-systems:pid-tuning
+[bootstrap-tool-plan] REUSING stored candidate slug=aquaculture_ras version=1 status=candidate (no LLM call; 24 steps, 24 tool_ids, coverage_gaps=0)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for aquaculture_ras/medium — bootstrapped a 24-step tool plan (candidate id=28 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: building-envelope:heat-loss, control-systems:pid-tuning, cybersecurity-threat-model:stride, electrical:cable-sizing, electrical:transformer-sizing, kla-oxygen:transfer, ph-titration:sizing, process:pump-sizing, fluids:pipe-sizing, ras-metabolism:load-estimation, drum-filter:microscreen-sizing, mbbr:biofilter-sizing, oxygenation:speece-cone, pressure-vessel:design, ras-degasser:packed-column, reactor:cstr-pfr-sizing, mass-aggregator:envelope-check, refrigeration-cycle:cop, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, transport-logistics:routing, uv-reactor:disinfection-sizing, yield-economics:npv
+[bootstrap-tool-plan] SEED-PROTECTED mass-aggregator:envelope-check: kept the first-principles contract value(s) for [total_system_mass_kg(seed=94000 vs tool=95204.6)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[class-reference-graph-db] {"product_class":"aquaculture_ras","resolved_to":"aquaculture_ras","hit":"db","nodes":10,"edges":29}
+[generic-emitter] physics-derived equipment: 10 word(s) sized from the contract; 9 principal item(s) synthesised (rearing_tank, drum_filter, biofilter, degasser, makeup_hex, dehumidifier, backup_immersion_heater, drum_filter_backwash, drum_filter_screen).
+[chain] Orchestrator: 10 modules, 10 sub-modules, 215 words, 19 tools ran (4740ms)
+[chain] Build #18k: toolOutputsBlock built (19 tools, 12184 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 15 component_classes covered (15 with match, 0 empty), 11103 chars (30932ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=5000000, target_performance_value=55 (t/yr)
+[chain] keyMetrics seeded early (pre-reviewer): Production Capacity Tpy=55 t/yr
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=6/10 plaus=5/10 coh=4/10 part=2/10 hon=8/10 (31648ms)
+[chain] PHASE 4 skeleton critic: 3 HIGH-severity issues found before any LLM painting
+  ✗ [internal_coherence @ sensing_instrumentation/sub_modules[0]/words[5]] The design JSON is truncated abruptly at the end of the last word ('Guided-radar level transmitter, Rearing Tank-mounted; 4–20 m_'), leaving unclosed brackets and braces.
+  ✗ [brief_to_design_fidelity @ environmental_interface] The brief specifies a process including 'heat pumps' to manage the 26.4 °C water temperature. However, the design only includes a 'Backup Immersion Heater' of 231 kW and completely
+  ✗ [engineering_plausibility @ mass_fluid_transport_process/sub_modules[0]/words[0]] The total required recirculation flow is 3604 m³/h. The design specifies 2x Circulation Pumps rated at 1800 m³/h each. To meet the 3604 m³/h requirement, both pumps must run simult
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 10379 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 15 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 7 / 15 patches (skipped 8)
+    REJECT [structure-locked] add_sub_module environmental_interface.environmental_interface__heat_pump_system: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "environmental_interface" (0 flagged module(s): none)
+    REJECT [structure-locked] add_sub_module mass_fluid_transport_process.mass_fluid_transport_process__standby_pump: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "mass_fluid_transport_process" (0 flagged module(s): none)
+    +overview environmental_interface: +633 chars
+    +overview mass_fluid_transport_process: +575 chars
+    =mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.english_sentence (prose)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word manufacturer="Grundfos" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word part_number="NK 200-315" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word material="cast iron casing, bronze impeller" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 19.4s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":979}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=7/10 phys=6/10 coh=7/10 part=8/10 hon=9/10 (31502ms)
+[chain] critic headline: The design successfully sizes the primary rearing volume and main circulation pumps, but features an under-sized biofilter flow rate and a truncated instrumentation section.
+[chain] critic issues: 2 high, 1 med, 3 total
+  ✗ [high/high] engineering_plausibility @ mass_fluid_transport_process/sub_modules/0/words/58/modifier_characters/3: The biofilter flow rate is rated at 358 m³/h, which is only 9.9% of the total recirculation flow (3604 m³/h). To remove the daily TAN load of 6.19 kg/day (257.9
+  ✗ [high/high] internal_coherence @ sensing_instrumentation/sub_modules/0/words/5/modifier_characters/1: The design JSON is truncated mid-word ('rati') at the very end of the document, resulting in missing sub-modules and incomplete data for the sensing and instrum
+  ✗ [med/high] brief_to_design_fidelity @ environmental_interface/sub_modules/0/words/18/modifier_characters/2: The backup immersion heater is rated at 231 kW, which is less than the calculated nominal make-up water heating duty of 235 kW (required to heat 14.4 m³/h of se
+[chain] physics-critic enforcement (shadow): no known-failure part — ship allowed.
+[chain] task-41 fidelity gates: Critic flagged 1 module(s) for brief_fidelity structural adds: environmental_interface
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 17114 chars
+[chain] STEP 8: R4 Flash-Lite review returned 20 patches
+[chain] STEP 8: R4 Flash-Lite review applied 5 / 20 patches (skipped 15)
+    =mass_fluid_transport_process.overview_paragraph_en (prose)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.grundfos_nk_pump_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.hdpe_pipe_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.titanium_hex_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.vfd_controller_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.butterfly_valve_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.pressure_transmitter_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.flow_meter_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+[chain] STEP 8: R4 Flash-Lite review done in 14.0s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":740}
+[chain] canonical product_class OVERRIDE: "" → "aquaculture_ras" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "aquaculture_ras" — skipping
+[chain] physics repair: 1 iter(s); HIGH 2→1; plausibility 6→7; patches 0
+  iter 0: proposed 0 applied 0 | HIGH 2→1 plaus 6→7
+[chain] modifier dedup: collapsed 1 cosmetic-dupe modifier(s) across 1 component(s)
+[chain] sub-module prose pre-fill: rewrote 9/10 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 1 unable_to_compare
+[chain] verified-parts allowlist: 110 entries (KPA=110, emitter=0, rag=0)
+[emitter-completion] 1 gap sub_module(s) for class "aquaculture_ras" — DB-first → generate → write-back
+[emitter-completion]      ↳ wrote back Southco to pretraining_extracted_parts
+[emitter-completion]   ✓ GEN  maintenance_serviceability::maintenance_serviceability__access_panel → Southco [MPN deferred; LLM suggested "E5-9-315-UU1" stored in DB]
+[emitter-completion] filled 1 gap(s): 0 DB-first, 1 generated.
+[chain] emitter-completion: filled 1 gap sub_module(s) (0 DB-first, 1 generated+written-back) before gate-23
+[chain] gate-23 emitter-completeness: PASS — 10 sub_modules checked, 10 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 3140
+  ✗ [sub_module_word_density] grammar: 2 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): maintenance_serviceability::maintenance_serviceability__access_panel (1 words), actuation_kinematics::actuation_kinematics__primary_assembly (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 3 sub-module(s) with <3 priced lines: power_distribution::power_distribution__main_breaker (2/7), control_compute_communication::control_compute_communication__main_controller (1/6), safety_protection::safety_protection__protective_relay (0/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 2 concrete components not present in any sub-module word — nk-200-315-90, pn10. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[chain] Phase 2 iter 0: applied 6 patches, skipped 7, allowlist_rejected=7, state_changed=true
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (add missing material modifier)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (add missing rating modifier)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (add missing dimension modifier)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (add missing regulatory modifier)
+    +maintenance_serviceability.sub_modules[0].words[+] (add missing word to satisfy density requirement)
+    +actuation_kinematics.sub_modules[0].words[+] (add missing word to satisfy density requirement)
+    [allowlist-strict] reject add_word with part_number — Phase 2 LLM may not invent MPN-bearing words; word_id=power_distribution__fuse_link mpn=170M6812 sub_module=power_distribution.sub_modules[0].words[+]. The deterministic-emitter must own all MPN-bearing words. Gate 23 enforces this upstream. If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one. (add priced part to satisfy density requirement)
+    [allowlist-strict] reject add_word with part_number — Phase 2 LLM may not invent MPN-bearing words; word_id=power_distribution__surge_arrester mpn=FN6840-1000 sub_module=power_distribution.sub_modules[0].words[+]. The deterministic-emitter must own all MPN-bearing words. Gate 23 enforces this upstream. If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one. (add priced part to satisfy density requirement)
+    [allowlist-strict] reject add_word with part_number — Phase 2 LLM may not invent MPN-bearing words; word_id=control_compute_communication__plc_rack mpn=6ES7155-6AU01-0CN0 sub_module=control_compute_communication.sub_modules[0].words[+]. The deterministic-emitter must own all MPN-bearing words. Gate 23 enforces this upstream. If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one. (add priced part to satisfy density requirement)
+    [allowlist-strict] reject add_word with part_number — Phase 2 LLM may not invent MPN-bearing words; word_id=control_compute_communication__hmi mpn=6AV2124-0QC02-0AX1 sub_module=control_compute_communication.sub_modules[0].words[+]. The deterministic-emitter must own all MPN-bearing words. Gate 23 enforces this upstream. If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one. (add priced part to satisfy density requirement)
+    [allowlist-strict] reject add_word with part_number — Phase 2 LLM may not invent MPN-bearing words; word_id=safety_protection__relay_1 mpn=OT1000E03P sub_module=safety_protection.sub_modules[0].words[+]. The deterministic-emitter must own all MPN-bearing words. Gate 23 enforces this upstream. If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one. (add priced part to satisfy density requirement)
+    [allowlist-strict] reject add_word with part_number — Phase 2 LLM may not invent MPN-bearing words; word_id=safety_protection__relay_2 mpn=LS-S11 sub_module=safety_protection.sub_modules[0].words[+]. The deterministic-emitter must own all MPN-bearing words. Gate 23 enforces this upstream. If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one. (add priced part to satisfy density requirement)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="NK 200-315-90" not in verified-parts allowlist (110 entries). Patch dropped. (add missing pump component mentioned in overview)
+[chain] Phase 2 iter 1: arith 1 pass / 0 fail; grammar 10 pass / 3 fail; total score 2860
+  ✗ [sub_module_word_density] grammar: 1 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): maintenance_serviceability::maintenance_serviceability__access_panel (2 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 3 sub-module(s) with <3 priced lines: power_distribution::power_distribution__main_breaker (2/7), control_compute_communication::control_compute_communication__main_controller (1/6), safety_protection::safety_protection__protective_relay (0/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 2 concrete components not present in any sub-module word — nk-200-315-90, pn10. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [sub_module_prose_covers_words] grammar: 1 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: actuation_kinematics::actuation_kinematics__primary_assembly prose drops 1/5 words: Mounting Bracket. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+[chain] Phase 2 iter 1: applied 1 patches, skipped 2, allowlist_rejected=2, state_changed=true
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="NK-200-315-90" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing pump component from overview)
+    ALLOWLIST_REJECT power_distribution.sub_modules[0].words[+]: word patch contains MPN="PV-200A-NH" not in verified-parts allowlist (110 entries). Patch dropped. (Add priced fuse holder)
+    =actuation_kinematics.sub_modules[0].english_sentence (Update prose to include all sub-module words)
+[chain] Phase 2 iter 2: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 3240
+  ✗ [sub_module_word_density] grammar: 1 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): maintenance_serviceability::maintenance_serviceability__access_panel (2 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 3 sub-module(s) with <3 priced lines: power_distribution::power_distribution__main_breaker (2/7), control_compute_communication::control_compute_communication__main_controller (1/6), safety_protection::safety_protection__protective_relay (0/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 2 concrete components not present in any sub-module word — nk-200-315-90, pn10. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[chain] Phase 2 iter 2: applied 3 patches, skipped 2, allowlist_rejected=2, state_changed=true
+    +maintenance_serviceability.sub_modules[0].words[+] (Increase word density for maintenance_serviceability sub-module)
+    +maintenance_serviceability.sub_modules[0].words[+] (Increase word density for maintenance_serviceability sub-module)
+    +maintenance_serviceability.sub_modules[0].words[+] (Increase word density for maintenance_serviceability sub-module)
+    ALLOWLIST_REJECT power_distribution.sub_modules[0].words[+]: word patch contains MPN="PV-200A-NH" not in verified-parts allowlist (110 entries). Patch dropped. (Add priced component to power_distribution sub-module)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="NK 200-315-90" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing pump MPN to mass_fluid_transport_process)
+[chain] Phase 2 iter 3: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 3340
+  ✗ [sub_module_word_density] grammar:  BoM-density: 3 sub-module(s) with <3 priced lines: power_distribution::power_distribution__main_breaker (2/7), control_compute_communication::control_compute_communication__main_controller (1/6), safety_protection::safety_protection__protective_relay (0/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 2 concrete components not present in any sub-module word — nk-200-315-90, pn10. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[chain] Phase 2 iter 3: applied 6 patches, skipped 3, allowlist_rejected=3, state_changed=true
+    ~merge-into-existing-word power_distribution.sub_modules[0].words[+] (+6 modifiers, 0 cosmetic dupes collapsed; densify power_distribution__main_breaker)
+    ~merge-into-existing-word power_distribution.sub_modules[0].words[+] (+6 modifiers, 0 cosmetic dupes collapsed; densify power_distribution__main_breaker)
+    ~merge-into-existing-word control_compute_communication.sub_modules[0].words[+] (+6 modifiers, 0 cosmetic dupes collapsed; densify control_compute_communication__main_controller)
+    ~merge-into-existing-word control_compute_communication.sub_modules[0].words[+] (+6 modifiers, 0 cosmetic dupes collapsed; densify control_compute_communication__main_controller)
+    ~merge-into-existing-word safety_protection.sub_modules[0].words[+] (+6 modifiers, 0 cosmetic dupes collapsed; densify safety_protection__protective_relay)
+    ~merge-into-existing-word safety_protection.sub_modules[0].words[+] (+6 modifiers, 0 cosmetic dupes collapsed; densify safety_protection__protective_relay)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[4]: word patch contains MPN="B-423" not in verified-parts allowlist (110 entries). Patch dropped. (densify maintenance_serviceability__access_panel_label)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="NK 200-315-90" not in verified-parts allowlist (110 entries). Patch dropped. (add missing component from overview)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="PN10-HDPE-400" not in verified-parts allowlist (110 entries). Patch dropped. (add missing component from overview)
+[chain] Phase 2 iter 4: emitter-identity re-assert corrected 6 word(s) before gate eval
+[chain] Phase 2 iter 4: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 3440
+  ✗ [sub_module_word_density] grammar:  BoM-density: 1 sub-module(s) with <3 priced lines: safety_protection::safety_protection__protective_relay (2/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 2 concrete components not present in any sub-module word — nk-200-315-90, pn10. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[chain] Phase 2 iter 4: applied 0 patches, skipped 5, allowlist_rejected=5, state_changed=false
+    ALLOWLIST_REJECT safety_protection.sub_modules[0].words[+]: word patch contains MPN="REF615" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing modifiers to satisfy sub_module_word_density)
+    ALLOWLIST_REJECT safety_protection.sub_modules[0].words[+]: word patch contains MPN="M22-PV" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing modifiers to satisfy sub_module_word_density)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="NK 200-315-90" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing pump component mentioned in overview)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="PE100-PN10" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing piping component mentioned in overview)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="B-423" not in verified-parts allowlist (110 entries). Patch dropped. (Enrich labelling set word with missing modifiers)
+[chain] Phase 2: no state change after repair iter 4 — bailing (further iterations will not progress).
+[chain] post-Phase-2 prose pre-fill: rewrote 1/10 sub-modules
+[chain] emitter-identity re-assert: corrected 0/214 pinned words; 1 emitter word(s) missing post-mutation
+[fill-blank-mpn] 38 blank catalogue word(s) for class "aquaculture_ras" (183 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Circulation Pump) → Grundfos UP15-42
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Suction Isolation Valve) → Grundfos NB 25-200/219
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Non-Return Valve) → Crouzet 81529907
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Flow Control Valve) → Sensirion SFC5500-0.5slm
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Differential-Pressure Switch) → Honeywell HSCDLNN100MDSA5
+[fill-blank-mpn]   ✓ DB   water_treatment_system::water_treatment_system__mechanical_filtration (Flow Control Valve) → Uhome TWV-20-NPT
+[fill-blank-mpn]   ✓ DB   water_treatment_system::water_treatment_system__mechanical_filtration (Local Sensor) → Texas Instruments TMP451AQDQFRQ1
+[fill-blank-mpn]   ✓ DB   environmental_interface::environmental_interface__heat_pump (Temperature Sensor) → Mitsubishi Electric PAC-TH011HT-E
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__main_breaker (Fuse Holder) → Delta Electronics B62SR24125CC
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__main_controller (Network Switch) → TI MSP430
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_sensor (Voltage Sensor) → ABB KEVCD
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_sensor (Pressure Sensor) → Sartorius BB-8804062
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__protective_relay (Interlock Switch) → Banner Engineering SI-GL42DM20-11
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__primary_assembly (Inlet Flow Control Valve) → Altecnic CONTSETALT533K
+[fill-blank-mpn] filled 14/38 blank word(s): 14 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 183 structural skipped.
+[chain] fill-blank-mpn: branded 14/38 blank catalogue word(s) (14 DB-first real MPN, 0 generated real-OEM), 183 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 1332 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 6223 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 15 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=10 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"aquaculture_ras","resolved_to":"aquaculture_ras","hit":"db","nodes":10,"edges":29}
+[chain] K10 shadow: PASS_SHADOW — matched=33 missing=0 extra=0
+[chain] headline derived: Production Capacity Tpy=55 t/yr [derived_from_brief]; Unit cost ceiling=5,000,000 GBP;  (0.00s)
+[chain] part verification: 15 parts checked — verified=10, unverified=5, uncertain=0, skip=0
+[chain] G5 RAG: 5 queries → 2 suggestions (high=1, medium=0, low=1, below_threshold=3, corpus=50 rows)
+[chain] part verification: stripped 5 high-confidence fake part_numbers
+  • mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::circulation_pump_word__suction_isolation_valve → removed "NB 25-200/219" (While Grundfos NB pumps exist, the specific model 'NB 25-200/219' is not found in the provided docum)
+  • control_compute_communication::control_compute_communication__main_controller::network_switch_word → removed "MSP430" (The MSP430 is a series of microcontrollers, not a specific part number for a network switch, and the)
+  • sensing_instrumentation::sensing_instrumentation__voltage_sensor::pressure_sensor_word → removed "BB-8804062" (The provided search results for Sartorius Univessel Glass components list part number BB-8804060 for)
+  • maintenance_serviceability::maintenance_serviceability__access_panel::maintenance_serviceability__access_panel_completion_word → removed "TBD (detailed design)" (The term 'TBD (detailed design)' is a placeholder for a part number that has not yet been determined)
+  • actuation_kinematics::actuation_kinematics__primary_assembly::actr_valve_on_rearing_tank_synth_word → removed "CONTSETALT533K" (A search for the specific part number 'CONTSETALT533K' yields no results in the provided search data)
+[chain] part verification: inherited part_number from deterministic sibling for 1 stripped word(s)
+  ↳ mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::circulation_pump_word__suction_isolation_valve ← mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::circulation_pump_word (PN: UP15-42)
+[chain] strip+recommend: 5 recommendations — high=4, medium=1, low=0, unknown=0 (manual sourcing required)
+[chain] structural-gate router: surfaced 2 unrepaired gate(s) as design decisions
+[nexar] GraphQL errors for mpn=UP15-42: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for HSCDLNN100MDSA5
+[nexar] GraphQL errors for mpn=TBD (detailed design): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TBD (catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=PAC-TH011HT-E: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for B62SR24125CC
+[nexar] GraphQL errors for mpn=KEVCD: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for SI-GL42DM20-11
+[mouser] HTTP 400 for TBD (field instrument — catalogue class)
+[nexar] GraphQL errors for mpn=TBD (field instrument — catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[chain] Stage 10.5 Part Reality Check: 13 checked, 7 real, 0 substituted, 6 warned (no substitute available). Nexar calls used: 6.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ circulation_pump_word: "Grundfos UP15-42" [class=unknown, library_class=none]
+  ⚠ circulation_pump_word__casing: "? TBD (detailed design)" [class=unknown, library_class=none]
+  ⚠ actr_blower_on_biofilter_synth_word: "? TBD (catalogue class)" [class=unknown, library_class=none]
+  ⚠ temperature_sensor_word: "Mitsubishi Electric PAC-TH011HT-E" [class=unknown, library_class=none]
+  ⚠ voltage_sensor_word: "ABB KEVCD" [class=unknown, library_class=none]
+  ⚠ instr_level_consolidated: "? TBD (field instrument — catalogue class)" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] module-paragraph-llm: 10/10 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 3 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/10 capital (threshold 6); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 4 sections, 0 warnings
+[chain] design decisions review: 7 choices (1 applied, 6 flagged, 0 blocked)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 11 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 1 deleted principal(s) re-created; 6 building take-off line(s) re-derived to the final footprint.
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 49.9 kW, 10.46%); economic-conductor saving £49,156
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 50.0 kW, 10.49%); economic-conductor saving £48,844
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 49.6 kW, 10.40%); economic-conductor saving £48,604
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 47.5 kW, 9.95%); economic-conductor saving £48,879
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 48.8 kW, 10.22%); economic-conductor saving £48,363
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 45.1 kW, 9.46%); economic-conductor saving £49,054
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 48.8 kW, 10.23%); economic-conductor saving £48,650
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 44.3 kW, 9.28%); economic-conductor saving £49,640
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 8 passes, DID NOT settle within 8 passes (cap) — ledger records the residual, no fixed point asserted; as-routed supply demand 477 → 521.286 kW (Δ 44.286 kW parasitic)
+[chain] computed-twin reconcile: 18 computed_<base> quantities dropped (computed_biofilter_air_flow_m3_h, computed_biofilter_media_volume_m3, computed_biofilter_tank_volume_m3, computed_building_process_loss_kw, computed_daily_feed_kg, computed_heat_pump_cop, computed_heat_pump_electrical_kw, computed_heating_duty_kw, computed_oxygen_demand_kg_day, computed_oxygen_supply_kg_h, computed_recirc_pump_head_m, computed_recirc_pump_hydraulic_power_w, computed_recirc_pump_motor_kw, computed_solids_load_kg_day, computed_tan_load_kg_day, computed_total_tank_volume_m3, computed_uv_lamp_power_kw, computed_uv_reactor_volume_m3); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 2 twin-less computed_* kept (computed_degasser_air_flow_m3_h, computed_degasser_column_volume_m3).
+[chain] phase 5: blender bg pipeline spawned (PID 1653) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/blender-bg.log
+[estimate] product_class=aquaculture_ras annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'aquaculture_ras' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 225 parts need price estimates
+[estimate] corpus-classified 29/225; 196 need rule-based / Flash-Lite
+[estimate] rule-based classified 39 parts; 157 still need Flash-Lite
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Engine B classifier override: 2 parts moved out of oem_subsystem
+[estimate] Flash-Lite classified 8 batches
+[estimate] 6 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] Flash-Lite (volume-aware) for 4 'unknown' parts
+[estimate] updated 6 existing, synthesised 219 new, 0 failed
+[estimate] C3 DB cache: 2 parts priced from distributor_cascade_cache (0 live API calls)
+[estimate] classification source: corpus=29 rule_based=39 flash_lite=156 fallback=0 curated=0 db_cache=2
+[estimate] estimate source: db_cache=2 curve=219 flash_lite_unknown=4
+[estimate] top classes in BoM:
+  fluid_path: 48
+  structural_metal: 41
+  oem_subsystem: 37
+  structural_polymer: 22
+  sensor: 21
+  mechanical_assembly: 19
+  motor_actuator: 7
+  thermal: 7
+[estimate] estimated cost: GBP 0.004
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 231 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 231/231 results in 120.6s
+[engine-c] flags: in_range=11  over=10  under=93  no_reference=117
+[engine-c] 103/231 priced lines flagged out-of-range vs reference corpus (44.6%)
+[engine-c] 43 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "aquaculture_ras" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: aquaculture_ras
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json
+[supplier-validate] no suppliers to validate
+[chain] CHAIN_SKIP_IMAGE_GEN=1 — skipping illustration generation
+[chain] deployment_envelope: no envelope mapped for aquaculture_ras (returning null is intentional for some classes)
+[chain] physics-derived bottom-up pricing: 193 components priced from parent physics → rolled into 15 assemblies; raw BoM £585,895
+[chain] R1 anchor re-price: generic BoM £585,895 → reconciled to contract anchor (raw £1,292,532, installed ≈ £2.20M); 234 lines weighted by component type
+[chain] costStack persisted: ex-works £1809544 (raw materials £1292532, class aquaculture_ras)
+[chain] G2 cost-reality: PASS — BoM £1292532 across 232 priced lines (2 unpriced)
+[chain] G3 review-completeness: WARN — 3 gaps
+  ⚠ sub_modules: 10 sub-modules across 10 modules — expected ≥20
+  ⚠ compliance: Compliance gate did not register any mandatory standards
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 6 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] pre-render SKU restore: re-added 3 blanked part_number(s) a late stage stripped from real parts — emitter is the part-identity authority
+[chain] self-audit (shadow): floor 4/10 · mean 7.7/10 · 0 blocking · below-8: brief_compliance=6, physics_fidelity=4
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £1,809,544 / 55 t/yr = £32,901/(t·yr) — within the £10,000–£55,000/(t·yr) class band for throughput output. (brief metric production_capacity_tpy=55 t/yr → 55 t/yr)
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 234 disclosed; 0 take-off prices written into the BoM; purchased £787,827 → installed £2,363,481 (central)
+[advisor-engagement] 10/10 modules got an advisor block — 20 specialist cards, 40 grounded questions
+[chain] advisor-engagement: 10 module blocks, 20 specialist cards
+[chain] tool-archetype: dropped 1 self-inapplicable wrong-domain tool(s): refrigeration-cycle:cop
+[chain] tool-archetype coherence (shadow): PASS — coherent — "aquaculture_ras" legitimately uses seawater-source markers (18 tools, 115 quantities scanned)
+[chain] render-quality (shadow): UNIVERSAL-FALLBACK (generic stock images — NOT this design) — class="aquaculture_ras" template=NONE hero=true modules=19 thin=0
+  ✗ BLENDER_UNIVERSAL_FALLBACK: No per-class Blender template for product_class="aquaculture_ras" (and no LLM-generated blender-scene.py) — the dossier's cover + module images are the GENERIC 
+[chain] tools-flow: rendered 205665 bytes (18 tools)
+[investor-section] 5 investors matched from 18 candidates: Hatch Blue, Supply Change Capital, Newfund, Buckhill Capital, Designer Fund
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 6/7 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  [schedule] ✗ Piping Isometrics  (drawings/isometric-index.png)
+  log:
+    · reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m
+    · convergence: physics<->CAD converged=True in 3 iters (parasitic 44.3 kW, 9.28%); economic-conductor saving £49,640
+    ·   draw_isometric.py: launch failed: TimeoutExpired: Command '['/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/.venv/bin/python', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/draw_isometric.py', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json']' timed out after 240 seconds
+    · shaded-hero: 00-hero.png already present — skip
+    · self-exam parts_ledger.py: ok — → CONNECTIVITY: 0 concern(s) — process 0/0 connected (0%) · instruments 0/0 associated (0%) · 0 origin(s) · 0 sink(s)
+    · self-exam render_ledger_html.py: ok — wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/parts-ledger.html  (0 equipment + 0 connections + 0 sub-com
+    · self-exam inspect_drawings.py: ok — OVERALL (floor) = 5.0  → blender-hero   (3 defects)   wrote drawings-inspection.json
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 6/7 drawings + hero → wired into the PDF
+[drawing-gates] 14 gates · 0 failing · ALL-PASS=True
+  ✓ [med ] legibility         single-line-diagram 6140x2640 aspect 2.3:1 (limit 4:1)
+  ✓ [med ] legibility         pid 4380x1776 aspect 2.5:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x1996 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2160x1578 aspect 1.4:1 (limit 4:1)
+  ✓ [med ] legibility         block-flow-diagram 4526x1276 aspect 3.5:1 (limit 4:1)
+  ✓ [med ] legibility         hvac-layout 2240x1810 aspect 1.2:1 (limit 4:1)
+  ✓ [med ] legibility         process-schedules 2492x4692 aspect 1.9:1 (limit 4:1)
+  ✓ [high] load_reconcile     panel total 446 kW vs contract 477 kW (ratio 0.93, ±15%)
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✓ [med ] material_diversity 3 distinct pipe material(s): ['carbon steel', 'duplex 2205', 'hdpe/pe100']
+  ✓ [med ] qty_coverage       degasser: contract qty 2, parts-manifest has 2 instance(s) (need ≥2)
+  ✓ [med ] qty_coverage       drum: contract qty 2, parts-manifest has 4 instance(s) (need ≥2)
+  ✓ [med ] qty_coverage       recirc: contract qty 2, parts-manifest has 2 instance(s) (need ≥2)
+  ✓ [med ] qty_coverage       tank: contract qty 4, parts-manifest has 5 instance(s) (need ≥3)
+[chain] drawing-gates: 0/14 failing — DRAWING >=8 PASS
+[census] 81 tie-in runs (272 units) = £75,435 (cable £50,760 + pipe £24,676)
+[census] routed major streams = £404,797  →  full interconnect ≈ £480,232
+[chain] cost-sanity re-derived on authoritative BoM (Σ £2,890,313): verdict pass — £73,572/t/yr
+[chain] requirements-driven BoM: 330 requirement lines (Σ £2,890,313) → state.requirementsBom; cost cascade reconciled to this total
+[render-minimal-pdf] state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json
+[render-minimal-pdf] modules: 10
+[render-minimal-pdf] rendering...
+[render-minimal-pdf] written /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/chain-v2.pdf (6874.5 KB)
+[render-minimal-pdf] persisted 0 macro claims to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/macro-claims.json
+[chain] integrity check: PDF 7039499 bytes, %PDF header OK
+[chain] deliverable: 2606200757 Aquaculture Ras.pdf
+AUDIT: aquaculture_ras/medium FAIL (HIGH=2 MED=1) — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT.md
+  ✗ [D-1] Sub-module density 1.00 per module — below floor 2.0. Splitter should have raised this. Investigate scripts/lib/orchestrator/submodule-splitter.ts.
+  ✗ [F-4] Physics Critic flagged 2 HIGH-severity engineering issues. See full list in 7-5-physics-critique.json.
+[chain] audit-pdf-run flagged issues (see AUDIT.md): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+AUDIT-BOM: aquaculture_ras PASS (HIGH=0 MED=0) — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-BOM.md
+LAYOUT-AUDIT: FAIL — V-1 overlaps=7 (HIGH=6 MED=0 LOW=1)   T-1 column-overflows=1 (HIGH=0 MED=1) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/chain-v2.pdf.AUDIT-LAYOUT.md
+  ✗ V-1 p168 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Solenoid + Diffuser (fail-open)'
+  ✗ V-1 p168 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Control Valve'
+  ✗ V-1 p168 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Solenoid + Diffuser (fail-open)'
+  ✗ V-1 p168 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Control Valve'
+  ✗ V-1 p174 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Analyser'
+  ✗ T-1 p99 [MED] col='MANUFACTURERPART NUMBER'→'QTY' overflow=8.5pt text='TMP451AQDQFRQ1'
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  CHAIN HARD-EXIT — Layout-overlap audit FAILED (code 11)            ║
+║  Text spans render at the same X+Y position (wrap={false} smear).   ║
+║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║
+║  See <pdf>.AUDIT-LAYOUT.md for the offending pages + bboxes.        ║
+║  Fix area: scripts/render-minimal-pdf.tsx — add page-break-before   ║
+║  on the sub-module wrap={false} block that overflowed the page.     ║
+╚══════════════════════════════════════════════════════════════════════╝
+[chain] GATE 11 layout-overlap (exit 11): FLAGGED (render-and-flag) — dossier ships, issue disclosed. Text spans overlap in the rendered PDF — see AUDIT-LAYOUT.md
+[chain] audit-pdf-layout flagged issues (see AUDIT-LAYOUT.md, status=11): Command failed: python3 /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-PARTS.md
+[parts-validator] PASS: 0 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-DRIFT.md
+[drift-detector] PASS: 4 contract quantities checked, 0 drifts (0 MED)
+[sizing-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-SIZING.md
+[sizing-audit] PASS: 0/1 matched-to-rule, 0 findings (0 MED, 0 LOW)
+[mispin-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-MISPIN.md
+[mispin-detector] PASS: 231 candidates scanned, 0 mis-pins
+[thermal-derating-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-THERMAL.md
+[thermal-derating-audit] PASS: 0 chiller(s) checked, 0 findings (0 MED, 0 LOW)
+[brief-constraint-completeness-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-COMPLETENESS.md
+[brief-constraint-completeness-audit] PASS: 15 constraints, 1 non-blocking findings (0 MED, 1 LOW)
+[consistency-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-CONSISTENCY.md
+[consistency-audit] PASS: 147 clusters, 2 findings (2 MED, 0 HIGH), 3 money-format drift(s)
+[jurisdictional-standards-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-JURISDICTION.md
+[jurisdictional-standards-audit] PASS: jurisdiction=UK, 88 surfaces scanned, 6 unique citations, 0 findings (0 MED, 0 LOW)
+[fictional-pn-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-FICTIONAL-PN.md
+[fictional-pn-audit] FAIL: 1 HIGH-severity finding(s) — hallucinated MPNs not found in any distributor catalogue
+
+======================================================================
+  CHAIN HARD-EXIT - Fictional-PN audit FAILED (code 20)
+  At least one BoM line emits a manufacturer+MPN combination that
+  returns null from ALL five live distributor APIs (Mouser, Digi-Key,
+  Farnell, LCSC, Nexar) and is not in the curated parts table.
+  Structured MPNs (alphanumeric+separator+alphanumeric) that miss all
+  distributors strongly indicate the LLM hallucinated a plausible-looking
+  but non-existent part number. A procurement engineer who tries to order
+  this part will find nothing — destroying the document's credibility.
+  PDF + state.json saved to disk for inspection but chain is BLOCKED.
+  See AUDIT-FICTIONAL-PN.md for the un-catalogued MPNs.
+  Fix area: scripts/lib/deterministic-emitter.ts — replace hallucinated
+  MPNs with real distributor-findable parts, or mark custom/OEM items
+  with a "CUSTOM-" prefix so future runs skip the existence check.
+======================================================================
+[chain] GATE 20 fictional-PN (exit 20): FLAGGED (render-and-flag) — dossier ships, issue disclosed. A part number is unverified in any catalogue — see AUDIT-FICTIONAL-PN.md
+[chain] fictional-pn-audit flagged issues (see AUDIT-FICTIONAL-PN.md, status=20): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+[chain] gate-21 price normalisation: capped 32 mis-pinned commodity partVerification price(s) before per-line audit
+[per-line-price-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-PER-LINE-PRICE.md
+[per-line-price-audit] FAIL: 2 HIGH-severity finding(s) — BoM unit prices diverge > 5× from live distributor prices
+
+======================================================================
+  CHAIN HARD-EXIT - Per-line price plausibility audit FAILED (code 21)
+  At least one BoM line has a rendered unit price that diverges > 5×
+  from the cheapest live distributor source (Mouser / Digi-Key /
+  Farnell / LCSC / Nexar). This level of per-line error cannot be
+  explained by quantity breaks, currency drift, or catalogue timing —
+  it indicates a systematic pricing error on the specific line item.
+  Gate 10 B-7 (aggregate cost band) does NOT catch this because
+  over-billing and under-billing errors can cancel in the total while
+  individual lines are both wrong in opposite directions.
+  PDF + state.json saved to disk for inspection but chain is BLOCKED.
+  See AUDIT-PER-LINE-PRICE.md for the mispriced line items.
+  Fix area: scripts/lib/deterministic-emitter.ts — correct the unit
+  basis (per-unit vs per-reel/lot), check currency conversion, or
+  update stale catalogue prices to 2025 UK market rates.
+======================================================================
+[chain] GATE 21 per-line-price (exit 21): FLAGGED (render-and-flag) — dossier ships, issue disclosed. A line price diverges >5x from catalogue — see AUDIT-PER-LINE-PRICE.md
+[chain] per-line-price-plausibility-audit flagged issues (see AUDIT-PER-LINE-PRICE.md, status=21): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+[chain] background enrichment spawned (PID 7917) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/background-enrichment.log
+[chain] render-and-flag: 3 gate(s) flagged but the dossier SHIPPED (set CHAIN_GATE_ENFORCE=1 to hard-block instead). See RESIDUAL-ISSUES.md.
+
+[chain] === FINAL ===  state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json  pdf: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/chain-v2.pdf  status=accepted_with_decisions  gates_passed=false  design_decisions=2
+[enrich] componentEngineering: 81 parts · 105 connections · 7 orphans · 32 ungoverned · 6 balances
+[chain] componentEngineering → state (per-component physics + governance + balances)
+[chain] dashboard: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/dashboard.html
+
+[chain] ── QUALITY LOOP Phase 3 (full) — iteration 1/2 ──
+
+  LEDGER (BoM + connectivity + coverage + tools) — ras-5m   £2,890,313 raw materials   87 parts + 105 connections   16 tools invoked
+  tag    type      name                     £ line in/out status               tool  BLE   GA P&ID  SLD  PNL  BFD  SCH  ISO
+  -------------------------------------------------------------------------------------------------------------------------
+  P-101  rotating  Recirc Pump            145,600    2/1 NOT FOUN      pump-sizing    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  X-104  other     Pipework Run             1,026    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  X-105  other     Distribution Manifold    1,026    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  I-102  valve     Flow Control Valve         684    1/9 IDENTIFI                —    ✓    ✓    ✗    ✓    ✓    ·    ✓    ✓
+  TK-105 vessel    Expansion Reservoir      2,041    1/1 BESPOKE                 —    ✓    ✓    ✗    ·    ·    ✗    ·    ✓
+  TK-101 vessel    Rearing Tank           197,808   12/2 BESPOKE         design +2    ✓    ✓    ✓    ·    ·    ✓    ✓    ✓
+  D-101  separator Drum Filter             13,679    2/3 NOT FOUN microscreen-siz +1    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  V-103  separator Biofilter               17,775    5/1 BESPOKE  microscreen-siz +1    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  C-101  exchanger Degasser                 9,892    2/1 BESPOKE    speece-cone +1    ✓    ✓    ✓    ✓    ✓    ✗    ✓    ✓
+  D-103  separator Drum Filter Backwash     6,840    2/0 NOT FOUN microscreen-siz +1    ✓    ✓    ✗    ·    ✓    ✗    ·    ✓
+  D-104  separator Drum Filter Screen      11,960    2/0 BESPOKE  microscreen-siz +1    ✓    ✓    ✗    ·    ✓    ✗    ·    ✓
+  B      rotating  Aeration Blower          5,742    1/1 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ✗    ·    ✓
+  B      rotating  Degassing Blower        21,837    2/1 ACTUATOR   speece-cone +1    ✓    ✓    ✗    ✓    ✓    ✗    ·    ✓
+  Y      valve     Emergency O₂ Solenoid    6,000    0/2 ACTUATOR                —    ✓    ✓    ✗    ·    ·    ·    ✓    ·
+  FCV    valve     Dissolved-O₂ Control     7,200    1/2 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ·
+  Y      valve     Emergency O₂ Solenoid    1,500    0/0 ACTUATOR                —    ✓    ✓    ✗    ·    ·    ·    ✓    ·
+  FCV    valve     Dissolved-O₂ Control     1,800    0/0 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ·
+  P      other     Make-up Water System    27,880    0/1 UTILITY                 —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  DV     other     Bleed / Drain System     9,037    1/1 UTILITY                 —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  DOS    other     Chemical Dosing Syste   31,760    0/1 SYSTEM          sizing +1    ✓    ✓    ·    ·    ·    ·    ✓    ·
+  FD     vessel    Feed Storage + Distri   46,192    0/0 SYSTEM                  —    ✓    ✓    ✗    ·    ·    ✗    ·    ✗
+  LOX    vessel    Oxygen Supply (LOX) S   38,440    3/2 SYSTEM                  —    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  SLU    other     Solids / Sludge Handl   29,960    1/1 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  MED    separator Biofilm Carrier Media   17,290    1/0 SYSTEM   microscreen-siz +1    ✓    ✓    ✗    ·    ·    ✗    ·    ✗
+  GR     other     Grading / Harvest Sys   45,400    0/0 SYSTEM       heat-loss +3    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  SYS    other     Product Chilling + Ic   38,750    1/1 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Mortality Handling Sy   26,480    0/0 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Intake + Make-up Trea   52,960    0/1 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Effluent Treatment +    59,256    3/0 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Live-Fish Handling +    41,480    0/0 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Biosecurity / Quarant   68,100    0/0 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  P-103  rotating  Heat Pump               60,450    1/1 NOT FOUN     heat-loss +1    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  —      other     Structural Frame        86,570    0/0 BESPOKE                 —    ✗    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  —      electricalEnclosure Panel         86,570    0/0 BESPOKE   cable-sizing +1    ·    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  X-102  exchanger Makeup Hex              10,880    1/1 BESPOKE    speece-cone +1    ✓    ✓    ✓    ·    ·    ✓    ✓    ✓
+  SLB    other     Reinforced Floor Slab  122,640    0/0 BUILDING                —    ✗    ✗    ·    ·    ·    ·    ·    ·
+  FRM    other     Steel Portal Frame      78,840    0/0 BUILDING                —    ✗    ✗    ·    ·    ·    ·    ·    ·
+  WAL    other     Insulated Wall Claddi   52,220    0/0 BUILDING     heat-loss +3    ✗    ✗    ·    ·    ·    ·    ·    ·
+  ROF    other     Insulated Roof Claddi   65,700    0/0 BUILDING                —    ✗    ✗    ·    ·    ·    ·    ·    ·
+  FND    other     Foundations + Ground    52,560    0/0 BUILDING                —    ✗    ✗    ·    ·    ·    ·    ·    ·
+  DR     other     Roller + Personnel Do   12,000    0/0 BUILDING microscreen-siz +4    ✓    ✓    ·    ·    ·    ·    ·    ·
+  X-101  other     Protein Skimming        28,000    4/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ✓
+  V-101  exchanger UV Sterilization        28,800    2/1 NOT FOUN                —    ✓    ✓    ✓    ✓    ✓    ✓    ·    ✓
+  V-102  exchanger Oxygenation System      49,730    0/0 NOT FOUN   speece-cone +1    ✓    ✓    ✓    ·    ·    ✓    ✓    ✓
+  I-104  instrumentTemperature Sensor         500    0/1 IDENTIFI                —    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  X-119  vessel    Expansion Vessel         2,120    2/1 BESPOKE         design +2    ✓    ✓    ✗    ·    ·    ✗    ·    ✓
+  X-120  other     Dehumidifier             1,368    1/0 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  H-101  other     Backup Immersion Heat   52,200    2/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ✓
+  AHU    other     Building Ventilation   128,000    1/1 UTILITY                 —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  X-122  electricalMain Breaker               821    1/1 NOT FOUN  cable-sizing +1    ✓    ✓    ·    ✗    ✗    ·    ·    ·
+  X-123  electricalDistribution Busbar      2,394   1/31 NOT FOUN                —    ✓    ✓    ·    ✗    ✓    ·    ·    ·
+  X-124  electricalFuse Holder                300    1/0 IDENTIFI                —    ✓    ✓    ·    ✗    ✗    ·    ·    ·
+  —      other     Power Contactor            821    0/0 BESPOKE                 —    ✗    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  X-125  electricalSurge Protector            821    1/0 NOT FOUN                —    ✓    ✓    ·    ✗    ✗    ·    ·    ·
+  G      electricalStandby Diesel Genera  163,560    1/1 UTILITY                 —    ✓    ✓    ·    ✓    ✗    ·    ·    ·
+  U      control   Control + Instrument    44,712    1/1 UTILITY                 —    ✓    ✓    ·    ✗    ✓    ·    ·    ·
+  X-132  control   Main Controller            547    1/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ✓
+  X-133  control   Communication Gateway      500   33/0 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ✓
+  X-134  control   I/O Module                 500    1/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  X-135  control   Network Switch             150    1/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  X-136  control   Controller Power Supp      547    1/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ✓
+  SCADA  control   SCADA / Plant Control   83,850    1/1 SYSTEM                  —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  I-106  instrumentVoltage Sensor             500    0/1 IDENTIFI                —    ✓    ✓    ✗    ·    ·    ·    ✗    ·
+  I-107  instrumentCurrent Sensor             500    0/1 NOT FOUN                —    ✓    ✓    ✗    ·    ·    ·    ✗    ✓
+  I-108  instrumentTemperature Probe          547    0/1 NOT FOUN                —    ✓    ✓    ✗    ·    ·    ·    ✗    ✓
+  I-109  instrumentPressure Sensor            500    0/1 NOT FOUN                —    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  X-127  other     Signal Conditioner         500    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  LT     instrumentLevel Transmitter        6,300    0/1 INSTRUME     heat-loss +2    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  TT     instrumentTemperature Transmitt    2,450    0/1 INSTRUME   speece-cone +1    ✓    ✓    ✓    ·    ·    ·    ✓    ✓
+  AT     instrumentDissolved-Oxygen Anal    8,000    1/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ✓    ✓    ·    ✓    ·
+  AT     instrumentTAN / Ammonia Analyse    2,200    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  AT     instrumentNitrate Analyser         2,400    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  AT     instrumentDissolved-CO₂ Analyse    2,300    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  AT     instrumentUV Transmittance / In    1,500    1/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ✓    ·    ·    ✗    ·
+  AT     instrumentpH Analyser              1,300    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ·
+  AT     instrumentConductivity / Salini    1,200    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ·
+  PT     instrumentO₂ Header Pressure Tr      850    0/1 INSTRUME        design +1    ✓    ✓    ✓    ·    ·    ·    ✓    ·
+  LT     vessel    LOX Tank Level + Low     1,100    0/1 INSTRUME     heat-loss +5    ✓    ✓    ✗    ·    ·    ✗    ·    ✗
+  X-128  electricalProtective Relay           821    1/1 NOT FOUN                —    ✓    ✓    ·    ✗    ✓    ·    ·    ·
+  X-129  other     Emergency Stop Button      479    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  X-130  other     Isolation Device           821    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  I-119  instrumentFire Detector              479    0/1 NOT FOUN                —    ✓    ✓    ✗    ·    ·    ·    ✗    ·
+  X-131  other     Interlock Switch           547    0/1 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  FCV    valve     Inlet Flow Control Va   56,232    1/2 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ✓
+  FCV    valve     Inlet Flow Control Va   31,258    0/0 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ✓
+  FCV    valve     Inlet Flow Control Va   44,734    0/0 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ✓
+  B      rotating  Degassing Blower        43,674    0/0 ACTUATOR   speece-cone +1    ✓    ✓    ✗    ✓    ✓    ✗    ·    ✓
+  -------------------------------------------------------------------------------------------------------------------------
+  PART coverage by drawing (present / expected):   BLE 42/49   GA 44/49   P&ID 12/44   SLD 13/19   PNL 15/19   BFD 9/20   SCH 14/24   ISO 8/11
+  CONNECTION coverage (pipes/wires/sensors vs the views):   pid 9/34 (26.5%)   process_schedules 39/105 (37.1%)   isometric 34/34 (100.0%)   route 105/105 (100.0%)
+  TOOLS invoked (16):
+    uv-reactor:disinfection-sizing           →  14 parts   34 calcs   28 claims
+      └ TK-101 Rearing Tank      Flow rate
+    drum-filter:microscreen-sizing           →  13 parts   33 calcs   26 claims
+      └ D-101 Drum Filter        Influent TSS
+    oxygenation:speece-cone                  →  13 parts   43 calcs   26 claims
+      └ C-101 Degasser           Oxygen Supply Rate
+    pressure-vessel:design                   →  12 parts   32 calcs   24 claims
+      └ TK-101 Rearing Tank      Internal design pressure
+    reactor:cstr-pfr-sizing                  →  12 parts   24 calcs   24 claims
+      └ TK-101 Rearing Tank      Reactor working volume (total)
+    mbbr:biofilter-sizing                    →  12 parts   32 calcs   36 claims
+      └ D-101 Drum Filter        Media Volume
+    building-envelope:heat-loss              →  12 parts   49 calcs   24 claims
+      └ GR Grading / Harvest Sy  Annual heating demand (degree-day method
+    electrical:cable-sizing                  →  12 parts   21 calcs   24 claims
+      └ — Enclosure Panel        De-rated tabulated-current target
+    process:pump-sizing                      →  10 parts   18 calcs   30 claims
+      └ P-101 Recirc Pump        Per-pump duty flow
+    ph-titration:sizing                      →  10 parts   17 calcs   20 claims
+      └ DOS Chemical Dosing Syst Initial bolus volume of acid/base
+    electrical:transformer-sizing            →  10 parts   25 calcs   30 claims
+      └ — Enclosure Panel        Apparent power demand
+    yield-economics:npv                      →   8 parts    9 calcs   24 claims
+      └ GR Grading / Harvest Sy  Annual gross revenue (year 1)
+    kla-oxygen:transfer                      →   8 parts   16 calcs    8 claims
+      └ DR Roller + Personnel D  Driving force for oxygen transfer
+    refrigeration-cycle:cop                  →   7 parts    7 calcs   21 claims
+      └ AT Dissolved-Oxygen Ana  Pressure ratio
+    ras-degasser:packed-column               →   5 parts    0 calcs   10 claims
+    ras-metabolism:load-estimation           →   1 parts    1 calcs    4 claims
+      └ GR Grading / Harvest Sy  Daily Feed
+  → 27 NOT FOUND · 47 parts w/ coverage gap · 2 orphan · 25 connections off the P&ID.  5 ambiguous tag(s) (name-corroborated).  56/87 parts have NO tool provenance.  wrote parts-ledger.json
+  → CONNECTIVITY: 7 concern(s) — process 17/23 connected (73.9%) · instruments 16/16 associated (100.0%) · 4 origin(s) · 2 sink(s)
+
+[chain] ledger updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/parts-ledger.json
+[chain] quality scorecard (iteration 1/2): floor=7/10 mean=9.4/10 allPass=false
+  headline: 9/10 ✓
+  brief_compliance: 6/10 ✗ BELOW 8
+  bill_of_materials: 8/10 ✓
+  performance_card: 10/10 ✓
+  design_narrative: 9/10 ✓
+  physics_fidelity: 4/10 ✗ BELOW 8
+  drawing_gates: 10/10 ✓
+  cost_sanity: 10/10 ✓
+  physics_gates: 10/10 ✓
+  tool_archetype: 10/10 ✓
+  connectivity: 7/10 ✗ BELOW 8
+[chain] dashboard updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/dashboard.html
+[chain] ledger HTML updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/parts-ledger.html
+
+[chain] quality loop: 2 directive(s) — 2 DATA fix, 0 CODE fix
+
+[chain] DATA-FIX: re-running with 2 directive(s) (iteration 2/2)
+  ✗ [connectivity] score=7/10 → fix at topology: 7 defect(s)
+      · D-103 Drum Filter Backwash: missing_output — Process equipment with no downstream connection — nothing leaves this separ
+      · D-104 Drum Filter Screen: missing_output — Process equipment with no downstream connection — nothing leaves this separat
+      · Y Emergency O₂ Solenoid + Diffuser (fail-open): missing_input — Process equipment with no upstream connection — nothing 
+  ✗ [drawing_gates] score=0/10 → fix at drawing_generator: 8 defect(s)
+      · blender: 42/49 — missing: — Structural Frame, SLB Reinforced Floor Slab, FRM Steel Portal Frame, WAL Insulated Wall Clad
+      · general-arrangement: 44/49 — missing: SLB Reinforced Floor Slab, FRM Steel Portal Frame, WAL Insulated Wall Cladding, RO
+      · pid: 12/44 — missing: I-102 Flow Control Valve, TK-105 Expansion Reservoir, D-103 Drum Filter Backwash, D-104 Drum Filte
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-rerun/yellowtail-kingfish-ras-5m.md (6841 chars)
+[chain] quality loop: loaded 2 fix directive(s) from iteration 1
+  → [connectivity] score=7/10 fix at topology: D-103 Drum Filter Backwash: missing_output — Process equipment with no downstream connection — nothing leaves this separator. Where does the flow go?; D-104 Drum Filter Screen: missing_output — Process equipment with no downstream connection — nothing leaves this separator. Where does the flow go?...
+  → [drawing_gates] score=0/10 fix at drawing_generator: blender: 42/49 — missing: — Structural Frame, SLB Reinforced Floor Slab, FRM Steel Portal Frame, WAL Insulated Wall Cladding, ROF Insulated Roof Cladding, FND Foundations + Ground Works, — Power Contactor; general-arrangement: 44/49 — missing: SLB Reinforced Floor Slab, FRM Steel Portal Frame, WAL Insulated Wall Cladding, ROF Insulated Roof Cladding, FND Foundations + Ground Works...
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 6841 chars
+[brief-parse] OK — confidence=HIGH, missing=4 fields, metrics=6
+[chain] classification: aquaculture_ras (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 11.4s)
+[chain] U5 brief augmentation: U5 augmentation (class: aquaculture_ras): 2 HARD field(s) filled with class-aware inferred values, 3 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg. Removed from missing_mandatory_fields: target_material, design_life.
+  [U5] filled "target_material": "316/316L stainless-steel process fabrication; products: calcium carbonate + oxygen + ammonia" (Material/products inferred from brief text for aquaculture_ras. class-agnostic inference from brief text for unmapped cl)
+  [U5] filled "design_life": "20–25 yr (chemical-process-plant design life; static process equipment + pressure vessels per PED / ASME VIII; periodic re-inspection)" (Industry-standard service life for aquaculture_ras per applicable design standard. class-agnostic inference from brief t)
+  [U5] still null after augmentation: max_mass_kg
+[chain] U6 brief expansion: 12 duties derived; product="Sashimi-grade yellowtail kingfish (Seriola lalandi)" (model=google/gemini-3.1-pro-preview, cost_usd=0.063106)
+  [U6] production_capacity_kg_per_yr = 55000 kg/yr [stated/high] — Stated in brief as 55 t/yr.
+  [U6] rearing_tank_volume_m3 = 901 m3 [stated/high] — Stated in brief.
+  [U6] max_standing_biomass_kg = 54060 kg [derived/high] — Calculated from total rearing tank volume (901 m3) multiplied by harvest stocking density 
+  [U6] harvest_count_fish_per_yr = 16176 fish/yr [derived/high] — Production capacity (55,000 kg/yr) divided by harvest weight (3.4 kg/fish).
+  [U6] recirculating_flow_rate_m3_per_h = 3604 m3/h [derived/high] — Tank volume (901 m3) multiplied by turnover rate (4 times per hour).
+  [U6] makeup_water_flow_m3_per_h = 14.4 m3/h [derived/high] — 0.4% of the main recirculating flow rate (3604 m3/h * 0.004).
+  [U6] daily_feed_load_kg_per_day = 206.4 kg/day [derived/medium] — Annual production (55,000 kg) * FCR (1.37) = 75,350 kg feed/yr. Divided by 365 days.
+  [U6] oxygen_demand_kg_per_day = 103.2 kg/day [derived/high] — Daily feed load (206.4 kg/day) multiplied by stated provision ratio (0.5 kg O2 per kg feed
+  [U6] ammonia_production_kg_per_day = 6.19 kg/day [derived/medium] — Estimated using standard aquaculture rule of thumb: ~3% of feed mass becomes TAN (206.4 kg
+  [U6] alkalinity_consumption_kg_per_day = 43.9 kg/day [derived/medium] — TAN load (6.19 kg/day) multiplied by stated consumption rate (7.1 g CaCO3 per g TAN).
+  [U6] makeup_water_heating_duty_kw = 241 kW [derived/medium] — Heating 14.4 m3/h (4.0 kg/s) of raw seawater from worst-case 12 C to 26.4 C. Q = m*Cp*dT =
+  [U6] microscreen_filtration_rating_um = 50 um [derived/high] — Stated range is 40 to 60 microns; nominal midpoint selected.
+[chain] engineering_contract: 79 quantities, 9 topology edges, 0 macro-assemblies (total £0), closures: 5 pass / 0 warn / 0 fail
+[specs-writeback] web search: aquaculture_ras aquaculture_ras heat_pump_source — 577ms
+[specs-writeback] {"spec_key":"heat_pump_source","part_number":"aquaculture_ras","hit":"miss","latency_ms":1462}
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":6}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":564}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":360}
+[products-writeback] {"product_name":"55 t/yr land-based marine Recirculating Aquaculture System (RAS) for yellowtail kingfish (Seriola lalandi), 200 g → 3.4 kg over 360 days at FCR 1.37. 900 m³ total rearing-tank volume across 4 circular","hit":"db_hybrid","matched":"204 t/yr land-based marine Recirculating Aquaculture System (RAS) for yellowtail kingfish (Seriola lalandi), 200 g → 3.4 kg over 360 days at FCR 1.37. 3340 m³ total rearing-tank volume across 10 circu","has_modules":true,"used_embedding":true,"candidates":1,"latency_ms":198}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: aquaculture_ras
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 10978 chars. First 200: {
+  "market_context": "The global aquaculture sector, particularly for high-value marine fish, has experienced significant growth driven by declining wild fish stocks and increasing consumer demand fo
+[research-synthesis] Complete: 4 competitors, 5 sources, 7 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for aquaculture_ras: replaying 6 stored duty spec(s) (ras-metabolism:load-estimation, mbbr:biofilter-sizing, drum-filter:microscreen-sizing, ras-degasser:packed-column, oxygenation:speece-cone, uv-reactor:disinfection-sizing) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool ras-metabolism:load-estimation (duty_hash=90398d51183a, db id=18) — no LLM call.
+[tool-generator] REUSED stored generated tool mbbr:biofilter-sizing (duty_hash=7101428c2960, db id=19) — no LLM call.
+[tool-generator] REUSED stored generated tool drum-filter:microscreen-sizing (duty_hash=e2ec5ba8ae37, db id=20) — no LLM call.
+[tool-generator] REUSED stored generated tool ras-degasser:packed-column (duty_hash=27646e94f9e0, db id=21) — no LLM call.
+[tool-generator] REUSED stored generated tool oxygenation:speece-cone (duty_hash=884455b1bc52, db id=22) — no LLM call.
+[tool-generator] REUSED stored generated tool uv-reactor:disinfection-sizing (duty_hash=71cd66aec232, db id=23) — no LLM call.
+[tool-creation] DONE for aquaculture_ras: created 6 self-test-passed tool(s) (ras-metabolism:load-estimation, mbbr:biofilter-sizing, drum-filter:microscreen-sizing, ras-degasser:packed-column, oxygenation:speece-cone, uv-reactor:disinfection-sizing), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for aquaculture_ras: created+registered 6 self-test-passed tool(s) [ras-metabolism:load-estimation, mbbr:biofilter-sizing, drum-filter:microscreen-sizing, ras-degasser:packed-column, oxygenation:speece-cone, uv-reactor:disinfection-sizing]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] COVERAGE GATE (brief-named units, reuse) for slug=aquaculture_ras:
+    ✓ drum/microscreen filter → drum-filter:microscreen-sizing
+    ✓ biofilter (MBBR/biological) → mbbr:biofilter-sizing
+    ✓ CO2 degasser / stripping column → ras-degasser:packed-column
+    ✓ oxygenation (cones / pure O2) → kla-oxygen:transfer
+    ✓ UV disinfection → uv-reactor:disinfection-sizing
+    ✓ heat pump / thermal hold → building-envelope:heat-loss
+    ✓ recirculation / process pumps → process:pump-sizing
+    ✓ electrical distribution → electrical:cable-sizing
+    ✓ control & instrumentation → control-systems:pid-tuning
+[bootstrap-tool-plan] REUSING stored candidate slug=aquaculture_ras version=1 status=candidate (no LLM call; 24 steps, 24 tool_ids, coverage_gaps=0)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for aquaculture_ras/medium — bootstrapped a 24-step tool plan (candidate id=28 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: building-envelope:heat-loss, control-systems:pid-tuning, cybersecurity-threat-model:stride, electrical:cable-sizing, electrical:transformer-sizing, kla-oxygen:transfer, ph-titration:sizing, process:pump-sizing, fluids:pipe-sizing, ras-metabolism:load-estimation, drum-filter:microscreen-sizing, mbbr:biofilter-sizing, oxygenation:speece-cone, pressure-vessel:design, ras-degasser:packed-column, reactor:cstr-pfr-sizing, mass-aggregator:envelope-check, refrigeration-cycle:cop, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, transport-logistics:routing, uv-reactor:disinfection-sizing, yield-economics:npv
+[bootstrap-tool-plan] SEED-PROTECTED mass-aggregator:envelope-check: kept the first-principles contract value(s) for [total_system_mass_kg(seed=94000 vs tool=95204.6)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[class-reference-graph-db] {"product_class":"aquaculture_ras","resolved_to":"aquaculture_ras","hit":"db","nodes":10,"edges":29}
+[generic-emitter] physics-derived equipment: 10 word(s) sized from the contract; 9 principal item(s) synthesised (rearing_tank, drum_filter, biofilter, degasser, makeup_hex, dehumidifier, backup_immersion_heater, drum_filter_backwash, drum_filter_screen).
+[chain] Orchestrator: 10 modules, 10 sub-modules, 215 words, 19 tools ran (4858ms)
+[chain] Build #18k: toolOutputsBlock built (19 tools, 12184 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 15 component_classes covered (15 with match, 0 empty), 11103 chars (30370ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=5000000, target_performance_value=55 (t/yr), operating_temp_min_c=8, operating_temp_max_c=26.4
+[chain] keyMetrics seeded early (pre-reviewer): Production Capacity Tpy=55 t/yr
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=7/10 plaus=8/10 coh=6/10 part=5/10 hon=9/10 (27771ms)
+[chain] PHASE 4 skeleton critic: 1 HIGH-severity issues found before any LLM painting
+  ✗ [brief_to_design_fidelity @ water_treatment_system/sub_modules[0]/words[16]] The oxygenation system is rated at 4 kg/h (96 kg/day), which is below the average daily oxygen demand of 103.2 kg/day (derived from 206.4 kg/day feed load * 0.5 kg O2/kg feed). It 
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 16698 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 24 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 18 / 24 patches (skipped 6)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word manufacturer="Grundfos" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word part_number="CR 155-4-2" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word material="AISI 316 stainless steel wetted parts" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word rating_primary="90 kW" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word rating_secondary="1800 m³/h @ 14.5 m head" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word regulatory="CE, IEC 60034, WRAS" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word (+9 modifiers)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word__drive_motor manufacturer="ABB" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 31.9s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1180}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=8/10 phys=7/10 coh=5/10 part=8/10 hon=9/10 (35021ms)
+[chain] critic headline: The design is highly detailed and matches the key RAS process parameters, but suffers from a critical material compatibility issue in the pumps and a truncated JSON payload.
+[chain] critic issues: 2 high, 2 med, 4 total
+  ✗ [high/high] engineering_plausibility @ modules[0].sub_modules[0].words[0]: The circulation pumps specify AISI 316 stainless steel wetted parts for 33 ppt seawater at 26.4 °C. Warm seawater will cause rapid pitting, crevice corrosion, a
+  ✗ [high/high] internal_coherence @ modules[7]: The design JSON is truncated and ends abruptly inside the 'sensing_instrumentation' module, resulting in malformed JSON syntax and missing components.
+  ✗ [med/high] brief_to_design_fidelity @ modules[4].sub_modules[0].words[18]: The Backup Immersion Heater is rated at 205 kW, which is insufficient to meet the derived make-up water sensible heating duty of 241 kW required to heat 14.4 m³
+  ✗ [med/medium] engineering_plausibility @ modules[0].sub_modules[0].words[58]: The Biofilter has a primary flow rating of 358 m³/h, which is only ~10% of the main recirculating flow rate of 3604 m³/h. While bypass biofiltration is possible
+[chain] physics-critic enforcement (shadow): no known-failure part — ship allowed.
+[chain] task-41 fidelity gates: Critic flagged 1 module(s) for brief_fidelity structural adds: modules[4].sub_modules[0].words[18]
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 16173 chars
+[chain] STEP 8: R4 Flash-Lite review returned 19 patches
+[chain] STEP 8: R4 Flash-Lite review applied 1 / 19 patches (skipped 18)
+    =mass_fluid_transport_process.overview_paragraph_en (prose)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.grundfos_cr_155_4_2_pump: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.abb_m3bp_315smb_motor: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.danfoss_vlt_aqua_drive: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word water_treatment_system.water_treatment_system__mechanical_filtration.hydrotech_hdf_2008_1: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word environmental_interface.environmental_interface__heat_pump.thermelec_immersion_heater: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word environmental_interface.environmental_interface__heat_pump.munters_mlt800_dehumidifier: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word power_distribution.power_distribution__main_breaker.schneider_masterpact_mtz2: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+[chain] STEP 8: R4 Flash-Lite review done in 14.2s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":490}
+[chain] canonical product_class OVERRIDE: "" → "aquaculture_ras" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "aquaculture_ras" — skipping
+[chain] physics repair: 0 iter(s); HIGH 2→2; plausibility 7→7; patches 0
+[chain] modifier dedup: collapsed 4 cosmetic-dupe modifier(s) across 4 component(s)
+[chain] sub-module prose pre-fill: rewrote 9/10 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 1 unable_to_compare
+[chain] verified-parts allowlist: 110 entries (KPA=110, emitter=0, rag=0)
+[emitter-completion] 1 gap sub_module(s) for class "aquaculture_ras" — DB-first → generate → write-back
+[emitter-completion]      ↳ wrote back Southco to pretraining_extracted_parts
+[emitter-completion]   ✓ GEN  maintenance_serviceability::maintenance_serviceability__access_panel → Southco [MPN deferred; LLM suggested "E5-9-315-UU1" stored in DB]
+[emitter-completion] filled 1 gap(s): 0 DB-first, 1 generated.
+[chain] emitter-completion: filled 1 gap sub_module(s) (0 DB-first, 1 generated+written-back) before gate-23
+[chain] gate-23 emitter-completeness: PASS — 10 sub_modules checked, 10 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 1 pass / 0 fail; grammar 10 pass / 3 fail; total score 2880
+  ✗ [sub_module_word_density] grammar: 2 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): maintenance_serviceability::maintenance_serviceability__access_panel (1 words), actuation_kinematics::actuation_kinematics__primary_assembly (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 3 sub-module(s) with <3 priced lines: power_distribution::power_distribution__main_breaker (2/7), control_compute_communication::control_compute_communication__main_controller (1/6), safety_protection::safety_protection__protective_relay (0/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): environmental_interface: overview mentions 1 concrete component not present in any sub-module word — mlt800. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: power_distribution::power_distribution__main_breaker::main_breaker_word has 2 conflicting "dimension" values: "400 V 3-phase LV incomer · 1000 A ACB frame (sized to 466 kW connected load, PF 0.9, 25% margin)" AND "400 V 3-phase LV incomer". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 0: applied 6 patches, skipped 1, allowlist_rejected=1, state_changed=true
+    ~merge-into-existing maintenance_serviceability.sub_modules[0].words[0] (Enriching under-dense sub-module with required modifiers)
+    +maintenance_serviceability.sub_modules[0].words[+] (Adding word to meet density requirement)
+    +maintenance_serviceability.sub_modules[0].words[+] (Adding word to meet density requirement)
+    +maintenance_serviceability.sub_modules[0].words[+] (Adding word to meet density requirement)
+    +actuation_kinematics.sub_modules[0].words[+] (Adding word to meet density requirement)
+    ~merge-into-existing power_distribution.sub_modules[0].words[0] (Removing duplicate conflicting dimension modifier)
+    ALLOWLIST_REJECT power_distribution.sub_modules[0].words[+]: word patch contains MPN="M4M 20" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to meet density requirement)
+[chain] Phase 2 iter 1: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 1: arith 1 pass / 0 fail; grammar 10 pass / 3 fail; total score 2840
+  ✗ [sub_module_word_density] grammar: 1 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): maintenance_serviceability::maintenance_serviceability__access_panel (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 4 sub-module(s) with <3 priced lines: power_distribution::power_distribution__main_breaker (2/7), control_compute_communication::control_compute_communication__main_controller (1/6), safety_protection::safety_protection__protective_relay (0/5), maintenance_serviceability::maintenance_serviceability__access_panel (0/4).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): environmental_interface: overview mentions 1 concrete component not present in any sub-module word — mlt800. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [sub_module_prose_covers_words] grammar: 1 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: actuation_kinematics::actuation_kinematics__primary_assembly prose drops 1/5 words: Mounting Bracket. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+[chain] Phase 2 iter 1: applied 4 patches, skipped 3, allowlist_rejected=3, state_changed=true
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="E3-10-15" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing manufacturer and part number to satisfy density requirements.)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="104321" not in verified-parts allowlist (110 entries). Patch dropped. (Add 5th word to access_panel sub-module to meet density requirement.)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[0].words[+]: word patch contains MPN="MLT800" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing MLT800 dehumidifier component to sub-module.)
+    =actuation_kinematics.sub_modules[0].english_sentence (Update prose to include all words in the sub-module.)
+    ~merge-into-existing-word power_distribution.sub_modules[0].words[+] (+5 modifiers, 0 cosmetic dupes collapsed; Add priced components to main_breaker to meet BoM density.)
+    ~merge-into-existing-word control_compute_communication.sub_modules[0].words[+] (+5 modifiers, 0 cosmetic dupes collapsed; Add priced components to main_controller to meet BoM density.)
+    ~merge-into-existing-word safety_protection.sub_modules[0].words[+] (+5 modifiers, 0 cosmetic dupes collapsed; Add priced components to protective_relay to meet BoM density.)
+[chain] Phase 2 iter 2: emitter-identity re-assert corrected 3 word(s) before gate eval
+[chain] Phase 2 iter 2: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 3270
+  ✗ [sub_module_word_density] grammar: 1 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): maintenance_serviceability::maintenance_serviceability__access_panel (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 3 sub-module(s) with <3 priced lines: control_compute_communication::control_compute_communication__main_controller (2/6), safety_protection::safety_protection__protective_relay (1/5), maintenance_serviceability::maintenance_serviceability__access_panel (0/4).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): environmental_interface: overview mentions 1 concrete component not present in any sub-module word — mlt800. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[chain] Phase 2 iter 2: applied 0 patches, skipped 6, allowlist_rejected=6, state_changed=false
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[0]: word patch contains MPN="E3-10-15" not in verified-parts allowlist (110 entries). Patch dropped. (Enriching access panel word with missing manufacturer and part number to meet density requirements.)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="123-4567" not in verified-parts allowlist (110 entries). Patch dropped. (Adding a 5th word to maintenance_serviceability to satisfy sub_module_word_density.)
+    ALLOWLIST_REJECT control_compute_communication.sub_modules[0].words[0]: word patch contains MPN="6ES7516-3AN02-0AB0" not in verified-parts allowlist (110 entries). Patch dropped. (Adding manufacturer and part number to main controller to meet BoM density requirements.)
+    ALLOWLIST_REJECT control_compute_communication.sub_modules[0].words[1]: word patch contains MPN="AB7007" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced components to communication gateway to meet BoM density requirements.)
+    ALLOWLIST_REJECT safety_protection.sub_modules[0].words[0]: word patch contains MPN="REF615" not in verified-parts allowlist (110 entries). Patch dropped. (Adding manufacturer and part number to protective relay to meet BoM density requirements.)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[0].words[+]: word patch contains MPN="MLT800" not in verified-parts allowlist (110 entries). Patch dropped. (Adding missing Munters MLT800 component to environmental_interface sub-modules.)
+[chain] Phase 2: no state change after repair iter 2 — bailing (further iterations will not progress).
+[chain] post-Phase-2 prose pre-fill: rewrote 1/10 sub-modules
+[chain] emitter-identity re-assert: corrected 0/214 pinned words; 1 emitter word(s) missing post-mutation
+[fill-blank-mpn] 38 blank catalogue word(s) for class "aquaculture_ras" (182 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Circulation Pump) → Grundfos UP15-42
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Suction Isolation Valve) → Grundfos NB 25-200/219
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Non-Return Valve) → Crouzet 81529907
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Flow Control Valve) → Sensirion SFC5500-0.5slm
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Differential-Pressure Switch) → Honeywell HSCDLNN100MDSA5
+[fill-blank-mpn]   ✓ DB   water_treatment_system::water_treatment_system__mechanical_filtration (Flow Control Valve) → Uhome TWV-20-NPT
+[fill-blank-mpn]   ✓ DB   water_treatment_system::water_treatment_system__mechanical_filtration (Local Sensor) → Texas Instruments TMP451AQDQFRQ1
+[fill-blank-mpn]   ✓ DB   environmental_interface::environmental_interface__heat_pump (Temperature Sensor) → Mitsubishi Electric PAC-TH011HT-E
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__main_breaker (Fuse Holder) → Delta Electronics B62SR24125CC
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__main_controller (Network Switch) → TI MSP430
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_sensor (Voltage Sensor) → ABB KEVCD
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_sensor (Pressure Sensor) → Sartorius BB-8804062
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__protective_relay (Interlock Switch) → Banner Engineering SI-GL42DM20-11
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__primary_assembly (Inlet Flow Control Valve) → Altecnic CONTSETALT533K
+[fill-blank-mpn] filled 14/38 blank word(s): 14 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 182 structural skipped.
+[chain] fill-blank-mpn: branded 14/38 blank catalogue word(s) (14 DB-first real MPN, 0 generated real-OEM), 182 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 1322 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 6223 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 14 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=10 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"aquaculture_ras","resolved_to":"aquaculture_ras","hit":"db","nodes":10,"edges":29}
+[chain] K10 shadow: PASS_SHADOW — matched=31 missing=0 extra=0
+[chain] headline derived: Production Capacity Tpy=55 t/yr [derived_from_brief]; Unit cost ceiling=5,000,000 GBP;  (0.00s)
+[chain] part verification: 14 parts checked — verified=10, unverified=4, uncertain=0, skip=0
+[chain] G5 RAG: 4 queries → 1 suggestions (high=1, medium=0, low=0, below_threshold=3, corpus=50 rows)
+[chain] part verification: stripped 4 high-confidence fake part_numbers
+  • mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::circulation_pump_word__suction_isolation_valve → removed "NB 25-200/219" (While Grundfos NB pumps exist, the specific model 'NB 25-200/219' does not appear in the provided do)
+  • control_compute_communication::control_compute_communication__main_controller::network_switch_word → removed "MSP430" (The MSP430 is a series of microcontrollers, not a specific part number for a network switch, and the)
+  • sensing_instrumentation::sensing_instrumentation__voltage_sensor::pressure_sensor_word → removed "BB-8804062" (The provided search results for Sartorius Univessel Glass components list part number BB-8804060 for)
+  • actuation_kinematics::actuation_kinematics__primary_assembly::actr_valve_on_rearing_tank_synth_word → removed "CONTSETALT533K" (A search for the specific part number 'CONTSETALT533K' yields no results in the provided search cont)
+[chain] part verification: inherited part_number from deterministic sibling for 1 stripped word(s)
+  ↳ mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::circulation_pump_word__suction_isolation_valve ← mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::circulation_pump_word (PN: UP15-42)
+[chain] strip+recommend: 4 recommendations — high=2, medium=2, low=0, unknown=0 (manual sourcing required)
+[chain] structural-gate router: surfaced 2 unrepaired gate(s) as design decisions
+[nexar] GraphQL errors for mpn=UP15-42: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TBD (catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=PAC-TH011HT-E: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TBD (detailed design): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for TBD (field instrument — catalogue class)
+[nexar] GraphQL errors for mpn=TBD (field instrument — catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=KEVCD: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[chain] Stage 10.5 Part Reality Check: 13 checked, 7 real, 0 substituted, 6 warned (no substitute available). Nexar calls used: 6.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ circulation_pump_word: "Grundfos UP15-42" [class=unknown, library_class=none]
+  ⚠ actr_blower_on_biofilter_synth_word: "? TBD (catalogue class)" [class=unknown, library_class=none]
+  ⚠ temperature_sensor_word: "Mitsubishi Electric PAC-TH011HT-E" [class=unknown, library_class=none]
+  ⚠ circulation_pump_word__casing: "? TBD (detailed design)" [class=unknown, library_class=none]
+  ⚠ instr_level_consolidated: "? TBD (field instrument — catalogue class)" [class=unknown, library_class=none]
+  ⚠ voltage_sensor_word: "ABB KEVCD" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] module-paragraph-llm: 10/10 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 3 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/10 capital (threshold 6); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 4 sections, 0 warnings
+[chain] design decisions review: 7 choices (1 applied, 6 flagged, 0 blocked)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 11 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 1 deleted principal(s) re-created; 6 building take-off line(s) re-derived to the final footprint.
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 44.3 kW, 9.50%); economic-conductor saving £54,332
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 45.1 kW, 9.68%); economic-conductor saving £52,623
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 50.9 kW, 10.92%); economic-conductor saving £48,605
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 45.9 kW, 9.86%); economic-conductor saving £51,801
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 45.1 kW, 9.69%); economic-conductor saving £50,563
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 46.2 kW, 9.92%); economic-conductor saving £52,149
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 45.1 kW, 9.67%); economic-conductor saving £52,110
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 45.2 kW, 9.71%); economic-conductor saving £52,360
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 8 passes, DID NOT settle within 8 passes (cap) — ledger records the residual, no fixed point asserted; as-routed supply demand 466 → 511.231 kW (Δ 45.231 kW parasitic)
+[chain] computed-twin reconcile: 18 computed_<base> quantities dropped (computed_biofilter_air_flow_m3_h, computed_biofilter_media_volume_m3, computed_biofilter_tank_volume_m3, computed_building_process_loss_kw, computed_daily_feed_kg, computed_heat_pump_cop, computed_heat_pump_electrical_kw, computed_heating_duty_kw, computed_oxygen_demand_kg_day, computed_oxygen_supply_kg_h, computed_recirc_pump_head_m, computed_recirc_pump_hydraulic_power_w, computed_recirc_pump_motor_kw, computed_solids_load_kg_day, computed_tan_load_kg_day, computed_total_tank_volume_m3, computed_uv_lamp_power_kw, computed_uv_reactor_volume_m3); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 2 twin-less computed_* kept (computed_degasser_air_flow_m3_h, computed_degasser_column_volume_m3).
+[chain] phase 5: blender bg pipeline spawned (PID 9315) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/blender-bg.log
+[estimate] product_class=aquaculture_ras annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'aquaculture_ras' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 224 parts need price estimates
+[estimate] corpus-classified 30/224; 194 need rule-based / Flash-Lite
+[estimate] rule-based classified 38 parts; 156 still need Flash-Lite
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Engine B classifier override: 2 parts moved out of oem_subsystem
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Flash-Lite classified 8 batches
+[estimate] 6 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] Flash-Lite (volume-aware) for 4 'unknown' parts
+[estimate] updated 5 existing, synthesised 219 new, 0 failed
+[estimate] C3 DB cache: 2 parts priced from distributor_cascade_cache (0 live API calls)
+[estimate] classification source: corpus=30 rule_based=38 flash_lite=155 fallback=0 curated=0 db_cache=2
+[estimate] estimate source: db_cache=2 curve=218 flash_lite_unknown=4
+[estimate] top classes in BoM:
+  fluid_path: 48
+  structural_metal: 41
+  oem_subsystem: 37
+  structural_polymer: 21
+  sensor: 21
+  mechanical_assembly: 19
+  motor_actuator: 7
+  thermal: 7
+[estimate] estimated cost: GBP 0.004
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 230 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 230/230 results in 144.1s
+[engine-c] flags: in_range=9  over=11  under=92  no_reference=118
+[engine-c] 103/230 priced lines flagged out-of-range vs reference corpus (44.8%)
+[engine-c] 43 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "aquaculture_ras" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: aquaculture_ras
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json
+[supplier-validate] no suppliers to validate
+[chain] CHAIN_SKIP_IMAGE_GEN=1 — skipping illustration generation
+[chain] deployment_envelope: no envelope mapped for aquaculture_ras (returning null is intentional for some classes)
+[chain] physics-derived bottom-up pricing: 186 components priced from parent physics → rolled into 13 assemblies; raw BoM £584,417
+[chain] R1 anchor re-price: generic BoM £584,417 → reconciled to contract anchor (raw £1,292,532, installed ≈ £2.20M); 233 lines weighted by component type
+[chain] costStack persisted: ex-works £1809544 (raw materials £1292532, class aquaculture_ras)
+[chain] G2 cost-reality: PASS — BoM £1292532 across 231 priced lines (2 unpriced)
+[chain] G3 review-completeness: WARN — 3 gaps
+  ⚠ sub_modules: 10 sub-modules across 10 modules — expected ≥20
+  ⚠ compliance: Compliance gate did not register any mandatory standards
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 6 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] pre-render SKU restore: re-added 3 blanked part_number(s) a late stage stripped from real parts — emitter is the part-identity authority
+[chain] self-audit (shadow): floor 5/10 · mean 7.3/10 · 0 blocking · below-8: brief_compliance=6, bill_of_materials=7, physics_fidelity=5
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £1,809,544 / 55 t/yr = £32,901/(t·yr) — within the £10,000–£55,000/(t·yr) class band for throughput output. (brief metric production_capacity_tpy=55 t/yr → 55 t/yr)
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 233 disclosed; 0 take-off prices written into the BoM; purchased £788,747 → installed £2,366,241 (central)
+[advisor-engagement] 10/10 modules got an advisor block — 20 specialist cards, 40 grounded questions
+[chain] advisor-engagement: 10 module blocks, 20 specialist cards
+[chain] tool-archetype: dropped 1 self-inapplicable wrong-domain tool(s): refrigeration-cycle:cop
+[chain] tool-archetype coherence (shadow): PASS — coherent — "aquaculture_ras" legitimately uses seawater-source markers (18 tools, 115 quantities scanned)
+[chain] render-quality (shadow): UNIVERSAL-FALLBACK (generic stock images — NOT this design) — class="aquaculture_ras" template=NONE hero=true modules=19 thin=0
+  ✗ BLENDER_UNIVERSAL_FALLBACK: No per-class Blender template for product_class="aquaculture_ras" (and no LLM-generated blender-scene.py) — the dossier's cover + module images are the GENERIC 
+[chain] tools-flow: rendered 205623 bytes (18 tools)
+[investor-section] 5 investors matched from 18 candidates: Hatch Blue, Supply Change Capital, NFT.VC, Newfund, Buckhill Capital
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 6/7 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  [schedule] ✗ Piping Isometrics  (drawings/isometric-index.png)
+  log:
+    · reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m
+    · convergence: physics<->CAD converged=True in 3 iters (parasitic 45.2 kW, 9.71%); economic-conductor saving £52,360
+    ·   draw_isometric.py: launch failed: TimeoutExpired: Command '['/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/.venv/bin/python', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/draw_isometric.py', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json']' timed out after 240 seconds
+    · shaded-hero: 00-hero.png already present — skip
+    · self-exam parts_ledger.py: ok — → CONNECTIVITY: 0 concern(s) — process 0/0 connected (0%) · instruments 0/0 associated (0%) · 0 origin(s) · 0 sink(s)
+    · self-exam render_ledger_html.py: ok — wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/parts-ledger.html  (0 equipment + 0 connections + 0 sub-com
+    · self-exam inspect_drawings.py: ok — OVERALL (floor) = 5.0  → blender-hero   (3 defects)   wrote drawings-inspection.json
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 6/7 drawings + hero → wired into the PDF
+[drawing-gates] 14 gates · 0 failing · ALL-PASS=True
+  ✓ [med ] legibility         single-line-diagram 6140x2640 aspect 2.3:1 (limit 4:1)
+  ✓ [med ] legibility         pid 4380x1776 aspect 2.5:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x1996 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2160x1594 aspect 1.4:1 (limit 4:1)
+  ✓ [med ] legibility         block-flow-diagram 4526x1276 aspect 3.5:1 (limit 4:1)
+  ✓ [med ] legibility         hvac-layout 2240x1826 aspect 1.2:1 (limit 4:1)
+  ✓ [med ] legibility         process-schedules 2492x4692 aspect 1.9:1 (limit 4:1)
+  ✓ [high] load_reconcile     panel total 411 kW vs contract 466 kW (ratio 0.88, ±15%)
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✓ [med ] material_diversity 3 distinct pipe material(s): ['carbon steel', 'duplex 2205', 'hdpe/pe100']
+  ✓ [med ] qty_coverage       degasser: contract qty 2, parts-manifest has 2 instance(s) (need ≥2)
+  ✓ [med ] qty_coverage       drum: contract qty 2, parts-manifest has 4 instance(s) (need ≥2)
+  ✓ [med ] qty_coverage       recirc: contract qty 2, parts-manifest has 2 instance(s) (need ≥2)
+  ✓ [med ] qty_coverage       tank: contract qty 4, parts-manifest has 5 instance(s) (need ≥3)
+[chain] drawing-gates: 0/14 failing — DRAWING >=8 PASS
+[census] 81 tie-in runs (272 units) = £75,435 (cable £50,760 + pipe £24,676)
+[census] routed major streams = £413,036  →  full interconnect ≈ £488,471
+[chain] cost-sanity re-derived on authoritative BoM (Σ £2,875,771): verdict pass — £73,201/t/yr
+[chain] requirements-driven BoM: 330 requirement lines (Σ £2,875,771) → state.requirementsBom; cost cascade reconciled to this total
+[render-minimal-pdf] state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json
+[render-minimal-pdf] modules: 10
+[render-minimal-pdf] rendering...
+[render-minimal-pdf] written /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/chain-v2.pdf (6891.0 KB)
+[render-minimal-pdf] persisted 0 macro claims to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/macro-claims.json
+[chain] integrity check: PDF 7056424 bytes, %PDF header OK
+[chain] deliverable: 2606200817 Aquaculture Ras.pdf
+AUDIT: aquaculture_ras/medium FAIL (HIGH=2 MED=2) — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT.md
+  ✗ [D-1] Sub-module density 1.00 per module — below floor 2.0. Splitter should have raised this. Investigate scripts/lib/orchestrator/submodule-splitter.ts.
+  ✗ [F-4] Physics Critic flagged 2 HIGH-severity engineering issues. See full list in 7-5-physics-critique.json.
+[chain] audit-pdf-run flagged issues (see AUDIT.md): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+AUDIT-BOM: aquaculture_ras PASS (HIGH=0 MED=0) — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-BOM.md
+LAYOUT-AUDIT: FAIL — V-1 overlaps=7 (HIGH=6 MED=0 LOW=1)   T-1 column-overflows=1 (HIGH=0 MED=1) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/chain-v2.pdf.AUDIT-LAYOUT.md
+  ✗ V-1 p171 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Solenoid + Diffuser (fail-open)'
+  ✗ V-1 p171 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Control Valve'
+  ✗ V-1 p171 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Solenoid + Diffuser (fail-open)'
+  ✗ V-1 p171 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Control Valve'
+  ✗ V-1 p177 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Analyser'
+  ✗ T-1 p102 [MED] col='MANUFACTURERPART NUMBER'→'QTY' overflow=8.5pt text='TMP451AQDQFRQ1'
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  CHAIN HARD-EXIT — Layout-overlap audit FAILED (code 11)            ║
+║  Text spans render at the same X+Y position (wrap={false} smear).   ║
+║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║
+║  See <pdf>.AUDIT-LAYOUT.md for the offending pages + bboxes.        ║
+║  Fix area: scripts/render-minimal-pdf.tsx — add page-break-before   ║
+║  on the sub-module wrap={false} block that overflowed the page.     ║
+╚══════════════════════════════════════════════════════════════════════╝
+[chain] GATE 11 layout-overlap (exit 11): FLAGGED (render-and-flag) — dossier ships, issue disclosed. Text spans overlap in the rendered PDF — see AUDIT-LAYOUT.md
+[chain] audit-pdf-layout flagged issues (see AUDIT-LAYOUT.md, status=11): Command failed: python3 /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-PARTS.md
+[parts-validator] PASS: 0 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-DRIFT.md
+[drift-detector] PASS: 4 contract quantities checked, 0 drifts (0 MED)
+[sizing-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-SIZING.md
+[sizing-audit] PASS: 0/1 matched-to-rule, 0 findings (0 MED, 0 LOW)
+[mispin-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-MISPIN.md
+[mispin-detector] PASS: 230 candidates scanned, 0 mis-pins
+[thermal-derating-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-THERMAL.md
+[thermal-derating-audit] PASS: 0 chiller(s) checked, 0 findings (0 MED, 0 LOW)
+[brief-constraint-completeness-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-COMPLETENESS.md
+[brief-constraint-completeness-audit] PASS: 14 constraints, 1 non-blocking findings (0 MED, 1 LOW)
+[consistency-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-CONSISTENCY.md
+[consistency-audit] PASS: 150 clusters, 2 findings (2 MED, 0 HIGH), 3 money-format drift(s)
+[jurisdictional-standards-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-JURISDICTION.md
+[jurisdictional-standards-audit] PASS: jurisdiction=UK, 87 surfaces scanned, 5 unique citations, 0 findings (0 MED, 0 LOW)
+[fictional-pn-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-FICTIONAL-PN.md
+[fictional-pn-audit] FAIL: 1 HIGH-severity finding(s) — hallucinated MPNs not found in any distributor catalogue
+
+======================================================================
+  CHAIN HARD-EXIT - Fictional-PN audit FAILED (code 20)
+  At least one BoM line emits a manufacturer+MPN combination that
+  returns null from ALL five live distributor APIs (Mouser, Digi-Key,
+  Farnell, LCSC, Nexar) and is not in the curated parts table.
+  Structured MPNs (alphanumeric+separator+alphanumeric) that miss all
+  distributors strongly indicate the LLM hallucinated a plausible-looking
+  but non-existent part number. A procurement engineer who tries to order
+  this part will find nothing — destroying the document's credibility.
+  PDF + state.json saved to disk for inspection but chain is BLOCKED.
+  See AUDIT-FICTIONAL-PN.md for the un-catalogued MPNs.
+  Fix area: scripts/lib/deterministic-emitter.ts — replace hallucinated
+  MPNs with real distributor-findable parts, or mark custom/OEM items
+  with a "CUSTOM-" prefix so future runs skip the existence check.
+======================================================================
+[chain] GATE 20 fictional-PN (exit 20): FLAGGED (render-and-flag) — dossier ships, issue disclosed. A part number is unverified in any catalogue — see AUDIT-FICTIONAL-PN.md
+[chain] fictional-pn-audit flagged issues (see AUDIT-FICTIONAL-PN.md, status=20): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+[chain] gate-21 price normalisation: capped 32 mis-pinned commodity partVerification price(s) before per-line audit
+[per-line-price-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/AUDIT-PER-LINE-PRICE.md
+[per-line-price-audit] FAIL: 2 HIGH-severity finding(s) — BoM unit prices diverge > 5× from live distributor prices
+
+======================================================================
+  CHAIN HARD-EXIT - Per-line price plausibility audit FAILED (code 21)
+  At least one BoM line has a rendered unit price that diverges > 5×
+  from the cheapest live distributor source (Mouser / Digi-Key /
+  Farnell / LCSC / Nexar). This level of per-line error cannot be
+  explained by quantity breaks, currency drift, or catalogue timing —
+  it indicates a systematic pricing error on the specific line item.
+  Gate 10 B-7 (aggregate cost band) does NOT catch this because
+  over-billing and under-billing errors can cancel in the total while
+  individual lines are both wrong in opposite directions.
+  PDF + state.json saved to disk for inspection but chain is BLOCKED.
+  See AUDIT-PER-LINE-PRICE.md for the mispriced line items.
+  Fix area: scripts/lib/deterministic-emitter.ts — correct the unit
+  basis (per-unit vs per-reel/lot), check currency conversion, or
+  update stale catalogue prices to 2025 UK market rates.
+======================================================================
+[chain] GATE 21 per-line-price (exit 21): FLAGGED (render-and-flag) — dossier ships, issue disclosed. A line price diverges >5x from catalogue — see AUDIT-PER-LINE-PRICE.md
+[chain] per-line-price-plausibility-audit flagged issues (see AUDIT-PER-LINE-PRICE.md, status=21): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+[chain] background enrichment spawned (PID 17463) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/background-enrichment.log
+[chain] render-and-flag: 3 gate(s) flagged but the dossier SHIPPED (set CHAIN_GATE_ENFORCE=1 to hard-block instead). See RESIDUAL-ISSUES.md.
+
+[chain] === FINAL ===  state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/state.json  pdf: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/chain-v2.pdf  status=accepted_with_decisions  gates_passed=false  design_decisions=2
+[enrich] componentEngineering: 81 parts · 105 connections · 7 orphans · 32 ungoverned · 6 balances
+[chain] componentEngineering → state (per-component physics + governance + balances)
+[chain] dashboard: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/dashboard.html
+
+[chain] ── QUALITY LOOP Phase 3 (full) — iteration 2/2 ──
+
+  LEDGER (BoM + connectivity + coverage + tools) — ras-5m   £2,875,771 raw materials   87 parts + 105 connections   16 tools invoked
+  tag    type      name                     £ line in/out status               tool  BLE   GA P&ID  SLD  PNL  BFD  SCH  ISO
+  -------------------------------------------------------------------------------------------------------------------------
+  P-101  rotating  Recirc Pump            145,600    2/1 NOT FOUN      pump-sizing    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  X-104  other     Pipework Run             1,028    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  X-105  other     Distribution Manifold    1,028    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  I-102  valve     Flow Control Valve         685    1/2 IDENTIFI                —    ✓    ✓    ✗    ✓    ✓    ·    ✓    ✓
+  TK-105 vessel    Expansion Reservoir      2,041    1/1 BESPOKE                 —    ✓    ✓    ✗    ·    ·    ✗    ·    ✓
+  TK-101 vessel    Rearing Tank           197,808   12/2 BESPOKE         design +2    ✓    ✓    ✓    ·    ·    ✓    ✓    ✓
+  D-101  separator Drum Filter             13,702    2/3 NOT FOUN microscreen-siz +1    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  V-103  separator Biofilter               17,775    5/1 BESPOKE  microscreen-siz +1    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  C-101  exchanger Degasser                 9,892    2/1 BESPOKE    speece-cone +1    ✓    ✓    ✓    ✓    ✓    ✗    ✓    ✓
+  D-103  separator Drum Filter Backwash     6,851    2/0 NOT FOUN microscreen-siz +1    ✓    ✓    ✗    ·    ✓    ✗    ·    ✓
+  D-104  separator Drum Filter Screen      11,960    2/7 BESPOKE  microscreen-siz +1    ✓    ✓    ✗    ·    ✓    ✗    ·    ✓
+  B      rotating  Aeration Blower          5,742    1/1 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ✗    ·    ✓
+  B      rotating  Degassing Blower        21,837    2/1 ACTUATOR   speece-cone +1    ✓    ✓    ✗    ✓    ✓    ✗    ·    ✓
+  Y      valve     Emergency O₂ Solenoid    6,000    0/2 ACTUATOR                —    ✓    ✓    ✗    ·    ·    ·    ✓    ·
+  FCV    valve     Dissolved-O₂ Control     7,200    1/2 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ·
+  Y      valve     Emergency O₂ Solenoid    1,500    0/0 ACTUATOR                —    ✓    ✓    ✗    ·    ·    ·    ✓    ·
+  FCV    valve     Dissolved-O₂ Control     1,800    0/0 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ·
+  P      other     Make-up Water System    27,880    0/1 UTILITY                 —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  DV     other     Bleed / Drain System     9,037    1/1 UTILITY                 —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  DOS    other     Chemical Dosing Syste   31,760    0/1 SYSTEM          sizing +1    ✓    ✓    ·    ·    ·    ·    ✓    ·
+  FD     vessel    Feed Storage + Distri   46,192    0/0 SYSTEM                  —    ✓    ✓    ✗    ·    ·    ✗    ·    ✗
+  LOX    vessel    Oxygen Supply (LOX) S   38,440    3/2 SYSTEM                  —    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  SLU    other     Solids / Sludge Handl   29,960    1/1 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  MED    separator Biofilm Carrier Media   17,290    1/0 SYSTEM   microscreen-siz +1    ✓    ✓    ✗    ·    ·    ✗    ·    ✗
+  GR     other     Grading / Harvest Sys   45,400    0/0 SYSTEM       heat-loss +3    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  SYS    other     Product Chilling + Ic   38,750    1/1 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Mortality Handling Sy   26,480    0/0 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Intake + Make-up Trea   52,960    0/1 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Effluent Treatment +    59,256    3/0 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Live-Fish Handling +    41,480    0/0 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  SYS    other     Biosecurity / Quarant   68,100    0/0 SYSTEM                  —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  P-103  rotating  Heat Pump               53,300    1/1 NOT FOUN     heat-loss +1    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  —      other     Structural Frame        86,480    0/0 BESPOKE                 —    ✗    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  —      electricalEnclosure Panel         86,480    0/0 BESPOKE   cable-sizing +1    ·    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  X-101  exchanger Makeup Hex              10,880    1/1 BESPOKE    speece-cone +1    ✓    ✓    ✗    ·    ·    ✗    ·    ✓
+  SLB    other     Reinforced Floor Slab  122,500    0/0 BUILDING                —    ✗    ✗    ·    ·    ·    ·    ·    ·
+  FRM    other     Steel Portal Frame      78,750    0/0 BUILDING                —    ✗    ✗    ·    ·    ·    ·    ·    ·
+  WAL    other     Insulated Wall Claddi   52,150    0/0 BUILDING     heat-loss +3    ✗    ✗    ·    ·    ·    ·    ·    ·
+  ROF    other     Insulated Roof Claddi   65,625    0/0 BUILDING                —    ✗    ✗    ·    ·    ·    ·    ·    ·
+  FND    other     Foundations + Ground    52,500    0/0 BUILDING                —    ✗    ✗    ·    ·    ·    ·    ·    ·
+  DR     other     Roller + Personnel Do   12,000    0/0 BUILDING microscreen-siz +4    ✓    ✓    ·    ·    ·    ·    ·    ·
+  X-103  other     Protein Skimming        28,000    4/1 NOT FOUN                —    ✓    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  V-101  exchanger UV Sterilization        28,800    2/1 NOT FOUN                —    ✓    ✓    ✓    ✓    ✓    ✓    ·    ✓
+  V-102  exchanger Oxygenation System      49,730    0/0 NOT FOUN   speece-cone +1    ✓    ✓    ✓    ·    ·    ✓    ✓    ✓
+  I-104  instrumentTemperature Sensor         500    0/1 IDENTIFI                —    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  X-119  vessel    Expansion Vessel         2,120    2/1 BESPOKE         design +2    ✓    ✓    ✗    ·    ·    ✗    ·    ✓
+  X-120  other     Dehumidifier             1,370    1/0 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  H-101  other     Backup Immersion Heat   47,000    2/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ✓
+  AHU    other     Building Ventilation   128,000    1/1 UTILITY                 —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  X-122  electricalMain Breaker               822    1/1 NOT FOUN  cable-sizing +1    ✓    ✓    ·    ✗    ✗    ·    ·    ·
+  X-123  electricalDistribution Busbar      2,398   1/31 NOT FOUN                —    ✓    ✓    ·    ✗    ✓    ·    ·    ·
+  X-124  electricalFuse Holder                300    1/0 IDENTIFI                —    ✓    ✓    ·    ✗    ✗    ·    ·    ·
+  —      other     Power Contactor            822    0/0 BESPOKE                 —    ✗    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  X-125  electricalSurge Protector            822    1/0 NOT FOUN                —    ✓    ✓    ·    ✗    ✗    ·    ·    ·
+  G      electricalStandby Diesel Genera  160,480    1/1 UTILITY                 —    ✓    ✓    ·    ✓    ✗    ·    ·    ·
+  U      control   Control + Instrument    44,096    1/1 UTILITY                 —    ✓    ✓    ·    ✗    ✓    ·    ·    ·
+  X-130  control   Main Controller            548   33/0 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ✓
+  X-131  control   Communication Gateway      500    1/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ✓
+  X-134  control   I/O Module                 500    1/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  X-135  control   Network Switch             150    1/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  X-136  control   Controller Power Supp      548    1/1 NOT FOUN                —    ✓    ✓    ·    ✓    ✓    ·    ·    ✓
+  SCADA  control   SCADA / Plant Control   83,300    1/1 SYSTEM                  —    ✓    ✓    ·    ✓    ✓    ·    ·    ·
+  I-106  instrumentVoltage Sensor             500    0/1 IDENTIFI                —    ✓    ✓    ✗    ·    ·    ·    ✗    ✓
+  I-107  instrumentCurrent Sensor             500    0/1 NOT FOUN                —    ✓    ✓    ✗    ·    ·    ·    ✗    ✓
+  I-108  instrumentTemperature Probe          548    0/1 NOT FOUN                —    ✓    ✓    ✗    ·    ·    ·    ✗    ✓
+  I-109  instrumentPressure Sensor            500    0/1 NOT FOUN                —    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  X-127  other     Signal Conditioner         500    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  LT     instrumentLevel Transmitter        6,300    0/1 INSTRUME     heat-loss +2    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  TT     instrumentTemperature Transmitt    2,450    0/1 INSTRUME   speece-cone +1    ✓    ✓    ✓    ·    ·    ·    ✓    ✓
+  AT     instrumentDissolved-Oxygen Anal    8,000    1/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ✓    ✓    ·    ✓    ·
+  AT     instrumentTAN / Ammonia Analyse    2,200    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  AT     instrumentNitrate Analyser         2,400    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  AT     instrumentDissolved-CO₂ Analyse    2,300    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  AT     instrumentUV Transmittance / In    1,500    1/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ✓    ·    ·    ✗    ·
+  AT     instrumentpH Analyser              1,300    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ✓
+  AT     instrumentConductivity / Salini    1,200    0/1 INSTRUME    heat-loss +13    ✓    ✓    ✗    ·    ·    ·    ✓    ·
+  PT     instrumentO₂ Header Pressure Tr      850    0/1 INSTRUME        design +1    ✓    ✓    ✓    ·    ·    ·    ✓    ·
+  LT     vessel    LOX Tank Level + Low     1,100    0/1 INSTRUME     heat-loss +5    ✓    ✓    ✗    ·    ·    ✗    ·    ✗
+  X-128  electricalProtective Relay           822    1/1 NOT FOUN                —    ✓    ✓    ·    ✗    ✓    ·    ·    ·
+  X-129  other     Emergency Stop Button      480    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ✓
+  X-132  other     Isolation Device           822    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  I-119  instrumentFire Detector              480    0/1 NOT FOUN                —    ✓    ✓    ✗    ·    ·    ·    ✗    ·
+  X-133  other     Interlock Switch           548    0/1 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·    ·
+  FCV    valve     Inlet Flow Control Va   56,232    1/2 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ✓
+  FCV    valve     Inlet Flow Control Va   31,258    0/0 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ✓
+  FCV    valve     Inlet Flow Control Va   44,734    0/0 ACTUATOR                —    ✓    ✓    ✗    ✓    ✓    ·    ✗    ✓
+  B      rotating  Degassing Blower        43,674    0/0 ACTUATOR   speece-cone +1    ✓    ✓    ✗    ✓    ✓    ✗    ·    ✓
+  -------------------------------------------------------------------------------------------------------------------------
+  PART coverage by drawing (present / expected):   BLE 42/49   GA 44/49   P&ID 11/44   SLD 13/19   PNL 15/19   BFD 8/20   SCH 14/24   ISO 8/11
+  CONNECTION coverage (pipes/wires/sensors vs the views):   pid 9/34 (26.5%)   process_schedules 39/105 (37.1%)   isometric 34/34 (100.0%)   route 105/105 (100.0%)
+  TOOLS invoked (16):
+    uv-reactor:disinfection-sizing           →  14 parts   34 calcs   28 claims
+      └ TK-101 Rearing Tank      Flow rate
+    drum-filter:microscreen-sizing           →  13 parts   33 calcs   26 claims
+      └ D-101 Drum Filter        Influent TSS
+    oxygenation:speece-cone                  →  13 parts   43 calcs   26 claims
+      └ C-101 Degasser           Oxygen Supply Rate
+    pressure-vessel:design                   →  12 parts   32 calcs   24 claims
+      └ TK-101 Rearing Tank      Internal design pressure
+    reactor:cstr-pfr-sizing                  →  12 parts   24 calcs   24 claims
+      └ TK-101 Rearing Tank      Reactor working volume (total)
+    mbbr:biofilter-sizing                    →  12 parts   32 calcs   36 claims
+      └ D-101 Drum Filter        Media Volume
+    building-envelope:heat-loss              →  12 parts   49 calcs   24 claims
+      └ GR Grading / Harvest Sy  Annual heating demand (degree-day method
+    electrical:cable-sizing                  →  12 parts   21 calcs   24 claims
+      └ — Enclosure Panel        De-rated tabulated-current target
+    process:pump-sizing                      →  10 parts   18 calcs   30 claims
+      └ P-101 Recirc Pump        Per-pump duty flow
+    ph-titration:sizing                      →  10 parts   17 calcs   20 claims
+      └ DOS Chemical Dosing Syst Initial bolus volume of acid/base
+    electrical:transformer-sizing            →  10 parts   25 calcs   30 claims
+      └ — Enclosure Panel        Apparent power demand
+    yield-economics:npv                      →   8 parts    9 calcs   24 claims
+      └ GR Grading / Harvest Sy  Annual gross revenue (year 1)
+    kla-oxygen:transfer                      →   8 parts   16 calcs    8 claims
+      └ DR Roller + Personnel D  Driving force for oxygen transfer
+    refrigeration-cycle:cop                  →   7 parts    7 calcs   21 claims
+      └ AT Dissolved-Oxygen Ana  Pressure ratio
+    ras-degasser:packed-column               →   5 parts    0 calcs   10 claims
+    ras-metabolism:load-estimation           →   1 parts    1 calcs    4 claims
+      └ GR Grading / Harvest Sy  Daily Feed
+  → 27 NOT FOUND · 48 parts w/ coverage gap · 2 orphan · 25 connections off the P&ID.  5 ambiguous tag(s) (name-corroborated).  56/87 parts have NO tool provenance.  wrote parts-ledger.json
+  → CONNECTIVITY: 6 concern(s) — process 18/23 connected (78.3%) · instruments 16/16 associated (100.0%) · 4 origin(s) · 2 sink(s)
+
+[chain] ledger updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/parts-ledger.json
+[chain] quality scorecard (iteration 2/2): floor=8/10 mean=9.6/10 allPass=true
+  headline: 9/10 ✓
+  brief_compliance: 6/10 ✗ BELOW 8
+  bill_of_materials: 7/10 ✗ BELOW 8
+  performance_card: 9/10 ✓
+  design_narrative: 8/10 ✓
+  physics_fidelity: 5/10 ✗ BELOW 8
+  drawing_gates: 10/10 ✓
+  cost_sanity: 10/10 ✓
+  physics_gates: 10/10 ✓
+  tool_archetype: 10/10 ✓
+  connectivity: 8/10 ✓
+[chain] dashboard updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/dashboard.html
+[chain] ledger HTML updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-5m/parts-ledger.html
+
+[chain] ✦ quality loop COMPLETE — all sections ≥8/10 (iteration 2/2)

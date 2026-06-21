@@ -1,0 +1,40 @@
+[audit-tools] auditing 182 tool(s) at concurrency 4 via google/gemini-3.1-pro-preview. NOTE: shares OpenRouter rate limits with any in-progress chain run — will back off + drop to concurrency 2 on a 429.
+[audit-tools] (1/182, 20s, $0.04) FAIL acoustic-modem:link-budget — out-of-range: 2/2 case(s) failed; first: "ber_estimate" = 0.5 is OUT OF RANGE [1e-9, 0.1] [case: Medium range (5km) acoustic link at 12 kHz using PSK modulation]
+[audit-tools] (2/182, 37s, $0.06) PASS aerosandbox:airfoil-analysis (2/2 cases)
+[audit-tools] (3/182, 46s, $0.14) PASS aeroelastic-flutter:wing (2/2 cases)
+[audit-tools] (4/182, 47s, $0.22) FAIL absorption:column-htu-ntu — crash: 1/2 case(s) failed; first: non-zero exit 3 [case: Typical stripping column (e.g., VOC removal from wastewater using steam/air)] | tool message: ValueError: y_in
+[audit-tools] (5/182, 56s, $0.32) FAIL aero:balloon-buoyancy — out-of-range: 2/2 case(s) failed; first: "total_mass_kg" = 2 is OUT OF RANGE [2.1, 2.6] [case: Small weather balloon with Helium]
+[audit-tools] (6/182, 58s, $0.36) PASS agitation:power (2/2 cases)
+[audit-tools] (7/182, 66s, $0.39) PASS ambiance:isa-atmosphere (3/3 cases)
+[audit-tools] (8/182, 69s, $0.43) FAIL airframe-fea:landing — tool-error: 2/2 case(s) failed; first: tool returned error field: Unknown material 'carbon_fiber'. Available: ['aluminium_6061_t6', 'aluminium_2024_t3', 'aluminium_7075_t6'
+[audit-tools] (9/182, 81s, $0.46) FAIL arc-flash:ieee-1584 — out-of-range: 2/2 case(s) failed; first: "var_cf" = 0.2465 is OUT OF RANGE [0.5, 2] [case: Low voltage (480V) panelboard with vertical conductors in a box, typical 30kA fault
+[audit-tools] (10/182, 82s, $0.51) PASS antenna:reflector-surface-rms (2/2 cases)
+[audit-tools] (11/182, 100s, $0.55) PASS bagging:throughput-sizing (2/2 cases)
+[audit-tools] (12/182, 101s, $0.61) FAIL attitude:disturbance-torque — crash: 2/2 case(s) failed; first: non-zero exit 3 [case: LEO 3U CubeSat at 400km altitude, dominated by aerodynamic and gravity gradient torques] | tool message: compu
+[audit-tools] (13/182, 102s, $0.65) PASS auv-hydro:drag-buoyancy (2/2 cases)
+[audit-tools] (14/182, 112s, $0.71) FAIL battery-c-rate-thermal:check — out-of-range: 1/2 case(s) failed; first: "cell_mass_kg" = 0.08 is OUT OF RANGE [0.5, 1.5] [case: eVTOL cruise battery with liquid cooling, high capacity, moderate C-rate, lon
+[audit-tools] (15/182, 132s, $0.75) FAIL battery-eclipse:cycle — out-of-range: 2/2 case(s) failed; first: "cycles_available_at_dod" = 5558 is OUT OF RANGE [10000, 200000] [case: Low Earth Orbit (LEO) satellite with high cycle count and low
+[audit-tools] (16/182, 133s, $0.78) FAIL bemt-propeller:thrust — out-of-range: 2/2 case(s) failed; first: "torque_nm" = 0.0568 is OUT OF RANGE [0.005, 0.05] [case: Small FPV drone propeller at sea level, high RPM, moderate airspeed]
+[audit-tools] (17/182, 143s, $0.84) FAIL battery-li-s:cell-sizing — out-of-range: 2/2 case(s) failed; first: "cell_count_for_energy" = 1401 is OUT OF RANGE [1100, 1300] [case: Aerospace HAPS/drone application with lightweight 20Ah Li-S cells 
+[audit-tools] (18/182, 148s, $0.86) PASS biocompatibility:iso-10993 (2/2 cases)
+[audit-tools] (19/182, 149s, $0.92) FAIL beamforming-codebook:dft-hybrid — out-of-range: 2/2 case(s) failed; first: "n_independent_beams" = 113 is OUT OF RANGE [63, 65] [case: 28 GHz 64-element array with 60 degree scan angle]
+[audit-tools] (20/182, 185s, $0.96) PASS biosteam:fermentation-stoich (2/2 cases)
+[audit-tools] (21/182, 185s, $0.98) FAIL bvlos-part23:certification — out-of-range: 2/2 case(s) failed; first: "cost_estimate_gbp" = 60000000 is OUT OF RANGE [1000000, 15000000] [case: Small remotely piloted cargo drone for BVLOS operations]
+[audit-tools] (22/182, 185s, $1.03) FAIL blood-pump:sizing — out-of-range: 2/2 case(s) failed; first: "exposure_time_s" = 1.283 is OUT OF RANGE [0.01, 1] [case: Adult Cardiopulmonary Bypass (CPB) roller pump with 3/8 inch tubing]
+[audit-tools] (23/182, 186s, $1.08) FAIL building-envelope:heat-loss — out-of-range: 1/2 case(s) failed; first: "recommended_heat_pump_kw" = 35 is OUT OF RANGE [45, 65] [case: Large older poorly-insulated building, 400m2 floor area]
+[audit-tools] (24/182, 205s, $1.11) FAIL cable:ampacity — out-of-range: 1/2 case(s) failed; first: "csa_mm2" = 95 is OUT OF RANGE [150, 400] [case: Large duty three-phase equivalent, aluminum cable in tray, longer run with higher am
+[audit-tools] (25/182, 206s, $1.14) FAIL cantera:thermochemistry — crash: 2/2 case(s) failed; first: non-zero exit 3 [case: Constant enthalpy and pressure (HP) equilibrium for stoichiometric methane-air mixture, checking adiabatic fla
+[audit-tools] (26/182, 206s, $1.18) FAIL cable:thermal-rating — out-of-range: 2/2 case(s) failed; first: "cable_outer_diameter_mm" = 8.92 is OUT OF RANGE [10, 30] [case: Standard AC EV charging cable (32A) with natural convection cooling]
+[audit-tools] (27/182, 218s, $1.21) PASS ccs-protocol:compliance (2/2 cases)
+[audit-tools] (28/182, 224s, $1.27) FAIL calibration-imperfection:phase-gain — out-of-range: 2/2 case(s) failed; first: "calibration_yield_pct" = 68 is OUT OF RANGE [80, 100] [case: Large array with uniform taper and tight calibration tolerances]
+[audit-tools] (29/182, 225s, $1.30) FAIL ceramic-electrolyte:conductivity — out-of-range: 2/2 case(s) failed; first: "ionic_conductivity_s_cm" = 7.051e-8 is OUT OF RANGE [0.00001, 0.002] [case: LLZO solid electrolyte at room temperature with low grai
+[audit-tools] (30/182, 232s, $1.33) FAIL cell-balance:model — tool-error: 2/2 case(s) failed; first: tool returned error field: Unknown balancing_type. Use one of ['passive_shunt', 'active_capacitor', 'active_inductor', 'active_transf
+[audit-tools] (31/182, 242s, $1.37) FAIL chemical-propulsion:sizing — crash: 2/2 case(s) failed; first: non-zero exit 3 [case: Small satellite monopropellant sizing for station keeping or minor orbit adjustments] | tool message: compute 
+[audit-tools] (32/182, 246s, $1.42) FAIL clean-in-place:cip — tool-error: 2/2 case(s) failed; first: tool returned error field: Unknown soil type. Available: ['cell_debris', 'protein_fouling', 'biofilm', 'yeast_residue', 'mineral_scal
+[audit-tools] (33/182, 258s, $1.46) FAIL co2-enrichment:sizing — out-of-range: 2/2 case(s) failed; first: "daily_infiltration_kg" = 2.57 is OUT OF RANGE [0.9, 2] [case: Small indoor grow room with tight envelope and high target CO2 concent
+[audit-tools] (34/182, 264s, $1.52) FAIL coherent-optical-receiver:dpsk-qpsk — out-of-range: 1/2 case(s) failed; first: "photons_for_ber_1e_9" = 21 is OUT OF RANGE [8, 12] [case: 100 Gbps QPSK coherent receiver at 1550 nm]
+[audit-tools] (35/182, 274s, $1.57) FAIL cold-gas-thruster:sizing — crash: 2/2 case(s) failed; first: non-zero exit 3 [case: Small CubeSat/NanoSat cold gas system using Nitrogen for attitude control] | tool message: compute failed: Val
+[audit-tools] (36/182, 280s, $1.62) PASS control-systems:pid-tuning (2/2 cases)
+[audit-tools] (37/182, 286s, $1.66) FAIL coolprop:refrigerant-properties — crash: 2/2 case(s) failed; first: non-zero exit 3 [case: Typical evaporator conditions for R134a in a chiller or medium-temp refrigeration system] | tool message: comp
+[audit-tools] (38/182, 293s, $1.69) FAIL cryocooler:sizing — crash: 1/2 case(s) failed; first: non-zero exit 3 [case: 4K Gifford-McMahon cryocooler for superconducting magnet or low-temp physics applications] | tool message: com
+[audit-tools] (39/182, 294s, $1.74) FAIL corrosion:anode-sizing — out-of-range: 2/2 case(s) failed; first: "driving_voltage_v" = -1.05 is OUT OF RANGE [0.15, 0.4] [case: Small vessel with zinc anodes for a 5-year mission life in typical sea

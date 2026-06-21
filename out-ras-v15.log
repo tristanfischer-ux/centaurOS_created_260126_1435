@@ -1,0 +1,1068 @@
+[chain] brief: /tmp/ras-final-brief.md (6447 chars)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 6447 chars
+[brief-parse] OK — confidence=HIGH, missing=5 fields, metrics=9
+[chain] classification: aquaculture_ras (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 16.2s)
+[chain] U5 brief augmentation: U5 augmentation (class: aquaculture_ras): 2 HARD field(s) filled with class-aware inferred values, 2 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, operating_environment. Removed from missing_mandatory_fields: target_material, design_life.
+  [U5] filled "target_material": "316/316L stainless-steel process fabrication; products: calcium carbonate + oxygen + ammonia" (Material/products inferred from brief text for aquaculture_ras. class-agnostic inference from brief text for unmapped cl)
+  [U5] filled "design_life": "20–25 yr (chemical-process-plant design life; static process equipment + pressure vessels per PED / ASME VIII; periodic re-inspection)" (Industry-standard service life for aquaculture_ras per applicable design standard. class-agnostic inference from brief t)
+  [U5] still null after augmentation: max_mass_kg, operating_environment
+[chain] U6 brief expansion: 12 duties derived; product="Yellowtail Kingfish (Seriola lalandi) - 3.4 kg sashimi-grade" (model=google/gemini-3.1-pro-preview, cost_usd=0.068084)
+  [U6] production_capacity_tpy = 204 t/yr [stated/high] — Reference full-scale commercial unit target stated in brief.
+  [U6] total_rearing_tank_volume_m3 = 3340 m3 [stated/high] — Reference total rearing-tank volume stated in brief.
+  [U6] max_standing_biomass_kg = 200400 kg [derived/high] — Total rearing volume (3340 m3) multiplied by harvest stocking density (60 kg/m3).
+  [U6] recirculation_flow_rate_m3_h = 13360 m3/h [derived/high] — Total rearing volume (3340 m3) multiplied by water turnover rate (4 hr-1).
+  [U6] makeup_water_flow_rate_m3_h = 53.44 m3/h [derived/high] — 0.4% of the main recirculation flow rate (13360 m3/h * 0.004). Well within the 124 m3/h si
+  [U6] average_daily_feed_load_kg_d = 765.7 kg/d [derived/medium] — Annual production (204,000 kg) * FCR (1.37) / 365 days.
+  [U6] oxygen_consumption_rate_kg_d = 382.85 kg/d [derived/high] — Average daily feed load (765.7 kg/d) * provision factor (0.5 kg O2 / kg feed).
+  [U6] tan_production_rate_kg_d = 22.97 kg/d [derived/medium] — Standard marine RAS rule of thumb: ~3% of feed load becomes TAN (765.7 kg/d * 0.03).
+  [U6] alkalinity_dosing_rate_kg_d = 163.1 kg/d [derived/high] — TAN load (22.97 kg/d) * consumption ratio (7.1 g CaCO3 / g TAN).
+  [U6] makeup_water_heating_duty_kw = 1144 kW [derived/high] — m*Cp*dT: 53.44 m3/h (14.84 kg/s) * 4.187 kJ/kgK * (26.4C - 8C worst-case borehole temp). R
+  [U6] microscreen_filtration_capacity_m3_h = 13360 m3/h [derived/high] — Must process 100% of the recirculation flow immediately on tank exit.
+  [U6] co2_stripping_duty_kg_d = 382.85 kg/d [derived/medium] — Approximately 1:1 mass ratio with oxygen consumption in marine teleosts (~1.37 molar ratio
+[chain] engineering_contract: 79 quantities, 8 topology edges, 0 macro-assemblies (total £0), closures: 4 pass / 1 warn / 0 fail
+[specs-writeback] web search: aquaculture_ras aquaculture_ras heat_pump_source — 1434ms
+[specs-writeback] {"spec_key":"heat_pump_source","part_number":"aquaculture_ras","hit":"miss","latency_ms":3224}
+[standards-writeback] {"standard_name":"BS EN 62477-1","hit":"db","latency_ms":6}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":632}
+[standards-writeback] {"standard_name":"G99","hit":"db_hybrid","latency_ms":544}
+[products-writeback] {"product_name":"204 t/yr land-based marine Recirculating Aquaculture System (RAS) for yellowtail kingfish (Seriola lalandi), 200 g → 3.4 kg over 360 days at FCR 1.37. 3340 m³ total rearing-tank volume across 10 circu","hit":"db_hybrid","matched":"204 t/yr land-based marine Recirculating Aquaculture System (RAS) for yellowtail kingfish (Seriola lalandi), 200 g → 3.4 kg over 360 days at FCR 1.37. 3340 m³ total rearing-tank volume across 10 circu","has_modules":true,"used_embedding":true,"candidates":1,"latency_ms":223}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=uk
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: aquaculture_ras
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 11959 chars. First 200: {
+  "market_context": "The global land-based recirculating aquaculture system (RAS) market is projected to experience significant growth, driven by consumer demand for sustainable, traceable seafood a
+[research-synthesis] Complete: 4 competitors, 5 sources, 9 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for aquaculture_ras: replaying 6 stored duty spec(s) (ras-metabolism:load-estimation, mbbr:biofilter-sizing, drum-filter:microscreen-sizing, ras-degasser:packed-column, oxygenation:speece-cone, uv-reactor:disinfection-sizing) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool ras-metabolism:load-estimation (duty_hash=90398d51183a, db id=18) — no LLM call.
+[tool-generator] REUSED stored generated tool mbbr:biofilter-sizing (duty_hash=7101428c2960, db id=19) — no LLM call.
+[tool-generator] REUSED stored generated tool drum-filter:microscreen-sizing (duty_hash=e2ec5ba8ae37, db id=20) — no LLM call.
+[tool-generator] REUSED stored generated tool ras-degasser:packed-column (duty_hash=27646e94f9e0, db id=21) — no LLM call.
+[tool-generator] REUSED stored generated tool oxygenation:speece-cone (duty_hash=884455b1bc52, db id=22) — no LLM call.
+[tool-generator] REUSED stored generated tool uv-reactor:disinfection-sizing (duty_hash=71cd66aec232, db id=23) — no LLM call.
+[tool-creation] DONE for aquaculture_ras: created 6 self-test-passed tool(s) (ras-metabolism:load-estimation, mbbr:biofilter-sizing, drum-filter:microscreen-sizing, ras-degasser:packed-column, oxygenation:speece-cone, uv-reactor:disinfection-sizing), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for aquaculture_ras: created+registered 6 self-test-passed tool(s) [ras-metabolism:load-estimation, mbbr:biofilter-sizing, drum-filter:microscreen-sizing, ras-degasser:packed-column, oxygenation:speece-cone, uv-reactor:disinfection-sizing]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] COVERAGE GATE (brief-named units, reuse) for slug=aquaculture_ras:
+    ✓ drum/microscreen filter → drum-filter:microscreen-sizing
+    ✓ biofilter (MBBR/biological) → mbbr:biofilter-sizing
+    ✓ CO2 degasser / stripping column → ras-degasser:packed-column
+    ✓ oxygenation (cones / pure O2) → kla-oxygen:transfer
+    ✓ heat pump / thermal hold → building-envelope:heat-loss
+    ✓ recirculation / process pumps → process:pump-sizing
+    ✓ electrical distribution → electrical:cable-sizing
+[bootstrap-tool-plan] REUSING stored candidate slug=aquaculture_ras version=1 status=candidate (no LLM call; 24 steps, 24 tool_ids, coverage_gaps=0)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for aquaculture_ras/medium — bootstrapped a 24-step tool plan (candidate id=28 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: building-envelope:heat-loss, control-systems:pid-tuning, cybersecurity-threat-model:stride, electrical:cable-sizing, electrical:transformer-sizing, kla-oxygen:transfer, ph-titration:sizing, process:pump-sizing, fluids:pipe-sizing, ras-metabolism:load-estimation, drum-filter:microscreen-sizing, mbbr:biofilter-sizing, oxygenation:speece-cone, pressure-vessel:design, ras-degasser:packed-column, reactor:cstr-pfr-sizing, mass-aggregator:envelope-check, refrigeration-cycle:cop, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, transport-logistics:routing, uv-reactor:disinfection-sizing, yield-economics:npv
+[bootstrap-tool-plan] SEED-PROTECTED mass-aggregator:envelope-check: kept the first-principles contract value(s) for [total_system_mass_kg(seed=94000 vs tool=349033.3)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[class-reference-graph-db] {"product_class":"aquaculture_ras","resolved_to":"aquaculture_ras","hit":"db","nodes":10,"edges":26}
+[generic-emitter] physics-derived equipment: 10 word(s) sized from the contract; 11 principal item(s) synthesised (rearing_tank, drum_filter, biofilter, degasser, uv_reactor, makeup_hex, dehumidifier, backup_immersion_heater, drum_filter_backwash, drum_filter_screen, degasser_column).
+[chain] Orchestrator: 10 modules, 10 sub-modules, 255 words, 19 tools ran (5186ms)
+[chain] Build #18k: toolOutputsBlock built (19 tools, 12180 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 16 component_classes covered (16 with match, 0 empty), 12055 chars (31833ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=5000000, target_performance_value=204 (tpy)
+[chain] keyMetrics seeded early (pre-reviewer): Production Capacity Tpy=204 tpy
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=6/10 plaus=5/10 coh=7/10 part=5/10 hon=8/10 (38445ms)
+[chain] PHASE 4 skeleton critic: 2 HIGH-severity issues found before any LLM painting
+  ✗ [brief_to_design_fidelity @ mass_fluid_transport_process/sub_modules[0]/words[58]] The biofilter flow rate is rated at 1,330 m³/h, which is only 10% of the required main recirculation flow rate of 13,360 m³/h (derived from 3,340 m³ rearing volume * 4 hr-1 turnove
+  ✗ [engineering_plausibility @ mass_fluid_transport_process/sub_modules[0]/words[58] and words[81]] The design specifies 1 Biofilter tank of 92 m³ capacity and 92 m³ of MBBR media. This represents a 100% media fill fraction. In moving-bed biofilm reactors (MBBR), the media must b
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 9841 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 12 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 8 / 12 patches (skipped 4)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word manufacturer="Xylem" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word part_number="e-LNE 150-200/2200" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word material="cast iron casing, 316SS impeller" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word rating_primary="94 kW" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word regulatory="ISO 9906, CE" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_word (+7 modifiers)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.biofilter_synth_word quantity="×2" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.biofilter_synth_word manufacturer="Veolia Water Technologies" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 15.5s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":918}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=6/10 phys=7/10 coh=4/10 part=3/10 hon=8/10 (43016ms)
+[chain] critic headline: The design successfully sizes rearing volumes and filtration capacities to the brief, but suffers from a truncated payload, a major biofilter flow bottleneck, and an oversized quarantine system.
+[chain] critic issues: 3 high, 1 med, 5 total
+  ✗ [high/high] brief_to_design_fidelity @ modules[0].sub_modules[0].words[55]: The Biofilter is rated at 1,330 m³/h primary flow capacity, but the main recirculation flow rate derived from the brief (3,340 m³ volume * 4 turnovers/hr) is 13
+  ✗ [high/high] brief_to_design_fidelity @ modules[0].sub_modules[0].words[139]: The quarantine/nursery RAS skid is rated at 200 t biomass primary capacity. This is identical to the maximum standing biomass of the entire grow-out system (200
+  ✗ [high/high] internal_coherence @ modules[4]: The design JSON is truncated and ends abruptly inside the environmental_interface module. This leaves the module incomplete and prevents verification of the hea
+  ✗ [med/high] internal_coherence @ modules[0].sub_modules[0].words[67] and words[103]: There is a quantity and naming mismatch for the degassing equipment. There are 8 units of 'Degasser' (principal equipment, word 67) with 8x assembly components,
+
+[chain] STEP 7.5b: physics-critic PHASE-2 AUTO-CORRECT (SHADOW — records would-be corrections, does NOT mutate the design)
+[chain] physics auto-correct (shadow): selected 1 blocking finding(s) → corrected 1, declined 0, unlocatable 0, still-uncorrectable 0 after 1 pass(es)
+  • [corrected] undersized-vs-load @ sensing_instrumentation/sub_modules[0]/words[15] (part-token): {rating_primary=0–5 mg/L TAN, price_estimate_gbp=2200, form=Ion-selective ammonium (TAN) analyser on Biofilter — the primary nitrification-control measurement; 4–20 mA to the make-up / feed-rate and biofilter supervision, part_number=TBD (field instrument — catalogue class)} → {rating_primary=0.02–2.00 mg/L NH4-N, price_estimate_gbp=2200, form=High-precision colorimetric ammonium (TAN) analyser for monitoring high-efficiency single-pass biofilter performance, part_number=LPV441.99.10010, manufacturer=Hach, list_price_gbp=11500}
+[chain] physics-critic enforcement (shadow): 1 BLOCKING known-failure fault(s) — a part the engine knows will fail:
+  ✗ [undersized-vs-load/high] @ modules[0].sub_modules[0].words[55]: The Biofilter is rated at 1,330 m³/h primary flow capacity, but the main recirculation flow rate derived from the brief (3,340 m³ volume * 4 turnovers/hr) is 13,360 m³/h. A biofilter capacity of 1,330…
+[chain] task-41 fidelity gates: Critic flagged 2 module(s) for brief_fidelity structural adds: modules[0].sub_modules[0].words[55], modules[0].sub_modules[0].words[139]
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 14650 chars
+[chain] STEP 8: R4 Flash-Lite review returned 17 patches
+[chain] STEP 8: R4 Flash-Lite review applied 9 / 17 patches (skipped 8)
+    =mass_fluid_transport_process.overview_paragraph_en (prose)
+    =structure_containment.overview_paragraph_en (prose)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__circulation_pump.circulation_pump_xylem_elne: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word water_treatment_system.water_treatment_system__mechanical_filtration.uv_reactor_wedeco_bx3000e: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word power_distribution.power_distribution__main_breaker.main_transformer_abb_dry: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [structure-locked] add_sub_module safety_protection.safety_protection__gas_monitoring: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "safety_protection" (2 flagged module(s): modules[0].sub_modules[0].words[55], modules[0].sub_modules[0].words[139])
+    REJECT [structure-locked] add_sub_module maintenance_serviceability.maintenance_serviceability__lifting_equipment: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "maintenance_serviceability" (2 flagged module(s): modules[0].sub_modules[0].words[55], modules[0].sub_modules[0].words[139])
+    skip add_grammar_link: to_sub_module "water_treatment_system__uv_sterilization" not in water_treatment_system
+[chain] STEP 8: R4 Flash-Lite review done in 16.2s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1179}
+[chain] canonical product_class OVERRIDE: "" → "aquaculture_ras" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "aquaculture_ras" — skipping
+[chain] physics repair: 0 iter(s); HIGH 3→3; plausibility 7→7; patches 0
+[chain] modifier dedup: collapsed 1 cosmetic-dupe modifier(s) across 1 component(s)
+[chain] sub-module prose pre-fill: rewrote 9/10 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 110 entries (KPA=110, emitter=0, rag=0)
+[emitter-completion] 1 gap sub_module(s) for class "aquaculture_ras" — DB-first → generate → write-back
+[emitter-completion]      ↳ wrote back Southco to pretraining_extracted_parts
+[emitter-completion]   ✓ GEN  maintenance_serviceability::maintenance_serviceability__access_panel → Southco [MPN deferred; LLM suggested "E5-9-315-UU1" stored in DB]
+[emitter-completion] filled 1 gap(s): 0 DB-first, 1 generated.
+[chain] emitter-completion: filled 1 gap sub_module(s) (0 DB-first, 1 generated+written-back) before gate-23
+[chain] gate-23 emitter-completeness: PASS — 10 sub_modules checked, 10 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 0 pass / 1 fail; grammar 10 pass / 3 fail; total score 450
+  ✗ [cost_ceiling] cost OVER: BoM Σ(unit×qty) £5306813 > ceiling £5000000 (6% over). Largest line: £420800 at environmental_interface::environmental_interface__heat_pump::util_ventilation. FIX: reduce per-unit cost on the largest lines (substitute parts) OR reduce quantity OR raise the ceiling if the brief allows.
+  ✗ [sub_module_word_density] grammar: 1 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): maintenance_serviceability::maintenance_serviceability__access_panel (1 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 3 sub-module(s) with <3 priced lines: power_distribution::power_distribution__main_breaker (2/7), control_compute_communication::control_compute_communication__main_controller (1/6), safety_protection::safety_protection__protective_relay (0/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 3 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 2 concrete components not present in any sub-module word — mbbr-220, ras-dg-1670 | structure_containment: overview mentions 1 concrete component not present in any sub-module word — bx-3000e | water_treatment_system: overview mentions 1 concrete component not present in any sub-module word — bx-3000e. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 2 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::biofilter_synth_word has 2 conflicting "dimension" values: "4.9 m dia x 4.9 m" AND "6.2 m dia × 7.3 m" | mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::degasser_synth_word has 2 conflicting "dimension" values: "3578x3041x3936 mm" AND "2.4 m dia × 5.5 m". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 0: applied 2 patches, skipped 1, allowlist_rejected=1, state_changed=true
+    +mass_fluid_transport_process.sub_modules[0].words[+] (Add missing MBBR vessel component to BoM)
+    +mass_fluid_transport_process.sub_modules[0].words[+] (Add missing degasser component to BoM)
+    ALLOWLIST_REJECT structure_containment.sub_modules[0].words[+]: word patch contains MPN="BX-3000E" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing UV reactor component to BoM)
+[chain] Phase 2 iter 1: arith 0 pass / 1 fail; grammar 9 pass / 4 fail; total score 130
+  ✗ [cost_ceiling] cost OVER: BoM Σ(unit×qty) £6012813 > ceiling £5000000 (20% over). Largest line: £420800 at environmental_interface::environmental_interface__heat_pump::util_ventilation. FIX: reduce per-unit cost on the largest lines (substitute parts) OR reduce quantity OR raise the ceiling if the brief allows.
+  ✗ [sub_module_word_density] grammar: 1 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): maintenance_serviceability::maintenance_serviceability__access_panel (1 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 3 sub-module(s) with <3 priced lines: power_distribution::power_distribution__main_breaker (2/7), control_compute_communication::control_compute_communication__main_controller (1/6), safety_protection::safety_protection__protective_relay (0/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): structure_containment: overview mentions 1 concrete component not present in any sub-module word — bx-3000e | water_treatment_system: overview mentions 1 concrete component not present in any sub-module word — bx-3000e. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [sub_module_prose_covers_words] grammar: 1 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump prose drops 2/142 words: AnoxKaldnes K5-MBBR-220, Pentair RAS-DG-1670. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+  ✗ [modifier_consistency] grammar: 2 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::biofilter_synth_word has 2 conflicting "dimension" values: "4.9 m dia x 4.9 m" AND "6.2 m dia × 7.3 m" | mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::degasser_synth_word has 2 conflicting "dimension" values: "3578x3041x3936 mm" AND "2.4 m dia × 5.5 m". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2: repair LLM returned unfixable: parse failure
+[chain] post-Phase-2 prose pre-fill: rewrote 2/10 sub-modules
+[chain] emitter-identity re-assert: corrected 0/254 pinned words; 1 emitter word(s) missing post-mutation
+[fill-blank-mpn] 39 blank catalogue word(s) for class "aquaculture_ras" (219 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Circulation Pump) → Grundfos UP15-42
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Suction Isolation Valve) → Grundfos NB 25-200/219
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Non-Return Valve) → Crouzet 81529907
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Flow Control Valve) → Sensirion SFC5500-0.5slm
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump (Differential-Pressure Switch) → Honeywell HSCDLNN100MDSA5
+[fill-blank-mpn]   ✓ DB   water_treatment_system::water_treatment_system__mechanical_filtration (Flow Control Valve) → Uhome TWV-20-NPT
+[fill-blank-mpn]   ✓ DB   water_treatment_system::water_treatment_system__mechanical_filtration (Local Sensor) → Texas Instruments TMP451AQDQFRQ1
+[fill-blank-mpn]   ✓ DB   environmental_interface::environmental_interface__heat_pump (Temperature Sensor) → Mitsubishi Electric PAC-TH011HT-E
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__main_breaker (Fuse Holder) → Delta Electronics B62SR24125CC
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__main_controller (Network Switch) → TI MSP430
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_sensor (Voltage Sensor) → ABB KEVCD
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_sensor (Pressure Sensor) → Sartorius BB-8804062
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__protective_relay (Interlock Switch) → Banner Engineering SI-GL42DM20-11
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__primary_assembly (Inlet Flow Control Valve) → Altecnic CONTSETALT533K
+[fill-blank-mpn] filled 14/39 blank word(s): 14 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 219 structural skipped.
+[chain] fill-blank-mpn: branded 14/39 blank catalogue word(s) (14 DB-first real MPN, 0 generated real-OEM), 219 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 1527 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 6053 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 15 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=10 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"aquaculture_ras","resolved_to":"aquaculture_ras","hit":"db","nodes":10,"edges":26}
+[chain] K10 shadow: PASS_SHADOW — matched=28 missing=0 extra=1
+[chain] K10 writeback: persisted 1 discovered edge(s) to grow the aquaculture_ras reference graph (was dead code until 2026-05-31)
+[chain] K10 writeback: persisted 2 discovered node(s) to grow the aquaculture_ras reference graph
+[chain] headline derived: Production Capacity Tpy=204 tpy [derived_from_brief]; Unit cost ceiling=5,000,000 GBP;  (0.00s)
+[class-reference-graph-db] wrote edge source=llm class=aquaculture_ras power_distribution->maintenance_serviceability
+[chain] part verification: 15 parts checked — verified=10, unverified=5, uncertain=0, skip=0
+[chain] G5 RAG: 5 queries → 2 suggestions (high=1, medium=0, low=1, below_threshold=3, corpus=50 rows)
+[chain] part verification: stripped 5 high-confidence fake part_numbers
+  • mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::circulation_pump_word__suction_isolation_valve → removed "NB 25-200/219" (While Grundfos NB pumps exist, the specific model 'NB 25-200/219' is not found in the provided docum)
+  • control_compute_communication::control_compute_communication__main_controller::network_switch_word → removed "MSP430" (The MSP430 is a family of microcontrollers, not a specific part number, and it is not designed for u)
+  • sensing_instrumentation::sensing_instrumentation__voltage_sensor::pressure_sensor_word → removed "BB-8804062" (The provided search results for Sartorius Univessel Glass components list part number BB-8804060 for)
+  • maintenance_serviceability::maintenance_serviceability__access_panel::maintenance_serviceability__access_panel_completion_word → removed "TBD (detailed design)" (The term 'TBD' stands for 'To Be Determined' and is not a valid part number for a Southco compressio)
+  • actuation_kinematics::actuation_kinematics__primary_assembly::actr_valve_on_rearing_tank_synth_word → removed "CONTSETALT533K" (A search of the provided documents and the Altecnic product range does not contain any reference to )
+[chain] part verification: inherited part_number from deterministic sibling for 1 stripped word(s)
+  ↳ mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::circulation_pump_word__suction_isolation_valve ← mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::circulation_pump_word (PN: UP15-42)
+[chain] strip+recommend: 5 recommendations — high=4, medium=1, low=0, unknown=0 (manual sourcing required)
+[chain] design decisions: 2 unresolved conflicts surfaced for human review
+  • mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::biofilter_synth_word dimension: "4.9 m dia x 4.9 m" AND "6.2 m dia × 7.3 m" → recommend "6.2 m dia × 7.3 m"
+  • mass_fluid_transport_process::mass_fluid_transport_process__circulation_pump::degasser_synth_word dimension: "3578x3041x3936 mm" AND "2.4 m dia × 5.5 m" → recommend "2.4 m dia × 5.5 m"
+[chain] structural-gate router: surfaced 3 unrepaired gate(s) as design decisions
+[nexar] GraphQL errors for mpn=UP15-42: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TBD (detailed design): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TBD (catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=PAC-TH011HT-E: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=KEVCD: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for TBD (field instrument — catalogue class)
+[nexar] GraphQL errors for mpn=TBD (field instrument — catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[chain] Stage 10.5 Part Reality Check: 13 checked, 7 real, 0 substituted, 6 warned (no substitute available). Nexar calls used: 6.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ circulation_pump_word: "Grundfos UP15-42" [class=unknown, library_class=none]
+  ⚠ circulation_pump_word__casing: "? TBD (detailed design)" [class=unknown, library_class=none]
+  ⚠ actr_blower_on_biofilter_synth_word: "? TBD (catalogue class)" [class=unknown, library_class=none]
+  ⚠ temperature_sensor_word: "Mitsubishi Electric PAC-TH011HT-E" [class=unknown, library_class=none]
+  ⚠ voltage_sensor_word: "ABB KEVCD" [class=unknown, library_class=none]
+  ⚠ instr_level_on_rearing_tank_synth_word: "? TBD (field instrument — catalogue class)" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] module-paragraph-llm: 10/10 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 3 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/10 capital (threshold 6); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 4 sections, 0 warnings
+[chain] design decisions review: 10 choices (1 applied, 9 flagged, 0 blocked)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 13 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 1 deleted principal(s) re-created; 6 building take-off line(s) re-derived to the final footprint.
+[chain] CHAIN_SKIP_DESIGN_LOOP=1 — design loop NOT closed early (cost stack reads pre-loop numbers)
+[chain] computed-twin reconcile: 18 computed_<base> quantities dropped (computed_biofilter_air_flow_m3_h, computed_biofilter_media_volume_m3, computed_biofilter_tank_volume_m3, computed_building_process_loss_kw, computed_daily_feed_kg, computed_heat_pump_cop, computed_heat_pump_electrical_kw, computed_heating_duty_kw, computed_oxygen_demand_kg_day, computed_oxygen_supply_kg_h, computed_recirc_pump_head_m, computed_recirc_pump_hydraulic_power_w, computed_recirc_pump_motor_kw, computed_solids_load_kg_day, computed_tan_load_kg_day, computed_total_tank_volume_m3, computed_uv_lamp_power_kw, computed_uv_reactor_volume_m3); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 2 twin-less computed_* kept (computed_degasser_air_flow_m3_h, computed_degasser_column_volume_m3).
+[chain] phase 5: blender bg pipeline spawned (PID 72703) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/blender-bg.log
+[estimate] product_class=aquaculture_ras annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'aquaculture_ras' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 262 parts need price estimates
+[estimate] corpus-classified 28/262; 234 need rule-based / Flash-Lite
+[estimate] rule-based classified 39 parts; 195 still need Flash-Lite
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Flash-Lite classified 10 batches
+[estimate] 6 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] Flash-Lite (volume-aware) for 4 'unknown' parts
+[estimate] updated 6 existing, synthesised 256 new, 0 failed
+[estimate] C3 DB cache: 2 parts priced from distributor_cascade_cache (0 live API calls)
+[estimate] classification source: corpus=28 rule_based=39 flash_lite=194 fallback=0 curated=0 db_cache=2
+[estimate] estimate source: db_cache=2 curve=256 flash_lite_unknown=4
+[estimate] top classes in BoM:
+  fluid_path: 59
+  structural_metal: 54
+  oem_subsystem: 39
+  sensor: 27
+  structural_polymer: 24
+  mechanical_assembly: 22
+  motor_actuator: 7
+  thermal: 7
+[estimate] estimated cost: GBP 0.004
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 268 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 268/268 results in 172.9s
+[engine-c] flags: in_range=13  over=14  under=101  no_reference=140
+[engine-c] 115/268 priced lines flagged out-of-range vs reference corpus (42.9%)
+[engine-c] 50 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "aquaculture_ras" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: aquaculture_ras
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/state.json
+[supplier-validate] no suppliers to validate
+[hero] step 0: per-project geometry generator (LLM)...
+[geom-gen] no template for product_class="aquaculture_ras"; runner will use universal renderer
+[geom-gen] registry-miss authored path available: npx tsx scripts/author-blender-scene.tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/state.json --out /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15
+[hero]   geometry generator failed (5); falling back to unmodified template
+[hero] step 1: Blender structural reference cover pass...
+[render-scene] no template for product_class='aquaculture_ras'; rendering with the UNIVERSAL deterministic builder
+[render-scene] no per-class template → UNIVERSAL builder build_universal_scene.py
+[univ] state=/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/state.json
+[univ] out  =/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15
+[univ] physical parts kept = 98; non-physical dropped = 170
+[univ] dropped: Casing, Impeller / Rotor, Drive Motor, Variable-Speed Drive, Flexible Coupling, Coupling Guard, Baseplate, Mechanical Seal, Suction Isolation Valve, Discharge Isolation Valve, Non-Return Valve, Discharge Pressure Gauge, Anti-Vibration Mounts, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Tank Wall (laminate), Tank Floor (graded to centre), Dual Drain / Centre Standpipe, Side Drain & Overflow, Inlet Distribution Ring, Internal Flow Baffles, Rim Stiffener, Access Walkway & Handrail, Internal Gelcoat / Lining, Earthing Boss, Nameplate, Drum / Element, Media / Mesh Panels, Drive Gearmotor, Backwash Spray Bar, Backwash Pump, Reject Trough, Differential-Pressure Switch, Support Frame, Local Control Panel, Tank Wall (laminate), Tank Floor (graded to centre), Dual Drain / Centre Standpipe, Side Drain & Overflow, Inlet Distribution Ring, Internal Flow Baffles, Rim Stiffener, Access Walkway & Handrail, Internal Gelcoat / Lining, Earthing Boss, Nameplate, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Drum / Element, Media / Mesh Panels, Drive Gearmotor, Backwash Spray Bar, Backwash Pump, Reject Trough, Differential-Pressure Switch, Support Frame, Local Control Panel, Drum / Element, Media / Mesh Panels, Drive Gearmotor, Backwash Spray Bar, Backwash Pump, Reject Trough, Differential-Pressure Switch, Support Frame, Local Control Panel, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Scroll Compressor, Evaporator Coil, Condenser Coil, Expansion Valve, Refrigerant Charge, Suction Accumulator, Refrigerant Pressure Switches, Control Panel, Frame & Panels, Anti-Vibration Mounts, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Process Unit, Inlet / Outlet Manifolds, Flow Control Valve, Dosing / Lamp Module, Local Sensor, Control & Power Module, Mounting Frame, Process Unit, Inlet / Outlet Manifolds, Flow Control Valve, Dosing / Lamp Module, Local Sensor, Control & Power Module, Mounting Frame, Process Unit, Inlet / Outlet Manifolds, Flow Control Valve, Dosing / Lamp Module, Local Sensor, Control & Power Module, Mounting Frame, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Power Contactor, Compression Latch
+[univ] undimensioned-tall cap = 40.2 m (= 1.6× tallest dimensioned vessel); capped parts: none
+[univ] cross-module augmentation: +3 FLUID process line(s) from grammar links not covered by topology (1 pairs already routed)
+[univ]   +aug fluid: Uv Reactor -> Protein Skimming
+[univ]   +aug fluid: Protein Skimming -> Rearing Tank
+[univ]   +aug fluid: Backup Immersion Heater -> Protein Skimming
+[univ] orphan connector: +97 edge(s) — 35 power, 31 signal, 31 water (power hub=Standby Diesel Generator, control hub=Main Controller)
+[univ] region order (L->R): ['mass_fluid_transport_process', 'structure_containment', 'water_treatment_system', 'actuation_kinematics', 'environmental_interface', 'power_distribution', 'control_compute_communication', 'sensing_instrumentation', 'safety_protection']
+[univ] geometry family = process_plant  (product_class=aquaculture_ras; aero/flight-vehicle = 0, tower-machine = 0 [grounded=True], grow/panel = 1 (distinct 1), battery-system = 1, rack/cabinet/server = 2 (structure 0, rack_class=False), vessel = 10 (distinct 8), marine = 0 (is_marine=False), of 98 physical parts; true_aircraft=False, true_spacecraft=False)
+[univ][flow] flow order (feed→product): ['actuation_kinematics', 'environmental_interface', 'mass_fluid_transport_process', 'structure_containment', 'water_treatment_system', 'sensing_instrumentation']
+[univ][flow] periphery (non-flow → back row): ['power_distribution', 'control_compute_communication', 'safety_protection']
+[univ][flow] train lanes=2 (regions ['actuation_kinematics', 'environmental_interface', 'mass_fluid_transport_process', 'structure_containment', 'water_treatment_system', 'sensing_instrumentation']); periphery back row=['power_distribution', 'control_compute_communication', 'safety_protection']
+[univ][flow] mega-array isolation: ['mass_fluid_transport_process'] → own solo lane(s); banks now 4
+[univ] plant bbox (mm): {'x0': -800.0, 'x1': 64812.185049503314, 'y0': -925.0, 'y1': 502045.71589967347}
+[univ] skid frame: 65.4×502.8 m footprint, 23.4 m tall, 9 post bays, clean minimal (no X-bracing)
+[univ] pipe rack: 64.0 m span @ 22.8 m, 14 bays, 2 tiers
+[univ][spine] axis=x  spine_y=245316  aisle=7126 mm (flow-train bisector, 81 train equip of 98)  x∈[-800,64812]
+[univ] routed edge 0 (fluid_loop): Rearing Tank  ->  Drum Filter
+[univ] routed edge 1 (fluid_loop): Drum Filter  ->  Biofilter
+[univ] routed edge 2 (fluid_loop): Biofilter  ->  Degasser
+[univ] routed edge 3 (fluid_loop): Degasser  ->  Oxygen Supply (LOX) System
+[univ] routed edge 4 (fluid_loop): Oxygen Supply (LOX) System  ->  Uv Reactor
+[univ] routed edge 5 (thermal): Heat Pump  ->  Rearing Tank
+[univ] routed edge 6 (fluid_loop): oxygen_supply  ->  Oxygen Supply (LOX) System
+[univ] routed edge 7 (electrical_bus) CABLE-TRAY: electrical_supply  ->  Recirc Pump  (+0 load drops)
+[univ] routed edge 8 (fluid_loop): Uv Reactor  ->  Protein Skimming
+[univ] routed edge 9 (fluid_loop): Protein Skimming  ->  Rearing Tank
+[univ] routed edge 10 (fluid_loop): Backup Immersion Heater  ->  Protein Skimming
+[univ] routed edge 11 (fluid_loop): Recirc Pump  ->  Rearing Tank
+[univ] routed edge 12 (fluid_loop): Pipework Run  ->  Rearing Tank
+[univ] routed edge 13 (fluid_loop): Distribution Manifold  ->  Rearing Tank
+[univ] routed edge 14 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Flow Control Valve  (+0 load drops)
+[univ] routed edge 15 (signal): Flow Control Valve  ->  Main Controller
+[univ] routed edge 16 (fluid_loop): Flow Control Valve  ->  Rearing Tank
+[univ] routed edge 17 (fluid_loop): Expansion Reservoir  ->  Rearing Tank
+[univ] routed edge 18 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Drum Filter  (+0 load drops)
+[univ] routed edge 19 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Biofilter  (+0 load drops)
+[univ] routed edge 20 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Degasser  (+0 load drops)
+[univ] routed edge 21 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Drum Filter Backwash  (+0 load drops)
+[univ] routed edge 22 (fluid_loop): Drum Filter Backwash  ->  Rearing Tank
+[univ] routed edge 23 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Drum Filter Screen  (+0 load drops)
+[univ] routed edge 24 (fluid_loop): Drum Filter Screen  ->  Rearing Tank
+[univ] routed edge 25 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Degasser Column  (+0 load drops)
+[univ] routed edge 26 (fluid_loop): Degasser Column  ->  Rearing Tank
+[univ] routed edge 27 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Aeration Blower  (+0 load drops)
+[univ] routed edge 28 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Degassing Blower  (+0 load drops)
+[univ] routed edge 29 (fluid_loop): Degassing Blower  ->  Rearing Tank
+[univ] routed edge 30 (fluid_loop): Emergency O₂ Solenoid + Diffuser (fail-open)  ->  Rearing Tank
+[univ] routed edge 31 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Dissolved-O₂ Control Valve  (+0 load drops)
+[univ] routed edge 32 (signal): Dissolved-O₂ Control Valve  ->  Main Controller
+[univ] routed edge 33 (fluid_loop): Dissolved-O₂ Control Valve  ->  Rearing Tank
+[univ] routed edge 34 (fluid_loop): Make-up Water System  ->  Rearing Tank
+[univ] routed edge 35 (fluid_loop): Bleed / Drain System  ->  Rearing Tank
+[univ] routed edge 36 (fluid_loop): Chemical Dosing System (pH / Alkalinity)  ->  Rearing Tank
+[univ] routed edge 37 (fluid_loop): Feed Storage + Distribution System  ->  Rearing Tank
+[univ] routed edge 38 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Oxygen Supply (LOX) System  (+0 load drops)
+[univ] routed edge 39 (fluid_loop): Solids / Sludge Handling System  ->  Rearing Tank
+[univ] routed edge 40 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Biofilm Carrier Media (MBBR)  (+0 load drops)
+[univ] routed edge 41 (fluid_loop): Biofilm Carrier Media (MBBR)  ->  Rearing Tank
+[univ] routed edge 42 (fluid_loop): Grading / Harvest System  ->  Rearing Tank
+[univ] routed edge 43 (fluid_loop): Product Chilling + Ice System  ->  Rearing Tank
+[univ] routed edge 44 (fluid_loop): Mortality Handling System  ->  Rearing Tank
+[univ] routed edge 45 (fluid_loop): Intake + Make-up Treatment Skid  ->  Rearing Tank
+[univ] routed edge 46 (fluid_loop): Effluent Treatment + Discharge System  ->  Rearing Tank
+[univ] routed edge 47 (fluid_loop): Live-Fish Handling + Transfer System  ->  Rearing Tank
+[univ] routed edge 48 (fluid_loop): Biosecurity / Quarantine System  ->  Rearing Tank
+[univ] routed edge 49 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  AnoxKaldnes K5-MBBR-220  (+0 load drops)
+[univ] routed edge 50 (fluid_loop): AnoxKaldnes K5-MBBR-220  ->  Rearing Tank
+[univ] routed edge 51 (fluid_loop): Pentair RAS-DG-1670  ->  Rearing Tank
+[univ] routed edge 52 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Heat Pump  (+0 load drops)
+[univ] routed edge 53 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Uv Reactor  (+0 load drops)
+[univ] routed edge 54 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Protein Skimming  (+0 load drops)
+[univ] routed edge 55 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  UV Sterilization  (+0 load drops)
+[univ] routed edge 56 (fluid_loop): UV Sterilization  ->  Protein Skimming
+[univ] routed edge 57 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Oxygen Supply (LOX) System  (+0 load drops)
+[univ] routed edge 58 (fluid_loop): Oxygen Supply (LOX) System  ->  Protein Skimming
+[univ] routed edge 59 (signal): Temperature Sensor  ->  Main Controller
+[univ] routed edge 60 (fluid_loop): Expansion Vessel  ->  Backup Immersion Heater
+[univ] routed edge 61 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Dehumidifier  (+0 load drops)
+[univ] routed edge 62 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Backup Immersion Heater  (+0 load drops)
+[univ] routed edge 63 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Building Ventilation (HRV)  (+0 load drops)
+[univ] routed edge 64 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Main Breaker  (+0 load drops)
+[univ] routed edge 65 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Distribution Busbar  (+0 load drops)
+[univ] routed edge 66 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Fuse Holder  (+0 load drops)
+[univ] routed edge 67 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Surge Protector  (+0 load drops)
+[univ] routed edge 68 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Control + Instrument UPS  (+0 load drops)
+[univ] routed edge 69 (signal): Control + Instrument UPS  ->  Main Controller
+[univ] routed edge 70 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Main Controller  (+0 load drops)
+[univ] routed edge 71 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Communication Gateway  (+0 load drops)
+[univ] routed edge 72 (signal): Communication Gateway  ->  Main Controller
+[univ] routed edge 73 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  I/O Module  (+0 load drops)
+[univ] routed edge 74 (signal): I/O Module  ->  Main Controller
+[univ] routed edge 75 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Network Switch  (+0 load drops)
+[univ] routed edge 76 (signal): Network Switch  ->  Main Controller
+[univ] routed edge 77 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Controller Power Supply  (+0 load drops)
+[univ] routed edge 78 (signal): Controller Power Supply  ->  Main Controller
+[univ] routed edge 79 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  SCADA / Plant Control System  (+0 load drops)
+[univ] routed edge 80 (signal): SCADA / Plant Control System  ->  Main Controller
+[univ] routed edge 81 (signal): Voltage Sensor  ->  Main Controller
+[univ] routed edge 82 (signal): Current Sensor  ->  Main Controller
+[univ] routed edge 83 (signal): Temperature Probe  ->  Main Controller
+[univ] routed edge 84 (signal): Pressure Sensor  ->  Main Controller
+[univ] routed edge 85 (signal): Signal Conditioner  ->  Main Controller
+[univ] routed edge 86 (signal): Level Transmitter  ->  Main Controller
+[univ] routed edge 87 (signal): Temperature Transmitter  ->  Main Controller
+[univ] routed edge 88 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Dissolved-Oxygen Analyser  (+0 load drops)
+[univ] routed edge 89 (signal): Dissolved-Oxygen Analyser  ->  Main Controller
+[univ] routed edge 90 (signal): TAN / Ammonia Analyser  ->  Main Controller
+[univ] routed edge 91 (signal): Nitrate Analyser  ->  Main Controller
+[univ] routed edge 92 (signal): Dissolved-CO₂ Analyser  ->  Main Controller
+[univ] routed edge 93 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  UV Transmittance / Intensity Monitor  (+0 load drops)
+[univ] routed edge 94 (signal): UV Transmittance / Intensity Monitor  ->  Main Controller
+[univ] routed edge 95 (signal): pH Analyser  ->  Main Controller
+[univ] routed edge 96 (signal): Conductivity / Salinity Analyser  ->  Main Controller
+[univ] routed edge 97 (signal): O₂ Header Pressure Transmitter  ->  Main Controller
+[univ] routed edge 98 (signal): LOX Tank Level + Low Alarm  ->  Main Controller
+[univ] routed edge 99 (fluid_loop): LOX Tank Level + Low Alarm  ->  Voltage Sensor
+[univ] routed edge 100 (signal): Protective Relay  ->  Main Controller
+[univ] routed edge 101 (signal): Emergency Stop Button  ->  Main Controller
+[univ] routed edge 102 (signal): Isolation Device  ->  Main Controller
+[univ] routed edge 103 (signal): Fire Detector  ->  Main Controller
+[univ] routed edge 104 (signal): Interlock Switch  ->  Main Controller
+[univ] routed edge 105 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Inlet Flow Control Valve  (+0 load drops)
+[univ] routed edge 106 (signal): Inlet Flow Control Valve  ->  Main Controller
+[univ] routed edge 107 (fluid_loop): Inlet Flow Control Valve  ->  Degassing Blower
+[univ] topology routed = 108/108; unresolved = 0
+[univ][route-audit] routes=108  over_equipment_segments=26  max_detour_ratio=84.424  same_elevation_crossings=1
+[univ][route-audit]   over-equipment routes: u_route_13_fluid_loop, u_route_14_electrical_bus, u_route_17_fluid_loop, u_route_19_electrical_bus, u_route_27_electrical_bus, u_route_31_electrical_bus, u_route_38_electrical_bus, u_route_3_fluid_loop, u_route_4_fluid_loop, u_route_53_electrical_bus, u_route_59_signal, u_route_61_electrical_bus, u_route_62_electrical_bus, u_route_6_fluid_loop, u_route_7_electrical_bus, u_route_8_fluid_loop
+[univ][route-audit]   same-Z crossings: [('u_route_64_electrical_bus', 'u_route_68_electrical_bus', 3346.0)]
+[univ][route-reconcile] DEFECT 1: dropped 1 fluid edge(s) routed onto a pure instrument (11 m of phantom pipe)
+[univ][route-reconcile]   drop  'LOX Tank Level + Low Alarm'→'Voltage Sensor'  DN300 11 m
+[univ][route-reconcile] DEFECT 2: capped 52 detour route(s) at 2.5× straight-line + 5 m (18319 m of routed length removed)
+[univ][route-reconcile] costed £ 5,587,773 → 2,600,254 (saved £2,987,518)
+[conn-schedule] 107 runs sized; cable-m by CSA: {'1.5 mm²': 9175.3, '16 mm²': 75.5, '25 mm²': 132.7, '2×400 mm²': 84.3, '6×400 mm²': 1075.8, '95 mm²': 5354.0}; pipe-m by DN: {'DN15': 64.7, 'DN200': 217.1, 'DN250': 144.5, 'DN300': 5788.1}; duct-m by size: {}
+[conn-bom] cable £1,111,424 | pipe £1,488,831 | duct £0 | total £2,600,254 (terminations £31,853; source model:uk-2026-supply+install)
+[conn-schedule] volt-drop limit 5% (env CONN_VOLTDROP_LIMIT_PCT); D1 upsized 60 run(s); D2 design recommendations: 38
+[conn-schedule] rendered outer_dia_mm range: min=3.3 mm  max=323.9 mm  (10 distinct sizes)
+[conn-UPSIZE] u_route_0_fluid_loop (fluid_loop) rearing_tanks -> rotary_drum_filter: DN300 → DN300 in 0 step(s) — flow 556.7 L/s stays > 3 m/s even at the largest standard bore (DN300) over 489 m; now 7.629 (in spec)
+[conn-UPSIZE] u_route_1_fluid_loop (fluid_loop) rotary_drum_filter -> mbbr_biofilter: DN300 → DN300 in 0 step(s) — flow 556.7 L/s stays > 3 m/s even at the largest standard bore (DN300) over 43 m; now 7.629 (in spec)
+[conn-UPSIZE] u_route_4_fluid_loop (fluid_loop) oxygen_cones -> uv_ozone_disinfection: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 493 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_7_electrical_bus (electrical_bus) electrical_supply -> recirc_pumps_and_heat_pumps: 400 mm² → 2×400 mm² in 1 step(s) — volt-drop 8.114% > 5% over 560 m at 1890.3 A on 1500 V; now 4.057 (in spec)
+[conn-UPSIZE] u_route_8_fluid_loop (fluid_loop) Uv Reactor -> Protein Skimming: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 458 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_9_fluid_loop (fluid_loop) Protein Skimming -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 443 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_10_fluid_loop (fluid_loop) Backup Immersion Heater -> Protein Skimming: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 546 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_11_fluid_loop (fluid_loop) Recirc Pump -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 474 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_12_fluid_loop (fluid_loop) Pipework Run -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 477 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_13_fluid_loop (fluid_loop) Distribution Manifold -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 479 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_14_electrical_bus (electrical_bus) Standby Diesel Generator -> Flow Control Valve: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.858% > 5% over 493 m at 87.1 A on 415 V; now 4.185 (in spec)
+[conn-UPSIZE] u_route_16_fluid_loop (fluid_loop) Flow Control Valve -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 477 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_17_fluid_loop (fluid_loop) Expansion Reservoir -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 481 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_18_electrical_bus (electrical_bus) Standby Diesel Generator -> Drum Filter: 16 mm² → 95 mm² in 5 step(s) — volt-drop 26.856% > 5% over 533 m at 87.1 A on 415 V; now 4.522 (in spec)
+[conn-UPSIZE] u_route_19_electrical_bus (electrical_bus) Standby Diesel Generator -> Biofilter: 16 mm² → 95 mm² in 5 step(s) — volt-drop 25.049% > 5% over 497 m at 87.1 A on 415 V; now 4.218 (in spec)
+[conn-UPSIZE] u_route_20_electrical_bus (electrical_bus) Standby Diesel Generator -> Degasser: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.604% > 5% over 488 m at 87.1 A on 415 V; now 4.143 (in spec)
+[conn-UPSIZE] u_route_21_electrical_bus (electrical_bus) Standby Diesel Generator -> Drum Filter Backwash: 16 mm² → 95 mm² in 5 step(s) — volt-drop 25.122% > 5% over 499 m at 87.1 A on 415 V; now 4.23 (in spec)
+[conn-UPSIZE] u_route_22_fluid_loop (fluid_loop) Drum Filter Backwash -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 511 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_23_electrical_bus (electrical_bus) Standby Diesel Generator -> Drum Filter Screen: 16 mm² → 95 mm² in 5 step(s) — volt-drop 25.049% > 5% over 497 m at 87.1 A on 415 V; now 4.218 (in spec)
+[conn-UPSIZE] u_route_24_fluid_loop (fluid_loop) Drum Filter Screen -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 515 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_25_electrical_bus (electrical_bus) Standby Diesel Generator -> Degasser Column: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.698% > 5% over 490 m at 87.1 A on 415 V; now 4.159 (in spec)
+[conn-UPSIZE] u_route_26_fluid_loop (fluid_loop) Degasser Column -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 515 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_27_electrical_bus (electrical_bus) Standby Diesel Generator -> Aeration Blower: 1.5 mm² → 25 mm² in 6 step(s) — volt-drop 65.078% > 5% over 486 m at 22.2 A on 415 V; now 3.896 (in spec)
+[conn-UPSIZE] u_route_28_electrical_bus (electrical_bus) Standby Diesel Generator -> Degassing Blower: 16 mm² → 95 mm² in 5 step(s) — volt-drop 25.83% > 5% over 513 m at 87.1 A on 415 V; now 4.349 (in spec)
+[conn-UPSIZE] u_route_29_fluid_loop (fluid_loop) Degassing Blower -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 483 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_30_fluid_loop (fluid_loop) Emergency O₂ Solenoid + Diffuser (fail-open) -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 485 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_31_electrical_bus (electrical_bus) Standby Diesel Generator -> Dissolved-O₂ Control Valve: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.831% > 5% over 493 m at 87.1 A on 415 V; now 4.181 (in spec)
+[conn-UPSIZE] u_route_33_fluid_loop (fluid_loop) Dissolved-O₂ Control Valve -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 477 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_34_fluid_loop (fluid_loop) Make-up Water System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 488 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_35_fluid_loop (fluid_loop) Bleed / Drain System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 524 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_36_fluid_loop (fluid_loop) Chemical Dosing System (pH / Alkalinity) -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 492 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_37_fluid_loop (fluid_loop) Feed Storage + Distribution System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 523 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_38_electrical_bus (electrical_bus) Standby Diesel Generator -> Oxygen Supply (LOX) System: 16 mm² → 95 mm² in 5 step(s) — volt-drop 23.914% > 5% over 475 m at 87.1 A on 415 V; now 4.026 (in spec)
+[conn-UPSIZE] u_route_39_fluid_loop (fluid_loop) Solids / Sludge Handling System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 495 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_40_electrical_bus (electrical_bus) Standby Diesel Generator -> Biofilm Carrier Media (MBBR): 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.096% > 5% over 478 m at 87.1 A on 415 V; now 4.057 (in spec)
+[conn-UPSIZE] u_route_41_fluid_loop (fluid_loop) Biofilm Carrier Media (MBBR) -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 498 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_42_fluid_loop (fluid_loop) Grading / Harvest System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 500 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_43_fluid_loop (fluid_loop) Product Chilling + Ice System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 520 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_44_fluid_loop (fluid_loop) Mortality Handling System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 503 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_45_fluid_loop (fluid_loop) Intake + Make-up Treatment Skid -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 506 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_47_fluid_loop (fluid_loop) Live-Fish Handling + Transfer System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 509 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_48_fluid_loop (fluid_loop) Biosecurity / Quarantine System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 511 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_49_electrical_bus (electrical_bus) Standby Diesel Generator -> AnoxKaldnes K5-MBBR-220: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.581% > 5% over 488 m at 87.1 A on 415 V; now 4.139 (in spec)
+[conn-UPSIZE] u_route_50_fluid_loop (fluid_loop) AnoxKaldnes K5-MBBR-220 -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 516 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_51_fluid_loop (fluid_loop) Pentair RAS-DG-1670 -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 513 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_52_electrical_bus (electrical_bus) Standby Diesel Generator -> Heat Pump: 240 mm² → 6×400 mm² in 4 step(s) — 475 m at 487.1 A on 415 V (= 231,154 A·m) exceeds practical LV reach (~90,000 A·m); now 1.003 (in spec)
+[conn-UPSIZE] u_route_53_electrical_bus (electrical_bus) Standby Diesel Generator -> Uv Reactor: 16 mm² → 95 mm² in 5 step(s) — volt-drop 22.927% > 5% over 455 m at 87.1 A on 415 V; now 3.86 (in spec)
+[conn-UPSIZE] u_route_54_electrical_bus (electrical_bus) Standby Diesel Generator -> Protein Skimming: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.698% > 5% over 490 m at 87.1 A on 415 V; now 4.159 (in spec)
+[conn-UPSIZE] u_route_55_electrical_bus (electrical_bus) Standby Diesel Generator -> UV Sterilization: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.471% > 5% over 486 m at 87.1 A on 415 V; now 4.12 (in spec)
+[conn-UPSIZE] u_route_56_fluid_loop (fluid_loop) UV Sterilization -> Protein Skimming: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 5 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_57_electrical_bus (electrical_bus) Standby Diesel Generator -> Oxygenation System: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.126% > 5% over 479 m at 87.1 A on 415 V; now 4.062 (in spec)
+[conn-UPSIZE] u_route_58_fluid_loop (fluid_loop) Oxygenation System -> Protein Skimming: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 530 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_60_fluid_loop (fluid_loop) Expansion Vessel -> Backup Immersion Heater: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 52 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_61_electrical_bus (electrical_bus) Standby Diesel Generator -> Dehumidifier: 120 mm² → 6×400 mm² in 4 step(s) — 479 m at 326.8 A on 415 V (= 156,379 A·m) exceeds practical LV reach (~90,000 A·m); now 0.622 (in spec)
+[conn-UPSIZE] u_route_62_electrical_bus (electrical_bus) Standby Diesel Generator -> Backup Immersion Heater: 300 mm² → 6×400 mm² in 11 step(s) — 471 m at 2433.8 A on 415 V (= 1,147,433 A·m) exceeds practical LV reach (~90,000 A·m); now 5.011 (in spec)
+[conn-UPSIZE] u_route_63_electrical_bus (electrical_bus) Standby Diesel Generator -> Building Ventilation (HRV): 16 mm² → 95 mm² in 5 step(s) — volt-drop 23.914% > 5% over 475 m at 87.1 A on 415 V; now 4.026 (in spec)
+[conn-UPSIZE] u_route_88_electrical_bus (electrical_bus) Standby Diesel Generator -> Dissolved-Oxygen Analyser: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.515% > 5% over 487 m at 87.1 A on 415 V; now 4.128 (in spec)
+[conn-UPSIZE] u_route_93_electrical_bus (electrical_bus) Standby Diesel Generator -> UV Transmittance / Intensity Monitor: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.126% > 5% over 479 m at 87.1 A on 415 V; now 4.062 (in spec)
+[conn-UPSIZE] u_route_105_electrical_bus (electrical_bus) Standby Diesel Generator -> Inlet Flow Control Valve: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.295% > 5% over 482 m at 87.1 A on 415 V; now 4.091 (in spec)
+[conn-UPSIZE] u_route_107_fluid_loop (fluid_loop) Inlet Flow Control Valve -> Degassing Blower: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 542 m; now 6.358 (in spec)
+[conn-DESIGN] u_route_0_fluid_loop (fluid_loop) rearing_tanks -> rotary_drum_filter: Run rearing_tanks→rotary_drum_filter: flow 556.7 L/s stays > 3 m/s even at the largest standard bore (DN300) over 489 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_1_fluid_loop (fluid_loop) rotary_drum_filter -> mbbr_biofilter: Run rotary_drum_filter→mbbr_biofilter: flow 556.7 L/s stays > 3 m/s even at the largest standard bore (DN300) over 43 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_4_fluid_loop (fluid_loop) oxygen_cones -> uv_ozone_disinfection: Run oxygen_cones→uv_ozone_disinfection: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 493 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_8_fluid_loop (fluid_loop) Uv Reactor -> Protein Skimming: Run Uv Reactor→Protein Skimming: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 458 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_9_fluid_loop (fluid_loop) Protein Skimming -> Rearing Tank: Run Protein Skimming→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 443 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_10_fluid_loop (fluid_loop) Backup Immersion Heater -> Protein Skimming: Run Backup Immersion Heater→Protein Skimming: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 546 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_11_fluid_loop (fluid_loop) Recirc Pump -> Rearing Tank: Run Recirc Pump→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 474 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_12_fluid_loop (fluid_loop) Pipework Run -> Rearing Tank: Run Pipework Run→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 477 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_13_fluid_loop (fluid_loop) Distribution Manifold -> Rearing Tank: Run Distribution Manifold→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 479 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_16_fluid_loop (fluid_loop) Flow Control Valve -> Rearing Tank: Run Flow Control Valve→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 477 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_17_fluid_loop (fluid_loop) Expansion Reservoir -> Rearing Tank: Run Expansion Reservoir→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 481 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_22_fluid_loop (fluid_loop) Drum Filter Backwash -> Rearing Tank: Run Drum Filter Backwash→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 511 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_24_fluid_loop (fluid_loop) Drum Filter Screen -> Rearing Tank: Run Drum Filter Screen→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 515 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_26_fluid_loop (fluid_loop) Degasser Column -> Rearing Tank: Run Degasser Column→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 515 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_29_fluid_loop (fluid_loop) Degassing Blower -> Rearing Tank: Run Degassing Blower→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 483 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_30_fluid_loop (fluid_loop) Emergency O₂ Solenoid + Diffuser (fail-open) -> Rearing Tank: Run Emergency O₂ Solenoid + Diffuser (fail-open)→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 485 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_33_fluid_loop (fluid_loop) Dissolved-O₂ Control Valve -> Rearing Tank: Run Dissolved-O₂ Control Valve→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 477 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_34_fluid_loop (fluid_loop) Make-up Water System -> Rearing Tank: Run Make-up Water System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 488 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_35_fluid_loop (fluid_loop) Bleed / Drain System -> Rearing Tank: Run Bleed / Drain System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 524 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_36_fluid_loop (fluid_loop) Chemical Dosing System (pH / Alkalinity) -> Rearing Tank: Run Chemical Dosing System (pH / Alkalinity)→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 492 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_37_fluid_loop (fluid_loop) Feed Storage + Distribution System -> Rearing Tank: Run Feed Storage + Distribution System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 523 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_39_fluid_loop (fluid_loop) Solids / Sludge Handling System -> Rearing Tank: Run Solids / Sludge Handling System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 495 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_41_fluid_loop (fluid_loop) Biofilm Carrier Media (MBBR) -> Rearing Tank: Run Biofilm Carrier Media (MBBR)→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 498 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_42_fluid_loop (fluid_loop) Grading / Harvest System -> Rearing Tank: Run Grading / Harvest System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 500 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_43_fluid_loop (fluid_loop) Product Chilling + Ice System -> Rearing Tank: Run Product Chilling + Ice System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 520 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_44_fluid_loop (fluid_loop) Mortality Handling System -> Rearing Tank: Run Mortality Handling System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 503 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_45_fluid_loop (fluid_loop) Intake + Make-up Treatment Skid -> Rearing Tank: Run Intake + Make-up Treatment Skid→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 506 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_47_fluid_loop (fluid_loop) Live-Fish Handling + Transfer System -> Rearing Tank: Run Live-Fish Handling + Transfer System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 509 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_48_fluid_loop (fluid_loop) Biosecurity / Quarantine System -> Rearing Tank: Run Biosecurity / Quarantine System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 511 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_50_fluid_loop (fluid_loop) AnoxKaldnes K5-MBBR-220 -> Rearing Tank: Run AnoxKaldnes K5-MBBR-220→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 516 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_51_fluid_loop (fluid_loop) Pentair RAS-DG-1670 -> Rearing Tank: Run Pentair RAS-DG-1670→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 513 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_52_electrical_bus (electrical_bus) Standby Diesel Generator -> Heat Pump: Run Standby Diesel Generator→Heat Pump: 475 m at 487.1 A on 415 V (= 231,154 A·m) exceeds practical LV reach (~90,000 A·m) — recommend a LOCAL SUB-DISTRIBUTION (MV feeder to a local step-down transformer near the load, LV distributed locally) OR relocate the load nearer its source. An ever-fatter LV conductor is the wrong response at this reach.
+[conn-DESIGN] u_route_56_fluid_loop (fluid_loop) UV Sterilization -> Protein Skimming: Run UV Sterilization→Protein Skimming: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 5 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_58_fluid_loop (fluid_loop) Oxygenation System -> Protein Skimming: Run Oxygenation System→Protein Skimming: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 530 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_60_fluid_loop (fluid_loop) Expansion Vessel -> Backup Immersion Heater: Run Expansion Vessel→Backup Immersion Heater: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 52 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_61_electrical_bus (electrical_bus) Standby Diesel Generator -> Dehumidifier: Run Standby Diesel Generator→Dehumidifier: 479 m at 326.8 A on 415 V (= 156,379 A·m) exceeds practical LV reach (~90,000 A·m) — recommend a LOCAL SUB-DISTRIBUTION (MV feeder to a local step-down transformer near the load, LV distributed locally) OR relocate the load nearer its source. An ever-fatter LV conductor is the wrong response at this reach.
+[conn-DESIGN] u_route_62_electrical_bus (electrical_bus) Standby Diesel Generator -> Backup Immersion Heater: Run Standby Diesel Generator→Backup Immersion Heater: 471 m at 2433.8 A on 415 V (= 1,147,433 A·m) exceeds practical LV reach (~90,000 A·m) — recommend a LOCAL SUB-DISTRIBUTION (MV feeder to a local step-down transformer near the load, LV distributed locally) OR relocate the load nearer its source. An ever-fatter LV conductor is the wrong response at this reach.
+[conn-DESIGN] u_route_107_fluid_loop (fluid_loop) Inlet Flow Control Valve -> Degassing Blower: Run Inlet Flow Control Valve→Degassing Blower: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 542 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-WARN] u_route_0_fluid_loop (fluid_loop) rearing_tanks -> rotary_drum_filter: DN300 7.629 exceeds ≤3 m/s velocity over 157.73 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_1_fluid_loop (fluid_loop) rotary_drum_filter -> mbbr_biofilter: DN300 7.629 exceeds ≤3 m/s velocity over 22.92 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_4_fluid_loop (fluid_loop) oxygen_cones -> uv_ozone_disinfection: DN300 6.358 exceeds ≤3 m/s velocity over 493.07 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_8_fluid_loop (fluid_loop) Uv Reactor -> Protein Skimming: DN300 6.358 exceeds ≤3 m/s velocity over 18.65 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_9_fluid_loop (fluid_loop) Protein Skimming -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 443.34 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_10_fluid_loop (fluid_loop) Backup Immersion Heater -> Protein Skimming: DN300 6.358 exceeds ≤3 m/s velocity over 111.32 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_11_fluid_loop (fluid_loop) Recirc Pump -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 116.3 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_12_fluid_loop (fluid_loop) Pipework Run -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 116.96 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_13_fluid_loop (fluid_loop) Distribution Manifold -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 117.53 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_16_fluid_loop (fluid_loop) Flow Control Valve -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 126.06 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_17_fluid_loop (fluid_loop) Expansion Reservoir -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 118.2 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_22_fluid_loop (fluid_loop) Drum Filter Backwash -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 167.36 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_24_fluid_loop (fluid_loop) Drum Filter Screen -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 169.66 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_26_fluid_loop (fluid_loop) Degasser Column -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 172.06 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_29_fluid_loop (fluid_loop) Degassing Blower -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 119.44 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_30_fluid_loop (fluid_loop) Emergency O₂ Solenoid + Diffuser (fail-open) -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 120.45 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_33_fluid_loop (fluid_loop) Dissolved-O₂ Control Valve -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 126.15 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_34_fluid_loop (fluid_loop) Make-up Water System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 122.56 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_35_fluid_loop (fluid_loop) Bleed / Drain System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 165.42 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_36_fluid_loop (fluid_loop) Chemical Dosing System (pH / Alkalinity) -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 125.02 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_37_fluid_loop (fluid_loop) Feed Storage + Distribution System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 174.88 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/build_universal_scene.py:11012: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  bsdf = m.node_tree.nodes.get("Principled BSDF") if m.use_nodes else None
+/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/build_universal_scene.py:11138: DeprecationWarning: 'World.use_nodes' is expected to be removed in Blender 6.0
+  world.use_nodes = True
+01:00.899  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-hero.png'
+01:01.962  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-iso.png'
+01:02.961  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-top.png'
+01:03.973  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-front.png'
+01:05.008  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-side.png'
+
+[conn-WARN] u_route_39_fluid_loop (fluid_loop) Solids / Sludge Handling System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 127.79 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_41_fluid_loop (fluid_loop) Biofilm Carrier Media (MBBR) -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 129.3 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_42_fluid_loop (fluid_loop) Grading / Harvest System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 130.87 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_43_fluid_loop (fluid_loop) Product Chilling + Ice System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 151.71 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_44_fluid_loop (fluid_loop) Mortality Handling System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 133.72 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_45_fluid_loop (fluid_loop) Intake + Make-up Treatment Skid -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 135.33 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_47_fluid_loop (fluid_loop) Live-Fish Handling + Transfer System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 138.34 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_48_fluid_loop (fluid_loop) Biosecurity / Quarantine System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 140.25 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_50_fluid_loop (fluid_loop) AnoxKaldnes K5-MBBR-220 -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 165.44 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_51_fluid_loop (fluid_loop) Pentair RAS-DG-1670 -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 142.22 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_56_fluid_loop (fluid_loop) UV Sterilization -> Protein Skimming: DN300 6.358 exceeds ≤3 m/s velocity over 4.72 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_58_fluid_loop (fluid_loop) Oxygenation System -> Protein Skimming: DN300 6.358 exceeds ≤3 m/s velocity over 529.89 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_60_fluid_loop (fluid_loop) Expansion Vessel -> Backup Immersion Heater: DN300 6.358 exceeds ≤3 m/s velocity over 11.8 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_62_electrical_bus (electrical_bus) Standby Diesel Generator -> Backup Immersion Heater: 6×400 mm² 5.011 exceeds ≤5% volt-drop over 471.46 m — D2 DESIGN RECOMMENDATION — LV reach exceeded; sub-distribution / relocate (see design_recommendation)
+[conn-WARN] u_route_107_fluid_loop (fluid_loop) Inlet Flow Control Valve -> Degassing Blower: DN300 6.358 exceeds ≤3 m/s velocity over 541.63 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[parts-manifest] wrote 109 placed parts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/parts-manifest.json  (plant 59.2×501.6×19.1 m)
+[route-manifest] wrote 108 routed lines (613 waypoints, 397 fittings) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/route-manifest.json
+[univ] INSPECT mode ON — clean CAD-inspection render (set INSPECT=0 for the PDF pipeline)
+[univ][inspect] recoloured equip=841 frame=51 pipe=2617 rack=46 unmatched=0
+[univ][inspect] view_transform=Standard
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-hero.png  (ortho_scale=391.1 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-iso.png  (ortho_scale=558.8 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-top.png  (ortho_scale=806.0 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-front.png  (ortho_scale=71.9 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/inspect-side.png  (ortho_scale=554.1 m)
+[univ][inspect] DONE — inspect-iso/top/front/side.png in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15
+[univ] SUMMARY {"geometry_family": "process_plant", "aero_subtype": null, "physical_parts": 98, "dropped": 170, "topology_total": 108, "topology_routed": 108, "topology_unresolved": [], "regions": ["mass_fluid_transport_process", "structure_containment", "water_treatment_system", "actuation_kinematics", "environmental_interface", "power_distribution", "control_compute_communication", "sensing_instrumentation", "safety_protection"], "route_audit": {"routes": 108, "over_equipment_segments": 26, "over_equipment_routes": ["u_route_13_fluid_loop", "u_route_14_electrical_bus", "u_route_17_fluid_loop", "u_route_19_electrical_bus", "u_route_27_electrical_bus", "u_route_31_electrical_bus", "u_route_38_electrical_bus", "u_route_3_fluid_loop", "u_route_4_fluid_loop", "u_route_53_electrical_bus", "u_route_59_signal", "u_route_61_electrical_bus", "u_route_62_electrical_bus", "u_route_6_fluid_loop", "u_route_7_electrical_bus", "u_route_8_fluid_loop"], "max_detour_ratio": 84.424, "max_detour_route": "u_route_8_fluid_loop", "same_elevation_crossings": 1, "crossing_detail": [["u_route_64_electrical_bus", "u_route_68_electrical_bus", 3346.0]], "tiers_used_note": "tiers separate crossings; lanes keep parallels apart"}, "route_reconcile": {"instrument_edges_dropped": 1, "routes_capped": 52, "length_saved_m": 18318.7, "gbp_saved": 2987518.39}, "connection_schedule_totals": {"cable_m_by_csa": {"1.5 mm\u00b2": 9175.3, "16 mm\u00b2": 75.5, "25 mm\u00b2": 132.7, "2\u00d7400 mm\u00b2": 84.3, "6\u00d7400 mm\u00b2": 1075.8, "95 mm\u00b2": 5354.0}, "pipe_m_by_dn": {"DN15": 64.7, "DN200": 217.1, "DN250": 144.5, "DN300": 5788.1}, "duct_m_by_size": {}, "other_m": 0.0, "runs_sized": 107, "runs_out_of_spec": 36, "runs_upsized": 60, "design_recommendations": 38, "cable_gbp": 1111423.86, "pipe_gbp": 1488830.64, "duct_gbp": 0.0, "transformer_gbp": 0.0, "other_gbp": 0.0, "terminations_gbp": 31853.2, "install_gbp": 2568401.3, "grand_total_gbp": 2600254.5, "cost_source": "model:uk-2026-supply+install"}, "parts_manifest_count": 109, "route_manifest_count": 108, "inspect": {"equip": 841, "frame": 51, "pipe": 2617, "rack": 46, "unmatched": 0}}
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:46:23)
+
+Blender quit
+Error: Not freed memory blocks: 1, total unfreed memory 0.062584 MB
+[univ] state=/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/state.json
+[univ] out  =/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15
+[univ] physical parts kept = 98; non-physical dropped = 170
+[univ] dropped: Casing, Impeller / Rotor, Drive Motor, Variable-Speed Drive, Flexible Coupling, Coupling Guard, Baseplate, Mechanical Seal, Suction Isolation Valve, Discharge Isolation Valve, Non-Return Valve, Discharge Pressure Gauge, Anti-Vibration Mounts, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Tank Wall (laminate), Tank Floor (graded to centre), Dual Drain / Centre Standpipe, Side Drain & Overflow, Inlet Distribution Ring, Internal Flow Baffles, Rim Stiffener, Access Walkway & Handrail, Internal Gelcoat / Lining, Earthing Boss, Nameplate, Drum / Element, Media / Mesh Panels, Drive Gearmotor, Backwash Spray Bar, Backwash Pump, Reject Trough, Differential-Pressure Switch, Support Frame, Local Control Panel, Tank Wall (laminate), Tank Floor (graded to centre), Dual Drain / Centre Standpipe, Side Drain & Overflow, Inlet Distribution Ring, Internal Flow Baffles, Rim Stiffener, Access Walkway & Handrail, Internal Gelcoat / Lining, Earthing Boss, Nameplate, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Drum / Element, Media / Mesh Panels, Drive Gearmotor, Backwash Spray Bar, Backwash Pump, Reject Trough, Differential-Pressure Switch, Support Frame, Local Control Panel, Drum / Element, Media / Mesh Panels, Drive Gearmotor, Backwash Spray Bar, Backwash Pump, Reject Trough, Differential-Pressure Switch, Support Frame, Local Control Panel, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Scroll Compressor, Evaporator Coil, Condenser Coil, Expansion Valve, Refrigerant Charge, Suction Accumulator, Refrigerant Pressure Switches, Control Panel, Frame & Panels, Anti-Vibration Mounts, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Process Unit, Inlet / Outlet Manifolds, Flow Control Valve, Dosing / Lamp Module, Local Sensor, Control & Power Module, Mounting Frame, Process Unit, Inlet / Outlet Manifolds, Flow Control Valve, Dosing / Lamp Module, Local Sensor, Control & Power Module, Mounting Frame, Process Unit, Inlet / Outlet Manifolds, Flow Control Valve, Dosing / Lamp Module, Local Sensor, Control & Power Module, Mounting Frame, Shell Course, Top Head / Roof, Base / Floor Plate, Support Skirt / Legs, Manway & Cover, Inlet Nozzle Set, Outlet Nozzle Set, Drain Nozzle, Overflow / Weir, Internal Distribution, Tank Vent / Pressure Relief, Access Ladder & Platform, Internal Lining / Coating, Earthing Boss, Nameplate, Power Contactor, Compression Latch
+[univ] undimensioned-tall cap = 40.2 m (= 1.6× tallest dimensioned vessel); capped parts: none
+[univ] cross-module augmentation: +3 FLUID process line(s) from grammar links not covered by topology (1 pairs already routed)
+[univ]   +aug fluid: Uv Reactor -> Protein Skimming
+[univ]   +aug fluid: Protein Skimming -> Rearing Tank
+[univ]   +aug fluid: Backup Immersion Heater -> Protein Skimming
+[univ] orphan connector: +97 edge(s) — 35 power, 31 signal, 31 water (power hub=Standby Diesel Generator, control hub=Main Controller)
+[univ] region order (L->R): ['mass_fluid_transport_process', 'structure_containment', 'water_treatment_system', 'actuation_kinematics', 'environmental_interface', 'power_distribution', 'control_compute_communication', 'sensing_instrumentation', 'safety_protection']
+[univ] geometry family = process_plant  (product_class=aquaculture_ras; aero/flight-vehicle = 0, tower-machine = 0 [grounded=True], grow/panel = 1 (distinct 1), battery-system = 1, rack/cabinet/server = 2 (structure 0, rack_class=False), vessel = 10 (distinct 8), marine = 0 (is_marine=False), of 98 physical parts; true_aircraft=False, true_spacecraft=False)
+[univ][flow] flow order (feed→product): ['actuation_kinematics', 'environmental_interface', 'structure_containment', 'mass_fluid_transport_process', 'water_treatment_system', 'sensing_instrumentation']
+[univ][flow] periphery (non-flow → back row): ['power_distribution', 'control_compute_communication', 'safety_protection']
+[univ][flow] train lanes=2 (regions ['actuation_kinematics', 'environmental_interface', 'structure_containment', 'mass_fluid_transport_process', 'water_treatment_system', 'sensing_instrumentation']); periphery back row=['power_distribution', 'control_compute_communication', 'safety_protection']
+[univ][flow] mega-array isolation: ['mass_fluid_transport_process'] → own solo lane(s); banks now 4
+[univ] plant bbox (mm): {'x0': -800.0, 'x1': 70710.99681269976, 'y0': -26580.945731407483, 'y1': 474175.77016826597}
+[univ] skid frame: 71.3×500.6 m footprint, 23.4 m tall, 9 post bays, clean minimal (no X-bracing)
+[univ] pipe rack: 69.9 m span @ 22.8 m, 15 bays, 2 tiers
+[univ][spine] axis=x  spine_y=403594  aisle=12136 mm (flow-train bisector, 81 train equip of 98)  x∈[-800,70711]
+[univ] routed edge 0 (fluid_loop): Rearing Tank  ->  Drum Filter
+[univ] routed edge 1 (fluid_loop): Drum Filter  ->  Biofilter
+[univ] routed edge 2 (fluid_loop): Biofilter  ->  Degasser
+[univ] routed edge 3 (fluid_loop): Degasser  ->  Oxygen Supply (LOX) System
+[univ] routed edge 4 (fluid_loop): Oxygen Supply (LOX) System  ->  Uv Reactor
+[univ] routed edge 5 (thermal): Heat Pump  ->  Rearing Tank
+[univ] routed edge 6 (fluid_loop): oxygen_supply  ->  Oxygen Supply (LOX) System
+[univ] routed edge 7 (electrical_bus) CABLE-TRAY: electrical_supply  ->  Recirc Pump  (+0 load drops)
+[univ] routed edge 8 (fluid_loop): Uv Reactor  ->  Protein Skimming
+[univ] routed edge 9 (fluid_loop): Protein Skimming  ->  Rearing Tank
+[univ] routed edge 10 (fluid_loop): Backup Immersion Heater  ->  Protein Skimming
+[univ] routed edge 11 (fluid_loop): Recirc Pump  ->  Rearing Tank
+[univ] routed edge 12 (fluid_loop): Pipework Run  ->  Rearing Tank
+[univ] routed edge 13 (fluid_loop): Distribution Manifold  ->  Rearing Tank
+[univ] routed edge 14 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Flow Control Valve  (+0 load drops)
+[univ] routed edge 15 (signal): Flow Control Valve  ->  Main Controller
+[univ] routed edge 16 (fluid_loop): Flow Control Valve  ->  Rearing Tank
+[univ] routed edge 17 (fluid_loop): Expansion Reservoir  ->  Rearing Tank
+[univ] routed edge 18 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Drum Filter  (+0 load drops)
+[univ] routed edge 19 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Biofilter  (+0 load drops)
+[univ] routed edge 20 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Degasser  (+0 load drops)
+[univ] routed edge 21 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Drum Filter Backwash  (+0 load drops)
+[univ] routed edge 22 (fluid_loop): Drum Filter Backwash  ->  Rearing Tank
+[univ] routed edge 23 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Drum Filter Screen  (+0 load drops)
+[univ] routed edge 24 (fluid_loop): Drum Filter Screen  ->  Rearing Tank
+[univ] routed edge 25 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Degasser Column  (+0 load drops)
+[univ] routed edge 26 (fluid_loop): Degasser Column  ->  Rearing Tank
+[univ] routed edge 27 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Aeration Blower  (+0 load drops)
+[univ] routed edge 28 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Degassing Blower  (+0 load drops)
+[univ] routed edge 29 (fluid_loop): Degassing Blower  ->  Rearing Tank
+[univ] routed edge 30 (fluid_loop): Emergency O₂ Solenoid + Diffuser (fail-open)  ->  Rearing Tank
+[univ] routed edge 31 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Dissolved-O₂ Control Valve  (+0 load drops)
+[univ] routed edge 32 (signal): Dissolved-O₂ Control Valve  ->  Main Controller
+[univ] routed edge 33 (fluid_loop): Dissolved-O₂ Control Valve  ->  Rearing Tank
+[univ] routed edge 34 (fluid_loop): Make-up Water System  ->  Rearing Tank
+[univ] routed edge 35 (fluid_loop): Bleed / Drain System  ->  Rearing Tank
+[univ] routed edge 36 (fluid_loop): Chemical Dosing System (pH / Alkalinity)  ->  Rearing Tank
+[univ] routed edge 37 (fluid_loop): Feed Storage + Distribution System  ->  Rearing Tank
+[univ] routed edge 38 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Oxygen Supply (LOX) System  (+0 load drops)
+[univ] routed edge 39 (fluid_loop): Solids / Sludge Handling System  ->  Rearing Tank
+[univ] routed edge 40 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Biofilm Carrier Media (MBBR)  (+0 load drops)
+[univ] routed edge 41 (fluid_loop): Biofilm Carrier Media (MBBR)  ->  Rearing Tank
+[univ] routed edge 42 (fluid_loop): Grading / Harvest System  ->  Rearing Tank
+[univ] routed edge 43 (fluid_loop): Product Chilling + Ice System  ->  Rearing Tank
+[univ] routed edge 44 (fluid_loop): Mortality Handling System  ->  Rearing Tank
+[univ] routed edge 45 (fluid_loop): Intake + Make-up Treatment Skid  ->  Rearing Tank
+[univ] routed edge 46 (fluid_loop): Effluent Treatment + Discharge System  ->  Rearing Tank
+[univ] routed edge 47 (fluid_loop): Live-Fish Handling + Transfer System  ->  Rearing Tank
+[univ] routed edge 48 (fluid_loop): Biosecurity / Quarantine System  ->  Rearing Tank
+[univ] routed edge 49 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  AnoxKaldnes K5-MBBR-220  (+0 load drops)
+[univ] routed edge 50 (fluid_loop): AnoxKaldnes K5-MBBR-220  ->  Rearing Tank
+[univ] routed edge 51 (fluid_loop): Pentair RAS-DG-1670  ->  Rearing Tank
+[univ] routed edge 52 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Heat Pump  (+0 load drops)
+[univ] routed edge 53 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Uv Reactor  (+0 load drops)
+[univ] routed edge 54 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Protein Skimming  (+0 load drops)
+[univ] routed edge 55 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  UV Sterilization  (+0 load drops)
+[univ] routed edge 56 (fluid_loop): UV Sterilization  ->  Protein Skimming
+[univ] routed edge 57 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Oxygen Supply (LOX) System  (+0 load drops)
+[univ] routed edge 58 (fluid_loop): Oxygen Supply (LOX) System  ->  Protein Skimming
+[univ] routed edge 59 (signal): Temperature Sensor  ->  Main Controller
+[univ] routed edge 60 (fluid_loop): Expansion Vessel  ->  Backup Immersion Heater
+[univ] routed edge 61 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Dehumidifier  (+0 load drops)
+[univ] routed edge 62 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Backup Immersion Heater  (+0 load drops)
+[univ] routed edge 63 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Building Ventilation (HRV)  (+0 load drops)
+[univ] routed edge 64 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Main Breaker  (+0 load drops)
+[univ] routed edge 65 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Distribution Busbar  (+0 load drops)
+[univ] routed edge 66 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Fuse Holder  (+0 load drops)
+[univ] routed edge 67 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Surge Protector  (+0 load drops)
+[univ] routed edge 68 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Control + Instrument UPS  (+0 load drops)
+[univ] routed edge 69 (signal): Control + Instrument UPS  ->  Main Controller
+[univ] routed edge 70 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Main Controller  (+0 load drops)
+[univ] routed edge 71 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Communication Gateway  (+0 load drops)
+[univ] routed edge 72 (signal): Communication Gateway  ->  Main Controller
+[univ] routed edge 73 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  I/O Module  (+0 load drops)
+[univ] routed edge 74 (signal): I/O Module  ->  Main Controller
+[univ] routed edge 75 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Network Switch  (+0 load drops)
+[univ] routed edge 76 (signal): Network Switch  ->  Main Controller
+[univ] routed edge 77 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Controller Power Supply  (+0 load drops)
+[univ] routed edge 78 (signal): Controller Power Supply  ->  Main Controller
+[univ] routed edge 79 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  SCADA / Plant Control System  (+0 load drops)
+[univ] routed edge 80 (signal): SCADA / Plant Control System  ->  Main Controller
+[univ] routed edge 81 (signal): Voltage Sensor  ->  Main Controller
+[univ] routed edge 82 (signal): Current Sensor  ->  Main Controller
+[univ] routed edge 83 (signal): Temperature Probe  ->  Main Controller
+[univ] routed edge 84 (signal): Pressure Sensor  ->  Main Controller
+[univ] routed edge 85 (signal): Signal Conditioner  ->  Main Controller
+[univ] routed edge 86 (signal): Level Transmitter  ->  Main Controller
+[univ] routed edge 87 (signal): Temperature Transmitter  ->  Main Controller
+[univ] routed edge 88 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Dissolved-Oxygen Analyser  (+0 load drops)
+[univ] routed edge 89 (signal): Dissolved-Oxygen Analyser  ->  Main Controller
+[univ] routed edge 90 (signal): TAN / Ammonia Analyser  ->  Main Controller
+[univ] routed edge 91 (signal): Nitrate Analyser  ->  Main Controller
+[univ] routed edge 92 (signal): Dissolved-CO₂ Analyser  ->  Main Controller
+[univ] routed edge 93 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  UV Transmittance / Intensity Monitor  (+0 load drops)
+[univ] routed edge 94 (signal): UV Transmittance / Intensity Monitor  ->  Main Controller
+[univ] routed edge 95 (signal): pH Analyser  ->  Main Controller
+[univ] routed edge 96 (signal): Conductivity / Salinity Analyser  ->  Main Controller
+[univ] routed edge 97 (signal): O₂ Header Pressure Transmitter  ->  Main Controller
+[univ] routed edge 98 (signal): LOX Tank Level + Low Alarm  ->  Main Controller
+[univ] routed edge 99 (fluid_loop): LOX Tank Level + Low Alarm  ->  Voltage Sensor
+[univ] routed edge 100 (signal): Protective Relay  ->  Main Controller
+[univ] routed edge 101 (signal): Emergency Stop Button  ->  Main Controller
+[univ] routed edge 102 (signal): Isolation Device  ->  Main Controller
+[univ] routed edge 103 (signal): Fire Detector  ->  Main Controller
+[univ] routed edge 104 (signal): Interlock Switch  ->  Main Controller
+[univ] routed edge 105 (electrical_bus) CABLE-TRAY: Standby Diesel Generator  ->  Inlet Flow Control Valve  (+0 load drops)
+[univ] routed edge 106 (signal): Inlet Flow Control Valve  ->  Main Controller
+[univ] routed edge 107 (fluid_loop): Inlet Flow Control Valve  ->  Degassing Blower
+[univ] topology routed = 108/108; unresolved = 0
+[univ][route-audit] routes=108  over_equipment_segments=0  max_detour_ratio=6.987  same_elevation_crossings=2
+[univ][route-audit]   same-Z crossings: [('u_route_64_electrical_bus', 'u_route_68_electrical_bus', 3346.0), ('u_route_71_electrical_bus', 'u_route_79_electrical_bus', 4126.0)]
+[univ][route-reconcile] DEFECT 1: dropped 1 fluid edge(s) routed onto a pure instrument (11 m of phantom pipe)
+[univ][route-reconcile]   drop  'LOX Tank Level + Low Alarm'→'Voltage Sensor'  DN300 11 m
+[univ][route-reconcile] DEFECT 2: capped 27 detour route(s) at 2.5× straight-line + 5 m (1098 m of routed length removed)
+[univ][route-reconcile] costed £ 2,416,346 → 2,337,648 (saved £78,697)
+[conn-schedule] 107 runs sized; cable-m by CSA: {'1.5 mm²': 1762.3, '16 mm²': 186.0, '240 mm²': 103.5, '25 mm²': 1556.3, '400 mm²': 84.3, '6 mm²': 113.9, '6×400 mm²': 974.7, '95 mm²': 1423.1}; pipe-m by DN: {'DN15': 64.7, 'DN200': 70.8, 'DN250': 144.5, 'DN300': 5731.2}; duct-m by size: {}
+[conn-bom] cable £874,149 | pipe £1,463,500 | duct £0 | total £2,337,648 (terminations £28,181; source model:uk-2026-supply+install)
+[conn-schedule] volt-drop limit 5% (env CONN_VOLTDROP_LIMIT_PCT); D1 upsized 55 run(s); D2 design recommendations: 38
+[conn-schedule] rendered outer_dia_mm range: min=3.3 mm  max=323.9 mm  (12 distinct sizes)
+[conn-UPSIZE] u_route_0_fluid_loop (fluid_loop) rearing_tanks -> rotary_drum_filter: DN300 → DN300 in 0 step(s) — flow 556.7 L/s stays > 3 m/s even at the largest standard bore (DN300) over 118 m; now 7.629 (in spec)
+[conn-UPSIZE] u_route_1_fluid_loop (fluid_loop) rotary_drum_filter -> mbbr_biofilter: DN300 → DN300 in 0 step(s) — flow 556.7 L/s stays > 3 m/s even at the largest standard bore (DN300) over 45 m; now 7.629 (in spec)
+[conn-UPSIZE] u_route_4_fluid_loop (fluid_loop) oxygen_cones -> uv_ozone_disinfection: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 503 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_8_fluid_loop (fluid_loop) Uv Reactor -> Protein Skimming: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 491 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_9_fluid_loop (fluid_loop) Protein Skimming -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 102 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_10_fluid_loop (fluid_loop) Backup Immersion Heater -> Protein Skimming: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 497 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_11_fluid_loop (fluid_loop) Recirc Pump -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 103 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_12_fluid_loop (fluid_loop) Pipework Run -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 106 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_13_fluid_loop (fluid_loop) Distribution Manifold -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 108 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_14_electrical_bus (electrical_bus) Standby Diesel Generator -> Flow Control Valve: 16 mm² → 25 mm² in 1 step(s) — volt-drop 6.164% > 5% over 122 m at 87.1 A on 415 V; now 3.944 (in spec)
+[conn-UPSIZE] u_route_16_fluid_loop (fluid_loop) Flow Control Valve -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 106 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_17_fluid_loop (fluid_loop) Expansion Reservoir -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 110 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_18_electrical_bus (electrical_bus) Standby Diesel Generator -> Drum Filter: 16 mm² → 25 mm² in 1 step(s) — volt-drop 7.646% > 5% over 152 m at 87.1 A on 415 V; now 4.892 (in spec)
+[conn-UPSIZE] u_route_19_electrical_bus (electrical_bus) Standby Diesel Generator -> Biofilter: 16 mm² → 25 mm² in 1 step(s) — volt-drop 6.323% > 5% over 125 m at 87.1 A on 415 V; now 4.046 (in spec)
+[conn-UPSIZE] u_route_20_electrical_bus (electrical_bus) Standby Diesel Generator -> Degasser: 16 mm² → 25 mm² in 1 step(s) — volt-drop 5.91% > 5% over 117 m at 87.1 A on 415 V; now 3.781 (in spec)
+[conn-UPSIZE] u_route_21_electrical_bus (electrical_bus) Standby Diesel Generator -> Drum Filter Backwash: 16 mm² → 25 mm² in 1 step(s) — volt-drop 6.428% > 5% over 128 m at 87.1 A on 415 V; now 4.113 (in spec)
+[conn-UPSIZE] u_route_22_fluid_loop (fluid_loop) Drum Filter Backwash -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 140 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_23_electrical_bus (electrical_bus) Standby Diesel Generator -> Drum Filter Screen: 16 mm² → 25 mm² in 1 step(s) — volt-drop 6.339% > 5% over 126 m at 87.1 A on 415 V; now 4.056 (in spec)
+[conn-UPSIZE] u_route_24_fluid_loop (fluid_loop) Drum Filter Screen -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 144 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_25_electrical_bus (electrical_bus) Standby Diesel Generator -> Degasser Column: 16 mm² → 25 mm² in 1 step(s) — volt-drop 6.005% > 5% over 119 m at 87.1 A on 415 V; now 3.842 (in spec)
+[conn-UPSIZE] u_route_26_fluid_loop (fluid_loop) Degasser Column -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 144 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_27_electrical_bus (electrical_bus) Standby Diesel Generator -> Aeration Blower: 1.5 mm² → 6 mm² in 3 step(s) — volt-drop 15.262% > 5% over 114 m at 22.2 A on 415 V; now 3.807 (in spec)
+[conn-UPSIZE] u_route_28_electrical_bus (electrical_bus) Standby Diesel Generator -> Degassing Blower: 16 mm² → 25 mm² in 1 step(s) — volt-drop 5.427% > 5% over 108 m at 87.1 A on 415 V; now 3.473 (in spec)
+[conn-UPSIZE] u_route_29_fluid_loop (fluid_loop) Degassing Blower -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 112 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_30_fluid_loop (fluid_loop) Emergency O₂ Solenoid + Diffuser (fail-open) -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 114 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_31_electrical_bus (electrical_bus) Standby Diesel Generator -> Dissolved-O₂ Control Valve: 16 mm² → 25 mm² in 1 step(s) — volt-drop 6.137% > 5% over 122 m at 87.1 A on 415 V; now 3.927 (in spec)
+[conn-UPSIZE] u_route_33_fluid_loop (fluid_loop) Dissolved-O₂ Control Valve -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 106 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_34_fluid_loop (fluid_loop) Make-up Water System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 117 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_35_fluid_loop (fluid_loop) Bleed / Drain System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 153 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_36_fluid_loop (fluid_loop) Chemical Dosing System (pH / Alkalinity) -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 121 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_37_fluid_loop (fluid_loop) Feed Storage + Distribution System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 152 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_38_electrical_bus (electrical_bus) Standby Diesel Generator -> Oxygen Supply (LOX) System: 16 mm² → 25 mm² in 1 step(s) — volt-drop 5.317% > 5% over 106 m at 87.1 A on 415 V; now 3.402 (in spec)
+[conn-UPSIZE] u_route_39_fluid_loop (fluid_loop) Solids / Sludge Handling System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 124 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_40_electrical_bus (electrical_bus) Standby Diesel Generator -> Biofilm Carrier Media (MBBR): 16 mm² → 25 mm² in 1 step(s) — volt-drop 5.402% > 5% over 107 m at 87.1 A on 415 V; now 3.456 (in spec)
+[conn-UPSIZE] u_route_41_fluid_loop (fluid_loop) Biofilm Carrier Media (MBBR) -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 127 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_42_fluid_loop (fluid_loop) Grading / Harvest System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 129 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_43_fluid_loop (fluid_loop) Product Chilling + Ice System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 149 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_44_fluid_loop (fluid_loop) Mortality Handling System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 132 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_45_fluid_loop (fluid_loop) Intake + Make-up Treatment Skid -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 135 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_46_fluid_loop (fluid_loop) Effluent Treatment + Discharge System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 144 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_47_fluid_loop (fluid_loop) Live-Fish Handling + Transfer System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 138 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_48_fluid_loop (fluid_loop) Biosecurity / Quarantine System -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 140 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_49_electrical_bus (electrical_bus) Standby Diesel Generator -> AnoxKaldnes K5-MBBR-220: 16 mm² → 25 mm² in 1 step(s) — volt-drop 5.888% > 5% over 117 m at 87.1 A on 415 V; now 3.767 (in spec)
+[conn-UPSIZE] u_route_50_fluid_loop (fluid_loop) AnoxKaldnes K5-MBBR-220 -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 145 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_51_fluid_loop (fluid_loop) Pentair RAS-DG-1670 -> Rearing Tank: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 142 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_53_electrical_bus (electrical_bus) Standby Diesel Generator -> Uv Reactor: 16 mm² → 95 mm² in 5 step(s) — volt-drop 23.309% > 5% over 463 m at 87.1 A on 415 V; now 3.925 (in spec)
+[conn-UPSIZE] u_route_56_fluid_loop (fluid_loop) UV Sterilization -> Protein Skimming: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 5 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_57_electrical_bus (electrical_bus) Standby Diesel Generator -> Oxygenation System: 16 mm² → 25 mm² in 1 step(s) — volt-drop 5.432% > 5% over 108 m at 87.1 A on 415 V; now 3.475 (in spec)
+[conn-UPSIZE] u_route_58_fluid_loop (fluid_loop) Oxygenation System -> Protein Skimming: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 137 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_60_fluid_loop (fluid_loop) Expansion Vessel -> Backup Immersion Heater: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 63 m; now 6.358 (in spec)
+[conn-UPSIZE] u_route_61_electrical_bus (electrical_bus) Standby Diesel Generator -> Dehumidifier: 120 mm² → 6×400 mm² in 5 step(s) — 489 m at 326.8 A on 415 V (= 159,882 A·m) exceeds practical LV reach (~90,000 A·m); now 0.636 (in spec)
+[conn-UPSIZE] u_route_62_electrical_bus (electrical_bus) Standby Diesel Generator -> Backup Immersion Heater: 300 mm² → 6×400 mm² in 11 step(s) — 485 m at 2433.8 A on 415 V (= 1,181,491 A·m) exceeds practical LV reach (~90,000 A·m); now 5.16 (in spec)
+[conn-UPSIZE] u_route_63_electrical_bus (electrical_bus) Standby Diesel Generator -> Building Ventilation (HRV): 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.262% > 5% over 482 m at 87.1 A on 415 V; now 4.085 (in spec)
+[conn-UPSIZE] u_route_105_electrical_bus (electrical_bus) Standby Diesel Generator -> Inlet Flow Control Valve: 16 mm² → 95 mm² in 5 step(s) — volt-drop 24.135% > 5% over 479 m at 87.1 A on 415 V; now 4.064 (in spec)
+[conn-UPSIZE] u_route_107_fluid_loop (fluid_loop) Inlet Flow Control Valve -> Degassing Blower: DN300 → DN300 in 0 step(s) — flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 510 m; now 6.358 (in spec)
+[conn-DESIGN] u_route_0_fluid_loop (fluid_loop) rearing_tanks -> rotary_drum_filter: Run rearing_tanks→rotary_drum_filter: flow 556.7 L/s stays > 3 m/s even at the largest standard bore (DN300) over 118 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_1_fluid_loop (fluid_loop) rotary_drum_filter -> mbbr_biofilter: Run rotary_drum_filter→mbbr_biofilter: flow 556.7 L/s stays > 3 m/s even at the largest standard bore (DN300) over 45 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_4_fluid_loop (fluid_loop) oxygen_cones -> uv_ozone_disinfection: Run oxygen_cones→uv_ozone_disinfection: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 503 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_8_fluid_loop (fluid_loop) Uv Reactor -> Protein Skimming: Run Uv Reactor→Protein Skimming: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 491 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_9_fluid_loop (fluid_loop) Protein Skimming -> Rearing Tank: Run Protein Skimming→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 102 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_10_fluid_loop (fluid_loop) Backup Immersion Heater -> Protein Skimming: Run Backup Immersion Heater→Protein Skimming: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 497 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_11_fluid_loop (fluid_loop) Recirc Pump -> Rearing Tank: Run Recirc Pump→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 103 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_12_fluid_loop (fluid_loop) Pipework Run -> Rearing Tank: Run Pipework Run→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 106 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_13_fluid_loop (fluid_loop) Distribution Manifold -> Rearing Tank: Run Distribution Manifold→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 108 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_16_fluid_loop (fluid_loop) Flow Control Valve -> Rearing Tank: Run Flow Control Valve→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 106 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_17_fluid_loop (fluid_loop) Expansion Reservoir -> Rearing Tank: Run Expansion Reservoir→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 110 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_22_fluid_loop (fluid_loop) Drum Filter Backwash -> Rearing Tank: Run Drum Filter Backwash→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 140 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_24_fluid_loop (fluid_loop) Drum Filter Screen -> Rearing Tank: Run Drum Filter Screen→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 144 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_26_fluid_loop (fluid_loop) Degasser Column -> Rearing Tank: Run Degasser Column→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 144 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_29_fluid_loop (fluid_loop) Degassing Blower -> Rearing Tank: Run Degassing Blower→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 112 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_30_fluid_loop (fluid_loop) Emergency O₂ Solenoid + Diffuser (fail-open) -> Rearing Tank: Run Emergency O₂ Solenoid + Diffuser (fail-open)→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 114 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_33_fluid_loop (fluid_loop) Dissolved-O₂ Control Valve -> Rearing Tank: Run Dissolved-O₂ Control Valve→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 106 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_34_fluid_loop (fluid_loop) Make-up Water System -> Rearing Tank: Run Make-up Water System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 117 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_35_fluid_loop (fluid_loop) Bleed / Drain System -> Rearing Tank: Run Bleed / Drain System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 153 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_36_fluid_loop (fluid_loop) Chemical Dosing System (pH / Alkalinity) -> Rearing Tank: Run Chemical Dosing System (pH / Alkalinity)→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 121 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_37_fluid_loop (fluid_loop) Feed Storage + Distribution System -> Rearing Tank: Run Feed Storage + Distribution System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 152 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_39_fluid_loop (fluid_loop) Solids / Sludge Handling System -> Rearing Tank: Run Solids / Sludge Handling System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 124 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_41_fluid_loop (fluid_loop) Biofilm Carrier Media (MBBR) -> Rearing Tank: Run Biofilm Carrier Media (MBBR)→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 127 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_42_fluid_loop (fluid_loop) Grading / Harvest System -> Rearing Tank: Run Grading / Harvest System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 129 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_43_fluid_loop (fluid_loop) Product Chilling + Ice System -> Rearing Tank: Run Product Chilling + Ice System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 149 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_44_fluid_loop (fluid_loop) Mortality Handling System -> Rearing Tank: Run Mortality Handling System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 132 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_45_fluid_loop (fluid_loop) Intake + Make-up Treatment Skid -> Rearing Tank: Run Intake + Make-up Treatment Skid→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 135 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_46_fluid_loop (fluid_loop) Effluent Treatment + Discharge System -> Rearing Tank: Run Effluent Treatment + Discharge System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 144 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_47_fluid_loop (fluid_loop) Live-Fish Handling + Transfer System -> Rearing Tank: Run Live-Fish Handling + Transfer System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 138 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_48_fluid_loop (fluid_loop) Biosecurity / Quarantine System -> Rearing Tank: Run Biosecurity / Quarantine System→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 140 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_50_fluid_loop (fluid_loop) AnoxKaldnes K5-MBBR-220 -> Rearing Tank: Run AnoxKaldnes K5-MBBR-220→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 145 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_51_fluid_loop (fluid_loop) Pentair RAS-DG-1670 -> Rearing Tank: Run Pentair RAS-DG-1670→Rearing Tank: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 142 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_56_fluid_loop (fluid_loop) UV Sterilization -> Protein Skimming: Run UV Sterilization→Protein Skimming: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 5 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_58_fluid_loop (fluid_loop) Oxygenation System -> Protein Skimming: Run Oxygenation System→Protein Skimming: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 137 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_60_fluid_loop (fluid_loop) Expansion Vessel -> Backup Immersion Heater: Run Expansion Vessel→Backup Immersion Heater: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 63 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-DESIGN] u_route_61_electrical_bus (electrical_bus) Standby Diesel Generator -> Dehumidifier: Run Standby Diesel Generator→Dehumidifier: 489 m at 326.8 A on 415 V (= 159,882 A·m) exceeds practical LV reach (~90,000 A·m) — recommend a LOCAL SUB-DISTRIBUTION (MV feeder to a local step-down transformer near the load, LV distributed locally) OR relocate the load nearer its source. An ever-fatter LV conductor is the wrong response at this reach.
+[conn-DESIGN] u_route_62_electrical_bus (electrical_bus) Standby Diesel Generator -> Backup Immersion Heater: Run Standby Diesel Generator→Backup Immersion Heater: 485 m at 2433.8 A on 415 V (= 1,181,491 A·m) exceeds practical LV reach (~90,000 A·m) — recommend a LOCAL SUB-DISTRIBUTION (MV feeder to a local step-down transformer near the load, LV distributed locally) OR relocate the load nearer its source. An ever-fatter LV conductor is the wrong response at this reach.
+[conn-DESIGN] u_route_107_fluid_loop (fluid_loop) Inlet Flow Control Valve -> Degassing Blower: Run Inlet Flow Control Valve→Degassing Blower: flow 463.9 L/s stays > 3 m/s even at the largest standard bore (DN300) over 510 m — recommend splitting the duty across parallel lines, a local boost, or relocating the consumer nearer the source. A single line past DN300 is the wrong response.
+[conn-WARN] u_route_0_fluid_loop (fluid_loop) rearing_tanks -> rotary_drum_filter: DN300 7.629 exceeds ≤3 m/s velocity over 118.36 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_1_fluid_loop (fluid_loop) rotary_drum_filter -> mbbr_biofilter: DN300 7.629 exceeds ≤3 m/s velocity over 22.92 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_4_fluid_loop (fluid_loop) oxygen_cones -> uv_ozone_disinfection: DN300 6.358 exceeds ≤3 m/s velocity over 503.21 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_8_fluid_loop (fluid_loop) Uv Reactor -> Protein Skimming: DN300 6.358 exceeds ≤3 m/s velocity over 491.1 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_9_fluid_loop (fluid_loop) Protein Skimming -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 93.29 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_10_fluid_loop (fluid_loop) Backup Immersion Heater -> Protein Skimming: DN300 6.358 exceeds ≤3 m/s velocity over 497.39 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_11_fluid_loop (fluid_loop) Recirc Pump -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 102.61 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_12_fluid_loop (fluid_loop) Pipework Run -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 106.21 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_13_fluid_loop (fluid_loop) Distribution Manifold -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 108.15 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_16_fluid_loop (fluid_loop) Flow Control Valve -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 106.17 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_17_fluid_loop (fluid_loop) Expansion Reservoir -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 109.95 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_22_fluid_loop (fluid_loop) Drum Filter Backwash -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 139.78 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_24_fluid_loop (fluid_loop) Drum Filter Screen -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 143.92 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_26_fluid_loop (fluid_loop) Degasser Column -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 143.62 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_29_fluid_loop (fluid_loop) Degassing Blower -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 111.67 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_30_fluid_loop (fluid_loop) Emergency O₂ Solenoid + Diffuser (fail-open) -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 114.2 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_33_fluid_loop (fluid_loop) Dissolved-O₂ Control Valve -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 106.32 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_34_fluid_loop (fluid_loop) Make-up Water System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 117.34 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_35_fluid_loop (fluid_loop) Bleed / Drain System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 153.41 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_36_fluid_loop (fluid_loop) Chemical Dosing System (pH / Alkalinity) -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 120.58 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_37_fluid_loop (fluid_loop) Feed Storage + Distribution System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 151.81 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_39_fluid_loop (fluid_loop) Solids / Sludge Handling System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 124.42 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_41_fluid_loop (fluid_loop) Biofilm Carrier Media (MBBR) -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 126.95 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_42_fluid_loop (fluid_loop) Grading / Harvest System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 128.89 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_43_fluid_loop (fluid_loop) Product Chilling + Ice System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 149.05 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_44_fluid_loop (fluid_loop) Mortality Handling System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 132.38 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_45_fluid_loop (fluid_loop) Intake + Make-up Treatment Skid -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 135.14 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_46_fluid_loop (fluid_loop) Effluent Treatment + Discharge System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 144.2 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)00:52.055  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/01-top.png'
+00:53.514  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/02-corner-FR.png'
+00:54.874  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/03-corner-BL.png'
+00:56.250  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/00-hero.png'
+[blender] module slug "actuation_kinematics" has no visual profile — using generic enclosure
+[blender] module slug "actuation_kinematics" has no visual profile — using generic enclosure
+00:57.799  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-actuation_kinematics.png'
+00:58.884  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-actuation_kinematics-top-front.png'
+01:05.105  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-control_compute_communication.png'
+01:14.179  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-control_compute_communication-top-front.png'
+01:31.282  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-environmental_interface.png'
+01:44.351  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-environmental_interface-top-front.png'
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:46:23)
+Error: strokes set empty
+01:45.732  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-mass_fluid_transport_process.png'
+01:46.761  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-mass_fluid_transport_process-top-front.png'
+01:54.153  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-power_distribution.png'
+02:00.208  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-power_distribution-top-front.png'
+02:09.066  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-safety_protection.png'
+02:14.259  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-safety_protection-top-front.png'
+02:23.721  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-sensing_instrumentation.png'
+02:29.823  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-sensing_instrumentation-top-front.png'
+Error: strokes set empty
+02:31.211  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-structure_containment.png'
+02:32.232  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-structure_containment-top-front.png'
+[blender] module slug "water_treatment_system" has no visual profile — using generic enclosure
+[blender] module slug "water_treatment_system" has no visual profile — using generic enclosure
+02:40.169  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-water_treatment_system.png'
+02:46.071  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/module-water_treatment_system-top-front.png'
+
+[conn-WARN] u_route_47_fluid_loop (fluid_loop) Live-Fish Handling + Transfer System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 138.24 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_48_fluid_loop (fluid_loop) Biosecurity / Quarantine System -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 140.18 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_50_fluid_loop (fluid_loop) AnoxKaldnes K5-MBBR-220 -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 144.51 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_51_fluid_loop (fluid_loop) Pentair RAS-DG-1670 -> Rearing Tank: DN300 6.358 exceeds ≤3 m/s velocity over 142.03 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_56_fluid_loop (fluid_loop) UV Sterilization -> Protein Skimming: DN300 6.358 exceeds ≤3 m/s velocity over 4.72 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_58_fluid_loop (fluid_loop) Oxygenation System -> Protein Skimming: DN300 6.358 exceeds ≤3 m/s velocity over 136.75 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_60_fluid_loop (fluid_loop) Expansion Vessel -> Backup Immersion Heater: DN300 6.358 exceeds ≤3 m/s velocity over 11.8 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[conn-WARN] u_route_62_electrical_bus (electrical_bus) Standby Diesel Generator -> Backup Immersion Heater: 6×400 mm² 5.16 exceeds ≤5% volt-drop over 485.45 m — D2 DESIGN RECOMMENDATION — LV reach exceeded; sub-distribution / relocate (see design_recommendation)
+[conn-WARN] u_route_107_fluid_loop (fluid_loop) Inlet Flow Control Valve -> Degassing Blower: DN300 6.358 exceeds ≤3 m/s velocity over 509.95 m — D2 DESIGN RECOMMENDATION — pipe ladder exhausted (see design_recommendation)
+[parts-manifest] wrote 109 placed parts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/parts-manifest.json  (plant 62.3×485.8×19.1 m)
+[route-manifest] wrote 108 routed lines (593 waypoints, 377 fittings) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/route-manifest.json
+[forge] 01-top.png
+[forge] 02-corner-FR.png
+[forge] 03-corner-BL.png
+[forge] 00-hero.png
+[forge] ── per-module best-view camera table ──────────────────
+[forge] scene bbox X[-0.67,70.58] Y[-26.45,475.05] Z[0.03,34.31]
+[forge] module actuation_kinematics             hint=three_quarter target=(0.49,202.18,0.90) loc=(-804.53,877.67,607.62) ortho=647.16  [MODULE-FRAMED]
+[forge] module-actuation_kinematics.png
+[forge] module-actuation_kinematics-top-front.png
+[forge] module control_compute_communication    hint=front         target=(34.78,403.66,1.11) loc=(26.11,413.99,6.56) ortho=6.96  [MODULE-FRAMED]
+[forge] module-control_compute_communication.png
+[forge] module-control_compute_communication-top-front.png
+[forge] module environmental_interface          hint=front         target=(6.59,2.18,3.03) loc=(-8.44,-15.73,12.48) ortho=8.42  [MODULE-FRAMED]
+[forge] module-environmental_interface.png
+[forge] module-environmental_interface-top-front.png
+[forge] module mass_fluid_transport_process     hint=three_quarter target=(33.53,237.39,17.22) loc=(837.28,1195.25,739.14) ortho=760.52  [MODULE-FRAMED]
+[forge] module-mass_fluid_transport_process.png
+[forge] module-mass_fluid_transport_process-top-front.png
+[forge] module power_distribution               hint=front         target=(30.55,403.12,1.41) loc=(21.57,413.82,7.06) ortho=5.59  [MODULE-FRAMED]
+[forge] module-power_distribution.png
+[forge] module-power_distribution-top-front.png
+[forge] module safety_protection                hint=three_quarter target=(38.81,403.07,0.76) loc=(45.00,410.44,6.32) ortho=4.86  [MODULE-FRAMED]
+[forge] module-safety_protection.png
+[forge] module-safety_protection-top-front.png
+[forge] module sensing_instrumentation          hint=three_quarter target=(32.77,396.30,2.16) loc=(21.08,410.24,12.66) ortho=7.81  [MODULE-FRAMED]
+[forge] module-sensing_instrumentation.png
+[forge] module-sensing_instrumentation-top-front.png
+[forge] module structure_containment            hint=three_quarter target=(34.96,223.80,11.69) loc=(880.12,1231.03,770.82) ortho=800.80  [MODULE-FRAMED]
+[forge] module-structure_containment.png
+[forge] module-structure_containment-top-front.png
+[forge] module water_treatment_system           hint=three_quarter target=(36.23,396.51,1.78) loc=(43.46,405.13,8.28) ortho=4.46  [MODULE-FRAMED]
+[forge] module-water_treatment_system.png
+[forge] module-water_treatment_system-top-front.png
+[forge] DONE — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15
+[univ] SUMMARY {"geometry_family": "process_plant", "aero_subtype": null, "physical_parts": 98, "dropped": 170, "topology_total": 108, "topology_routed": 108, "topology_unresolved": [], "regions": ["mass_fluid_transport_process", "structure_containment", "water_treatment_system", "actuation_kinematics", "environmental_interface", "power_distribution", "control_compute_communication", "sensing_instrumentation", "safety_protection"], "route_audit": {"routes": 108, "over_equipment_segments": 0, "over_equipment_routes": [], "max_detour_ratio": 6.987, "max_detour_route": "u_route_3_fluid_loop", "same_elevation_crossings": 2, "crossing_detail": [["u_route_64_electrical_bus", "u_route_68_electrical_bus", 3346.0], ["u_route_71_electrical_bus", "u_route_79_electrical_bus", 4126.0]], "tiers_used_note": "tiers separate crossings; lanes keep parallels apart"}, "route_reconcile": {"instrument_edges_dropped": 1, "routes_capped": 27, "length_saved_m": 1097.8, "gbp_saved": 78697.35}, "connection_schedule_totals": {"cable_m_by_csa": {"1.5 mm\u00b2": 1762.3, "16 mm\u00b2": 186.0, "240 mm\u00b2": 103.5, "25 mm\u00b2": 1556.3, "400 mm\u00b2": 84.3, "6 mm\u00b2": 113.9, "6\u00d7400 mm\u00b2": 974.7, "95 mm\u00b2": 1423.1}, "pipe_m_by_dn": {"DN15": 64.7, "DN200": 70.8, "DN250": 144.5, "DN300": 5731.2}, "duct_m_by_size": {}, "other_m": 0.0, "runs_sized": 107, "runs_out_of_spec": 37, "runs_upsized": 55, "design_recommendations": 38, "cable_gbp": 874148.63, "pipe_gbp": 1463499.54, "duct_gbp": 0.0, "transformer_gbp": 0.0, "other_gbp": 0.0, "terminations_gbp": 28181.2, "install_gbp": 2309466.97, "grand_total_gbp": 2337648.17, "cost_source": "model:uk-2026-supply+install"}, "parts_manifest_count": 109, "route_manifest_count": 108, "inspect": null}
+
+Blender quit
+[render-scene] shaded hero pass: 00-hero=shaded OK
+[render-scene] UNIVERSAL OK — cover + 10 module page(s) from inspect-hero.png
+[hero]   template runner produced blender-cover.png in 232.3s
+[hero]   Blender cover OK in 232.3s → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/blender-cover.png
+[hero] step 2: Gemini 3.1 Flash Image preview (i2i)...
+[hero]   Gemini OK in 25.1s (1477.4 KB)
+[hero] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/cover.png
+[hero] updated state.brief_hero_image_path
+[modules] building palette card for 10 module(s)...
+[modules] all 10 module images already on disk; skipping template render
+[modules] template renderer produced 10/10 module images
+[modules] updated state.module_image_paths with 10 entries
+[chain] deployment_envelope: no envelope mapped for aquaculture_ras (returning null is intentional for some classes)
+[chain] physics-derived bottom-up pricing: 223 components priced from parent physics → rolled into 15 assemblies; raw BoM £1,783,443
+[chain] R1 anchor re-price: generic BoM £1,783,443 → reconciled to contract anchor (raw £4,794,118, installed ≈ £8.15M); 271 lines weighted by component type
+[chain] costStack persisted: ex-works £4794118 (raw materials £4794118, class aquaculture_ras)
+[chain] G2 cost-reality: PASS — BoM £4794118 across 269 priced lines (2 unpriced)
+[chain] G3 review-completeness: WARN — 3 gaps
+  ⚠ sub_modules: 10 sub-modules across 10 modules — expected ≥20
+  ⚠ compliance: Compliance gate did not register any mandatory standards
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 6 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] pre-render SKU restore: re-added 3 blanked part_number(s) a late stage stripped from real parts — emitter is the part-identity authority
+[callLlm] attempt 1/3 transient (TypeError: fetch failed); retrying in 5s...
+[chain] self-audit (shadow): floor 2/10 · mean 6.2/10 · 2 blocking · below-8: brief_compliance=6, bill_of_materials=2, physics_fidelity=3
+  ✗ [bill_of_materials] 265 zero-priced lines for major physical items (pumps, valves, sensors)
+  ✗ [physics_fidelity] 3 HIGH issues incl. biofilter bottleneck, truncation, part placeholders
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £4,794,118 / 204 t/yr = £23,501/(t·yr) — within the £10,000–£55,000/(t·yr) class band for throughput output. (brief metric production_capacity_tpy=204 tpy → 204 t/yr)
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 271 disclosed; 0 take-off prices written into the BoM; purchased £1,528,120 → installed £4,584,360 (central)
+[advisor-engagement] 10/10 modules got an advisor block — 20 specialist cards, 39 grounded questions
+[chain] advisor-engagement: 10 module blocks, 20 specialist cards
+[chain] tool-archetype coherence (shadow): HIGH — 2 domain-mismatched tool(s)/quantity(ies) in "aquaculture_ras": refrigeration-cycle:cop[refrigeration:evaporator / refrigeration cycle], contract:heat_pump_source[marine:seawater]
+  ✗ refrigeration-cycle:cop [refrigeration:evaporator / refrigeration cycle] (worked-calc)
+  ✗ contract:heat_pump_source [marine:seawater] (contract-quantity)
+[chain] render-quality (shadow): UNIVERSAL-FALLBACK (generic stock images — NOT this design) — class="aquaculture_ras" template=NONE hero=true modules=19 thin=0
+  ✗ BLENDER_UNIVERSAL_FALLBACK: No per-class Blender template for product_class="aquaculture_ras" (and no LLM-generated blender-scene.py) — the dossier's cover + module images are the GENERIC 
+[chain] tools-flow: rendered 202863 bytes (19 tools)
+[investor-section] 5 investors matched from 18 candidates: Hatch Blue, Supply Change Capital, Buckhill Capital, Greenbackers Investment Capital, Designer Fund
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 6/7 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  [schedule] ✗ Piping Isometrics  (drawings/isometric-index.png)
+  log:
+    · reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15
+    · convergence: physics<->CAD converged=True in 3 iters (parasitic 30.6 kW, 2.81%); economic-conductor saving £85,912
+    ·   draw_isometric.py: launch failed: TimeoutExpired: Command '['/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/.venv/bin/python', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/draw_isometric.py', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/state.json']' timed out after 240 seconds
+    · self-exam parts_ledger.py: ok — → 0 NOT FOUND · 0 parts w/ coverage gap · 0 orphan · 99 connections off the P&ID.  wrote parts-ledger.json
+    · self-exam render_ledger_html.py: ok — wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/parts-ledger.html  (0 equipment + 0 connections + 0 sub-co
+    · self-exam inspect_drawings.py: ok — OVERALL (floor) = 5.0  → blender-hero   (2 defects)   wrote drawings-inspection.json
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 6/7 drawings + hero → wired into the PDF
+[census] 145 tie-in runs (592 units) = £138,762 (cable £82,668 + pipe £56,095)
+[census] routed major streams = £2,337,648  →  full interconnect ≈ £2,476,410
+[chain] cost-sanity re-derived on authoritative BoM (Σ £9,472,960): verdict pass — £46,436/t/yr
+[chain] requirements-driven BoM: 374 requirement lines (Σ £9,472,960) → state.requirementsBom; cost cascade reconciled to this total
+[render-minimal-pdf] state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/state.json
+[render-minimal-pdf] modules: 10
+[render-minimal-pdf] rendering...
+[render-minimal-pdf] written /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/chain-v2.pdf (24126.3 KB)
+[render-minimal-pdf] persisted 0 macro claims to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/macro-claims.json
+[chain] integrity check: PDF 24705315 bytes, %PDF header OK
+[chain] deliverable: 2606171410 Aquaculture Ras.pdf
+AUDIT: aquaculture_ras/medium FAIL (HIGH=2 MED=2) — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT.md
+  ✗ [D-1] Sub-module density 1.00 per module — below floor 2.0. Splitter should have raised this. Investigate scripts/lib/orchestrator/submodule-splitter.ts.
+  ✗ [F-4] Physics Critic flagged 3 HIGH-severity engineering issues. See full list in 7-5-physics-critique.json.
+[chain] audit-pdf-run flagged issues (see AUDIT.md): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+AUDIT-BOM: aquaculture_ras PASS (HIGH=0 MED=0) — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-BOM.md
+LAYOUT-AUDIT: FAIL — V-1 overlaps=7 (HIGH=6 MED=0 LOW=1)   T-1 column-overflows=1 (HIGH=0 MED=1) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/chain-v2.pdf.AUDIT-LAYOUT.md
+  ✗ V-1 p173 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Solenoid + Diffuser (fail-open)'
+  ✗ V-1 p173 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Control Valve'
+  ✗ V-1 p173 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Solenoid + Diffuser (fail-open)'
+  ✗ V-1 p173 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Control Valve'
+  ✗ V-1 p180 [HIGH] X=1.00 Y=1.00 A='‚' vs B='Analyser'
+  ✗ T-1 p101 [MED] col='MANUFACTURERPART NUMBER'→'QTY' overflow=8.5pt text='TMP451AQDQFRQ1'
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  CHAIN HARD-EXIT — Layout-overlap audit FAILED (code 11)            ║
+║  Text spans render at the same X+Y position (wrap={false} smear).   ║
+║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║
+║  See <pdf>.AUDIT-LAYOUT.md for the offending pages + bboxes.        ║
+║  Fix area: scripts/render-minimal-pdf.tsx — add page-break-before   ║
+║  on the sub-module wrap={false} block that overflowed the page.     ║
+╚══════════════════════════════════════════════════════════════════════╝
+[chain] GATE 11 layout-overlap (exit 11): FLAGGED (render-and-flag) — dossier ships, issue disclosed. Text spans overlap in the rendered PDF — see AUDIT-LAYOUT.md
+[chain] audit-pdf-layout flagged issues (see AUDIT-LAYOUT.md, status=11): Command failed: python3 /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-PARTS.md
+[parts-validator] PASS: 0 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-DRIFT.md
+[drift-detector] PASS: 4 contract quantities checked, 0 drifts (0 MED)
+[sizing-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-SIZING.md
+[sizing-audit] PASS: 0/0 matched-to-rule, 0 findings (0 MED, 0 LOW)
+[mispin-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-MISPIN.md
+[mispin-detector] PASS: 268 candidates scanned, 0 mis-pins
+[thermal-derating-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-THERMAL.md
+[thermal-derating-audit] PASS: 0 chiller(s) checked, 0 findings (0 MED, 0 LOW)
+[brief-constraint-completeness-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-COMPLETENESS.md
+[brief-constraint-completeness-audit] PASS: 14 constraints, 1 non-blocking findings (0 MED, 1 LOW)
+[consistency-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-CONSISTENCY.md
+[consistency-audit] PASS: 130 clusters, 2 findings (2 MED, 0 HIGH), 3 money-format drift(s)
+[jurisdictional-standards-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-JURISDICTION.md
+[jurisdictional-standards-audit] PASS: jurisdiction=UK, 82 surfaces scanned, 0 unique citations, 0 findings (0 MED, 0 LOW)
+[fictional-pn-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-FICTIONAL-PN.md
+[fictional-pn-audit] FAIL: 1 HIGH-severity finding(s) — hallucinated MPNs not found in any distributor catalogue
+
+======================================================================
+  CHAIN HARD-EXIT - Fictional-PN audit FAILED (code 20)
+  At least one BoM line emits a manufacturer+MPN combination that
+  returns null from ALL five live distributor APIs (Mouser, Digi-Key,
+  Farnell, LCSC, Nexar) and is not in the curated parts table.
+  Structured MPNs (alphanumeric+separator+alphanumeric) that miss all
+  distributors strongly indicate the LLM hallucinated a plausible-looking
+  but non-existent part number. A procurement engineer who tries to order
+  this part will find nothing — destroying the document's credibility.
+  PDF + state.json saved to disk for inspection but chain is BLOCKED.
+  See AUDIT-FICTIONAL-PN.md for the un-catalogued MPNs.
+  Fix area: scripts/lib/deterministic-emitter.ts — replace hallucinated
+  MPNs with real distributor-findable parts, or mark custom/OEM items
+  with a "CUSTOM-" prefix so future runs skip the existence check.
+======================================================================
+[chain] GATE 20 fictional-PN (exit 20): FLAGGED (render-and-flag) — dossier ships, issue disclosed. A part number is unverified in any catalogue — see AUDIT-FICTIONAL-PN.md
+[chain] fictional-pn-audit flagged issues (see AUDIT-FICTIONAL-PN.md, status=20): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+[chain] gate-21 price normalisation: capped 36 mis-pinned commodity partVerification price(s) before per-line audit
+[per-line-price-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/AUDIT-PER-LINE-PRICE.md
+[per-line-price-audit] FAIL: 1 HIGH-severity finding(s) — BoM unit prices diverge > 5× from live distributor prices
+
+======================================================================
+  CHAIN HARD-EXIT - Per-line price plausibility audit FAILED (code 21)
+  At least one BoM line has a rendered unit price that diverges > 5×
+  from the cheapest live distributor source (Mouser / Digi-Key /
+  Farnell / LCSC / Nexar). This level of per-line error cannot be
+  explained by quantity breaks, currency drift, or catalogue timing —
+  it indicates a systematic pricing error on the specific line item.
+  Gate 10 B-7 (aggregate cost band) does NOT catch this because
+  over-billing and under-billing errors can cancel in the total while
+  individual lines are both wrong in opposite directions.
+  PDF + state.json saved to disk for inspection but chain is BLOCKED.
+  See AUDIT-PER-LINE-PRICE.md for the mispriced line items.
+  Fix area: scripts/lib/deterministic-emitter.ts — correct the unit
+  basis (per-unit vs per-reel/lot), check currency conversion, or
+  update stale catalogue prices to 2025 UK market rates.
+======================================================================
+[chain] GATE 21 per-line-price (exit 21): FLAGGED (render-and-flag) — dossier ships, issue disclosed. A line price diverges >5x from catalogue — see AUDIT-PER-LINE-PRICE.md
+[chain] per-line-price-plausibility-audit flagged issues (see AUDIT-PER-LINE-PRICE.md, status=21): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+[chain] background enrichment spawned (PID 80131) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/background-enrichment.log
+[chain] render-and-flag: 3 gate(s) flagged but the dossier SHIPPED (set CHAIN_GATE_ENFORCE=1 to hard-block instead). See RESIDUAL-ISSUES.md.
+
+[chain] === FINAL ===  state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/state.json  pdf: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/chain-v2.pdf  status=accepted_with_decisions  gates_passed=false  design_decisions=5
+[enrich] componentEngineering: 120 parts · 108 connections · 1 orphans · 39 ungoverned · 6 balances
+[chain] componentEngineering → state (per-component physics + governance + balances)
+[chain] dashboard: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-v15/dashboard.html
