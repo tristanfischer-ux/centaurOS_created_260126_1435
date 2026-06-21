@@ -1595,12 +1595,12 @@ function checkRasFeedAndPumpReconciled(): Assertion[] {
     const SINGLE_UNIT_LIMIT = 2000
     out.push(assertEq(
       'RAS.recirc_loop_split_into_parallel_trains',
-      'the recirc pump + rotary drum filter + CO₂ degasser are split into N>1 parallel trains, each ≤ ~2,000 m³/h per unit (no single unit carries the full 13,360 m³/h loop); counts agree and per-unit×N ≈ loop total',
+      'the recirc pump + rotary drum filter + CO₂ degasser are split into N>1 parallel trains, each ≤ ~2,000 m³/h per unit (no single unit carries the full 13,360 m³/h loop); the PUMP count = N duty + 1 installed standby (N+1, life-critical loop) while drum + degasser = N duty, and per-unit×N ≈ loop total',
       JSON.stringify({ loop, pumpN, drumN, degN, drumEach, degWaterEach }),
       () =>
         Number.isFinite(loop) && loop > SINGLE_UNIT_LIMIT &&                   // only split when needed
-        pumpN >= 2 && drumN >= 2 && degN >= 2 &&                              // all three split
-        pumpN === drumN && drumN === degN &&                                  // one train count for the loop
+        pumpN >= 3 && drumN >= 2 && degN >= 2 &&                              // pumps split + standby; filters/degassers split
+        pumpN === drumN + 1 && drumN === degN &&                             // pump = N duty + 1 INSTALLED STANDBY (N+1); drum + degasser = N duty (one duty count)
         Number.isFinite(drumEach) && drumEach <= SINGLE_UNIT_LIMIT &&         // per-unit drum ≤ limit
         Number.isFinite(degWaterEach) && degWaterEach <= SINGLE_UNIT_LIMIT && // per-unit degasser ≤ limit
         Math.abs(drumEach * drumN - loop) / loop <= 0.02 &&                   // per-unit × N ≈ loop total

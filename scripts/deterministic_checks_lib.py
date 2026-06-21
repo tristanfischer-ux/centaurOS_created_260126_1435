@@ -221,15 +221,31 @@ def _checks_consistency(state: dict, run_dir: str) -> List[Check]:
         if per_unit is None or total is None:
             continue
         unit = qunit(quantities, per_key)
+        tol = _tol_pct(total, 0.02, 1.0)
+        exact = _eq_status(per_unit * cnt, total, tol)
+        # A counted principal may INSTALL a STANDBY above its flow-sharing DUTY count (life-
+        # critical N+1/N+2 redundancy, e.g. the brief's duty/standby recirc pumps): the installed
+        # product then overshoots the system total by a whole number of per-unit standby duties.
+        # Accept that — the DUTY units (round(total ÷ per-unit)) must tile the total AND the
+        # installed count exceeds duty by a SMALL standby (≤2). The standby is SPARE capacity, not
+        # a sizing error. A genuine count/per-unit mismatch (not a clean standby) still FAILS.
+        # Universal across any standby-redundant counted principal.
+        duty = round(total / per_unit) if per_unit else cnt
+        standby = cnt - duty
+        duty_tiles = per_unit > 0 and abs(per_unit * duty - total) / max(total, 1.0) <= 0.02
+        is_standby = exact != PASS and duty >= 1 and 0 < standby <= 2 and duty_tiles
+        flow_cnt = duty if is_standby else cnt
+        note = (f"  [{int(cnt)} installed = {int(duty)} duty + {int(standby)} standby]"
+                if is_standby else "")
         out.append(Check(
-            name=f"{base.replace('_', ' ')}: per-unit x {ck} == {total_key}",
+            name=f"{base.replace('_', ' ')}: per-unit x {('duty count' if is_standby else ck)} == {total_key}",
             category="CONSISTENCY", relation="eq",
-            status=_eq_status(per_unit * cnt, total, _tol_pct(total, 0.02, 1.0)),
-            actual=per_unit * cnt, expected=total,
-            tol=_tol_pct(total, 0.02, 1.0), unit=unit,
-            a_factors=(per_unit, cnt), producer=per_key,
-            detail=(f"{per_unit:g} {unit} per unit x {cnt:g} units must equal the "
-                    f"{total:g} {unit} system total ({total_key})."),
+            status=(PASS if (exact == PASS or is_standby) else FAIL),
+            actual=per_unit * flow_cnt, expected=total,
+            tol=tol, unit=unit,
+            a_factors=(per_unit, flow_cnt), producer=per_key,
+            detail=(f"{per_unit:g} {unit} per unit x {flow_cnt:g} DUTY units must equal the "
+                    f"{total:g} {unit} system total ({total_key}){note}."),
         ))
 
     # --- C2. per-unit_gbp x qty == line_gbp on every principal BoM line ---
