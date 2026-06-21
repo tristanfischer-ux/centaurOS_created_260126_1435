@@ -3524,9 +3524,43 @@ def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
     return made
 
 
+def _line_section(row: dict, spec: dict) -> str:
+    """Classify a sized run so flow lines and electrical cables never share a units
+    column (Tristan: 'water and electrics mixed... amps and cubes'). Universal —
+    keys off the connection-schedule's own kind / mechanism, no class assumptions."""
+    kind = (spec.get("kind") or "").lower()
+    mech = (row.get("mechanism") or "").lower()
+    if kind == "cable" or "electric" in mech or mech == "signal" or "power" in mech:
+        return "electrical"
+    if kind == "pipe" and ("loop" in mech or "fluid" in mech):
+        return "pipe"
+    return "other"
+
+
+def _line_basis(row: dict) -> str:
+    """How a Line £ is built (Tristan: 'how or where the line cost number comes from')
+    — the material take-off + £/m × length + install, from the row's own fields."""
+    bits = []
+    q = clean_cell(row.get("qty", ""))
+    if q:
+        bits.append(q)
+    uc = num(row.get("unit_cost_gbp"))
+    ln = num(row.get("length_m"))
+    if uc is not None and ln:
+        bits.append(f"£{uc:,.0f}/m × {ln:,.1f} m")
+    elif uc is not None:
+        bits.append(f"£{uc:,.0f}/unit")
+    inst = num(row.get("install_gbp"))
+    if inst:
+        bits.append(f"install £{inst:,.0f}")
+    return " · ".join(bits)
+
+
 def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
-    """#22 — Line & velocity table from connection-schedule.json (from/to/size/
-    velocity), with within_spec conditional-formatted RED. Real sortable rows."""
+    """#22 — Line & velocity schedule from connection-schedule.json, SPLIT into
+    process-pipe lines (velocity vs ≤3 m/s) and electrical/signal cables (volt-drop
+    vs ≤5 %) so flow, current and power units never mix in one column. Adds a Basis
+    column showing how each Line £ is derived. within_spec ✗ conditional-formatted RED."""
     cs = load_json(os.path.join(run_dir, "connection-schedule.json"))
     if not cs or not isinstance(cs, dict):
         return False
@@ -3536,77 +3570,108 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
     specs = cs.get("specs") or []  # parallel, carries the spec_limit text
 
     ws = wb.create_sheet("Line & velocity")
-    set_widths(ws, {"A": 6, "B": 22, "C": 22, "D": 14, "E": 18, "F": 12,
-                    "G": 16, "H": 10, "I": 22, "J": 16})
+    set_widths(ws, {"A": 6, "B": 22, "C": 22, "D": 16, "E": 16, "F": 14,
+                    "G": 16, "H": 10, "I": 9, "J": 13, "K": 62})
     title_row(
-        ws, "Line & velocity schedule", 10,
-        "Every sized run from connection-schedule.json — from · to · DN/CSA · "
-        "rating · velocity-or-ΔU · within-spec (✗ = RED) · spec limit · line £. "
-        "Sortable; the within-spec column flags any run outside its limit.",
+        ws, "Line & velocity schedule", 11,
+        "Every sized run, SPLIT so units never mix: process-pipe lines (flow m³/s, "
+        "velocity vs ≤ 3 m/s) · electrical & signal cables (current A, volt-drop vs "
+        "≤ 5 %) · other services. Velocity / ΔU is the AS-SIZED value (post-upsizing); "
+        "'In spec' ✗ = RED. Basis shows how each Line £ is built (take-off × £/m + install).",
     )
-    header(ws, 4, ["#", "From", "To", "Size", "Rating", "Velocity / ΔU",
-                   "Length (m)", "In spec", "Spec limit", "Line £"])
-    r = 5
-    first = r
-    fail_rows = 0
+
+    # bucket rows by section, preserving the original index for the '#'
+    groups: Dict[str, list] = {"pipe": [], "electrical": [], "other": []}
     for idx, row in enumerate(rows):
         if not isinstance(row, dict):
             continue
         spec = specs[idx] if idx < len(specs) and isinstance(specs[idx], dict) else {}
-        in_spec = row.get("within_spec")
-        ws.cell(r, 1, idx + 1).border = BORDER
-        ws.cell(r, 2, clean_cell(row.get("from", ""))).border = BORDER
-        ws.cell(r, 3, clean_cell(row.get("to", ""))).border = BORDER
-        ws.cell(r, 4, clean_cell(row.get("size", ""))).border = BORDER
-        ws.cell(r, 5, clean_cell(row.get("rating", ""))).border = BORDER
-        # velocity / volt-drop: prefer the numeric drop_pct_or_velocity from specs
-        velnum = num(spec.get("drop_pct_or_velocity"))
-        if velnum is not None:
-            vc = ws.cell(r, 6, velnum)
-            vc.number_format = FMT_DEC2
-        else:
-            vc = ws.cell(r, 6, clean_cell(row.get("drop", "")))
-        vc.border = BORDER
-        lc = ws.cell(r, 7, num(row.get("length_m")))
-        lc.number_format = FMT_DEC1
-        lc.border = BORDER
-        sc = ws.cell(r, 8, "✓" if in_spec else "✗")
-        sc.border = BORDER
-        sc.alignment = Alignment(horizontal="center")
-        if in_spec is False:
-            sc.fill = FILL_FAIL
-            sc.font = FONT_FAIL
-            fail_rows += 1
-            for col in range(1, 11):
-                ws.cell(r, col).fill = FILL_FAIL
-        else:
-            sc.fill = FILL_PASS
-            sc.font = FONT_PASS
-        ws.cell(r, 9, clean_cell(spec.get("spec_limit", ""))).border = BORDER
-        lt = ws.cell(r, 10, num(row.get("line_total_gbp")))
-        lt.number_format = FMT_GBP
-        lt.border = BORDER
+        groups[_line_section(row, spec)].append((idx, row, spec))
+
+    SECTIONS = [
+        ("pipe", "Process pipe lines — flow (m³/s) · velocity limit ≤ 3 m/s"),
+        ("electrical", "Electrical & signal cables — current (A) · volt-drop limit ≤ 5 %"),
+        ("other", "Other services (air / misc)"),
+    ]
+    HDR = ["#", "From", "To", "Size", "Rating", "Velocity / ΔU", "Spec limit",
+           "Length (m)", "In spec", "Line £", "Basis"]
+    r = 4
+    grand_fail = 0
+    spec_cells = []   # In-spec column cells for the conditional-format range
+    for key, label in SECTIONS:
+        g = groups[key]
+        if not g:
+            continue
+        sub_banner(ws, r, label, 11)
         r += 1
-    last = r - 1
+        header(ws, r, HDR)
+        r += 1
+        sec_first = r
+        for idx, row, spec in g:
+            in_spec = row.get("within_spec")
+            ws.cell(r, 1, idx + 1).border = BORDER
+            ws.cell(r, 2, clean_cell(row.get("from", ""))).border = BORDER
+            ws.cell(r, 3, clean_cell(row.get("to", ""))).border = BORDER
+            ws.cell(r, 4, clean_cell(row.get("size", ""))).border = BORDER
+            ws.cell(r, 5, clean_cell(row.get("rating", ""))).border = BORDER
+            # AS-SIZED velocity / volt-drop (post-upsizing) from specs — never the
+            # stale pre-upsize row['drop'].
+            velnum = num(spec.get("drop_pct_or_velocity"))
+            if velnum is not None:
+                vc = ws.cell(r, 6, velnum)
+                vc.number_format = FMT_DEC2
+            else:
+                vc = ws.cell(r, 6, clean_cell(row.get("drop", "")))
+            vc.border = BORDER
+            ws.cell(r, 7, clean_cell(spec.get("spec_limit", ""))).border = BORDER
+            lc = ws.cell(r, 8, num(row.get("length_m")))
+            lc.number_format = FMT_DEC1
+            lc.border = BORDER
+            sc = ws.cell(r, 9, "✓" if in_spec is not False else "✗")
+            sc.border = BORDER
+            sc.alignment = Alignment(horizontal="center")
+            spec_cells.append(sc.coordinate)
+            if in_spec is False:
+                sc.font = FONT_FAIL
+                grand_fail += 1
+                for col in range(1, 12):
+                    ws.cell(r, col).fill = FILL_FAIL
+            else:
+                sc.fill = FILL_PASS
+                sc.font = FONT_PASS
+            lt = ws.cell(r, 10, num(row.get("line_total_gbp")))
+            lt.number_format = FMT_GBP
+            lt.border = BORDER
+            basis = _line_basis(row)
+            bc = ws.cell(r, 11, basis)
+            bc.alignment = WRAP_TOP
+            bc.border = BORDER
+            if len(basis) > 60:
+                ws.row_dimensions[r].height = min(-(-len(basis) // 60), 4) * 14.5
+            r += 1
+        # per-section Σ line £
+        ws.cell(r, 2, f"Σ {label.split('—')[0].strip()}").font = FONT_SUB
+        st = ws.cell(r, 10, f"=SUM(J{sec_first}:J{r - 1})")
+        st.font = Font(bold=True)
+        st.fill = FILL_RESULT
+        st.number_format = FMT_GBP
+        r += 2
 
-    # foot: out-of-spec tally + Σ line £
-    ws.cell(r, 2, "Runs out-of-spec").font = FONT_SUB
-    tc = ws.cell(r, 8, fail_rows)
-    tc.font = FONT_FAIL if fail_rows else FONT_PASS
-    tc.fill = FILL_FAIL if fail_rows else FILL_PASS
-    sct = ws.cell(r, 10, f"=SUM(J{first}:J{last})")
-    sct.font = Font(bold=True)
-    sct.fill = FILL_RESULT
-    sct.number_format = FMT_GBP
+    # grand foot: out-of-spec tally across all sections
+    ws.cell(r, 2, "Runs out-of-spec (all sections, as-sized)").font = FONT_SUB
+    tc = ws.cell(r, 9, grand_fail)
+    tc.font = FONT_FAIL if grand_fail else FONT_PASS
+    tc.fill = FILL_FAIL if grand_fail else FILL_PASS
+    tc.alignment = Alignment(horizontal="center")
 
-    # conditional formatting: any '✗' in the In-spec column goes red live
-    from openpyxl.formatting.rule import CellIsRule
-    ws.conditional_formatting.add(
-        f"H{first}:H{last}",
-        CellIsRule(operator="equal", formula=['"✗"'], fill=FILL_FAIL, font=FONT_FAIL))
-    ws.auto_filter.ref = f"A4:J{last}"
+    # any '✗' in an In-spec cell goes red live
+    if spec_cells:
+        from openpyxl.formatting.rule import CellIsRule
+        ws.conditional_formatting.add(
+            f"I5:I{r}",
+            CellIsRule(operator="equal", formula=['"✗"'], fill=FILL_FAIL, font=FONT_FAIL))
     ws.freeze_panes = "A5"
-    back_link(ws, 10)
+    back_link(ws, 11)
     return True
 
 
