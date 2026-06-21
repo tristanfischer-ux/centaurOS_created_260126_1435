@@ -4060,8 +4060,11 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
             sp_L = get_column_letter(spec_col)
             for rr in range(body_first, body_last + 1):
                 cell = ws.cell(rr, spec_col)
+                # ELSE branch must be a STATIC value — referencing the spec cell itself
+                # ({sp_L}{rr}) is a CIRCULAR reference (the cell is THIS formula). When
+                # ΔU is non-numeric there is no volt-drop to check, so show "—".
                 cell.value = (f'=IF(ISNUMBER({du_L}{rr}),'
-                              f'IF({du_L}{rr}<=5,"✓","✗"),{sp_L}{rr})')
+                              f'IF({du_L}{rr}<=5,"✓","✗"),"—")')
             from openpyxl.formatting.rule import CellIsRule
             ws.conditional_formatting.add(
                 f"{sp_L}{body_first}:{sp_L}{body_last}",
