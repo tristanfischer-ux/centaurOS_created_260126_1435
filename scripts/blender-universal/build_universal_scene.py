@@ -328,6 +328,20 @@ SKID_FRAME_HEIGHT_FRAC   = 0.92   # frame top = this × tallest-EQUIPMENT-top. W
                                   # the excluded towers tower above it.
 SKID_POST_MM             = 180    # box-section size of frame posts/rails (substantial)
 
+# ── STAGE 1 LINEAR LAYOUT (BLENDER_LINEAR_LAYOUT=1) ─────────────────────────
+# A DETERMINISTIC diagnostic placement that lays EVERY part in ONE straight row
+# along +X, ordered by process sequence (region_rank ascending, then a stable
+# tag/name tie-break). This is STAGE 1 of the 4-stage connection-points plan
+# (1: correct parts in one line in process order · 2: ports · 3: wire ·
+# 4: fold/compact). It deliberately BYPASSES the compact bank/serpentine layout,
+# the skid frame, the pipe rack and the topology routing — those belong to the
+# folding/wiring stages. Default OFF so the production compact placement is
+# byte-unchanged; truthy → the linear override runs (see place_all_linear).
+LINEAR_LAYOUT_ON = os.environ.get("BLENDER_LINEAR_LAYOUT", "").strip().lower() \
+    not in ("", "0", "false", "no", "off")
+# Clear gap [mm] left between successive parts' footprint edges along the row.
+LINEAR_PART_GAP_MM = 2500   # ≈2.5 m breathing space so the row reads part-by-part
+
 # ── 6. Pipe palette by mechanism ───────────────────────────────────────────
 # Pipe radius ~1.7× (Tristan 2026-06-10): the runs read as thin wires. 110→190 mm.
 # 2026-06-11: PIPE_DIA_MM is NO LONGER the diameter every run is drawn at. Each run
@@ -7276,6 +7290,121 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
 # ═══════════════════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════════════
+# STAGE 1 — DETERMINISTIC LINEAR LAYOUT (BLENDER_LINEAR_LAYOUT=1)
+# ───────────────────────────────────────────────────────────────────────────
+# Lay EVERY part in ONE straight row along +X, ordered by process sequence, then
+# return the SAME 5-tuple as the family placers so main()'s manifests + inspect
+# render are common. This is STAGE 1 of Tristan's 4-stage connection-points plan:
+#   (1) correct parts, all in one line in process order   ← THIS function
+#   (2) add connection ports        (3) wire port-to-port
+#   (4) fold the line into a compact layout
+# So it deliberately builds NO skid frame, NO pipe rack and routes NO topology —
+# those are the later (fold/wire) stages. It reuses build_part verbatim (the part
+# GEOMETRY / materials / lighting are GOOD and unchanged) and only sets each
+# part's POSITION. Universal: pure sort-by-rank + lay-in-X, no per-class logic.
+# ═══════════════════════════════════════════════════════════════════════════
+def _linear_sort_key(p):
+    """Stable process-order key: region_rank ascending (upstream→downstream),
+    then a deterministic tie-break so two parts at the same rank always land in
+    the same order across runs. The tie-break is the part's tag/identity — its
+    module_id + region_key + lower-cased name — so the row is byte-reproducible."""
+    rank = int(getattr(p, "region_rank", REGION_PRIORITY_DEFAULT) or REGION_PRIORITY_DEFAULT)
+    tag = f"{getattr(p, 'module_id', '')}|{getattr(p, 'region_key', '')}|{str(p.name).lower()}"
+    return (rank, tag)
+
+
+def place_all_linear(parts, MAT, MO):
+    """STAGE 1 linear override. Sort parts by (region_rank, tag) and place each
+    sequentially along +X, centred on the Y axis (y=0), sitting on the deck datum
+    (z=DECK_Z_MM, the same floor the production placers use), with NO overlap:
+    the X cursor advances by half the previous footprint + LINEAR_PART_GAP_MM +
+    half this footprint. Returns (bbox_mm, region_centres, frame_top_mm=0,
+    routed=0, unresolved=[]) — the family-placer tuple, but with no frame / rack /
+    routing (Stage 1 only). Each part keeps its exact geometry; only its position
+    changes. Reserves the FULL footprint (footprint_mm already accounts for a
+    qty-N vessel/machine grid) so a replicated array never overlaps its neighbour.
+
+    BUILDING-SHELL EXCLUSION: the plant-scale envelope shells (floor slab / portal
+    frame / wall + roof cladding / foundations — `_layout_is_envelope`, the SAME
+    test production uses) are NOT laid in the row. They are 25-29 m squares that
+    would dwarf every process part and make the "row of parts in order" unreadable;
+    production never lays them in-line either — it re-centres them on the finished
+    equipment so they ENCLOSE the plant. We do the same: place each shell CENTRED on
+    the row's bbox AFTER the row is built (still placed, still in the BoM, just not a
+    giant in-line square). Universal + deterministic (footprint-keyed, no per-class)."""
+    row_parts = [p for p in parts if not _layout_is_envelope(p)]
+    shell_parts = [p for p in parts if _layout_is_envelope(p)]
+    ordered = sorted(row_parts, key=_linear_sort_key)
+    region_centres = {}
+    x_cursor = 0.0
+    prev_half_x = None
+    n_placed = 0
+    print(f"[univ][linear] STAGE 1 linear layout ON — {len(ordered)} process parts in "
+          f"ONE row along +X (sorted by region_rank, then tag); gap "
+          f"{LINEAR_PART_GAP_MM/1000:.1f} m; NO frame/rack/routing"
+          + (f"; {len(shell_parts)} building-shell part(s) centred on the row (NOT "
+             f"in-line)" if shell_parts else ""))
+    for p in ordered:
+        fx, fy, _fz = footprint_mm(resolved_dims_mm(p))
+        half_x = fx / 2.0
+        if prev_half_x is None:
+            x_cursor = half_x            # first part: its centre is half its width in
+        else:
+            x_cursor += prev_half_x + LINEAR_PART_GAP_MM + half_x
+        # build the part at (x_cursor, y=0) on the deck floor — geometry untouched.
+        asm, anchors = build_part(p, x_cursor, 0.0, DECK_Z_MM, MAT, MO)
+        p.obj_anchor, p.anchors = asm, anchors
+        p.placed_xyz_mm = anchors["centre"]
+        # one "region centre" per region_key (first part seen in that region wins) so
+        # the manifest's region map still resolves; in a single row this is indicative.
+        region_centres.setdefault(p.region_key, (x_cursor, 0.0))
+        print(f"[univ][linear]   #{n_placed:02d} rank={int(getattr(p,'region_rank',0)):>3} "
+              f"x={x_cursor/1000:7.2f} m  fp={fx/1000:.2f}×{fy/1000:.2f} m  "
+              f"[{p.module_id}] {p.name}")
+        prev_half_x = half_x
+        n_placed += 1
+
+    # ROW bbox from the placed PROCESS-part EXTENTS (centre ± half-footprint per
+    # axis) so the inspect cameras frame the WHOLE row + its depth.
+    min_x, max_x = 1e12, -1e12
+    min_y, max_y = 1e12, -1e12
+    for p in ordered:
+        if not p.placed_xyz_mm:
+            continue
+        cx, cy = p.placed_xyz_mm[0], p.placed_xyz_mm[1]
+        fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+        min_x = min(min_x, cx - fx / 2); max_x = max(max_x, cx + fx / 2)
+        min_y = min(min_y, cy - fy / 2); max_y = max(max_y, cy + fy / 2)
+    if max_x < -1e11:                      # no process parts placed (degenerate)
+        min_x = max_x = min_y = max_y = 0.0
+    print(f"[univ][linear] process-row bbox (mm): x0={min_x:.0f} x1={max_x:.0f} "
+          f"(length {(max_x-min_x)/1000:.1f} m × depth {(max_y-min_y)/1000:.1f} m, "
+          f"{n_placed} parts)")
+    # BUILDING-SHELL parts: RECORD each CENTRED on the finished process row WITHOUT a
+    # solid mesh — exactly production's treatment (it notes the shell is already
+    # represented by the enclosing skid-frame wireframe, so drawing its 850 m² solid
+    # slab would only OBSCURE the equipment in every view). The part is still placed
+    # (placed_xyz_mm set → it appears in the parts-manifest + BoM); it is simply not a
+    # giant in-line square that would swamp the row. The bbox is NOT extended to the
+    # shell footprint here — the process ROW is the subject the cameras frame.
+    if shell_parts and max_x > -1e11:
+        scx = (min_x + max_x) / 2.0
+        scy = (min_y + max_y) / 2.0
+        for p in shell_parts:
+            p.placed_xyz_mm = (scx, scy, DECK_Z_MM)
+            p.anchors = _box_anchors(scx, scy, DECK_Z_MM, 0.0)
+            region_centres.setdefault(p.region_key, (scx, scy))
+            fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+            print(f"[univ][linear]   shell (centred, no mesh) "
+                  f"fp={fx/1000:.1f}×{fy/1000:.1f} m  [{p.module_id}] {p.name}")
+    bbox = {"x0": min_x - 800, "x1": max_x + 800,
+            "y0": min_y - 800, "y1": max_y + 800}
+    print(f"[univ][linear] full bbox (mm): {bbox}")
+    # frame_top=0, routed=0, unresolved=[] — Stage 1 builds none of those.
+    return bbox, region_centres, 0.0, 0, []
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # UNIVERSAL LAYOUT OPTIMISER hook (opt-in: LAYOUT_OPTIMISE=1) — re-flow the placed
 # equipment to layout_optimiser.py's deterministic CRAFT minimum-weighted-pipe-run
 # layout AFTER place_all, then let the skid frame + pipe rack + routing re-derive on
@@ -11787,6 +11916,26 @@ def render_inspection(out_dir, bbox):
         },
     ]
 
+    # STAGE 1 LINEAR LAYOUT (BLENDER_LINEAR_LAYOUT=1): add a dedicated LINE camera
+    # that frames the WHOLE long-thin row broadside (looking along +Y from in front,
+    # the row running left→right across the frame) so the single-row process order
+    # is unmistakable. The standard iso/top/front cameras already auto-fit to the
+    # row's bbox; this one is the canonical "down-the-line" elevation. Same bright
+    # materials + lighting as the rest of the inspection set (only the camera differs).
+    if LINEAR_LAYOUT_ON:
+        # ortho_scale must span the full ROW LENGTH (dx) — _ortho_scale already takes
+        # the larger of (width, height×aspect), so passing (dx, dz) frames the length.
+        line_scale = _ortho_scale(dx, dz)
+        line_radius = max(dx, dy, dz, 1.0) * 3.0
+        cams.append({
+            # broadside elevation, lifted a touch off the deck so cylindrical parts
+            # read as 3-D (a tiny down-tilt) while the row stays left→right.
+            "name": "inspect-line",
+            "loc": (cx, ymn - line_radius, cz + dz * 0.25),
+            "target": (cx, cy, cz),
+            "ortho_scale": line_scale,
+        })
+
     for cam in cams:
         fl.clear_cameras()
         c = fl.setup_camera(cam["loc"], cam["target"], cam["ortho_scale"], focal=50)
@@ -11951,7 +12100,16 @@ def main():
     product_class = product_class_of(state)
     family = detect_geometry_family(parts, modules, product_class)
     _route_log_reset()   # fresh route log so audit_routes() sees only this run
-    if family == "aero_body":
+    if LINEAR_LAYOUT_ON:
+        # STAGE 1 (BLENDER_LINEAR_LAYOUT=1) — universal DETERMINISTIC linear layout:
+        # every part in ONE row along +X in process order. Bypasses the family
+        # placers, skid frame, pipe rack and routing (those belong to the later
+        # fold/wire stages). Returns the same 5-tuple so the render below is common.
+        print(f"[univ] BLENDER_LINEAR_LAYOUT=1 — overriding the '{family}' placer "
+              f"with the Stage-1 single-row linear layout")
+        bbox, region_centres, frame_h, routed, unresolved = place_all_linear(
+            parts, MAT, MO)
+    elif family == "aero_body":
         global _AERO_QUANTITIES
         _AERO_QUANTITIES = quantities
         bbox, region_centres, frame_h, routed, unresolved = place_aero_body(
