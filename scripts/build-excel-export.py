@@ -1430,6 +1430,10 @@ def bom_ref(tag, field: str = "name") -> Optional[str]:
 # Principals only — sub-component nouns ("Casing", "Impeller", "Top Head") repeat across
 # parents and are NOT global identities; they stay exploded under their parent in the BoM.
 _NAME_REG: Dict[str, Dict[str, str]] = {}
+# Parallel index by NORMALISED TAG, so a tab that knows only the part's tag (the
+# Line & velocity From/To endpoints, a schedule's served-equipment column) can also
+# reference the master row. Populated alongside _NAME_REG in tab_parts_master.
+_TAG_REG: Dict[str, Dict[str, str]] = {}
 
 
 def _norm_name(s) -> str:
@@ -1475,6 +1479,16 @@ def name_ref(name, field: str = "name") -> Optional[str]:
     return "=" + rec[field]
 
 
+def tag_ref(tag, field: str = "tag") -> Optional[str]:
+    """The cross-sheet cell-reference FORMULA for a part identified by its TAG on the
+    master "Part names" tab, or None when the tag is not a registered principal (caller
+    keeps its literal). field ∈ {tag, name}. Carries the leading '='."""
+    rec = _TAG_REG.get(_norm_tag(tag))
+    if not rec or field not in rec:
+        return None
+    return "=" + rec[field]
+
+
 def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
     """THE master list of part NAMES (Tristan 2026-06-21). One row per distinct principal
     part: its canonical Tag + Name typed ONCE here. Populates _NAME_REG so every other
@@ -1482,6 +1496,7 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
     consumers can resolve. Principals only (a tag with no '.' suffix whose requirement is
     not a ↳ sub-component)."""
     _NAME_REG.clear()
+    _TAG_REG.clear()
     ws = wb.create_sheet("Part names")
     set_widths(ws, {"A": 14, "B": 46, "C": 8, "D": 64})
     title_row(ws, "Part names — the master list", 4,
@@ -1527,11 +1542,14 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
         rq.alignment = WRAP_TOP
         rq.font = FONT_NOTE
         rq.border = BORDER
-        _NAME_REG[_norm_name(p["req"])] = {
+        _rec = {
             "tag":  f"'Part names'!$A${r}",
             "name": f"'Part names'!$B${r}",
             "row":  str(r),
         }
+        _NAME_REG[_norm_name(p["req"])] = _rec
+        if p["tag"] and p["tag"] != "—":
+            _TAG_REG.setdefault(_norm_tag(p["tag"]), _rec)
         r += 1
     apply_col_formats(ws, 5, {3: FMT_INT}, r - 1)
     ws.auto_filter.ref = f"A4:D{r - 1}"
@@ -4426,8 +4444,13 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         for idx, row, spec in g:
             in_spec = row.get("within_spec")
             ws.cell(r, 1, idx + 1).border = BORDER
-            ws.cell(r, 2, clean_cell(row.get("from", ""))).border = BORDER
-            ws.cell(r, 3, clean_cell(row.get("to", ""))).border = BORDER
+            # From / To endpoints REFERENCE the master "Part names" tag where the endpoint
+            # is a registered principal (one identity; click through to the part) — literal
+            # tag kept for boundary / aggregate endpoints the master doesn't carry.
+            _fr = tag_ref(row.get("from", ""))
+            ws.cell(r, 2, _fr if _fr else clean_cell(row.get("from", ""))).border = BORDER
+            _to = tag_ref(row.get("to", ""))
+            ws.cell(r, 3, _to if _to else clean_cell(row.get("to", ""))).border = BORDER
             ws.cell(r, 4, clean_cell(row.get("size", ""))).border = BORDER
             ws.cell(r, 5, clean_cell(row.get("rating", ""))).border = BORDER
             # AS-SIZED velocity / volt-drop (post-upsizing) from specs — never the

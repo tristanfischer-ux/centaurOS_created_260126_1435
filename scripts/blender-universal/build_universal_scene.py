@@ -4705,10 +4705,53 @@ def build_parts_manifest(parts):
     return rows
 
 
-def write_parts_manifest(out_dir, parts):
+def _remap_manifest_to_canonical_tags(rows, state):
+    """Overwrite each AUXILIARY manifest row's equipment_tag with the canonical tag the
+    bill-of-materials + instrument index already use (canonical_tags.build_name_tag_map),
+    so the GA / P&ID / line-list and the Excel show ONE tag per part (Tristan 2026-06-21:
+    "one name/tag per part used throughout"). Before this, the manifest minted its own
+    SHAPE-class tag (a blower → K-103) for a part the BoM calls B-201 — two namespaces for
+    the same plant. PRINCIPALS are untouched (build_name_tag_map only carries synthesised
+    instruments / actuators / utilities), so TK-101 / C-101 / P-101 keep their manifest tag
+    that the BoM already agrees on. Per-instance: the Nth drawn row of a name takes the Nth
+    canonical tag (in row order); when more instances are drawn than were tagged the last
+    tag is reused. Pure mutation of rows; no-op when state / canonical_tags is unavailable."""
+    if state is None:
+        return 0
+    try:
+        import canonical_tags as _ct
+    except Exception:
+        return 0
+    name_map = _ct.build_name_tag_map(state)
+    if not name_map:
+        return 0
+    used: dict[str, int] = {}
+    n_remapped = 0
+    for row in rows:
+        key = _ct._norm_name(row.get("name"))
+        tags = name_map.get(key)
+        if not tags:
+            continue
+        idx = used.get(key, 0)
+        new_tag = tags[idx] if idx < len(tags) else tags[-1]
+        used[key] = idx + 1
+        if row.get("equipment_tag") != new_tag:
+            row["equipment_tag"] = new_tag
+            n_remapped += 1
+    if n_remapped:
+        print(f"[parts-manifest] unified {n_remapped} auxiliary tag(s) to the canonical "
+              f"BoM/index namespace (canonical_tags)")
+    return n_remapped
+
+
+def write_parts_manifest(out_dir, parts, state=None):
     """Write <out_dir>/parts-manifest.json — the parts-position export the GA +
     isometric drawing generators consume. PURE EXPORT (reads placed state, writes
     one file). Returns the manifest dict (also handy for the SUMMARY line).
+
+    `state` (the design state.json dict) lets the manifest adopt the canonical auxiliary
+    tags so the drawings and the BoM/Excel share ONE tag per part; omitted → the legacy
+    shape-class manifest tags (back-compat for callers that don't pass it).
 
     Kill switch: GA_SKIP_MANIFEST=1 skips ALL manifest work (the bbox reads + the
     write) — used to prove the render / route-audit outputs are byte-identical with
@@ -4720,6 +4763,9 @@ def write_parts_manifest(out_dir, parts):
         return {"parts": [], "count": 0, "skipped": True}
     os.makedirs(out_dir, exist_ok=True)
     rows = build_parts_manifest(parts)
+    # Unify auxiliary tags with the canonical BoM/index namespace (kill: CANON_TAGS=0).
+    if os.environ.get("CANON_TAGS", "").strip() not in ("0", "false", "no"):
+        _remap_manifest_to_canonical_tags(rows, state)
     # overall placed-equipment bounding box (mm) — the GA's plant L×W×H source.
     if rows:
         xs, ys, zs_lo, zs_hi = [], [], [], []
@@ -13138,7 +13184,7 @@ def main():
     # Every part is now placed (placed_xyz_mm + anchors set above); project that
     # into parts-manifest.json. PURE EXPORT — always writes, disturbs nothing on
     # the render / route / schedule paths.
-    parts_manifest = write_parts_manifest(out_dir, parts)
+    parts_manifest = write_parts_manifest(out_dir, parts, state)
 
     # ── ROUTE-WAYPOINT MANIFEST — the data the PIPING ISOMETRIC drawing consumes.
     # Joins the routed polylines (_ROUTE_LOG) to their sized specs (_CONN_SPECS) and

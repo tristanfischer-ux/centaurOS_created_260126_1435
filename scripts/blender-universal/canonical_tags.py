@@ -157,6 +157,37 @@ def build_tag_map(state: dict) -> dict:
     return tag_map
 
 
+def _norm_name(s) -> str:
+    """Normalise a human part name for a NAME-keyed lookup: NFKC-fold (so the
+    subscript 'O₂' folds to 'O2'), lowercase, collapse whitespace, trim. The SAME
+    fold the parts-manifest consumer applies, so 'Dissolved-O₂ Control Valve' joins
+    whether it arrives with a subscript or not."""
+    import unicodedata
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(s or "")).strip().lower())
+
+
+def build_name_tag_map(state: dict) -> dict:
+    """{normalised_name: [tag, …]} for every synthesised auxiliary — the per-instance
+    tag list keyed by the human NAME instead of the cid. This lets a consumer that
+    carries only the part NAME (the parts-manifest — its Part objects have no cid) adopt
+    the SAME canonical tag the bill-of-materials + instrument index use, so the GA / P&ID
+    drawings stop minting their own shape-class tags (K-103) for a part the BoM calls
+    B-201. When two auxiliary words share a name (e.g. a Dissolved-O₂ Control Valve on the
+    rearing tanks AND one on the biofilter), their instance tags are CONCATENATED in
+    document order, so the manifest's Nth drawn instance of that name reads the Nth tag."""
+    tm = build_tag_map(state)
+    out: dict[str, list[str]] = {}
+    for _w, name, cid in _iter_words(state):
+        tags = tm.get(cid)
+        if not tags or not name:
+            continue
+        key = _norm_name(name)
+        if not key:
+            continue
+        out.setdefault(key, []).extend(tags)
+    return out
+
+
 def format_range(tags: list[str]) -> str:
     """Render a per-instance tag list as a compact label for a single
     bill-of-materials row: a 1-tag list → the tag itself ("LT-201"); a multi-tag
