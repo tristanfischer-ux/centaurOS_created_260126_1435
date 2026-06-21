@@ -247,6 +247,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Glossary": "Plain-English meaning of every abbreviation (DN, ISA tags, FC/FO, status codes, units).",
     "Risk register": "Hazards & findings (live: physics critic, gate flags, cost) + process-safety risks, S×L scored.",
     "Regulatory": "Compliance-gate verdict + statutory duties derived from jurisdiction + hazards present.",
+    "Assembly sequence": "Order-of-works: civils → tankage → mechanical → pipework → electrical → I&C → commissioning.",
 }
 
 # A whitelist of CONTROL-CHARS Excel rejects inside a worksheet cell string —
@@ -3890,6 +3891,109 @@ def tab_regulatory(wb: Workbook, state: dict) -> bool:
     return True
 
 
+# Universal construction / erection sequence — the standard order of works for a
+# process plant. Each phase keys off equipment tokens in the bill of materials, so
+# the equipment list populates from whatever the engine built (no per-class table).
+#   (phase, token_regex_or_None, predecessor, plant/lifting, hold/witness point)
+_ERECTION_PHASES = [
+    ("Site establishment & civils",
+     r"foundation|slab|\bbund\b|civil|groundwork|plinth|concrete|earthwork|drainage channel",
+     "Site handover & set-out", "Excavator, concrete pump",
+     "Foundation survey + concrete cube tests signed off"),
+    ("Tankage & major static equipment erection",
+     r"\btank\b|\bvessel\b|\bcolumn\b|biofilter|degas|\bsilo\b|\bbasin\b|\bsump\b|reactor|skimmer|clarifier|\bmbbr\b|media",
+     "Civils complete & cured", "Mobile crane",
+     "Tank / vessel hydrostatic (leak) test witnessed"),
+    ("Mechanical equipment installation",
+     r"\bpump\b|blower|\bfilter\b|heat pump|compressor|screen|mixer|\bfan\b|dehumidif|\buv\b|chiller|\bhrv\b|skid|aerat|exchanger",
+     "Tankage set & grouted", "Forklift / overhead crane",
+     "Alignment + rotation (bump) test recorded"),
+    ("Pipework & ductwork",
+     r"\bpipe\b|\bvalve\b|\bline\b|\bduct\b|manifold|header|\bspool\b|fitting|flange|\bdn\d",
+     "Equipment installed", "Pipe trolleys, chain hoists",
+     "Pressure / leak test certificate per line"),
+    ("Electrical installation",
+     r"switchgear|transformer|\bmcc\b|\bpanel\b|\bcable\b|\bups\b|generator|genset|distribution|busbar|\bats\b|feeder|breaker|\bmccb\b|\bmcb\b",
+     "Equipment set, cable routes ready", "Cable drum jacks",
+     "Insulation-resistance + earth-continuity tests"),
+    ("Instrumentation, controls & SCADA",
+     r"transmitter|\bsensor\b|\bprobe\b|analys|instrument|controller|\bscada\b|\bplc\b|flow meter|\bgauge\b|\bhmi\b|level switch",
+     "Electrical energised (LV)", "Hand tools",
+     "Loop checks + calibration certificates"),
+    ("Pre-commissioning & commissioning",
+     None, "All systems installed & tested", "—",
+     "Water-on, functional + performance test; client witness"),
+]
+
+
+def tab_assembly_sequence(wb: Workbook, state: dict) -> bool:
+    """Z — native Assembly & Erection Sequence (Tristan 2026-06-21: bring the PDF's
+    assembly/erection sequence into the Excel). Universal: a standard order-of-works
+    whose per-phase equipment list is derived from the bill of materials by discipline
+    keyword (no per-class table). Each phase carries its predecessor, lifting plant and
+    a hold / witness point."""
+    bom = state.get("requirementsBom") or []
+    principals = [b for b in bom if isinstance(b, dict) and not b.get("sub_of") and num(b.get("line_gbp"))]
+    if not principals:
+        principals = [b for b in bom if isinstance(b, dict) and b.get("requirement")]
+    if not principals:
+        return False
+
+    # assign each principal to the FIRST matching phase (commissioning takes none)
+    buckets = {ph[0]: [] for ph in _ERECTION_PHASES}
+    for b in principals:
+        blob = f"{b.get('requirement', '')} {b.get('part', '')} {b.get('tag', '')}".lower()
+        placed = False
+        for ph, rx, *_ in _ERECTION_PHASES:
+            if rx and re.search(rx, blob):
+                tag = clean_cell(b.get("tag", ""))
+                nm = clean_cell(b.get("requirement", "")).lstrip("↳ ").split("·")[0].strip()
+                buckets[ph].append(f"{nm}{(' [' + tag + ']') if tag else ''}")
+                placed = True
+                break
+        if not placed:
+            buckets["Mechanical equipment installation"].append(
+                clean_cell(b.get("requirement", "")).split("·")[0].strip())
+
+    ws = wb.create_sheet("Assembly sequence")
+    set_widths(ws, {"A": 6, "B": 34, "C": 60, "D": 26, "E": 22, "F": 40})
+    title_row(
+        ws, "Assembly & erection sequence", 6,
+        "Standard order of works for the plant, derived from the bill of materials by "
+        "discipline. Each step lists the principal equipment installed in it (with tags), "
+        "its predecessor, the lifting plant, and the hold / witness point that gates the "
+        "next step. Universal sequence — not specific to this plant type. Indicative; a "
+        "site-specific construction phase plan (CDM) is required before works begin.",
+    )
+    header(ws, 4, ["Step", "Phase / activity", "Principal equipment installed (tag)",
+                   "Predecessor", "Lifting plant", "Hold / witness point"])
+    r = 5
+    step = 1
+    for ph, rx, pred, plant, hold in _ERECTION_PHASES:
+        items = list(dict.fromkeys(buckets.get(ph, [])))
+        if ph.startswith("Pre-commissioning"):
+            equip = "Whole plant — flush, fill, leak-check, energise, wet-commission, performance test."
+        elif items:
+            shown = items[:14]
+            equip = "; ".join(shown) + (f"  (+{len(items) - 14} more)" if len(items) > 14 else "")
+        else:
+            continue  # skip a phase with no equipment (other than commissioning)
+        ws.cell(r, 1, step).border = BORDER
+        ws.cell(r, 2, clean_cell(ph)).border = BORDER
+        c3 = ws.cell(r, 3, equip); c3.alignment = WRAP_TOP; c3.border = BORDER
+        ws.cell(r, 4, clean_cell(pred if step > 1 else "Site handover & set-out")).border = BORDER
+        ws.cell(r, 5, clean_cell(plant)).border = BORDER
+        c6 = ws.cell(r, 6, clean_cell(hold)); c6.alignment = WRAP_TOP; c6.border = BORDER
+        lines = max(1, -(-len(equip) // 58))
+        if lines > 1:
+            ws.row_dimensions[r].height = min(lines, 6) * 14.5
+        r += 1
+        step += 1
+    ws.freeze_panes = "A5"
+    back_link(ws, 6)
+    return True
+
+
 def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
     """#20 — Panel / load schedule as a real table (from panel-schedule.md)."""
     path = os.path.join(run_dir, "drawings", "panel-schedule.md")
@@ -4460,6 +4564,7 @@ def build(run_dir: str, out_path: str) -> dict:
     add_tab("Line & velocity", lambda: tab_line_velocity(wb, run_dir))
     add_tab("Risk register", lambda: tab_risk_register(wb, state))
     add_tab("Regulatory", lambda: tab_regulatory(wb, state))
+    add_tab("Assembly sequence", lambda: tab_assembly_sequence(wb, state))
     add_tab("Glossary", lambda: tab_glossary(wb, state))
 
     print("  · Image tabs")
