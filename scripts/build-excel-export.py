@@ -3646,7 +3646,15 @@ def _render_md_table(ws: Worksheet, start_row: int, heading: str,
             if n_only:
                 cell.value = num(txt)
             else:
-                cell.value = txt
+                # Referencify: a cell that IS a master part name (or its tag) becomes a
+                # cell-reference to "Part names" — so md-rendered schedules (instrument index,
+                # valve list, panel schedule) also point at the one master, not a repeat.
+                # Skips the spec ✓/✗ column (left for the live in-spec formula). Literal kept
+                # for anything not a registered principal.
+                _ref = None
+                if not (spec_col is not None and ci + 1 == spec_col) and isinstance(txt, str) and txt.strip():
+                    _ref = name_ref(txt) or tag_ref(txt)
+                cell.value = _ref if _ref else txt
             cell.border = BORDER
             cell.alignment = WRAP_TOP
             # colour an in-spec ✓/✗ cell
@@ -4444,12 +4452,14 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         for idx, row, spec in g:
             in_spec = row.get("within_spec")
             ws.cell(r, 1, idx + 1).border = BORDER
-            # From / To endpoints REFERENCE the master "Part names" tag where the endpoint
-            # is a registered principal (one identity; click through to the part) — literal
-            # tag kept for boundary / aggregate endpoints the master doesn't carry.
-            _fr = tag_ref(row.get("from", ""))
+            # From / To endpoints REFERENCE the master "Part names" row where the endpoint
+            # is a registered principal (one identity; click through to the part). The
+            # connection-schedule labels endpoints by NAME ("Standby Diesel Generator"), so
+            # resolve by name first, tag second; literal kept for boundary endpoints (e.g.
+            # "Utility Incomer") the master doesn't carry.
+            _fr = name_ref(row.get("from", "")) or tag_ref(row.get("from", ""))
             ws.cell(r, 2, _fr if _fr else clean_cell(row.get("from", ""))).border = BORDER
-            _to = tag_ref(row.get("to", ""))
+            _to = name_ref(row.get("to", "")) or tag_ref(row.get("to", ""))
             ws.cell(r, 3, _to if _to else clean_cell(row.get("to", ""))).border = BORDER
             ws.cell(r, 4, clean_cell(row.get("size", ""))).border = BORDER
             ws.cell(r, 5, clean_cell(row.get("rating", ""))).border = BORDER

@@ -2461,7 +2461,12 @@ def assemble(out_dir: str):
                         pgbp = pf
                         pbasis = pbasis + " · floored to min credible process price"
                     nlow = name.lower()
-                    ptag = ("DOS" if "dosing" in nlow else "FD" if "feed" in nlow
+                    # Prefer the parts-manifest ISA tag (what the GA / P&ID / line-list
+                    # draw — X-104 / EP-101 / TK-106 / Z-101) so the BoM and the drawings
+                    # carry ONE tag per part (Tristan 2026-06-21). The mnemonic
+                    # (DOS/FD/LOX/…) is only a fallback for a system not drawn as geometry.
+                    ptag = tag if tag and tag != "—" else (
+                            "DOS" if "dosing" in nlow else "FD" if "feed" in nlow
                             else "LOX" if ("oxygen" in nlow or "lox" in nlow) else "SLU" if "sludge" in nlow
                             else "SCADA" if "scada" in nlow else "GR" if ("grading" in nlow or "harvest" in nlow)
                             else "MED" if ("media" in nlow or "carrier" in nlow) else "SYS")
@@ -2479,7 +2484,10 @@ def assemble(out_dir: str):
                 if w.get("_structure"):
                     bgbp = _child_price(w)
                     nlow = name.lower()
-                    btag = ("SLB" if "slab" in nlow else "FRM" if ("frame" in nlow or "portal" in nlow)
+                    # Prefer the parts-manifest ISA tag (drawing-consistent) over the civil
+                    # mnemonic, same as the SYSTEM branch — one tag per part across BoM + drawings.
+                    btag = tag if tag and tag != "—" else (
+                            "SLB" if "slab" in nlow else "FRM" if ("frame" in nlow or "portal" in nlow)
                             else "WAL" if "wall" in nlow else "ROF" if "roof" in nlow
                             else "FND" if ("foundation" in nlow or "ground" in nlow)
                             else "DR" if "door" in nlow else "BLD")
