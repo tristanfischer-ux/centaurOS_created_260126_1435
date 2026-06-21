@@ -1359,8 +1359,13 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
                                 {(o.get("service") or "") for o in outs} - {""})) or "—"
         miss = incomplete.get(name)
         status = "OK" if not miss else "missing: " + ", ".join(miss)
-        ws.cell(r, 1, clean_cell(name)).border = BORDER
-        ws.cell(r, 2, clean_cell(_tag_for(name))).border = BORDER
+        # Part name + tag REFERENCE the master "Part names" tab where the part is a
+        # registered principal (one identity across the workbook); literal fallback for
+        # boundary / aggregate endpoints the master doesn't carry.
+        _pn = name_ref(name)
+        ws.cell(r, 1, _pn if _pn else clean_cell(name)).border = BORDER
+        _pt = name_ref(name, "tag")
+        ws.cell(r, 2, _pt if _pt else clean_cell(_tag_for(name))).border = BORDER
         sc = ws.cell(r, 3, clean_cell(status))
         sc.border = BORDER
         if miss:
@@ -1408,6 +1413,132 @@ def bom_ref(tag, field: str = "name") -> Optional[str]:
     return "=" + rec[field]
 
 
+# ── MASTER PART-NAME REGISTRY (the "Part names" tab IS the single source) ──────
+# Tristan 2026-06-21, stated four times: "a master series of NAMES, and all other
+# names referenced in the spreadsheet on different tabs will be referencing the
+# names, not using the names from scratch again … when the name is first introduced,
+# every single other reference to that name needs to reference that name."
+#
+# The BoM registry above is keyed by TAG — but the engine carries TWO independent tag
+# namespaces (requirementsBom mints catalogue-class tags B-201/FCV-201/SYS; the parts
+# manifest mints shape-class tags K-103/I-114), so a TAG can't be the cross-tab join.
+# The PART NAME is the one identity every tab and both namespaces share ("Aeration
+# Blower" is "Aeration Blower" in the BoM, the drawings, the ledger and the spec sheet).
+# So the master is keyed by NORMALISED NAME: the "Part names" tab introduces each
+# principal's name ONCE; every other tab references that cell. Edit a name there and it
+# propagates across the whole workbook; Formulas ▸ Trace Dependents follows it.
+# Principals only — sub-component nouns ("Casing", "Impeller", "Top Head") repeat across
+# parents and are NOT global identities; they stay exploded under their parent in the BoM.
+_NAME_REG: Dict[str, Dict[str, str]] = {}
+
+
+def _norm_name(s) -> str:
+    """Normalise a human part name to its cross-tab identity key: NFKC-fold, strip the
+    ↳ child marker, cut the ' · detail' requirement tail, lowercase, collapse runs of
+    whitespace, drop edge punctuation. 'Recirc Pump · 110 kW (78 kW shaft)' and
+    'recirc  pump' both → 'recirc pump'."""
+    import unicodedata
+    t = unicodedata.normalize("NFKC", str(s or "")).replace("↳", " ")
+    for sep in ("·", "•", "—", " - ", " | "):
+        if sep in t:
+            t = t.split(sep)[0]
+    t = re.sub(r"\s+", " ", t).strip().lower()
+    return t.strip(" .,:;-")
+
+
+def _clean_name(s) -> str:
+    """The display name = the requirement head before the ' · ' detail tail, ↳ stripped.
+    Keeps original casing/unicode (e.g. 'Dissolved-O₂ Control Valve')."""
+    t = str(s or "").replace("↳", "").strip()
+    for sep in ("·", "•"):
+        if sep in t:
+            t = t.split(sep)[0]
+    return t.strip(" .,:;-")
+
+
+def _detail_tail(s) -> str:
+    """Everything AFTER the name head — the ' · 110 kW …' descriptor — or '' if none."""
+    t = str(s or "").replace("↳", "").strip()
+    for sep in ("·", "•"):
+        if sep in t:
+            return sep + " " + sep.join(t.split(sep)[1:]).strip()
+    return ""
+
+
+def name_ref(name, field: str = "name") -> Optional[str]:
+    """The cross-sheet cell-reference FORMULA (e.g. "='Part names'!$B$7") for a part's
+    master NAME, or None when the name is not a registered principal (caller keeps its
+    literal). field ∈ {name, tag}. Carries the leading '=' — write it straight to a cell."""
+    rec = _NAME_REG.get(_norm_name(name))
+    if not rec or field not in rec:
+        return None
+    return "=" + rec[field]
+
+
+def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
+    """THE master list of part NAMES (Tristan 2026-06-21). One row per distinct principal
+    part: its canonical Tag + Name typed ONCE here. Populates _NAME_REG so every other
+    tab references these cells instead of repeating the string. Built FIRST so all
+    consumers can resolve. Principals only (a tag with no '.' suffix whose requirement is
+    not a ↳ sub-component)."""
+    _NAME_REG.clear()
+    ws = wb.create_sheet("Part names")
+    set_widths(ws, {"A": 14, "B": 46, "C": 8, "D": 64})
+    title_row(ws, "Part names — the master list", 4,
+              "THE single source of every part's name. Each name is typed ONCE here; every "
+              "other tab (BoM, Cost, Spec sheets, Connection trace, schedules) REFERENCES these "
+              "cells, never repeats the string — edit a name here and it updates across the whole "
+              "workbook. Select a Name cell and use Formulas ▸ Trace Dependents to see everywhere "
+              "it is used. One row per principal part; sub-components are listed under their parent "
+              "on the BoM.")
+    header(ws, 4, ["Tag", "Name", "Qty", "Requirement (as stated)"])
+    bom = state.get("requirementsBom") or []
+    # collect principals in document order, dedup by normalised name (first wins)
+    seen: set = set()
+    principals: List[dict] = []
+    for row in bom:
+        if not isinstance(row, dict):
+            continue
+        tag = str(row.get("tag", "") or "").strip()
+        req = str(row.get("requirement", "") or "")
+        if "." in tag or req.strip().startswith("↳"):
+            continue                         # sub-component / instance — not a master name
+        # Connection / pipework lines ("air connection: A → B", tag C01…) are priced in the
+        # BoM but are not PARTS — keep them off the name master (the arrow / "connection" noun
+        # is the universal signal, independent of class).
+        if "→" in req or re.search(r"\bconnection\b", req, re.I):
+            continue
+        nm = _clean_name(req)
+        key = _norm_name(req)
+        if not nm or not key or key in seen:
+            continue
+        seen.add(key)
+        principals.append({"tag": tag, "name": nm, "qty": row.get("qty"), "req": req})
+    # stable, readable order: by name (the thing the reader scans)
+    principals.sort(key=lambda p: p["name"].lower())
+    r = 5
+    for p in principals:
+        ws.cell(r, 1, clean_cell(p["tag"]) or "—").border = BORDER
+        nc = ws.cell(r, 2, clean_cell(p["name"]))
+        nc.font = FONT_SUB
+        nc.border = BORDER
+        ws.cell(r, 3, p["qty"]).border = BORDER
+        rq = ws.cell(r, 4, clean_cell(p["req"]))
+        rq.alignment = WRAP_TOP
+        rq.font = FONT_NOTE
+        rq.border = BORDER
+        _NAME_REG[_norm_name(p["req"])] = {
+            "tag":  f"'Part names'!$A${r}",
+            "name": f"'Part names'!$B${r}",
+            "row":  str(r),
+        }
+        r += 1
+    apply_col_formats(ws, 5, {3: FMT_INT}, r - 1)
+    ws.auto_filter.ref = f"A4:D{r - 1}"
+    ws.freeze_panes = "A5"
+    back_link(ws, 4)
+
+
 def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     _BOM_REGISTRY.clear()
     ws = wb.create_sheet("BoM")
@@ -1425,7 +1556,19 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     first_line_row = r
     for row in bom:
         ws.cell(r, 1, clean_cell(row.get("tag", ""))).border = BORDER
-        rq = ws.cell(r, 2, clean_cell(row.get("requirement", "")))
+        # Requirement column — the NAME is referenced from the master "Part names" tab
+        # (introduced once), with this row's own detail tail (" · 110 kW …") appended, so
+        # editing the master name updates the BoM too. Sub-components (↳) and unmatched
+        # names keep their literal text (not global identities).
+        _req_raw = clean_cell(row.get("requirement", ""))
+        _nref = name_ref(row.get("requirement", "")) if not str(
+            row.get("requirement", "") or "").strip().startswith("↳") else None
+        if _nref:
+            _tail = _detail_tail(row.get("requirement", ""))
+            _val = (_nref + ' & "  ' + _tail.replace('"', '""') + '"') if _tail else _nref
+            rq = ws.cell(r, 2, _val)
+        else:
+            rq = ws.cell(r, 2, _req_raw)
         rq.alignment = WRAP_TOP
         rq.border = BORDER
         ws.cell(r, 3, row.get("qty")).border = BORDER
@@ -1540,7 +1683,12 @@ def tab_cost(wb: Workbook, state: dict) -> bool:
     first = r
     for ln in cb["lines"]:
         basis = ln.get("basis") or {}
-        ws.cell(r, 1, clean_cell(ln.get("label", ""))).border = BORDER
+        # Label REFERENCES the master "Part names" tab where this cost line names a known
+        # principal (one identity); a literal is kept where the costBasis label diverges
+        # from the BoM name (e.g. "Circulation Pump" vs "Recirc Pump" — that literal is the
+        # visible flag of a name still to be reconciled at source).
+        _lref = name_ref(ln.get("label", ""))
+        ws.cell(r, 1, _lref if _lref else clean_cell(ln.get("label", ""))).border = BORDER
         ws.cell(r, 2, clean_cell(ln.get("module", ""))).border = BORDER
         ws.cell(r, 3, num(ln.get("cost_gbp"))).border = BORDER
         ws.cell(r, 4, "yes" if ln.get("defensible") else "no").border = BORDER
@@ -3356,14 +3504,14 @@ def tab_spec_sheets(wb: Workbook, state: dict) -> bool:
         # ---- block header (the canonical TAG band — the stable identity) ----
         sub_banner(ws, r, f"{tag}", 8)
         r += 1
-        header(ws, r, ["Name (→ BoM)", "Status", "Qty", "Unit £", "Line £",
+        header(ws, r, ["Name (→ Part names)", "Status", "Qty", "Unit £", "Line £",
                        "Material", "Part / MPN", "Driving worked-calc (basis)"])
         r += 1
-        # The single data row for this principal. Name / Qty / Unit £ REFERENCE the
-        # canonical BoM registry by cell where the tag resolves (one identity across
-        # the dossier; a BoM price/qty edit propagates here) — literal fallback if the
-        # tag isn't a BoM line, so the tab never breaks.
-        _name_ref = bom_ref(tag, "name")
+        # The single data row for this principal. Name REFERENCES the master "Part names"
+        # tab (the one place the name is typed); Qty / Unit £ REFERENCE the canonical BoM
+        # registry by tag (a BoM price/qty edit propagates here). Literal fallbacks so the
+        # tab never breaks.
+        _name_ref = name_ref(req) or bom_ref(tag, "name")
         nc = ws.cell(r, 1, _name_ref if _name_ref else (req or "spec"))
         nc.font = FONT_SUB
         nc.border = BORDER
@@ -4594,6 +4742,8 @@ def build(run_dir: str, out_path: str) -> dict:
     fail_count = tab_checks(wb, state, run_dir)
     checks_ws = wb["⚠ Checks"]
     fail_labels = getattr(checks_ws, "_forge_fail_labels", [])
+    print("  · Part names")
+    tab_parts_master(wb, state, run_dir)
     print("  · Quantities")
     tab_quantities(wb, state)
     print("  · Calculations")
