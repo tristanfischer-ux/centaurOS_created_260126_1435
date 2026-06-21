@@ -7599,6 +7599,34 @@ PORT_TERMINAL_MM = (260.0, 200.0, 240.0)
 _PORT_ELECTRICAL_SHAPES = {"cabinet", "cabinet_small", "transformer_box", "box",
                            "instrument"}
 
+# A DRY material-handling / storage / ancillary / door STATION — kit that consumes only
+# POWER (a motor/drive/door operator), never a process fluid. Used by the no-ledger-edge
+# port fallback so a dry station with no edges gets a POWER terminal, not a spurious
+# water in/out (Tristan 2026-06-21: the 6 RAS dry stations — Feed Storage + Distribution,
+# Grading/Harvest, Mortality Handling, Live-Fish Handling, Biosecurity, Roller/Personnel
+# Doors — are power-only). UNIVERSAL — name-keyed handling/storage/door vocabulary, no
+# class table; a genuine flow-through PROCESS part (tank/filter/pump) never matches.
+_DRY_ANCILLARY_RE = re.compile(
+    r"feed|grad|harvest|mortalit|live.?fish|biosecur|\bdoor|roller|personnel|"
+    r"storage|handling|store\b|forklift|conveyor|hopper|loading|packing|crane|hoist",
+    re.IGNORECASE)
+# A WET-PROCESS station that ALSO carries a handling/storage word but genuinely moves a
+# fluid/slurry (e.g. "Solids / Sludge Handling System", "Effluent Storage Tank") — it
+# must KEEP its water ports, so it overrides the dry match. Narrow wet-stream vocabulary.
+_WET_PROCESS_RE = re.compile(
+    r"sludge|solids|slurry|effluent|waste.?water|sediment|backwash|brine|"
+    r"\btank\b|reservoir|sump|clarifier|thicken|dewater|decant",
+    re.IGNORECASE)
+
+
+def _is_dry_ancillary(name):
+    """A DRY material-handling / storage / ancillary / door STATION (power-only) — the
+    no-edge port fallback's test. True when the name matches the dry-station vocabulary
+    AND does NOT match a genuine wet-stream word (so a Sludge/Solids Handling unit, an
+    Effluent Storage tank, etc. stay water). Universal, name-keyed, no class table."""
+    n = str(name or "")
+    return bool(_DRY_ANCILLARY_RE.search(n) and not _WET_PROCESS_RE.search(n))
+
 
 def _terminal_marker(nm, face_xyz_mm, MAT, mod, MO, kind="power"):
     """A SMALL terminal/junction box marking a power or signal tie-in. The box is
@@ -7640,8 +7668,15 @@ def _required_ports_for(part, adj_entry):
     if wanted:
         return wanted
     # ── no ledger edges → a sensible UNIVERSAL default by part character ──
-    if part.shape in _PORT_ELECTRICAL_SHAPES:
-        _add("power", "in")                           # cabinet/instrument → power feed
+    # A DRY material-handling / storage / ancillary / door STATION consumes only POWER
+    # (a motor / drive / door operator), never a process fluid — give it a power feed,
+    # NOT a spurious water in/out (Tristan 2026-06-21). Detected by the dry-station
+    # vocabulary (handling / storage / door / feed / grading / mortality …) OR an
+    # electrical SHAPE. A genuine flow-through PROCESS part with no edges still gets
+    # water in+out. Universal — name/shape-keyed, no class table.
+    if part.shape in _PORT_ELECTRICAL_SHAPES \
+            or _is_dry_ancillary(getattr(part, "name", "")):
+        _add("power", "in")                           # cabinet/instrument/dry station → power feed
     else:
         _add("water", "in"); _add("water", "out")     # flow-through process default
     return wanted
@@ -7885,6 +7920,83 @@ def _wire_path(src_xyz, dst_xyz, service, run_idx=0, overhead_base_z=None):
     return pts
 
 
+# A SOURCE that feeds this many destinations of the SAME service is a FAN-OUT — route it
+# as a SHARED TRAY (one trunk + drop spurs) rather than N independent flying runs, which
+# is the spaghetti Tristan flagged on dense plants (a Distribution Busbar → 30 instruments,
+# SCADA → N signal_ins). Below this count, the per-edge port-to-port path reads fine.
+WIRE_FANOUT_MIN = 3
+
+
+def _tray_paths(src_xyz, dests_xyz, service, overhead_base_z=None, tier_idx=0):
+    """SHARED-TRAY router for a fan-out (one source port → many same-service dest ports).
+
+    Lays ONE overhead TRUNK from the source port along the equipment-bulk rack to a tray
+    SPINE that spans the destinations, then a short DROP SPUR from the spine down onto each
+    destination port. Reads as a real cable tray / pipe-rack branch (a trunk with taps)
+    instead of N independent flying runs. Still PORT-TO-PORT: the trunk STARTS exactly on
+    the source port; each spur ENDS exactly on a destination port — nothing floats.
+
+    Geometry (all mm, Manhattan):
+      • spine axis = the destination span's LONGER plan extent (X or Y), at the dest
+        centroid's other-axis coordinate, at the overhead deck Z + this service's tier;
+      • trunk = source port → rise to deck → across to the spine's NEAR end → run the full
+        spine length to its FAR end (so the trunk physically overflies every tap point);
+      • spur(d) = the spine point directly above dest d → drop straight onto dest d's port.
+
+    Returns (trunk_pts, [(dest_xyz, spur_pts), …]) — `trunk_pts` drawn once; each spur drawn
+    as its own short run. The deck never sits below the tallest port + clearance."""
+    sx, sy, sz = (float(c) for c in src_xyz)
+    dests = [tuple(float(c) for c in d) for d in dests_xyz]
+    tier = _WIRE_SERVICE_TIER.get(service, tier_idx) * WIRE_SERVICE_TIER_MM
+    deck = max([sz] + [d[2] for d in dests]) + WIRE_OVERHEAD_CLEAR_MM
+    if overhead_base_z is not None:
+        deck = max(deck, float(overhead_base_z))
+    z_spine = deck + tier
+    xs = [d[0] for d in dests]
+    ys = [d[1] for d in dests]
+    # spine runs along the axis the destinations spread furthest along; the spine's OTHER
+    # coordinate is the dest centroid (so spurs drop roughly straight down, short + tidy).
+    cx = sum(xs) / len(xs)
+    cy = sum(ys) / len(ys)
+    span_x = max(xs) - min(xs)
+    span_y = max(ys) - min(ys)
+    if span_x >= span_y:
+        axis = "x"
+        a0, a1 = min(xs), max(xs)
+        spine_other = cy
+        near = (a0, spine_other, z_spine) if abs(a0 - sx) <= abs(a1 - sx) else (a1, spine_other, z_spine)
+        far = (a1, spine_other, z_spine) if near[0] == a0 else (a0, spine_other, z_spine)
+    else:
+        axis = "y"
+        a0, a1 = min(ys), max(ys)
+        spine_other = cx
+        near = (spine_other, a0, z_spine) if abs(a0 - sy) <= abs(a1 - sy) else (spine_other, a1, z_spine)
+        far = (spine_other, a1, z_spine) if near[1] == a0 else (spine_other, a0, z_spine)
+    # TRUNK: source port → up to deck → across to the spine NEAR end → along to the FAR end.
+    trunk = [(sx, sy, sz), (sx, sy, z_spine)]
+    if (abs(near[0] - sx) > 1.0) or (abs(near[1] - sy) > 1.0):
+        # corner into the spine line: move in the non-spine axis first, then onto the end.
+        if axis == "x":
+            trunk.append((sx, spine_other, z_spine))   # square up to the spine's Y lane
+        else:
+            trunk.append((spine_other, sy, z_spine))   # square up to the spine's X lane
+        trunk.append(near)
+    trunk.append(far)                                  # run the full spine span
+    # SPUR: the spine point directly above each dest → drop onto the dest port.
+    spurs = []
+    for d in dests:
+        if axis == "x":
+            tap = (d[0], spine_other, z_spine)
+        else:
+            tap = (spine_other, d[1], z_spine)
+        spur = [tap]
+        if abs(tap[0] - d[0]) > 1.0 or abs(tap[1] - d[1]) > 1.0:
+            spur.append((d[0], d[1], z_spine))         # square up over the port
+        spur.append((d[0], d[1], d[2]))                # drop ONTO the port
+        spurs.append((d, spur))
+    return trunk, spurs
+
+
 def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
     """STAGE 3. Route every LEDGER edge PORT-TO-PORT so the laid-out parts read as one
     connected line with nothing floating, and collect each routed run's real path
@@ -7901,7 +8013,21 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
         edge's real bore, mechanism-coloured, scheduled + audited) named u_wire_*.
     An edge whose endpoint is an abstract battery-limit boundary (no placed/ported
     part) is LEFT UNWIRED and logged. Writes wired-lengths.json (per-run length +
-    totals) when out_dir is given. Returns the summary dict."""
+    totals) when out_dir is given. Returns the summary dict.
+
+    SHARED TRAYS (2026-06-21, Tristan): when ONE source feeds ≥WIRE_FANOUT_MIN (3)
+    destinations of the SAME service — a Distribution Busbar → N instrument power_ins, a
+    SCADA/Main Controller → N signal_ins — those edges are NOT drawn as N independent
+    flying runs (the spaghetti on a dense plant, e.g. CO₂ ~170 edges). Instead the group
+    is routed as ONE overhead TRUNK from the source port along the rack to a tray SPINE
+    spanning the destinations, with a short DROP SPUR from the spine onto each dest port
+    (see _tray_paths). Still port-to-port: trunk starts on the source's <service>_out,
+    each spur ends on a dest's <service>_in. Groups smaller than the threshold keep the
+    per-edge port-to-port path. LENGTH RULE for the cost/volt-drop maths: each edge in a
+    trayed group is charged its OWN spur length PLUS its equal share of the shared trunk
+    (trunk_len / N) — so Σ(edge lengths) == trunk + Σ(spurs) exactly (no double-count, no
+    under-count), while a single fat trunk is physically drawn once. Universal — keys only
+    off (from_part, service, dest-count), no class table."""
     by_name = {p.name: p for p in parts}
     wired, skipped, fallbacks, already = [], [], 0, 0
     n_edges = len(ledger_topology or [])
@@ -7919,6 +8045,11 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
     if overhead_base_z is not None:
         print(f"[univ][wire]   overhead deck Z = {overhead_base_z:.0f} mm "
               f"(equipment-bulk top + {WIRE_OVERHEAD_CLEAR_MM:.0f} mm clearance)")
+    # ── PHASE A — RESOLVE every edge to its src/dst ports (NO draw yet) so fan-outs can
+    #    be grouped. A record carries everything PHASE B needs to draw it (per-edge OR as
+    #    part of a shared tray). Edges that resolve to no port are skipped here exactly as
+    #    before (abstract boundary / assembly / unported endpoint) — never drawn.
+    resolved = []        # [{idx,e,frm,to,mech,service,src_part,dst_part,src_xyz,...}]
     for idx, e in enumerate(ledger_topology or []):
         frm = e.get("from_part")
         to = e.get("to_part")
@@ -7956,48 +8087,114 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
             print(f"[univ][wire]   port FALLBACK {edge_lbl}: "
                   f"src={src_key}({src_how}) dst={dst_key}({dst_how}) "
                   f"— wanted {service}_out / {service}_in")
-        # per-RUN Z micro-stagger within this service so the many same-service runs
-        # (e.g. the busbar's signal leads) don't all cross at one overhead height.
-        _run_i = _svc_run_count.get(service, 0)
-        _svc_run_count[service] = _run_i + 1
-        waypoints = _wire_path(src_xyz, dst_xyz, service, run_idx=_run_i,
-                               overhead_base_z=overhead_base_z)
-        render_mech = _WIRE_SERVICE_MECH.get(service, "fluid_loop")
-        # carry the edge's rating into the sizer (real bore), threading the canonical
-        # part names so the scheduled/costed spec names this physical line.
-        edge_for_size = dict(e)
-        edge_for_size.setdefault("from_part", frm)
-        edge_for_size.setdefault("to_part", to)
-        nm = f"u_wire_{idx:03d}_{_part_prefix(str(frm))}_{service}"
-        try:
-            _draw_run(nm, render_mech, waypoints, src_xyz, dst_xyz, MAT, MO,
-                      pipe_module, conn=(src_part.obj_anchor, dst_part.obj_anchor),
-                      own_parts=(src_part, dst_part), log=True, edge=edge_for_size)
-        except Exception as ex:   # never let one run kill the wiring pass
-            print(f"[univ][wire]   WARN draw failed for {edge_lbl}: {ex}")
-            skipped.append({"edge": edge_lbl, "reason": f"draw error: {ex}"})
-            continue
-        length_m = _polyline_len_m(waypoints)
+        resolved.append({
+            "idx": idx, "e": e, "frm": frm, "to": to, "mech": mech, "service": service,
+            "edge_lbl": edge_lbl, "src_part": src_part, "dst_part": dst_part,
+            "src_xyz": src_xyz, "dst_xyz": dst_xyz, "src_key": src_key, "dst_key": dst_key,
+            "src_how": src_how, "dst_how": dst_how,
+        })
+
+    # ── group the resolved edges by (from_part, service). A group with ≥WIRE_FANOUT_MIN
+    #    destinations is a FAN-OUT → one SHARED TRAY (trunk + drop spurs). Smaller groups
+    #    keep the per-edge port-to-port path. Group identity is the SOURCE PORT coordinate
+    #    (so two distinct sources of the same name can't merge) keyed by (frm, service).
+    from collections import OrderedDict
+    groups = OrderedDict()
+    for r in resolved:
+        groups.setdefault((r["frm"], r["service"]), []).append(r)
+    n_fanout_groups = sum(1 for g in groups.values() if len(g) >= WIRE_FANOUT_MIN)
+
+    def _record(r, nm, waypoints, length_m, mode):
+        """Draw ONE run + append its wired-record. Shared by per-edge + spur draws."""
+        render_mech = _WIRE_SERVICE_MECH.get(r["service"], "fluid_loop")
+        edge_for_size = dict(r["e"])
+        edge_for_size.setdefault("from_part", r["frm"])
+        edge_for_size.setdefault("to_part", r["to"])
+        _draw_run(nm, render_mech, waypoints, waypoints[0], waypoints[-1], MAT, MO,
+                  pipe_module, conn=(r["src_part"].obj_anchor, r["dst_part"].obj_anchor),
+                  own_parts=(r["src_part"], r["dst_part"]), log=True, edge=edge_for_size)
         wired.append({
-            "run_name": nm, "from_part": frm, "to_part": to,
-            "mechanism": mech, "service": service,
-            "src_port": src_key, "dst_port": dst_key,
-            "port_match": "exact" if (src_how == "exact" and dst_how == "exact") else "fallback",
+            "run_name": nm, "from_part": r["frm"], "to_part": r["to"],
+            "mechanism": r["mech"], "service": r["service"],
+            "src_port": r["src_key"], "dst_port": r["dst_key"],
+            "port_match": "exact" if (r["src_how"] == "exact" and r["dst_how"] == "exact") else "fallback",
+            "route_mode": mode,
             "length_m": round(length_m, 3),
             "waypoints_mm": [[round(c, 1) for c in w] for w in waypoints],
         })
+
+    n_trayed = 0
+    for (frm, service), grp in groups.items():
+        if len(grp) >= WIRE_FANOUT_MIN:
+            # ── SHARED TRAY: one trunk from the (single) source port → spurs to each dest.
+            src_xyz = grp[0]["src_xyz"]      # same source port for the whole group
+            dests = [r["dst_xyz"] for r in grp]
+            try:
+                trunk, spurs = _tray_paths(src_xyz, dests, service,
+                                           overhead_base_z=overhead_base_z)
+            except Exception as ex:
+                print(f"[univ][wire]   WARN tray build failed for {frm}/{service} "
+                      f"({ex}); falling back to per-edge runs")
+                grp_fallback = True
+            else:
+                grp_fallback = False
+                trunk_len_m = _polyline_len_m(trunk)
+                # LENGTH RULE: each edge is charged its OWN spur + an equal share of the
+                # shared trunk (trunk_len / N) → Σ(edge lengths) == trunk + Σ(spurs).
+                share_m = trunk_len_m / float(len(grp))
+                # draw the trunk ONCE (named on the source), then each spur (named on its
+                # dest) — both through _draw_run so each is sized/scheduled/audited.
+                tnm = f"u_wire_trunk_{_part_prefix(str(frm))}_{service}"
+                render_mech = _WIRE_SERVICE_MECH.get(service, "fluid_loop")
+                try:
+                    _draw_run(tnm, render_mech, trunk, trunk[0], trunk[-1], MAT, MO,
+                              pipe_module,
+                              conn=(grp[0]["src_part"].obj_anchor, None),
+                              own_parts=(grp[0]["src_part"],), log=True,
+                              edge=dict(grp[0]["e"]))
+                except Exception as ex:
+                    print(f"[univ][wire]   WARN trunk draw failed for {frm}/{service}: {ex}")
+                # spurs come back in the SAME ORDER as `dests` (== grp order) — zip 1:1.
+                for r, (_d, spur) in zip(grp, spurs):
+                    snm = f"u_wire_{r['idx']:03d}_{_part_prefix(str(r['to']))}_{service}_spur"
+                    spur_len_m = _polyline_len_m(spur)
+                    try:
+                        _record(r, snm, spur, spur_len_m + share_m, "tray_spur")
+                    except Exception as ex:
+                        print(f"[univ][wire]   WARN spur draw failed for {r['edge_lbl']}: {ex}")
+                        skipped.append({"edge": r["edge_lbl"], "reason": f"draw error: {ex}"})
+                n_trayed += 1
+                print(f"[univ][wire]   SHARED TRAY {frm} → {len(grp)}× {service} "
+                      f"(trunk {trunk_len_m * fl.MM:.1f} m + {len(grp)} spurs)")
+            if not grp_fallback:
+                continue
+        # ── per-edge port-to-port path (small group OR a tray that failed to build).
+        for r in grp:
+            _run_i = _svc_run_count.get(service, 0)
+            _svc_run_count[service] = _run_i + 1
+            waypoints = _wire_path(r["src_xyz"], r["dst_xyz"], service, run_idx=_run_i,
+                                   overhead_base_z=overhead_base_z)
+            nm = f"u_wire_{r['idx']:03d}_{_part_prefix(str(frm))}_{service}"
+            try:
+                _record(r, nm, waypoints, _polyline_len_m(waypoints), "per_edge")
+            except Exception as ex:   # never let one run kill the wiring pass
+                print(f"[univ][wire]   WARN draw failed for {r['edge_lbl']}: {ex}")
+                skipped.append({"edge": r["edge_lbl"], "reason": f"draw error: {ex}"})
+                continue
     total_m = round(sum(w["length_m"] for w in wired), 2)
     by_service = {}
     for w in wired:
         by_service.setdefault(w["service"], 0.0)
         by_service[w["service"]] += w["length_m"]
     by_service = {k: round(v, 2) for k, v in sorted(by_service.items())}
-    summary = {"schema": "wired-lengths/1",
+    summary = {"schema": "wired-lengths/2",
                "edges_total": n_edges,
                "edges_wired": len(wired),
                "edges_skipped": len(skipped),
                "edges_drawn_by_spine": already,   # Stage 4: abstract-boundary edges the spine router drew
                "port_fallbacks": fallbacks,
+               "fanout_groups_trayed": n_trayed,  # fan-outs routed as a SHARED TRAY (trunk + spurs)
+               "fanout_groups_detected": n_fanout_groups,
                "total_routed_length_m": total_m,
                "length_m_by_service": by_service,
                "skipped": skipped,
@@ -8006,6 +8203,7 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
           f"edges WIRED port-to-port ({fallbacks} via a port fallback), "
           f"{already} already drawn by the spine router (abstract boundary), "
           f"{len(skipped)} left unwired (abstract boundary / assembly); "
+          f"{n_trayed} fan-out(s) routed as a SHARED TRAY; "
           f"total routed length {total_m:.1f} m")
     if by_service:
         print(f"[univ][wire]   routed length by service (m): {by_service}")
