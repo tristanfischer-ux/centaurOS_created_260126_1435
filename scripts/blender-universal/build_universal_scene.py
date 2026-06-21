@@ -342,6 +342,32 @@ LINEAR_LAYOUT_ON = os.environ.get("BLENDER_LINEAR_LAYOUT", "").strip().lower() \
 # Clear gap [mm] left between successive parts' footprint edges along the row.
 LINEAR_PART_GAP_MM = 2500   # ≈2.5 m breathing space so the row reads part-by-part
 
+# ── STAGE 3 PORT-TO-PORT WIRING (BLENDER_WIRE_PORTS) ───────────────────────────
+# STAGE 3 of the 4-stage connection-points plan: route every LEDGER edge as a real
+# pipe PORT-TO-PORT (from the source part's <service>_out port to the destination
+# part's <service>_in port — the coordinates Stage 2 stored on part.ports), so the
+# line reads as one long CONNECTED run with nothing floating. See wire_ports().
+# Default-ON-WITH-LINEAR (the safe Stage-3 deliverable to SEE is the wired linear
+# row): unset → ON only when BLENDER_LINEAR_LAYOUT=1, so the PRODUCTION render keeps
+# its existing centre-based topology routing untouched. An explicit value forces it
+# either way (BLENDER_WIRE_PORTS=1 to also wire a production layout; =0 to suppress).
+def _wire_ports_on(linear_on):
+    v = os.environ.get("BLENDER_WIRE_PORTS", "").strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    return bool(linear_on)        # default: ON iff the Stage-1 linear layout is active
+# How far above the TALLER of the two ports a wired run's horizontal "across" leg
+# travels [mm] — the run rises from the source port, crosses overhead at this
+# clearance, then drops to the destination port (a clean Manhattan 3-segment path
+# that reads as one connected line and clears the equipment tops it spans).
+WIRE_OVERHEAD_CLEAR_MM = 900.0
+# Per-(service) Z stagger [mm] added to the overhead leg so two wired runs that
+# share a span (e.g. the water main + the power bus running the length of the row)
+# sit at distinct elevations and don't co-incide / cross at the same height.
+WIRE_SERVICE_TIER_MM = 320.0
+
 # ── 6. Pipe palette by mechanism ───────────────────────────────────────────
 # Pipe radius ~1.7× (Tristan 2026-06-10): the runs read as thin wires. 110→190 mm.
 # 2026-06-11: PIPE_DIA_MM is NO LONGER the diameter every run is drawn at. Each run
@@ -407,6 +433,15 @@ MECH_COLOUR = {             # sRGB; make_mat handles linear conversion.
     "mechanical":    (0.55, 0.56, 0.60),   # grey — mechanical / drive
     "data":          (0.20, 0.70, 0.40),   # green — signal / data
     "control":       (0.92, 0.80, 0.15),   # yellow — control / instrument air
+    # LEDGER-MECHANISM keys (Stage-3 port-to-port wiring keys off the ledger edge's
+    # raw `mechanism`, which uses these literals). Folded into the SAME service-colour
+    # convention so a wired line reads by service: signal=green (= data), the oxygen
+    # header = teal, the ventilation/gas air line = pale cyan-grey. Additive — these
+    # mechanisms were previously absent from the map (fell to neutral grey); production
+    # routing uses fluid_supply/fluid_return/electrical_bus/thermal, unaffected.
+    "signal":        (0.20, 0.70, 0.40),   # green — instrument signal (same as data)
+    "oxygen":        (0.10, 0.78, 0.74),   # teal — O₂ / oxidant gas header
+    "air":           (0.62, 0.80, 0.86),   # pale cyan-grey — ventilation / gas air
 }
 MECH_DEFAULT_COLOUR = (0.50, 0.52, 0.56)
 
@@ -4395,7 +4430,8 @@ def _synthetic_equipment_rows(parts, region_rank_default):
         if getattr(obj, "type", None) != "MESH" or obj.data is None:
             continue
         nm = obj.name
-        if nm.startswith(("u_skid_", "u_route_", "u_pipe_", "u_trunk_", "u_tap_")):
+        if nm.startswith(("u_skid_", "u_route_", "u_pipe_", "u_trunk_", "u_tap_",
+                          "u_wire_")):
             continue
         block_key = role = None
         for rx, fixed_role in _SYN_PREFIX_RE:
@@ -7619,6 +7655,224 @@ def add_connection_ports(parts, MAT, MO, ledger_adj):
           f"ported, {n_ports} ports total (fluid stubs + small terminals; "
           f"stored on part.ports for Stage-3 wiring)")
     return n_with, n_ports
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STAGE 3 — WIRE THE LINE PORT-TO-PORT (4-stage connection-points plan)
+# ───────────────────────────────────────────────────────────────────────────
+# Stage 1 laid every part in process order; Stage 2 stored each part's named in/out
+# connection PORTS on p.ports[f"{service}_{dir}"]. Stage 3 (this) ROUTES every LEDGER
+# edge as a real pipe FROM the source part's `<service>_out` port TO the destination
+# part's `<service>_in` port — the durable coordinates Stage 2 stored — so the whole
+# row reads as ONE long CONNECTED line with NOTHING floating: every pipe starts
+# EXACTLY on a source-port coordinate and ends EXACTLY on a destination-port
+# coordinate (never a part centre, never thin air).
+#
+# UNIVERSAL: it keys ONLY off (a) the finalized LEDGER edge list (from_part/to_part/
+# mechanism + its rating), (b) cl._service_of(mechanism) to pick the port pair, and
+# (c) p.ports. No RAS-only / per-class table. It runs after add_connection_ports and
+# works under the Stage-1 linear row (the deliverable to SEE) AND, when explicitly
+# enabled, the production placers.
+#
+# PATH: a clean Manhattan 3-segment route — RISE from the source port up to an
+# overhead clearance Z (above the taller of the two ports + a per-service tier
+# stagger so parallel services don't co-incide), run ACROSS to above the destination
+# port, then DROP onto the destination port. Reads as one connected run and clears
+# the equipment tops it spans. Drawn through the SAME _draw_run chokepoint the
+# production router uses, so each wired run is sized at its REAL bore from the edge
+# rating (_sized_dia_mm), coloured by mechanism (_mech_pipe_mat — water=blue,
+# power=red cable-tray, thermal=orange, signal=green, O₂=teal, air=cyan), recorded in
+# _CONN_SPECS (the schedule) + _ROUTE_LOG (the audit). Object names ride a `u_wire_`
+# prefix registered in the INSPECT recolour + the synthetic-manifest skip so a wired
+# run keeps its mechanism colour and is never mistaken for an equipment block.
+#
+# MISSING-PORT FALLBACK (never skip a real edge silently): for an edge of service S,
+# the source port is p.ports['S_out']; if that exact key is absent, fall back to the
+# nearest available port of service S (any 'S_*'), then to ANY port on the part — and
+# LOG the substitution. An edge is only LEFT UNWIRED when an endpoint resolves to no
+# placed-and-ported part at all (an abstract battery-limit boundary — grid / drain /
+# atmosphere — which has no physical part to land on); those are logged too.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Ledger SERVICE → the render `mechanism` _draw_run/_mech_pipe_mat colour by + decide
+# cable-tray vs round pipe. The ledger's raw `mechanism` is usually already a
+# colour-known key (fluid_loop/electrical_bus/thermal/signal/air/oxygen), but routing
+# the WIRE by the SERVICE (not the raw mechanism) keeps the palette coherent across
+# any archetype's mechanism spellings and guarantees power → the cable-tray branch.
+_WIRE_SERVICE_MECH = {
+    "water":   "fluid_loop",      # blue round pipe
+    "thermal": "thermal",         # orange round pipe
+    "power":   "electrical_bus",  # red CABLE TRAY (the _draw_run electrical branch)
+    "signal":  "signal",          # green round pipe (thin)
+    "oxygen":  "oxygen",          # teal round pipe
+    "air":     "air",             # cyan round pipe
+}
+# Stable per-service tier index so the overhead "across" leg of each service sits at a
+# distinct elevation band (water below, power above it, etc.) and parallel mains that
+# share the row span never co-incide / cross at the same height.
+_WIRE_SERVICE_TIER = {"water": 0, "thermal": 1, "oxygen": 2, "air": 3,
+                      "power": 4, "signal": 5}
+
+
+def _pick_port(part, service, direction):
+    """Return (port_xyz, port_key, how) for `part`'s (service, direction) connection
+    point — the coordinate Stage 2 stored on part.ports — with a never-skip fallback:
+      1. EXACT  part.ports['<service>_<direction>']                      → how='exact'
+      2. SAME-SERVICE any part.ports['<service>_*'] (prefer the right dir if only the
+         other dir exists, else either)                                  → how='service'
+      3. ANY   any port on the part                                      → how='any'
+    Returns (None, None, 'none') when the part has no ports at all (caller logs it)."""
+    ports = getattr(part, "ports", None) or {}
+    if not ports:
+        return None, None, "none"
+    exact = f"{service}_{direction}"
+    if exact in ports:
+        return tuple(ports[exact]), exact, "exact"
+    # same service, opposite/either direction
+    svc_keys = [k for k in ports if k.startswith(f"{service}_")]
+    if svc_keys:
+        # prefer the requested direction's twin if present, else the first stable one
+        svc_keys.sort()
+        return tuple(ports[svc_keys[0]]), svc_keys[0], "service"
+    # any port — last resort so a real edge is NEVER dropped for want of an exact port
+    any_keys = sorted(ports.keys())
+    return tuple(ports[any_keys[0]]), any_keys[0], "any"
+
+
+def _wire_path(src_xyz, dst_xyz, service):
+    """Build the orthogonal Manhattan waypoint path (mm) FROM the source port TO the
+    destination port: RISE straight up from src to an overhead clearance Z → run
+    ACROSS (in X then Y) at that Z → DROP straight down onto dst. The clearance Z is
+    above the taller of the two ports by WIRE_OVERHEAD_CLEAR_MM plus a per-service
+    tier stagger, so parallel services don't co-incide. Endpoints are EXACTLY the two
+    port coordinates (the run starts on the source port, ends on the destination
+    port — nothing floats). Degenerate near-coincident ports get a direct 2-pt run."""
+    sx, sy, sz = (float(c) for c in src_xyz)
+    dx, dy, dz = (float(c) for c in dst_xyz)
+    tier = _WIRE_SERVICE_TIER.get(service, 0) * WIRE_SERVICE_TIER_MM
+    z_cross = max(sz, dz) + WIRE_OVERHEAD_CLEAR_MM + tier
+    pts = [(sx, sy, sz)]                       # start ON the source port
+    if abs(sx - dx) < 1.0 and abs(sy - dy) < 1.0:
+        pts.append((dx, dy, dz))              # ports stacked → straight drop/rise
+        return pts
+    pts.append((sx, sy, z_cross))             # rise to the overhead lane
+    if abs(sx - dx) > 1.0:
+        pts.append((dx, sy, z_cross))         # across in X
+    if abs(sy - dy) > 1.0:
+        pts.append((dx, dy, z_cross))         # across in Y
+    pts.append((dx, dy, dz))                  # drop ONTO the destination port
+    return pts
+
+
+def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
+    """STAGE 3. Route every LEDGER edge PORT-TO-PORT so the laid-out parts read as one
+    connected line with nothing floating, and collect each routed run's real path
+    length for the downstream velocity / volt-drop / cost maths.
+
+    `ledger_topology` = the finalized connection list (cl.finalize_ledger output) —
+    each edge a dict {from_part, to_part, mechanism, constraint_kind, required_value,
+    required_unit, required_margin_factor, material_context, …}. For each edge:
+      • service  = the edge's _ledger_service or cl._service_of(mechanism); an
+        'assembly' edge is a MOUNT (part-of), not a routable connection → skipped.
+      • source   = from_part.ports['<service>_out'] (fallback via _pick_port);
+        dest     = to_part.ports['<service>_in']  (fallback via _pick_port).
+      • a Manhattan rise→across→drop path is drawn through _draw_run (sized at the
+        edge's real bore, mechanism-coloured, scheduled + audited) named u_wire_*.
+    An edge whose endpoint is an abstract battery-limit boundary (no placed/ported
+    part) is LEFT UNWIRED and logged. Writes wired-lengths.json (per-run length +
+    totals) when out_dir is given. Returns the summary dict."""
+    by_name = {p.name: p for p in parts}
+    wired, skipped, fallbacks = [], [], 0
+    n_edges = len(ledger_topology or [])
+    pipe_module = "mass_fluid_transport_process"   # the routing module bucket
+    for idx, e in enumerate(ledger_topology or []):
+        frm = e.get("from_part")
+        to = e.get("to_part")
+        mech = e.get("mechanism")
+        service = e.get("_ledger_service") or cl._service_of(mech)
+        edge_lbl = f"{frm}→{to} [{mech}/{service}]"
+        if service == "assembly":
+            skipped.append({"edge": edge_lbl, "reason": "assembly mount (not a routable connection)"})
+            continue
+        src_part = by_name.get(frm)
+        dst_part = by_name.get(to)
+        # An endpoint with no placed-and-ported part is an abstract battery-limit
+        # boundary (grid / drain / atmosphere) — there is no physical port to land on.
+        if src_part is None or dst_part is None or not getattr(src_part, "ports", None) \
+                or not getattr(dst_part, "ports", None):
+            why = ("source is an abstract boundary / unported part"
+                   if (src_part is None or not getattr(src_part, "ports", None))
+                   else "destination is an abstract boundary / unported part")
+            skipped.append({"edge": edge_lbl, "reason": why})
+            continue
+        src_xyz, src_key, src_how = _pick_port(src_part, service, "out")
+        dst_xyz, dst_key, dst_how = _pick_port(dst_part, service, "in")
+        if src_xyz is None or dst_xyz is None:        # belt-and-braces (ports dict empty)
+            skipped.append({"edge": edge_lbl, "reason": "no usable port on an endpoint"})
+            continue
+        if src_how != "exact" or dst_how != "exact":
+            fallbacks += 1
+            print(f"[univ][wire]   port FALLBACK {edge_lbl}: "
+                  f"src={src_key}({src_how}) dst={dst_key}({dst_how}) "
+                  f"— wanted {service}_out / {service}_in")
+        waypoints = _wire_path(src_xyz, dst_xyz, service)
+        render_mech = _WIRE_SERVICE_MECH.get(service, "fluid_loop")
+        # carry the edge's rating into the sizer (real bore), threading the canonical
+        # part names so the scheduled/costed spec names this physical line.
+        edge_for_size = dict(e)
+        edge_for_size.setdefault("from_part", frm)
+        edge_for_size.setdefault("to_part", to)
+        nm = f"u_wire_{idx:03d}_{_part_prefix(str(frm))}_{service}"
+        try:
+            _draw_run(nm, render_mech, waypoints, src_xyz, dst_xyz, MAT, MO,
+                      pipe_module, conn=(src_part.obj_anchor, dst_part.obj_anchor),
+                      own_parts=(src_part, dst_part), log=True, edge=edge_for_size)
+        except Exception as ex:   # never let one run kill the wiring pass
+            print(f"[univ][wire]   WARN draw failed for {edge_lbl}: {ex}")
+            skipped.append({"edge": edge_lbl, "reason": f"draw error: {ex}"})
+            continue
+        length_m = _polyline_len_m(waypoints)
+        wired.append({
+            "run_name": nm, "from_part": frm, "to_part": to,
+            "mechanism": mech, "service": service,
+            "src_port": src_key, "dst_port": dst_key,
+            "port_match": "exact" if (src_how == "exact" and dst_how == "exact") else "fallback",
+            "length_m": round(length_m, 3),
+            "waypoints_mm": [[round(c, 1) for c in w] for w in waypoints],
+        })
+    total_m = round(sum(w["length_m"] for w in wired), 2)
+    by_service = {}
+    for w in wired:
+        by_service.setdefault(w["service"], 0.0)
+        by_service[w["service"]] += w["length_m"]
+    by_service = {k: round(v, 2) for k, v in sorted(by_service.items())}
+    summary = {"schema": "wired-lengths/1",
+               "edges_total": n_edges,
+               "edges_wired": len(wired),
+               "edges_skipped": len(skipped),
+               "port_fallbacks": fallbacks,
+               "total_routed_length_m": total_m,
+               "length_m_by_service": by_service,
+               "skipped": skipped,
+               "runs": wired}
+    print(f"[univ][wire] STAGE 3 port-to-port wiring — {len(wired)}/{n_edges} ledger "
+          f"edges WIRED port-to-port ({fallbacks} via a port fallback), "
+          f"{len(skipped)} left unwired (abstract boundary / assembly); "
+          f"total routed length {total_m:.1f} m")
+    if by_service:
+        print(f"[univ][wire]   routed length by service (m): {by_service}")
+    if skipped:
+        for s in skipped[:12]:
+            print(f"[univ][wire]   UNWIRED {s['edge']}: {s['reason']}")
+    if out_dir:
+        try:
+            with open(os.path.join(out_dir, "wired-lengths.json"), "w") as wf:
+                json.dump(summary, wf, indent=1)
+            print(f"[univ][wire]   wrote wired-lengths.json — {len(wired)} runs, "
+                  f"{total_m:.1f} m total → {os.path.join(out_dir, 'wired-lengths.json')}")
+        except Exception as we:
+            print(f"[univ][wire]   WARN could not write wired-lengths.json: {we}")
+    return summary
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -11781,7 +12035,8 @@ def apply_inspection_materials(parts):
         #    exactly like u_route_* — we keep that colour and only kill the gloss
         #    (NOT recolour them neutral-grey via the unmatched fallback). ──
         if nm.startswith("u_route_") or nm.startswith("u_trunk_") \
-                or nm.startswith("u_tap_") or nm.startswith("u_pipe_"):
+                or nm.startswith("u_tap_") or nm.startswith("u_pipe_") \
+                or nm.startswith("u_wire_"):
             for m in obj.data.materials:
                 if m is None:
                     continue
@@ -12391,6 +12646,32 @@ def main():
                 print(f"[univ][ports] WARN ports-debug dump failed: {_de}")
     else:
         print("[univ][ports] BLENDER_CONNECTION_PORTS=0 — Stage-2 ports suppressed")
+
+    # ── STAGE 3 (4-stage connection-points plan) — WIRE THE LINE PORT-TO-PORT ──
+    # Route EVERY ledger edge as a real pipe from the source part's <service>_out port
+    # to the destination part's <service>_in port (the coordinates Stage 2 stored on
+    # part.ports), so the laid-out parts read as ONE long connected line with nothing
+    # floating, and collect each run's real routed length (→ wired-lengths.json) for
+    # the velocity / volt-drop / cost maths. Default-ON-WITH-LINEAR (the safe Stage-3
+    # deliverable to SEE): on by default ONLY when BLENDER_LINEAR_LAYOUT=1 — in the
+    # linear layout place_all_linear routed NOTHING, so wire_ports is the SOLE pipe
+    # drawer (no double-draw). The PRODUCTION placers already route their own topology
+    # (route_on_spine), so Stage-3 wiring stays OFF for them unless BLENDER_WIRE_PORTS=1
+    # is set explicitly (which would then ADD a port-to-port set on top — opt-in only).
+    # Runs through _draw_run, so each wired run is sized + scheduled + audited like any
+    # routed run (audit_routes / reconcile_route_specs / write_connection_schedule below
+    # therefore include the wired runs). Requires Stage-2 ports.
+    if _ports_on and _wire_ports_on(LINEAR_LAYOUT_ON):
+        try:
+            wire_ports(parts, topology, MAT, MO, out_dir=out_dir)
+        except Exception as _we:   # additive — never fail the whole render
+            print(f"[univ][wire] WARN wire_ports skipped: {_we}")
+    elif not _ports_on:
+        print("[univ][wire] STAGE 3 skipped — Stage-2 ports are off (need ports to wire)")
+    else:
+        print("[univ][wire] STAGE 3 port-to-port wiring OFF (set BLENDER_WIRE_PORTS=1 "
+              "to wire a production layout; it is ON by default under "
+              "BLENDER_LINEAR_LAYOUT=1)")
 
     # ── ROUTE AUDIT — the harsh self-check on the pipe routing (Tristan 2026-06-11).
     # Computes over-equipment segments / max detour ratio / same-elevation crossings
