@@ -328,6 +328,22 @@ SKID_FRAME_HEIGHT_FRAC   = 0.92   # frame top = this × tallest-EQUIPMENT-top. W
                                   # the excluded towers tower above it.
 SKID_POST_MM             = 180    # box-section size of frame posts/rails (substantial)
 
+# ── STAGE 4 GROUND SLAB (the floor the plant SITS ON) ──────────────────────────
+# Tristan 2026-06-21: the universal render had "everything floating in the air, no
+# floor showing". add_ground_slab lays a flat reinforced-concrete deck under the
+# plant: its TOP at DECK_Z_MM (the same datum every part's underside sits on, so the
+# equipment SITS on it), spanning the equipment footprint + a margin so it reads as a
+# deck the plant stands on (not a tight tile, not a horizon-filling plane that would
+# shrink the plant in-frame). Universal, footprint-keyed; named u_ground_* (already
+# registered in the parts-manifest skip + the INSPECT recolour). Skipped for the
+# free-space families (aircraft/satellite have their own faint ground plane; a wind
+# turbine has its own foundation pad).
+GROUND_SLAB_THICK_MM   = 400.0    # reinforced slab depth (top at DECK_Z_MM, extends down)
+GROUND_SLAB_MARGIN_MM  = 2500.0   # apron beyond the equipment footprint (a walkable margin)
+# Concrete-grey, a touch darker than the 0.85 INSPECT world so the deck reads as a
+# distinct surface under the plant while staying subordinate to the equipment.
+GROUND_SLAB_COLOUR     = (0.62, 0.62, 0.64)
+
 # ── STAGE 1 LINEAR LAYOUT (BLENDER_LINEAR_LAYOUT=1) ─────────────────────────
 # A DETERMINISTIC diagnostic placement that lays EVERY part in ONE straight row
 # along +X, ordered by process sequence (region_rank ascending, then a stable
@@ -342,22 +358,81 @@ LINEAR_LAYOUT_ON = os.environ.get("BLENDER_LINEAR_LAYOUT", "").strip().lower() \
 # Clear gap [mm] left between successive parts' footprint edges along the row.
 LINEAR_PART_GAP_MM = 2500   # ≈2.5 m breathing space so the row reads part-by-part
 
-# ── STAGE 3 PORT-TO-PORT WIRING (BLENDER_WIRE_PORTS) ───────────────────────────
-# STAGE 3 of the 4-stage connection-points plan: route every LEDGER edge as a real
-# pipe PORT-TO-PORT (from the source part's <service>_out port to the destination
-# part's <service>_in port — the coordinates Stage 2 stored on part.ports), so the
-# line reads as one long CONNECTED run with nothing floating. See wire_ports().
-# Default-ON-WITH-LINEAR (the safe Stage-3 deliverable to SEE is the wired linear
-# row): unset → ON only when BLENDER_LINEAR_LAYOUT=1, so the PRODUCTION render keeps
-# its existing centre-based topology routing untouched. An explicit value forces it
-# either way (BLENDER_WIRE_PORTS=1 to also wire a production layout; =0 to suppress).
+# ── STAGE 3/4 PORT-TO-PORT WIRING (BLENDER_WIRE_PORTS) ─────────────────────────
+# Route every LEDGER edge as a real pipe PORT-TO-PORT (from the source part's
+# <service>_out port to the destination part's <service>_in port — the coordinates
+# Stage 2 stored on part.ports), so the line reads as one long CONNECTED run with
+# NOTHING floating. See wire_ports().
+#
+# STAGE 4 CONVERGENCE (2026-06-21): port-to-port wiring is now ON BY DEFAULT for the
+# PRODUCTION compact layout too (not just the Stage-1 linear row). The compact placer
+# IS the fold; this brings the ports + port-to-port runs INTO that fold so the real
+# hero shows parts connected port-to-port. The OLD centre-based spine router
+# (route_topology) still runs, but it now DEFERS every edge wire_ports can resolve
+# (both endpoints are real placed-and-ported parts) and only routes the abstract
+# battery-limit edges wire_ports cannot land on (grid / drain / atmosphere incomers)
+# — see _edge_is_port_wirable + _SPINE_DRAWN_EDGE_IDS, so each edge is drawn EXACTLY
+# ONCE (no double-draw). Escape hatch: BLENDER_WIRE_PORTS=0 restores the pure
+# centre-based spine routing (route_topology draws everything, wire_ports off).
 def _wire_ports_on(linear_on):
     v = os.environ.get("BLENDER_WIRE_PORTS", "").strip().lower()
     if v in ("1", "true", "yes", "on"):
         return True
     if v in ("0", "false", "no", "off"):
         return False
-    return bool(linear_on)        # default: ON iff the Stage-1 linear layout is active
+    # default: ON — the Stage-1 linear row AND the production compact layout both wire
+    # port-to-port. (Stage 4 turned this on for production; was: ON iff linear_on.)
+    return True
+
+# STAGE 4 DOUBLE-DRAW GUARD — the registry of topology edges the centre-based SPINE
+# router (route_topology / _emit_routes_on_plan) actually drew this run, keyed by the
+# edge object's id(). wire_ports skips any edge already in here, so when both engines
+# run (production with wiring ON) NO edge is drawn twice. Reset per build alongside
+# _ROUTE_LOG. (Edge identity is stable: the SAME topology list object is passed to the
+# placer's route_topology AND to wire_ports, so id(edge) matches across both.)
+_SPINE_DRAWN_EDGE_IDS = set()
+
+
+def _spine_defers_to_wire_ports():
+    """True when wire_ports is the PRIMARY router for part-to-part edges (Stage 4):
+    the spine router must then DEFER (skip) every edge wire_ports will draw and route
+    ONLY the abstract battery-limit edges. This is exactly `_wire_ports_on(...)` — when
+    wiring is active the partition is in force; when it is off the spine draws all."""
+    return _wire_ports_on(LINEAR_LAYOUT_ON)
+
+
+def _edge_is_port_wirable(e, by_name):
+    """The SINGLE source of truth for the wire_ports ↔ spine-router partition: True iff
+    THIS ledger edge will be drawn PORT-TO-PORT by wire_ports (so the spine router must
+    skip it). An edge is port-wirable when it is a routable service (not an assembly
+    mount) AND BOTH endpoints resolve — by EXACT name — to a placed, NON-ENVELOPE part.
+
+    "placed + non-envelope" is EXACTLY the set add_connection_ports gives ports to
+    (_required_ports_for always returns ≥1 port for such a part, via its universal
+    water-in/out | power-in fallback), so this predicate is the route-TIME-valid proxy
+    for "will be ported": it must NOT test p.ports, because the spine router
+    (route_topology) runs INSIDE the placer, BEFORE Stage-2 ports exist. wire_ports runs
+    AFTER ports, where placed+non-envelope ⟺ has-ports, so both engines agree on the
+    partition and every edge is drawn by exactly one of them.
+
+    Uses exact name match (by_name = {p.name: p}), NOT resolve_endpoint's fuzzy token
+    overlap, because finalize_ledger already canonicalised every REAL endpoint to its
+    resolved part's `p.name` (it sets e['from_part']/e['to_part'] = a_name/b_name). So an
+    abstract battery-limit endpoint keeps its raw tag (absent from by_name) and is NOT
+    port-wirable → the spine router routes it (its _resolve_abstract_end synthesises an
+    incomer/centroid). EXACT complement of route_topology's abstract-endpoint handling."""
+    mech = e.get("mechanism")
+    service = e.get("_ledger_service") or cl._service_of(mech)
+    if service == "assembly":
+        return False
+    a = by_name.get(e.get("from_part"))
+    b = by_name.get(e.get("to_part"))
+    return (a is not None and b is not None
+            and bool(getattr(a, "placed_xyz_mm", None))
+            and bool(getattr(b, "placed_xyz_mm", None))
+            and not _layout_is_envelope(a) and not _layout_is_envelope(b))
+
+
 # How far above the TALLER of the two ports a wired run's horizontal "across" leg
 # travels [mm] — the run rises from the source port, crosses overhead at this
 # clearance, then drops to the destination port (a clean Manhattan 3-segment path
@@ -3808,6 +3883,7 @@ def _route_log_reset():
     _ROUTE_LOG.clear()
     _CONN_SPECS.clear()
     _SIZING_CACHE.clear()
+    _SPINE_DRAWN_EDGE_IDS.clear()   # Stage 4 double-draw guard (see _edge_is_port_wirable)
 
 
 def _route_log_add(name, mech, waypoints, a_xy, b_xy, own_parts=()):
@@ -4431,7 +4507,7 @@ def _synthetic_equipment_rows(parts, region_rank_default):
             continue
         nm = obj.name
         if nm.startswith(("u_skid_", "u_route_", "u_pipe_", "u_trunk_", "u_tap_",
-                          "u_wire_")):
+                          "u_wire_", "u_ground_")):
             continue
         block_key = role = None
         for rx, fixed_role in _SYN_PREFIX_RE:
@@ -6434,10 +6510,23 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
     Nozzle pick + mechanism colours unchanged. Returns (routed_count, unresolved)."""
     rack_base_z = rack_elevation_mm(frame_top_mm)
 
+    # STAGE 4: when wire_ports is the primary router (default-ON, incl. production), the
+    # SPINE router DEFERS every PORT-WIRABLE edge (both ends a real placed+ported part —
+    # wire_ports draws those port-to-port) and routes ONLY the abstract battery-limit
+    # edges (grid/drain/atmosphere incomers) wire_ports cannot land on. Same partition
+    # predicate both sides + the drawn-edge registry ⇒ each edge drawn EXACTLY once.
+    _defer = _spine_defers_to_wire_ports()
+    _by_name = {p.name: p for p in parts}
+    _deferred = 0
+
     # ── PASS 1: resolve every edge to concrete 3D endpoints (collect, don't draw) ─
     resolved = []   # per drawable edge: dict of endpoints/metadata
     unresolved = []
     for i, e in enumerate(topology):
+        # Stage 4 deferral: leave the port-wirable part-to-part edges to wire_ports.
+        if _defer and _edge_is_port_wirable(e, _by_name):
+            _deferred += 1
+            continue
         frm = e.get("from_part", "")
         to = e.get("to_part", "")
         mech = e.get("mechanism", "fluid_loop")
@@ -6517,6 +6606,18 @@ def route_topology(topology, parts, MAT, MO, frame_top_mm=None,
     if rack_plan is None and bbox_mm is not None:
         rack_plan = make_rack_plan_for_rows(
             bbox_mm, rack_base_z, equipment_xy_bboxes_mm(parts), axis="x")
+
+    # STAGE 4: record every edge the spine router actually drew (resolved → emitted), so
+    # wire_ports skips them (belt-and-braces against double-draw). The abstract-boundary
+    # edges live here; the port-wirable part-to-part edges were deferred above.
+    for r in resolved:
+        _e = r.get("edge")
+        if _e is not None:
+            _SPINE_DRAWN_EDGE_IDS.add(id(_e))
+    if _defer:
+        print(f"[univ][wire] STAGE 4: spine router drew {len(resolved)} abstract-boundary "
+              f"edge(s); DEFERRED {_deferred} part-to-part edge(s) to wire_ports "
+              f"(each edge drawn once)")
 
     routed, emit_unresolved = _emit_routes_on_plan(
         resolved, rack_plan, rack_base_z, MAT, MO,
@@ -7739,18 +7840,38 @@ def _pick_port(part, service, direction):
     return tuple(ports[any_keys[0]]), any_keys[0], "any"
 
 
-def _wire_path(src_xyz, dst_xyz, service):
+# Per-RUN micro-stagger [mm] WITHIN a service tier: successive runs of the SAME service
+# (e.g. the 20+ signal leads off the distribution busbar) step up by this so they don't
+# all cross at one overhead height (the same-Z-crossing tangle). A small band — N runs
+# spread over N×this — kept under the service-tier pitch so services stay separated.
+WIRE_RUN_STAGGER_MM = 110.0
+WIRE_RUN_STAGGER_LEVELS = 6    # cycle the per-run offset over this many levels per service
+
+
+def _wire_path(src_xyz, dst_xyz, service, run_idx=0, overhead_base_z=None):
     """Build the orthogonal Manhattan waypoint path (mm) FROM the source port TO the
     destination port: RISE straight up from src to an overhead clearance Z → run
-    ACROSS (in X then Y) at that Z → DROP straight down onto dst. The clearance Z is
-    above the taller of the two ports by WIRE_OVERHEAD_CLEAR_MM plus a per-service
-    tier stagger, so parallel services don't co-incide. Endpoints are EXACTLY the two
-    port coordinates (the run starts on the source port, ends on the destination
-    port — nothing floats). Degenerate near-coincident ports get a direct 2-pt run."""
+    ACROSS (in X then Y) at that Z → DROP straight down onto dst. The across-leg runs
+    at a shared OVERHEAD-DECK Z (overhead_base_z = the equipment-bulk top + clearance,
+    like a real overhead pipe rack) so a port-to-port run FLIES ABOVE the equipment it
+    spans (e.g. the tall tank farm) instead of draping across the tank tops; it is
+    lifted further by a per-SERVICE tier stagger (services don't co-incide) plus a
+    per-RUN micro-stagger (run_idx) so two runs of the SAME service that share a span
+    sit at distinct heights (cuts the same-Z-crossing tangle). The deck never drops
+    below either port (a run between two tall nozzles stays at its own height + clear).
+    Endpoints are EXACTLY the two port coordinates (the run starts on the source port,
+    ends on the destination port — nothing floats). Degenerate near-coincident ports
+    get a direct 2-pt run."""
     sx, sy, sz = (float(c) for c in src_xyz)
     dx, dy, dz = (float(c) for c in dst_xyz)
     tier = _WIRE_SERVICE_TIER.get(service, 0) * WIRE_SERVICE_TIER_MM
-    z_cross = max(sz, dz) + WIRE_OVERHEAD_CLEAR_MM + tier
+    run_off = (run_idx % WIRE_RUN_STAGGER_LEVELS) * WIRE_RUN_STAGGER_MM
+    # base overhead deck: the shared equipment-bulk top (if supplied), but never below
+    # the taller of the two ports + clearance (so a tall-to-tall run isn't pushed down).
+    deck = max(sz, dz) + WIRE_OVERHEAD_CLEAR_MM
+    if overhead_base_z is not None:
+        deck = max(deck, float(overhead_base_z))
+    z_cross = deck + tier + run_off
     pts = [(sx, sy, sz)]                       # start ON the source port
     if abs(sx - dx) < 1.0 and abs(sy - dy) < 1.0:
         pts.append((dx, dy, dz))              # ports stacked → straight drop/rise
@@ -7782,15 +7903,35 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
     part) is LEFT UNWIRED and logged. Writes wired-lengths.json (per-run length +
     totals) when out_dir is given. Returns the summary dict."""
     by_name = {p.name: p for p in parts}
-    wired, skipped, fallbacks = [], [], 0
+    wired, skipped, fallbacks, already = [], [], 0, 0
     n_edges = len(ledger_topology or [])
     pipe_module = "mass_fluid_transport_process"   # the routing module bucket
+    _svc_run_count = {}   # per-service counter → per-run Z micro-stagger (anti-tangle)
+    # OVERHEAD DECK: route the across-legs above the EQUIPMENT BULK (non-tall parts —
+    # tanks/skids; stacks/flares excluded via is_tall_for_frame so the deck isn't dragged
+    # up to a flare tip) + clearance, so every port-to-port run FLIES OVER the tank farm
+    # like a real overhead rack instead of draping across the tank tops. None → fall back
+    # to the per-run "taller-port + clearance" height (the original behaviour).
+    _bulk_tops = [p.anchors["top"][2] for p in parts
+                  if getattr(p, "anchors", None) and "top" in p.anchors
+                  and not is_tall_for_frame(p)]
+    overhead_base_z = (max(_bulk_tops) + WIRE_OVERHEAD_CLEAR_MM) if _bulk_tops else None
+    if overhead_base_z is not None:
+        print(f"[univ][wire]   overhead deck Z = {overhead_base_z:.0f} mm "
+              f"(equipment-bulk top + {WIRE_OVERHEAD_CLEAR_MM:.0f} mm clearance)")
     for idx, e in enumerate(ledger_topology or []):
         frm = e.get("from_part")
         to = e.get("to_part")
         mech = e.get("mechanism")
         service = e.get("_ledger_service") or cl._service_of(mech)
         edge_lbl = f"{frm}→{to} [{mech}/{service}]"
+        # STAGE 4 double-draw guard: an edge the centre-based spine router already drew
+        # (an abstract battery-limit edge it routes; wire_ports can't land on it anyway)
+        # must NOT be re-drawn here. id()-keyed on the SAME topology list both engines
+        # share. Belt-and-braces — the partition predicate already excludes these.
+        if id(e) in _SPINE_DRAWN_EDGE_IDS:
+            already += 1
+            continue
         if service == "assembly":
             skipped.append({"edge": edge_lbl, "reason": "assembly mount (not a routable connection)"})
             continue
@@ -7815,7 +7956,12 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
             print(f"[univ][wire]   port FALLBACK {edge_lbl}: "
                   f"src={src_key}({src_how}) dst={dst_key}({dst_how}) "
                   f"— wanted {service}_out / {service}_in")
-        waypoints = _wire_path(src_xyz, dst_xyz, service)
+        # per-RUN Z micro-stagger within this service so the many same-service runs
+        # (e.g. the busbar's signal leads) don't all cross at one overhead height.
+        _run_i = _svc_run_count.get(service, 0)
+        _svc_run_count[service] = _run_i + 1
+        waypoints = _wire_path(src_xyz, dst_xyz, service, run_idx=_run_i,
+                               overhead_base_z=overhead_base_z)
         render_mech = _WIRE_SERVICE_MECH.get(service, "fluid_loop")
         # carry the edge's rating into the sizer (real bore), threading the canonical
         # part names so the scheduled/costed spec names this physical line.
@@ -7850,13 +7996,15 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
                "edges_total": n_edges,
                "edges_wired": len(wired),
                "edges_skipped": len(skipped),
+               "edges_drawn_by_spine": already,   # Stage 4: abstract-boundary edges the spine router drew
                "port_fallbacks": fallbacks,
                "total_routed_length_m": total_m,
                "length_m_by_service": by_service,
                "skipped": skipped,
                "runs": wired}
-    print(f"[univ][wire] STAGE 3 port-to-port wiring — {len(wired)}/{n_edges} ledger "
+    print(f"[univ][wire] STAGE 3/4 port-to-port wiring — {len(wired)}/{n_edges} ledger "
           f"edges WIRED port-to-port ({fallbacks} via a port fallback), "
+          f"{already} already drawn by the spine router (abstract boundary), "
           f"{len(skipped)} left unwired (abstract boundary / assembly); "
           f"total routed length {total_m:.1f} m")
     if by_service:
@@ -7991,6 +8139,45 @@ def _apply_layout_optimiser(parts, topology, bbox):
     print(f"[univ][layout] CRAFT re-flow: moved {n_moved}/{len(common)} equipment parts; "
           f"footprint {(xs1 - xs0) / 1000.0:.1f}×{(ys1 - ys0) / 1000.0:.1f} m")
     return {"x0": xs0 - 800, "x1": xs1 + 800, "y0": ys0 - 800, "y1": ys1 + 800}
+
+
+def add_ground_slab(parts, MAT, MO, bbox_mm=None):
+    """STAGE 4. Lay a flat reinforced-concrete DECK under the plant so it visibly SITS
+    ON A FLOOR (Tristan 2026-06-21: "everything floating in the air, no floor showing").
+
+    The slab spans the EQUIPMENT footprint (equipment_bbox_mm — the equipment bulk, NOT
+    the tall frame/stacks, so the apron hugs the plant) + GROUND_SLAB_MARGIN_MM apron on
+    every side; its TOP sits at DECK_Z_MM (the datum every part's underside rests on, so
+    the equipment sits ON the slab — no z-fight, nothing buried) and it extends
+    GROUND_SLAB_THICK_MM downward. Concrete-grey matte. Named u_ground_slab so it is
+    skipped by the parts-manifest (it is the deck, not an equipment item) and recoloured
+    as the deck in the INSPECT pass. Universal — footprint-keyed, no per-class logic.
+
+    Returns the slab object."""
+    # equipment_bbox_mm already adds the margin + returns a safe default if nothing is
+    # placed; it frames the equipment BULK (tall stacks/flares excluded) so the apron
+    # hugs the plant rather than chasing a flare spike out to the plant edge.
+    eb = equipment_bbox_mm(parts, margin_mm=GROUND_SLAB_MARGIN_MM)
+    w = max(1000.0, eb["x1"] - eb["x0"])
+    d = max(1000.0, eb["y1"] - eb["y0"])
+    cx = (eb["x0"] + eb["x1"]) / 2.0
+    cy = (eb["y0"] + eb["y1"]) / 2.0
+    # TOP at DECK_Z_MM → the box centre is half the thickness BELOW the deck datum, so the
+    # equipment (underside at DECK_Z_MM) sits exactly on the slab top with no overlap.
+    z_centre = DECK_Z_MM - GROUND_SLAB_THICK_MM / 2.0
+    mkey = "u_ground_slab_mat"
+    if mkey not in MAT:
+        MAT[mkey] = fl.make_mat("m_u_ground_slab", fl._to_linear(GROUND_SLAB_COLOUR),
+                                kind="concrete")
+    slab = fl.add_box(
+        "u_ground_slab",
+        (cx * fl.MM, cy * fl.MM, z_centre * fl.MM),
+        (w * fl.MM, d * fl.MM, GROUND_SLAB_THICK_MM * fl.MM),
+        MAT[mkey], module="structure_containment", module_objects=MO)
+    print(f"[univ][ground] STAGE 4 floor — concrete deck {w/1000.0:.1f}×{d/1000.0:.1f} m, "
+          f"{GROUND_SLAB_THICK_MM/1000.0:.2f} m thick, top at DECK_Z={DECK_Z_MM} mm "
+          f"(plant sits on it)")
+    return slab
 
 
 def place_process_plant(parts, regions, topology, MAT, MO):
@@ -12056,6 +12243,16 @@ def apply_inspection_materials(parts):
             obj.data.materials.append(_matte((1.00, 0.45, 0.00)))
             n_pipe += 1
             continue
+        # ── GROUND SLAB (Stage 4: add_ground_slab) → a flat concrete-grey deck the
+        #    plant visibly SITS on. A touch darker than the 0.85 world so the floor
+        #    reads as a distinct surface under the equipment, but light enough to
+        #    stay subordinate (it must not compete with the plant). Not a Part →
+        #    would otherwise fall to the neutral-grey unmatched bucket. ──
+        if nm.startswith("u_ground_"):
+            obj.data.materials.clear()
+            obj.data.materials.append(_matte(GROUND_SLAB_COLOUR))
+            n_frame += 1            # counted with structure (it is the deck), not equip
+            continue
         # ── RACK-FARM geometry (u_rf_*) → flat matte by sub-part role, so the
         #    rows of racks + the BoP lineup read by colour in the judging surface
         #    (these objects aren't owned by a Part, so they'd otherwise fall to the
@@ -12610,6 +12807,28 @@ def main():
         bbox, region_centres, frame_h, routed, unresolved = place_process_plant(
             parts, regions, topology, MAT, MO)
 
+    # ── STAGE 4 GROUND SLAB — the FLOOR the plant sits on ──
+    # Tristan 2026-06-21: the universal render had "everything floating in the air, no
+    # floor showing". Lay a concrete deck under the plant (top at DECK_Z_MM, the datum
+    # every part sits on) so the equipment visibly stands ON a floor. SKIPPED for the
+    # FREE-SPACE families: an aircraft/satellite (aero_body) floats with its own faint
+    # context ground plane, and a wind turbine (tower_machine) springs from its own
+    # foundation pad — a deck slab under either would be wrong. ON for the deck-standing
+    # families (process_plant, generic_assembly, rack_farm, panel_array) + the linear
+    # row. Opt out with BLENDER_GROUND_SLAB=0. Universal — footprint-keyed, additive.
+    _NO_SLAB_FAMILIES = ("aero_body", "tower_machine")
+    _slab_on = os.environ.get("BLENDER_GROUND_SLAB", "1").strip().lower() \
+        not in ("0", "false", "no", "off")
+    if _slab_on and (LINEAR_LAYOUT_ON or family not in _NO_SLAB_FAMILIES):
+        try:
+            add_ground_slab(parts, MAT, MO, bbox_mm=bbox)
+        except Exception as _ge:    # the floor is additive — never fail the whole render
+            print(f"[univ][ground] WARN add_ground_slab skipped: {_ge}")
+    elif not _slab_on:
+        print("[univ][ground] BLENDER_GROUND_SLAB=0 — floor suppressed")
+    else:
+        print(f"[univ][ground] floor skipped for free-space family '{family}'")
+
     # ── STAGE 2 (4-stage connection-points plan) — NAMED IN/OUT CONNECTION PORTS ──
     # Now that every part is PLACED (placed_xyz_mm + anchors set above by whichever
     # placer ran — the Stage-1 linear row OR a production family placer), give each
@@ -12647,31 +12866,46 @@ def main():
     else:
         print("[univ][ports] BLENDER_CONNECTION_PORTS=0 — Stage-2 ports suppressed")
 
-    # ── STAGE 3 (4-stage connection-points plan) — WIRE THE LINE PORT-TO-PORT ──
+    # ── STAGE 3/4 (4-stage connection-points plan) — WIRE THE LINE PORT-TO-PORT ──
     # Route EVERY ledger edge as a real pipe from the source part's <service>_out port
     # to the destination part's <service>_in port (the coordinates Stage 2 stored on
     # part.ports), so the laid-out parts read as ONE long connected line with nothing
     # floating, and collect each run's real routed length (→ wired-lengths.json) for
-    # the velocity / volt-drop / cost maths. Default-ON-WITH-LINEAR (the safe Stage-3
-    # deliverable to SEE): on by default ONLY when BLENDER_LINEAR_LAYOUT=1 — in the
-    # linear layout place_all_linear routed NOTHING, so wire_ports is the SOLE pipe
-    # drawer (no double-draw). The PRODUCTION placers already route their own topology
-    # (route_on_spine), so Stage-3 wiring stays OFF for them unless BLENDER_WIRE_PORTS=1
-    # is set explicitly (which would then ADD a port-to-port set on top — opt-in only).
+    # the velocity / volt-drop / cost maths.
+    #
+    # STAGE 4 (2026-06-21): now DEFAULT-ON for the PRODUCTION compact layout — but ONLY
+    # for the families whose placer routes through the DEFERRING route_topology path
+    # (process_plant + generic_assembly) or the linear row (which draws no pipe itself).
+    # For those, route_topology already deferred the part-to-part edges (see
+    # _SPINE_DRAWN_EDGE_IDS), so wire_ports is the SOLE drawer of them — port-to-port,
+    # no double-draw. The bespoke-routing families (aero_body / tower_machine /
+    # panel_array / rack_farm) draw their OWN specialised runs (aero arms, rack busways,
+    # per-rack taps) that are NOT port-based and do NOT participate in the deferral —
+    # wiring on top would double-draw, so they stay on their existing routing unless the
+    # operator explicitly forces BLENDER_WIRE_PORTS=1. Escape hatch BLENDER_WIRE_PORTS=0
+    # restores pure centre-based routing everywhere.
     # Runs through _draw_run, so each wired run is sized + scheduled + audited like any
     # routed run (audit_routes / reconcile_route_specs / write_connection_schedule below
     # therefore include the wired runs). Requires Stage-2 ports.
-    if _ports_on and _wire_ports_on(LINEAR_LAYOUT_ON):
+    _PORT_WIRING_FAMILIES = ("process_plant", "generic_assembly")
+    _wire_flag = _wire_ports_on(LINEAR_LAYOUT_ON)
+    _explicit = os.environ.get("BLENDER_WIRE_PORTS", "").strip().lower() in (
+        "1", "true", "yes", "on")
+    # Family participates in port-to-port wiring when it deferred (process_plant /
+    # generic_assembly), under the linear layout, OR the operator forced it explicitly.
+    _family_wires = (LINEAR_LAYOUT_ON or family in _PORT_WIRING_FAMILIES or _explicit)
+    if _ports_on and _wire_flag and _family_wires:
         try:
             wire_ports(parts, topology, MAT, MO, out_dir=out_dir)
         except Exception as _we:   # additive — never fail the whole render
             print(f"[univ][wire] WARN wire_ports skipped: {_we}")
     elif not _ports_on:
-        print("[univ][wire] STAGE 3 skipped — Stage-2 ports are off (need ports to wire)")
+        print("[univ][wire] STAGE 3/4 skipped — Stage-2 ports are off (need ports to wire)")
+    elif _wire_flag and not _family_wires:
+        print(f"[univ][wire] STAGE 4 port-to-port wiring SKIPPED for family '{family}' "
+              f"(bespoke router draws its own runs; set BLENDER_WIRE_PORTS=1 to force)")
     else:
-        print("[univ][wire] STAGE 3 port-to-port wiring OFF (set BLENDER_WIRE_PORTS=1 "
-              "to wire a production layout; it is ON by default under "
-              "BLENDER_LINEAR_LAYOUT=1)")
+        print("[univ][wire] STAGE 3/4 port-to-port wiring OFF (BLENDER_WIRE_PORTS=0)")
 
     # ── ROUTE AUDIT — the harsh self-check on the pipe routing (Tristan 2026-06-11).
     # Computes over-equipment segments / max detour ratio / same-elevation crossings
