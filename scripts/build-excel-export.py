@@ -171,8 +171,27 @@ def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
         s = ws.cell(2, 1, subtitle)
         s.font = FONT_NOTE
         s.alignment = LEFT_TOP
+        # Grow the merged subtitle row so a 2-3 line purpose note never clips
+        # (Excel does NOT auto-grow a MERGED wrapped cell). Estimate lines from
+        # the text length vs the merged width (~5.5 chars per column-width unit).
+        approx_cols_wide = max(1, sum(_col_width(ws, ci) for ci in range(1, span + 1)))
+        chars_per_line = max(40, approx_cols_wide * 1.05)
+        lines = max(1, int(_math.ceil(len(subtitle) / chars_per_line)))
+        ws.row_dimensions[2].height = 15 + 13 * min(lines, 4)
         nxt = 3
     return nxt + 1  # leave a blank spacer row
+
+
+def _col_width(ws: Worksheet, col_idx: int) -> float:
+    """Best-effort current width of a column (default 8.43 if unset)."""
+    try:
+        from openpyxl.utils import get_column_letter
+        cd = ws.column_dimensions.get(get_column_letter(col_idx))
+        if cd is not None and cd.width:
+            return float(cd.width)
+    except Exception:  # noqa: BLE001
+        pass
+    return 8.43
 
 
 def header(ws: Worksheet, row: int, cols: List[str]) -> None:
@@ -211,15 +230,15 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "⚠ Checks": "Live arithmetic invariants (== the CLI verifier). RED = numbers don't reconcile.",
     "Quantities": "Every sized contract quantity with family, basis & source.",
     "Calculations": "Worked calcs grouped by tool — live Excel formulas where structured.",
-    "BoM": "Bill of materials — every line, with a live Σ line £ total.",
-    "Cost": "Cost basis — per-line cost build-up with method, inputs & factors.",
+    "BoM": "THE BILL — what to buy: every line, qty, part/MPN, live Σ line £ total.",
+    "Cost": "PRICE PROVENANCE — how each £ was derived (method, factors, confidence).",
     "Brief compliance": "Every brief target metric vs the achieved quantity vs a live PASS/FAIL.",
     "Cost waterfall": "BoM → assembly → factory COGS → install → installed ASP (live running totals).",
     "Inputs & Assumptions": "Editable yellow drivers (price/feed/energy/labour/capex) — the economics model inputs.",
     "Economics": "Live revenue / opex / EBITDA / margin / payback / NPV / IRR — all formulas off the Inputs tab. Opex pie + revenue-vs-EBITDA bar.",
     "Scenarios": "Live FINE scale sweep (0.2x-5x, six-tenths capex law) with per-row payback/NPV/IRR + Low/Central/High price sensitivity. Capex/payback line charts + EBITDA bar.",
     "Investment Analysis": "THE SWEET-SPOT FINDER. Live break-even / viability / investable / NPV-max / £5M-anchor over the sweep + a recommended-deployment callout. IRR-vs-capex (with hurdle lines), NPV, payback & EBITDA-margin curves.",
-    "Spec sheets": "One block per principal item: duty, rating, qty, £, driving calc & part/MPN.",
+    "Spec sheets": "SIZING RATIONALE — why each principal is this size: duty, rating, driving calc.",
     "Panel schedule": "Electrical panel / load schedule as a real sortable table.",
     "Process line list": "Process line list — sortable rows cross-referenced to the P&ID.",
     "Process valve list": "Process valve list — tag, type, service, size, fail action.",
@@ -1303,7 +1322,11 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     ws = wb.create_sheet("BoM")
     set_widths(ws, {"A": 12, "B": 50, "C": 8, "D": 28, "E": 8, "F": 12, "G": 12, "H": 50})
     title_row(ws, "Bill of materials", 8,
-              "requirementsBom — every line. Σ line_gbp is a LIVE total at the foot.")
+              "THE PROCUREMENT BILL — what to buy. Every line: tag · requirement · qty · "
+              "part / MPN · unit £ · LIVE line £ (=qty×unit) · basis; sub-components explode "
+              "under their parent (cost shown 'incl. in parent'). Σ line £ is live at the foot. "
+              "→ For HOW each price was derived & how confident, see the 'Cost' tab. "
+              "→ For WHY each principal item is sized as it is, see the 'Spec sheets' tab.")
     header(ws, 4, ["Tag", "Requirement", "Qty", "Part", "Status",
                    "Unit £", "Line £", "Basis"])
     bom = state.get("requirementsBom") or []
@@ -1392,7 +1415,11 @@ def tab_cost(wb: Workbook, state: dict) -> bool:
     ws = wb.create_sheet("Cost")
     set_widths(ws, {"A": 30, "B": 28, "C": 14, "D": 12, "E": 22, "F": 22, "G": 14, "H": 50})
     title_row(ws, "Cost basis", 8,
-              "costBasis.lines — per-word cost build-up with method, inputs and factors.")
+              "THE PRICE PROVENANCE — how each number was derived and how confident. "
+              "Per line: the cost METHOD (catalogue price / estimate / class-reference), the "
+              "inputs behind it, the install & contingency FACTORS, and the rollup to installed "
+              "cost. Same items as the BoM — this is the audit trail behind every £, NOT a second "
+              "bill (quantities & line totals live on the 'BoM' tab; sizing rationale on 'Spec sheets').")
     # rollup band
     roll = cb.get("rollup") or {}
     if roll:
@@ -3113,9 +3140,11 @@ def tab_spec_sheets(wb: Workbook, state: dict) -> bool:
                     "G": 14, "H": 58})
     title_row(
         ws, "Spec sheet — per principal item", 8,
-        "One block per principal BoM line: tag · duty/rating (from the requirement) "
-        "· qty · unit £ · line £ · the driving worked-calc (basis) · the part/MPN. "
-        "Line £ is a LIVE =qty×unit; the foot Σ totals the principals.",
+        "THE SIZING RATIONALE — why each big-ticket item is the size it is. One block per "
+        "PRINCIPAL line (sub-components excluded): tag · duty / rating (from the requirement) "
+        "· qty · unit £ · LIVE line £ · the driving worked-calc that sized it (basis) · the "
+        "part / MPN. NOT a bill (full line-by-line buy list is the 'BoM' tab) and NOT a price "
+        "audit (cost method & confidence is the 'Cost' tab) — this is the engineering 'why'.",
     )
     r = 4
     first_line_row = None
