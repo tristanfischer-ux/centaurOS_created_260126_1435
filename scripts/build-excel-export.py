@@ -244,6 +244,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Process valve list": "Process valve list — tag, type, service, size, fail action.",
     "Process instruments": "Instrument index — tag, ISA, measured variable, range, signal.",
     "Line & velocity": "Every sized run with velocity / volt-drop & within-spec flagging.",
+    "Glossary": "Plain-English meaning of every abbreviation (DN, ISA tags, FC/FO, status codes, units).",
 }
 
 # A whitelist of CONTROL-CHARS Excel rejects inside a worksheet cell string —
@@ -3321,6 +3322,116 @@ def _render_md_table(ws: Worksheet, start_row: int, heading: str,
     return r, body_first
 
 
+# Universal engineering-nomenclature glossary. Standard across EVERY archetype
+# (it is industry abbreviation, not RAS-specific) — Tristan: "what does DN stand
+# for?", "I don't know what ISA stands for", "abbreviations glossary". Grouped so
+# related terms sit together; British spelling; every term spelled out in full.
+_GLOSSARY: List[tuple] = [
+    ("Pipe sizes & materials", [
+        ("DN", "Diameter Nominal — the nominal bore size of a pipe / valve in millimetres (e.g. DN200 ≈ 200 mm bore). A size label, not the exact internal diameter."),
+        ("NB", "Nominal Bore — same idea as DN; the nominal internal pipe size."),
+        ("CS", "Carbon steel — the default structural / pipe steel where no corrosion or hygiene driver applies."),
+        ("316L", "316L stainless steel — low-carbon austenitic stainless; the corrosion-resistant grade for process-water, oxidiser and hygienic duties."),
+        ("304 / 304L", "304 / 304L stainless steel — general-purpose austenitic stainless."),
+        ("DUPLEX", "Duplex stainless steel — high-strength, chloride-corrosion-resistant stainless for seawater / brackish duties."),
+        ("HDPE / PE100", "High-density polyethylene (PE100 grade) — tough, corrosion-free thermoplastic pipe for water / effluent at low pressure."),
+        ("PP", "Polypropylene — chemical-resistant thermoplastic, used for ducting, linings and pipe-insulation lagging."),
+        ("FRP / GRP", "Fibre-reinforced plastic (glass-reinforced plastic) — moulded composite for tanks and vessels."),
+        ("PVC / uPVC", "Poly(vinyl chloride) pipe grades — low-cost drainage / cold-water pipe."),
+    ]),
+    ("Instrumentation (ISA tags)", [
+        ("ISA", "The instrument-tag convention to ISA-5.1 (International Society of Automation) — the letter code naming what an instrument measures and does."),
+        ("LT", "Level Transmitter — measures liquid level."),
+        ("TT", "Temperature Transmitter — measures temperature."),
+        ("PT", "Pressure Transmitter — measures pressure."),
+        ("FT", "Flow Transmitter — measures flow rate."),
+        ("AT", "Analyser Transmitter — measures a composition variable, e.g. dissolved oxygen, pH or redox."),
+        ("AT (pH) / AT (ORP)", "Analyser variant: pH, or oxidation-reduction (redox) potential."),
+        ("LSL / LSH", "Level Switch Low / Level Switch High — a discrete level alarm/trip."),
+        ("4–20 mA", "The standard analogue field-signal current loop (4 mA = zero, 20 mA = full scale)."),
+        ("HART", "Highway Addressable Remote Transducer — a digital signal superimposed on the 4–20 mA loop."),
+        ("PLC / SCADA", "Programmable Logic Controller / Supervisory Control And Data Acquisition — the plant control system."),
+    ]),
+    ("Valves & safety", [
+        ("FC", "Fail Closed — the valve drives to the CLOSED position on loss of signal, air or power."),
+        ("FO", "Fail Open — the valve drives to the OPEN position on failure."),
+        ("PSV / PRV", "Pressure Safety / Relief Valve — mechanical over-pressure protection."),
+        ("XV / SDV", "Shutdown / emergency-shutdown Valve — fast on/off safety isolation."),
+        ("PCV", "Pressure / Process Control Valve — a modulating control valve."),
+        ("HV", "Hand Valve — manual isolation."),
+        ("NRV / CV", "Non-Return Valve / Check Valve — prevents reverse flow."),
+    ]),
+    ("Electrical", [
+        ("MCB", "Miniature Circuit Breaker."),
+        ("MCCB", "Moulded-Case Circuit Breaker."),
+        ("MCC", "Motor Control Centre — the cabinet housing motor starters / drives."),
+        ("ATS", "Automatic Transfer Switch — switches the load to standby supply on mains loss."),
+        ("UPS", "Uninterruptible Power Supply — battery-backed supply for control / instruments."),
+        ("VSD / VFD", "Variable-Speed / Variable-Frequency Drive — controls motor speed."),
+        ("LV / HV", "Low Voltage / High Voltage."),
+        ("ΔU %", "Volt-drop percentage — the voltage lost along a cable run as a fraction of the supply voltage (kept within spec, typically ≤ 5 %)."),
+    ]),
+    ("HVAC", [
+        ("HVAC", "Heating, Ventilation & Air-Conditioning."),
+        ("DX", "Direct-Expansion — a refrigerant-coil cooling / dehumidification system."),
+        ("AHU", "Air-Handling Unit — the fan/coil/filter box serving a zone."),
+        ("Z-01, Z-02 …", "HVAC zone identifiers — each Z-number is a separately-served air zone (supply / return)."),
+        ("ACH", "Air Changes per Hour — room-volume ventilation rate."),
+    ]),
+    ("Bill-of-materials status codes", [
+        ("BESPOKE", "Made-to-order item — fabricated / engineered to spec; no off-the-shelf part number."),
+        ("UTILITY", "A utility / commodity item (pipework, cable, civils) priced parametrically."),
+        ("SYSTEM", "A multi-part packaged system priced as one unit."),
+        ("IDENTIFIED", "A specific real product has been matched (manufacturer + part number)."),
+        ("NOT FOUND", "No catalogue match yet — the price is an engineering estimate."),
+        ("INSTRUMENT", "A field-instrument line."),
+    ]),
+    ("Units", [
+        ("m³/h", "Cubic metres per hour — volumetric flow."),
+        ("m³/s", "Cubic metres per second — volumetric flow."),
+        ("kW / kWh", "Kilowatt (power) / kilowatt-hour (energy)."),
+        ("mg/L", "Milligrams per litre — concentration (e.g. dissolved oxygen)."),
+        ("bar / barg", "Pressure / pressure gauge (above atmospheric)."),
+        ("t/yr", "Tonnes per year — annual throughput."),
+        ("°C", "Degrees Celsius — temperature."),
+    ]),
+]
+
+
+def tab_glossary(wb: Workbook, state: dict) -> bool:
+    """Reference glossary of every abbreviation used across the dossier tabs and
+    drawings. Universal (standard engineering nomenclature, identical for any
+    archetype). Tristan flagged DN / ISA / PT / FC-FO / status-codes / Z-zones as
+    undefined."""
+    ws = wb.create_sheet("Glossary")
+    set_widths(ws, {"A": 20, "B": 104})
+    title_row(ws, "Glossary — abbreviations & symbols", 2,
+              "Plain-English meaning of every abbreviation used on the schedule, "
+              "drawing, bill-of-materials and cost tabs. Standard engineering "
+              "nomenclature (British spelling); the same reference applies to any plant.")
+    r = 4
+    for category, entries in _GLOSSARY:
+        sub_banner(ws, r, category, 2)
+        r += 1
+        for term, meaning in entries:
+            tc = ws.cell(r, 1, term)
+            tc.font = FONT_SUB
+            tc.alignment = WRAP_TOP
+            tc.border = BORDER
+            mc = ws.cell(r, 2, meaning)
+            mc.alignment = WRAP_TOP
+            mc.border = BORDER
+            # grow the row when the meaning wraps (col B ≈ 102 chars/line)
+            lines = max(1, -(-len(meaning) // 102))
+            if lines > 1:
+                ws.row_dimensions[r].height = lines * 14.5
+            r += 1
+        r += 1  # spacer between categories
+    ws.freeze_panes = "A4"
+    back_link(ws, 2)
+    return True
+
+
 def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
     """#20 — Panel / load schedule as a real table (from panel-schedule.md)."""
     path = os.path.join(run_dir, "drawings", "panel-schedule.md")
@@ -3794,6 +3905,7 @@ def build(run_dir: str, out_path: str) -> dict:
     # process schedules creates 0..3 sheets; treat >0 as success
     add_tab("Process schedules", lambda: tab_process_schedules(wb, run_dir) > 0)
     add_tab("Line & velocity", lambda: tab_line_velocity(wb, run_dir))
+    add_tab("Glossary", lambda: tab_glossary(wb, state))
 
     print("  · Image tabs")
     used_titles = {t.lower() for t in wb.sheetnames}
