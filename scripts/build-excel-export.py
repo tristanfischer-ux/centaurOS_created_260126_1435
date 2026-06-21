@@ -764,6 +764,13 @@ def style_chart(ch, *, legend="auto", data_labels=False, gridlines=False):
         except Exception:  # noqa: BLE001
             pass
         try:
+            # Excel renders a NEGATIVE bar HOLLOW/white by default (invertIfNegative).
+            # A loss-making EBITDA bar must stay the SAME solid colour as the positives
+            # (just pointing down) — Tristan flagged the white "EBITDA Low" bar.
+            s.invertIfNegative = False
+        except Exception:  # noqa: BLE001
+            pass
+        try:
             s.smooth = False
         except Exception:  # noqa: BLE001
             pass
@@ -2281,14 +2288,27 @@ def tab_economics(wb: Workbook, state: dict) -> bool:
     # Pie: opex breakdown
     pie = PieChart()
     pie.title = "Opex breakdown"
-    pie.height, pie.width = 8, 13
+    pie.height, pie.width = 8, 17   # wider so the category legend has room
     pdata = Reference(ws, min_col=2, min_row=brk_first, max_row=brk_last)
     plabs = Reference(ws, min_col=1, min_row=brk_first, max_row=brk_last)
     pie.add_data(pdata, titles_from_data=False)
     pie.set_categories(plabs)
     from openpyxl.chart.label import DataLabelList
-    pie.dataLabels = DataLabelList()
-    pie.dataLabels.showPercent = True   # slices stay multi-colour (correct for a pie)
+    # Clean pie: the CATEGORY names go in a right-side legend (no collision), the
+    # slices carry the PERCENT only. (Tristan: "lots of writing overwriting each
+    # other" — putting category names ON a small pie's slices is the collision.)
+    dl = DataLabelList()
+    dl.showPercent = True
+    dl.showCatName = False
+    dl.showSerName = False
+    dl.showVal = False
+    dl.showLegendKey = False
+    dl.showBubbleSize = False
+    pie.dataLabels = dl
+    from openpyxl.chart.legend import Legend
+    pie.legend = Legend()
+    pie.legend.position = "r"
+    pie.legend.overlay = False
     ws.add_chart(pie, f"F{cf_first}")
 
     # Bar: revenue vs total opex vs EBITDA — build a tiny 3-row helper block so
