@@ -3513,19 +3513,48 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
                     "G": 22, "H": 12, "I": 10, "J": 8})
     title_row(
         ws, "Electrical panel / load schedule", 10,
-        "Parsed from panel-schedule.md — real sortable rows (circuit / load / "
-        "device / cable / volt-drop). 'In spec' ✓ green / ✗ red. Auto-generated; "
-        "not for construction.",
+        "Real sortable rows (circuit · load · device · cable · volt-drop). The "
+        "engine computes Design I = P·1000 / (√3·V·pf·η) — pf 0.85 / η 0.90 for "
+        "motor circuits, pf 1.0 / η 1.0 for resistive loads — from each circuit's "
+        "INSTALLED motor frame (so the amps can exceed the duty-kW shown). ΔU % is "
+        "the cable volt-drop over its length / CSA at Design I. 'In spec' is a LIVE "
+        "formula = (ΔU ≤ 5 %): edit a ΔU cell and the verdict + red flag recompute. "
+        "Auto-generated; not for construction.",
     )
     r = 4
     last_circuit_first = None
     for heading, hdr, rows in tables:
-        # locate an 'in spec' column for conditional colour
+        # locate the 'in spec' + 'ΔU' columns for live verdicts + conditional colour
         spec_col = None
+        du_col = None
         for idx, h in enumerate(hdr, start=1):
-            if "spec" in h.lower():
+            hl = h.lower()
+            if "spec" in hl:
                 spec_col = idx
+            if "δu" in hl or "volt" in hl or "drop" in hl or "δ" in hl:
+                du_col = idx
         r, body_first = _render_md_table(ws, r, heading, hdr, rows, spec_col)
+        body_last = r - 1
+        # MAKE 'In spec' LIVE: verdict computed from the ΔU cell vs the 5% limit,
+        # not the static '✓' parsed from the markdown (Tristan: "doesn't seem to be
+        # using real formulas, which makes me suspicious"). Universal — any panel md
+        # with a volt-drop + in-spec column gets a live check.
+        if spec_col and du_col and len(hdr) >= 6 and body_last >= body_first:
+            du_L = get_column_letter(du_col)
+            sp_L = get_column_letter(spec_col)
+            for rr in range(body_first, body_last + 1):
+                cell = ws.cell(rr, spec_col)
+                cell.value = (f'=IF(ISNUMBER({du_L}{rr}),'
+                              f'IF({du_L}{rr}<=5,"✓","✗"),{sp_L}{rr})')
+            from openpyxl.formatting.rule import CellIsRule
+            ws.conditional_formatting.add(
+                f"{sp_L}{body_first}:{sp_L}{body_last}",
+                CellIsRule(operator="equal", formula=['"✗"'],
+                           fill=FILL_FAIL, font=FONT_FAIL))
+            ws.conditional_formatting.add(
+                f"{sp_L}{body_first}:{sp_L}{body_last}",
+                CellIsRule(operator="equal", formula=['"✓"'],
+                           fill=FILL_PASS, font=FONT_PASS))
         # autofilter + format the wide circuit table (the one with many columns)
         if len(hdr) >= 6:
             last_circuit_first = (body_first, r - 1, len(hdr))
