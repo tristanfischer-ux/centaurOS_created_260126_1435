@@ -408,6 +408,9 @@ def build_line_list(proc, schedule: dict, state: dict,
     topo = PID._topology(state)
     proc_topo = [e for e in topo if e.get("mechanism") != "electrical_bus"]
     tag_of = {n.key: n.tag for n in proc.nodes}
+    # canonical name → equipment-tag map so routed-line endpoints (human names) resolve
+    # to the SAME tag the BoM/GA use, never an invented abbreviation.
+    tag_by_name = _manifest_tag_by_name(out_dir)
     pid_sheet = "FF-PID-001"
 
     # LEDGER material per line number, read from the route-manifest (the authoritative source —
@@ -465,8 +468,8 @@ def build_line_list(proc, schedule: dict, state: dict,
         phase = _phase_from({}, mech, svc_blob)
         rows.append(LineRow(
             number=str(num),
-            frm_tag=frm if _looks_like_tag(frm) else _short_tag(frm),
-            to_tag=to if _looks_like_tag(to) else _short_tag(to),
+            frm_tag=_resolve_endpoint_tag(frm, proc, tag_by_name),
+            to_tag=_resolve_endpoint_tag(to, proc, tag_by_name),
             service=_humanise_route_service(svc_raw) or PID._humanise(code) or "Process line",
             fluid=_fluid_name(frm, svc_raw, code),
             phase=phase,
@@ -497,9 +500,59 @@ def _looks_like_tag(s: str) -> bool:
 
 def _short_tag(key: str) -> str:
     """A readable short tag for an endpoint with no resolved equipment tag (a header /
-    abstract supply): the key's initials, e.g. electrical_supply → 'ES'."""
+    abstract supply): the key's initials, e.g. electrical_supply → 'ES'. LAST RESORT
+    only — _resolve_endpoint_tag prefers the real canonical tag first."""
     toks = [t for t in re.split(r"[_\s]+", str(key or "")) if t]
     return ("".join(t[0] for t in toks[:3]) or (str(key or "")[:3])).upper() or "—"
+
+
+def _manifest_tag_by_name(out_dir: Optional[str]) -> dict:
+    """{canonical part name (lower) → equipment tag} from parts-manifest.json, so a
+    ROUTED line whose endpoint is a NAME ('Rearing Tank') resolves to the SAME canonical
+    tag ('TK-101') the BoM / GA / P&ID use — never an invented abbreviation ('RT')
+    (Tristan 2026-06-21: one identity for each part across everything). First instance of
+    a repeated name wins (the farm representative)."""
+    if not out_dir:
+        return {}
+    p = os.path.join(out_dir, "parts-manifest.json")
+    if not os.path.exists(p):
+        return {}
+    try:
+        pm = json.load(open(p))
+    except Exception:  # noqa: BLE001
+        return {}
+    items = pm.get("parts") or pm.get("items") or (pm if isinstance(pm, list) else [])
+    by: dict = {}
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        nm = str(it.get("name") or "").strip().lower()
+        tg = str(it.get("equipment_tag") or it.get("tag") or "").strip()
+        if nm and tg and _looks_like_tag(tg):
+            by.setdefault(nm, tg)
+    return by
+
+
+def _resolve_endpoint_tag(raw: str, proc, by_name: dict) -> str:
+    """Resolve a routed-line endpoint to its CANONICAL equipment tag so the line list
+    shares ONE identity with the BoM / GA / P&ID. Order: already-a-tag → parts-manifest
+    name→tag → reconstructed-process node token match → last-resort initials. Never
+    invents an abbreviation ('RT') when a real canonical tag ('TK-101') exists."""
+    s = str(raw or "").strip()
+    if not s:
+        return "—"
+    if _looks_like_tag(s):
+        return s
+    t = by_name.get(s.lower())
+    if t:
+        return t
+    toks = [w for w in re.split(r"[_\s]+", s.lower()) if len(w) > 3]
+    if toks and proc is not None:
+        for nd in getattr(proc, "nodes", []):
+            k = str(getattr(nd, "key", "")).lower()
+            if toks and all(w in k for w in toks):
+                return nd.tag
+    return _short_tag(s)
 
 
 def _humanise_route_service(svc: str) -> str:
