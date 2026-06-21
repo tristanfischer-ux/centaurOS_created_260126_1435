@@ -245,6 +245,8 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Process instruments": "Instrument index — tag, ISA, measured variable, range, signal.",
     "Line & velocity": "Every sized run with velocity / volt-drop & within-spec flagging.",
     "Glossary": "Plain-English meaning of every abbreviation (DN, ISA tags, FC/FO, status codes, units).",
+    "Risk register": "Hazards & findings (live: physics critic, gate flags, cost) + process-safety risks, S×L scored.",
+    "Regulatory": "Compliance-gate verdict + statutory duties derived from jurisdiction + hazards present.",
 }
 
 # A whitelist of CONTROL-CHARS Excel rejects inside a worksheet cell string —
@@ -3496,6 +3498,347 @@ def tab_glossary(wb: Workbook, state: dict) -> bool:
     return True
 
 
+_FILL_RISK_HI = PatternFill("solid", fgColor="F4CCCC")   # red-ish
+_FILL_RISK_MED = PatternFill("solid", fgColor="FCE5CD")  # amber
+_FILL_RISK_LO = PatternFill("solid", fgColor="D9EAD3")   # green
+
+# Universal hazard library. Each entry keys off EQUIPMENT/SERVICE tokens that
+# actually appear in the bill of materials (so it fires for whatever plant the
+# engine built — no per-class table), and carries the inherent severity ×
+# likelihood plus the statutory regulations the hazard triggers. SHARED by the
+# Risk Register (X) and the Regulatory & Compliance tab (Y). British spelling;
+# regulations default to the UK family (the matrix maps to US/EU equivalents).
+#   (token_regex, hazard, cause, severity 1-5, likelihood 1-5, mitigation, [regulations])
+_HAZARD_LIB = [
+    (r"liquid oxygen|\blox\b|\boxygen\b|oxygenat|\bpsa\b|\bo₂\b",
+     "Oxygen enrichment — fire / accelerated combustion",
+     "Stored or generated O₂ raises local oxygen concentration; oils and materials ignite readily.",
+     4, 2, "O₂-clean materials, exclusion zones, gas detection + ventilation interlocks, no hydrocarbons near O₂.",
+     ["Dangerous Substances and Explosive Atmospheres Regulations 2002 (DSEAR)",
+      "BCGA / EIGA oxygen-handling codes of practice"]),
+    (r"ammonia|\bnh3\b|biofilter|nitrif|\bh2s\b|hydrogen sulphide|chlorine|\bcl2\b",
+     "Toxic / asphyxiant gas release",
+     "Biological or chemical processes can release ammonia, hydrogen sulphide or chlorine.",
+     4, 2, "Gas detection, forced ventilation, scrubbing, respiratory PPE, confined-space controls.",
+     ["Control of Substances Hazardous to Health Regulations 2002 (COSHH)"]),
+    (r"pressure vessel|pressuris|relief valve|\bpsv\b|compressor|air receiver|autoclave",
+     "Stored pressure energy",
+     "Pressurised vessels and lines can fail explosively.",
+     4, 2, "Design + periodic inspection to pressure code, relief devices, written scheme of examination.",
+     ["Pressure Systems Safety Regulations 2000 (PSSR)",
+      "Pressure Equipment (Safety) Regulations 2016"]),
+    (r"\bpump\b|blower|\bmotor\b|rotat|\bfan\b|mixer|agitator|\bvsd\b|\bdrive\b",
+     "Rotating machinery — entanglement / mechanical failure",
+     "Exposed rotating parts; stored mechanical energy; loss of a duty machine upsets the process.",
+     3, 3, "Fixed guarding, lock-off / isolation (LOTO), N+1 standby on critical duties, vibration monitoring.",
+     ["Provision and Use of Work Equipment Regulations 1998 (PUWER)",
+      "Supply of Machinery (Safety) Regulations 2008 (UKCA)"]),
+    (r"switchgear|transformer|\bmcc\b|\bhv\b|\bkv\b|400 v|busbar|\bups\b|generator|genset|distribution board",
+     "Electrical — shock / arc-flash",
+     "High fault energy at switchgear and transformers; shock risk from LV / HV.",
+     4, 2, "BS 7671 installation, arc-flash assessment, lock-off, IP-rated enclosures, RCD + earthing.",
+     ["Electricity at Work Regulations 1989",
+      "BS 7671 Requirements for Electrical Installations"]),
+    (r"\btank\b|\bvessel\b|\bcolumn\b|\bsump\b|\bbasin\b|\bsilo\b|\bpit\b|reactor",
+     "Working at height / confined space (tanks & vessels)",
+     "Tank tops present a fall risk; tank interiors are confined spaces (atmosphere / drowning).",
+     4, 2, "Edge protection, confined-space permit-to-work, atmosphere testing, rescue plan.",
+     ["Work at Height Regulations 2005", "Confined Spaces Regulations 1997"]),
+    (r"\bfish\b|aquacultur|livestock|broodstock|larvae|hatchery|\bras\b",
+     "Livestock welfare — mass mortality on plant failure",
+     "Loss of recirculation, oxygen or temperature control can cause rapid stock mortality.",
+     3, 3, "N+1 on critical plant, alarmed O₂ / level / temperature, standby power, automatic failover.",
+     ["Welfare of Farmed Animals (England) Regulations 2007", "Animal Welfare Act 2006"]),
+    (r"discharge|effluent|sludge|waste ?water|blowdown|\bbleed\b|drain to",
+     "Environmental discharge to controlled waters",
+     "Process effluent or sludge discharged to controlled waters requires consent.",
+     3, 3, "Discharge permit, effluent treatment to consent limits, monitoring + reporting.",
+     ["Environmental Permitting (England and Wales) Regulations 2016"]),
+    (r"boiler|heater|immersion|heat pump|\bsteam\b|hot water|chiller|refriger",
+     "Thermal — burns / scald / refrigerant",
+     "Hot surfaces and fluids (scald / burn); refrigerant leak (asphyxiation).",
+     3, 2, "Insulation + guarding, thermal relief, refrigerant leak detection + ventilation.",
+     ["Provision and Use of Work Equipment Regulations 1998 (PUWER)",
+      "Fluorinated Greenhouse Gases Regulations (F-Gas)"]),
+    (r"dosing|chemical|\bacid\b|alkali|caustic|bicarb|coagulant|disinfect|biocide",
+     "Chemical handling — corrosive / reactive",
+     "Dosing chemicals are corrosive or reactive; incompatible mixing is hazardous.",
+     3, 2, "Bunding, segregated storage, COSHH assessment, PPE, eyewash / safety shower.",
+     ["Control of Substances Hazardous to Health Regulations 2002 (COSHH)",
+      "Dangerous Substances and Explosive Atmospheres Regulations 2002 (DSEAR)"]),
+    (r"\buv\b|ultraviolet|\bozone\b",
+     "Radiation — ultraviolet / ozone exposure",
+     "Ultraviolet reactors emit harmful UV; ozone is a respiratory irritant.",
+     2, 2, "Interlocked enclosures, UV-opaque shielding, ozone detection + destruct.",
+     ["Control of Artificial Optical Radiation at Work Regulations 2010"]),
+]
+
+# Statutory duties that apply to ANY industrial plant, by jurisdiction (independent
+# of the specific hazards) — the always-on baseline of the regulatory tab.
+_BASE_REGS_BY_JURIS = {
+    "UK": [("Health and Safety at Work etc. Act 1974", "Overarching duty of care to workers and others."),
+           ("Management of Health and Safety at Work Regulations 1999", "Suitable & sufficient risk assessment."),
+           ("Construction (Design and Management) Regulations 2015 (CDM)", "Design + construction safety duties."),
+           ("Supply of Machinery (Safety) Regulations 2008 (UKCA)", "Machinery conformity + UKCA marking.")],
+    "US": [("OSHA General Duty Clause (29 U.S.C. § 654)", "Overarching duty of care."),
+           ("OSHA 29 CFR 1910", "General-industry safety standards."),
+           ("National Electrical Code (NFPA 70)", "Electrical installation."),
+           ("EPA Clean Water Act (NPDES)", "Discharge permitting.")],
+    "EU": [("Directive 89/391/EEC (OSH Framework)", "Overarching duty of care."),
+           ("Machinery Directive 2006/42/EC (CE)", "Machinery conformity + CE marking."),
+           ("ATEX 2014/34/EU", "Equipment in explosive atmospheres."),
+           ("Industrial Emissions Directive 2010/75/EU", "Emissions + discharge permitting.")],
+}
+
+# Map a UK statute to its rough US/EU equivalent so the hazard regulations follow
+# the detected jurisdiction (universal — no per-class content).
+_REG_JURIS_MAP = {
+    "Dangerous Substances and Explosive Atmospheres Regulations 2002 (DSEAR)":
+        {"US": "OSHA 29 CFR 1910.119 (Process Safety Management)", "EU": "ATEX 1999/92/EC"},
+    "Control of Substances Hazardous to Health Regulations 2002 (COSHH)":
+        {"US": "OSHA Hazard Communication 29 CFR 1910.1200", "EU": "Chemical Agents Directive 98/24/EC"},
+    "Pressure Systems Safety Regulations 2000 (PSSR)":
+        {"US": "ASME Boiler & Pressure Vessel Code", "EU": "Pressure Equipment Directive 2014/68/EU"},
+    "Pressure Equipment (Safety) Regulations 2016":
+        {"US": "ASME BPVC", "EU": "Pressure Equipment Directive 2014/68/EU"},
+    "Electricity at Work Regulations 1989":
+        {"US": "NFPA 70E", "EU": "Low Voltage Directive 2014/35/EU"},
+    "BS 7671 Requirements for Electrical Installations":
+        {"US": "National Electrical Code (NFPA 70)", "EU": "HD 60364 / IEC 60364"},
+    "Environmental Permitting (England and Wales) Regulations 2016":
+        {"US": "EPA Clean Water Act (NPDES)", "EU": "Industrial Emissions Directive 2010/75/EU"},
+    "Provision and Use of Work Equipment Regulations 1998 (PUWER)":
+        {"US": "OSHA 29 CFR 1910 Subpart O", "EU": "Use of Work Equipment Directive 2009/104/EC"},
+    "Supply of Machinery (Safety) Regulations 2008 (UKCA)":
+        {"US": "ANSI B11 machine safety", "EU": "Machinery Directive 2006/42/EC"},
+}
+
+
+def _derive_hazards(state: dict):
+    """Hazards PRESENT in this design, derived from the equipment tokens in the
+    bill of materials. Universal — fires for whatever the engine built."""
+    bom = state.get("requirementsBom") or []
+    corpus = " ".join(
+        " ".join(str(b.get(k, "")) for k in ("requirement", "part", "name_human", "status", "tag"))
+        for b in bom if isinstance(b, dict)
+    ).lower()
+    present = []
+    for rx, name, cause, sev, lik, mit, regs in _HAZARD_LIB:
+        if re.search(rx, corpus):
+            present.append(dict(name=name, cause=cause, sev=sev, lik=lik, mit=mit, regs=regs))
+    return present
+
+
+def _rag(score: int):
+    if score >= 15:
+        return ("High", _FILL_RISK_HI)
+    if score >= 8:
+        return ("Medium", _FILL_RISK_MED)
+    return ("Low", _FILL_RISK_LO)
+
+
+def _detect_jurisdiction(state: dict) -> str:
+    cg = state.get("complianceGate") or {}
+    js = cg.get("jurisdictions_detected") or []
+    if js:
+        j = str(js[0]).upper()
+        if j in _BASE_REGS_BY_JURIS:
+            return j
+        if j in ("GB", "UK", "ENGLAND", "WALES", "SCOTLAND"):
+            return "UK"
+        if j in ("USA", "US"):
+            return "US"
+    return "UK"
+
+
+def tab_risk_register(wb: Workbook, state: dict) -> bool:
+    """X — native Risk Register (Tristan 2026-06-21: bring the PDF's risk register
+    into the Excel). Universal + fully traceable: rows from LIVE engine findings
+    (physics critique, residual gate flags, cost sanity) PLUS process-hazard rows
+    derived from the equipment actually present. No RAS-only content."""
+    rows = []   # (category, hazard/finding, cause, sev, lik, mitigation, source)
+
+    # 1) LIVE engineering findings — the physics critic's issues
+    pc = state.get("physicsCritique") or {}
+    for iss in (pc.get("issues") or []):
+        if not isinstance(iss, dict):
+            continue
+        sevtxt = str(iss.get("severity", "")).lower()
+        sev = 5 if sevtxt == "high" else 3 if sevtxt in ("medium", "med") else 2
+        rows.append(("Engineering — design", iss.get("issue", "").strip() or "Design concern",
+                     f"Physics critic ({iss.get('dimension', 'engineering')}), at {iss.get('where', 'design')}.",
+                     sev, 3, "Resolve / re-spec before procurement; re-run the physics check to confirm closure.",
+                     "state.physicsCritique.issues"))
+
+    # 2) LIVE residual gate flags (QA / commercial)
+    for ri in (state.get("residualIssues") or []):
+        if not isinstance(ri, dict):
+            continue
+        gate = str(ri.get("gate", "")).lower()
+        cat = ("Commercial — pricing" if "price" in gate else
+               "Procurement — part data" if "pn" in gate or "fictional" in gate else
+               "Documentation — drawing/layout" if "layout" in gate or "overlap" in gate else
+               "Quality assurance")
+        rows.append((cat, ri.get("summary", "").strip() or ri.get("gate", "Gate flag"),
+                     f"Deterministic {ri.get('gate', 'gate')} raised a flag.",
+                     3, 2, "Review the named audit, correct the source line, and re-run the gate.",
+                     "state.residualIssues"))
+
+    # 3) LIVE cost-sanity (commercial) when outside / borderline the industry band
+    cstat = state.get("costSanity") or {}
+    if isinstance(cstat, dict) and cstat.get("ratio_to_nearest_edge"):
+        ratio = num(cstat.get("ratio_to_nearest_edge")) or 1.0
+        if ratio and ratio > 1.05:
+            sev = 4 if ratio > 2 else 3 if ratio > 1.5 else 2
+            rows.append(("Commercial — capex", "Capex per output unit outside the typical industry band",
+                         clean_cell(cstat.get("message", "")) or "Cost-per-output outside band.",
+                         sev, 3, "Value-engineer the high-cost items or confirm the premium is justified.",
+                         "state.costSanity"))
+
+    # 4) PROCESS-HAZARD rows from the equipment present (universal hazard library)
+    for hz in _derive_hazards(state):
+        rows.append(("Process safety / HSE", hz["name"], hz["cause"],
+                     hz["sev"], hz["lik"], hz["mit"], "Equipment present in the bill of materials"))
+
+    if not rows:
+        return False
+
+    ws = wb.create_sheet("Risk register")
+    set_widths(ws, {"A": 6, "B": 22, "C": 40, "D": 40, "E": 6, "F": 6, "G": 7,
+                    "H": 10, "I": 46, "J": 16, "K": 26})
+    title_row(
+        ws, "Risk register", 11,
+        "Preliminary hazard & risk register, derived LIVE from the engine. Engineering "
+        "/ QA / commercial rows come from the physics critic, the deterministic gate "
+        "flags and the independent cost-sanity check; the process-safety rows are "
+        "derived from the equipment actually present in the bill of materials, each "
+        "with its inherent severity × likelihood and the standard mitigation. Score = "
+        "S × L (≤7 Low / 8–14 Medium / ≥15 High). Universal — not specific to this plant "
+        "type. Preliminary; a site-specific HAZID / HAZOP is required before construction.",
+    )
+    header(ws, 4, ["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score",
+                   "Rating", "Mitigation", "Residual", "Source"])
+    r = 5
+    for i, (cat, hz, cause, sev, lik, mit, src) in enumerate(rows, start=1):
+        score = sev * lik
+        rating, fill = _rag(score)
+        ws.cell(r, 1, i).border = BORDER
+        ws.cell(r, 2, clean_cell(cat)).border = BORDER
+        c3 = ws.cell(r, 3, clean_cell(hz)); c3.alignment = WRAP_TOP; c3.border = BORDER
+        c4 = ws.cell(r, 4, clean_cell(cause)); c4.alignment = WRAP_TOP; c4.border = BORDER
+        ws.cell(r, 5, sev).border = BORDER
+        ws.cell(r, 6, lik).border = BORDER
+        sc = ws.cell(r, 7, score); sc.border = BORDER
+        # live recompute so an edited S or L re-scores: =E*F
+        sc.value = f"=E{r}*F{r}"
+        rc = ws.cell(r, 8, rating); rc.border = BORDER; rc.fill = fill
+        rc.alignment = Alignment(horizontal="center")
+        c9 = ws.cell(r, 9, clean_cell(mit)); c9.alignment = WRAP_TOP; c9.border = BORDER
+        ws.cell(r, 10, "Tolerable (with mitigation)").border = BORDER
+        c11 = ws.cell(r, 11, clean_cell(src)); c11.alignment = WRAP_TOP; c11.border = BORDER
+        # grow row for the longest wrapped cell
+        longest = max(len(str(hz)), len(str(cause)), len(str(mit)))
+        if longest > 40:
+            ws.row_dimensions[r].height = min(-(-longest // 40), 5) * 14.5
+        r += 1
+    ws.auto_filter.ref = f"A4:K{r - 1}"
+    ws.freeze_panes = "A5"
+    back_link(ws, 11)
+    return True
+
+
+def tab_regulatory(wb: Workbook, state: dict) -> bool:
+    """Y — native Regulatory & Compliance tab (Tristan 2026-06-21). Universal: the
+    engine's compliance-gate verdict + a jurisdiction × hazard → regulation matrix
+    derived from the hazards present. Honest when the gate skipped (no class
+    standards registered)."""
+    cg = state.get("complianceGate") or {}
+    juris = _detect_jurisdiction(state)
+    hazards = _derive_hazards(state)
+
+    ws = wb.create_sheet("Regulatory")
+    set_widths(ws, {"A": 6, "B": 56, "C": 50, "D": 22})
+    verdict = str(cg.get("verdict", "—")).upper()
+    title_row(
+        ws, "Regulatory & compliance", 4,
+        f"Jurisdiction: {juris}. Engine compliance-gate verdict: {verdict} "
+        f"({cg.get('mandatory_covered', 0)}/{cg.get('mandatory_total', 0)} class standards covered). "
+        "The statutory duties below are derived from the jurisdiction + the hazards present "
+        "in this design (universal hazard → regulation matrix), NOT a per-class list. Where the "
+        "gate skipped (no class-specific standards registered), that is shown honestly — the "
+        "engineer must still verify and apply the duties below before sale / construction.",
+    )
+    r = 4
+    # verdict banner row
+    if cg.get("reason"):
+        sub_banner(ws, r, "Engine compliance-gate verdict", 4)
+        r += 1
+        vc = ws.cell(r, 1, verdict)
+        vc.font = FONT_SUB
+        vc.fill = FILL_PASS if verdict == "PASS" else _FILL_RISK_MED
+        m = ws.cell(r, 2, clean_cell(cg.get("reason", "")))
+        m.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
+        ws.row_dimensions[r].height = 30
+        r += 2
+
+    # 1) always-on statutory duties for the jurisdiction
+    sub_banner(ws, r, f"Statutory duties that always apply ({juris})", 4)
+    r += 1
+    header(ws, r, ["#", "Regulation / standard", "Applies because", "Status"])
+    r += 1
+    n = 1
+    for reg, why in _BASE_REGS_BY_JURIS.get(juris, _BASE_REGS_BY_JURIS["UK"]):
+        ws.cell(r, 1, n).border = BORDER
+        ws.cell(r, 2, clean_cell(reg)).border = BORDER
+        c3 = ws.cell(r, 3, clean_cell(why)); c3.alignment = WRAP_TOP; c3.border = BORDER
+        ws.cell(r, 4, "Mandatory — verify").border = BORDER
+        r += 1
+        n += 1
+
+    # 2) hazard-driven regulations (deduped), mapped to the detected jurisdiction
+    r += 1
+    sub_banner(ws, r, "Hazard-driven regulations (from the equipment present)", 4)
+    r += 1
+    header(ws, r, ["#", "Regulation / standard", "Triggered by (hazard present)", "Status"])
+    r += 1
+    seen = {}
+    for hz in hazards:
+        for reg in hz["regs"]:
+            mapped = reg
+            if juris != "UK" and reg in _REG_JURIS_MAP:
+                mapped = _REG_JURIS_MAP[reg].get(juris, reg)
+            seen.setdefault(mapped, []).append(hz["name"])
+    n = 1
+    for reg, triggers in seen.items():
+        ws.cell(r, 1, n).border = BORDER
+        ws.cell(r, 2, clean_cell(reg)).border = BORDER
+        # dedupe trigger names, keep readable
+        trig = "; ".join(dict.fromkeys(triggers))
+        c3 = ws.cell(r, 3, clean_cell(trig)); c3.alignment = WRAP_TOP; c3.border = BORDER
+        if len(trig) > 48:
+            ws.row_dimensions[r].height = min(-(-len(trig) // 48), 4) * 14.5
+        ws.cell(r, 4, "Mandatory — verify").border = BORDER
+        r += 1
+        n += 1
+
+    # 3) any conflicts the gate found
+    conflicts = cg.get("conflicts") or []
+    if conflicts:
+        r += 1
+        sub_banner(ws, r, "Standards conflicts flagged by the engine", 4)
+        r += 1
+        for c in conflicts:
+            ws.cell(r, 1, "⚠").font = FONT_FAIL
+            cc = ws.cell(r, 2, clean_cell(str(c))); cc.alignment = WRAP_TOP
+            ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
+            r += 1
+
+    ws.freeze_panes = "A4"
+    back_link(ws, 4)
+    return True
+
+
 def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
     """#20 — Panel / load schedule as a real table (from panel-schedule.md)."""
     path = os.path.join(run_dir, "drawings", "panel-schedule.md")
@@ -4063,6 +4406,8 @@ def build(run_dir: str, out_path: str) -> dict:
     # process schedules creates 0..3 sheets; treat >0 as success
     add_tab("Process schedules", lambda: tab_process_schedules(wb, run_dir) > 0)
     add_tab("Line & velocity", lambda: tab_line_velocity(wb, run_dir))
+    add_tab("Risk register", lambda: tab_risk_register(wb, state))
+    add_tab("Regulatory", lambda: tab_regulatory(wb, state))
     add_tab("Glossary", lambda: tab_glossary(wb, state))
 
     print("  · Image tabs")
