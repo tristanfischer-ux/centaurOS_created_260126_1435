@@ -60,6 +60,7 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import draw_pid as PID  # noqa: E402  (the P&ID generator — single source of truth)
 import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+import canonical_tags  # noqa: E402  (the SHARED auxiliary-tag authority — one tag, BoM + drawings)
 
 # Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
 # generate_process_schedules() from the run's own artifacts; '' until set ('—').
@@ -798,10 +799,25 @@ def _valve_size_from(location: str, line_rows) -> str:
 
 def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[ValveRow]:
     rows: list[ValveRow] = []
-    tag_seq: dict[str, int] = {}
-    seen = set()
     used_lines: dict[str, int] = {}     # line number → how many valves already cite it
     vseq = 0
+    # CANONICAL TAGS (shared with the bill-of-materials): a valve that the synthesis
+    # flagged as an actuator (`_actuator`) carries its canonical tag here too, so the
+    # same physical valve has ONE name in the bill-of-materials and the valve list. A
+    # valve that is NOT in the map (most isolation / relief / breather valves are not
+    # `_actuator`) keeps the existing 200-loop numbering UNCHANGED — its fallback
+    # counter is seeded ABOVE the map's highest per-prefix number so the two number
+    # spaces never collide.
+    tag_map = canonical_tags.build_tag_map(state)
+    tag_seq: dict[str, int] = {}
+    for _tags in tag_map.values():
+        for _t in _tags:
+            _pfx, _n = _t.rsplit("-", 1)
+            try:
+                tag_seq[_pfx] = max(tag_seq.get(_pfx, 200), int(_n))
+            except ValueError:
+                pass
+    seen = set()
     # LEDGER fail-states: every contract '*_fail_state' quantity → FO/FC (read once).
     fail_states = _collect_fail_state_quantities(state)
     # walk in module order so PSV-201, PSV-202 … read top-to-bottom.
@@ -823,11 +839,18 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
             location, pid_ref = _valve_location_and_ref(
                 prefix, cid, f"{name} {form_for_match}", proc, line_rows,
                 used_lines, vseq)
-            # one ISA tag per valve TYPE, numbered in the 200 loop range like the P&ID lines
-            tag_seq[prefix] = tag_seq.get(prefix, 200) + 1
-            tag = f"{prefix}-{tag_seq[prefix]}"
-            if qty > 1:
-                tag = f"{tag} (×{qty})"
+            # one ISA tag per valve TYPE, numbered in the 200 loop range like the P&ID lines.
+            # SINGLE SOURCE: an actuator-flagged valve takes its canonical tag from the
+            # shared map (same as the bill-of-materials) — a qty-N run renders as a range
+            # ("FCV-201–204"). A non-mapped valve keeps the existing numbering.
+            mapped = tag_map.get(cid)
+            if mapped:
+                tag = canonical_tags.format_range(mapped)
+            else:
+                tag_seq[prefix] = tag_seq.get(prefix, 200) + 1
+                tag = f"{prefix}-{tag_seq[prefix]}"
+                if qty > 1:
+                    tag = f"{tag} (×{qty})"
             form = mods.get("form", "") or name
             if prefix == "PSV":
                 set_or_cv = _parse_set_pressure(mods, form)
@@ -991,8 +1014,23 @@ def _instr_host_vessel(cid: str) -> str:
 
 def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
     rows: list[InstrRow] = []
-    tag_seq: dict[str, int] = {}
     seen = set()
+    # CANONICAL TAGS (the single source shared with the bill-of-materials): every
+    # synthesised auxiliary instrument's ISA tag comes from canonical_tags.build_tag_map,
+    # keyed by content-character id, so "LT-201" here is the SAME LT-201 the
+    # requirements bill-of-materials prints. Non-synthesised equipment instruments
+    # (a pump's discharge gauge, the dosing pH probe) are NOT in the map and keep
+    # the existing 200-loop numbering — seeded ABOVE the map's highest per-prefix
+    # number so the two number-spaces never collide.
+    tag_map = canonical_tags.build_tag_map(state)
+    tag_seq: dict[str, int] = {}
+    for _tags in tag_map.values():
+        for _t in _tags:
+            _pfx, _n = _t.rsplit("-", 1)
+            try:
+                tag_seq[_pfx] = max(tag_seq.get(_pfx, 200), int(_n))
+            except ValueError:
+                pass
     for w, name, cid in _iter_words(state):
         blob = f"{cid} {name}"
         if _INSTR_NOISE.search(blob):
@@ -1021,13 +1059,18 @@ def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
                                r"Memosens|multipoint|displacer|Coriolis)\b", form, re.I)
                 if mt:
                     itype = mt.group(1)
-            isa_label = isa
-            if measured.startswith("pH"):
-                isa_label = "AT (pH)"
-            elif measured.startswith("Redox"):
-                isa_label = "AT (ORP)"
-            elif measured == "Composition":
-                isa_label = "AT"
+            # ISA display refinement (independent of the tag NUMBER): a pH / ORP /
+            # composition analyser shows "AT (pH)" / "AT (ORP)" / "AT". The base letter
+            # itself is set per-instance below FROM the canonical tag prefix so the
+            # displayed ISA can never disagree with the tag.
+            def _isa_label_for(base: str) -> str:
+                if measured.startswith("pH"):
+                    return "AT (pH)"
+                if measured.startswith("Redox"):
+                    return "AT (ORP)"
+                if measured == "Composition":
+                    return "AT"
+                return base
             # The clean range lives in the `rating_primary` modifier ('0–2.4 m',
             # '0–40 °C'); `form` often truncates it ('…high / low-'). Read both, the
             # rating first so its clean span wins.
@@ -1048,9 +1091,22 @@ def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
             # 200 loop range to align with the line numbers.
             n = qty if qty and qty > 0 else 1
             sig = _signal_from_form(form)
+            mapped = tag_map.get(cid)   # canonical per-instance tags (synth aux only)
             for inst in range(1, n + 1):
-                tag_seq[isa] = tag_seq.get(isa, 200) + 1
-                tag = f"{isa}-{tag_seq[isa]}"
+                # SINGLE SOURCE: the synthesised auxiliary's Nth instance reads its
+                # canonical tag (shared with the bill-of-materials). The displayed ISA
+                # base letter is then taken FROM that tag's prefix so the index never
+                # disagrees with the tag — the pH / ORP / composition refinement below
+                # still applies. A non-mapped (equipment) instrument, or an instance
+                # index beyond the map's list, falls back to the existing numbering so
+                # nothing crashes or blanks.
+                if mapped is not None and (inst - 1) < len(mapped):
+                    tag = mapped[inst - 1]
+                    inst_isa = tag.rsplit("-", 1)[0]
+                else:
+                    tag_seq[isa] = tag_seq.get(isa, 200) + 1
+                    tag = f"{isa}-{tag_seq[isa]}"
+                    inst_isa = isa
                 if n > 1 and host:
                     loc = f"{host}-{inst:02d}"
                 elif n > 1:
@@ -1058,7 +1114,7 @@ def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
                 else:
                     loc = base_location
                 rows.append(InstrRow(
-                    tag=tag, isa=isa_label, service=_norm(service),
+                    tag=tag, isa=_isa_label_for(inst_isa), service=_norm(service),
                     measured=measured, itype=_short(itype, 22),
                     location=loc, rng=rng, signal=sig,
                     loop_ref="FF-PID-001"))

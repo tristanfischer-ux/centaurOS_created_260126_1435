@@ -18,6 +18,17 @@ evidence.py) renders them; the dossier renderer will consume the same structure.
 from __future__ import annotations
 import json, math, os, re, sys
 
+# SHARED canonical-tag authority (scripts/blender-universal/canonical_tags.py): the
+# SINGLE source for synthesised-auxiliary tags, so an instrument / actuator / utility
+# carries ONE name in this bill-of-materials AND in the drawing schedules. Guarded so
+# `--selftest` (and any environment without the blender-universal dir importable) still
+# runs — when absent, the auxiliary rows fall back to the legacy bare ISA letter.
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "blender-universal"))
+    import canonical_tags  # type: ignore
+except Exception:           # pragma: no cover  (defensive — keeps --selftest standalone)
+    canonical_tags = None   # type: ignore
+
 # Materials take-off rates — UK 2026 fabricated supply (ex-works, not installed).
 # Sources: SGS Engineering, Enduramaxx, process-vessel fabricator quotes, CECA data.
 #   FRP/GRP laminate fabricated (winding/hand lay-up + QC, ex-works): £8–14/kg; mid = £12/kg
@@ -2225,6 +2236,18 @@ def assemble(out_dir: str):
     # partVerifications `price` map is already the capped value — the SAME field
     # gate 21 reads. Idempotent + no-op for non-mis-pinned states (CO₂/SAF unchanged).
     _normalise_partverification_prices(st)
+    # CANONICAL TAGS — build the shared {cid: [tag, …]} map ONCE from this state, so the
+    # synthesised-auxiliary rows below carry the SAME numbered tag the drawing schedules
+    # print. Keyed by the word's content-character id. Range-rendered per row (a qty-N
+    # word emits ONE row → "LT-201–205"). None when the module is unavailable (--selftest).
+    _aux_tag_map = canonical_tags.build_tag_map(st) if canonical_tags is not None else {}
+    def _canon_tag(w, fallback):
+        """The canonical range-label for a synthesised-auxiliary word, or `fallback`
+        (the legacy bare ISA letter) if its cid is absent from the map."""
+        cc = w.get("content_character") or {}
+        cid = cc.get("character_id") if isinstance(cc, dict) else None
+        tags = _aux_tag_map.get(cid) if cid else None
+        return canonical_tags.format_range(tags) if (tags and canonical_tags is not None) else fallback
     def _load(n):
         p = os.path.join(out_dir, n)
         return json.load(open(p)) if os.path.exists(p) else {}
@@ -2360,6 +2383,7 @@ def assemble(out_dir: str):
                     itag = ("LT" if "level" in nlow else "TT" if "temperature" in nlow
                             else "PT" if "pressure" in nlow else "FT" if "flow" in nlow
                             else "AT")   # ISA-5.1 instrument tag (analysers → AT)
+                    itag = _canon_tag(w, itag)   # numbered canonical tag — same as the drawings
                     rows.append({"tag": itag, "requirement": requirement, "status": "INSTRUMENT",
                                  "part": "field instrument (catalogue class)", "qty": qy,
                                  "unit_gbp": round(igbp), "line_gbp": round(igbp * qy),
@@ -2393,6 +2417,7 @@ def assemble(out_dir: str):
                     nlow = name.lower()
                     atag = ("FCV" if "valve" in nlow else "B" if "blower" in nlow
                             else "FE" if "fan" in nlow else "Y")   # ISA: control valve / blower
+                    atag = _canon_tag(w, atag)   # numbered canonical tag — same as the drawings
                     rows.append({"tag": atag, "requirement": requirement, "status": "ACTUATOR",
                                  "part": "final control element (catalogue class)", "qty": qy,
                                  "unit_gbp": round(agbp), "line_gbp": round(agbp * qy),
@@ -2411,6 +2436,7 @@ def assemble(out_dir: str):
                     nlow = name.lower()
                     utag = ("G" if "generator" in nlow else "P" if ("make-up" in nlow or "make up" in nlow)
                             else "DV" if ("bleed" in nlow or "drain" in nlow) else "AHU" if "ventil" in nlow else "U")
+                    utag = _canon_tag(w, utag)   # numbered canonical tag — same as the drawings
                     rows.append({"tag": utag, "requirement": requirement, "status": "UTILITY",
                                  "part": "balance-of-plant system (catalogue class)", "qty": qy,
                                  "unit_gbp": round(ugbp), "line_gbp": round(ugbp * qy),
