@@ -849,7 +849,7 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
             size = _valve_size_from(location, line_rows)
             rows.append(ValveRow(
                 tag=tag, vtype=vtype,
-                service=_short(form, 60),
+                service=_norm(form),
                 location=location, size=size or "line size",
                 set_or_cv=set_or_cv, fail_action=fail, pid_ref=pid_ref))
             break
@@ -902,22 +902,35 @@ _SENSING_PRINCIPLE_LABEL = {
 
 
 def _range_from_form(form: str, measured: str) -> str:
-    """Pull a measurement range from the BoM form string, e.g. 'process range to 250 bar',
-    '–50 to +600 °C', 'range to 120 m', '–40 to +85 °C electronics'."""
-    f = form or ""
-    # explicit lo-to-hi with a unit
-    m = re.search(r"(?:range\s*)?[–\-]?\d[\d.]*\s*to\s*[+–\-]?\d[\d.]*\s*"
-                  r"(?:°?C|bar|m\b|mbar|barg|kPa|MPa)", f, re.I)
+    """Pull a measurement range from the instrument's spec text. Handles the en-dash
+    'lo–hi unit' the engine's rating_primary uses ('0–2.4 m', '0–40 °C', '0–20 mg/L'),
+    the 'X to Y unit' long form ('–50 to +600 °C'), a single-bound 'to X unit', and a
+    DN span for flow meters. Universal — keys off the number+unit grammar, no class
+    assumptions. A pH / ORP electrode has a standard physical span, returned as a
+    genuine instrument spec when the spec text carries no explicit range."""
+    f = re.sub(r"\s+", " ", form or "")
+    # Unit alternation. Multi-char / m-prefixed units come BEFORE bare 'm' so
+    # '0–100 m³/h' and '0–20 mg/L' are not clipped to '… m'.
+    U = (r"(?:°?C|barg|bar|mbar|kPa|MPa|mg/?[lL]|[µu]g/?[lL]|ppm|ppb|pH|NTU|FNU|"
+         r"mS/cm|[µu]S/cm|L/min|lpm|Nm³/h|m³/h|m3/h|kW|kV|mm|cm|km|kg|%|V|A|Hz|m)")
+    # lo–hi (en-dash) OR lo-to-hi, with a trailing unit
+    m = re.search(rf"[–\-+]?\d[\d.]*\s*(?:to|[–\-])\s*[+–\-]?\d[\d.]*\s*{U}\b", f, re.I)
     if m:
-        return m.group(0).replace("range", "").strip()
-    # 'to 250 bar' / 'to 120 m' single-bound
-    m = re.search(r"(?:range\s*)?to\s*\d[\d.]*\s*(?:bar|m\b|°?C|mbar|kPa)", f, re.I)
+        return re.sub(r"^\s*range\s*", "", m.group(0), flags=re.I).strip()
+    # single-bound 'to 250 bar' / 'to 120 m'
+    m = re.search(rf"(?:range\s*)?to\s*\d[\d.]*\s*{U}\b", f, re.I)
     if m:
-        return m.group(0).strip()
+        return re.sub(r"^\s*range\s*", "", m.group(0), flags=re.I).strip()
     # DN span for flow meters (DN25–DN300)
     m = re.search(r"DN\s?\d+\s*[–\-]\s*DN\s?\d+", f, re.I)
     if m and measured == "Flow":
         return m.group(0).strip()
+    # pH / ORP analysers have a standard sensor span (physical spec, not a guess)
+    ml = (measured or "").lower()
+    if ml.startswith("ph"):
+        return "0–14 pH"
+    if "redox" in ml or "orp" in ml:
+        return "−1500 to +1500 mV"
     return "—"
 
 
@@ -1015,7 +1028,11 @@ def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
                 isa_label = "AT (ORP)"
             elif measured == "Composition":
                 isa_label = "AT"
-            rng = _range_from_form(form, measured)
+            # The clean range lives in the `rating_primary` modifier ('0–2.4 m',
+            # '0–40 °C'); `form` often truncates it ('…high / low-'). Read both, the
+            # rating first so its clean span wins.
+            rng = _range_from_form(
+                f"{mods.get('rating_primary', '') or ''} {form}", measured)
             mfr_pn = " ".join(x for x in (mods.get("manufacturer", ""),
                                           mods.get("part_number", "")) if x).strip()
             service = (name or PID._humanise(cid))
@@ -1041,7 +1058,7 @@ def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
                 else:
                     loc = base_location
                 rows.append(InstrRow(
-                    tag=tag, isa=isa_label, service=_short(service, 56),
+                    tag=tag, isa=isa_label, service=_norm(service),
                     measured=measured, itype=_short(itype, 22),
                     location=loc, rng=rng, signal=sig,
                     loop_ref="FF-PID-001"))
@@ -1056,6 +1073,14 @@ def build_instrument_index(proc, state: dict, line_rows) -> list[InstrRow]:
 def _short(s, n):
     s = re.sub(r"\s+", " ", str(s or "")).strip()
     return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def _norm(s):
+    """Whitespace-normalise WITHOUT truncating — for the markdown schedule cells.
+    The Excel exporter wraps + auto-grows the row height, so the FULL service /
+    description text must reach it; Tristan flagged the '…' clipping on the Service,
+    valve and instrument columns ('dots are missing stuff')."""
+    return re.sub(r"\s+", " ", str(s or "")).strip()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1102,7 +1127,7 @@ def render_markdown(sc: Schedules) -> str:
                "Design rating | Insul. | P&ID |")
     out.append("|---|---|---|---|---|---|---|---|---|:--:|---|")
     for r in sc.lines:
-        out.append(f"| `{r.number}` | {r.frm_tag} | {r.to_tag} | {_short(r.service,40)} | "
+        out.append(f"| `{r.number}` | {r.frm_tag} | {r.to_tag} | {_norm(r.service)} | "
                    f"{r.fluid} | {r.phase} | {r.dn} | {r.material} | {r.rating} | "
                    f"{r.insulation} | {r.pid_ref} |")
     out.append(f"\n*{len(sc.lines)} process lines.*\n")
@@ -1112,7 +1137,7 @@ def render_markdown(sc: Schedules) -> str:
     out.append("| Tag | Type | Service | Line / location | Size | Set / Cv | Fail | P&ID |")
     out.append("|---|---|---|---|---|---|:--:|---|")
     for v in sc.valves:
-        out.append(f"| `{v.tag}` | {v.vtype} | {_short(v.service,52)} | {v.location} | "
+        out.append(f"| `{v.tag}` | {v.vtype} | {_norm(v.service)} | {v.location} | "
                    f"{v.size} | {v.set_or_cv} | {v.fail_action} | {v.pid_ref} |")
     out.append(f"\n*{len(sc.valves)} valve types (control / relief / isolation / ESD). "
                "Fail-action: FC = fail-closed, FO = fail-open.*\n")
@@ -1123,7 +1148,7 @@ def render_markdown(sc: Schedules) -> str:
                "Loop |")
     out.append("|---|---|---|---|---|---|---|---|---|")
     for i in sc.instruments:
-        out.append(f"| `{i.tag}` | {i.isa} | {_short(i.service,46)} | {i.measured} | "
+        out.append(f"| `{i.tag}` | {i.isa} | {_norm(i.service)} | {i.measured} | "
                    f"{i.itype} | {i.location} | {i.rng} | {i.signal} | {i.loop_ref} |")
     out.append(f"\n*{len(sc.instruments)} instrument types (ISA — LT level · PT pressure · "
                "TT temperature · FT flow · AT analyser).*\n")
