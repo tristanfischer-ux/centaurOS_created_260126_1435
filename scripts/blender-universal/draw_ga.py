@@ -582,9 +582,13 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # The schedule sits in the right-hand column BELOW the side elevation, where
     # both layouts leave clear whitespace — never overlapping the bottom title
     # strip. It is height-bounded; overflow is summarised as "+N more items".
-    key_x = side_x
+    # FULL-WIDTH bottom strip (Tristan: "no reason you couldn't put the equipment
+    # schedule in two columns") — the right gutter alone only fit one column and the
+    # 72-item list overran into the title block. Spanning the sheet width lets the
+    # schedule lay out in multiple legible columns.
+    key_x = margin
     key_y = side_y + front_h + 56
-    key_w = max(side_w + 30, 300)
+    key_w = width - 2 * margin
     key_h_max = (height - title_h - 30) - key_y
     _draw_key(svg, parts, keynotes, key_x, key_y, key_x + key_w, key_h_max)
 
@@ -763,10 +767,17 @@ def _draw_key(svg, parts, keynotes, x, y, x_right, h_max):
     # the panel width allows, then shrinking the row height to a legibility floor. The
     # panel grows within the right gutter if still needed.
     total = len(rows)
-    ncol = max(1, int(bw // 168))                 # ≥168 px per column (tag + name)
+    # Column count is HEIGHT-driven: pick enough columns to keep each one a readable
+    # length (~24 rows) at a legible row height, bounded by the panel width and a
+    # 4-column cap; force ≥2 columns once the list is long (Tristan's explicit ask).
+    max_cols_by_width = max(1, int(bw // 200))    # ≥200 px per column (tag + full name)
+    target_cols = max(1, math.ceil(total / 24))
+    ncol = max(1, min(max_cols_by_width, 4, target_cols))
+    if total > 16:
+        ncol = max(ncol, 2)
     rows_per_col = max(1, math.ceil(total / ncol))
-    rh = max(6.6, min(13.0, body_h / rows_per_col))
-    fs = max(5.2, min(8.2, rh * 0.62))            # font scales with row height
+    rh = max(8.0, min(13.0, body_h / rows_per_col))
+    fs = max(5.6, min(8.2, rh * 0.62))            # font scales with row height
     shown = rows                                  # no cap, no overflow note
     panel_h = header_h + rows_per_col * rh + pad
     svg.rect(x, y, bw, panel_h, stroke=GRID_FAINT, width=1.1, fill=FILL_BG)
