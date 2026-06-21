@@ -1,5 +1,16 @@
 # Excel Dossier — Tristan Review Pass 2 (2026-06-21) — FULL SPEC
 
+## ✅ STATUS @ 2026-06-21 (rebuilt dossier: `out/ras-5m-v27/dossier.xlsx` + `~/Downloads/ras-5m-v27_dossier_rebuilt.xlsx` — 33 tabs, 0 CHECKS FAIL, 72 live calcs)
+**DONE + committed + in the rebuilt file:** A (calc unify) · C (temp matcher) · F (bootstrap stub removed) · G (pie legend+percent / solid negative bars / no axis-title overlap) · B1+J (distinct BoM/Cost/Spec subtitles + auto-grow) · L1 (backticks) · L3+M+N (no `…` truncation — verified 77→0; instrument Range populated from rating_primary, en-dash matcher, pH/ORP spans) · L4/L5 (Glossary tab) · O (Line&velocity split pipe/cable/other + Basis col) · I (Scenarios: tornado sensitivity + breakeven + corners) · K (panel live In-spec formula + documented Design-I basis) · D (Connection trace Tag col + live =A{row} cell-refs for Trace Precedents/Dependents) · S-partial (drawing res cap 2600→3400, SVG 1600→3000) · **X (Risk Register, native)** · **Y (Regulatory & Compliance, native)** · **Z (Assembly & Erection Sequence, native)**. Drawings re-rendered standalone (L3/N proven in process-schedules.md).
+
+**REMAINING (render-heavy / visual / re-run cluster — need a focused pass):**
+- **B2 (#187) canonical numbered tags everywhere** — BoM still shows bare ISA letters (LT/TT/AT) while P&ID/instrument-index use LT-201/TT-201. Best at SOURCE (requirements_bom / synthesis assigns numbered tags → re-run) OR an exporter-side name→numbered-tag normalisation map. Underpins the cryptic line-list from/to (RT/DF/OS().
+- **E (#190) connection flow-diagram image** — needs a cyclic-graph layout engine (RAS is a recirc LOOP; pure topo-sort fails). Reuse/extend draw_bfd.py rank+cycle-compression. Colour edges by service.
+- **Drawings T/U/V/W/R (#199) label de-collision + A2 canvas + GA multi-column schedule** — per-generator SVG layout in draw_*.py; needs render→look→adjust iteration (GA is only 2160px native — needs bigger canvas/scale, not just the downscale-cap bump).
+- **Blender P/Q (#198) nozzle ports + port-to-port routing + floor + no part-vomit** — build_universal_scene.py; needs re-render + visual verify. Render quality (materials/lighting) is GOOD — don't touch.
+
+
+
 > Tristan did a complete tab-by-tab + drawing-by-drawing review of `ras-5m-v27_dossier`. This file captures EVERY item (A–W) with the fix, location, and status so the implementation sprint survives context compaction. **All fixes UNIVERSAL** (exporter `scripts/build-excel-export.py` + drawing generators `scripts/blender-universal/draw_*.py` + `build_universal_scene.py`); no RAS-only hacks, no metric-gaming. Run via `generate_drawing_set.py <state.json> <out_dir>` (drawings, standalone, no Blender) → `parts_ledger.py` → `build-excel-export.py <out_dir> <out>/dossier.xlsx`; Blender needs a re-render. Latest run dir: `out/ras-5m-v27`. Drawings render SPARSER in the chain than a standalone re-render — always re-render standalone before measuring.
 
 ## CODE ALREADY DONE this session (uncommitted, on disk in build-excel-export.py — COMMIT THESE)
