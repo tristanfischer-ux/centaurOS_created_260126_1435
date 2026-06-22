@@ -2212,7 +2212,7 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
             # NOT a pitch fraction. The old 0.55–0.8×pitch overhang made a big tank array's
             # supply/power mains stick 8+ m PAST the plant edge as stray floor lines (Tristan
             # 2026-06-22, "two black wires going nowhere"). dia = the tank diameter in scope.
-            _edge = dia / 2.0 + 800.0                      # 0.8 m beyond a tank's outer face
+            _edge = dia / 2.0 + 250.0                      # hug the tank face (0.25 m clearance)
             sup_x, drn_x = cxs[0] - _edge, cxs[-1] + _edge  # mains just outside the columns
             y_f, y_b = rys[0] - 500.0, rys[-1] + 500.0      # span the rows + a short elbow
 
@@ -4021,6 +4021,14 @@ def audit_connection_geometry(parts, tol_mm=1400.0):
             _V2 = __import__("mathutils").Vector
             fam = {}
             thin = []
+            outliers = []
+            # plant centre from non-flying meshes, to flag stragglers far from the pack
+            _ox = [o.matrix_world.translation.x * 1000 for o in bpy.data.objects
+                   if getattr(o, "type", None) == "MESH" and o.data is not None]
+            _oy = [o.matrix_world.translation.y * 1000 for o in bpy.data.objects
+                   if getattr(o, "type", None) == "MESH" and o.data is not None]
+            _mcx = sorted(_ox)[len(_ox) // 2] if _ox else 0
+            _mcy = sorted(_oy)[len(_oy) // 2] if _oy else 0
             for obj in bpy.data.objects:
                 if getattr(obj, "type", None) != "MESH" or obj.data is None:
                     continue
@@ -4036,11 +4044,19 @@ def audit_connection_geometry(parts, tol_mm=1400.0):
                 if dims[2] > 8000 and dims[1] < 700 and dims[0] < 700:   # long + thin = a "line"
                     zc = sum(c.z for c in cs) / 8 * 1000
                     thin.append((round(dims[2] / 1000, 1), round(zc), obj.name))
+                t = mw.translation
+                tx, ty, tz = t.x * 1000, t.y * 1000, t.z * 1000
+                zmin = min(c.z for c in cs) * 1000
+                if ((tx - _mcx) ** 2 + (ty - _mcy) ** 2) ** 0.5 > 18000 or zmin > 1200:
+                    outliers.append((obj.name, round(tx), round(ty), round(zmin)))
             print("[univ][inventory] mesh families: " + ", ".join(
                 f"{k}={v}" for k, v in sorted(fam.items(), key=lambda x: -x[1])[:18]))
             print(f"[univ][inventory] THIN+LONG 'line' meshes (>8 m long, <0.7 m thick): {len(thin)}")
             for L, zc, nm in sorted(thin, reverse=True)[:30]:
                 print(f"   len={L:>5}m zc={zc:>5}mm  {nm}")
+            print(f"[univ][inventory] OUTLIER meshes (>18 m from centre OR floating >1.2 m): {len(outliers)}")
+            for nm, tx, ty, zmn in sorted(outliers, key=lambda r: -abs(r[1]))[:20]:
+                print(f"   ({tx},{ty}) zmin={zmn}mm  {nm}")
         except Exception as _ie:
             print(f"[univ][inventory] skipped: {_ie}")
     return bad
@@ -8597,10 +8613,28 @@ def _ground_floaters(parts):
                 p.placed_xyz_mm = (p.placed_xyz_mm[0], p.placed_xyz_mm[1],
                                    p.placed_xyz_mm[2] + dz / fl.MM)
             grounded.append(p.name)
-    if grounded:
-        print(f"[univ][layout] grounded {len(grounded)} floating part(s) onto the deck: "
-              f"{grounded[:8]}")
-    return len(grounded)
+    # SECOND pass — UNOWNED elevated stray meshes (port stubs / markers not tracked by any
+    # part, so the per-part loop above misses them; these are the tiny far-left floaters in
+    # the corner views). Anything that is NOT a flying service (pipe/route/wire/frame/deck) and
+    # hangs >0.7 m above the deck is dropped onto it.
+    part_prefs = tuple(_part_prefix(p.name) for p in parts)
+    strays = 0
+    for o in list(bpy.data.objects):
+        if getattr(o, "type", None) != "MESH" or o.data is None:
+            continue
+        nm = o.name
+        if any(nm.startswith(s) for s in skip) or nm.startswith("u_control_cabinet"):
+            continue
+        if any(nm.startswith(pp) for pp in part_prefs):
+            continue                              # owned by a part (handled above)
+        zmin = min(((o.matrix_world @ _V(c)).z * 1000.0 for c in o.bound_box), default=DECK_Z_MM)
+        if zmin > DECK_Z_MM + 700.0:
+            o.location = (o.location[0], o.location[1], o.location[2] + (DECK_Z_MM - zmin) * fl.MM)
+            strays += 1
+    if grounded or strays:
+        print(f"[univ][layout] grounded {len(grounded)} floating part(s) + {strays} unowned "
+              f"stray mesh(es) onto the deck: {grounded[:8]}")
+    return len(grounded) + strays
 
 
 def _delete_part_meshes(p):
@@ -8708,6 +8742,11 @@ def _colocate_field_instruments(parts):
              and getattr(p, "placed_xyz_mm", None) is not None]
     if not hosts or not insts:
         return 0
+    # plant centroid — instruments mount on the host's PLANT-FACING side so they never stick
+    # out past an edge host into empty floor (Tristan 2026-06-22: the LOX alarm jutting far
+    # left, isolated). Bias the mount angle toward the centroid + a small spread.
+    pcx = sum(h.placed_xyz_mm[0] for h in hosts) / len(hosts)
+    pcy = sum(h.placed_xyz_mm[1] for h in hosts) / len(hosts)
     moved, n, host_load = set(), 0, {}
     for i, ip in enumerate(insts):
         itok = set(ip.match_tokens)
@@ -8720,8 +8759,9 @@ def _colocate_field_instruments(parts):
             best = hosts[i % len(hosts)]          # no token match → spread round-robin
         k = host_load.get(best.name, 0)
         host_load[best.name] = k + 1
-        ang = k * 2.39996                          # golden angle → even radial spread
         hx, hy, _hz = best.placed_xyz_mm
+        _inward = math.atan2(pcy - hy, pcx - hx)   # direction host → plant centre
+        ang = _inward + (k - 1) * 0.45             # small fan around the inward direction
         # SHRINK an oversized instrument first (a level switch / alarm wrongly sized as a
         # 3 m vessel reads as a floating TANK — Tristan 2026-06-22). Field devices are small.
         _ifx, _ify, _ = footprint_mm(resolved_dims_mm(ip))
