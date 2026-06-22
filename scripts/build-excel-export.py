@@ -1640,6 +1640,29 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     sum_row = r
     r += 2
 
+    # BUILDING & CIVILS — listed in the BoM/equipment list (Tristan 2026-06-22: "additional items
+    # must be in the BoM and equipment list") but DELIBERATELY NOT summed into the raw-materials Σ
+    # above: it is INSTALLED civils that bypasses the OEM manufacturing stack. The all-in project
+    # capex (equipment installed + building) is on the Cost waterfall.
+    _cs_b = state.get("costStack") or {}
+    _bld = num(_cs_b.get("building_civils_gbp"))
+    if _bld:
+        sub_banner(ws, r, "Building & Civils (installed — separate from the raw-materials Σ above)", 8)
+        r += 1
+        ws.cell(r, 1, "BLDG-001").border = BORDER
+        ws.cell(r, 3, 1).border = BORDER
+        ws.cell(r, 4, "Insulated steel-frame industrial building — clad walls, insulated roof, "
+                      "floor slab, drainage, roller + personnel doors").border = BORDER
+        ws.cell(r, 5, "derived").border = BORDER
+        ws.cell(r, 6, _bld).border = BORDER
+        ws.cell(r, 7, _bld).border = BORDER
+        _bn = ws.cell(r, 8, f"installed civils: {int(_cs_b.get('building_footprint_m2') or 0):,} m² "
+                            f"footprint × UK-2026 rates; NOT in the raw Σ (bypasses the OEM stack). "
+                            f"All-in project capex on the Cost waterfall.")
+        _bn.font = FONT_NOTE
+        _bn.border = BORDER
+        r += 2
+
     # coverage_by_drawing from parts-ledger.json
     pl = load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
     cov = pl.get("coverage_by_drawing") or {}
