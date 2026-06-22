@@ -339,10 +339,11 @@ SKID_POST_MM             = 180    # box-section size of frame posts/rails (subst
 # free-space families (aircraft/satellite have their own faint ground plane; a wind
 # turbine has its own foundation pad).
 GROUND_SLAB_THICK_MM   = 400.0    # reinforced slab depth (top at DECK_Z_MM, extends down)
-GROUND_SLAB_MARGIN_MM  = 2500.0   # apron beyond the equipment footprint (a walkable margin)
-# Concrete-grey, a touch darker than the 0.85 INSPECT world so the deck reads as a
-# distinct surface under the plant while staying subordinate to the equipment.
-GROUND_SLAB_COLOUR     = (0.62, 0.62, 0.64)
+GROUND_SLAB_MARGIN_MM  = 4000.0   # (was 2500) wider apron so the floor clearly reads in the hero
+# Concrete-grey — darker than before (was 0.62) against the 0.85 INSPECT world so the
+# deck reads UNMISTAKABLY as the plant floor in the hero/iso view (Tristan 2026-06-22:
+# "no floor"), while staying subordinate to the equipment.
+GROUND_SLAB_COLOUR     = (0.52, 0.52, 0.55)
 
 # ── STAGE 1 LINEAR LAYOUT (BLENDER_LINEAR_LAYOUT=1) ─────────────────────────
 # A DETERMINISTIC diagnostic placement that lays EVERY part in ONE straight row
@@ -437,11 +438,13 @@ def _edge_is_port_wirable(e, by_name):
 # travels [mm] — the run rises from the source port, crosses overhead at this
 # clearance, then drops to the destination port (a clean Manhattan 3-segment path
 # that reads as one connected line and clears the equipment tops it spans).
-WIRE_OVERHEAD_CLEAR_MM = 900.0
+WIRE_OVERHEAD_CLEAR_MM = 450.0   # (was 900) hug the equipment tops — less overhead "flare"
 # Per-(service) Z stagger [mm] added to the overhead leg so two wired runs that
 # share a span (e.g. the water main + the power bus running the length of the row)
-# sit at distinct elevations and don't co-incide / cross at the same height.
-WIRE_SERVICE_TIER_MM = 320.0
+# sit at distinct elevations and don't co-incide / cross at the same height. Kept
+# small (was 320) so runs read as a TIDY rack at near-uniform height, not a spray of
+# pipes climbing to a dozen elevations (Tristan 2026-06-22: "pipework flaring around").
+WIRE_SERVICE_TIER_MM = 130.0
 
 # ── 6. Pipe palette by mechanism ───────────────────────────────────────────
 # Pipe radius ~1.7× (Tristan 2026-06-10): the runs read as thin wires. 110→190 mm.
@@ -2135,15 +2138,20 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
     # ── PROCESS VESSELS: shell + dished heads + kind-specific support ──
     if shape in _VESSEL_KIND:
         kind = _VESSEL_KIND[shape]
+        # BOX-dimmed vessel fallback (Tristan 2026-06-22, the 13.3 m "Degasser" tower):
+        # a vessel/column whose contract dim is a BOX (e.g. "1548x1316x1703 mm") carries
+        # w/d/h, NOT dia/len — without the fallbacks below build_part ignored the box and
+        # fell to the 12 m tall_column DEFAULT, rendering a ⌀0.8×12 m tower for a 1.7 m
+        # degasser. Read the box h_mm/w_mm so the rendered vessel matches the contract.
         if shape == "tank":
-            dia = rd.get("dia_mm", 3000)
-            ln = rd.get("len_mm") or TYPE_DEFAULTS_MM[shape]["height"]
+            dia = rd.get("dia_mm") or rd.get("w_mm") or 3000
+            ln = rd.get("len_mm") or rd.get("h_mm") or TYPE_DEFAULTS_MM[shape]["height"]
         elif shape == "horizontal_vessel":
-            dia = rd.get("dia_mm", 700)
-            ln = rd.get("len_mm") or TYPE_DEFAULTS_MM[shape]["length"]
+            dia = rd.get("dia_mm") or rd.get("h_mm") or 700
+            ln = rd.get("len_mm") or rd.get("w_mm") or TYPE_DEFAULTS_MM[shape]["length"]
         else:
-            dia = rd.get("dia_mm", 800)
-            ln = rd.get("len_mm") or TYPE_DEFAULTS_MM[shape].get("height", 3000)
+            dia = rd.get("dia_mm") or rd.get("w_mm") or 800
+            ln = rd.get("len_mm") or rd.get("h_mm") or TYPE_DEFAULTS_MM[shape].get("height", 3000)
         # qty-N vessels (e.g. a 10-tank rearing farm) render as a COMPACT grid of N
         # DISTINCT instances centred on this part's footprint (x_mm,y_mm). Each instance
         # gets a UNIQUE object base-name (nm_inst<idx>) so build_parts_manifest can
