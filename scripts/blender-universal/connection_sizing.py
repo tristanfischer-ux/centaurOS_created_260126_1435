@@ -651,7 +651,18 @@ def _detect_phase(material_context: Optional[str],
 
     # Decision: explicit-liquid beats everything; otherwise liquid keywords beat
     # gas keywords (process names embed 'gas'); else any gas hint -> gas.
+    # A STRIPPER / DEGASSER / SCRUBBER / DEAERATOR feed names the gas species being REMOVED,
+    # not the carried fluid — the feed/recirc line carries the LIQUID (e.g. 'nitrified water to
+    # degasser to strip CO2 below 6 mg/L'). When a liquid keyword (water…) is present, that
+    # stripped-gas token must NOT flip the line to gas. The gas OUTLET (vent, no liquid keyword)
+    # is unaffected and stays gas. (Tristan 2026-06-22: RAS degasser feed was mis-sized as a
+    # 14 m/s 'CO2 gas' DN200 — it is water and sizes to DN600 @ ~1.6 m/s.)
+    _stripped_context = any(k in blob for k in (
+        "strip", "stripper", "stripping", "degas", "degasser", "degasifier",
+        "deaerat", "scrub", "scrubber", "mg/l", "mg l", "below 6mg"))
     if explicit_liquid:
+        return "liquid"
+    if has_liquid and _stripped_context:
         return "liquid"
     if has_liquid and not has_gas:
         return "liquid"
