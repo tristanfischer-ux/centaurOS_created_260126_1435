@@ -3048,6 +3048,12 @@ def _shift_objects_by_prefix(prefixes, dy_mm, moved):
     a part built shares the part-name prefix)."""
     if not prefixes:
         return
+    if isinstance(prefixes, str):
+        prefixes = (prefixes,)
+    # Also carry each part's qty-N MANIFOLD ("u_pipe_<prefix>_*") so a bank Y-shift moves the
+    # array's supply/drain/power headers WITH it — otherwise the manifold is left behind and
+    # hangs in mid-air as a floating "comb" (Tristan 2026-06-22). Same fix as _shift_part_xy.
+    prefixes = tuple(prefixes) + tuple("u_pipe_" + p for p in prefixes)
     dy = dy_mm * fl.MM
     for obj in bpy.data.objects:
         if not obj.name.startswith(prefixes):
@@ -8320,8 +8326,13 @@ def _shift_part_xy(p, dx_mm, dy_mm, moved):
     a Blender-object handle and rides the mesh move; nothing else to update."""
     dxb, dyb = dx_mm * fl.MM, dy_mm * fl.MM
     pref = _part_prefix(p.name)
+    # The qty-N array MANIFOLD (build_part's supply/drain/power headers + drops) is named
+    # "u_pipe_<nm>_*" (a u_pipe_ prefix so it stays OUT of the equipment bbox) — so it does
+    # NOT start with the part prefix and was LEFT BEHIND when the array moved, hanging in
+    # mid-air as a floating "comb" (Tristan 2026-06-22). Move it WITH its array too.
+    manifold_pref = "u_pipe_" + pref
     for obj in bpy.data.objects:
-        if not obj.name.startswith(pref):
+        if not (obj.name.startswith(pref) or obj.name.startswith(manifold_pref)):
             continue
         try:
             oid = obj.as_pointer()
@@ -8348,6 +8359,57 @@ def _layout_is_envelope(p):
     fx, fy, _ = footprint_mm(resolved_dims_mm(p))
     return (p.shape not in _VESSEL_KIND
             and (fx * fy >= 200e6 or (max(fx, fy) >= 25000 and min(fx, fy) >= 6000)))
+
+
+_FIELD_INSTRUMENT_MODULES = {"sensing_instrumentation"}
+_MOUNT_HOST_MODULES = {"mass_fluid_transport_process", "water_treatment_system",
+                       "environmental_interface", "actuation_kinematics"}
+
+
+def _colocate_field_instruments(parts):
+    """Move each FIELD INSTRUMENT (sensing_instrumentation) ONTO the process equipment it
+    monitors so it reads as field-mounted — instead of a sparse instrument band 12 m off the
+    plant whose signal headers hang in mid-air (Tristan 2026-06-22: 'random pipes floating in
+    the air … nowhere to nowhere'). The optimiser clusters I&C by signal weight (all → the
+    controller), so it drifts away from the process; this pulls each instrument back onto its
+    HOST: the process-equipment part with the best NAME-TOKEN overlap (round-robin fallback),
+    at the host centre + a golden-angle radial offset so several instruments on one host don't
+    stack. Runs BEFORE routing so the signal runs become short local drops onto the host.
+    Universal — keys on module + name tokens, no class table."""
+    hosts = [p for p in parts
+             if p.module_id in _MOUNT_HOST_MODULES
+             and getattr(p, "placed_xyz_mm", None) is not None
+             and not _layout_is_envelope(p) and p.shape != "instrument"]
+    insts = [p for p in parts
+             if p.module_id in _FIELD_INSTRUMENT_MODULES
+             and getattr(p, "placed_xyz_mm", None) is not None]
+    if not hosts or not insts:
+        return 0
+    moved, n, host_load = set(), 0, {}
+    for i, ip in enumerate(insts):
+        itok = set(ip.match_tokens)
+        best, bov = None, 0
+        for h in hosts:
+            ov = len(itok & set(h.match_tokens))
+            if ov > bov:
+                bov, best = ov, h
+        if best is None:
+            best = hosts[i % len(hosts)]          # no token match → spread round-robin
+        k = host_load.get(best.name, 0)
+        host_load[best.name] = k + 1
+        ang = k * 2.39996                          # golden angle → even radial spread
+        hx, hy, _hz = best.placed_xyz_mm
+        tx, ty = hx + 2200.0 * math.cos(ang), hy + 2200.0 * math.sin(ang)
+        ix, iy, _iz = ip.placed_xyz_mm
+        dx, dy = tx - ix, ty - iy
+        if abs(dx) < 1.0 and abs(dy) < 1.0:
+            continue
+        _shift_part_xy(ip, dx, dy, moved)
+        n += 1
+    if n:
+        print(f"[univ][layout] co-located {n} field instrument(s) onto process equipment "
+              f"(was a floating instrument band)")
+    return n
 
 
 def _apply_layout_optimiser(parts, topology, bbox):
@@ -8499,6 +8561,14 @@ def place_process_plant(parts, regions, topology, MAT, MO):
             print(f"[univ] plant bbox after layout-optimise (mm): {bbox}")
         except Exception as _e:
             print(f"[univ][layout] optimiser skipped (error): {_e}")
+    # Field instruments → onto their host equipment (kills the floating instrument band).
+    # Runs whenever the layout is active (independent of the optimiser env gate) so the
+    # signal 'combs' never hang in space. Kill: CHAIN_SKIP_INSTRUMENT_COLOCATE=1.
+    if os.environ.get("CHAIN_SKIP_INSTRUMENT_COLOCATE", "") in ("", "0", "false", "no"):
+        try:
+            _colocate_field_instruments(parts)
+        except Exception as _e:
+            print(f"[univ][layout] instrument co-locate skipped (error): {_e}")
 
     # 5. TALL braced skid frame that HUGS THE EQUIPMENT BULK (Fix 1, FRAME FIT).
     #    BOTH the footprint AND the height target come from the NON-tall equipment
