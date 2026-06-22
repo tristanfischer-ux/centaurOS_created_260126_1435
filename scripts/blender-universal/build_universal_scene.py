@@ -13941,13 +13941,11 @@ def main():
         draw_boundary_services(parts, MAT, MO)
     except Exception as _be:
         print(f"[univ][boundary] skipped: {_be}")
-    # BUILDING ENVELOPE (walls + roof + door) — EXTERIOR view only (BLENDER_PLANT_SHELL=1).
-    # The default render is the CUTAWAY (no roof/walls); the exterior render sets the flag.
-    if os.environ.get("BLENDER_PLANT_SHELL", "").strip().lower() in ("1", "true", "yes", "on"):
-        try:
-            build_plant_shell(parts, MAT, MO)
-        except Exception as _se:
-            print(f"[univ][shell] skipped: {_se}")
+    # NOTE: the BUILDING ENVELOPE is NOT built here — it is added as a SECOND render pass in the
+    # INSPECT=0 branch (interior first, then shell + exterior) so BOTH drawings come from the
+    # SAME scene build. Rendering them as two separate processes gave different layouts (the
+    # placement is not deterministic across processes), so the water services landed in different
+    # places between the exterior + interior drawings (Tristan 2026-06-22).
 
     # ── STAGE 2 (4-stage connection-points plan) — NAMED IN/OUT CONNECTION PORTS ──
     # Now that every part is PLACED (placed_xyz_mm + anchors set above by whichever
@@ -14112,10 +14110,28 @@ def main():
                 return False
         for _k in list(MO.keys()):
             MO[_k] = [_o for _o in MO[_k] if _alive(_o)]
-        # 8. render the production PDF set (hero + per-module), bespoke visual bar.
+        # 8. render the production PDF set (hero + per-module) — the INTERIOR LAYOUT (no shell).
         fl.run_render_pipeline(out_dir, MO,
                                structure_module_id=STRUCTURE_MODULE_ID,
                                hero_open_frame=True)
+        # 8b. EXTERIOR pass — add the building shell to the SAME scene + render again to a
+        #     subdir, so the architectural exterior + the interior layout are the IDENTICAL
+        #     plant (two separate processes diverge — placement isn't deterministic across
+        #     processes; Tristan 2026-06-22 caught the services in different places). Gated by
+        #     BLENDER_PLANT_SHELL=1 so the chain's default render stays interior-only.
+        if os.environ.get("BLENDER_PLANT_SHELL", "").strip().lower() in ("1", "true", "yes", "on"):
+            try:
+                build_plant_shell(parts, MAT, MO)
+                for _k in list(MO.keys()):
+                    MO[_k] = [_o for _o in MO[_k] if _alive(_o)]
+                _extdir = os.path.join(out_dir, "exterior")
+                os.makedirs(_extdir, exist_ok=True)
+                fl.run_render_pipeline(_extdir, MO,
+                                       structure_module_id=STRUCTURE_MODULE_ID,
+                                       hero_open_frame=True)
+                print(f"[univ][shell] EXTERIOR render set (same layout) → {_extdir}")
+            except Exception as _se:
+                print(f"[univ][shell] exterior pass skipped: {_se}")
         _inspect_summary = None
 
     # final summary line for the caller
