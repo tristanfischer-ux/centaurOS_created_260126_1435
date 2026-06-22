@@ -8960,27 +8960,91 @@ def build_plant_shell(parts, MAT, MO):
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     w, d = x1 - x0, y1 - y0
     z0 = DECK_Z_MM
-    wall = MAT.get("m_shell_wall") or fl.make_mat("m_shell_wall", (0.82, 0.83, 0.85),
-                                                  metallic=0.10, roughness=0.75)
-    roof = MAT.get("m_shell_roof") or fl.make_mat("m_shell_roof", (0.60, 0.62, 0.66),
-                                                  metallic=0.25, roughness=0.6)
-    door = MAT.get("m_shell_door") or fl.make_mat("m_shell_door", (0.40, 0.42, 0.46),
-                                                  metallic=0.30, roughness=0.5)
-    MAT["m_shell_wall"], MAT["m_shell_roof"], MAT["m_shell_door"] = wall, roof, door
+    def _mat(key, rgb, **kw):
+        m = MAT.get(key) or fl.make_mat(key, rgb, **kw)
+        MAT[key] = m
+        return m
+    wall = _mat("m_shell_wall", (0.74, 0.77, 0.82), metallic=0.20, roughness=0.55)   # clad steel
+    trim = _mat("m_shell_trim", (0.30, 0.34, 0.42), metallic=0.40, roughness=0.45)   # dark trim
+    roof = _mat("m_shell_roof", (0.44, 0.47, 0.52), metallic=0.30, roughness=0.55)
+    door = _mat("m_shell_door", (0.34, 0.36, 0.40), metallic=0.35, roughness=0.45)
+    glass = _mat("m_shell_glass", (0.32, 0.50, 0.62), metallic=0.10, roughness=0.10)
+    plinth = _mat("m_shell_plinth", (0.26, 0.28, 0.32), metallic=0.10, roughness=0.8)
 
     def _b(name, c, sz, m):
         o = fl.add_box(name, (c[0] * MM, c[1] * MM, c[2] * MM),
                        (sz[0] * MM, sz[1] * MM, sz[2] * MM), m, module=None, module_objects=MO)
         o.dimensions = (sz[0] * MM, sz[1] * MM, sz[2] * MM)   # add_box halves; set true size
         return o
+    # ── walls ──
     _b("u_shell_wall_N", (cx, y1, z0 + H / 2), (w + t, t, H), wall)
     _b("u_shell_wall_S", (cx, y0, z0 + H / 2), (w + t, t, H), wall)
     _b("u_shell_wall_E", (x1, cy, z0 + H / 2), (t, d, H), wall)
     _b("u_shell_wall_W", (x0, cy, z0 + H / 2), (t, d, H), wall)
-    _b("u_shell_roof", (cx, cy, z0 + H + t / 2), (w + 2 * t, d + 2 * t, t), roof)
-    _b("u_shell_door", (cx, y0 - t * 0.4, z0 + 2100.0), (5000.0, t * 1.4, 4200.0), door)
-    print(f"[univ][shell] building envelope {w/1000.0:.1f}×{d/1000.0:.1f}×{H/1000.0:.1f} m "
-          f"(4 walls + roof + roller door)")
+    # ── dark PLINTH base course (proud of the cladding) ──
+    pl_h, pr = 900.0, t + 200.0
+    _b("u_shell_plinth_N", (cx, y1, z0 + pl_h / 2), (w + t + 200, pr, pl_h), plinth)
+    _b("u_shell_plinth_S", (cx, y0, z0 + pl_h / 2), (w + t + 200, pr, pl_h), plinth)
+    _b("u_shell_plinth_E", (x1, cy, z0 + pl_h / 2), (pr, d + 200, pl_h), plinth)
+    _b("u_shell_plinth_W", (x0, cy, z0 + pl_h / 2), (pr, d + 200, pl_h), plinth)
+    # ── CONTINUOUS GLAZING band (clerestory) at ~0.62 H ──
+    gz, gh = z0 + H * 0.62, 1600.0
+    _b("u_shell_glaze_N", (cx, y1, gz), (w * 0.86, t + 120, gh), glass)
+    _b("u_shell_glaze_S", (cx, y0, gz), (w * 0.55, t + 120, gh), glass)   # front: shorter (door)
+    _b("u_shell_glaze_E", (x1, cy, gz), (t + 120, d * 0.86, gh), glass)
+    _b("u_shell_glaze_W", (x0, cy, gz), (t + 120, d * 0.86, gh), glass)
+    # ── vertical CLADDING SEAMS (proud battens every ~4.5 m) so walls read as profiled ──
+    seam = 140.0
+    nx = max(2, int(w / 4500))
+    for i in range(nx + 1):
+        sx = x0 + (w * i / nx)
+        _b(f"u_shell_seamN_{i}", (sx, y1, z0 + H / 2 + 200), (seam, t + 80, H - 1200), trim)
+        _b(f"u_shell_seamS_{i}", (sx, y0, z0 + H / 2 + 200), (seam, t + 80, H - 1200), trim)
+    ny = max(2, int(d / 4500))
+    for j in range(ny + 1):
+        sy = y0 + (d * j / ny)
+        _b(f"u_shell_seamE_{j}", (x1, sy, z0 + H / 2 + 200), (t + 80, seam, H - 1200), trim)
+        _b(f"u_shell_seamW_{j}", (x0, sy, z0 + H / 2 + 200), (t + 80, seam, H - 1200), trim)
+    # ── CORNER trims ──
+    for (ccx, ccy, tag) in ((x0, y0, "SW"), (x1, y0, "SE"), (x0, y1, "NW"), (x1, y1, "NE")):
+        _b(f"u_shell_corner_{tag}", (ccx, ccy, z0 + H / 2), (t + 220, t + 220, H), trim)
+    # ── low-pitch GABLE roof along the longer axis, with eaves overhang + ridge + fascia ──
+    ov = 900.0
+    pitch = math.radians(11.0)
+    import mathutils as _mu
+    STEPS = 7
+    if w >= d:                                   # ridge runs along X → gable ends at x0/x1
+        half, length = d / 2.0, w + 2 * ov
+        slope, rise = half / math.cos(pitch), half * math.tan(pitch)
+        for sgn, tag in ((1, "N"), (-1, "S")):
+            o = _b(f"u_shell_roof_{tag}", (cx, cy + sgn * half / 2.0, z0 + H + rise / 2.0),
+                   (length, slope, t * 0.8), roof)
+            o.rotation_euler = (-sgn * pitch, 0.0, 0.0)
+        _b("u_shell_ridge", (cx, cy, z0 + H + rise + 150), (length, 360, 360), trim)
+        for gx, gtag in ((x0, "W"), (x1, "E")):  # stepped triangular gable in-fill
+            for s in range(STEPS):
+                f = (s + 0.5) / STEPS
+                _b(f"u_shell_gable_{gtag}_{s}", (gx, cy, z0 + H + f * rise),
+                   (t, d * (1 - f), rise / STEPS + 60), wall)
+    else:                                        # ridge runs along Y → gable ends at y0/y1
+        half, length = w / 2.0, d + 2 * ov
+        slope, rise = half / math.cos(pitch), half * math.tan(pitch)
+        for sgn, tag in ((1, "E"), (-1, "W")):
+            o = _b(f"u_shell_roof_{tag}", (cx + sgn * half / 2.0, cy, z0 + H + rise / 2.0),
+                   (slope, length, t * 0.8), roof)
+            o.rotation_euler = (0.0, sgn * pitch, 0.0)
+        _b("u_shell_ridge", (cx, cy, z0 + H + rise + 150), (360, length, 360), trim)
+        for gy, gtag in ((y0, "S"), (y1, "N")):
+            for s in range(STEPS):
+                f = (s + 0.5) / STEPS
+                _b(f"u_shell_gable_{gtag}_{s}", (cx, gy, z0 + H + f * rise),
+                   (w * (1 - f), t, rise / STEPS + 60), wall)
+    # ── ROLLER door + PERSONNEL door on the front (S) wall ──
+    _b("u_shell_rollerdoor", (cx - 3000, y0 - t * 0.4, z0 + 2300.0), (5200.0, t * 1.6, 4600.0), door)
+    _b("u_shell_persondoor", (cx + 3200, y0 - t * 0.4, z0 + 1150.0), (1200.0, t * 1.6, 2300.0), door)
+    print(f"[univ][shell] ARCHITECTURAL building envelope {w/1000.0:.1f}×{d/1000.0:.1f} m, "
+          f"eave {H/1000.0:.1f} m + pitched roof (clad walls, plinth, glazing band, seams, "
+          f"corner trims, roller + personnel doors)")
     return 1
 
 
