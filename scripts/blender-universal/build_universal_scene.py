@@ -2208,9 +2208,13 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
             pwr_z = base_z_mm + 600.0                   # power header low on the side
             cxs = [x_mm + (c - (cols - 1) / 2.0) * pitch for c in range(cols)]
             rys = [y_mm + (r - (rows - 1) / 2.0) * pitch for r in range(rows)]
-            x_l, x_r = cxs[0] - pitch * 0.5, cxs[-1] + pitch * 0.5
-            y_f, y_b = rys[0] - pitch * 0.55, rys[-1] + pitch * 0.55
-            sup_x, drn_x = x_l - pitch * 0.3, x_r + pitch * 0.3
+            # Headers HUG the array — a small CLEARANCE beyond the outer tank face / rows,
+            # NOT a pitch fraction. The old 0.55–0.8×pitch overhang made a big tank array's
+            # supply/power mains stick 8+ m PAST the plant edge as stray floor lines (Tristan
+            # 2026-06-22, "two black wires going nowhere"). dia = the tank diameter in scope.
+            _edge = dia / 2.0 + 800.0                      # 0.8 m beyond a tank's outer face
+            sup_x, drn_x = cxs[0] - _edge, cxs[-1] + _edge  # mains just outside the columns
+            y_f, y_b = rys[0] - 500.0, rys[-1] + 500.0      # span the rows + a short elbow
 
             def _vp(n, x, y, z0, z1, rr, mt):     # vertical pipe
                 fl.add_cyl("u_pipe_" + n, (x * MM, y * MM, (z0 + z1) / 2 * MM), rr, abs(z1 - z0) * MM,
@@ -3974,6 +3978,42 @@ def audit_connection_geometry(parts, tol_mm=1400.0):
           f"(tol {tol_mm:.0f} mm) — these are the 'random lines':")
     for g, nm, s, mech, near in sorted(bad, reverse=True)[:30]:
         print(f"   gap={g:>6}mm  {nm} end {s} [{mech}]  nearest={near}")
+
+    # ── BROAD SCAN: any MESH object whose world-bbox reaches well BEYOND the plant
+    #    envelope (the mystery thin lines extending past the slab). Names them so we know
+    #    what they are (route? manifold? frame? stub?) instead of guessing from the render.
+    exs0 = exs1 = eys0 = eys1 = None   # envelope from part FOOTPRINTS (not centres, so a
+    for p in parts:                    # header beside a wide tank doesn't read as 'beyond')
+        if not getattr(p, "placed_xyz_mm", None):
+            continue
+        _cx, _cy = p.placed_xyz_mm[0], p.placed_xyz_mm[1]
+        _fx, _fy, _ = footprint_mm(resolved_dims_mm(p))
+        lo_x, hi_x, lo_y, hi_y = _cx - _fx / 2, _cx + _fx / 2, _cy - _fy / 2, _cy + _fy / 2
+        exs0 = lo_x if exs0 is None else min(exs0, lo_x)
+        exs1 = hi_x if exs1 is None else max(exs1, hi_x)
+        eys0 = lo_y if eys0 is None else min(eys0, lo_y)
+        eys1 = hi_y if eys1 is None else max(eys1, hi_y)
+    if exs0 is not None:
+        ex0, ex1, ey0, ey1 = exs0 - 4000, exs1 + 4000, eys0 - 4000, eys1 + 4000
+        beyond = []
+        for obj in bpy.data.objects:
+            if getattr(obj, "type", None) != "MESH" or obj.data is None:
+                continue
+            if obj.name.startswith(("u_ground_", "u_skid_")):
+                continue   # the deck + frame legitimately span the plant
+            try:
+                mw = obj.matrix_world
+                cs = [mw @ __import__("mathutils").Vector(c) for c in obj.bound_box]
+            except Exception:
+                continue
+            ox = max(0.0, ex0 - max(c.x * 1000 for c in cs), min(c.x * 1000 for c in cs) - ex1)
+            oy = max(0.0, ey0 - max(c.y * 1000 for c in cs), min(c.y * 1000 for c in cs) - ey1)
+            d = math.hypot(ox, oy)
+            if d > 3000:
+                beyond.append((round(d / 1000, 1), obj.name))
+        print(f"[univ][conn-audit] MESH objects reaching >3 m BEYOND the plant: {len(beyond)}")
+        for d, nm in sorted(beyond, reverse=True)[:25]:
+            print(f"   {d:>5} m beyond  {nm}")
     return bad
 
 
@@ -4150,6 +4190,28 @@ def _spec_pipe_rate_gbp_per_m(spec):
     return float(cs.PIPE_COST_GBP_PER_M_BY_DN.get(spec.get("size_label"), 0.0))
 
 
+def _delete_run_geometry(run_names):
+    """Remove the BLENDER objects of the named routed runs (every object _draw_run /
+    prim_pipe_run / _draw_cable_tray created carries the run name as its object-name
+    prefix). Used when a route is DROPPED so its phantom geometry never renders. Returns
+    the count removed."""
+    names = [n for n in (run_names or []) if n]
+    if not names:
+        return 0
+    n = 0
+    for obj in list(bpy.data.objects):
+        onm = obj.name
+        if any(onm == rn or onm.startswith(rn) for rn in names):
+            try:
+                bpy.data.objects.remove(obj, do_unlink=True)
+                n += 1
+            except (RuntimeError, ReferenceError):
+                pass
+    if n:
+        print(f"[univ][route-reconcile]   deleted {n} phantom-route mesh object(s)")
+    return n
+
+
 def reconcile_route_specs(parts):
     """Apply the two routing-cost fixes to _CONN_SPECS in place (see block comment).
     Returns a small summary dict. Pure over the module globals — no I/O."""
@@ -4171,6 +4233,7 @@ def reconcile_route_specs(parts):
     # DEFECT 1 — drop fluid specs that tie a pure instrument into the process loop.
     kept = []
     dropped_instr = []
+    dropped_run_names = []
     for s in _CONN_SPECS:
         if _mech_is_fluid(s.get("mechanism")):
             pa = resolve_endpoint(str(s.get("from_part") or ''), parts)
@@ -4182,10 +4245,19 @@ def reconcile_route_specs(parts):
             if from_instr or to_instr:
                 dropped_instr.append((s.get("from_part"), s.get("to_part"),
                                       s.get("size_label"), float(s.get("length_m") or 0.0)))
+                if s.get("run_name"):
+                    dropped_run_names.append(s["run_name"])
                 continue
         kept.append(s)
     if dropped_instr:
         _CONN_SPECS[:] = kept
+        # DELETE the dropped routes' BLENDER GEOMETRY too — not just the cost spec. Without
+        # this the phantom pipe stays drawn (a blue/red line ending in mid-air at the
+        # instrument — Tristan 2026-06-22), even though it's gone from the BoM. _draw_run
+        # names every object with the run name as prefix, so delete by that prefix.
+        _delete_run_geometry(dropped_run_names)
+        # purge their route-log entries so the connection audit + manifest agree.
+        _ROUTE_LOG[:] = [r for r in _ROUTE_LOG if r.get("name") not in set(dropped_run_names)]
 
     # DEFECT 2 — cap the COSTED length of any detour at straight-line × factor + pad.
     n_capped = 0
@@ -8561,10 +8633,26 @@ def add_ground_slab(parts, MAT, MO, bbox_mm=None):
     as the deck in the INSPECT pass. Universal — footprint-keyed, no per-class logic.
 
     Returns the slab object."""
-    # equipment_bbox_mm already adds the margin + returns a safe default if nothing is
-    # placed; it frames the equipment BULK (tall stacks/flares excluded) so the apron
-    # hugs the plant rather than chasing a flare spike out to the plant edge.
-    eb = equipment_bbox_mm(parts, margin_mm=GROUND_SLAB_MARGIN_MM)
+    # The FLOOR must sit under EVERY placed part (Tristan 2026-06-22: "the floor slab does
+    # not cover the entire space") — including the tall/outlying parts equipment_bbox_mm
+    # excludes (a lone LOX tank / generator in a corner was off the slab). Span the FULL
+    # placed-part footprint + apron, so nothing stands on bare ground.
+    _x0 = _x1 = _y0 = _y1 = None
+    for _p in parts:
+        if not getattr(_p, "placed_xyz_mm", None):
+            continue
+        _cx, _cy = _p.placed_xyz_mm[0], _p.placed_xyz_mm[1]
+        _fx, _fy, _ = footprint_mm(resolved_dims_mm(_p))
+        _hx, _hy = _fx / 2.0, _fy / 2.0
+        _x0 = _cx - _hx if _x0 is None else min(_x0, _cx - _hx)
+        _x1 = _cx + _hx if _x1 is None else max(_x1, _cx + _hx)
+        _y0 = _cy - _hy if _y0 is None else min(_y0, _cy - _hy)
+        _y1 = _cy + _hy if _y1 is None else max(_y1, _cy + _hy)
+    _m = GROUND_SLAB_MARGIN_MM
+    if _x0 is None:
+        eb = equipment_bbox_mm(parts, margin_mm=GROUND_SLAB_MARGIN_MM)
+    else:
+        eb = {"x0": _x0 - _m, "x1": _x1 + _m, "y0": _y0 - _m, "y1": _y1 + _m}
     w = max(1000.0, eb["x1"] - eb["x0"])
     d = max(1000.0, eb["y1"] - eb["y0"])
     cx = (eb["x0"] + eb["x1"]) / 2.0
