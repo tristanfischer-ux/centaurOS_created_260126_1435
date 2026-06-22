@@ -695,7 +695,7 @@ class Part:
     """A physical, renderable part resolved from a word."""
     __slots__ = ("name", "module_id", "region_key", "region_rank",
                  "shape", "dim", "qty", "form", "match_tokens",
-                 "obj_anchor", "placed_xyz_mm", "anchors", "ports")
+                 "obj_anchor", "placed_xyz_mm", "anchors", "ports", "_consolidated")
 
     def __init__(self, name, module_id, region_key, region_rank, shape, dim, qty, form):
         self.name = name
@@ -3999,8 +3999,8 @@ def audit_connection_geometry(parts, tol_mm=1400.0):
         for obj in bpy.data.objects:
             if getattr(obj, "type", None) != "MESH" or obj.data is None:
                 continue
-            if obj.name.startswith(("u_ground_", "u_skid_")):
-                continue   # the deck + frame legitimately span the plant
+            if obj.name.startswith("u_ground_"):
+                continue   # the deck legitimately spans the plant (+ apron)
             try:
                 mw = obj.matrix_world
                 cs = [mw @ __import__("mathutils").Vector(c) for c in obj.bound_box]
@@ -4014,6 +4014,35 @@ def audit_connection_geometry(parts, tol_mm=1400.0):
         print(f"[univ][conn-audit] MESH objects reaching >3 m BEYOND the plant: {len(beyond)}")
         for d, nm in sorted(beyond, reverse=True)[:25]:
             print(f"   {d:>5} m beyond  {nm}")
+        # FULL INVENTORY (Tristan 2026-06-22 — stop guessing what the floor lines are): every
+        # MESH object family by prefix, + every THIN/LONG piece (one axis ≫ the other two) so
+        # the "random lines" are named, wherever they sit.
+        try:
+            _V2 = __import__("mathutils").Vector
+            fam = {}
+            thin = []
+            for obj in bpy.data.objects:
+                if getattr(obj, "type", None) != "MESH" or obj.data is None:
+                    continue
+                pre = re.match(r"(u_[a-z]+_?[a-z]*)", obj.name)
+                key = pre.group(1) if pre else obj.name[:14]
+                fam[key] = fam.get(key, 0) + 1
+                mw = obj.matrix_world
+                cs = [mw @ _V2(c) for c in obj.bound_box]
+                ex = (max(c.x for c in cs) - min(c.x for c in cs)) * 1000
+                ey = (max(c.y for c in cs) - min(c.y for c in cs)) * 1000
+                ez = (max(c.z for c in cs) - min(c.z for c in cs)) * 1000
+                dims = sorted([ex, ey, ez])
+                if dims[2] > 8000 and dims[1] < 700 and dims[0] < 700:   # long + thin = a "line"
+                    zc = sum(c.z for c in cs) / 8 * 1000
+                    thin.append((round(dims[2] / 1000, 1), round(zc), obj.name))
+            print("[univ][inventory] mesh families: " + ", ".join(
+                f"{k}={v}" for k, v in sorted(fam.items(), key=lambda x: -x[1])[:18]))
+            print(f"[univ][inventory] THIN+LONG 'line' meshes (>8 m long, <0.7 m thick): {len(thin)}")
+            for L, zc, nm in sorted(thin, reverse=True)[:30]:
+                print(f"   len={L:>5}m zc={zc:>5}mm  {nm}")
+        except Exception as _ie:
+            print(f"[univ][inventory] skipped: {_ie}")
     return bad
 
 
@@ -8279,6 +8308,23 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
         if service == "assembly":
             skipped.append({"edge": edge_lbl, "reason": "assembly mount (not a routable connection)"})
             continue
+        # HERO DECLUTTER (Tristan 2026-06-22): a 3-D hero does NOT draw every instrument
+        # power + signal SPUR — the thin red(power)/green(signal) lines to sensing/control
+        # sub-components are the "random lines from nowhere to nowhere, going through the
+        # tanks" (that wiring belongs on the P&ID, not the 3-D model). Skip any edge whose
+        # endpoint is a PURE INSTRUMENT. DEFAULT ON; BLENDER_WIRE_INSTRUMENTS=1 restores it.
+        if os.environ.get("BLENDER_WIRE_INSTRUMENTS", "").strip().lower() \
+                not in ("1", "true", "yes", "on"):
+            _fp, _tp = by_name.get(frm), by_name.get(to)
+            # (a) any spur to/from a sub-component (instrument/control), AND (b) any SIGNAL/
+            # CONTROL/DATA cable at all — instrument & control wiring belongs on the P&ID, not
+            # the 3-D hero; drawing it is the thin-line clutter (Tristan 2026-06-22). Fluid +
+            # power-to-principals stay. Universal — mechanism/module keyed, no class table.
+            if (_fp is not None and _is_subcomponent_part(_fp)) \
+                    or (_tp is not None and _is_subcomponent_part(_tp)) \
+                    or str(mech).lower() in ("signal", "control", "data"):
+                skipped.append({"edge": edge_lbl, "reason": "hero-declutter: I&C/sub-component spur"})
+                continue
         src_part = by_name.get(frm)
         dst_part = by_name.get(to)
         # An endpoint with no placed-and-ported part is an abstract battery-limit
@@ -8498,9 +8544,149 @@ def _layout_is_envelope(p):
             and (fx * fy >= 200e6 or (max(fx, fy) >= 25000 and min(fx, fy) >= 6000)))
 
 
-_FIELD_INSTRUMENT_MODULES = {"sensing_instrumentation"}
+_FIELD_INSTRUMENT_MODULES = {"sensing_instrumentation", "safety_protection"}
+
+
+def _is_subcomponent_part(p):
+    """UNIVERSAL test (no class table): a part that is a SUB-COMPONENT — an instrument,
+    sensor, alarm, safety device, or control/LV-electrical part — that should be mounted on
+    its parent / housed in the control cabinet, NOT placed + wired as standalone principal
+    equipment (Tristan 2026-06-22). Keyed on the decomposition MODULE + a generic control
+    vocabulary, so it holds for any archetype's I&C + control system."""
+    if getattr(p, "_consolidated", False):
+        return True
+    if p.module_id in ("sensing_instrumentation", "safety_protection",
+                       "control_compute_communication"):
+        return True
+    nm = (p.name or "").lower()
+    if p.module_id == "power_distribution" and any(t in nm for t in _CONTROL_NAME_TOKENS) \
+            and not any(k in nm for k in _CONTROL_KEEP_TOKENS):
+        return True
+    return False
 _MOUNT_HOST_MODULES = {"mass_fluid_transport_process", "water_treatment_system",
                        "environmental_interface", "actuation_kinematics"}
+
+
+def _ground_floaters(parts):
+    """UNIVERSAL 'nothing floats' pass (Tristan 2026-06-22). Any EQUIPMENT part whose drawn
+    mesh BOTTOM hangs > 700 mm above the deck datum is dropped straight down so it sits on the
+    deck. Pipes / routes / frame / the deck itself are excluded (they legitimately fly). Keyed
+    on the Z gap only — no class table. Returns the count grounded + names."""
+    _V = __import__("mathutils").Vector
+    skip = ("u_pipe_", "u_route_", "u_wire_", "u_skid_", "u_ground_", "u_rack_",
+            "u_grid_", "u_datum_", "u_dim_")
+    # group objects by part prefix → each part's mesh-bottom across all its objects
+    grounded = []
+    for p in parts:
+        pref = _part_prefix(p.name)
+        objs = [o for o in bpy.data.objects
+                if o.name.startswith(pref) and getattr(o, "type", None) == "MESH"
+                and o.data is not None and not any(o.name.startswith(s) for s in skip)]
+        if not objs:
+            continue
+        zmin = None
+        for o in objs:
+            for c in o.bound_box:
+                wz = (o.matrix_world @ _V(c)).z * 1000.0
+                zmin = wz if zmin is None else min(zmin, wz)
+        if zmin is not None and zmin > DECK_Z_MM + 700.0:
+            dz = (DECK_Z_MM - zmin) * fl.MM        # drop so the bottom rests on the deck
+            for o in objs:
+                o.location = (o.location[0], o.location[1], o.location[2] + dz)
+            if getattr(p, "placed_xyz_mm", None):
+                p.placed_xyz_mm = (p.placed_xyz_mm[0], p.placed_xyz_mm[1],
+                                   p.placed_xyz_mm[2] + dz / fl.MM)
+            grounded.append(p.name)
+    if grounded:
+        print(f"[univ][layout] grounded {len(grounded)} floating part(s) onto the deck: "
+              f"{grounded[:8]}")
+    return len(grounded)
+
+
+def _delete_part_meshes(p):
+    """Remove every BLENDER object a part created (matched by build_part's name prefix +
+    its qty-N manifold u_pipe_ prefix). Returns the count removed."""
+    pref = _part_prefix(p.name)
+    mpref = "u_pipe_" + pref
+    n = 0
+    for obj in list(bpy.data.objects):
+        if obj.name.startswith(pref) or obj.name.startswith(mpref):
+            try:
+                bpy.data.objects.remove(obj, do_unlink=True)
+                n += 1
+            except (RuntimeError, ReferenceError):
+                pass
+    return n
+
+
+def _scale_part_mesh(p, factor):
+    """Uniformly scale every BLENDER object of a part about the part's placed centre by
+    `factor` — used to shrink an oversized instrument so it reads as a small field device,
+    not a tank. Centre (placed_xyz) is unchanged."""
+    if factor <= 0 or abs(factor - 1.0) < 1e-3 or not getattr(p, "placed_xyz_mm", None):
+        return
+    pref = _part_prefix(p.name)
+    c = (p.placed_xyz_mm[0] * fl.MM, p.placed_xyz_mm[1] * fl.MM, p.placed_xyz_mm[2] * fl.MM)
+    for obj in bpy.data.objects:
+        if not obj.name.startswith(pref):
+            continue
+        obj.scale = tuple(s * factor for s in obj.scale)
+        obj.location = tuple(c[i] + (obj.location[i] - c[i]) * factor for i in range(3))
+
+
+_CONTROL_MODULES = {"control_compute_communication"}
+_CONTROL_NAME_TOKENS = ("busbar", "breaker", "relay", "switchgear", "switch", "gateway",
+                        "ups", "controller", "scada", "i/o", "i o", "io module", "module",
+                        "power supply", "panel", "cabinet", "interlock", "network",
+                        "distribution board", "plc", "rtu", "marshalling")
+_CONTROL_KEEP_TOKENS = ("generator", "genset", "transformer", "diesel", "alternator",
+                        "switchboard mv", "inverter")   # real principal electrical plant
+
+
+def _consolidate_control_cabinet(parts, MAT, MO):
+    """Tristan 2026-06-22: the control system is ONE cabinet, not 10 scattered boxes each
+    individually wired. Collapse every control sub-component (the I&C + small LV electrical
+    parts — busbar, breaker, relay, I/O, switch, gateway, UPS, controller, SCADA) into a
+    SINGLE control-cabinet enclosure: delete their individual meshes, draw one cabinet, and
+    move their placed_xyz onto the cabinet so the slab + wiring treat them as one unit. Real
+    principal plant (generator/transformer) is NEVER consolidated. Returns the count folded."""
+    def _is_control(p):
+        nm = (p.name or "").lower()
+        if any(k in nm for k in _CONTROL_KEEP_TOKENS):
+            return False
+        if p.module_id in _CONTROL_MODULES:
+            return True
+        if p.module_id == "power_distribution" and any(t in nm for t in _CONTROL_NAME_TOKENS):
+            return True
+        return False
+    ctrl = [p for p in parts if _is_control(p) and getattr(p, "placed_xyz_mm", None)]
+    if len(ctrl) < 2:
+        return 0
+    # cabinet footprint at the control cluster's edge of the plant (its own centroid)
+    cx = sum(p.placed_xyz_mm[0] for p in ctrl) / len(ctrl)
+    cy = sum(p.placed_xyz_mm[1] for p in ctrl) / len(ctrl)
+    n_units = len(ctrl)
+    cab_w = max(3000.0, min(8000.0, 900.0 * math.ceil(n_units / 2)))   # 2 tiers of bays
+    cab_d, cab_h = 1400.0, 2200.0
+    for p in ctrl:
+        _delete_part_meshes(p)
+        p.placed_xyz_mm = (cx, cy, cab_h / 2.0 + DECK_Z_MM)   # records now point at the cabinet
+        p._consolidated = True
+    mat = MAT.get("m_control_cabinet")
+    if mat is None:
+        mat = fl.make_mat("m_control_cabinet", (0.62, 0.64, 0.68), metallic=0.55, roughness=0.45)
+        MAT["m_control_cabinet"] = mat
+    base_z = DECK_Z_MM + cab_h / 2.0
+    fl.add_box("u_control_cabinet", (cx * fl.MM, cy * fl.MM, base_z * fl.MM),
+               (cab_w * fl.MM, cab_d * fl.MM, cab_h * fl.MM), mat, module=None, module_objects=MO)
+    # thin plinth so it reads as standing on the deck
+    fl.add_box("u_control_cabinet_plinth", (cx * fl.MM, cy * fl.MM, (DECK_Z_MM + 75.0) * fl.MM),
+               ((cab_w + 150) * fl.MM, (cab_d + 150) * fl.MM, 150.0 * fl.MM),
+               MAT.get("m_skid", mat), module=None, module_objects=MO)
+    print(f"[univ][layout] consolidated {n_units} control sub-component(s) into ONE control "
+          f"cabinet ({cab_w/1000:.1f}×{cab_d/1000:.1f}×{cab_h/1000:.1f} m) at "
+          f"({cx/1000:.1f}, {cy/1000:.1f})")
+    return n_units
 
 
 def _colocate_field_instruments(parts):
@@ -8536,12 +8722,30 @@ def _colocate_field_instruments(parts):
         host_load[best.name] = k + 1
         ang = k * 2.39996                          # golden angle → even radial spread
         hx, hy, _hz = best.placed_xyz_mm
-        tx, ty = hx + 2200.0 * math.cos(ang), hy + 2200.0 * math.sin(ang)
+        # SHRINK an oversized instrument first (a level switch / alarm wrongly sized as a
+        # 3 m vessel reads as a floating TANK — Tristan 2026-06-22). Field devices are small.
+        _ifx, _ify, _ = footprint_mm(resolved_dims_mm(ip))
+        _imax = max(_ifx, _ify)
+        if _imax > 900.0:
+            _scale_part_mesh(ip, 700.0 / _imax)
+        # mount at the HOST EDGE (host footprint radius + 600 mm) so it sits ON the host,
+        # not floating 2 m off-centre inside/beside a big vessel.
+        _hfx, _hfy, _ = footprint_mm(resolved_dims_mm(best))
+        _r = max(_hfx, _hfy) / 2.0 + 600.0
+        tx, ty = hx + _r * math.cos(ang), hy + _r * math.sin(ang)
         ix, iy, _iz = ip.placed_xyz_mm
         dx, dy = tx - ix, ty - iy
-        if abs(dx) < 1.0 and abs(dy) < 1.0:
-            continue
-        _shift_part_xy(ip, dx, dy, moved)
+        if abs(dx) >= 1.0 or abs(dy) >= 1.0:
+            _shift_part_xy(ip, dx, dy, moved)
+        # GROUND it in Z — a field instrument hung at its old mid-air Z reads as a floating
+        # box (Tristan 2026-06-22). Drop its meshes so the part sits ~0.5 m off the deck.
+        _pref = _part_prefix(ip.name)
+        _dz = (DECK_Z_MM + 500.0) - ip.placed_xyz_mm[2]
+        if abs(_dz) > 1.0:
+            for _o in bpy.data.objects:
+                if _o.name.startswith(_pref):
+                    _o.location = (_o.location[0], _o.location[1], _o.location[2] + _dz * fl.MM)
+            ip.placed_xyz_mm = (ip.placed_xyz_mm[0], ip.placed_xyz_mm[1], DECK_Z_MM + 500.0)
         n += 1
     if n:
         print(f"[univ][layout] co-located {n} field instrument(s) onto process equipment "
@@ -8663,6 +8867,23 @@ def add_ground_slab(parts, MAT, MO, bbox_mm=None):
         eb = equipment_bbox_mm(parts, margin_mm=GROUND_SLAB_MARGIN_MM)
     else:
         eb = {"x0": _x0 - _m, "x1": _x1 + _m, "y0": _y0 - _m, "y1": _y1 + _m}
+    # DEFINITIVE per-part coverage test (Tristan 2026-06-22: stop reporting slab SIZE, test
+    # that every part actually STANDS on it). Any part whose footprint pokes past eb → the
+    # slab is EXPANDED to include it, then we assert zero uncovered. No part may dangle.
+    for _p in parts:
+        if not getattr(_p, "placed_xyz_mm", None):
+            continue
+        _cx, _cy = _p.placed_xyz_mm[0], _p.placed_xyz_mm[1]
+        _fx, _fy, _ = footprint_mm(resolved_dims_mm(_p))
+        eb["x0"] = min(eb["x0"], _cx - _fx / 2 - _m)
+        eb["x1"] = max(eb["x1"], _cx + _fx / 2 + _m)
+        eb["y0"] = min(eb["y0"], _cy - _fy / 2 - _m)
+        eb["y1"] = max(eb["y1"], _cy + _fy / 2 + _m)
+    _uncov = [getattr(_p, "name", "?") for _p in parts if getattr(_p, "placed_xyz_mm", None)
+              and not (eb["x0"] <= _p.placed_xyz_mm[0] <= eb["x1"]
+                       and eb["y0"] <= _p.placed_xyz_mm[1] <= eb["y1"])]
+    print(f"[univ][ground] per-part slab coverage: {len(parts)} parts, "
+          f"{len(_uncov)} centre(s) off slab" + (f" → {_uncov[:6]}" if _uncov else " (all on)"))
     w = max(1000.0, eb["x1"] - eb["x0"])
     d = max(1000.0, eb["y1"] - eb["y0"])
     cx = (eb["x0"] + eb["x1"]) / 2.0
@@ -8682,6 +8903,54 @@ def add_ground_slab(parts, MAT, MO, bbox_mm=None):
     print(f"[univ][ground] STAGE 4 floor — concrete deck {w/1000.0:.1f}×{d/1000.0:.1f} m, "
           f"{GROUND_SLAB_THICK_MM/1000.0:.2f} m thick, top at DECK_Z={DECK_Z_MM} mm "
           f"(plant sits on it)")
+    # DEFINITIVE coverage test against the ACTUAL DRAWN MESHES (not part records — those kept
+    # disagreeing with the render). Any equipment mesh whose XY footprint pokes past the drawn
+    # slab is named; the slab is then re-grown + redrawn to swallow it, and we re-test. No
+    # equipment may overhang the deck. (Tristan 2026-06-22: "it blatantly doesn't cover it".)
+    try:
+        _SK2 = _SKIP + ("u_control_cabinet",)   # cabinet sits on the deck, judged by centre
+        def _offslab(gx0, gx1, gy0, gy1):
+            """meshes whose ORIGIN (drawn XY centre) falls outside the KNOWN slab rectangle.
+            Uses object translation, NOT bound_box (bound_box read HALF the real size here —
+            that bug made the check shrink a correct slab; Tristan 2026-06-22)."""
+            bad = []
+            for o in bpy.data.objects:
+                if getattr(o, "type", None) != "MESH" or o.data is None:
+                    continue
+                if o.name.startswith("u_ground_") or any(o.name.startswith(s) for s in _SK2):
+                    continue                      # the slab itself + pipes/frame/rack (above deck)
+                t = o.matrix_world.translation
+                mcx, mcy = t.x * 1000.0, t.y * 1000.0
+                if not (gx0 <= mcx <= gx1 and gy0 <= mcy <= gy1):
+                    bad.append((o.name, round(mcx), round(mcy)))
+            return bad
+        # slab rectangle is KNOWN from the draw (cx,cy,w,d) — no bound_box guesswork.
+        gx0, gx1, gy0, gy1 = cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2
+        bad = _offslab(gx0, gx1, gy0, gy1)
+        for _it in range(4):
+            if not bad:
+                break
+            for _nm, mcx, mcy in bad:
+                gx0 = min(gx0, mcx - _m); gx1 = max(gx1, mcx + _m)
+                gy0 = min(gy0, mcy - _m); gy1 = max(gy1, mcy + _m)
+            cx, cy = (gx0 + gx1) / 2.0, (gy0 + gy1) / 2.0
+            w, d = gx1 - gx0, gy1 - gy0
+            for o in list(bpy.data.objects):       # REDRAW (delete + re-add), never rescale
+                if o.name.startswith("u_ground_slab"):
+                    bpy.data.objects.remove(o, do_unlink=True)
+            slab = fl.add_box("u_ground_slab", (cx * fl.MM, cy * fl.MM, z_centre * fl.MM),
+                              (w * fl.MM, d * fl.MM, GROUND_SLAB_THICK_MM * fl.MM),
+                              MAT[mkey], module="structure_containment", module_objects=MO)
+            bad = _offslab(gx0, gx1, gy0, gy1)
+        if bad:
+            print(f"[univ][ground] coverage STILL OFF — {len(bad)} equipment mesh centre(s) off:")
+            for _nm, mcx, mcy in bad[:12]:
+                print(f"   OFF-SLAB {_nm} centre=({mcx},{mcy})")
+        else:
+            print(f"[univ][ground] coverage VERIFIED — 0 equipment centres off the deck "
+                  f"({w/1000.0:.1f}×{d/1000.0:.1f} m at ({cx/1000.0:.1f},{cy/1000.0:.1f}))")
+    except Exception as _e:
+        print(f"[univ][ground] coverage check skipped: {_e}")
     return slab
 
 
@@ -8732,6 +9001,18 @@ def place_process_plant(parts, regions, topology, MAT, MO):
             _colocate_field_instruments(parts)
         except Exception as _e:
             print(f"[univ][layout] instrument co-locate skipped (error): {_e}")
+    # Control system → ONE cabinet (Tristan 2026-06-22). Universal: keys on the I&C +
+    # control decomposition modules, no class table. Kill: CHAIN_SKIP_CONTROL_CABINET=1.
+    if os.environ.get("CHAIN_SKIP_CONTROL_CABINET", "") in ("", "0", "false", "no"):
+        try:
+            _consolidate_control_cabinet(parts, MAT, MO)
+        except Exception as _e:
+            print(f"[univ][layout] control-cabinet consolidate skipped (error): {_e}")
+    # UNIVERSAL 'nothing floats' — drop any equipment mesh hanging above the deck onto it.
+    try:
+        _ground_floaters(parts)
+    except Exception as _e:
+        print(f"[univ][layout] ground-floaters skipped (error): {_e}")
 
     # 5. TALL braced skid frame that HUGS THE EQUIPMENT BULK (Fix 1, FRAME FIT).
     #    BOTH the footprint AND the height target come from the NON-tall equipment
@@ -8742,11 +9023,14 @@ def place_process_plant(parts, regions, topology, MAT, MO):
                   if p.anchors and not is_tall_for_frame(p)]
     tallest = max(equip_tops) if equip_tops else SKID_FRAME_MIN_HEIGHT_MM
     frame_h = max(SKID_FRAME_MIN_HEIGHT_MM, tallest * SKID_FRAME_HEIGHT_FRAC)
-    build_skid_frame(equip_bbox, frame_h, MAT, MO)
-
-    # 5b. PHYSICAL PIPE-RACK STRUCTURE (Fix 2): light grey beams + posts at the
-    #     shared rack elevation so the overhead pipes visibly rest on a rack.
-    build_pipe_rack(equip_bbox, frame_h, MAT, MO)
+    # The SKID FRAME + PIPE RACK are thin decorative steel (u_skid_*rail*/cross + u_rack_
+    # stringers). On a clean hero they render as a spray of thin "random lines" lying on the
+    # floor + overhead (Tristan 2026-06-22: "random lines … not connected to anything") — the
+    # slab already grounds the plant and pipes route port-to-port independently of the rack,
+    # so the skeleton adds clutter, not meaning. DEFAULT OFF; BLENDER_SKID_FRAME=1 restores it.
+    if os.environ.get("BLENDER_SKID_FRAME", "").strip().lower() in ("1", "true", "yes", "on"):
+        build_skid_frame(equip_bbox, frame_h, MAT, MO)
+        build_pipe_rack(equip_bbox, frame_h, MAT, MO)
 
     # 6. route topology on a real OVERHEAD PIPE-RACK SPINE. FLOW LAYOUT: the spine
     #    runs through the MIDDLE of the process TRAIN (the flow regions) so flow
@@ -13514,6 +13798,16 @@ def main():
         fl.add_lights(target_centre=(cx, cy, span * 0.28),
                       fill_energy=240, fill_size=max(14.0, span * 0.6))
         fl.make_world_white()
+        # Purge DELETED objects from the module-objects lists — the control-cabinet
+        # consolidation + phantom-route deletion removed meshes still referenced in MO, and
+        # run_render_pipeline's palette pass would hit a removed StructRNA (ReferenceError).
+        def _alive(o):
+            try:
+                return o.name in bpy.data.objects
+            except (ReferenceError, RuntimeError):
+                return False
+        for _k in list(MO.keys()):
+            MO[_k] = [_o for _o in MO[_k] if _alive(_o)]
         # 8. render the production PDF set (hero + per-module), bespoke visual bar.
         fl.run_render_pipeline(out_dir, MO,
                                structure_module_id=STRUCTURE_MODULE_ID,
