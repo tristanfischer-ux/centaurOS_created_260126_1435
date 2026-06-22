@@ -8485,11 +8485,15 @@ def place_process_plant(parts, regions, topology, MAT, MO):
         _PLANT_FLOW_PLAN = None
     print(f"[univ] plant bbox (mm): {bbox}")
 
-    # 4b. UNIVERSAL LAYOUT OPTIMISER (opt-in: LAYOUT_OPTIMISE=1). Re-flow the placed
-    #     equipment to the deterministic CRAFT minimum-weighted-pipe-run layout
-    #     (the connection ledger is the weighted input). The skid frame + pipe rack +
-    #     routing below all re-derive from the (now tighter) bbox + part anchors.
-    if os.environ.get("LAYOUT_OPTIMISE", "") not in ("", "0", "false", "no"):
+    # 4b. UNIVERSAL LAYOUT OPTIMISER (DEFAULT-ON 2026-06-22, Tristan's call; LAYOUT_OPTIMISE=0
+    #     to disable). Re-flow the placed equipment to the deterministic CRAFT minimum-weighted-
+    #     pipe-run layout (the connection ledger is the weighted input) so connected parts sit
+    #     NEAR each other — the skid frame + pipe rack + routing below re-derive from the (now
+    #     tighter) bbox + anchors. Validated on RAS: pipe run −36% (2860→1828 m), same-elevation
+    #     crossings 45→10, footprint +2% (just more square) — the decisive fix for the
+    #     "spread-out plant → long flying pipe runs" clutter. try/except below makes it a no-op
+    #     on any layout it can't improve. Only reached on the process-plant placement path.
+    if os.environ.get("LAYOUT_OPTIMISE", "1").strip().lower() not in ("0", "false", "no", "off"):
         try:
             bbox = _apply_layout_optimiser(parts, topology, bbox)
             print(f"[univ] plant bbox after layout-optimise (mm): {bbox}")
