@@ -751,7 +751,18 @@ def _name_head(name):
     return re.sub(r"\([^)]*\)", " ", str(name)).strip().lower()
 
 
-def classify_shape(name, form):
+_INSTRUMENT_SHAPE_MODULES = ("sensing_instrumentation", "safety_protection",
+                             "control_compute_communication")
+
+
+def classify_shape(name, form, module_id=""):
+    # 0. I&C / control / safety parts are small DEVICES — a level switch, an analyser, a
+    #    relay — NEVER vessels, even when the name carries a vessel noun ("LOX TANK Level +
+    #    Low Alarm" is a level sensor, not a 3.7 m tank; "UV Transmittance Monitor" is not a
+    #    vessel). The module is the authority over the misleading name (Tristan 2026-06-22:
+    #    "there is a problem with the dimensions … whether things are cylinders or rectangles").
+    if module_id in _INSTRUMENT_SHAPE_MODULES:
+        return "instrument"
     head = _name_head(name)
     # 1. explicit small-device head nouns win (anti-qualifier-hijack)
     for pattern, kind in _DEVICE_HEAD_RE:
@@ -829,7 +840,7 @@ def extract_parts(state):
                     if mc.get("kind") == "quantity":
                         qty = parse_quantity(mc.get("value"))
                         break
-                shape = classify_shape(name, form)
+                shape = classify_shape(name, form, module_id)
                 parts.append(Part(name, module_id, region_key, rank, shape, dim, qty, form))
     # A qty-N big VESSEL/TANK is replicated DOWNSTREAM in build_part (one Part, N
     # instances drawn as a compact grid, each with a unique object base-name) so the
@@ -2046,6 +2057,14 @@ def resolved_dims_mm(part):
     # (build_part replicates _VESSEL_KIND shapes into a cols×rows grid). Harmless for
     # all other shapes / qty-1 parts (footprint_mm only consumes it for vessels).
     rd["_qty"] = qty
+    # CAP an instrument's geometry — a field device (sensor / transmitter / analyser / relay)
+    # is small regardless of a bad dimension modifier (a "Voltage Sensor" tagged 1.28 m is
+    # data noise, not a 1.3 m box). Clamp every axis to ≤600 mm so a stray dim can't render a
+    # device as a vessel-scale block (Tristan 2026-06-22). Universal — shape-keyed.
+    if shape == "instrument":
+        for _k in ("dia_mm", "len_mm", "w_mm", "d_mm", "h_mm"):
+            if rd.get(_k):
+                rd[_k] = min(float(rd[_k]), 600.0)
     return rd
 
 
@@ -4873,6 +4892,12 @@ def build_parts_manifest(parts):
                         "h": round(sd.get("h_mm") or h, 1)}
             else:
                 dims = {"w": round(w, 1), "d": round(dep, 1), "h": round(h, 1)}
+        # An INSTRUMENT's reported dims must match its capped render geometry (≤600 mm) — the
+        # box branch above reports the RAW part.dim, which for a mis-tagged device (Voltage
+        # Sensor @1.28 m) re-introduces the vessel-scale size the render already capped. Cap
+        # here too so the BoM/GA agree with the model (Tristan 2026-06-22).
+        if p.shape == "instrument":
+            dims = {k: round(min(float(v), 600.0), 1) for k, v in dims.items()}
         rows.append({
             "tag": pref,
             "equipment_tag": equip_tag,
