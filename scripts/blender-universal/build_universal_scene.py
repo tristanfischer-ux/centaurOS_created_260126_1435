@@ -8664,6 +8664,27 @@ def _ground_floaters(parts):
     return len(grounded) + strays
 
 
+def _hide_field_instruments(parts):
+    """HERO declutter (Tristan 2026-06-22, chose 'hide them in the hero'): drop the small
+    field instruments (shape=='instrument') from the 3-D model — once their wiring is
+    suppressed they read as orphan cubes 'dangling nowhere', and a 3-D plant hero belongs to
+    the principal equipment; the instruments live on the P&ID + BoM, not the model. They stay
+    in `parts` (BoM unaffected). DEFAULT ON; SHOW_FIELD_INSTRUMENTS=1 keeps them. Universal —
+    shape-keyed, no class table."""
+    if os.environ.get("SHOW_FIELD_INSTRUMENTS", "").strip().lower() in ("1", "true", "yes", "on"):
+        return 0
+    n = 0
+    for p in parts:
+        if getattr(p, "shape", None) == "instrument":
+            if _delete_part_meshes(p):
+                n += 1
+            p._consolidated = True   # so the coverage/route checks skip it (no mesh anyway)
+    if n:
+        print(f"[univ][layout] hid {n} field instrument(s) from the hero (on the P&ID/BoM, "
+              f"not the 3-D model)")
+    return n
+
+
 def _delete_part_meshes(p):
     """Remove every BLENDER object a part created (matched by build_part's name prefix +
     its qty-N manifold u_pipe_ prefix). Returns the count removed."""
@@ -9087,6 +9108,11 @@ def place_process_plant(parts, regions, topology, MAT, MO):
             _consolidate_control_cabinet(parts, MAT, MO)
         except Exception as _e:
             print(f"[univ][layout] control-cabinet consolidate skipped (error): {_e}")
+    # HIDE field instruments from the hero (they live on the P&ID/BoM, not the 3-D model).
+    try:
+        _hide_field_instruments(parts)
+    except Exception as _e:
+        print(f"[univ][layout] hide-instruments skipped (error): {_e}")
     # UNIVERSAL 'nothing floats' — drop any equipment mesh hanging above the deck onto it.
     try:
         _ground_floaters(parts)
