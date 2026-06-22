@@ -535,10 +535,10 @@ MECH_DEFAULT_COLOUR = (0.50, 0.52, 0.56)
 # (key, sRGB, metallic, roughness). The flat INSPECT=1 render uses INSPECT_TYPE_COLOUR instead,
 # so this only changes the photoreal render. UNIVERSAL — keyed on shape, no class table.
 SHAPE_MAT = {
-    "tall_column":       ("col",      (0.79, 0.81, 0.85), 0.90, 0.24),  # stainless column
-    "tall_vessel":       ("reactor",  (0.78, 0.80, 0.84), 0.88, 0.26),  # stainless reactor
-    "vertical_vessel":   ("vessel",   (0.80, 0.82, 0.86), 0.88, 0.26),  # stainless vessel
-    "horizontal_vessel": ("vessel",   (0.80, 0.82, 0.86), 0.88, 0.26),  # stainless drum
+    "tall_column":       ("col",      (0.74, 0.76, 0.80), 0.55, 0.42),  # BRUSHED stainless column
+    "tall_vessel":       ("reactor",  (0.73, 0.75, 0.79), 0.52, 0.44),  # brushed reactor
+    "vertical_vessel":   ("vessel",   (0.75, 0.77, 0.81), 0.52, 0.44),  # brushed stainless vessel
+    "horizontal_vessel": ("vessel",   (0.75, 0.77, 0.81), 0.52, 0.44),  # brushed stainless drum
     "compressor":        ("comp",     (0.28, 0.38, 0.50), 0.55, 0.38),  # painted steel
     "pump":              ("pump",     (0.18, 0.40, 0.60), 0.45, 0.40),  # painted cast-iron (blue)
     "tank":              ("tank",     (0.60, 0.68, 0.74), 0.25, 0.42),  # GRP / painted tank
@@ -14196,7 +14196,8 @@ def main():
                 except (AttributeError, TypeError):
                     pass
             _bg = _nt.nodes.new("ShaderNodeBackground")
-            _bg.inputs["Strength"].default_value = 0.45
+            _bg.inputs["Strength"].default_value = 0.14   # subtle — just reflection + gradient,
+            #                                               not a wash (0.45 blew the metals out)
             _ow = _nt.nodes.new("ShaderNodeOutputWorld")
             _nt.links.new(_sky.outputs[0], _bg.inputs[0])
             _nt.links.new(_bg.outputs[0], _ow.inputs[0])
