@@ -321,6 +321,63 @@ def _name_tokens(s: str) -> set:
     return {t for t in re.split(r"[^a-z0-9]+", (s or "").lower()) if len(t) > 2}
 
 
+def _pid_norm(s) -> str:
+    """Normalise an equipment name for the manifest tag join (NFKC so 'O₂'→'O2',
+    lowercase, collapse non-alnum)."""
+    import unicodedata
+    return re.sub(r"[^a-z0-9]+", " ",
+                  unicodedata.normalize("NFKC", str(s or "")).lower()).strip()
+
+
+def _tag_num(tag: str) -> int:
+    """The trailing running number of an ISA tag ('TK-104'→104, 'B-201'→201) for picking
+    the array's representative (lowest-numbered) tag; large default keeps unparseable last."""
+    m = re.search(r"(\d+)\s*$", str(tag or ""))
+    return int(m.group(1)) if m else 10**9
+
+
+def _build_manifest_tag_index(out_dir):
+    """{normalised_name: equipment_tag} from the parts-manifest — the SAME tag the GA / BoM /
+    Excel carry — so the P&ID/BFD/iso node uses ONE identity per part instead of minting its
+    own sequential tag (Tristan 2026-06-22, the 4th-namespace fix: UV Sterilization must be
+    V-101 in the drawings too, not X-103). For a qty-N array the LOWEST-numbered instance is
+    the node's representative tag (TK-101 for the rearing-tank bank). Returns {} when absent."""
+    idx: dict[str, str] = {}
+    if not out_dir:
+        return idx
+    for r in (_load_parts_manifest(out_dir).get("parts") or []):
+        nm = _pid_norm(r.get("name"))
+        tg = r.get("equipment_tag")
+        if not nm or not tg:
+            continue
+        if nm not in idx or _tag_num(tg) < _tag_num(idx[nm]):
+            idx[nm] = tg
+    return idx
+
+
+def _resolve_manifest_tag(name, idx):
+    """The manifest equipment_tag for a node `name`: exact normalised match first, then a
+    TOKEN-SUBSET fallback so a generic node label still resolves ('MBBR biofilter'→'Biofilter'
+    via {biofilter}⊆{mbbr,biofilter}; 'CO2 degasser'→'Degasser'). None when nothing matches."""
+    if not idx:
+        return None
+    n = _pid_norm(name)
+    if n in idx:
+        return idx[n]
+    ntok = {t for t in n.split() if len(t) > 2}
+    if not ntok:
+        return None
+    best = None
+    for mn, tg in idx.items():
+        mtok = {t for t in mn.split() if len(t) > 2}
+        if mtok and (mtok <= ntok or ntok <= mtok):
+            # prefer the most-specific (largest) token overlap; tie → lowest tag number
+            score = len(mtok & ntok)
+            if best is None or score > best[0] or (score == best[0] and _tag_num(tg) < _tag_num(best[1])):
+                best = (score, tg)
+    return best[1] if best else None
+
+
 def _array_groups_from_manifest(manifest: dict) -> list[dict]:
     """Group the parts-manifest into ARRAYS of identical units. A group = ≥2 manifest
     rows that share the SAME equipment NAME (e.g. 10 rows 'Rearing Tank') OR the same
@@ -360,6 +417,14 @@ def _match_array_group(node_key: str, node_label: str, groups: list[dict]):
     for g in groups:
         gtoks = set(g["name_tokens"])
         gtoks |= {t[:-1] for t in list(gtoks) if t.endswith("s") and len(t) > 3}
+        if not gtoks:
+            continue
+        # Require a SUBSET match (group tokens ⊆ node, or node ⊆ group) so a single shared
+        # GENERIC device noun ('pump' / 'tank' / 'filter') can't bind a Heat Pump node onto the
+        # Recirc Pump array (Tristan 2026-06-22: that mis-match gave Heat Pump the recirc tag +
+        # a phantom ×4 count). The distinctive token must agree.
+        if not (gtoks <= ntoks or ntoks <= gtoks):
+            continue
         score = len(ntoks & gtoks)
         if score > best_score:
             best_score, best = score, g
@@ -1461,14 +1526,21 @@ def reconstruct_process(schedule: dict, state: dict,
     tag_counters: dict[str, int] = {}
 
     def _next_tag(letter: str) -> str:
-        # ISA-ish sequential tag: letter + a per-letter running number (left→right).
-        tag_counters[letter] = tag_counters.get(letter, 100) + 1
+        # Fallback tag for an ABSTRACT process node with NO physical manifest part (e.g.
+        # "Oxygen cones"). Seeded at 900 (→ X-901…) so a fallback tag can NEVER collide with
+        # a real manifest equipment tag (P-101 / X-113 …) — P1 resolves every PHYSICAL node to
+        # its manifest tag; only true abstractions reach here. (Was 100, which collided.)
+        tag_counters[letter] = tag_counters.get(letter, 900) + 1
         return f"{letter}-{tag_counters[letter]}"
 
+    # P1 (Tristan 2026-06-22): resolve each node's tag from the parts-manifest by NAME so the
+    # P&ID/BFD/iso carry the SAME equipment tag as the GA/BoM/Excel (one identity everywhere);
+    # _next_tag is only the fallback for an abstract node the manifest doesn't carry.
+    _man_tag_idx = _build_manifest_tag_index(out_dir)
     for k in ordered:
         name = _resolve_word(k, eq_idx)
         sym, letter = _classify(k, name, has_exact_word=(k in eq_idx))
-        nd = Node(key=k, tag=_next_tag(letter),
+        nd = Node(key=k, tag=(_resolve_manifest_tag(name, _man_tag_idx) or _next_tag(letter)),
                   label=name, sym=sym, column=col_of.get(k, 0))
         nodes[k] = nd
 
