@@ -1737,6 +1737,25 @@ def _add_dished_head(nm, x_mm, y_mm, z_face_mm, dia_mm, direction, mat, mod, MO,
     return rise
 
 
+def _greeble_ladder(nm, cx_b, cy_b, r_b, z0_b, z1_b, steel, mod, MO):
+    """#4 (Tristan 2026-06-22): a CLEAN vertical access ladder on the +X face of a vessel/tank —
+    two stiles + rungs (add_cyl, so no add_box half-size issue). Deliberately NO cage hoops /
+    handrail ring: the busy per-tank furniture read as a 'scalloped blob' (mempalace render-
+    regression 2026-06-13). A thin one-sided ladder reads as 'engineered' without the blob."""
+    h = z1_b - z0_b
+    if h < 1.5:
+        return
+    lx = cx_b + r_b + 0.15
+    for s in (-1, 1):
+        fl.add_cyl(f"{nm}_ladrail{s:+d}", (lx, cy_b + s * 0.22, (z0_b + z1_b) / 2),
+                   0.025, h, steel, module=mod, module_objects=MO)
+    n = max(3, int(h / 0.30))
+    for k in range(n):
+        fl.add_cyl(f"{nm}_ladrung{k}", (lx, cy_b, z0_b + (k + 0.5) * h / n),
+                   0.018, 0.44, steel, module=mod, module_objects=MO,
+                   rotation=(math.radians(90), 0, 0))
+
+
 def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, MO,
                  MAT, lagged=False):
     """Deterministic process vessel = shell + two dished heads + a kind-specific
@@ -1825,6 +1844,7 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
         # 2026-06-13: "_add_vessel_nozzles … reads as random grey circles stuck on the
         # tanks" — WRONG for an open RAS tank, whose tie-ins come from the per-instance
         # MANIFOLD, not a pressure-vessel manway). Closed vessels below keep their nozzles.
+        _greeble_ladder(nm, x_mm * fl.MM, y_mm * fl.MM, r, z_bot, z_bot + body_h, steel, mod, MO)
         return {"root": shell, "name": nm}, anchors
 
     # ── VERTICAL families: column / reactor / vertical / bed ──
@@ -1876,6 +1896,7 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
     # vessels (skip the small bed/filter legs case — those are minor drums).
     if kind in ("column", "reactor", "vertical"):
         _add_vessel_nozzles(nm, anchors, dia_mm, kind, MAT, mod, MO)
+    _greeble_ladder(nm, x_mm * fl.MM, y_mm * fl.MM, r, z_bot, cz + body_h / 2, steel, mod, MO)
     return {"root": shell, "name": nm}, anchors
 
 
@@ -9048,9 +9069,57 @@ def build_plant_shell(parts, MAT, MO):
     # ── ROLLER door + PERSONNEL door on the front (S) wall ──
     _b("u_shell_rollerdoor", (cx - 3000, y0 - t * 0.4, z0 + 2300.0), (5200.0, t * 1.6, 4600.0), door)
     _b("u_shell_persondoor", (cx + 3200, y0 - t * 0.4, z0 + 1150.0), (1200.0, t * 1.6, 2300.0), door)
+    # ── #9 ARCHITECTURAL DETAIL (Tristan 2026-06-22; NOT in parts) ──
+    eave_z = z0 + H
+    for ey, gt in ((y0, "S"), (y1, "N")):                 # eave gutters
+        _b(f"u_shell_gutter_{gt}", (cx, ey, eave_z + 90), (w + 2 * t, 280, 240), trim)
+    dn = _mat("m_shell_downpipe", (0.50, 0.52, 0.56), metallic=0.5, roughness=0.5)
+    for dx, dy, dt in ((x0, y0, "SW"), (x1, y0, "SE"), (x0, y1, "NW"), (x1, y1, "NE")):
+        fl.add_cyl(f"u_shell_downpipe_{dt}", (dx * MM, dy * MM, (z0 + H / 2) * MM),
+                   0.11, H * MM, dn, module=None, module_objects=MO)
+    rl = _mat("m_shell_rooflight", (0.72, 0.83, 0.92), metallic=0.0, roughness=0.06)
+    for sgn in (1, -1):                                    # ridge rooflight strips
+        for k in range(3):
+            if w >= d:
+                _b(f"u_shell_rl_{sgn}_{k}", (x0 + w * (k + 1) / 4, cy + sgn * d * 0.22,
+                   eave_z + rise * 0.55), (w * 0.11, d * 0.20, 140), rl)
+            else:
+                _b(f"u_shell_rl_{sgn}_{k}", (cx + sgn * w * 0.22, y0 + d * (k + 1) / 4,
+                   eave_z + rise * 0.55), (w * 0.20, d * 0.11, 140), rl)
+    _b("u_shell_doortrack", (cx - 3000, y0 - t * 0.5, z0 + 4750), (5600, t * 1.8, 280), trim)
+    _b("u_shell_signage", (cx, y0 - t * 0.6, z0 + H * 0.80),
+       (min(w * 0.45, 9000), t * 0.5, 1500), _mat("m_shell_sign", (0.18, 0.34, 0.54),
+                                                   metallic=0.2, roughness=0.5))
+    for k in range(5):                                     # louvre vent bank (E wall)
+        _b(f"u_shell_louvre_{k}", (x1 + t * 0.3, cy - 2400 + k * 1200, z0 + H * 0.72),
+           (t * 0.6, 900, 180), trim)
+
+    # ── #8 SITE CONTEXT + SCALE (Tristan 2026-06-22; NOT in parts) ──
+    tar = _mat("m_site_tarmac", (0.17, 0.18, 0.20), metallic=0.0, roughness=0.92)
+    _b("u_site_tarmac", (cx, cy, z0 - 70), (w + 30000, d + 30000, 80), tar)
+    _b("u_site_road", (cx, y0 - d / 2 - 11000, z0 - 45),
+       (9000, 16000, 90), _mat("m_site_road", (0.13, 0.14, 0.16), metallic=0.0, roughness=0.93))
+    hivis = _mat("m_site_hivis", (0.96, 0.55, 0.05), metallic=0.0, roughness=0.7)
+    trouser = _mat("m_site_trouser", (0.20, 0.22, 0.28), metallic=0.0, roughness=0.7)
+    skin = _mat("m_site_skin", (0.78, 0.60, 0.50), metallic=0.0, roughness=0.6)
+    for i, (px, py) in enumerate(((cx - 1500, y0 - 3800), (cx + 1200, y0 - 5400),
+                                  (cx - 9000, y0 - 4200))):
+        fl.add_cyl(f"u_site_person{i}_legs", (px * MM, py * MM, (z0 + 350) * MM),
+                   0.15, 700 * MM, trouser, module=None, module_objects=MO)
+        _b(f"u_site_person{i}_torso", (px, py, z0 + 1250), (520, 360, 850), hivis)
+        fl.add_sphere(f"u_site_person{i}_head", (px * MM, py * MM, (z0 + 1780) * MM),
+                      0.16, skin, module=None, module_objects=MO)
+    # forklift near the road
+    fx, fy = cx + 10000, y0 - 8000
+    ylw = _mat("m_site_forklift", (0.95, 0.74, 0.05), metallic=0.3, roughness=0.5)
+    _b("u_site_fl_body", (fx, fy, z0 + 950), (1500, 2700, 1500), ylw)
+    _b("u_site_fl_cab", (fx, fy + 300, z0 + 2150), (1350, 1500, 1100), trim)
+    _b("u_site_fl_mast", (fx, fy - 1550, z0 + 1600), (1300, 220, 3200), trim)
+    for s in (-1, 1):
+        _b(f"u_site_fl_fork{s}", (fx + s * 420, fy - 2100, z0 + 170), (170, 1500, 130), trim)
     print(f"[univ][shell] ARCHITECTURAL building envelope {w/1000.0:.1f}×{d/1000.0:.1f} m, "
-          f"eave {H/1000.0:.1f} m + pitched roof (clad walls, plinth, glazing band, seams, "
-          f"corner trims, roller + personnel doors)")
+          f"eave {H/1000.0:.1f} m + pitched roof + #9 detail (gutters/downpipes/rooflights/"
+          f"signage/louvres) + #8 site (tarmac/road/people/forklift)")
     return 1
 
 

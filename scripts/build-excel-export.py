@@ -4738,12 +4738,26 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
                 return c
         return None
 
-    # 1. hero
+    # 1. hero (interior layout — the materialed render's 00-hero)
     hero = first_existing(os.path.join(run_dir, "00-hero.png"),
                           os.path.join(run_dir, "blender-cover.png"))
     if hero:
-        specs.append((hero, "Render — Hero",
-                      "Blender 3D render of the plant (geometry + layout; indicative, not photoreal)."))
+        specs.append((hero, "Render — Interior layout",
+                      "Blender 3D render — interior plant layout (no walls/roof), view 1."))
+    # 1b. SECOND interior angle + the EXTERIOR building views (Tristan 2026-06-22: the Excel was
+    #     missing the updated renders + the external building). The exterior set is rendered to
+    #     <run>/exterior/ from the SAME scene build (BLENDER_PLANT_SHELL=1).
+    _ext = os.path.join(run_dir, "exterior")
+    for _p, _ttl, _cap in (
+        (os.path.join(run_dir, "02-corner-FR.png"), "Render — Interior layout (view 2)",
+         "Interior plant layout — second angle."),
+        (os.path.join(_ext, "00-hero.png"), "Render — Building exterior",
+         "Architectural exterior of the building enclosing the plant, view 1."),
+        (os.path.join(_ext, "02-corner-FR.png"), "Render — Building exterior (view 2)",
+         "Architectural exterior — second angle."),
+    ):
+        if os.path.exists(_p):
+            specs.append((_p, _ttl, _cap))
 
     # 2. module renders — REMOVED (Tristan 2026-06-20): the per-module Blender
     # highlight renders (module-*.png) read as poor quality and their provenance was
