@@ -491,7 +491,11 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # equipment-schedule panel in the right gutter below the side elevation, so the
     # schedule never gets clipped or driven into the title block.
     n_sched_rows = max(8, min(len(parts), 16))
-    sched_bottom = (side_y + front_h + 56) + (20 + n_sched_rows * 13 + 8)
+    # the schedule sits BELOW the front elevation (which is below the plan) — NOT just below
+    # the plan TOP, or it covers the plan + front elevation (Tristan 2026-06-22: "the equipment
+    # schedule is hiding most of the plans and elevations").
+    sched_top = front_y + front_h + 56
+    sched_bottom = sched_top + (20 + n_sched_rows * 13 + 8)
     height = max(front_y + front_h + 64, sched_bottom + 24) + title_h
     width = int(math.ceil(width))
     height = int(math.ceil(height))
@@ -587,7 +591,7 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # 72-item list overran into the title block. Spanning the sheet width lets the
     # schedule lay out in multiple legible columns.
     key_x = margin
-    key_y = side_y + front_h + 56
+    key_y = sched_top                       # below the front elevation (see sched_top above)
     key_w = width - 2 * margin
     key_h_max = (height - title_h - 30) - key_y
     _draw_key(svg, parts, keynotes, key_x, key_y, key_x + key_w, key_h_max)

@@ -14179,9 +14179,10 @@ def main():
         #    procedural Nishita sky so metals/water reflect a real sky + get graduated ambient
         #    (the single biggest realism jump). Low strength so it lifts + reflects without
         #    blowing out; the add_lights() sun stays the controlled key. Universal, no file.
+        _scn = bpy.context.scene
         try:
             _sw = bpy.data.worlds.new("world_sky")
-            scene.world = _sw
+            _scn.world = _sw
             _sw.use_nodes = True
             _nt = _sw.node_tree
             for _n in list(_nt.nodes):
@@ -14204,8 +14205,8 @@ def main():
         # ── #3 QUALITY (Tristan 2026-06-22) — higher resolution + samples + AO. The early
         #    setup set 2400×1600/64; bump here (nothing resets between) for a crisper final.
         try:
-            scene.render.resolution_x, scene.render.resolution_y = 3000, 2000
-            _ev = getattr(scene, "eevee", None)
+            _scn.render.resolution_x, _scn.render.resolution_y = 3000, 2000
+            _ev = getattr(_scn, "eevee", None)
             if _ev is not None:
                 for _a, _v in (("taa_render_samples", 160), ("use_gtao", True),
                                ("gtao_distance", 0.6), ("gtao_factor", 1.0)):
