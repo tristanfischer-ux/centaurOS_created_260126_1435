@@ -486,7 +486,7 @@ function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
 // `recirculation_flow` (a SYSTEM flow → "-tion" process noun) from minting a bogus box
 // while `degasser_air_flow` (a device) correctly synthesises. No per-class table.
 const DEVICE_NOUNS = new Set([
-  'pump', 'fan', 'tank', 'vessel', 'column', 'tower', 'skid', 'unit', 'exchanger',
+  'pump', 'fan', 'tank', 'vessel', 'column', 'tower', 'skid', 'unit', 'exchanger', 'hex',
   'chiller', 'boiler', 'degasser', 'filter', 'blower', 'compressor', 'reactor',
   'clarifier', 'separator', 'stripper', 'mixer', 'press', 'membrane', 'sump',
   'basin', 'cone', 'scrubber', 'cyclone', 'centrifuge', 'hopper', 'silo', 'drum',
@@ -776,7 +776,7 @@ function completeness(g: EquipGroup): number {
 const PLACEMENT: { re: RegExp; module: RegExp }[] = [
   { re: /filter|biofil|degas|skim|clarif|\buv\b|ozone|treat|media|membran|aerat|settl|disinfe|steril/i, module: /water_treatment|treatment|process/i },
   { re: /pump|blower|compress|\bfan\b|manifold|\bpipe|flow|valve|duct/i, module: /mass_fluid|fluid|transport|process/i },
-  { re: /heat|chill|boiler|thermal|hvac|cool|refrig|exchang|dehumid|latent/i, module: /environment|thermal|interface/i },
+  { re: /heat|chill|boiler|thermal|hvac|cool|refrig|exchang|\bhex\b|\bhx\b|condenser|evaporator|dehumid|latent/i, module: /environment|thermal|interface/i },
   { re: /tank|vessel|reservoir|sump|basin|silo|hopper|column|tower|cone|enclos|frame|contain/i, module: /structure|contain|process/i },
 ]
 
@@ -1985,6 +1985,16 @@ function deriveService(w: WordLike, quantities: Record<string, number>): Service
   // 1) FOOTPRINT / PLAN-AREA driver + NO fluid capacity + NO 3-D vessel dimension →
   //    a STRUCTURAL, dry, atmospheric part (the £42M Structural Frame case: its driver
   //    is a `… m² footprint`, never a vessel). Decided by the DRIVER, not the name.
+  // 0) HEAT EXCHANGER — its m² is the HEAT-TRANSFER area (a thermal-process spec), NEVER a
+  //    building footprint, so it must not fall to the structural rule below. (The 'Makeup Hex'
+  //    abbreviation evaded the device classifier and was priced as structural tonnage in the
+  //    building module; the physics critic flagged the mis-placement.) A water/water plate HEX
+  //    is a fluid component on the process-water side. Universal: keyed off the exchanger noun.
+  if (/heat[\s-]?exchang|\bhx\b|\bhex\b|condenser|evaporator|\beconomiser\b|\binterchanger\b|recuperat/i.test(w.name_human ?? '')) {
+    const seawaterHx = /seawater|brine|marine|sea.?water|saline|titanium/i.test(w.name_human ?? '')
+    return { fluid: seawaterHx ? 'seawater' : 'process_water', phase: 'liquid', pressure_bar: 0, fabrication_family: 'fluid_vessel', criticality: 'standard' }
+  }
+
   const areaDriver = dimIsAreaDriver(dim) || /m²|m2\b/.test(ratingUnit)
   const hasVesselGeom = /m\s*dia/i.test(dim) || /\d\s*x\s*\d.*mm/i.test(dim)
   if (areaDriver && capM3 <= 0 && !hasVesselGeom) {

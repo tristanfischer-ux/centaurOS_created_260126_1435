@@ -12454,6 +12454,12 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     drum_filter_count: q(recircTrainCount, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `number of parallel drum-filter trains = ceil(recirculation_flow ÷ ${SINGLE_UNIT_FLOW_LIMIT_M3H} m³/h single-unit limit); each on the per-unit flow above` }),
 
     // ── Biofiltration (MBBR sized on TAN load) ──
+    // PROCESS WATER throughput = the FULL recirculating flow: the MBBR sits in the main loop
+    // and nitrifies ALL recirculated water continuously (this is the biofilter's headline duty;
+    // the aeration AIR below is a service, not its process rating). Without this key the
+    // synthesiser read the aeration air (≈10% of the loop) as the biofilter's flow rating and
+    // the physics critic correctly flagged the MBBR as treating only 10% of the flow.
+    biofilter_water_flow_m3_h: q(recirculationFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `full recirculating flow (${recirculationFlowM3H} m³/h) nitrified by the in-loop MBBR — media volume sized for the TAN load, the vessel passes the whole loop` }),
     biofilter_media_volume_m3: q(biofilterMediaVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'TAN_load ÷ ~0.35 kg TAN/m³ media/day (MBBR areal nitrification rate)' }),
     biofilter_tank_volume_m3: q(biofilterTankVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: 'media volume ÷ ~60% fill ratio (50-70% MBBR media fill)' }),
     biofilter_air_flow_m3_h: q(biofilterAirFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `MBBR aeration air = GREATER of media mixing (${biofilterMediaVolumeM3} m³ × 12 m³/h/m³) and the aeration O₂-transfer demand (${aerationO2TransferKgDay} kg/day ÷ ${o2TransferPerM3Air} kg O₂/m³ air) — so the blower genuinely transfers the gap-1 aeration O₂ path` }),
