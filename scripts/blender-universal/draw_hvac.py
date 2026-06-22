@@ -1772,7 +1772,7 @@ def _draw_title_block(svg, sysm, meta, scale_S, width, height, title_h):
     rows = [("DRAWING No.", "FF-HVAC-001"),
             ("REV", _tb.REV),
             ("DATE", _ISSUE_DATE or "—  "),
-            ("SCALE", f"1:{int(scale_S)}  (@ A3)")]
+            ("SCALE", f"1:{int(scale_S)}  (@ A1)")]
     rh = 22
     box_h = rh * len(rows)
     svg.rect(bx0, by0, bw, box_h, stroke=INK, width=1.3, fill=FILL_BG)

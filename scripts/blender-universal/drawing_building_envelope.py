@@ -121,6 +121,17 @@ def building_footprint_mm(state: dict, bbox: dict):
     raw_aspect = (max(eq_w, eq_d) / min(eq_w, eq_d)) if min(eq_w, eq_d) > 0 else 1.0
     aspect = max(1.0, min(raw_aspect, _MAX_BUILDING_ASPECT))   # long / short
 
+    # CLUSTERED plant (low aspect): the building ENCLOSES the equipment at full size — the SAME
+    # footprint the 3-D render's plant shell + the building-civils cost use (equipment extent +
+    # perimeter clearance). The slab-area hall (with the equipment scaled to fit) is reserved for
+    # a high-aspect RIBBON layout (the placer strung the kit into a line). The slab area
+    # undercounts a clustered hall, so using it made the HVAC/GA building disagree with the 3-D
+    # render (Tristan 2026-06-22 — "HVAC odd, not linked to the building"). Universal — keyed on
+    # layout aspect, never a product class.
+    _CLEARANCE_MM = 5000.0   # 2.5 m aisle each side (matches the render shell + the civils footprint)
+    if raw_aspect < 3.0:
+        return eq_w + _CLEARANCE_MM, eq_d + _CLEARANCE_MM
+
     # size a rectangle of the given aspect to the slab area: short·long = area, long =
     # aspect·short ⇒ short = sqrt(area/aspect).
     short = math.sqrt(area_mm2 / aspect)
