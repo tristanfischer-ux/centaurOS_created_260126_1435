@@ -120,6 +120,57 @@ def main(argv):
             if refs or literal_hits or t in NAME_TABS:
                 print(f"    {t:24s} refs={refs:4d}  unreferenced-name-literals={literal_hits:3d}{flag}")
 
+    # ── (3b) COMPREHENSIVE per-tab scan: every tab, principal identity coverage ──
+    if "Part names" in wb.sheetnames:
+        pn = wb["Part names"]
+        m_names, m_tags = set(), set()
+        for rr in range(5, pn.max_row + 1):
+            nv = pn.cell(rr, 2).value
+            tv = pn.cell(rr, 1).value
+            if isinstance(nv, str) and nv.strip():
+                m_names.add(_norm_name(nv))
+            if isinstance(tv, str) and tv.strip() and tv != "—":
+                m_tags.add(_norm_tag(tv))
+        m_names.discard("")
+        import re as _re
+        print("\n[3b] COMPREHENSIVE per-tab scan (every tab) — principal identities only")
+        print(f"     refs=live cell-link  ·  =id=standalone principal name/tag as LITERAL (fixable)"
+              f"  ·  ~prose=principal embedded in generated text")
+        print(f"     {'TAB':24s}{'refs':>6}{'=id':>6}{'~prose':>8}   verdict")
+        for t in wb.sheetnames:
+            ws2 = wb[t]
+            refs = standalone = prose = 0
+            for row in ws2.iter_rows():
+                for c in row:
+                    v = c.value
+                    if not isinstance(v, str) or not v.strip():
+                        continue
+                    if "'Part names'!" in v:
+                        refs += 1
+                        continue
+                    if v.startswith("="):
+                        continue
+                    nv = _norm_name(v)
+                    lv = v.strip().lower()
+                    if nv in m_names or lv in m_tags:
+                        standalone += 1          # the WHOLE cell is a principal id → should be a ref
+                    else:
+                        hit = any(len(mn) >= 6 and mn in nv for mn in m_names) or \
+                              any(_re.search(r"(?<![a-z0-9])" + _re.escape(tg) + r"(?![a-z0-9])", lv) for tg in m_tags)
+                        if hit:
+                            prose += 1
+            if not (refs or standalone or prose):
+                continue
+            if t in ("Part names", "Glossary"):
+                verdict = "n/a (master / definitions)"
+            elif standalone == 0 and prose == 0:
+                verdict = "FULLY REFERENCED"
+            elif standalone > 0:
+                verdict = f"GAP: {standalone} standalone principal id(s) as literal"
+            else:
+                verdict = "prose-embedded only (descriptive)"
+            print(f"     {t:24s}{refs:>6}{standalone:>6}{prose:>8}   {verdict}")
+
     # ── (4) BROKEN MASTER REFS ──
     if "Part names" in wb.sheetnames:
         maxr = wb["Part names"].max_row
