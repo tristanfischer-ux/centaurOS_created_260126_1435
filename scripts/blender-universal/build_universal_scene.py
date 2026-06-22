@@ -3924,6 +3924,59 @@ def _route_log_add(name, mech, waypoints, a_xy, b_xy, own_parts=()):
                        "own_bboxes": own})
 
 
+def audit_connection_geometry(parts, tol_mm=1400.0):
+    """DETERMINISTIC CONNECTION AUDIT (Tristan 2026-06-22): every drawn line MUST land on a
+    real part at BOTH ends — no line goes from nowhere to nowhere. Walks _ROUTE_LOG (every
+    emitted run) and tests each run's two ENDPOINTS against the placed parts' bboxes + ports.
+    Reports each endpoint that is NOT within tol of any part. Returns the list of offenders so
+    a caller can gate. This is the answer to 'how are you confirming all parts connect?'."""
+    import math as _m
+    tgts = []   # (label, cx,cy,cz, hx,hy,hz) — every valid landing target
+    for p in parts:
+        if getattr(p, "placed_xyz_mm", None) is None:
+            continue
+        bb = part_xy_bbox_mm(p)
+        cx, cy, cz = p.placed_xyz_mm
+        if bb is not None:
+            hx = (bb[2] - bb[0]) / 2.0 + tol_mm
+            hy = (bb[3] - bb[1]) / 2.0 + tol_mm
+        else:
+            hx = hy = 1500.0 + tol_mm
+        hz = 1e9   # ignore Z for the landing test (a riser can meet a nozzle at any height)
+        tgts.append((p.name, cx, cy, cz, hx, hy, hz))
+        for pn, pc in (getattr(p, "ports", None) or {}).items():
+            tgts.append((p.name + ":" + pn, pc[0], pc[1], pc[2], tol_mm, tol_mm, 1e9))
+
+    def _nearest(pt):
+        x, y = float(pt[0]), float(pt[1])
+        best = None
+        for nm, cx, cy, cz, hx, hy, hz in tgts:
+            dx = max(0.0, abs(x - cx) - hx)
+            dy = max(0.0, abs(y - cy) - hy)
+            g = _m.hypot(dx, dy)
+            if best is None or g < best[0]:
+                best = (g, nm)
+                if g <= 0.0:
+                    break
+        return best or (9e9, "—")
+
+    bad = []
+    for r in _ROUTE_LOG:
+        wp = r.get("waypoints") or []
+        if len(wp) < 2:
+            continue
+        for side, pt in (("A", wp[0]), ("B", wp[-1])):
+            g, nm = _nearest(pt)
+            if g > 0.0:
+                bad.append((round(g), r.get("name", "?"), side, r.get("mech", ""), nm))
+    n = len(_ROUTE_LOG)
+    print(f"[univ][conn-audit] {n} drawn run(s); {len(bad)} endpoint(s) NOT on a part "
+          f"(tol {tol_mm:.0f} mm) — these are the 'random lines':")
+    for g, nm, s, mech, near in sorted(bad, reverse=True)[:30]:
+        print(f"   gap={g:>6}mm  {nm} end {s} [{mech}]  nearest={near}")
+    return bad
+
+
 def _seg_horizontal(p, q, z_tol=50.0):
     """True if the segment p→q is a (near-)horizontal run (its Z barely changes and
     it actually moves in XY) — the legs that must not cross equipment / each other."""
@@ -13265,6 +13318,10 @@ def main():
             wire_ports(parts, topology, MAT, MO, out_dir=out_dir)
         except Exception as _we:   # additive — never fail the whole render
             print(f"[univ][wire] WARN wire_ports skipped: {_we}")
+        try:
+            audit_connection_geometry(parts)   # prove every line lands on a part at both ends
+        except Exception as _ae:
+            print(f"[univ][conn-audit] skipped: {_ae}")
     elif not _ports_on:
         print("[univ][wire] STAGE 3/4 skipped — Stage-2 ports are off (need ports to wire)")
     elif _wire_flag and not _family_wires:
