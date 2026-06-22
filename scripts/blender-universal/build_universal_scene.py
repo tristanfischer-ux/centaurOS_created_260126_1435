@@ -530,24 +530,28 @@ MECH_COLOUR = {             # sRGB; make_mat handles linear conversion.
 MECH_DEFAULT_COLOUR = (0.50, 0.52, 0.56)
 
 # ── 7. Material palette for the geometry by shape family ───────────────────
+# REALISTIC PBR materials for the MATERIALED (INSPECT=0) render — stainless vessels, GRP/painted
+# tanks, painted machinery, galvanised steel (Tristan 2026-06-22 "make the images better #1").
+# (key, sRGB, metallic, roughness). The flat INSPECT=1 render uses INSPECT_TYPE_COLOUR instead,
+# so this only changes the photoreal render. UNIVERSAL — keyed on shape, no class table.
 SHAPE_MAT = {
-    "tall_column":       ("col",      (0.80, 0.82, 0.86), 0.55, 0.34),
-    "tall_vessel":       ("reactor",  (0.00, 0.40, 0.95), 0.25, 0.34),
-    "vertical_vessel":   ("vessel",   (0.00, 0.72, 0.92), 0.20, 0.35),
-    "horizontal_vessel": ("vessel",   (0.00, 0.72, 0.92), 0.20, 0.35),
-    "compressor":        ("comp",     (0.10, 0.45, 0.95), 0.45, 0.32),
-    "pump":              ("pump",     (1.00, 0.40, 0.00), 0.10, 0.42),
-    "tank":              ("tank",     (0.00, 0.55, 0.34), 0.10, 0.44),
-    "stack":             ("stack",    (0.50, 0.50, 0.54), 0.45, 0.45),
-    "package_box":       ("pkg",      (0.55, 0.40, 0.34), 0.30, 0.52),
-    "skid_box":          ("skidbox",  (0.45, 0.62, 0.78), 0.30, 0.42),
-    "transformer_box":   ("xfmr",     (0.30, 0.34, 0.40), 0.45, 0.45),
-    "cabinet":           ("cab",      (0.20, 0.24, 0.30), 0.45, 0.45),
-    "cabinet_small":     ("cabs",     (0.22, 0.26, 0.32), 0.40, 0.45),
-    "gantry":            ("gantry",   (0.55, 0.56, 0.60), 0.55, 0.42),
-    "inline_spool":      ("spool",    (0.45, 0.70, 0.95), 0.35, 0.30),
-    "instrument":        ("instr",    (0.00, 0.92, 0.10), 0.10, 0.45),
-    "box":               ("box",      (0.55, 0.56, 0.58), 0.30, 0.50),
+    "tall_column":       ("col",      (0.79, 0.81, 0.85), 0.90, 0.24),  # stainless column
+    "tall_vessel":       ("reactor",  (0.78, 0.80, 0.84), 0.88, 0.26),  # stainless reactor
+    "vertical_vessel":   ("vessel",   (0.80, 0.82, 0.86), 0.88, 0.26),  # stainless vessel
+    "horizontal_vessel": ("vessel",   (0.80, 0.82, 0.86), 0.88, 0.26),  # stainless drum
+    "compressor":        ("comp",     (0.28, 0.38, 0.50), 0.55, 0.38),  # painted steel
+    "pump":              ("pump",     (0.18, 0.40, 0.60), 0.45, 0.40),  # painted cast-iron (blue)
+    "tank":              ("tank",     (0.60, 0.68, 0.74), 0.25, 0.42),  # GRP / painted tank
+    "stack":             ("stack",    (0.62, 0.63, 0.66), 0.62, 0.40),  # galvanised
+    "package_box":       ("pkg",      (0.54, 0.56, 0.60), 0.35, 0.52),  # painted package skid
+    "skid_box":          ("skidbox",  (0.50, 0.58, 0.68), 0.40, 0.44),  # painted skid
+    "transformer_box":   ("xfmr",     (0.40, 0.42, 0.47), 0.50, 0.44),
+    "cabinet":           ("cab",      (0.32, 0.38, 0.48), 0.55, 0.40),  # painted cabinet
+    "cabinet_small":     ("cabs",     (0.34, 0.40, 0.50), 0.50, 0.40),
+    "gantry":            ("gantry",   (0.58, 0.59, 0.62), 0.70, 0.38),  # galvanised steel
+    "inline_spool":      ("spool",    (0.80, 0.82, 0.86), 0.88, 0.26),  # stainless spool
+    "instrument":        ("instr",    (0.30, 0.34, 0.40), 0.45, 0.42),  # (hidden in hero)
+    "box":               ("box",      (0.54, 0.56, 0.60), 0.40, 0.48),
 }
 STRUCTURE_MODULE_ID = "structure_containment"  # the skid frame module tag
 
@@ -1799,7 +1803,9 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
         rim_z = z_bot + body_h
         water_z = z_bot + body_h * 0.90                       # ~10% freeboard below the rim
         if "u_water" not in MAT:
-            MAT["u_water"] = fl.make_mat("m_u_water", (0.10, 0.34, 0.42), metallic=0.0, roughness=0.30)
+            # reflective aquaculture water — brighter teal-green + low roughness so it reads as
+            # a WATER surface (a mirror-ish sheen), not a flat dark disc (Tristan 2026-06-22 #5).
+            MAT["u_water"] = fl.make_mat("m_u_water", (0.06, 0.40, 0.46), metallic=0.0, roughness=0.06)
         fl.add_cyl(f"{nm}_watersurf", (x_mm * fl.MM, y_mm * fl.MM, water_z), r * 0.965, 0.05,
                    MAT["u_water"], module=mod, module_objects=MO)
         fl.add_torus(f"{nm}_rim", (x_mm * fl.MM, y_mm * fl.MM, rim_z),
@@ -14100,6 +14106,46 @@ def main():
         fl.add_lights(target_centre=(cx, cy, span * 0.28),
                       fill_energy=240, fill_size=max(14.0, span * 0.6))
         fl.make_world_white()
+        # ── #2 SKY ENVIRONMENT (Tristan 2026-06-22) — replace the flat grey world with a
+        #    procedural Nishita sky so metals/water reflect a real sky + get graduated ambient
+        #    (the single biggest realism jump). Low strength so it lifts + reflects without
+        #    blowing out; the add_lights() sun stays the controlled key. Universal, no file.
+        try:
+            _sw = bpy.data.worlds.new("world_sky")
+            scene.world = _sw
+            _sw.use_nodes = True
+            _nt = _sw.node_tree
+            for _n in list(_nt.nodes):
+                _nt.nodes.remove(_n)
+            _sky = _nt.nodes.new("ShaderNodeTexSky")
+            for _a, _v in (("sky_type", "NISHITA"), ("sun_elevation", math.radians(58)),
+                           ("sun_rotation", math.radians(130)), ("sun_intensity", 0.25),
+                           ("air_density", 1.4), ("dust_density", 1.6)):
+                try:
+                    setattr(_sky, _a, _v)
+                except (AttributeError, TypeError):
+                    pass
+            _bg = _nt.nodes.new("ShaderNodeBackground")
+            _bg.inputs["Strength"].default_value = 0.45
+            _ow = _nt.nodes.new("ShaderNodeOutputWorld")
+            _nt.links.new(_sky.outputs[0], _bg.inputs[0])
+            _nt.links.new(_bg.outputs[0], _ow.inputs[0])
+        except Exception as _we:
+            print(f"[univ][render] sky world skipped: {_we}")
+        # ── #3 QUALITY (Tristan 2026-06-22) — higher resolution + samples + AO. The early
+        #    setup set 2400×1600/64; bump here (nothing resets between) for a crisper final.
+        try:
+            scene.render.resolution_x, scene.render.resolution_y = 3000, 2000
+            _ev = getattr(scene, "eevee", None)
+            if _ev is not None:
+                for _a, _v in (("taa_render_samples", 160), ("use_gtao", True),
+                               ("gtao_distance", 0.6), ("gtao_factor", 1.0)):
+                    try:
+                        setattr(_ev, _a, _v)
+                    except (AttributeError, TypeError):
+                        pass
+        except Exception as _qe:
+            print(f"[univ][render] quality bump skipped: {_qe}")
         # Purge DELETED objects from the module-objects lists — the control-cabinet
         # consolidation + phantom-route deletion removed meshes still referenced in MO, and
         # run_render_pipeline's palette pass would hit a removed StructRNA (ReferenceError).
