@@ -2002,9 +2002,18 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
     install = num(cs.get("installation_cost_gbp")) or 0.0
     steps.append(("+ Installation / field erection", install, None,
                   "installation_cost_gbp"))
-    steps.append(("= Installed ASP", None,
+    steps.append(("= Installed ASP (process equipment)", None,
                   num(cs.get("installed_asp_gbp")),
-                  "installed_asp_gbp (anchor — final installed price)"))
+                  "installed_asp_gbp (anchor — process plant installed price)"))
+    # Building & Civils added at INSTALLED level (not through the OEM manufacturing stack) →
+    # the ALL-IN project capex (Tristan 2026-06-22: building in the BoM, capex ~£7M all-in).
+    bld = num(cs.get("building_civils_gbp")) or 0.0
+    if bld:
+        steps.append(("+ Building & Civils (installed)", bld, None,
+                      "building_civils_gbp — insulated industrial building, floor slab, drainage, "
+                      "doors (civils — separate from the equipment OEM stack)"))
+        steps.append(("= ALL-IN PROJECT CAPEX", None, num(cs.get("all_in_capex_gbp")),
+                      "all_in_capex_gbp (anchor — equipment + building, total project capex)"))
 
     first = r
     running_row: Optional[int] = None  # row holding the last LIVE running total
@@ -2181,7 +2190,10 @@ def _sweet_spot(state: dict) -> Optional[Dict[str, Any]]:
         return None
     is_ras = price_unit == "£/kg"
     cs = state.get("costStack") or {}
-    base_capex = (num(cs.get("installed_asp_gbp")) or num(cs.get("factory_cogs_gbp"))
+    # prefer the ALL-IN project capex (equipment + building) when present, so the financial
+    # analysis matches the all-in headline (Tristan 2026-06-22); else the equipment installed.
+    base_capex = (num(cs.get("all_in_capex_gbp")) or num(cs.get("installed_asp_gbp"))
+                  or num(cs.get("factory_cogs_gbp"))
                   or num(cs.get("raw_materials_bom_gbp")) or 1_000_000.0)
     rows = [_econ_at(o, out_qty, base_capex, is_ras) for o in _sweep_outputs(out_qty)]
     d = _ECON_DEFAULTS
@@ -2269,8 +2281,10 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
     # ---- engine-grounded values (fall back + label as assumption if absent) ----
     out_qty, out_unit, price_unit, out_noun = _econ_output_metric(state)
 
-    capex = num(cs.get("installed_asp_gbp"))
-    capex_basis = "from engine · costStack.installed_asp_gbp (BoM + assembly + install)"
+    capex = num(cs.get("all_in_capex_gbp")) or num(cs.get("installed_asp_gbp"))
+    capex_basis = ("from engine · costStack.all_in_capex_gbp (equipment installed + building & civils)"
+                   if cs.get("all_in_capex_gbp")
+                   else "from engine · costStack.installed_asp_gbp (BoM + assembly + install)")
     if capex is None:
         capex = num(cs.get("factory_cogs_gbp")) or num(cs.get("raw_materials_bom_gbp"))
         capex_basis = "from engine · costStack (installed ASP absent — COGS proxy)"
