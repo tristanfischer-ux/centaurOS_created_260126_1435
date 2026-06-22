@@ -8196,6 +8196,39 @@ async function main() {
           cs.installed_asp_gbp = sum('channel_list_price_gbp', 'installation_cost_gbp')
         if (st.cost_reality && typeof st.cost_reality === 'object') st.cost_reality.bom_total_gbp = Math.round(reqTotal)
       }
+      // BUILDING & CIVILS (universal — Tristan 2026-06-22): the plant's building envelope is
+      // modelled (building_height_m, wall/roof U-values) but was never COSTED. Cost it as
+      // INSTALLED civils (NOT through the OEM manufacturing stack — a building isn't OEM-
+      // manufactured) and add to the ALL-IN project capex. Footprint from the plant bbox
+      // (parts-manifest); kept OUT of the raw requirementsBom so the Σ-BoM == parts-ledger
+      // reconciliation stays intact. Universal: any design with a plant footprint gets a building.
+      try {
+        const csb = st.costStack as Record<string, number> | undefined
+        if (csb && Number(csb.installed_asp_gbp) > 0) {
+          let footM2 = 0
+          const pmPath = resolve(outDir, 'parts-manifest.json')
+          if (existsSync(pmPath)) {
+            const pm = JSON.parse(readFileSync(pmPath, 'utf8'))
+            const b = pm.bbox_mm || {}
+            const L = ((b.x_max_mm || 0) - (b.x_min_mm || 0)) / 1000
+            const W = ((b.y_max_mm || 0) - (b.y_min_mm || 0)) / 1000
+            if (L > 0 && W > 0) footM2 = (L + 5) * (W + 5)   // +2.5 m clearance aisle each side
+          }
+          if (footM2 > 0) {
+            const hM = Number((st as Record<string, any>).orchestratorContract?.quantities?.building_height_m?.value) || 6.5
+            const wallH = hM + 2.0
+            const wallA = 4 * Math.sqrt(footM2) * wallH
+            const roofA = footM2
+            // UK-2026 INSTALLED civils £/m²: floor slab + drainage 650; clad wall + insulation
+            // 240; insulated roof 190; + fixed allowance for roller/personnel doors + services.
+            const bldg = Math.round(footM2 * 650 + wallA * 240 + roofA * 190 + 120000)
+            csb.building_civils_gbp = bldg
+            csb.all_in_capex_gbp = Math.round(Number(csb.installed_asp_gbp) + bldg)
+            csb.building_footprint_m2 = Math.round(footM2)
+            console.error(`[chain] building & civils: ${Math.round(footM2)} m² → £${bldg.toLocaleString()} (installed civils); ALL-IN capex £${csb.all_in_capex_gbp.toLocaleString()}`)
+          }
+        }
+      } catch { /* civils additive; never fail the cost stack */ }
       // RE-DERIVE the independent cost-sanity gate (gate 32) on the AUTHORITATIVE BoM
       // (ledger Phase 1c, 2026-06-17). The early shadow stage ran BEFORE this
       // requirements-driven BoM existed, so it recorded state.costSanity against the

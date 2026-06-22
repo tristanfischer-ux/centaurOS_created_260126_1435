@@ -8385,7 +8385,10 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
         # sub-components are the "random lines from nowhere to nowhere, going through the
         # tanks" (that wiring belongs on the P&ID, not the 3-D model). Skip any edge whose
         # endpoint is a PURE INSTRUMENT. DEFAULT ON; BLENDER_WIRE_INSTRUMENTS=1 restores it.
-        if os.environ.get("BLENDER_WIRE_INSTRUMENTS", "").strip().lower() \
+        # HERO-ONLY (not _INSPECT_MODE): only the materialed hero declutters the I&C wiring; the
+        # INSPECT=1 technical render KEEPS it so the parts-ledger + P&ID + the connectivity audit
+        # see the instrument↔measured associations (Tristan 2026-06-22 — hiding broke coverage).
+        if (not _INSPECT_MODE) and os.environ.get("BLENDER_WIRE_INSTRUMENTS", "").strip().lower() \
                 not in ("1", "true", "yes", "on"):
             _fp, _tp = by_name.get(frm), by_name.get(to)
             # (a) any spur to/from a sub-component (instrument/control), AND (b) any SIGNAL/
@@ -9362,18 +9365,23 @@ def place_process_plant(parts, regions, topology, MAT, MO):
             _colocate_field_instruments(parts)
         except Exception as _e:
             print(f"[univ][layout] instrument co-locate skipped (error): {_e}")
-    # Control system → ONE cabinet (Tristan 2026-06-22). Universal: keys on the I&C +
-    # control decomposition modules, no class table. Kill: CHAIN_SKIP_CONTROL_CABINET=1.
-    if os.environ.get("CHAIN_SKIP_CONTROL_CABINET", "") in ("", "0", "false", "no"):
+    # Control system → ONE cabinet (Tristan 2026-06-22). HERO-ONLY (not _INSPECT_MODE): the
+    # INSPECT=1 technical render keeps the individual control parts so the single-line + P&ID +
+    # ledger see the full electrical system (consolidating them in the chain render emptied the
+    # SLD + broke connectivity). Universal: keys on the I&C/control modules. Kill: CHAIN_SKIP_
+    # CONTROL_CABINET=1.
+    if (not _INSPECT_MODE) and os.environ.get("CHAIN_SKIP_CONTROL_CABINET", "") in ("", "0", "false", "no"):
         try:
             _consolidate_control_cabinet(parts, MAT, MO)
         except Exception as _e:
             print(f"[univ][layout] control-cabinet consolidate skipped (error): {_e}")
-    # HIDE field instruments from the hero (they live on the P&ID/BoM, not the 3-D model).
-    try:
-        _hide_field_instruments(parts)
-    except Exception as _e:
-        print(f"[univ][layout] hide-instruments skipped (error): {_e}")
+    # HIDE field instruments — HERO-ONLY. INSPECT=1 keeps them so the BoM/P&ID/ledger + the
+    # instrument-coverage audit are intact; only the materialed hero hides them.
+    if not _INSPECT_MODE:
+        try:
+            _hide_field_instruments(parts)
+        except Exception as _e:
+            print(f"[univ][layout] hide-instruments skipped (error): {_e}")
     # UNIVERSAL 'nothing floats' — drop any equipment mesh hanging above the deck onto it.
     try:
         _ground_floaters(parts)
@@ -14011,11 +14019,13 @@ def main():
     else:
         print(f"[univ][ground] floor skipped for free-space family '{family}'")
 
-    # EXTERNAL service connections (water-in / effluent-out / power) crossing the plant edge.
-    try:
-        draw_boundary_services(parts, MAT, MO)
-    except Exception as _be:
-        print(f"[univ][boundary] skipped: {_be}")
+    # EXTERNAL service connections (water-in / effluent-out / power) crossing the plant edge —
+    # HERO-ONLY (not _INSPECT_MODE) so the chain's technical render/ledger is unchanged.
+    if not _INSPECT_MODE:
+        try:
+            draw_boundary_services(parts, MAT, MO)
+        except Exception as _be:
+            print(f"[univ][boundary] skipped: {_be}")
     # NOTE: the BUILDING ENVELOPE is NOT built here — it is added as a SECOND render pass in the
     # INSPECT=0 branch (interior first, then shell + exterior) so BOTH drawings come from the
     # SAME scene build. Rendering them as two separate processes gave different layouts (the
