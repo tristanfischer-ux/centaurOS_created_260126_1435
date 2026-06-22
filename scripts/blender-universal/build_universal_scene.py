@@ -8673,15 +8673,22 @@ def _hide_field_instruments(parts):
     shape-keyed, no class table."""
     if os.environ.get("SHOW_FIELD_INSTRUMENTS", "").strip().lower() in ("1", "true", "yes", "on"):
         return 0
+    # NON-PHYSICAL / building-feature items that should NOT be standalone boxes on the deck: a
+    # media/resin FILL lives INSIDE its vessel; doors/louvres are building fabric, not plant kit
+    # (Tristan 2026-06-22 "random squares"). Hidden from the 3-D model; stay in the BoM.
+    _NONPHYS = re.compile(r"\b(carrier media|media|resin|biofilm|fill|charge|coating|"
+                          r"door|personnel|louvre|cladding|insulation|paint|spares|software|"
+                          r"licen[cs]e|service|warranty|training)\b", re.I)
     n = 0
     for p in parts:
-        if getattr(p, "shape", None) == "instrument":
+        nm = p.name or ""
+        if getattr(p, "shape", None) == "instrument" or _NONPHYS.search(nm):
             if _delete_part_meshes(p):
                 n += 1
             p._consolidated = True   # so the coverage/route checks skip it (no mesh anyway)
     if n:
-        print(f"[univ][layout] hid {n} field instrument(s) from the hero (on the P&ID/BoM, "
-              f"not the 3-D model)")
+        print(f"[univ][layout] hid {n} field-instrument / non-physical item(s) from the hero "
+              f"(on the P&ID/BoM, not the 3-D model)")
     return n
 
 
@@ -8720,7 +8727,9 @@ _CONTROL_MODULES = {"control_compute_communication"}
 _CONTROL_NAME_TOKENS = ("busbar", "breaker", "relay", "switchgear", "switch", "gateway",
                         "ups", "controller", "scada", "i/o", "i o", "io module", "module",
                         "power supply", "panel", "cabinet", "interlock", "network",
-                        "distribution board", "plc", "rtu", "marshalling")
+                        "distribution board", "plc", "rtu", "marshalling",
+                        "fuse", "surge", "protector", "isolator", "contactor", "starter",
+                        "vfd", "drive", "distribution busbar", "protective")
 _CONTROL_KEEP_TOKENS = ("generator", "genset", "transformer", "diesel", "alternator",
                         "switchboard mv", "inverter")   # real principal electrical plant
 
