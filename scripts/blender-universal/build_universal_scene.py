@@ -8633,21 +8633,31 @@ def add_ground_slab(parts, MAT, MO, bbox_mm=None):
     as the deck in the INSPECT pass. Universal — footprint-keyed, no per-class logic.
 
     Returns the slab object."""
-    # The FLOOR must sit under EVERY placed part (Tristan 2026-06-22: "the floor slab does
-    # not cover the entire space") — including the tall/outlying parts equipment_bbox_mm
-    # excludes (a lone LOX tank / generator in a corner was off the slab). Span the FULL
-    # placed-part footprint + apron, so nothing stands on bare ground.
+    # The FLOOR must sit under EVERY placed part (Tristan 2026-06-22: "the slab does not cover
+    # the entire space"). footprint_mm under-reports a qty-N ARRAY's extent (it returned a
+    # single-unit footprint, so the slab mis-centred and the tank farm hung off it). So span
+    # the ACTUAL drawn EQUIPMENT MESH world-bboxes (the real geometry), + apron — guaranteed
+    # to cover everything regardless of array/footprint quirks.
+    _SKIP = ("u_pipe_", "u_route_", "u_wire_", "u_skid_", "u_ground_", "u_grid_",
+             "u_datum_", "u_dim_", "u_rack_")
     _x0 = _x1 = _y0 = _y1 = None
-    for _p in parts:
-        if not getattr(_p, "placed_xyz_mm", None):
-            continue
-        _cx, _cy = _p.placed_xyz_mm[0], _p.placed_xyz_mm[1]
-        _fx, _fy, _ = footprint_mm(resolved_dims_mm(_p))
-        _hx, _hy = _fx / 2.0, _fy / 2.0
-        _x0 = _cx - _hx if _x0 is None else min(_x0, _cx - _hx)
-        _x1 = _cx + _hx if _x1 is None else max(_x1, _cx + _hx)
-        _y0 = _cy - _hy if _y0 is None else min(_y0, _cy - _hy)
-        _y1 = _cy + _hy if _y1 is None else max(_y1, _cy + _hy)
+    try:
+        _V = __import__("mathutils").Vector
+        for obj in bpy.data.objects:
+            if getattr(obj, "type", None) != "MESH" or obj.data is None:
+                continue
+            if any(obj.name.startswith(s) for s in _SKIP):
+                continue
+            mw = obj.matrix_world
+            for c in obj.bound_box:
+                w = mw @ _V(c)
+                wx, wy = w.x * 1000.0, w.y * 1000.0
+                _x0 = wx if _x0 is None else min(_x0, wx)
+                _x1 = wx if _x1 is None else max(_x1, wx)
+                _y0 = wy if _y0 is None else min(_y0, wy)
+                _y1 = wy if _y1 is None else max(_y1, wy)
+    except Exception:
+        _x0 = None
     _m = GROUND_SLAB_MARGIN_MM
     if _x0 is None:
         eb = equipment_bbox_mm(parts, margin_mm=GROUND_SLAB_MARGIN_MM)
@@ -12904,11 +12914,11 @@ def add_inspection_lights():
     # cylinders/boxes don't read perfectly flat. Aimed at world origin (the
     # cameras frame the bbox; lights need only be roughly centred + large).
     for nm, loc, energy in [
-        ("ins_fill_top",   (0.0, 0.0, 60.0), 220),
-        ("ins_fill_front", (0.0, -55.0, 30.0), 130),
-        ("ins_fill_back",  (0.0, 55.0, 30.0), 130),
-        ("ins_fill_left",  (-55.0, 0.0, 30.0), 130),
-        ("ins_fill_right", (55.0, 0.0, 30.0), 130),
+        ("ins_fill_top",   (0.0, 0.0, 60.0), 140),
+        ("ins_fill_front", (0.0, -55.0, 30.0), 80),
+        ("ins_fill_back",  (0.0, 55.0, 30.0), 70),
+        ("ins_fill_left",  (-55.0, 0.0, 30.0), 80),
+        ("ins_fill_right", (55.0, 0.0, 30.0), 70),
     ]:
         bpy.ops.object.light_add(type="AREA", location=loc)
         a = bpy.context.active_object
@@ -12921,6 +12931,21 @@ def add_inspection_lights():
             a.data.use_shadow = False
         except AttributeError:
             pass
+
+    # A DOMINANT directional SUN with shadows OFF (Tristan 2026-06-22: "no shading … all
+    # blobby"). It shades every surface by its NORMAL — a clear light→dark gradient across a
+    # cylinder/sphere so equipment reads as SOLID 3-D FORM, not a flat silhouette — while
+    # use_shadow=False keeps the deck free of the cast shadow-lines that read as stray pipes.
+    bpy.ops.object.light_add(type="SUN", location=(0.0, 0.0, 90.0))
+    _sun = bpy.context.active_object
+    _sun.name = "ins_sun"
+    _sun.data.energy = 3.2
+    for _a, _v in (("use_shadow", False), ("angle", 0.15)):
+        try:
+            setattr(_sun.data, _a, _v)
+        except (AttributeError, TypeError):
+            pass
+    _sun.rotation_euler = mathutils_vec((-0.55, -0.7, -1.0)).to_track_quat("-Z", "Y").to_euler()
 
     # Force every Eevee shadow flag OFF (no cast shadows anywhere); keep AO for a
     # touch of crevice definition. Fast settings (32-64 samples) for judging speed.
