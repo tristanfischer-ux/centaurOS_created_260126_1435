@@ -8212,8 +8212,20 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
         })
 
     n_trayed = 0
+    # Tray threshold is SERVICE-AWARE (Tristan 2026-06-22): FLUID stays DIRECT port-to-port so
+    # every pipe visibly lands on its part (WIRE_FANOUT_MIN=999), but SIGNAL / ELECTRICAL fan-outs
+    # (16 instruments → 1 controller, busbar → N loads) BUNDLE into a marshalled cable TRAY — one
+    # neat run instead of 16 thin cables crisscrossing the plant. Cables are thin + many-to-one, so
+    # a tray is the realistic + tidy answer; pipes are few + must connect, so direct.
+    _CABLE_SERVICES = ("signal", "electric", "power", "data", "control", "bus")
+
+    def _is_cable(svc):
+        s = str(svc or "").lower()
+        return any(t in s for t in _CABLE_SERVICES)
+
     for (frm, service), grp in groups.items():
-        if len(grp) >= WIRE_FANOUT_MIN:
+        _thr = 3 if _is_cable(service) else WIRE_FANOUT_MIN
+        if len(grp) >= _thr:
             # ── SHARED TRAY: one trunk from the (single) source port → spurs to each dest.
             src_xyz = grp[0]["src_xyz"]      # same source port for the whole group
             dests = [r["dst_xyz"] for r in grp]
