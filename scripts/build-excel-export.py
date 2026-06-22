@@ -205,7 +205,10 @@ def header(ws: Worksheet, row: int, cols: List[str]) -> None:
 
 def sub_banner(ws: Worksheet, row: int, text: str, span: int) -> None:
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=span)
-    c = ws.cell(row, 1, clean_cell(text))
+    # A deliberate "=..." live-formula heading (e.g. a Spec-sheet banner referencing the
+    # master tag) is written raw; everything else is defanged for display.
+    val = text if (isinstance(text, str) and text.startswith("=")) else clean_cell(text)
+    c = ws.cell(row, 1, val)
     c.font = FONT_SUB
     c.fill = FILL_SUB
     c.alignment = LEFT_TOP
@@ -1573,7 +1576,11 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     r = 5
     first_line_row = r
     for row in bom:
-        ws.cell(r, 1, clean_cell(row.get("tag", ""))).border = BORDER
+        # Tag column REFERENCES the master "Part names" tag where this is a principal (one
+        # identity; the master is the single source of the tag too). Sub-components (P-101.1)
+        # and connection lines keep their literal tag (not master principals).
+        _btref = tag_ref(row.get("tag", ""))
+        ws.cell(r, 1, _btref if _btref else clean_cell(row.get("tag", ""))).border = BORDER
         # Requirement column — the NAME is referenced from the master "Part names" tab
         # (introduced once), with this row's own detail tail (" · 110 kW …") appended, so
         # editing the master name updates the BoM too. Sub-components (↳) and unmatched
@@ -3520,7 +3527,9 @@ def tab_spec_sheets(wb: Workbook, state: dict) -> bool:
             mpn = pv_by_word.get(head, "")
 
         # ---- block header (the canonical TAG band — the stable identity) ----
-        sub_banner(ws, r, f"{tag}", 8)
+        # The banner REFERENCES the master "Part names" tag where this is a principal (so the
+        # tag is sourced once); literal fallback for anything the master doesn't carry.
+        sub_banner(ws, r, tag_ref(tag) or f"{tag}", 8)
         r += 1
         header(ws, r, ["Name (→ Part names)", "Status", "Qty", "Unit £", "Line £",
                        "Material", "Part / MPN", "Driving worked-calc (basis)"])
@@ -4196,12 +4205,12 @@ def tab_assembly_sequence(wb: Workbook, state: dict) -> bool:
             if rx and re.search(rx, blob):
                 tag = clean_cell(b.get("tag", ""))
                 nm = clean_cell(b.get("requirement", "")).lstrip("↳ ").split("·")[0].strip()
-                buckets[ph].append(f"{nm}{(' [' + tag + ']') if tag else ''}")
+                buckets[ph].append((nm, tag))      # (name, tag) — referenced at render
                 placed = True
                 break
         if not placed:
             buckets["Mechanical equipment installation"].append(
-                clean_cell(b.get("requirement", "")).split("·")[0].strip())
+                (clean_cell(b.get("requirement", "")).split("·")[0].strip(), ""))
 
     ws = wb.create_sheet("Assembly sequence")
     set_widths(ws, {"A": 6, "B": 34, "C": 60, "D": 26, "E": 22, "F": 40})
@@ -4223,7 +4232,29 @@ def tab_assembly_sequence(wb: Workbook, state: dict) -> bool:
             equip = "Whole plant — flush, fill, leak-check, energise, wet-commission, performance test."
         elif items:
             shown = items[:14]
-            equip = "; ".join(shown) + (f"  (+{len(items) - 14} more)" if len(items) > 14 else "")
+            tail = len(items) - 14
+            # Build a concat formula REFERENCING the master "Part names" for each principal's
+            # name + tag (one identity; click a precedent). Literal fallback per item; if no
+            # item resolves, emit the plain string (no pointless all-literal formula).
+            exprs, any_ref = [], False
+            for nm, tag in shown:
+                nref = name_ref(nm)
+                tref = tag_ref(tag) if tag else None
+                any_ref = any_ref or bool(nref) or bool(tref)
+                nexpr = nref[1:] if nref else '"' + str(nm).replace('"', '""') + '"'
+                if tag:
+                    texpr = tref[1:] if tref else '"' + str(tag).replace('"', '""') + '"'
+                    exprs.append(f'{nexpr} & " [" & {texpr} & "]"')
+                else:
+                    exprs.append(nexpr)
+            if any_ref:
+                joined = ' & "; " & '.join(exprs)
+                if tail > 0:
+                    joined += f' & "  (+{tail} more)"'
+                equip = "=" + joined
+            else:
+                equip = "; ".join(f"{nm}{(' [' + tag + ']') if tag else ''}" for nm, tag in shown) \
+                    + (f"  (+{tail} more)" if tail > 0 else "")
         else:
             continue  # skip a phase with no equipment (other than commissioning)
         ws.cell(r, 1, step).border = BORDER

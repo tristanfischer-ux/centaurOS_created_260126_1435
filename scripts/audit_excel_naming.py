@@ -150,6 +150,8 @@ def main(argv):
                         continue
                     if v.startswith("="):
                         continue
+                    if v.strip().startswith("↳"):
+                        continue          # a sub-component row whose name may match a principal
                     nv = _norm_name(v)
                     lv = v.strip().lower()
                     if nv in m_names or lv in m_tags:
