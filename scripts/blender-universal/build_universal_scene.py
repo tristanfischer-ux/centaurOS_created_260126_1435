@@ -445,6 +445,12 @@ WIRE_OVERHEAD_CLEAR_MM = 450.0   # (was 900) hug the equipment tops — less ove
 # small (was 320) so runs read as a TIDY rack at near-uniform height, not a spray of
 # pipes climbing to a dozen elevations (Tristan 2026-06-22: "pipework flaring around").
 WIRE_SERVICE_TIER_MM = 130.0
+# A run whose plan span is at/under this stays at its OWN LOCAL height (just above the
+# taller of its two ports) — a short riser → local cross → drop that LANDS on the port,
+# instead of flying up to the global ~6.4 m overhead rack and back down (the absurd 40 m
+# detour Tristan flagged: a busbar→fuse-holder 1.5 m apart routed up-and-over the whole
+# plant). ONLY genuinely long cross-plant runs use the high rack to clear the tank farm.
+WIRE_LOCAL_DIRECT_MAX_MM = 9000.0
 
 # ── 6. Pipe palette by mechanism ───────────────────────────────────────────
 # Pipe radius ~1.7× (Tristan 2026-06-10): the runs read as thin wires. 110→190 mm.
@@ -7969,7 +7975,10 @@ def _wire_path(src_xyz, dst_xyz, service, run_idx=0, overhead_base_z=None):
     # base overhead deck: the shared equipment-bulk top (if supplied), but never below
     # the taller of the two ports + clearance (so a tall-to-tall run isn't pushed down).
     deck = max(sz, dz) + WIRE_OVERHEAD_CLEAR_MM
-    if overhead_base_z is not None:
+    # Only LONG runs are lifted to the shared overhead rack; a short/local run keeps its
+    # own low deck so it connects port-to-port directly (no fly-over-the-plant detour).
+    _span = abs(sx - dx) + abs(sy - dy)
+    if overhead_base_z is not None and _span > WIRE_LOCAL_DIRECT_MAX_MM:
         deck = max(deck, float(overhead_base_z))
     z_cross = deck + tier + run_off
     pts = [(sx, sy, sz)]                       # start ON the source port
@@ -7989,7 +7998,10 @@ def _wire_path(src_xyz, dst_xyz, service, run_idx=0, overhead_base_z=None):
 # as a SHARED TRAY (one trunk + drop spurs) rather than N independent flying runs, which
 # is the spaghetti Tristan flagged on dense plants (a Distribution Busbar → 30 instruments,
 # SCADA → N signal_ins). Below this count, the per-edge port-to-port path reads fine.
-WIRE_FANOUT_MIN = 3
+WIRE_FANOUT_MIN = 999   # (was 3) Tristan 2026-06-22 chose DIRECT port-to-port: every edge
+# draws its own source-port→dest-port run that visibly LANDS on the port, instead of an
+# aggregated shared TRUNK that flies to a 40 m spine and feeds drop-spurs (which read as
+# "the pipe doesn't connect to the part"). Set high to disable the shared-tray fan-out.
 
 
 def _tray_paths(src_xyz, dests_xyz, service, overhead_base_z=None, tier_idx=0):
@@ -8014,7 +8026,12 @@ def _tray_paths(src_xyz, dests_xyz, service, overhead_base_z=None, tier_idx=0):
     dests = [tuple(float(c) for c in d) for d in dests_xyz]
     tier = _WIRE_SERVICE_TIER.get(service, tier_idx) * WIRE_SERVICE_TIER_MM
     deck = max([sz] + [d[2] for d in dests]) + WIRE_OVERHEAD_CLEAR_MM
-    if overhead_base_z is not None:
+    # Lift the tray spine to the shared overhead rack ONLY when the fan-out genuinely spans
+    # the plant; a LOCAL cluster of destinations keeps a low spine so the spurs drop a short
+    # way onto their ports (not a plant-wide trunk at 6.4 m for nearby parts).
+    _tray_span = max(max(d[0] for d in dests) - min(d[0] for d in dests),
+                     max(d[1] for d in dests) - min(d[1] for d in dests))
+    if overhead_base_z is not None and _tray_span > WIRE_LOCAL_DIRECT_MAX_MM:
         deck = max(deck, float(overhead_base_z))
     z_spine = deck + tier
     xs = [d[0] for d in dests]
