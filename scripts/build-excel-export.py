@@ -4682,7 +4682,16 @@ def downscale_png(src_png: str, run_dir: str, max_px: int = 3400) -> str:
                 im = im.resize((max(1, int(w * scale)), max(1, int(h * scale))))
             out_dir = os.path.join(run_dir, ".excel-tmp")
             os.makedirs(out_dir, exist_ok=True)
-            out = os.path.join(out_dir, "ds_" + os.path.basename(src_png))
+            # Name the downscaled file by its PARENT-QUALIFIED relative path, NOT the bare
+            # basename — interior 00-hero.png and exterior/00-hero.png share a basename, so a
+            # basename-keyed temp made the exterior OVERWRITE the interior and both tabs embedded
+            # the SAME image (Tristan 2026-06-22: "interior and exterior layouts are identical").
+            try:
+                _rel = os.path.relpath(src_png, run_dir)
+            except ValueError:
+                _rel = os.path.basename(src_png)
+            _safe = _rel.replace(os.sep, "_").replace("..", "_")
+            out = os.path.join(out_dir, "ds_" + _safe)
             # save as compressed JPEG inside a .png-ext wrapper would confuse openpyxl;
             # keep PNG but optimise.
             im.save(out, format="PNG", optimize=True)
