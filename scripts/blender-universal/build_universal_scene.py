@@ -2223,7 +2223,9 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
             r_pwr = 0.035    # cable run
             ttop = base_z_mm + (ln or 3000)
             sup_z = ttop + 1300.0                       # supply header above the tanks
-            drn_z = base_z_mm + 250.0                   # drain header just off the floor
+            drn_z = base_z_mm + 1100.0                  # drain/return header at a VISIBLE height
+                                                        # (Tristan 2026-06-22: "can't see water
+                                                        # going OUT") — was 250 mm, hidden at floor
             pwr_z = base_z_mm + 600.0                   # power header low on the side
             cxs = [x_mm + (c - (cols - 1) / 2.0) * pitch for c in range(cols)]
             rys = [y_mm + (r - (rows - 1) / 2.0) * pitch for r in range(rows)]
@@ -8924,6 +8926,117 @@ def _apply_layout_optimiser(parts, topology, bbox):
     return {"x0": xs0 - 800, "x1": xs1 + 800, "y0": ys0 - 800, "y1": ys1 + 800}
 
 
+def _plant_extent_mm(parts):
+    """(x0,x1,y0,y1, tallest_top_z) over every placed part's FOOTPRINT — the building/boundary
+    helpers size off this. Excludes nothing (the shell must enclose the whole plant)."""
+    xs, ys, tops = [], [], []
+    for p in parts:
+        if not getattr(p, "placed_xyz_mm", None):
+            continue
+        cx, cy = p.placed_xyz_mm[0], p.placed_xyz_mm[1]
+        fx, fy, fz = footprint_mm(resolved_dims_mm(p))
+        xs += [cx - fx / 2, cx + fx / 2]
+        ys += [cy - fy / 2, cy + fy / 2]
+        tops.append(p.placed_xyz_mm[2] + fz / 2)
+    if not xs:
+        return None
+    return min(xs), max(xs), min(ys), max(ys), max(tops)
+
+
+def build_plant_shell(parts, MAT, MO):
+    """Build the EXTERNAL BUILDING ENVELOPE around the plant (Tristan 2026-06-22: "build the
+    external building … show two blenders, the building from the outside and with no roof or
+    walls"). 4 opaque clad walls + a roof + a roller door, sized from the equipment footprint +
+    a 2.5 m clearance aisle and headroom above the tallest equipment. Gated by BLENDER_PLANT_
+    SHELL=1 — the CUTAWAY render leaves it off; the EXTERIOR render turns it on. Universal."""
+    ext = _plant_extent_mm(parts)
+    if ext is None:
+        return 0
+    MM = fl.MM
+    x0e, x1e, y0e, y1e, top = ext
+    clr, t = 2500.0, 300.0
+    x0, x1, y0, y1 = x0e - clr, x1e + clr, y0e - clr, y1e + clr
+    H = max(top + 2500.0, 7000.0)                 # headroom above the tallest equipment
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    w, d = x1 - x0, y1 - y0
+    z0 = DECK_Z_MM
+    wall = MAT.get("m_shell_wall") or fl.make_mat("m_shell_wall", (0.82, 0.83, 0.85),
+                                                  metallic=0.10, roughness=0.75)
+    roof = MAT.get("m_shell_roof") or fl.make_mat("m_shell_roof", (0.60, 0.62, 0.66),
+                                                  metallic=0.25, roughness=0.6)
+    door = MAT.get("m_shell_door") or fl.make_mat("m_shell_door", (0.40, 0.42, 0.46),
+                                                  metallic=0.30, roughness=0.5)
+    MAT["m_shell_wall"], MAT["m_shell_roof"], MAT["m_shell_door"] = wall, roof, door
+
+    def _b(name, c, sz, m):
+        o = fl.add_box(name, (c[0] * MM, c[1] * MM, c[2] * MM),
+                       (sz[0] * MM, sz[1] * MM, sz[2] * MM), m, module=None, module_objects=MO)
+        o.dimensions = (sz[0] * MM, sz[1] * MM, sz[2] * MM)   # add_box halves; set true size
+        return o
+    _b("u_shell_wall_N", (cx, y1, z0 + H / 2), (w + t, t, H), wall)
+    _b("u_shell_wall_S", (cx, y0, z0 + H / 2), (w + t, t, H), wall)
+    _b("u_shell_wall_E", (x1, cy, z0 + H / 2), (t, d, H), wall)
+    _b("u_shell_wall_W", (x0, cy, z0 + H / 2), (t, d, H), wall)
+    _b("u_shell_roof", (cx, cy, z0 + H + t / 2), (w + 2 * t, d + 2 * t, t), roof)
+    _b("u_shell_door", (cx, y0 - t * 0.4, z0 + 2100.0), (5000.0, t * 1.4, 4200.0), door)
+    print(f"[univ][shell] building envelope {w/1000.0:.1f}×{d/1000.0:.1f}×{H/1000.0:.1f} m "
+          f"(4 walls + roof + roller door)")
+    return 1
+
+
+def draw_boundary_services(parts, MAT, MO):
+    """Draw the EXTERNAL service connections crossing the building boundary (Tristan 2026-06-22:
+    "water coming from outside in as the main inlet, and electricity"): a WATER inlet, an
+    EFFLUENT discharge, and the POWER feed — each a service-coloured pipe from the relevant
+    equipment out to a marker beyond the plant edge. Universal — name-keyed, no class table."""
+    ext = _plant_extent_mm(parts)
+    if ext is None:
+        return 0
+    MM, OUT = fl.MM, 7000.0
+    x0, x1, y0, y1, _top = ext
+    placed = [p for p in parts if getattr(p, "placed_xyz_mm", None)
+              and not getattr(p, "_consolidated", False)]
+    n = 0
+
+    def _find(keys):
+        for p in placed:
+            if any(k in (p.name or "").lower() for k in keys):
+                return p
+        return None
+
+    def _stub(part, mech, label, edge):
+        nonlocal n
+        if part is None:
+            return
+        px, py, _pz = part.placed_xyz_mm
+        m = _mech_pipe_mat(mech, MAT)
+        z = 800.0
+        if edge in ("x0", "x1"):
+            ex = (x0 - OUT) if edge == "x0" else (x1 + OUT)
+            fl.add_cyl(f"u_boundary_{label}", ((ex + px) / 2 * MM, py * MM, z * MM),
+                       0.22, abs(px - ex) * MM, m, module=None, module_objects=MO,
+                       rotation=(0, math.radians(90), 0))
+            mkx, mky = ex, py
+        else:
+            ey = (y0 - OUT) if edge == "y0" else (y1 + OUT)
+            fl.add_cyl(f"u_boundary_{label}", (px * MM, (ey + py) / 2 * MM, z * MM),
+                       0.22, abs(py - ey) * MM, m, module=None, module_objects=MO,
+                       rotation=(math.radians(90), 0, 0))
+            mkx, mky = px, ey
+        mk = fl.add_box(f"u_boundary_{label}_marker", (mkx * MM, mky * MM, (z + 300) * MM),
+                        (1000.0 * MM, 1000.0 * MM, 1600.0 * MM), m, module=None, module_objects=MO)
+        mk.dimensions = (1000.0 * MM, 1000.0 * MM, 1600.0 * MM)
+        n += 1
+
+    _stub(_find(("intake", "make-up", "makeup", "make up")), "fluid_supply", "water_in", "x0")
+    _stub(_find(("effluent", "discharge")), "fluid_return", "effluent_out", "x1")
+    _stub(_find(("generator", "genset", "diesel", "transformer", "main breaker", "incomer")),
+          "electrical_bus", "power", "y1")
+    if n:
+        print(f"[univ][boundary] {n} external service connection(s): water-in / effluent-out / power")
+    return n
+
+
 def add_ground_slab(parts, MAT, MO, bbox_mm=None):
     """STAGE 4. Lay a flat reinforced-concrete DECK under the plant so it visibly SITS
     ON A FLOOR (Tristan 2026-06-21: "everything floating in the air, no floor showing").
@@ -13758,6 +13871,19 @@ def main():
         print("[univ][ground] BLENDER_GROUND_SLAB=0 — floor suppressed")
     else:
         print(f"[univ][ground] floor skipped for free-space family '{family}'")
+
+    # EXTERNAL service connections (water-in / effluent-out / power) crossing the plant edge.
+    try:
+        draw_boundary_services(parts, MAT, MO)
+    except Exception as _be:
+        print(f"[univ][boundary] skipped: {_be}")
+    # BUILDING ENVELOPE (walls + roof + door) — EXTERIOR view only (BLENDER_PLANT_SHELL=1).
+    # The default render is the CUTAWAY (no roof/walls); the exterior render sets the flag.
+    if os.environ.get("BLENDER_PLANT_SHELL", "").strip().lower() in ("1", "true", "yes", "on"):
+        try:
+            build_plant_shell(parts, MAT, MO)
+        except Exception as _se:
+            print(f"[univ][shell] skipped: {_se}")
 
     # ── STAGE 2 (4-stage connection-points plan) — NAMED IN/OUT CONNECTION PORTS ──
     # Now that every part is PLACED (placed_xyz_mm + anchors set above by whichever
