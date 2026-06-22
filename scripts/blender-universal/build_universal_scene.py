@@ -2324,6 +2324,7 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
                            ((x_mm + xo) * fl.MM, y_mm * fl.MM, (base_z_mm + h / 2) * fl.MM),
                            (w * fl.MM, dep * fl.MM, h * fl.MM), mat,
                            module=mod, module_objects=MO)
+            o.dimensions = (w * fl.MM, dep * fl.MM, h * fl.MM)   # add_box halves; set true size
             if asm is None:
                 asm = {"root": o, "name": nm}
         return asm, _box_anchors(x_mm, y_mm, base_z_mm, h)
@@ -2361,6 +2362,7 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
                        ((x_mm + xo) * fl.MM, (y_mm + yo) * fl.MM, (base_z_mm + h / 2) * fl.MM),
                        (w * fl.MM, dep * fl.MM, h * fl.MM), mat,
                        module=mod, module_objects=MO)
+        o.dimensions = (w * fl.MM, dep * fl.MM, h * fl.MM)   # add_box halves; set true size
         if asm is None:
             asm = {"root": o, "name": nm}
     return asm, _box_anchors(x_mm, y_mm, base_z_mm, h)
@@ -8736,12 +8738,15 @@ def _consolidate_control_cabinet(parts, MAT, MO):
         mat = fl.make_mat("m_control_cabinet", (0.62, 0.64, 0.68), metallic=0.55, roughness=0.45)
         MAT["m_control_cabinet"] = mat
     base_z = DECK_Z_MM + cab_h / 2.0
-    fl.add_box("u_control_cabinet", (cx * fl.MM, cy * fl.MM, base_z * fl.MM),
-               (cab_w * fl.MM, cab_d * fl.MM, cab_h * fl.MM), mat, module=None, module_objects=MO)
+    _cab = fl.add_box("u_control_cabinet", (cx * fl.MM, cy * fl.MM, base_z * fl.MM),
+                      (cab_w * fl.MM, cab_d * fl.MM, cab_h * fl.MM), mat, module=None, module_objects=MO)
+    _cab.dimensions = (cab_w * fl.MM, cab_d * fl.MM, cab_h * fl.MM)   # add_box halves; set true size
     # thin plinth so it reads as standing on the deck
-    fl.add_box("u_control_cabinet_plinth", (cx * fl.MM, cy * fl.MM, (DECK_Z_MM + 75.0) * fl.MM),
-               ((cab_w + 150) * fl.MM, (cab_d + 150) * fl.MM, 150.0 * fl.MM),
-               MAT.get("m_skid", mat), module=None, module_objects=MO)
+    _pl = fl.add_box("u_control_cabinet_plinth", (cx * fl.MM, cy * fl.MM, (DECK_Z_MM + 75.0) * fl.MM),
+                     ((cab_w + 150) * fl.MM, (cab_d + 150) * fl.MM, 150.0 * fl.MM),
+                     MAT.get("m_skid", mat), module=None, module_objects=MO)
+    _pl.dimensions = ((cab_w + 150) * fl.MM, (cab_d + 150) * fl.MM, 150.0 * fl.MM)
+    bpy.context.view_layer.update()
     print(f"[univ][layout] consolidated {n_units} control sub-component(s) into ONE control "
           f"cabinet ({cab_w/1000:.1f}×{cab_d/1000:.1f}×{cab_h/1000:.1f} m) at "
           f"({cx/1000:.1f}, {cy/1000:.1f})")
@@ -8965,9 +8970,16 @@ def add_ground_slab(parts, MAT, MO, bbox_mm=None):
         (cx * fl.MM, cy * fl.MM, z_centre * fl.MM),
         (w * fl.MM, d * fl.MM, GROUND_SLAB_THICK_MM * fl.MM),
         MAT[mkey], module="structure_containment", module_objects=MO)
-    print(f"[univ][ground] STAGE 4 floor — concrete deck {w/1000.0:.1f}×{d/1000.0:.1f} m, "
-          f"{GROUND_SLAB_THICK_MM/1000.0:.2f} m thick, top at DECK_Z={DECK_Z_MM} mm "
-          f"(plant sits on it)")
+    # add_box produces HALF the requested size here (confirmed: 55.7 m → obj.dimensions 27.8 m
+    # = exactly half; root cause of the deck never covering the tanks — Tristan 2026-06-22).
+    # Force the true size by setting obj.dimensions directly (version-independent).
+    slab.dimensions = (w * fl.MM, d * fl.MM, GROUND_SLAB_THICK_MM * fl.MM)
+    bpy.context.view_layer.update()
+    _sd = tuple(round(v / fl.MM) for v in slab.dimensions)
+    _sl = tuple(round(v / fl.MM) for v in slab.location)
+    print(f"[univ][ground] STAGE 4 floor — REQUESTED {w/1000.0:.1f}×{d/1000.0:.1f} m at "
+          f"({cx/1000.0:.1f},{cy/1000.0:.1f}); ACTUAL obj.dimensions={_sd} mm location={_sl} mm "
+          f"(if ACTUAL≈half the request, add_box is halving boxes)")
     # DEFINITIVE coverage test against the ACTUAL DRAWN MESHES (not part records — those kept
     # disagreeing with the render). Any equipment mesh whose XY footprint pokes past the drawn
     # slab is named; the slab is then re-grown + redrawn to swallow it, and we re-test. No
@@ -9006,6 +9018,8 @@ def add_ground_slab(parts, MAT, MO, bbox_mm=None):
             slab = fl.add_box("u_ground_slab", (cx * fl.MM, cy * fl.MM, z_centre * fl.MM),
                               (w * fl.MM, d * fl.MM, GROUND_SLAB_THICK_MM * fl.MM),
                               MAT[mkey], module="structure_containment", module_objects=MO)
+            slab.dimensions = (w * fl.MM, d * fl.MM, GROUND_SLAB_THICK_MM * fl.MM)  # add_box halves
+            bpy.context.view_layer.update()
             bad = _offslab(gx0, gx1, gy0, gy1)
         if bad:
             print(f"[univ][ground] coverage STILL OFF — {len(bad)} equipment mesh centre(s) off:")
