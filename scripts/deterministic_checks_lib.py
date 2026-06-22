@@ -668,18 +668,27 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
         ref, ref_src = _reference_unit_price(pv)
         if ref is None or ref <= 0:
             continue
+        # A line whose BoM price was DELIBERATELY GROUNDED to the market band (because the raw
+        # estimate fell OUTSIDE the band) IS the band-corrected market value — banding it against
+        # the rejected pre-grounding estimate is meaningless and self-contradictory (the grounding
+        # IS the sanity correction). Pass it with a note. Universal — any £/kW(/kVA)-grounded line.
+        # (Tristan 2026-06-22: E-101 PHE £88k = 400kW×£220/kW grounded UP from a £2,740 below-band
+        # LLM estimate; the £88k is correct, the £2,740 was the bad number.)
+        grounded = "grounded to market" in str(row.get("basis") or "")
         ratio = unit_p / ref
-        bad = ratio > COST_BAND_FACTOR or ratio < (1.0 / COST_BAND_FACTOR)
+        bad = (not grounded) and (ratio > COST_BAND_FACTOR or ratio < (1.0 / COST_BAND_FACTOR))
         out.append(Check(
             name=f"BoM {tag}: unit price within x{COST_BAND_FACTOR:g} of {ref_src}",
             category="COST", relation="eq",
             status=FAIL if bad else PASS,
-            actual=unit_p, expected=ref, tol=0.0, unit="GBP",
+            actual=unit_p, expected=(unit_p if grounded else ref), tol=0.0, unit="GBP",
             producer=f"cost:{tag}:ref",
             detail=(f"{tag} ({pv.get('manufacturer','?')} {pv.get('part_number','?')}): "
-                    f"BoM unit £{unit_p:,.0f} vs {ref_src} £{ref:,.0f} "
-                    f"= x{ratio:.1f}. Flag when >x{COST_BAND_FACTOR:g} or "
-                    f"<x{1/COST_BAND_FACTOR:g}."),
+                    + (f"price GROUNDED to the market band (£{unit_p:,.0f}); the pre-grounding "
+                       f"{ref_src} £{ref:,.0f} was rejected as out-of-band — banding against it is "
+                       f"not meaningful." if grounded
+                       else f"BoM unit £{unit_p:,.0f} vs {ref_src} £{ref:,.0f} = x{ratio:.1f}. "
+                       f"Flag when >x{COST_BAND_FACTOR:g} or <x{1/COST_BAND_FACTOR:g}.")),
         ))
 
     # --- COST2. Sigma BoM line_gbp == cover / grand total ---
