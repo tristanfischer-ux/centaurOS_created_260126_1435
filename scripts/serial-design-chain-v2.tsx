@@ -8409,6 +8409,17 @@ async function main() {
     console.error(`[chain] deliverable-copy step failed (non-fatal): ${(err as Error).message}`)
   }
 
+  // PDF-based audits (run / bom / layout) require a rendered chain-v2.pdf. In Excel-only mode
+  // (CHAIN_WANT_PDF != 1 — the DEFAULT; Tristan: "no PDFs, Excel only") there is NO PDF, so these
+  // false-fail — audit-pdf-bom emits B-0 "chain-v2.pdf missing → exit 10" on EVERY run, masking the
+  // real scorecard. UNIVERSAL fix: run the PDF audits ONLY when a PDF exists. In Excel-only mode the
+  // BoM + cost reconciliation is validated by the Excel ⚠Checks tab, and design quality by the
+  // state-based gates (parts-spec / sizing / slot-mispin / drawing-gates / self-audit / cost-sanity)
+  // that follow — none of which need a PDF.
+  if (!existsSync(resolve(outDir, 'chain-v2.pdf'))) {
+    console.error('[chain] PDF-off (Excel-only): skipping PDF-based audits (run/bom/layout); BoM validated by the Excel ⚠Checks tab + the state-based gates below.')
+  } else {
+
   // 2026-05-23 P0-5: auto-audit every chain run via the 5-axis audit script.
   // Writes AUDIT.md to outDir, exits 1 on HIGH findings. We don't propagate
   // its exit code — the audit is informational; chain success is defined by
@@ -8505,6 +8516,7 @@ async function main() {
     }
     console.error(`[chain] audit-pdf-layout flagged issues (see AUDIT-LAYOUT.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
+  }  // end PDF-based audits (only when a chain-v2.pdf was rendered)
 
   // 2026-05-24 (Tristan-asked, council L17 root-cause fix): parts-spec
   // validator. The L17 council found Schaltbau C310 mis-rated 3× (1500 A
