@@ -214,6 +214,18 @@ def sub_banner(ws: Worksheet, row: int, text: str, span: int) -> None:
     c.alignment = LEFT_TOP
 
 
+def unverified_banner(ws: Worksheet, row: int, span: int, text: str) -> int:
+    """A red, wrapped warning band spanning `span` columns at `row` — used to flag an
+    economics tab as presenting an UNVERIFIED model (no real sale price derivable for
+    this class). Returns the next free row. Two rows tall for the wrapped message."""
+    ws.merge_cells(start_row=row, start_column=1, end_row=row + 1, end_column=span)
+    c = ws.cell(row, 1, clean_cell(text))
+    c.fill = FILL_FAIL
+    c.font = FONT_FAIL
+    c.alignment = WRAP_TOP
+    return row + 2
+
+
 # Number formats (#37) — kill General/scientific. Excel display masks only;
 # they never change the stored value, so they are safe on live-formula cells.
 FMT_GBP = "£#,##0"          # money, no decimals
@@ -852,17 +864,20 @@ def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
         ws, state, run_dir, r, data_r, DATA_COL_A, fail_labels)
     fail_count += fc
 
-    # conditional formatting so STATUS cells colour live on open / recompute
-    from openpyxl.formatting.rule import CellIsRule
-    status_range = f"F{hdr+1}:F{r-1}"
-    ws.conditional_formatting.add(
-        status_range,
-        CellIsRule(operator="equal", formula=['"FAIL"'], fill=FILL_FAIL, font=FONT_FAIL),
-    )
-    ws.conditional_formatting.add(
-        status_range,
-        CellIsRule(operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS),
-    )
+    # conditional formatting so STATUS cells colour live on open / recompute. GUARD: only when
+    # there is >=1 check row — an archetype that yields ZERO checks would make an invalid F5:F4
+    # range and crash the whole Excel build (Tristan 2026-06-23 universality audit: SAF/satellite).
+    if r - 1 >= hdr + 1:
+        from openpyxl.formatting.rule import CellIsRule
+        status_range = f"F{hdr+1}:F{r-1}"
+        ws.conditional_formatting.add(
+            status_range,
+            CellIsRule(operator="equal", formula=['"FAIL"'], fill=FILL_FAIL, font=FONT_FAIL),
+        )
+        ws.conditional_formatting.add(
+            status_range,
+            CellIsRule(operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS),
+        )
     ws.cell(2, 1)  # keep title intact
     # ↑ Contents back-link at col span+1 (=H), clear of the hidden J–M data block.
     back_link(ws, 7)
@@ -2337,18 +2352,26 @@ def _econ_at(out: float, base_q: float, base_capex: float,
     recommended row. Holds labour fixed (small plants don't shed fixed staff), scales
     energy pro-rata with output, capex via the six-tenths law."""
     d = _ECON_DEFAULTS
-    sale = d["sale_price_ras"] if is_ras else d["sale_price_generic"]
+    # On the non-RAS path, mirror the SIGNAL-DERIVED drivers the live cells use (not the
+    # RAS hardcodes), so the Python colouring/recommended-row pick matches the workbook.
+    g = None if is_ras else _ECON_GENERIC
+    sale = d["sale_price_ras"] if is_ras else (g["sale_price"] if g else d["sale_price_generic"])
     feed_p = d["feed_price_ras"] if is_ras else d["feed_price_generic"]
     fcr = d["fcr_ras"] if is_ras else d["fcr_generic"]
     sale_mult = 1000.0 if is_ras else 1.0
+    hours = d["hours"] if is_ras else (g["hours"] if g else d["hours"])
+    load_factor = d["load_factor"] if is_ras else (g["load_factor"] if g else d["load_factor"])
+    energy_price = d["energy_price"] if is_ras else (g["energy_price"] if g else d["energy_price"])
+    labour = d["labour"] if is_ras else (g["labour"] if g else d["labour"])
+    other_opex = d["other_opex"] if is_ras else (g["other_opex"] if g else d["other_opex"])
     ratio = (out / base_q) if base_q else 1.0
     capex = base_capex * (ratio ** SCALE_EXPONENT)
     revenue = out * sale_mult * sale
     feed = out * sale_mult * fcr * feed_p
     # connected load scaled pro-rata with output (mirrors the sweep's energy formula)
-    energy = _ECON_LOAD_KW * ratio * d["hours"] * d["load_factor"] * d["energy_price"]
+    energy = _ECON_LOAD_KW * ratio * hours * load_factor * energy_price
     maint = capex * d["maint_pct"] / 100.0
-    opex = feed + energy + d["labour"] + maint + d["other_opex"]
+    opex = feed + energy + labour + maint + other_opex
     ebitda = revenue - opex
     r = d["discount_rate"] / 100.0
     n = d["project_life"]
@@ -2457,6 +2480,126 @@ def _econ_output_metric(state: dict) -> Tuple[float, str, str, str]:
     return 1.0, "unit", "£/unit", "output"
 
 
+def _output_is_per_year(out_unit: str) -> bool:
+    """Does the headline output metric carry a TIME dimension (per-year / per-day /
+    per-hour throughput or production)? If so, an annual £/yr revenue–EBITDA–IRR
+    model is the right frame (RAS t/yr, SAF t/yr, CO2 t/day). If NOT — a per-UNIT
+    manufactured product whose spec is W / kg / m (a satellite's bus power, a HAPS
+    payload mass) — '£/yr revenue / EBITDA / IRR' is the WRONG frame and the
+    per-year economic tabs should be flagged as not-applicable. Signal-based: looks
+    only at the unit string's time dimension, never at the archetype name."""
+    u = (out_unit or "").strip().lower()
+    # explicit per-time tokens anywhere in the unit (t/yr, kg/day, m³/h, /hr, p.a.)
+    for tok in ("/yr", "/year", "/y", "/day", "/d", "/h", "/hr", "/hour", "/s",
+                "/min", "/week", "/wk", "/month", "/mo", "per year", "per day",
+                "per hour", "p.a", "pa"):
+        if tok in u:
+            return True
+    return False
+
+
+def _econ_generic_drivers(state: dict, capex: float) -> Dict[str, Any]:
+    """Derive the NON-RAS economics drivers from physical signals already in state,
+    NOT from RAS-shaped hardcodes. Universal: keyed on signals (capex fraction,
+    operating-hours field), never on archetype name. Returns the driver values + an
+    honest, RAS-free basis string for each, plus `sale_price_verified` (False when no
+    real per-unit price is derivable → the economics tabs must be flagged UNVERIFIED).
+
+    The same dict feeds BOTH the live Inputs cells (tab_inputs_assumptions) and the
+    Python sweep mirror (_ECON_DEFAULTS / _econ_at) so the two stay byte-consistent."""
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    cap = capex if (capex and capex > 0) else 1_000_000.0
+
+    # ── operating hours: from an engine duty signal, else a labelled assumption.
+    hours = qval(q, "operating_hours_yr") or qval(q, "annual_operating_hours") \
+        or qval(q, "operating_hours_per_year")
+    if hours and hours > 0:
+        hours_basis = "from engine · operating_hours_yr"
+    else:
+        hours = 8000.0
+        hours_basis = ("assumed — typical process-plant annual operating hours "
+                       "(supply a class duty-cycle to refine)")
+
+    # ── load factor: from a duty / availability / capacity-factor signal, else a
+    # generic assumption (NOT 'continuous RAS duty').
+    lf = qval(q, "load_factor") or qval(q, "capacity_factor") \
+        or qval(q, "availability_factor") or qval(q, "duty_cycle")
+    if lf and 0 < lf <= 1.0:
+        load_factor = float(lf)
+        lf_basis = "from engine · duty-cycle / load-factor signal"
+    else:
+        load_factor = 0.65
+        lf_basis = ("assumed average/peak electrical load factor — supply a class "
+                    "duty-cycle to refine")
+
+    # ── labour: from a headcount/FTE signal if present, else an opex-fraction-of-
+    # capex proxy (no 'FTE for a small RAS' hardcode).
+    fte = qval(q, "operating_headcount") or qval(q, "fte_count") \
+        or qval(q, "operator_count") or qval(q, "staff_count")
+    if fte and fte > 0:
+        labour = round(float(fte) * 65_000.0, 0)  # £65k fully-loaded per FTE
+        labour_basis = (f"from engine · {int(round(fte))} FTE × £65,000 fully-loaded "
+                        "(edit the rate or headcount to refine)")
+    else:
+        labour = round(cap * 0.04, 0)  # 4% of capex/yr — a generic labour proxy
+        labour_basis = ("assumed — 4% of installed capex/yr as a labour proxy "
+                        "(no headcount signal; supply a class labour model to refine)")
+
+    # ── other opex: from a consumables signal if present, else opex-fraction-of-capex.
+    consum = qval(q, "consumables_cost_gbp_yr") or qval(q, "reagent_cost_gbp_yr") \
+        or qval(q, "annual_consumables_gbp")
+    if consum and consum > 0:
+        other_opex = round(float(consum), 0)
+        other_basis = "from engine · consumables / reagent annual cost"
+    else:
+        other_opex = round(cap * 0.02, 0)  # 2% of capex/yr — insurance/overhead proxy
+        other_basis = ("assumed — 2% of installed capex/yr (consumables, insurance, "
+                       "overhead; supply a class opex model to refine)")
+
+    # ── energy price: a generic UK-industrial assumption, NO RAS micro-grid claim.
+    energy_price = 0.15
+    energy_basis = ("assumed — UK industrial electricity ~£0.15/kWh "
+                    "(edit to your tariff)")
+
+    # ── sale price: only verified if a real per-unit price signal exists in state.
+    sale = qval(q, "sale_price_gbp_per_unit") or qval(q, "product_price_gbp") \
+        or qval(q, "unit_sale_price_gbp")
+    if sale and sale > 0:
+        sale_price = float(sale)
+        sale_verified = True
+        sale_basis = "from engine · product unit sale price"
+    else:
+        sale_price = 0.0  # do NOT ship a degenerate £1/unit stub
+        sale_verified = False
+        sale_basis = ("UNVERIFIED — no per-unit market price is derivable for this "
+                      "class. Enter a real sale price to make the economics tabs "
+                      "meaningful; until then revenue / EBITDA / IRR are not valid.")
+
+    return {
+        "hours": hours, "hours_basis": hours_basis,
+        "load_factor": load_factor, "load_factor_basis": lf_basis,
+        "labour": labour, "labour_basis": labour_basis,
+        "other_opex": other_opex, "other_opex_basis": other_basis,
+        "energy_price": energy_price, "energy_basis": energy_basis,
+        "sale_price": sale_price, "sale_price_basis": sale_basis,
+        "sale_price_verified": sale_verified,
+    }
+
+
+# Resolved non-RAS drivers for the current run, published by tab_inputs_assumptions
+# so the Python sweep mirror (_econ_at) reproduces what the live cells show. None on
+# the RAS path (the RAS _ECON_DEFAULTS values are used unchanged). Also carries the
+# sale-price-verified flag the economics tabs read to decide the UNVERIFIED banner.
+_ECON_GENERIC: Optional[Dict[str, Any]] = None
+
+
+def _econ_sale_unverified() -> bool:
+    """True when the current (non-RAS) run has no real per-unit sale price, so the
+    per-year economic tabs are presenting an UNVERIFIED model. False on the RAS path
+    (the £/kg fish price is grounded) and whenever a real price was derived."""
+    return bool(_ECON_GENERIC and not _ECON_GENERIC.get("sale_price_verified", False))
+
+
 def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
     """TAB 1 — editable yellow input cells, one per row, driving the whole model.
     Engine-derived values (tonnage, capex, connected load) are pulled from state
@@ -2512,6 +2655,14 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
 
     is_ras = price_unit == "£/kg"
 
+    # On the NON-RAS path derive the economics drivers from physical signals (capex
+    # fraction / operating-hours field), with honest RAS-free basis strings; publish
+    # them so the Python sweep mirror (_econ_at) reproduces the live cells. On the
+    # RAS path leave _ECON_GENERIC None so the grounded £/kg defaults stand unchanged.
+    global _ECON_GENERIC
+    gen = None if is_ras else _econ_generic_drivers(state, capex)
+    _ECON_GENERIC = gen
+
     ws = wb.create_sheet(INPUTS_SHEET)
     set_widths(ws, {"A": 34, "B": 14, "C": 12, "D": 74})
     title_row(
@@ -2541,31 +2692,53 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
         rows.append(("fcr", "Feed conversion ratio (FCR)", round(fcr, 3), "kg/kg",
                      fcr_basis, FMT_DEC2))
     else:
-        rows.append(("sale_price", "Sale price (per output unit)", 1.0,
-                     f"£/{out_unit}",
-                     "ASSUMPTION · generic unit price — set to the market value "
-                     "for this product (no RAS £/kg default applies)", FMT_GBP2))
+        # NON-RAS: a real per-unit price only when the engine supplies one; otherwise
+        # the price is UNVERIFIED (do NOT ship a degenerate £1/unit stub that fakes an
+        # investor model — the economics tabs are flagged UNVERIFIED instead).
+        rows.append(("sale_price", "Sale price (per output unit)",
+                     round(gen["sale_price"], 4), f"£/{out_unit}",
+                     gen["sale_price_basis"], FMT_GBP2))
         rows.append(("feed_price", "Feedstock price", 0.0, "£/unit",
-                     "ASSUMPTION · feedstock cost driver (0 if not feed-driven)",
+                     "assumed — feedstock cost driver (0 if not feed-driven)",
                      FMT_GBP2))
         rows.append(("fcr", "Feedstock conversion ratio", 0.0, "ratio",
-                     "ASSUMPTION · feed-to-output ratio (0 disables the feed term)",
+                     "assumed — feed-to-output ratio (0 disables the feed term)",
                      FMT_DEC2))
-    rows.append(("energy_price", "Energy price", 0.15, "£/kWh",
-                 "UK industrial net of the planned on-site renewable micro-grid; "
-                 "grid alone ~£0.22/kWh", FMT_GBP2))
-    rows.append(("load_kw", "Connected electrical load", round(load_kw, 1), "kW",
-                 load_basis, FMT_DEC1))
-    rows.append(("load_factor", "Electrical load factor", 0.65, "avg/peak",
-                 "continuous RAS duty, average/peak", FMT_DEC2))
-    rows.append(("hours", "Operating hours", 8760.0, "h/yr", "continuous",
-                 FMT_INT))
-    rows.append(("labour", "Labour", 300000.0, "£/yr",
-                 "≈8 FTE loaded for a small RAS; scale with tonnage", FMT_GBP))
-    rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
-                 "process-plant norm", FMT_DEC1))
-    rows.append(("other_opex", "Other opex", 120000.0, "£/yr",
-                 "LOX, chemicals, juveniles, insurance, overhead", FMT_GBP))
+    # Energy price / load factor / hours / labour / other opex: RAS keeps its grounded
+    # values + basis EXACTLY; the non-RAS path uses signal-derived values with honest,
+    # RAS-free basis strings (no LOX / juveniles / micro-grid / 'continuous RAS duty').
+    if is_ras:
+        rows.append(("energy_price", "Energy price", 0.15, "£/kWh",
+                     "UK industrial net of the planned on-site renewable micro-grid; "
+                     "grid alone ~£0.22/kWh", FMT_GBP2))
+        rows.append(("load_kw", "Connected electrical load", round(load_kw, 1), "kW",
+                     load_basis, FMT_DEC1))
+        rows.append(("load_factor", "Electrical load factor", 0.65, "avg/peak",
+                     "continuous RAS duty, average/peak", FMT_DEC2))
+        rows.append(("hours", "Operating hours", 8760.0, "h/yr", "continuous",
+                     FMT_INT))
+        rows.append(("labour", "Labour", 300000.0, "£/yr",
+                     "≈8 FTE loaded for a small RAS; scale with tonnage", FMT_GBP))
+        rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
+                     "process-plant norm", FMT_DEC1))
+        rows.append(("other_opex", "Other opex", 120000.0, "£/yr",
+                     "LOX, chemicals, juveniles, insurance, overhead", FMT_GBP))
+    else:
+        rows.append(("energy_price", "Energy price", round(gen["energy_price"], 4),
+                     "£/kWh", gen["energy_basis"], FMT_GBP2))
+        rows.append(("load_kw", "Connected electrical load", round(load_kw, 1), "kW",
+                     load_basis, FMT_DEC1))
+        rows.append(("load_factor", "Electrical load factor",
+                     round(gen["load_factor"], 3), "avg/peak",
+                     gen["load_factor_basis"], FMT_DEC2))
+        rows.append(("hours", "Operating hours", round(gen["hours"], 0), "h/yr",
+                     gen["hours_basis"], FMT_INT))
+        rows.append(("labour", "Labour", gen["labour"], "£/yr",
+                     gen["labour_basis"], FMT_GBP))
+        rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
+                     "process-plant norm", FMT_DEC1))
+        rows.append(("other_opex", "Other opex", gen["other_opex"], "£/yr",
+                     gen["other_opex_basis"], FMT_GBP))
     rows.append(("capex", "Installed capex", round(capex, 0), "£", capex_basis,
                  FMT_GBP))
     rows.append(("scale_exp", "Scaling exponent n  (capex ∝ output^n)",
@@ -2649,6 +2822,23 @@ def tab_economics(wb: Workbook, state: dict) -> bool:
         "(and the charts) recompute. Money £#,##0; margins 0.0%; years 0.0.",
     )
     r = 4
+    # Flag the tab UNVERIFIED when no real per-unit sale price exists (the revenue/
+    # EBITDA/IRR below are then NOT a valid investor model); and reframe when the
+    # output is a per-UNIT product rather than annual throughput.
+    if _econ_sale_unverified():
+        r = unverified_banner(
+            ws, r, 4,
+            "⚠ UNVERIFIED ECONOMICS — no per-unit market sale price could be "
+            "derived for this product class. Revenue, EBITDA, payback and IRR below "
+            "are NOT a valid investor model until you enter a real sale price on the "
+            "'Inputs & Assumptions' tab.")
+    if not _output_is_per_year(out_unit):
+        r = unverified_banner(
+            ws, r, 4,
+            "⚠ PER-UNIT PRODUCT — this output (" + clean_cell(out_unit) + ") is a "
+            "manufactured-product spec, not annual throughput. A £/yr revenue / "
+            "EBITDA / IRR frame does not apply; read this tab as per-unit cost, not "
+            "an annual P&L.")
 
     # ---- revenue + opex stack ----------------------------------------------
     sub_banner(ws, r, "Annual profit & loss", 4)
@@ -2887,6 +3077,19 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
         "and the whole curve, the Investment Analysis tab and the charts all move.",
     )
     r = 4
+    if _econ_sale_unverified():
+        r = unverified_banner(
+            ws, r, 8,
+            "⚠ UNVERIFIED ECONOMICS — no per-unit market sale price could be "
+            "derived for this product class. The whole revenue/EBITDA/IRR sweep "
+            "below is NOT a valid investor model until you enter a real sale price "
+            "on the 'Inputs & Assumptions' tab.")
+    if not _output_is_per_year(out_unit):
+        r = unverified_banner(
+            ws, r, 8,
+            "⚠ PER-UNIT PRODUCT — this output (" + clean_cell(out_unit) + ") is a "
+            "manufactured-product spec, not annual throughput; an annual £/yr "
+            "scale-economics sweep does not apply. Read as a per-unit cost curve.")
 
     # ---- FINE scale sweep ---------------------------------------------------
     base_q = round(out_qty, 6) or 204.0
@@ -3249,6 +3452,20 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
         "the curves all move. Output unit: " + out_unit + ".",
     )
     r = 4
+    if _econ_sale_unverified():
+        r = unverified_banner(
+            ws, r, 6,
+            "⚠ UNVERIFIED ECONOMICS — no per-unit market sale price could be "
+            "derived for this product class, so the sweet-spot / investability "
+            "verdict below is NOT a valid investor model. Enter a real sale price "
+            "on the 'Inputs & Assumptions' tab first.")
+    if not _output_is_per_year(out_unit):
+        r = unverified_banner(
+            ws, r, 6,
+            "⚠ PER-UNIT PRODUCT — this output (" + clean_cell(out_unit) + ") is a "
+            "manufactured-product spec, not annual throughput. 'IRR / payback / "
+            "investable scale' is the wrong frame for a per-unit product; treat the "
+            "figures below as indicative only.")
 
     # ── ★ CAPEX → MAX OUTPUT SOLVER (Tristan 2026-06-20: "how do you get as much fish
     #    production out for a specific amount of capex?"). The six-tenths cost-capacity
@@ -3342,8 +3559,9 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
                 f"{_fmt_yr(rec['payback'])} — the best NPV in range. The "
                 f"{_ECON_DEFAULTS['hurdle_rate']:.0f}% investor hurdle is not reached "
                 f"anywhere in the 0.2x-5x sweep at the current inputs"
-                + (" (set a real sale price on the Inputs tab — the generic £1/unit "
-                   "default makes every scale sub-viable)." if not is_ras
+                + (" (economics are UNVERIFIED — no per-unit sale price is "
+                   "derivable for this class; set a real sale price on the Inputs "
+                   "tab to get a meaningful model)." if _econ_sale_unverified()
                    else ".") )
         # £5M ceiling line
         if five:

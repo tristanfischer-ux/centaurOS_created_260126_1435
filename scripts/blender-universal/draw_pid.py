@@ -862,12 +862,15 @@ def _synthesise_control_loops(nodes: dict, lines: list, placed_instr: set,
       • DISSOLVED-OXYGEN loop  — the DO analyser on the rearing tank modulates the
         OXYGENATION system (AC controller, dashed signal to an O2 feed control valve).
       • LEVEL loop             — the level transmitter on the tank opens the MAKE-UP /
-        inlet water feed (LC controller, dashed signal to a make-up control valve).
+        inlet water feed (LC controller, dashed signal to a make-up control valve). Wired
+        ONLY when a REAL make-up / inlet / feed node exists (no self-loop fallback — a tank
+        with a level transmitter but no make-up feed, e.g. a CO₂/SAF surge drum, gets no
+        spurious life-support loop).
       • FT on the main recirc line — a flow transmitter on the principal recirculation pipe.
 
     Universal: keyed on the instruments the engine actually synthesised (DO / level) + the
     destination equipment NAME, never a product class. Returns a list[ControlLoop]; empty
-    when the design carries neither a DO nor a level instrument."""
+    when the design carries no DO instrument and no level-instrument-with-a-real-make-up-node."""
     loops: list[ControlLoop] = []
     # the node(s) carrying the DO / level measurement (a tank / vessel with that bubble).
     do_node = next((nd for nd in nodes.values()
@@ -887,16 +890,19 @@ def _synthesise_control_loops(nodes: dict, lines: list, placed_instr: set,
                 dst_fail_open=o2_fail_open))
 
     # --- level → make-up-water loop ---
+    # Only wire this when a REAL make-up destination exists (a make-up / inlet / feed / intake
+    # node distinct from the level tank). The old self-loop fallback (dst = the tank itself when
+    # no make-up node was found) fired for ANY design with a tank + level transmitter — drawing a
+    # spurious "level → make-up water" life-support loop on a CO₂/SAF plant whose level tank has
+    # no make-up feed at all. A genuine RAS keeps its real make-up node, so its loop still draws.
     if lvl_node is not None:
         mu_dest = _find_node(nodes, _MAKEUP_DEST_RE,
                              exclude_keys={lvl_node.key})
-        # if no explicit make-up node exists, the loop still reads correctly pointing back
-        # at the tank's own inlet — draw it as a self-loop on the level node's make-up valve.
-        dst = mu_dest.key if mu_dest is not None else lvl_node.key
-        loops.append(ControlLoop(
-            src_key=lvl_node.key, dst_key=dst,
-            measure_tag="LT", controller_tag="LC",
-            label="level → make-up", dst_valve_tag="FCV"))
+        if mu_dest is not None:
+            loops.append(ControlLoop(
+                src_key=lvl_node.key, dst_key=mu_dest.key,
+                measure_tag="LT", controller_tag="LC",
+                label="level → make-up", dst_valve_tag="FCV"))
 
     # --- FT on the MAIN recirculation line ---
     # pick the principal forward process line out of the tank (the recirc draw) — the
@@ -1697,8 +1703,29 @@ def reconstruct_process(schedule: dict, state: dict,
     notes.append("Instrument bubbles + valves shown where the design schedule carries "
                  "them; loop numbers are auto-allocated placeholders.")
     if control_loops:
-        notes.append("Control loops shown dashed: dissolved-oxygen → oxygenation and tank "
-                     "level → make-up water (life-safety interlocks).")
+        # Describe ONLY the loops actually wired, derived from each loop's label — never a
+        # fixed "DO → oxygenation and level → make-up (life-safety)" string. A CO₂/SAF plant
+        # that wired neither no longer claims fish-farm life-support interlocks; a real RAS
+        # that wired both still names them (and flags them life-safety).
+        has_do = any("do" in (cl.label or "").lower() or "oxygen" in (cl.label or "").lower()
+                     for cl in control_loops)
+        has_makeup = any("make-up" in (cl.label or "").lower()
+                         or "makeup" in (cl.label or "").lower() for cl in control_loops)
+        phrases = []
+        if has_do:
+            phrases.append("dissolved-oxygen → oxygenation")
+        if has_makeup:
+            phrases.append("tank level → make-up water")
+        for cl in control_loops:
+            lbl = (cl.label or "").lower()
+            if "do" in lbl or "oxygen" in lbl or "make-up" in lbl or "makeup" in lbl:
+                continue
+            if cl.label:
+                phrases.append(cl.label)
+        if phrases:
+            life_safety = " (life-safety interlocks)" if (has_do or has_makeup) else ""
+            notes.append("Control loops shown dashed: " + " and ".join(phrases)
+                         + life_safety + ".")
 
     return Process(archetype=arch, nodes=list(nodes.values()), lines=lines,
                    power_note=power_note, notes=notes,

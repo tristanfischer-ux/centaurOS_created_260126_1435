@@ -1756,6 +1756,40 @@ def _greeble_ladder(nm, cx_b, cy_b, r_b, z0_b, z1_b, steel, mod, MO):
                    rotation=(math.radians(90), 0, 0))
 
 
+# ── OPEN-REARING / open-process-water detector (H1, 2026-06-23) ──────────────
+# A bare `tank`/`storage` shape is NOT a signal that the vessel is OPEN to the
+# air with a free water surface. The teal-water + open-rim + centre-drain-stand-
+# pipe treatment below is the AQUACULTURE rearing-tank signature; a CO₂ / SAF /
+# e-fuel storage or pressure tank is a CLOSED roofed vessel. Gate the open-top
+# treatment on a POSITIVE physical signal: the part NAME names an open-rearing /
+# open-process-water structure (rearing / raceway / basin / pond / lagoon /
+# aquaculture / grow-out / nursery), OR the geometry MATERIAL is the aquaculture
+# water mat (an open-process-water CONTENTS cue set upstream). Never an archetype-
+# name string equality — keyed on the noun + the fluid-contents material only.
+_OPEN_REARING_RE = re.compile(
+    r"rearing|raceway|basin|\bpond\b|lagoon|aquacultur|grow.?out|nursery",
+    re.IGNORECASE)
+
+
+def _is_open_rearing_tank(nm, mat, MAT):
+    """True only when a POSITIVE open-rearing / open-process-water signal fires —
+    the part NAME matches an open-rearing noun, OR the vessel's body material IS
+    the aquaculture open-water mat (an explicit open-process-water contents cue).
+    `nm` is the normalised object base-name ("u_<part-name>…") so the rearing-tank
+    noun survives as a substring. Default (no signal) → CLOSED storage tank."""
+    if _OPEN_REARING_RE.search(str(nm or "")):
+        return True
+    # open-process-water CONTENTS cue: the shell mat is the aquaculture water mat
+    # (set upstream when the contents are an open process-water pool, not a closed
+    # storage/pressure inventory). Compared by identity against MAT["u_water"].
+    try:
+        if "u_water" in MAT and mat is MAT["u_water"]:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, MO,
                  MAT, lagged=False):
     """Deterministic process vessel = shell + two dished heads + a kind-specific
@@ -1804,8 +1838,15 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
         return {"root": shell, "name": nm}, anchors
 
     if kind == "tank":
-        # SQUAT large-diameter cylinder, FLAT bottom on a low plinth, shallow
-        # cone/dome roof. Emphatically NOT a sphere.
+        # SQUAT large-diameter cylinder, FLAT bottom on a low plinth. Emphatically
+        # NOT a sphere. The ROOF treatment forks on a PHYSICAL signal (H1, 2026-06-23):
+        #   • OPEN-REARING signal (name = rearing/raceway/basin/pond/lagoon/aquaculture/
+        #     grow-out/nursery, OR the open-process-water contents mat) → the AQUACULTURE
+        #     open-top treatment: recessed teal WATER SURFACE + open steel RIM + centre
+        #     dual-drain STANDPIPE (the RAS signature). PRESERVED EXACTLY.
+        #   • DEFAULT (any other tank/storage — a CO₂ / SAF / e-fuel closed storage or
+        #     pressure tank) → a CLOSED roofed vessel: a shallow low-DOME roof, NO water
+        #     surface, NO standpipe. A closed inventory is not an open pool.
         body_h = length_mm * fl.MM
         plinth_h = max(0.10, r * 0.10)
         z_bot = base_z_mm * fl.MM + plinth_h
@@ -1814,36 +1855,50 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
                    r * 1.08, plinth_h, steel, module=mod, module_objects=MO)
         shell = fl.add_cyl(f"{nm}_shell", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h / 2),
                            r, body_h, mat, module=mod, module_objects=MO)
-        # OPEN-TOP RAS tank (council 2026-06-16: the solid lid read as a featureless
-        # green blob). Now: a recessed DARK WATER SURFACE so top-down reads "open tank
-        # with water"; a steel RIM ring at the open edge; a CENTRE dual-drain STANDPIPE
-        # (the signature RAS fitting); a scale-aware perimeter handrail that survives the
-        # plant zoom. Universal for kind=="tank".
-        rim_z = z_bot + body_h
-        water_z = z_bot + body_h * 0.90                       # ~10% freeboard below the rim
-        if "u_water" not in MAT:
-            # reflective aquaculture water — brighter teal-green + low roughness so it reads as
-            # a WATER surface (a mirror-ish sheen), not a flat dark disc (Tristan 2026-06-22 #5).
-            MAT["u_water"] = fl.make_mat("m_u_water", (0.06, 0.40, 0.46), metallic=0.0, roughness=0.06)
-        fl.add_cyl(f"{nm}_watersurf", (x_mm * fl.MM, y_mm * fl.MM, water_z), r * 0.965, 0.05,
-                   MAT["u_water"], module=mod, module_objects=MO)
-        fl.add_torus(f"{nm}_rim", (x_mm * fl.MM, y_mm * fl.MM, rim_z),
-                     r, max(0.06, r * 0.03), steel, module=mod, module_objects=MO)
-        # a LOW centre dual-drain standpipe — just proud of the water (the RAS signature),
-        # NOT a tall column. Tristan 2026-06-16: the #139 rim furniture (8 posts + handrail
-        # + wind-girder per tank, ×10) read as a SCALLOPED BLOB silhouette — "blobby again".
-        # mempalace (render-regression 2026-06-13): the decent renders are CLEAN cylinders
-        # with shading, not busy furniture. Stripped the posts/handrail/wind-girder; a tank
-        # now reads as a clean shallow cylinder + dark water + a thin rim + a low centre drain.
-        fl.add_cyl(f"{nm}_centredrain", (x_mm * fl.MM, y_mm * fl.MM, water_z + 0.18),
-                   max(0.10, r * 0.04), 0.45, steel, module=mod, module_objects=MO)
         anchors = {"top": (x_mm, y_mm, (z_bot + body_h) / fl.MM),
                    "bottom": (x_mm, y_mm, z_bot / fl.MM),
                    "centre": (x_mm, y_mm, (z_bot + body_h / 2) / fl.MM)}
-        # NO bolted side manway / nozzles on an OPEN tank (mempalace render-regression
-        # 2026-06-13: "_add_vessel_nozzles … reads as random grey circles stuck on the
-        # tanks" — WRONG for an open RAS tank, whose tie-ins come from the per-instance
-        # MANIFOLD, not a pressure-vessel manway). Closed vessels below keep their nozzles.
+        if _is_open_rearing_tank(nm, mat, MAT):
+            # OPEN-TOP RAS rearing tank (council 2026-06-16: the solid lid read as a
+            # featureless green blob). A recessed DARK WATER SURFACE so top-down reads
+            # "open tank with water"; a steel RIM ring at the open edge; a CENTRE dual-
+            # drain STANDPIPE (the signature RAS fitting). Fires ONLY on the open-rearing
+            # signal — a closed CO₂/SAF storage tank never grows a water pool.
+            rim_z = z_bot + body_h
+            water_z = z_bot + body_h * 0.90                       # ~10% freeboard below the rim
+            if "u_water" not in MAT:
+                # reflective aquaculture water — brighter teal-green + low roughness so it reads as
+                # a WATER surface (a mirror-ish sheen), not a flat dark disc (Tristan 2026-06-22 #5).
+                MAT["u_water"] = fl.make_mat("m_u_water", (0.06, 0.40, 0.46), metallic=0.0, roughness=0.06)
+            fl.add_cyl(f"{nm}_watersurf", (x_mm * fl.MM, y_mm * fl.MM, water_z), r * 0.965, 0.05,
+                       MAT["u_water"], module=mod, module_objects=MO)
+            fl.add_torus(f"{nm}_rim", (x_mm * fl.MM, y_mm * fl.MM, rim_z),
+                         r, max(0.06, r * 0.03), steel, module=mod, module_objects=MO)
+            # a LOW centre dual-drain standpipe — just proud of the water (the RAS signature),
+            # NOT a tall column. Tristan 2026-06-16: the #139 rim furniture (8 posts + handrail
+            # + wind-girder per tank, ×10) read as a SCALLOPED BLOB silhouette — "blobby again".
+            # mempalace (render-regression 2026-06-13): the decent renders are CLEAN cylinders
+            # with shading, not busy furniture. Stripped the posts/handrail/wind-girder; a tank
+            # now reads as a clean shallow cylinder + dark water + a thin rim + a low centre drain.
+            fl.add_cyl(f"{nm}_centredrain", (x_mm * fl.MM, y_mm * fl.MM, water_z + 0.18),
+                       max(0.10, r * 0.04), 0.45, steel, module=mod, module_objects=MO)
+            # NO bolted side manway / nozzles on an OPEN tank (mempalace render-regression
+            # 2026-06-13: "_add_vessel_nozzles … reads as random grey circles stuck on the
+            # tanks" — WRONG for an open RAS tank, whose tie-ins come from the per-instance
+            # MANIFOLD, not a pressure-vessel manway).
+        else:
+            # CLOSED-TOP storage / pressure tank (the universal default): a shallow low-
+            # DOME roof closes the shell — no open water surface, no centre standpipe. The
+            # correct silhouette for a CO₂ / SAF / e-fuel closed inventory. Roof = a sphere
+            # squashed in Z to a low cap, capped to a realistic rise.
+            roof_rise = min(r * 0.35, body_h * 0.20)
+            roof = fl.add_sphere(f"{nm}_roof", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h),
+                                 r * 0.99, mat, module=mod, module_objects=MO)
+            roof.scale = (1.0, 1.0, max(0.12, roof_rise / max(r, 1e-6)))
+            # closed tanks legitimately carry tie-in nozzles + a top manway (unlike the
+            # open rearing tank). Anchor top stays at the dome apex for routing.
+            anchors["top"] = (x_mm, y_mm, (z_bot + body_h + roof_rise) / fl.MM)
+            _add_vessel_nozzles(nm, anchors, dia_mm, "tank", MAT, mod, MO)
         _greeble_ladder(nm, x_mm * fl.MM, y_mm * fl.MM, r, z_bot, z_bot + body_h, steel, mod, MO)
         return {"root": shell, "name": nm}, anchors
 
@@ -6367,12 +6422,15 @@ def _load_required_services():
         from component_engineering import _required_services as _rs
         return _rs
     except Exception:
-        def _rs(name, module, function):   # replica of component_engineering._required_services
+        def _rs(name, module, function, wet_plant=True):   # replica of component_engineering._required_services
             t = re.sub(r'[^a-z0-9]', '', f"{name} {module} {function}".lower())
             m = re.sub(r'[^a-z0-9]', '', str(module or '').lower()); req = set()
             if any(k in t for k in ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan', 'lamp', 'mixer', 'agitat')):
                 req.add('power')
-            if any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'fan', 'compress')):
+            # PROCESS-FLUID role gated on the WET-plant signal (M1, 2026-06-23 — keep in
+            # sync with component_engineering._required_services). RAS-only tokens
+            # ('rear','cone') are a conditional extension folded in here, never universal.
+            if wet_plant and any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'fan', 'compress')):
                 req.add('water')
             if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
                 req.add('signal')
@@ -6397,7 +6455,7 @@ def _load_required_services():
                     req.add('signal')
                 if 'controlcompute' in m or 'communication' in m:
                     req.update(('signal', 'power'))
-                if 'massfluid' in m or 'watertreatment' in m or 'fluidtransport' in m:
+                if wet_plant and ('massfluid' in m or 'watertreatment' in m or 'fluidtransport' in m):
                     req.add('water')
                 if 'environmentalinterface' in m:
                     req.add('power')
@@ -6572,10 +6630,17 @@ def augment_topology_connect_orphans(state, topology, parts):
     # authored one of them (e.g. Expansion Reservoir → Rearing Tank gives an OUT but no
     # IN). Universal — keyed on edge direction, no per-part table.
     have = {}
+    plant_is_wet = False   # WET-plant signal (M1, 2026-06-23): does the topology carry
+    #                        any process-FLUID edge? A dry archetype (satellite / aero /
+    #                        BESS / generic_assembly) has none → its parts default to
+    #                        power/signal, never a spurious process-water pipe. Physical
+    #                        signal (fluid topology edge), never an archetype-name string.
     for e in topology:
         svc = _edge_service(e.get('mechanism'))
         if not svc:
             continue
+        if svc == 'water':
+            plant_is_wet = True
         for endp in (e.get('from_part'), e.get('to_part')):
             pp = resolve_endpoint(str(endp or ''), parts)
             if pp is not None:
@@ -6660,7 +6725,7 @@ def augment_topology_connect_orphans(state, topology, parts):
                 n_chain += 1
 
     for p in parts:
-        needed = _REQUIRED_SERVICES(p.name, p.module_id or '', getattr(p, 'function', '') or '')
+        needed = _REQUIRED_SERVICES(p.name, p.module_id or '', getattr(p, 'function', '') or '', plant_is_wet)
         got = have.get(p.name, set())
         # a FINAL CONTROL ELEMENT that is ACTUATED (a control valve / solenoid / motorised
         # / actuated damper) takes a command signal, even when its role only asked for
@@ -7947,11 +8012,15 @@ def _terminal_marker(nm, face_xyz_mm, MAT, mod, MO, kind="power"):
     return (fx, fy, fz)
 
 
-def _required_ports_for(part, adj_entry):
+def _required_ports_for(part, adj_entry, wet_plant=True):
     """The set of (service, direction) ports a part needs, from its ledger adjacency.
     direction ∈ {"in","out"}. `adj_entry` = ledger adjacency[name] or None.
-    Universal fallback when the part has NO ledger edges: a flow-through PROCESS part
-    gets water in+out; a pure electrical/control part gets a single power_in."""
+    Universal fallback when the part has NO ledger edges: on a WET / process-fluid
+    plant a flow-through PROCESS part gets water in+out; a pure electrical/control
+    part (or ANY part on a DRY plant — satellite/aero/BESS — with no fluid topology)
+    gets a single power_in. `wet_plant` (M1, 2026-06-23) gates the water default on a
+    PHYSICAL signal (fluid edges present), so a dry archetype never grows a spurious
+    water in/out. Default True preserves the wet-plant behaviour for legacy callers."""
     wanted = []
     seen = set()
 
@@ -7978,10 +8047,13 @@ def _required_ports_for(part, adj_entry):
     # electrical SHAPE. A genuine flow-through PROCESS part with no edges still gets
     # water in+out. Universal — name/shape-keyed, no class table.
     if part.shape in _PORT_ELECTRICAL_SHAPES \
-            or _is_dry_ancillary(getattr(part, "name", "")):
-        _add("power", "in")                           # cabinet/instrument/dry station → power feed
+            or _is_dry_ancillary(getattr(part, "name", "")) \
+            or not wet_plant:
+        # cabinet / instrument / dry station → power feed; AND on a DRY plant (no fluid
+        # topology) EVERY no-edge part defaults to power, never a spurious water in/out.
+        _add("power", "in")
     else:
-        _add("water", "in"); _add("water", "out")     # flow-through process default
+        _add("water", "in"); _add("water", "out")     # flow-through process default (WET plant)
     return wanted
 
 
@@ -8001,6 +8073,17 @@ def add_connection_ports(parts, MAT, MO, ledger_adj):
     p.ports[f"{service}_{dir}"]. Returns (n_parts_with_ports, n_ports_total)."""
     adj = ledger_adj or {}
     n_with, n_ports = 0, 0
+    # WET-plant signal (M1, 2026-06-23): the design has a process-FLUID topology iff any
+    # ledger adjacency edge is a water/fluid service. On a DRY plant (satellite / aero /
+    # BESS — zero fluid edges) the no-edge port fallback defaults to POWER, not a spurious
+    # water in/out. Physical signal (ledger fluid edges), never an archetype-name string.
+    def _adj_has_water(entry):
+        for d in ("inputs", "outputs"):
+            for e in (entry.get(d) or []):
+                if str(e.get("service") or "").lower() == "water":
+                    return True
+        return False
+    wet_plant = any(_adj_has_water(e) for e in adj.values())
     for p in parts:
         if not getattr(p, "placed_xyz_mm", None):
             continue                                  # never placed → nothing to port
@@ -8008,7 +8091,7 @@ def add_connection_ports(parts, MAT, MO, ledger_adj):
         # solid) → they are not a connectable process item; skip (no port, no record).
         if _layout_is_envelope(p):
             continue
-        wanted = _required_ports_for(p, adj.get(p.name))
+        wanted = _required_ports_for(p, adj.get(p.name), wet_plant)
         if not wanted:
             continue
         # placed footprint extents (mm) → port positions on the walls. footprint_mm
@@ -13893,11 +13976,21 @@ def main():
     # no process feed are supplied from their nearest O₂ source (LOX/oxygen-supply/header)
     # by an OXYGEN line — the physically-correct tie, so they stop reading as missing_input.
     _candidate = _candidate + cl.close_oxygen_directions(parts, _candidate, log=lambda m: print(m))
+    # WET-plant signal (M1, 2026-06-23): the design carries a process-FLUID topology iff
+    # any candidate edge is a fluid service. Bind it onto the required-services classifier
+    # so the power-direction closer + the completeness audit agree that a DRY archetype
+    # (satellite / aero / BESS / generic_assembly — no fluid edges) needs NO process water,
+    # rather than flagging/closing a spurious water tie. Physical signal (fluid edges),
+    # never an archetype-name string. A RAS / wet plant has fluid edges → wet → unchanged.
+    _plant_is_wet = any(_edge_service(e.get('mechanism')) == 'water' for e in _candidate)
+
+    def _required_services_wet(name, module, function):
+        return _REQUIRED_SERVICES(name, module, function, _plant_is_wet)
     # every part that REQUIRES power but shows no supply gets a feed from the distribution
     # hub — closes the completeness audit's 'missing [power]' concern (e.g. a blower with
     # no power feed). Uses the SAME _REQUIRED_SERVICES the audit reads, so it fills exactly
     # the gaps the audit flags.
-    _candidate = _candidate + cl.close_power_directions(parts, _candidate, _REQUIRED_SERVICES,
+    _candidate = _candidate + cl.close_power_directions(parts, _candidate, _required_services_wet,
                                                         log=lambda m: print(m))
     _candidate = _candidate + cl.close_subcomponents(parts, _candidate, log=lambda m: print(m))
     # final boundary connector: sinks fed from their producer + discharged to disposal;
@@ -13908,7 +14001,7 @@ def main():
     # STRICT completeness gate — every part must SHOW its required input + output (Tristan
     # 2026-06-20). A concern = a part not fully connected; it is written to the ledger
     # artifact so the deterministic suite can FAIL on it (no 80%-coverage absorption).
-    _ledger_concerns = cl.audit_completeness(parts, topology, _REQUIRED_SERVICES,
+    _ledger_concerns = cl.audit_completeness(parts, topology, _required_services_wet,
                                              log=lambda m: print(m))
     # Per-part adjacency (the traceable "which part connects to what") + referential
     # integrity (every reference names a real part on both ends) — Tristan 2026-06-20.

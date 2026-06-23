@@ -1340,9 +1340,18 @@ interface UtilitySpec {
   key: string
   driver: (q: Record<string, number>) => number | undefined // the contract duty that sizes it
   label: string
+  // OPTIONAL labelOf: when the bare `driver` quantity is ambiguous across archetypes (e.g.
+  // media_volume_m3 = MBBR biofilm carrier on a bio-plant, but catalyst / resin / packing on
+  // a chemical bed), resolve the equipment NAME from a PHYSICAL signal in the quantities so a
+  // non-bio plant gets a generic "Packed Media" line, never "Biofilm Carrier (MBBR)". When
+  // present it overrides `label`; `label` remains the default for every other consumer.
+  labelOf?: (q: Record<string, number>) => string
   module: RegExp
   size: (d: number) => { dim: string; rating: [string, string]; gbp: number }
-  form: (d: number) => string
+  // `form` may read the full contract quantities (2nd arg) to make its rationale conditional
+  // on a PHYSICAL signal (e.g. a nitrification / bio-process key) rather than asserting a
+  // fixed archetype rationale. Specs that don't need it keep the single-arg `(d) => …` form.
+  form: (d: number, q?: Record<string, number>) => string
   // OPTIONAL supersedes: the physics-derived system REPLACES any generic word-engine
   // PLACEHOLDER for the same function (e.g. the LOX system supersedes the bare
   // "Oxygenation System" word). When this fires, the matching non-flagged principal
@@ -1382,19 +1391,20 @@ const UTILITY_SYSTEMS: UtilitySpec[] = [
     form: (kw) => `On-line double-conversion UPS + battery (~30 min autonomy) sized to the ~${Math.round(kw * 0.08)} kW control + instrument + alarm load; rides the PLC, dissolved-oxygen analysers and auto-dialler through the genset start so the plant alarms even while mains is lost` },
 ]
 
-function utilityWord(spec: UtilitySpec, d: number, category: 'utility' | 'process' = 'utility'): WordLike {
+function utilityWord(spec: UtilitySpec, d: number, category: 'utility' | 'process' = 'utility', quantities?: Record<string, number>): WordLike {
   const s = spec.size(d)
   const mods: ModifierCharacter[] = [mod('quantity', '×1')]
   if (s.dim) mods.push(mod('dimension', s.dim))
   mods.push(mod('rating_primary', s.rating[0], s.rating[1]))
   mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(s.gbp)))))
-  mods.push(mod('form', spec.form(d)))
+  mods.push(mod('form', spec.form(d, quantities)))
   mods.push(mod('part_number', 'TBD (catalogue class)'))
   mods.push(mod('lifecycle', `Concept design — ${category === 'process' ? 'process-support' : 'balance-of-plant'} system sized from the contract duty; exact MPN at detailed design`))
   mods.push(mod('installation', `Plant-level ${category === 'process' ? 'process' : 'utility / safety'} system; placement confirmed at layout`))
   const id = `${category === 'process' ? 'proc' : 'util'}_${spec.key}`
   const flags = category === 'process' ? { _synthesized: true, _process: true } : { _synthesized: true, _utility: true }
-  return { id, name_human: spec.label, content_character: { character_id: id, name_human: spec.label }, modifier_characters: mods, ...(flags as object) }
+  const label = (spec.labelOf && quantities) ? spec.labelOf(quantities) : spec.label
+  return { id, name_human: label, content_character: { character_id: id, name_human: label }, modifier_characters: mods, ...(flags as object) }
 }
 
 function isProcessSystem(w: WordLike): boolean {
@@ -1510,10 +1520,33 @@ function sizeMainIncomer(
 // oxygen demand implies LOX storage + vaporiser, a declared solids load implies dewatering.
 // Same machinery as the utility systems (#142), priced whole from the duty.
 // ──────────────────────────────────────────────────────────────────────────────
+// A nitrification / biological-process signal: present only when the contract declares a
+// bio-treatment duty (biofilter media, an alkalinity-against-nitrification dose, an ammonia /
+// nitrate / TAN load). A chemical plant (CO₂ capture, SAF) has none of these even when it
+// doses chemicals, so its dosing rationale stays generic ("process pH / chemistry"), never
+// "nitrification". Universal — keyed on the physical bio quantities, never a class name.
+function hasNitrificationSignal(q: Record<string, number>): boolean {
+  return (pickQ(q, /nitrif|alkalinity|ammonia|_tan_|nitrate|biofilm|biofilter|_bio_/i) ?? 0) > 0
+}
+// Derive the SCADA closed-loop list from the measurement quantities the contract actually
+// carries — universal, no fixed RAS string. Each entry fires only when its physical signal is
+// present (a DO loop only when there's a dissolved-oxygen duty; a pH loop only with a pH/dose
+// signal; etc.). Returns "every measured process loop" when no specific signal is present.
+function scadaLoopList(q: Record<string, number>): string {
+  const loops: string[] = []
+  if ((pickQ(q, /\blevel\b|_level_|tank_level|water_level/i) ?? 0) > 0) loops.push('level')
+  if ((pickQ(q, /temperature|_temp_|_temp_c|thermal_load|heating_load|cooling_load/i) ?? 0) > 0) loops.push('temperature')
+  if ((pickQ(q, /oxygen|dissolved.?oxygen|\bdo_|_do_|aeration/i) ?? 0) > 0) loops.push('dissolved-oxygen')
+  if ((pickQ(q, /\bph\b|_ph_|alkalinity|_dose_kg_day$|dosing_kg/i) ?? 0) > 0) loops.push('pH')
+  if ((pickQ(q, /flow|_m3_h$|throughput|recirc/i) ?? 0) > 0) loops.push('flow')
+  if ((pickQ(q, /pressure|_bar$|_kpa$|_mpa$/i) ?? 0) > 0) loops.push('pressure')
+  if ((pickQ(q, /conductiv|salinity|_ec_/i) ?? 0) > 0) loops.push('conductivity')
+  return loops.length ? `every measured loop (${loops.join(' / ')})` : 'every measured process loop'
+}
 const PROCESS_SYSTEMS: UtilitySpec[] = [
   { key: 'chemical_dosing', driver: (q) => pickQ(q, /_dose_kg_day$|dosing_kg|alkalinity_dose/), label: 'Chemical Dosing System (pH / Alkalinity)', module: /mass_fluid|process|chemical|dosing|water/,
     size: (kgd) => { const store = Math.max(2, (kgd * 7) / 1000); return { dim: cylinderFromVolumeM3(store, 'dosing tank'), rating: [String(Math.round(kgd)), 'kg/day'], gbp: Math.round(30000 + kgd * 20) } },
-    form: (kgd) => `Bulk + day storage (~${Math.round((kgd * 7) / 1000)} m³, 7-day) + duty/standby dosing pumps + in-line mixer; doses ~${Math.round(kgd)} kg/day to hold pH / alkalinity against nitrification` },
+    form: (kgd, q) => `Bulk + day storage (~${Math.round((kgd * 7) / 1000)} m³, 7-day) + duty/standby dosing pumps + in-line mixer; doses ~${Math.round(kgd)} kg/day to ${q && hasNitrificationSignal(q) ? 'hold pH / alkalinity against nitrification' : 'hold process pH / chemistry to the declared dose-rate set-point'}` },
   { key: 'feed_system', driver: (q) => pickQ(q, /daily_feed_kg|feed_kg_day|_feed_kg$/), label: 'Feed Storage + Distribution System', module: /mass_fluid|process|feed/,
     size: (kgd) => { const silo = Math.max(10, (kgd * 14) / 650); return { dim: cylinderFromVolumeM3(silo, 'feed silo'), rating: [String(Math.round(kgd)), 'kg/day'], gbp: Math.round(40000 + kgd * 30) } },
     form: (kgd) => `Bulk feed silos (~${Math.round((kgd * 14) / 650)} m³, ~2-week) + pneumatic conveying + per-tank automatic feeders + load cells; delivers ~${Math.round(kgd)} kg/day on a controlled ration` },
@@ -1525,18 +1558,34 @@ const PROCESS_SYSTEMS: UtilitySpec[] = [
     form: (kgd) => `Gravity thickener + rotary-screen / belt dewatering + skip; concentrates ~${Math.round(kgd)} kg/day captured solids to a haulable cake for off-site disposal` },
   { key: 'scada', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'SCADA / Plant Control System', module: /control|compute|scada|sensing|instrument/,
     size: (kw) => ({ dim: '', rating: [String(Math.round(kw)), 'kW plant'], gbp: Math.round(60000 + kw * 50) }),
-    form: (kw) => `Redundant PLC racks + SCADA servers + operator HMIs + plant network + auto-dialler alarms; closes every measured loop (level / temperature / DO / pH) and alarms the ~${Math.round(kw)} kW plant 24/7` },
-  { key: 'biofilm_media', driver: (q) => pickQ(q, /_media_volume_m3$|media_volume_m3$/), label: 'Biofilm Carrier Media (MBBR)', module: /mass_fluid|process|water|biofilter/,
+    // The closed-loop list is DERIVED from the measurement quantities the contract actually
+    // carries (level / temperature / DO / pH / flow / pressure / conductivity), never a fixed
+    // RAS string — a CO₂/SAF plant lists the loops IT measures, not "DO / pH". Generic fallback
+    // ("every measured process loop") when no measurement signal is present.
+    form: (kw, q) => `Redundant PLC racks + SCADA servers + operator HMIs + plant network + auto-dialler alarms; closes ${q ? scadaLoopList(q) : 'every measured process loop'} and alarms the ~${Math.round(kw)} kW plant 24/7` },
+  // media_volume_m3 is AMBIGUOUS: MBBR biofilm carrier on a bio-plant, but catalyst / resin /
+  // adsorbent / structured packing on a chemical bed (SAF, CO₂). Resolve the equipment NAME +
+  // rationale from a nitrification/bio signal — generic "packed media" otherwise. The volume
+  // still SIZES the line either way. Universal — keyed on the physical bio signal, never a class.
+  { key: 'biofilm_media', driver: (q) => pickQ(q, /_media_volume_m3$|media_volume_m3$/), label: 'Packed / Bed Media', labelOf: (q) => hasNitrificationSignal(q) ? 'Biofilm Carrier Media (MBBR)' : 'Packed / Bed Media', module: /mass_fluid|process|water|biofilter/,
     size: (v) => ({ dim: `${Math.round(v)} m³ fill`, rating: [String(Math.round(v)), 'm³'], gbp: Math.round(v * 700) }),
-    form: (v) => `~${Math.round(v)} m³ of high-surface-area polyethylene biofilm carriers (moving-bed / MBBR media, ~500–800 m²/m³); the nitrifying-biofilm support that does the ammonia removal — the working heart of the biofilter, and a major line a shell-only take-off misses entirely` },
+    form: (v, q) => (q && hasNitrificationSignal(q))
+      ? `~${Math.round(v)} m³ of high-surface-area polyethylene biofilm carriers (moving-bed / MBBR media, ~500–800 m²/m³); the nitrifying-biofilm support that does the ammonia removal — the working heart of the biofilter, and a major line a shell-only take-off misses entirely`
+      : `~${Math.round(v)} m³ of bed media fill (the catalyst / sorbent / structured packing the process beds require); a major bulk-media line a shell-only take-off misses entirely` },
   { key: 'grading_harvest', driver: (q) => pickQ(q, /standing_biomass_kg|harvest_biomass_kg/), label: 'Grading / Harvest System', module: /mass_fluid|process|actuation|harvest/,
     size: (bio) => ({ dim: '', rating: [String(Math.round(bio / 1000)), 't biomass'], gbp: Math.round(40000 + (bio / 1000) * 100) }),
     form: (bio) => `Fish pump + grader + counter + crowding screens; handles the ~${Math.round(bio / 1000)} t standing biomass for routine grading + harvest without manual netting` },
   // Tristan 2026-06-16: "how do they get harvested AND chilled?" — the grading/harvest
   // system above lands the fish, but a harvested batch must be CHILLED immediately (from
-  // the culture temperature to ~1 °C) for product quality + shelf life. Driven by the
-  // annual throughput; universal — any plant declaring a harvest/production rate gets it.
-  { key: 'harvest_chilling', driver: (q) => pickQ(q, /annual_production_t_yr|harvest_throughput_t_yr|production_capacity_t_yr/), label: 'Product Chilling + Ice System', module: /mass_fluid|process|harvest|environmental|water/,
+  // the culture temperature to ~1 °C) for product quality + shelf life.
+  // GATE (2026-06-23): keyed on a PERISHABLE-BIOMASS signal, NOT the bare annual t/yr.
+  // A CO₂-capture or e-fuel plant is also rated in t/yr but produces a stable chemical that
+  // needs no flake-ice; only a plant that declares a live/harvested BIOMASS quantity gets a
+  // fish-chilling ice system. The throughput still SIZES the chiller — but only once the
+  // biomass signal has CONFIRMED the product is a perishable harvest. Universal: any plant
+  // with a standing/harvest biomass duty AND a throughput rate gets it; a chemical plant
+  // (no biomass quantity) never does.
+  { key: 'harvest_chilling', driver: (q) => { const bio = pickQ(q, /standing_biomass_kg|harvest_biomass_kg|biomass_kg/); if (!bio || !(bio > 0)) return undefined; return pickQ(q, /annual_production_t_yr|harvest_throughput_t_yr|production_capacity_t_yr/) }, label: 'Product Chilling + Ice System', module: /mass_fluid|process|harvest|environmental|water/,
     size: (tyr) => { const weeklyKg = (tyr * 1000) / 52; const dutyKw = Math.max(8, (weeklyKg * 3.6 * 25) / (8 * 3600)); return { dim: boxFromRatingKw(dutyKw), rating: [String(Math.round(dutyKw)), 'kW chill'], gbp: Math.round(25000 + tyr * 250) } },
     form: (tyr) => `Flake-ice machine + refrigerated-seawater (RSW) chiller + insulated harvest holding; chills the graded harvest (~${Math.round((tyr * 1000) / 52)} kg/week) from culture temperature to ~1 °C on ice immediately after harvest for product quality + shelf life` },
   // ── council round-1 (2026-06-16): the systems a BUILDABLE live-animal RAS must have but
@@ -1588,7 +1637,7 @@ export function synthesizeProcessSystems(modules: ModuleLike[], quantities: Reco
         })
       }
     }
-    ;((sm.words ??= []) as WordLike[]).push(utilityWord(spec, d, 'process'))
+    ;((sm.words ??= []) as WordLike[]).push(utilityWord(spec, d, 'process', quantities))
     n += 1
   }
   return n

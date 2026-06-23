@@ -29,6 +29,20 @@ try:
 except Exception:           # pragma: no cover  (defensive — keeps --selftest standalone)
     canonical_tags = None   # type: ignore
 
+# SHARED phase authority (scripts/blender-universal/connection_sizing.py): the SAME
+# liquid/gas/steam classifier the universal Blender connection-sizer uses, so the
+# bill-of-materials sizes a fluid edge by its PHYSICAL phase rather than assuming
+# every non-cable/non-duct edge is a water main. A genuine gas / vapour / steam tie
+# (CO₂ / H₂ / syngas / amine-stripper overhead) is sized small-bore at a high gas
+# velocity, NOT on the bulk-water-main model; only a true LIQUID edge keeps the
+# HDPE/316L water model. Guarded so --selftest stays standalone when the
+# blender-universal dir is not importable (falls back to the volumetric/mass-flow
+# heuristic in _edge_phase below).
+try:
+    from connection_sizing import _detect_phase as _cs_detect_phase  # type: ignore
+except Exception:           # pragma: no cover  (defensive — keeps --selftest standalone)
+    _cs_detect_phase = None  # type: ignore
+
 # Materials take-off rates — UK 2026 fabricated supply (ex-works, not installed).
 # Sources: SGS Engineering, Enduramaxx, process-vessel fabricator quotes, CECA data.
 #   FRP/GRP laminate fabricated (winding/hand lay-up + QC, ex-works): £8–14/kg; mid = £12/kg
@@ -1842,6 +1856,48 @@ _GAS_SERVICE_RE = re.compile(
     re.I)
 
 
+def _edge_phase(frm: str, to: str, rating: str, mech: str) -> str:
+    """Classify a fluid edge as 'liquid' | 'gas' | 'steam' by its PHYSICAL phase,
+    delegating to connection_sizing._detect_phase (the SAME authority the Blender
+    connection-sizer uses) so the bill-of-materials and the drawings agree.
+
+    The phase detector keys on PHYSICAL signals only — the fluid words in the
+    endpoint names + the mechanism + the flow unit — never an archetype name. A
+    water edge (rearing tank ↔ biofilter, volumetric m³/s, 'fluid_loop') resolves
+    to LIQUID and keeps the water-main model; a CO₂ / H₂ / syngas / amine-overhead
+    tie resolves to GAS and is sized small-bore. STEAM is reported separately
+    (a special high-velocity gas).
+
+    The material_context fed to the detector is the endpoint names + mechanism (the
+    only fluid description a connection row carries); the rating's unit drives the
+    no-text mass-flow fallback. When the shared detector is unavailable (--selftest
+    without the blender-universal dir), falls back to: an explicit gas/steam word in
+    the endpoints/mechanism → gas/steam; a bare kg/s|kg/h|Nm³ mass rating → gas;
+    else liquid (the historic default)."""
+    blob = f"{frm} {to} {mech}".strip()
+    unit = None
+    m = re.search(r"(kg\s*/\s*[sh]|nm3|nm³|m3/s|m³/s|m3/h|m³/h|l/s|l/min|l/h)",
+                  str(rating or ""), re.I)
+    if m:
+        unit = m.group(1).lower().replace(" ", "").replace("³", "3")
+    if _cs_detect_phase is not None:
+        try:
+            return _cs_detect_phase(blob, unit, frm, to)
+        except Exception:   # pragma: no cover — never let a phase miss crash the BoM
+            pass
+    # Standalone fallback (no shared detector): physical-signal heuristic only.
+    low = blob.lower()
+    if "steam" in low:
+        return "steam"
+    if re.search(r"\bgas\b|vapou?r|compressed|syngas|tail[_ ]?gas|off[_ ]?gas|flue|"
+                 r"\bco2\b|carbon[_ ]?dioxide|\bh2\b|hydrogen|methane|\bch4\b|"
+                 r"nitrogen|\bn2\b|\bo2\b|oxygen|ammonia", low):
+        return "gas"
+    if unit in ("kg/s", "kg/h", "nm3", "nm3"):
+        return "gas"
+    return "liquid"
+
+
 def _edge_water_flow_m3h(frm: str, to: str, recirc_m3h: float, q, trains: int = 1) -> tuple:
     """Realistic per-edge water duty (m³/h) + a short basis label, from the edge's
     ENDPOINTS + the contract quantities — NOT the schedule's blanket recirc flow.
@@ -1857,8 +1913,18 @@ def _edge_water_flow_m3h(frm: str, to: str, recirc_m3h: float, q, trains: int = 
     loop edge carries the per-train duty (a real DN500-600 header), not one
     physically-impossible giant main carrying the entire plant flow through a single
     point-to-point pipe. Universal: a single representative edge per loop segment is
-    one train's share."""
+    one train's share.
+
+    `recirc_m3h` is None for a plant that declares NO recirculation loop (a once-
+    through / non-recirculating archetype): there is then no loop to represent, so the
+    main-loop branch is skipped and every branch falls back to its ABSOLUTE floor duty
+    (the `recirc * fraction` terms collapse to 0 and the floor wins) rather than a
+    fraction of a fabricated plant flow."""
     blob = f"{frm} {to}".lower()
+    has_recirc = recirc_m3h is not None and recirc_m3h > 0
+    # For the fraction-of-recirc default terms below, a None recirc contributes 0 so the
+    # absolute floor (the `max(..., FLOOR)` second arg) governs — no phantom loop flow.
+    recirc_m3h = float(recirc_m3h) if has_recirc else 0.0
 
     def _qv(*keys, default=None):
         for k in keys:
@@ -1890,7 +1956,7 @@ def _edge_water_flow_m3h(frm: str, to: str, recirc_m3h: float, q, trains: int = 
     # headers; one represented edge = one train.
     frm_loop = bool(_LOOP_NODE_RE.search(frm))
     to_loop = bool(_LOOP_NODE_RE.search(to))
-    if frm_loop and to_loop and not _branch_veto:
+    if has_recirc and frm_loop and to_loop and not _branch_veto:
         n = max(int(trains), 1)
         return (recirc_m3h / n,
                 f"main recirculation loop — per-train header ({recirc_m3h:,.0f} m³/h ÷ {n} parallel trains)"
@@ -2007,9 +2073,14 @@ def _connection_rows(out_dir: str, q=None):
         return default
 
     # whole-plant recirculation flow (the schedule's blanket value) — the ONLY edges
-    # that legitimately carry it are the main-loop edges.
+    # that legitimately carry it are the main-loop edges. ARCHETYPE-NEUTRAL: this must
+    # come from a DECLARED recirculation quantity, never a hardcoded plant flow. A plant
+    # with NO recirculation loop (a once-through process, a CO₂/SAF train) declares none
+    # → recirc_m3h stays None and NO phantom loop reference is synthesised; the branch-
+    # duty rules below fall back to absolute floors rather than a fraction of a fabricated
+    # loop flow. The RAS declares recirculation_flow_m3_h, so it is unaffected.
     recirc_m3h = _qval("recirculation_flow_m3_h", "degasser_water_flow_m3_h",
-                       "drum_filter_throughput_m3_h", default=13360.0)
+                       "drum_filter_throughput_m3_h", default=None)
     # PARALLEL PROCESS TRAINS — the recirculation LOOP flow is split across N parallel
     # treatment trains (the recirc PUMPS / drum-filters / degassers that actually carry
     # the loop), so a single represented loop edge carries one train's share. The split
@@ -2075,23 +2146,77 @@ def _connection_rows(out_dir: str, q=None):
             rating_is_mass = bool(re.search(r"\bkg\s*/\s*[sh]\b|\bnm3\b|nm³|\bg\s*/\s*s\b", rating, re.I))
             is_loop = bool(_LOOP_NODE_RE.search(frm) and _LOOP_NODE_RE.search(to))
 
-            # GAS / cryo-liquid DELIVERY line (oxygen/ozone/CO₂ feed) — a small mass
-            # flow, sized small-bore stainless, NOT a bulk-water main. Detected when
-            # the edge is a gas service AND its rating is a mass flow (kg/s, kg/h).
-            if (not is_loop) and _GAS_SERVICE_RE.search(endpoints) and rating_is_mass:
-                # small-bore gas/LOX delivery line — DN15-50 stainless by mass duty
-                kgs = _num(rating) or 0.0
-                if re.search(r"kg\s*/\s*h", rating, re.I):
-                    kgs = kgs / 3600.0
-                dn_mm = 15 if kgs < 0.05 else 25 if kgs < 0.2 else 40 if kgs < 1.0 else 50
-                rate, matlabel = _stainless_rate_per_m(dn_mm), "316L stainless (gas)"
+            # ── PHASE ROUTING (archetype-neutral) ──
+            # The fluid branch is NO LONGER assumed to be water. Detect the PHYSICAL
+            # phase (liquid / gas / steam) from the endpoints + mechanism + flow unit
+            # via the SHARED connection-sizing authority, and route accordingly:
+            #   gas / steam  → small-bore line at a high gas velocity (NOT a water main);
+            #   liquid       → the HDPE/316L water-main model (unchanged — RAS preserved).
+            # A main RECIRCULATION-LOOP edge is process water by construction, so it is
+            # never re-phased to gas (the loop carries the recirculating LIQUID even if a
+            # unit name mentions a stripped gas species like CO₂). This keeps the RAS
+            # loop edges (rearing tank ↔ biofilter ↔ degasser, m³/s) sizing as water.
+            phase = "liquid" if is_loop else _edge_phase(frm, to, rating, mech)
+
+            # RAS-PRESERVATION GUARD: a stated VOLUMETRIC flow unit (m³/s, m³/h, L/s …) is a
+            # LIQUID signal — a gas DELIVERY line is rated in MASS or normal-volume (kg/s,
+            # kg/h, Nm³), never bulk m³/s. So an edge whose rating carries a volumetric unit
+            # stays LIQUID regardless of a gas-species word in an endpoint name: the RAS
+            # recirculation WATER passing THROUGH an in-loop 'Oxygen Supply (LOX) System' /
+            # 'Protein Skimmer' is water at 0.45 m³/s, and the bleed/drain → 'effluent' ties
+            # are water (the shared detector's substring 'flue'∈'effluent' would otherwise
+            # mis-flag them gas). This keeps every RAS fluid edge on the water model. A gas
+            # verdict is therefore honoured only for a NON-volumetric-rated tie (a real mass
+            # /Nm³ feed, or an unrated dosing line). (Physical signal: the rating UNIT —
+            # never an archetype name.)
+            rating_is_volumetric = bool(re.search(
+                r"m3\s*/\s*[sh]|m³\s*/\s*[sh]|\bl\s*/\s*(?:s|min|h|hr)\b", rating, re.I))
+            if phase in ("gas", "steam") and rating_is_volumetric:
+                phase = "liquid"
+
+            # GAS / STEAM DELIVERY line (oxygen/ozone/CO₂/H₂/syngas/amine-overhead feed)
+            # — sized small-bore at a HIGH gas velocity, NOT a bulk-water main. Sizing
+            # input precedence: a stated MASS flow (kg/s, kg/h) drives a mass-duty DN; a
+            # stated VOLUMETRIC gas flow (m³/s, m³/h) is sized at the gas velocity; with
+            # no parseable rating a small-bore DN50 default is used.
+            if (not is_loop) and phase in ("gas", "steam"):
+                v_target = 30.0 if phase == "steam" else 18.0   # m/s gas/steam line
+                if rating_is_mass:
+                    # small-bore gas delivery line — DN15-50 by mass duty
+                    kgs = _num(rating) or 0.0
+                    if re.search(r"kg\s*/\s*h", rating, re.I):
+                        kgs = kgs / 3600.0
+                    dn_mm = 15 if kgs < 0.05 else 25 if kgs < 0.2 else 40 if kgs < 1.0 else 50
+                    flow_note = f"{rating} (mass flow, not bulk water)"
+                else:
+                    # A normal-volume gas rate (Nm³/h, Nm³/s) → size at the gas velocity.
+                    # Otherwise (no recognised flow UNIT — e.g. 'N2 purge', '0', '—')
+                    # use a small-bore DN50 default. Note: a bulk m³/s|m³/h|L/s unit can
+                    # never reach here — the RAS-preservation guard above re-routes any
+                    # volumetric-unit rating to LIQUID, so we must NOT extract a bare
+                    # number from unitless text ('N2' → '2' would mis-size a phantom main).
+                    nm3 = re.search(r"(-?\d+(?:\.\d+)?)\s*nm3\s*/\s*([sh])|(-?\d+(?:\.\d+)?)\s*nm³\s*/\s*([sh])",
+                                    rating, re.I)
+                    qv = 0.0
+                    if nm3:
+                        val = float(nm3.group(1) or nm3.group(3))
+                        per = (nm3.group(2) or nm3.group(4)).lower()
+                        qv = (val / 3600.0) if per == "h" else val   # → m³/s
+                    if qv > 0:
+                        _dn, _b, _v = _size_pipe_from_flow(qv * 3600.0, target_v_ms=v_target)
+                        dn_mm = int(_dn)
+                        flow_note = f"{rating} @ {v_target:.0f} m/s {phase}"
+                    else:
+                        dn_mm = 50
+                        flow_note = f"unrated {phase} tie → small-bore default"
+                rate, matlabel = _stainless_rate_per_m(dn_mm), f"316L stainless ({phase})"
                 term = 2.0 * (0.25 * rate + 80.0)
                 line = round(length_m * rate + term)
                 size = f"DN{dn_mm}"
                 within = True
-                sized_note = f"gas/cryo delivery line: {rating} → DN{dn_mm} small-bore {matlabel}"
-                basis = (f"gas delivery pipe £{rate:.0f}/m @ DN{dn_mm} ({matlabel}) × "
-                         f"{length_m:.1f} m + 2 ends · {rating} (mass flow, not bulk water)")
+                sized_note = f"{phase} delivery line: {rating} → DN{dn_mm} small-bore {matlabel}"
+                basis = (f"{phase} delivery pipe £{rate:.0f}/m @ DN{dn_mm} ({matlabel}) × "
+                         f"{length_m:.1f} m + 2 ends · {flow_note}")
             else:
                 flow_m3h, duty_basis = _edge_water_flow_m3h(frm, to, recirc_m3h, q, trains)
                 dn_mm, bore_mm, v_ms = _size_pipe_from_flow(flow_m3h)

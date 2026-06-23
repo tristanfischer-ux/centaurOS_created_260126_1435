@@ -868,10 +868,25 @@ def _group_critical_life_support(tree: Tree, state: dict, devices: list):
     if cb:
         feeder.devices.append(_as_device(cb, "breaker", "CB"))
     main.branches = keep + [feeder]
+    # Derive the note from the ACTUAL critical loads claimed onto this board, never a fixed RAS
+    # string. A non-RAS plant (e.g. a CO₂/SAF unit with a standby genset + N+1) names ITS critical
+    # loads here, not "recirculation, oxygenation / dissolved-oxygen control" fish-farm kit. The
+    # double gate above (standby source + critical redundancy) still controls whether this fires.
+    load_names = []
+    seen = set()
+    for br in claimed:
+        nm = (br.label or br.to_node or "").strip()
+        key = nm.lower()
+        if nm and key not in seen:
+            seen.add(key)
+            load_names.append(nm)
+    load_list = ", ".join(load_names[:6]) if load_names else "the plant's critical loads"
+    if len(load_names) > 6:
+        load_list += ", …"
     tree.notes = list(tree.notes or []) + [
-        "Critical life-support loads (recirculation, oxygenation / dissolved-oxygen control, "
-        "SCADA) grouped on a UPS-backed sub-board that the standby generator + ATS hold on a "
-        "mains failure — the life-safety supply a recirculating-life-support plant needs."]
+        f"Critical loads ({load_list}) grouped on a UPS-backed sub-board that the standby "
+        "generator + ATS hold on a mains failure — the life-safety supply this plant's "
+        "critical equipment needs."]
 
 
 # ── powered-load real-current sizing ─────────────────────────────────────────

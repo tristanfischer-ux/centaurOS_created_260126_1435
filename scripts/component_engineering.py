@@ -25,18 +25,30 @@ _GOV = [(('pump', 'circulation'), 'pump-sizing'), (('drum', 'microscreen', 'scre
         (('feed', 'biomass', 'metabol', 'stock', 'fish', 'rear'), 'ras-metabolism'),
         (('enclos', 'frame', 'structur', 'panel', 'contain'), 'envelope-check')]
 
-def _required_services(name, module, function):
+def _required_services(name, module, function, wet_plant=True):
     """DETERMINISTIC: which connection SERVICES a part of this type MUST have, so a
     missing one is named (the loop then creates it). Powered kit needs power; process
-    units sit in the water flow; sensors emit a signal to control; the control system
+    units sit in the FLUID flow; sensors emit a signal to control; the control system
     consumes signals + power. Pure structure (frame/enclosure/label) needs none.
     Tristan 2026-06-15: a part with no inputs/outputs is probably missing one — this
-    says WHICH one."""
+    says WHICH one.
+
+    `wet_plant` (2026-06-23, M1) gates the PROCESS-FLUID default on a PHYSICAL plant-
+    level signal: the design is a WET / process-fluid plant (any fluid topology edge
+    present, or the process-plant geometry family). When False — a dry / electrical /
+    manufactured archetype (satellite, aero, BESS, generic_assembly with no fluid
+    edges) — a part is NOT handed a spurious process-WATER pipe; it defaults to
+    power / signal only. Default True preserves every caller that does not yet pass
+    the signal (a RAS / wet plant keeps its water services unchanged)."""
     t = _norm(f"{name} {module} {function}"); m = _norm(module); req = set()
     # ── (1) NAME-keyword roles (cross-module: a pump / sensor / valve anywhere) ──
     if any(k in t for k in ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan', 'lamp', 'mixer', 'agitat')):
         req.add('power')
-    if any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'fan', 'compress')):
+    # PROCESS-FLUID role — ONLY on a WET plant. The bare tokens below describe parts
+    # that sit in a fluid flow; on a DRY archetype (no fluid edges, not a process
+    # plant) they must NOT pull a spurious process-water pipe. The RAS-only tokens
+    # ('rear', 'cone') are a CONDITIONAL extension folded in here, never universal.
+    if wet_plant and any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'fan', 'compress')):
         req.add('water')
     if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
         req.add('signal')
@@ -71,7 +83,7 @@ def _required_services(name, module, function):
             req.add('signal')
         if 'controlcompute' in m or 'communication' in m:
             req.update(('signal', 'power'))
-        if 'massfluid' in m or 'watertreatment' in m or 'fluidtransport' in m:
+        if wet_plant and ('massfluid' in m or 'watertreatment' in m or 'fluidtransport' in m):
             req.add('water')
         if 'environmentalinterface' in m:
             req.add('power')
@@ -428,13 +440,18 @@ def build_connectivity(run, req_bom, tools):
     def _match(ep, name):
         a, b = _norm(ep), _norm(name)
         return bool(a) and bool(b) and (a == b or a in b or b in a)
+    # WET-PLANT signal (M1, 2026-06-23): the design carries a process-FLUID topology
+    # iff any routed line is a water/process-fluid service. A dry archetype (satellite,
+    # aero, BESS) has zero water lines → its parts default to power/signal, never a
+    # spurious process-water pipe. Physical signal (routed edges), no archetype name.
+    wet_plant = any(e.get('service') == 'water' for e in edges)
     for part in parts:
         part['incoming'] = [e for e in edges if _match(e['to'], part['name'])]
         part['outgoing'] = [e for e in edges if _match(e['from'], part['name'])]
         part['function'] = func.get(_norm(part['name']), '')
         part['governing_tool'] = _gov(part['name'], part['function'])
         present = set(('power' if e['service'] == 'electrical' else e['service']) for e in part['incoming'] + part['outgoing'])
-        _req = _required_services(part['name'], part.get('module', ''), part['function'])
+        _req = _required_services(part['name'], part.get('module', ''), part['function'], wet_plant)
         part['missing'] = sorted(_req - present)
         # ORPHAN = ISOLATED (no edges at all) AND it actually needs a service. A pure
         # structural part (frame / enclosure → no required services) is connectionless by
