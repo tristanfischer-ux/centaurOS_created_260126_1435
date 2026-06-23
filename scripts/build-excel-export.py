@@ -5542,13 +5542,26 @@ def build(run_dir: str, out_path: str) -> dict:
     # the file opens broken). Real build-generated formulas NEVER start with "= " (space after =) and
     # never contain a digit directly followed by whitespace+letter — so this net is safe for genuine
     # formulas (incl. "=...*8000/1e9", "='Inputs & Assumptions'!$B$5", "=IF(...)"). ----
-    _prose_re = re.compile(r"\d\s+[A-Za-z]")
+    # Detector: a string openpyxl will store as a formula that is NOT a valid Excel formula —
+    # engine PROSE ("= 3.91 t/day …"), chemical formulas, OR a live worked-calc formula left with an
+    # UNBOUND symbol (a bare letter like "E" in "=B187/(2*B189*E-…)"). Strip every VALID formula
+    # token; if ANY letter remains it cannot be a real formula → defang. Safe for genuine formulas
+    # (=…*8000/1e9, =IF(…), ='Inputs & Assumptions'!$B$5, =CO2 cell-ref) → they strip to nothing.
+    def _is_invalid_formula(_s: str) -> bool:
+        _t = re.sub(r'"[^"]*"', "", _s)                     # string literals ("PASS"/"FAIL"/…) — letters here are VALID
+        _t = re.sub(r"'[^']*'!", "", _t)                    # sheet refs
+        _t = re.sub(r"\$?[A-Z]{1,3}\$?\d+", "", _t)         # cell refs (incl CO2-style)
+        _t = re.sub(r"[A-Za-z][A-Za-z0-9.]*\s*\(", "(", _t) # function calls -> (
+        _t = re.sub(r"\bin_[a-z0-9_]+\b", "", _t)           # known defined names
+        _t = re.sub(r"\d+\.?\d*([eE][+\-]?\d+)?", "", _t)    # numbers incl scientific (1e9)
+        _t = re.sub(r"[\s+\-*/^%(),:.=&<>​]", "", _t)  # operators / whitespace / zero-width
+        return bool(re.search(r"[A-Za-z]", _t))
     _defanged = 0
     for _ws in wb.worksheets:
         for _row in _ws.iter_rows():
             for _c in _row:
                 _v = _c.value
-                if isinstance(_v, str) and _v.startswith("=") and (_v[1:2] in (" ", "\t") or _prose_re.search(_v)):
+                if isinstance(_v, str) and _v.startswith("=") and _is_invalid_formula(_v):
                     _c.value = clean_cell(_v)   # zero-width-space prefix → stored as TEXT, not a formula
                     _defanged += 1
     if _defanged:
