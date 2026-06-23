@@ -269,6 +269,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Risk register": "Hazards & findings (live: physics critic, gate flags, cost) + process-safety risks, S×L scored.",
     "Regulatory": "Compliance-gate verdict + statutory duties derived from jurisdiction + hazards present.",
     "Assembly sequence": "Order-of-works: civils → tankage → mechanical → pipework → electrical → I&C → commissioning.",
+    "Tool provenance": "Every engineering tool's input source → output → consumer, with a USED / STALE / ORPHANED verdict — the auditable proof that each tool's number is actually used.",
 }
 
 # A whitelist of CONTROL-CHARS Excel rejects inside a worksheet cell string —
@@ -776,8 +777,10 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
         "COST": "E4 · COST — per-line price band & Σ lines == cover total",
         "CONNECTIVITY": "E5 · CONNECTIVITY/SPEC — out-of-spec tally & velocity limit",
         "BRIEF": "E6 · BRIEF — design realises each stated brief target metric (±5%)",
+        "PROVENANCE": "E7 · PROVENANCE — every engineering-tool output is actually USED by the "
+                      "design (no stale/orphaned tool computations)",
     }
-    for fam in ("CONSISTENCY", "ADEQUACY", "BALANCE", "COST", "CONNECTIVITY", "BRIEF"):
+    for fam in ("CONSISTENCY", "ADEQUACY", "BALANCE", "COST", "CONNECTIVITY", "BRIEF", "PROVENANCE"):
         fam_checks = [c for c in checks if c.category == fam]
         if not fam_checks:
             continue
@@ -5312,6 +5315,91 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
 # ============================================================================
 # MAIN
 # ============================================================================
+def tab_tool_io(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """TOOL I/O — provenance & traceability (Tristan 2026-06-23): every engineering tool that ran,
+    with where each output's INPUT came from and where its OUTPUT goes, plus a USED/STALE/ORPHANED
+    verdict. Makes the 'computed by verified tools' claim auditable end-to-end."""
+    import re as _re
+    tu = load_json(os.path.join(run_dir, "4-orchestrator-tools-used.json"))
+    if not isinstance(tu, dict) or not tu.get("tools"):
+        return False
+    ws = wb.create_sheet("Tool provenance")
+    set_widths(ws, {"A": 30, "B": 30, "C": 13, "D": 9, "E": 42, "F": 32, "G": 11})
+    title_row(
+        ws, "Tool provenance — input → output traceability", 7,
+        "Every engineering tool that ran, with where each output's INPUT came from and where its "
+        "OUTPUT goes. STATUS: USED = the design uses the tool's value; STALE = the design shows a "
+        "DIFFERENT value (tool ran at another scale/input — see ⚠ Checks E7); ORPHANED = the value "
+        "is used nowhere; TRACED = value used elsewhere in the design.")
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    qval = {k.lower(): num(v.get("value") if isinstance(v, dict) else v) for k, v in q.items()}
+    consumed = {v for v in qval.values() if v is not None}
+    for r in (state.get("requirementsBom") or []):
+        for f in ("unit_gbp", "line_gbp", "qty"):
+            n = num(r.get(f))
+            if n is not None:
+                consumed.add(round(n, 3))
+    for v in (state.get("costStack") or {}).values():
+        n = num(v)
+        if n is not None:
+            consumed.add(round(n, 3))
+
+    def _present(x: float) -> bool:
+        for cand in (x, x * 1000.0, x / 1000.0):
+            for c in consumed:
+                if abs(cand - c) <= max(abs(c) * 0.02, 0.01):
+                    return True
+        return False
+
+    header(ws, 5, ["Tool", "Output field", "Value", "Unit", "Input — from",
+                   "→ Consumed by", "Status"])
+    r = 6
+    for t in tu["tools"]:
+        tid = str(t.get("tool_id", "?"))
+        for c in (t.get("claims") or []):
+            field = str(c.get("field", ""))
+            val = num(c.get("value"))
+            of = str(c.get("output_field", "")).lower()
+            f = _re.sub(r"^calc_", "", field).lower()
+            qk = of if of in qval else (f if f in qval else None)
+            if qk is not None and val is not None and qval[qk] is not None:
+                qv = qval[qk]
+                if abs(val - qv) <= max(abs(qv) * 0.02, 0.01):
+                    status, cons = "USED", f"{qk} = {qv:g}"
+                else:
+                    status, cons = "STALE", f"{qk} = {qv:g}  (≠ tool {val:g})"
+            elif val is not None and abs(val) in (0.0, 1.0):
+                status, cons = "—", "(zero/unit — not checked)"
+            elif val is not None and _present(val):
+                status, cons = "TRACED", "value used in the design"
+            else:
+                status, cons = "ORPHANED", "appears nowhere downstream"
+            ws.cell(r, 1, tid).border = BORDER
+            ws.cell(r, 2, clean_cell(c.get("output_field") or field)).border = BORDER
+            ws.cell(r, 3, val).border = BORDER
+            ws.cell(r, 4, clean_cell(c.get("unit", ""))).border = BORDER
+            e = ws.cell(r, 5, clean_cell(c.get("input_summary", "")))
+            e.alignment = WRAP_TOP
+            e.font = FONT_NOTE
+            e.border = BORDER
+            ws.cell(r, 6, clean_cell(cons)).border = BORDER
+            sc = ws.cell(r, 7, status)
+            sc.border = BORDER
+            if status in ("USED", "TRACED"):
+                sc.fill, sc.font = FILL_PASS, FONT_PASS
+            elif status in ("STALE", "ORPHANED"):
+                sc.fill, sc.font = FILL_FAIL, FONT_FAIL
+            else:
+                sc.fill, sc.font = FILL_ADVISORY, FONT_ADVISORY
+            r += 1
+    apply_col_formats(ws, 6, {3: FMT_NUM}, r - 1)
+    if r > 6:
+        ws.auto_filter.ref = f"A5:G{r - 1}"
+    ws.freeze_panes = "A6"
+    back_link(ws, 7)
+    return True
+
+
 def _reorder_tabs(wb: Workbook) -> None:
     """Reorder sheets into a READER-NARRATIVE sequence (Tristan 2026-06-23): Story (hero render
     early) → Commercial (economics early) → Engineering → Drawings → Reference/Audit (the plumbing
@@ -5328,7 +5416,7 @@ def _reorder_tabs(wb: Workbook) -> None:
         "Line & velocity": 24, "Panel schedule": 25, "Process line list": 26,
         "Process valve list": 27, "Process instruments": 28, "Assembly sequence": 29,
         "Risk register": 30, "Regulatory": 31,
-        "⚠ Checks": 90, "Connection trace": 91, "Part names": 92, "Glossary": 93,
+        "⚠ Checks": 90, "Tool provenance": 91, "Connection trace": 92, "Part names": 93, "Glossary": 94,
     }
 
     def _rank(title: str) -> int:
@@ -5426,6 +5514,7 @@ def build(run_dir: str, out_path: str) -> dict:
     add_tab("Regulatory", lambda: tab_regulatory(wb, state))
     add_tab("Assembly sequence", lambda: tab_assembly_sequence(wb, state))
     add_tab("Glossary", lambda: tab_glossary(wb, state))
+    add_tab("Tool provenance", lambda: tab_tool_io(wb, state, run_dir))
 
     print("  · Image tabs")
     used_titles = {t.lower() for t in wb.sheetnames}

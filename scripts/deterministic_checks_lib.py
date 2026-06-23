@@ -1171,6 +1171,86 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
     return out
 
 
+def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
+    """TOOL I/O PROVENANCE (Tristan 2026-06-23): every value a 'verified engineering tool' computes
+    (4-orchestrator-tools-used.json) must actually be USED by the design — either it matches the
+    same-named contract quantity, or its value appears in the design's consumed numbers (quantities
+    ∪ BoM ∪ costStack). A tool that ran but whose output the design does NOT use (orphaned), or
+    whose recorded value DISAGREES with the quantity it claims to produce (stale — e.g. a tool run
+    at the 222 t/yr reference while the design scaled to 62 t/yr), is a provenance failure: the
+    dossier claims 'computed by this tool' but the number shown came from somewhere else. Universal."""
+    out: List[Check] = []
+    tu = _load_json(os.path.join(run_dir, "4-orchestrator-tools-used.json"))
+    if not isinstance(tu, dict):
+        return out
+    tools = tu.get("tools") or []
+    if not tools:
+        return out
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    qval = {k.lower(): (v.get("value") if isinstance(v, dict) else v) for k, v in q.items()}
+    consumed = set()
+    for v in qval.values():
+        n = num(v)
+        if n is not None:
+            consumed.add(round(n, 3))
+    for r in (state.get("requirementsBom") or []):
+        for f in ("unit_gbp", "line_gbp", "qty"):
+            n = num(r.get(f))
+            if n is not None:
+                consumed.add(round(n, 3))
+    for v in (state.get("costStack") or {}).values():
+        n = num(v)
+        if n is not None:
+            consumed.add(round(n, 3))
+
+    def _present(x: float) -> bool:
+        for cand in (x, x * 1000.0, x / 1000.0):       # allow W↔kW / unit scaling
+            for c in consumed:
+                if abs(cand - c) <= max(abs(c) * 0.02, 0.01):
+                    return True
+        return False
+
+    for t in tools:
+        tid = str(t.get("tool_id", "?"))
+        for c in (t.get("claims") or []):
+            field = str(c.get("field", ""))
+            val = num(c.get("value"))
+            if val is None:
+                continue
+            of = str(c.get("output_field", "")).lower()
+            f = re.sub(r"^calc_", "", field).lower()
+            # prefer the claim's DECLARED output_field (the engine's own claim→quantity mapping),
+            # else the calc_-stripped field name.
+            qk = (of if of in qval else f if f in qval else
+                  next((k for k in qval if k == f or (len(f) >= 6 and (f in k or k in f))), None))
+            if qk is not None:
+                qv = num(qval[qk])
+                ok = qv is not None and abs(val - qv) <= max(abs(qv) * 0.02, 0.01)
+                _tol = round(max(abs(qv) * 0.02, 0.01), 3) if qv is not None else 0.01
+                out.append(Check(
+                    name=f"Tool output used: {field}", category="PROVENANCE", relation="eq",
+                    status=PASS if ok else FAIL, actual=round(val, 3),
+                    expected=(round(qv, 3) if qv is not None else val), tol=_tol, unit="",
+                    producer=f"tool:{tid}",
+                    detail=(f"{tid} {field}={val:g} matches contract {qk}." if ok else
+                            f"STALE: {tid} computed {field}={val:g} but the design uses {qk}="
+                            f"{qv:g} — the tool output is NOT the number shown (tool ran at a "
+                            f"different scale/input).")))
+            else:
+                if abs(val) in (0.0, 1.0):              # un-checkable zero/unit value
+                    continue
+                used = _present(val)
+                out.append(Check(
+                    name=f"Tool output traced: {field}", category="PROVENANCE", relation="eq",
+                    status=PASS if used else FAIL, actual=round(val, 3), expected=None,
+                    tol=0.0, unit="", producer=f"tool:{tid}",
+                    detail=(f"{tid} {field}={val:g} is used in the design." if used else
+                            f"ORPHANED: {tid} computed {field}={val:g} but this value appears "
+                            f"NOWHERE in the design's quantities/BoM/cost — tool ran but its "
+                            f"output is unused.")))
+    return out
+
+
 def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     """Run EVERY deterministic check against a run directory and return the list
     of Check records (PASS / FAIL / N/A). Pure: reads only the run's JSON, makes
@@ -1186,6 +1266,7 @@ def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     checks.extend(_checks_cost(state, run_dir))
     checks.extend(_checks_connectivity(state, run_dir))
     checks.extend(_checks_brief_compliance(state, run_dir))
+    checks.extend(_checks_tool_provenance(state, run_dir))
     return checks
 
 
