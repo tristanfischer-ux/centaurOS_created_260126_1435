@@ -757,8 +757,9 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
         "BALANCE": "E3 · BALANCE — mass/energy/flow closures & continuity",
         "COST": "E4 · COST — per-line price band & Σ lines == cover total",
         "CONNECTIVITY": "E5 · CONNECTIVITY/SPEC — out-of-spec tally & velocity limit",
+        "BRIEF": "E6 · BRIEF — design realises each stated brief target metric (±5%)",
     }
-    for fam in ("CONSISTENCY", "ADEQUACY", "BALANCE", "COST", "CONNECTIVITY"):
+    for fam in ("CONSISTENCY", "ADEQUACY", "BALANCE", "COST", "CONNECTIVITY", "BRIEF"):
         fam_checks = [c for c in checks if c.category == fam]
         if not fam_checks:
             continue
@@ -5293,6 +5294,44 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
 # ============================================================================
 # MAIN
 # ============================================================================
+def _reorder_tabs(wb: Workbook) -> None:
+    """Reorder sheets into a READER-NARRATIVE sequence (Tristan 2026-06-23): Story (hero render
+    early) → Commercial (economics early) → Engineering → Drawings → Reference/Audit (the plumbing
+    last). PURE presentation — Excel formula references are by sheet NAME, so tab order never breaks
+    a formula. Universal — keys on tab name/prefix, no archetype logic; unknown tabs take a sensible
+    middle rank."""
+    _RANK = {
+        "Contents": 0, "Overview": 1,
+        "Render — Interior layout": 2,                 # HERO render — early (exact name)
+        "Brief": 3, "Brief compliance": 4,
+        "Economics": 10, "Scenarios": 11, "Investment Analysis": 12,
+        "Cost": 13, "Cost waterfall": 14, "Inputs & Assumptions": 15,
+        "BoM": 20, "Quantities": 21, "Calculations": 22, "Spec sheets": 23,
+        "Line & velocity": 24, "Panel schedule": 25, "Process line list": 26,
+        "Process valve list": 27, "Process instruments": 28, "Assembly sequence": 29,
+        "Risk register": 30, "Regulatory": 31,
+        "⚠ Checks": 90, "Connection trace": 91, "Part names": 92, "Glossary": 93,
+    }
+
+    def _rank(title: str) -> int:
+        if title in _RANK:
+            return _RANK[title]
+        t = title.lower()
+        if t.startswith("render"):
+            return 50                                   # non-hero renders → Drawings
+        for i, p in enumerate(("ga", "p&id", "bfd", "single", "hvac")):
+            if t.startswith(p):
+                return 55 + i
+        if t.startswith("isometric"):
+            return 70
+        if t.startswith("module"):
+            return 72
+        return 40                                       # unknown data tab: end of engineering
+
+    orig = {id(ws): i for i, ws in enumerate(wb._sheets)}
+    wb._sheets.sort(key=lambda ws: (_rank(ws.title), orig[id(ws)]))
+
+
 def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
     if state is None:
@@ -5379,6 +5418,10 @@ def build(run_dir: str, out_path: str) -> dict:
         if png and add_image_tab(wb, run_dir, png, ttl, cap, used_titles):
             img_ok += 1
             print(f"      + {ttl}")
+
+    # ---- reorder into the reader-narrative sequence BEFORE Contents is built, so the Contents
+    # index lists the tabs in the new order (Story → Commercial → Engineering → Drawings → Audit) ----
+    _reorder_tabs(wb)
 
     # ---- CONTENTS (#26): built LAST so the full ordered tab list is known,
     # then moved to sheet #1 with a one-line description + hyperlink per tab ----
