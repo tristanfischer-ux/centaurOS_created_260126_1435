@@ -127,6 +127,49 @@ const DEFAULT_DISCLAIMER = (
   + 'as indicated; full SPDX records are available on request.'
 )
 
+// ── FIRST-PRINCIPLES CALCULATOR ATTRIBUTION (orchestrator-integrity "C-full") ─
+//
+// The first-principles "calculator" (universal-contract-sizing.ts + the seeders +
+// the engineering-lock-gate) writes the CORRECT contract quantities with
+// `source: 'calculator'` — these are the values the design actually uses (e.g.
+// RAS daily_feed_kg=232.7 at 62 t/yr). They are NOT `tool:`-sourced, so the
+// tool-sourced loop below never credited them, and the page instead credited the
+// bootstrapped stand-in tools' WRONG `calc_*` shadow values (the deterministic
+// PROVENANCE check E7 then flagged those as STALE/ORPHANED). This block credits
+// the calculator as the producer of its own values, GROUPED by SUBSYSTEM derived
+// from the quantity name with a UNIVERSAL keyword map (no per-class table); and
+// the tool-sourced loop EXCLUDES `calc_*` shadow duplicates whose de-prefixed
+// name matches a canonical `source:'calculator'` key.
+
+/** UNIVERSAL subsystem keyword map: first match wins, in declaration order.
+ *  Keys on the quantity NAME only — no class/archetype table. */
+const FIRST_PRINCIPLES_SUBSYSTEMS: Array<{ id: string; label: string; re: RegExp }> = [
+  { id: 'thermal',         label: 'Thermal',         re: /heat|heating|ventilation|temp|hvac|scop|dehumid/i },
+  { id: 'biological',      label: 'Biological',      re: /biofilter|mbbr|tan|ammonia|nitrif|feed|biomass|metabolism/i },
+  { id: 'oxygenation',     label: 'Oxygenation',     re: /oxygen|o2|speece|cone|do_/i },
+  { id: 'hydraulics',      label: 'Hydraulics',      re: /pump|flow|recirc|head|hydraulic/i },
+  { id: 'solids',          label: 'Solids',          re: /drum|filter|solids|sludge|screen/i },
+  { id: 'disinfection',    label: 'Disinfection',    re: /uv|ozone|disinfect/i },
+  { id: 'water_chemistry', label: 'Water Chemistry', re: /ph|alkalin|co2|degas|salin|bicarb/i },
+  { id: 'electrical',      label: 'Electrical',      re: /transformer|kva|cable|voltdrop|load_kw|genset|busbar/i },
+  { id: 'building',        label: 'Building',        re: /building|fabric|wall|roof|floor|footprint|slab|civil/i },
+]
+
+/** Map a calculator quantity NAME to its subsystem id + label (universal). */
+function firstPrinciplesSubsystem(name: string): { id: string; label: string } {
+  for (const s of FIRST_PRINCIPLES_SUBSYSTEMS) {
+    if (s.re.test(name)) return { id: s.id, label: s.label }
+  }
+  return { id: 'process', label: 'Process' }
+}
+
+/** A `source:'calculator'` quantity carries `source` / `source_detail` DIRECTLY
+ *  on the quantity object (NOT under `.provenance`) — see universal-contract-
+ *  sizing.ts. Returns true for a finite-valued calculator quantity. */
+function isCalculatorSourced(q: any): boolean {
+  return !!q && typeof q === 'object' && q.source === 'calculator' && Number.isFinite(q.value)
+}
+
 /**
  * Build the Tools-Used attribution page from a finished Contract.
  *
@@ -158,9 +201,25 @@ export function buildToolsUsedPage(
     upstreamFeeders.set(edge.to, existing)
   }
 
+  // Canonical first-principles keys (lower-cased) the calculator OWNS. Used to
+  // (a) credit the calculator below and (b) EXCLUDE `calc_*` shadow duplicates
+  // whose de-prefixed name matches one of these from the tool-sourced loop.
+  const calculatorKeys = new Set<string>()
+  for (const [k, q] of Object.entries(contract.quantities)) {
+    if (isCalculatorSourced(q as any)) calculatorKeys.add(k.toLowerCase())
+  }
+
   const byTool = new Map<string, ToolAttributionEntry>()
   for (const [field, q] of Object.entries(contract.quantities)) {
     if (!isToolSourced(q)) continue
+    // EXCLUDE `calc_*` shadow duplicates: a bootstrapped stand-in tool's output
+    // written as `calc_<name>` whose de-prefixed `<name>` matches a canonical
+    // `source:'calculator'` key. These are refused/redundant shadows of the
+    // first-principles value — do NOT list them as computed (they are the STALE/
+    // ORPHANED entries the PROVENANCE check E7 flags).
+    if (/^calc_/i.test(field) && calculatorKeys.has(field.replace(/^calc_/i, '').toLowerCase())) {
+      continue
+    }
     const tid = q.provenance.tool_id ?? ''
     if (!tid) continue
     // 2026-05-23 (eVTOL chain 2 audit): provenance often omits tool_version
@@ -263,6 +322,44 @@ export function buildToolsUsedPage(
   } catch {
     // Registry not available — skip the unused-tools section
   }
+
+  // (a) CREDIT THE FIRST-PRINCIPLES CALCULATOR — group every `source:'calculator'`
+  // quantity into a synthetic "tool" per SUBSYSTEM (universal keyword map). Each
+  // claim's value EQUALS the contract value the design uses, so the PROVENANCE
+  // check E7 matches (not stale). These are added to `byTool` so the existing
+  // sort + return picks them up alongside the genuine tool entries.
+  const firstPrinciplesEntries = new Map<string, ToolAttributionEntry>()
+  for (const [field, q] of Object.entries(contract.quantities)) {
+    if (!isCalculatorSourced(q as any)) continue
+    const sub = firstPrinciplesSubsystem(field)
+    const tid = `first-principles:${sub.id}`
+    let entry = firstPrinciplesEntries.get(tid)
+    if (!entry) {
+      entry = {
+        tool_id: tid,
+        tool_name: `First-Principles Sizing — ${sub.label}`,
+        tool_version: 'calculator',
+        tool_license: 'free-proprietary' as License,
+        tool_source_url: 'internal://forgeos/first-principles-sizing',
+        pinned_versions: {},
+        claims: [],
+        total_duration_ms: 0,
+      }
+      firstPrinciplesEntries.set(tid, entry)
+      ;(entry as any).worked = []
+    }
+    const qa = q as any
+    entry.claims.push({
+      field,
+      value: qa.value,
+      unit: typeof qa.unit === 'string' ? qa.unit : '',
+      input_summary: typeof qa.source_detail === 'string' && qa.source_detail
+        ? qa.source_detail
+        : 'first-principles engineering calculation',
+      output_field: field,
+    })
+  }
+  for (const [tid, entry] of firstPrinciplesEntries) byTool.set(tid, entry)
 
   return {
     title: 'COMPUTATIONS BY VERIFIED ENGINEERING TOOLS',

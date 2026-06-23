@@ -1358,6 +1358,113 @@ export function applyStepOutputs(
   return { contract: { ...c, quantities }, skipped, protected_keys: protectedKeys }
 }
 
+// ── (e′) DETERMINISTIC STEP PRUNE — orchestrator-integrity fix "C-full" ──────
+//
+// The first-principles calculator (universal-contract-sizing.ts + the seeders +
+// the engineering-lock-gate) writes the CORRECT contract quantities with
+// `source: 'calculator'` BEFORE the bootstrapped tool plan runs. A bootstrapped
+// stand-in tool that RE-COMPUTES one of those same quantities is at best
+// redundant (seed-protection already refuses its clobber) and at worst a wrong-
+// scale shadow whose tool-sourced `calc_*` value pollutes the provenance page +
+// trips the deterministic PROVENANCE check (E7). So, deterministically, SKIP a
+// bootstrapped step's contract write when EITHER:
+//   (a) EVERY one of its outputs[].contract_key is ALREADY present on the live
+//       contract as a `source:'calculator'` quantity — the calculator owns all
+//       of this step's outputs, so the tool is a pure redundant shadow; OR
+//   (b) NONE of its outputs[].contract_key is consumed downstream — no OTHER
+//       step reads it via inputs[].from_contract_key AND it is not itself a final
+//       contract output the design needs (the universal mass/cost producer keys,
+//       or a key the calculator already owns, count as "needed").
+// A step that produces at least one genuinely-needed, non-calculator-seeded
+// output keeps writing. This is UNIVERSAL: it keys purely on `source==='calculator'`
+// + cross-step consumption, with NO per-class / per-archetype table. The seed-
+// protection in applyStepOutputs stays as a BACKSTOP for any step that is kept
+// but still happens to touch a seeded key.
+//
+// RAS-PRESERVING: a pruned (a)-step's outputs are ALL calculator-owned, so seed-
+// protection would have refused every one of them anyway — the computed numbers
+// are untouched, only the redundant shadow + its worked-calcs disappear. A pruned
+// (b)-step's outputs are read by nothing, so removing them changes no downstream
+// value. The tool still INVOKES (the executor calls it before contract_update);
+// pruning only suppresses its WRITE, so no number the design uses changes.
+
+/** Lower-cased set of contract keys whose live quantity is `source:'calculator'`
+ *  (the first-principles values the calculator owns). Reads the LIVE contract at
+ *  execution time, so it reflects all seeds laid down before the plan runs. */
+function calculatorOwnedKeys(c: ContractInProgress): Set<string> {
+  const owned = new Set<string>()
+  const qs = (c?.quantities ?? {}) as Record<string, any>
+  for (const [k, v] of Object.entries(qs)) {
+    if (v && typeof v === 'object' && v.source === 'calculator' && Number.isFinite(v.value)) {
+      owned.add(k.toLowerCase())
+    }
+  }
+  return owned
+}
+
+/** The set of contract keys CONSUMED downstream across the whole plan spec —
+ *  every inputs[].from_contract_key of every step (lower-cased). A step whose
+ *  outputs are all absent from this set AND not otherwise needed is orphaned. */
+function consumedContractKeys(spec: ToolPlanSpec): Set<string> {
+  const consumed = new Set<string>()
+  for (const s of spec.steps) {
+    for (const inp of s.inputs) {
+      if (inp.from_contract_key) consumed.add(inp.from_contract_key.toLowerCase())
+    }
+  }
+  return consumed
+}
+
+/** The universal "final output" keys a plan needs even when no later step reads
+ *  them: the mass producer's headline mass + any cost/capex key it produces. A
+ *  step producing one of these is never orphan-pruned (rule b). */
+function neededFinalKeys(spec: ToolPlanSpec): Set<string> {
+  const needed = new Set<string>([UNIVERSAL_MASS_KEY.toLowerCase()])
+  for (const s of spec.steps) {
+    for (const o of s.outputs) {
+      const kl = o.contract_key.toLowerCase()
+      if (COST_KEY_TOKENS.some(t => kl.includes(t))) needed.add(kl)
+    }
+  }
+  return needed
+}
+
+/** Decide whether a bootstrapped step is prunable against the LIVE contract.
+ *  Pure + deterministic. `consumed` = every downstream from_contract_key in the
+ *  plan; `needed` = keys the design needs as FINAL outputs even when no step reads
+ *  them. Returns null when the step must run, else the human reason. */
+export function pruneReasonForStep(
+  step: ToolPlanStepSpec,
+  liveContract: ContractInProgress,
+  consumed: Set<string>,
+  needed: Set<string>,
+): string | null {
+  const outKeys = step.outputs.map(o => o.contract_key)
+  if (outKeys.length === 0) return null // no outputs to reason about — leave it
+  const owned = calculatorOwnedKeys(liveContract)
+
+  // (a) the calculator already owns EVERY output of this step → redundant shadow.
+  if (outKeys.every(k => owned.has(k.toLowerCase()))) {
+    return 'outputs already calculator-sourced'
+  }
+
+  // (b) REMOVED 2026-06-23 — UNSAFE. The "consumed-by-nothing" rule keyed only on
+  // cross-step (tool→tool) consumption, but a tool output can be consumed by the
+  // EMITTER / Blender / drawings / dashboard — none of which are tool-plan steps.
+  // Verified regression (v12): it pruned 8 GENUINE equipment-sizing quantities the
+  // calculator does NOT own — drum_filter_screen_area_m2, drum_filter_backwash_flow_m3_h,
+  // speece_cone_diameter_m, ph_base_dose_rate_ml_min, ph_loop_kp/ki/settling — because
+  // no later TOOL step read them, even though the equipment list + drawings do. Only
+  // rule (a) (the calculator demonstrably OWNS every output → a true redundant shadow)
+  // is safe; it never drops a quantity nothing else produces. NOTE: rule (a) only fires
+  // for outputs already seeded by the calculator at prune time; making the redundant-tool
+  // prune fully effective (to also SAVE the wasted invoke) needs the prune to run AFTER
+  // the calculator seeding stage — tracked as a follow-up. `consumed`/`needed` are kept
+  // in the signature for that future safe re-introduction.
+  void consumed; void needed
+  return null
+}
+
 /** Turn a validated + ordered spec into the runnable ClassToolPlan. One ToolStep
  *  per spec step; required:false (a novel-class tool error cannot halt the run);
  *  feeds_into derived from the data-flow edges in `order`/the spec wiring. */
@@ -1376,6 +1483,13 @@ export function materialisePlan(slug: string, spec: ToolPlanSpec, orderedToolIds
     writesByTool.set(s.tool_id, set)
   }
 
+  // Whole-plan knowledge for the deterministic step prune (fix C-full, rule b):
+  // which contract keys ANY step reads downstream + which are needed final
+  // outputs. Computed once from the spec; the per-key calculator-ownership check
+  // reads the LIVE contract at execution time inside the closure.
+  const consumed = consumedContractKeys(spec)
+  const needed = neededFinalKeys(spec)
+
   const tools: ToolStep[] = orderedSteps.map((step) => {
     const downstream = new Set<string>()
     for (const other of spec.steps) {
@@ -1389,6 +1503,18 @@ export function materialisePlan(slug: string, spec: ToolPlanSpec, orderedToolIds
       feeds_into: [...downstream],
       input_from_contract: (c: ContractInProgress) => buildStepInput(step, c),
       contract_update: (c: ContractInProgress, output: unknown) => {
+        // DETERMINISTIC STEP PRUNE (fix C-full): evaluated against the LIVE
+        // contract that already carries the source:'calculator' seeds. Skip the
+        // write entirely when the calculator owns every output of this step
+        // (redundant shadow) OR none of its outputs is consumed/needed (orphan).
+        const pruneReason = pruneReasonForStep(step, c, consumed, needed)
+        if (pruneReason) {
+          console.warn(
+            `[bootstrap-tool-plan] PRUNED ${step.tool_id}: ${pruneReason} ` +
+            `(outputs already calculator-sourced / consumed-by-nothing)`,
+          )
+          return c // leave the contract untouched — no shadow quantity written
+        }
         const { contract, skipped, protected_keys } = applyStepOutputs(step, c, output)
         if (skipped.length > 0) {
           console.warn(
