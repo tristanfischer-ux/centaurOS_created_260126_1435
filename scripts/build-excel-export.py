@@ -77,6 +77,7 @@ FILL_RESULT = PatternFill("solid", fgColor="E2EFDA")       # pale green = live r
 FILL_CONST = PatternFill("solid", fgColor="FCE4D6")        # peach = shared constant
 FILL_PASS = PatternFill("solid", fgColor="C6EFCE")         # green pass
 FILL_FAIL = PatternFill("solid", fgColor="FFC7CE")         # red fail
+FILL_ADVISORY = PatternFill("solid", fgColor="FFF2CC")     # amber = advisory (non-gating LLM)
 FILL_LEGACY = PatternFill("solid", fgColor="F2F2F2")       # grey = static legacy calc
 FILL_TITLE = PatternFill("solid", fgColor="2E5A88")
 
@@ -85,6 +86,7 @@ FONT_HEADER = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
 FONT_SUB = Font(name="Calibri", size=11, bold=True, color="1F3A5F")
 FONT_PASS = Font(bold=True, color="006100")
 FONT_FAIL = Font(bold=True, color="9C0006")
+FONT_ADVISORY = Font(bold=True, color="9C6500")            # amber text = advisory
 FONT_NOTE = Font(italic=True, size=9, color="666666")
 FONT_MONO = Font(name="Menlo", size=10)
 
@@ -478,20 +480,36 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
             row += 1
         row += 1
 
-        # per-section table
+        # per-section table. A section flagged `advisory` is the LLM SEMANTIC self-audit — it is
+        # NON-GATING (the gating floor/allPass already exclude it) and noisy, so a sub-8 advisory
+        # section is shown AMBER "ADVISORY", NOT red FAIL — red is reserved for a real DETERMINISTIC
+        # gate breach (Tristan 2026-06-23: advisory LLM scores were painting the dossier red while
+        # the authoritative gates all pass). The 'advisory' flag comes straight from the scorecard.
         header(ws, row, ["Section", "Score", "≥8?", "Defects"])
+        row += 1
+        note = ws.cell(row, 1, "Sections marked (advisory) are the LLM self-audit — non-gating; "
+                               "amber = advisory concern, red = a deterministic gate breach.")
+        note.font = FONT_NOTE
+        note.alignment = WRAP_TOP
         row += 1
         for sec in sc.get("sections", []):
             name = sec.get("name", "")
             score = sec.get("score")
+            advisory = bool(sec.get("advisory"))
             defects = sec.get("defects") or []
-            ws.cell(row, 1, name).border = BORDER
+            ws.cell(row, 1, name + ("  (advisory)" if advisory else "")).border = BORDER
             cs = ws.cell(row, 2, score)
             cs.border = BORDER
             ok = isinstance(score, (int, float)) and score >= 8
-            cp = ws.cell(row, 3, "PASS" if ok else "FAIL")
-            cp.fill = FILL_PASS if ok else FILL_FAIL
-            cp.font = FONT_PASS if ok else FONT_FAIL
+            if ok:
+                verdict, vfill, vfont = "PASS", FILL_PASS, FONT_PASS
+            elif advisory:
+                verdict, vfill, vfont = "ADVISORY", FILL_ADVISORY, FONT_ADVISORY
+            else:
+                verdict, vfill, vfont = "FAIL", FILL_FAIL, FONT_FAIL
+            cp = ws.cell(row, 3, verdict)
+            cp.fill = vfill
+            cp.font = vfont
             cp.border = BORDER
             cd = ws.cell(row, 4, "; ".join(str(d) for d in defects))
             cd.alignment = WRAP_TOP
