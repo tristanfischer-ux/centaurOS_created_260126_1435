@@ -436,8 +436,9 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
     # a click; the full-resolution hero is its own tab. Floats over the empty cols right of D. ----
     try:
         from openpyxl.drawing.image import Image as XLImage
-        _hero = first_existing(os.path.join(run_dir, "00-hero.png"),
-                               os.path.join(run_dir, "blender-cover.png"))
+        _hero = next((p for p in (os.path.join(run_dir, "00-hero.png"),
+                                  os.path.join(run_dir, "blender-cover.png"))
+                      if os.path.exists(p)), None)
         if _hero:
             _hds = downscale_png(_hero, run_dir, max_px=900)
             _himg = XLImage(_hds)
