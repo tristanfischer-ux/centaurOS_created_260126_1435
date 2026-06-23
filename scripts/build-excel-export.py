@@ -221,6 +221,7 @@ FMT_GBP2 = "£#,##0.00"      # money with pence (small unit prices)
 FMT_INT = "#,##0"           # counts / integers with thousands separators
 FMT_DEC1 = "#,##0.0"        # one decimal (velocities, %drop, ratings)
 FMT_DEC2 = "#,##0.00"       # two decimals (ratios, m/s, areas)
+FMT_NUM = "#,##0.##"        # thousands sep, drops trailing zeros (62 -> "62", 2.58 -> "2.58")
 
 # CONTENTS hyperlink target / back-link constant.
 CONTENTS_SHEET = "Contents"
@@ -230,7 +231,10 @@ FONT_LINK = Font(name="Calibri", size=11, color="1F3A5F", underline="single", bo
 # back to _default_desc(); these cover the data tabs by their exact sheet name.
 _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Overview": "Quality scorecard, headline metrics & run provenance.",
+    "Brief": "The original client brief and the engine's enhanced, structured interpretation that drives the design.",
     "⚠ Checks": "Live arithmetic invariants (== the CLI verifier). RED = numbers don't reconcile.",
+    "Part names": "The master parts list — every part named once; every other tab references these cells.",
+    "Connection trace": "Which part connects to what — live input/output cell-references with completeness & integrity counts.",
     "Quantities": "Every sized contract quantity with family, basis & source.",
     "Calculations": "Worked calcs grouped by tool — live Excel formulas where structured.",
     "BoM": "THE BILL — what to buy: every line, qty, part/MPN, live Σ line £ total.",
@@ -516,6 +520,153 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
 
 
 # ============================================================================
+# TAB — BRIEF (original client brief vs the engine-enhanced structured brief)
+# ============================================================================
+def _brief_paragraphs(md: str) -> List[str]:
+    """Split a markdown/prose brief into readable paragraphs, one per row. Blank-line
+    separated blocks become paragraphs; a leading '# heading' / list bullet is kept
+    verbatim (lightly de-marked). Universal — no class assumptions."""
+    out: List[str] = []
+    block: List[str] = []
+    for raw in str(md or "").splitlines():
+        ln = raw.rstrip()
+        if not ln.strip():
+            if block:
+                out.append(" ".join(block).strip())
+                block = []
+            continue
+        s = ln.strip()
+        # a markdown heading or list bullet is its OWN paragraph (don't fold into prose)
+        if re.match(r"^#{1,6}\s", s) or re.match(r"^[-*]\s", s):
+            if block:
+                out.append(" ".join(block).strip())
+                block = []
+            s = re.sub(r"^#{1,6}\s+", "", s)        # drop the ### markers, keep the text
+            out.append(s)
+        else:
+            block.append(s)
+    if block:
+        out.append(" ".join(block).strip())
+    return [p for p in out if p]
+
+
+def tab_brief(wb: Workbook, run_dir: str) -> None:
+    """The ORIGINAL client brief (left) vs the engine's ENHANCED, structured brief
+    (right). Original = 0-original-brief.md (prose, one paragraph per row, wrapped);
+    enhanced = 1-brief-expanded.json (labelled sections; lists one item per row).
+    Falls back gracefully when a file is missing. Universal."""
+    ws = wb.create_sheet("Brief")
+    set_widths(ws, {"A": 80, "B": 4, "C": 46})
+    title_row(
+        ws, "Brief — original vs engine-enhanced", 3,
+        "The verbatim client brief (left) and the engine's structured, enhanced "
+        "interpretation (right) that drives the whole design.",
+    )
+
+    # ---- read both sources (gracefully) ----
+    orig = ""
+    op = os.path.join(run_dir, "0-original-brief.md")
+    if os.path.exists(op):
+        try:
+            orig = open(op, "r").read()
+        except Exception:  # noqa: BLE001
+            orig = ""
+    enh = load_json(os.path.join(run_dir, "1-brief-expanded.json")) or {}
+
+    # ---- column headers ----
+    r0 = 4
+    oc = ws.cell(r0, 1, "Original brief (verbatim)")
+    oc.font = FONT_SUB
+    oc.fill = FILL_SUB
+    oc.alignment = LEFT_TOP
+    ec = ws.cell(r0, 3, "Engine-enhanced brief (structured)")
+    ec.font = FONT_SUB
+    ec.fill = FILL_SUB
+    ec.alignment = LEFT_TOP
+    r0 += 1
+
+    # ---- LEFT: original prose, one paragraph per row, wrapped ----
+    left_r = r0
+    paras = _brief_paragraphs(orig)
+    if not paras:
+        c = ws.cell(left_r, 1, "— 0-original-brief.md not found —")
+        c.font = FONT_NOTE
+        c.alignment = WRAP_TOP
+        left_r += 1
+    else:
+        for p in paras:
+            c = ws.cell(left_r, 1, clean_cell(p))
+            c.alignment = WRAP_TOP
+            # grow the row so a long paragraph never clips (col A ≈ 80 wide)
+            ws.row_dimensions[left_r].height = 14.5 * min(8, max(1, -(-len(p) // 95)))
+            left_r += 1
+
+    # ---- RIGHT: enhanced brief, each key a labelled section ----
+    right_r = r0
+    SCALAR_KEYS = [
+        ("product_summary", "Product summary"),
+        ("primary_product", "Primary product"),
+        ("construction_materials", "Construction materials"),
+    ]
+    LIST_KEYS = [
+        ("derived_requirements", "Derived requirements"),
+        ("operating_conditions", "Operating conditions"),
+    ]
+
+    def _label(text: str) -> None:
+        nonlocal right_r
+        lc = ws.cell(right_r, 3, clean_cell(text))
+        lc.font = FONT_SUB
+        right_r += 1
+
+    def _value(text: str) -> None:
+        nonlocal right_r
+        vc = ws.cell(right_r, 3, clean_cell(text))
+        vc.alignment = WRAP_TOP
+        vc.font = FONT_NOTE
+        s = str(text or "")
+        ws.row_dimensions[right_r].height = 14.5 * min(6, max(1, -(-len(s) // 55)))
+        right_r += 1
+
+    if not enh:
+        c = ws.cell(right_r, 3, "— 1-brief-expanded.json not found —")
+        c.font = FONT_NOTE
+        c.alignment = WRAP_TOP
+        right_r += 1
+    else:
+        for key, label in SCALAR_KEYS:
+            v = enh.get(key)
+            if v:
+                _label(label)
+                _value(str(v))
+                right_r += 1  # spacer
+        for key, label in LIST_KEYS:
+            items = enh.get(key)
+            if isinstance(items, list) and items:
+                _label(label)
+                for it in items:
+                    if isinstance(it, dict):
+                        lbl = (it.get("label") or it.get("key") or "").strip()
+                        val = it.get("value")
+                        unit = it.get("unit") or ""
+                        line = f"{lbl}: {val} {unit}".strip() if lbl else f"{val} {unit}".strip()
+                        prov = it.get("provenance") or it.get("confidence")
+                        if prov:
+                            line += f"   ({prov})"
+                    else:
+                        line = str(it)
+                    _value("• " + line)
+                right_r += 1  # spacer
+        notes = enh.get("notes")
+        if notes:
+            _label("Notes")
+            _value(str(notes))
+
+    ws.freeze_panes = "A4"
+    back_link(ws, 3)
+
+
+# ============================================================================
 # TAB 2 — "⚠ Checks"  (THE ERROR-SURFACING TAB — the point of the exercise)
 # ============================================================================
 def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
@@ -713,6 +864,8 @@ def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
         CellIsRule(operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS),
     )
     ws.cell(2, 1)  # keep title intact
+    # ↑ Contents back-link at col span+1 (=H), clear of the hidden J–M data block.
+    back_link(ws, 7)
     ws.freeze_panes = "A5"
 
     # stash the fail summary on the object for the caller's report
@@ -728,7 +881,7 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
     ws = wb.create_sheet("Quantities")
     set_widths(ws, {"A": 34, "B": 16, "C": 12, "D": 16, "E": 12, "F": 12, "G": 62})
     title_row(ws, "Contract quantities", 7,
-              "orchestratorContract.quantities — the engine's sized values.")
+              "Every sized contract quantity with its family, basis and source.")
     header(ws, 4, ["Name", "Value", "Unit", "Family", "Basis", "Source", "Source detail"])
     quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
     r = 5
@@ -751,8 +904,9 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         cd.font = FONT_NOTE
         cd.border = BORDER
         r += 1
-    # number formats (#37) on the Value column — kill General/scientific
-    apply_col_formats(ws, 5, {2: FMT_DEC2}, r - 1)
+    # number formats (#37) on the Value column — FMT_NUM drops trailing .00 so an
+    # integer-valued metric reads "62" not "62.00", while 2.58 still shows "2.58".
+    apply_col_formats(ws, 5, {2: FMT_NUM}, r - 1)
     ws.auto_filter.ref = f"A4:G{r - 1}"
     ws.freeze_panes = "A5"
     back_link(ws, 7)
@@ -1385,6 +1539,7 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
         r += 1
     ws.freeze_panes = "A6"
     ws.auto_filter.ref = f"A5:F{max(6, r - 1)}"
+    back_link(ws, 6)
     return True
 
 
@@ -1738,7 +1893,9 @@ def tab_cost(wb: Workbook, state: dict) -> bool:
         _lref = name_ref(ln.get("label", ""))
         ws.cell(r, 1, _lref if _lref else clean_cell(ln.get("label", ""))).border = BORDER
         ws.cell(r, 2, clean_cell(ln.get("module", ""))).border = BORDER
-        ws.cell(r, 3, num(ln.get("cost_gbp"))).border = BORDER
+        # A 0/None cost renders as an em-dash (text) so it never reads as a real £0.
+        _cost = num(ln.get("cost_gbp"))
+        ws.cell(r, 3, _cost if _cost else "—").border = BORDER
         ws.cell(r, 4, "yes" if ln.get("defensible") else "no").border = BORDER
         ws.cell(r, 5, clean_cell(basis.get("method", ""))).border = BORDER
         inp = basis.get("inputs")
@@ -1749,11 +1906,17 @@ def tab_cost(wb: Workbook, state: dict) -> bool:
         nt.font = FONT_NOTE
         nt.border = BORDER
         r += 1
+    last_line = r - 1
     # live Σ
     ws.cell(r, 1, "Σ cost_gbp (live)").font = FONT_SUB
     ts = ws.cell(r, 3, f"=SUM(C{first}:C{r-1})")
     ts.font = Font(bold=True)
     ts.fill = FILL_RESULT
+    ts.number_format = FMT_GBP
+    # number formats (#37) on the Cost £ column — was rendering bare integers (General)
+    apply_col_formats(ws, first, {3: FMT_GBP}, last_line)
+    # filterable like the BoM / Quantities tables (header row -> last data row)
+    ws.auto_filter.ref = f"A{start}:H{last_line}"
     ws.freeze_panes = f"A{start+1}"
     back_link(ws, 8)
     return True
@@ -1957,7 +2120,9 @@ def tab_brief_compliance(wb: Workbook, state: dict) -> bool:
     ws.conditional_formatting.add(rng, CellIsRule(
         operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS))
 
-    apply_col_formats(ws, first, {2: FMT_DEC2, 5: FMT_DEC2}, r - 1)
+    # FMT_NUM on the Target / Achieved metric columns: integer-valued metrics (62 t/yr)
+    # read "62" not "62.00", while genuine decimals (FCR 1.37) still show their places.
+    apply_col_formats(ws, first, {2: FMT_NUM, 5: FMT_NUM}, r - 1)
     ws.auto_filter.ref = f"A4:H{r-1}"
     ws.freeze_panes = "A5"
     back_link(ws, 8)
@@ -4424,7 +4589,10 @@ def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
             if h.lower() in ("service", "description", "measured", "notes", "remarks"):
                 widths[get_column_letter(idx)] = 54
         set_widths(ws, widths)
-        title_row(ws, heading.split("·")[-1].strip() or sheet, max(ncol, 2),
+        # Use the clean SHEET NAME as the title (sentence case) — the source heading is
+        # verbatim ALL-CAPS ("LINE LIST"/"VALVE LIST"/"INSTRUMENT INDEX"); the descriptive
+        # subtitle carries the detail.
+        title_row(ws, sheet, max(ncol, 2),
                   "Parsed from process-schedules.md — real sortable rows.")
         nxt, body_first = _render_md_table(ws, 4, "", hdr, rows)
         ws.auto_filter.ref = f"A4:{get_column_letter(ncol)}{nxt - 1}"
@@ -4632,7 +4800,9 @@ def tab_contents(wb: Workbook, descriptions: Dict[str, str]) -> None:
 
 
 def _default_desc(name: str) -> str:
-    """Fallback one-line description for image / module tabs not in the static map."""
+    """Fallback one-line description for image / module tabs not in the static map.
+    Distinct lines per drawing TYPE (matched on the title) so GA/P&ID/BFD/Single-line/
+    HVAC never share an identical generic string."""
     low = name.lower()
     if low.startswith("module —"):
         return "Per-module Blender render."
@@ -4640,6 +4810,16 @@ def _default_desc(name: str) -> str:
         return "Representative pipe isometric drawing."
     if low.startswith("render"):
         return "Photoreal Blender render."
+    if low.startswith("ga") or "general arrangement" in low:
+        return "General arrangement — equipment layout & footprint."
+    if "p&id" in low or low.startswith("pid"):
+        return "Piping & instrumentation diagram — process flow, valves, instruments."
+    if low.startswith("bfd") or "block flow" in low:
+        return "Block flow diagram — major process blocks & streams."
+    if "single-line" in low or "single line" in low:
+        return "Single-line electrical distribution diagram."
+    if "hvac" in low:
+        return "Ventilation & climate-control schematic."
     return "Engineering drawing / view."
 
 
@@ -4746,10 +4926,10 @@ def add_image_tab(wb: Workbook, run_dir: str, png_path: str, title: str,
     try:
         sheet_title = safe_sheet_title(title, used_titles)
         ws = wb.create_sheet(sheet_title)
-        ws.cell(1, 1, title).font = Font(size=14, bold=True, color="1F3A5F")
-        cap = ws.cell(2, 1, caption)
-        cap.font = FONT_NOTE
-        cap.alignment = LEFT_TOP
+        # Shared navy title band (matches the data tabs) + a ↑ Contents back-link, instead
+        # of a bare bold cell. title_row returns the next free row; the image goes below it.
+        img_row = title_row(ws, title, 6, caption)
+        back_link(ws, 6)
         img = XLImage(ds)
         # cap on-sheet display size (keep aspect) so the tab is readable. Raised
         # 1100→1700 to match the higher-res embed: the underlying PNG is up to
@@ -4759,7 +4939,7 @@ def add_image_tab(wb: Workbook, run_dir: str, png_path: str, title: str,
             ratio = max_w / float(img.width)
             img.width = int(img.width * ratio)
             img.height = int(img.height * ratio)
-        ws.add_image(img, "A4")
+        ws.add_image(img, f"A{img_row}")
         return True
     except Exception as exc:  # noqa: BLE001
         print(f"    ! could not embed {png_path}: {exc}")
@@ -4862,6 +5042,16 @@ def build(run_dir: str, out_path: str) -> dict:
 
     print("  · Overview")
     tab_overview(wb, state, run_dir, sha)
+    print("  · Brief")
+    tab_brief(wb, run_dir)
+    # Place Brief immediately AFTER Overview, BEFORE ⚠ Checks (created next).
+    # openpyxl appends at the end, so move it up to index 1.
+    try:
+        _bi = wb.sheetnames.index("Brief")
+        if _bi != 1:
+            wb.move_sheet("Brief", 1 - _bi)
+    except ValueError:
+        pass
     print("  · ⚠ Checks")
     fail_count = tab_checks(wb, state, run_dir)
     checks_ws = wb["⚠ Checks"]
