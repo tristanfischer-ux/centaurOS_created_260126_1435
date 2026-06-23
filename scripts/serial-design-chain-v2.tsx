@@ -8309,10 +8309,16 @@ async function main() {
   // chain opens the nicely-named deliverable copy ("<YYMMDDHHMM> <Subject>.pdf")
   // instead (created after the integrity check below).
   renderEnv.RENDER_NO_OPEN = '1'
-  // TEMP DEBUG GUARD (revert before commit): stop before the react-pdf render so
-  // the converged design+drawings+BoM can be inspected without producing the PDF.
-  if (process.env.CHAIN_SKIP_RENDER === '1' || QUALITY_LOOP_PHASE < 3) {
-    console.error(`[chain] ${process.env.CHAIN_SKIP_RENDER === '1' ? 'CHAIN_SKIP_RENDER=1' : `QUALITY_LOOP_PHASE=${QUALITY_LOOP_PHASE}`} — skipping react-pdf render (converged state + drawings + BoM are on disk; quality loop will still run)`)
+  // EXCEL-ONLY DELIVERABLE (Tristan 2026-06-23): the Excel spreadsheet IS the product; the
+  // react-pdf chain-v2.pdf is NOT wanted. Skip the PDF render when CHAIN_SKIP_PDF=1 (Excel +
+  // Blender renders still produced) OR CHAIN_SKIP_RENDER=1 (also skips Blender) OR before the
+  // quality loop converges. The Excel deliverable is built above (excel_deliverable step)
+  // regardless of this flag, so CHAIN_SKIP_PDF=1 yields the full Excel without any PDF.
+  if (process.env.CHAIN_SKIP_RENDER === '1' || process.env.CHAIN_SKIP_PDF === '1' || QUALITY_LOOP_PHASE < 3) {
+    const _why = process.env.CHAIN_SKIP_RENDER === '1' ? 'CHAIN_SKIP_RENDER=1'
+      : process.env.CHAIN_SKIP_PDF === '1' ? 'CHAIN_SKIP_PDF=1'
+      : `QUALITY_LOOP_PHASE=${QUALITY_LOOP_PHASE}`
+    console.error(`[chain] ${_why} — skipping react-pdf render (Excel deliverable + drawings + BoM are on disk; quality loop will still run)`)
     logAction({ step: 'render_skipped', ok: true })
   } else {
   // 2026-05-23 P2-5: wrap render subprocess in try/catch → exit 5 (render
