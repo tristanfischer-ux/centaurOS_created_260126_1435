@@ -5535,6 +5535,25 @@ def build(run_dir: str, out_path: str) -> dict:
     print("  · Contents (sheet #1)")
     tab_contents(wb, _TAB_DESCRIPTIONS)
 
+    # ---- FINAL SANITISATION (Tristan 2026-06-23): defang any cell openpyxl turned into a FORMULA
+    # that is actually engine PROSE. openpyxl stores ANY string starting with "=" as a formula;
+    # engine notes that start with "=" (e.g. a worked-calc assumption "= 3.91 t/day (g/s x 86.4 /
+    # 1000)") then become invalid <f> records → Excel strips them ("Removed Records: Formula" and
+    # the file opens broken). Real build-generated formulas NEVER start with "= " (space after =) and
+    # never contain a digit directly followed by whitespace+letter — so this net is safe for genuine
+    # formulas (incl. "=...*8000/1e9", "='Inputs & Assumptions'!$B$5", "=IF(...)"). ----
+    _prose_re = re.compile(r"\d\s+[A-Za-z]")
+    _defanged = 0
+    for _ws in wb.worksheets:
+        for _row in _ws.iter_rows():
+            for _c in _row:
+                _v = _c.value
+                if isinstance(_v, str) and _v.startswith("=") and (_v[1:2] in (" ", "\t") or _prose_re.search(_v)):
+                    _c.value = clean_cell(_v)   # zero-width-space prefix → stored as TEXT, not a formula
+                    _defanged += 1
+    if _defanged:
+        print(f"  · defanged {_defanged} mis-flagged prose-as-formula cell(s) (Excel-corruption guard)")
+
     wb.save(out_path)
 
     size_mb = os.path.getsize(out_path) / (1024 * 1024)
