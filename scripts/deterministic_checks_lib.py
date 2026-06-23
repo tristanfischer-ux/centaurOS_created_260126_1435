@@ -1088,6 +1088,89 @@ def _match_partverification_by_mpn(bom_row: dict,
 # ============================================================================
 # PUBLIC ENTRY POINT
 # ============================================================================
+_BRIEF_UNIT_FAM = {
+    "m3": "vol", "kg/m3": "density", "kg": "mass", "days": "time", "day": "time",
+    "hr": "time", "h": "time", "mins": "time2", "min": "time2", "minute": "time2",
+    "minutes": "time2", "%": "frac", "percent": "frac", "pct": "frac", "t/yr": "tpy",
+    "tpy": "tpy", "tonne/yr": "tpy", "tonnes/yr": "tpy", "ratio": "ratio", "c": "temp",
+    "degc": "temp", "ppt": "sal", "kw": "power", "mw": "power", "kwh": "energy",
+}
+
+
+def _ufam(u: Any) -> str:
+    s = re.sub(r"\s+", "", str(u or "").lower()).replace("³", "3").replace("°", "")
+    return _BRIEF_UNIT_FAM.get(s, s)
+
+
+def _btoks(s: Any) -> set:
+    s = re.sub(r"[^a-z0-9]+", " ", str(s or "").lower())
+    _drop = {"kg", "m3", "mm", "days", "day", "mins", "min", "minute", "minutes", "hr",
+             "h", "s", "percent", "pct", "tpy", "yr", "year", "per", "c", "ppt", "kw",
+             "mw", "kwh", "ml", "l", "w", "ratio", "the", "of", "value", "target", "a", "an"}
+    return {t for t in s.split() if t and t not in _drop and not t.isdigit()}
+
+
+def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
+    """UNIVERSAL: deterministically verify each STRUCTURED brief target metric
+    (constraints.target_performance.metrics) against the matching DESIGNED contract quantity —
+    so the brief's own targets are AUTHORITATIVELY verified, not merely disclosed. Matching is
+    conservative: ALL of the metric's concept tokens must be present in the quantity name AND the
+    unit-family must agree; a metric with no confident contract match is SKIPPED (never falsely
+    failed). Class-agnostic — any archetype whose brief carries structured target metrics."""
+    out: List[Check] = []
+    oc = state.get("orchestratorContract") or {}
+    q: Dict[str, Any] = oc.get("quantities") or {}
+    if not q:
+        return out
+    pb = state.get("parsedBrief") or _load_json(os.path.join(run_dir, "1-parsed-brief.json")) or {}
+    metrics = ((((pb or {}).get("constraints") or {}).get("target_performance") or {}).get("metrics")) or []
+    if not metrics:
+        return out
+    qidx = [(k, _btoks(k), _ufam((q[k] or {}).get("unit") if isinstance(q[k], dict) else ""))
+            for k in q]
+    for m in metrics:
+        if not isinstance(m, dict):
+            continue
+        km, tv, unit = m.get("key_metric"), m.get("value"), (m.get("unit") or "")
+        try:
+            tvf = float(tv)
+        except (TypeError, ValueError):
+            continue
+        mt, mu = _btoks(km), _ufam(unit)
+        if not km or not mt or tvf == 0:
+            continue
+        # candidate designed quantities: unit-family agrees AND a concept-token overlap (>=2,
+        # or a full subset for a single-token metric). Among the candidates pick the value
+        # CLOSEST to the brief target — this resolves a per-unit-vs-total name clash (the brief's
+        # 'rearing_tank_volume_m3' = the TOTAL 1016 m3 must match the contract's total_tank_volume
+        # 1016, not the 254 m3 per-tank quantity of the same name). A genuine shortfall (no
+        # concept+unit quantity within 5% of the target) still FAILS.
+        cands = []
+        for k, kt, ku in qidx:
+            if not (mu == ku or not mu or not ku):
+                continue
+            ov = len(mt & kt)
+            if ov >= 2 or (mt <= kt and ov >= 1):
+                dvc = qval(q, k)
+                if dvc is not None:
+                    cands.append((abs(dvc - tvf), dvc, k))
+        if not cands:
+            continue
+        cands.sort(key=lambda t: t[0])
+        _, dv, best = cands[0]
+        tol = abs(tvf) * 0.05
+        out.append(Check(
+            name=f"Brief target met: {km}",
+            category="BRIEF", relation="eq",
+            status=PASS if abs(dv - tvf) <= tol else FAIL,
+            actual=round(dv, 4), expected=tvf, tol=round(tol, 4), unit=unit,
+            producer=f"brief:{km}",
+            detail=(f"Brief target {km} = {tvf:g} {unit}; design ({best}) = {dv:g} {unit} — "
+                    f"the design must realise the brief target within ±5%."),
+        ))
+    return out
+
+
 def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     """Run EVERY deterministic check against a run directory and return the list
     of Check records (PASS / FAIL / N/A). Pure: reads only the run's JSON, makes
@@ -1102,6 +1185,7 @@ def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     checks.extend(_checks_balance(state, run_dir))
     checks.extend(_checks_cost(state, run_dir))
     checks.extend(_checks_connectivity(state, run_dir))
+    checks.extend(_checks_brief_compliance(state, run_dir))
     return checks
 
 
