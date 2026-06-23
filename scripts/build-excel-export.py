@@ -5556,16 +5556,30 @@ def build(run_dir: str, out_path: str) -> dict:
         _t = re.sub(r"\d+\.?\d*([eE][+\-]?\d+)?", "", _t)    # numbers incl scientific (1e9)
         _t = re.sub(r"[\s+\-*/^%(),:.=&<>​]", "", _t)  # operators / whitespace / zero-width
         return bool(re.search(r"[A-Za-z]", _t))
-    _defanged = 0
+    # Excel's FILE LOADER rejects lowercase scientific-notation number literals (e.g. "1e9", "1.5e6")
+    # in stored formulas — it silently drops the formula ("Removed Records: Formula") even though the
+    # UI accepts 1e9 typed live. (Confirmed via LibreOffice round-trip: it rewrites 1e9 -> 1000000000.)
+    # So expand any sci-notation literal in a SURVIVING formula to a plain number. Lookbehind/ahead
+    # keep it from touching identifiers/cell-refs (e.g. "B1e9" or a name).
+    _sci = re.compile(r"(?<![A-Za-z0-9_])(\d+\.?\d*[eE][+\-]?\d+)(?![A-Za-z0-9_])")
+    def _expand_sci(_m: "re.Match") -> str:
+        _val = float(_m.group(1))
+        return str(int(_val)) if _val == int(_val) else repr(_val)
+    _defanged = _normalised = 0
     for _ws in wb.worksheets:
         for _row in _ws.iter_rows():
             for _c in _row:
                 _v = _c.value
-                if isinstance(_v, str) and _v.startswith("=") and _is_invalid_formula(_v):
-                    _c.value = clean_cell(_v)   # zero-width-space prefix → stored as TEXT, not a formula
+                if not (isinstance(_v, str) and _v.startswith("=")):
+                    continue
+                if _is_invalid_formula(_v):
+                    _c.value = clean_cell(_v)        # zero-width-space prefix → stored as TEXT, not a formula
                     _defanged += 1
-    if _defanged:
-        print(f"  · defanged {_defanged} mis-flagged prose-as-formula cell(s) (Excel-corruption guard)")
+                elif _sci.search(_v):
+                    _c.value = _sci.sub(_expand_sci, _v)   # 1e9 -> 1000000000 (Excel-loader-safe)
+                    _normalised += 1
+    if _defanged or _normalised:
+        print(f"  · Excel-corruption guard: defanged {_defanged} prose-as-formula + normalised {_normalised} sci-notation formula(s)")
 
     wb.save(out_path)
 
