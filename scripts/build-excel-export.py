@@ -432,6 +432,23 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
         "that go RED where the engine's numbers do not reconcile.",
     )
 
+    # ---- hero render thumbnail (top-right) — the cover answers "what does it look like?" without
+    # a click; the full-resolution hero is its own tab. Floats over the empty cols right of D. ----
+    try:
+        from openpyxl.drawing.image import Image as XLImage
+        _hero = first_existing(os.path.join(run_dir, "00-hero.png"),
+                               os.path.join(run_dir, "blender-cover.png"))
+        if _hero:
+            _hds = downscale_png(_hero, run_dir, max_px=900)
+            _himg = XLImage(_hds)
+            if _himg.width and _himg.width > 560:
+                _hr = 560 / float(_himg.width)
+                _himg.width = int(_himg.width * _hr)
+                _himg.height = int(_himg.height * _hr)
+            ws.add_image(_himg, "F2")
+    except Exception:  # never let the cover image break the Overview
+        pass
+
     # ---- provenance block ----
     sub_banner(ws, row, "Run provenance", 4)
     row += 1
