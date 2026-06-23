@@ -1571,6 +1571,34 @@ function checkRasFeedAndPumpReconciled(): Assertion[] {
       () => `motor=${motor} power=${power} hydraulic_kw=${Number.isFinite(hydW) ? (hydW / 1000).toFixed(1) : hydW}`,
     ))
 
+    // CAPEX CEILING from the STRUCTURED constraint (2026-06-23, £50 M scale-up fix):
+    // the brief-parser STRIPS the capex ceiling from product_description prose
+    // ("Capex ceilings have been excluded …") but ALWAYS populates the structured
+    // constraints.unit_cost_ceiling.value. The contract MUST read that structured
+    // value, NOT regex the (now ceiling-free) prose and fall back to the £5 M
+    // default — which silently mis-budgeted the £50 M brief at £5 M, tripping the
+    // capex_within_ceiling closure on a design that actually fits. Feed a brief
+    // whose prose has NO ceiling but whose structured constraint says £50 M.
+    {
+      const briefNoProseCeiling = {
+        product_description: 'Recirculating aquaculture system held at 26.4 °C grow-out temperature for 600 tonnes per year yellowtail kingfish, 33 ppt salinity, 4 turnovers per hour, 99.6% of its water recirculated, feed conversion ratio 1.37.',
+        constraints: { target_performance: { value: 600, unit: 't/yr' }, unit_cost_ceiling: { value: 50_000_000, currency: 'GBP' } },
+      }
+      const c50 = buildContract('aquaculture_ras', briefNoProseCeiling) as any
+      const ceil = c50?.quantities?.capex_ceiling_gbp?.value
+      const closure = (c50?.closures ?? []).find((cl: any) => cl?.invariant_id === 'capex_within_ceiling')
+      out.push(assertEq(
+        'RAS.capex_ceiling_from_structured_constraint',
+        'capex ceiling is read from constraints.unit_cost_ceiling.value (the brief-parser strips it from prose), so a £50 M brief budgets at £50 M (not the £5 M default) and the capex_within_ceiling closure PASSes on a within-budget design',
+        JSON.stringify({ ceil, closure_status: closure?.status, closure_measured: closure?.measured }),
+        () =>
+          Number.isFinite(ceil) && ceil === 50_000_000 &&        // structured value won, not the £5 M fallback
+          closure && closure.status === 'pass' &&                // within-budget design now reconciles
+          Number.isFinite(closure.measured) && closure.measured <= ceil * 1.05,
+        () => `ceil=${ceil} closure=${closure?.status} measured=${closure?.measured}`,
+      ))
+    }
+
     // UV + HRT single-source sanity (council #3 + #5): seeded, in-band, right units.
     const uv = v('uv_lamp_power_kw'), hrt = v('hydraulic_retention_time_mins')
     out.push(assertEq(

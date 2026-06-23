@@ -11751,6 +11751,15 @@ registerArchetype('aquaculture_ras', (brief: any) => {
   // capex at £5 M → the achievable tonnage is the largest whose cost ≤ ceiling.
   const referenceEquipCapexGbp = 8_150_000               // 204 t/yr reference unit equipment capex
   const capexCeilingGbp = (() => {
+    // PRIMARY: the structured constraint the brief-parser reliably populates
+    // (`constraints.unit_cost_ceiling.value`). The parser STRIPS the capex
+    // ceiling from `product_description` prose ("Capex ceilings have been
+    // excluded …"), so a desc-regex alone silently falls back to the £5 M
+    // default — which is wrong for any non-£5 M brief (e.g. the £50 M scale-up).
+    const ucc = brief?.constraints?.unit_cost_ceiling
+    const uccVal = Number(ucc?.value ?? ucc ?? 0)
+    if (uccVal >= 100_000) return uccVal
+    // FALLBACK: regex the description (older briefs that keep the ceiling inline).
     const m = desc.match(/(?:capex\s+ceiling|capex|capital|installed\s+cost|equipment)[^£\d]{0,40}£?\s*([\d,]{6,})/i)
       || desc.match(/£?\s*([\d,]{6,})\s*(?:capex|capital|pounds?\s+capex|for\s+the\s+recirculating)/i)
     if (m) { const v = parseFloat(m[1].replace(/,/g, '')); if (v >= 100_000) return v }
@@ -12557,7 +12566,7 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     // ── System ──
     connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'Σ heat-pump electrical + recirc pumps + MBBR/degasser blowers + UV/ozone/PSA/controls' }),
     design_equipment_capex_gbp: q(designEquipCapexGbp, 'GBP', 'currency', 'gross', 'system', 'calculator', { source_detail: 'equipment capex anchor for this tonnage (≈£40k/annual-tonne off the £8.15 M / 204 t/yr reference)' }),
-    capex_ceiling_gbp: q(capexCeilingGbp, 'GBP', 'currency', 'gross', 'system', 'brief', { source_detail: '£5,000,000 installed-capex ceiling for the RAS equipment, shipping and installation' }),
+    capex_ceiling_gbp: q(capexCeilingGbp, 'GBP', 'currency', 'gross', 'system', 'brief', { source_detail: `£${capexCeilingGbp.toLocaleString('en-GB')} installed-capex ceiling for the RAS equipment, shipping and installation` }),
     total_system_mass_kg: q(totalSystemMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'bottom-up field-erected estimate: rearing tanks ~40 t + treatment vessels ~18 t + pumps/blowers ~9 t + heat pumps ~12 t + pipework/structure ~15 t' }),
 
     // ════ FOUR UNIVERSAL PHYSICS ELEMENTS — each key emitted ONLY when its physical
