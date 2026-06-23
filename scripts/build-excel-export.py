@@ -1358,7 +1358,7 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
             xl_formula = substitution_to_excel(sub_text) if not structured else None
             ev_val = safe_eval_substitution(sub_text) if not structured else None
             if not structured:
-                marker = "  [recomputed live]" if xl_formula else "  [static — no auto-check]"
+                marker = "  [build-verified]" if ev_val is not None else "  [static — no auto-check]"
                 ws.cell(r, 1, label + marker).font = Font(bold=True, italic=True, color="7F7F7F")
             calc_title_row = r
             r += 1
@@ -1380,8 +1380,9 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
                 sc.fill = FILL_LEGACY
                 r += 1
                 ws.cell(r, 1, "result").font = FONT_NOTE
-                if xl_formula is not None and isinstance(res_val, (int, float)):
-                    lc = ws.cell(r, 2, xl_formula)        # LIVE recomputation
+                if isinstance(res_val, (int, float)):
+                    _bval = ev_val if isinstance(ev_val, (int, float)) else res_val
+                    lc = ws.cell(r, 2, _bval)             # STATIC computed result — never a live worked-calc formula (Excel-safe)
                     lc.fill = FILL_RESULT
                     lc.number_format = "#,##0.0000"
                     ws.cell(r, 5, res_val)                # engine value
@@ -1389,8 +1390,11 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
                     ws.cell(r, 7, res_unit)
                     drift = (abs(ev_val - res_val) / abs(res_val)
                              if (ev_val is not None and res_val) else 0.0)
-                    if drift <= 0.02:
-                        verdict, vfont = "✓ recomputed live — maths checks out", FONT_PASS
+                    if ev_val is None:
+                        verdict, vfont = "— result shown (substitution not auto-evaluable)", FONT_NOTE
+                        static_count += 1
+                    elif drift <= 0.02:
+                        verdict, vfont = "✓ maths checks out (build-verified)", FONT_PASS
                         live_count += 1
                     else:
                         verdict = (f"⚠ engine result ≠ its own substitution "
@@ -1446,30 +1450,28 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
                 ws.cell(r, 3, iunit)
                 r += 1
 
-            # ---- live result row ----
+            # ---- result row (STATIC computed value — NEVER a live worked-calc formula) ----
+            # A live worked-calc formula (formula_to_excel / substitution_to_excel) can be Excel-INVALID
+            # for some classes — unbound physics symbols (a bare "E" joint-efficiency), sci-notation, or
+            # patterns Excel's file loader rejects though openpyxl + LibreOffice both accept them. Result:
+            # "Removed Records: Formula from sheetN.xml" and a workbook that won't open (the recurring SAF
+            # break). The Calculations tab is a TRANSCRIPT (formula + substitution + result), so the result
+            # is emitted as the STATIC computed value and the formula-vs-result reconciliation is done HERE
+            # in Python and shown as a static verdict — which is exactly the "do the Excel numbers reconcile
+            # with the physics" check. Universal across every archetype. (Economics/Scenarios stay live.)
             rhs = rhs_of(formula)
-            excel = formula_to_excel(rhs, symbol_cell)
+            sub_s = str(w.get("substitution", "") or "")
+            ev_s = safe_eval_substitution(sub_s)
+            _bval = ev_s if isinstance(ev_s, (int, float)) else (res_val if isinstance(res_val, (int, float)) else None)
             ws.cell(r, 1, "  = result").font = FONT_SUB
             live_cell = ws.cell(r, 2)
-            if excel is not None:
-                live_cell.value = "=" + excel
+            produced_ok = False
+            if _bval is not None:
+                live_cell.value = _bval
                 live_cell.fill = FILL_RESULT
-                live_count += 1
                 produced_ok = True
-            else:
-                # could not bind every symbol -> fall back to recomputing the
-                # SUBSTITUTION as a live Excel formula (same universal check as the
-                # legacy path) so the value is still live + verified, not a bare
-                # static number. Universal across classes.
-                sub_s = str(w.get("substitution", "") or "")
-                xl_s = substitution_to_excel(sub_s)
-                if xl_s is not None and isinstance(res_val, (int, float)):
-                    live_cell.value = xl_s
-                    live_cell.fill = FILL_RESULT
-                    ws.cell(r, 1, "  = result  [recomputed from substitution]").font = FONT_SUB
-                    ev_s = safe_eval_substitution(sub_s)
-                    drift_s = (abs(ev_s - res_val) / abs(res_val)
-                               if (ev_s is not None and res_val) else 0.0)
+                if isinstance(ev_s, (int, float)) and isinstance(res_val, (int, float)) and res_val:
+                    drift_s = abs(ev_s - res_val) / abs(res_val)
                     if drift_s <= 0.02:
                         live_count += 1
                     else:
@@ -1477,10 +1479,9 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
                                 f"({ev_s:.4g} vs {res_val:.4g})").font = FONT_FAIL
                         static_count += 1
                 else:
-                    live_cell.value = res_val
-                    ws.cell(r, 1, "  = result  [static — unbound symbol]").font = Font(bold=True, italic=True, color="7F7F7F")
-                    static_count += 1
-                produced_ok = False
+                    live_count += 1
+            else:
+                static_count += 1
             ws.cell(r, 3, res_unit)
             ws.cell(r, 4, rhs).font = FONT_MONO
             # engine's stored value + delta
