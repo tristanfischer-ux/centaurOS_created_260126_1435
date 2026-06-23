@@ -502,6 +502,32 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
         ws.cell(row, 1, "No quality-scorecard found.").font = FONT_NOTE
         row += 2
 
+    # ---- deterministic computational-checks summary (Tristan 2026-06-23: a one-glance pass/fail
+    # count ON the Overview; the per-invariant detail stays on the ⚠ Checks tab). Computed LIVE via
+    # the SAME dcl.run_all_checks the ⚠ Checks tab renders, so the count can never drift from it. ----
+    try:
+        _all_checks = dcl.run_all_checks(run_dir, state)
+        _fails = [c for c in _all_checks
+                  if str(getattr(c, "status", "")).upper() == "FAIL"]
+        _n, _nf = len(_all_checks), len(_fails)
+        if _n:
+            sub_banner(ws, row, "Computational checks", 4)
+            row += 1
+            ws.cell(row, 1, "Deterministic invariants").font = FONT_SUB
+            _cc = ws.cell(row, 2, f"{_n - _nf} / {_n} pass"
+                          + (f"  ·  {_nf} FAIL" if _nf else "  ·  0 fail"))
+            _cc.fill = FILL_PASS if _nf == 0 else FILL_FAIL
+            _cc.font = FONT_PASS if _nf == 0 else FONT_FAIL
+            _nt = ws.cell(row, 3, "full detail on the ⚠ Checks tab")
+            _nt.font = FONT_NOTE
+            row += 1
+            for _c in _fails[:12]:
+                ws.cell(row, 1, "✗ " + str(getattr(_c, "name", ""))).font = FONT_FAIL
+                row += 1
+            row += 1
+    except Exception:  # never let the summary break the Overview
+        pass
+
     # ---- headline metrics ----
     km = state.get("keyMetrics") or {}
     sub_banner(ws, row, "Headline metrics", 4)
