@@ -259,18 +259,18 @@ async function callSpecialistWithFailover(
 // Model label shown in the response card
 const COUNCIL_MODEL_LABEL: Record<string, string> = {
     "chief-of-staff":      "Grok 4.3",
-    "fundraising-advisor": "Claude Opus 4.7",
+    "fundraising-advisor": "DeepSeek V4-Pro",
     "strategist":          "Gemini 3.1 Pro",
     "finance-lead":        "Kimi K2.6",
     "cto":                 "DeepSeek V4-Pro",
     "sales-lead":          "DeepSeek V4-Flash",
     "vp-manufacturing":    "DeepSeek V4-Flash",
     "vp-supply-chain":     "Gemini 3.1 Pro",
-    "product-lead":        "Qwen 3.6 Max",
+    "product-lead":        "Qwen 3.7 Max",
     "growth-marketer":     "DeepSeek V4-Flash",
     "vp-engineering":      "DeepSeek V4-Flash",
     "hiring-team":         "Kimi K2.6",
-    "legal-counsel":       "GLM-5.1",
+    "legal-counsel":       "GLM-5.2",
 }
 
 // W50: Signature close headers used in Round 2 prompts so each specialist

@@ -4,20 +4,21 @@ import {
 import type { SidebarNavItem } from './types'
 
 /**
- * MARKETPLACE section — empty post-2026-05-20 nav simplification.
+ * MARKETPLACE section.
  *
- * Tristan 2026-05-20: Suppliers page removed from website nav. Supplier data
- * + matching infra (match_marketplace_listings_v2, Gemini 3.5 Flash explainer,
- * 8,347-listing pgvector corpus) remain alive and reachable directly via
- * /marketplace and inside Forge PDF generation. Just unlisted from the
- * sidebar — consistent with the 2026-04-24 pivot decision that suppliers
- * belong INSIDE Forge output rather than as their own browse surface.
+ * Tristan 2026-05-20: the old /marketplace browse surface was retired (it now
+ * redirects to The Forge). The supplier data + matching infra
+ * (match_marketplace_listings_v2, Gemini 3.5 Flash explainer, pgvector corpus)
+ * stayed alive throughout — only the nav entry was removed.
  *
- * App nav as of 2026-05-20: Welcome / My Profile / Brainstorm / The Forge /
- * Investors. The Money / Fundraising section is flag-gated separately.
+ * Re-link 2026-06-23: the WORKING supplier search/directory surface lives at
+ * /suppliers/search (server page → searchSuppliers in src/actions/suppliers.ts;
+ * semantic + FTS + keyword fallback). Re-added a "Suppliers" nav item pointing
+ * at it so founders can reach supplier search from the sidebar again. The old
+ * /marketplace → /the-forge-v2 redirect is left in place — it does not block
+ * reaching /suppliers/search.
  *
- * Arrays remain exported as empty to keep Sidebar.tsx imports working.
- * Restore by re-adding the SidebarNavItem entries.
+ * Restore further entries by re-adding SidebarNavItem objects here.
  */
 
 export const marketplacePeopleNavigation: SidebarNavItem[] = [
@@ -25,5 +26,10 @@ export const marketplacePeopleNavigation: SidebarNavItem[] = [
 ]
 
 export const marketplaceSuppliesNavigation: SidebarNavItem[] = [
-  // Suppliers removed from nav 2026-05-20 — see file-level comment.
+  {
+    name: 'Suppliers',
+    href: '/suppliers/search',
+    icon: Store,
+    tooltip: 'Search the supplier directory — describe what you need and get ranked matches',
+  },
 ]
