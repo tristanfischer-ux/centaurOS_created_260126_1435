@@ -8201,10 +8201,17 @@ async function main() {
       // INSTALLED civils (NOT through the OEM manufacturing stack — a building isn't OEM-
       // manufactured) and add to the ALL-IN project capex. Footprint from the plant bbox
       // (parts-manifest); kept OUT of the raw requirementsBom so the Σ-BoM == parts-ledger
-      // reconciliation stays intact. Universal: any design with a plant footprint gets a building.
+      // reconciliation stays intact. Universal but GATED: only a HOUSED design (its building
+      // envelope was modelled — building_height_m / wall / roof / floor fabric present) gets a
+      // building. An UNHOUSED archetype (satellite, aero body, open skid, turbine) has a footprint
+      // but NO enclosing building, so it must NOT be charged one. Keyed on the building-fabric
+      // signal, never a class.
       try {
         const csb = st.costStack as Record<string, number> | undefined
-        if (csb && Number(csb.installed_asp_gbp) > 0) {
+        const _q = ((st as Record<string, any>).orchestratorContract?.quantities) || {}
+        const _housed = ['building_height_m', 'wall_area', 'roof_area', 'floor_area',
+                         'wall_u', 'roof_u', 'building_volume'].some(k => _q[k] != null)
+        if (csb && Number(csb.installed_asp_gbp) > 0 && _housed) {
           let footM2 = 0
           const pmPath = resolve(outDir, 'parts-manifest.json')
           if (existsSync(pmPath)) {
