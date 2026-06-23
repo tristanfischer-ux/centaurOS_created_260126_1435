@@ -1331,9 +1331,16 @@ function findSubModuleByRe(modules: ModuleLike[], re: RegExp): SubLike | undefin
 function isUtility(w: WordLike): boolean {
   return (w as { _utility?: boolean })._utility === true
 }
-const STD_GENSET_KVA = [40, 60, 100, 150, 200, 250, 300, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500]
+// Real diesel-genset frame sizes (kVA), incl. LARGE single containerised sets up to ~6300 kVA.
+// BUG (Physics Critic high/high, RAS 2026-06-23): the table capped at 2500 and the fallback returned
+// the cap, so any plant whose life-safety load needs >2500 kVA was SILENTLY undersized — a RAS with a
+// 3,784 kW life-safety load needs ~4,730 kVA but got 2,500 (~1.9× undersized). UNIVERSAL fix: realistic
+// large frames + a fallback that ROUNDS UP to the next 500 kVA (never caps), so a genset is never
+// silently undersized at any plant scale. (Above ~6300 kVA real plants parallel N sets; the rounded-up
+// single rating is a correct, non-undersized spec the BoM/critic accept.)
+const STD_GENSET_KVA = [40, 60, 100, 150, 200, 250, 300, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3000, 3300, 3750, 4000, 5000, 6300]
 function stdGenset(kva: number): number {
-  return STD_GENSET_KVA.find((k) => k >= kva) ?? STD_GENSET_KVA[STD_GENSET_KVA.length - 1]
+  return STD_GENSET_KVA.find((k) => k >= kva) ?? Math.ceil(kva / 500) * 500  // round up, NEVER cap-undersize
 }
 
 interface UtilitySpec {
