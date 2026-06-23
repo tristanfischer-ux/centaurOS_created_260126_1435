@@ -375,20 +375,20 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
   starter_v2: {
     tier: 'starter_v2',
     name: 'Starter',
-    description: 'The new entry tier for hardware founders',
+    description: 'Unlimited investor access for £20 a month',
     bestFor:
-      '100 investor leads a month with full why-fit + how-to-pitch + drafted-email, plus 50 brainstorming sessions. Top up with £10 per 100 extra leads when you need more.',
+      'Unlimited investor leads with full why-fit + how-to-pitch + drafted-email, plus 50 brainstorming sessions. One price, no per-lead metering.',
     priceMonthlyGBP: 2000, // £20/month
     priceAnnualGBP: 19200, // £192/year (save 20%)
     legacy: false,
     featured: true,
     features: [
-      '100 investor leads per month',
+      'Unlimited investor access',
       'Full why-fit + how-to-pitch + drafted-email',
       '50 brainstorming sessions per month',
       'All 13 specialists',
       'Marketplace browse + orders',
-      '£10 per 100 extra investor leads',
+      'Verified investor emails',
       'Email support',
     ],
     limits: {
@@ -407,7 +407,11 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       investorIntelligenceAccess: true,
       maxStorageMB: 2_000,
       maxComputeBudgetUsd: 18,
-      investorLeadsPerMonth: 100,
+      // 2026-06-23 monetisation collapse: £20 Starter grants UNLIMITED investor
+      // access. This field is display/allowance-only — the real cap lives in
+      // MONTHLY_INVESTOR_VIEW_CAPS (src/lib/ai/limit-check.ts) where starter_v2
+      // is intentionally absent (= unlimited). null = unlimited here too.
+      investorLeadsPerMonth: null,
       brainstormSessionsPerMonth: 50, // loosened 2026-04-25 from 10 to 50; viral-first directive
       savedSearchesLifetime: null,
     },

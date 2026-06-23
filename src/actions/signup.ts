@@ -334,6 +334,15 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     redirect(redirectTo);
   }
 
+  // Checkout funnel: a logged-out visitor who clicked "Start Starter — £20/mo"
+  // on /pricing is sent here with ?redirect=/pricing. After signup, send them
+  // straight back so they can start Stripe checkout as an authenticated user.
+  // SECURITY: allowlist exact safe paths only — no traversal, no query, no
+  // open redirect. /pricing is the only funnel destination today.
+  if (redirectTo === "/pricing") {
+    redirect("/pricing");
+  }
+
   // DECISION 2026-04-17: new email/password signups land on /welcome — the
   // guided tour from Tristan. The Welcome page's CTA marks onboarding_data
   // and routes to /today. Supplier flag is handled during onboarding, not

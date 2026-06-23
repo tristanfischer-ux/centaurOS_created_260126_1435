@@ -36,10 +36,11 @@ import {
   Info,
   ChevronDown,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { MarketingNav } from '@/components/marketing/marketing-nav'
 import { MarketingFooter } from '@/components/marketing/marketing-footer'
 import { cn } from '@/lib/utils'
-import { SUBSCRIPTION_PLANS, INVESTOR_SEARCH_ADDON } from '@/lib/billing/plans'
+import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 
 type BillingPeriod = 'monthly' | 'annual'
 
@@ -121,18 +122,20 @@ interface PricingContentProps {
 }
 
 export function PricingContent({ isAuthed = false }: PricingContentProps) {
+  const router = useRouter()
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly')
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
+  const [checkoutPending, setCheckoutPending] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
-  // 2026-04-25 pricing restructure: public catalogue is Free / Starter / Pro,
-  // with Enterprise on the contact-sales row below and the Investor Search
-  // Add-On on its own card. Legacy Seed (£19) and Startup Team (£49) are
-  // hidden — existing subscribers continue to be honoured at their existing
-  // limits but the public surface only shows the new tiers.
+  // 2026-06-23 monetisation collapse: the public catalogue is exactly TWO
+  // options — Free and the £20 Starter (starter_v2) with UNLIMITED investor
+  // access. Pro / Enterprise / Seed / Startup Team and the Investor Search
+  // Add-On still exist in plans.ts (existing subscribers keep resolving) but
+  // are no longer displayed on the public pricing surface.
   const plans = [
     SUBSCRIPTION_PLANS.free,
     SUBSCRIPTION_PLANS.starter_v2,
-    SUBSCRIPTION_PLANS.professional,
   ]
 
   /**
@@ -141,6 +144,40 @@ export function PricingContent({ isAuthed = false }: PricingContentProps) {
    */
   function handleFaqToggle(index: number): void {
     setExpandedFaq(expandedFaq === index ? null : index)
+  }
+
+  /**
+   * Starts Stripe checkout for the £20 Starter (starter_v2) plan.
+   *
+   * Logged-out visitors are routed through /join with a redirect back to
+   * /pricing so they can sign up first, then click again to subscribe.
+   * Logged-in users POST to /api/billing/checkout and are redirected to the
+   * returned Stripe Checkout URL.
+   */
+  async function handleStartStarter(): Promise<void> {
+    if (!isAuthed) {
+      router.push('/join?redirect=/pricing')
+      return
+    }
+    setCheckoutError(null)
+    setCheckoutPending(true)
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: 'starter_v2', billingPeriod }),
+      })
+      const data = (await res.json()) as { url?: string; error?: string }
+      if (!res.ok || !data.url) {
+        setCheckoutError(data.error || 'Could not start checkout. Please try again.')
+        setCheckoutPending(false)
+        return
+      }
+      window.location.href = data.url
+    } catch {
+      setCheckoutError('Could not start checkout. Please try again.')
+      setCheckoutPending(false)
+    }
   }
 
   return (
@@ -226,8 +263,8 @@ export function PricingContent({ isAuthed = false }: PricingContentProps) {
             </button>
           </div>
 
-          {/* Pricing cards — 3 columns: Free, Starter (highlighted), Pro */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Pricing cards — 2 columns: Free and Starter (highlighted) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 max-w-3xl mx-auto">
             {plans.map((plan) => {
               const isHighlighted = plan.tier === 'starter_v2'
               const monthlyPrice = billingPeriod === 'monthly'
@@ -323,93 +360,41 @@ export function PricingContent({ isAuthed = false }: PricingContentProps) {
 
                     {/* CTA */}
                     <div className="space-y-2">
-                      <Button
-                        asChild
-                        className={cn(
-                          'w-full',
-                          isHighlighted
-                            ? 'bg-international-orange hover:bg-international-orange-hover'
-                            : ''
-                        )}
-                        variant={isHighlighted ? 'default' : 'outline'}
-                      >
-                        <Link href="/join">
-                          {plan.tier === 'free'
-                            ? 'Stay on Free'
-                            : plan.tier === 'starter_v2'
-                              ? 'Start Starter — £20/mo'
-                              : `Upgrade to ${plan.name}`}
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </Link>
-                      </Button>
+                      {plan.tier === 'starter_v2' ? (
+                        <Button
+                          type="button"
+                          onClick={handleStartStarter}
+                          disabled={checkoutPending}
+                          className="w-full bg-international-orange hover:bg-international-orange-hover"
+                        >
+                          {checkoutPending ? 'Starting checkout…' : 'Start Starter — £20/mo'}
+                          {!checkoutPending && <ArrowRight className="h-4 w-4 ml-2" />}
+                        </Button>
+                      ) : (
+                        <Button asChild className="w-full" variant="outline">
+                          <Link href="/join">
+                            Stay on Free
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Link>
+                        </Button>
+                      )}
                       <p className="text-xs text-muted-foreground text-center">
                         {plan.tier === 'free'
                           ? 'Free forever · No credit card required'
-                          : plan.tier === 'starter_v2'
-                            ? 'Cancel anytime · £10 per 100 extra leads'
-                            : 'Cancel anytime · Pay-as-you-go beyond limits'
+                          : 'Unlimited investor access · Cancel anytime'
                         }
                       </p>
+                      {plan.tier === 'starter_v2' && checkoutError && (
+                        <p className="text-xs text-destructive text-center" role="alert">
+                          {checkoutError}
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
               )
             })}
           </div>
-
-          {/* Investor Search Add-On — one-click upsell card */}
-          <div className="mb-16">
-            <Card className="border-dashed border-2 border-international-orange/40 bg-international-orange/5">
-              <CardContent className="py-6 px-6 sm:py-8 sm:px-8">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="h-12 w-12 rounded-xl bg-international-orange/15 flex items-center justify-center shrink-0">
-                      <Users className="h-6 w-6 text-international-orange" />
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <h3 className="text-lg font-semibold text-foreground">
-                          {INVESTOR_SEARCH_ADDON.label}
-                        </h3>
-                        <span className="text-sm text-muted-foreground">
-                          One-click top-up from inside Investors
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Burned through your Starter allowance this month? Add another 100 investor leads — full why-fit, how-to-pitch, and drafted email — for £10. No resubscription, no admin.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-start md:items-end shrink-0">
-                    <span className="text-3xl font-bold text-foreground">£{(INVESTOR_SEARCH_ADDON.priceGBP / 100).toFixed(0)}</span>
-                    <span className="text-sm text-muted-foreground">per {INVESTOR_SEARCH_ADDON.searchesPerPurchase} extra leads</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Enterprise section — Strategy Council tier */}
-          <Card className="mb-16 bg-muted/30">
-            <CardContent className="py-8">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-xl bg-international-orange/10 flex items-center justify-center">
-                    <Zap className="h-7 w-7 text-international-orange" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-foreground">Enterprise — Strategy Council</h3>
-                    <p className="text-muted-foreground">
-                      Custom specialists tuned for your company, retrieval over your foundry data, audit log, SSO, and SLA. Unlimited brainstorms and dedicated account manager.
-                    </p>
-                  </div>
-                </div>
-                <Button variant="outline" size="lg" asChild>
-                  <a href="/contact">Contact Sales</a>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Social proof section — real data, not fake logos */}
           <div className="mb-16">
@@ -433,20 +418,18 @@ export function PricingContent({ isAuthed = false }: PricingContentProps) {
             </p>
             <div className="relative">
               <div className="overflow-x-auto">
-                <div className="min-w-[560px]">
-                {/* Header row — Free / Starter (highlighted) / Pro / Enterprise */}
-                <div className="grid grid-cols-5 gap-2 sm:gap-4 pb-4 border-b border-muted">
+                <div className="min-w-[320px]">
+                {/* Header row — Free / Starter (highlighted) */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-4 border-b border-muted">
                   <div className="text-xs sm:text-sm font-medium text-muted-foreground">Feature</div>
                   <div className="text-xs sm:text-sm font-medium text-center">Free</div>
                   <div className="text-xs sm:text-sm font-medium text-center text-international-orange">Starter</div>
-                  <div className="text-xs sm:text-sm font-medium text-center">Pro</div>
-                  <div className="text-xs sm:text-sm font-medium text-center">Enterprise</div>
                 </div>
 
                 {COMPARISON_FEATURES.map((feature) => (
                   <div
                     key={feature.name}
-                    className="grid grid-cols-5 gap-2 sm:gap-4 py-3 border-b border-muted/50"
+                    className="grid grid-cols-3 gap-2 sm:gap-4 py-3 border-b border-muted/50"
                   >
                     <div className="text-xs sm:text-sm text-foreground flex items-center gap-1.5">
                       {feature.name}
@@ -463,8 +446,6 @@ export function PricingContent({ isAuthed = false }: PricingContentProps) {
                     </div>
                     <ComparisonCell value={feature.free} />
                     <ComparisonCell value={feature.starter_v2} />
-                    <ComparisonCell value={feature.professional} />
-                    <ComparisonCell value={feature.enterprise} />
                   </div>
                 ))}
               </div>
@@ -625,34 +606,27 @@ function ComparisonCell({ value }: { value: boolean | string }) {
 }
 
 /**
- * Feature comparison data — Free / Starter (the new £20 tier) / Pro / Enterprise.
+ * Feature comparison data — Free vs the £20 Starter only.
  *
- * 2026-04-25: legacy Seed (£19) and legacy Startup Team (£49) are intentionally
- * not in the comparison grid. Existing subscribers continue to be honoured at
- * their current limits but don't get advertised on the public surface.
+ * 2026-06-23 monetisation collapse: the public surface shows exactly two
+ * options. Pro / Enterprise / legacy Seed (£19) / legacy Startup Team (£49)
+ * are intentionally not in the comparison grid. Existing subscribers continue
+ * to be honoured at their current limits but aren't advertised publicly.
  */
 const COMPARISON_FEATURES: Array<{
   name: string
   free: boolean | string
   starter_v2: boolean | string
-  professional: boolean | string
-  enterprise: boolean | string
 }> = [
-  { name: 'Investor leads/month', free: 'Browse only', starter_v2: '100', professional: 'Unlimited', enterprise: 'Unlimited' },
-  { name: 'Why-fit + how-to-pitch + drafted email', free: false, starter_v2: true, professional: true, enterprise: true },
-  { name: 'Investor Search Add-On (£10 / 100 extra)', free: false, starter_v2: true, professional: true, enterprise: true },
-  { name: 'Brainstorming sessions', free: '1/month', starter_v2: '10/month', professional: 'Unlimited', enterprise: 'Unlimited' },
-  { name: 'Saved investor searches', free: '5 lifetime', starter_v2: 'Unlimited', professional: 'Unlimited', enterprise: 'Unlimited' },
-  { name: 'All 13 specialists', free: 'Read-only sandbox', starter_v2: true, professional: true, enterprise: true },
-  { name: 'Deep Council', free: false, starter_v2: false, professional: true, enterprise: true },
-  { name: 'Strategy Council', free: false, starter_v2: false, professional: false, enterprise: true },
-  { name: 'Verified investor emails', free: false, starter_v2: true, professional: true, enterprise: true },
-  { name: 'Fund performance & hardware fit', free: false, starter_v2: true, professional: true, enterprise: true },
-  { name: 'Marketplace orders', free: 'Unlimited', starter_v2: 'Unlimited', professional: 'Unlimited', enterprise: 'Unlimited' },
-  { name: 'Supplier matching', free: true, starter_v2: true, professional: true, enterprise: true },
-  { name: 'Voice-to-task', free: false, starter_v2: false, professional: true, enterprise: true },
-  { name: 'Engineering reports', free: false, starter_v2: true, professional: true, enterprise: true },
-  { name: 'API access', free: false, starter_v2: false, professional: true, enterprise: true },
-  { name: 'Dedicated account manager', free: false, starter_v2: false, professional: false, enterprise: true },
-  { name: 'Platform fee', free: '10% (0% first 3 orders)', starter_v2: '10% (0% first 3 orders)', professional: '5%', enterprise: '5%' },
+  { name: 'Investor leads/month', free: 'Browse only', starter_v2: 'Unlimited' },
+  { name: 'Why-fit + how-to-pitch + drafted email', free: false, starter_v2: true },
+  { name: 'Brainstorming sessions', free: '5/month', starter_v2: '50/month' },
+  { name: 'Saved investor searches', free: '5 lifetime', starter_v2: 'Unlimited' },
+  { name: 'All 13 specialists', free: 'Read-only sandbox', starter_v2: true },
+  { name: 'Verified investor emails', free: false, starter_v2: true },
+  { name: 'Fund performance & hardware fit', free: false, starter_v2: true },
+  { name: 'Marketplace orders', free: 'Unlimited', starter_v2: 'Unlimited' },
+  { name: 'Supplier matching', free: true, starter_v2: true },
+  { name: 'Engineering reports', free: false, starter_v2: true },
+  { name: 'Platform fee', free: '10% (0% first 3 orders)', starter_v2: '10% (0% first 3 orders)' },
 ]

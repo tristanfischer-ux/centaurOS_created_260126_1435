@@ -1,20 +1,20 @@
 /**
- * Money V2 layout — flag guard for all /money/* routes.
+ * Money V2 layout — front-door for all /money/* routes.
  *
- * Any user whose `new_money_experience` flag is off sees a 404 when they hit
- * a /money/* route. Legacy Cash Burn routes (/cash-burn/*) remain mounted in
- * parallel and continue to serve until Chunk 7 cutover.
+ * 2026-06-23 monetisation collapse: the V2 investor cockpit (/money/raise) is
+ * now the primary front door, so the `new_money_experience` flag gate has been
+ * removed and /money/** is reachable by default for every user. Legacy
+ * /investors and /cash-burn routes remain mounted in parallel and continue to
+ * serve; they just aren't the primary nav any more.
+ *
+ * The FLAG_NEW_MONEY_EXPERIENCE flag itself is left intact in the registry for
+ * other surfaces (nav highlighting, "New" badge) — only the hard 404 gate on
+ * this layout is dropped.
  */
-
-import { notFound } from 'next/navigation'
-import { getCurrentUserFeatureFlag } from '@/lib/features/flags'
-import { FLAG_NEW_MONEY_EXPERIENCE } from '@/lib/features/keys'
 
 // Data is strictly per-user / per-foundry.
 export const dynamic = 'force-dynamic'
 
 export default async function MoneyLayout({ children }: { children: React.ReactNode }) {
-  const enabled = await getCurrentUserFeatureFlag(FLAG_NEW_MONEY_EXPERIENCE)
-  if (!enabled) notFound()
   return <>{children}</>
 }
