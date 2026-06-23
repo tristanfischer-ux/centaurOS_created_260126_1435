@@ -75,6 +75,52 @@ def _box_from_dim(dim):
     return (float(m.group(1)) / 1000, float(m.group(2)) / 1000, float(m.group(3)) / 1000) if m else None
 
 
+# ── WETTED-PARTS CORROSION (Tristan 2026-06-23) ─────────────────────────────────────────
+# A plant handling a CORROSIVE fluid (seawater / brackish / saline / chlorinated / ozonated)
+# must specify corrosion-resistant wetted materials — carbon steel / cast iron corrode fast in
+# marine service. Detect the plant fluid corrosivity ONCE (from the whole state blob — brief,
+# contract, services), then (a) _material upgrades a wetted steel shell to 316L, and (b) every
+# wetted catalogue part carries an explicit material of construction. Universal — keyed on the
+# FLUID, never a product class. Freshwater / non-corrosive plants are untouched.
+_PLANT_CORROSIVE = False
+_PLANT_MOC = ""
+_PLANT_CORROSION = ""
+
+
+def _set_plant_corrosivity(state):
+    global _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION
+    blob = json.dumps(state).lower()
+    if re.search(r"seawater|sea water|\bmarine\b|brackish|saline|salinity|maricultur", blob):
+        _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (
+            True, "316L stainless / bronze (seawater)", "seawater/marine chloride service")
+    elif re.search(r"chlorinat|hypochlor|ozonat|\bozone\b|peracetic|caustic|acidic|low\s*ph", blob):
+        _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (
+            True, "316L stainless / PVC-U (chemical)", "chlorinated/chemical service")
+    else:
+        _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (False, "", "")
+
+
+_WETTED_NOUN = re.compile(
+    r"pump|valve|pipe|pipework|manifold|heat\s*exchang|\bhex\b|filter|strainer|\btank\b|vessel|"
+    r"column|degas|skimmer|sump|basin|reservoir|clarifier|drum|steril|\buv\b|biofilter|reactor|"
+    r"nozzle|diffuser|header|spool|screen|weir|scrubber", re.I)
+_NONWETTED_NOUN = re.compile(
+    r"motor|drive|\bvsd\b|cabinet|panel|busbar|cable|switch|transformer|generator|\bups\b|frame|"
+    r"structur|building|\bduct\b|\bfan\b|blower|\bahu\b|hvac|controller|\bplc\b|gauge|light|ladder|"
+    r"platform|walkway|sign|sensor|monitor|alarm|button|interlock|relay|probe", re.I)
+
+
+def _wetted_moc(name, requirement):
+    """The corrosion-resistant material-of-construction for a WETTED part in a corrosive plant,
+    else '' (non-corrosive plant, or a clearly non-wetted part)."""
+    if not _PLANT_CORROSIVE:
+        return ""
+    blob = (str(name or "") + " " + str(requirement or "")).lower()
+    if _NONWETTED_NOUN.search(blob):
+        return ""
+    return _PLANT_MOC if _WETTED_NOUN.search(blob) else ""
+
+
 def _material(name, mods):
     """(label, density kg/m³, £/kg) for the take-off. From the requirement's material if
     stated, else a UNIVERSAL inference — open water/process tanks → FRP/GRP; pressure +
@@ -90,6 +136,10 @@ def _material(name, mods):
     if re.search(r"\btank\b|basin|reservoir|\bsump\b|pond|raceway|lagoon", blob) \
             and not re.search(r"pressure|reactor|column|stripper", blob):
         return ("FRP/GRP", FRP_RHO, FRP_RATE)                  # open (atmospheric) tank
+    # CORROSIVE plant (seawater/chemical): a wetted steel shell must be 316L, not carbon steel —
+    # carbon steel corrodes fast in chloride service (Tristan 2026-06-23). Universal.
+    if _PLANT_CORROSIVE:
+        return ("316L stainless", 8000.0, 14.0)
     return ("carbon steel", STEEL_RHO, STEEL_RATE)
 
 
@@ -2236,6 +2286,9 @@ def assemble(out_dir: str):
     # partVerifications `price` map is already the capped value — the SAME field
     # gate 21 reads. Idempotent + no-op for non-mis-pinned states (CO₂/SAF unchanged).
     _normalise_partverification_prices(st)
+    # WETTED-PARTS CORROSION — detect the plant fluid corrosivity (seawater/chemical) once, so
+    # the take-off upgrades wetted steel shells to 316L and every wetted part gets an explicit MoC.
+    _set_plant_corrosivity(st)
     # CANONICAL TAGS — build the shared {cid: [tag, …]} map ONCE from this state, so the
     # synthesised-auxiliary rows below carry the SAME numbered tag the drawing schedules
     # print. Keyed by the word's content-character id. Range-rendered per row (a qty-N
@@ -2672,6 +2725,14 @@ def assemble(out_dir: str):
                        "basis": basis}
                 if mt_spec:
                     row.update(mt_spec)   # material · wall_mm · mass_kg · diameter_m · height_m
+                # WETTED-PARTS CORROSION: a wetted catalogue/parametric part (pump/valve/pipe/HEX/
+                # filter) in a corrosive plant carries an explicit material of construction — shells
+                # already got one via mt_spec. Universal — keyed on fluid corrosivity + the noun.
+                if not row.get("material"):
+                    _moc = _wetted_moc(name, requirement)
+                    if _moc:
+                        row["material"] = _moc
+                        row["basis"] = f"{row.get('basis','')} · MoC: {_moc} for {_PLANT_CORROSION}"
                 rows.append(row)
                 # ── itemise the ASSEMBLY BREAKDOWN beneath the parent: one row per
                 # physics-sized sub-component, scaled to SUM to the parent's line cost.
