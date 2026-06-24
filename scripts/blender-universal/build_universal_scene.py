@@ -2871,6 +2871,18 @@ _PLANT_FLOW_PLAN = None
 # aisle (which is far behind the train, inflating every flow run's riser).
 _PLANT_FLOW_TRAIN_REGIONS = None
 
+# CONTAINERISED LAYOUT (Tristan 2026-06-24: "it's supposed to fit a 40-ft container
+# but the GA doesn't fit"). When the brief declares a long-thin fixed enclosure
+# (parsedBrief.constraints.max_dimensions_mm with a length:width aspect ≥ this), the
+# square-ish serpentine layout is wrong — the equipment must lay out as a SINGLE row
+# down the container length, within the container internal WIDTH. Set in main() from
+# the brief; gates a container-aware branch in place_all + _place_region. None → the
+# normal process-plant layout (every non-containerised class is completely unaffected).
+_CONTAINER_ENVELOPE_MM = None       # {'l':.., 'w':.., 'h':..} container INTERNAL dims (mm)
+_CONTAINER_LAYOUT = False           # True → force the container flat-pack layout
+_CONTAINER_ASPECT_MIN = 3.0         # length/width ≥ 3 ⇒ a container/skid, not a building pad
+_CONTAINER_WALL_MARGIN_MM = 250     # clearance from the container internal wall to equipment
+
 
 def _flow_fold_banks(flow_regions, region_w, n_lanes):
     """Fold the FLOW-ORDERED region list into ≤ n_lanes contiguous lanes so the
@@ -2891,6 +2903,56 @@ def _flow_fold_banks(flow_regions, region_w, n_lanes):
     # so the cut never reorders the train, it only chooses where to wrap).
     return _balanced_bank_split(flow_regions,
                                 [region_w[rk] for rk in flow_regions], n_lanes)
+
+
+def _place_container(parts, region_list, region_parts, envelope_parts, MAT, MO):
+    """CONTAINERISED layout (Tristan 2026-06-24): the brief fixes a long-thin enclosure
+    (a 40-ft ISO container ≈ 12.19 m × 2.44 m internal), so the square-ish serpentine
+    bay layout is wrong — it produced an 8.68 × 7.97 m block that does NOT fit. Here the
+    equipment is FLAT-PACKED into the container footprint: every part shelf-packs into
+    rows that WRAP at the container INTERNAL LENGTH, the rows stacking across the
+    container WIDTH. The result is a believable in-container GA (long down the length,
+    ≤ the internal width). Regions are kept in flow order so connected stages stay near.
+    Gated to containerised classes only — every other family uses place_all unchanged."""
+    env = _CONTAINER_ENVELOPE_MM or {}
+    intern_l = max(3000.0, float(env.get("l") or 12000.0) - 2 * _CONTAINER_WALL_MARGIN_MM)
+    # Flatten parts in flow/region order; envelope shells are placed last (centred).
+    ordered = []
+    for rk in region_list:
+        ordered += region_parts.get(rk, [])
+    # tight container gap — racks abut with a service finger, not a plant aisle
+    CGAP = 120
+    dx, dy = _shelf_pack(ordered, 0.0, 0.0, intern_l, DECK_Z_MM, CGAP, MAT, MO, y_dir=+1)
+    print(f"[univ][container] flat-pack {len(ordered)} parts into {intern_l/1000:.1f} m "
+          f"internal length → {dx/1000:.1f} m × {dy/1000:.1f} m (rows wrap at length)")
+    # region centres = centroid of each region's placed parts (for the pipe-rack spine)
+    region_centres = {}
+    for rk in region_list:
+        rp = [p for p in region_parts.get(rk, []) if p.placed_xyz_mm]
+        if rp:
+            cx = sum(p.placed_xyz_mm[0] for p in rp) / len(rp)
+            cy = sum(p.placed_xyz_mm[1] for p in rp) / len(rp)
+            region_centres[rk] = (cx, cy)
+    # bbox from placed-equipment EXTENTS (same idiom as place_all)
+    min_x, max_x, min_y, max_y = 1e12, -1e12, 1e12, -1e12
+    for p in parts:
+        if not p.placed_xyz_mm:
+            continue
+        cx, cy = p.placed_xyz_mm[0], p.placed_xyz_mm[1]
+        fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+        min_x = min(min_x, cx - fx / 2); max_x = max(max_x, cx + fx / 2)
+        min_y = min(min_y, cy - fy / 2); max_y = max(max_y, cy + fy / 2)
+    # envelope shells (floor slab / container frame) centred on the equipment, recorded
+    # for the BoM + enclosing bbox WITHOUT a solid mesh (matches place_all's treatment).
+    if envelope_parts and max_x > -1e11:
+        ecx, ecy = (min_x + max_x) / 2.0, (min_y + max_y) / 2.0
+        for p in envelope_parts:
+            p.placed_xyz_mm = (ecx, ecy, 0.0)
+            fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+            min_x = min(min_x, ecx - fx / 2); max_x = max(max_x, ecx + fx / 2)
+            min_y = min(min_y, ecy - fy / 2); max_y = max(max_y, ecy + fy / 2)
+    bbox = {"x0": min_x - 800, "x1": max_x + 800, "y0": min_y - 800, "y1": max_y + 800}
+    return bbox, region_centres
 
 
 def place_all(parts, regions, MAT, MO):
@@ -2944,6 +3006,12 @@ def place_all(parts, regions, MAT, MO):
         region_list = [rk for rk in region_list if region_parts[rk]]
         n_banks = max(1, min(N_BANKS, len(region_list)))
     region_w = {rk: _estimate_region_width(region_parts[rk]) for rk in region_list}
+
+    # CONTAINERISED CLASS → flat-pack into the fixed enclosure footprint instead of the
+    # square-ish serpentine bays (Tristan 2026-06-24: the 40-ft BESS GA didn't fit). Gated
+    # on _CONTAINER_LAYOUT (set in main from the brief envelope); zero effect otherwise.
+    if _CONTAINER_LAYOUT:
+        return _place_container(parts, region_list, region_parts, _envelope_parts, MAT, MO)
 
     # Detect mega-array regions UP FRONT (a hall-sized qty-N replicated vessel grid,
     # e.g. the RAS 10-tank farm). They are pulled into their OWN solo lane below, so
@@ -9530,7 +9598,11 @@ def place_process_plant(parts, regions, topology, MAT, MO):
     #     crossings 45→10, footprint +2% (just more square) — the decisive fix for the
     #     "spread-out plant → long flying pipe runs" clutter. try/except below makes it a no-op
     #     on any layout it can't improve. Only reached on the process-plant placement path.
-    if os.environ.get("LAYOUT_OPTIMISE", "1").strip().lower() not in ("0", "false", "no", "off"):
+    # The optimiser re-flows parts to be "more square" (its own note) — exactly what a
+    # containerised flat-pack must NOT do (it would undo the long-thin row that fits the
+    # container). Skip it when the container layout is active.
+    if (not _CONTAINER_LAYOUT
+            and os.environ.get("LAYOUT_OPTIMISE", "1").strip().lower() not in ("0", "false", "no", "off")):
         try:
             bbox = _apply_layout_optimiser(parts, topology, bbox)
             print(f"[univ] plant bbox after layout-optimise (mm): {bbox}")
@@ -10406,6 +10478,29 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     if rack_mod not in MO:
         MO[rack_mod] = []
     row_pitch = RACK_D_MM + RACK_AISLE_MM
+    # CONTAINERISED FIT (Tristan 2026-06-24): the brief fixes a 40-ft envelope, so the
+    # racks must run DOWN THE LENGTH in rows against the long walls (≤ container width),
+    # not spread into a square hall. Re-derive the grid to fit the brief enclosure and
+    # tighten the inter-row aisle so n_rows fit the internal width. cont_margin is the
+    # wall clearance (a real container is tight — racks abut the walls, front-access).
+    cont_margin = CONTAINER_MARGIN_MM
+    if _CONTAINER_LAYOUT and _CONTAINER_ENVELOPE_MM:
+        cont_margin = _CONTAINER_WALL_MARGIN_MM
+        usable_l = _CONTAINER_ENVELOPE_MM["l"] - 2 * cont_margin
+        usable_w = _CONTAINER_ENVELOPE_MM["w"] - 2 * cont_margin
+        # most rows that fit the width (racks line both long walls of a tight container;
+        # min 150 mm back-to-back gap — real containers are front-access, no walk aisle)
+        max_rows = max(1, int((usable_w + 150.0) // (RACK_D_MM + 150.0)))
+        # USE BOTH WALLS: a real container lines racks down every available wall row, which
+        # keeps each row short (≈ half the racks) and leaves length for the BoP lineup to
+        # continue in the SAME rows (so the combined lineup wraps inside the box, not a tail).
+        n_rows = max(1, min(max_rows, n_racks))
+        racks_per_row = math.ceil(n_racks / n_rows)
+        if n_rows >= 2:
+            row_pitch = RACK_D_MM + max(250.0, (usable_w - n_rows * RACK_D_MM) / (n_rows - 1))
+        print(f"[univ][rackfarm] containerised grid: {n_racks} racks → {n_rows} row(s) × "
+              f"{racks_per_row} down a {_CONTAINER_ENVELOPE_MM['l']/1000:.1f} m enclosure "
+              f"(row pitch {row_pitch/1000:.2f} m)")
     row_len_mm = racks_per_row * RACK_PITCH_MM
     rack_anchor_by_index = []     # (cx, cy, top_z) per placed rack, for bus routing
     placed = 0
@@ -10436,14 +10531,31 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     bop_items = _select_bop_items(parts, flavour)
     region_centres = {}
     bop_anchor = {}               # role → (cx, cy, top_z) for topology routing
+    # CONTAINERISED: line the BoP skids up ALONG X (down the container, beyond the rack
+    # rows) on the centreline — NOT stacked in Y (which ballooned the enclosure to ~9.8 m
+    # deep). Otherwise keep the original Y-stacked lineup along the end wall.
+    _container_bop = bool(_CONTAINER_LAYOUT and _CONTAINER_ENVELOPE_MM)
+    # CONTAINERISED: continue the BoP lineup IN THE SAME ROWS as the racks (both walls),
+    # greedily filling the shortest row, so the combined rack+BoP lineup WRAPS within the
+    # container length instead of running one 12 m tail past the racks. bop_row_x tracks
+    # each row's running X (starting beyond the rack block); bop_row_y are the rack rows.
+    bop_row_x = [bop_x] * max(1, n_rows)
+    bop_row_y = [r * row_pitch for r in range(max(1, n_rows))]
     cursor_y = bop_y_centre - (sum(it[2] for it in bop_items)
                                + BOP_GAP_MM * max(0, len(bop_items) - 1)) / 2.0
-    bop_y_lo = cursor_y           # actual lineup Y extent (for the enclosure fit)
-    bop_y_hi = cursor_y
+    bop_y_lo = (min(bop_row_y) if _container_bop else cursor_y)   # actual lineup Y extent
+    bop_y_hi = (max(bop_row_y) if _container_bop else cursor_y)
     for role, part_or_none, depth_mm, w_mm, h_mm, rgb in bop_items:
-        cx = bop_x + w_mm / 2
-        cy = cursor_y + depth_mm / 2
-        bop_y_hi = cursor_y + depth_mm   # running far edge of the lineup
+        if _container_bop:
+            r = min(range(len(bop_row_x)), key=lambda i: bop_row_x[i])  # shortest row
+            cx = bop_row_x[r] + w_mm / 2
+            cy = bop_row_y[r]
+            bop_y_lo = min(bop_y_lo, cy - depth_mm / 2)
+            bop_y_hi = max(bop_y_hi, cy + depth_mm / 2)
+        else:
+            cx = bop_x + w_mm / 2
+            cy = cursor_y + depth_mm / 2
+            bop_y_hi = cursor_y + depth_mm   # running far edge of the lineup
         nm = f"u_rf_bop_{role}"
         mat = MAT.get(f"u_rf_bop_{role}") or fl.make_mat(
             f"m_rf_bop_{role}", rgb, metallic=0.35, roughness=0.42)
@@ -10480,8 +10592,12 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
                                     mat, steel, MAT, mod, MO)
         bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
         region_centres[role] = (cx, cy)
-        cursor_y += depth_mm + BOP_GAP_MM
-    bop_x1 = bop_x + max((it[3] for it in bop_items), default=BOP_LANE_W_MM)
+        if _container_bop:
+            bop_row_x[r] += w_mm + BOP_GAP_MM
+        else:
+            cursor_y += depth_mm + BOP_GAP_MM
+    bop_x1 = (max(bop_row_x) if _container_bop
+              else bop_x + max((it[3] for it in bop_items), default=BOP_LANE_W_MM))
 
     # ── 3. CONTAINER ENCLOSURE around racks + aisles + BoP ──────────────────
     # A shipping-container-like shell (floor + roof + 4 walls) sized to the rack
@@ -10489,18 +10605,26 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     # mode apply_inspection_materials renders u_skid_* as the faint wireframe, so we
     # name the enclosure with that prefix and it reads as the same faint cage that
     # lets the interior show.
-    enc_x0 = racks_x0 - CONTAINER_MARGIN_MM
-    enc_x1 = bop_x1 + CONTAINER_MARGIN_MM
+    enc_x0 = racks_x0 - cont_margin
+    enc_x1 = bop_x1 + cont_margin
     # Fit the enclosure to the ACTUAL Y extent of BOTH the rack block AND the BoP
     # lineup (which can be taller than the racks once enough BoP skids are present —
     # the old BOP_LANE_W_MM heuristic let the end skids poke out of the container).
-    enc_y0 = min(racks_y0, bop_y_lo) - CONTAINER_MARGIN_MM
-    enc_y1 = max(racks_y1, bop_y_hi) + CONTAINER_MARGIN_MM
+    enc_y0 = min(racks_y0, bop_y_lo) - cont_margin
+    enc_y1 = max(racks_y1, bop_y_hi) + cont_margin
     enc_w = enc_x1 - enc_x0
     enc_d = enc_y1 - enc_y0
-    enc_h = RACK_H_MM + 2 * CONTAINER_MARGIN_MM
+    enc_h = RACK_H_MM + 2 * cont_margin
     enc_cx = (enc_x0 + enc_x1) / 2
     enc_cy = (enc_y0 + enc_y1) / 2
+    # CONTAINERISED: render the shell at the brief's TRUE 40-ft envelope (so the GA reads
+    # as a real container), centred on the equipment, but never SMALLER than the packed
+    # equipment (clamp up if the lineup is longer than the nominal box).
+    if _CONTAINER_LAYOUT and _CONTAINER_ENVELOPE_MM:
+        enc_w = max(enc_w, _CONTAINER_ENVELOPE_MM["l"])
+        enc_d = max(enc_d, _CONTAINER_ENVELOPE_MM["w"])
+        if _CONTAINER_ENVELOPE_MM.get("h"):
+            enc_h = max(enc_h, _CONTAINER_ENVELOPE_MM["h"])
     _build_container_enclosure(enc_cx, enc_cy, DECK_Z_MM, enc_w, enc_d, enc_h, MAT, MO)
     frame_top_mm = DECK_Z_MM + enc_h
     print(f"[univ][rackfarm] container enclosure: {enc_w/1000:.1f}×{enc_d/1000:.1f} m "
@@ -14024,6 +14148,29 @@ def main():
     # Guards against a stale hint if the interpreter is ever reused across runs.
     global _HERO_HINT
     _HERO_HINT = None
+
+    # CONTAINERISED LAYOUT detection (Tristan 2026-06-24). The brief fixes a long-thin
+    # enclosure under parsedBrief.constraints.max_dimensions_mm = {w,d,h}; a 40-ft ISO
+    # container is 12192 × 2438 mm (aspect ~5.0). When the envelope is present AND
+    # long-thin (length/width ≥ _CONTAINER_ASPECT_MIN), force the container flat-pack so
+    # the GA fits the box instead of sprawling into a square block. A container_payload_
+    # rating_kg quantity (emitted only for containerised classes) further confirms it but
+    # is not required. Every non-containerised class leaves these globals at their
+    # defaults (None/False) and is completely unaffected.
+    global _CONTAINER_LAYOUT, _CONTAINER_ENVELOPE_MM
+    _CONTAINER_LAYOUT, _CONTAINER_ENVELOPE_MM = False, None
+    try:
+        _dims = ((state.get("parsedBrief") or {}).get("constraints") or {}).get("max_dimensions_mm") or {}
+        _w, _d = float(_dims.get("w") or 0), float(_dims.get("d") or 0)
+        if _w > 0 and _d > 0:
+            _long, _short = max(_w, _d), min(_w, _d)
+            if _short > 0 and _long / _short >= _CONTAINER_ASPECT_MIN:
+                _CONTAINER_LAYOUT = True
+                _CONTAINER_ENVELOPE_MM = {"l": _long, "w": _short, "h": float(_dims.get("h") or 0)}
+                print(f"[univ] containerised layout: enclosure {_long/1000:.2f} × {_short/1000:.2f} m "
+                      f"(aspect {_long/_short:.1f}) → flat-pack equipment into the container footprint")
+    except (TypeError, ValueError):
+        pass
 
     fl.init_scene()
     MAT = fl.make_default_palette()
