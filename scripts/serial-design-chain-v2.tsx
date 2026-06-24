@@ -7712,10 +7712,14 @@ async function main() {
           if (objDefaulted) ssRecord.notes = [...(ss.notes ?? []), 'primary_objective not stated in brief — defaulted to balanced']
           if (Math.abs(ss.rescale_factor - 1) > 0.01) {
             ssRecord.notes = [...(ssRecord.notes ?? []),
-              `Phase 1 RECORDS this recommendation only; regenerating the dossier at ${ss.rescale_factor.toFixed(2)}× the briefed output would REALISE the sweet spot (not auto-run — a deliberate, paid future step).`]
+              `This single chain run RECORDS the recommendation; to REALISE it (a real design that actually hits the target, not a six-tenths estimate) run the design-to-target loop: \`npx tsx scripts/design-to-target-run.ts <brief> <out-dir>\` — it re-runs the chain at converging scales (#47).`]
           }
           csState.sweetSpot = ssRecord
           console.error(`[chain] sweet-spot reconciliation: ${ss.verdict.toUpperCase()} (objective=${objective}, rescale=${ss.rescale_factor.toFixed(2)}×) — ${ss.trade_off_statement}`)
+          if (ss.verdict === 'incompatible') {
+            console.error(`[chain] → REDIRECT (not just disclose): this design is OFF-TARGET. Converge a real design with:`)
+            console.error(`[chain]     npx tsx scripts/design-to-target-run.ts ${briefPath} ${outDir}-converged`)
+          }
           logAction({
             step: 'sweet_spot_reconciliation', ok: true, verdict: ss.verdict,
             rescale_factor: ss.rescale_factor, objective,

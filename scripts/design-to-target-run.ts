@@ -46,14 +46,16 @@ export interface DesignToTargetResult {
 
 const _M = (v: number) => `£${(v / 1e6).toFixed(2)}M`
 
-/** Drive the design-to-target loop. `runner` re-runs the chain (real) or simulates it (test). Pure control. */
-export async function runDesignToTarget(opts: DesignToTargetOpts, runner: ChainRunner): Promise<DesignToTargetResult> {
+/** Drive the design-to-target loop. `runner` re-runs the chain (real) or simulates it (test).
+ * `seedRound0` lets the caller pass an already-measured round 0 (so the smart entry-point doesn't
+ * pay for it twice). Pure control. */
+export async function runDesignToTarget(opts: DesignToTargetOpts, runner: ChainRunner, seedRound0?: RoundMeasurement): Promise<DesignToTargetResult> {
   const maxRounds = opts.max_rounds ?? 4
   const tol = opts.tolerance ?? 0.05
   const trace: string[] = []
 
   // round 0 — the briefed scale (1.0).
-  const r0 = await runner(1, 0)
+  const r0 = seedRound0 ?? await runner(1, 0)
   const rounds: RoundMeasurement[] = [r0]
   trace.push(`round 0: scale 1.000 → ${r0.output.toPrecision(4)} @ ${_M(r0.capex_gbp)}`)
 
@@ -62,6 +64,12 @@ export async function runDesignToTarget(opts: DesignToTargetOpts, runner: ChainR
   if (opts.objective === 'output_max' || ceiling == null) {
     trace.push(`objective ${opts.objective}${ceiling == null ? ' / no cost ceiling' : ''} → no cost loop (build the target, accept the cost)`)
     return { converged: true, objective: opts.objective, goal_cost_gbp: null, rounds, best: r0, trace }
+  }
+  // COMPATIBLE — round 0 already fits the budget: build the briefed target, do NOT scale up to "spend
+  // the ceiling" (a cost_min/balanced brief that is affordable should not over-build). No loop.
+  if (r0.capex_gbp <= ceiling * (1 + tol)) {
+    trace.push(`round 0 ${_M(r0.capex_gbp)} already within the ${_M(ceiling)} ceiling → build the briefed target (no rescale needed)`)
+    return { converged: true, objective: opts.objective, goal_cost_gbp: ceiling, rounds, best: r0, trace }
   }
 
   // cost goal: cost_min → the ceiling; balanced → the sweet-spot capex (from round-0 real data).
@@ -149,6 +157,53 @@ async function _selftest(): Promise<void> {
   console.log(`design-to-target ORCHESTRATOR selftest: OK (cost_min converged to £5M in ${a.rounds.length} rounds → ${a.best!.output.toFixed(0)} units; output_max one-shot; no-ceiling one-shot; already-compatible)`)
 }
 
-if (require.main === module && process.argv.includes('--selftest')) {
-  _selftest().catch((e) => { console.error(e); process.exit(1) })
+/**
+ * SMART ENTRY POINT (the auto-trigger): run a brief, and if the reconciliation shows cost↔output
+ * TENSION (and the objective is cost-driven), AUTOMATICALLY converge a real design to the target —
+ * else one-shot. The user runs ONE command; the loop fires only when it should. The objective +
+ * ceiling are read from round 0's own state (no need to pass them). Round 0 is reused (not re-run).
+ */
+async function main(): Promise<void> {
+  const briefPath = process.argv[2], baseOutDir = process.argv[3]
+  if (!briefPath || !baseOutDir) {
+    console.error('usage: design-to-target-run.ts <brief.md> <base-out-dir> [--max-rounds N] [--tol 0.05]')
+    process.exit(1)
+  }
+  const maxArg = process.argv.indexOf('--max-rounds')
+  const tolArg = process.argv.indexOf('--tol')
+  const max_rounds = maxArg > 0 ? parseInt(process.argv[maxArg + 1], 10) : 4
+  const tolerance = tolArg > 0 ? parseFloat(process.argv[tolArg + 1]) : 0.05
+
+  const { readFileSync } = await import('fs')
+  const { resolve } = await import('path')
+
+  // round 0 (scale 1) — the briefed design.
+  const seedOpts: DesignToTargetOpts = { briefPath, baseOutDir, objective: 'balanced', cost_ceiling_gbp: null, max_rounds, tolerance }
+  console.error(`[design-to-target] round 0 — running the briefed design (scale 1.0) …`)
+  const r0 = await chainRunner(seedOpts)(1, 0)
+
+  // auto-read the objective + ceiling + hard floor from round 0's settled brief.
+  const st = JSON.parse(readFileSync(resolve(r0.out_dir, 'state.json'), 'utf8'))
+  const c = st?.parsedBrief?.constraints ?? {}
+  const objective = (c.primary_objective?.value as PrimaryObjective) ?? 'balanced'
+  const cost_ceiling_gbp = typeof c.unit_cost_ceiling?.value === 'number' ? c.unit_cost_ceiling.value : null
+  const floorVal = typeof c.output_floor?.value === 'number' ? c.output_floor.value : null
+  const targetVal = typeof c.target_performance?.value === 'number' ? c.target_performance.value : r0.output
+  const output_floor_scale = floorVal && targetVal ? floorVal / targetVal : null
+  const verdict = st?.sweetSpot?.verdict ?? '(none)'
+  console.error(`[design-to-target] objective=${objective}  ceiling=${cost_ceiling_gbp ? _M(cost_ceiling_gbp) : 'none'}  sweet-spot verdict=${verdict}`)
+
+  const result = await runDesignToTarget(
+    { briefPath, baseOutDir, objective, cost_ceiling_gbp, output_floor_scale, max_rounds, tolerance },
+    chainRunner({ briefPath, baseOutDir, objective, cost_ceiling_gbp, max_rounds, tolerance }),
+    r0,   // reuse round 0 — don't pay for it twice
+  )
+  console.error('\n[design-to-target] ── convergence trace ──')
+  for (const line of result.trace) console.error('  ' + line)
+  console.error(`\n[design-to-target] ${result.converged ? '✦ DONE' : '⚠ stopped (max rounds)'} — committed design: ${result.best?.out_dir} (${result.best?.output.toPrecision(4)} @ ${_M(result.best?.capex_gbp ?? 0)})`)
+}
+
+if (require.main === module) {
+  if (process.argv.includes('--selftest')) _selftest().catch((e) => { console.error(e); process.exit(1) })
+  else main().catch((e) => { console.error('[design-to-target] FATAL:', e); process.exit(1) })
 }
