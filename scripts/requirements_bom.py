@@ -459,15 +459,35 @@ def _materials_takeoff(name, mods, geom=None, service=None):
 #   • a switchgear FLOOR (£120 busbar) overriding the real £0.40 estimate → £448k;
 #   • a catalogue REEL/SHEET price applied per-cell (Alpha Wire reel £59, Bergquist pad
 #     sheet £40) × thousands of cells → £221k / £150k.
-# So these take a tight BAND: a £3 floor (never £0, never the switchgear floor) and a £12
-# ceiling (never a reel/sheet price per unit). Universal — a genuine distribution busbar /
+# So these take a tight BAND, SPLIT by material (BESS benchmark-net punch-list 2026-06-24): a
+# stamped METAL busbar / interconnect-bar is ~£2-15 each; a WIRE / LEAD / SENSE / insulation-PAD
+# is a consumable ~£0.3-2.5 each (the net flagged the shared £12 ceiling as still 10-20× too high
+# for a per-cell tap wire / pad → £45k each). Universal — a genuine distribution busbar /
 # switchboard part carries no cell/tap/interconnect qualifier and is untouched.
 _PACK_MICRO_COMMODITY_RE = re.compile(
     r"cell[\s_-]*to[\s_-]*cell|\bcell\b[\w\s_-]*(?:busbar|bus[\s_-]?bar|link|tap|sense|"
     r"interconnect|insulation[\s_-]*pad)|tap[\s_-]*(?:wire|lead)|sense[\s_-]*(?:wire|lead)|"
     r"insulation[\s_-]*pad|interconnect[\s_-]*(?:bar|link)", re.I)
-_PACK_MICRO_FLOOR_GBP = 3.0
-_PACK_MICRO_CEILING_GBP = 12.0
+# the WIRE/LEAD/PAD consumable subset (cheaper than a stamped metal bar)
+_PACK_MICRO_WIRE_PAD_RE = re.compile(
+    r"tap[\s_-]*(?:wire|lead)|sense[\s_-]*(?:wire|lead)|insulation[\s_-]*pad|"
+    r"cell[\s_-]*(?:voltage[\s_-]*)?(?:tap|sense)?[\s_-]*(?:wire|lead|pad)", re.I)
+_PACK_MICRO_WIRE_FLOOR_GBP, _PACK_MICRO_WIRE_CEILING_GBP = 0.3, 2.5
+_PACK_MICRO_METAL_FLOOR_GBP, _PACK_MICRO_METAL_CEILING_GBP = 2.0, 15.0
+# back-compat aliases (default = the metal band) for any other reader
+_PACK_MICRO_FLOOR_GBP = _PACK_MICRO_METAL_FLOOR_GBP
+_PACK_MICRO_CEILING_GBP = _PACK_MICRO_METAL_CEILING_GBP
+
+def _pack_micro_band(name: str):
+    """(floor_gbp, ceiling_gbp) for a pack-internal micro-commodity, else None. Wire/lead/sense/
+    insulation-pad → the consumable band (£0.3-2.5); a stamped metal busbar / interconnect-bar /
+    link → the metal band (£2-15). Universal, noun-keyed."""
+    nm = name or ""
+    if not _PACK_MICRO_COMMODITY_RE.search(nm):
+        return None
+    if _PACK_MICRO_WIRE_PAD_RE.search(nm):
+        return (_PACK_MICRO_WIRE_FLOOR_GBP, _PACK_MICRO_WIRE_CEILING_GBP)
+    return (_PACK_MICRO_METAL_FLOOR_GBP, _PACK_MICRO_METAL_CEILING_GBP)
 
 _MIN_PRICE_FLOORS = [
     (re.compile(r"main[_ ]?breaker|\bmccb\b|moulded[_ ]?case|air[_ ]?circuit", re.I), 180.0),
@@ -571,10 +591,12 @@ def _price_floor_for(name: str, md=None):
     # busbar's correct £0.40 estimate → £120 × 3,735 = £448k. These carry a real catalogue/
     # estimate price already, so they take NO floor. Universal (no class table); a genuine
     # distribution busbar / switchboard part has no "cell"/"tap"/"interconnect" qualifier.
-    if _PACK_MICRO_COMMODITY_RE.search(nm):
+    _micro = _pack_micro_band(nm)
+    if _micro is not None:
         # a tiny but non-ZERO minimum (a stamped strip / hookup wire / thermal pad is a few
         # £ in bulk, never the £120 switchgear floor and never £0) — keeps the line credible.
-        return _PACK_MICRO_FLOOR_GBP
+        # Material-split: a metal bar floors at £2, a wire/pad consumable at £0.3.
+        return _micro[0]
     kw = None
     if isinstance(md, dict):
         kw_val, is_kva = _rating_kw(md, nm)
@@ -660,6 +682,15 @@ def _corpus_median_lift(unit_gbp: float, pv: dict):
     # under-priced principal (Degasser £4,946→£65k) starts in the hundreds-thousands; a
     # small-target lift (junction box → £110) is unaffected. Universal, no noun/class table.
     if target > 10_000.0 and unit_gbp < 1_000.0:
+        return None
+    # RATIO guard (2026-06-24, BESS benchmark-net punch-list): the absolute guard above missed
+    # MID-range commodity mismatches — a per-module sheet-metal "module bottom tray" £40→£3,000
+    # (75×), "module top cover" £1→£866 (866×), "rack heater thermostat" £16→£1,500 (94×). A lift
+    # that MULTIPLIES a sub-£500 commodity by more than 20× is a class-mismatch (the corpus matched
+    # a stamped per-module part to a large-component reference), NOT an under-priced principal. The
+    # genuine cases stay: Degasser £4,946→£65k is 13× (and orig ≥ £500); junction box £40→£110 is
+    # 2.75×. Universal, no noun list.
+    if unit_gbp < 500.0 and target > unit_gbp * 20.0:
         return None
     edge = "p25" if (p25 not in (None, "") and target < median) else "0.6×median"
     basis = (f" · lifted £{round(unit_gbp):,}→£{round(target):,} to the engine corpus "
@@ -1409,6 +1440,11 @@ def _selftest() -> int:
                 "engine_c_ref_count": 5}, None),                                    # already in range → untouched
         (8000, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 9000,
                 "engine_c_ref_count": 5}, None),                                    # 89% of median (≥0.5×) → not materially under
+        # RATIO guard: a sub-£500 commodity multiplied >20× is a class-mismatch → untouched.
+        (40, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 6000,
+              "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 3000}, None),        # module tray £40→£3,000 (75×) → REJECTED
+        (16, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 3000,
+              "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 1500}, None),        # heater thermostat £16→£1,500 (94×) → REJECTED
     ]
     for u, pv, want in _lift_cases:
         res = _corpus_median_lift(float(u), pv)
@@ -1842,13 +1878,24 @@ def _selftest() -> int:
     for nm in ("Distillation Column", "Buffer Vessel", "Rearing Tank", "Fischer-Tropsch Reactor"):
         if _price_floor_for(nm, {}) is not None:
             print(f"  FAIL process-vessel {nm!r} wrongly floored (£{_price_floor_for(nm, {})})"); bad += 1
-    # (d2) PACK-INTERNAL MICRO-COMMODITY guard (2026-06-24): a cell-to-cell busbar / cell tap
-    # wire / cell insulation pad takes the tiny £3 micro floor, NOT the £120 switchgear
-    # busbar floor (×3,735 = £448k). A genuine distribution / DC busbar still gets £120.
-    for nm in ("cell-to-cell busbar", "cell voltage tap wire", "cell insulation pad",
-               "cell interconnect bar", "module sense wire"):
-        if _price_floor_for(nm, {}) != 3.0:
-            print(f"  FAIL micro-commodity {nm!r} not £3 floor (got {_price_floor_for(nm, {})})"); bad += 1
+    # (d2) PACK-INTERNAL MICRO-COMMODITY guard (2026-06-24): a pack-internal cell part takes the
+    # tiny micro band, NOT the £120 switchgear busbar floor (×3,735 = £448k). Material-split: a
+    # stamped METAL busbar/interconnect-bar floors at £2 (ceiling £15); a WIRE/LEAD/insulation-PAD
+    # consumable floors at £0.3 (ceiling £2.5 — the net flagged the old shared £12 ceiling as still
+    # 10-20× too high). A genuine distribution / DC busbar still gets the £120 switchgear floor.
+    for nm in ("cell-to-cell busbar", "cell interconnect bar"):           # metal → £2 floor
+        if _price_floor_for(nm, {}) != 2.0:
+            print(f"  FAIL micro-commodity metal {nm!r} not £2 floor (got {_price_floor_for(nm, {})})"); bad += 1
+    for nm in ("cell voltage tap wire", "cell insulation pad", "module sense wire"):  # consumable → £0.3
+        if _price_floor_for(nm, {}) != 0.3:
+            print(f"  FAIL micro-commodity wire/pad {nm!r} not £0.3 floor (got {_price_floor_for(nm, {})})"); bad += 1
+    # ceilings: a wire/pad caps at £2.5, a metal bar at £15
+    if _pack_micro_band("cell voltage tap wire") != (0.3, 2.5):
+        print(f"  FAIL wire/pad band (got {_pack_micro_band('cell voltage tap wire')})"); bad += 1
+    if _pack_micro_band("cell-to-cell busbar") != (2.0, 15.0):
+        print(f"  FAIL metal-bar band (got {_pack_micro_band('cell-to-cell busbar')})"); bad += 1
+    if _pack_micro_band("DC busbar 800 V") is not None:
+        print("  FAIL distribution busbar wrongly matched the micro band"); bad += 1
     for nm in ("DC busbar 800 V", "distribution busbar", "main switchboard busbar"):
         if _price_floor_for(nm, {}) != 120.0:
             print(f"  FAIL distribution busbar {nm!r} lost its £120 floor (got {_price_floor_for(nm, {})})"); bad += 1
@@ -2896,11 +2943,12 @@ def assemble(out_dir: str):
                              if "floored" not in basis else basis)
                 # PACK-INTERNAL MICRO-COMMODITY CEILING (2026-06-24): a cell tap/sense wire or
                 # insulation pad priced from a catalogue REEL/SHEET (£59 reel, £40 sheet) and
-                # applied per-cell ×3,750 is a pack-size error (£221k / £150k). Cap the per-unit
-                # at £12 — a real cell wire/pad is a few £ in bulk. Universal; only the pack
-                # micro-commodity nouns match (a distribution busbar / real part is untouched).
-                if _PACK_MICRO_COMMODITY_RE.search(name or "") and gbp > _PACK_MICRO_CEILING_GBP:
-                    gbp = _PACK_MICRO_CEILING_GBP
+                # applied per-cell ×3,750 is a pack-size error. Cap the per-unit at the material
+                # band — a wire/pad consumable at £2.5, a stamped metal bar at £15. Universal;
+                # only the pack micro-commodity nouns match (a distribution busbar is untouched).
+                _micro_band = _pack_micro_band(name or "")
+                if _micro_band is not None and gbp > _micro_band[1]:
+                    gbp = _micro_band[1]
                     basis = (basis + " · capped to pack micro-commodity ceiling"
                              if "micro-commodity ceiling" not in basis else basis)
                 # CONTROL-ELEMENT class budget (RAS audit 2026-06-19) — a final control
