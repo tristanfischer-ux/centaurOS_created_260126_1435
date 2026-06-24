@@ -453,6 +453,22 @@ def _materials_takeoff(name, mods, geom=None, service=None):
 # part class, the floor is applied. UK 2026 trade-supply lower bounds (installed bare
 # device, conservative — a genuine quote will be higher, never lower). Universal:
 # keyed off the component NOUN, no per-archetype table.
+# PACK-INTERNAL MICRO-COMMODITY (2026-06-24): a cell-to-cell busbar, cell link / tap /
+# sense wire, cell interconnect bar or insulation pad is a stamped/wire/die-cut part bought
+# in the THOUSANDS at a few £ each. Two failure modes both fixed via this one matcher:
+#   • a switchgear FLOOR (£120 busbar) overriding the real £0.40 estimate → £448k;
+#   • a catalogue REEL/SHEET price applied per-cell (Alpha Wire reel £59, Bergquist pad
+#     sheet £40) × thousands of cells → £221k / £150k.
+# So these take a tight BAND: a £3 floor (never £0, never the switchgear floor) and a £12
+# ceiling (never a reel/sheet price per unit). Universal — a genuine distribution busbar /
+# switchboard part carries no cell/tap/interconnect qualifier and is untouched.
+_PACK_MICRO_COMMODITY_RE = re.compile(
+    r"cell[\s_-]*to[\s_-]*cell|\bcell\b[\w\s_-]*(?:busbar|bus[\s_-]?bar|link|tap|sense|"
+    r"interconnect|insulation[\s_-]*pad)|tap[\s_-]*(?:wire|lead)|sense[\s_-]*(?:wire|lead)|"
+    r"insulation[\s_-]*pad|interconnect[\s_-]*(?:bar|link)", re.I)
+_PACK_MICRO_FLOOR_GBP = 3.0
+_PACK_MICRO_CEILING_GBP = 12.0
+
 _MIN_PRICE_FLOORS = [
     (re.compile(r"main[_ ]?breaker|\bmccb\b|moulded[_ ]?case|air[_ ]?circuit", re.I), 180.0),
     (re.compile(r"\bbreaker\b|\bmcb\b|circuit[_ ]?breaker", re.I), 45.0),
@@ -555,13 +571,10 @@ def _price_floor_for(name: str, md=None):
     # busbar's correct £0.40 estimate → £120 × 3,735 = £448k. These carry a real catalogue/
     # estimate price already, so they take NO floor. Universal (no class table); a genuine
     # distribution busbar / switchboard part has no "cell"/"tap"/"interconnect" qualifier.
-    if re.search(r"cell[\s_-]*to[\s_-]*cell|\bcell\b[\w\s_-]*(?:busbar|bus[\s_-]?bar|link|tap|"
-                 r"sense|interconnect|insulation[\s_-]*pad)|tap[\s_-]*(?:wire|lead)|"
-                 r"sense[\s_-]*(?:wire|lead)|insulation[\s_-]*pad|interconnect[\s_-]*(?:bar|link)",
-                 nm, re.I):
+    if _PACK_MICRO_COMMODITY_RE.search(nm):
         # a tiny but non-ZERO minimum (a stamped strip / hookup wire / thermal pad is a few
         # £ in bulk, never the £120 switchgear floor and never £0) — keeps the line credible.
-        return 3.0
+        return _PACK_MICRO_FLOOR_GBP
     kw = None
     if isinstance(md, dict):
         kw_val, is_kva = _rating_kw(md, nm)
@@ -638,6 +651,15 @@ def _corpus_median_lift(unit_gbp: float, pv: dict):
     # never LOWER a price, and never lift ABOVE the median (the conservative ceiling)
     target = min(max(target, unit_gbp), median)
     if target <= unit_gbp * 1.0001:
+        return None
+    # COMMODITY-MATCHED-TO-PRINCIPAL guard (2026-06-24): a tiny commodity estimate lifted to
+    # a LARGE corpus reference is a CLASS-MISMATCH, not an under-priced principal — the corpus
+    # matched a per-module "module steel frame" (£40) / per-rack "cold plate" (£700) to large
+    # industrial components and lifted them to £34,000 / £19,250 (a 27-850× jump). Reject a
+    # lift whose TARGET is large (> £10k) while the original is a commodity (< £1k). A genuine
+    # under-priced principal (Degasser £4,946→£65k) starts in the hundreds-thousands; a
+    # small-target lift (junction box → £110) is unaffected. Universal, no noun/class table.
+    if target > 10_000.0 and unit_gbp < 1_000.0:
         return None
     edge = "p25" if (p25 not in (None, "") and target < median) else "0.6×median"
     basis = (f" · lifted £{round(unit_gbp):,}→£{round(target):,} to the engine corpus "
@@ -2872,6 +2894,15 @@ def assemble(out_dir: str):
                         status, part = "NOT FOUND", "requirement stated"
                     basis = (basis + " · floored to min credible price"
                              if "floored" not in basis else basis)
+                # PACK-INTERNAL MICRO-COMMODITY CEILING (2026-06-24): a cell tap/sense wire or
+                # insulation pad priced from a catalogue REEL/SHEET (£59 reel, £40 sheet) and
+                # applied per-cell ×3,750 is a pack-size error (£221k / £150k). Cap the per-unit
+                # at £12 — a real cell wire/pad is a few £ in bulk. Universal; only the pack
+                # micro-commodity nouns match (a distribution busbar / real part is untouched).
+                if _PACK_MICRO_COMMODITY_RE.search(name or "") and gbp > _PACK_MICRO_CEILING_GBP:
+                    gbp = _PACK_MICRO_CEILING_GBP
+                    basis = (basis + " · capped to pack micro-commodity ceiling"
+                             if "micro-commodity ceiling" not in basis else basis)
                 # CONTROL-ELEMENT class budget (RAS audit 2026-06-19) — a final control
                 # element (a modulating / DN400 / on-off process valve or actuator)
                 # reaching this point with £0 (the synthesis stamped no price and it is
