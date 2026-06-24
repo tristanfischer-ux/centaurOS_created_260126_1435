@@ -1437,6 +1437,40 @@ def _selftest() -> int:
             if r.get("service") == "water" and _dn(r) == 300 and "316" in r["basis"] and "3.7111" in r["requirement"]:
                 print(f"  FAIL edge still priced DN300/316L at full recirc: {r['tag']} {r['requirement'][:40]}"); bad += 1
 
+    # ── CAPACITY-UNIT SIZE LINE (BESS GA-fit bug, gate 36 2026-06-24) — a `capacity`
+    # modifier is a VOLUME only when its unit is m³/L; a non-volume capacity (A/V/W/kW/
+    # L/min) must render with its REAL unit, never " m³". The old code hardcoded m³ onto
+    # any capacity → a 2300 A breaker read "2300 m³", a 150 L/min pump "150 m³" (50-250×
+    # the whole 40-ft container). UNIVERSAL: build a tiny state, assemble it, assert the
+    # requirement strings carry true units, a genuine m³/L volume is preserved, and a
+    # non-volume capacity already covered by rating_primary is dropped (not duplicated).
+    with _tf.TemporaryDirectory() as _cd:
+        _capstate = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+            {"id": "w_breaker", "name_human": "AC main breaker",
+             "modifier_characters": [{"kind": "capacity", "value": "2300", "unit": "A"}]},
+            {"id": "w_pump", "name_human": "cooling pump",
+             "modifier_characters": [{"kind": "rating_primary", "value": "150 L/min @ 20 m head"},
+                                     {"kind": "capacity", "value": "150", "unit": "L/min"}]},
+            {"id": "w_tank", "name_human": "buffer tank",
+             "modifier_characters": [{"kind": "capacity", "value": "5", "unit": "m³"}]},
+            {"id": "w_sump", "name_human": "coolant sump",
+             "modifier_characters": [{"kind": "capacity", "value": "200", "unit": "L"}]},
+        ]}]}]}}
+        json.dump(_capstate, open(os.path.join(_cd, "state.json"), "w"))
+        _crow = {r["requirement"].split("·")[0].strip(): r["requirement"] for r in assemble(_cd)}
+        _brk = _crow.get("AC main breaker", "")
+        if "m³" in _brk or "2300 A" not in _brk:
+            print(f"  FAIL breaker capacity not shown as 2300 A: {_brk!r}"); bad += 1
+        _tank = _crow.get("buffer tank", "")
+        if "5 m³" not in _tank:
+            print(f"  FAIL genuine m³ tank volume not preserved: {_tank!r}"); bad += 1
+        _sump = _crow.get("coolant sump", "")
+        if "200 L" not in _sump or "m³" in _sump:
+            print(f"  FAIL litre capacity not shown as 200 L: {_sump!r}"); bad += 1
+        _pump = _crow.get("cooling pump", "")
+        if "m³" in _pump:   # the L/min rating is already in rating_primary → no redundant " · 150 m³"
+            print(f"  FAIL pump non-volume capacity rendered as m³: {_pump!r}"); bad += 1
+
     # ── UNIVERSAL RATING-BASED COST MODEL (council 2026-06-16/17) ──
     # invariant: power-rated kit is priced from the £/kW(/kVA) market curve in BOTH
     # directions — a £0/under-priced line is lifted UP, an over-priced one pulled
@@ -2529,7 +2563,29 @@ def assemble(out_dir: str):
                 duty = md.get("rating_primary")
                 duty_u = next((x.get("unit") for x in (w.get("modifier_characters") or [])
                                if x.get("kind") == "rating_primary"), "")
-                size = md.get("dimension") or (f"{md.get('capacity')} m³" if md.get("capacity") else None)
+                # SIZE line. `capacity` is a genuine VOLUME only when its modifier unit is a
+                # volume (m³/L); for an electrical/flow/thermal part `capacity` carries its OWN
+                # unit (A, V, W, kW, L/min). The old code hardcoded " m³" onto ANY capacity value
+                # — so a 2300 A breaker rendered "2300 m³", a 1000 V sensor "1000 m³", a 150 L/min
+                # pump "150 m³" (50-250× the whole 40-ft container). That broke the GA sizing AND
+                # the generative benchmark net (gate 36) flagged it as a pervasive volume bug.
+                # UNIVERSAL fix: honour the capacity modifier's REAL unit; only label m³ when it
+                # actually is a volume. A non-volume rating already covered by rating_primary (duty)
+                # is dropped to avoid a redundant "1000 V measuring range · 1000 V".
+                size = md.get("dimension")
+                if not size and md.get("capacity"):
+                    cap_val = md.get("capacity")
+                    cap_unit = next((x.get("unit") for x in (w.get("modifier_characters") or [])
+                                     if x.get("kind") == "capacity"), None) or ""
+                    cu = str(cap_unit).strip()
+                    if not cu or re.fullmatch(r"m3|m³", cu, re.I):
+                        size = f"{cap_val} m³"                 # genuine volume capacity (tank/vessel)
+                    elif re.fullmatch(r"l|litre|litres|liter|liters", cu, re.I):
+                        size = f"{cap_val} L"                  # volume in litres
+                    elif not duty:
+                        size = f"{cap_val} {cu}"               # a RATING (A/V/W/kW/…) — show its true unit
+                    else:
+                        size = None                           # non-volume capacity already in the duty
                 conns = ", ".join(sorted(conns_by_tag.get(tag, []))) or None
                 parts_req = [name]
                 # MOTOR-NAMEPLATE DISPLAY (council 2026-06-17): a motor-driven line
