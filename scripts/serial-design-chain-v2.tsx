@@ -49,7 +49,7 @@ import { buildContractForChain, type EngineeringContract } from './lib/engineeri
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv, readHeadlineCostGbp, deriveOutputDenominator } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
-import { generateBenchmarkExpectation, compareToBenchmark, diagnoseFaults, briefDescriptionFromState, type BenchmarkExpectation, type DivergenceReport, type Fault } from './lib/benchmark-expectation'
+import { generateBenchmarkExpectation, compareToBenchmark, diagnoseFaults, routeFaults, briefDescriptionFromState, type BenchmarkExpectation, type DivergenceReport, type Fault } from './lib/benchmark-expectation'
 import { reconcile as reconcileSweetSpot, type PrimaryObjective } from './lib/sweet-spot'
 import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
@@ -8463,35 +8463,44 @@ async function main() {
             for (const f of faults) {
               console.error(`[chain]   ↳ FAULT ${f.line} [${f.dimension}] — ${f.issue} (${f.magnitude}) → ${f.suggested}`)
             }
-            // ROUTED PUNCH-LIST (Tristan 2026-06-24, the "go around again to another loop" target):
-            // when the net diverges, write benchmark-punchlist.md grouping each per-line fault by its
-            // likely cause — the concrete feedback an engineer (or the next loop) acts on, mirroring
-            // the drawing-gates punch-list. Only on a non-OK verdict; the dossier never references it.
+            // ROUTED PUNCH-LIST (Tristan 2026-06-24: "fix the source, never the symptom"). When the
+            // net diverges, route every per-line fault to its SOURCE RULE via the line's `basis`
+            // provenance (routeFaults) and group benchmark-punchlist.md BY SOURCE RULE — the exact
+            // function to fix in code, universal, never a per-line data patch. Each fix must land
+            // with a regression guard so the rule can't regress (problems then monotonically fall).
+            // Mirrors the drawing-gates punch-list. Only on a non-OK verdict; the dossier never refs it.
             if (report.worst !== 'ok') {
               try {
-                const byCause = new Map<string, typeof faults>()
-                for (const f of faults) {
-                  const k = (f.likely_cause || 'uncategorised').toString()
-                  if (!byCause.has(k)) byCause.set(k, [] as any)
-                  byCause.get(k)!.push(f)
+                const routed = routeFaults(faults, st)
+                ;(st as Record<string, any>).benchmarkFaultsRouted = routed
+                const byRule = new Map<string, { src: any; items: typeof routed }>()
+                for (const f of routed) {
+                  const k = f.source ? `${f.source.rule} — ${f.source.file} :: ${f.source.fn}` : 'UNROUTED (no basis match — inspect manually)'
+                  if (!byRule.has(k)) byRule.set(k, { src: f.source, items: [] as any })
+                  byRule.get(k)!.items.push(f)
                 }
                 const md: string[] = [
                   `# Benchmark sanity-net punch-list — ${report.worst.toUpperCase()}`,
                   ``,
                   `Generated ${exp.model} vs the deterministic engine. ${report.summary}`,
                   ``,
+                  `> PRINCIPLE: a deterministic engine never slips — every wrong line is a wrong RULE.`,
+                  `> Fix the SOURCE rule (universal, in code) + add a regression guard. Never patch the data point.`,
+                  ``,
                   `## Divergences (headline)`,
                   ...report.findings.filter(f => f.verdict !== 'ok').map(f =>
                     `- **${f.dimension}** [${f.verdict}, ${f.ratio ?? '—'}×] — expected ${f.expected}; engine ${f.deterministic}. ${f.note}`),
                   ``,
-                  `## Per-line faults, grouped by likely cause (fix these → re-run → the net re-checks)`,
+                  `## Faults routed to their SOURCE RULE (fix the rule → add a guard → re-run → the net re-checks)`,
                 ]
-                for (const [cause, fs] of byCause) {
-                  md.push(``, `### ${cause} (${fs.length})`)
-                  for (const f of fs) md.push(`- \`${f.line}\` [${f.dimension}] — ${f.issue} (${f.magnitude}) → suggested ${f.suggested}`)
+                for (const [k, { src, items }] of byRule) {
+                  md.push(``, `### ${k} (${items.length} line${items.length === 1 ? '' : 's'})`)
+                  if (src?.fix_hint) md.push(`*Fix:* ${src.fix_hint}`)
+                  for (const f of items) md.push(`- \`${f.line}\` [${f.dimension}] — ${f.issue} (${f.magnitude}) → suggested ${f.suggested}  ·  basis: \`${(f.basis || '—').slice(0, 60)}\``)
                 }
                 writeFileSync(resolve(outDir, 'benchmark-punchlist.md'), md.join('\n'))
-                console.error(`[chain] benchmark net: wrote benchmark-punchlist.md (${faults.length} per-line fault(s) grouped by cause)`)
+                const ruleList = [...byRule.keys()].map(k => k.split(' — ')[0]).join(', ')
+                console.error(`[chain] benchmark net: wrote benchmark-punchlist.md — ${faults.length} fault(s) routed to ${byRule.size} source rule(s): ${ruleList}`)
               } catch (plErr) {
                 console.error(`[chain] benchmark punch-list write failed (non-fatal): ${(plErr as Error).message.slice(0, 120)}`)
               }

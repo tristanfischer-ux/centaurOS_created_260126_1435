@@ -367,6 +367,72 @@ export async function diagnoseFaults(exp: BenchmarkExpectation, state: any, repo
   } catch (e) { console.error(`[benchmark] diagnose failed: ${(e as Error).message}`); return [] }
 }
 
+// ── SOURCE-RULE ROUTING (Tristan 2026-06-24: "fix the source, never the symptom") ───────────────
+// A deterministic engine never slips — a wrong line is the product of a wrong RULE, so the fix is
+// always to the RULE (universal, in code), never the data point. The engine already records WHICH
+// rule priced/sized every line: the line's `basis` string is its provenance. This maps a basis to
+// the exact source function so the punch-list routes each fault to the rule to fix — turning "find
+// the source" from a hunt into a lookup. ORDER MATTERS: the most specific / most-likely-culprit
+// rule first (a lift/floor/cap dominates a generic "catalogue"/"parametric" tail in the same basis).
+export interface SourceRule { rule: string; file: string; fn: string; fix_hint: string }
+const SOURCE_RULES: Array<{ re: RegExp; rule: SourceRule }> = [
+  { re: /lifted £[\d,]+→£[\d,]+ to the engine corpus|corpus (?:p25|median)/i,
+    rule: { rule: 'corpus-median-lift', file: 'scripts/requirements_bom.py', fn: '_corpus_median_lift',
+            fix_hint: 'a commodity lifted to a large-component corpus reference — tighten the lift eligibility (class-mismatch guard)' } },
+  { re: /capped to pack micro-commodity ceiling|micro-commodity/i,
+    rule: { rule: 'pack-micro-commodity-band', file: 'scripts/requirements_bom.py', fn: '_PACK_MICRO_COMMODITY_RE / _PACK_MICRO_{FLOOR,CEILING}_GBP',
+            fix_hint: 'a per-cell stamped/wire/pad part — adjust the £3 floor / £12 ceiling or the noun matcher' } },
+  { re: /floored to min credible price|floored to m/i,
+    rule: { rule: 'price-floor', file: 'scripts/requirements_bom.py', fn: '_price_floor_for / _MIN_PRICE_FLOORS',
+            fix_hint: 'a floor (switchgear/process) is overriding a correct low estimate — narrow the floor regex or exempt the noun' } },
+  { re: /rating-based|× £[\d,]+\/k(?:W|VA)|£\/k(?:W|VA)/i,
+    rule: { rule: 'rating-based-pricing', file: 'scripts/requirements_bom.py', fn: '_rating_kw / rating-based price',
+            fix_hint: 'a value read as kW/kVA — verify _rating_kw honours the modifier unit (flow/current/voltage are not power)' } },
+  { re: /six-tenths|cost-capacity rule/i,
+    rule: { rule: 'six-tenths-scaler', file: 'scripts/requirements_bom.py', fn: 'six-tenths cost-capacity scaler',
+            fix_hint: 'a scaled price off a reference duty — check the reference duty + exponent' } },
+  { re: /capped at [\d.]+× list|commodity (?:ceiling|cap)/i,
+    rule: { rule: 'commodity-ceiling', file: 'scripts/requirements_bom.py', fn: '_apply_commodity_ceiling / _bare_commodity_ceiling',
+            fix_hint: 'a catalogue commodity cap — adjust the cap multiple or the commodity noun set' } },
+  { re: /materials? take-?off|hoop|wall .*P·r|bottom-up parametric/i,
+    rule: { rule: 'materials-takeoff', file: 'scripts/requirements_bom.py', fn: '_materials_takeoff',
+            fix_hint: 'a £/kg material take-off — check the dimension/volume it reads + the typed service (structural vs pressure vessel)' } },
+  { re: /pipe £[\d.]+\/m|DN\d+|connection:|cable .*mm²/i,
+    rule: { rule: 'connection-sizing', file: 'scripts/requirements_bom.py', fn: '_connection_rows / _edge_water_flow_m3h',
+            fix_hint: 'a pipe/cable run — check the per-edge duty + DN/CSA sizing' } },
+  { re: /parametric/i,
+    rule: { rule: 'unit-operation-parametric', file: 'scripts/requirements_bom.py', fn: '_unit_operation_price',
+            fix_hint: 'a per-unit-operation parametric — check the duty key + the £/duty coefficient' } },
+  { re: /installed instrument|catalogue-class budget/i,
+    rule: { rule: 'instrument-synthesis', file: 'scripts/requirements_bom.py', fn: '_child_price (instrument)',
+            fix_hint: 'a synthesised field instrument — check the installed-cost estimate' } },
+  { re: /catalogue/i,
+    rule: { rule: 'catalogue-price', file: 'src/lib/pdf-engine-v2/lib/distributors/db-only-cascade.ts', fn: 'lookupCached (distributor cascade)',
+            fix_hint: 'a catalogue/distributor price — a REEL/SHEET price may be applied per-unit (pack-size error) or the part is mis-pinned' } },
+]
+
+/** Map a BoM line's `basis` provenance string to the source RULE that produced it. Pure. */
+export function sourceRuleForBasis(basis: string): SourceRule | null {
+  const b = String(basis || '')
+  for (const { re, rule } of SOURCE_RULES) if (re.test(b)) return rule
+  return null
+}
+
+/** Attach the source rule to each fault by matching it back to its BoM line's basis. Pure. */
+export function routeFaults(faults: Fault[], state: any): Array<Fault & { source: SourceRule | null; basis: string }> {
+  const rb: any[] = Array.isArray(state?.requirementsBom) ? state.requirementsBom : []
+  const norm = (s: any) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  return (faults || []).map(f => {
+    const key = norm(f.line)
+    // match the fault's line to a BoM row by tag, then by requirement-name containment
+    let line = rb.find(r => key && norm(r.tag) === key)
+      || rb.find(r => key && (norm(r.requirement).includes(key) || key.includes(norm(r.requirement).split(' ').slice(0, 3).join(' '))))
+      || rb.find(r => key && norm(r.requirement).startsWith(key.split(' ').slice(0, 2).join(' ')))
+    const basis = line ? String(line.basis || '') : ''
+    return { ...f, basis, source: basis ? sourceRuleForBasis(basis) : null }
+  })
+}
+
 // ── CLI ────────────────────────────────────────────────────────────────────
 async function main() {
   const dir = process.argv[2]
@@ -445,6 +511,19 @@ function _selftest() {
   // classify boundaries
   if (classify(2.6) !== 'radical' || classify(1.8) !== 'warn' || classify(1.2) !== 'ok' || classify(1 / 2.6) !== 'radical') {
     console.log('FAIL: classify boundaries'); bad++
+  }
+  // SOURCE-RULE ROUTING — each basis maps to the exact source RULE (fix the source, never the symptom)
+  if (sourceRuleForBasis('rating-based: 150 kW × £700/kW')?.rule !== 'rating-based-pricing') { console.log('FAIL: rating basis → rating-based-pricing'); bad++ }
+  if (sourceRuleForBasis('catalogue · lifted £40→£34,000 to the engine corpus 0.6×median')?.rule !== 'corpus-median-lift') { console.log('FAIL: corpus lift basis → corpus-median-lift'); bad++ }
+  if (sourceRuleForBasis('catalogue · floored to min credible price')?.rule !== 'price-floor') { console.log('FAIL: floor basis → price-floor'); bad++ }
+  if (sourceRuleForBasis('catalogue · capped to pack micro-commodity ceiling')?.rule !== 'pack-micro-commodity-band') { console.log('FAIL: micro-cap basis → pack-micro-commodity-band'); bad++ }
+  if (sourceRuleForBasis('catalogue · MoC: 316L stainless')?.rule !== 'catalogue-price') { console.log('FAIL: plain catalogue → catalogue-price'); bad++ }
+  // routeFaults attaches the source by matching the fault back to its BoM line's basis
+  const routed = routeFaults(
+    [{ line: 'cooling pump', dimension: 'cost', issue: 'too high', magnitude: '30×', suggested: '£3k', likely_cause: 'flow read as kW' }] as any,
+    { requirementsBom: [{ tag: 'P-1', requirement: 'cooling pump · 150 L/min', basis: 'rating-based: 150 kW × £700/kW', line_gbp: 210000 }] })
+  if (routed[0]?.source?.rule !== 'rating-based-pricing' || routed[0]?.source?.file !== 'scripts/requirements_bom.py') {
+    console.log(`FAIL: routeFaults did not route the pump to rating-based-pricing (got ${JSON.stringify(routed[0]?.source)})`); bad++
   }
   console.log(bad === 0 ? 'benchmark-expectation selftest: OK' : `benchmark-expectation selftest: ${bad} FAIL`)
   if (bad) process.exit(1)
