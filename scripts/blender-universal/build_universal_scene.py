@@ -221,6 +221,12 @@ SHAPE_RULES = [
     (r"\bskid\b|package|additisation|generation|inerting|nitrogen", "skid_box"),
     (r"gantry|loading arm|loading", "gantry"),
     (r"\bmixer\b|static mixer", "inline_spool"),
+    # GENERIC process vessel catch-all (Tristan 2026-06-24: a part named "…vessel" /
+    # "…pot" / "maturation vessel" / "reservoir" / "accumulator" matched NO earlier rule
+    # and fell to a flat BOX. A closed process vessel is a vertical cylinder with dished
+    # ends — give it that shape. Placed AFTER every specific reactor/column/separator/
+    # tank/electrical rule so those still win, and before the instrument/box fallbacks.)
+    (r"\bvessel\b|\bpot\b|reservoir|accumulator|maturation|\bdigest", "vertical_vessel"),
     (r"valve|transmitter|thermowell|detector|analy[sz]er|metering|"
      r"instrument|sensor|relief|gauge|probe", "instrument"),
 ]
@@ -646,6 +652,16 @@ def parse_dimension(dim_value):
         a = _num(s)
         if a is not None:
             return {"kind": "area", "area_m2": a}
+
+    # VOLUME, e.g. "5 m³" / "5 m3" / "8 m³ each" / "1.1 m^3" (Tristan 2026-06-24: a
+    # bespoke emitter that prints a vessel as a bare VOLUME — common on the CO₂ plant —
+    # was silently UNPARSED → the part fell to a generic type-default BOX, discarding the
+    # physics so a 5 m³ tank and a 0.5 m³ pot rendered the SAME size. Capture the volume;
+    # resolved_dims_mm converts it to a SHAPE-AWARE cylinder (a column stays slender, a
+    # tank stays squat). Universal — any archetype that emits an m³-only dim is fixed.)
+    mv = re.search(r"(-?\d+(?:\.\d+)?)\s*m(?:³|3|\^3|\*\*3)\b", s)
+    if mv:
+        return {"kind": "volume", "vol_m3": float(mv.group(1))}
 
     # "<dia> m dia x <len> m"  (cylinder with two figures)
     m = re.search(r"(-?\d+(?:\.\d+)?)\s*m\s*dia(?:meter)?\s*x\s*(-?\d+(?:\.\d+)?)\s*m", s)
@@ -2102,6 +2118,31 @@ def _machine_grid_span_mm(unit_w_mm: float, unit_dep_mm: float, n: int):
     return span_x, span_y
 
 
+# aspect ratio (height ÷ diameter) for a volume-only vessel, keyed on its SHAPE. A
+# slender distillation/absorber column is tall; a storage tank is squat; a reactor /
+# vertical vessel is ~2:1; an unknown vessel defaults near-cubic. Mirrors the contract's
+# noun-aware cylinderDimsForVolume so the render aspect agrees with the sizing tool.
+_VOLUME_ASPECT_BY_SHAPE = {
+    "tall_column": 3.0, "column": 3.0,
+    "tall_vessel": 2.0, "vertical_vessel": 2.0,
+    "horizontal_vessel": 2.5,            # length ÷ diameter (laid on saddles)
+    "tank": 0.9, "storage": 0.9,         # squat atmospheric storage
+    "box": 1.0,
+}
+
+
+def _cyl_from_volume_m3(vol_m3, shape):
+    """Convert a vessel VOLUME (m³) → (dia_mm, len_mm) using a shape-aware aspect k=H/D.
+    V = π/4·D²·H = π/4·k·D³ ⇒ D = (4V/(π·k))^⅓, H = k·D. Pure + deterministic."""
+    try:
+        v = max(float(vol_m3), 0.001)
+    except (TypeError, ValueError):
+        v = 1.0
+    k = _VOLUME_ASPECT_BY_SHAPE.get(shape, 1.2)
+    d_m = (4.0 * v / (math.pi * k)) ** (1.0 / 3.0)
+    return d_m * 1000.0, (k * d_m) * 1000.0
+
+
 def resolved_dims_mm(part):
     """Return a concrete (kind, geometry-dict) in MM, from explicit dim if
     present else the type default for the shape. Footprint is used by the
@@ -2132,6 +2173,11 @@ def resolved_dims_mm(part):
         side = max(1000.0, math.sqrt(d["area_m2"]) * 1000)
         rd = {"shape": shape, "w_mm": side, "d_mm": side, "h_mm": side * 0.45,
               "explicit": True}
+    elif d and d["kind"] == "volume":
+        # bare volume → SHAPE-AWARE cylinder dia + height (mirrors the contract's
+        # cylinderDimsForVolume aspect logic, keyed on the part's SHAPE not its noun).
+        dia_mm, len_mm = _cyl_from_volume_m3(d["vol_m3"], shape)
+        rd = {"shape": shape, "dia_mm": dia_mm, "len_mm": len_mm, "explicit": True}
     else:
         # no explicit dim → type default
         td = dict(TYPE_DEFAULTS_MM.get(shape, TYPE_DEFAULTS_MM["box"]))

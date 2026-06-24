@@ -8038,6 +8038,11 @@ async function main() {
           QUALITY_LOOP_DRAWING_DIRECTIVES: drawingGeneratorDirectivesBlock || '',
           QUALITY_LOOP_TOPOLOGY_DIRECTIVES: topologyDirectivesBlock || '',
           INSPECT: '0',
+          // The dossier embeds FOUR renders: 2 interior + 2 building-exterior. The exterior
+          // building shell is gated behind BLENDER_PLANT_SHELL so it only renders when asked;
+          // set it here so EVERY chain run produces out/<run>/exterior/ and the Excel image
+          // collector finds all four (Tristan 2026-06-24: "two internal + two external shots").
+          BLENDER_PLANT_SHELL: '1',
         },
       })
       console.log('[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)')
