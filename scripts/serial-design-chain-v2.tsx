@@ -3388,6 +3388,25 @@ async function main() {
 
   // Working brief for the rest of the chain
   const parsedResult = { ok: true, data: currentParsed }
+
+  // ── DESIGN-TO-TARGET SCALE OVERRIDE (#47, 2026-06-24) ────────────────────────────
+  // The design-to-target loop (scripts/design-to-target-run.ts) converges a REAL design onto a
+  // cost goal by re-running the chain at different output SCALES (the automated RAS-£5M iteration).
+  // It multiplies the briefed output target by DESIGN_TARGET_SCALE so the WHOLE design scales, then
+  // measures the real cost. Default 1 → exact no-op (a normal run is byte-identical). Applied here,
+  // after the brief settles + before the contract is built, so every downstream stage sees the
+  // scaled target.
+  {
+    const _ds = parseFloat(process.env.DESIGN_TARGET_SCALE || '1')
+    const _tp = (parsedResult.data as { constraints?: { target_performance?: { value?: number; unit?: string } } })?.constraints?.target_performance
+    if (isFinite(_ds) && _ds > 0 && Math.abs(_ds - 1) > 1e-6 && _tp && typeof _tp.value === 'number' && _tp.value > 0) {
+      const _before = _tp.value
+      _tp.value = _tp.value * _ds
+      console.error(`[chain] DESIGN_TARGET_SCALE=${_ds} → output target ${_before} → ${_tp.value} ${_tp.unit ?? ''} (design-to-target loop, #47)`)
+      logAction({ step: 'design_target_scale', scale: _ds, before: _before, after: _tp.value })
+    }
+  }
+
   const productClass = currentProductClass
   const classification = { productClass: currentProductClass, confidence: classificationOriginal.confidence }
 
