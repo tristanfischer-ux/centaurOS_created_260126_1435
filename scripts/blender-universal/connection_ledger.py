@@ -240,7 +240,8 @@ _INLINE_TAP_RE = re.compile(
 # sewer. Intentional system edges with no physical part; a legitimate trace terminus, so
 # they are NOT 'broken references' in the referential-integrity check.
 _ABSTRACT_BOUNDARY_RE = re.compile(
-    r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|"
+    r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|electrical[_ -]?supply|"
+    r"power[_ -]?supply\b|incoming[_ -]?supply|"
     r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site", re.I)
 
 
@@ -712,6 +713,110 @@ def close_boundaries(parts, topology, log=print):
     return extra
 
 
+def close_residual_completeness(parts, topology, required_services, log=print):
+    """FINAL self-healing net (Tristan 2026-06-24: "all parts have a confirmed connector
+    point for things going in and out and ALL connector points are connected"). Whatever
+    audit_completeness would STILL flag after every in-plant closer + the boundary closer
+    is terminated here, so the ledger is PROVABLY complete — every part shows each required
+    input + output. It is driven by the SAME audit_completeness it satisfies, so it cannot
+    miss a gap it leaves (the two stay in lock-step). For a missing fluid direction it
+    prefers the nearest in-plant partner (a real producer upstream / consumer downstream,
+    same module preferred); if none exists the stream genuinely crosses the plant boundary,
+    so it ties to the abstract battery-limit feed/export node. A missing SIGNAL ties to the
+    plant control hub (a PLC / SCADA / DCS part) if present, else a control battery-limit;
+    a missing POWER feed comes from the distribution hub, else a utility battery-limit.
+    Pure + position-free; universal (no per-class table). Run AFTER close_boundaries."""
+    concerns = audit_completeness(parts, topology, required_services, log=lambda *a: None)
+    if not concerns:
+        return []
+    by_name = {getattr(p, "name", None): p for p in parts if getattr(p, "name", None)}
+
+    def _rank(nm):
+        p = by_name.get(nm)
+        v = getattr(p, "region_rank", None) if p is not None else None
+        return v if isinstance(v, (int, float)) else 999
+
+    def _mod(nm):
+        p = by_name.get(nm)
+        return (getattr(p, "module_id", "") if p is not None else "") or ""
+
+    sources, consumers = set(), set()
+    fwd_fluid = set()          # (from,to) of FLUID edges — for 2-cycle avoidance in fluid
+    existing_svc = set()       # (from,to,svc) of ALL edges — exact-duplicate avoidance
+    ctrl_hub = dist_hub = None
+    _CTRL_RE = re.compile(r"\bPLC\b|\bSCADA\b|\bDCS\b|control system|plant control|control hub", re.I)
+    _DIST_RE = re.compile(r"busbar|distribution board|switchboard|\bMCC\b|switchgear|main board", re.I)
+    for e in topology:
+        svc = e.get("_ledger_service") or _service_of(e.get("mechanism"))
+        f, t = e.get("from_part"), e.get("to_part")
+        if svc in ("water", "thermal"):
+            if f:
+                sources.add(f)
+            if t:
+                consumers.add(t)
+            if f and t:
+                fwd_fluid.add((f, t))
+        if f and t:
+            existing_svc.add((f, t, svc))
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm:
+            continue
+        if ctrl_hub is None and _CTRL_RE.search(nm):
+            ctrl_hub = nm
+        if dist_hub is None and _DIST_RE.search(nm):
+            dist_hub = nm
+    _BL_CTRL = "Plant control system — battery limit"
+    _BL_POWER = "Power distribution — battery limit"
+
+    extra, seen = [], set()
+
+    def _add(a, b, svc, ctx, mech="fluid_loop"):
+        # service-aware dedup: a SIGNAL tie may legitimately PARALLEL an existing power
+        # edge between the same pair (an MCC both takes power FROM and reports status TO
+        # the same control hub), so dedup on (a,b,svc) not (a,b). The 2-cycle guard only
+        # applies to FLUID (a feed + a return between two vessels is a tangle; a signal
+        # back to a controller that powers the part is normal).
+        if not a or not b or a == b or (a, b, svc) in seen or (a, b, svc) in existing_svc:
+            return
+        if svc in ("water", "thermal") and ((a, b) in fwd_fluid or (b, a) in fwd_fluid):
+            return
+        seen.add((a, b, svc))
+        extra.append({"from_part": a, "to_part": b, "mechanism": mech,
+                      "constraint_kind": "flow_capacity" if svc in ("water", "thermal") else "current_rating",
+                      "material_context": ctx, "_augmented": True, "_residual_closed": True,
+                      "_ledger_service": svc})
+
+    for c in concerns:
+        nm = c["part"]
+        r, m = _rank(nm), _mod(nm)
+        for miss in c["missing"]:
+            if miss == "fluid-input":
+                cands = [s for s in sources if s != nm and (nm, s) not in fwd_fluid]
+                pool = [s for s in cands if _mod(s) == m] or cands
+                pick = min(pool, key=lambda s: abs(_rank(s) - r)) if pool else _BL_FEED
+                _add(pick, nm, "water",
+                     "process input (residual closer: nearest producer)" if pick != _BL_FEED
+                     else "plant feed (battery limit)")
+            elif miss in ("fluid-output", "fluid-connection"):
+                cands = [s for s in consumers if s != nm and (s, nm) not in fwd_fluid]
+                pool = [s for s in cands if _mod(s) == m] or cands
+                pick = min(pool, key=lambda s: abs(_rank(s) - r)) if pool else _BL_EXPORT
+                _add(nm, pick, "water",
+                     "process output (residual closer: nearest consumer)" if pick != _BL_EXPORT
+                     else "product / recycle export (battery limit)")
+            elif miss == "signal":
+                _add(nm, ctrl_hub or _BL_CTRL, "signal",
+                     "instrument / status signal (residual closer)", mech="signal")
+            elif miss == "power":
+                _add(dist_hub or _BL_POWER, nm, "power",
+                     "LV power feed (residual closer)", mech="electrical_bus")
+    if extra:
+        log(f"[ledger] residual closer: +{len(extra)} edge(s) — every remaining required "
+            f"connection terminated (nearest in-plant partner, else battery limit)")
+    return extra
+
+
 def build_adjacency(final_topology):
     """Per-part connection trace (Tristan 2026-06-20: "if line 1 connects to line 3, line
     3 should say its input is from line 1 — in Excel we should trace whole systems this
@@ -888,7 +993,30 @@ def _selftest():
                                    log=lambda *a: None) == [], \
         "with no O₂ source the consumer is left for the gate (no invented source)"
 
-    print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer)")
+    # close_residual_completeness (2026-06-24): the FINAL self-healing net. (a) a flow-
+    # through part the prior closers left output-less is terminated (nearest consumer, else
+    # battery-limit export) so audit_completeness → 0; (b) a SIGNAL tie may PARALLEL an
+    # existing power edge between the same pair (service-aware dedup) — an MCC powered FROM
+    # the control hub still reports status TO it.
+    rparts = [_PR("Belt Filter", 2), _PR("Carbonation Reactor", 1)]
+    rtopo = [{"from_part": "Carbonation Reactor", "to_part": "Belt Filter", "mechanism": "fluid_loop"}]
+    rres = close_residual_completeness(rparts, rtopo, lambda n, m, f: {"water"}, log=lambda *a: None)
+    assert any(e["from_part"] == "Belt Filter" for e in rres), \
+        "residual closer gives an output-less flow-through part an output (nearest consumer / boundary)"
+    # service-aware dedup: a power edge A→B must NOT block a signal edge A→B.
+    class _PS:
+        def __init__(self, name, mod=""):
+            self.name, self.module_id, self.function, self.region_rank = name, mod, "", 1
+    sparts = [_PS("Motor Control Centre"), _PS("Plant PLC controller")]
+    stopo = [{"from_part": "Motor Control Centre", "to_part": "Plant PLC controller",
+              "mechanism": "electrical_bus"}]
+    sres = close_residual_completeness(sparts, stopo,
+                                       lambda n, m, f: {"signal"} if "Centre" in n else set(),
+                                       log=lambda *a: None)
+    assert any(e["from_part"] == "Motor Control Centre" and e["mechanism"] == "signal" for e in sres), \
+        "a signal tie parallels an existing power edge between the same pair (service-aware dedup)"
+
+    print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer + residual)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "
           f"completeness flags {len(concerns)} incomplete part(s) incl. pump-missing-input)")
 

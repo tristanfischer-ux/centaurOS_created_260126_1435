@@ -6534,43 +6534,72 @@ def _endpoint_is_pure_instrument(name):
 _DIST_SOURCE_RE     = re.compile(
     r"(?:\b(?:diesel|standby|backup|emergency|power|electrical|engine)\s+)?\bgenerator\b(?!\s*set\s+for\s+steam)"
     r"|\bgenset\b|\bincomer\b|utility\s*(?:supply|incomer|connection)|\bgrid\b|\bmains\b"
-    r"|incoming\s*transformer|step[- ]?down\s*transformer",
+    r"|incoming\s*transformer",
     re.IGNORECASE)
 # a bare "generator" qualified by steam/heat/process words is a HEAT source, not power.
 _NOT_POWER_GENERATOR_RE = re.compile(
     r"steam|waste[- ]?heat|fired|furnace|boiler|process|heat[- ]?recovery|hrsg|reformer|syngas",
     re.IGNORECASE)
+# POWER / DISTRIBUTION transformer = a SERIES spine stage BETWEEN the incomer and the
+# board (MV/LV, HV/LV, step-up/down, distribution, isolation, dry-type, unit, auxiliary).
+# It is NOT an instrument transformer (CT / VT / PT) — those measure, they don't
+# distribute power; the negative guard drops them so a metering CT never grows a spine.
+# (2026-06-24 universal fix: a plant "distribution transformer" matched no role and got
+# wired as a LOAD off the board — MCC→transformer, backwards — so it read as a dead-end
+# with no downstream. It belongs IN the spine: incomer → transformer → board → loads.)
+_DIST_XFMR_RE       = re.compile(
+    r"distribution\s*transformer|power\s*transformer|\bMV\s*/?\s*LV\s*transformer\b|"
+    r"\bHV\s*/?\s*LV\s*transformer\b|\bLV\s*transformer\b|step[- ]?up\s*transformer|"
+    r"step[- ]?down\s*transformer|isolation\s*transformer|dry[- ]?type\s*transformer|"
+    r"auxiliary\s*transformer|unit\s*transformer|\btransformer\b",
+    re.IGNORECASE)
+_NOT_POWER_XFMR_RE  = re.compile(
+    r"current\s*transformer|\bCT\b|potential\s*transformer|voltage\s*transformer|"
+    r"instrument\s*transformer", re.IGNORECASE)
 _DIST_MAINBRK_RE    = re.compile(r"main\s*breaker|main\s*switch|main\s*isolat|incoming\s*breaker|\bACB\b|\bMCCB\b|main\s*circuit\s*breaker", re.IGNORECASE)
 _DIST_BUSBAR_RE     = re.compile(r"busbar|bus\s*bar|distribution\s*board|switchboard|main\s*board|\bMCC\b|consumer\s*unit|\bpanelboard\b|distribution\s*panel|switchgear|switch[- ]?gear|motor\s*control\s*cent|\bLV\s*board\b|\bMV\s*board\b|low[- ]?voltage\s*board|\bLV\s*panel\b|\bLV\s*switchboard\b|power\s*distribution\s*unit|\bPDU\b", re.IGNORECASE)
-_DIST_PROTECT_RE    = re.compile(r"\bfuse\b|surge|\bSPD\b|protective\s*relay|protection\s*relay|earth\s*leakage|\bRCD\b|\bRCBO\b|\bMCB\b", re.IGNORECASE)
+# a DOWNSTREAM / sub-distribution board (an MCC, a motor-control board, a sub-board, a
+# local/field panel) sits BELOW the main board in series — keyed so multiple boards
+# order main→sub instead of collapsing to one (the 2nd board used to orphan).
+_DIST_SUBBOARD_RE   = re.compile(r"\bMCC\b|motor\s*control\s*cent|motor\s*control\s*board|sub[- ]?board|sub[- ]?distribution|local\s*panel|field\s*panel", re.IGNORECASE)
+_DIST_PROTECT_RE    = re.compile(r"\bfuse\b|surge|\bSPD\b|protective\s*relay|protection\s*relay|safety\s*relay|earth\s*leakage|\bRCD\b|\bRCBO\b|\bMCB\b|motor[- ]?protection|\bMPCB\b", re.IGNORECASE)
 
 
 def _distribution_spine(parts):
     """Order the distribution-chain parts present into a SERIES electrical spine.
-    Returns (spine, load_hub, protects) where spine is an ordered list of part NAMES
-    [source, main_breaker, busbar] (only the stages actually present) and load_hub is
-    the bus the loads should tap (the busbar/board if present, else the last spine
-    stage, else None). Protective devices (fuse / surge / relay) are returned
-    separately as bus TAPS — they sit ON the bus, not in the series path. Each role is
-    filled by the FIRST matching part, most-specific role first so a 'main breaker'
-    never falls through to the broad source test. Pure, name-only, archetype-agnostic
-    — a class with none of these roles yields an empty spine (caller falls back)."""
-    src = brk = bus = None
-    protects = []
+    Returns (spine, load_hub, protects) where spine is the ORDERED list of part NAMES
+    incomer → SOURCE → TRANSFORMER → MAIN-BREAKER → BUSBAR(s, main→sub) (only the stages
+    actually present) and load_hub is the bus the loads should tap (the last/most-
+    downstream board, else the last spine stage, else None). Protective devices (fuse /
+    surge / protective-or-safety relay / motor-protection breaker) are returned
+    separately as bus TAPS — they sit ON the bus, not in the series path. MULTIPLE boards
+    chain in series (a main board → its MCC) rather than collapsing to one. Each scalar
+    role is filled by the FIRST matching part, most-specific role first so a 'main
+    breaker' never falls through to the broad source test. Pure, name-only, archetype-
+    agnostic — a class with none of these roles yields an empty spine (caller falls back)."""
+    src = xfmr = brk = None
+    buses_main: list[str] = []
+    buses_sub: list[str] = []
+    protects: list[str] = []
     for p in parts:
         nm = p.name or ""
-        # most-specific first (a 'main breaker'/'busbar' must not also match source)
+        # most-specific role first: main-breaker, then protective tap, then board, then
+        # transformer, then source. A protective device must not be claimed as a board
+        # (and vice-versa), so the protect test excludes board-named parts.
         if _DIST_MAINBRK_RE.search(nm) and brk is None:
             brk = nm
-        elif _DIST_BUSBAR_RE.search(nm) and bus is None:
-            bus = nm
-        elif _DIST_PROTECT_RE.search(nm):
+        elif _DIST_PROTECT_RE.search(nm) and not _DIST_BUSBAR_RE.search(nm):
             protects.append(nm)
+        elif _DIST_BUSBAR_RE.search(nm):
+            (buses_sub if _DIST_SUBBOARD_RE.search(nm) else buses_main).append(nm)
+        elif _DIST_XFMR_RE.search(nm) and not _NOT_POWER_XFMR_RE.search(nm) and xfmr is None:
+            xfmr = nm   # a power/distribution transformer is a series stage, not a load
         elif _DIST_SOURCE_RE.search(nm) and not _NOT_POWER_GENERATOR_RE.search(nm) \
                 and src is None:
             src = nm   # a STEAM/waste-heat/process generator is excluded — it's a heat source
-    spine = [s for s in (src, brk, bus) if s]
-    load_hub = bus or (spine[-1] if spine else None)
+    buses = buses_main + buses_sub          # main board(s) feed sub-boards (MCC) in series
+    spine = [s for s in (src, xfmr, brk, *buses) if s]
+    load_hub = buses[-1] if buses else (spine[-1] if spine else None)
     return spine, load_hub, protects
 
 
@@ -14002,6 +14031,12 @@ def main():
     # final boundary connector: sinks fed from their producer + discharged to disposal;
     # feed-stage/product units with no in-plant neighbour tied to the battery limit.
     _candidate = _candidate + cl.close_boundaries(parts, _candidate, log=lambda m: print(m))
+    # FINAL self-healing net — whatever the strict completeness audit would STILL flag is
+    # terminated to its nearest in-plant partner (else the battery limit), so EVERY part
+    # shows each required input + output and the ledger is provably complete. Driven by the
+    # same audit it satisfies (Tristan 2026-06-24: "all connector points are connected").
+    _candidate = _candidate + cl.close_residual_completeness(parts, _candidate,
+                                                             _required_services_wet, log=lambda m: print(m))
     topology, _ledger_dropped = cl.finalize_ledger(_candidate, parts, resolve_endpoint,
                                                    log=lambda m: print(m))
     # STRICT completeness gate — every part must SHOW its required input + output (Tristan

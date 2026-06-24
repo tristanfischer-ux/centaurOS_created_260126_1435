@@ -60,7 +60,8 @@ TYPE_EXPECTED = {
 }
 TYPE_RULES = [
     ("instrument", r"transmitter|analy[sz]er|\bprobe\b|sensor|\bgauge\b|level switch|"
-                   r"flow meter|detector|monitor"),
+                   r"flow meter|flowmeter|\bmeter\b|densit|turbidit|viscosit|coriolis|"
+                   r"mass flow|detector|monitor"),
     ("valve",      r"\bvalve\b|solenoid|actuator|damper"),
     ("control",    r"controller|gateway|\bI/O\b|network switch|power supply|scada|\bUPS\b|\bPLC\b"),
     ("electrical", r"transformer|switchgear|\bMCC\b|\bpanel\b|busbar|generator|genset|breaker|relay|\bATS\b|fuse|surge"),
@@ -117,6 +118,106 @@ def _norm(s: str) -> str:
     return re.sub(r"s\b", "", s)
 
 
+# ── CABINET GROUPING (universal, role-keyed — no per-class table) ─────────────────
+# Tristan 2026-06-24: "all sub systems that are small should be put into a cabinet" +
+# "create a deterministic check for all things going into the cabinets so we can see the
+# inputs and outputs and the connectors and that it all works". A real plant houses every
+# small electrical / control device inside an ENCLOSURE: a power board / MCC houses the
+# breakers / fuses / relays / drives; a control / marshalling cabinet houses the I/O cards
+# / PLC / network switch / gateway. We classify the enclosures by ROLE, then assign each
+# small device to the right enclosure (matching domain, same module preferred). Field
+# INSTRUMENTS (probes / transmitters / analysers / detectors) are NOT housed — they are
+# field-mounted and wire TO a cabinet, so they are never cabinet contents.
+_CABINET_POWER_RE = re.compile(
+    r"busbar|distribution\s*board|switchboard|motor\s*control\s*cent|\bMCC\b|switch[- ]?gear|"
+    r"\bLV\s*board\b|\bMV\s*board\b|panelboard|consumer\s*unit|\bPDU\b|distribution\s*panel|"
+    r"power\s*distribution\s*panel|drive\s*cabinet|\bVSD\b\s*cabinet", re.I)
+_CABINET_CTRL_RE = re.compile(
+    r"marshalling|control\s*cabinet|control\s*panel|\bDCS\b|\bPLC\b|\bHMI\b|junction\s*box|"
+    r"control\s*system|control\s*enclosure|instrument\s*panel|i/?o\s*rack|remote\s*i/?o|"
+    r"control[- ]?network", re.I)
+_HOUSED_POWER_RE = re.compile(
+    r"\bbreaker\b|\bfuse\b|surge|\bSPD\b|\brelay\b|\bMCB\b|\bMCCB\b|\bMPCB\b|\bRCD\b|\bRCBO\b|"
+    r"contactor|isolator|motor[- ]?protection|earth[- ]?leakage|\bVFD\b|variable[- ]?frequency|"
+    r"frequency\s*drive|soft[- ]?start|blower/centrifuge\s*VSD", re.I)
+_HOUSED_CTRL_RE = re.compile(
+    r"i/?o\s*card|i/?o\s*module|plc\s*module|gateway|network\s*switch|signal\s*conditioner|"
+    r"\bbarrier\b|marshalling\s*terminal|power\s*supply|\bPSU\b|interface\s*station", re.I)
+# a "remote I/O rack" / "remote I/O" is itself a small ENCLOSURE (it houses I/O cards) →
+# treat as a cabinet, not a housed device, so cabinet-match takes precedence below.
+
+
+def _build_cabinets(equipment: list, concern_tags: set) -> dict:
+    """Group small electrical/control devices into the enclosure that houses them and
+    return a deterministic cabinet schedule: for each cabinet, its housed CONTENTS with
+    each device's IN/OUT connectors + a connected verdict, and a cabinet-level all_connected
+    flag. `connected` reuses the SAME connectivity verdict the ledger computed (a device is
+    connected iff it is not in concern_tags), so the cabinet deck cannot disagree with the
+    connector audit. Universal — role vocabulary only."""
+    def _is_cab(e):
+        return (e.get("type") in ("electrical", "control")
+                and (_CABINET_POWER_RE.search(e["name"]) or _CABINET_CTRL_RE.search(e["name"])))
+
+    cabinets_eq = [e for e in equipment if _is_cab(e)]
+    cab_tags = {e["tag"] for e in cabinets_eq}
+
+    def _domain(e):
+        return "power" if _CABINET_POWER_RE.search(e["name"]) else "control"
+
+    # housed = a small power/control device that is NOT itself a cabinet/enclosure
+    housed = []
+    for e in equipment:
+        if e["tag"] in cab_tags or e.get("type") not in ("electrical", "control"):
+            continue
+        if _HOUSED_POWER_RE.search(e["name"]):
+            housed.append((e, "power"))
+        elif _HOUSED_CTRL_RE.search(e["name"]):
+            housed.append((e, "control"))
+
+    def _pick_cabinet(dev, dom):
+        same_dom = [c for c in cabinets_eq if _domain(c) == dom]
+        same_mod = [c for c in same_dom if c.get("module") and c.get("module") == dev.get("module")]
+        for pool in (same_mod, same_dom, cabinets_eq):
+            if pool:
+                return sorted(pool, key=lambda c: str(c["tag"]))[0]
+        return None
+
+    by_cab: dict = {e["tag"]: [] for e in cabinets_eq}
+    n_unassigned = 0
+    for dev, dom in housed:
+        cab = _pick_cabinet(dev, dom)
+        if cab is None:
+            n_unassigned += 1
+            continue
+        by_cab[cab["tag"]].append({
+            "tag": dev["tag"], "name": dev["name"], "type": dev["type"],
+            "function": dev.get("transformation", "—"),
+            "n_in": len(dev.get("inputs") or []), "n_out": len(dev.get("outputs") or []),
+            "inputs": (dev.get("inputs") or [])[:6], "outputs": (dev.get("outputs") or [])[:6],
+            "connected": dev["tag"] not in concern_tags})
+
+    cabinets = []
+    for cab in sorted(cabinets_eq, key=lambda c: str(c["tag"])):
+        contents = by_cab[cab["tag"]]
+        cab_connected = cab["tag"] not in concern_tags
+        all_conn = cab_connected and all(c["connected"] for c in contents)
+        cabinets.append({
+            "tag": cab["tag"], "name": cab["name"], "domain": _domain(cab),
+            "module": cab.get("module"), "connected": cab_connected,
+            "n_in": len(cab.get("inputs") or []), "n_out": len(cab.get("outputs") or []),
+            "inputs": (cab.get("inputs") or [])[:6], "outputs": (cab.get("outputs") or [])[:6],
+            "n_contents": len(contents), "contents": contents,
+            "all_connected": all_conn})
+    n_all_conn = sum(1 for c in cabinets if c["all_connected"])
+    return {
+        "n_cabinets": len(cabinets),
+        "n_housed": len(housed) - n_unassigned,
+        "n_unassigned": n_unassigned,
+        "n_cabinets_all_connected": n_all_conn,
+        "all_cabinets_proven": n_all_conn == len(cabinets) and n_unassigned == 0,
+        "cabinets": cabinets}
+
+
 def _classify(name: str, tag: str) -> str:
     blob = f"{name} {tag}".lower()
     for typ, rx in TYPE_RULES:
@@ -147,6 +248,16 @@ def main() -> int:
     state = _load(state_path) or {}
     manifest = _load(out_dir / "parts-manifest.json") or {}
     conn = _load(out_dir / "connection-schedule.json") or {}
+    # connection-ledger.json is the AUTHORITATIVE connection graph (every part→part tie:
+    # fluid, electrical, SIGNAL, air, oxygen, assembly) — the SAME graph Blender renders
+    # and the BoM costs. connection-schedule.json is only the SIZED cable/pipe runs (no
+    # signal ties, only a subset of electrical), so building connectivity from it alone
+    # manufactures false orphans for every instrument/controller (whose tie is a signal
+    # wire, never a sized power cable) and for distribution gear wired in the ledger but
+    # not the sizing schedule. We attach inputs/outputs from BOTH: the schedule gives the
+    # sized via + cost + drawing coverage; the ledger closes the connectivity graph.
+    # Universal — no per-class logic. (Tristan 2026-06-24: audit the graph that is real.)
+    cledger = _load(out_dir / "connection-ledger.json") or {}
     route = _load(out_dir / "route-manifest.json") or {}
     rb = state.get("requirementsBom") or []
 
@@ -386,6 +497,9 @@ def main() -> int:
     tagpair_to_lineno = {(_norm(str(l.get("from_tag", ""))), _norm(str(l.get("to_tag", "")))):
                          l.get("line_number") for l in route_lines if isinstance(l, dict)}
     connections = []
+    # ties already attached from the SIZED schedule, keyed (from_norm, to_norm, mech) so
+    # the authoritative-ledger pass below never double-lists the same physical run.
+    attached_pairs: set = set()
     for i, r in enumerate(rows):
         fr_key, to_key = _norm(str(r.get("from", ""))), _norm(str(r.get("to", "")))
         mech = r.get("mechanism", "")
@@ -421,6 +535,34 @@ def main() -> int:
             te["inputs"].append(f"{fn} ({(fe or {}).get('tag') or '?'}) via {via} [{mech}]")
         if fe:
             fe["outputs"].append(f"{tn} ({(te or {}).get('tag') or '?'}) via {via} [{mech}]")
+        if fe or te:
+            attached_pairs.add((fr_key, to_key, mech))
+
+    # ── 2b. AUTHORITATIVE LEDGER TIES — close the connectivity graph ──────────────────
+    # The sized schedule above carries only cables + pipes; the connection-ledger holds
+    # EVERY tie Blender drew (signal wires to the DCS, the full electrical spine, air /
+    # oxygen / assembly). Attach each ledger tie not already represented by a sized run so
+    # an instrument/controller shows its signal connector and distribution gear shows its
+    # power in+out. Same `via [mech]` idiom; coverage/cost stay schedule-driven. Universal.
+    cledger_rows = cledger.get("rows", []) if isinstance(cledger, dict) else []
+    n_ledger_attached = 0
+    for r in cledger_rows:
+        fr_key, to_key = _norm(str(r.get("from_part", ""))), _norm(str(r.get("to_part", "")))
+        mech = r.get("mechanism", "") or r.get("service", "")
+        if (fr_key, to_key, mech) in attached_pairs:
+            continue
+        fe, te = resolve(fr_key), resolve(to_key)
+        if not (fe or te):
+            continue
+        attached_pairs.add((fr_key, to_key, mech))
+        kind = MECH_KIND.get(mech, MECH_KIND.get(r.get("service", ""), "tie"))
+        fn = fe["name"] if fe else fr_key.title()
+        tn = te["name"] if te else to_key.title()
+        if te:
+            te["inputs"].append(f"{fn} ({(fe or {}).get('tag') or '?'}) via {kind} [{mech}]")
+        if fe:
+            fe["outputs"].append(f"{tn} ({(te or {}).get('tag') or '?'}) via {kind} [{mech}]")
+        n_ledger_attached += 1
 
     # ── reconciliations / summaries ──
     by_drawing = {}
@@ -474,6 +616,12 @@ def main() -> int:
     #   Legitimate end points — no output required, but SHOULD have input.
 
     ORIGIN_KEYWORDS = {"grid", "mains", "water supply", "water intake", "make-up water",
+                       # a make-up / dosing / day tank is fed by manual delivery (bagged
+                       # reagent, tanker) — a battery-limit ORIGIN with an OUTPUT only.
+                       # Aligns parts_ledger with connection_ledger._FLUID_ORIGIN_RE which
+                       # already exempts "make-up" (Tristan 2026-06-24: the two audits must
+                       # agree on what is a legitimate single-direction origin).
+                       "make-up", "makeup", "make up",
                        "feed", "food", "fuel", "air intake", "seawater", "freshwater",
                        "oxygen supply", "chemical supply", "intake",
                        # a stored-medium SUPPLY tank (LOX / bulk chemical / fuel storage)
@@ -515,7 +663,14 @@ def main() -> int:
         # genuinely disconnected part. Universal role keywords, no per-class table.
         "control valve", "solenoid", "diffuser", "filter screen", "drum filter screen",
         "feed storage", "feed distribution", "feed system", "grading", "harvest",
-        "mortality", "live-fish handling", "biosecurity"}
+        "mortality", "live-fish handling", "biosecurity",
+        # SAFETY-RELIEF devices are DEAD-LEG taps off a protected vessel discharging to
+        # atmosphere / flare / a header — NOT inline flow-through nodes. Like a buffer or
+        # a control valve they do not carry the process loop, so requiring each to have
+        # its own fluid in+out is a false orphan (the PSV on a reactor reads "no upstream"
+        # because the relief tap is not drawn as a process line). Universal role keywords.
+        "relief valve", "safety valve", "pressure-relief", "pressure relief", "psv",
+        "rupture disc", "bursting disc", "vacuum breaker", "breather valve", "vent valve"}
 
     connectivity_concerns = []
     origin_parts = []
@@ -637,7 +792,8 @@ def main() -> int:
             # required electrical role at all (a pure enclosure with no power feed) is
             # not a concern in either direction.
             is_terminal_elec = bool(re.search(
-                r"\bfuse\b|surge|\bSPD\b|protective relay|protection relay|"
+                r"\bfuse\b|surge|\bSPD\b|protective relay|protection relay|safety relay|"
+                r"motor[- ]?protection|\bMPCB\b|earth leakage|\bRCD\b|\bRCBO\b|\bMCB\b|"
                 r"cable tray|terminal block|enclosure|junction box|\bgland\b",
                 name_l, re.I))
             needs_in = not is_origin and not (is_terminal_elec and not has_any)
@@ -711,6 +867,10 @@ def main() -> int:
     # parts with NO tool provenance
     parts_without_tools = [e["tag"] for e in equipment if not e.get("tools")]
 
+    # ── CABINETS — house every small electrical/control device + prove its connectors ──
+    _concern_tags = {c["tag"] for c in connectivity_concerns}
+    cabinets = _build_cabinets(equipment, _concern_tags)
+
     report = dict(out_dir=str(out_dir), grand_total_gbp=round(grand), n_equipment=len(equipment),
                   n_connections=len(connections),
                   connections_gbp=round(sum(c["line_gbp"] or 0 for c in connections)),
@@ -735,7 +895,8 @@ def main() -> int:
                       n_instrument_associated=n_instrument_associated,
                       n_electrical_total=n_electrical_total,
                       n_electrical_connected=n_electrical_connected,
-                      n_orphans=len(orphans)))
+                      n_orphans=len(orphans)),
+                  cabinets=cabinets)
     (out_dir / "parts-ledger.json").write_text(json.dumps(report, indent=1))
 
     # ── printed ledger + coverage ──

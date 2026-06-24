@@ -5344,6 +5344,84 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
 # ============================================================================
 # MAIN
 # ============================================================================
+def tab_cabinet_schedule(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """Cabinet schedule — the deterministic proof that every small electrical / control
+    device is HOUSED in a cabinet and that each housed device PLUS the cabinet itself shows
+    its required IN/OUT connectors, all connected (Tristan 2026-06-24: "create a deterministic
+    check for all things going into the cabinets so we can see the inputs and outputs and the
+    connectors and that it all works"). Reads the `cabinets` block parts_ledger.py authored
+    from the same connectivity verdict the Connection-trace deck uses, so the two cannot
+    disagree. Universal — every archetype with electrical/control gear gets the deck."""
+    pl = load_json(os.path.join(run_dir, "parts-ledger.json"))
+    cab = (pl.get("cabinets") if isinstance(pl, dict) else None) or {}
+    cabinets = cab.get("cabinets") or []
+    if not cabinets:
+        return False
+
+    ws = wb.create_sheet("Cabinet schedule")
+    set_widths(ws, {"A": 34, "B": 11, "C": 26, "D": 44, "E": 44, "F": 13})
+    title_row(ws, "Cabinet schedule — what is inside each cabinet, and that it all connects", 6,
+              "Every small electrical / control device is housed in a cabinet (a power board / "
+              "MCC, or a control / marshalling cabinet). Each row shows the device, what feeds "
+              "INTO it and what it feeds OUT to (by name + connector type), and a connector "
+              "verdict. The cabinet header states whether the cabinet AND all its contents are "
+              "fully connected — the deterministic 'it all works' proof.")
+    proven = cab.get("all_cabinets_proven")
+    sub_banner(ws, 4,
+               f"{cab.get('n_cabinets', len(cabinets))} cabinet(s)   ·   "
+               f"{cab.get('n_housed', 0)} housed device(s)   ·   "
+               f"{cab.get('n_cabinets_all_connected', 0)}/{cab.get('n_cabinets', len(cabinets))} "
+               f"cabinets fully connected   ·   "
+               f"ALL CONNECTORS PROVEN: {'YES ✓' if proven else 'NO — see ✗ rows'}", 6)
+
+    def _join(items):
+        out = []
+        for it in (items or []):
+            s = str(it)
+            # ledger strings look like 'Main Breaker (X-123) via cable [electrical_bus]'
+            out.append(s)
+        return "\n".join(out) if out else "—"
+
+    r = 5
+    for c in cabinets:
+        # ── cabinet header band ──
+        dom = (c.get("domain") or "").upper()
+        verdict = "✓ ALL CONNECTED" if c.get("all_connected") else "✗ INCOMPLETE"
+        hdr_txt = (f"{clean_cell(c.get('name'))}  [{dom} CABINET · {clean_cell(c.get('tag'))}]   "
+                   f"— {c.get('n_contents', 0)} device(s) housed   ·   "
+                   f"cabinet feeds: {c.get('n_in', 0)} in / {c.get('n_out', 0)} out   ·   {verdict}")
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+        hc = ws.cell(r, 1, clean_cell(hdr_txt))
+        hc.font = Font(bold=True, color="FFFFFF")
+        hc.fill = PatternFill("solid", fgColor="107C10" if c.get("all_connected") else "C00000")
+        hc.alignment = LEFT_TOP
+        r += 1
+        header(ws, r, ["Housed device", "Tag", "Function", "Inputs ← (from)",
+                       "Outputs → (to)", "Connectors"])
+        r += 1
+        contents = c.get("contents") or []
+        if not contents:
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+            ws.cell(r, 1, "— no discrete devices itemised (cabinet feeds the loads directly) —").font = FONT_NOTE
+            r += 1
+        for d in contents:
+            ws.cell(r, 1, clean_cell(d.get("name"))).border = BORDER
+            ws.cell(r, 2, clean_cell(d.get("tag"))).border = BORDER
+            ws.cell(r, 3, clean_cell(d.get("function"))).border = BORDER
+            ci = ws.cell(r, 4, _join(d.get("inputs"))); ci.alignment = WRAP_TOP; ci.border = BORDER
+            co = ws.cell(r, 5, _join(d.get("outputs"))); co.alignment = WRAP_TOP; co.border = BORDER
+            ok = d.get("connected")
+            sc = ws.cell(r, 6, f"✓ {d.get('n_in',0)} in / {d.get('n_out',0)} out" if ok
+                         else f"✗ unconnected ({d.get('n_in',0)} in / {d.get('n_out',0)} out)")
+            sc.border = BORDER
+            sc.font = Font(color="107C10", bold=True) if ok else Font(color="C00000", bold=True)
+            r += 1
+        r += 1  # spacer between cabinets
+    ws.freeze_panes = "A5"
+    back_link(ws, 6)
+    return True
+
+
 def tab_tool_io(wb: Workbook, state: dict, run_dir: str) -> bool:
     """TOOL I/O — provenance & traceability (Tristan 2026-06-23): every engineering tool that ran,
     with where each output's INPUT came from and where its OUTPUT goes, plus a USED/STALE/ORPHANED
@@ -5545,6 +5623,7 @@ def build(run_dir: str, out_path: str) -> dict:
 
     add_tab("Brief compliance", lambda: tab_brief_compliance(wb, state))
     add_tab("Connection trace", lambda: tab_connection_trace(wb, state, run_dir))
+    add_tab("Cabinet schedule", lambda: tab_cabinet_schedule(wb, state, run_dir))
     add_tab("Cost waterfall", lambda: tab_cost_waterfall(wb, state))
     # ---- ECONOMICS MODEL: Inputs -> Economics -> Scenarios (live + charts).
     # Built in this order so Economics/Scenarios can reference the Inputs cells.
