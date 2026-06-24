@@ -50,7 +50,13 @@
  *   }
  */
 
-import { getClassStandards, type RegulatoryStandard, type Jurisdiction } from '../class-standards'
+import { type RegulatoryStandard, type Jurisdiction } from '../class-standards'
+// DB-first overlay for per-class standards. Behind env STANDARDS_DB_LIVE (default
+// OFF). When OFF it returns the baked getClassStandards() result UNCHANGED, so this
+// is a zero-behaviour-change swap until the flag is explicitly enabled. When ON it
+// fills the §Compliance section for UNSEEN archetypes from the
+// pretraining_extracted_standards corpus (the read-slice of ForgeOS strengthening #2).
+import { getClassStandardsDBFirst as getClassStandards } from '../lib/knowledge/class-standards-db'
 
 export type ComplianceVerdict = 'PASS' | 'WARN' | 'HALT'
 
