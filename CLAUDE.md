@@ -6,6 +6,20 @@
 
 ---
 
+## ⭐ CORE FIX PRINCIPLE — fix the SOURCE rule, never the symptom (Tristan 2026-06-24, MANDATORY)
+
+**The engine is DETERMINISTIC, so it never "slips" — every wrong output is the product of a wrong RULE.** There is no legitimate per-instance "data" bug: a wrong part, price, or size is always a *rule* that is wrong for that whole class of input. Therefore:
+
+1. **Fix the RULE in code, not the data point.** A patch that corrects *this run's* output (e.g. re-spec one part, override one price) is a BAND-AID — the bad rule survives and reproduces the error next run. This explicitly REJECTS the "re-spec the part in-run" model (the physics-critic-autocorrect pattern) as the design target. Trace the divergence to the source function and fix the function.
+
+2. **Every fix is UNIVERSAL.** No per-class / per-part special-casing. Keyed off a noun/unit/provenance signal, never a hardcoded class table. (A line matching nothing must be untouched — the CO₂/SAF byte-identity guarantee.)
+
+3. **Every fix carries a regression GUARD** (an invariant / `--selftest` assertion) so the fixed rule *cannot* regress. This is what makes the problem count fall **monotonically** over time — the self-correcting AIM.
+
+4. **Route by provenance.** Every BoM line records WHICH rule produced it in its `basis` string. The benchmark net (gate 36) maps `basis` → source rule via `sourceRuleForBasis()` / `routeFaults()` (`scripts/lib/benchmark-expectation.ts`) and writes `benchmark-punchlist.md` grouped by source function — so "find the source" is a lookup, not a hunt. The loop: **net flags → route to source rule → fix the rule + add a guard → re-run → the net re-checks.** Worked examples (all this pattern): the 8 BESS fixes 2026-06-24 (capacity→m³, flow-read-as-kW, busbar floor, corpus-lift class-mismatch, micro-commodity band) — each a source-rule fix in `requirements_bom.py` with a `--selftest` assertion.
+
+---
+
 ## STOP HUNTING — read these BEFORE searching the filesystem
 
 **API keys** → [`./API_KEYS.md`](./API_KEYS.md). ~30 services, ~150 keys, 15 file locations. Check first; if it's wrong, fix it before moving on.
