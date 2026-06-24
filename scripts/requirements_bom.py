@@ -548,6 +548,20 @@ def _price_floor_for(name: str, md=None):
     The duty terms read the line's `rating_primary` kW via `md` (optional — a None
     `md`, or a rating that is not kW, falls back to the flat floor)."""
     nm = name or ""
+    # PACK-INTERNAL MICRO-COMMODITY guard (2026-06-24): a cell-to-cell busbar, cell link,
+    # tap/sense wire, cell interconnect bar or insulation pad is a stamped/wire part bought
+    # in the THOUSANDS at pennies each — NOT the switchboard busbar / relay the electrical
+    # floors below target. The £120 distribution-busbar floor was overriding the cell-to-cell
+    # busbar's correct £0.40 estimate → £120 × 3,735 = £448k. These carry a real catalogue/
+    # estimate price already, so they take NO floor. Universal (no class table); a genuine
+    # distribution busbar / switchboard part has no "cell"/"tap"/"interconnect" qualifier.
+    if re.search(r"cell[\s_-]*to[\s_-]*cell|\bcell\b[\w\s_-]*(?:busbar|bus[\s_-]?bar|link|tap|"
+                 r"sense|interconnect|insulation[\s_-]*pad)|tap[\s_-]*(?:wire|lead)|"
+                 r"sense[\s_-]*(?:wire|lead)|insulation[\s_-]*pad|interconnect[\s_-]*(?:bar|link)",
+                 nm, re.I):
+        # a tiny but non-ZERO minimum (a stamped strip / hookup wire / thermal pad is a few
+        # £ in bulk, never the £120 switchgear floor and never £0) — keeps the line credible.
+        return 3.0
     kw = None
     if isinstance(md, dict):
         kw_val, is_kva = _rating_kw(md, nm)
@@ -1806,6 +1820,16 @@ def _selftest() -> int:
     for nm in ("Distillation Column", "Buffer Vessel", "Rearing Tank", "Fischer-Tropsch Reactor"):
         if _price_floor_for(nm, {}) is not None:
             print(f"  FAIL process-vessel {nm!r} wrongly floored (£{_price_floor_for(nm, {})})"); bad += 1
+    # (d2) PACK-INTERNAL MICRO-COMMODITY guard (2026-06-24): a cell-to-cell busbar / cell tap
+    # wire / cell insulation pad takes the tiny £3 micro floor, NOT the £120 switchgear
+    # busbar floor (×3,735 = £448k). A genuine distribution / DC busbar still gets £120.
+    for nm in ("cell-to-cell busbar", "cell voltage tap wire", "cell insulation pad",
+               "cell interconnect bar", "module sense wire"):
+        if _price_floor_for(nm, {}) != 3.0:
+            print(f"  FAIL micro-commodity {nm!r} not £3 floor (got {_price_floor_for(nm, {})})"); bad += 1
+    for nm in ("DC busbar 800 V", "distribution busbar", "main switchboard busbar"):
+        if _price_floor_for(nm, {}) != 120.0:
+            print(f"  FAIL distribution busbar {nm!r} lost its £120 floor (got {_price_floor_for(nm, {})})"); bad += 1
     # (e) duty-scaled floor tiers
     if not (_duty_scaled_floor(3) == 1500.0 and _duty_scaled_floor(30) == 15000.0
             and _duty_scaled_floor(100) == 300000.0 and _duty_scaled_floor(None) is None):
