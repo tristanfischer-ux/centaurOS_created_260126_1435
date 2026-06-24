@@ -255,7 +255,9 @@ function collectBomPriceLines(state: any): BomPriceLine[] {
 
 export type PricePlausibilitySeverity = 'HIGH' | 'MEDIUM' | 'LOW' | 'PASS'
 
-function classifySeverity(ratio: number): PricePlausibilitySeverity {
+// exported so the gate-registry prove-the-catch test can drive the gate's entire severity
+// decision (a 10x over-bill / a 0.01x under-bill → HIGH) without a forge-truth.db price fixture.
+export function classifySeverity(ratio: number): PricePlausibilitySeverity {
   // Ratio = bom_unit_price / distributor_best
   // > 5 or < 0.2: massive error in either direction → HIGH
   if (ratio > 5 || ratio < 0.2) return 'HIGH'

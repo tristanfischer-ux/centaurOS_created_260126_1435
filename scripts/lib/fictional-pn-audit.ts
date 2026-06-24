@@ -99,7 +99,9 @@ const COMMODITY_SKIP_REGEX = /^(?:M\d{1,2}(?:\.\d)?\s*(?:x\s*\d+)?|generic|stand
 // more alphanumerics. This is the shape of most manufacturer part numbers
 // (e.g. "STM32H743ZIT6", "C310-1500V", "170M6810", "ABCD-1234-5X").
 // Parts matching this regex AND not found in any distributor are HIGH.
-const STRUCTURED_PN_REGEX = /^[A-Z0-9]{3,}[-_/][A-Z0-9]{1,}(?:[-_/][A-Z0-9]{1,})*$/
+// exported so the gate-registry prove-the-catch test can drive the structured-MPN decision
+// (a hallucinated structured PN is HIGH when no distributor has it) without a forge-truth.db fixture.
+export const STRUCTURED_PN_REGEX = /^[A-Z0-9]{3,}[-_/][A-Z0-9]{1,}(?:[-_/][A-Z0-9]{1,})*$/
 
 // Short alphanumeric (3-4 chars) — too ambiguous for a distributor search to
 // return a meaningful miss. LOW severity.

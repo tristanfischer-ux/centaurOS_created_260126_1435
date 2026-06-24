@@ -116,15 +116,15 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+# fitz (PyMuPDF) is needed ONLY to extract spans from a real PDF. Import it LAZILY so the pure
+# overlap-decision functions (pair_overlap / detect_overlaps / Overlap.severity) and --selftest
+# run without it (gate 11 prove-the-catch). The PDF path errors at use-time if fitz is absent.
 try:
     import fitz  # PyMuPDF
+    _HAVE_FITZ = True
 except ImportError:
-    print(
-        '[audit-pdf-layout] ERROR: PyMuPDF (fitz) not installed. '
-        'Run: pip3 install PyMuPDF',
-        file=sys.stderr,
-    )
-    sys.exit(2)
+    fitz = None  # type: ignore
+    _HAVE_FITZ = False
 
 
 X_OVERLAP_FRAC = 0.50
@@ -265,6 +265,9 @@ class ColumnOverflow:
 
 def extract_spans(pdf_path: Path) -> list[Span]:
     """Walk every page, collect every non-empty text span with its bbox."""
+    if not _HAVE_FITZ:
+        print('[audit-pdf-layout] ERROR: PyMuPDF (fitz) not installed. Run: pip3 install PyMuPDF', file=sys.stderr)
+        sys.exit(2)
     spans: list[Span] = []
     doc = fitz.open(str(pdf_path))
     try:
@@ -716,8 +719,30 @@ def write_report(
     return report_path
 
 
+def _selftest() -> int:
+    """PROVE-THE-CATCH (gate 11): the pure overlap decision must FIRE on two text spans stacked
+    at the same X+Y (a real layout smear), and NOT fire on cleanly separated spans. No PDF/fitz."""
+    bad = 0
+    a = Span(24, 'Discharge rate 2C continuous', 72.0, 300.0, 320.0, 312.0, 'Helvetica')
+    b = Span(24, 'Nominal voltage 800 V DC bus', 74.0, 301.0, 322.0, 311.0, 'Helvetica')
+    ov = pair_overlap(a, b)
+    if ov is None or ov.severity != 'HIGH':
+        print(f'  FAIL: stacked spans not flagged HIGH (got {ov and ov.severity})'); bad += 1
+    if not detect_overlaps([a, b]):
+        print('  FAIL: detect_overlaps found no overlap on a real smear'); bad += 1
+    # negative control: side-by-side columns (same Y, far apart in X) must NOT flag
+    c = Span(24, 'Left column header', 72.0, 300.0, 200.0, 312.0, 'Helvetica')
+    d = Span(24, 'Right column header', 400.0, 300.0, 520.0, 312.0, 'Helvetica')
+    if pair_overlap(c, d) is not None:
+        print('  FAIL: side-by-side columns wrongly flagged as overlap'); bad += 1
+    print('audit-pdf-layout selftest: OK' if bad == 0 else f'audit-pdf-layout selftest: {bad} FAIL')
+    return 1 if bad else 0
+
+
 def main() -> int:
     args = sys.argv[1:]
+    if '--selftest' in args:
+        return _selftest()
     if len(args) != 1:
         print(
             'Usage: python3 scripts/audit-pdf-layout.py <pdf-path>',

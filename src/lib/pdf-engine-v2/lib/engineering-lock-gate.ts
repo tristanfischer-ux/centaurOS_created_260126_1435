@@ -74,6 +74,25 @@ export const HARD_REQUIRED_SLOTS: Record<string, string[]> = {
   // The gate runs a soft fill pass for all classes regardless.
 }
 
+/**
+ * Pure HARD-slot check (the core of gate 22's Phase 3): the HARD_REQUIRED_SLOTS for the class
+ * that are absent / null / 0 / empty in the quantities. exit_code_22 = (this is non-empty after
+ * the DB+web fill). Exported so the gate-registry prove-the-catch test drives the REAL decision
+ * (a contract missing cell_count for a BESS → ['cell_count']) synchronously, no DB needed.
+ */
+export function missingHardSlots(productClass: string, quantities: Record<string, any>): string[] {
+  const cls = (productClass ?? '').toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  const hardRequired = HARD_REQUIRED_SLOTS[cls] ?? []
+  const q = quantities ?? {}
+  const miss: string[] = []
+  for (const slot of hardRequired) {
+    const qty = q[slot]
+    const val = typeof qty === 'object' ? (qty as any)?.value : qty
+    if (val === undefined || val === null || val === 0 || val === '') miss.push(slot)
+  }
+  return miss
+}
+
 // ── Jurisdiction → mandatory standards ──────────────────────────────────────
 // Minimal set — enough to validate the BESS class on first smoke run.
 const JURISDICTION_MANDATORY_STANDARDS: Record<string, string[]> = {
@@ -283,13 +302,7 @@ export async function lockEngineering(
   } catch { /* non-fatal */ }
 
   // ── Phase 3: HARD-required slot check ─────────────────────────────────
-  for (const slot of hardRequired) {
-    const qty = contract.quantities[slot]
-    const val = typeof qty === 'object' ? (qty as any)?.value : qty
-    if (val === undefined || val === null || val === 0 || val === '') {
-      result.hard_miss_slots.push(slot)
-    }
-  }
+  result.hard_miss_slots.push(...missingHardSlots(productClass, contract.quantities))
 
   if (result.hard_miss_slots.length > 0) {
     result.exit_code_22 = true
