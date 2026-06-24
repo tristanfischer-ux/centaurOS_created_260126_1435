@@ -2880,7 +2880,7 @@ _PLANT_FLOW_TRAIN_REGIONS = None
 # normal process-plant layout (every non-containerised class is completely unaffected).
 _CONTAINER_ENVELOPE_MM = None       # {'l':.., 'w':.., 'h':..} container INTERNAL dims (mm)
 _CONTAINER_LAYOUT = False           # True → force the container flat-pack layout
-_CONTAINER_ASPECT_MIN = 3.0         # length/width ≥ 3 ⇒ a container/skid, not a building pad
+_CONTAINER_ASPECT_MIN = 2.2         # length/width ≥ 2.2 ⇒ a container (20-ft=2.48, 40-ft=5.0), not a building pad
 _CONTAINER_WALL_MARGIN_MM = 250     # clearance from the container internal wall to equipment
 
 
@@ -14162,13 +14162,22 @@ def main():
     try:
         _dims = ((state.get("parsedBrief") or {}).get("constraints") or {}).get("max_dimensions_mm") or {}
         _w, _d = float(_dims.get("w") or 0), float(_dims.get("d") or 0)
+        # a contract container_payload_rating_kg is emitted ONLY for containerised classes — a
+        # strong, aspect-independent "this IS a container" signal (2026-06-24: a 20-ft ISO is
+        # 6.06×2.44 m = aspect 2.48, which missed the old 3.0 threshold → square fallback that
+        # didn't fit. A 40-ft is 5.0.) So trigger when EITHER the payload rating is present OR
+        # the envelope is long-thin (aspect ≥ 2.2, which now covers a 20-ft).
+        _q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+        _payload = _q.get("container_payload_rating_kg")
+        _has_payload = (_payload.get("value") if isinstance(_payload, dict) else _payload) not in (None, 0, "")
         if _w > 0 and _d > 0:
             _long, _short = max(_w, _d), min(_w, _d)
-            if _short > 0 and _long / _short >= _CONTAINER_ASPECT_MIN:
+            _aspect = _long / _short if _short > 0 else 0
+            if _short > 0 and (_has_payload or _aspect >= _CONTAINER_ASPECT_MIN):
                 _CONTAINER_LAYOUT = True
                 _CONTAINER_ENVELOPE_MM = {"l": _long, "w": _short, "h": float(_dims.get("h") or 0)}
                 print(f"[univ] containerised layout: enclosure {_long/1000:.2f} × {_short/1000:.2f} m "
-                      f"(aspect {_long/_short:.1f}) → flat-pack equipment into the container footprint")
+                      f"(aspect {_aspect:.1f}{', payload-rated' if _has_payload else ''}) → flat-pack equipment into the container footprint")
     except (TypeError, ValueError):
         pass
 
