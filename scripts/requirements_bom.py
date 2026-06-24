@@ -489,6 +489,33 @@ def _pack_micro_band(name: str):
         return (_PACK_MICRO_WIRE_FLOOR_GBP, _PACK_MICRO_WIRE_CEILING_GBP)
     return (_PACK_MICRO_METAL_FLOOR_GBP, _PACK_MICRO_METAL_CEILING_GBP)
 
+
+# BATTERY CELL energy-pricing (2026-06-24, BESS benchmark-net): the LFP cell is the DOMINANT cost
+# of a BESS (~55% of the battery-only system) but rendered at £0 — the catalogue cascade misses
+# the cell MPN and nothing fell back. Price it from its ENERGY: capacity(Ah) × voltage(V) × £/kWh
+# at the CELL level (~£45/kWh = ~55% of the ~£80/kWh battery-system price, 2026 CATL/EVE class).
+# Universal across chemistries (LFP/NMC/NCA/Na-ion), no per-part table.
+CELL_GBP_PER_KWH = 45.0
+_BATTERY_CELL_RE = re.compile(
+    r"\b(?:lfp|nmc|nca|lto|li[\s_-]?ion|lithium|sodium[\s_-]?ion|prismatic|pouch|cylindrical)\b"
+    r"[\w\s_-]*\bcell\b|\bbattery\b[\w\s_-]*\bcell\b", re.I)
+_NON_BATTERY_CELL_RE = re.compile(r"fuel[\s_-]?cell|load[\s_-]?cell|solar[\s_-]?cell|photovoltaic|pv[\s_-]?cell", re.I)
+
+def _battery_cell_price(name: str, md: dict):
+    """A battery CELL priced from its ENERGY (Ah × V × £/kWh_cell), else None. Returns None for a
+    non-battery 'cell' (fuel/load/solar) or a cell with no usable Ah. Voltage from the dimension
+    modifier ('3.2 V'); defaults to 3.2 V (LFP nominal). Universal."""
+    nm = name or ""
+    if _NON_BATTERY_CELL_RE.search(nm) or not _BATTERY_CELL_RE.search(nm):
+        return None
+    cap_ah = _num((md or {}).get("capacity"))
+    if not cap_ah or cap_ah <= 0:
+        return None
+    mv = re.search(r"([\d.]+)\s*v\b", str((md or {}).get("dimension") or ""), re.I)
+    volt = float(mv.group(1)) if mv else 3.2
+    kwh = cap_ah * volt / 1000.0
+    return round(kwh * CELL_GBP_PER_KWH, 2) if kwh > 0 else None
+
 _MIN_PRICE_FLOORS = [
     (re.compile(r"main[_ ]?breaker|\bmccb\b|moulded[_ ]?case|air[_ ]?circuit", re.I), 180.0),
     (re.compile(r"\bbreaker\b|\bmcb\b|circuit[_ ]?breaker", re.I), 45.0),
@@ -1894,6 +1921,16 @@ def _selftest() -> int:
         print(f"  FAIL wire/pad band (got {_pack_micro_band('cell voltage tap wire')})"); bad += 1
     if _pack_micro_band("cell-to-cell busbar") != (2.0, 15.0):
         print(f"  FAIL metal-bar band (got {_pack_micro_band('cell-to-cell busbar')})"); bad += 1
+    # (d3) BATTERY CELL energy-pricing (2026-06-24): an LFP prismatic cell (280 Ah, 3.2 V) is
+    # priced 0.896 kWh × £45/kWh = £40.32 — never £0 (the dominant BESS cost). A non-battery
+    # 'cell' (fuel/load/solar) is NOT energy-priced; a cell with no Ah returns None.
+    _cellp = _battery_cell_price("LFP prismatic cell", {"capacity": "280", "dimension": "3.2 V"})
+    if _cellp is None or abs(_cellp - 40.32) > 0.5:
+        print(f"  FAIL LFP cell energy price (got {_cellp}, want ~£40.32)"); bad += 1
+    if _battery_cell_price("hydrogen fuel cell stack", {"capacity": "280"}) is not None:
+        print("  FAIL non-battery 'fuel cell' wrongly energy-priced"); bad += 1
+    if _battery_cell_price("LFP prismatic cell", {}) is not None:
+        print("  FAIL cell with no Ah should return None"); bad += 1
     if _pack_micro_band("DC busbar 800 V") is not None:
         print("  FAIL distribution busbar wrongly matched the micro band"); bad += 1
     for nm in ("DC busbar 800 V", "distribution busbar", "main switchboard busbar"):
@@ -2898,6 +2935,18 @@ def assemble(out_dir: str):
                 elif pn and not _TBD_RE.search(pn):
                     status, part = "IDENTIFIED", f"{mfr} {pn}".strip()
                     gbp, basis = price.get(wid, 0.0), "catalogue"
+                    # BATTERY CELL — the DOMINANT BESS cost. ALWAYS price from its ENERGY (the
+                    # grounded, commoditised truth: Ah × V × £/kWh_cell); a catalogue/list stamp
+                    # for a cell is an unreliable LLM estimate (rendered £0 here, £100 there for the
+                    # same £40 cell). A real distributor hit (gate-21 below) can still override.
+                    _cell = _battery_cell_price(name, md)
+                    if _cell and _cell > 0:
+                        _ah = _num(md.get("capacity"))
+                        gbp, basis = _cell, f"battery cell · £{_cell:.2f}/cell from {_ah:.0f} Ah × cell V × £{CELL_GBP_PER_KWH:.0f}/kWh"
+                    elif gbp <= 0:
+                        _lp = _num(md.get("list_price_gbp"))
+                        if _lp and _lp > 0:
+                            gbp, basis = _lp, "catalogue · manufacturer list price"
                     # GATE-21 PRICE FEEDBACK (council 2026-06-16): when the cheapest
                     # real distributor price diverges > 5× from the rendered estimate,
                     # prefer the distributor price (TI TMP451 £900→£1.40 class).
