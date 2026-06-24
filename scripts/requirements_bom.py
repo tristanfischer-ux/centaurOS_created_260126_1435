@@ -738,7 +738,14 @@ _COMMODITY_NOUN_RE = re.compile(
     r"\bfuse\b|fuse[_ -]?holder|\bled\b|\bdiode\b|\bresistor\b|\bcapacitor\b|"
     r"pressure[_ -]?switch|differential[_ -]?pressure|\bdp[_ -]?switch\b|limit[_ -]?switch|"
     r"push[_ -]?button|indicator[_ -]?light|\brelay\b|\bgateway\b|network[_ -]?switch|"
-    r"signal[_ -]?conditioner|i/?o[_ -]?module|terminal\b",
+    r"signal[_ -]?conditioner|i/?o[_ -]?module|terminal\b|"
+    # Per-cell / per-module electrical COMMODITY sub-components (Tristan 2026-06-24, UNIVERSAL):
+    # a cell-to-cell busbar, tap/sense wire, insulation pad, cell link, lug or ferrule is a tiny
+    # high-quantity commodity (~£1–20), NOT a principal. Without these a BESS cell busbar was
+    # corpus-lifted £120→£452 (corpus median £585 is for LARGE power-distribution busbars) — a
+    # ~90× over-bill across 3,735 units. Same family as the instrument material-take-off bug.
+    r"bus[_ -]?bar|busbar|tap[_ -]?(?:wire|lead)|voltage[_ -]?tap|sense[_ -]?(?:wire|lead)|"
+    r"insulation[_ -]?pad|cell[_ -]?link|interconnect[_ -]?(?:bar|link)|\blug\b|\bferrule\b",
     re.I)
 # A structured part number: alphanumeric with a separator OR a long alphanumeric
 # run (looks like a real SKU), ≥5 chars — the same shape gate-20 uses. A bare
@@ -2998,6 +3005,13 @@ def assemble(out_dir: str):
         req_lead = str(row.get("requirement", "")).split("·")[0]
         if _CORPUS_LIFT_SKIP_RE.search(req_lead):
             continue          # length-priced run — owned by _connection_rows, never lift
+        if _COMMODITY_NOUN_RE.search(req_lead):
+            # COMMODITY sub-component (busbar / tap-wire / cable / fuse / lug …): never corpus-lift.
+            # The corpus median for a commodity NOUN is dominated by larger / bespoke variants, so a
+            # lift over-bills the small per-cell part (the BESS busbar £120→£452 bug). Principals —
+            # which the lift is FOR — never match this regex, so legitimate under-priced principals
+            # (the Degasser £4,946 vs £65k median case) are unaffected. (Tristan 2026-06-24, UNIVERSAL.)
+            continue
         nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
         pv = pv_by_name.get(nmk)
         res = _corpus_median_lift(u, pv) if pv else None
