@@ -426,16 +426,19 @@ function rendererWouldEmitMassRow(state: any): boolean {
 }
 
 function rendererWouldEmitMetricRow(state: any, metricKey: string): boolean {
-  // 2026-05-30 universal completeness pass: _buildComplianceRows now emits a
-  // row for EVERY brief metric — a real PASS/FAIL row when METRIC_MAP knows the
-  // key AND the mapped quantity is present, otherwise an informational row
-  // (target + universally-resolved-or-"—" achieved). So no brief metric is ever
-  // silently absent from the rendered table; the row is always present. The
-  // KNOWN_METRIC_MAP mirror is retained only for the I12b keyset-sync invariant
-  // and to identify which metrics get a *real audited* (vs informational) row.
-  // A metric with a curated mapping + present quantity still renders the richer
-  // audited row; everything else renders the informational fallback. Either
-  // way the constraint is VISIBLE, which is what gate 17 checks.
+  // 2026-05-30 universal completeness pass: _buildComplianceRows emits a row for EVERY brief
+  // metric — a real PASS/FAIL row when METRIC_MAP knows the key AND the mapped quantity is
+  // present, otherwise an informational row (target + universally-resolved-or-"—" achieved). So
+  // no brief metric is ever silently absent from the rendered table → gate 17's metric-completeness
+  // intent is satisfied by a RENDERER INVARIANT, not by this gate.
+  //
+  // GATE-INTENT GUARD (Tristan 2026-06-24): this `return true` is NOT a blind trust of a comment —
+  // the renderer invariant it relies on is TESTED by the harness invariant
+  // `UNIVERSAL.renderer_emits_compliance_row_for_every_brief_metric` (regression-harness.tsx), which
+  // drives a mapped AND a deliberately UNMAPPED brief metric through the real _buildComplianceRows
+  // and asserts BOTH get a row. If a future renderer change re-drops an unmapped metric (the
+  // original L22 namesake bug), that harness invariant FAILS — so the property stays guarded even
+  // though this gate's metric-path is (correctly) a no-op while the renderer holds the invariant.
   void state
   void metricKey
   return true

@@ -2843,6 +2843,41 @@ function checkCo2FixInvariants(): Assertion[] {
     ))
   }
 
+  // GATE-17 INTENT GUARD (Tristan 2026-06-24): gate 17's rendererWouldEmitMetricRow returns true
+  // because the renderer's _buildComplianceRows emits a row for EVERY brief metric — mapped OR not.
+  // That `return true` is honest ONLY while this invariant holds. Drive a MAPPED metric AND a
+  // deliberately UNMAPPED one (no METRIC_MAP entry) through the real renderer and assert BOTH get a
+  // row. If a future renderer change re-drops an unmapped metric (the original L22 namesake bug —
+  // a constraint silently absent from the compliance table), THIS fails — so gate 17 is no longer
+  // blind to its own failure mode; the guard just lives on the renderer property, not in the gate.
+  {
+    const bad: string[] = []
+    const synth: any = {
+      moduleDecomposition: { product_class: 'bess' },
+      parsedBrief: { product_class: 'bess', constraints: { target_performance: { metrics: [
+        { key_metric: 'usable_energy_mwh', value: 3.5, unit: 'MWh', category: 'scale' },     // mapped
+        { key_metric: 'zorblax_flux_qq', value: 42, unit: 'qq', category: 'scale' },          // deliberately UNMAPPED
+      ] } } },
+      orchestratorContract: { quantities: {} },
+    }
+    try {
+      const rows = _buildComplianceRows(synth, null, null)
+      const blob = JSON.stringify(rows).toLowerCase()
+      const mappedHasRow = rows.some((r: any) => String(r.constraint ?? '').toLowerCase().includes('energy') || /3\.5/.test(JSON.stringify(r)))
+      const unmappedHasRow = blob.includes('zorblax') || rows.some((r: any) => /\b42\b/.test(JSON.stringify(r)) && JSON.stringify(r).includes('qq'))
+      if (!mappedHasRow) bad.push('mapped brief metric (usable_energy_mwh) got NO compliance row')
+      if (!unmappedHasRow) bad.push('UNMAPPED brief metric (zorblax_flux_qq) got NO row — the renderer silently dropped it (gate-17 namesake regression)')
+    } catch (err) {
+      bad.push(`_buildComplianceRows threw: ${String(err).slice(0, 120)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.renderer_emits_compliance_row_for_every_brief_metric',
+      'the renderer emits a Brief-Compliance row for EVERY brief metric — mapped AND unmapped — so no brief constraint is ever silently absent (the property that justifies gate 17 rendererWouldEmitMetricRow=true; a regression here means gate 17 has gone blind to its namesake bug)',
+      bad.length, (n) => n === 0,
+      () => `renderer dropped a brief metric: ${bad.join(' ; ')}. Restore the universal-completeness pass in render-minimal-pdf.tsx _buildComplianceRows (emit an informational row for an unmapped metric, never continue).`,
+    ))
+  }
+
   // ── (2b) RANGE-aware compliance: an in-band design setpoint PASSes (2026-06-06) ──
   // The brief states synthesis conditions as RANGES (200-350 °C, 20-30 bar); the
   // parser collapses each to its max. With the raw brief text present, an in-band
