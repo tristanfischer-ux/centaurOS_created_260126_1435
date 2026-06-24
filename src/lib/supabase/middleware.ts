@@ -33,6 +33,17 @@ const PUBLIC_ROUTES = [
     '/blog',  // Public blog (content group)
     '/api/admin/dashboard',  // Standalone admin dashboard (own password gate)
     '/api/admin/snapshot-pdf',  // Agent-callable PDF download (CRON_SECRET Bearer at route)
+    // MARKETING / SEO / lead-gen pages (Relaunch Phase 1.3, 2026-06-24): these pages EXIST but were
+    // NOT public, so anonymous visitors were bounced to /login — killing the top of funnel. They
+    // carry no auth-gated data (pure marketing). Deliberately NOT adding /share /pay /profile /shared
+    // here — those have their own token/RLS checks to verify first (relaunch-plan trap #4).
+    '/about',             // company / story
+    '/contact',           // contact + lead capture
+    '/story',             // founder story (SEO)
+    '/case-study',        // case studies (SEO / social proof)
+    '/sample-package',    // sample dossier — the product showcase, a top conversion asset
+    '/investor-readiness',// investor-readiness landing
+    '/preview-landing',   // preview / campaign landing
 ]
 
 // RED-TEAM-PIVOT-PLAN Tier 2 step 14: anonymous /investors landing. The
