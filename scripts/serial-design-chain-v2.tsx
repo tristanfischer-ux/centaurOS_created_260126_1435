@@ -3398,12 +3398,22 @@ async function main() {
   // scaled target.
   {
     const _ds = parseFloat(process.env.DESIGN_TARGET_SCALE || '1')
-    const _tp = (parsedResult.data as { constraints?: { target_performance?: { value?: number; unit?: string } } })?.constraints?.target_performance
+    const _tp = (parsedResult.data as { constraints?: { target_performance?: { value?: number; unit?: string; metrics?: Array<{ value?: number; unit?: string; key_metric?: string }> } } })?.constraints?.target_performance
     if (isFinite(_ds) && _ds > 0 && Math.abs(_ds - 1) > 1e-6 && _tp && typeof _tp.value === 'number' && _tp.value > 0) {
-      const _before = _tp.value
+      const _orig = _tp.value
       _tp.value = _tp.value * _ds
-      console.error(`[chain] DESIGN_TARGET_SCALE=${_ds} → output target ${_before} → ${_tp.value} ${_tp.unit ?? ''} (design-to-target loop, #47)`)
-      logAction({ step: 'design_target_scale', scale: _ds, before: _before, after: _tp.value })
+      // ALSO scale the OUTPUT metric(s) in metrics[] — the entries that RESTATE this same target
+      // (value ≈ the original top-level value), so deriveOutputDenominator + the £/output-unit
+      // denominator reflect the scaled design. Leave UNRELATED metrics alone (harvest weight,
+      // per-tank volume) — only the output target restated, matched by value, is scaled.
+      let _nMetrics = 0
+      for (const m of (_tp.metrics || [])) {
+        if (typeof m.value === 'number' && m.value > 0 && Math.abs(m.value - _orig) <= 1e-6 * Math.max(1, _orig)) {
+          m.value = m.value * _ds; _nMetrics++
+        }
+      }
+      console.error(`[chain] DESIGN_TARGET_SCALE=${_ds} → output target ${_orig} → ${_tp.value} ${_tp.unit ?? ''} (+${_nMetrics} matching metric(s)) (design-to-target loop, #47)`)
+      logAction({ step: 'design_target_scale', scale: _ds, before: _orig, after: _tp.value, metrics_scaled: _nMetrics })
     }
   }
 
