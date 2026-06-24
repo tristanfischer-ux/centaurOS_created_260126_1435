@@ -3104,15 +3104,39 @@ async function main() {
   // old hard-exit-everywhere behaviour (CI). This is the universal answer to "the system
   // shouldn't refuse to produce anything because a gate is 4% off or mis-clustered."
   const residualIssues: Array<{ code: number; gate: string; summary: string; severity: 'catastrophic' | 'flagged'; at: string }> = []
+  // ENFORCEMENT POLICY (Tristan 2026-06-24, "turn on enforcement for the now-proven wrongness
+  // gates"). A gateBlock gate that catches unambiguous WRONGNESS (a wrong spec/size/type/price/
+  // count, a fictional part, a part priced absurdly per kg, a mass over the container rating)
+  // HARD-BLOCKS by default — every one has a proven proveCatch in gate-registry.ts, so flipping
+  // it on is safe. The DISCLOSURE / false-positive-prone gates (layout overlap, compliance-table
+  // completeness, cross-page prose, jurisdiction inference) flag + route but ship a DRAFT, since a
+  // wrong jurisdiction guess or a legit side-by-side column must not halt the whole run. Escape:
+  // CHAIN_GATE_SOFT=1 makes every gateBlock gate flag-only (a deliberate draft run).
+  const WRONGNESS_GATES = new Set([10, 12, 13, 14, 15, 16, 20, 21, 30])
+  const gateSoft = ['1', 'true', 'yes', 'on'].includes(String(process.env.CHAIN_GATE_SOFT || '').toLowerCase())
   const gateBlock = (code: number, gateName: string, summary: string, opts?: { catastrophic?: boolean }): void => {
     const enforce = opts?.catastrophic === true || !!process.env.CHAIN_GATE_ENFORCE
+      || (WRONGNESS_GATES.has(code) && !gateSoft)
     residualIssues.push({ code, gate: gateName, summary, severity: enforce ? 'catastrophic' : 'flagged', at: new Date().toISOString() })
     logAction({ step: `gate_block_${code}`, gate: gateName, code, severity: enforce ? 'catastrophic' : 'flagged', summary, enforced: enforce })
     if (enforce) {
-      console.error(`\n[chain] === FATAL ${gateName} (exit ${code}) ===\n${summary}`)
+      console.error(`\n[chain] === FATAL ${gateName} (exit ${code}) — WRONGNESS, fix the source rule ===\n${summary}`)
       process.exit(code)
     }
-    console.error(`[chain] ${gateName} (exit ${code}): FLAGGED (render-and-flag) — dossier ships, issue disclosed. ${summary}`)
+    console.error(`[chain] ${gateName} (exit ${code}): FLAGGED (render-and-flag) — dossier ships as DRAFT, issue disclosed + routed. ${summary}`)
+  }
+  // The proven WRONGNESS enforce-gates (31 deterministic deceptions, 32 cost magnitude, 33 a part
+  // the engine KNOWS fails, 34 a domain-mismatched tool, 36 a >2.5× benchmark divergence) default
+  // to ENFORCING — each has a proven proveCatch. An explicit `=0`/`off` still wins (a deliberate
+  // shadow run). Drawing-gates (35) stays opt-in (it can be strict on a borderline aspect ratio).
+  for (const [flag, val] of [
+    ['PDF_ENGINE_SELF_AUDIT_ENFORCING', 'deterministic'],
+    ['COST_SANITY_ENFORCING', '1'],
+    ['PHYSICS_CRITIC_ENFORCING', '1'],
+    ['TOOL_ARCHETYPE_ENFORCING', '1'],
+    ['BENCHMARK_NET_ENFORCING', '1'],
+  ] as const) {
+    if (process.env[flag] === undefined) process.env[flag] = val
   }
 
   // ── Save the original brief (Phase 0 refinement loop, Tristan 2026-05-15)
