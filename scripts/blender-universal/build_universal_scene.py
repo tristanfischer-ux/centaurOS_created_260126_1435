@@ -192,7 +192,10 @@ SHAPE_RULES = [
     # a CRYSTALLISER is a vertical body with a CONICAL bottom (forced-circulation /
     # draft-tube / Oslo) — give it the cone-bottom primitive, not a flat box (Tristan
     # 2026-06-24: "crystallisers the correct shape"). Before column/reactor so it wins.
-    (r"crystallis|recrystallis", "cone_vessel"),
+    # NEGATIVE GUARD: a crystalliser ANCILLARY ("crystalliser circulation heater / product
+    # cooler / vacuum condenser") is a HEAT EXCHANGER, not the crystalliser vessel — let it
+    # fall through to the exchanger/heater rules below (it must NOT become a cone vessel).
+    (r"(?:re)?crystallis(?!.*(?:heater|cooler|condenser|exchang|reboiler|chiller))", "cone_vessel"),
     # ── HORIZONTAL vessels (separation/exchange/disengagement) BEFORE the
     #    generic vertical bucket, because "separator"/"drum"/"knock-out" are the
     #    classic horizontal-on-saddles shapes. A "steam drum" + "3-phase
