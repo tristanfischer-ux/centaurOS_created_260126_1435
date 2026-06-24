@@ -10,6 +10,16 @@ npm run lint -- --quiet || {
   exit 1
 }
 
+# Typecheck against the baseline (Tristan 2026-06-24): the pre-push NEVER ran tsc, so a NEW
+# TypeScript error slipped to CI (which runs tsc --noEmit) and turned it red. typecheck:baseline
+# fails ONLY on errors beyond the captured baseline (scripts/typecheck-baseline.json) — so it
+# blocks NEW type errors here without forcing a clean-up of the long-standing pre-existing debt.
+echo "→ Running typecheck (baseline)..."
+NODE_OPTIONS="--max-old-space-size=6144" npm run typecheck:baseline || {
+  echo "❌ New TypeScript errors vs baseline. Fix them (or, if intentional, npm run typecheck:baseline:update)."
+  exit 1
+}
+
 # Engine regression guards (Tristan 2026-06-24, CORE FIX PRINCIPLE enforcement): run every
 # engine --selftest (the rule-level guards where pricing/sizing/contract source-rule fixes land)
 # and BLOCK the push on any failure. This is the DETERMINISTIC enforcement of "every fix carries
