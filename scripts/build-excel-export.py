@@ -5352,6 +5352,25 @@ def tab_tool_io(wb: Workbook, state: dict, run_dir: str) -> bool:
                     return True
         return False
 
+    # RIGOROUS field-level consumption proof (Tristan 2026-06-24: prove the output GOES somewhere,
+    # not just that its value coincidentally appears): the set of every token any tool declares as an
+    # INPUT. An output field is genuinely CONSUMED if its name (or a distinctive token of it) is some
+    # other tool's input — a real edge in the tool DAG, universal across archetypes.
+    _input_tokens: set = set()
+    for _t in tu["tools"]:
+        for _c in (_t.get("claims") or []):
+            for _tok in _re.findall(r"[a-z][a-z0-9_]{3,}", str(_c.get("input_summary", "")).lower()):
+                _input_tokens.add(_tok)
+    _STOP = {"from", "each", "total", "rated", "with", "into", "flow", "load", "duty", "this", "that"}
+    def _consumed_by_tool(field: str) -> bool:
+        f = str(field).lower().strip()
+        if not f:
+            return False
+        if f in _input_tokens:
+            return True
+        toks = [t for t in _re.findall(r"[a-z][a-z0-9]{3,}", f) if t not in _STOP]
+        return bool(toks) and any(t in _input_tokens for t in toks)
+
     header(ws, 5, ["Tool", "Output field", "Value", "Unit", "Input — from",
                    "→ Consumed by", "Status"])
     r = 6
@@ -5369,6 +5388,8 @@ def tab_tool_io(wb: Workbook, state: dict, run_dir: str) -> bool:
                     status, cons = "USED", f"{qk} = {qv:g}"
                 else:
                     status, cons = "STALE", f"{qk} = {qv:g}  (≠ tool {val:g})"
+            elif _consumed_by_tool(c.get("output_field") or field):
+                status, cons = "USED", "feeds another tool's input (DAG edge)"
             elif val is not None and abs(val) in (0.0, 1.0):
                 status, cons = "—", "(zero/unit — not checked)"
             elif val is not None and _present(val):
