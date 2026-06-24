@@ -125,11 +125,12 @@ export function reconcile(input: SweetSpotInput): SweetSpotResult {
     }
   } else if (unconstrained) {
     // no cost constraint → build what's asked (don't grow infinitely on output_max with no budget).
-    recO = input.objective === 'cost_min' ? floor : target
+    // cost_min with a stated hard floor builds that minimum; otherwise the target (the ask).
+    recO = input.objective === 'cost_min' ? (hardFloor ?? target) : target
   } else {
-    // compatible: the floor fits the budget. Objective shapes WHERE in the feasible band we sit.
+    // compatible: the target fits the budget. Objective shapes WHERE in the feasible band we sit.
     if (input.objective === 'cost_min') {
-      recO = floor                                   // cheapest design that still meets the need
+      recO = hardFloor ?? target                     // cheapest design that still meets the requirement
     } else if (input.objective === 'output_max') {
       recO = Math.max(target, qMaxBudget)            // spend the budget, maximise output
     } else {
@@ -242,7 +243,18 @@ function _selftest(): void {
   if (!(c7.recommended_output > 1000)) throw new Error('7: output_max with headroom must scale up')
   if (c7.recommended_capex_gbp > 10_000_000 + 1) throw new Error('7: must stay within the ceiling')
 
-  console.log('sweet-spot selftest: OK (compatible / incompatible×3-objectives / scale-economies / unconstrained / output-max-headroom)')
+  // 8. cost_min in the COMPATIBLE + UNCONSTRAINED branches must not throw (regression guard for the
+  //    renamed-variable bug): no hard floor → build the target; hard floor → build the floor.
+  const c8a = reconcile({ objective: 'cost_min', output_target: 1000, output_floor: null, cost_ceiling_gbp: 9_000_000, ...ref })
+  if (!approx(c8a.recommended_output, 1000)) throw new Error(`8a: compatible cost_min, no floor → target, got ${c8a.recommended_output}`)
+  const c8b = reconcile({ objective: 'cost_min', output_target: 1000, output_floor: 600, cost_ceiling_gbp: 9_000_000, ...ref })
+  if (!approx(c8b.recommended_output, 600)) throw new Error(`8b: compatible cost_min w/ hard floor → floor, got ${c8b.recommended_output}`)
+  const c8c = reconcile({ objective: 'cost_min', output_target: 1000, output_floor: null, cost_ceiling_gbp: null, ...ref })
+  if (!approx(c8c.recommended_output, 1000)) throw new Error(`8c: unconstrained cost_min → target, got ${c8c.recommended_output}`)
+  const c8d = reconcile({ objective: 'cost_min', output_target: 1000, output_floor: 400, cost_ceiling_gbp: null, ...ref })
+  if (!approx(c8d.recommended_output, 400)) throw new Error(`8d: unconstrained cost_min w/ hard floor → floor, got ${c8d.recommended_output}`)
+
+  console.log('sweet-spot selftest: OK (compatible / incompatible×3 / scale-economies / unconstrained / output-max-headroom / cost_min-branches)')
 }
 
 if (require.main === module && process.argv.includes('--selftest')) _selftest()

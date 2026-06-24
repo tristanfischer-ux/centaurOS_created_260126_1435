@@ -30,6 +30,8 @@ Required output schema:
     "batch_size": { "value": number|null, "source": "user"|"inferred"|"missing" },
     "design_life": { "value": string|null, "source": "user"|"inferred"|"missing" },
     "operating_environment": { "temp_min_c": number|null, "temp_max_c": number|null, "source": "user"|"inferred"|"missing" },
+    "primary_objective": { "value": "cost_min"|"output_max"|"balanced", "source": "user"|"inferred"|"missing" },
+    "output_floor": { "value": number|null, "unit": string|null, "source": "user"|"inferred"|"missing" },
     "safety_standards": [{ "standard": string, "code": string, "source_grade": "A"|"B"|"C", "source": "user"|"inferred" }],
     "additional_constraints": [{ "description": string, "source": "user"|"inferred" }]
   },
@@ -86,7 +88,13 @@ MULTI-METRIC EXTRACTION (P1-1 — 2026-05-23 root-cause fix for unit-family bug 
 - Use SNAKE_CASE engineering metric names; prefer canonical names used in published datasheets (e.g. "rated_power_kw" not "max_power" or "power_output").
 - Always emit at least ONE metric with category = "scale" when the brief contains any quantitative scale info. This is the single most important metric for downstream layers; getting it right prevents the entire wrong-size-design bug class.
 - Source tagging on metrics matches the same rules as other constraint fields: "user" only when verbatim in the brief.
-- target_performance.key_metric/value/unit (the legacy single-metric fields) MUST mirror metrics[0] of the highest-confidence "scale" entry — they are kept for back-compat with consumers that have not migrated to the metrics[] array yet.`
+- target_performance.key_metric/value/unit (the legacy single-metric fields) MUST mirror metrics[0] of the highest-confidence "scale" entry — they are kept for back-compat with consumers that have not migrated to the metrics[] array yet.
+
+PRIMARY OBJECTIVE (sweet-spot reconciliation — 2026-06-24):
+- A brief is a WISH-LIST. It can ask for mutually-incompatible things (a large output AND a tight budget). The engine reconciles these against a capacity-scaling law, but it must know which to favour when they conflict.
+- primary_objective.value captures the brief's stated priority: "cost_min" (minimise cost to meet the output — favour the cheapest design that still delivers), "output_max" (maximise output within budget — favour the most productive design that fits), or "balanced" (the best cost/output compromise).
+- Set source = "user" ONLY when the founder explicitly states a priority ("keep cost down even if output suffers", "maximise throughput regardless of capex", "the budget is hard"). Otherwise set value = "balanced" and source = "inferred". NEVER tag a defaulted "balanced" as "user".
+- output_floor is a HARD minimum acceptable output, distinct from target_performance (the WISH). Set value + unit ONLY when the founder states a hard minimum ("must produce at least N", "no less than N units/yr"). If the brief states only a target (the wish) with no hard floor, set value = null, unit = null, source = "missing". Use the SAME unit as the primary scale metric in target_performance.`
 
 // ─── Stage 3: Research Synthesis ───────────────────────────────────────────
 

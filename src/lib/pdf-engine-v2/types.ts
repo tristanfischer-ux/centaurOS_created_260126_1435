@@ -141,6 +141,23 @@ export interface StructuredBriefJSON {
     operating_environment: StructuredBriefOperatingEnvironment
     safety_standards: StructuredBriefSafetyStandard[]
     additional_constraints: StructuredBriefAdditionalConstraint[]
+    /** Sweet-spot reconciliation (Phase 1b, 2026-06-24): the question every brief
+     *  must answer — when the brief's cost ceiling and output target conflict, which
+     *  wins? 'cost_min' = spend the least to meet the output; 'output_max' = deliver
+     *  the most within budget; 'balanced' = the best cost/output compromise. Defaults
+     *  to 'balanced' when the brief is silent (a note records the default). */
+    primary_objective?: {
+      value: 'cost_min' | 'output_max' | 'balanced'
+      source: BriefSourceTag
+    }
+    /** Sweet-spot reconciliation (Phase 1b): a HARD minimum acceptable output the
+     *  design must not fall below — distinct from target_performance (the WISH). null
+     *  when the brief states no hard floor. Same unit as target_performance.value. */
+    output_floor?: {
+      value: number | null
+      unit: string | null
+      source: BriefSourceTag
+    }
     /** U6: reasoner-derived quantified engineering duties (the detailed brief). */
     derived_requirements?: DerivedRequirement[]
   }

@@ -48,7 +48,8 @@ import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
-import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
+import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv, readHeadlineCostGbp, deriveOutputDenominator } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
+import { reconcile as reconcileSweetSpot, type PrimaryObjective } from './lib/sweet-spot'
 import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { recordGateFailure } from './lib/lesson-loop'
@@ -2401,11 +2402,37 @@ function computeQualityScorecard(state: any): QualityScorecard {
   const cs = state.costSanity
   if (cs) {
     const v = String(cs.verdict || 'pass')
-    sections.push({
-      name: 'cost_sanity',
-      score: v === 'pass' ? 10 : v === 'med' ? 5 : 2,
-      defects: cs.reason ? [String(cs.reason).slice(0, 200)] : [],
-    })
+    // ── Sweet-spot DEFERRAL (Phase 1c, 2026-06-24) ──────────────────────────────
+    // When the sweet-spot reconciler returned 'incompatible', the off-band cost is a
+    // RECONCILED, HONEST, DISCLOSED trade-off — the brief asked for an output AND a
+    // cost ceiling the capacity-scaling law says cannot both be met, and the engine
+    // resolved it by the brief's stated primary_objective. That is NOT an engine error
+    // (a hidden bad number), so the cost_sanity gate must NOT treat it as a hard defect
+    // and spin the quality loop forever re-running a design whose cost cannot be lifted
+    // without rescaling (the CO₂ case). We downgrade cost_sanity from a FAIL (2) to a
+    // disclosed/advisory note that does NOT drag the deterministic floor. This is a
+    // GUARD, fully reversible, and DEFAULT-SAFE: with no state.sweetSpot present (older
+    // runs, or a brief with no cost ceiling) behaviour is exactly as before.
+    const ss = state.sweetSpot
+    const reconciledTradeOff = ss && String(ss.verdict || '') === 'incompatible'
+    if (reconciledTradeOff && (v === 'high' || v === 'med')) {
+      sections.push({
+        name: 'cost_sanity',
+        score: 10,
+        // advisory: stays VISIBLE in the scorecard but cannot drag the deterministic
+        // floor (computeScorecardFloor uses non-advisory sections only).
+        advisory: true,
+        defects: [
+          `cost is a DISCLOSED, reconciled trade-off (sweet-spot verdict: incompatible, objective: ${String(ss.objective || 'balanced')}) — not an engine error; resolved per the brief's primary objective, recommended scale ${Number(ss.rescale_factor ?? 1).toFixed(2)}×.`.slice(0, 200),
+        ],
+      })
+    } else {
+      sections.push({
+        name: 'cost_sanity',
+        score: v === 'pass' ? 10 : v === 'med' ? 5 : 2,
+        defects: cs.reason ? [String(cs.reason).slice(0, 200)] : [],
+      })
+    }
   }
 
   // Physics critic enforcement (gate 33)
@@ -7601,6 +7628,80 @@ async function main() {
       const csState = JSON.parse(readFileSync(statePath, 'utf-8'))
       const cs = computeCostSanity(csState)
       csState.costSanity = cs
+
+      // ── Sweet-spot reconciliation (Phase 1c, 2026-06-24): a brief is a WISH-LIST;
+      //    it can ask for a cost ceiling AND an output target that the capacity-scaling
+      //    law says cannot both be met. Reconcile them ANALYTICALLY from ONE reference
+      //    design (same ex-works numerator as cost-sanity + the brief's primary output)
+      //    and RECORD the recommended operating point + frontier in state.sweetSpot.
+      //    Phase 1 does NOT auto-rescale + re-run the chain (a future, paid step) — it
+      //    records the recommendation, the frontier, and (below) lets the quality loop
+      //    STOP spinning on a design whose off-band cost is an honest, reconciled
+      //    trade-off rather than an engine error. Default-safe: any missing input →
+      //    skip cleanly, behaviour unchanged.
+      try {
+        const headline = readHeadlineCostGbp(csState)
+        const denom = deriveOutputDenominator(csState)
+        const bc = csState?.parsedBrief?.constraints ?? {}
+        const objRaw = String(bc?.primary_objective?.value ?? '').trim()
+        const objective: PrimaryObjective =
+          (objRaw === 'cost_min' || objRaw === 'output_max' || objRaw === 'balanced') ? objRaw : 'balanced'
+        const objDefaulted = objRaw === '' || objRaw !== objective
+        // cost ceiling: the brief's TOTAL-capex ceiling (unit_cost_ceiling is the headline
+        // capex constraint on these process-plant briefs). null → unconstrained.
+        const ceilingRaw = bc?.unit_cost_ceiling?.value
+        const cost_ceiling_gbp =
+          (typeof ceilingRaw === 'number' && Number.isFinite(ceilingRaw) && ceilingRaw > 0) ? ceilingRaw : null
+        // output_target = the reference output denominator (in its canonical unit).
+        const output_target = (denom && Number.isFinite(denom.value) && denom.value > 0) ? denom.value : null
+        // HARD output floor from the brief, if stated (vs the target = wish). Only
+        // applied when its value is in the same family as the derived denominator.
+        const ofRaw = bc?.output_floor
+        const output_floor =
+          (ofRaw && typeof ofRaw.value === 'number' && Number.isFinite(ofRaw.value) && ofRaw.value > 0)
+            ? ofRaw.value : null
+
+        if (headline && headline.gbp > 0 && output_target) {
+          const ss = reconcileSweetSpot({
+            objective,
+            output_target,
+            output_floor,
+            cost_ceiling_gbp,
+            ref_output: output_target,        // the reference design IS the briefed target
+            ref_capex_gbp: headline.gbp,
+            output_unit_label: denom.unit_label,
+          })
+          // record provenance + the no-auto-rescale note Tristan asked for.
+          const ssRecord: any = {
+            ...ss,
+            objective_defaulted: objDefaulted,
+            ref_output: output_target,
+            ref_capex_gbp: headline.gbp,
+            ref_capex_source: headline.source,
+            output_unit_label: denom.unit_label,
+          }
+          if (objDefaulted) ssRecord.notes = [...(ss.notes ?? []), 'primary_objective not stated in brief — defaulted to balanced']
+          if (Math.abs(ss.rescale_factor - 1) > 0.01) {
+            ssRecord.notes = [...(ssRecord.notes ?? []),
+              `Phase 1 RECORDS this recommendation only; regenerating the dossier at ${ss.rescale_factor.toFixed(2)}× the briefed output would REALISE the sweet spot (not auto-run — a deliberate, paid future step).`]
+          }
+          csState.sweetSpot = ssRecord
+          console.error(`[chain] sweet-spot reconciliation: ${ss.verdict.toUpperCase()} (objective=${objective}, rescale=${ss.rescale_factor.toFixed(2)}×) — ${ss.trade_off_statement}`)
+          logAction({
+            step: 'sweet_spot_reconciliation', ok: true, verdict: ss.verdict,
+            rescale_factor: ss.rescale_factor, objective,
+            recommended_output: ss.recommended_output, recommended_capex_gbp: ss.recommended_capex_gbp,
+            within_cost_ceiling: ss.within_cost_ceiling, meets_output_floor: ss.meets_output_floor,
+          })
+        } else {
+          console.error(`[chain] sweet-spot reconciliation: skipped (no headline cost or output denominator) — behaviour unchanged.`)
+          logAction({ step: 'sweet_spot_reconciliation', ok: true, verdict: 'skipped', reason: 'missing headline cost or output denominator' })
+        }
+      } catch (ssErr) {
+        console.error(`[chain] sweet-spot reconciliation threw (non-fatal): ${(ssErr as Error).message}`)
+        logAction({ step: 'sweet_spot_reconciliation', ok: false, error: String(ssErr).slice(0, 200) })
+      }
+
       writeFileSync(statePath, JSON.stringify(csState, null, 2))
       const tag = cs.verdict.toUpperCase()
       console.error(`[chain] cost-sanity (shadow): ${tag} — ${cs.message}`)

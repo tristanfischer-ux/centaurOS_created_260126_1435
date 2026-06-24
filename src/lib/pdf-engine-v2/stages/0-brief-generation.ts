@@ -417,6 +417,29 @@ export async function runBriefParsing(
       parsed.constraints.additional_constraints = []
     }
 
+    // Sweet-spot reconciliation (Phase 1b, 2026-06-24): the question every brief
+    // must answer — when the cost ceiling and output target conflict, which wins?
+    // Default to 'balanced' when the brief is silent (record the default), so a
+    // brief with no stated objective behaves exactly as before everywhere except
+    // that the reconciler now has an objective to follow. Default-safe.
+    const c = parsed.constraints as any
+    const validObjectives = ['cost_min', 'output_max', 'balanced']
+    const poRaw = c.primary_objective
+    if (!poRaw || typeof poRaw !== 'object' || !validObjectives.includes(String(poRaw.value))) {
+      c.primary_objective = { value: 'balanced', source: 'inferred' }
+      c._primary_objective_defaulted = true
+      if (!parsed.missing_mandatory_fields.includes('primary_objective')) {
+        parsed.missing_mandatory_fields.push('primary_objective')
+      }
+      console.log('[brief-parse] primary_objective not stated — defaulted to "balanced".')
+    }
+    // output_floor: a HARD minimum (vs target = wish). Normalise to {value,unit,source};
+    // null value = no hard floor stated (the common case).
+    const ofRaw = c.output_floor
+    if (!ofRaw || typeof ofRaw !== 'object' || !(typeof ofRaw.value === 'number' && Number.isFinite(ofRaw.value) && ofRaw.value > 0)) {
+      c.output_floor = { value: null, unit: ofRaw && typeof ofRaw === 'object' ? (ofRaw.unit ?? null) : null, source: 'missing' }
+    }
+
     // P1-1 (2026-05-23): normalise the new metrics[] field. Default to empty
     // array when LLM didn't emit (e.g. brief is qualitative-only). Then
     // reconcile so legacy target_performance fields mirror the highest-

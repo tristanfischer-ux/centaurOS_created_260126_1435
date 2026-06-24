@@ -4026,6 +4026,135 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
     return max(r, hh + 74)
 
 
+def _render_sweet_spot_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
+    """Render the "Sweet spot & brief reconciliation" block (Phase 1d, 2026-06-24)
+    from state['sweetSpot'] (the TS reconcile output — NOT the Python _sweet_spot
+    economics mirror). Shows the verdict, the human trade-off statement, the
+    recommended operating point (output / capex / £-per-unit), and the cost-output
+    frontier as a small table + a tiny £/unit-vs-output line chart. FORMULA-FREE
+    (every cell a literal value — zero #REF! risk). Returns the next free row, or
+    None when state['sweetSpot'] is absent (older dossiers) so the caller skips
+    cleanly."""
+    ss = state.get("sweetSpot")
+    if not isinstance(ss, dict):
+        return None  # older dossier — no reconciliation recorded; skip cleanly
+
+    from openpyxl.chart import LineChart, Reference
+
+    verdict = str(ss.get("verdict", "")).strip() or "unknown"
+    objective = str(ss.get("objective", "balanced")).strip() or "balanced"
+    unit = str(ss.get("output_unit_label") or "unit")
+    stmt = str(ss.get("trade_off_statement", "")).strip()
+    rec_out = num(ss.get("recommended_output"))
+    rec_cap = num(ss.get("recommended_capex_gbp"))
+    rec_cpu = num(ss.get("recommended_cost_per_unit"))
+    rescale = num(ss.get("rescale_factor"))
+    within_ceiling = ss.get("within_cost_ceiling")
+    meets_floor = ss.get("meets_output_floor")
+    notes = ss.get("notes") if isinstance(ss.get("notes"), list) else []
+
+    r = start_row
+
+    # ── verdict banner ──
+    verdict_label = {
+        "compatible": "COMPATIBLE — the brief's cost ceiling and output target fit together",
+        "incompatible": "INCOMPATIBLE (reconciled) — cost ceiling & output target conflict; resolved by the stated objective",
+        "unconstrained": "UNCONSTRAINED — no cost ceiling stated, so no cost/output tension",
+    }.get(verdict, f"verdict: {verdict}")
+    sub_banner(ws, r, f"Reconciliation verdict — {verdict_label}", 8)
+    vcell = ws.cell(r, 1)
+    if verdict == "incompatible":
+        vcell.fill = FILL_FAIL; vcell.font = FONT_FAIL
+    elif verdict == "compatible":
+        vcell.fill = FILL_PASS; vcell.font = FONT_PASS
+    r += 1
+
+    # ── the human trade-off statement (wrapped, spanning the width) ──
+    if stmt:
+        ws.merge_cells(start_row=r, start_column=1, end_row=r + 1, end_column=8)
+        sc = ws.cell(r, 1, clean_cell(stmt))
+        sc.alignment = WRAP_TOP
+        r += 2
+    obj_label = {
+        "cost_min": "COST — spend the least to meet the output",
+        "output_max": "OUTPUT — deliver the most within budget",
+        "balanced": "BALANCED — the best cost/output compromise",
+    }.get(objective, objective)
+    objc = ws.cell(r, 1, f"Primary objective followed: {obj_label}"
+                   + ("  (defaulted — brief did not state a priority)" if ss.get("objective_defaulted") else ""))
+    objc.font = FONT_NOTE
+    r += 2
+
+    # ── recommended operating point ──
+    header(ws, r, ["Recommended operating point", "Value", "", "", "", "", "", ""])
+    r += 1
+    def _kv(label: str, value: Any, fmt: Optional[str] = None) -> None:
+        nonlocal r
+        ws.cell(r, 1, label).font = FONT_SUB
+        c = ws.cell(r, 2, value)
+        if fmt:
+            c.number_format = fmt
+        c.fill = FILL_RESULT
+        r += 1
+    if rec_out is not None:
+        _kv(f"Recommended output ({unit})", rec_out, FMT_DEC1)
+    if rec_cap is not None:
+        _kv("Recommended capex (£)", rec_cap, FMT_GBP)
+    if rec_cpu is not None:
+        _kv(f"Recommended £/{unit}", rec_cpu, FMT_GBP2 if rec_cpu < 100 else FMT_GBP)
+    if rescale is not None:
+        _kv("Recommended scale vs brief (×)", rescale, FMT_DEC1)
+    _kv("Within cost ceiling?", "Yes" if within_ceiling else ("No" if within_ceiling is False else "—"))
+    _kv("Meets hard output floor?", "Yes" if meets_floor else ("No" if meets_floor is False else "—"))
+    r += 1
+
+    # ── the cost-output frontier table (output | capex | £/unit) ──
+    frontier = ss.get("frontier") if isinstance(ss.get("frontier"), list) else []
+    if frontier:
+        sub_banner(ws, r, "Cost–output frontier (capacity-scaling law) — £/unit falls with scale (economies of scale)", 8)
+        r += 1
+        header(ws, r, [f"Output ({unit})", "Capex (£)", f"£/{unit}", "", "", "", "", ""])
+        r += 1
+        chart_first = r
+        for pt in frontier:
+            if not isinstance(pt, dict):
+                continue
+            o = num(pt.get("output")); cap = num(pt.get("capex_gbp")); cpu = num(pt.get("cost_per_unit"))
+            ws.cell(r, 1, o).number_format = FMT_DEC1
+            ws.cell(r, 2, cap).number_format = FMT_GBP
+            cc = ws.cell(r, 3, cpu)
+            cc.number_format = FMT_GBP2 if (cpu is not None and cpu < 100) else FMT_GBP
+            r += 1
+        chart_last = r - 1
+
+        # ── tiny line chart: £/unit (y) vs output (x) ──
+        if chart_last >= chart_first:
+            ch = LineChart()
+            ch.title = f"£/{unit} vs output — the sweet-spot curve"
+            ch.height, ch.width = 7.5, 14
+            ch.y_axis.title = f"£/{unit}"
+            ch.x_axis.title = f"Output ({unit})"
+            ch.x_axis.delete = False
+            ch.y_axis.delete = False
+            data = Reference(ws, min_col=3, min_row=chart_first, max_row=chart_last)
+            cats = Reference(ws, min_col=1, min_row=chart_first, max_row=chart_last)
+            ch.add_data(data, titles_from_data=False)
+            ch.set_categories(cats)
+            style_chart(ch, legend=None)
+            ws.add_chart(ch, f"E{chart_first}")
+            r = max(r, chart_last + 16)
+        r += 1
+
+    # ── notes (no-auto-rescale disclosure etc.) ──
+    for n in notes:
+        nc = ws.cell(r, 1, clean_cell(str(n)))
+        nc.font = FONT_NOTE
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+        r += 1
+
+    return r
+
+
 def tab_financial_model(wb: Workbook, state: dict) -> bool:
     """A + B (consolidation 2026-06-24) — "Financial model": Economics (base case +
     its opex pie / revenue-vs-EBITDA bar) on top, then the Scenarios scale sweep +
@@ -4077,6 +4206,14 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
     _section("Investment analysis — the sweet-spot finder")
     nxt = _render_investment_section(ws, state, r)
     r = (nxt if nxt is not None else r) + 1
+
+    # ── Sweet spot & brief reconciliation (Phase 1d, 2026-06-24) ──
+    # Reads state['sweetSpot'] (the TS reconcile output). Skips cleanly (renders
+    # nothing) when absent — older dossiers have no reconciliation recorded.
+    if state.get("sweetSpot"):
+        _section("Sweet spot & brief reconciliation")
+        nxt = _render_sweet_spot_section(ws, state, r)
+        r = (nxt if nxt is not None else r) + 1
 
     ws.freeze_panes = "A5"
     back_link(ws, 8)
