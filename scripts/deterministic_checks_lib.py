@@ -771,6 +771,26 @@ def _checks_connectivity(state: dict, run_dir: str) -> List[Check]:
     # connection. This is STRICT (any concern FAILS) — it replaces the old 80%-coverage
     # check that absorbed real gaps (2 missing in 23 parts = 91% silently passed).
     cledger = _load_json(os.path.join(run_dir, "connection-ledger.json"))
+    # UNIVERSAL fix (Tristan 2026-06-24): connection-ledger.json is authored ONLY inside Blender's
+    # build_universal_scene (line ~14012) and is absent or stale in PDF-off / Excel-only mode — so
+    # reading only it made this STRICT completeness check silently SKIP on every class but RAS (whose
+    # ledger was a stale leftover). The SAME per-part connection completeness is computed EVERY chain,
+    # bpy-free, by parts_ledger.py → parts-ledger.json :: connectivity {n_concerns, concerns}. Fall back
+    # to it (synthesise the cledger shape) so the connector proof is genuinely universal.
+    if not (isinstance(cledger, dict) and isinstance(cledger.get("completeness"), dict)):
+        _pl = _load_json(os.path.join(run_dir, "parts-ledger.json"))
+        if isinstance(_pl, dict) and isinstance(_pl.get("connectivity"), dict):
+            _cc = _pl["connectivity"]
+            _concerns_norm = [
+                {"part": (c.get("tag") or c.get("part") or c.get("name") or "?"),
+                 "missing": ([c.get("issue")] if c.get("issue") else (c.get("missing") or []))}
+                for c in (_cc.get("concerns") or [])]
+            cledger = {
+                "completeness": {
+                    "n_concerns": int(_cc.get("n_concerns") if _cc.get("n_concerns") is not None
+                                      else len(_cc.get("concerns") or [])),
+                    "concerns": _concerns_norm},
+                "referential_integrity": _pl.get("referential_integrity") or {}}
     if isinstance(cledger, dict) and isinstance(cledger.get("completeness"), dict):
         comp = cledger["completeness"]
         concerns = comp.get("concerns") or []

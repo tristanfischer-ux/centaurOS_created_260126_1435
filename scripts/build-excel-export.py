@@ -1525,7 +1525,35 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
     Returns False (tab skipped) when no ledger is present."""
     led = load_json(os.path.join(run_dir, "connection-ledger.json"))
     if not isinstance(led, dict) or not led.get("adjacency"):
-        return False
+        # UNIVERSAL fallback (Tristan 2026-06-24): connection-ledger.json is Blender-authored and absent
+        # in PDF-off / Excel-only mode, so this "decks" trace tab was RAS-only. parts_ledger.py writes a
+        # flat `connections` list + a `connectivity` completeness block for EVERY archetype (bpy-free) —
+        # fold it into the same adjacency shape so the connector deck is universal.
+        _pl = load_json(os.path.join(run_dir, "parts-ledger.json"))
+        _conns = _pl.get("connections") if isinstance(_pl, dict) else None
+        if not _conns:
+            return False
+        _adj: Dict[str, Dict[str, list]] = {}
+        for _c in _conns:
+            _fp = str(_c.get("from_part") or "").strip()
+            _tp = str(_c.get("to_part") or "").strip()
+            _svc = str(_c.get("service") or _c.get("mech") or _c.get("line_number") or "")
+            if _fp:
+                _adj.setdefault(_fp, {"inputs": [], "outputs": []})
+                if _tp:
+                    _adj[_fp]["outputs"].append({"to": _tp, "service": _svc})
+            if _tp:
+                _adj.setdefault(_tp, {"inputs": [], "outputs": []})
+                if _fp:
+                    _adj[_tp]["inputs"].append({"from": _fp, "service": _svc})
+        _cc = (_pl.get("connectivity") or {}) if isinstance(_pl, dict) else {}
+        led = {"adjacency": _adj, "count": len(_conns),
+               "completeness": {
+                   "n_concerns": int(_cc.get("n_concerns") or len(_cc.get("concerns") or [])),
+                   "concerns": [{"part": (x.get("name") or x.get("tag") or "?"),
+                                 "missing": [x.get("issue")] if x.get("issue") else (x.get("missing") or [])}
+                                for x in (_cc.get("concerns") or [])]},
+               "referential_integrity": {}}
     adj = led["adjacency"]
     comp = led.get("completeness") or {}
     ri = led.get("referential_integrity") or {}
