@@ -4525,9 +4525,19 @@ function assertEq<T>(id: string, description: string, actual: T, predicate: (v: 
   return { id, description, passed, detail: passed ? undefined : (detail ? detail(actual) : `got ${JSON.stringify(actual)}`) }
 }
 
-function runRenderer(statePath: string): { ok: boolean; pdfPath: string; pages: number; sizeKb: number; stderr: string } {
+// NO-RENDER mode (Tristan 2026-06-24, repeatedly: "do not produce PDFs at this stage").
+// The Excel spreadsheet is the deliverable; the react-pdf render is NOT wanted while iterating.
+// When REGRESSION_NO_RENDER=1 (or --no-render), the harness runs ALL the pure, snapshot-independent
+// invariants (cost-sanity, benchmark net, synthesis, etc.) but NEVER shells out to render-minimal-pdf,
+// so no .regression.pdf is ever written. The render-dependent assertions (I1/I2 + the pdftotext blocks,
+// all already guarded on renderResult.ok) skip cleanly. Use this for verifying a pure invariant.
+const REGRESSION_NO_RENDER = process.env.REGRESSION_NO_RENDER === '1' || process.argv.includes('--no-render')
+function runRenderer(statePath: string): { ok: boolean; pdfPath: string; pages: number; sizeKb: number; stderr: string; skipped?: boolean } {
   const pdfPath = statePath.replace(/\.json$/, '.regression.pdf')
   const projectRoot = resolve(__dirname, '..')
+  if (REGRESSION_NO_RENDER) {
+    return { ok: false, pdfPath: '', pages: 0, sizeKb: 0, stderr: 'skipped: REGRESSION_NO_RENDER (no PDF produced)', skipped: true }
+  }
   try {
     const stderr = execFileSync('npx', ['tsx', resolve(__dirname, 'render-minimal-pdf.tsx'), statePath, pdfPath], {
       cwd: projectRoot,
@@ -4646,14 +4656,16 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // per-snapshot base-reproduction check when economics are present.
   assertions.push(...checkScenarioInvariants(state))
 
-  // I1. Renderer + PDF size
+  // I1. Renderer + PDF size (skipped entirely in NO-RENDER mode — no PDF is produced)
   const renderResult = runRenderer(snapshotPath)
-  assertions.push({
-    id: 'I1.render',
-    description: 'renderer exits 0 + writes PDF >= 200 KB',
-    passed: renderResult.ok && renderResult.sizeKb >= 200,
-    detail: !renderResult.ok ? `render failed: ${renderResult.stderr.slice(0, 300)}` : (renderResult.sizeKb < 200 ? `pdf only ${renderResult.sizeKb.toFixed(1)} KB` : undefined),
-  })
+  if (!renderResult.skipped) {
+    assertions.push({
+      id: 'I1.render',
+      description: 'renderer exits 0 + writes PDF >= 200 KB',
+      passed: renderResult.ok && renderResult.sizeKb >= 200,
+      detail: !renderResult.ok ? `render failed: ${renderResult.stderr.slice(0, 300)}` : (renderResult.sizeKb < 200 ? `pdf only ${renderResult.sizeKb.toFixed(1)} KB` : undefined),
+    })
+  }
 
   // I2. Page count
   if (renderResult.pages > 0) {
