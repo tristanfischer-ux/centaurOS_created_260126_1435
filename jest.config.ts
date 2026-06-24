@@ -10,6 +10,13 @@ const createJestConfig = nextJest({
 const config: Config = {
     coverageProvider: 'v8',
     testEnvironment: 'jsdom',
+    // OOM fix (Tristan 2026-06-24): the heavy orchestrator suites (relevance-sweep,
+    // bootstrap-tool-plan, …) import large module graphs and grew jest workers past the
+    // default heap → "Jest worker encountered N child process exceptions" → 10 suites
+    // failed-to-RUN (0 real test failures), spuriously blocking the pre-push/CI gate.
+    // Restart a worker before it OOMs, and cap parallelism so peak memory stays bounded.
+    workerIdleMemoryLimit: '768MB',
+    maxWorkers: '50%',
     setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
@@ -39,6 +46,20 @@ const config: Config = {
         '<rootDir>/tests/e2e/',
         '<rootDir>/.claude/worktrees/',
         '<rootDir>/_archive/',
+        // scripts/lib/cost/ and scripts/lib/orchestrator/ *.test.* are tsx-RUN assertion scripts
+        // (a top-level main()/IIFE + console.log + process.exit — NO jest describe/it/expect). Jest
+        // mis-collected them by the .test.* suffix, ran main(), and the process.exit KILLED the jest
+        // worker → "child process exception" → 10 suites failed-to-RUN (0 real test failures),
+        // spuriously blocking the pre-push/CI gate (the likely original cause of the main↔branch
+        // drift — the gate was unpassable so pushes bypassed it). They run via `npx tsx <file>` /
+        // verify-engine-guards.sh, not jest. The 3 REAL jest tests in scripts/lib/ (engineering-
+        // ledger, engineering-problem-narrative, tool-selection-narrative) are top-level, not in
+        // these subdirs, so they still run. Tristan 2026-06-24.
+        '<rootDir>/scripts/lib/cost/',
+        '<rootDir>/scripts/lib/orchestrator/',
+        // a tsx-run assertion script (top-level guard checks + console.log "PASSED", no jest
+        // describe/it) mis-suffixed .test.tsx — jest "must contain at least one test". Runs via tsx.
+        '<rootDir>/src/lib/pdf-engine-v2/brief-expander.test.tsx',
     ],
     // Only match test files with .test. or .spec. patterns
     testMatch: [
