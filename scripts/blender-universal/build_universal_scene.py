@@ -1554,19 +1554,25 @@ def token_overlap(a_tokens, b_tokens):
 # that deliberately AVOID the saturated service hues (blue=water, red=electrical,
 # orange=thermal) so the coloured service pipes POP and stay traceable against the
 # equipment. Cycled by module — universal across archetypes, no per-class code.
+# PROFESSIONAL NEUTRAL palette (Tristan 2026-06-24: "blender images must look great, no parts vomit").
+# The previous mid-chroma "muted" tones rendered GARISH under the studio lighting (slate teal → cyan,
+# muted violet → purple, clay → orange = the toy-block look). Equipment now reads as STEEL/PLANT — all
+# variants pulled hard toward neutral steel grey (≈0.65) with only a FAINT tint for first-glance module
+# differentiation; the SERVICE PIPES (blue=water / red=electrical / orange=thermal) carry the colour and
+# now POP against the neutral plant. Universal across archetypes (cycled by module, no per-class code).
 MODULE_EQUIP_COLOURS = [
-    (0.62, 0.64, 0.68),   # 0 — cool steel grey
-    (0.58, 0.70, 0.60),   # 1 — sage green
-    (0.80, 0.72, 0.54),   # 2 — sand / tan
-    (0.64, 0.58, 0.76),   # 3 — muted violet
-    (0.48, 0.66, 0.72),   # 4 — slate teal
-    (0.82, 0.66, 0.52),   # 5 — clay
-    (0.56, 0.62, 0.48),   # 6 — olive
-    (0.74, 0.60, 0.66),   # 7 — mauve
-    (0.60, 0.66, 0.76),   # 8 — periwinkle grey
-    (0.76, 0.70, 0.46),   # 9 — ochre grey
-    (0.50, 0.58, 0.62),   # 10 — blue grey
-    (0.72, 0.60, 0.54),   # 11 — taupe
+    (0.66, 0.67, 0.70),   # 0 — neutral steel
+    (0.63, 0.67, 0.64),   # 1 — faint sage-steel
+    (0.71, 0.69, 0.63),   # 2 — faint sand-steel
+    (0.66, 0.64, 0.70),   # 3 — faint violet-steel
+    (0.62, 0.67, 0.69),   # 4 — faint slate-steel
+    (0.71, 0.66, 0.62),   # 5 — faint clay-steel
+    (0.64, 0.66, 0.61),   # 6 — faint olive-steel
+    (0.69, 0.65, 0.67),   # 7 — faint mauve-steel
+    (0.63, 0.66, 0.71),   # 8 — faint periwinkle-steel
+    (0.70, 0.68, 0.62),   # 9 — faint ochre-steel
+    (0.62, 0.65, 0.67),   # 10 — blue-steel grey
+    (0.68, 0.65, 0.63),   # 11 — faint taupe-steel
 ]
 _MODULE_COLOUR_ORDER = []  # module_ids in deterministic first-seen order
 
