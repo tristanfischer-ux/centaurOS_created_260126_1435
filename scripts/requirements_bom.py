@@ -525,6 +525,9 @@ _MIN_PRICE_FLOORS = [
     (re.compile(r"\brelay\b", re.I), 35.0),
     (re.compile(r"isolat(?:or|ion)[_ ]?(?:device|switch)?|disconnect|load[_ ]?break", re.I), 95.0),
     (re.compile(r"contactor", re.I), 80.0),
+    # a bare solenoid / pilot VALVE is a small control part (~£50-200) — its own modest floor, NOT
+    # the £1,500 O₂-supply-system floor that used to catch it (2026-06-24).
+    (re.compile(r"\bsolenoid\b|pilot[_ ]?valve", re.I), 80.0),
     (re.compile(r"fuse[_ ]?holder|fuse[_ ]?carrier", re.I), 25.0),
     (re.compile(r"emergency[_ ]?stop|e[_ -]?stop", re.I), 40.0),
     (re.compile(r"interlock|safety[_ ]?switch", re.I), 60.0),
@@ -571,7 +574,11 @@ _PROCESS_SYSTEM_FLOORS = [
     # blower at £165k vs the ~£30k market). A blower is light rotating kit.
     (re.compile(r"\bblower\b|aerat\w*[_ ]?(?:blower|system)|degass\w*[_ ]?blower|air[_ ]?blower|"
                 r"roots[_ ]?blower|lobe[_ ]?blower|degassing[_ ]?blower", re.I), _BLOWER_DUTY),
-    (re.compile(r"\bo2\b|oxygen|\blox\b|solenoid|oxygen[_ ]?(?:supply|system|dos|inject)", re.I), 1500.0),
+    # O₂/oxygen SUPPLY SYSTEM floor £1,500 — NOT a bare "solenoid" (a small valve ~£50-300; the
+    # bare alternative wrongly floored a 250 V "off-gas activation solenoid" to £1,500 ×13 = £19.5k,
+    # 2026-06-24). The oxygen-system patterns still match the real LOX/O₂ supply skid.
+    (re.compile(r"\bo2\b|oxygen|\blox\b|oxygen[_ ]?(?:supply|system|dos|inject)|"
+                r"oxygen[_ ]?(?:dosing|injection)[_ ]?solenoid", re.I), 1500.0),
 ]
 
 
