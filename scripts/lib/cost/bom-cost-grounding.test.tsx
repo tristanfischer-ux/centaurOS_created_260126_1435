@@ -272,6 +272,17 @@ const unsizedVessel = word('recycle knock-out drum', {
 const unsizedG = groundBomLineCost(unsizedVessel, { quantities: {} })
 ok('unsized KO drum (guarded knock-out) → no-ground (no fabricated number)', unsizedG.price_gbp === null && unsizedG.provenance === 'no-ground', `£${unsizedG.price_gbp}`)
 
+// FIELD INSTRUMENT must not inherit a co-located vessel's material take-off (Tristan 2026-06-24):
+// a "reactor pH probe" / "temperature sensor" / "density meter" sharing a sub-module with a reactor
+// whose *_shell_mass_kg is registered must route OFF the fabricated path (the AUXILIARY_GUARD), NOT
+// be priced as 772 kg of 316L — the £62,529 over-bill bug. Each must NOT get the vessel take-off.
+for (const instr of ['reactor pH probe', 'reactor temperature sensor', 'reactor slurry density meter']) {
+  const iw = word(instr, { form: { value: 'field instrument' }, manufacturer: { value: 'Endress+Hauser' }, part_number: { value: 'descriptive instrument' } })
+  const ig = groundBomLineCost(iw, { quantities: { carbonation_reactor_shell_mass_kg: 772 } })
+  ok(`field instrument "${instr}" does NOT inherit the co-located reactor's material take-off`,
+     ig.provenance === 'no-ground' && !/316L|kg.*fabrication|kg ×/.test(ig.basis ?? ''), `${ig.provenance} / £${ig.price_gbp} / ${ig.basis ?? ''}`)
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 
 // Dual-mode: self-running under `npx tsx` (the documented run mode, matching the sibling cost

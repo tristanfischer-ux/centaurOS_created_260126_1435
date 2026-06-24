@@ -208,6 +208,13 @@ const AUXILIARY_GUARD = new RegExp(
     'instrument-?air', 'cooling-water skid', 'cooling water skid', 'additisation', 'blanketing',
     'controller', 'control system', 'safety instrumented', 'fire and gas', 'fire & gas',
     'thermowell', 'temperature probe',
+    // GENERIC FIELD INSTRUMENTS (Tristan 2026-06-24, UNIVERSAL): a probe / sensor / meter /
+    // gauge is a commodity instrument (~£0.2–5k), NEVER a fabricated vessel. Without these, a
+    // line like "reactor pH probe" / "reactor temperature sensor" / "reactor slurry density
+    // meter" matched the REACTOR's *_shell_mass_kg via the word "reactor" and inherited its
+    // material-take-off (e.g. £62,529 for 772 kg of 316L) — a 30–250× over-bill. \\bmeter\\b is
+    // word-bounded so it ignores "metering skid" (already guarded) and "diameter".
+    '\\bprobe\\b', '\\bsensor\\b', '\\bmeter\\b', '\\bgauge\\b', 'sight\\s?glass', 'level switch',
   ].join('|'),
   'i',
 )
