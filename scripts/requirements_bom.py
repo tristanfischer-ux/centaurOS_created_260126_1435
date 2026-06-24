@@ -1099,7 +1099,19 @@ def _rating_kw(md: dict, name: str = "", requirement: str = ""):
     unit = ""
     rp = md.get("rating_primary") if isinstance(md, dict) else None
     if rp is not None:
-        val = _num(rp)
+        # GUARD (2026-06-24): a rating_primary carrying a NON-power unit (flow L/min·m³/h,
+        # current A, voltage V, pressure bar, speed rpm, head m, temp °C) is NOT a kW
+        # rating. _num() ignores the unit, so "150 L/min @ 20 m head" was read as 150 kW
+        # and the cooling pump priced 150 kW × £700/kW = £105k (×2 = £210k). Only accept a
+        # bare number or an explicit kW/kVA/MW/MVA. Universal — same unit-honouring fix as
+        # the capacity→m³ size bug.
+        rp_str = str(rp)
+        _has_power = bool(re.search(r"\b\d[\d.]*\s*(?:k|m)?(?:w|va)\b", rp_str, re.I))
+        _has_nonpower = bool(re.search(
+            r"l\s*/?\s*min|l\s*/?\s*s|m\s*3\s*/?\s*h|m³|\bgpm\b|\bm\b\s*head|\bhead\b|"
+            r"\bA\b|\bV\b|\bkV\b|\bbar\b|\bk?pa\b|\bmpa\b|\brpm\b|\bhz\b|°\s*c|\bmm\b",
+            rp_str, re.I))
+        val = None if (_has_nonpower and not _has_power) else _num(rp)
     # explicit unit from the modifier list if the caller passed one through name/req
     blob = f"{name} {requirement}"
     if val is None:
@@ -1470,6 +1482,19 @@ def _selftest() -> int:
         _pump = _crow.get("cooling pump", "")
         if "m³" in _pump:   # the L/min rating is already in rating_primary → no redundant " · 150 m³"
             print(f"  FAIL pump non-volume capacity rendered as m³: {_pump!r}"); bad += 1
+
+    # ── RATING-KW UNIT GUARD (cost side of the same unit-confusion, 2026-06-24) — a
+    # rating_primary with a NON-power unit must NOT be read as kW. "150 L/min @ 20 m head"
+    # was read as 150 kW → the cooling pump priced 150 kW × £700/kW = £105k. A genuine kW
+    # rating still prices; a kVA/MVA/MW rating still parses.
+    if _rating_kw({"rating_primary": "150 L/min @ 20 m head"}, "cooling pump")[0] is not None:
+        print("  FAIL rating_kw read a flow rating (L/min) as kW"); bad += 1
+    if _rating_kw({"rating_primary": "2300 A"}, "AC main breaker")[0] is not None:
+        print("  FAIL rating_kw read a current rating (A) as kW"); bad += 1
+    if _rating_kw({"rating_primary": "94"}, "Circulation Pump")[0] != 94:
+        print("  FAIL rating_kw dropped a bare kW number"); bad += 1
+    if _rating_kw({"rating_primary": "132 kW"}, "Circulation Pump")[0] != 132:
+        print("  FAIL rating_kw dropped an explicit kW rating"); bad += 1
 
     # ── UNIVERSAL RATING-BASED COST MODEL (council 2026-06-16/17) ──
     # invariant: power-rated kit is priced from the £/kW(/kVA) market curve in BOTH
