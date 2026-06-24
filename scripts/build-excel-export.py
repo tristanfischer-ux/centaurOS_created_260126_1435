@@ -411,6 +411,69 @@ def lhs_symbol(formula: str) -> str:
 
 
 # ============================================================================
+# COST BREAKDOWN BY CATEGORY — deterministic "where does my money go?" (Tristan 2026-06-24)
+# ============================================================================
+# A founder opening a 30-tab BoM is overwhelmed; a founder who sees "62% of capex is vessels +
+# heat exchangers, 11% pumps" gets value in five seconds. Deterministic: reads parts-ledger.json
+# (the engine's own classified equipment[] + connections[]), groups by a founder-friendly category,
+# sums line_gbp, returns sorted [(category, gbp, pct, n_lines)]. UNIVERSAL — name-based classifier,
+# no per-class table. Instruments/Valves are tested BEFORE Vessels so "reactor pH probe" classifies
+# as an instrument, not a vessel (the same shared-keyword trap fixed in bom-cost-grounding.ts).
+_COST_CAT_RULES = [
+    (r'reboil|condenser|\bcooler\b|exchanger|\bhx\b|chiller|economiser|heat[- ]?recovery|\bheater\b', 'Heat exchangers & thermal'),
+    (r'dryer|kiln|calciner|hot[- ]?air', 'Drying & thermal'),
+    (r'centrifuge|filter press|cyclone|decanter|clarifier|belt filter|\bscreen\b|membrane|\bfilter\b', 'Filtration & separation'),
+    (r'bagging|packaging|palletis|conveyor|\bfeeder\b|hopper|\bsilo\b|\bsack\b|material handling', 'Material handling & packaging'),
+    (r'\bprobe\b|\bsensor\b|\bmeter\b|\bgauge\b|transmitter|analy[sz]er|detector|thermowell|sight\s?glass', 'Instruments'),
+    (r'\bvalve\b|solenoid|\bactuator\b|\bdamper\b', 'Valves'),
+    (r'reactor|crystallis|\bvessel\b|\btank\b|\bcolumn\b|\btower\b|absorber|stripper|\bdrum\b|reservoir|receiver|launder|\bsump\b', 'Vessels, reactors & columns'),
+    (r'\bpump\b|blower|compressor|\bfan\b|agitator|mixer|skimmer|aerat', 'Pumps, blowers & compressors'),
+    (r'\bmcc\b|motor control|switchgear|transformer|\bpanel\b|busbar|breaker|\brelay\b|\bups\b|electrical|\bcable\b|generator|genset', 'Electrical & power'),
+    (r'\bplc\b|scada|control|\bi/o\b|\bhmi\b|gateway', 'Control system'),
+    (r'\bskid\b|\bframe\b|structure|foundation|plinth|containment|\bbund\b|platform|walkway', 'Structure & containment'),
+]
+_COST_TYPE_FALLBACK = {
+    'vessel': 'Vessels, reactors & columns', 'rotating': 'Pumps, blowers & compressors',
+    'exchanger': 'Heat exchangers & thermal', 'separator': 'Filtration & separation',
+    'instrument': 'Instruments', 'valve': 'Valves', 'electrical': 'Electrical & power',
+    'control': 'Control system', 'structural': 'Structure & containment',
+}
+
+
+def _cost_category(name: str, tag: str, etype: str) -> str:
+    blob = f"{name} {tag}".lower()
+    for rx, cat in _COST_CAT_RULES:
+        if re.search(rx, blob):
+            return cat
+    return _COST_TYPE_FALLBACK.get((etype or '').lower(), 'Balance of plant')
+
+
+def cost_breakdown_by_category(run_dir: str) -> List[tuple]:
+    """Returns [(category, gbp, pct_of_total, n_lines)] sorted by cost desc. [] if no ledger."""
+    pl = load_json(os.path.join(run_dir, "parts-ledger.json"))
+    if not isinstance(pl, dict):
+        return []
+    agg: Dict[str, List[float]] = {}   # cat -> [gbp, n]
+    for e in pl.get("equipment", []) or []:
+        v = e.get("line_gbp") or 0
+        if not v:
+            continue
+        cat = _cost_category(e.get("name") or e.get("requirement") or "", e.get("tag") or "", e.get("type"))
+        a = agg.setdefault(cat, [0.0, 0]); a[0] += v; a[1] += 1
+    for c in pl.get("connections", []) or []:
+        v = c.get("line_gbp") or 0
+        if not v:
+            continue
+        kind = (c.get("kind") or "").lower(); mech = (c.get("mechanism") or "").lower()
+        cat = 'Cabling & power runs' if ('cable' in kind or 'electric' in mech or 'signal' in mech) else 'Pipework'
+        a = agg.setdefault(cat, [0.0, 0]); a[0] += v; a[1] += 1
+    total = sum(a[0] for a in agg.values()) or 1.0
+    rows = [(cat, gn[0], 100.0 * gn[0] / total, int(gn[1])) for cat, gn in agg.items()]
+    rows.sort(key=lambda r: r[1], reverse=True)
+    return rows
+
+
+# ============================================================================
 # TAB 1 — OVERVIEW (quality scorecard + headline metrics + provenance)
 # ============================================================================
 def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
@@ -581,6 +644,39 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
             metric_row(km["headline_constraint"])
         for m in (km.get("supporting_metrics") or [])[:12]:
             metric_row(m)
+    row += 1
+
+    # ---- where the money goes (deterministic capex breakdown by category) — the five-second
+    # "where does my budget go?" answer a founder needs before they read 30 tabs. ----
+    _cb = cost_breakdown_by_category(run_dir)
+    if _cb:
+        sub_banner(ws, row, "Where the money goes — capex by category", 4)
+        row += 1
+        _note = ws.cell(row, 1, "Deterministic roll-up of every bill-of-materials line, grouped by "
+                                "equipment category. Sums to the equipment + connections capex.")
+        _note.font = FONT_NOTE
+        _note.alignment = WRAP_TOP
+        row += 1
+        header(ws, row, ["Category", "Cost (£)", "% of capex", "Share"])
+        row += 1
+        _bar_font = Font(name="Menlo", size=10, color="2E5A88")
+        for cat, gbp, pct, _n in _cb:
+            ws.cell(row, 1, cat).border = BORDER
+            cg = ws.cell(row, 2, round(gbp))
+            cg.number_format = "#,##0"
+            cg.border = BORDER
+            cp = ws.cell(row, 3, round(pct, 1))
+            cp.number_format = '0.0"%"'
+            cp.border = BORDER
+            cb = ws.cell(row, 4, "█" * int(round(pct / 2.5)) if pct >= 1.25 else "▏")
+            cb.font = _bar_font
+            cb.border = BORDER
+            row += 1
+        ws.cell(row, 1, "Total (equipment + connections)").font = FONT_SUB
+        _ct = ws.cell(row, 2, round(sum(r[1] for r in _cb)))
+        _ct.number_format = "#,##0"
+        _ct.font = FONT_SUB
+        row += 2
 
     back_link(ws, 4)
 
