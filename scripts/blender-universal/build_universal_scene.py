@@ -10535,6 +10535,20 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     # rows) on the centreline — NOT stacked in Y (which ballooned the enclosure to ~9.8 m
     # deep). Otherwise keep the original Y-stacked lineup along the end wall.
     _container_bop = bool(_CONTAINER_LAYOUT and _CONTAINER_ENVELOPE_MM)
+    # BATTERY-ONLY CONTAINER (Tristan 2026-06-24, industry): a containerised BESS container holds
+    # the BATTERIES only — the power-conversion (PCS, step-up transformer, MV switchgear) lives in
+    # a SEPARATE, co-located container. So for a containerised BESS, split the BoP: the battery-side
+    # roles (BMS, chiller/cooling, fire, HVAC) stay IN the battery container; the power-conversion
+    # roles go to a companion enclosure placed beside it. The battery container then sizes to
+    # racks + battery-side BoP and FITS. Universal — keyed on BoP role, no per-class table.
+    _EXTERNAL_PC_ROLES = {"pcs", "transformer", "switchgear"}
+    _external_bop = []
+    if _container_bop:
+        _external_bop = [it for it in bop_items if it[0] in _EXTERNAL_PC_ROLES]
+        bop_items = [it for it in bop_items if it[0] not in _EXTERNAL_PC_ROLES]
+        if _external_bop:
+            print(f"[univ][rackfarm] battery-only container: {len(_external_bop)} power-conversion "
+                  f"skid(s) ({', '.join(it[0] for it in _external_bop)}) moved to a companion enclosure")
     # CONTAINERISED: continue the BoP lineup IN THE SAME ROWS as the racks (both walls),
     # greedily filling the shortest row, so the combined rack+BoP lineup WRAPS within the
     # container length instead of running one 12 m tail past the racks. bop_row_x tracks
@@ -10625,15 +10639,53 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
         enc_d = max(enc_d, _CONTAINER_ENVELOPE_MM["w"])
         if _CONTAINER_ENVELOPE_MM.get("h"):
             enc_h = max(enc_h, _CONTAINER_ENVELOPE_MM["h"])
+    # battery container shell — but for a battery-only container the enclosure must NOT be widened
+    # to the brief envelope's WIDTH if that's the LENGTH axis; clamp to the real battery footprint
+    # so the companion sits beside it. (enc_w/enc_d already clamped to the envelope above.)
     _build_container_enclosure(enc_cx, enc_cy, DECK_Z_MM, enc_w, enc_d, enc_h, MAT, MO)
     frame_top_mm = DECK_Z_MM + enc_h
-    print(f"[univ][rackfarm] container enclosure: {enc_w/1000:.1f}×{enc_d/1000:.1f} m "
-          f"footprint, {enc_h/1000:.1f} m tall; BoP lineup of {len(bop_items)} skids")
+    print(f"[univ][rackfarm] battery container enclosure: {enc_w/1000:.1f}×{enc_d/1000:.1f} m "
+          f"footprint, {enc_h/1000:.1f} m tall; BoP lineup of {len(bop_items)} battery-side skids")
+
+    # ── 3b. COMPANION POWER-CONVERSION CONTAINER (battery-only split) ──────────
+    # The PCS / transformer / MV switchgear excluded from the battery container are placed here —
+    # a second, co-located container in front of (−Y) the battery container — so the GA shows the
+    # real two-container site arrangement (batteries + power-conversion), and the battery container
+    # itself stays a clean batteries-only box.
+    _comp_y0 = enc_y0
+    if _external_bop:
+        pc_gap = 2500.0
+        pc_depth = max((it[2] for it in _external_bop), default=2400.0)
+        pc_cy = enc_y0 - pc_gap - pc_depth / 2.0
+        pc_x0 = enc_x0 + cont_margin
+        pc_cursor_x = pc_x0
+        for role, part_or_none, depth_mm, w_mm, h_mm, rgb in _external_bop:
+            cx = pc_cursor_x + w_mm / 2.0
+            mod = part_or_none.module_id if part_or_none else "energy_conversion_transduction"
+            if mod not in MO:
+                MO[mod] = []
+            nm = f"u_rf_pcbop_{role}"
+            mat = MAT.get(f"u_rf_pcbop_{role}") or fl.make_mat(f"m_rf_pcbop_{role}", rgb, metallic=0.35, roughness=0.42)
+            MAT[f"u_rf_pcbop_{role}"] = mat
+            if role == "transformer":
+                _build_bop_transformer(nm, cx, pc_cy, DECK_Z_MM, w_mm, depth_mm, h_mm, mat, steel, MAT, mod, MO)
+            else:  # pcs / switchgear → cabinet lineup
+                _build_bop_cabinet_lineup(nm, cx, pc_cy, DECK_Z_MM, w_mm, depth_mm, h_mm, mat, steel, MAT, mod, MO, n_sections=3, louvres=True)
+            bop_anchor[role] = (cx, pc_cy, DECK_Z_MM + h_mm)
+            region_centres[role] = (cx, pc_cy)
+            pc_cursor_x += w_mm + BOP_GAP_MM
+        pc_w = (pc_cursor_x - pc_x0) + 2 * cont_margin
+        pc_d = pc_depth + 2 * cont_margin
+        pc_cx = pc_x0 - cont_margin + pc_w / 2.0
+        _build_container_enclosure(pc_cx, pc_cy, DECK_Z_MM, pc_w, pc_d, enc_h, MAT, MO)
+        _comp_y0 = pc_cy - pc_d / 2.0
+        print(f"[univ][rackfarm] companion power-conversion container: {pc_w/1000:.1f}×{pc_d/1000:.1f} m "
+              f"({len(_external_bop)} skids: {', '.join(it[0] for it in _external_bop)})")
 
     # ── 4. TOPOLOGY: electrical bus (racks→DC bus→PCS→transformer) as cable
     #    trays + thermal (PCS/racks→heat rejection) as coolant pipes to the chiller.
     #    Reuse the existing overhead-rack router + cable-tray / pipe primitives.
-    bbox = {"x0": enc_x0, "x1": enc_x1, "y0": enc_y0, "y1": enc_y1}
+    bbox = {"x0": enc_x0, "x1": enc_x1, "y0": min(enc_y0, _comp_y0), "y1": enc_y1}
     routed, unresolved = _route_rack_farm_topology(
         topology, parts, rack_anchor_by_index, bop_anchor, region_centres,
         frame_top_mm, bbox, MAT, MO)
