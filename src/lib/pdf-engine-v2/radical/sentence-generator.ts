@@ -354,18 +354,33 @@ export function capitaliseFirst(s: string): string {
  *
  * A name_human that is empty/absent → humaniseId(sub.id) (existing behaviour).
  */
+// The 12 canonical function-taxonomy module slugs. A sub-module whose name_human IS one of
+// these ("mass fluid transport process") reads as jargon when used as a sentence subject, so
+// for those we prefer the primary equipment word instead. A CLEAN equipment-grouping name
+// ("cell string", "BMS master", "thermal loop") is a good subject and must be kept.
+const _TAXONOMY_LABELS = new Set([
+  'energy_storage_source', 'energy_conversion_transduction', 'structure_containment',
+  'sensing_instrumentation', 'control_compute_communication', 'safety_protection',
+  'environmental_interface', 'power_distribution', 'maintenance_serviceability',
+  'actuation_kinematics', 'mass_fluid_transport_process', 'hmi_ergonomics',
+])
+
 function resolveSubmoduleLabel(subModule: SubModuleSpec): string {
-  // Prefer the primary EQUIPMENT word's name ("packed absorber column") over the
-  // function-taxonomy name_human ("mass fluid transport process") — the taxonomy
-  // reads as jargon when used as a sentence subject ("The mass fluid transport
-  // process absorbs 5 components"). 2026-06-09 universal; the equipment names are
-  // the same ones the module headings + flowchart already use.
+  const raw = (subModule.name_human ?? '').trim()
+  const normId = raw.toLowerCase().replace(/\s+/g, '_')
+  // Prefer a CLEAN sub-module name as the subject — it reads naturally ("The cell string
+  // consists of …") and avoids the redundant, ungrammatical "The LFP prismatic cells consists
+  // of LFP prismatic cells …" the equipment-word-first path produced. Fall back to the primary
+  // EQUIPMENT word ONLY when name_human is empty, a snake_case internal ID, OR a function-
+  // taxonomy label (the 2026-06-09 reason — taxonomy jargon reads wrong as a subject).
+  const isCleanSubName = !!raw && !(raw.includes('_') && !raw.includes(' ')) &&
+    !_TAXONOMY_LABELS.has(normId) && !_TAXONOMY_LABELS.has(subModule.id)
+  if (isCleanSubName) return raw
   const words: any[] = Array.isArray((subModule as any).words) ? (subModule as any).words : []
   for (const w of words) {
     const nm = String((w as any)?.content_character?.name_human || (w as any)?.name_human || '').trim()
     if (nm && !(nm.includes('_') && !nm.includes(' '))) return nm
   }
-  const raw = (subModule.name_human ?? '').trim()
   if (!raw) return humaniseId(subModule.id)
   // Contains underscore but NO space → looks like a snake_case internal ID.
   if (raw.includes('_') && !raw.includes(' ')) return humaniseId(subModule.id)
