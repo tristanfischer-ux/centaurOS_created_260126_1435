@@ -10,6 +10,16 @@ npm run lint -- --quiet || {
   exit 1
 }
 
+# Engine regression guards (Tristan 2026-06-24, CORE FIX PRINCIPLE enforcement): run every
+# engine --selftest (the rule-level guards where pricing/sizing/contract source-rule fixes land)
+# and BLOCK the push on any failure. This is the DETERMINISTIC enforcement of "every fix carries
+# a guard that can't regress" — it must execute, not depend on CLAUDE.md / an agent remembering.
+echo "→ Running engine regression guards..."
+bash scripts/verify-engine-guards.sh || {
+  echo "❌ Engine guards failed — a source rule regressed. Fix the RULE (not the symptom) before pushing."
+  exit 1
+}
+
 # Run unit tests
 echo "→ Running unit tests..."
 npm run test || {
