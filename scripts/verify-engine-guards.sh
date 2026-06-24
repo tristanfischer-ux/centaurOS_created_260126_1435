@@ -50,6 +50,9 @@ run "scenario-planning.ts --selftest"         npx tsx scripts/lib/scenario-plann
 # PROVE-THE-CATCH: every registered gate must catch its own adversarial input (intent, not just
 # existence). A gate that can no longer block the exact failure it exists to catch fails here.
 run "gate-registry --selftest (prove-catch)"  npx tsx scripts/lib/gate-registry.ts --selftest
+# VERIFY-BEFORE-WRITEBACK: an LLM-web spec/standard/product is persisted only with real evidence
+# (authoritative URL + an excerpt that supports the value) — a hallucinated value is rejected.
+run "web-extraction-verify --selftest"        npx tsx src/lib/pdf-engine-v2/lib/knowledge/web-extraction-verify.ts --selftest
 
 # ── the UNIVERSAL regression harness (pure invariants incl. benchmark_net + requirements_bom
 #    selftest), against an EXPLICIT complete snapshot only. NO PDF (REGRESSION_NO_RENDER=1).

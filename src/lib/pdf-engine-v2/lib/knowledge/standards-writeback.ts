@@ -214,6 +214,16 @@ If you cannot find the standard, return: {"scope":"","raw_excerpt":"not found","
       return null
     }
     if (!parsed.scope || parsed.raw_excerpt === 'not found') return null
+    // VERIFY-BEFORE-WRITEBACK (Tristan 2026-06-24): require a real authoritative URL + a verbatim
+    // excerpt that references the standard NUMBER — so a fabricated "scope" for a standard the LLM
+    // can't actually cite is not persisted. value = standard_name (the number, e.g. "62619", must
+    // appear in the cited sentence).
+    const { isVerifiedWebExtraction } = await import('./web-extraction-verify')
+    const verdict = isVerifiedWebExtraction({ value: standard_name, source_url: String(parsed.source_url ?? ''), raw_excerpt: String(parsed.raw_excerpt ?? ''), requireValueInExcerpt: true })
+    if (!verdict.ok) {
+      console.error(`[standards-writeback] REJECTED unverified web standard ${standard_name}: ${verdict.reason}`)
+      return null
+    }
     return {
       scope: String(parsed.scope).slice(0, 512),
       raw_excerpt: `${String(parsed.raw_excerpt ?? '').slice(0, 900)} [source: ${parsed.source_url ?? ''}]`.slice(0, 1024),

@@ -259,6 +259,15 @@ If you cannot find the product, return: {"manufacturer":"","key_specs":{},"envel
       return null
     }
     if (!parsed.manufacturer && !Object.keys(parsed.key_specs ?? {}).length) return null
+    // VERIFY-BEFORE-WRITEBACK (Tristan 2026-06-24): a product is persisted only with a real
+    // authoritative source URL — the evidence for a structured product (no single excerpt). A
+    // fabricated product the LLM can't cite a page for is not written. requireExcerpt=false.
+    const { isVerifiedWebExtraction } = await import('./web-extraction-verify')
+    const pVerdict = isVerifiedWebExtraction({ value: String(parsed.manufacturer || product_name), source_url: String(parsed.source_url ?? ''), requireExcerpt: false })
+    if (!pVerdict.ok) {
+      console.error(`[products-writeback] REJECTED unverified web product ${product_name}: ${pVerdict.reason}`)
+      return null
+    }
     const modules: ProductModule[] = Array.isArray(parsed.modules)
       ? parsed.modules
           .filter((m: any) => m && typeof m.module === 'string')

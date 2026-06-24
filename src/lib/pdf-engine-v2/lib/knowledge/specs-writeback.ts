@@ -224,6 +224,16 @@ If you cannot find an authoritative value, return: {"value":"","unit":"","source
       return null
     }
     if (!parsed.value || parsed.value === 'not found' || parsed.raw_excerpt === 'not found') return null
+    // VERIFY-BEFORE-WRITEBACK (Tristan 2026-06-24): do not persist an unsupported LLM value. The
+    // cited excerpt MUST contain the claimed number + carry a real authoritative URL — this catches
+    // a hallucinated spec (the value isn't in the sentence the LLM cited) before it becomes a
+    // confident DB hit. Reject → return null → no writeback (treated as a web miss).
+    const { isVerifiedWebExtraction } = await import('./web-extraction-verify')
+    const verdict = isVerifiedWebExtraction({ value: String(parsed.value), source_url: String(parsed.source_url ?? ''), raw_excerpt: String(parsed.raw_excerpt ?? ''), requireValueInExcerpt: true })
+    if (!verdict.ok) {
+      console.error(`[specs-writeback] REJECTED unverified web spec ${manufacturer} ${part_number} ${spec_key}=${parsed.value}: ${verdict.reason}`)
+      return null
+    }
     return {
       value: String(parsed.value),
       unit: String(parsed.unit ?? ''),
