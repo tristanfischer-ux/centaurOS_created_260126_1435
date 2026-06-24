@@ -57,7 +57,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import get_column_letter, column_index_from_string
 from openpyxl.worksheet.worksheet import Worksheet
 
 # The SHARED deterministic-check library — the SAME pure-arithmetic checks the
@@ -246,30 +246,21 @@ FONT_LINK = Font(name="Calibri", size=11, color="1F3A5F", underline="single", bo
 _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Overview": "Quality scorecard, headline metrics & run provenance.",
     "Brief": "The original client brief and the engine's enhanced, structured interpretation that drives the design.",
-    "⚠ Checks": "Live arithmetic invariants (== the CLI verifier). RED = numbers don't reconcile.",
+    "⚠ Checks": "Live arithmetic invariants (== the CLI verifier; RED = numbers don't reconcile), then Brief-compliance (target vs achieved) and Tool-provenance (USED/STALE/ORPHANED) sections.",
     "Part names": "The master parts list — every part named once; every other tab references these cells.",
     "Connection trace": "Which part connects to what — live input/output cell-references with completeness & integrity counts.",
     "Quantities": "Every sized contract quantity with family, basis & source.",
     "Calculations": "Worked calcs grouped by tool — live Excel formulas where structured.",
-    "BoM": "THE BILL — what to buy: every line, qty, part/MPN, live Σ line £ total.",
-    "Cost": "PRICE PROVENANCE — how each £ was derived (method, factors, confidence).",
-    "Brief compliance": "Every brief target metric vs the achieved quantity vs a live PASS/FAIL.",
+    "Bill of Materials (Ledger)": "THE BILL — what to buy (tag · item · qty · unit £ · live Σ line £), with two collapsible column-groups: 'Cost basis' (how each £ was derived) and 'Engineering spec' (why each principal is this size).",
     "Cost waterfall": "BoM → assembly → factory COGS → install → installed ASP (live running totals).",
     "Inputs & Assumptions": "Editable yellow drivers (price/feed/energy/labour/capex) — the economics model inputs.",
-    "Economics": "Live revenue / opex / EBITDA / margin / payback / NPV / IRR — all formulas off the Inputs tab. Opex pie + revenue-vs-EBITDA bar.",
-    "Scenarios": "Live FINE scale sweep (0.2x-5x, capex via the tunable scaling exponent — default LINEAR/modular) with per-row payback/NPV/IRR + Low/Central/High price sensitivity. Capex/payback line charts + EBITDA bar.",
-    "Investment Analysis": "THE SWEET-SPOT FINDER. Live break-even / viability / investable / NPV-max / £5M-anchor over the sweep + a recommended-deployment callout. IRR-vs-capex (with hurdle lines), NPV, payback & EBITDA-margin curves.",
-    "Spec sheets": "SIZING RATIONALE — why each principal is this size: duty, rating, driving calc.",
+    "Financial model": "The whole commercial model on one sheet: base-case Economics (revenue / opex / EBITDA / NPV / IRR + charts), the scale sweep + Low/Central/High price sensitivity, and the Investment-analysis sweet-spot finder — all live off the Inputs tab.",
     "Panel schedule": "Electrical panel / load schedule as a real sortable table.",
-    "Process line list": "Process line list — sortable rows cross-referenced to the P&ID.",
-    "Process valve list": "Process valve list — tag, type, service, size, fail action.",
-    "Process instruments": "Instrument index — tag, ISA, measured variable, range, signal.",
+    "Process schedules": "Process line list, valve list & instrument index — three sortable sections cross-referenced to the P&ID.",
     "Line & velocity": "Every sized run with velocity / volt-drop & within-spec flagging.",
     "Glossary": "Plain-English meaning of every abbreviation (DN, ISA tags, FC/FO, status codes, units).",
-    "Risk register": "Hazards & findings (live: physics critic, gate flags, cost) + process-safety risks, S×L scored.",
-    "Regulatory": "Compliance-gate verdict + statutory duties derived from jurisdiction + hazards present.",
+    "Risk & Regulatory": "Live hazard & risk register (physics critic, gate flags, cost, equipment) + the compliance-gate verdict and statutory duties, on one sheet.",
     "Assembly sequence": "Order-of-works: civils → tankage → mechanical → pipework → electrical → I&C → commissioning.",
-    "Tool provenance": "Every engineering tool's input source → output → consumer, with a USED / STALE / ORPHANED verdict — the auditable proof that each tool's number is actually used.",
 }
 
 # A whitelist of CONTROL-CHARS Excel rejects inside a worksheet cell string —
@@ -945,6 +936,42 @@ def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
             CellIsRule(operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS),
         )
     ws.cell(2, 1)  # keep title intact
+
+    # ---- FOLDED SECTIONS (Tristan 2026-06-24 consolidation): Brief compliance + Tool
+    # provenance now live UNDER the checks as labelled sections rather than two standalone
+    # tabs — all three are "did the engine's numbers hold up?" audit content. Each section
+    # renders its own header + table; rows go below the checks block (cols A–H), clear of the
+    # hidden J–M data block which is parallel to the checks rows above. ----
+    sect_r = r + 2
+    big1 = ws.cell(sect_r, 1, "Brief compliance — every target vs achieved vs PASS/FAIL")
+    big1.font = FONT_TITLE; big1.fill = FILL_TITLE
+    big1.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+    ws.merge_cells(start_row=sect_r, start_column=1, end_row=sect_r, end_column=8)
+    ws.row_dimensions[sect_r].height = 24
+    sect_r += 2
+    bc_next = _render_brief_compliance_section(ws, state, sect_r)
+    if bc_next is None:
+        ws.cell(sect_r, 1, "— the brief carries no target_performance metrics to verify —").font = FONT_NOTE
+        sect_r += 2
+    else:
+        # live conditional formatting on the section's STATUS column (G)
+        from openpyxl.formatting.rule import CellIsRule as _CIR
+        _rng = f"G{sect_r + 1}:G{bc_next - 1}"
+        if bc_next - 1 >= sect_r + 1:
+            ws.conditional_formatting.add(_rng, _CIR(operator="equal", formula=['"FAIL"'], fill=FILL_FAIL, font=FONT_FAIL))
+            ws.conditional_formatting.add(_rng, _CIR(operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS))
+        sect_r = bc_next + 1
+
+    big2 = ws.cell(sect_r, 1, "Tool provenance — input → output traceability (USED / STALE / ORPHANED)")
+    big2.font = FONT_TITLE; big2.fill = FILL_TITLE
+    big2.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+    ws.merge_cells(start_row=sect_r, start_column=1, end_row=sect_r, end_column=8)
+    ws.row_dimensions[sect_r].height = 24
+    sect_r += 2
+    ti_next = _render_tool_io_section(ws, state, run_dir, sect_r)
+    if ti_next is None:
+        ws.cell(sect_r, 1, "— no orchestrator tool log for this run —").font = FONT_NOTE
+
     # ↑ Contents back-link at col span+1 (=H), clear of the hidden J–M data block.
     back_link(ws, 7)
     ws.freeze_panes = "A5"
@@ -1649,6 +1676,21 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
         r += 1
     ws.freeze_panes = "A6"
     ws.auto_filter.ref = f"A5:F{max(6, r - 1)}"
+    # ── Cabinets section (Tristan 2026-06-24 consolidation): the deterministic proof
+    # that every small electrical / control device is HOUSED in a cabinet and that the
+    # cabinet + its contents show their IN/OUT connectors, all connected. Reads the SAME
+    # parts-ledger connectivity verdict as the trace above, so the two cannot disagree. --
+    r += 1  # spacer
+    big = ws.cell(r, 1, "Cabinets — housed devices + connector proof")
+    big.font = FONT_TITLE
+    big.fill = FILL_TITLE
+    big.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+    ws.row_dimensions[r].height = 24
+    r += 2
+    nxt = _render_cabinet_section(ws, run_dir, r)
+    if nxt is None:
+        ws.cell(r, 1, "— no electrical / control cabinets itemised for this design —").font = FONT_NOTE
     back_link(ws, 6)
     return True
 
@@ -1825,19 +1867,89 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
     back_link(ws, 4)
 
 
+_LEDGER_SHEET = "Bill of Materials (Ledger)"
+
+
+def _fmt_cost_items(items) -> str:
+    """Render a cost-basis inputs/factors list (each a {name,value,unit} dict) as clean
+    'name: value unit; …' text instead of a raw Python dict dump in the Ledger."""
+    if not isinstance(items, list):
+        return str(items or "")
+    out = []
+    for it in items:
+        if isinstance(it, dict):
+            nm = it.get("name") or it.get("label") or ""
+            val = it.get("value", it.get("amount", it.get("rate", "")))
+            unit = it.get("unit", "")
+            s = str(nm)
+            if val not in (None, ""):
+                s += f": {val}"
+            if unit:
+                s += f" {unit}"
+            out.append(s.strip(": ").strip())
+        elif it not in (None, ""):
+            out.append(str(it))
+    return "; ".join(x for x in out if x)
+
+
+def _build_costbasis_by_name(state: dict) -> Dict[str, dict]:
+    """Index costBasis.lines by NORMALISED NAME (cost lines carry a `label` + `word_id`
+    but NO tag — name is the only join key shared with the BoM's `requirement`)."""
+    out: Dict[str, dict] = {}
+    cb = state.get("costBasis") or {}
+    for ln in (cb.get("lines") or []):
+        if not isinstance(ln, dict):
+            continue
+        key = _norm_name(ln.get("label", ""))
+        if key and key not in out:
+            out[key] = ln
+    return out
+
+
+def _build_mpn_by_word(state: dict) -> Dict[str, str]:
+    """tag/word(lower) -> 'Manufacturer MPN' from partVerifications (Spec-sheet MPN col)."""
+    out: Dict[str, str] = {}
+    for pv in (state.get("partVerifications") or []):
+        if not isinstance(pv, dict):
+            continue
+        mfr = (pv.get("manufacturer") or "").strip()
+        mpn = (pv.get("part_number") or "").strip()
+        if not mpn:
+            continue
+        label = f"{mfr} {mpn}".strip()
+        for k in (pv.get("word_name"), pv.get("word_id")):
+            if k:
+                out.setdefault(str(k).strip().lower(), label)
+    return out
+
+
 def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
+    """STAGE 4 consolidation (2026-06-24) — the headline merge: BoM + Cost + Spec sheets
+    on ONE sheet "Bill of Materials (Ledger)" with two collapsible Excel column-GROUPS.
+    ALWAYS VISIBLE: Tag · Item · Qty · Unit £ · Line £ (the buy-list). COLLAPSIBLE GROUP
+    "Cost basis" (cols F–J, from costBasis.lines, joined by NAME — cost lines carry no
+    tag): method · key inputs · factors · estimate class · confidence. COLLAPSIBLE GROUP
+    "Engineering spec" (cols K–N, principals only): duty/rating · material · sizing calc ·
+    MPN / datasheet. Commodity lines leave the spec columns blank (correct). Both detail
+    groups are collapsed-by-default. Keeps the LIVE Σ + the cost-reconciliation note."""
     _BOM_REGISTRY.clear()
-    ws = wb.create_sheet("BoM")
-    set_widths(ws, {"A": 12, "B": 50, "C": 8, "D": 28, "E": 8, "F": 12, "G": 12, "H": 50})
-    title_row(ws, "Bill of materials", 8,
-              "THE PROCUREMENT BILL — what to buy. Every line: tag · requirement · qty · "
-              "part / MPN · unit £ · LIVE line £ (=qty×unit) · basis; sub-components explode "
-              "under their parent (cost shown 'incl. in parent'). Σ line £ is live at the foot. "
-              "→ For HOW each price was derived & how confident, see the 'Cost' tab. "
-              "→ For WHY each principal item is sized as it is, see the 'Spec sheets' tab.")
-    header(ws, 4, ["Tag", "Requirement", "Qty", "Part", "Status",
-                   "Unit £", "Line £", "Basis"])
+    ws = wb.create_sheet(_LEDGER_SHEET)
+    set_widths(ws, {"A": 12, "B": 46, "C": 8, "D": 12, "E": 12,           # always-visible
+                    "F": 18, "G": 30, "H": 22, "I": 10, "J": 12,          # Cost-basis group
+                    "K": 30, "L": 18, "M": 50, "N": 30})                  # Engineering-spec group
+    title_row(ws, "Bill of Materials (Ledger)", 14,
+              "THE BILL + its provenance + its engineering, on one sheet. ALWAYS shown: tag · "
+              "item · qty · unit £ · LIVE line £ (the buy-list). Two COLLAPSIBLE column-groups "
+              "(click the [+] above cols F and K to expand): 'Cost basis' = HOW each £ was "
+              "derived (method / inputs / factors / estimate class / confidence); 'Engineering "
+              "spec' = WHY each principal is this size (duty / material / sizing calc / MPN). "
+              "Σ line £ is live at the foot; commodity lines leave the spec columns blank.")
+    header(ws, 4, ["Tag", "Item", "Qty", "Unit £", "Line £",
+                   "Cost method", "Key inputs", "Factors", "Est class", "Confidence",
+                   "Duty / rating", "Material", "Sizing calc (basis)", "MPN / datasheet"])
     bom = state.get("requirementsBom") or []
+    cost_by_name = _build_costbasis_by_name(state)
+    mpn_by_word = _build_mpn_by_word(state)
     r = 5
     first_line_row = r
     for row in bom:
@@ -1846,9 +1958,9 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         # and connection lines keep their literal tag (not master principals).
         _btref = tag_ref(row.get("tag", ""))
         ws.cell(r, 1, _btref if _btref else clean_cell(row.get("tag", ""))).border = BORDER
-        # Requirement column — the NAME is referenced from the master "Part names" tab
+        # Item column — the NAME is referenced from the master "Part names" tab
         # (introduced once), with this row's own detail tail (" · 110 kW …") appended, so
-        # editing the master name updates the BoM too. Sub-components (↳) and unmatched
+        # editing the master name updates the ledger too. Sub-components (↳) and unmatched
         # names keep their literal text (not global identities).
         _req_raw = clean_cell(row.get("requirement", ""))
         _nref = name_ref(row.get("requirement", "")) if not str(
@@ -1862,8 +1974,6 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         rq.alignment = WRAP_TOP
         rq.border = BORDER
         ws.cell(r, 3, row.get("qty")).border = BORDER
-        ws.cell(r, 4, clean_cell(row.get("part", ""))).border = BORDER
-        ws.cell(r, 5, clean_cell(row.get("status", ""))).border = BORDER
         # A sub-component row (requirement marked "↳") whose cost is rolled into its
         # parent (line_gbp == 0) must NOT show a standalone unit price: the parametric
         # intermediate is often larger than the parent itself (e.g. a £137k "110 kW
@@ -1874,32 +1984,60 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         _line_num = _line_raw if isinstance(_line_raw, (int, float)) else 0
         _is_subcomp = str(row.get("requirement", "") or "").strip().startswith("↳")
         if _is_subcomp and not _line_num:
-            ws.cell(r, 6, "incl. in parent").border = BORDER
-            ws.cell(r, 7, "—").border = BORDER
+            ws.cell(r, 4, "incl. in parent").border = BORDER
+            ws.cell(r, 5, "—").border = BORDER
         else:
-            ws.cell(r, 6, num(row.get("unit_gbp"))).border = BORDER
-            ws.cell(r, 7, num(row.get("line_gbp"))).border = BORDER
-        bs = ws.cell(r, 8, clean_cell(row.get("basis", "")))
-        bs.alignment = WRAP_TOP
-        bs.font = FONT_NOTE
-        bs.border = BORDER
+            ws.cell(r, 4, num(row.get("unit_gbp"))).border = BORDER
+            ws.cell(r, 5, num(row.get("line_gbp"))).border = BORDER
+
+        # ── COST-BASIS group (cols F–J) — joined by name; blank when no cost line ──
+        _cl = cost_by_name.get(_norm_name(row.get("requirement", "")))
+        _cbasis = (_cl.get("basis") or {}) if _cl else {}
+        if _cbasis:
+            ws.cell(r, 6, clean_cell(_cbasis.get("method", ""))).border = BORDER
+            ic = ws.cell(r, 7, clean_cell(_fmt_cost_items(_cbasis.get("inputs"))))
+            ic.alignment = WRAP_TOP; ic.font = FONT_NOTE; ic.border = BORDER
+            fc = ws.cell(r, 8, clean_cell(_fmt_cost_items(_cbasis.get("factors"))))
+            fc.alignment = WRAP_TOP; fc.font = FONT_NOTE; fc.border = BORDER
+            ws.cell(r, 9, clean_cell(_cbasis.get("estimate_class", ""))).border = BORDER
+            ws.cell(r, 10, clean_cell(_cbasis.get("confidence", ""))).border = BORDER
+
+        # ── ENGINEERING-SPEC group (cols K–N) — PRINCIPALS ONLY (a top-level line that
+        #    carries a real line cost); commodity / sub-component lines leave it blank ──
+        _is_principal = (not _is_subcomp) and bool(_line_num)
+        if _is_principal:
+            # duty / rating = the requirement text (carries the sizing, '132 kW motor …')
+            dc = ws.cell(r, 11, _req_raw); dc.alignment = WRAP_TOP; dc.font = FONT_NOTE; dc.border = BORDER
+            ws.cell(r, 12, clean_cell(row.get("material", ""))).border = BORDER
+            sc = ws.cell(r, 13, clean_cell(row.get("basis", "")))
+            sc.alignment = WRAP_TOP; sc.font = FONT_NOTE; sc.border = BORDER
+            # MPN / datasheet: partVerifications by tag, then by the requirement head noun;
+            # fall back to the BoM `part` text.
+            _mpn = mpn_by_word.get(str(row.get("tag", "")).strip().lower()) or ""
+            if not _mpn and _req_raw:
+                _head = re.split(r"[·\-(]", _req_raw)[0].strip().lower()
+                _mpn = mpn_by_word.get(_head, "")
+            pc = ws.cell(r, 14, clean_cell(_mpn) or clean_cell(row.get("part", "")) or "—")
+            pc.alignment = WRAP_TOP; pc.border = BORDER
+
         # Register this part's canonical cells so other tabs reference (not repeat) it.
+        # Sheet name = the merged ledger (was 'BoM') so every bom_ref() still resolves.
         _rtag = str(row.get("tag", "") or "").strip()
         if _rtag:
             _BOM_REGISTRY.setdefault(_norm_tag(_rtag), {
-                "tag":  f"'BoM'!$A${r}",
-                "name": f"'BoM'!$B${r}",
-                "qty":  f"'BoM'!$C${r}",
-                "part": f"'BoM'!$D${r}",
-                "unit": f"'BoM'!$F${r}",
-                "line": f"'BoM'!$G${r}",
+                "tag":  f"'{_LEDGER_SHEET}'!$A${r}",
+                "name": f"'{_LEDGER_SHEET}'!$B${r}",
+                "qty":  f"'{_LEDGER_SHEET}'!$C${r}",
+                "part": f"'{_LEDGER_SHEET}'!$N${r}",
+                "unit": f"'{_LEDGER_SHEET}'!$D${r}",
+                "line": f"'{_LEDGER_SHEET}'!$E${r}",
             })
         r += 1
     last_line_row = r - 1
 
-    # LIVE Σ of line £
+    # LIVE Σ of line £ (col E)
     ws.cell(r, 1, "Σ TOTAL").font = FONT_SUB
-    tot = ws.cell(r, 7, f"=SUM(G{first_line_row}:G{last_line_row})")
+    tot = ws.cell(r, 5, f"=SUM(E{first_line_row}:E{last_line_row})")
     tot.font = Font(bold=True)
     tot.fill = FILL_RESULT
     sum_row = r
@@ -1912,16 +2050,16 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     _cs_b = state.get("costStack") or {}
     _bld = num(_cs_b.get("building_civils_gbp"))
     if _bld:
-        sub_banner(ws, r, "Building & Civils (installed — separate from the raw-materials Σ above)", 8)
+        sub_banner(ws, r, "Building & Civils (installed — separate from the raw-materials Σ above)", 14)
         r += 1
         ws.cell(r, 1, "BLDG-001").border = BORDER
-        ws.cell(r, 3, 1).border = BORDER
-        ws.cell(r, 4, "Insulated steel-frame industrial building — clad walls, insulated roof, "
+        ws.cell(r, 2, "Insulated steel-frame industrial building — clad walls, insulated roof, "
                       "floor slab, drainage, roller + personnel doors").border = BORDER
-        ws.cell(r, 5, "derived").border = BORDER
-        ws.cell(r, 6, _bld).border = BORDER
-        ws.cell(r, 7, _bld).border = BORDER
-        _bn = ws.cell(r, 8, f"installed civils: {int(_cs_b.get('building_footprint_m2') or 0):,} m² "
+        ws.cell(r, 3, 1).border = BORDER
+        ws.cell(r, 4, _bld).border = BORDER
+        ws.cell(r, 5, _bld).border = BORDER
+        ws.cell(r, 6, "derived").border = BORDER
+        _bn = ws.cell(r, 11, f"installed civils: {int(_cs_b.get('building_footprint_m2') or 0):,} m² "
                             f"footprint × UK-2026 rates; NOT in the raw Σ (bypasses the OEM stack). "
                             f"All-in project capex on the Cost waterfall.")
         _bn.font = FONT_NOTE
@@ -1932,9 +2070,10 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     pl = load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
     cov = pl.get("coverage_by_drawing") or {}
     if cov:
-        sub_banner(ws, r, "Coverage by drawing (parts-ledger.json)", 8)
+        sub_banner(ws, r, "Coverage by drawing (parts-ledger.json)", 14)
         r += 1
-        header(ws, r, ["Drawing", "Expected", "Present", "% present", "", "", "", ""])
+        header(ws, r, ["Drawing", "Expected", "Present", "% present", "", "", "",
+                       "", "", "", "", "", "", ""])
         r += 1
         for dname, c in cov.items():
             ws.cell(r, 1, dname).border = BORDER
@@ -1951,85 +2090,33 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     grand = num(pl.get("grand_total_gbp"))
     if grand is not None:
         ws.cell(r, 1, "parts-ledger grand_total_gbp").font = FONT_SUB
-        gc = ws.cell(r, 7, grand)
+        gc = ws.cell(r, 5, grand)
         gc.number_format = FMT_GBP
-        ws.cell(r, 8, f"Compare against the LIVE Σ line £ at row {sum_row}. "
+        ws.cell(r, 6, f"Compare against the LIVE Σ line £ at row {sum_row}. "
                       f"See the ⚠ Checks tab for the reconciliation row.").font = FONT_NOTE
-    # number formats (#37) on the BoM line block: Qty (#,##0) + Unit/Line £ (£#,##0)
+    # number formats (#37): Qty (#,##0) + Unit/Line £ (£#,##0) + the cost-basis Est class
     apply_col_formats(ws, first_line_row, {3: FMT_INT}, last_line_row)
-    apply_col_formats(ws, first_line_row, {6: FMT_GBP, 7: FMT_GBP}, sum_row)
-    ws.auto_filter.ref = f"A4:H{last_line_row}"
+    apply_col_formats(ws, first_line_row, {4: FMT_GBP, 5: FMT_GBP}, sum_row)
+    ws.auto_filter.ref = f"A4:N{last_line_row}"
     ws.freeze_panes = "A5"
-    back_link(ws, 8)
 
+    # ── COLLAPSIBLE column-groups (collapsed by default). The two detail blocks fold
+    #    behind a [+] so the default view is the clean buy-list (A–E); a click expands
+    #    'Cost basis' (F–J) or 'Engineering spec' (K–N). DO NOT delete the data — it is
+    #    present, just hidden. Set the outline level + hidden flag on EVERY column in the
+    #    range (openpyxl's range-group() only stamps the endpoints, leaving the middle
+    #    columns ungrouped + visible), then collapse the group at its right edge. ──
+    for _grp in ("FGHIJ", "KLMN"):
+        for _cl in _grp:
+            cd = ws.column_dimensions[_cl]
+            cd.outline_level = 1
+            cd.hidden = True
+        # the collapse control sits on the column just RIGHT of the group
+        right = get_column_letter(column_index_from_string(_grp[-1]) + 1)
+        ws.column_dimensions[right].collapsed = True
+    ws.sheet_properties.outlinePr.summaryRight = True
 
-# ============================================================================
-# TAB 6 — COST (costBasis.lines + rollup)
-# ============================================================================
-def tab_cost(wb: Workbook, state: dict) -> bool:
-    cb = state.get("costBasis")
-    if not cb or not isinstance(cb, dict) or not cb.get("lines"):
-        return False
-    ws = wb.create_sheet("Cost")
-    set_widths(ws, {"A": 30, "B": 28, "C": 14, "D": 12, "E": 22, "F": 22, "G": 14, "H": 50})
-    title_row(ws, "Cost basis", 8,
-              "THE PRICE PROVENANCE — how each number was derived and how confident. "
-              "Per line: the cost METHOD (catalogue price / estimate / class-reference), the "
-              "inputs behind it, the install & contingency FACTORS, and the rollup to installed "
-              "cost. Same items as the BoM — this is the audit trail behind every £, NOT a second "
-              "bill (quantities & line totals live on the 'BoM' tab; sizing rationale on 'Spec sheets').")
-    # rollup band
-    roll = cb.get("rollup") or {}
-    if roll:
-        sub_banner(ws, 4, "Rollup", 8)
-        rr = 5
-        for k, v in roll.items():
-            ws.cell(rr, 1, k).font = FONT_SUB
-            ws.cell(rr, 2, v)
-            rr += 1
-        start = rr + 1
-    else:
-        start = 4
-    header(ws, start, ["Label", "Module", "Cost £", "Defensible",
-                       "Method", "Inputs", "Est class", "Notes"])
-    r = start + 1
-    first = r
-    for ln in cb["lines"]:
-        basis = ln.get("basis") or {}
-        # Label REFERENCES the master "Part names" tab where this cost line names a known
-        # principal (one identity); a literal is kept where the costBasis label diverges
-        # from the BoM name (e.g. "Circulation Pump" vs "Recirc Pump" — that literal is the
-        # visible flag of a name still to be reconciled at source).
-        _lref = name_ref(ln.get("label", ""))
-        ws.cell(r, 1, _lref if _lref else clean_cell(ln.get("label", ""))).border = BORDER
-        ws.cell(r, 2, clean_cell(ln.get("module", ""))).border = BORDER
-        # A 0/None cost renders as an em-dash (text) so it never reads as a real £0.
-        _cost = num(ln.get("cost_gbp"))
-        ws.cell(r, 3, _cost if _cost else "—").border = BORDER
-        ws.cell(r, 4, "yes" if ln.get("defensible") else "no").border = BORDER
-        ws.cell(r, 5, clean_cell(basis.get("method", ""))).border = BORDER
-        inp = basis.get("inputs")
-        ws.cell(r, 6, clean_cell(", ".join(map(str, inp)) if isinstance(inp, list) else str(inp or ""))).border = BORDER
-        ws.cell(r, 7, clean_cell(basis.get("estimate_class", ""))).border = BORDER
-        nt = ws.cell(r, 8, clean_cell(basis.get("notes", "")))
-        nt.alignment = WRAP_TOP
-        nt.font = FONT_NOTE
-        nt.border = BORDER
-        r += 1
-    last_line = r - 1
-    # live Σ
-    ws.cell(r, 1, "Σ cost_gbp (live)").font = FONT_SUB
-    ts = ws.cell(r, 3, f"=SUM(C{first}:C{r-1})")
-    ts.font = Font(bold=True)
-    ts.fill = FILL_RESULT
-    ts.number_format = FMT_GBP
-    # number formats (#37) on the Cost £ column — was rendering bare integers (General)
-    apply_col_formats(ws, first, {3: FMT_GBP}, last_line)
-    # filterable like the BoM / Quantities tables (header row -> last data row)
-    ws.auto_filter.ref = f"A{start}:H{last_line}"
-    ws.freeze_panes = f"A{start+1}"
-    back_link(ws, 8)
-    return True
+    back_link(ws, 14)
 
 
 # ============================================================================
@@ -2123,7 +2210,10 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[
     return best[2], best[3], best[4]
 
 
-def tab_brief_compliance(wb: Workbook, state: dict) -> bool:
+def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
+    """Render the Brief-compliance matrix onto `ws` starting at `start_row` (header row).
+    Returns the next free row, or None when the brief carries no target metrics. (Was
+    tab_brief_compliance; refactored into a section folded under "⚠ Checks", 2026-06-24.)"""
     pb = state.get("parsedBrief") or {}
     con = pb.get("constraints") or {}
     tp = con.get("target_performance") or {}
@@ -2132,21 +2222,12 @@ def tab_brief_compliance(wb: Workbook, state: dict) -> bool:
     if not metrics and tp.get("value") is not None:
         metrics = [tp]
     if not metrics:
-        return False
+        return None
     quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
 
-    ws = wb.create_sheet("Brief compliance")
-    set_widths(ws, {"A": 36, "B": 14, "C": 12, "D": 32, "E": 14, "F": 12,
-                    "G": 10, "H": 40})
-    title_row(
-        ws, "Brief-compliance matrix", 8,
-        "Every brief target_performance metric vs the ACHIEVED contract quantity "
-        "vs a LIVE PASS/FAIL. Target & achieved are matched by value + unit family "
-        "(brief & contract use different names). Yellow = editable; STATUS recomputes.",
-    )
-    header(ws, 4, ["Brief metric", "Target", "Unit", "Matched contract quantity",
-                   "Achieved", "Direction", "STATUS", "Note"])
-    r = 5
+    header(ws, start_row, ["Brief metric", "Target", "Unit", "Matched contract quantity",
+                           "Achieved", "Direction", "STATUS", "Note"])
+    r = start_row + 1
     first = r
     for m in metrics:
         key = (m.get("key_metric") or m.get("metric") or m.get("name") or "").strip()
@@ -2233,10 +2314,7 @@ def tab_brief_compliance(wb: Workbook, state: dict) -> bool:
     # FMT_NUM on the Target / Achieved metric columns: integer-valued metrics (62 t/yr)
     # read "62" not "62.00", while genuine decimals (FCR 1.37) still show their places.
     apply_col_formats(ws, first, {2: FMT_NUM, 5: FMT_NUM}, r - 1)
-    ws.auto_filter.ref = f"A4:H{r-1}"
-    ws.freeze_panes = "A5"
-    back_link(ws, 8)
-    return True
+    return r
 
 
 # ============================================================================
@@ -2894,13 +2972,15 @@ def _ref(name: str) -> str:
     return _ECON_INPUT_ADDR[name]
 
 
-def tab_economics(wb: Workbook, state: dict) -> bool:
-    """TAB 2 — every cell a LIVE formula over the Inputs cells. Computes revenue,
-    the opex stack, EBITDA + margin, simple payback, a discounted-cashflow NPV
-    column (years 0..life) and a live IRR. Plus an opex breakdown sub-table that
-    feeds the pie chart."""
+def _render_economics_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
+    """Render the Economics block onto `ws` from `start_row`. Returns the next free row,
+    or None when the Inputs tab didn't build. (Was tab_economics; refactored into a
+    section of the merged "Financial model" sheet, 2026-06-24.) Every cell is a LIVE
+    formula over the 'Inputs & Assumptions' cells: revenue, the opex stack, EBITDA +
+    margin, simple payback, a discounted-cashflow NPV column and a live IRR, plus an opex
+    pie + a revenue/opex/EBITDA bar."""
     if not _ECON_INPUT_ADDR:
-        return False  # Inputs tab didn't build -> nothing to reference
+        return None  # Inputs tab didn't build -> nothing to reference
 
     out_qty, out_unit, price_unit, out_noun = _econ_output_metric(state)
     is_ras = price_unit == "£/kg"
@@ -2908,15 +2988,7 @@ def tab_economics(wb: Workbook, state: dict) -> bool:
     sale_mult = "*1000" if is_ras else ""
 
     R = _ref  # local alias
-    ws = wb.create_sheet("Economics")
-    set_widths(ws, {"A": 34, "B": 18, "C": 12, "D": 60})
-    title_row(
-        ws, "Economics — live revenue / opex / EBITDA / NPV", 4,
-        "Every value is a LIVE formula referencing the yellow cells on the "
-        "'Inputs & Assumptions' tab. Edit any input there and every number here "
-        "(and the charts) recompute. Money £#,##0; margins 0.0%; years 0.0.",
-    )
-    r = 4
+    r = start_row
     # Flag the tab UNVERIFIED when no real per-unit sale price exists (the revenue/
     # EBITDA/IRR below are then NOT a valid investor model); and reframe when the
     # output is a per-UNIT product rather than annual throughput.
@@ -3138,40 +3210,29 @@ def tab_economics(wb: Workbook, state: dict) -> bool:
     style_chart(bar, legend=None, data_labels=True)  # solid bars + £ labels (EBITDA stays visible even when near break-even)
     ws.add_chart(bar, f"F{cf_first + 16}")
 
-    ws.freeze_panes = "A5"
-    back_link(ws, 4)
-    return True
+    # leave room below the two stacked charts (each ~16 rows tall, anchored in col F)
+    return max(r, cf_first + 34)
 
 
-def tab_scenarios(wb: Workbook, state: dict) -> bool:
-    """TAB 3 — a live scenario explorer: a FINE log-spaced scale sweep (six-tenths
-    capex law, 0.2x..5x of the as-built output, ~16 rows) carrying capex / revenue /
-    opex / EBITDA / payback / NPV (live annuity DCF) / IRR (live RATE), plus a
-    Low/Central/High price-driver block — all LIVE formulas referencing the Inputs
-    cells. The sweep's cell ranges are stashed on the worksheet object so the
-    Investment Analysis tab can drive its sweet-spot INDEX/MATCH + curves off them.
-    Adds capex-vs-scale + payback-vs-scale line charts and a L/C/H EBITDA bar."""
+def _render_scenarios_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
+    """Render the Scenarios block onto `ws` from `start_row`. Returns the next free row,
+    or None when the Inputs tab didn't build. (Was tab_scenarios; refactored into a
+    section of the merged "Financial model" sheet, 2026-06-24.) A live scenario explorer:
+    a FINE log-spaced scale sweep carrying capex / revenue / opex / EBITDA / payback / NPV
+    (annuity DCF) / IRR (RATE), plus a Low/Central/High price-driver block — all LIVE
+    formulas off the Inputs cells. The sweep's cell ranges are stashed on THIS worksheet
+    object (`ws._forge_sweep`, keyed off `ws.title`) so the Investment-analysis section
+    below drives its sweet-spot INDEX/MATCH + curves off them. Charts anchor relative to
+    `start_row` so they never collide with the Economics section above."""
     if not _ECON_INPUT_ADDR:
-        return False
+        return None
 
     out_qty, out_unit, price_unit, out_noun = _econ_output_metric(state)
     is_ras = price_unit == "£/kg"
     sale_mult = "*1000" if is_ras else ""
     R = _ref
 
-    ws = wb.create_sheet("Scenarios")
-    set_widths(ws, {"A": 16, "B": 16, "C": 16, "D": 16, "E": 16, "F": 12,
-                    "G": 14, "H": 12, "I": 4, "J": 16, "K": 16, "L": 16, "M": 16})
-    title_row(
-        ws, "Scenarios — live scale sweep & price sensitivity", 8,
-        "LEFT: a FINE log-spaced output sweep (0.2x to 5x the as-built plant; capex "
-        "follows capex_ref × (q/q_ref)^n where n = the 'Scaling exponent' Inputs cell, "
-        "default 1.0 = LINEAR/modular), with LIVE payback, annuity-DCF NPV and RATE-"
-        "based IRR per row. RIGHT: Low/Central/High on the key price drivers. Every cell "
-        "is a LIVE formula off the Inputs tab — edit a driver (or the scaling exponent) "
-        "and the whole curve, the Investment Analysis tab and the charts all move.",
-    )
-    r = 4
+    r = start_row
     if _econ_sale_unverified():
         r = unverified_banner(
             ws, r, 8,
@@ -3470,7 +3531,7 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
     c1.add_data(d1, titles_from_data=False)
     c1.set_categories(cats)
     style_chart(c1, legend=None)  # single solid line, no rainbow, no heavy gridlines
-    ws.add_chart(c1, "J4")
+    ws.add_chart(c1, f"J{start_row}")
 
     # 2) payback vs output (line) — uses the capped numeric column
     c2 = LineChart()
@@ -3483,7 +3544,7 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
     c2.add_data(d2, titles_from_data=False)
     c2.set_categories(cats2)
     style_chart(c2, legend=None)
-    ws.add_chart(c2, "J21")
+    ws.add_chart(c2, f"J{start_row + 17}")
 
     # 3) Low/Central/High EBITDA (bar)
     c3 = BarChart()
@@ -3495,11 +3556,11 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
     c3.add_data(d3, titles_from_data=False)
     c3.set_categories(cats3)
     style_chart(c3, legend=None, data_labels=True)  # Low/Central/High £ labels on each bar
-    ws.add_chart(c3, "J38")
+    ws.add_chart(c3, f"J{start_row + 34}")
 
-    ws.freeze_panes = "A5"
-    back_link(ws, 8)
-    return True
+    # the three line/bar charts (cols J+) span ~start_row .. start_row+50; return below
+    # the LATER of the data rows and the chart stack so the next section never overlaps.
+    return max(r, start_row + 52)
 
 
 # ============================================================================
@@ -3513,20 +3574,27 @@ def tab_scenarios(wb: Workbook, state: dict) -> bool:
 # vs-scale) let an investor SEE the crossings. A recommended-deployment callout
 # (Python-mirrored prose + live value cells) sits at the top.
 # ----------------------------------------------------------------------------
-def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
+def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
+    """Render the Investment-analysis (sweet-spot finder) block onto `ws` from `start_row`.
+    Returns the next free row, or None when the Scenarios sweep didn't build. (Was
+    tab_investment_analysis; refactored into a section of the merged "Financial model"
+    sheet, 2026-06-24.) Reads the sweep geometry stashed by the Scenarios section on the
+    SAME worksheet (`ws._forge_sweep`); because that stash keys off `ws.title`, the
+    INDEX/MATCH + curve references resolve to whatever this sheet is called — the merge
+    needs no formula edits."""
     if not _ECON_INPUT_ADDR:
-        return False
-    scen = wb["Scenarios"] if "Scenarios" in wb.sheetnames else None
-    sw = getattr(scen, "_forge_sweep", None) if scen is not None else None
+        return None
+    sw = getattr(ws, "_forge_sweep", None)
     if not sw:
-        return False  # Scenarios sweep didn't build -> nothing to analyse
+        return None  # Scenarios sweep didn't build -> nothing to analyse
 
     out_qty, out_unit, price_unit, out_noun = _econ_output_metric(state)
     is_ras = price_unit == "£/kg"
     R = _ref
     ss = _sweet_spot(state)  # Python mirror for the prose callout + colouring
 
-    # sweep cell ranges (on the Scenarios tab) — cross-sheet quoted refs
+    # sweep cell ranges (on THIS sheet) — quoted refs to ws.title (same-sheet refs are
+    # valid Excel; they resolve correctly whatever the merged sheet is named).
     sh = f"'{sw['sheet']}'"
     f, l = sw["first"], sw["last"]
     OUT = f"{sh}!${sw['col_out']}${f}:${sw['col_out']}${l}"
@@ -3536,17 +3604,7 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
     IRRr = f"{sh}!${sw['col_irr']}${f}:${sw['col_irr']}${l}"
     PAY = f"{sh}!${sw['col_payback']}${f}:${sw['col_payback']}${l}"
 
-    ws = wb.create_sheet("Investment Analysis")
-    set_widths(ws, {"A": 34, "B": 18, "C": 16, "D": 16, "E": 14, "F": 12,
-                    "G": 4, "H": 16, "I": 16, "J": 16, "K": 16, "L": 16})
-    title_row(
-        ws, "Investment Analysis — the sweet-spot finder", 6,
-        "Where does this plant become INVESTABLE, and what size should management "
-        "build? Every result below is a LIVE formula over the scale sweep on the "
-        "Scenarios tab — edit any Input and the recommended size, the thresholds and "
-        "the curves all move. Output unit: " + out_unit + ".",
-    )
-    r = 4
+    r = start_row
     if _econ_sale_unverified():
         r = unverified_banner(
             ws, r, 6,
@@ -3964,140 +4022,63 @@ def tab_investment_analysis(wb: Workbook, state: dict) -> bool:
     style_chart(c4, legend=None)
     ws.add_chart(c4, f"A{hh+54}")
 
-    ws.freeze_panes = "A4"
-    back_link(ws, 6)
-    return True
+    # the four scatter charts (anchored in col A) span hh .. hh+72; return below them.
+    return max(r, hh + 74)
 
 
-# ============================================================================
-# TAB — SPEC-SHEET-PER-PRINCIPAL (#43)
-# ============================================================================
-# One compact block per principal BoM item: tag, duty, rating, qty, unit £,
-# line £, driving worked-calc label (the 'basis'), and the part/MPN.
-# ----------------------------------------------------------------------------
-def tab_spec_sheets(wb: Workbook, state: dict) -> bool:
-    bom = state.get("requirementsBom") or []
-    if not bom:
-        return False
-    # PRINCIPAL items = top-level lines (no sub_of parent) that carry a real line
-    # cost. Sub-components (sub_of set) fold into their parent and are excluded.
-    principals = [
-        b for b in bom
-        if isinstance(b, dict) and not b.get("sub_of")
-        and num(b.get("line_gbp"))
-    ]
-    if not principals:
-        # fall back to anything with a line cost so the tab still renders
-        principals = [b for b in bom if isinstance(b, dict) and num(b.get("line_gbp"))]
-    if not principals:
-        return False
-    principals.sort(key=lambda b: num(b.get("line_gbp")) or 0.0, reverse=True)
+def tab_financial_model(wb: Workbook, state: dict) -> bool:
+    """A + B (consolidation 2026-06-24) — "Financial model": Economics (base case +
+    its opex pie / revenue-vs-EBITDA bar) on top, then the Scenarios scale sweep +
+    price sensitivity + its charts, then the Investment-analysis sweet-spot finder +
+    its curves — all on ONE sheet. "Inputs & Assumptions" stays a SEPARATE tab (it is
+    the editable driver surface every section references).
 
-    # part-verification lookup: tag/word -> best MPN string, for the part column
-    pv_by_word: Dict[str, str] = {}
-    for pv in (state.get("partVerifications") or []):
-        if not isinstance(pv, dict):
-            continue
-        mfr = (pv.get("manufacturer") or "").strip()
-        mpn = (pv.get("part_number") or "").strip()
-        if not mpn:
-            continue
-        label = (f"{mfr} {mpn}".strip())
-        for k in (pv.get("word_name"), pv.get("word_id")):
-            if k:
-                pv_by_word.setdefault(str(k).strip().lower(), label)
+    Reference safety: every cross-sheet formula either targets 'Inputs & Assumptions'
+    (unchanged, still its own tab) or is a SAME-SHEET ref built from `ws.title`/the
+    stashed sweep (the Scenarios section stashes `ws._forge_sweep` keyed off THIS sheet,
+    which the Investment section reads back) — so no formula carries a now-dead
+    "Economics"/"Scenarios" sheet name. Universal; skips only when the Inputs tab
+    didn't build (no economic model possible)."""
+    if not _ECON_INPUT_ADDR:
+        return False  # Inputs tab didn't build -> no economic model
 
-    ws = wb.create_sheet("Spec sheets")
-    set_widths(ws, {"A": 22, "B": 18, "C": 12, "D": 14, "E": 14, "F": 14,
-                    "G": 14, "H": 58})
+    ws = wb.create_sheet("Financial model")
+    # widest of the three sections (Scenarios uses A..M = 13 cols) sets the widths.
+    set_widths(ws, {"A": 30, "B": 18, "C": 16, "D": 16, "E": 16, "F": 12,
+                    "G": 14, "H": 16, "I": 16, "J": 16, "K": 16, "L": 16, "M": 16})
     title_row(
-        ws, "Spec sheet — per principal item", 8,
-        "THE SIZING RATIONALE — why each big-ticket item is the size it is. One block per "
-        "PRINCIPAL line (sub-components excluded): tag · duty / rating (from the requirement) "
-        "· qty · unit £ · LIVE line £ · the driving worked-calc that sized it (basis) · the "
-        "part / MPN. NOT a bill (full line-by-line buy list is the 'BoM' tab) and NOT a price "
-        "audit (cost method & confidence is the 'Cost' tab) — this is the engineering 'why'.",
+        ws, "Financial model — economics · scenarios · investment analysis", 8,
+        "The whole commercial model on one sheet, every cell a LIVE formula over the "
+        "yellow 'Inputs & Assumptions' tab: (1) the base-case Economics (revenue / opex / "
+        "EBITDA / NPV / IRR + charts); (2) a fine scale-sweep + Low/Central/High price "
+        "sensitivity; (3) the Investment-analysis sweet-spot finder. Edit any input and "
+        "everything here recomputes. Money £#,##0; margins 0.0%; years 0.0.",
     )
     r = 4
-    first_line_row = None
-    line_total_rows: List[int] = []
 
-    for b in principals:
-        tag = clean_cell(b.get("tag", "")) or "(no tag)"
-        req = clean_cell(b.get("requirement", ""))
-        status = clean_cell(b.get("status", ""))
-        part = clean_cell(b.get("part", ""))
-        qty = num(b.get("qty"))
-        unit_gbp = num(b.get("unit_gbp"))
-        line_gbp = num(b.get("line_gbp"))
-        basis = clean_cell(b.get("basis", ""))
-        material = clean_cell(b.get("material", ""))
-        # duty/rating: prefer the structured rating in the requirement text after
-        # the tag noun; we surface the WHOLE requirement as 'duty' (it carries the
-        # sizing, e.g. '132 kW motor (97 kW shaft)') — universal, no class parsing.
-        mpn = pv_by_word.get(str(b.get("tag", "")).strip().lower()) or ""
-        if not mpn and req:
-            # try to match by the leading noun of the requirement against pv words
-            head = re.split(r"[·\-(]", req)[0].strip().lower()
-            mpn = pv_by_word.get(head, "")
+    def _section(title: str) -> None:
+        nonlocal r
+        big = ws.cell(r, 1, title)
+        big.font = FONT_TITLE; big.fill = FILL_TITLE
+        big.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+        ws.row_dimensions[r].height = 24
+        r += 2
 
-        # ---- block header (the canonical TAG band — the stable identity) ----
-        # The banner REFERENCES the master "Part names" tag where this is a principal (so the
-        # tag is sourced once); literal fallback for anything the master doesn't carry.
-        sub_banner(ws, r, tag_ref(tag) or f"{tag}", 8)
-        r += 1
-        header(ws, r, ["Name (→ Part names)", "Status", "Qty", "Unit £", "Line £",
-                       "Material", "Part / MPN", "Driving worked-calc (basis)"])
-        r += 1
-        # The single data row for this principal. Name REFERENCES the master "Part names"
-        # tab (the one place the name is typed); Qty / Unit £ REFERENCE the canonical BoM
-        # registry by tag (a BoM price/qty edit propagates here). Literal fallbacks so the
-        # tab never breaks.
-        _name_ref = name_ref(req) or bom_ref(tag, "name")
-        nc = ws.cell(r, 1, _name_ref if _name_ref else (req or "spec"))
-        nc.font = FONT_SUB
-        nc.border = BORDER
-        ws.cell(r, 2, clean_cell(status)).border = BORDER
-        _qty_ref = bom_ref(tag, "qty")
-        qc = ws.cell(r, 3, _qty_ref if _qty_ref else qty)
-        qc.fill = FILL_RESULT if _qty_ref else FILL_INPUT
-        qc.border = BORDER
-        _unit_ref = bom_ref(tag, "unit")
-        uc = ws.cell(r, 4, _unit_ref if _unit_ref else unit_gbp)
-        uc.fill = FILL_RESULT if _unit_ref else FILL_INPUT
-        uc.border = BORDER
-        # Line £ LIVE = qty × unit £ when both cells carry a value/ref; else the stored value
-        _have_q = bool(_qty_ref) or qty is not None
-        _have_u = bool(_unit_ref) or unit_gbp is not None
-        if _have_q and _have_u:
-            lc = ws.cell(r, 5, f"=C{r}*D{r}")
-        else:
-            lc = ws.cell(r, 5, line_gbp)
-        lc.fill = FILL_RESULT
-        lc.border = BORDER
-        line_total_rows.append(r)
-        ws.cell(r, 6, clean_cell(material)).border = BORDER
-        pc = ws.cell(r, 7, clean_cell(mpn) or (part or "—"))
-        pc.border = BORDER
-        pc.alignment = WRAP_TOP
-        bc = ws.cell(r, 8, basis)
-        bc.alignment = WRAP_TOP
-        bc.font = FONT_NOTE
-        bc.border = BORDER
-        if first_line_row is None:
-            first_line_row = r
-        apply_col_formats(ws, r, {4: FMT_GBP, 5: FMT_GBP}, r)
-        r += 2  # spacer between blocks
+    # ── Economics ──
+    _section("Economics — base case (revenue / opex / EBITDA / NPV / IRR)")
+    nxt = _render_economics_section(ws, state, r)
+    r = (nxt if nxt is not None else r) + 2
+    # ── Scenarios (stashes ws._forge_sweep for the section below) ──
+    _section("Scenarios — scale sweep & price sensitivity")
+    nxt = _render_scenarios_section(ws, state, r)
+    r = (nxt if nxt is not None else r) + 2
+    # ── Investment Analysis (reads ws._forge_sweep) ──
+    _section("Investment analysis — the sweet-spot finder")
+    nxt = _render_investment_section(ws, state, r)
+    r = (nxt if nxt is not None else r) + 1
 
-    # foot Σ over all principal line totals (live, sums the discrete cells)
-    if line_total_rows:
-        ws.cell(r, 1, "Σ PRINCIPALS").font = FONT_SUB
-        sum_expr = "=" + "+".join(f"E{rr}" for rr in line_total_rows)
-        tot = ws.cell(r, 5, sum_expr)
-        tot.font = Font(bold=True)
-        tot.fill = FILL_RESULT
-        tot.number_format = FMT_GBP
-    ws.freeze_panes = "A4"
+    ws.freeze_panes = "A5"
     back_link(ws, 8)
     return True
 
@@ -4475,11 +4456,11 @@ def _detect_jurisdiction(state: dict) -> str:
     return "UK"
 
 
-def tab_risk_register(wb: Workbook, state: dict) -> bool:
-    """X — native Risk Register (Tristan 2026-06-21: bring the PDF's risk register
-    into the Excel). Universal + fully traceable: rows from LIVE engine findings
-    (physics critique, residual gate flags, cost sanity) PLUS process-hazard rows
-    derived from the equipment actually present. No RAS-only content."""
+def _render_risk_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
+    """Render the Risk register TABLE onto `ws` starting at `start_row` (header row).
+    Returns the next free row, or None when there are no rows to show. The header is
+    written by the caller as a section banner. (Was tab_risk_register; refactored into
+    a section for the "Risk & Regulatory" merge, 2026-06-24.)"""
     rows = []   # (category, hazard/finding, cause, sev, lik, mitigation, source)
 
     # 1) LIVE engineering findings — the physics critic's issues
@@ -4525,24 +4506,12 @@ def tab_risk_register(wb: Workbook, state: dict) -> bool:
                      hz["sev"], hz["lik"], hz["mit"], "Equipment present in the bill of materials"))
 
     if not rows:
-        return False
+        return None
 
-    ws = wb.create_sheet("Risk register")
-    set_widths(ws, {"A": 6, "B": 22, "C": 40, "D": 40, "E": 6, "F": 6, "G": 7,
-                    "H": 10, "I": 46, "J": 16, "K": 26})
-    title_row(
-        ws, "Risk register", 11,
-        "Preliminary hazard & risk register, derived LIVE from the engine. Engineering "
-        "/ QA / commercial rows come from the physics critic, the deterministic gate "
-        "flags and the independent cost-sanity check; the process-safety rows are "
-        "derived from the equipment actually present in the bill of materials, each "
-        "with its inherent severity × likelihood and the standard mitigation. Score = "
-        "S × L (≤7 Low / 8–14 Medium / ≥15 High). Universal — not specific to this plant "
-        "type. Preliminary; a site-specific HAZID / HAZOP is required before construction.",
-    )
-    header(ws, 4, ["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score",
-                   "Rating", "Mitigation", "Residual", "Source"])
-    r = 5
+    header(ws, start_row, ["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score",
+                           "Rating", "Mitigation", "Residual", "Source"])
+    r = start_row + 1
+    body_first = r
     for i, (cat, hz, cause, sev, lik, mit, src) in enumerate(rows, start=1):
         score = sev * lik
         rating, fill = _rag(score)
@@ -4565,34 +4534,63 @@ def tab_risk_register(wb: Workbook, state: dict) -> bool:
         if longest > 40:
             ws.row_dimensions[r].height = min(-(-longest // 40), 5) * 14.5
         r += 1
-    ws.auto_filter.ref = f"A4:K{r - 1}"
+    ws.auto_filter.ref = f"A{start_row}:K{r - 1}"
+    return r
+
+
+def tab_risk_regulatory(wb: Workbook, state: dict) -> bool:
+    """E (consolidation 2026-06-24) — "Risk & Regulatory": the Risk register section
+    on top, the Regulatory & compliance section below, on ONE sheet (both derive from
+    the SAME universal hazard library, so they belong together). Each section keeps its
+    full table. Universal; skips only if NEITHER section has content."""
+    ws = wb.create_sheet("Risk & Regulatory")
+    set_widths(ws, {"A": 6, "B": 22, "C": 40, "D": 40, "E": 6, "F": 6, "G": 7,
+                    "H": 10, "I": 46, "J": 16, "K": 26})
+    title_row(
+        ws, "Risk & Regulatory", 11,
+        "Preliminary hazard & risk register PLUS the regulatory / compliance duties, on "
+        "one sheet (both derive from the same universal hazard library). Risk rows come "
+        "LIVE from the physics critic, the deterministic gate flags, the cost-sanity check "
+        "and the equipment present; the regulatory section adds the engine's compliance-gate "
+        "verdict and the jurisdiction × hazard → regulation matrix. Score = S × L (≤7 Low / "
+        "8–14 Medium / ≥15 High). Universal — not plant-specific. Preliminary; a site-specific "
+        "HAZID / HAZOP and a regulatory review are required before construction / sale.",
+    )
+    r = 4
+    # ── Risk register section ──
+    sub_banner(ws, r, "Risk register", 11)
+    r += 1
+    nxt = _render_risk_section(ws, state, r)
+    if nxt is None:
+        ws.cell(r, 1, "— no live risk findings or process hazards for this design —").font = FONT_NOTE
+        r += 2
+    else:
+        r = nxt + 1
+    # ── Regulatory & compliance section ──
+    sub_banner(ws, r, "Regulatory & compliance", 11)
+    r += 1
+    r = _render_regulatory_section(ws, state, r)
     ws.freeze_panes = "A5"
     back_link(ws, 11)
     return True
 
 
-def tab_regulatory(wb: Workbook, state: dict) -> bool:
-    """Y — native Regulatory & Compliance tab (Tristan 2026-06-21). Universal: the
-    engine's compliance-gate verdict + a jurisdiction × hazard → regulation matrix
-    derived from the hazards present. Honest when the gate skipped (no class
-    standards registered)."""
+def _render_regulatory_section(ws: Worksheet, state: dict, start_row: int) -> int:
+    """Render the Regulatory & compliance content onto `ws` starting at `start_row`.
+    Returns the next free row. (Was tab_regulatory; refactored into a section for the
+    "Risk & Regulatory" merge, 2026-06-24.) Universal: the engine's compliance-gate
+    verdict + a jurisdiction × hazard → regulation matrix; honest when the gate skipped."""
     cg = state.get("complianceGate") or {}
     juris = _detect_jurisdiction(state)
     hazards = _derive_hazards(state)
-
-    ws = wb.create_sheet("Regulatory")
-    set_widths(ws, {"A": 6, "B": 56, "C": 50, "D": 22})
     verdict = str(cg.get("verdict", "—")).upper()
-    title_row(
-        ws, "Regulatory & compliance", 4,
-        f"Jurisdiction: {juris}. Engine compliance-gate verdict: {verdict} "
-        f"({cg.get('mandatory_covered', 0)}/{cg.get('mandatory_total', 0)} class standards covered). "
-        "The statutory duties below are derived from the jurisdiction + the hazards present "
-        "in this design (universal hazard → regulation matrix), NOT a per-class list. Where the "
-        "gate skipped (no class-specific standards registered), that is shown honestly — the "
-        "engineer must still verify and apply the duties below before sale / construction.",
-    )
-    r = 4
+    # one-line jurisdiction / verdict note under the section banner
+    sub_banner(ws, start_row,
+               f"Jurisdiction: {juris}   ·   compliance-gate verdict: {verdict} "
+               f"({cg.get('mandatory_covered', 0)}/{cg.get('mandatory_total', 0)} class standards covered). "
+               "Statutory duties below are derived from the jurisdiction + the hazards present "
+               "(universal matrix), not a per-class list — verify before sale / construction.", 4)
+    r = start_row + 1
     # verdict banner row
     if cg.get("reason"):
         sub_banner(ws, r, "Engine compliance-gate verdict", 4)
@@ -4658,9 +4656,7 @@ def tab_regulatory(wb: Workbook, state: dict) -> bool:
             ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
             r += 1
 
-    ws.freeze_panes = "A4"
-    back_link(ws, 4)
-    return True
+    return r
 
 
 # Universal construction / erection sequence — the standard order of works for a
@@ -4863,9 +4859,12 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
 
 
 def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
-    """#21 — Process line list / valve list / instrument index as real tabs
-    (from process-schedules.md). Each md table becomes its OWN sheet so each is
-    independently sortable. Returns the number of sheets created."""
+    """#21 — Process line list / valve list / instrument index as ONE sheet
+    "Process schedules" with three section bands (Tristan 2026-06-24 consolidation:
+    they all come from the same drawings/process-schedules.md, so one sheet with
+    three banded sections is cleaner than three near-identical tabs). Each section is
+    still its own sortable table. Returns the number of sections rendered (>0 => tab
+    kept)."""
     path = os.path.join(run_dir, "drawings", "process-schedules.md")
     if not os.path.exists(path):
         return 0
@@ -4877,41 +4876,57 @@ def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
     if not tables:
         return 0
 
-    # map each section heading to a short, unique sheet name
+    # a friendly section title per source heading
     name_for = {
         "line": "Process line list",
         "valve": "Process valve list",
         "instrument": "Process instruments",
     }
+    # pre-filter to non-empty tables + widest column count across them all (so the
+    # title band + back-link span the whole sheet)
+    secs = [(h, hd, rw) for (h, hd, rw) in tables if rw]
+    if not secs:
+        return 0
+    span = 2
+    for _h, hd, rw in secs:
+        span = max(span, len(hd), max((len(r) for r in rw), default=0))
+
+    ws = wb.create_sheet("Process schedules")
+    widths = {get_column_letter(i): (14 if i > 1 else 16) for i in range(1, span + 1)}
+    set_widths(ws, widths)
+    title_row(ws, "Process schedules", span,
+              "Process line list, valve list and instrument index — each a sortable "
+              "section parsed from process-schedules.md and cross-referenced to the P&ID.")
     made = 0
-    for heading, hdr, rows in tables:
-        if not rows:
-            continue
+    r = 4
+    used = set()
+    for heading, hdr, rows in secs:
         hl = heading.lower()
-        sheet = next((v for k, v in name_for.items() if k in hl), None)
-        if sheet is None:
-            sheet = "Process " + re.sub(r"[^a-z0-9 ]", "", hl)[:20].strip()
-        sheet = sheet[:31]
-        if sheet in wb.sheetnames:
-            sheet = (sheet[:28] + f"-{made}")
-        ws = wb.create_sheet(sheet)
-        ncol = max(len(hdr), max((len(rw) for rw in rows), default=0))
-        widths = {get_column_letter(i): (14 if i > 1 else 16) for i in range(1, ncol + 1)}
-        # widen a likely 'service' / description column
+        sect = next((v for k, v in name_for.items() if k in hl), None)
+        if sect is None:
+            sect = "Process " + re.sub(r"[^a-z0-9 ]", "", hl).strip()[:24]
+        # disambiguate a repeated heading
+        base = sect
+        n = 1
+        while sect in used:
+            n += 1
+            sect = f"{base} ({n})"
+        used.add(sect)
+        # widen any 'service'/'description'-like column for THIS section
         for idx, h in enumerate(hdr, start=1):
             if h.lower() in ("service", "description", "measured", "notes", "remarks"):
-                widths[get_column_letter(idx)] = 54
-        set_widths(ws, widths)
-        # Use the clean SHEET NAME as the title (sentence case) — the source heading is
-        # verbatim ALL-CAPS ("LINE LIST"/"VALVE LIST"/"INSTRUMENT INDEX"); the descriptive
-        # subtitle carries the detail.
-        title_row(ws, sheet, max(ncol, 2),
-                  "Parsed from process-schedules.md — real sortable rows.")
-        nxt, body_first = _render_md_table(ws, 4, "", hdr, rows)
-        ws.auto_filter.ref = f"A4:{get_column_letter(ncol)}{nxt - 1}"
-        ws.freeze_panes = "A5"
-        back_link(ws, max(ncol, 2))
+                ws.column_dimensions[get_column_letter(idx)].width = 54
+        # banded section heading + its table; _render_md_table writes the section
+        # banner itself when passed a heading.
+        nxt, body_first = _render_md_table(ws, r, sect, hdr, rows)
+        ncol = max(len(hdr), max((len(rw) for rw in rows), default=0))
+        # a per-section auto-filter on the LAST section is most useful; set it each
+        # time so the final survivor covers that section's rows.
+        ws.auto_filter.ref = f"A{body_first - 1}:{get_column_letter(ncol)}{nxt - 1}"
+        r = nxt + 1  # blank spacer row between sections
         made += 1
+    ws.freeze_panes = "A4"
+    back_link(ws, span)
     return made
 
 
@@ -5344,35 +5359,27 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
 # ============================================================================
 # MAIN
 # ============================================================================
-def tab_cabinet_schedule(wb: Workbook, state: dict, run_dir: str) -> bool:
-    """Cabinet schedule — the deterministic proof that every small electrical / control
-    device is HOUSED in a cabinet and that each housed device PLUS the cabinet itself shows
-    its required IN/OUT connectors, all connected (Tristan 2026-06-24: "create a deterministic
-    check for all things going into the cabinets so we can see the inputs and outputs and the
-    connectors and that it all works"). Reads the `cabinets` block parts_ledger.py authored
-    from the same connectivity verdict the Connection-trace deck uses, so the two cannot
-    disagree. Universal — every archetype with electrical/control gear gets the deck."""
+def _render_cabinet_section(ws: Worksheet, run_dir: str, start_row: int) -> Optional[int]:
+    """Render the Cabinet schedule TABLE onto `ws` starting at `start_row`. Returns the
+    next free row, or None when there is no `cabinets` block to show. (Was
+    tab_cabinet_schedule; refactored into a section appended to "Connection trace",
+    2026-06-24 — both read the same parts-ledger connectivity verdict, so they cannot
+    disagree.) The cabinet rows prove every small electrical / control device is HOUSED
+    and that the cabinet + its contents show their IN/OUT connectors, all connected."""
     pl = load_json(os.path.join(run_dir, "parts-ledger.json"))
     cab = (pl.get("cabinets") if isinstance(pl, dict) else None) or {}
     cabinets = cab.get("cabinets") or []
     if not cabinets:
-        return False
+        return None
 
-    ws = wb.create_sheet("Cabinet schedule")
-    set_widths(ws, {"A": 34, "B": 11, "C": 26, "D": 44, "E": 44, "F": 13})
-    title_row(ws, "Cabinet schedule — what is inside each cabinet, and that it all connects", 6,
-              "Every small electrical / control device is housed in a cabinet (a power board / "
-              "MCC, or a control / marshalling cabinet). Each row shows the device, what feeds "
-              "INTO it and what it feeds OUT to (by name + connector type), and a connector "
-              "verdict. The cabinet header states whether the cabinet AND all its contents are "
-              "fully connected — the deterministic 'it all works' proof.")
     proven = cab.get("all_cabinets_proven")
-    sub_banner(ws, 4,
+    sub_banner(ws, start_row,
                f"{cab.get('n_cabinets', len(cabinets))} cabinet(s)   ·   "
                f"{cab.get('n_housed', 0)} housed device(s)   ·   "
                f"{cab.get('n_cabinets_all_connected', 0)}/{cab.get('n_cabinets', len(cabinets))} "
                f"cabinets fully connected   ·   "
                f"ALL CONNECTORS PROVEN: {'YES ✓' if proven else 'NO — see ✗ rows'}", 6)
+    r = start_row + 1
 
     def _join(items):
         out = []
@@ -5382,7 +5389,6 @@ def tab_cabinet_schedule(wb: Workbook, state: dict, run_dir: str) -> bool:
             out.append(s)
         return "\n".join(out) if out else "—"
 
-    r = 5
     for c in cabinets:
         # ── cabinet header band ──
         dom = (c.get("domain") or "").upper()
@@ -5417,27 +5423,19 @@ def tab_cabinet_schedule(wb: Workbook, state: dict, run_dir: str) -> bool:
             sc.font = Font(color="107C10", bold=True) if ok else Font(color="C00000", bold=True)
             r += 1
         r += 1  # spacer between cabinets
-    ws.freeze_panes = "A5"
-    back_link(ws, 6)
-    return True
+    return r
 
 
-def tab_tool_io(wb: Workbook, state: dict, run_dir: str) -> bool:
-    """TOOL I/O — provenance & traceability (Tristan 2026-06-23): every engineering tool that ran,
-    with where each output's INPUT came from and where its OUTPUT goes, plus a USED/STALE/ORPHANED
-    verdict. Makes the 'computed by verified tools' claim auditable end-to-end."""
+def _render_tool_io_section(ws: Worksheet, state: dict, run_dir: str, start_row: int) -> Optional[int]:
+    """Render the Tool-provenance table onto `ws` starting at `start_row` (header row).
+    Returns the next free row, or None when no tools ran. (Was tab_tool_io; refactored
+    into a section folded under "⚠ Checks", 2026-06-24.) Every engineering tool that ran,
+    with where each output's INPUT came from and where its OUTPUT goes, plus a
+    USED/STALE/ORPHANED/TRACED verdict — the 'computed by verified tools' proof."""
     import re as _re
     tu = load_json(os.path.join(run_dir, "4-orchestrator-tools-used.json"))
     if not isinstance(tu, dict) or not tu.get("tools"):
-        return False
-    ws = wb.create_sheet("Tool provenance")
-    set_widths(ws, {"A": 30, "B": 30, "C": 13, "D": 9, "E": 42, "F": 32, "G": 11})
-    title_row(
-        ws, "Tool provenance — input → output traceability", 7,
-        "Every engineering tool that ran, with where each output's INPUT came from and where its "
-        "OUTPUT goes. STATUS: USED = the design uses the tool's value; STALE = the design shows a "
-        "DIFFERENT value (tool ran at another scale/input — see ⚠ Checks E7); ORPHANED = the value "
-        "is used nowhere; TRACED = value used elsewhere in the design.")
+        return None
     q = (state.get("orchestratorContract") or {}).get("quantities") or {}
     qval = {k.lower(): num(v.get("value") if isinstance(v, dict) else v) for k, v in q.items()}
     consumed = {v for v in qval.values() if v is not None}
@@ -5477,9 +5475,10 @@ def tab_tool_io(wb: Workbook, state: dict, run_dir: str) -> bool:
         toks = [t for t in _re.findall(r"[a-z][a-z0-9]{3,}", f) if t not in _STOP]
         return bool(toks) and any(t in _input_tokens for t in toks)
 
-    header(ws, 5, ["Tool", "Output field", "Value", "Unit", "Input — from",
-                   "→ Consumed by", "Status"])
-    r = 6
+    header(ws, start_row, ["Tool", "Output field", "Value", "Unit", "Input — from",
+                           "→ Consumed by", "Status"])
+    r = start_row + 1
+    body_first = r
     for t in tu["tools"]:
         tid = str(t.get("tool_id", "?"))
         for c in (t.get("claims") or []):
@@ -5520,12 +5519,8 @@ def tab_tool_io(wb: Workbook, state: dict, run_dir: str) -> bool:
             else:
                 sc.fill, sc.font = FILL_ADVISORY, FONT_ADVISORY
             r += 1
-    apply_col_formats(ws, 6, {3: FMT_NUM}, r - 1)
-    if r > 6:
-        ws.auto_filter.ref = f"A5:G{r - 1}"
-    ws.freeze_panes = "A6"
-    back_link(ws, 7)
-    return True
+    apply_col_formats(ws, body_first, {3: FMT_NUM}, r - 1)
+    return r
 
 
 def _reorder_tabs(wb: Workbook) -> None:
@@ -5537,14 +5532,14 @@ def _reorder_tabs(wb: Workbook) -> None:
     _RANK = {
         "Contents": 0, "Overview": 1,
         "Render — Interior layout": 2,                 # HERO render — early (exact name)
-        "Brief": 3, "Brief compliance": 4,
-        "Economics": 10, "Scenarios": 11, "Investment Analysis": 12,
-        "Cost": 13, "Cost waterfall": 14, "Inputs & Assumptions": 15,
-        "BoM": 20, "Quantities": 21, "Calculations": 22, "Spec sheets": 23,
-        "Line & velocity": 24, "Panel schedule": 25, "Process line list": 26,
-        "Process valve list": 27, "Process instruments": 28, "Assembly sequence": 29,
-        "Risk register": 30, "Regulatory": 31,
-        "⚠ Checks": 90, "Tool provenance": 91, "Connection trace": 92, "Part names": 93, "Glossary": 94,
+        "Brief": 3,
+        "Financial model": 10,
+        "Cost waterfall": 14, "Inputs & Assumptions": 15,
+        "Bill of Materials (Ledger)": 20, "Quantities": 21, "Calculations": 22,
+        "Line & velocity": 24, "Panel schedule": 25, "Process schedules": 26,
+        "Assembly sequence": 29,
+        "Risk & Regulatory": 30,
+        "⚠ Checks": 90, "Connection trace": 92, "Part names": 93, "Glossary": 94,
     }
 
     def _rank(title: str) -> int:
@@ -5597,10 +5592,11 @@ def build(run_dir: str, out_path: str) -> dict:
     tab_quantities(wb, state)
     print("  · Calculations")
     live_n, static_n = tab_calculations(wb, state)
-    print("  · BoM")
-    tab_bom(wb, state, run_dir)
-    print("  · Cost")
-    has_cost = tab_cost(wb, state)
+    print("  · Bill of Materials (Ledger)")
+    tab_bom(wb, state, run_dir)   # BoM + Cost + Spec sheets merged into one ledger sheet
+    # Cost provenance is now a collapsible group on the ledger; report has_cost from state.
+    _cb = state.get("costBasis")
+    has_cost = bool(isinstance(_cb, dict) and _cb.get("lines"))
 
     # ---- NEW high-value engineering + schedule tabs (each self-guards: a tab
     # whose source data is absent is SKIPPED cleanly so any class still builds) --
@@ -5621,29 +5617,21 @@ def build(run_dir: str, out_path: str) -> dict:
             print(f"  · {name} — skipped (no source data)")
             skipped.append(f"{name} (no source data)")
 
-    add_tab("Brief compliance", lambda: tab_brief_compliance(wb, state))
     add_tab("Connection trace", lambda: tab_connection_trace(wb, state, run_dir))
-    add_tab("Cabinet schedule", lambda: tab_cabinet_schedule(wb, state, run_dir))
     add_tab("Cost waterfall", lambda: tab_cost_waterfall(wb, state))
-    # ---- ECONOMICS MODEL: Inputs -> Economics -> Scenarios (live + charts).
-    # Built in this order so Economics/Scenarios can reference the Inputs cells.
-    # Each self-guards (skips cleanly on a class with no usable output metric).
+    # ---- ECONOMICS MODEL: Inputs -> Financial model (Economics + Scenarios +
+    # Investment Analysis on ONE sheet, 2026-06-24 consolidation). Inputs is built
+    # FIRST + kept SEPARATE so _ECON_INPUT_ADDR is populated before the model
+    # references it. Each self-guards (skips cleanly with no usable output metric).
     add_tab(INPUTS_SHEET, lambda: tab_inputs_assumptions(wb, state))
-    add_tab("Economics", lambda: tab_economics(wb, state))
-    add_tab("Scenarios", lambda: tab_scenarios(wb, state))
-    # Investment Analysis depends on the Scenarios sweep (stashed cell ranges) —
-    # built immediately after so the sweet-spot INDEX/MATCH + curves can reference it.
-    add_tab("Investment Analysis", lambda: tab_investment_analysis(wb, state))
-    add_tab("Spec sheets", lambda: tab_spec_sheets(wb, state))
+    add_tab("Financial model", lambda: tab_financial_model(wb, state))
     add_tab("Panel schedule", lambda: tab_panel_schedule(wb, run_dir))
     # process schedules creates 0..3 sheets; treat >0 as success
     add_tab("Process schedules", lambda: tab_process_schedules(wb, run_dir) > 0)
     add_tab("Line & velocity", lambda: tab_line_velocity(wb, run_dir))
-    add_tab("Risk register", lambda: tab_risk_register(wb, state))
-    add_tab("Regulatory", lambda: tab_regulatory(wb, state))
+    add_tab("Risk & Regulatory", lambda: tab_risk_regulatory(wb, state))
     add_tab("Assembly sequence", lambda: tab_assembly_sequence(wb, state))
     add_tab("Glossary", lambda: tab_glossary(wb, state))
-    add_tab("Tool provenance", lambda: tab_tool_io(wb, state, run_dir))
 
     print("  · Image tabs")
     used_titles = {t.lower() for t in wb.sheetnames}
