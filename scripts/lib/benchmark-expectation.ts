@@ -46,6 +46,9 @@ for (const p of [
 }
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || ''
 const BENCHMARK_MODEL = process.env.BENCHMARK_MODEL || 'z-ai/glm-5.2'  // most capable model in the stack (Tristan 2026-06-24)
+// The diagnose step (a fault-extraction over a big line-item list) is latency-sensitive and doesn't
+// need the deepest reasoning — a faster model avoids the GLM-5.2 reasoning-token timeout squeeze.
+const DIAGNOSE_MODEL = process.env.DIAGNOSE_MODEL || 'x-ai/grok-4.3'
 // How far the deterministic number may stray from the LLM benchmark before we flag.
 const WARN_FACTOR = Number(process.env.BENCHMARK_WARN_FACTOR || 1.5)     // [1.5,2.5)× → WARN
 const RADICAL_FACTOR = Number(process.env.BENCHMARK_RADICAL_FACTOR || 2.5) // ≥2.5× (or ≤1/2.5) → RADICAL → full check
@@ -55,6 +58,12 @@ export interface BenchmarkExpectation {
   expected_cost: { low_gbp: number; expected_gbp: number; high_gbp: number; per_output_unit: string; basis: string }
   expected_outputs: Array<{ metric: string; value: number; unit: string }>
   expected_bom: Array<{ item: string; typical_pct_of_cost: number; note?: string }>
+  // SIZING realism (Tristan 2026-06-24): the physical envelope a real one occupies. The "you asked
+  // for a 40-ft container but the GA is a massive space" alarm + the "single component bigger than
+  // the whole enclosure" catch (the busbar at 350 m³ in an 86 m³ container).
+  expected_sizing: { footprint_m2: number; volume_m3: number; envelope: string; basis: string }
+  // COMPONENT completeness: the major components a real one MUST have. A missing one → flag + investigate.
+  required_components: string[]
   reasoning: string
   model: string
 }
@@ -125,9 +134,14 @@ export async function generateBenchmarkExpectation(briefDescription: string): Pr
     `  "expected_cost": { "low_gbp": <number>, "expected_gbp": <number>, "high_gbp": <number>, "per_output_unit": "<e.g. £/kWh, £/kW, £/t·yr>", "basis": "<one sentence: how you arrived at this>" },\n` +
     `  "expected_outputs": [ { "metric": "<name>", "value": <number>, "unit": "<unit>" } ],\n` +
     `  "expected_bom": [ { "item": "<major component/category>", "typical_pct_of_cost": <number 0-100>, "note": "<optional>" } ],\n` +
-    `  "reasoning": "<2-3 sentences of how a real one of these is costed and what dominates the bill of materials>"\n` +
+    `  "expected_sizing": { "footprint_m2": <number>, "volume_m3": <number>, "envelope": "<e.g. one 40-ft ISO container ≈ 30 m² / 86 m³>", "basis": "<one sentence>" },\n` +
+    `  "required_components": [ "<major component a real one MUST have, e.g. power conversion system>", "..." ],\n` +
+    `  "reasoning": "<2-3 sentences of how a real one of these is costed/sized and what dominates the bill of materials>"\n` +
     `}\n` +
-    `Be realistic and specific. The expected_bom percentages should reflect where the money REALLY goes in this class of system.`
+    `Be realistic and specific. expected_bom percentages = where the money REALLY goes. expected_sizing = the ` +
+    `PHYSICAL envelope a real one occupies (if the brief states a container/enclosure, size to it — a single ` +
+    `component can never be larger than the whole enclosure). required_components = the handful of major ` +
+    `subsystems whose ABSENCE would mean the design is incomplete.`
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -137,8 +151,9 @@ export async function generateBenchmarkExpectation(briefDescription: string): Pr
         'HTTP-Referer': 'https://fractionalforge.com',
         'X-Title': 'ForgeOS benchmark sanity net',
       },
-      body: JSON.stringify({ model: BENCHMARK_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 2000 }),
-      signal: AbortSignal.timeout(90_000),
+      // reasoning model (GLM-5.2) — give room to think before the JSON, or the completion comes back empty
+      body: JSON.stringify({ model: BENCHMARK_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 6000 }),
+      signal: AbortSignal.timeout(120_000),
     })
     if (!res.ok) { console.error(`[benchmark] LLM HTTP ${res.status}`); return null }
     const j: any = await res.json()
@@ -235,6 +250,51 @@ export function compareToBenchmark(exp: BenchmarkExpectation, state: any): Diver
     }
   }
 
+  // 4) SIZING realism — does the physical envelope match, and is any single component larger than the
+  // whole enclosure? (the busbar at 350 m³ in an 86 m³ container; the GA that is a "massive space").
+  const env = exp.expected_sizing?.volume_m3
+  if (typeof env === 'number' && env > 0) {
+    // component volumes parsed from BoM requirement strings ("· 350 m³") + any contract volume keys
+    const vols: Array<{ name: string; m3: number }> = []
+    for (const b of rb) {
+      // tolerate "350 m³" (unicode) and "350 m3" (ascii); no \b after ³ (it is a non-word char)
+      const m = String(b?.requirement || '').match(/·\s*([\d,]+(?:\.\d+)?)\s*m(?:³|3)(?!\d)/)
+      if (m) vols.push({ name: String(b.requirement).split('·')[0].trim(), m3: parseFloat(m[1].replace(/,/g, '')) })
+    }
+    const biggest = vols.slice().sort((a, c) => c.m3 - a.m3)[0]
+    if (biggest && biggest.m3 > env) {
+      // a single component bigger than the stated enclosure is an unambiguous sizing error
+      findings.push({
+        dimension: 'sizing — single component vs enclosure',
+        expected: `≤ the ${exp.expected_sizing.envelope || 'enclosure'} (~${Math.round(env)} m³ total)`,
+        deterministic: `"${biggest.name.slice(0, 32)}" alone is ${biggest.m3.toLocaleString()} m³`,
+        ratio: Number((biggest.m3 / env).toFixed(2)),
+        verdict: 'radical',
+        note: 'a single component is larger than the entire stated enclosure — a volume/units bug (this also breaks the GA layout)',
+      })
+    }
+    const sumV = vols.reduce((a, v) => a + v.m3, 0)
+    if (sumV > 0) {
+      const ratio = sumV / env
+      if (ratio >= WARN_FACTOR) {
+        findings.push({
+          dimension: 'sizing — total equipment volume',
+          expected: `fits ${exp.expected_sizing.envelope || 'the enclosure'} (~${Math.round(env)} m³)`,
+          deterministic: `equipment sums to ~${Math.round(sumV).toLocaleString()} m³`,
+          ratio: Number(ratio.toFixed(2)),
+          verdict: classify(ratio),
+          note: 'the equipment does not fit the stated enclosure — the GA drawing will sprawl beyond the container',
+        })
+      }
+    }
+  }
+
+  // 5) COMPONENT completeness — required_components is carried for the LLM diagnose step to judge
+  // against the ACTUAL bill. Naive keyword matching is too brittle (it false-flags "battery racks"
+  // missing when the cells ship as "cell-to-cell busbar" / "module steel frame", and false-passes
+  // "battery management system" on the generic token "system"). Presence is a fuzzy judgement, so the
+  // LLM (which understands that a cell busbar implies cells) assesses it in diagnoseFaults().
+
   const worst = worstOf(findings.map(f => f.verdict))
   const needs_full_check = worst === 'radical'
   const summary = !findings.length
@@ -243,6 +303,53 @@ export function compareToBenchmark(exp: BenchmarkExpectation, state: any): Diver
     : worst === 'warn' ? 'deterministic output deviates from the benchmark — review recommended'
     : 'RADICAL divergence — the deterministic engine and the LLM benchmark disagree by >2.5× on a core dimension; one of them is wrong. FULL CHECK REQUIRED.'
   return { findings, worst, needs_full_check, summary }
+}
+
+// ── auto-diagnose (the LLM steps INTO the deterministic numbers and names the fault) ───────────
+export interface Fault {
+  line: string; dimension: string; issue: string; magnitude: string; suggested: string; likely_cause: string
+}
+export async function diagnoseFaults(exp: BenchmarkExpectation, state: any, report: DivergenceReport): Promise<Fault[]> {
+  if (!OPENROUTER_KEY) return []
+  const rb: any[] = Array.isArray(state?.requirementsBom) ? state.requirementsBom : []
+  const total = rb.reduce((a, b) => a + (b?.line_gbp || 0), 0) || 1
+  const top = rb.slice().sort((a, b) => (b?.line_gbp || 0) - (a?.line_gbp || 0)).slice(0, 25)
+    .map(b => `${b.tag || '—'} | qty ${b.qty} | unit £${b.unit_gbp} | line £${Math.round(b.line_gbp || 0)} (${(100 * (b.line_gbp || 0) / total).toFixed(0)}%) | ${(b.requirement || '').toString().slice(0, 60)}`)
+  const flagged = report.findings.filter(f => f.verdict !== 'ok')
+    .map(f => `- ${f.dimension}: expected ${f.expected}; engine gave ${f.deterministic} (${f.verdict})`)
+  const prompt =
+    `You are auditing a deterministic engineering bill of materials that DIVERGED from a realistic ` +
+    `benchmark. Your job: look at the ACTUAL line items below and name the SPECIFIC lines at fault, ` +
+    `so an engineer can fix them. Be concrete (which line, how far off, the likely cause: wrong unit ` +
+    `price / wrong quantity / wrong size-or-volume / mis-classified commodity / missing component).\n\n` +
+    `BENCHMARK said: cost ~£${Math.round(exp.expected_cost.expected_gbp).toLocaleString()}; ` +
+    `sizing ${exp.expected_sizing?.envelope || '—'}; BoM mix ${(exp.expected_bom || []).map(x => `${x.item} ~${x.typical_pct_of_cost}%`).join(', ')}.\n\n` +
+    `REQUIRED COMPONENTS a real one MUST have: ${(exp.required_components || []).join(', ')}. Check the bill ` +
+    `below and report any genuinely ABSENT one as a fault with dimension "component" — but DO NOT false-flag: ` +
+    `a component is present even if named differently (e.g. cells ship as "cell-to-cell busbar"/"module frame"; ` +
+    `a PCS may appear as "inverter"). Only flag a subsystem that truly has no representation in the bill.\n\n` +
+    `FLAGGED DIVERGENCES:\n${flagged.join('\n')}\n\n` +
+    `TOP DETERMINISTIC LINE ITEMS (tag | qty | unit £ | line £ (% of bill) | description):\n${top.join('\n')}\n\n` +
+    `Return ONLY JSON: { "faults": [ { "line": "<tag or name>", "dimension": "cost|sizing|quantity|component", ` +
+    `"issue": "<what's wrong>", "magnitude": "<e.g. ~90× too high>", "suggested": "<realistic value>", ` +
+    `"likely_cause": "<root cause>" } ] }. List only genuine faults, worst first.`
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENROUTER_KEY}`, 'Content-Type': 'application/json', 'X-Title': 'ForgeOS fault diagnosis' },
+      body: JSON.stringify({ model: DIAGNOSE_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 4000 }),
+      signal: AbortSignal.timeout(180_000),
+    })
+    if (!res.ok) { console.error(`[benchmark] diagnose HTTP ${res.status}`); return [] }
+    const j: any = await res.json()
+    let raw = j?.choices?.[0]?.message?.content
+    if (!raw || typeof raw !== 'string') { console.error('[benchmark] diagnose: empty completion'); return [] }
+    const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/); if (fence) raw = fence[1]
+    const a = raw.indexOf('{'), b = raw.lastIndexOf('}')
+    if (a === -1 || b === -1) { console.error(`[benchmark] diagnose: no JSON in completion (${raw.slice(0, 80)}…)`); return [] }
+    const p = JSON.parse(raw.slice(a, b + 1))
+    return Array.isArray(p.faults) ? p.faults.slice(0, 12) : []
+  } catch (e) { console.error(`[benchmark] diagnose failed: ${(e as Error).message}`); return [] }
 }
 
 // ── CLI ────────────────────────────────────────────────────────────────────
@@ -257,7 +364,9 @@ async function main() {
   const exp = await generateBenchmarkExpectation(desc)
   if (!exp) { console.error('[benchmark] could not generate — aborting'); process.exit(2) }
   const report = compareToBenchmark(exp, state)
-  const out = { expectation: exp, report, generated_for: dir }
+  // auto-diagnose: when anything flagged, have the LLM step into the numbers and name the faults
+  const faults = report.findings.some(f => f.verdict !== 'ok') ? await diagnoseFaults(exp, state, report) : []
+  const out = { expectation: exp, report, faults, generated_for: dir }
   writeFileSync(join(resolve(dir), 'benchmark-expectation.json'), JSON.stringify(out, null, 2))
 
   // ── the "full check" print ──
@@ -269,6 +378,13 @@ async function main() {
     console.log(`     expected (LLM):   ${f.expected}`)
     console.log(`     deterministic:    ${f.deterministic}   [ratio ${f.ratio ?? '—'}]`)
     console.log(`     ${f.note}`)
+  }
+  if (faults.length) {
+    console.log('\n── AUTO-DIAGNOSIS (the LLM, stepping into the deterministic line items) ──')
+    for (const f of faults) {
+      console.log(`  • ${f.line} [${f.dimension}] — ${f.issue} (${f.magnitude})`)
+      console.log(`      → suggested: ${f.suggested}  ·  likely cause: ${f.likely_cause}`)
+    }
   }
   console.log(`\nVERDICT: ${bar(report.worst)} — ${report.summary}`)
   if (report.needs_full_check) {
@@ -285,6 +401,8 @@ function _selftest() {
     expected_cost: { low_gbp: 750_000, expected_gbp: 1_000_000, high_gbp: 1_300_000, per_output_unit: '£/kWh', basis: '~£300/kWh × 3 MWh' },
     expected_outputs: [{ metric: 'nameplate', value: 3, unit: 'MWh' }],
     expected_bom: [{ item: 'battery cells', typical_pct_of_cost: 55 }, { item: 'PCS', typical_pct_of_cost: 15 }],
+    expected_sizing: { footprint_m2: 30, volume_m3: 86, envelope: 'one 40-ft ISO container', basis: '40-ft container' },
+    required_components: ['power conversion system', 'step-up transformer', 'battery management system'],
     reasoning: 'cells dominate', model: 'test',
   }
   // RADICAL cost (the real BESS: £8.9M OEM vs £1.3M high → ~6.8×)
@@ -301,6 +419,14 @@ function _selftest() {
   })
   const bomF = r3.findings.find(f => f.dimension === 'BoM concentration')
   if (!bomF || bomF.verdict === 'ok') { console.log('FAIL: a 90%-of-bill busbar line should flag BoM concentration'); bad++ }
+  // SIZING: a single 350 m³ component in an 86 m³ envelope → radical sizing flag
+  const r4 = compareToBenchmark(exp, {
+    costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {},
+    requirementsBom: [{ requirement: 'cell-to-cell busbar · 350 m³', line_gbp: 1000 }],
+  })
+  const sizeF = r4.findings.find(f => f.dimension.startsWith('sizing — single'))
+  if (!sizeF || sizeF.verdict !== 'radical') { console.log('FAIL: a 350 m³ component in an 86 m³ enclosure should be RADICAL sizing'); bad++ }
+  // (component-completeness is LLM-judged in diagnoseFaults — not a deterministic finding — so no pure case here)
   // classify boundaries
   if (classify(2.6) !== 'radical' || classify(1.8) !== 'warn' || classify(1.2) !== 'ok' || classify(1 / 2.6) !== 'radical') {
     console.log('FAIL: classify boundaries'); bad++
