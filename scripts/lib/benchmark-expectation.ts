@@ -1,0 +1,313 @@
+/**
+ * benchmark-expectation.ts — the GENERATIVE SANITY NET (Tristan 2026-06-24).
+ *
+ * The deterministic engine can be confidently, obviously wrong — a 3 MWh BESS priced at £2,963/kWh,
+ * a £62k pH probe — and no per-class deterministic gate catches it, because the magnitude is plausible
+ * for SOME class. The fix Tristan specified: ask an LLM, independently, what a system like THIS should
+ * be — the benchmark a knowledgeable engineer gives off the top of their head: expected cost, expected
+ * electrical/performance output, and the expected bill of materials — then DIFF the deterministic engine
+ * against it. A radical divergence on ANY dimension is flagged automatically and triggers a "full check".
+ *
+ * It is a NET, not a judge: it never decides who is right. It raises the alarm so the wrong one (the
+ * generative LLM or the deterministic engine) gets verified. UNIVERSAL by construction: the LLM needs
+ * no pre-loaded cost band, so it works on any/unseen archetype — unlike gate 32's hardcoded
+ * INDUSTRY_COST_BANDS, which silently skip classes nobody pre-loaded.
+ *
+ * INDEPENDENCE PRINCIPLE (Tristan 2026-06-24, the load-bearing design decision): the benchmark is
+ * only a valid check if it FAILS DIFFERENTLY from the thing it checks. The deterministic engine is
+ * BOTTOM-UP — it sums per-part prices (catalogue × qty); its errors are arithmetic/pricing bugs (a
+ * busbar at £452 × 3,735, a 350 m³ volume, a wrong floor). The benchmark is forced to be TOP-DOWN —
+ * a market-anchored gestalt ("a real 3 MWh battery sells for ~£300/kWh → ~£0.9M") that, by method,
+ * CANNOT contain the busbar arithmetic bug because it never sums busbars. The prompt explicitly
+ * FORBIDS bottom-up itemise-and-add; if it didn't, the benchmark would reproduce the engine's method
+ * (and its errors) and the check would be circular and worthless. Top-down vs bottom-up is the
+ * independence; the divergence between them is the signal.
+ *
+ * Usage:
+ *   npx tsx scripts/lib/benchmark-expectation.ts <out-dir>     # generate + compare + print the full check
+ *   npx tsx scripts/lib/benchmark-expectation.ts --selftest    # pure comparison logic
+ */
+import { readFileSync, existsSync, writeFileSync } from 'fs'
+import { resolve, join } from 'path'
+import { homedir } from 'os'
+
+// ── env (same places the chain reads) ──────────────────────────────────────────
+for (const p of [
+  resolve(process.cwd(), '.env.local'),
+  resolve(homedir(), '.claude/secrets/openrouter.env'),
+]) {
+  try {
+    if (!existsSync(p)) continue
+    for (const line of readFileSync(p, 'utf8').split('\n')) {
+      const m = line.match(/^\s*(?:export\s+)?([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
+    }
+  } catch { /* ignore */ }
+}
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || ''
+const BENCHMARK_MODEL = process.env.BENCHMARK_MODEL || 'z-ai/glm-5.2'  // most capable model in the stack (Tristan 2026-06-24)
+// How far the deterministic number may stray from the LLM benchmark before we flag.
+const WARN_FACTOR = Number(process.env.BENCHMARK_WARN_FACTOR || 1.5)     // [1.5,2.5)× → WARN
+const RADICAL_FACTOR = Number(process.env.BENCHMARK_RADICAL_FACTOR || 2.5) // ≥2.5× (or ≤1/2.5) → RADICAL → full check
+
+// ── types ───────────────────────────────────────────────────────────────────
+export interface BenchmarkExpectation {
+  expected_cost: { low_gbp: number; expected_gbp: number; high_gbp: number; per_output_unit: string; basis: string }
+  expected_outputs: Array<{ metric: string; value: number; unit: string }>
+  expected_bom: Array<{ item: string; typical_pct_of_cost: number; note?: string }>
+  reasoning: string
+  model: string
+}
+export type Verdict = 'ok' | 'warn' | 'radical'
+export interface DivergenceFinding {
+  dimension: string
+  expected: string
+  deterministic: string
+  ratio: number | null
+  verdict: Verdict
+  note: string
+}
+export interface DivergenceReport {
+  findings: DivergenceFinding[]
+  worst: Verdict
+  needs_full_check: boolean
+  summary: string
+}
+
+// ── deterministic readers (the engine's own numbers) ───────────────────────────
+export function deterministicHeadlineCostGbp(state: any): { gbp: number; source: string } | null {
+  const cs = state?.costStack || {}
+  for (const [k, src] of [['oem_transfer_price_gbp', 'costStack.oem_transfer_price_gbp'],
+                          ['installed_asp_gbp', 'costStack.installed_asp_gbp']] as const) {
+    if (typeof cs[k] === 'number' && cs[k] > 0) return { gbp: cs[k], source: src }
+  }
+  const cr = state?.cost_reality?.bom_total_gbp
+  if (typeof cr === 'number' && cr > 0) return { gbp: cr, source: 'cost_reality.bom_total_gbp' }
+  const rb = state?.requirementsBom
+  if (Array.isArray(rb)) {
+    const s = rb.reduce((a: number, b: any) => a + (b?.line_gbp || 0), 0)
+    if (s > 0) return { gbp: s, source: 'Σ requirementsBom.line_gbp' }
+  }
+  return null
+}
+
+/** A compact brief description for the LLM, built from the parsed brief. */
+export function briefDescriptionFromState(state: any): string {
+  const pb = state?.parsedBrief || {}
+  const c = pb.constraints || {}
+  const tp = c.target_performance || {}
+  const cls = state?.orchestratorContract?.product_class || pb.product_class || 'engineered system'
+  const lines: string[] = [`Product class: ${cls}`]
+  if (pb.summary) lines.push(`Summary: ${String(pb.summary).slice(0, 600)}`)
+  if (tp.value != null) lines.push(`Headline target: ${tp.value} ${tp.unit || ''} (${tp.key_metric || 'output'})`)
+  for (const m of (tp.metrics || []).slice(0, 10)) lines.push(`  - ${m.key_metric || m.key}: ${m.value} ${m.unit || ''}`)
+  if (c.unit_cost_ceiling?.value) lines.push(`Stated cost ceiling: ${c.unit_cost_ceiling.value} ${c.unit_cost_ceiling.unit || 'GBP'}`)
+  return lines.join('\n')
+}
+
+// ── the generative benchmark (LLM) ─────────────────────────────────────────────
+export async function generateBenchmarkExpectation(briefDescription: string): Promise<BenchmarkExpectation | null> {
+  if (!OPENROUTER_KEY) { console.error('[benchmark] no OPENROUTER_API_KEY — cannot generate benchmark'); return null }
+  const prompt =
+    `You are a senior cost & systems engineer giving a fast, independent SANITY benchmark for a piece of ` +
+    `industrial hardware — the kind of off-the-top-of-your-head estimate you would give if asked "roughly ` +
+    `what should one of these cost, output, and be built from?".\n\n` +
+    `CRITICAL — this must be a TOP-DOWN, MARKET-ANCHORED estimate, NOT a bottom-up build-up. Anchor to ` +
+    `what a REAL one of these ACTUALLY SELLS FOR or costs to build, from your knowledge of shipped products ` +
+    `and real projects (e.g. "utility battery storage runs ~£250-400/kWh installed → a 3 MWh system ≈ ` +
+    `£0.9-1.2M"). Do NOT itemise components and add them up — that is the exact method the system being ` +
+    `checked already uses, so reproducing it would make this a useless circular check. Give the gestalt ` +
+    `figure a market analyst would quote, then express the bill of materials only as the rough PERCENTAGE ` +
+    `MIX a real one has (so we can spot when a deterministic build-up lets one line dominate the bill).\n\n` +
+    `SYSTEM:\n${briefDescription}\n\n` +
+    `Return ONLY JSON, no commentary:\n` +
+    `{\n` +
+    `  "expected_cost": { "low_gbp": <number>, "expected_gbp": <number>, "high_gbp": <number>, "per_output_unit": "<e.g. £/kWh, £/kW, £/t·yr>", "basis": "<one sentence: how you arrived at this>" },\n` +
+    `  "expected_outputs": [ { "metric": "<name>", "value": <number>, "unit": "<unit>" } ],\n` +
+    `  "expected_bom": [ { "item": "<major component/category>", "typical_pct_of_cost": <number 0-100>, "note": "<optional>" } ],\n` +
+    `  "reasoning": "<2-3 sentences of how a real one of these is costed and what dominates the bill of materials>"\n` +
+    `}\n` +
+    `Be realistic and specific. The expected_bom percentages should reflect where the money REALLY goes in this class of system.`
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://fractionalforge.com',
+        'X-Title': 'ForgeOS benchmark sanity net',
+      },
+      body: JSON.stringify({ model: BENCHMARK_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 2000 }),
+      signal: AbortSignal.timeout(90_000),
+    })
+    if (!res.ok) { console.error(`[benchmark] LLM HTTP ${res.status}`); return null }
+    const j: any = await res.json()
+    let raw = j?.choices?.[0]?.message?.content
+    if (!raw || typeof raw !== 'string') return null
+    const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (fence) raw = fence[1]
+    const a = raw.indexOf('{'), b = raw.lastIndexOf('}')
+    if (a === -1 || b === -1) return null
+    const p = JSON.parse(raw.slice(a, b + 1))
+    if (!p.expected_cost || typeof p.expected_cost.expected_gbp !== 'number') return null
+    return { ...p, model: BENCHMARK_MODEL } as BenchmarkExpectation
+  } catch (e) {
+    console.error(`[benchmark] generation failed: ${(e as Error).message}`)
+    return null
+  }
+}
+
+// ── the comparison (PURE — testable without an LLM) ────────────────────────────
+function classify(ratio: number): Verdict {
+  const r = ratio >= 1 ? ratio : 1 / ratio
+  if (r >= RADICAL_FACTOR) return 'radical'
+  if (r >= WARN_FACTOR) return 'warn'
+  return 'ok'
+}
+const worstOf = (vs: Verdict[]): Verdict =>
+  vs.includes('radical') ? 'radical' : vs.includes('warn') ? 'warn' : 'ok'
+
+export function compareToBenchmark(exp: BenchmarkExpectation, state: any): DivergenceReport {
+  const findings: DivergenceFinding[] = []
+
+  // 1) COST — the headline check.
+  const det = deterministicHeadlineCostGbp(state)
+  if (det && exp.expected_cost?.expected_gbp > 0) {
+    const e = exp.expected_cost
+    const ratio = det.gbp / e.expected_gbp
+    // verdict against the ENVELOPE: ok if within [low,high]; else scaled by how far past the edge.
+    let verdict: Verdict = 'ok'
+    if (det.gbp < e.low_gbp) verdict = classify(e.low_gbp / det.gbp)
+    else if (det.gbp > e.high_gbp) verdict = classify(det.gbp / e.high_gbp)
+    findings.push({
+      dimension: 'all-in cost',
+      expected: `£${Math.round(e.low_gbp).toLocaleString()}–${Math.round(e.high_gbp).toLocaleString()} (mid £${Math.round(e.expected_gbp).toLocaleString()})`,
+      deterministic: `£${Math.round(det.gbp).toLocaleString()} (${det.source})`,
+      ratio: Number(ratio.toFixed(2)),
+      verdict,
+      note: verdict === 'ok' ? 'within the benchmark envelope' : `${ratio.toFixed(1)}× the LLM mid-estimate — ${e.basis || ''}`,
+    })
+  }
+
+  // 2) OUTPUT — does the design deliver the expected performance?
+  const km = state?.keyMetrics || {}
+  const ho = km.headline_output || {}
+  const detVal = Number(ho.value)
+  if (Number.isFinite(detVal) && detVal > 0) {
+    const match = (exp.expected_outputs || []).find(o =>
+      (o.unit || '').toLowerCase().replace(/\s/g, '') === String(ho.unit || '').toLowerCase().replace(/\s/g, ''))
+    if (match && match.value > 0) {
+      const ratio = detVal / match.value
+      findings.push({
+        dimension: `output (${ho.unit || ''})`,
+        expected: `${match.value} ${match.unit}`,
+        deterministic: `${detVal} ${ho.unit || ''}`,
+        ratio: Number(ratio.toFixed(2)),
+        verdict: classify(ratio),
+        note: classify(ratio) === 'ok' ? 'output matches expectation' : 'design output diverges from the benchmark',
+      })
+    }
+  }
+
+  // 3) BoM MIX — does a category dominate the bill far more than a real one of these would?
+  const rb: any[] = Array.isArray(state?.requirementsBom) ? state.requirementsBom : []
+  const total = rb.reduce((a, b) => a + (b?.line_gbp || 0), 0)
+  if (total > 0 && Array.isArray(exp.expected_bom) && exp.expected_bom.length) {
+    // top deterministic line as a fraction of the bill
+    const top = rb.slice().sort((a, b) => (b?.line_gbp || 0) - (a?.line_gbp || 0))[0]
+    if (top) {
+      const topPct = 100 * (top.line_gbp || 0) / total
+      const topName = String(top.requirement || top.tag || 'top line').toLowerCase()
+      // the highest single category a real one of these should reach
+      const maxExpectedPct = Math.max(...exp.expected_bom.map(x => x.typical_pct_of_cost || 0))
+      // flag when one line alone exceeds the largest category a real BoM would have, by the factor
+      const ratio = maxExpectedPct > 0 ? topPct / maxExpectedPct : null
+      if (ratio && ratio >= WARN_FACTOR) {
+        findings.push({
+          dimension: 'BoM concentration',
+          expected: `no single category above ~${Math.round(maxExpectedPct)}% of cost`,
+          deterministic: `"${(top.requirement || top.tag || '').toString().slice(0, 36)}" is ${topPct.toFixed(0)}% of the bill`,
+          ratio: Number(ratio.toFixed(2)),
+          verdict: classify(ratio),
+          note: 'one line dominates the bill far more than a real one of these would — likely an over-priced or over-counted commodity',
+        })
+      }
+    }
+  }
+
+  const worst = worstOf(findings.map(f => f.verdict))
+  const needs_full_check = worst === 'radical'
+  const summary = !findings.length
+    ? 'no comparable dimensions (missing benchmark or deterministic numbers)'
+    : worst === 'ok' ? 'deterministic output is within the LLM benchmark on every checked dimension'
+    : worst === 'warn' ? 'deterministic output deviates from the benchmark — review recommended'
+    : 'RADICAL divergence — the deterministic engine and the LLM benchmark disagree by >2.5× on a core dimension; one of them is wrong. FULL CHECK REQUIRED.'
+  return { findings, worst, needs_full_check, summary }
+}
+
+// ── CLI ────────────────────────────────────────────────────────────────────
+async function main() {
+  const dir = process.argv[2]
+  if (!dir) { console.error('Usage: benchmark-expectation.ts <out-dir>'); process.exit(1) }
+  const statePath = join(resolve(dir), 'state.json')
+  if (!existsSync(statePath)) { console.error(`no state.json in ${dir}`); process.exit(1) }
+  const state = JSON.parse(readFileSync(statePath, 'utf8'))
+  const desc = briefDescriptionFromState(state)
+  console.error(`[benchmark] generating expectation via ${BENCHMARK_MODEL}…`)
+  const exp = await generateBenchmarkExpectation(desc)
+  if (!exp) { console.error('[benchmark] could not generate — aborting'); process.exit(2) }
+  const report = compareToBenchmark(exp, state)
+  const out = { expectation: exp, report, generated_for: dir }
+  writeFileSync(join(resolve(dir), 'benchmark-expectation.json'), JSON.stringify(out, null, 2))
+
+  // ── the "full check" print ──
+  const bar = (v: Verdict) => v === 'radical' ? '🔴 RADICAL' : v === 'warn' ? '🟠 WARN' : '🟢 OK'
+  console.log('\n══════════ GENERATIVE BENCHMARK — FULL CHECK ══════════')
+  console.log(`LLM expectation (${exp.model}): ${exp.reasoning}\n`)
+  for (const f of report.findings) {
+    console.log(`${bar(f.verdict)}  ${f.dimension}`)
+    console.log(`     expected (LLM):   ${f.expected}`)
+    console.log(`     deterministic:    ${f.deterministic}   [ratio ${f.ratio ?? '—'}]`)
+    console.log(`     ${f.note}`)
+  }
+  console.log(`\nVERDICT: ${bar(report.worst)} — ${report.summary}`)
+  if (report.needs_full_check) {
+    console.log('⚠ A radical divergence was flagged. Verify which side is wrong BEFORE shipping this dossier.')
+  }
+  console.log('═══════════════════════════════════════════════════════\n')
+  process.exit(report.needs_full_check ? 3 : 0)
+}
+
+// ── selftest (pure comparison) ─────────────────────────────────────────────
+function _selftest() {
+  let bad = 0
+  const exp: BenchmarkExpectation = {
+    expected_cost: { low_gbp: 750_000, expected_gbp: 1_000_000, high_gbp: 1_300_000, per_output_unit: '£/kWh', basis: '~£300/kWh × 3 MWh' },
+    expected_outputs: [{ metric: 'nameplate', value: 3, unit: 'MWh' }],
+    expected_bom: [{ item: 'battery cells', typical_pct_of_cost: 55 }, { item: 'PCS', typical_pct_of_cost: 15 }],
+    reasoning: 'cells dominate', model: 'test',
+  }
+  // RADICAL cost (the real BESS: £8.9M OEM vs £1.3M high → ~6.8×)
+  const r1 = compareToBenchmark(exp, { costStack: { oem_transfer_price_gbp: 8_900_000 }, keyMetrics: {}, requirementsBom: [] })
+  if (r1.worst !== 'radical' || !r1.needs_full_check) { console.log('FAIL: £8.9M vs £1.3M high should be RADICAL'); bad++ }
+  // OK cost (within envelope)
+  const r2 = compareToBenchmark(exp, { costStack: { oem_transfer_price_gbp: 1_050_000 }, keyMetrics: {}, requirementsBom: [] })
+  const costF = r2.findings.find(f => f.dimension === 'all-in cost')
+  if (!costF || costF.verdict !== 'ok') { console.log('FAIL: £1.05M within envelope should be OK'); bad++ }
+  // BoM concentration: one line 60% when max expected 55% → ratio 1.09 → ok; one line 90% → 1.6× → warn+
+  const r3 = compareToBenchmark(exp, {
+    costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {},
+    requirementsBom: [{ requirement: 'cell-to-cell busbar', line_gbp: 900 }, { requirement: 'rest', line_gbp: 100 }],
+  })
+  const bomF = r3.findings.find(f => f.dimension === 'BoM concentration')
+  if (!bomF || bomF.verdict === 'ok') { console.log('FAIL: a 90%-of-bill busbar line should flag BoM concentration'); bad++ }
+  // classify boundaries
+  if (classify(2.6) !== 'radical' || classify(1.8) !== 'warn' || classify(1.2) !== 'ok' || classify(1 / 2.6) !== 'radical') {
+    console.log('FAIL: classify boundaries'); bad++
+  }
+  console.log(bad === 0 ? 'benchmark-expectation selftest: OK' : `benchmark-expectation selftest: ${bad} FAIL`)
+  if (bad) process.exit(1)
+}
+
+if (process.argv.includes('--selftest')) _selftest()
+else if (require.main === module) main().catch(e => { console.error(e); process.exit(1) })
