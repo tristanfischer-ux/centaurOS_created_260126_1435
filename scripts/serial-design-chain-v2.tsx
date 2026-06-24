@@ -49,6 +49,7 @@ import { buildContractForChain, type EngineeringContract } from './lib/engineeri
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv, readHeadlineCostGbp, deriveOutputDenominator } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
+import { generateBenchmarkExpectation, compareToBenchmark, diagnoseFaults, briefDescriptionFromState, type BenchmarkExpectation, type DivergenceReport, type Fault } from './lib/benchmark-expectation'
 import { reconcile as reconcileSweetSpot, type PrimaryObjective } from './lib/sweet-spot'
 import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
@@ -8424,6 +8425,61 @@ async function main() {
       } catch (csErr) {
         console.error(`[chain] cost-sanity re-derive on authoritative BoM threw (non-fatal): ${(csErr as Error).message}`)
         logAction({ step: 'cost_sanity_reconciled', ok: false, error: String(csErr).slice(0, 200) })
+      }
+      // ── GENERATIVE BENCHMARK SANITY NET (gate 36, SHADOW by default, Tristan 2026-06-24):
+      //    the universal "pull it back when the determinism goes off" net. An LLM gives an
+      //    INDEPENDENT, top-down, market-anchored expectation of what a system like THIS should
+      //    cost / output / be sized / be built from (scripts/lib/benchmark-expectation.ts), and we
+      //    DIFF the settled deterministic engine against it. A RADICAL divergence (>2.5× on any
+      //    core dimension) is auto-flagged + the LLM steps INTO the line items to name the faults.
+      //    UNIVERSAL: unlike gate 32's hardcoded INDUSTRY_COST_BANDS (which silently skip unseen
+      //    classes), the LLM needs no pre-loaded band — it works on any archetype. INDEPENDENCE:
+      //    the benchmark is forced TOP-DOWN (market gestalt), the engine is BOTTOM-UP (sums parts),
+      //    so the net cannot reproduce the engine's arithmetic bug. Records state.benchmarkDivergence
+      //    (+ .benchmarkExpectation / .benchmarkFaults) on EVERY costed run → the dossier + the
+      //    operator always see the verdict. SHADOW by default (never exits); ENFORCING is opt-in via
+      //    BENCHMARK_NET_ENFORCING (a RADICAL verdict then hard-exits 36). The LLM call (~2-3 min)
+      //    runs on full runs (QUALITY_LOOP_PHASE>=3) or when BENCHMARK_NET_FORCE=1 — cheap BoM-only
+      //    iterations skip it to stay cost-disciplined. Kill entirely with CHAIN_SKIP_BENCHMARK_NET=1.
+      const wantBenchmark = !process.env.CHAIN_SKIP_BENCHMARK_NET &&
+        (QUALITY_LOOP_PHASE >= 3 || process.env.BENCHMARK_NET_FORCE === '1')
+      if (wantBenchmark) {
+        try {
+          const desc = briefDescriptionFromState(st)
+          console.error('[chain] benchmark net: generating independent top-down expectation (LLM)…')
+          const exp = await generateBenchmarkExpectation(desc)
+          if (exp) {
+            const report = compareToBenchmark(exp, st)
+            const faults: Fault[] = report.findings.some(f => f.verdict !== 'ok')
+              ? await diagnoseFaults(exp, st, report) : []
+            ;(st as Record<string, any>).benchmarkExpectation = exp
+            ;(st as Record<string, any>).benchmarkDivergence = report
+            ;(st as Record<string, any>).benchmarkFaults = faults
+            const icon = report.worst === 'radical' ? '🔴 RADICAL' : report.worst === 'warn' ? '🟠 WARN' : '🟢 OK'
+            console.error(`[chain] benchmark net (${exp.model}): ${icon} — ${report.summary}`)
+            for (const f of report.findings.filter(f => f.verdict !== 'ok')) {
+              console.error(`[chain]   • ${f.dimension}: expected ${f.expected}; engine ${f.deterministic} [${f.verdict}, ${f.ratio ?? '—'}×]`)
+            }
+            for (const f of faults) {
+              console.error(`[chain]   ↳ FAULT ${f.line} [${f.dimension}] — ${f.issue} (${f.magnitude}) → ${f.suggested}`)
+            }
+            logAction({ step: 'benchmark_net', ok: true, verdict: report.worst, needs_full_check: report.needs_full_check, faults: faults.length, expected_gbp: Math.round(exp.expected_cost?.expected_gbp || 0) })
+            // ENFORCING (opt-in): a RADICAL divergence is a "one of them is wrong" alarm → hard-exit 36.
+            const benchEnforce = !['', '0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.BENCHMARK_NET_ENFORCING || '').toLowerCase())
+            if (benchEnforce && report.needs_full_check) {
+              writeFileSync(statePath, JSON.stringify(st))
+              console.error(`[chain] benchmark net ENFORCING: BLOCKING (exit 36) — ${report.summary}`)
+              logAction({ step: 'benchmark_net_enforce', ok: false, exit: 36, verdict: report.worst })
+              process.exit(36)
+            }
+          } else {
+            console.error('[chain] benchmark net: LLM returned no expectation — skipping (shadow never blocks)')
+            logAction({ step: 'benchmark_net', ok: false, error: 'no expectation generated' })
+          }
+        } catch (bErr) {
+          console.error(`[chain] benchmark net threw (non-fatal): ${(bErr as Error).message.slice(0, 200)}`)
+          logAction({ step: 'benchmark_net', ok: false, error: String(bErr).slice(0, 200) })
+        }
       }
       writeFileSync(statePath, JSON.stringify(st))
       console.log(`[chain] requirements-driven BoM: ${reqRows.length} requirement lines (Σ £${Math.round(reqTotal).toLocaleString('en-GB')}) → state.requirementsBom; cost cascade reconciled to this total`)

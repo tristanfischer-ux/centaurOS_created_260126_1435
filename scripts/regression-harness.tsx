@@ -49,6 +49,7 @@ import { massAggregator } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
+import { compareToBenchmark, type BenchmarkExpectation } from './lib/benchmark-expectation'
 import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
 import { co2MineralisationEmitter } from './lib/orchestrator/emitters/co2-mineralisation'
@@ -593,6 +594,47 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
       return o.rasHeadline === 10_668_668 && o.rasOutput === 204 && o.rasVerdict === 'pass' &&
         o.rasBandBasis === 'class:aquaculture_ras' && o.rasBandLow === 10_000 && o.rasBandHigh === 55_000 &&
         o.absurdVerdict === 'high' && o.co2Verdict === 'high' && o.co2BandLow === 1_500
+    },
+    (v) => `result=${v}`,
+  ))
+
+  // ── GENERATIVE BENCHMARK SANITY NET — pure comparison guards the "pull it back when the
+  // determinism goes off" net wired into the chain (gate 36, 2026-06-24). compareToBenchmark is
+  // the deterministic half of an LLM-anchored check: given an independent top-down expectation
+  // (cost envelope + sizing + BoM mix), it must (a) flag a >2.5× cost over-run as RADICAL +
+  // needs_full_check (the real BESS: £8.9M vs a £0.75-1.3M envelope), (b) read a within-envelope
+  // cost as OK, (c) flag a single component larger than the whole enclosure as RADICAL sizing
+  // (the busbar at 350 m³ in an 86 m³ container — the GA-doesn't-fit bug), and (d) flag one BoM
+  // line dominating the bill far past the largest real category as a concentration warning. This
+  // is the chain-side guarantee that the net keeps catching the confidently-wrong deterministic
+  // output that no per-class band gate sees. UNIVERSAL (the expectation is LLM-supplied at runtime,
+  // no hardcoded band). Mirrors benchmark-expectation.ts --selftest but lives in the universal suite.
+  const benchExp: BenchmarkExpectation = {
+    expected_cost: { low_gbp: 750_000, expected_gbp: 1_000_000, high_gbp: 1_300_000, per_output_unit: '£/kWh', basis: '~£300/kWh × 3 MWh' },
+    expected_outputs: [{ metric: 'nameplate', value: 3, unit: 'MWh' }],
+    expected_bom: [{ item: 'battery cells', typical_pct_of_cost: 55 }, { item: 'PCS', typical_pct_of_cost: 15 }],
+    expected_sizing: { footprint_m2: 30, volume_m3: 86, envelope: 'one 40-ft ISO container', basis: '40-ft container' },
+    required_components: ['power conversion system', 'step-up transformer', 'battery management system'],
+    reasoning: 'cells dominate', model: 'test',
+  }
+  const benchRadical = compareToBenchmark(benchExp, { costStack: { oem_transfer_price_gbp: 8_900_000 }, keyMetrics: {}, requirementsBom: [] })
+  const benchOk = compareToBenchmark(benchExp, { costStack: { oem_transfer_price_gbp: 1_050_000 }, keyMetrics: {}, requirementsBom: [] })
+  const benchSizing = compareToBenchmark(benchExp, { costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {}, requirementsBom: [{ requirement: 'cell-to-cell busbar · 350 m³', line_gbp: 1000 }] })
+  const benchConc = compareToBenchmark(benchExp, { costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {}, requirementsBom: [{ requirement: 'cell-to-cell busbar', line_gbp: 900 }, { requirement: 'rest', line_gbp: 100 }] })
+  out.push(assertEq(
+    'UNIVERSAL.benchmark_net_flags_radical_divergence',
+    'compareToBenchmark flags a >2.5× cost over-run as RADICAL + needs_full_check, reads a within-envelope cost as OK, flags a single component larger than the whole enclosure as RADICAL sizing (the 350 m³ busbar in an 86 m³ container), and flags one line dominating the bill as a concentration warning — the deterministic half of the generative sanity net (chain gate 36)',
+    JSON.stringify({
+      radicalWorst: benchRadical.worst, radicalNeedsCheck: benchRadical.needs_full_check,
+      okCost: (benchOk.findings.find(f => f.dimension === 'all-in cost') || {}).verdict,
+      sizingVerdict: (benchSizing.findings.find(f => f.dimension.startsWith('sizing — single')) || {}).verdict,
+      concVerdict: (benchConc.findings.find(f => f.dimension === 'BoM concentration') || {}).verdict,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.radicalWorst === 'radical' && o.radicalNeedsCheck === true &&
+        o.okCost === 'ok' && o.sizingVerdict === 'radical' &&
+        (o.concVerdict === 'warn' || o.concVerdict === 'radical')
     },
     (v) => `result=${v}`,
   ))
