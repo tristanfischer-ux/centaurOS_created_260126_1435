@@ -52,6 +52,7 @@ import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceMode
 import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { recordGateFailure } from './lib/lesson-loop'
+import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
@@ -3053,6 +3054,18 @@ async function main() {
   const brief = readFileSync(briefPath, 'utf-8')
   console.error(`[chain] brief: ${briefPath} (${brief.length} chars)`)
   logAction({ step: 'init', brief_chars: brief.length, brief_path: briefPath })
+
+  // EXECUTABLE-SKILL PREFLIGHT (#5): assert hard preconditions + announce every non-default
+  // toggle, so a DEGRADED/misconfigured run is LOUD at the top of the log, not silent. The
+  // floor only bites when a gate is enforcing — say so. Fatal (no API key) exits early.
+  const preflight = runChainPreflight()
+  console.error(preflight.summary)
+  for (const w of preflight.warnings) console.error(`[chain] PREFLIGHT ⚠ ${w}`)
+  logAction({ step: 'preflight', ok: preflight.ok, active_toggles: preflight.activeToggles, warnings: preflight.warnings })
+  if (!preflight.ok) {
+    for (const f of preflight.fatal) console.error(`[chain] PREFLIGHT ✗ FATAL: ${f}`)
+    process.exit(1)
+  }
 
   // ── Render-and-flag-by-default (Tristan 2026-06-12) ──────────────────────────
   // A gate that finds a NON-CATASTROPHIC issue (a false-positive-prone heuristic, or
