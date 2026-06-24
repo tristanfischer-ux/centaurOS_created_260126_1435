@@ -51,6 +51,7 @@ import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceMod
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
+import { recordGateFailure } from './lib/lesson-loop'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
@@ -8119,6 +8120,20 @@ async function main() {
         writeFileSync(resolve(outDir, 'drawing-gates-punchlist.md'), md.join('\n'))
         console.log(`[chain] drawing-gates PUNCH-LIST (${nFail} defect(s) → ${byStage.size} stage(s)) → drawing-gates-punchlist.md`)
         for (const [stage, fs] of byStage) console.log(`[chain]   → ${stage}: ${fs.map((f) => `${f.gate}/${f.drawing}`).join(', ')}`)
+        // LESSON→RULE LOOP (#1): the punch-list already routes each defect to its fix-stage —
+        // feed it back. Each loss → cross-run failure-ledger + an auto-drafted invariant stub;
+        // a recurring (class, gate) flags a council escalation. Additive: records only, never
+        // blocks (the enforcing decision below is unchanged). Best-effort — never breaks the run.
+        for (const [stage, fs] of byStage) {
+          for (const f of fs) {
+            const res = recordGateFailure({
+              product_class: productClass, gate: `drawing:${f.gate}`, exit_code: null,
+              fix_stage: stage, run_dir: outDir, detail: `${f.drawing}: ${f.detail}`,
+            })
+            if (res?.escalate) console.log(`[chain]   ⚠ lesson-loop: drawing:${f.gate} has recurred ${res.recurrence}× on ${productClass} — council escalation flagged (tasks/harness-stubs/)`)
+          }
+        }
+        if (nFail > 0) console.log(`[chain]   ↳ lesson-loop: ${nFail} loss(es) logged to failure-ledger + invariant stub(s) drafted in tasks/harness-stubs/`)
         const dgEnforce = !['', '0', 'false', 'no', 'off', 'shadow'].includes((process.env.DRAWING_GATES_ENFORCING || '').toLowerCase())
         if (dgEnforce) {
           console.error('[chain] === DRAWING_GATES_ENFORCING: a drawing defect remains — exit 35 (punch-list above) ===')
@@ -9353,6 +9368,21 @@ async function main() {
       console.error(`\n[chain] ✦ quality loop COMPLETE — all sections ≥8/10 (iteration ${iter + 1}/${MAX_QUALITY_LOOPS})`)
     } else {
       console.error(`\n[chain] quality loop: max iterations (${MAX_QUALITY_LOOPS}) reached — floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10`)
+      // LESSON→RULE LOOP (#1): the run ended below the ≥8 floor after exhausting the loop —
+      // record each DETERMINISTIC (non-advisory) section still <8 as a loss (advisory LLM
+      // sections never gate, so they are not logged). Each → ledger + invariant stub; a
+      // recurring section escalates. Best-effort, never breaks the run.
+      try {
+        for (const s of (scorecard.sections || [])) {
+          if (s.advisory || s.score >= 8) continue
+          const res = recordGateFailure({
+            product_class: productClass, gate: `scorecard:${s.name}`, exit_code: null,
+            fix_stage: null, run_dir: outDir,
+            detail: `section ${s.name}=${s.score}/10 after ${MAX_QUALITY_LOOPS} iters; defects: ${(s.defects || []).slice(0, 4).join(' | ')}`,
+          })
+          if (res?.escalate) console.error(`[chain]   ⚠ lesson-loop: section '${s.name}' has recurred ${res.recurrence}× below 8 on ${productClass} — council escalation flagged`)
+        }
+      } catch { /* best-effort */ }
     }
   } catch (loopErr) {
     console.error(`[chain] quality loop stage miss (non-fatal): ${(loopErr as Error).message.slice(0, 200)}`)
