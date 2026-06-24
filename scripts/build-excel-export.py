@@ -474,6 +474,161 @@ def cost_breakdown_by_category(run_dir: str) -> List[tuple]:
 
 
 # ============================================================================
+# TAB 0 — EXECUTIVE SUMMARY (the "wow" cover — gridlines off, image-led)
+# ============================================================================
+# Tristan 2026-06-24: a 30-tab spreadsheet says "audit"; the first thing a reader sees must say
+# "wow". This is a pitch-deck-style cover (NOT a grid): hero render + headline cards (what · output ·
+# cost · status) + the capex breakdown + "what's inside" + the concierge ladder (your next steps).
+# The detailed review surfaces (Overview, Checks, Ledger) follow. UNIVERSAL — no per-class content.
+def _humanize_class(c: Any) -> str:
+    s = str(c or "this system").replace("_", " ").strip()
+    s = re.sub(r"\bco2\b", "CO₂", s, flags=re.I)
+    return (s[:1].upper() + s[1:]) if s else "This system"
+
+
+def _headline_build_cost(state: dict) -> tuple:
+    """(label, gbp) for the cover's cost card — the most defensible 'what it costs', labelled honestly."""
+    cs = state.get("costStack") or {}
+    for k, label in (("installed_asp_gbp", "All-in installed cost"),
+                     ("oem_transfer_price_gbp", "Build cost (ex-works)")):
+        v = cs.get(k)
+        if isinstance(v, (int, float)) and v > 0:
+            return label, float(v)
+    cr = (state.get("cost_reality") or {}).get("bom_total_gbp")
+    if isinstance(cr, (int, float)) and cr > 0:
+        return "Materials cost (bill of materials)", float(cr)
+    return None, None
+
+
+def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
+    ws = wb.create_sheet("Executive Summary")
+    ws.sheet_view.showGridLines = False
+    set_widths(ws, {"A": 26, "B": 20, "C": 18, "D": 18, "E": 16, "F": 16, "G": 16})
+    km = state.get("keyMetrics") or {}
+    pc = ((state.get("orchestratorContract") or {}).get("product_class")
+          or (state.get("parsedBrief") or {}).get("product_class"))
+    proj = _humanize_class(pc)
+
+    nxt = title_row(
+        ws, f"ForgeOS Engineering Dossier — {proj}", 7,
+        "The engineering reality of your hardware idea — a buildable design, a real bill of "
+        "materials, the true cost, and who can make it. The detail is in the tabs; this page is "
+        "the summary.",
+    )
+
+    # ---- hero render (right side) ----
+    try:
+        from openpyxl.drawing.image import Image as XLImage
+        hero = next((p for p in (os.path.join(run_dir, "00-hero.png"),
+                                 os.path.join(run_dir, "blender-cover.png"))
+                     if os.path.exists(p)), None)
+        if hero:
+            ds = downscale_png(hero, run_dir, max_px=900)
+            im = XLImage(ds)
+            if im.width and im.width > 470:
+                r = 470 / float(im.width)
+                im.width = int(im.width * r)
+                im.height = int(im.height * r)
+            ws.add_image(im, "E" + str(nxt))
+    except Exception:  # never let the cover image break the build
+        pass
+
+    # ---- headline cards (left column) ----
+    FONT_CARD_L = Font(name="Calibri", size=9, bold=True, color="888888")
+    FONT_CARD_V = Font(name="Calibri", size=16, bold=True, color="1F3A5F")
+    row = nxt
+
+    def card(label: str, value: str, sub: str = "") -> None:
+        nonlocal row
+        cl = ws.cell(row, 1, label.upper())
+        cl.font = FONT_CARD_L
+        row += 1
+        cv = ws.cell(row, 1, value)
+        cv.font = FONT_CARD_V
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+        row += 1
+        if sub:
+            cs = ws.cell(row, 1, sub)
+            cs.font = FONT_NOTE
+            cs.alignment = WRAP_TOP
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+            row += 1
+        row += 1
+
+    card("What it is", proj)
+    ho = km.get("headline_output") or {}
+    if ho.get("value") not in (None, ""):
+        card("Output", f"{ho.get('value')} {ho.get('unit', '')}".strip(), str(ho.get("label", "")))
+    clabel, cgbp = _headline_build_cost(state)
+    if cgbp:
+        card(clabel, f"£{round(cgbp):,}")
+    sc_obj = state.get("qualityScorecard") or load_json(os.path.join(run_dir, "quality-scorecard.json")) or {}
+    floor = sc_obj.get("floor")
+    if isinstance(floor, (int, float)):
+        card("Status",
+             "Engineering-validated" if floor >= 8 else f"Quality floor {floor}/10",
+             "Scored against deterministic engineering gates." if floor >= 8 else "")
+
+    # clear the hero image before full-width sections
+    row = max(row, nxt + 16) + 1
+
+    # ---- where the money goes (top categories) ----
+    cb = cost_breakdown_by_category(run_dir)
+    if cb:
+        sub_banner(ws, row, "Where the money goes — capex by category", 7)
+        row += 1
+        _bar_font = Font(name="Menlo", size=10, color="2E5A88")
+        for cat, gbp, pct, _n in cb[:7]:
+            ws.cell(row, 1, cat).font = FONT_SUB
+            cg = ws.cell(row, 2, round(gbp))
+            cg.number_format = "#,##0"
+            cp = ws.cell(row, 4, round(pct, 1))
+            cp.number_format = '0.0"%"'
+            cbar = ws.cell(row, 5, "█" * int(round(pct / 2.5)) if pct >= 1.25 else "▏")
+            cbar.font = _bar_font
+            row += 1
+        row += 1
+
+    # ---- what's inside ----
+    sub_banner(ws, row, "What's inside this workbook", 7)
+    row += 1
+    for tab in ("Bill of Materials (Ledger)", "Cost waterfall", "Financial model",
+                "Calculations", "Risk & Regulatory", "Connection trace"):
+        desc = _TAB_DESCRIPTIONS.get(tab)
+        if desc:
+            ws.cell(row, 1, "•  " + tab).font = FONT_SUB
+            d = ws.cell(row, 2, desc)
+            d.font = FONT_NOTE
+            d.alignment = WRAP_TOP
+            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=7)
+            row += 1
+    row += 1
+
+    # ---- your next steps (the concierge ladder) ----
+    sub_banner(ws, row, "Your next steps — from design to a funded factory", 7)
+    row += 1
+    ladder = [
+        ("✓  You have the engineering dossier", "A buildable design, a real bill of materials, and the true cost — this document.", FONT_PASS),
+        ("→  Talk to the experts this design needs", "We connect you to vetted specialists for the open questions the design raises.", FONT_SUB),
+        ("→  Get real supplier quotes (RFQ)", "We take this bill of materials to suppliers and bring back real quotes.", FONT_SUB),
+        ("→  Raise the money on these numbers", "We help you turn the validated design and costs into a fundraise.", FONT_SUB),
+    ]
+    for head, sub, font in ladder:
+        h = ws.cell(row, 1, head)
+        h.font = font
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+        row += 1
+        s = ws.cell(row, 1, "      " + sub)
+        s.font = FONT_NOTE
+        s.alignment = WRAP_TOP
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+        row += 1
+    row += 1
+    contact = ws.cell(row, 1, "Fractional Forge — Tristan Fischer, Founder.  Reply to take the next step.")
+    contact.font = FONT_SUB
+
+
+# ============================================================================
 # TAB 1 — OVERVIEW (quality scorecard + headline metrics + provenance)
 # ============================================================================
 def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
@@ -5763,7 +5918,7 @@ def _reorder_tabs(wb: Workbook) -> None:
     a formula. Universal — keys on tab name/prefix, no archetype logic; unknown tabs take a sensible
     middle rank."""
     _RANK = {
-        "Contents": 0, "Overview": 1,
+        "Executive Summary": -1, "Contents": 0, "Overview": 1,
         "Render — Interior layout": 2,                 # HERO render — early (exact name)
         "Brief": 3,
         "Financial model": 10,
@@ -5803,6 +5958,8 @@ def build(run_dir: str, out_path: str) -> dict:
     wb = Workbook()
     wb.remove(wb.active)  # drop the default sheet
 
+    print("  · Executive Summary")
+    tab_executive_summary(wb, state, run_dir, sha)
     print("  · Overview")
     tab_overview(wb, state, run_dir, sha)
     print("  · Brief")
@@ -5884,6 +6041,15 @@ def build(run_dir: str, out_path: str) -> dict:
     # then moved to sheet #1 with a one-line description + hyperlink per tab ----
     print("  · Contents (sheet #1)")
     tab_contents(wb, _TAB_DESCRIPTIONS)
+
+    # The Executive Summary is the COVER — force it to the very front, ahead of Contents
+    # (tab_contents moves itself to index 0; the wow cover must precede it). Tristan 2026-06-24.
+    try:
+        _ei = wb.sheetnames.index("Executive Summary")
+        if _ei != 0:
+            wb.move_sheet("Executive Summary", -_ei)
+    except ValueError:
+        pass
 
     # ---- FINAL SANITISATION (Tristan 2026-06-23): defang any cell openpyxl turned into a FORMULA
     # that is actually engine PROSE. openpyxl stores ANY string starting with "=" as a formula;
