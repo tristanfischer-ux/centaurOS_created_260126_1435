@@ -152,6 +152,42 @@ def _run_shaded_hero_pass(out_dir: Path, state_path: Path,
     return ok
 
 
+def _run_exterior_pass(out_dir: Path, state_path: Path,
+                       log: list[str]) -> bool:
+    """Run a Blender pass with BLENDER_PLANT_SHELL=1 to produce the BUILDING-EXTERIOR renders
+    in out_dir/exterior/ (the dossier embeds 2 interior + 2 exterior shots). MUST run even when
+    the main CAD artifacts are REUSED from the early settle loop — the exterior pass lives inside
+    build_universal_scene's INSPECT=0+SHELL branch, which the reuse path skips, so out/exterior/
+    was never produced (Tristan 2026-06-24: "two internal + two external; only one internal
+    shows"). Skipped if exterior/00-hero.png already exists. Non-fatal."""
+    ext_hero = out_dir / "exterior" / "00-hero.png"
+    if ext_hero.exists() and ext_hero.stat().st_size > 1000:
+        log.append("exterior: exterior/00-hero.png already present — skip")
+        return True
+    blender = _blender_bin()
+    if not blender:
+        log.append("exterior: SKIP — blender not on PATH")
+        return False
+    env = dict(os.environ, BLENDER_OUT_DIR=str(out_dir),
+               STATE_JSON=str(state_path), INSPECT="0", BLENDER_PLANT_SHELL="1")
+    log.append("exterior: running INSPECT=0 BLENDER_PLANT_SHELL=1 Blender pass → exterior/")
+    try:
+        proc = subprocess.run(
+            [blender, "--background", "--python",
+             str(_THIS / "build_universal_scene.py"), "--", str(state_path)],
+            env=env, capture_output=True, text=True, timeout=1500)
+    except Exception as exc:  # noqa: BLE001
+        log.append(f"exterior: Blender launch failed: {exc}")
+        return False
+    ok = ext_hero.exists() and ext_hero.stat().st_size > 1000
+    if not ok:
+        tail = (proc.stderr or proc.stdout or "")[-300:]
+        log.append(f"exterior: Blender ran (rc={proc.returncode}) but exterior/00-hero.png absent: …{tail}")
+    else:
+        log.append("exterior: exterior/ renders written (building-exterior shots)")
+    return ok
+
+
 def _run_generator(script: str, out_dir: Path, state_path: Path,
                    png_name: str, log: list[str]) -> bool:
     """Run one draw_*.py as an isolated subprocess; return whether its PNG landed."""
@@ -321,6 +357,11 @@ def generate_drawing_set(state_path: str | Path,
     inspect_mode = os.environ.get("INSPECT", "1").strip()
     if inspect_mode == "0":
         _run_shaded_hero_pass(out_dir, state_path, log)
+        # Building-exterior shots (out/exterior/) — runs even when the main CAD artifacts are
+        # reused, so the dossier's 2 interior + 2 exterior renders are all produced. Gated on the
+        # chain's BLENDER_PLANT_SHELL=1 so a bare INSPECT=0 render stays interior-only.
+        if os.environ.get("BLENDER_PLANT_SHELL", "").strip().lower() in ("1", "true", "yes", "on"):
+            _run_exterior_pass(out_dir, state_path, log)
 
     # The universal-CAD HERO render for the dossier cover + per-module fallback
     # (build_universal_scene.py writes inspect-iso.png to out_dir). The chain reads
