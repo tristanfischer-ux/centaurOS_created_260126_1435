@@ -47,6 +47,9 @@ run "benchmark-expectation.ts --selftest"     npx tsx scripts/lib/benchmark-expe
 run "sweet-spot.ts --selftest"                npx tsx scripts/lib/sweet-spot.ts --selftest
 run "design-to-target.ts --selftest"          npx tsx scripts/lib/design-to-target.ts --selftest
 run "scenario-planning.ts --selftest"         npx tsx scripts/lib/scenario-planning.ts --selftest
+# PROVE-THE-CATCH: every registered gate must catch its own adversarial input (intent, not just
+# existence). A gate that can no longer block the exact failure it exists to catch fails here.
+run "gate-registry --selftest (prove-catch)"  npx tsx scripts/lib/gate-registry.ts --selftest
 
 # ── the UNIVERSAL regression harness (pure invariants incl. benchmark_net + requirements_bom
 #    selftest), against an EXPLICIT complete snapshot only. NO PDF (REGRESSION_NO_RENDER=1).
