@@ -3000,6 +3000,21 @@ def assemble(out_dir: str):
                     gbp = _micro_band[1]
                     basis = (basis + " · capped to pack micro-commodity ceiling"
                              if "micro-commodity ceiling" not in basis else basis)
+                # SMALL-HEATER £/W CEILING (2026-06-24, BESS punch-list): a PTC / anti-condensation
+                # / rack / panel / trace heater rated in WATTS (not kW) is a small resistive part
+                # (~£0.3-0.6/W); a gate-21 distributor datum of £1,500 for a 250 W PTC rack heater is
+                # a wrong catalogue price. Cap a sub-2 kW heater at £0.6/W (min £30). Excludes the
+                # immersion / backup / process heaters (kW-scale, priced on their own duty floor).
+                if re.search(r"\bheater\b", name, re.I) and not re.search(
+                        r"immersion|backup|process|duct|inline|booster|jacket|reboil", name, re.I):
+                    _wm = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*w\b",
+                                    f"{requirement} {md.get('capacity') or ''} {md.get('rating_primary') or ''}", re.I)
+                    _watt = float(_wm.group(1).replace(",", "")) if _wm else None
+                    if _watt and _watt <= 2000:
+                        _hcap = max(30.0, _watt * 0.6)
+                        if gbp > _hcap:
+                            gbp = _hcap
+                            basis = basis + f" · capped to small-heater £0.6/W ceiling ({_watt:.0f} W)"
                 # CONTROL-ELEMENT class budget (RAS audit 2026-06-19) — a final control
                 # element (a modulating / DN400 / on-off process valve or actuator)
                 # reaching this point with £0 (the synthesis stamped no price and it is
@@ -3244,6 +3259,14 @@ def assemble(out_dir: str):
             # lift over-bills the small per-cell part (the BESS busbar £120→£452 bug). Principals —
             # which the lift is FOR — never match this regex, so legitimate under-priced principals
             # (the Degasser £4,946 vs £65k median case) are unaffected. (Tristan 2026-06-24, UNIVERSAL.)
+            continue
+        # SMALL W-RATED HEATER: a PTC / anti-condensation / rack / panel heater rated in WATTS is a
+        # small resistive part — the corpus median for "heater" is dominated by kW-scale immersion/
+        # process heaters, so a lift over-bills the 250 W rack heater (£100→£1,500, gate-21 saw it
+        # too). Skip the lift; the £0.6/W ceiling keeps it sane. (Tristan 2026-06-24, UNIVERSAL.)
+        if (re.search(r"\bheater\b", req_lead, re.I)
+                and not re.search(r"immersion|backup|process|duct|inline|booster|jacket|reboil", req_lead, re.I)
+                and re.search(r"\b\d[\d,]*\s*w\b", str(row.get("requirement") or ""), re.I)):
             continue
         nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
         pv = pv_by_name.get(nmk)
