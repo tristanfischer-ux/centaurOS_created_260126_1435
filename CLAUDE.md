@@ -20,6 +20,18 @@
 
 ---
 
+## ⭐ GATE INTENT RULE — a gate must PROVE it catches (Tristan 2026-06-24, MANDATORY)
+
+**"There is a gate" is the LETTER; "the gate stops a bad dossier and drives a fix" is the INTENT.** You can satisfy the letter (a wired function, a scary banner) while failing the intent — the gate never fires, or fires and ships anyway (Goodhart's law: congratulating yourself for *having* a gate). A gate you can walk straight through is decoration.
+
+**The rule (executable, not just this doc):** a gate is not real until it PROVES it catches. Every gate declares the exact failure it exists to detect (an **adversarial input**) and must demonstrate that, given that input, (a) its decision **FIRES** and (b) firing produces its **intended action** — block + route-to-fix, not a silent record. A gate with only happy-path tests, or none, fails the meta-check. **Intent is verified by demonstrating the catch — never by the gate's existence.**
+
+- The mechanism: `scripts/lib/gate-registry.ts` (`--selftest`, run by `scripts/verify-engine-guards.sh`). Each gate has a `proveCatch()` (drives the gate's decision with a bad input, asserts it fires) + `enforcedByDefault()` (is it ON, or SHADOW-by-default — a walk-through-by-config). `UNPROVEN_GATES` lists gates with no proof yet (the coverage gap to close). A gate that stops catching fails the build.
+- **The purpose of a gate is to flag a problem AND drive its fix.** A gate that ships silently (problem forgotten) OR hard-stops with no routing (doesn't say where to fix) both fail the loop: **detect → "there's a problem, go fix it" (routed to source) → fix the rule + guard → re-run → fewer problems.** When you add or touch a gate, add its `proveCatch` to the registry, and make a fired gate emit a routed fix item (the [[CORE FIX PRINCIPLE]] applies to gate findings too).
+- Known coverage gaps (2026-06-24 audit): gates 11–21 route through `gateBlock()` and are walk-through unless `CHAIN_GATE_ENFORCE=1`; 31–36 are shadow unless their `*_ENFORCING` flag is set; gate 22's `exit(22)` is inside a `try/catch` that can swallow it; gate 30 was downgraded non-fatal. Closing these (a proof + real block/route per gate) is standing work.
+
+---
+
 ## STOP HUNTING — read these BEFORE searching the filesystem
 
 **API keys** → [`./API_KEYS.md`](./API_KEYS.md). ~30 services, ~150 keys, 15 file locations. Check first; if it's wrong, fix it before moving on.
