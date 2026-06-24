@@ -8463,6 +8463,39 @@ async function main() {
             for (const f of faults) {
               console.error(`[chain]   ↳ FAULT ${f.line} [${f.dimension}] — ${f.issue} (${f.magnitude}) → ${f.suggested}`)
             }
+            // ROUTED PUNCH-LIST (Tristan 2026-06-24, the "go around again to another loop" target):
+            // when the net diverges, write benchmark-punchlist.md grouping each per-line fault by its
+            // likely cause — the concrete feedback an engineer (or the next loop) acts on, mirroring
+            // the drawing-gates punch-list. Only on a non-OK verdict; the dossier never references it.
+            if (report.worst !== 'ok') {
+              try {
+                const byCause = new Map<string, typeof faults>()
+                for (const f of faults) {
+                  const k = (f.likely_cause || 'uncategorised').toString()
+                  if (!byCause.has(k)) byCause.set(k, [] as any)
+                  byCause.get(k)!.push(f)
+                }
+                const md: string[] = [
+                  `# Benchmark sanity-net punch-list — ${report.worst.toUpperCase()}`,
+                  ``,
+                  `Generated ${exp.model} vs the deterministic engine. ${report.summary}`,
+                  ``,
+                  `## Divergences (headline)`,
+                  ...report.findings.filter(f => f.verdict !== 'ok').map(f =>
+                    `- **${f.dimension}** [${f.verdict}, ${f.ratio ?? '—'}×] — expected ${f.expected}; engine ${f.deterministic}. ${f.note}`),
+                  ``,
+                  `## Per-line faults, grouped by likely cause (fix these → re-run → the net re-checks)`,
+                ]
+                for (const [cause, fs] of byCause) {
+                  md.push(``, `### ${cause} (${fs.length})`)
+                  for (const f of fs) md.push(`- \`${f.line}\` [${f.dimension}] — ${f.issue} (${f.magnitude}) → suggested ${f.suggested}`)
+                }
+                writeFileSync(resolve(outDir, 'benchmark-punchlist.md'), md.join('\n'))
+                console.error(`[chain] benchmark net: wrote benchmark-punchlist.md (${faults.length} per-line fault(s) grouped by cause)`)
+              } catch (plErr) {
+                console.error(`[chain] benchmark punch-list write failed (non-fatal): ${(plErr as Error).message.slice(0, 120)}`)
+              }
+            }
             logAction({ step: 'benchmark_net', ok: true, verdict: report.worst, needs_full_check: report.needs_full_check, faults: faults.length, expected_gbp: Math.round(exp.expected_cost?.expected_gbp || 0) })
             // ENFORCING (opt-in): a RADICAL divergence is a "one of them is wrong" alarm → hard-exit 36.
             const benchEnforce = !['', '0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.BENCHMARK_NET_ENFORCING || '').toLowerCase())

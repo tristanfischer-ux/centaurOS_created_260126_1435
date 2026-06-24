@@ -313,32 +313,47 @@ export async function diagnoseFaults(exp: BenchmarkExpectation, state: any, repo
   if (!OPENROUTER_KEY) return []
   const rb: any[] = Array.isArray(state?.requirementsBom) ? state.requirementsBom : []
   const total = rb.reduce((a, b) => a + (b?.line_gbp || 0), 0) || 1
-  const top = rb.slice().sort((a, b) => (b?.line_gbp || 0) - (a?.line_gbp || 0)).slice(0, 25)
-    .map(b => `${b.tag || '—'} | qty ${b.qty} | unit £${b.unit_gbp} | line £${Math.round(b.line_gbp || 0)} (${(100 * (b.line_gbp || 0) / total).toFixed(0)}%) | ${(b.requirement || '').toString().slice(0, 60)}`)
+  // EVERY MATERIAL LINE (Tristan 2026-06-24: "look at every single line and every single spec").
+  // The diagnose used to see only the top 25 by cost — a wrong line at #40 slipped it. Now it
+  // sees every priced line (a tiny £-share line can still be a per-UNIT spec error: a £59 tap
+  // wire × 3,750). Sorted by line cost; capped at 150 so the prompt stays bounded, with an
+  // explicit note when the tail is truncated so a silent cap never reads as "all lines checked".
+  const priced = rb.filter(b => (b?.line_gbp || 0) > 0).sort((a, b) => (b?.line_gbp || 0) - (a?.line_gbp || 0))
+  const LINE_CAP = 150
+  const shown = priced.slice(0, LINE_CAP)
+  const truncatedNote = priced.length > LINE_CAP
+    ? `\n(NOTE: ${priced.length - LINE_CAP} further lines below £${Math.round(shown[shown.length - 1]?.line_gbp || 0)} not shown — flag the cap if a tail line looks suspect.)` : ''
+  const lines = shown.map(b =>
+    `${b.tag || '—'} | qty ${b.qty} | unit £${b.unit_gbp} | line £${Math.round(b.line_gbp || 0)} (${(100 * (b.line_gbp || 0) / total).toFixed(1)}%) | ${(b.requirement || '').toString().slice(0, 64)}`)
   const flagged = report.findings.filter(f => f.verdict !== 'ok')
     .map(f => `- ${f.dimension}: expected ${f.expected}; engine gave ${f.deterministic} (${f.verdict})`)
+  const perUnit = exp.expected_cost?.per_output_unit || ''
   const prompt =
     `You are auditing a deterministic engineering bill of materials that DIVERGED from a realistic ` +
-    `benchmark. Your job: look at the ACTUAL line items below and name the SPECIFIC lines at fault, ` +
-    `so an engineer can fix them. Be concrete (which line, how far off, the likely cause: wrong unit ` +
-    `price / wrong quantity / wrong size-or-volume / mis-classified commodity / missing component).\n\n` +
-    `BENCHMARK said: cost ~£${Math.round(exp.expected_cost.expected_gbp).toLocaleString()}; ` +
-    `sizing ${exp.expected_sizing?.envelope || '—'}; BoM mix ${(exp.expected_bom || []).map(x => `${x.item} ~${x.typical_pct_of_cost}%`).join(', ')}.\n\n` +
+    `benchmark. Go line by line through EVERY item below and name the SPECIFIC lines at fault, so an ` +
+    `engineer can fix them. Check BOTH the line total AND the per-UNIT price for plausibility for that ` +
+    `specific item (a £59 cell tap wire or a £120 cell busbar is a per-unit error even at a small bill ` +
+    `share). Be concrete (which line, how far off, the likely cause: wrong unit price / wrong quantity / ` +
+    `wrong size-or-volume / mis-classified commodity / a per-cell commodity carrying a reel-or-sheet ` +
+    `price / missing component).\n\n` +
+    `BENCHMARK said: total cost ~£${Math.round(exp.expected_cost.expected_gbp).toLocaleString()} ` +
+    `(${perUnit ? `~${perUnit}` : ''}); sizing ${exp.expected_sizing?.envelope || '—'}; ` +
+    `BoM mix ${(exp.expected_bom || []).map(x => `${x.item} ~${x.typical_pct_of_cost}%`).join(', ')}.\n\n` +
     `REQUIRED COMPONENTS a real one MUST have: ${(exp.required_components || []).join(', ')}. Check the bill ` +
     `below and report any genuinely ABSENT one as a fault with dimension "component" — but DO NOT false-flag: ` +
     `a component is present even if named differently (e.g. cells ship as "cell-to-cell busbar"/"module frame"; ` +
     `a PCS may appear as "inverter"). Only flag a subsystem that truly has no representation in the bill.\n\n` +
     `FLAGGED DIVERGENCES:\n${flagged.join('\n')}\n\n` +
-    `TOP DETERMINISTIC LINE ITEMS (tag | qty | unit £ | line £ (% of bill) | description):\n${top.join('\n')}\n\n` +
+    `EVERY DETERMINISTIC LINE ITEM (tag | qty | unit £ | line £ (% of bill) | description):\n${lines.join('\n')}${truncatedNote}\n\n` +
     `Return ONLY JSON: { "faults": [ { "line": "<tag or name>", "dimension": "cost|sizing|quantity|component", ` +
     `"issue": "<what's wrong>", "magnitude": "<e.g. ~90× too high>", "suggested": "<realistic value>", ` +
-    `"likely_cause": "<root cause>" } ] }. List only genuine faults, worst first.`
+    `"likely_cause": "<root cause>" } ] }. List EVERY genuine fault you find (per-line, not just the biggest), worst first.`
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${OPENROUTER_KEY}`, 'Content-Type': 'application/json', 'X-Title': 'ForgeOS fault diagnosis' },
-      body: JSON.stringify({ model: DIAGNOSE_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 4000 }),
-      signal: AbortSignal.timeout(180_000),
+      body: JSON.stringify({ model: DIAGNOSE_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 8000 }),
+      signal: AbortSignal.timeout(240_000),
     })
     if (!res.ok) { console.error(`[benchmark] diagnose HTTP ${res.status}`); return [] }
     const j: any = await res.json()
@@ -348,7 +363,7 @@ export async function diagnoseFaults(exp: BenchmarkExpectation, state: any, repo
     const a = raw.indexOf('{'), b = raw.lastIndexOf('}')
     if (a === -1 || b === -1) { console.error(`[benchmark] diagnose: no JSON in completion (${raw.slice(0, 80)}…)`); return [] }
     const p = JSON.parse(raw.slice(a, b + 1))
-    return Array.isArray(p.faults) ? p.faults.slice(0, 12) : []
+    return Array.isArray(p.faults) ? p.faults.slice(0, 40) : []
   } catch (e) { console.error(`[benchmark] diagnose failed: ${(e as Error).message}`); return [] }
 }
 
