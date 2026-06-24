@@ -95,9 +95,13 @@ interface Co2MinParams {
   meaCircM3H: number
   absorberDiaM: number
   absorberHeightM: number
+  absorberColumnHeightM: number
   reactorVolumeM3: number
   filterAreaM2: number
   distillColDiaM: number
+  distillColHeightM: number
+  crystalliserDiaM: number
+  crystalliserHeightM: number
   dryerHeatKw: number
   steamKgH: number
   boilerSteamKgH: number
@@ -180,11 +184,23 @@ function deriveParams(c: ContractInProgress): Co2MinParams {
     meaWtPct: q(c, 'mea_wt_pct', 30),
     // ~0.40 mol CO2/mol MEA working capacity on 30 wt% MEA ⇒ ~70 kg solution per kg CO2/h.
     meaCircM3H: q(c, 'mea_circulation_m3_per_hour', 0.68),
-    absorberDiaM: q(c, 'absorber_diameter_m', 0.4),
+    // the RENDERED column uses the flooding-corrected DN diameter (absorber_column_diameter_m)
+    // not the raw rate-based absorber_diameter_m, which floods at ~4× velocity (a 0.2 m needle).
+    absorberDiaM: q(c, 'absorber_column_diameter_m', q(c, 'absorber_diameter_m', 0.4)),
     absorberHeightM: q(c, 'absorber_packed_height_m', 6),
+    // tangent-to-tangent shell height (packing + heads + sumps + distributors) — the real
+    // physical column height to render, not the bare packed height.
+    absorberColumnHeightM: q(c, 'absorber_column_height_tt_m', q(c, 'absorber_packed_height_m', 6) * 1.2),
     reactorVolumeM3: q(c, 'carbonation_reactor_volume_m3', 4),
     filterAreaM2: q(c, 'filter_area_m2', 3),
     distillColDiaM: q(c, 'distillation_column_diameter_m', 0.3),
+    // no contract height for the wash-water stripping column → derive a slender packed-column
+    // height from the diameter (≈20:1), clamped to a sane 6–14 m band.
+    distillColHeightM: Math.min(14, Math.max(6, q(c, 'distillation_column_diameter_m', 0.3) * 20)),
+    crystalliserDiaM: q(c, 'k2so4_crystalliser_diameter_m', 0.73),
+    // forced-circulation crystalliser body height back-solved from volume + diameter.
+    crystalliserHeightM: Math.max(1.5,
+      q(c, 'k2so4_crystalliser_volume_m3', 1.1) / (0.785 * Math.pow(q(c, 'k2so4_crystalliser_diameter_m', 0.73), 2))),
     dryerHeatKw,
     steamKgH: reboilerSteamKgH,
     boilerSteamKgH,
@@ -204,7 +220,7 @@ function emitAbsorptionCapture(p: Co2MinParams): DesignModule {
     word('packed_absorber_column_word', 'packed absorber column',
       cc('packed_absorber_column', 'packed absorber column', 'mass_fluid_transport_process', 'stainless_steel'),
       [mod('quantity', '×1'), mod('form', 'random-packed counter-current column, flanged segments for field erection'),
-       mod('dimension', `${p.absorberDiaM.toFixed(1)} m dia × ${p.absorberHeightM.toFixed(0)} m`), mod('manufacturer', 'Sulzer'),
+       mod('dimension', `${p.absorberDiaM.toFixed(2)} m dia × ${p.absorberColumnHeightM.toFixed(1)} m`), mod('manufacturer', 'Sulzer'),
        mod('part_number', 'fabricated 316L packed column — bespoke vessel'), mod('list_price_gbp', '26000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('structured_packing_word', 'structured packing',
       cc('structured_packing', 'structured packing', 'mass_fluid_transport_process', 'stainless_steel'),
@@ -418,7 +434,8 @@ function emitK2so4Recovery(p: Co2MinParams): DesignModule {
        mod('part_number', 'CRNE 5-6'), mod('list_price_gbp', '3400')]),
     word('k2so4_recrystalliser_word', 'K2SO4 recrystalliser',
       cc('k2so4_recrystalliser', 'K2SO4 forced-circulation recrystalliser', 'chemical_reaction_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'forced-circulation crystalliser, MEA stripping'), mod('manufacturer', 'GEA Messo'),
+      [mod('quantity', '×1'), mod('form', 'forced-circulation crystalliser, MEA stripping'),
+       mod('dimension', `${p.crystalliserDiaM.toFixed(2)} m dia × ${p.crystalliserHeightM.toFixed(1)} m`), mod('manufacturer', 'GEA Messo'),
        mod('part_number', 'forced-circulation crystalliser — bespoke package'), mod('list_price_gbp', '21000')]),
     word('k2so4_hot_air_dryer_word', 'K2SO4 hot-air dryer',
       cc('k2so4_hot_air_dryer', 'K2SO4 fluid-bed hot-air dryer', 'thermal_transfer_function', 'stainless_steel'),
@@ -449,7 +466,7 @@ function emitMeaRecovery(p: Co2MinParams): DesignModule {
     `CaCO3 wash water is distilled in a ${p.distillColDiaM.toFixed(1)} m column (${p.steamKgH.toFixed(0)} kg/h reboiler steam) to recover MEA and reclaim wash water; recovered MEA returns to the absorber`, [
     word('mea_distillation_column_word', 'MEA distillation column',
       cc('mea_distillation_column', 'MEA wash-water distillation column', 'mass_fluid_transport_process', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'packed stripping column'), mod('dimension', `${p.distillColDiaM.toFixed(1)} m dia`), mod('manufacturer', 'Koch-Glitsch'),
+      [mod('quantity', '×1'), mod('form', 'packed stripping column'), mod('dimension', `${p.distillColDiaM.toFixed(1)} m dia × ${p.distillColHeightM.toFixed(1)} m`), mod('manufacturer', 'Koch-Glitsch'),
        mod('part_number', 'fabricated 316L packed stripping column — bespoke vessel'), mod('list_price_gbp', '20000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('reboiler_word', 'distillation reboiler',
       cc('reboiler', 'thermosiphon reboiler', 'thermal_transfer_function', 'stainless_steel'),

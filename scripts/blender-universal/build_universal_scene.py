@@ -189,6 +189,10 @@ SHAPE_RULES = [
     (r"oxygenat|oxygen.?cone|speece", "vertical_vessel"),
     (r"clarifier|settler|lamella|sediment", "tank"),
     (r"\buv\b|steriliz|disinfect|ozone", "vertical_vessel"),
+    # a CRYSTALLISER is a vertical body with a CONICAL bottom (forced-circulation /
+    # draft-tube / Oslo) — give it the cone-bottom primitive, not a flat box (Tristan
+    # 2026-06-24: "crystallisers the correct shape"). Before column/reactor so it wins.
+    (r"crystallis|recrystallis", "cone_vessel"),
     # ── HORIZONTAL vessels (separation/exchange/disengagement) BEFORE the
     #    generic vertical bucket, because "separator"/"drum"/"knock-out" are the
     #    classic horizontal-on-saddles shapes. A "steam drum" + "3-phase
@@ -240,6 +244,7 @@ TYPE_DEFAULTS_MM = {
     "tall_column":       dict(dia=900,  height=12000),
     "tall_vessel":       dict(dia=1200, height=4500),
     "vertical_vessel":   dict(dia=700,  height=2400),
+    "cone_vessel":       dict(dia=900,  height=3000),
     "horizontal_vessel": dict(dia=700,  length=2600),
     "compressor":        dict(w=1800,   d=1100, h=1300),
     "pump":              dict(w=900,    d=500,  h=700),
@@ -1926,7 +1931,7 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
 
     # ── VERTICAL families: column / reactor / vertical / bed ──
     head_rise = dia_mm * fl.MM * 0.19
-    if kind in ("column", "reactor"):
+    if kind in ("column", "reactor", "cone_vessel"):
         skirt_h = max(0.55, length_mm * fl.MM * 0.10)
     else:  # vertical / bed sit on short legs
         skirt_h = max(0.35, r * 0.9)
@@ -1942,13 +1947,19 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
                                            metallic=0.0, roughness=0.62)
         fl.add_cyl(f"{nm}_lagging", (x_mm * fl.MM, y_mm * fl.MM, cz), r * 1.07,
                    body_h * 0.94, MAT["u_lagging"], module=mod, module_objects=MO)
-    # dished heads top + bottom (z faces at the tan lines)
+    # top head always dished; the BOTTOM is a CONE on a cone_vessel (crystalliser), else dished
     _add_dished_head(f"{nm}_th", x_mm, y_mm, cz / fl.MM + body_h / (2 * fl.MM),
                      dia_mm, +1, mat, mod, MO)
-    _add_dished_head(f"{nm}_bh", x_mm, y_mm, cz / fl.MM - body_h / (2 * fl.MM),
-                     dia_mm, -1, mat, mod, MO)
+    if kind == "cone_vessel":
+        cone_h = max(0.4, r * 0.9)
+        bz = cz - body_h / 2.0      # bottom tangent line (m); cone hangs below it to an apex
+        fl.add_frustum(f"{nm}_cone", (x_mm * fl.MM, y_mm * fl.MM, bz - cone_h / 2.0),
+                       r * 0.12, r, cone_h, mat, module=mod, module_objects=MO)
+    else:
+        _add_dished_head(f"{nm}_bh", x_mm, y_mm, cz / fl.MM - body_h / (2 * fl.MM),
+                         dia_mm, -1, mat, mod, MO)
 
-    if kind in ("column", "reactor"):
+    if kind in ("column", "reactor", "cone_vessel"):
         # cylindrical support SKIRT to the deck
         fl.add_cyl(f"{nm}_skirt", (x_mm * fl.MM, y_mm * fl.MM, base_z_mm * fl.MM + skirt_h / 2),
                    r * 0.94, skirt_h, steel, module=mod, module_objects=MO)
@@ -1971,7 +1982,7 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
                "centre": (x_mm, y_mm, cz / fl.MM)}
     # Fix 1: standard top/bottom side nozzles + a manway on MAJOR vertical
     # vessels (skip the small bed/filter legs case — those are minor drums).
-    if kind in ("column", "reactor", "vertical"):
+    if kind in ("column", "reactor", "vertical", "cone_vessel"):
         _add_vessel_nozzles(nm, anchors, dia_mm, kind, MAT, mod, MO)
     _greeble_ladder(nm, x_mm * fl.MM, y_mm * fl.MM, r, z_bot, cz + body_h / 2, steel, mod, MO)
     return {"root": shell, "name": nm}, anchors
@@ -2269,6 +2280,7 @@ _VESSEL_KIND = {
     "tall_column":     "column",
     "tall_vessel":     "reactor",
     "vertical_vessel": "vertical",
+    "cone_vessel":     "cone_vessel",
     "horizontal_vessel": "horizontal",
     "tank":            "tank",
 }
