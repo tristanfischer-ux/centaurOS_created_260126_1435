@@ -3825,6 +3825,38 @@ function checkToolLineageStampInvariant(): Assertion[] {
   return out
 }
 
+// BRIEF SCALE (Tristan 2026-06-25): a vertical_farm must size from the brief's stated
+// tray_capacity, not a class default. A 6,000-tray brief → tray_count + canopy scale to it (the
+// builder was defaulting to 40 trays / 100 m², a ~150× undersized farm); brief-silent falls back.
+function checkVfScaleFollowsBriefInvariant(): Assertion[] {
+  const out: Assertion[] = []
+  const failures: string[] = []
+  try {
+    const stated = buildContract('vertical_farm', {
+      product_description: 'Indoor vertical farm, approximately 6,000 ebb/flow cultivation trays of approximately 2,760 by 1,290 millimetres.',
+      constraints: { target_performance: { value: 6000, unit: 'trays', metrics: [{ key_metric: 'tray_capacity', value: 6000, unit: 'trays' }] }, max_dimensions_mm: { h: 2896 } },
+    } as unknown as Parameters<typeof buildContract>[1]) as { quantities?: Record<string, { value?: number }> }
+    const tc = Number(stated?.quantities?.tray_count?.value)
+    const canopy = Number(stated?.quantities?.canopy_area_m2?.value ?? stated?.quantities?.canopy_m2?.value)
+    if (!(tc >= 5000)) failures.push(`tray_count=${tc}, expected ≈6000 from the brief (not the 40 default)`)
+    if (!(canopy >= 5000)) failures.push(`canopy_area_m2=${canopy}, expected to scale with 6000 trays (not the 100 default)`)
+    const dflt = buildContract('vertical_farm', {
+      product_description: 'Vertical farm, 8 mobile trolleys × 5 tiers.',
+      constraints: { target_performance: {}, max_dimensions_mm: { h: 2896 } },
+    } as unknown as Parameters<typeof buildContract>[1]) as { quantities?: Record<string, { value?: number }> }
+    if (Number(dflt?.quantities?.tray_count?.value) > 200) failures.push(`brief-silent fallback tray_count=${dflt?.quantities?.tray_count?.value}, expected ~40`)
+  } catch (err) {
+    failures.push(`buildContract('vertical_farm', …) threw: ${String(err).slice(0, 120)}`)
+  }
+  out.push(assertEq(
+    'VF.scale_follows_brief',
+    "vertical_farm sizes from the brief's stated tray_capacity (a 6,000-tray brief → tray_count + canopy scale to it), NOT a class default (40 trays / 100 m²); a brief that states no tray metric still falls back",
+    failures.length, (n) => n === 0,
+    () => `VF scale wrong: ${failures.join(' ; ')}. Check the briefMetricVal read in registerArchetype('vertical_farm', …) in engineering-contract.ts.`,
+  ))
+  return out
+}
+
 function checkBessDcBusFollowsBriefInvariant(): Assertion[] {
   const out: Assertion[] = []
   const CELL_V = 3.2
@@ -10881,6 +10913,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   for (const a of checkBessTransformerSizingInvariant()) assertions.push(a)
   for (const a of checkBessDcBusFollowsBriefInvariant()) assertions.push(a)
   for (const a of checkToolLineageStampInvariant()) assertions.push(a)
+  for (const a of checkVfScaleFollowsBriefInvariant()) assertions.push(a)
   for (const a of checkBessBusbarLabelAndAmpacityInvariant()) assertions.push(a)
   for (const a of checkBessEnclosureVolumeFollowsBriefInvariant()) assertions.push(a)
 

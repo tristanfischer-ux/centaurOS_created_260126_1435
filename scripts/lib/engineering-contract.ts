@@ -1518,21 +1518,44 @@ registerArchetype('vertical_farm', (brief: any) => {
     const b = m[2] ? parseFloat(m[2]) : a
     return (a + b) / 2
   }
-  // Canopy from brief: explicit target_canopy_m2 OR extract from prose
+  // BRIEF SCALE (Tristan 2026-06-25 — the universal "read the brief's stated scale" principle,
+  // same as the dc_bus fix): the brief's stated tray_capacity is the PRIMARY scale metric. Read
+  // it from target_performance.metrics so the design sizes for the brief, NOT a class default
+  // (the brief said 6,000 trays; the builder was defaulting to 40 because it only matched "N
+  // trolleys × N tiers" prose). Canopy then derives from trays × the brief's stated tray area.
+  const briefMetricVal = (names: string[]): number | null => {
+    const ms = brief?.constraints?.target_performance?.metrics
+    if (!Array.isArray(ms)) return null
+    for (const m of ms) {
+      const k = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').toLowerCase()
+      if (names.some(n => k.includes(n))) {
+        const v = Number(m?.value)
+        if (Number.isFinite(v) && v > 0) return v
+      }
+    }
+    return null
+  }
+  const briefTrayCapacity = briefMetricVal(['tray_capacity', 'tray_count', 'number_of_trays', 'trays'])
+  // tray growing area from the brief's stated tray dimensions ("trays of 2,760 × 1,290 mm"), else
+  // default. Strip thousands-commas first so "2,760 by 1,290" parses (the comma broke the match).
+  const trayDimM = desc.replace(/,/g, '').match(/(\d{3,4})\s*(?:by|×|x|\*)\s*(\d{3,4})\s*(?:mm|millimet)/i)
+  const trayAreaBaseM2 = trayDimM ? (parseFloat(trayDimM[1]) * parseFloat(trayDimM[2])) / 1e6 : 0.5
+  // Trolley topology from brief: "8 mobile trolleys × 5 tiers" → 40 trays (the FALLBACK only)
+  const trolleyCount = extractRange(/(\d{1,2})\s*-?\s*(\d{1,2})?\s*(?:mobile\s+)?(?:growing\s+)?trolleys/i, 8)
+  const tiersPerTrolley = extractRange(/(\d)\s*-?\s*(\d)?\s*(?:vertical\s+)?tiers/i, 5)
+  const trayCount = Math.max(1, Math.round(briefTrayCapacity ?? (trolleyCount * tiersPerTrolley)))
+  // Canopy: brief trays × tray area (when the brief states a tray count) OR explicit
+  // target_canopy_m2 OR prose "<N> m² canopy" OR a class default.
   const canopyAreaM2 = (() => {
+    if (briefTrayCapacity) return Math.max(1, Math.round(briefTrayCapacity * trayAreaBaseM2))
     const tc = Number(brief?.constraints?.target_canopy_m2?.value ?? 0)
     if (tc > 0) return tc
     const m = desc.match(/(\d{2,4})\s*m².*(?:canopy|growing|growing[\s-]surface)/i)
     if (m) return parseFloat(m[1])
-    // target_performance.unit=='m²' fallback
     const tp = brief?.constraints?.target_performance
     if (tp && String(tp.unit).toLowerCase() === 'm2') return Number(tp.value)
     return 100  // class default
   })()
-  // Trolley topology from brief: "8 mobile trolleys × 5 tiers" → 40 trays
-  const trolleyCount = extractRange(/(\d{1,2})\s*-?\s*(\d{1,2})?\s*(?:mobile\s+)?(?:growing\s+)?trolleys/i, 8)
-  const tiersPerTrolley = extractRange(/(\d)\s*-?\s*(\d)?\s*(?:vertical\s+)?tiers/i, 5)
-  const trayCount = trolleyCount * tiersPerTrolley  // 40 typical
   const trayAreaM2 = canopyAreaM2 / trayCount
   // Tier canopy clearance — live vertical headroom for plant growth on each
   // tier. Honours the brief's max_plant_height_cm CEILING: every tier must
