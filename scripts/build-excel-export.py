@@ -6234,7 +6234,33 @@ def build(run_dir: str, out_path: str) -> dict:
     }
 
 
+def _selftest() -> int:
+    """Pure guards for the compliance MATCHER + direction + class display — the false-PASS class of
+    bug (2026-06-25). Exits non-zero on any failure; wired into verify-engine-guards.sh."""
+    bad = 0
+    # (1) _match_quantity must match the ACHIEVED quantity by NAME, NOT the target-closest ECHO.
+    qs = {
+        "nameplate_capacity_kwh": {"value": 2912, "unit": "kWh"},
+        "usable_capacity_kwh_requested": {"value": 5000, "unit": "kWh"},   # brief echo — must be ignored
+        "continuous_power_kw": {"value": 1000, "unit": "kW"},
+        "peak_power_kw": {"value": 1250, "unit": "kW"},
+    }
+    m = _match_quantity({"key_metric": "nameplate_capacity_kwh", "value": 5000, "unit": "kWh"}, qs)
+    if not m or m[0] != "nameplate_capacity_kwh" or m[1] != 2912:
+        print(f"  FAIL matcher grabbed the echo, not the achieved nameplate (got {m})"); bad += 1
+    m = _match_quantity({"key_metric": "rated_power_kw", "value": 2500, "unit": "kW"}, qs)
+    if not m or m[0] != "continuous_power_kw":   # rated→continuous, not peak
+        print(f"  FAIL matcher power → {m} (want continuous_power_kw)"); bad += 1
+    # (2) _humanize_class display names
+    if _humanize_class("bess") != "Battery Energy Storage System":
+        print(f"  FAIL humanize bess (got {_humanize_class('bess')})"); bad += 1
+    print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
+    return bad
+
+
 def main() -> None:
+    if "--selftest" in sys.argv[1:]:
+        raise SystemExit(1 if _selftest() else 0)
     run_dir = sys.argv[1] if len(sys.argv) > 1 else "out/ras-v26-verify"
     run_dir = os.path.normpath(run_dir)
     if not os.path.isdir(run_dir):

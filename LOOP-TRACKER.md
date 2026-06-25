@@ -1,6 +1,42 @@
 # 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
 
 ═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-25, Tristan asleep — "work autonomously")
+═══════════════════════════════════════════════════════════════════════════════
+THEME: the benchmark net + the database now do real work, not rubber-stamping.
+
+DONE THIS SESSION (all UNIVERSAL, committed; pushing to main):
+  ✓ BENCHMARK NET now actually checks — was diffing ONLY cost (BESS headline "850 MWh/yr throughput"
+    matched none of its 6 predicted outputs by unit-string). Now diffs EVERY predicted output vs the
+    contract by name + unit-family (canonicalMeasure/engineValueForMetric). Flags power 1000-vs-2500
+    kW RADICAL, nameplate 2912-vs-5000 + dc-bus 800-vs-1500 WARN. WARN tightened 1.5×→1.2× (a >20%
+    delta is actionable → routed). benchmark-expectation.ts.
+  ✓ PRICING DB-FIRST + UNIVERSAL — _db_spec_price(name,md) in requirements_bom.py: median real
+    forge-truth.db price by NOUN + discriminating SPEC (noun-only reproduced the over-prices; spec
+    required). Cell £0/£100 → real DB £52. Wired into cell + catalogue-miss + the RATING MODEL.
+  ✓ GROWING-DB LOOP CLOSED end-to-end: Part A (_enqueue_db_misses → ~/.forge-truth/price-ingest-
+    queue.jsonl, no API) + Part B (scripts/ingest/ingest-priced-principals.ts → LLM sources real
+    part, dual-anchor verify [4× of estimate OR DB class range], writeback). DEMONSTRATED: 86 kW
+    chiller £51,600 estimate → ingested Daikin EWAD-TZB2R86 £38,500 → re-price reads it from DB.
+    DATA-BACKED 56%→65%. SCHEDULED daily 03:30 (launchd com.forge.price-ingest + run-price-ingest.sh;
+    fast model google/gemini-2.5-flash — GLM-5.2 reasoning times out).
+  ✓ EXEC SUMMARY upgraded PDF-quality + deterministic: _exec_synopsis (every clause a state value) +
+    Validation card + the brief Key-specs/compliance table. FIXED _match_quantity (was matching the
+    target-CLOSEST quantity = the _requested ECHO → false PASS; now matches by NAME, echoes excluded
+    → nameplate shows the honest 2912) + efficiency/cycle-life direction + _humanize_class display.
+    Fixes the ⚠ Checks tab too. build-excel-export.py.
+
+IN FLIGHT: clean full run → out/bess-20ft-v3 (the v2 re-run had a head -1 SIGPIPE; relaunched clean).
+  On completion: verify benchmark flags the under-sizing + exec summary honest + chiller DB-backed →
+  push all → handover. NOTE: v3's benchmark will now (correctly) flag power/nameplate — the design is
+  genuinely under the 5 MWh/2.5 MW brief (the DENSITY gap, engine sizes 2.91 MWh in a 20-ft).
+
+REMAINING (real long pole, unchanged): 5-9 MWh DENSITY (engine sizes 2.91 not 5 — needs 2026 high-
+  density cells; the benchmark now FLAGS it); 40-ft container hardcode (deterministic-emitter.ts:4220);
+  CI red needs Tristan's ci.yml one-liner (workflow scope). Drawers: forgeos_gotchas_{f0ba3f06dc6aab83,
+  32400f7728a3e1b4}, forgeos_decisions_e7e330189c33aef5.
+
+═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-24 night, Tristan asleep — "keep going all the way through")
 ═══════════════════════════════════════════════════════════════════════════════
 20-FT BESS SHOWCASE is the canonical example (40-ft RETIRED — Tristan: "nobody uses 40-ft").
