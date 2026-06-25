@@ -6402,9 +6402,13 @@ def _reorder_tabs(wb: Workbook) -> None:
         "Executive Summary": -1, "Contents": 0, "Overview": 1,
         "Render — Interior layout": 2,                 # HERO render — early (exact name)
         "Brief": 3,
+        # Calcs + Quantities are FOUNDATIONAL — they feed the BoM, cost waterfall and financial
+        # model, so they come BEFORE them (Tristan: "calcs must come before the BoM and the cost
+        # waterfall — they choose the categories and what happens downstream").
+        "Quantities": 4, "Calculations": 5,
         "Financial model": 10,
         "Cost waterfall": 14, "Inputs & Assumptions": 15,
-        "Bill of Materials (Ledger)": 20, "Quantities": 21, "Calculations": 22,
+        "Bill of Materials (Ledger)": 20,
         "Line & velocity": 24, "Panel schedule": 25, "Process schedules": 26,
         "Assembly sequence": 29,
         "Risk & Regulatory": 30,
