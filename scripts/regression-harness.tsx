@@ -59,6 +59,7 @@ import { splitDenseSubModulesByRadical, TARGET_DENSITY_DEFAULT, MIN_CHILD_WORDS_
 import { classifyBespokeEquipment, bespokeEquipmentReference, bespokeFlagFor, isBespokeFabrication } from '../src/lib/pdf-engine-v2/lib/bespoke-equipment-bands'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { composeToolGraph } from './lib/orchestrator/auto-planner'
+import { stampToolLineage } from './lib/orchestrator/executor'
 import { validateToolPlanSpec, applyStepOutputs, materialisePlan, type ToolPlanSpec, type ToolPlanStepSpec } from './lib/orchestrator/generic/bootstrap-tool-plan'
 import { relevanceCacheKey, checkUnitCoverage } from './lib/orchestrator/generic/relevance-sweep'
 import { storeProposalForClass, loadProposalForClass } from './lib/orchestrator/generic/tool-creation-pass'
@@ -3788,6 +3789,42 @@ function checkBessTransformerSizingInvariant(): Assertion[] {
 // (b) series_cells_per_string == round(brief_v / 3.2); (c) string/rack count is a
 // positive INTEGER; (d) nameplate_capacity_kwh is preserved within ~2% across the
 // voltage change (800 V vs 1500 V both ≈ 5.4 MWh). iter-N catches iter-(N+1).
+// TRACEABILITY SPINE (Tristan 2026-06-25): a tool's outputs must be born traceable. After a
+// tool's contract_update writes a NEW quantity, stampToolLineage gives it source=tool:<id>, a
+// non-empty lineage.from, and a prose source_detail — so no tool-produced number "appears from
+// nowhere". Guards the measured 17%→92% provenance jump on Fischer Farms. Fill-the-gap only: an
+// already-sourced quantity is never overwritten.
+function checkToolLineageStampInvariant(): Assertion[] {
+  const out: Assertion[] = []
+  const failures: string[] = []
+  try {
+    const c: { quantities: Record<string, Record<string, unknown>> } = {
+      quantities: { hvac_cooling_kw: { value: 30, unit: 'kW' } },
+    }
+    stampToolLineage({}, c as unknown as Parameters<typeof stampToolLineage>[1], 'hvac:load-sizing')
+    const qn = c.quantities.hvac_cooling_kw
+    if (!String(qn.source ?? '').startsWith('tool:')) failures.push(`source not tool:<id>, got '${qn.source}'`)
+    const lin = qn.lineage as { from?: unknown[] } | undefined
+    if (!Array.isArray(lin?.from) || lin.from.length === 0) failures.push(`lineage.from missing/empty: ${JSON.stringify(qn.lineage)}`)
+    if (!String(qn.source_detail ?? '').trim()) failures.push('source_detail empty')
+    // an ALREADY-sourced quantity must NOT be overwritten (fill-the-gap only)
+    const c2: { quantities: Record<string, Record<string, unknown>> } = {
+      quantities: { x: { value: 5, unit: 'kW', source: 'brief', source_detail: 'from brief' } },
+    }
+    stampToolLineage({}, c2 as unknown as Parameters<typeof stampToolLineage>[1], 'hvac:load-sizing')
+    if (c2.quantities.x.source !== 'brief') failures.push(`overwrote a real source: ${c2.quantities.x.source}`)
+  } catch (err) {
+    failures.push(`stampToolLineage threw: ${String(err).slice(0, 120)}`)
+  }
+  out.push(assertEq(
+    'UNIVERSAL.tool_quantities_born_traceable',
+    'A tool\'s contract_update outputs are stamped with lineage (source=tool:<id> + lineage.from + source_detail) so no tool-produced number appears from nowhere; an already-sourced quantity is never overwritten (the spine 17%→92% provenance fix, executor.stampToolLineage)',
+    failures.length, (n) => n === 0,
+    () => `tool-lineage stamp wrong: ${failures.join(' ; ')}`,
+  ))
+  return out
+}
+
 function checkBessDcBusFollowsBriefInvariant(): Assertion[] {
   const out: Assertion[] = []
   const CELL_V = 3.2
@@ -10843,6 +10880,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   for (const a of checkEFuelSynthesisInvariants()) assertions.push(a)
   for (const a of checkBessTransformerSizingInvariant()) assertions.push(a)
   for (const a of checkBessDcBusFollowsBriefInvariant()) assertions.push(a)
+  for (const a of checkToolLineageStampInvariant()) assertions.push(a)
   for (const a of checkBessBusbarLabelAndAmpacityInvariant()) assertions.push(a)
   for (const a of checkBessEnclosureVolumeFollowsBriefInvariant()) assertions.push(a)
 

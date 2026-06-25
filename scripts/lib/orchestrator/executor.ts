@@ -122,7 +122,7 @@ export async function runToolPlan(
  *  per-tool code. Fills ONLY the gap — a quantity that already records a real source/lineage
  *  is never overwritten. (The contract's flat quantity shape carries source/source_detail/
  *  lineage; we read/write it via an index cast since the in-progress contract type is loose.) */
-function stampToolLineage(
+export function stampToolLineage(
   beforeVals: Record<string, number | undefined>,
   contract: ContractInProgress,
   toolId: string,
