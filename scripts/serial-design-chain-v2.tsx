@@ -8593,6 +8593,32 @@ async function main() {
     logAction({ step: 'dossier_repair', ok: false, error: String(rerr).slice(0, 160) })
   }
 
+  // ── TRACEABILITY SPINE (Tristan 2026-06-25: "every number should come from some original
+  //    source — the brief → tools → contract → …; nothing should appear from nowhere"). Shadow
+  //    gate: report how many quantities have NO recorded origin + any same-physical-role value
+  //    contradiction (e.g. total_supply_demand_kw 124,478 vs total_electrical_demand_kw 41.3).
+  //    SHADOW for now (records + logs, never blocks) while the contract/sizing are migrated to
+  //    record each number's lineage; flip to --enforce once the traceable fraction reaches ~100%.
+  try {
+    const provOut = execFileSync('python3',
+      [resolve(__dirname, 'lib', 'provenance.py'), outDir],
+      { encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'], timeout: 60_000 })
+    const head = String(provOut).split('\n').find(l => l.startsWith('provenance:')) || ''
+    if (head) {
+      console.error(`[chain] ${head}`)
+      const m = head.match(/SOURCELESS (\d+).*traceable (\d+)%/)
+      logAction({ step: 'provenance', ok: true,
+        sourceless: m ? Number(m[1]) : undefined, traceable_pct: m ? Number(m[2]) : undefined })
+    }
+  } catch (perr) {
+    // provenance.py exits non-zero in --enforce mode; in shadow it only prints to stderr,
+    // and any failure here is non-fatal (the spine is advisory until migration completes).
+    const so = (perr as { stderr?: string }).stderr || ''
+    const head = String(so).split('\n').find(l => l.startsWith('provenance:')) || ''
+    if (head) console.error(`[chain] ${head}`)
+    logAction({ step: 'provenance', ok: false, error: String(perr).slice(0, 120) })
+  }
+
   // ── EXCEL DELIVERABLE (Tristan standing constraint: "the Excel dossier.xlsx is the
   //    review surface; NO PDFs; open the new Excel"). Build dossier.xlsx from the settled
   //    state (BoM reconciled above), copy a timestamped snapshot to ~/Downloads, and OPEN

@@ -1363,6 +1363,45 @@ def check_tool_io_traceability(state, rows, run_dir) -> list:
 # Aggregator
 # --------------------------------------------------------------------------- #
 
+def check_provenance(state, rows, run_dir) -> list:
+    """The TRACEABILITY SPINE, surfaced in the dossier (Tristan 2026-06-25): every number must
+    trace to the brief via a tool/formula. Flags quantities with NO recorded origin (appear
+    from nowhere) + same-physical-role value contradictions. Delegates to provenance.py."""
+    out: list = []
+    try:
+        from provenance import audit_provenance
+    except Exception:  # noqa: BLE001
+        return out
+    try:
+        rep = audit_provenance(state)
+    except Exception:  # noqa: BLE001
+        return out
+    sc = rep.scorecard()
+    if sc.get("total", 0) == 0:
+        return out
+    if sc["sourceless"] > 0:
+        examples = [f.key for f in rep.findings if f.kind == "sourceless"][:6]
+        frac = round(sc["traceable_fraction"] * 100)
+        sev = "HIGH" if sc["sourceless"] > sc["total"] * 0.25 else "MED"
+        out.append(Finding(
+            tab="Quantities", check="provenance_sourceless", severity=sev,
+            message=(f"{sc['sourceless']} of {sc['total']} quantities have no recorded origin "
+                     f"(only {frac}% trace to the brief via a tool/formula) — numbers appear from nowhere"),
+            actual=", ".join(examples) + ("…" if sc["sourceless"] > 6 else ""),
+            expected="every number records its source (source_detail or lineage.from) rooting at the brief",
+            source_rule="provenance.py — record each number's lineage at source (contract / sizing / tools)",
+        ))
+    for f in rep.findings:
+        if f.kind == "divergence":
+            out.append(Finding(
+                tab="Quantities", check="provenance_divergence", severity="HIGH",
+                message=f.message, actual=str(f.value),
+                expected="two quantities of the same physical role must agree",
+                source_rule="provenance.py — one is a wrong roll-up / unit error; fix at source",
+            ))
+    return out
+
+
 _CHECKS = [
     check_bom,
     check_capex_by_category,
@@ -1380,6 +1419,7 @@ _CHECKS = [
     check_traceability_basis,       # 13 principal line with no provenance (basis)
     check_tag_validity,             # 14 garbage / duplicate principal tags
     check_tool_io_traceability,     # 15 tool claim with no input/output edge (untraceable calc)
+    check_provenance,               # 16 SPINE: quantities with no recorded origin + role divergence
 ]
 
 
@@ -1565,8 +1605,9 @@ def _selftest() -> int:
         "orchestratorContract": {
             "product_class": "widget",
             "quantities": {
-                # exact-unit match -> compliance verifies, no matcher-gap flag
-                "throughput_units": {"value": 1000, "unit": "units", "family": "count"},
+                # exact-unit match -> compliance verifies, no matcher-gap flag.
+                # source='brief' -> traceable, so check_provenance stays silent on the clean fixture.
+                "throughput_units": {"value": 1000, "unit": "units", "family": "count", "source": "brief"},
             },
         },
         "parsedBrief": {
