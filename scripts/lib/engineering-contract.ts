@@ -13140,6 +13140,11 @@ registerArchetype('water_treatment', (brief: any) => {
     ro_recovery_percent: q(roRecoveryPct, '%', 'dimensionless', 'rated', 'system', 'brief', 'RO recovery factor (75%)'),
     granular_carbon_throughput_m3_h: q(treatmentThroughputM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'GAC / softener treatment throughput (~14.5 m³/h)'),
     connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', `sum of pump + dosing + control loads ≈ ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC are out of scope)`),
+    // Numeric scope flag (the universal sizer reads the quantities map reliably; the string
+    // scope_exclusions_desc on shared_quantities does NOT survive into the orchestrator contract).
+    // 1 = the building / civils / rack framework are supplied by others → synthesizeBuildingStructure
+    // returns 0 (no £1.1M phantom hall). 'build'/'scope' stems are STOP_STEMS so this never synthesises.
+    building_out_of_scope: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'the building, civils and cultivation rack framework are supplied by others — OUT of scope (no hall is synthesised around the water plant)'),
     total_supply_demand_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', 'total connected electrical demand of the water plant'),
   }
 

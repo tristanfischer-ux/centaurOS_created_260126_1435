@@ -1810,12 +1810,18 @@ export function synthesizeBuildingStructure(
   // OWN exclusion words (carried on the contract by any archetype that emits scope_exclusions_desc),
   // universal + opt-in — no per-class table. A class that excludes nothing is unaffected (the
   // building still synthesises as before).
+  // PRIMARY signal — a numeric flag on the quantities map (this DOES propagate into the orchestrator
+  // contract, unlike the string scope_exclusions_desc on shared_quantities, which is stripped).
+  const buildingExcludedFlag = Number(
+    quantities?.['building_out_of_scope'] ?? quantities?.['building_excluded'] ?? 0,
+  )
+  // FALLBACK — the string exclusions, when an archetype does carry them through.
   const scopeExclusions = String(
     (contract as unknown as { shared_quantities?: Record<string, unknown>; scope_exclusions_desc?: unknown })
       ?.shared_quantities?.scope_exclusions_desc
     ?? (contract as unknown as { scope_exclusions_desc?: unknown })?.scope_exclusions_desc ?? '',
   ).toLowerCase()
-  if (/\bbuilding\b|\bcivils?\b|\bthe\s+hall\b|process\s+hall|rack\s+framework/.test(scopeExclusions)) {
+  if (buildingExcludedFlag >= 1 || /\bbuilding\b|\bcivils?\b|\bthe\s+hall\b|process\s+hall|rack\s+framework/.test(scopeExclusions)) {
     return 0
   }
 
