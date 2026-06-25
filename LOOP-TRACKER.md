@@ -21,14 +21,20 @@ DONE + COMMITTED (main, latest 4538f51ad):
   MWh↔kWh, B capex-by-category sums the bill (£797k cells dominate), C transformer 1.25→3.15
   MVA sized to power (+invariant), F rack 2-tier stacking → GA fits 20-ft (5.3m).
 
-THE REMAINING BIG PIECE (next session — this is the control-flow change the council said is
-the real fix; the loop module EXISTS but is NOT wired):
-  1. WIRE repair_dossier() into serial-design-chain-v2.tsx as a LOOP GATE *before* the Excel
-     build: run audit → apply deterministic fixers → re-audit → EMIT ONLY when clean; surface
-     the human-gaps (no-revenue, brief-FAIL design misses) as QUESTIONS, not a broken dossier.
-  2. Make the dossier verdict a PURE FUNCTION of the audit — delete any independently-writable
-     "validated" flag (that independent green light is WHY the physics critic + 33 invariants
-     got ignored before).
+PROGRESS 2026-06-25 (post-compaction, commit 25994304c): repair loop WIRED into
+build-excel-export.py build() — runs repair_dossier() BEFORE rendering any tab. On v5: 137
+untagged principals → 0 (118 ISA tags), 44 dup lines merged, 2 £0 filled. Verdict + ⚠ Audit
+tab now a pure function of the POST-repair audit. Remaining 16 are honest design/source gaps
+(dc_bus FAIL, 3 physics HIGH, phantom refs, no-revenue, 0/0 coverage, 7 £0 commodities
+DELIBERATELY routed-not-patched: missing price = source-rule gap, not a loop band-aid).
+state._dossierRepair records {iterations, fixes_applied, needs_input[]}.
+
+THE REMAINING BIG PIECE (this is the control-flow change the council said is the real fix):
+  1. ✅ DONE — repair loop wired into the Excel build (verdict = pure function of post-repair audit).
+  1b. WIRE repair_dossier() INTO serial-design-chain-v2.tsx too (not just the Excel build) so the
+     DRAWINGS/renders reflect the fixes, and human-gaps surface as QUESTIONS pre-emit.
+  2. ✅ (Excel) verdict is now a pure function of the post-repair audit (state._dossierAudit). The
+     chain-level "validated"/benchmark-🟢 green light still needs the same treatment.
   3. Add the SOURCE-RULE auto-fixers the loop flags but can't patch in rows: fuse/current/
      transformer-coherence sizing reconciliation in the contract/emitter; the duplicate-pump
      at source; the missing-tag at the emitter (not just post-patched).
