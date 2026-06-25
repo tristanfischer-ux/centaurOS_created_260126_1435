@@ -194,7 +194,7 @@ function isCalculatorSourced(q: any): boolean {
  *  Same manifest the auto-planner consumes (auto-plan-fallback.ts). Returns an
  *  empty map (→ floor "brief" behaviour) if the file is unavailable. */
 let _inputKeysCache: Map<string, string[]> | null = null
-function loadToolInputKeys(): Map<string, string[]> {
+export function loadToolInputKeys(): Map<string, string[]> {
   if (_inputKeysCache) return _inputKeysCache
   const map = new Map<string, string[]>()
   try {

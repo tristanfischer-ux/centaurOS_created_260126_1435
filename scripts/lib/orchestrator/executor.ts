@@ -23,6 +23,7 @@ import type {
   ToolStep,
 } from './types'
 import { getTool } from './registry'
+import { loadToolInputKeys } from './attribution'
 
 export interface ExecutorOutcome {
   contract: ContractInProgress
@@ -113,6 +114,40 @@ export async function runToolPlan(
 // PRIVATE
 // ---------------------------------------------------------------------------
 
+/** TRACEABILITY SPINE: after a tool writes its outputs into the contract, stamp every NEW or
+ *  CHANGED quantity with its lineage — the tool that produced it (`source: tool:<id>`, a
+ *  `lineage.from` list of the tool's declared inputs that exist as quantities, and a prose
+ *  `source_detail`) — so no tool-produced number is born sourceless ("appears from nowhere").
+ *  UNIVERSAL: this ONE place covers every tool's outputs across every archetype, with no
+ *  per-tool code. Fills ONLY the gap — a quantity that already records a real source/lineage
+ *  is never overwritten. (The contract's flat quantity shape carries source/source_detail/
+ *  lineage; we read/write it via an index cast since the in-progress contract type is loose.) */
+function stampToolLineage(
+  beforeVals: Record<string, number | undefined>,
+  contract: ContractInProgress,
+  toolId: string,
+): void {
+  const declared = loadToolInputKeys().get(toolId) ?? []
+  const present = new Set(Object.keys(contract.quantities))
+  const from = declared.filter(k => present.has(k))
+  const fromList = from.length ? from : ['brief']
+  for (const [key, qRaw] of Object.entries(contract.quantities)) {
+    const qq = qRaw as unknown as Record<string, unknown> | undefined
+    if (!qq || typeof qq !== 'object') continue
+    const prev = beforeVals[key]
+    const changed = prev === undefined || prev !== (qq.value as number | undefined)
+    if (!changed) continue
+    const src = String(qq.source ?? '')
+    if (!src || src === '<none>') qq.source = `tool:${toolId}`
+    if (!qq.lineage) qq.lineage = { from: fromList, via: `tool:${toolId}` }
+    if (!String(qq.source_detail ?? '').trim()) {
+      qq.source_detail = from.length
+        ? `computed by ${toolId} from ${from.slice(0, 8).join(', ')}`
+        : `computed by ${toolId} (inputs from brief)`
+    }
+  }
+}
+
 interface StepOutcome {
   ok: boolean
   contract: ContractInProgress | null
@@ -142,11 +177,20 @@ async function runStep(
   tool_results.set(step.tool_id, result)
   if (!result.ok) return { ok: false, contract: null, warnings: result.warnings, error: result.error }
 
+  // TRACEABILITY SPINE (Tristan 2026-06-25: "every number should come from some original
+  // source — the brief → tools → contract; nothing appears from nowhere"). Snapshot the
+  // quantity values BEFORE the tool writes its outputs, so we can stamp lineage on exactly
+  // the quantities this tool produced or changed.
+  const beforeVals: Record<string, number | undefined> = {}
+  for (const [k, v] of Object.entries(contract.quantities)) {
+    beforeVals[k] = (v as unknown as { value?: number } | undefined)?.value
+  }
   const updated = step.contract_update(contract, result.output)
   const newContract: ContractInProgress = {
     ...updated,
     _tools_run: [...updated._tools_run.filter(t => t !== step.tool_id), step.tool_id],
   }
+  stampToolLineage(beforeVals, newContract, step.tool_id)
   // Capture the tool's worked calculations (inputs -> formula -> substituted numbers
   // -> result) so the Tools-Used appendix can show the maths a reviewer can check by
   // hand. UNIVERSAL: any tool whose Python emits a `worked` list is covered with zero
