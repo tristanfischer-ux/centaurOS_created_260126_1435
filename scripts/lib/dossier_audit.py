@@ -1436,6 +1436,58 @@ def check_dominant_bom_line(state, rows, run_dir) -> list:
     return out
 
 
+def check_calc_coverage(state, rows, run_dir) -> list:
+    """GUARANTEE every code calculation appears in Excel (Tristan 2026-06-25: "ALL the calculations
+    in code have to appear in excel"). A number's calculation is SHOWN if its derivation is a real
+    FORMULA (a source_detail carrying an operator) OR a tool worked-calc (formula + substitution).
+    Having only inputs (lineage.from) is NOT enough — that's the lineage, not the calculation.
+    This is the forcing function: it flags every HIDDEN calc so calc-coverage is driven to 100%
+    (the same pattern as the provenance spine; the build refuses to ship below it when enforcing)."""
+    out: list = []
+    q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+    if not isinstance(q, dict) or not q:
+        return out
+    wc = (state.get("worked_calculations")
+          or ((state.get("orchestratorContract") or {}).get("worked_calculations")) or {})
+    worked = set()
+    if isinstance(wc, dict):
+        for calcs in wc.values():
+            for c in (calcs or []):
+                if isinstance(c, dict):
+                    f = c.get("output_field") or c.get("field") or c.get("label")
+                    if f:
+                        worked.add(str(f).lower())
+    # A ROOT (a brief assumption or a physics constant) is an INPUT, not a calculation — it has
+    # no formula because it isn't computed. Only DERIVED quantities need a shown calculation.
+    _ROOTS = {"brief", "physics_constant", "constant", "standard", "anchor", "datasheet", "spec"}
+    _OPS = ("=", "×", "*", "/", "+", "−", "·", "^")
+    hidden, total = [], 0
+    for k, v in q.items():
+        if not isinstance(v, dict):
+            continue
+        if str(v.get("source", "")).strip().lower() in _ROOTS:
+            continue   # an input/constant, not a calculation
+        total += 1
+        sd = str(v.get("source_detail") or "")
+        has_formula = len(sd) > 3 and any(op in sd for op in _OPS)
+        if str(k).lower() in worked or has_formula:
+            continue
+        hidden.append(str(k))
+    cov = round((total - len(hidden)) / total * 100) if total else 100
+    if hidden:
+        out.append(Finding(
+            tab="Calculations", check="calc_coverage",
+            severity="HIGH" if cov < 70 else "MED",
+            message=(f"{len(hidden)} of {total} numbers ({100 - cov}%) have NO calculation shown "
+                     f"in Excel — only a value (calc-coverage {cov}%). A number you cannot see "
+                     f"computed is not verifiable."),
+            actual=", ".join(hidden[:6]) + ("…" if len(hidden) > 6 else ""),
+            expected="every number shows its formula + inputs + result (a worked calc) in the Calculations tab",
+            source_rule="every code calculation must emit a worked-calc (a calc() capture) that the Calculations tab renders — drive calc-coverage to 100%",
+        ))
+    return out
+
+
 def check_provenance(state, rows, run_dir) -> list:
     """The TRACEABILITY SPINE, surfaced in the dossier (Tristan 2026-06-25): every number must
     trace to the brief via a tool/formula. Flags quantities with NO recorded origin (appear
@@ -1495,6 +1547,7 @@ _CHECKS = [
     check_provenance,               # 16 SPINE: quantities with no recorded origin + role divergence
     check_brief_unverified,         # 17 most brief metrics UNVERIFIED (brief scale didn't propagate)
     check_dominant_bom_line,        # 18 a single BoM line > 50% of the bill (mis-price)
+    check_calc_coverage,            # 19 GUARANTEE: every code calculation is shown in Excel (formula)
 ]
 
 
