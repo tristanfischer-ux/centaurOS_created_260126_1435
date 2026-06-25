@@ -40,14 +40,23 @@
  *   discovery_source = 'price_ingest_<YYYY-MM-DD>'  (date via --date / INGEST_DATE)
  *
  * ── VERIFICATION (no hallucinated junk in the DB) ────────────────────────────
- * A result is REJECTED (skipped + logged, never written) when ANY holds:
+ * A result is REJECTED (skipped + logged, never written) when ANY HARD reject holds:
  *   - confidence === 'low'
  *   - unit_price_gbp ≤ 0 or non-finite or absurd (> £50,000,000)
- *   - unit_price_gbp diverges from est_unit_gbp by more than 4× either way
- *     (the estimate is a sanity anchor — a real 86 kW chiller is within a few×
- *      of £51,600, not £5 or £5M). Skipped when est_unit_gbp ≤ 0 (no anchor).
  *   - manufacturer or part_number empty / obviously fake (N/A, generic, TBD,
  *     example, unknown, tbc, n.a., none, …)
+ * Plus a PRICE-MAGNITUDE check that passes via EITHER anchor and is rejected only
+ * when it fails BOTH:
+ *   (a) ESTIMATE anchor — within 4× of est_unit_gbp either way (the historical
+ *       check; skipped when est_unit_gbp ≤ 0).
+ *   (b) DATA anchor — within the DB CLASS-TYPICAL RANGE for the noun: the robust
+ *       band [p10×0.5, p90×2] of real same-noun prices in
+ *       pretraining_extracted_parts (≥5 rows; else unavailable).
+ *   The estimate is sometimes the very thing that's WRONG (a real 1500 A DC
+ *   contactor is ~£485 but the engine estimated £3,500) — the loop exists to
+ *   REPLACE bad estimates with real DB-anchored data, so anchor (b) rescues a
+ *   real price that the estimate would have rejected. When NEITHER anchor is
+ *   available, the magnitude check is skipped (historical no-anchor behaviour).
  *
  * ── SAFETY + ERGONOMICS ──────────────────────────────────────────────────────
  *   - DRY-RUN by default: prints each proposed writeback + accept/reject reason,
@@ -144,7 +153,12 @@ interface LlmResult {
   confidence: 'high' | 'medium' | 'low' | string
 }
 
-type Verdict = { accept: true } | { accept: false; reason: string }
+type Verdict = { accept: true; via?: string } | { accept: false; reason: string }
+
+// A DB class-typical price band for a component noun: the robust [lo, hi] range
+// derived from the distribution of REAL parts of the same noun in the DB. This is
+// the DATA anchor — independent of the engine's (possibly-wrong) estimate.
+type DbRange = { lo: number; hi: number } | null
 
 // ── PURE verification predicate (testable without LLM or DB) ─────────────────
 function looksFake(s: string): boolean {
@@ -257,10 +271,28 @@ export function existsLikeNeedles(noun: string, name: string, spec: string): { n
 }
 
 /**
- * Decide whether an LLM-sourced part is safe to write back, using the engine's
- * own estimate as a sanity anchor. PURE — no I/O. Exported logic, tested by --selftest.
+ * Decide whether an LLM-sourced part is safe to write back. PURE — no I/O.
+ * Exported logic, tested by --selftest.
+ *
+ * The HARD rejects (confidence=low, non-positive/absurd price, fake/empty
+ * manufacturer or MPN) are UNCONDITIONAL — nothing can rescue them.
+ *
+ * The price-magnitude check passes via EITHER of two independent anchors, and is
+ * rejected only when it fails BOTH:
+ *   (a) ESTIMATE anchor — within `DIVERGENCE_FACTOR` (default 4×) of the engine's
+ *       hand-coded estimate `estUnitGbp` (the historical check).
+ *   (b) DATA anchor — within the DB CLASS-TYPICAL RANGE `dbRange` for the noun,
+ *       i.e. the price distribution of REAL parts of the same noun in the DB.
+ *
+ * Why BOTH: the estimate is sometimes the very thing that's WRONG — a real 1500 A
+ * DC contactor is ~£485 but the engine estimated £3,500, so the correct price
+ * "diverges 7.2×" and the old estimate-only check rejected it. The loop exists to
+ * REPLACE bad estimates with real data, so a real price that matches the DB class
+ * range must be accepted even when it diverges from the estimate. `dbRange` is
+ * precomputed by the caller (async DB read) and passed in to keep this pure +
+ * unit-testable; pass `null` when no DB range is available (<5 comparable rows).
  */
-export function verifyResult(r: LlmResult, estUnitGbp: number): Verdict {
+export function verifyResult(r: LlmResult, estUnitGbp: number, dbRange: DbRange = null): Verdict {
   if (!r || typeof r !== 'object') return { accept: false, reason: 'no result object' }
   const conf = String(r.confidence || '').trim().toLowerCase()
   if (conf === 'low') return { accept: false, reason: 'confidence=low' }
@@ -276,19 +308,68 @@ export function verifyResult(r: LlmResult, estUnitGbp: number): Verdict {
   if (looksFake(r.part_number))
     return { accept: false, reason: `part_number empty/fake ("${r.part_number}")` }
 
-  // Divergence-from-estimate sanity anchor (only when there IS a positive anchor).
+  // ── price-magnitude check: accept via EITHER anchor, reject only if it fails BOTH ──
+  // Anchor (a): divergence-from-estimate (only meaningful when there IS a positive est).
   const est = Number(estUnitGbp)
-  if (Number.isFinite(est) && est > 0) {
-    const ratio = price >= est ? price / est : est / price
-    if (ratio > DIVERGENCE_FACTOR)
-      return {
-        accept: false,
-        reason: `price £${Math.round(price).toLocaleString()} diverges ${ratio.toFixed(
-          1,
-        )}× from estimate £${Math.round(est).toLocaleString()} (> ${DIVERGENCE_FACTOR}×)`,
-      }
+  const haveEstAnchor = Number.isFinite(est) && est > 0
+  let estRatio = NaN
+  let passEst = false
+  if (haveEstAnchor) {
+    estRatio = price >= est ? price / est : est / price
+    passEst = estRatio <= DIVERGENCE_FACTOR
   }
-  return { accept: true }
+
+  // Anchor (b): within the DB class-typical range (when available).
+  const haveDbAnchor = !!dbRange && Number.isFinite(dbRange.lo) && Number.isFinite(dbRange.hi)
+  const passDb = haveDbAnchor && price >= dbRange!.lo && price <= dbRange!.hi
+
+  // If NEITHER anchor is available, there is nothing to sanity-check against —
+  // preserve the historical behaviour (no anchor → accept, see the est ≤ 0 case).
+  if (!haveEstAnchor && !haveDbAnchor) return { accept: true }
+
+  if (passEst) return { accept: true, via: 'estimate' }
+  if (passDb) return { accept: true, via: 'db' }
+
+  // Failed every available anchor → reject, naming each anchor it failed.
+  const parts: string[] = []
+  if (haveEstAnchor)
+    parts.push(`diverges ${estRatio.toFixed(1)}× from estimate £${Math.round(est).toLocaleString()} (> ${DIVERGENCE_FACTOR}×)`)
+  if (haveDbAnchor)
+    parts.push(`outside DB class range £${Math.round(dbRange!.lo).toLocaleString()}–£${Math.round(dbRange!.hi).toLocaleString()}`)
+  return {
+    accept: false,
+    reason: `price £${Math.round(price).toLocaleString()} ${parts.join(' AND ')}`,
+  }
+}
+
+/**
+ * Compute the DB CLASS-TYPICAL price band for a component noun: the price
+ * distribution of REAL parts whose part_name contains the noun. Returns a robust
+ * band [p10 × 0.5, p90 × 2] (10th/90th percentiles with generous slack — this is
+ * a sanity NET, not a precise check) when ≥5 priced rows exist, else null
+ * (anchor unavailable). READONLY DB read — open the handle `{ readonly: true }`.
+ * Reuses the existing better-sqlite3 `Database` import.
+ */
+export function dbClassRangeForNoun(db: Database.Database, noun: string): DbRange {
+  const n = String(noun || '').trim()
+  if (!n) return null
+  const rows = db
+    .prepare(
+      `SELECT unit_price_gbp FROM pretraining_extracted_parts
+         WHERE lower(part_name) LIKE '%' || lower(?) || '%' AND unit_price_gbp > 0`,
+    )
+    .all(n) as { unit_price_gbp: number }[]
+  const prices = rows
+    .map((x) => Number(x.unit_price_gbp))
+    .filter((p) => Number.isFinite(p) && p > 0)
+    .sort((a, b) => a - b)
+  if (prices.length < 5) return null
+  // Nearest-rank percentile (no interpolation — fine for a generous sanity band).
+  const pct = (q: number) => {
+    const idx = Math.min(prices.length - 1, Math.max(0, Math.ceil(q * prices.length) - 1))
+    return prices[idx]
+  }
+  return { lo: pct(0.1) * 0.5, hi: pct(0.9) * 2 }
 }
 
 // ── the LLM call (OpenRouter, same pattern as benchmark-expectation.ts) ──────────
@@ -570,7 +651,10 @@ async function main() {
       console.log(`[ingest] ⚠ LLM-FAIL  ${e.key} (${e.noun} · ${e.spec}) — no result, left in queue`)
       continue
     }
-    const v = verifyResult(r, e.est_unit_gbp)
+    // DATA anchor (b): the DB class-typical range for this noun (readonly read;
+    // db is already open — readonly in dry-run, writable in commit).
+    const dbRange = dbClassRangeForNoun(db, e.noun)
+    const v = verifyResult(r, e.est_unit_gbp, dbRange)
     const head =
       `${e.noun} · ${e.spec || '(unspecified)'}  →  ${r.manufacturer} ${r.part_number}  ` +
       `£${Number.isFinite(r.unit_price_gbp) ? Math.round(r.unit_price_gbp).toLocaleString() : r.unit_price_gbp}  ` +
@@ -583,6 +667,15 @@ async function main() {
       // on the next run and the growing-DB loop actually closes.
       r.part_name = canonicalPartName(r.part_name, e.noun, e.spec)
       console.log(`[ingest] ✓ ACCEPT  ${head}`)
+      // Signal the loop CORRECTED a wrong estimate: accepted on the DB class range
+      // when the estimate-divergence anchor would have rejected this real price.
+      if (v.via === 'db' && dbRange) {
+        const est = Number(e.est_unit_gbp)
+        console.log(
+          `[ingest]            accepted via DB class range £${Math.round(dbRange.lo).toLocaleString()}–£${Math.round(dbRange.hi).toLocaleString()}` +
+            (Number.isFinite(est) && est > 0 ? ` (estimate £${Math.round(est).toLocaleString()} was off)` : ''),
+        )
+      }
       console.log(`[ingest]            part_name: ${r.part_name}  ·  class: ${r.component_class}`)
       if (COMMIT) {
         writeOne!(e, r)
@@ -651,6 +744,51 @@ function selftest() {
 
   // No anchor (est ≤ 0): divergence check is SKIPPED, otherwise-sane result ACCEPTS.
   ok(verifyResult({ ...sane, unit_price_gbp: 999_999 }, 0).accept === true, 'no estimate anchor → skip divergence, ACCEPT')
+
+  // ── DATA anchor (b): the DB class-typical range rescues a real price the WRONG
+  //    estimate would reject, and never rescues an absurd one. ───────────────────
+  const contactor: LlmResult = {
+    manufacturer: 'Schaltbau', part_number: 'C310-1500A', part_name: '1500 A DC contactor',
+    unit_price_gbp: 485, component_class: 'electrical', description: '1500 A DC contactor', confidence: 'high',
+  }
+  // Real £485 contactor vs a WRONG £3,500 estimate (7.2× off → fails (a)) but well
+  // within the DB class range {50, 1500} → ACCEPT via (b) — the loop CORRECTS the
+  // bad estimate.
+  {
+    const v = verifyResult(contactor, 3_500, { lo: 50, hi: 1500 })
+    ok(v.accept === true, 'contactor £485 vs est £3,500 (7.2× off) but in DB range → ACCEPT via (b)')
+    ok(v.accept === true && v.via === 'db', 'accepted contactor records via=db (estimate was the wrong one)')
+  }
+  // Chiller within 4× of estimate (passes (a)); no DB range available → still ACCEPT.
+  {
+    const v = verifyResult({ ...sane, unit_price_gbp: 38_500 }, 51_600, null)
+    ok(v.accept === true, 'chiller £38,500 within 4× of est £51,600, dbRange null → ACCEPT via (a)')
+    ok(v.accept === true && v.via === 'estimate', 'chiller records via=estimate')
+  }
+  // Absurd £50,000 contactor: fails (a) (14× off) AND fails (b) (outside {50,1500}) → REJECT.
+  ok(
+    verifyResult({ ...contactor, unit_price_gbp: 50_000 }, 3_500, { lo: 50, hi: 1500 }).accept === false,
+    'absurd £50,000 contactor fails BOTH anchors → REJECT',
+  )
+  // Hard rejects still unconditional regardless of either anchor.
+  ok(
+    verifyResult({ ...contactor, confidence: 'low' }, 3_500, { lo: 50, hi: 1500 }).accept === false,
+    'confidence=low → REJECT regardless of either anchor',
+  )
+  ok(
+    verifyResult({ ...contactor, part_number: 'N/A' }, 3_500, { lo: 50, hi: 1500 }).accept === false,
+    'fake MPN "N/A" → REJECT regardless of either anchor',
+  )
+  // No estimate, but the DB range alone vouches for the price → ACCEPT via (b).
+  ok(
+    verifyResult(contactor, 0, { lo: 50, hi: 1500 }).accept === true,
+    'no estimate but in DB range → ACCEPT via (b)',
+  )
+  // In estimate band AND in DB band → ACCEPT (estimate anchor checked first).
+  {
+    const v = verifyResult(contactor, 500, { lo: 50, hi: 1500 })
+    ok(v.accept === true && v.via === 'estimate', 'in both bands → ACCEPT, estimate anchor wins ordering')
+  }
 
   // ── canonicalPartName: the resolver-match guarantee ────────────────────────
   // THE bug this closes: the LLM returned "Aermec AN 086 Air-Cooled Liquid
