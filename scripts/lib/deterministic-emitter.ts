@@ -589,6 +589,12 @@ interface BessParams {
   // Default 20 kW (1 MW × 2% losses at 98% efficiency).
   inverterDissipatedKw: number
 
+  // Container SIZE (2026-06-25): the brief envelope's length → 20-ft or 40-ft ISO. emitStructure-
+  // Containment emits the matching container word (was hardcoded 40-ft → a 20-ft brief shipped a
+  // 40-ft £14k box + wrong GA). containerLengthM = the longer horizontal dimension in metres.
+  containerLengthM: number
+  containerSizeFt: number   // 20 | 40
+
   // ── Shared engineering values (2026-05-26, L38 class-killer A) ──────────
   // Read from contract.shared_quantities via getSharedQty(). All sub_module
   // emitters that reference coolant chemistry, mass cap, etc. MUST use these
@@ -726,7 +732,13 @@ function deriveBessParams(contract: ContractShape): BessParams {
     NFPA2001_NOVEC_CLASS_A_CONCENTRATION_PCT,
   )
 
+  // Container size from the contract (set by the BESS contract builder from the brief envelope).
+  const containerLengthM = q(contract, 'container_internal_length_m', 12.03)
+  const containerSizeFt = containerLengthM <= 7.5 ? 20 : 40   // a 20-ft ISO is 6.06 m; a 40-ft is 12.03 m
+
   return {
+    containerLengthM,
+    containerSizeFt,
     cellCount,
     rackCount,
     cellsPerRack,
@@ -4210,26 +4222,35 @@ function emitSafetyProtection(p: BessParams): DesignModule {
 // ---------------------------------------------------------------------------
 
 function emitStructureContainment(p: BessParams): DesignModule {
+  // Container per the brief ENVELOPE (2026-06-25): a 20-ft brief gets a 20-ft container word, a
+  // 40-ft brief the 40-ft — was hardcoded 40-ft (a £14k box + "40-foot" narrative on EVERY 20-ft
+  // brief). Internal ids (word/cc) stay stable for slot + topology references; only the visible
+  // label / form / part-number / price / module text change with p.containerSizeFt.
+  const _ft = p.containerSizeFt === 20 ? 20 : 40
+  const _c = _ft === 20
+    ? { label: 'ISO container 20-ft HC', pn: '20HC-BESS-HD', price: '5200',
+        form: 'CIMC 20-ft High-Cube ISO container, bespoke heavy-duty BESS modification (reinforced floor, cable penetrations, access doors, internal DIN-rail framework), Corten steel body — heavy-haul road transport (a 5 MWh-class container exceeds the standard 28-tonne limit)' }
+    : { label: 'ISO container 40-ft HC', pn: '40HC-BESS-HD', price: '14000',
+        form: 'CIMC 40-ft High-Cube ISO container, bespoke heavy-duty BESS modification (reinforced floor, cable penetrations, access doors, internal DIN-rail framework), Corten steel body' }
   const isoContainerShell = makeSubModule(
     'iso_container_shell',
     'ISO container shell',
     'contains',
-    '40-foot HC ISO container with structural floor + thermal insulation',
+    `${_ft}-foot HC ISO container with structural floor + thermal insulation`,
     [
       word(
         'iso_container_40hc_word',
-        'ISO container 40 HC word',
-        cc('iso_container_40hc', 'ISO container 40-ft HC', null, 'steel'),
+        `ISO container ${_ft} HC word`,
+        cc('iso_container_40hc', _c.label, null, 'steel'),
         [
           mod('quantity', '×1'),
           mod('regulatory', 'ISO 6346'),
-          mod('form', 'CIMC 40-ft High-Cube ISO container, bespoke heavy-duty BESS modification (reinforced floor, cable penetrations, access doors, internal DIN-rail framework), Corten steel body'),
-          // C1 pin: CIMC EnergyChain 40HC BESS container — CIMC Group container
-          // division supplies custom-modified 40-ft HC enclosures to CATL EnerC+,
-          // Sungrow PowerStack, BYD Cube Pro as OEM. CIMC product ref: 40HC-BESS-HD.
+          mod('form', _c.form),
+          // CIMC EnergyChain BESS container — CIMC Group supplies custom-modified HC enclosures to
+          // CATL EnerC+, Sungrow PowerStack, BYD Cube Pro as OEM (20HC- and 40HC-BESS-HD lines).
           mod('manufacturer', 'CIMC'),
-          mod('part_number', '40HC-BESS-HD'),
-          mod('list_price_gbp', '14000'), // CIMC 40HC-BESS-HD UK/EU trade ≈ £14,000; FIX A 2026-05-29
+          mod('part_number', _c.pn),
+          mod('list_price_gbp', _c.price),
         ],
       ),
       word(
@@ -4393,7 +4414,7 @@ function emitStructureContainment(p: BessParams): DesignModule {
 
   return {
     module: 'structure_containment',
-    module_brief: 'Houses the BESS in a 40-foot HC ISO container with reinforced floor, mineral-wool fire-rated insulation and IP54 double-leaf doors with positive-opening door position safety switches.',
+    module_brief: `Houses the BESS in a ${_ft}-foot HC ISO container with reinforced floor, mineral-wool fire-rated insulation and IP54 double-leaf doors with positive-opening door position safety switches.`,
     overview_paragraph_en: '',
     derived_parameters: {
       container_count: 1,

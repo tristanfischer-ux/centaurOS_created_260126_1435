@@ -679,6 +679,12 @@ registerArchetype('bess', (brief: any) => {
   // in-container closure below — single source of truth).
   const cellMassKg = 5.3
   const briefMassCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 28_000)
+  // Container SIZE from the brief envelope (2026-06-25): the longer horizontal dimension is the
+  // container length (a 20-ft ISO ≈ 6.06 m, a 40-ft ≈ 12.03 m). The emitter reads this to emit the
+  // RIGHT container (was hardcoded 40-ft → a 20-ft brief shipped a 40-ft £14k box). Default 12.03 m
+  // (40-ft) only when the brief states no envelope.
+  const _md = brief?.constraints?.max_dimensions_mm ?? {}
+  const containerLengthM = Math.max(Number(_md.w ?? 0), Number(_md.d ?? 0), Number(_md.l ?? 0)) / 1000 || 12.03
   // DERIVE the rack ceiling from the BRIEF'S mass budget — NOT a hardcoded 15.
   // 2026-05-31 fix: `rackCountMaxSingleContainer = 15` was sized for the original
   // 28 t cap and silently ignored the brief's actual mass allowance, so EVERY
@@ -915,6 +921,9 @@ registerArchetype('bess', (brief: any) => {
     // the payload gate (exit 30) and the render-minimal-pdf display both guard
     // with presence checks so omission is safe.
     container_payload_rating_kg: q(briefMassCapKg, 'kg', 'mass', 'max', 'system', 'brief', { source_detail: `bespoke heavy-duty enclosure rated to brief gross-mass cap (${briefMassCapKg.toLocaleString('en-GB')} kg); road-transportable with route notification / specialist trailer per brief` }),
+    // container SIZE for the emitter — the longer horizontal envelope dimension (20-ft ≈ 6.06 m,
+    // 40-ft ≈ 12.03 m). emitStructureContainment emits the matching container word + tare + price.
+    container_internal_length_m: q(containerLengthM, 'm', 'length', 'rated', 'system', 'brief', { source_detail: `container length from brief max_dimensions_mm (longer horizontal dim); ${containerLengthM <= 7.5 ? '20-ft ISO' : '40-ft ISO'} class` }),
     // BESS L26 (2026-05-25, gate-17 HIGH #4): ac_output_voltage_v — UK
     // grid-tie BESS universally uses 400 V / 50 Hz LV AC output via the PCS;
     // brief target_performance has key 'ac_output_voltage_v' → 400 V. METRIC_MAP
