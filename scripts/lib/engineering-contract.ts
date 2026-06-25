@@ -13106,9 +13106,11 @@ registerArchetype('water_treatment', (brief: any) => {
     fresh_water_storage_capacity_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', 'fresh-water buffer storage (Codema 40 m³ galvanised tank); lock-gate HARD slot (exit 22)'),
 
     // ── PRINCIPAL EQUIPMENT (self-describing keys → universal sizer synthesises + prices) ──
-    // RO skid — sized by footprint (5.8 × 3.4 m set-up envelope); throughput 8 m³/h alone is
-    // below the synth threshold, the area mints + sizes the skid.
-    reverse_osmosis_skid_area_m2: q(20, 'm²', 'area', 'rated', 'module', 'brief', 'reverse-osmosis skid set-up footprint (5.8 m × 3.4 m, Codema HORTI PURE RO7-3LP2P)'),
+    // RO skid — ONE packaged skid sized by its physical envelope volume (3.8 × 1.4 × 2.0 m
+    // ≈ 10.6 m³). NB: do NOT key this as `_area_m2` — that is read as MEMBRANE area and explodes
+    // into thousands of membrane elements (the £61M "Ro Membrane Elements · 364 m²" bug, 2026-06-25);
+    // an 8 m³/h throughput is below the synth threshold so the envelope volume mints the one skid.
+    reverse_osmosis_skid_volume_m3: q(10, 'm³', 'volume', 'rated', 'module', 'brief', 'reverse-osmosis packaged skid envelope (3.8 m × 1.4 m × 2.0 m, Codema HORTI PURE RO7-3LP2P, 8 m³/h @ 75% recovery)'),
     reverse_osmosis_skid_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one RO purification skid'),
     gac_filter_vessel_volume_m3: q(1.8, 'm³', 'volume', 'rated', 'module', 'calculator', 'granular-activated-carbon filter vessel (1 × 42-inch tank, 14.5 m³/h)'),
     softener_vessel_volume_each_m3: q(1.5, 'm³', 'volume', 'rated', 'module', 'calculator', 'glass-fibre softener vessel (350 L resin each, 14 m³/h duplex)'),

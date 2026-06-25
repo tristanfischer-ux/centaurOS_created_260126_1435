@@ -1802,6 +1802,23 @@ export function synthesizeBuildingStructure(
     if (Array.isArray(sm.words)) sm.words = sm.words.filter((w) => !isBuildingStructure(w))
   }
 
+  // SCOPE FIDELITY (Tristan 2026-06-25): if the brief EXPLICITLY excludes the building / civils
+  // (a process plant supplied INTO an existing building by others — e.g. the Codema Fischer Farms
+  // water/fertigation plant), do NOT synthesise a hall around the equipment. Otherwise the universal
+  // BUILDING_ELEMENTS add a floor slab + portal frame + cladding + foundations regardless of scope
+  // — a £1.1M+ scope-creep line on a plant whose building is supplied by others. Keyed on the brief's
+  // OWN exclusion words (carried on the contract by any archetype that emits scope_exclusions_desc),
+  // universal + opt-in — no per-class table. A class that excludes nothing is unaffected (the
+  // building still synthesises as before).
+  const scopeExclusions = String(
+    (contract as unknown as { shared_quantities?: Record<string, unknown>; scope_exclusions_desc?: unknown })
+      ?.shared_quantities?.scope_exclusions_desc
+    ?? (contract as unknown as { scope_exclusions_desc?: unknown })?.scope_exclusions_desc ?? '',
+  ).toLowerCase()
+  if (/\bbuilding\b|\bcivils?\b|\bthe\s+hall\b|process\s+hall|rack\s+framework/.test(scopeExclusions)) {
+    return 0
+  }
+
   // Collect the PLAN FOOTPRINT (× quantity) + height of every PRINCIPAL equipment item it
   // houses. Exclude the non-principal synthesised families (instruments / actuators /
   // utilities / process-support / sub-components) — they sit on / inside the principals, not
