@@ -1363,6 +1363,79 @@ def check_tool_io_traceability(state, rows, run_dir) -> list:
 # Aggregator
 # --------------------------------------------------------------------------- #
 
+def _as_num(x):
+    try:
+        return float(x)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def check_brief_unverified(state, rows, run_dir) -> list:
+    """The brief compliance must NOT be mostly UNVERIFIED. If a brief target has no matching
+    contract quantity, the design cannot be confirmed against its own brief — which usually means
+    the brief's SCALE never propagated into the sizing (Tristan 2026-06-25: the Exec Summary
+    showed every metric UNVERIFIED while the design was sized ~150× below the 6,000-tray brief)."""
+    out: list = []
+    try:
+        metrics = ((((state.get("parsedBrief") or {}).get("constraints") or {})
+                    .get("target_performance") or {}).get("metrics")) or []
+    except Exception:  # noqa: BLE001
+        return out
+    if not isinstance(metrics, list) or not metrics:
+        return out
+    unverified, total = [], 0
+    for m in metrics:
+        if not isinstance(m, dict):
+            continue
+        name = m.get("key_metric") or m.get("metric") or m.get("name") or ""
+        if not name:
+            continue
+        total += 1
+        mk = _contract_match(state, name, m.get("unit") or "")
+        matched = mk[0] if isinstance(mk, tuple) else mk   # _contract_match → (key, value) or (None, None)
+        if matched is None:
+            unverified.append(str(name))
+    if total and len(unverified) >= max(1, total * 0.5):
+        sev = "HIGH" if len(unverified) == total else "MED"
+        out.append(Finding(
+            tab="Exec Summary", check="brief_unverified", severity=sev,
+            message=(f"{len(unverified)} of {total} brief metrics are UNVERIFIED (no matching "
+                     f"contract quantity) — the design cannot be confirmed against its own brief; "
+                     f"usually the brief's scale did not propagate into the sizing"),
+            actual=", ".join(unverified[:6]) + ("…" if len(unverified) > 6 else ""),
+            expected="every brief target maps to a same-unit-family contract quantity",
+            source_rule="brief scale metrics must propagate into the contract (sizing reads the brief target, not a class default)",
+        ))
+    return out
+
+
+def check_dominant_bom_line(state, rows, run_dir) -> list:
+    """No single bill-of-materials line should dominate the bill — a line > 50% of the total is
+    almost always a mis-price (Tristan 2026-06-25: a 40 W UV steriliser at £35k × 10 = £350k was
+    87% of the bill, surfacing as 'Other equipment 87%')."""
+    out: list = []
+    principals = [r for r in rows if isinstance(r, dict)
+                  and str(r.get("status")) != "SUB-COMPONENT"
+                  and (_as_num(r.get("line_gbp")) or 0) > 0]
+    total = sum((_as_num(r.get("line_gbp")) or 0) for r in principals)
+    if total <= 0 or len(principals) < 3:
+        return out
+    for r in principals:
+        lg = _as_num(r.get("line_gbp")) or 0
+        if lg > 0.5 * total:
+            name = str(r.get("requirement") or r.get("part") or "?")
+            out.append(Finding(
+                tab="Bill of Materials", check="dominant_bom_line", severity="HIGH",
+                message=(f"a single line '{name[:48]}' is £{round(lg):,} = {round(lg/total*100)}% "
+                         f"of the £{round(total):,} bill — almost certainly a mis-price (check the "
+                         f"unit price against the part's spec)"),
+                actual=f"unit £{r.get('unit_gbp')} × qty {r.get('qty')}",
+                expected="no single line should exceed ~50% of the bill",
+                source_rule="per-line price plausibility — a small-spec part priced as a large assembly",
+            ))
+    return out
+
+
 def check_provenance(state, rows, run_dir) -> list:
     """The TRACEABILITY SPINE, surfaced in the dossier (Tristan 2026-06-25): every number must
     trace to the brief via a tool/formula. Flags quantities with NO recorded origin (appear
@@ -1420,6 +1493,8 @@ _CHECKS = [
     check_tag_validity,             # 14 garbage / duplicate principal tags
     check_tool_io_traceability,     # 15 tool claim with no input/output edge (untraceable calc)
     check_provenance,               # 16 SPINE: quantities with no recorded origin + role divergence
+    check_brief_unverified,         # 17 most brief metrics UNVERIFIED (brief scale didn't propagate)
+    check_dominant_bom_line,        # 18 a single BoM line > 50% of the bill (mis-price)
 ]
 
 
@@ -1640,7 +1715,9 @@ def _selftest() -> int:
         {"tag": "P-1", "requirement": "Frame", "status": "IDENTIFIED",
          "part": "Frame A", "qty": 2, "unit_gbp": 1500, "line_gbp": 3000, "basis": "x"},
         {"tag": "P-2", "requirement": "Motor", "status": "IDENTIFIED",
-         "part": "Motor B", "qty": 1, "unit_gbp": 8000, "line_gbp": 8000, "basis": "x"},
+         "part": "Motor B", "qty": 1, "unit_gbp": 4000, "line_gbp": 4000, "basis": "x"},
+        {"tag": "TK-1", "requirement": "Tank", "status": "IDENTIFIED",
+         "part": "Tank C", "qty": 1, "unit_gbp": 4000, "line_gbp": 4000, "basis": "x"},
         {"tag": "C-1", "requirement": "wiring loom", "status": "UTILITY",
          "part": "loom", "qty": 1, "unit_gbp": 600, "line_gbp": 600, "basis": "x"},
     ]
