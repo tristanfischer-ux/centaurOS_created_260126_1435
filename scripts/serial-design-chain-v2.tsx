@@ -3414,6 +3414,14 @@ async function main() {
   // Working brief for the rest of the chain
   const parsedResult = { ok: true, data: currentParsed }
 
+  // PRESERVE THE RAW BRIEF (Tristan 2026-06-25): the parser genericises product_description and
+  // drops specifics (tray dims "2,760 × 1,290 mm", the "2 departments × 10 tunnels" layout), so
+  // any downstream consumer reading the prose loses them. Keep the founder's ORIGINAL text on the
+  // parsed brief so (a) class builders can read the real numbers (the universal "read the brief"
+  // principle), and (b) the dossier's "original brief verbatim" tab shows the TRUE text, not the
+  // engine-augmented one (#60). Universal — every class benefits, no per-class code.
+  try { (parsedResult.data as Record<string, unknown>).original_text = brief } catch { /* best-effort */ }
+
   // ── DESIGN-TO-TARGET SCALE OVERRIDE (#47, 2026-06-24) ────────────────────────────
   // The design-to-target loop (scripts/design-to-target-run.ts) converges a REAL design onto a
   // cost goal by re-running the chain at different output SCALES (the automated RAS-£5M iteration).

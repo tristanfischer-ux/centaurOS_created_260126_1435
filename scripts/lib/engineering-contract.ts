@@ -593,7 +593,9 @@ registerArchetype('bess', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const briefValue = Number(tp.value ?? 0)
   const briefUnit = String(tp.unit ?? 'kWh').toLowerCase()
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   // Normalise to kWh USABLE. 2026-05-23 (Task #69) — fixed brief-fidelity bug
   // analogous to bioreactor's: if brief parser picks C-rate or cycle-life
   // (dimensionless or hr⁻¹ unit) as target_performance, the old "else briefValue"
@@ -1327,7 +1329,9 @@ registerArchetype('haps', (brief: any) => {
   //   - altitude_m (parse "18-22 km" — default 20000 m)
   //   - propulsion_each_w (parse "600-900W each" — default 750 W)
 
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
     if (!m) return dflt
@@ -1510,7 +1514,9 @@ registerArchetype('vertical_farm', (brief: any) => {
   // BEFORE Generator so canopy / LED / HVAC / yield / water all close
   // arithmetically. Same pattern as the BESS + HAPS archetypes.
 
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
     if (!m) return dflt
@@ -1850,7 +1856,9 @@ registerArchetype('heat_pump_residential', (brief: any) => {
     // 3. Class default
     return 12
   })()
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
     if (!m) return dflt
@@ -2090,7 +2098,9 @@ registerArchetype('drone', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const briefValue = Number(tp.value ?? 0)
   const briefUnit = String(tp.unit ?? 'min').toLowerCase()
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
     if (!m) return dflt
@@ -2349,7 +2359,9 @@ registerArchetype('auv', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const briefValue = Number(tp.value ?? 0)
   const briefUnit = String(tp.unit ?? 'm').toLowerCase()
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
     if (!m) return dflt
@@ -2656,7 +2668,9 @@ registerArchetype('bioreactor', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const briefValue = Number(tp.value ?? 0)
   const briefUnit = String(tp.unit ?? 'L').toLowerCase()
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
     if (!m) return dflt
@@ -2921,7 +2935,9 @@ registerArchetype('cgm', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const briefValue = Number(tp.value ?? 0)
   const briefUnit = String(tp.unit ?? 'day').toLowerCase()
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
     if (!m) return dflt
@@ -3159,7 +3175,9 @@ registerArchetype('edge_ai', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const briefValue = Number(tp.value ?? 0)
   const briefUnit = String(tp.unit ?? 'tps').toLowerCase()
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
     if (!m) return dflt
@@ -3413,7 +3431,9 @@ registerArchetype('ev_charger', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const briefValue = Number(tp.value ?? 0)
   const briefUnit = String(tp.unit ?? 'kw').toLowerCase()
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
     if (!m) return dflt
@@ -8732,7 +8752,9 @@ registerArchetype('fso', (brief: any) => {
 // Qorvo TGA2624 GaN PA £150/PA in volume, Xilinx Zynq UltraScale+ MPSoC
 // £8k/tile, 28 GHz multilayer Rogers RO4350B patch PCB £25/element.
 registerArchetype('phased_array', (brief: any) => {
-  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Read the ORIGINAL brief text first (preserved on parsedBrief.original_text) — the parser
+  // genericises product_description and drops specifics (e.g. tray dims "2,760 × 1,290 mm").
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
   const numElements = Math.max(4, Math.round(extractRangeFromDesc(desc, /(\d{2,5})\s*elements?/i, 256)))
   const freqGhz = extractRangeFromDesc(desc, /(\d{1,3}(?:\.\d+)?)\s*GHz/i, 28)
   const scanRangeDeg = extractRangeFromDesc(desc, /[±\+\-]?\s*(\d{1,3})\s*°?\s*scan/i, 60)
