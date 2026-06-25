@@ -641,11 +641,56 @@ def _selftest() -> int:
 # CLI
 # --------------------------------------------------------------------------- #
 
+def _cli_writeback(run_dir: str) -> int:
+    """Chain entrypoint: load <run_dir>/state.json, run the deterministic repair loop,
+    and write the REPAIRED state back in place so EVERY downstream consumer (the Excel
+    deliverable, any re-render, the chain verdict) builds from the corrected bill. The
+    auto-fixable defects are gone; only genuine human-input / source-rule gaps survive
+    in state._dossierRepair.needs_input. Idempotent — re-running on a repaired state is
+    a no-op (the loop converges immediately)."""
+    import json
+    sp = os.path.join(run_dir, "state.json")
+    try:
+        with open(sp) as fh:
+            state = json.load(fh)
+    except Exception as e:  # noqa: BLE001
+        print(f"dossier_repair: cannot read {sp}: {e}", file=sys.stderr)
+        return 2
+    rows = state.get("requirementsBom") or []
+    res = repair_dossier(state, rows, run_dir)
+    state = res.state
+    state["requirementsBom"] = res.rows
+    state["_dossierRepair"] = {
+        **res.summary(),
+        "fixes": list(res.fixes_applied),
+        "needs_input": [
+            {"check": f.check, "severity": f.severity, "tab": f.tab,
+             "message": f.message, "why": f.source_rule}
+            for f in res.remaining()
+        ],
+    }
+    try:
+        with open(sp, "w") as fh:
+            json.dump(state, fh, indent=2)
+    except Exception as e:  # noqa: BLE001
+        print(f"dossier_repair: cannot write {sp}: {e}", file=sys.stderr)
+        return 2
+    s = res.summary()
+    print(f"dossier_repair: {s['fixes_applied']} fix(es) over {s['iterations']} pass(es); "
+          f"{s['remaining']} gap(s) need input ({s['blocking']} blocking HIGH) → wrote {sp}",
+          file=sys.stderr)
+    return 0
+
+
 if __name__ == "__main__":
     if len(sys.argv) >= 2 and sys.argv[1] == "--selftest":
         sys.exit(_selftest())
+    elif len(sys.argv) >= 2 and os.path.isdir(sys.argv[1]):
+        # chain use: repair <run_dir>/state.json in place
+        sys.exit(_cli_writeback(sys.argv[1]))
     else:
-        print("usage: dossier_repair.py --selftest", file=sys.stderr)
+        print("usage: dossier_repair.py --selftest | <run_dir>  (repairs run_dir/state.json in place)",
+              file=sys.stderr)
         print("  (programmatic use: repair_dossier(state, rows, run_dir) -> RepairResult)",
               file=sys.stderr)
         sys.exit(2)

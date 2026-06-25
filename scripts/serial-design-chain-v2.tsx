@@ -8568,6 +8568,31 @@ async function main() {
     logAction({ step: 'requirements_bom', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // ── SELF-CORRECTING REPAIR (Tristan 2026-06-25: "the engine should look at things, see
+  //    that it doesn't work, and FIX it — find all the problems and fix them internally,
+  //    without producing a report until it's fixed"). Run the deterministic audit→FIX→
+  //    re-audit loop over the settled state.json IN PLACE, AFTER the bill is assembled and
+  //    BEFORE the Excel deliverable, so the dossier builds from the REPAIRED bill: untagged
+  //    principals tagged, by-function duplicates merged, £0-sibling lines priced. Only
+  //    genuine human-input / source-rule gaps survive (state._dossierRepair.needs_input —
+  //    never a silent auto-fixable defect). Idempotent (the loop converges) + non-fatal (a
+  //    failure leaves state untouched; build-excel-export also repairs in-build as a backstop).
+  try {
+    execFileSync('python3', [resolve(__dirname, 'lib', 'dossier_repair.py'), outDir],
+      { stdio: 'inherit', timeout: 120_000 })
+    try {
+      const rState = JSON.parse(readFileSync(resolve(outDir, 'state.json'), 'utf8'))
+      const rep = rState?._dossierRepair
+      if (rep) {
+        console.error(`[chain] self-repair: ${rep.fixes_applied} fix(es) over ${rep.iterations} pass(es); ${rep.remaining} gap(s) need input (${rep.blocking} blocking HIGH)`)
+        logAction({ step: 'dossier_repair', ok: true, fixes: rep.fixes_applied, remaining: rep.remaining, blocking: rep.blocking })
+      }
+    } catch { /* summary read best-effort */ }
+  } catch (rerr) {
+    console.error(`[chain] dossier-repair failed (non-fatal): ${(rerr as Error).message.slice(0, 140)}`)
+    logAction({ step: 'dossier_repair', ok: false, error: String(rerr).slice(0, 160) })
+  }
+
   // ── EXCEL DELIVERABLE (Tristan standing constraint: "the Excel dossier.xlsx is the
   //    review surface; NO PDFs; open the new Excel"). Build dossier.xlsx from the settled
   //    state (BoM reconciled above), copy a timestamped snapshot to ~/Downloads, and OPEN
