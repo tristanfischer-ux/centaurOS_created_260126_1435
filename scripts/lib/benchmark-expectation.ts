@@ -50,8 +50,11 @@ const BENCHMARK_MODEL = process.env.BENCHMARK_MODEL || 'z-ai/glm-5.2'  // most c
 // need the deepest reasoning — a faster model avoids the GLM-5.2 reasoning-token timeout squeeze.
 const DIAGNOSE_MODEL = process.env.DIAGNOSE_MODEL || 'x-ai/grok-4.3'
 // How far the deterministic number may stray from the LLM benchmark before we flag.
-const WARN_FACTOR = Number(process.env.BENCHMARK_WARN_FACTOR || 1.5)     // [1.5,2.5)× → WARN
-const RADICAL_FACTOR = Number(process.env.BENCHMARK_RADICAL_FACTOR || 2.5) // ≥2.5× (or ≤1/2.5) → RADICAL → full check
+// Tristan 2026-06-25: tighten the ACTIONABLE tolerance — a >20% delta on any line/output is a
+// warning the engine has to do something about (route to source rule + fix), not a pass. WARN at
+// 1.2× routes; RADICAL at 2.5× additionally trips the full diagnose + (enforcing) hard block.
+const WARN_FACTOR = Number(process.env.BENCHMARK_WARN_FACTOR || 1.2)     // >20% delta → WARN (actionable → routed)
+const RADICAL_FACTOR = Number(process.env.BENCHMARK_RADICAL_FACTOR || 2.5) // ≥2.5× (or ≤1/2.5) → RADICAL → full check + block
 
 // ── types ───────────────────────────────────────────────────────────────────
 export interface BenchmarkExpectation {
@@ -182,6 +185,87 @@ function classify(ratio: number): Verdict {
 const worstOf = (vs: Verdict[]): Verdict =>
   vs.includes('radical') ? 'radical' : vs.includes('warn') ? 'warn' : 'ok'
 
+// Canonicalise a (value, unit) into a comparable base by UNIT FAMILY, so the net can diff a
+// predicted "5000 kWh" against an engine "2.91 MWh" with no exact unit-string match. Returns the
+// value in the family base (energy→kWh, power→kW, voltage→V, current→A, percent→%, mass→kg) +
+// the family tag; null when the value is not finite.
+export function canonicalMeasure(value: number, unit: string): { v: number; family: string } | null {
+  const v = Number(value)
+  if (!Number.isFinite(v)) return null
+  const u = String(unit || '').toLowerCase().replace(/\s/g, '')
+  if (/^wh$/.test(u)) return { v: v / 1000, family: 'energy' }
+  if (/^kwh$/.test(u)) return { v, family: 'energy' }
+  if (/^mwh$/.test(u)) return { v: v * 1000, family: 'energy' }
+  if (/^gwh$/.test(u)) return { v: v * 1e6, family: 'energy' }
+  if (/^w$/.test(u)) return { v: v / 1000, family: 'power' }
+  if (/^kw$/.test(u)) return { v, family: 'power' }
+  if (/^mw$/.test(u)) return { v: v * 1000, family: 'power' }
+  if (/^gw$/.test(u)) return { v: v * 1e6, family: 'power' }
+  if (/^mv$/.test(u)) return { v: v / 1000, family: 'voltage' }
+  if (/^v$/.test(u)) return { v, family: 'voltage' }
+  if (/^kv$/.test(u)) return { v: v * 1000, family: 'voltage' }
+  if (/^ma$/.test(u)) return { v: v / 1000, family: 'current' }
+  if (/^a$/.test(u)) return { v, family: 'current' }
+  if (/^ka$/.test(u)) return { v: v * 1000, family: 'current' }
+  if (/^%$|^percent$|^pct$/.test(u)) return { v, family: 'percent' }
+  if (/^ratio$|^fraction$/.test(u) || (u === '' && v > 0 && v <= 1)) return { v: v * 100, family: 'percent' }
+  if (/^cycles?$|^count$|^ea$|^units?$/.test(u) || u === '') return { v, family: 'count' }
+  if (/^m2$|^m²$|^sqm$/.test(u)) return { v, family: 'area' }
+  if (/^m3$|^m³$/.test(u)) return { v, family: 'volume' }
+  if (/^kg$/.test(u)) return { v, family: 'mass' }
+  if (/^t$|^tonne$|^tonnes$/.test(u)) return { v: v * 1000, family: 'mass' }
+  return { v, family: u }   // unknown unit — only compares against the SAME raw unit
+}
+
+// Find the engine's actual value for a predicted output metric. (1) exact orchestrator-contract
+// quantity key; else (2) same-unit-FAMILY + best name-token overlap (so 'rated_power_kw' finds
+// 'continuous_power_kw'), de-prioritising peak/max; else (3) keyMetrics.headline_output when its
+// family matches. Returns the canonical value + a raw display string + the source key.
+export function engineValueForMetric(
+  metric: string, wantUnit: string, quantities: Record<string, any>, headlineOutput: any
+): { v: number; raw: string; source: string } | null {
+  const wantFamily = canonicalMeasure(1, wantUnit)?.family
+  const norm = (s: string) => String(s || '').toLowerCase()
+  const stripUnit = (s: string) =>
+    norm(s).replace(/_(kwh|mwh|gwh|wh|kw|mw|gw|w|kv|mv|v|ka|ma|a|percent|pct|cycles?|kg|t|m2|m3)$/g, '')
+  const GENERIC = new Set(['rated', 'system', 'capacity', 'nominal', 'total', 'design', 'continuous', 'output', 'the', 'of', 'per', 'max'])
+  const toks = (s: string) => new Set(stripUnit(s).split(/[_\s]+/).filter(t => t && !GENERIC.has(t)))
+
+  const exact = quantities[metric]
+  if (exact && Number.isFinite(Number(exact.value))) {
+    const c = canonicalMeasure(Number(exact.value), exact.unit || wantUnit)
+    if (c) return { v: c.v, raw: `${exact.value} ${exact.unit || wantUnit}`, source: `contract.${metric}` }
+  }
+
+  const wantToks = toks(metric)
+  let best: { key: string; q: any; score: number } | null = null
+  if (wantToks.size > 0) {
+    for (const [key, q] of Object.entries(quantities)) {
+      if (!q || !Number.isFinite(Number(q.value))) continue
+      const c = canonicalMeasure(Number(q.value), q.unit || '')
+      if (!c || (wantFamily && c.family !== wantFamily)) continue
+      const kt = toks(key)
+      let overlap = 0
+      for (const t of wantToks) if (kt.has(t)) overlap++
+      if (overlap === 0) continue
+      const score = overlap - (/peak|max|surge|inrush/.test(norm(key)) ? 0.5 : 0)
+      if (!best || score > best.score) best = { key, q, score }
+    }
+  }
+  if (best) {
+    const c = canonicalMeasure(Number(best.q.value), best.q.unit || wantUnit)!
+    return { v: c.v, raw: `${best.q.value} ${best.q.unit || wantUnit}`, source: `contract.${best.key}` }
+  }
+
+  if (headlineOutput && Number.isFinite(Number(headlineOutput.value))) {
+    const c = canonicalMeasure(Number(headlineOutput.value), headlineOutput.unit || '')
+    if (c && (!wantFamily || c.family === wantFamily)) {
+      return { v: c.v, raw: `${headlineOutput.value} ${headlineOutput.unit || ''}`, source: 'keyMetrics.headline_output' }
+    }
+  }
+  return null
+}
+
 export function compareToBenchmark(exp: BenchmarkExpectation, state: any): DivergenceReport {
   const findings: DivergenceFinding[] = []
 
@@ -204,24 +288,35 @@ export function compareToBenchmark(exp: BenchmarkExpectation, state: any): Diver
     })
   }
 
-  // 2) OUTPUT — does the design deliver the expected performance?
+  // 2) OUTPUT — does the design deliver EVERY expected performance number?
+  // (2026-06-25, Tristan "is the check actually working?") The old check diffed ONLY
+  // keyMetrics.headline_output and matched it to a prediction by EXACT unit-string — so a BESS
+  // whose headline is "850 MWh/year throughput" matched none of the predicted nameplate-kWh /
+  // power-kW / voltage-V outputs, and the net diffed ZERO of the 6 outputs it predicted (a 5 MWh
+  // brief silently shipped at 2.91 MWh / 1 MW). Now we diff EACH expected_output against the
+  // engine's actual value for THAT metric — keyed to the orchestrator contract quantity by name +
+  // UNIT-FAMILY (kWh↔MWh, kW↔MW, V↔kV, %↔ratio), with headline_output as a fallback.
+  const qAll: Record<string, any> = (state?.orchestratorContract?.quantities) || {}
   const km = state?.keyMetrics || {}
   const ho = km.headline_output || {}
-  const detVal = Number(ho.value)
-  if (Number.isFinite(detVal) && detVal > 0) {
-    const match = (exp.expected_outputs || []).find(o =>
-      (o.unit || '').toLowerCase().replace(/\s/g, '') === String(ho.unit || '').toLowerCase().replace(/\s/g, ''))
-    if (match && match.value > 0) {
-      const ratio = detVal / match.value
-      findings.push({
-        dimension: `output (${ho.unit || ''})`,
-        expected: `${match.value} ${match.unit}`,
-        deterministic: `${detVal} ${ho.unit || ''}`,
-        ratio: Number(ratio.toFixed(2)),
-        verdict: classify(ratio),
-        note: classify(ratio) === 'ok' ? 'output matches expectation' : 'design output diverges from the benchmark',
-      })
-    }
+  for (const o of (exp.expected_outputs || [])) {
+    if (!o || !(o.value > 0)) continue
+    const want = canonicalMeasure(o.value, o.unit)
+    if (!want) continue                       // family we can't canonicalise → skip (no false signal)
+    const got = engineValueForMetric(o.metric, o.unit, qAll, ho)
+    if (!got) continue                        // engine has no comparable quantity → skip
+    const ratio = got.v / want.v
+    const verdict = classify(ratio)
+    findings.push({
+      dimension: `output — ${o.metric}`,
+      expected: `${o.value} ${o.unit}`,
+      deterministic: `${got.raw} (${got.source})`,
+      ratio: Number(ratio.toFixed(2)),
+      verdict,
+      note: verdict === 'ok'
+        ? 'design meets the expected output'
+        : `design ${o.metric} is ${ratio < 1 ? 'BELOW' : 'ABOVE'} the brief/benchmark expectation by ${(ratio >= 1 ? ratio : 1 / ratio).toFixed(2)}×`,
+    })
   }
 
   // 3) BoM MIX — does a category dominate the bill far more than a real one of these would?
@@ -508,9 +603,24 @@ function _selftest() {
   const sizeF = r4.findings.find(f => f.dimension.startsWith('sizing — single'))
   if (!sizeF || sizeF.verdict !== 'radical') { console.log('FAIL: a 350 m³ component in an 86 m³ enclosure should be RADICAL sizing'); bad++ }
   // (component-completeness is LLM-judged in diagnoseFaults — not a deterministic finding — so no pure case here)
-  // classify boundaries
-  if (classify(2.6) !== 'radical' || classify(1.8) !== 'warn' || classify(1.2) !== 'ok' || classify(1 / 2.6) !== 'radical') {
+  // classify boundaries (WARN tightened to 1.2× = a 20% delta is actionable, Tristan 2026-06-25)
+  if (classify(2.6) !== 'radical' || classify(1.8) !== 'warn' || classify(1.3) !== 'warn' ||
+      classify(1.1) !== 'ok' || classify(1 / 1.25) !== 'warn' || classify(1 / 2.6) !== 'radical') {
     console.log('FAIL: classify boundaries'); bad++
+  }
+  // OUTPUT DIFF (Tristan 2026-06-25 "is the check actually working?") — the net must diff EVERY
+  // predicted output against the contract by NAME + UNIT-FAMILY, not one headline by unit-string.
+  if (canonicalMeasure(5, 'MWh')?.v !== 5000 || canonicalMeasure(5000, 'kWh')?.v !== 5000) { console.log('FAIL: energy unit-family canonicalise'); bad++ }
+  if (canonicalMeasure(2.5, 'MW')?.v !== 2500 || canonicalMeasure(0.86, 'ratio')?.v !== 86) { console.log('FAIL: power/ratio canonicalise'); bad++ }
+  {
+    const qs = { nameplate_capacity_kwh: { value: 2912, unit: 'kWh' }, continuous_power_kw: { value: 1000, unit: 'kW' }, peak_power_kw: { value: 1250, unit: 'kW' } }
+    // a 5,000 kWh / 2.5 MW brief vs a 2,912 kWh / 1 MW design — both must be FOUND and diverge
+    const nm = engineValueForMetric('nameplate_capacity_kwh', 'kWh', qs as any, {})
+    const pw = engineValueForMetric('rated_power_kw', 'kW', qs as any, {})   // finds continuous_power_kw, not peak
+    if (!nm || nm.v !== 2912) { console.log(`FAIL: output match nameplate (got ${JSON.stringify(nm)})`); bad++ }
+    if (!pw || pw.v !== 1000 || pw.source !== 'contract.continuous_power_kw') { console.log(`FAIL: output match power → continuous (got ${JSON.stringify(pw)})`); bad++ }
+    const rep = compareToBenchmark({ expected_cost: { low_gbp: 0, expected_gbp: 0, high_gbp: 0 } as any, expected_outputs: [{ metric: 'rated_power_kw', value: 2500, unit: 'kW' }], expected_bom: [], required_components: [], expected_sizing: {} as any, reasoning: '', model: 't' } as any, { orchestratorContract: { quantities: qs } })
+    if (rep.worst !== 'radical') { console.log(`FAIL: 1 MW vs 2.5 MW must be RADICAL (got ${rep.worst})`); bad++ }
   }
   // SOURCE-RULE ROUTING — each basis maps to the exact source RULE (fix the source, never the symptom)
   if (sourceRuleForBasis('rating-based: 150 kW × £700/kW')?.rule !== 'rating-based-pricing') { console.log('FAIL: rating basis → rating-based-pricing'); bad++ }
