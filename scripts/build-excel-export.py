@@ -480,9 +480,28 @@ def cost_breakdown_by_category(run_dir: str) -> List[tuple]:
 # "wow". This is a pitch-deck-style cover (NOT a grid): hero render + headline cards (what · output ·
 # cost · status) + the capex breakdown + "what's inside" + the concierge ladder (your next steps).
 # The detailed review surfaces (Overview, Checks, Ledger) follow. UNIVERSAL — no per-class content.
+# proper display names for known class slugs (an acronym like "bess" reads badly as "Bess").
+_CLASS_DISPLAY = {
+    "bess": "Battery Energy Storage System",
+    "bess-utility-scale": "Battery Energy Storage System",
+    "energy_storage": "Battery Energy Storage System",
+    "haps": "High-Altitude Pseudo-Satellite",
+    "ras": "Recirculating Aquaculture System",
+    "aquaculture_ras": "Recirculating Aquaculture System",
+    "auv": "Autonomous Underwater Vehicle",
+    "co2_mineralisation": "CO₂ Mineralisation Plant",
+}
+
+
 def _humanize_class(c: Any) -> str:
-    s = str(c or "this system").replace("_", " ").strip()
+    raw = str(c or "").strip().lower()
+    if raw in _CLASS_DISPLAY:
+        return _CLASS_DISPLAY[raw]
+    s = str(c or "this system").replace("_", " ").replace("-", " ").strip()
     s = re.sub(r"\bco2\b", "CO₂", s, flags=re.I)
+    # uppercase common engineering acronyms so they don't read as Title-case words
+    s = re.sub(r"\b(bess|haps|ras|auv|pcs|hvac|saf|uv|dc|ac|lfp|nmc)\b",
+               lambda m: m.group(1).upper(), s, flags=re.I)
     return (s[:1].upper() + s[1:]) if s else "This system"
 
 
@@ -498,6 +517,54 @@ def _headline_build_cost(state: dict) -> tuple:
     if isinstance(cr, (int, float)) and cr > 0:
         return "Materials cost (bill of materials)", float(cr)
     return None, None
+
+
+def _exec_validation_verdict(state: dict) -> tuple:
+    """(short_status, long_sentence) from the DETERMINISTIC validation signals — the benchmark net
+    (independent top-down market check) + the cost-sanity gate. Universal; no LLM. Returns
+    ('Engineering-validated' | 'N checks flagged' | '', sentence)."""
+    bd = state.get("benchmarkDivergence") or {}
+    worst = bd.get("worst")
+    nflag = sum(1 for f in (bd.get("findings") or []) if f.get("verdict") and f.get("verdict") != "ok")
+    if worst == "ok":
+        return ("Engineering-validated",
+                "An independent top-down market benchmark agrees with the engine on every checked "
+                "dimension (cost, output, sizing).")
+    if worst in ("warn", "radical"):
+        return (f"{nflag} check{'s' if nflag != 1 else ''} flagged",
+                f"An independent market benchmark flags {nflag} dimension"
+                f"{'s' if nflag != 1 else ''} where the design diverges from the brief/market "
+                f"expectation — see the ⚠ Checks tab for the routed detail.")
+    return ("", "")
+
+
+def _exec_synopsis(state: dict) -> str:
+    """A deterministic 1-paragraph synopsis assembled ENTIRELY from state — no LLM prose. Every
+    clause is a state value (class, headline output, build cost, benchmark verdict), so the prose
+    can never drift from the numbers in the tabs. Universal across product classes."""
+    km = state.get("keyMetrics") or {}
+    pc = ((state.get("orchestratorContract") or {}).get("product_class")
+          or (state.get("parsedBrief") or {}).get("product_class"))
+    proj = _humanize_class(pc)
+    parts = []
+    ho = km.get("headline_output") or {}
+    if ho.get("value") not in (None, ""):
+        out = f"{ho.get('value')} {ho.get('unit', '')}".strip()
+        lbl = str(ho.get("label", "")).strip()
+        parts.append(f"This dossier specifies a {proj} — {out}"
+                     + (f" ({lbl.lower()})" if lbl else "") + ".")
+    else:
+        parts.append(f"This dossier specifies a {proj}.")
+    clabel, cgbp = _headline_build_cost(state)
+    if cgbp:
+        parts.append(f"The engine values the build at £{round(cgbp):,} ({clabel.lower()}).")
+    _, vsent = _exec_validation_verdict(state)
+    if vsent:
+        parts.append(vsent)
+    parts.append("Every figure in this workbook — the bill of materials, the costs, and the "
+                 "specifications below — is derived deterministically from the engineering "
+                 "contract, computed rather than estimated by hand.")
+    return " ".join(parts)
 
 
 def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
@@ -564,13 +631,38 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
         card(clabel, f"£{round(cgbp):,}")
     sc_obj = state.get("qualityScorecard") or load_json(os.path.join(run_dir, "quality-scorecard.json")) or {}
     floor = sc_obj.get("floor")
+    vstatus, _vsent = _exec_validation_verdict(state)
     if isinstance(floor, (int, float)):
         card("Status",
              "Engineering-validated" if floor >= 8 else f"Quality floor {floor}/10",
              "Scored against deterministic engineering gates." if floor >= 8 else "")
+    elif vstatus:
+        card("Validation", vstatus, "Independent top-down market benchmark vs the engine.")
 
     # clear the hero image before full-width sections
     row = max(row, nxt + 16) + 1
+
+    # ---- deterministic synopsis (every clause is a state value — prose cannot drift) ----
+    syn = _exec_synopsis(state)
+    if syn:
+        sc = ws.cell(row, 1, syn)
+        sc.font = Font(name="Calibri", size=11, color="333333")
+        sc.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.merge_cells(start_row=row, start_column=1, end_row=row + 2, end_column=7)
+        ws.row_dimensions[row].height = 56
+        row += 4
+
+    # ---- key specifications & brief compliance (deterministic, brief-driven spec sheet) ----
+    cmp_start = row
+    sub_banner(ws, row, "Key specifications & brief compliance — every target deterministically verified", 7)
+    nr = _render_brief_compliance_section(ws, state, row + 1)
+    if nr:
+        row = nr + 1
+    else:
+        # no brief metrics → drop the empty banner we just wrote
+        for _c in range(1, 8):
+            ws.cell(cmp_start, _c).value = None
+        row = cmp_start
 
     # ---- where the money goes (top categories) ----
     cb = cost_breakdown_by_category(run_dir)
@@ -2417,43 +2509,65 @@ def _unit_family(unit: str) -> Tuple[str, float]:
     return table.get(u, ("?" + u, 1.0))
 
 
+# brief-ECHO quantity suffixes — these carry the REQUESTED target value, not the ACHIEVED design
+# value, so a compliance match against them is a guaranteed false PASS. Excluded from matching.
+_ECHO_SUFFIXES = ("_requested", "_request", "_target", "_demand", "_brief", "_spec")
+_QTY_UNIT_SUFFIX = re.compile(
+    r"_(kwh|mwh|gwh|wh|kw|mw|gw|w|kva|mva|kv|mv|v|ka|ma|a|percent|pct|cycles?|kg|t|m2|m3|c)$")
+_QTY_STOP_TOKENS = {"the", "of", "per", "system", "total", "design", "rated", "nominal"}
+
+
+def _norm_qty_name(s: str) -> str:
+    return _QTY_UNIT_SUFFIX.sub("", str(s or "").lower())
+
+
 def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[str, float, str]]:
-    """Find the contract quantity that fulfils a brief metric, by VALUE + UNIT
-    FAMILY (names differ). Returns (qty_name, achieved_value, qty_unit) or None.
-    Strategy: same family as the brief metric, then prefer the quantity whose
-    canonical value is closest to the brief's canonical target (a faithful
-    'we hit the same number' match), tie-broken by a name-token overlap so e.g.
-    total_tank_volume_m3 (3340) is preferred over rearing_tank_volume_each_m3
-    (334) for the 3,340 m³ target."""
+    """Find the ACHIEVED contract quantity that fulfils a brief metric, by NAME + UNIT FAMILY.
+    (2026-06-25 fix) Match by NAME — NOT by which value is closest to the target. Closeness-to-
+    target is Goodhart: it grabs a brief-ECHO quantity (usable_capacity_kwh_REQUESTED=5000) over
+    the real achieved value (nameplate_capacity_kwh=2912), manufacturing a false PASS in the
+    compliance table. Strategy mirrors the benchmark net's engineValueForMetric: (1) exact/
+    unit-normalised NAME match to the achieved quantity (echoes excluded); (2) same unit-family,
+    best name-token overlap, de-prioritising echoes + peak/max. Returns (name, achieved, unit)."""
     b_val = num(metric.get("value"))
     if b_val is None:
         return None
-    b_fam, b_mul = _unit_family(metric.get("unit", ""))
-    b_canon = b_val * b_mul
-    # name tokens of the brief metric, for the tie-break
-    b_key = (metric.get("key_metric") or metric.get("metric") or "").lower()
-    b_tokens = set(re.findall(r"[a-z]+", b_key))
+    b_fam, _ = _unit_family(metric.get("unit", ""))
+    b_key = (metric.get("key_metric") or metric.get("metric") or metric.get("name") or "").lower().strip()
+    b_norm = _norm_qty_name(b_key)
+    b_tokens = set(t for t in re.findall(r"[a-z]+", b_norm) if t not in _QTY_STOP_TOKENS)
 
-    best = None  # (closeness, -overlap, name, achieved_value, unit)
+    # (1) exact / unit-normalised NAME match — the achieved quantity of the SAME name (no echoes)
+    for qname, qv in quantities.items():
+        if not isinstance(qv, dict) or any(e in qname.lower() for e in _ECHO_SUFFIXES):
+            continue
+        a_val = num(qv.get("value"))
+        if a_val is None:
+            continue
+        a_fam, _ = _unit_family(qv.get("unit", ""))
+        if a_fam != b_fam:
+            continue
+        if qname.lower() == b_key or _norm_qty_name(qname) == b_norm:
+            return qname, a_val, qv.get("unit", "")
+
+    # (2) same-family, best NAME-TOKEN overlap (NOT target-closeness), echoes + peak/max penalised
+    best = None  # (-overlap, penalty, name, value, unit)
     for qname, qv in quantities.items():
         if not isinstance(qv, dict):
             continue
         a_val = num(qv.get("value"))
         if a_val is None:
             continue
-        a_fam, a_mul = _unit_family(qv.get("unit", ""))
+        a_fam, _ = _unit_family(qv.get("unit", ""))
         if a_fam != b_fam:
             continue
-        a_canon = a_val * a_mul
-        # relative closeness to the brief target (0 == exact hit)
-        denom = max(abs(b_canon), 1e-9)
-        closeness = abs(a_canon - b_canon) / denom
-        # only treat as a fulfilment candidate within a sane window (±50% of
-        # target) so an unrelated same-family quantity is never grabbed
-        if closeness > 0.5:
+        ql = qname.lower()
+        overlap = len(b_tokens & set(re.findall(r"[a-z]+", _norm_qty_name(ql))))
+        if overlap == 0:
             continue
-        overlap = len(b_tokens & set(re.findall(r"[a-z]+", qname.lower())))
-        cand = (round(closeness, 6), -overlap, qname, a_val, qv.get("unit", ""))
+        penalty = (2 if any(e in ql for e in _ECHO_SUFFIXES) else 0) + \
+                  (1 if re.search(r"peak|max|surge|inrush", ql) else 0)
+        cand = (-overlap, penalty, qname, a_val, qv.get("unit", ""))
         if best is None or cand < best:
             best = cand
     if best is None:
@@ -2516,15 +2630,20 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
         ac.fill = FILL_RESULT
         ac.border = BORDER
 
-        # Direction of the PASS test, inferred from the metric category/name:
-        #  - efficiency ratios (FCR) & cycle-time: lower-is-better -> achieved <= target
-        #  - everything else (scale, density, throughput): meet-or-exceed -> >= target
+        # Direction of the PASS test (2026-06-25 fix): HIGHER-is-better is the default (scale,
+        # power, capacity, ENERGY efficiency %, cycle LIFE). LOWER-is-better ONLY for genuine
+        # minimise targets — a feed-conversion ratio, a time/duration to complete, a cost-per-unit,
+        # or a cycle TIME (NOT cycle life). The old `category=='efficiency'` wrongly made round-trip
+        # efficiency lower-better (98.5% vs 88% → false FAIL), and `'cycle' in key` wrongly caught
+        # cycle_life (more cycles is better → false direction).
+        kl = key.lower()
         lower_better = (
-            category == "efficiency"
-            or "fcr" in key.lower()
-            or "conversion_ratio" in key.lower()
-            or "cycle" in key.lower()
-            or "_days" in key.lower()
+            "fcr" in kl
+            or "feed_conversion" in kl
+            or "conversion_ratio" in kl
+            or "_days" in kl or "duration" in kl or "lead_time" in kl
+            or "lcoe" in kl or "cost_per" in kl
+            or ("cycle" in kl and bool(re.search(r"\btime\b|hour|minute|second|_s\b", kl)))
         )
         # tolerance band: ±2% of target (display rounding + sizing granularity)
         tol = abs(tgt) * 0.02 if tgt else 0.0
