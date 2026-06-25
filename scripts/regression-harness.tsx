@@ -3775,6 +3775,78 @@ function checkBessTransformerSizingInvariant(): Assertion[] {
   return out
 }
 
+// ── BESS DC-bus-voltage-follows-brief invariant (2026-06-25) ──────────────────
+// Guards the source-rule fix: the DC bus voltage MUST be READ FROM THE BRIEF, not
+// hardcoded at 800 V. Prior bug — the contract pinned `const dcBusVoltage = 800`,
+// so a brief stating "Direct-current bus voltage: approximately 1,500 V nominal"
+// shipped 800 V → a brief-compliance FAIL (target 1500 vs achieved 800) AND a
+// physics current-overload (2.5 MW / 800 V = 3125 A exceeds the busbar/contactor
+// ratings; at 1500 V it is 1667 A). The voltage change re-architects the cell
+// string (series cells ↑, parallel strings/racks ↓) but MUST preserve the
+// nameplate energy. Rules: (a) dc_bus_voltage_v == the brief's stated value;
+// (b) series_cells_per_string == round(brief_v / 3.2); (c) string/rack count is a
+// positive INTEGER; (d) nameplate_capacity_kwh is preserved within ~2% across the
+// voltage change (800 V vs 1500 V both ≈ 5.4 MWh). iter-N catches iter-(N+1).
+function checkBessDcBusFollowsBriefInvariant(): Assertion[] {
+  const out: Assertion[] = []
+  const CELL_V = 3.2
+  function build(dcBriefV: number | null) {
+    const metrics: any[] = [{ key_metric: 'rated_power', value: 2500, unit: 'kW' }]
+    if (dcBriefV != null) metrics.push({ key_metric: 'dc_bus_voltage_v', value: dcBriefV, unit: 'V' })
+    const brief: any = {
+      product_description: `Containerised 20-ft LFP BESS, 5 MWh nameplate, 2.5 MW continuous discharge.`,
+      constraints: {
+        target_performance: { value: 4500, unit: 'kWh', metrics },
+        max_mass_kg: { value: 44000 },
+        max_dimensions_mm: { l: 6060, w: 2440, d: 2440 },
+      },
+    }
+    const c: any = buildContract('bess', brief)
+    const Q = (k: string) => Number(c?.quantities?.[k]?.value)
+    return {
+      dc: Q('dc_bus_voltage_v'),
+      series: Q('series_cells_per_string'),
+      strings: Q('parallel_strings_total'),
+      racks: Q('rack_count'),
+      nameplate: Q('nameplate_capacity_kwh'),
+      busA: Q('bus_continuous_current_a'),
+    }
+  }
+  const failures: string[] = []
+  try {
+    const dflt = build(null)        // brief silent → default 800 V (legacy behaviour preserved)
+    const stated = build(1500)      // brief states 1500 V → must follow
+    // (a) dc_bus_voltage_v follows the brief's stated value
+    if (dflt.dc !== 800) failures.push(`brief-silent dc_bus_voltage_v=${dflt.dc}, expected default 800`)
+    if (stated.dc !== 1500) failures.push(`brief-states-1500 dc_bus_voltage_v=${stated.dc}, expected 1500 (still hardcoded?)`)
+    // (b) series cells re-derive from the stated voltage
+    const expSeries = Math.round(1500 / CELL_V)  // 469
+    if (stated.series !== expSeries) failures.push(`series_cells_per_string=${stated.series}, expected round(1500/3.2)=${expSeries}`)
+    // (c) string/rack count is a positive integer (the string topology must stay coherent)
+    for (const [k, v] of [['strings', stated.strings], ['racks', stated.racks]] as const) {
+      if (!(v > 0) || !Number.isInteger(v)) failures.push(`${k}=${v} is not a positive integer at 1500 V`)
+    }
+    // (d) nameplate energy PRESERVED across the voltage change (within ~2%)
+    if (!(dflt.nameplate > 0) || !(stated.nameplate > 0)) {
+      failures.push(`nameplate missing (silent ${dflt.nameplate}, stated ${stated.nameplate})`)
+    } else {
+      const drift = Math.abs(stated.nameplate - dflt.nameplate) / dflt.nameplate
+      if (drift > 0.02) failures.push(`nameplate shrank ${dflt.nameplate.toFixed(0)}→${stated.nameplate.toFixed(0)} kWh (${(drift * 100).toFixed(1)}% > 2%) — voltage change must NOT shrink the battery`)
+    }
+    // (e) the current-overload resolves: at 1500 V the bus current falls to ~1667 A
+    if (!(stated.busA < dflt.busA)) failures.push(`bus_continuous_current_a did not fall with higher voltage (silent ${dflt.busA} A vs stated ${stated.busA} A)`)
+  } catch (err) {
+    failures.push(`buildContract('bess', …) threw: ${String(err).slice(0, 140)}`)
+  }
+  out.push(assertEq(
+    'BESS.dc_bus_follows_brief',
+    'BESS dc_bus_voltage_v is READ FROM THE BRIEF (not hardcoded 800): a brief stating 1500 V gets 1500 V with series cells = round(1500/3.2)=469, an integer string/rack count, the bus current falling to ~1667 A, and the nameplate energy PRESERVED within 2% across the voltage change',
+    failures.length, (n) => n === 0,
+    () => `BESS dc-bus-follows-brief wrong: ${failures.join(' ; ')}. Check the dcBusVoltage reader in registerArchetype('bess', …) in scripts/lib/engineering-contract.ts (read target_performance.metrics / desc, default 800 only when silent; the rack/string cascade must preserve nameplate).`,
+  ))
+  return out
+}
+
 // ── Render worked-calc de-dup + Executive-Summary prose invariants (2026-06-05) ─
 //
 // Guards the two render-side fixes made after the co2-mineralisation-2sink-v6
@@ -10575,6 +10647,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // memoised (builds the registered contract + runs the emitter once per run).
   for (const a of checkEFuelSynthesisInvariants()) assertions.push(a)
   for (const a of checkBessTransformerSizingInvariant()) assertions.push(a)
+  for (const a of checkBessDcBusFollowsBriefInvariant()) assertions.push(a)
 
   // Self-contained sub-module density-splitter (bin-pack rewrite) invariants —
   // load the CO₂ v12 fixture themselves + a synthetic ac/dc design; memoised so

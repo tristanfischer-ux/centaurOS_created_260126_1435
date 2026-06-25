@@ -793,6 +793,50 @@ def _price_floor_for(name: str, md=None):
     return None
 
 
+# ── ZERO-PRICE COMMODITY FLOOR (2026-06-25) ──
+# A £0 unit price is NEVER correct: every part costs SOMETHING. An IDENTIFIED / principal
+# line can still finalise at £0 when the catalogue MPN missed, the DB-spec resolver missed,
+# and no list price was stamped — real commodity parts the parts-DB had no price for
+# (Klauke 16208 cable lugs, Vishay MKP1848C capacitor, Schaffner FN6840 line filter,
+# Trelleborg gasket, Brady 121085 labels). This is the FINAL guard: no priced line may emit
+# unit_price_gbp <= 0. The floor is a small, CONSERVATIVE minimum derived from the principal
+# NOUN class (via `_principal_noun`) — universal, noun-keyed, NOT a per-MPN table. The goal
+# is "no £0" with an HONEST floored-not-sourced basis, never a precise (or inflated) guess —
+# precise pricing is the DB-ingest track. ORDER: most specific noun first; a generic £0
+# commodity falls back to the conservative catch-all.
+_COMMODITY_NOUN_FLOORS = [
+    # label / marker / nameplate / tag — die-cut adhesive, pennies-to-£1 each
+    ({"label", "labels", "marker", "markers", "nameplate", "nameplates", "tag", "tags",
+      "sticker", "stickers", "placard"}, 1.0),
+    # cable lug / ferrule / terminal / crimp / connector pin — a stamped contact, ~£2
+    ({"lug", "lugs", "ferrule", "ferrules", "terminal", "terminals", "crimp", "crimps",
+      "ferule", "spade", "bootlace"}, 2.0),
+    # gasket / seal / o-ring / grommet / bung — moulded elastomer, ~£5
+    ({"gasket", "gaskets", "seal", "seals", "oring", "grommet", "grommets", "bung",
+      "bungs", "washer", "washers"}, 5.0),
+    # fuse / mcb / breaker (bare commodity protective device), ~£8
+    ({"fuse", "fuses", "mcb", "mcbs", "breaker", "breakers", "fuselink"}, 8.0),
+    # capacitor / cap, ~£15
+    ({"capacitor", "capacitors", "cap", "caps", "supercapacitor"}, 15.0),
+    # EMC / line / mains filter, ~£60
+    ({"filter", "filters", "choke", "chokes"}, 60.0),
+]
+# generic conservative catch-all for any OTHER £0 commodity — every part costs something
+_COMMODITY_GENERIC_FLOOR_GBP = 3.0
+
+
+def _commodity_zero_floor(name: str):
+    """A small, deterministic, NOUN-keyed minimum price (£) for a line that finalised at
+    £0 — the 'no £0 priced line' guard. Returns (floor_gbp, noun) keyed off the line's
+    principal NOUN; falls back to the conservative generic floor for any other noun.
+    Universal, no per-MPN table. CONSERVATIVE — a small floor, never an inflated guess."""
+    noun = _principal_noun(name)
+    for nouns, floor in _COMMODITY_NOUN_FLOORS:
+        if noun in nouns:
+            return (floor, noun)
+    return (_COMMODITY_GENERIC_FLOOR_GBP, noun)
+
+
 # ── CORPUS-MEDIAN LIFT (RAS £5M audit 2026-06-20) ──
 # A principal that has NO rating/take-off basis (so neither _reconcile_rated_price
 # nor the take-off path corrected it) keeps the engine's flat parametric estimate —
@@ -2115,6 +2159,36 @@ def _selftest() -> int:
         print("  FAIL a pump wrongly given a class-reference budget"); bad += 1
     if _duty_scaled_class_budget("Heat Pump", None) is not None:
         print("  FAIL class-reference budget without a kW wrongly returned"); bad += 1
+    # (h) ZERO-PRICE COMMODITY FLOOR (2026-06-25): a £0 commodity line is floored to a
+    # small NOUN-appropriate minimum (no £0 priced line ever ships) — the real parts the
+    # DB had no price for. Keyed off _principal_noun, universal (no per-MPN table).
+    for _name, _want_floor, _want_noun in [
+            ("Brady 121085 labels", 1.0, "labels"),                 # label/marker → £1
+            ("Klauke 16208 cable lug", 2.0, "lug"),                 # cable lug/ferrule → £2
+            ("Trelleborg gasket", 5.0, "gasket"),                   # gasket/seal → £5
+            ("Eaton MCB", 8.0, "mcb"),                              # fuse/MCB → £8
+            ("Vishay MKP1848C capacitor", 15.0, "capacitor"),       # capacitor → £15
+            ("Schaffner FN6840 line filter", 60.0, "filter"),       # EMC/line filter → £60
+            ("anonymous bracket clip", 3.0, "clip")]:               # any other commodity → £3 catch-all
+        _f, _n = _commodity_zero_floor(_name)
+        if _f != _want_floor or _n != _want_noun:
+            print(f"  FAIL commodity floor {_name!r}: got (£{_f}, {_n!r}) want (£{_want_floor}, {_want_noun!r})"); bad += 1
+    # the floor LIFTS a £0 line and annotates provenance; a normally-priced line is UNCHANGED.
+    def _apply_zero_floor(name, gbp):
+        """mirror the in-assemble guard for a unit test: lift £0 → noun floor, else no-op."""
+        if gbp <= 0:
+            _cf, _cn = _commodity_zero_floor(name)
+            return (_cf, f"x · commodity-floor (no DB price; {_cn!r} → £{_cf:g})")
+        return (gbp, "x")
+    _g0, _b0 = _apply_zero_floor("Klauke 16208 cable lug", 0.0)
+    if not (_g0 == 2.0 and "commodity-floor" in _b0):
+        print(f"  FAIL £0 cable lug not floored to £2 with annotated basis (got £{_g0}, {_b0!r})"); bad += 1
+    _g1, _b1 = _apply_zero_floor("Trelleborg gasket", 42.0)          # already priced → untouched
+    if not (_g1 == 42.0 and "commodity-floor" not in _b1):
+        print(f"  FAIL normally-priced gasket wrongly altered by the £0 floor (got £{_g1})"); bad += 1
+    _g2, _b2 = _apply_zero_floor("Schaffner FN6840 line filter", 0.0)
+    if not (_g2 == 60.0 and "commodity-floor" in _b2):
+        print(f"  FAIL £0 line filter not floored to £60 (got £{_g2})"); bad += 1
 
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
@@ -3259,6 +3333,19 @@ def assemble(out_dir: str):
                                  f"reference £{pre_gbp:,.0f} is "
                                  f"{gbp / pre_gbp:.0f}× below the duty-rated price "
                                  f"(undersized for the duty)")
+                # ── ZERO-PRICE COMMODITY FLOOR (2026-06-25): FINAL guard — no priced
+                # principal/IDENTIFIED line may emit unit £0. A real commodity MPN (Klauke
+                # cable lug, Vishay capacitor, Schaffner line filter, Trelleborg gasket,
+                # Brady labels) that missed the catalogue, the DB-spec resolver and the list
+                # price reaches here at £0 — every part costs SOMETHING. Apply a small,
+                # conservative minimum keyed off the principal NOUN (commodity-floor, no
+                # DB price). Skips a SUB-COMPONENT (its £ lives in the parent's breakdown,
+                # line_gbp=0) and a BUILDING/structural line (handled on its own path). ──
+                if gbp <= 0 and status not in ("SUB-COMPONENT", "BUILDING"):
+                    _cf, _cnoun = _commodity_zero_floor(name)
+                    gbp = _cf
+                    basis = (basis + f" · commodity-floor (no DB price; '{_cnoun}' → £{_cf:g})"
+                             if "commodity-floor" not in basis else basis)
                 row = {"tag": tag, "requirement": requirement, "status": status,
                        "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),
                        "basis": basis}

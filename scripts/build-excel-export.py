@@ -2012,6 +2012,143 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
     return live_count, static_count
 
 
+# ── connection-trace phantom-reference resolver (Tristan 2026-06-25) ─────────
+# A pure transform over the trace adjacency that guarantees the connection trace can
+# only reference parts that EXIST. The ledger authors endpoint labels as derived
+# strings (title-cased / abbreviated / detail-stripped / "[N]"-indexed); this maps each
+# back to the real bill-of-materials part name it was derived from, and DROPS any label
+# that resolves to no real part (a pure routing-graph artefact). UNIVERSAL — keyed on
+# token-subset matching against state.requirementsBom, never a per-class rename table.
+
+# Explicit process-boundary endpoints (a connection's far side IS the plant battery limit,
+# legitimately not a part) — these are KEPT as honest boundary labels, not dropped as
+# phantoms. Universal boundary nouns, independent of class.
+_TRACE_BOUNDARY_RE = re.compile(
+    r"\b(battery limit|boundary|b/?l|to grid|from grid|grid tie|"
+    r"atmosphere|ambient|disposal|effluent|drain|vent to|flare|"
+    r"utility|off-?site|external supply|feedstock supply|product export)\b",
+    re.I)
+
+
+def _trace_tokens(s) -> List[str]:
+    """Lowercase alphanumeric tokens of a part / endpoint name, detail tail (· …) and the
+    ↳ child marker stripped, '[N]' index dropped — the join key for endpoint resolution."""
+    import unicodedata as _ud
+    t = _ud.normalize("NFKC", str(s or "")).replace("↳", " ")
+    for sep in ("·", "•"):
+        if sep in t:
+            t = t.split(sep)[0]
+    return [x for x in re.findall(r"[a-z0-9]+", t.lower())]
+
+
+def _build_real_part_index(state: dict) -> List[Tuple[str, set]]:
+    """(display_name, token_set) for every REAL principal part in the bill of materials —
+    skips connection/pipework lines (the '→' / 'connection' signal) and ↳ sub-components,
+    mirroring tab_parts_master's principal filter. The set the trace must resolve against."""
+    out: List[Tuple[str, set]] = []
+    seen: set = set()
+    for b in (state.get("requirementsBom") or []):
+        if not isinstance(b, dict):
+            continue
+        req = str(b.get("requirement") or "")
+        if "→" in req or re.search(r"\bconnection\b", req, re.I):
+            continue
+        if req.strip().startswith("↳"):
+            continue
+        nm = b.get("name_human") or req
+        ts = set(_trace_tokens(nm))
+        if not ts:
+            continue
+        disp = _clean_name(nm) or str(nm).strip()
+        key = (disp.lower(), frozenset(ts))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((disp, ts))
+    return out
+
+
+def _resolve_endpoint_name(ep: str, real_index: List[Tuple[str, set]]) -> Optional[str]:
+    """Resolve a derived endpoint label to the REAL part name it came from, or None when it
+    matches no real part. Rule (universal): the endpoint's tokens must be a SUBSET of a real
+    part's tokens, where a short endpoint token may match a real token by PREFIX so the
+    engine's abbreviations resolve ('bm'⊂'bms', 'pc'⊂'pcs', 'step up transformer'⊂'step-up
+    transformer'). Among candidates the SHORTEST real name wins (the tightest match). A pure
+    routing artefact ('Heat Rejection', '(Busway)', 'Rack Block', 'Rack[0]') subsets nothing
+    → None (the caller drops it)."""
+    ets = set(_trace_tokens(ep))
+    if not ets or not any(len(t) >= 2 for t in ets):
+        return None
+    best: Optional[str] = None
+    best_len = 10 ** 9
+    for disp, rt in real_index:
+        ok = True
+        for et in ets:
+            if et in rt:
+                continue
+            if len(et) >= 2 and any(rtok.startswith(et) for rtok in rt):
+                continue
+            ok = False
+            break
+        if ok and len(rt) < best_len:
+            best, best_len = disp, len(rt)
+    return best
+
+
+def _resolve_trace_endpoints(adj: dict, state: dict) -> dict:
+    """Rewrite the trace adjacency so EVERY node + every input/output endpoint references a
+    real bill-of-materials part (or an explicit process boundary): derived labels are mapped
+    to the real part name, phantoms are dropped along with the edges that referenced them.
+    Nodes whose own name is a phantom are removed entirely; resolved nodes are merged when two
+    derived labels collapse onto the same real part. Pure transform — returns a fresh dict."""
+    real_index = _build_real_part_index(state)
+
+    def _canon(name: str) -> Optional[str]:
+        s = str(name or "").strip()
+        if not s:
+            return None
+        r = _resolve_endpoint_name(s, real_index)
+        if r:
+            return r
+        if _TRACE_BOUNDARY_RE.search(s):
+            return s  # honest boundary, kept as-is
+        return None  # phantom — drop
+
+    out: Dict[str, Dict[str, list]] = {}
+    for node, a in (adj or {}).items():
+        cn = _canon(node)
+        if not cn:
+            continue  # node itself is a phantom — drop it and its edges
+        slot = out.setdefault(cn, {"inputs": [], "outputs": []})
+        a = a or {}
+        for i in (a.get("inputs") or []):
+            src = _canon(i.get("from"))
+            if src:
+                slot["inputs"].append({"from": src, "service": i.get("service", "")})
+        for o in (a.get("outputs") or []):
+            dst = _canon(o.get("to"))
+            if dst:
+                slot["outputs"].append({"to": dst, "service": o.get("service", "")})
+    # de-dup merged inputs/outputs (two derived labels collapsing onto one real part can
+    # double an identical edge)
+    for slot in out.values():
+        seen_i, di = set(), []
+        for i in slot["inputs"]:
+            k = (i["from"], i.get("service", ""))
+            if k not in seen_i:
+                seen_i.add(k)
+                di.append(i)
+        slot["inputs"] = di
+        seen_o, do = set(), []
+        for o in slot["outputs"]:
+            k = (o["to"], o.get("service", ""))
+            if k not in seen_o:
+                seen_o.add(k)
+                do.append(o)
+        slot["outputs"] = do
+    return out
+
+
 # ============================================================================
 # TAB 5 — BoM (requirementsBom + coverage_by_drawing + Σ check)
 # ============================================================================
@@ -2054,6 +2191,17 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
                                 for x in (_cc.get("concerns") or [])]},
                "referential_integrity": {}}
     adj = led["adjacency"]
+    # ── PHANTOM-REFERENCE FIX (Tristan 2026-06-25, dossier_audit phantom_reference HIGH):
+    # the ledger / parts-ledger author endpoint labels as abbreviated / title-cased /
+    # detail-stripped / indexed derived strings ("Bm Ctrl", "Pc Inverter 1 Mw …",
+    # "Heat Rejection", "(Busway)", "Rack[0]"). Some derive from a REAL bill-of-materials
+    # part (just re-cased / abbreviated); others are pure routing-graph artefacts that match
+    # NO real part. The connection trace must only ever reference parts that EXIST, so we
+    # resolve every endpoint against the real part-name set: a derived label is rewritten to
+    # the real part name it came from, and a label that resolves to nothing real (and is not
+    # an explicit process boundary) is DROPPED — never shown as a phantom. UNIVERSAL: keyed
+    # purely on token-subset matching against state.requirementsBom, no per-class rename table.
+    adj = _resolve_trace_endpoints(adj, state)
     comp = led.get("completeness") or {}
     ri = led.get("referential_integrity") or {}
     incomplete = {c.get("part"): c.get("missing", []) for c in (comp.get("concerns") or [])}
@@ -3214,8 +3362,15 @@ def _econ_generic_drivers(state: dict, capex: float) -> Dict[str, Any]:
         lf_basis = ("assumed average/peak electrical load factor — supply a class "
                     "duty-cycle to refine")
 
-    # ── labour: from a headcount/FTE signal if present, else an opex-fraction-of-
-    # capex proxy (no 'FTE for a small RAS' hardcode).
+    # ── labour: from a headcount/FTE signal if present, else a SANE fixed default.
+    # (Tristan 2026-06-25: the old 4%-of-capex proxy gave ~£71k/yr for an unmanned battery
+    # container — absurd. Labour is NOT a fraction of installed capex; for an unmanned /
+    # skid / containerised plant with no operating headcount it is a small fixed
+    # maintenance-contract figure — remote monitoring + a few annual service visits — not
+    # a number that scales with how expensive the kit was.) UNIVERSAL: keyed only on the
+    # presence of a headcount signal, never on the class. When no headcount is supplied we
+    # default an unmanned plant to a small ASSUMED fixed annual figure, clearly flagged
+    # 'assumed — supply a real figure'; supply a headcount/FTE to model a manned operation.
     fte = qval(q, "operating_headcount") or qval(q, "fte_count") \
         or qval(q, "operator_count") or qval(q, "staff_count")
     if fte and fte > 0:
@@ -3223,9 +3378,12 @@ def _econ_generic_drivers(state: dict, capex: float) -> Dict[str, Any]:
         labour_basis = (f"from engine · {int(round(fte))} FTE × £65,000 fully-loaded "
                         "(edit the rate or headcount to refine)")
     else:
-        labour = round(cap * 0.04, 0)  # 4% of capex/yr — a generic labour proxy
-        labour_basis = ("assumed — 4% of installed capex/yr as a labour proxy "
-                        "(no headcount signal; supply a class labour model to refine)")
+        # Unmanned / skid plant: a small fixed maintenance-contract default, NOT a % of capex.
+        labour = 25_000.0
+        labour_basis = ("assumed — supply a real figure. No operating headcount signal, so "
+                        "this is defaulted as an UNMANNED / skid plant: ~£25,000/yr for "
+                        "remote monitoring + periodic maintenance visits (NOT a % of capex). "
+                        "Enter your real annual labour cost, or supply an operating headcount.")
 
     # ── other opex: from a consumables signal if present, else opex-fraction-of-capex.
     consum = qval(q, "consumables_cost_gbp_yr") or qval(q, "reagent_cost_gbp_yr") \

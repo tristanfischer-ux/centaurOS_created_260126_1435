@@ -658,10 +658,40 @@ registerArchetype('bess', (brief: any) => {
   const cellAh = 280
   const cellVoltageV = 3.2
   const cellEnergyKwh = (cellAh * cellVoltageV) / 1000  // 0.896 kWh/cell
-  // DC bus 800 V nominal. Integer-clean 1P × N_series at exactly 800 V:
-  // N_series = 800 / 3.2 = 250 cells (IEC 61140 voltage-class boundary).
-  const dcBusVoltage = 800
-  const seriesCellsPerString = Math.round(dcBusVoltage / cellVoltageV)  // 250 → 250 × 3.2 V = 800 V exactly
+  // DC bus voltage — READ FROM THE BRIEF (2026-06-25 fix: was hardcoded 800,
+  // ignoring a brief that states e.g. "Direct-current bus voltage: approximately
+  // 1,500 V nominal" → the dossier shipped 800 V = a brief-compliance FAIL AND a
+  // physics current-overload (2.5 MW / 800 V = 3125 A exceeds the busbar/contactor
+  // ratings; at 1500 V it is 1667 A). Pull the nominal DC bus voltage from
+  // target_performance.metrics (or the product description); default 800 V only
+  // when the brief is silent. The cell-string topology cascades off this value:
+  // series_cells = round(dcBusVoltage / cellVoltageV), and the rack/string count
+  // re-derives to hold nameplate energy fixed (energy = rackCount × cellsPerRack ×
+  // cellEnergy is voltage-independent because cellsPerRack = series_cells), so the
+  // total cell count and nameplate kWh are PRESERVED across a voltage change.
+  const dcBusVoltage = (() => {
+    const mets = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
+    for (const m of mets) {
+      const key = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').toLowerCase()
+      const u = String(m?.unit ?? '').toLowerCase()
+      const v = Number(m?.value)
+      // DC bus voltage keys: dc_bus_voltage_v / dc_bus_voltage / dc_voltage /
+      // bus_voltage. EXCLUDE AC output voltage (ac_*) — that is a different rail.
+      if (!(v > 0)) continue
+      if (!/(^|_)dc(_|$)/.test(key) && !/bus_?voltage/.test(key)) continue
+      if (/\bac\b|ac_/.test(key)) continue
+      if (!/volt|_v$|^v$/.test(key) && u !== 'v' && u !== 'vdc' && u !== '') continue
+      if (u === 'kv') return v * 1000
+      return v  // V (or unitless metric already in volts)
+    }
+    // SECOND: explicit "DC bus voltage … N[,NNN] V" in the product description
+    // (thousands separators allowed: "approximately 1,500 V nominal").
+    const dm = desc.match(/(?:dc[\s-]?bus|direct[\s-]?current\s+bus|dc\s+link)[^.\n]{0,40}?(\d{1,2},\d{3}|\d{3,5})\s*v\b/i)
+    if (dm) return parseInt(dm[1].replace(/,/g, ''), 10)
+    // THIRD: class default — integer-clean 1P × 250S at exactly 800 V.
+    return 800
+  })()
+  const seriesCellsPerString = Math.round(dcBusVoltage / cellVoltageV)  // e.g. 800/3.2 = 250 ; 1500/3.2 ≈ 469
   // BESS L3 physics-critic fix (2026-05-24, issues #1 + #2): the brief's
   // 3.5 MWh usable + 800 V + 28 t + single-container envelope is genuinely
   // over-constrained at 5.3 kg/cell LFP. Solve the integer-feasible config:
@@ -867,14 +897,14 @@ registerArchetype('bess', (brief: any) => {
     // The deterministic emitter reads this as the transformer word's nameplate so
     // the unit can never again be sized at half the rated power.
     transformer_rating_kva: q(transformerRatingKva, 'kVA', 'power', 'rated', 'system', 'calculator', { source_detail: `next standard dry-type rating ≥ continuous_power_kw (${continuousKw} kW) × 1.1 = ${Math.round(transformerRatingMinKva)} kVA min` }),
-    dc_bus_voltage_v: q(dcBusVoltage, 'V', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    dc_bus_voltage_v: q(dcBusVoltage, 'V', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'nominal DC bus voltage from brief target_performance.metrics (dc_bus_voltage_v / dc_voltage / bus_voltage) or product description; default 800 V only when the brief is silent' }),
     bus_continuous_current_a: q(busContinuousA, 'A', 'dimensionless', 'continuous', 'system', 'calculator', { source_detail: 'continuous_kw × 1000 / dc_bus_voltage_v' }),
     bus_peak_current_a: q(busPeakA, 'A', 'dimensionless', 'peak', 'system', 'calculator'),
     // BESS L3 (2026-05-24, issue #2): integer-clean topology — emit the
     // authoritative values so the deterministic emitter consumes them via
     // q(contract, …) shadowing (drawer: q() helper is contract-wins).
     rack_count: q(rackCount, '', 'dimensionless', 'rated', 'rack', 'calculator', { source_detail: `min(${racksTheoretical} theoretical for energy target, ${rackCountMaxByMass} mass-budget cap @ ${briefMassCapKg} kg)` }),
-    cells_per_rack: q(cellsPerRack, '', 'dimensionless', 'rated', 'rack', 'calculator', { source_detail: '1P × 250S = 800 V nominal exactly' }),
+    cells_per_rack: q(cellsPerRack, '', 'dimensionless', 'rated', 'rack', 'calculator', { source_detail: `1P × ${seriesCellsPerString}S = ${stringVoltageNominalV.toFixed(0)} V nominal (series cells = round(dc_bus_voltage_v / cell_voltage_v))` }),
     series_cells_per_string: q(seriesCellsPerString, '', 'dimensionless', 'rated', 'rack', 'calculator', { source_detail: 'dc_bus_voltage_v / cell_voltage_v (IEC 61140 voltage-class)' }),
     parallel_strings_per_rack: q(parallelStringsPerRack, '', 'dimensionless', 'rated', 'rack', 'physics_constant'),
     parallel_strings_total: q(parallelStringsTotal, '', 'dimensionless', 'rated', 'system', 'calculator'),
