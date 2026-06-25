@@ -3857,6 +3857,46 @@ function checkVfScaleFollowsBriefInvariant(): Assertion[] {
   return out
 }
 
+// WATER-SYSTEM ARCHETYPE (Tristan 2026-06-25): a water / fertigation / irrigation PLANT brief must
+// classify as water_treatment (NOT vertical_farm — that built £112M of LED/HVAC/canopy) and build
+// the water subsystems with a sane (~tens of kW, NOT MW) electrical load. Guards the source-rule fix.
+function checkWaterTreatmentArchetypeInvariant(): Assertion[] {
+  const out: Assertion[] = []
+  const failures: string[] = []
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { classifyProduct } = require('../src/lib/pdf-engine-v2/product-classifier') as { classifyProduct: (s: string) => { productClass: string } }
+    const waterBrief = 'A complete water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility: reverse-osmosis skid, softening, granular-activated-carbon filter, fresh-water and drain-water storage tanks, two A/B nutrient dosing units, and the ebb/flow distribution network with 200 actuated valves. Lighting and climate/HVAC are out of scope.'
+    if (classifyProduct(waterBrief).productClass !== 'water_treatment') failures.push(`a water-plant brief classified as ${classifyProduct(waterBrief).productClass}, expected water_treatment`)
+    // A true leafy-greens vertical-farm brief must NOT over-match to water_treatment.
+    const vfBrief = 'A vertical farm growing leafy greens on multi-tier racks under LED horticultural lighting. Target yield 50 t/yr.'
+    if (classifyProduct(vfBrief).productClass !== 'vertical_farm') failures.push(`a leafy-greens VF brief classified as ${classifyProduct(vfBrief).productClass}, expected vertical_farm (over-match)`)
+
+    const c = buildContract('water_treatment', { product_description: waterBrief, original_text: waterBrief, constraints: {} } as unknown as Parameters<typeof buildContract>[1]) as { product_class?: string; quantities?: Record<string, { value?: number }> }
+    if (!c) { failures.push("buildContract('water_treatment') returned null") } else {
+      const Q = (k: string) => Number(c.quantities?.[k]?.value)
+      for (const slot of ['ro_permeate_capacity_m3_h', 'irrigation_demand_m3_h', 'fresh_water_storage_capacity_m3']) {
+        if (!(Q(slot) > 0)) failures.push(`HARD slot ${slot}=${Q(slot)}, expected >0 (else exit 22)`)
+      }
+      const load = Q('connected_electrical_load_kw')
+      if (!(load > 0 && load < 1000)) failures.push(`connected_electrical_load_kw=${load}, expected a sane tens-of-kW plant (>0, <1000), NOT a megawatt facility`)
+      // The principal water equipment must be present (the universal sizer synthesises off these).
+      for (const k of ['reverse_osmosis_skid_area_m2', 'fresh_water_tank_volume_each_m3', 'fertigation_dosing_pump_throughput_m3_h', 'softener_vessel_volume_each_m3']) {
+        if (!(Q(k) > 0)) failures.push(`principal equipment key ${k}=${Q(k)}, expected >0`)
+      }
+    }
+  } catch (err) {
+    failures.push(`water_treatment archetype threw: ${String(err).slice(0, 140)}`)
+  }
+  out.push(assertEq(
+    'WT.classifies_and_builds_water_system',
+    "a water/fertigation/irrigation PLANT brief classifies as water_treatment (not vertical_farm) and builds the water subsystems (RO/softener/tanks/dosing) with a sane tens-of-kW load (NOT the 124 MW vertical_farm mis-size); a leafy-greens VF brief still routes to vertical_farm",
+    failures.length, (n) => n === 0,
+    () => `water_treatment archetype wrong: ${failures.join(' ; ')}. Check the DECLARED_CLASS_SIGNATURE in product-classifier.ts + registerArchetype('water_treatment', …) in engineering-contract.ts.`,
+  ))
+  return out
+}
+
 function checkBessDcBusFollowsBriefInvariant(): Assertion[] {
   const out: Assertion[] = []
   const CELL_V = 3.2
@@ -10914,6 +10954,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   for (const a of checkBessDcBusFollowsBriefInvariant()) assertions.push(a)
   for (const a of checkToolLineageStampInvariant()) assertions.push(a)
   for (const a of checkVfScaleFollowsBriefInvariant()) assertions.push(a)
+  for (const a of checkWaterTreatmentArchetypeInvariant()) assertions.push(a)
   for (const a of checkBessBusbarLabelAndAmpacityInvariant()) assertions.push(a)
   for (const a of checkBessEnclosureVolumeFollowsBriefInvariant()) assertions.push(a)
 
