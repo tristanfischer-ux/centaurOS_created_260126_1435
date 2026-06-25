@@ -23,6 +23,8 @@ export interface QuantityUpdate {
   source: string         // which artifact drove it
   basis: string          // human-readable reason
   rel_change: number     // |to-from| / max(|from|, eps); 1 when `from` was null
+  from_keys?: string[]   // TRACEABILITY SPINE: the upstream quantity keys this value was
+                         // computed from (lineage.from), so the number is not born sourceless
 }
 
 export interface ConvergenceReport {
@@ -90,6 +92,7 @@ export function computeQuantityUpdates(
       source: 'convergence-report',
       basis: 'as-routed supply demand = plant load + distribution parasitic (pump friction + cable I²R); sizes the incomer/transformer — does NOT replace the brief plant-load metric',
       rel_change: rel(from, converged),
+      from_keys: ['connected_electrical_load_kw', 'total_electrical_demand_kw'],
     })
   }
   // 2. cooling load (converged) — only if the engine already carries the quantity
@@ -134,8 +137,17 @@ export function applyUpdates(quantities: Record<string, any>, updates: QuantityU
   const next: Record<string, any> = { ...(quantities || {}) }
   for (const u of updates) {
     const prev = next[u.key]
-    if (prev != null && typeof prev === 'object') next[u.key] = { ...prev, value: u.to }
-    else next[u.key] = { value: u.to, unit: u.unit, family: 'derived', basis: u.basis, source: 'design-loop' }
+    // TRACEABILITY SPINE: carry the update's REAL source + reason + upstream inputs onto the
+    // written quantity (previously hardcoded source:'design-loop' with no detail/lineage, so
+    // these design-loop quantities were born sourceless). source_detail = the basis prose;
+    // lineage.from = the upstream quantity keys it was computed from (when known).
+    const meta = {
+      source: u.source || 'design-loop',
+      source_detail: u.basis,
+      lineage: { from: (u.from_keys && u.from_keys.length ? u.from_keys : ['brief']), via: u.source || 'design-loop' },
+    }
+    if (prev != null && typeof prev === 'object') next[u.key] = { ...prev, value: u.to, ...meta }
+    else next[u.key] = { value: u.to, unit: u.unit, family: 'derived', basis: u.basis, ...meta }
   }
   return next
 }

@@ -134,11 +134,18 @@ export function resizeFromConvergedDemand(
   const kva = nextStandardKva(sReq)
   const next = { ...q }
   const prev = next.total_supply_demand_kva
-  if (prev != null && typeof prev === 'object') next.total_supply_demand_kva = { ...prev, value: kva }
+  // TRACEABILITY SPINE: this incomer kVA is computed FROM total_supply_demand_kw — record that
+  // lineage + a prose source_detail so it is not born sourceless.
+  const meta = {
+    source: 'design-loop',
+    source_detail: `incomer S=P/pf×(1+headroom) from total_supply_demand_kw=${kw} kW (pf ${pf}, ${Math.round(headroom * 100)}% headroom → next IEC-60076 standard)`,
+    lineage: { from: ['total_supply_demand_kw'], via: 'design-loop:incomer-sizing' },
+  }
+  if (prev != null && typeof prev === 'object') next.total_supply_demand_kva = { ...prev, value: kva, ...meta }
   else next.total_supply_demand_kva = {
     value: kva, unit: 'kVA', family: 'power',
     basis: `incomer re-sized from the as-routed supply demand ${kw} kW (S=P/pf×(1+headroom), pf ${pf}, ${Math.round(headroom * 100)}% headroom → next IEC-60076 standard); converged-loop E pass`,
-    source: 'design-loop',
+    ...meta,
   }
   return { quantities: next, kva, kw }
 }
