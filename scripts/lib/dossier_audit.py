@@ -1436,6 +1436,56 @@ def check_dominant_bom_line(state, rows, run_dir) -> list:
     return out
 
 
+def check_scope_fidelity(state, rows, run_dir) -> list:
+    """The design must build ONLY what the brief asks for — honour the brief's explicit EXCLUSIONS
+    (Tristan 2026-06-25: a water-system brief was built as a £112M full vertical farm with LED/HVAC
+    the brief excluded). Read the brief's stated exclusions; flag any subsystem present in the bill
+    that the brief excludes. Universal — keyed on the brief's own exclusion words, no per-class table."""
+    out: list = []
+    pb = state.get("parsedBrief") or {}
+    text = " ".join(str(pb.get(k) or "") for k in
+                    ("original_text", "product_description", "mission_statement", "why_now")).lower()
+    if not text:
+        return out
+    # Pull the exclusion clauses: "excluding X, Y and Z", "excludes …", "… out of scope".
+    excl = " ".join(re.findall(r"exclud(?:ing|es?|ed)[:\s]+([^.;]{3,240})", text))
+    m = re.search(r"([^.;]{3,200})\bout[\s-]of[\s-]scope", text)
+    if m:
+        excl += " " + m.group(1)
+    if not excl.strip():
+        return out
+    # (exclusion keywords the brief might state) → (BoM part terms that mean that subsystem)
+    SUBSYS = [
+        ("lighting", ("lighting", "light", "led", "luminaire"),
+         ("led", "luminaire", "grow light", "horticultural", "photoperiod fixture")),
+        ("climate / HVAC", ("climate", "hvac", "ventilation", "heating", "air-condition", "heating-ventilation"),
+         ("hvac", "chiller", "dehumidif", " ahu", "air handling", "condenser", "cooling unit", "heat pump", "refrigerant")),
+        ("building / structure", ("building", "rack framework", "cultivation rack", "structure", "civil"),
+         ("building", "canopy", "growing rack", "cultivation rack", "trolley", "structural floor")),
+    ]
+    for label, excl_kw, bom_kw in SUBSYS:
+        if not any(kw in excl for kw in excl_kw):
+            continue   # the brief did NOT exclude this subsystem
+        hits = []
+        for r in rows:
+            if not isinstance(r, dict) or str(r.get("status")) == "SUB-COMPONENT":
+                continue
+            name = str(r.get("requirement") or r.get("part") or "").lower()
+            if any(bk.strip() in name for bk in bom_kw):
+                hits.append((str(r.get("requirement") or r.get("part") or "?"), _as_num(r.get("line_gbp")) or 0))
+        if hits:
+            cost = sum(h[1] for h in hits)
+            out.append(Finding(
+                tab="Exec Summary", check="scope_fidelity", severity="HIGH",
+                message=(f"the brief EXCLUDES {label}, but the design builds it: {len(hits)} part(s), "
+                         f"£{round(cost):,} (e.g. '{hits[0][0][:40]}'). Build only what the brief asks for."),
+                actual=f"£{round(cost):,} of out-of-scope {label}",
+                expected=f"no {label} parts — the brief excludes them",
+                source_rule="scope-fidelity: drop subsystems the brief excludes; route a process/water-system brief to the process path, not a full-product emitter",
+            ))
+    return out
+
+
 def check_calc_coverage(state, rows, run_dir) -> list:
     """GUARANTEE every code calculation appears in Excel (Tristan 2026-06-25: "ALL the calculations
     in code have to appear in excel"). A number's calculation is SHOWN if its derivation is a real
@@ -1548,6 +1598,7 @@ _CHECKS = [
     check_brief_unverified,         # 17 most brief metrics UNVERIFIED (brief scale didn't propagate)
     check_dominant_bom_line,        # 18 a single BoM line > 50% of the bill (mis-price)
     check_calc_coverage,            # 19 GUARANTEE: every code calculation is shown in Excel (formula)
+    check_scope_fidelity,           # 20 design builds a subsystem the brief EXCLUDES (out of scope)
 ]
 
 
