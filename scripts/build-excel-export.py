@@ -6399,7 +6399,7 @@ def _reorder_tabs(wb: Workbook) -> None:
     a formula. Universal — keys on tab name/prefix, no archetype logic; unknown tabs take a sensible
     middle rank."""
     _RANK = {
-        "Executive Summary": -1, "Contents": 0, "Overview": 1,
+        "Executive Summary": -1, "Contents": 0, "⭐ Scorecard": 0.5, "Overview": 1,
         "Render — Interior layout": 2,                 # HERO render — early (exact name)
         "Brief": 3,
         # Calcs + Quantities are FOUNDATIONAL — they feed the BoM, cost waterfall and financial
@@ -6432,6 +6432,51 @@ def _reorder_tabs(wb: Workbook) -> None:
 
     orig = {id(ws): i for i, ws in enumerate(wb._sheets)}
     wb._sheets.sort(key=lambda ws: (_rank(ws.title), orig[id(ws)]))
+
+
+def tab_scorecard(wb: Workbook, state: dict) -> None:
+    """The ≥8-every-section self-audit, surfaced for the reader (Tristan 2026-06-25: the dossier
+    must SHOW its own quality, not bury it). Renders state.selfAudit — the MIN section score vs the
+    ≥8 floor, the mean, and every section's score + its top defect — so the reader sees exactly
+    where the design is solid and where it isn't. This is the headline quality measure."""
+    sa = state.get("selfAudit") or {}
+    secs = sa.get("sections") or []
+    if not isinstance(secs, list) or not secs:
+        return
+    ws = wb.create_sheet("⭐ Scorecard")
+    set_widths(ws, {"A": 28, "B": 9, "C": 16, "D": 82})
+    title_row(ws, "Quality scorecard — every section against the ≥8 floor", 4,
+              "The engine's own self-audit. The AIM is ≥8 on EVERY section — the floor, not the "
+              "average. A section below 8 is flagged; a BLOCKING defect means the dossier is not "
+              "yet shippable. This is the headline quality measure for the whole dossier.")
+    r = 4
+    mn = sa.get("min_score")
+    mean = sa.get("mean_score")
+    n_ok = sum(1 for s in secs if isinstance(s.get("score"), (int, float)) and s.get("score") >= 8)
+    min_fill = FILL_PASS if (isinstance(mn, (int, float)) and mn >= 8) else FILL_FAIL
+    mc = ws.cell(r, 1, f"MIN section score  {mn}/10")
+    mc.font = FONT_TITLE
+    mc.fill = min_fill
+    ws.cell(r, 2).fill = min_fill
+    ws.cell(r, 3, f"{n_ok}/{len(secs)} sections ≥8").font = FONT_SUB
+    ws.cell(r, 4, f"mean {mean}/10   ·   AIM: every section ≥8").font = FONT_NOTE
+    r += 2
+    header(ws, r, ["Section", "Score", "vs ≥8 floor", "Top defect (why it's below 8)"])
+    r += 1
+    for s in secs:
+        if not isinstance(s, dict):
+            continue
+        score = s.get("score")
+        ok = isinstance(score, (int, float)) and score >= 8
+        ws.cell(r, 1, clean_cell(s.get("name", ""))).font = FONT_SUB
+        scell = ws.cell(r, 2, score)
+        scell.fill = FILL_PASS if ok else (FILL_FAIL if s.get("blocking") else FILL_ADVISORY)
+        ws.cell(r, 3, "PASS ✓" if ok else ("⛔ BLOCKING" if s.get("blocking") else "below 8"))
+        defect = s.get("defects") or [""]
+        dcell = ws.cell(r, 4, clean_cell(defect[0] if defect else ""))
+        dcell.alignment = WRAP_TOP
+        dcell.font = FONT_NOTE
+        r += 1
 
 
 def build(run_dir: str, out_path: str) -> dict:
@@ -6478,6 +6523,8 @@ def build(run_dir: str, out_path: str) -> dict:
     tab_executive_summary(wb, state, run_dir, sha)
     print("  · Overview")
     tab_overview(wb, state, run_dir, sha)
+    print("  · ⭐ Scorecard")
+    tab_scorecard(wb, state)
     print("  · Brief")
     tab_brief(wb, run_dir)
     # Place Brief immediately AFTER Overview, BEFORE ⚠ Checks (created next).
