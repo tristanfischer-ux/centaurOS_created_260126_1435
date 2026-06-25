@@ -10,7 +10,22 @@ scorecard, now a front Excel tab ⭐ Scorecard). Lead with min_score, NEVER sub-
 %, calc-coverage %) — a rising sub-metric on a wrong artifact is a false signal (drawer
 forgeos_gotchas_83ce662c83091aac).
 
-THE PINNED NEXT BUILD = TASK #93: a water_treatment / process-water ARCHETYPE. Fischer Farms is
+STATUS 2026-06-25 (continuation): TASK #93 ARCHETYPE IS BUILT + WORKING — engine classifies the Codema
+brief as water_treatment + builds the RIGHT water subsystems. Scorecard on briefs-loop/fischer_farms_
+codema.md: vertical_farm min1/mean3.8 (£112M) → water_treatment v1 min2/mean6.5 (£2.3M) → v2 min2/mean5.7.
+brief_compliance 9, performance_card 10, connected_load 48 kW (was 124 MW). Commits 8af2a8826 (archetype,
+5 reg points) + 50d51e669 (WT invariant) + iteration fixes. NOW ITERATING TO ≥8 (min stuck at 2). ROUTED
+REMAINING BUGS (scorecard-flagged, fix at SOURCE): (a) RO membrane £61M→£244k (re-keyed _skid_area_m2→
+_skid_volume_m3) but a TOOL still sizes "364 m² membrane" → £244k ~3× high; fix the membrane sub-assembly
+£/m² rule. (b) Building scope-creep £1.1M slab FIXED commit 15e53717d (numeric building_out_of_scope=1 →
+synthesizeBuildingStructure returns 0); PENDING run-confirm. (c) THE CURRENT BLOCKER = BATTERY-TEMPLATE
+CONTAMINATION (non-determinism #86): v2 narrative/physics/BoM pulled in "energy_storage_source / cell
+assemblies / Cell Monitoring Unit / copy-paste battery template" (v1 did NOT) — an LLM emitter/narrative
+stage defaults to BESS language on a water plant; INVESTIGATE which stage injects it. (d) ebb/flow PIPEWORK
++ 200 valves (71% of £1.25M) still not costed (distributed-network follow-on; total currently equipment-only
+≈£2.3-2.4M). RUN with the 6 *_ENFORCING=0 shadow flags (see below) → out/fischer-codema-v3 → read selfAudit.
+
+(superseded — for context) THE PINNED NEXT BUILD = TASK #93: a water_treatment / process-water ARCHETYPE. Fischer Farms is
 mis-classified: product-classifier.ts:133 routes fertigation/vertical-farm/growing-tray →
 vertical_farm → the full-farm emitter (LED/HVAC/canopy = £112M, the wrong artifact). The brief IS
 a water-system spec (Tristan: don't build a vertical farm then prune — that's the symptom; the
