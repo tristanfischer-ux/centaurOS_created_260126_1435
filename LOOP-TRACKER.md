@@ -1,7 +1,56 @@
 # 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
 
 ═══════════════════════════════════════════════════════════════════════════════
-## ▶▶▶ RESUME (2026-06-25 late — SELF-CORRECTING DOSSIER LOOP, mid-build)
+## ▶▶▶ RESUME (2026-06-25 — FISCHER FARMS / WATER-PLANT ARCHETYPE; post-compaction)
+═══════════════════════════════════════════════════════════════════════════════
+THE GOAL: make the engine reproduce the real Codema Fischer Farms deliverable (a WATER /
+fertigation / ebb-flow irrigation PLANT, ~£1.25M / €1,395,019) from the detailed brief
+briefs-loop/fischer_farms_codema.md. THE METRIC = state.selfAudit.min_score (the ≥8-every-section
+scorecard, now a front Excel tab ⭐ Scorecard). Lead with min_score, NEVER sub-metrics (provenance
+%, calc-coverage %) — a rising sub-metric on a wrong artifact is a false signal (drawer
+forgeos_gotchas_83ce662c83091aac).
+
+THE PINNED NEXT BUILD = TASK #93: a water_treatment / process-water ARCHETYPE. Fischer Farms is
+mis-classified: product-classifier.ts:133 routes fertigation/vertical-farm/growing-tray →
+vertical_farm → the full-farm emitter (LED/HVAC/canopy = £112M, the wrong artifact). The brief IS
+a water-system spec (Tristan: don't build a vertical farm then prune — that's the symptom; the
+SOURCE is the missing class). FIX: (a) a classifier rule that routes a "water-handling /
+fertigation / irrigation PLANT or SYSTEM" brief to water_treatment BEFORE the vertical_farm rule
+(match the PRODUCT noun, not the context); (b) a water_treatment contract builder + emitter sizing
+RO (8 m³/h, 75% rec), softener (14 m³/h), GAC (14.5 m³/h), particle filter, 3×40 m³ storage tanks,
+2 A/B fertigation units (45 m³/h, Lowara e-SHE 7.5 kW, EC/pH loop, Iwaki dosing, 8×1000 L stock),
+the ebb/flow network (6000 containers, 200 valves, 45 m³/h·dept, DN125→DN75 mains, DN110/160 drain,
+5000 L pit, 80 m³/h cloth filter), hand watering (25 m³/h), the Hoogendoorn iSii control. Reuse the
+existing process tools (pump/tank/RO/dosing sizing the RAS+generic paths use). GROUND TRUTH (the
+sense-check target, all in the brief): per-subsystem £85k/£31k/£92k/£895k/£24k/£128k → £1.25M;
+D ebb/flow = 71% = installed pipework+200 valves+labour; load = low TENS of kW not MW. VERIFY by a
+fresh chain run → the ⭐ Scorecard min_score + the Sense-check tab (water-vs-water) + landing near £1.25M.
+
+INFRASTRUCTURE BUILT THIS SESSION (all committed, all VISIBLE in the Excel now — these make the
+quality measurable so #93 can be judged):
+- ⭐ Scorecard tab (front, #87) + quality dashboard (#92) — min/mean + per-section + blocking +
+  traceability%/calc-coverage% (commits 0c133929a, f595193ed).
+- Sense-check tab (#88-ish) — the benchmark net (gate 36) LLM top-down expected BoM/cost vs the
+  engine, per-dimension + per-LINE faults flagged; was computed every run + discarded (commit 5e1f7c5ff).
+- Traceability SPINE (provenance.py) — every number records lineage; 17%→95% (executor stamp +
+  design-loop writeback); chain shadow gate + ⚠Audit check + invariant.
+- dossier_audit.py — ~20 deterministic per-tab checks incl. brief_unverified, dominant_bom_line,
+  scope_fidelity (#85 detection), calc_coverage (the "all calcs in Excel" GUARANTEE, 3% today),
+  provenance. dossier_repair.py — audit→FIX→re-audit loop (wired into chain + Excel build).
+- Source fixes (correct but exposed the scope bug): vertical_farm reads brief tray_capacity
+  (1182bec89); parsedBrief.original_text preserved so builders read real specs (8561c09ed).
+
+RUN HOW-TO: shadow gates so it completes for inspection:
+PDF_ENGINE_SELF_AUDIT_ENFORCING=0 COST_SANITY_ENFORCING=0 PHYSICS_CRITIC_ENFORCING=0 \
+TOOL_ARCHETYPE_ENFORCING=0 BENCHMARK_NET_ENFORCING=0 DRAWING_GATES_ENFORCING=0 \
+npx tsx scripts/serial-design-chain-v2.tsx briefs-loop/fischer_farms_codema.md out/fischer-codema-v1
+Read score: python3 -c "import json;s=json.load(open('out/.../state.json'));print(s['selfAudit'])"
+
+TASK LIST = #56-93 (the full punch-list from both BESS + Fischer reviews + resilience + Excel checks
++ #93 the archetype). Work one-by-one, mark complete ONLY when verified in the artifact.
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ (prior) SELF-CORRECTING DOSSIER LOOP
 ═══════════════════════════════════════════════════════════════════════════════
 TRISTAN'S DIRECTIVE (the spine): the engine must FIND every problem AND FIX it INTERNALLY,
 deterministically, and NOT produce a dossier until it's clean. A report that says "failed"
