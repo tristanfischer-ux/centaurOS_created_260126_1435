@@ -6478,6 +6478,49 @@ def tab_scorecard(wb: Workbook, state: dict) -> None:
         dcell.font = FONT_NOTE
         r += 1
 
+    # ---- engine quality metrics (#92): the dossier carries its own confidence rating ----
+    r += 1
+    sub_banner(ws, r, "Engine quality metrics — the dossier's own confidence rating", 4)
+    r += 1
+    try:
+        from provenance import audit_provenance
+        _trace = round((audit_provenance(state).scorecard().get("traceable_fraction") or 0) * 100)
+    except Exception:  # noqa: BLE001
+        _trace = None
+    # calc-coverage: % of DERIVED numbers whose formula is shown (mirrors check_calc_coverage)
+    _q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+    _roots = {"brief", "physics_constant", "constant", "standard", "anchor", "datasheet", "spec"}
+    _wc = (state.get("worked_calculations")
+           or ((state.get("orchestratorContract") or {}).get("worked_calculations")) or {})
+    _worked = set()
+    if isinstance(_wc, dict):
+        for _cs in _wc.values():
+            for _c in (_cs or []):
+                if isinstance(_c, dict):
+                    _f = _c.get("output_field") or _c.get("field") or _c.get("label")
+                    if _f:
+                        _worked.add(str(_f).lower())
+    _shown = _tot = 0
+    for _k, _v in _q.items():
+        if not isinstance(_v, dict) or str(_v.get("source", "")).lower() in _roots:
+            continue
+        _tot += 1
+        _sd = str(_v.get("source_detail") or "")
+        if _k.lower() in _worked or (len(_sd) > 3 and any(o in _sd for o in ("=", "×", "*", "/", "+"))):
+            _shown += 1
+    _cov = round(_shown / _tot * 100) if _tot else 100
+    for _label, _val, _aim in [
+        ("Sections at ≥8 (AIM: all)", f"{n_ok} / {len(secs)}", n_ok == len(secs)),
+        ("Min section score", f"{mn}/10", isinstance(mn, (int, float)) and mn >= 8),
+        ("Traceability — every number → the brief", f"{_trace}%" if _trace is not None else "—", (_trace or 0) >= 100),
+        ("Calc-coverage — every number shows its formula", f"{_cov}%", _cov >= 100),
+    ]:
+        ws.cell(r, 1, _label).font = FONT_SUB
+        vcl = ws.cell(r, 2, _val)
+        vcl.fill = FILL_PASS if _aim else FILL_ADVISORY
+        ws.cell(r, 4, "AIM: 100%" if "—" not in str(_val) else "").font = FONT_NOTE
+        r += 1
+
 
 def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
