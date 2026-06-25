@@ -1493,6 +1493,14 @@ def _reconcile_rated_price(name: str, md: dict, gbp: float, basis: str,
     kw, is_kva = _rating_kw(md, name, requirement)
     if kw is None:
         return (gbp, basis)
+    # DB-FIRST (growing-DB loop, Tristan 2026-06-25): a REAL spec-matched part in forge-truth.db
+    # beats the rating-model estimate — this is how an ingested principal (e.g. the 86 kW chiller
+    # the ingest job wrote) flows back into pricing on the next run, closing the loop. The known
+    # rating gives a reliable spec token even when md/name omit it.
+    _dbp = _db_spec_price(f"{name} {kw:.0f} {'kva' if is_kva else 'kw'}", md)
+    if _dbp and _dbp[0] > 0:
+        return (round(_dbp[0], 2),
+                f"real DB median of {_dbp[1]} comparable {_dbp[3]} '{_dbp[2]}' parts (forge-truth.db)")
     model = _rated_equipment_cost(name, kw, is_kva)
     if not model:
         return (gbp, basis)
