@@ -72,6 +72,7 @@ import deterministic_checks_lib as dcl  # noqa: E402
 # path (scripts/lib is the sibling dir) so the exporter works regardless of the caller's cwd.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 from dossier_audit import audit_dossier  # noqa: E402
+from dossier_repair import repair_dossier  # noqa: E402
 
 # ----------------------------------------------------------------------------
 # STYLES — light theme only (Tristan: light mode, never dark)
@@ -6230,8 +6231,32 @@ def build(run_dir: str, out_path: str) -> dict:
     # the verdict (state["_dossierAudit"]) and the "⚠ Audit" tab can render the findings. `rows` are
     # the assembled BoM (state.requirementsBom); the audit guards every key access itself. ----
     rows = state.get("requirementsBom") or []
-    report = audit_dossier(state, rows, run_dir)
+    # ---- SELF-CORRECTING REPAIR LOOP (Tristan 2026-06-25: "the engine should look at things,
+    # see that it doesn't work, and FIX it — find all the problems and fix them internally,
+    # without producing a report until it's fixed"). Don't merely flag defects: run the
+    # deterministic audit→FIX→re-audit loop so the auto-fixable ones (untagged principals,
+    # duplicate parts, £0 lines a sibling can price) are CORRECTED before any tab is rendered.
+    # Every tab is then built from the REPAIRED bill, and the verdict reflects ONLY the genuine
+    # remaining gaps (human-input / source-rule), surfaced as questions — never a silent
+    # auto-fixable defect. The source-rule fixes (sizing in the contract, the tag rule in the
+    # emitter) are the deeper track; this closes the loop for the deliverable surface. ----
+    _repair = repair_dossier(state, rows, run_dir)
+    state, rows = _repair.state, _repair.rows
+    state["requirementsBom"] = rows                       # downstream tabs read the repaired bill
+    report = audit_dossier(state, rows, run_dir)          # audit of the REPAIRED dossier
     state["_dossierAudit"] = report.scorecard()
+    state["_dossierRepair"] = {
+        **_repair.summary(),
+        "fixes": list(_repair.fixes_applied),
+        "needs_input": [
+            {"check": f.check, "severity": f.severity, "tab": f.tab,
+             "message": f.message, "why": f.source_rule}
+            for f in _repair.remaining()
+        ],
+    }
+    if _repair.fixes_applied:
+        print(f"  · self-repair: {len(_repair.fixes_applied)} fix(es) applied over "
+              f"{_repair.iterations} pass(es); {len(_repair.remaining())} gap(s) need input")
 
     print("  · Executive Summary")
     tab_executive_summary(wb, state, run_dir, sha)
