@@ -490,31 +490,105 @@ def _pack_micro_band(name: str):
     return (_PACK_MICRO_METAL_FLOOR_GBP, _PACK_MICRO_METAL_CEILING_GBP)
 
 
-# BATTERY CELL energy-pricing (2026-06-24, BESS benchmark-net): the LFP cell is the DOMINANT cost
-# of a BESS (~55% of the battery-only system) but rendered at £0 — the catalogue cascade misses
-# the cell MPN and nothing fell back. Price it from its ENERGY: capacity(Ah) × voltage(V) × £/kWh
-# at the CELL level (~£45/kWh = ~55% of the ~£80/kWh battery-system price, 2026 CATL/EVE class).
-# Universal across chemistries (LFP/NMC/NCA/Na-ion), no per-part table.
-CELL_GBP_PER_KWH = 45.0
+# BATTERY CELL pricing — the LFP cell is the DOMINANT BESS cost (rendered £0 on a catalogue miss).
+# DB-FIRST (Tristan 2026-06-25: "your cell price was back-solved as the remaining cost — don't you
+# have better data?"). We DO: forge-truth.db holds real prismatic-cell prices (Hithium/EVE/CALB/
+# Gotion 280 Ah LFP ≈ £51-53). So price the cell from the REAL DB cell market (by chemistry +
+# capacity), and ONLY fall back to a £/kWh estimate when the DB has no comparable cell. The fallback
+# constant is itself GROUNDED in that DB cell data (~£57/kWh = ~£52 for a 0.896 kWh 280 Ah cell),
+# NOT back-solved from the system price. Universal across chemistries (LFP/NMC/NCA/Na-ion).
+CELL_GBP_PER_KWH = 57.0   # DB-grounded: median real 280 Ah LFP cell ≈ £52 / 0.896 kWh ≈ £58/kWh (forge-truth.db)
+_FORGE_TRUTH_DB = os.path.expanduser("~/.forge-truth/forge-truth.db")
+_CELL_DB_CACHE: dict = {}
 _BATTERY_CELL_RE = re.compile(
     r"\b(?:lfp|nmc|nca|lto|li[\s_-]?ion|lithium|sodium[\s_-]?ion|prismatic|pouch|cylindrical)\b"
     r"[\w\s_-]*\bcell\b|\bbattery\b[\w\s_-]*\bcell\b", re.I)
 _NON_BATTERY_CELL_RE = re.compile(r"fuel[\s_-]?cell|load[\s_-]?cell|solar[\s_-]?cell|photovoltaic|pv[\s_-]?cell", re.I)
 
+def _cell_chemistry(nm: str) -> str:
+    for c in ("lfp", "lifepo", "nmc", "nca", "lto", "sodium"):
+        if c in nm.lower():
+            return "lfp" if c == "lifepo" else c
+    return "lfp"   # prismatic-cell default chemistry for grid storage
+
+# UNIVERSAL DB-FIRST price resolver (Tristan 2026-06-25: "use the database to get the number — you
+# have been hand-coding rather than using universal code"). For ANY component, the real price is the
+# median of forge-truth.db parts that share this component's principal NOUN *and* its discriminating
+# SPEC. The spec is REQUIRED: a noun-only match is too coarse (the DB 'heater' class is dominated by
+# kW immersion heaters → £4,270 for a 250 W PTC heater — the very over-price hand-coding was patching).
+# No spec, or <2 comparable rows → None, and the caller falls back to the grounded floor. DB read only
+# (no live API — consistent with the chain-as-DB-consumer principle). One code path, every component.
+_NOUN_STOP = {"the", "and", "for", "with", "type", "grid", "high", "low", "duty", "mini", "new",
+              "dc", "ac", "lv", "mv", "hv", "off", "gas", "rack", "module", "system", "assembly"}
+_DB_PRICE_CACHE: dict = {}
+
+def _principal_noun(name: str) -> str:
+    toks = [t for t in re.findall(r"[a-z]{3,}", (name or "").lower()) if t not in _NOUN_STOP]
+    return toks[-1] if toks else ""
+
+def _spec_like_tokens(name: str, md: dict):
+    """Strongest discriminating spec as DB LIKE-patterns (Ah > kWh > kW > W > A > V). [] when none —
+    a noun-only DB median is not trustworthy, so the caller must fall back to the floor."""
+    md = md or {}
+    blob = f"{name} {md.get('capacity','')} {md.get('rating_primary','')} {md.get('dimension','')}"
+    for unit in ("ah", "kwh", "kw", "w", "a", "v"):
+        m = re.search(rf"(\d[\d,]*(?:\.\d+)?)\s*{unit}\b", blob, re.I)
+        if m:
+            n = re.sub(r"\.0+$", "", m.group(1).replace(",", ""))
+            return (unit, n, [f"%{n}{unit}%", f"%{n} {unit}%"])
+    return None
+
+def _db_spec_price(name: str, md: dict):
+    """UNIVERSAL: (median_gbp, n, noun, spec) of forge-truth.db parts matching this component's
+    principal NOUN + discriminating SPEC (≥2 rows), else None. The one DB-first price path."""
+    if not os.path.exists(_FORGE_TRUTH_DB):
+        return None
+    noun = _principal_noun(name)
+    spec = _spec_like_tokens(name, md)
+    if not noun or not spec:
+        return None
+    unit, nstr, likes = spec
+    key = (noun, unit, nstr)
+    if key in _DB_PRICE_CACHE:
+        return _DB_PRICE_CACHE[key]
+    out = None
+    try:
+        import sqlite3
+        con = sqlite3.connect(f"file:{_FORGE_TRUTH_DB}?mode=ro", uri=True)
+        rows = con.execute(
+            "SELECT unit_price_gbp FROM pretraining_extracted_parts "
+            "WHERE lower(part_name) LIKE ? AND (lower(part_name) LIKE ? OR lower(part_name) LIKE ?) "
+            "AND unit_price_gbp > 0",
+            (f"%{noun}%", likes[0], likes[1])).fetchall()
+        con.close()
+        prices = sorted(float(r[0]) for r in rows if r and r[0])
+        if len(prices) >= 2:
+            out = (prices[len(prices) // 2], len(prices), noun, f"{nstr}{unit}")
+    except Exception:
+        out = None
+    _DB_PRICE_CACHE[key] = out
+    return out
+
 def _battery_cell_price(name: str, md: dict):
-    """A battery CELL priced from its ENERGY (Ah × V × £/kWh_cell), else None. Returns None for a
-    non-battery 'cell' (fuel/load/solar) or a cell with no usable Ah. Voltage from the dimension
-    modifier ('3.2 V'); defaults to 3.2 V (LFP nominal). Universal."""
+    """A battery CELL price → (gbp, basis) or None. DB-first via the UNIVERSAL resolver (real cell
+    market in forge-truth.db), else an energy estimate (Ah × V × £/kWh_cell, the constant itself
+    DB-grounded). None for a non-battery 'cell' (fuel/load/solar) or a cell with no usable Ah."""
     nm = name or ""
     if _NON_BATTERY_CELL_RE.search(nm) or not _BATTERY_CELL_RE.search(nm):
         return None
     cap_ah = _num((md or {}).get("capacity"))
     if not cap_ah or cap_ah <= 0:
         return None
+    db = _db_spec_price(name, md)
+    if db is not None and db[0] > 0:
+        return (round(db[0], 2), f"battery cell · £{db[0]:.2f}/cell — real DB median of {db[1]} {db[3]} cells (forge-truth.db)")
     mv = re.search(r"([\d.]+)\s*v\b", str((md or {}).get("dimension") or ""), re.I)
     volt = float(mv.group(1)) if mv else 3.2
     kwh = cap_ah * volt / 1000.0
-    return round(kwh * CELL_GBP_PER_KWH, 2) if kwh > 0 else None
+    if kwh <= 0:
+        return None
+    est = round(kwh * CELL_GBP_PER_KWH, 2)
+    return (est, f"battery cell · £{est:.2f}/cell from {cap_ah:.0f} Ah × {volt:.1f} V × £{CELL_GBP_PER_KWH:.0f}/kWh (DB-grounded estimate; no exact-capacity cell in DB)")
 
 _MIN_PRICE_FLOORS = [
     (re.compile(r"main[_ ]?breaker|\bmccb\b|moulded[_ ]?case|air[_ ]?circuit", re.I), 180.0),
@@ -1928,16 +2002,23 @@ def _selftest() -> int:
         print(f"  FAIL wire/pad band (got {_pack_micro_band('cell voltage tap wire')})"); bad += 1
     if _pack_micro_band("cell-to-cell busbar") != (2.0, 15.0):
         print(f"  FAIL metal-bar band (got {_pack_micro_band('cell-to-cell busbar')})"); bad += 1
-    # (d3) BATTERY CELL energy-pricing (2026-06-24): an LFP prismatic cell (280 Ah, 3.2 V) is
-    # priced 0.896 kWh × £45/kWh = £40.32 — never £0 (the dominant BESS cost). A non-battery
-    # 'cell' (fuel/load/solar) is NOT energy-priced; a cell with no Ah returns None.
+    # (d3) BATTERY CELL pricing (2026-06-24/25): an LFP prismatic cell (280 Ah, 3.2 V) → (gbp, basis)
+    # in a sane CELL range (£20-90): the real DB median (~£52, forge-truth.db) when present, else the
+    # DB-grounded energy estimate (0.896 kWh × £57/kWh ≈ £51). A non-battery 'cell' (fuel/load/solar)
+    # is NOT priced; a cell with no Ah returns None.
     _cellp = _battery_cell_price("LFP prismatic cell", {"capacity": "280", "dimension": "3.2 V"})
-    if _cellp is None or abs(_cellp - 40.32) > 0.5:
-        print(f"  FAIL LFP cell energy price (got {_cellp}, want ~£40.32)"); bad += 1
+    if not (isinstance(_cellp, tuple) and 20.0 <= _cellp[0] <= 90.0 and "cell" in _cellp[1]):
+        print(f"  FAIL LFP cell price not a sane (gbp, basis) tuple (got {_cellp})"); bad += 1
     if _battery_cell_price("hydrogen fuel cell stack", {"capacity": "280"}) is not None:
-        print("  FAIL non-battery 'fuel cell' wrongly energy-priced"); bad += 1
+        print("  FAIL non-battery 'fuel cell' wrongly priced"); bad += 1
     if _battery_cell_price("LFP prismatic cell", {}) is not None:
         print("  FAIL cell with no Ah should return None"); bad += 1
+    # (d4) UNIVERSAL DB-spec resolver (2026-06-25): noun + discriminating spec required; a noun with
+    # NO numeric spec returns None (don't trust a coarse noun-only DB median — the £4,270 heater bug).
+    if _spec_like_tokens("off-gas activation solenoid", {}) is not None:
+        print("  FAIL spec-less part should yield no spec token (noun-only DB match is unsafe)"); bad += 1
+    if _spec_like_tokens("PTC rack heater", {"rating_primary": "250 W"}) is None:
+        print("  FAIL a 250 W heater should yield a spec token for DB matching"); bad += 1
     if _pack_micro_band("DC busbar 800 V") is not None:
         print("  FAIL distribution busbar wrongly matched the micro band"); bad += 1
     for nm in ("DC busbar 800 V", "distribution busbar", "main switchboard busbar"):
@@ -2947,13 +3028,19 @@ def assemble(out_dir: str):
                     # for a cell is an unreliable LLM estimate (rendered £0 here, £100 there for the
                     # same £40 cell). A real distributor hit (gate-21 below) can still override.
                     _cell = _battery_cell_price(name, md)
-                    if _cell and _cell > 0:
-                        _ah = _num(md.get("capacity"))
-                        gbp, basis = _cell, f"battery cell · £{_cell:.2f}/cell from {_ah:.0f} Ah × cell V × £{CELL_GBP_PER_KWH:.0f}/kWh"
+                    if _cell and _cell[0] > 0:
+                        gbp, basis = _cell[0], _cell[1]
                     elif gbp <= 0:
-                        _lp = _num(md.get("list_price_gbp"))
-                        if _lp and _lp > 0:
-                            gbp, basis = _lp, "catalogue · manufacturer list price"
+                        # UNIVERSAL DB-FIRST (Tristan 2026-06-25): the catalogue (exact MPN) missed,
+                        # so resolve the price from the DB by component NOUN + SPEC before any list
+                        # stamp — the same data path that prices the cell, for every spec'd part.
+                        _dbp = _db_spec_price(name, md)
+                        if _dbp and _dbp[0] > 0:
+                            gbp, basis = round(_dbp[0], 2), f"real DB median of {_dbp[1]} comparable {_dbp[3]} '{_dbp[2]}' parts (forge-truth.db)"
+                        else:
+                            _lp = _num(md.get("list_price_gbp"))
+                            if _lp and _lp > 0:
+                                gbp, basis = _lp, "catalogue · manufacturer list price"
                     # GATE-21 PRICE FEEDBACK (council 2026-06-16): when the cheapest
                     # real distributor price diverges > 5× from the rendered estimate,
                     # prefer the distributor price (TI TMP451 £900→£1.40 class).
