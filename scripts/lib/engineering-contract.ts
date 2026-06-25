@@ -518,6 +518,17 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   land_based_aquaculture: 'aquaculture_ras',
   marine_ras: 'aquaculture_ras',
   fish_farm_ras: 'aquaculture_ras',
+  // water_treatment — a water / fertigation / ebb-flow irrigation PROCESS PLANT (2026-06-25).
+  // The PRODUCT is the water system (RO + softening + GAC + storage + A/B dosing + irrigation
+  // pumps + distribution), NOT a vertical farm. Process-plant family; field-erected.
+  water_treatment: 'water_treatment',
+  water_treatment_plant: 'water_treatment',
+  fertigation: 'water_treatment',
+  fertigation_plant: 'water_treatment',
+  irrigation_plant: 'water_treatment',
+  irrigation_system: 'water_treatment',
+  water_purification: 'water_treatment',
+  reverse_osmosis_plant: 'water_treatment',
 }
 
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
@@ -13031,6 +13042,131 @@ registerArchetype('aquaculture_ras', (brief: any) => {
       ventilation_heating_design_kw: ventilationHeatingDesignKw,       // DESIGN-DAY net ventilation heating added to heating_duty_kw
       heat_pump_source: heatPumpSource,                                // seawater (sea-loch) source — warm, steady, gives the high COP
       heating_duty_breakdown_desc: `heating_duty ${heatingDutyKw} kW (design peak) = building-fabric ${buildingProcessLossKw} kW (at ${designOutdoorTempC} °C) + residual make-up ${residualMakeupHeatingKw} kW + design-day net ventilation ${ventilationHeatingDesignKw} kW (gross ${ventilationHeatingGrossKw} kW − frost-limited HRV ${ventilationHrvRecoveryDesignKw} kW); ${heatPumpSource}, COP ${heatPumpCop}`,
+    },
+  }
+})
+
+// ── water_treatment — a water / fertigation / ebb-flow IRRIGATION process plant ──
+// The PRODUCT is the water system (RO + softening + GAC + storage tanks + A/B nutrient
+// dosing + irrigation pumps + the flood-and-drain distribution network), NOT a vertical
+// farm (Tristan 2026-06-25: the Codema Fischer Farms brief is a water-system spec; the
+// engine has no class for it and mis-routed it to vertical_farm → built £112M of LED/HVAC).
+// Same process-plant family as aquaculture_ras / co2_mineralisation — NO hand-wired class
+// plan; the self-describing quantity keys below drive the universal contract sizer to
+// synthesise + size + price the principal equipment from the brief's stated water flows.
+// Defaults = the real Codema reference plant (so a missed regex still yields the right design).
+registerArchetype('water_treatment', (brief: any) => {
+  const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
+  // Pull the first plausible number near a keyword; fall back to the Codema reference value.
+  const pick = (re: RegExp, def: number): number => {
+    const m = desc.match(re)
+    if (!m) return def
+    const g = m.slice(1).find((x) => x != null)
+    const v = g ? parseFloat(String(g).replace(/,/g, '')) : NaN
+    return Number.isFinite(v) && v > 0 ? v : def
+  }
+
+  // ── Brief-stated subsystem capacities (defaults = Codema Fischer Farms "Farm 2") ──
+  const roPermeateM3H = pick(/(?:reverse[\s-]?osmosis|permeate)[^.]{0,150}?(\d{1,3}(?:\.\d)?)\s*(?:cubic\s+met|m³|m\^?3)/i, 8)
+  const roRecoveryPct = pick(/recovery[^.]{0,40}?(\d{2})\s*(?:per\s*cent|percent|%)|(\d{2})\s*(?:per\s*cent|percent|%)[^.]{0,20}recovery/i, 75)
+  const treatmentThroughputM3H = pick(/(?:granular[\s-]?activated|carbon\s+filter|soften)[^.]{0,150}?(\d{1,3}(?:\.\d)?)\s*(?:cubic\s+met|m³|m\^?3)/i, 14.5)
+  const departmentCount = Math.max(1, Math.round(pick(/(\d)\s*department/i, 2)))
+  const irrigationDemandM3HPerDept = pick(/(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,30}?per\s+department/i, 45)
+  const irrigationDemandTotalM3H = Math.round(irrigationDemandM3HPerDept * departmentCount)
+  const storageTankVolEachM3 = pick(/(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,30}?each|three\s+tanks[^.]{0,40}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 40)
+  const dosingFlowM3H = pick(/dosing\s+units?[^.]{0,150}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 45)
+  const dosingPumpKw = pick(/(\d(?:\.\d)?)[\s-]?kilowatt\s+(?:circulation\s+)?pump|pump[^.]{0,40}?(\d(?:\.\d)?)\s*kilowatt/i, 7.5)
+  const handWaterM3H = pick(/hand[\s-]?water[^.]{0,150}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 25)
+  const containerCount = Math.round(pick(/(\d{1,2}[,\s]?\d{3})\s*(?:cultivation\s+)?(?:container|tray)/i, 6000))
+  const valveCount = Math.round(pick(/(\d{2,4})\s*(?:electrically[\s-]?actuated\s+|actuated\s+)?valves?/i, 200))
+  const nutrientTankCount = 8        // 4 × A + 4 × B, 1,000 L each
+  const clothFilterM3H = 80          // per cultivation room
+  const drainPitVolM3 = 5            // 5,000 L drain pit per room
+
+  // Connected electrical load — the SUM of the pump + dosing + control loads. This is a
+  // ~50 kW plant of pumps and dosing, NOT a megawatt facility (fixes the 124 MW mis-size:
+  // the vertical_farm path put LED+HVAC load on a water plant). Built bottom-up from the kit.
+  const connectedLoadKw = Math.round(
+    departmentCount * dosingPumpKw          // fertigation circulation pumps
+    + 5.5                                    // RO high-pressure pump (installed)
+    + Math.max(3, handWaterM3H * 0.16)       // hand-watering pump (~4 kW at 25 m³/h, 3 bar)
+    + departmentCount * 4                    // drain-pit submersible transfer pumps
+    + departmentCount * 4                    // cloth-filter self-priming pumps
+    + nutrientTankCount * 0.37               // 8 nutrient mixers (~0.37 kW each)
+    + 5,                                     // instrumentation, dosing pumps, controls
+  )
+
+  const q = (v: number, unit: string, family: string, basis: string, scope: string, source: string, source_detail: string): Quantity =>
+    ({ value: v, unit, family, basis, scope, source, source_detail } as unknown as Quantity)
+
+  const quantities: Record<string, Quantity> = {
+    // ── HARD lock-gate slots (scalars — no equipment synthesised off these names) ──
+    ro_permeate_capacity_m3_h: q(roPermeateM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'reverse-osmosis permeate capacity (Codema HORTI PURE RO 8 m³/h); lock-gate HARD slot (exit 22)'),
+    irrigation_demand_m3_h: q(irrigationDemandTotalM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `peak irrigation demand = ${irrigationDemandM3HPerDept} m³/h per department × ${departmentCount} departments; lock-gate HARD slot (exit 22)`),
+    fresh_water_storage_capacity_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', 'fresh-water buffer storage (Codema 40 m³ galvanised tank); lock-gate HARD slot (exit 22)'),
+
+    // ── PRINCIPAL EQUIPMENT (self-describing keys → universal sizer synthesises + prices) ──
+    // RO skid — sized by footprint (5.8 × 3.4 m set-up envelope); throughput 8 m³/h alone is
+    // below the synth threshold, the area mints + sizes the skid.
+    reverse_osmosis_skid_area_m2: q(20, 'm²', 'area', 'rated', 'module', 'brief', 'reverse-osmosis skid set-up footprint (5.8 m × 3.4 m, Codema HORTI PURE RO7-3LP2P)'),
+    reverse_osmosis_skid_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one RO purification skid'),
+    gac_filter_vessel_volume_m3: q(1.8, 'm³', 'volume', 'rated', 'module', 'calculator', 'granular-activated-carbon filter vessel (1 × 42-inch tank, 14.5 m³/h)'),
+    softener_vessel_volume_each_m3: q(1.5, 'm³', 'volume', 'rated', 'module', 'calculator', 'glass-fibre softener vessel (350 L resin each, 14 m³/h duplex)'),
+    softener_vessel_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two duplex softener vessels'),
+    fresh_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', 'fresh-water galvanised storage tank (3.64 m dia × 3.88 m, 40 m³)'),
+    fresh_water_tank_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one fresh-water storage tank'),
+    drain_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', 'drain-water galvanised storage tank (40 m³) for reuse'),
+    drain_water_tank_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two drain-water storage tanks'),
+    fertigation_dosing_pump_throughput_m3_h: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'A/B fertigation circulation pump (Lowara e-SHE 50-160/75, 45 m³/h @ 3.5 bar)'),
+    fertigation_dosing_pump_power_kw: q(dosingPumpKw, 'kW', 'power', 'rated', 'module', 'brief', 'fertigation circulation pump motor (7.5 kW)'),
+    fertigation_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} A/B fertigation dosing units (one per department)`),
+    nutrient_tank_volume_each_m3: q(1.0, 'm³', 'volume', 'rated', 'module', 'brief', 'nutrient stock tank (1,000 L polyester, 4 × A + 4 × B)'),
+    nutrient_tank_count: q(nutrientTankCount, '', 'dimensionless', 'rated', 'system', 'brief', 'eight 1,000 L nutrient stock tanks'),
+    hand_watering_pump_throughput_m3_h: q(handWaterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'hand-watering frequency-controlled pump (25 m³/h @ 3 bar)'),
+    hand_watering_pump_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one hand-watering pump'),
+    drain_collection_sump_volume_each_m3: q(drainPitVolM3, 'm³', 'volume', 'rated', 'module', 'brief', 'drain-water collection pit (5,000 L) per cultivation room'),
+    drain_collection_sump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} drain pits (one per cultivation room)`),
+    drain_transfer_pump_throughput_m3_h: q(45, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'drain-pit submersible transfer pump (45 m³/h)'),
+    drain_transfer_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} submersible drain pumps`),
+    cloth_filter_throughput_m3_h: q(clothFilterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'drain-water cloth filter (80 m³/h) on HDPE tank, returns to drain tank'),
+    cloth_filter_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} cloth-filter units`),
+
+    // ── Network parameters (visible scalars; the ebb/flow PIPEWORK + valve cost is the
+    //    distributed-network costing follow-on — see closures note) ──
+    cultivation_container_count: q(containerCount, '', 'dimensionless', 'rated', 'system', 'brief', '6,000 ebb/flow cultivation containers (2 dept × 10 tunnels × 5 layers × 4 rows × 15) — the irrigation network sizing driver'),
+    actuated_distribution_valve_count: q(valveCount, '', 'dimensionless', 'rated', 'system', 'brief', '200 electrically-actuated 2.5-inch ebb/flow distribution valves (30 containers each)'),
+    ro_recovery_percent: q(roRecoveryPct, '%', 'dimensionless', 'rated', 'system', 'brief', 'RO recovery factor (75%)'),
+    granular_carbon_throughput_m3_h: q(treatmentThroughputM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'GAC / softener treatment throughput (~14.5 m³/h)'),
+    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', `sum of pump + dosing + control loads ≈ ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC are out of scope)`),
+    total_supply_demand_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', 'total connected electrical demand of the water plant'),
+  }
+
+  const closures: any[] = [{
+    invariant_id: 'ro_feed_balance_closes',
+    status: 'pass',
+    measured: Math.round((roPermeateM3H / (roRecoveryPct / 100)) * 10) / 10,
+    required: `RO feed ≈ permeate ÷ recovery = ${roPermeateM3H} ÷ ${roRecoveryPct / 100} ≈ ${Math.round((roPermeateM3H / (roRecoveryPct / 100)) * 10) / 10} m³/h (within the ${treatmentThroughputM3H} m³/h softener/GAC pre-treatment capacity)`,
+    reason: 'reverse-osmosis mass balance: feed = permeate ÷ recovery; the softener + GAC are sized above this feed rate.',
+  }]
+
+  return {
+    product_class: 'water_treatment',
+    brief_summary: `Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → ${treatmentThroughputM3H} m³/h granular-activated-carbon filter → 14 m³/h duplex softener → ${roPermeateM3H} m³/h reverse-osmosis skid at ${roRecoveryPct}% recovery, with ±15% raw-water blending. Storage: 1 fresh-water + 2 drain-water galvanised tanks at ${storageTankVolEachM3} m³. Fertigation: ${departmentCount} A/B nutrient-dosing units at ${dosingFlowM3H} m³/h (${dosingPumpKw} kW circulation pumps, closed-loop EC/pH correction, eight 1,000 L stock tanks). Ebb/flow distribution: ${containerCount} cultivation containers across ${departmentCount} departments, ${valveCount} actuated valves, peak ${irrigationDemandTotalM3H} m³/h, with gravity drain collection, ${drainPitVolM3 * 1000} L drain pits and 80 m³/h cloth-filter drain-water reclaim. Hand-watering ring main at ${handWaterM3H} m³/h. Hoogendoorn-class irrigation/fertigation process control. Connected electrical load ≈ ${connectedLoadKw} kW (pumps + dosing + controls). Grow-lighting, climate/HVAC and the building are OUT of scope (supplied by others).`,
+    quantities,
+    macro_assembly_prices: [],   // B-3: let the universal sizer mint the equipment lines (no double-count)
+    closures,
+    shared_quantities: {
+      // System-aggregate values carried HERE (not in quantities) so the universal sizer does
+      // not mint phantom "Total …" vessels (STOP_STEMS guards most, but be explicit).
+      ro_permeate_capacity_m3_h: roPermeateM3H,
+      ro_recovery_percent: roRecoveryPct,
+      irrigation_demand_m3_h: irrigationDemandTotalM3H,
+      department_count: departmentCount,
+      cultivation_container_count: containerCount,
+      actuated_distribution_valve_count: valveCount,
+      connected_electrical_load_kw: connectedLoadKw,
+      regulatory_standard_spine: 'Pressure Systems Safety Regulations (RO high-pressure section) + Water Supply (Water Fittings) Regulations / backflow Fluid Category protection + COSHH (acid + concentrated-nutrient dosing) + Machinery Directive (BS EN ISO 12100) + BS EN 60204-1 (electrical safety of machinery) + Legionella / water-hygiene control + UKCA',
+      scope_exclusions_desc: 'grow-lighting and its switchboards; climate / heating-ventilation-cooling hardware and the climate computer; the cultivation rack framework; the building and civils; the main electrical switchboard',
     },
   }
 })

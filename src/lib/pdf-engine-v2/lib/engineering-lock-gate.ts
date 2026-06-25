@@ -70,6 +70,10 @@ export const HARD_REQUIRED_SLOTS: Record<string, string[]> = {
   // (registerArchetype 'aquaculture_ras'), so they pass the lock gate. Kept minimal
   // (per CLAUDE.md item #13 — the builder MUST emit these EXACT names or exit 22).
   aquaculture_ras: ['annual_production_t_yr', 'total_tank_volume_m3', 'recirculation_flow_m3_h', 'heating_duty_kw'],
+  // water_treatment (water / fertigation / irrigation process plant, 2026-06-25) — the three
+  // sizing anchors every downstream stage reads; all derived by the engineering-contract builder
+  // (registerArchetype 'water_treatment'), so they pass the lock gate. EXACT names (else exit 22).
+  water_treatment: ['ro_permeate_capacity_m3_h', 'irrigation_demand_m3_h', 'fresh_water_storage_capacity_m3'],
   // Default: no HARD required slots for classes without explicit entries.
   // The gate runs a soft fill pass for all classes regardless.
 }

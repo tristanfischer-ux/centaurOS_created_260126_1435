@@ -251,6 +251,16 @@ const CLASS_ALIASES: Record<string, string> = {
   land_based_aquaculture: 'aquaculture_ras',
   marine_ras: 'aquaculture_ras',
   fish_farm_ras: 'aquaculture_ras',
+  // water_treatment — water / fertigation / irrigation process plant (2026-06-25). Mirrors
+  // the engineering-contract.ts ARCHETYPE_ALIASES additions. Field-erected process-plant family.
+  water_treatment: 'water_treatment',
+  water_treatment_plant: 'water_treatment',
+  fertigation: 'water_treatment',
+  fertigation_plant: 'water_treatment',
+  irrigation_plant: 'water_treatment',
+  irrigation_system: 'water_treatment',
+  water_purification: 'water_treatment',
+  reverse_osmosis_plant: 'water_treatment',
 }
 
 function normaliseClass(raw: string): string | null {
@@ -1753,6 +1763,33 @@ function rasVoltageTier(_: string | null, c: ParsedConstraints): VoltageTier {
 function rasFormFactor(_: string | null, _c: ParsedConstraints): string { return 'field_erected' }
 function rasApplication(_: string | null, _c: ParsedConstraints): string { return 'land_based_marine_aquaculture' }
 
+// water_treatment — a water / fertigation / irrigation process plant (2026-06-25). Sized by the
+// peak irrigation/water throughput (m³/h). ALWAYS returns a tier (never null) so a registered
+// class never yields a null envelope (chain exit 7); default medium = the Codema reference plant.
+function wtreatScaleTier(c: ParsedConstraints): string {
+  const desc = String(c.product_description ?? '').toLowerCase()
+  // Peak irrigation/water throughput in m³/h: total ("90 m³/h"), per-department ("45 … per
+  // department"), or RO permeate. Default 90 m³/h total (the 2×45 Codema reference).
+  let m3h: number | null = null
+  const perDept = desc.match(/(\d{2,3})\s*(?:cubic\s+met(?:re|er)s?|m³|m\^?3)[^.]{0,30}?per\s+department/i)
+  const depts = desc.match(/(\d)\s*department/i)
+  if (perDept) m3h = parseFloat(perDept[1]) * (depts ? parseFloat(depts[1]) : 2)
+  if (m3h === null) {
+    const tot = desc.match(/(\d{2,4})\s*(?:cubic\s+met(?:re|er)s?|m³|m\^?3)\s*(?:per\s+hour|\/\s*h)/i)
+    if (tot) m3h = parseFloat(tot[1])
+  }
+  const t = m3h ?? 90
+  if (t < 30) return 'small'
+  if (t <= 300) return 'medium'
+  return 'large'
+}
+function wtreatVoltageTier(_: string | null, c: ParsedConstraints): VoltageTier {
+  if (c.voltage_class_v) return classifyVoltage(c.voltage_class_v)
+  return 'low' // 400 V three-phase LV — a pumping/dosing plant of low tens of kW
+}
+function wtreatFormFactor(_: string | null, _c: ParsedConstraints): string { return 'field_erected' }
+function wtreatApplication(_: string | null, _c: ParsedConstraints): string { return 'horticultural_water_fertigation_irrigation' }
+
 const DETECTORS: Record<string, ClassDetectors> = {
   bess: {
     scaleTier: bessScaleTier,
@@ -1990,6 +2027,12 @@ const DETECTORS: Record<string, ClassDetectors> = {
     voltageTier: rasVoltageTier,
     formFactor: rasFormFactor,
     application: rasApplication,
+  },
+  water_treatment: {
+    scaleTier: wtreatScaleTier,
+    voltageTier: wtreatVoltageTier,
+    formFactor: wtreatFormFactor,
+    application: wtreatApplication,
   },
 }
 

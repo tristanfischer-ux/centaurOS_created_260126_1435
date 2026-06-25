@@ -59,6 +59,16 @@ const DECLARED_CLASS_SIGNATURES: Array<{ re: RegExp; cls: string }> = [
   // vehicle/marine/aerospace catches below — a kingfish RAS brief is full of
   // "seawater", "marine", "tank" tokens that otherwise mis-route to 'vehicle'.
   { re: /recirculating\s+aquaculture|\baquaculture\b|land[\s-]?based\s+(?:marine\s+)?(?:fish\b|aquacult)|yellowtail\s+kingfish|fish[\s-]?rearing\s+tank|recirculat\w+.{0,25}\bfish\b/, cls: 'aquaculture_ras' },
+  // Water / fertigation / ebb-flow irrigation PLANT (2026-06-25) — a water-treatment +
+  // irrigation PROCESS PLANT (RO, softening, GAC, storage tanks, A/B nutrient dosing, pumps,
+  // distribution valves) that SUPPLIES an indoor/vertical farm. The PRODUCT is the water
+  // system, NOT the farm. MUST beat the vertical_farm keyword rule below (which catches
+  // "fertigation" / "growing tray" and would build the whole LED/HVAC/canopy farm — the
+  // Codema Fischer Farms mis-route that produced a £112M dossier). Keys on the product NOUN
+  // (water/irrigation PLANT or SYSTEM), not the application context (vertical farm). A true
+  // leafy-greens vertical-farm brief never names a "water-handling / fertigation / irrigation
+  // plant" as its deliverable, so it falls through to vertical_farm.
+  { re: /\b(?:irrigation|fertigation)\s+(?:and\s+\w+\s+)?(?:plant|system|installation)\b|water[\s-]?handling(?:\s+(?:and|,))?|\bwater[\s-]?treatment\s+(?:plant|system)|water[\s-]?purification|(?:reverse[\s-]?osmosis|ebb[\s\/.-]*and[\s\/.-]*flow|ebb[\s\/.-]*flow)[^.]{0,160}(?:fertigation|irrigation|nutrient|storage\s+tank|plant|installation)/, cls: 'water_treatment' },
 ]
 
 export function classifyProduct(briefText: string): ProductClassification {

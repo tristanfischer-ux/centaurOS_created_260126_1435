@@ -641,6 +641,14 @@ export const COST_STACK: Record<string, CostStackRatios> = {
   ras: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'RAS — alias of aquaculture_ras; field-erected process plant (no factory/margin/channel).' },
   recirculating_aquaculture: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'Recirculating aquaculture — alias of aquaculture_ras; field-erected.' },
   aquaponics: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'Aquaponics plant — field-erected process plant (no factory/margin/channel).' },
+  // water_treatment — water / fertigation / ebb-flow irrigation process plant (2026-06-25).
+  // Built + installed on site (RO/softener/GAC skids, storage tanks, A/B dosing units, pumps,
+  // the ebb/flow PVC distribution network + actuated valves), NOT a factory product with a
+  // margin + channel. Same field-erected build-up as aquaculture_ras (the dominant cost is
+  // installed pipework + valves + labour, not factory-margined hardware).
+  water_treatment: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'Water / fertigation / irrigation plant — FIELD-ERECTED (built on site, NO factory/margin/channel). Installed CAPEX = raw materials + field installation + FOAK/contingency + EPC/engineering.' },
+  fertigation: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'Fertigation plant — alias of water_treatment; field-erected process plant.' },
+  irrigation_plant: { ...ARCH_FIELD_ERECTED_PLANT, notes: 'Irrigation plant — alias of water_treatment; field-erected process plant.' },
   vertical_farm_module: {
     assembly_labour_factor: 0.18,
     factory_overhead_factor: 0.18,
