@@ -562,7 +562,10 @@ def _db_spec_price(name: str, md: dict):
             (f"%{noun}%", likes[0], likes[1])).fetchall()
         con.close()
         prices = sorted(float(r[0]) for r in rows if r and r[0])
-        if len(prices) >= 2:
+        # ≥1 is enough: the match is noun + EXACT spec token (same component, same rating), and the
+        # growing-DB loop ingests VERIFIED real parts one at a time — a single comparable must price
+        # so the loop closes (a freshly-ingested 86 kW chiller resolves next run). 2026-06-25.
+        if len(prices) >= 1:
             out = (prices[len(prices) // 2], len(prices), noun, f"{nstr}{unit}")
     except Exception:
         out = None
