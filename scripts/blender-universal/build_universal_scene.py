@@ -10484,6 +10484,8 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     # tighten the inter-row aisle so n_rows fit the internal width. cont_margin is the
     # wall clearance (a real container is tight — racks abut the walls, front-access).
     cont_margin = CONTAINER_MARGIN_MM
+    n_tiers = 1                 # vertical rack tiers (1 = single-height; >1 = stacked)
+    tier_pitch = RACK_H_MM      # Z step between tiers (rack height + gap), set when stacking
     if _CONTAINER_LAYOUT and _CONTAINER_ENVELOPE_MM:
         cont_margin = _CONTAINER_WALL_MARGIN_MM
         usable_l = _CONTAINER_ENVELOPE_MM["l"] - 2 * cont_margin
@@ -10496,25 +10498,56 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
         # continue in the SAME rows (so the combined lineup wraps inside the box, not a tail).
         n_rows = max(1, min(max_rows, n_racks))
         racks_per_row = math.ceil(n_racks / n_rows)
+        # VERTICAL STACKING (Tristan 2026-06-25): a real 20-ft 5 MWh BESS stacks racks
+        # 2-high — the racks do NOT fit a 6.06 m container single-height, so the enclosure
+        # used to balloon to the equipment LENGTH (~11.9 m, a 40-ft box) instead of growing
+        # UPWARD. When the single-height row of racks_per_row cabinets would overrun the
+        # container internal length, split the racks into N TIERS so each tier's row fits.
+        # tiers = ceil(single_height_length / usable_length); deterministic, no per-class
+        # hardcoding — keyed only on the brief envelope length vs the rack pitch. Only the
+        # CONTAINER path stacks; every other class (CO2/SAF/generic) is untouched.
+        single_height_len = racks_per_row * RACK_PITCH_MM
+        if single_height_len > usable_l:
+            # Pack each tier DENSE to the container length (the most racks a row can hold
+            # within usable_l), then add as many tiers as needed. This keeps every rack row
+            # ≤ the envelope length (so the enclosure clamps to the real box) AND leaves the
+            # tail slots on the top tier free for the battery-side BoP to share the upper
+            # tier instead of running a tail past the racks.
+            racks_per_row = max(1, int(usable_l // RACK_PITCH_MM))
+            floor_capacity = n_rows * racks_per_row
+            n_tiers = max(1, math.ceil(n_racks / floor_capacity))
+            tier_pitch = RACK_H_MM + 100.0    # rack height + a small inter-tier gap
         if n_rows >= 2:
             row_pitch = RACK_D_MM + max(250.0, (usable_w - n_rows * RACK_D_MM) / (n_rows - 1))
-        print(f"[univ][rackfarm] containerised grid: {n_racks} racks → {n_rows} row(s) × "
-              f"{racks_per_row} down a {_CONTAINER_ENVELOPE_MM['l']/1000:.1f} m enclosure "
-              f"(row pitch {row_pitch/1000:.2f} m)")
+        print(f"[univ][rackfarm] containerised grid: {n_racks} racks → {n_tiers} tier(s) × "
+              f"{n_rows} row(s) × {racks_per_row} down a {_CONTAINER_ENVELOPE_MM['l']/1000:.1f} m "
+              f"enclosure (row pitch {row_pitch/1000:.2f} m, tier pitch {tier_pitch/1000:.2f} m)")
     row_len_mm = racks_per_row * RACK_PITCH_MM
     rack_anchor_by_index = []     # (cx, cy, top_z) per placed rack, for bus routing
+    # For each (tier,row) lane, record the X just PAST the last rack on that lane — the
+    # battery-side BoP starts here, so a partially-filled top tier offers its free length
+    # to the BoP (it shares the upper tier instead of running a tail past the racks).
+    lane_rack_end_x = {}
     placed = 0
-    for row in range(n_rows):
-        y_row = row * row_pitch
-        n_this = min(racks_per_row, n_racks - placed)
-        for col in range(n_this):
-            cx = col * RACK_PITCH_MM
-            nm = f"u_rf_rack_r{row}_c{col}"
-            _build_battery_rack(nm, cx, y_row, DECK_Z_MM, cells_per_rack,
-                                rack_frame_mat, cell_mat, busbar_mat, steel, MAT,
-                                rack_mod, MO, flavour=flavour)
-            rack_anchor_by_index.append((cx, y_row, DECK_Z_MM + RACK_H_MM))
-        placed += n_this
+    # Fill the floor footprint (rows × cols) at tier 0 first, then climb to the next
+    # tier — so a 24-rack 20-ft brief lays 2 tiers of 12 within the ~6 m box.
+    for tier in range(n_tiers):
+        tier_z = DECK_Z_MM + tier * tier_pitch
+        for row in range(n_rows):
+            n_this = min(racks_per_row, max(0, n_racks - placed))
+            for col in range(n_this):
+                cx = col * RACK_PITCH_MM
+                nm = f"u_rf_rack_t{tier}_r{row}_c{col}"
+                _build_battery_rack(nm, cx, y_row=row * row_pitch, deck_z_mm=tier_z,
+                                    cells_per_rack=cells_per_rack,
+                                    frame_mat=rack_frame_mat, cell_mat=cell_mat,
+                                    busbar_mat=busbar_mat, steel=steel, MAT=MAT,
+                                    rack_mod=rack_mod, MO=MO, flavour=flavour)
+                rack_anchor_by_index.append((cx, row * row_pitch, tier_z + RACK_H_MM))
+            # X just past this lane's last rack (or the lane origin if it has no racks)
+            lane_rack_end_x[(tier, row)] = (n_this * RACK_PITCH_MM - RACK_W_MM / 2
+                                            if n_this > 0 else -RACK_W_MM / 2)
+            placed += n_this
 
     racks_x0 = -RACK_W_MM / 2
     racks_x1 = (racks_per_row - 1) * RACK_PITCH_MM + RACK_W_MM / 2
@@ -10553,20 +10586,61 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     # greedily filling the shortest row, so the combined rack+BoP lineup WRAPS within the
     # container length instead of running one 12 m tail past the racks. bop_row_x tracks
     # each row's running X (starting beyond the rack block); bop_row_y are the rack rows.
-    bop_row_x = [bop_x] * max(1, n_rows)
-    bop_row_y = [r * row_pitch for r in range(max(1, n_rows))]
+    # TIER-AWARE WRAP (Tristan 2026-06-25): each (row × tier) is a BoP LANE capped at the
+    # container internal length (racks_x0 + usable_l). A skid goes to the lane with the
+    # smallest running X that still has room; when the floor lanes are full it climbs to
+    # the next tier's lanes — the SAME vertical-stacking principle the racks use — so the
+    # battery-side BoP never pushes the enclosure LENGTH past the real container envelope.
+    # usable_l is in scope whenever _container_bop is True (set in the same _CONTAINER_LAYOUT
+    # branch above). The cap is the container internal length measured from the rack origin.
+    _bop_x_cap = (racks_x0 + usable_l) if _container_bop else None
+    if _container_bop:
+        _n_bl_rows = max(1, n_rows)
+        _n_bl_tiers = max(1, n_tiers)
+        # Each lane starts just PAST its own racks (a small gap), so a partially-filled
+        # top tier presents its free length to the BoP first, and a full floor lane (racks
+        # already at usable_l) has no room left → the cap pushes the BoP up a tier.
+        bop_row_x, bop_row_y, bop_row_z = [], [], []
+        for _t in range(_n_bl_tiers):
+            for _r in range(_n_bl_rows):
+                _end = lane_rack_end_x.get((_t, _r), -RACK_W_MM / 2)
+                bop_row_x.append(_end + BOP_GAP_MM)
+                bop_row_y.append(_r * row_pitch)
+                bop_row_z.append(DECK_Z_MM + _t * tier_pitch)
+    else:
+        bop_row_x = [bop_x] * max(1, n_rows)
+        bop_row_y = [r * row_pitch for r in range(max(1, n_rows))]
+        bop_row_z = [DECK_Z_MM for _ in range(max(1, n_rows))]
     cursor_y = bop_y_centre - (sum(it[2] for it in bop_items)
                                + BOP_GAP_MM * max(0, len(bop_items) - 1)) / 2.0
     bop_y_lo = (min(bop_row_y) if _container_bop else cursor_y)   # actual lineup Y extent
     bop_y_hi = (max(bop_row_y) if _container_bop else cursor_y)
     for role, part_or_none, depth_mm, w_mm, h_mm, rgb in bop_items:
         if _container_bop:
-            r = min(range(len(bop_row_x)), key=lambda i: bop_row_x[i])  # shortest row
+            # prefer a lane that still has length-budget for this skid; among those pick
+            # the shortest. If NONE fit (every existing lane is full to the container
+            # length), open a NEW tier of lanes ABOVE the racks at the next Z and place the
+            # skid there from the rack origin — climbing vertically keeps the enclosure
+            # LENGTH at the real container envelope (the same stacking principle as racks).
+            _fits = [i for i in range(len(bop_row_x))
+                     if _bop_x_cap is None or bop_row_x[i] + w_mm <= _bop_x_cap]
+            if not _fits:
+                _new_z = max(bop_row_z) + tier_pitch
+                for _r in range(max(1, n_rows)):
+                    bop_row_x.append(racks_x0)
+                    bop_row_y.append(_r * row_pitch)
+                    bop_row_z.append(_new_z)
+                _fits = [i for i in range(len(bop_row_x))
+                         if _bop_x_cap is None or bop_row_x[i] + w_mm <= _bop_x_cap]
+            _pool = _fits if _fits else list(range(len(bop_row_x)))
+            r = min(_pool, key=lambda i: bop_row_x[i])
             cx = bop_row_x[r] + w_mm / 2
             cy = bop_row_y[r]
+            bop_z = bop_row_z[r]
             bop_y_lo = min(bop_y_lo, cy - depth_mm / 2)
             bop_y_hi = max(bop_y_hi, cy + depth_mm / 2)
         else:
+            bop_z = DECK_Z_MM
             cx = bop_x + w_mm / 2
             cy = cursor_y + depth_mm / 2
             bop_y_hi = cursor_y + depth_mm   # running far edge of the lineup
@@ -10581,30 +10655,30 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
         # (keyed by role, no per-state hardcoding) so the lineup is real gear, not
         # plain blocks. depth_mm = Y footprint, w_mm = X footprint along the wall.
         if role == "transformer":
-            _build_bop_transformer(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+            _build_bop_transformer(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                    mat, steel, MAT, mod, MO)
         elif role == "pcs":
-            _build_bop_cabinet_lineup(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+            _build_bop_cabinet_lineup(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                       mat, steel, MAT, mod, MO, n_sections=3,
                                       louvres=True)
         elif role == "switchgear":
-            _build_bop_cabinet_lineup(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+            _build_bop_cabinet_lineup(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                       mat, steel, MAT, mod, MO, n_sections=2,
                                       louvres=True, louvre_rgb=(0.22, 0.24, 0.28))
         elif role in ("chiller", "cooling"):   # BESS chiller / compute CRAC-CRAH
-            _build_bop_chiller(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+            _build_bop_chiller(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                mat, steel, MAT, MO, mod)
         elif role in ("pdu", "ups"):           # compute power: tall cabinet lineup
-            _build_bop_cabinet_lineup(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+            _build_bop_cabinet_lineup(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                       mat, steel, MAT, mod, MO, n_sections=2,
                                       louvres=True, louvre_rgb=(0.22, 0.24, 0.28))
         elif role == "fire":
-            _build_bop_fire(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+            _build_bop_fire(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                             mat, steel, MAT, mod, MO)
         else:  # bms_ctrl / network / any other controller role → small wall cabinet
-            _build_bop_wall_cabinet(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+            _build_bop_wall_cabinet(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                     mat, steel, MAT, mod, MO)
-        bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
+        bop_anchor[role] = (cx, cy, bop_z + h_mm)
         region_centres[role] = (cx, cy)
         if _container_bop:
             bop_row_x[r] += w_mm + BOP_GAP_MM
@@ -10628,7 +10702,14 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     enc_y1 = max(racks_y1, bop_y_hi) + cont_margin
     enc_w = enc_x1 - enc_x0
     enc_d = enc_y1 - enc_y0
-    enc_h = RACK_H_MM + 2 * cont_margin
+    # Height grows with the rack TIERS: a stacked column rises to (n_tiers-1)*tier_pitch
+    # + RACK_H_MM, so the enclosure must clear the top tier (a 20-ft box is 2.59 m tall,
+    # which clears 2 tiers of ~2.2 m racks once the per-tier gap is tightened). It must
+    # ALSO clear any BoP skid that climbed to a tier above the racks.
+    stacked_rack_h = (n_tiers - 1) * tier_pitch + RACK_H_MM
+    bop_top_h = (max((z for (_, _, z) in bop_anchor.values()), default=DECK_Z_MM)
+                 - DECK_Z_MM) if _container_bop else 0.0
+    enc_h = max(stacked_rack_h, bop_top_h) + 2 * cont_margin
     enc_cx = (enc_x0 + enc_x1) / 2
     enc_cy = (enc_y0 + enc_y1) / 2
     # CONTAINERISED: render the shell at the brief's TRUE 40-ft envelope (so the GA reads

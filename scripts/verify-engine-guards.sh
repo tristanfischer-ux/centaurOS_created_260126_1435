@@ -42,6 +42,7 @@ echo "━━━ Engine regression guards (deterministic; blocks a regression) �
 #    where source-rule fixes land; this is the deterministic enforcement of the CORE FIX PRINCIPLE)
 run "requirements_bom.py --selftest"          "$PY" scripts/requirements_bom.py --selftest
 run "build-excel-export.py --selftest"        "$PY" scripts/build-excel-export.py --selftest
+run "dossier_audit.py --selftest"            "$PY" scripts/lib/dossier_audit.py --selftest
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest
 run "benchmark-expectation.ts --selftest"     npx tsx scripts/lib/benchmark-expectation.ts --selftest

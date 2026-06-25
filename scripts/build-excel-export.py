@@ -67,6 +67,12 @@ from openpyxl.worksheet.worksheet import Worksheet
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import deterministic_checks_lib as dcl  # noqa: E402
 
+# The DETERMINISTIC per-tab self-audit + ship gate (scripts/lib/dossier_audit.py). It is the
+# SHIP GATE: the dossier is not "validated" unless its scorecard is clean. Imported by absolute
+# path (scripts/lib is the sibling dir) so the exporter works regardless of the caller's cwd.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+from dossier_audit import audit_dossier  # noqa: E402
+
 # ----------------------------------------------------------------------------
 # STYLES — light theme only (Tristan: light mode, never dark)
 # ----------------------------------------------------------------------------
@@ -448,29 +454,56 @@ def _cost_category(name: str, tag: str, etype: str) -> str:
     return _COST_TYPE_FALLBACK.get((etype or '').lower(), 'Balance of plant')
 
 
-def cost_breakdown_by_category(run_dir: str) -> List[tuple]:
-    """Returns [(category, gbp, pct_of_total, n_lines)] sorted by cost desc. [] if no ledger."""
-    pl = load_json(os.path.join(run_dir, "parts-ledger.json"))
-    if not isinstance(pl, dict):
-        return []
+# Universal noun-keyed equipment-category map (2026-06-25 fix). Keyed on NOUNS that appear in
+# the requirement/part text of ANY product class — no per-class hardcoding. Rules are matched in
+# order; first hit wins, so the most specific principal nouns (cells, racks, power conversion)
+# precede the generic connection/enclosure buckets. The catch-all is "Other equipment".
+_EQUIP_CAT_RULES = [
+    (r'\bcell\b|\bcells\b|\bmodule\b|\bmodules\b|\bbattery pack\b|\bprismatic\b|\bpouch\b', 'Battery cells & modules'),
+    (r'\brack\b|\bframe\b|\bbusbar\b|\bbus[- ]?bar\b|\bstructure\b|\bchassis\b|\bskid\b|\bplinth\b|\bsupport\b', 'Racks & structure'),
+    (r'\binverter\b|\bpcs\b|\btransformer\b|\bswitchgear\b|\bbreaker\b|\bcontactor\b|\brectifier\b|\bconverter\b|\bmcc\b|\bgenset\b|\bgenerator\b', 'Power conversion & electrical'),
+    (r'\bpump\b|\bchiller\b|\bcooling\b|\bcoolant\b|\bfan\b|\bhvac\b|\bradiator\b|\bcompressor\b|\bcondenser\b|\bevaporator\b|cold[- ]?plate', 'Thermal management'),
+    (r'\bbms\b|\bsensor\b|\bcontroller\b|\bmonitor\b|\bplc\b|\bscada\b|\bhmi\b|\bthermistor\b|\bgauge\b|\bmeter\b|\btransmitter\b|\bprobe\b|\binstrument\b', 'Controls & instrumentation'),
+    (r'\bcable\b|\bcabling\b|\bwire\b|\bwiring\b|\bharness\b|\bloom\b|\bconduit\b|\blug\b|\bterminal\b', 'Cabling & power runs'),
+    (r'\bpipe\b|\bpipework\b|\bvalve\b|\bfitting\b|\bmanifold\b|\bhose\b|\bflange\b', 'Pipework'),
+    (r'\bcontainer\b|\benclosure\b|\bdoor\b|\bcabinet\b|\bhousing\b|\bcanopy\b|\bpanel\b', 'Enclosure'),
+]
+
+
+def _equip_category(name: str) -> str:
+    """UNIVERSAL noun-keyed category for a BoM line (no per-class tables). First rule wins;
+    everything unmatched falls into a single honest catch-all."""
+    blob = str(name or "").lower()
+    for rx, cat in _EQUIP_CAT_RULES:
+        if re.search(rx, blob):
+            return cat
+    return 'Other equipment'
+
+
+def cost_breakdown_by_category(rows: List[dict]) -> List[tuple]:
+    """Returns [(category, gbp, pct_of_total, n_lines)] sorted by cost desc, [] if no rows.
+    (2026-06-25 fix) Categorise the WHOLE assembled bill of materials by EQUIPMENT category so the
+    breakdown SUMS TO THE BoM GRAND TOTAL — was reading parts-ledger.json's `equipment` list, which
+    is empty for most runs, leaving only the connection (cabling/pipework) lines and a ~£11.6k total
+    against a ~£797k bill. Groups the principal `requirementsBom` rows (excluding SUB-COMPONENT
+    children whose cost rolls into a parent) by a universal noun map; percentages are of the BoM
+    grand total."""
     agg: Dict[str, List[float]] = {}   # cat -> [gbp, n]
-    for e in pl.get("equipment", []) or []:
-        v = e.get("line_gbp") or 0
-        if not v:
+    for r in rows or []:
+        if not isinstance(r, dict):
             continue
-        cat = _cost_category(e.get("name") or e.get("requirement") or "", e.get("tag") or "", e.get("type"))
-        a = agg.setdefault(cat, [0.0, 0]); a[0] += v; a[1] += 1
-    for c in pl.get("connections", []) or []:
-        v = c.get("line_gbp") or 0
-        if not v:
+        if str(r.get("status", "") or "").strip().upper() == "SUB-COMPONENT":
             continue
-        kind = (c.get("kind") or "").lower(); mech = (c.get("mechanism") or "").lower()
-        cat = 'Cabling & power runs' if ('cable' in kind or 'electric' in mech or 'signal' in mech) else 'Pipework'
-        a = agg.setdefault(cat, [0.0, 0]); a[0] += v; a[1] += 1
+        v = r.get("line_gbp") or 0
+        if not isinstance(v, (int, float)) or v <= 0:
+            continue
+        cat = _equip_category(
+            f"{r.get('requirement', '')} {r.get('part', '')}")
+        a = agg.setdefault(cat, [0.0, 0]); a[0] += float(v); a[1] += 1
     total = sum(a[0] for a in agg.values()) or 1.0
-    rows = [(cat, gn[0], 100.0 * gn[0] / total, int(gn[1])) for cat, gn in agg.items()]
-    rows.sort(key=lambda r: r[1], reverse=True)
-    return rows
+    out = [(cat, gn[0], 100.0 * gn[0] / total, int(gn[1])) for cat, gn in agg.items()]
+    out.sort(key=lambda x: x[1], reverse=True)
+    return out
 
 
 # ============================================================================
@@ -558,9 +591,19 @@ def _exec_synopsis(state: dict) -> str:
     clabel, cgbp = _headline_build_cost(state)
     if cgbp:
         parts.append(f"The engine values the build at £{round(cgbp):,} ({clabel.lower()}).")
-    _, vsent = _exec_validation_verdict(state)
-    if vsent:
-        parts.append(vsent)
+    # The deterministic ship gate has the last word: when it FAILS, the synopsis must NOT claim the
+    # dossier is validated (2026-06-25). It carries the honest DRAFT clause instead of the benchmark
+    # "agrees on every dimension" sentence.
+    _aud = state.get("_dossierAudit") or {}
+    if _aud and _aud.get("ship_ok") is False:
+        _open = int(_aud.get("total") or 0)
+        parts.append(f"This is a DRAFT: the deterministic self-audit flags {_open} open "
+                     f"issue{'s' if _open != 1 else ''} ({_aud.get('high', 0)} high-severity) — "
+                     f"see the ⚠ Audit tab. It is not yet engineering-validated.")
+    else:
+        _, vsent = _exec_validation_verdict(state)
+        if vsent:
+            parts.append(vsent)
     parts.append("Every figure in this workbook — the bill of materials, the costs, and the "
                  "specifications below — is derived deterministically from the engineering "
                  "contract, computed rather than estimated by hand.")
@@ -632,7 +675,15 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
     sc_obj = state.get("qualityScorecard") or load_json(os.path.join(run_dir, "quality-scorecard.json")) or {}
     floor = sc_obj.get("floor")
     vstatus, _vsent = _exec_validation_verdict(state)
-    if isinstance(floor, (int, float)):
+    # ---- the deterministic SHIP GATE overrides every other status (2026-06-25). When the per-tab
+    # self-audit (scripts/lib/dossier_audit.py) says ship_ok=False, the dossier is a DRAFT — it may
+    # NOT claim "Engineering-validated" no matter what the quality floor or benchmark say. ----
+    _aud = state.get("_dossierAudit") or {}
+    _open = int(_aud.get("total") or 0)
+    if _aud and _aud.get("ship_ok") is False:
+        card("Status", f"DRAFT — {_open} open issue{'s' if _open != 1 else ''}",
+             "Deterministic self-audit ship gate FAILED — see the ⚠ Audit tab.")
+    elif isinstance(floor, (int, float)):
         card("Status",
              "Engineering-validated" if floor >= 8 else f"Quality floor {floor}/10",
              "Scored against deterministic engineering gates." if floor >= 8 else "")
@@ -665,7 +716,7 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
         row = cmp_start
 
     # ---- where the money goes (top categories) ----
-    cb = cost_breakdown_by_category(run_dir)
+    cb = cost_breakdown_by_category(state.get("requirementsBom") or [])
     if cb:
         sub_banner(ws, row, "Where the money goes — capex by category", 7)
         row += 1
@@ -895,12 +946,12 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
 
     # ---- where the money goes (deterministic capex breakdown by category) — the five-second
     # "where does my budget go?" answer a founder needs before they read 30 tabs. ----
-    _cb = cost_breakdown_by_category(run_dir)
+    _cb = cost_breakdown_by_category(state.get("requirementsBom") or [])
     if _cb:
         sub_banner(ws, row, "Where the money goes — capex by category", 4)
         row += 1
         _note = ws.cell(row, 1, "Deterministic roll-up of every bill-of-materials line, grouped by "
-                                "equipment category. Sums to the equipment + connections capex.")
+                                "equipment category. Sums to the bill-of-materials grand total.")
         _note.font = FONT_NOTE
         _note.alignment = WRAP_TOP
         row += 1
@@ -919,7 +970,7 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
             cb.font = _bar_font
             cb.border = BORDER
             row += 1
-        ws.cell(row, 1, "Total (equipment + connections)").font = FONT_SUB
+        ws.cell(row, 1, "Total (bill of materials)").font = FONT_SUB
         _ct = ws.cell(row, 2, round(sum(r[1] for r in _cb)))
         _ct.number_format = "#,##0"
         _ct.font = FONT_SUB
@@ -1323,6 +1374,83 @@ def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
     ws._forge_fail_count = fail_count       # type: ignore[attr-defined]
     ws._forge_fail_labels = fail_labels     # type: ignore[attr-defined]
     return fail_count
+
+
+# ============================================================================
+# TAB — "⚠ Audit"  (THE DETERMINISTIC SHIP GATE — per-tab self-audit findings)
+# ============================================================================
+def tab_audit(wb: Workbook, report) -> None:
+    """Render the deterministic per-tab self-audit (scripts/lib/dossier_audit.py) as a worksheet.
+    A scorecard header line + every Finding grouped by its target tab. HIGH = red, MED = amber,
+    LOW = grey — the SHIP GATE made visible: a FAIL verdict means the dossier is NOT validated."""
+    ws = wb.create_sheet("⚠ Audit")
+    set_widths(ws, {"A": 10, "B": 30, "C": 60, "D": 22, "E": 22})
+    sc = report.scorecard()
+    title_row(
+        ws, "⚠ Dossier self-audit — the deterministic ship gate", 5,
+        "Every per-tab check (scripts/lib/dossier_audit.py) — pass/fail FLAGS, no LLM. A FAIL "
+        "verdict (any HIGH finding) means the dossier is NOT validated. HIGH = red, MED = amber, "
+        "LOW = grey.",
+    )
+    r = 4
+    # ---- scorecard header line ----
+    verdict = sc.get("verdict", "?")
+    sline = (f"VERDICT: {verdict}  ·  {sc.get('high', 0)} HIGH  ·  {sc.get('med', 0)} MED  ·  "
+             f"{sc.get('low', 0)} LOW  ·  {sc.get('total', 0)} total"
+             f"  ·  ship_ok={sc.get('ship_ok')}")
+    hc = ws.cell(r, 1, sline)
+    hc.font = FONT_TITLE
+    hc.fill = FILL_FAIL if verdict == "FAIL" else (FILL_ADVISORY if verdict == "REVIEW" else FILL_PASS)
+    hc.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+    ws.row_dimensions[r].height = 22
+    r += 2
+
+    by_tab = report.by_tab()
+    if not by_tab:
+        ws.cell(r, 1, "No findings — every deterministic check passed.").font = FONT_PASS
+        back_link(ws, 5)
+        ws.freeze_panes = "A5"
+        return
+
+    _SEV_STYLE = {
+        "HIGH": (FILL_FAIL, FONT_FAIL),
+        "MED": (FILL_ADVISORY, FONT_ADVISORY),
+        "LOW": (FILL_LEGACY, FONT_NOTE),
+    }
+    for tab_name, findings in by_tab.items():
+        # tab band
+        tb = ws.cell(r, 1, tab_name)
+        tb.font = FONT_TITLE
+        tb.fill = FILL_TITLE
+        tb.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+        ws.row_dimensions[r].height = 20
+        r += 1
+        header(ws, r, ["Severity", "Check", "Message", "Actual", "Expected"])
+        r += 1
+        for f in findings:
+            sev = str(getattr(f, "severity", "") or "").upper()
+            fill, font = _SEV_STYLE.get(sev, (FILL_LEGACY, FONT_NOTE))
+            sc1 = ws.cell(r, 1, sev or "—")
+            sc1.fill = fill
+            sc1.font = font
+            sc1.border = BORDER
+            ws.cell(r, 2, clean_cell(getattr(f, "check", "") or "")).border = BORDER
+            mc = ws.cell(r, 3, clean_cell(getattr(f, "message", "") or ""))
+            mc.alignment = WRAP_TOP
+            mc.border = BORDER
+            ac = ws.cell(r, 4, clean_cell(getattr(f, "actual", "") or ""))
+            ac.alignment = WRAP_TOP
+            ac.border = BORDER
+            ec = ws.cell(r, 5, clean_cell(getattr(f, "expected", "") or ""))
+            ec.alignment = WRAP_TOP
+            ec.border = BORDER
+            r += 1
+        r += 1
+
+    back_link(ws, 5)
+    ws.freeze_panes = "A5"
 
 
 # ============================================================================
@@ -2499,8 +2627,18 @@ def _unit_family(unit: str) -> Tuple[str, float]:
         # mass -> canonical kg
         "kg": ("mass_kg", 1.0), "g": ("mass_kg", 0.001), "t": ("mass_kg", 1000.0),
         "tonne": ("mass_kg", 1000.0), "tonnes": ("mass_kg", 1000.0),
-        # power -> canonical kW
-        "kw": ("power_kw", 1.0), "mw": ("power_kw", 1000.0), "w": ("power_kw", 0.001),
+        # energy -> canonical kWh (2026-06-25 fix: a brief metric in MWh must match a
+        # contract quantity in kWh — the family string MUST be identical for both, or the
+        # compliance matcher's `a_fam == b_fam` test fails and the row shows UNVERIFIED).
+        "wh": ("energy_kwh", 0.001), "kwh": ("energy_kwh", 1.0),
+        "mwh": ("energy_kwh", 1000.0), "gwh": ("energy_kwh", 1_000_000.0),
+        # power -> canonical kW (w/kw/mw/gw all map to ONE family)
+        "w": ("power_kw", 0.001), "kw": ("power_kw", 1.0),
+        "mw": ("power_kw", 1000.0), "gw": ("power_kw", 1_000_000.0),
+        # voltage -> canonical V
+        "v": ("voltage_v", 1.0), "kv": ("voltage_v", 1000.0), "mv": ("voltage_v", 0.001),
+        # current -> canonical A
+        "a": ("current_a", 1.0), "ka": ("current_a", 1000.0), "ma": ("current_a", 0.001),
         # temperature -> canonical °C (° already stripped above; K not offset-converted, rare)
         "c": ("temp_c", 1.0), "degc": ("temp_c", 1.0), "celsius": ("temp_c", 1.0),
         # dimensionless / ratio
@@ -6057,7 +6195,7 @@ def _reorder_tabs(wb: Workbook) -> None:
         "Line & velocity": 24, "Panel schedule": 25, "Process schedules": 26,
         "Assembly sequence": 29,
         "Risk & Regulatory": 30,
-        "⚠ Checks": 90, "Connection trace": 92, "Part names": 93, "Glossary": 94,
+        "⚠ Checks": 90, "⚠ Audit": 91, "Connection trace": 92, "Part names": 93, "Glossary": 94,
     }
 
     def _rank(title: str) -> int:
@@ -6088,6 +6226,13 @@ def build(run_dir: str, out_path: str) -> dict:
     wb = Workbook()
     wb.remove(wb.active)  # drop the default sheet
 
+    # ---- DETERMINISTIC SHIP-GATE AUDIT — run FIRST so the Exec Summary validation card can read
+    # the verdict (state["_dossierAudit"]) and the "⚠ Audit" tab can render the findings. `rows` are
+    # the assembled BoM (state.requirementsBom); the audit guards every key access itself. ----
+    rows = state.get("requirementsBom") or []
+    report = audit_dossier(state, rows, run_dir)
+    state["_dossierAudit"] = report.scorecard()
+
     print("  · Executive Summary")
     tab_executive_summary(wb, state, run_dir, sha)
     print("  · Overview")
@@ -6106,6 +6251,8 @@ def build(run_dir: str, out_path: str) -> dict:
     fail_count = tab_checks(wb, state, run_dir)
     checks_ws = wb["⚠ Checks"]
     fail_labels = getattr(checks_ws, "_forge_fail_labels", [])
+    print("  · ⚠ Audit")
+    tab_audit(wb, report)
     print("  · Part names")
     tab_parts_master(wb, state, run_dir)
     print("  · Quantities")
@@ -6241,6 +6388,7 @@ def build(run_dir: str, out_path: str) -> dict:
         "image_tabs": img_ok,
         "has_cost": has_cost,
         "skipped_tabs": skipped,
+        "audit": report.scorecard(),
         "sha": sha,
     }
 
@@ -6291,6 +6439,11 @@ def main() -> None:
     print(f"  CHECKS FAIL : {res['fail_count']}")
     for fl in res["fail_labels"]:
         print(f"      FAIL -> {fl}")
+    _aud = res.get("audit") or {}
+    if _aud:
+        print(f"  SHIP GATE   : {_aud.get('verdict')}  ·  {_aud.get('high', 0)} HIGH "
+              f"· {_aud.get('med', 0)} MED · {_aud.get('low', 0)} LOW "
+              f"· ship_ok={_aud.get('ship_ok')}")
 
 
 if __name__ == "__main__":

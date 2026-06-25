@@ -3721,6 +3721,60 @@ function checkEFuelSynthesisInvariants(): Assertion[] {
   return out
 }
 
+// ── BESS step-up transformer sizing invariant (2026-06-25) ────────────────────
+// Guards the undersizing fix: the step-up transformer apparent-power rating MUST
+// be DERIVED from the design continuous power, never pinned at 1250 kVA. Prior bug
+// — continuous power was corrected to read the brief (e.g. 2,500 kW) but the
+// transformer stayed at 1.25 MVA = exactly HALF rated power (overheat/trip at full
+// load, Physics Critic HIGH). Rule: transformer_rating_kva ≥ continuous_power_kw
+// × 1.1, and it must be a standard dry-type rating. iter-N catches iter-(N+1).
+function checkBessTransformerSizingInvariant(): Assertion[] {
+  const out: Assertion[] = []
+  const STANDARD_TRANSFORMER_KVA = [500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000]
+  // Two design points: the legacy 1 MW (rating must stay ≥1100 → 1250 kVA) and the
+  // 2.5 MW brief that exposed the bug (rating must be ≥2750 → 3150 kVA, NOT 1250).
+  const cases = [
+    { kw: 1000, label: '1 MW' },
+    { kw: 2500, label: '2.5 MW (the bug case)' },
+  ]
+  const failures: string[] = []
+  for (const c of cases) {
+    try {
+      const brief: any = {
+        product_description: `Containerised LFP BESS, ${(c.kw / 1000).toFixed(1)} MW continuous discharge, 2.69 MWh usable.`,
+        constraints: {
+          target_performance: {
+            value: 2688, unit: 'kWh',
+            metrics: [{ key_metric: 'rated_power', value: c.kw, unit: 'kW' }],
+          },
+        },
+      }
+      const contract: any = buildContract('bess', brief)
+      const kva = Number(contract?.quantities?.transformer_rating_kva?.value)
+      const cont = Number(contract?.quantities?.continuous_power_kw?.value)
+      const minKva = c.kw * 1.1
+      const expected = STANDARD_TRANSFORMER_KVA.find((k) => k >= minKva) ?? Math.ceil(minKva / 1000) * 1000
+      if (!(cont === c.kw)) failures.push(`${c.label}: continuous_power_kw read as ${cont}, expected ${c.kw}`)
+      if (!(kva > 0)) failures.push(`${c.label}: transformer_rating_kva missing/0 (${kva}) — lock to continuous power`)
+      else {
+        if (kva < minKva) failures.push(`${c.label}: transformer ${kva} kVA < continuous ${c.kw} kW × 1.1 = ${minKva} kVA — UNDERSIZED (the half-rated bug)`)
+        if (kva !== expected) failures.push(`${c.label}: transformer ${kva} kVA ≠ next standard ${expected} kVA`)
+        // The original bug: a 2.5 MW system stuck at 1250 kVA. Assert it's NOT 1250 there.
+        if (c.kw >= 2000 && kva <= 1250) failures.push(`${c.label}: transformer still pinned at ≤1250 kVA (${kva}) — the regression is back`)
+      }
+    } catch (err) {
+      failures.push(`${c.label}: buildContract('bess', …) threw: ${String(err).slice(0, 140)}`)
+    }
+  }
+  out.push(assertEq(
+    'BESS.transformer_rating_follows_continuous_power',
+    'BESS step-up transformer_rating_kva is DERIVED from continuous power (≥ continuous_power_kw × 1.1, next standard dry-type rating) — a 2.5 MW system gets ≥3150 kVA, never the half-rated 1250 kVA',
+    failures.length, (n) => n === 0,
+    () => `BESS transformer sizing wrong: ${failures.join(' ; ')}. Check transformerRatingKva derivation in registerArchetype('bess', …) in scripts/lib/engineering-contract.ts (next standard ≥ continuousKw × 1.1).`,
+  ))
+  return out
+}
+
 // ── Render worked-calc de-dup + Executive-Summary prose invariants (2026-06-05) ─
 //
 // Guards the two render-side fixes made after the co2-mineralisation-2sink-v6
@@ -10520,6 +10574,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // HARD slots + plan no-marine/irrigation (gate 34). Snapshot-independent,
   // memoised (builds the registered contract + runs the emitter once per run).
   for (const a of checkEFuelSynthesisInvariants()) assertions.push(a)
+  for (const a of checkBessTransformerSizingInvariant()) assertions.push(a)
 
   // Self-contained sub-module density-splitter (bin-pack rewrite) invariants —
   // load the CO₂ v12 fixture themselves + a synthetic ac/dc design; memoised so

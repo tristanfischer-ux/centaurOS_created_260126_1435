@@ -562,6 +562,11 @@ interface BessParams {
   thermalRejectionKw: number
   continuousPowerKw: number
   peakPowerKw: number
+  // Step-up transformer apparent-power rating (kVA), DERIVED from continuous
+  // power in the contract (2026-06-25 fix). The transformer word's nameplate,
+  // form, part_number + price ALL read this — never a hardcoded 1250 — so a
+  // 2,500 kW system gets a 3,000 kVA (3 MVA) unit, not a half-rated 1.25 MVA.
+  transformerRatingKva: number
   nameplateKwh: number
   usableKwh: number
   dodFraction: number
@@ -652,6 +657,18 @@ function deriveBessParams(contract: ContractShape): BessParams {
   const thermalRejectionKw = q(contract, 'thermal_rejection_min_kw', 30)
   const continuousPowerKw = q(contract, 'continuous_power_kw', 1000)
   const peakPowerKw = q(contract, 'peak_power_kw', 1250)
+  // Step-up transformer rating — read the contract's DERIVED value (2026-06-25 fix).
+  // Legacy contracts without the field fall back to the SAME universal rule the
+  // contract builder uses: next standard dry-type rating ≥ continuousPowerKw × 1.1
+  // (PF≈1 grid-tied PCS → kVA ≈ kW). Mirrors STANDARD_TRANSFORMER_KVA in
+  // engineering-contract.ts so legacy + current paths size identically.
+  const transformerRatingKva = (() => {
+    const fromContract = q(contract, 'transformer_rating_kva', 0)
+    if (fromContract > 0) return Math.round(fromContract)
+    const STANDARD_TRANSFORMER_KVA = [500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000]
+    const minKva = continuousPowerKw * 1.1
+    return STANDARD_TRANSFORMER_KVA.find((kva) => kva >= minKva) ?? Math.ceil(minKva / 1000) * 1000
+  })()
   const nameplateKwh = q(contract, 'nameplate_capacity_kwh', 3360)
   const usableKwh = q(contract, 'usable_capacity_kwh', 2688)
   const dodFraction = q(contract, 'dod_fraction', 0.80)
@@ -749,6 +766,7 @@ function deriveBessParams(contract: ContractShape): BessParams {
     thermalRejectionKw,
     continuousPowerKw,
     peakPowerKw,
+    transformerRatingKva,
     nameplateKwh,
     usableKwh,
     dodFraction,
@@ -1713,25 +1731,38 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
       // L48 council fix (2026-05-27, 4/4 seats): step_up_transformer was emitting
       // £38 (Engine B class curve for "transformer" radical, no MV qualifier).
       // 1 MVA 400V/11kV cast-resin dry-type UK trade ~£20-30k (Schneider Trihal,
-      // ABB EcoDry, Siemens GEAFOL). Pin Schneider Trihal at £25k.
-      word(
-        'step_up_transformer_word',
-        'step-up transformer word',
-        cc('step_up_transformer', 'step-up transformer', 'magnetic_coupling_function', 'copper'),
-        [
-          mod('quantity', '×1'),
-          // Phase B transformer fix: canonical rating is 1250 kVA / 1.25 MVA
-          // (resolves §0(II) single-source-of-truth violation — "1000kVA/1MVA"
-          // vs "1250kVA" contradiction in plan table row 5).
-          mod('capacity', '1.25', 'MVA'),
-          mod('manufacturer', 'Schneider Electric'),
-          mod('part_number', 'Trihal 1250kVA 400V/11kV'),
-          mod('list_price_gbp', '25000'),
-          mod('form', '1250 kVA / 1.25 MVA 400V/11kV cast-resin dry-type, external pad-mounted (excluded from container mass budget per IEC 62933-5-2 §6.4)'),
-          mod('regulatory', 'IEC 60076'),
-          mod('installation', 'external pad-mount'),
-        ],
-      ),
+      // ABB EcoDry, Siemens GEAFOL).
+      // 2026-06-25 UNDERSIZING FIX: rating, nameplate, part_number, form + price ALL
+      // derive from p.transformerRatingKva (contract-derived = next standard rating
+      // ≥ continuous_power_kw × 1.1). Prior bug pinned 1250 kVA / 1.25 MVA, so a
+      // 2,500 kW system shipped a HALF-rated transformer (Physics Critic HIGH:
+      // overheats/trips at full power). Price scales with rating off the £25k @
+      // 1250 kVA reference via kVA^0.7 (standard transformer cost-vs-rating curve):
+      // 3000 kVA → ~£46k (within the £40-55k 3 MVA dry-type trade band).
+      (() => {
+        const kva = p.transformerRatingKva
+        const mva = kva / 1000
+        // Trihal frame spans 100–3150 kVA; tag the model by its kVA so the PN is real.
+        const trihalKva = kva <= 3150 ? kva : 3150
+        const priceGbp = Math.round(25000 * Math.pow(kva / 1250, 0.7))
+        return word(
+          'step_up_transformer_word',
+          'step-up transformer word',
+          cc('step_up_transformer', 'step-up transformer', 'magnetic_coupling_function', 'copper'),
+          [
+            mod('quantity', '×1'),
+            // Canonical rating DERIVED from continuous power (single source of truth =
+            // contract.transformer_rating_kva), resolving §0(II) and the half-rated bug.
+            mod('capacity', mva.toFixed(2), 'MVA'),
+            mod('manufacturer', 'Schneider Electric'),
+            mod('part_number', `Trihal ${trihalKva}kVA 400V/11kV`),
+            mod('list_price_gbp', String(priceGbp)),
+            mod('form', `${kva} kVA / ${mva.toFixed(2)} MVA 400V/11kV cast-resin dry-type, external pad-mounted (excluded from container mass budget per IEC 62933-5-2 §6.4)`),
+            mod('regulatory', 'IEC 60076'),
+            mod('installation', 'external pad-mount'),
+          ],
+        )
+      })(),
       word(
         'transformer_neutral_grounding_word',
         'transformer neutral grounding word',
@@ -1804,11 +1835,12 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
 
   return {
     module: 'energy_conversion_transduction',
-    module_brief: `Converts ${(p.continuousPowerKw / 1000).toFixed(1)} MW continuous (${(p.peakPowerKw / 1000).toFixed(2)} MW peak) between the ${p.dcBusVoltageV} V DC pack bus and the AC grid via a bidirectional PCS (in-container) and a 400V/11kV dry-type step-up transformer (EXTERNAL pad-mounted outside the container per IEC 62933-5-2 §6.4 — keeps container mass within road-transport cap).`,
+    module_brief: `Converts ${(p.continuousPowerKw / 1000).toFixed(1)} MW continuous (${(p.peakPowerKw / 1000).toFixed(2)} MW peak) between the ${p.dcBusVoltageV} V DC pack bus and the AC grid via a bidirectional PCS (in-container) and a ${(p.transformerRatingKva / 1000).toFixed(2)} MVA 400V/11kV dry-type step-up transformer (EXTERNAL pad-mounted outside the container per IEC 62933-5-2 §6.4 — keeps container mass within road-transport cap).`,
     overview_paragraph_en: '',
     derived_parameters: {
       continuous_power_kw: p.continuousPowerKw,
       peak_power_kw: p.peakPowerKw,
+      transformer_rating_kva: p.transformerRatingKva,
       dc_bus_voltage_v: p.dcBusVoltageV,
       // PCS one-way efficiency (read by cooling_power gate for PCS heat estimation only)
       efficiency: 0.98,

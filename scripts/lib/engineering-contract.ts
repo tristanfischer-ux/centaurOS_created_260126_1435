@@ -740,16 +740,12 @@ registerArchetype('bess', (brief: any) => {
   const pcsMassKg = 1_500        // 1 MW outdoor PCS cabinet (Sungrow SC1000UD-MV class)
   const bmsCablingMassKg = 500   // BMS master + slaves + cabling + safety contactors
   const coolingMassKg = 1_000    // liquid cooling chiller + pumps + cold-plate manifolds
-  const transformerMassKg = 4_250  // 1 MVA dry-type — EXTERNAL, NOT counted in container mass
-  const inContainerMassKg = totalCellMassKg + containerTareKg + totalRackMassKg + pcsMassKg + bmsCablingMassKg + coolingMassKg
-  const massWithExternalTxfrKg = inContainerMassKg + transformerMassKg  // for transparency
-  // briefTargetFeasibility ALREADY accounts for capacity shortfall above; we
-  // OR in the mass shortfall here so the cover/critic see it surfaced.
-  const massFeasibility = inContainerMassKg <= briefMassCapKg
   // Continuous power — READ FROM THE BRIEF (2026-06-25 fix: was hardcoded 1000, ignoring a 2,500 kW
   // brief → the benchmark net flagged rated_power 2.5× under = RADICAL). Pull rated/continuous power
   // from target_performance.metrics (or the product description); default 1,000 kW only when truly
   // absent. Peak = 1.25× continuous (15-min overload), the prior ratio.
+  // Computed HERE (above the mass block) so the step-up-transformer rating + mass
+  // can both derive from it.
   const briefPowerKw = (() => {
     const mets = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
     for (const m of mets) {
@@ -766,6 +762,33 @@ registerArchetype('bess', (brief: any) => {
   })()
   const continuousKw = briefPowerKw
   const peakKw = Math.round(briefPowerKw * 1.25)
+  // Step-up transformer apparent-power rating (2026-06-25 fix): DERIVE from the
+  // design continuous power, never hardcode. Prior bug — the transformer word was
+  // pinned at 1250 kVA / 1.25 MVA (tied to the OLD 1 MW power); when continuous
+  // power was corrected to read the brief (e.g. 2,500 kW), the transformer rating
+  // did NOT follow, leaving it at exactly HALF rated power → overheat/trip at full
+  // load (Physics Critic HIGH). Universal: size to continuousKw × 1.1 (10% margin
+  // for harmonics + ambient) and round UP to the next standard dry-type rating.
+  // PF≈1 for a grid-tied PCS, so kVA ≈ kW; the 1.1× covers the small reactive +
+  // overload headroom. A 2,500 kW system → 2,750 kVA min → next standard 3,000 kVA
+  // (3 MVA); a 1,000 kW system → 1,100 kVA min → next standard 1,250 kVA (unchanged).
+  const STANDARD_TRANSFORMER_KVA = [500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000]
+  const transformerRatingMinKva = continuousKw * 1.1
+  const transformerRatingKva =
+    STANDARD_TRANSFORMER_KVA.find((kva) => kva >= transformerRatingMinKva) ??
+    // Above the largest standard single unit: round up to the next 1000 kVA.
+    Math.ceil(transformerRatingMinKva / 1000) * 1000
+  // EXTERNAL pad-mounted dry-type transformer — NOT counted in container mass.
+  // Mass scales with rating (2026-06-25 fix): 4,250 kg is a 1 MVA (1000 kVA)
+  // cast-resin dry-type reference; a ~3 MVA unit is materially heavier. Use the
+  // standard dry-type mass scaling exponent ~0.75 (mass ∝ kVA^0.75): a 3000 kVA
+  // unit → 4250 × (3000/1000)^0.75 ≈ 9,690 kg.
+  const transformerMassKg = Math.round(4_250 * Math.pow(transformerRatingKva / 1000, 0.75))
+  const inContainerMassKg = totalCellMassKg + containerTareKg + totalRackMassKg + pcsMassKg + bmsCablingMassKg + coolingMassKg
+  const massWithExternalTxfrKg = inContainerMassKg + transformerMassKg  // for transparency
+  // briefTargetFeasibility ALREADY accounts for capacity shortfall above; we
+  // OR in the mass shortfall here so the cover/critic see it surfaced.
+  const massFeasibility = inContainerMassKg <= briefMassCapKg
   const busContinuousA = (continuousKw * 1000) / dcBusVoltage  // 1250 A
   const busPeakA = (peakKw * 1000) / dcBusVoltage              // 1562 A
   // BESS L3 fix (2026-05-24, issue #3): per-string (per-rack) current =
@@ -839,6 +862,11 @@ registerArchetype('bess', (brief: any) => {
     brief_mass_cap_kg: q(briefMassCapKg, 'kg', 'mass', 'max', 'system', 'brief'),
     continuous_power_kw: q(continuousKw, 'kW', 'power', 'continuous', 'system', 'brief'),
     peak_power_kw: q(peakKw, 'kW', 'power', 'peak', 'system', 'brief', { condition: '15 min duration' }),
+    // Step-up transformer apparent-power rating — DERIVED from continuous power
+    // (2026-06-25 fix): next standard dry-type rating ≥ continuous_power_kw × 1.1.
+    // The deterministic emitter reads this as the transformer word's nameplate so
+    // the unit can never again be sized at half the rated power.
+    transformer_rating_kva: q(transformerRatingKva, 'kVA', 'power', 'rated', 'system', 'calculator', { source_detail: `next standard dry-type rating ≥ continuous_power_kw (${continuousKw} kW) × 1.1 = ${Math.round(transformerRatingMinKva)} kVA min` }),
     dc_bus_voltage_v: q(dcBusVoltage, 'V', 'dimensionless', 'rated', 'system', 'physics_constant'),
     bus_continuous_current_a: q(busContinuousA, 'A', 'dimensionless', 'continuous', 'system', 'calculator', { source_detail: 'continuous_kw × 1000 / dc_bus_voltage_v' }),
     bus_peak_current_a: q(busPeakA, 'A', 'dimensionless', 'peak', 'system', 'calculator'),
@@ -905,7 +933,7 @@ registerArchetype('bess', (brief: any) => {
     // full container audit, not just cells. Transformer is EXTERNAL pad-
     // mounted (industry standard) and excluded from the in-container budget.
     in_container_mass_kg: q(inContainerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `cells (${totalCellMassKg.toFixed(0)}) + shell (${containerTareKg}) + racks (${totalRackMassKg}) + PCS (${pcsMassKg}) + BMS/cable (${bmsCablingMassKg}) + cooling (${coolingMassKg}) kg — transformer EXCLUDED (external pad-mount)` }),
-    external_transformer_mass_kg: q(transformerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: '1 MVA dry-type EXTERNAL pad-mounted transformer, NOT in container mass per IEC 62933-5-2 §6.4' }),
+    external_transformer_mass_kg: q(transformerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `${(transformerRatingKva / 1000).toFixed(2)} MVA (${transformerRatingKva} kVA) dry-type EXTERNAL pad-mounted transformer, NOT in container mass per IEC 62933-5-2 §6.4` }),
     system_mass_with_external_kg: q(massWithExternalTxfrKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'in-container + external transformer; informational only — container mass cap applies to in_container_mass_kg' }),
     transformer_installation: q(1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'transformer_installation=1 means EXTERNAL pad-mount (industry standard per IEC 62933-5-2 §6.4 / NEC 706.10); =0 would mean in-container (legacy non-utility BESS only)' }),
     mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `1 iff in_container_mass_kg ≤ brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg` }),
