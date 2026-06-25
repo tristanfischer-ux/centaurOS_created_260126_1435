@@ -5809,13 +5809,24 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
     #     missing the updated renders + the external building). The exterior set is rendered to
     #     <run>/exterior/ from the SAME scene build (BLENDER_PLANT_SHELL=1).
     _ext = os.path.join(run_dir, "exterior")
+    # The full set for BOTH surfaces (Tristan 2026-06-25): hero + front-corner + top-down + back-
+    # corner, interior then exterior. Each is guarded by os.path.exists, so a class that renders
+    # fewer views simply gets fewer tabs (universal — no per-class assumption).
     for _p, _ttl, _cap in (
         (os.path.join(run_dir, "02-corner-FR.png"), "Render — Interior layout (view 2)",
-         "Interior plant layout — second angle."),
+         "Interior plant layout — front-corner angle."),
+        (os.path.join(run_dir, "01-top.png"), "Render — Interior layout (top)",
+         "Interior plant layout — top-down plan view."),
+        (os.path.join(run_dir, "03-corner-BL.png"), "Render — Interior layout (view 3)",
+         "Interior plant layout — back-corner angle."),
         (os.path.join(_ext, "00-hero.png"), "Render — Building exterior",
-         "Architectural exterior of the building enclosing the plant, view 1."),
+         "Architectural exterior of the container enclosure, view 1."),
         (os.path.join(_ext, "02-corner-FR.png"), "Render — Building exterior (view 2)",
-         "Architectural exterior — second angle."),
+         "Architectural exterior — front-corner angle."),
+        (os.path.join(_ext, "01-top.png"), "Render — Building exterior (top)",
+         "Architectural exterior — top-down view."),
+        (os.path.join(_ext, "03-corner-BL.png"), "Render — Building exterior (view 3)",
+         "Architectural exterior — back-corner angle."),
     ):
         if os.path.exists(_p):
             specs.append((_p, _ttl, _cap))
