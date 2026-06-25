@@ -151,6 +151,59 @@ def _norm_name(name) -> str:
     return s.strip("_")
 
 
+# Synonym tokens that name the SAME engineering concept under different words, so a
+# brief metric and a contract quantity can match even when the noun differs
+# (e.g. usable_energy ↔ usable_capacity, rated_power ↔ ac_output ↔ inverter_rating).
+# Deliberately SMALL — only well-established interchangeable engineering nouns — to
+# avoid over-broadening the matcher (we do NOT collapse, say, "mass" and "load").
+_SYNONYM_GROUPS = [
+    {"capacity", "energy", "storage"},
+    {"power", "output", "rating"},
+]
+# token -> canonical representative of its synonym group
+_SYNONYM_CANON = {}
+for _g in _SYNONYM_GROUPS:
+    _canon = sorted(_g)[0]
+    for _t in _g:
+        _SYNONYM_CANON[_t] = _canon
+
+
+def _norm_name_syn(name) -> str:
+    """Like _norm_name but folds each synonym token to its group's canonical token,
+    so synonyms collapse to the same base key (usable_capacity ≡ usable_energy)."""
+    base = _norm_name(name)
+    if not base:
+        return ""
+    toks = [t for t in base.split("_") if t]
+    folded = [_SYNONYM_CANON.get(t, t) for t in toks]
+    return "_".join(folded)
+
+
+# Direction of a brief metric: does the design MEET the target by being ≥ it, ≤ it,
+# or by being close? Inferred from the metric name / category, never from class.
+_HIGHER_BETTER_RX = re.compile(
+    r"\b(efficiency|effic|round_trip|rte|cop|yield|uptime|availability|"
+    r"throughput|capacity|energy|power|output|life|cycle|durab|range|"
+    r"speed|coverage|recovery|purity|selectivity)\b", re.I)
+_LOWER_BETTER_RX = re.compile(
+    r"\b(cost|price|capex|opex|mass|weight|footprint|area|loss|losses|"
+    r"emission|emissions|leak|downtime|payback|noise|consumption|spend)\b", re.I)
+
+
+def _metric_direction(name, category) -> str:
+    """Return 'higher' (meet-or-exceed), 'lower' (under-or-equal), or 'close'."""
+    text = f"{name or ''} {category or ''}"
+    # lower-better wins ties on cost/mass (those tokens are unambiguous)
+    if _LOWER_BETTER_RX.search(text):
+        return "lower"
+    if _HIGHER_BETTER_RX.search(text):
+        return "higher"
+    cat = str(category or "").strip().lower()
+    if cat in ("scale", "performance", "durability", "efficiency"):
+        return "higher"
+    return "close"
+
+
 def _num(x):
     """Coerce to float if possible, else None."""
     if x is None:
@@ -225,21 +278,61 @@ def _product_class(state) -> str:
 
 def _contract_match(state, metric_name, metric_unit):
     """
-    Return (key, value) of a contract quantity whose normalised name EQUALS the
+    Return (key, value) of a contract quantity whose normalised name matches the
     metric's normalised name and is in the SAME unit family, else (None, None).
     This is the deterministic "would the brief-compliance matcher find it" oracle.
+    Tries EXACT name first, then a synonym-folded match (usable_energy ↔
+    usable_capacity) so the matcher does not miss interchangeable engineering nouns.
     """
     fam = _unit_family(metric_unit)
     target = _norm_name(metric_name)
+    target_syn = _norm_name_syn(metric_name)
     if not target:
         return (None, None)
+    # Pass 1: exact normalised-name match in the same family.
     for k, v in _quantities(state).items():
         if not isinstance(v, dict):
             continue
         qfam = _unit_family(v.get("unit"))
         if _norm_name(k) == target and (fam == "" or qfam == "" or qfam == fam):
             return (k, v.get("value"))
+    # Pass 2: synonym-folded match (only when it adds a synonym, not pure re-check).
+    if target_syn and target_syn != target:
+        for k, v in _quantities(state).items():
+            if not isinstance(v, dict):
+                continue
+            qfam = _unit_family(v.get("unit"))
+            if _norm_name_syn(k) == target_syn and (fam == "" or qfam == "" or qfam == fam):
+                return (k, v.get("value"))
     return (None, None)
+
+
+def _convert_value(value, from_unit, to_unit):
+    """Convert a scalar between units of the SAME family using a small SI-prefix
+    ladder. Returns float in to_unit, or None if not convertible. Used so a brief
+    target in MWh can be compared to a contract value in kWh."""
+    v = _num(value)
+    if v is None:
+        return None
+    fu, tu = _norm_unit(from_unit), _norm_unit(to_unit)
+    if fu == tu:
+        return v
+    fam_f, fam_t = _unit_family(from_unit), _unit_family(to_unit)
+    if fam_f == "" or fam_f != fam_t:
+        return None
+    # multiplier to the family BASE unit (wh / w / v / a / g / m / l)
+    scale = {
+        "gwh": 1e9, "mwh": 1e6, "kwh": 1e3, "wh": 1.0,
+        "gw": 1e9, "mw": 1e6, "kw": 1e3, "w": 1.0,
+        "kv": 1e3, "v": 1.0, "mv": 1e-3,
+        "ka": 1e3, "a": 1.0, "ma": 1e-3,
+        "t": 1e6, "tonne": 1e6, "tonnes": 1e6, "te": 1e6, "kg": 1e3, "g": 1.0,
+        "km": 1e3, "m": 1.0, "cm": 1e-2, "mm": 1e-3,
+        "kl": 1e3, "m3": 1e3, "l": 1.0, "ml": 1e-3,
+    }
+    if fu not in scale or tu not in scale:
+        return None
+    return v * scale[fu] / scale[tu]
 
 
 # --------------------------------------------------------------------------- #
@@ -466,12 +559,22 @@ def check_drawing_coverage(state, rows, run_dir) -> list:
 
     grand = _num((ledger or {}).get("grand_total_gbp"))
 
-    # Find per-drawing coverage entries: look for a list of {expected, present, ...}.
+    # Find per-drawing coverage entries. The ledger may carry them as a LIST of
+    # {name, expected, present} OR a DICT keyed by drawing name -> {expected, present}
+    # (the real shape: `coverage_by_drawing`). Normalise to a list of (name, exp, pres).
     def _find_drawings(obj):
         if isinstance(obj, dict):
+            # dict-of-drawings (e.g. coverage_by_drawing) — every value carries
+            # expected/present.
             for k, v in obj.items():
-                if k in ("drawings", "coverage", "per_drawing") and isinstance(v, list):
-                    return v
+                if k in ("coverage_by_drawing", "drawings", "coverage", "per_drawing"):
+                    if isinstance(v, list):
+                        return [(str((d or {}).get("name") or i), d)
+                                for i, d in enumerate(v) if isinstance(d, dict)]
+                    if isinstance(v, dict):
+                        return [(str(name), d) for name, d in v.items()
+                                if isinstance(d, dict) and (
+                                    "expected" in d or "present" in d)]
             for v in obj.values():
                 r = _find_drawings(v)
                 if r:
@@ -479,10 +582,11 @@ def check_drawing_coverage(state, rows, run_dir) -> list:
         return None
 
     drawings = _find_drawings(ledger) or []
-    all_zero = bool(drawings) and all(
-        (_num(d.get("expected")) or 0) == 0 and (_num(d.get("present")) or 0) == 0
-        for d in drawings if isinstance(d, dict)
-    )
+    parsed = [
+        (name, _num(d.get("expected")) or 0, _num(d.get("present")) or 0)
+        for name, d in drawings if isinstance(d, dict)
+    ]
+    all_zero = bool(parsed) and all(exp == 0 and pres == 0 for _, exp, pres in parsed)
 
     if all_zero or (grand is not None and grand == 0):
         out.append(Finding(
@@ -492,6 +596,25 @@ def check_drawing_coverage(state, rows, run_dir) -> list:
             actual="0/0 coverage" if all_zero else f"grand_total_gbp=£{grand:,.0f}",
             expected="non-zero coverage and grand total",
             source_rule="parts-ledger must be populated with per-drawing coverage",
+        ))
+        return out
+
+    # PARTIAL coverage: any drawing with present < expected (not the 0/0 degenerate
+    # case). Report the worst-covered drawings.
+    partial = [
+        (name, exp, pres) for name, exp, pres in parsed
+        if exp > 0 and pres < exp
+    ]
+    if partial:
+        partial.sort(key=lambda t: (t[2] / t[1]) if t[1] else 1.0)
+        worst = "; ".join(f"{n}: {int(p)}/{int(e)}" for n, e, p in partial[:4])
+        out.append(Finding(
+            tab=tab, check="coverage_partial", severity="HIGH",
+            message=(f"{len(partial)} drawing(s) are only PARTIALLY covered "
+                     f"(present < expected). Worst: {worst}"),
+            actual=f"{len(partial)} partial drawings",
+            expected="every drawing fully covered (present = expected)",
+            source_rule="every engineering drawing must represent every expected part",
         ))
     return out
 
@@ -637,6 +760,506 @@ def check_class_templates(state, rows, run_dir) -> list:
 
 
 # --------------------------------------------------------------------------- #
+# Shared row helpers for the new checks
+# --------------------------------------------------------------------------- #
+
+def _principal_rows(rows) -> list:
+    """Principal lines: not SUB-COMPONENT and priced > 0."""
+    return [
+        r for r in rows
+        if isinstance(r, dict)
+        and _status(r) != "SUB-COMPONENT"
+        and (_num(r.get("line_gbp")) or 0) > 0
+    ]
+
+
+def _row_name(r) -> str:
+    return str(r.get("part") or r.get("requirement") or r.get("name_human") or "").strip()
+
+
+# Words stripped when reducing a part name to its functional NOUN for duplicate
+# detection. Brand/model tokens vary; the function (pump/inverter/transformer) is
+# the equivalence key.
+_NOUN_STOP_RX = re.compile(
+    r"\b(the|a|an|of|for|with|and|x|series|model|type|grade|class|"
+    r"unit|assembly|module|kit|set|mk|rev)\b", re.I)
+
+
+def _functional_noun(name) -> str:
+    """Reduce a part description to a small bag of meaningful tokens (lowercased,
+    de-branded heuristically) — used as the 'same component by function' key."""
+    s = str(name or "").lower()
+    s = re.sub(r"[^a-z0-9 ]+", " ", s)
+    s = _NOUN_STOP_RX.sub(" ", s)
+    toks = [t for t in s.split() if len(t) > 2 and not t.isdigit()]
+    return " ".join(sorted(set(toks)))
+
+
+def _row_spec(r) -> str:
+    """A coarse rating/spec signature from the requirement text (numbers + units),
+    so two same-noun lines only count as duplicates when their key rating agrees."""
+    text = f"{r.get('requirement','')} {r.get('part','')}"
+    nums = re.findall(r"\d+(?:\.\d+)?\s*[a-zA-Z%°]+", text)
+    return " ".join(sorted(n.replace(" ", "").lower() for n in nums))
+
+
+# --------------------------------------------------------------------------- #
+# Check 9 — Brief metric MEET/FAIL (Exec Summary / Checks)
+# --------------------------------------------------------------------------- #
+
+def check_brief_metric_fail(state, rows, run_dir) -> list:
+    """For each brief metric that DOES match a contract quantity, decide whether the
+    achieved value MEETS the target (respecting direction). Emit HIGH on a real
+    design miss (e.g. dc_bus_voltage_v target 1500 V, achieved 800 V). The existing
+    audit only ever flags UNVERIFIED — it never catches a value that is present but
+    fails the brief."""
+    tab = "Exec Summary / Checks"
+    out: list = []
+    TOL = 0.02  # 2% tolerance for "meets" on equality/close metrics
+    for m in _brief_metrics(state):
+        name = _metric_name(m)
+        if not name:
+            continue
+        unit = m.get("unit")
+        target = _num(m.get("value") if isinstance(m, dict) else None)
+        if target is None:
+            continue
+        qk, qv = _contract_match(state, name, unit)
+        if qk is None:
+            continue  # no matched quantity -> brief_compliance/cross_tab handle UNVERIFIED
+        # Convert the achieved value into the brief metric's unit where possible.
+        qunit = (_quantities(state).get(qk) or {}).get("unit")
+        achieved = _convert_value(qv, qunit, unit)
+        if achieved is None:
+            achieved = _num(qv)
+        if achieved is None:
+            continue
+        direction = _metric_direction(name, m.get("category") if isinstance(m, dict) else None)
+        meets = True
+        if direction == "higher":
+            meets = achieved >= target * (1 - TOL)
+        elif direction == "lower":
+            meets = achieved <= target * (1 + TOL)
+        else:  # close
+            meets = abs(achieved - target) <= abs(target) * TOL or target == 0
+        if not meets:
+            u = str(unit or "").strip()
+            out.append(Finding(
+                tab=tab, check="brief_metric_fail", severity="HIGH",
+                message=(f"brief metric '{name}': target {target:g}{u} but design "
+                         f"achieves {achieved:g}{u} (via {qk}) — does not meet the brief"),
+                actual=f"{achieved:g}{u}", expected=f"{target:g}{u} ({direction}-is-better)",
+                source_rule="every matched brief metric must MEET its target, not merely be present",
+            ))
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Check 10 — Capex reconciliation (Overview / Financial)
+# --------------------------------------------------------------------------- #
+
+def check_capex_reconciliation(state, rows, run_dir) -> list:
+    """Reconcile the headline/installed capex against the BoM grand total (Σ line_gbp
+    over non-SUB-COMPONENT rows). Catches 'the chart shows £11.6k while the bill is
+    £797k' by RECONCILIATION rather than guessing connection ratios."""
+    tab = "Overview / Exec Summary"
+    out: list = []
+    if not isinstance(rows, list) or not rows:
+        return out
+    nonchild = [r for r in rows if isinstance(r, dict) and _status(r) != "SUB-COMPONENT"]
+    bom_total = sum((_num(r.get("line_gbp")) or 0) for r in nonchild)
+    if bom_total <= 0:
+        return out
+
+    cs = state.get("costStack") if isinstance(state.get("costStack"), dict) else {}
+    installed = None
+    inst_src = ""
+    for key in ("installed_asp_gbp", "oem_transfer_price_gbp", "raw_materials_bom_gbp"):
+        val = _num(cs.get(key))
+        if val is not None and val > 0:
+            installed, inst_src = val, key
+            break
+
+    if installed is not None:
+        ratio = installed / bom_total
+        # installed capex should be a sane multiple of the raw BoM (markup, labour,
+        # overhead, margin, install). Outside 0.8×–4× is a reconciliation failure.
+        if ratio < 0.8 or ratio > 4.0:
+            out.append(Finding(
+                tab=tab, check="capex_reconciliation", severity="HIGH",
+                message=(f"installed capex (£{installed:,.0f} via {inst_src}) is "
+                         f"{ratio:.2f}× the BoM grand total (£{bom_total:,.0f}) — outside "
+                         f"the sane 0.8×–4× band; the headline capex does not reconcile "
+                         f"with the bill of materials"),
+                actual=f"£{installed:,.0f} ({ratio:.2f}× BoM)",
+                expected=f"0.8×–4× of £{bom_total:,.0f}",
+                source_rule="installed/headline capex must reconcile to Σ(BoM line_gbp) within a sane multiple",
+            ))
+
+    # Also reconcile the raw_materials_bom_gbp 'capex by category' figure: if a
+    # rendered category total is wildly LESS than the bill (< 50% of the BoM grand
+    # total) the chart is showing a fraction of the real bill.
+    raw_cat = _num(cs.get("raw_materials_bom_gbp"))
+    if raw_cat is not None and raw_cat > 0 and raw_cat < 0.5 * bom_total:
+        out.append(Finding(
+            tab=tab, check="capex_reconciliation", severity="HIGH",
+            message=(f"capex-by-category raw-materials figure (£{raw_cat:,.0f}) is under "
+                     f"half the BoM grand total (£{bom_total:,.0f}) — the cover figure "
+                     f"undercounts the bill"),
+            actual=f"£{raw_cat:,.0f} vs bill £{bom_total:,.0f}",
+            expected=f"≈ £{bom_total:,.0f}",
+            source_rule="capex-by-category figure must sum to the BoM grand total",
+        ))
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Check 11 — Duplicate principal by function (Bill of Materials)
+# --------------------------------------------------------------------------- #
+
+# Placeholder PART values that are not a real manufacturer+model identity — a shared
+# placeholder is NOT evidence of a duplicate (two different requirements can both read
+# "made to spec"). The duplicate signal must come from a real part identity.
+_PART_PLACEHOLDER_RX = re.compile(
+    r"^(made to spec|requirement stated|bespoke|custom|tbd|n/?a|generic|"
+    r"as required|to spec|standard|none|—|-)\s*$", re.I)
+
+
+def _is_placeholder_part(name) -> bool:
+    return bool(_PART_PLACEHOLDER_RX.match(str(name or "").strip()))
+
+
+def check_duplicate_principal(state, rows, run_dir) -> list:
+    """Two PRINCIPAL lines that are the SAME component by function — same REQUIREMENT
+    noun AND the same real part identity AND the same key rating — under different
+    modules = likely a double-definition.
+
+    False-positive discipline: a duplicate must be a real part IDENTITY repeated for
+    the SAME function. Lines whose `part` is a placeholder ("made to spec") are skipped
+    (a shared placeholder across two different requirements is not a duplicate); and a
+    generic commodity SKU re-used on two genuinely different requirements (a Brady
+    label on a 'DC isolator label' and a 'padlock') is not flagged because the
+    REQUIREMENT noun differs."""
+    tab = "Bill of Materials"
+    out: list = []
+    if not isinstance(rows, list):
+        return out
+    principals = _principal_rows(rows)
+    groups: dict = {}
+    for r in principals:
+        part = _row_name(r)
+        if _is_placeholder_part(part):
+            continue
+        part_flat = _flat(part)
+        if len(part_flat) < 5:
+            continue  # too generic / ambiguous to assert identity
+        req_noun = _functional_noun(r.get("requirement") or part)
+        # KEY = real part identity + the requirement-function noun + key rating.
+        key = (part_flat, req_noun, _row_spec(r))
+        groups.setdefault(key, []).append(r)
+    for (part_flat, req_noun, spec), grp in groups.items():
+        if len(grp) < 2:
+            continue
+        modules = {str(r.get("module") or "").strip().lower() for r in grp}
+        reqs = {str(r.get("requirement") or "").strip().lower() for r in grp}
+        # A real double-definition: same part + same requirement re-entered. Require
+        # ≥2 distinct module placements OR identical requirement repeated (qty>1 would
+        # be ONE line, so two rows of the same req+part is a genuine duplication).
+        distinct_modules = len([m for m in modules if m])
+        if distinct_modules < 2 and len(reqs) > 1:
+            continue
+        name = _row_name(grp[0]) or req_noun
+        where = (f"{distinct_modules} modules" if distinct_modules >= 2
+                 else f"{len(grp)} lines for the same requirement")
+        out.append(Finding(
+            tab=tab, check="duplicate_principal", severity="HIGH",
+            message=(f"duplicate principal: '{name}'"
+                     f"{(' · ' + spec) if spec else ''} appears {len(grp)}× across "
+                     f"{where} — likely a double-definition"),
+            actual=f"{len(grp)} identical principal lines",
+            expected="one line (with qty) per distinct component",
+            source_rule="a principal component must not be defined twice across modules",
+        ))
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Check 12 — Phantom reference in connection trace
+# --------------------------------------------------------------------------- #
+
+def _flat(x) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(x or "").lower())
+
+
+def _add_name_to_index(idx, name):
+    nm = str(name or "").strip()
+    if not nm:
+        return
+    idx.add(_functional_noun(nm))
+    idx.add(_flat(nm))
+
+
+def _design_part_names(state) -> list:
+    """Every principal/equipment NAME the design knows about, beyond requirementsBom:
+    the moduleDecomposition word `name_human`s and any ledger equipment names. The
+    connection trace is built from the design's equipment graph (a different
+    name-space than the requirements rows), so we must resolve against BOTH."""
+    names: list = []
+    md = state.get("moduleDecomposition") or {}
+    for m in (md.get("modules") or []):
+        if not isinstance(m, dict):
+            continue
+        for sm in (m.get("sub_modules") or []):
+            if not isinstance(sm, dict):
+                continue
+            for w in (sm.get("words") or []):
+                if isinstance(w, dict):
+                    nh = w.get("name_human") or w.get("requirement")
+                    if nh:
+                        names.append(str(nh))
+    return names
+
+
+def _bom_name_index(rows, state=None, run_dir=None) -> set:
+    """Normalised name index of every real part the design knows: requirementsBom
+    lines + design words (name_human) + ledger equipment. Resolution against this
+    union avoids a false-positive storm from the connection-trace name-space being
+    formatted differently than the requirements rows."""
+    idx = set()
+    for r in rows if isinstance(rows, list) else []:
+        if isinstance(r, dict):
+            _add_name_to_index(idx, _row_name(r))
+            _add_name_to_index(idx, r.get("tag"))
+    if state is not None:
+        for nm in _design_part_names(state):
+            _add_name_to_index(idx, nm)
+    ledger = _load_parts_ledger(run_dir) if run_dir else None
+    if isinstance(ledger, dict):
+        for eq in (ledger.get("equipment") or []):
+            if isinstance(eq, dict):
+                _add_name_to_index(idx, eq.get("name") or eq.get("part") or eq.get("name_human"))
+                _add_name_to_index(idx, eq.get("tag"))
+    idx.discard("")
+    return idx
+
+
+def _load_parts_ledger(run_dir):
+    path = os.path.join(run_dir or "", "parts-ledger.json")
+    if run_dir and os.path.isfile(path):
+        try:
+            with open(path, "r") as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            return None
+    return None
+
+
+def _collect_connection_refs(state, run_dir) -> list:
+    """Gather referenced part NAMES from any connection-trace / connectivity structure
+    in state OR the parts-ledger. Returns a list of (label, name) tuples. Empty if no
+    such structure exists (caller then skips silently)."""
+    refs: list = []
+    sources = []
+    # state-side structures
+    for key in ("connectionTrace", "connections", "connectivity", "topology"):
+        v = state.get(key)
+        if v is not None:
+            sources.append(v)
+    # parts-ledger structures (the realistic location)
+    ledger = _load_parts_ledger(run_dir)
+    if isinstance(ledger, dict):
+        for key in ("connections", "connectivity", "cabinets"):
+            if key in ledger:
+                sources.append(ledger[key])
+
+    def _walk(obj, ctx):
+        if isinstance(obj, dict):
+            # rows-of {part, inputs, outputs} or {from_part, to_part}
+            for fk in ("from_part", "to_part", "part", "name", "name_human"):
+                val = obj.get(fk)
+                if isinstance(val, str) and val.strip():
+                    refs.append((ctx, val.strip()))
+            for ik in ("inputs", "outputs"):
+                seq = obj.get(ik)
+                if isinstance(seq, list):
+                    for it in seq:
+                        if isinstance(it, str) and it.strip():
+                            refs.append((ctx, it.strip()))
+                        elif isinstance(it, dict):
+                            _walk(it, ctx)
+            for vv in obj.values():
+                if isinstance(vv, (dict, list)):
+                    _walk(vv, ctx)
+        elif isinstance(obj, list):
+            for it in obj:
+                _walk(it, ctx)
+
+    for src in sources:
+        _walk(src, "connection-trace")
+    return refs
+
+
+# Reference labels that are structural placeholders, not parts (collapsed / skipped).
+_REF_STOP_RX = re.compile(
+    r"\b(the|a|an|of|for|with|and|to|from|via|x|series|model|unit|assembly|"
+    r"module|kit|set|mk|rev|mw|kw|kv|v|a|mm|m|dn|sch|nominal|bidirectional)\b", re.I)
+
+
+def _ref_noun(name) -> str:
+    """Reduce a connection-trace endpoint label to a comparable noun bag: strip array
+    indices (Rack[0]->Rack), parentheses ((Busway)->Busway), units, and stop-words."""
+    s = str(name or "")
+    s = re.sub(r"\[\d+\]", "", s)            # Rack[0] -> Rack
+    s = re.sub(r"[()\[\]]", " ", s)          # drop bracketing
+    s = re.sub(r"[^a-z0-9 ]+", " ", s.lower())
+    s = _REF_STOP_RX.sub(" ", s)
+    toks = [t for t in s.split() if len(t) > 2 and not t.isdigit()]
+    return " ".join(sorted(set(toks)))
+
+
+def check_phantom_reference(state, rows, run_dir) -> list:
+    """Every part referenced by a connection trace must resolve to a real part the
+    design knows (requirementsBom line / design word / ledger equipment). Flags a
+    reference that resolves to NOTHING (e.g. a trace pointing at 'cabinets' when no
+    such part exists). Skips silently when no connection structure is present.
+
+    False-positive discipline: the connection trace is built from the design's
+    equipment graph, formatted differently than the requirements rows — so we resolve
+    against the UNION of all known part name-spaces, collapse array-index artefacts
+    (Rack[0..23] -> one 'Rack'), and require a real token mismatch before flagging."""
+    tab = "Connectivity / Drawings"
+    out: list = []
+    refs = _collect_connection_refs(state, run_dir)
+    if not refs:
+        return out
+    idx = _bom_name_index(rows, state=state, run_dir=run_dir)
+    if not idx:
+        return out  # nothing to resolve against -> can't judge; stay silent
+    idx_tokens = set()
+    for bnoun in idx:
+        idx_tokens.update(t for t in bnoun.split() if len(t) > 2)
+
+    seen = set()
+    for _ctx, name in refs:
+        nn = _ref_noun(name)
+        flat = _flat(re.sub(r"\[\d+\]", "", str(name)))
+        if not nn and not flat:
+            continue
+        toks = set(nn.split())
+        resolved = False
+        # (a) flattened-name substring match against any known flattened name
+        for bnoun in idx:
+            if flat and bnoun and (flat in bnoun or bnoun in flat):
+                resolved = True
+                break
+        # (b) ANY meaningful token of the reference appears in the known token set
+        if not resolved and toks and (toks & idx_tokens):
+            resolved = True
+        if resolved:
+            continue
+        canon = re.sub(r"\[\d+\]", "", str(name)).strip().lower()
+        if canon in seen:
+            continue  # collapse Rack[0..23] -> one finding
+        seen.add(canon)
+        out.append(Finding(
+            tab=tab, check="phantom_reference", severity="HIGH",
+            message=(f"connection trace references '{name}' but no such part exists "
+                     f"in the bill of materials / design"),
+            actual=f"reference '{name}'",
+            expected="every referenced part resolves to a real BoM/design part",
+            source_rule="connection-trace references must resolve to real BoM/design parts",
+        ))
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Check 13 — Traceability basis (Bill of Materials)
+# --------------------------------------------------------------------------- #
+
+def check_traceability_basis(state, rows, run_dir) -> list:
+    """Every PRINCIPAL line must carry a non-empty `basis` (provenance). Count
+    principals with a blank/missing basis and flag the untraceable lines."""
+    tab = "Bill of Materials"
+    out: list = []
+    if not isinstance(rows, list):
+        return out
+    principals = _principal_rows(rows)
+    if not principals:
+        return out
+    blank = [r for r in principals
+             if str(r.get("basis") or "").strip() in ("", "—", "-", "none", "None", "n/a", "N/A")]
+    if not blank:
+        return out
+    sev = "HIGH" if len(blank) >= max(3, 0.1 * len(principals)) else "MED"
+    ex = "; ".join(_row_name(r)[:40] or "?" for r in blank[:3])
+    out.append(Finding(
+        tab=tab, check="traceability_basis", severity=sev,
+        message=(f"{len(blank)} of {len(principals)} principal lines have no provenance "
+                 f"(basis) — the number's source is untraceable. Examples: {ex}"),
+        actual=f"{len(blank)} without basis",
+        expected="every principal line carries a basis string",
+        source_rule="every principal BoM line must record its provenance in `basis`",
+    ))
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Check 14 — Tag validity & uniqueness (Bill of Materials)
+# --------------------------------------------------------------------------- #
+
+_TAG_RX = re.compile(r"^[A-Z]{1,3}-?\d+[A-Za-z0-9.\-]*$")
+_TAG_GARBAGE = {"tbd", "x", "0", "n/a", "na", "none", "?", "todo"}
+
+
+def check_tag_validity(state, rows, run_dir) -> list:
+    """Harden the tag check: a principal tag must be present, look like a real tag,
+    and be UNIQUE across the bill. (The existing tag_coverage HIGH for any untagged
+    principal stays in check_bom; this adds validity + uniqueness.)"""
+    tab = "Bill of Materials"
+    out: list = []
+    if not isinstance(rows, list):
+        return out
+    principals = _principal_rows(rows)
+    if not principals:
+        return out
+
+    garbage = []
+    counts: dict = {}
+    for r in principals:
+        raw = str(r.get("tag") or "").strip()
+        if _tag_missing(raw):
+            continue  # tag_coverage already flags missing
+        low = raw.lower()
+        if low in _TAG_GARBAGE or not _TAG_RX.match(raw):
+            garbage.append((r, raw))
+        counts[raw] = counts.get(raw, 0) + 1
+
+    if garbage:
+        ex = "; ".join(f"{_row_name(r)[:24]}='{t}'" for r, t in garbage[:3])
+        out.append(Finding(
+            tab=tab, check="tag_validity", severity="HIGH",
+            message=(f"{len(garbage)} principal lines carry a garbage/invalid tag "
+                     f"(not a real X-/P-/TK- identifier). Examples: {ex}"),
+            actual=f"{len(garbage)} invalid tags",
+            expected="every tag matches a real tag pattern (e.g. P-101)",
+            source_rule="a principal tag must be a recognised, non-placeholder identifier",
+        ))
+
+    dups = {t: n for t, n in counts.items() if n > 1}
+    if dups:
+        ex = "; ".join(f"'{t}'×{n}" for t, n in list(dups.items())[:3])
+        out.append(Finding(
+            tab=tab, check="tag_validity", severity="HIGH",
+            message=(f"{len(dups)} tag(s) are reused across principal lines — tags must "
+                     f"be unique. Examples: {ex}"),
+            actual=f"{len(dups)} duplicated tags",
+            expected="every principal tag unique across the bill",
+            source_rule="a drawing-cross-reference tag must be unique across the bill of materials",
+        ))
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Aggregator
 # --------------------------------------------------------------------------- #
 
@@ -649,6 +1272,13 @@ _CHECKS = [
     check_physics_critic,
     check_economics,
     check_class_templates,
+    # --- added checks (deterministic, universal) ---
+    check_brief_metric_fail,        # 9  brief target present but FAILS (e.g. dc_bus 800<1500)
+    check_capex_reconciliation,     # 10 installed/headline capex vs Σ BoM line_gbp
+    check_duplicate_principal,      # 11 same component defined twice across modules
+    check_phantom_reference,        # 12 connection trace references a non-existent part
+    check_traceability_basis,       # 13 principal line with no provenance (basis)
+    check_tag_validity,             # 14 garbage / duplicate principal tags
 ]
 
 
@@ -692,6 +1322,11 @@ def _selftest() -> int:
             "quantities": {
                 # same base name as brief metric, but kWh vs the brief's MWh -> matcher gap
                 "nameplate_capacity_kwh": {"value": 3360, "unit": "kWh", "family": "energy"},
+                # MEETS-by-conversion-and-synonym (usable_capacity ↔ usable_energy):
+                # 4500 kWh = 4.5 MWh ≥ 4.5 MWh target -> no brief_metric_fail (clean direction)
+                "usable_capacity_kwh": {"value": 4500, "unit": "kWh", "family": "energy"},
+                # FAILS the brief: achieved 800 V vs target 1500 V (the real design miss)
+                "dc_bus_voltage_v": {"value": 800, "unit": "V", "family": "voltage"},
             },
         },
         "parsedBrief": {
@@ -700,13 +1335,20 @@ def _selftest() -> int:
                 "target_performance": {
                     "metrics": [
                         {"key_metric": "nameplate_capacity_mwh", "value": 3, "unit": "MWh"},
+                        {"key_metric": "usable_energy_mwh", "value": 4.5, "unit": "MWh",
+                         "category": "performance"},
+                        {"key_metric": "dc_bus_voltage_v", "value": 1500, "unit": "V",
+                         "category": "performance"},
                     ]
                 }
             },
         },
         "keyMetrics": {"headline_output": {"id": "nameplate_capacity_mwh",
                                            "label": "Nameplate", "value": "3", "unit": "MWh"}},
-        "costStack": {"installed_asp_gbp": 0},  # -> HIGH installed capex £0; bess -> MED no-revenue
+        "costStack": {
+            "installed_asp_gbp": 0,            # -> HIGH installed capex £0; bess -> MED no-revenue
+            "raw_materials_bom_gbp": 1000,     # -> HIGH capex_reconciliation (1000 << bill 50009)
+        },
         "physicsCritique": {"issues": [
             {"severity": "high", "title": "Transformer undersized 2x"},
             {"severity": "high", "issue": "Racks do not fit the container"},
@@ -729,6 +1371,26 @@ def _selftest() -> int:
         # big connection line dominating the bill (drives capex-category HIGH)
         {"tag": "C-1", "requirement": "DC cabling", "status": "UTILITY",
          "part": "cable run", "qty": 1, "unit_gbp": 50000, "line_gbp": 50000, "basis": "x"},
+        # duplicate principal: same Grundfos pump defined twice under different modules
+        {"tag": "P-9", "module": "thermal", "requirement": "Coolant pump · 50 m3h",
+         "status": "IDENTIFIED", "part": "Grundfos NB 50-160 pump",
+         "qty": 1, "unit_gbp": 3000, "line_gbp": 3000, "basis": "catalogue"},
+        {"tag": "P-9b", "module": "fire_suppression", "requirement": "Coolant pump · 50 m3h",
+         "status": "IDENTIFIED", "part": "Grundfos NB 50-160 pump",
+         "qty": 1, "unit_gbp": 3000, "line_gbp": 3000, "basis": "catalogue"},
+        # blank-basis principals (>=3 -> HIGH traceability_basis)
+        {"tag": "B-1", "requirement": "Busbar set", "status": "IDENTIFIED",
+         "part": "Cu busbar", "qty": 1, "unit_gbp": 400, "line_gbp": 400, "basis": ""},
+        {"tag": "B-2", "requirement": "Enclosure", "status": "IDENTIFIED",
+         "part": "Steel enclosure", "qty": 1, "unit_gbp": 700, "line_gbp": 700, "basis": "—"},
+        {"tag": "B-3", "requirement": "Gland plate", "status": "IDENTIFIED",
+         "part": "Gland plate", "qty": 1, "unit_gbp": 90, "line_gbp": 90},
+        # garbage tag (HIGH tag_validity)
+        {"tag": "TBD", "requirement": "HMI", "status": "IDENTIFIED",
+         "part": "Touchscreen", "qty": 1, "unit_gbp": 800, "line_gbp": 800, "basis": "x"},
+        # duplicate tag X-1 reused (HIGH tag_validity uniqueness)
+        {"tag": "X-1", "requirement": "Contactor", "status": "IDENTIFIED",
+         "part": "Contactor", "qty": 1, "unit_gbp": 250, "line_gbp": 250, "basis": "x"},
         # child — excluded from principal checks
         {"tag": "X-1.1", "requirement": "cell", "status": "SUB-COMPONENT",
          "part": "cell", "qty": 100, "unit_gbp": 1, "line_gbp": 100, "basis": "x"},
@@ -748,7 +1410,21 @@ def _selftest() -> int:
     expect("installed_capex" in checks, "A: expected installed_capex HIGH (£0)")
     expect("no_revenue_line" in checks, "A: expected no_revenue_line MED (bess, no revenue)")
     expect("process_template_leak" in checks, "A: expected process_template_leak MED (hydrostatic in bess)")
+    # ---- new checks fire on dirty data ----
+    expect("brief_metric_fail" in checks, "A: expected brief_metric_fail HIGH (dc_bus 800<1500)")
+    expect("capex_reconciliation" in checks, "A: expected capex_reconciliation HIGH (£1000 << bill)")
+    expect("duplicate_principal" in checks, "A: expected duplicate_principal HIGH (2× Grundfos pump)")
+    expect("traceability_basis" in checks, "A: expected traceability_basis HIGH (3 blank basis)")
+    expect("tag_validity" in checks, "A: expected tag_validity HIGH (garbage + duplicate tags)")
     expect(sc["verdict"] == "FAIL" and sc["ship_ok"] is False, f"A: expected FAIL/ship_ok=False, got {sc}")
+
+    # brief_metric_fail must name the dc_bus miss specifically, and NOT fire on the
+    # usable-energy metric that MEETS by synonym+conversion (4.5 MWh = 4500 kWh).
+    bmf = [f for f in rep.findings if f.check == "brief_metric_fail"]
+    expect(any("dc_bus_voltage_v" in f.message for f in bmf),
+           "A: brief_metric_fail should name dc_bus_voltage_v")
+    expect(not any("usable_energy" in f.message for f in bmf),
+           "A: brief_metric_fail must NOT fire on usable_energy (meets via synonym+conversion)")
 
     # physics finding must name the first titles
     phys = [f for f in rep.findings if f.check == "unresolved_high_physics"][0]
@@ -774,7 +1450,9 @@ def _selftest() -> int:
             },
         },
         "keyMetrics": {"headline_output": {"id": "throughput_units", "value": "1000", "unit": "units"}},
-        "costStack": {"installed_asp_gbp": 250000},
+        # installed capex within a sane multiple of the £11,600 BoM (≈2.5×) so
+        # capex_reconciliation stays silent on the clean fixture.
+        "costStack": {"installed_asp_gbp": 29000},
         "physicsCritique": {"issues": [{"severity": "low", "title": "cosmetic"}]},
     }
     clean_rows = [
@@ -816,6 +1494,55 @@ def _selftest() -> int:
         expect("coverage_empty" in {f.check for f in repd.findings},
                "D: expected coverage_empty HIGH for 0/0 ledger")
 
+        # ---- Fixture D2: DICT-keyed coverage_by_drawing 0/0 (the REAL shape that
+        # the old _find_drawings missed) -> still HIGH coverage_empty --------------
+        with open(os.path.join(td, "parts-ledger.json"), "w") as fh:
+            json.dump({"grand_total_gbp": 0, "coverage_by_drawing": {
+                "pid": {"expected": 0, "present": 0, "pct": None},
+                "single-line-diagram": {"expected": 0, "present": 0, "pct": None},
+            }}, fh)
+        repd2 = audit_dossier(clean_state, clean_rows, run_dir=td)
+        expect("coverage_empty" in {f.check for f in repd2.findings},
+               "D2: expected coverage_empty on DICT-keyed coverage_by_drawing 0/0")
+
+    # ---- Fixture E: PARTIAL drawing coverage -> HIGH coverage_partial ----------
+    with tempfile.TemporaryDirectory() as te:
+        with open(os.path.join(te, "parts-ledger.json"), "w") as fh:
+            json.dump({"grand_total_gbp": 11000, "coverage_by_drawing": {
+                "pid": {"expected": 104, "present": 11},      # badly under-covered
+                "block-flow-diagram": {"expected": 22, "present": 7},
+                "general-arrangement": {"expected": 5, "present": 5},  # full -> not flagged
+            }}, fh)
+        repe = audit_dossier(clean_state, clean_rows, run_dir=te)
+        checkse = {f.check for f in repe.findings}
+        expect("coverage_partial" in checkse, "E: expected coverage_partial HIGH (pid 11/104)")
+        expect("coverage_empty" not in checkse, "E: must NOT be coverage_empty (non-zero coverage)")
+
+    # ---- Fixture F: phantom reference in connection trace -> HIGH -------------
+    with tempfile.TemporaryDirectory() as tf:
+        with open(os.path.join(tf, "parts-ledger.json"), "w") as fh:
+            json.dump({"grand_total_gbp": 11000,
+                       "coverage_by_drawing": {"ga": {"expected": 3, "present": 3}},
+                       "connections": [
+                           # resolvable: 'Motor B' is a real BoM line
+                           {"from_part": "Motor B", "to_part": "Frame A"},
+                           # phantom: 'cabinets' is not in the bill of materials
+                           {"from_part": "Frame A", "to_part": "cabinets"},
+                       ]}, fh)
+        repf = audit_dossier(clean_state, clean_rows, run_dir=tf)
+        phantoms = [f for f in repf.findings if f.check == "phantom_reference"]
+        expect(any("cabinets" in f.message for f in phantoms),
+               "F: expected phantom_reference HIGH for 'cabinets'")
+        expect(not any("Motor" in f.message for f in phantoms),
+               "F: must NOT flag the resolvable 'Motor B' reference")
+
+    # ---- Unit checks: synonym + conversion helpers ---------------------------
+    expect(_norm_name_syn("usable_energy_mwh") == _norm_name_syn("usable_capacity_kwh"),
+           "synonym fold: usable_energy ≡ usable_capacity")
+    expect(abs((_convert_value(4500, "kWh", "MWh") or 0) - 4.5) < 1e-9,
+           "convert 4500 kWh -> 4.5 MWh")
+    expect(_convert_value(100, "kg", "MWh") is None, "convert refuses cross-family")
+
     if failures:
         print("SELFTEST FAILED:")
         for f in failures:
@@ -838,8 +1565,17 @@ def _cli(run_dir: str) -> int:
         return 2
     with open(sp, "r") as fh:
         state = json.load(fh)
-    # rows are not on disk in a standard place — run state-only checks.
-    report = audit_dossier(state, rows=[], run_dir=run_dir)
+    # The assembled BoM rows are carried on state as `requirementsBom` (the
+    # REQUIREMENT→FULFILMENT→COST rows). Use them so the row-dependent checks fire;
+    # fall back to costBasis.lines, else an empty list (state-only checks still run).
+    rows = state.get("requirementsBom")
+    if not isinstance(rows, list) or not rows:
+        cb = state.get("costBasis")
+        if isinstance(cb, dict) and isinstance(cb.get("lines"), list):
+            rows = cb["lines"]
+        else:
+            rows = []
+    report = audit_dossier(state, rows=rows, run_dir=run_dir)
     sc = report.scorecard()
     print(f"=== dossier audit: {run_dir} ===")
     print(f"verdict={sc['verdict']}  ship_ok={sc['ship_ok']}  "
