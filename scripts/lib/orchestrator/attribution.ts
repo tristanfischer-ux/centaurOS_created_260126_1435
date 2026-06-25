@@ -19,6 +19,9 @@
  * listing = marketing."
  */
 
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
 import type {
   ContractInProgress,
   License,
@@ -170,6 +173,92 @@ function isCalculatorSourced(q: any): boolean {
   return !!q && typeof q === 'object' && q.source === 'calculator' && Number.isFinite(q.value)
 }
 
+// ── U9-C · REAL DATA-INPUT PROVENANCE FOR FEEDER-LESS TOOLS ───────────────────
+//
+// U9-B only fills `input_summary` for a tool that has an UPSTREAM-TOOL feeder
+// edge (another tool's output feeds it). A tool that reads the BRIEF and/or the
+// CONTRACT QUANTITIES directly — no upstream tool — fell back to "(none)" even
+// though it DID consume real inputs (75% of claims on a real BESS dossier read
+// "(none)"). This block derives the real inputs UNIVERSALLY: every tool declares
+// its actual input fields in the harvested tool-I/O manifest (`input_keys`,
+// projected from each tool's Python signature by harvest-tool-io.ts — no
+// per-tool table). We intersect those declared inputs with the contract
+// quantities actually present and cite them, split by provenance: a brief-/
+// calculator-/anchor-sourced quantity is cited under "brief", a tool-sourced
+// quantity is cited under "contract". The floor rule: a tool that produced a
+// real output ALWAYS read the brief (every orchestrator tool's
+// `input_from_contract` is handed the brief), so the minimum citation is
+// "brief" — never "(none)".
+
+/** Lazily load the checked-in tool-I/O manifest's `input_keys` per tool id.
+ *  Same manifest the auto-planner consumes (auto-plan-fallback.ts). Returns an
+ *  empty map (→ floor "brief" behaviour) if the file is unavailable. */
+let _inputKeysCache: Map<string, string[]> | null = null
+function loadToolInputKeys(): Map<string, string[]> {
+  if (_inputKeysCache) return _inputKeysCache
+  const map = new Map<string, string[]>()
+  try {
+    const raw = JSON.parse(
+      readFileSync(join(__dirname, 'tool-io-manifest.json'), 'utf-8'),
+    ) as Record<string, { input_keys?: string[] }>
+    for (const [tid, io] of Object.entries(raw)) {
+      if (Array.isArray(io?.input_keys)) map.set(tid, io.input_keys)
+    }
+  } catch { /* manifest unavailable — derivation falls back to the "brief" floor */ }
+  _inputKeysCache = map
+  return _inputKeysCache
+}
+
+/** Test seam: reset the input-keys manifest cache. */
+export function _resetInputKeysCacheForTests(): void {
+  _inputKeysCache = null
+}
+
+/** A contract quantity is "brief-ish" (cite under "brief") when its provenance
+ *  source is NOT another tool — i.e. brief / calculator / anchor / physics-
+ *  constant / undefined. A tool-sourced quantity is cited under "contract". */
+function quantityIsBriefIsh(q: any): boolean {
+  const src = q && typeof q === 'object' ? String(q.provenance?.source ?? '') : ''
+  return !src.startsWith('tool:')
+}
+
+/**
+ * Derive a human-readable `input_summary` for a tool that has NO upstream-tool
+ * feeder edge, from its REAL declared inputs (the tool-I/O manifest's
+ * `input_keys`) intersected with the contract quantities actually present.
+ *
+ * Universal — keyed off the tool's own declared inputs, no per-tool table.
+ * Returns e.g. "inputs from: brief (rated_power_kw, dc_bus_voltage_v)" or
+ * "inputs from: brief + contract (cell_count, rack_count)". When nothing
+ * resolves, returns the floor "inputs from: brief" — a tool that produced a
+ * real output always read the brief, so NO produced claim ever shows "(none)".
+ */
+function deriveInputSummaryFromContract(
+  toolId: string,
+  quantities: Record<string, any>,
+): string {
+  const inputKeys = loadToolInputKeys().get(toolId) ?? []
+  const briefFields: string[] = []
+  const contractFields: string[] = []
+  for (const key of inputKeys) {
+    const q = quantities[key]
+    if (q === undefined) continue              // not a present contract quantity — skip
+    if (quantityIsBriefIsh(q)) briefFields.push(key)
+    else contractFields.push(key)
+  }
+  const MAX_FIELDS = 6
+  const fmtList = (xs: string[]) => {
+    const shown = xs.slice(0, MAX_FIELDS).join(', ')
+    return xs.length > MAX_FIELDS ? `${shown}, +${xs.length - MAX_FIELDS} more` : shown
+  }
+  const parts: string[] = []
+  // FLOOR: every orchestrator tool reads the brief. Always cite "brief"; when we
+  // resolved which brief-derived quantities it consumed, name them in parens.
+  parts.push(briefFields.length > 0 ? `brief (${fmtList(briefFields)})` : 'brief')
+  if (contractFields.length > 0) parts.push(`contract (${fmtList(contractFields)})`)
+  return `inputs from: ${parts.join(' + ')}`
+}
+
 /**
  * Build the Tools-Used attribution page from a finished Contract.
  *
@@ -264,9 +353,20 @@ export function buildToolsUsedPage(
     // produced the inputs for this tool — list them explicitly so the
     // Tools-Used appendix shows real dependencies instead of "(none)".
     const feeders = upstreamFeeders.get(tid)
-    const inputSummary = feeders && feeders.length > 0
-      ? `inputs from: ${feeders.join(', ')}${feeders.length > 0 ? ' + brief' : ''}`
-      : summariseInput(q.provenance.invocation_input)
+    let inputSummary: string
+    if (feeders && feeders.length > 0) {
+      inputSummary = `inputs from: ${feeders.join(', ')} + brief`
+    } else {
+      // U9-C: no upstream-tool feeder. Prefer the literal invocation_input when
+      // the tool actually recorded one; otherwise derive the REAL inputs from
+      // the tool's declared input_keys ∩ contract quantities (floor: "brief").
+      // This removes the "(none)" fallback for every tool that read the brief
+      // and/or contract quantities directly — ~75% of claims on a real dossier.
+      const literal = summariseInput(q.provenance.invocation_input)
+      inputSummary = literal === '(none)'
+        ? deriveInputSummaryFromContract(tid, contract.quantities)
+        : literal
+    }
     entry.claims.push({
       field,
       value: q.value,

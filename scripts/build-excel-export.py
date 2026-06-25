@@ -1758,7 +1758,7 @@ def _infer_inputs_from_formula(formula, substitution):
     return list(inputs.values()) or None
 
 
-def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
+def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]:
     """
     Returns (live_calc_count, static_calc_count).
 
@@ -1806,6 +1806,60 @@ def tab_calculations(wb: Workbook, state: dict) -> Tuple[int, int]:
         ws.cell(r, 4, note).font = FONT_NOTE
         r += 1
     r += 1
+
+    # ---- Tool data-flow section (INPUT → TOOL → OUTPUT destination) ----------
+    # Tristan 2026-06-25: "the spreadsheet should have all of the tools with a clear
+    # input of where the information came from to start that tool, and then a clear
+    # exit as to where the information from that tool goes to." That flow lived ONLY
+    # on the ⚠ Checks tab — the founder looks for calcs HERE. Reuse the SAME
+    # _render_tool_io_section (Tool | Output field | Value | Unit | Input—from |
+    # → Consumed by | Status) so each tool's inputs and output destinations are
+    # visible ABOVE the worked-calc transcript. Kept on ⚠ Checks too; this is an
+    # ADDITIONAL surface, not a move.
+    df_banner = ws.cell(
+        r, 1,
+        "Tool data-flow — where each tool's inputs came from and where its outputs go")
+    df_banner.font = FONT_TITLE
+    df_banner.fill = FILL_TITLE
+    df_banner.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    ws.row_dimensions[r].height = 24
+    r += 1
+    ws.cell(
+        r, 1,
+        "Each row: a tool OUTPUT, the INPUT it was computed from (— from), and where "
+        "that value GOES (→ Consumed by). Status: USED/TRACED = the output flows on; "
+        "ORPHANED = it appears nowhere downstream; STALE = the downstream value disagrees.",
+    ).font = FONT_NOTE
+    r += 2
+    io_next = _render_tool_io_section(ws, state, run_dir, r)
+    if io_next is None:
+        ws.cell(r, 1, "— no orchestrator tool log for this run —").font = FONT_NOTE
+        r += 2
+    else:
+        # live conditional formatting on the Status column (G) for this section
+        from openpyxl.formatting.rule import CellIsRule as _CIR
+        _rng = f"G{r + 1}:G{io_next - 1}"
+        if io_next - 1 >= r + 1:
+            ws.conditional_formatting.add(
+                _rng, _CIR(operator="equal", formula=['"ORPHANED"'], fill=FILL_FAIL, font=FONT_FAIL))
+            ws.conditional_formatting.add(
+                _rng, _CIR(operator="equal", formula=['"STALE"'], fill=FILL_FAIL, font=FONT_FAIL))
+            ws.conditional_formatting.add(
+                _rng, _CIR(operator="equal", formula=['"USED"'], fill=FILL_PASS, font=FONT_PASS))
+            ws.conditional_formatting.add(
+                _rng, _CIR(operator="equal", formula=['"TRACED"'], fill=FILL_PASS, font=FONT_PASS))
+        r = io_next + 1
+
+    # ---- worked-calc transcript (formula + substitution + result, per tool) --
+    wc_banner = ws.cell(
+        r, 1, "Worked calculations — every value recomputed live + cross-checked")
+    wc_banner.font = FONT_TITLE
+    wc_banner.fill = FILL_TITLE
+    wc_banner.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    ws.row_dimensions[r].height = 24
+    r += 2
 
     tools = (state.get("toolsUsedPage") or {}).get("tools", [])
     qindex = index_design_quantities(state)   # authoritative design quantities to cross-check against
@@ -6441,7 +6495,7 @@ def build(run_dir: str, out_path: str) -> dict:
     print("  · Quantities")
     tab_quantities(wb, state)
     print("  · Calculations")
-    live_n, static_n = tab_calculations(wb, state)
+    live_n, static_n = tab_calculations(wb, state, run_dir)
     print("  · Bill of Materials (Ledger)")
     tab_bom(wb, state, run_dir)   # BoM + Cost + Spec sheets merged into one ledger sheet
     # Cost provenance is now a collapsible group on the ledger; report has_cost from state.

@@ -1260,6 +1260,106 @@ def check_tag_validity(state, rows, run_dir) -> list:
 
 
 # --------------------------------------------------------------------------- #
+# Check 15 — Tool I/O traceability (Calculations)
+# --------------------------------------------------------------------------- #
+
+# An input_summary that names no source: a worked calc whose inputs are untraceable.
+_NO_INPUT_TOKENS = {"", "(none)", "none", "n/a", "na", "—", "-", "–"}
+
+
+def _input_is_missing(claim) -> bool:
+    if not isinstance(claim, dict):
+        return True
+    return str(claim.get("input_summary") or "").strip().lower() in _NO_INPUT_TOKENS
+
+
+def _output_field_missing(claim) -> bool:
+    if not isinstance(claim, dict):
+        return True
+    out = claim.get("output_field") or claim.get("field")
+    return str(out or "").strip() == ""
+
+
+def check_tool_io_traceability(state, rows, run_dir) -> list:
+    """Every worked tool calc must record WHERE its inputs came from (input_summary)
+    and WHERE its output goes (output_field). A claim with no input edge means the
+    number is not traceable back to its source; a claim with no output destination is
+    a dangling result. Counts both across every tool's claims.
+
+    Universal + deterministic — keys on the claim shape only, never on class. Skips
+    silently when the run has no tools (some classes/iterations carry none)."""
+    tab = "Calculations"
+    out: list = []
+    tp = state.get("toolsUsedPage")
+    if not isinstance(tp, dict):
+        return out
+    tools = tp.get("tools")
+    if not isinstance(tools, list) or not tools:
+        return out  # no tools this run -> nothing to judge
+
+    total = 0
+    no_input = 0
+    no_input_examples: list = []
+    for t in tools:
+        if not isinstance(t, dict):
+            continue
+        tid = str(t.get("tool_id") or t.get("tool_name") or "?")
+        claims = t.get("claims")
+        if not isinstance(claims, list):
+            continue
+        for c in claims:
+            if not isinstance(c, dict):
+                continue
+            total += 1
+            fld = str(c.get("field") or c.get("output_field") or "?")
+            if _input_is_missing(c):
+                no_input += 1
+                if len(no_input_examples) < 3:
+                    no_input_examples.append(f"{tid}·{fld}")
+            # OUTPUT edge: a claim that declares no output destination at all.
+            if _output_field_missing(c):
+                out.append(Finding(
+                    tab=tab, check="tool_io_traceability", severity="MED",
+                    message=(f"tool '{tid}' claim '{fld}' declares no output "
+                             f"destination (output_field) — the result is a dangling "
+                             f"number with nowhere to flow"),
+                    actual="output_field empty",
+                    expected="every tool claim names its output_field",
+                    source_rule="every tool claim must declare where its output goes (output_field)",
+                ))
+
+    if total == 0:
+        return out
+
+    # INPUT edge: a large fraction missing an input edge is a real traceability
+    # failure (the worked calcs aren't anchored to a source); a smaller fraction is
+    # a softer flag.
+    if no_input > 0:
+        frac = no_input / total
+        ex = "; ".join(no_input_examples)
+        if frac > 0.40:
+            out.append(Finding(
+                tab=tab, check="tool_io_traceability", severity="HIGH",
+                message=(f"{no_input} of {total} tool claims don't record where their "
+                         f"inputs came from (input_summary '(none)') — the worked calcs "
+                         f"aren't traceable to their source. Examples: {ex}"),
+                actual=f"{no_input}/{total} claims with no input edge ({frac:.0%})",
+                expected="every tool claim cites its input source (input_summary)",
+                source_rule="every tool claim must record its input provenance (input_summary), not '(none)'",
+            ))
+        else:
+            out.append(Finding(
+                tab=tab, check="tool_io_traceability", severity="MED",
+                message=(f"{no_input} of {total} tool claims don't record where their "
+                         f"inputs came from (input_summary '(none)'). Examples: {ex}"),
+                actual=f"{no_input}/{total} claims with no input edge ({frac:.0%})",
+                expected="every tool claim cites its input source (input_summary)",
+                source_rule="every tool claim must record its input provenance (input_summary), not '(none)'",
+            ))
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Aggregator
 # --------------------------------------------------------------------------- #
 
@@ -1279,6 +1379,7 @@ _CHECKS = [
     check_phantom_reference,        # 12 connection trace references a non-existent part
     check_traceability_basis,       # 13 principal line with no provenance (basis)
     check_tag_validity,             # 14 garbage / duplicate principal tags
+    check_tool_io_traceability,     # 15 tool claim with no input/output edge (untraceable calc)
 ]
 
 
@@ -1355,6 +1456,26 @@ def _selftest() -> int:
             {"severity": "medium", "title": "minor"},
         ]},
         "assemblySequence": "Step 7: hydrostatic leak test of the main vessel.",
+        # Tool I/O traceability: 4 of 5 claims show input_summary "(none)" (80% > 40%)
+        # -> HIGH; one claim also declares no output_field at all -> MED.
+        "toolsUsedPage": {"tools": [
+            {"tool_id": "arc-flash:ieee1584", "claims": [
+                {"field": "incident_energy", "input_summary": "(none)",
+                 "output_field": "governing_incident_energy"},
+                {"field": "boundary_m", "input_summary": "none",
+                 "output_field": "arc_flash_boundary_m"},
+                {"field": "ppe_category", "input_summary": "",
+                 "output_field": "ppe_cat"},
+            ]},
+            {"tool_id": "thermal:derating", "claims": [
+                # missing input AND no output destination at all (neither output_field
+                # nor field) -> MED no-output finding.
+                {"input_summary": "(none)", "output_field": "", "field": ""},
+                # the ONE traceable claim
+                {"field": "margin_pct", "input_summary": "inputs from: brief temp_max_c",
+                 "output_field": "thermal_margin_pct"},
+            ]},
+        ]},
     }
     # NB: equipment lines are deliberately near-zero while a big cabling line carries
     # the bill — this is the capex-by-category bug (chart shows only connections).
@@ -1416,7 +1537,16 @@ def _selftest() -> int:
     expect("duplicate_principal" in checks, "A: expected duplicate_principal HIGH (2× Grundfos pump)")
     expect("traceability_basis" in checks, "A: expected traceability_basis HIGH (3 blank basis)")
     expect("tag_validity" in checks, "A: expected tag_validity HIGH (garbage + duplicate tags)")
+    expect("tool_io_traceability" in checks, "A: expected tool_io_traceability (4/5 claims '(none)')")
     expect(sc["verdict"] == "FAIL" and sc["ship_ok"] is False, f"A: expected FAIL/ship_ok=False, got {sc}")
+
+    # tool_io_traceability must fire HIGH on the input gap (4/5 > 40%) AND MED on the
+    # one claim that declares no output destination.
+    tio = [f for f in rep.findings if f.check == "tool_io_traceability"]
+    expect(any(f.severity == "HIGH" and "inputs came from" in f.message for f in tio),
+           "A: tool_io_traceability should HIGH-flag the input gap (4/5 (none))")
+    expect(any(f.severity == "MED" and "no output destination" in f.message for f in tio),
+           "A: tool_io_traceability should MED-flag the claim with no output_field")
 
     # brief_metric_fail must name the dc_bus miss specifically, and NOT fire on the
     # usable-energy metric that MEETS by synonym+conversion (4.5 MWh = 4500 kWh).
@@ -1454,6 +1584,16 @@ def _selftest() -> int:
         # capex_reconciliation stays silent on the clean fixture.
         "costStack": {"installed_asp_gbp": 29000},
         "physicsCritique": {"issues": [{"severity": "low", "title": "cosmetic"}]},
+        # Clean tools: every claim cites a real input AND names an output_field ->
+        # tool_io_traceability stays silent.
+        "toolsUsedPage": {"tools": [
+            {"tool_id": "motor:sizing", "claims": [
+                {"field": "torque_nm", "input_summary": "inputs from: brief rated_power_kw",
+                 "output_field": "rated_torque_nm"},
+                {"field": "rpm", "input_summary": "inputs from: contract drive_speed_rpm",
+                 "output_field": "rated_rpm"},
+            ]},
+        ]},
     }
     clean_rows = [
         {"tag": "P-1", "requirement": "Frame", "status": "IDENTIFIED",

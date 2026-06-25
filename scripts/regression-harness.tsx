@@ -10561,28 +10561,38 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         (n) => n >= 1,
         (n) => `flow_edges.length = ${n} — the planFlowEdges argument was dropped from buildToolsUsedPage in orchestrate.ts, or the ClassToolPlan has no feeds_into declarations. The Section 1c diagram degrades to a flat fan-out with no causal graph.`,
       ))
-      // Also assert that at least one tool has an input_summary citing upstream feeders
-      // (the U9-B narrative grounding: "(none)" replaced by "inputs from: <tool>").
-      // Skips gracefully when the snapshot pre-dates the U9-B feature (all input_summary
-      // fields are empty strings — the feature populates them from the upstreamFeeders
-      // inversion). An empty-string input_summary means the field was SET but not
-      // populated by the feature; we cannot distinguish pre-feature snapshots from
-      // a regression in this case, so we skip rather than false-fail.
-      const toolsWithFeeders = toolsPage.tools.filter((t: any) =>
-        typeof t?.input_summary === 'string' && /inputs from:/i.test(t.input_summary)
-      ).length
-      const anyInputSummarySet = toolsPage.tools.some((t: any) =>
-        typeof t?.input_summary === 'string' && t.input_summary.length > 0
+      // U9-C (2026-06-25): every claim must cite its REAL data inputs, never the
+      // bare "(none)" placeholder. input_summary lives per-CLAIM (toolsUsedPage
+      // .tools[].claims[].input_summary), not on the tool — the previous version
+      // of this assertion read t.input_summary (which does not exist) so it never
+      // actually fired, letting a 75%-"(none)" page pass. We now compute the real
+      // FRACTION of claims with a non-"(none)" input_summary and require ≥70%.
+      //
+      // A non-"(none)" summary is one of: a feeder citation ("inputs from: <tool>"),
+      // a derived contract/brief citation ("inputs from: brief (…)"), or a literal
+      // invocation_input. Before U9-C ~25% of claims were grounded (only the tools
+      // with an upstream-tool feeder); the U9-C derivation lifts feeder-less tools
+      // (which read the brief / contract quantities directly) from "(none)" to a
+      // real summary, so a healthy page is ≥80% — 70% is a deliberately slack floor.
+      const allClaims: any[] = toolsPage.tools.flatMap((t: any) =>
+        Array.isArray(t?.claims) ? t.claims : []
       )
-      if (flowEdges.length > 0 && anyInputSummarySet) {
-        // input_summary field is present and non-empty for at least one tool —
-        // this is a post-U9-B snapshot, so the feeder grounding MUST be populated.
+      const claimsWithSummary = allClaims.filter(
+        (c: any) => typeof c?.input_summary === 'string' && c.input_summary.length > 0
+      )
+      // Skip gracefully on a pre-U9-B snapshot where no claim ever set the field
+      // (cannot distinguish "feature absent" from "regression" in that case).
+      if (claimsWithSummary.length > 0) {
+        const grounded = claimsWithSummary.filter(
+          (c: any) => c.input_summary !== '(none)'
+        ).length
+        const groundedPct = Math.round((grounded / claimsWithSummary.length) * 100)
         assertions.push(assertEq(
-          'UNIVERSAL.tools_flow_narrative_grounded_in_feeders',
-          `≥1 tool in toolsUsedPage has input_summary citing upstream feeders ("inputs from: …") — "Section 1c" narrative is grounded in the real causal graph, not "(none)" placeholders (U9-B 2026-05-29)`,
-          toolsWithFeeders,
-          (n) => n >= 1,
-          (n) => `${n} tools have a feeder-grounded input_summary. flow_edges exist (${flowEdges.length}) but upstreamFeeders inversion in buildToolsUsedPage may have regressed — "(none)" is being emitted instead of real feeder lists.`,
+          'UNIVERSAL.tools_flow_input_summary_grounded_fraction',
+          `≥70% of toolsUsedPage claims cite a REAL input_summary (feeder, derived brief/contract inputs, or literal invocation) — NOT the "(none)" placeholder. Guards the U9-C feeder-less-tool derivation (attribution.ts deriveInputSummaryFromContract); a feeder-less tool that reads the brief/contract directly must still cite "brief" at minimum (2026-06-25)`,
+          groundedPct,
+          (pct) => pct >= 70,
+          (pct) => `only ${pct}% of claims have a non-"(none)" input_summary (${grounded}/${claimsWithSummary.length}). The U9-C derivation in buildToolsUsedPage may have regressed — feeder-less tools that read the brief/contract are falling back to "(none)" instead of "inputs from: brief (…)". Check deriveInputSummaryFromContract + the tool-io-manifest.json load.`,
         ))
       }
     }
