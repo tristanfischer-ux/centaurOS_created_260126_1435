@@ -2158,6 +2158,21 @@ function emitPowerDistribution(p: BessParams): DesignModule {
   // NOT the C310/300 — that is 300 A continuous, insufficient for per-rack
   // peak current at larger rack counts.
   const perRackContactorCapacityA = Math.max(160, Math.ceil(p.stringPeakA * 1.25 / 20) * 20)  // round to nearest 20 A frame, min 160 A
+  // FIX 2 (2026-06-25): main bus contactor capacity was frozen at 2000 A and
+  // ignored the (brief-derived) bus current. UL 9540A 13.2.4 requires ≥1.25×
+  // continuous; at 800 V the bus draws ~3125 A so 2000 A is UNDERSIZED. Size
+  // from p.busContinuousA × 1.25 and round up to the nearest 100 A frame.
+  // The Schaltbau C330 spans 2000 A @ 3×500 mm² to 3000 A @ 3×1000 mm²
+  // terminals — pick the heavier terminal config when the required current
+  // exceeds the 2000 A @ 3×500 mm² rating (mirrors the frame-ladder pattern
+  // used for the transformer + per-rack contactor). Beyond the part's 3000 A
+  // single-pole max, parallel N devices (mirrors the cablesPerPhase pattern)
+  // so the emitted capacity never claims more than the real part can deliver.
+  const mainBusRequiredA = Math.max(2000, Math.ceil(p.busContinuousA * 1.25 / 100) * 100)
+  const C330_MAX_A = 3000
+  const mainBusContactorParallel = Math.max(1, Math.ceil(mainBusRequiredA / C330_MAX_A))
+  const mainBusContactorCapacityA = Math.min(mainBusRequiredA, C330_MAX_A)  // per-device capacity (≤ part max)
+  const mainBusContactorTerminal = mainBusContactorCapacityA > 2000 ? '3×1000 mm²' : '3×500 mm²'
   // Max string voltage at full charge (3.65 V/cell × series cells).
   // Used in form string for documentation — the emitted dimension is 1500 V
   // (contactor's rated voltage), not the bus voltage, to correctly describe
@@ -2242,10 +2257,10 @@ function emitPowerDistribution(p: BessParams): DesignModule {
         'main bus contactor word',
         cc('main_bus_contactor', 'main bus contactor', 'electromechanical_switching_function', 'copper'),
         [
-          mod('quantity', '×1'),
+          mod('quantity', fmtQty(mainBusContactorParallel)),
           mod('dimension', '1500', 'V'),
-          mod('capacity', '2000', 'A'),
-          mod('form', 'Schaltbau C330-A (2000 A continuous @ 3×500 mm² / 1500 V DC bi-directional, MCS Level 2/3, IEC 60947-4-1)'),
+          mod('capacity', String(mainBusContactorCapacityA), 'A'),
+          mod('form', `Schaltbau C330-A (${mainBusContactorCapacityA} A continuous @ ${mainBusContactorTerminal} / 1500 V DC bi-directional, MCS Level 2/3${mainBusContactorParallel > 1 ? `, ${mainBusContactorParallel}× in parallel for ${(mainBusContactorCapacityA * mainBusContactorParallel)} A total` : ''}, sized for ${p.busContinuousA.toFixed(0)} A bus continuous × 1.25 margin per UL 9540A 13.2.4, IEC 60947-4-1)`),
           mod('manufacturer', 'Schaltbau'),
           mod('part_number', 'C330-A'),
           mod('list_price_gbp', '3500'),
@@ -2346,24 +2361,40 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('regulatory', 'IEC 60269-6 (gPV)'),
         ],
       ),
-      word(
-        'dc_busbar_800v_word',
-        'DC busbar 800 V word',
-        cc('dc_busbar_800v', 'DC busbar 800 V', 'electrical_conducting_function', 'copper'),
+      // FIX 1 (2026-06-25): id/name MUST NOT bake the voltage. The old
+      // 'dc_busbar_800v' id + 'DC busbar 800 V' name shipped a busbar
+      // labelled "800 V" even for a 1500 V brief (stale-label form of the
+      // dc_bus bug). Keep a STABLE voltage-free character_id ('dc_busbar')
+      // and put the (brief-derived) voltage in the DISPLAY NAME only.
+      // FIX 3 (2026-06-25): capacity was frozen at 2000 A regardless of bus
+      // current — the 800 V brief draws ~3125 A (HIGHER than the 1500 V
+      // brief's ~1667 A), so a fixed 2000 A busbar is UNDERSIZED at 800 V.
+      // Size from p.busContinuousA × 1.25 (UL 9540A 13.2.4 continuous margin),
+      // round up to a sensible frame, and scale the copper cross-section note
+      // at ~2.5 A/mm² to track the chosen ampacity.
+      (() => {
+        const busbarCapacityA = Math.ceil((p.busContinuousA * 1.25) / 100) * 100  // round up to nearest 100 A
+        const busbarCrossSectionMm2 = Math.ceil((busbarCapacityA / 2.5) / 50) * 50  // ~2.5 A/mm², round up to 50 mm²
+        return word(
+        'dc_busbar_word',
+        `DC busbar ${Math.round(p.dcBusVoltageV)} V word`,
+        cc('dc_busbar', `DC busbar ${Math.round(p.dcBusVoltageV)} V`, 'electrical_conducting_function', 'copper'),
         [
           mod('quantity', '×1'),
           // Use rating_primary for voltage (not dimension) to avoid modifier_consistency
           // conflict when Phase 1 LLM adds a physical-length dimension modifier.
           mod('rating_primary', `${p.dcBusVoltageV} V DC`),
-          mod('capacity', '2000', 'A'),
-          // C1 pin: Mersen TCB-800-80x10 — 80×10 mm 800 mm² tinned copper bus bar,
-          // 2000 A rated @ 2.5 A/mm², IEC 61439 compliant, pre-cut to DC switchgear
-          // width. Mersen bus-bar catalogue TCB series.
+          mod('capacity', String(busbarCapacityA), 'A'),
+          // C1 pin: Mersen TCB-series tinned copper bus bar, sized @ 2.5 A/mm²
+          // for the bus continuous current with 1.25× margin, IEC 61439
+          // compliant, pre-cut to DC switchgear width. Mersen bus-bar catalogue.
           mod('manufacturer', 'Mersen'),
-          mod('part_number', 'TCB-800-80x10'),
-          mod('list_price_gbp', '80'),   // Mersen TCB-800-80x10 UK trade ≈ £80 (Mersen direct / RS); FIX A 2026-05-29
+          mod('part_number', `TCB-${busbarCrossSectionMm2}-CU`),
+          mod('form', `${busbarCrossSectionMm2} mm² tinned ETP copper bus bar, ${busbarCapacityA} A rated @ 2.5 A/mm² (sized for ${p.busContinuousA.toFixed(0)} A continuous bus current × 1.25 margin per UL 9540A 13.2.4), IEC 61439 compliant`),
+          mod('list_price_gbp', '80'),   // Mersen TCB-series UK trade ≈ £80 (Mersen direct / RS); FIX A 2026-05-29
         ],
-      ),
+      )
+      })(),
     ],
   )
 

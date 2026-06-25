@@ -79,6 +79,7 @@ import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { buildContract } from './lib/engineering-contract'
+import { emitBessDesign } from './lib/deterministic-emitter'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { augmentBrief } from '../src/lib/pdf-engine-v2/brief-augment'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
@@ -97,7 +98,7 @@ import { generatePhysicsNarrative } from './lib/orchestrator/attribution'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
 import { gatherModuleOpenItems, questionHasProcurementLeak } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
-import { scanEmitterForBriefLiterals } from './lib/brief-value-literal-scanner'
+import { scanEmitterForBriefLiterals, scanContractForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily, extractOccurrences as gate18ExtractOccurrences, cluster as gate18Cluster, buildFindings as gate18BuildFindings, currentCalcSignatureOf, constraintRoleOf } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, tokenize as emitterTokenize, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { classifyByRules, matchCorpusPrice, resolveEmitterPinPrice, type CorpusPriceRow } from './estimate-missing-prices'
@@ -3847,6 +3848,152 @@ function checkBessDcBusFollowsBriefInvariant(): Assertion[] {
   return out
 }
 
+// ── BESS DC-busbar LABEL + busbar/contactor AMPACITY follow the bus invariant (2026-06-25) ──
+// Three HIGH hardcodes in the deterministic emitter's power_distribution module:
+//   FIX 1 — the DC busbar baked "800 V" into its character_id ('dc_busbar_800v') and
+//     name ('DC busbar 800 V'), so a 1500 V brief shipped a busbar LABELLED 800 V
+//     (the stale-label form of the dc_bus bug). The label must read the brief voltage.
+//   FIX 2 — the main bus contactor capacity was frozen at 2000 A, ignoring the
+//     (brief-derived) bus current; at 800 V the bus draws ~3125 A so 2000 A is
+//     UNDERSIZED. Must be busContinuousA × 1.25.
+//   FIX 3 — the DC busbar ampacity was frozen at 2000 A / 800 mm², same defect.
+// Guard: emit the BESS design for a 1500 V (≈1667 A) and an 800 V (≈3125 A) brief and
+// assert (a) the busbar NAME embeds the brief voltage (1500 V → "1500 V", not 800);
+// (b) busbar + contactor capacities are SIZED (≥ busContinuousA × 1.25, per-device for
+// the contactor); (c) the 800 V/3125 A case has a HIGHER busbar ampacity than the
+// 1500 V/1667 A case (proves computed, not frozen at 2000); (d) no stale
+// 'dc_busbar_800v' id survives anywhere in the emitted design. iter-N catches iter-(N+1).
+function checkBessBusbarLabelAndAmpacityInvariant(): Assertion[] {
+  const out: Assertion[] = []
+  const qty = (value: number) => ({ value, unit: '', basis: 'test', source: 'test' })
+  function emit(dcV: number, busA: number) {
+    const contract: any = {
+      product_class: 'battery_energy_storage_system',
+      quantities: {
+        dc_bus_voltage_v: qty(dcV),
+        bus_continuous_current_a: qty(busA),
+        bus_peak_current_a: qty(Math.round(busA * 1.25)),
+      },
+    }
+    const design: any = emitBessDesign(contract, {})
+    const findWord = (charId: string) => {
+      for (const m of design.modules) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+        if (w.content_character?.character_id === charId) return w
+      }
+      return null
+    }
+    const capA = (w: any) => Number((w?.modifier_characters ?? []).find((mc: any) => mc.kind === 'capacity')?.value)
+    const busbar = findWord('dc_busbar')
+    const contactor = findWord('main_bus_contactor')
+    return {
+      busbarName: String(busbar?.name_human ?? ''),
+      busbarCapA: capA(busbar),
+      contactorCapA: capA(contactor),
+      stale: JSON.stringify(design).includes('dc_busbar_800v'),
+    }
+  }
+  const failures: string[] = []
+  try {
+    const hv = emit(1500, 1667)
+    const lv = emit(800, 3125)
+    // (a) busbar NAME embeds the brief voltage (FIX 1 — no baked 800 V)
+    if (!/\b1500 V\b/.test(hv.busbarName)) failures.push(`1500 V brief busbar name="${hv.busbarName}" does not read "1500 V" (stale 800 V label?)`)
+    if (!/\b800 V\b/.test(lv.busbarName)) failures.push(`800 V brief busbar name="${lv.busbarName}" does not read "800 V"`)
+    // (b) busbar + contactor capacities SIZED ≥ busContinuousA × 1.25 (FIX 2 + FIX 3 — not frozen at 2000)
+    const hvMin = 1667 * 1.25, lvMin = 3125 * 1.25
+    if (!(hv.busbarCapA + 1e-6 >= hvMin)) failures.push(`1500 V busbar cap ${hv.busbarCapA} A < ${hvMin.toFixed(0)} A (1.25× bus)`)
+    if (!(lv.busbarCapA + 1e-6 >= lvMin)) failures.push(`800 V busbar cap ${lv.busbarCapA} A < ${lvMin.toFixed(0)} A (1.25× bus) — frozen at 2000?`)
+    if (!(hv.contactorCapA > 0)) failures.push(`1500 V contactor cap missing/zero`)
+    if (!(lv.contactorCapA > 0)) failures.push(`800 V contactor cap missing/zero`)
+    // (c) the 800 V/3125 A case draws MORE current → HIGHER busbar ampacity than 1500 V/1667 A
+    if (!(lv.busbarCapA > hv.busbarCapA)) failures.push(`800 V busbar cap (${lv.busbarCapA} A) not > 1500 V busbar cap (${hv.busbarCapA} A) — both frozen at 2000? ampacity must track bus current`)
+    // (d) no stale 'dc_busbar_800v' id anywhere
+    if (hv.stale || lv.stale) failures.push(`stale 'dc_busbar_800v' character_id still present (hv=${hv.stale}, lv=${lv.stale})`)
+  } catch (err) {
+    failures.push(`emitBessDesign threw: ${String(err).slice(0, 140)}`)
+  }
+  out.push(assertEq(
+    'BESS.busbar_label_and_ampacity_follow_bus',
+    'BESS DC busbar LABEL + busbar/contactor AMPACITY follow the brief-derived bus: a 1500 V brief gets a busbar NAMED "DC busbar 1500 V" (not the stale baked 800 V), busbar + main-bus-contactor capacities are SIZED from busContinuousA × 1.25 (not frozen at 2000 A), the 800 V/3125 A case carries a HIGHER busbar ampacity than the 1500 V/1667 A case, and no stale dc_busbar_800v character_id survives',
+    failures.length, (n) => n === 0,
+    () => `BESS busbar label/ampacity wrong: ${failures.join(' ; ')}. Check the dc_busbar word (name from p.dcBusVoltageV, capacity from p.busContinuousA × 1.25) + the main_bus_contactor capacity (mainBusContactorCapacityA) in emitPowerDistribution() in scripts/lib/deterministic-emitter.ts.`,
+  ))
+  return out
+}
+
+// ── BESS enclosure-volume + container-price-follow-brief invariant (2026-06-25) ──
+// Same source-rule family as the dc_bus=800 + 40-ft-container hardcodes: a value
+// that ignores the brief envelope, so a 20-ft brief inherits 40-ft sizing.
+// Two related bugs guarded here:
+//   FIX 1 — enclosure_volume_m3 is now EMITTED by the BESS contract, derived from
+//     the brief max_dimensions_mm. The deterministic emitter sizes the Novec 1230
+//     fire-suppression agent mass off q(contract,'enclosure_volume_m3',86); when
+//     the contract emitted nothing it fell back to 86 m³ (a 40-ft box) even for a
+//     20-ft brief (~38 m³) → ~2.3× over-sized suppression agent mass + price.
+//   FIX 2 — the iso_container_enclosure macro price + label FOLLOW the derived
+//     container size (≤7.5 m → 20-ft ≈ £4.8k, else 40-ft ≈ £8k) instead of a flat
+//     £8,000 "40-ft" regardless of size.
+// Rules: (a) a 20-ft envelope emits enclosure_volume_m3 in the 35-40 m³ band — and
+// crucially NOT the 86 m³ fallback; (b) a 40-ft envelope emits a clearly larger
+// volume (≈ 80-90 m³); (c) volume scales monotonically with the brief box;
+// (d) a brief silent on the envelope keeps the 86 m³ default; (e) the macro price
+// + label are 20-ft (£4.8k, "20-ft") for the 20-ft brief and 40-ft (£8k, "40-ft")
+// for the 40-ft brief. iter-N catches iter-(N+1).
+function checkBessEnclosureVolumeFollowsBriefInvariant(): Assertion[] {
+  const out: Assertion[] = []
+  function build(dims: any | undefined) {
+    const brief: any = {
+      product_description: `Containerised LFP BESS, 3.5 MWh nameplate, 2.5 MW continuous discharge, 800 V DC bus.`,
+      constraints: {
+        target_performance: { metrics: [
+          { key_metric: 'usable_energy', value: 3.5, unit: 'MWh' },
+          { key_metric: 'rated_power', value: 2500, unit: 'kW' },
+        ] },
+        max_mass_kg: { value: 38000 },
+        ...(dims ? { max_dimensions_mm: dims } : {}),
+      },
+    }
+    const c: any = buildContract('bess', brief)
+    const macro = (c?.macro_assembly_prices ?? []).find((m: any) => m.word_name === 'iso_container_enclosure')
+    return {
+      vol: Number(c?.quantities?.enclosure_volume_m3?.value),
+      len: Number(c?.quantities?.container_internal_length_m?.value),
+      price: Number(macro?.unit_price_gbp),
+      label: String(macro?.source_detail ?? ''),
+    }
+  }
+  const failures: string[] = []
+  try {
+    const small = build({ l: 6060, w: 2440, d: 2440 })  // 20-ft envelope
+    const big = build({ l: 12030, w: 2440, d: 2590 })   // 40-ft envelope
+    const silent = build(undefined)                      // no envelope → default
+    // (a) 20-ft volume is emitted, in the 35-40 m³ band, and is NOT the 86 fallback
+    if (!(small.vol > 0)) failures.push(`20-ft enclosure_volume_m3 not emitted (${small.vol}) — contract must emit it`)
+    if (small.vol >= 85) failures.push(`20-ft enclosure_volume_m3=${small.vol.toFixed(1)} is the ~86 m³ (40-ft) fallback — brief envelope ignored`)
+    if (!(small.vol >= 30 && small.vol <= 45)) failures.push(`20-ft enclosure_volume_m3=${small.vol.toFixed(1)} outside the ~35-40 m³ band for a 6.06×2.44×2.44 box`)
+    // (b) 40-ft volume is clearly larger (≈ 80-90 m³)
+    if (!(big.vol >= 75 && big.vol <= 95)) failures.push(`40-ft enclosure_volume_m3=${big.vol.toFixed(1)} outside the ~80-90 m³ band`)
+    // (c) volume scales with the brief box (40-ft strictly larger than 20-ft)
+    if (!(big.vol > small.vol * 1.5)) failures.push(`enclosure_volume_m3 does not scale with the brief envelope (20-ft ${small.vol.toFixed(1)} vs 40-ft ${big.vol.toFixed(1)})`)
+    // (d) brief silent on envelope keeps the 86 m³ default
+    if (Math.abs(silent.vol - 86) > 0.5) failures.push(`brief-silent enclosure_volume_m3=${silent.vol} — expected 86 m³ default`)
+    // (e) macro price + label follow the derived size
+    if (!(small.price > 0 && small.price < 7000)) failures.push(`20-ft iso_container_enclosure price=£${small.price} — expected a 20-ft price (~£4.5-5.2k), not the 40-ft £8k`)
+    if (!/20-?ft/i.test(small.label)) failures.push(`20-ft iso_container_enclosure label missing "20-ft": "${small.label.slice(0, 80)}"`)
+    if (!(big.price >= 7000)) failures.push(`40-ft iso_container_enclosure price=£${big.price} — expected ~£8k`)
+    if (!/40-?ft/i.test(big.label)) failures.push(`40-ft iso_container_enclosure label missing "40-ft": "${big.label.slice(0, 80)}"`)
+  } catch (err) {
+    failures.push(`buildContract('bess', …) threw: ${String(err).slice(0, 140)}`)
+  }
+  out.push(assertEq(
+    'BESS.enclosure_volume_follows_brief',
+    'BESS enclosure_volume_m3 is EMITTED from the brief envelope (a 20-ft brief gets ~35-40 m³, NOT the 86 m³ 40-ft fallback; a 40-ft brief gets ~80-90 m³; volume scales with the box; brief-silent keeps 86), and the iso_container_enclosure macro price + label follow the derived container size (20-ft ≈ £4.8k/"20-ft", 40-ft ≈ £8k/"40-ft")',
+    failures.length, (n) => n === 0,
+    () => `BESS enclosure-volume-follows-brief wrong: ${failures.join(' ; ')}. Check enclosureVolumeM3 + the iso_container_enclosure macro in registerArchetype('bess', …) in scripts/lib/engineering-contract.ts (both derive from max_dimensions_mm / containerLengthM; default 86 m³ + £8k only when the brief is silent).`,
+  ))
+  return out
+}
+
 // ── Render worked-calc de-dup + Executive-Summary prose invariants (2026-06-05) ─
 //
 // Guards the two render-side fixes made after the co2-mineralisation-2sink-v6
@@ -6526,6 +6673,44 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         (n) => `${n} line(s) in deterministic-emitter.ts contain the literal ${maxMassKg} (brief.max_mass_kg). Fix: use String(p.briefMassCapKg) from contract.shared_quantities. Lines: ${literalHits.slice(0, 5).join(', ')}`,
       ))
     }
+  }
+
+  // ── UNIVERSAL: gate-25 contract-strict CATCHES a brief-mirror hardcode (2026-06-25) ──
+  //
+  // UNIVERSAL.gate25_contract_strict_catches_brief_mirror — the gate-25 file-coverage
+  // closure: engineering-contract.ts was STRUCTURALLY blind to gate 25 (only the
+  // emitter + tool-narratives were scanned) so a bare `const dcBusVoltage = 800`
+  // shipped 800 V while the brief stated 1,500 V. This invariant proves BOTH
+  // directions of the contract-strict scan so the coverage cannot silently regress:
+  //   (a) a synthetic `dcBusVoltage = 800` vs brief 1500 → FLAGGED (the catch);
+  //   (b) the REAL engineering-contract.ts (dc now brief-read) vs brief 1500/35000
+  //       → ZERO hits (no false positive on the file's constants/ladders/rates/
+  //       silent-brief fallbacks).
+  {
+    const catchesBug = scanContractForBriefLiterals(
+      'const dcBusVoltage = 800',
+      { dc_bus_voltage_v: 1500 },
+      'bess',
+    ).hits.some((h) => h.brief_key === 'dc_bus_voltage_v' && h.value === 800)
+
+    const contractPath = resolve(dirname(snapshotPath), '../../scripts/lib/engineering-contract.ts')
+    let noFalsePositive = true
+    if (existsSync(contractPath)) {
+      const src = readFileSync(contractPath, 'utf-8')
+      const real = scanContractForBriefLiterals(src, { dc_bus_voltage_v: 1500, max_mass_kg: 35000 }, 'bess')
+      noFalsePositive = real.passed
+    }
+
+    assertions.push(assertEq(
+      'UNIVERSAL.gate25_contract_strict_catches_brief_mirror',
+      'Gate-25 contract-strict scan catches a brief-mirror hardcode (dcBusVoltage=800 vs brief 1500) AND does not false-positive on the real engineering-contract.ts',
+      catchesBug && noFalsePositive ? 1 : 0,
+      (v) => v === 1,
+      () => `Gate-25 contract-strict regressed: catchesBug=${catchesBug}, noFalsePositive=${noFalsePositive}. ` +
+        `If catchesBug=false the contract file is no longer covered (the dc_bus=800 class can re-enter). ` +
+        `If noFalsePositive=false a legitimate computed literal / constant / ladder / silent-brief fallback is being flagged — ` +
+        `check scanContractForBriefLiterals in scripts/lib/brief-value-literal-scanner.ts (slotNameMatchesConstraint specificity + the fallback/prose/ladder skips).`,
+    ))
   }
 
   // UNIVERSAL.process_instruments_priced_apart (2026-06-01, Tristan cost-fingerprint)
@@ -10648,6 +10833,8 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   for (const a of checkEFuelSynthesisInvariants()) assertions.push(a)
   for (const a of checkBessTransformerSizingInvariant()) assertions.push(a)
   for (const a of checkBessDcBusFollowsBriefInvariant()) assertions.push(a)
+  for (const a of checkBessBusbarLabelAndAmpacityInvariant()) assertions.push(a)
+  for (const a of checkBessEnclosureVolumeFollowsBriefInvariant()) assertions.push(a)
 
   // Self-contained sub-module density-splitter (bin-pack rewrite) invariants —
   // load the CO₂ v12 fixture themselves + a synthetic ac/dc design; memoised so

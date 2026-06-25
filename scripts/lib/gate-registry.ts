@@ -37,6 +37,7 @@ import { classifySeverity } from './per-line-price-plausibility-audit'
 import { missingHardSlots } from '../../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runPayloadRatingAudit } from '../../src/lib/pdf-engine-v2/lib/payload-rating-audit'
 import { evaluateSelfAuditEnforcement } from './semantic-self-audit'
+import { scanContractForBriefLiterals, selftestContractStrict } from './brief-value-literal-scanner'
 
 export interface GateProof {
   code: number
@@ -237,6 +238,19 @@ export const GATES: GateProof[] = [
     code: 36, name: 'generative-benchmark-net', intent: 'a >2.5× divergence between the deterministic engine and an independent top-down expectation',
     proveCatch: () => compareToBenchmark(BENCH_EXP, { costStack: { oem_transfer_price_gbp: 8_900_000 }, keyMetrics: {}, requirementsBom: [] } as any).needs_full_check === true,
     enforcedByDefault: () => !['', '0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.BENCHMARK_NET_ENFORCING || '').toLowerCase()),
+  },
+  {
+    code: 25, name: 'brief-value-literal-scanner (contract-strict)',
+    intent: 'a brief-MIRROR value hardcoded as a literal in engineering-contract.ts (`const dcBusVoltage = 800` while the brief states 1,500 V) — the file gate 25 was STRUCTURALLY blind to until 2026-06-25',
+    proveCatch: () => {
+      // (a) the contract-strict scan CATCHES the named-slot hardcode that contradicts
+      //     the brief, AND (b) its bundled selftest (catch + no-false-positive on the
+      //     real contract's constants/ladders/rates/fallbacks) passes both directions.
+      const bug = scanContractForBriefLiterals('const dcBusVoltage = 800', { dc_bus_voltage_v: 1500 }, 'bess')
+      const fires = bug.hits.some((h: any) => h.brief_key === 'dc_bus_voltage_v' && h.value === 800)
+      return fires && selftestContractStrict().passed
+    },
+    enforcedByDefault: () => true, // gate 25 is an always-on hard process.exit(25) (no flag)
   },
 ]
 

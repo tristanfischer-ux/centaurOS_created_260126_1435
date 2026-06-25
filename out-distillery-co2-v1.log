@@ -1,0 +1,92 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/distillery_co2_recovery.md (5508 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 5508 chars
+[brief-parse] OK — confidence=HIGH, missing=4 fields, metrics=6
+[chain] classification: bioreactor (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 15.6s)
+[chain] U5 brief augmentation: U5 augmentation (class: bioreactor): 3 HARD field(s) filled with class-aware inferred values, 4 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: max_mass_kg, target_process, target_material.
+  [U5] filled "max_mass_kg": 2000 (Class default for GMP stirred-tank bioreactor (21 CFR Part 11 / EU Annex 11 class; 316L wetted surfaces))
+  [U5] filled "target_process": "Biopharmaceutical manufacturing: stirred-tank fed-batch / perfusion culture, DO/pH closed-loop control, CIP/SIP cleaning cycles" (Class-canonical process for bioreactor. Class default for GMP stirred-tank bioreactor (21 CFR Part 11 / EU Annex 11 clas)
+  [U5] filled "target_material": "316L electropolished stainless steel vessel, single-use polymer bags (for smaller scale), PTFE seals" (Class-canonical material for bioreactor. Class default for GMP stirred-tank bioreactor (21 CFR Part 11 / EU Annex 11 cla)
+[chain] U6 brief expansion: 15 duties derived; product="Beverage-grade liquid carbon dioxide (>= 99.9% purity)" (model=google/gemini-3.1-pro-preview, cost_usd=0.07047)
+  [U6] average_recovery_capacity_kg_per_day = 2000 kg/day [stated/high] — Stated headline capacity for the system.
+  [U6] average_processing_rate_kg_per_hr = 83.3 kg/h [derived/high] — 2000 kg/day divided by 24 hours continuous operation.
+  [U6] peak_feed_rate_kg_per_hr = 250 kg/h [stated/high] — Stated peak intermittent flow from fermentation washbacks.
+  [U6] gas_buffer_capacity_kg = n/a kg [derived/low] — Depends on the duration of the 250 kg/hr peak vs the compressor sizing. If compressor is s
+  [U6] liquid_storage_capacity_kg = 5000 kg [stated/high] — Stated requirement for 2-3 days of buffer storage.
+  [U6] liquid_storage_volume_m3 = 4.64 m3 [derived/high] — 5000 kg capacity divided by liquid CO2 density at -30 C and 18 bar (approx. 1078 kg/m3).
+  [U6] product_purity_percent = 99.9 % [stated/high] — Stated beverage-grade specification (ISBT guidelines).
+  [U6] water_removal_duty_kg_per_day = 36 kg/day [derived/medium] — Feed is water-saturated at ~30 C (vapor pressure ~4.24 kPa). Mass ratio of water to CO2 is
+  [U6] liquefaction_pressure_bar = 18 bar [stated/high] — Stated target pressure for the liquefaction stage.
+  [U6] liquefaction_temperature_c = -30 C [stated/high] — Stated target temperature for the liquefaction stage.
+  [U6] average_liquefaction_cooling_load_kw = 9.7 kW [derived/medium] — Enthalpy change of CO2 from 30 C gas to -30 C liquid is ~350 kJ/kg. At 83.3 kg/hr (0.0231 
+  [U6] average_compressor_power_kw = 8.8 kW [derived/medium] — Isentropic compression of 83.3 kg/hr CO2 from 1 bar to 18 bar requires ~230 kJ/kg ideal wo
+  [U6] estimated_average_electrical_load_kw = 17.5 kW [derived/medium] — Sum of average compressor power (8.8 kW), refrigeration power (9.7 kW cooling at COP 1.5 =
+  [U6] skid_footprint_m2 = 14.78 m2 [derived/high] — Stated constraint of a single 20-foot ISO container (6.06 m x 2.44 m).
+  [U6] annual_production_capacity_tonnes = 660 tonnes/year [stated/high] — Stated 2 tonnes per day over 330 operating days per year.
+[chain] engineering_contract: 21 quantities, 5 topology edges, 8 macro-assemblies (total £260,000), closures: 3 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db","latency_ms":247}
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":5}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db","latency_ms":4}
+[products-writeback] {"product_name":"Stirred-tank bioreactor, 1000 L working / 1250 L total volume (316L jacketed). Vessel 0.93 m diameter × 1.85 m height (H:D=2:1). Agitator 5.00 kW (5 W/L). Sparger 750.0 L/min @ 0.75 vvm. kLa 272 1/h d","hit":"db_hybrid","matched":"GE Wave Bioreactor 200L","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":1997}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 4/7 mandatory covered for UK+EU+global
+  ⚠ ICH Q7 (missing_mandatory): Good Manufacturing Practice for Active Pharmaceutical Ingredients (global). API manufacture — process validation, change
+  ⚠ MD 2006/42/EC (missing_mandatory): Machinery Directive (EU). Agitator drives, peristaltic pumps, harvest systems classified as machinery — risk assessment 
+  ⚠ LVD + EMC + RoHS (missing_mandatory): CE-marking electrical/EMC/substance baseline (EU). Standard CE-marking trio for any electrical equipment placed on the E
+  ⚠ JURISDICTION_SCOPE (jurisdiction_conflict): Brief targets multiple regions (UK, EU, global) without an explicit harmonisation plan. Each region adds £25-60k in cert
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: bioreactor
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 9676 chars. First 200: {
+  "market_context": "The market for on-site carbon dioxide recovery in the food and beverage sector, particularly within brewing and distilling, has been growing due to increasing CO2 supply volatil
+[research-synthesis] Complete: 4 competitors, 5 sources, 6 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[chain] Orchestrator: 12 modules, 23 sub-modules, 56 words, 17 tools ran (11142ms)
+[chain] Build #18k: toolOutputsBlock built (20 tools, 27902 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 13 component_classes covered (13 with match, 0 empty), 9553 chars (15629ms)
+[chain] brief constraints propagated to stainless_vessel.derived_parameters: unit_cost_ceiling_gbp=250000, max_mass_kg=2000, envelope_volume_m3=38.31, target_performance_value=2000 (kg/day), operating_temp_min_c=-10, operating_temp_max_c=30
+[chain] Contract validation: all 8 macro-assemblies present in design ✓
+[chain] keyMetrics seeded early (pre-reviewer): Recovery Capacity Kg Per Day=2,000 kg/day
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=2/10 plaus=4/10 coh=8/10 part=9/10 hon=7/10 (31156ms)
+[chain] PHASE 4 skeleton critic: 2 HIGH-severity issues found before any LLM painting
+  ✗ [engineering_plausibility @ modules/jacket_cooling_heating/sub_modules/0] The cooling jacket capacity is rated at 7.00 kW, while the direct-drive VFD motor is rated at 5.00 kW. Since almost all motor power (5.00 kW) is converted to heat via viscous dissi
+  ✗ [engineering_plausibility @ brief/constraints/max_mass_kg] The maximum mass constraint is 2000 kg. A 1250L total volume stainless steel pressure vessel (jacketed, ASME/PED rated) has a dry weight of approximately 800-1200 kg. When filled w
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 12443 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 17 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 17 / 17 patches (skipped 0)
+    skip merge [identity-locked A3]: stainless_vessel.sanitary_vessel_body_pressure_envelope.top_dished_head_word manufacturer="Pfaudler" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: stainless_vessel.sanitary_vessel_body_pressure_envelope.top_dished_head_word part_number="AE-250-2:1" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: stainless_vessel.sanitary_vessel_body_pressure_envelope.top_dished_head_word material="316L stainless steel" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: stainless_vessel.sanitary_vessel_body_pressure_envelope.top_dished_head_word rating_primary="PED Category II" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word stainless_vessel.sanitary_vessel_body_pressure_envelope.top_dished_head_word (+5 modifiers)
+    skip merge [identity-locked A3]: stainless_vessel.sanitary_vessel_body_pressure_envelope.bottom_dished_head_word manufacturer="Pfaudler" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: stainless_vessel.sanitary_vessel_body_pressure_envelope.bottom_dished_head_word part_number="AE-250-BD" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: stainless_vessel.sanitary_vessel_body_pressure_envelope.bottom_dished_head_word material="316L stainless steel" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 25.2s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":2,"d_overview_chars":513}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=0/10 phys=2/10 coh=4/10 part=8/10 hon=2/10 (15017ms)
+[chain] critic headline: Severe product class mismatch: the design delivers a biopharmaceutical stirred-tank bioreactor instead of the requested CO2 capture, purification, and liquefaction skid.
+[chain] critic issues: 5 high, 0 med, 5 total
+  ✗ [high/high] brief_to_design_fidelity @ modules: Complete product class mismatch. The brief specifies a CO2 capture, purification, and liquefaction system (2000 kg/day capacity, 18 bar, -30 °C, with 5000 kg li
+  ✗ [high/high] engineering_plausibility @ modules[0].sub_modules[0].words[0]: The vessel provided is a 1250 L (1.25 m³) stainless bioreactor vessel. The brief requires 5000 kg of liquid CO2 storage. At -30 °C and 18 bar, liquid CO2 has a 
+  ✗ [high/high] engineering_plausibility @ modules[1].sub_modules[1].words[0]: The cooling medium is specified as 30% propylene glycol/water with an operating range of -10 to +90 °C. 30% propylene glycol freezes at approximately -13 °C and
+  ✗ [high/high] brief_to_design_fidelity @ modules: Missing critical process equipment. There is no gas compressor to reach 18 bar (the brief derived requirements calculate an 8.8 kW compressor is needed), no des
+  ✗ [high/high] honesty_signal @ brief.brief_expansion.notes: The brief expansion notes claim 'The initial brief incorrectly identified the system as a biopharmaceutical bioreactor. This has been corrected to a distillery 
+
+[chain] STEP 7.5b: physics-critic PHASE-2 AUTO-CORRECT (SHADOW — records would-be corrections, does NOT mutate the design)
+[chain] physics auto-correct (shadow): selected 1 blocking finding(s) → corrected 1, declined 0, unlocatable 0, still-uncorrectable 0 after 1 pass(es)
+  • [corrected] undersized-vs-load @ stainless_vessel/sub_modules[0]/words[0] (part-token): {capacity=1250, form=electropolished Ra <0.5 µm, dimension=0.93×1.85} → {capacity=5678 L, form=Vacuum-insulated double-wall liquid CO2 storage tank, dimension=1.52m x 4.88m, manufacturer=Chart Industries, part_number=VS-1500-350, rating_primary=24 bar, material=Stainless steel inner vessel, list_price_gbp=52000}
+[chain] physics-critic enforcement (ENFORCING): 1 BLOCKING known-failure fault(s) — a part the engine knows will fail:
+  ✗ [undersized-vs-load/high] @ modules[0].sub_modules[0].words[0]: The vessel provided is a 1250 L (1.25 m³) stainless bioreactor vessel. The brief requires 5000 kg of liquid CO2 storage. At -30 °C and 18 bar, liquid CO2 has a density of ~1078 kg/m³, requiring a mini…
+[chain] physics-critic ENFORCING: BLOCKING (exit 33) — the design recommends 1 part(s) the Physics Critic proved will FAIL. Refusing to ship a known-failing part. Fix the flagged part(s) (or run Phase-2 auto-correct) and re-run.

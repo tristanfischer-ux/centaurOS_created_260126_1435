@@ -5309,8 +5309,18 @@ async function main() {
       'pdf-engine-v2',
       'tool-narratives.ts',
     )
+    // engineering-contract.ts (2026-06-25 blind-spot closure): the contract
+    // builder is exactly where a brief-MIRROR hardcode hides — a bare
+    // `const dcBusVoltage = 800` shipped 800 V while the brief stated 1,500 V,
+    // and gate 25 was STRUCTURALLY blind to this file. It is added here and
+    // scanned in CONTRACT-STRICT mode inside scanMultipleFilesForBriefLiterals
+    // (matched by the `engineering-contract` path), which flags only a
+    // brief-mirror literal (constraint-unit-trailing OR in-family-named const)
+    // and skips the file's many legitimate computed literals, physics constants,
+    // standard-catalogue ladders, and silent-brief `?? N` fallback defaults.
+    const engineeringContractPath = resolve(__dirname, 'lib/engineering-contract.ts')
     const gate25Result = scanMultipleFilesForBriefLiterals(
-      [emitterPath, toolNarrativesPath],
+      [emitterPath, toolNarrativesPath, engineeringContractPath],
       briefConstraintsForScan,
       currentProductClass ?? 'unknown',
     )

@@ -442,6 +442,412 @@ export function scanEmitterFileForBriefLiterals(
   return scanEmitterForBriefLiterals(source, constraints, className, minValue)
 }
 
+// ── Contract-strict scan (2026-06-25, gate-25 file-coverage extension) ───────
+//
+// THE BLIND SPOT: gate 25 only ever scanned deterministic-emitter.ts (+ later
+// tool-narratives.ts). It NEVER scanned scripts/lib/engineering-contract.ts —
+// yet that is exactly where a brief-MIRROR hardcode hides: a brief stated
+// "DC bus voltage 1,500 V nominal" while engineering-contract.ts carried a
+// bare `const dcBusVoltage = 800`, the contract emitted 800 V, and every
+// downstream physics/cost cascade silently used the wrong rail. Gate 25 was
+// STRUCTURALLY blind to the file.
+//
+// WHY A LOOSE SCAN WON'T DO: engineering-contract.ts is FULL of legitimate
+// literals — physics constants (cellVoltageV 3.2, 280 Ah cells, 1.25 safety
+// factors), standard-catalogue ladders ([500,630,800,1000,…] kVA transformer
+// sizes), £/kW rates (hvacPerKwGbp = 800), per-line prices (unit_price_gbp:
+// 1500), sizing bands (klaPerH <= 800), and SILENT-BRIEF fallback defaults
+// (the dc_bus reader's own `return 800` when the brief is silent). The
+// canonical emitter scan would drown in false positives here.
+//
+// CONTRACT-STRICT MODE flags ONLY a brief-mirror hardcode and skips the
+// legitimate patterns above. A literal is flagged iff ALL hold:
+//   (1) value >= minValue (skips small physics constants like 3.2, 1.25);
+//   (2) the line is NOT a comment / import / export / type annotation /
+//       ladder-array element / arithmetic-scaling operand / silent-brief
+//       fallback (`?? N`, `return N` inside the reader IIFE, `: number = N`);
+//   (3) AND the literal carries an UNAMBIGUOUS family signal that MATCHES the
+//       brief constraint's family, via EITHER
+//         (a) the constraint's own UNIT trailing the literal ("1500 V",
+//             "35,000 kg"), OR
+//         (b) the literal being ASSIGNED-TO / KEYED-BY a NAME whose family
+//             (familyFromValueKey) equals the constraint's family
+//             (`dcBusVoltage = 800` → voltage; `unit_price_gbp: 1500` → money,
+//             which does NOT match a voltage constraint and is skipped).
+// A bare number with neither an in-family name nor the constraint unit is a
+// coincidental collision (a price, a rate, a sizing band) and is left alone —
+// this is what keeps the scan quiet on the physics-constant / ladder file
+// while still catching the bare `= 800` voltage mirror (it is assigned to a
+// voltage-named const, so signal (b) fires).
+
+/**
+ * Lines that are SILENT-BRIEF fallback defaults — a literal used ONLY as the
+ * default when the brief is silent (the legitimate dc_bus pattern: the reader
+ * IIFE ends `return 800` / a value is `?? 800` / `: number = 800`). These are
+ * the CORRECT shape (read the brief, fall back to a class default) and must
+ * never be flagged. Distinct from EXCLUDED_LINE_PATTERNS (which the emitter
+ * scan also uses) so the contract scan can add its own conservative skips
+ * without changing emitter behaviour.
+ */
+const CONTRACT_FALLBACK_LINE_PATTERNS: RegExp[] = [
+  /\?\?\s*[\d,]/,                 // `x ?? 800` nullish fallback default
+  /\|\|\s*[\d,]/,                 // `x || 800` OR fallback default
+  /^\s*return\s+[\d,]+\b/,        // `return 800` — class-default branch of a reader IIFE
+  /:\s*number\s*=\s*[\d,]/,       // `param: number = 800` typed default
+]
+
+/**
+ * Provenance / prose lines — `source_detail:`, `reason:`, `condition:`, `note:`,
+ * `english_sentence:`, `paragraph_en:` etc. carry DESCRIPTIVE strings that quote
+ * example values ("default 800 V only when the brief is silent", "400 V or 800 V
+ * EV-class typical", "CCS2 800 V architecture"). The literal there is NOT the
+ * emitted value — the emitted value is a VARIABLE elsewhere on the line (e.g.
+ * `q(dcBusVoltage, 'V', …, { source_detail: '… 800 V …' })`). Skip the whole
+ * line so a coincidental brief==example collision (a dc=800 brief vs the "800 V"
+ * example prose) never false-positives. Universal: this is prose, not a value.
+ */
+const CONTRACT_PROSE_KEY_RE = /\b(source_detail|reason|condition|note|notes|description|english_sentence|paragraph_en|sentence_en|topology_clause|label|comment|rationale|basis_detail)\s*:/
+
+/**
+ * Detect a standard-catalogue LADDER array element, e.g.
+ *   const STANDARD_TRANSFORMER_KVA = [500, 630, 800, 1000, 1250, …]
+ * A literal that sits inside a `[ … ]` with sibling comma-separated numbers is
+ * a ladder rung, not a brief mirror. Heuristic: the line contains a `[` before
+ * the literal and at least one OTHER bare number separated by a comma.
+ */
+function isLadderArrayLine(lineText: string): boolean {
+  // an array literal with >=3 numeric elements
+  const arr = lineText.match(/\[[^\]]*\]/)
+  if (!arr) return false
+  const nums = arr[0].match(/\b\d[\d,]*\b/g) ?? []
+  return nums.length >= 3
+}
+
+/**
+ * Infer the family of the NAME a literal is assigned to / keyed by on this line,
+ * looking immediately to the LEFT of the literal for:
+ *   - `someName = <lit>`            (assignment / object-shorthand key)
+ *   - `some_key: <lit>`             (object property)
+ *   - `'some_key', <lit>`           (mod()/q() positional key arg)
+ * Returns the familyFromValueKey() of that name, or null when no name is found.
+ */
+function familyFromAssignedName(beforeNum: string): string | null {
+  // `name = ` or `name: ` or `'name', `
+  const m =
+    beforeNum.match(/([A-Za-z_][A-Za-z0-9_]{2,})\s*[:=]\s*$/) ||
+    beforeNum.match(/['"]([a-z_][a-z0-9_]{2,})['"]\s*,\s*$/i)
+  if (!m) return null
+  return familyFromValueKey(m[1])
+}
+
+/** Unit / family tokens that carry NO distinguishing meaning for a slot name. */
+const NON_DISTINGUISHING_TOKENS = new Set([
+  // unit suffixes
+  'v', 'kv', 'mv', 'kg', 'kgs', 't', 'kw', 'mw', 'gw', 'w', 'wh', 'kwh', 'mwh', 'gwh',
+  'a', 'ka', 'ma', 'gbp', 'usd', 'eur', 'mm', 'cm', 'm', 'km', 'years', 'yr', 'yrs',
+  // family / generic words (the family is matched separately; these don't distinguish
+  // ONE voltage/mass quantity from another)
+  'voltage', 'volt', 'mass', 'weight', 'power', 'energy', 'current', 'price', 'cost',
+  'count', 'qty', 'quantity', 'size', 'value', 'nominal', 'rated', 'target', 'design',
+])
+
+/**
+ * The DISTINGUISHING tokens of a brief constraint key — the tokens that pin it
+ * to ONE specific quantity, after dropping unit suffixes + the bare family word.
+ *   dc_bus_voltage_v → {dc, bus}        (NOT every voltage — the DC-BUS voltage)
+ *   ac_grid_voltage_v → {ac, grid}
+ *   max_mass_kg      → {max}            (the mass CAP, not a per-rack mass)
+ *   unit_cost_ceiling_gbp → {unit, ceiling}
+ * A slot name must contain ALL of these (token-substring) to be the same slot.
+ * Returns an empty array when the key is only a family+unit (then PASS B is
+ * suppressed — too generic to pin a unique slot safely).
+ */
+function distinguishingTokens(briefKey: string): string[] {
+  return briefKey
+    .toLowerCase()
+    .split(/[_\s]+/)
+    .filter((tok) => tok.length >= 2 && !NON_DISTINGUISHING_TOKENS.has(tok))
+}
+
+/**
+ * Token synonyms — a brief key's distinguishing token is satisfied by any of its
+ * synonyms appearing in the slot name. Universal (semantic equivalence, not a
+ * class table): `max_mass_kg`'s distinguishing token `max` is met by a slot
+ * named `…Cap…` / `…Ceiling…` (the canonical "mass cap" naming).
+ */
+const TOKEN_SYNONYMS: Record<string, string[]> = {
+  max: ['max', 'maximum', 'cap', 'ceiling', 'limit', 'upper'],
+  min: ['min', 'minimum', 'floor', 'lower'],
+  ceiling: ['ceiling', 'cap', 'max', 'maximum', 'limit'],
+  bus: ['bus', 'busbar'],
+  grid: ['grid', 'mains', 'utility'],
+}
+
+/** Split a camelCase / snake_case identifier into lowercase tokens. */
+function splitIdentifierTokens(name: string): string[] {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[_\s]+/)
+    .filter(Boolean)
+}
+
+/**
+ * Does a slot NAME denote the SAME quantity as the brief constraint key?
+ * Requires the slot's tokens to contain EVERY distinguishing token of the key,
+ * AND the slot's family to equal the constraint family. So `dcBusVoltage`
+ * matches `dc_bus_voltage_v` (dc+bus+voltage-family) but `lineVoltageV`,
+ * `acInputVoltageV`, `outputVoltageMaxV` do NOT (missing dc / bus).
+ */
+function slotNameMatchesConstraint(slotName: string, briefKey: string, family: string): boolean {
+  if (familyFromValueKey(slotName) !== family) return false
+  const distinguish = distinguishingTokens(briefKey)
+  if (distinguish.length === 0) return false  // too generic to pin a unique slot
+  const slotTokens = splitIdentifierTokens(slotName)
+  const slotJoined = slotTokens.join(' ')
+  return distinguish.every((d) => {
+    const accepted = TOKEN_SYNONYMS[d] ?? [d]
+    return accepted.some((syn) => slotTokens.includes(syn) || slotJoined.includes(syn))
+  })
+}
+
+/** Shared per-line skips for the contract-strict scan (both passes). */
+function contractLineIsSkippable(rawLine: string, lineText: string): boolean {
+  // Comments / imports / exports / type annotations.
+  if (EXCLUDED_LINE_PATTERNS.some((p) => p.test(rawLine))) return true
+  // Silent-brief fallback defaults (`?? 800`, `return 800`, `: number = 800`).
+  // The CORRECT read-brief-then-default shape — never a mirror.
+  if (CONTRACT_FALLBACK_LINE_PATTERNS.some((p) => p.test(lineText))) return true
+  // Provenance / prose lines (source_detail:, reason:, …) — the literal is an
+  // EXAMPLE inside a description string, not the emitted value.
+  if (CONTRACT_PROSE_KEY_RE.test(lineText)) return true
+  // Standard-catalogue ladder arrays ([500, 630, 800, …]).
+  if (isLadderArrayLine(lineText)) return true
+  return false
+}
+
+/** Is the position immediately before `beforeTrim`'s end a VALUE position? */
+function isValuePosition(beforeTrim: string): boolean {
+  return (
+    /[:=]\s*$/.test(beforeTrim) ||                       // name = N / name: N
+    /['"][A-Za-z_][\w]*['"]\s*,\s*$/.test(beforeTrim) || // 'key', N  (mod/q positional)
+    /\b(?:q|mod)\(\s*$/.test(beforeTrim) ||              // q( N  / mod( N
+    /[([,]\s*$/.test(beforeTrim)                         // ( N  / , N  / [ N
+  )
+}
+
+/**
+ * scanContractForBriefLiterals — CONTRACT-STRICT scan of engineering-contract.ts
+ * (or any file dense with legitimate computed literals). See the block comment
+ * above for the rule. Returns the SAME shape as scanEmitterForBriefLiterals so
+ * the multi-file aggregator can fold it in.
+ *
+ * TWO complementary passes per constraint:
+ *
+ *   PASS A — STALE-LITERAL (the classic gate-25 signal): the BRIEF VALUE appears
+ *   as a value-position literal with the constraint's unit or an in-family name.
+ *   Catches "35,000 kg" frozen in the contract.
+ *
+ *   PASS B — NAMED-SLOT HARDCODE (the dc_bus=800 signal, 2026-06-25): an
+ *   in-constraint-family-NAMED variable (`dcBusVoltage`, `*_voltage_v`,
+ *   `massCapKg`, …) is assigned a BARE LITERAL that does NOT equal the brief
+ *   value. This is a frozen brief-MIRROR slot that CONTRADICTS the brief — the
+ *   literal is the WRONG value (800 while the brief says 1500), so PASS A
+ *   (which searches for the brief value 1500) can never see it. PASS B keys off
+ *   the SLOT NAME, not the value, so it catches a hardcode regardless of which
+ *   wrong number it froze. Skips the silent-brief `?? N` / `return N` fallback
+ *   (that IS the correct default shape) via contractLineIsSkippable.
+ */
+export function scanContractForBriefLiterals(
+  contractSource: string,
+  constraints: MinimalBriefConstraints,
+  className: string,
+  minValue = 100,
+): BriefValueLiteralScanResult {
+  const lines = contractSource.split('\n')
+  const hits: LiteralHit[] = []
+  const seen = new Set<string>()  // dedupe (line × key) across the two passes
+  let constraintsChecked = 0
+
+  for (const [key, rawValue] of Object.entries(constraints)) {
+    if (rawValue === undefined || rawValue === null) continue
+    const value = Number(rawValue)
+    if (!Number.isFinite(value) || value < minValue) continue
+
+    constraintsChecked++
+    const pattern = buildLiteralPattern(value)
+    const label = BRIEF_KEY_LABELS[key] ?? key
+    const expectedFamily = CONSTRAINT_EXPECTED_FAMILY[key]
+
+    // ── PASS B: NAMED-SLOT HARDCODE — the dc_bus=800 case ────────────────────
+    // Find `<inFamilyName> = <bareLiteral>` / `<inFamilyName>: <bareLiteral>`
+    // where the slot name maps to THIS constraint's family and the literal value
+    // ≠ the brief value (a frozen mirror that contradicts the brief). Requires a
+    // known family (so an unmapped constraint can't fire this name-only pass).
+    if (expectedFamily) {
+      // name = N  |  name: N   (N = a bare integer literal, optional thousands comma)
+      const slotRe = /([A-Za-z_][A-Za-z0-9_]{2,})\s*[:=]\s*(\d{1,3}(?:,\d{3})+|\d{2,7})\b/g
+      for (let i = 0; i < lines.length; i++) {
+        const rawLine = lines[i]
+        const lineText = rawLine.replace(/\/\/.*$/, '').replace(/\/\*[\s\S]*?\*\//g, '')
+        if (contractLineIsSkippable(rawLine, lineText)) continue
+        slotRe.lastIndex = 0
+        let m: RegExpExecArray | null
+        while ((m = slotRe.exec(lineText)) !== null) {
+          const slotName = m[1]
+          // The slot must denote the SAME quantity as the brief key — same family
+          // AND every distinguishing token (dc+bus for dc_bus_voltage_v). This is
+          // what separates the dc-bus slot from lineVoltageV / acInputVoltageV /
+          // rackMassKgEach / totalMassKg (same family, DIFFERENT quantity).
+          if (!slotNameMatchesConstraint(slotName, key, expectedFamily)) continue
+          const litValue = Number(m[2].replace(/,/g, ''))
+          if (!Number.isFinite(litValue) || litValue < minValue) continue
+          // Skip a literal that is preceded by an arithmetic operator (scaling).
+          const idxLit = m.index + m[0].length - m[2].length
+          const before = lineText.slice(0, idxLit).replace(/\s+$/, '')
+          if (/[*/+\-]$/.test(before)) continue
+          // The CONTRADICTION: a brief-family-named slot hardcoded to a value that
+          // is NOT the brief's value. (If it EQUALS the brief, PASS A reports it
+          // as a stale literal; we don't double-flag — dedup below.)
+          if (litValue === value) continue
+          const dk = `${i}|${key}`
+          if (seen.has(dk)) continue
+          seen.add(dk)
+          hits.push({
+            value: litValue,
+            brief_key: key,
+            brief_label: label,
+            line_number: i + 1,
+            line_text: lineText.trim(),
+            raw_match: m[2],
+          })
+        }
+      }
+    }
+
+    // ── PASS A: STALE-LITERAL — the brief value frozen in the contract ───────
+    for (let i = 0; i < lines.length; i++) {
+      const rawLine = lines[i]
+      const lineText = rawLine.replace(/\/\/.*$/, '').replace(/\/\*[\s\S]*?\*\//g, '')
+
+      if (contractLineIsSkippable(rawLine, lineText)) continue
+
+      const match = lineText.match(pattern)
+      if (!match) continue
+      const mIdx = match.index ?? lineText.indexOf(match[1])
+
+      // Arithmetic-scaling operand (× / ÷ / + / -) — a rounding/percentage/offset
+      // constant in a computation, never a brief mirror.
+      const beforeNum = lineText.slice(0, mIdx).replace(/\s+$/, '')
+      if (/[*/+\-]$/.test(beforeNum)) continue
+
+      // ── VALUE-POSITION requirement ───────────────────────────────────────
+      const beforeTrim = lineText.slice(0, mIdx)
+      if (!isValuePosition(beforeTrim)) continue
+
+      // ── The strict family gate ───────────────────────────────────────────
+      // Signal (a): the constraint's OWN unit trails the literal.
+      const trailing = lineText.slice(mIdx + match[1].length).replace(/^[\s)\]}]+/, '')
+      const expectedRe = expectedFamily ? UNIT_FAMILY_TRAILING[expectedFamily] : undefined
+      const unitMatches = !!(expectedRe && expectedRe.test(trailing))
+
+      // Signal (b): the literal is assigned-to / keyed-by a SLOT NAME that denotes
+      // the SAME QUANTITY as the brief key (same family AND distinguishing tokens —
+      // `dcBusVoltage = 1500` → the dc-bus voltage). A mere family match is NOT
+      // enough: `acInputVoltageV = 400`, `totalMassKg = 720`, `unit_price_gbp: 800`
+      // share the family but are DIFFERENT quantities — they must NOT flag just
+      // because a contrived brief value collides with their literal.
+      const assignedName =
+        beforeTrim.match(/([A-Za-z_][A-Za-z0-9_]{2,})\s*[:=]\s*$/)?.[1] ??
+        beforeTrim.match(/['"]([a-z_][a-z0-9_]{2,})['"]\s*,\s*$/i)?.[1] ??
+        null
+      const nameFamily = assignedName ? familyFromValueKey(assignedName) : null
+      const nameMatches = !!(
+        expectedFamily &&
+        assignedName &&
+        slotNameMatchesConstraint(assignedName, key, expectedFamily)
+      )
+
+      // A value-position literal whose name maps to a DIFFERENT family than the
+      // constraint (e.g. `unit_price_gbp: 1500` → money vs a voltage constraint)
+      // is a coincidental collision — skip it even though the unit might trail.
+      if (expectedFamily && nameFamily && nameFamily !== expectedFamily) continue
+
+      // No expectedFamily → require a SOME-name signal (conservative).
+      const flagged = expectedFamily
+        ? (unitMatches || nameMatches)
+        : nameFamily !== null
+
+      if (!flagged) continue
+
+      const dk = `${i}|${key}`
+      if (seen.has(dk)) continue
+      seen.add(dk)
+
+      hits.push({
+        value,
+        brief_key: key,
+        brief_label: label,
+        line_number: i + 1,
+        line_text: lineText.trim(),
+        raw_match: match[1],
+      })
+    }
+  }
+
+  const passed = hits.length === 0
+  let errorMessage: string | null = null
+  if (!passed) {
+    const out = [
+      `[Gate 25 / exit 25] Brief-value literal scanner FAIL (contract-strict) — class: ${className}`,
+      `${hits.length} brief-mirror literal(s) found in engineering-contract.ts:`,
+    ]
+    for (const h of hits) {
+      out.push(`  Line ${h.line_number}: literal "${h.raw_match}" matches brief.${h.brief_key} (${h.brief_label})`)
+      out.push(`    → ${h.line_text.substring(0, 120)}`)
+    }
+    out.push('')
+    out.push('Fix: READ the value from the brief (target_performance.metrics / description), with the')
+    out.push('  class default ONLY in a `?? N` / `return N` silent-brief fallback — never a bare assignment.')
+    out.push('  This is the dc_bus_voltage_v class: a brief stating 1500 V must yield 1500 V, not a frozen 800.')
+    errorMessage = out.join('\n')
+  }
+
+  return {
+    passed,
+    hits,
+    lines_scanned: lines.length,
+    constraints_checked: constraintsChecked,
+    error_message: errorMessage,
+    class_name: className,
+  }
+}
+
+/**
+ * scanContractFileForBriefLiterals — file-backed wrapper for the contract-strict
+ * scan.
+ */
+export function scanContractFileForBriefLiterals(
+  contractPath: string,
+  constraints: MinimalBriefConstraints,
+  className: string,
+  minValue = 100,
+): BriefValueLiteralScanResult {
+  if (!fs.existsSync(contractPath)) {
+    return {
+      passed: false,
+      hits: [],
+      lines_scanned: 0,
+      constraints_checked: 0,
+      error_message: `[Gate 25] Contract file not found: ${contractPath}`,
+      class_name: className,
+    }
+  }
+  const source = fs.readFileSync(contractPath, 'utf-8')
+  return scanContractForBriefLiterals(source, constraints, className, minValue)
+}
+
 // ── Multi-file scan (2026-05-27, L43 universal extension) ────────────────────
 
 /**
@@ -482,6 +888,22 @@ export function scanMultipleFilesForBriefLiterals(
   for (const sourcePath of sourcePaths) {
     if (!fs.existsSync(sourcePath)) continue
     const source = fs.readFileSync(sourcePath, 'utf-8')
+    // engineering-contract.ts scanned in CONTRACT-STRICT mode — it is dense with
+    // legitimate computed literals (physics constants, £/kW rates, price lines,
+    // standard-catalogue ladders, silent-brief fallback defaults); contract-strict
+    // flags ONLY a brief-MIRROR hardcode (the dc_bus=800 class: a value with the
+    // constraint's own unit OR assigned to an in-family-named const), so the loose
+    // emitter scan's bare-literal catch would NOT drown the file in false positives.
+    const isContract = /engineering-contract/.test(sourcePath)
+    if (isContract) {
+      const cResult = scanContractForBriefLiterals(source, constraints, className, minValue)
+      constraintsCheckedSeen = Math.max(constraintsCheckedSeen, cResult.constraints_checked)
+      totalLinesScanned += cResult.lines_scanned
+      for (const hit of cResult.hits) {
+        allHits.push({ ...hit, source_file: path.basename(sourcePath) })
+      }
+      continue
+    }
     // Narratives scanned in STRICT mode (require the constraint's own unit) —
     // tool descriptions are dense with coincidental physics numbers; the emitter
     // is scanned leniently (bare-literal catch).
@@ -721,5 +1143,83 @@ export function scanEmitterFileWithHistoricalValues(
     historical_hits: historicalHits,
     combined_passed: highCount === 0,
     combined_high_count: highCount,
+  }
+}
+
+// ── Selftest (proveCatch for the contract-strict extension, 2026-06-25) ──────
+//
+//   npx tsx scripts/lib/brief-value-literal-scanner.ts --selftest
+//
+// Proves the gate-25 CONTRACT-STRICT extension (1) CATCHES a contract-level
+// brief-MIRROR hardcode (the dc_bus=800-vs-brief-1500 class) and (2) does NOT
+// false-positive on the legitimate computed literals / physics constants /
+// standard-catalogue ladders / silent-brief fallback defaults that fill
+// engineering-contract.ts. Exit non-zero if any case regresses — wired into
+// the gate registry so the coverage cannot silently disappear.
+export function selftestContractStrict(): { passed: boolean; failures: string[] } {
+  const failures: string[] = []
+  const expect = (name: string, cond: boolean) => { if (!cond) failures.push(name) }
+
+  // (1) CATCHES the named-slot hardcode that contradicts the brief.
+  const bug = scanContractForBriefLiterals(
+    'const dcBusVoltage = 800',
+    { dc_bus_voltage_v: 1500 },
+    'bess',
+  )
+  expect('catches dcBusVoltage=800 vs brief 1500',
+    bug.hits.some((h) => h.brief_key === 'dc_bus_voltage_v' && h.value === 800))
+
+  // (2) SKIPS the silent-brief fallback default (the CORRECT read-then-default).
+  const ok = scanContractForBriefLiterals(
+    'const v = (() => {\n  const x = readBrief()\n  if (x) return x\n  return 800\n})()',
+    { dc_bus_voltage_v: 1500 },
+    'bess',
+  )
+  expect('skips `return 800` silent-brief fallback', ok.passed)
+
+  // (3) SKIPS family-but-different-quantity slots, ladders, prices, constants.
+  const noise = scanContractForBriefLiterals(
+    [
+      'const lineVoltageV = 230',                                  // mains, not dc bus
+      'const acInputVoltageV = 400',                              // diff rail
+      'const STANDARD_TRANSFORMER_KVA = [500, 630, 800, 1000]',   // ladder
+      'const hvacPerKwGbp = 800',                                 // £/kW rate (money)
+      'const cellAh = 280',                                       // physics constant
+      'const totalMassKg = 720',                                  // a total, not the cap
+      "  unit_price_gbp: 1500,",                                  // per-line price
+    ].join('\n'),
+    { dc_bus_voltage_v: 800, ac_grid_voltage_v: 1500, max_mass_kg: 720, unit_cost_ceiling_gbp: 1500 },
+    'bess',
+  )
+  expect('skips lineVoltage/acInput/ladder/rate/constant/total/price (no false positives)', noise.passed)
+
+  // (4) CATCHES the canonical mass-cap slot named with a synonym (cap≈max).
+  const massCap = scanContractForBriefLiterals(
+    'const briefMassCapKg = 28000',
+    { max_mass_kg: 35000 },
+    'bess',
+  )
+  expect('catches briefMassCapKg=28000 vs brief max 35000 (cap≈max synonym)',
+    massCap.hits.some((h) => h.brief_key === 'max_mass_kg'))
+
+  // (5) The REAL engineering-contract.ts (dc now brief-read) must NOT flag dc_bus.
+  const contractPath = path.resolve(__dirname, 'engineering-contract.ts')
+  if (fs.existsSync(contractPath)) {
+    const real = scanContractFileForBriefLiterals(contractPath, { dc_bus_voltage_v: 1500, max_mass_kg: 35000 }, 'bess')
+    expect('real contract file: zero false positives (brief dc=1500, mass=35000)', real.passed)
+  }
+
+  return { passed: failures.length === 0, failures }
+}
+
+if (require.main === module && process.argv.includes('--selftest')) {
+  const { passed, failures } = selftestContractStrict()
+  if (passed) {
+    console.log('[brief-value-literal-scanner] contract-strict selftest: PASS (5 cases)')
+    process.exit(0)
+  } else {
+    console.error('[brief-value-literal-scanner] contract-strict selftest: FAIL')
+    for (const f of failures) console.error('  ✗ ' + f)
+    process.exit(1)
   }
 }

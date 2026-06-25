@@ -715,6 +715,32 @@ registerArchetype('bess', (brief: any) => {
   // (40-ft) only when the brief states no envelope.
   const _md = brief?.constraints?.max_dimensions_mm ?? {}
   const containerLengthM = Math.max(Number(_md.w ?? 0), Number(_md.d ?? 0), Number(_md.l ?? 0)) / 1000 || 12.03
+  // Enclosure gross internal VOLUME from the brief envelope (2026-06-25): the
+  // fire-suppression (Novec 1230) agent mass scales with the protected volume,
+  // so a 20-ft brief (~38 m³) must NOT inherit the 40-ft container's 86 m³ —
+  // doing so over-sized the suppression agent mass + price ~2.3×. The brief gives
+  // an EXTERNAL envelope (L×W×H in mm); the agent fills the GROSS INTERNAL volume.
+  // Mirror how container_internal_length_m is derived (longer horizontal dim as
+  // length): take the three largest provided dims as L (longest), W, H, then
+  // subtract a per-dimension structural allowance for the corrugated wall + frame
+  // to get the gross internal box — the SAME basis that puts a 40-ft HC external
+  // 12.03×2.44×2.59 at ≈86 m³ gross internal (the emitter's canonical default).
+  const _mdSorted = [Number(_md.l ?? 0), Number(_md.w ?? 0), Number(_md.d ?? 0), Number(_md.h ?? 0)]
+    .filter((v) => v > 0)
+    .sort((a, b) => b - a)
+  // The external box (L×W×H) maps to a slightly LARGER gross internal envelope
+  // because the industry's "gross internal" figure counts the full corrugation +
+  // corner-post void (the HC roof bow), so the suppression volume is reckoned
+  // generously, NOT net of wall thickness. A single universal factor calibrated so
+  // the 40-ft HC external 12.03×2.44×2.59 = 76.0 m³ lands at the canonical ~86 m³
+  // gross (×1.10, mid-way between the strict-net ×1.05 and the round-86 ×1.13);
+  // the SAME factor maps the 20-ft external 6.06×2.44×2.44 = 36.1 m³ → ~40 m³
+  // gross (within the 35-40 m³ band a 20-ft HC enclosure actually presents).
+  const HC_GROSS_FACTOR = 1.1  // external box → gross-internal (40-ft 76.0 → ~84, 20-ft 36.1 → ~40)
+  const enclosureVolumeM3 =
+    _mdSorted.length >= 3
+      ? (_mdSorted[0] / 1000) * (_mdSorted[1] / 1000) * (_mdSorted[2] / 1000) * HC_GROSS_FACTOR
+      : 86  // brief silent on envelope → 40-ft HC gross default (matches emitter fallback)
   // DERIVE the rack ceiling from the BRIEF'S mass budget — NOT a hardcoded 15.
   // 2026-05-31 fix: `rackCountMaxSingleContainer = 15` was sized for the original
   // 28 t cap and silently ignored the brief's actual mass allowance, so EVERY
@@ -982,6 +1008,13 @@ registerArchetype('bess', (brief: any) => {
     // container SIZE for the emitter — the longer horizontal envelope dimension (20-ft ≈ 6.06 m,
     // 40-ft ≈ 12.03 m). emitStructureContainment emits the matching container word + tare + price.
     container_internal_length_m: q(containerLengthM, 'm', 'length', 'rated', 'system', 'brief', { source_detail: `container length from brief max_dimensions_mm (longer horizontal dim); ${containerLengthM <= 7.5 ? '20-ft ISO' : '40-ft ISO'} class` }),
+    // Enclosure gross internal volume from the brief envelope (2026-06-25). The
+    // deterministic emitter (emitStructureContainment) reads this for Novec 1230
+    // fire-suppression agent-mass sizing via q(contract,'enclosure_volume_m3',86);
+    // previously the contract never emitted it so EVERY brief — including a 20-ft
+    // — fell back to the 86 m³ (40-ft) default, over-sizing the agent mass + price
+    // ~2.3×. Now scales with the brief box (20-ft ≈ 38 m³, 40-ft ≈ 86 m³).
+    enclosure_volume_m3: q(enclosureVolumeM3, 'm³', 'volume', 'rated', 'system', 'brief', { source_detail: `gross internal volume from brief max_dimensions_mm (L×W×H × ${HC_GROSS_FACTOR} HC-gross factor); ${containerLengthM <= 7.5 ? '20-ft ISO' : '40-ft ISO'} class (default 86 m³ only when the brief is silent on envelope)` }),
     // BESS L26 (2026-05-25, gate-17 HIGH #4): ac_output_voltage_v — UK
     // grid-tie BESS universally uses 400 V / 50 Hz LV AC output via the PCS;
     // brief target_performance has key 'ac_output_voltage_v' → 400 V. METRIC_MAP
@@ -1138,14 +1171,24 @@ registerArchetype('bess', (brief: any) => {
       total_gbp: 75 * continuousKw,
       source_detail: `£75/kW × ${continuousKw} kW (Sungrow SC1000UD bidirectional PCS, bare unit; MV transformation provided by the separate external pad-mount step-up transformer)`,
     },
-    {
-      word_name: 'iso_container_enclosure',
-      unit_price_gbp: 8000,
-      dimension_basis: 'each',
-      dimension_value: 1,
-      total_gbp: 8000,
-      source_detail: `£8,000 flat — 40-ft HC ISO container with structural mods, fire-rated penetrations, HVAC mounting`,
-    },
+    ((): MacroAssemblyPrice => {
+      // Container price + label FOLLOW the derived size (2026-06-25): mirror the
+      // emitter's containerSizeFt rule (containerLengthM ≤ 7.5 m → 20-ft, else
+      // 40-ft) so a 20-ft brief is no longer billed the 40-ft £8,000 box with a
+      // "40-ft" label. A bespoke BESS-grade 20-ft enclosure (structural mods +
+      // fire-rated penetrations + HVAC mounting) ≈ £4,800; the 40-ft ≈ £8,000.
+      // Universal: derived from the number, no per-brief hardcoding.
+      const containerSizeFt = containerLengthM <= 7.5 ? 20 : 40
+      const enclosurePriceGbp = containerSizeFt === 20 ? 4800 : 8000
+      return {
+        word_name: 'iso_container_enclosure',
+        unit_price_gbp: enclosurePriceGbp,
+        dimension_basis: 'each',
+        dimension_value: 1,
+        total_gbp: enclosurePriceGbp,
+        source_detail: `£${enclosurePriceGbp.toLocaleString('en-GB')} flat — ${containerSizeFt}-ft HC ISO container with structural mods, fire-rated penetrations, HVAC mounting`,
+      }
+    })(),
     {
       word_name: 'bms_master_controller',
       unit_price_gbp: 3000,

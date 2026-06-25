@@ -1,0 +1,374 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-rerun/e_fuel_synthesis.md (10679 chars)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 10679 chars
+[brief-parse] OK — confidence=HIGH, missing=3 fields, metrics=12
+[chain] classification: e_fuel_synthesis (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 29.3s)
+[chain] U5 brief augmentation: U5 augmentation (class: e_fuel_synthesis): 3 HARD field(s) filled with class-aware inferred values, 4 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: max_mass_kg, target_process, target_material.
+  [U5] filled "max_mass_kg": 40000 (class-agnostic inference from brief text for unmapped class "e_fuel_synthesis")
+  [U5] filled "target_process": "Continuous chemical process: capture + electrolysis; field-erected skid-mounted modular plant with closed-loop solvent/reagent recovery and automated process control" (Process inferred from brief mission/description for e_fuel_synthesis. class-agnostic inference from brief text for unmap)
+  [U5] filled "target_material": "316/316L stainless-steel process fabrication; products: hydrogen + oxygen" (Material/products inferred from brief text for e_fuel_synthesis. class-agnostic inference from brief text for unmapped c)
+[chain] U6 brief expansion: 12 duties derived; product="Sustainable Aviation Fuel (SAF) and Naphtha co-product" (model=google/gemini-3.1-pro-preview, cost_usd=0.066116)
+  [U6] saf_production_kg_per_hr = 125 kg/h [stated/high] — Stated in brief (1000 t/yr over 8000 h/yr).
+  [U6] total_liquid_hydrocarbon_production_kg_per_hr = 208.3 kg/h [derived/high] — SAF production (125 kg/h) represents >= 60% of the total liquid product. 125 / 0.60 = 208.
+  [U6] naphtha_production_kg_per_hr = 83.3 kg/h [derived/high] — Total liquid hydrocarbon (208.3 kg/h) minus SAF cut (125 kg/h).
+  [U6] co2_feed_rate_kg_per_hr = 1000 kg/h [stated/high] — Stated in brief.
+  [U6] h2_feed_rate_kg_per_hr = 140 kg/h [stated/high] — Stated in brief.
+  [U6] fresh_feed_gas_volume_nm3_per_hr = 2066 Nm3/h [derived/high] — CO2 (1000 kg/h / 44.01 = 22.72 kmol/h) + H2 (140 kg/h / 2.016 = 69.44 kmol/h) = 92.16 kmol
+  [U6] process_water_production_kg_per_hr = 532 kg/h [derived/high] — 65% of 1000 kg/h CO2 is converted (650 kg/h = 14.77 kmol/h). Stoichiometry (CO2 + 3H2 -> -
+  [U6] purge_gas_to_thermal_oxidiser_kg_per_hr = 400 kg/h [derived/medium] — Overall mass balance: Total feed (1140 kg/h) minus total liquid hydrocarbons (208 kg/h) mi
+  [U6] ft_reaction_exotherm_cooling_duty_kw = 451 kW [derived/medium] — 14.77 kmol/h CO2 converted. Enthalpy of single-step CO2 hydrogenation to paraffins is appr
+  [U6] electrical_load_mw = 3 MW [stated/high] — Stated in brief.
+  [U6] operating_hours_per_year_h = 8000 h [stated/high] — Stated in brief.
+  [U6] catalyst_lifespan_months = 24 months [stated/high] — Stated as >= 2-year service interval to end-of-run.
+  [U5b] dropped inferred plant-wide max_mass_kg cap (40000 kg) — field-erected e_fuel_synthesis; per-skid road limits apply
+[chain] engineering_contract: 21 quantities, 8 topology edges, 0 macro-assemblies (total £0), closures: 4 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"BS EN 62477-1","hit":"db","latency_ms":7}
+[standards-writeback] {"standard_name":"G99","hit":"db_hybrid","latency_ms":248}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":283}
+[products-writeback] {"product_name":"1000 t/yr Sustainable Aviation Fuel (SAF) via single-step Power-to-Liquid Fischer-Tropsch (CO₂ + 3 H₂ → -CH₂- + 2 H₂O over an iron catalyst) + ~667 t/yr naphtha co-product. SAF ~125 kg/h (~3750 L/day)","hit":"db_hybrid","matched":"1000 t/yr Sustainable Aviation Fuel (SAF) via single-step Power-to-Liquid Fischer-Tropsch (CO₂ + 3 H₂ → -CH₂- + 2 H₂O over an iron catalyst) + ~667 t/yr naphtha co-product. SAF ~125 kg/h (~3750 L/day)","has_modules":true,"used_embedding":true,"candidates":1,"latency_ms":172}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=uk
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 4/10 mandatory covered for UK+EU
+  ⚠ ASTM D7566 Annex A1 (missing_mandatory): Standard Specification for Aviation Turbine Fuel Containing Synthesised Hydrocarbons — Annex A1 (Fischer-Tropsch SPK) (g
+  ⚠ ASTM D1655 (missing_mandatory): Standard Specification for Aviation Turbine Fuels (Jet A / Jet A-1) (global). The finished blended jet fuel placed on th
+  ⚠ DEF STAN 91-091 (missing_mandatory): Turbine Fuel, Kerosine Type, Jet A-1 (UK Ministry of Defence Defence Standard) (UK). The UK reference specification for 
+  ⚠ COMAH 2015 (missing_mandatory): Control of Major Accident Hazards Regulations 2015 (UK). The flammable + toxic inventory (hydrogen, carbon monoxide, hyd
+  ⚠ DSEAR (missing_mandatory): Dangerous Substances and Explosive Atmospheres Regulations 2002 (UK). Mandatory explosive-atmosphere risk assessment + h
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: e_fuel_synthesis
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 10505 chars. First 200: {
+  "market_context": "The sustainable aviation fuel (SAF) market is experiencing rapid growth driven by global decarbonization targets for the aviation sector. Industry reports suggest that the globa
+[research-synthesis] Complete: 4 competitors, 6 sources, 10 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[chain] Orchestrator: 8 modules, 16 sub-modules, 73 words, 22 tools ran (2939ms)
+[chain] Build #18k: toolOutputsBlock built (24 tools, 15447 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 16 component_classes covered (16 with match, 0 empty), 13905 chars (21946ms)
+[chain] brief constraints propagated to mass_fluid_transport_process.derived_parameters: unit_cost_ceiling_gbp=45000000, target_performance_value=1000 (t/yr), operating_temp_min_c=-15, operating_temp_max_c=35
+[chain] keyMetrics seeded early (pre-reviewer): Saf Production Tpy=1,000 t/yr
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=10/10 plaus=7/10 coh=9/10 part=10/10 hon=9/10 (41952ms)
+[chain] PHASE 4 skeleton critic: 1 HIGH-severity issues found before any LLM painting
+  ✗ [engineering_plausibility @ modules[1].sub_modules[0].words[0]] The multitubular fixed-bed FT reactor (1.24 m diameter x 5.0 m, rated for 25-30 bar) has a listed mass of only 6,683 kg. For a reactor of this diameter and pressure rating, the 316
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 15820 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 24 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 11 / 24 patches (skipped 13)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.feedstock_receipt_conditioning_mass_fluid_transport_process.co2_feed_compressor_word material="316L stainless steel wetted parts" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word mass_fluid_transport_process.feedstock_receipt_conditioning_mass_fluid_transport_process.co2_feed_compressor_word (+5 modifiers)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.feedstock_receipt_conditioning_mass_fluid_transport_process.h2_feed_compressor_word material="316L stainless steel wetted parts" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word mass_fluid_transport_process.feedstock_receipt_conditioning_mass_fluid_transport_process.h2_feed_compressor_word (+5 modifiers)
+    skip merge [identity-locked A3]: energy_conversion_transduction.ft_synthesis_train_chemical_reaction_chemical_sensing_etc.ft_synthesis_reactor_word material="316L stainless steel shell and tubes" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_conversion_transduction.ft_synthesis_train_chemical_reaction_chemical_sensing_etc.ft_synthesis_reactor_word regulatory="PED 2014/68/EU Category IV" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word energy_conversion_transduction.ft_synthesis_train_chemical_reaction_chemical_sensing_etc.ft_synthesis_reactor_word (+5 modifiers)
+    skip: sub-module "mass_fluid_transport_process.separation_recycle_train" not found
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 44.6s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":964}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=7/10 phys=7/10 coh=8/10 part=10/10 hon=9/10 (49029ms)
+[chain] critic headline: The design features exceptionally realistic, industry-standard components, but contains critical sizing mismatches in the purge/thermal oxidiser loop and structural mass contradictions.
+[chain] critic issues: 1 high, 3 med, 4 total
+  ✗ [high/high] brief_to_design_fidelity @ modules[4].sub_modules[0].words[1]: The overall mass balance requires a purge of 401.4 kg/h of unconverted gas (1140 kg/h feed - 208 kg/h HC - 532 kg/h water) to maintain steady state. However, th
+  ✗ [med/high] engineering_plausibility @ modules[3].sub_modules[0].words[6]: The 18 m tall, 0.8 m diameter fractionation column is listed with a mass of only 2341 kg. A standard 316L column of these dimensions with a safe wall thickness 
+  ✗ [med/high] internal_coherence @ modules[1].sub_modules[0].words[0]: The reactor has two conflicting mass values in its modifier characters: 'mass': '6683 kg' and 'mass': '14200 kg'. For a 1.24 m diameter x 5.0 m tall multitubula
+  ✗ [med/medium] engineering_plausibility @ modules[2].sub_modules[0].words[2]: The recycle compressor is rated at only 4 kW. In a 25 bar synthesis loop with a high recycle ratio (per-pass conversion is only ~40% to achieve 65% overall), th
+
+[chain] STEP 7.5b: physics-critic PHASE-2 AUTO-CORRECT (SHADOW — records would-be corrections, does NOT mutate the design)
+[chain] physics auto-correct (shadow): selected 1 blocking finding(s) → corrected 0, declined 0, unlocatable 0, still-uncorrectable 1 after 2 pass(es)
+  • [uncleared] undersized-vs-load @ mass_fluid_transport_process/sub_modules[0]/words[5] (part-token): {form=control valve taking a small purge to the thermal oxidiser to prevent inert build-up, capacity=150, manufacturer=Emerson Fisher, part_number=easy-e GX control valve + DVC positioner, list_price_gbp=6400} → {form=control valve taking a small purge to the thermal oxidiser to prevent inert build-up, capacity=500 kg/h, manufacturer=Emerson Fisher, part_number=easy-e ET control valve + DVC6200 positioner, list_price_gbp=7800}
+  • [uncleared] undersized-vs-load @ environmental_interface/sub_modules[0]/words[1] (part-token): {form=enclosed thermal oxidiser/flare for the tail-gas purge, ~1000 °C / ~1.0 s residence for CO + VOC destruction, capacity=833, dimension=0.4 m stack dia, manufacturer=Zeeco, part_number=enclosed ground thermal oxidiser — engineered package, list_price_gbp=300000} → {form=enclosed thermal oxidiser/flare for the tail-gas purge, ~1000 °C / ~1.0 s residence for CO + VOC destruction, capacity=2.5 MW, dimension=1.0 m stack dia, manufacturer=Zeeco, part_number=ZTOF-8.5, list_price_gbp=450000}
+[chain] physics-critic enforcement (shadow): 1 BLOCKING known-failure fault(s) — a part the engine knows will fail:
+  ✗ [undersized-vs-load/high] @ modules[4].sub_modules[0].words[1]: The overall mass balance requires a purge of 401.4 kg/h of unconverted gas (1140 kg/h feed - 208 kg/h HC - 532 kg/h water) to maintain steady state. However, the purge control valve is rated for only …
+[chain] task-41 fidelity gates: Critic flagged 1 module(s) for brief_fidelity structural adds: modules[4].sub_modules[0].words[1]
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 11400 chars
+[chain] STEP 8: R4 Flash-Lite review returned 12 patches
+[chain] STEP 8: R4 Flash-Lite review applied 8 / 12 patches (skipped 4)
+    =mass_fluid_transport_process.overview_paragraph_en (prose)
+    =energy_conversion_transduction.overview_paragraph_en (prose)
+    =mass_fluid_transport_process.overview_paragraph_en (prose)
+    =energy_conversion_transduction.overview_paragraph_en (prose)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.feedstock_receipt_conditioning_mass_fluid_transport_process.co2_feed_compressor_word part_number="API 618-3S-VSD" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.feedstock_receipt_conditioning_mass_fluid_transport_process.co2_feed_compressor_word regulatory="API 618, PED 2014/68/EU" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word mass_fluid_transport_process.feedstock_receipt_conditioning_mass_fluid_transport_process.co2_feed_compressor_word (+5 modifiers)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.feedstock_receipt_conditioning_mass_fluid_transport_process.h2_feed_compressor_word part_number="API 618-H2-2S" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8: R4 Flash-Lite review done in 10.0s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":335}
+[chain] canonical product_class OVERRIDE: "" → "e_fuel_synthesis" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "e_fuel_synthesis" — skipping
+[chain] physics repair: 0 iter(s); HIGH 1→1; plausibility 7→7; patches 0
+[chain] modifier dedup: collapsed 1 cosmetic-dupe modifier(s) across 1 component(s)
+[chain] sub-module prose pre-fill: rewrote 16/16 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] library-override detection: tagged 7 word(s) with source_detail="Library override: (no reason given)" — these will be Brave-verified by background-enrichment
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 1 unable_to_compare
+[chain] verified-parts allowlist: 183 entries (KPA=110, emitter=73, rag=0)
+[chain] gate-23 emitter-completeness: PASS — 16 sub_modules checked, 16 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 1 pass / 0 fail; grammar 9 pass / 3 fail; total score 2410
+  ✗ [sensor_has_receiver] grammar: 1 sensor sub-module(s) with no downstream consumer: maintenance_serviceability::product_storage_loading_chemical_sensing. FIX: add a grammar_link or cross_module_grammar_link from each one to its data-receiving controller.
+  ✗ [thermal_path_closes] grammar: 3 heat-source sub-module(s) without thermal_path: mass_fluid_transport_process::feedstock_receipt_conditioning_mass_fluid_transport_process, mass_fluid_transport_process::separation_recycle_train, sensing_instrumentation::electrical_drives_power. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: energy_conversion_transduction::ft_synthesis_train_chemical_reaction_chemical_sensing_etc::ft_synthesis_reactor_word has 2 conflicting "mass" values: "6683" AND "14200 kg". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 0: applied 5 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    +cross_module_grammar_links.[+] (Connect storage metering sensor to DCS controller)
+    +cross_module_grammar_links.[+] (Provide thermal path for feedstock compressors)
+    +cross_module_grammar_links.[+] (Provide thermal path for separation train)
+    +cross_module_grammar_links.[+] (Provide thermal path for electrical drives)
+    =energy_conversion_transduction.sub_modules[0].words[0].modifier_characters (Remove duplicate mass modifier and keep the correct 14200kg value)
+[chain] Phase 2 iter 1: arith 1 pass / 0 fail; grammar 12 pass / 0 fail; total score 3600
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 466 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 6223 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 73 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=8 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"e_fuel_synthesis","resolved_to":"e_fuel_synthesis","hit":"db","nodes":6,"edges":17}
+[chain] K10 shadow: PASS_SHADOW — matched=17 missing=0 extra=0
+[chain] headline derived: Saf Production Tpy=1,000 t/yr [derived_from_brief]; Unit cost ceiling=45,000,000 GBP;  (0.00s)
+[chain] part verification: 73 parts checked — verified=30, unverified=37, uncertain=6, skip=0
+[chain] G5 RAG: 43 queries → 5 suggestions (high=0, medium=0, low=5, below_threshold=38, corpus=50 rows)
+[chain] part verification: stripped 45 high-confidence fake part_numbers
+  • mass_fluid_transport_process::feedstock_receipt_conditioning_mass_fluid_transport_process::h2_feed_compressor_word → removed "API 618 hydrogen-service multistage compressor — engineered package" (While Howden manufactures API 618 compressors, the provided string is a descriptive category or proj)
+  • mass_fluid_transport_process::feedstock_receipt_conditioning_mass_fluid_transport_process::co2_dryer_word → removed "twin-tower regenerative molecular-sieve gas dryer — packaged skid" (The provided part number is a generic description of a product type rather than a specific manufactu)
+  • mass_fluid_transport_process::feedstock_receipt_conditioning_mass_fluid_transport_process::h2_buffer_vessel_word → removed "fabricated hydrogen-service buffer receiver vessel — bespoke vessel" (The term 'fabricated hydrogen-service buffer receiver vessel — bespoke vessel' is a descriptive phra)
+  • mass_fluid_transport_process::feedstock_receipt_conditioning_mass_fluid_transport_process::feed_filter_coalescer_word → removed "gas filter coalescer assembly — configured" (The term 'gas filter coalescer assembly — configured' is a descriptive category or a generic product)
+  • mass_fluid_transport_process::feedstock_receipt_conditioning_chemical_reaction::sulphur_guard_bed_word → removed "fabricated 316L lead/lag guard-bed vessel pair — bespoke vessel" (The provided part number is a descriptive phrase for a custom-fabricated industrial assembly rather )
+[chain] part verification: inherited part_number from deterministic sibling for 2 stripped word(s)
+  ↳ sensing_instrumentation::electrical_drives_power::mcc_word ← sensing_instrumentation::electrical_drives_power::vfd_small_word (PN: ACS580-01)
+  ↳ sensing_instrumentation::control_network::profinet_switch_word ← sensing_instrumentation::control_network::remote_io_word (PN: 6ES7155-6AU01-0CN0)
+[chain] strip+recommend: 45 recommendations — high=11, medium=6, low=0, unknown=28 (manual sourcing required)
+[farnell] HTTP 403 for API 618 multistage reciprocating process compressor — engineered package
+[mouser] HTTP 400 for API 618 multistage reciprocating process compressor — engineered package
+[nexar] GraphQL errors for mpn=CRNE 10-4: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CRNE 5-8: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=API 618 multistage reciprocating process compressor — engineered package: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=NK 65-200: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for KFD2-STC4-Ex1
+[nexar] GraphQL errors for mpn=easy-e GX control valve + DVC positioner: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Trihal cast-resin distribution transformer: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=KFD2-STC4-Ex1: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Flame 2700: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[chain] Stage 10.5 Part Reality Check: 8 checked, 0 real, 0 substituted, 8 warned (no substitute available). Nexar calls used: 8.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ process_water_pump_word: "Grundfos CRNE 10-4" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ product_pump_word: "Grundfos CRNE 5-8" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ co2_feed_compressor_word: "Burckhardt Compression API 618 multistage reciprocating process compressor — engineered package" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ product_loading_pump_word: "Grundfos NK 65-200" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ purge_control_valve_word: "Emerson Fisher easy-e GX control valve + DVC positioner" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ mv_transformer_word: "Schneider Electric Trihal cast-resin distribution transformer" [class=electromagnetic_actuator_function, library_class=motor_actuator]
+  ⚠ sil_barrier_word: "Pepperl+Fuchs KFD2-STC4-Ex1" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ flame_detector_word: "Dräger Flame 2700" [class=chemical_sensing_function, library_class=sensor]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] module-paragraph-llm: 8/8 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 4 structural mass quantities found, 0 module_mass_kg written (none); coverage 2/8 capital (threshold 5); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 6 sections, 0 warnings
+[chain] design decisions review: 4 choices (1 applied, 3 flagged, 0 blocked)
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 34.3 kW, 1.14%); economic-conductor saving £15,990
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 34.8 kW, 1.16%); economic-conductor saving £15,912
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 34.6 kW, 1.15%); economic-conductor saving £16,002
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 34.2 kW, 1.14%); economic-conductor saving £15,231
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 34.7 kW, 1.16%); economic-conductor saving £15,378
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 35.0 kW, 1.17%); economic-conductor saving £15,732
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 34.4 kW, 1.15%); economic-conductor saving £15,944
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 34.8 kW, 1.16%); economic-conductor saving £15,583
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 8 passes, DID NOT settle within 8 passes (cap) — ledger records the residual, no fixed point asserted; as-routed supply demand 3000 → 3034.834 kW (Δ 34.834 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 21336) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/blender-bg.log
+[estimate] product_class=e_fuel_synthesis annual_volume=100 (default)
+[estimate] corpus real-price lookup disabled for class 'e_fuel_synthesis' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] pinned 73 parts from emitter list_price_gbp modifiers (bypasses Engine B curve)
+[estimate] 0 parts need price estimates
+[estimate] nothing to do
+[estimate] persisted 73 emitter list_price pins → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 73 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 73/73 results in 34.4s
+[engine-c] flags: in_range=19  over=37  under=5  no_reference=12
+[engine-c] 42/73 priced lines flagged out-of-range vs reference corpus (57.5%)
+[engine-c] 29 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "e_fuel_synthesis" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: e_fuel_synthesis
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/state.json
+[supplier-validate] no suppliers to validate
+[hero] step 0: per-project geometry generator (LLM)...
+[geom-gen] no template for product_class="e_fuel_synthesis"; runner will use universal renderer
+[geom-gen] registry-miss authored path available: npx tsx scripts/author-blender-scene.tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/state.json --out /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example
+[hero]   geometry generator failed (5); falling back to unmodified template
+[hero] step 1: Blender structural reference cover pass...
+[hero]   template runner produced blender-cover.png in 0.0s
+[hero]   Blender cover OK in 0.0s → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/blender-cover.png
+[hero] step 2: Gemini 3.1 Flash Image preview (i2i)...
+[hero]   Gemini OK in 22.2s (1657.8 KB)
+[hero] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/cover.png
+[hero] updated state.brief_hero_image_path
+[modules] building palette card for 8 module(s)...
+[modules] all 8 module images already on disk; skipping template render
+[modules] template renderer produced 6/8 module images
+[modules] updated state.module_image_paths with 6 entries
+[chain] deployment_envelope: no envelope mapped for e_fuel_synthesis (returning null is intentional for some classes)
+[chain] costStack persisted: ex-works £16445013 (raw materials £10609686, class e_fuel_synthesis)
+[chain] G2 cost-reality: REJECT — BoM £10609686 across 73 priced lines (0 unpriced)
+[chain] G3 review-completeness: WARN — 1 gap
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 10 lines re-priced from DOE/NETL + cache (real), 6 recorded-only (low-confidence kept at prior price)
+[chain] pre-render SKU restore: re-added 43 blanked part_number(s) a late stage stripped from real parts — emitter is the part-identity authority
+[chain] self-audit (shadow): floor 6/10 · mean 8.7/10 · 0 blocking · below-8: physics_fidelity=6
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £16,445,013 / 1,000 t/yr = £16,445/(t·yr SAF) — within the £12,000–£60,000/(t·yr SAF) class band for throughput output. (brief metric saf_production_tpy=1000 t/yr → 1,000 t/yr)
+[chain] cost-basis: refreshed cost_reality + costStack to the post-writeback BoM £8,555,061 (ex-works £13,260,345)
+[chain] cost-basis: 4 take-off + 7 curve + 0 catalogue + 62 disclosed; 4 take-off prices written into the BoM; purchased £7,745,502 → installed £23,236,506 (central)
+[advisor-engagement] 8/8 modules got an advisor block — 16 specialist cards, 32 grounded questions
+[chain] advisor-engagement: 8 module blocks, 16 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "e_fuel_synthesis" (24 tools, 86 quantities scanned)
+[chain] render-quality (shadow): PASS — class="e_fuel_synthesis" template=e-fuel-synthesis-9shot.py hero=true modules=22 thin=0
+[chain] tools-flow: rendered 211425 bytes (24 tools)
+[investor-section] 5 investors matched from 18 candidates: Startupbootcamp, Constructor Capital, Bright Capital, DIF, MIG Capital
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 7/7 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  [schedule] ✓ Piping Isometrics  (drawings/isometric-index.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 7/7 drawings + hero → wired into the PDF
+[drawing-gates] 10 gates · 1 failing · ALL-PASS=False
+  ✓ [med ] legibility         single-line-diagram 4880x3180 aspect 1.5:1 (limit 4:1)
+  ✓ [med ] legibility         pid 2360x2208 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x2260 aspect 1.0:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2160x2062 aspect 1.0:1 (limit 4:1)
+  ✓ [med ] legibility         block-flow-diagram 2526x2036 aspect 1.2:1 (limit 4:1)
+  ✓ [med ] legibility         hvac-layout 2240x1566 aspect 1.4:1 (limit 4:1)
+  ✓ [med ] legibility         process-schedules 2492x7338 aspect 2.9:1 (limit 4:1)
+  ✗ [high] load_reconcile     panel total 10468 kW vs contract 3000 kW (ratio 3.49, ±15%)
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✓ [med ] material_diversity 4 distinct pipe material(s): ['316l stainless', 'carbon steel', 'hdpe/pe100', 'stainless steel']
+[chain] drawing-gates: 1/10 failing — DRAWING >=8 FAIL (drawing-gates.json — each failing gate names its fix stage)
+[chain] drawing-gates PUNCH-LIST (2 defect(s) → 1 stage(s)) → drawing-gates-punchlist.md
+[chain]   → contract (connected_electrical_load_kw) + panel kW resolution: load_reconcile/panel-schedule, load_reconcile/single-line-diagram
+[census] 131 tie-in runs (658 units) = £362,025 (cable £320,640 + pipe £41,385)
+[census] routed major streams = £52,692  →  full interconnect ≈ £414,718
+  [corpus-median-lift] raised 5 under-priced principal line(s) to their engine corpus lower edge (+£126,903)
+[chain] cost-sanity re-derived on authoritative BoM (Σ £9,561,945): verdict pass — £14,821/t/yr
+[chain] requirements-driven BoM: 196 requirement lines (Σ £9,561,945) → state.requirementsBom; cost cascade reconciled to this total
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/dossier.xlsx
+  · Overview
+  · Brief
+  · ⚠ Checks
+  · Part names
+  · Quantities
+  · Calculations
+  · BoM
+  · Cost
+  · Brief compliance
+  · Connection trace — skipped (no source data)
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Economics
+  · Scenarios
+  · Investment Analysis
+  · Spec sheets
+  · Panel schedule
+  · Process schedules
+  · Line & velocity
+  · Risk register
+  · Regulatory
+  · Assembly sequence
+  · Glossary
+  · Tool provenance
+  · Image tabs
+      + Render — Interior layout
+      + Render — Interior layout (view 2)
+      + GA — General Arrangement
+      + P&ID
+      + BFD — Block Flow
+      + Single-line
+      + HVAC
+      + Isometric — 201-H2-DN32
+      + Isometric — 202-H2-DN15
+      + Isometric — 203-ST-DN200
+  · Contents (sheet #1)
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/dossier.xlsx
+  size        : 10.00 MB
+  tabs (36)  : ['Contents', 'Overview', 'Render — Interior layout', 'Brief', 'Brief compliance', 'Economics', 'Scenarios', 'Investment Analysis', 'Cost', 'Cost waterfall', 'Inputs & Assumptions', 'BoM', 'Quantities', 'Calculations', 'Spec sheets', 'Line & velocity', 'Panel schedule', 'Process line list', 'Process valve list', 'Process instruments', 'Assembly sequence', 'Risk register', 'Regulatory', 'Render — Interior layout (view', 'GA — General Arrangement', 'P&ID', 'BFD — Block Flow', 'Single-line', 'HVAC', 'Isometric — 201-H2-DN32', 'Isometric — 202-H2-DN15', 'Isometric — 203-ST-DN200', '⚠ Checks', 'Tool provenance', 'Part names', 'Glossary']
+  live calcs  : 88
+  static calcs: 7
+  image tabs  : 10
+  skipped     : ['Connection trace (no source data)']
+  CHECKS FAIL : 8
+      FAIL -> [COST] BoM I-116: unit price within x5 of distributor_price_gbp
+      FAIL -> [COST] BoM I-127: unit price within x5 of distributor_price_gbp
+      FAIL -> [COST] BoM I-131: unit price within x5 of distributor_price_gbp
+      FAIL -> [COST] Sigma requirementsBom.line_gbp == cover grand total
+      FAIL -> [BRIEF] Brief target met: jet_range_selectivity_percent
+      FAIL -> [BRIEF] Brief target met: synthesis_pressure_max_bar
+      FAIL -> [BRIEF] Brief target met: electrical_load_mw
+      FAIL -> [PROVENANCE] Tool output used: total_plant_mass_kg
+[chain] Excel deliverable → /Users/tristanfischer/Downloads/saf-example_dossier_2026-06-23_1717.xlsx
+[render-minimal-pdf] state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/state.json
+[render-minimal-pdf] modules: 8
+[render-minimal-pdf] rendering...
+Invalid '          ' string child outside <Text> component
+Invalid '          ' string child outside <Text> component
+[render-minimal-pdf] written /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/chain-v2.pdf (25530.1 KB)
+[render-minimal-pdf] persisted 0 macro claims to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/macro-claims.json
+[chain] integrity check: PDF 26142871 bytes, %PDF header OK
+[chain] deliverable: 2606231717 SAF.pdf
+AUDIT: e_fuel_synthesis/small FAIL (HIGH=2 MED=1) — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/AUDIT.md
+  ✗ [F-4] Physics Critic flagged 1 HIGH-severity engineering issues. See full list in 7-5-physics-critique.json.
+  ✗ [V-1] Detected 7 lines with TRUE overlap signal (repeated token or mixed prose+caps on same Y). Excluded 14 known-table rows. React-pdf wrap={false} blocks exceeding page-remaining height stack on existing content. First sampl
+[chain] audit-pdf-run flagged issues (see AUDIT.md): Command failed: npx tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/sc
+AUDIT-BOM: e_fuel_synthesis FAIL (HIGH=1 MED=0) — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/saf-example/AUDIT-BOM.md
+  ✗ [B-3] Cover Raw materials BoM £9,561,945 != Σ module sub-totals £10,328,400 (ratio 1.08×). The cover number is computed from macros + word-level lines, but the BoM TABLE only shows the matched-macro + word-level lines. If ratio < 0.9, macros are 
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  BOM-QUALITY GATE FAIL — chain exits code 10                        ║
+║  Physics Critic alone is insufficient. BoM line totals + cover     ║
+║  reconciliation must pass. Fix the issues above and re-run.        ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  CHAIN HARD-EXIT — BoM-quality audit FAILED (code 10)               ║
+║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║
+║  Fix the BoM issues flagged above (AUDIT-BOM.md) and re-run.        ║
+║  Common fixes: rename macro to match word_id; lower matcher         ║
+║  threshold; widen cost-repair UP-cap for class; force macro         ║
+║  override on emitter's headline word.                              ║
+╚══════════════════════════════════════════════════════════════════════╝
