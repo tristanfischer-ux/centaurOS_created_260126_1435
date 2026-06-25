@@ -569,6 +569,60 @@ def _db_spec_price(name: str, md: dict):
     _DB_PRICE_CACHE[key] = out
     return out
 
+# DB-INGEST QUEUE — the chain-side half of the growing-DB loop. A principal the DB-first resolver
+# could NOT price (fell to a hand-coded estimate) is logged here; the off-chain ingest job
+# (scripts/ingest/ingest-priced-principals.ts) web-searches + writes back the real part. NO live
+# API on the chain side (chain-as-DB-consumer) — this is an append-only log only.
+_PRICE_INGEST_QUEUE = os.path.expanduser("~/.forge-truth/price-ingest-queue.jsonl")
+_INGEST_MIN_GBP = 2000.0   # only principals worth ingesting a real part for (skip commodities)
+
+def _enqueue_db_misses(rows):
+    """Append estimate-priced PRINCIPAL lines (unit ≥ £2k, basis = a hand-coded estimate/rating
+    model, NOT a DB/catalogue/materials source) to the price-ingest queue. Dedup by (noun|spec)
+    against the existing queue so it never grows unbounded."""
+    cand = []
+    for r in rows:
+        if r.get("status") == "SUB-COMPONENT":
+            continue
+        unit = r.get("unit_gbp") or 0
+        if unit < _INGEST_MIN_GBP:
+            continue
+        b = str(r.get("basis", "")).lower()
+        if any(t in b for t in ("forge-truth", "catalogue", "materials", "take-off", "distributor")):
+            continue   # already data-backed
+        if not any(t in b for t in ("estimate", "rating-based", "budget", "parametric", "curve", "£/k", "class budget")):
+            continue   # only hand-coded estimates are ingest candidates
+        req = str(r.get("requirement", ""))
+        name = (req.split("·")[0].strip() or str(r.get("part", ""))).strip()
+        noun = _principal_noun(name)
+        if not noun:
+            continue
+        m = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*(mva|kva|mwh|kwh|mw|kw|kv|ah|m2|m3|°c|bar|w|a|v|l)\b", req, re.I)
+        spec = (m.group(1).replace(",", "") + m.group(2).lower()) if m else ""
+        cand.append({"key": f"{noun}|{spec}", "noun": noun, "spec": spec, "name": name[:80],
+                     "requirement": req[:140], "est_unit_gbp": round(unit), "tag": r.get("tag")})
+    if not cand:
+        return
+    seen = set()
+    try:
+        if os.path.exists(_PRICE_INGEST_QUEUE):
+            with open(_PRICE_INGEST_QUEUE) as f:
+                for ln in f:
+                    try:
+                        seen.add(json.loads(ln).get("key"))
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    new = [c for c in cand if c["key"] not in seen and not seen.add(c["key"])]
+    if not new:
+        return
+    os.makedirs(os.path.dirname(_PRICE_INGEST_QUEUE), exist_ok=True)
+    with open(_PRICE_INGEST_QUEUE, "a") as f:
+        for c in new:
+            f.write(json.dumps(c) + "\n")
+    print(f"[requirements_bom] price-ingest queue: +{len(new)} DB-miss principal(s) → {_PRICE_INGEST_QUEUE}", file=sys.stderr)
+
 def _battery_cell_price(name: str, md: dict):
     """A battery CELL price → (gbp, basis) or None. DB-first via the UNIVERSAL resolver (real cell
     market in forge-truth.db), else an energy estimate (Ah × V × £/kWh_cell, the constant itself
@@ -3417,6 +3471,14 @@ def assemble(out_dir: str):
         if isinstance(u, (int, float)) and isinstance(qy, (int, float)) and float(row.get("line_gbp") or 0) > 0:
             row["unit_gbp"] = round(u)
             row["line_gbp"] = round(u) * int(qy)
+    # DB-INGEST ENQUEUE (Tristan 2026-06-25 "wire the ingest") — log every PRINCIPAL the DB could
+    # not price (fell to a hand-coded estimate) to the price-ingest queue so the off-chain ingest
+    # job grows the DB; next run the DB-first resolver prices it from data. Cheap append; no API.
+    if os.environ.get("PRICE_INGEST_ENQUEUE", "1") not in ("0", "false", "no"):
+        try:
+            _enqueue_db_misses(rows)
+        except Exception:
+            pass
     return rows
 
 
