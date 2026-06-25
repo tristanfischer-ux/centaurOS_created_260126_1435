@@ -1,6 +1,51 @@
 # 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
 
 ═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-25 late — SELF-CORRECTING DOSSIER LOOP, mid-build)
+═══════════════════════════════════════════════════════════════════════════════
+TRISTAN'S DIRECTIVE (the spine): the engine must FIND every problem AND FIX it INTERNALLY,
+deterministically, and NOT produce a dossier until it's clean. A report that says "failed"
+is a failure, not a deliverable. Detection ≠ the deliverable. (4-seat council unanimous.)
+
+DONE + COMMITTED (main, latest 4538f51ad):
+- dossier_audit.py — deterministic per-tab self-audit, ~16 checks (tag coverage/validity,
+  line-math, capex≡ΣBoM reconciliation, MWh↔kWh + synonym matcher gap, brief_metric_FAIL
+  [catches dc_bus 800-vs-1500], duplicate-principal, phantom-reference, traceability/basis,
+  partial+empty drawing coverage, unresolved-HIGH-physics, no-revenue, template-leak). Wired
+  as a "⚠ Audit" tab; Exec Summary says "DRAFT — N issues" not "validated" when not clean.
+- dossier_repair.py — the generate→audit→FIX→re-audit LOOP + fixer registry (fix_missing_tags
+  ISA noun→prefix, fix_duplicate_principal, fix_zero_principal_price). FIXABLE_CHECKS split +
+  NON_FIXABLE_RATIONALE (human/source gaps surface as QUESTIONS, never dropped). Converges to
+  a fixed point. Both --selftest in verify-engine-guards.sh.
+- Earlier same session (committed f76875a70): the 4 top-severity source fixes — A matcher
+  MWh↔kWh, B capex-by-category sums the bill (£797k cells dominate), C transformer 1.25→3.15
+  MVA sized to power (+invariant), F rack 2-tier stacking → GA fits 20-ft (5.3m).
+
+THE REMAINING BIG PIECE (next session — this is the control-flow change the council said is
+the real fix; the loop module EXISTS but is NOT wired):
+  1. WIRE repair_dossier() into serial-design-chain-v2.tsx as a LOOP GATE *before* the Excel
+     build: run audit → apply deterministic fixers → re-audit → EMIT ONLY when clean; surface
+     the human-gaps (no-revenue, brief-FAIL design misses) as QUESTIONS, not a broken dossier.
+  2. Make the dossier verdict a PURE FUNCTION of the audit — delete any independently-writable
+     "validated" flag (that independent green light is WHY the physics critic + 33 invariants
+     got ignored before).
+  3. Add the SOURCE-RULE auto-fixers the loop flags but can't patch in rows: fuse/current/
+     transformer-coherence sizing reconciliation in the contract/emitter; the duplicate-pump
+     at source; the missing-tag at the emitter (not just post-patched).
+  4. Still-flagged-not-fixed from Tristan's BESS review: economics (no revenue line for BESS,
+     £71k labour proxy, capex shown-as-computed-then-tweakable), generic-process templates on
+     a battery (assembly "hydrostatic test", thin P&ID, phantom cabinets), exterior render =
+     interior, "original brief verbatim" not verbatim, calc→BoM traceability (numbers "from
+     nowhere"). The audit now FLAGS most; the loop must FIX or escalate each.
+  5. STRONG real test case waiting: Fischer Farms (Codema) water/fertigation/ebb-flow brief —
+     €1.395M ground-truth, ~80% fluid-handling (engine's sweet spot), lighting excluded. The
+     agent drafted a ready brief. Run it once the loop is wired.
+
+GTM (separate thread, parked): ~/Downloads/forgeos-gtm-strategy.html (red-teamed) — operating
+companies in PROCESS/fluid-handling ("pumps, pipes, tanks"), below the consultancy waterline,
+prove-on-known-answers → warm pilot → public; CI is GREEN (workflow-scope saga resolved).
+
+═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-25, Tristan asleep — "work autonomously")
 ═══════════════════════════════════════════════════════════════════════════════
 THEME: the benchmark net + the database now do real work, not rubber-stamping.
