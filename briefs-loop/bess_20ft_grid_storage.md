@@ -25,7 +25,8 @@ Key constraints:
 - Cooling: liquid-cooled battery thermal management
 - Grid connection: 11 kV, three-phase, 50 Hz, through a dedicated step-up transformer
 - Grid code: compliant with Engineering Recommendation G99 for connection to the distribution network
-- Footprint: a single 20-foot ISO container (external 6.06 m × 2.44 m × 2.59 m), transportable on a standard road trailer
+- Footprint: a single 20-foot ISO container (external 6.06 m × 2.44 m × 2.59 m)
+- Maximum gross mass: 44,000 kg — a 5 MWh 20-foot battery container is heavy-haul class (it exceeds the ~28-tonne standard road limit, as do all 5–9 MWh containers at current cell density), transported on a low-loader under a movement order rather than a standard trailer
 - Operating environment: outdoor, ambient -20 °C to +45 °C
 - Design life: 15 years, approximately 6,000 equivalent full cycles
 - Annual production volume: 50 systems per year

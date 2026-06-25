@@ -740,9 +740,26 @@ registerArchetype('bess', (brief: any) => {
   // briefTargetFeasibility ALREADY accounts for capacity shortfall above; we
   // OR in the mass shortfall here so the cover/critic see it surfaced.
   const massFeasibility = inContainerMassKg <= briefMassCapKg
-  // Continuous power 1 MW = 1000 kW; peak 1.25 MW for 15 min
-  const continuousKw = 1000  // brief default for utility BESS
-  const peakKw = 1250
+  // Continuous power — READ FROM THE BRIEF (2026-06-25 fix: was hardcoded 1000, ignoring a 2,500 kW
+  // brief → the benchmark net flagged rated_power 2.5× under = RADICAL). Pull rated/continuous power
+  // from target_performance.metrics (or the product description); default 1,000 kW only when truly
+  // absent. Peak = 1.25× continuous (15-min overload), the prior ratio.
+  const briefPowerKw = (() => {
+    const mets = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
+    for (const m of mets) {
+      const key = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').toLowerCase()
+      const u = String(m?.unit ?? '').toLowerCase()
+      const v = Number(m?.value)
+      if (!(v > 0) || !/power/.test(key) || /peak|surge/.test(key)) continue
+      if (u === 'mw') return v * 1000
+      if (u === 'kw' || u === '') return v
+    }
+    const dm = desc.match(/(\d+(?:\.\d+)?)\s*(mw|kw)\b/i)
+    if (dm) return dm[2].toLowerCase() === 'mw' ? parseFloat(dm[1]) * 1000 : parseFloat(dm[1])
+    return 1000
+  })()
+  const continuousKw = briefPowerKw
+  const peakKw = Math.round(briefPowerKw * 1.25)
   const busContinuousA = (continuousKw * 1000) / dcBusVoltage  // 1250 A
   const busPeakA = (peakKw * 1000) / dcBusVoltage              // 1562 A
   // BESS L3 fix (2026-05-24, issue #3): per-string (per-rack) current =
