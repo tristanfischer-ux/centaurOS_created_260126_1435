@@ -6408,7 +6408,7 @@ def _reorder_tabs(wb: Workbook) -> None:
         "Quantities": 4, "Calculations": 5,
         "Financial model": 10,
         "Cost waterfall": 14, "Inputs & Assumptions": 15,
-        "Bill of Materials (Ledger)": 20,
+        "Bill of Materials (Ledger)": 20, "Sense-check": 21,
         "Line & velocity": 24, "Panel schedule": 25, "Process schedules": 26,
         "Assembly sequence": 29,
         "Risk & Regulatory": 30,
@@ -6432,6 +6432,127 @@ def _reorder_tabs(wb: Workbook) -> None:
 
     orig = {id(ws): i for i, ws in enumerate(wb._sheets)}
     wb._sheets.sort(key=lambda ws: (_rank(ws.title), orig[id(ws)]))
+
+
+def tab_benchmark(wb: Workbook, state: dict) -> None:
+    """The INDEPENDENT SENSE-CHECK (Tristan 2026-06-25: a generative LLM gives a top-down expected
+    BoM/process/cost; the deterministic engine is diffed against it; each line out by more than the
+    band is flagged). The benchmark net (gate 36) already computes this every run — it was just
+    never shown. Renders state.benchmarkExpectation (LLM top-down) vs the engine, the per-dimension
+    divergence, and the per-line faults the LLM caught in the deterministic bill."""
+    be = state.get("benchmarkExpectation") or {}
+    bd = state.get("benchmarkDivergence") or {}
+    bf = state.get("benchmarkFaults") or []
+    if not be and not bd and not bf:
+        return
+    ws = wb.create_sheet("Sense-check")
+    set_widths(ws, {"A": 30, "B": 30, "C": 26, "D": 18, "E": 60})
+    title_row(ws, "Independent sense-check — generative LLM expectation vs the deterministic engine", 5,
+              "An LLM independently estimates, TOP-DOWN from the market, what a plant like this should "
+              "cost, output and be built from. The deterministic engine builds BOTTOM-UP from parts. The "
+              "two methods are diffed: a large gap means one is wrong. This is the engine's own sanity "
+              "check — shown here so you can see it, not just trust it.")
+    r = 4
+    worst = str(bd.get("worst", "?")).upper()
+    wfill = FILL_FAIL if worst in ("RADICAL", "FAIL") else (FILL_ADVISORY if worst in ("WARN", "REVIEW") else FILL_PASS)
+    vc = ws.cell(r, 1, f"VERDICT: {worst}")
+    vc.font = FONT_TITLE
+    vc.fill = wfill
+    ws.cell(r, 2).fill = wfill
+    ws.cell(r, 5, clean_cell(bd.get("summary") or "")).font = FONT_NOTE
+    r += 2
+
+    # ---- cost: LLM envelope vs engine ----
+    ec = be.get("expected_cost") or {}
+    if ec:
+        sub_banner(ws, r, "All-in cost — LLM top-down envelope vs the engine", 5)
+        r += 1
+        header(ws, r, ["", "LLM expected (top-down)", "Engine (bottom-up)", "Ratio", "Basis"])
+        r += 1
+        eng = (num((state.get("costStack") or {}).get("oem_transfer_price_gbp"))
+               or num((state.get("costStack") or {}).get("installed_asp_gbp")) or 0)
+        exp = num(ec.get("expected_gbp")) or 0
+        ratio = (eng / exp) if exp else None
+        ws.cell(r, 1, "All-in cost").font = FONT_SUB
+        ws.cell(r, 2, f"£{round(num(ec.get('low_gbp')) or 0):,}–£{round(num(ec.get('high_gbp')) or 0):,} (mid £{round(exp):,})")
+        ws.cell(r, 3, f"£{round(eng):,}")
+        rc = ws.cell(r, 4, f"{ratio:.1f}×" if ratio else "—")
+        rc.fill = FILL_FAIL if (ratio and (ratio > 1.5 or ratio < 0.67)) else FILL_PASS
+        e = ws.cell(r, 5, clean_cell(ec.get("basis") or ""))
+        e.alignment = WRAP_TOP
+        e.font = FONT_NOTE
+        r += 2
+
+    # ---- per-dimension divergence (expected vs deterministic) ----
+    findings = bd.get("findings") or []
+    if findings:
+        sub_banner(ws, r, f"Per-dimension divergence — {len(findings)} checked (cost · output · sizing · components)", 5)
+        r += 1
+        header(ws, r, ["Dimension", "LLM expected", "Engine (deterministic)", "Ratio", "Verdict"])
+        r += 1
+        for f in findings:
+            if not isinstance(f, dict):
+                continue
+            ws.cell(r, 1, clean_cell(f.get("dimension", ""))).font = FONT_SUB
+            ws.cell(r, 2, clean_cell(str(f.get("expected", "")))).alignment = WRAP_TOP
+            ws.cell(r, 3, clean_cell(str(f.get("deterministic", "")))).alignment = WRAP_TOP
+            rr = f.get("ratio")
+            ws.cell(r, 4, f"{num(rr):.1f}×" if num(rr) else "—")
+            verd = str(f.get("verdict", ""))
+            vcell = ws.cell(r, 5, verd)
+            vcell.fill = FILL_FAIL if verd in ("radical", "fail") else (FILL_ADVISORY if verd in ("warn", "review") else FILL_PASS)
+            r += 1
+        r += 1
+
+    # ---- per-LINE faults: the sense-check flags (the LLM caught these in the bill) ----
+    if bf:
+        sub_banner(ws, r, f"Per-line-item faults — {len(bf)} lines the LLM flags as wrong in the engine's bill", 5)
+        r += 1
+        header(ws, r, ["Bill line", "What's wrong", "Magnitude", "LLM-suggested", "Likely cause"])
+        r += 1
+        for f in bf:
+            if not isinstance(f, dict):
+                continue
+            ws.cell(r, 1, clean_cell(f.get("line", ""))).font = FONT_SUB
+            iss = ws.cell(r, 2, clean_cell(f.get("issue", "")))
+            iss.alignment = WRAP_TOP
+            mc = ws.cell(r, 3, clean_cell(f.get("magnitude", "")))
+            mc.fill = FILL_FAIL
+            ws.cell(r, 4, clean_cell(f.get("suggested", "")))
+            lc = ws.cell(r, 5, clean_cell(f.get("likely_cause", "")))
+            lc.alignment = WRAP_TOP
+            lc.font = FONT_NOTE
+            r += 1
+        r += 1
+
+    # ---- LLM-expected bill structure (top-down % of cost) ----
+    ebom = be.get("expected_bom") or []
+    if ebom:
+        sub_banner(ws, r, "LLM-expected bill structure (top-down — what the cost SHOULD break into)", 5)
+        r += 1
+        header(ws, r, ["Expected line / category", "% of cost", "Note", "", ""])
+        r += 1
+        for b in ebom:
+            if not isinstance(b, dict):
+                continue
+            ws.cell(r, 1, clean_cell(b.get("item", ""))).font = FONT_SUB
+            ws.cell(r, 2, f"{num(b.get('typical_pct_of_cost')) or 0:g}%")
+            nt = ws.cell(r, 3, clean_cell(b.get("note", "")))
+            nt.alignment = WRAP_TOP
+            nt.font = FONT_NOTE
+            r += 1
+        r += 1
+    reasoning = be.get("reasoning")
+    if reasoning:
+        sub_banner(ws, r, "LLM reasoning (how the top-down expectation was formed)", 5)
+        r += 1
+        rc2 = ws.cell(r, 1, clean_cell(reasoning))
+        rc2.alignment = WRAP_TOP
+        rc2.font = FONT_NOTE
+        try:
+            ws.merge_cells(start_row=r, start_column=1, end_row=r + 4, end_column=5)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def tab_scorecard(wb: Workbook, state: dict) -> None:
@@ -6568,6 +6689,8 @@ def build(run_dir: str, out_path: str) -> dict:
     tab_overview(wb, state, run_dir, sha)
     print("  · ⭐ Scorecard")
     tab_scorecard(wb, state)
+    print("  · Sense-check")
+    tab_benchmark(wb, state)
     print("  · Brief")
     tab_brief(wb, run_dir)
     # Place Brief immediately AFTER Overview, BEFORE ⚠ Checks (created next).
