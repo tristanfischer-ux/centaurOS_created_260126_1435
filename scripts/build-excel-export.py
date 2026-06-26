@@ -170,11 +170,100 @@ def set_widths(ws: Worksheet, widths: Dict[str, float]) -> None:
 # keyed by Excel sheet name. title_row stamps each tab's score banner from this — every tab shows its
 # deterministic quality vs the ≥8 floor, on the tab.
 _TAB_SCORES: dict = {}
+_RUN_DIR: str = ""           # set in build() so the banner can read parts-ledger coverage
+_COV_CACHE: dict = {}
+
+
+def _ledger_coverage(run_dir: str) -> dict:
+    if run_dir in _COV_CACHE:
+        return _COV_CACHE[run_dir]
+    cov = {}
+    try:
+        d = load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
+        cov = d.get("coverage_by_drawing") or {}
+    except Exception:  # noqa: BLE001
+        cov = {}
+    _COV_CACHE[run_dir] = cov
+    return cov
+
+
+def _aux_tab_score(title: str, run_dir: str):
+    """A deterministic quality score for a DRAWING / RENDER / META sheet that the per-tab scorecard
+    (the 16 data tabs) doesn't cover — so EVERY sheet shows a quality number (Tristan 2026-06-27).
+    Drawings score from parts-ledger drawing coverage (an EMPTY P&ID → 0); renders use coverage as a
+    proxy + flag that object-level visual quality is an open check (no fake clean PASS); ⚠ Checks uses
+    the invariant pass-rate; ⚠ Audit the ship verdict. Pure navigation tabs (Contents) return None."""
+    t = (title or "").lower()
+    cov = _ledger_coverage(run_dir)
+
+    def _cov(key: str, label: str, advisory: str = ""):
+        c = cov.get(key)
+        if not isinstance(c, dict):
+            return None
+        pct = c.get("pct")
+        if not isinstance(pct, (int, float)):
+            return None
+        sc = max(0, min(10, round(pct / 10)))
+        st = "PASS" if sc >= 8 else "FAIL"
+        iss = []
+        if advisory:
+            iss.append(advisory)
+        iss.append(f"{label} part coverage {c.get('present')}/{c.get('expected')} ({pct:.0f}%)"
+                   + ("" if sc >= 8 else " — under-covered: the drawing must render its parts so their tags match the BoM"))
+        return {"score": sc, "target": 8, "status": st, "issues": iss,
+                "fix": "drawing generator must emit every principal part's tag so parts_ledger coverage ≥ 80%"}
+
+    if "p&id" in t or t == "pid":
+        return _cov("pid", "P&ID")
+    if "block flow" in t or "bfd" in t:
+        return _cov("block-flow-diagram", "Block-flow")
+    if "general arrangement" in t or t.startswith("ga "):
+        return _cov("general-arrangement", "GA")
+    if "single-line" in t or "single line" in t:
+        return _cov("single-line-diagram", "Single-line")
+    if "isometric" in t:
+        return _cov("isometric-index", "Isometric")
+    if "render" in t or "interior layout" in t or "building exterior" in t:
+        return _cov("blender", "Render",
+                    advisory="ADVISORY: object-level visual quality (sizing / scatter / GA-vs-render consistency) is an OPEN check — coverage proxy only")
+    if "checks" in t:  # ⚠ Checks — deterministic-invariant pass rate
+        try:
+            import deterministic_checks_lib as _dcl
+            _chk = _dcl.run_all_checks(run_dir, None)
+            _n = len(_chk)
+            _nf = len([c for c in _chk if str(getattr(c, "status", "")).upper() == "FAIL"])
+            if _n:
+                # ANY failing invariant means this tab is NOT clean — never round a handful of
+                # fails away into a green 10 (the fake-8). 0 fails → 10; else a hard FAIL.
+                _sc = 10 if _nf == 0 else max(0, 8 - 2 * _nf)
+                return {"score": _sc, "target": 8, "status": "PASS" if _sc >= 8 else "FAIL",
+                        "issues": [f"{_nf} of {_n} deterministic invariants FAIL — this tab cannot be a clean 10 over failures"] if _nf else [f"{_n}/{_n} invariants pass"],
+                        "fix": "fix each failing invariant at source"}
+        except Exception:  # noqa: BLE001
+            pass
+        return None
+    if "audit" in t:  # ⚠ Audit — the dossier ship verdict = does every scored tab reach ≥8?
+        _scored = [v.get("score") for v in _TAB_SCORES.values() if isinstance(v.get("score"), (int, float))]
+        if _scored:
+            _worst = min(_scored)
+            _ok = _worst >= 8
+            return {"score": 8 if _ok else max(2, _worst), "target": 8, "status": "PASS" if _ok else "FAIL",
+                    "issues": [] if _ok else [f"the dossier does NOT ship — the weakest tab scores {_worst}/10; every tab must reach ≥8"],
+                    "fix": "resolve the failing tabs (see the per-tab punch-list / ⚠ Audit findings)"}
+        return None
+    if "hvac" in t:
+        # a drawing we can't deterministically score yet → ADVISORY, never a fake PASS.
+        return {"score": None, "target": 8, "status": "UNSCORED",
+                "issues": ["no deterministic quality check covers the HVAC drawing yet (open coverage gap)"],
+                "fix": "add a deterministic check for the HVAC drawing (duct sizing / placement / class-appropriateness)"}
+    return None  # Contents / ⭐ Scorecard navigation tabs
 
 
 def _tab_quality_banner(title: str):
     """The quality-banner spec ({text, fill, height}) for a sheet, or None if the tab isn't scored."""
     v = _TAB_SCORES.get(title)
+    if not isinstance(v, dict):
+        v = _aux_tab_score(title, _RUN_DIR)   # drawing / render / meta sheets → on-the-fly score
     if not isinstance(v, dict):
         return None
     tgt = v.get("target", 8)
@@ -6745,6 +6834,8 @@ def build(run_dir: str, out_path: str) -> dict:
     if state is None:
         raise SystemExit(f"No state.json in {run_dir}")
     sha = git_short_sha()
+    global _RUN_DIR
+    _RUN_DIR = run_dir            # so _tab_quality_banner can score drawing/render/meta sheets
 
     wb = Workbook()
     wb.remove(wb.active)  # drop the default sheet
@@ -7022,6 +7113,24 @@ def _selftest() -> int:
     # (2) _humanize_class display names
     if _humanize_class("bess") != "Battery Energy Storage System":
         print(f"  FAIL humanize bess (got {_humanize_class('bess')})"); bad += 1
+    # (3) X1 (Tristan 2026-06-27): EVERY sheet gets an honest quality banner — a drawing scores from
+    # parts-ledger coverage, and an EMPTY drawing is a 0/FAIL, NEVER a fake PASS. Universal (keyed on
+    # drawing TYPE, not archetype).
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        with open(os.path.join(_td, "parts-ledger.json"), "w") as _fh:
+            json.dump({"coverage_by_drawing": {
+                "pid": {"present": 0, "expected": 44, "pct": 0.0},
+                "general-arrangement": {"present": 73, "expected": 77, "pct": 94.8},
+            }}, _fh)
+        _COV_CACHE.clear()
+        _pid = _aux_tab_score("P&ID", _td)
+        if not _pid or _pid.get("status") != "FAIL" or _pid.get("score") != 0:
+            print(f"  FAIL X1 aux-score: an EMPTY P&ID must be 0/FAIL, not a fake pass (got {_pid})"); bad += 1
+        _ga = _aux_tab_score("GA — General Arrangement", _td)
+        if not _ga or _ga.get("status") != "PASS":
+            print(f"  FAIL X1 aux-score: a 95%-covered GA must PASS (got {_ga})"); bad += 1
+        _COV_CACHE.clear()
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
