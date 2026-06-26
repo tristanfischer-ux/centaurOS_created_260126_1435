@@ -7157,6 +7157,20 @@ def build(run_dir: str, out_path: str) -> dict:
         _auxv = _aux_tab_score(_nm, run_dir)
         if isinstance(_auxv, dict):
             _TAB_SCORES[_nm] = _auxv
+    # X2 (Tristan 2026-06-27): the Financial model tab must NOT be a green 10 while it renders its own
+    # '⚠ UNVERIFIED ECONOMICS' banner. _econ_sale_unverified() is the engine's real sale-price-verified
+    # signal (a 'revenue' WORD in state is not enough — the PRICE must be derivable). When unverified,
+    # cap the Financial-model score at a FAIL so the banner and the score agree.
+    try:
+        _fm = _TAB_SCORES.get("Financial model")
+        if _econ_sale_unverified() and isinstance(_fm, dict) and isinstance(_fm.get("score"), (int, float)) and _fm["score"] > 6:
+            _fm["score"] = 6
+            _fm["status"] = "FAIL"
+            _fm["issues"] = (["the economics are UNVERIFIED — no per-unit market sale price is derivable, "
+                              "so revenue / EBITDA / NPV are not real; give it a verified price OR a "
+                              "capex/opex/payback model for this class"] + (_fm.get("issues") or []))[:6]
+    except Exception:  # noqa: BLE001
+        pass
     _ts_summary = tab_scorecard_summary(_TAB_SCORES)         # re-derive over the FULL workbook
     state["tabScorecard"] = _TAB_SCORES
     state["tabScorecardSummary"] = _ts_summary

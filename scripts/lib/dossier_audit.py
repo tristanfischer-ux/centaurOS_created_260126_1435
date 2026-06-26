@@ -741,18 +741,39 @@ def check_economics(state, rows, run_dir) -> list:
             source_rule="installed capex (installed_asp_gbp) must be computed and positive",
         ))
 
-    # Revenue heuristic — conservative: only flag when class is clearly no-output-sale
-    # AND no revenue signal anywhere in the financial state.
+    # Revenue: a financial model with NO verified revenue path is UNVERIFIED — it must NOT score a
+    # green 10 (Tristan 2026-06-27: the water-plant Financial model showed '⚠ UNVERIFIED ECONOMICS'
+    # yet the tab scored 10/10 — the fake-8 again). Flag whenever there is NO revenue signal anywhere
+    # in the financial state, for ANY class (was BESS-only). A storage/grid class earns arbitrage (a
+    # known, recoverable model → MED); any other class with no derivable sale price is an unverified
+    # model that needs a real price OR a class-appropriate capex/opex/payback frame (→ HIGH).
     cls = _product_class(state)
-    if _NO_OUTPUT_SALE_RX.search(cls) and not _state_has_revenue_signal(state):
-        out.append(Finding(
-            tab=tab, check="no_revenue_line", severity="MED",
-            message=(f"no revenue line — the financial model is not meaningful for this "
-                     f"class ({cls}); storage earns arbitrage, not output sales"),
-            actual="no sale-price/revenue signal",
-            expected="an arbitrage/service revenue model",
-            source_rule="financial model must carry a revenue path appropriate to the class",
-        ))
+    if not _state_has_revenue_signal(state):
+        if _NO_OUTPUT_SALE_RX.search(cls):
+            out.append(Finding(
+                tab=tab, check="no_revenue_line", severity="MED",
+                message=(f"no revenue line — a storage/grid class ({cls}) earns arbitrage/service "
+                         f"revenue, not output sales; the financial model needs that path"),
+                actual="no sale-price/revenue signal",
+                expected="an arbitrage/service revenue model",
+                source_rule="financial model must carry a revenue path appropriate to the class",
+            ))
+        elif _PROCESS_CLASS_RX.search(cls):
+            # an infrastructure / process plant (water / treatment / SAF / CO₂ …) with NO derivable
+            # sale price → its revenue / EBITDA / NPV are UNVERIFIED; the tab must NOT be a green 10
+            # over its own '⚠ UNVERIFIED ECONOMICS' banner (Tristan 2026-06-27). A sellable PRODUCT
+            # class (widget / server) is NOT flagged here — a missing price on a sellable product is a
+            # separate gap, and infrastructure plants are the case that needs a capex/payback frame.
+            out.append(Finding(
+                tab=tab, check="no_revenue_line", severity="HIGH",
+                message=(f"the financial model has NO verified revenue path ({cls}): no per-unit sale "
+                         f"price is derivable, so revenue / EBITDA / NPV are UNVERIFIED — the tab cannot "
+                         f"be a green 10 over its own '⚠ UNVERIFIED ECONOMICS' banner. For an "
+                         f"infrastructure / cost project give it a capex / opex / payback model instead of revenue"),
+                actual="no sale-price/revenue signal; economics UNVERIFIED",
+                expected="a verified revenue path, OR a class-appropriate capex/opex/payback model",
+                source_rule="financial model must carry a verified revenue path OR an explicit cost-project (capex/payback) frame for its class",
+            ))
     return out
 
 
