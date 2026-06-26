@@ -10,6 +10,27 @@ scorecard, now a front Excel tab ⭐ Scorecard). Lead with min_score, NEVER sub-
 %, calc-coverage %) — a rising sub-metric on a wrong artifact is a false signal (drawer
 forgeos_gotchas_83ce662c83091aac).
 
+PUNCH-LIST PROGRESS 2026-06-26 (working down tab-scorecard-punchlist.md):
+- FIXED: BoM line-math check skipped SUB-COMPONENT rows (commit 0c520046c) — removed 202 false-positive
+  HIGHs that masked the real BoM issues. NOTE: SUB-COMPONENT rows carry line_gbp=£0 BY DESIGN (price
+  rolled into the principal); never flag them.
+- ROUTED-REMAINING (each traced to source, fix next):
+  1. Electrical Control Panel £713,078 = 58% of the £1.225M bill (DOMINANT). Word qty=×1, but
+     requirements_bom.py prices it 'bottom-up parametric' (no price hint) → £713,078 shown as 3271×£218.
+     The parametric panel/cabinet pricer over-estimates ~15× for a 48 kW plant. FIX in requirements_bom.py
+     parametric electrical-enclosure pricing (find what driver yields qty 3271). This is why £1.225M was
+     coincidentally ≈Codema but composition-WRONG.
+  2. Irrigation pump 12 m³/h vs 90 m³/h demand (physics 3/10 BLOCKER). From the auto-created
+     irrigation:pump-sizing tool (irrigation_pump_sizing.py) — it sizes 12 not 90; the irrigation is
+     actually delivered by the 2×45 m³/h fertigation pumps, so the separate Irrigation Pump is redundant
+     OR must size to irrigation_demand_m3_h. ALSO it got a MARINE material ('316L/bronze seawater chloride')
+     on a FRESHWATER plant — a wrong-domain material default to find+fix.
+  3. parts-ledger empty (drawing coverage 0/0) + 2 garbage tags (BoM HIGHs).
+  4. Calculations 6/10 (calc-coverage 24% — emit a worked-calc per derived number).
+  5. 4 UNSCORED tabs (Part names, Panel schedule, Line & velocity, Glossary) — write deterministic checks.
+  6. Chain HARD-GATE on min tab ≥8 (read tab-scorecard.json) so a failing dossier can't ship.
+  v4 scorecard: min 3/mean 7.2; per-tab min BoM (0/10 → after check fix reveals the £713k panel etc.).
+
 STATUS 2026-06-26 (per-tab scorecard + water archetype iterations):
 - water_treatment archetype: v4 = min 3/mean 7.2, BoM £1,225,300 ≈ Codema £1.25M. Battery contamination
   (storage-aware energy floor, derive-skeleton.ts) + building scope-creep (numeric building_out_of_scope
