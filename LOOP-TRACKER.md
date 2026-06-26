@@ -1,7 +1,49 @@
 # 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
 
 ═══════════════════════════════════════════════════════════════════════════════
-## ▶▶▶ RESUME (2026-06-25 — FISCHER FARMS / WATER-PLANT ARCHETYPE; post-compaction)
+## ▶▶▶ RESUME (2026-06-26 — WORK DOWN THE PER-TAB PUNCH-LIST; post-compaction)
+═══════════════════════════════════════════════════════════════════════════════
+TRISTAN'S STANDING INSTRUCTION: "keep going down the punch list until everything fixed." The loop is now
+INTERNAL + deterministic — each chain run writes out/<run>/tab-scorecard-punchlist.md, every failing
+Excel tab routed to its SOURCE rule. Work that list top-down: fix the SOURCE rule (never the symptom),
+add a guard, re-run, the tab re-scores. Done when every tab ≥8 (min tab score is the headline).
+
+WHERE IT STANDS: the water_treatment archetype is BUILT + WORKING (commits 8af2a8826 + iterations). On
+briefs-loop/fischer_farms_codema.md the dossier went vertical_farm min1/mean3.8/£112M → water_treatment
+v4 min3/mean7.2/£1,225,300 (≈ Codema £1.25M). Battery contamination + building scope-creep + RO £61M all
+FIXED. The deterministic per-tab scorecard is BUILT (#94): dossier_audit.tab_scores() scores every tab,
+title_row stamps it ON each tab, build() persists tab-scorecard.json + the punch-list.
+
+ROUTED REMAINING (the punch-list — fix in order, each traced to source):
+  1. ELECTRICAL CONTROL PANEL £713,078 = 58% of the £1.225M bill (DOMINANT — so the total is
+     coincidentally ≈Codema but composition-WRONG). Word qty=×1, but requirements_bom.py prices it
+     'bottom-up parametric' (no price hint) → £713,078 shown as 3271×£218, ~15× over for a 48 kW plant.
+     FIX: the parametric electrical-enclosure pricer in requirements_bom.py (find the driver = 3271).
+  2. IRRIGATION PUMP 12 m³/h vs 90 m³/h demand (physics 3/10 BLOCKER). From the auto-created
+     irrigation:pump-sizing tool (scripts/lib/orchestrator/tools/python/irrigation_pump_sizing.py) — sizes
+     12 not 90; irrigation is actually delivered by the 2×45 m³/h fertigation pumps so the separate
+     Irrigation Pump is redundant OR must size to irrigation_demand_m3_h. ALSO it got a MARINE material
+     ("316L/bronze seawater chloride") on a FRESHWATER plant — a wrong-domain material default to find+fix.
+  3. parts-ledger empty (drawing coverage 0/0) + 2 garbage tags (BoM HIGHs).
+  4. Calculations 6/10 (calc-coverage 24% — emit a worked-calc per derived number).
+  5. 4 UNSCORED tabs (Part names, Panel schedule, Line & velocity, Glossary) — write their deterministic
+     checks in dossier_audit.py + add to COVERED_TABS so they can be certified.
+  6. Chain HARD-GATE on min tab ≥8 (read tab-scorecard.json) so a failing dossier can't ship.
+ALREADY FIXED THIS PUSH: BoM line-math check now skips SUB-COMPONENT rows (commit 0c520046c) — those
+carry line_gbp=£0 BY DESIGN (rolled into the principal); never flag them.
+
+RUN (shadow gates so it completes for inspection):
+PDF_ENGINE_SELF_AUDIT_ENFORCING=0 COST_SANITY_ENFORCING=0 PHYSICS_CRITIC_ENFORCING=0 \
+TOOL_ARCHETYPE_ENFORCING=0 BENCHMARK_NET_ENFORCING=0 DRAWING_GATES_ENFORCING=0 \
+npx tsx scripts/serial-design-chain-v2.tsx briefs-loop/fischer_farms_codema.md out/fischer-codema-v5
+Then: .venv/bin/python scripts/build-excel-export.py out/fischer-codema-v5 out/fischer-codema-v5/dossier.xlsx
+READ per-tab: python3 -c "import json,sys;sys.path.insert(0,'scripts/lib');from dossier_audit import tab_scores;
+s=json.load(open('out/fischer-codema-v5/state.json'));print(tab_scores(s,s.get('requirementsBom') or [],'out/fischer-codema-v5'))"
+KEY DRAWERS: forgeos_gotchas_ba0ec09401ee666d (duty-aware FLOOR bug family) · meta_decisions_74a61f5c4a458987
+(per-tab deterministic loop) · forgeos_decisions_12757a69844bba8e (how to add a process-plant archetype).
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-25 — FISCHER FARMS / WATER-PLANT ARCHETYPE; superseded)
 ═══════════════════════════════════════════════════════════════════════════════
 THE GOAL: make the engine reproduce the real Codema Fischer Farms deliverable (a WATER /
 fertigation / ebb-flow irrigation PLANT, ~£1.25M / €1,395,019) from the detailed brief
