@@ -45,7 +45,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
 
 ## FINANCIAL MODEL
 - [ ] F1 — NO revenue associated with the model.
-- [ ] F2 — line 13 talks about feed / feedstock with a feedstock NUMBER — a water/fertigation plant has
+- [x] F2 (FIXED — feedstock marked N/A for non-feed-driven classes) — line 13 talks about feed / feedstock with a feedstock NUMBER — a water/fertigation plant has
       NO feedstock; that number is wrong / shouldn't exist. **→ class-appropriate economics**
 
 ## COST WATERFALL

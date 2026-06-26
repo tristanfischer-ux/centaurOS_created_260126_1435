@@ -3809,12 +3809,24 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
         rows.append(("sale_price", "Sale price (per output unit)",
                      round(gen["sale_price"], 4), f"£/{out_unit}",
                      gen["sale_price_basis"], FMT_GBP2))
-        rows.append(("feed_price", "Feedstock price", 0.0, "£/unit",
-                     "assumed — feedstock cost driver (0 if not feed-driven)",
-                     FMT_GBP2))
-        rows.append(("fcr", "Feedstock conversion ratio", 0.0, "ratio",
-                     "assumed — feed-to-output ratio (0 disables the feed term)",
-                     FMT_DEC2))
+        # FEEDSTOCK is a PROCESS-PLANT concept (a CO₂/SAF/fermentation plant CONSUMES a feedstock
+        # to make product). A manufactured product or an infrastructure plant (BESS, server, water /
+        # fertigation plant) has NO feedstock — showing a "feedstock price/ratio" there is wrong
+        # (Tristan 2026-06-27: "why do you have a feedstock number — it does not [need a] feedstock").
+        # Keep the cells (so the universal P&L formulas never reference a missing cell) but VALUE 0
+        # and LABEL them N/A so no bogus feed cost or assumption is implied. `_feed_driven` is the
+        # engine's feed signal (a real feed_price/fcr from the economics); 0 ⇒ not feed-driven.
+        _feed_driven = bool(gen.get("feed_price") or gen.get("fcr"))
+        if _feed_driven:
+            rows.append(("feed_price", "Feedstock price", round(gen.get("feed_price", 0.0), 4),
+                         f"£/{out_unit}", gen.get("feed_price_basis", "feedstock cost driver"), FMT_GBP2))
+            rows.append(("fcr", "Feedstock conversion ratio", round(gen.get("fcr", 0.0), 3),
+                         "ratio", gen.get("fcr_basis", "feed-to-output ratio"), FMT_DEC2))
+        else:
+            rows.append(("feed_price", "Feedstock price", 0.0, f"£/{out_unit}",
+                         "N/A — this product/plant has NO feedstock (not a feed-driven process)", FMT_GBP2))
+            rows.append(("fcr", "Feedstock conversion ratio", 0.0, "ratio",
+                         "N/A — no feedstock for this class (feed term disabled)", FMT_DEC2))
     # Energy price / load factor / hours / labour / other opex: RAS keeps its grounded
     # values + basis EXACTLY; the non-RAS path uses signal-derived values with honest,
     # RAS-free basis strings (no LOX / juveniles / micro-grid / 'continuous RAS duty').
