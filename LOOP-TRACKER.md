@@ -35,7 +35,7 @@ STAGE 4 — Class-appropriate economics (F1)
 STAGE 5 — Universal tags + verification coverage
   [x] X3 tab order · [x] B1 BoM key-inputs/factors · [~] B2 child rows · [x] CH2 ⚠Checks alignment
   [x] LV1/X5 Line&velocity rows carry the canonical line tag (201-WT-DN15, joined from route-manifest) · [ ] PS1/Panel/Assembly checks
-  [ ] AU2 surface benchmark-net in ⚠Audit (needs run w/o CHAIN_SKIP_BENCHMARK_NET) · [ ] Brief verbatim (#60)
+  [x] AU2 benchmark-net (LLM top-down vs engine bottom-up + ratio + verdict) rendered in ⚠Audit · [ ] Brief verbatim (#60)
 
 RECOVERED (2026-06-26, mined from ALL ~117 old trackers by 4 agents → docs/RECOVERED-TRACKER-ITEMS-2026-06.md).
 Still-open recurring ARCHITECTURE items past councils flagged — fold into the stages above:

@@ -1581,7 +1581,7 @@ def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
 # ============================================================================
 # TAB — "⚠ Audit"  (THE DETERMINISTIC SHIP GATE — per-tab self-audit findings)
 # ============================================================================
-def tab_audit(wb: Workbook, report) -> None:
+def tab_audit(wb: Workbook, report, state: Optional[dict] = None) -> None:
     """Render the deterministic per-tab self-audit (scripts/lib/dossier_audit.py) as a worksheet.
     A scorecard header line + every Finding grouped by its target tab. HIGH = red, MED = amber,
     LOW = grey — the SHIP GATE made visible: a FAIL verdict means the dossier is NOT validated."""
@@ -1648,6 +1648,57 @@ def tab_audit(wb: Workbook, report) -> None:
             ec = ws.cell(r, 5, clean_cell(getattr(f, "expected", "") or ""))
             ec.alignment = WRAP_TOP
             ec.border = BORDER
+            r += 1
+        r += 1
+
+    # ── AU2 (Tristan 2026-06-27): the BENCHMARK NET — the generative-LLM's INDEPENDENT, top-down,
+    #    market-anchored expectation beside each engine (bottom-up) number, and whether they AGREE.
+    #    This is the self-correcting AIM made visible: the dossier must SHOW the LLM-vs-engine compare. ──
+    bd = (state or {}).get("benchmarkDivergence") or {}
+    be = (state or {}).get("benchmarkExpectation") or {}
+    r += 1
+    _bband = ws.cell(r, 1, "BENCHMARK NET — independent generative-LLM expectation (top-down) vs the engine (bottom-up)")
+    _bband.font = FONT_TITLE
+    _bband.fill = FILL_TITLE
+    _bband.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+    ws.row_dimensions[r].height = 20
+    r += 1
+    _bfind = bd.get("findings") if isinstance(bd, dict) else None
+    if not _bfind:
+        _nc = ws.cell(r, 1, "Benchmark net was not run for this dossier (a cheap BoM-only iteration, or "
+                            "CHAIN_SKIP_BENCHMARK_NET). On a full run this table shows the LLM's market-anchored "
+                            "expectation beside every engine number, with the divergence ratio + verdict.")
+        _nc.font = FONT_NOTE
+        _nc.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+        ws.row_dimensions[r].height = 28
+        r += 1
+    else:
+        _sm = ws.cell(r, 1, f"{bd.get('summary', '')}  ·  model: {be.get('model', '?')}  ·  worst verdict: {bd.get('worst', '?')}")
+        _sm.font = FONT_SUB
+        _sm.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+        ws.row_dimensions[r].height = 24
+        r += 1
+        header(ws, r, ["Dimension", "LLM expected (top-down)", "Engine (bottom-up)", "Ratio", "Verdict / note"])
+        r += 1
+        _VF = {"ok": (FILL_PASS, FONT_PASS), "pass": (FILL_PASS, FONT_PASS),
+               "warn": (FILL_ADVISORY, FONT_ADVISORY),
+               "radical": (FILL_FAIL, FONT_FAIL), "fail": (FILL_FAIL, FONT_FAIL)}
+        for f in _bfind:
+            if not isinstance(f, dict):
+                continue
+            _v = str(f.get("verdict", "")).lower()
+            _fill, _font = _VF.get(_v, (FILL_LEGACY, FONT_NOTE))
+            ws.cell(r, 1, clean_cell(f.get("dimension", ""))).border = BORDER
+            _c2 = ws.cell(r, 2, clean_cell(f.get("expected", ""))); _c2.alignment = WRAP_TOP; _c2.border = BORDER
+            _c3 = ws.cell(r, 3, clean_cell(f.get("deterministic", ""))); _c3.alignment = WRAP_TOP; _c3.border = BORDER
+            _rt = f.get("ratio")
+            _c4 = ws.cell(r, 4, (f"{_rt:.2f}×" if isinstance(_rt, (int, float)) else "—")); _c4.border = BORDER
+            _note = (str(f.get("verdict", "")) + " — " + str(f.get("note", ""))).strip(" —")
+            _c5 = ws.cell(r, 5, clean_cell(_note)); _c5.alignment = WRAP_TOP
+            _c5.fill = _fill; _c5.font = _font; _c5.border = BORDER
             r += 1
         r += 1
 
@@ -7116,7 +7167,7 @@ def build(run_dir: str, out_path: str) -> dict:
     checks_ws = wb["⚠ Checks"]
     fail_labels = getattr(checks_ws, "_forge_fail_labels", [])
     print("  · ⚠ Audit")
-    tab_audit(wb, report)
+    tab_audit(wb, report, state)
     print("  · Part names")
     tab_parts_master(wb, state, run_dir)
     print("  · Quantities")
