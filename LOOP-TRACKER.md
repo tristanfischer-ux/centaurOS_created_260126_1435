@@ -11,16 +11,18 @@ real gap); renderer+audit+banner all agree, Exec Summary honest 2/10. Commits 91
 dimensioned family NEVER matches a unitless count (_fam_compatible). Guards: dossier_audit --selftest
 G/H/J; requirements_bom --selftest (d1).
 
-⛔ NEXT (THE big one) = STALE-BoM / determinism #86. The dossier BoM is built from a MID-CHAIN snapshot,
-NOT the deterministic engine. v5 stored state.requirementsBom = 68 lines / £3,077,078 with a PHANTOM panel
-(qty 3463 × £800 = £2.77M; 3463 = RO-membrane element count bleeding into the panel word at build time).
-Re-running rb.assemble('out/fischer-codema-v5') on the SAME final state = 171 lines / £779,446, panel qty 1
-£800. So state.requirementsBom DIVERGES from a fresh re-derive. FIX: re-derive the BoM on the FINAL state
-before scoring/rendering — chain re-runs requirements_bom at the end and overwrites state.requirementsBom,
-OR build-excel-export.py + scorecard call assemble(run_dir). The min-credible FLOOR (panel £800) is correct
-per-unit — it only looked wrong multiplied by the phantom qty. The honest scorecard CORRECTLY caught the
-£2.77M (BoM 0/10, dominant_bom_line HIGH) — loop works, data was stale. Drawer forgeos_gotchas_dc59ed7a53dd73de.
-After #86: irrigation pump (#2), gac/softener throughput quantity, parts-ledger, then chain min-tab≥8 hard-gate.
+✅ £2.77M PHANTOM PANEL FIXED (commit 7add12c3d) — it was NOT a stale-manifest issue (earlier hypothesis
+WRONG). ROOT: the chain runs dossier_repair.py (serial-design-chain-v2.tsx:8589) which writes state.json in
+place; its fix_duplicate_principal merges 'by-function duplicates' and SUMS qty, but _dup_key keyed on
+r['part'] = the placeholder 'requirement stated' (identical on ALL not-found rows) → Electrical Control Panel
+(qty 1) + RO membrane (qty 3463) + ~100 distinct not-found lines collapsed into ONE row, summed qty 3463 →
+£2.77M = 90% of bill, 171→68 lines. costStack stayed £779k (set at 8375) → BoM≠costStack in the SAME state =
+the fingerprint of a repair-step corruption. FIX: _dup_key keys on REQUIREMENT (identity), placeholder/empty
+noun → no merge. VERIFIED v5: BoM 170 lines / £779,521, installed capex £1,325,058 ≈ Codema £1.25M; phantom
+GONE; min tab is now Exec Summary 2/10 (the REAL irrigation FAIL + gac gap). Drawer forgeos_fixes_21962caf479dbcc2.
+NEXT real punch-list (all now-honest signals): (#2) irrigation pump 12 vs 45 m³/h (irrigation_pump_sizing.py);
+gac/softener throughput quantity not emitted (universal-contract-sizing); parts-ledger 0/0 (not populated this
+run); 3 garbage tags; then chain min-tab≥8 hard-gate. A FRESH chain run now exercises the fixed repair end-to-end.
 
 ═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-26 PM — HONEST SCORING LANDED; fresh v5 run in flight)
