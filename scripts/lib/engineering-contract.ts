@@ -13104,6 +13104,11 @@ registerArchetype('water_treatment', (brief: any) => {
     ro_permeate_capacity_m3_h: q(roPermeateM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'reverse-osmosis permeate capacity (Codema HORTI PURE RO 8 m³/h); lock-gate HARD slot (exit 22)'),
     irrigation_demand_m3_h: q(irrigationDemandTotalM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `peak irrigation demand = ${irrigationDemandM3HPerDept} m³/h per department × ${departmentCount} departments; lock-gate HARD slot (exit 22)`),
     fresh_water_storage_capacity_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', 'fresh-water buffer storage (Codema 40 m³ galvanised tank); lock-gate HARD slot (exit 22)'),
+    // The brief's 'water_storage_capacity' is the PLANT TOTAL across the 3 galvanised tanks (1 fresh +
+    // 2 drain, ~40 m³ each = 120 m³) — emit it under the brief's own metric name so the compliance check
+    // compares TOTAL-vs-TOTAL, not the per-tank 40 against the 120 target (v10 Exec Summary miss: a brief
+    // total must be matched by an aggregate, never one unit's capacity).
+    water_storage_capacity_m3: q(storageTankVolEachM3 * 3, 'm³', 'volume', 'rated', 'system', 'calculator', 'total water storage = 3 galvanised tanks (1 fresh + 2 drain) × 40 m³ = 120 m³'),
 
     // ── PRINCIPAL EQUIPMENT (self-describing keys → universal sizer synthesises + prices) ──
     // RO skid — ONE packaged skid sized by its physical envelope volume (3.8 × 1.4 × 2.0 m
@@ -13122,6 +13127,9 @@ registerArchetype('water_treatment', (brief: any) => {
     fertigation_dosing_pump_throughput_m3_h: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'A/B fertigation circulation pump (Lowara e-SHE 50-160/75, 45 m³/h @ 3.5 bar)'),
     fertigation_dosing_pump_power_kw: q(dosingPumpKw, 'kW', 'power', 'rated', 'module', 'brief', 'fertigation circulation pump motor (7.5 kW)'),
     fertigation_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} A/B fertigation dosing units (one per department)`),
+    // Brief 'fertigation_dosing_capacity' is the PLANT TOTAL = both A/B dosing units (2 × 45 = 90 m³/h),
+    // not one unit's 45 — emit the aggregate under the brief metric name so compliance compares total-vs-total.
+    fertigation_dosing_capacity_m3_per_hr: q(dosingFlowM3H * departmentCount, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `total fertigation dosing capacity = ${departmentCount} units × ${dosingFlowM3H} m³/h = ${dosingFlowM3H * departmentCount} m³/h`),
     nutrient_tank_volume_each_m3: q(1.0, 'm³', 'volume', 'rated', 'module', 'brief', 'nutrient stock tank (1,000 L polyester, 4 × A + 4 × B)'),
     nutrient_tank_count: q(nutrientTankCount, '', 'dimensionless', 'rated', 'system', 'brief', 'eight 1,000 L nutrient stock tanks'),
     hand_watering_pump_throughput_m3_h: q(handWaterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'hand-watering frequency-controlled pump (25 m³/h @ 3 bar)'),
