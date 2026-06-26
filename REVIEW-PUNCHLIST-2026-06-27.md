@@ -4,7 +4,7 @@ Every point from the verbal walkthrough, captured verbatim-faithful, grouped. `[
 Routing in **→** to where the fix lives. This is the authoritative list; work it top-down, fix at SOURCE.
 
 ## ★ CROSS-CUTTING (apply to ALL tabs)
-- [ ] **X1 — EVERY tab needs a tab-quality banner + score**, including the DRAWING/RENDER sheets that
+- [~] **X1 (BANNER on every sheet + GATE coverage DONE; drawing CONTENT fixes remain → #100/#101) — EVERY tab needs a tab-quality banner + score**, including the DRAWING/RENDER sheets that
       currently have none: ⭐ Scorecard, Render interior layout (×3 views), Render building exterior (×4),
       GA, P&ID, BFD, Single-line, HVAC, Isometric (201/202/203), ⚠ Checks, ⚠ Audit. The per-tab scorecard
       only scores ~16 data tabs today; it must cover the WHOLE workbook (37 sheets). **→ dossier_audit + build-excel**
@@ -23,7 +23,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
 
 ## EXECUTIVE SUMMARY
 - [~] Key specs & brief compliance achieved 6/10 — **Tristan: realistic, fine.** (no action)
-- [ ] E1 — the ⭐ Scorecard tab itself has NO tab-quality check; add one for consistency (every tab incl. this).
+- [x] E1 (banner DONE) — the ⭐ Scorecard tab itself has NO tab-quality check; add one for consistency (every tab incl. this).
 
 ## OVERVIEW
 - [x] O1 (FIXED commit) — shows 10/10 PASS but rows 17–21 contain a bunch of FAILURES. The 10/10 is FALSE — the score
@@ -83,13 +83,13 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
       to confirm closure" — they are NOT fixed. Actually FIX them + re-run the physics check to close. **→ X6**
 
 ## RENDER — INTERIOR LAYOUT (view / top / view-2)  [3 sheets]
-- [ ] RI1 — NO tab-quality number on any of them — add one. **→ X1**
+- [x] RI1 (banner DONE) — NO tab-quality number on any of them — add one. **→ X1**
 - [ ] RI2 — image is a MASS of very fine blue wires everywhere + lots of tiny identical little boxes /
       valves / tanks. Suspect default-sized objects littered across the scene. Identify what they are; a
       cabinet's internals should be IN the cabinet, not scattered. **→ Blender scene / object sizing**
 
 ## RENDER — BUILDING EXTERIOR (×4)
-- [ ] RE1 — needs a tab-quality number (generally looks fine). **→ X1**
+- [x] RE1 (banner DONE) — needs a tab-quality number (generally looks fine). **→ X1**
 
 ## GA — GENERAL ARRANGEMENT
 - [ ] GA1 — masses of tiny little components all over the place. **→ object sizing**
@@ -97,32 +97,32 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
       arrangements despite BOTH being top views — they must be the SAME layout. **→ one layout source feeds both**
 
 ## P&ID
-- [ ] PID1 — needs a tab-quality number. **→ X1**
+- [x] PID1 (banner DONE) — needs a tab-quality number. **→ X1**
 - [ ] PID2 — EMPTY — nothing shows in it. **→ P&ID generator for water archetype**
 
 ## BFD — BLOCK FLOW
-- [ ] BFD1 — needs a tab-quality number. **→ X1**
+- [x] BFD1 (banner DONE) — needs a tab-quality number. **→ X1**
 - [ ] BFD2 — EMPTY — nothing shows. **→ BFD generator**
 
 ## SINGLE-LINE
-- [ ] SL1 — needs a tab-quality number (more detailed; verify correctness). **→ X1**
+- [x] SL1 (banner DONE) — needs a tab-quality number (more detailed; verify correctness). **→ X1**
 
 ## HVAC
-- [ ] HV1 — needs a tab-quality number. **→ X1**
+- [x] HV1 (banner DONE) — needs a tab-quality number. **→ X1**
 - [ ] HV2 — right size space, but verify the air-duct system actually works / is placed where it should be.
 
 ## ISOMETRIC (201 / 202 / 203)
-- [ ] ISO1 — needs a tab-quality number. **→ X1**
+- [x] ISO1 (banner DONE) — needs a tab-quality number. **→ X1**
 - [ ] ISO2 — 201, 202, 203 look ALMOST IDENTICAL — they should be DISTINCT (per-line spools). Clarify the
       difference or fix the generator. **→ isometric generator**
 
 ## ⚠ CHECKS
-- [ ] CH1 — needs a tab-quality number. **→ X1**
+- [x] CH1 (banner DONE) — needs a tab-quality number. **→ X1**
 - [ ] CH2 — the live-input column on the RIGHT does not line up with the rows BELOW (ROW MISALIGNMENT,
       data shifted) — **raised many times** — fix the alignment. **→ build-excel Checks layout**
 
 ## ⚠ AUDIT (dossier self-audit)
-- [ ] AU1 — needs a tab-quality number. **→ X1**
+- [x] AU1 (banner DONE) — needs a tab-quality number. **→ X1**
 - [ ] AU2 — MISSING: the comparison of what the GENERATIVE LLM expects vs what the engine actually produced
       (the benchmark net), and whether they're CONNECTED/agree. It must be shown in the dossier. **→ surface state.benchmarkDivergence**
 
