@@ -10,6 +10,18 @@ scorecard, now a front Excel tab ⭐ Scorecard). Lead with min_score, NEVER sub-
 %, calc-coverage %) — a rising sub-metric on a wrong artifact is a false signal (drawer
 forgeos_gotchas_83ce662c83091aac).
 
+STATUS 2026-06-26 (per-tab scorecard + water archetype iterations):
+- water_treatment archetype: v4 = min 3/mean 7.2, BoM £1,225,300 ≈ Codema £1.25M. Battery contamination
+  (storage-aware energy floor, derive-skeleton.ts) + building scope-creep (numeric building_out_of_scope
+  flag) BOTH fixed+verified GONE. RO £61M→£244k (partial). Remaining blocker: physics_fidelity 3/10 —
+  IRRIGATION PUMP UNDERSIZED (rated 12 m³/h vs 45 m³/h/dept demand) — route to the irrigation pump sizing.
+- DETERMINISTIC PER-TAB SCORECARD BUILT (#94, Tristan's architectural ask): dossier_audit.tab_scores()
+  scores EVERY Excel tab 0-10 vs ≥8 (HIGH=4/MED=2/LOW=1 penalty); title_row stamps the score ON each tab;
+  ⭐ Scorecard front table; build() persists tab-scorecard.json + tab-scorecard-punchlist.md (routed loop
+  signal). UNSCORED = no check = coverage gap (never a free 10). v4 per-tab: BoM 0 (line-math £0 lines),
+  Calc 6 (calc-cov 24%), Risk 6 (physics), 4 UNSCORED (Part names/Panel schedule/Line & velocity/Glossary).
+  NEXT: write checks for the 4 UNSCORED tabs; chain-gate on min tab ≥8; fix BoM £0 lines + irrigation pump.
+
 STATUS 2026-06-25 (continuation): TASK #93 ARCHETYPE IS BUILT + WORKING — engine classifies the Codema
 brief as water_treatment + builds the RIGHT water subsystems. Scorecard on briefs-loop/fischer_farms_
 codema.md: vertical_farm min1/mean3.8 (£112M) → water_treatment v1 min2/mean6.5 (£2.3M) → v2 min2/mean5.7.
