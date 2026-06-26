@@ -1185,6 +1185,34 @@ export function autoWireSpecInputs(
       }
     }
 
+    // DECLARED-INPUT COMPLETION (2026-06-26): the LLM is PROMPTED to wire a tool input to a matching
+    // AVAILABLE CONTRACT KEY (prompt WIRING priority (a)) but does so NON-DETERMINISTICALLY — it omitted
+    // irrigation_demand_m3_h for irrigation:pump-sizing, so the pump fell back to the drip-emitter sum
+    // (12 m³/h vs the 90 m³/h demand the tool ALREADY floors to). Deterministically GUARANTEE it: for
+    // every input field this tool DECLARES whose EXACT name is an available CONTRACT quantity, wire it
+    // when the LLM left it unwired. Exact-name match = the same quantity by the contract's naming
+    // convention; an already-wired field (a constant the LLM gave, or a chained upstream output) is left
+    // untouched. UNIVERSAL — removes the whole LLM-omission class of under-sizing, not just irrigation.
+    {
+      const declared = io.get(step.tool_id)?.inputs
+      if (declared) {
+        const wiredParams = new Set(newInputs.map(i => i.param))
+        const availKeySet = new Set(availCandidates.map(c => c.key))
+        // SCOPE to SIZING-DRIVER fields (demand / target / peak / required / rated capacity / duty /
+        // load / setpoint) — the inputs whose OMISSION under-sizes the result. This is narrow enough
+        // that an exact-name match to a contract key is high-confidence the SAME quantity, and it avoids
+        // wiring an incidental foreign-class field the merged manifest may carry (lines 368-389).
+        const isSizingDriver = (f: string) => /(^|_)(demand|target|peak|required|duty|load|setpoint|capacity)(_|$)/i.test(f)
+        for (const field of declared) {
+          if (field === 'component_masses_kg') continue // handled by the mass-producer block above
+          if (!wiredParams.has(field) && availKeySet.has(field) && isSizingDriver(field)) {
+            newInputs.push({ param: field, from_contract_key: field })
+            rewired.push({ tool_id: step.tool_id, param: field, from_contract_key: field, was_constant: '(injected sizing-driver input)' })
+          }
+        }
+      }
+    }
+
     // Now this step's OUTPUT contract_keys become upstream candidates for later steps.
     for (const o of step.outputs) {
       upstreamProduced.push({ key: o.contract_key, unitFamily: unitFamilyOf(o.unit) })
