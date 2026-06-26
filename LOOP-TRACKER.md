@@ -1,6 +1,28 @@
 # 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
 
 ═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-27 — 13/16 TABS ≥8 on a FRESH run; 3 left, v7 validating 2)
+═══════════════════════════════════════════════════════════════════════════════
+FRESH v6 run CONFIRMS the committed fixes end-to-end: 13/16 tabs ≥8, 0 UNSCORED, Calc holds at 8,
+the ≥8 SHIP GATE fires (ship_ok=False + exit 2 + DRAFT). 3 FAILS remain:
+1. Exec Summary 2 — irrigation pump 12 vs 45 (FIXED: tool floors to demand d1b9e45e5 + manifest now
+   declares irrigation_demand_m3_h so the planner wires it [latest commit]) + gac/softener UNVERIFIED
+   (FIXED: renamed to brief's GAC terms 519eb8879). BOTH land in v7 → Exec Summary should PASS.
+2. BoM 6 — TWO issues: (a) parts-ledger STALE (parts_ledger.py ran in-chain before the BoM was final →
+   grand_total=0; re-running it on the FINAL state gives £802,727 + real coverage — SAME staleness class
+   as dossier_repair; fix = run parts_ledger LAST / build-excel re-derive). (b) drawing-coverage matching
+   false-negs: P&ID 0/45, BFD 0/20 (parts in those drawings don't match BoM tags) — the KNOWN parts_ledger
+   matching issue (mem forgeos_parts_ledger_exists). DEEP — do deliberately.
+3. Risk 6 — irrigation (fixed → v7 resolves one HIGH) + water storage OVER-SIZED: the buffer tool
+   (generated/water_storage__buffer_sizing.py) uses a CONSUMPTIVE model fresh=(demand−supply)·dur·SF=196.8
+   m³ but Codema ebb/flow RECIRCULATES (drain reclaim) so brief's 40 m³ is right — needs a reclaim term OR
+   honour-brief-spec (don't let a generic tool override a brief-pinned HARD slot). ENGINEERING NUANCE — do
+   deliberately (40 vs 196.8 must be got right).
+v7 IN FLIGHT (out/fischer-codema-v7) → validates #1 + half of #3. After v7: fix parts_ledger staleness +
+matching (BoM), water-storage model (Risk). NOTE: build-excel's repair + parts_ledger are NOT persisted, so
+re-score offline via dossier_audit.tab_scores on out/<run>/state.json after re-running parts_ledger.py.
+
+═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-26 NIGHT — ≥8-EVERY-TAB is now a CODED SHIP GATE; grinding tabs up)
 ═══════════════════════════════════════════════════════════════════════════════
 TRISTAN: work CONTINUOUSLY (no check-ins) until EVERY tab is a GENUINE ≥8 (not fake); the ≥8-every-tab
