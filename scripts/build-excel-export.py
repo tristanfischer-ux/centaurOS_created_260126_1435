@@ -6680,6 +6680,32 @@ def tab_scorecard(wb: Workbook, state: dict) -> None:
         ws.cell(r, 4, "AIM: 100%" if "—" not in str(_val) else "").font = FONT_NOTE
         r += 1
 
+    # ---- PER-TAB deterministic scorecard (Tristan 2026-06-26): every tab vs the ≥8 floor ----
+    _tabsc = state.get("tabScorecard") or {}
+    if isinstance(_tabsc, dict) and _tabsc:
+        r += 1
+        _su = state.get("tabScorecardSummary") or {}
+        sub_banner(ws, r, f"Per-tab quality — every tab against the ≥8 floor "
+                          f"(worst: {_su.get('min_tab', '?')} {_su.get('min_score', '?')}/10; "
+                          f"{len(_su.get('fail_tabs') or [])} FAIL, {len(_su.get('unscored_tabs') or [])} UNSCORED)", 4)
+        r += 1
+        header(ws, r, ["Tab", "Score", "vs ≥8 floor", "Top issue / coverage gap (fix at source)"])
+        r += 1
+        for _tab, _v in _tabsc.items():
+            if not isinstance(_v, dict):
+                continue
+            _st = _v.get("status")
+            _scv = _v.get("score")
+            ws.cell(r, 1, clean_cell(_tab)).font = FONT_SUB
+            _scell = ws.cell(r, 2, _scv if _scv is not None else "—")
+            _scell.fill = FILL_PASS if _st == "PASS" else (FILL_ADVISORY if _st == "UNSCORED" else FILL_FAIL)
+            ws.cell(r, 3, "PASS ✓" if _st == "PASS" else ("UNSCORED" if _st == "UNSCORED" else "⛔ below 8"))
+            _iss = _v.get("issues") or [""]
+            _icell = ws.cell(r, 4, clean_cell(_iss[0] if _iss else ""))
+            _icell.alignment = WRAP_TOP
+            _icell.font = FONT_NOTE
+            r += 1
+
 
 def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
@@ -6719,6 +6745,29 @@ def build(run_dir: str, out_path: str) -> dict:
     state["tabScorecardSummary"] = _ts_summary
     print(f"  · per-tab scorecard: min {_ts_summary['min_tab']}={_ts_summary['min_score']}/10 · "
           f"{len(_ts_summary['fail_tabs'])} FAIL, {len(_ts_summary['unscored_tabs'])} UNSCORED")
+    # Persist the per-tab scorecard + a ROUTED punch-list — the loop signal. Every tab <8 or UNSCORED,
+    # its issue + the source rule to fix at. The chain / operator / next run reads these to drive the
+    # ≥8 loop: tab <8 → fix the source rule → re-run → tab re-scores. (Fix the SOURCE, not the symptom.)
+    try:
+        with open(os.path.join(run_dir, "tab-scorecard.json"), "w", encoding="utf-8") as _fh:
+            json.dump({"tabs": _TAB_SCORES, "summary": _ts_summary}, _fh, indent=2, default=str)
+        _punch = [
+            f"- **{_t}** — {(_v.get('score') if _v.get('score') is not None else 'UNSCORED')}/10 "
+            f"{_v.get('status')} — {(_v.get('issues') or ['—'])[0]}\n"
+            f"  FIX (at source): {_v.get('fix') or 'write a deterministic check for this tab'}"
+            for _t, _v in _TAB_SCORES.items() if _v.get("status") in ("FAIL", "UNSCORED")
+        ]
+        if _punch:
+            with open(os.path.join(run_dir, "tab-scorecard-punchlist.md"), "w", encoding="utf-8") as _fh:
+                _fh.write(
+                    f"# Per-tab quality punch-list — min {_ts_summary['min_tab']} "
+                    f"{_ts_summary['min_score']}/10 ({len(_ts_summary['fail_tabs'])} FAIL, "
+                    f"{len(_ts_summary['unscored_tabs'])} UNSCORED)\n\n"
+                    "Every tab must score ≥8. Fix each at SOURCE (the rule that produced the defect), "
+                    "not the symptom; re-run; the tab re-scores. An UNSCORED tab's fix is to write its "
+                    "deterministic check.\n\n" + "\n".join(_punch) + "\n")
+    except Exception:  # noqa: BLE001 — persistence must never break the build
+        pass
     state["_dossierRepair"] = {
         **_repair.summary(),
         "fixes": list(_repair.fixes_applied),
