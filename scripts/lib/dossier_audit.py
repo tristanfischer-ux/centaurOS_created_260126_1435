@@ -366,8 +366,14 @@ def check_bom(state, rows, run_dir) -> list:
             source_rule="every principal BoM line must carry a drawing-cross-reference tag",
         ))
 
-    # -- LINE MATH: qty * unit_gbp must equal line_gbp (±1).
+    # -- LINE MATH: qty * unit_gbp must equal line_gbp (±1). SUB-COMPONENT rows are EXCLUDED: they
+    # carry line_gbp=£0 BY DESIGN (the principal carries the counted/rolled-up price; the sub-rows are
+    # an indicative breakdown, not counted in the bill total), so qty×unit≠0 on a £0 sub-row is correct,
+    # not a fault. Counting it flagged 202 false HIGHs on the water dossier → BoM forced to 0/10. The
+    # line-math invariant applies to PRINCIPAL (counted) lines only.
     for r in rows:
+        if _status(r) == "SUB-COMPONENT":
+            continue
         qty = _num(r.get("qty"))
         unit = _num(r.get("unit_gbp"))
         line = _num(r.get("line_gbp"))
