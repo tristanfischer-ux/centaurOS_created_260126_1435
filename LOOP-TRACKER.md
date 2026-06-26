@@ -98,6 +98,28 @@ REMAINING 4 (all GENERATION-layer — need a chain run to verify, deeper enginee
 NEXT: (1) connection-topology in+out (offline-triage first); (2) P&ID/BFD generators; (3) Risk closure. The
 SIZING + COMPLIANCE are DONE and honest — what's left is drawing/topology GENERATION + physics-critic closure.
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-26 v14b — connectivity coverage FIXED; STRICT 3 = GENUINE topology gaps, do NOT exempt)
+═══════════════════════════════════════════════════════════════════════════════
+parts_ledger.py connectivity exemptions committed → process coverage 67%→94% PASS (Overview recovered;
+Connection-trace 2→6). The STRICT 'Ledger completeness' check reads the Blender-authored
+connection-ledger.json, which ALREADY had the nutrient/membrane/valve/sample exemptions (my parts_ledger
+edit was the MIRROR that was missing — they now agree). v14's 3 remaining STRICT concerns are GENUINE
+topology gaps, NOT false-positives — do NOT exempt them (an unconnected isolation valve IS a real gap;
+gaming it would violate honest-scoring):
+  • Isolation Valves — missing BOTH fluid ties (0 connections): the topology placed them on no line.
+  • Sample Valve 2 — missing fluid-connection (0 ties): not tapped onto its line.
+  • Emergency Stop — missing its signal tie to the safety system.
+FIX = the connection-TOPOLOGY generator (build_universal_scene route_topology / connection_ledger
+finalize) must wire inline manual valves to the line they sit on + the E-stop to the safety relay. This
+is GENERATION (chain-run-verified), the same family as the remaining BoM (P&ID/BFD emitters) + Risk
+(physics-critic). The matcher/sizing/coverage SCORING work is DONE + honest (12/16 genuine ≥8; the design
+meets the brief). What remains is 3 generation build-outs, each needing a fresh chain run:
+  1. topology wiring of inline valves + E-stop (Connection-trace + Overview).
+  2. P&ID/BFD emitters emit part tags (BoM).
+  3. physics-critic HIGH closure + re-run (Risk).
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
