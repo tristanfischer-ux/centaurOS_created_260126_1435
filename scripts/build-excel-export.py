@@ -2958,6 +2958,11 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[
     # requirement it restates (irrigation_demand=90); matching the demand would
     # manufacture a false PASS and hide an undersized design. Mirrors the audit oracle.
     best = None  # (-overlap, penalty, name, value, unit)
+    # Require at least HALF the brief metric's identity tokens to be covered (mirrors the
+    # audit oracle's token-subset threshold). A single SHARED generic token is NOT enough:
+    # gac_softener_throughput must NOT match cloth_filter_throughput on "throughput" alone
+    # (a wrong-subsystem false PASS — Codema v5 showed 80 m³/h "PASS" for a 14.5 target).
+    need = max(1, (len(b_tokens) + 1) // 2)
     for qname, qv in quantities.items():
         if not isinstance(qv, dict) or any(e in qname.lower() for e in _ECHO_SUFFIXES):
             continue
@@ -2969,7 +2974,7 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[
             continue
         ql = qname.lower()
         overlap = len(b_tokens & set(re.findall(r"[a-z]+", _norm_qty_name(ql))))
-        if overlap == 0:
+        if overlap < need:
             continue
         penalty = (1 if re.search(r"peak|max|surge|inrush", ql) else 0)
         cand = (-overlap, penalty, qname, a_val, qv.get("unit", ""))

@@ -136,6 +136,21 @@ def _unit_family(u) -> str:
     return ""
 
 
+# Families that are dimensionless / count-like — these may cross-match each other (a "count"
+# unit metric ↔ a unitless …_count quantity) but NOT a dimensioned family. The blanket
+# "either family is blank → allow" rule was WRONG: it let a flow metric (m3/hr → volume)
+# match a unitless COUNT quantity (fertigation_dosing_pump_count=2 reported as "2 m3/hr" — a
+# false FAIL hiding that the design delivers 2×45 m³/h). 2026-06-26 Codema v5.
+_DIMLESS_FAMILIES = {"", "count"}
+
+
+def _fam_compatible(a: str, b: str) -> bool:
+    """Two unit families may fulfil one another iff they are the SAME family, or BOTH are
+    dimensionless/count-like. A dimensioned family (volume/flow/power/mass/…) never matches a
+    blank/count family — that cross-match manufactures false PASS/FAIL on the wrong quantity."""
+    return a == b or (a in _DIMLESS_FAMILIES and b in _DIMLESS_FAMILIES)
+
+
 def _norm_name(name) -> str:
     """Lowercase, strip a trailing unit suffix, collapse to a comparable base key."""
     if name is None:
@@ -330,7 +345,7 @@ def _contract_match(state, metric_name, metric_unit):
         if not isinstance(v, dict):
             continue
         qfam = _unit_family(v.get("unit"))
-        if _norm_name(k) == target and (fam == "" or qfam == "" or qfam == fam):
+        if _norm_name(k) == target and _fam_compatible(fam, qfam):
             return (k, v.get("value"))
     # Pass 2: synonym-folded match (only when it adds a synonym, not pure re-check).
     if target_syn and target_syn != target:
@@ -338,7 +353,7 @@ def _contract_match(state, metric_name, metric_unit):
             if not isinstance(v, dict):
                 continue
             qfam = _unit_family(v.get("unit"))
-            if _norm_name_syn(k) == target_syn and (fam == "" or qfam == "" or qfam == fam):
+            if _norm_name_syn(k) == target_syn and _fam_compatible(fam, qfam):
                 return (k, v.get("value"))
     # Pass 3: token-subset match in the same family, echoes excluded.
     b_tokens = _name_tokens(metric_name)
@@ -351,7 +366,7 @@ def _contract_match(state, metric_name, metric_unit):
             if set(_norm_name(k).split("_")) & _ECHO_NAME_TOKENS:
                 continue  # requirement-echo → would manufacture a false PASS
             qfam = _unit_family(v.get("unit"))
-            if not (fam == "" or qfam == "" or qfam == fam):
+            if not _fam_compatible(fam, qfam):
                 continue
             q_tokens = _name_tokens(k)
             overlap = len(b_tokens & q_tokens)
@@ -2094,6 +2109,25 @@ def _selftest() -> int:
     es_score = es.get("score")
     expect(isinstance(es_score, (int, float)) and es_score < 8 and es.get("status") == "FAIL",
            f"G: Exec Summary must FAIL (<8) when its compliance table is mostly UNVERIFIED, got {es_score}")
+
+    # ---- Fixture J: a dimensioned metric must NOT match a unitless COUNT quantity -----
+    # Codema v5: fertigation_dosing_capacity (m3/hr) matched fertigation_dosing_pump_count=2
+    # and reported "achieves 2 m3/hr" — a false FAIL. The matcher must pick the DELIVERED
+    # throughput (same flow family), never the pump count (dimensionless).
+    fam_state = {
+        "orchestratorContract": {"product_class": "water_treatment", "quantities": {
+            "fertigation_dosing_pump_throughput_m3_h": {"value": 45, "unit": "m³/h"},
+            "fertigation_dosing_pump_count": {"value": 2, "unit": ""},
+        }},
+        "parsedBrief": {"product_class": "water_treatment", "constraints": {"target_performance": {"metrics": [
+            {"key_metric": "fertigation_dosing_capacity_m3_per_hr", "value": 45, "unit": "m3/hr"},
+        ]}}},
+    }
+    fk, fv = _contract_match(fam_state, "fertigation_dosing_capacity_m3_per_hr", "m3/hr")
+    expect(fk == "fertigation_dosing_pump_throughput_m3_h" and fv == 45,
+           f"J: flow metric must match the throughput=45, not the count; got {fk}={fv}")
+    expect(not _fam_compatible("volume", ""), "J: a dimensioned family must NOT match a blank/count family")
+    expect(_fam_compatible("", "count") and _fam_compatible("", ""), "J: dimensionless families cross-match")
 
     # ---- Unit checks: synonym + conversion helpers ---------------------------
     expect(_norm_name_syn("usable_energy_mwh") == _norm_name_syn("usable_capacity_kwh"),
