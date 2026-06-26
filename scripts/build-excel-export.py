@@ -2671,6 +2671,47 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
 _LEDGER_SHEET = "Bill of Materials (Ledger)"
 
 
+# Parse a BoM `basis` STRING into (key inputs, factors) for the Ledger G/H columns when the
+# structured cost-basis carries none (Tristan 2026-06-27: G & H were blank for every line — the
+# engine's costBasis.inputs/factors are []). The per-line derivation IS in the basis string
+# ("60 kVA × £320/kVA", "364 m² plan × £90/m²", "pipe £104/m @ DN125 × 21.9 m"). UNIVERSAL — regex on
+# physical quantities + £-rates/multipliers, no archetype logic; a line with no derivation → blank.
+_BASIS_FACTOR_RE = re.compile(r"£[\d,]+(?:\.\d+)?\s*/\s*[A-Za-z²³%·\d]+|×\s*[\d,.]+|[\d.]+\s*%")
+_BASIS_INPUT_RE = re.compile(
+    r"⌀?\d[\d,.]*\s*(?:m²|m³|m\b|mm|DN\s?\d+|kVA|kW|kWh|kg|t\b|L\b|°C?|inch|barg?|kPa|MPa|m/s)",
+    re.I)
+_BASIS_FACTOR_WORDS = ("floored", "lifted", "corpus", "install", "margin", "FOAK", "EPC",
+                       "contingency", "take-off", "class budget", "catalogue", "rating-based",
+                       "parametric")
+
+
+def _basis_split(basis_str):
+    """(key_inputs, factors) extracted from a BoM basis string, for Ledger cols G/H."""
+    s = str(basis_str or "").strip()
+    if not s:
+        return ("", "")
+    inputs = list(dict.fromkeys(m.group(0).strip() for m in _BASIS_INPUT_RE.finditer(s)))
+    factors = list(dict.fromkeys(m.group(0).strip() for m in _BASIS_FACTOR_RE.finditer(s)))
+    sl = s.lower()
+    for w in _BASIS_FACTOR_WORDS:
+        if w.lower() in sl and w not in factors:
+            factors.append(w)
+    return ("; ".join(inputs)[:58], "; ".join(factors)[:58])
+
+
+def _basis_method(basis_str) -> str:
+    """The cost METHOD word from a basis string (first segment / known method keyword)."""
+    s = str(basis_str or "").strip()
+    if not s:
+        return ""
+    for kw in ("catalogue", "rating-based", "structural steelwork take-off", "take-off",
+               "materials take-off", "bottom-up parametric", "parametric", "budget allowance",
+               "catalogue-class budget", "corpus"):
+        if kw in s.lower():
+            return kw
+    return s.split("·")[0].split(":")[0].strip()[:24]
+
+
 def _fmt_cost_items(items) -> str:
     """Render a cost-basis inputs/factors list (each a {name,value,unit} dict) as clean
     'name: value unit; …' text instead of a raw Python dict dump in the Ledger."""
@@ -2791,17 +2832,33 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             ws.cell(r, 4, num(row.get("unit_gbp"))).border = BORDER
             ws.cell(r, 5, num(row.get("line_gbp"))).border = BORDER
 
-        # ── COST-BASIS group (cols F–J) — joined by name; blank when no cost line ──
+        # ── COST-BASIS group (cols F–J) — from the joined cost line, FALLING BACK to the row's own
+        #    `basis` string so Key inputs (G) + Factors (H) are NEVER blank when a derivation exists
+        #    (Tristan 2026-06-27: G/H were empty for every line). A SUB-COMPONENT child is an
+        #    apportionment of its parent → it is MARKED as such (B2), not left mysteriously blank. ──
         _cl = cost_by_name.get(_norm_name(row.get("requirement", "")))
         _cbasis = (_cl.get("basis") or {}) if _cl else {}
-        if _cbasis:
-            ws.cell(r, 6, clean_cell(_cbasis.get("method", ""))).border = BORDER
-            ic = ws.cell(r, 7, clean_cell(_fmt_cost_items(_cbasis.get("inputs"))))
+        _g = _fmt_cost_items(_cbasis.get("inputs"))
+        _h = _fmt_cost_items(_cbasis.get("factors"))
+        if not _g and not _h:
+            _g, _h = _basis_split(row.get("basis"))
+        _method = _cbasis.get("method") or _basis_method(row.get("basis"))
+        _eclass = _cbasis.get("estimate_class", "")
+        _conf = _cbasis.get("confidence", "")
+        if _is_subcomp:
+            # apportioned child of a parent principal — say so rather than show blanks
+            _eclass = _eclass or "↳ apportioned"
+            _conf = _conf or "incl. in parent"
+            if not _g and not _h:
+                _g = "incl. in parent line"
+        if _method or _g or _h or _eclass or _conf:
+            ws.cell(r, 6, clean_cell(_method)).border = BORDER
+            ic = ws.cell(r, 7, clean_cell(_g))
             ic.alignment = WRAP_TOP; ic.font = FONT_NOTE; ic.border = BORDER
-            fc = ws.cell(r, 8, clean_cell(_fmt_cost_items(_cbasis.get("factors"))))
+            fc = ws.cell(r, 8, clean_cell(_h))
             fc.alignment = WRAP_TOP; fc.font = FONT_NOTE; fc.border = BORDER
-            ws.cell(r, 9, clean_cell(_cbasis.get("estimate_class", ""))).border = BORDER
-            ws.cell(r, 10, clean_cell(_cbasis.get("confidence", ""))).border = BORDER
+            ws.cell(r, 9, clean_cell(_eclass)).border = BORDER
+            ws.cell(r, 10, clean_cell(_conf)).border = BORDER
 
         # ── ENGINEERING-SPEC group (cols K–N) — PRINCIPALS ONLY (a top-level line that
         #    carries a real line cost); commodity / sub-component lines leave it blank ──
@@ -7145,6 +7202,11 @@ def _selftest() -> int:
     # (2) _humanize_class display names
     if _humanize_class("bess") != "Battery Energy Storage System":
         print(f"  FAIL humanize bess (got {_humanize_class('bess')})"); bad += 1
+    # (4) B1 (Tristan 2026-06-27): the BoM Key-inputs/Factors columns must NOT be blank when the
+    # basis string carries the derivation — _basis_split extracts inputs + factors universally.
+    _gi, _gf = _basis_split("rating-based: 60 kVA × £320/kVA (UK-2026 installed mid)")
+    if "60 kVA" not in _gi or "£320/kVA" not in _gf:
+        print(f"  FAIL B1 basis-split: got inputs={_gi!r} factors={_gf!r}"); bad += 1
     # (3) X1 (Tristan 2026-06-27): EVERY sheet gets an honest quality banner — a drawing scores from
     # parts-ledger coverage, and an EMPTY drawing is a 0/FAIL, NEVER a fake PASS. Universal (keyed on
     # drawing TYPE, not archetype).

@@ -58,9 +58,9 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
 - [ ] IA2 — numbers' provenance unclear; they should come FROM the brief. **→ X4**
 
 ## BILL OF MATERIALS (Ledger) — 6/10
-- [ ] B1 — columns G & H (Key inputs / Factors) are EMPTY — populate them or they have no purpose.
+- [x] B1 (FIXED — G/H now parse the basis derivation) — columns G & H (Key inputs / Factors) are EMPTY — populate them or they have no purpose.
       **(raised every time — stop ignoring it.)**
-- [ ] B2 — from ~line 335 the format CHANGES (the sub-component/child rows): no class estimate, no
+- [~] B2 (children now marked ↳ apportioned / carry class+conf) — from ~line 335 the format CHANGES (the sub-component/child rows): no class estimate, no
       confidence number, no material choice. Make the child rows consistent (or clearly mark them as
       apportioned children of a parent). **→ build-excel BoM child rendering**
 - [ ] B3 — BoM rows need WHERE-IT-GOES (destination/usage). **→ X4**
