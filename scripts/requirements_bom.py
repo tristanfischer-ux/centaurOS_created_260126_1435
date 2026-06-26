@@ -668,6 +668,21 @@ _MIN_PRICE_FLOORS = [
     (re.compile(r"i/?o[_ ]?module|input[_ ]?output", re.I), 250.0),
     (re.compile(r"controller[_ ]?power|power[_ ]?supply|\bpsu\b", re.I), 120.0),
     (re.compile(r"main[_ ]?controller|\bplc\b|programmable[_ ]?logic", re.I), 400.0),
+    # Electrical ASSEMBLY enclosures (a populated panel / board / switchboard / MCC — NOT a
+    # bare component). The 2026-06-26 Codema audit found "Electrical Control Panel" matched NO
+    # floor → it rendered at £218, and a stale qty=3,271 had made it £713k = 58% of the bill.
+    # These are whole assemblies (enclosure + main gear + busbars + wiring + terminals + build)
+    # — a real quote is never below these minimums. Bare "panel" is deliberately NOT matched
+    # (a solar / vent / deflagration / cladding panel is not switchgear); only unambiguous
+    # switchgear-assembly nouns. LAST in the table so a component WITHIN an assembly (a
+    # "switchboard busbar" → £120 busbar, a "panel breaker" → £45) matches its own floor first;
+    # only a bare assembly noun reaches these. Conservative flat minimums (a real quote is higher).
+    (re.compile(r"switch[_ ]?board|\bmcc\b|motor[_ ]?control[_ ]?(?:centre|center)|"
+                r"main[_ ]?distribution[_ ]?board|\bmdb\b|main[_ ]?switchgear", re.I), 3000.0),
+    (re.compile(r"control[_ ]?panel|control[_ ]?cabinet|control[_ ]?enclosure|"
+                r"distribution[_ ]?board|distribution[_ ]?panel|panel[_ ]?board|consumer[_ ]?unit|"
+                r"power[_ ]?distribution[_ ]?panel|electrical[_ ]?panel|electrical[_ ]?cabinet", re.I),
+     800.0),
 ]
 
 
@@ -2095,6 +2110,20 @@ def _selftest() -> int:
     for nm in ("Distillation Column", "Buffer Vessel", "Rearing Tank", "Fischer-Tropsch Reactor"):
         if _price_floor_for(nm, {}) is not None:
             print(f"  FAIL process-vessel {nm!r} wrongly floored (£{_price_floor_for(nm, {})})"); bad += 1
+    # (d1) ELECTRICAL ASSEMBLY enclosures (2026-06-26 Codema: "Electrical Control Panel" had NO
+    # floor → £218, and a stale qty made it £713k). A populated panel/board/switchboard/MCC takes
+    # a minimum-credible assembly floor; a COMPONENT within one keeps its own (busbar £120, breaker
+    # £45); a solar/vent/deflagration/cladding panel is NOT switchgear → untouched.
+    for nm, want in [("Electrical Control Panel", 800.0), ("Local Control Panel", 800.0),
+                     ("Distribution Board", 800.0), ("Power Distribution Panel", 800.0),
+                     ("Main Switchboard", 3000.0), ("Motor Control Centre", 3000.0)]:
+        if _price_floor_for(nm, {}) != want:
+            print(f"  FAIL assembly floor {nm!r}: £{_price_floor_for(nm, {})} (want £{want})"); bad += 1
+    if _price_floor_for("main switchboard busbar", {}) != 120.0:   # component wins over assembly
+        print(f"  FAIL switchboard busbar lost its £120 floor (got {_price_floor_for('main switchboard busbar', {})})"); bad += 1
+    for nm in ("Solar Panel", "Deflagration Vent Panel", "Polycarbonate cladding panel"):
+        if _price_floor_for(nm, {}) is not None:
+            print(f"  FAIL non-switchgear {nm!r} wrongly floored (£{_price_floor_for(nm, {})})"); bad += 1
     # (d2) PACK-INTERNAL MICRO-COMMODITY guard (2026-06-24): a pack-internal cell part takes the
     # tiny micro band, NOT the £120 switchgear busbar floor (×3,735 = £448k). Material-split: a
     # stamped METAL busbar/interconnect-bar floors at £2 (ceiling £15); a WIRE/LEAD/insulation-PAD
