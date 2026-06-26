@@ -2849,7 +2849,9 @@ def _unit_family(unit: str) -> Tuple[str, float]:
     Unknown units fall back to family='?'+the raw token so two identical raw
     units still match each other."""
     u = (unit or "").strip().lower().replace(" ", "")
-    u = u.replace("³", "3").replace("²", "2").replace("·", ".").replace("μ", "u").replace("°", "")
+    # m3 ≡ m³ ≡ m^3 (the brief parser is non-deterministic about exponent notation — a caret
+    # form "m^3" otherwise reads as an unknown family and breaks compliance matching, Codema v7).
+    u = u.replace("³", "3").replace("²", "2").replace("^", "").replace("·", ".").replace("μ", "u").replace("°", "")
     table = {
         # throughput / production per year -> canonical tonnes/yr
         "tpy": ("t_per_yr", 1.0), "t/yr": ("t_per_yr", 1.0),

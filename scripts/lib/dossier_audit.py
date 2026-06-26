@@ -123,6 +123,12 @@ def _norm_unit(u) -> str:
         return ""
     s = str(u).strip().lower()
     s = s.replace(" ", "")
+    # Normalise exponent notations so m3 ≡ m³ ≡ m^3 (and m2 ≡ m² ≡ m^2). The brief
+    # parser is NON-DETERMINISTIC about these: one run emits "m3/hr", the next "m^3/hr"
+    # — without this, "m^3" reads as an UNKNOWN family ('') and a flow metric then wrongly
+    # matches a unitless COUNT (both '') while the real throughput (volume) is excluded
+    # (Codema v7: fertigation/gac/ro_permeate all broke on the caret). 2026-06-27.
+    s = s.replace("³", "3").replace("²", "2").replace("^", "")
     # take the leading unit token of compound units e.g. "MWh / year" -> "mwh"
     s = re.split(r"[/]", s, maxsplit=1)[0]
     return s
