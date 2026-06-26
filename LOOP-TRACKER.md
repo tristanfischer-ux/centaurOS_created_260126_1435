@@ -1,6 +1,28 @@
 # 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
 
 ═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-26 EVE — HONEST SCORING DONE; next = STALE-BoM determinism #86)
+═══════════════════════════════════════════════════════════════════════════════
+HONEST-SCORING SYSTEM COMPLETE + VERIFIED on a FRESH v5 run (5 commits, all guarded). v5 compliance:
+7 PASS, 1 FAIL (irrigation pump 12<45 = #2 real), 1 UNVERIFIED (gac/softener throughput not emitted =
+real gap); renderer+audit+banner all agree, Exec Summary honest 2/10. Commits 9159e4525, eacba20d2,
+0e6903183, 93c44b0a1 (+ tracker). Matcher now: per-metric UNVERIFIED=HIGH; ONE shared matcher
+(family+synonym+token-subset ≥half, plurals folded); echoes (…_demand) excluded → match DELIVERED qty;
+dimensioned family NEVER matches a unitless count (_fam_compatible). Guards: dossier_audit --selftest
+G/H/J; requirements_bom --selftest (d1).
+
+⛔ NEXT (THE big one) = STALE-BoM / determinism #86. The dossier BoM is built from a MID-CHAIN snapshot,
+NOT the deterministic engine. v5 stored state.requirementsBom = 68 lines / £3,077,078 with a PHANTOM panel
+(qty 3463 × £800 = £2.77M; 3463 = RO-membrane element count bleeding into the panel word at build time).
+Re-running rb.assemble('out/fischer-codema-v5') on the SAME final state = 171 lines / £779,446, panel qty 1
+£800. So state.requirementsBom DIVERGES from a fresh re-derive. FIX: re-derive the BoM on the FINAL state
+before scoring/rendering — chain re-runs requirements_bom at the end and overwrites state.requirementsBom,
+OR build-excel-export.py + scorecard call assemble(run_dir). The min-credible FLOOR (panel £800) is correct
+per-unit — it only looked wrong multiplied by the phantom qty. The honest scorecard CORRECTLY caught the
+£2.77M (BoM 0/10, dominant_bom_line HIGH) — loop works, data was stale. Drawer forgeos_gotchas_dc59ed7a53dd73de.
+After #86: irrigation pump (#2), gac/softener throughput quantity, parts-ledger, then chain min-tab≥8 hard-gate.
+
+═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-26 PM — HONEST SCORING LANDED; fresh v5 run in flight)
 ═══════════════════════════════════════════════════════════════════════════════
 TRISTAN HAMMERED (4×): "a pass is good — unverified AND fail are bad"; "an 8 must make someone go
