@@ -7212,6 +7212,21 @@ def build(run_dir: str, out_path: str) -> dict:
                               "capex/opex/payback model for this class"] + (_fm.get("issues") or []))[:6]
     except Exception:  # noqa: BLE001
         pass
+    # F1/X2 — RE-STAMP every sheet's quality banner from the FINAL _TAB_SCORES. Banners are written at
+    # tab-BUILD time (title_row, row 2) from the scores as they were THEN; any score adjusted later in
+    # this gate-feed (the economics-unverified Financial penalty, any merged drawing score) would leave
+    # the VISIBLE banner reading higher than the gate verdict — a residual fake-8. Re-stamping closes
+    # it: no banner can now exceed the score the gate uses. (Only touches rows that ALREADY hold a
+    # banner, so a subtitle/other row 2 is never clobbered.)
+    for _wsb in wb.worksheets:
+        _bcell = _wsb.cell(2, 1)
+        if isinstance(_bcell.value, str) and _bcell.value.startswith("⬤ TAB QUALITY"):
+            _qb = _tab_quality_banner(_wsb.title)
+            if _qb is not None:
+                _bcell.value = _qb["text"]
+                _bcell.fill = _qb["fill"]
+                _wsb.row_dimensions[2].height = _qb["height"]
+
     _ts_summary = tab_scorecard_summary(_TAB_SCORES)         # re-derive over the FULL workbook
     state["tabScorecard"] = _TAB_SCORES
     state["tabScorecardSummary"] = _ts_summary
@@ -7292,6 +7307,21 @@ def _selftest() -> int:
         if not _ga or _ga.get("status") != "PASS":
             print(f"  FAIL X1 aux-score: a 95%-covered GA must PASS (got {_ga})"); bad += 1
         _COV_CACHE.clear()
+    # (5) F1/X2: the on-tab banner must REFLECT the _TAB_SCORES score — it can never read higher than
+    # the gate verdict (the Financial fake-8: banner 10 while the gate FAILs at 6). The re-stamp pass
+    # relies on _tab_quality_banner reading the FINAL score; prove it does.
+    _saved = dict(_TAB_SCORES)
+    _TAB_SCORES.clear()
+    _TAB_SCORES["Demo Tab"] = {"score": 6, "target": 8, "status": "FAIL", "issues": ["economics unverified"]}
+    _bn = _tab_quality_banner("Demo Tab")
+    if not _bn or "6/10" not in _bn["text"] or "FAIL" not in _bn["text"]:
+        print(f"  FAIL banner-reflects-score: a 6/FAIL tab must banner '6/10 … FAIL' (got {_bn})"); bad += 1
+    _TAB_SCORES["Demo Tab"] = {"score": 9, "target": 8, "status": "PASS"}
+    _bn = _tab_quality_banner("Demo Tab")
+    if not _bn or "9/10" not in _bn["text"] or "PASS" not in _bn["text"]:
+        print(f"  FAIL banner-reflects-score: a 9/PASS tab must banner '9/10 … PASS' (got {_bn})"); bad += 1
+    _TAB_SCORES.clear()
+    _TAB_SCORES.update(_saved)
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 

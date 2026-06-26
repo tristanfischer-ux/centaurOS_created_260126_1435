@@ -14,7 +14,7 @@ EVERY fix UNIVERSAL (keyed on a signal, no archetype table) + PERMANENT (`--self
 STAGE 0 — Honest + TOTAL scorer (PRECONDITION)
   [x] X1 banner+score on every sheet · [x] ship gate spans full workbook · [x] X2 Overview/Conn honest
   [x] ⚠Checks by invariant pass-rate · [x] Financial gate-FAIL when economics UNVERIFIED
-  [ ] F1 banner RE-STAMP (banner reads 10 while gate FAILs) · [ ] guard: banner ≤ gate verdict per tab
+  [x] F1 banner RE-STAMP (every banner re-stamped from FINAL scores; Financial 10→6 FAIL) · [x] guard: banner reflects score (selftest 5)
 STAGE 0.5 — SIGHT: audit the DELIVERED artefact, not state.json
   [x] render LITTER (`manifest_sight.py`, caps render/GA; v9 47%→0/FAIL) — SOURCE fix = Stage 3
   [ ] bbox-containment (walls-outside) · [ ] shared-layout-hash (GA-top==render-top) · [ ] Excel cell-reader
