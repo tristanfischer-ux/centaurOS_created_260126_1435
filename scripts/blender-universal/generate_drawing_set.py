@@ -350,6 +350,27 @@ def generate_drawing_set(state_path: str | Path,
                             "block-flow-diagram.png", log)
     bfd_path = str(out_dir / "drawings" / "block-flow-diagram.png") if bfd_ok else None
 
+    # ── ONE SOURCE OF TRUTH (Tristan 2026-06-26: "the Blender model sets the connection lengths, so the
+    #    GA must follow the Blender model exactly — one source of truth"). The CANONICAL placement is the
+    #    one the system drawings (GA / P&ID / single-line) + schedules were just drawn from. The shaded-
+    #    hero / exterior / CAD-hero RENDER passes below re-run build_universal_scene, which RE-PLACES and
+    #    OVERWRITES parts-manifest.json (+ route / connection-schedule) with DIFFERENT positions — so
+    #    parts_ledger, the BoM, the Line&velocity lengths and the coverage matrix (all computed AFTER the
+    #    render passes) would read a placement that no longer matches the GA the reader sees. Snapshot the
+    #    canonical manifests here and RESTORE them after the render passes, so every DATA surface in the
+    #    dossier reflects the SAME placement as the GA. (The render PNGs stay visual-only.) ──
+    import shutil as _sh
+    _canon_bak: dict = {}
+    for _mname in ("parts-manifest.json", "route-manifest.json", "connection-schedule.json", "edge-manifest.json"):
+        _msrc = out_dir / _mname
+        if _msrc.exists():
+            _mbak = out_dir / f".{_mname}.canon"
+            try:
+                _sh.copy2(_msrc, _mbak)
+                _canon_bak[_mname] = _mbak
+            except Exception:  # noqa: BLE001
+                pass
+
     # SHADED STUDIO HERO PASS (INSPECT=0): the settle loop produced flat
     # inspect-*.png renders. The late drawing-set call passes INSPECT=0 to
     # trigger a second Blender pass with studio lighting (key-sun + soft
@@ -373,6 +394,16 @@ def generate_drawing_set(state_path: str | Path,
         if p.exists() and p.stat().st_size > 1000:
             hero_abs = str(p)
             break
+
+    # ── RESTORE the canonical placement (see "ONE SOURCE OF TRUTH" above) BEFORE the self-examination,
+    #    so parts_ledger / the BoM / the Line&velocity lengths / the coverage matrix all read the SAME
+    #    placement the GA was drawn from — not the re-placement the render passes left behind. ──
+    for _mname, _mbak in _canon_bak.items():
+        try:
+            _sh.copy2(_mbak, out_dir / _mname)
+            _mbak.unlink()
+        except Exception:  # noqa: BLE001
+            pass
 
     # ── DETERMINISTIC SELF-EXAMINATION (the loop's drawing feedback signal) ──
     # The LEDGER (parts_ledger.py — BoM + inputs/outputs/transformations + the
