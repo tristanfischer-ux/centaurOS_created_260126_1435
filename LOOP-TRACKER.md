@@ -36,6 +36,45 @@ STAGE 5 — Universal tags + verification coverage
   [ ] LV1/X5 every schedule row a real TAG · [ ] PS1/Panel/Assembly class-appropriate checks
   [ ] AU2 surface benchmark-net in ⚠Audit (needs run w/o CHAIN_SKIP_BENCHMARK_NET) · [ ] Brief verbatim (#60)
 
+RECOVERED (2026-06-26, mined from ALL ~117 old trackers by 4 agents → docs/RECOVERED-TRACKER-ITEMS-2026-06.md).
+Still-open recurring ARCHITECTURE items past councils flagged — fold into the stages above:
+  ★ [1/3 THE BIG ONE] ONE CANONICAL LEDGER — assemble `state.ledger` ONCE; BoM/P&ID/single-line/narrative/cost/
+    drawings are READ-ONLY projections of it (kills the multi-pricing-engine / multi-material-resolver / multi-
+    load-list drift = "the render shows a stale value the ledger already fixed"). CAVEAT (load-bearing): a single
+    ledger DESTROYS the cross-surface error detectors (gates 5/11/12/18 diff two independent values) → ADD
+    absolute-plausibility gates + a gate-32/benchmark re-derive on a path the ledger does NOT feed BEFORE unifying.
+    [LEDGER-FIX-PLAN, ANVIL-UNIVERSAL-TRACKER]
+  [loop] THE DESIGN LOOP must run ≥3×: tools→Blender→drawings "does this make sense?"→discover next tool→back to
+    tools; BoM/cost only AFTER it settles + geometry feeds BACK into sizing (today BoM/cost run BEFORE Blender
+    convergence, so measured run-lengths + converged loads never reach the dossier) [ENGINE-FIX-PLAN, UNIVERSAL-DESIGN-LOOP-DESIGN]
+  [1 SIZING WALL] `applyFamilySizing` is a NO-OP — execute the super-brief governing equations BEFORE grounding
+    parts (the £34k-for-£8M sizing wall; the lone blocker to a ≥8 sizing tab) [UNIVERSAL-ENGINE-SUPERBRIEF-PLAN]
+  [1 provenance] per-line cost_basis {method,inputs,unit_rate+cepci_year,correlation_ref,factors,estimate_class,
+    confidence} (~6% sourced today); every tool returns {value,source,uncertainty}; every prose number traces to a
+    contract field; keysMatch key on (base_key,basis) NOT ≥8-char substring (it fuses dc/ac siblings) [CO2-COST-AUDIT, ITER9, wall2-council]
+  [0 honest] distinguish DERIVED from ASSUMED-BUT-COHERENT — "internal coherence fooled the physics critic"; a
+    self-consistent HARD-CODED number must NOT score as a verified one [OXCCU-SAF-REVIEW, PLAN-deterministic-generation]
+  [2] deterministic repair: on a sizing-gate fail the emitter RE-DERIVES the part from the failed constraint (≤2),
+    never an LLM swap (anti-band-aid = CORE FIX PRINCIPLE) [PLAN-deterministic-generation]
+  [2] promote SWALLOWED warnings to visible FAILs: convergence-not-reached (ships iter-N as "converged"),
+    keyMetrics=null reaching reviewers Stages 15-25 (only set at 32) [IMPROVEMENT_PLAN, AUDIT_TRACE]
+  [2 gates] requirement-coverage fail-closed (brief-required subsystem absent = FAIL, #84); +closedFluidLoopHasHeatRejection,
+    +partNumberCapacityVsModel (model-suffix capacity, ZR18K=5.27kW≠18); activate gates that silently skip when the
+    Generator omits their derived_parameters field [HAPS-AUTOPLANNER, ITER9-RED-TEAM]
+  [3] real per-feeder electrical loads (single-line shows 0.0A; no fake total÷N) + ONE per-equipment load list so
+    the panel total == contract BY CONSTRUCTION (load_reconcile is green-by-luck) [ENGINE-FIX-PLAN, LEDGER-FIX-PLAN]
+  [3] over-decomposition: BoM ~6× too many lines vs reference density (~40 heat-pump/~100 BESS) — inflates cost +
+    hides per-line absurdity; collapse fixings to one "sundries" line [PLAN-2026-05-17]
+  [3/0.5] design-to-envelope fit-audit: force the design into its stated envelope (e.g. 40ft hi-cube), cross-check
+    CAD bbox vs contract vs mass — "the most powerful sizing-bug detector" (a SIGHT artefact-read) [DESIGN-TO-ENVELOPE-PLAN]
+  [3] layout-revealed-needs: after each Blender pass add tools the geometry reveals (long run→booster pump, wide
+    span→support steel, hot line→trace-heat) [UNIVERSAL-DESIGN-LOOP-DESIGN]
+  [4] payback=0 is a bug; re-base economics on ACHIEVED installed capex (floored by the bottom-up BoM); Towler/Turton
+    C_e=a+b·S^n CEPCI-indexed correlations + Lang factors, labelled HONESTLY as AACE Class-4 ±30% (never ±10%) [CO2-COST-AUDIT, SCENARIO-PLANNING-PLAN, OXCCU-SAF-REVIEW]
+  [NEW] self-learning DB never grows: class-ref reads BAKED 2026-05-18 snapshots; writebackDiscoveredNode/Edge have
+    ZERO callers; no web-on-miss topology discovery for unseen classes [UNIVERSAL-ENGINE-PLAN, FORGE-ENGINE-DB-AUDIT]
+  [NEW scope] a brief with no physical BoM (pure software/data) must be REFUSED honestly, not faked through the gates [SPACE-SECTOR-ROADMAP]
+
 EXIT: (1) honest scorecard ≥8 on all 37 sheets, gate exits 0 (UNVERIFIED=FAIL); (2) every check proves its
 catch + no false-positive; (3) every number resolves up+down (zero orphans); (4) fresh skeptic pass finds
 nothing; (5) benchmark net (top-down) agrees with engine (bottom-up) within band.
