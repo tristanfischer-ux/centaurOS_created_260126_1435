@@ -1,6 +1,31 @@
 # 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
 
 ═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-27 v7 — 13/16 ≥8; 3 left ALL trace to WATER-ARCHETYPE SIZING bugs)
+═══════════════════════════════════════════════════════════════════════════════
+v7 (fresh, all fixes) = 13/16 tabs ≥8, the 3 remaining ALL at 6 (close). Caret fix (m^3≡m³≡m3, commit
+this push) flipped Exec 0→6 — the brief parser is NON-DETERMINISTIC about unit notation (#86); without
+it a flow metric matched a unitless COUNT. The 3 remaining tabs reduce to a CLUSTER OF WATER SIZING BUGS
+the physics critic correctly flags (fix at SOURCE in engineering-contract.ts + the auto-tools):
+  • drain_collection_sump_volume_each_m3 = 600 m³ (brief = 5,000 L = 5 m³ pits → ~120× OVER) — from
+    tool:irrigation:ebb-flow-demand; almost certainly an L→m³ unit error in that generated tool.
+  • total_water_storage 262 m³ + fresh_water_storage_capacity 196.8 (brief 40 m³) — buffer tool uses a
+    CONSUMPTIVE model, no drain-reclaim term (ebb/flow recirculates) → over-sized.
+  • fertigation + hand-watering pump MOTORS under-powered (process:pump-sizing under-rates the motor).
+  • irrigation_pump_flow 12 vs 45 demand — tool floors to demand (d1b9e45e5) + manifest declares it
+    (e6d5e72ab) but the LLM auto-planner did NOT wire irrigation_demand_m3_h this run (non-deterministic).
+    HIGH-LEVERAGE candidate fix: make the executor PROTECT a brief-sourced quantity from tool overwrite
+    (universal "brief is ground truth" — would fix irrigation AND storage), OR pin irrigation_pump_flow in
+    the contract. Plus the per-dept metric name shares too few tokens with any delivery qty (matcher edge).
+  • BoM: parts_ledger P&ID 0/45 + BFD 0/20 drawing MATCHING false-negs (known, mem forgeos_parts_ledger_exists)
+    + parts-ledger STALE (runs before BoM final → re-run on final state gives £802k + real coverage).
+NEXT (deliberate, verify each with a fresh run): (1) fix the 600 m³ sump unit error in the ebb-flow-demand
+tool; (2) buffer-sizing reclaim term / honour-brief-spec; (3) pump-motor power calc; (4) irrigation pump
+deterministic sizing (executor brief-protection is the universal lever); (5) parts_ledger drawing match +
+run-it-last. NOTE: build-excel repair + parts_ledger are NOT persisted — re-run parts_ledger.py on the
+final state, then dossier_audit.tab_scores. 12 commits this session; honest-scoring + ≥8 ship gate DONE.
+
+═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-27 — 13/16 TABS ≥8 on a FRESH run; 3 left, v7 validating 2)
 ═══════════════════════════════════════════════════════════════════════════════
 FRESH v6 run CONFIRMS the committed fixes end-to-end: 13/16 tabs ≥8, 0 UNSCORED, Calc holds at 8,
