@@ -180,12 +180,29 @@ def fix_missing_tags(state: dict, rows: list):
     return state, rows, n, note
 
 
+# Fulfilment-status PLACEHOLDERS — these are NOT a component identity. A NOT-FOUND /
+# BESPOKE row carries part="requirement stated" / "made to spec" (+ variants), IDENTICAL
+# across dozens of physically-distinct requirements. Keying the dedup on that placeholder
+# collapsed an Electrical Control Panel, an RO membrane (qty 3463 elements) and ~100 other
+# distinct not-found lines into ONE row with the SUMMED qty — the £2.77M phantom panel and
+# a 171→68 line collapse (Codema 2026-06-26). The dedup noun must be the row's durable
+# IDENTITY (its requirement), never the fulfilment text.
+_PLACEHOLDER_NOUNS = {
+    "requirement_stated", "requirement_stated_structural", "requirement_stated_parametric",
+    "requirement_stated_rating_based_parametric", "made_to_spec", "not_found", "tbd",
+}
+
+
 def _dup_key(r: dict):
-    """A duplicate-by-function key: normalised noun + the salient spec the audit
-    would compare on. We use the normalised part/name plus a coarse spec slug so
-    two physically-identical definitions collapse, but a 30 kW pump and a 75 kW
-    pump (genuinely different) do NOT."""
-    noun = _norm_name(r.get("part") or r.get("name_human") or r.get("requirement"))
+    """A duplicate-by-function key: the row's durable IDENTITY (its requirement) + the
+    salient spec the audit would compare on. Two physically-identical definitions collapse,
+    but a 30 kW pump and a 75 kW pump (genuinely different) do NOT — and two DISTINCT
+    not-found requirements never collapse just because they share the 'requirement stated'
+    fulfilment placeholder."""
+    noun = _norm_name(r.get("requirement") or r.get("name_human") or r.get("part"))
+    # If the identity field is a fulfilment placeholder (or empty), DON'T risk a merge.
+    if not noun or noun in _PLACEHOLDER_NOUNS:
+        return ("", "")
     spec = ""
     for k in ("spec", "rating_primary", "capacity", "form", "model", "part_number"):
         v = r.get(k)
@@ -617,6 +634,30 @@ def _selftest() -> int:
     res2 = repair_dossier(clean_state, clean_rows, run_dir="/nonexistent-run-dir-xyz")
     expect(res2.iterations == 0, f"clean-of-fixable bill needs 0 repair passes, got {res2.iterations}")
     expect(res2.rows == before, "clean bill must be left byte-identical (no spurious mutation)")
+
+    # ---- NOT-FOUND placeholder guard (Codema 2026-06-26) ----------------------
+    # Distinct NOT-FOUND requirements all carry part="requirement stated" — the dedup
+    # must key on the REQUIREMENT (identity), NOT that placeholder, or it collapses
+    # physically-distinct lines into ONE with the SUMMED qty (the £2.77M phantom panel:
+    # an Electrical Control Panel + an RO membrane qty 3463 + others merged → qty 3469).
+    nf_rows = [
+        {"tag": "X-1", "requirement": "Electrical Control Panel", "status": "NOT FOUND",
+         "part": "requirement stated", "qty": 1, "unit_gbp": 800, "line_gbp": 800},
+        {"tag": "F-1", "requirement": "RO Membrane · 364 m² area", "status": "NOT FOUND",
+         "part": "requirement stated", "qty": 3463, "unit_gbp": 12, "line_gbp": 41556},
+        {"tag": "I-1", "requirement": "SCADA Plant Control System", "status": "NOT FOUND",
+         "part": "requirement stated", "qty": 5, "unit_gbp": 600, "line_gbp": 3000},
+    ]
+    res3 = repair_dossier(clean_state, [dict(r) for r in nf_rows],
+                          run_dir="/nonexistent-run-dir-xyz")
+    nf_principals = [r for r in res3.rows if _is_principal(r)]
+    expect(len(nf_principals) == 3,
+           f"3 DISTINCT not-found requirements must NOT collapse on the 'requirement stated' "
+           f"placeholder, got {len(nf_principals)}: {[_row_noun(r)[:24] for r in nf_principals]}")
+    panel = [r for r in nf_principals if "control panel" in _row_noun(r).lower()]
+    expect(panel and _num(panel[0].get("qty")) == 1,
+           f"the Electrical Control Panel must keep qty 1 (no summed phantom), got "
+           f"{panel and panel[0].get('qty')}")
 
     if failures:
         print("SELFTEST FAILED:")
