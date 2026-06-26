@@ -8,7 +8,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
       currently have none: ⭐ Scorecard, Render interior layout (×3 views), Render building exterior (×4),
       GA, P&ID, BFD, Single-line, HVAC, Isometric (201/202/203), ⚠ Checks, ⚠ Audit. The per-tab scorecard
       only scores ~16 data tabs today; it must cover the WHOLE workbook (37 sheets). **→ dossier_audit + build-excel**
-- [ ] **X2 — a quality banner must be HONEST (no false PASS).** Overview shows 10/10 PASS while rows
+- [~] **X2 (Overview+Conn-trace DONE; rest of false-pass audit ongoing) — a quality banner must be HONEST (no false PASS).** Overview shows 10/10 PASS while rows
       17–21 visibly show failures; Connection-trace shows status "OK" but it's HARD-CODED, not computed.
       A green score over visible failures is the fake-8 again. **→ make each tab's check read the real cell state**
 - [ ] **X3 — TAB ORDER must be logical (said several times):** Brief → Inputs & Assumptions → Calculations
@@ -26,7 +26,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
 - [ ] E1 — the ⭐ Scorecard tab itself has NO tab-quality check; add one for consistency (every tab incl. this).
 
 ## OVERVIEW
-- [ ] O1 — shows 10/10 PASS but rows 17–21 contain a bunch of FAILURES. The 10/10 is FALSE — the score
+- [x] O1 (FIXED commit) — shows 10/10 PASS but rows 17–21 contain a bunch of FAILURES. The 10/10 is FALSE — the score
       must reflect the failures shown on the tab. **→ Overview check must read those rows**
 
 ## BRIEF
@@ -127,7 +127,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
       (the benchmark net), and whether they're CONNECTED/agree. It must be shown in the dossier. **→ surface state.benchmarkDivergence**
 
 ## CONNECTION TRACE — 10/10
-- [ ] CT1 — status shows "OK" but it's HARD-CODED. It must be COMPUTED (OK only if a real check passes),
+- [x] CT1 (FIXED commit — invariant now routes to Connection-trace) — status shows "OK" but it's HARD-CODED. It must be COMPUTED (OK only if a real check passes),
       not a literal. **→ compute connection status**
 
 ## PART NAMES
