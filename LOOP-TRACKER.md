@@ -75,6 +75,29 @@ of Risk. THEN: P&ID/BFD empty generators (BoM), connection-trace fluid-in+out + 
 6/290 invariants. (Risk now also has a NEW physics-critic note ON the correct 90 pump — verify it's not a
 false flag on the now-right design.)
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-26 v14 — 12/16 DATA TABS ≥8; design MEETS brief; remaining 4 = GENERATION layer)
+═══════════════════════════════════════════════════════════════════════════════
+MILESTONE: 12/16 data tabs genuine ≥8 (was 11; Exec Summary 0→≥8). The matcher fixes this session made the
+ENGINE HONESTLY RECOGNISE that the design MEETS the brief (pump 90/storage 120/fert 90):
+  • deterministic_checks_lib brief-target invariant: _ufam folds #86 unit-notation (m3/hr≡m³/h); never binds
+    a dimensioned metric to a *_count; MEET-OR-EXCEED (≥) not equality → 7/7 brief targets PASS (was 4/7).
+  • dossier_audit _contract_match Pass 4 SUBJECT-anchored: a met DEMAND named differently from its DELIVERY
+    binds (irrigation 'demand' 45 ↔ delivered 'pump_flow' 90) → removed the last Exec false-UNVERIFIED.
+  Both committed + selftest-green. These are SCORING-layer (apply to any state, verified OFFLINE on v14 —
+  no chain run needed to iterate the matcher).
+REMAINING 4 (all GENERATION-layer — need a chain run to verify, deeper engineering):
+  • Connection trace 2 + Overview 6 (SAME 2 invariants): topology gap — only 18/27 process parts have BOTH a
+    fluid IN and OUT in connection-schedule.json (66.7% < 80% threshold) + 3 parts missing a required
+    connection. FIX: the connection-topology generator must wire every process part's inlet+outlet (OR, if
+    terminal parts like a final drain legitimately have one side, relax the invariant for true terminals).
+    Verify FIRST whether it's a real gap or terminal-part false-positive (offline: inspect connection-schedule).
+  • BoM 6: P&ID 0/47 + BFD 0/21 EMPTY generators (#101 Stage-3 build-out — the dominant BoM blocker).
+  • Risk 6: physics-critic HIGHs (X6) — incl. a NEW note on the now-correct 90 pump; verify not a false flag.
+NEXT: (1) connection-topology in+out (offline-triage first); (2) P&ID/BFD generators; (3) Risk closure. The
+SIZING + COMPLIANCE are DONE and honest — what's left is drawing/topology GENERATION + physics-critic closure.
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
