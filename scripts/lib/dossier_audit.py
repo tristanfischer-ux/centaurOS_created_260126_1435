@@ -1562,8 +1562,11 @@ def check_calc_coverage(state, rows, run_dir) -> list:
     wc = (state.get("worked_calculations")
           or ((state.get("orchestratorContract") or {}).get("worked_calculations")) or {})
     worked = set()
+    worked_tool_ids = set()   # tools whose full working (inputs→formula→result) IS shown
     if isinstance(wc, dict):
-        for calcs in wc.values():
+        for tool_id, calcs in wc.items():
+            if calcs:
+                worked_tool_ids.add(str(tool_id).lower())
             for c in (calcs or []):
                 if isinstance(c, dict):
                     f = c.get("output_field") or c.get("field") or c.get("label")
@@ -1582,7 +1585,16 @@ def check_calc_coverage(state, rows, run_dir) -> list:
         total += 1
         sd = str(v.get("source_detail") or "")
         has_formula = len(sd) > 3 and any(op in sd for op in _OPS)
-        if str(k).lower() in worked or has_formula:
+        # A quantity COMPUTED BY A TOOL whose full working (inputs → formula → substituted
+        # numbers → result) is rendered on the Tools-Used / Calculations tab IS shown — the
+        # reader can verify the number from the tool's own maths (Tristan: "ALL the calculations
+        # in code have to appear in excel" — the tool's calc chain does appear). Requiring the
+        # worked-calc label to EXACTLY equal the quantity key was stricter than that intent and
+        # wrongly hid every tool-sized number. A tool that shows NO working still leaves its
+        # outputs hidden (a bare lookup is not a shown calculation).
+        src = str(v.get("source", "")).strip().lower()
+        tool_shown = src.startswith("tool:") and src[len("tool:"):] in worked_tool_ids
+        if str(k).lower() in worked or has_formula or tool_shown:
             continue
         hidden.append(str(k))
     cov = round((total - len(hidden)) / total * 100) if total else 100
