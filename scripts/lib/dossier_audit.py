@@ -1618,6 +1618,41 @@ def check_calc_coverage(state, rows, run_dir) -> list:
     return out
 
 
+def check_overview_invariants(state, rows, run_dir) -> list:
+    """The Overview tab DISPLAYS the deterministic arithmetic invariants (the SAME
+    deterministic_checks_lib.run_all_checks the ⚠ Checks tab renders, summarised as
+    'N/M pass · K FAIL'). Its score MUST reflect them — a tab cannot show a green 10/10
+    while it renders failing invariants (Tristan 2026-06-27: Overview 10/10 over rows 17-21
+    FAILs is the fake-8 again). One finding, severity scaled by the fail count; routed to
+    Overview so its banner drops until the invariants are fixed at source."""
+    tab = "Overview"
+    out: list = []
+    try:
+        import sys as _sys
+        _sdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")  # scripts/
+        if _sdir not in _sys.path:
+            _sys.path.insert(0, _sdir)
+        import deterministic_checks_lib as _dcl  # noqa: N813
+        checks = _dcl.run_all_checks(run_dir, state)
+    except Exception:  # noqa: BLE001 — never break scoring on the optional invariant lib
+        return out
+    if not checks:
+        return out
+    fails = [c for c in checks if str(getattr(c, "status", "")).upper() == "FAIL"]
+    if fails:
+        names = "; ".join(str(getattr(c, "name", ""))[:46] for c in fails[:4])
+        out.append(Finding(
+            tab=tab, check="overview_invariant_fail",
+            severity="HIGH" if len(fails) >= 2 else "MED",
+            message=(f"{len(fails)} of {len(checks)} deterministic invariants FAIL — shown ON the Overview "
+                     f"({len(checks) - len(fails)}/{len(checks)} pass · {len(fails)} FAIL): {names}"),
+            actual=f"{len(fails)} invariant(s) FAIL",
+            expected="every deterministic invariant passes (the Overview cannot be a green 10/10 over visible failures)",
+            source_rule="fix each failing invariant at SOURCE (arithmetic reconciliation / brief-target / ledger completeness) — see deterministic_checks_lib.run_all_checks",
+        ))
+    return out
+
+
 def check_provenance(state, rows, run_dir) -> list:
     """The TRACEABILITY SPINE, surfaced in the dossier (Tristan 2026-06-25): every number must
     trace to the brief via a tool/formula. Flags quantities with NO recorded origin (appear
@@ -1826,6 +1861,7 @@ _CHECKS = [
     check_line_velocity,
     check_panel_schedule,
     check_glossary,
+    check_overview_invariants,   # Overview score must reflect the failing invariants it displays
     check_drawing_coverage,
     check_physics_critic,
     check_economics,
