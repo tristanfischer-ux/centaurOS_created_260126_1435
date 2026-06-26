@@ -118,7 +118,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
 
 ## ⚠ CHECKS
 - [x] CH1 (banner DONE) — needs a tab-quality number. **→ X1**
-- [ ] CH2 — the live-input column on the RIGHT does not line up with the rows BELOW (ROW MISALIGNMENT,
+- [x] CH2 (FIXED — live inputs now on the check row) — the live-input column on the RIGHT does not line up with the rows BELOW (ROW MISALIGNMENT,
       data shifted) — **raised many times** — fix the alignment. **→ build-excel Checks layout**
 
 ## ⚠ AUDIT (dossier self-audit)

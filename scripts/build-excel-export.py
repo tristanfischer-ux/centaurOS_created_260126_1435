@@ -1326,18 +1326,21 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
                         ws.cell(r, col).fill = FILL_FAIL
                     r += 1
                 continue  # N/A, or static-fail already rendered — nothing live
-            data_r += 1
-            # --- hidden editable data cells ---
-            ws.cell(data_r, 10, c.name)
+            data_r += 1   # retained for the return signature only; inputs now live on row r
+            # --- editable data cells, ON THE SAME VISIBLE ROW as the check (CH2, Tristan 2026-06-27:
+            #     the right-hand live-input column must LINE UP with its check row — it used to sit on a
+            #     separate `data_r` block that advances only on live rows, so it drifted UP past every
+            #     family banner / spacer / static-fail row and no longer matched the rows below it). ---
+            ws.cell(r, 10, c.name)
             if c.a_factors is not None:
                 per_unit, count = c.a_factors
-                ws.cell(data_r, 11, per_unit).fill = FILL_INPUT      # K = per-unit
-                ws.cell(data_r, 13, count).fill = FILL_INPUT         # M = count
-                actual_formula = f"=${data_col_a}${data_r}*$M${data_r}"
+                ws.cell(r, 11, per_unit).fill = FILL_INPUT      # K = per-unit
+                ws.cell(r, 13, count).fill = FILL_INPUT         # M = count
+                actual_formula = f"=${data_col_a}${r}*$M${r}"
             else:
-                ws.cell(data_r, 11, c.actual).fill = FILL_INPUT      # K = actual
-                actual_formula = f"=${data_col_a}${data_r}"
-            ws.cell(data_r, 12, c.expected).fill = FILL_INPUT        # L = expected
+                ws.cell(r, 11, c.actual).fill = FILL_INPUT      # K = actual
+                actual_formula = f"=${data_col_a}${r}"
+            ws.cell(r, 12, c.expected).fill = FILL_INPUT        # L = expected
 
             # A COST check tagged relation="eq" with tol==0 is decided by the lib as a
             # RATIO BAND (unit price within xN of its reference), NOT an equality —
@@ -1349,7 +1352,7 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
             ws.cell(r, 1, c.name).border = BORDER
             ws.cell(r, 1).alignment = WRAP_TOP
             ws.cell(r, 2, actual_formula).border = BORDER
-            ws.cell(r, 3, f"=$L${data_r}").border = BORDER
+            ws.cell(r, 3, f"=$L${r}").border = BORDER
             ws.cell(r, 4, f"=B{r}-C{r}").border = BORDER
             ws.cell(r, 5, tol_cell_val).border = BORDER
             # STATUS formula chosen to MIRROR the lib's own decision (see docstring)
