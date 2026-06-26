@@ -670,7 +670,24 @@ def main() -> int:
         # its own fluid in+out is a false orphan (the PSV on a reactor reads "no upstream"
         # because the relief tap is not drawn as a process line). Universal role keywords.
         "relief valve", "safety valve", "pressure-relief", "pressure relief", "psv",
-        "rupture disc", "bursting disc", "vacuum breaker", "breather valve", "vent valve"}
+        "rupture disc", "bursting disc", "vacuum breaker", "breather valve", "vent valve",
+        # PNEUMATIC ACTUATORS / ACTUATED VALVES are FINAL-CONTROL elements on a line (the same role as
+        # the already-exempt "control valve"/"solenoid") — not flow-through nodes. SAMPLE valves are
+        # DEAD-LEG taps (like a PSV). MEMBRANE ELEMENTS are the internal media of a membrane bank/skid
+        # (the bank is the process node; its elements are sub-components). Requiring each to carry its
+        # own fluid in+out is a false orphan that deflated water_treatment coverage to 67 % (2026-06-26).
+        "pneumatic actuat", "actuated valve", "actuator", "sample valve", "sample point",
+        "membrane element", "membrane elements", "ro membrane element",
+        # CHECK / NON-RETURN valves are inline final elements (like a control valve), not flow-through
+        # nodes. MEMBRANE HOUSINGS / pressure-vessel tubes are the RO/UF SKID's sub-components (the skid
+        # is the process node). "ro membrane" (the membrane stack itself) is internal to the skid too.
+        "check valve", "non-return", "nrv", "membrane housing", "membrane housings",
+        "pressure vessel housing", "ro membrane", "uf membrane", "membrane bank",
+        # CHEMICAL STOCK / DAY / DOSING tanks (A/B fertiliser concentrate, acid, caustic, nutrient) are
+        # filled by EXTERNAL DELIVERY (drums / IBC / manual top-up), NOT a piped process line — they are
+        # a process-fluid SOURCE with an output to the dosing pump and no piped INPUT. Requiring a piped
+        # fluid input is a false orphan (the fill is off-system). Universal for any chemical day-tank.
+        "nutrient tank", "stock tank", "day tank", "concentrate tank", "dosing tank", "chemical tank"}
 
     connectivity_concerns = []
     origin_parts = []
