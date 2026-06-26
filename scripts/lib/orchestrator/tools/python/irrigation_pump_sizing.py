@@ -67,11 +67,37 @@ def compute(payload: dict) -> dict:
     pipe_length_m = float(payload.get("pipe_length_m", 50))
     pipe_diameter_mm = float(payload.get("pipe_diameter_mm", 25))
 
-    # Total flow
-    total_flow_lph = n_emitters * flow_per_emitter_lph
+    # Total flow — the GREATER of the emitter-summed flow and the stated PEAK DEMAND.
+    # An ebb/flow (flood/drain) bench system is NOT a sum of drip emitters: its pump must
+    # deliver the peak FLOOD rate the brief specifies (Codema 45 m³/h per department). When
+    # the orchestrator passes the irrigation demand (target_flow_m3_h / peak_flow_m3_h /
+    # irrigation_demand_m3_h), the pump is floored to it so it can NEVER be undersized vs the
+    # demand it exists to meet (Codema 2026-06-26: the emitter model sized 12 m³/h against a
+    # 45 m³/h demand → a guaranteed brief FAIL). Universal: a stated demand always wins.
+    emitter_flow_m3_h = n_emitters * flow_per_emitter_lph / 1000.0
+    target_flow_m3_h = float(
+        payload.get("target_flow_m3_h")
+        or payload.get("peak_flow_m3_h")
+        or payload.get("irrigation_demand_m3_h")
+        or payload.get("demand_m3_h")
+        or 0.0
+    )
+    total_flow_m3_h = max(emitter_flow_m3_h, target_flow_m3_h)
+    total_flow_lph = total_flow_m3_h * 1000.0
     total_flow_lpm = total_flow_lph / 60.0
-    total_flow_m3_h = total_flow_lph / 1000.0
     flow_q_lps = total_flow_lpm / 60.0  # L/s
+
+    # AUTO-SIZE the pipe to the flow (keep velocity ≤ 2.0 m/s — the standard ceiling for a
+    # liquid suction/delivery main; > 2.5 m/s erodes + hammers). A pump tool must never run
+    # its own design flow through an undersized default pipe: 45 m³/h through the 25 mm default
+    # gives 25 m/s and an absurd friction head/power (Codema 2026-06-26). Round UP to the next
+    # standard DN. Universal — the chosen diameter never goes below the caller's stated pipe.
+    _STD_DN_MM = [15, 20, 25, 32, 40, 50, 65, 80, 100, 125, 150, 200, 250, 300, 350, 400]
+    _q_m3_s_pre = total_flow_m3_h / 3600.0
+    _min_area = _q_m3_s_pre / 2.0                      # area for v = 2.0 m/s
+    _min_d_mm = math.sqrt(4.0 * _min_area / math.pi) * 1000.0 if _min_area > 0 else 0.0
+    _dn_for_flow = next((d for d in _STD_DN_MM if d >= _min_d_mm), _STD_DN_MM[-1])
+    pipe_diameter_mm = max(pipe_diameter_mm, _dn_for_flow)
 
     # Pressure loss conversion: 1 kPa = 0.102 m water column
     h_emitter = pressure_loss_kpa * 0.102
