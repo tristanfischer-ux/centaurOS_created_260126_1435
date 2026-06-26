@@ -84,7 +84,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
 
 ## RENDER — INTERIOR LAYOUT (view / top / view-2)  [3 sheets]
 - [x] RI1 (banner DONE) — NO tab-quality number on any of them — add one. **→ X1**
-- [ ] RI2 — image is a MASS of very fine blue wires everywhere + lots of tiny identical little boxes /
+- [~] RI2 (SIGHT: litter now DETECTED + scores render 0/FAIL; generator fix pending) — image is a MASS of very fine blue wires everywhere + lots of tiny identical little boxes /
       valves / tanks. Suspect default-sized objects littered across the scene. Identify what they are; a
       cabinet's internals should be IN the cabinet, not scattered. **→ Blender scene / object sizing**
 
@@ -92,7 +92,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
 - [x] RE1 (banner DONE) — needs a tab-quality number (generally looks fine). **→ X1**
 
 ## GA — GENERAL ARRANGEMENT
-- [ ] GA1 — masses of tiny little components all over the place. **→ object sizing**
+- [~] GA1 (SIGHT: litter now DETECTED + scores GA 0/FAIL; generator fix pending) — masses of tiny little components all over the place. **→ object sizing**
 - [ ] GA2 — **CRITICAL**: the GA (top) and the Render interior-layout (top) show COMPLETELY DIFFERENT
       arrangements despite BOTH being top views — they must be the SAME layout. **→ one layout source feeds both**
 

@@ -44,6 +44,7 @@ run "requirements_bom.py --selftest"          "$PY" scripts/requirements_bom.py 
 run "build-excel-export.py --selftest"        "$PY" scripts/build-excel-export.py --selftest
 run "dossier_audit.py --selftest"            "$PY" scripts/lib/dossier_audit.py --selftest
 run "dossier_repair.py --selftest"            "$PY" scripts/lib/dossier_repair.py --selftest
+run "manifest_sight.py --selftest"            "$PY" scripts/lib/manifest_sight.py --selftest
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest

@@ -187,6 +187,26 @@ def _ledger_coverage(run_dir: str) -> dict:
     return cov
 
 
+_LITTER_CACHE: dict = {}
+
+
+def _manifest_litter(run_dir: str):
+    """SIGHT: default-size litter score for the delivered parts-manifest (cached). The engine reading
+    its OWN rendered geometry — a render/GA tab can't be a genuine ≥8 while most objects are default
+    boxes (Tristan saw 'tiny identical boxes')."""
+    if run_dir in _LITTER_CACHE:
+        return _LITTER_CACHE[run_dir]
+    res = None
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
+        import manifest_sight as _ms
+        res = _ms.litter_from_path(os.path.join(run_dir, "parts-manifest.json"))
+    except Exception:  # noqa: BLE001
+        res = None
+    _LITTER_CACHE[run_dir] = res
+    return res
+
+
 def _aux_tab_score(title: str, run_dir: str):
     """A deterministic quality score for a DRAWING / RENDER / META sheet that the per-tab scorecard
     (the 16 data tabs) doesn't cover — so EVERY sheet shows a quality number (Tristan 2026-06-27).
@@ -217,15 +237,33 @@ def _aux_tab_score(title: str, run_dir: str):
         return _cov("pid", "P&ID")
     if "block flow" in t or "bfd" in t:
         return _cov("block-flow-diagram", "Block-flow")
+    def _cap_litter(base):
+        """A render / GA drawing reflects the parts-manifest geometry, so default-size LITTER caps its
+        score — it cannot be a genuine ≥8 while most objects are default boxes (SIGHT)."""
+        if not isinstance(base, dict):
+            return base
+        lit = _manifest_litter(run_dir)
+        if isinstance(lit, dict) and isinstance(lit.get("score"), (int, float)) and lit["score"] < (base.get("score") or 10):
+            w = lit.get("worst") or {}
+            base["score"] = lit["score"]
+            base["status"] = "PASS" if lit["score"] >= 8 else "FAIL"
+            base["issues"] = ([f"default-size LITTER: {lit['litter_parts']}/{lit['parts']} parts "
+                               f"({int(lit['litter_ratio']*100)}%) share a default box — worst: "
+                               f"{w.get('n_distinct','?')} distinct parts @ {w.get('dims','?')} "
+                               f"(e.g. {', '.join((w.get('examples') or [])[:3])}); the geometry "
+                               f"generator must derive real per-part dims"] + (base.get("issues") or []))[:6]
+            base["fix"] = "geometry generator must size each part from its real dims, not a shared default box"
+        return base
+
     if "general arrangement" in t or t.startswith("ga "):
-        return _cov("general-arrangement", "GA")
+        return _cap_litter(_cov("general-arrangement", "GA"))
     if "single-line" in t or "single line" in t:
         return _cov("single-line-diagram", "Single-line")
     if "isometric" in t:
         return _cov("isometric-index", "Isometric")
     if "render" in t or "interior layout" in t or "building exterior" in t:
-        return _cov("blender", "Render",
-                    advisory="ADVISORY: object-level visual quality (sizing / scatter / GA-vs-render consistency) is an OPEN check — coverage proxy only")
+        return _cap_litter(_cov("blender", "Render",
+                    advisory="ADVISORY: object-level visual quality (scatter / GA-vs-render consistency) is a partial check"))
     if "checks" in t:  # ⚠ Checks — deterministic-invariant pass rate
         try:
             import deterministic_checks_lib as _dcl
