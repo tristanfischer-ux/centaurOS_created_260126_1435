@@ -276,13 +276,49 @@ def _product_class(state) -> str:
     ).strip().lower()
 
 
+# Quantities whose NAME echoes the brief's REQUESTED value (the requirement), not the
+# design's ACHIEVED/DELIVERED value. Matching a brief metric against one of these is a
+# guaranteed false PASS (e.g. irrigation_demand_m3_h=90 is the REQUIREMENT; the design
+# only DELIVERS irrigation_pump_flow_m3_h=12 — matching the demand hides the undersized
+# pump). Excluded from the token-subset pass so the honest verdict (FAIL) surfaces.
+_ECHO_NAME_TOKENS = {"requested", "request", "target", "brief", "spec",
+                     "demand", "required", "setpoint"}
+# Tokens carrying no engineering identity — dropped before token-overlap matching.
+_MATCH_STOP_TOKENS = {
+    "the", "of", "per", "system", "total", "design", "rated", "nominal",
+    "max", "min", "peak", "avg", "mean",
+    # unit / rate tokens that survive _norm_name on compound names (…_m3_per_hr, …_count)
+    "m3", "m2", "m", "h", "hr", "hrs", "day", "yr", "year", "s",
+    "kw", "kwh", "kva", "kv", "v", "a", "kg", "t", "l",
+    "count", "nr", "no", "qty", "ea", "off", "unit", "units", "pcs", "number",
+}
+
+
+def _singularise(tok: str) -> str:
+    """Fold a trailing plural so containers ≡ container, valves ≡ valve."""
+    return tok[:-1] if len(tok) > 3 and tok.endswith("s") and not tok.endswith("ss") else tok
+
+
+def _name_tokens(name) -> set:
+    """Engineering-identity tokens of a name: normalised, unit/stop tokens dropped,
+    plurals folded. Used for the token-subset compliance match."""
+    base = _norm_name(name)
+    return {_singularise(t) for t in base.split("_") if t and t not in _MATCH_STOP_TOKENS}
+
+
 def _contract_match(state, metric_name, metric_unit):
     """
-    Return (key, value) of a contract quantity whose normalised name matches the
-    metric's normalised name and is in the SAME unit family, else (None, None).
-    This is the deterministic "would the brief-compliance matcher find it" oracle.
-    Tries EXACT name first, then a synonym-folded match (usable_energy ↔
-    usable_capacity) so the matcher does not miss interchangeable engineering nouns.
+    Return (key, value) of a contract quantity that FULFILS the brief metric (same unit
+    family, matching name), else (None, None). This is the deterministic "would the
+    brief-compliance matcher find it" oracle. Three passes, most-specific first:
+      1. EXACT normalised-name match in the same family.
+      2. SYNONYM-folded match (usable_energy ↔ usable_capacity).
+      3. TOKEN-SUBSET match in the same family — the brief's identity tokens are covered
+         by a quantity's tokens (cultivation_containers ↔ cultivation_container_count,
+         ro_permeate_capacity_m3_per_hr ↔ ro_permeate_capacity_m3_h). Requirement-ECHO
+         quantities (…_demand / …_target) are EXCLUDED so a brief metric matches the
+         DELIVERED quantity (irrigation_pump_flow), never the requirement it restates —
+         which keeps a genuine miss honest (a FAIL, not a manufactured PASS).
     """
     fam = _unit_family(metric_unit)
     target = _norm_name(metric_name)
@@ -304,6 +340,29 @@ def _contract_match(state, metric_name, metric_unit):
             qfam = _unit_family(v.get("unit"))
             if _norm_name_syn(k) == target_syn and (fam == "" or qfam == "" or qfam == fam):
                 return (k, v.get("value"))
+    # Pass 3: token-subset match in the same family, echoes excluded.
+    b_tokens = _name_tokens(metric_name)
+    if b_tokens:
+        need = max(1, (len(b_tokens) + 1) // 2)  # at least half the brief's tokens covered
+        best = None  # (-overlap, peak_penalty, extra_tokens, key, value)
+        for k, v in _quantities(state).items():
+            if not isinstance(v, dict):
+                continue
+            if set(_norm_name(k).split("_")) & _ECHO_NAME_TOKENS:
+                continue  # requirement-echo → would manufacture a false PASS
+            qfam = _unit_family(v.get("unit"))
+            if not (fam == "" or qfam == "" or qfam == fam):
+                continue
+            q_tokens = _name_tokens(k)
+            overlap = len(b_tokens & q_tokens)
+            if overlap < need:
+                continue
+            penalty = 1 if re.search(r"peak|max|surge|inrush", str(k).lower()) else 0
+            cand = (-overlap, penalty, len(q_tokens - b_tokens), k, v.get("value"))
+            if best is None or cand < best:
+                best = cand
+        if best is not None:
+            return (best[3], best[4])
     return (None, None)
 
 
@@ -454,49 +513,20 @@ def check_capex_by_category(state, rows, run_dir) -> list:
 # --------------------------------------------------------------------------- #
 
 def _would_show_unverified(state, m) -> bool:
-    """A brief metric renders UNVERIFIED when no contract quantity matches it by
-    (same unit family AND same normalised name). We reuse the *strict* family+name
-    oracle; if the strict oracle finds a match the renderer's looser matcher might
-    still miss it (e.g. MWh metric vs kWh quantity → different unit token, same
-    family) — that mismatch is exactly the gap this check surfaces."""
+    """A brief metric renders UNVERIFIED iff NO contract quantity fulfils it. The
+    rendered compliance table and this oracle share ONE matcher (`_contract_match` —
+    family + synonym + token-subset, requirement-echoes excluded), so the table and the
+    score never disagree (the old split — strict oracle here, looser matcher in the
+    renderer — produced phantom 'matcher gap' findings on metrics that genuinely match,
+    e.g. ro_permeate_capacity_m3_per_hr ↔ ro_permeate_capacity_m3_h). Retired the
+    separate compliance_matcher_gap check: with one matcher the gap is closed by
+    construction (a divergence between the two file-level implementations is now a
+    cross-file consistency concern, not a per-metric finding)."""
     name = _metric_name(m)
-    unit = m.get("unit")
-    fam = _unit_family(unit)
-    target = _norm_name(name)
-    if not target:
+    if not name:
         return False
-    # The naive renderer matches on EXACT unit token, not family.
-    nu = _norm_unit(unit)
-    for k, v in _quantities(state).items():
-        if not isinstance(v, dict):
-            continue
-        if _norm_name(k) == target and _norm_unit(v.get("unit")) == nu:
-            return False  # exact-unit match → renderer verifies it
-    # No exact-unit match → renderer shows UNVERIFIED.
-    return True
-
-
-def check_brief_compliance(state, rows, run_dir) -> list:
-    tab = "Exec Summary / Checks"
-    out: list = []
-    for m in _brief_metrics(state):
-        name = _metric_name(m)
-        if not name:
-            continue
-        if not _would_show_unverified(state, m):
-            continue
-        # Renderer would show UNVERIFIED; does a same-FAMILY same-name quantity exist?
-        qk, qv = _contract_match(state, name, m.get("unit"))
-        if qk is not None:
-            out.append(Finding(
-                tab=tab, check="compliance_matcher_gap", severity="HIGH",
-                message=(f"brief metric '{name}' shows UNVERIFIED but contract quantity "
-                         f"'{qk}'={qv} exists in the same family (matcher gap)"),
-                actual=f"{name} UNVERIFIED",
-                expected=f"matched to {qk}={qv}",
-                source_rule="brief-compliance matcher must match across unit-family (MWh↔kWh), not exact unit token",
-            ))
-    return out
+    qk, _ = _contract_match(state, name, m.get("unit"))
+    return qk is None
 
 
 # --------------------------------------------------------------------------- #
@@ -1593,7 +1623,6 @@ def check_provenance(state, rows, run_dir) -> list:
 _CHECKS = [
     check_bom,
     check_capex_by_category,
-    check_brief_compliance,
     check_cross_tab,
     check_drawing_coverage,
     check_physics_critic,
@@ -1863,8 +1892,10 @@ def _selftest() -> int:
     expect("line_math" in checks, "A: expected line_math HIGH")
     expect("zero_principal" in checks, "A: expected zero_principal MED")
     expect("capex_category_coverage" in checks, "A: expected capex_category_coverage HIGH (conn £500 << grand)")
-    expect("compliance_matcher_gap" in checks, "A: expected compliance_matcher_gap HIGH (MWh vs kWh)")
-    expect("cross_tab_value" in checks, "A: expected cross_tab_value HIGH")
+    # compliance_matcher_gap RETIRED — the renderer + score now share ONE matcher
+    # (_contract_match), so a metric that matches cross-unit-family (MWh↔kWh) is a clean
+    # PASS, never a 'gap'. cross_tab_value has its own focused fixture (H) below.
+    expect("compliance_matcher_gap" not in checks, "A: compliance_matcher_gap is retired (one matcher)")
     expect("ledger_present" in checks, "A: expected ledger_present MED (no parts-ledger.json)")
     expect("unresolved_high_physics" in checks, "A: expected unresolved_high_physics HIGH (2 highs)")
     expect("installed_capex" in checks, "A: expected installed_capex HIGH (£0)")
@@ -2017,6 +2048,22 @@ def _selftest() -> int:
                "F: expected phantom_reference HIGH for 'cabinets'")
         expect(not any("Motor" in f.message for f in phantoms),
                "F: must NOT flag the resolvable 'Motor B' reference")
+
+    # ---- Fixture H: cross-tab — UNVERIFIED on compliance but computed in headline --
+    # A metric with NO fulfilling contract quantity (so the compliance table shows
+    # UNVERIFIED) whose value nonetheless appears in keyMetrics.headline_output must
+    # raise cross_tab_value (the two tabs disagree). Guards the surviving check after
+    # compliance_matcher_gap was retired.
+    xtab_state = {
+        "orchestratorContract": {"product_class": "widget", "quantities": {}},  # nothing to match
+        "parsedBrief": {"product_class": "widget", "constraints": {"target_performance": {"metrics": [
+            {"key_metric": "throughput_units", "value": 1000, "unit": "units"},
+        ]}}},
+        "keyMetrics": {"headline_output": {"id": "throughput_units", "value": "1000", "unit": "units"}},
+    }
+    repx = audit_dossier(xtab_state, [], run_dir="/nonexistent-run-dir-xyz")
+    expect(any(f.check == "cross_tab_value" for f in repx.findings),
+           "H: expected cross_tab_value (UNVERIFIED on compliance, computed in headline)")
 
     # ---- Fixture G: HONEST SCORING — every UNVERIFIED metric is its own HIGH ----
     # Tristan 2026-06-26: "a pass is good — unverified and fail are bad"; "if you can't

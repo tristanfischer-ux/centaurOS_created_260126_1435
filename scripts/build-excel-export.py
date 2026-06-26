@@ -2859,6 +2859,17 @@ def _unit_family(unit: str) -> Tuple[str, float]:
         # volume -> canonical m3
         "m3": ("volume_m3", 1.0), "litre": ("volume_m3", 0.001),
         "l": ("volume_m3", 0.001), "litres": ("volume_m3", 0.001),
+        # volumetric flow -> canonical m3/h (a brief metric in m3/hr must match a
+        # contract quantity in m3/h / m³/h — the slash/spelling must not split them)
+        "m3/h": ("flow_m3h", 1.0), "m3/hr": ("flow_m3h", 1.0), "m3perhr": ("flow_m3h", 1.0),
+        "m3/hour": ("flow_m3h", 1.0), "m3ph": ("flow_m3h", 1.0),
+        "l/h": ("flow_m3h", 0.001), "lph": ("flow_m3h", 0.001),
+        "l/s": ("flow_m3h", 3.6), "lps": ("flow_m3h", 3.6),
+        # count / quantity -> canonical count (a "count"-unit metric must match a
+        # contract quantity whose name is a …_count even when it carries no unit token)
+        "count": ("count", 1.0), "nr": ("count", 1.0), "no": ("count", 1.0),
+        "qty": ("count", 1.0), "ea": ("count", 1.0), "off": ("count", 1.0),
+        "pcs": ("count", 1.0), "pieces": ("count", 1.0), "#": ("count", 1.0),
         # density -> canonical kg/m3
         "kg/m3": ("density", 1.0), "g/l": ("density", 1.0),
         # time / cycle -> canonical days
@@ -2916,6 +2927,18 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[
     b_norm = _norm_qty_name(b_key)
     b_tokens = set(t for t in re.findall(r"[a-z]+", b_norm) if t not in _QTY_STOP_TOKENS)
 
+    def _fam_ok(a_fam: str, qname: str) -> bool:
+        """Same unit family, OR a COUNT metric vs a count-named unitless quantity
+        (a …_count / …_qty quantity carries no unit token so its family reads as
+        'ratio'/unknown — match it by the count noun in its name, gated by the
+        token-overlap test below)."""
+        if a_fam == b_fam:
+            return True
+        if b_fam == "count":
+            return (a_fam in ("count", "ratio") or a_fam.startswith("?")) and \
+                   bool(re.search(r"(count|qty|number|_nr|valves?|containers?|units?)$", qname.lower()))
+        return False
+
     # (1) exact / unit-normalised NAME match — the achieved quantity of the SAME name (no echoes)
     for qname, qv in quantities.items():
         if not isinstance(qv, dict) or any(e in qname.lower() for e in _ECHO_SUFFIXES):
@@ -2924,28 +2947,31 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[
         if a_val is None:
             continue
         a_fam, _ = _unit_family(qv.get("unit", ""))
-        if a_fam != b_fam:
+        if not _fam_ok(a_fam, qname):
             continue
         if qname.lower() == b_key or _norm_qty_name(qname) == b_norm:
             return qname, a_val, qv.get("unit", "")
 
-    # (2) same-family, best NAME-TOKEN overlap (NOT target-closeness), echoes + peak/max penalised
+    # (2) same-family, best NAME-TOKEN overlap (NOT target-closeness). Requirement-ECHO
+    # quantities (…_demand / …_target) are EXCLUDED — not merely penalised — so a brief
+    # metric matches the DELIVERED quantity (irrigation_pump_flow=12), never the
+    # requirement it restates (irrigation_demand=90); matching the demand would
+    # manufacture a false PASS and hide an undersized design. Mirrors the audit oracle.
     best = None  # (-overlap, penalty, name, value, unit)
     for qname, qv in quantities.items():
-        if not isinstance(qv, dict):
+        if not isinstance(qv, dict) or any(e in qname.lower() for e in _ECHO_SUFFIXES):
             continue
         a_val = num(qv.get("value"))
         if a_val is None:
             continue
         a_fam, _ = _unit_family(qv.get("unit", ""))
-        if a_fam != b_fam:
+        if not _fam_ok(a_fam, qname):
             continue
         ql = qname.lower()
         overlap = len(b_tokens & set(re.findall(r"[a-z]+", _norm_qty_name(ql))))
         if overlap == 0:
             continue
-        penalty = (2 if any(e in ql for e in _ECHO_SUFFIXES) else 0) + \
-                  (1 if re.search(r"peak|max|surge|inrush", ql) else 0)
+        penalty = (1 if re.search(r"peak|max|surge|inrush", ql) else 0)
         cand = (-overlap, penalty, qname, a_val, qv.get("unit", ""))
         if best is None or cand < best:
             best = cand
