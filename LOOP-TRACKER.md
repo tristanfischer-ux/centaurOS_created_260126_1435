@@ -31,6 +31,28 @@ the snapshot/restore fixed the DATA surfaces but root≠_loop persists (render-P
 NEXT: (1) irrigation pump = demand; (2) brief-target comparison uses totals; (3) drain reclaim; (4) P&ID/BFD
 generators; (5) dup-tag X-123; then re-run v11 + re-score. Each needs a fresh chain run to verify.
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-26 v13 — gate-34 irrigation-drop FIXED; pump now an AUTO-PLANNER input-mapping bug)
+═══════════════════════════════════════════════════════════════════════════════
+v13 = 11/16 data tabs ≥8 (same as v12). LANDED + CONFIRMED: storage total 120, fertigation total 90 (the
+brief-named-total contract quantities). gate-34 fix LANDED: irrigation:pump-sizing is NO LONGER dropped
+(no drop_wrong_domain in v13 actions; provenance shows the tool RAN) — a genuine universal bug fixed
+(isIrrigationClass added + guarded, harness c2).
+BUT irrigation_pump_flow_m3_h is STILL 12 vs demand 90. PRECISE ROOT (v13 provenance): the kept tool is the
+AUTO-PLANNER BOOTSTRAP (tool_version:"bootstrap"), NOT the registered vertical-farm class-plan — so my
+vertical-farm.ts input_from_contract edit (passing the demand) is DEAD for water_treatment. The auto-planner
+mapped total_emitters=6000 (→ 6000×2L/h = 12 m³/h) into the tool but did NOT pass irrigation_demand_m3_h=90,
+even though it IS a declared input_key (tool-io-manifest). NEXT (the precise fix): make the auto-planner
+bootstrap MAP irrigation_demand_m3_h/peak_flow_m3_h from the contract into the tool payload (the tool ALREADY
+floors to it — unit-verified: demand 90 → pump 90.0). Find where composeToolGraph/bootstrap builds the tool
+input payload + ensure declared demand input_keys present in the contract are passed. ALTERNATIVELY: brief-pin
+irrigation_pump_flow to the demand so the executor 'brief is ground truth' directional guard (MUST_MEET
+flow_rate, under-size→restore) lifts it post-tool — but irrigation_pump_flow_m3_h ends _flow_m3_h → synth
+trigger (universal-contract-sizing:112), so guard against minting a phantom pump.
+REMAINING 5 FAILS unchanged: Exec (irrigation 12 + fertigation-matcher + hand_watering), BoM (P&ID/BFD empty
+generators + dup-tag X-123), Connection-trace, Overview (6/290 invariants), Risk.
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
