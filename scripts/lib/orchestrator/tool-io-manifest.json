@@ -2645,11 +2645,14 @@
     "input_keys": [
       "canopy_area_m2",
       "flow_per_emitter_l_h",
+      "irrigation_demand_m3_h",
+      "peak_flow_m3_h",
       "pipe_diameter_mm",
       "pipe_length_m",
       "pressure_loss_kpa",
       "static_head_m",
       "system_type",
+      "target_flow_m3_h",
       "total_emitters",
       "tray_count"
     ],
