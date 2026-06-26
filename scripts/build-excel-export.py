@@ -6562,13 +6562,17 @@ def _reorder_tabs(wb: Workbook) -> None:
         "Executive Summary": -1, "Contents": 0, "⭐ Scorecard": 0.5, "Overview": 1,
         "Render — Interior layout": 2,                 # HERO render — early (exact name)
         "Brief": 3,
-        # Calcs + Quantities are FOUNDATIONAL — they feed the BoM, cost waterfall and financial
-        # model, so they come BEFORE them (Tristan: "calcs must come before the BoM and the cost
-        # waterfall — they choose the categories and what happens downstream").
-        "Quantities": 4, "Calculations": 5,
-        "Financial model": 10,
-        "Cost waterfall": 14, "Inputs & Assumptions": 15,
-        "Bill of Materials (Ledger)": 20, "Sense-check": 21,
+        # The LOGICAL READING ORDER (Tristan 2026-06-27, said several times): the BRIEF states the
+        # need → INPUTS & ASSUMPTIONS are the drivers taken from it → QUANTITIES + CALCULATIONS derive
+        # the design from those → the BILL OF MATERIALS lists what to buy → the COST WATERFALL sums the
+        # BoM up the cost stack → the FINANCIAL MODEL runs the economics off the cost. So:
+        # Brief → Inputs & Assumptions → Quantities → Calculations → BoM → Cost waterfall → Financial.
+        "Inputs & Assumptions": 4,                      # drivers from the brief — near the FRONT
+        "Quantities": 5, "Calculations": 6,
+        "Bill of Materials (Ledger)": 12,               # the bill — BEFORE the cost waterfall it feeds
+        "Cost waterfall": 14,                           # sums the BoM up the cost stack (AFTER the BoM)
+        "Financial model": 16,                          # economics off the cost (AFTER the cost waterfall)
+        "Sense-check": 18,
         "Line & velocity": 24, "Panel schedule": 25, "Process schedules": 26,
         "Assembly sequence": 29,
         "Risk & Regulatory": 30,

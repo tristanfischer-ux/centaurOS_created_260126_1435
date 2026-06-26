@@ -11,7 +11,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
 - [~] **X2 (Overview+Conn-trace DONE; rest of false-pass audit ongoing) — a quality banner must be HONEST (no false PASS).** Overview shows 10/10 PASS while rows
       17–21 visibly show failures; Connection-trace shows status "OK" but it's HARD-CODED, not computed.
       A green score over visible failures is the fake-8 again. **→ make each tab's check read the real cell state**
-- [ ] **X3 — TAB ORDER must be logical (said several times):** Brief → Inputs & Assumptions → Calculations
+- [x] **X3 (FIXED) — TAB ORDER must be logical (said several times):** Brief → Inputs & Assumptions → Calculations
       → … → Bill of Materials → Cost waterfall. (Calculations AFTER Brief; Inputs near the front, before
       Calculations; Cost waterfall AFTER the BoM it derives from.) **→ build-excel sheet order**
 - [ ] **X4 — every NUMBER needs WHERE-FROM and WHERE-TO.** Each value must trace UP to its source
@@ -37,7 +37,7 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
       needs its WHERE-FROM. **→ X4**
 
 ## CALCULATIONS
-- [ ] CA1 — move the Calculations tab to come AFTER Brief (order). **→ X3**
+- [x] CA1 (FIXED via X3) — move the Calculations tab to come AFTER Brief (order). **→ X3**
 - [ ] CA2 — each number's derivation chain is unclear: inputs/outputs shown but "where is this going" +
       "status used or not" is murky. Show where each calc value FLOWS TO. **→ X4**
 - [ ] CA3 — specific: B56 incident energy = 3.1 — no visible SOURCE for it; the arc-flash IB rating = 144
@@ -51,10 +51,10 @@ Routing in **→** to where the fix lives. This is the authoritative list; work 
 ## COST WATERFALL
 - [ ] CW1 — the raw-materials / BoM numbers are HARD-CODED; they must be DERIVED FROM the Bill of Materials
       (where do they come from?). **→ X4 + compute from BoM**
-- [ ] CW2 — order: Cost waterfall should come AFTER the BoM. (raised before.) **→ X3**
+- [x] CW2 (FIXED via X3) — order: Cost waterfall should come AFTER the BoM. (raised before.) **→ X3**
 
 ## INPUTS & ASSUMPTIONS
-- [ ] IA1 — move near the FRONT, after Brief and before Calculations. **→ X3**
+- [x] IA1 (FIXED via X3) — move near the FRONT, after Brief and before Calculations. **→ X3**
 - [ ] IA2 — numbers' provenance unclear; they should come FROM the brief. **→ X4**
 
 ## BILL OF MATERIALS (Ledger) — 6/10
