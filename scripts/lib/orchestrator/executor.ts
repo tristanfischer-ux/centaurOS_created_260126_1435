@@ -185,10 +185,38 @@ async function runStep(
   for (const [k, v] of Object.entries(contract.quantities)) {
     beforeVals[k] = (v as unknown as { value?: number } | undefined)?.value
   }
+  // BRIEF IS GROUND TRUTH on a GROSS contradiction (Tristan 2026-06-27: a tab must honour the
+  // brief's explicit spec). An EXPLICIT brief value (source='brief') is what the customer
+  // SPECIFIED — a generic auto-tool may REFINE it, but must NOT grossly OVERRIDE it. The Codema
+  // ebb-flow-demand tool sized the drain sump to the ENTIRE flood volume (600 m³) vs the brief's
+  // 5 m³ transfer pit (120×); the buffer tool sized fresh storage at 196.8 m³ vs the brief's 40 m³
+  // (4.9×) using a consumptive model on a RECIRCULATING ebb/flow plant. Snapshot the brief-pinned
+  // values BEFORE the tool, and after contract_update RESTORE any the tool moved by >3× (a gross
+  // contradiction, not a refinement). Universal; a within-3× refinement is left to the tool.
+  const briefPinned: Record<string, number> = {}
+  for (const [k, v] of Object.entries(contract.quantities)) {
+    const qq = v as unknown as { value?: number; source?: string } | undefined
+    if (qq && String(qq.source ?? '').toLowerCase() === 'brief' && typeof qq.value === 'number') {
+      briefPinned[k] = qq.value
+    }
+  }
   const updated = step.contract_update(contract, result.output)
   const newContract: ContractInProgress = {
     ...updated,
     _tools_run: [...updated._tools_run.filter(t => t !== step.tool_id), step.tool_id],
+  }
+  for (const [k, briefVal] of Object.entries(briefPinned)) {
+    const qq = newContract.quantities[k] as unknown as { value?: number; source?: string; source_detail?: string } | undefined
+    if (!qq || typeof qq !== 'object' || typeof qq.value !== 'number') continue
+    const newVal = qq.value
+    if (briefVal === 0 || newVal === briefVal) continue
+    const ratio = Math.abs(newVal / briefVal)
+    if (ratio > 3 || ratio < 1 / 3) {
+      // gross contradiction → the brief wins; record the tool's (rejected) figure for transparency
+      qq.value = briefVal
+      qq.source = 'brief'
+      qq.source_detail = `brief-pinned ${briefVal} (held — ${step.tool_id} suggested ${Number(newVal.toFixed(3))}, a ${ratio.toFixed(0)}× divergence, rejected as a gross override of an explicit brief spec)`
+    }
   }
   stampToolLineage(beforeVals, newContract, step.tool_id)
   // Capture the tool's worked calculations (inputs -> formula -> substituted numbers
