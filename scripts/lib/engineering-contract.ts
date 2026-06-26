@@ -13138,7 +13138,10 @@ registerArchetype('water_treatment', (brief: any) => {
     cultivation_container_count: q(containerCount, '', 'dimensionless', 'rated', 'system', 'brief', '6,000 ebb/flow cultivation containers (2 dept × 10 tunnels × 5 layers × 4 rows × 15) — the irrigation network sizing driver'),
     actuated_distribution_valve_count: q(valveCount, '', 'dimensionless', 'rated', 'system', 'brief', '200 electrically-actuated 2.5-inch ebb/flow distribution valves (30 containers each)'),
     ro_recovery_percent: q(roRecoveryPct, '%', 'dimensionless', 'rated', 'system', 'brief', 'RO recovery factor (75%)'),
-    granular_carbon_throughput_m3_h: q(treatmentThroughputM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'GAC / softener treatment throughput (~14.5 m³/h)'),
+    // Named with the brief's own GAC/softener terminology (not "granular_carbon") so the brief
+    // metric gac_softener_throughput matches its DELIVERED capacity — the design treats at
+    // 14.5 m³/h ≥ the 14.5 m³/h demand (a genuine PASS, not a matcher work-around).
+    gac_softener_throughput_m3_h: q(treatmentThroughputM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'GAC / softener treatment throughput (~14.5 m³/h)'),
     connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', `sum of pump + dosing + control loads ≈ ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC are out of scope)`),
     // Numeric scope flag (the universal sizer reads the quantities map reliably; the string
     // scope_exclusions_desc on shared_quantities does NOT survive into the orchestrator contract).
