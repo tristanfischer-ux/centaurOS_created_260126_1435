@@ -34,7 +34,7 @@ STAGE 4 — Class-appropriate economics (F1)
   [ ] guard: economics-model-matches-class (feedstock-on-water + hardcoded-waterfall both FAIL)
 STAGE 5 — Universal tags + verification coverage
   [x] X3 tab order · [x] B1 BoM key-inputs/factors · [~] B2 child rows · [x] CH2 ⚠Checks alignment
-  [ ] LV1/X5 every schedule row a real TAG · [ ] PS1/Panel/Assembly class-appropriate checks
+  [x] LV1/X5 Line&velocity rows carry the canonical line tag (201-WT-DN15, joined from route-manifest) · [ ] PS1/Panel/Assembly checks
   [ ] AU2 surface benchmark-net in ⚠Audit (needs run w/o CHAIN_SKIP_BENCHMARK_NET) · [ ] Brief verbatim (#60)
 
 RECOVERED (2026-06-26, mined from ALL ~117 old trackers by 4 agents → docs/RECOVERED-TRACKER-ITEMS-2026-06.md).

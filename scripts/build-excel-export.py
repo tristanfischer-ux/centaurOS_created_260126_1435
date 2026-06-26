@@ -6136,8 +6136,27 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         return False
     specs = cs.get("specs") or []  # parallel, carries the spec_limit text
 
+    # LV1/X5 (Tristan 2026-06-27: "every line must have a TAG"). The CANONICAL line tag is the route-
+    # manifest's `line_number` (e.g. "201-WT-DN15") — the SAME tag the isometric spools + the P&ID use.
+    # Map each connection-schedule row to it by (from, to, size); index fallback keeps it robust.
+    _rm = load_json(os.path.join(run_dir, "route-manifest.json")) or {}
+    _rlines = _rm.get("lines") if isinstance(_rm, dict) else None
+    _tag_by_fts: dict = {}
+    if isinstance(_rlines, list):
+        for _ln in _rlines:
+            if isinstance(_ln, dict) and _ln.get("line_number"):
+                _tag_by_fts[(str(_ln.get("from_tag")), str(_ln.get("to_tag")), str(_ln.get("size_label")))] = str(_ln.get("line_number"))
+
+    def _line_tag(row, idx):
+        k = (str(row.get("from")), str(row.get("to")), str(row.get("size")))
+        if k in _tag_by_fts:
+            return _tag_by_fts[k]
+        if isinstance(_rlines, list) and idx < len(_rlines) and isinstance(_rlines[idx], dict):
+            return str(_rlines[idx].get("line_number") or (idx + 1))
+        return str(idx + 1)
+
     ws = wb.create_sheet("Line & velocity")
-    set_widths(ws, {"A": 6, "B": 22, "C": 22, "D": 16, "E": 16, "F": 14,
+    set_widths(ws, {"A": 15, "B": 22, "C": 22, "D": 16, "E": 16, "F": 14,
                     "G": 16, "H": 10, "I": 9, "J": 13, "K": 62})
     title_row(
         ws, "Line & velocity schedule", 11,
@@ -6160,7 +6179,7 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         ("electrical", "Electrical & signal cables — current (A) · volt-drop limit ≤ 5 %"),
         ("other", "Other services (air / misc)"),
     ]
-    HDR = ["#", "From", "To", "Size", "Rating", "Velocity / ΔU", "Spec limit",
+    HDR = ["Tag", "From", "To", "Size", "Rating", "Velocity / ΔU", "Spec limit",
            "Length (m)", "In spec", "Line £", "Basis"]
     r = 4
     grand_fail = 0
@@ -6176,7 +6195,7 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         sec_first = r
         for idx, row, spec in g:
             in_spec = row.get("within_spec")
-            ws.cell(r, 1, idx + 1).border = BORDER
+            ws.cell(r, 1, _line_tag(row, idx)).border = BORDER
             # From / To endpoints REFERENCE the master "Part names" row where the endpoint
             # is a registered principal (one identity; click through to the part). The
             # connection-schedule labels endpoints by NAME ("Standby Diesel Generator"), so
