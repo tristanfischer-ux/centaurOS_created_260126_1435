@@ -1258,7 +1258,11 @@ def check_traceability_basis(state, rows, run_dir) -> list:
 # Check 14 — Tag validity & uniqueness (Bill of Materials)
 # --------------------------------------------------------------------------- #
 
-_TAG_RX = re.compile(r"^[A-Z]{1,3}-?\d+[A-Za-z0-9.\-]*$")
+# A real tag: PREFIX (1-3 caps) + number, optionally a RANGE for a group of identical
+# instruments (FCV-201–208 = eight valves on one line, an ISA convention) — the en-dash/
+# em-dash must be accepted or a legitimate range reads as garbage (Codema 2026-06-26: the
+# only "garbage" tags were FCV-201–208 / LT-201–211 range groups).
+_TAG_RX = re.compile(r"^[A-Z]{1,3}-?\d+[A-Za-z0-9.\-–—/]*$")
 _TAG_GARBAGE = {"tbd", "x", "0", "n/a", "na", "none", "?", "todo"}
 
 

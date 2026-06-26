@@ -6776,6 +6776,28 @@ def build(run_dir: str, out_path: str) -> dict:
     state["tabScorecardSummary"] = _ts_summary
     print(f"  · per-tab scorecard: min {_ts_summary['min_tab']}={_ts_summary['min_score']}/10 · "
           f"{len(_ts_summary['fail_tabs'])} FAIL, {len(_ts_summary['unscored_tabs'])} UNSCORED")
+    # ── PER-TAB ≥8 FLOOR IS THE SHIP GATE (Tristan 2026-06-26: "an 8/10 on every single tab
+    #    as a MINIMUM must be part of the code"). The dossier is NOT validated unless EVERY tab
+    #    scores a genuine ≥8 — a FAIL tab (<8) OR an UNSCORED tab (no deterministic check exists
+    #    to certify it, so it cannot be claimed ≥8) BOTH block. This folds into ship_ok so the
+    #    existing SHIP GATE / "⚠ Audit" tab / DRAFT banner all reflect it; the chain's hard-gate
+    #    (exit 37) reads tabScorecardSummary.all_pass. UNSCORED counts as a fail by design — a
+    #    genuine 8 means a check looked and passed, never "nothing looked". ──
+    _aud_sc = state.get("_dossierAudit") or {}
+    if not _ts_summary.get("all_pass"):
+        _aud_sc["ship_ok"] = False
+        if _aud_sc.get("verdict") not in (None, "FAIL"):
+            _aud_sc["verdict"] = "FAIL"
+        _aud_sc["per_tab_floor"] = {
+            "all_pass": False, "min_tab": _ts_summary.get("min_tab"),
+            "min_score": _ts_summary.get("min_score"),
+            "fail_tabs": _ts_summary.get("fail_tabs"),
+            "unscored_tabs": _ts_summary.get("unscored_tabs"),
+        }
+        state["_dossierAudit"] = _aud_sc
+        print(f"  · SHIP GATE: per-tab ≥8 floor NOT met — "
+              f"{len(_ts_summary['fail_tabs'])} tab(s) <8, {len(_ts_summary['unscored_tabs'])} UNSCORED "
+              f"→ ship_ok=False (every tab must be a genuine ≥8)")
     # Persist the per-tab scorecard + a ROUTED punch-list — the loop signal. Every tab <8 or UNSCORED,
     # its issue + the source rule to fix at. The chain / operator / next run reads these to drive the
     # ≥8 loop: tab <8 → fix the source rule → re-run → tab re-scores. (Fix the SOURCE, not the symptom.)
@@ -6971,7 +6993,9 @@ def build(run_dir: str, out_path: str) -> dict:
         "image_tabs": img_ok,
         "has_cost": has_cost,
         "skipped_tabs": skipped,
-        "audit": report.scorecard(),
+        # The floor-aware audit (ship_ok already folds in the per-tab ≥8 gate above).
+        "audit": state.get("_dossierAudit") or report.scorecard(),
+        "tab_floor": _ts_summary,
         "sha": sha,
     }
 
@@ -7027,6 +7051,16 @@ def main() -> None:
         print(f"  SHIP GATE   : {_aud.get('verdict')}  ·  {_aud.get('high', 0)} HIGH "
               f"· {_aud.get('med', 0)} MED · {_aud.get('low', 0)} LOW "
               f"· ship_ok={_aud.get('ship_ok')}")
+    # PER-TAB ≥8 FLOOR — the codified ship requirement (Tristan 2026-06-26): the dossier is
+    # NOT validated until EVERY tab is a genuine ≥8 (a <8 tab OR an UNSCORED tab blocks). The
+    # workbook is still written (so it is inspectable + carries the DRAFT banner), but the
+    # process EXITS NON-ZERO so the chain's excel_deliverable step + CI register the gate.
+    _tf = res.get("tab_floor") or {}
+    if not _tf.get("all_pass", True):
+        print(f"  PER-TAB ≥8 GATE: FAIL — min {_tf.get('min_tab')}={_tf.get('min_score')}/10; "
+              f"<8: {_tf.get('fail_tabs')}; UNSCORED: {_tf.get('unscored_tabs')}")
+        print("  → dossier is a DRAFT (not validated): every tab must reach a genuine ≥8.")
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
