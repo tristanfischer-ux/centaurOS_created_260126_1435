@@ -7072,6 +7072,34 @@ def build(run_dir: str, out_path: str) -> dict:
     if _defanged or _normalised:
         print(f"  · Excel-corruption guard: defanged {_defanged} prose-as-formula + normalised {_normalised} sci-notation formula(s)")
 
+    # ── X1 GATE-FEED (Tristan 2026-06-27): the SHIP GATE must cover EVERY sheet, not just the 16 data
+    #    tabs. Now that all sheets exist, merge each drawing/render/meta sheet's aux-score into the
+    #    per-tab scorecard, so an EMPTY P&ID / BFD actually FAILS the dossier (not just a red banner).
+    #    Pure-navigation tabs (Contents / ⭐ Scorecard) carry no content to score → skipped. ──
+    _NAV_TABS = {"Contents", "⭐ Scorecard"}
+    for _wsx in wb.worksheets:
+        _nm = _wsx.title
+        if _nm in _TAB_SCORES or _nm in _NAV_TABS:
+            continue
+        _auxv = _aux_tab_score(_nm, run_dir)
+        if isinstance(_auxv, dict):
+            _TAB_SCORES[_nm] = _auxv
+    _ts_summary = tab_scorecard_summary(_TAB_SCORES)         # re-derive over the FULL workbook
+    state["tabScorecard"] = _TAB_SCORES
+    state["tabScorecardSummary"] = _ts_summary
+    if not _ts_summary.get("all_pass"):
+        _aud_full = state.get("_dossierAudit") or {}
+        _aud_full["ship_ok"] = False
+        _aud_full["verdict"] = "FAIL"
+        state["_dossierAudit"] = _aud_full
+        print(f"  · SHIP GATE (full workbook): min {_ts_summary['min_tab']}={_ts_summary['min_score']}/10 · "
+              f"{len(_ts_summary['fail_tabs'])} <8 · {len(_ts_summary['unscored_tabs'])} UNSCORED → ship_ok=False")
+    try:
+        with open(os.path.join(run_dir, "tab-scorecard.json"), "w", encoding="utf-8") as _fh:
+            json.dump({"tabs": _TAB_SCORES, "summary": _ts_summary}, _fh, indent=2, default=str)
+    except Exception:  # noqa: BLE001
+        pass
+
     wb.save(out_path)
 
     size_mb = os.path.getsize(out_path) / (1024 * 1024)
