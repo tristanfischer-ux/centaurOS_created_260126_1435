@@ -1639,10 +1639,175 @@ def check_provenance(state, rows, run_dir) -> list:
     return out
 
 
+# ── Placeholder names that are NOT a real part identity (mirror dossier_repair). ──
+_PLACEHOLDER_NAMES = {
+    "requirement stated", "requirement stated structural", "requirement stated parametric",
+    "requirement stated rating based parametric", "made to spec", "not found", "tbd", "",
+    "field instrument catalogue class", "final control element catalogue class",
+}
+
+
+def _display_name(r: dict) -> str:
+    """The name the Part-names tab shows: prefer the REQUIREMENT (durable identity) over the
+    fulfilment placeholder ('requirement stated' is a status, not a name)."""
+    return str(r.get("requirement") or r.get("name_human") or r.get("part") or "").strip()
+
+
+def check_part_names(state, rows, run_dir) -> list:
+    """'Part names' is the master list every other tab references — each principal must carry a
+    REAL, non-placeholder name. (Tristan: every tab a genuine ≥8; an unscored tab cannot pass.)"""
+    tab = "Part names"
+    out: list = []
+    principals = _principal_rows(rows)
+    if not principals:
+        return out
+    bad = []
+    for r in principals:
+        low = re.sub(r"[^a-z0-9 ]+", " ", _display_name(r).lower()).strip()
+        low = re.sub(r"\s+", " ", low)
+        if not low or low in _PLACEHOLDER_NAMES:
+            bad.append(r)
+    if bad:
+        frac = len(bad) / len(principals)
+        out.append(Finding(
+            tab=tab, check="part_name_placeholder", severity="HIGH" if frac > 0.10 else "MED",
+            message=(f"{len(bad)} of {len(principals)} principal parts have a placeholder/blank name "
+                     f"(e.g. 'requirement stated') instead of a real part name — the master Part-names "
+                     f"list every tab references is incomplete"),
+            actual=", ".join(_display_name(r)[:20] or "(blank)" for r in bad[:5]),
+            expected="every principal carries a real, descriptive name on the Part names tab",
+            source_rule="requirements_bom must emit a real requirement/name for every line (never the fulfilment placeholder as the name)",
+        ))
+    return out
+
+
+def _load_run_json(run_dir, name):
+    try:
+        with open(os.path.join(run_dir or "", name), "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def check_line_velocity(state, rows, run_dir) -> list:
+    """'Line & velocity' schedule (connection-schedule.json): every sized run must be WITHIN
+    SPEC (pipe velocity ≤ limit, cable volt-drop ≤ limit). An out-of-spec line is a real
+    hydraulic/electrical defect (e.g. 25 m/s through an undersized pipe)."""
+    tab = "Line & velocity"
+    out: list = []
+    cs = _load_run_json(run_dir, "connection-schedule.json")
+    lines = cs.get("rows") if isinstance(cs, dict) else None
+    expected = len(_principal_rows(rows)) >= 10  # a real multi-equipment plant has connections
+    if not isinstance(lines, list) or not lines:
+        if expected:
+            out.append(Finding(
+                tab=tab, check="line_schedule_missing", severity="HIGH",
+                message=("no Line & velocity schedule (connection-schedule.json absent/empty) for a "
+                         "plant with many equipment items — every sized run must be listed with its "
+                         "velocity / volt-drop and within-spec verdict"),
+                actual="0 lines", expected="a line schedule with one row per sized run",
+                source_rule="the connection/route builder must emit connection-schedule.json with sized runs",
+            ))
+        return out
+    oos = [r for r in lines if isinstance(r, dict) and r.get("within_spec") is False]
+    if oos:
+        frac = len(oos) / len(lines)
+        ex = "; ".join(f"{str(r.get('from',''))[:14]}→{str(r.get('to',''))[:14]} {r.get('drop','')}" for r in oos[:3])
+        out.append(Finding(
+            tab=tab, check="line_out_of_spec", severity="HIGH" if frac > 0.05 else "MED",
+            message=(f"{len(oos)} of {len(lines)} sized runs are OUT OF SPEC (pipe velocity > limit "
+                     f"or cable volt-drop > limit) on the Line & velocity schedule. Examples: {ex}"),
+            actual=f"{len(oos)} out-of-spec lines",
+            expected="every line within spec (pipe ≤ 3 m/s, cable ΔU ≤ 5 %) — upsize the run at source",
+            source_rule="the sizing tool / line-sizer must pick a diameter/CSA that keeps velocity ≤ 3 m/s and ΔU ≤ 5 %",
+        ))
+    return out
+
+
+def check_panel_schedule(state, rows, run_dir) -> list:
+    """'Panel schedule' (drawings/panel-schedule.md): an electrical design must publish a panel/
+    load schedule with real circuit rows. Absent or empty = a missing deliverable, not a pass."""
+    tab = "Panel schedule"
+    out: list = []
+    # Only a design that HAS electrical load owes a panel schedule.
+    q = _quantities(state)
+    has_elec = any(re.search(r"electrical_load|connected_load|supply_demand|switchboard|incomer", k, re.I)
+                   for k in q) or any(re.search(r"panel|switchboard|breaker|mcc|distribution board",
+                                                _row_name(r), re.I) for r in _principal_rows(rows))
+    if not has_elec:
+        return out
+    path = os.path.join(run_dir or "", "drawings", "panel-schedule.md")
+    text = ""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except Exception:  # noqa: BLE001
+        text = ""
+    # count markdown table body rows (lines with ≥2 pipes that aren't the header/separator)
+    body = [ln for ln in text.splitlines()
+            if ln.count("|") >= 2 and not re.match(r"^\s*\|?[\s:|-]+\|?\s*$", ln)]
+    data_rows = max(0, len(body) - 1)  # minus the header row
+    if data_rows < 1:
+        out.append(Finding(
+            tab=tab, check="panel_schedule_missing", severity="HIGH",
+            message=("the electrical design publishes NO panel / load schedule with circuit rows "
+                     "(drawings/panel-schedule.md absent or empty) — an electrified plant must list "
+                     "its circuits, breakers and cables"),
+            actual=f"{data_rows} circuit rows",
+            expected="a panel schedule with one row per circuit (load · breaker · cable · ΔU)",
+            source_rule="the panel-schedule generator must emit a circuit row per powered load",
+        ))
+    return out
+
+
+# Tag-prefixes the universal Glossary documents (ISA + the engine's own families). A BoM tag
+# whose prefix is outside this set is an abbreviation the Glossary does not explain.
+_GLOSSARY_TAG_PREFIXES = {
+    "P", "TK", "F", "V", "I", "HX", "INV", "TX", "EP", "C", "X",
+    "FCV", "FV", "LV", "PV", "TV", "LT", "PT", "TT", "FT", "AT", "LE", "FE", "PE", "TE",
+    "M", "G", "UV", "PMP", "BLR", "AHU", "MCC", "DB", "SW", "ATS",
+}
+
+
+def check_glossary(state, rows, run_dir) -> list:
+    """'Glossary' must define every abbreviation the dossier USES. Genuine coverage check: every
+    ISA tag-prefix that appears in the bill must be a documented family (else a reader meets an
+    undefined code). The static glossary covers the standard families; a NOVEL prefix flags."""
+    tab = "Glossary"
+    out: list = []
+    principals = _principal_rows(rows)
+    if not principals:
+        return out
+    undocumented = {}
+    for r in principals:
+        raw = str(r.get("tag") or "").strip()
+        m = re.match(r"^([A-Z]{1,4})-?\d", raw)
+        if not m:
+            continue
+        pref = m.group(1)
+        if pref not in _GLOSSARY_TAG_PREFIXES:
+            undocumented[pref] = undocumented.get(pref, 0) + 1
+    if undocumented:
+        ex = ", ".join(f"{p}- (×{n})" for p, n in sorted(undocumented.items())[:6])
+        out.append(Finding(
+            tab=tab, check="glossary_undocumented_prefix", severity="MED",
+            message=(f"{len(undocumented)} tag-prefix family/families used in the bill are not in the "
+                     f"Glossary: {ex} — a reader meets an undefined code"),
+            actual=ex,
+            expected="every ISA tag-prefix used is defined on the Glossary tab",
+            source_rule="add the tag-prefix to the universal glossary (build-excel GLOSSARY) OR use a documented prefix in the tag scheme",
+        ))
+    return out
+
+
 _CHECKS = [
     check_bom,
     check_capex_by_category,
     check_cross_tab,
+    check_part_names,
+    check_line_velocity,
+    check_panel_schedule,
+    check_glossary,
     check_drawing_coverage,
     check_physics_critic,
     check_economics,
@@ -1713,6 +1878,9 @@ COVERED_TABS = {
     "Bill of Materials (Ledger)", "Cost waterfall", "Financial model",
     "Connection trace", "Risk & Regulatory", "Process schedules",
     "Assembly sequence", "Brief",
+    # 2026-06-26: the formerly-UNSCORED tabs now carry deterministic checks (a genuine ≥8
+    # requires a check that looked, never "nothing examined it").
+    "Part names", "Line & velocity", "Panel schedule", "Glossary",
 }
 
 _SEVERITY_PENALTY = {"HIGH": 4, "MED": 2, "LOW": 1}
@@ -2113,6 +2281,36 @@ def _selftest() -> int:
     es_score = es.get("score")
     expect(isinstance(es_score, (int, float)) and es_score < 8 and es.get("status") == "FAIL",
            f"G: Exec Summary must FAIL (<8) when its compliance table is mostly UNVERIFIED, got {es_score}")
+
+    # ---- Fixture K: the 4 formerly-UNSCORED tab checks PROVE they catch ----------
+    # part_names (placeholder name), line_velocity (out-of-spec run), panel_schedule
+    # (missing for an electrified design), glossary (undocumented tag-prefix).
+    with tempfile.TemporaryDirectory() as tk:
+        with open(os.path.join(tk, "connection-schedule.json"), "w") as fh:
+            json.dump({"rows": [{"from": "Pump A", "to": "Tank B", "within_spec": False,
+                                 "drop": "25 m/s"}] + [{"from": f"n{i}", "to": f"m{i}",
+                                 "within_spec": True} for i in range(12)]}, fh)
+        k_rows = [
+            {"tag": "P-1", "requirement": "Recirculation pump", "status": "IDENTIFIED",
+             "part": "Grundfos", "qty": 1, "unit_gbp": 4000, "line_gbp": 4000},
+            # placeholder NAME (part_names fires): requirement is the placeholder
+            {"tag": "X-7", "requirement": "requirement stated", "status": "NOT FOUND",
+             "part": "requirement stated", "qty": 1, "unit_gbp": 800, "line_gbp": 800},
+            # undocumented tag-prefix ZZ- (glossary fires)
+            {"tag": "ZZ-3", "requirement": "Main Switchboard", "status": "IDENTIFIED",
+             "part": "Switchboard", "qty": 1, "unit_gbp": 3000, "line_gbp": 3000},
+        ] + [{"tag": f"TK-{i}", "requirement": f"Tank {i}", "status": "IDENTIFIED",
+              "part": f"Tank {i}", "qty": 1, "unit_gbp": 1000, "line_gbp": 1000} for i in range(9)]
+        k_state = {"orchestratorContract": {"product_class": "water_treatment",
+                   "quantities": {"connected_electrical_load_kw": {"value": 48, "unit": "kW"}}},
+                   "parsedBrief": {"product_class": "water_treatment", "constraints": {}},
+                   "costStack": {"installed_asp_gbp": 50000}}
+        repk = audit_dossier(k_state, k_rows, run_dir=tk)
+        kchecks = {f.check for f in repk.findings}
+        expect("part_name_placeholder" in kchecks, "K: part_names must catch a 'requirement stated' name")
+        expect("line_out_of_spec" in kchecks, "K: line_velocity must catch a within_spec=False run")
+        expect("panel_schedule_missing" in kchecks, "K: panel_schedule must catch a missing schedule on an electrified design")
+        expect("glossary_undocumented_prefix" in kchecks, "K: glossary must catch the undocumented ZZ- prefix")
 
     # ---- Fixture J: a dimensioned metric must NOT match a unitless COUNT quantity -----
     # Codema v5: fertigation_dosing_capacity (m3/hr) matched fertigation_dosing_pump_count=2
