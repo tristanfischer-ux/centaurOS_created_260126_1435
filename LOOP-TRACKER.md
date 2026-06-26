@@ -53,6 +53,28 @@ trigger (universal-contract-sizing:112), so guard against minting a phantom pump
 REMAINING 5 FAILS unchanged: Exec (irrigation 12 + fertigation-matcher + hand_watering), BoM (P&ID/BFD empty
 generators + dup-tag X-123), Connection-trace, Overview (6/290 invariants), Risk.
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-26 v14 — DESIGN NOW MEETS THE BRIEF; remaining Exec = #86 matcher non-determinism)
+═══════════════════════════════════════════════════════════════════════════════
+v14 = 11/16 data tabs ≥8. THE SIZING IS NOW CORRECT (real, not faked): irrigation_pump_flow 90 (=demand,
+auto-wire fix LANDED), water_storage 120 (3×40), fertigation 90 (2×45). Three distinct UNIVERSAL bugs fixed
+this session to get here: (1) brief-named TOTAL contract quantities (per-unit→plant-total); (2) gate-34
+isIrrigationClass (was dropping irrigation tools on an irrigation plant); (3) auto-planner DECLARED-INPUT
+COMPLETION (LLM omitted the demand input → pump fell to emitter-sum 12; now deterministically wired).
+REMAINING Exec Summary 0 is NO LONGER under-sizing — it is the #86 COMPLIANCE-MATCHER / BRIEF-PARSE
+NON-DETERMINISM: the brief parser NAMES the same requirement differently each run
+(max_irrigation_demand_m3_per_hr ↔ max_irrigation_demand_per_department; fertigation_dosing_capacity_m3_per_hr
+↔ fertigation_dosing_capacity), so the compliance check can't bind the CORRECT achieved quantity (pump 90,
+fert 90) to the wandering brief-metric name → reports UNVERIFIED/FAIL despite the design being right. Also
+hand_watering_capacity has no emitted total (brief 25 m³/h @3 bar → emit hand_watering_capacity_m3_per_hr =
+handWaterM3H). HIGHEST-LEVERAGE NEXT = #86: make the compliance matcher bind a brief metric to an achieved
+quantity by SEMANTIC FAMILY + UNIT (irrigation-flow ↔ irrigation_demand/pump_flow) robust to the name
+variation, OR make the brief parser emit DETERMINISTIC metric keys. This single fix should clear Exec + much
+of Risk. THEN: P&ID/BFD empty generators (BoM), connection-trace fluid-in+out + ledger-completeness, Overview
+6/290 invariants. (Risk now also has a NEW physics-critic note ON the correct 90 pump — verify it's not a
+false flag on the now-right design.)
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
