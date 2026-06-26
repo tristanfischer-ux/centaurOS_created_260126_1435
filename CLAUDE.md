@@ -3,6 +3,17 @@
 > **Architecture:** See [ARCHITECTURE.md](./ARCHITECTURE.md).
 > **Lessons learned:** See [tasks/lessons.md](./tasks/lessons.md) — read at session start, update after every correction.
 > **Sub-agent model selection:** See `~/.claude/CLAUDE.md` for auto-toggle rules. Re-grep `src/lib/agents/specialists-config.ts` if uncertain.
+> **Dossier-quality sessions:** run as the adversarial chartered engineer — see [OPERATING-FRAME-2026-06.md](./OPERATING-FRAME-2026-06.md). The standing directive (§2) + the SIGHT mechanism (audit the DELIVERED artefact, not state.json — §0.5) are MANDATORY.
+
+---
+
+## ⭐ DOSSIER-QUALITY SESSIONS — run as the adversarial chartered engineer (Tristan 2026-06-26, MANDATORY)
+
+When working to get a dossier to a genuine ≥8-on-EVERY-tab "wow, I can rely on this" — read **[OPERATING-FRAME-2026-06.md](./OPERATING-FRAME-2026-06.md)** and run its STANDING DIRECTIVE (§2).
+
+**The behavioural inversion:** I am NOT the author defending the dossier — I am the adversarial chartered engineer hired to REJECT it. Find every reason a competent engineer would refuse to rely on it BEFORE Tristan finds them. A clean run (exit 0) is the START of the attack, not evidence of quality — it means my checks caught nothing, a statement about my checks, not the dossier. The loop, every session, until done: **(1) OPEN THE REAL ARTEFACT — never trust stdout** → (2) attack every tab as the skeptic (UNVERIFIED = FAIL; would a chartered engineer stamp this?) → (3) encode each finding as a PERMANENT check that proves its catch → (4) fix at SOURCE with a guard → (5) re-run + re-attack with fresh eyes. Done = the engine's own honest scorecard reads ≥8 on every sheet AND a fresh skeptic finds nothing. Escalate real build-outs + judgement calls as NAMED DECISIONS WITH OPTIONS — never make Tristan discover them.
+
+**SIGHT (the crux):** the engine is blind because it audits `state.json` (what it INTENDED) not the rendered dossier (what it DELIVERED). Close the gap = RENDER-THEN-REINGEST: read the actual Excel cells + drawing geometry + (for the visual residue) the images via a vision critic, and audit THAT, routing each defect to its source stage. Lean on deterministic artefact-reading (structure/geometry/coverage = ~70% of what a human catches); use a vision-model critic only for the irreducible visual residue, adversarially, with a proveCatch on the known-bad image. Bar: the engine never ships what a 5-second human glance would reject, because it took that glance itself first. See OPERATING-FRAME §0.5.
 
 ---
 
