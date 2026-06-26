@@ -287,6 +287,24 @@ export function isSeawaterSourceClass(productClass: string): boolean {
   return classMatchesTokens(productClass, SEAWATER_SOURCE_CLASS_TOKENS)
 }
 
+/** IRRIGATION / agricultural water-distribution PRODUCT class tokens — a water / fertigation /
+ *  irrigation plant LEGITIMATELY uses the irrigation hydraulics markers (sprinkler, drip emitter,
+ *  n_emitters, Hazen-Williams): `irrigation:pump-sizing` is EXACTLY the right tool for it, not a
+ *  wrong-domain stand-in. For these classes the gate suppresses irrigation findings — the missing
+ *  sibling of isMarineClass / isHydroponicClass (Tristan 2026-06-26: gate 34 was DROPPING
+ *  irrigation:pump-sizing on the Codema fertigation/irrigation plant, so the pump fell back to the
+ *  drip-emitter sum of 12 m³/h vs the 90 m³/h demand). PURE. */
+const IRRIGATION_CLASS_TOKENS = [
+  'water_treatment', 'water_treatment_plant', 'irrigation', 'irrigation_plant', 'irrigation_system',
+  'fertigation', 'fertigation_plant', 'horticulture', 'horticultural', 'vertical_farm', 'greenhouse',
+  'glasshouse', 'nursery', 'cultivation', 'water_purification', 'water_distribution', 'ebb_flow',
+]
+
+/** Is this product class an IRRIGATION / water-distribution plant (irrigation markers legitimate)? PURE. */
+export function isIrrigationClass(productClass: string): boolean {
+  return classMatchesTokens(productClass, IRRIGATION_CLASS_TOKENS)
+}
+
 /** Does ONE tools-used entry present a domain marker WRONG for this class? The per-tool
  *  version of the worked-calc scan in computeToolArchetypeCoherence, honouring the same
  *  suppression rules (marine on a submersible, hydroponic on a grower, refrigeration on
@@ -300,12 +318,14 @@ export function toolLeaksWrongDomain(tool: any, productClass: string): boolean {
   const hydroponic = isHydroponicClass(productClass)
   const cooling = isCoolingClass(productClass)
   const seawaterSource = isSeawaterSourceClass(productClass)
+  const irrigation = isIrrigationClass(productClass)
   const worked: any[] = Array.isArray(tool?.worked) ? tool.worked : []
   for (const w of worked) {
     for (const hit of scanTextForMarkers(workedCalcText(w))) {
       if (hit.family === 'marine' && marine) continue
       if (hit.family === 'hydroponic' && hydroponic) continue
       if (hit.family === 'refrigeration' && cooling) continue
+      if (hit.family === 'irrigation' && irrigation) continue
       if (hit.family === 'marine' && seawaterSource && SEAWATER_SOURCE_MARKER_IDS.has(hit.marker)) continue
       return true
     }
@@ -504,7 +524,8 @@ export function computeToolArchetypeCoherence(state: any): ToolArchetypeCoherenc
     if (family === 'marine') return !marine
     if (family === 'hydroponic') return !hydroponic
     if (family === 'refrigeration') return !cooling
-    return true // irrigation
+    if (family === 'irrigation') return !isIrrigationClass(productClass)  // irrigation legitimate on an irrigation/water/fertigation plant
+    return true
   }
 
   // ── Worked-calcs ──────────────────────────────────────────────────────────

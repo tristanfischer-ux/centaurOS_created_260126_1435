@@ -3089,6 +3089,19 @@ function checkCo2FixInvariants(): Assertion[] {
       want('(c) verdict high', r.verdict === 'high')
       want('(c) irrigation finding on irrigation:pump-sizing', hasFinding(r, 'irrigation:pump-sizing', 'irrigation'))
     }
+    // (c2) IRRIGATION class (water_treatment / fertigation) + the SAME irrigation worked-calc →
+    //      ZERO irrigation findings AND the tool is KEPT, not dropped (Tristan 2026-06-26: gate 34 was
+    //      dropping irrigation:pump-sizing on the Codema fertigation plant, so the pump fell back to the
+    //      drip-emitter sum 12 m³/h vs the 90 m³/h demand). The missing isIrrigationClass suppression.
+    {
+      const irrTool = mkTool('irrigation:pump-sizing', 'n_emitters via Hazen-Williams sprinkler head loss')
+      const r = computeToolArchetypeCoherence(mkState('water_treatment', [irrTool]))
+      want('(c2) irrigation class suppresses irrigation findings', r.findings.filter((f) => f.family === 'irrigation').length === 0)
+      // the chain DROP uses toolLeaksWrongDomain — it must KEEP the tool on an irrigation plant
+      want('(c2) irrigation tool kept on water_treatment', toolLeaksWrongDomain({ ...irrTool, applicable_to_class: false }, 'water_treatment') === false)
+      // …but STILL dropped on a genuinely wrong class (co2_mineralisation)
+      want('(c2) irrigation tool still wrong on co2', toolLeaksWrongDomain({ ...irrTool, applicable_to_class: false }, 'co2_mineralisation') === true)
+    }
     // (d) non-marine + CLEAN process tool (hoop stress, no marine words) → NOT in findings
     {
       const r = computeToolArchetypeCoherence(mkState('co2_mineralisation', [
