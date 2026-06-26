@@ -71,7 +71,7 @@ import deterministic_checks_lib as dcl  # noqa: E402
 # SHIP GATE: the dossier is not "validated" unless its scorecard is clean. Imported by absolute
 # path (scripts/lib is the sibling dir) so the exporter works regardless of the caller's cwd.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
-from dossier_audit import audit_dossier  # noqa: E402
+from dossier_audit import audit_dossier, tab_scores, tab_scorecard_summary  # noqa: E402
 from dossier_repair import repair_dossier  # noqa: E402
 
 # ----------------------------------------------------------------------------
@@ -166,8 +166,36 @@ def set_widths(ws: Worksheet, widths: Dict[str, float]) -> None:
         ws.column_dimensions[col].width = w
 
 
+# Per-tab deterministic scorecard (Tristan 2026-06-26): set in build() from dossier_audit.tab_scores,
+# keyed by Excel sheet name. title_row stamps each tab's score banner from this — every tab shows its
+# deterministic quality vs the ≥8 floor, on the tab.
+_TAB_SCORES: dict = {}
+
+
+def _tab_quality_banner(title: str):
+    """The quality-banner spec ({text, fill, height}) for a sheet, or None if the tab isn't scored."""
+    v = _TAB_SCORES.get(title)
+    if not isinstance(v, dict):
+        return None
+    tgt = v.get("target", 8)
+    status = v.get("status")
+    if status == "UNSCORED":
+        return {
+            "text": f"⬤ TAB QUALITY — UNSCORED: no deterministic check covers this tab yet, so it cannot be certified ≥{tgt}. {v.get('fix', '')}",
+            "fill": FILL_ADVISORY, "height": 30,
+        }
+    sc = v.get("score")
+    issues = v.get("issues") or []
+    tail = (f"  →  {issues[0]}" if (status == "FAIL" and issues) else "")
+    return {
+        "text": f"⬤ TAB QUALITY: {sc}/10   ·   target ≥{tgt}   ·   {status}{tail}",
+        "fill": FILL_PASS if status == "PASS" else FILL_FAIL,
+        "height": 30 if tail else 18,
+    }
+
+
 def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
-    """Write a full-width title band; return the next free row index."""
+    """Write a full-width title band (+ a deterministic per-tab quality banner); return next free row."""
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=span)
     c = ws.cell(1, 1, text)
     c.font = FONT_TITLE
@@ -175,9 +203,19 @@ def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
     c.alignment = Alignment(vertical="center", horizontal="left", indent=1)
     ws.row_dimensions[1].height = 26
     nxt = 2
+    # Quality banner — every scored tab shows its deterministic score vs the ≥8 floor, ON the tab.
+    qb = _tab_quality_banner(ws.title)
+    if qb is not None:
+        ws.merge_cells(start_row=nxt, start_column=1, end_row=nxt, end_column=span)
+        bc = ws.cell(nxt, 1, qb["text"])
+        bc.fill = qb["fill"]
+        bc.font = FONT_SUB
+        bc.alignment = LEFT_TOP
+        ws.row_dimensions[nxt].height = qb["height"]
+        nxt += 1
     if subtitle:
-        ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=span)
-        s = ws.cell(2, 1, subtitle)
+        ws.merge_cells(start_row=nxt, start_column=1, end_row=nxt, end_column=span)
+        s = ws.cell(nxt, 1, subtitle)
         s.font = FONT_NOTE
         s.alignment = LEFT_TOP
         # Grow the merged subtitle row so a 2-3 line purpose note never clips
@@ -186,8 +224,8 @@ def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
         approx_cols_wide = max(1, sum(_col_width(ws, ci) for ci in range(1, span + 1)))
         chars_per_line = max(40, approx_cols_wide * 1.05)
         lines = max(1, int(_math.ceil(len(subtitle) / chars_per_line)))
-        ws.row_dimensions[2].height = 15 + 13 * min(lines, 4)
-        nxt = 3
+        ws.row_dimensions[nxt].height = 15 + 13 * min(lines, 4)
+        nxt += 1
     return nxt + 1  # leave a blank spacer row
 
 
@@ -6670,6 +6708,17 @@ def build(run_dir: str, out_path: str) -> dict:
     state["requirementsBom"] = rows                       # downstream tabs read the repaired bill
     report = audit_dossier(state, rows, run_dir)          # audit of the REPAIRED dossier
     state["_dossierAudit"] = report.scorecard()
+    # DETERMINISTIC PER-TAB SCORECARD (Tristan 2026-06-26): score EVERY tab against the ≥8 floor and
+    # stamp the score ON each tab (title_row reads _TAB_SCORES). The minimum scored tab is the
+    # dossier's per-tab floor; UNSCORED tabs are coverage gaps to close. Written to state so the
+    # chain can gate + route the loop (a tab <8 → its source_rule fix → re-run → tab ≥8).
+    global _TAB_SCORES
+    _TAB_SCORES = tab_scores(state, rows, run_dir)
+    state["tabScorecard"] = _TAB_SCORES
+    _ts_summary = tab_scorecard_summary(_TAB_SCORES)
+    state["tabScorecardSummary"] = _ts_summary
+    print(f"  · per-tab scorecard: min {_ts_summary['min_tab']}={_ts_summary['min_score']}/10 · "
+          f"{len(_ts_summary['fail_tabs'])} FAIL, {len(_ts_summary['unscored_tabs'])} UNSCORED")
     state["_dossierRepair"] = {
         **_repair.summary(),
         "fixes": list(_repair.fixes_applied),

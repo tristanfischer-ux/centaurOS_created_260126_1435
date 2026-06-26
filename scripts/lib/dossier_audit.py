@@ -1625,6 +1625,113 @@ def audit_dossier(state: dict, rows: list, run_dir: str) -> AuditReport:
 
 
 # --------------------------------------------------------------------------- #
+# DETERMINISTIC PER-TAB SCORECARD (Tristan 2026-06-26)
+#
+# Every Excel tab carries its OWN deterministic 0-10 score against the ≥8 floor, shown ON the tab.
+# The engine USES these scores internally: a tab below 8 is a routed fault to fix at source, and a
+# dossier whose worst tab is below 8 is NOT certified. This is the per-tab, deterministic complement
+# to the 6-section selfAudit — no LLM, reproducible, and the loop's signal. A tab a check EXAMINED
+# and found clean scores 10; a tab NO deterministic check examines is UNSCORED (a coverage gap — it
+# can NEVER be a free 10, because an un-checked tab cannot be certified ≥8; the universal fix is to
+# write its check).
+# --------------------------------------------------------------------------- #
+
+# Canonical Excel tabs that MUST carry a deterministic quality score (the data/engineering tabs).
+# Meta tabs (⭐ Scorecard, Sense-check) and pure-narrative tabs are excluded from the floor.
+SCORED_TABS = [
+    "Executive Summary", "Overview", "Brief", "Quantities", "Calculations",
+    "Bill of Materials (Ledger)", "Cost waterfall", "Financial model",
+    "Connection trace", "Part names", "Risk & Regulatory", "Assembly sequence",
+    "Panel schedule", "Process schedules", "Line & velocity", "Glossary",
+]
+
+# A deterministic check EXAMINES these canonical tabs (so a clean one scores 10; the rest are
+# UNSCORED = a coverage gap to close, never a silent pass). Derived from the _CHECKS tab tags.
+COVERED_TABS = {
+    "Executive Summary", "Overview", "Quantities", "Calculations",
+    "Bill of Materials (Ledger)", "Cost waterfall", "Financial model",
+    "Connection trace", "Risk & Regulatory", "Process schedules",
+    "Assembly sequence", "Brief",
+}
+
+_SEVERITY_PENALTY = {"HIGH": 4, "MED": 2, "LOW": 1}
+
+# Route an audit Finding.tab (audit-domain names) → its canonical Excel tab. First substring wins.
+_TAB_ROUTE = [
+    ("bill of material", "Bill of Materials (Ledger)"), ("bom", "Bill of Materials (Ledger)"),
+    ("coverage", "Bill of Materials (Ledger)"), ("ledger", "Bill of Materials (Ledger)"),
+    ("capex", "Cost waterfall"), ("cost", "Cost waterfall"),
+    ("financial", "Financial model"), ("inputs", "Financial model"), ("revenue", "Financial model"),
+    ("econom", "Financial model"),
+    ("quantit", "Quantities"), ("calculation", "Calculations"),
+    ("connectiv", "Connection trace"), ("drawing", "Connection trace"),
+    ("part name", "Part names"), ("glossar", "Glossary"),
+    ("risk", "Risk & Regulatory"), ("regulator", "Risk & Regulatory"), ("physics", "Risk & Regulatory"),
+    ("line & velocity", "Line & velocity"), ("panel", "Panel schedule"),
+    ("schedule", "Process schedules"), ("process", "Process schedules"),
+    ("assembly", "Assembly sequence"),
+    ("brief", "Brief"), ("overview", "Overview"),
+    ("exec", "Executive Summary"), ("checks", "Executive Summary"), ("audit", "Executive Summary"),
+]
+
+
+def _route_to_excel_tab(audit_tab: str) -> str:
+    tl = str(audit_tab or "").lower()
+    for sub, canon in _TAB_ROUTE:
+        if sub in tl:
+            return canon
+    return "Executive Summary"
+
+
+def tab_scores(state: dict, rows: list, run_dir: str) -> dict:
+    """Deterministic per-tab scorecard. Returns {tab: {score|None, target, status, issues, fix}}.
+
+    score is 0-10 (10 − Σ severity penalty, HIGH=4 / MED=2 / LOW=1); status PASS (≥8) / FAIL (<8) /
+    UNSCORED (no check covers the tab). The minimum scored tab is the dossier's per-tab floor.
+    """
+    report = audit_dossier(state, rows, run_dir)
+    by_tab: dict = {}
+    for f in report.findings:
+        by_tab.setdefault(_route_to_excel_tab(f.tab), []).append(f)
+
+    out: dict = {}
+    for tab in SCORED_TABS:
+        fs = by_tab.get(tab, [])
+        if tab not in COVERED_TABS:
+            out[tab] = {
+                "score": None, "target": 8, "status": "UNSCORED",
+                "issues": ["no deterministic check examines this tab yet — it cannot be certified ≥8"],
+                "fix": "write a deterministic check for this tab in dossier_audit.py (the universal fix for an unscored tab)",
+            }
+            continue
+        penalty = sum(_SEVERITY_PENALTY.get(f.severity, 1) for f in fs)
+        score = max(0, 10 - penalty)
+        out[tab] = {
+            "score": score, "target": 8,
+            "status": "PASS" if score >= 8 else "FAIL",
+            "issues": [f"[{f.severity}] {f.message[:110]}" for f in fs[:6]],
+            "fix": next((f.source_rule for f in fs if f.source_rule), ""),
+        }
+    return out
+
+
+def tab_scorecard_summary(scores: dict) -> dict:
+    """Headline numbers over the per-tab scorecard: the min scored tab + how many fail / are unscored."""
+    scored = [(t, v) for t, v in scores.items() if isinstance(v.get("score"), (int, float))]
+    fails = [t for t, v in scored if v["score"] < v["target"]]
+    unscored = [t for t, v in scores.items() if v.get("status") == "UNSCORED"]
+    min_tab, min_score = (None, None)
+    if scored:
+        min_tab, mv = min(scored, key=lambda kv: kv[1]["score"])
+        min_score = mv["score"]
+    return {
+        "min_tab": min_tab, "min_score": min_score,
+        "scored_count": len(scored), "fail_tabs": fails, "unscored_tabs": unscored,
+        "all_pass": (not fails and not unscored),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Selftest
 # --------------------------------------------------------------------------- #
 
