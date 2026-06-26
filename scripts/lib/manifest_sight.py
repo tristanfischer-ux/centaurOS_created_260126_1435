@@ -21,6 +21,7 @@ flags + scores it honestly until then.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections import defaultdict
 from typing import Any
@@ -75,6 +76,52 @@ def default_size_litter(manifest: Any) -> dict:
     }
 
 
+def manifest_divergence(run_dir: str) -> dict:
+    """SIGHT: if a run holds ≥2 parts-manifest.json that DISAGREE on where the parts ARE, the drawings
+    can disagree — GA reads one manifest, the render the other → "GA-top ≠ render-top" (Tristan's GA2).
+    Deterministic, UNIVERSAL: compares part CENTRES (pos_mm) across every manifest in the run; >10% of
+    common parts at different positions = divergence. The fix is ONE canonical placement → ONE manifest
+    that GA + render + parts_ledger all consume (no re-place after the render)."""
+    import glob
+    paths = sorted(glob.glob(os.path.join(run_dir, "**", "parts-manifest.json"), recursive=True))
+    if len(paths) < 2:
+        return {"manifests": len(paths), "diverged": False, "score": 10, "status": "PASS", "detail": ""}
+    layouts = []
+    for p in paths:
+        try:
+            with open(p, "r", encoding="utf-8") as fh:
+                d = json.load(fh)
+            lay = {}
+            for x in _parts(d):
+                if isinstance(x, dict):
+                    key = str(x.get("tag") or x.get("name") or "")
+                    pos = x.get("pos_mm") or [0, 0, 0]
+                    lay[key] = tuple(round(float(c)) for c in pos[:3])
+            layouts.append((p, lay))
+        except Exception:  # noqa: BLE001
+            continue
+    if len(layouts) < 2:
+        return {"manifests": len(paths), "diverged": False, "score": 10, "status": "PASS", "detail": ""}
+    base_p, base = layouts[0]
+    worst = None
+    for p, lay in layouts[1:]:
+        common = set(base) & set(lay)
+        if not common:
+            continue
+        moved = sum(1 for k in common if base[k] != lay[k])
+        frac = moved / len(common)
+        if frac > 0.10 and (worst is None or frac > worst[0]):
+            worst = (frac, moved, len(common), p)
+    if worst:
+        _d = lambda pp: (os.path.basename(os.path.dirname(pp)) or "root")  # noqa: E731
+        return {"manifests": len(paths), "diverged": True, "score": 0, "status": "FAIL",
+                "detail": (f"{worst[1]}/{worst[2]} parts at DIFFERENT positions between "
+                           f"{_d(base_p)}/parts-manifest and {_d(worst[3])}/parts-manifest — GA and the "
+                           f"render can show different layouts depending which they read"),
+                "fix": "ONE canonical placement → ONE parts-manifest that GA + render + parts_ledger all consume"}
+    return {"manifests": len(paths), "diverged": False, "score": 10, "status": "PASS", "detail": ""}
+
+
 def litter_from_path(manifest_path: str) -> dict:
     try:
         with open(manifest_path, "r", encoding="utf-8") as fh:
@@ -108,6 +155,25 @@ def _selftest() -> int:
     if r["litter_parts"] != 0:
         print(f"  FAIL legit-repeat: 4 same-size valves must not be flagged (got {r['litter_parts']})")
         bad += 1
+    # proveCatch: two manifests in a run that disagree on positions → diverged/FAIL (GA2).
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        os.makedirs(os.path.join(_td, "_loop"), exist_ok=True)
+        _a = {"parts": [{"tag": f"t{i}", "pos_mm": [i * 100, 0, 0], "dims_mm": {"w": 50, "d": 50, "h": 50}} for i in range(10)]}
+        _b = {"parts": [{"tag": f"t{i}", "pos_mm": [i * 100 + 9000, 5000, 0], "dims_mm": {"w": 50, "d": 50, "h": 50}} for i in range(10)]}
+        with open(os.path.join(_td, "parts-manifest.json"), "w") as fh:
+            json.dump(_a, fh)
+        with open(os.path.join(_td, "_loop", "parts-manifest.json"), "w") as fh:
+            json.dump(_b, fh)
+        r = manifest_divergence(_td)
+        if not r["diverged"] or r["status"] != "FAIL":
+            print(f"  FAIL divergence proveCatch: two disagreeing manifests must be FAIL (got {r})"); bad += 1
+        # counter-case: identical second manifest → no divergence, PASS.
+        with open(os.path.join(_td, "_loop", "parts-manifest.json"), "w") as fh:
+            json.dump(_a, fh)
+        r = manifest_divergence(_td)
+        if r["diverged"]:
+            print(f"  FAIL divergence counter-case: identical manifests must PASS (got {r})"); bad += 1
     print("manifest_sight selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 

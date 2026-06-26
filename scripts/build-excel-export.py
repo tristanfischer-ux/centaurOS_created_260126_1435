@@ -207,6 +207,25 @@ def _manifest_litter(run_dir: str):
     return res
 
 
+_DIV_CACHE: dict = {}
+
+
+def _manifest_div(run_dir: str):
+    """SIGHT: do ≥2 parts-manifests in the run disagree on positions (GA reads one, render another →
+    GA-top ≠ render-top)? Cached."""
+    if run_dir in _DIV_CACHE:
+        return _DIV_CACHE[run_dir]
+    res = None
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
+        import manifest_sight as _ms
+        res = _ms.manifest_divergence(run_dir)
+    except Exception:  # noqa: BLE001
+        res = None
+    _DIV_CACHE[run_dir] = res
+    return res
+
+
 def _aux_tab_score(title: str, run_dir: str):
     """A deterministic quality score for a DRAWING / RENDER / META sheet that the per-tab scorecard
     (the 16 data tabs) doesn't cover — so EVERY sheet shows a quality number (Tristan 2026-06-27).
@@ -238,12 +257,20 @@ def _aux_tab_score(title: str, run_dir: str):
     if "block flow" in t or "bfd" in t:
         return _cov("block-flow-diagram", "Block-flow")
     def _cap_litter(base):
-        """A render / GA drawing reflects the parts-manifest geometry, so default-size LITTER caps its
-        score — it cannot be a genuine ≥8 while most objects are default boxes (SIGHT)."""
+        """A render / GA drawing reflects the parts-manifest geometry, so default-size LITTER and a
+        MANIFEST DIVERGENCE (GA reads one manifest, the render another → different layouts) both cap its
+        score — it cannot be a genuine ≥8 while most objects are default boxes OR the two top-views can
+        legitimately disagree (SIGHT)."""
         if not isinstance(base, dict):
             return base
+
+        def _cur(b):  # current score, treating a legit 0 as 0 (NOT `or 10` — that masks a real 0)
+            s = b.get("score")
+            return s if isinstance(s, (int, float)) else 10
+
+        # LITTER first, then DIVERGENCE — so the more-fundamental divergence issue leads the banner.
         lit = _manifest_litter(run_dir)
-        if isinstance(lit, dict) and isinstance(lit.get("score"), (int, float)) and lit["score"] < (base.get("score") or 10):
+        if isinstance(lit, dict) and isinstance(lit.get("score"), (int, float)) and lit["score"] < _cur(base):
             w = lit.get("worst") or {}
             base["score"] = lit["score"]
             base["status"] = "PASS" if lit["score"] >= 8 else "FAIL"
@@ -253,6 +280,12 @@ def _aux_tab_score(title: str, run_dir: str):
                                f"(e.g. {', '.join((w.get('examples') or [])[:3])}); the geometry "
                                f"generator must derive real per-part dims"] + (base.get("issues") or []))[:6]
             base["fix"] = "geometry generator must size each part from its real dims, not a shared default box"
+        div = _manifest_div(run_dir)
+        if isinstance(div, dict) and div.get("diverged"):
+            base["score"] = 0
+            base["status"] = "FAIL"
+            base["issues"] = ([f"LAYOUT DIVERGENCE: {div.get('detail', '')}"] + (base.get("issues") or []))[:6]
+            base["fix"] = div.get("fix", base.get("fix", ""))
         return base
 
     if "general arrangement" in t or t.startswith("ga "):

@@ -17,7 +17,8 @@ STAGE 0 — Honest + TOTAL scorer (PRECONDITION)
   [x] F1 banner RE-STAMP (every banner re-stamped from FINAL scores; Financial 10→6 FAIL) · [x] guard: banner reflects score (selftest 5)
 STAGE 0.5 — SIGHT: audit the DELIVERED artefact, not state.json
   [x] render LITTER (`manifest_sight.py`, caps render/GA; v9 47%→0/FAIL) — SOURCE fix = Stage 3
-  [ ] bbox-containment (walls-outside) · [ ] shared-layout-hash (GA-top==render-top) · [ ] Excel cell-reader
+  [~] shared-layout DIVERGENCE detector (manifest_sight: 2 manifests, 122/122 parts moved → GA/render 0/FAIL; SOURCE=one-manifest)
+  [ ] bbox-containment (N/A this archetype: no envelope) · [ ] Excel cell-reader
   [ ] vision critic (adversarial, proveCatch on littered render) · [ ] render-then-reingest wiring
 STAGE 1 — Provenance spine (= X4, highest-leverage build-out)
   [ ] every number carries WHERE-FROM + WHERE-TO as data · [ ] orphan-number check
