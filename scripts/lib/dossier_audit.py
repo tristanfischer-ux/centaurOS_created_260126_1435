@@ -313,6 +313,15 @@ _MATCH_STOP_TOKENS = {
     "kw", "kwh", "kva", "kv", "v", "a", "kg", "t", "l",
     "count", "nr", "no", "qty", "ea", "off", "unit", "units", "pcs", "number",
 }
+# MEASURE / SCOPE words — the part of a metric name that says HOW it is measured or at what scope,
+# not WHAT it is. Stripped to leave the SUBJECT noun(s) for the subject-anchored match (Pass 4), so a
+# brief that names a REQUIREMENT by its measure word ('irrigation_demand') still binds to the DELIVERED
+# quantity that names it differently ('irrigation_pump_flow').
+_MEASURE_SCOPE_TOKENS = {
+    "demand", "capacity", "throughput", "flow", "rate", "duty", "load", "output", "delivery",
+    "department", "each", "module", "per", "total", "max", "min", "peak", "required", "target",
+    "pump", "motor", "power", "volume", "size", "value",
+}
 
 
 def _singularise(tok: str) -> str:
@@ -384,6 +393,28 @@ def _contract_match(state, metric_name, metric_unit):
                 best = cand
         if best is not None:
             return (best[3], best[4])
+    # Pass 4: SUBJECT-anchored family match. When the brief names a REQUIREMENT by a word the DELIVERED
+    # quantity doesn't share (irrigation 'demand' ↔ the delivered irrigation 'pump_flow'), bind by the
+    # metric's distinctive SUBJECT noun(s) + same family, preferring the fewest extra tokens. Requires
+    # EVERY subject noun present (so it stays specific) and excludes requirement-echoes. Removes the
+    # false-UNVERIFIED on a met demand (v14 max_irrigation_demand_per_department met by irrigation_pump_flow).
+    subj = {t for t in b_tokens if t not in _MEASURE_SCOPE_TOKENS}
+    if subj:
+        best4 = None
+        for k, v in _quantities(state).items():
+            if not isinstance(v, dict):
+                continue
+            if set(_norm_name(k).split("_")) & _ECHO_NAME_TOKENS:
+                continue
+            if not _fam_compatible(fam, _unit_family(v.get("unit"))):
+                continue
+            q_tokens = _name_tokens(k)
+            if subj <= q_tokens:                      # every subject noun present in the quantity
+                cand4 = (len(q_tokens - b_tokens), k, v.get("value"))
+                if best4 is None or cand4 < best4:
+                    best4 = cand4
+        if best4 is not None:
+            return (best4[1], best4[2])
     return (None, None)
 
 
