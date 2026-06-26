@@ -1,6 +1,27 @@
 # 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
 
 ═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-26 NIGHT — ≥8-EVERY-TAB is now a CODED SHIP GATE; grinding tabs up)
+═══════════════════════════════════════════════════════════════════════════════
+TRISTAN: work CONTINUOUSLY (no check-ins) until EVERY tab is a GENUINE ≥8 (not fake); the ≥8-every-tab
+floor must be PART OF THE CODE. DONE this push (commits): per-tab ≥8 floor is now the SHIP GATE
+(build-excel ship_ok=False + EXIT 2 + DRAFT banner unless tabScorecardSummary.all_pass; UNSCORED counts as
+fail = anti-fake-8) [099de10e3]; tag_validity accepts range tags FCV-201–208 (gate-intent) [099de10e3];
+4 formerly-UNSCORED tabs now have GENUINE deterministic checks (Part names/Line&velocity/Panel schedule/
+Glossary — prove-the-catch Fixture K) so UNSCORED count = 0 [next commit]; irrigation pump tool sizes to
+the stated DEMAND + auto-sizes its pipe (12→45 m³/h, DN100, 2.2 kW) [the tool fix]; gac/softener throughput
+renamed to the brief's GAC terms → compliance matches (UNVERIFIED→PASS) [gac commit].
+v5 PER-TAB now: Exec 2, Calc 6, BoM 6, Risk 6, the 4 ex-UNSCORED = 10/10/10/8, rest 10. all_pass FALSE.
+REMAINING sub-8 (drive each to ≥8 at SOURCE): Exec Summary = irrigation pump (tool fixed; CHECK v6 wired
+the demand — if still 12, wire irrigation_demand_m3_h into the auto-planner tool input) + gac (fixed);
+Calc 6 = calc-coverage 24% (28/37 numbers have no worked-calc — systematic: emit calc() per derived qty);
+BoM 6 = parts-ledger 0/0 (parts_ledger.py didn't populate — CHECK v6); Risk 6 = water storage OVER-SIZED
+(fresh_water_storage_capacity 196.8 + drain tank 64.8 vs brief 40 m³ — the universal sizer overwrites the
+brief-pinned HARD slot; deep sizer fix, do carefully). FRESH RUN out/fischer-codema-v6 IN FLIGHT (exercises
+the repair/tag/irrigation/gac fixes) → when done: build-excel, read tab_scores, continue the grind from the
+REAL state. Then a v7 after the contract (gac/irrigation) fixes land.
+
+═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-26 EVE — HONEST SCORING DONE; next = STALE-BoM determinism #86)
 ═══════════════════════════════════════════════════════════════════════════════
 HONEST-SCORING SYSTEM COMPLETE + VERIFIED on a FRESH v5 run (5 commits, all guarded). v5 compliance:
