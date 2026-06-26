@@ -431,6 +431,13 @@ const stepIrrigation: ToolStep = {
     return {
       total_emitters: Math.max(40, Math.round(canopyM2 * 4)),
       flow_per_emitter_l_h: 2.0,
+      // An EBB/FLOW (flood-and-drain) plant's pump must meet the stated irrigation DEMAND, not the drip
+      // emitter sum — pass the demand so irrigation_pump_sizing floors the pump to it (v10: the pump
+      // came out 12 m³/h while irrigation_demand_m3_h was 90 because the demand was never passed in).
+      irrigation_demand_m3_h: c.quantities?.irrigation_demand_m3_h?.value
+        ?? c.quantities?.peak_flow_m3_h?.value ?? null,
+      peak_flow_m3_h: c.quantities?.peak_flow_m3_h?.value
+        ?? c.quantities?.irrigation_demand_m3_h?.value ?? null,
       system_type: 'nft' as const,
       pressure_loss_kpa: 50,
       static_head_m: 3.0,

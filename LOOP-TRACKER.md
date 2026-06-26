@@ -5,6 +5,32 @@
 > (verbatim tab review). Work the MASTER CHECKLIST top-down; update status in place; the RESUME blocks below
 > are the running detail log.
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-26 v10 — 11/16 DATA tabs ≥8; 5 FAIL, ALL precisely diagnosed)
+═══════════════════════════════════════════════════════════════════════════════
+Fresh v10 (all accumulated fixes). 11/16 data tabs ≥8 (Line&velocity/Panel/Process/Assembly now 10 —
+the canonical-manifest fix made data surfaces coherent). 5 FAIL, root causes from brief ground-truth
+(briefs-loop/fischer_farms_codema.md):
+1. Exec Summary 0 + Risk 6 — WATER SIZING vs brief:
+   • irrigation_pump_flow_m3_h = 12 but irrigation_demand_m3_h = 90 (brief: 2 depts × 45) → pump UNDER its
+     OWN declared demand. FIX: pump flow = max(computed, irrigation_demand_m3_h). [source: irrigation pump sizing]
+   • storage: brief water_storage_capacity = 120 (3 tanks × 40); compared metric reads
+     fresh_water_storage_capacity = 40 (ONE tank). total_water_storage_volume_m3 = 261.6 exists. FIX: the
+     brief-target comparison must use the TOTAL (count×each / total_*), not the per-unit quantity.
+   • fertigation: brief 90 (2 units × 45); compared reads fertigation_dosing_pump_throughput = 45 (per unit).
+     Same per-unit-vs-total mismatch.
+   • drain_water_tank = 64.8 each vs brief 40 — buffer-sizing consumptive model over-sizes (no reclaim term).
+2. BoM 2 — (a) P&ID 0/44 + BFD 0/20 EMPTY generators (Stage 3 build-out #101); (b) duplicate tag 'X-123'×2.
+3. Connection trace 2 — process-parts fluid-in+out coverage + ledger-completeness invariants.
+4. Overview 6 — 6/290 invariants FAIL (BoM P-105 emitted-kW mismatch + 5 more).
+CORE INSIGHT: brief targets are PLANT TOTALS; design quantities are PER-UNIT (N tanks / 2 depts / 2 units).
+The brief-target comparison + several metrics must aggregate count×per-unit. + irrigation pump genuinely
+under-sized. SIGHT: manifest divergence STILL flags _loop vs root (early settle-loop vs final placement) —
+the snapshot/restore fixed the DATA surfaces but root≠_loop persists (render-PNG freeze still open).
+NEXT: (1) irrigation pump = demand; (2) brief-target comparison uses totals; (3) drain reclaim; (4) P&ID/BFD
+generators; (5) dup-tag X-123; then re-run v11 + re-score. Each needs a fresh chain run to verify.
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
