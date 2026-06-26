@@ -1377,10 +1377,18 @@ def _as_num(x):
 
 
 def check_brief_unverified(state, rows, run_dir) -> list:
-    """The brief compliance must NOT be mostly UNVERIFIED. If a brief target has no matching
-    contract quantity, the design cannot be confirmed against its own brief — which usually means
-    the brief's SCALE never propagated into the sizing (Tristan 2026-06-25: the Exec Summary
-    showed every metric UNVERIFIED while the design was sized ~150× below the 6,000-tray brief)."""
+    """Every brief target must be PROVEN against a contract quantity. A pass is good; an
+    UNVERIFIED metric is BAD (Tristan 2026-06-26: "a pass is good — unverified and fail are
+    bad") — the design cannot be confirmed against its own brief, which usually means the
+    brief's SCALE never propagated into the sizing (the Exec Summary showed every metric
+    UNVERIFIED while the design was sized ~150× below the 6,000-container brief).
+
+    Scoring honesty: emit ONE HIGH finding PER UNVERIFIED metric (NOT a single softened
+    roll-up). The old code collapsed all UNVERIFIED metrics into one finding and downgraded
+    it to MED unless 100% were unverified — so a tab whose compliance table was 1-of-5 PASS
+    still scored 8/10. Per-metric HIGH means the Exec Summary score now reflects the truth:
+    the only way to raise it is to make the engine actually verify the metric (match a
+    same-family contract quantity / propagate the brief scale), never to soften the scorer."""
     out: list = []
     try:
         metrics = ((((state.get("parsedBrief") or {}).get("constraints") or {})
@@ -1389,27 +1397,26 @@ def check_brief_unverified(state, rows, run_dir) -> list:
         return out
     if not isinstance(metrics, list) or not metrics:
         return out
-    unverified, total = [], 0
     for m in metrics:
         if not isinstance(m, dict):
             continue
         name = m.get("key_metric") or m.get("metric") or m.get("name") or ""
         if not name:
             continue
-        total += 1
         mk = _contract_match(state, name, m.get("unit") or "")
         matched = mk[0] if isinstance(mk, tuple) else mk   # _contract_match → (key, value) or (None, None)
-        if matched is None:
-            unverified.append(str(name))
-    if total and len(unverified) >= max(1, total * 0.5):
-        sev = "HIGH" if len(unverified) == total else "MED"
+        if matched is not None:
+            continue  # matched → PASS/FAIL handled by check_brief_metric_fail (a matched miss is its own HIGH)
+        u = str(m.get("unit") or "").strip()
+        tgt = _num(m.get("value") if isinstance(m, dict) else None)
+        tgt_s = f"{tgt:g}{u}" if tgt is not None else "(stated)"
         out.append(Finding(
-            tab="Exec Summary", check="brief_unverified", severity=sev,
-            message=(f"{len(unverified)} of {total} brief metrics are UNVERIFIED (no matching "
-                     f"contract quantity) — the design cannot be confirmed against its own brief; "
-                     f"usually the brief's scale did not propagate into the sizing"),
-            actual=", ".join(unverified[:6]) + ("…" if len(unverified) > 6 else ""),
-            expected="every brief target maps to a same-unit-family contract quantity",
+            tab="Exec Summary", check="brief_unverified", severity="HIGH",
+            message=(f"brief metric '{name}' (target {tgt_s}) is UNVERIFIED — no contract quantity "
+                     f"in the same unit family within ±50% of target, so the design cannot be "
+                     f"confirmed to meet its own brief"),
+            actual=f"{name} UNVERIFIED",
+            expected=f"a same-unit-family contract quantity proving {name} = {tgt_s}",
             source_rule="brief scale metrics must propagate into the contract (sizing reads the brief target, not a class default)",
         ))
     return out
@@ -2010,6 +2017,36 @@ def _selftest() -> int:
                "F: expected phantom_reference HIGH for 'cabinets'")
         expect(not any("Motor" in f.message for f in phantoms),
                "F: must NOT flag the resolvable 'Motor B' reference")
+
+    # ---- Fixture G: HONEST SCORING — every UNVERIFIED metric is its own HIGH ----
+    # Tristan 2026-06-26: "a pass is good — unverified and fail are bad"; "if you can't
+    # score yourself correctly you can't fix yourself". A compliance table that is
+    # mostly UNVERIFIED must NOT let the Executive Summary score ≥8 (the generosity bug:
+    # the old roll-up collapsed N unverified metrics into one MED → tab scored 8/10).
+    unver_state = {
+        "orchestratorContract": {"product_class": "water_treatment", "quantities": {
+            # ONE metric is provable (exact-unit match) -> PASS; the rest have no match.
+            "ro_recovery_percent": {"value": 75, "unit": "%", "family": "percent", "source": "brief"},
+        }},
+        "parsedBrief": {"product_class": "water_treatment", "constraints": {"target_performance": {"metrics": [
+            {"key_metric": "ro_recovery_percent", "value": 75, "unit": "%"},        # PASS
+            {"key_metric": "cultivation_containers", "value": 6000, "unit": "count"},   # UNVERIFIED
+            {"key_metric": "max_irrigation_demand_m3_per_hr", "value": 45, "unit": "m3/hr"},  # UNVERIFIED
+            {"key_metric": "ro_permeate_capacity_m3_per_hr", "value": 8, "unit": "m3/hr"},    # UNVERIFIED
+            {"key_metric": "actuated_valves", "value": 200, "unit": "count"},               # UNVERIFIED
+        ]}}},
+        "keyMetrics": {"headline_output": {"id": "ro_recovery_percent", "value": "75", "unit": "%"}},
+        "costStack": {"installed_asp_gbp": 1000},
+    }
+    repg = audit_dossier(unver_state, [], run_dir="/nonexistent-run-dir-xyz")
+    unv = [f for f in repg.findings if f.check == "brief_unverified"]
+    expect(len(unv) == 4, f"G: expected 4 per-metric brief_unverified HIGH, got {len(unv)}")
+    expect(all(f.severity == "HIGH" for f in unv), "G: every UNVERIFIED metric must be HIGH")
+    scg = tab_scores(unver_state, [], "/nonexistent-run-dir-xyz")
+    es = scg.get("Executive Summary") or {}
+    es_score = es.get("score")
+    expect(isinstance(es_score, (int, float)) and es_score < 8 and es.get("status") == "FAIL",
+           f"G: Exec Summary must FAIL (<8) when its compliance table is mostly UNVERIFIED, got {es_score}")
 
     # ---- Unit checks: synonym + conversion helpers ---------------------------
     expect(_norm_name_syn("usable_energy_mwh") == _norm_name_syn("usable_capacity_kwh"),
