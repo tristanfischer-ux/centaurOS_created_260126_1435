@@ -1,0 +1,560 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/fischer_farms_fertigation.md (7428 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 7428 chars
+[brief-parse] OK — confidence=HIGH, missing=5 fields, metrics=16
+[chain] classification: vertical_farm (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 12.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: vertical_farm): 3 HARD field(s) filled with class-aware inferred values, 4 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: max_mass_kg, target_process, operating_environment.
+  [U5] filled "max_mass_kg": 28000 (Class default for containerised vertical farm (40 ft Hi-Cube ISO container; controlled-interior ≈ +18–24 °C; design life)
+  [U5] filled "target_process": "Containerised hydroponic cultivation: NFT/DWC tray grow, LED photoperiod control, fertigation dosing, CO₂ enrichment, psychrometric HVAC management" (Class-canonical process for vertical_farm. Class default for containerised vertical farm (40 ft Hi-Cube ISO container; c)
+  [U5] filled "operating_environment": {"temp_min_c":16,"temp_max_c":26} (Class-canonical operating temperature range for vertical_farm: 16 °C to 26 °C. Class default for containerised vertical )
+[chain] U6 brief expansion: 15 duties derived; product="Fertigated irrigation water for hydroponic crops" (model=google/gemini-3.1-pro-preview, cost_usd=0.0635)
+  [U6] total_cultivation_area_m2 = 21362.4 m2 [derived/high] — 6,000 trays multiplied by tray dimensions of 2.76 m x 1.29 m
+  [U6] tray_flood_volume_m3 = 0.0534 m3 [derived/high] — Tray area (3.5604 m2) multiplied by 0.015 m flood depth
+  [U6] valve_group_flow_demand_m3_per_hr = 45 m3/h [derived/high] — 30 trays per valve group multiplied by 1.5 m3/h inlet flow per tray. Matches stated max si
+  [U6] valve_group_flood_volume_m3 = 1.602 m3 [derived/high] — 30 trays per valve group multiplied by 0.0534 m3 flood volume per tray
+  [U6] ro_feed_water_demand_m3_per_hr = 10.67 m3/h [derived/high] — 8 m3/h permeate capacity divided by 0.75 recovery rate
+  [U6] ro_reject_flow_m3_per_hr = 2.67 m3/h [derived/high] — RO feed water demand (10.67 m3/h) minus permeate capacity (8 m3/h)
+  [U6] max_fresh_water_production_m3_per_hr = 9.2 m3/h [derived/high] — 8 m3/h RO permeate plus maximum 15% raw water blend (1.2 m3/h)
+  [U6] total_water_storage_capacity_m3 = 120 m3 [derived/high] — One 40 m3 fresh water tank plus two 40 m3 drain water tanks
+  [U6] total_fertigation_dosing_capacity_m3_per_hr = 90 m3/h [derived/high] — Two A/B nutrient-dosing units at 45 m3/h each
+  [U6] drain_pit_total_volume_m3 = 10 m3 [derived/high] — 5,000 L (5 m3) per cultivation room multiplied by 2 cultivation departments
+  [U6] estimated_peak_electrical_load_kw = 35 kW [derived/medium] — Sum of major continuous loads: 2x 7.5kW fertigation pumps + estimated 2x 4kW drain pumps +
+  [U6] ro_permeate_capacity_m3_per_hr = 8 m3/h [stated/high] — Stated in brief
+  [U6] softener_gac_throughput_m3_per_hr = 14 m3/h [stated/high] — Stated in brief
+  [U6] cloth_filter_capacity_m3_per_hr = 80 m3/h [stated/high] — Stated in brief
+  [U6] target_feed_water_conductivity_ms_per_cm = 0.5 mS/cm [stated/high] — Stated in brief
+[chain] engineering_contract: 26 quantities, 3 topology edges, 5 macro-assemblies (total £669,000), closures: 2 pass / 0 warn / 1 fail
+  ✕ [electrical_supply_closure] Total demand 920.0 kW vs supply 44 kW (2091%). Need <90% with diversity.
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db","latency_ms":387}
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":7}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db","latency_ms":5}
+[products-writeback] {"product_name":"Containerised VF, 3000 m² canopy across 6000 trays (8 trolleys × 5 tiers). LED 450.0 kW @ 250 µmol/m²/s. HVAC 465.0 kW cooling. Total electrical 920.0 kW / 44 kW supply. Annual yield 750.0 t. Macro-as","hit":"db_hybrid","matched":"Vertical Future smart farm","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":1621}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 3/7 mandatory covered for UK+EU
+  ⚠ HACCP (missing_mandatory): Hazard Analysis and Critical Control Points — Codex Alimentarius (global). Mandatory hazard-based food safety system for
+  ⚠ MD 2006/42/EC (missing_mandatory): Machinery Directive (EU). Conveyors, lifts, automated harvesters classified as machinery; risk assessment + DoC required
+  ⚠ WRAS (missing_mandatory): Water Regulations Approval Scheme (UK) (UK). UK regulatory approval required for fittings and materials in direct contac
+  ⚠ RoHS 2011/65 (missing_mandatory): Restriction of Hazardous Substances Directive (EU). LED fixtures and electronic controllers placed on the EU market must
+  ⚠ JURISDICTION_SCOPE (jurisdiction_conflict): Brief targets multiple regions (UK, EU) without an explicit harmonisation plan. Each region adds £25-60k in certificatio
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: vertical_farm
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 10334 chars. First 200: {
+  "market_context": "The European and UK vertical farming market is projected by industry analysts to grow significantly, with estimates suggesting it could exceed several billion dollars by 2030, d
+[research-synthesis] Complete: 4 competitors, 5 sources, 4 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[orchestrator] ⚠️  fixed-point iteration did not converge in 5 iterations — using iter-5 state (design may oscillate within 5% band)
+[chain] Orchestrator: 11 modules, 27 sub-modules, 90 words, 21 tools ran (8044ms)
+[chain] Build #18k: toolOutputsBlock built (22 tools, 17276 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 18 component_classes covered (18 with match, 0 empty), 15100 chars (20608ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=1250000, max_mass_kg=28000, target_performance_value=6000 (count), operating_temp_min_c=16, operating_temp_max_c=26
+[chain] Contract validation: all 5 macro-assemblies present in design ✓
+[chain] keyMetrics seeded early (pre-reviewer): Cultivation Trays=6,000 count
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=2/10 plaus=1/10 coh=3/10 part=5/10 hon=4/10 (36825ms)
+[chain] PHASE 4 skeleton critic: 5 HIGH-severity issues found before any LLM painting
+  ✗ [brief_to_design_fidelity @ irrigation_nutrient] The design completely omits the required RO system (8 m3/h), water softener and GAC system (14 m3/h), cloth filter (80 m3/h), and the 40 m3 fresh water and 40 m3 drain water tanks.
+  ✗ [engineering_plausibility @ growing_canopy/words[1]] The design attempts to fit 6,000 trays (0.5 m² each, total 3,000 m² canopy) inside a single 40HC container (floor area ~28.2 m²). Even with 5 tiers on 8 racks, the maximum physical
+  ✗ [engineering_plausibility @ climate_control/words[0]] The Mitsubishi PUMY-P140YKM2 and Daikin FXFSQ125ARV16 are rated in the design at '711.1 kW' cooling capacity. In reality, the PUMY-P140 is a 14 kW nominal outdoor unit and the FXFS
+  ✗ [engineering_plausibility @ electrical_distribution/words[1]] The ABB S203 MCBs are listed with capacities of '495 A' and '411 A'. Miniature Circuit Breakers (MCBs) of the S200 series only go up to 63A (or 100A for high-performance MCBs). Rat
+  ✗ [engineering_plausibility @ electrical_distribution/words[0]] The total lighting load of 12,000 x 60W Heliospectra lights is 720 kW. The main breaker is an ABB Tmax XT1H 160 (rated for 160A, though listed as 250A). At 400V 3-phase, a 160A bre
+[chain] PHASE 4 FAIL_FAST: plausibility 1/10 — tool skeleton is unrecoverable; reviewer cascade will NOT fix this. Loop continues so PDF lands for diagnosis, but fix the orchestrator tool wiring first.
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 13460 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 18 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 18 / 18 patches (skipped 0)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.growing_tray_word manufacturer="Grodan" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.growing_tray_word part_number="GRO-TRAY-2300-HDPE" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.growing_tray_word material="food-grade HDPE" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.growing_tray_word rating_primary="0.50 m² per tray" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word growing_canopy.mobile_growing_trolleys.growing_tray_word (+5 modifiers)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word manufacturer="Tente" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word part_number="5947UOP250P62" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word material="polyurethane wheel on steel housing" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 28.0s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":1,"d_overview_chars":651}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=3/10 phys=1/10 coh=3/10 part=5/10 hon=2/10 (31728ms)
+[chain] critic headline: The design honours the documented trade-off of a 920 kW electrical load on a 44 kW supply, but contains severe physical scaling impossibilities and fabricated component ratings.
+[chain] critic issues: 6 high, 0 med, 6 total
+  ✗ [high/high] engineering_plausibility @ growing_canopy/sub_modules/0/words/0: The design specifies 8 Montel GREENROLL racks measuring 1353x2300x2400 mm (envelope volume of 7.47 m³ each) carrying 750 trays of 2300x217x50 mm (total tray vol
+  ✗ [high/high] engineering_plausibility @ climate_control/sub_modules/0/words/0: The Mitsubishi PUMY-P140YKM2 outdoor unit and Daikin FXFSQ125 indoor cassette are both listed with a cooling capacity of 711.1 kW. In reality, the PUMY-P140 is 
+  ✗ [high/high] engineering_plausibility @ electrical_distribution/sub_modules/1/words/0: The ABB S203 MCBs are listed with capacities of 495 A and 411 A. The ABB S200 series MCBs only go up to 63 A. Furthermore, these branch breakers far exceed the 
+  ✗ [high/high] engineering_plausibility @ irrigation_nutrient/sub_modules/1/words/0: The Grundfos CRE 3 pump is listed with a power rating of 22.00 kW. A CRE 3 pump is a small-capacity vertical multistage pump typically rated under 2.2 kW. A 22 
+  ✗ [high/high] engineering_plausibility @ irrigation_nutrient/sub_modules/0/words/0: The Enduramaxx 172810 is a 1,000 L vertical tank, but the design lists its capacity as 30,000 L (30 m³). A 1,000 L tank cannot hold 30,000 L.
+  ✗ [high/high] brief_to_design_fidelity @ effluent_treatment/sub_modules/0/words/0: The Amiad Mini Sigma filter has a listed capacity of 40 L/min (2.4 m³/h). This is far below the brief's requirement for a cloth filter capacity of 80 m³/h and d
+
+[chain] STEP 7.5b: physics-critic PHASE-2 AUTO-CORRECT (SHADOW — records would-be corrections, does NOT mutate the design)
+[chain] physics auto-correct (shadow): selected 1 blocking finding(s) → corrected 3, declined 0, unlocatable 0, still-uncorrectable 0 after 2 pass(es)
+  • [uncleared] undersized-vs-load @ electrical_distribution/sub_modules[0]/words[0] (part-token): {manufacturer=ABB, part_number=Tmax XT1H 160 4p, capacity=250, form=ABB Tmax XT1H 4-pole 36 kA} → {manufacturer=ABB, part_number=XT6N 800 Ekip Dip LS/I In=800 4p F F, capacity=800 A, form=ABB Tmax XT6N 4-pole 36 kA MCCB, rating_primary=800 A, list_price_gbp=2450}
+  • [corrected] undersized-vs-load @ climate_control/sub_modules[0]/words[0] (part-token): {manufacturer=Mitsubishi Electric, part_number=PUMY-P140YKM2, capacity=711.1, form=Mitsubishi Electric PUMY-P140YKM2 R32 inverter outdoor unit, 711.1 kW cooling capacity} → {manufacturer=Carrier, part_number=38APD150, capacity=527 kW, form=Carrier Gemini 38APD150 air-cooled DX condensing unit, 527 kW cooling capacity, rating_primary=527 kW, list_price_gbp=75000}
+  • [corrected] undersized-vs-load @ electrical_distribution/sub_modules[1]/words[0] (part-token): {manufacturer=ABB, part_number=S203-C (3-pole C-curve MCB), capacity=495, form=ABB S203 C-curve 3-pole MCB} → {manufacturer=ABB, part_number=XT5N 600 Ekip Dip LS/I In=600 3p F F, capacity=600 A, form=ABB Tmax XT5 3-pole MCCB, rating_primary=600 A, list_price_gbp=1450}
+  • [corrected] undersized-vs-load @ effluent_treatment/sub_modules[0]/words[0] (part-token): {manufacturer=Amiad, part_number=Mini Sigma, capacity=40, form=Amiad Mini Sigma 2" self-cleaning screen filter} → {manufacturer=Amiad, part_number=Sigma Pro 4, capacity=80 m³/h, form=Amiad Sigma Pro 4" automatic polymeric screen filter, rating_primary=80 m³/h, list_price_gbp=4200}
+[chain] physics-critic enforcement (shadow): 1 BLOCKING known-failure fault(s) — a part the engine knows will fail:
+  ✗ [undersized-vs-load/high] @ electrical_distribution/sub_modules/1/words/0: The ABB S203 MCBs are listed with capacities of 495 A and 411 A. The ABB S200 series MCBs only go up to 63 A. Furthermore, these branch breakers far exceed the main incoming breaker rating of 250 A (A…
+[chain] task-41 fidelity gates: Critic flagged 1 module(s) for brief_fidelity structural adds: effluent_treatment
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 14809 chars
+[chain] STEP 8: R4 Flash-Lite review returned 16 patches
+[chain] STEP 8: R4 Flash-Lite review applied 14 / 16 patches (skipped 2)
+    =growing_canopy.mobile_growing_trolleys.english_sentence (prose)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word manufacturer="Tente" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word part_number="5947UOP250P62" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word material="polyurethane wheel, steel housing" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word rating_primary="250 kg load capacity" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word regulatory="EN 12532" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word growing_canopy.mobile_growing_trolleys.trolley_castor_word (+5 modifiers)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.floor_guide_rail_word manufacturer="Bosch Rexroth" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8: R4 Flash-Lite review done in 14.9s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1661}
+[chain] canonical product_class OVERRIDE: "" → "vertical_farm" (deterministic classifier wins)
+
+[chain] STEP 8.5: domain specialist (vertical_farm) review
+
+[chain] STEP 8.5: R4.5 vertical_farm specialist ...
+[chain] STEP 8.5: R4.5 vertical_farm specialist raw response: 11555 chars
+[chain] STEP 8.5: R4.5 vertical_farm specialist returned 12 patches
+[chain] STEP 8.5: R4.5 vertical_farm specialist applied 10 / 12 patches (skipped 2)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word manufacturer="Tente" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word part_number="5947UOP250P62" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word material="polyurethane wheel / steel housing" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word rating_primary="250 kg load" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word regulatory="EN 12532" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word growing_canopy.mobile_growing_trolleys.trolley_castor_word (+9 modifiers)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.floor_guide_rail_word manufacturer="Bosch Rexroth" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.floor_guide_rail_word part_number="3842992420" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8.5: R4.5 vertical_farm specialist done in 22.6s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":2,"d_overview_chars":1028}
+[chain] physics repair: 1 iter(s); HIGH 6→6; plausibility 1→1; patches 1
+  iter 0: proposed 11 applied 1 | HIGH 6→6 plaus 1→1 | apply_log: REJECT (identity-locked A1): physics-repair op="replace_modifier" not allowed — only set_derived_parameter + edit_word(name_human); part identity is emitter-owned / REJECT (identity-locked A1): physics-repair op="replace_modifier" not allowed — only set_derived_parameter + edit_word(name_human); part identity is emitter-owned / REJECT (identity-locked A1): physics-repair op="replace_modifier" not allowed — only set_derived_parameter + edit_word(name_human); part identity is emitter-owned
+[chain] sub-module prose pre-fill: rewrote 27/27 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] library-override detection: tagged 2 word(s) with source_detail="Library override: (no reason given)" — these will be Brave-verified by background-enrichment
+[chain] G0.5 brief-target-reconciliation: PASS — 1 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 139 entries (KPA=110, emitter=29, rag=0)
+[chain] gate-23 emitter-completeness: PASS — 27 sub_modules checked, 27 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 0: arith 0 pass / 1 fail; grammar 6 pass / 7 fail; total score -5470
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21} but missing [canopy_area_m2, led_efficacy_umol_j, led_power_kw]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [thermal_path_closes] grammar: 1 heat-source sub-module(s) without thermal_path: data_compute_communication::networking. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [declared_links_unique] grammar: 1 duplicate link(s): irrigation_nutrient: recirculation_loop::external_irrigation_skid::fluid_loop
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 40 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_solenoid_valve_word  (3 mods, need ≥4), climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4) ...+34. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — gro-tray-2300-hdpe, rbe-12-12-1-1 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 5 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×217" AND "2300×217×50 mm" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000" AND "12000×80×40 mm" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000" AND "1200×600×2000 mm" | lighting_array::lighting_distribution::lighting_bus_cable_word has 2 conflicting "dimension" values: "2×1.5" AND "25 m length" ...+1. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 0: applied 3 patches, skipped 4, allowlist_rejected=3, state_changed=true
+    =lighting_array.derived_parameters (Add missing derived parameters to lighting_array)
+    +cross_module_grammar_links.[+] (Close thermal path for data_compute_communication)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    =irrigation_nutrient.grammar_links (Remove duplicate grammar link in irrigation_nutrient)
+    ALLOWLIST_REJECT growing_canopy.sub_modules[0].words[+]: word patch contains MPN="GRO-TRAY-2300-HDPE" not in verified-parts allowlist (139 entries). Patch dropped. (Add missing tray component to growing_canopy)
+    ALLOWLIST_REJECT growing_canopy.sub_modules[0].words[+]: word patch contains MPN="RBE-12-12-1-1" not in verified-parts allowlist (139 entries). Patch dropped. (Add missing utility dock component to growing_canopy)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+]: word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Add missing cable component to lighting_array)
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 1: arith 1 pass / 0 fail; grammar 7 pass / 6 fail; total score -3070
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [declared_links_unique] grammar: 1 duplicate link(s): irrigation_nutrient: recirculation_loop::external_irrigation_skid::fluid_loop
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 40 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_solenoid_valve_word  (3 mods, need ≥4), climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4) ...+34. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — gro-tray-2300-hdpe, rbe-12-12-1-1 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 5 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×217" AND "2300×217×50 mm" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000" AND "12000×80×40 mm" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000" AND "1200×600×2000 mm" | lighting_array::lighting_distribution::lighting_bus_cable_word has 2 conflicting "dimension" values: "2×1.5" AND "25 m length" ...+1. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2: repair LLM returned unfixable: parse failure
+[fill-blank-mpn] 13 blank catalogue word(s) for class "vertical_farm" (48 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   climate_control::dx_hvac_unit (condensate recovery pump) → Fujitsu UTR-DPB24T
+[fill-blank-mpn]   ✓ DB   climate_control::co2_enrichment (CO2 solenoid valve) → Burkert 6013-2A
+[fill-blank-mpn]   ✓ DB   automation_sensing::environmental_sensors (CO2 NDIR sensor) → Amphenol SGX Sensortech IR31CE
+[fill-blank-mpn]   ✓ DB   automation_sensing::water_chemistry_sensors (water temperature NTC sensor) → Mitsubishi Electric PAC-TH011TK-E
+[fill-blank-mpn]   ✓ DB   data_compute_communication::networking (Ethernet Cat6 cable) → Stewart Connector BM-MFAR080N
+[fill-blank-mpn] filled 5/13 blank word(s): 5 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 48 structural skipped.
+[chain] fill-blank-mpn: branded 5/13 blank catalogue word(s) (5 DB-first real MPN, 0 generated real-OEM), 48 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 357 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 19369 lines scanned, 2 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 34 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=11 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"vertical_farm","resolved_to":"vertical_farm","hit":"db","nodes":15,"edges":38}
+[chain] K10 shadow: FAIL_SHADOW — matched=20 missing=13 extra=0
+[chain] headline derived: Cultivation Trays=6,000 count [derived_from_brief]; Unit cost ceiling=1,250,000 GBP; Yield per m² per year=49.7 kg/m²/yr (0.00s)
+[chain] part verification: 34 parts checked — verified=28, unverified=4, uncertain=2, skip=0
+[chain] G5 RAG: 6 queries → 1 suggestions (high=0, medium=0, low=1, below_threshold=5, corpus=50 rows)
+[chain] part verification: stripped 7 high-confidence fake part_numbers
+  • growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word → removed "GREENROLL mobile grow rack" (Montel manufactures 'GREENRAK' and 'GROWRAK' systems, but there is no evidence of a product named 'G)
+  • climate_control::co2_enrichment::co2_pressure_regulator_word → removed "Model 825" (Model 825 — pattern strip: contains descriptor word + suffix ("Model 825"), not a SKU)
+  • data_compute_communication::networking::industrial_managed_switch_word → removed "GREYHOUND GRS1052-AAAA" (The search results for the Hirschmann GREYHOUND 105 series show part numbers following a specific fo)
+  • structure_containment::iso_container_40hc::iso_container_40hc_word → removed "40HC dry container (ISO 6346 42G1)" (While CIMC manufactures 40ft High Cube containers, the ISO 6346 code 42G1 refers to a standard 40ft )
+  • structure_containment::access_doors::personnel_door_assembly_word → removed "Hygienic Hinged Door (insulated single-leaf)" (Hygienic Hinged Door (insulated single-leaf) — pattern strip: three or more all-alphabetic words ("H)
+[chain] strip+recommend: 7 recommendations — high=5, medium=1, low=0, unknown=1 (manual sourcing required)
+[chain] design decisions: 5 unresolved conflicts surfaced for human review
+  • growing_canopy::mobile_growing_trolleys::growing_tray_word dimension: "2300×217" AND "2300×217×50 mm" → recommend "2300×217×50 mm"
+  • growing_canopy::mobile_growing_trolleys::floor_guide_rail_word dimension: "12000" AND "12000×80×40 mm" → recommend "12000×80×40 mm"
+  • growing_canopy::seedling_propagation::propagation_rack_word dimension: "1200×600×2000" AND "1200×600×2000 mm" → recommend "1200×600×2000 mm"
+  • lighting_array::lighting_distribution::lighting_bus_cable_word dimension: "2×1.5" AND "25 m length" → recommend "2x1.5"
+  • climate_control::dx_hvac_unit::refrigerant_line_set_word dimension: "15.9/9.5" AND "10 m length" → recommend "15.9/9.5"
+[chain] structural-gate router: surfaced 4 unrepaired gate(s) as design decisions
+[nexar] token refresh HTTP 429: Too many requests. Please try again later.
+[nexar] GraphQL errors for mpn=PUMY-P140YKM2: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=basicDIM Wireless: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=MITRA X: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=UTR-DPB24T: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=FXFSQ125ARV16 (VRV-S round-flow cassette): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=MLT800: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=6013-2A: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=172810 1000 L vertical tank: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=PAC-TH011TK-E: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CRE 3: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=S203-C (3-pole C-curve MCB): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=IRDH275B-435: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Tmax XT1H 160 4p: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=294 push-bar panic device: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=B-7541 polyester rating-plate label: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Mini Sigma: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TUV PL-L 4P (germicidal 254 nm): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[chain] Stage 10.5 Part Reality Check: 26 checked, 8 real, 0 substituted, 18 warned (no substitute available). Nexar calls used: 18.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ rockwool_propagation_cube_word: "Grodan A-OK 36/40" [class=unknown, library_class=none]
+  ⚠ dx_hvac_unit_word: "Mitsubishi Electric PUMY-P140YKM2" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ lighting_dali_controller_word: "Tridonic basicDIM Wireless" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ horticultural_led_fixture_word: "Heliospectra MITRA X" [class=optical_emission_function, library_class=optical]
+  ⚠ condensate_recovery_pump_word: "Fujitsu UTR-DPB24T" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ dx_indoor_unit_word: "Daikin FXFSQ125ARV16 (VRV-S round-flow cassette)" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ refrigeration_dehumidifier_word: "Munters MLT800" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ co2_solenoid_valve_word: "Burkert 6013-2A" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ fertigation_reservoir_word: "Enduramaxx 172810 1000 L vertical tank" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ water_temp_ntc_sensor_word: "Mitsubishi Electric PAC-TH011TK-E" [class=electrical_conducting_function, library_class=none]
+  ⚠ fertigation_pump_word: "Grundfos CRE 3" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ lighting_branch_breaker_word: "ABB S203-C (3-pole C-curve MCB)" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ insulation_monitor_word: "Bender IRDH275B-435" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ tp_n_main_breaker_word: "ABB Tmax XT1H 160 4p" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ emergency_egress_release_word: "Exidor 294 push-bar panic device" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ ukca_marking_label_word: "Brady B-7541 polyester rating-plate label" [class=unknown, library_class=none]
+  ⚠ screen_filter_50_micron_word: "Amiad Mini Sigma" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ uvc_low_pressure_lamp_word: "Signify (Philips) TUV PL-L 4P (germicidal 254 nm)" [class=optical_emission_function, library_class=optical]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] PHYSICS BLOCKED: engineering_plausibility=1/10 brief_fidelity=2/10 — promoting acceptanceStatus to 'blocked'
+[chain] module-paragraph-llm: 11/11 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 0 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/10 capital (threshold 6); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 6 sections, 1 warnings
+[chain] design decisions review: 13 choices (1 applied, 12 flagged, 0 blocked)
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 768277260.9 kW, 76827726.09%); economic-conductor saving £849
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 758934808.6 kW, 75893480.86%); economic-conductor saving £832
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 799346899.1 kW, 79934689.91%); economic-conductor saving £845
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 768277260.9 kW, 76827726.09%); economic-conductor saving £849
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 769979938.9 kW, 76997993.89%); economic-conductor saving £849
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 1528047088.2 kW, 152804708.82%); economic-conductor saving £828
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 725737127.9 kW, 72573712.79%); economic-conductor saving £831
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 1524627178.6 kW, 152462717.86%); economic-conductor saving £834
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 8 passes, DID NOT settle within 8 passes (cap) — ledger records the residual, no fixed point asserted; as-routed supply demand 1000 → 1524628178.62 kW (Δ 1524627178.62 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 2005) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/blender-bg.log
+[estimate] product_class=vertical_farm annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'vertical_farm' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 83 parts need price estimates
+[estimate] corpus-classified 5/83; 78 need rule-based / Flash-Lite
+[estimate] rule-based classified 17 parts; 61 still need Flash-Lite
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Flash-Lite classified 4 batches
+[estimate] 26 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] Flash-Lite (volume-aware) for 4 'unknown' parts
+[estimate] updated 27 existing, synthesised 56 new, 0 failed
+[estimate] C3 DB cache: 0 hits — run scripts/ingest/* to populate the cache for better pricing accuracy
+[estimate] classification source: corpus=5 rule_based=17 flash_lite=61 fallback=0 curated=0 db_cache=0
+[estimate] estimate source: db_cache=0 curve=79 flash_lite_unknown=4
+[estimate] top classes in BoM:
+  structural_polymer: 15
+  mechanical_assembly: 9
+  safety_consumable: 9
+  oem_subsystem: 9
+  fluid_path: 8
+  structural_metal: 7
+  electronic_pcb: 5
+  electronic_connector: 4
+[estimate] estimated cost: GBP 0.003
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: vertical_farm
+[engine-c] 90 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 90/90 results in 38.3s
+[engine-c] flags: in_range=20  over=14  under=47  no_reference=9
+[engine-c] 61/90 priced lines flagged out-of-range vs reference corpus (67.8%)
+[engine-c] 16 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] BoM context:
+  • top manufacturers: Mitsubishi Electric, ABB, Montel, Grodan, Heliospectra, Tridonic, Daikin, Fujitsu, Munters, Harris
+  • critical components (top 10):
+      - fertigation pump (×1, 22.00 kW, Grundfos CR-class vertical multistage centrifugal)
+      - manifold PVC pipe (×1, 32 mm OD, PVC-U pressure pipe, food-contact)
+      - tray drip emitter (×12000, 2 L/h, pressure-compensating emitter)
+      - return drainage grid (×1, 50 mm OD, PVC-U gravity return manifold)
+      - inline UV steriliser (×1, 40 W, Grodan Aquariumsupplies UV 40W inline 254 nm)
+      - propagation rack (×1, 1200×600×2000 mm, 3-tier seedling rack)
+      - rockwool propagation cube (×75000, Grodan A-OK 36/40 wrapped)
+      - horticultural LED bar (×12000, 60 W, Heliospectra MITRA X / Fluence SPYDR class — complete fixture with INTEGRAL constant-current driver, passive heatsink + reflective optics, tunable RB+W)
+      - mobile growing trolley (×8, 1353×2300×2400 mm, powder-coated steel chassis on floor guide rails, full container width, rolls out the end doors (extraction access — no internal walkway))
+      - NFT growing tray (×6000, 2300×217 mm, food-grade HDPE recirculating channel, 0.50 m² per tray)
+  [principal_vf_oem] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [principal_vf_oem] +3 archetype-tagged row(s) from prior web-fallback persistence
+  [principal_vf_oem] scoring 15 candidates via Flash-Lite…
+  [led_supplier] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60)) — 1 semantic-only save(s) the keyword filter missed
+  [led_supplier] +2 archetype-tagged row(s) from prior web-fallback persistence
+  [led_supplier] scoring 15 candidates via Flash-Lite…
+  [led_supplier] web-fallback: 1 Brave query(ies) (need 1)
+    [led_supplier] "horticultural LED manufacturer grow light supplier vertical farm supplier UK manufacturer" → 14 hits (cumulative 14)
+  [led_supplier] web-fallback: 14 Brave hits, 14 after dedup; scoring via Flash-Lite…
+  [led_supplier] web-fallback: 3 candidate(s) collapsed by apex-domain pre-dedup (e.g. multiple product pages on the same company domain)
+  [name-url] mismatch warning — using domain-derived "Powerplusgroup" instead of cleaned "PPG Projects" (host=powerplusgroup.co.uk)
+  [led_supplier] web-fallback rejected: "Heliospectra LED Grow Lights Systems for Vertical Farming and CEA ⋆ VERTIKIT" → pre-check: too long (12 words)
+  [led_supplier] web-fallback: 1 candidate(s) rejected by validators (listicle / part-number / name/url mismatch)
+  [led_supplier] web-fallback: accepted 1/14
+  [led_supplier] persisted web candidates → inserted: 0, updated: 1, embedded: 1, skipped: 0
+  [hvac_integrator] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60)) — 2 semantic-only save(s) the keyword filter missed
+  [hvac_integrator] +4 archetype-tagged row(s) from prior web-fallback persistence
+  [hvac_integrator] scoring 15 candidates via Flash-Lite…
+  [headquarters-lookup] populated city on 3 candidate(s) via known-locations + Brave HQ query
+  [cross-archetype dedup] apex "verticallyurban.com" appears in 2 archetypes — keeping in "led_supplier" (score 10), dropping from "led_supplier" (score 9)
+  [cross-archetype dedup] removed 1 duplicate candidate slot(s)
+[enrich-suppliers] product_class: vertical_farm
+  principal_vf_oem: 3 candidate(s)
+    • [db] GrowUp Urban Farms (GB) — confidence: medium
+    • [db] Grow Dynamics (GB) — confidence: low
+    • [db] Digital Farming (GB) — confidence: low
+  led_supplier: 2 candidate(s)  — 2 from forge-truth.db (13 rejected); 1 added via web-fallback. Only 2 of 3 candidates — sales team may want to broaden the search.
+    • [db] Philips (Netherlands) — confidence: high
+    • [web] Vertically Urban (United Kingdom) — confidence: high
+  hvac_integrator: 3 candidate(s)
+    • [db] Munters (Sweden) — confidence: low
+    • [db] Eipl (United Kingdom) — confidence: low
+    • [db] Penmann (GB) — confidence: low
+[enrich-suppliers] calls — brave: 6, flash-lite (score): 59, flash-lite (name cleanup): 3, flash-lite (capability): 9
+[enrich-suppliers] provenance (web-fallback): 1 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (3 archetypes) + 1 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/state.json
+[supplier-validate] 8 candidate(s) examined: 6 already reconciled, 0 URLs replaced, 2 dropped, 2 changed total
+[supplier-validate] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/state.json
+[hero] step 0: per-project geometry generator (LLM)...
+[geom-gen] product_class=vertical_farm template=vertical-farm-9shot.py primary=openai/gpt-5.5 fallback=anthropic/claude-sonnet-4.6
+[geom-gen] [openai/gpt-5.5] first attempt: 238 lines, 141.8s
+[geom-gen] using output from openai/gpt-5.5
+[geom-gen] geometric-number fidelity: 5/6 (83%)
+[geom-gen] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/blender-scene.py (21430 bytes) + forge_blender_lib.py
+[hero]   geometry generator OK in 146.9s
+[hero] step 1: Blender structural reference cover pass...
+[hero]   template runner produced blender-cover.png in 0.0s
+[hero]   Blender cover OK in 0.0s → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/blender-cover.png
+[hero] step 2: Gemini 3.1 Flash Image preview (i2i)...
+[hero]   Gemini OK in 20.8s (1771.8 KB)
+[hero] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/cover.png
+[hero] updated state.brief_hero_image_path
+[modules] building palette card for 11 module(s)...
+[modules] all 11 module images already on disk; skipping template render
+[modules] template renderer produced 11/11 module images
+[modules] updated state.module_image_paths with 11 entries
+[chain] deployment_envelope: no envelope mapped for vertical_farm (returning null is intentional for some classes)
+[chain] costStack persisted: ex-works £6821380 (raw materials £5268679, class vertical_farm)
+[chain] G2 cost-reality: PASS — BoM £5268679 across 90 priced lines (0 unpriced)
+[chain] G3 review-completeness: PASS
+[chain] bom-cost-grounding: 7 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] pre-render SKU restore: re-added 7 blanked part_number(s) a late stage stripped from real parts — emitter is the part-identity authority
+[chain] self-audit (shadow): floor 1/10 · mean 3.8/10 · 9 blocking · below-8: brief_compliance=6, bill_of_materials=2, performance_card=3, design_narrative=2, physics_fidelity=1
+  ✗ [bill_of_materials] Total £5.27M vs £1.25M ceiling
+  ✗ [bill_of_materials] LED fixtures, DX HVAC, trolleys are wrong class for irrigation/fertigation plant
+  ✗ [bill_of_materials] Many £1 placeholder lines
+  ✗ [design_narrative] Claims 3000 m² canopy + 149 t/yr from single 40 ft container
+  ✗ [design_narrative] Generic mission boilerplate
+  ✗ [physics_fidelity] 750 trays per rack impossible
+[chain] sweet-spot reconciliation: INCOMPATIBLE (objective=balanced, rescale=0.20×) — ⚠ The brief asks for 360,000 m³/yr AND a £1.25M ceiling — these CANNOT both be met: 360,000 m³/yr costs £6.82M (5.5× the ceiling). Reconciled to your stated priority — BALANCED (the best cost/output compromise): the sweet spot is 72,000 m³/yr at £2.40M (£33/m³/yr) — the best compromise between the two, closest to your ideal of full output at full budget.
+[chain] → REDIRECT (not just disclose): this design is OFF-TARGET. Converge a real design with:
+[chain]     npx tsx scripts/design-to-target-run.ts /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/fischer_farms_fertigation.md /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3-converged
+[chain] cost-sanity (shadow): HIGH — Independent cost sanity HIGH: £6,821,380 / 360,000 m³/yr = £18.9/(unit·yr) is 79.2× below the £1,500/(unit·yr) low edge of the £1,500–£10,000/(unit·yr) industry band for throughput output — the bill of materials is almost certainly UNDERCOUNTED (missing line items / wrong unit price). (brief metric max_irrigation_demand_per_department_m3_per_hr=45 m3/h → 360,000 m³/yr; Capacity-per-time plant (CAPEX per annual output unit). Amine CO₂ capture + mineralisation PILOT ~£1,500-10,000/(t·yr CO₂) — commercial-scale DAC targets sub-£1,500 but a pilot/first-of-a-kind plant sits in this band (IEA DAC 2024; Climeworks/Heirloom/Carbon Engineering disclosures). A £55k plant capturing 365 t/yr = £150/(t·yr) is ~15× below this floor (the real CO₂ undercount).)
+[chain] cost-basis: refreshed cost_reality + costStack to the post-writeback BoM £5,832,196 (ex-works £7,550,968)
+[chain] cost-basis: 1 take-off + 1 curve + 0 catalogue + 88 disclosed; 1 take-off price written into the BoM; purchased £612,240 → installed £1,836,720 (central)
+[advisor-engagement] 11/11 modules got an advisor block — 22 specialist cards, 44 grounded questions
+[chain] advisor-engagement: 11 module blocks, 22 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — "vertical_farm" legitimately uses hydroponic markers (22 tools, 130 quantities scanned)
+[chain] render-quality (shadow): PASS — class="vertical_farm" template=vertical-farm-9shot.py hero=true modules=22 thin=0
+[chain] tools-flow: rendered 220725 bytes (22 tools)
+[investor-section] 5 investors matched from 18 candidates: Navitas Capital, Sony Innovation Fund, Newfund, NFT.VC, EEC Ventures
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 7/7 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  [schedule] ✓ Piping Isometrics  (drawings/isometric-index.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 7/7 drawings + hero → wired into the PDF
+[drawing-gates] 9 gates · 0 failing · ALL-PASS=True
+  ✓ [med ] legibility         single-line-diagram 2120x1300 aspect 1.6:1 (limit 4:1)
+  ✓ [med ] legibility         pid 2360x1376 aspect 1.7:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x896 aspect 2.5:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2160x2050 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         block-flow-diagram 2526x976 aspect 2.6:1 (limit 4:1)
+  ✓ [med ] legibility         hvac-layout 2240x1788 aspect 1.3:1 (limit 4:1)
+  ✓ [med ] legibility         process-schedules 2492x3264 aspect 1.3:1 (limit 4:1)
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✓ [med ] material_diversity 2 distinct pipe material(s): ['carbon steel', 'hdpe/pe100']
+[chain] drawing-gates: 0/9 failing — DRAWING >=8 PASS
+[census] 0 tie-in runs (0 units) = £0 (cable £0 + pipe £0)
+[census] routed major streams = £109,459  →  full interconnect ≈ £109,459
+  [corpus-median-lift] raised 18 under-priced principal line(s) to their engine corpus lower edge (+£85,705)
+[requirements_bom] price-ingest queue: +2 DB-miss principal(s) → /Users/tristanfischer/.forge-truth/price-ingest-queue.jsonl
+[chain] cost-sanity re-derived on authoritative BoM (Σ £12,402,925): verdict high — £45/m³/yr
+[chain] benchmark net: generating independent top-down expectation (LLM)…
+[chain] benchmark net (z-ai/glm-5.2): 🔴 RADICAL — RADICAL divergence — the deterministic engine and the LLM benchmark disagree by >2.5× on a core dimension; one of them is wrong. FULL CHECK REQUIRED.
+[chain]   • all-in cost: expected £350,000–850,000 (mid £550,000); engine £16,058,117 (costStack.oem_transfer_price_gbp) [radical, 29.2×]
+[chain]   • output — irrigation_capacity: expected 45 m³/h; engine 24 m³/h (contract.irrigation_pump_flow_m3_h) [warn, 0.53×]
+[chain]   • output — circulation_pump_power: expected 7.5 kW; engine 330.25681 kW (contract.led_installed_power_kw) [radical, 44.03×]
+[chain]   • BoM concentration: expected no single category above ~15% of cost; engine "UV-C warning label" is 64% of the bill [radical, 4.27×]
+[chain]   • sizing — total equipment volume: expected fits Dedicated plant room ~110 m² (roughly 10×11 m), ceiling height 4 m; two 40 m³ tanks alone occupy ~50 m² (~450 m³); engine equipment sums to ~591 m³ [warn, 1.31×]
+[chain]   ↳ FAULT UV-C warning label [cost] — unit price and total absurd for label (~90× total bill share) → £2–5 per label, qty ≤10
+[chain]   ↳ FAULT CO2 bulk tank · 3000 kg [cost] — unit price ~20–30× too high for 3 t tank (~£1.3 M vs realistic £40–60 k) → £50 k
+[chain]   ↳ FAULT DX outdoor unit · 711.1 kW [cost] — unit price ~10× too high; also outside water-system scope (£535 k vs ~£50–80 k) → remove or £70 k
+[chain]   ↳ FAULT fertigation reservoir · 30000 L [cost] — unit price 3–4 orders of magnitude too low (£8 vs £8–15 k) → £10 k
+[chain]   ↳ FAULT nutrient stock tank A · 200 L [cost] — unit price ~50× too high for 200 L stock tank (£55 k vs £1–1.5 k) → £1.2 k
+[chain]   ↳ FAULT nutrient stock tank B · 200 L [cost] — unit price ~50× too high (duplicate of A) (£55 k vs £1–1.5 k) → £1.2 k
+[chain]   ↳ FAULT all water connection lines (C01–C39) [component] — no representation of RO skid, softener+GAC, 2×40 m³ buffer tanks, distribution manifold to 6000 trays (entire subsystems absent) → add RO skid ~£80 k, 2×40 m³ tanks ~£65 k each, GAC/softener ~£45 k, main manifold ~£40 k
+[chain]   ↳ FAULT horticultural LED fixture · 60 W [cost] — outside benchmark scope; total also inflates bill 3× (£1.8 M (14.5 %) irrelevant to irrigation plant) → remove from water BoM
+[chain]   ↳ FAULT inline UV steriliser · 40 W [quantity] — qty=1 insufficient; price also high for 40 W unit (needs ≥3–4 redundant units) → qty 4 @ £2.5 k
+[chain]   ↳ FAULT PLC controller / edge industrial PC / HMI [cost] — PLC/SCADA budget ~£1–2 k instead of realistic ~£60–80 k panel (under-sized by factor ~40) → £65 k integrated SCADA panel
+[chain] benchmark net: wrote benchmark-punchlist.md — 10 fault(s) routed to 3 source rule(s): UNROUTED (no basis match, materials-takeoff, catalogue-price
+[chain] requirements-driven BoM: 129 requirement lines (Σ £12,402,925) → state.requirementsBom; cost cascade reconciled to this total
+dossier_repair: 2 fix(es) over 1 pass(es); 11 gap(s) need input (10 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/state.json
+[chain] self-repair: 2 fix(es) over 1 pass(es); 11 gap(s) need input (10 blocking HIGH)
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/dossier.xlsx
+  · Executive Summary
+  · Overview
+  · Brief
+  · ⚠ Checks
+  · ⚠ Audit
+  · Part names
+  · Quantities
+  · Calculations
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Financial model
+  · Panel schedule
+  · Process schedules
+  · Line & velocity
+  · Risk & Regulatory
+  · Assembly sequence
+  · Glossary
+  · Image tabs
+      + Render — Interior layout
+      + Render — Interior layout (view 2)
+      + Render — Interior layout (top)
+      + Render — Interior layout (view 3)
+      + Render — Building exterior
+      + Render — Building exterior (view 2)
+      + Render — Building exterior (top)
+      + Render — Building exterior (view 3)
+      + GA — General Arrangement
+      + P&ID
+      + BFD — Block Flow
+      + Single-line
+      + HVAC
+      + Isometric — 201-WT-DN300
+      + Isometric — 202-PR
+      + Isometric — 203-WT-DN300
+  · Contents (sheet #1)
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/dossier.xlsx
+  size        : 33.57 MB
+  tabs (36)  : ['Executive Summary', 'Contents', 'Overview', 'Render — Interior layout', 'Brief', 'Quantities', 'Calculations', 'Financial model', 'Cost waterfall', 'Inputs & Assumptions', 'Bill of Materials (Ledger)', 'Line & velocity', 'Panel schedule', 'Process schedules', 'Assembly sequence', 'Risk & Regulatory', 'Render — Interior layout (view', 'Render — Interior layout (top)', 'Render — Interior layout (vie-2', 'Render — Building exterior', 'Render — Building exterior (vie', 'Render — Building exterior (top', 'Render — Building exterior (v-2', 'GA — General Arrangement', 'P&ID', 'BFD — Block Flow', 'Single-line', 'HVAC', 'Isometric — 201-WT-DN300', 'Isometric — 202-PR', 'Isometric — 203-WT-DN300', '⚠ Checks', '⚠ Audit', 'Connection trace', 'Part names', 'Glossary']
+  live calcs  : 81
+  static calcs: 1
+  image tabs  : 16
+  CHECKS FAIL : 11
+      FAIL -> [BALANCE] closure: electrical_supply_closure
+      FAIL -> [COST] BoM P-1: unit price within x5 of price_estimate_gbp
+      FAIL -> [COST] BoM P-3: unit price within x5 of price_estimate_gbp
+      FAIL -> [COST] BoM X-11: unit price within x5 of price_estimate_gbp
+      FAIL -> [COST] BoM X-14: unit price within x5 of distributor_price_gbp
+      FAIL -> [COST] BoM X-22: unit price within x5 of price_estimate_gbp
+      FAIL -> [COST] Sigma requirementsBom.line_gbp == cover grand total
+      FAIL -> [CONNECTIVITY] Ledger completeness: every part shows its required input + output
+      FAIL -> [CONNECTIVITY] Connection rows within_spec == false (tally)
+      FAIL -> [CONNECTIVITY] Worst pipe velocity <= spec limit (6×DN300)
+      FAIL -> [BRIEF] Brief target met: feed_water_conductivity_ms_per_cm
+  SHIP GATE   : FAIL  ·  10 HIGH · 1 MED · 0 LOW · ship_ok=False
+[chain] Excel deliverable → /Users/tristanfischer/Downloads/fischer-farms-v3_dossier_2026-06-25_1733.xlsx
+[chain] PDF OFF by default (set CHAIN_WANT_PDF=1 to enable) — NOT rendering chain-v2.pdf (Excel deliverable + drawings + BoM are on disk; quality loop still runs)
+[chain] deliverable-copy step failed (non-fatal): ENOENT: no such file or directory, open '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/chain-v2.pdf'
+[chain] PDF-off (Excel-only): skipping PDF-based audits (run/bom/layout); BoM validated by the Excel ⚠Checks tab + the state-based gates below.
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/AUDIT-PARTS.md
+[parts-validator] PASS: 0 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/AUDIT-DRIFT.md
+[drift-detector] PASS: 3 contract quantities checked, 0 drifts (0 MED)
+[sizing-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/AUDIT-SIZING.md
+[sizing-audit] PASS: 0/0 matched-to-rule, 0 findings (0 MED, 0 LOW)
+[mispin-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/AUDIT-MISPIN.md
+[mispin-detector] PASS: 90 candidates scanned, 0 mis-pins
+[thermal-derating-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/AUDIT-THERMAL.md
+[thermal-derating-audit] PASS: 0 chiller(s) checked, 0 findings (0 MED, 0 LOW)
+[brief-constraint-completeness-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/AUDIT-COMPLETENESS.md
+[brief-constraint-completeness-audit] PASS: 24 constraints, 1 non-blocking findings (0 MED, 1 LOW)
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/chain-v2.pdf': No such file or directory.
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/chain-v2.pdf': No such file or directory.
+[consistency-audit] pdftotext failed: Command failed: pdftotext /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/chain-v2.pdf -
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/chain-v2.pdf': No such file or directory.
+
+[consistency-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/AUDIT-CONSISTENCY.md
+[consistency-audit] PASS: 0 clusters, 0 findings (0 MED, 0 HIGH), 0 money-format drift(s)
+[jurisdictional-standards-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/AUDIT-JURISDICTION.md
+[jurisdictional-standards-audit] PASS: jurisdiction=UNKNOWN, 205 surfaces scanned, 36 unique citations, 188 findings (0 MED, 188 LOW)
+[fictional-pn-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v3/AUDIT-FICTIONAL-PN.md
+[fictional-pn-audit] FAIL: 1 HIGH-severity finding(s) — hallucinated MPNs not found in any distributor catalogue
+
+======================================================================
+  CHAIN HARD-EXIT - Fictional-PN audit FAILED (code 20)
+  At least one BoM line emits a manufacturer+MPN combination that
+  returns null from ALL five live distributor APIs (Mouser, Digi-Key,
+  Farnell, LCSC, Nexar) and is not in the curated parts table.
+  Structured MPNs (alphanumeric+separator+alphanumeric) that miss all
+  distributors strongly indicate the LLM hallucinated a plausible-looking
+  but non-existent part number. A procurement engineer who tries to order
+  this part will find nothing — destroying the document's credibility.
+  PDF + state.json saved to disk for inspection but chain is BLOCKED.
+  See AUDIT-FICTIONAL-PN.md for the un-catalogued MPNs.
+  Fix area: scripts/lib/deterministic-emitter.ts — replace hallucinated
+  MPNs with real distributor-findable parts, or mark custom/OEM items
+  with a "CUSTOM-" prefix so future runs skip the existence check.
+======================================================================
+
+[chain] === FATAL GATE 20 fictional-PN (exit 20) — WRONGNESS, fix the source rule ===
+A part number is unverified in any catalogue — see AUDIT-FICTIONAL-PN.md

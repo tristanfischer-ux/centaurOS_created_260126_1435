@@ -1,0 +1,515 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/fischer_farms_codema.md (13435 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 13435 chars
+[brief-parse] OK — confidence=HIGH, missing=5 fields, metrics=9
+[chain] classification: water_treatment (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 10.1s)
+[chain] U5 brief augmentation: U5 augmentation (class: water_treatment): 1 HARD field(s) filled with class-aware inferred values, 4 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, operating_environment. Removed from missing_mandatory_fields: target_process.
+  [U5] filled "target_process": "Continuous chemical process: capture; field-erected fixed plant with closed-loop solvent/reagent recovery and automated process control" (Process inferred from brief mission/description for water_treatment. class-agnostic inference from brief text for unmapp)
+  [U5] still null after augmentation: max_mass_kg, operating_environment
+[chain] U6 brief expansion: 15 duties derived; product="Purified, pH-adjusted, and nutrient-dosed irrigation water (fertigation)." (model=google/gemini-3.1-pro-preview, cost_usd=0.068044)
+  [U6] ro_permeate_production_m3_h = 8 m3/h [stated/high] — Stated permeate capacity of the reverse osmosis unit.
+  [U6] ro_feed_water_demand_m3_h = 10.67 m3/h [derived/high] — Calculated from 8.0 m3/h permeate and 75% recovery factor (8.0 / 0.75 = 10.667). Aligns wi
+  [U6] ro_reject_waste_flow_m3_h = 2.67 m3/h [derived/high] — Mass balance: Feed (10.67) - Permeate (8.0) = Reject (2.67).
+  [U6] max_blended_fresh_water_m3_h = 9.6 m3/h [derived/high] — RO permeate (8.0 m3/h) plus maximum raw-tap-water blending capacity (1.6 m3/h).
+  [U6] gac_filtration_throughput_m3_h = 14.5 m3/h [stated/high] — Stated nominal filtration capacity for the granular-activated-carbon filter.
+  [U6] softener_treatment_throughput_m3_h = 14 m3/h [stated/high] — Stated capacity of the water softener unit.
+  [U6] softener_batch_capacity_m3 = 91 m3 [stated/high] — Stated volume of water treated between automatic brine regenerations.
+  [U6] total_water_storage_capacity_m3 = 120 m3 [derived/high] — One 40 m3 fresh-water tank plus two 40 m3 drain-water tanks.
+  [U6] total_fertigation_delivery_m3_h = 90 m3/h [derived/high] — Two A/B nutrient-dosing units, each rated at 45 m3/h.
+  [U6] fertigation_delivery_pressure_bar = 3.5 bar [stated/high] — Stated operating pressure for the 45 m3/h circulation pumps.
+  [U6] fertilizer_stock_storage_l = 8000 L [derived/high] — Eight 1,000-litre polyester fertilizer tanks.
+  [U6] hand_watering_flow_m3_h = 25 m3/h [stated/high] — Stated hand watering capacity metric.
+  [U6] total_major_pump_power_kw = 20.5 kW [derived/medium] — RO high-pressure pump (5.5 kW) + two fertigation circulation pumps (2 x 7.5 kW). Excludes 
+  [U6] actuated_irrigation_valves_count = 200 count [stated/high] — Stated requirement for the ebb/flow distribution network.
+  [U6] cultivation_containers_count = 6000 count [stated/high] — Stated scale metric for the multi-layer cultivation facility.
+[chain] engineering_contract build failed: Cannot read properties of undefined (reading 'length'); continuing without Contract (LLM-only fallback)
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":977}
+[standards-writeback] web search: BS EN 62477-1 — 1001ms
+[standards-writeback] {"standard_name":"BS EN 62477-1","hit":"web","latency_ms":1887}
+[standards-writeback] web search: G99 — 1209ms
+[standards-writeback] REJECTED unverified web standard G99: excerpt does not contain the claimed value "G99" — unsupported (likely hallucinated)
+[standards-writeback] {"standard_name":"G99","hit":"miss","latency_ms":2475}
+[products-writeback] {"product_name":"Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → 14.5 m³/h granular-activated-car","hit":"db_hybrid","matched":"Pentair X-Flow XIGA UF + RO","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":149}
+[engineering-lock-gate] PASS — filled 0 slots + 2 standards; jurisdiction=uk
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK+EU
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: water_treatment
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 8788 chars. First 200: {
+  "market_context": "The global market for indoor farming and controlled-environment agriculture (CEA) is experiencing robust growth, driven by urbanization, food security concerns, and sustainabili
+[research-synthesis] Complete: 4 competitors, 5 sources, 4 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for water_treatment: replaying 5 stored duty spec(s) (gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, mechanical-filtration:cloth-screen, water-storage:buffer-sizing) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool gac-filter:liquid-phase-sizing (duty_hash=765d91123186, db id=29) — no LLM call.
+[tool-generator] REUSED stored generated tool ion-exchange:softener-sizing (duty_hash=1da257ad1145, db id=30) — no LLM call.
+[tool-generator] REUSED stored generated tool irrigation:ebb-flow-demand (duty_hash=11db9bbe8701, db id=31) — no LLM call.
+[tool-generator] REUSED stored generated tool mechanical-filtration:cloth-screen (duty_hash=df965805489c, db id=32) — no LLM call.
+[tool-generator] REUSED stored generated tool water-storage:buffer-sizing (duty_hash=37eebb6d6496, db id=33) — no LLM call.
+[tool-creation] DONE for water_treatment: created 5 self-test-passed tool(s) (gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, mechanical-filtration:cloth-screen, water-storage:buffer-sizing), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for water_treatment: created+registered 5 self-test-passed tool(s) [gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, mechanical-filtration:cloth-screen, water-storage:buffer-sizing]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] COVERAGE GATE (brief-named units, reuse) for slug=water_treatment:
+    ✗ UNSIZED heat pump / thermal hold
+    ✓ recirculation / process pumps → fluids:pipe-sizing
+    ✓ electrical distribution → electrical:transformer-sizing
+[bootstrap-tool-plan] COVERAGE GAP: checklist unit "heat pump / thermal hold" unsized — no selected/created tool covers it for slug=water_treatment.
+[bootstrap-tool-plan] REUSING stored candidate slug=water_treatment version=1 status=candidate (no LLM call; 26 steps, 24 tool_ids, coverage_gaps=1)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for water_treatment/medium — bootstrapped a 26-step tool plan (candidate id=31 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: arc-flash:ieee-1584, control-systems:pid-tuning, cybersecurity-threat-model:stride, electrical:transformer-sizing, electrical:cable-sizing, fluids:pipe-sizing, gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, irrigation:pump-sizing, lifecycle-co2:assessment, mechanical-filtration:cloth-screen, nutrient-solution:chemistry, ph-titration:sizing, pressure-vessel:design, mass-aggregator:envelope-check, process:pump-sizing, protection-coordination:dc-ac, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, water-treatment-ro:sizing, water-storage:buffer-sizing, yield-economics:npv
+[bootstrap-tool-plan] SEED-PROTECTED gac-filter:liquid-phase-sizing: kept the first-principles contract value(s) for [gac_filter_vessel_volume_m3(seed=1.8 vs tool=2.4166666666666665)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[bootstrap-tool-plan] SEED-PROTECTED ion-exchange:softener-sizing: kept the first-principles contract value(s) for [softener_vessel_volume_each_m3(seed=1.5 vs tool=0.4619932646875)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[bootstrap-tool-plan] SEED-PROTECTED irrigation:ebb-flow-demand: kept the first-principles contract value(s) for [irrigation_demand_m3_h(seed=90 vs tool=1200)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[bootstrap-tool-plan] FAIL-CLOSED nutrient-solution:chemistry: missing computed output field(s) → emitted nothing for [nutrient_concentrations_mg_l(nutrient-solution:chemistry.nutrient_concentrations_mg_l)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED mass-aggregator:envelope-check: missing computed output field(s) → emitted nothing for [mass_budget_utilisation_pct(mass-aggregator:envelope-check.mass_budget_utilisation_pct)] (no fabricated number written)
+[class-reference-graph-db] {"product_class":"water_treatment","resolved_to":"water_treatment","hit":"db","nodes":11,"edges":19}
+[generic-emitter] physics-derived equipment: 27 word(s) sized from the contract; 6 principal item(s) synthesised (fertigation_dosing_pump, nutrient_tank, hand_watering_pump, drain_collection_sump, cloth_filter, irrigation_pump).
+[chain] Orchestrator: 11 modules, 20 sub-modules, 246 words, 18 tools ran (2771ms)
+[chain] Build #18k: toolOutputsBlock built (21 tools, 11770 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 20 component_classes covered (20 with match, 0 empty), 15463 chars (24853ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=1400000, target_performance_value=6000 (count)
+[chain] keyMetrics seeded early (pre-reviewer): Total Cultivation Containers=6,000 count
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=3/10 plaus=4/10 coh=6/10 part=4/10 hon=5/10 (27195ms)
+[chain] PHASE 4 skeleton critic: 5 HIGH-severity issues found before any LLM painting
+  ✗ [brief_to_design_fidelity @ structure_containment/words] The design includes a reinforced concrete slab (£142,100), steel portal frame (£91,350), and wall cladding (£84,770), totaling £318,220. The brief explicitly excludes 'the building
+  ✗ [brief_to_design_fidelity @ mass_fluid_transport_process/words] The 'Irrigation Pump' is rated at 12 m3/h, but the brief requires a maximum irrigation demand of 45 m3/h per department. A 12 m3/h pump cannot meet this peak demand.
+  ✗ [engineering_plausibility @ mass_fluid_transport_process/words] The hand watering pump is rated for 25 m3/h at 3.0 bar but is paired with a 2 kW motor. At 25 m3/h (0.00694 m3/s) and 3 bar (300,000 Pa), the hydraulic power is 2.08 kW. Assuming a
+  ✗ [brief_to_design_fidelity @ mass_fluid_transport_process/words] The design specifies two 'Drain Collection Sumps' of 600 m3 each (15m dia x 3.4m). The brief explicitly asks for 'a 5,000-litre drain pit per cultivation room' (5 m3 each). This is
+  ✗ [engineering_plausibility @ sensing_instrumentation/words] The 'Pressure Transducer' has a rating of '2 kW', dimensions of '600x510x660 mm', and is classified under the 'rotating_electrical' fabrication family. This is a clear copy-paste e
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 12991 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 16 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 5 / 16 patches (skipped 11)
+    REJECT [structure-locked] add_sub_module mass_fluid_transport_process.mass_fluid_transport_process__fresh_water_tank: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "mass_fluid_transport_process" (0 flagged module(s): none)
+    REJECT [structure-locked] add_sub_module mass_fluid_transport_process.mass_fluid_transport_process__drain_water_tanks: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "mass_fluid_transport_process" (0 flagged module(s): none)
+    +overview mass_fluid_transport_process: +611 chars
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_elements_word quantity="×8" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_elements_word manufacturer="Dow FilmTec" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_elements_word part_number="BW30-400" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_elements_word material="polyamide thin-film composite" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_elements_word rating_primary="8 m³/h permeate at 75 % recovery" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 28.7s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":598}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=3/10 phys=4/10 coh=4/10 part=5/10 hon=6/10 (24253ms)
+[chain] critic headline: The design contains critical scope creep by including £318k of excluded building works, while suffering from massive tank oversizing and an empty fertigation module.
+[chain] critic issues: 4 high, 2 med, 6 total
+  ✗ [high/high] brief_to_design_fidelity @ modules[10].sub_modules[0].words[19,20,21]: The design includes a reinforced concrete slab (£142,100), hot-rolled steel portal frame (£91,350), and insulated cladding (£84,770) totaling £318,220. The brie
+  ✗ [high/high] brief_to_design_fidelity @ modules[1].sub_modules[1].words[55]: The Drain Collection Sump is sized at 15.0 m diameter x 3.4 m height, yielding a capacity of 600 m³ each (1,200 m³ total). The brief explicitly requests 'Two dr
+  ✗ [high/high] engineering_plausibility @ modules[7].sub_modules[0].words[0]: A 'Storage Cell' of 262 m³ capacity (6.9 m dia x 7.0 m) is placed inside the 'energy_storage_source' module. This appears to be a misclassified fresh-water stor
+  ✗ [high/high] internal_coherence @ modules[4].sub_modules[0]: The 'fertigation_dosing_system' module is completely empty (words array is empty), while the actual fertigation dosing pumps, nutrient tanks, and mixers are mis
+  ✗ [med/high] brief_to_design_fidelity @ modules[1].sub_modules[1].words[78]: The Irrigation Pump is rated at 12 m³/h. However, the brief states that the maximum irrigation demand per department is 45 m³/h.
+  ✗ [med/high] internal_coherence @ modules[6].sub_modules[0].words[6]: Only 1 pH sensor/electrode is specified in the sensing_instrumentation module, but the system has two independent fertigation units, each requiring its own pH a
+[chain] physics-critic enforcement (shadow): no known-failure part — ship allowed.
+[chain] task-41 fidelity gates: Critic flagged 3 module(s) for brief_fidelity structural adds: modules[10].sub_modules[0].words[19,20,21], modules[1].sub_modules[1].words[55], modules[1].sub_modules[1].words[78]
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 17930 chars
+[chain] STEP 8: R4 Flash-Lite review returned 19 patches
+[chain] STEP 8: R4 Flash-Lite review applied 5 / 19 patches (skipped 14)
+    =mass_fluid_transport_process.overview_paragraph_en (prose)
+    =mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.english_sentence (prose)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.dow_filmtec_bw30_400_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.lowara_eshe_pump_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.iwaki_acid_pump_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.danfoss_vfd_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.rotoplas_tank_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.hoogendoorn_isii_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+[chain] STEP 8: R4 Flash-Lite review done in 16.8s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":2715}
+[chain] canonical product_class OVERRIDE: "" → "water_treatment" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "water_treatment" — skipping
+[chain] physics repair: 2 iter(s); HIGH 4→2; plausibility 4→5; patches 0
+  iter 0: proposed 0 applied 0 | HIGH 4→2 plaus 4→5 | 2 of 4 findings declared unfixable; 2 flagged for manual sourcing; apply_log: 
+  iter 1: proposed 0 applied 0 | HIGH 2→2 plaus 5→5 | 1 of 2 findings declared unfixable; 4 flagged for manual sourcing; apply_log: 
+[chain] sub-module prose pre-fill: rewrote 19/20 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 110 entries (KPA=110, emitter=0, rag=0)
+[emitter-completion] 1 gap sub_module(s) for class "water_treatment" — DB-first → generate → write-back
+[emitter-completion]      ↳ wrote back Dosatron to pretraining_extracted_parts
+[emitter-completion]   ✓ GEN  fertigation_dosing_system::fertigation_dosing_system__primary_assembly → Dosatron [MPN deferred; LLM suggested "D8RE2" stored in DB]
+[emitter-completion] filled 1 gap(s): 0 DB-first, 1 generated.
+[chain] emitter-completion: filled 1 gap sub_module(s) (0 DB-first, 1 generated+written-back) before gate-23
+[chain] gate-23 emitter-completeness: PASS — 20 sub_modules checked, 20 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 1 pass / 0 fail; grammar 9 pass / 4 fail; total score 1770
+  ✗ [thermal_path_closes] grammar: 2 heat-source sub-module(s) without thermal_path: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements, mass_fluid_transport_process::mass_fluid_transport_process__flow_distribution_plates. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [sub_module_word_density] grammar: 4 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1 words), environmental_interface::environmental_interface__permeate_outlet (3 words), environmental_interface::environmental_interface__outlet_manifold (2 words), maintenance_serviceability::maintenance_serviceability__cip_system_connections (3 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 12 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2/7) ...+6.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 3 concrete components not present in any sub-module word — ewn-c21vcer, bw30, c21vcer. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "364 m² area" AND "8-inch × 40-inch". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 0: applied 14 patches, skipped 2, allowlist_rejected=2, state_changed=true
+    +cross_module_grammar_links.[+] (Resolve thermal_path_closes failure for membrane heat sources)
+    ~merge-into-existing mass_fluid_transport_process.sub_modules[0].words[0] (Merge conflicting dimension modifiers into one canonical value)
+    ~merge-into-existing fertigation_dosing_system.sub_modules[0].words[0] (Enrich word with missing modifiers to meet density requirements)
+    +fertigation_dosing_system.sub_modules[0].words[+] (Add word to meet sub_module_word_density requirement)
+    +fertigation_dosing_system.sub_modules[0].words[+] (Add word to meet sub_module_word_density requirement)
+    +fertigation_dosing_system.sub_modules[0].words[+] (Add word to meet sub_module_word_density requirement)
+    +fertigation_dosing_system.sub_modules[0].words[+] (Add word to meet sub_module_word_density requirement)
+    +environmental_interface.sub_modules[0].words[+] (Add word to meet sub_module_word_density requirement)
+    +environmental_interface.sub_modules[0].words[+] (Add word to meet sub_module_word_density requirement)
+    +environmental_interface.sub_modules[1].words[+] (Add word to meet sub_module_word_density requirement)
+    +environmental_interface.sub_modules[1].words[+] (Add word to meet sub_module_word_density requirement)
+    +environmental_interface.sub_modules[1].words[+] (Add word to meet sub_module_word_density requirement)
+    +maintenance_serviceability.sub_modules[0].words[+] (Add word to meet sub_module_word_density requirement)
+    +maintenance_serviceability.sub_modules[0].words[+] (Add word to meet sub_module_word_density requirement)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="EWN-C21VCER" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing component mentioned in overview)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="BW30-400" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing component mentioned in overview)
+[chain] Phase 2 iter 1: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 1: arith 1 pass / 0 fail; grammar 9 pass / 4 fail; total score 1930
+  ✗ [sub_module_word_density] grammar:  BoM-density: 14 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), fertigation_dosing_system::fertigation_dosing_system__primary_assembly (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6) ...+8.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 3 concrete components not present in any sub-module word — ewn-c21vcer, bw30, c21vcer. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [sub_module_prose_covers_words] grammar: 3 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: environmental_interface::environmental_interface__permeate_outlet prose drops 2/5 words: Permeate Pipe, Permeate Fitting | environmental_interface::environmental_interface__outlet_manifold prose drops 3/5 words: Manifold Gasket, Manifold Bolt, Manifold Support | maintenance_serviceability::maintenance_serviceability__cip_system_connections prose drops 2/5 words: CIP Hose, CIP Nozzle. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8-inch × 40-inch (364 m² total area)" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 1: applied 4 patches, skipped 2, allowlist_rejected=2, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Fix duplicate dimension and add missing procurement details for RO membranes)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="EWN-C21VCER" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing dosing pump component mentioned in overview)
+    =environmental_interface.sub_modules[0].english_sentence (Update prose to include all words in the sub-module)
+    =environmental_interface.sub_modules[1].english_sentence (Update prose to include all words in the sub-module)
+    =maintenance_serviceability.sub_modules[0].english_sentence (Update prose to include all words in the sub-module)
+    ALLOWLIST_REJECT fertigation_dosing_system.sub_modules[0].words[0]: word patch contains MPN="D3RE25" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing manufacturer and part number to satisfy density requirements)
+[chain] Phase 2 iter 2: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 2: arith 1 pass / 0 fail; grammar 10 pass / 3 fail; total score 2470
+  ✗ [sub_module_word_density] grammar:  BoM-density: 14 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), fertigation_dosing_system::fertigation_dosing_system__primary_assembly (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6) ...+8.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 3 concrete components not present in any sub-module word — ewn-c21vcer, bw30, c21vcer. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8-inch × 40-inch (364 m² total area)" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 2: applied 0 patches, skipped 6, allowlist_rejected=6, state_changed=false
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[0]: word patch contains MPN="BW30-400" not in verified-parts allowlist (110 entries). Patch dropped. (Resolve duplicate dimension modifiers and add missing part details for RO membranes.)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="EWN-C21VCER" not in verified-parts allowlist (110 entries). Patch dropped. (Add missing EWN-C21VCER component mentioned in overview.)
+    ALLOWLIST_REJECT fertigation_dosing_system.sub_modules[0].words[0]: word patch contains MPN="D25RE2" not in verified-parts allowlist (110 entries). Patch dropped. (Enrich under-specified word with manufacturer and part number.)
+    ALLOWLIST_REJECT power_distribution.sub_modules[1].words[0]: word patch contains MPN="DB100" not in verified-parts allowlist (110 entries). Patch dropped. (Enrich power distribution block with required density modifiers.)
+    ALLOWLIST_REJECT control_compute_communication.sub_modules[0].words[0]: word patch contains MPN="6ES7214-1AG40-0XB0" not in verified-parts allowlist (110 entries). Patch dropped. (Enrich PLC controller with required density modifiers.)
+    ALLOWLIST_REJECT actuation_kinematics.sub_modules[1].words[0]: word patch contains MPN="6013" not in verified-parts allowlist (110 entries). Patch dropped. (Enrich solenoid valve with required density modifiers.)
+[chain] Phase 2: no state change after repair iter 2 — bailing (further iterations will not progress).
+[chain] post-Phase-2 prose pre-fill: rewrote 1/20 sub-modules
+[fill-blank-mpn] 62 blank catalogue word(s) for class "water_treatment" (196 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__electrical_control_panel (Motor Starter) → RFS Technologies GDM-8
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__power_distribution_block (Motor Control Center) → RFS Technologies GDM-8
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__power_distribution_block (Vfd Controller) → ABB ACS580-01-12A6-4
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements (Differential-Pressure Switch) → Honeywell HSCDLNN100MDSA5
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements (Non-Return Valve) → Crouzet 81529907
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements (Irrigation Pump) → Grundfos CM3-3
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__plc_controller (PLC Controller) → Renesas / Intersil ISL1571IRZ
+[fill-blank-mpn]   ✓ DB   fertigation_dosing_system::fertigation_dosing_system__primary_assembly (Water-Powered Dosing Pump) → Dosatron D8RE5
+[fill-blank-mpn]   ✓ DB   fertigation_dosing_system::fertigation_dosing_system__primary_assembly (Dosing Pump Controller) → Watson-Marlow TUB-SAN-6.4
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__solenoid_valves (Solenoid Valves) → Crouzet 81519648
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__solenoid_valves (Inlet Flow Control Valve) → Altecnic CONTSETALT533K
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__solenoid_valve (Pneumatic Actuated Valve) → Swagelok SS-63TS8-12-12
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__storage_cell (Cell Monitoring Unit) → Analog Devices Inc. EVAL-ADBMS6830BMSW
+[fill-blank-mpn]   ✓ DB   structure_containment::structure_containment__module_support_system (Differential-Pressure Switch) → Honeywell HSCDLNN100MDSA5
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__pressure_relief_valve (Pressure Relief Valve) → Sartorius BB-34163124
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__pressure_relief_valve (Low Pressure Switch) → Analog Devices Inc./Maxim Integrated MAX31827ANTABRPF+T
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__pressure_relief_valve (High Pressure Switch) → Daikin S1PH
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__pressure_relief_valve (Cable Trays) → Banner Engineering K30LMBXXP
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__overcurrent_protection (Leak Detection Sensor) → Crouzet 81512201
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__overcurrent_protection (Check Valve) → Reliance CV-25
+[fill-blank-mpn]   ✓ DB   maintenance_serviceability::maintenance_serviceability__leveling_feet (Cable Glands) → L-Com LCCA30725/BK-FT3
+[fill-blank-mpn] filled 21/62 blank word(s): 21 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 196 structural skipped.
+[chain] fill-blank-mpn: branded 21/62 blank catalogue word(s) (21 DB-first real MPN, 0 generated real-OEM), 196 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 1425 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 19529 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 21 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=11 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"water_treatment","resolved_to":"water_treatment","hit":"db","nodes":11,"edges":19}
+[chain] K10 shadow: PASS_SHADOW — matched=20 missing=0 extra=1
+[chain] K10 writeback: persisted 1 discovered edge(s) to grow the water_treatment reference graph (was dead code until 2026-05-31)
+[chain] K10 writeback: persisted 2 discovered node(s) to grow the water_treatment reference graph
+[chain] headline derived: Total Cultivation Containers=6,000 count [derived_from_brief]; Unit cost ceiling=1,400,000 GBP;  (0.00s)
+[class-reference-graph-db] wrote edge source=llm class=water_treatment mass_fluid_transport_process->control_compute_communication
+[chain] part verification: 21 parts checked — verified=15, unverified=5, uncertain=1, skip=0
+[chain] G5 RAG: 6 queries → 3 suggestions (high=1, medium=0, low=2, below_threshold=3, corpus=50 rows)
+[chain] part verification: stripped 5 high-confidence fake part_numbers
+  • fertigation_dosing_system::fertigation_dosing_system__primary_assembly::dosing_pump_controller_word → removed "TUB-SAN-6.4" (A search for the specific part number 'TUB-SAN-6.4' yields no direct matches in the provided search )
+  • actuation_kinematics::actuation_kinematics__solenoid_valves::actr_valve_on_nutrient_tank_synth_word → removed "CONTSETALT533K" (A search for the specific part number 'CONTSETALT533K' yields no results in the provided documents o)
+  • actuation_kinematics::actuation_kinematics__solenoid_valve::pneumatic_actuated_valve_word → removed "SS-63TS8-12-12" (The search results confirm the existence of the base part number SS-63TS8, but there is no evidence )
+  • safety_protection::safety_protection__pressure_relief_valve::pressure_relief_valve_word → removed "BB-34163124" (A search of Sartorius product catalogs and documentation does not contain any reference to the part )
+  • safety_protection::safety_protection__overcurrent_protection::check_valve_word → removed "CV-25" (The search results for 'Reliance CV-25' refer to flooring (Altro Reliance 25), a System on Module (C)
+[chain] strip+recommend: 5 recommendations — high=4, medium=0, low=0, unknown=1 (manual sourcing required)
+[chain] design decisions: 1 unresolved conflict surfaced for human review
+  • mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word dimension: "8-inch × 40-inch (364 m² total area)" AND "364 m² area" → recommend "8-inch × 40-inch (364 m² total area)"
+[chain] structural-gate router: surfaced 2 unrepaired gate(s) as design decisions
+[nexar] GraphQL errors for mpn=TBD (catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TBD (detailed design): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=ACS580-01-12A6-4: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=D8RE5: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CM3-3: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for TBD (field instrument — catalogue class)
+[nexar] GraphQL errors for mpn=TBD (field instrument — catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for K30LMBXXP
+[farnell] HTTP 403 for 81512201
+[chain] Stage 10.5 Part Reality Check: 16 checked, 10 real, 0 substituted, 6 warned (no substitute available). Nexar calls used: 6.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ util_standby_generator: "? TBD (catalogue class)" [class=unknown, library_class=none]
+  ⚠ electrical_control_panel_word: "? TBD (detailed design)" [class=unknown, library_class=none]
+  ⚠ vfd_controller_word: "ABB ACS580-01-12A6-4" [class=unknown, library_class=none]
+  ⚠ fertigation_dosing_system__primary_assembly_completion_word: "Dosatron D8RE5" [class=unknown, library_class=none]
+  ⚠ irrigation_pump_synth_word: "Grundfos CM3-3" [class=unknown, library_class=none]
+  ⚠ instr_level_consolidated: "? TBD (field instrument — catalogue class)" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] module-paragraph-llm: 11/11 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 2 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/11 capital (threshold 7); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 3 sections, 0 warnings
+[chain] design decisions review: 8 choices (1 applied, 7 flagged, 0 blocked)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 14 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 8 deleted principal(s) re-created; 6 building take-off line(s) re-derived to the final footprint.
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.18%); economic-conductor saving £1,376
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.18%); economic-conductor saving £1,390
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.18%); economic-conductor saving £1,368
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.18%); economic-conductor saving £1,369
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.18%); economic-conductor saving £1,372
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.18%); economic-conductor saving £1,381
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.18%); economic-conductor saving £1,379
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.19%); economic-conductor saving £1,383
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 8 passes, DID NOT settle within 8 passes (cap) — ledger records the residual, no fixed point asserted; as-routed supply demand 48 → 48.092 kW (Δ 0.092 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 68843) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/blender-bg.log
+[estimate] product_class=water_treatment annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'water_treatment' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 322 parts need price estimates
+[estimate] corpus-classified 45/322; 277 need rule-based / Flash-Lite
+[estimate] rule-based classified 51 parts; 226 still need Flash-Lite
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Flash-Lite classified 12 batches
+[estimate] 6 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] Flash-Lite (volume-aware) for 2 'unknown' parts
+[estimate] updated 9 existing, synthesised 313 new, 0 failed
+[estimate] C3 DB cache: 2 parts priced from distributor_cascade_cache (0 live API calls)
+[estimate] classification source: corpus=44 rule_based=51 flash_lite=225 fallback=0 curated=0 db_cache=2
+[estimate] estimate source: db_cache=2 curve=318 flash_lite_unknown=2
+[estimate] top classes in BoM:
+  fluid_path: 79
+  structural_metal: 66
+  structural_polymer: 41
+  mechanical_assembly: 40
+  oem_subsystem: 37
+  sensor: 18
+  motor_actuator: 10
+  mechanical_fastener: 8
+[estimate] estimated cost: GBP 0.004
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 334 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 334/334 results in 167.6s
+[engine-c] flags: in_range=19  over=11  under=132  no_reference=172
+[engine-c] 143/334 priced lines flagged out-of-range vs reference corpus (42.8%)
+[engine-c] 71 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "water_treatment" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: water_treatment
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/state.json
+[supplier-validate] no suppliers to validate
+[hero] step 0: per-project geometry generator (LLM)...
+[geom-gen] no template for product_class="water_treatment"; runner will use universal renderer
+[geom-gen] registry-miss authored path available: npx tsx scripts/author-blender-scene.tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/state.json --out /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2
+[hero]   geometry generator failed (5); falling back to unmodified template
+[hero] step 1: Blender structural reference cover pass...
+[hero]   template runner produced blender-cover.png in 0.0s
+[hero]   Blender cover OK in 0.0s → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/blender-cover.png
+[hero] step 2: Gemini 3.1 Flash Image preview (i2i)...
+[hero]   Gemini OK in 23.3s (1269.8 KB)
+[hero] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/cover.png
+[hero] updated state.brief_hero_image_path
+[modules] building palette card for 11 module(s)...
+[modules] all 11 module images already on disk; skipping template render
+[modules] template renderer produced 11/11 module images
+[modules] updated state.module_image_paths with 11 entries
+[chain] deployment_envelope: no envelope mapped for water_treatment (returning null is intentional for some classes)
+[chain] physics-derived bottom-up pricing: 215 components priced from parent physics → rolled into 18 assemblies; raw BoM £683,870
+[chain] costStack persisted: ex-works £957418 (raw materials £683870, class water_treatment)
+[chain] G2 cost-reality: PASS — BoM £683870 across 334 priced lines (0 unpriced)
+[chain] G3 review-completeness: WARN — 3 gaps
+  ⚠ sub_modules: 20 sub-modules across 11 modules — expected ≥22
+  ⚠ compliance: Compliance gate did not register any mandatory standards
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 8 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] pre-render SKU restore: re-added 4 blanked part_number(s) a late stage stripped from real parts — emitter is the part-identity authority
+[callLlm] attempt 1/3 transient (TypeError: fetch failed); retrying in 5s...
+[chain] self-audit (shadow): floor 2/10 · mean 5.7/10 · 8 blocking · below-8: brief_compliance=6, bill_of_materials=5, design_narrative=4, physics_fidelity=2
+  ✗ [bill_of_materials] energy_storage_source module with cell assemblies is wrong product class
+  ✗ [bill_of_materials] multiple £0 lines
+  ✗ [design_narrative] copy-paste battery template language and numbers
+  ✗ [physics_fidelity] critical copy-paste from battery template
+  ✗ [physics_fidelity] massive tank over-sizing
+  ✗ [physics_fidelity] wrong-class energy storage module
+[chain] sweet-spot reconciliation: COMPATIBLE (objective=balanced, rescale=1.00×) — The brief is internally consistent: 360,000 m³/yr fits within the £1.40M ceiling. Recommended operating point: 360,000 m³/yr at £957k (£3/m³/yr). Objective: BALANCED (the best cost/output compromise).
+[chain] cost-sanity (shadow): HIGH — Independent cost sanity HIGH: £957,418 / 360,000 m³/yr = £2.7/(unit·yr) is 564.0× below the £1,500/(unit·yr) low edge of the £1,500–£10,000/(unit·yr) industry band for throughput output — the bill of materials is almost certainly UNDERCOUNTED (missing line items / wrong unit price). (brief metric max_irrigation_demand_per_department=45 m3/hr → 360,000 m³/yr; Capacity-per-time plant (CAPEX per annual output unit). Amine CO₂ capture + mineralisation PILOT ~£1,500-10,000/(t·yr CO₂) — commercial-scale DAC targets sub-£1,500 but a pilot/first-of-a-kind plant sits in this band (IEA DAC 2024; Climeworks/Heirloom/Carbon Engineering disclosures). A £55k plant capturing 365 t/yr = £150/(t·yr) is ~15× below this floor (the real CO₂ undercount).)
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 334 disclosed; 0 take-off prices written into the BoM; purchased £764,005 → installed £2,292,015 (central)
+[advisor-engagement] 11/11 modules got an advisor block — 22 specialist cards, 44 grounded questions
+[chain] advisor-engagement: 11 module blocks, 22 specialist cards
+[chain] tool-archetype: dropped 1 self-inapplicable wrong-domain tool(s): irrigation:pump-sizing
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "water_treatment" (20 tools, 63 quantities scanned)
+[chain] render-quality (shadow): UNIVERSAL-FALLBACK (generic stock images — NOT this design) — class="water_treatment" template=NONE hero=true modules=22 thin=0
+  ✗ BLENDER_UNIVERSAL_FALLBACK: No per-class Blender template for product_class="water_treatment" (and no LLM-generated blender-scene.py) — the dossier's cover + module images are the GENERIC 
+[chain] tools-flow: rendered 223815 bytes (20 tools)
+[investor-section] 5 investors matched from 18 candidates: Navitas Capital, Sony Innovation Fund, Newfund, NFT.VC, EEC Ventures
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 7/7 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  [schedule] ✓ Piping Isometrics  (drawings/isometric-index.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 7/7 drawings + hero → wired into the PDF
+[drawing-gates] 10 gates · 1 failing · ALL-PASS=False
+  ✓ [med ] legibility         single-line-diagram 4460x2120 aspect 2.1:1 (limit 4:1)
+  ✓ [med ] legibility         pid 2200x1200 aspect 1.8:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x1468 aspect 1.5:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2160x1966 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         block-flow-diagram 2200x1120 aspect 2.0:1 (limit 4:1)
+  ✓ [med ] legibility         hvac-layout 2240x1680 aspect 1.3:1 (limit 4:1)
+  ✓ [med ] legibility         process-schedules 2492x4608 aspect 1.8:1 (limit 4:1)
+  ✗ [high] load_reconcile     panel total 137 kW vs contract 48 kW (ratio 2.86, ±15%)
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✓ [med ] material_diversity 2 distinct pipe material(s): ['carbon steel', 'hdpe/pe100']
+[chain] drawing-gates: 1/10 failing — DRAWING >=8 FAIL (drawing-gates.json — each failing gate names its fix stage)
+[chain] drawing-gates PUNCH-LIST (2 defect(s) → 1 stage(s)) → drawing-gates-punchlist.md
+[chain]   → contract (connected_electrical_load_kw) + panel kW resolution: load_reconcile/panel-schedule, load_reconcile/single-line-diagram
+[chain]   ⚠ lesson-loop: drawing:load_reconcile has recurred 3× on water_treatment — council escalation flagged (tasks/harness-stubs/)
+[chain]   ⚠ lesson-loop: drawing:load_reconcile has recurred 4× on water_treatment — council escalation flagged (tasks/harness-stubs/)
+[chain]   ↳ lesson-loop: 2 loss(es) logged to failure-ledger + invariant stub(s) drafted in tasks/harness-stubs/
+[census] 134 tie-in runs (3357 units) = £3,421,096 (cable £3,389,374 + pipe £31,722)
+[census] routed major streams = £7,996  →  full interconnect ≈ £3,429,092
+  [corpus-median-lift] raised 7 under-priced principal line(s) to their engine corpus lower edge (+£73,310)
+[requirements_bom] price-ingest queue: +1 DB-miss principal(s) → /Users/tristanfischer/.forge-truth/price-ingest-queue.jsonl
+[chain] building & civils: 2303 m² → £2,584,406 (installed civils); ALL-IN capex £4,949,497
+[chain] cost-sanity re-derived on authoritative BoM (Σ £1,391,230): verdict high — £5/m³/yr
+[chain] benchmark net: generating independent top-down expectation (LLM)…
+[chain] benchmark net (z-ai/glm-5.2): 🔴 RADICAL — RADICAL divergence — the deterministic engine and the LLM benchmark disagree by >2.5× on a core dimension; one of them is wrong. FULL CHECK REQUIRED.
+[chain]   • all-in cost: expected £750,000–1,250,000 (mid £950,000); engine £1,947,722 (costStack.oem_transfer_price_gbp) [warn, 2.05×]
+[chain]   • output — storage_buffer: expected 120 m3; engine 196.79999999999998 m3 (contract.fresh_water_storage_capacity_m3) [warn, 1.64×]
+[chain]   • sizing — total equipment volume: expected fits Dedicated plant room ~150 m2 (10x15m) for treatment+fertigation skids, plus outdoor tank farm ~70 m2 for 120 m3 storage (~700 m³); engine equipment sums to ~2,726 m³ [radical, 3.89×]
+[chain]   ↳ FAULT SLB [sizing] — Footprint 1353 m² vs benchmark plant room + tank farm ~220 m² (~6× too large) → 150–220 m² slab
+[chain]   ↳ FAULT FRM [sizing] — 1353 m² portal frame vs required ~150 m² plant room (~9× too large) → 150–220 m² frame
+[chain]   ↳ FAULT ROF [sizing] — 1353 m² roof vs required plant-room scale (~9× too large) → 150–220 m² cladding
+[chain]   ↳ FAULT WAL [sizing] — 1398 m² wall cladding vs required ~220 m² envelope (~6× too large) → 220–300 m² cladding
+[chain]   ↳ FAULT FND [sizing] — 1353 m² foundations vs required skid + tank-farm slab (~6× too large) → 220 m² foundations
+[chain]   ↳ FAULT X-112 / — (RO Membrane Elements) [cost] — Single line £40 760 for 364 m² membranes; duplicate identical-price lines for UF/GRP housings (~3–4× overpriced per skid + duplicates) → £10–15k for full RO membrane set + vessels
+[chain]   ↳ FAULT TK-114 [quantity] — 2× 7.2 m dia drain tanks (≈130 m³ each) contributing to 197 m³ total storage vs required 120 m³ buffer (storage 64 % high) → 3–4× 30–40 m³ tanks only
+[chain]   ↳ FAULT TK-104 / TK-102 / TK-105 [quantity] — Three separate 5.8 m dia tanks (≈40 m³ each) plus TK-114 already oversize (excess buffer volume) → Combine into 120 m³ total (raw/permeate/fert)
+[chain]   ↳ FAULT X-121 [cost] — £12 000 doors on 1353 m² building (building-scale item on process plant) → Omit or reduce to skid access doors
+[chain]   ↳ FAULT X-122 (Pneumatic Actuators) [quantity] — 200 actuators at £329 each (£65.8k) vs benchmark 15 % actuated-valve share on £950k bill (~2× high count + price) → 80–120 actuators at £150–200
+[chain]   ↳ FAULT I-106 / I-103 / I-110 / I-112 [quantity] — 4× 200-valve lines (manual, solenoid, isolation) at £80–95 each (800 valves total for 45 m³/h plant) → ≤200 total valves across all types
+[chain]   ↳ FAULT C55–C01 (water connections) [component] — 32+ micro connection lines (£24–£2k) with 0 m³/s flow; none represent field piping to 6000 containers (noise lines, missing distribution manifold/piping) → Single £80–120k field piping + manifold line
+[chain]   ↳ FAULT G-201 [cost] — £19 200 60 kVA generator on 48 kW plant (~2× oversized) → 30–40 kVA unit or omit if grid-backed
+[chain]   ↳ FAULT P-104 / P-101 [cost] — £9 290 pumps for 12–25 m³/h vs required 45 m³/h booster sets (undersized flow, overpriced per unit) → £6–8k VFD booster sets at 45 m³/h
+[chain] benchmark net: wrote benchmark-punchlist.md — 14 fault(s) routed to 5 source rule(s): unit-operation-parametric, UNROUTED (no basis match, materials-takeoff, corpus-median-lift, rating-based-pricing
+[chain] requirements-driven BoM: 387 requirement lines (Σ £1,391,230) → state.requirementsBom; cost cascade reconciled to this total
+dossier_repair: 1 fix(es) over 1 pass(es); 208 gap(s) need input (208 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/state.json
+[chain] self-repair: 1 fix(es) over 1 pass(es); 208 gap(s) need input (208 blocking HIGH)
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/dossier.xlsx
+  · Executive Summary
+  · Overview
+  · ⭐ Scorecard
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · ⚠ Audit
+  · Part names
+  · Quantities
+  · Calculations
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Financial model
+  · Panel schedule
+  · Process schedules
+  · Line & velocity
+  · Risk & Regulatory
+  · Assembly sequence
+  · Glossary
+  · Image tabs
+      + Render — Interior layout
+      + Render — Interior layout (view 2)
+      + Render — Interior layout (top)
+      + Render — Interior layout (view 3)
+      + Render — Building exterior
+      + Render — Building exterior (view 2)
+      + Render — Building exterior (top)
+      + Render — Building exterior (view 3)
+      + GA — General Arrangement
+      + P&ID
+      + BFD — Block Flow
+      + Single-line
+      + HVAC
+      + Isometric — 201-PR
+      + Isometric — 202-WT-DN15
+      + Isometric — 203-WT-DN15
+  · Contents (sheet #1)
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/dossier.xlsx
+  size        : 32.52 MB
+  tabs (38)  : ['Executive Summary', 'Contents', '⭐ Scorecard', 'Overview', 'Render — Interior layout', 'Brief', 'Quantities', 'Calculations', 'Financial model', 'Cost waterfall', 'Inputs & Assumptions', 'Bill of Materials (Ledger)', 'Sense-check', 'Line & velocity', 'Panel schedule', 'Process schedules', 'Assembly sequence', 'Risk & Regulatory', 'Render — Interior layout (view', 'Render — Interior layout (top)', 'Render — Interior layout (vie-2', 'Render — Building exterior', 'Render — Building exterior (vie', 'Render — Building exterior (top', 'Render — Building exterior (v-2', 'GA — General Arrangement', 'P&ID', 'BFD — Block Flow', 'Single-line', 'HVAC', 'Isometric — 201-PR', 'Isometric — 202-WT-DN15', 'Isometric — 203-WT-DN15', '⚠ Checks', '⚠ Audit', 'Connection trace', 'Part names', 'Glossary']
+  live calcs  : 58
+  static calcs: 2
+  image tabs  : 16
+  CHECKS FAIL : 8
+      FAIL -> [COST] Sigma requirementsBom.line_gbp == cover grand total
+      FAIL -> [CONNECTIVITY] Ledger completeness: every part shows its required input + output
+      FAIL -> [BRIEF] Brief target met: water_storage_capacity
+      FAIL -> [BRIEF] Brief target met: fertigation_dosing_capacity
+      FAIL -> [BRIEF] Brief target met: hand_watering_capacity
+      FAIL -> [PROVENANCE] Tool output used: building_footprint_m2
+      FAIL -> [PROVENANCE] Tool output used: building_gross_floor_area_m2
+      FAIL -> [PROVENANCE] Tool output used: building_wall_area_m2
+  SHIP GATE   : FAIL  ·  208 HIGH · 0 MED · 0 LOW · ship_ok=False
+[chain] Excel deliverable → /Users/tristanfischer/Downloads/fischer-codema-v2_dossier_2026-06-25_2259.xlsx
+[chain] PDF OFF by default (set CHAIN_WANT_PDF=1 to enable) — NOT rendering chain-v2.pdf (Excel deliverable + drawings + BoM are on disk; quality loop still runs)
+[chain] deliverable-copy step failed (non-fatal): ENOENT: no such file or directory, open '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/chain-v2.pdf'
+[chain] PDF-off (Excel-only): skipping PDF-based audits (run/bom/layout); BoM validated by the Excel ⚠Checks tab + the state-based gates below.
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/AUDIT-PARTS.md
+[parts-validator] PASS: 0 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v2/AUDIT-DRIFT.md
+[drift-detector] FAIL: 1 HIGH-severity drift(s)
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  CHAIN HARD-EXIT — Numeric-claim drift detector FAILED (code 12)    ║
+║  Orchestrator-computed count diverges from BoM-emitted quantity     ║
+║  by > 20% (e.g. BMS slave count 313 in narrative, 165 in BoM).      ║
+║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║
+║  See AUDIT-DRIFT.md for the diverging contract-vs-BoM quantities.   ║
+║  Fix area: align orchestrator tool assumption (e.g. PyBaMM cells/   ║
+║  slave) with deterministic-emitter constant (e.g. 24-channel       ║
+║  BMS slave). Whichever side is wrong, fix at the source.           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+[chain] === FATAL GATE 12 numeric-drift (exit 12) — WRONGNESS, fix the source rule ===
+Narrative count diverges from a BoM quantity — see AUDIT-DRIFT.md

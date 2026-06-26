@@ -1,4 +1,46 @@
-# 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
+# LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
+
+> Tristan 2026-06-26: ONE tracker. No duplicates. This is it. All others are archived (`docs/archive/trackers/`)
+> or are reference-only: `OPERATING-FRAME-2026-06.md` (why + self-prompt + SIGHT), `REVIEW-PUNCHLIST-2026-06-27.md`
+> (verbatim tab review). Work the MASTER CHECKLIST top-down; update status in place; the RESUME blocks below
+> are the running detail log.
+
+═══════════════════════════════════════════════════════════════════════════════
+## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
+═══════════════════════════════════════════════════════════════════════════════
+`[x]` done+guarded · `[~]` partial (SIGHT/sub-item done, SOURCE fix pending) · `[ ]` not started.
+EVERY fix UNIVERSAL (keyed on a signal, no archetype table) + PERMANENT (`--selftest`/proveCatch guard).
+
+STAGE 0 — Honest + TOTAL scorer (PRECONDITION)
+  [x] X1 banner+score on every sheet · [x] ship gate spans full workbook · [x] X2 Overview/Conn honest
+  [x] ⚠Checks by invariant pass-rate · [x] Financial gate-FAIL when economics UNVERIFIED
+  [ ] F1 banner RE-STAMP (banner reads 10 while gate FAILs) · [ ] guard: banner ≤ gate verdict per tab
+STAGE 0.5 — SIGHT: audit the DELIVERED artefact, not state.json
+  [x] render LITTER (`manifest_sight.py`, caps render/GA; v9 47%→0/FAIL) — SOURCE fix = Stage 3
+  [ ] bbox-containment (walls-outside) · [ ] shared-layout-hash (GA-top==render-top) · [ ] Excel cell-reader
+  [ ] vision critic (adversarial, proveCatch on littered render) · [ ] render-then-reingest wiring
+STAGE 1 — Provenance spine (= X4, highest-leverage build-out)
+  [ ] every number carries WHERE-FROM + WHERE-TO as data · [ ] orphan-number check
+  [ ] CW1 cost-waterfall traces to BoM · [ ] IA2 inputs from brief · [ ] CA3/Q1/B3 flow · [ ] CA2 used/unused
+STAGE 2 — Close the risk loop (X6/R1)
+  [ ] HIGH physics finding → correction + re-run · [ ] Risk score reflects CLOSURE (guard: unclosed HIGH FAILs)
+STAGE 3 — Drawing-content build-outs (SOURCE generators)
+  [ ] P&ID generator (EMPTY→tagged loops, #101) · [ ] BFD generator (EMPTY, #101)
+  [ ] geometry generator derives REAL per-part dims (SOURCE of the litter) · [ ] ONE layout → GA-top+render-top (#100)
+  [ ] isometrics 201/202/203 distinct (#101) · [ ] single-line/HVAC verified
+STAGE 4 — Class-appropriate economics (F1)
+  [x] F2 feedstock N/A · [ ] capex/opex/payback frame for infrastructure · [ ] no phantom revenue + banner reflects it
+  [ ] guard: economics-model-matches-class (feedstock-on-water + hardcoded-waterfall both FAIL)
+STAGE 5 — Universal tags + verification coverage
+  [x] X3 tab order · [x] B1 BoM key-inputs/factors · [~] B2 child rows · [x] CH2 ⚠Checks alignment
+  [ ] LV1/X5 every schedule row a real TAG · [ ] PS1/Panel/Assembly class-appropriate checks
+  [ ] AU2 surface benchmark-net in ⚠Audit (needs run w/o CHAIN_SKIP_BENCHMARK_NET) · [ ] Brief verbatim (#60)
+
+EXIT: (1) honest scorecard ≥8 on all 37 sheets, gate exits 0 (UNVERIFIED=FAIL); (2) every check proves its
+catch + no false-positive; (3) every number resolves up+down (zero orphans); (4) fresh skeptic pass finds
+nothing; (5) benchmark net (top-down) agrees with engine (bottom-up) within band.
+RE-VERIFY: brief parser non-deterministic on names/units (#86) → verify on a FRESH run; parts_ledger stale
+in-chain → re-run on final state. Latest run: out/fischer-codema-v9 (needs a v10 for gac/irrigation contract).
 
 ═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-27 v7 — 13/16 ≥8; 3 left ALL trace to WATER-ARCHETYPE SIZING bugs)

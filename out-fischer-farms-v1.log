@@ -1,0 +1,879 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/fischer_farms_fertigation.md (7428 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 7428 chars
+[brief-parse] OK — confidence=HIGH, missing=4 fields, metrics=4
+[chain] classification: vertical_farm (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 12.1s)
+[chain] U5 brief augmentation: U5 augmentation (class: vertical_farm): 2 HARD field(s) filled with class-aware inferred values, 4 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: max_mass_kg, target_process.
+  [U5] filled "max_mass_kg": 28000 (Class default for containerised vertical farm (40 ft Hi-Cube ISO container; controlled-interior ≈ +18–24 °C; design life)
+  [U5] filled "target_process": "Containerised hydroponic cultivation: NFT/DWC tray grow, LED photoperiod control, fertigation dosing, CO₂ enrichment, psychrometric HVAC management" (Class-canonical process for vertical_farm. Class default for containerised vertical farm (40 ft Hi-Cube ISO container; c)
+[chain] U6 brief expansion: 15 duties derived; product="Precisely dosed and pH-balanced fertigation water delivered to indoor crop cultivation trays." (model=google/gemini-3.1-pro-preview, cost_usd=0.072386)
+  [U6] total_cultivation_area_m2 = 21362.4 m2 [derived/high] — 6000 trays * (2.76 m length * 1.29 m width)
+  [U6] tray_flood_volume_m3 = 0.0534 m3 [derived/high] — Tray area (3.5604 m2) * flood depth (0.015 m)
+  [U6] valve_group_flow_rate_m3_per_hr = 45 m3/h [derived/high] — 30 trays per valve group * 1.5 m3/h inlet flow per tray
+  [U6] total_irrigation_demand_m3_per_hr = 90 m3/h [derived/high] — 2 cultivation departments * 45 m3/h maximum simultaneous demand per department
+  [U6] ro_feed_water_demand_m3_per_hr = 10.67 m3/h [derived/high] — 8 m3/h permeate capacity / 0.75 recovery rate
+  [U6] ro_reject_flow_m3_per_hr = 2.67 m3/h [derived/high] — RO feed water demand (10.67 m3/h) - RO permeate capacity (8 m3/h)
+  [U6] softener_gac_throughput_m3_per_hr = 14 m3/h [stated/high] — Stated in brief (provides buffer over the 10.67 m3/h RO feed for the raw-water blend line)
+  [U6] total_water_storage_capacity_m3 = 120 m3 [derived/high] — 1 fresh water tank + 2 drain water tanks = 3 tanks * 40 m3 each
+  [U6] fertigation_pump_pressure_bar = 3.5 bar [stated/high] — Stated in brief
+  [U6] fertigation_pumping_power_kw = 15 kW [derived/high] — 2 A/B nutrient-dosing units * 7.5 kW circulation pump per unit
+  [U6] drain_recovery_filter_capacity_m3_per_hr = 80 m3/h [stated/high] — Stated in brief
+  [U6] target_feed_water_conductivity_ms_per_cm = 0.5 mS/cm [stated/high] — Stated in brief
+  [U6] nutrient_stock_storage_l = 8000 L [derived/high] — 8 nutrient stock tanks * 1000 liters each
+  [U6] drain_pit_capacity_l = 10000 L [derived/high] — 2 cultivation departments * 5000 liters per department pit
+  [U6] hand_watering_flow_m3_per_hr = 25 m3/h [stated/high] — Stated in brief
+[chain] engineering_contract: 26 quantities, 3 topology edges, 5 macro-assemblies (total £53,040), closures: 2 pass / 1 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db","latency_ms":282}
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":5}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db","latency_ms":6}
+[products-writeback] {"product_name":"Containerised VF, 100 m² canopy across 40 trays (8 trolleys × 5 tiers). LED 15.0 kW @ 250 µmol/m²/s. HVAC 21.3 kW cooling. Total electrical 41.3 kW / 44 kW supply. Annual yield 25.0 t. Macro-assembly ","hit":"db_hybrid","matched":"Vertical Future smart farm","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":1817}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 3/7 mandatory covered for UK+EU
+  ⚠ HACCP (missing_mandatory): Hazard Analysis and Critical Control Points — Codex Alimentarius (global). Mandatory hazard-based food safety system for
+  ⚠ MD 2006/42/EC (missing_mandatory): Machinery Directive (EU). Conveyors, lifts, automated harvesters classified as machinery; risk assessment + DoC required
+  ⚠ WRAS (missing_mandatory): Water Regulations Approval Scheme (UK) (UK). UK regulatory approval required for fittings and materials in direct contac
+  ⚠ RoHS 2011/65 (missing_mandatory): Restriction of Hazardous Substances Directive (EU). LED fixtures and electronic controllers placed on the EU market must
+  ⚠ JURISDICTION_SCOPE (jurisdiction_conflict): Brief targets multiple regions (UK, EU) without an explicit harmonisation plan. Each region adds £25-60k in certificatio
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: vertical_farm
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 12533 chars. First 200: {
+  "market_context": "The vertical farming market in the UK and Europe is experiencing significant growth, driven by the need for resilient, local food production, reduced water usage, and year-round
+[research-synthesis] Complete: 4 competitors, 8 sources, 8 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[orchestrator] ⚠️  fixed-point iteration did not converge in 5 iterations — using iter-5 state (design may oscillate within 5% band)
+[chain] Orchestrator: 11 modules, 27 sub-modules, 90 words, 21 tools ran (12636ms)
+[chain] Build #18k: toolOutputsBlock built (22 tools, 17231 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 18 component_classes covered (18 with match, 0 empty), 15109 chars (23904ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=1250000, max_mass_kg=28000, target_performance_value=6000 (trays), operating_temp_min_c=15, operating_temp_max_c=30
+[chain] Contract validation: all 5 macro-assemblies present in design ✓
+[chain] keyMetrics seeded early (pre-reviewer): Cultivation Trays Count=6,000 trays
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=4/10 plaus=5/10 coh=8/10 part=7/10 hon=6/10 (34160ms)
+[chain] PHASE 4 skeleton critic: 2 HIGH-severity issues found before any LLM painting
+  ✗ [brief_to_design_fidelity @ modules] The design completely omits the water purification system (Reverse Osmosis, water softener, and GAC filter) and the 120 m³ water storage tanks (1 fresh, 2 drain) specified in the b
+  ✗ [engineering_plausibility @ modules/irrigation_nutrient/sub_modules/1] The system is specified as an 'ebb/flow' plant, but the design uses 400 x 2 L/h drip emitters and a 0.18 kW Grundfos CRE 3 pump (total flow 0.8 m³/h). Ebb and flow irrigation requi
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 12749 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 16 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 16 / 16 patches (skipped 0)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.growing_tray_word manufacturer="Enduramaxx" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.growing_tray_word part_number="172810-2300" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.growing_tray_word material="food-grade HDPE" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.growing_tray_word rating_primary="2.50 m² per tray" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word growing_canopy.mobile_growing_trolleys.growing_tray_word (+5 modifiers)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word manufacturer="Montel" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word part_number="GR-CAST-250" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word material="polyurethane wheel" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 23.4s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":1,"d_overview_chars":1065}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=8/10 phys=5/10 coh=6/10 part=9/10 hon=9/10 (44938ms)
+[chain] critic headline: Design successfully honours the documented trade-off of a scaled-down 100 m² containerised system, but contains critical physical mismatches in breaker sizing, pipe velocity, and ebb/flow volume.
+[chain] critic issues: 4 high, 0 med, 4 total
+  ✗ [high/high] engineering_plausibility @ electrical_distribution/sub_modules/0/words/0: The main breaker (ABB Tmax XT1H 160 4p, 63 A) is undersized for the 41.3 kW total electrical load. At 400V 3-phase with a 0.9 power factor, the current is 41300
+  ✗ [high/high] internal_coherence @ irrigation_nutrient/sub_modules/1/words/2: The design specifies 400 x 2 L/h drip emitters, which is completely inconsistent with the ebb/flow recirculating tray system described in the brief and the 0.05
+  ✗ [high/high] engineering_plausibility @ irrigation_nutrient/sub_modules/0/words/0: The primary nutrient tank (Enduramaxx 1000 L) is too small to support a single flood cycle. 40 trays with a flood volume of 53.4 L each require 2,136 L of water
+  ✗ [high/high] engineering_plausibility @ irrigation_nutrient/sub_modules/1/words/1: The 32 mm OD PVC-U pipe is too small for ebb/flow. Flooding 2,136 L in 10 minutes requires a flow rate of 12.8 m³/h (0.00356 m³/s). In a 26 mm ID pipe, this res
+
+[chain] STEP 7.5b: physics-critic PHASE-2 AUTO-CORRECT (SHADOW — records would-be corrections, does NOT mutate the design)
+[chain] physics auto-correct (shadow): selected 3 blocking finding(s) → corrected 3, declined 0, unlocatable 0, still-uncorrectable 0 after 1 pass(es)
+  • [corrected] undersized-vs-load @ electrical_distribution/sub_modules[0]/words[0] (part-token): {manufacturer=ABB, part_number=Tmax XT1H 160 4p, capacity=63, form=ABB Tmax XT1H 4-pole 36 kA} → {manufacturer=ABB, part_number=1SDA067441R1, capacity=100 A, form=ABB Tmax XT1H 4-pole 36 kA 100A, rating_primary=100 A, list_price_gbp=380}
+  • [corrected] undersized-vs-load @ irrigation_nutrient/sub_modules[0]/words[1] (word-id): {capacity=200, form=external skid — separate from tank B to prevent Ca-PO4-SO4 precipitation} → {capacity=3000 L, form=vertical tank, manufacturer=Enduramaxx, part_number=17120300, rating_primary=3000 L, dimension=1400mm dia x 2150mm h, material=MDPE, list_price_gbp=750}
+  • [corrected] undersized-vs-load @ irrigation_nutrient/sub_modules[1]/words[1] (part-token): {dimension=32, form=PVC-U pressure pipe, food-contact} → {dimension=63, form=PVC-U pressure pipe, PN16, food-contact, manufacturer=GF Piping Systems, part_number=161.017.085, rating_primary=PN16, material=PVC-U, list_price_gbp=25.5}
+[chain] physics-critic enforcement (shadow): 3 BLOCKING known-failure fault(s) — a part the engine knows will fail:
+  ✗ [undersized-vs-load/high] @ electrical_distribution/sub_modules/0/words/0: The main breaker (ABB Tmax XT1H 160 4p, 63 A) is undersized for the 41.3 kW total electrical load. At 400V 3-phase with a 0.9 power factor, the current is 41300 / (1.732 * 400 * 0.9) = 66.2 A, which e…
+  ✗ [undersized-vs-load/high] @ irrigation_nutrient/sub_modules/0/words/0: The primary nutrient tank (Enduramaxx 1000 L) is too small to support a single flood cycle. 40 trays with a flood volume of 53.4 L each require 2,136 L of water. A 1,000 L tank will run dry before eve…
+  ✗ [undersized-vs-load/high] @ irrigation_nutrient/sub_modules/1/words/1: The 32 mm OD PVC-U pipe is too small for ebb/flow. Flooding 2,136 L in 10 minutes requires a flow rate of 12.8 m³/h (0.00356 m³/s). In a 26 mm ID pipe, this results in a fluid velocity of 6.7 m/s, far…
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 10450 chars
+[chain] STEP 8: R4 Flash-Lite review returned 11 patches
+[chain] STEP 8: R4 Flash-Lite review applied 11 / 11 patches (skipped 0)
+    =growing_canopy.overview_paragraph_en (prose)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word manufacturer="Tente" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word part_number="2477UAP100P63" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word material="Polyurethane tread, steel housing" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word rating_primary="250 kg dynamic load" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word regulatory="EN 12532" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word growing_canopy.mobile_growing_trolleys.trolley_castor_word (+5 modifiers)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.floor_guide_rail_word manufacturer="Item Industrietechnik" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8: R4 Flash-Lite review done in 11.4s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":924}
+[chain] canonical product_class OVERRIDE: "" → "vertical_farm" (deterministic classifier wins)
+
+[chain] STEP 8.5: domain specialist (vertical_farm) review
+
+[chain] STEP 8.5: R4.5 vertical_farm specialist ...
+[chain] STEP 8.5: R4.5 vertical_farm specialist raw response: 12521 chars
+[chain] STEP 8.5: R4.5 vertical_farm specialist returned 20 patches
+[chain] STEP 8.5: R4.5 vertical_farm specialist applied 20 / 20 patches (skipped 0)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word manufacturer="Tente" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word part_number="5947UFR100P62" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word material="polyurethane wheel on steel housing" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word rating_primary="250 kg" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.trolley_castor_word regulatory="EN 12532" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word growing_canopy.mobile_growing_trolleys.trolley_castor_word (+5 modifiers)
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.floor_guide_rail_word manufacturer="Bosch Rexroth" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: growing_canopy.mobile_growing_trolleys.floor_guide_rail_word part_number="3842992420" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8.5: R4.5 vertical_farm specialist done in 27.9s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":1,"d_overview_chars":1125}
+[chain] physics repair: 1 iter(s); HIGH 4→4; plausibility 5→5; patches 2
+  iter 0: proposed 6 applied 2 | HIGH 4→4 plaus 5→5 | ROLLED BACK iter 0: high 4→6, plausibility 5→2. Restoring snapshot.
+[chain] sub-module prose pre-fill: rewrote 27/27 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] library-override detection: tagged 2 word(s) with source_detail="Library override: (no reason given)" — these will be Brave-verified by background-enrichment
+[chain] G0.5 brief-target-reconciliation: PASS — 1 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 139 entries (KPA=110, emitter=29, rag=0)
+[chain] gate-23 emitter-completeness: PASS — 27 sub_modules checked, 27 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 0: arith 0 pass / 1 fail; grammar 7 pass / 6 fail; total score -5170
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21} but missing [canopy_area_m2, led_efficacy_umol_j, led_power_kw]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [thermal_path_closes] grammar: 1 heat-source sub-module(s) without thermal_path: data_compute_communication::networking. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 5 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087" AND "2300×1087×150 mm" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000" AND "12000×50×30 mm" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000" AND "1200×600×2000 mm" | lighting_array::lighting_distribution::lighting_bus_cable_word has 2 conflicting "dimension" values: "2×1.5" AND "2×1.5 mm² × 25 m" ...+1. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 0: applied 13 patches, skipped 1, allowlist_rejected=0, state_changed=true
+    =lighting_array.derived_parameters (Add missing derived parameters for led_ppfd_area gate)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    +cross_module_grammar_links.[+] (Resolve thermal_path_closes failure for data_compute_communication)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Enrich mobile_growing_trolley_word)
+    ~merge-into-existing lighting_array.sub_modules[0].words[0] (Enrich horticultural_led_fixture_word)
+    ~merge-into-existing climate_control.sub_modules[0].words[0] (Enrich dx_hvac_unit_word)
+    ~merge-into-existing irrigation_nutrient.sub_modules[0].words[0] (Enrich fertigation_reservoir_word)
+    ~merge-into-existing automation_sensing.sub_modules[2].words[0] (Enrich plc_controller_word)
+    ~merge-into-existing electrical_distribution.sub_modules[0].words[0] (Enrich tp_n_main_breaker_word)
+    ~merge-into-existing data_compute_communication.sub_modules[0].words[0] (Enrich edge_industrial_pc_word)
+    ~merge-into-existing structure_containment.sub_modules[0].words[0] (Enrich iso_container_40hc_word)
+    ~merge-into-existing worker_access_safety.sub_modules[2].words[0] (Enrich uvc_low_pressure_lamp_word)
+    ~merge-into-existing regulatory_compliance.sub_modules[0].words[1] (Enrich ukca_marking_label_word)
+    ~merge-into-existing effluent_treatment.sub_modules[0].words[0] (Enrich screen_filter_50_micron_word)
+[chain] Phase 2 iter 1: emitter-identity re-assert corrected 11 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 1: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087" AND "2300×1087×150 mm" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000" AND "12000×50×30 mm" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000" AND "1200×600×2000 mm" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 1: applied 5 patches, skipped 12, allowlist_rejected=11, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j key to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT growing_canopy.sub_modules[0].words[+]: word patch contains MPN="5947UFR100P62" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich trolley_castor_word)
+    ALLOWLIST_REJECT growing_canopy.sub_modules[0].words[+]: word patch contains MPN="3842992420" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich floor_guide_rail_word)
+    ALLOWLIST_REJECT growing_canopy.sub_modules[0].words[+]: word patch contains MPN="RMI12.1101" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich utility_quick_connect_word)
+    ALLOWLIST_REJECT growing_canopy.sub_modules[1].words[+]: word patch contains MPN="PROP-RACK-3T" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich propagation_rack_word)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+]: word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+]: word patch contains MPN="ESB 40-40N" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_relay_contactor_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+]: word patch contains MPN="Si-30" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich condensate_recovery_pump_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[3].words[+]: word patch contains MPN="Mini Mega" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich hepa_h13_filter_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[1].words[+]: word patch contains MPN="PVC-U" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich manifold_pvc_pipe_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[1].words[+]: word patch contains MPN="PCJ" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich tray_drip_emitter_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[1].words[+]: word patch contains MPN="PVC-U" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich return_drainage_grid_word)
+[chain] Phase 2 iter 2: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 2: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 2: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 3: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 3: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 3: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 4: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 4: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 4: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 5: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 5: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 5: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 6: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 6: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 6: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 7: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 7: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 7: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 8: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 8: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 8: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 9: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 9: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 9: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 10: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 10: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 10: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 11: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 11: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 11: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 12: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 12: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 12: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 13: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 13: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 13: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 14: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 14: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 14: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 15: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 15: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 15: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 16: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 16: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 16: applied 5 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    =lighting_array.derived_parameters (Add missing led_efficacy_umol_j to derived_parameters)
+    skip append-to-non-array: regulatory_compliance.grammar_links[+]
+    ~merge-into-existing growing_canopy.sub_modules[0].words[0] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[1] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[0].words[3] (Remove duplicate dimension modifier)
+    ~merge-into-existing growing_canopy.sub_modules[1].words[0] (Remove duplicate dimension modifier)
+    ALLOWLIST_REJECT lighting_array.sub_modules[1].words[+] : word patch contains MPN="OLFLEX CLASSIC 110" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich lighting_bus_cable_word)
+    ALLOWLIST_REJECT climate_control.sub_modules[0].words[+] : word patch contains MPN="Streamline" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich refrigerant_line_set_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_a_word)
+    ALLOWLIST_REJECT irrigation_nutrient.sub_modules[0].words[+] : word patch contains MPN="200L-TANK" not in verified-parts allowlist (139 entries). Patch dropped. (Enrich nutrient_stock_tank_b_word)
+[chain] Phase 2 iter 17: emitter-identity re-assert corrected 4 word(s) before gate eval
+[grammar] cross_module_required_links: skipped 8 registry bug(s) for Vertical Farm: energy_conversion_transduction ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | mass_fluid_transport_process ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit) | environmental_interface ↔ structure_containment (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 17: arith 0 pass / 1 fail; grammar 8 pass / 5 fail; total score -4950
+  ✗ [led_ppfd_area] led_ppfd_area INCOMPLETE on lighting_array: declared {ppfd=275.21, canopy_area_m2=100, led_power_kw=11.01} but missing [led_efficacy_umol_j]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to lighting_array.derived_parameters.
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: regulatory_compliance::certification_evidence, regulatory_compliance::traceability_qr
+  ✗ [sub_module_word_density] grammar: 20 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): growing_canopy::seedling_propagation (2 words), lighting_array::led_fixtures (1 words), lighting_array::lighting_distribution (3 words), climate_control::dehumidifier (2 words), climate_control::co2_enrichment (4 words), climate_control::air_circulation (3 words), automation_sensing::environmental_sensors (3 words), automation_sensing::water_chemistry_sensors (4 words) ...+12. FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 17 sub-module(s) with <3 priced lines: growing_canopy::mobile_growing_trolleys (0/5), lighting_array::lighting_distribution (0/3), climate_control::dx_hvac_unit (0/6), climate_control::co2_enrichment (0/4), climate_control::air_circulation (0/3), irrigation_nutrient::external_irrigation_skid (0/6) ...+11.
+  ✗ [word_modifier_richness] grammar: 39 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): climate_control::co2_enrichment::co2_injection_diffuser_word  (2 mods, need ≥4), climate_control::air_circulation::mixing_circulation_fan_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_a_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::nutrient_stock_tank_b_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_acid_tank_word  (3 mods, need ≥4), irrigation_nutrient::external_irrigation_skid::ph_correction_base_tank_word  (3 mods, need ≥4) ...+33. FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): growing_canopy: overview mentions 2 concrete components not present in any sub-module word — prop-rack-3t, rmi12 | lighting_array: overview mentions 2 concrete components not present in any sub-module word — olflex, classic. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word has 2 conflicting "dimension" values: "1353×2300×2400 mm" AND "1353×2300×2400" | growing_canopy::mobile_growing_trolleys::growing_tray_word has 2 conflicting "dimension" values: "2300×1087×150 mm" AND "2300×1087" | growing_canopy::mobile_growing_trolleys::floor_guide_rail_word has 2 conflicting "dimension" values: "12000×50×30 mm" AND "12000" | growing_canopy::seedling_propagation::propagation_rack_word has 2 conflicting "dimension" values: "1200×600×2000 mm" AND "1200×600×2000" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2: hit max repair iterations (18); bailing
+[fill-blank-mpn] 13 blank catalogue word(s) for class "vertical_farm" (48 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   climate_control::dx_hvac_unit (condensate recovery pump) → Fujitsu UTR-DPB24T
+[fill-blank-mpn]   ✓ DB   climate_control::co2_enrichment (CO2 solenoid valve) → Burkert 6013-2A
+[fill-blank-mpn]   ✓ DB   automation_sensing::environmental_sensors (CO2 NDIR sensor) → Amphenol SGX Sensortech IR31CE
+[fill-blank-mpn]   ✓ DB   automation_sensing::water_chemistry_sensors (water temperature NTC sensor) → Mitsubishi Electric PAC-TH011TK-E
+[fill-blank-mpn]   ✓ DB   data_compute_communication::networking (Ethernet Cat6 cable) → Stewart Connector BM-MFAR080N
+[fill-blank-mpn] filled 5/13 blank word(s): 5 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 48 structural skipped.
+[chain] fill-blank-mpn: branded 5/13 blank catalogue word(s) (5 DB-first real MPN, 0 generated real-OEM), 48 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 368 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 19346 lines scanned, 2 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 34 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=11 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"vertical_farm","resolved_to":"vertical_farm","hit":"db","nodes":15,"edges":38}
+[chain] K10 shadow: FAIL_SHADOW — matched=21 missing=13 extra=0
+[chain] headline derived: Cultivation Trays Count=6,000 trays [derived_from_brief]; Unit cost ceiling=1,250,000 GBP; Yield per m² per year=49.7 kg/m²/yr (0.00s)
+[chain] part verification: 34 parts checked — verified=29, unverified=3, uncertain=2, skip=0
+[chain] G5 RAG: 5 queries → 1 suggestions (high=0, medium=0, low=1, below_threshold=4, corpus=50 rows)
+[chain] part verification: stripped 6 high-confidence fake part_numbers
+  • growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word → removed "GREENROLL mobile grow rack" (Search results confirm Montel manufactures 'GROWRAK' and 'GROW&ROLL' systems, but there is no eviden)
+  • climate_control::co2_enrichment::co2_pressure_regulator_word → removed "Model 825" (Model 825 — pattern strip: contains descriptor word + suffix ("Model 825"), not a SKU)
+  • data_compute_communication::networking::industrial_managed_switch_word → removed "GREYHOUND GRS1052-AAAA" (The search results for the Hirschmann GREYHOUND 105 series show standard part numbers like 942287002)
+  • structure_containment::access_doors::personnel_door_assembly_word → removed "Hygienic Hinged Door (insulated single-leaf)" (Hygienic Hinged Door (insulated single-leaf) — pattern strip: three or more all-alphabetic words ("H)
+  • regulatory_compliance::traceability_qr::water_quality_sampling_port_word → removed "Type 546 Pro" (Type 546 Pro — pattern strip: contains descriptor word + suffix ("Type 546 Pro"), not a SKU)
+[chain] strip+recommend: 6 recommendations — high=4, medium=2, low=0, unknown=0 (manual sourcing required)
+[chain] design decisions: 7 unresolved conflicts surfaced for human review
+  • growing_canopy::mobile_growing_trolleys::mobile_growing_trolley_word dimension: "1353×2300×2400 mm" AND "1353×2300×2400" → recommend "1353×2300×2400 mm"
+  • growing_canopy::mobile_growing_trolleys::growing_tray_word dimension: "2300×1087×150 mm" AND "2300×1087" → recommend "2300×1087×150 mm"
+  • growing_canopy::mobile_growing_trolleys::floor_guide_rail_word dimension: "12000×50×30 mm" AND "12000" → recommend "12000×50×30 mm"
+  • growing_canopy::seedling_propagation::propagation_rack_word dimension: "1200×600×2000 mm" AND "1200×600×2000" → recommend "1200×600×2000 mm"
+  • lighting_array::lighting_distribution::lighting_bus_cable_word dimension: "2×1.5" AND "2×1.5 mm² × 25 m" → recommend "2×1.5"
+  • climate_control::dx_hvac_unit::refrigerant_line_set_word dimension: "15.9/9.5" AND "15.9/9.5 mm OD × 10 m" → recommend "15.9/9.5 mm OD × 10 m"
+  • structure_containment::iso_container_40hc::iso_container_40hc_word dimension: "12190×2440×2900 mm" AND "12190×2440×2900" → recommend "12190×2440×2900 mm"
+[chain] structural-gate router: surfaced 3 unrepaired gate(s) as design decisions
+[farnell] HTTP 403 for basicDIM Wireless
+[nexar] GraphQL errors for mpn=basicDIM Wireless: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=MITRA X: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=A-OK 36/40: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for UTR-DPB24T
+[nexar] GraphQL errors for mpn=UTR-DPB24T: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for MLT800
+[nexar] GraphQL errors for mpn=FXFSQ125ARV16 (VRV-S round-flow cassette): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=MLT800: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=PUMY-P140YKM2: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=6013-2A: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for SHT41-AD1B-R3
+[farnell] HTTP 403 for IR31CE
+[nexar] GraphQL errors for mpn=172810 1000 L vertical tank: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CRE 3: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for 6ES7214-1AG40-0XB0 (S7-1200 CPU 1214C DC/DC/DC)
+[farnell] HTTP 403 for Tmax XT1H 160 4p
+[nexar] GraphQL errors for mpn=PAC-TH011TK-E: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=IRDH275B-435: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for UNO-148
+[nexar] GraphQL errors for mpn=Tmax XT1H 160 4p: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for BM-MFAR080N
+[nexar] GraphQL errors for mpn=S203-C (3-pole C-curve MCB): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for M22-PV
+[farnell] HTTP 403 for TUV PL-L 4P (germicidal 254 nm)
+[nexar] GraphQL errors for mpn=294 push-bar panic device: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=40HC dry container (ISO 6346 42G1): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TUV PL-L 4P (germicidal 254 nm): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Mini Sigma: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=B-7541 polyester rating-plate label: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[chain] Stage 10.5 Part Reality Check: 27 checked, 8 real, 0 substituted, 19 warned (no substitute available). Nexar calls used: 19.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ lighting_dali_controller_word: "Tridonic basicDIM Wireless" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ horticultural_led_fixture_word: "Heliospectra MITRA X" [class=optical_emission_function, library_class=optical]
+  ⚠ rockwool_propagation_cube_word: "Grodan A-OK 36/40" [class=unknown, library_class=none]
+  ⚠ condensate_recovery_pump_word: "Fujitsu UTR-DPB24T" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ dx_indoor_unit_word: "Daikin FXFSQ125ARV16 (VRV-S round-flow cassette)" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ refrigeration_dehumidifier_word: "Munters MLT800" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ dx_hvac_unit_word: "Mitsubishi Electric PUMY-P140YKM2" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ co2_solenoid_valve_word: "Burkert 6013-2A" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ fertigation_reservoir_word: "Enduramaxx 172810 1000 L vertical tank" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ fertigation_pump_word: "Grundfos CRE 3" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ water_temp_ntc_sensor_word: "Mitsubishi Electric PAC-TH011TK-E" [class=electrical_conducting_function, library_class=none]
+  ⚠ insulation_monitor_word: "Bender IRDH275B-435" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ tp_n_main_breaker_word: "ABB Tmax XT1H 160 4p" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ lighting_branch_breaker_word: "ABB S203-C (3-pole C-curve MCB)" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ emergency_egress_release_word: "Exidor 294 push-bar panic device" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ iso_container_40hc_word: "CIMC 40HC dry container (ISO 6346 42G1)" [class=unknown, library_class=none]
+  ⚠ uvc_low_pressure_lamp_word: "Signify (Philips) TUV PL-L 4P (germicidal 254 nm)" [class=optical_emission_function, library_class=optical]
+  ⚠ screen_filter_50_micron_word: "Amiad Mini Sigma" [class=fluid_flow_state, library_class=fluid_path]
+  ⚠ ukca_marking_label_word: "Brady B-7541 polyester rating-plate label" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] module-paragraph-llm: 11/11 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 0 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/10 capital (threshold 6); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 6 sections, 1 warnings
+[chain] design decisions review: 15 choices (1 applied, 14 flagged, 0 blocked)
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 205356.2 kW, 20535.62%); economic-conductor saving £310
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 212290.8 kW, 21229.08%); economic-conductor saving £308
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 107976.0 kW, 10797.60%); economic-conductor saving £313
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 212139.3 kW, 21213.93%); economic-conductor saving £310
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 188794.7 kW, 18879.47%); economic-conductor saving £306
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 123478.6 kW, 12347.86%); economic-conductor saving £328
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 3 iters (parasitic 123478.6 kW, 12347.86%); economic-conductor saving £328
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 7 passes, settled at pass 7; as-routed supply demand 1000 → 124478.556 kW (Δ 123478.556 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 39421) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/blender-bg.log
+[estimate] product_class=vertical_farm annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'vertical_farm' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 83 parts need price estimates
+[estimate] corpus-classified 4/83; 79 need rule-based / Flash-Lite
+[estimate] rule-based classified 17 parts; 62 still need Flash-Lite
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Flash-Lite classified 4 batches
+[estimate] 26 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] Flash-Lite (volume-aware) for 3 'unknown' parts
+[estimate] updated 27 existing, synthesised 56 new, 0 failed
+[estimate] C3 DB cache: 0 hits — run scripts/ingest/* to populate the cache for better pricing accuracy
+[estimate] classification source: corpus=4 rule_based=17 flash_lite=62 fallback=0 curated=0 db_cache=0
+[estimate] estimate source: db_cache=0 curve=80 flash_lite_unknown=3
+[estimate] top classes in BoM:
+  structural_polymer: 15
+  mechanical_assembly: 9
+  safety_consumable: 9
+  oem_subsystem: 9
+  fluid_path: 8
+  structural_metal: 7
+  electronic_pcb: 5
+  electronic_connector: 4
+[estimate] estimated cost: GBP 0.002
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: vertical_farm
+[engine-c] 90 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 90/90 results in 35.4s
+[engine-c] flags: in_range=20  over=14  under=47  no_reference=9
+[engine-c] 61/90 priced lines flagged out-of-range vs reference corpus (67.8%)
+[engine-c] 16 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] BoM context:
+  • top manufacturers: Mitsubishi Electric, ABB, Montel, Grodan, Heliospectra, Tridonic, Daikin, Fujitsu, Munters, Harris
+  • critical components (top 10):
+      - propagation rack (×1, 1200×600×2000 mm, 3-tier seedling rack)
+      - rockwool propagation cube (×2500, Grodan A-OK 36/40 wrapped)
+      - fertigation pump (×1, 0.18 kW, Grundfos CR-class vertical multistage centrifugal)
+      - manifold PVC pipe (×1, 32 mm OD, PVC-U pressure pipe, food-contact)
+      - tray drip emitter (×400, 2 L/h, pressure-compensating emitter)
+      - return drainage grid (×1, 50 mm OD, PVC-U gravity return manifold)
+      - inline UV steriliser (×1, 40 W, Grodan Aquariumsupplies UV 40W inline 254 nm)
+      - mobile growing trolley (×8, 1353×2300×2400 mm, powder-coated steel chassis on floor guide rails, full container width, rolls out the end doors (extraction access — no internal walkway))
+      - NFT growing tray (×40, 2300×1087 mm, food-grade HDPE recirculating channel, 2.50 m² per tray)
+      - trolley castor with brake (×32, 250 kg, polyurethane wheel, swivel + brake)
+  [principal_vf_oem] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [principal_vf_oem] +3 archetype-tagged row(s) from prior web-fallback persistence
+  [principal_vf_oem] scoring 15 candidates via Flash-Lite…
+  [led_supplier] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60)) — 1 semantic-only save(s) the keyword filter missed
+  [led_supplier] +2 archetype-tagged row(s) from prior web-fallback persistence
+  [led_supplier] scoring 15 candidates via Flash-Lite…
+  [hvac_integrator] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60)) — 2 semantic-only save(s) the keyword filter missed
+  [hvac_integrator] +4 archetype-tagged row(s) from prior web-fallback persistence
+  [hvac_integrator] scoring 15 candidates via Flash-Lite…
+  [headquarters-lookup] populated city on 4 candidate(s) via known-locations + Brave HQ query
+[enrich-suppliers] product_class: vertical_farm
+  principal_vf_oem: 3 candidate(s)
+    • [db] GrowUp Urban Farms (GB) — confidence: medium
+    • [db] Digital Farming (GB) — confidence: low
+    • [db] Grow Dynamics (GB) — confidence: low
+  led_supplier: 3 candidate(s)
+    • [db] Philips (Netherlands) — confidence: high
+    • [db] Vertically Urban (GB) — confidence: medium
+    • [db] Camtronics Vale (United Kingdom) — confidence: high
+  hvac_integrator: 3 candidate(s)
+    • [db] Munters (Sweden) — confidence: low
+    • [db] Eipl (United Kingdom) — confidence: low
+    • [db] Penmann (GB) — confidence: low
+[enrich-suppliers] calls — brave: 6, flash-lite (score): 45, flash-lite (name cleanup): 0, flash-lite (capability): 9
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (3 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/state.json
+[supplier-validate] 9 candidate(s) examined: 7 already reconciled, 0 URLs replaced, 2 dropped, 2 changed total
+[supplier-validate] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/state.json
+[hero] step 0: per-project geometry generator (LLM)...
+[geom-gen] product_class=vertical_farm template=vertical-farm-9shot.py primary=openai/gpt-5.5 fallback=anthropic/claude-sonnet-4.6
+[geom-gen] [openai/gpt-5.5] first attempt: 289 lines, 164.6s
+[geom-gen] using output from openai/gpt-5.5
+[geom-gen] geometric-number fidelity: 7/8 (88%)
+[geom-gen] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/blender-scene.py (26068 bytes) + forge_blender_lib.py
+[hero]   geometry generator OK in 167.6s
+[hero] step 1: Blender structural reference cover pass...
+[hero]   template runner produced blender-cover.png in 0.0s
+[hero]   Blender cover OK in 0.0s → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/blender-cover.png
+[hero] step 2: Gemini 3.1 Flash Image preview (i2i)...
+[hero]   Gemini OK in 20.8s (1607.1 KB)
+[hero] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/cover.png
+[hero] updated state.brief_hero_image_path
+[modules] building palette card for 11 module(s)...
+[modules] all 11 module images already on disk; skipping template render
+[modules] template renderer produced 11/11 module images
+[modules] updated state.module_image_paths with 11 entries
+[chain] deployment_envelope: no envelope mapped for vertical_farm (returning null is intentional for some classes)
+[chain] costStack persisted: ex-works £138977 (raw materials £107342, class vertical_farm)
+[chain] G2 cost-reality: PASS — BoM £107342 across 90 priced lines (0 unpriced)
+[chain] G3 review-completeness: PASS
+[chain] bom-cost-grounding: 6 lines re-priced from DOE/NETL + cache (real), 1 recorded-only (low-confidence kept at prior price)
+[chain] pre-render SKU restore: re-added 6 blanked part_number(s) a late stage stripped from real parts — emitter is the part-identity authority
+[chain] self-audit (shadow): floor 2/10 · mean 5/10 · 1 blocking · below-8: headline=2, brief_compliance=6, performance_card=3, design_narrative=7, physics_fidelity=4
+  ✗ [headline] asserts 6000 trays from brief but actual design delivers only 1600 trays (8 trolleys × 5 tiers × 40 trays) in 100 m^{2} container
+[chain] sweet-spot reconciliation: COMPATIBLE (objective=balanced, rescale=1.00×) — The brief is internally consistent: 360,000 m³/yr fits within the £1.25M ceiling. Recommended operating point: 360,000 m³/yr at £139k (£0/m³/yr). Objective: BALANCED (the best cost/output compromise).
+[chain] cost-sanity (shadow): HIGH — Independent cost sanity HIGH: £138,977 / 360,000 m³/yr = £0.4/(unit·yr) is 3885.5× below the £1,500/(unit·yr) low edge of the £1,500–£10,000/(unit·yr) industry band for throughput output — the bill of materials is almost certainly UNDERCOUNTED (missing line items / wrong unit price). (brief metric irrigation_demand_per_department_m3_per_hr=45 m³/h → 360,000 m³/yr; Capacity-per-time plant (CAPEX per annual output unit). Amine CO₂ capture + mineralisation PILOT ~£1,500-10,000/(t·yr CO₂) — commercial-scale DAC targets sub-£1,500 but a pilot/first-of-a-kind plant sits in this band (IEA DAC 2024; Climeworks/Heirloom/Carbon Engineering disclosures). A £55k plant capturing 365 t/yr = £150/(t·yr) is ~15× below this floor (the real CO₂ undercount).)
+[chain] cost-basis: refreshed cost_reality + costStack to the post-writeback BoM £107,346 (ex-works £138,981)
+[chain] cost-basis: 1 take-off + 0 curve + 0 catalogue + 89 disclosed; 1 take-off price written into the BoM; purchased £46,815 → installed £140,445 (central)
+[advisor-engagement] 11/11 modules got an advisor block — 22 specialist cards, 44 grounded questions
+[chain] advisor-engagement: 11 module blocks, 22 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — "vertical_farm" legitimately uses hydroponic markers (22 tools, 130 quantities scanned)
+[chain] render-quality (shadow): PASS — class="vertical_farm" template=vertical-farm-9shot.py hero=true modules=22 thin=0
+[chain] tools-flow: rendered 219045 bytes (22 tools)
+[investor-section] 5 investors matched from 18 candidates: Navitas Capital, Sony Innovation Fund, Newfund, NFT.VC, EEC Ventures
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 7/7 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  [schedule] ✓ Piping Isometrics  (drawings/isometric-index.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 7/7 drawings + hero → wired into the PDF
+[drawing-gates] 9 gates · 0 failing · ALL-PASS=True
+  ✓ [med ] legibility         single-line-diagram 2120x1300 aspect 1.6:1 (limit 4:1)
+  ✓ [med ] legibility         pid 2360x1376 aspect 1.7:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x896 aspect 2.5:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2160x2050 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         block-flow-diagram 2526x976 aspect 2.6:1 (limit 4:1)
+  ✓ [med ] legibility         hvac-layout 2240x1788 aspect 1.3:1 (limit 4:1)
+  ✓ [med ] legibility         process-schedules 2492x1836 aspect 1.4:1 (limit 4:1)
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✓ [med ] material_diversity 2 distinct pipe material(s): ['carbon steel', 'hdpe/pe100']
+[chain] drawing-gates: 0/9 failing — DRAWING >=8 PASS
+[census] 0 tie-in runs (0 units) = £0 (cable £0 + pipe £0)
+[census] routed major streams = £33,245  →  full interconnect ≈ £33,245
+  [corpus-median-lift] raised 18 under-priced principal line(s) to their engine corpus lower edge (+£8,185)
+[requirements_bom] price-ingest queue: +3 DB-miss principal(s) → /Users/tristanfischer/.forge-truth/price-ingest-queue.jsonl
+[chain] cost-sanity re-derived on authoritative BoM (Σ £621,626): verdict high — £2/m³/yr
+[chain] benchmark net: generating independent top-down expectation (LLM)…
+[chain] benchmark net (z-ai/glm-5.2): 🔴 RADICAL — RADICAL divergence — the deterministic engine and the LLM benchmark disagree by >2.5× on a core dimension; one of them is wrong. FULL CHECK REQUIRED.
+[chain]   • output — irrigation_demand: expected 45 m³/h; engine 0.8 m³/h (contract.irrigation_pump_flow_m3_h) [radical, 0.02×]
+[chain]   • output — growing_area: expected 10000 m²; engine 100 m² (contract.canopy_area_m2) [radical, 0.01×]
+[chain]   • BoM concentration: expected no single category above ~30% of cost; engine "UV-C warning label" is 51% of the bill [warn, 1.69×]
+[chain]   ↳ FAULT UV-C warning label [cost] — unit price and line total absurd for warning label (~35000× too high) → £1–5 per label
+[chain]   ↳ FAULT nutrient stock tank A · 200 L [cost] — unit price far too high for 200 L tank (~50–100× too high) → £500–1200
+[chain]   ↳ FAULT nutrient stock tank B · 200 L [cost] — unit price far too high for 200 L tank (~50–100× too high) → £500–1200
+[chain]   ↳ FAULT inline UV steriliser · 40 W [cost] — unit price inflated for small UV unit (~10–20× too high) → £1500–3000
+[chain]   ↳ FAULT pH correction acid tank · 25 L [cost] — unit price far too high for small tank (~20–40× too high) → £300–600
+[chain]   ↳ FAULT pH correction base tank · 25 L [cost] — unit price far too high for small tank (~20–40× too high) → £300–600
+[chain]   ↳ FAULT all Cxx water connection lines (C03, C25, C23, C04, C02, C28, C33, C29, C24, C27, C31, C34, C30, C36, C35, C26, C32) [cost] — fabricated connection items with arbitrary high prices and zero/inconsistent flows (entire class invalid) → remove or replace with real pipe/fitting items at realistic prices
+[chain]   ↳ FAULT DX HVAC unit · 29.5 kW [quantity] — only 1 unit for 100 m² (benchmark scale 10000 m²) (~100× too low) → qty 80–120
+[chain]   ↳ FAULT horticultural LED fixture · 138 W [quantity] — only 80 units for 100 m² canopy (~100× too low) → qty 8000–12000
+[chain]   ↳ FAULT fertigation pump · 0.18 kW [sizing] — flow 0.18 kW / 0.8 m³/h vs required 45 m³/h (~50× undersized) → pump sized for 45 m³/h (~5–7 kW)
+[chain]   ↳ FAULT Reverse osmosis system [component] — no RO equipment present despite required for fertigation loop (absent) → add RO skid + booster (~£25k–40k)
+[chain]   ↳ FAULT Multi-tier racking structures [component] — only 8 trolleys + 1 propagation rack; no fixed multi-tier racking for 10000 m² scale (largely absent) → add tiered rack steelwork (~15% of budget)
+[chain] benchmark net: wrote benchmark-punchlist.md — 12 fault(s) routed to 4 source rule(s): UNROUTED (no basis match, materials-takeoff, catalogue-price, rating-based-pricing
+[chain] requirements-driven BoM: 126 requirement lines (Σ £621,626) → state.requirementsBom; cost cascade reconciled to this total
+dossier_repair: 2 fix(es) over 1 pass(es); 4 gap(s) need input (4 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/state.json
+[chain] self-repair: 2 fix(es) over 1 pass(es); 4 gap(s) need input (4 blocking HIGH)
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/dossier.xlsx
+  · Executive Summary
+  · Overview
+  · Brief
+  · ⚠ Checks
+  · ⚠ Audit
+  · Part names
+  · Quantities
+  · Calculations
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Financial model
+  · Panel schedule
+  · Process schedules
+  · Line & velocity
+  · Risk & Regulatory
+  · Assembly sequence
+  · Glossary
+  · Image tabs
+      + Render — Interior layout
+      + Render — Interior layout (view 2)
+      + Render — Interior layout (top)
+      + Render — Interior layout (view 3)
+      + Render — Building exterior
+      + Render — Building exterior (view 2)
+      + Render — Building exterior (top)
+      + Render — Building exterior (view 3)
+      + GA — General Arrangement
+      + P&ID
+      + BFD — Block Flow
+      + Single-line
+      + HVAC
+      + Isometric — 201-PR
+      + Isometric — 202-CO-DN125
+      + Isometric — 203-PR
+  · Contents (sheet #1)
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/dossier.xlsx
+  size        : 33.84 MB
+  tabs (36)  : ['Executive Summary', 'Contents', 'Overview', 'Render — Interior layout', 'Brief', 'Financial model', 'Cost waterfall', 'Inputs & Assumptions', 'Bill of Materials (Ledger)', 'Quantities', 'Calculations', 'Line & velocity', 'Panel schedule', 'Process schedules', 'Assembly sequence', 'Risk & Regulatory', 'Render — Interior layout (view', 'Render — Interior layout (top)', 'Render — Interior layout (vie-2', 'Render — Building exterior', 'Render — Building exterior (vie', 'Render — Building exterior (top', 'Render — Building exterior (v-2', 'GA — General Arrangement', 'P&ID', 'BFD — Block Flow', 'Single-line', 'HVAC', 'Isometric — 201-PR', 'Isometric — 202-CO-DN125', 'Isometric — 203-PR', '⚠ Checks', '⚠ Audit', 'Connection trace', 'Part names', 'Glossary']
+  live calcs  : 81
+  static calcs: 1
+  image tabs  : 16
+  CHECKS FAIL : 10
+      FAIL -> [BALANCE] closure: electrical_supply_closure
+      FAIL -> [COST] BoM P-1: unit price within x5 of price_estimate_gbp
+      FAIL -> [COST] BoM P-3: unit price within x5 of price_estimate_gbp
+      FAIL -> [COST] BoM X-11: unit price within x5 of price_estimate_gbp
+      FAIL -> [COST] BoM X-14: unit price within x5 of distributor_price_gbp
+      FAIL -> [COST] BoM X-22: unit price within x5 of price_estimate_gbp
+      FAIL -> [COST] Sigma requirementsBom.line_gbp == cover grand total
+      FAIL -> [CONNECTIVITY] Ledger completeness: every part shows its required input + output
+      FAIL -> [CONNECTIVITY] Connection rows within_spec == false (tally)
+      FAIL -> [CONNECTIVITY] Worst pipe velocity <= spec limit (6×DN300)
+  SHIP GATE   : FAIL  ·  4 HIGH · 0 MED · 0 LOW · ship_ok=False
+[chain] Excel deliverable → /Users/tristanfischer/Downloads/fischer-farms-v1_dossier_2026-06-25_1326.xlsx
+[chain] PDF OFF by default (set CHAIN_WANT_PDF=1 to enable) — NOT rendering chain-v2.pdf (Excel deliverable + drawings + BoM are on disk; quality loop still runs)
+[chain] deliverable-copy step failed (non-fatal): ENOENT: no such file or directory, open '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/chain-v2.pdf'
+[chain] PDF-off (Excel-only): skipping PDF-based audits (run/bom/layout); BoM validated by the Excel ⚠Checks tab + the state-based gates below.
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/AUDIT-PARTS.md
+[parts-validator] PASS: 0 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/AUDIT-DRIFT.md
+[drift-detector] PASS: 3 contract quantities checked, 0 drifts (0 MED)
+[sizing-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/AUDIT-SIZING.md
+[sizing-audit] PASS: 0/0 matched-to-rule, 0 findings (0 MED, 0 LOW)
+[mispin-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/AUDIT-MISPIN.md
+[mispin-detector] PASS: 90 candidates scanned, 0 mis-pins
+[thermal-derating-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/AUDIT-THERMAL.md
+[thermal-derating-audit] PASS: 0 chiller(s) checked, 0 findings (0 MED, 0 LOW)
+[brief-constraint-completeness-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/AUDIT-COMPLETENESS.md
+[brief-constraint-completeness-audit] PASS: 11 constraints, 1 non-blocking findings (0 MED, 1 LOW)
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/chain-v2.pdf': No such file or directory.
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/chain-v2.pdf': No such file or directory.
+[consistency-audit] pdftotext failed: Command failed: pdftotext /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/chain-v2.pdf -
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/chain-v2.pdf': No such file or directory.
+
+[consistency-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/AUDIT-CONSISTENCY.md
+[consistency-audit] PASS: 0 clusters, 0 findings (0 MED, 0 HIGH), 0 money-format drift(s)
+[jurisdictional-standards-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/AUDIT-JURISDICTION.md
+[jurisdictional-standards-audit] PASS: jurisdiction=UNKNOWN, 205 surfaces scanned, 36 unique citations, 188 findings (0 MED, 188 LOW)
+[fictional-pn-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-farms-v1/AUDIT-FICTIONAL-PN.md
+[fictional-pn-audit] FAIL: 1 HIGH-severity finding(s) — hallucinated MPNs not found in any distributor catalogue
+
+======================================================================
+  CHAIN HARD-EXIT - Fictional-PN audit FAILED (code 20)
+  At least one BoM line emits a manufacturer+MPN combination that
+  returns null from ALL five live distributor APIs (Mouser, Digi-Key,
+  Farnell, LCSC, Nexar) and is not in the curated parts table.
+  Structured MPNs (alphanumeric+separator+alphanumeric) that miss all
+  distributors strongly indicate the LLM hallucinated a plausible-looking
+  but non-existent part number. A procurement engineer who tries to order
+  this part will find nothing — destroying the document's credibility.
+  PDF + state.json saved to disk for inspection but chain is BLOCKED.
+  See AUDIT-FICTIONAL-PN.md for the un-catalogued MPNs.
+  Fix area: scripts/lib/deterministic-emitter.ts — replace hallucinated
+  MPNs with real distributor-findable parts, or mark custom/OEM items
+  with a "CUSTOM-" prefix so future runs skip the existence check.
+======================================================================
+
+[chain] === FATAL GATE 20 fictional-PN (exit 20) — WRONGNESS, fix the source rule ===
+A part number is unverified in any catalogue — see AUDIT-FICTIONAL-PN.md
