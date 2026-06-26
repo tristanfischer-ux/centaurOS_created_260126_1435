@@ -193,11 +193,18 @@ async function runStep(
   // (4.9×) using a consumptive model on a RECIRCULATING ebb/flow plant. Snapshot the brief-pinned
   // values BEFORE the tool, and after contract_update RESTORE any the tool moved by >3× (a gross
   // contradiction, not a refinement). Universal; a within-3× refinement is left to the tool.
-  const briefPinned: Record<string, number> = {}
+  // MUST-MEET rating families: the design must DELIVER at least the brief value, so a tool may
+  // make it LARGER (over-spec is safe) but must not shrink it BELOW the brief (under-sizing a
+  // motor / pump / cable is unsafe — Codema: the fertigation pump's brief 7.5 kW motor was
+  // re-derived to 4 kW from an incomplete head, which the physics critic flagged as insufficient).
+  // NOT applied to lower-is-better families (mass / cost / area / loss) where smaller is better.
+  const MUST_MEET = new Set(['power', 'current', 'flow_rate', 'throughput', 'capacity',
+                             'pressure', 'voltage', 'energy', 'duty', 'head'])
+  const briefPinned: Record<string, { value: number; family: string }> = {}
   for (const [k, v] of Object.entries(contract.quantities)) {
-    const qq = v as unknown as { value?: number; source?: string } | undefined
+    const qq = v as unknown as { value?: number; source?: string; family?: string } | undefined
     if (qq && String(qq.source ?? '').toLowerCase() === 'brief' && typeof qq.value === 'number') {
-      briefPinned[k] = qq.value
+      briefPinned[k] = { value: qq.value, family: String(qq.family ?? '').toLowerCase() }
     }
   }
   const updated = step.contract_update(contract, result.output)
@@ -205,17 +212,23 @@ async function runStep(
     ...updated,
     _tools_run: [...updated._tools_run.filter(t => t !== step.tool_id), step.tool_id],
   }
-  for (const [k, briefVal] of Object.entries(briefPinned)) {
+  for (const [k, pin] of Object.entries(briefPinned)) {
+    const briefVal = pin.value
     const qq = newContract.quantities[k] as unknown as { value?: number; source?: string; source_detail?: string } | undefined
     if (!qq || typeof qq !== 'object' || typeof qq.value !== 'number') continue
     const newVal = qq.value
     if (briefVal === 0 || newVal === briefVal) continue
     const ratio = Math.abs(newVal / briefVal)
-    if (ratio > 3 || ratio < 1 / 3) {
-      // gross contradiction → the brief wins; record the tool's (rejected) figure for transparency
+    const grossOverride = ratio > 3 || ratio < 1 / 3
+    const underRatedSpec = newVal < briefVal && MUST_MEET.has(pin.family)
+    if (grossOverride || underRatedSpec) {
+      // the brief wins; record the tool's (rejected) figure for transparency
+      const why = grossOverride
+        ? `a ${ratio.toFixed(0)}× divergence, rejected as a gross override of an explicit brief spec`
+        : `${Number(newVal.toFixed(3))} < the brief ${briefVal} ${pin.family} rating — a tool must not under-size a must-meet brief spec`
       qq.value = briefVal
       qq.source = 'brief'
-      qq.source_detail = `brief-pinned ${briefVal} (held — ${step.tool_id} suggested ${Number(newVal.toFixed(3))}, a ${ratio.toFixed(0)}× divergence, rejected as a gross override of an explicit brief spec)`
+      qq.source_detail = `brief-pinned ${briefVal} (held — ${step.tool_id} suggested ${Number(newVal.toFixed(3))}: ${why})`
     }
   }
   stampToolLineage(beforeVals, newContract, step.tool_id)
