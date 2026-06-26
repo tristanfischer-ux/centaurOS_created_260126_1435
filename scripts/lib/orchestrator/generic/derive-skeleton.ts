@@ -88,6 +88,20 @@ const THERMAL_COOLING_FLOOR = ['heat_exchanger', 'cooling_fan', 'chiller_unit', 
 const THERMAL_HEATING_FLOOR = ['heat_pump', 'heat_exchanger', 'circulation_pump', 'temperature_sensor', 'expansion_vessel', 'insulation_jacket']
 const THERMAL_BOTH_FLOOR    = ['heat_exchanger', 'heat_pump', 'chiller_unit', 'cooling_fan', 'temperature_sensor', 'air_damper']
 
+// ── STORAGE-AWARE ENERGY-SOURCE FLOOR (Tristan 2026-06-26 — the water-plant battery contamination) ──
+// The default `energy_storage_source` floor is a fixed BATTERY kit (storage cell + cell module +
+// DC busbar). That is wrong for a plant that stores NO energy — verified on the Codema water /
+// fertigation plant, which got a phantom "Storage Cell / Cell Module Assembly" sub-module (the
+// "copy-paste battery template" the scorecard flagged) even though it has no battery. Mirrors the
+// duty-aware thermal floor exactly: the energy-SOURCE module's content follows whether the contract
+// actually STORES energy. A storage plant (BESS) keeps the battery floor; a plant with no storage
+// signal gets its real energy SOURCE — the mains electrical supply (incomer + transformer +
+// switchboard). Universal (no class table) — keyed on the contract's own storage-bearing keys.
+const ENERGY_STORAGE_FLOOR    = ['storage_cell', 'cell_module_assembly', 'module_rack', 'dc_busbar', 'cell_monitoring_unit', 'dc_disconnect']
+const ELECTRICAL_SUPPLY_FLOOR = ['mains_incomer', 'distribution_transformer', 'main_switchboard', 'power_supply_unit', 'surge_protection_device', 'energy_meter']
+// A positive storage-bearing quantity = the plant actually stores energy (battery kWh / cells).
+const ENERGY_STORAGE_RE = /(^|_)(kwh|cell_count|cells_total|battery|usable_energy_kwh|usable_capacity_kwh|nameplate_capacity_kwh|storage_kwh|pack_energy)(_|$)|_kwh($|_)/i
+
 // Cooling-duty markers: a key that DEMANDS heat rejection (a chiller/condenser/cooler
 // duty or a cooling-water/refrigeration load). `heat_exchanger`/`cross_exchanger` is
 // excluded — it is duty-neutral (recovers heat in either direction).
@@ -126,6 +140,25 @@ function thermalFloorFor(contract: ContractInProgress): string[] {
     // never declared a thermal duty — they previously got this exact list).
     default: return THERMAL_COOLING_FLOOR
   }
+}
+
+/** True when the contract carries a positive energy-STORAGE quantity (battery kWh / cell count) —
+ *  i.e. the plant actually stores energy, so the `energy_storage_source` module is genuinely a
+ *  battery. A plant with no such key (a water plant, a pump station) does NOT store energy. */
+function hasEnergyStorage(contract: ContractInProgress): boolean {
+  const quantities = contract?.quantities ?? {}
+  for (const [key, tq] of Object.entries(quantities)) {
+    const v = (tq as { value?: unknown })?.value
+    if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) continue
+    if (ENERGY_STORAGE_RE.test(key)) return true
+  }
+  return false
+}
+
+/** The energy_storage_source floor that matches whether the plant STORES energy: a battery kit for a
+ *  storage plant, the mains electrical supply for a plant that only DRAWS power (no battery). */
+function energyFloorFor(contract: ContractInProgress): string[] {
+  return hasEnergyStorage(contract) ? ENERGY_STORAGE_FLOOR : ELECTRICAL_SUPPLY_FLOOR
 }
 
 const ACRONYMS: Record<string, string> = {
@@ -192,6 +225,7 @@ function componentsForModule(
   contract: ContractInProgress,
 ): string[] {
   const isThermal = moduleKey === 'environmental_interface'
+  const isEnergyStore = moduleKey === 'energy_storage_source'
   const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
   const out: string[] = []
@@ -209,7 +243,9 @@ function componentsForModule(
   if (out.length < MIN_WORDS) {
     // Duty-aware thermal floor (heating ⇒ heat-pump set, cooling ⇒ chiller set, etc.);
     // every other module keeps its static Tier-C floor.
-    const floor = isThermal ? thermalFloorFor(contract) : (TIER_C_FLOOR[moduleKey] ?? GENERIC_FLOOR)
+    const floor = isThermal ? thermalFloorFor(contract)
+      : isEnergyStore ? energyFloorFor(contract)
+      : (TIER_C_FLOOR[moduleKey] ?? GENERIC_FLOOR)
     for (const c of floor) {
       if (out.length >= MIN_WORDS) break
       push(c)
