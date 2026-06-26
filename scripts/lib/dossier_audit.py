@@ -1639,16 +1639,37 @@ def check_overview_invariants(state, rows, run_dir) -> list:
     if not checks:
         return out
     fails = [c for c in checks if str(getattr(c, "status", "")).upper() == "FAIL"]
-    if fails:
-        names = "; ".join(str(getattr(c, "name", ""))[:46] for c in fails[:4])
+    if not fails:
+        return out
+    names = "; ".join(str(getattr(c, "name", ""))[:46] for c in fails[:4])
+    # The Overview DISPLAYS the summary count → its score reflects the TOTAL fails.
+    out.append(Finding(
+        tab=tab, check="overview_invariant_fail",
+        severity="HIGH" if len(fails) >= 2 else "MED",
+        message=(f"{len(fails)} of {len(checks)} deterministic invariants FAIL — shown ON the Overview "
+                 f"({len(checks) - len(fails)}/{len(checks)} pass · {len(fails)} FAIL): {names}"),
+        actual=f"{len(fails)} invariant(s) FAIL",
+        expected="every deterministic invariant passes (the Overview cannot be a green 10/10 over visible failures)",
+        source_rule="fix each failing invariant at SOURCE (arithmetic reconciliation / brief-target / ledger completeness) — see deterministic_checks_lib.run_all_checks",
+    ))
+    # ROUTE each failing invariant to the SPECIFIC tab it concerns, so that tab's score drops too
+    # — a Connection-trace 10/10 must not stand while the 'ledger completeness / every part shows
+    # input+output' invariant FAILS (Tristan 2026-06-27: the connection-trace 'OK' is meaningless if
+    # the completeness invariant it should mirror is red). Keyed on the invariant NAME, universal.
+    for c in fails:
+        nm = str(getattr(c, "name", ""))
+        nl = nm.lower()
+        if re.search(r"ledger completeness|input\s*\+\s*output|in\s*\+\s*out|fluid in|connect", nl):
+            dest = "Connection trace"
+        elif re.search(r"brief target|target met|compliance", nl):
+            dest = "Exec Summary"
+        else:
+            continue  # the Overview summary already covers the generic ones
         out.append(Finding(
-            tab=tab, check="overview_invariant_fail",
-            severity="HIGH" if len(fails) >= 2 else "MED",
-            message=(f"{len(fails)} of {len(checks)} deterministic invariants FAIL — shown ON the Overview "
-                     f"({len(checks) - len(fails)}/{len(checks)} pass · {len(fails)} FAIL): {names}"),
-            actual=f"{len(fails)} invariant(s) FAIL",
-            expected="every deterministic invariant passes (the Overview cannot be a green 10/10 over visible failures)",
-            source_rule="fix each failing invariant at SOURCE (arithmetic reconciliation / brief-target / ledger completeness) — see deterministic_checks_lib.run_all_checks",
+            tab=dest, check="invariant_fail_on_tab", severity="HIGH",
+            message=(f"a deterministic invariant this tab is responsible for FAILS: {nm[:80]}"),
+            actual="invariant FAIL", expected="the invariant passes",
+            source_rule="fix the invariant at source (deterministic_checks_lib) — this tab cannot pass while it fails",
         ))
     return out
 
@@ -1947,7 +1968,7 @@ _TAB_ROUTE = [
     ("financial", "Financial model"), ("inputs", "Financial model"), ("revenue", "Financial model"),
     ("econom", "Financial model"),
     ("quantit", "Quantities"), ("calculation", "Calculations"),
-    ("connectiv", "Connection trace"), ("drawing", "Connection trace"),
+    ("connectiv", "Connection trace"), ("connection", "Connection trace"), ("drawing", "Connection trace"),
     ("part name", "Part names"), ("glossar", "Glossary"),
     ("risk", "Risk & Regulatory"), ("regulator", "Risk & Regulatory"), ("physics", "Risk & Regulatory"),
     ("line & velocity", "Line & velocity"), ("panel", "Panel schedule"),
