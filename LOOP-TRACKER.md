@@ -1,6 +1,29 @@
 # 3-Example Quality Loop — Autonomous (started 2026-06-23, Tristan asleep)
 
 ═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-26 PM — HONEST SCORING LANDED; fresh v5 run in flight)
+═══════════════════════════════════════════════════════════════════════════════
+TRISTAN HAMMERED (4×): "a pass is good — unverified AND fail are bad"; "an 8 must make someone go
+'wow', not box-tick"; "if you can't score yourself correctly you can't fix yourself". THE SCORER WAS
+GENEROUS — fixed at source (3 commits, all guarded):
+  • 9159e4525 — per-metric honesty: each UNVERIFIED brief metric is its OWN HIGH (was: collapsed to ONE
+    MED unless 100% unverified → tab scored 8). Exec Summary 8→0.
+  • eacba20d2 — ONE compliance matcher shared by renderer (build-excel _match_quantity) + audit
+    (dossier_audit _contract_match): family+synonym+token-subset, plurals folded, requirement-ECHO
+    (…_demand/_target) EXCLUDED so a metric matches the DELIVERED qty not the requirement it restates.
+    Retired the phantom compliance_matcher_gap. Result: containers/ro_permeate/valves → green PASS,
+    irrigation 12<45 → red FAIL (surfaces the undersized pump). Exec Summary 0→6 (honest+precise).
+  • 0e6903183 — min-credible price floor for electrical ASSEMBLIES (panel £800 / switchboard+MCC £3,000),
+    placed LAST so components (busbar £120/breaker £45) win; bare solar/vent panels untouched.
+FINDING: the £713k 'Electrical Control Panel' (58% of bill) was STALE STATE — current code yields qty=1
+(£218→£800 floored). The dominant-BoM-line flag fired on v4's old requirementsBom.
+GUARDS: dossier_audit.py --selftest Fixtures G+H; requirements_bom.py --selftest section (d1).
+IN FLIGHT: fresh chain → out/fischer-codema-v5 (log out-fischer-codema-v5.log, 6 *_ENFORCING=0). When it
+lands: build-excel-export.py out/fischer-codema-v5 …, read tab_scores — expect Exec Summary ≈6 (irrigation
+FAIL), BoM no longer £713k. THEN punch-list #2 = irrigation pump 12 vs 45 (irrigation_pump_sizing.py) +
+its marine-material leak; then parts-ledger/calc-coverage/UNSCORED tabs/chain min-tab≥8 hard-gate.
+
+═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-26 — WORK DOWN THE PER-TAB PUNCH-LIST; post-compaction)
 ═══════════════════════════════════════════════════════════════════════════════
 TRISTAN'S STANDING INSTRUCTION: "keep going down the punch list until everything fixed." The loop is now
