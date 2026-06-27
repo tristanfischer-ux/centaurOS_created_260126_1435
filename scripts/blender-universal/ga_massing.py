@@ -41,6 +41,12 @@ GA_NON_MASSING_RE = re.compile(
     r"\bcabling\b|\bcable tray(?:s)?\b|\bcable gland(?:s)?\b|"
     r"\bterminal block(?:s)?\b|\b(?:power )?distribution block(?:s)?\b|"
     r"\bpower supply unit\b|\bdin rail\b|\bwireway\b|"
+    # membrane-skid INTERNALS -> represented by the membrane/RO/UF SKID on the GA, never massed
+    # individually (you do not draw spiral-wound elements / FRP pressure tubes / the media bank on a
+    # plant General Arrangement — the skid package is the massed object). element/media/housing/
+    # cartridge/module/bank are the internals; a 'membrane skid/unit/package' stays massed.
+    r"\bmembrane (?:element(?:s)?|media|cartridge(?:s)?|module(?:s)?|housings?|bank)\b|"
+    r"\b(?:ro|uf|nf|mf) membrane(?:s)?\b|\bmembrane stack(?:s)?\b|"
     # field instruments -> P&ID tags
     r"\btransmitter\b|\btransducer(?:s)?\b|\bsensor\b|\banaly[sz]er\b|"
     r"\bflow ?meter(?:s)?\b|\bgauge\b|\bprobe\b|\bdetector\b|\bindicator\b|"

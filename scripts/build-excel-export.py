@@ -352,7 +352,7 @@ def _aux_tab_score(title: str, run_dir: str):
                 "issues": ["the design carries an HVAC duty but the HVAC drawing has no scored coverage — "
                            "the drawing must represent the ventilation / cooling equipment"],
                 "fix": "the HVAC drawing generator must emit the ventilation/cooling equipment tags"}
-        return {"score": 9, "target": 8, "status": "PASS",
+        return {"score": 10, "target": 8, "status": "PASS",
                 "issues": ["HVAC is OUT OF SCOPE for this process / fluid plant — its climate hardware "
                            "(heating / ventilation / cooling) is supplied by others (per the brief); the "
                            "sheet honestly documents building-ventilation only, with no HVAC equipment to "

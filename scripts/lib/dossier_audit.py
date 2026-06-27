@@ -1941,6 +1941,10 @@ _GLOSSARY_TAG_PREFIXES = {
     "P", "TK", "F", "V", "I", "HX", "INV", "TX", "EP", "C", "X",
     "FCV", "FV", "LV", "PV", "TV", "LT", "PT", "TT", "FT", "AT", "LE", "FE", "PE", "TE",
     "M", "G", "UV", "PMP", "BLR", "AHU", "MCC", "DB", "SW", "ATS",
+    # power-distribution / structural / UPS / skid-or-zone families (documented in the build-excel
+    # GLOSSARY) — these appear on a fully-built process-plant bill (3-phase feed, skid frames, control
+    # UPS) and must each be defined so a reader never meets an unexplained tag prefix.
+    "D", "S", "U", "Z",
 }
 
 
