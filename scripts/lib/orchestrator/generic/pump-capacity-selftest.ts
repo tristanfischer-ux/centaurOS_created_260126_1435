@@ -7,7 +7,7 @@
 // whose capacity is < 50% of the gap word's computed duty (keeping the honest generic spec). This
 // guard fails the build if the capacity parser or the duty reader regress.
 
-import { partFlowCapacityM3h, wordFlowDutyM3h } from '../../../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { partFlowCapacityM3h, wordFlowDutyM3h, isCommodityProcessValve } from '../../../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 function pumpWord(name: string, m3h: number) {
   const slug = name.toLowerCase().replace(/\W+/g, '_')
@@ -36,8 +36,16 @@ function run() {
   // a correctly-sized pump (120 m³/h for a 90 m³/h duty) must NOT be rejected
   if (partFlowCapacityM3h(big)! < duty * 0.5) throw new Error('pump-capacity: a correctly-sized pump must NOT be rejected')
 
+  // commodity process valves stay GENERIC (no name-matched sub-miniature MPN); actuated/control valves keep a pin
+  for (const v of ['Non-Return Valve', 'Check Valves', 'Swing Check Valve', 'Manual Ball Valve', 'Gate Valve']) {
+    if (!isCommodityProcessValve(v)) throw new Error(`pump-capacity: "${v}" must be treated as a commodity process valve (keep generic)`)
+  }
+  for (const v of ['Pneumatic Actuated Valve', 'Solenoid Valve', 'Control Valve', 'Dosing Valve', 'Modulating Valve', 'Centrifugal Pump']) {
+    if (isCommodityProcessValve(v)) throw new Error(`pump-capacity: "${v}" must NOT be treated as a commodity valve (it carries a real MPN / is not a valve)`)
+  }
+
   // eslint-disable-next-line no-console
-  console.log('pump-capacity --selftest OK (CM3-3 3 m³/h rejected for a 90 m³/h duty; a 120 m³/h pump accepted)')
+  console.log('pump-capacity --selftest OK (CM3-3 3 m³/h rejected for a 90 m³/h duty; a 120 m³/h pump accepted; commodity valves kept generic, actuated/control valves pinnable)')
 }
 
 run()

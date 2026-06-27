@@ -296,6 +296,17 @@ export function partFlowCapacityM3h(p: { part_name?: string | null; raw_excerpt?
   return m ? parseFloat(m[1]) : null
 }
 
+// A SIMPLE COMMODITY process valve (check / non-return / swing / ball / gate / globe / needle), which
+// is specified GENERICALLY at design stage (size + rating + material), NOT by a single MPN — so a
+// fill-blank name-token match must not pin an unreliable specific part on it. An ACTUATED / control /
+// solenoid / dosing / metering valve is EXCLUDED (it legitimately carries a real MPN). UNIVERSAL.
+export function isCommodityProcessValve(name: string): boolean {
+  const n = (name || '').toLowerCase()
+  if (!/\bvalves?\b|\bnon.?return\b/.test(n)) return false
+  if (/actuat|solenoid|motoris|motoriz|\bcontrol\b|dosing|metering|modulat|throttl|pneumatic|electric/.test(n)) return false
+  return /\b(check|non.?return|swing|ball|gate|globe|needle|wafer|lift|foot|isolation|isolat)\b/.test(n)
+}
+
 // A gap word's flow DUTY (m³/h) when it is a flow machine (pump/blower/compressor/fan/filter), read
 // from its rating_primary. Returns null for a non-flow word or no m³/h rating, so capacity-gating
 // only ever touches a flow machine with a known duty. UNIVERSAL.
@@ -1042,6 +1053,18 @@ export async function fillBlankWordMpns(
         const cap = duty ? partFlowCapacityM3h(dbHit) : null
         if (duty && cap !== null && cap < duty * 0.5) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): DB ${dbHit.manufacturer} ${dbHit.part_number} ~${cap} m³/h << duty ${duty} m³/h — keeping generic spec`)
+          continue
+        }
+        // COMMODITY PROCESS VALVE (Tristan 2026-06-27): a simple mechanical valve — check / non-return /
+        // swing / ball / gate / globe / needle — is specified GENERICALLY at design stage (by size,
+        // rating, material: "DN100 PN16 wafer check valve"), NOT by a single MPN. A DB name-token match
+        // pins an unreliable part: a Crouzet sub-miniature non-return FLOW SENSOR (81529907) + a 24V DC
+        // solenoid (81519648) were pinned onto a process Non-Return / Solenoid Valve in a 90 m³/h plant
+        // — right "valve"/"non-return" token, wrong SCALE + vendor (the physics critic's valve HIGHs).
+        // Keep the generic spec. NOT applied to an ACTUATED / control / dosing valve (those carry a real
+        // MPN — e.g. the brief's Keystone Composeal). UNIVERSAL — keyed on the commodity-valve vocabulary.
+        if (isCommodityProcessValve(cand.name)) {
+          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): commodity process valve — generic spec (size/rating/material), not a name-matched MPN (was ${dbHit.manufacturer} ${dbHit.part_number})`)
           continue
         }
         const typeOk = dbHitAcceptableForWord(dbHit, cand.name)
