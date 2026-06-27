@@ -195,21 +195,44 @@ function headToken(component: string): string {
  * (head-noun match avoids `cell_monitoring_units` grabbing `cell_count`). Returns
  * 1 when the contract knows no matching count — never invents a number.
  */
-function contractCountFor(component: string, contract: ContractInProgress): number {
+export function contractCountFor(component: string, contract: ContractInProgress): number {
   const head = headToken(component)
   if (!head) return 1
   const singular = head.replace(/s$/, '')
+  // Component token set (singularised) — used to test a count key's QUALIFIERS against the
+  // component, so a QUALIFIED count (`actuated_distribution_valve_count`) binds ONLY to a word
+  // that shares those qualifiers, not to every word with the same head noun. Without this, the
+  // 200-actuated-valve count smeared onto all ~17 distinct valve words (×200 each = ~3,400
+  // valves; the physics-critic "massive duplication of valve counts" HIGH). UNIVERSAL — keyed on
+  // token overlap, no class table. (Also fixes biofilter_tank grabbing rearing_tank_count, etc.)
+  const compToks = new Set(
+    component.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map((t) => t.replace(/s$/, '')),
+  )
+  let best = 1
+  let bestSpecificity = -1
   const quantities = contract?.quantities ?? {}
   for (const [key, tq] of Object.entries(quantities)) {
     const m = key.match(/^(.+?)_(count|qty|quantity|number)$/i)
     if (!m) continue
-    const qNoun = m[1].split('_').pop() ?? ''
-    if (qNoun === head || qNoun === singular || `${qNoun}s` === head) {
-      const v = (tq as { value?: unknown })?.value
-      if (typeof v === 'number' && Number.isFinite(v) && v >= 1 && v < 1e7) return Math.round(v)
+    const keyToks = m[1].toLowerCase().split('_').filter(Boolean).map((t) => t.replace(/s$/, ''))
+    const qHead = keyToks[keyToks.length - 1] ?? ''
+    // the component must carry the count's HEAD noun …
+    if (!(qHead === head || qHead === singular || `${qHead}s` === head || compToks.has(qHead))) continue
+    // … AND at least HALF of the count's QUALIFIER tokens (so `actuated_distribution_valve_count`
+    // binds to "Pneumatic Actuated Valve" [shares actuated] but NOT to "Solenoid Valve"; a count
+    // with no qualifiers — `cell_count` — needs only the head noun, as before).
+    const quals = keyToks.slice(0, -1)
+    const sharedQuals = quals.filter((t) => compToks.has(t)).length
+    if (quals.length > 0 && sharedQuals < Math.ceil(quals.length / 2)) continue
+    const v = (tq as { value?: unknown })?.value
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 1 && v < 1e7) {
+      // Prefer the MOST-specific count key that still matches (more shared qualifiers wins), so a
+      // word never takes a vaguer count when a tighter one fits.
+      const specificity = sharedQuals
+      if (specificity > bestSpecificity) { bestSpecificity = specificity; best = Math.round(v) }
     }
   }
-  return 1
+  return best
 }
 
 // A component name that is intrinsically a COOLING device — must NOT appear in the

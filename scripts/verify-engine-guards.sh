@@ -54,6 +54,7 @@ run "derive-topology.ts --selftest"           npx tsx scripts/lib/orchestrator/g
 run "pump-motor --selftest"                   npx tsx scripts/lib/orchestrator/generic/pump-motor-selftest.ts
 run "instrument-sizing --selftest"            npx tsx scripts/lib/orchestrator/generic/instrument-sizing-selftest.ts
 run "storage-aggregate --selftest"            npx tsx scripts/lib/orchestrator/generic/storage-aggregate-selftest.ts
+run "count-match --selftest"                  npx tsx scripts/lib/orchestrator/generic/count-match-selftest.ts
 run "benchmark-expectation.ts --selftest"     npx tsx scripts/lib/benchmark-expectation.ts --selftest
 run "sweet-spot.ts --selftest"                npx tsx scripts/lib/sweet-spot.ts --selftest
 run "design-to-target.ts --selftest"          npx tsx scripts/lib/design-to-target.ts --selftest
