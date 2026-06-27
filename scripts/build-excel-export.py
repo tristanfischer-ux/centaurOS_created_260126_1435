@@ -7478,6 +7478,15 @@ def build(run_dir: str, out_path: str) -> dict:
         _auxv = _aux_tab_score(_nm, run_dir)
         if isinstance(_auxv, dict):
             _TAB_SCORES[_nm] = _auxv
+    # ── UNIVERSAL HONEST CAP (Tristan 2026-06-27 — "no whack-a-mole"). ONE rule over EVERY tab from
+    #    EVERY source, replacing the per-sheet render/HVAC/Financial patches: a tab's score is capped by
+    #    the CAVEATS IT ITSELF DECLARES in its issues. A VERIFICATION GAP (unverified / advisory /
+    #    partial-check / cannot-confirm / nothing-derivable) caps at 7 (FAIL — the engine does NOT know
+    #    it is right). A SOFTER caveat (assumption / estimate / out-of-scope / TBD / provisional) caps at
+    #    8 (class-correct, but never a verified-perfect 10). A NEW archetype's gaps therefore cap
+    #    THEMSELVES — the dishonest 10-over-an-unverified-line cannot recur on any class without new
+    #    code. proveCatch in _selftest. ─────────────────────────────────────────────────────────────
+    _apply_universal_honest_cap(_TAB_SCORES)
     # X2 (Tristan 2026-06-27): the Financial model tab must NOT be a green 10 while it renders its own
     # '⚠ UNVERIFIED ECONOMICS' banner. _econ_sale_unverified() is the engine's real sale-price-verified
     # signal (a 'revenue' WORD in state is not enough — the PRICE must be derivable). When unverified,
@@ -7550,10 +7559,49 @@ def build(run_dir: str, out_path: str) -> dict:
     }
 
 
+# UNIVERSAL HONEST-CAP markers — what a tab DECLARES that means it is not verified-perfect.
+_VERIF_GAP_RX = re.compile(
+    r"unverified|not (?:fully )?verif|partial check|cannot (?:verify|confirm)|could not (?:verify|size|confirm)|"
+    r"no .{0,40}(?:derivable|verifiable)|object-level visual quality|advisory[: ]", re.I)
+_SOFT_CAVEAT_RX = re.compile(
+    r"\bassumption\b|\bassumed\b|\bestimate(?:d)?\b|out[- ]of[- ]scope|to be (?:confirmed|determined)|"
+    r"\bTBD\b|placeholder|provisional|supplied by others", re.I)
+
+
+def _apply_universal_honest_cap(scores: dict) -> dict:
+    """ONE universal rule (no whack-a-mole): cap each tab's score by the caveats IT declares in its
+    own issues. VERIFICATION GAP → ≤7 (FAIL); SOFTER caveat → ≤8 (never a perfect 10). Applied to
+    EVERY tab from EVERY source so a new archetype's gaps cap themselves. Returns the same dict."""
+    for _name, e in (scores or {}).items():
+        if not isinstance(e, dict) or not isinstance(e.get("score"), (int, float)):
+            continue
+        issues = " ".join(str(i) for i in (e.get("issues") or []))
+        if not issues:
+            continue
+        cap = 7 if _VERIF_GAP_RX.search(issues) else (8 if _SOFT_CAVEAT_RX.search(issues) else None)
+        if cap is not None and e["score"] > cap:
+            e["score"] = cap
+            e["status"] = "PASS" if cap >= 8 else "FAIL"
+    return scores
+
+
 def _selftest() -> int:
     """Pure guards for the compliance MATCHER + direction + class display — the false-PASS class of
     bug (2026-06-25). Exits non-zero on any failure; wired into verify-engine-guards.sh."""
     bad = 0
+    # proveCatch the UNIVERSAL honest cap (Tristan 2026-06-27 'no whack-a-mole'): an unverified line
+    # caps ANY tab at ≤7, a soft caveat at ≤8, a clean tab is untouched — on ANY archetype, no new code.
+    _hc = _apply_universal_honest_cap({
+        "X": {"score": 10, "issues": ["the model is UNVERIFIED — no price derivable"]},
+        "Y": {"score": 10, "issues": ["values are an estimate pending vendor quote"]},
+        "Z": {"score": 10, "issues": ["12/12 invariants pass"]},
+    })
+    if _hc["X"]["score"] != 7 or _hc["X"]["status"] != "FAIL":
+        print(f"  FAIL honest-cap: an UNVERIFIED tab must cap at 7/FAIL (got {_hc['X']})"); bad += 1
+    if _hc["Y"]["score"] != 8:
+        print(f"  FAIL honest-cap: an ESTIMATE tab must cap at 8 (got {_hc['Y']})"); bad += 1
+    if _hc["Z"]["score"] != 10:
+        print(f"  FAIL honest-cap: a CLEAN tab must stay 10 (got {_hc['Z']})"); bad += 1
     # (1) _match_quantity must match the ACHIEVED quantity by NAME, NOT the target-closest ECHO.
     qs = {
         "nameplate_capacity_kwh": {"value": 2912, "unit": "kWh"},
