@@ -250,6 +250,40 @@ Same pattern for BFD (11/20=55%) + Single-line (7/19=37%, electrical — draw_si
 
 
 ═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-27 POST-COMPACT — PHYSICS FIRST done + P&ID coverage; v18→v19 confirming)
+═══════════════════════════════════════════════════════════════════════════════
+SIX universal+guarded fixes this session (all proveCatch in verify-engine-guards.sh; all green):
+  PHYSICS (the 2 HIGH physics-critic findings — Tristan's top concern):
+  1. INSTRUMENTS never sized as kW machines — 9878e8a8e (universal-contract-sizing): a skeleton
+     field-instrument (no _instrument flag) fuzzy-matched a ~2 kW power group → got boxFromRatingKw
+     (600×510×660) + "2 kW" (the "transducer rated 2 kW" HIGH + the GA litter box). isInstrument is
+     now NAME-based (FIELD_INSTRUMENT_RE mirrors ga_massing); skipped in the sizing loop. Guard:
+     instrument-sizing --selftest. VERIFIED in v18 state: 0 instruments kW-rated.
+  2. total_* AGGREGATE never a vessel — 9878e8a8e (synthesis path) + 87a44f244 (RECONCILE path):
+     a total_water_storage roll-up minted a phantom 262 m³ "Total Water Storage" tank (the
+     cross-contamination HIGH vs the brief's 3 separate 40 m³ tanks). Suppressed when ≥2 constituent
+     non-aggregate volume groups present — in BOTH applyUniversalContractSizing AND
+     reconcilePrincipalEquipment (the 2nd path was why it survived v18). Guard: storage-aggregate.
+  P&ID/BFD/SINGLE-LINE COVERAGE (3 causes diagnosed, 2.5 fixed):
+  3. (c) parts_ledger _classify: HMI 'touchSCREEN' no longer falls to separator (\bscreen\b) +
+     control rule recognises HMI/touchscreen/DCS. (d70e61ab5)
+  4. (b) derive-topology now includes GROUNDED principal vessels (Cip/Cleaning/UF-membrane/GRP),
+     not just _synthesized — they join the P&ID/BFD spine. Excludes _subcomponent. (d70e61ab5)
+  5. (a-matcher) parts_ledger _ISA_FUNC credits water-quality analysers (ORP/chlorine/TDS/leak→AT,
+     symbol already drawn) + valve types (check→NV, manual→HV, solenoid/actuated→XV); telemetry
+     (Aquavista/gateway)→control not instrument. v17 P&ID 27/44→30/41 (73%) matcher-side alone. (6e5010433)
+  Guards added: instrument-sizing, storage-aggregate, parts_ledger --selftest; all in verify-engine-guards.sh.
+PROJECTED v19 P&ID ≈34/40 (85%, ≥8) once topology+storage land in a fresh render.
+NEXT: (a-draw) draw_pid must DRAW the inline valve symbols (XV/NV/HV) the matcher now recognises
+(5-6 valves: solenoid/pneumatic/check/manual) — polish, P&ID already ≥8 without. Single-line 32%:
+worst tab = small CONTROL devices (PLC/SCADA/HMI/PSU/gateway) expected on single-line but belong on
+the PANEL SCHEDULE (a single-line shows POWER distribution; control gear is cabinet contents) —
+candidate REPS-expectation fix (control → panel-schedule only), verify honest. Financial 6 (#57).
+v18 = instrument+topology+matcher (NOT reconcile-storage, launched before 87a44f244) → Total Water
+Storage still in v18. v19 = the COMPLETE set (authoritative). Re-score offline: parts_ledger →
+build-excel → tab-scorecard.json. HEAD 87a44f244.
+
+═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ POST-COMPACT PRIORITIES (Tristan 2026-06-27): ALL tabs ≥8; PHYSICS FIRST; UNIVERSAL Blender
 ═══════════════════════════════════════════════════════════════════════════════
 Full execution plan: handover `~/Downloads/handovers/2026-06-27T-codema-UNIVERSAL-blender-db-PLAN-5a9c2cf5d.md`.
