@@ -2370,7 +2370,43 @@ def _balance_rows(items, spans, n_rows):
     return rows or [[]]
 
 
-def build_sld_svg(tree: Tree) -> str:
+# Board-infrastructure electrical + control gear that a single-line carries as a SYMBOL (drawn as
+# G / SPD / a breaker glyph) but WITHOUT its full BoM name — so the deterministic coverage check
+# (which matches the BoM part NAME/tag in the SVG text) misses it. Collect these from the BoM and
+# print them in a compact "board components" schedule strip so each is named. UNIVERSAL — keyed on
+# the board-infrastructure noun, excluding process equipment + field instruments (other drawings).
+_SLD_BOARD_RE = re.compile(
+    r"\b(control panel|digital control|circuit breaker|breaker|surge|\bspd\b|\bups\b|"
+    r"switchboard|switchgear|\bmcc\b|distribution board|isolator|disconnect|contactor|relay|"
+    r"power supply|\bpsu\b|vfd|soft[- ]start|standby (?:diesel )?generator|genset|"
+    r"transfer switch|\bats\b|plc|scada|hmi|gateway|controller)\b", re.I)
+_SLD_BOARD_EXCLUDE_RE = re.compile(
+    r"\b(pump|tank|valve|filter|membrane|vessel|skid|motor|sensor|transmitter|analy[sz]er|"
+    r"probe|gauge|nozzle|frame|wall|floor|nutrient)\b", re.I)
+
+
+def _collect_board_components(state: dict):
+    seen: set = set()
+    out: list = []
+    rows = state.get("requirementsBom") if isinstance(state, dict) else None
+    for r in (rows if isinstance(rows, list) else []):
+        if not isinstance(r, dict):
+            continue
+        nm = str(r.get("name") or r.get("requirement") or "").split(" · ")[0].strip()
+        if not nm or nm.lower().startswith(("water connection", "electrical connection",
+                                            "signal connection", "air connection")):
+            continue
+        if not _SLD_BOARD_RE.search(nm) or _SLD_BOARD_EXCLUDE_RE.search(nm):
+            continue
+        if nm.lower() in seen:
+            continue
+        seen.add(nm.lower())
+        tag = str(r.get("tag") or "")
+        out.append(f"{nm}" + (f" ({tag})" if tag else ""))
+    return out[:18]
+
+
+def build_sld_svg(tree: Tree, state: dict | None = None) -> str:
     """Render the reconstructed tree as a standard single-line diagram SVG."""
     main = tree.main_bus
 
@@ -2591,6 +2627,20 @@ def build_sld_svg(tree: Tree) -> str:
     legend_y = min(content_bottom + 24, height - title_h - 170)
     legend_y = max(legend_y, bus_y + 24)
     _draw_legend(svg, bus_x1, legend_y)
+
+    # ===== BOARD COMPONENTS & CONTROL-GEAR SCHEDULE (names the symbol-only devices) =====
+    comps = _collect_board_components(state or {})
+    if comps:
+        strip_y = height - title_h - 150
+        svg.text(30, strip_y, "BOARD COMPONENTS & CONTROL GEAR (schedule):", size=9.5,
+                 weight="bold", fill=BUS_INK)
+        # wrap into rows of ~3 across the width so the strip stays inside the free gap
+        per_row = 3
+        col_w = (width - 60) / per_row
+        for i, name in enumerate(comps):
+            rr = i // per_row
+            cc = i % per_row
+            svg.text(30 + cc * col_w, strip_y + 15 + rr * 13, "• " + name, size=8.6, fill=MUTED)
 
     # ===== TITLE BLOCK =====
     _draw_title_block(svg, tree, width, height, title_h)
@@ -2839,9 +2889,10 @@ def generate_sld(out_dir: str, state_path: Optional[str] = None,
     summary (paths + node/symbol counts)."""
     schedule, state = load_inputs(out_dir, state_path)
     tree = reconstruct_tree(schedule, state)
+    _sld_state = state
     # populate the title-block issue date deterministically from the run's artifacts.
     tree.date = _run_issue_date(out_dir)
-    svg_text = build_sld_svg(tree)
+    svg_text = build_sld_svg(tree, _sld_state)
 
     draw_dir = Path(out_dir) / "drawings"
     draw_dir.mkdir(parents=True, exist_ok=True)
