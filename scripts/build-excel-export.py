@@ -7567,6 +7567,18 @@ def _selftest() -> int:
     m = _match_quantity({"key_metric": "rated_power_kw", "value": 2500, "unit": "kW"}, qs)
     if not m or m[0] != "continuous_power_kw":   # rated→continuous, not peak
         print(f"  FAIL matcher power → {m} (want continuous_power_kw)"); bad += 1
+    # (1b) proveCatch the EXACT fake match Tristan caught (2026-06-27): a hand-watering metric (25 m³/h)
+    # must NOT match a fertigation pump (90 m³/h) — a different subsystem sharing only the unit +
+    # generic word. The rate-unit (…_m3_per_hr) must not leak {m3,hr} into identity overlap.
+    fake_qs = {"fertigation_dosing_capacity_m3_per_hr": {"value": 90, "unit": "m3/h"}}
+    fm = _match_quantity({"key_metric": "hand_watering_capacity_m3_per_hr", "value": 25, "unit": "m3/h"}, fake_qs)
+    if fm is not None:
+        print(f"  FAIL fake-match: hand-watering must NOT match the fertigation pump (got {fm}) — wrong-subsystem false PASS"); bad += 1
+    # and it MUST match its own subsystem when present
+    good_qs = dict(fake_qs); good_qs["hand_watering_pump_throughput_m3_h"] = {"value": 25, "unit": "m3/h"}
+    gm = _match_quantity({"key_metric": "hand_watering_capacity_m3_per_hr", "value": 25, "unit": "m3/h"}, good_qs)
+    if not gm or gm[0] != "hand_watering_pump_throughput_m3_h":
+        print(f"  FAIL fake-match: hand-watering must match its OWN pump (got {gm})"); bad += 1
     # (2) _humanize_class display names
     if _humanize_class("bess") != "Battery Energy Storage System":
         print(f"  FAIL humanize bess (got {_humanize_class('bess')})"); bad += 1
@@ -7592,6 +7604,16 @@ def _selftest() -> int:
         _ga = _aux_tab_score("GA — General Arrangement", _td)
         if not _ga or _ga.get("status") != "PASS":
             print(f"  FAIL X1 aux-score: a 95%-covered GA must PASS (got {_ga})"); bad += 1
+        # proveCatch the inflated render (2026-06-27): a render at 100% tag-coverage STILL carries the
+        # 'object-level visual quality is a partial check' advisory — its picture is UNVERIFIED — so it
+        # must be capped at 7/FAIL, NEVER a 10. (The fix that earns ≥8 is a real vision check that
+        # clears the advisory, not a coverage number.)
+        with open(os.path.join(_td, "parts-ledger.json"), "w") as _fh:
+            json.dump({"coverage_by_drawing": {"blender": {"present": 40, "expected": 40, "pct": 100.0}}}, _fh)
+        _COV_CACHE.clear()
+        _rn = _aux_tab_score("Render — Interior layout", _td)
+        if not _rn or _rn.get("score", 10) > 7 or _rn.get("status") != "FAIL":
+            print(f"  FAIL render-cap: a 100%-coverage render with an UNVERIFIED-visual advisory must be ≤7/FAIL, not a fake 10 (got {_rn})"); bad += 1
         _COV_CACHE.clear()
     # (5) F1/X2: the on-tab banner must REFLECT the _TAB_SCORES score — it can never read higher than
     # the gate verdict (the Financial fake-8: banner 10 while the gate FAILs at 6). The re-stamp pass
