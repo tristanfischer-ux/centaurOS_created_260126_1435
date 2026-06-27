@@ -227,6 +227,27 @@ tag for every expected part (valves/instruments belong on the P&ID, unlike the G
 re-running the draw_*.py + parts_ledger on a finished state (or a fresh chain). THEN Financial
 capex/payback frame (#57), Risk physics-critic remaining HIGHs. ⚠Audit/⚠Checks rise as rest clear.
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ P&ID/BFD COVERAGE — precise gap diagnosis (offline-iterable; draw_pid.py is bpy-free)
+═══════════════════════════════════════════════════════════════════════════════
+P&ID present 27/44 (61%). draw_pid.py is BPY-FREE + standalone: `python3 scripts/blender-universal/
+draw_pid.py out/<run> out/<run>/state.json` regenerates pid.svg → then parts_ledger.py → re-score.
+So this is OFFLINE-ITERABLE (seconds, no Blender/chain). The 17 missing P&ID parts split into 3 causes:
+  (a) INSTRUMENTS + VALVES (11) — Orp/Chlorine/Tds/Leak sensors, Aquavista/Remote-Monitoring Gateway,
+      Solenoid/Manual-Ball/Check/Pneumatic-Actuated valves + Pneumatic Actuators. These BELONG on the
+      P&ID as tags (unlike the GA). draw_pid must emit an instrument bubble / inline-valve symbol for
+      each (synthesizeInstrumentation exists — check why it isn't covering these; likely not tagging
+      the BoM valves/sensors). BIGGEST chunk.
+  (b) VESSELS missing from the topology SPINE (4) — Total Water Storage, Cip Tank, Cleaning Tank, Uf
+      Membrane Bank (+ Grp Membrane Housings). These are PRINCIPAL process equipment my derive-topology
+      skipped because it only walks `_synthesized` words — these are skeleton/non-synth or named
+      differently. FIX: broaden deriveProcessTopology to also include real principal vessels/separators
+      (by type/name) not just _synthesized, OR ensure they're synthesised. (derive-topology.ts.)
+  (c) MIS-CLASSIFICATION (1) — "HMI Touchscreen" typed `separator` by parts_ledger _classify (an HMI is
+      a control panel, not a separator) → wrongly inflates P&ID-expected. Fix _classify.
+Same pattern for BFD (11/20=55%) + Single-line (7/19=37%, electrical — draw_single_line feeders).
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
