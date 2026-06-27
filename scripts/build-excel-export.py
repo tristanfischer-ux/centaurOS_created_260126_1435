@@ -698,14 +698,33 @@ def _cost_category(name: str, tag: str, etype: str) -> str:
 # the requirement/part text of ANY product class — no per-class hardcoding. Rules are matched in
 # order; first hit wins, so the most specific principal nouns (cells, racks, power conversion)
 # precede the generic connection/enclosure buckets. The catch-all is "Other equipment".
+# Function-based categories that are CORRECT on ANY archetype — NOT BESS-shaped. The old list keyed
+# "module"→'Battery cells & modules' (so an RO/UF MEMBRANE module on a water plant read as a battery)
+# and "pump"→'Thermal management' (so a process PUMP read as cooling). Now a category names the
+# equipment's FUNCTION: a membrane → Filtration, a pump → Rotating equipment, a battery cell → Energy
+# storage, a chiller → Heat transfer. Matched in order, most-specific first; catch-all 'Other equipment'.
 _EQUIP_CAT_RULES = [
-    (r'\bcell\b|\bcells\b|\bmodule\b|\bmodules\b|\bbattery pack\b|\bprismatic\b|\bpouch\b', 'Battery cells & modules'),
-    (r'\brack\b|\bframe\b|\bbusbar\b|\bbus[- ]?bar\b|\bstructure\b|\bchassis\b|\bskid\b|\bplinth\b|\bsupport\b', 'Racks & structure'),
-    (r'\binverter\b|\bpcs\b|\btransformer\b|\bswitchgear\b|\bbreaker\b|\bcontactor\b|\brectifier\b|\bconverter\b|\bmcc\b|\bgenset\b|\bgenerator\b', 'Power conversion & electrical'),
-    (r'\bpump\b|\bchiller\b|\bcooling\b|\bcoolant\b|\bfan\b|\bhvac\b|\bradiator\b|\bcompressor\b|\bcondenser\b|\bevaporator\b|cold[- ]?plate', 'Thermal management'),
-    (r'\bbms\b|\bsensor\b|\bcontroller\b|\bmonitor\b|\bplc\b|\bscada\b|\bhmi\b|\bthermistor\b|\bgauge\b|\bmeter\b|\btransmitter\b|\bprobe\b|\binstrument\b', 'Controls & instrumentation'),
-    (r'\bcable\b|\bcabling\b|\bwire\b|\bwiring\b|\bharness\b|\bloom\b|\bconduit\b|\blug\b|\bterminal\b', 'Cabling & power runs'),
-    (r'\bpipe\b|\bpipework\b|\bvalve\b|\bfitting\b|\bmanifold\b|\bhose\b|\bflange\b', 'Pipework'),
+    # genuine ENERGY STORAGE only (a battery/cell/flywheel) — NOT a bare "module" (membrane/PV module)
+    (r'\bbattery\b|\bbattery pack\b|\bbattery module\b|\bcell\b|\bcells\b|\bprismatic\b|\bpouch\b|\bflywheel\b|\bsupercapacitor\b', 'Energy storage'),
+    # FILTRATION & MEMBRANES (RO/UF/NF/MF, softener, GAC, screens, cartridges, media)
+    (r'\bmembrane\b|\bfilter\b|\bfiltration\b|\bro\b|\buf\b|\bnf\b|\bmf\b|reverse.?osmos|ultrafilt|nanofilt|\bsoftener\b|ion.?exchange|\bresin\b|\bgac\b|\bcartridge\b|\bscreen\b|\bstrainer\b|\bmedia\b', 'Filtration & membranes'),
+    # VESSELS, TANKS & COLUMNS (process containment)
+    (r'\btank\b|\bvessel\b|\bcolumn\b|\bdrum\b|\breactor\b|\bsilo\b|\bclarifier\b|\bdegas|\bdeaerat|\bsump\b|\breservoir\b|\bcistern\b|\bdigester\b|\bcontactor tank\b|\bhopper\b', 'Vessels, tanks & columns'),
+    # HEAT TRANSFER — genuine thermal kit ONLY (NOT a plain pump)
+    (r'heat.?exchanger|\bchiller\b|\bcooler\b|\bcondenser\b|\bevaporator\b|cooling.?tower|radiator|cold[- ]?plate|\bhx\b|\bdry.?cooler\b', 'Heat transfer'),
+    # ROTATING EQUIPMENT (pumps/blowers/compressors/fans/mixers — process movers, not cooling)
+    (r'\bpump\b|\bblower\b|\bcompressor\b|\bfan\b|\bmixer\b|\bagitator\b|\bcentrifuge\b|\bturbine\b', 'Rotating equipment'),
+    # POWER & ELECTRICAL conversion/distribution
+    (r'\binverter\b|\bpcs\b|\btransformer\b|\bswitchgear\b|\bbreaker\b|\bcontactor\b|\brectifier\b|\bconverter\b|\bmcc\b|\bgenset\b|\bgenerator\b|\bups\b|\bats\b|\bvfd\b|\bvsd\b|soft.?start|\bacb\b|incomer', 'Power & electrical'),
+    # CONTROLS & INSTRUMENTATION
+    (r'\bbms\b|\bsensor\b|\bcontroller\b|\bmonitor\b|\bplc\b|\bscada\b|\bhmi\b|\bthermistor\b|\bthermocouple\b|\bgauge\b|\bmeter\b|\btransmitter\b|\bprobe\b|\binstrument\b|analy[sz]er', 'Controls & instrumentation'),
+    # STRUCTURE & SKIDS
+    (r'\brack\b|\bframe\b|\bbusbar\b|\bbus[- ]?bar\b|\bstructure\b|\bchassis\b|\bskid\b|\bplinth\b|\bsupport\b|\bplatform\b|\bpedestal\b|\bgantry\b', 'Structure & skids'),
+    # CABLING & POWER RUNS
+    (r'\bcable\b|\bcabling\b|\bwire\b|\bwiring\b|\bharness\b|\bloom\b|\bconduit\b|\blug\b|\bterminal\b|\bwireway\b', 'Cabling & power runs'),
+    # PIPEWORK & VALVES
+    (r'\bpipe\b|\bpipework\b|\bvalve\b|\bfitting\b|\bmanifold\b|\bhose\b|\bflange\b|\bduct\b', 'Pipework & valves'),
+    # ENCLOSURE
     (r'\bcontainer\b|\benclosure\b|\bdoor\b|\bcabinet\b|\bhousing\b|\bcanopy\b|\bpanel\b', 'Enclosure'),
 ]
 
