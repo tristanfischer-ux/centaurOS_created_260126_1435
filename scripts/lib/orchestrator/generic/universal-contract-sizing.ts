@@ -520,6 +520,19 @@ function isSynthesisable(g: EquipGroup): boolean {
   return false
 }
 
+// A phrase that NAMES a reporting aggregate (a roll-up SUM across real units), never a
+// discrete vessel — `total_water_storage`, `overall_tank_volume`, `combined_buffer`. The
+// engine already treats a `total_*` volume as the per-unit↔aggregate reconciliation anchor
+// (aggregateVolumeForGroup); this marks the same family so it is never ALSO synthesised as
+// its own physical mega-vessel (the physics-critic HIGH: a single 262 m³ "Total Water
+// Storage" tank standing in for the brief's three separate 40 m³ tanks → cross-contamination).
+const AGGREGATE_MARKER_RE = /\b(total|overall|combined|aggregate|grand|whole|sum)\b/i
+function isPureAggregatePhrase(phrase: string): boolean {
+  // Normalise `_` → space first: `\b` does NOT break between word-chars `l` and `_`, so a raw
+  // `total_water_storage` phrase would evade `\btotal\b` without this.
+  return AGGREGATE_MARKER_RE.test(String(phrase ?? '').replace(/_/g, ' '))
+}
+
 // ── cleanup (Round 3): physics-first BoM — drop the skeleton's leftover junk ──
 // Small generic detailed-design filler that is never PRINCIPAL equipment (keeps it
 // out of the GA + the headline cost). Structure/enclosure are NOT here — they're real.
@@ -883,8 +896,26 @@ function synthWord(g: EquipGroup): WordLike & { _synthesized?: boolean } {
 // HERE, once, properly.
 // ──────────────────────────────────────────────────────────────────────────────
 
+// A FIELD INSTRUMENT is a 4-20 mA / loop-powered measurement device (transmitter,
+// transducer, sensor, analyser, flowmeter, gauge, probe, detector) — it draws < 1 W and
+// is a P&ID TAG, never a kW machine. The vocabulary mirrors ga_massing.py's instrument set
+// (the same list that drops these from the 3-D GA scene), so SIGHT (render-side) and SIZING
+// (contract-side) agree on what an instrument is. UNIVERSAL — keyed purely on the instrument
+// noun, no archetype table. (Deliberately excludes 'switch'/'indicator' to avoid catching
+// switchgear / indicator lights, which DO carry a real electrical rating.)
+const FIELD_INSTRUMENT_RE =
+  /\b(transmitters?|transducers?|sensors?|analy[sz]ers?|flow\s?meters?|gauges?|probes?|detectors?|thermocouples?|thermowells?|pyrometers?|manometers?|piezometers?|hygrometers?)\b/i
+function isFieldInstrumentByName(w: WordLike): boolean {
+  return FIELD_INSTRUMENT_RE.test(String(w.name_human ?? ''))
+}
+// True for a word that is a field instrument by EITHER the synthesised `_instrument` flag
+// (synthesizeInstrumentation) OR its NAME (a skeleton / padding instrument word the flag
+// never reaches — e.g. the generic 'Pressure Transducer' the skeleton padded into
+// sensing_instrumentation). The name path is what stops such a word being sized as a 2 kW
+// rotating machine by the contract-quantity fuzzy match (physics-critic HIGH: "pressure
+// transducer rated 2 kW — off by four orders of magnitude").
 function isInstrument(w: WordLike): boolean {
-  return (w as { _instrument?: boolean })._instrument === true
+  return (w as { _instrument?: boolean })._instrument === true || isFieldInstrumentByName(w)
 }
 function anyKey(q: Record<string, number>, re: RegExp): boolean {
   return Object.keys(q).some((k) => re.test(k))
@@ -2989,6 +3020,14 @@ export function applyUniversalContractSizing(
   for (const m of modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
       for (const w of sm.words ?? []) {
+        // A FIELD INSTRUMENT (sensor / transmitter / transducer / analyser / gauge / probe)
+        // must NEVER be sized from a power / throughput group: a fuzzy contract-quantity
+        // match stamps it a rotating-machine box + a kW rating (boxFromRatingKw floored to
+        // 600×510×660 mm + "2 kW" — the physics-critic HIGH "transducer rated 2 kW, off by
+        // four orders of magnitude", and the SAME default box that littered the GA). An
+        // instrument is a 4-20 mA loop tag, not a machine; leave it un-sized here (it is a
+        // P&ID tag downstream). UNIVERSAL — keyed on the instrument noun, any archetype.
+        if (isInstrument(w)) continue
         const wStems = wordStems(w)
         if (wStems.length === 0) continue
         let best: EquipGroup | null = null
@@ -3026,6 +3065,19 @@ export function applyUniversalContractSizing(
     for (const g of groups) {
       if (matched.has(g.phrase)) continue
       if (!isSynthesisable(g)) continue
+      // A `total_*` / overall / combined volume is a REPORTING SUM of the real vessels, not a
+      // physical tank. Synthesising it mints a phantom mega-vessel that double-counts the
+      // constituents and reads as one contaminating store. Suppress it ONLY when the
+      // constituent vessels ARE present as ≥2 other synthesisable, non-aggregate volume groups
+      // (so a lone total_* with no breakdown still makes its vessel). UNIVERSAL — keyed on the
+      // aggregate marker + constituent presence, no class table. (physics-critic Risk-tab fix.)
+      if (isPureAggregatePhrase(g.phrase) && g.volume !== undefined) {
+        const constituents = groups.filter(
+          (o) => o !== g && o.volume !== undefined && o.volume >= 1
+            && !isPureAggregatePhrase(o.phrase) && isSynthesisable(o),
+        )
+        if (constituents.length >= 2) continue
+      }
       const target = pickModule(modules, g.phrase)
       const sm = target?.sub_modules?.[0]
       if (!sm) continue

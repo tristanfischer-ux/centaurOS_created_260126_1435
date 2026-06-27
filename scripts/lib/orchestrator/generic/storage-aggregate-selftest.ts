@@ -1,0 +1,61 @@
+// proveCatch guard for the "a total_* aggregate is never a physical vessel" fix in
+// universal-contract-sizing.ts (Tristan 2026-06-27, physics-critic Risk-tab PHYSICS-FIRST work).
+//
+// THE BUG it catches: the contract carries the brief's SEPARATE storage vessels
+// (fresh_water_tank 40 m³ ×1, drain_water_tank ×2) AND a roll-up total_water_storage_volume_m3.
+// The synthesis minted a vessel for the total TOO — a single 262 m³ "Total Water Storage" tank
+// that double-counts the constituents and reads as one store mixing clean RO water with
+// recirculated drain water (physics-critic HIGH: violates the ebb/flow process topology, makes
+// drain recovery impossible without cross-contamination). The fix suppresses synthesis of a
+// total_* / overall / combined volume WHEN the constituent vessels are present (≥2 synthesisable
+// non-aggregate volume groups). This guard fails the build if the phantom aggregate tank returns,
+// OR if the suppression over-reaches and a LONE total_* (no breakdown) stops making its vessel.
+//
+// Standalone (not a --selftest block inside the big module). Wired into verify-engine-guards.sh.
+
+import { applyUniversalContractSizing } from './universal-contract-sizing'
+
+function names(modules: any): string[] {
+  const out: string[] = []
+  for (const m of modules) for (const sm of m.sub_modules) for (const w of sm.words ?? []) out.push(w.name_human || '')
+  return out
+}
+function emptyModules(): any {
+  return [{ module: 'storage', sub_modules: [{ sub_module: 's', words: [] }] }]
+}
+function contractOf(q: Record<string, number>): any {
+  const quantities: Record<string, { value: number }> = {}
+  for (const [k, v] of Object.entries(q)) quantities[k] = { value: v }
+  return { quantities }
+}
+
+function run() {
+  // CASE 1 (proveCatch): separate tanks + a total roll-up → the separate tanks synthesise,
+  // the total does NOT (it is a reporting sum, not a vessel).
+  const m1 = emptyModules()
+  applyUniversalContractSizing(m1 as never[], contractOf({
+    fresh_water_tank_volume_each_m3: 40, fresh_water_tank_count: 1,
+    drain_water_tank_volume_each_m3: 40, drain_water_tank_count: 2,
+    total_water_storage_volume_m3: 120,
+  }), { explode: false, instrument: false, dedupeAndStrip: false })
+  const n1 = names(m1)
+  const hasFresh = n1.some((x) => /fresh water tank/i.test(x))
+  const hasDrain = n1.some((x) => /drain water tank/i.test(x))
+  const hasTotal = n1.some((x) => /total|overall|combined/i.test(x))
+  if (!hasFresh || !hasDrain) throw new Error(`storage-aggregate: the separate fresh/drain tanks must still synthesise (got ${JSON.stringify(n1)})`)
+  if (hasTotal) throw new Error(`storage-aggregate: a "Total Water Storage" phantom vessel was synthesised — a total_* roll-up must NEVER become a physical tank (got ${JSON.stringify(n1)})`)
+
+  // CASE 2 (counter-case): a LONE total_* with no constituent breakdown MUST still make its
+  // vessel (don't lose the only storage tank).
+  const m2 = emptyModules()
+  applyUniversalContractSizing(m2 as never[], contractOf({
+    total_buffer_tank_volume_m3: 50,
+  }), { explode: false, instrument: false, dedupeAndStrip: false })
+  const n2 = names(m2)
+  if (!n2.some((x) => /buffer/i.test(x))) throw new Error(`storage-aggregate: a lone total_* vessel (no constituents) must still synthesise — the suppression over-reached (got ${JSON.stringify(n2)})`)
+
+  // eslint-disable-next-line no-console
+  console.log('storage-aggregate --selftest OK (separate tanks kept; total roll-up suppressed when constituents present; lone total still synthesised)')
+}
+
+run()

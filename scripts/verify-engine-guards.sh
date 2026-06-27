@@ -51,6 +51,8 @@ run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/dr
 run "ga_massing.py --selftest"                "$PY" scripts/blender-universal/ga_massing.py --selftest
 run "derive-topology.ts --selftest"           npx tsx scripts/lib/orchestrator/generic/derive-topology.ts --selftest
 run "pump-motor --selftest"                   npx tsx scripts/lib/orchestrator/generic/pump-motor-selftest.ts
+run "instrument-sizing --selftest"            npx tsx scripts/lib/orchestrator/generic/instrument-sizing-selftest.ts
+run "storage-aggregate --selftest"            npx tsx scripts/lib/orchestrator/generic/storage-aggregate-selftest.ts
 run "benchmark-expectation.ts --selftest"     npx tsx scripts/lib/benchmark-expectation.ts --selftest
 run "sweet-spot.ts --selftest"                npx tsx scripts/lib/sweet-spot.ts --selftest
 run "design-to-target.ts --selftest"          npx tsx scripts/lib/design-to-target.ts --selftest
