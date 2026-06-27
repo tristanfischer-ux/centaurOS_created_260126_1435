@@ -181,6 +181,35 @@ NEXT: (1) let v16 finish → read tab-scorecard.json: confirm 8 renders + GA + P
 (2) launch v17 (adds motor fix) → re-score. (3) remaining: divergence (render-PNG freeze, if still
 flagged), Financial capex frame (#57), storage 3×40 split, ⚠Checks/⚠Audit (derived — fall as rest clear).
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-27 — 15→25 of 34 sheets ≥8; FIVE universal fixes; render+GA CLEARED)
+═══════════════════════════════════════════════════════════════════════════════
+FIVE universal+guarded fixes this session moved the workbook 15→25 of 34 sheets ≥8:
+  1. Render/GA LITTER — 61ccae24b (ga_massing.py): drop P&ID-detail from 3D scene.
+  2. P&ID/BFD TOPOLOGY — c20ab489a (derive-topology.ts): derive spine when none authored.
+  3. PUMP MOTOR kW — e0ad4f1a9 (universal-contract-sizing): consume contract *_motor_kw.
+  4. Manifest DIVERGENCE — daff359de (manifest_sight): ignore internal _loop sub-dir (false-pos).
+  5. Render/GA EXPECTED — 4de2532ab (parts_ledger): exclude GA-non-massing from render/GA expected.
+RESULT (v16 re-scored): 8 render sheets + GA all 0→9 (litter 0 + divergence PASS + coverage 90%).
+P&ID/BFD 0→6 (topology). Connection-trace cleared. Audit 2→4.
+
+REMAINING 9 sheets <8 (the next layers):
+  • P&ID 6 (27/44=61% cov) + BFD 6 (11/20=55%) — the derived topology spine has the PRINCIPAL
+    equipment but the P&ID must ALSO TAG the valves/instruments (its proper home) to lift coverage
+    ≥80%. Fix = draw_pid.py instrument/valve enrichment (they ARE expected on the P&ID, unlike GA).
+  • Single-line 4 (7/19=37% cov) — electrical drawing under-covers; needs feeders/parts tagged.
+  • BoM 6 + Financial 6 (#57 capex frame) + Risk 6 (motor fix #79 helps — NOT in v16, lands v17).
+  • ⚠ Audit 4 + ⚠ Checks 6 — DERIVED (ship verdict / invariant pass-rate); rise as the rest clear.
+  • HVAC — UNSCORED (no deterministic check; _aux_tab_score returns None → advisory).
+
+JUDGMENT CALL flagged: water_treatment renders use the GENERIC universal Blender fallback (no
+bespoke -9shot template). They now score 9 on the DETERMINISTIC proxy (coverage), but VISUAL "wow"
+(photoreal) needs a bespoke water template — a big build, Tristan's call. See
+[[forgeos_two_render_engines_bespoke_vs_universal]].
+NEXT: v17 (fresh chain, motor fix in BoM/Risk) → re-score. Then P&ID/BFD/Single-line coverage
+(draw_*.py tag enrichment) + Financial capex frame.
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
