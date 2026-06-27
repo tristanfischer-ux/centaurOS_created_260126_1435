@@ -593,6 +593,17 @@ _VALVE_KINDS = [
     # per its own text + o2_dosing_valve_fail_state=1); the FC here is only a default.
     (re.compile(r"solenoid_valve|\bsolenoid\b|sov\b|on.?off_valve|shut.?off_solenoid", re.I),
      "XV", "Solenoid shut-off", "FC"),
+    # Non-return / check valve — a passive one-way device (no fail-action). Was MISSING, so a
+    # "Check Valve" BoM line entered no schedule row and the P&ID/process-schedule coverage dropped.
+    (re.compile(r"check[_ ]?valve|non.?return|\bnrv\b|one.?way.?valve|foot.?valve|clack_valve", re.I),
+     "NV", "Non-return (check)", "—"),
+    # Actuated on/off isolation (pneumatic / electric / motorised actuator) — a powered isolating
+    # valve that is NOT an ESD/solenoid by name. Catches "Pneumatic Actuated Valve", "Automated Ball
+    # Valve", a bare "Pneumatic Actuator". (The XV/ESD + solenoid rules above need an esd/shutdown/
+    # solenoid keyword, so a plainly-"actuated" valve fell through to nothing.)
+    (re.compile(r"pneumatic.{0,14}(?:actuat|valve)|(?:actuat|automat|motor(?:is|iz)ed).{0,14}valve|"
+                r"actuated_valve|automated_ball|\bactuator\b", re.I),
+     "XV", "Actuated isolation", "FC"),
     (re.compile(r"isolation_valve|\bhv\b|hand_valve|ball_valve|gate_valve|manual_valve|"
                 r"isolat.{0,12}valve|valve.{0,12}isolat", re.I),
      "HV", "Manual isolation", "—"),
