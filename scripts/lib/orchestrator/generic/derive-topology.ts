@@ -1,0 +1,154 @@
+// Universal process-topology deriver.
+//
+// WHY (Tristan 2026-06-27, the P&ID/BFD ≥8 work): the P&ID + BFD generators draw
+// the process flow graph from `contract.topology` (an array of TopologyEdge
+// {from_part,to_part,mechanism,...}). ~40 registered archetype builders hand-author
+// that array; a few (water_treatment) — and ANY unseen archetype that comes through
+// the generic emitter — emit none, so the drawings render "No process topology in
+// state — nothing to draw." and score 0. Hand-authoring a per-class topology is the
+// wrong answer (it does nothing for the next unknown class). The universal answer:
+// DERIVE a feed→product process spine from the principal equipment the physics engine
+// already synthesised (universal-contract-sizing), so every class — seen or unseen —
+// gets a drawable graph. Fires ONLY when no hand-authored topology exists, so the
+// classes that author their own edges are untouched.
+//
+// The role-rank table is ported from draw_bfd.py::_ROLE_PATTERNS (the canonical
+// feed(0)→product(9) process spine the BFD itself lays out by), enriched with GENERAL
+// process vocabulary (membrane/RO/UF separation, GAC, softening, brine/reject disposal,
+// distribution pumping) — all class-agnostic, no per-class table. Keying the derived
+// spine off the BFD's own role vocabulary guarantees the topology and the BFD layout
+// agree. Endpoints are snake_case slugs of each item's name_human; the drawings resolve
+// endpoints by fuzzy token-overlap against the part display name (build_universal_scene
+// resolve_endpoint), so a slug == snake_case(name_human) always resolves.
+
+import type { TopologyEdge } from '../../engineering-contract'
+
+type AnyWord = {
+  name_human?: string
+  content_character?: { name_human?: string }
+  _synthesized?: boolean
+}
+type AnyModule = { sub_modules?: Array<{ words?: AnyWord[] }> }
+
+// Equipment that belongs on the SINGLE-LINE (electrical) or as a P&ID instrument/valve
+// TAG — NOT a node on the fluid process spine. Excluded from the derived topology.
+const NON_PROCESS_RE =
+  /\b(generator|ups\b|scada|switchboard|switchgear|incomer|transformer|\bmcc\b|motor[ _-]?control|distribution[ _-]?board|\bpanel\b|\bplc\b|\bhmi\b|circuit[ _-]?breaker|busbar|cabling|earthing|\bvalve\b|transmitter|transducer|\bsensor\b|analy[sz]er|\bgauge\b|\bprobe\b|flow[ _-]?meter|\bdetector\b|\bindicator\b|controller|interface|gateway|monitoring)\b/i
+
+// feed(0) → product(9) spine, ported from draw_bfd.py::_ROLE_PATTERNS + general
+// process-equipment synonyms. Checked IN ORDER — earliest match wins — so a "feed pump"
+// lands at feed(0) before the generic pump→distribution(9) rule.
+const ROLE_PATTERNS: Array<[RegExp, number]> = [
+  [/feed|inlet|supply|make.?up|charge|intake|receiv|raw[ _-]?water/i, 0],
+  [/pre.?heat|preheater|guard.?bed|drier|dryer|conditioning|blend|mixer|saturat|soften|dechlor|antiscal|dosing/i, 1],
+  [/reactor|synthesis|absorber|contactor|carbonat|crystallis|crystalliz|converter|reformer|electrolys|reverse.?osmosis|\bro\b|membrane|\buf\b|ultrafiltrat|nanofiltrat|\bedi\b|deioni/i, 2],
+  [/steam.?generator|waste.?heat|boiler|economiser|economizer|reboiler|quench/i, 3],
+  [/separator|flash|knock.?out|ko.?drum|\bdrum\b|decanter|coalesc|demister|filter|stripper|clarifier|\bgac\b|carbon|degass|sediment|cartridge/i, 4],
+  [/recycle|\breturn\b|tail.?gas|\bloop\b|recompress|recirc/i, 5],
+  [/oxidis|oxidiz|flare|incinerat|\bvent\b|purge|abatement|effluent|disposal|\bwaste\b|\bdrain\b|\bsump\b|reject|concentrate|\bbrine\b|blowdown|backwash/i, 6],
+  [/fractionat|distillat|hydrocrack|hydrotreat|isomeris|isomeriz|refin|upgrad|rectif|\bcolumn\b/i, 7],
+  [/condenser|cooler|chiller|cold.?box|cryo/i, 8],
+  [/storage|\btank\b|\bproduct\b|export|loading|gantry|dispatch|reservoir|bottling|\bpump\b|distribution|irrigation|fertigation|watering|delivery/i, 9],
+]
+
+function roleRank(name: string): number {
+  const blob = name || ''
+  for (const [rx, rank] of ROLE_PATTERNS) if (rx.test(blob)) return rank
+  return 5 // neutral mid-spine when no role keyword is present
+}
+
+export function slugify(name: string): string {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+/**
+ * Derive a feed→product process-flow topology from the synthesised principal
+ * equipment in `modules`. Returns [] when there is no process equipment to chain
+ * (caller keeps any existing/empty topology).
+ */
+export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
+  // Collect distinct principal PROCESS equipment (physics-synthesised, fluid-side).
+  const seen = new Set<string>()
+  const items: Array<{ name: string; slug: string; rank: number }> = []
+  for (const m of modules || []) {
+    for (const sm of m.sub_modules || []) {
+      for (const w of sm.words || []) {
+        if (!w?._synthesized) continue
+        const name = w.name_human || w.content_character?.name_human || ''
+        if (!name) continue
+        if (NON_PROCESS_RE.test(name)) continue // electrical / instrument / valve → not the fluid spine
+        const slug = slugify(name)
+        if (!slug || seen.has(slug)) continue
+        seen.add(slug)
+        items.push({ name, slug, rank: roleRank(name) })
+      }
+    }
+  }
+  if (items.length < 2) return [] // need ≥2 nodes to draw an edge
+
+  // Order along the spine (rank, then name for a stable deterministic tie-break)
+  items.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
+
+  const edges: TopologyEdge[] = []
+  for (let i = 0; i < items.length - 1; i++) {
+    const a = items[i], b = items[i + 1]
+    // thermal mechanism for heat-recovery(3)/cooling(8) endpoints, else fluid.
+    const thermal = a.rank === 3 || a.rank === 8 || b.rank === 8
+    edges.push({
+      from_part: a.slug,
+      to_part: b.slug,
+      mechanism: thermal ? 'thermal' : 'fluid_loop',
+      constraint_kind: thermal ? 'thermal_rejection' : 'flow_capacity',
+    } as TopologyEdge)
+  }
+  return edges
+}
+
+// ── proveCatch selftest ──────────────────────────────────────────────────────
+function _selftest() {
+  const mk = (name: string): AnyWord => ({ name_human: name, _synthesized: true })
+  // a water plant's synthesised equipment (the real Codema set, incl. electrical +
+  // instruments + valves that MUST be excluded from the fluid spine)
+  const modules: AnyModule[] = [{
+    sub_modules: [{
+      words: [
+        mk('Mains Incomer'), mk('Reverse Osmosis Skid'), mk('Ro Membrane'),
+        mk('Gac Filter'), mk('Softener Vessel'), mk('Cloth Filter'),
+        mk('Fresh Water Tank'), mk('Total Water Storage'), mk('Drain Collection Sump'),
+        mk('Irrigation Pump'), mk('Fertigation Dosing Pump'),
+        // these MUST be excluded from the process spine:
+        mk('Standby Diesel Generator'), mk('Main Switchboard'), mk('SCADA / Plant Control System'),
+        mk('Inlet Flow Control Valve'), mk('Level Transmitter'), mk('pH Analyser'),
+        { name_human: 'Skeleton Filler', _synthesized: false }, // non-synth → ignored
+      ],
+    }],
+  }]
+  const topo = deriveProcessTopology(modules)
+  if (topo.length === 0) throw new Error('derive-topology FAILED: empty topology for a water plant with principal equipment')
+  const endpoints = new Set<string>()
+  for (const e of topo) { endpoints.add(e.from_part); endpoints.add(e.to_part) }
+  // electrical / instrument / valve gear must NOT appear as process nodes
+  for (const bad of ['standby_diesel_generator', 'main_switchboard', 'inlet_flow_control_valve', 'level_transmitter', 'ph_analyser', 'scada_plant_control_system']) {
+    if (endpoints.has(bad)) throw new Error(`derive-topology leaked a non-process node onto the fluid spine: ${bad}`)
+  }
+  // the principal process equipment MUST be present
+  for (const need of ['reverse_osmosis_skid', 'gac_filter', 'fresh_water_tank', 'irrigation_pump']) {
+    if (!endpoints.has(need)) throw new Error(`derive-topology missing principal equipment node: ${need}`)
+  }
+  // feed must come before product on the spine (RO/membrane/filter < storage/pump rank)
+  const ranks = topo.map(e => e.from_part)
+  if (!ranks.includes('gac_filter')) throw new Error('derive-topology: separation stage absent from spine')
+  // empty / single-node inputs return []
+  if (deriveProcessTopology([]).length !== 0) throw new Error('derive-topology: empty modules must yield []')
+  if (deriveProcessTopology([{ sub_modules: [{ words: [mk('Lone Tank')] }] }]).length !== 0) throw new Error('derive-topology: single node must yield [] (no edge)')
+  // a class that ALREADY has principal equipment but where all are electrical → [] (no fluid spine invented)
+  const elecOnly = deriveProcessTopology([{ sub_modules: [{ words: [mk('Main Switchboard'), mk('Distribution Transformer'), mk('Standby Diesel Generator')] }] }])
+  if (elecOnly.length !== 0) throw new Error('derive-topology: electrical-only plant must NOT get an invented fluid spine')
+  // eslint-disable-next-line no-console
+  console.log(`derive-topology --selftest OK (${topo.length} edges; ${endpoints.size} process nodes; electrical/instrument/valve excluded)`)
+}
+
+if (process.argv.includes('--selftest')) _selftest()

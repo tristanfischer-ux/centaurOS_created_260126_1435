@@ -6639,6 +6639,32 @@ async function main() {
     logAction({ step: 'principal_equipment_reconcile', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // UNIVERSAL process-topology fallback — the P&ID + BFD draw their flow graph from
+  // contract.topology; ~40 archetype builders hand-author it but a few (water_treatment)
+  // and ANY unseen archetype on the generic path emit none, so those drawings render
+  // empty and score 0. Derive a feed→product spine from the FINAL synthesised principal
+  // equipment (runs here, after reconcile, where modules + state.orchestratorContract are
+  // settled). Fires ONLY when no hand-authored topology exists — the classes that author
+  // their own edges are untouched. Written to state.orchestratorContract.topology (what the
+  // drawings read via the engineeringContract→orchestratorContract fallback).
+  try {
+    const orch: any = state.orchestratorContract
+    const haveOrchTopo = Array.isArray(orch?.topology) && orch.topology.length > 0
+    const haveEngTopo = Array.isArray((engineeringContract as any)?.topology) && (engineeringContract as any).topology.length > 0
+    if (orch && !haveOrchTopo && !haveEngTopo) {
+      const { deriveProcessTopology } = await import('./lib/orchestrator/generic/derive-topology')
+      const derived = deriveProcessTopology((state.moduleDecomposition?.modules ?? []) as any)
+      if (derived.length > 0) {
+        orch.topology = derived
+        console.error(`[chain] derived process topology (no hand-authored edges): ${derived.length} edge(s) across the principal-equipment spine → P&ID + BFD`)
+        logAction({ step: 'derive_process_topology', edges: derived.length, derived: true })
+      }
+    }
+  } catch (err) {
+    console.error(`[chain] topology derivation failed (non-fatal): ${(err as Error).message}`)
+    logAction({ step: 'derive_process_topology', ok: false, error: String(err).slice(0, 200) })
+  }
+
   const statePath = resolve(outDir, 'state.json')
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })
