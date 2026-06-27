@@ -2633,7 +2633,22 @@ export function reconcilePrincipalEquipment(
     const val = v?.value
     if (typeof val === 'number' && Number.isFinite(val)) quantities[k] = val
   }
-  const principalGroups = buildGroups(quantities).filter(isSynthesisable)
+  // A `total_*`/overall/combined volume is a reporting SUM, not a vessel — exclude it from the
+  // principal-equipment set when its constituent vessels are present (≥2 other non-aggregate
+  // volume groups). SAME rule as the generic-emitter synthesis path; applying it HERE is what
+  // removes the phantom "Total Water Storage" 262 m³ mega-tank (the physics-critic HIGH): this
+  // reconcile re-mints principals from the contract LATER in the chain, and because the aggregate
+  // is dropped from `canons`, the reconcile's invented-removal also deletes any pre-existing copy.
+  const allSynth = buildGroups(quantities).filter(isSynthesisable)
+  const principalGroups = allSynth.filter((g) => {
+    if (isPureAggregatePhrase(g.phrase) && g.volume !== undefined) {
+      const constituents = allSynth.filter(
+        (o) => o !== g && o.volume !== undefined && o.volume >= 1 && !isPureAggregatePhrase(o.phrase),
+      )
+      if (constituents.length >= 2) return false
+    }
+    return true
+  })
   res.groups = principalGroups.length
   if (principalGroups.length === 0) return res
 

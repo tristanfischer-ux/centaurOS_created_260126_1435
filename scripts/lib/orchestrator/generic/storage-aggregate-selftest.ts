@@ -13,7 +13,7 @@
 //
 // Standalone (not a --selftest block inside the big module). Wired into verify-engine-guards.sh.
 
-import { applyUniversalContractSizing } from './universal-contract-sizing'
+import { applyUniversalContractSizing, reconcilePrincipalEquipment } from './universal-contract-sizing'
 
 function names(modules: any): string[] {
   const out: string[] = []
@@ -54,8 +54,33 @@ function run() {
   const n2 = names(m2)
   if (!n2.some((x) => /buffer/i.test(x))) throw new Error(`storage-aggregate: a lone total_* vessel (no constituents) must still synthesise — the suppression over-reached (got ${JSON.stringify(n2)})`)
 
+  // CASE 3 (the REAL bug path): reconcilePrincipalEquipment re-mints principals from the contract
+  // LATER in the chain. Even with a pre-existing "Total Water Storage" word in the design, the
+  // reconcile must DROP it (not in `canons`) while keeping the separate tanks.
+  const m3: any = [{
+    module: 'storage', sub_modules: [{ sub_module: 's', words: [
+      { id: 'total_water_storage_synth_word', name_human: 'Total Water Storage', _synthesized: true,
+        content_character: { character_id: 'total_water_storage_synth', name_human: 'Total Water Storage' },
+        modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'capacity', value: '262', unit: 'm³' }] },
+      { id: 'fresh_water_tank_synth_word', name_human: 'Fresh Water Tank', _synthesized: true,
+        content_character: { character_id: 'fresh_water_tank_synth', name_human: 'Fresh Water Tank' },
+        modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'capacity', value: '40', unit: 'm³' }] },
+      { id: 'drain_water_tank_synth_word', name_human: 'Drain Water Tank', _synthesized: true,
+        content_character: { character_id: 'drain_water_tank_synth', name_human: 'Drain Water Tank' },
+        modifier_characters: [{ kind: 'quantity', value: '×2' }, { kind: 'capacity', value: '40', unit: 'm³' }] },
+    ] }],
+  }]
+  reconcilePrincipalEquipment(m3 as never[], contractOf({
+    fresh_water_tank_volume_each_m3: 40, fresh_water_tank_count: 1,
+    drain_water_tank_volume_each_m3: 40, drain_water_tank_count: 2,
+    total_water_storage_volume_m3: 120,
+  }) as never)
+  const n3 = names(m3)
+  if (n3.some((x) => /total|overall|combined/i.test(x))) throw new Error(`storage-aggregate: reconcilePrincipalEquipment did NOT remove the phantom "Total Water Storage" mega-tank (got ${JSON.stringify(n3)})`)
+  if (!n3.some((x) => /fresh water tank/i.test(x)) || !n3.some((x) => /drain water tank/i.test(x))) throw new Error(`storage-aggregate: reconcile dropped a real separate tank (got ${JSON.stringify(n3)})`)
+
   // eslint-disable-next-line no-console
-  console.log('storage-aggregate --selftest OK (separate tanks kept; total roll-up suppressed when constituents present; lone total still synthesised)')
+  console.log('storage-aggregate --selftest OK (separate tanks kept; total roll-up suppressed at synthesis AND removed by the principal reconcile; lone total still synthesised)')
 }
 
 run()
