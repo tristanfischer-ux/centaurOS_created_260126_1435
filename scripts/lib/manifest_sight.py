@@ -131,6 +131,37 @@ def manifest_divergence(run_dir: str) -> dict:
     return {"manifests": len(paths), "diverged": False, "score": 10, "status": "PASS", "detail": ""}
 
 
+# A part whose TYPE is electrical-connection / power / control but whose 3-D SHAPE is a process VESSEL
+# body is a wrong-shape mis-render — the council's typed-shape defect (2026-06-27). The exemplar: a
+# "3 Phase Power Input" rendered as a `horizontal_vessel` (a 2.7 m cylinder = a stray red beam shooting
+# off the platform). Deterministic + universal: no archetype logic, just type-noun vs shape-class.
+import re as _re
+_ELEC_TYPE_RX = _re.compile(
+    r"power\s+(?:input|supply|feed|inlet|connection|distribution|point)|"
+    r"(?:incoming|incomer|main)\s+(?:supply|feed|power)|\bincomer\b|\d\s*[- ]?phase\s+power|"
+    r"three[- ]?phase\s+power|electrical\s+(?:supply|input|feed|connection|intake)|"
+    r"\bbusbar\b|bus[- ]?bar|distribution\s+board|consumer\s+unit|\bisolator\b", _re.I)
+_VESSEL_BODY_SHAPES = {
+    "horizontal_vessel", "vertical_vessel", "tank", "column", "tall_column", "cone_vessel",
+    "drum", "sphere", "skid_box", "stack",
+}
+
+
+def shape_type_mismatches(manifest) -> dict:
+    """Flag every part whose NAME is an electrical-connection/power part but whose SHAPE is a process
+    VESSEL body — a wrong-shape mis-render (the stray-beam class). Returns {count, parts, status}.
+    status FAIL when count>0 (the render cannot be a clean pass with a power feed drawn as a vessel)."""
+    out = []
+    for p in _parts(manifest):
+        if not isinstance(p, dict):
+            continue
+        nm = str(p.get("name") or "")
+        shp = str(p.get("shape") or "")
+        if _ELEC_TYPE_RX.search(nm) and shp in _VESSEL_BODY_SHAPES:
+            out.append({"name": nm, "shape": shp, "fix": "an electrical/power-connection part must be a cabinet/box, not a process vessel"})
+    return {"count": len(out), "parts": out, "status": "FAIL" if out else "PASS"}
+
+
 def litter_from_path(manifest_path: str) -> dict:
     try:
         with open(manifest_path, "r", encoding="utf-8") as fh:
@@ -142,6 +173,17 @@ def litter_from_path(manifest_path: str) -> dict:
 
 def _selftest() -> int:
     bad = 0
+    # proveCatch the WRONG-SHAPE defect (Tristan 2026-06-27): a "3 Phase Power Input" rendered as a
+    # horizontal_vessel (the stray red beam) MUST be flagged; a real vessel / a correctly-shaped
+    # cabinet must NOT be (no false positive).
+    _stm = shape_type_mismatches({"parts": [
+        {"name": "3 Phase Power Input", "shape": "horizontal_vessel"},   # the defect → must flag
+        {"name": "Main Power Supply", "shape": "cabinet"},               # correct electrical shape → clean
+        {"name": "3-Phase Separator", "shape": "horizontal_vessel"},     # a real process vessel → clean
+        {"name": "Reverse Osmosis Skid", "shape": "skid_box"},           # real → clean
+    ]})
+    if _stm["count"] != 1 or _stm["status"] != "FAIL" or _stm["parts"][0]["name"] != "3 Phase Power Input":
+        print(f"  FAIL shape-type: a power input drawn as a horizontal_vessel must be the ONLY flag (got {_stm})"); bad += 1
     # proveCatch: 10 DISTINCT parts the generator gave the SAME default box → litter, FAIL.
     littered = {"parts": [{"name": f"thing_{i}", "dims_mm": {"w": 130, "d": 100, "h": 120}}
                           for i in range(10)]}

@@ -784,6 +784,21 @@ _INSTRUMENT_SHAPE_MODULES = ("sensing_instrumentation", "safety_protection",
                              "control_compute_communication")
 
 
+# Electrical power-connection / distribution parts → an enclosure shape, never a process vessel.
+_ELECTRICAL_CONN_RE = re.compile(
+    r"power\s+(?:input|supply|feed|inlet|connection|distribution|point)|"
+    r"(?:incoming|incomer|main)\s+(?:supply|feed|power|incomer)|\bincomer\b|"
+    r"\d\s*[- ]?phase\s+power|three[- ]?phase\s+power|"
+    r"electrical\s+(?:supply|input|feed|connection|intake|panel|board)|"
+    r"\bbusbar\b|bus[- ]?bar|distribution\s+board|consumer\s+unit|\bisolator\b|"
+    r"power\s+(?:point|socket|outlet)", re.I)
+# A genuine PROCESS-VESSEL noun — if present, the vessel/exchanger rules below should win, so the
+# electrical guard stands down (it only fires for a pure electrical-connection name).
+_PROCESS_VESSEL_NOUN_RE = re.compile(
+    r"separator|\bvessel\b|\btank\b|\bcolumn\b|\bdrum\b|reactor|\bfilter\b|scrubber|absorber|"
+    r"\bexchanger\b|\bdegasser\b|\bstripper\b|\breceiver\b|\bcontactor tank\b", re.I)
+
+
 def classify_shape(name, form, module_id=""):
     # 0. I&C / control / safety parts are small DEVICES — a level switch, an analyser, a
     #    relay — NEVER vessels, even when the name carries a vessel noun ("LOX TANK Level +
@@ -792,6 +807,14 @@ def classify_shape(name, form, module_id=""):
     #    "there is a problem with the dimensions … whether things are cylinders or rectangles").
     if module_id in _INSTRUMENT_SHAPE_MODULES:
         return "instrument"
+    # 0.5 ELECTRICAL / power-connection parts are CABINETS, never process vessels (council typed-shape
+    #     rule, 2026-06-27). WITHOUT this, the horizontal-vessel rule's "3[- ]?phase" token (intended
+    #     for a 3-phase SEPARATOR) HIJACKS "3 Phase Power Input" and renders it as a 2.7 m horizontal
+    #     cylinder — the stray red "beam" that shoots off the platform. A genuine process-vessel noun in
+    #     the name still wins (so a transformer → transformer_box below is unaffected; this guard only
+    #     fires when there is NO vessel noun). UNIVERSAL.
+    if _ELECTRICAL_CONN_RE.search(name) and not _PROCESS_VESSEL_NOUN_RE.search(name):
+        return "cabinet"
     head = _name_head(name)
     # 1. explicit small-device head nouns win (anti-qualifier-hijack)
     for pattern, kind in _DEVICE_HEAD_RE:
