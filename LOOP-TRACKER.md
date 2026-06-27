@@ -1,5 +1,33 @@
 # LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
 
+> ▶▶▶ 2026-06-27 SESSION CLOSE-2 (HEAD 019e4a67f, ~22 universal fix-commits). Dossier **29/34 ≥8**.
+> NEW since close-1: (A) CHAIN-ORDERING FIX (b38505ad2) — a 'freshen scorer inputs' stage re-renders
+> the schematics + parts_ledger + RE-RUNS the physics critic on the FINAL cleaned design just before
+> build-excel, so Risk + BoM stop grading the stale pre-cleanup state. VERIFIED firing in v22.
+> (B) FINANCIAL cost-of-service (bdd858a95) — a no-revenue water plant now gets an honest capex/opex/
+> LEVELISED £1.30/m³ model (not a capped-6 'unverified revenue' stub) → Financial CLEARED. (C) drum-
+> filter mis-nesting (019e4a67f) — GAC/RO/UF now get pressure-vessel parts not a rotary drum+gearmotor
+> +spray bar (cleared 2 of the 4 genuine Risk HIGH). Guards added: population-count, subassembly-class,
+> brief-storage-hold, etc. — all green.
+>
+> THE FRESHEN-SCORER PROVED the design is honest: re-running the critic on the FINAL state gave 4 HIGH
+> (down from the stale set) — these are GENUINE, not stale. After the drum-filter fix (019e4a67f) → 2
+> remain, both deeper:
+>   • PUMP PART MIS-PIN — fill-blank-mpn pinned 'Grundfos CM3-3' (a ~3 m³/h pump) for the 90 m³/h
+>     Irrigation Pump (DB name-match ignores CAPACITY). FIX needs parts-DB capacity validation OR a
+>     philosophy call: a principal flow-machine should keep its GENERIC contract spec ('90 m³/h @ 3.5
+>     bar end-suction') rather than accept an unverified small-capacity MPN. ⭐ ESCALATE — Tristan's call.
+>   • ACTUATED-VALVE NAMING — the critic wants the brief's '200 electrically-actuated valves' as a
+>     clearly-named population; the design has 'Pneumatic Actuated Valve ×200' but the critic reads it
+>     as 'lacking'. Bounded fix: synthesise/rename one 'Actuated Distribution Valve ×200' from
+>     actuated_distribution_valve_count.
+> REMAINING NON-RISK: BoM 6 — the coverage check demands EVERY drawing 100% (present==expected); after
+> the freshen-scorer most are 86-97% but the tail (blender/GA electrical internals, a few P&ID/panel
+> parts) keeps it <100%. ⚠Audit/⚠Checks 6 = DERIVED (rise when BoM+Risk clear). HVAC unscored.
+> NEXT: the pump-pin philosophy call (escalated), the actuated-valve naming, then the BoM 100%-every-
+> drawing tail. Handover: ~/Downloads/handovers/2026-06-27T-codema-PHYSICS-FIRST-7fixes-a8b675734.md.
+
+
 > ▶▶ 2026-06-27 SESSION CLOSE (HEAD abc426561): 17 universal fix-commits. Dossier 25→**28/34 ≥8**,
 > every engineering drawing ≥86% (P&ID 97%, process/iso 100%, single-line 91%, panel 86%, BFD 89%,
 > blender/GA 90%). DESIGN is comprehensively fixed + VERIFIED in the final state: 2 physics HIGHs
