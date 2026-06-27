@@ -830,6 +830,74 @@ def _exec_validation_verdict(state: dict) -> tuple:
     return ("", "")
 
 
+# A FOREIGN served-asset noun: something a process/utility plant SERVES, never PRODUCES (a water plant
+# does not make "cultivation containers"; it makes treated water). A bare "count" headline of one of
+# these is the DEMAND DRIVER, not the plant's deliverable.
+_SERVED_ASSET_RE = re.compile(
+    r"\bcontainer|cultivation|\bplant\b|\bplants\b|\bpot\b|\bpots\b|\btree|\bcrop|seedling|\bbed\b|\bbeds\b|"
+    r"greenhouse|glasshouse|polytunnel|hectare|\bacre|\bhouse|\bhome|\bdwelling|\broom\b", re.I)
+# Names that denote a BOUNDARY OUTPUT / plant DUTY (what the plant delivers OUT, or the brief
+# requirement it is built to meet). Matched against the key with underscores turned to spaces (so
+# 'irrigation_demand' is seen as 'irrigation demand'). Deliberately EXCLUDES the ambiguous "throughput"
+# + "flow" (an internal process-stage rate — cloth_filter_throughput=80 is NOT the deliverable) to
+# avoid the council's "largest-internal-flow" trap.
+_DELIVERABLE_NAME_RE = re.compile(
+    r"\b(demand|duty|capacity|production|deliver\w*|supply|output|yield|export|dispatch|harvest|"
+    r"treated|product|permeate|effluent|distillate)\b", re.I)
+# Internal / utility / waste / storage streams that are NEVER the headline deliverable.
+_INTERNAL_FLOW_RE = re.compile(
+    r"\b(recirc\w*|recycl\w*|backwash|makeup|make.?up|cooling|coolant|internal|loop|cip|cleaning|"
+    r"drain\w*|sump|waste|reject|blowdown|flush|filter|softener|stage|transfer|storage|tank|vessel|"
+    r"skid|nutrient)\b", re.I)
+# A real OUTPUT RATE (per-time / power / energy-rate) — NOT a static volume. A bare 'm³' (a storage
+# volume) must NOT count as a flow; require a time denominator or a power/energy unit.
+_FLOW_UNIT_RE = re.compile(r"/\s*h(r)?\b|/\s*day|/\s*yr|/\s*year|per[_ ]?h|m3[_ ]?h\b|m³/h|\bkw\b|\bmw\b|kwh|mwh|gwh|kg\s*/|t\s*/|tonne\s*/", re.I)
+
+
+def _honest_headline_output(state: dict) -> dict:
+    """Deterministic, UNIVERSAL: return the plant's HONEST headline output. If the engine's headline is
+    a FOREIGN served-asset COUNT (e.g. '6,000 cultivation containers' for a WATER plant — the plant
+    serves them, it does not produce them), replace it with the plant's actual boundary DELIVERABLE
+    (the largest output-named process flow, internal/utility streams excluded), and demote the count to
+    served-context. Council rule (2026-06-27): the deliverable is the boundary-crossing OUTPUT, never a
+    served-asset count, never the largest INTERNAL throughput. Leaves a real product-unit headline
+    (MWh, kg/yr, m³/h) untouched. proveCatch in _selftest."""
+    km = state.get("keyMetrics") or {}
+    ho = dict(km.get("headline_output") or {})
+    unit = str(ho.get("unit", "")).strip().lower()
+    label = str(ho.get("label") or ho.get("id") or "")
+    is_foreign_count = unit in ("count", "each", "units", "unit", "nr", "no", "") and bool(_SERVED_ASSET_RE.search(label))
+    if not is_foreign_count:
+        return ho  # already a genuine product unit — untouched (BESS MWh, VF kg/yr, …)
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    best = None
+    for k, v in q.items():
+        if not isinstance(v, dict):
+            continue
+        val = v.get("value")
+        un = str(v.get("unit") or "")
+        if not isinstance(val, (int, float)) or val <= 0:
+            continue
+        if not _FLOW_UNIT_RE.search(un):
+            continue
+        k_words = k.replace("_", " ")
+        if _INTERNAL_FLOW_RE.search(k_words) or not _DELIVERABLE_NAME_RE.search(k_words):
+            continue
+        if best is None or val > best[1]:
+            best = (k, float(val), un)
+    if best is None:
+        return ho  # cannot derive the deliverable honestly — leave the count; the foreign-unit check flags it
+    k, val, un = best
+    nm = re.sub(r"_(m3|m³|per_hr|per_h|m3_h|kw|kwh|mwh).*$", "", k).replace("_", " ").strip().title()
+    return {
+        "id": "derived_deliverable", "label": f"{nm} delivered",
+        "value": (int(val) if float(val).is_integer() else round(val, 1)), "unit": un,
+        "notes": (f"the plant's boundary deliverable (derived from contract quantity '{k}'); the brief's "
+                  f"'{ho.get('value')} {ho.get('label')}' is the served-asset demand it MEETS — shown as context"),
+        "_served_context": f"{ho.get('value')} {ho.get('label')}",
+    }
+
+
 def _exec_synopsis(state: dict) -> str:
     """A deterministic 1-paragraph synopsis assembled ENTIRELY from state — no LLM prose. Every
     clause is a state value (class, headline output, build cost, benchmark verdict), so the prose
@@ -839,12 +907,14 @@ def _exec_synopsis(state: dict) -> str:
           or (state.get("parsedBrief") or {}).get("product_class"))
     proj = _humanize_class(pc)
     parts = []
-    ho = km.get("headline_output") or {}
+    ho = _honest_headline_output(state)   # honest boundary deliverable, not a foreign served-asset count
     if ho.get("value") not in (None, ""):
         out = f"{ho.get('value')} {ho.get('unit', '')}".strip()
         lbl = str(ho.get("label", "")).strip()
+        _served = ho.get("_served_context")
         parts.append(f"This dossier specifies a {proj} — {out}"
-                     + (f" ({lbl.lower()})" if lbl else "") + ".")
+                     + (f" ({lbl.lower()})" if lbl else "")
+                     + (f", serving {str(_served).lower()}" if _served else "") + ".")
     else:
         parts.append(f"This dossier specifies a {proj}.")
     clabel, cgbp = _headline_build_cost(state)
@@ -925,9 +995,12 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
         row += 1
 
     card("What it is", proj)
-    ho = km.get("headline_output") or {}
+    ho = _honest_headline_output(state)   # the plant's boundary deliverable, not a foreign served-asset count
     if ho.get("value") not in (None, ""):
-        card("Output", f"{ho.get('value')} {ho.get('unit', '')}".strip(), str(ho.get("label", "")))
+        _sub = str(ho.get("label", ""))
+        if ho.get("_served_context"):
+            _sub = (_sub + f" · serves {ho['_served_context']}").strip(" ·")
+        card("Output", f"{ho.get('value')} {ho.get('unit', '')}".strip(), _sub)
     clabel, cgbp = _headline_build_cost(state)
     if cgbp:
         card(clabel, f"£{round(cgbp):,}")
@@ -7602,6 +7675,25 @@ def _selftest() -> int:
         print(f"  FAIL honest-cap: an ESTIMATE tab must cap at 8 (got {_hc['Y']})"); bad += 1
     if _hc["Z"]["score"] != 10:
         print(f"  FAIL honest-cap: a CLEAN tab must stay 10 (got {_hc['Z']})"); bad += 1
+    # proveCatch the honest HEADLINE OUTPUT (Tristan 2026-06-27): a foreign served-asset COUNT
+    # ('6000 cultivation containers' for a water plant) must be replaced by the plant's boundary
+    # DELIVERABLE (an output-named flow, internal/storage excluded), NOT a static volume, NOT an
+    # internal stage, NOT the largest throughput. A real product-unit headline (MWh) is untouched.
+    _wp = {"keyMetrics": {"headline_output": {"label": "Cultivation Containers", "value": 6000, "unit": "count"}},
+           "orchestratorContract": {"quantities": {
+               "irrigation_demand_m3_h": {"value": 90, "unit": "m³/h"},          # the deliverable (90)
+               "cloth_filter_throughput_m3_h": {"value": 80, "unit": "m³/h"},    # internal stage — must NOT win
+               "water_storage_capacity_m3": {"value": 120, "unit": "m³"},        # a VOLUME — must NOT win
+               "ro_permeate_production_m3_per_hr": {"value": 8, "unit": "m3/h"},  # a sub-stream
+           }}}
+    _hh = _honest_headline_output(_wp)
+    if _hh.get("unit", "").lower() not in ("m³/h", "m3/h") or float(_hh.get("value") or 0) != 90:
+        print(f"  FAIL honest-headline: water plant must show the 90 m³/h deliverable, not 6000 count / 80 internal / 120 volume (got {_hh})"); bad += 1
+    if not _hh.get("_served_context"):
+        print("  FAIL honest-headline: the served-asset count must be retained as context"); bad += 1
+    _bess = _honest_headline_output({"keyMetrics": {"headline_output": {"label": "Energy delivered", "value": 3.5, "unit": "MWh"}}})
+    if _bess.get("unit") != "MWh" or _bess.get("value") != 3.5:
+        print(f"  FAIL honest-headline: a real product-unit headline (MWh) must be UNTOUCHED (got {_bess})"); bad += 1
     # (1) _match_quantity must match the ACHIEVED quantity by NAME, NOT the target-closest ECHO.
     qs = {
         "nameplate_capacity_kwh": {"value": 2912, "unit": "kWh"},
