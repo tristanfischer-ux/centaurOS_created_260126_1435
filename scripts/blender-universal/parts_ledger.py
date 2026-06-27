@@ -37,9 +37,13 @@ OUTPUT: <out_dir>/parts-ledger.json + a printed ledger + coverage check-off.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # sibling modules
+import ga_massing  # GA non-massing classifier — keep render/GA EXPECTED consistent with the scene
 
 REPS = ["blender", "general-arrangement", "pid", "single-line-diagram", "panel-schedule",
         "block-flow-diagram", "process-schedules", "isometric-index"]
@@ -461,6 +465,13 @@ def main() -> int:
         sublist = subs.get(tag, [])
         cov = {key: covered(tag, name, key) for key in REPS}
         expected = TYPE_EXPECTED.get(typ, set())
+        # Consistency with the 3D scene: a part the GA/render correctly OMIT — inline valves,
+        # field instruments, switchgear/panel internals, fittings (P&ID-level detail dropped
+        # from the Blender scene by build_universal_scene's ga_massing filter) — must NOT be
+        # EXPECTED in the render or GA either; otherwise its guaranteed-absence deflates
+        # render/GA coverage. It REMAINS expected on the P&ID / schedules (its proper home).
+        if ga_massing.is_ga_non_massing(name):
+            expected = expected - {"blender", "general-arrangement"}
         basis_full = str(r.get("basis", ""))
         eq_tools = _find_tools_for_equipment(tag, name, basis_full)
         equipment.append(dict(
