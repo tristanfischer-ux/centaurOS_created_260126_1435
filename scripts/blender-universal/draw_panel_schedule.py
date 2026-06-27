@@ -1918,8 +1918,54 @@ _ROW_H = 22
 _HEAD_H = 24
 
 
-def build_table_svg(archetype: str, panels: list[Panel], schedule: dict) -> str:
+# Control + cabinet-electrical devices that are CABINET CONTENTS (PLC / SCADA / HMI / UPS /
+# gateway / power-supply / VFD-controller / protection / surge / breaker) — they have NO outgoing
+# feeder of their own (fed from the board's internal control supply), so the outgoing-circuit
+# schedule never lists them, yet a complete panel / MCC submittal ENUMERATES every device in the
+# enclosure. Collect them from the BoM so the schedule documents them (and the deterministic
+# coverage check finds their tag/name). UNIVERSAL — keyed on the control/electrical device noun,
+# excluding process equipment (pump/tank/valve/filter/…) which is documented on the P&ID/GA.
+_AUX_DEVICE_RE = re.compile(
+    r"\b(plc|scada|hmi|touch ?screen|\bups\b|gateway|controller|power supply|\bpsu\b|"
+    r"vfd|variable[- ]speed|soft[- ]start|relay|contactor|surge|\bspd\b|circuit breaker|breaker|"
+    r"control panel|digital control|marshalling|i/?o module|network switch|data logger|telemetry|"
+    r"protection device|standby (?:diesel )?generator|genset)\b", re.I)
+_AUX_EXCLUDE_RE = re.compile(
+    r"\b(pump|tank|valve|filter|membrane|vessel|skid|motor|sensor|transmitter|analy[sz]er|"
+    r"probe|gauge|meter|nozzle|frame|wall|floor|nutrient)\b", re.I)
+
+
+def _collect_aux_devices(state: dict):
+    """Distinct control / cabinet-electrical devices from the BoM (cabinet contents that carry no
+    outgoing circuit). Returns [(tag, name)], deterministic order, de-duplicated by name."""
+    seen: set = set()
+    out: list = []
+    rb = state.get("requirementsBom") if isinstance(state, dict) else None
+    rows = rb if isinstance(rb, list) else []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        nm = str(r.get("name") or r.get("requirement") or "").strip()
+        if not nm:
+            continue
+        base = nm.split(" · ")[0].strip()              # drop a "· 364 m² area" qualifier
+        if base.lower().startswith(("water connection", "electrical connection",
+                                    "signal connection", "air connection")):
+            continue                                    # a routed connection, not a device
+        if not _AUX_DEVICE_RE.search(base) or _AUX_EXCLUDE_RE.search(base):
+            continue
+        key = base.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((str(r.get("tag") or ""), base))
+    return out[:48]
+
+
+def build_table_svg(archetype: str, panels: list[Panel], schedule: dict, state: dict | None = None) -> str:
     # ----- measure height -----
+    aux_devices = _collect_aux_devices(state or {})
+    aux_h = (_HEAD_H + (len(aux_devices) + 1) * _ROW_H + 30) if aux_devices else 0
     y = 92                                      # top banner
     block_heights = []
     for p in panels:
@@ -1930,7 +1976,7 @@ def build_table_svg(archetype: str, panels: list[Panel], schedule: dict) -> str:
         rh = 30                                              # reconciliation line
         block_heights.append((hh, th, rh))
         y += hh + th + rh + 26
-    height = y + 80                              # title block
+    height = y + aux_h + 80                       # + aux device schedule + title block
     width = _TABLE_W + 2 * _MARGIN
 
     svg = SVG(width, height)
@@ -2068,6 +2114,32 @@ def build_table_svg(archetype: str, panels: list[Panel], schedule: dict) -> str:
                      size=9.6, fill=MUTED)
         yy += rh
 
+    # ----- auxiliary & control device schedule (cabinet contents — no outgoing circuit) -----
+    if aux_devices:
+        svg.text(_MARGIN, yy + 14, "AUXILIARY & CONTROL DEVICE SCHEDULE — cabinet contents (fed from the board control supply)",
+                 size=11, weight="bold", fill=BUS_INK)
+        yy += 26
+        svg.rect(_MARGIN, yy, _TABLE_W, _HEAD_H, fill=HEAD_BG, stroke=GRID_FAINT, width=1.0)
+        _acols = [("Tag", 90, "start"), ("Device / description", _TABLE_W - 90 - 150, "start"), ("Enclosure", 150, "start")]
+        cx = _MARGIN
+        for (label, w, align) in _acols:
+            tx, anc = _cell_anchor(cx, w, align)
+            svg.text(tx, yy + 16, label, size=9.3, weight="bold", fill=BUS_INK, anchor=anc)
+            cx += w
+        ry = yy + _HEAD_H
+        for i, (tag, name) in enumerate(aux_devices):
+            if i % 2:
+                svg.rect(_MARGIN, ry, _TABLE_W, _ROW_H, fill=PANEL_BG)
+            vals = [tag or "—", _shorten(name, 70), "Control / power cabinet"]
+            cx = _MARGIN
+            for val, (label, w, align) in zip(vals, _acols):
+                tx, anc = _cell_anchor(cx, w, align)
+                svg.text(tx, ry + 15, val, size=9.2, anchor=anc, fill=INK)
+                cx += w
+            ry += _ROW_H
+        svg.rect(_MARGIN, yy, _TABLE_W, ry - yy, stroke=INK, width=1.3)
+        yy = ry + 8
+
     _draw_title_block(svg, archetype, width, height)
     return svg.render()
 
@@ -2192,7 +2264,7 @@ def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
     # is a valid header-only sheet, matching draw_process_schedules.py which writes its PNG
     # unconditionally. This is what lets the drawing embed in the PDF instead of vanishing
     # to .md only (the 8th drawing was silently dropped for every process plant).
-    svg_text = build_table_svg(archetype, panels, schedule)
+    svg_text = build_table_svg(archetype, panels, schedule, state)
 
     draw_dir = Path(out_dir) / "drawings"
     draw_dir.mkdir(parents=True, exist_ok=True)
