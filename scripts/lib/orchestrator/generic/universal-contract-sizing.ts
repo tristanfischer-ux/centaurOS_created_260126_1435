@@ -44,6 +44,7 @@
 import type { ContractInProgress } from '../types'
 import { mod, type ModifierCharacter } from './emitter-primitives'
 import { mergeMods, type ModuleLike, type WordLike } from './sizing'
+import { contractCountFor } from './derive-skeleton'
 
 // ── measure taxonomy ───────────────────────────────────────────────────────
 type Measure =
@@ -2629,6 +2630,71 @@ export interface PrincipalReconcileResult {
  * flag → byte-untouched). Universal: keyed entirely on the contract's self-describing
  * quantities, no class branch.
  */
+// ── POPULATION-COUNT RE-ASSERT (LLM valve/instrument smear) ───────────────────────────────
+// The LLM Phase-2 commonly stamps a single large contract POPULATION count (e.g.
+// `actuated_distribution_valve_count = 200`) onto EVERY word that merely shares its HEAD NOUN —
+// ~15 valve words each ×200 = 3,000 valves for a 200-valve network (the physics-critic "massive
+// duplication of valve counts" HIGH + a grossly over-counted bill). This pass re-asserts the
+// DETERMINISTIC per-word count (contractCountFor, qualifier-strict) over exactly that smear.
+//
+// PRECISELY TARGETED (false-positive-safe): a word's count is reset ONLY when ALL hold —
+//   (a) the word currently carries a value ≥ POP_MIN that EQUALS some contract `*_count` value, AND
+//   (b) that count key's HEAD NOUN is one of the word's tokens (so the word plausibly grabbed THIS
+//       count by head-noun match — the smear signature), AND
+//   (c) the qualifier-strict contractCountFor gives a DIFFERENT value.
+// → "Solenoid Valves ×200" (head noun valve, fails actuated/distribution qualifiers) drops to 1;
+//   "Pneumatic Actuated Valve ×200" (matches the qualifiers) is UNCHANGED; a "Drip Emitter ×200"
+//   whose count key's head noun isn't "emitter" is never touched; a small per-equipment count
+//   (<POP_MIN) is never touched. UNIVERSAL — token-overlap keyed, no class table. Mutates in place.
+const POP_MIN = 12
+function singulariseTok(t: string): string {
+  return t.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/s$/, '')
+}
+export function reassertPopulationCounts(modules: ModuleLike[], contract: ContractInProgress): number {
+  const quantities: Record<string, number> = {}
+  const q = (contract?.quantities ?? {}) as Record<string, { value?: unknown } | undefined>
+  for (const [k, v] of Object.entries(q)) {
+    const val = v?.value
+    if (typeof val === 'number' && Number.isFinite(val)) quantities[k] = val
+  }
+  // population counts: value → set of HEAD NOUNS of the `*_count` keys carrying that value
+  const popHeadsByValue = new Map<number, Set<string>>()
+  for (const [k, v] of Object.entries(quantities)) {
+    const m = k.match(/^(.+?)_(count|qty|quantity|number)$/i)
+    if (!m || v < POP_MIN) continue
+    const head = singulariseTok(m[1].split('_').pop() ?? '')
+    if (!head) continue
+    const val = Math.round(v)
+    if (!popHeadsByValue.has(val)) popHeadsByValue.set(val, new Set())
+    popHeadsByValue.get(val)!.add(head)
+  }
+  if (popHeadsByValue.size === 0) return 0
+  let fixed = 0
+  for (const mdl of modules ?? []) {
+    for (const sm of mdl.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        const qmod = (w.modifier_characters ?? []).find((mc) => mc.kind === 'quantity')
+        if (!qmod) continue
+        const cur = Math.round(parseFloat(String(qmod.value).replace(/[^0-9.]/g, '')) || 0)
+        if (cur < POP_MIN) continue
+        const heads = popHeadsByValue.get(cur)
+        if (!heads) continue
+        const name = w.name_human ?? w.content_character?.name_human ?? ''
+        const toks = new Set(name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(singulariseTok))
+        // (b) the word must share a HEAD NOUN with a same-valued population count (smear signature)
+        if (![...heads].some((h) => toks.has(h))) continue
+        // (c) the qualifier-strict deterministic count must DISAGREE with the stamped population
+        const cc = contractCountFor(name, contract)
+        if (cc !== cur && cc >= 1) {
+          qmod.value = `×${cc}`
+          fixed += 1
+        }
+      }
+    }
+  }
+  return fixed
+}
+
 export function reconcilePrincipalEquipment(
   modules: ModuleLike[],
   contract: ContractInProgress,

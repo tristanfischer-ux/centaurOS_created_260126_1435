@@ -6601,7 +6601,7 @@ async function main() {
   try {
     const isGeneric = /Generic emitter/i.test(String((state.moduleDecomposition as any)?.rationale_excluded ?? ''))
     if (isGeneric && engineeringContract) {
-      const { reconcilePrincipalEquipment } = await import('./lib/orchestrator/generic/universal-contract-sizing')
+      const { reconcilePrincipalEquipment, reassertPopulationCounts } = await import('./lib/orchestrator/generic/universal-contract-sizing')
       // Pass the contract the RENDERER + GA read (state.orchestratorContract) so the building
       // take-off's re-derived footprint write-back (synthesizeBuildingStructure, run inside the
       // reconcile against the FINAL equipment set) persists where it is consumed; fall back to
@@ -6609,6 +6609,19 @@ async function main() {
       const reconcileContract: any = (state.orchestratorContract && (state.orchestratorContract as any).quantities)
         ? state.orchestratorContract
         : { quantities: engineeringContract.quantities }
+      // Re-assert the deterministic per-word count over any LLM-stamped POPULATION smear (the
+      // ~15 valve words each ×200 = 3,000 valves for a 200-valve network — the physics-critic
+      // "massive duplication of valve counts" HIGH + a grossly over-counted bill). Runs BEFORE the
+      // principal reconcile so downstream BoM/cost/connectivity read the corrected counts.
+      try {
+        const popFixed = reassertPopulationCounts((state.moduleDecomposition?.modules ?? []) as any, reconcileContract)
+        if (popFixed > 0) {
+          console.error(`[chain] population-count re-assert: ${popFixed} word(s) corrected from an LLM population smear (e.g. valve ×200 stamped on every synonym → deterministic per-word count)`)
+          logAction({ step: 'population_count_reassert', words_fixed: popFixed })
+        }
+      } catch (err) {
+        console.error(`[chain] population-count re-assert failed (non-fatal): ${(err as Error).message}`)
+      }
       const rec = reconcilePrincipalEquipment(
         (state.moduleDecomposition?.modules ?? []) as any,
         reconcileContract,
