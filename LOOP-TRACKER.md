@@ -1,5 +1,30 @@
 # LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
 
+> ▶▶ 2026-06-27 SESSION CLOSE (HEAD abc426561): 17 universal fix-commits. Dossier 25→**28/34 ≥8**,
+> every engineering drawing ≥86% (P&ID 97%, process/iso 100%, single-line 91%, panel 86%, BFD 89%,
+> blender/GA 90%). DESIGN is comprehensively fixed + VERIFIED in the final state: 2 physics HIGHs
+> (instrument-2kW + total-water-storage) cleared; valve over-count 3,028→441; duplicate tags + property
+> phantoms eliminated; brief-storage honoured (drain 64.8→40); pump heuristic; single-line/panel/process
+> drawings completed; water cost band fixed. All guarded (verify-engine-guards green).
+>
+> ⭐ DOMINANT REMAINING BLOCKER = STALENESS / STAGE-ORDERING (NOT a design defect — the design is correct):
+> the engine's PHYSICS CRITIC (Stage 7.5), DRAWINGS (generate_drawing_set ~ln 8249) and parts_ledger all
+> run BEFORE the post-Phase-2 deterministic cleanup (reconcile/reassertPopulationCounts/dropAttributePhantom
+> at ~ln 6604) AND before requirementsBom is built (~ln 8418). So the SCORECARD reads a pre-cleanup design:
+>   • RISK 6 — reads a STALE 7-5-physics-critique.json flagging ALREADY-FIXED issues (×200 valves, 64.8 drain,
+>     phantoms). Re-confirmed: v21 final state has valves 441 + drain 40, but the Stage-7.5 critique predates
+>     the fix. FIX = re-run the physics critic AFTER the reconcile block (or move cleanup before 7.5).
+>   • BoM 6 — its check demands EVERY drawing 100% (present==expected); the chain renders the P&ID ancillary
+>     register EMPTY because generate_drawing_set runs before requirementsBom. FIX = build requirementsBom
+>     BEFORE generate_drawing_set, OR re-render drawings after it. The OFFLINE re-score (re-render draw_* +
+>     parts_ledger + build-excel on the FINAL state) already reflects the fixed coverage — that path is canonical.
+> THE FIX for BOTH is one chain-ordering change: run the deterministic cleanup + requirementsBom, THEN the
+> critic + drawings + parts_ledger + build-excel. ~the single highest-leverage remaining move.
+> Other remaining: FINANCIAL 6 (needs a cost-of-service capex/opex/£-per-m³ frame for a no-revenue plant —
+> a build-excel renderer build); ⚠AUDIT/⚠CHECKS 6 (DERIVED — rise when the above clear); HVAC unscored.
+> Handover: ~/Downloads/handovers/2026-06-27T-codema-PHYSICS-FIRST-7fixes-a8b675734.md (update pending).
+
+
 > ▶ 2026-06-27 LATEST (HEAD 0208efbe4): 13 universal fixes this session. Beyond the 9 earlier
 > (2 physics HIGHs, P&ID/BFD topology, single-line REPS, matcher, count-match, pump): +4 attacking
 > the v19 dominant blocker (LLM valve over-decomp + phantoms): (10) reassertPopulationCounts —
