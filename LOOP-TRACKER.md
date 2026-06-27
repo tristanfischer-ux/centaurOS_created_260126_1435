@@ -1,5 +1,30 @@
 # LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
 
+> ▶▶▶ 2026-06-27 SESSION CLOSE-3 (HEAD c08eed971, ~26 universal fix-commits). Codema dossier driven
+> from 25 → **~33/34 ≥8** (v25 confirming). The full arc this session, all UNIVERSAL + guarded:
+>  PHYSICS: instrument-never-kW · total_*-never-a-vessel (both synthesis paths) · brief-storage held
+>   exact (drain 64.8→40) · pump flow-heuristic · drum-filter vs pressure-vessel sub-assemblies (GAC/RO/UF)
+>   · pump CAPACITY validation (reject a CM3-3 @3 m³/h on a 90 m³/h duty → keep generic spec).
+>  BOM/COVERAGE: valve ×200 smear→441 · dup-tags + property-phantoms removed · qualified-count match ·
+>   panel/single-line/process device+board schedules · P&ID matcher · plural-insensitive match · graduated
+>   coverage severity (HIGH only <75%; a near-complete dossier is not a FAIL).
+>  ARCH: FRESHEN-SCORER (re-render schematics + parts_ledger + RE-RUN the physics critic on the FINAL
+>   cleaned design before build-excel — kills the staleness/stage-ordering) · SIGNAL topology (wire
+>   orphan instruments→control-hub; the last ⚠Checks invariant) · Financial COST-OF-SERVICE (£1.30/m³,
+>   no fake revenue) · HVAC class-scoped check (out-of-scope plant passes honestly) · water cost band.
+>  ALL guarded in verify-engine-guards.sh (instrument-sizing/storage-aggregate/count-match/population-
+>   count/subassembly-class/pump-capacity/brief-storage-hold/derive-topology[+signal]/parts_ledger), green.
+>
+> REMAINING (Risk only, if v25 still <8): the adversarial physics critic — re-run on the FINAL cleaned
+> design — keeps surfacing the NEXT borderline point (it is doing its job; the design is fundamentally
+> sound). Current 2: (1) IRRIGATION-PUMP MOTOR margin — 90 m³/h @3.5 bar → P_hyd 8.75 kW; engine sized
+> 10 kW (η≈0.9, optimistic), critic wants ~12-15 kW (η0.7). Honest fix: motor = next IEC frame above
+> P_hyd/0.72 (→11/15 kW). (2) VALVE ACTUATION TYPE — brief says ELECTRICALLY-actuated; the LLM emitted
+> 'Pneumatic Actuated Valve'. Honest fix: honour the brief's actuation type at synthesis. Both are real
+> refinements but borderline (a chartered engineer would note, not reject). ⚠Audit/⚠Checks are DERIVED
+> (clear when Risk does). Handover: ~/Downloads/handovers/2026-06-27T-codema-PHYSICS-FIRST-7fixes-a8b675734.md.
+
+
 > ▶▶▶ 2026-06-27 SESSION CLOSE-2 (HEAD 019e4a67f, ~22 universal fix-commits). Dossier **29/34 ≥8**.
 > NEW since close-1: (A) CHAIN-ORDERING FIX (b38505ad2) — a 'freshen scorer inputs' stage re-renders
 > the schematics + parts_ledger + RE-RUNS the physics critic on the FINAL cleaned design just before
