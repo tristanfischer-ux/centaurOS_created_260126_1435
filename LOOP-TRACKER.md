@@ -1,5 +1,16 @@
 # LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
 
+> ▶▶▶ 2026-06-27 CLOSE-4 (HEAD aeab856f7, 29 fix-commits; v26 = all-fixes run). v25 verified the
+> SIGNAL-topology fired (10 instrument→hub edges) + CLEARED the instrument-association invariant — but
+> it TRADED for a 'ledger referential integrity' FAIL: (a) the edges named SLUGS while the ledger
+> resolves AUTHORED NAMES, and (b) audit_referential_integrity's part set was PLACED-parts-only, and
+> ga_massing keeps an instrument OUT of the 3-D scene so it is never placed. Fixed both (aeab856f7):
+> emit the human name; union all authored word names into the referential set. Plus motor-frame fix
+> (8db5244ef: nextMotorFrameKw → IEC frames, irrigation 9.65→15 kW). LESSON: wiring a logical part
+> (instrument/controller) into the connection graph needs BOTH a name the ledger resolves AND inclusion
+> in the referential part-universe — a placed-parts-only check rejects valid logical ties. v26 should
+> clear ⚠Checks + Connection-trace + Risk(pump) → ⚠Audit (derived) follows.
+>
 > ▶▶▶ 2026-06-27 SESSION CLOSE-3 (HEAD c08eed971, ~26 universal fix-commits). Codema dossier driven
 > from 25 → **~33/34 ≥8** (v25 confirming). The full arc this session, all UNIVERSAL + guarded:
 >  PHYSICS: instrument-never-kW · total_*-never-a-vessel (both synthesis paths) · brief-storage held
