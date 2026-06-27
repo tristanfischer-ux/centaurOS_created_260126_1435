@@ -157,6 +157,30 @@ for a 90 m³/h duty — absurdly undersized part SELECTION (separate from the mo
 90 m³/h @ 3.5 bar duty wants a big end-suction/multistage pump, not a CM-series. Route to the
 pump part-selection rule.
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-27 — THREE universal fixes committed; v16 confirming, motor → v17)
+═══════════════════════════════════════════════════════════════════════════════
+THREE universal+guarded fixes landed this session:
+  1. RENDER/GA LITTER — 61ccae24b (ga_massing.py). VERIFIED real chain v15: 128→54 parts, 0 litter.
+  2. P&ID/BFD TOPOLOGY — c20ab489a (derive-topology.ts). CONFIRMED FIRING in real chain v16 log
+     ("derived process topology" ×1). Derives feed→product spine from synthesised equipment.
+  3. PUMP MOTOR kW — e0ad4f1a9 (universal-contract-sizing motorKwOverride). Offline-verified:
+     irrigation pump 2→10 kW (binds contract 9.653). NOT in v16 (committed after launch) → v17.
+All three have a proveCatch selftest in verify-engine-guards.sh (ga_massing / derive-topology /
+pump-motor). v16 = render+topology clean run (in progress, out/fischer-codema-v16).
+
+OBSERVATIONS from v16 (for later):
+  • BLENDER_UNIVERSAL_FALLBACK: water_treatment has NO bespoke -9shot template → renders use the
+    GENERIC universal scene (dark CAD). Litter fix removes the part-vomit so the DETERMINISTIC
+    render score (coverage+litter+divergence) should clear, but a bespoke water template would be
+    the "wow" visual upgrade (big build — Tristan call). See [[forgeos_two_render_engines_bespoke_vs_universal]].
+  • Skeleton critic (advisory) flagged: "Total Water Storage" 262 m³ aggregate vs brief's 3×40
+    split (storage representation), + the now-fixed pump-motor. Re-check on v17.
+NEXT: (1) let v16 finish → read tab-scorecard.json: confirm 8 renders + GA + P&ID + BFD leave 0.
+(2) launch v17 (adds motor fix) → re-score. (3) remaining: divergence (render-PNG freeze, if still
+flagged), Financial capex frame (#57), storage 3×40 split, ⚠Checks/⚠Audit (derived — fall as rest clear).
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
