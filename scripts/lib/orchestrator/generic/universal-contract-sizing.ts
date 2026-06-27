@@ -689,7 +689,29 @@ const SUB_ASSEMBLY: { re: RegExp; parts: SubSpec[] }[] = [
       { name: 'Discharge Pressure Gauge', derive: () => ({ gbp: 160 }) },
       { name: 'Anti-Vibration Mounts', derive: () => ({ gbp: 220 }) },
     ] },
-  { re: /filter|\bscreen\b|strainer|membrane|skimmer/i,
+  // PRESSURE-VESSEL FILTER (GAC / activated-carbon / sand / multimedia / cartridge / softener /
+  // ion-exchange / RO / UF / NF membrane) — a CLOSED pressure vessel with a media bed OR membrane
+  // elements, NOT a rotary drum/microscreen. MUST be matched BEFORE the drum-filter rule so a 'Gac
+  // Filter' / 'Ro Membrane' never inherits a drum + gearmotor + backwash spray bar + reject trough
+  // (the physics-critic HIGH: "the Gac Filter / RO Membrane sub-module contains rotary drum-filter
+  // components"). Universal — keyed on the media/membrane noun, no class table.
+  { re: /\bgac\b|granular.?activ|activated.?carbon|carbon.?filter|sand.?filter|multi.?media|cartridge|\bmembrane\b|reverse.?osmos|\bro\b|\buf\b|ultrafiltrat|nanofiltrat|\bnf\b|softener|ion.?exchange|\bresin\b|deioni/i,
+    parts: [
+      { name: 'Pressure Vessel Shell', derive: (p) => ({ rating: { v: p.m3h || 15, u: 'm³/h' }, gbp: 3000 + (p.m3h || 15) * 90 }) },
+      { name: 'Filter Media / Membrane Elements', derive: (p) => ({ gbp: 2000 + (p.m3h || 15) * 65 }) },
+      { name: 'Upper Distribution Header', derive: () => ({ gbp: 900 }) },
+      { name: 'Lower Underdrain / Nozzle Plate', derive: () => ({ gbp: 1200 }) },
+      { name: 'Backwash / Service Valve Nest', derive: () => ({ gbp: 2600 }) },
+      { name: 'Differential-Pressure Gauges', derive: () => ({ gbp: 320 }) },
+      { name: 'Air Scour / Vent', derive: () => ({ gbp: 480 }) },
+      { name: 'Sample Cock', derive: () => ({ gbp: 140 }) },
+      { name: 'Skid Frame & Pipework', derive: () => ({ gbp: 1800 }) },
+      { name: 'Nameplate', derive: () => ({ gbp: 60 }) },
+    ] },
+  // ROTARY DRUM / MICROSCREEN / DISC / CLOTH / BAND SCREEN filter — a moving-media screen with a
+  // drum, drive gearmotor, backwash spray bar + reject trough. NARROWED from the old broad
+  // /filter|membrane/ (which swept GAC + RO into here) to the genuine rotary-screen vocabulary.
+  { re: /drum.?filter|micro.?screen|rotary.?(?:drum|screen|disc)|disc.?filter|cloth.?filter|\bscreen\b|band.?screen|travel(?:ling)?.?screen|\bstrainer\b|skimmer/i,
     parts: [
       { name: 'Drum / Element', derive: (p) => ({ rating: { v: p.m3h || 500, u: 'm³/h' }, gbp: 4000 + (p.m3h || 500) * 1.1 }) },
       { name: 'Media / Mesh Panels', derive: (p) => ({ gbp: 1500 + (p.m3h || 500) * 0.4 }) },
