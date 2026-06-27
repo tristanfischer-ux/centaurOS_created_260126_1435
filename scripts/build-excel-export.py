@@ -188,6 +188,7 @@ def _ledger_coverage(run_dir: str) -> dict:
 
 
 _LITTER_CACHE: dict = {}
+_SHAPE_MM_CACHE: dict = {}
 
 
 def _manifest_litter(run_dir: str):
@@ -208,6 +209,23 @@ def _manifest_litter(run_dir: str):
 
 
 _DIV_CACHE: dict = {}
+
+
+def _manifest_shape_mismatch(run_dir: str):
+    """SIGHT: read the DELIVERED parts-manifest and flag electrical parts drawn as process vessels
+    (the stray-beam class). Cached. {count, parts, status} or None."""
+    if run_dir in _SHAPE_MM_CACHE:
+        return _SHAPE_MM_CACHE[run_dir]
+    res = None
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
+        import manifest_sight as _ms
+        with open(os.path.join(run_dir, "parts-manifest.json"), "r", encoding="utf-8") as _fh:
+            res = _ms.shape_type_mismatches(json.load(_fh))
+    except Exception:  # noqa: BLE001
+        res = None
+    _SHAPE_MM_CACHE[run_dir] = res
+    return res
 
 
 def _manifest_div(run_dir: str):
@@ -293,6 +311,18 @@ def _aux_tab_score(title: str, run_dir: str):
             base["status"] = "FAIL"
             base["issues"] = ([f"LAYOUT DIVERGENCE: {div.get('detail', '')}"] + (base.get("issues") or []))[:6]
             base["fix"] = div.get("fix", base.get("fix", ""))
+        # WRONG-SHAPE (council typed-shape gate 2026-06-27): a render/GA with an electrical part drawn
+        # as a process VESSEL (a power feed as a 2.7 m horizontal cylinder = the stray red beam) cannot
+        # be a clean pass. Read the DELIVERED manifest, FAIL on any mismatch. Deterministic; the
+        # source fix (classify_shape) prevents it, this enforces it on the rendered artefact.
+        stm = _manifest_shape_mismatch(run_dir)
+        if isinstance(stm, dict) and stm.get("count"):
+            ex = ", ".join(f"{p['name']}→{p['shape']}" for p in stm.get("parts", [])[:3])
+            base["score"] = min(_cur(base), 4)
+            base["status"] = "FAIL"
+            base["issues"] = ([f"WRONG SHAPE: {stm['count']} electrical part(s) rendered as a process "
+                               f"vessel (the stray-beam defect): {ex}"] + (base.get("issues") or []))[:6]
+            base["fix"] = "classify_shape must map an electrical/power-connection part to a cabinet/box, not a vessel"
         return base
 
     if "general arrangement" in t or t.startswith("ga "):
