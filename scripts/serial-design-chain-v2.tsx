@@ -6685,6 +6685,20 @@ async function main() {
         logAction({ step: 'derive_process_topology', edges: derived.length, derived: true })
       }
     }
+    // SIGNAL topology — wire every field instrument to the control hub. The fluid spine excludes
+    // instruments/controllers, and the Blender signal-wiring only sees 3-D-placed parts (instruments
+    // are dropped from the scene by ga_massing) — so without this the connection-ledger has ZERO
+    // instrument ties and the deterministic 'instruments associated' invariant FAILS (orphan sensors).
+    // Appended on the GENERIC path only (a registered class wires its own); additive to any fluid edges.
+    if (orch && !haveEngTopo) {
+      const { deriveSignalTopology } = await import('./lib/orchestrator/generic/derive-topology')
+      const sigEdges = deriveSignalTopology((state.moduleDecomposition?.modules ?? []) as any)
+      if (sigEdges.length > 0) {
+        orch.topology = [...(Array.isArray(orch.topology) ? orch.topology : []), ...sigEdges]
+        console.error(`[chain] derived SIGNAL topology: ${sigEdges.length} instrument→control-hub signal edge(s) (wires the orphan sensors)`)
+        logAction({ step: 'derive_signal_topology', edges: sigEdges.length })
+      }
+    }
   } catch (err) {
     console.error(`[chain] topology derivation failed (non-fatal): ${(err as Error).message}`)
     logAction({ step: 'derive_process_topology', ok: false, error: String(err).slice(0, 200) })

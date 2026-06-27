@@ -122,6 +122,60 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   return edges
 }
 
+// A FIELD INSTRUMENT word (sensor / transmitter / transducer / analyser / gauge / probe / level /
+// flow / pressure / temperature element) — needs a SIGNAL tie to the control system.
+const INSTRUMENT_RE =
+  /\b(transmitter|transducer|sensor|analy[sz]er|gauge|probe|detector|\borp\b|\bph\b|conductivity|turbidity|silica|chlorine|level|flow ?meter|flowmeter)\b/i
+// The CONTROL HUB nouns — the PLC / SCADA / control-system the instruments report to + the
+// controllers that command actuators. Ranked: a plant control SYSTEM / SCADA / DCS first, then a PLC.
+const CONTROL_HUB_RE = /\b(scada|plant control|control system|\bdcs\b|\bplc\b|control panel|controller)\b/i
+
+/**
+ * Derive SIGNAL topology — every field INSTRUMENT wires to the control hub (a PLC / SCADA / control
+ * system). The fluid topology (above) deliberately EXCLUDES instruments/controllers (they are P&ID
+ * tags / panel contents, not fluid-spine nodes) AND the Blender signal-wiring only sees 3-D-PLACED
+ * parts — but instruments + control gear are dropped from the 3-D scene (ga_massing), so they never
+ * get a signal edge and the connectivity audit reports "0 of N instruments wired" (an orphan-sensor
+ * FAIL). This pass adds the LOGICAL instrument→control-hub signal edges, independent of 3-D placement,
+ * so the connection-ledger + the deterministic instrument-association invariant see a wired plant.
+ * Returns [] when there is no control hub or no instrument. UNIVERSAL — keyed on the instrument +
+ * control-hub vocabulary, no class table.
+ */
+export function deriveSignalTopology(modules: AnyModule[]): TopologyEdge[] {
+  const instruments: string[] = []
+  const hubs: string[] = []
+  const seenI = new Set<string>()
+  const seenH = new Set<string>()
+  for (const m of modules || []) {
+    for (const sm of m.sub_modules || []) {
+      for (const w of sm.words || []) {
+        if (!w || (w as AnyWord)._subcomponent) continue
+        const name = w.name_human || w.content_character?.name_human || ''
+        if (!name) continue
+        if (CONTROL_HUB_RE.test(name)) {
+          const s = slugify(name)
+          if (s && !seenH.has(s)) { seenH.add(s); hubs.push(s) }
+        } else if (INSTRUMENT_RE.test(name)) {
+          const s = slugify(name)
+          if (s && !seenI.has(s)) { seenI.add(s); instruments.push(s) }
+        }
+      }
+    }
+  }
+  if (hubs.length === 0 || instruments.length === 0) return []
+  // Prefer a SCADA / plant-control-system hub if present (it sorts first by name), else the first PLC.
+  const hub = hubs.sort()[0]
+  const edges: TopologyEdge[] = []
+  for (const inst of instruments) {
+    if (inst === hub) continue
+    edges.push({
+      from_part: inst, to_part: hub, mechanism: 'signal',
+      constraint_kind: 'signal', material_context: 'instrument signal cable 4-20mA',
+    } as TopologyEdge)
+  }
+  return edges
+}
+
 // ── proveCatch selftest ──────────────────────────────────────────────────────
 function _selftest() {
   const mk = (name: string): AnyWord => ({ name_human: name, _synthesized: true })
@@ -171,8 +225,23 @@ function _selftest() {
   // a class that ALREADY has principal equipment but where all are electrical → [] (no fluid spine invented)
   const elecOnly = deriveProcessTopology([{ sub_modules: [{ words: [mk('Main Switchboard'), mk('Distribution Transformer'), mk('Standby Diesel Generator')] }] }])
   if (elecOnly.length !== 0) throw new Error('derive-topology: electrical-only plant must NOT get an invented fluid spine')
+  // SIGNAL topology: every instrument wires to the control hub (orphan-sensor fix).
+  const sig = deriveSignalTopology([{ sub_modules: [{ words: [
+    mk('Level Transmitter'), mk('pH Analyser'), mk('Pressure Transducer'),
+    mk('SCADA / Plant Control System'), mk('PLC Controller'),
+    mk('Reverse Osmosis Skid'), // a process vessel — NOT an instrument, must not get a signal edge
+  ] }] }])
+  if (sig.length < 3) throw new Error(`derive-topology SIGNAL: the 3 instruments must each get a signal edge to the hub (got ${sig.length})`)
+  for (const e of sig) {
+    if (e.mechanism !== 'signal') throw new Error('derive-topology SIGNAL: edges must carry mechanism "signal"')
+    if (e.from_part === 'reverse_osmosis_skid') throw new Error('derive-topology SIGNAL: a process vessel must NOT get a signal edge')
+  }
+  const sigHubs = new Set(sig.map(e => e.to_part))
+  if (sigHubs.size !== 1) throw new Error(`derive-topology SIGNAL: all instruments must wire to ONE control hub (got ${[...sigHubs].join(',')})`)
+  // no control hub OR no instrument → []
+  if (deriveSignalTopology([{ sub_modules: [{ words: [mk('Fresh Water Tank'), mk('Irrigation Pump')] }] }]).length !== 0) throw new Error('derive-topology SIGNAL: no instrument/hub must yield []')
   // eslint-disable-next-line no-console
-  console.log(`derive-topology --selftest OK (${topo.length} edges; ${endpoints.size} process nodes; electrical/instrument/valve excluded)`)
+  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine)`)
 }
 
 if (process.argv.includes('--selftest')) _selftest()
