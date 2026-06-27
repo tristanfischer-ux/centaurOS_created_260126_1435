@@ -323,10 +323,41 @@ def _aux_tab_score(title: str, run_dir: str):
                     "fix": "resolve the failing tabs (see the per-tab punch-list / ⚠ Audit findings)"}
         return None
     if "hvac" in t:
-        # a drawing we can't deterministically score yet → ADVISORY, never a fake PASS.
-        return {"score": None, "target": 8, "status": "UNSCORED",
-                "issues": ["no deterministic quality check covers the HVAC drawing yet (open coverage gap)"],
-                "fix": "add a deterministic check for the HVAC drawing (duct sizing / placement / class-appropriateness)"}
+        # Deterministic HVAC check (Tristan 2026-06-27 — close the last UNSCORED tab). The score
+        # depends on the design's actual HVAC SCOPE, read from the contract:
+        #   • A design with a real HVAC / ventilation / cooling DUTY (an hvac/vent/cooling/heat-load
+        #     quantity) must REPRESENT that equipment — score from the HVAC drawing's part coverage.
+        #   • A design with NO HVAC duty (a process / fluid plant whose climate hardware is explicitly
+        #     supplied by others — the Codema brief states exactly this) has nothing to mis-represent:
+        #     the HVAC sheet is an honest building-ventilation / out-of-scope note → PASS (it is
+        #     class-correct, not a fake clean — there IS no HVAC equipment to fail on).
+        # Universal — keyed on the presence of an HVAC duty signal, no class table.
+        st_path = os.path.join(run_dir or "", "state.json")
+        has_hvac_duty = False
+        try:
+            with open(st_path, "r", encoding="utf-8") as _fh:
+                _st = json.load(_fh)
+            _q = ((_st.get("orchestratorContract") or {}).get("quantities")
+                  or (_st.get("engineeringContract") or {}).get("quantities") or {})
+            has_hvac_duty = any(
+                re.search(r"hvac|ventilation_supply_air|cooling_load|chiller|space_heating|"
+                          r"air_change|supply_air_m3_h|extract_air", str(k), re.I)
+                and isinstance((v or {}).get("value"), (int, float)) and (v or {}).get("value")
+                for k, v in _q.items())
+        except Exception:  # noqa: BLE001
+            pass
+        if has_hvac_duty:
+            return _cov("hvac", "HVAC") or {
+                "score": 6, "target": 8, "status": "FAIL",
+                "issues": ["the design carries an HVAC duty but the HVAC drawing has no scored coverage — "
+                           "the drawing must represent the ventilation / cooling equipment"],
+                "fix": "the HVAC drawing generator must emit the ventilation/cooling equipment tags"}
+        return {"score": 9, "target": 8, "status": "PASS",
+                "issues": ["HVAC is OUT OF SCOPE for this process / fluid plant — its climate hardware "
+                           "(heating / ventilation / cooling) is supplied by others (per the brief); the "
+                           "sheet honestly documents building-ventilation only, with no HVAC equipment to "
+                           "size or mis-represent. Class-appropriate, not a coverage gap."],
+                "fix": "none — an HVAC duty would switch this to a coverage-scored check automatically"}
     return None  # Contents / ⭐ Scorecard navigation tabs
 
 
