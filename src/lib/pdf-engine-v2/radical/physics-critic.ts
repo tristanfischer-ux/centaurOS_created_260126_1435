@@ -57,18 +57,18 @@ export interface CritiqueReport {
 // internal reasoning and returns empty content (verified A/B in ab-tests/).
 const FLASH_LITE_MODEL = 'google/gemini-3.5-flash'
 
-// Char cap on the design JSON fed to the critic. Raised 80K→200K (2026-06-06):
-// the universal process-instrumentation module (M8, ~18 words with full
-// modifiers) pushed process-plant designs past 80K, which truncated the LAST
-// module in the critic's input — so the critic false-flagged "design JSON
-// truncated abruptly" as an internal_coherence HIGH and tanked the score
-// (e_fuel v16: internal_coherence 5, when the actual state.json was valid and
-// the last instrument word intact). Gemini 3.5 Flash takes ~50K-token
-// (~200K-char) inputs comfortably (1M context); the output max_tokens (16K) is
-// a separate budget. The critic MUST see the whole design or its verdict is
-// meaningless. If a design ever exceeds this, trim compactDesign() rather than
-// silently clipping the tail.
-const DESIGN_JSON_CHAR_CAP = 200_000
+// Char cap on the design JSON fed to the critic. Raised 80K→200K (2026-06-06), then 200K→1.2M
+// (2026-06-27): a fully-instrumented process plant (Codema water_treatment, ~400 words: instruments +
+// 200-valve populations + per-word modifiers + synthesised sub-components) serialises to ~608K chars,
+// 3× the old 200K cap — so the critic saw only the FIRST THIRD, truncated mid-word, and false-flagged
+// BOTH "design JSON truncated" AND a CASCADE of "X is missing from the BoM" HIGHs (e.g. "the three
+// 40 m³ storage tanks are missing — 107 m³ deficit", when the tanks were present in the unseen tail).
+// Two coupled failures from one clip: the truncation artifact itself + every downstream "missing"
+// false-positive. The model (1M-token context) takes ~600K chars (~150K tokens) comfortably; output
+// max_tokens (16K) is a separate budget. The critic MUST see the WHOLE design or its verdict is
+// meaningless — so the cap now sits above any real design size. (If a design ever exceeds even this,
+// trim via a compactDesign() that drops WHOLE low-value words, never clips mid-structure.)
+const DESIGN_JSON_CHAR_CAP = 1_200_000
 
 function compactDesign(modules: any[], brief: any, keyMetrics: any, partSummary: any, decisions: any[], contractTradeOffs: any): any {
   const compactModules = (modules || []).map((m: any) => ({

@@ -726,12 +726,39 @@ def check_drawing_coverage(state, rows, run_dir) -> list:
 # Check 6 — Physics critic (Risk & Regulatory)
 # --------------------------------------------------------------------------- #
 
+# A physics-critic HIGH is a DESIGN defect only when it concerns the DESIGN — not when it is an
+# artifact of the critic's own LLM input/output (a TRUNCATED JSON payload, a parse error) or a vague
+# advisory hedge with no concrete failure ("perform a detailed analysis", "should be verified"). These
+# are exactly the findings gate 33 (issueIsBlocking, physics-critic-enforcement.ts) already SKIPS as
+# non-design false-positives. Counting them as Risk-tab defects is a FALSE FAIL (penalising a correct
+# design for an LLM payload artifact) — as dishonest as a false PASS. So the Risk tab counts only the
+# findings that name the DESIGN's problem, matching the gate-33 contract. (Tristan 2026-06-27.)
+_PHYS_FP_PAYLOAD = re.compile(
+    r"(truncat|json\s+payload|payload\s+is\s+physically|json\s+is\s+(?:incomplete|malformed|cut)|"
+    r"parse\s+error|unparse|malformed\s+json|cut\s+off\s+(?:mid|at)|incomplete\s+json|"
+    r"json\s+is\s+truncat|design\s+json\s+is)", re.I)
+_PHYS_FP_VAGUE = re.compile(
+    r"\b(perform\s+a\s+detailed|should\s+be\s+verified|recommend\s+verifying|consider\s+reviewing|"
+    r"further\s+analysis\s+(?:is\s+)?(?:recommended|required|needed)|a\s+detailed\s+(?:load|thermal|"
+    r"structural)\s+analysis)\b", re.I)
+
+
+def _physics_high_is_design_defect(issue: dict) -> bool:
+    txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}"
+    if _PHYS_FP_PAYLOAD.search(txt):
+        return False  # the critic's INPUT was truncated — an engine I/O artifact, not a design defect
+    if _PHYS_FP_VAGUE.search(txt) and not re.search(r"/words?[\[/]|\bsub_modules?\b", txt):
+        return False  # a holistic advisory with no NAMED part — gate-33 false-positive discipline
+    return True
+
+
 def check_physics_critic(state, rows, run_dir) -> list:
     tab = "Risk & Regulatory"
     out: list = []
     highs = [
         i for i in _physics_issues(state)
         if isinstance(i, dict) and str(i.get("severity", "")).lower() == "high"
+        and _physics_high_is_design_defect(i)
     ]
     if highs:
         titles = []
