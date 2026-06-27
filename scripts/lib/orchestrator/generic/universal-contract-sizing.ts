@@ -600,10 +600,28 @@ const R2 = (n: number) => Math.round(n)
 // tool's true P=ρgQH/η) is UNCHANGED — this only governs a pump the contract never head-sized.
 const FLOW_PUMP_DEFAULT_BAR = 2.5
 const FLOW_PUMP_EFF = 0.62
+// Standard IEC three-phase motor frames (kW). You cannot buy a "9.653 kW" motor — a real motor is
+// SELECTED at the next standard frame ABOVE the required power with a service margin. Rounding the
+// derived shaft power up to the next frame (×1.15 service factor) gives the honest NAMEPLATE rating
+// the physics critic checks against (90 m³/h @ 3.5 bar → ~8.75 kW hydraulic / ~12 kW shaft @ η0.72 →
+// 15 kW frame) instead of a bare hydraulic number that reads as undersized. UNIVERSAL — any motor.
+const IEC_MOTOR_FRAMES_KW = [
+  0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200,
+  250, 315, 355, 400, 450, 500, 560, 630, 710, 800, 900, 1000,
+]
+const MOTOR_SERVICE_FACTOR = 1.15
+function nextMotorFrameKw(kw: number): number {
+  if (!(kw > 0)) return kw
+  const need = kw * MOTOR_SERVICE_FACTOR
+  for (const f of IEC_MOTOR_FRAMES_KW) if (f >= need - 1e-9) return f
+  return Math.ceil(need)
+}
 const motorKw = (p: ParentPhysics) =>
-  (p.motorKwOverride && p.motorKwOverride > 0)
-    ? p.motorKwOverride
-    : Math.max(1.5, (p.kw / 0.88) || (p.m3h ? (p.m3h * FLOW_PUMP_DEFAULT_BAR) / (36 * FLOW_PUMP_EFF) : 30 / 0.88))
+  nextMotorFrameKw(
+    (p.motorKwOverride && p.motorKwOverride > 0)
+      ? p.motorKwOverride
+      : Math.max(1.5, (p.kw / 0.88) || (p.m3h ? (p.m3h * FLOW_PUMP_DEFAULT_BAR) / (36 * FLOW_PUMP_EFF) : 30 / 0.88)),
+  )
 
 // Read a pump/rotating parent's already-computed motor/drive power (kW) from the contract
 // quantities by stem (e.g. parent 'Irrigation Pump' → irrigation_pump_motor_kw=9.653). The
