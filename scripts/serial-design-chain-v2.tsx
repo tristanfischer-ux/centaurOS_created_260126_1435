@@ -8678,6 +8678,57 @@ async function main() {
     logAction({ step: 'provenance', ok: false, error: String(perr).slice(0, 120) })
   }
 
+  // ── FRESHEN SCORER INPUTS — fix the staleness / stage-ordering (Tristan 2026-06-27) ─────────
+  //    The physics critic (Stage 7.5), the schematic drawings + parts_ledger ALL ran BEFORE the
+  //    post-Phase-2 deterministic cleanup (reconcile / reassertPopulationCounts / dropAttributePhantom
+  //    ~ln 6604) AND before requirementsBom was assembled (above) — so the scorecard would grade a
+  //    PRE-CLEANUP design: a stale ×200 valve duplication the cleanup already collapsed (3,028→441),
+  //    an EMPTY P&ID ancillary register (the drawings rendered before the BoM existed), and storage
+  //    tanks the cleanup since placed/sized. Re-run the bpy-free schematics + parts_ledger + the
+  //    physics critic ON THE FINAL STATE so the dossier's Risk + BoM tabs reflect what actually ships.
+  //    The heavy Blender renders are NOT re-run (they don't read the BoM). UNIVERSAL; non-fatal.
+  try {
+    const _py = existsSync(resolve(__dirname, '..', '.venv', 'bin', 'python'))
+      ? resolve(__dirname, '..', '.venv', 'bin', 'python') : 'python3'
+    for (const _d of ['draw_pid', 'draw_bfd', 'draw_single_line', 'draw_panel_schedule', 'draw_process_schedules']) {
+      try { execFileSync(_py, [resolve(__dirname, 'blender-universal', `${_d}.py`), outDir, statePath], { stdio: 'ignore', timeout: 120_000 }) } catch { /* a schematic that can't render just omits its page */ }
+    }
+    try { execFileSync(_py, [resolve(__dirname, 'blender-universal', 'parts_ledger.py'), outDir, statePath], { stdio: 'ignore', timeout: 120_000 }) } catch { /* coverage best-effort */ }
+    console.error('[chain] freshen-scorer-inputs: re-rendered schematics + parts_ledger on the FINAL state (post-cleanup, post-BoM)')
+    logAction({ step: 'freshen_scorer_inputs', ok: true })
+  } catch (frErr) {
+    logAction({ step: 'freshen_scorer_inputs', ok: false, error: String(frErr).slice(0, 160) })
+  }
+  // RE-RUN the physics critic on the FINAL cleaned design so the Risk tab is HONEST (reflects the
+  // shipped state, not the Stage-7.5 pre-cleanup critique). Overwrites 7-5-physics-critique.json
+  // (what dossier_audit reads for the Risk tab). The mid-chain gate-33 / autocorrect already ran on
+  // the original critique — this only refreshes the END scorecard. Non-fatal; skipped without a key.
+  try {
+    if (apiKey) {
+      const _fs = JSON.parse(readFileSync(statePath, 'utf8'))
+      const _mods = _fs?.moduleDecomposition?.modules ?? []
+      if (Array.isArray(_mods) && _mods.length > 0) {
+        const _fresh = await runPhysicsCritic({
+          modules: _mods,
+          brief: parsedResult.data,
+          keyMetrics,
+          productClass,
+          apiKey,
+          contractTradeOffs: buildContractTradeOffs(engineeringContract),
+        })
+        if (_fresh) {
+          writeFileSync(resolve(outDir, '7-5-physics-critique.json'), JSON.stringify(_fresh, null, 2))
+          const _high = _fresh.issues.filter(i => i.severity === 'high').length
+          console.error(`[chain] physics-critic RE-RUN on the final cleaned design → ${_high} HIGH (Risk now reflects the shipped state)`)
+          logAction({ step: 'physics_critic_rerun', ok: true, high: _high })
+        }
+      }
+    }
+  } catch (pcErr) {
+    console.error(`[chain] physics-critic re-run failed (non-fatal): ${(pcErr as Error).message.slice(0, 140)}`)
+    logAction({ step: 'physics_critic_rerun', ok: false, error: String(pcErr).slice(0, 160) })
+  }
+
   // ── EXCEL DELIVERABLE (Tristan standing constraint: "the Excel dossier.xlsx is the
   //    review surface; NO PDFs; open the new Excel"). Build dossier.xlsx from the settled
   //    state (BoM reconciled above), copy a timestamped snapshot to ~/Downloads, and OPEN
