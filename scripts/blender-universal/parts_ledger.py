@@ -450,7 +450,12 @@ def main() -> int:
         if not txt:
             return False
         nm = (name or "").strip()
-        name_present = bool(nm and len(nm) >= 4 and nm.lower() in txt.lower())
+        # PLURAL-INSENSITIVE name match: a 'Circuit Breakers' BoM line IS represented by a 'Circuit
+        # Breaker' on the drawing (and vice-versa) — a trailing-s on either side must not break the
+        # substring credit. Singularise each word (strip a word-final 's') on BOTH the name and the
+        # drawing text before comparing. Universal; corrects a coverage false-negative, not a relax.
+        _sing = lambda s: re.sub(r"s\b", "", s.lower())  # noqa: E731
+        name_present = bool(nm and len(nm) >= 4 and (nm.lower() in txt.lower() or _sing(nm) in _sing(txt)))
         if tag and (f" {tag} " in txt or f">{tag}<" in txt):
             # Tag is present in the drawing. If the tag is UNAMBIGUOUS (unique
             # identity — one equipment per tag), credit on tag alone. If the tag
