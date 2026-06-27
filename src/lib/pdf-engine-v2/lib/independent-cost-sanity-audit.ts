@@ -210,6 +210,18 @@ export const CLASS_OUTPUT_BANDS: Record<string, IndustryCostBand & { aliases?: s
     aliases: ['power_to_liquid', 'fischer_tropsch', 'ptl', 'saf', 'e_kerosene'],
     notes: 'FOAK e-SAF capex per t/yr SAF capacity; design-council est Gemini £18k/Grok £38k/MiMo £40-80k',
   },
+  water_treatment: {
+    family: 'throughput', low: 0.3, high: 40, per_unit_label: '£/(m³·yr)',
+    aliases: ['water_treatment', 'water_purification', 'fertigation', 'desalination',
+              'reverse_osmosis_plant', 'process_water', 'irrigation', 'ebb_flow', 'water_handling'],
+    notes: 'Water-handling / purification / fertigation plant, CAPEX per m³ of ANNUAL throughput capacity ' +
+      '(VOLUME output → £/(m³·yr), NOT the mass/CO₂ £/(t·yr) scale). Municipal/industrial water-treatment ' +
+      'capex is ~£0.5-15 per m³/yr of capacity depending on treatment intensity (RO + softening + ' +
+      'fertigation higher than plain filtration); the wide £0.3-40 band catches an order-of-magnitude ' +
+      'volume-vs-mass unit confusion. Codema Fischer Farms: ~£687k / 360,000 m³/yr ≈ £1.9/(m³·yr) sits ' +
+      'comfortably IN band — the prior HIGH was the generic throughput band mis-keyed to the £1,500-10,000 ' +
+      'CO₂ £/(t·yr) scale (a 786× false alarm). Moderate confidence.',
+  },
   aquaculture_ras: {
     family: 'throughput', low: 10_000, high: 55_000, per_unit_label: '£/(t·yr)',
     aliases: ['ras', 'recirculating_aquaculture', 'recirculating_aquaculture_system',
